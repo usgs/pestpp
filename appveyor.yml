@@ -1,0 +1,61 @@
+environment:
+  
+  matrix:
+    - PYTHON_VERSION: "3.6"
+      CONDA_INSTALL_LOCN: "C:\\Miniconda36-x64"
+
+platform:
+    - x64
+clone_depth: 1
+shallow_clone: true
+
+# Do not build on tags (GitHub and BitBucket)
+skip_tags: false
+
+# Start builds on tags only (GitHub and BitBucket)
+skip_non_tags: false
+
+cache:
+  - '%LOCALAPPDATA%\pip\Cache'
+  - '%USERPROFILE%\.cache\pyemu'
+
+init:
+  - echo %PYTHON_VERSION% %CONDA_INSTALL_LOCN%
+
+install:
+  - set PATH=%CONDA_INSTALL_LOCN%;%CONDA_INSTALL_LOCN%\scripts;%PATH%;
+  - set PYTHONUNBUFFERED=1
+  # for msinttypes and newer stuff
+  - conda config --set always_yes true
+  - conda update conda
+  - conda update --all
+  - conda config --set show_channel_urls yes
+  - conda config --prepend channels conda-forge
+  - conda info -a
+
+  - conda install --yes python=%PYTHON_VERSION% pip numpy scipy pandas nose matplotlib
+  - pip install coveralls
+  - pip install pyshp
+  - pip install nose-timer
+  - pip install git+https://github.com/modflowpy/flopy.git@develop
+  - pip install git+https://github.com/jtwhite79/pyemu.git@develop
+  # Show the installed packages + versions
+  - conda list
+  - #git clone -b master --depth 1 https://github.com/jtwhite79/pestpp-opt_benchmarks
+  - #git clone -b master --depth 1 https://github.com/jtwhite79/pestpp-ies_benchmarks
+
+build: false
+
+test_script:
+  - #cd benchmarks
+  - set PATH=%PATH%;..\..\..\test_bin\win;..\..\test_bin\win;
+  - nosetests -v -w ./benchmarks basic_tests.py
+  - set USE_INTEL="YES";
+  - nosetests -v -w ./benchmarks basic_tests.py
+  - #nosetests -v -w ./pestpp-ies_benchmarks ies_test.py
+  - #nosetests -v -w ./pestpp-opt_benchmarks opt_test.py
+
+after_test:
+ - echo done
+matrix:
+  fast_finish: true
