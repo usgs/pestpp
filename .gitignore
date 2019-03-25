@@ -1,0 +1,63 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+*.mod
+
+# Compiled Dynamic libraries
+*.so
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+/src/programs/gsa/gsa
+/src/programs/pest++/pestpp
+/src/programs/pestpp-ies/pestpp-ies
+/src/programs/pestpp-opt/pestpp-opt
+/src/programs/pestpp-pso/psopp
+/src/utilities/ascii2pbin/ascii2pbin
+/src/utilities/pbin2ascii/pbin2ascii
+/src/utilities/pbin_dump/pbin_dump
+/src/utilities/sweep/sweep
+
+# User files
+/src/local.mak
+
+# Makefile object
+/src/libs/build-stamp
+
+/morris_meth/ipch
+/morris_meth/Debug
+/pest++/ipch
+/pest++/pest++/Debug
+/pest++/pest++/Release
+/pest++/x64
+/pest_routines/pest_routines/Debug
+/pest++/Debug
+/genie/Debug
+/genie/Release
+/pest++/Release
+/propack/propack/Debug
+Debug
+Win32
+x64
+/pest++/run_manager_fortran_test/Release
+/pest++/benchmarks/3pg/pestpp/
+/pest++/benchmarks/10par_xsec/pestpp/
+/pest++/benchmarks/box/pestpp/
+/pest++/benchmarks/henry/pestpp/
+/pest++/benchmarks/kirishima/pestpp/
+/pest++/benchmarks/stor/pestpp/
+/pest++/benchmarks/tidal/pestpp/
+pest++/mio/model_input_output_interface.mod
+pest++/pest++/pestpp
+pest++/run_manager_fortran_test/fortran_test
+pest++/sweep/sweep
+
+.DS_Store
