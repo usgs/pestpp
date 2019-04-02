@@ -198,10 +198,10 @@ ofstream prep_sweep_output_file(Pest &pest_scenario)
 	csv << ",phi,meas_phi,regul_phi";
 	for (auto &ogrp : pest_scenario.get_ctl_ordered_obs_group_names())
 	{
-		csv << ',' << ogrp;
+		csv << ',' << pest_utils::lower_cp(ogrp);
 	}
 	for (auto &oname : pest_scenario.get_ctl_ordered_obs_names())
-		csv << ',' << oname;
+		csv << ',' << pest_utils::lower_cp(oname);
 	csv << endl;
 	csv.flush();
 	return csv;

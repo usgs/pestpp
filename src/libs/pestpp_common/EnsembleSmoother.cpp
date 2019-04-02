@@ -1813,7 +1813,7 @@ void IterEnsembleSmoother::initialize()
 	//{
 	//	throw_ies_error("use of localization matrix and autoadaloc not supported...yet!");
 	//}
-
+	message(1, "initializing localizer");
 	use_localizer = localizer.initialize(performance_log);
 	if (!use_localizer)
 		message(1, "not using localization");
@@ -1829,6 +1829,25 @@ void IterEnsembleSmoother::initialize()
 			message(1, "using localization matrix " + localizer.get_filename());
 			localizer.report(file_manager.rec_ofstream());
 		}
+	}
+	if ((use_localizer) && (!localizer.get_autoadaloc()))
+	{
+
+		ss.str("");
+		ss << "using localized solution with " << localizer.get_num_upgrade_steps() << " sequential upgrade steps";
+		message(1, ss.str());
+		ss.str("");
+		if (num_threads > 0)
+		{
+			ss.str("");
+			ss << "using multithreaded localization calculation with " << num_threads << " threads";
+			message(1, ss.str());
+
+		}
+		if (localizer.get_how() == Localizer::How::OBSERVATIONS)
+			message(1, "localizing by obseravtions");
+		else
+			message(1, "localizing by parameters");
 	}
 
 	num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
@@ -1907,25 +1926,7 @@ void IterEnsembleSmoother::initialize()
 
 	sanity_checks();
 
-	if ((use_localizer) && (!localizer.get_autoadaloc()))
-	{
-
-		ss.str("");
-		ss << "using localized solution with " << localizer.get_num_upgrade_steps() << " sequential upgrade steps";
-		message(1, ss.str());
-		ss.str("");
-		if (num_threads > 0)
-		{
-			ss.str("");
-			ss << "using multithreaded localization calculation with " << num_threads << " threads";
-			message(1, ss.str());
-
-		}
-		if (localizer.get_how() == Localizer::How::OBSERVATIONS)
-			message(1, "localizing by obseravtions");
-		else
-			message(1, "localizing by parameters");
-	}
+	
 
 	bool echo = false;
 	if (verbose_level > 1)

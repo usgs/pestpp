@@ -525,7 +525,7 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 				convert_ip(tokens[0], svd_info.maxsing);
 				convert_ip(tokens[1], svd_info.eigthresh);
 			}
-			if (sec_lnum == 3) {
+			else if (sec_lnum == 3) {
 				convert_ip(tokens[0], svd_info.eigwrite);
 			}
 			else
