@@ -1,0 +1,87 @@
+sudo: false
+dist: trusty
+language: python
+
+python:
+  - "3.6"
+
+cache:
+  pip: true
+  apt: true
+  directories:
+    - $HOME/.cache/pip
+    - $HOME/.local
+
+matrix:
+  include:
+    - name: "pestpp-opt tests"
+      env: TEST_REPO="https://github.com/jtwhite79/pestpp-opt_benchmarks" TEST_SCRIPT="opt_test.py" TEST_DIR="pestpp-opt_benchmarks"
+    - name: "pestpp-ies tests part 1"
+      env: TEST_REPO="https://github.com/jtwhite79/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_part1.py" TEST_DIR="pestpp-ies_benchmarks"
+    - name: "pestpp-ies tests part 2"
+      env: TEST_REPO="https://github.com/jtwhite79/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_part2.py" TEST_DIR="pestpp-ies_benchmarks"
+    - name: "pestpp-ies tests part 3"
+      env: TEST_REPO="https://github.com/jtwhite79/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_part3.py" TEST_DIR="pestpp-ies_benchmarks"
+    - name: "pestpp-ies tests part 4"
+      env: TEST_REPO="https://github.com/jtwhite79/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_part4.py" TEST_DIR="pestpp-ies_benchmarks"
+    - name: "pestpp-ies tests baseline"
+      env: TEST_REPO="https://github.com/jtwhite79/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_base.py" TEST_DIR="pestpp-ies_benchmarks"
+
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - g++-6
+      - gfortran-6
+      - liblapack-dev
+
+git:
+  depth: 1
+env:
+  global:
+    - MAKEFLAGS="-j 2"
+
+before_script:
+  - cd src
+  - rm -r -f ../bin/linux/
+  - make clean
+  - COMPILER=gcc6 CXX=g++-6 FC=gfortran-6 STATIC=no make install
+  - cd ..
+  - wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - conda update --yes conda
+  - "export DISPLAY=:99.0"
+  - "sh -e /etc/init.d/xvfb start"
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION pip numpy scipy pandas matplotlib nose
+  - git clone --depth 1 --single-branch -b develop https://github.com/modflowpy/flopy.git
+  - cd flopy
+  - python setup.py install
+  - cd ..
+  - git clone --depth 1 --single-branch -b develop https://github.com/jtwhite79/pyemu.git
+  - cd pyemu
+  - python setup.py install
+  - cd ..
+  - export PYTHONPATH=$PYTHONPATH:.
+  - export PATH="./test_bin/linux:../test_bin/linux:../../test_bin/linux:$PATH"
+  - nosetests -v -w ./benchmarks basic_tests.py
+
+script:
+  - git clone -b master --depth 1 $TEST_REPO  
+  - cd $TEST_DIR
+  - nosetests -v $TEST_SCRIPT
+
+
+# after_success:
+#   - chmod +x trigger-travis.sh
+#   - ./trigger-travis.sh jtwhite79 pestpp-opt_benchmarks $TRAVIS_ACCESS_TOKEN
+#   - ./trigger-travis.sh jtwhite79 pestpp-ies_benchmarks $TRAVIS_ACCESS_TOKEN
+#   - ./trigger-travis.sh jtwhite79 pestpp-ies_benchmarks2 $TRAVIS_ACCESS_TOKEN
+#   - ./trigger-travis.sh jtwhite79 pestpp-ies_benchmarks_base $TRAVIS_ACCESS_TOKEN
+notifications:
+  email: 
+    recipents:
+      - jtwhite1000@gmail.com
+    on_success: always
+    on_failure: always
