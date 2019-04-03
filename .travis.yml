@@ -15,17 +15,17 @@ cache:
 matrix:
   include:
     - name: "pestpp-opt tests"
-      env: TEST_REPO="https://github.com/jtwhite79/pestpp-opt_benchmarks" TEST_SCRIPT="opt_test.py" TEST_DIR="pestpp-opt_benchmarks"
+      env: TEST_REPO="https://github.com/usgs/pestpp-opt_benchmarks" TEST_SCRIPT="opt_test.py" TEST_DIR="pestpp-opt_benchmarks"
     - name: "pestpp-ies tests part 1"
-      env: TEST_REPO="https://github.com/jtwhite79/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_part1.py" TEST_DIR="pestpp-ies_benchmarks"
+      env: TEST_REPO="https://github.com/usgs/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_part1.py" TEST_DIR="pestpp-ies_benchmarks"
     - name: "pestpp-ies tests part 2"
-      env: TEST_REPO="https://github.com/jtwhite79/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_part2.py" TEST_DIR="pestpp-ies_benchmarks"
+      env: TEST_REPO="https://github.com/usgs/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_part2.py" TEST_DIR="pestpp-ies_benchmarks"
     - name: "pestpp-ies tests part 3"
-      env: TEST_REPO="https://github.com/jtwhite79/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_part3.py" TEST_DIR="pestpp-ies_benchmarks"
+      env: TEST_REPO="https://github.com/usgs/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_part3.py" TEST_DIR="pestpp-ies_benchmarks"
     - name: "pestpp-ies tests part 4"
-      env: TEST_REPO="https://github.com/jtwhite79/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_part4.py" TEST_DIR="pestpp-ies_benchmarks"
+      env: TEST_REPO="https://github.com/usgs/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_part4.py" TEST_DIR="pestpp-ies_benchmarks"
     - name: "pestpp-ies tests baseline"
-      env: TEST_REPO="https://github.com/jtwhite79/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_base.py" TEST_DIR="pestpp-ies_benchmarks"
+      env: TEST_REPO="https://github.com/usgs/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_base.py" TEST_DIR="pestpp-ies_benchmarks"
 
 addons:
   apt:
