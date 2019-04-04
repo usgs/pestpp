@@ -1233,12 +1233,12 @@ string Covariance::try_from(Pest &pest_scenario, FileManager &file_manager, bool
 	if (extra.size() > 0)
 	{
 		stringstream ss;
-		ss << "WARNING: Cov::try_from() error: " << extra.size() << " extra elements in covariance matrix being drop ";
+		ss << "WARNING: Cov::try_from(): " << extra.size() << " extra elements in covariance matrix being drop - these are probably for fixed parameters and/or zero-weight observations";
 		//for (auto name : extra)
 		//	ss << " " << name;
 		//throw PestError(ss.str());
 		file_manager.rec_ofstream() << ss.str() << endl << endl;
-		cout << "WARNING: " << extra.size() << " unrecognized elements in covariance matrix being dropped, see .rec file for listing" << endl;
+		//cout << "WARNING: " << extra.size() << " unrecognized elements in covariance matrix being dropped, see .rec file for listing" << endl;
 		drop(extra);
 	}
 	return how.str();
