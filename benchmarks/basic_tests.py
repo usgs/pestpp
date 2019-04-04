@@ -102,7 +102,15 @@ def basic_test(model_d="ies_10par_xsec"):
     oe.iloc[:-3, :].to_csv(os.path.join(new_d, "restart_failed_base_obs.csv"))
     oe.to_binary(os.path.join(new_d, "obs.jcb"))
 
+    pst.control_data.noptmax = 0
     pst.write(os.path.join(new_d, "pest.pst"))
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
+    df = pd.read_csv(os.path.join(new_d,"pest.phi.group.csv"))
+    assert df.loc[0,"head"] == 0.5,df
+    return
+    pst.control_data.noptmax = noptmax
+    pst.write(os.path.join(new_d, "pest.pst"))
+    
 
     
     m_d = os.path.join(model_d,"master_pestpp_sen")
@@ -257,8 +265,8 @@ def tie_by_group_test():
 
 
 if __name__ == "__main__":
-    #basic_test("ies_10par_xsec")
-    glm_save_binary_test()
+    basic_test("ies_10par_xsec")
+    #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
     #tie_by_group_test()

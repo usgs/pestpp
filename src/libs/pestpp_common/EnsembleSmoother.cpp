@@ -1760,7 +1760,7 @@ void IterEnsembleSmoother::initialize()
 		ph.update(_oe, _pe, false);
 		message(0, "control file parameter phi report:");
 		ph.report(true,false);
-		
+		ph.write(0, 1);
 		ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
 		Observations obs;
 		Eigen::VectorXd v = _oe.get_real_vector("BASE");
