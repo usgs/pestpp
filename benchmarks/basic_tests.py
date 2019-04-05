@@ -106,7 +106,7 @@ def basic_test(model_d="ies_10par_xsec"):
     pst.write(os.path.join(new_d, "pest.pst"))
     pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
     df = pd.read_csv(os.path.join(new_d,"pest.phi.group.csv"))
-    #assert df.loc[0,"head"] == 0.5,df
+    assert df.loc[0,"head"] == 0.5,df
     #return
     pst.control_data.noptmax = noptmax
     pst.write(os.path.join(new_d, "pest.pst"))
