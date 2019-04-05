@@ -106,8 +106,8 @@ def basic_test(model_d="ies_10par_xsec"):
     pst.write(os.path.join(new_d, "pest.pst"))
     pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
     df = pd.read_csv(os.path.join(new_d,"pest.phi.group.csv"))
-    assert df.loc[0,"head"] == 0.5,df
-    return
+    #assert df.loc[0,"head"] == 0.5,df
+    #return
     pst.control_data.noptmax = noptmax
     pst.write(os.path.join(new_d, "pest.pst"))
     
@@ -156,6 +156,7 @@ def glm_save_binary_test():
         shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d, "pest.pst"))
     pst.pestpp_options = {"num_reals":30,"save_binary":True}
+    pst.control_data.noptmax = 1
     pst.write(os.path.join(t_d, "pest_save_binary.pst"))
     pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies", "-glm"), "pest_save_binary.pst", 10, master_dir=m_d,
                                 slave_root=model_d, local=local, port=port)
@@ -265,8 +266,8 @@ def tie_by_group_test():
 
 
 if __name__ == "__main__":
-    basic_test("ies_10par_xsec")
-    #glm_save_binary_test()
+    #basic_test("ies_10par_xsec")
+    glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
     #tie_by_group_test()
