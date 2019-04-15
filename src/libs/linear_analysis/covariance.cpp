@@ -1434,7 +1434,7 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 				{
 					for (Eigen::SparseMatrix<double>::InnerIterator it(cov_matrix, icol); it; ++it)
 					{
-						triplet_list.push_back(Eigen::Triplet<double>(start_irow + it.row(), jcol, it.value()));
+						triplet_list.push_back(Eigen::Triplet<double>(start_irow + it.row(), jcol, var_mult * it.value()));
 						irow++;
 					}
 					jcol++;
