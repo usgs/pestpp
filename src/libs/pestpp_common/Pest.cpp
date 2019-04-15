@@ -1008,7 +1008,16 @@ const vector<string> &Pest::get_outfile_vec()
 }
 
 Pest::~Pest() {
-	//if (regul_scheme_ptr !=0) delete regul_scheme_ptr;
+	/*if (regul_scheme_ptr != 0)
+	{
+		try
+		{
+			delete regul_scheme_ptr;
+		}
+		catch (...)
+		{
+		}
+	}*/
 }
 
 ostream& operator<< (ostream &os, const Pest& val)

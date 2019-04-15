@@ -262,12 +262,53 @@ def tie_by_group_test():
     jco = pyemu.Jco.from_binary(os.path.join(m_d,"pest_tied.jcb"))
     assert jco.shape[1] == 2,jco.shape
 
+def unc_file_test():
+    model_d = "ies_10par_xsec"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
+    
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_uncfile")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(t_d,m_d)
+    pst = pyemu.Pst(os.path.join(m_d,"pest.pst"))
+    cov = pyemu.Cov.from_parameter_data(pst)
+    cov.to_uncfile(os.path.join(m_d,"pest.unc"),covmat_file=os.path.join(m_d,"cov.mat"),var_mult=2.0,include_path=False)
+    pst.pestpp_options = {}
+    pst.pestpp_options["parcov"] = "pest.unc"
+    pst.pestpp_options["ies_num_reals"] = 10000
+    pst.pestpp_options["ies_verbose_level"] = 3
+    pst.control_data.noptmax = -2
+    pst.write(os.path.join(m_d,"pest_unc.pst"))
+    pyemu.os_utils.run("{0} {1}".format(exe_path,"pest_unc.pst"),cwd=m_d)
 
+    pe_1 = pd.read_csv(os.path.join(m_d,"pest_unc.0.par.csv"),index_col=0).apply(np.log10)
 
-
+    cov = pyemu.Cov.from_parameter_data(pst)
+    cov *= 2.0
+    cov.to_uncfile(os.path.join(m_d,"pest.unc"),covmat_file=os.path.join(m_d,"cov.mat"),var_mult=1.0,include_path=False)
+    pst.pestpp_options = {}
+    pst.pestpp_options["parcov"] = "cov.mat"
+    pst.pestpp_options["ies_num_reals"] = 10000
+    pst.pestpp_options["ies_verbose_level"] = 3 
+    pst.control_data.noptmax = -2
+    pst.write(os.path.join(m_d,"pest_unc.pst"))
+    pyemu.os_utils.run("{0} {1}".format(exe_path,"pest_unc.pst"),cwd=m_d)
+    pe_2 = pd.read_csv(os.path.join(m_d,"pest_unc.0.par.csv"),index_col=0).apply(np.log10)
+    diff = pe_1 - pe_2
+    print(pe_1.std(ddof=0)**2)
+    print(pe_2.std(ddof=0)**2)
+    print(diff.sum())
+    assert diff.sum().max() < 1.0e-10
 if __name__ == "__main__":
+    unc_file_test()
+
     #basic_test("ies_10par_xsec")
-    glm_save_binary_test()
+    #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
     #tie_by_group_test()

@@ -228,7 +228,9 @@ Mat Mat::inv(bool echo)
 	Logger* log = new Logger();
 	log->set_echo(echo);
 	//inv_ip(log);
-	return inv(log);
+	Mat new_mat = inv(log);
+	delete log;
+	return new_mat;
 }
 
 
@@ -1340,7 +1342,7 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 					word = pest_utils::upper_cp(tokens[0]);
 					if (word.find("FILE") != string::npos)
 						cov_filename = tokens[1];
-					else if (word.find("VARIANCE") != string::npos)
+					else if (word.find("VARIANCE_MULTIPLIER") != string::npos)
 						pest_utils::convert_ip(tokens[1], var_mult);
 					else if (word.find("FIRST_PARAMETER") != string::npos)
 						start_par = pest_utils::upper_cp(tokens[1]);
@@ -1434,7 +1436,7 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 				{
 					for (Eigen::SparseMatrix<double>::InnerIterator it(cov_matrix, icol); it; ++it)
 					{
-						triplet_list.push_back(Eigen::Triplet<double>(start_irow + it.row(), jcol, it.value()));
+						triplet_list.push_back(Eigen::Triplet<double>(start_irow + it.row(), jcol, var_mult * it.value()));
 						irow++;
 					}
 					jcol++;
