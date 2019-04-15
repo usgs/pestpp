@@ -135,4 +135,5 @@ string Logger::elapsed_time_to_string(std::chrono::system_clock::time_point &cur
 
 Logger::~Logger()
 {
+	delete fout;
 }
