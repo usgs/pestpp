@@ -135,6 +135,7 @@ PROCESS_INFORMATION start(string &cmd_string)
 		std::string cmd_string(cmd_line);
 		throw std::runtime_error("CreateProcess() failed for command: " + cmd_string);
 	}
+	delete cmd_line;
 	return pi;
 }
 #endif
