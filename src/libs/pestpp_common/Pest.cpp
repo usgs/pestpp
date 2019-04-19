@@ -147,6 +147,9 @@ void Pest::check_inputs(ostream &f_rec)
 		{
 			par_warnings.push_back(pname + " has 'dercom' > 1, pestpp suite doesn't support 'dercom' > 1, ignoring");
 		}
+		if ((prec->chglim != "RELATIVE") && (prec->chglim != "FACTOR"))
+			par_problems.push_back(pname + " 'parchglim not in ['factor','relative']: " + prec->chglim);
+
 
 	}
 
@@ -1005,6 +1008,99 @@ const  vector<string> &Pest::get_insfile_vec()
 const vector<string> &Pest::get_outfile_vec()
 {
 	return model_exec_info.outfile_vec;
+}
+
+void Pest::enforce_par_change_lims_ip(Parameters & upgrade_ctl_pars, const Parameters &last_ctl_pars)
+{
+	double fpm = control_info.facparmax;
+	double facorig = control_info.facorig;
+	double rpm = control_info.relparmax;
+	double orig_val, last_val, fac_lb, fac_ub, rel_lb, rel_ub, eff_ub, eff_lb,chg_lb, chg_ub;
+	double scaling_factor = 1.0;
+	string parchglim;
+
+	ParameterInfo &p_info = ctl_parameter_info;
+	const ParameterRec *p_rec;
+
+	for (auto p : upgrade_ctl_pars)
+	{
+		last_val = last_ctl_pars.get_rec(p.first);
+		p_rec = p_info.get_parameter_rec_ptr(p.first);
+		parchglim = p_rec->chglim;
+
+		if (p.second == 0)
+			p.second = p_rec->ubnd / 4.0;
+		orig_val = ctl_parameters.get_rec(p.first);
+
+		//apply facorig correction if needed
+		if (ctl_parameter_info.get_parameter_rec_ptr(p.first)->tranform_type == ParameterRec::TRAN_TYPE::NONE)
+			if (abs(p.second) < abs(orig_val * facorig))
+				p.second = orig_val * facorig;
+
+
+		//calc fac lims
+		if (p.second < 0)
+		{
+			fac_lb = fpm * last_val;
+			fac_ub = last_val / fpm;
+		}
+	
+		else
+		{
+			fac_lb = last_val / fpm;
+			fac_ub = last_val * fpm;
+		}
+
+		//calc rel lims
+		rel_lb = last_val - (abs(last_val) * rpm);
+		rel_ub = last_val + (abs(last_val) * rpm);
+
+		if (parchglim == "FACTOR")
+		{
+			chg_lb = fac_lb;
+			chg_ub = fac_ub;
+		}
+		else if (parchglim == "RELATIVE")
+		{
+			chg_lb = rel_lb;
+			chg_ub = rel_ub;
+		}
+		else
+		{
+			throw runtime_error("Pest::enforce_par_change_lims_ip error: unrecognized 'parchglim': " + parchglim);
+		}
+
+		//calc effective lims
+		eff_ub = min(chg_ub, p_rec->ubnd);
+		eff_lb = max(chg_lb, p_rec->lbnd);
+
+		if (p.second > eff_ub)
+		{
+
+		}
+		else if (p.second < eff_lb)
+		{
+
+		}
+
+	}
+
+	if (scaling_factor == 0.0)
+	{
+		throw runtime_error("Pest::enforce_par_change_lims_ip error : zero length parameter vector");
+	}
+
+	if (scaling_factor != 1.0)
+	{
+
+	}
+
+
+
+			
+
+
+	
 }
 
 Pest::~Pest() {

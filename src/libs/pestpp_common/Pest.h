@@ -77,6 +77,7 @@ public:
 	const ParetoInfo &get_pareto_info() const { return pareto_info; }
 	vector<string> get_nonregul_obs() const;
 	string get_pst_filename() { return pst_filename; }
+	void enforce_par_change_lims_ip(Parameters &update_ctl_pars, const Parameters &last_ctl_pars);
 	virtual ~Pest();
 	
 private:
