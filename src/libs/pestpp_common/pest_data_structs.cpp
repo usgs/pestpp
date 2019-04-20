@@ -974,6 +974,12 @@ void PestppOptions::parce_line(const string &line)
 		{
 			convert_ip(value, ies_autoadaloc_sigma_dist);
 		}
+		else if (key == "IES_ENFORCE_CHGLIM")
+		{
+			transform(value.begin(), value.end(), value.begin(), ::tolower);
+			istringstream is(value);
+			is >> boolalpha >> ies_enforce_chglim;
+		}
 
 		else {
 

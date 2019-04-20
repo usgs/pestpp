@@ -880,6 +880,7 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	pestpp_options.set_ies_csv_by_reals(true);
 	pestpp_options.set_ies_autoadaloc(false);
 	pestpp_options.set_ies_autoadaloc_sigma_dist(1.0);
+	pestpp_options.set_ies_enforce_chglim(false);
 
 	pestpp_options.set_condor_submit_file(string());
 	pestpp_options.set_overdue_giveup_minutes(1.0e+30);
@@ -1019,8 +1020,11 @@ const vector<string> &Pest::get_outfile_vec()
 	return model_exec_info.outfile_vec;
 }
 
-void Pest::enforce_par_change_limits(Parameters & upgrade_ctl_pars, const Parameters &last_ctl_pars, bool enforce_bounds)
+void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &last_ctl_pars, bool enforce_chglim, bool enforce_bounds)
 {
+	if ((!enforce_chglim) && (!enforce_bounds))
+		return;
+
 	double fpm = control_info.facparmax;
 	double facorig = control_info.facorig;
 	double rpm = control_info.relparmax;
@@ -1085,31 +1089,45 @@ void Pest::enforce_par_change_limits(Parameters & upgrade_ctl_pars, const Parame
 		}
 		else
 		{
-			throw runtime_error("Pest::enforce_par_change_limits() error: unrecognized 'parchglim': " + parchglim);
+			throw runtime_error("Pest::enforce_par_limits() error: unrecognized 'parchglim': " + parchglim);
 		}
 
-		
+
 		double temp = 1.0;
-		if (p.second > chg_ub)
-		{
-			temp = abs((chg_ub - last_val) / (p.second - last_val));
+		if (enforce_chglim)
+		{		
+			if (p.second > chg_ub)
+			{
+				temp = abs((chg_ub - last_val) / (p.second - last_val));
+				if ((temp > 1.0) || (temp < 0.0))
+				{
+					stringstream ss;
+					ss << "Pest::enforce_par_limts() error: invalid upper parchglim scaling factor " << temp << " for par " << p.first << endl;
+					ss << " chglim:" << chg_ub << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+					throw runtime_error(ss.str());
+				}
+
+				if (temp < scaling_factor)
+				{
+					scaling_factor = temp;
+					controlling_par = p.first;
+				}
+			}
+
+			else if (p.second < chg_lb)
+				temp = abs((last_val - chg_lb) / (last_val - p.second));
 			if ((temp > 1.0) || (temp < 0.0))
-				throw runtime_error("Pest::enforce_par_change_limts() error: invalid scaling factor for par " + p.first);
+			{
+				stringstream ss;
+				ss << "Pest::enforce_par_limts() error: invalid lower parchglim scaling factor " << temp << " for par " << p.first << endl;
+				ss << " chglim:" << chg_lb << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+				throw runtime_error(ss.str());
+			}
 			if (temp < scaling_factor)
 			{
 				scaling_factor = temp;
 				controlling_par = p.first;
-			}	
-		}
-
-		else if (p.second < chg_lb)
-			temp = abs((last_val - chg_lb) / (last_val - p.second));
-		if ((temp > 1.0) || (temp < 0.0))
-			throw runtime_error("Pest::enforce_par_change_limts() error: invalid scaling factor for par " + p.first);
-		if (temp < scaling_factor)
-		{
-			scaling_factor = temp;
-			controlling_par = p.first;
+			}
 		}
 
 		if (enforce_bounds)
@@ -1118,7 +1136,12 @@ void Pest::enforce_par_change_limits(Parameters & upgrade_ctl_pars, const Parame
 			{
 				temp = abs((p_rec->ubnd - last_val) / (p.second - last_val));
 				if ((temp > 1.0) || (temp < 0.0))
-					throw runtime_error("Pest::enforce_par_change_limts() error: invalid scaling factor for par " + p.first);
+				{
+					stringstream ss;
+					ss << "Pest::enforce_par_limts() error: invalid upper bound scaling factor " << temp << " for par " << p.first << endl;
+					ss << " ubnd:" << p_rec->ubnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+					throw runtime_error(ss.str());
+				}
 				if (temp < scaling_factor)
 				{
 					scaling_factor = temp;
@@ -1129,7 +1152,13 @@ void Pest::enforce_par_change_limits(Parameters & upgrade_ctl_pars, const Parame
 			else if (p.second < p_rec->lbnd)
 				temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
 			if ((temp > 1.0) || (temp < 0.0))
-				throw runtime_error("Pest::enforce_par_change_limts() error: invalid scaling factor for par " + p.first);
+				if ((temp > 1.0) || (temp < 0.0))
+				{
+					stringstream ss;
+					ss << "Pest::enforce_par_limts() error: invalid lower bound scaling factor " << temp << " for par " << p.first << endl;
+					ss << " lbnd:" << p_rec->lbnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+					throw runtime_error(ss.str());
+				}
 			if (temp < scaling_factor)
 			{
 				scaling_factor = temp;

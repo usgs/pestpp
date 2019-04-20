@@ -3365,7 +3365,10 @@ bool IterEnsembleSmoother::solve_new()
 			ParameterEnsemble pe_lam_scale = pe;
 			pe_lam_scale.set_eigen(*pe_lam_scale.get_eigen_ptr() + (*pe_upgrade.get_eigen_ptr() * sf));
 			if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
-				pe_lam_scale.enforce_bounds();
+			{
+				pe_lam_scale.enforce_limits(pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+			}
+
 			pe_lams.push_back(pe_lam_scale);
 			lam_vals.push_back(cur_lam);
 			scale_vals.push_back(sf);

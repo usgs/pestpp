@@ -1614,7 +1614,7 @@ void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, Per
 		reorder(vector<string>(), pest_scenario_ptr->get_ctl_ordered_adj_par_names());
 	}
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_enforce_bounds())
-		enforce_bounds();
+		enforce_limits(false);
 
 
 }
@@ -1872,7 +1872,7 @@ void ParameterEnsemble::save_fixed()
 	}
 }
 
-void ParameterEnsemble::enforce_bounds()
+void ParameterEnsemble::enforce_limits(bool enforce_chglim)
 {
 	//reset parameters to be inbounds - very crude
 	if (tstat != ParameterEnsemble::transStatus::NUM)
@@ -1880,35 +1880,41 @@ void ParameterEnsemble::enforce_bounds()
 		throw_ensemble_error("pe.enforce_bounds() tstat != NUM not implemented");
 
 	}
-	Parameters base = pest_scenario_ptr->get_ctl_parameters();
-	for (int i=0;i<reals.rows();i++)
+	if (enforce_chglim)
 	{
-
-		Parameters real(var_names, reals.row(i));
-		pest_scenario_ptr->enforce_par_change_limits(real, base, true);
-		reals.row(i) = real.get_data_eigen_vec(var_names);
-	}
-
-	/*ParameterInfo pinfo = pest_scenario_ptr->get_ctl_parameter_info();
-	Parameters lower = pest_scenario_ptr->get_ctl_parameter_info().get_low_bnd(var_names);
-	Parameters upper = pest_scenario_ptr->get_ctl_parameter_info().get_up_bnd(var_names);
-	par_transform.ctl2numeric_ip(lower);
-	par_transform.ctl2numeric_ip(upper);
-	Eigen::VectorXd col;
-	double l, u, v;
-	for (int j = 0; j < reals.cols(); j++)
-	{
-		l = lower[var_names[j]];
-		u = upper[var_names[j]];
-		col = reals.col(j);
+		Parameters base = pest_scenario_ptr->get_ctl_parameters();
 		for (int i = 0; i < reals.rows(); i++)
 		{
-			v = col(i);
-			v = v < l ? l : v;
-			col(i) = v > u ? u : v;
+
+			Parameters real(var_names, reals.row(i));
+			pest_scenario_ptr->enforce_par_limits(real, base, false, true);
+			pest_scenario_ptr->enforce_par_limits(real, base, true, false);
+			reals.row(i) = real.get_data_eigen_vec(var_names);
 		}
-		reals.col(j) = col;
-	}*/
+	}
+	else
+	{
+		ParameterInfo pinfo = pest_scenario_ptr->get_ctl_parameter_info();
+		Parameters lower = pest_scenario_ptr->get_ctl_parameter_info().get_low_bnd(var_names);
+		Parameters upper = pest_scenario_ptr->get_ctl_parameter_info().get_up_bnd(var_names);
+		par_transform.ctl2numeric_ip(lower);
+		par_transform.ctl2numeric_ip(upper);
+		Eigen::VectorXd col;
+		double l, u, v;
+		for (int j = 0; j < reals.cols(); j++)
+		{
+			l = lower[var_names[j]];
+			u = upper[var_names[j]];
+			col = reals.col(j);
+			for (int i = 0; i < reals.rows(); i++)
+			{
+				v = col(i);
+				v = v < l ? l : v;
+				col(i) = v > u ? u : v;
+			}
+			reals.col(j) = col;
+		}
+	}
 }
 
 void ParameterEnsemble::to_binary(string file_name)
