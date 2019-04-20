@@ -1880,7 +1880,16 @@ void ParameterEnsemble::enforce_bounds()
 		throw_ensemble_error("pe.enforce_bounds() tstat != NUM not implemented");
 
 	}
-	ParameterInfo pinfo = pest_scenario_ptr->get_ctl_parameter_info();
+	Parameters base = pest_scenario_ptr->get_ctl_parameters();
+	for (int i=0;i<reals.rows();i++)
+	{
+
+		Parameters real(var_names, reals.row(i));
+		pest_scenario_ptr->enforce_par_change_limits(real, base, true);
+		reals.row(i) = real.get_data_eigen_vec(var_names);
+	}
+
+	/*ParameterInfo pinfo = pest_scenario_ptr->get_ctl_parameter_info();
 	Parameters lower = pest_scenario_ptr->get_ctl_parameter_info().get_low_bnd(var_names);
 	Parameters upper = pest_scenario_ptr->get_ctl_parameter_info().get_up_bnd(var_names);
 	par_transform.ctl2numeric_ip(lower);
@@ -1899,7 +1908,7 @@ void ParameterEnsemble::enforce_bounds()
 			col(i) = v > u ? u : v;
 		}
 		reals.col(j) = col;
-	}
+	}*/
 }
 
 void ParameterEnsemble::to_binary(string file_name)

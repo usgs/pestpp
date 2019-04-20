@@ -74,6 +74,9 @@ void Pest::check_inputs(ostream &f_rec)
 		svd_info.maxsing = min(numeric_pars.size(), observation_values.size());
 	}
 
+	if (control_info.facparmax <= 1.0)
+		throw PestError("'facparmax' must be greater than 1.0");
+
 	if (control_info.pestmode == ControlInfo::PestMode::PARETO)
 	{
 		bool found_pareto = false, found_other = false;
@@ -149,8 +152,14 @@ void Pest::check_inputs(ostream &f_rec)
 		}
 		if ((prec->chglim != "RELATIVE") && (prec->chglim != "FACTOR"))
 			par_problems.push_back(pname + " 'parchglim not in ['factor','relative']: " + prec->chglim);
-
-
+		
+		if ((prec->ubnd > 0.0) && (prec->lbnd < 0.0))
+		{
+			if (prec->chglim == "FACTOR")
+				par_problems.push_back(pname + " 'factor' parchglim not compatible with bnounds that cross zero");
+			else if ((prec->chglim == "RELATIVE") && (control_info.relparmax < 1.0))
+				par_problems.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
+		}
 	}
 
 	bool err = false;
@@ -818,7 +827,7 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	//pestpp_options.set_use_parcov_scaling(false);
 	pestpp_options.set_parcov_scale_fac(-999.0);
 	pestpp_options.set_jac_scale(true);
-	pestpp_options.set_upgrade_augment(true);
+	pestpp_options.set_upgrade_augment(false);
 	pestpp_options.set_opt_obj_func("");
 	pestpp_options.set_opt_coin_log(true);
 	pestpp_options.set_opt_skip_final(false);
@@ -833,7 +842,7 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	pestpp_options.set_opt_iter_derinc_fac(1.0);
 	pestpp_options.set_opt_include_bnd_pi(true);
 	pestpp_options.set_hotstart_resfile(string());
-	pestpp_options.set_upgrade_bounds("ROBUST");
+	pestpp_options.set_upgrade_bounds("CHEAP");
 	pestpp_options.set_ies_par_csv("");
 	pestpp_options.set_ies_obs_csv("");
 	pestpp_options.set_ies_obs_restart_csv("");
@@ -1010,15 +1019,17 @@ const vector<string> &Pest::get_outfile_vec()
 	return model_exec_info.outfile_vec;
 }
 
-void Pest::enforce_par_change_lims_ip(Parameters & upgrade_ctl_pars, const Parameters &last_ctl_pars)
+void Pest::enforce_par_change_limits(Parameters & upgrade_ctl_pars, const Parameters &last_ctl_pars, bool enforce_bounds)
 {
 	double fpm = control_info.facparmax;
 	double facorig = control_info.facorig;
 	double rpm = control_info.relparmax;
 	double orig_val, last_val, fac_lb, fac_ub, rel_lb, rel_ub, eff_ub, eff_lb,chg_lb, chg_ub;
+	double chg_fac, chg_rel;
 	double scaling_factor = 1.0;
 	string parchglim;
-
+	
+	string controlling_par = "";
 	ParameterInfo &p_info = ctl_parameter_info;
 	const ParameterRec *p_rec;
 
@@ -1034,26 +1045,33 @@ void Pest::enforce_par_change_lims_ip(Parameters & upgrade_ctl_pars, const Param
 
 		//apply facorig correction if needed
 		if (ctl_parameter_info.get_parameter_rec_ptr(p.first)->tranform_type == ParameterRec::TRAN_TYPE::NONE)
-			if (abs(p.second) < abs(orig_val * facorig))
+			if (abs(p.second) < abs(orig_val) * facorig)
 				p.second = orig_val * facorig;
 
 
 		//calc fac lims
-		if (p.second < 0)
+		if (abs(last_val) > abs(p.second))
+			chg_fac = last_val / p.second;
+		else
+			chg_fac = p.second / last_val;
+		if (p.second > 0.0)
 		{
-			fac_lb = fpm * last_val;
-			fac_ub = last_val / fpm;
+			fac_lb = last_val / fpm;
+			fac_ub = last_val * fpm;
+			
 		}
 	
 		else
 		{
-			fac_lb = last_val / fpm;
-			fac_ub = last_val * fpm;
+			fac_lb = last_val * fpm;
+			fac_ub = last_val / fpm;
+			
 		}
 
 		//calc rel lims
 		rel_lb = last_val - (abs(last_val) * rpm);
 		rel_ub = last_val + (abs(last_val) * rpm);
+		chg_rel = (last_val - p.second) / last_val;
 
 		if (parchglim == "FACTOR")
 		{
@@ -1067,32 +1085,75 @@ void Pest::enforce_par_change_lims_ip(Parameters & upgrade_ctl_pars, const Param
 		}
 		else
 		{
-			throw runtime_error("Pest::enforce_par_change_lims_ip error: unrecognized 'parchglim': " + parchglim);
+			throw runtime_error("Pest::enforce_par_change_limits() error: unrecognized 'parchglim': " + parchglim);
 		}
 
-		//calc effective lims
-		eff_ub = min(chg_ub, p_rec->ubnd);
-		eff_lb = max(chg_lb, p_rec->lbnd);
-
-		if (p.second > eff_ub)
+		
+		double temp = 1.0;
+		if (p.second > chg_ub)
 		{
-
+			temp = abs((chg_ub - last_val) / (p.second - last_val));
+			if ((temp > 1.0) || (temp < 0.0))
+				throw runtime_error("Pest::enforce_par_change_limts() error: invalid scaling factor for par " + p.first);
+			if (temp < scaling_factor)
+			{
+				scaling_factor = temp;
+				controlling_par = p.first;
+			}	
 		}
-		else if (p.second < eff_lb)
+
+		else if (p.second < chg_lb)
+			temp = abs((last_val - chg_lb) / (last_val - p.second));
+		if ((temp > 1.0) || (temp < 0.0))
+			throw runtime_error("Pest::enforce_par_change_limts() error: invalid scaling factor for par " + p.first);
+		if (temp < scaling_factor)
 		{
+			scaling_factor = temp;
+			controlling_par = p.first;
+		}
+
+		if (enforce_bounds)
+		{
+			if (p.second > p_rec->ubnd)
+			{
+				temp = abs((p_rec->ubnd - last_val) / (p.second - last_val));
+				if ((temp > 1.0) || (temp < 0.0))
+					throw runtime_error("Pest::enforce_par_change_limts() error: invalid scaling factor for par " + p.first);
+				if (temp < scaling_factor)
+				{
+					scaling_factor = temp;
+					controlling_par = p.first;
+				}
+			}
+
+			else if (p.second < p_rec->lbnd)
+				temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
+			if ((temp > 1.0) || (temp < 0.0))
+				throw runtime_error("Pest::enforce_par_change_limts() error: invalid scaling factor for par " + p.first);
+			if (temp < scaling_factor)
+			{
+				scaling_factor = temp;
+				controlling_par = p.first;
+			}
 
 		}
+		
 
 	}
 
 	if (scaling_factor == 0.0)
 	{
-		throw runtime_error("Pest::enforce_par_change_lims_ip error : zero length parameter vector");
+		throw runtime_error("Pest::enforce_par_change_limits error : zero length parameter vector");
 	}
 
 	if (scaling_factor != 1.0)
 	{
-
+		for (auto &p : upgrade_ctl_pars)
+		{
+			
+			last_val = last_ctl_pars.get_rec(p.first);
+			p.second =last_val + (p.second - last_val) *  scaling_factor;
+		}
 	}
 
 
@@ -1102,6 +1163,25 @@ void Pest::enforce_par_change_lims_ip(Parameters & upgrade_ctl_pars, const Param
 
 	
 }
+
+map<string, double> Pest::get_pars_at_bounds(const Parameters & pars)
+{
+	 map<string, double> bnd_map;
+	 const ParameterRec *p_rec;
+	 ParameterInfo &pinfo = ctl_parameter_info;
+
+	 for (auto p : pars)
+	 {
+		 p_rec = pinfo.get_parameter_rec_ptr(p.first);
+		 if (p.second > p_rec->ubnd)
+			 bnd_map[p.first] = p_rec->ubnd;
+		 else if (p.second < p_rec->lbnd)
+			 bnd_map[p.first] = p_rec->lbnd;
+
+	 }
+	 return bnd_map;
+}
+
 
 Pest::~Pest() {
 	/*if (regul_scheme_ptr != 0)

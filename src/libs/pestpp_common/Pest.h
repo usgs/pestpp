@@ -35,6 +35,7 @@ class PriorInformation;
 
 class Pest {
 public:
+	enum class LimitType { NONE, LBND, UBND, REL, FACT };
 	friend ostream& operator<< (ostream &os, const Pest& val);
 	Pest();
 	void set_defaults();
@@ -77,7 +78,8 @@ public:
 	const ParetoInfo &get_pareto_info() const { return pareto_info; }
 	vector<string> get_nonregul_obs() const;
 	string get_pst_filename() { return pst_filename; }
-	void enforce_par_change_lims_ip(Parameters &update_ctl_pars, const Parameters &last_ctl_pars);
+	void enforce_par_change_limits(Parameters &update_ctl_pars, const Parameters &last_ctl_pars, bool enforce_bounds=false);
+	map<string,double> get_pars_at_bounds(const Parameters &pars);
 	virtual ~Pest();
 	
 private:

@@ -864,7 +864,7 @@ int main(int argc, char* argv[])
 		}
 
 		// clean up
-		fout_rec.close();
+		//fout_rec.close();
 		delete base_jacobian_ptr;
 		delete super_jacobian_ptr;
 		delete run_manager_ptr;
