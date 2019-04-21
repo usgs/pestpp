@@ -1158,19 +1158,21 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 			}
 
 			else if (p.second < p_rec->lbnd)
-				temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
-			if ((temp > 1.0) || (temp < 0.0))
-				if ((temp > 1.0) || (temp < 0.0))
-				{
-					stringstream ss;
-					ss << "Pest::enforce_par_limts() error: invalid lower bound scaling factor " << temp << " for par " << p.first << endl;
-					ss << " lbnd:" << p_rec->lbnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
-					throw runtime_error(ss.str());
-				}
-			if (temp < scaling_factor)
 			{
-				scaling_factor = temp;
-				controlling_par = p.first;
+				temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
+				if ((temp > 1.0) || (temp < 0.0))
+					if ((temp > 1.0) || (temp < 0.0))
+					{
+						stringstream ss;
+						ss << "Pest::enforce_par_limts() error: invalid lower bound scaling factor " << temp << " for par " << p.first << endl;
+						ss << " lbnd:" << p_rec->lbnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+						throw runtime_error(ss.str());
+					}
+				if (temp < scaling_factor)
+				{
+					scaling_factor = temp;
+					controlling_par = p.first;
+				}
 			}
 
 		}
