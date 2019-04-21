@@ -2100,7 +2100,7 @@ void IterEnsembleSmoother::initialize()
 
 	if (pest_scenario.get_control_info().noptmax == -2)
 	{
-		message(0, "'noptmax'=0, running mean parameter ensemble values and quitting");
+		message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
 		message(1, "calculating mean parameter values");
 		Parameters pars;
 		vector<double> mv = pe.get_mean_stl_vector();

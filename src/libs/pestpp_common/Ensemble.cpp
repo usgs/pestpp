@@ -1888,7 +1888,7 @@ void ParameterEnsemble::enforce_limits(bool enforce_chglim)
 
 			Parameters real(var_names, reals.row(i));
 			pest_scenario_ptr->enforce_par_limits(real, base, false, true);
-			pest_scenario_ptr->enforce_par_limits(real, base, true, false);
+			//pest_scenario_ptr->enforce_par_limits(real, base, true, false);
 			reals.row(i) = real.get_data_eigen_vec(var_names);
 		}
 	}
