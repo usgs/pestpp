@@ -399,6 +399,27 @@ def parchglim_test():
     print(p_df)
     
 
+    rpm = 100
+    fpm = 100
+    par.loc[pst.par_names[1:],"partrans"] = "fixed"
+    par.loc[pst.par_names[1:],"parchglim"] = "factor"
+    par.loc[pst.par_names[0],"partrans"] = "none"
+    par.loc[pst.par_names[0],"parlbnd"] = 0.9
+    par.loc[pst.par_names[0],"parubnd"] = 1.1   
+    par.loc[pst.par_names[0],"parchglim"] = "relative"
+    par.loc[pst.par_names[0],"parval1"] = 1.0
+    pst.control_data.relparmax = rpm
+    pst.control_data.facparmax = fpm
+    
+    pst.write(os.path.join(m_d,"pest_parchglim.pst"))
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
+    p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
+    print(p_df)
+    assert p_df.loc["stage","parval1"] == par.loc["stage","parubnd"]
+
+    
+
+
 if __name__ == "__main__":
     parchglim_test()
     #unc_file_test()
