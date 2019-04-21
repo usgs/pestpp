@@ -156,7 +156,7 @@ void Pest::check_inputs(ostream &f_rec)
 		if ((prec->ubnd > 0.0) && (prec->lbnd < 0.0))
 		{
 			if (prec->chglim == "FACTOR")
-				par_problems.push_back(pname + " 'factor' parchglim not compatible with bnounds that cross zero");
+				par_problems.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
 			else if ((prec->chglim == "RELATIVE") && (control_info.relparmax < 1.0))
 				par_problems.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
 		}
