@@ -382,7 +382,22 @@ def parchglim_test():
     print(p_df.loc["stage","parval1"],par.loc["stage","parval1"] + rpm)
     assert np.abs(p_df.loc["stage","parval1"] - (par.loc["stage","parval1"] + rpm)) < 1.0e-6
 
-
+    # currently something is up with the upgrade calcs in pestpp-glm
+    # so this test just makes sure it runs without throwing an exception
+    rpm = 1.1
+    par.loc[pst.par_names[1:],"partrans"] = "fixed"
+    par.loc[pst.par_names[1:],"parchglim"] = "factor"
+    par.loc[pst.par_names[0],"partrans"] = "none"
+    par.loc[pst.par_names[0],"parlbnd"] = -10.0
+    par.loc[pst.par_names[0],"parubnd"] = 10.0   
+    par.loc[pst.par_names[0],"parchglim"] = "relative"
+    par.loc[pst.par_names[0],"parval1"] = 0.0
+    pst.control_data.relparmax = rpm
+    pst.write(os.path.join(m_d,"pest_parchglim.pst"))
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
+    p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
+    print(p_df)
+    
 
 if __name__ == "__main__":
     parchglim_test()

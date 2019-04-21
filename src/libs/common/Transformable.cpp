@@ -161,7 +161,7 @@ vector<string> Transformable::get_notnormal_keys()
 	vector<string> not_normal;
 	for (auto &i : items)
 	{
-		if (isnormal(i.second))
+		if ((isnormal(i.second)) || (i.second ==0.0))
 			continue;
 		not_normal.push_back(i.first);
 	}

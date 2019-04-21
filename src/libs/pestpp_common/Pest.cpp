@@ -1040,17 +1040,25 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 	for (auto p : upgrade_ctl_pars)
 	{
 		last_val = last_ctl_pars.get_rec(p.first);
+		
 		p_rec = p_info.get_parameter_rec_ptr(p.first);
 		parchglim = p_rec->chglim;
 
-		if (p.second == 0)
+		if (p.second == 0.0)
 			p.second = p_rec->ubnd / 4.0;
 		orig_val = ctl_parameters.get_rec(p.first);
+		if (orig_val == 0.0)
+			orig_val = p_rec->ubnd / 4.0;
 
 		//apply facorig correction if needed
 		if (ctl_parameter_info.get_parameter_rec_ptr(p.first)->tranform_type == ParameterRec::TRAN_TYPE::NONE)
+		{
 			if (abs(p.second) < abs(orig_val) * facorig)
 				p.second = orig_val * facorig;
+			if (abs(last_val) < abs(orig_val * facorig))
+				last_val = orig_val * facorig;
+		}
+			
 
 
 		//calc fac lims
@@ -1073,8 +1081,8 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 		}
 
 		//calc rel lims
-		rel_lb = last_val - (abs(last_val) * rpm);
-		rel_ub = last_val + (abs(last_val) * rpm);
+		rel_lb = last_ctl_pars.get_rec(p.first) - (abs(last_val) * rpm);
+		rel_ub = last_ctl_pars.get_rec(p.first) + (abs(last_val) * rpm);
 		chg_rel = (last_val - p.second) / last_val;
 
 		if (parchglim == "FACTOR")
