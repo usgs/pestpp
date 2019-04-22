@@ -756,7 +756,7 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 	performance_log->log_event("limiting out of bounds pars");
 	//limit_parameters_ip(base_run_active_ctl_pars, upgrade_active_ctl_pars,
 	//	limit_type, prev_frozen_active_ctl_pars);
-	pest_scenario.enforce_par_limits(upgrade_active_ctl_pars, base_run_active_ctl_pars, true);
+	pest_scenario.enforce_par_limits(upgrade_active_ctl_pars, base_run_active_ctl_pars, true, true);
 	performance_log->log_event("checking for denormal floating point values");
 	if (upgrade_active_ctl_pars.get_notnormal_keys().size() > 0)
 	{
@@ -1375,7 +1375,7 @@ Parameters SVDSolver::limit_parameters_freeze_all_ip(const Parameters &init_acti
 	upgrade_active_ctl_pars.erase(prev_frozen_active_ctl_pars);
 
 	//check_limits(init_active_ctl_ars, upgrade_active_ctl_pars, limit_type_map, limited_ctl_parameters);
-	pest_scenario.enforce_par_limits(upgrade_active_ctl_pars, init_active_ctl_pars);
+	pest_scenario.enforce_par_limits(upgrade_active_ctl_pars, init_active_ctl_pars,true,true);
 	
 	//// Remove parameters at their upper and lower bound limits as these will be frozen
 	//vector<string> pars_at_bnds;
