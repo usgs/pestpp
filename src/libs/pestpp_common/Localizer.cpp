@@ -618,8 +618,10 @@ void AutoAdaLocThread::work(int thread_id)
 	unique_lock<mutex> triplets_guard(triplets_lock, defer_lock);
 	unique_lock<mutex>pfm_guard(pfm_lock, defer_lock);
 	unique_lock<mutex>par_names_guard(par_names_lock, defer_lock);
+	bool use_list_obs = true;
 	while (true)
 	{
+
 		while (true)
 		{
 			if (par_indices_guard.try_lock())
@@ -673,6 +675,11 @@ void AutoAdaLocThread::work(int thread_id)
 				if (list_obs.size() > 0)
 				{
 					sobs = list_obs[par_names[jpar]];
+					use_list_obs = true;
+				}
+				else
+				{
+					use_list_obs = false;
 				}
 				pcount++;
 				par_indices_guard.unlock();
@@ -713,11 +720,14 @@ void AutoAdaLocThread::work(int thread_id)
 				}
 
 			}
-			if ((obs_std[iobs] == 0.0) || (sobs.size() == 0))
+			if (obs_std[iobs] == 0.0) 
 			{
 				continue;
 			}
 			
+			if ((use_list_obs) && (sobs.size() == 0))
+				continue;
+
 			if ((sobs.size() > 0) && (sobs.find(oname) == sobs.end()))
 			{
 				continue;
