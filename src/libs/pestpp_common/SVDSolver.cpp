@@ -92,7 +92,7 @@ SVDSolver::SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, Objective
 	const ParamTransformSeq &_par_transform, Jacobian &_jacobian,
 	OutputFileWriter &_output_file_writer, SVDSolver::MAT_INV _mat_inv,
 	PerformanceLog *_performance_log, const string &_description, Covariance _parcov, bool _phiredswh_flag, bool _splitswh_flag, bool _save_next_jacobian)
-	: ctl_info(&_pest_scenario.get_control_info()), svd_info(_pest_scenario.get_svd_info()), par_group_info_ptr(&_pest_scenario.get_base_group_info()),
+	: pest_scenario(_pest_scenario), ctl_info(&_pest_scenario.get_control_info()), svd_info(_pest_scenario.get_svd_info()), par_group_info_ptr(&_pest_scenario.get_base_group_info()),
 	ctl_par_info_ptr(&_pest_scenario.get_ctl_parameter_info()), obs_info_ptr(&_pest_scenario.get_ctl_observation_info()), obj_func(_obj_func),
 	file_manager(_file_manager), observations_ptr(&_pest_scenario.get_ctl_observations()), par_transform(_par_transform), der_forgive(_pest_scenario.get_pestpp_options().get_der_forgive()), phiredswh_flag(_phiredswh_flag),
 	splitswh_flag(_splitswh_flag), save_next_jacobian(_save_next_jacobian), prior_info_ptr(_pest_scenario.get_prior_info_ptr()), jacobian(_jacobian),
@@ -687,7 +687,7 @@ void SVDSolver::calc_lambda_upgrade_vecQ12J(const Jacobian &jacobian, const QSqr
 void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active_ctl_pars, QSqrtMatrix &Q_sqrt,
 	const DynamicRegularization &regul, VectorXd &residuals_vec, vector<string> &obs_names_vec,
 	const Parameters &base_run_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
-	MarquardtMatrix marquardt_type, LimitType &limit_type, bool scale_upgrade)
+	MarquardtMatrix marquardt_type, Pest::LimitType &limit_type, bool scale_upgrade)
 {
 	Parameters upgrade_ctl_del_pars;
 	Parameters grad_ctl_del_pars;
@@ -754,8 +754,9 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 	}
 	//Freeze any new parameters that want to go out of bounds
 	performance_log->log_event("limiting out of bounds pars");
-	limit_parameters_ip(base_run_active_ctl_pars, upgrade_active_ctl_pars,
-		limit_type, prev_frozen_active_ctl_pars);
+	//limit_parameters_ip(base_run_active_ctl_pars, upgrade_active_ctl_pars,
+	//	limit_type, prev_frozen_active_ctl_pars);
+	pest_scenario.enforce_par_limits(upgrade_active_ctl_pars, base_run_active_ctl_pars, true, true);
 	performance_log->log_event("checking for denormal floating point values");
 	if (upgrade_active_ctl_pars.get_notnormal_keys().size() > 0)
 	{
@@ -1057,7 +1058,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		{
 			Parameters tmp_new_par;
 			Parameters frozen_active_ctl_pars = failed_jac_pars;
-			LimitType limit_type;
+			Pest::LimitType limit_type;
 			//use call to calc_upgrade_vec to compute frozen parameters
 			calc_upgrade_vec_freeze(0, frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
 				obs_names_vec, base_run_active_ctl_par,
@@ -1106,7 +1107,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 
 			Parameters new_pars;
 			// reset frozen_active_ctl_pars
-			LimitType limit_type;
+			Pest::LimitType limit_type;
 			Parameters frozen_active_ctl_pars = failed_jac_pars;
 			try
 			{
@@ -1152,7 +1153,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			}
 
 			////Try to extend the previous upgrade vector
-			if ((upgrade_augment) &&  (limit_type == LimitType::LBND || limit_type == LimitType::UBND))
+			if ((upgrade_augment) &&  (limit_type == Pest::LimitType::LBND || limit_type == Pest::LimitType::UBND))
 			{
 				Parameters frozen_active_ctl_pars = failed_jac_pars;
 				calc_upgrade_vec_freeze(i_lambda, frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
@@ -1271,176 +1272,178 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	return best_upgrade_run;
 }
 
-void SVDSolver::check_limits(const Parameters &init_active_ctl_pars, const Parameters &upgrade_active_ctl_pars,
-	map<string, LimitType> &limit_type_map, Parameters &active_ctl_parameters_at_limit)
-{
-	const string *name;
-	double p_init;
-	double p_upgrade;
-	double b_facorg_lim;
-	pair<bool, double> par_limit;
-	const ParameterRec *p_info;
-
-	for (auto &ipar : upgrade_active_ctl_pars)
-	{
-		name = &(ipar.first);  // parameter name
-		p_info = ctl_par_info_ptr->get_parameter_rec_ptr(*name);
-		if (p_info->is_active())
-		{
-			par_limit = pair<bool, double>(false, 0.0);
-			p_upgrade = ipar.second;  // upgrade parameter value
-			p_init = init_active_ctl_pars.get_rec(*name);
-
-			double init_value = ctl_par_info_ptr->get_parameter_rec_ptr(*name)->init_value;
-			if (init_value == 0.0)
-			{
-				init_value = ctl_par_info_ptr->get_parameter_rec_ptr(*name)->ubnd / 4.0;
-			}
-			b_facorg_lim = ctl_info->facorig * init_value;
-			if (abs(p_init) >= b_facorg_lim) {
-				b_facorg_lim = p_init;
-			}
-
-			// Check Relative Chanage Limit
-			if (p_info->chglim == "RELATIVE" && abs((p_upgrade - p_init) / b_facorg_lim) > ctl_info->relparmax)
-			{
-				par_limit.first = true;
-				par_limit.second = p_init + sign(p_upgrade - p_init) * ctl_info->relparmax *  abs(b_facorg_lim);
-				limit_type_map[*name] = LimitType::REL;
-			}
-
-			// Check Factor Change Limit
-			else if (p_info->chglim == "FACTOR") {
-				if (b_facorg_lim > 0 && p_upgrade < b_facorg_lim / ctl_info->facparmax)
-				{
-					par_limit.first = true;
-					par_limit.second = b_facorg_lim / ctl_info->facparmax;
-					limit_type_map[*name] = LimitType::FACT;
-				}
-				else if (b_facorg_lim > 0 && p_upgrade > b_facorg_lim*ctl_info->facparmax)
-				{
-					par_limit.first = true;
-					par_limit.second = b_facorg_lim * ctl_info->facparmax;
-					limit_type_map[*name] = LimitType::FACT;
-				}
-				else if (b_facorg_lim < 0 && p_upgrade < b_facorg_lim*ctl_info->facparmax)
-				{
-					par_limit.first = true;
-					par_limit.second = b_facorg_lim * ctl_info->facparmax;
-					limit_type_map[*name] = LimitType::FACT;
-				}
-				else if (b_facorg_lim < 0 && p_upgrade > b_facorg_lim / ctl_info->facparmax)
-				{
-					par_limit.first = true;
-					par_limit.second = b_facorg_lim / ctl_info->facparmax;
-					limit_type_map[*name] = LimitType::FACT;
-				}
-			}
-			// Check parameter upper bound
-			if ((!par_limit.first && p_upgrade > p_info->ubnd) ||
-				(par_limit.first && par_limit.second > p_info->ubnd)) {
-				par_limit.first = true;
-				par_limit.second = p_info->ubnd;
-				limit_type_map[*name] = LimitType::UBND;
-			}
-			// Check parameter lower bound
-			else if ((!par_limit.first && p_upgrade < p_info->lbnd) ||
-				(par_limit.first && par_limit.second < p_info->lbnd)) {
-				par_limit.first = true;
-				par_limit.second = p_info->lbnd;
-				limit_type_map[*name] = LimitType::LBND;
-			}
-			// Add any limited parameters to model_parameters_at_limit
-			if (par_limit.first) {
-				active_ctl_parameters_at_limit.insert(*name, par_limit.second);
-			}
-		}
-	}
-}
+//void SVDSolver::check_limits(const Parameters &init_active_ctl_pars, const Parameters &upgrade_active_ctl_pars,
+//	map<string, Pest::LimitType> &limit_type_map, Parameters &active_ctl_parameters_at_limit)
+//{
+//	const string *name;
+//	double p_init;
+//	double p_upgrade;
+//	double b_facorg_lim;
+//	pair<bool, double> par_limit;
+//	const ParameterRec *p_info;
+//
+//	for (auto &ipar : upgrade_active_ctl_pars)
+//	{
+//		name = &(ipar.first);  // parameter name
+//		p_info = ctl_par_info_ptr->get_parameter_rec_ptr(*name);
+//		if (p_info->is_active())
+//		{
+//			par_limit = pair<bool, double>(false, 0.0);
+//			p_upgrade = ipar.second;  // upgrade parameter value
+//			p_init = init_active_ctl_pars.get_rec(*name);
+//
+//			double init_value = ctl_par_info_ptr->get_parameter_rec_ptr(*name)->init_value;
+//			if (init_value == 0.0)
+//			{
+//				init_value = ctl_par_info_ptr->get_parameter_rec_ptr(*name)->ubnd / 4.0;
+//			}
+//			b_facorg_lim = ctl_info->facorig * init_value;
+//			if (abs(p_init) >= b_facorg_lim) {
+//				b_facorg_lim = p_init;
+//			}
+//
+//			// Check Relative Chanage Limit
+//			if (p_info->chglim == "RELATIVE" && abs((p_upgrade - p_init) / b_facorg_lim) > ctl_info->relparmax)
+//			{
+//				par_limit.first = true;
+//				par_limit.second = p_init + sign(p_upgrade - p_init) * ctl_info->relparmax *  abs(b_facorg_lim);
+//				limit_type_map[*name] = Pest::LimitType::REL;
+//			}
+//
+//			// Check Factor Change Limit
+//			else if (p_info->chglim == "FACTOR") {
+//				if (b_facorg_lim > 0 && p_upgrade < b_facorg_lim / ctl_info->facparmax)
+//				{
+//					par_limit.first = true;
+//					par_limit.second = b_facorg_lim / ctl_info->facparmax;
+//					limit_type_map[*name] = Pest::LimitType::FACT;
+//				}
+//				else if (b_facorg_lim > 0 && p_upgrade > b_facorg_lim*ctl_info->facparmax)
+//				{
+//					par_limit.first = true;
+//					par_limit.second = b_facorg_lim * ctl_info->facparmax;
+//					limit_type_map[*name] = Pest::LimitType::FACT;
+//				}
+//				else if (b_facorg_lim < 0 && p_upgrade < b_facorg_lim*ctl_info->facparmax)
+//				{
+//					par_limit.first = true;
+//					par_limit.second = b_facorg_lim * ctl_info->facparmax;
+//					limit_type_map[*name] = Pest::LimitType::FACT;
+//				}
+//				else if (b_facorg_lim < 0 && p_upgrade > b_facorg_lim / ctl_info->facparmax)
+//				{
+//					par_limit.first = true;
+//					par_limit.second = b_facorg_lim / ctl_info->facparmax;
+//					limit_type_map[*name] = Pest::LimitType::FACT;
+//				}
+//			}
+//			// Check parameter upper bound
+//			if ((!par_limit.first && p_upgrade > p_info->ubnd) ||
+//				(par_limit.first && par_limit.second > p_info->ubnd)) {
+//				par_limit.first = true;
+//				par_limit.second = p_info->ubnd;
+//				limit_type_map[*name] = Pest::LimitType::UBND;
+//			}
+//			// Check parameter lower bound
+//			else if ((!par_limit.first && p_upgrade < p_info->lbnd) ||
+//				(par_limit.first && par_limit.second < p_info->lbnd)) {
+//				par_limit.first = true;
+//				par_limit.second = p_info->lbnd;
+//				limit_type_map[*name] = Pest::LimitType::LBND;
+//			}
+//			// Add any limited parameters to model_parameters_at_limit
+//			if (par_limit.first) {
+//				active_ctl_parameters_at_limit.insert(*name, par_limit.second);
+//			}
+//		}
+//	}
+//}
 
 Parameters SVDSolver::limit_parameters_freeze_all_ip(const Parameters &init_active_ctl_pars,
 	Parameters &upgrade_active_ctl_pars, const Parameters &prev_frozen_active_ctl_pars)
 {
-	map<string, LimitType> limit_type_map;
+	map<string, Pest::LimitType> limit_type_map;
 	Parameters limited_ctl_parameters;
 	const string *name;
 	double p_init;
 	double p_upgrade;
 	double p_limit;
-	Parameters new_frozen_active_ctl_parameters;
+	Parameters new_frozen_active_ctl_parameters, bnd_lim_pars ,chg_lim_pars;
 	pair<bool, double> par_limit;
 
 	//remove frozen parameters
 	upgrade_active_ctl_pars.erase(prev_frozen_active_ctl_pars);
 
-	check_limits(init_active_ctl_pars, upgrade_active_ctl_pars, limit_type_map, limited_ctl_parameters);
-	// Remove parameters at their upper and lower bound limits as these will be frozen
-	vector<string> pars_at_bnds;
-	for (auto ipar : limit_type_map)
-	{
-		if (ipar.second == LimitType::LBND || ipar.second == LimitType::UBND)
-		{
-			pars_at_bnds.push_back(ipar.first);
-		}
-	}
-	limited_ctl_parameters.erase(pars_at_bnds);
+	//check_limits(init_active_ctl_ars, upgrade_active_ctl_pars, limit_type_map, limited_ctl_parameters);
+	pest_scenario.enforce_par_limits(upgrade_active_ctl_pars, init_active_ctl_pars,true,true);
+	
+	//// Remove parameters at their upper and lower bound limits as these will be frozen
+	//vector<string> pars_at_bnds;
+	//for (auto ipar : limit_type_map)
+	//{
+	//	if (ipar.second == Pest::Pest::LimitType::LBND || ipar.second == Pest::Pest::LimitType::UBND)
+	//	{
+	//		pars_at_bnds.push_back(ipar.first);
+	//	}
+	//}
+	//limited_ctl_parameters.erase(pars_at_bnds);
 
-	// Calculate most stringent limit factor on a PEST parameter
-	double limit_factor = 1.0;
-	double tmp_limit;
-	string limit_parameter_name = "";
-	Parameters init_numeric_pars = par_transform.active_ctl2numeric_cp(init_active_ctl_pars);
-	Parameters upgrade_numeric_pars = par_transform.active_ctl2numeric_cp(upgrade_active_ctl_pars);
-	Parameters numeric_parameters_at_limit = par_transform.active_ctl2numeric_cp(limited_ctl_parameters);
-	for (auto &ipar : numeric_parameters_at_limit)
-	{
-		name = &(ipar.first);
-		p_limit = ipar.second;
-		p_init = init_numeric_pars.get_rec(*name);
-		p_upgrade = upgrade_numeric_pars.get_rec(*name);
-		tmp_limit = (p_limit - p_init) / (p_upgrade - p_init);
-		if (tmp_limit < limit_factor)  {
-			limit_factor = tmp_limit;
-			limit_parameter_name = *name;
-		}
-	}
-	// Apply limit factor to PEST upgrade parameters
-	if (limit_factor != 1.0)
-	{
-		for (auto &ipar : upgrade_numeric_pars)
-		{
-			name = &(ipar.first);
-			p_init = init_numeric_pars.get_rec(*name);
-			ipar.second = p_init + (ipar.second - p_init) *  limit_factor;
-		}
-	}
+	//// Calculate most stringent limit factor on a PEST parameter
+	//double limit_factor = 1.0;
+	//double tmp_limit;
+	//string limit_parameter_name = "";
+	//Parameters init_numeric_pars = par_transform.active_ctl2numeric_cp(init_active_ctl_pars);
+	//Parameters upgrade_numeric_pars = par_transform.active_ctl2numeric_cp(upgrade_active_ctl_pars);
+	//Parameters numeric_parameters_at_limit = par_transform.active_ctl2numeric_cp(limited_ctl_parameters);
+	//for (auto &ipar : limited_ctl_parameters)
+	//{
+	//	name = &(ipar.first);
+	//	p_limit = ipar.second;
+	//	p_init = init_active_ctl_pars.get_rec(*name);
+	//	p_upgrade = upgrade_active_ctl_pars.get_rec(*name);
+	//	tmp_limit = (p_limit - p_init) / (p_upgrade - p_init);
+	//	if (tmp_limit < limit_factor)  {
+	//		limit_factor = tmp_limit;
+	//		limit_parameter_name = *name;
+	//	}
+	//}
+	//// Apply limit factor to PEST upgrade parameters
+	//if (limit_factor != 1.0)
+	//{
+	//	for (auto &ipar : upgrade_active_ctl_pars)
+	//	{
+	//		name = &(ipar.first);
+	//		p_init = init_active_ctl_pars.get_rec(*name);
+	//		ipar.second = p_init + (ipar.second - p_init) *  limit_factor;
+	//	}
+	//}
 
-	//Transform parameters back their ative control state and freeze any that violate their bounds
-	upgrade_active_ctl_pars = par_transform.numeric2active_ctl_cp(upgrade_numeric_pars);
+	////Transform parameters back their ative control state and freeze any that violate their bounds
+	//upgrade_active_ctl_pars = par_transform.numeric2active_ctl_cp(upgrade_numeric_pars);
 
-	check_limits(init_active_ctl_pars, upgrade_active_ctl_pars, limit_type_map, limited_ctl_parameters);
-	for (auto &ipar : upgrade_active_ctl_pars)
-	{
-		name = &(ipar.first);
-		if (limit_type_map[*name] == LimitType::UBND)
-		{
-			double limit_value = ctl_par_info_ptr->get_parameter_rec_ptr(*name)->ubnd;
-			new_frozen_active_ctl_parameters[*name] = limit_value;
-		}
-		else if (limit_type_map[*name] == LimitType::LBND)
-		{
-			double limit_value = ctl_par_info_ptr->get_parameter_rec_ptr(*name)->lbnd;
-			new_frozen_active_ctl_parameters[*name] = limit_value;
-		}
-	}
+	//check_limits(init_active_ctl_pars, upgrade_active_ctl_pars, limit_type_map, limited_ctl_parameters);
+	//for (auto &ipar : upgrade_active_ctl_pars)
+	//{
+	//	name = &(ipar.first);
+	//	if (limit_type_map[*name] == Pest::LimitType::UBND)
+	//	{
+	//		double limit_value = ctl_par_info_ptr->get_parameter_rec_ptr(*name)->ubnd;
+	//		new_frozen_active_ctl_parameters[*name] = limit_value;
+	//	}
+	//	else if (limit_type_map[*name] == Pest::LimitType::LBND)
+	//	{
+	//		double limit_value = ctl_par_info_ptr->get_parameter_rec_ptr(*name)->lbnd;
+	//		new_frozen_active_ctl_parameters[*name] = limit_value;
+	//	}
+	//}
 
 	// Impose frozen Parameters
 	for (auto &ipar : prev_frozen_active_ctl_pars)
 	{
 		upgrade_active_ctl_pars[ipar.first] = ipar.second;
 	}
-
-	for (auto &ipar : new_frozen_active_ctl_parameters)
+	map<string, double> bnd_map = pest_scenario.get_pars_at_bounds(upgrade_active_ctl_pars);
+	for (auto &ipar : bnd_map)
 	{
 		upgrade_active_ctl_pars[ipar.first] = ipar.second;
 	}
@@ -1567,84 +1570,84 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 	return num_upgrade_out_grad_in;
 }
 
-void SVDSolver::limit_parameters_ip(const Parameters &init_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
-	LimitType &limit_type, const Parameters &frozen_active_ctl_pars)
-{
-	map<string, LimitType> limit_type_map;
-	limit_type = LimitType::NONE;
-	const string *name;
-	double p_init;
-	double p_upgrade;
-	double p_limit;
-
-	Parameters limited_active_ctl_parameters;
-	//remove forozen parameters from upgrade pars
-	upgrade_active_ctl_pars.erase(frozen_active_ctl_pars);
-
-	check_limits(init_active_ctl_pars, upgrade_active_ctl_pars, limit_type_map, limited_active_ctl_parameters);
-
-	////delete any limits cooresponding to ignored types
-	//for (auto it = limited_active_ctl_parameters.begin(); it != limited_active_ctl_parameters.end();)
-	//{
-	//	const string &name = (*it).first;
-	//	const LimitType l_type = limit_type_map[name];
-
-	//	auto temp_it = it;
-	//	++temp_it;
-
-	//	if (l_type == LimitType::LBND || l_type == LimitType::UBND)
-	//	{
-	//		limited_active_ctl_parameters.erase(it);
-	//	}
-
-	//	it = temp_it;
-	//}
-	// Calculate most stringent limit factor on a numeric PEST parameters
-	double limit_factor = 1.0;
-	double tmp_limit;
-	string limit_parameter_name = "";
-	Parameters limited_numeric_parameters = par_transform.active_ctl2numeric_cp(limited_active_ctl_parameters);
-	//this can be optimized to just compute init_numeric_parameters for those parameters at their limits
-	Parameters init_numeric_pars = par_transform.active_ctl2numeric_cp(init_active_ctl_pars);
-	Parameters upgrade_numeric_pars = par_transform.active_ctl2numeric_cp(upgrade_active_ctl_pars);
-	for (auto &ipar : limited_numeric_parameters)
-	{
-		name = &(ipar.first);
-		p_limit = ipar.second;
-		p_init = init_numeric_pars.get_rec(*name);
-		p_upgrade = upgrade_numeric_pars.get_rec(*name);
-		tmp_limit = (p_limit - p_init) / (p_upgrade - p_init);
-		if (tmp_limit < limit_factor)
-		{
-			limit_factor = tmp_limit;
-			limit_parameter_name = *name;
-			limit_type = limit_type_map[*name];
-		}
-	}
-	if (limit_factor == 0.0)
-	{
-		cout << endl <<  "WARNING: zero-length upgrade vector resulting from parameter bounds enforcement" << endl;
-		file_manager.rec_ofstream() << "WARNING: zero-length upgrade vector resulting from parameter bounds enforcement" << endl;
-	}
-	// Apply limit factor to numeric PEST upgrade parameters
-	if (limit_factor != 1.0)
-	{
-		for (auto &ipar : upgrade_numeric_pars)
-		{
-			name = &(ipar.first);
-			p_init = init_numeric_pars.get_rec(*name);
-			ipar.second = p_init + (ipar.second - p_init) *  limit_factor;
-		}
-	}
-	//Convert newly limited parameters to their derivative state
-	upgrade_active_ctl_pars = par_transform.numeric2active_ctl_cp(upgrade_numeric_pars);
-	// Impose frozen Parameters as they were removed in the beginning
-	for (auto &ipar : frozen_active_ctl_pars)
-	{
-		upgrade_active_ctl_pars[ipar.first] = ipar.second;
-	}
-	return;
-}
+//void SVDSolver::limit_parameters_ip(const Parameters &init_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
+//	Pest::LimitType &limit_type, const Parameters &frozen_active_ctl_pars)
+//{
+//	map<string, Pest::LimitType> limit_type_map;
+//	limit_type = Pest::LimitType::NONE;
+//	const string *name;
+//	double p_init;
+//	double p_upgrade;
+//	double p_limit;
+//
+//	Parameters limited_active_ctl_parameters;
+//	//remove forozen parameters from upgrade pars
+//	upgrade_active_ctl_pars.erase(frozen_active_ctl_pars);
+//
+//	check_limits(init_active_ctl_pars, upgrade_active_ctl_pars, limit_type_map, limited_active_ctl_parameters);
+//
+//	////delete any limits cooresponding to ignored types
+//	//for (auto it = limited_active_ctl_parameters.begin(); it != limited_active_ctl_parameters.end();)
+//	//{
+//	//	const string &name = (*it).first;
+//	//	const Pest::LimitType l_type = limit_type_map[name];
+//
+//	//	auto temp_it = it;
+//	//	++temp_it;
+//
+//	//	if (l_type == Pest::LimitType::LBND || l_type == Pest::LimitType::UBND)
+//	//	{
+//	//		limited_active_ctl_parameters.erase(it);
+//	//	}
+//
+//	//	it = temp_it;
+//	//}
+//	// Calculate most stringent limit factor on a numeric PEST parameters
+//	double limit_factor = 1.0;
+//	double tmp_limit;
+//	string limit_parameter_name = "";
+//	Parameters limited_numeric_parameters = par_transform.active_ctl2numeric_cp(limited_active_ctl_parameters);
+//	//this can be optimized to just compute init_numeric_parameters for those parameters at their limits
+//	Parameters init_numeric_pars = par_transform.active_ctl2numeric_cp(init_active_ctl_pars);
+//	Parameters upgrade_numeric_pars = par_transform.active_ctl2numeric_cp(upgrade_active_ctl_pars);
+//	for (auto &ipar : limited_numeric_parameters)
+//	{
+//		name = &(ipar.first);
+//		p_limit = ipar.second;
+//		p_init = init_numeric_pars.get_rec(*name);
+//		p_upgrade = upgrade_numeric_pars.get_rec(*name);
+//		tmp_limit = (p_limit - p_init) / (p_upgrade - p_init);
+//		if (tmp_limit < limit_factor)
+//		{
+//			limit_factor = tmp_limit;
+//			limit_parameter_name = *name;
+//			limit_type = limit_type_map[*name];
+//		}
+//	}
+//	if (limit_factor == 0.0)
+//	{
+//		cout << endl <<  "WARNING: zero-length upgrade vector resulting from parameter bounds enforcement" << endl;
+//		file_manager.rec_ofstream() << "WARNING: zero-length upgrade vector resulting from parameter bounds enforcement" << endl;
+//	}
+//	// Apply limit factor to numeric PEST upgrade parameters
+//	if (limit_factor != 1.0)
+//	{
+//		for (auto &ipar : upgrade_numeric_pars)
+//		{
+//			name = &(ipar.first);
+//			p_init = init_numeric_pars.get_rec(*name);
+//			ipar.second = p_init + (ipar.second - p_init) *  limit_factor;
+//		}
+//	}
+//	//Convert newly limited parameters to their derivative state
+//	upgrade_active_ctl_pars = par_transform.numeric2active_ctl_cp(upgrade_numeric_pars);
+//	// Impose frozen Parameters as they were removed in the beginning
+//	for (auto &ipar : frozen_active_ctl_pars)
+//	{
+//		upgrade_active_ctl_pars[ipar.first] = ipar.second;
+//	}
+//	return;
+//}
 
 PhiComponets SVDSolver::phi_estimate(const ModelRun &base_run, const Jacobian &jacobian, QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
 	const Eigen::VectorXd &residuals_vec, const vector<string> &obs_names_vec,

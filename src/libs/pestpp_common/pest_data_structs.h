@@ -417,7 +417,8 @@ public:
 	void set_ies_autoadaloc(bool _flag) { ies_autoadaloc = _flag; }
 	double get_ies_autoadaloc_sigma_dist() const { return ies_autoadaloc_sigma_dist; }
 	void set_ies_autoadaloc_sigma_dist(double _dist) { ies_autoadaloc_sigma_dist = _dist; }
-	
+	bool get_ies_enforce_chglim() const { return ies_enforce_chglim; }
+	void set_ies_enforce_chglim(bool _flag) { ies_enforce_chglim = _flag; }
 
 
 	set<string> get_passed_args() const { return passed_args; }
@@ -525,6 +526,7 @@ private:
 	bool ies_csv_by_reals;
 	bool ies_autoadaloc;
 	double ies_autoadaloc_sigma_dist;
+	bool ies_enforce_chglim;
 };
 
 ostream& operator<< (ostream &os, const PestppOptions& val);
