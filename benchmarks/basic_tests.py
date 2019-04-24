@@ -304,8 +304,125 @@ def unc_file_test():
     print(pe_2.std(ddof=0)**2)
     print(diff.sum())
     assert diff.sum().max() < 1.0e-10
+
+def parchglim_test():
+    model_d = "ies_10par_xsec"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
+    
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_parchglim")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(t_d,m_d)
+    pst = pyemu.Pst(os.path.join(m_d,"pest.pst"))
+    fpm = 1.05
+    pst.control_data.facparmax = fpm
+    par = pst.parameter_data
+    par.loc[pst.par_names[1:],"partrans"] = "fixed"
+    par.loc[pst.par_names[0],"partrans"] = "log"
+    par.loc[pst.par_names[0],"parchglim"] = "factor"
+    par.loc[pst.par_names[0],"parval1"] = 1.0
+    
+    pst.control_data.noptmax = 1
+    pst.pestpp_options["lambdas"] = 1.0
+    pst.write(os.path.join(m_d,"pest_parchglim.pst"))
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
+    p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
+    assert p_df.loc["stage","parval1"] == fpm
+
+    rpm = 0.1
+    par.loc[pst.par_names[0],"parchglim"] = "relative"
+    pst.control_data.relparmax = rpm
+    pst.write(os.path.join(m_d,"pest_parchglim.pst"))
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
+    p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
+    print(par)
+    print(p_df)
+    assert p_df.loc["stage","parval1"] == par.loc["stage","parval1"] + (rpm * par.loc["stage","parval1"])
+
+
+    par.loc[pst.par_names[0],"partrans"] = "none"
+    par.loc[pst.par_names[0],"parlbnd"] = -10.0
+    par.loc[pst.par_names[0],"parubnd"] = 0.0   
+    par.loc[pst.par_names[0],"parchglim"] = "factor"
+    par.loc[pst.par_names[0],"parval1"] = -1.0
+    pst.write(os.path.join(m_d,"pest_parchglim.pst"))
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
+    p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
+    print(p_df)
+    assert p_df.loc["stage","parval1"] == par.loc["stage","parval1"] + np.abs(par.loc["stage","parval1"] * (fpm-1))
+
+    rpm = 1.1
+    par.loc[pst.par_names[0],"partrans"] = "none"
+    par.loc[pst.par_names[0],"parlbnd"] = -10.0
+    par.loc[pst.par_names[0],"parubnd"] = 10.0   
+    par.loc[pst.par_names[0],"parchglim"] = "relative"
+    par.loc[pst.par_names[0],"parval1"] = -1.0
+    pst.control_data.relparmax = rpm
+    pst.write(os.path.join(m_d,"pest_parchglim.pst"))
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
+    p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
+    print(p_df)
+    print(p_df.loc["stage","parval1"],par.loc["stage","parval1"] + rpm)
+    assert np.abs(p_df.loc["stage","parval1"] - (par.loc["stage","parval1"] + rpm)) < 1.0e-6
+
+
+    par.loc[pst.par_names[1:],"partrans"] = "log"
+    par.loc[pst.par_names[1:],"parchglim"] = "factor"
+    pst.control_data.facparmax = 5.0
+    
+    pst.write(os.path.join(m_d,"pest_parchglim.pst"))
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
+    p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
+    print(p_df)
+    print(p_df.loc["stage","parval1"],par.loc["stage","parval1"] + rpm)
+    assert np.abs(p_df.loc["stage","parval1"] - (par.loc["stage","parval1"] + rpm)) < 1.0e-6
+
+    # currently something is up with the upgrade calcs in pestpp-glm
+    # so this test just makes sure it runs without throwing an exception
+    rpm = 1.1
+    par.loc[pst.par_names[1:],"partrans"] = "fixed"
+    par.loc[pst.par_names[1:],"parchglim"] = "factor"
+    par.loc[pst.par_names[0],"partrans"] = "none"
+    par.loc[pst.par_names[0],"parlbnd"] = -10.0
+    par.loc[pst.par_names[0],"parubnd"] = 10.0   
+    par.loc[pst.par_names[0],"parchglim"] = "relative"
+    par.loc[pst.par_names[0],"parval1"] = 0.0
+    pst.control_data.relparmax = rpm
+    pst.write(os.path.join(m_d,"pest_parchglim.pst"))
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
+    p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
+    print(p_df)
+    
+
+    rpm = 100
+    fpm = 100
+    par.loc[pst.par_names[1:],"partrans"] = "fixed"
+    par.loc[pst.par_names[1:],"parchglim"] = "factor"
+    par.loc[pst.par_names[0],"partrans"] = "none"
+    par.loc[pst.par_names[0],"parlbnd"] = 0.9
+    par.loc[pst.par_names[0],"parubnd"] = 1.1   
+    par.loc[pst.par_names[0],"parchglim"] = "relative"
+    par.loc[pst.par_names[0],"parval1"] = 1.0
+    pst.control_data.relparmax = rpm
+    pst.control_data.facparmax = fpm
+    
+    pst.write(os.path.join(m_d,"pest_parchglim.pst"))
+    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
+    p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
+    print(p_df)
+    assert p_df.loc["stage","parval1"] == par.loc["stage","parubnd"]
+
+    
+
+
 if __name__ == "__main__":
-    unc_file_test()
+    parchglim_test()
+    #unc_file_test()
 
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()

@@ -64,7 +64,7 @@ class SVDSolver
 public:
 	enum class MAT_INV{ Q12J, JTQJ };
 protected:
-	enum class LimitType {NONE, LBND, UBND, REL, FACT};
+	//enum class LimitType {NONE, LBND, UBND, REL, FACT};
 	enum class MarquardtMatrix {IDENT, JTQJ};
 	enum class UpgradeBounds {ROBUST, CHEAP};
 public:
@@ -97,7 +97,7 @@ protected:
 		vector<string> par_name_vec;
 		Parameters frozen_numeric_pars;
 	};
-
+	Pest &pest_scenario;
 	const static string svd_solver_type_name;
 	SVDPackage *svd_package;
 	MAT_INV mat_inv;
@@ -131,8 +131,8 @@ protected:
 	Covariance parcov;
 	double parcov_scale_fac;
 	Eigen::SparseMatrix<double> JS;
-	virtual void limit_parameters_ip(const Parameters &init_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
-		LimitType &limit_type, const Parameters &frozen_ative_ctl_pars);
+	//virtual void limit_parameters_ip(const Parameters &init_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
+	//	Pest::LimitType &limit_type, const Parameters &frozen_ative_ctl_pars);
 	virtual Parameters limit_parameters_freeze_all_ip(const Parameters &init_active_ctl_pars,
 		Parameters &upgrade_active_ctl_pars, const Parameters &frozen_active_ctl_pars = Parameters());
 	virtual const string &get_description(){return description;}
@@ -141,7 +141,7 @@ protected:
 		double &rel_change);
 	void calc_upgrade_vec(double i_lambda, Parameters &frozen_ctl_pars, QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
 		Eigen::VectorXd &residuals_vec, vector<string> &obs_names_vec, const Parameters &base_run_ctl_pars,
-		Parameters &new_ctl_pars, MarquardtMatrix marquardt_type, LimitType &limit_type, bool scale_upgrade=false);
+		Parameters &new_ctl_pars, MarquardtMatrix marquardt_type, Pest::LimitType &limit_type, bool scale_upgrade=false);
 	void calc_upgrade_vec_freeze(double i_lambda, Parameters &frozen_ctl_pars, QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
 		Eigen::VectorXd &residuals_vec, vector<string> &obs_names_vec, const Parameters &base_run_ctl_pars,
 		Parameters &new_ctl_pars, MarquardtMatrix marquardt_type, bool scale_upgrade = false);
@@ -155,8 +155,8 @@ protected:
 		const Parameters &active_base_ctl_pars, const Parameters &freeze_active_ctl_pars,
 		double lambda, Parameters &active_ctl_upgrade_pars, Parameters &upgrade_active_ctl_del_pars,
 		Parameters &grad_active_ctl_del_pars, MarquardtMatrix marquardt_type, bool scale_upgrade=false);
-	void check_limits(const Parameters &init_ctl_pars, const Parameters &upgrade_ctl_pars,
-		map<string, LimitType> &limit_type_map, Parameters &active_ctl_parameters_at_limit);
+	//void check_limits(const Parameters &init_ctl_pars, const Parameters &upgrade_ctl_pars,
+	//	map<string, Pest::LimitType> &limit_type_map, Parameters &active_ctl_parameters_at_limit);
 	Eigen::VectorXd calc_residual_corrections(const Jacobian &jacobian, const Parameters &del_numeric_pars,
 							   const vector<string> obs_name_vec);
 	void dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jacobian, QSqrtMatrix &Q_sqrt,

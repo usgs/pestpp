@@ -114,7 +114,7 @@ Parameters SVDASolver::limit_parameters_freeze_all_ip(const Parameters &init_act
 void SVDASolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active_ctl_pars, QSqrtMatrix &Q_sqrt,
 	const DynamicRegularization &regul, VectorXd &residuals_vec,
 	vector<string> &obs_names_vec, const Parameters &base_run_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
-	MarquardtMatrix marquardt_type, LimitType &limit_type, bool scale_upgrade)
+	MarquardtMatrix marquardt_type, Pest::LimitType &limit_type, bool scale_upgrade)
 {
 	Parameters upgrade_ctl_del_pars;
 	Parameters grad_ctl_del_pars;
@@ -455,7 +455,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 			Parameters base_numeric_pars = par_transform.ctl2numeric_cp(base_run.get_ctl_pars());
 
 			Parameters frzn_pars;
-			LimitType limit_type;
+			Pest::LimitType limit_type;
 			calc_upgrade_vec(i_lambda, frzn_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
 				obs_names_vec, base_run_active_ctl_pars,
 				new_pars, MarquardtMatrix::IDENT, limit_type,false);

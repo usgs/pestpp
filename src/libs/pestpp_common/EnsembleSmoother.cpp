@@ -2100,7 +2100,7 @@ void IterEnsembleSmoother::initialize()
 
 	if (pest_scenario.get_control_info().noptmax == -2)
 	{
-		message(0, "'noptmax'=0, running mean parameter ensemble values and quitting");
+		message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
 		message(1, "calculating mean parameter values");
 		Parameters pars;
 		vector<double> mv = pe.get_mean_stl_vector();
@@ -3365,7 +3365,10 @@ bool IterEnsembleSmoother::solve_new()
 			ParameterEnsemble pe_lam_scale = pe;
 			pe_lam_scale.set_eigen(*pe_lam_scale.get_eigen_ptr() + (*pe_upgrade.get_eigen_ptr() * sf));
 			if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
-				pe_lam_scale.enforce_bounds();
+			{
+				pe_lam_scale.enforce_limits(pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+			}
+
 			pe_lams.push_back(pe_lam_scale);
 			lam_vals.push_back(cur_lam);
 			scale_vals.push_back(sf);
