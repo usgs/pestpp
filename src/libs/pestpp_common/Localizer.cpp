@@ -669,12 +669,13 @@ void AutoAdaLocThread::work(int thread_id)
 					continue;
 				}
 				par_ss = pe_diff.col(jpar) * (1.0 / par_std[jpar]);
-				par_indices_guard.unlock();
+				
 				if (list_obs.size() > 0)
 				{
 					sobs = list_obs[par_names[jpar]];
 				}
 				pcount++;
+				par_indices_guard.unlock();
 				break;
 			}
 		}
@@ -712,7 +713,7 @@ void AutoAdaLocThread::work(int thread_id)
 				}
 
 			}
-			if (obs_std[iobs] == 0.0)
+			if ((obs_std[iobs] == 0.0) || (sobs.size() == 0))
 			{
 				continue;
 			}

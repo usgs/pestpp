@@ -3087,7 +3087,7 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 	if (use_localizer)
 	{
 		
-		loc_map = localizer.get_localizer_map(iter, oe, pe, performance_log);
+		//loc_map = localizer.get_localizer_map(iter, oe, pe, performance_log);
 		//localizer.report(file_manager.rec_ofstream());
 	}
 	else
