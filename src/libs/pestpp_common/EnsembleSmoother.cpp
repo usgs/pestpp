@@ -1815,6 +1815,7 @@ void IterEnsembleSmoother::initialize()
 	//}
 	message(1, "initializing localizer");
 	use_localizer = localizer.initialize(performance_log);
+	num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
 	if (!use_localizer)
 		message(1, "not using localization");
 	else
@@ -1850,7 +1851,7 @@ void IterEnsembleSmoother::initialize()
 			message(1, "localizing by parameters");
 	}
 
-	num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
+	
 	
 	iter = 0;
 	//ofstream &frec = file_manager.rec_ofstream();
@@ -3087,7 +3088,7 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 	if (use_localizer)
 	{
 		
-		loc_map = localizer.get_localizer_map(iter, oe, pe, performance_log);
+		//loc_map = localizer.get_localizer_map(iter, oe, pe, performance_log);
 		//localizer.report(file_manager.rec_ofstream());
 	}
 	else
