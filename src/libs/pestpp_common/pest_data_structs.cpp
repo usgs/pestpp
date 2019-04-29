@@ -958,6 +958,18 @@ void PestppOptions::parce_line(const string &line)
 			istringstream is(value);
 			is >> boolalpha >> ies_debug_upgrade_only;
 		}
+		else if (key == "IES_DEBUG_HIGH_SUBSET_PHI")
+		{
+			transform(value.begin(), value.end(), value.begin(), ::tolower);
+			istringstream is(value);
+			is >> boolalpha >> ies_debug_high_subset_phi;
+		}
+		else if (key == "IES_DEBUG_HIGH_UPGRADE_PHI")
+		{
+			transform(value.begin(), value.end(), value.begin(), ::tolower);
+			istringstream is(value);
+			is >> boolalpha >> ies_debug_high_upgrade_phi;
+		}
 		else if (key == "IES_CSV_BY_REALS")
 		{
 			transform(value.begin(), value.end(), value.begin(), ::tolower);

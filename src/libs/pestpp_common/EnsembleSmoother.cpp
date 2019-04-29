@@ -3258,7 +3258,19 @@ void IterEnsembleSmoother::update_reals_by_phi(ParameterEnsemble &_pe, Observati
 	
 	vector<string> oe_names = _oe.get_real_names();
 	vector<string> pe_names = _pe.get_real_names();
+	vector<string> oe_base_names = oe.get_real_names();
+	vector<string> pe_base_names = pe.get_real_names();
+
+	//if (pe_names.size() != oe_base_names.size())
+	//	throw runtime_error("IterEnsembleSmoother::update_reals_by_phi() error: pe_names != oe_base_names");
+	map<string, int> oe_name_to_idx;
+	map<int,string> pe_idx_to_name;
+
+	for (int i = 0; i < oe_base_names.size(); i++)
+		oe_name_to_idx[oe_base_names[i]] = i;
 	
+	for (int i = 0; i < pe_base_names.size(); i++)
+		pe_idx_to_name[i] = pe_base_names[i];
 	//store map of current phi values
 	ph.update(oe, pe);
 	PhiHandler::phiType pt = PhiHandler::phiType::COMPOSITE;
@@ -3283,7 +3295,11 @@ void IterEnsembleSmoother::update_reals_by_phi(ParameterEnsemble &_pe, Observati
 		cur_phi = cur_phi_map.at(oname);
 		if (new_phi < cur_phi * acc_fac)
 		{
-			pname = pe_names[i];
+			//pname = pe_names[i];
+			//pname = pe_names[oe_name_to_idx[oname]];
+			pname = pe_idx_to_name[oe_name_to_idx[oname]];
+			if (find(pe_names.begin(), pe_names.end(), pname) == pe_names.end())
+				throw runtime_error("IterEnsembleSmoother::update_reals_by_phi() error: pname not in pe_names: " + pname);
 			ss.str("");
 			ss << "updating pe:oe real =" << pname << ":" << oname << ", current phi: new phi  =" << cur_phi << ":" << new_phi;
 			message(3, ss.str());
@@ -3475,13 +3491,20 @@ bool IterEnsembleSmoother::solve_new()
 	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
 	double lam_inc = pest_scenario.get_pestpp_options().get_ies_lambda_inc_fac();
 	double lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
-
+	
 
 	//subset stuff here
 	if ((best_idx != -1) && (use_subset) && (subset_size < pe.shape().first))
 	{
 
 		double acc_phi = last_best_mean * acc_fac;
+		
+		if (pest_scenario.get_pestpp_options().get_ies_debug_high_subset_phi())
+		{
+			cout << "ies_debug_high_subset_phi active" << endl;
+			best_mean = acc_phi + 1.0;
+		}
+
 		if (best_mean > acc_phi)
 		{
 			//ph.update(oe_lams[best_idx],pe_lams[best_idx]);
@@ -3601,6 +3624,7 @@ bool IterEnsembleSmoother::solve_new()
 		ph.update(oe_lam_best, pe_lams[best_idx]);
 		best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
 		best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
+		
 	}
 
 	ph.update(oe_lam_best, pe_lams[best_idx]);
@@ -3609,8 +3633,15 @@ bool IterEnsembleSmoother::solve_new()
 	message(1, "last best mean phi * acceptable phi factor: ", last_best_mean * acc_fac);
 	message(1, "current best mean phi: ", best_mean);
 
+	if (pest_scenario.get_pestpp_options().get_ies_debug_high_upgrade_phi())
+	{
+		cout << "ies_debug_high_upgrade_phi active" << endl;
+		best_mean = (last_best_mean * acc_fac) + 1.0;
+	}
+
 	//track this here for phi-based termination check
 	best_mean_phis.push_back(best_mean);
+
 
 	if (best_mean < last_best_mean * acc_fac)
 	{
@@ -3638,7 +3669,7 @@ bool IterEnsembleSmoother::solve_new()
 	{
 		//message(0, "not updating parameter ensemble");
 		message(0, "only updating realizations with reduced phi");
-		update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx]);
+		update_reals_by_phi(pe_lams[best_idx], oe_lam_best);
 		ph.update(oe, pe);
 		double new_lam = last_best_lam * lam_inc;
 		new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
