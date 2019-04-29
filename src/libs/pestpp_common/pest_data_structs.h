@@ -411,6 +411,11 @@ public:
 	void set_ies_debug_bad_phi(bool _fail) { ies_debug_bad_phi = _fail; }
 	bool get_ies_debug_upgrade_only() const { return ies_debug_upgrade_only; }
 	void set_ies_debug_upgrade_only(bool _flag) { ies_debug_upgrade_only = _flag; }
+	bool get_ies_debug_high_subset_phi() const { return ies_debug_high_subset_phi; }
+	void set_ies_debug_high_subset_phi(bool _flag) { ies_debug_high_subset_phi = _flag; }
+	bool get_ies_debug_high_upgrade_phi() const { return ies_debug_high_upgrade_phi; }
+	void set_ies_debug_high_upgrade_phi(bool _flag) { ies_debug_high_upgrade_phi = _flag; }
+
 	bool get_ies_csv_by_reals() const { return ies_csv_by_reals; }
 	void set_ies_csv_by_reals(bool _flag) { ies_csv_by_reals = _flag; }
 	bool get_ies_autoadaloc() const { return ies_autoadaloc; }
@@ -523,10 +528,13 @@ private:
 	bool ies_debug_fail_remainder;
 	bool ies_debug_bad_phi;
 	bool ies_debug_upgrade_only;
+	bool ies_debug_high_subset_phi;
+	bool ies_debug_high_upgrade_phi;
 	bool ies_csv_by_reals;
 	bool ies_autoadaloc;
 	double ies_autoadaloc_sigma_dist;
 	bool ies_enforce_chglim;
+	
 };
 
 ostream& operator<< (ostream &os, const PestppOptions& val);

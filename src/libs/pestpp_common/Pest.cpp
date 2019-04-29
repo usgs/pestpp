@@ -877,6 +877,8 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	pestpp_options.set_ies_debug_fail_remainder(false);
 	pestpp_options.set_ies_debug_bad_phi(false);
 	pestpp_options.set_ies_debug_upgrade_only(false);
+	pestpp_options.set_ies_debug_high_subset_phi(false);
+	pestpp_options.set_ies_debug_high_upgrade_phi(false);
 	pestpp_options.set_ies_csv_by_reals(true);
 	pestpp_options.set_ies_autoadaloc(false);
 	pestpp_options.set_ies_autoadaloc_sigma_dist(1.0);
