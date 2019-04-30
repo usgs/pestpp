@@ -150,7 +150,8 @@ void Pest::check_inputs(ostream &f_rec)
 		{
 			par_warnings.push_back(pname + " has 'dercom' > 1, pestpp suite doesn't support 'dercom' > 1, ignoring");
 		}
-		if ((prec->chglim != "RELATIVE") && (prec->chglim != "FACTOR"))
+		if (((prec->tranform_type != ParameterRec::TRAN_TYPE::FIXED) && (prec->tranform_type != ParameterRec::TRAN_TYPE::TIED)) && 
+			(prec->chglim != "RELATIVE") && (prec->chglim != "FACTOR"))
 			par_problems.push_back(pname + " 'parchglim not in ['factor','relative']: " + prec->chglim);
 		
 		if ((prec->ubnd > 0.0) && (prec->lbnd < 0.0))
@@ -877,6 +878,8 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	pestpp_options.set_ies_debug_fail_remainder(false);
 	pestpp_options.set_ies_debug_bad_phi(false);
 	pestpp_options.set_ies_debug_upgrade_only(false);
+	pestpp_options.set_ies_debug_high_subset_phi(false);
+	pestpp_options.set_ies_debug_high_upgrade_phi(false);
 	pestpp_options.set_ies_csv_by_reals(true);
 	pestpp_options.set_ies_autoadaloc(false);
 	pestpp_options.set_ies_autoadaloc_sigma_dist(1.0);
