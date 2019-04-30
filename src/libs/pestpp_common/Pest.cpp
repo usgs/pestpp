@@ -150,7 +150,8 @@ void Pest::check_inputs(ostream &f_rec)
 		{
 			par_warnings.push_back(pname + " has 'dercom' > 1, pestpp suite doesn't support 'dercom' > 1, ignoring");
 		}
-		if ((prec->chglim != "RELATIVE") && (prec->chglim != "FACTOR"))
+		if (((prec->tranform_type != ParameterRec::TRAN_TYPE::FIXED) && (prec->tranform_type != ParameterRec::TRAN_TYPE::TIED)) && 
+			(prec->chglim != "RELATIVE") && (prec->chglim != "FACTOR"))
 			par_problems.push_back(pname + " 'parchglim not in ['factor','relative']: " + prec->chglim);
 		
 		if ((prec->ubnd > 0.0) && (prec->lbnd < 0.0))
