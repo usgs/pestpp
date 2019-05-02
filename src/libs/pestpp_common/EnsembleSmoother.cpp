@@ -3186,7 +3186,7 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 		vector<exception_ptr> exception_ptrs;
 		message(2, "launching threads");
 		
-		for (int i = 0; i < min(num_threads,int(loc_map.size())); i++)
+		for (int i = 0; i <num_threads; i++)
 		{
 			exception_ptrs.push_back(exception_ptr());
 		}

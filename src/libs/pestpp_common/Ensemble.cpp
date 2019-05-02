@@ -204,7 +204,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 				vector<exception_ptr> exception_ptrs;
 				plog->log_event("launching draw threads");
 
-				for (int i = 0; i < min(num_threads,int(group_keys.size())); i++)
+				for (int i = 0; i < num_threads; i++)
 				{
 					exception_ptrs.push_back(exception_ptr());
 				}
@@ -2594,7 +2594,7 @@ void DrawThread::work(int thread_id, int num_reals, int ies_verbose, map<string,
 				break;
 			}
 		}
-		while (true)
+		/*while (true)
 		{
 			if (draw_guard.try_lock())
 			{
@@ -2602,7 +2602,7 @@ void DrawThread::work(int thread_id, int num_reals, int ies_verbose, map<string,
 				draw_guard.unlock();
 				break;
 			}
-		}
+		}*/
 		
 		ss.str("");
 		ss << "thread: " << thread_id <<  " - Randomized Eigen decomposition of full cov for " << names.size() << " element matrix" << endl;
@@ -2645,6 +2645,7 @@ void DrawThread::work(int thread_id, int num_reals, int ies_verbose, map<string,
 		{
 			if (draw_guard.try_lock())
 			{
+				block = draws_ptr->block(0, idx[0], num_reals, idx.size());
 				draws_ptr->block(0, idx[0], num_reals, idx.size()) = (proj * block.transpose()).transpose();
 				draw_guard.unlock();
 				break;
