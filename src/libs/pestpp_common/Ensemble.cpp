@@ -193,7 +193,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 				group_keys.push_back(gi.first);
 			DrawThread worker(plog, cov, &draws, group_keys, grouper);
 			int num_threads = pest_scenario_ptr->get_pestpp_options().get_ies_num_threads();
-			if (num_threads <= 0)
+			if ((num_threads <= 0) || (group_keys.size() == 1))
 			{
 				worker.work(0, num_reals, level, idx_map, std_map);
 			}
@@ -204,7 +204,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 				vector<exception_ptr> exception_ptrs;
 				plog->log_event("launching draw threads");
 
-				for (int i = 0; i < num_threads; i++)
+				for (int i = 0; i < min(num_threads,int(group_keys.size())); i++)
 				{
 					exception_ptrs.push_back(exception_ptr());
 				}

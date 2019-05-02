@@ -1280,13 +1280,13 @@ void IterEnsembleSmoother::sanity_checks()
 		warnings.push_back("not using prior scaling - this is really a dev option, you should always use prior scaling...");
 	}*/
 
-	if ((ppo->get_ies_num_threads() > 0) && (!use_localizer))
+	/*if ((ppo->get_ies_num_threads() > 0) && (!use_localizer))
 	{
 		warnings.push_back("'ies_num_threads > 0 but no localization, resetting 'ies_num_threads' = 0");
 		ppo->set_ies_num_threads(-1);
 		num_threads = -1;
 	}
-
+*/
 
 
 	if (warnings.size() > 0)
@@ -3174,8 +3174,8 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 	LocalUpgradeThread worker(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map,
 		localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
 
-	//if ((num_threads < 1) || (loc_map.size() == 1))
-	if (num_threads < 1)
+	if ((num_threads < 1) || (loc_map.size() == 1))
+	//if (num_threads < 1)
 	{
 		worker.work(0, iter, cur_lam);
 	}
@@ -3186,7 +3186,7 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 		vector<exception_ptr> exception_ptrs;
 		message(2, "launching threads");
 		
-		for (int i = 0; i < num_threads; i++)
+		for (int i = 0; i < min(num_threads,int(loc_map.size())); i++)
 		{
 			exception_ptrs.push_back(exception_ptr());
 		}
