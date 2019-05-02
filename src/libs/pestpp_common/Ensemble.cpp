@@ -111,6 +111,22 @@ void Ensemble::add_2_cols_ip(Ensemble &other)
 
 }
 
+
+void draw_thread_function(int id, DrawThread &worker, int num_reals, int ies_verbose, map<string, int> idx_map, map<string, double> std_map, exception_ptr &eptr)
+{
+	try
+	{
+		worker.work(id, num_reals, ies_verbose, idx_map, std_map);
+	}
+	catch (...)
+	{
+		eptr = current_exception();
+	}
+
+	return;
+}
+
+
 void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const vector<string> &draw_names,
 	const map<string, vector<string>> &grouper, PerformanceLog *plog, int level)
 {
@@ -121,7 +137,9 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 
 	//matrix to hold the standard normal draws
 	Eigen::MatrixXd draws(num_reals, draw_names.size());
+
 	draws.setZero();
+	
 
 	//make sure the cov is aligned
 	if (cov.get_col_names() != draw_names)
@@ -136,8 +154,14 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 		f << draws << endl;
 		f.close();
 	}
+	Eigen::MatrixXd draws_temp = draws;
 
 	Eigen::VectorXd std = cov.e_ptr()->diagonal().cwiseSqrt();
+	map<string, double> std_map;
+	for (int i = 0; i < std.size(); i++)
+	{
+		std_map[var_names[i]] = std(i);
+	}
 	//if diagonal cov, then scale by std
 	if (cov.isdiagonal())
 	{
@@ -155,87 +179,149 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 
 		if (grouper.size() > 0)
 		{
-			cout << "...drawing by group" << endl;
-			Covariance gcov;
 			stringstream ss;
-			RedSVD::RedSymEigen<Eigen::SparseMatrix<double>> eig;
-
-			Eigen::MatrixXd proj;
+			ss.str("");
+			ss << "...drawing by group" << endl;
+			plog->log_event(ss.str());
+			cout << ss.str();
 			map<string, int> idx_map;
-			vector<int> idx;
+			
 			for (int i = 0; i < var_names.size(); i++)
 				idx_map[var_names[i]] = i;
-			for (auto &gi : grouper)
+			vector<string> group_keys;
+			for (auto gi : grouper)
+				group_keys.push_back(gi.first);
+			DrawThread worker(plog, cov, &draws, group_keys, grouper);
+			int num_threads = pest_scenario_ptr->get_pestpp_options().get_ies_num_threads();
+			if (num_threads <= 0)
 			{
-				ss.str("");
-				ss << "...processing " << gi.first << " with " << gi.second.size() << " elements" << endl;
-				cout << ss.str();
-				plog->log_event(ss.str());
-				if (gi.second.size() == 0)
-					throw_ensemble_error("Ensemble::draw(): no elements found for group", gi.second);
-				if (gi.second.size() == 1)
+				worker.work(0, num_reals, level, idx_map, std_map);
+			}
+			else
+			{
+				Eigen::setNbThreads(1);
+				vector<thread> threads;
+				vector<exception_ptr> exception_ptrs;
+				plog->log_event("launching draw threads");
+
+				for (int i = 0; i < num_threads; i++)
 				{
-					ss.str("");
-					ss << "only one element in group " << gi.first << ", scaling by std";
-					plog->log_event(ss.str());
-					int j = idx_map[gi.second[0]];
-					draws.col(j) *= std(j);
-					continue;
+					exception_ptrs.push_back(exception_ptr());
 				}
 
-				gcov = cov.get(gi.second);
-				if (level > 2)
+				for (int i = 0; i < num_threads; i++)
 				{
-					gcov.to_ascii(gi.first + "_cov.dat");
+					//threads.push_back(thread(&LocalUpgradeThread::work, &worker, i, iter, cur_lam));
+
+					threads.push_back(thread(draw_thread_function, i, std::ref(worker), num_reals, level, idx_map, std_map,std::ref(exception_ptrs[i])));
+
 				}
-
-				idx.clear();
-				for (auto n : gi.second)
-					idx.push_back(idx_map[n]);
-				if (idx.size() != idx[idx.size() - 1] - idx[0] + 1)
-					throw_ensemble_error("Ensemble:: draw() error in full cov group draw: idx out of order");
-
-				//cout << var_names[idx[0]] << "," << var_names[idx.size() - idx[0]] << endl;
-				//cout << idx[0] << ',' << idx[idx.size()-1] << ',' <<  idx.size() << " , " << idx[idx.size()-1] - idx[0] <<  endl;
-
-				double fac = gcov.e_ptr()->diagonal().minCoeff();
-				ss.str("");
-				ss << "min variance for group " << gi.first << ": " << fac;
-				plog->log_event(ss.str());
-				Eigen::MatrixXd block = draws.block(0, idx[0], num_reals, idx.size());
-				ss.str("");
-				ss << "Randomized Eigen decomposition of full cov for " << gi.second.size() << " element matrix" << endl;
-				plog->log_event(ss.str());
-				eig.compute(*gcov.e_ptr() * (1.0/fac), gi.second.size());
-				//RedSVD::RedSVD<Eigen::SparseMatrix<double>> svd;
-				//svd.compute(*gcov.e_ptr(),gcov.get_col_names().size());// , gi.second.size());
-				//cout << svd.singularValues() << endl;
-				//Eigen::JacobiSVD<Eigen::MatrixXd> svd(gcov.e_ptr()->toDense(), Eigen::ComputeFullU);
-				//svd.computeU();
-
-				proj = (eig.eigenvectors() * (fac *eig.eigenvalues()).cwiseSqrt().asDiagonal());
-				//proj = (svd.matrixU() * svd.singularValues().asDiagonal());
-
-				if (level > 2)
+				plog->log_event("waiting to join threads");
+				//for (auto &t : threads)
+				//	t.join();
+				for (int i = 0; i < num_threads; ++i)
 				{
-					ofstream f(gi.first + "_evec.dat");
-					f << eig.eigenvectors() << endl;
-					//f << svd.matrixU() << endl;
-					f.close();
-					ofstream ff(gi.first + "_sqrt_evals.dat");
-					ff << (fac * eig.eigenvalues()).cwiseSqrt() << endl;
-					//ff << svd.singularValues() << endl;
-					ff.close();
-					ofstream fff(gi.first+"_proj.dat");
-					fff << proj << endl;
-					fff.close();
+					if (exception_ptrs[i])
+					{
+						try
+						{
+							rethrow_exception(exception_ptrs[i]);
+						}
+						catch (const std::exception& e)
+						{
+							ss.str("");
+							ss << "thread " << i << "raised an exception: " << e.what();
+							throw runtime_error(ss.str());
+						}
+					}
+					threads[i].join();
 				}
-				//cout << "block " << block.rows() << " , " << block.cols() << endl;
-				//cout << " proj " << proj.rows() << " , " << proj.cols() << endl;
-				plog->log_event("projecting group block");
-				draws.block(0, idx[0], num_reals, idx.size()) = (proj * block.transpose()).transpose();
+				plog->log_event("threaded draws done");
 
 			}
+			
+
+			//Covariance gcov;
+			//
+			//RedSVD::RedSymEigen<Eigen::SparseMatrix<double>> eig;
+
+			//Eigen::MatrixXd proj;
+			////map<string, int> idx_map;
+			//vector<int> idx;
+			//for (int i = 0; i < var_names.size(); i++)
+			//	idx_map[var_names[i]] = i;
+			//for (auto &gi : grouper)
+			//{
+			//	ss.str("");
+			//	ss << "...processing " << gi.first << " with " << gi.second.size() << " elements" << endl;
+			//	cout << ss.str();
+			//	plog->log_event(ss.str());
+			//	if (gi.second.size() == 0)
+			//		throw_ensemble_error("Ensemble::draw(): no elements found for group", gi.second);
+			//	if (gi.second.size() == 1)
+			//	{
+			//		ss.str("");
+			//		ss << "only one element in group " << gi.first << ", scaling by std";
+			//		plog->log_event(ss.str());
+			//		int j = idx_map[gi.second[0]];
+			//		draws.col(j) *= std(j);
+			//		continue;
+			//	}
+
+			//	gcov = cov.get(gi.second);
+			//	if (level > 2)
+			//	{
+			//		gcov.to_ascii(gi.first + "_cov.dat");
+			//	}
+
+			//	idx.clear();
+			//	for (auto n : gi.second)
+			//		idx.push_back(idx_map[n]);
+			//	if (idx.size() != idx[idx.size() - 1] - idx[0] + 1)
+			//		throw_ensemble_error("Ensemble:: draw() error in full cov group draw: idx out of order");
+
+			//	//cout << var_names[idx[0]] << "," << var_names[idx.size() - idx[0]] << endl;
+			//	//cout << idx[0] << ',' << idx[idx.size()-1] << ',' <<  idx.size() << " , " << idx[idx.size()-1] - idx[0] <<  endl;
+
+			//	double fac = gcov.e_ptr()->diagonal().minCoeff();
+			//	ss.str("");
+			//	ss << "min variance for group " << gi.first << ": " << fac;
+			//	plog->log_event(ss.str());
+			//	Eigen::MatrixXd block = draws.block(0, idx[0], num_reals, idx.size());
+			//	ss.str("");
+			//	ss << "Randomized Eigen decomposition of full cov for " << gi.second.size() << " element matrix" << endl;
+			//	plog->log_event(ss.str());
+			//	eig.compute(*gcov.e_ptr() * (1.0/fac), gi.second.size());
+			//	//RedSVD::RedSVD<Eigen::SparseMatrix<double>> svd;
+			//	//svd.compute(*gcov.e_ptr(),gcov.get_col_names().size());// , gi.second.size());
+			//	//cout << svd.singularValues() << endl;
+			//	//Eigen::JacobiSVD<Eigen::MatrixXd> svd(gcov.e_ptr()->toDense(), Eigen::ComputeFullU);
+			//	//svd.computeU();
+
+			//	proj = (eig.eigenvectors() * (fac *eig.eigenvalues()).cwiseSqrt().asDiagonal());
+			//	//proj = (svd.matrixU() * svd.singularValues().asDiagonal());
+
+			//	if (level > 2)
+			//	{
+			//		ofstream f(gi.first + "_evec.dat");
+			//		f << eig.eigenvectors() << endl;
+			//		//f << svd.matrixU() << endl;
+			//		f.close();
+			//		ofstream ff(gi.first + "_sqrt_evals.dat");
+			//		ff << (fac * eig.eigenvalues()).cwiseSqrt() << endl;
+			//		//ff << svd.singularValues() << endl;
+			//		ff.close();
+			//		ofstream fff(gi.first+"_proj.dat");
+			//		fff << proj << endl;
+			//		fff.close();
+			//	}
+			//	//cout << "block " << block.rows() << " , " << block.cols() << endl;
+			//	//cout << " proj " << proj.rows() << " , " << proj.cols() << endl;
+			//	plog->log_event("projecting group block");
+			//	draws.block(0, idx[0], num_reals, idx.size()) = (proj * block.transpose()).transpose();
+
+			//}
+			
 		}
 		else
 		{
@@ -2333,4 +2419,239 @@ void ObservationEnsemble::from_eigen_mat(Eigen::MatrixXd mat, const vector<strin
 	if (missing.size() > 0)
 		throw_ensemble_error("ObservationEnsemble.from_eigen_mat() the following obs names no found: ", missing);
 	Ensemble::from_eigen_mat(mat, _real_names, _var_names);
+}
+
+DrawThread::DrawThread(PerformanceLog * _performance_log, Covariance & _cov,
+	Eigen::MatrixXd *_draws_ptr, vector<string> &_group_keys, const map<string, vector<string>> &_grouper) : cov(_cov),
+	group_keys(_group_keys), grouper(_grouper)
+{
+	//idx_map = _idx_map;
+	//std_map = _std_map;
+	//std_map = _std_map;
+	performance_log = _performance_log;
+	draws_ptr = _draws_ptr;
+}
+
+
+void DrawThread::work(int thread_id, int num_reals, int ies_verbose, map<string, int> idx_map, map<string,double> std_map)
+{
+	stringstream ss;
+
+	unique_lock<mutex> cov_guard(cov_lock,defer_lock);
+	unique_lock<mutex> draw_guard(draw_lock,defer_lock);
+	//unique_lock<mutex> grouper_guard(grouper_lock,defer_lock);
+	unique_lock<mutex> pfm_guard(pfm_lock,defer_lock);
+	unique_lock<mutex> key_guard(key_lock, defer_lock);
+	int count = 0;
+	string group;
+	vector<string> names;
+	Covariance gcov;
+	vector<int> idx;
+	Eigen::MatrixXd block, proj;
+	RedSVD::RedSymEigen<Eigen::SparseMatrix<double>> eig;
+	while (true)
+	{
+		//get the key for more work, or return if all work done
+		while (true)
+		{
+			if (key_guard.try_lock())
+			{
+				if (group_keys.size() == 0)
+				{
+					ss.str("");
+					ss << "draw thread: " << thread_id << " processed " << count << " groups";
+					if (ies_verbose > 1)
+					{
+						cout << ss.str() << endl;
+
+					}
+					while (true)
+					{
+						if (pfm_guard.try_lock())
+						{
+							performance_log->log_event(ss.str());
+							pfm_guard.unlock();
+							break;
+						}
+					}
+					key_guard.unlock();
+					return;
+				}
+			}
+			group = group_keys[group_keys.size() - 1];
+			group_keys.pop_back();
+			names = grouper[group];
+			if (names.size() == 0)
+			{
+				ss.str("");
+				ss << "no entries for grouper key:" << group;
+				while (true)
+				{
+					if (pfm_guard.try_lock())
+					{
+						performance_log->log_event(ss.str());
+						pfm_guard.unlock();
+						break;
+					}
+				}
+				key_guard.unlock();
+				continue;
+			}
+			key_guard.unlock();
+			break;
+		}
+		
+		if (ies_verbose > 1)
+		{
+			ss.str("");
+			ss << "...processing " << group << " with " <<names.size() << " elements" << endl;
+			cout << ss.str();
+			while (true)
+			{
+				if (pfm_guard.try_lock())
+				{
+					performance_log->log_event(ss.str());
+					pfm_guard.unlock();
+					break;
+				}
+			}
+		}
+
+		//if there is only one par in the group
+		if (names.size() == 1)
+		{
+			ss.str("");
+			ss << "thread: " << thread_id << " - only one element in group " <<group << ", scaling by std";
+			while (true)
+			{
+				if (pfm_guard.try_lock())
+				{
+					performance_log->log_event(ss.str());
+					pfm_guard.unlock();
+					break;
+				}
+			}
+			int j = idx_map[names[0]];
+			while (true)
+			{
+				if (draw_guard.try_lock())
+				{
+					draws_ptr->col(j) *= std_map[names[0]];
+					draw_guard.unlock();
+					break;
+				}
+			}
+			
+			continue;
+		}
+
+		//get a sub cov
+		while (true)
+		{
+			if (cov_guard.try_lock())
+			{
+				gcov = cov.get(names);
+				cov_guard.unlock();
+				break;
+			}
+		}
+		
+		if (ies_verbose > 2)
+		{
+			gcov.to_ascii(group + "_cov.dat");
+		}
+
+		idx.clear();
+		for (auto n : names)
+			idx.push_back(idx_map[n]);
+
+		if (idx.size() != idx[idx.size() - 1] - idx[0] + 1)
+		{
+			ss.str("");
+			ss << "thread: " << thread_id << " - DrawThread error: idx out of order for group: " << group;
+			while (true)
+			{
+				if (pfm_guard.try_lock())
+				{
+					performance_log->log_event(ss.str());
+					pfm_guard.unlock();
+					break;
+				}
+			}
+			throw runtime_error(ss.str());
+		}
+
+
+		double fac = gcov.e_ptr()->diagonal().minCoeff();
+		ss.str("");
+		ss << "thread: " << thread_id <<  " - min variance for group " << group << ": " << fac;
+		while (true)
+		{
+			if (pfm_guard.try_lock())
+			{
+				performance_log->log_event(ss.str());
+				pfm_guard.unlock();
+				break;
+			}
+		}
+		while (true)
+		{
+			if (draw_guard.try_lock())
+			{
+				block = draws_ptr->block(0, idx[0], num_reals, idx.size());
+				draw_guard.unlock();
+				break;
+			}
+		}
+		
+		ss.str("");
+		ss << "thread: " << thread_id <<  " - Randomized Eigen decomposition of full cov for " << names.size() << " element matrix" << endl;
+		while (true)
+		{
+			if (pfm_guard.try_lock())
+			{
+				performance_log->log_event(ss.str());
+				pfm_guard.unlock();
+				break;
+			}
+		}
+		eig.compute(*gcov.e_ptr() * (1.0 / fac), names.size());
+		//RedSVD::RedSVD<Eigen::SparseMatrix<double>> svd;
+		//svd.compute(*gcov.e_ptr(),gcov.get_col_names().size());// , gi.second.size());
+		//cout << svd.singularValues() << endl;
+		//Eigen::JacobiSVD<Eigen::MatrixXd> svd(gcov.e_ptr()->toDense(), Eigen::ComputeFullU);
+		//svd.computeU();
+
+		proj = (eig.eigenvectors() * (fac *eig.eigenvalues()).cwiseSqrt().asDiagonal());
+		//proj = (svd.matrixU() * svd.singularValues().asDiagonal());
+
+		if (ies_verbose > 2)
+		{
+			ofstream f(group + "_evec.dat");
+			f << eig.eigenvectors() << endl;
+			//f << svd.matrixU() << endl;
+			f.close();
+			ofstream ff(group + "_sqrt_evals.dat");
+			ff << (fac * eig.eigenvalues()).cwiseSqrt() << endl;
+			//ff << svd.singularValues() << endl;
+			ff.close();
+			ofstream fff(group + "_proj.dat");
+			fff << proj << endl;
+			fff.close();
+		}
+		//cout << "block " << block.rows() << " , " << block.cols() << endl;
+		//cout << " proj " << proj.rows() << " , " << proj.cols() << endl;
+		while (true)
+		{
+			if (draw_guard.try_lock())
+			{
+				draws_ptr->block(0, idx[0], num_reals, idx.size()) = (proj * block.transpose()).transpose();
+				draw_guard.unlock();
+				break;
+			}
+		}
+		
+
+	}
+
 }
