@@ -5,6 +5,7 @@
 #include <random>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <mutex>
 #include "FileManager.h"
 #include "ObjectiveFunc.h"
 #include "OutputFileWriter.h"
@@ -171,6 +172,29 @@ public:
 	void draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level);
 
 	//ObservationEnsemble get_mean_diff();
+};
+
+class DrawThread
+{
+public:
+
+	DrawThread(PerformanceLog *_performance_log, Covariance &_cov,Eigen::MatrixXd *_draws_ptr,
+		vector<string> &_group_keys, const map<string,vector<string>> &_grouper);
+	
+	void work(int thread_id, int num_reals, int ies_verbose, map<string, int> idx_map, map<string, double> std_map);
+
+
+private:
+    //int num_real, ies_verbose;
+	Eigen::MatrixXd *draws_ptr;
+	PerformanceLog* performance_log;
+	Covariance cov;
+	//Eigen::MatrixXd draws;
+	vector<string> group_keys;
+	//map<string, int> idx_map;
+	map<string, vector<string>> grouper;
+	//map<string, double> std_map;
+	mutex cov_lock, draw_lock, key_lock, pfm_lock;
 };
 
 
