@@ -643,7 +643,7 @@ void AutoAdaLocThread::work(int thread_id)
 							break;
 						}
 					}
-					
+					par_indices_guard.unlock();
 					return;
 				}
 				if (par_indices.size() % 10000 == 0)
