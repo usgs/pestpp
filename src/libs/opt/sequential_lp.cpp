@@ -1936,8 +1936,20 @@ void sequentialLP::iter_presolve()
 	build_constraint_bound_arrays();
 
 	if (use_chance)
+	{
 		presolve_fosm_report();
-
+		stringstream ss;
+		ss << "jcb." << slp_iter << ".fosm.rei";
+		//vector<string> fosm_names = constraints_fosm.get_keys();
+		//Observations obs_fosm = pest_scenario.get_ctl_observations().get_subset(fosm_names.begin(),fosm_names.end());
+		Observations obs_fosm = pest_scenario.get_ctl_observations();
+		for (auto &i : constraints_fosm)
+		{
+			obs_fosm[i.first] = i.second;
+		}
+		of_wr.write_opt_constraint_rei(file_mgr_ptr->open_ofile_ext(ss.str()), slp_iter, pest_scenario.get_ctl_parameters(),
+			pest_scenario.get_ctl_observations(), obs_fosm);
+	}
 	//report to rec file
 	presolve_constraint_report();
 
