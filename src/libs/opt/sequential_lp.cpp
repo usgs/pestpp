@@ -1575,6 +1575,7 @@ void sequentialLP::iter_postsolve()
 
 	double diff, val;
 	Parameters upgrade_pars(all_pars_and_dec_vars);
+	Parameters dv_changes = upgrade_pars;
 	string name;
 	for (int i = 0; i < num_dec_vars(); ++i)
 	{
@@ -1582,7 +1583,7 @@ void sequentialLP::iter_postsolve()
 		val = all_pars_and_dec_vars[name];
 		diff = abs(dec_var_vals[i] - all_pars_and_dec_vars[name]);
 		upgrade_pars.update_rec(name,dec_var_vals[i] + val);
-
+		dv_changes.update_rec(name, dec_var_vals[i] - val);
 		max_abs_dec_var_change = (diff > max_abs_dec_var_change) ? diff : max_abs_dec_var_change;
 		max_abs_dec_var_val = (abs(val) > max_abs_dec_var_val) ? val : max_abs_dec_var_val;
 	}
@@ -1602,7 +1603,8 @@ void sequentialLP::iter_postsolve()
 	postsolve_pi_constraint_report(upgrade_pars);
 
 	Observations upgrade_obs = constraints_sim;
-	Eigen::VectorXd est_obs_vec = jco.get_matrix(ctl_ord_obs_constraint_names, ctl_ord_dec_var_names) * upgrade_pars.get_partial_data_eigen_vec(ctl_ord_dec_var_names);
+	
+	Eigen::VectorXd est_obs_vec = constraints_sim.get_data_eigen_vec(ctl_ord_obs_constraint_names) +  jco.get_matrix(ctl_ord_obs_constraint_names, ctl_ord_dec_var_names) * dv_changes.get_partial_data_eigen_vec(ctl_ord_dec_var_names);
 	upgrade_obs.update_without_clear(ctl_ord_obs_constraint_names, est_obs_vec);
 	postsolve_model_constraint_report(upgrade_obs, "estimated");
 	write_res_file(upgrade_obs, "est");
@@ -1630,7 +1632,7 @@ void sequentialLP::iter_postsolve()
 			for (auto &o : ctl_ord_obs_constraint_names)
 				fosm_obs[o] = fosm_obs[o] + post_constraint_offset[o];
 			//postsolve_model_constraint_report(fosm_obs, "simulated + fosm");
-			write_res_file(upgrade_obs, "sim+fosm");
+			write_res_file(fosm_obs, "sim+fosm");
 		}
 		
 	}
