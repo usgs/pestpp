@@ -1583,7 +1583,7 @@ void sequentialLP::iter_postsolve()
 		val = all_pars_and_dec_vars[name];
 		diff = abs(dec_var_vals[i] - all_pars_and_dec_vars[name]);
 		upgrade_pars.update_rec(name,dec_var_vals[i] + val);
-		dv_changes.update_rec(name, dec_var_vals[i] - val);
+		dv_changes.update_rec(name,upgrade_pars[name] - val);
 		max_abs_dec_var_change = (diff > max_abs_dec_var_change) ? diff : max_abs_dec_var_change;
 		max_abs_dec_var_val = (abs(val) > max_abs_dec_var_val) ? val : max_abs_dec_var_val;
 	}
