@@ -1575,6 +1575,24 @@ void sequentialLP::iter_postsolve()
 
 	double diff, val;
 	Parameters upgrade_pars(all_pars_and_dec_vars);
+	if (!model.primalFeasible())
+	{
+		for (auto &name : ctl_ord_dec_var_names)
+		{
+			upgrade_pars.update_rec(name, numeric_limits<double>::min());
+
+		}
+		stringstream ss;
+		ss << slp_iter << ".par";
+		of_wr.write_par(file_mgr_ptr->open_ofile_ext(ss.str()), upgrade_pars, *par_trans.get_offset_ptr(), *par_trans.get_scale_ptr());
+		file_mgr_ptr->close_file(ss.str());
+		of_wr.write_par(file_mgr_ptr->open_ofile_ext("par"), upgrade_pars, *par_trans.get_offset_ptr(), *par_trans.get_scale_ptr());
+		file_mgr_ptr->close_file("par");
+		f_rec << " --- warning: parameter file " << ss.str() << "contains double min (extreme) values" << endl;
+		f_rec << "     and no res / rei files are being written b/c solution is infeasible" << endl;
+
+		return;
+	}
 	Parameters dv_changes = upgrade_pars;
 	string name;
 	for (int i = 0; i < num_dec_vars(); ++i)
@@ -1621,7 +1639,11 @@ void sequentialLP::iter_postsolve()
 	{
 		f_rec << "  ---  running the model once with optimal decision var values" << endl;
 		bool success = make_upgrade_run(upgrade_pars, upgrade_obs);
-
+		if (!success)
+		{
+			f_rec << " --- optimal decision var value run failed, cannot continue... " << endl;
+			return;
+		}
 		
 		//postsolve_constraint_report(upgrade_obs, upgrade_pars, "simulated");
 		postsolve_model_constraint_report(upgrade_obs, "simulated");
