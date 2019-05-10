@@ -152,11 +152,18 @@ private:
 	//report the fosm chance constraint info before solving the current LP problem
 	void presolve_fosm_report();
 
+	void write_res_file(Observations &obs, string tag);
+
 	//report dec var info the newly solved LP solution.  returns the current and new obj func
 	pair<double,double> postsolve_decision_var_report(Parameters &upgrade_pars);
 
 	//report the current and newly solved LP constraint info
-	void postsolve_constraint_report(Observations &upgrade_obs, Parameters &upgrade_pars);
+	//void postsolve_constraint_report(Observations &upgrade_obs, Parameters &upgrade_pars, string tag="simulated");
+
+	void postsolve_model_constraint_report(Observations &upgrade_obs, string tag);
+
+	void postsolve_pi_constraint_report(Parameters &upgrade_pars);
+
 
 	//check that all constraints and dec vars are satified
 	pair < map < string, double > , map<string,double >> postsolve_check(Observations &upgrade_obs, Parameters &upgrade_pars);
