@@ -1579,7 +1579,7 @@ void sequentialLP::iter_postsolve()
 	{
 		for (auto &name : ctl_ord_dec_var_names)
 		{
-			upgrade_pars.update_rec(name, numeric_limits<double>::min());
+			upgrade_pars.update_rec(name, numeric_limits<double>::lowest());
 
 		}
 		stringstream ss;
