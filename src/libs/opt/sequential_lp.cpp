@@ -326,10 +326,10 @@ void sequentialLP::presolve_constraint_report()
 	return;
 }
 
-void sequentialLP::postsolve_constraint_report(Observations &upgrade_obs,Parameters &upgrade_pars)
+void sequentialLP::postsolve_model_constraint_report(Observations &upgrade_obs, string tag)
 {
 	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
-	f_rec << endl << endl << "     constraint information at end of SLP iteration " << slp_iter << endl << endl;
+	f_rec << endl << endl << "     " << tag << " constraint information at end of SLP iteration " << slp_iter << endl << endl;
 	f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(25) << "simplex status";
 	f_rec << setw(15) << "price";
 	if (use_chance)
@@ -339,7 +339,7 @@ void sequentialLP::postsolve_constraint_report(Observations &upgrade_obs,Paramet
 	vector<double> cur_residuals = get_constraint_residual_vec();
 	vector<double> new_residuals = get_constraint_residual_vec(upgrade_obs);
 	double sim_val;
-	for (int i = 0; i<num_obs_constraints(); ++i)
+	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
 		sim_val = upgrade_obs[name];
@@ -368,7 +368,12 @@ void sequentialLP::postsolve_constraint_report(Observations &upgrade_obs,Paramet
 		}
 	}
 
+}
+
+void sequentialLP::postsolve_pi_constraint_report(Parameters &upgrade_pars)
+{
 	//report prior information constraints
+	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
 	if (num_pi_constraints() > 0)
 	{
 		f_rec << endl << endl << "     prior information constraint information at end of SLP iteration " << slp_iter << endl << endl;
@@ -393,16 +398,7 @@ void sequentialLP::postsolve_constraint_report(Observations &upgrade_obs,Paramet
 			i++;
 		}
 	}
-	stringstream ss;
-	ss << slp_iter << ".rei";
-	of_wr.write_opt_constraint_rei(file_mgr_ptr->open_ofile_ext(ss.str()), slp_iter, upgrade_pars,
-		pest_scenario.get_ctl_observations(), upgrade_obs);
-	file_mgr_ptr->close_file(ss.str());
-	if (use_chance)
-	{
-		f_rec << "  ---  note: residual file " << ss.str() << " reports the simulated" << endl;
-		f_rec << "       constraint values from the model outputs without FOSM offsets" << endl << endl;
-	}
+	
 	return;
 }
 
@@ -1553,12 +1549,23 @@ void sequentialLP::solve()
 	}
 }
 
+void sequentialLP::write_res_file(Observations &obs, string tag)
+{
+	stringstream ss;
+	ss << slp_iter << "." << tag << ".rei";
+	of_wr.write_opt_constraint_rei(file_mgr_ptr->open_ofile_ext(ss.str()), slp_iter, all_pars_and_dec_vars,
+		pest_scenario.get_ctl_observations(), obs);
+	file_mgr_ptr->close_file(ss.str());
+
+}
+
 void sequentialLP::iter_postsolve()
 {
-
 	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
+	f_rec << "  ---  processing results for iteration " << slp_iter << " LP solution  ---  " << endl << endl;
+	
 
-	row_price = model.getRowPrice();
+	
 
 	//extract (optimal) decision vars
 	//and track some info for convergence checking
@@ -1568,6 +1575,25 @@ void sequentialLP::iter_postsolve()
 
 	double diff, val;
 	Parameters upgrade_pars(all_pars_and_dec_vars);
+	if (!model.primalFeasible())
+	{
+		for (auto &name : ctl_ord_dec_var_names)
+		{
+			upgrade_pars.update_rec(name, numeric_limits<double>::lowest());
+
+		}
+		stringstream ss;
+		ss << slp_iter << ".par";
+		of_wr.write_par(file_mgr_ptr->open_ofile_ext(ss.str()), upgrade_pars, *par_trans.get_offset_ptr(), *par_trans.get_scale_ptr());
+		file_mgr_ptr->close_file(ss.str());
+		of_wr.write_par(file_mgr_ptr->open_ofile_ext("par"), upgrade_pars, *par_trans.get_offset_ptr(), *par_trans.get_scale_ptr());
+		file_mgr_ptr->close_file("par");
+		f_rec << " --- warning: parameter file " << ss.str() << "contains double min (extreme) values" << endl;
+		f_rec << "     and no res / rei files are being written b/c solution is infeasible" << endl;
+
+		return;
+	}
+	Parameters dv_changes = upgrade_pars;
 	string name;
 	for (int i = 0; i < num_dec_vars(); ++i)
 	{
@@ -1575,29 +1601,65 @@ void sequentialLP::iter_postsolve()
 		val = all_pars_and_dec_vars[name];
 		diff = abs(dec_var_vals[i] - all_pars_and_dec_vars[name]);
 		upgrade_pars.update_rec(name,dec_var_vals[i] + val);
-
+		dv_changes.update_rec(name,upgrade_pars[name] - val);
 		max_abs_dec_var_change = (diff > max_abs_dec_var_change) ? diff : max_abs_dec_var_change;
 		max_abs_dec_var_val = (abs(val) > max_abs_dec_var_val) ? val : max_abs_dec_var_val;
 	}
 	max_abs_dec_var_change /= max(max_abs_dec_var_val,1.0);
 
-	//run the model with optimal decision var values
+	pair<double, double> cur_new_obj = postsolve_decision_var_report(upgrade_pars);
 
-	Observations upgrade_obs = constraints_sim;
-	if (!super_secret_option)
-	{
-		bool success = make_upgrade_run(upgrade_pars, upgrade_obs);
+	
 
-		f_rec << "  ---  processing results for iteration " << slp_iter << " LP solution  ---  " << endl << endl;
-		postsolve_constraint_report(upgrade_obs, upgrade_pars);
-	}
 	double obj_val = model.getObjValue();
 
-	pair<double,double> cur_new_obj = postsolve_decision_var_report(upgrade_pars);
-
-
-	f_rec << endl << endl <<  "  ---  iteration " << slp_iter << " objective function value: " << setw(15) << cur_new_obj.second << "  ---  " << endl << endl;
+	f_rec << endl << endl << "  ---  iteration " << slp_iter << " objective function value: " << setw(15) << cur_new_obj.second << "  ---  " << endl << endl;
 	cout << endl << endl << "  ---  iteration " << slp_iter << " objective function value: " << setw(15) << cur_new_obj.second << "  ---  " << endl << endl;
+
+	row_price = model.getRowPrice();
+
+	postsolve_pi_constraint_report(upgrade_pars);
+
+	Observations upgrade_obs = constraints_sim;
+	
+	Eigen::VectorXd est_obs_vec = constraints_sim.get_data_eigen_vec(ctl_ord_obs_constraint_names) +  jco.get_matrix(ctl_ord_obs_constraint_names, ctl_ord_dec_var_names) * dv_changes.get_partial_data_eigen_vec(ctl_ord_dec_var_names);
+	upgrade_obs.update_without_clear(ctl_ord_obs_constraint_names, est_obs_vec);
+	postsolve_model_constraint_report(upgrade_obs, "estimated");
+	write_res_file(upgrade_obs, "est");
+	if (use_chance)
+	{
+		Observations fosm_obs = upgrade_obs;
+		for (auto &o : ctl_ord_obs_constraint_names)
+			fosm_obs[o] = fosm_obs[o] + post_constraint_offset[o];
+		//postsolve_model_constraint_report(fosm_obs, "estimated + fosm");
+		write_res_file(fosm_obs, "est+fosm");
+	}
+
+	if (!super_secret_option)
+	{
+		f_rec << "  ---  running the model once with optimal decision var values" << endl;
+		bool success = make_upgrade_run(upgrade_pars, upgrade_obs);
+		if (!success)
+		{
+			f_rec << " --- optimal decision var value run failed, cannot continue... " << endl;
+			return;
+		}
+		
+		//postsolve_constraint_report(upgrade_obs, upgrade_pars, "simulated");
+		postsolve_model_constraint_report(upgrade_obs, "simulated");
+		write_res_file(upgrade_obs, "sim");
+		if (use_chance)
+		{
+			Observations fosm_obs = upgrade_obs;
+			for (auto &o : ctl_ord_obs_constraint_names)
+				fosm_obs[o] = fosm_obs[o] + post_constraint_offset[o];
+			//postsolve_model_constraint_report(fosm_obs, "simulated + fosm");
+			write_res_file(fosm_obs, "sim+fosm");
+		}
+		
+	}
+
+	
 
 	//track the objective function values
 	if (slp_iter == 1)
@@ -1936,8 +1998,20 @@ void sequentialLP::iter_presolve()
 	build_constraint_bound_arrays();
 
 	if (use_chance)
+	{
 		presolve_fosm_report();
-
+		//stringstream ss;
+		//ss << "jcb." << slp_iter << ".fosm.rei";
+		////vector<string> fosm_names = constraints_fosm.get_keys();
+		////Observations obs_fosm = pest_scenario.get_ctl_observations().get_subset(fosm_names.begin(),fosm_names.end());
+		//Observations obs_fosm = pest_scenario.get_ctl_observations();
+		//for (auto &i : constraints_fosm)
+		//{
+		//	obs_fosm[i.first] = i.second;
+		//}
+		//of_wr.write_opt_constraint_rei(file_mgr_ptr->open_ofile_ext(ss.str()), slp_iter, pest_scenario.get_ctl_parameters(),
+		//	pest_scenario.get_ctl_observations(), obs_fosm);
+	}
 	//report to rec file
 	presolve_constraint_report();
 
@@ -1945,9 +2019,10 @@ void sequentialLP::iter_presolve()
 	build_obj_func_coef_array();
 
 	stringstream ss;
-	ss << "jcb." << slp_iter << ".rei";
-	of_wr.write_opt_constraint_rei(file_mgr_ptr->open_ofile_ext(ss.str()), slp_iter, pest_scenario.get_ctl_parameters(),
-		pest_scenario.get_ctl_observations(), constraints_sim);
+	//ss << slp_iter << "jcb.rei";
+	/*of_wr.write_opt_constraint_rei(file_mgr_ptr->open_ofile_ext(ss.str()), slp_iter, pest_scenario.get_ctl_parameters(),
+		pest_scenario.get_ctl_observations(), constraints_sim);*/
+	write_res_file(constraints_sim, "jcb");
 
 	return;
 }
