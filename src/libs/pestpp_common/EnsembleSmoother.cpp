@@ -4065,8 +4065,8 @@ vector<int> IterEnsembleSmoother::run_ensemble(ParameterEnsemble &_pe, Observati
 	if (failed_real_indices.size() > 0)
 	{
 		stringstream ss;
-		vector<string> par_real_names = pe.get_real_names();
-		vector<string> obs_real_names = oe.get_real_names();
+		vector<string> par_real_names = _pe.get_real_names();
+		vector<string> obs_real_names = _oe.get_real_names();
 		ss << "the following par:obs realization runs failed: ";
 		for (auto &i : failed_real_indices)
 		{
