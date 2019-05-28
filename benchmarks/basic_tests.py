@@ -418,10 +418,33 @@ def parchglim_test():
     assert p_df.loc["stage","parval1"] == par.loc["stage","parubnd"]
 
     
-
+def sen_plusplus_test():
+    model_d = "ies_10par_xsec"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
+    
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_sen_plusplus")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
+    pst.pestpp_options = {}
+    pst.pestpp_options["gsa_method"] = "morris"
+    pst.pestpp_options["gsa_sobol_samples"] = 50
+    pst.pestpp_options["gsa_sobol_par_dist"] = "unif"
+    pst.pestpp_options["gsa_morris_r"] = 4
+    pst.pestpp_options["gsa_morris_p"] = 5
+    pst.pestpp_options["gsa_morris_delta"] = 2
+    pst.write(os.path.join(t_d,"pest_sen.pst"))
+    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-sen"), "pest_sen.pst", 5, master_dir=m_d,
+                           slave_root=model_d,local=local,port=port)
 
 if __name__ == "__main__":
-    parchglim_test()
+    sen_plusplus_test()
+    #parchglim_test()
     #unc_file_test()
 
     #basic_test("ies_10par_xsec")
