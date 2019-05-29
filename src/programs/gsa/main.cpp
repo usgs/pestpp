@@ -324,7 +324,7 @@ int main(int argc, char* argv[])
 	auto method = gsa_opt_map.find("GSA_METHOD");
 
 	GsaAbstractBase* gsa_method = nullptr;
-	if (method != gsa_opt_map.end() && method->second == "MORRIS")
+	if (method == gsa_opt_map.end() || method->second == "MORRIS")
 	{
 		int morris_r = 4;
 		int morris_p = 4;

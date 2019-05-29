@@ -443,11 +443,11 @@ def sen_plusplus_test():
                            slave_root=model_d,local=local,port=port)
 
 if __name__ == "__main__":
-    sen_plusplus_test()
+    #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
 
-    #basic_test("ies_10par_xsec")
+    basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
