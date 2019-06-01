@@ -425,6 +425,24 @@ public:
 	bool get_ies_enforce_chglim() const { return ies_enforce_chglim; }
 	void set_ies_enforce_chglim(bool _flag) { ies_enforce_chglim = _flag; }
 
+	string get_gsa_method() const { return gsa_method; }
+	void set_gsa_method(string _m) { gsa_method = _m; }
+	bool get_gsa_morris_pooled_obs() const { return gsa_morris_pooled_obs; }
+	void set_gsa_morris_pooled_obs(bool _flag) {gsa_morris_pooled_obs = _flag; }
+	bool get_gsa_morris_obs_sen() const { return gsa_morris_obs_sen; }
+	void set_gsa_morris_obs_sen(bool _flag) { gsa_morris_obs_sen = _flag; }
+	double get_gsa_morris_p() const { return gsa_morris_p; }
+	void set_gsa_morris_p(double _p) { gsa_morris_p = _p; }
+	double get_gsa_morris_r() const { return gsa_morris_r; }
+	void set_gsa_morris_r(double _r) { gsa_morris_r = _r; }
+	double get_gsa_morris_delta() const { return gsa_morris_delta; }
+	void set_gsa_morris_delta(double _d) { gsa_morris_delta = _d; }
+	int get_gsa_sobol_samples() const { return gsa_sobol_samples; }
+	void set_gsa_sobol_samples(int _s) { gsa_sobol_samples = _s; }
+	string get_gsa_sobol_par_dist() const { return gsa_sobol_par_dist; }
+	void set_gsa_sobol_par_dist(string _d) { gsa_sobol_par_dist = _d; }
+	int get_gsa_rand_seed() const { return gsa_rand_seed; }
+	void set_gsa_rand_seed(int _r) { gsa_rand_seed = _r; }
 
 	set<string> get_passed_args() const { return passed_args; }
 	map<string, string> get_arg_map()const { return arg_map; }
@@ -534,7 +552,17 @@ private:
 	bool ies_autoadaloc;
 	double ies_autoadaloc_sigma_dist;
 	bool ies_enforce_chglim;
-	
+
+	string gsa_method;
+	int gsa_morris_p;
+	int gsa_morris_r;
+	int gsa_sobol_samples;
+	bool gsa_morris_pooled_obs;
+	bool gsa_morris_obs_sen;
+	double gsa_morris_delta;
+	string gsa_sobol_par_dist;
+	int gsa_rand_seed;
+		
 };
 
 ostream& operator<< (ostream &os, const PestppOptions& val);
