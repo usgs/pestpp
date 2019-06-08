@@ -51,13 +51,13 @@ const int RunManagerPanther::PING_INTERVAL_SECS = 60;
 const int RunManagerPanther::MAX_CONCURRENT_RUNS_LOWER_LIMIT = 1;
 
 
-SlaveInfoRec::SlaveInfoRec(int _socket_fd)
+AgentInfoRec::AgentInfoRec(int _socket_fd)
 {
 	socket_fd = _socket_fd;
 	name_info_vec = w_getnameinfo_vec(_socket_fd);
 	run_id = UNKNOWN_ID;
 	group_id = UNKNOWN_ID;
-	state = SlaveInfoRec::State::NEW;
+	state = AgentInfoRec::State::NEW;
 	work_dir = "";
 	linpack_time = std::chrono::hours(-500);
 	run_time = std::chrono::hours(-500);
@@ -67,7 +67,7 @@ SlaveInfoRec::SlaveInfoRec(int _socket_fd)
 	failed_pings = 0;
 }
 
-bool SlaveInfoRec::CompareTimes::operator() (const SlaveInfoRec &a, const SlaveInfoRec &b)
+bool AgentInfoRec::CompareTimes::operator() (const AgentInfoRec &a, const AgentInfoRec &b)
 {
 	bool ret = false;
 	if (a.run_time > std::chrono::milliseconds(0) && b.run_time > std::chrono::milliseconds(0))
@@ -82,88 +82,88 @@ bool SlaveInfoRec::CompareTimes::operator() (const SlaveInfoRec &a, const SlaveI
 }
 
 
-int SlaveInfoRec::get_socket_fd() const
+int AgentInfoRec::get_socket_fd() const
 {
 	return socket_fd;
 }
 
-void SlaveInfoRec::set_socket_fd(int _socket_fd)
+void AgentInfoRec::set_socket_fd(int _socket_fd)
 {
 	socket_fd = _socket_fd;
 }
 
-string SlaveInfoRec::get_hostname()const
+string AgentInfoRec::get_hostname()const
 {
 	return name_info_vec[0];
 }
 
-string SlaveInfoRec::get_port()const
+string AgentInfoRec::get_port()const
 {
 	return name_info_vec[1];
 }
 
-string SlaveInfoRec::get_socket_name()const
+string AgentInfoRec::get_socket_name()const
 {
 	return name_info_vec[0] + ":" + name_info_vec[1];
 }
 
-int SlaveInfoRec::get_run_id() const
+int AgentInfoRec::get_run_id() const
 {
 	return run_id;
 }
 
-void SlaveInfoRec::set_run_id(int _run_id)
+void AgentInfoRec::set_run_id(int _run_id)
 {
 	run_id = _run_id;
 }
 
-int SlaveInfoRec::get_group_id() const
+int AgentInfoRec::get_group_id() const
 {
 	return group_id;
 }
 
-void SlaveInfoRec::set_group_id(int _group_id)
+void AgentInfoRec::set_group_id(int _group_id)
 {
 	group_id = _group_id;
 }
 
-SlaveInfoRec::State SlaveInfoRec::get_state() const
+AgentInfoRec::State AgentInfoRec::get_state() const
 {
 	return state;
 }
 
-void SlaveInfoRec::set_state(const State &_state)
+void AgentInfoRec::set_state(const State &_state)
 {
-	if (_state == SlaveInfoRec::State::ACTIVE)
+	if (_state == AgentInfoRec::State::ACTIVE)
 	{
-		throw PestError("SlaveInfo::set_state: run_id and group_id must be supplied when state it set to active");
+		throw PestError("AgentInfo::set_state: run_id and group_id must be supplied when state it set to active");
 	}
 	state = _state;
 }
 
-void SlaveInfoRec::set_state(const State &_state, int _run_id, int _group_id)
+void AgentInfoRec::set_state(const State &_state, int _run_id, int _group_id)
 {
 	state = _state;
 	run_id = _run_id;
 	group_id = _group_id;
 }
 
-void SlaveInfoRec::set_work_dir(const std::string &_work_dir)
+void AgentInfoRec::set_work_dir(const std::string &_work_dir)
 {
 	work_dir = _work_dir;
 }
 
-string SlaveInfoRec::get_work_dir() const
+string AgentInfoRec::get_work_dir() const
 {
 	return work_dir;
 }
 
-void SlaveInfoRec::start_timer()
+void AgentInfoRec::start_timer()
 {
 	start_time = std::chrono::system_clock::now();
 }
 
-void SlaveInfoRec::end_run()
+void AgentInfoRec::end_run()
 {
 	auto dt = std::chrono::system_clock::now() - start_time;
 	if (run_time > std::chrono::hours(0))
@@ -177,56 +177,56 @@ void SlaveInfoRec::end_run()
 	}
 }
 
-void SlaveInfoRec::end_linpack()
+void AgentInfoRec::end_linpack()
 {
 	linpack_time = std::chrono::system_clock::now() - start_time;
 }
 
-double SlaveInfoRec::get_duration_sec() const
+double AgentInfoRec::get_duration_sec() const
 {
 	chrono::system_clock::duration dt = chrono::system_clock::now() - start_time;
 	return (double)std::chrono::duration_cast<std::chrono::milliseconds>(dt).count() / 1000.0;
 }
 
-double SlaveInfoRec::get_duration_minute() const
+double AgentInfoRec::get_duration_minute() const
 {
 	return get_duration_sec() / 60.0;
 }
 
-double SlaveInfoRec::get_runtime_sec() const
+double AgentInfoRec::get_runtime_sec() const
 {
 	return(double)std::chrono::duration_cast<std::chrono::milliseconds>(run_time).count() / 1000.0;
 }
 
-double SlaveInfoRec::get_runtime_minute() const
+double AgentInfoRec::get_runtime_minute() const
 {
 	double run_minutes = std::chrono::duration_cast<std::chrono::milliseconds>(run_time).count() / 60000.0;
 	return run_minutes;
 }
 
-double SlaveInfoRec::get_runtime() const
+double AgentInfoRec::get_runtime() const
 {
 	return double(run_time.count());
 }
 
-double SlaveInfoRec::get_linpack_time() const
+double AgentInfoRec::get_linpack_time() const
 {
 	return double(linpack_time.count());
 }
 
 
-void SlaveInfoRec::reset_failed_pings()
+void AgentInfoRec::reset_failed_pings()
 {
 	failed_pings = 0;
 }
 
-int SlaveInfoRec::add_failed_ping()
+int AgentInfoRec::add_failed_ping()
 {
 	failed_pings++;
 	return failed_pings;
 }
 
-void SlaveInfoRec::set_ping(bool val)
+void AgentInfoRec::set_ping(bool val)
 {
 	ping = val;
 	//a success response
@@ -235,22 +235,22 @@ void SlaveInfoRec::set_ping(bool val)
 	else reset_last_ping_time();
 }
 
-bool SlaveInfoRec::get_ping() const
+bool AgentInfoRec::get_ping() const
 {
 	return ping;
 }
 
-int SlaveInfoRec::get_failed_pings() const
+int AgentInfoRec::get_failed_pings() const
 {
 	return failed_pings;
 }
 
-void SlaveInfoRec::reset_last_ping_time()
+void AgentInfoRec::reset_last_ping_time()
 {
 	last_ping_time = chrono::system_clock::now();
 }
 
-int SlaveInfoRec::seconds_since_last_ping_time() const
+int AgentInfoRec::seconds_since_last_ping_time() const
 {
 	return chrono::duration_cast<std::chrono::seconds>
 		(chrono::system_clock::now() - last_ping_time).count();
@@ -309,7 +309,7 @@ int RunManagerPanther::get_n_concurrent(int run_id)
 	int n = 0;
 	for (auto &i = range_pair.first; i != range_pair.second; ++i)
 	{
-		if (i->second->get_state() == SlaveInfoRec::State::ACTIVE)
+		if (i->second->get_state() == AgentInfoRec::State::ACTIVE)
 		{
 			++n;
 		}
@@ -317,7 +317,7 @@ int RunManagerPanther::get_n_concurrent(int run_id)
 	return n;
 }
 
-list<SlaveInfoRec>::iterator RunManagerPanther::get_active_run_iter(int socket)
+list<AgentInfoRec>::iterator RunManagerPanther::get_active_run_iter(int socket)
 {
 	auto iter = socket_to_iter_map.find(socket);
 
@@ -327,7 +327,7 @@ list<SlaveInfoRec>::iterator RunManagerPanther::get_active_run_iter(int socket)
 	}
 	else
 	{
-		return slave_info_set.end();
+		return agent_info_set.end();
 	}
 }
 
@@ -424,14 +424,14 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	int num_runs = waiting_runs.size();
 	cout << "    running model " << num_runs << " times" << endl;
 	f_rmr << "running model " << num_runs << " times" << endl;
-	if (slave_info_set.size() == 0) // first entry is the listener, slave apears after this
+	if (agent_info_set.size() == 0) // first entry is the listener, slave apears after this
 	{
-		cout << endl << "      waiting for slaves to appear..." << endl << endl;
-		f_rmr << endl << "    waiting for slaves to appear..." << endl << endl;
+		cout << endl << "      waiting for agents to appear..." << endl << endl;
+		f_rmr << endl << "    waiting for agents to appear..." << endl << endl;
 	}
 	else
 	{
-		for (auto &si : slave_info_set)
+		for (auto &si : agent_info_set)
 			si.reset_runtime();
 	}
 	cout << endl;
@@ -439,7 +439,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 
 	cout << "PANTHER progress" << endl;
 	cout << "   runs(C = completed | F = failed | T = timed out)" << endl;
-	cout << "   slaves(R = running | W = waiting | U = unavailable)" << endl;
+	cout << "   agents(R = running | W = waiting | U = unavailable)" << endl;
 	cout << "------------------------------------------------------------------------------" << endl;
 
 	std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
@@ -447,7 +447,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	while (!all_runs_complete() && terminate_reason == RUN_UNTIL_COND::NORMAL)
 	{
 		echo();
-		init_slaves();
+		init_agents();
 		//schedule runs on available nodes
 		schedule_runs();
 		echo();
@@ -527,35 +527,35 @@ bool RunManagerPanther::ping()
 bool RunManagerPanther::ping(int i_sock)
 {
 	bool ping_sent = false;
-	list<SlaveInfoRec>::iterator slave_info_iter = socket_to_iter_map.at(i_sock);
-	SlaveInfoRec::State state = slave_info_iter->get_state();
-	if (state != SlaveInfoRec::State::WAITING
-		&& state != SlaveInfoRec::State::ACTIVE
-		&& state != SlaveInfoRec::State::COMPLETE
-		&& state != SlaveInfoRec::State::KILLED
-		&& state != SlaveInfoRec::State::KILLED_FAILED)
+	list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(i_sock);
+	AgentInfoRec::State state = agent_info_iter->get_state();
+	if (state != AgentInfoRec::State::WAITING
+		&& state != AgentInfoRec::State::ACTIVE
+		&& state != AgentInfoRec::State::COMPLETE
+		&& state != AgentInfoRec::State::KILLED
+		&& state != AgentInfoRec::State::KILLED_FAILED)
 	{
 		return ping_sent;
 	}
 
-	string sock_hostname = slave_info_iter->get_hostname();
+	string sock_hostname = agent_info_iter->get_hostname();
 	fd_set read_fds = master;
-	//if the slave hasn't communicated since the last ping request
-	if ((!FD_ISSET(i_sock, &read_fds)) && slave_info_iter->get_ping())
+	//if the agent hasn't communicated since the last ping request
+	if ((!FD_ISSET(i_sock, &read_fds)) && agent_info_iter->get_ping())
 	{
-		int fails = slave_info_iter->add_failed_ping();
-		report("failed to receive ping response from slave: " + sock_hostname + "$" + slave_info_iter->get_work_dir(), false);
+		int fails = agent_info_iter->add_failed_ping();
+		report("failed to receive ping response from agent: " + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
 		if (fails >= MAX_FAILED_PINGS)
 		{
 			ping_sent = true;
-			report("max failed ping communications since last successful run for slave:" + sock_hostname + "$" + slave_info_iter->get_work_dir() + "  -> terminating", false);
-			close_slave(i_sock);
+			report("max failed ping communications since last successful run form agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir() + "  -> terminating", false);
+			close_agent(i_sock);
 			return ping_sent;
 		}
 	}
 	//check if it is time to ping again...
-	double duration = (double)slave_info_iter->seconds_since_last_ping_time();
-	double ping_time = max(double(PING_INTERVAL_SECS), slave_info_iter->get_runtime_sec());
+	double duration = (double)agent_info_iter->seconds_since_last_ping_time();
+	double ping_time = max(double(PING_INTERVAL_SECS), agent_info_iter->get_runtime_sec());
 	if (duration >= ping_time)
 	{
 		ping_sent = true;
@@ -564,18 +564,18 @@ bool RunManagerPanther::ping(int i_sock)
 		int err = net_pack.send(i_sock, data, 0);
 		if (err <= 0)
 		{
-			int fails = slave_info_iter->add_failed_ping();
-			report("failed to send ping request to slave:" + sock_hostname + "$" + slave_info_iter->get_work_dir(), false);
+			int fails = agent_info_iter->add_failed_ping();
+			report("failed to send ping request to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
 			if (fails >= MAX_FAILED_PINGS)
 			{
-				report("max failed ping communications since last successful run for slave:" + sock_hostname + "$" + slave_info_iter->get_work_dir() + "  -> terminating", true);
-				close_slave(i_sock);
+				report("max failed ping communications since last successful run for agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir() + "  -> terminating", true);
+				close_agent(i_sock);
 				return ping_sent;
 			}
 		}
-		else slave_info_iter->set_ping(true);
+		else agent_info_iter->set_ping(true);
 #ifdef _DEBUG
-		report("ping sent to slave:" + sock_hostname + "$" + slave_info_iter->get_work_dir(), false);
+		report("ping sent to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
 #endif
 	}
 	return ping_sent;
@@ -610,13 +610,13 @@ bool RunManagerPanther::listen()
 				if (newfd == -1) {}
 				else
 				{
-					add_slave(newfd);
+					add_agent(newfd);
 				}
 			}
 			else  // handle data from a client
 			{
 				//set the ping flag since the slave sent something back
-				list<SlaveInfoRec>::iterator iter = socket_to_iter_map.at(i);
+				list<AgentInfoRec>::iterator iter = socket_to_iter_map.at(i);
 				iter->set_ping(false);
 				process_message(i);
 			} // END handle data from client
@@ -625,7 +625,7 @@ bool RunManagerPanther::listen()
 	return got_message;
 }
 
-void RunManagerPanther::close_slaves()
+void RunManagerPanther::close_agents()
 {
 	/*for (int i = 0; i <= fdmax; i++)
 	{
@@ -640,42 +640,42 @@ void RunManagerPanther::close_slaves()
 		for (auto &si : socket_to_iter_map)
 			sock_nums.push_back(si.first);
 		for (auto si : sock_nums)
-			close_slave(si);
+			close_agent(si);
 		w_sleep(2000);
 
 	}
 }
 
-void RunManagerPanther::close_slave(int i_sock)
+void RunManagerPanther::close_agent(int i_sock)
 {
-	list<SlaveInfoRec>::iterator slave_info_iter = socket_to_iter_map.at(i_sock);
-	close_slave(slave_info_iter);
+	list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(i_sock);
+	close_agent(agent_info_iter);
 }
 
-void RunManagerPanther::close_slave(list<SlaveInfoRec>::iterator slave_info_iter)
+void RunManagerPanther::close_agent(list<AgentInfoRec>::iterator agent_info_iter)
 {
-	int i_sock = slave_info_iter->get_socket_fd();
-	int run_id = slave_info_iter->get_run_id();
-	SlaveInfoRec::State state = slave_info_iter->get_state();
+	int i_sock = agent_info_iter->get_socket_fd();
+	int run_id = agent_info_iter->get_run_id();
+	AgentInfoRec::State state = agent_info_iter->get_state();
 
-	string socket_name = slave_info_iter->get_socket_name();
+	string socket_name = agent_info_iter->get_socket_name();
 	w_close(i_sock); // bye!
 	FD_CLR(i_sock, &master); // remove from master set
 	// remove run from active_runid_to_iterset_map
-	unschedule_run(slave_info_iter);
+	unschedule_run(agent_info_iter);
 
 	// check if this run needs to be returned to the waiting queue
 	int n_concurr = get_n_concurrent(run_id);
-	if (run_id != SlaveInfoRec::UNKNOWN_ID &&  slave_info_iter->get_state() == SlaveInfoRec::State::ACTIVE && n_concurr == 0)
+	if (run_id != AgentInfoRec::UNKNOWN_ID &&  agent_info_iter->get_state() == AgentInfoRec::State::ACTIVE && n_concurr == 0)
 	{
 		waiting_runs.push_front(run_id);
 	}
 
-	slave_info_set.erase(slave_info_iter);
+	agent_info_set.erase(agent_info_iter);
 	socket_to_iter_map.erase(i_sock);
 
 	stringstream ss;
-	ss << "closed connection to slave: " << socket_name << ", number of slaves: " << socket_to_iter_map.size();
+	ss << "closed connection to agent: " << socket_name << ", number of agents: " << socket_to_iter_map.size();
 	report(ss.str(), false);
 }
 
@@ -684,12 +684,12 @@ void RunManagerPanther::schedule_runs()
 {
 	NetPackage net_pack;
 
-	std::list<list<SlaveInfoRec>::iterator> free_slave_list = get_free_slave_list();
-	int n_responsive_slaves = get_n_responsive_slaves();
+	std::list<list<AgentInfoRec>::iterator> free_agent_list = get_free_agent_list();
+	int n_responsive_agents = get_n_responsive_agents();
 	//first try to schedule waiting runs
-	for (auto it_run = waiting_runs.begin(); !free_slave_list.empty() && it_run != waiting_runs.end();)
+	for (auto it_run = waiting_runs.begin(); !free_agent_list.empty() && it_run != waiting_runs.end();)
 	{
-		int success = schedule_run(*it_run, free_slave_list, n_responsive_slaves);
+		int success = schedule_run(*it_run, free_agent_list, n_responsive_agents);
 		if (success >= 0)
 		{
 			it_run = waiting_runs.erase(it_run);
@@ -709,20 +709,20 @@ void RunManagerPanther::schedule_runs()
 			double global_avg_runtime = get_global_runtime_minute();
 			bool should_schedule = false;
 
-			list<SlaveInfoRec>::iterator it_slave, iter_e;
-			for (it_slave = slave_info_set.begin(), iter_e = slave_info_set.end();
-				it_slave != iter_e; ++it_slave)
+			list<AgentInfoRec>::iterator it_agent, iter_e;
+			for (it_agent = agent_info_set.begin(), iter_e = agent_info_set.end();
+				it_agent != iter_e; ++it_agent)
 			{
-				SlaveInfoRec::State state = it_slave->get_state();
-				if (state == SlaveInfoRec::State::ACTIVE)
+				AgentInfoRec::State state = it_agent->get_state();
+				if (state == AgentInfoRec::State::ACTIVE)
 				{
 					should_schedule = false;
-					int run_id = it_slave->get_run_id();
-					int act_sock_id = it_slave->get_socket_fd();
+					int run_id = it_agent->get_run_id();
+					int act_sock_id = it_agent->get_socket_fd();
 					int n_concur = get_n_concurrent(run_id);
 
-					duration = it_slave->get_duration_minute();
-					avg_runtime = it_slave->get_runtime_minute();
+					duration = it_agent->get_duration_minute();
+					avg_runtime = it_agent->get_runtime_minute();
 					if (avg_runtime <= 0) avg_runtime = global_avg_runtime;
 					if (avg_runtime <= 0) avg_runtime = 1.0E+10;
 					vector<int> overdue_kill_runs_vec = get_overdue_runs_over_kill_threshold(run_id);
@@ -749,14 +749,14 @@ void RunManagerPanther::schedule_runs()
 						model_runs_timed_out += overdue_kill_runs_vec.size();
 					}
 					else if (((duration > overdue_giveup_minutes) || (duration > avg_runtime*overdue_giveup_fac))
-						&& free_slave_list.empty())
+						&& free_agent_list.empty())
 					{
 						// If there are no free slaves kill the overdue ones
 						// This is necessary to keep runs with small numbers of slaves behaving
 						stringstream ss;
 						ss << "overdue. duration:" << duration << ", avg:" << avg_runtime;
-						kill_run(it_slave, ss.str());
-						update_run_failed(run_id, it_slave->get_socket_fd());
+						kill_run(it_agent, ss.str());
+						update_run_failed(run_id, it_agent->get_socket_fd());
 
 						if (failure_map.count(run_id) + overdue_kill_runs_vec.size() <= max_n_failure)
 						{
@@ -771,15 +771,15 @@ void RunManagerPanther::schedule_runs()
 						else should_schedule = false;
 					}
 
-					if ((!free_slave_list.empty()) && should_schedule)
+					if ((!free_agent_list.empty()) && should_schedule)
 					{
-						string host_name = it_slave->get_hostname();
+						string host_name = it_agent->get_hostname();
 						stringstream ss;
 						ss << "rescheduling overdue run " << run_id << " (" << duration << "|" <<
 							avg_runtime << " minutes) on: " << host_name << "$" <<
-							it_slave->get_work_dir();
+							it_agent->get_work_dir();
 						report(ss.str(), false);
-						int success = schedule_run(run_id, free_slave_list, n_responsive_slaves);
+						int success = schedule_run(run_id, free_agent_list, n_responsive_agents);
 						n_concur = get_n_concurrent(run_id);
 						if (success >= 0)
 						{
@@ -809,10 +809,10 @@ void RunManagerPanther::schedule_runs()
 	}
 }
 
-int RunManagerPanther::schedule_run(int run_id, std::list<list<SlaveInfoRec>::iterator> &free_slave_list, int n_responsive_slaves)
+int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::iterator> &free_agent_list, int n_responsive_agents)
 {
 	int scheduled = -1;
-	auto it_slave = free_slave_list.end(); // iterator to current socket
+	auto it_agent = free_agent_list.end(); // iterator to current socket
 	int n_concurrent = get_n_concurrent(run_id);
 
 	if (run_finished(run_id))
@@ -828,21 +828,21 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<SlaveInfoRec>::it
 	else if (failure_map.count(run_id) == 0)// || failure_map.count(run_id) >= slave_fd.size())
 	{
 		// schedule a run on a slave
-		it_slave = free_slave_list.begin();
+		it_agent = free_agent_list.begin();
 		scheduled = -1;
 	}
-	else if (failure_map.count(run_id) + n_concurrent >= n_responsive_slaves)
+	else if (failure_map.count(run_id) + n_concurrent >= n_responsive_agents)
 	{
 		// enough enough slaves to make all failed runs on different slaves
 		// schedule a run on a slave
-		it_slave = free_slave_list.begin();
+		it_agent = free_agent_list.begin();
 		scheduled = -1;
 	}
 	else if (failure_map.count(run_id) > 0)
 	{
-		for (it_slave = free_slave_list.begin(); it_slave != free_slave_list.end(); ++it_slave)
+		for (it_agent = free_agent_list.begin(); it_agent != free_agent_list.end(); ++it_agent)
 		{
-			int socket_fd = (*it_slave)->get_socket_fd();
+			int socket_fd = (*it_agent)->get_socket_fd();
 			auto fail_iter_pair = failure_map.equal_range(run_id);
 
 			auto i = fail_iter_pair.first;
@@ -858,26 +858,26 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<SlaveInfoRec>::it
 			}
 		}
 	}
-	if (it_slave != free_slave_list.end())
+	if (it_agent != free_agent_list.end())
 	{
-		int socket_fd = (*it_slave)->get_socket_fd();
+		int socket_fd = (*it_agent)->get_socket_fd();
 		vector<char> data = file_stor.get_serial_pars(run_id);
-		string host_name = (*it_slave)->get_hostname();
+		string host_name = (*it_agent)->get_hostname();
 		NetPackage net_pack(NetPackage::PackType::START_RUN, cur_group_id, run_id, "");
 		int err = net_pack.send(socket_fd, &data[0], data.size());
 		if (err > 0)
 		{
-			(*it_slave)->set_state(SlaveInfoRec::State::ACTIVE, run_id, cur_group_id);
+			(*it_agent)->set_state(AgentInfoRec::State::ACTIVE, run_id, cur_group_id);
 			//start run timer
-			(*it_slave)->start_timer();
+			(*it_agent)->start_timer();
 			//reset the last ping time so we don't ping immediately after run is started
-			(*it_slave)->reset_last_ping_time();
-			active_runid_to_iterset_map.insert(make_pair(run_id, *it_slave));
+			(*it_agent)->reset_last_ping_time();
+			active_runid_to_iterset_map.insert(make_pair(run_id, *it_agent));
 			stringstream ss;
-			ss << "Sending run " << run_id << " to: " << host_name << "$" << (*it_slave)->get_work_dir() <<
+			ss << "Sending run " << run_id << " to: " << host_name << "$" << (*it_agent)->get_work_dir() <<
 				"  (group id:" << cur_group_id << ", run id:" << run_id << ", concurrent runs:" << get_n_concurrent(run_id) << ")";
 			report(ss.str(), false);
-			free_slave_list.erase(it_slave);
+			free_agent_list.erase(it_agent);
 			scheduled = 1;
 		}
 	}
@@ -888,11 +888,11 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<SlaveInfoRec>::it
 
 void RunManagerPanther::echo()
 {
-	map<string, int> stats_map = get_slave_stats();
+	map<string, int> stats_map = get_agent_stats();
 	cout << get_time_string_short() << " runs("
 		<< "C=" << setw(5) << left << model_runs_done
 		<< "| F=" << setw(5) << left << model_runs_failed
-		<< "| T=" << setw(5) << left << model_runs_timed_out << "): slaves("
+		<< "| T=" << setw(5) << left << model_runs_timed_out << "): agents("
 		<< "R=" << setw(4) << left << stats_map["run"]
 		<< "| W=" << setw(4) << left << stats_map["wait"]
 		<< "| U=" << setw(4) << left << stats_map["unavailable"] << ")\r" << flush;
@@ -936,29 +936,29 @@ void RunManagerPanther::process_message(int i_sock)
 {
 	NetPackage net_pack;
 	int err;
-	list<SlaveInfoRec>::iterator slave_info_iter = socket_to_iter_map.at(i_sock);
+	list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(i_sock);
 
-	string host_name = slave_info_iter->get_hostname();
-	string port_name = slave_info_iter->get_port();
-	string socket_name = slave_info_iter->get_socket_name();
+	string host_name = agent_info_iter->get_hostname();
+	string port_name = agent_info_iter->get_port();
+	string socket_name = agent_info_iter->get_socket_name();
 
 	if(( err=net_pack.recv(i_sock)) <=0) // error or lost connection
 	{
 		if (err  == -2) {
-			report("received corrupt message from slave: " + host_name + "$" + slave_info_iter->get_work_dir() + " - terminating slave", false);
+			report("received corrupt message from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + " - terminating agent", false);
 		}
 		else if (err < 0) {
-			report("receive failed from slave: " + host_name + "$" + slave_info_iter->get_work_dir() + " - terminating slave", false);
+			report("receive failed from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + " - terminating agent", false);
 		}
 		else {
-			report("lost connection to slave: " + host_name + "$" + slave_info_iter->get_work_dir(), false);
+			report("lost connection to agent: " + host_name + "$" + agent_info_iter->get_work_dir(), false);
 		}
-		close_slave(i_sock);
+		close_agent(i_sock);
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::CORRUPT_MESG)
 	{
-		report("Slave reporting corrupt message: " + host_name + "$" + slave_info_iter->get_work_dir() + " - terminating slave", false);
-		close_slave(i_sock);
+		report("agent reporting corrupt message: " + host_name + "$" + agent_info_iter->get_work_dir() + " - terminating agent", false);
+		close_agent(i_sock);
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::RUNDIR)
 	{
@@ -967,29 +967,29 @@ void RunManagerPanther::process_message(int i_sock)
 		{
 			string work_dir = NetPackage::extract_string(net_pack.get_data(), 0, net_pack.get_data().size());
 			stringstream ss;
-			ss << "initializing new slave connection from: " << socket_name << ", number of slaves: " << socket_to_iter_map.size() << ", working dir: " << work_dir;
+			ss << "initializing new agent connection from: " << socket_name << ", number of agents: " << socket_to_iter_map.size() << ", working dir: " << work_dir;
 			report(ss.str(), false);
-			slave_info_iter->set_work_dir(work_dir);
-			slave_info_iter->set_state(SlaveInfoRec::State::CWD_RCV);
+			agent_info_iter->set_work_dir(work_dir);
+			agent_info_iter->set_state(AgentInfoRec::State::CWD_RCV);
 		}
 		else
 		{
-			report("received corrupt run directory from slave: " + host_name + " - terminating slave", false);
-			close_slave(i_sock);
+			report("received corrupt run directory from agent: " + host_name + " - terminating agent", false);
+			close_agent(i_sock);
 		}
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::LINPACK)
 	{
-		slave_info_iter->end_linpack();
-		slave_info_iter->set_state(SlaveInfoRec::State::LINPACK_RCV);
+		agent_info_iter->end_linpack();
+		agent_info_iter->set_state(AgentInfoRec::State::LINPACK_RCV);
 		stringstream ss;
-		ss << "new slave ready: " << socket_name;
+		ss << "new agent ready: " << socket_name;
 		report(ss.str(), false);
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::READY)
 	{
 		// ready message received from slave
-		slave_info_iter->set_state(SlaveInfoRec::State::WAITING);
+		agent_info_iter->set_state(AgentInfoRec::State::WAITING);
 	}
 
 	else if ( (net_pack.get_type() == NetPackage::PackType::RUN_FINISHED
@@ -1014,18 +1014,18 @@ void RunManagerPanther::process_message(int i_sock)
 		if (run_finished(run_id))
 		{
 			stringstream ss;
-			ss << "Prevoiusly completed run:" << run_id << ", finished on:" << host_name << "$" << slave_info_iter->get_work_dir() <<
-				"  (run time:" << slave_info_iter->get_runtime_minute() << " min, group id:" << group_id <<
+			ss << "Prevoiusly completed run:" << run_id << ", finished on:" << host_name << "$" << agent_info_iter->get_work_dir() <<
+				"  (run time:" << agent_info_iter->get_runtime_minute() << " min, group id:" << group_id <<
 				", run id:" << run_id << " concurrent:" << get_n_concurrent(run_id) << ")";
 			report(ss.str(), false);
 		}
 		else
 		{
 			// keep track of model run time
-			slave_info_iter->end_run();
+			agent_info_iter->end_run();
 			stringstream ss;
-			ss << "run " << run_id << " received from: " << host_name << "$" << slave_info_iter->get_work_dir() <<
-				"  (run time:" << slave_info_iter->get_runtime_minute() << " min, avg run time:" << get_global_runtime_minute() << " min, group id:" << group_id <<
+			ss << "run " << run_id << " received from: " << host_name << "$" << agent_info_iter->get_work_dir() <<
+				"  (run time:" << agent_info_iter->get_runtime_minute() << " min, avg run time:" << get_global_runtime_minute() << " min, group id:" << group_id <<
 				", run id: " << run_id << " concurrent:" << get_n_concurrent(run_id) << ")";
 			report(ss.str(), false);
 			process_model_run(i_sock, net_pack);
@@ -1043,7 +1043,7 @@ void RunManagerPanther::process_message(int i_sock)
 
 		if (!run_finished(run_id))
 		{
-			ss << "Run " << run_id << " failed on slave:" << host_name << "$" << slave_info_iter->get_work_dir() << "  (group id: " << group_id << ", run id: " << run_id << ", concurrent: " << n_concur << ") ";
+			ss << "Run " << run_id << " failed on agent:" << host_name << "$" << agent_info_iter->get_work_dir() << "  (group id: " << group_id << ", run id: " << run_id << ", concurrent: " << n_concur << ") ";
 			report(ss.str(), false);
 			model_runs_failed++;
 			update_run_failed(run_id, i_sock);
@@ -1065,24 +1065,24 @@ void RunManagerPanther::process_message(int i_sock)
 		auto it = get_active_run_iter(i_sock);
 		unschedule_run(it);
 		stringstream ss;
-		ss << "Run " << run_id << " killed on slave: " << host_name << "$" << slave_info_iter->get_work_dir() << ", run id:" << run_id << " concurrent: " << n_concur;
+		ss << "Run " << run_id << " killed on agent: " << host_name << "$" << agent_info_iter->get_work_dir() << ", run id:" << run_id << " concurrent: " << n_concur;
 		report(ss.str(), false);
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::PING)
 	{
 #ifdef _DEBUG
-		report("ping received from slave" + host_name + "$" + slave_info_iter->get_work_dir(), false);
+		report("ping received from agent" + host_name + "$" + agent_info_iter->get_work_dir(), false);
 #endif
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::IO_ERROR)
 	{
 		//string err(net_pack.get_data().begin(),net_pack.get_data().end());
-		report("error in model IO files on slave: " + host_name + "$" + slave_info_iter->get_work_dir() + "-terminating slave. ", true);
-		close_slave(i_sock);
+		report("error in model IO files on agent: " + host_name + "$" + agent_info_iter->get_work_dir() + "-terminating agent. ", true);
+		close_agent(i_sock);
 	}
 	else
 	{
-		report("received unsupported message from slave: ", false);
+		report("received unsupported message from agent: ", false);
 		net_pack.print_header(f_rmr);
 		//save results from model run
 	}
@@ -1090,7 +1090,7 @@ void RunManagerPanther::process_message(int i_sock)
 
 bool RunManagerPanther::process_model_run(int sock_id, NetPackage &net_pack)
 {
-	list<SlaveInfoRec>::iterator slave_info_iter = socket_to_iter_map.at(sock_id);
+	list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(sock_id);
 	bool use_run = false;
 	int run_id = net_pack.get_run_id();
 
@@ -1102,7 +1102,7 @@ bool RunManagerPanther::process_model_run(int sock_id, NetPackage &net_pack)
 		double run_time = 0;
 		Serialization::unserialize(net_pack.get_data(), pars, get_par_name_vec(), obs, get_obs_name_vec(), run_time);
 		file_stor.update_run(run_id, pars, obs);
-		slave_info_iter->set_state(SlaveInfoRec::State::COMPLETE);
+		agent_info_iter->set_state(AgentInfoRec::State::COMPLETE);
 		//slave_info_iter->set_state(SlaveInfoRec::State::WAITING);
 		use_run = true;
 		model_runs_done++;
@@ -1115,33 +1115,33 @@ bool RunManagerPanther::process_model_run(int sock_id, NetPackage &net_pack)
 	return use_run;
 }
 
-void RunManagerPanther::kill_run(list<SlaveInfoRec>::iterator slave_info_iter, const string &reason)
+void RunManagerPanther::kill_run(list<AgentInfoRec>::iterator agent_info_iter, const string &reason)
 {
-	int socket_id = slave_info_iter->get_socket_fd();
-	SlaveInfoRec::State state = slave_info_iter->get_state();
-	unschedule_run(slave_info_iter);
-	if (socket_id && (state == SlaveInfoRec::State::ACTIVE || state == SlaveInfoRec::State::KILLED_FAILED))
+	int socket_id = agent_info_iter->get_socket_fd();
+	AgentInfoRec::State state = agent_info_iter->get_state();
+	unschedule_run(agent_info_iter);
+	if (socket_id && (state == AgentInfoRec::State::ACTIVE || state == AgentInfoRec::State::KILLED_FAILED))
 	{
-		int run_id = slave_info_iter->get_run_id();
-		slave_info_iter->set_state(SlaveInfoRec::State::KILLED);
+		int run_id = agent_info_iter->get_run_id();
+		agent_info_iter->set_state(AgentInfoRec::State::KILLED);
 		//schedule run to be killed
-		string host_name = slave_info_iter->get_hostname();
+		string host_name = agent_info_iter->get_hostname();
 		stringstream ss;
 		ss << "sending kill request. reason: " << reason << ", run id:" << run_id;
-		ss<< ",  num previous fails:" << failure_map.count(run_id) << ", slave: " << host_name << "$" << slave_info_iter->get_work_dir();
+		ss<< ",  num previous fails:" << failure_map.count(run_id) << ", agent: " << host_name << "$" << agent_info_iter->get_work_dir();
 		report(ss.str(), false);
 		NetPackage net_pack(NetPackage::PackType::REQ_KILL, 0, 0, "");
 		char data = '\0';
 		int err = net_pack.send(socket_id, &data, sizeof(data));
 		if (err == 1)
 		{
-			slave_info_iter->set_state(SlaveInfoRec::State::KILLED);
+			agent_info_iter->set_state(AgentInfoRec::State::KILLED);
 		}
 		else
 		{
-			report("error sending kill request to slave:" + host_name + "$" +
-				slave_info_iter->get_work_dir(), true);
-			slave_info_iter->set_state(SlaveInfoRec::State::KILLED_FAILED);
+			report("error sending kill request to agent:" + host_name + "$" +
+				agent_info_iter->get_work_dir(), true);
+			agent_info_iter->set_state(AgentInfoRec::State::KILLED_FAILED);
 		}
 	}
 }
@@ -1151,12 +1151,12 @@ void RunManagerPanther::kill_runs(int run_id, bool update_failure_map, const str
 {
 	auto range_pair = active_runid_to_iterset_map.equal_range(run_id);
 	//runs with this id are not needed so kill them
-	list<list<SlaveInfoRec>::iterator> kill_list;
+	list<list<AgentInfoRec>::iterator> kill_list;
 
 	for (auto b = range_pair.first; b != range_pair.second; ++b)
 	{
-		list<SlaveInfoRec>::iterator slave_info_iter = (*b).second;
-		kill_list.push_back(slave_info_iter);
+		list<AgentInfoRec>::iterator agent_info_iter = (*b).second;
+		kill_list.push_back(agent_info_iter);
 	}
 	for (auto &iter : kill_list)
 	{
@@ -1168,19 +1168,19 @@ void RunManagerPanther::kill_runs(int run_id, bool update_failure_map, const str
 
 void RunManagerPanther::kill_all_active_runs()
 {
-	list<list<SlaveInfoRec>::iterator> iter_list;
-	list<SlaveInfoRec>::iterator iter_b, iter_e;
+	list<list<AgentInfoRec>::iterator> iter_list;
+	list<AgentInfoRec>::iterator iter_b, iter_e;
 	bool active_runs = true;
 	for (int n_tries = 0; active_runs && n_tries >= 100; ++n_tries)
 	{
-		init_slaves();
+		init_agents();
 		active_runs = false;
-		for (iter_b = slave_info_set.begin(), iter_e = slave_info_set.end();
+		for (iter_b = agent_info_set.begin(), iter_e = agent_info_set.end();
 			iter_b != iter_e; ++iter_b)
 		{
 			int socket_id = iter_b->get_socket_fd();
-			SlaveInfoRec::State state = iter_b->get_state();
-			if (socket_id && (state == SlaveInfoRec::State::ACTIVE || state == SlaveInfoRec::State::KILLED_FAILED))
+			AgentInfoRec::State state = iter_b->get_state();
+			if (socket_id && (state == AgentInfoRec::State::ACTIVE || state == AgentInfoRec::State::KILLED_FAILED))
 			{
 				active_runs = true;
 				kill_run(iter_b, "completed run group");
@@ -1190,23 +1190,23 @@ void RunManagerPanther::kill_all_active_runs()
 	}
 }
 
- void RunManagerPanther::init_slaves()
+ void RunManagerPanther::init_agents()
  {
-	 for (auto &i_slv : slave_info_set)
+	 for (auto &i_agent : agent_info_set)
 	 {
-		int i_sock = i_slv.get_socket_fd();
-		SlaveInfoRec::State cur_state = i_slv.get_state();
-		if (cur_state == SlaveInfoRec::State::NEW)
+		int i_sock = i_agent.get_socket_fd();
+		AgentInfoRec::State cur_state = i_agent.get_state();
+		if (cur_state == AgentInfoRec::State::NEW)
 		{
 			NetPackage net_pack(NetPackage::PackType::REQ_RUNDIR, 0, 0, "");
 			char data = '\0';
 			int err = net_pack.send(i_sock, &data, sizeof(data));
 			if (err > 0)
 			{
-				i_slv.set_state(SlaveInfoRec::State::CWD_REQ);
+				i_agent.set_state(AgentInfoRec::State::CWD_REQ);
 			}
 		}
-		else if (cur_state == SlaveInfoRec::State::CWD_RCV)
+		else if (cur_state == AgentInfoRec::State::CWD_RCV)
 		{
 			// send parameter and observation names
 			NetPackage net_pack(NetPackage::PackType::PAR_NAMES, 0, 0, "");
@@ -1224,23 +1224,23 @@ void RunManagerPanther::kill_all_active_runs()
 
 			if (err_par > 0 && err_obs > 0)
 			{
-				i_slv.set_state(SlaveInfoRec::State::NAMES_SENT);
+				i_agent.set_state(AgentInfoRec::State::NAMES_SENT);
 			}
 		}
-		else if (cur_state == SlaveInfoRec::State::NAMES_SENT)
+		else if (cur_state == AgentInfoRec::State::NAMES_SENT)
 		{
 			NetPackage net_pack(NetPackage::PackType::REQ_LINPACK, 0, 0, "");
 			char data = '\0';
 			int err = net_pack.send(i_sock, &data, sizeof(data));
 			if (err  > 0)
 			{
-				i_slv.set_state(SlaveInfoRec::State::LINPACK_REQ);
-				i_slv.start_timer();
+				i_agent.set_state(AgentInfoRec::State::LINPACK_REQ);
+				i_agent.start_timer();
 			}
 		}
-		else if (cur_state == SlaveInfoRec::State::LINPACK_RCV)
+		else if (cur_state == AgentInfoRec::State::LINPACK_RCV)
 		{
-			i_slv.set_state(SlaveInfoRec::State::WAITING);
+			i_agent.set_state(AgentInfoRec::State::WAITING);
 		}
 	}
  }
@@ -1253,7 +1253,7 @@ void RunManagerPanther::kill_all_active_runs()
 	 double duration;
 	 for (auto &i = range_pair.first; i != range_pair.second; ++i)
 	 {
-		 if (i->second->get_state() == SlaveInfoRec::State::ACTIVE)
+		 if (i->second->get_state() == AgentInfoRec::State::ACTIVE)
 		 {
 			 double avg_runtime = i->second->get_runtime_minute();
 			 if (avg_runtime <= 0) avg_runtime = get_global_runtime_minute();;
@@ -1278,7 +1278,7 @@ void RunManagerPanther::kill_all_active_runs()
 	 // check for active runs
 	 for (auto it_active = active_runid_to_iterset_map.begin(); it_active != active_runid_to_iterset_map.end(); ++it_active)
 	 {
-		 if (it_active->second->get_state() == SlaveInfoRec::State::ACTIVE)
+		 if (it_active->second->get_state() == AgentInfoRec::State::ACTIVE)
 		 {
 			 return false;
 		 }
@@ -1287,7 +1287,7 @@ void RunManagerPanther::kill_all_active_runs()
  }
 
 
- list<SlaveInfoRec>::iterator RunManagerPanther::add_slave(int sock_id)
+ list<AgentInfoRec>::iterator RunManagerPanther::add_agent(int sock_id)
  {
 	 stringstream ss;
 	 ss << "new connection from: " << w_getnameinfo_string(sock_id);
@@ -1298,8 +1298,8 @@ void RunManagerPanther::kill_all_active_runs()
 	 }
 
 	 //list<SlaveInfoRec>::iterator
-	slave_info_set.push_back(SlaveInfoRec(sock_id));
-	list<SlaveInfoRec>::iterator iter = std::prev(slave_info_set.end());
+	agent_info_set.push_back(AgentInfoRec(sock_id));
+	list<AgentInfoRec>::iterator iter = std::prev(agent_info_set.end());
 	socket_to_iter_map[sock_id] = iter;
 	return iter;
  }
@@ -1309,7 +1309,7 @@ void RunManagerPanther::kill_all_active_runs()
 	 double global_runtime = 0;
 	 double temp = 0;
 	 int count = 0;
-	 for (auto &si : slave_info_set)
+	 for (auto &si : agent_info_set)
 	 {
 		 temp = si.get_runtime_minute();
 		 if (temp > 0)
@@ -1323,14 +1323,14 @@ void RunManagerPanther::kill_all_active_runs()
 	 return global_runtime / (double)count;
  }
 
- void RunManagerPanther::unschedule_run(list<SlaveInfoRec>::iterator slave_info_iter)
+ void RunManagerPanther::unschedule_run(list<AgentInfoRec>::iterator agent_info_iter)
  {
-	 int run_id = slave_info_iter->get_run_id();
+	 int run_id = agent_info_iter->get_run_id();
 	 auto range_pair = active_runid_to_iterset_map.equal_range(run_id);
 
 	 for (auto iter = range_pair.first; iter != range_pair.second;)
 	 {
-		 if (iter->second == slave_info_iter)
+		 if (iter->second == agent_info_iter)
 		 {
 			 iter = active_runid_to_iterset_map.erase(iter);
 			 return;
@@ -1342,15 +1342,15 @@ void RunManagerPanther::kill_all_active_runs()
 	 }
  }
 
- list<list<SlaveInfoRec>::iterator> RunManagerPanther::get_free_slave_list()
+ list<list<AgentInfoRec>::iterator> RunManagerPanther::get_free_agent_list()
  {
-	 list<list<SlaveInfoRec>::iterator> iter_list;
-	 list<SlaveInfoRec>::iterator iter_b, iter_e;
-	 for (iter_b = slave_info_set.begin(), iter_e = slave_info_set.end();
+	 list<list<AgentInfoRec>::iterator> iter_list;
+	 list<AgentInfoRec>::iterator iter_b, iter_e;
+	 for (iter_b = agent_info_set.begin(), iter_e = agent_info_set.end();
 		 iter_b != iter_e; ++iter_b)
 	 {
-		 SlaveInfoRec::State cur_state = iter_b->get_state();
-		 if (cur_state == SlaveInfoRec::State::WAITING)
+		 AgentInfoRec::State cur_state = iter_b->get_state();
+		 if (cur_state == AgentInfoRec::State::WAITING)
 		 {
 			 iter_list.push_back(iter_b);
 		 }
@@ -1358,22 +1358,22 @@ void RunManagerPanther::kill_all_active_runs()
 	 return iter_list;
  }
 
- map<string, int> RunManagerPanther::get_slave_stats()
+ map<string, int> RunManagerPanther::get_agent_stats()
  {
 	 map<string, int> stats_map;
-	 list<SlaveInfoRec>::iterator iter_b, iter_e;
+	 list<AgentInfoRec>::iterator iter_b, iter_e;
 	 int n_active = 0;
 	 int n_waiting = 0;
 	 int n_unavailable = 0;
-	 for (iter_b = slave_info_set.begin(), iter_e = slave_info_set.end();
+	 for (iter_b = agent_info_set.begin(), iter_e = agent_info_set.end();
 		 iter_b != iter_e; ++iter_b)
 	 {
-		 SlaveInfoRec::State cur_state = iter_b->get_state();
-		 if (cur_state == SlaveInfoRec::State::WAITING)
+		 AgentInfoRec::State cur_state = iter_b->get_state();
+		 if (cur_state == AgentInfoRec::State::WAITING)
 		 {
 			 ++n_waiting;
 		 }
-		 else if (cur_state == SlaveInfoRec::State::ACTIVE)
+		 else if (cur_state == AgentInfoRec::State::ACTIVE)
 		 {
 			 ++n_active;
 		 }
@@ -1385,7 +1385,7 @@ void RunManagerPanther::kill_all_active_runs()
 	 stats_map["wait"] = n_waiting;
 	 stats_map["run"] = n_active;
 	 stats_map["unavailable"] = n_unavailable;
-	 stats_map["total"] = slave_info_set.size();
+	 stats_map["total"] = agent_info_set.size();
 	 return stats_map;
  }
 
@@ -1399,10 +1399,10 @@ void RunManagerPanther::kill_all_active_runs()
 	 return run_id_set.size();
  }
 
- int RunManagerPanther::get_n_responsive_slaves()
+ int RunManagerPanther::get_n_responsive_agents()
  {
 	 int n = 0;
-	 for (const auto &i : slave_info_set)
+	 for (const auto &i : agent_info_set)
 	 {
 		 if (i.get_failed_pings() < N_PINGS_UNRESPONSIVE) ++n;
 	 }
@@ -1469,7 +1469,7 @@ void RunManagerYAMRCondor::write_submit_file()
 	for (auto &line : submit_lines)
 		f_out << line << endl;
 	int n_q = min(max_condor_queue, get_n_waiting_runs());
-	cout << "queueing "  << n_q << " slaves " ;
+	cout << "queueing "  << n_q << " agents " ;
 	f_out << "queue " << n_q << endl;
 
 }
@@ -1540,7 +1540,7 @@ int RunManagerYAMRCondor::submit()
 
 void RunManagerYAMRCondor::cleanup(int cluster)
 {
-	RunManagerPanther::close_slaves();
+	RunManagerPanther::close_agents();
 	stringstream ss;
 	ss << "condor_rm " << cluster << " 1>cr_temp.stdout 2>cr_temp.stderr";
 	system(ss.str().c_str());
@@ -1549,8 +1549,8 @@ void RunManagerYAMRCondor::cleanup(int cluster)
 	ss << "condor_rm " << cluster << " -forcex 1>cr_temp.stdout 2>cr_temp.stderr";
 	w_sleep(2000);
 	system(ss.str().c_str());
-	RunManagerPanther::close_slaves();
-	cout << "   all slaves freed " << endl << endl;
+	RunManagerPanther::close_agents();
+	cout << "   all agents freed " << endl << endl;
 }
 
 void RunManagerYAMRCondor::parse_submit_file()

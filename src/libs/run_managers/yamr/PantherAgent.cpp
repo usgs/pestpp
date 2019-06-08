@@ -1,4 +1,4 @@
-#include "PantherSlave.h"
+#include "PantherAgent.h"
 #include "utilities.h"
 #include "Serialization.h"
 #include "system_variables.h"
@@ -14,12 +14,12 @@ using namespace pest_utils;
 
 int  linpack_wrap(void);
 
-PANTHERSlave::PANTHERSlave() :mi()
+PANTHERAgent::PANTHERAgent() :mi()
 {
 
 }
 
-void PANTHERSlave::init_network(const string &host, const string &port)
+void PANTHERAgent::init_network(const string &host, const string &port)
 {
 	w_init();
 
@@ -41,7 +41,7 @@ void PANTHERSlave::init_network(const string &host, const string &port)
 	w_print_servinfo(servinfo, cout);
 	cout << endl;
 	// connect
-	cout << "YAMR Slave will poll for master connection every " << poll_interval_seconds << " seconds" << endl;
+	cout << "PANTHER Agent will poll for master connection every " << poll_interval_seconds << " seconds" << endl;
 	addrinfo* connect_addr = nullptr;
 	while  (connect_addr == nullptr)
 	{
@@ -64,14 +64,14 @@ void PANTHERSlave::init_network(const string &host, const string &port)
 }
 
 
-PANTHERSlave::~PANTHERSlave()
+PANTHERAgent::~PANTHERAgent()
 {
 	w_close(sockfd);
 	w_cleanup();
 }
 
 
-void PANTHERSlave::process_ctl_file(const string &ctl_filename)
+void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 {
 	ifstream fin;
 	long lnum;
@@ -203,7 +203,7 @@ void PANTHERSlave::process_ctl_file(const string &ctl_filename)
 
 
 
-void PANTHERSlave::process_panther_ctl_file(const string &ctl_filename)
+void PANTHERAgent::process_panther_ctl_file(const string &ctl_filename)
 {
 	ifstream fin;
 	long lnum;
@@ -333,7 +333,7 @@ void PANTHERSlave::process_panther_ctl_file(const string &ctl_filename)
 }
 
 
-int PANTHERSlave::recv_message(NetPackage &net_pack, struct timeval *tv)
+int PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
 {
 	fd_set read_fds;
 	int err = -1;
@@ -403,7 +403,7 @@ int PANTHERSlave::recv_message(NetPackage &net_pack, struct timeval *tv)
 	//          2  no message recieved
 }
 
-int PANTHERSlave::recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs)
+int PANTHERAgent::recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs)
 {
 	int err = -1;
 	int result = 0;
@@ -415,7 +415,7 @@ int PANTHERSlave::recv_message(NetPackage &net_pack, long  timeout_seconds, long
 }
 
 
-int PANTHERSlave::send_message(NetPackage &net_pack, const void *data, unsigned long data_len)
+int PANTHERAgent::send_message(NetPackage &net_pack, const void *data, unsigned long data_len)
 {
 	int err;
 	int n;
@@ -432,7 +432,7 @@ int PANTHERSlave::send_message(NetPackage &net_pack, const void *data, unsigned 
 }
 
 
-NetPackage::PackType PANTHERSlave::run_model(Parameters &pars, Observations &obs, NetPackage &net_pack)
+NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs, NetPackage &net_pack)
 {
 	NetPackage::PackType final_run_status = NetPackage::PackType::RUN_FAILED;
 	bool done = false;
@@ -459,7 +459,7 @@ NetPackage::PackType PANTHERSlave::run_model(Parameters &pars, Observations &obs
 		}
 
 		vector<double> obs_vec;
-		thread run_thread(&PANTHERSlave::run_async, this, &f_terminate, &f_finished, &shared_execptions,
+		thread run_thread(&PANTHERAgent::run_async, this, &f_terminate, &f_finished, &shared_execptions,
 		   &pars, &obs);
 		pest_utils::thread_RAII raii(run_thread);
 
@@ -558,14 +558,14 @@ NetPackage::PackType PANTHERSlave::run_model(Parameters &pars, Observations &obs
 }
 
 
-void PANTHERSlave::run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
+void PANTHERAgent::run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
 	Parameters* pars, Observations* obs)
 {
 	mi.run(terminate,finished,shared_execptions, pars, obs);
 }
 
 
-void PANTHERSlave::check_io()
+void PANTHERAgent::check_io()
 {
 	vector<string> inaccessible_files;
 	for (auto &file : insfile_vec)
@@ -586,7 +586,7 @@ void PANTHERSlave::check_io()
 	}
 }
 
-void PANTHERSlave::start(const string &host, const string &port)
+void PANTHERAgent::start(const string &host, const string &port)
 {
 	NetPackage net_pack;
 	Observations obs;
