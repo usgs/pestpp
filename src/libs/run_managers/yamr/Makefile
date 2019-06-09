@@ -5,7 +5,7 @@ include $(top_builddir)/global.mak
 LIB := $(LIB_PRE)rm_yamr$(LIB_EXT)
 OBJECTS := \
     RunManagerPanther \
-    PantherSlave
+    PantherAgent
 OBJECTS := $(addsuffix $(OBJ_EXT),$(OBJECTS))
 
 

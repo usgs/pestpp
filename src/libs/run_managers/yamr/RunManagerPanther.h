@@ -30,11 +30,11 @@
 #include "RunManagerAbstract.h"
 #include "RunStorage.h"
 
-class SlaveInfoRec {
+class AgentInfoRec {
 public:
 	static const int UNKNOWN_ID = -9999;
 	enum class State { NEW, CWD_REQ, CWD_RCV, NAMES_SENT, LINPACK_REQ, LINPACK_RCV, WAITING, ACTIVE, KILLED, KILLED_FAILED, COMPLETE };
-	SlaveInfoRec(int _socket_fd);
+	AgentInfoRec(int _socket_fd);
 	int get_socket_fd() const;
 	string get_hostname()const;
 	string get_port()const;
@@ -66,7 +66,7 @@ public:
 	void reset_last_ping_time();
 	void reset_runtime() { run_time = std::chrono::system_clock::duration::zero(); }
 	int seconds_since_last_ping_time() const;
-	~SlaveInfoRec(){}
+	~AgentInfoRec(){}
 private:
 	int socket_fd;
 	int run_id;
@@ -85,7 +85,7 @@ public:
 	{
 	public:
 		CompareTimes() {}
-		bool operator() (const SlaveInfoRec &a, const SlaveInfoRec &b);
+		bool operator() (const AgentInfoRec &a, const AgentInfoRec &b);
 	};
 };
 
@@ -106,7 +106,7 @@ public:
 	virtual RunManagerAbstract::RUN_UNTIL_COND run_until(RUN_UNTIL_COND condition, int n_nops = 0, double sec = 0.0);
 	~RunManagerPanther(void);
 	int get_n_waiting_runs() { return waiting_runs.size(); }
-	void close_slaves();
+	void close_agents();
 
 
 
@@ -129,28 +129,28 @@ private:
 	int model_runs_failed;
 	int model_runs_timed_out;
 	fd_set master; // master file descriptor list
-	list<SlaveInfoRec> slave_info_set;
-	map<int, list<SlaveInfoRec>::iterator> socket_to_iter_map;
-	multimap<int, list<SlaveInfoRec>::iterator> active_runid_to_iterset_map;
+	list<AgentInfoRec> agent_info_set;
+	map<int, list<AgentInfoRec>::iterator> socket_to_iter_map;
+	multimap<int, list<AgentInfoRec>::iterator> active_runid_to_iterset_map;
 	std::deque<int> waiting_runs;
 	std::unordered_multimap<int, int> failure_map;
 
-	int schedule_run(int run_id, std::list<list<SlaveInfoRec>::iterator> &free_slave_list, int n_responsive_slaves);
-	void unschedule_run(list<SlaveInfoRec>::iterator slave_info_iter);
-	void kill_run(list<SlaveInfoRec>::iterator slave_info_iter, const std::string &reason="UNKNOWN");
+	int schedule_run(int run_id, std::list<list<AgentInfoRec>::iterator> &free_agent_list, int n_responsive_agents);
+	void unschedule_run(list<AgentInfoRec>::iterator agent_info_iter);
+	void kill_run(list<AgentInfoRec>::iterator agent_info_iter, const std::string &reason="UNKNOWN");
 	void kill_runs(int run_id, bool update_failure_map, const std::string &reason = "UNKNOWN");
 	void kill_all_active_runs();
-	void close_slave(int i_sock);
-	void close_slave(list<SlaveInfoRec>::iterator slave_info_iter);
+	void close_agent(int i_sock);
+	void close_agent(list<AgentInfoRec>::iterator agent_info_iter);
 
 	std::ofstream &f_rmr;
 	bool listen();
 	bool process_model_run(int sock_id, NetPackage &net_pack);
 	void process_message(int i);
 	void schedule_runs();
-	void init_slaves();
-	list<SlaveInfoRec>::iterator add_slave(int sock_id);
-	void erase_slave(int sock_id);
+	void init_agents();
+	list<AgentInfoRec>::iterator add_agent(int sock_id);
+	void erase_agent(int sock_id);
 	bool ping(int i_sock);
 	bool ping();
 	void report(std::string message,bool to_cout);
@@ -159,15 +159,15 @@ private:
 	void echo();
 	vector<int> get_overdue_runs_over_kill_threshold(int run_id);
 	bool all_runs_complete();
-	list<SlaveInfoRec>::iterator get_active_run_iter(int socket);
-	std::list<std::list<SlaveInfoRec>::iterator> get_free_slave_list();
+	list<AgentInfoRec>::iterator get_active_run_iter(int socket);
+	std::list<std::list<AgentInfoRec>::iterator> get_free_agent_list();
 	double get_global_runtime_minute() const;
 	int get_n_concurrent(int run_id);
 	int get_n_unique_failures();
-	int get_n_responsive_slaves();
+	int get_n_responsive_agents();
 	virtual void update_run_failed(int run_id, int socket_fd);
 	virtual void update_run_failed(int run_id);
-	map<string, int> get_slave_stats();
+	map<string, int> get_agent_stats();
 };
 
 class RunManagerYAMRCondor : public RunManagerPanther

@@ -17,8 +17,8 @@
     along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 */
 
-#ifndef PANTHERSLAVE_H_
-#define PANTHERSLAVE_H_
+#ifndef PANTHERAGENT_H_
+#define PANTHERAGENT_H_
 
 #include "network_wrapper.h"
 #include <iostream>
@@ -32,12 +32,12 @@
 #include "Transformable.h"
 #include "model_interface.h"
 
-class PANTHERSlave{
+class PANTHERAgent{
 public:
-	PANTHERSlave();
+	PANTHERAgent();
 	void init_network(const std::string &host, const std::string &port);
 	void start(const std::string &host, const std::string &port);
-	~PANTHERSlave();
+	~PANTHERAgent();
 	void run();
 	int recv_message(NetPackage &net_pack, struct timeval *tv=NULL);
 	int recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs = 0);
@@ -81,4 +81,4 @@ private:
 
 };
 
-#endif /* PANTHERSLAVE_H_ */
+#endif /* PANTHERAGENT_H_ */
