@@ -885,6 +885,17 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	pestpp_options.set_ies_autoadaloc_sigma_dist(1.0);
 	pestpp_options.set_ies_enforce_chglim(false);
 
+	pestpp_options.set_gsa_method("MORRIS");
+	//many of these defaults are also redefined in gsa main
+	pestpp_options.set_gsa_morris_p(4);
+	pestpp_options.set_gsa_morris_r(4);
+	pestpp_options.set_gsa_morris_delta(0.6666);
+	pestpp_options.set_gsa_morris_obs_sen(true);
+	pestpp_options.set_gsa_morris_pooled_obs(false);
+	pestpp_options.set_gsa_sobol_par_dist("norm");
+	pestpp_options.set_gsa_sobol_samples(4);
+	pestpp_options.set_gsa_rand_seed(2);
+
 	pestpp_options.set_condor_submit_file(string());
 	pestpp_options.set_overdue_giveup_minutes(1.0e+30);
 

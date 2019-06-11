@@ -37,7 +37,7 @@
 #include "RunManagerGenie.h"
 #include "RunManagerSerial.h"
 #include "OutputFileWriter.h"
-#include "PantherSlave.h"
+#include "PantherAgent.h"
 #include "Serialization.h"
 #include "system_variables.h"
 
@@ -128,20 +128,20 @@ int main(int argc, char* argv[])
 				cerr << "PANTHER worker requires the master be specified as /H hostname:port" << endl << endl;
 				throw(PestCommandlineError(commandline));
 			}
-			PANTHERSlave yam_slave;
+			PANTHERAgent yam_agent;
 			string ctl_file = "";
 			try {
 				string ctl_file;
 				if (upper_cp(file_ext) == "YMR")
 				{
 					ctl_file = file_manager.build_filename("ymr");
-					yam_slave.process_panther_ctl_file(ctl_file);
+					yam_agent.process_panther_ctl_file(ctl_file);
 				}
 				else
 				{
 					// process traditional PEST control file
 					ctl_file = file_manager.build_filename("pst");
-					yam_slave.process_ctl_file(ctl_file);
+					yam_agent.process_ctl_file(ctl_file);
 				}
 			}
 			catch (PestError e)
@@ -151,7 +151,7 @@ int main(int argc, char* argv[])
 				throw(e);
 			}
 
-			yam_slave.start(sock_parts[0], sock_parts[1]);
+			yam_agent.start(sock_parts[0], sock_parts[1]);
 		}
 		catch (PestError &perr)
 		{
@@ -270,10 +270,10 @@ int main(int argc, char* argv[])
 	}
 
 
-	map<string, string> gsa_opt_map;
+	//map<string, string> gsa_opt_map;
 	//process .gsa file
 	string gsa_filename = file_manager.get_base_filename() + ".gsa";
-	if (!check_exist_in(gsa_filename))
+	/*if (!check_exist_in(gsa_filename))
 	{
 		cout << "WARNING: " << gsa_filename << " not found, using standard settings and Method of Morris:" << endl;
 		cout << "     MORRIS_P: 4" << endl;
@@ -298,7 +298,20 @@ int main(int argc, char* argv[])
 			cerr << e.what() << endl << endl;
 			throw(e);
 		}
+	}*/
+	if (check_exist_in(gsa_filename))
+	{
+		cout << "WARNING: use of .gsa files is deprecated - .gsa file '" << gsa_filename << "' is being ignored, please use '++' args";
 	}
+
+	PestppOptions *pp_ptr = pest_scenario.get_pestpp_options_ptr();
+	map<string, string> gsa_opt_map = pp_ptr->get_arg_map();
+	/*gsa_opt_map["METHOD"] = pp_ptr->get_gsa_method();
+	gsa_opt_map["MORRIS_DELTA"] = pp_ptr->get_gsa_morris_delta();
+	gsa_opt_map["MORRIS_P"] = pp_ptr->get_gsa_morris_p();
+	gsa_opt_map["MORRIS_R"] = pp_ptr->get_gsa_morris_r;
+	gsa_opt_map["MORRIS_OBS_SEN"] = pp_ptr->get_gsa_morris_obs_sen();
+*/
 	//Build Transformation with ctl_2_numberic
 	ParamTransformSeq base_partran_seq(pest_scenario.get_base_par_tran_seq());
 	Parameters ctl_par = pest_scenario.get_ctl_parameters();
@@ -308,35 +321,36 @@ int main(int argc, char* argv[])
 	ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
 	ModelRun model_run(&obj_func, pest_scenario.get_ctl_observations());
 	const set<string> &log_trans_pars = base_partran_seq.get_log10_ptr()->get_items();
-	auto method = gsa_opt_map.find("METHOD");
+	auto method = gsa_opt_map.find("GSA_METHOD");
 
 	GsaAbstractBase* gsa_method = nullptr;
-	if (method != gsa_opt_map.end() && method->second == "MORRIS")
+	if (method == gsa_opt_map.end() || method->second == "MORRIS")
 	{
 		int morris_r = 4;
-		int morris_p = 5;
+		int morris_p = 4;
 
 		double morris_delta = .666;
-		double default_delta = true;
+		bool default_delta = true;
 		bool calc_pooled_obs = false;
 		bool calc_morris_obs_sen = true;
-		auto morris_r_it = gsa_opt_map.find("MORRIS_R");
+		auto morris_r_it = gsa_opt_map.find("GSA_MORRIS_R");
 		if (morris_r_it != gsa_opt_map.end())
 		{
 			convert_ip(morris_r_it->second, morris_r);
 		}
-		auto morris_p_it = gsa_opt_map.find("MORRIS_P");
+		auto morris_p_it = gsa_opt_map.find("GSA_MORRIS_P");
 		if (morris_p_it != gsa_opt_map.end())
 		{
 			convert_ip(morris_p_it->second, morris_p);
 		}
-		auto morris_d_it = gsa_opt_map.find("MORRIS_DELTA");
+		auto morris_d_it = gsa_opt_map.find("GSA_MORRIS_DELTA");
 		if (morris_d_it != gsa_opt_map.end())
 		{
+			
 			convert_ip(morris_d_it->second, morris_delta);
 			default_delta = false;
 		}
-		auto morris_pool_it = gsa_opt_map.find("MORRIS_POOLED_OBS");
+		auto morris_pool_it = gsa_opt_map.find("GSA_MORRIS_POOLED_OBS");
 		if (morris_pool_it != gsa_opt_map.end())
 		{
 			string pooled_obs_flag = morris_pool_it->second;
@@ -344,7 +358,7 @@ int main(int argc, char* argv[])
 			if (pooled_obs_flag == "TRUE") calc_pooled_obs = true;
 		}
 
-		auto morris_obs_sen_it = gsa_opt_map.find("MORRIS_OBS_SEN");
+		auto morris_obs_sen_it = gsa_opt_map.find("GSA_MORRIS_OBS_SEN");
 		if (morris_obs_sen_it != gsa_opt_map.end())
 		{
 			string obs_sen_flag = morris_obs_sen_it->second;
@@ -389,12 +403,12 @@ int main(int argc, char* argv[])
 		GsaAbstractBase::PARAM_DIST par_dist = GsaAbstractBase::PARAM_DIST::uniform;
 
 		int n_sample = 100;
-		auto sob_n_sam_it = gsa_opt_map.find("SOBOL_SAMPLES");
+		auto sob_n_sam_it = gsa_opt_map.find("GSA_SOBOL_SAMPLES");
 		if (sob_n_sam_it != gsa_opt_map.end())
 		{
 			convert_ip(sob_n_sam_it->second, n_sample);
 		}
-		auto sob_p_dist_it = gsa_opt_map.find("SOBOL_PAR_DIST");
+		auto sob_p_dist_it = gsa_opt_map.find("GSA_SOBOL_PAR_DIST");
 		if (sob_p_dist_it != gsa_opt_map.end())
 		{
 			string par_dist_str = sob_p_dist_it->second;
@@ -408,6 +422,7 @@ int main(int argc, char* argv[])
 				throw PestError(str.str());
 			}
 		}
+
 
 		gsa_method = new Sobol(pest_scenario, file_manager, &obj_func,
 			base_partran_seq, n_sample, par_dist, 1.0);

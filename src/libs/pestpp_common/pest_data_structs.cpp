@@ -993,6 +993,46 @@ void PestppOptions::parce_line(const string &line)
 			is >> boolalpha >> ies_enforce_chglim;
 		}
 
+
+		else if (key == "GSA_METHOD")
+		{
+			convert_ip(value, gsa_method);
+		}
+		else if (key == "GSA_MORRIS_POOLED_OBS")
+		{
+			transform(value.begin(), value.end(), value.begin(), ::tolower);
+			istringstream is(value);
+			is >> boolalpha >> gsa_morris_pooled_obs;
+		}
+		else if (key == "GSA_MORRIS_OBS_SEN")
+		{
+			transform(value.begin(), value.end(), value.begin(), ::tolower);
+			istringstream is(value);
+			is >> boolalpha >> gsa_morris_obs_sen;
+		}
+		else if (key == "GSA_MORRIS_P")
+		{
+			convert_ip(value, gsa_morris_p);
+		}
+		else if (key == "GSA_MORRIS_R")
+		{
+			convert_ip(value, gsa_morris_r);
+		}
+		else if (key == "GSA_MORRIS_DELTA")
+		{
+			convert_ip(value, gsa_morris_delta);
+		}
+
+		else if (key == "GSA_SOBOL_SAMPLES")
+		{
+			convert_ip(value, gsa_sobol_samples);
+		}
+		else if (key == "GSA_SOBOL_PAR_DIST")
+		{
+			convert_ip(value, gsa_sobol_par_dist);
+		}
+
+
 		else {
 
 			throw PestParsingError(line, "Invalid key word \"" + key +"\"");
