@@ -27,11 +27,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="PantherSlave.h" />
+    <ClInclude Include="PantherAgent.h" />
     <ClInclude Include="RunManagerPanther.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="PantherSlave.cpp" />
+    <ClCompile Include="PantherAgent.cpp" />
     <ClCompile Include="RunManagerPanther.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

@@ -9,18 +9,18 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="PantherSlave.h">
+    <ClInclude Include="RunManagerPanther.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="RunManagerPanther.h">
+    <ClInclude Include="PantherAgent.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="PantherSlave.cpp">
+    <ClCompile Include="RunManagerPanther.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RunManagerPanther.cpp">
+    <ClCompile Include="PantherAgent.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

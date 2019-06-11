@@ -34,7 +34,7 @@ along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 #include "FileManager.h"
 #include "RunManagerSerial.h"
 #include "OutputFileWriter.h"
-#include "PantherSlave.h"
+#include "PantherAgent.h"
 #include "Serialization.h"
 #include "system_variables.h"
 #include "pest_error.h"
@@ -362,20 +362,20 @@ int main(int argc, char* argv[])
 					cerr << "PANTHER worker requires the master be specified as /H hostname:port" << endl << endl;
 					throw(PestCommandlineError(commandline));
 				}
-				PANTHERSlave yam_slave;
+				PANTHERAgent yam_agent;
 				string ctl_file = "";
 				try {
 					string ctl_file;
 					if (upper_cp(file_ext) == "YMR")
 					{
 						ctl_file = file_manager.build_filename("ymr");
-						yam_slave.process_panther_ctl_file(ctl_file);
+						yam_agent.process_panther_ctl_file(ctl_file);
 					}
 					else
 					{
 						// process traditional PEST control file
 						ctl_file = file_manager.build_filename("pst");
-						yam_slave.process_ctl_file(ctl_file);
+						yam_agent.process_ctl_file(ctl_file);
 					}
 				}
 				catch (PestError e)
@@ -385,7 +385,7 @@ int main(int argc, char* argv[])
 					throw(e);
 				}
 
-				yam_slave.start(sock_parts[0], sock_parts[1]);
+				yam_agent.start(sock_parts[0], sock_parts[1]);
 			}
 			catch (PestError &perr)
 			{
