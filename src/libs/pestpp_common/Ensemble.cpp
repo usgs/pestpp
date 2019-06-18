@@ -461,12 +461,12 @@ Covariance Ensemble::get_diagonal_cov_matrix()
 	return Covariance(var_names, mat, Covariance::MatType::DIAGONAL);
 }
 
-Eigen::MatrixXd Ensemble::get_eigen_mean_diff()
+Eigen::MatrixXd Ensemble::get_eigen_mean_diff(string on_real)
 {
-	return get_eigen_mean_diff(vector<string>(),vector<string>());
+	return get_eigen_mean_diff(vector<string>(),vector<string>(),on_real);
 }
 
-Eigen::MatrixXd Ensemble::get_eigen_mean_diff(const vector<string> &_real_names, const vector<string> &_var_names)
+Eigen::MatrixXd Ensemble::get_eigen_mean_diff(const vector<string> &_real_names, const vector<string> &_var_names, string on_real)
 {
 	//get a matrix this is the differences of var_names  realized values from the mean realized value
 
@@ -477,14 +477,31 @@ Eigen::MatrixXd Ensemble::get_eigen_mean_diff(const vector<string> &_real_names,
 	else
 		_reals = get_eigen(_real_names, _var_names);
 
+
+	map<int, double> center_on_map;
+	if (on_real.size() > 0)
+	{
+		vector<string>::iterator it = find(real_names.begin(), real_names.end(), on_real);
+		if (it == real_names.end())
+			throw runtime_error("Ensemble::get_eigen_mean_diff() error: 'on_real' not found: " + on_real);
+		int idx = distance(real_names.begin(), it);
+		for (int i = 0; i <_reals.cols(); i++)
+			center_on_map[i] = _reals(idx, i);
+	}
+	else
+	{
+		for (int j = 0; j < _reals.cols(); j++)
+			center_on_map[j] = _reals.col(j).mean();
+	}
+
 	//process each var name
-	double mean;
+	//double mean;
 	int s = _reals.rows();
 	for (int j = 0; j < _reals.cols(); j++)
 	{
-		mean = _reals.col(j).mean();
+		//mean = _reals.col(j).mean();
 		//Eigen::MatrixXd temp = _reals.col(j);
-		_reals.col(j) = _reals.col(j) - (Eigen::VectorXd::Ones(s) * mean);
+		_reals.col(j) = _reals.col(j) - (Eigen::VectorXd::Ones(s) * center_on_map[j]);
 		//temp = _reals.col(j);
 		//cout << temp << endl;
 	}
