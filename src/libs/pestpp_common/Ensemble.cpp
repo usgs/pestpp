@@ -434,7 +434,7 @@ Covariance Ensemble::get_diagonal_cov_matrix()
 	//build an empirical diagonal covariance matrix from the realizations
 
 
-	Eigen::MatrixXd meandiff = get_eigen_mean_diff();
+	Eigen::MatrixXd meandiff = get_eigen_anomalies();
 	double var;
 	vector<Eigen::Triplet<double>> triplets;
 	double num_reals = double(reals.rows());
@@ -461,12 +461,12 @@ Covariance Ensemble::get_diagonal_cov_matrix()
 	return Covariance(var_names, mat, Covariance::MatType::DIAGONAL);
 }
 
-Eigen::MatrixXd Ensemble::get_eigen_mean_diff(string on_real)
+Eigen::MatrixXd Ensemble::get_eigen_anomalies(string on_real)
 {
-	return get_eigen_mean_diff(vector<string>(),vector<string>(),on_real);
+	return get_eigen_anomalies(vector<string>(),vector<string>(),on_real);
 }
 
-Eigen::MatrixXd Ensemble::get_eigen_mean_diff(const vector<string> &_real_names, const vector<string> &_var_names, string on_real)
+Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names, const vector<string> &_var_names, string on_real)
 {
 	//get a matrix this is the differences of var_names  realized values from the mean realized value
 
@@ -525,13 +525,13 @@ pair<map<string, double>, map<string, double>>  Ensemble::get_moment_maps(const 
 	if (_real_names.size() == 0)
 	{
 		mean = reals.colwise().mean();
-		Eigen::MatrixXd mean_diff = get_eigen_mean_diff();
+		Eigen::MatrixXd mean_diff = get_eigen_anomalies();
 		std = mean_diff.array().pow(2).colwise().sum().sqrt();
 	}
 	else
 	{
 		mean = get_eigen(_real_names,vector<string>()).colwise().mean();
-		Eigen::MatrixXd mean_diff = get_eigen_mean_diff(_real_names,vector<string>());
+		Eigen::MatrixXd mean_diff = get_eigen_anomalies(_real_names,vector<string>());
 		std = mean_diff.array().pow(2).colwise().sum().sqrt();
 	}
 	map<string, double> mean_map, std_map;

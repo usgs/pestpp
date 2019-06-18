@@ -388,7 +388,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 	vector<string> par_names = pe.get_pest_scenario_ptr()->get_ctl_ordered_adj_par_names(), obs_names = pe.get_pest_scenario_ptr()->get_ctl_ordered_nz_obs_names();
 
 	performance_log->log_event("autoadaloc: calculating correlation coefficients");
-	Eigen::MatrixXd pe_diff = pe.get_eigen_mean_diff(vector<string>(), par_names), oe_diff = oe.get_eigen_mean_diff(vector<string>(), obs_names);
+	Eigen::MatrixXd pe_diff = pe.get_eigen_anomalies(vector<string>(), par_names), oe_diff = oe.get_eigen_anomalies(vector<string>(), obs_names);
 	double scale = 1.0 / double(pe.shape().first - 1);
 	Eigen::ArrayXd par_std = ((pe_diff.array().square().colwise().sum()) * scale).cwiseSqrt();
 	Eigen::ArrayXd obs_std = ((oe_diff.array().square().colwise().sum()) * scale).cwiseSqrt();
