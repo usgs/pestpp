@@ -992,6 +992,10 @@ void PestppOptions::parce_line(const string &line)
 			istringstream is(value);
 			is >> boolalpha >> ies_enforce_chglim;
 		}
+		else if (key == "IES_CENTER_ON")
+		{
+			convert_ip(value, ies_center_on);
+		}
 
 
 		else if (key == "GSA_METHOD")

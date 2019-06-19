@@ -55,8 +55,9 @@ public:
 	const Eigen::MatrixXd* get_eigen_ptr() const { return &reals; }
 	void set_eigen(Eigen::MatrixXd _reals);
 
-	Eigen::MatrixXd get_eigen_mean_diff();
-	Eigen::MatrixXd get_eigen_mean_diff(const vector<string> &_real_names, const vector<string> &_var_names);
+	Eigen::MatrixXd get_eigen_anomalies(string on_real="");
+	Eigen::MatrixXd get_eigen_anomalies(const vector<string> &_real_names, const vector<string> &_var_names, string on_real="");
+
 
 	vector<double> get_mean_stl_vector();
 	pair<map<string, double>, map<string, double>>  get_moment_maps(const vector<string> &_real_names=vector<string>());

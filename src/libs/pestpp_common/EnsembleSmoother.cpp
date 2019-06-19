@@ -1966,6 +1966,9 @@ void IterEnsembleSmoother::initialize()
 	}
 
 	bool oe_drawn = initialize_oe(obscov);
+	string center_on = ppo->get_ies_center_on();
+	
+	
 
 	try
 	{
@@ -2098,6 +2101,21 @@ void IterEnsembleSmoother::initialize()
 		oe.to_csv(ss.str());
 	}
 	message(1, "saved base observation ensemble (obsval+noise) to ", ss.str());
+
+	if (center_on.size() > 0)
+	{
+		ss.str("");
+		ss << "centering on realization: '" << center_on << "' ";
+		message(1, ss.str());
+		vector<string> names = pe.get_real_names();
+		if (find(names.begin(), names.end(), center_on) == names.end())
+			throw_ies_error("'ies_center_on' realization not found in par en: " + center_on);
+		names = oe.get_real_names();
+		if (find(names.begin(), names.end(), center_on) == names.end())
+			throw_ies_error("'ies_center_on' realization not found in obs en: " + center_on);
+	}
+	else
+		message(1, "centering on ensemble mean vector");
 
 	if (pest_scenario.get_control_info().noptmax == -2)
 	{
@@ -2269,6 +2287,7 @@ void IterEnsembleSmoother::initialize()
 		last_best_lam = pow(10.0,(floor(log10(x))));
 	}
 
+
 	message(1, "current lambda:", last_best_lam);
 	message(0, "initialization complete");
 
@@ -2280,7 +2299,7 @@ Eigen::MatrixXd IterEnsembleSmoother::get_Am(const vector<string> &real_names, c
 {
 
 	double scale = (1.0 / (sqrt(double(real_names.size() - 1))));
-	Eigen::MatrixXd par_diff = scale * pe_base.get_eigen_mean_diff(real_names,par_names);
+	Eigen::MatrixXd par_diff = scale * pe_base.get_eigen_anomalies(real_names,par_names,pest_scenario.get_pestpp_options().get_ies_center_on());
 	par_diff.transposeInPlace();
 	if (verbose_level > 1)
 	{
@@ -3138,13 +3157,31 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 	Am_map.reserve(par_names.size());
 	obs_resid_map.reserve(obs_names.size());
 	obs_diff_map.reserve(obs_names.size());
+	
+	//check for the 'center_on' real - it may have been dropped...
+	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
+	if (center_on.size() > 0)
+	{
+		vector<string> real_names = oe_upgrade.get_real_names();
+		if (find(real_names.begin(), real_names.end(), center_on) == real_names.end())
+		{
+			message(0, "Warning: 'ies_center_on' real not found in obs en, reverting to mean...");
+			center_on = "";
+		}
+		real_names = pe_upgrade.get_real_names();
+		if ((center_on.size() > 0) && find(real_names.begin(), real_names.end(), center_on) == real_names.end())
+		{
+			message(0, "Warning: 'ies_center_on' real not found in par en, reverting to mean...");
+			center_on = "";
+		}
+	}
 
 	Eigen::MatrixXd mat = ph.get_obs_resid_subset(oe_upgrade);
 	for (int i = 0; i < obs_names.size(); i++)
 	{
 		obs_resid_map[obs_names[i]] = mat.col(i);
 	}
-	mat = oe_upgrade.get_eigen_mean_diff();
+	mat = oe_upgrade.get_eigen_anomalies(center_on);
 	for (int i = 0; i < obs_names.size(); i++)
 	{
 		obs_diff_map[obs_names[i]] = mat.col(i);
@@ -3154,7 +3191,7 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 	{
 		par_resid_map[par_names[i]] = mat.col(i);
 	}	
-	mat = pe_upgrade.get_eigen_mean_diff();
+	mat = pe_upgrade.get_eigen_anomalies(center_on);
 	for (int i = 0; i <par_names.size(); i++)
 	{
 		par_diff_map[par_names[i]] = mat.col(i);
