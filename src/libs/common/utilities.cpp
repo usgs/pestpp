@@ -760,9 +760,9 @@ void save_binary(const string &filename, const vector<string> &row_names, const 
 	//check row name and col name lengths
 	int mx_rlen = 0, mx_clen = 0;
 	for (auto &n : row_names)
-		mx_rlen = max(mx_rlen, n.size());
+		mx_rlen = max(mx_rlen, n.length());
 	for (auto &n : col_names)
-		mx_clen = max(mx_clen, n.size());
+		mx_clen = max(mx_clen, n.length());
 	if ((mx_rlen > 20) || (mx_clen > 12))
 		save_binary_orgfmt(filename, row_names, col_names, matrix);
 	else
