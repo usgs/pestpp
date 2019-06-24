@@ -764,7 +764,7 @@ void Jacobian::print(std::ostream &fout) const
 void Jacobian::save(const string &ext) const
 {
 	string filename = file_manager.build_filename(ext);
-	pest_utils::save_binary(filename, base_numeric_par_names, base_sim_obs_names, matrix);
+	pest_utils::save_binary(filename,  base_sim_obs_names, base_numeric_par_names, matrix);
 
 	//ofstream &jout = file_manager.open_ofile_ext(ext, ios::out | ios::binary);
 	//int n_par = base_numeric_par_names.size();
