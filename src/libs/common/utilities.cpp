@@ -759,14 +759,16 @@ void save_binary(const string &filename, const vector<string> &row_names, const 
 {
 	//check row name and col name lengths
 	int mx_rlen = 0, mx_clen = 0;
-	for (auto &n : row_names)
+	/*for (auto &n : row_names)
 		mx_rlen = max(mx_rlen, n.length());
 	for (auto &n : col_names)
-		mx_clen = max(mx_clen, n.length());
-	if ((mx_rlen > 20) || (mx_clen > 12))
-		save_binary_orgfmt(filename, row_names, col_names, matrix);
-	else
+		mx_clen = max(mx_clen, n.length());*/
+	mx_rlen = max_element(row_names.begin(), row_names.end()) - row_names.begin();
+	mx_clen = max_element(col_names.begin(), col_names.end()) - col_names.begin();
+	if ((row_names[mx_rlen].length() > 20) || (col_names[mx_clen].length() > 12))
 		save_binary_extfmt(filename, row_names, col_names, matrix);
+	else
+		save_binary_orgfmt(filename, row_names, col_names, matrix);
 }
 
 void save_binary_extfmt(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix)

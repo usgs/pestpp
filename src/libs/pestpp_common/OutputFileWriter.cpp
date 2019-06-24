@@ -858,10 +858,10 @@ void OutputFileWriter::write_svd_iteration(int iteration_no)
 		fout_svd << "OPTIMISATION ITERATION NO.        : " << iteration_no << endl << endl;
 }
 
-void OutputFileWriter::write_jco(bool isBaseIter, string ext, const Jacobian &jco)
+void OutputFileWriter::write_jco(bool isBaseIter, string ext, Jacobian &jco)
 {
 
-	ofstream &jout = file_manager.open_ofile_ext(ext, ios::out | ios::binary);
+	//ofstream &jout = file_manager.open_ofile_ext(ext, ios::out | ios::binary);
 
 	vector<string> obs_names;
 	vector<string> par_names;
@@ -892,61 +892,63 @@ void OutputFileWriter::write_jco(bool isBaseIter, string ext, const Jacobian &jc
 		par_names = jco.get_base_numeric_par_names();
 		obs_names = jco.get_sim_obs_names();
 	}
+	string filename = file_manager.build_filename(ext);
+	Eigen::SparseMatrix<double>* matrix_ptr = jco.get_matrix_ptr();
+	pest_utils::save_binary(filename, obs_names, par_names, *matrix_ptr);
+	//int n_par = par_names.size();
+	//int n_obs_and_pi = obs_names.size();
+	//int n;
+	//int tmp;
+	//double data;
+	//char par_name[12];
+	//char obs_name[20];
 
-	int n_par = par_names.size();
-	int n_obs_and_pi = obs_names.size();
-	int n;
-	int tmp;
-	double data;
-	char par_name[12];
-	char obs_name[20];
+	//// write header
+	//tmp = -n_par;
+	//jout.write((char*)&tmp, sizeof(tmp));
+	//tmp = -n_obs_and_pi;
+	//jout.write((char*)&tmp, sizeof(tmp));
 
-	// write header
-	tmp = -n_par;
-	jout.write((char*)&tmp, sizeof(tmp));
-	tmp = -n_obs_and_pi;
-	jout.write((char*)&tmp, sizeof(tmp));
+	////write number nonzero elements in jacobian (includes prior information)
+	////n = matrix.nonZeros();
+	//n = jco.get_nonzero();
+	//jout.write((char*)&n, sizeof(n));
 
-	//write number nonzero elements in jacobian (includes prior information)
-	//n = matrix.nonZeros();
-	n = jco.get_nonzero();
-	jout.write((char*)&n, sizeof(n));
+	////write matrix
+	//n = 0;
+	//map<string, double>::const_iterator found_pi_par;
+	//map<string, double>::const_iterator not_found_pi_par;
 
-	//write matrix
-	n = 0;
-	map<string, double>::const_iterator found_pi_par;
-	map<string, double>::const_iterator not_found_pi_par;
+	////Eigen::SparseMatrix<double> matrix_T(matrix);
+	//Eigen::SparseMatrix<double> matrix_T;
+	//if (isBaseIter)
+	//	matrix_T = jco.get_matrix(obs_names,par_names);
+	//else
+	//	matrix_T = jco.get_matrix();
+	//matrix_T.transpose();
+	//for (int icol = 0; icol<jco.get_outersize(); ++icol)
+	//{
+	//	for (SparseMatrix<double>::InnerIterator it(matrix_T, icol); it; ++it)
+	//	{
+	//		data = it.value();
+	//		n = it.row() + 1 + it.col() * matrix_T.rows();
+	//		jout.write((char*)&(n), sizeof(n));
+	//		jout.write((char*)&(data), sizeof(data));
+	//	}
+	//}
+	////save parameter names
+	//for (vector<string>::const_iterator b = par_names.begin(), e = par_names.end();
+	//	b != e; ++b) {
+	//	string_to_fortran_char(*b, par_name, 12);
+	//	jout.write(par_name, 12);
+	//}
 
-	//Eigen::SparseMatrix<double> matrix_T(matrix);
-	Eigen::SparseMatrix<double> matrix_T;
-	if (isBaseIter)
-		matrix_T = jco.get_matrix(obs_names,par_names);
-	else
-		matrix_T = jco.get_matrix();
-	matrix_T.transpose();
-	for (int icol = 0; icol<jco.get_outersize(); ++icol)
-	{
-		for (SparseMatrix<double>::InnerIterator it(matrix_T, icol); it; ++it)
-		{
-			data = it.value();
-			n = it.row() + 1 + it.col() * matrix_T.rows();
-			jout.write((char*)&(n), sizeof(n));
-			jout.write((char*)&(data), sizeof(data));
-		}
-	}
-	//save parameter names
-	for (vector<string>::const_iterator b = par_names.begin(), e = par_names.end();
-		b != e; ++b) {
-		string_to_fortran_char(*b, par_name, 12);
-		jout.write(par_name, 12);
-	}
-
-	//save observation and Prior information names
-	for (vector<string>::const_iterator b = obs_names.begin(), e = obs_names.end();
-		b != e; ++b) {
-		string_to_fortran_char(*b, obs_name, 20);
-		jout.write(obs_name, 20);
-	}
-	//save observation names (part 2 prior information)
-	file_manager.close_file(ext);
+	////save observation and Prior information names
+	//for (vector<string>::const_iterator b = obs_names.begin(), e = obs_names.end();
+	//	b != e; ++b) {
+	//	string_to_fortran_char(*b, obs_name, 20);
+	//	jout.write(obs_name, 20);
+	//}
+	////save observation names (part 2 prior information)
+	//file_manager.close_file(ext);
 }

@@ -442,12 +442,46 @@ def sen_plusplus_test():
     pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-sen"), "pest_sen.pst", 5, master_dir=m_d,
                            slave_root=model_d,local=local,port=port)
 
+def glm_long_name_test():
+    model_d = "ies_10par_xsec"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
+    
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_longname")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
+    pst.pestpp_options = {}
+    pst.control_data.noptmax = -1
+    #pst.write(os.path.join(t_d,"pest.pst"))
+    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-glm"), "pest.pst", 3, master_dir=m_d,
+                          slave_root=model_d,local=local,port=port)
+    jco = pyemu.Jco.from_binary(os.path.join(m_d,"pest.jcb")).to_dataframe()
+
+    with open(os.path.join(t_d,"fake.dat.tpl"),'w') as f:
+        f.write("ptf ~\n")
+        f.write("~  long_long_long_fake_par_name ~\n")
+    pst.add_parameters(os.path.join(t_d,"fake.dat.tpl"),pst_path='.')
+    pst.write(os.path.join(t_d,"pest_longname.pst"))
+    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-glm"), "pest_longname.pst", 3, master_dir=m_d,
+                          slave_root=model_d,local=local,port=port)
+    jco = pyemu.Jco.from_binary(os.path.join(m_d,"pest_longname.jcb")).to_dataframe()
+    print(jco.columns.values[-1],pst.parameter_data.parnme.iloc[-1])
+    assert jco.columns.values[-1] == pst.parameter_data.parnme.iloc[-1]
+
+
+
 if __name__ == "__main__":
+    glm_long_name_test()
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
 
-    basic_test("ies_10par_xsec")
+    #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
