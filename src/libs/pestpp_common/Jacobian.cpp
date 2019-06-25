@@ -704,63 +704,126 @@ void Jacobian::print(std::ostream &fout) const
 	fout << "matrix: " << matrix << endl;
 }
 
+//void Jacobian::save_old(const string &ext) const
+//{
+//	ofstream &jout = file_manager.open_ofile_ext(ext, ios::out |ios::binary);
+//	int n_par = base_numeric_par_names.size();
+//	int n_obs_and_pi = base_sim_obs_names.size();
+//	int n;
+//	int tmp;
+//	double data;
+//	char par_name[12];
+//	char obs_name[20];
+//
+//	// write header
+//	tmp  = -n_par;
+//	jout.write((char*) &tmp, sizeof(tmp));
+//	tmp = -n_obs_and_pi;
+//	jout.write((char*) &tmp, sizeof(tmp));
+//
+//	//write number nonzero elements in jacobian (includes prior information)
+//	n = matrix.nonZeros();
+//	jout.write((char*)&n, sizeof(n));
+//
+//	//write matrix
+//	n = 0;
+//	map<string, double>::const_iterator found_pi_par;
+//	map<string, double>::const_iterator not_found_pi_par;
+//
+//	Eigen::SparseMatrix<double> matrix_T(matrix);
+//	matrix_T.transpose();
+//	for (int icol=0; icol<matrix.outerSize(); ++icol)
+//	{
+//		for (SparseMatrix<double>::InnerIterator it(matrix_T, icol); it; ++it)
+//		{
+//			data = it.value();
+//			n = it.row() + 1 + it.col() * matrix_T.rows();
+//			jout.write((char*) &(n), sizeof(n));
+//			jout.write((char*) &(data), sizeof(data));
+//			}
+//	}
+//	//save parameter names
+//	for(vector<string>::const_iterator b=base_numeric_par_names.begin(), e=base_numeric_par_names.end();
+//		b!=e; ++b) {
+//		string l = lower_cp(*b);
+//		string_to_fortran_char(l, par_name, 12);
+//		jout.write(par_name, 12);
+//	}
+//
+//	//save observation and Prior information names
+//	for(vector<string>::const_iterator b=base_sim_obs_names.begin(), e=base_sim_obs_names.end();
+//		b!=e; ++b) {
+//		string l = lower_cp(*b);
+//		string_to_fortran_char(l, obs_name, 20);
+//		jout.write(obs_name, 20);
+//	}
+//	//save observation names (part 2 prior information)
+//	file_manager.close_file(ext);
+//}
+
 void Jacobian::save(const string &ext) const
 {
-	ofstream &jout = file_manager.open_ofile_ext(ext, ios::out |ios::binary);
-	int n_par = base_numeric_par_names.size();
-	int n_obs_and_pi = base_sim_obs_names.size();
-	int n;
-	int tmp;
-	double data;
-	char par_name[12];
-	char obs_name[20];
+	string filename = file_manager.build_filename(ext);
+	pest_utils::save_binary(filename,  base_sim_obs_names, base_numeric_par_names, matrix);
 
-	// write header
-	tmp  = -n_par;
-	jout.write((char*) &tmp, sizeof(tmp));
-	tmp = -n_obs_and_pi;
-	jout.write((char*) &tmp, sizeof(tmp));
+	//ofstream &jout = file_manager.open_ofile_ext(ext, ios::out | ios::binary);
+	//int n_par = base_numeric_par_names.size();
+	//int n_obs_and_pi = base_sim_obs_names.size();
 
-	//write number nonzero elements in jacobian (includes prior information)
-	n = matrix.nonZeros();
-	jout.write((char*)&n, sizeof(n));
+	//int n;
+	//int tmp;
+	//double data;
+	//char par_name[200];
+	//char obs_name[200];
 
-	//write matrix
-	n = 0;
-	map<string, double>::const_iterator found_pi_par;
-	map<string, double>::const_iterator not_found_pi_par;
+	//// write header
+	//tmp = n_par;
+	//jout.write((char*)&tmp, sizeof(tmp));
+	//tmp = n_obs_and_pi;
+	//jout.write((char*)&tmp, sizeof(tmp));
 
-	Eigen::SparseMatrix<double> matrix_T(matrix);
-	matrix_T.transpose();
-	for (int icol=0; icol<matrix.outerSize(); ++icol)
-	{
-		for (SparseMatrix<double>::InnerIterator it(matrix_T, icol); it; ++it)
-		{
-			data = it.value();
-			n = it.row() + 1 + it.col() * matrix_T.rows();
-			jout.write((char*) &(n), sizeof(n));
-			jout.write((char*) &(data), sizeof(data));
-			}
-	}
-	//save parameter names
-	for(vector<string>::const_iterator b=base_numeric_par_names.begin(), e=base_numeric_par_names.end();
-		b!=e; ++b) {
-		string l = lower_cp(*b);
-		string_to_fortran_char(l, par_name, 12);
-		jout.write(par_name, 12);
-	}
+	////write number nonzero elements in jacobian (includes prior information)
+	//n = matrix.nonZeros();
+	//jout.write((char*)&n, sizeof(n));
 
-	//save observation and Prior information names
-	for(vector<string>::const_iterator b=base_sim_obs_names.begin(), e=base_sim_obs_names.end();
-		b!=e; ++b) {
-		string l = lower_cp(*b);
-		string_to_fortran_char(l, obs_name, 20);
-		jout.write(obs_name, 20);
-	}
-	//save observation names (part 2 prior information)
-	file_manager.close_file(ext);
+	////write matrix
+	//n = 0;
+	//map<string, double>::const_iterator found_pi_par;
+	//map<string, double>::const_iterator not_found_pi_par;
+
+	//Eigen::SparseMatrix<double> matrix_T(matrix);
+	//matrix_T.transpose();
+	//for (int icol = 0; icol<matrix.outerSize(); ++icol)
+	//{
+	//	for (Eigen::SparseMatrix<double>::InnerIterator it(matrix_T, icol); it; ++it)
+	//	{
+	//		data = it.value();
+	//		n = it.row() - 1;
+	//		jout.write((char*) &(n), sizeof(n));
+	//		n = it.col() - 1;
+	//		jout.write((char*) &(n), sizeof(n));
+
+	//		jout.write((char*) &(data), sizeof(data));
+	//	}
+	//}
+	////save parameter names
+	//for (vector<string>::const_iterator b = base_numeric_par_names.begin(), e = base_numeric_par_names.end();
+	//	b != e; ++b) {
+	//	string l = lower_cp(*b);
+	//	string_to_fortran_char(l, par_name, 200);
+	//	jout.write(par_name, 200);
+	//}
+
+	////save observation and Prior information names
+	//for (vector<string>::const_iterator b = base_sim_obs_names.begin(), e = base_sim_obs_names.end();
+	//	b != e; ++b) {
+	//	string l = lower_cp(*b);
+	//	string_to_fortran_char(l, obs_name, 200);
+	//	jout.write(obs_name, 200);
+	//}
+	////save observation names (part 2 prior information)
+	//file_manager.close_file(ext);
 }
-
 
 void Jacobian::read(const string &filename)
 {

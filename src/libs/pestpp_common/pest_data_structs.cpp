@@ -409,7 +409,7 @@ void PestppOptions::parce_line(const string &line)
 			convert_ip(value, max_n_super);
 
 		}
-		else if (key=="SUPER_EIGTHRES"){
+		else if (key=="SUPER_EIGTHRESH"){
 			convert_ip(value, super_eigthres);
 		}
 		else if (key=="N_ITER_BASE"){

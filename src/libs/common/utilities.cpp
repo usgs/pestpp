@@ -755,6 +755,140 @@ bool read_binary(const string &filename, vector<string> &row_names, vector<strin
 	return is_new_format;
 }
 
+void save_binary(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix)
+{
+	//check row name and col name lengths
+	int mx_rlen = 0, mx_clen = 0;
+	/*for (auto &n : row_names)
+		mx_rlen = max(mx_rlen, n.length());
+	for (auto &n : col_names)
+		mx_clen = max(mx_clen, n.length());*/
+	mx_rlen = max_element(row_names.begin(), row_names.end()) - row_names.begin();
+	mx_clen = max_element(col_names.begin(), col_names.end()) - col_names.begin();
+	if ((row_names[mx_rlen].length() > 20) || (col_names[mx_clen].length() > 12))
+		save_binary_extfmt(filename, row_names, col_names, matrix);
+	else
+		save_binary_orgfmt(filename, row_names, col_names, matrix);
+}
+
+void save_binary_extfmt(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix)
+{
+	ofstream jout(filename, ios::out | ios::binary);
+	int n_par = col_names.size();
+	int n_obs_and_pi = row_names.size();
+	int n;
+	int tmp;
+	double data;
+	char par_name[200];
+	char obs_name[200];
+
+	// write header
+	tmp = n_par;
+	jout.write((char*)&tmp, sizeof(tmp));
+	tmp = n_obs_and_pi;
+	jout.write((char*)&tmp, sizeof(tmp));
+
+	//write number nonzero elements in jacobian (includes prior information)
+	n = matrix.nonZeros();
+	jout.write((char*)&n, sizeof(n));
+
+	//write matrix
+	n = 0;
+	map<string, double>::const_iterator found_pi_par;
+	map<string, double>::const_iterator not_found_pi_par;
+
+	Eigen::SparseMatrix<double> matrix_T(matrix);
+	matrix_T.transpose();
+	for (int icol = 0; icol<matrix.outerSize(); ++icol)
+	{
+		for (Eigen::SparseMatrix<double>::InnerIterator it(matrix_T, icol); it; ++it)
+		{
+			data = it.value();
+			n = it.row() - 1;
+			jout.write((char*) &(n), sizeof(n));
+			n = it.col() - 1;
+			jout.write((char*) &(n), sizeof(n));
+
+			jout.write((char*) &(data), sizeof(data));
+		}
+	}
+	//save parameter names
+	for (vector<string>::const_iterator b = col_names.begin(), e = col_names.end();
+		b != e; ++b) {
+		string l = pest_utils::lower_cp(*b);
+		pest_utils::string_to_fortran_char(l, par_name, 200);
+		jout.write(par_name, 200);
+	}
+
+	//save observation and Prior information names
+	for (vector<string>::const_iterator b = row_names.begin(), e = row_names.end();
+		b != e; ++b) {
+		string l = pest_utils::lower_cp(*b);
+		pest_utils::string_to_fortran_char(l, obs_name, 200);
+		jout.write(obs_name, 200);
+	}
+	//save observation names (part 2 prior information)
+	jout.close();
+}
+
+
+void save_binary_orgfmt(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix)
+{
+	ofstream jout(filename, ios::out | ios::binary);
+	int n_par = col_names.size();
+	int n_obs_and_pi = row_names.size();
+	int n;
+	int tmp;
+	double data;
+	char par_name[12];
+	char obs_name[20];
+
+	// write header
+	tmp = -n_par;
+	jout.write((char*)&tmp, sizeof(tmp));
+	tmp = -n_obs_and_pi;
+	jout.write((char*)&tmp, sizeof(tmp));
+
+	//write number nonzero elements in jacobian (includes prior information)
+	n = matrix.nonZeros();
+	jout.write((char*)&n, sizeof(n));
+
+	//write matrix
+	n = 0;
+	map<string, double>::const_iterator found_pi_par;
+	map<string, double>::const_iterator not_found_pi_par;
+
+	Eigen::SparseMatrix<double> matrix_T(matrix);
+	matrix_T.transpose();
+	for (int icol = 0; icol<matrix.outerSize(); ++icol)
+	{
+		for (Eigen::SparseMatrix<double>::InnerIterator it(matrix_T, icol); it; ++it)
+		{
+			data = it.value();
+			n = it.row() + 1 + it.col() * matrix_T.rows();
+			jout.write((char*) &(n), sizeof(n));
+			jout.write((char*) &(data), sizeof(data));
+		}
+	}
+	//save parameter names
+	for (vector<string>::const_iterator b = col_names.begin(), e = col_names.end();
+		b != e; ++b) {
+		string l = pest_utils::lower_cp(*b);
+		pest_utils::string_to_fortran_char(l, par_name, 12);
+		jout.write(par_name, 12);
+	}
+
+	//save observation and Prior information names
+	for (vector<string>::const_iterator b = row_names.begin(), e = row_names.end();
+		b != e; ++b) {
+		string l = pest_utils::lower_cp(*b);
+		pest_utils::string_to_fortran_char(l, obs_name, 20);
+		jout.write(obs_name, 20);
+	}
+	//save observation names (part 2 prior information)
+	jout.close();
+}
+
 
 } // end of namespace pest_utils
 
