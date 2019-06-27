@@ -2,7 +2,7 @@
 #define CONFIG_OS_H_
 
 
-#define PESTPP_VERSION "4.2.11";
+#define PESTPP_VERSION "4.2.12";
 
 #if defined(_WIN32) || defined(_WIN64)
 #define OS_WIN
