@@ -442,12 +442,48 @@ def sen_plusplus_test():
     pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-sen"), "pest_sen.pst", 5, master_dir=m_d,
                            slave_root=model_d,local=local,port=port)
 
+def secondary_marker_test():
+    t_d = os.path.join("secondary_marker_test","template")
+    tpl_file = os.path.join(t_d,"par.dat.tpl")
+
+    with open(tpl_file,'w') as f:
+        f.write("ptf ~\n")
+        f.write("~ p1    ~\n")
+
+    tpl_file = "par.dat.tpl"
+    b_d = os.getcwd()
+    os.chdir(t_d)
+    #try:
+
+    ins_files = [f for f in os.listdir(".") if f.endswith(".ins")]
+    with open("forward_run.py",'w') as f:
+        f.write("import shutil\n")
+        for ins_file in ins_files:
+            out_file = ins_file.replace(".ins","")
+            f.write("shutil.copy2('{0}','{1}')\n".format(out_file+"_bak",out_file))
+            
+    for ins_file in ins_files:
+       
+        shutil.copy2(out_file+"_bak",out_file)
+        pst = pyemu.Pst.from_io_files(tpl_file,tpl_file.replace(".tpl",""),
+            ins_file,ins_file.replace(".ins",""))
+        pst.control_data.noptmax = 0
+        pst.model_command = "python forward_run.py"
+        pst.write(os.path.join("test.pst"))
+        
+        pyemu.os_utils.run("{0} test.pst".format(exe_path))
+    #except Exception as e:
+    #    os.chdir(b_d)
+    #    raise Exception(e)
+    os.chdir(b_d)
+
 if __name__ == "__main__":
+    glm_long_name_test()
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-
-    basic_test("ies_10par_xsec")
+    secondary_marker_test()
+    #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()

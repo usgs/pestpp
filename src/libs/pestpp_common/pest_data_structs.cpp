@@ -409,7 +409,7 @@ void PestppOptions::parce_line(const string &line)
 			convert_ip(value, max_n_super);
 
 		}
-		else if (key=="SUPER_EIGTHRES"){
+		else if (key=="SUPER_EIGTHRESH"){
 			convert_ip(value, super_eigthres);
 		}
 		else if (key=="N_ITER_BASE"){
@@ -991,6 +991,10 @@ void PestppOptions::parce_line(const string &line)
 			transform(value.begin(), value.end(), value.begin(), ::tolower);
 			istringstream is(value);
 			is >> boolalpha >> ies_enforce_chglim;
+		}
+		else if (key == "IES_CENTER_ON")
+		{
+			convert_ip(value, ies_center_on);
 		}
 
 

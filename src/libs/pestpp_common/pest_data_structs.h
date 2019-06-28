@@ -424,6 +424,8 @@ public:
 	void set_ies_autoadaloc_sigma_dist(double _dist) { ies_autoadaloc_sigma_dist = _dist; }
 	bool get_ies_enforce_chglim() const { return ies_enforce_chglim; }
 	void set_ies_enforce_chglim(bool _flag) { ies_enforce_chglim = _flag; }
+	string get_ies_center_on()const { return ies_center_on; }
+	void set_ies_center_on(string _value) { ies_center_on = _value; }
 
 	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -552,6 +554,7 @@ private:
 	bool ies_autoadaloc;
 	double ies_autoadaloc_sigma_dist;
 	bool ies_enforce_chglim;
+	string ies_center_on;
 
 	string gsa_method;
 	int gsa_morris_p;

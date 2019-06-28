@@ -75,7 +75,7 @@ public:
 	void write_obj_iter(int iter, int nruns, PhiData const &pph_data);
 	void write_sen_iter(int iter, map<string, double> &ctl_par_sens);
 
-	void write_jco(bool isBaseIter, string ext, const Jacobian &jco);
+	void write_jco(bool isBaseIter, string ext, Jacobian &jco);
 
 	void write_upgrade(int iteration, int is_super, double lambda, double scale_factor, Parameters &pars);
 	void write_jco_run_id(int groupid, std::map<string, vector<int>> &par_run_map);
