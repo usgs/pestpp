@@ -1352,7 +1352,7 @@ subroutine mio_getnxt(ifail,j1,num1,num2,nblc)
         implicit none        
 
         integer ifail
-        integer j1,num1,num2,nblc,i
+        integer j1,num1,num2,nblc,i,ii
 
         ifail=0
         do 20 i=j1+1,nblc
@@ -1362,10 +1362,19 @@ subroutine mio_getnxt(ifail,j1,num1,num2,nblc)
         return
 50      num1=i
         i=index(dline(num1:nblc),' ')
+        ii=index(dline(num1:nblc),',')
+        if(ii.ne.0) then
+            if(i.eq.0)then
+                i = ii
+            else
+                i = min(i,ii)
+            end if
+        end if
+        
         if(i.eq.0) then
-          num2=nblc
+            num2=nblc
         else
-          num2=num1+i-2
+            num2=num1+i-2
         end if
 
         return

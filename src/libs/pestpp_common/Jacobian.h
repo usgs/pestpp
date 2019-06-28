@@ -80,7 +80,9 @@ public:
 		const ParameterGroupInfo &group_info,
 		RunManagerAbstract &run_manager, const PriorInformation &prior_info, bool splitswh_flag);
 
-	virtual void save(const std::string &ext="jco") const;
+	//virtual void save_old(const std::string &ext="jco") const;
+	virtual void save(const std::string &ext = "jco") const;
+
 	void read(const std::string &filename);
 	virtual void print(std::ostream &fout) const;
 	virtual const set<string>& get_failed_parameter_names() const;

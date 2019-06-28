@@ -884,6 +884,7 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	pestpp_options.set_ies_autoadaloc(false);
 	pestpp_options.set_ies_autoadaloc_sigma_dist(1.0);
 	pestpp_options.set_ies_enforce_chglim(false);
+	pestpp_options.set_ies_center_on("");
 
 	pestpp_options.set_gsa_method("MORRIS");
 	//many of these defaults are also redefined in gsa main
