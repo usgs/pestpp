@@ -40,6 +40,12 @@ using namespace::pest_utils;
 OutputFileWriter::OutputFileWriter(FileManager &_file_manager, Pest &_pest_scenario, bool restart_flag, bool _save_rei, int _eigenwrite)
 	: file_manager(_file_manager), pest_scenario(_pest_scenario),case_name(_file_manager.get_base_filename()), save_rei(_save_rei), eigenwrite(_eigenwrite)
 {
+	
+}
+
+
+void OutputFileWriter::prep_glm_files(bool restart_flag)
+{
 	if (restart_flag)
 	{
 		ofstream &fout_sen = file_manager.open_ofile_ext("sen", ofstream::app);

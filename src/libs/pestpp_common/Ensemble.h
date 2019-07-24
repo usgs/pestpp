@@ -64,6 +64,7 @@ public:
 
 	void append_other_rows(Ensemble &other);
 	void append(string real_name, const Transformable &trans);
+	void replace(int idx, const Transformable &trans, string real_name="");
 
 	Covariance get_diagonal_cov_matrix();
 
@@ -72,6 +73,7 @@ public:
 	void drop_rows(const vector<string> &drop_names);
 	void keep_rows(const vector<int> &row_idxs);
 	void keep_rows(const vector<string> &keep_names);
+	
 
 	Pest* get_pest_scenario_ptr() { return pest_scenario_ptr; }
 	Pest get_pest_scenario() { return *pest_scenario_ptr; }

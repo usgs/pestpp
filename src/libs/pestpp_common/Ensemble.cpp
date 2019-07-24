@@ -1128,6 +1128,41 @@ void Ensemble::append(string real_name, const Transformable &trans)
 		org_real_names.push_back(real_name);
 }
 
+void Ensemble::replace(int idx, const Transformable &trans, string real_name)
+{
+	stringstream ss;
+	
+	//make sure all var_names are found
+	vector<string> keys = trans.get_keys();
+	set<string> tset(keys.begin(), keys.end());
+	vector<string> missing;
+	for (auto &n : var_names)
+		if (tset.find(n) == tset.end())
+			missing.push_back(n);
+	if (missing.size() > 0)
+	{
+		ss.str("");
+		ss << "Ensemble::append() error: the following var_names not found: ";
+		for (auto &m : missing)
+			ss << m << " , ";
+		throw_ensemble_error(ss.str());
+	}
+
+	reals.row(idx) = trans.get_data_eigen_vec(var_names);
+	if (real_name.size() > 0)
+	{
+		//make sure this real_name isn't ready used
+		if (find(real_names.begin(), real_names.end(), real_name) != real_names.end())
+		{
+			ss << "Ensemble::replace() error: real_name '" << real_name << "' already in real_names";
+			throw_ensemble_error(ss.str());
+		}
+		real_names[idx] = real_name;
+		org_real_names[idx] = real_name;
+	}
+}
+
+
 void Ensemble::to_binary_old(string file_name,bool transposed)
 {
 	ofstream fout(file_name, ios::binary);

@@ -1351,7 +1351,7 @@ void IterEnsembleSmoother::initialize_restart()
 	}
 	else
 	{
-		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looing for csv, jcb, or jco";
+		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
 		throw_ies_error(ss.str());
 	}
 	if (par_restart_csv.size() > 0)
@@ -1393,7 +1393,7 @@ void IterEnsembleSmoother::initialize_restart()
 		}
 		else
 		{
-			ss << "unrecognized restart par ensemble extension " << par_ext << ", looing for csv, jcb, or jco";
+			ss << "unrecognized restart par ensemble extension " << par_ext << ", looking for csv, jcb, or jco";
 			throw_ies_error(ss.str());
 		}
 		if (pe.shape().first != oe.shape().first)
@@ -1403,7 +1403,7 @@ void IterEnsembleSmoother::initialize_restart()
 			throw_ies_error(ss.str());
 		}
 
-		//check that restart pe is in sync
+		//check that restart pe is in sync with pe_base
 		vector<string> pe_real_names = pe.get_real_names(), pe_base_real_names = pe_base.get_real_names();
 		vector<string>::const_iterator start, end;
 		vector<string> missing;
@@ -1441,7 +1441,7 @@ void IterEnsembleSmoother::initialize_restart()
 		}
 	}
 
-	//check that restart oe is in sync
+	//check that restart oe is in sync with oe_base
 	vector<string> oe_real_names = oe.get_real_names(), oe_base_real_names = oe_base.get_real_names();
 	vector<string>::const_iterator start, end;
 	vector<string> missing;
@@ -1452,10 +1452,39 @@ void IterEnsembleSmoother::initialize_restart()
 			missing.push_back(rname);
 	if (missing.size() > 0)
 	{
-		ss << "the following realization names were found in the restart obs en but not in the 'base' obs en:";
-		for (auto &m : missing)
-			ss << m << ",";
-		throw_ies_error(ss.str());
+		//the special case where the base real is what is missing...
+		if ((missing.size() == 1) && (missing[0] == "BASE"))
+		{
+			//check that the base real is in the par en - restart_par_en should be accounted for by now
+			int base_par_idx = -1;
+			vector<string> pe_real_names = pe.get_real_names(), pe_base_real_names = pe_base.get_real_names();
+			for (int i = 0; i < pe_base.shape().first; i++)
+			{
+				if (pe_base_real_names[i] == "BASE")
+				{
+					base_par_idx = i;
+					break;
+				}
+			}
+			if (base_par_idx != -1)
+			{
+				Observations obs = pest_scenario.get_ctl_observations();
+				oe_base.replace(base_par_idx, obs, "BASE");
+			}
+			else
+			{
+				ss << "the 'base' realization was not found in the restart obs en and also not found in the par en";
+				throw_ies_error(ss.str());
+			}
+
+		}
+		else
+		{
+			ss << "the following realization names were found in the restart obs en but not in the 'base' obs en:";
+			for (auto &m : missing)
+				ss << m << ",";
+			throw_ies_error(ss.str());
+		}
 
 	}
 
@@ -1927,7 +1956,6 @@ void IterEnsembleSmoother::initialize()
 
 	sanity_checks();
 
-	
 
 	bool echo = false;
 	if (verbose_level > 1)

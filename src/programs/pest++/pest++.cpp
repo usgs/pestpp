@@ -293,6 +293,7 @@ int main(int argc, char* argv[])
 		//Initialize OutputFileWriter to hadle IO of suplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
+		output_file_writer.prep_glm_files(restart_flag);
 		output_file_writer.set_svd_output_opt(pest_scenario.get_svd_info().eigwrite);
 		if (!restart_flag)
 		{
