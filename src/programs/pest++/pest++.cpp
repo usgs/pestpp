@@ -588,8 +588,8 @@ int main(int argc, char* argv[])
 				cout << e.what() << endl;
 				fout_rec << endl << endl;
 				fout_rec << e.what() << endl;
-				cout << "FATAL ERROR: base parameter run failed." << endl;
-				fout_rec << "FATAL ERROR: base parameter run failed." << endl;
+				cout << "FATAL ERROR, cannot continue" << endl;
+				fout_rec << "FATAL ERROR, cannot continue" << endl;
 				exit(1);
 			}
 			// Build Super Parameter or SVDA problem
@@ -742,13 +742,9 @@ int main(int argc, char* argv[])
 			if (oi.second.weight > 0.0)
 				fout_rec << setw(20) << oi.first << setw(20) << oi.second.group << setw(20) << oi.second.weight << endl;
 			fout_rec << endl << endl;
-			//covariance instance for observation noise
-			Covariance obscov;
-			obscov.from_observation_weights(pest_scenario.get_ctl_ordered_obs_names(), reweight,
-				pest_scenario.get_ctl_ordered_pi_names(), pest_scenario.get_prior_info_ptr());
-
+			
 			//instance of linear analysis
-			linear_analysis la(&j, &pest_scenario, &obscov, &unc_log);
+			linear_analysis la(j, pest_scenario, file_manager, &unc_log);
 
 			//if needed, set the predictive sensitivity vectors
 			const vector<string> pred_names = pest_scenario.get_pestpp_options().get_prediction_names();
@@ -819,6 +815,7 @@ int main(int argc, char* argv[])
 				map<int,int> run_map = pe.add_runs(run_manager_ptr);
 				run_manager_ptr->run();
 				ObservationEnsemble oe(&pest_scenario);
+				Covariance obscov = la.get_obscov();
 				oe.draw(num_reals, obscov, &performance_log, 1);
 				oe.update_from_runs(run_map, run_manager_ptr);
 				if (binary)

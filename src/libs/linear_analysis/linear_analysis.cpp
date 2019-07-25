@@ -335,114 +335,114 @@ linear_analysis::linear_analysis(Mat _jacobian, Mat _parcov, Mat _obscov, map<st
 }
 
 
-linear_analysis::linear_analysis(string &jco_filename,Logger* _log)
-{
-	log = _log;
-	string pst_filename = jco_filename;
-	pst_filename.replace(jco_filename.size() - 4, jco_filename.size() - 1, ".pst");
-	if (pest_utils::check_exist_in(pst_filename))
-	{
-		pest_utils::upper_ip(jco_filename);
-		Mat jco;
-		Pest pest_scenario;
-		try
-		{
-			load_jco(jco, jco_filename);
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::linear_analysis() error loading jco: " + string(e.what()));
-		}
-		try
-		{
-			load_pst(pest_scenario, pst_filename);
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::linear_analysis() error loading pst: " + string(e.what()));
-		}
-		linear_analysis(jco, pest_scenario);
-	}
-	else
-	{
-		try
-		{
-			load_jco(jacobian, jco_filename);
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::linear_analysis() error loading jco: " + string(e.what()));
-		}
-	}
-	R_sv = -999, G_sv = -999, ImR_sv = -999, V1_sv = -999;
-}
+//linear_analysis::linear_analysis(string &jco_filename,Logger* _log)
+//{
+//	log = _log;
+//	string pst_filename = jco_filename;
+//	pst_filename.replace(jco_filename.size() - 4, jco_filename.size() - 1, ".pst");
+//	if (pest_utils::check_exist_in(pst_filename))
+//	{
+//		pest_utils::upper_ip(jco_filename);
+//		Mat jco;
+//		Pest pest_scenario;
+//		try
+//		{
+//			load_jco(jco, jco_filename);
+//		}
+//		catch (exception &e)
+//		{
+//			throw_error("linear_analysis::linear_analysis() error loading jco: " + string(e.what()));
+//		}
+//		try
+//		{
+//			load_pst(pest_scenario, pst_filename);
+//		}
+//		catch (exception &e)
+//		{
+//			throw_error("linear_analysis::linear_analysis() error loading pst: " + string(e.what()));
+//		}
+//		linear_analysis(jco, pest_scenario);
+//	}
+//	else
+//	{
+//		try
+//		{
+//			load_jco(jacobian, jco_filename);
+//		}
+//		catch (exception &e)
+//		{
+//			throw_error("linear_analysis::linear_analysis() error loading jco: " + string(e.what()));
+//		}
+//	}
+//	R_sv = -999, G_sv = -999, ImR_sv = -999, V1_sv = -999;
+//}
 
 
-linear_analysis::linear_analysis(string &jco_filename, string &parcov_filename, string &obscov_filename,Logger* _log)
-{
-	log = _log;
-	try
-	{
-		load_jco(jacobian, jco_filename);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::linear_analysis() error loading jco: " + string(e.what()));
-	}
-	try
-	{
-		load_parcov(parcov_filename);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::linear_analysis() error loading parcov: " + string(e.what()));
-	}
-	try
-	{
-		load_obscov(obscov_filename);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::linear_analysis() error loading obscov: " + string(e.what()));
-	}
-	R_sv = -999, G_sv = -999, ImR_sv = -999, V1_sv = -999;
-}
+//linear_analysis::linear_analysis(string &jco_filename, string &parcov_filename, string &obscov_filename,Logger* _log)
+//{
+//	log = _log;
+//	try
+//	{
+//		load_jco(jacobian, jco_filename);
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::linear_analysis() error loading jco: " + string(e.what()));
+//	}
+//	try
+//	{
+//		load_parcov(parcov_filename);
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::linear_analysis() error loading parcov: " + string(e.what()));
+//	}
+//	try
+//	{
+//		load_obscov(obscov_filename);
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::linear_analysis() error loading obscov: " + string(e.what()));
+//	}
+//	R_sv = -999, G_sv = -999, ImR_sv = -999, V1_sv = -999;
+//}
 
 
-linear_analysis::linear_analysis(Mat _jacobian, Pest pest_scenario,Logger* _log)
-{
-	log = _log;
-	jacobian = _jacobian;
-	try
-	{
-		parcov.from_parameter_bounds(pest_scenario);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::linear_analysis() error setting parcov from parameter bounds:" + string(e.what()));
-	}
-	try
-	{
-		obscov.from_observation_weights(pest_scenario);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::linear_analysis() error setting obscov from observation weights:" + string(e.what()));
-	}
-	R_sv = -999, G_sv = -999, ImR_sv = -999,V1_sv=-999;
-}
+//linear_analysis::linear_analysis(Mat _jacobian, Pest pest_scenario,Logger* _log)
+//{
+//	log = _log;
+//	jacobian = _jacobian;
+//	try
+//	{
+//		parcov.from_parameter_bounds(pest_scenario);
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::linear_analysis() error setting parcov from parameter bounds:" + string(e.what()));
+//	}
+//	try
+//	{
+//		obscov.from_observation_weights(pest_scenario);
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::linear_analysis() error setting obscov from observation weights:" + string(e.what()));
+//	}
+//	R_sv = -999, G_sv = -999, ImR_sv = -999,V1_sv=-999;
+//}
 
-linear_analysis::linear_analysis(Mat* _jacobian, Pest* pest_scenario, Logger* _log)
+linear_analysis::linear_analysis(Mat &_jacobian, Pest &pest_scenario, FileManager &file_manager, Logger* _log)
 {
 	bool parcov_success = false;
 	log = _log;
-	jacobian = *_jacobian;
-	const string parcov_filename = pest_scenario->get_pestpp_options().get_parcov_filename();
+	jacobian = _jacobian;
+	const string parcov_filename = pest_scenario.get_pestpp_options().get_parcov_filename();
 	if (parcov_filename.size() > 0)
 	{
 		try
 		{
-			load_parcov(parcov_filename);
+			parcov.try_from(pest_scenario, file_manager, true);
 			parcov_success = true;
 		}
 		catch (exception &e)
@@ -454,68 +454,85 @@ linear_analysis::linear_analysis(Mat* _jacobian, Pest* pest_scenario, Logger* _l
 	{
 		try
 		{
-			parcov.from_parameter_bounds(*pest_scenario);
+			parcov.from_parameter_bounds(pest_scenario);
 		}
 		catch (exception &e)
 		{
 			throw_error("linear_analysis::linear_analysis() error setting parcov from parameter bounds:" + string(e.what()));
 		}
 	}
-	try
+	const string obscov_filename = pest_scenario.get_pestpp_options().get_obscov_filename();
+	bool obscov_success = false;
+	if (obscov_filename.size() > 0)
 	{
-		obscov.from_observation_weights(*pest_scenario);
+		try
+		{
+			obscov.try_from(pest_scenario, file_manager, false);
+			obscov_success = true;
+		}
+		catch (exception &e)
+		{
+			log->warning("unable to load obscov from file: " + obscov_filename + ", reverting to observation weights " + e.what());
+		}
 	}
-	catch (exception &e)
+	if (!obscov_success)
 	{
-		throw_error("linear_analysis::linear_analysis() error setting obscov from observation weights:" + string(e.what()));
+		try
+		{
+			obscov.from_observation_weights(pest_scenario);
+		}
+		catch (exception &e)
+		{
+			throw_error("linear_analysis::linear_analysis() error setting obscov from observation weights:" + string(e.what()));
+
+		}
 	}
 	R_sv = -999, G_sv = -999, ImR_sv = -999, V1_sv = -999;
-
 }
 
-void  linear_analysis::set_parcov(Mat* _parcov)
+void  linear_analysis::set_parcov(Mat &_parcov)
 {
-	parcov = *_parcov;
+	parcov = _parcov;
 	//check that everything is kosher
 	//vector<string> missing;
 	//bool aligned = true;
 	//if (jacobian.get_col_names().size() != _parcov.get_row_names.size())
 }
 
-linear_analysis::linear_analysis(Mat* _jacobian, Pest* pest_scenario, Mat* _obscov, Logger* _log)
-{
-	bool parcov_success = false;
-	log = _log;
-	jacobian = *_jacobian;
-	obscov = *_obscov;
-	const string parcov_filename = pest_scenario->get_pestpp_options().get_parcov_filename();
-	if (parcov_filename.size() > 0)
-	{
-		try
-		{
-			load_parcov(parcov_filename);
-			parcov_success = true;
-		}
-		catch (exception &e)
-		{
-			log->warning("unable to load parcov from file: " + parcov_filename + ", reverting to parameter bounds " + e.what());
-			cout << "WARNING: unable to load parcov from file : " << parcov_filename << ", reverting to parameter bounds" << endl;
-		}
-	}
-	if (!parcov_success)
-	{
-		try
-		{
-			parcov.from_parameter_bounds(*pest_scenario);
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::linear_analysis() error setting parcov from parameter bounds:" + string(e.what()));
-		}
-	}
-	R_sv = -999, G_sv = -999, ImR_sv = -999, V1_sv = -999;
-
-	}
+//linear_analysis::linear_analysis(Mat* _jacobian, Pest* pest_scenario, Mat* _obscov, Logger* _log)
+//{
+//	bool parcov_success = false;
+//	log = _log;
+//	jacobian = *_jacobian;
+//	obscov = *_obscov;
+//	const string parcov_filename = pest_scenario->get_pestpp_options().get_parcov_filename();
+//	if (parcov_filename.size() > 0)
+//	{
+//		try
+//		{
+//			load_parcov(parcov_filename);
+//			parcov_success = true;
+//		}
+//		catch (exception &e)
+//		{
+//			log->warning("unable to load parcov from file: " + parcov_filename + ", reverting to parameter bounds " + e.what());
+//			cout << "WARNING: unable to load parcov from file : " << parcov_filename << ", reverting to parameter bounds" << endl;
+//		}
+//	}
+//	if (!parcov_success)
+//	{
+//		try
+//		{
+//			parcov.from_parameter_bounds(*pest_scenario);
+//		}
+//		catch (exception &e)
+//		{
+//			throw_error("linear_analysis::linear_analysis() error setting parcov from parameter bounds:" + string(e.what()));
+//		}
+//	}
+//	R_sv = -999, G_sv = -999, ImR_sv = -999, V1_sv = -999;
+//
+//	}
 
 void linear_analysis::align()
 {
