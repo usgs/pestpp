@@ -1468,6 +1468,9 @@ void IterEnsembleSmoother::initialize_restart()
 			}
 			if (base_par_idx != -1)
 			{
+				ss.str("");
+				ss << "WARNING: replacing base obs en realization '" << oe_base_real_names[base_par_idx] << "' with 'base' (noise free) values to match par en 'base' location";
+				message(2, ss.str());
 				Observations obs = pest_scenario.get_ctl_observations();
 				oe_base.replace(base_par_idx, obs, "BASE");
 			}
