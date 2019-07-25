@@ -218,10 +218,9 @@ public:
 	enum GLOBAL_OPT { NONE, OPT_DE };
 	PestppOptions(int _n_iter_base = 50, int _n_iter_super = 0, int _max_n_super = 50,
 		double _super_eigthres = 1.0E-6, SVD_PACK _svd_pack = PestppOptions::REDSVD,
-		MAT_INV _mat_inv = PestppOptions::JTQJ, double _auto_norm = -999,
 		double _super_relparmax = 0.1, int max_run_fail = 3,
 		bool iter_summary_flag = true, bool der_forgive = true,
-		double overdue_reched_fac = 1.15, double overdue_giveup_fac = 100, double reg_frac = -1.0,
+		double overdue_reched_fac = 1.15, double overdue_giveup_fac = 100,
 		GLOBAL_OPT _global_opt = PestppOptions::NONE,
 		double _de_f = 0.8, double _de_cr = 0.9, int _de_npopulation = 40, int _de_max_gen = 100, bool _de_dither_f = true);
 	void parce_line(const string &line);
@@ -230,8 +229,6 @@ public:
 	int get_n_iter_base() const { return n_iter_base; }
 	int get_n_iter_super() const { return n_iter_super; }
 	SVD_PACK get_svd_pack() const { return svd_pack; }
-	MAT_INV get_mat_inv() const { return mat_inv; }
-	double get_auto_norm() const { return auto_norm; }
 	double get_super_relparmax() const { return super_relparmax; }
 	int get_max_run_fail() const { return max_run_fail; }
 	int get_max_super_frz_iter()const { return max_super_frz_iter; }
@@ -253,8 +250,6 @@ public:
 	void set_n_iter_base(int _n_iter_base) { n_iter_base = _n_iter_base; }
 	void set_n_iter_super(int _n_iter_super) { n_iter_super = _n_iter_super; }
 	void set_svd_pack(const SVD_PACK _svd_pack = EIGEN) { svd_pack = _svd_pack; }
-	void set_mat_inv(const MAT_INV _mat_inv = JTQJ) { mat_inv = _mat_inv; }
-	void set_auto_norm(double _auto_norm) { auto_norm = _auto_norm; };
 	void set_super_relparmax(double _super_relparmax) { super_relparmax = _super_relparmax; };
 	void set_max_run_fail(int _max_run_fail) { max_run_fail = _max_run_fail; }
 	void set_max_super_frz_iter(int n) { max_super_frz_iter = n; }
@@ -286,11 +281,7 @@ public:
 	void set_sweep_forgive(bool _forgive) { sweep_forgive = _forgive; }
 	bool get_sweep_base_run()const { return sweep_base_run; }
 	void set_sweep_base_run(bool _base) { sweep_base_run = _base; }
-	double get_reg_frac()const { return reg_frac; }
-	//bool get_use_parcov_scaling()const { return use_parcov_scaling; }
-	//void set_use_parcov_scaling(bool _scale) { use_parcov_scaling = _scale; }
-	double get_parcov_scale_fac() const { return parcov_scale_fac; }
-	void set_parcov_scale_fac(double _fac) { parcov_scale_fac = _fac; }
+
 	bool get_jac_scale()const { return jac_scale; }
 	void set_jac_scale(bool _jac_scale) { jac_scale = _jac_scale; }
 
@@ -455,8 +446,6 @@ private:
 	int max_n_super;
 	double super_eigthres;
 	SVD_PACK svd_pack;
-	MAT_INV mat_inv;
-	double auto_norm;
 	double super_relparmax;
 	int max_run_fail;
 	int max_super_frz_iter;
@@ -474,15 +463,12 @@ private:
 	double overdue_giveup_fac;
 	double overdue_giveup_minutes;
 	string condor_submit_file;
-	double reg_frac;
 
 	string sweep_parameter_csv_file;
 	string sweep_output_csv_file;
 	bool sweep_forgive;
 	int sweep_chunk;
 	bool sweep_base_run;
-	//bool use_parcov_scaling;
-	double parcov_scale_fac;
 	bool jac_scale;
 	bool upgrade_augment;
 	string upgrade_bounds;

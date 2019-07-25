@@ -66,17 +66,13 @@ void OutputFileWriter::prep_glm_files(bool restart_flag)
 	}
 }
 
-void OutputFileWriter::iteration_report(std::ostream &os, int iter, int nruns, string iteration_type, string svd_type, string mat_inv)
+void OutputFileWriter::iteration_report(std::ostream &os, int iter, int nruns, string iteration_type, string svd_type)
 {
 	os << "OPTIMISATION ITERATION NUMBER: " << iter << endl << endl;
 	os << "  Iteration type: " << iteration_type << endl;
 	if (!svd_type.empty())
 	{
 		os << "  SVD Package: " << svd_type << endl;
-	}
-	if (!mat_inv.empty())
-	{
-		os << "  Matrix Inversion: " << mat_inv << endl;
 	}
 	os << "  Model calls so far : " << nruns << endl;
 	os << endl;

@@ -252,28 +252,6 @@ void Pest::check_inputs(ostream &f_rec)
 		}
 	}
 
-	if (pestpp_options.get_auto_norm() > 0.0)
-	{
-		if (pestpp_options.get_parcov_scale_fac() > 0.0)
-			throw PestError("Can't use 'autonorm' and 'parcov_scale_fac' > 0.0");
-		f_rec << "pest++ option 'autonorm' is being deprecated in favor of 'use_parcov_scaling'" << endl;
-		cout << "pest++ option 'autonorm' is being deprecated in favor of 'use_parcov_scaling'" << endl;
-		//pestpp_options.set_auto_norm(-999.0);
-	}
-	if (pestpp_options.get_parcov_scale_fac() > 0.0)
-	{
-		if (pestpp_options.get_mat_inv() == PestppOptions::MAT_INV::Q12J)
-		{
-			f_rec << "pest++ mat_inv = q12j, but parcov_scale_fac > 0.0." << endl;
-			throw PestError("pest++ mat_inv = q12j, but parcov_scale_fac > 0.0.");
-		}
-		if (pestpp_options.get_parcov_scale_fac() > 1.0)
-		{
-			cout << "'parcov_scale_fac' > 1.0, resetting to 1.0" << endl;
-			f_rec << "'parcov_scale_fac' > 1.0, resetting to 1.0" << endl;
-			pestpp_options.set_parcov_scale_fac(1.0);
-		}
-	}
 	if (pestpp_options.get_hotstart_resfile().size() > 0)
 		if (pestpp_options.get_basejac_filename().size() == 0)
 		{
@@ -825,8 +803,7 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	pestpp_options.set_sweep_forgive(false);
 	pestpp_options.set_sweep_chunk(500);
 	pestpp_options.set_tie_by_group(false);
-	//pestpp_options.set_use_parcov_scaling(false);
-	pestpp_options.set_parcov_scale_fac(-999.0);
+
 	pestpp_options.set_jac_scale(true);
 	pestpp_options.set_upgrade_augment(false);
 	pestpp_options.set_opt_obj_func("");
@@ -906,46 +883,6 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 			pestpp_options.parce_line(*b);
 	}
 	
-	if (pestpp_options.get_auto_norm() > 0.0)
-	{
-		cout << "WARNING 'autonorm' option is being deprecated in favor of use_parcov_scaling. ignoring..." << endl;
-		f_rec << "WARNING 'autonorm' option is being deprecated in favor of use_parcov_scaling. ignoring..." << endl;
-		
-		/*double u_bnd;
-		double l_bnd;
-		double avg;
-		double spread;
-		double auto_norm = pestpp_options.get_auto_norm();
-		const string *par_name;
-		Parameters upper_bnd;
-		Parameters lower_bnd;
-		for(vector<string>::const_iterator b=ctl_ordered_par_names.begin(), e=ctl_ordered_par_names.end();
-			b!=e; ++b) {
-				upper_bnd.insert(*b, ctl_parameter_info.get_parameter_rec_ptr(*b)->ubnd);
-				lower_bnd.insert(*b, ctl_parameter_info.get_parameter_rec_ptr(*b)->lbnd);
-		}
-		base_par_transform.ctl2numeric_ip(upper_bnd);
-		base_par_transform.ctl2numeric_ip(lower_bnd);
-		for(Parameters::const_iterator b=upper_bnd.begin(), e=upper_bnd.end();
-			b!=e; ++b) {
-				par_name = &((*b).first);
-				u_bnd = (*b).second;
-
-				l_bnd = lower_bnd.get_rec(*par_name);
-				spread = u_bnd - l_bnd;
-				avg = (u_bnd + l_bnd) / 2.0;
-				t_auto_norm->insert(*par_name, -avg, auto_norm/spread);
-		}*/
-	}
-	//if the reg_frac arg was passed, reset the regul pointer
-	if (pestpp_options.get_reg_frac() >= 0.0)
-	{
-		double dummy = -1.0e+10;
-		delete regul_scheme_ptr;
-		regul_scheme_ptr = new DynamicRegularization(use_dynamic_reg, true, dummy,
-			dummy, dummy, wfmin, wfmax, dummy, dummy, wfinit);
-
-	}
 	regul_scheme_ptr->set_max_reg_iter(pestpp_options.get_max_reg_iter());
 //	//Make sure we use Q1/2J is PROPACK is chosen
 //	if (pestpp_options.get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)

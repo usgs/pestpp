@@ -331,7 +331,7 @@ int main(int argc, char* argv[])
 		TerminationController termination_ctl(pest_scenario.get_control_info().noptmax, pest_scenario.get_control_info().phiredstp,
 			pest_scenario.get_control_info().nphistp, pest_scenario.get_control_info().nphinored, pest_scenario.get_control_info().relparstp,
 			pest_scenario.get_control_info().nrelpar, pest_scenario.get_regul_scheme_ptr()->get_use_dynamic_reg(),
-			pest_scenario.get_regul_scheme_ptr()->get_phimaccept(), pest_scenario.get_pestpp_options().get_reg_frac());
+			pest_scenario.get_regul_scheme_ptr()->get_phimaccept());
 
 		
 

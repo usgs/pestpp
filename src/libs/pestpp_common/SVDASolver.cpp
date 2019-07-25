@@ -39,13 +39,18 @@ using namespace pest_utils;
 using namespace Eigen;
 
 const string SVDASolver::svda_solver_type_name = "svda_super_par";
-
+/*
+SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
+		const ParamTransformSeq &_par_transform, Jacobian &_jacobian,
+		OutputFileWriter &_output_file_writer, SVDSolver::MAT_INV _mat_inv,
+		PerformanceLog *_performance_log, const string &description = string("base parameter solution"),
+		bool _phiredswh_flag = false, bool _splitswh_flag = false, bool _save_next_jacobian = true);
+*/
 SVDASolver::SVDASolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func_ptr,
 	const ParamTransformSeq &_par_transform, Jacobian &_jacobian,	OutputFileWriter &_output_file_writer,
-	SVDSolver::MAT_INV _mat_inv, PerformanceLog *_performance_log, bool _phiredswh_flag, bool _splitswh_flag)
+	PerformanceLog *_performance_log, bool _phiredswh_flag, bool _splitswh_flag)
 	: SVDSolver(_pest_scenario, _file_manager, _obj_func_ptr, _par_transform, _jacobian,
-		_output_file_writer, _mat_inv, _performance_log,
-		 "super parameter solution", Covariance(), _phiredswh_flag, _splitswh_flag, false),
+		_output_file_writer, _performance_log,"super parameter solution", _phiredswh_flag, _splitswh_flag, false),
 		max_super_frz_iter(_pest_scenario.get_pestpp_options().get_max_super_frz_iter())
 {
 }
@@ -130,10 +135,6 @@ void SVDASolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_activ
 
 	UPGRADE_FUNCTION calc_lambda_upgrade = &SVDASolver::calc_lambda_upgrade_vec_JtQJ;
 
-	if (mat_inv == MAT_INV::Q12J)
-	{
-		calc_lambda_upgrade = &SVDASolver::calc_lambda_upgrade_vecQ12J;
-	}
 
 		// need to remove parameters frozen due to failed jacobian runs when calling calc_lambda_upgrade_vec
 		//Freeze Parameters at the boundary whose ugrade vector and gradient both head out of bounds
@@ -419,7 +420,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 			Parameters frozen_active_ctl_pars;
 			//If running in regularization mode, adjust the regularization weights
 			// define a function type for upgrade methods
-			if (regul_scheme_ptr->get_use_dynamic_reg() && reg_frac <= 0.0)
+			if (regul_scheme_ptr->get_use_dynamic_reg())
 			{
 				dynamic_weight_adj(base_run, jacobian, Q_sqrt, residuals_vec, obs_names_vec,
 					base_run_active_ctl_pars, frozen_active_ctl_pars);

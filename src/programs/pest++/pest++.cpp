@@ -356,14 +356,6 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_max_run_fail());
 		}
 
-		//setup the parcov, if needed
-		Covariance parcov;
-		//if (pest_scenario.get_pestpp_options().get_use_parcov_scaling())
-		double parcov_scale_fac = pest_scenario.get_pestpp_options().get_parcov_scale_fac();
-		if (parcov_scale_fac > 0.0)
-		{
-			parcov.try_from(pest_scenario, file_manager);
-		}
 		const ParamTransformSeq &base_trans_seq = pest_scenario.get_base_par_tran_seq();
 
 		ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
@@ -372,7 +364,7 @@ int main(int argc, char* argv[])
 		TerminationController termination_ctl(pest_scenario.get_control_info().noptmax, pest_scenario.get_control_info().phiredstp,
 			pest_scenario.get_control_info().nphistp, pest_scenario.get_control_info().nphinored, pest_scenario.get_control_info().relparstp,
 			pest_scenario.get_control_info().nrelpar, pest_scenario.get_regul_scheme_ptr()->get_use_dynamic_reg(),
-			pest_scenario.get_regul_scheme_ptr()->get_phimaccept(), pest_scenario.get_pestpp_options().get_reg_frac());
+			pest_scenario.get_regul_scheme_ptr()->get_phimaccept());
 
 		//if we are doing a restart, update the termination_ctl
 		if (restart_flag)
@@ -380,10 +372,9 @@ int main(int argc, char* argv[])
 			restart_ctl.update_termination_ctl(termination_ctl);
 		}
 
-		SVDSolver::MAT_INV mat_inv = SVDSolver::MAT_INV::JTQJ;
-		if (pest_scenario.get_pestpp_options().get_mat_inv() == PestppOptions::Q12J) mat_inv = SVDSolver::MAT_INV::Q12J;
+		//SVDSolver::MAT_INV mat_inv = SVDSolver::MAT_INV::JTQJ;
 		SVDSolver base_svd(pest_scenario, file_manager, &obj_func, base_trans_seq,
-			*base_jacobian_ptr, output_file_writer, mat_inv, &performance_log, "base parameter solution",parcov);
+			*base_jacobian_ptr, output_file_writer, &performance_log, "base parameter solution");
 
 		base_svd.set_svd_package(pest_scenario.get_pestpp_options().get_svd_pack());
 		//Build Super-Parameter problem
@@ -622,7 +613,7 @@ int main(int argc, char* argv[])
 				}
 				SVDASolver super_svd(pest_scenario, file_manager, &obj_func,
 					trans_svda, *super_jacobian_ptr,
-					output_file_writer, mat_inv, &performance_log,
+					output_file_writer, &performance_log,
 					base_svd.get_phiredswh_flag(), base_svd.get_splitswh_flag());
 				super_svd.set_svd_package(pest_scenario.get_pestpp_options().get_svd_pack());
 				//use base jacobian to compute first super jacobian if there was not a super upgrade
@@ -685,16 +676,6 @@ int main(int argc, char* argv[])
 
 		{
 			cout << endl << endl << endl;
-			if (pest_scenario.get_pestpp_options().get_auto_norm() > 0.0)
-			{
-				fout_rec << "WARNING: pestpp-glm 'autonorm' option != 0.0. This can greatly effect the outcome " << endl;
-				fout_rec << "         of the following analyses, which depend heavily on the Jacobian." << endl;
-				fout_rec << "         skipping FOSM calculations" << endl;
-				cout << "WARNING: pestpp-glm 'autonorm' option != 0.0. This can greatly effect the outcome " << endl;
-				cout << "         of the following analyses, which depend heavily on the Jacobian." << endl;
-				cout << "         skipping FOSM calculations" << endl;
-				return 0;
-			}
 			cout << endl << endl << endl;
 			cout << "  ---  starting uncertainty analysis calculations  ---  " << endl << endl << endl;
 			cout << "  uncertainty estimates calculated using Schur's " << endl;

@@ -90,16 +90,15 @@ bool MuPoint::operator< (const MuPoint &rhs) const
 
 SVDSolver::SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
 	const ParamTransformSeq &_par_transform, Jacobian &_jacobian,
-	OutputFileWriter &_output_file_writer, SVDSolver::MAT_INV _mat_inv,
-	PerformanceLog *_performance_log, const string &_description, Covariance _parcov, bool _phiredswh_flag, bool _splitswh_flag, bool _save_next_jacobian)
+	OutputFileWriter &_output_file_writer,
+	PerformanceLog *_performance_log, const string &_description, bool _phiredswh_flag, bool _splitswh_flag, bool _save_next_jacobian)
 	: pest_scenario(_pest_scenario), ctl_info(&_pest_scenario.get_control_info()), svd_info(_pest_scenario.get_svd_info()), par_group_info_ptr(&_pest_scenario.get_base_group_info()),
 	ctl_par_info_ptr(&_pest_scenario.get_ctl_parameter_info()), obs_info_ptr(&_pest_scenario.get_ctl_observation_info()), obj_func(_obj_func),
 	file_manager(_file_manager), observations_ptr(&_pest_scenario.get_ctl_observations()), par_transform(_par_transform), der_forgive(_pest_scenario.get_pestpp_options().get_der_forgive()), phiredswh_flag(_phiredswh_flag),
 	splitswh_flag(_splitswh_flag), save_next_jacobian(_save_next_jacobian), prior_info_ptr(_pest_scenario.get_prior_info_ptr()), jacobian(_jacobian),
-	regul_scheme_ptr(_pest_scenario.get_regul_scheme_ptr()), output_file_writer(_output_file_writer), mat_inv(_mat_inv), description(_description), best_lambda(20.0),
+	regul_scheme_ptr(_pest_scenario.get_regul_scheme_ptr()), output_file_writer(_output_file_writer), description(_description), best_lambda(20.0),
 	performance_log(_performance_log), base_lambda_vec(_pest_scenario.get_pestpp_options().get_base_lambda_vec()), lambda_scale_vec(_pest_scenario.get_pestpp_options().get_lambda_scale_vec()),
-	terminate_local_iteration(false), reg_frac(_pest_scenario.get_pestpp_options().get_reg_frac()),
-		parcov(_parcov),parcov_scale_fac(_pest_scenario.get_pestpp_options().get_parcov_scale_fac()),upgrade_augment(_pest_scenario.get_pestpp_options().get_upgrade_augment())
+	terminate_local_iteration(false),upgrade_augment(_pest_scenario.get_pestpp_options().get_upgrade_augment())
 {
 	if (_pest_scenario.get_pestpp_options().get_jac_scale())
 	{
@@ -150,7 +149,7 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 	ModelRun best_upgrade_run(cur_run);
 	// Start Solution iterations
 	bool save_nextjac = false;
-	string matrix_inv = (mat_inv == MAT_INV::Q12J) ? "\"Q 1/2 J\"" : "\"Jt Q J\"";
+	//string matrix_inv = (mat_inv == MAT_INV::Q12J) ? "\"Q 1/2 J\"" : "\"Jt Q J\"";
 	terminate_local_iteration = false;
 
 	bool calc_jacobian = calc_first_jacobian;
@@ -172,11 +171,11 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 		debug_print(global_iter_num);
 		cout << endl << endl;
 		os << endl;
-		output_file_writer.iteration_report(cout, global_iter_num, run_manager.get_total_runs(), get_description(), svd_package->description, matrix_inv);
+		output_file_writer.iteration_report(cout, global_iter_num, run_manager.get_total_runs(), get_description(), svd_package->description);
 
 		if (restart_controller.get_restart_option() == RestartController::RestartOption::NONE)
 		{
-			output_file_writer.iteration_report(os, global_iter_num, run_manager.get_total_runs(), get_description(), svd_package->description, matrix_inv);
+			output_file_writer.iteration_report(os, global_iter_num, run_manager.get_total_runs(), get_description(), svd_package->description);
 		}
 
 		if (restart_controller.get_restart_option() != RestartController::RestartOption::RESUME_UPGRADE_RUNS)
@@ -215,11 +214,6 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 
 			// Update Regularization weights if REG_FRAC is used
 			ModelRun prev_run(best_upgrade_run);
-			if (regul_scheme_ptr->get_use_dynamic_reg() && reg_frac > 0.0)
-			{
-				//dynamic_weight_adj_percent(best_upgrade_run, 0.10);
-				dynamic_weight_adj_percent(best_upgrade_run, reg_frac);
-			}
 			os << endl;
 			// write out report for starting phi
 			PhiData phi_data = obj_func->phi_report(best_upgrade_run.get_obs(), best_upgrade_run.get_ctl_pars(), *regul_scheme_ptr);
@@ -426,14 +420,6 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	performance_log->log_event("forming JtQJ matrix");
 	Eigen::SparseMatrix<double> JtQJ = jac.transpose() * q_mat * jac;
 
-	if (parcov.nrow() > 0)
-	//if (parcov_scale_fac > 0.0)
-	{
-		cout << parcov_scale_fac << endl;
-		performance_log->log_event("JtQJ plus parcov.inv");
-		JtQJ = JtQJ + (parcov_scale_fac * *parcov.get(numeric_par_names).inv().e_ptr());
-	}
-
 	Eigen::VectorXd upgrade_vec;
 	if (marquardt_type == MarquardtMatrix::IDENT)
 	{
@@ -571,116 +557,116 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	}
 }
 
-void SVDSolver::calc_lambda_upgrade_vecQ12J(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
-	const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
-	const Parameters &base_active_ctl_pars, const Parameters &prev_frozen_active_ctl_pars,
-	double lambda, Parameters &active_ctl_upgrade_pars, Parameters &upgrade_active_ctl_del_pars,
-	Parameters &grad_active_ctl_del_pars, MarquardtMatrix marquardt_type, bool scale_upgrade)
-{
-	Parameters base_numeric_pars = par_transform.active_ctl2numeric_cp(base_active_ctl_pars);
-	//Create a set of Ctl Parameters which does not include the frozen Parameters
-	Parameters pars_nf = base_active_ctl_pars;
-	pars_nf.erase(prev_frozen_active_ctl_pars);
-	//Transform these parameters to numeric parameters
-	par_transform.active_ctl2numeric_ip(pars_nf);
-	vector<string> numeric_par_names = pars_nf.get_keys();
-
-	//Compute effect of frozen parameters on the residuals vector
-	Parameters delta_freeze_pars = prev_frozen_active_ctl_pars;
-	Parameters base_freeze_pars(base_active_ctl_pars, delta_freeze_pars.get_keys());
-	par_transform.active_ctl2numeric_ip(delta_freeze_pars);
-	par_transform.active_ctl2numeric_ip(base_freeze_pars);
-	delta_freeze_pars -= base_freeze_pars;
-	VectorXd del_residuals = calc_residual_corrections(jacobian, delta_freeze_pars, obs_name_vec);
-	VectorXd corrected_residuals = Residuals + del_residuals;
-
-	VectorXd Sigma;
-	VectorXd Sigma_trunc;
-	Eigen::SparseMatrix<double> U;
-	Eigen::SparseMatrix<double> Vt;
-	Eigen::SparseMatrix<double> q_sqrt = Q_sqrt.get_sparse_matrix(obs_name_vec, regul);
-	Eigen::SparseMatrix<double> jac = jacobian.get_matrix(obs_name_vec, numeric_par_names);
-	Eigen::SparseMatrix<double> SqrtQ_J = q_sqrt * jac;
-	// Returns truncated Sigma, U and Vt arrays with small singular parameters trimed off
-	performance_log->log_event("commencing SVD factorization");
-	svd_package->solve_ip(SqrtQ_J, Sigma, U, Vt, Sigma_trunc);
-	performance_log->log_event("SVD factorization complete");
-	//Only add lambda to singular values above the threshhold
-	if (marquardt_type == MarquardtMatrix::IDENT)
-	{
-		Sigma = Sigma.array() + lambda;
-	}
-	else
-	{
-		//this needs checking
-		Sigma = Sigma.array() + (Sigma.cwiseProduct(Sigma).array() * lambda).sqrt();
-	}
-	output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
-	VectorXd Sigma_inv = Sigma.array().inverse();
-
-	performance_log->log_event("commencing linear algebra multiplication to compute ugrade");
-	stringstream info_str;
-	info_str << "Vt info: " << "rows = " << Vt.rows() << ": cols = " << Vt.cols() << ": size = " << Vt.size() << ": nonzeros = " << Vt.nonZeros();
-	performance_log->log_event(info_str.str());
-	info_str.str("");
-	info_str << "U info: " << "rows = " << U.rows() << ": cols = " << U.cols() << ": size = " << U.size() << ": nonzeros = " << U.nonZeros();
-	performance_log->log_event(info_str.str());
-	Eigen::VectorXd upgrade_vec;
-	upgrade_vec = Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * (q_sqrt  * corrected_residuals)));
-
-
-
-	// scale the upgrade vector using the technique described in the PEST manual
-	if (scale_upgrade)
-	{
-		double beta = 1.0;
-		Eigen::VectorXd gama = jac * upgrade_vec;
-		Eigen::SparseMatrix<double> Q_diag = get_diag_matrix(q_sqrt);
-		Q_diag = (Q_diag * Q_diag).eval();
-		double top = corrected_residuals.transpose() * Q_diag * gama;
-		double bot = gama.transpose() * Q_diag * gama;
-		if (bot != 0)
-		{
-			beta = top / bot;
-		}
-		upgrade_vec *= beta;
-	}
-
-
-	Eigen::VectorXd grad_vec;
-	grad_vec = -2.0 * (jac.transpose() * (q_sqrt * (q_sqrt * Residuals)));
-	performance_log->log_event("linear algebra multiplication to compute ugrade complete");
-
-	//tranfere newly computed componets of the ugrade vector to upgrade.svd_uvec
-	upgrade_active_ctl_del_pars.clear();
-	grad_active_ctl_del_pars.clear();
-
-	string *name_ptr;
-	auto it_nf_end = pars_nf.end();
-	for (size_t i = 0; i < numeric_par_names.size(); ++i)
-	{
-		name_ptr = &(numeric_par_names[i]);
-		upgrade_active_ctl_del_pars[*name_ptr] = upgrade_vec(i);
-		grad_active_ctl_del_pars[*name_ptr] = grad_vec(i);
-		auto it_nf = pars_nf.find(*name_ptr);
-		if (it_nf != it_nf_end)
-		{
-			it_nf->second += upgrade_vec(i);
-		}
-	}
-	// Transform upgrade_pars back to ctl parameters
-	active_ctl_upgrade_pars = par_transform.numeric2active_ctl_cp(pars_nf);
-	Parameters tmp_pars(base_numeric_pars);
-	par_transform.del_numeric_2_del_active_ctl_ip(upgrade_active_ctl_del_pars, tmp_pars);
-	tmp_pars = base_numeric_pars;
-	par_transform.del_numeric_2_del_active_ctl_ip(grad_active_ctl_del_pars, tmp_pars);
-
-	//tranfere previously frozen componets of the ugrade vector to upgrade.svd_uvec
-	for (auto &ipar : prev_frozen_active_ctl_pars)
-	{
-		active_ctl_upgrade_pars[ipar.first] = ipar.second;
-	}
-}
+//void SVDSolver::calc_lambda_upgrade_vecQ12J(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
+//	const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
+//	const Parameters &base_active_ctl_pars, const Parameters &prev_frozen_active_ctl_pars,
+//	double lambda, Parameters &active_ctl_upgrade_pars, Parameters &upgrade_active_ctl_del_pars,
+//	Parameters &grad_active_ctl_del_pars, MarquardtMatrix marquardt_type, bool scale_upgrade)
+//{
+//	Parameters base_numeric_pars = par_transform.active_ctl2numeric_cp(base_active_ctl_pars);
+//	//Create a set of Ctl Parameters which does not include the frozen Parameters
+//	Parameters pars_nf = base_active_ctl_pars;
+//	pars_nf.erase(prev_frozen_active_ctl_pars);
+//	//Transform these parameters to numeric parameters
+//	par_transform.active_ctl2numeric_ip(pars_nf);
+//	vector<string> numeric_par_names = pars_nf.get_keys();
+//
+//	//Compute effect of frozen parameters on the residuals vector
+//	Parameters delta_freeze_pars = prev_frozen_active_ctl_pars;
+//	Parameters base_freeze_pars(base_active_ctl_pars, delta_freeze_pars.get_keys());
+//	par_transform.active_ctl2numeric_ip(delta_freeze_pars);
+//	par_transform.active_ctl2numeric_ip(base_freeze_pars);
+//	delta_freeze_pars -= base_freeze_pars;
+//	VectorXd del_residuals = calc_residual_corrections(jacobian, delta_freeze_pars, obs_name_vec);
+//	VectorXd corrected_residuals = Residuals + del_residuals;
+//
+//	VectorXd Sigma;
+//	VectorXd Sigma_trunc;
+//	Eigen::SparseMatrix<double> U;
+//	Eigen::SparseMatrix<double> Vt;
+//	Eigen::SparseMatrix<double> q_sqrt = Q_sqrt.get_sparse_matrix(obs_name_vec, regul);
+//	Eigen::SparseMatrix<double> jac = jacobian.get_matrix(obs_name_vec, numeric_par_names);
+//	Eigen::SparseMatrix<double> SqrtQ_J = q_sqrt * jac;
+//	// Returns truncated Sigma, U and Vt arrays with small singular parameters trimed off
+//	performance_log->log_event("commencing SVD factorization");
+//	svd_package->solve_ip(SqrtQ_J, Sigma, U, Vt, Sigma_trunc);
+//	performance_log->log_event("SVD factorization complete");
+//	//Only add lambda to singular values above the threshhold
+//	if (marquardt_type == MarquardtMatrix::IDENT)
+//	{
+//		Sigma = Sigma.array() + lambda;
+//	}
+//	else
+//	{
+//		//this needs checking
+//		Sigma = Sigma.array() + (Sigma.cwiseProduct(Sigma).array() * lambda).sqrt();
+//	}
+//	output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
+//	VectorXd Sigma_inv = Sigma.array().inverse();
+//
+//	performance_log->log_event("commencing linear algebra multiplication to compute ugrade");
+//	stringstream info_str;
+//	info_str << "Vt info: " << "rows = " << Vt.rows() << ": cols = " << Vt.cols() << ": size = " << Vt.size() << ": nonzeros = " << Vt.nonZeros();
+//	performance_log->log_event(info_str.str());
+//	info_str.str("");
+//	info_str << "U info: " << "rows = " << U.rows() << ": cols = " << U.cols() << ": size = " << U.size() << ": nonzeros = " << U.nonZeros();
+//	performance_log->log_event(info_str.str());
+//	Eigen::VectorXd upgrade_vec;
+//	upgrade_vec = Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * (q_sqrt  * corrected_residuals)));
+//
+//
+//
+//	// scale the upgrade vector using the technique described in the PEST manual
+//	if (scale_upgrade)
+//	{
+//		double beta = 1.0;
+//		Eigen::VectorXd gama = jac * upgrade_vec;
+//		Eigen::SparseMatrix<double> Q_diag = get_diag_matrix(q_sqrt);
+//		Q_diag = (Q_diag * Q_diag).eval();
+//		double top = corrected_residuals.transpose() * Q_diag * gama;
+//		double bot = gama.transpose() * Q_diag * gama;
+//		if (bot != 0)
+//		{
+//			beta = top / bot;
+//		}
+//		upgrade_vec *= beta;
+//	}
+//
+//
+//	Eigen::VectorXd grad_vec;
+//	grad_vec = -2.0 * (jac.transpose() * (q_sqrt * (q_sqrt * Residuals)));
+//	performance_log->log_event("linear algebra multiplication to compute ugrade complete");
+//
+//	//tranfere newly computed componets of the ugrade vector to upgrade.svd_uvec
+//	upgrade_active_ctl_del_pars.clear();
+//	grad_active_ctl_del_pars.clear();
+//
+//	string *name_ptr;
+//	auto it_nf_end = pars_nf.end();
+//	for (size_t i = 0; i < numeric_par_names.size(); ++i)
+//	{
+//		name_ptr = &(numeric_par_names[i]);
+//		upgrade_active_ctl_del_pars[*name_ptr] = upgrade_vec(i);
+//		grad_active_ctl_del_pars[*name_ptr] = grad_vec(i);
+//		auto it_nf = pars_nf.find(*name_ptr);
+//		if (it_nf != it_nf_end)
+//		{
+//			it_nf->second += upgrade_vec(i);
+//		}
+//	}
+//	// Transform upgrade_pars back to ctl parameters
+//	active_ctl_upgrade_pars = par_transform.numeric2active_ctl_cp(pars_nf);
+//	Parameters tmp_pars(base_numeric_pars);
+//	par_transform.del_numeric_2_del_active_ctl_ip(upgrade_active_ctl_del_pars, tmp_pars);
+//	tmp_pars = base_numeric_pars;
+//	par_transform.del_numeric_2_del_active_ctl_ip(grad_active_ctl_del_pars, tmp_pars);
+//
+//	//tranfere previously frozen componets of the ugrade vector to upgrade.svd_uvec
+//	for (auto &ipar : prev_frozen_active_ctl_pars)
+//	{
+//		active_ctl_upgrade_pars[ipar.first] = ipar.second;
+//	}
+//}
 
 
 
@@ -705,10 +691,10 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 
 	UPGRADE_FUNCTION calc_lambda_upgrade = &SVDSolver::calc_lambda_upgrade_vec_JtQJ;
 
-	if (mat_inv == MAT_INV::Q12J)
+	/*if (mat_inv == MAT_INV::Q12J)
 	{
 		calc_lambda_upgrade = &SVDSolver::calc_lambda_upgrade_vecQ12J;
-	}
+	}*/
 
 	// need to remove parameters frozen due to failed jacobian runs when calling calc_lambda_upgrade_vec
 	//Freeze Parameters at the boundary whose ugrade vector and gradient both head out of bounds
@@ -796,10 +782,10 @@ void SVDSolver::calc_upgrade_vec_freeze(double i_lambda, Parameters &prev_frozen
 
 	UPGRADE_FUNCTION calc_lambda_upgrade = &SVDSolver::calc_lambda_upgrade_vec_JtQJ;
 
-	if (mat_inv == MAT_INV::Q12J)
+	/*if (mat_inv == MAT_INV::Q12J)
 	{
 		calc_lambda_upgrade = &SVDSolver::calc_lambda_upgrade_vecQ12J;
-	}
+	}*/
 
 	// need to remove parameters frozen due to failed jacobian runs when calling calc_lambda_upgrade_vec
 	//Freeze Parameters at the boundary whose ugrade vector and gradient both head out of bounds
@@ -1063,7 +1049,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			calc_upgrade_vec_freeze(0, frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
 				obs_names_vec, base_run_active_ctl_par,
 				tmp_new_par, mar_mat, false);
-			if (regul_scheme_ptr->get_use_dynamic_reg() && reg_frac < 0.0)
+			if (regul_scheme_ptr->get_use_dynamic_reg())
 			{
 				dynamic_weight_adj(base_run, jacobian, Q_sqrt, residuals_vec, obs_names_vec,
 					base_run_active_ctl_par, frozen_active_ctl_pars);
@@ -1666,10 +1652,6 @@ PhiComponets SVDSolver::phi_estimate(const ModelRun &base_run, const Jacobian &j
 
 	UPGRADE_FUNCTION calc_lambda_upgrade = &SVDSolver::calc_lambda_upgrade_vec_JtQJ;
 
-	if (mat_inv == MAT_INV::Q12J)
-	{
-		calc_lambda_upgrade = &SVDSolver::calc_lambda_upgrade_vecQ12J;
-	}
 
 	(*this.*calc_lambda_upgrade)(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
 		base_run_active_ctl_par, freeze_active_ctl_pars, 0, new_pars, upgrade_ctl_del_pars,
