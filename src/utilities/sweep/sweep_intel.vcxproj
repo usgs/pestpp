@@ -98,7 +98,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\pestpp_common;$(SolutionDir)\libs\linear_analysis;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)\libs\run_managers\yamr;$(SolutionDir)\libs\run_managers\genie_wrapper;$(SolutionDir)\libs\run_managers\serial;$(SolutionDir)\libs\run_managers\external;$(SolutionDir)libs\Eigen</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\pestpp_common;$(SolutionDir)\libs\linear_analysis;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)\libs\run_managers\yamr;$(SolutionDir)\libs\run_managers\serial;$(SolutionDir)\libs\run_managers\external;$(SolutionDir)libs\Eigen</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -107,7 +107,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(IFORT_COMPILER18)\compiler\lib\intel64;$(IFORT_COMPILER18)\mkl\lib\intel64;$(SolutionDir)i$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libopt.lib;mkl_blas95_lp64.lib;mkl_lapack95_lp64.lib;ws2_32.lib;Advapi32.lib;propack.lib;common.lib;pestpp_common.lib;mio.lib;wrappers.lib;genie.lib;genie_wrapper.lib;yamr.lib;external.lib;serial.lib;abstract_base.lib;linear_analysis.lib;pest_routines.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libopt.lib;mkl_blas95_lp64.lib;mkl_lapack95_lp64.lib;ws2_32.lib;Advapi32.lib;propack.lib;common.lib;pestpp_common.lib;mio.lib;wrappers.lib;yamr.lib;external.lib;serial.lib;abstract_base.lib;linear_analysis.lib;pest_routines.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

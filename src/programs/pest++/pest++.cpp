@@ -34,7 +34,6 @@
 #include  "QSqrtMatrix.h"
 #include "FileManager.h"
 #include "TerminationController.h"
-#include "RunManagerGenie.h"
 #include "RunManagerSerial.h"
 #include "RunManagerExternal.h"
 #include "SVD_PROPACK.h"
@@ -101,8 +100,6 @@ int main(int argc, char* argv[])
 			cerr << "        pest++ control_file.pst /H :port" << endl << endl;
 			cerr << "    PANTHER runner:" << endl;
 			cerr << "        pest++ control_file.pst /H hostname:port " << endl << endl;
-			cerr << "    GENIE:" << endl;
-			cerr << "        pest++ control_file.pst /G hostname:port" << endl << endl;
 			cerr << "    external run manager:" << endl;
 			cerr << "        pest++ control_file.pst /E" << endl << endl;
 			cerr << " additional options can be found in the PEST++ manual" << endl;
@@ -194,19 +191,13 @@ int main(int argc, char* argv[])
 
 		it_find = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/g");
 		next_item.clear();
-		if (it_find != cmd_arg_vec.end() && it_find + 1 != cmd_arg_vec.end())
-		{
-			next_item = *(it_find + 1);
-			strip_ip(next_item);
-
-		}
-		//Check for GENIE Master
 		if (it_find != cmd_arg_vec.end())
 		{
-			//Using GENIE run manager
-			run_manager_type = RunManagerType::GENIE;
-			socket_str = next_item;
+			cerr << "Genie run manager ('/g') no longer supported, please use PANTHER instead" << endl;
+			return 1;
+
 		}
+		
 
 		RestartController restart_ctl;
 
@@ -341,14 +332,7 @@ int main(int argc, char* argv[])
 					pest_scenario.get_pestpp_options().get_overdue_giveup_minutes());
 			}
 		}
-		else if (run_manager_type == RunManagerType::GENIE)
-		{
-			strip_ip(socket_str);
-			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
-			run_manager_ptr = new RunManagerGenie(exi.comline_vec,
-				exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
-				file_manager.build_filename("rns"), socket_str);
-		}
+		
 		else if (run_manager_type == RunManagerType::EXTERNAL)
 		{
 			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();

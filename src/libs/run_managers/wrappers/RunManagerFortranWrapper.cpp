@@ -2,7 +2,6 @@
 #include "utilities.h"
 #include "RunManagerPanther.h"
 #include "RunManagerSerial.h"
-#include "RunManagerGenie.h"
 #include "pest_error.h"
 
 typedef class RunManagerAbstract RunManagerAbstract;
@@ -67,35 +66,6 @@ int rmif_create_panther_(
 	}
 	return err;
 }
-
-int rmif_create_genie_(char *f_comline, int  *comline_str_len, int *comline_array_len,
-	char *f_tpl, int  *tpl_str_len, int *tpl_array_len,
-	char *f_inp, int  *inp_str_len, int *inp_array_len,
-	char *f_ins, int  *ins_str_len, int *ins_array_len,
-	char *f_out, int  *out_str_len, int *out_array_len,
-	char *f_storfile, int *storfile_len,
-	char *f_host, int *f_host_len,
-	char *f_genie_tag, int *genie_tag_len)
-{
-	int err = 0;
-	try {
-		vector<string> comline_vec =  fortran_str_array_2_vec(f_comline, *comline_str_len, *comline_array_len);
-		vector<string> tpl_vec =  fortran_str_array_2_vec(f_tpl, *tpl_str_len, *tpl_array_len);
-		vector<string> inp_vec =  fortran_str_array_2_vec(f_inp, *inp_str_len, *inp_array_len);
-		vector<string> ins_vec =  fortran_str_array_2_vec(f_ins, *ins_str_len, *ins_array_len);
-		vector<string> out_vec =  fortran_str_array_2_vec(f_out, *out_str_len, *out_array_len);
-		string storfile =  fortran_str_2_string(f_storfile, *storfile_len);
-		string host =  fortran_str_2_string(f_host, *f_host_len);
-		string genie_tag =  fortran_str_2_string(f_genie_tag, *genie_tag_len);
-		_run_manager_ptr_ = new RunManagerGenie(comline_vec, tpl_vec, inp_vec, ins_vec, out_vec, storfile, genie_tag);
-	}
-	catch(...)
-	{
-		err = 1;
-	}
-	return err;
-}
-
 
 int rmif_add_run_(double *parameter_data, int *npar, int *id)
 {

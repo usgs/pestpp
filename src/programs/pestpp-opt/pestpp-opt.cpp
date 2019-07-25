@@ -15,7 +15,6 @@
 #include "ModelRunPP.h"
 #include "FileManager.h"
 #include "TerminationController.h"
-#include "RunManagerGenie.h"
 #include "RunManagerSerial.h"
 #include "RunManagerExternal.h"
 #include "OutputFileWriter.h"
@@ -80,8 +79,6 @@ int main(int argc, char* argv[])
 			cerr << "        pestpp-opt control_file.pst /H :port" << endl << endl;
 			cerr << "    PANTHER worker:" << endl;
 			cerr << "        pestpp-opt /H hostname:port " << endl << endl;
-			cerr << "    GENIE:" << endl;
-			cerr << "        pestpp-opt control_file.pst /G hostname:port" << endl << endl;
 			cerr << "    external run manager:" << endl;
 			cerr << "        pestpp-opt control_file.pst /E" << endl << endl;
 			cerr << " additional options can be found in the PEST++ manual" << endl;
@@ -173,18 +170,11 @@ int main(int argc, char* argv[])
 
 		it_find = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/g");
 		next_item.clear();
-		if (it_find != cmd_arg_vec.end() && it_find + 1 != cmd_arg_vec.end())
-		{
-			next_item = *(it_find + 1);
-			strip_ip(next_item);
-
-		}
-		//Check for GENIE Master
 		if (it_find != cmd_arg_vec.end())
 		{
-			//Using GENIE run manager
-			run_manager_type = RunManagerType::GENIE;
-			socket_str = next_item;
+			cerr << "Genie run manager ('/g') no longer supported, please use PANTHER instead" << endl;
+			return 1;
+
 		}
 
 		RestartController restart_ctl;
@@ -192,54 +182,30 @@ int main(int argc, char* argv[])
 		//process restart and reuse jacobian directives
 		vector<string>::const_iterator it_find_j = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/j");
 		vector<string>::const_iterator it_find_r = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/r");
-		bool restart_flag = false;
-		bool save_restart_rec_header = true;
+		
 
 		debug_initialize(file_manager.build_filename("dbg"));
-		if (it_find_j != cmd_arg_vec.end())
+		if ((it_find_j != cmd_arg_vec.end()) || (it_find_r != cmd_arg_vec.end()))
 		{
-			restart_ctl.get_restart_option() = RestartController::RestartOption::REUSE_JACOBIAN;
-			file_manager.open_default_files();
-		}
-		else if (it_find_r != cmd_arg_vec.end())
-		{
-			ifstream &fin_rst = file_manager.open_ifile_ext("rst");
-			restart_ctl.process_rst_file(fin_rst);
-			file_manager.close_file("rst");
-			restart_flag = true;
-			file_manager.open_default_files(true);
-			ofstream &fout_rec_tmp = file_manager.rec_ofstream();
-			fout_rec_tmp << endl << endl;
-			if (run_manager_type == RunManagerType::EXTERNAL)
-			{
-				save_restart_rec_header = false;
-			}
-			else
-			{
-				fout_rec_tmp << "Restarting pestpp-opt ....." << endl << endl;
-				cout << "    Restarting pestpp-opt ....." << endl << endl;
-			}
-		}
-		else
-		{
-			restart_ctl.get_restart_option() = RestartController::RestartOption::NONE;
-			file_manager.open_default_files();
-		}
+			cerr << "ERROR: pestpp-opt does not support restart options" << endl <<endl;
 
+		}
+		
+		restart_ctl.get_restart_option() = RestartController::RestartOption::NONE;
+		file_manager.open_default_files();
+		
 		ofstream &fout_rec = file_manager.rec_ofstream();
 		PerformanceLog performance_log(file_manager.open_ofile_ext("pfm"));
 
-		if (!restart_flag || save_restart_rec_header)
-		{
-			fout_rec << "             pestpp-opt version " << endl << endl;
-			fout_rec << "       by the pestpp development team" << endl;
-			fout_rec << endl;
-			fout_rec << endl << endl << "version: " << version << endl;
-			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-			fout_rec << "using control file: \"" << complete_path << "\"" << endl;
-			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
-		}
-
+		
+		fout_rec << "             pestpp-opt version " << endl << endl;
+		fout_rec << "       by the pestpp development team" << endl;
+		fout_rec << endl;
+		fout_rec << endl << endl << "version: " << version << endl;
+		fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+		fout_rec << "using control file: \"" << complete_path << "\"" << endl;
+		fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+		
 		cout << endl;
 		cout << "using control file: \"" << complete_path << "\"" << endl;
 		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
@@ -274,17 +240,15 @@ int main(int argc, char* argv[])
 
 		//Initialize OutputFileWriter to hadle IO of suplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;	=
-		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
-		//output_file_writer.set_svd_output_opt(pest_scenario.get_svd_info().eigwrite);
-		if (!restart_flag)
-		{
-			//output_file_writer.scenario_report(fout_rec);
-			output_file_writer.scenario_io_report(fout_rec);
-			output_file_writer.scenario_pargroup_report(fout_rec);
-			output_file_writer.scenario_par_report(fout_rec);
-			output_file_writer.scenario_obs_report(fout_rec);
-			output_file_writer.scenario_pi_report(fout_rec);
-		}
+		OutputFileWriter output_file_writer(file_manager, pest_scenario,false);
+		
+		//output_file_writer.scenario_report(fout_rec);
+		output_file_writer.scenario_io_report(fout_rec);
+		output_file_writer.scenario_pargroup_report(fout_rec);
+		output_file_writer.scenario_par_report(fout_rec);
+		output_file_writer.scenario_obs_report(fout_rec);
+		output_file_writer.scenario_pi_report(fout_rec);
+		
 		/*if (pest_scenario.get_pestpp_options().get_iter_summary_flag())
 		{
 			output_file_writer.write_par_iter(0, pest_scenario.get_ctl_parameters());
@@ -309,14 +273,7 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
 				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes());
 		}
-		else if (run_manager_type == RunManagerType::GENIE)
-		{
-			strip_ip(socket_str);
-			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
-			run_manager_ptr = new RunManagerGenie(exi.comline_vec,
-				exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
-				file_manager.build_filename("rns"), socket_str);
-		}
+
 		else if (run_manager_type == RunManagerType::EXTERNAL)
 		{
 			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
@@ -376,11 +333,7 @@ int main(int argc, char* argv[])
 			pest_scenario.get_control_info().nrelpar, pest_scenario.get_regul_scheme_ptr()->get_use_dynamic_reg(),
 			pest_scenario.get_regul_scheme_ptr()->get_phimaccept(), pest_scenario.get_pestpp_options().get_reg_frac());
 
-		//if we are doing a restart, update the termination_ctl
-		if (restart_flag)
-		{
-			restart_ctl.update_termination_ctl(termination_ctl);
-		}
+		
 
 		Parameters cur_ctl_parameters = pest_scenario.get_ctl_parameters();
 		//Allocates Space for Run Manager.  This initializes the model parameter names and observations names.
@@ -447,26 +400,7 @@ int main(int argc, char* argv[])
 		}
 
 
-		//// Differential Evolution
-		//if (pest_scenario.get_pestpp_options().get_global_opt() == PestppOptions::OPT_DE)
-		//{
-		//	int rand_seed = 1;
-		//	int np = pest_scenario.get_pestpp_options().get_de_npopulation();
-		//	int max_gen = pest_scenario.get_pestpp_options().get_de_max_gen();
-		//	double f = pest_scenario.get_pestpp_options().get_de_f();
-		//	double cr = pest_scenario.get_pestpp_options().get_de_cr();
-		//	bool dither_f = pest_scenario.get_pestpp_options().get_de_dither_f();
-		//	ModelRun init_run(&obj_func, pest_scenario.get_ctl_observations());
-		//	Parameters cur_ctl_parameters = pest_scenario.get_ctl_parameters();
-		//	run_manager_ptr->reinitialize();
-		//	DifferentialEvolution de_solver(pest_scenario, file_manager, &obj_func,
-		//		base_trans_seq, output_file_writer, &performance_log, rand_seed);
-		//	de_solver.initialize_population(*run_manager_ptr, np);
-		//	de_solver.solve(*run_manager_ptr, restart_ctl, max_gen, f, cr, dither_f, init_run);
-		//	run_manager_ptr->free_memory();
-		//	exit(1);
-		//}
-
+		
 		else
 		{
 			//Define model Run for Base Parameters (uses base parameter tranformations)
@@ -482,10 +416,9 @@ int main(int argc, char* argv[])
 					cur_run.set_ctl_parameters(restart_pars);
 				}
 			}
-			if (!restart_flag || save_restart_rec_header)
-			{
-				fout_rec << "   -----    Starting Optimization Iterations    ----    " << endl << endl;
-			}
+			
+			fout_rec << "   -----    Starting Optimization Iterations    ----    " << endl << endl;
+			
 			Covariance parcov;
 			parcov.try_from(pest_scenario, file_manager);
 			sequentialLP slp(pest_scenario, run_manager_ptr, parcov, &file_manager, output_file_writer);
