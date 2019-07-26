@@ -66,13 +66,13 @@ public:
 protected:
 	//enum class LimitType {NONE, LBND, UBND, REL, FACT};
 	enum class MarquardtMatrix {IDENT, JTQJ};
-	enum class UpgradeBounds {ROBUST, CHEAP};
 public:
 	SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
 		const ParamTransformSeq &_par_transform, Jacobian &_jacobian,
 		OutputFileWriter &_output_file_writer,
 		PerformanceLog *_performance_log, const string &description = string("base parameter solution"),
 		bool _phiredswh_flag = false, bool _splitswh_flag = false, bool _save_next_jacobian = true);
+
 	virtual ModelRun compute_jacobian(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &cur_run, bool restart_runs = false);
 	virtual ModelRun solve(RunManagerAbstract &run_manager, TerminationController &termination_ctl, int max_iter, ModelRun &cur_run,
 		ModelRun &optimum_run, RestartController &restart_controller, bool calc_first_jacobian = true);
@@ -101,7 +101,6 @@ protected:
 	const static string svd_solver_type_name;
 	SVDPackage *svd_package;
 	MarquardtMatrix mar_mat;
-	UpgradeBounds upgrade_bounds;
 	const string description;
 	const ControlInfo *ctl_info;
 	SVDInfo svd_info;
@@ -125,7 +124,6 @@ protected:
 	std::vector<double> lambda_scale_vec;
 	bool terminate_local_iteration;
 	bool der_forgive;
-	bool upgrade_augment;
 	Eigen::SparseMatrix<double> JS;
 	//virtual void limit_parameters_ip(const Parameters &init_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
 	//	Pest::LimitType &limit_type, const Parameters &frozen_ative_ctl_pars);
@@ -138,7 +136,7 @@ protected:
 	void calc_upgrade_vec(double i_lambda, Parameters &frozen_ctl_pars, QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
 		Eigen::VectorXd &residuals_vec, vector<string> &obs_names_vec, const Parameters &base_run_ctl_pars,
 		Parameters &new_ctl_pars, MarquardtMatrix marquardt_type, Pest::LimitType &limit_type, bool scale_upgrade=false);
-	void calc_upgrade_vec_freeze(double i_lambda, Parameters &frozen_ctl_pars, QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
+	void test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &frozen_ctl_pars, QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
 		Eigen::VectorXd &residuals_vec, vector<string> &obs_names_vec, const Parameters &base_run_ctl_pars,
 		Parameters &new_ctl_pars, MarquardtMatrix marquardt_type, bool scale_upgrade = false);
 	/*void calc_lambda_upgrade_vecQ12J(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,

@@ -2107,6 +2107,8 @@ void IterEnsembleSmoother::initialize()
 		else
 			add_bases();
 
+	message(2, "checking for denormal values in pe");
+	pe.check_for_normal("initial transformed parameter ensemble");
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
@@ -2119,7 +2121,8 @@ void IterEnsembleSmoother::initialize()
 		pe.to_csv(ss.str());
 	}
 	message(1, "saved initial parameter ensemble to ", ss.str());
-
+	message(2, "cehcking for denormal values in base oe");
+	oe.check_for_normal("base observation ensemble");
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{

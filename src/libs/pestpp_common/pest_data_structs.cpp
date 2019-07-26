@@ -589,20 +589,13 @@ void PestppOptions::parce_line(const string &line)
 
 		else if (key == "UPGRADE_AUGMENT")
 		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> upgrade_augment;
+		cout << "++UPGRADE_AUGMENT is deprecated and no longers supported" << endl;
 
 		}
 
 		else if (key == "UPGRADE_BOUNDS")
 		{
-			if (value == "ROBUST")
-				convert_ip(value, upgrade_bounds);
-			else if (value == "CHEAP")
-				convert_ip(value, upgrade_bounds);
-			else
-				throw runtime_error("unrecognozed 'upgrade_bounds' option: should 'robust' or 'cheap'");
+		cout << "++UPGRADE_BOUNDS is deprecated and no longers supported" << endl;
 
 		}
 

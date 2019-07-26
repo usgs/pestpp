@@ -249,7 +249,7 @@ public:
 	void set_super_eigthres(double _super_eigthres) { super_eigthres = _super_eigthres; }
 	void set_n_iter_base(int _n_iter_base) { n_iter_base = _n_iter_base; }
 	void set_n_iter_super(int _n_iter_super) { n_iter_super = _n_iter_super; }
-	void set_svd_pack(const SVD_PACK _svd_pack = EIGEN) { svd_pack = _svd_pack; }
+	void set_svd_pack(const SVD_PACK _svd_pack) { svd_pack = _svd_pack; }
 	void set_super_relparmax(double _super_relparmax) { super_relparmax = _super_relparmax; };
 	void set_max_run_fail(int _max_run_fail) { max_run_fail = _max_run_fail; }
 	void set_max_super_frz_iter(int n) { max_super_frz_iter = n; }
@@ -285,18 +285,11 @@ public:
 	bool get_jac_scale()const { return jac_scale; }
 	void set_jac_scale(bool _jac_scale) { jac_scale = _jac_scale; }
 
-	bool get_upgrade_augment()const { return upgrade_augment; }
-	void set_upgrade_augment(bool _upgrade_augment) { upgrade_augment = _upgrade_augment; }
-
 	void set_hotstart_resfile(string _res_file) { hotstart_resfile = _res_file; }
 	string get_hotstart_resfile() const { return hotstart_resfile; }
 
 	bool get_tie_by_group() const { return tie_by_group; }
 	void set_tie_by_group(bool _flag) { tie_by_group = _flag; }
-
-	void set_upgrade_bounds(string _upgrade_bounds) { upgrade_bounds = _upgrade_bounds; }
-	string get_upgrade_bounds() const { return upgrade_bounds; }
-
 
 	string get_opt_obj_func()const { return opt_obj_func; }
 	void set_opt_obj_func(string _opt_obj_func) { opt_obj_func = _opt_obj_func; }
@@ -470,8 +463,6 @@ private:
 	int sweep_chunk;
 	bool sweep_base_run;
 	bool jac_scale;
-	bool upgrade_augment;
-	string upgrade_bounds;
 	string hotstart_resfile;
 
 	bool tie_by_group;

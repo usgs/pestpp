@@ -894,6 +894,8 @@ void Ensemble::throw_ensemble_error(string message, vector<string> vec)
 void Ensemble::throw_ensemble_error(string message)
 {
 	string full_message = "Ensemble Error: " + message;
+	cout << endl << endl << full_message << endl << endl;
+	//cerr << endl << endl << full_message << endl << endl;
 	throw runtime_error(full_message);
 }
 
@@ -1270,6 +1272,28 @@ void Ensemble::to_binary_old(string file_name,bool transposed)
 	}
 	//save observation names (part 2 prior information)
 	fout.close();
+}
+
+void Ensemble::check_for_normal(string context)
+{
+	stringstream ss;
+	ss << "realization,variable,value" << endl;
+	bool nn_found = false;
+	for (int i = 0; i < reals.rows(); i++)
+		for (int j = 0; j < reals.cols(); j++)
+			if (!isnormal(reals(i, j)) && (reals(i, j) != 0.0))
+			{
+				ss << real_names[i] << "," << var_names[j] << "," << reals(i,j) << endl;
+				nn_found = true;
+			}
+	if (nn_found)
+	{
+		ofstream of("ensemble_not_normal.csv");
+		of << ss.str();
+		ss.str("");
+		ss << "Ensemble::check_for_normal() - " << context << " - not normal values found, see file 'ensemble_not_normal.csv'";
+		throw_ensemble_error(ss.str());
+	}
 }
 
 void Ensemble::to_binary(string file_name, bool transposed)
@@ -1811,6 +1835,7 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 
 	for (int i = 0; i < real_names.size(); i++)
 		rmap[real_names[i]] = i;
+	vector<string> nn;
 	for (auto &rname : run_real_names)
 	{
 		//idx = find(real_names.begin(), real_names.end(), rname) - real_names.begin();
@@ -1824,6 +1849,15 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 		else if (tstat == ParameterEnsemble::transStatus::NUM)
 			par_transform.numeric2model_ip(pars_real);
 		replace_fixed(rname, pars_real);
+		nn = pars_real.get_notnormal_keys();
+		if (nn.size() > 0)
+		{
+			stringstream ss;
+			ss << "ParameterEnsemble:: add_runs() error: denormal values for realization " << rname << " : ";
+			for (auto n : nn)
+				ss << n << ",";
+			throw_ensemble_error(ss.str());
+		}
 		run_id = run_mgr_ptr->add_run(pars_real);
 		real_run_ids[idx]  = run_id;
 	}

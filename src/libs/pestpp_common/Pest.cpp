@@ -805,7 +805,6 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	pestpp_options.set_tie_by_group(false);
 
 	pestpp_options.set_jac_scale(true);
-	pestpp_options.set_upgrade_augment(false);
 	pestpp_options.set_opt_obj_func("");
 	pestpp_options.set_opt_coin_log(true);
 	pestpp_options.set_opt_skip_final(false);
@@ -820,7 +819,6 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	pestpp_options.set_opt_iter_derinc_fac(1.0);
 	pestpp_options.set_opt_include_bnd_pi(true);
 	pestpp_options.set_hotstart_resfile(string());
-	pestpp_options.set_upgrade_bounds("CHEAP");
 	pestpp_options.set_ies_par_csv("");
 	pestpp_options.set_ies_obs_csv("");
 	pestpp_options.set_ies_obs_restart_csv("");
@@ -976,7 +974,7 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 {
 	if ((!enforce_chglim) && (!enforce_bounds))
 		return;
-
+	stringstream ss;
 	double fpm = control_info.facparmax;
 	double facorig = control_info.facorig;
 	double rpm = control_info.relparmax;
@@ -984,7 +982,8 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 	double chg_fac, chg_rel;
 	double scaling_factor = 1.0;
 	string parchglim;
-	
+	double bnd_tol = 0.001;
+	double scaled_bnd_val;
 	string controlling_par = "";
 	ParameterInfo &p_info = ctl_parameter_info;
 	const ParameterRec *p_rec;
@@ -1061,7 +1060,7 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 				temp = abs((chg_ub - last_val) / (p.second - last_val));
 				if ((temp > 1.0) || (temp < 0.0))
 				{
-					stringstream ss;
+					ss.str("");
 					ss << "Pest::enforce_par_limts() error: invalid upper parchglim scaling factor " << temp << " for par " << p.first << endl;
 					ss << " chglim:" << chg_ub << ", last_val:" << last_val << ", current_val:" << p.second << endl;
 					throw runtime_error(ss.str());
@@ -1078,7 +1077,7 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 				temp = abs((last_val - chg_lb) / (last_val - p.second));
 			if ((temp > 1.0) || (temp < 0.0))
 			{
-				stringstream ss;
+				ss.str("");
 				ss << "Pest::enforce_par_limts() error: invalid lower parchglim scaling factor " << temp << " for par " << p.first << endl;
 				ss << " chglim:" << chg_lb << ", last_val:" << last_val << ", current_val:" << p.second << endl;
 				throw runtime_error(ss.str());
@@ -1092,12 +1091,26 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 
 		if (enforce_bounds)
 		{
-			if (p.second > p_rec->ubnd)
+			/*if (last_val >= p_rec->ubnd)
+			{
+				ss.str("");
+				ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at upper bound";
+				throw runtime_error(ss.str());
+			}
+
+			else if (last_val <= p_rec->lbnd)
+			{
+				ss.str("");
+				ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at lower bound";
+				throw runtime_error(ss.str());
+			}*/
+			scaled_bnd_val = p_rec->ubnd + (p_rec->ubnd * bnd_tol);
+			if (p.second > scaled_bnd_val)
 			{
 				temp = abs((p_rec->ubnd - last_val) / (p.second - last_val));
 				if ((temp > 1.0) || (temp < 0.0))
 				{
-					stringstream ss;
+					
 					ss << "Pest::enforce_par_limts() error: invalid upper bound scaling factor " << temp << " for par " << p.first << endl;
 					ss << " ubnd:" << p_rec->ubnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
 					throw runtime_error(ss.str());
@@ -1108,18 +1121,17 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 					controlling_par = p.first;
 				}
 			}
-
-			else if (p.second < p_rec->lbnd)
+			scaled_bnd_val = p_rec->lbnd - (p_rec->lbnd * bnd_tol);
+			if (p.second < p_rec->lbnd)
 			{
 				temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
 				if ((temp > 1.0) || (temp < 0.0))
-					if ((temp > 1.0) || (temp < 0.0))
-					{
-						stringstream ss;
-						ss << "Pest::enforce_par_limts() error: invalid lower bound scaling factor " << temp << " for par " << p.first << endl;
-						ss << " lbnd:" << p_rec->lbnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
-						throw runtime_error(ss.str());
-					}
+				{
+					stringstream ss;
+					ss << "Pest::enforce_par_limts() error: invalid lower bound scaling factor " << temp << " for par " << p.first << endl;
+					ss << " lbnd:" << p_rec->lbnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+					throw runtime_error(ss.str());
+				}
 				if (temp < scaling_factor)
 				{
 					scaling_factor = temp;
@@ -1155,19 +1167,21 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 	
 }
 
-map<string, double> Pest::get_pars_at_bounds(const Parameters & pars)
+map<string, double> Pest::get_pars_at_near_bounds(const Parameters & pars, double tol)
 {
 	 map<string, double> bnd_map;
 	 const ParameterRec *p_rec;
 	 ParameterInfo &pinfo = ctl_parameter_info;
-
+	 double v;
 	 for (auto p : pars)
 	 {
 		 p_rec = pinfo.get_parameter_rec_ptr(p.first);
-		 if (p.second > p_rec->ubnd)
-			 bnd_map[p.first] = p_rec->ubnd;
-		 else if (p.second < p_rec->lbnd)
-			 bnd_map[p.first] = p_rec->lbnd;
+		 v = (p_rec->ubnd - (tol * p_rec->ubnd));
+		 if (p.second >= v)
+			 bnd_map[p.first] = v;
+		 v = (p_rec->lbnd + (tol * p_rec->lbnd));
+		 if (p.second <= v)
+			 bnd_map[p.first] = v;
 
 	 }
 	 return bnd_map;
