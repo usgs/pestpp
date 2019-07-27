@@ -420,47 +420,41 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	if (marquardt_type == MarquardtMatrix::IDENT)
 	{
 		stringstream info_str;
-		bool recalc_js = false;
 		Eigen::SparseMatrix<double> S;
 
-		if (true)
-		{
-			//Compute Scaling Matrix Sii
-			performance_log->log_event("commencing to scale JtQJ matrix");
-			svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc, 0.0);
-			VectorXd Sigma_inv_sqrt = Sigma.array().inverse().sqrt();
-			S = Vt.transpose() * Sigma_inv_sqrt.asDiagonal() * U.transpose();
-			VectorXd S_diag = S.diagonal();
-			MatrixXd S_tmp = S_diag.asDiagonal();
-			S = S_tmp.sparseView();
-			stringstream info_str1;
-			info_str1 << "S info: " << "rows = " << S.rows() << ": cols = " << S.cols() << ": size = " << S.size() << ": nonzeros = " << S.nonZeros();
-			performance_log->log_event(info_str1.str());
-			performance_log->log_event("JS");
-			JS = jac * S;
-			performance_log->log_event("JS.transpose() * q_mat * JS + lambda * S.transpose() * S");
-			JtQJ = JS.transpose() * q_mat * JS + lambda * S.transpose() * S;
-			info_str.str("");
-			info_str << "S info: " << "rows = " << S.rows() << ": cols = " << S.cols() << ": size = " << S.size() << ": nonzeros = " << S.nonZeros();
-			performance_log->log_event(info_str.str());
-			recalc_js = true;
-		}
-
-
-
+		
+		//Compute Scaling Matrix Sii
+		performance_log->log_event("commencing to scale JtQJ matrix");
+		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc, 0.0);
+		VectorXd Sigma_inv_sqrt = Sigma.array().inverse().sqrt();
+		S = Vt.transpose() * Sigma_inv_sqrt.asDiagonal() * U.transpose();
+		VectorXd S_diag = S.diagonal();
+		MatrixXd S_tmp = S_diag.asDiagonal();
+		S = S_tmp.sparseView();
+		stringstream info_str1;
+		info_str1 << "S info: " << "rows = " << S.rows() << ": cols = " << S.cols() << ": size = " << S.size() << ": nonzeros = " << S.nonZeros();
+		performance_log->log_event(info_str1.str());
+		performance_log->log_event("JS");
+		JS = jac * S;
+		performance_log->log_event("JS.transpose() * q_mat * JS + lambda * S.transpose() * S");
+		JtQJ = JS.transpose() * q_mat * JS + lambda * S.transpose() * S;
+		info_str.str("");
+		info_str << "S info: " << "rows = " << S.rows() << ": cols = " << S.cols() << ": size = " << S.size() << ": nonzeros = " << S.nonZeros();
+		performance_log->log_event(info_str.str());
+		
+		
 		// Returns truncated Sigma, U and Vt arrays with small singular parameters trimed off
 		performance_log->log_event("commencing SVD factorization");
 		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
 		performance_log->log_event("SVD factorization complete");
 
-		if (!recalc_js)
-		{
-			VectorXd Sigma_inv_sqrt = Sigma.array().inverse().sqrt();
-			S = Vt.transpose() * Sigma_inv_sqrt.asDiagonal() * U.transpose();
-			VectorXd S_diag = S.diagonal();
-			MatrixXd S_tmp = S_diag.asDiagonal();
-			S = S_tmp.sparseView();
-		}
+		
+		/*VectorXd Sigma_inv_sqrt = Sigma.array().inverse().sqrt();
+		S = Vt.transpose() * Sigma_inv_sqrt.asDiagonal() * U.transpose();
+		VectorXd S_diag = S.diagonal();
+		MatrixXd S_tmp = S_diag.asDiagonal();
+		S = S_tmp.sparseView();*/
+		
 
 		output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
 
@@ -569,24 +563,9 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 
 	upgrade_active_ctl_pars.clear();
 	// define a function type for upgrade methods
-	typedef void(SVDSolver::*UPGRADE_FUNCTION) (const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt,
-		const DynamicRegularization &regul,
-		const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
-		const Parameters &base_ctl_pars, const Parameters &prev_frozen_ctl_pars,
-		double lambda, Parameters &ctl_upgrade_pars, Parameters &upgrade_ctl_del_pars,
-		Parameters &grad_ctl_del_pars, MarquardtMatrix marquardt_type, bool scale_upgrade);
-
-	UPGRADE_FUNCTION calc_lambda_upgrade = &SVDSolver::calc_lambda_upgrade_vec_JtQJ;
-
-	/*if (mat_inv == MAT_INV::Q12J)
-	{
-		calc_lambda_upgrade = &SVDSolver::calc_lambda_upgrade_vecQ12J;
-	}*/
-
-	// need to remove parameters frozen due to failed jacobian runs when calling calc_lambda_upgrade_vec
-	//Freeze Parameters at the boundary whose ugrade vector and gradient both head out of bounds
+	
 	performance_log->log_event("commencing calculation of upgrade vector");
-	(*this.*calc_lambda_upgrade)(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
+	calc_lambda_upgrade_vec_JtQJ(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
 		base_run_active_ctl_pars, prev_frozen_active_ctl_pars, i_lambda, upgrade_active_ctl_pars, upgrade_ctl_del_pars,
 		grad_ctl_del_pars, marquardt_type, scale_upgrade);
 	if (upgrade_active_ctl_pars.get_notnormal_keys().size() > 0)
@@ -634,21 +613,14 @@ void SVDSolver::test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &pr
 
 	
 	upgrade_active_ctl_pars.clear();
-	// define a function type for upgrade methods
-	typedef void(SVDSolver::*UPGRADE_FUNCTION) (const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt,
-		const DynamicRegularization &regul,
-		const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
-		const Parameters &base_ctl_pars, const Parameters &prev_frozen_ctl_pars,
-		double lambda, Parameters &ctl_upgrade_pars, Parameters &upgrade_ctl_del_pars,
-		Parameters &grad_ctl_del_pars, MarquardtMatrix marquardt_type, bool scale_upgrade);
-
-	UPGRADE_FUNCTION calc_lambda_upgrade = &SVDSolver::calc_lambda_upgrade_vec_JtQJ;
+	
 
 	performance_log->log_event("commencing calculation of upgrade vector");
-	(*this.*calc_lambda_upgrade)(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
+	
+	calc_lambda_upgrade_vec_JtQJ(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
 		base_run_active_ctl_pars, prev_frozen_active_ctl_pars, i_lambda, upgrade_active_ctl_pars, upgrade_ctl_del_pars,
 		grad_ctl_del_pars, marquardt_type, scale_upgrade);
-	
+
 	performance_log->log_event("commencing check of parameter bounds and gradients");
 
 	//get parameters who are at their bounds and heading out - these are the ones to freeze
