@@ -256,6 +256,7 @@ int main(int argc, char* argv[])
 
 		cout << endl;
 		cout << "using control file: \"" << complete_path << "\"" << endl << endl;
+		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
