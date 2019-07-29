@@ -87,7 +87,6 @@ bool MuPoint::operator< (const MuPoint &rhs) const
 }
 
 
-
 SVDSolver::SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
 	const ParamTransformSeq &_par_transform, Jacobian &_jacobian,
 	OutputFileWriter &_output_file_writer,
@@ -102,10 +101,10 @@ SVDSolver::SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, Objective
 {
 	if (_pest_scenario.get_pestpp_options().get_jac_scale())
 	{
-		mar_mat = MarquardtMatrix::IDENT;
+		mar_mat = MarquardtMatrix::JTQJ;
 	}
 	else
-		mar_mat = MarquardtMatrix::JTQJ;
+		mar_mat = MarquardtMatrix::IDENT;
 	svd_package = new SVD_EIGEN();
 }
 
