@@ -574,14 +574,14 @@ void OutputFileWriter::phi_report(std::ostream &os, int const iter, int const nr
 }
 
 
-void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Observations &sim)
+void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Observations &sim, ObservationInfo &oi)
 {
 
 	os << setw(21) << " Name" << setw(13) << " Group" << setw(21) << " Measured" << setw(21) << " Modelled" << setw(21) << " Residual" << setw(21) << " Weight" << endl;
 	//vector<string> obs_name_vec = obs.get_keys();
 	vector<string> obs_name_vec = pest_scenario.get_ctl_ordered_obs_names();
 	double obs_val, sim_val;
-	ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+	//ObservationInfo oi = pest_scenario.get_ctl_observation_info();
 	//for(vector<string>::const_iterator b = obs_name_vec.begin(),
 	//	e = obs_name_vec.end(); b!=e; ++b)
 	for (auto &b : obs_name_vec)
@@ -606,7 +606,8 @@ void OutputFileWriter::write_opt_constraint_rei(std::ofstream &fout, int iter_no
 	fout.precision(12);
 	fout << " MODEL OUTPUTS AT END OF OPTIMISATION ITERATION NO. " << iter_no << ":-" << endl;
 	fout << endl << endl;
-	obs_report(fout, obs, sim);
+	ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+	obs_report(fout, obs, sim, oi);
 	//process prior information
 	//const PriorInformation *prior_info_ptr = obj_func.get_prior_info_ptr();
 	const PriorInformation *prior_info_ptr = pest_scenario.get_prior_info_ptr();
@@ -641,7 +642,8 @@ void OutputFileWriter::write_rei(ofstream &fout, int iter_no, const Observations
 	fout.precision(12);
 	fout << " MODEL OUTPUTS AT END OF OPTIMISATION ITERATION NO. " << iter_no << ":-" << endl;
 	fout << endl << endl;
-	obs_report(fout, obs, sim);
+	ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+	obs_report(fout, obs, sim, oi);
 	//process prior information
 	const PriorInformation *prior_info_ptr = pest_scenario.get_prior_info_ptr();
 	const PriorInformationRec *pi_rec_ptr;

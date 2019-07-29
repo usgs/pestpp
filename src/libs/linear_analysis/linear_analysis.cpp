@@ -437,6 +437,8 @@ linear_analysis::linear_analysis(Mat &_jacobian, Pest &pest_scenario, FileManage
 	bool parcov_success = false;
 	log = _log;
 	jacobian = _jacobian;
+	if (jacobian.nrow() != pest_scenario.get_nonregul_obs().size())
+		jacobian = jacobian.get(pest_scenario.get_ctl_ordered_obs_names(), pest_scenario.get_ctl_ordered_adj_par_names());
 	const string parcov_filename = pest_scenario.get_pestpp_options().get_parcov_filename();
 	if (parcov_filename.size() > 0)
 	{

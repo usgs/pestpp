@@ -65,7 +65,7 @@ public:
 	enum class MAT_INV{ Q12J, JTQJ };
 protected:
 	//enum class LimitType {NONE, LBND, UBND, REL, FACT};
-	enum class MarquardtMatrix {IDENT, JTQJ};
+	enum class MarquardtMatrix {IDENT, JTQJ, PRIOR};
 public:
 	SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
 		const ParamTransformSeq &_par_transform, Jacobian &_jacobian,
@@ -167,6 +167,7 @@ protected:
 		const Parameters &base_run_active_ctl_par, const Parameters &freeze_active_ctl_pars,
 		DynamicRegularization &tmp_regul_scheme, bool scale_upgrade = false);
 	int check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Parameters &current_active_ctl_pars, const Parameters &new_upgrade_active_ctl_pars, const Parameters &new_grad_active_ctl_pars = Parameters());
+	Eigen::SparseMatrix<double> get_normal_matrix(MarquardtMatrix marquardt_type, double lambda, Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul, const vector<string> &par_name_vec, const vector<string> &obs_name_vec);
 };
 
 #endif /* SVDSOLVER_H_ */

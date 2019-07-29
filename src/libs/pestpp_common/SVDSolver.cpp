@@ -379,6 +379,51 @@ VectorXd SVDSolver::calc_residual_corrections(const Jacobian &jacobian, const Pa
 	return del_residuals;
 }
 
+Eigen::SparseMatrix<double> SVDSolver::get_normal_matrix(MarquardtMatrix marquardt_type, double lambda, Jacobian & jacobian, const QSqrtMatrix & Q_sqrt, const DynamicRegularization & regul, const vector<string> &par_name_vec, const vector<string> &obs_name_vec)
+{
+	VectorXd Sigma;
+	VectorXd Sigma_trunc;
+	Eigen::SparseMatrix<double> U;
+	Eigen::SparseMatrix<double> Vt;
+	// the last boolean arguement is an instruction to compute the square weights
+	Eigen::SparseMatrix<double> q_mat = Q_sqrt.get_sparse_matrix(obs_name_vec, regul, true);
+	Eigen::SparseMatrix<double> jac = jacobian.get_matrix(obs_name_vec,par_name_vec);
+	performance_log->log_event("forming initial JtQJ matrix for lambda scaling");
+	Eigen::SparseMatrix<double> JtQJ = jac.transpose() * q_mat * jac;
+	Eigen::VectorXd upgrade_vec;
+	if (marquardt_type == MarquardtMatrix::JTQJ)
+	{
+		stringstream info_str;
+		Eigen::SparseMatrix<double> S;
+
+
+		//Compute Scaling Matrix Sii
+		performance_log->log_event("commencing to scale JtQJ matrix");
+		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc, 0.0);
+		VectorXd Sigma_inv_sqrt = Sigma.array().inverse().sqrt();
+		S = Vt.transpose() * Sigma_inv_sqrt.asDiagonal() * U.transpose();
+		VectorXd S_diag = S.diagonal();
+		MatrixXd S_tmp = S_diag.asDiagonal();
+		S = S_tmp.sparseView();
+		stringstream info_str1;
+		info_str1 << "S info: " << "rows = " << S.rows() << ": cols = " << S.cols() << ": size = " << S.size() << ": nonzeros = " << S.nonZeros();
+		performance_log->log_event(info_str1.str());
+		performance_log->log_event("JS");
+		JS = jac * S;
+		performance_log->log_event("JS.transpose() * q_mat * JS + lambda * S.transpose() * S");
+		JtQJ = JS.transpose() * q_mat * JS + lambda * S.transpose() * S;
+	}
+	else if (marquardt_type == MarquardtMatrix::IDENT)
+	{
+
+	}
+	else if (marquardt_type == MarquardtMatrix::PRIOR)
+	{
+
+	}
+	return Eigen::SparseMatrix<double>();
+}
+
 void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
 	const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
 	const Parameters &base_active_ctl_pars, const Parameters &prev_frozen_active_ctl_pars,
@@ -410,51 +455,47 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	// removed this line when true added to end of the previous call to get_sparce_matrix
 	//q_mat = (q_mat * q_mat).eval();
 	Eigen::SparseMatrix<double> jac = jacobian.get_matrix(obs_name_vec, numeric_par_names);
-	Eigen::SparseMatrix<double> ident;
-	ident.resize(jac.cols(), jac.cols());
-	ident.setIdentity();
+	//Eigen::SparseMatrix<double> ident;
+	//ident.resize(jac.cols(), jac.cols());
+	//ident.setIdentity();
 	performance_log->log_event("forming JtQJ matrix");
 	Eigen::SparseMatrix<double> JtQJ = jac.transpose() * q_mat * jac;
 
 	Eigen::VectorXd upgrade_vec;
-	if (marquardt_type == MarquardtMatrix::IDENT)
+	if (marquardt_type == MarquardtMatrix::JTQJ)
 	{
 		stringstream info_str;
 		Eigen::SparseMatrix<double> S;
 
-		
+
 		//Compute Scaling Matrix Sii
-		performance_log->log_event("commencing to scale JtQJ matrix");
+		performance_log->log_event("commencing to scale JtQJ matrix- first SVD...");
 		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc, 0.0);
 		VectorXd Sigma_inv_sqrt = Sigma.array().inverse().sqrt();
 		S = Vt.transpose() * Sigma_inv_sqrt.asDiagonal() * U.transpose();
 		VectorXd S_diag = S.diagonal();
 		MatrixXd S_tmp = S_diag.asDiagonal();
 		S = S_tmp.sparseView();
+		
 		stringstream info_str1;
 		info_str1 << "S info: " << "rows = " << S.rows() << ": cols = " << S.cols() << ": size = " << S.size() << ": nonzeros = " << S.nonZeros();
 		performance_log->log_event(info_str1.str());
 		performance_log->log_event("JS");
+		
 		JS = jac * S;
 		performance_log->log_event("JS.transpose() * q_mat * JS + lambda * S.transpose() * S");
+		
 		JtQJ = JS.transpose() * q_mat * JS + lambda * S.transpose() * S;
+		
 		info_str.str("");
 		info_str << "S info: " << "rows = " << S.rows() << ": cols = " << S.cols() << ": size = " << S.size() << ": nonzeros = " << S.nonZeros();
 		performance_log->log_event(info_str.str());
-		
-		
+
+
 		// Returns truncated Sigma, U and Vt arrays with small singular parameters trimed off
-		performance_log->log_event("commencing SVD factorization");
+		performance_log->log_event("commencing SVD factorization of lambda-scaled JtQJ");
 		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
 		performance_log->log_event("SVD factorization complete");
-
-		
-		/*VectorXd Sigma_inv_sqrt = Sigma.array().inverse().sqrt();
-		S = Vt.transpose() * Sigma_inv_sqrt.asDiagonal() * U.transpose();
-		VectorXd S_diag = S.diagonal();
-		MatrixXd S_tmp = S_diag.asDiagonal();
-		S = S_tmp.sparseView();*/
-		
 
 		output_file_writer.write_svd(Sigma, Vt, lambda, prev_frozen_active_ctl_pars, Sigma_trunc);
 
@@ -469,11 +510,12 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		info_str.str("");
 		info_str << "jac info: " << "rows = " << jac.rows() << ": cols = " << jac.cols() << ": size = " << jac.size() << ": nonzeros = " << jac.nonZeros();
 		performance_log->log_event(info_str.str());
+		
 		upgrade_vec = S * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * ((jac * S).transpose()* (q_mat  * (corrected_residuals))))));
 	}
-	else
+	else if (marquardt_type == MarquardtMatrix::IDENT)
 	{
-		performance_log->log_event("commencing SVD factorization");
+		performance_log->log_event("commencing SVD factorization - using identity lambda scaling");
 		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
 		performance_log->log_event("SVD factorization complete");
 		//Only add lambda to singular values above the threshhold
@@ -493,6 +535,14 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		performance_log->log_event(info_str.str());
 		upgrade_vec = Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * (jac.transpose() * (q_mat  * corrected_residuals))));
 	}
+	else if (marquardt_type == MarquardtMatrix::PRIOR)
+	{
+
+	}
+
+	else
+		throw runtime_error("unrecognized marquardt scaling type");
+
 
 	// scale the upgrade vector using the technique described in the PEST manual
 	if (scale_upgrade)
@@ -678,8 +728,11 @@ ModelRun SVDSolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termina
 	cout << "  reading previously computed jacobian:  " << jac_filename << endl;
 	file_manager.get_ofstream("rec") << "  reading previously computed jacobian:  " << jac_filename << endl;
 	jacobian.read(jac_filename);
+	Parameters pars = pest_scenario.get_ctl_parameters();
+	par_transform.active_ctl2numeric_ip(pars);
+	jacobian.set_base_numeric_pars(pars);
 	//todo: make sure the jco has the right pars and obs
-
+	
 	if (!res_filename.empty())
 	{
 		stringstream message;

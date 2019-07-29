@@ -519,63 +519,137 @@ int main(int argc, char* argv[])
 			{
 				if (restart_ctl.get_restart_option() != RestartController::RestartOption::NONE  && restart_ctl.get_iteration_type() == RestartController::IterationType::SUPER)
 				{
-					string filename = pest_scenario.get_pestpp_options().get_basejac_filename();
-					filename = ((filename.empty()) ? file_manager.build_filename("jcb") : filename);
-					base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, false, filename);
+					try
+					{
+						string filename = pest_scenario.get_pestpp_options().get_basejac_filename();
+						filename = ((filename.empty()) ? file_manager.build_filename("jcb") : filename);
+						base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, false, filename);
+					}
+					catch (exception &e)
+					{
+						cout << "error restarting super parameter process: " << e.what() << endl;
+						throw runtime_error(e.what());
+					}
 				}
 				else if (restart_ctl.get_restart_option() == RestartController::RestartOption::REUSE_JACOBIAN && n_base_iter < 0)
 				{
-					string filename = pest_scenario.get_pestpp_options().get_basejac_filename();
-					filename = ((filename.empty()) ? file_manager.build_filename("jco") : filename);
-					base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, true, filename);
+					try
+					{
+						string filename = pest_scenario.get_pestpp_options().get_basejac_filename();
+						string res_filename = pest_scenario.get_pestpp_options().get_hotstart_resfile();
+						filename = ((filename.empty()) ? file_manager.build_filename("jco") : filename);
+						base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, true, filename, res_filename);
+					}
+					catch (exception &e)
+					{
+						cout << "error restarting with existing jco and n_iter_base < 0: " << e.what() << endl;
+						throw runtime_error(e.what());
+					}
 				}
 				else if (n_base_iter < 0)
 				{
 					bool restart_runs = (restart_ctl.get_restart_option() == RestartController::RestartOption::REUSE_JACOBIAN);
-					cur_run = base_svd.compute_jacobian(*run_manager_ptr, termination_ctl, cur_run, restart_runs);
-					if (pest_scenario.get_control_info().noptmax < 0)
+					try
 					{
-						optimum_run = cur_run;
-						output_file_writer.write_rei(file_manager.open_ofile_ext("rei"), -1, pest_scenario.get_ctl_observations(),
-							cur_run.get_obs(), *cur_run.get_obj_func_ptr(), pest_scenario.get_ctl_parameters());
-						termination_ctl.set_terminate(true);
-						termination_ctl.set_reason("NOPTMAX criterion met");
-						//bool success = run_manager_ptr->get_observations_vec(0, init_sim);
+						cur_run = base_svd.compute_jacobian(*run_manager_ptr, termination_ctl, cur_run, restart_runs);
+						if (pest_scenario.get_control_info().noptmax < 0)
+						{
+							optimum_run = cur_run;
+							output_file_writer.write_rei(file_manager.open_ofile_ext("rei"), -1, pest_scenario.get_ctl_observations(),
+								cur_run.get_obs(), *cur_run.get_obj_func_ptr(), pest_scenario.get_ctl_parameters());
+							termination_ctl.set_terminate(true);
+							termination_ctl.set_reason("NOPTMAX criterion met");
+							//bool success = run_manager_ptr->get_observations_vec(0, init_sim);
+						}
+					}
+					catch (exception &e)
+					{
+						cout << "error initializing with n_iter_base < 0: " << e.what() << endl;
+						throw runtime_error(e.what());
 					}
 				}
 				else if (pest_scenario.get_control_info().noptmax < 0)
 				{
-					bool restart_runs = (restart_ctl.get_restart_option() == RestartController::RestartOption::RESUME_JACOBIAN_RUNS);
-					cur_run = base_svd.compute_jacobian(*run_manager_ptr, termination_ctl, cur_run, restart_runs);
-					if (restart_runs) restart_ctl.get_restart_option() = RestartController::RestartOption::NONE;
+					if (restart_ctl.get_restart_option() == RestartController::RestartOption::REUSE_JACOBIAN)
+					{
+						try
+						{
+							string jco_filename = pest_scenario.get_pestpp_options().get_basejac_filename();
+							jco_filename = ((jco_filename.empty()) ? file_manager.build_filename("jco") : jco_filename);
+							string res_filename = pest_scenario.get_pestpp_options().get_hotstart_resfile();
+
+							cur_run = base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, true, jco_filename, res_filename);
+							if (!cur_run.obs_valid())
+								cur_run = base_svd.solve(*run_manager_ptr, termination_ctl, n_base_iter, cur_run, optimum_run, restart_ctl, false);
+						}
+						catch (exception &e)
+						{
+							cout << "error restarting with existing jco: " << e.what() << endl;
+							throw runtime_error(e.what());
+						}
+					}
+					else
+					{
+						try
+						{
+
+
+							bool restart_runs = (restart_ctl.get_restart_option() == RestartController::RestartOption::RESUME_JACOBIAN_RUNS);
+							cur_run = base_svd.compute_jacobian(*run_manager_ptr, termination_ctl, cur_run, restart_runs);
+							if (restart_runs) restart_ctl.get_restart_option() = RestartController::RestartOption::NONE;
+
+							//bool success = run_manager_ptr->get_observations_vec(0, init_sim);
+						}
+						catch (exception &e)
+						{
+							cout << "error filling base jacobian: " << e.what() << endl;
+							throw runtime_error(e.what());
+						}
+					}
 					optimum_run = cur_run;
 					output_file_writer.write_rei(file_manager.open_ofile_ext("rei"), -1, pest_scenario.get_ctl_observations(),
 						cur_run.get_obs(), *cur_run.get_obj_func_ptr(), pest_scenario.get_ctl_parameters());
 					termination_ctl.set_terminate(true);
 					termination_ctl.set_reason("NOPTMAX criterion met");
-					//bool success = run_manager_ptr->get_observations_vec(0, init_sim);
 				}
 				else if (restart_ctl.get_restart_option() == RestartController::RestartOption::REUSE_JACOBIAN)
 				{
-					bool calc_first_jacobian = false;
-					string jco_filename = pest_scenario.get_pestpp_options().get_basejac_filename();
-					jco_filename = ((jco_filename.empty()) ? file_manager.build_filename("jco") : jco_filename);
-					string res_filename = pest_scenario.get_pestpp_options().get_hotstart_resfile();
+					try
+					{
+						bool calc_first_jacobian = false;
+						string jco_filename = pest_scenario.get_pestpp_options().get_basejac_filename();
+						jco_filename = ((jco_filename.empty()) ? file_manager.build_filename("jco") : jco_filename);
+						string res_filename = pest_scenario.get_pestpp_options().get_hotstart_resfile();
 
-					cur_run = base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, true, jco_filename,res_filename);
-					// Run the model once with the current parameters to compute the observations
-					cur_run = base_svd.solve(*run_manager_ptr, termination_ctl, n_base_iter, cur_run, optimum_run, restart_ctl, calc_first_jacobian);
-					termination_ctl.check_last_iteration();
+						cur_run = base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, true, jco_filename, res_filename);
+						// Run the model once with the current parameters to compute the observations
+						cur_run = base_svd.solve(*run_manager_ptr, termination_ctl, n_base_iter, cur_run, optimum_run, restart_ctl, calc_first_jacobian);
+						termination_ctl.check_last_iteration();
+					}
+					catch (exception &e)
+					{
+						cout << "error in base parameter iteration process with existing jacobian: " << e.what() << endl;
+						throw runtime_error(e.what());
+					}
 				}
 				else
 				{
-					if (restart_ctl.get_restart_option() == RestartController::RestartOption::RESUME_UPGRADE_RUNS)
+					try
 					{
-						base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, false, file_manager.build_filename("jcb"));
+						if (restart_ctl.get_restart_option() == RestartController::RestartOption::RESUME_UPGRADE_RUNS)
+						{
+							base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, false, file_manager.build_filename("jcb"));
+						}
+						bool calc_first_jacobian = true;
+						cur_run = base_svd.solve(*run_manager_ptr, termination_ctl, n_base_iter, cur_run, optimum_run, restart_ctl, calc_first_jacobian);
+						termination_ctl.check_last_iteration();
 					}
-					bool calc_first_jacobian = true;
-					cur_run = base_svd.solve(*run_manager_ptr, termination_ctl, n_base_iter, cur_run, optimum_run, restart_ctl, calc_first_jacobian);
-					termination_ctl.check_last_iteration();
+					catch (exception &e)
+					{
+						cout << "error in base parameter iteration process: " << e.what() << endl;
+						throw runtime_error(e.what());
+					}
+
 				}
 				//if (termination_ctl.get_iteration_number() == 1)
 					//bool success = run_manager_ptr->get_observations_vec(0, init_sim);
@@ -588,8 +662,8 @@ int main(int argc, char* argv[])
 				cout << e.what() << endl;
 				fout_rec << endl << endl;
 				fout_rec << e.what() << endl;
-				cout << "FATAL ERROR, cannot continue" << endl;
-				fout_rec << "FATAL ERROR, cannot continue" << endl;
+				cout << "Error encountered, cannot continue" << endl;
+				fout_rec << "Error encountered, cannot continue" << endl;
 				exit(1);
 			}
 			// Build Super Parameter or SVDA problem
@@ -642,8 +716,8 @@ int main(int argc, char* argv[])
 			{
 				cout << e.what() << endl;
 				fout_rec << e.what() << endl;
-				cout << "WARNING: super parameter run failed.  Switching to base parameters" << endl << endl;
-				fout_rec << "WARNING: super parameter run failed.  Switching to base parameters" << endl << endl;
+				cout << "WARNING: super parameter process failed.  Switching to base parameters" << endl << endl;
+				fout_rec << "WARNING: super parameter process failed.  Switching to base parameters" << endl << endl;
 				ofstream &fout_restart = file_manager.get_ofstream("rst");
 				RestartController::write_start_failed_super(fout_restart);
 				restart_ctl.get_restart_option() = RestartController::RestartOption::NONE;
@@ -661,7 +735,8 @@ int main(int argc, char* argv[])
 		output_file_writer.par_report(fout_rec, optimum_run.get_ctl_pars());
 
 		fout_rec << endl << "  Observations with optimal model-simulated equivalents and residuals" << endl;
-		output_file_writer.obs_report(fout_rec, *obj_func.get_obs_ptr(), optimum_run.get_obs());
+		ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+		output_file_writer.obs_report(fout_rec, *obj_func.get_obs_ptr(), optimum_run.get_obs(),oi);
 
 		fout_rec << endl << "Final composite objective function " << endl;
 		PhiData phi_data = obj_func.phi_report(optimum_run.get_obs(), optimum_run.get_ctl_pars(), *(pest_scenario.get_regul_scheme_ptr()));
@@ -736,12 +811,18 @@ int main(int argc, char* argv[])
 
 
 			fout_rec << endl;
-			fout_rec << "Scaled observation weights used to form observation noise covariance matrix:" << endl;
+			/*fout_rec << "Scaled observation weights used to form observation noise covariance matrix written to residual file " <<  endl;
 			fout_rec << endl << setw(20) << "observation" << setw(20) << "group" << setw(20) << "scaled_weight" << endl;
 			for (auto &oi : reweight.observations)
 			if (oi.second.weight > 0.0)
 				fout_rec << setw(20) << oi.first << setw(20) << oi.second.group << setw(20) << oi.second.weight << endl;
-			fout_rec << endl << endl;
+			fout_rec << endl << endl;*/
+			string reres_filename = file_manager.get_base_filename() + ".fosm_reweight.rei";
+			ofstream &reres_of = file_manager.open_ofile_absolute("fosm_reweight.rei",reres_filename);
+			
+			Observations obs = pest_scenario.get_ctl_observations();
+			output_file_writer.obs_report(reres_of, obs, sim, reweight);
+			fout_rec << "Scaled observation weights used to form observation noise covariance matrix written to residual file '" << reres_filename << "'" << endl << endl;
 			
 			//instance of linear analysis
 			linear_analysis la(j, pest_scenario, file_manager, &unc_log);

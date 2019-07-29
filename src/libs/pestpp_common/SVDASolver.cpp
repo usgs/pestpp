@@ -428,9 +428,6 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		}
 
 		vector<double> lambda_vec = base_lambda_vec;
-		lambda_vec.push_back(best_lambda);
-		lambda_vec.push_back(best_lambda / 2.0);
-		lambda_vec.push_back(best_lambda * 2.0);
 		std::sort(lambda_vec.begin(), lambda_vec.end());
 		auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
 		lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
