@@ -32,7 +32,7 @@ class TerminationController
 public:
 	TerminationController(int _noptmax=0, double _phiredstp=0.0, int _nphistp=0,
 		int _nphinored=0, double _relparstp = 0.0, int _nrelpar = 0,
-		bool _use_dynaimc_regul = false, double _phim_accept=0.0, double reg_frac = 0);
+		bool _use_dynaimc_regul = false, double _phim_accept=0.0);
 	TerminationController(const TerminationController &rhs) {*this = rhs;}
 	bool process_iteration(const PhiComponets &phi, double relpar);
 	void set_terminate(bool _terminate_code) { terminate_code = _terminate_code; }
@@ -50,7 +50,6 @@ private:
 	double phiredstp;
 	double relparstp;
 	double phim_accept;
-	double reg_frac;
 	double current_phi;
 	unsigned nphistp;
 	int noptmax;

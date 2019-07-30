@@ -175,17 +175,13 @@ int main(int argc, char* argv[])
 		}
 
 		it_find = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/g");
+		it_find = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/g");
 		next_item.clear();
-		if (it_find != cmd_arg_vec.end() && it_find + 1 != cmd_arg_vec.end())
-		{
-			next_item = *(it_find + 1);
-			strip_ip(next_item);
-
-		}
-		//Check for GENIE Master
 		if (it_find != cmd_arg_vec.end())
 		{
-			throw runtime_error("GENIE not supported by pestpp-ies");
+			cerr << "Genie run manager ('/g') no longer supported, please use PANTHER instead" << endl;
+			return 1;
+
 		}
 
 		RestartController restart_ctl;

@@ -17,17 +17,17 @@ public:
 	linear_analysis(){;}
 
 	//the easiest constructor, builds parcov and obscov from the pst associated with jco_filename
-	linear_analysis(string &jco_filename,Logger* _log = new Logger());
+	//linear_analysis(string &jco_filename,Logger* _log = new Logger());
 
 	//loads parcov and obscov from files, can .pst, .mat or .unc files
-	linear_analysis(string &jco_filename, string &parcov_filename, string &obscov_filename, Logger* _log = new Logger());
+	//linear_analysis(string &jco_filename, string &parcov_filename, string &obscov_filename, Logger* _log = new Logger());
 
 	//load parcov and obscov from parameter bounds and observation weights
-	linear_analysis(Mat _jacobian, Pest pest_scenario, Logger* _log = new Logger());
+	//linear_analysis(Mat _jacobian, Pest pest_scenario, Logger* _log = new Logger());
 
-	//pointer constructors for pest++ integration
-	linear_analysis(Mat* _jacobian, Pest* pest_scenario, Logger* _log = new Logger());
-	linear_analysis(Mat* _jacobian, Pest* pest_scenario, Mat* _obscov, Logger* _log = new Logger());
+	//constructor for pest++ integration
+	linear_analysis(Mat &_jacobian, Pest &pest_scenario, FileManager &file_manager, Logger* _log = new Logger());
+	//linear_analysis(Mat* _jacobian, Pest* pest_scenario, Mat* _obscov, Logger* _log = new Logger());
 
 
 	//directly from Mat objects
@@ -37,7 +37,8 @@ public:
 	void set_predictions(vector<Mat> preds);
 	void set_predictions(Mat* preds);
 
-	void  set_parcov(Mat* _parcov);
+	void  set_parcov(Mat &_parcov);
+	void set_obscov(Mat &_obscov) { obscov = _obscov; }
 
 	//get a new linear analysis object consisting of a subset of par and obs names
 	linear_analysis get(vector<string> &new_par_names, vector<string> &new_obs_names);

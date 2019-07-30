@@ -380,7 +380,8 @@ def parchglim_test():
     p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
     print(p_df)
     print(p_df.loc["stage","parval1"],par.loc["stage","parval1"] + rpm)
-    assert np.abs(p_df.loc["stage","parval1"] - (par.loc["stage","parval1"] + rpm)) < 1.0e-6
+    d = np.abs(p_df.loc["stage","parval1"] - (par.loc["stage","parval1"] + rpm))
+    assert d < 1.0e-6,d
 
     # currently something is up with the upgrade calcs in pestpp-glm
     # so this test just makes sure it runs without throwing an exception
@@ -478,11 +479,11 @@ def secondary_marker_test():
     os.chdir(b_d)
 
 if __name__ == "__main__":
-    glm_long_name_test()
+    #glm_long_name_test()
     #sen_plusplus_test()
-    #parchglim_test()
+    parchglim_test()
     #unc_file_test()
-    secondary_marker_test()
+    #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()

@@ -183,7 +183,6 @@ PESTPP_INCLUDES := \
     -I $(LIBS_DIR)/run_managers/abstract_base \
     -I $(LIBS_DIR)/run_managers/yamr \
     -I $(LIBS_DIR)/run_managers/serial \
-    -I $(LIBS_DIR)/run_managers/genie_wrapper \
     -I $(LIBS_DIR)/run_managers/external \
     -I $(LIBS_DIR)/run_managers/wrappers \
     -I $(LIBS_DIR)/pestpp_common \
@@ -197,7 +196,6 @@ PESTPP_LIBS := \
     -L$(LIBS_DIR)/run_managers/yamr -lrm_yamr \
     -L$(LIBS_DIR)/run_managers/serial -lrm_serial \
     -L$(LIBS_DIR)/run_managers/external -lrm_external \
-    -L$(LIBS_DIR)/run_managers/genie_wrapper -lrm_genie_wrapper \
     -L$(LIBS_DIR)/run_managers/abstract_base -lrm_abstract \
     -L$(LIBS_DIR)/mio -lmio \
     -L$(LIBS_DIR)/common -lcommon \
