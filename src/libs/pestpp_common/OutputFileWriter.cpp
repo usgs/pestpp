@@ -40,6 +40,12 @@ using namespace::pest_utils;
 OutputFileWriter::OutputFileWriter(FileManager &_file_manager, Pest &_pest_scenario, bool restart_flag, bool _save_rei, int _eigenwrite)
 	: file_manager(_file_manager), pest_scenario(_pest_scenario),case_name(_file_manager.get_base_filename()), save_rei(_save_rei), eigenwrite(_eigenwrite)
 {
+	
+}
+
+
+void OutputFileWriter::prep_glm_files(bool restart_flag)
+{
 	if (restart_flag)
 	{
 		ofstream &fout_sen = file_manager.open_ofile_ext("sen", ofstream::app);
@@ -60,17 +66,13 @@ OutputFileWriter::OutputFileWriter(FileManager &_file_manager, Pest &_pest_scena
 	}
 }
 
-void OutputFileWriter::iteration_report(std::ostream &os, int iter, int nruns, string iteration_type, string svd_type, string mat_inv)
+void OutputFileWriter::iteration_report(std::ostream &os, int iter, int nruns, string iteration_type, string svd_type)
 {
 	os << "OPTIMISATION ITERATION NUMBER: " << iter << endl << endl;
 	os << "  Iteration type: " << iteration_type << endl;
 	if (!svd_type.empty())
 	{
 		os << "  SVD Package: " << svd_type << endl;
-	}
-	if (!mat_inv.empty())
-	{
-		os << "  Matrix Inversion: " << mat_inv << endl;
 	}
 	os << "  Model calls so far : " << nruns << endl;
 	os << endl;
@@ -572,14 +574,14 @@ void OutputFileWriter::phi_report(std::ostream &os, int const iter, int const nr
 }
 
 
-void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Observations &sim)
+void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Observations &sim, ObservationInfo &oi)
 {
 
 	os << setw(21) << " Name" << setw(13) << " Group" << setw(21) << " Measured" << setw(21) << " Modelled" << setw(21) << " Residual" << setw(21) << " Weight" << endl;
 	//vector<string> obs_name_vec = obs.get_keys();
 	vector<string> obs_name_vec = pest_scenario.get_ctl_ordered_obs_names();
 	double obs_val, sim_val;
-	ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+	//ObservationInfo oi = pest_scenario.get_ctl_observation_info();
 	//for(vector<string>::const_iterator b = obs_name_vec.begin(),
 	//	e = obs_name_vec.end(); b!=e; ++b)
 	for (auto &b : obs_name_vec)
@@ -604,7 +606,8 @@ void OutputFileWriter::write_opt_constraint_rei(std::ofstream &fout, int iter_no
 	fout.precision(12);
 	fout << " MODEL OUTPUTS AT END OF OPTIMISATION ITERATION NO. " << iter_no << ":-" << endl;
 	fout << endl << endl;
-	obs_report(fout, obs, sim);
+	ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+	obs_report(fout, obs, sim, oi);
 	//process prior information
 	//const PriorInformation *prior_info_ptr = obj_func.get_prior_info_ptr();
 	const PriorInformation *prior_info_ptr = pest_scenario.get_prior_info_ptr();
@@ -639,7 +642,8 @@ void OutputFileWriter::write_rei(ofstream &fout, int iter_no, const Observations
 	fout.precision(12);
 	fout << " MODEL OUTPUTS AT END OF OPTIMISATION ITERATION NO. " << iter_no << ":-" << endl;
 	fout << endl << endl;
-	obs_report(fout, obs, sim);
+	ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+	obs_report(fout, obs, sim, oi);
 	//process prior information
 	const PriorInformation *prior_info_ptr = pest_scenario.get_prior_info_ptr();
 	const PriorInformationRec *pi_rec_ptr;
@@ -893,8 +897,8 @@ void OutputFileWriter::write_jco(bool isBaseIter, string ext, Jacobian &jco)
 		obs_names = jco.get_sim_obs_names();
 	}
 	string filename = file_manager.build_filename(ext);
-	Eigen::SparseMatrix<double>* matrix_ptr = jco.get_matrix_ptr();
-	pest_utils::save_binary(filename, obs_names, par_names, *matrix_ptr);
+	Eigen::SparseMatrix<double> matrix = jco.get_matrix(obs_names,par_names);
+	pest_utils::save_binary(filename, obs_names, par_names, matrix);
 	//int n_par = par_names.size();
 	//int n_obs_and_pi = obs_names.size();
 	//int n;

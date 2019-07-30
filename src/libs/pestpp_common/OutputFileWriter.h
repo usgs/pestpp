@@ -42,6 +42,7 @@ class OutputFileWriter
 {
 public:
 	OutputFileWriter(FileManager &_file_manager, Pest &_pest_scenario, bool restart_flag = false, bool _save_rei = true, int _eigenwrite = 0);
+	void prep_glm_files(bool restart_flag);
 	void write_rei(std::ofstream &fout, int iter_no, const Observations &obs,
 		const Observations &sim, const ObjectiveFunc &obj_func, const Parameters &pars);
 	void write_par(std::ofstream &fout, const Parameters &pars, const TranOffset &offset_tran, const TranScale &scale_tran);
@@ -66,9 +67,9 @@ public:
 		double const dynamic_reg_weight,bool final=false, string tag="Starting");
 	void par_report(std::ostream &os, Parameters const &new_ctl_pars);
 	void par_report(std::ostream &os, int const iter, Parameters const &new_pars, Parameters const &old_pars, string par_type);
-	void iteration_report(std::ostream &os, int iter, int nruns, string iteration_type, string svd_type=string(""), string mat_inv=string(""));
+	void iteration_report(std::ostream &os, int iter, int nruns, string iteration_type, string svd_type=string(""));
 	void scenario_report(std::ostream &os);
-	void obs_report(std::ostream &os, const Observations &obs, const Observations &sim);
+	void obs_report(std::ostream &os, const Observations &obs, const Observations &sim, ObservationInfo &oi);
 
 	void param_change_stats(double p_old, double p_new, bool &have_fac, double &fac_change, bool &have_rel, double &rel_change);
 	void write_par_iter(int iter, Parameters const &ctl_pars);

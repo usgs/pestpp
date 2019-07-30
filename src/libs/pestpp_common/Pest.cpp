@@ -252,28 +252,6 @@ void Pest::check_inputs(ostream &f_rec)
 		}
 	}
 
-	if (pestpp_options.get_auto_norm() > 0.0)
-	{
-		if (pestpp_options.get_parcov_scale_fac() > 0.0)
-			throw PestError("Can't use 'autonorm' and 'parcov_scale_fac' > 0.0");
-		f_rec << "pest++ option 'autonorm' is being deprecated in favor of 'use_parcov_scaling'" << endl;
-		cout << "pest++ option 'autonorm' is being deprecated in favor of 'use_parcov_scaling'" << endl;
-		//pestpp_options.set_auto_norm(-999.0);
-	}
-	if (pestpp_options.get_parcov_scale_fac() > 0.0)
-	{
-		if (pestpp_options.get_mat_inv() == PestppOptions::MAT_INV::Q12J)
-		{
-			f_rec << "pest++ mat_inv = q12j, but parcov_scale_fac > 0.0." << endl;
-			throw PestError("pest++ mat_inv = q12j, but parcov_scale_fac > 0.0.");
-		}
-		if (pestpp_options.get_parcov_scale_fac() > 1.0)
-		{
-			cout << "'parcov_scale_fac' > 1.0, resetting to 1.0" << endl;
-			f_rec << "'parcov_scale_fac' > 1.0, resetting to 1.0" << endl;
-			pestpp_options.set_parcov_scale_fac(1.0);
-		}
-	}
 	if (pestpp_options.get_hotstart_resfile().size() > 0)
 		if (pestpp_options.get_basejac_filename().size() == 0)
 		{
@@ -825,10 +803,8 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	pestpp_options.set_sweep_forgive(false);
 	pestpp_options.set_sweep_chunk(500);
 	pestpp_options.set_tie_by_group(false);
-	//pestpp_options.set_use_parcov_scaling(false);
-	pestpp_options.set_parcov_scale_fac(-999.0);
+
 	pestpp_options.set_jac_scale(true);
-	pestpp_options.set_upgrade_augment(false);
 	pestpp_options.set_opt_obj_func("");
 	pestpp_options.set_opt_coin_log(true);
 	pestpp_options.set_opt_skip_final(false);
@@ -843,7 +819,6 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	pestpp_options.set_opt_iter_derinc_fac(1.0);
 	pestpp_options.set_opt_include_bnd_pi(true);
 	pestpp_options.set_hotstart_resfile(string());
-	pestpp_options.set_upgrade_bounds("CHEAP");
 	pestpp_options.set_ies_par_csv("");
 	pestpp_options.set_ies_obs_csv("");
 	pestpp_options.set_ies_obs_restart_csv("");
@@ -906,46 +881,6 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 			pestpp_options.parce_line(*b);
 	}
 	
-	if (pestpp_options.get_auto_norm() > 0.0)
-	{
-		cout << "WARNING 'autonorm' option is being deprecated in favor of use_parcov_scaling. ignoring..." << endl;
-		f_rec << "WARNING 'autonorm' option is being deprecated in favor of use_parcov_scaling. ignoring..." << endl;
-		
-		/*double u_bnd;
-		double l_bnd;
-		double avg;
-		double spread;
-		double auto_norm = pestpp_options.get_auto_norm();
-		const string *par_name;
-		Parameters upper_bnd;
-		Parameters lower_bnd;
-		for(vector<string>::const_iterator b=ctl_ordered_par_names.begin(), e=ctl_ordered_par_names.end();
-			b!=e; ++b) {
-				upper_bnd.insert(*b, ctl_parameter_info.get_parameter_rec_ptr(*b)->ubnd);
-				lower_bnd.insert(*b, ctl_parameter_info.get_parameter_rec_ptr(*b)->lbnd);
-		}
-		base_par_transform.ctl2numeric_ip(upper_bnd);
-		base_par_transform.ctl2numeric_ip(lower_bnd);
-		for(Parameters::const_iterator b=upper_bnd.begin(), e=upper_bnd.end();
-			b!=e; ++b) {
-				par_name = &((*b).first);
-				u_bnd = (*b).second;
-
-				l_bnd = lower_bnd.get_rec(*par_name);
-				spread = u_bnd - l_bnd;
-				avg = (u_bnd + l_bnd) / 2.0;
-				t_auto_norm->insert(*par_name, -avg, auto_norm/spread);
-		}*/
-	}
-	//if the reg_frac arg was passed, reset the regul pointer
-	if (pestpp_options.get_reg_frac() >= 0.0)
-	{
-		double dummy = -1.0e+10;
-		delete regul_scheme_ptr;
-		regul_scheme_ptr = new DynamicRegularization(use_dynamic_reg, true, dummy,
-			dummy, dummy, wfmin, wfmax, dummy, dummy, wfinit);
-
-	}
 	regul_scheme_ptr->set_max_reg_iter(pestpp_options.get_max_reg_iter());
 //	//Make sure we use Q1/2J is PROPACK is chosen
 //	if (pestpp_options.get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
@@ -1039,7 +974,7 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 {
 	if ((!enforce_chglim) && (!enforce_bounds))
 		return;
-
+	stringstream ss;
 	double fpm = control_info.facparmax;
 	double facorig = control_info.facorig;
 	double rpm = control_info.relparmax;
@@ -1047,7 +982,8 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 	double chg_fac, chg_rel;
 	double scaling_factor = 1.0;
 	string parchglim;
-	
+	double bnd_tol = 0.001;
+	double scaled_bnd_val;
 	string controlling_par = "";
 	ParameterInfo &p_info = ctl_parameter_info;
 	const ParameterRec *p_rec;
@@ -1124,7 +1060,7 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 				temp = abs((chg_ub - last_val) / (p.second - last_val));
 				if ((temp > 1.0) || (temp < 0.0))
 				{
-					stringstream ss;
+					ss.str("");
 					ss << "Pest::enforce_par_limts() error: invalid upper parchglim scaling factor " << temp << " for par " << p.first << endl;
 					ss << " chglim:" << chg_ub << ", last_val:" << last_val << ", current_val:" << p.second << endl;
 					throw runtime_error(ss.str());
@@ -1141,7 +1077,7 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 				temp = abs((last_val - chg_lb) / (last_val - p.second));
 			if ((temp > 1.0) || (temp < 0.0))
 			{
-				stringstream ss;
+				ss.str("");
 				ss << "Pest::enforce_par_limts() error: invalid lower parchglim scaling factor " << temp << " for par " << p.first << endl;
 				ss << " chglim:" << chg_lb << ", last_val:" << last_val << ", current_val:" << p.second << endl;
 				throw runtime_error(ss.str());
@@ -1155,12 +1091,26 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 
 		if (enforce_bounds)
 		{
-			if (p.second > p_rec->ubnd)
+			/*if (last_val >= p_rec->ubnd)
+			{
+				ss.str("");
+				ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at upper bound";
+				throw runtime_error(ss.str());
+			}
+
+			else if (last_val <= p_rec->lbnd)
+			{
+				ss.str("");
+				ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at lower bound";
+				throw runtime_error(ss.str());
+			}*/
+			scaled_bnd_val = p_rec->ubnd + (p_rec->ubnd * bnd_tol);
+			if (p.second > scaled_bnd_val)
 			{
 				temp = abs((p_rec->ubnd - last_val) / (p.second - last_val));
 				if ((temp > 1.0) || (temp < 0.0))
 				{
-					stringstream ss;
+					
 					ss << "Pest::enforce_par_limts() error: invalid upper bound scaling factor " << temp << " for par " << p.first << endl;
 					ss << " ubnd:" << p_rec->ubnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
 					throw runtime_error(ss.str());
@@ -1171,18 +1121,17 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 					controlling_par = p.first;
 				}
 			}
-
-			else if (p.second < p_rec->lbnd)
+			scaled_bnd_val = p_rec->lbnd - (p_rec->lbnd * bnd_tol);
+			if (p.second < p_rec->lbnd)
 			{
 				temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
 				if ((temp > 1.0) || (temp < 0.0))
-					if ((temp > 1.0) || (temp < 0.0))
-					{
-						stringstream ss;
-						ss << "Pest::enforce_par_limts() error: invalid lower bound scaling factor " << temp << " for par " << p.first << endl;
-						ss << " lbnd:" << p_rec->lbnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
-						throw runtime_error(ss.str());
-					}
+				{
+					stringstream ss;
+					ss << "Pest::enforce_par_limts() error: invalid lower bound scaling factor " << temp << " for par " << p.first << endl;
+					ss << " lbnd:" << p_rec->lbnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+					throw runtime_error(ss.str());
+				}
 				if (temp < scaling_factor)
 				{
 					scaling_factor = temp;
@@ -1218,19 +1167,21 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 	
 }
 
-map<string, double> Pest::get_pars_at_bounds(const Parameters & pars)
+map<string, double> Pest::get_pars_at_near_bounds(const Parameters & pars, double tol)
 {
 	 map<string, double> bnd_map;
 	 const ParameterRec *p_rec;
 	 ParameterInfo &pinfo = ctl_parameter_info;
-
+	 double v;
 	 for (auto p : pars)
 	 {
 		 p_rec = pinfo.get_parameter_rec_ptr(p.first);
-		 if (p.second > p_rec->ubnd)
-			 bnd_map[p.first] = p_rec->ubnd;
-		 else if (p.second < p_rec->lbnd)
-			 bnd_map[p.first] = p_rec->lbnd;
+		 v = (p_rec->ubnd - (tol * p_rec->ubnd));
+		 if (p.second >= v)
+			 bnd_map[p.first] = v;
+		 v = (p_rec->lbnd + (tol * p_rec->lbnd));
+		 if (p.second <= v)
+			 bnd_map[p.first] = v;
 
 	 }
 	 return bnd_map;
