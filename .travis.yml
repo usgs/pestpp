@@ -26,6 +26,9 @@ matrix:
       env: TEST_REPO="https://github.com/usgs/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_part4.py" TEST_DIR="pestpp-ies_benchmarks"
     - name: "pestpp-ies tests baseline"
       env: TEST_REPO="https://github.com/usgs/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_base.py" TEST_DIR="pestpp-ies_benchmarks"
+    - name: "pestpp-glm tests baseline"
+      env: TEST_REPO="https://github.com/usgs/pestpp-glm_benchmarks" TEST_SCRIPT="glm_test_base.py" TEST_DIR="pestpp-glm_benchmarks"
+
 
 addons:
   apt:

@@ -158,7 +158,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\pestpp_common;$(SolutionDir)\libs\linear_analysis;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)\libs\run_managers\yamr;$(SolutionDir)\libs\run_managers\genie_wrapper;$(SolutionDir)\libs\run_managers\serial;$(SolutionDir)\libs\run_managers\external;$(SolutionDir)libs\Eigen</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\pestpp_common;$(SolutionDir)\libs\linear_analysis;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)\libs\run_managers\yamr;$(SolutionDir)\libs\run_managers\serial;$(SolutionDir)\libs\run_managers\external;$(SolutionDir)libs\Eigen</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeaderFile />
@@ -191,12 +191,6 @@
     </ProjectReference>
     <ProjectReference Include="..\..\libs\run_managers\abstract_base\abstract_base.vcxproj">
       <Project>{bae973de-66eb-4f44-a6b4-ffbcc8bef530}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\..\libs\run_managers\genie\genie.vcxproj">
-      <Project>{5bf76059-872c-4a70-9d5f-235c86131ddd}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\..\libs\run_managers\genie_wrapper\genie_wrapper.vcxproj">
-      <Project>{b8b618d6-2a60-4180-a5c5-ec7b18e0b1ee}</Project>
     </ProjectReference>
     <ProjectReference Include="..\..\libs\run_managers\serial\serial.vcxproj">
       <Project>{07650fa3-aeb1-4a11-90a8-d7e0e50c450f}</Project>

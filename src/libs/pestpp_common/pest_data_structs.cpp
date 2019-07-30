@@ -296,10 +296,8 @@ ostream& operator<< (ostream &os, const PestppOptions& val)
 	os << "    max_n_super = " << left << setw(20) << val.get_max_n_super() << endl;
 	os << "    super eigthres = " << left << setw(20) << val.get_super_eigthres() << endl;
 	os << "    svd pack = " << left << setw(20) << val.get_svd_pack() << endl;
-	os << "    auto norm = " << left << setw(20) << val.get_auto_norm() << endl;
 	os << "    super relparmax = " << left << setw(20) << val.get_super_relparmax() << endl;
 	os << "    max super frz iter = " << left << setw(20) << val.get_max_super_frz_iter() << endl;
-	os << "    mat inv = " << left << setw(20) << val.get_mat_inv() << endl;
 	os << "    max run fail = " << left << setw(20) << val.get_max_run_fail() << endl;
 	os << "    max reg iter = " << left << setw(20) << val.get_max_reg_iter() << endl;
 	os << "    use jacobian scaling a la PEST? = ";
@@ -307,8 +305,6 @@ ostream& operator<< (ostream &os, const PestppOptions& val)
 		os << " yes" << endl;
 	else
 		os << " no" << endl;
-	if (val.get_reg_frac() > 0.0)
-		os << "    regularization fraction of total phi = " << left << setw(10) << val.get_reg_frac() << endl;
 	os << "    lambdas = " << endl;
 	for (auto &lam : val.get_base_lambda_vec())
 	{
@@ -343,7 +339,6 @@ ostream& operator<< (ostream &os, const PestppOptions& val)
 	os << "    run overdue reschedule factor = " << left << setw(20) << val.get_overdue_reched_fac() << endl;
 	os << "    run overdue giveup factor = " << left << setw(20) << val.get_overdue_giveup_fac() << endl;
 	os << "    base parameter jacobian filename = " << left << setw(20) << val.get_basejac_filename() << endl;
-	os << "    prior parameter covariance upgrade scaling factor = " << left << setw(10) << val.get_parcov_scale_fac() << endl;
 	if (val.get_global_opt() == PestppOptions::GLOBAL_OPT::OPT_DE)
 	{
 		os << "    global optimizer = differential evolution (DE)" << endl;
@@ -358,15 +353,15 @@ ostream& operator<< (ostream &os, const PestppOptions& val)
 }
 
 PestppOptions::PestppOptions(int _n_iter_base, int _n_iter_super, int _max_n_super, double _super_eigthres,
-	SVD_PACK _svd_pack, MAT_INV _mat_inv, double _auto_norm, double _super_relparmax, int _max_run_fail,
-	bool _iter_summary_flag, bool _der_forgive, double _overdue_reched_fac, double _overdue_giveup_fac, double _reg_frac,
+	SVD_PACK _svd_pack, double _super_relparmax, int _max_run_fail,
+	bool _iter_summary_flag, bool _der_forgive, double _overdue_reched_fac, double _overdue_giveup_fac,
 	GLOBAL_OPT _global_opt, double _de_f, double _de_cr, int _de_npopulation, int _de_max_gen, bool _de_dither_f)
 	: n_iter_base(_n_iter_base), n_iter_super(_n_iter_super), max_n_super(_max_n_super), super_eigthres(_super_eigthres),
-	svd_pack(_svd_pack), mat_inv(_mat_inv), auto_norm(_auto_norm), super_relparmax(_super_relparmax),
+	svd_pack(_svd_pack), super_relparmax(_super_relparmax),
 	max_run_fail(_max_run_fail), max_super_frz_iter(50), max_reg_iter(50), base_lambda_vec({ 0.1, 1.0, 10.0, 100.0, 1000.0 }),
 	lambda_scale_vec({1.0}),
 	iter_summary_flag(_iter_summary_flag), der_forgive(_der_forgive), overdue_reched_fac(_overdue_reched_fac),
-	overdue_giveup_fac(_overdue_giveup_fac), reg_frac(_reg_frac), global_opt(_global_opt),
+	overdue_giveup_fac(_overdue_giveup_fac), global_opt(_global_opt),
 	de_f(_de_f), de_cr(_de_cr), de_npopulation(_de_npopulation), de_max_gen(_de_max_gen), de_dither_f(_de_dither_f)
 {
 }
@@ -431,18 +426,14 @@ void PestppOptions::parce_line(const string &line)
 
 
 		}
-		else if (key=="AUTO_NORM"){
-			convert_ip(value, auto_norm);
-		}
+		
 		else if (key == "SUPER_RELPARMAX"){
 			convert_ip(value, super_relparmax);
 		}
 		else if (key == "MAX_SUPER_FRZ_ITER"){
 			convert_ip(value, max_super_frz_iter);
 		}
-		else if (key == "MAT_INV"){
-			if (value == "Q1/2J") mat_inv = Q12J;
-		}
+		
 		else if (key == "MAX_RUN_FAIL"){
 			convert_ip(value, max_run_fail);
 		}
@@ -588,22 +579,6 @@ void PestppOptions::parce_line(const string &line)
 			is >> boolalpha >> tie_by_group;
 		}
 
-
-		else if (key == "REG_FRAC")
-		{
-			//convert_ip(value, reg_frac);
-			throw runtime_error("'++reg_frac' has been deprecated - please use * regularization and PHIMLIM");
-		}
-		/*else if (key == "USE_PARCOV_SCALING")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> use_parcov_scaling;
-		}*/
-		else if (key == "PARCOV_SCALE_FAC")
-		{
-			convert_ip(value, parcov_scale_fac);
-		}
 		else if (key == "JAC_SCALE")
 		{
 			transform(value.begin(), value.end(), value.begin(), ::tolower);
@@ -614,20 +589,13 @@ void PestppOptions::parce_line(const string &line)
 
 		else if (key == "UPGRADE_AUGMENT")
 		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> upgrade_augment;
+		cout << "++UPGRADE_AUGMENT is deprecated and no longers supported" << endl;
 
 		}
 
 		else if (key == "UPGRADE_BOUNDS")
 		{
-			if (value == "ROBUST")
-				convert_ip(value, upgrade_bounds);
-			else if (value == "CHEAP")
-				convert_ip(value, upgrade_bounds);
-			else
-				throw runtime_error("unrecognozed 'upgrade_bounds' option: should 'robust' or 'cheap'");
+		cout << "++UPGRADE_BOUNDS is deprecated and no longers supported" << endl;
 
 		}
 

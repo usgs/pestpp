@@ -79,7 +79,7 @@ public:
 	vector<string> get_nonregul_obs() const;
 	string get_pst_filename() { return pst_filename; }
 	void enforce_par_limits(Parameters &update_ctl_pars, const Parameters &last_ctl_pars, bool enforce_chglim=true, bool enforce_bounds=false);
-	map<string,double> get_pars_at_bounds(const Parameters &pars);
+	map<string,double> get_pars_at_near_bounds(const Parameters &pars, double tol=0.0);
 	virtual ~Pest();
 	
 private:

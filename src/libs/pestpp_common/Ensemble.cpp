@@ -894,6 +894,8 @@ void Ensemble::throw_ensemble_error(string message, vector<string> vec)
 void Ensemble::throw_ensemble_error(string message)
 {
 	string full_message = "Ensemble Error: " + message;
+	cout << endl << endl << full_message << endl << endl;
+	//cerr << endl << endl << full_message << endl << endl;
 	throw runtime_error(full_message);
 }
 
@@ -1128,6 +1130,41 @@ void Ensemble::append(string real_name, const Transformable &trans)
 		org_real_names.push_back(real_name);
 }
 
+void Ensemble::replace(int idx, const Transformable &trans, string real_name)
+{
+	stringstream ss;
+	
+	//make sure all var_names are found
+	vector<string> keys = trans.get_keys();
+	set<string> tset(keys.begin(), keys.end());
+	vector<string> missing;
+	for (auto &n : var_names)
+		if (tset.find(n) == tset.end())
+			missing.push_back(n);
+	if (missing.size() > 0)
+	{
+		ss.str("");
+		ss << "Ensemble::append() error: the following var_names not found: ";
+		for (auto &m : missing)
+			ss << m << " , ";
+		throw_ensemble_error(ss.str());
+	}
+
+	reals.row(idx) = trans.get_data_eigen_vec(var_names);
+	if (real_name.size() > 0)
+	{
+		//make sure this real_name isn't ready used
+		if (find(real_names.begin(), real_names.end(), real_name) != real_names.end())
+		{
+			ss << "Ensemble::replace() error: real_name '" << real_name << "' already in real_names";
+			throw_ensemble_error(ss.str());
+		}
+		real_names[idx] = real_name;
+		org_real_names[idx] = real_name;
+	}
+}
+
+
 void Ensemble::to_binary_old(string file_name,bool transposed)
 {
 	ofstream fout(file_name, ios::binary);
@@ -1235,6 +1272,28 @@ void Ensemble::to_binary_old(string file_name,bool transposed)
 	}
 	//save observation names (part 2 prior information)
 	fout.close();
+}
+
+void Ensemble::check_for_normal(string context)
+{
+	stringstream ss;
+	ss << "realization,variable,value" << endl;
+	bool nn_found = false;
+	for (int i = 0; i < reals.rows(); i++)
+		for (int j = 0; j < reals.cols(); j++)
+			if (!isnormal(reals(i, j)) && (reals(i, j) != 0.0))
+			{
+				ss << real_names[i] << "," << var_names[j] << "," << reals(i,j) << endl;
+				nn_found = true;
+			}
+	if (nn_found)
+	{
+		ofstream of("ensemble_not_normal.csv");
+		of << ss.str();
+		ss.str("");
+		ss << "Ensemble::check_for_normal() - " << context << " - not normal values found, see file 'ensemble_not_normal.csv'";
+		throw_ensemble_error(ss.str());
+	}
 }
 
 void Ensemble::to_binary(string file_name, bool transposed)
@@ -1776,6 +1835,7 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 
 	for (int i = 0; i < real_names.size(); i++)
 		rmap[real_names[i]] = i;
+	vector<string> nn;
 	for (auto &rname : run_real_names)
 	{
 		//idx = find(real_names.begin(), real_names.end(), rname) - real_names.begin();
@@ -1789,6 +1849,15 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 		else if (tstat == ParameterEnsemble::transStatus::NUM)
 			par_transform.numeric2model_ip(pars_real);
 		replace_fixed(rname, pars_real);
+		nn = pars_real.get_notnormal_keys();
+		if (nn.size() > 0)
+		{
+			stringstream ss;
+			ss << "ParameterEnsemble:: add_runs() error: denormal values for realization " << rname << " : ";
+			for (auto n : nn)
+				ss << n << ",";
+			throw_ensemble_error(ss.str());
+		}
 		run_id = run_mgr_ptr->add_run(pars_real);
 		real_run_ids[idx]  = run_id;
 	}

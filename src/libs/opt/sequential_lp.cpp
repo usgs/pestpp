@@ -1105,10 +1105,11 @@ void sequentialLP::calc_chance_constraint_offsets()
 
 		//create a linear object
 		Logger logger(file_mgr_ptr->get_ofstream("pfm"), false);
-		linear_analysis la(&fosm_jco, &pest_scenario, &obscov, &logger);
+		linear_analysis la(fosm_jco, pest_scenario,*file_mgr_ptr, &logger);
+		la.set_obscov(obscov);
 
 		//set the prior parameter covariance matrix
-		la.set_parcov(&parcov);
+		la.set_parcov(parcov);
 
 		//set the predictions (the constraints)
 		la.set_predictions(ctl_ord_obs_constraint_names);
