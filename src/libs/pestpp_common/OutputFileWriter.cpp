@@ -897,8 +897,8 @@ void OutputFileWriter::write_jco(bool isBaseIter, string ext, Jacobian &jco)
 		obs_names = jco.get_sim_obs_names();
 	}
 	string filename = file_manager.build_filename(ext);
-	Eigen::SparseMatrix<double>* matrix_ptr = jco.get_matrix_ptr();
-	pest_utils::save_binary(filename, obs_names, par_names, *matrix_ptr);
+	Eigen::SparseMatrix<double> matrix = jco.get_matrix(obs_names,par_names);
+	pest_utils::save_binary(filename, obs_names, par_names, matrix);
 	//int n_par = par_names.size();
 	//int n_obs_and_pi = obs_names.size();
 	//int n;

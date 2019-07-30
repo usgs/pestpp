@@ -459,7 +459,15 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	//ident.setIdentity();
 	performance_log->log_event("forming JtQJ matrix");
 	Eigen::SparseMatrix<double> JtQJ = jac.transpose() * q_mat * jac;
-
+	/*cout << "JTQJ" << endl;
+	cout << JtQJ.toDense() << endl;
+	cout << endl;
+	cout << "Q" << endl;
+	cout << q_mat.toDense() << endl;
+	cout << endl;
+	cout << "jac" << endl;
+	cout << jac.toDense() << endl;
+	cout << endl;*/
 	Eigen::VectorXd upgrade_vec;
 	if (marquardt_type == MarquardtMatrix::JTQJ)
 	{
@@ -511,6 +519,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		performance_log->log_event(info_str.str());
 		
 		upgrade_vec = S * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * ((jac * S).transpose()* (q_mat  * (corrected_residuals))))));
+		
 	}
 	else if (marquardt_type == MarquardtMatrix::IDENT)
 	{
@@ -835,8 +844,7 @@ void SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContro
 	performance_log->log_event("processing jacobian runs complete");
 
 	performance_log->log_event("saving jacobian and sen files");
-	// save jacobian
-	//jacobian.save("jcb");
+	
 	output_file_writer.write_jco(true,"jcb", jacobian);
 
 	//Update parameters and observations for base run
