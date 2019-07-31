@@ -31,6 +31,7 @@ install:
   - conda update --all
   - conda config --set show_channel_urls yes
   - conda config --prepend channels conda-forge
+  - conda activate base
   - conda info -a
 
   - conda install --yes python=%PYTHON_VERSION% pip numpy scipy pandas nose matplotlib
