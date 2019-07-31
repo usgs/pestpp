@@ -32,7 +32,7 @@ install:
   - conda update --all
   - conda config --set show_channel_urls yes
   - conda config --prepend channels conda-forge
-  - CALL conda.bat activate
+  - call %CONDA_INSTALL_LOCN%\scripts\activate
   - conda info -a
 
   - conda install --yes python=%PYTHON_VERSION% pip numpy scipy pandas nose matplotlib
