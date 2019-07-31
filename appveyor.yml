@@ -26,12 +26,13 @@ install:
   - set PATH=%CONDA_INSTALL_LOCN%;%CONDA_INSTALL_LOCN%\scripts;%PATH%;
   - set PYTHONUNBUFFERED=1
   # for msinttypes and newer stuff
+
   - conda config --set always_yes true
   - conda update conda
   - conda update --all
   - conda config --set show_channel_urls yes
   - conda config --prepend channels conda-forge
-  - conda activate
+  - CALL conda.bat activate
   - conda info -a
 
   - conda install --yes python=%PYTHON_VERSION% pip numpy scipy pandas nose matplotlib
