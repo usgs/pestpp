@@ -238,14 +238,36 @@ def tie_by_group_test():
     tied_names = pst.adj_par_names[:3]
     par.loc[tied_names[1:3],"partrans"] = "tied"
     par.loc[tied_names[1:3],"partied"] = tied_names[0]
+    par.loc[tied_names[1:3],"parubnd"] = par.loc[tied_names[1:3],"parval1"] * 1.0001
+    par.loc[tied_names[1:3],"parlbnd"] = par.loc[tied_names[1:3],"parval1"] * 0.9999
     pst.pestpp_options = {}
     pst.pestpp_options["ies_num_reals"] = 10
     pst.pestpp_options["ies_lambda_mults"] = 1.0
     pst.pestpp_options["lambda_scale_fac"] = 1.0
     pst.pestpp_options["tie_by_group"] = True
-    pst.control_data.noptmax = 2
+    pst.control_data.noptmax = 1
+
     pst.write(os.path.join(t_d,"pest_tied.pst"))
-    
+    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-glm"), "pest_tied.pst", 5, master_dir=m_d,
+                           slave_root=model_d,local=local,port=port)
+    jco = pyemu.Jco.from_binary(os.path.join(m_d,"pest_tied.jcb"))
+    assert jco.shape[1] == 2,jco.shape
+    par_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_tied.par"))
+    print(par_df)
+    too_low = par.loc[par_df.parval1 < par.parlbnd,"parnme"]
+    assert too_low.shape[0] == 0,too_low
+    too_high = par.loc[par_df.parval1 > par.parubnd, "parnme"]
+    assert too_high.shape[0] == 0, too_high
+
+    par.loc[tied_names[1:3], "parubnd"] = par.loc[tied_names[1:3], "parval1"] * 1.5
+    par.loc[tied_names[1:3], "parlbnd"] = par.loc[tied_names[1:3], "parval1"] * 0.5
+    pst.pestpp_options["ies_num_reals"] = 10
+    pst.pestpp_options["ies_lambda_mults"] = 1.0
+    pst.pestpp_options["lambda_scale_fac"] = 1.0
+    pst.pestpp_options["tie_by_group"] = True
+    pst.control_data.noptmax = 3
+    pst.write(os.path.join(t_d, "pest_tied.pst"))
+
     pyemu.os_utils.start_slaves(t_d, exe_path, "pest_tied.pst", 10, master_dir=m_d,
                            slave_root=model_d,local=local,port=port)
     df = pd.read_csv(os.path.join(m_d,"pest_tied.{0}.par.csv".format(pst.control_data.noptmax)),index_col=0)
@@ -481,11 +503,11 @@ def secondary_marker_test():
 if __name__ == "__main__":
     #glm_long_name_test()
     #sen_plusplus_test()
-    parchglim_test()
+    #parchglim_test()
     #unc_file_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
-    #tie_by_group_test()
+    tie_by_group_test()

@@ -36,7 +36,8 @@ public:
 	static std::map<std::string, std::string>  process_gsa_file(std::ifstream &fin, FileManager &file_manager);
 	std::vector<double> calc_interval_midpoints(int n_interval, double min, double max);
 	double ltqnorm(double p);
-	static void set_seed(unsigned int _seed) { rand_engine.seed(_seed); }
+	void set_seed(unsigned int _seed) { seed = _seed;  rand_engine.seed(_seed); }
+	unsigned int get_seed() { return seed; }
 	virtual ~GsaAbstractBase(void);
 
 protected:

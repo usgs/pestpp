@@ -379,19 +379,20 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	vector<string> pestpp_input;
 	regul_scheme_ptr = new DynamicRegularization(use_dynamic_reg);
 
+	//dont change these text names - they are used in ParamTransformSeq
 	TranTied *t_tied = new TranTied("PEST to model tied transformation");
 	TranOffset *t_offset = new TranOffset("PEST to model offset transformation");
 	TranScale *t_scale = new TranScale("PEST to model scale transformation");
 	TranLog10 *t_log = new TranLog10("PEST to model log transformation");
 	TranFixed *t_fixed = new TranFixed("PEST to model fixed transformation");
-	TranNormalize *t_auto_norm = new TranNormalize("PEST auto-normalization transformation");
+	//TranNormalize *t_auto_norm = new TranNormalize("PEST auto-normalization transformation");
 
 	base_par_transform.push_back_ctl2model(t_scale);
 	base_par_transform.push_back_ctl2model(t_offset);
 	base_par_transform.push_back_ctl2active_ctl(t_tied);
 	base_par_transform.push_back_ctl2active_ctl(t_fixed);
 	base_par_transform.push_back_active_ctl2numeric(t_log);
-	base_par_transform.push_back_active_ctl2numeric(t_auto_norm);
+	
 
 	set<string> tied_names;
 	pst_filename = _pst_filename;
@@ -970,7 +971,7 @@ const vector<string> &Pest::get_outfile_vec()
 	return model_exec_info.outfile_vec;
 }
 
-void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &last_ctl_pars, bool enforce_chglim, bool enforce_bounds)
+void Pest::enforce_par_limits(Parameters & upgrade_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim, bool enforce_bounds)
 {
 	if ((!enforce_chglim) && (!enforce_bounds))
 		return;
@@ -987,7 +988,8 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 	string controlling_par = "";
 	ParameterInfo &p_info = ctl_parameter_info;
 	const ParameterRec *p_rec;
-
+	Parameters upgrade_ctl_pars = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
+	Parameters last_ctl_pars = base_par_transform.active_ctl2ctl_cp(last_active_ctl_pars);
 	for (auto p : upgrade_ctl_pars)
 	{
 		last_val = last_ctl_pars.get_rec(p.first);
@@ -1138,10 +1140,7 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 					controlling_par = p.first;
 				}
 			}
-
-		}
-		
-
+		}	
 	}
 
 	if (scaling_factor == 0.0)
@@ -1151,20 +1150,62 @@ void Pest::enforce_par_limits(Parameters & upgrade_ctl_pars, const Parameters &l
 
 	if (scaling_factor != 1.0)
 	{
-		for (auto &p : upgrade_ctl_pars)
+		for (auto &p : upgrade_active_ctl_pars)
 		{
 			
 			last_val = last_ctl_pars.get_rec(p.first);
 			p.second =last_val + (p.second - last_val) *  scaling_factor;
 		}
 	}
+}
 
-
-
-			
-
-
-	
+pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(const vector<string>& keys)
+{
+	Parameters lbnd = ctl_parameter_info.get_low_bnd(keys);
+	Parameters ubnd = ctl_parameter_info.get_up_bnd(keys);
+	if (base_par_transform.get_tied_ptr()->get_items().size() == 0)
+		return pair<Parameters,Parameters>(lbnd,ubnd);
+	auto tt_items = base_par_transform.get_tied_ptr()->get_items();
+	double ref_bnd, tie_bnd, tie_ratio,dist_ratio,new_bnd;
+	double tie_val, ref_val;
+	for (auto &tt_item : tt_items)
+	{
+		ref_val = ctl_parameters.get_rec(tt_item.second.first);
+		tie_val = ctl_parameters.get_rec(tt_item.first);
+		
+		//lower bound
+		ref_bnd = ref_val - ctl_parameter_info.get_parameter_rec_ptr(tt_item.second.first)->lbnd;
+		tie_bnd = tie_val - ctl_parameter_info.get_parameter_rec_ptr(tt_item.first)->lbnd;
+		tie_ratio = tt_item.second.second;
+		if ((ref_bnd == 0) || (tie_bnd == 0))
+			new_bnd = ref_val;
+		else
+		{
+			dist_ratio = tie_bnd / ref_bnd;
+			new_bnd = ref_val - (dist_ratio * ref_bnd);
+		}
+		if (new_bnd > lbnd.get_rec(tt_item.second.first))
+		{
+			lbnd.update_rec(tt_item.second.first, new_bnd);
+		}
+		
+		//upper bound
+		ref_bnd = ctl_parameter_info.get_parameter_rec_ptr(tt_item.second.first)->ubnd - ref_val;
+		tie_bnd = ctl_parameter_info.get_parameter_rec_ptr(tt_item.first)->ubnd - tie_val;
+		tie_ratio = tt_item.second.second;
+		if ((ref_bnd == 0) || (tie_bnd == 0))
+			new_bnd = ref_val;
+		else
+		{
+			dist_ratio = tie_bnd / ref_bnd;
+			new_bnd = ref_val + (dist_ratio * ref_bnd);
+		}
+		if (new_bnd < ubnd.get_rec(tt_item.second.first))
+		{
+			ubnd.update_rec(tt_item.second.first, new_bnd);
+		}
+	}
+	return pair<Parameters,Parameters>(lbnd,ubnd);
 }
 
 map<string, double> Pest::get_pars_at_near_bounds(const Parameters & pars, double tol)

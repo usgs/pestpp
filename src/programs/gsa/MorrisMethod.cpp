@@ -284,7 +284,7 @@ void MorrisMethod::assemble_runs(RunManagerAbstract &run_manager)
 void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run)
 {
 	ofstream &fout_morris = file_manager_ptr->open_ofile_ext("msn");
-	ofstream &fout_raw = file_manager_ptr->open_ofile_ext("raw");
+	ofstream &fout_raw = file_manager_ptr->open_ofile_ext("raw.csv");
 
 	ModelRun run0 = model_run;
 	ModelRun run1 = model_run;

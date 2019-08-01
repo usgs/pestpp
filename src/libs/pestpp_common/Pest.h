@@ -78,8 +78,10 @@ public:
 	const ParetoInfo &get_pareto_info() const { return pareto_info; }
 	vector<string> get_nonregul_obs() const;
 	string get_pst_filename() { return pst_filename; }
-	void enforce_par_limits(Parameters &update_ctl_pars, const Parameters &last_ctl_pars, bool enforce_chglim=true, bool enforce_bounds=false);
+	void enforce_par_limits(Parameters &update_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim=true, bool enforce_bounds=false);
 	map<string,double> get_pars_at_near_bounds(const Parameters &pars, double tol=0.0);
+	pair<Parameters,Parameters> get_effective_ctl_lower_upper_bnd(const vector<string> &keys);
+	
 	virtual ~Pest();
 	
 private:
