@@ -1159,8 +1159,9 @@ void Pest::enforce_par_limits(Parameters & upgrade_active_ctl_pars, const Parame
 	}
 }
 
-pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(const vector<string>& keys)
+pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &pars)
 {
+	vector<string> keys = pars.get_keys();
 	Parameters lbnd = ctl_parameter_info.get_low_bnd(keys);
 	Parameters ubnd = ctl_parameter_info.get_up_bnd(keys);
 	if (base_par_transform.get_tied_ptr()->get_items().size() == 0)
@@ -1170,8 +1171,8 @@ pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(const vector
 	double tie_val, ref_val;
 	for (auto &tt_item : tt_items)
 	{
-		ref_val = ctl_parameters.get_rec(tt_item.second.first);
-		tie_val = ctl_parameters.get_rec(tt_item.first);
+		ref_val = pars.get_rec(tt_item.second.first);
+		tie_val = pars.get_rec(tt_item.first);
 		
 		//lower bound
 		ref_bnd = ref_val - ctl_parameter_info.get_parameter_rec_ptr(tt_item.second.first)->lbnd;

@@ -41,7 +41,7 @@ GsaAbstractBase::GsaAbstractBase(Pest &_pest_scenario,
 		max_numeric_pars[p_name] = p_info->ubnd;
 		min_numeric_pars[p_name] = p_info->lbnd;
 	}*/
-	pair<Parameters,Parameters> ppair = _pest_scenario.get_effective_ctl_lower_upper_bnd(inti_pars.get_keys());
+	pair<Parameters,Parameters> ppair = _pest_scenario.get_effective_ctl_lower_upper_bnd(inti_pars);
 	max_numeric_pars = ppair.second;
 	min_numeric_pars = ppair.first;
 
