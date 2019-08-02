@@ -876,7 +876,7 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 		}
 
 		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
-
+		
 		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
 		{
 			int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
@@ -896,7 +896,7 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 				pe.keep_rows(keep_names);
 			}
 		}
-
+		
 
 		if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior())
 		{
@@ -918,6 +918,13 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 					parcov.to_ascii(filename);
 				}
 			}
+		}
+		if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
+		{
+			if (pest_scenario.get_pestpp_options().get_ies_obs_restart_csv().size() > 0)
+				message(1, "Warning: even though ies_enforce_bounds is true, a restart obs en was passed, so bounds will not be enforced on the initial par en");
+			else
+				pe.enforce_limits(pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
 		}
 
 	}
