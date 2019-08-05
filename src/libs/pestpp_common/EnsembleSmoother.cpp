@@ -3162,15 +3162,23 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 	unordered_map<string, double> parcov_inv_map;
 	parcov_inv_map.reserve(pe_upgrade.shape().second);
 	Eigen::VectorXd parcov_inv;// = parcov.get(par_names).inv().e_ptr()->toDense().cwiseSqrt().asDiagonal();
-	if (parcov.isdiagonal())
-		parcov_inv = parcov.inv().get_matrix().diagonal().cwiseSqrt();
+	if (!parcov.isdiagonal())
+	{
+		//parcov_inv = parcov.inv().get_matrix().diagonal().cwiseSqrt();
+		parcov_inv = parcov.get_matrix().diagonal();
+		
+	}
 	else
 	{
 		message(2, "extracting diagonal from prior parameter covariance matrix");
 		Covariance parcov_diag;
 		parcov_diag.from_diagonal(parcov);
-		parcov_inv = parcov_diag.inv().get_matrix().diagonal().cwiseSqrt();
+		//parcov_inv = parcov_diag.inv().get_matrix().diagonal().cwiseSqrt();
+		parcov_inv = parcov_diag.get_matrix().diagonal();
+		
 	}
+	parcov_inv = parcov_inv.cwiseSqrt().inverse();
+
 	vector<string> par_names = pe_upgrade.get_var_names();
 	for (int i = 0; i < parcov_inv.size(); i++)
 		parcov_inv_map[par_names[i]] = parcov_inv[i];
