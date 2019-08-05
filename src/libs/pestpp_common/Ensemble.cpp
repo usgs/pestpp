@@ -2073,24 +2073,25 @@ void ParameterEnsemble::enforce_limits(bool enforce_chglim)
 	{
 		double l, u, v;
 		Parameters real = pest_scenario_ptr->get_ctl_parameters();//.get_subset(var_names.begin(), var_names.end());
+		//pest_scenario_ptr->get_base_par_tran_seq().ctl2numeric_ip(real);
 		pair<Parameters, Parameters> ppar;
 		ppar = pest_scenario_ptr->get_effective_ctl_lower_upper_bnd(real);
 		for (int i = 0; i < reals.rows(); i++)
 		{
 			real.update_without_clear(var_names,reals.row(i));
-			//pest_scenario_ptr->get_base_par_tran_seq().numeric2ctl_ip(real);
+			Parameters real_ctl = pest_scenario_ptr->get_base_par_tran_seq().numeric2ctl_cp(real);
 			
 			cout << "";
 			for (auto n : var_names)
 			{
-				v = real[n];
+				v = real_ctl[n];
 				l = ppar.first[n];
 				u = ppar.second[n];
 				v = v < l ? l : v;
 				v = v > u ? u : v;
-				real.update_rec(n, v);
+				real_ctl.update_rec(n, v);
 			}
-			reals.row(i) = pest_scenario_ptr->get_base_par_tran_seq().ctl2numeric_cp(real).get_data_eigen_vec(var_names);
+			reals.row(i) = pest_scenario_ptr->get_base_par_tran_seq().ctl2numeric_cp(real_ctl).get_data_eigen_vec(var_names);
 		}
 
 		//this works except maybe not when tied pars are present
