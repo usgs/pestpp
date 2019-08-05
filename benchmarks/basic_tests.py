@@ -246,9 +246,26 @@ def tie_by_group_test():
     pst.pestpp_options["ies_lambda_mults"] = 1.0
     pst.pestpp_options["lambda_scale_fac"] = 1.0
     pst.pestpp_options["tie_by_group"] = True
+    pst.pestpp_options["ies_include_base"] = False
     pst.control_data.noptmax = 1
 
+
     pst.write(os.path.join(t_d,"pest_tied.pst"))
+    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-sen"), "pest_tied.pst", 5, master_dir=m_d,
+                           slave_root=model_d,local=local,port=port)
+    df = pd.read_csv(os.path.join(m_d,"pest_tied.sen.par.csv"),index_col=0)
+    df.columns = df.columns.str.lower()
+    print(df.loc[:,tied_names[1:3]])
+    print(df.loc[:,tied_names[1:3]].std(axis=1))
+    print(df.loc[:,tied_names[1:3]].std(axis=1).apply(np.abs).max())
+    assert df.loc[:,tied_names[1:3]].std(axis=1).apply(np.abs).max() < 1.0e-8
+    for real in df.index:
+        too_low = df.loc[real,df.loc[real,par.parnme] < par.parlbnd]
+        assert too_low.shape[0] == 0, "sen,{0},{1},{2}".format(nopt,real,too_low)
+        too_high = df.loc[real, df.loc[real, par.parnme] > par.parubnd]
+        assert too_high.shape[0] == 0, "sen,{0},{1},{2}".format(nopt,real,too_high)
+    
+    #pst.write(os.path.join(t_d,"pest_tied.pst"))
     pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-glm"), "pest_tied.pst", 5, master_dir=m_d,
                            slave_root=model_d,local=local,port=port)
     jco = pyemu.Jco.from_binary(os.path.join(m_d,"pest_tied.jcb"))
@@ -261,23 +278,28 @@ def tie_by_group_test():
     assert too_high.shape[0] == 0, too_high
 
     
-    pst.control_data.noptmax = 3
+    pst.control_data.noptmax = 1
     pst.write(os.path.join(t_d, "pest_tied.pst"))
 
     pyemu.os_utils.start_slaves(t_d, exe_path, "pest_tied.pst", 10, master_dir=m_d,
                            slave_root=model_d,local=local,port=port)
-    df = pd.read_csv(os.path.join(m_d,"pest_tied.{0}.par.csv".format(pst.control_data.noptmax)),index_col=0)
-    df.columns = df.columns.str.lower()
-    print(df.loc[:,tied_names].std(axis=1).apply(np.abs).max())
-    #assert df.loc[:,tied_names].std(axis=1).apply(np.abs).max() < 1.0e-8
-    for real in df.index:
-        too_low = df.loc[real,df.loc[real,par.parnme] < par.parlbnd]
-        assert too_low.shape[0] == 0, "{0},{1}".format(real,too_low)
-        too_high = df.loc[real, df.loc[real, par.parnme] > par.parubnd]
-        assert too_high.shape[0] == 0, "{0},{1}".format(real,too_high)
+    
+    for nopt in range(pst.control_data.noptmax+1):
+        df = pd.read_csv(os.path.join(m_d,"pest_tied.{0}.par.csv".format(nopt)),index_col=0)
+        df.columns = df.columns.str.lower()
+        print(df.loc[:,tied_names[1:3]])
+        print(df.loc[:,tied_names[1:3]].std(axis=1))
+        print(df.loc[:,tied_names[1:3]].std(axis=1).apply(np.abs).max())
+        assert df.loc[:,tied_names[1:3]].std(axis=1).apply(np.abs).max() < 1.0e-8
+        for real in df.index:
+            too_low = df.loc[real,df.loc[real,par.parnme] < par.parlbnd]
+            assert too_low.shape[0] == 0, "ies,{0},{1},{2}".format(nopt,real,too_low)
+            too_high = df.loc[real, df.loc[real, par.parnme] > par.parubnd]
+            assert too_high.shape[0] == 0, "ies,{0},{1},{2}".format(nopt,real,too_high)
 
 
-    par.loc[tied_names[1:3],"parval1"] = tied_names[0]
+    par.loc[tied_names[1:3],"parval1"] = par.loc[tied_names[0],"parval1"]
+    print(par.parval1)
     par.loc[tied_names[1:3], "parubnd"] = par.loc[tied_names[1:3], "parval1"] * 1.5
     par.loc[tied_names[1:3], "parlbnd"] = par.loc[tied_names[1:3], "parval1"] * 0.5
     pst.pestpp_options["ies_num_reals"] = 10
@@ -294,11 +316,11 @@ def tie_by_group_test():
     print(df.loc[:, tied_names].std(axis=1).apply(np.abs).max())
     assert df.loc[:, tied_names].std(axis=1).apply(np.abs).max() < 1.0e-8
     for real in df.index:
-        too_low = df.loc[real, df.loc[real, par.parnme] < par.parlbnd]
-        assert too_low.shape[0] == 0, too_low
+        too_low = df.loc[real,df.loc[real,par.parnme] < par.parlbnd]
+        assert too_low.shape[0] == 0, "ies,{0},{1},{2}".format(nopt,real,too_low)
         too_high = df.loc[real, df.loc[real, par.parnme] > par.parubnd]
-        assert too_high.shape[0] == 0, too_high
-
+        assert too_high.shape[0] == 0, "ies,{0},{1},{2}".format(nopt,real,too_high)
+    
     df.to_csv(os.path.join(t_d,"sweep_in.csv"))
     pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-swp"), "pest_tied.pst", 5, master_dir=m_d,
                            slave_root=model_d,local=local,port=port)

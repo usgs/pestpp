@@ -1023,7 +1023,6 @@ void Pest::enforce_par_limits(Parameters & upgrade_active_ctl_pars, const Parame
 		{
 			fac_lb = last_val / fpm;
 			fac_ub = last_val * fpm;
-			
 		}
 	
 		else
@@ -1178,7 +1177,7 @@ pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &
 		ref_bnd = ref_val - ctl_parameter_info.get_parameter_rec_ptr(tt_item.second.first)->lbnd;
 		tie_bnd = tie_val - ctl_parameter_info.get_parameter_rec_ptr(tt_item.first)->lbnd;
 		tie_ratio = tt_item.second.second;
-		if ((ref_bnd == 0) || (tie_bnd == 0))
+		if ((ref_bnd <= 0) || (tie_bnd <= 0))
 			new_bnd = ref_val;
 		else
 		{
@@ -1194,7 +1193,7 @@ pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &
 		ref_bnd = ctl_parameter_info.get_parameter_rec_ptr(tt_item.second.first)->ubnd - ref_val;
 		tie_bnd = ctl_parameter_info.get_parameter_rec_ptr(tt_item.first)->ubnd - tie_val;
 		tie_ratio = tt_item.second.second;
-		if ((ref_bnd == 0) || (tie_bnd == 0))
+		if ((ref_bnd <= 0) || (tie_bnd <= 0))
 			new_bnd = ref_val;
 		else
 		{

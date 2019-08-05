@@ -41,6 +41,7 @@ public:
 	virtual ~GsaAbstractBase(void);
 
 protected:
+	Pest* pest_scenario_ptr;
 	PARAM_DIST par_dist;
 	std::vector<std::string> adj_par_name_vec;
 	std::vector<std::string> obs_name_vec;

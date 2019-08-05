@@ -2072,12 +2072,14 @@ void ParameterEnsemble::enforce_limits(bool enforce_chglim)
 	else
 	{
 		double l, u, v;
+		Parameters real = pest_scenario_ptr->get_ctl_parameters();//.get_subset(var_names.begin(), var_names.end());
 		pair<Parameters, Parameters> ppar;
+		ppar = pest_scenario_ptr->get_effective_ctl_lower_upper_bnd(real);
 		for (int i = 0; i < reals.rows(); i++)
 		{
-			Parameters real(var_names,reals.row(i));
-			pest_scenario_ptr->get_base_par_tran_seq().numeric2ctl_ip(real);
-			ppar = pest_scenario_ptr->get_effective_ctl_lower_upper_bnd(real);
+			real.update_without_clear(var_names,reals.row(i));
+			//pest_scenario_ptr->get_base_par_tran_seq().numeric2ctl_ip(real);
+			
 			cout << "";
 			for (auto n : var_names)
 			{

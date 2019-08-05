@@ -27,7 +27,7 @@ GsaAbstractBase::GsaAbstractBase(Pest &_pest_scenario,
 	//copy transformations and delete all active_ctl to numeric transformation except the log trans
 	ofstream &frec = file_manager_ptr->rec_ofstream();
 
-	
+	pest_scenario_ptr = &_pest_scenario;
 
 	gsa_parm_tran_seq.deep_copy(_par_transform);
 	gsa_parm_tran_seq.clear_tranSeq_active_ctl2numeric();
