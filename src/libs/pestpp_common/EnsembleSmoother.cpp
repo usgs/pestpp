@@ -3177,7 +3177,7 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 		parcov_inv = parcov_diag.get_matrix().diagonal();
 		
 	}
-	parcov_inv = parcov_inv.cwiseSqrt().inverse();
+	parcov_inv = parcov_inv.cwiseSqrt().cwiseInverse();
 
 	vector<string> par_names = pe_upgrade.get_var_names();
 	for (int i = 0; i < parcov_inv.size(); i++)

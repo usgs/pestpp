@@ -42,7 +42,7 @@ else:
 
 noptmax = 4
 num_reals = 20
-port = 4020
+port = 4021
 
 def basic_test(model_d="ies_10par_xsec"):
     pyemu.Ensemble.reseed()
