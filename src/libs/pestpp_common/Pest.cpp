@@ -804,7 +804,8 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	pestpp_options.set_sweep_forgive(false);
 	pestpp_options.set_sweep_chunk(500);
 	pestpp_options.set_tie_by_group(false);
-
+	pestpp_options.set_enforce_tied_bounds(false);
+	
 	pestpp_options.set_jac_scale(true);
 	pestpp_options.set_opt_obj_func("");
 	pestpp_options.set_opt_coin_log(true);
@@ -988,8 +989,20 @@ void Pest::enforce_par_limits(Parameters & upgrade_active_ctl_pars, const Parame
 	string controlling_par = "";
 	ParameterInfo &p_info = ctl_parameter_info;
 	const ParameterRec *p_rec;
-	Parameters upgrade_ctl_pars = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
-	Parameters last_ctl_pars = base_par_transform.active_ctl2ctl_cp(last_active_ctl_pars);
+	Parameters upgrade_ctl_pars;
+	Parameters last_ctl_pars;
+
+	if (pestpp_options.get_enforce_tied_bounds())
+	{
+		upgrade_ctl_pars = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
+		last_ctl_pars = base_par_transform.active_ctl2ctl_cp(last_active_ctl_pars);
+	}
+	else
+	{
+		upgrade_ctl_pars = upgrade_active_ctl_pars;
+		last_ctl_pars = last_active_ctl_pars;
+
+	}
 	for (auto p : upgrade_ctl_pars)
 	{
 		last_val = last_ctl_pars.get_rec(p.first);
