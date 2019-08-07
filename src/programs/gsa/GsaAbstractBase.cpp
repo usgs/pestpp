@@ -1,5 +1,6 @@
 #include <iostream>
 #include <list>
+#include <iomanip>
 #include "GsaAbstractBase.h"
 #include "utilities.h"
 #include "FileManager.h"
@@ -24,18 +25,42 @@ GsaAbstractBase::GsaAbstractBase(Pest &_pest_scenario,
 //	}
 
 	//copy transformations and delete all active_ctl to numeric transformation except the log trans
+	ofstream &frec = file_manager_ptr->rec_ofstream();
+
+	pest_scenario_ptr = &_pest_scenario;
+
 	gsa_parm_tran_seq.deep_copy(_par_transform);
 	gsa_parm_tran_seq.clear_tranSeq_active_ctl2numeric();
 	gsa_parm_tran_seq.push_back_active_ctl2numeric(_par_transform.get_log10_ptr()->clone());
 	base_partran_seq_ptr = &gsa_parm_tran_seq;
 	Parameters inti_pars = _pest_scenario.get_ctl_parameters();
-	for (const auto &i : inti_pars)
+	if (_pest_scenario.get_pestpp_options().get_enforce_tied_bounds())
 	{
-		const string &p_name = i.first;
-		const ParameterRec *p_info = _pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(p_name);
-		max_numeric_pars[p_name] = p_info->ubnd;
-		min_numeric_pars[p_name] = p_info->lbnd;
+		pair<Parameters, Parameters> ppair = _pest_scenario.get_effective_ctl_lower_upper_bnd(inti_pars);
+		max_numeric_pars = ppair.second;
+		min_numeric_pars = ppair.first;
+
+
+		frec << endl << "  effective parameter bounds (accounting for tied parameters)" << endl;
+		frec << setw(50) << left << "parnme" << setw(25) << "initial value" << setw(25) << "control file lower bound" << setw(25) << "effective lower bound" << setw(25) << "control file upper bound" << setw(25) << "effective upper bound" << endl;
+		ParameterInfo pi = _pest_scenario.get_ctl_parameter_info();
+		for (auto &p : _pest_scenario.get_ctl_ordered_par_names())
+			frec << setw(50) << left << setprecision(7) << scientific << p << setw(25) << inti_pars.get_rec(p) << setw(25) << pi.get_parameter_rec_ptr(p)->lbnd << setw(25) << min_numeric_pars.get_rec(p) << setw(25) << pi.get_parameter_rec_ptr(p)->ubnd << setw(25) << max_numeric_pars.get_rec(p) << setw(25) << "" << endl;
+
+	
 	}
+	else
+	{
+		for (const auto &i : inti_pars)
+		{
+			const string &p_name = i.first;
+			const ParameterRec *p_info = _pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(p_name);
+			max_numeric_pars[p_name] = p_info->ubnd;
+			min_numeric_pars[p_name] = p_info->lbnd;
+		}
+	}
+
+	
 	base_partran_seq_ptr->ctl2numeric_ip(max_numeric_pars);
 	base_partran_seq_ptr->ctl2numeric_ip(min_numeric_pars);
 	for (const auto i : _pest_scenario.get_ctl_ordered_adj_par_names())
@@ -44,7 +69,7 @@ GsaAbstractBase::GsaAbstractBase(Pest &_pest_scenario,
 		{
 			adj_par_name_vec.push_back(i);
 		}
-	}
+	}	
 }
 
 

@@ -404,7 +404,10 @@ void PestppOptions::parce_line(const string &line)
 			convert_ip(value, max_n_super);
 
 		}
-		else if (key=="SUPER_EIGTHRESH"){
+		else if ((key=="SUPER_EIGTHRESH") || (key=="SUPER_EIGTHRES"))
+		{
+			passed_args.insert("SUPER_EIGTHRESH");
+			passed_args.insert("SUPER_EIGTHRES");
 			convert_ip(value, super_eigthres);
 		}
 		else if (key=="N_ITER_BASE"){
@@ -589,13 +592,24 @@ void PestppOptions::parce_line(const string &line)
 
 		else if (key == "UPGRADE_AUGMENT")
 		{
-		cout << "++UPGRADE_AUGMENT is deprecated and no longers supported" << endl;
+		cout << "++UPGRADE_AUGMENT is deprecated and no longer supported...ignoring" << endl;
 
 		}
 
 		else if (key == "UPGRADE_BOUNDS")
 		{
-		cout << "++UPGRADE_BOUNDS is deprecated and no longers supported" << endl;
+		cout << "++UPGRADE_BOUNDS is deprecated and no longer supported...ignoring" << endl;
+
+		}
+
+		else if (key == "AUTO_NORM")
+		{
+			cout << "++AUTO_NORM is deprecated and no longer supported...ignoring" << endl;
+
+		}
+		else if (key == "MAT_INV")
+		{
+			cout << "++MAT_INV is deprecated (JtQJ only) and no longer supported...ignoring" << endl;
 
 		}
 
@@ -1004,7 +1018,16 @@ void PestppOptions::parce_line(const string &line)
 			convert_ip(value, gsa_sobol_par_dist);
 		}
 
-
+		else if (key == "GSA_SOBOL_PAR_DIST")
+		{
+			convert_ip(value, gsa_sobol_par_dist);
+		}
+		else if (key == "ENFORCE_TIED_BOUNDS")
+		{
+			transform(value.begin(), value.end(), value.begin(), ::tolower);
+			istringstream is(value);
+			is >> boolalpha >> enforce_tied_bounds;
+		 }
 		else {
 
 			throw PestParsingError(line, "Invalid key word \"" + key +"\"");

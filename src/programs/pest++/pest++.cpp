@@ -868,11 +868,20 @@ int main(int argc, char* argv[])
 				double ival, fval;
 				for (auto &pred_name : pred_names)
 				{
-					int idx = distance(run_manager_ptr->get_obs_name_vec().begin(),find(run_manager_ptr->get_obs_name_vec().begin(),
-						run_manager_ptr->get_obs_name_vec().end(), pred_name));
-					ival = run_manager_ptr->get_init_sim()[idx];
-					//ival = pest_scenario.get_ctl_observations().get_rec(pred_name);
 					fval = optimum_run.get_obs().get_rec(pred_name);
+					if (run_manager_ptr->get_init_sim().size() > 0)
+					{
+						int idx = distance(run_manager_ptr->get_obs_name_vec().begin(), find(run_manager_ptr->get_obs_name_vec().begin(),
+							run_manager_ptr->get_obs_name_vec().end(), pred_name));
+						ival = run_manager_ptr->get_init_sim()[idx];
+					}
+					else
+					{
+						cout << "WARNING: initial simulation results not available, falling back to optimum run outputs for prior forecast mean" << endl;
+						fout_rec << "WARNING: initial simulation results not available, falling back to optimum run outputs for prior forecast mean" << endl;
+						ival = fval;
+					}
+					
 					init_final_pred_values[pred_name] = pair<double, double>(ival, fval);
 				}
 				string predsum_filename = file_manager.get_base_filename() + ".pred.usum.csv";

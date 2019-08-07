@@ -1420,6 +1420,35 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 				new_freeze_active_ctl_pars.insert(*name_ptr, p_org);
 		}
 	}
+	if (pest_scenario.get_pestpp_options().get_enforce_tied_bounds())
+	{
+		ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
+
+		TranTied* tt = par_transform.get_tied_ptr();
+		Parameters current_ctl_pars = current_active_ctl_pars;
+		tt->reverse(current_ctl_pars);
+		Parameters upgrade_ctl_pars = upgrade_active_ctl_pars;
+		tt->reverse(upgrade_ctl_pars);
+		auto items = tt->get_items();
+		pair<string, double> tt_item;
+		for (auto ipar : upgrade_ctl_pars)
+		{
+			if (items.find(ipar.first) == items.end())
+				continue;
+
+			tt_item = items.at(ipar.first);
+
+			p_new = ipar.second;
+			p_org = current_ctl_pars.get_rec(ipar.first);
+			upper_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(ipar.first)->ubnd;
+			lower_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(ipar.first)->lbnd;
+			bool par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
+			if (par_going_out)
+			{
+				new_freeze_active_ctl_pars.insert(tt_item.first, current_ctl_pars.get_rec(tt_item.first));
+			}
+		}
+	}
 	return num_upgrade_out_grad_in;
 }
 

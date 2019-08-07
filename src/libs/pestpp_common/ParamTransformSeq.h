@@ -95,6 +95,8 @@ public:
 	const TranLog10 *get_log10_ptr() const;
 	TranSVD *get_svda_ptr()const;
 	TranFixed *get_svda_fixed_ptr()const;
+	TranTied *get_tied_ptr()const;
+
 	const vector<Transformation*> get_ctl2model_tranformations() const {return tranSeq_ctl2model;}
 	const vector<Transformation*> get_ctl2active_ctl_tranformations() const {return tranSeq_ctl2active_ctl;}
 	const vector<Transformation*> get_active_ctl2numeric_tranformations() const {return tranSeq_active_ctl2numeric;}

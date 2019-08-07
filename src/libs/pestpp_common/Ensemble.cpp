@@ -1776,6 +1776,8 @@ void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, Per
 		reorder(vector<string>(), pest_scenario_ptr->get_ctl_ordered_adj_par_names());
 	}
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_enforce_bounds())
+		//dont enforce parchglim-style here - if a pars initial value is near its bound, lots of realizations 
+		//will be near zero length.  
 		enforce_limits(false);
 
 
@@ -2046,12 +2048,13 @@ void ParameterEnsemble::save_fixed()
 
 void ParameterEnsemble::enforce_limits(bool enforce_chglim)
 {
-	//reset parameters to be inbounds - very crude
+	
 	if (tstat != ParameterEnsemble::transStatus::NUM)
 	{
 		throw_ensemble_error("pe.enforce_bounds() tstat != NUM not implemented");
 
 	}
+	//fancy vector shrinking style enforcement
 	if (enforce_chglim)
 	{
 		Parameters base = pest_scenario_ptr->get_ctl_parameters();
@@ -2059,33 +2062,69 @@ void ParameterEnsemble::enforce_limits(bool enforce_chglim)
 		{
 
 			Parameters real(var_names, reals.row(i));
-			pest_scenario_ptr->enforce_par_limits(real, base, false, true);
+
+			pest_scenario_ptr->enforce_par_limits(real, base, true, true);
 			//pest_scenario_ptr->enforce_par_limits(real, base, true, false);
 			reals.row(i) = real.get_data_eigen_vec(var_names);
 		}
 	}
+	//reset parameters to be inbounds - very crude
 	else
 	{
-		ParameterInfo pinfo = pest_scenario_ptr->get_ctl_parameter_info();
-		Parameters lower = pest_scenario_ptr->get_ctl_parameter_info().get_low_bnd(var_names);
-		Parameters upper = pest_scenario_ptr->get_ctl_parameter_info().get_up_bnd(var_names);
-		par_transform.ctl2numeric_ip(lower);
-		par_transform.ctl2numeric_ip(upper);
-		Eigen::VectorXd col;
+
 		double l, u, v;
-		for (int j = 0; j < reals.cols(); j++)
+		if (pest_scenario_ptr->get_pestpp_options().get_enforce_tied_bounds())
+
 		{
-			l = lower[var_names[j]];
-			u = upper[var_names[j]];
-			col = reals.col(j);
+			Parameters real = pest_scenario_ptr->get_ctl_parameters();//.get_subset(var_names.begin(), var_names.end());
+			//pest_scenario_ptr->get_base_par_tran_seq().ctl2numeric_ip(real);
+			pair<Parameters, Parameters> ppar;
+			ppar = pest_scenario_ptr->get_effective_ctl_lower_upper_bnd(real);
 			for (int i = 0; i < reals.rows(); i++)
 			{
-				v = col(i);
-				v = v < l ? l : v;
-				col(i) = v > u ? u : v;
+				real.update_without_clear(var_names, reals.row(i));
+				Parameters real_ctl = pest_scenario_ptr->get_base_par_tran_seq().numeric2ctl_cp(real);
+
+				cout << "";
+				for (auto n : var_names)
+				{
+					v = real_ctl[n];
+					l = ppar.first[n];
+					u = ppar.second[n];
+					v = v < l ? l : v;
+					v = v > u ? u : v;
+					real_ctl.update_rec(n, v);
+				}
+				reals.row(i) = pest_scenario_ptr->get_base_par_tran_seq().ctl2numeric_cp(real_ctl).get_data_eigen_vec(var_names);
+
 			}
-			reals.col(j) = col;
 		}
+		else
+		{
+			//this works except maybe not when tied pars are present
+			ParameterInfo pinfo = pest_scenario_ptr->get_ctl_parameter_info();
+			Parameters lower = pest_scenario_ptr->get_ctl_parameter_info().get_low_bnd(var_names);
+			Parameters upper = pest_scenario_ptr->get_ctl_parameter_info().get_up_bnd(var_names);
+			par_transform.ctl2numeric_ip(lower);
+			par_transform.ctl2numeric_ip(upper);
+			Eigen::VectorXd col;
+
+			for (int j = 0; j < reals.cols(); j++)
+			{
+				l = lower[var_names[j]];
+				u = upper[var_names[j]];
+				col = reals.col(j);
+				for (int i = 0; i < reals.rows(); i++)
+				{
+					v = col(i);
+					v = v < l ? l : v;
+					col(i) = v > u ? u : v;
+				}
+				reals.col(j) = col;
+			}
+		}
+		
+
 	}
 }
 

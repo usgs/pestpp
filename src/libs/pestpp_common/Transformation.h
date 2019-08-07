@@ -275,6 +275,7 @@ public:
 	virtual void print(ostream &os) const;
 	virtual bool is_one_to_one() const {return true;}
 	virtual TranTied* clone() const {return new TranTied(*this);}
+	const map<string, pair_string_double> get_items() { return items; }
 protected:
 	map<string, pair_string_double> items;
 };
@@ -330,29 +331,29 @@ protected:
 	void calc_svd();
 };
 
-class TranNormalize: public Transformation {
-public:
-	class NormData {
-	public:
-		double offset;
-		double scale;
-		NormData(double _offset=0.0, double _scale=1.0) :offset(_offset), scale(_scale){}
-		~NormData(){};
-	};
-	TranNormalize(const string &_name="unknown TranNormalize"): Transformation(_name){};
-	TranNormalize(const TranNormalize &rhs) : Transformation(rhs), items(rhs.items) {}
-	void insert(const string &item_name, double _offset, double _scale);
-	virtual void forward(Transformable &data);
-	virtual void reverse(Transformable &data);
-	virtual void jacobian_forward(Jacobian &jac);
-	virtual void jacobian_reverse(Jacobian &jac);
-	virtual void d1_to_d2(Transformable &del_data, Transformable &data);
-	virtual void d2_to_d1(Transformable &del_data, Transformable &data);
-	virtual ~TranNormalize(){};
-	virtual void print(ostream &os) const;
-	virtual bool is_one_to_one() const {return true;}
-	virtual TranNormalize* clone() const {return new TranNormalize(*this);}
-protected:
-	map<string, NormData> items;
-};
+//class TranNormalize: public Transformation {
+//public:
+//	class NormData {
+//	public:
+//		double offset;
+//		double scale;
+//		NormData(double _offset=0.0, double _scale=1.0) :offset(_offset), scale(_scale){}
+//		~NormData(){};
+//	};
+//	TranNormalize(const string &_name="unknown TranNormalize"): Transformation(_name){};
+//	TranNormalize(const TranNormalize &rhs) : Transformation(rhs), items(rhs.items) {}
+//	void insert(const string &item_name, double _offset, double _scale);
+//	virtual void forward(Transformable &data);
+//	virtual void reverse(Transformable &data);
+//	virtual void jacobian_forward(Jacobian &jac);
+//	virtual void jacobian_reverse(Jacobian &jac);
+//	virtual void d1_to_d2(Transformable &del_data, Transformable &data);
+//	virtual void d2_to_d1(Transformable &del_data, Transformable &data);
+//	virtual ~TranNormalize(){};
+//	virtual void print(ostream &os) const;
+//	virtual bool is_one_to_one() const {return true;}
+//	virtual TranNormalize* clone() const {return new TranNormalize(*this);}
+//protected:
+//	map<string, NormData> items;
+//};
 #endif /* TRANSFORMATION_H_ */

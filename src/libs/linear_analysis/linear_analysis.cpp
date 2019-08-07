@@ -1072,11 +1072,11 @@ void linear_analysis::set_predictions(vector<string> preds)
 	for (auto pred : preds)
 	{
 		pest_utils::upper_ip(pred);
-
+		if (predictions.find(pred) != predictions.end())
+			throw_error("linear_analysis::set_predictions() error: pred:" + pred + " already in predictions");
 		if (find(obs_names->begin(), obs_names->end(), pred) != obs_names->end())
 		{
-			if (predictions.find(pred) != predictions.end())
-				throw_error("linear_analysis::set_predictions() error: pred:" + pred + " already in predictions");
+			
 			Mat mpred;
 			log->log("extracting prediction " + pred + " from jacobian");
 			try
