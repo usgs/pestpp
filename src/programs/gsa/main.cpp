@@ -22,6 +22,7 @@
 #include <fstream>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <iomanip>
 #include "config_os.h"
 #include "MorrisMethod.h"
 #include "sobol.h"
@@ -50,6 +51,10 @@ using Eigen::VectorXd;
 
 int main(int argc, char* argv[])
 {
+#ifndef _DEBUG
+	try
+	{
+#endif
 	string version = PESTPP_VERSION;
 	cout << endl << endl;
 	cout << "             pestpp-sen: a tool for global sensitivity analysis" << endl << endl;
@@ -251,7 +256,16 @@ int main(int argc, char* argv[])
 	{
 		gsa_restart = GSA_RESTART::NONE;
 	}
+	//OutputFileWriter(FileManager &_file_manager, Pest &_pest_scenario, bool restart_flag = false, bool _save_rei = true, int _eigenwrite = 0);
+	OutputFileWriter output_writer(file_manager, pest_scenario, false, false);
+	ofstream &frec = file_manager.rec_ofstream();
+	output_writer.scenario_report(frec);
+	output_writer.scenario_io_report(frec);
+	output_writer.scenario_par_report(frec);
+	output_writer.scenario_obs_report(frec);
 
+	pest_scenario.check_inputs(frec);
+	pest_scenario.check_io();
 
 	//map<string, string> gsa_opt_map;
 	//process .gsa file
@@ -285,6 +299,7 @@ int main(int argc, char* argv[])
 	if (check_exist_in(gsa_filename))
 	{
 		cout << "WARNING: use of .gsa files is deprecated - .gsa file '" << gsa_filename << "' is being ignored, please use '++' args";
+		return 1;
 	}
 
 	PestppOptions *pp_ptr = pest_scenario.get_pestpp_options_ptr();
@@ -356,35 +371,20 @@ int main(int argc, char* argv[])
 			calc_morris_obs_sen, GsaAbstractBase::PARAM_DIST::uniform, 1.0);
 		gsa_method = m_ptr;
 		m_ptr->process_pooled_var_file();
+		
+		frec << endl << endl << endl << "Method of Morris settings:" << endl;
+
+		frec << scientific << left << setw(30) << " morris_r " << morris_r << endl;
+		frec << scientific << left << setw(30) << " morris_p " << morris_p << endl;
+		frec << scientific << left << setw(30) << " morris_delta " << morris_delta << endl << endl;
+		
+
 	}
-	//else if (method != gsa_opt_map.end() && method->second == "TORNADO")
-	//{
-	//	bool calc_obs_sen = true;
-	//
-	//	auto morris_obs_sen_it = gsa_opt_map.find("TORNADO_OBS_SEN");
-	//	if (morris_obs_sen_it != gsa_opt_map.end())
-	//	{
-	//		string obs_sen_flag = morris_obs_sen_it->second;
-	//		upper_ip(obs_sen_flag);
-	//		if (obs_sen_flag == "FALSE") calc_obs_sen = false;
-	//	}
-	////	TornadoPlot(const std::vector<std::string> &_adj_par_name_vec, const Parameters &_fixed_ctl_pars, const Parameters &_init_pars,
-	//	///	const Parameters &lower_bnd,
-	//		//const Parameters &upper_bnd, const set<string> &_log_trans_pars,
-	//		//ParamTransformSeq *base_partran_seq,
-	//		//const std::vector<std::string> &_obs_name_vec, FileManager *_file_manager_ptr,
-	//		//const ObservationInfo *_obs_info_ptr, bool _calc_obs_sen);
-	//	Parameters init_par = pest_scenario.get_ctl_parameter_info().get_init_value(ctl_par.get_keys());
-	//	TornadoPlot *t_ptr = new TornadoPlot(adj_par_name_vec, fixed_pars, init_par,
-	//		lower_bnd, upper_bnd, log_trans_pars,
-	//		&base_partran_seq, pest_scenario.get_ctl_ordered_obs_names(), &file_manager,
-	//		&(pest_scenario.get_ctl_observation_info()), calc_obs_sen);
-	//	gsa_method = t_ptr;
-	//}
+	
 	else if (method != gsa_opt_map.end() && method->second == "SOBOL")
 	{
 		GsaAbstractBase::PARAM_DIST par_dist = GsaAbstractBase::PARAM_DIST::uniform;
-
+		string par_dist_str = "UNIFORM";
 		int n_sample = 100;
 		auto sob_n_sam_it = gsa_opt_map.find("GSA_SOBOL_SAMPLES");
 		if (sob_n_sam_it != gsa_opt_map.end())
@@ -394,7 +394,7 @@ int main(int argc, char* argv[])
 		auto sob_p_dist_it = gsa_opt_map.find("GSA_SOBOL_PAR_DIST");
 		if (sob_p_dist_it != gsa_opt_map.end())
 		{
-			string par_dist_str = sob_p_dist_it->second;
+			par_dist_str = sob_p_dist_it->second;
 			upper_ip(par_dist_str);
 			if (par_dist_str == "NORM") par_dist = GsaAbstractBase::PARAM_DIST::normal;
 			else if (par_dist_str == "UNIF") par_dist = GsaAbstractBase::PARAM_DIST::uniform;
@@ -406,13 +406,18 @@ int main(int argc, char* argv[])
 			}
 		}
 
-
 		gsa_method = new Sobol(pest_scenario, file_manager, &obj_func,
 			base_partran_seq, n_sample, par_dist, 1.0);
+
+		frec << endl << endl << endl << "Method of Sobol settings:" << endl;
+
+		frec << scientific << left << setw(30) << " n_sample " << n_sample << endl;
+		frec << scientific << left << setw(30) << " sobol par dist " <<par_dist_str << endl;
+		
 	}
 	else
 	{
-		throw PestError("A valid method for computing the sensitivity must be specified in the *.gsa file");
+		throw PestError("A valid method for computing the sensitivity must be specified in the control file");
 	}
 
 	auto morris_r_it = gsa_opt_map.find("RAND_SEED");
@@ -421,7 +426,7 @@ int main(int argc, char* argv[])
 		unsigned int seed = convert_cp<unsigned int>(morris_r_it->second);
 		gsa_method->set_seed(seed);
 	}
-
+	frec << scientific << left << setw(30) << " gsa random seed " << gsa_method->get_seed() << endl;
 	// make model runs
 	if (gsa_restart == GSA_RESTART::NONE)
 	{
@@ -453,4 +458,14 @@ int main(int argc, char* argv[])
 	//cout << endl << "Simulation Complete - Press RETURN to close window" << endl;
 	//char buf[256];
 	//OperSys::gets_s(buf, sizeof(buf));
+#ifndef _DEBUG
+	}
+	catch (exception &e)
+	{
+		cout << "Error condition prevents further execution: " << endl << e.what() << endl;
+		//cout << "press enter to continue" << endl;
+		//char buf[256];
+		//OperSys::gets_s(buf, sizeof(buf));
+	}
+#endif
 }

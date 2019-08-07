@@ -876,7 +876,7 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 		}
 
 		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
-
+		
 		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
 		{
 			int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
@@ -896,7 +896,7 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 				pe.keep_rows(keep_names);
 			}
 		}
-
+		
 
 		if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior())
 		{
@@ -918,6 +918,13 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 					parcov.to_ascii(filename);
 				}
 			}
+		}
+		if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
+		{
+			if (pest_scenario.get_pestpp_options().get_ies_obs_restart_csv().size() > 0)
+				message(1, "Warning: even though ies_enforce_bounds is true, a restart obs en was passed, so bounds will not be enforced on the initial par en");
+			else
+				pe.enforce_limits(pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
 		}
 
 	}
@@ -3155,15 +3162,23 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 	unordered_map<string, double> parcov_inv_map;
 	parcov_inv_map.reserve(pe_upgrade.shape().second);
 	Eigen::VectorXd parcov_inv;// = parcov.get(par_names).inv().e_ptr()->toDense().cwiseSqrt().asDiagonal();
-	if (parcov.isdiagonal())
-		parcov_inv = parcov.inv().get_matrix().diagonal().cwiseSqrt();
+	if (!parcov.isdiagonal())
+	{
+		//parcov_inv = parcov.inv().get_matrix().diagonal().cwiseSqrt();
+		parcov_inv = parcov.get_matrix().diagonal();
+		
+	}
 	else
 	{
 		message(2, "extracting diagonal from prior parameter covariance matrix");
 		Covariance parcov_diag;
 		parcov_diag.from_diagonal(parcov);
-		parcov_inv = parcov_diag.inv().get_matrix().diagonal().cwiseSqrt();
+		//parcov_inv = parcov_diag.inv().get_matrix().diagonal().cwiseSqrt();
+		parcov_inv = parcov_diag.get_matrix().diagonal();
+		
 	}
+	parcov_inv = parcov_inv.cwiseSqrt().cwiseInverse();
+
 	vector<string> par_names = pe_upgrade.get_var_names();
 	for (int i = 0; i < parcov_inv.size(); i++)
 		parcov_inv_map[par_names[i]] = parcov_inv[i];

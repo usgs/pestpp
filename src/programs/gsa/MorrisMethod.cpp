@@ -18,6 +18,7 @@
 #include "utilities.h"
 #include "FileManager.h"
 #include "Stats.h"
+//#include "Ensemble.h"
 
 using namespace std;
 using namespace pest_utils;
@@ -257,6 +258,7 @@ Parameters MorrisMethod::get_numeric_parameters(int row)
 
 void MorrisMethod::assemble_runs(RunManagerAbstract &run_manager)
 {
+	map<int, Parameters> par_map;
 	for (int tmp_r=0; tmp_r<r; ++tmp_r)
 	{
 		b_star_mat = create_P_star_mat(adj_par_name_vec.size());
@@ -277,14 +279,53 @@ void MorrisMethod::assemble_runs(RunManagerAbstract &run_manager)
 				par_name = adj_par_name_vec[i-1];
 			}
 			run_id = run_manager.add_run(pars, par_name, Parameters::no_data);
+			base_partran_seq_ptr->model2ctl_ip(pars);
+			par_map[run_id] =  pars;
+
 		}
 	}
+	//write the parameter sequence to a csv file
+	string filename = file_manager_ptr->get_base_filename() + ".sen.par.csv";
+	ofstream fout(filename);
+	vector<string> var_names = pest_scenario_ptr->get_ctl_ordered_par_names();
+	fout << "run_id";
+	for (auto pname : var_names)
+		fout << "," << pname;
+	fout << endl;
+	for (auto &p : par_map)
+	{
+		fout << p.first;
+		for (auto &pname : var_names)
+			fout << "," << p.second.get_rec(pname);
+		fout << endl;
+	}
+	/*ParameterEnsemble pe(pest_scenario_ptr);
+	vector<string> real_names,var_names=pest_scenario_ptr->get_ctl_ordered_par_names();
+	stringstream ss;
+	map<int, string> real_name_map;
+	for (auto &p : par_map)
+	{
+		ss.str("");
+		ss << p.first;
+		real_names.push_back(ss.str());
+		real_name_map[p.first] = ss.str();
+	}
+	pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
+	pe.reserve(real_names, var_names);
+	for (auto &p : par_map)
+	{
+		pe.update_real_ip(real_name_map[p.first], p.second.get_data_eigen_vec(var_names));
+	}
+	string filename = file_manager_ptr->get_base_filename() + ".sen.par.csv";
+	pe.to_csv(filename);*/
+
+
 }
 
 void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run)
 {
 	ofstream &fout_morris = file_manager_ptr->open_ofile_ext("msn");
-	ofstream &fout_raw = file_manager_ptr->open_ofile_ext("raw");
+	ofstream &fout_raw = file_manager_ptr->open_ofile_ext("raw.csv");
 
 	ModelRun run0 = model_run;
 	ModelRun run1 = model_run;
