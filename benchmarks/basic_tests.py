@@ -247,6 +247,7 @@ def tie_by_group_test():
     pst.pestpp_options["lambda_scale_fac"] = 1.0
     pst.pestpp_options["tie_by_group"] = True
     pst.pestpp_options["ies_include_base"] = False
+    pst.pestpp_options["enforce_tied_bounds"] = True
     pst.control_data.noptmax = 1
 
 
@@ -261,9 +262,9 @@ def tie_by_group_test():
     assert df.loc[:,tied_names[1:3]].std(axis=1).apply(np.abs).max() < 1.0e-8
     for real in df.index:
         too_low = df.loc[real,df.loc[real,par.parnme] < par.parlbnd]
-        assert too_low.shape[0] == 0, "sen,{0},{1},{2}".format(nopt,real,too_low)
+        assert too_low.shape[0] == 0, "sen,{0},{1}".format(real,too_low)
         too_high = df.loc[real, df.loc[real, par.parnme] > par.parubnd]
-        assert too_high.shape[0] == 0, "sen,{0},{1},{2}".format(nopt,real,too_high)
+        assert too_high.shape[0] == 0, "sen,{0},{1}".format(real,too_high)
     
     #pst.write(os.path.join(t_d,"pest_tied.pst"))
     pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-glm"), "pest_tied.pst", 5, master_dir=m_d,
@@ -306,6 +307,8 @@ def tie_by_group_test():
     pst.pestpp_options["ies_lambda_mults"] = 1.0
     pst.pestpp_options["lambda_scale_fac"] = 1.0
     pst.pestpp_options["tie_by_group"] = True
+
+
     pst.control_data.noptmax = 3
     pst.write(os.path.join(t_d, "pest_tied.pst"))
 
@@ -317,18 +320,22 @@ def tie_by_group_test():
     assert df.loc[:, tied_names].std(axis=1).apply(np.abs).max() < 1.0e-8
     for real in df.index:
         too_low = df.loc[real,df.loc[real,par.parnme] < par.parlbnd]
-        assert too_low.shape[0] == 0, "ies,{0},{1},{2}".format(nopt,real,too_low)
+        assert too_low.shape[0] == 0, "ies,{0},{1}".format(real,too_low)
         too_high = df.loc[real, df.loc[real, par.parnme] > par.parubnd]
-        assert too_high.shape[0] == 0, "ies,{0},{1},{2}".format(nopt,real,too_high)
+        assert too_high.shape[0] == 0, "ies,{0},{1}".format(real,too_high)
     
     df.to_csv(os.path.join(t_d,"sweep_in.csv"))
     pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-swp"), "pest_tied.pst", 5, master_dir=m_d,
                            slave_root=model_d,local=local,port=port)
-
+    pst.control_data.noptmax = 3
+    pst.pestpp_options["enforce_tied_bounds"] = False
+    pst.write(os.path.join(t_d, "pest_tied.pst"))
     pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-glm"), "pest_tied.pst", 5, master_dir=m_d,
                            slave_root=model_d,local=local,port=port)
     jco = pyemu.Jco.from_binary(os.path.join(m_d,"pest_tied.jcb"))
     assert jco.shape[1] == 2,jco.shape
+
+
 
 def unc_file_test():
     model_d = "ies_10par_xsec"
