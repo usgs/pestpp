@@ -433,6 +433,10 @@ public:
 	set<string> get_passed_args() const { return passed_args; }
 	map<string, string> get_arg_map()const { return arg_map; }
 
+	void set_enforce_tied_bounds(bool _flag) { enforce_tied_bounds = _flag; }
+	bool get_enforce_tied_bounds() const { return enforce_tied_bounds; }
+
+
 private:
 	int n_iter_base;
 	int n_iter_super;
@@ -542,6 +546,8 @@ private:
 	double gsa_morris_delta;
 	string gsa_sobol_par_dist;
 	int gsa_rand_seed;
+
+	bool enforce_tied_bounds;
 		
 };
 

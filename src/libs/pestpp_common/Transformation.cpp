@@ -916,115 +916,115 @@ void TranSVD::print(ostream &os) const
 	os << "  Singular Values = " << Sigma << endl;
 }
 
-void TranNormalize::forward(Transformable &data)
-{
-	Transformable::iterator data_iter, data_end = data.end();
-	for (map<string,NormData>::const_iterator b=items.begin(), e=items.end();
-		b!=e; ++b) {
-		data_iter = data.find(b->first);
-		if (data_iter != data_end)
-		{
-			(*data_iter).second += b->second.offset;
-			(*data_iter).second *= b->second.scale;
-		}
-	}
-}
-
-
-void TranNormalize::reverse(Transformable &data)
-{
-	Transformable::iterator data_iter, data_end = data.end();
-	for (map<string,NormData>::const_iterator b=items.begin(), e=items.end();
-		b!=e; ++b) {
-		data_iter = data.find(b->first);
-		if (data_iter != data_end)
-		{
-			(*data_iter).second /= b->second.scale;
-			(*data_iter).second -= b->second.offset;
-		}
-	}
-}
-
-
-void TranNormalize::jacobian_forward(Jacobian &jac)
-{
-	size_t icol = 0;
-	double factor = 0;
-	Transformable &data = jac.base_numeric_parameters;
-	unordered_map<string, int> par_2_col_map = jac.get_par2col_map();
-	auto iter_end = par_2_col_map.end();
-	for (const auto &irec : items)
-	{
-		auto iter = par_2_col_map.find(irec.first);
-		if (iter != iter_end)
-		{
-			icol = iter->second;
-			factor = irec.second.scale;
-			jac.matrix.col(icol) /= factor;
-		}
-	}
-	forward(data);
-}
-
-void TranNormalize::jacobian_reverse(Jacobian &jac)
-{
-	size_t icol = 0;
-	double factor = 0;
-	Transformable &data = jac.base_numeric_parameters;
-	unordered_map<string, int> par_2_col_map = jac.get_par2col_map();
-	auto iter_end = par_2_col_map.end();
-	for (const auto &irec : items)
-	{
-		auto iter = par_2_col_map.find(irec.first);
-		if (iter != iter_end)
-		{
-			icol = iter->second;
-			factor = irec.second.scale;
-			jac.matrix.col(icol) *= factor;
-		}
-	}
-	reverse(data);
-}
-
-void TranNormalize::d1_to_d2(Transformable &del_data, Transformable &data)
-{
-	Transformable::iterator del_data_iter, del_data_end = del_data.end();
-	for (map<string, NormData>::const_iterator b = items.begin(), e = items.end();
-		b != e; ++b) {
-		del_data_iter = data.find(b->first);
-		if (del_data_iter != del_data_end)
-		{
-			(*del_data_iter).second /= b->second.scale;
-		}
-	}
-	forward(data);
-}
-
-void TranNormalize::d2_to_d1(Transformable &del_data, Transformable &data)
-{
-	Transformable::iterator del_data_iter, del_data_end = del_data.end();
-	for (map<string, NormData>::const_iterator b = items.begin(), e = items.end();
-		b != e; ++b) {
-		del_data_iter = del_data.find(b->first);
-		if (del_data_iter != del_data_end)
-		{
-			(*del_data_iter).second *= b->second.scale;
-		}
-	}
-	reverse(data);
-}
-
-void TranNormalize::insert(const string &item_name, double _offset, double _scale)
-{
-	items[item_name] = NormData(_offset, _scale);
-}
-
-void TranNormalize::print(ostream &os) const
-{
-	os << "Transformation name = " << name << "; (type=TranNormalize)" << endl;
-	for (map<string,NormData>::const_iterator b=items.begin(), e=items.end();
-		b!=e; ++b) {
-			os << "  item name = " << (*b).first << ";  scale value = " << (*b).second.scale
-				<< ";  offset value = " << (*b).second.offset <<endl;
-	}
-}
+//void TranNormalize::forward(Transformable &data)
+//{
+//	Transformable::iterator data_iter, data_end = data.end();
+//	for (map<string,NormData>::const_iterator b=items.begin(), e=items.end();
+//		b!=e; ++b) {
+//		data_iter = data.find(b->first);
+//		if (data_iter != data_end)
+//		{
+//			(*data_iter).second += b->second.offset;
+//			(*data_iter).second *= b->second.scale;
+//		}
+//	}
+//}
+//
+//
+//void TranNormalize::reverse(Transformable &data)
+//{
+//	Transformable::iterator data_iter, data_end = data.end();
+//	for (map<string,NormData>::const_iterator b=items.begin(), e=items.end();
+//		b!=e; ++b) {
+//		data_iter = data.find(b->first);
+//		if (data_iter != data_end)
+//		{
+//			(*data_iter).second /= b->second.scale;
+//			(*data_iter).second -= b->second.offset;
+//		}
+//	}
+//}
+//
+//
+//void TranNormalize::jacobian_forward(Jacobian &jac)
+//{
+//	size_t icol = 0;
+//	double factor = 0;
+//	Transformable &data = jac.base_numeric_parameters;
+//	unordered_map<string, int> par_2_col_map = jac.get_par2col_map();
+//	auto iter_end = par_2_col_map.end();
+//	for (const auto &irec : items)
+//	{
+//		auto iter = par_2_col_map.find(irec.first);
+//		if (iter != iter_end)
+//		{
+//			icol = iter->second;
+//			factor = irec.second.scale;
+//			jac.matrix.col(icol) /= factor;
+//		}
+//	}
+//	forward(data);
+//}
+//
+//void TranNormalize::jacobian_reverse(Jacobian &jac)
+//{
+//	size_t icol = 0;
+//	double factor = 0;
+//	Transformable &data = jac.base_numeric_parameters;
+//	unordered_map<string, int> par_2_col_map = jac.get_par2col_map();
+//	auto iter_end = par_2_col_map.end();
+//	for (const auto &irec : items)
+//	{
+//		auto iter = par_2_col_map.find(irec.first);
+//		if (iter != iter_end)
+//		{
+//			icol = iter->second;
+//			factor = irec.second.scale;
+//			jac.matrix.col(icol) *= factor;
+//		}
+//	}
+//	reverse(data);
+//}
+//
+//void TranNormalize::d1_to_d2(Transformable &del_data, Transformable &data)
+//{
+//	Transformable::iterator del_data_iter, del_data_end = del_data.end();
+//	for (map<string, NormData>::const_iterator b = items.begin(), e = items.end();
+//		b != e; ++b) {
+//		del_data_iter = data.find(b->first);
+//		if (del_data_iter != del_data_end)
+//		{
+//			(*del_data_iter).second /= b->second.scale;
+//		}
+//	}
+//	forward(data);
+//}
+//
+//void TranNormalize::d2_to_d1(Transformable &del_data, Transformable &data)
+//{
+//	Transformable::iterator del_data_iter, del_data_end = del_data.end();
+//	for (map<string, NormData>::const_iterator b = items.begin(), e = items.end();
+//		b != e; ++b) {
+//		del_data_iter = del_data.find(b->first);
+//		if (del_data_iter != del_data_end)
+//		{
+//			(*del_data_iter).second *= b->second.scale;
+//		}
+//	}
+//	reverse(data);
+//}
+//
+//void TranNormalize::insert(const string &item_name, double _offset, double _scale)
+//{
+//	items[item_name] = NormData(_offset, _scale);
+//}
+//
+//void TranNormalize::print(ostream &os) const
+//{
+//	os << "Transformation name = " << name << "; (type=TranNormalize)" << endl;
+//	for (map<string,NormData>::const_iterator b=items.begin(), e=items.end();
+//		b!=e; ++b) {
+//			os << "  item name = " << (*b).first << ";  scale value = " << (*b).second.scale
+//				<< ";  offset value = " << (*b).second.offset <<endl;
+//	}
+//}
