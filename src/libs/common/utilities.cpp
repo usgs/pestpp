@@ -758,11 +758,19 @@ bool read_binary(const string &filename, vector<string> &row_names, vector<strin
 void save_binary(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix)
 {
 	//check row name and col name lengths
-	int mx_rlen = 0, mx_clen = 0;
-	for (auto &n : row_names)
-		mx_rlen = max(mx_rlen, n.length());
-	for (auto &n : col_names)
-		mx_clen = max(mx_clen, n.length());
+	int mx_rlen = 0, mx_clen = 0, v;
+	for (auto& n : row_names)
+	{
+		v = n.length();
+		mx_rlen = max(mx_rlen, v);
+	}
+		
+	for (auto& n : col_names)
+	{
+		v = n.length();
+		mx_clen = max(mx_clen, v);
+	}
+		
 	//mx_rlen = max_element(row_names.begin(), row_names.end()) - row_names.begin();
 	//mx_clen = max_element(col_names.begin(), col_names.end()) - col_names.begin();
 	if ((mx_rlen > 20) || (mx_clen > 12))
