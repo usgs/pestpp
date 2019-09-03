@@ -128,8 +128,8 @@ ifeq ($(COMPILER),intel)  # Intel compilers
         endif
         EXT_LIBS += -lifcore -lpthread -lm -ldl
     else ifeq ($(SYSTEM),mac)
-        MKLROOT ?= /opt/intel/compilers_and_libraries_2018.1.126/mac/mkl
-        EXTRADIR = /opt/intel/compilers_and_libraries_2018.1.126/mac/compiler
+        MKLROOT ?= /opt/intel/compilers_and_libraries_2019.4.233/mac/mkl
+        EXTRADIR = /opt/intel/compilers_and_libraries_2019.4.233/mac/compiler
         EXT_INCLUDES = -I${MKLROOT}/include/intel64/lp64 -I${MKLROOT}/include
         EXT_LIBS = \
              ${MKLROOT}/lib/libmkl_lapack95_ilp64.a \
