@@ -27,6 +27,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="covariance.h" />
     <ClInclude Include="DifferentialEvolution.h" />
     <ClInclude Include="eigen_tools.h" />
     <ClInclude Include="Ensemble.h" />
@@ -34,7 +35,9 @@
     <ClInclude Include="FileManager.h" />
     <ClInclude Include="Jacobian.h" />
     <ClInclude Include="Jacobian_1to1.h" />
+    <ClInclude Include="linear_analysis.h" />
     <ClInclude Include="Localizer.h" />
+    <ClInclude Include="logger.h" />
     <ClInclude Include="ModelRunPP.h" />
     <ClInclude Include="ObjectiveFunc.h" />
     <ClInclude Include="OutputFileWriter.h" />
@@ -56,6 +59,7 @@
     <ClInclude Include="Transformation.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="covariance.cpp" />
     <ClCompile Include="DifferentialEvolution.cpp" />
     <ClCompile Include="eigen_tools.cpp" />
     <ClCompile Include="Ensemble.cpp" />
@@ -63,7 +67,9 @@
     <ClCompile Include="FileManager.cpp" />
     <ClCompile Include="Jacobian.cpp" />
     <ClCompile Include="Jacobian_1to1.cpp" />
+    <ClCompile Include="linear_analysis.cpp" />
     <ClCompile Include="Localizer.cpp" />
+    <ClCompile Include="logger.cpp" />
     <ClCompile Include="ModelRunPP.cpp" />
     <ClCompile Include="ObjectiveFunc.cpp" />
     <ClCompile Include="OutputFileWriter.cpp" />
