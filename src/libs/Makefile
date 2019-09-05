@@ -4,7 +4,6 @@ include $(top_builddir)/global.mak
 
 SUBDIRS := \
     common \
-    linear_analysis \
     mio \
     pestpp_common \
     pest_routines \
