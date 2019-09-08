@@ -5,7 +5,7 @@ top_builddir = .
 include $(top_builddir)/global.mak
 
 
-all: libs-target programs-target
+all: libs-target programs-target utilities-target
 
 libs-target:
 	(cd libs; $(MAKE))

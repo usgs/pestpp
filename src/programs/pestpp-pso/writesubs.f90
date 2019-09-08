@@ -147,6 +147,12 @@ subroutine listini(basnam,gindex)
     write(unit(1),'(/,3X,A)')'Prior information is included in objective function'
   end if
   !
+  if (trim(pestmode) == 'parunc') then
+    write(unit(1),'(/,3X,A)')'Parameter uncertainty mode is active:-'
+    write(unit(1),'(3X,A,T63,I9)')'Number of calibrated particles desired',nreal
+    write(unit(1),'(3X,A,T63,1PE9.2)')'Obj threshold for calibration',thresh
+  end if
+  !
   write(unit(1),'(3/)')
   !
   if (rstpso == 1) then
@@ -457,15 +463,27 @@ subroutine listout(iiter,gbest,gmbest,gpbest,gindex,objmin,iphistp)
   integer::ipart,iparm,igp
   
   double precision,intent(in)::gbest,gmbest,gpbest,objmin
+  double precision::gsum,gave
 !----------------------------------------------------------------------------------------
 
+! calculate basic stats on objectives
+  gsum = 0.0d+00
+  !
+  do ipart=1,npop
+    gsum = gsum + objopt(ipart)
+  end do
+  !
+  gave = gsum/dble(npop)
+  !
+! write listing output
   write(unit(1),'(A,I10)')                      'OPTIMISATION ITERATION NO.        : ',iiter
   write(unit(1),'(A,I10)')                      '   Model calls so far             : ',modeval
   if (iiter > 0) then
     write(unit(1),'(A,1PE10.3)')                '   Current inertia value          : ',inertia  
   end if
   write(unit(1),'(A,1PE10.3)')                  '   Best particle value            : ',gbest
-  if (iiter > 0) then
+  write(unit(1),'(A,1PE10.3)')                  '   Average among pbest positions  : ',gave
+  if (iiter > 0 .and. trim(pestmode) == 'estimation') then
     write(unit(1),'(A,F10.3)')                  '   Percent of previous iter.      : ',&
         (gbest/objmin)*1.0d+02
     write(unit(1),'(A,I10)')                    '   Iters. since last sig. reduct. : ',iphistp
@@ -602,7 +620,7 @@ subroutine listout(iiter,gbest,gmbest,gpbest,gindex,objmin,iphistp)
     end if
     !
 !   write best neighbor particle identifier if neighborhoods are used
-    if (neibr == 1) then
+    if (neibr == 1 .and. trim(pestmode) == 'estimation') then
       !
       do ipart=1,npop
         !
@@ -718,7 +736,7 @@ subroutine writebest(gindex,basnam)
   end do
   !
   do ipart=1,npop
-    if (ipart == 1) write(unit(3),'(A20,2X)',advance='no')adjustl('composite obj')
+    if (ipart == 1) write(unit(3),'(A20,2X)',advance='no')adjustl('composite-obj')
     if (ipart < npop) then
       write(unit(3),'(1X,1PE15.8)',advance='no')objopt(ipart)
     else
@@ -1574,9 +1592,175 @@ end subroutine wrparerst
 
 
 
+subroutine wparunc(basnam,nsav)
+!========================================================================================
+!==== This subroutine writes all calibrated particles and their obj's.               ====
+!====    by Adam Siade                                                               ====
+!========================================================================================
+!========================================================================================
+
+  use psodat
+  
+  implicit none
+  
+! specifications:
+!----------------------------------------------------------------------------------------  
+  integer,intent(in)::nsav
+  integer::ipart,iparm,isav,igp,iobs
+  
+  character(len=100),intent(in)::basnam
+  character(len=100)::fnam
+  
+  double precision::objsav
+!----------------------------------------------------------------------------------------
+
+  fnam = trim(basnam) // '.pun'
+  open(unit(9),file=trim(fnam))
+  !
+! write parsav
+  write(unit(9),'(I0)')nsav
+  !
+  do iparm=1,npar
+    !
+    do isav=1,nsav
+      !
+      if (isav == 1) write(unit(9),'(T8,A)',advance='no')adjustl(parnme(iparm))
+      !
+      if (isav < nsav) then
+        write(unit(9),'(1PE15.8,1X)',advance='no')scale(iparm)*parsav(iparm,isav) &
+            + offset(iparm)
+      else if (isav == nsav) then
+        write(unit(9),'(1PE15.8)')scale(iparm)*parsav(iparm,isav) + offset(iparm)
+      end if
+      !
+    end do
+    !
+  end do
+  !
+! write objgpsav
+  write(unit(9),'(/)')
+  !
+  do igp=1,nobsgp
+    !
+    do isav=1,nsav
+      !
+      if (isav == 1) write(unit(9),'(T8,A)',advance='no')adjustl(obgnme(igp))
+      !
+      if (isav < nsav) then
+        write(unit(9),'(1PE15.8,1X)',advance='no')objgpsav(igp,isav)
+      else if (isav == nsav) then
+        write(unit(9),'(1PE15.8)')objgpsav(igp,isav)
+      end if
+      !
+    end do
+    !
+  end do
+  !
+! write total objective for each parsav
+!   write(unit(9),'(/)')
+  !
+  do isav=1,nsav
+    !
+    objsav = 0.0d+00
+    !
+    if (isav == 1) write(unit(9),'(T8,A)',advance='no')'total obj      '
+    !
+    do igp=1,nobsgp
+      objsav = objsav + objgpsav(igp,isav)
+    end do
+    !
+    if (isav < nsav) then
+      write(unit(9),'(1PE15.8,1X)',advance='no')objsav
+    else if (isav == nsav) then
+      write(unit(9),'(1PE15.8)')objsav
+    end if
+    !
+  end do
+  !
+! write observations
+  write(unit(9),'(/)')
+  !
+  do iobs=1,nobs
+    !
+    do isav=1,nsav
+      !
+      if (isav == 1) write(unit(9),'(T8,A)',advance='no')adjustl(obsnme(iobs))
+      !
+      if (isav < nsav) then
+        write(unit(9),'(1PE15.8,1X)',advance='no')punobs(iobs,isav)
+      else if (isav == nsav) then
+        write(unit(9),'(1PE15.8)')punobs(iobs,isav)
+      end if
+      !
+    end do
+    !
+  end do
+  !
+  close(unit(9))
+  
+end subroutine wparunc
+  
+
+
+subroutine listpun(nsav)
+!========================================================================================
+!==== This subroutine writes all calibrated particles and their obj's.               ====
+!====    by Adam Siade                                                               ====
+!========================================================================================
+!========================================================================================
+
+  use psodat
+  
+  implicit none
+  
+! specifications:
+!----------------------------------------------------------------------------------------  
+  integer,intent(in)::nsav
+!----------------------------------------------------------------------------------------  
+
+  backspace(unit(1))
+  !
+  write(unit(1),'(3X,A,I0,A)')'PARUNC: ',nsav,' calibrated particles have been saved'
+  !
+  if (neibr == 0) write(unit(1),'(A,/)')' '
+  
+end subroutine listpun
 
 
 
+
+subroutine wrtneib()
+!========================================================================================
+!==== This subroutine writes best neihbors for parunc mode.                          ====
+!====    by Adam Siade                                                               ====
+!========================================================================================
+!========================================================================================
+
+  use psodat
+  
+  implicit none
+  
+! specifications:
+!----------------------------------------------------------------------------------------  
+  integer::ipart
+!----------------------------------------------------------------------------------------  
+
+  do ipart=1,npop
+    !
+    if (ipart == 1) write(unit(1),'(3X,A)',advance='no')'best neighbor   -->'
+    !
+    if (ipart < npop) then
+      write(unit(1),'(8X,I4.4,3X)',advance='no')gneibr(ipart)
+    else
+      write(unit(1),'(8X,I4.4,3X)')gneibr(ipart)
+    end if
+    !
+  end do 
+  !
+! write extra blank line
+  write(unit(1),'(A)')' '
+  
+end subroutine wrtneib
 
 
 

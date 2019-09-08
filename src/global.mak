@@ -199,6 +199,7 @@ PESTPP_LIBS := \
     -L$(LIBS_DIR)/mio -lmio \
     -L$(LIBS_DIR)/common -lcommon \
     -L$(LIBS_DIR)/propack -lpropack \
+    -L$(LIBS_DIR)/pest_routines -lpest_routines \
     -L$(LIBS_DIR)/opt -lopt \
      $(EXT_LIBS)
 
