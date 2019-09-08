@@ -88,8 +88,7 @@ def basic_test(model_d="ies_10par_xsec"):
     # draw some ensembles
     idx = [i for i in range(num_reals)]
     idx[-1] = "base"
-    pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst, cov=cov, num_reals=num_reals,
-                                                    use_homegrown=True,group_chunks=True)
+    pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst, cov=cov, num_reals=num_reals)
     pe.index = idx
     pe.to_csv(os.path.join(new_d, "par.csv"))
     pe.to_binary(os.path.join(new_d, "par.jcb"))
