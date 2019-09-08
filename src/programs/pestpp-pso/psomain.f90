@@ -1,6 +1,6 @@
 !========================================================================================
 !==== This code is the main driver for conducting basic Particle Swarm Optimization  ====
-!==== for parameter estimation within the PEST suite, using the PANTE\THER run manager.====
+!==== for parameter estimation within the PEST suite, using the YAMR run manager.    ====
 !====    by Adam Siade                                                               ====
 !========================================================================================
 !========================================================================================
@@ -13,7 +13,7 @@ program particleswarmopt
 ! specifications:
 !----------------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------------- 
-! external routines for run management via PANTHER
+! external routines for run management via YAMR
 !----------------------------------------------------------------------------------------
   external rmif_delete
   integer rmif_delete
@@ -31,8 +31,8 @@ program particleswarmopt
   err = 0
   
 ! read arguments from the command line
-  call get_command_argument(1,pstnam)
-  call get_command_argument(2,port)
+  call getarg(1,pstnam)
+  call getarg(2,port)
   if (pstnam(1:1) == ' ' .or. port(1:1) == ' ') then
     write(*,*)'Usage is: psopp case.pst port'
     stop
@@ -53,10 +53,16 @@ program particleswarmopt
   !
 ! read pest control file
   call readpst(pstnam)
+  !
+! read pso control file
+  call readpso(pstnam)
   
   
 ! assign unit numbers
 ! -------------------------------------------------------------------------------------------------
+  allocate(unit(10))
+  unit = 0
+  !
 ! record file
   unit(1) = 19
 ! restart output
@@ -72,29 +78,32 @@ program particleswarmopt
 ! observation output
   unit(4) = 22
   !
+! parunc mode
+! ~~~~~~~~~~~
+  unit(9) = 28
+  ujac    = 29 
+  !
 ! pareto mode
 ! ~~~~~~~~~~~
 ! all pareto-specific output files
   unit(5) = 23
   !
 ! initial parameter sets
-  unit(8) = 27
+  uipar   = 27
 !--------------------------------------------------------------------------------------------------
   
 
 ! open record file
   recnam = trim(basnam) // '.rec'
   open(unit(1),file=trim(recnam))
-  
- 
+  !
 ! set up PEST++ run manager
 ! instantiate
   call instantrm(port)
   !                       
 ! initialize
   call initialrm(0)
-   
-
+  !
 ! if-statements governing pestmode
   if (trim(pestmode) == 'estimation') then
     !
@@ -103,6 +112,10 @@ program particleswarmopt
   else if (trim(pestmode) == 'pareto') then
     !
     call psopareto(basnam)
+    !
+  else if (trim(pestmode) == 'parunc') then
+    !
+    call parunc(basnam)
     !
   end if
   
