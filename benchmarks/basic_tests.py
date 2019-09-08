@@ -116,29 +116,29 @@ def basic_test(model_d="ies_10par_xsec"):
     m_d = os.path.join(model_d,"master_pestpp_sen")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
-    pyemu.os_utils.start_slaves(new_d, exe_path.replace("-ies","-sen"), "pest.pst", 5, master_dir=m_d,
-                           slave_root=model_d,local=local,port=port)
+    pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-sen"), "pest.pst", 5, master_dir=m_d,
+                           worker_root=model_d,local=local,port=port)
     df = pd.read_csv(os.path.join(m_d, "pest.mio"),index_col=0)
 
     # run sweep
     m_d = os.path.join(model_d,"master_sweep1")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
-    pyemu.os_utils.start_slaves(new_d, exe_path.replace("-ies","-swp"), "pest.pst", 5, master_dir=m_d,
-                           slave_root=model_d,local=local,port=port)
+    pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-swp"), "pest.pst", 5, master_dir=m_d,
+                           worker_root=model_d,local=local,port=port)
     df = pd.read_csv(os.path.join(m_d, "sweep_out.csv"),index_col=0)
     
     m_d = os.path.join(model_d,"master_pestpp-glm")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
-    pyemu.os_utils.start_slaves(new_d, exe_path.replace("-ies","-glm"), "pest.pst", 10, master_dir=m_d,
-                           slave_root=model_d,local=local,port=port)
+    pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-glm"), "pest.pst", 10, master_dir=m_d,
+                           worker_root=model_d,local=local,port=port)
 
     m_d = os.path.join(model_d,"master_pestpp-ies")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
-    pyemu.os_utils.start_slaves(new_d, exe_path, "pest.pst", 10, master_dir=m_d,
-                           slave_root=model_d,local=local,port=port)
+    pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 10, master_dir=m_d,
+                           worker_root=model_d,local=local,port=port)
 
 
 
@@ -158,8 +158,8 @@ def glm_save_binary_test():
     pst.pestpp_options = {"num_reals":30,"save_binary":True}
     pst.control_data.noptmax = 1
     pst.write(os.path.join(t_d, "pest_save_binary.pst"))
-    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies", "-glm"), "pest_save_binary.pst", 10, master_dir=m_d,
-                                slave_root=model_d, local=local, port=port)
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-glm"), "pest_save_binary.pst", 10, master_dir=m_d,
+                                worker_root=model_d, local=local, port=port)
 
     pe = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"pest_save_binary.post.paren.jcb"))
     pe = pyemu.ObservationEnsemble.from_binary(pst=pst,filename=os.path.join(m_d, "pest_save_binary.post.obsen.jcb"))
@@ -182,16 +182,16 @@ def sweep_forgive_test():
     pe.to_csv(os.path.join(t_d,"sweep_in.csv"))
     pst.pestpp_options["sweep_forgive"] = True
     pst.write(os.path.join(t_d,"pest_forgive.pst"))
-    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-swp"), "pest_forgive.pst", 10, master_dir=m_d,
-                           slave_root=model_d,local=local,port=port)
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_forgive.pst", 10, master_dir=m_d,
+                           worker_root=model_d,local=local,port=port)
     df1 = pd.read_csv(os.path.join(m_d, "sweep_out.csv"),index_col=0)
 
     pe = pe.loc[:,pst.par_names[:2]]
     pe.to_csv(os.path.join(t_d,"sweep_in.csv"))
     pst.pestpp_options["sweep_forgive"] = True
     pst.write(os.path.join(t_d,"pest_forgive.pst"))
-    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-swp"), "pest_forgive.pst", 10, master_dir=m_d,
-                           slave_root=model_d,local=local,port=port)
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_forgive.pst", 10, master_dir=m_d,
+                           worker_root=model_d,local=local,port=port)
     df2 = pd.read_csv(os.path.join(m_d, "sweep_out.csv"),index_col=0)
     diff = df1 - df2
     print(diff.max())
@@ -217,8 +217,8 @@ def inv_regul_test():
     pst.reg_data.phimaccept = 2.2
     pst.control_data.noptmax = 10
     pst.write(os.path.join(t_d,"pest_regul.pst"))
-    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-glm"), "pest_regul.pst", 10, master_dir=m_d,
-                           slave_root=model_d,local=local,port=port)
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-glm"), "pest_regul.pst", 10, master_dir=m_d,
+                           worker_root=model_d,local=local,port=port)
     
 
 def tie_by_group_test():
@@ -252,8 +252,8 @@ def tie_by_group_test():
 
 
     pst.write(os.path.join(t_d,"pest_tied.pst"))
-    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-sen"), "pest_tied.pst", 5, master_dir=m_d,
-                           slave_root=model_d,local=local,port=port)
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sen"), "pest_tied.pst", 5, master_dir=m_d,
+                           worker_root=model_d,local=local,port=port)
     df = pd.read_csv(os.path.join(m_d,"pest_tied.sen.par.csv"),index_col=0)
     df.columns = df.columns.str.lower()
     print(df.loc[:,tied_names[1:3]])
@@ -267,8 +267,8 @@ def tie_by_group_test():
         assert too_high.shape[0] == 0, "sen,{0},{1}".format(real,too_high)
     
     #pst.write(os.path.join(t_d,"pest_tied.pst"))
-    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-glm"), "pest_tied.pst", 5, master_dir=m_d,
-                           slave_root=model_d,local=local,port=port)
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-glm"), "pest_tied.pst", 5, master_dir=m_d,
+                           worker_root=model_d,local=local,port=port)
     jco = pyemu.Jco.from_binary(os.path.join(m_d,"pest_tied.jcb"))
     assert jco.shape[1] == 2,jco.shape
     par_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_tied.par"))
@@ -282,8 +282,8 @@ def tie_by_group_test():
     pst.control_data.noptmax = 1
     pst.write(os.path.join(t_d, "pest_tied.pst"))
 
-    pyemu.os_utils.start_slaves(t_d, exe_path, "pest_tied.pst", 10, master_dir=m_d,
-                           slave_root=model_d,local=local,port=port)
+    pyemu.os_utils.start_workers(t_d, exe_path, "pest_tied.pst", 10, master_dir=m_d,
+                           worker_root=model_d,local=local,port=port)
     
     for nopt in range(pst.control_data.noptmax+1):
         df = pd.read_csv(os.path.join(m_d,"pest_tied.{0}.par.csv".format(nopt)),index_col=0)
@@ -312,8 +312,8 @@ def tie_by_group_test():
     pst.control_data.noptmax = 3
     pst.write(os.path.join(t_d, "pest_tied.pst"))
 
-    pyemu.os_utils.start_slaves(t_d, exe_path, "pest_tied.pst", 10, master_dir=m_d,
-                                slave_root=model_d, local=local, port=port)
+    pyemu.os_utils.start_workers(t_d, exe_path, "pest_tied.pst", 10, master_dir=m_d,
+                                worker_root=model_d, local=local, port=port)
     df = pd.read_csv(os.path.join(m_d, "pest_tied.{0}.par.csv".format(pst.control_data.noptmax)), index_col=0)
     df.columns = df.columns.str.lower()
     print(df.loc[:, tied_names].std(axis=1).apply(np.abs).max())
@@ -325,13 +325,13 @@ def tie_by_group_test():
         assert too_high.shape[0] == 0, "ies,{0},{1}".format(real,too_high)
     
     df.to_csv(os.path.join(t_d,"sweep_in.csv"))
-    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-swp"), "pest_tied.pst", 5, master_dir=m_d,
-                           slave_root=model_d,local=local,port=port)
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_tied.pst", 5, master_dir=m_d,
+                           worker_root=model_d,local=local,port=port)
     pst.control_data.noptmax = 3
     pst.pestpp_options["enforce_tied_bounds"] = False
     pst.write(os.path.join(t_d, "pest_tied.pst"))
-    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-glm"), "pest_tied.pst", 5, master_dir=m_d,
-                           slave_root=model_d,local=local,port=port)
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-glm"), "pest_tied.pst", 5, master_dir=m_d,
+                           worker_root=model_d,local=local,port=port)
     jco = pyemu.Jco.from_binary(os.path.join(m_d,"pest_tied.jcb"))
     assert jco.shape[1] == 2,jco.shape
 
@@ -515,8 +515,8 @@ def sen_plusplus_test():
     pst.pestpp_options["gsa_morris_p"] = 5
     pst.pestpp_options["gsa_morris_delta"] = 2
     pst.write(os.path.join(t_d,"pest_sen.pst"))
-    pyemu.os_utils.start_slaves(t_d, exe_path.replace("-ies","-sen"), "pest_sen.pst", 5, master_dir=m_d,
-                           slave_root=model_d,local=local,port=port)
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sen"), "pest_sen.pst", 5, master_dir=m_d,
+                           worker_root=model_d,local=local,port=port)
 
 def secondary_marker_test():
     t_d = os.path.join("secondary_marker_test","template")
