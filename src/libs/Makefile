@@ -6,7 +6,6 @@ SUBDIRS := \
     common \
     mio \
     pestpp_common \
-    pest_routines \
     propack \
     run_managers \
     opt
