@@ -95,7 +95,7 @@ def basic_test(model_d="ies_10par_xsec"):
     pe.to_csv(os.path.join(new_d, "sweep_in.csv"))
     pe.loc[:, pst.adj_par_names].to_csv(os.path.join(new_d, "par_some.csv"))
     pe.iloc[:-3, :].to_csv(os.path.join(new_d, "restart_failed_par.csv"))
-    oe = pyemu.ObservationEnsemble.from_id_gaussian_draw(pst, num_reals=num_reals)
+    oe = pyemu.ObservationEnsemble.from_gaussian_draw(pst, num_reals=num_reals)
     oe.index = idx
     oe.to_csv(os.path.join(new_d, "obs.csv"))
     oe.iloc[:-3, :].to_csv(os.path.join(new_d, "restart_failed_base_obs.csv"))
