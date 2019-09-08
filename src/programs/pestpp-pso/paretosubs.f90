@@ -98,7 +98,7 @@ subroutine repcont(iiter,repred)
               !
               do ipto=1,nptogp
                 !
-                if (ptogp(ipart1,ipto) > ptogp(ipart2,ipto)) then
+                if (ptogp(ipart1,ipto) >= ptogp(ipart2,ipto)) then
                   !
                   dom = 1
                   !
@@ -142,7 +142,7 @@ subroutine repcont(iiter,repred)
             !
             do ipto=1,nptogp
               !
-              if (ptogp(ipart1,ipto) > ptogp(ipart2,ipto)) then
+              if (ptogp(ipart1,ipto) >= ptogp(ipart2,ipto)) then
                 !
                 dom = 1
                 !
@@ -215,7 +215,7 @@ subroutine repcont(iiter,repred)
             !
             do ipto=1,nptogp
               !
-              if (ptogp(ipart,ipto) > repoobj(irep,ipto)) then
+              if (ptogp(ipart,ipto) >= repoobj(irep,ipto)) then
                 !
                 dom = 1
                 !
@@ -302,7 +302,7 @@ subroutine repcont(iiter,repred)
             !
             do ipto=1,nptogp
               !
-              if (repoobj(irep1,ipto) > repoobj(irep2,ipto)) then
+              if (repoobj(irep1,ipto) >= repoobj(irep2,ipto)) then
                 !
                 dom = 1
                 !
