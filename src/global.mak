@@ -186,8 +186,7 @@ PESTPP_INCLUDES := \
     -I $(LIBS_DIR)/run_managers/external \
     -I $(LIBS_DIR)/run_managers/wrappers \
     -I $(LIBS_DIR)/pestpp_common \
-    -I $(LIBS_DIR)/opt \
-    -I $(LIBS_DIR)/linear_analysis $(EXT_INCLUDES)
+    -I $(LIBS_DIR)/opt $(EXT_INCLUDES)
 
 # Be careful with the order of library dependencies
 PESTPP_LIBS := \
@@ -200,7 +199,6 @@ PESTPP_LIBS := \
     -L$(LIBS_DIR)/mio -lmio \
     -L$(LIBS_DIR)/common -lcommon \
     -L$(LIBS_DIR)/propack -lpropack \
-    -L$(LIBS_DIR)/linear_analysis -llinear_analysis \
     -L$(LIBS_DIR)/pest_routines -lpest_routines \
     -L$(LIBS_DIR)/opt -lopt \
      $(EXT_LIBS)
