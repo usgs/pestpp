@@ -43,7 +43,7 @@ subroutine psopareto(basnam)
   alpha    = 0.0d+00
   !
 ! remove all repository output files from previous runs
-  call system('rm ./*.rep')
+  !call system('rm ./*.rep')
   !
 ! restart from previous run if requested
   if (rstpso == 1) then

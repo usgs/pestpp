@@ -67,21 +67,21 @@ end subroutine getwrd
 
 
 
-! subroutine lowcas(astrng)
-! 
-! ! Subroutine LOWCAS converts a string to lower case.
-! 
-!   implicit none
-! 
-!   integer::i,j
-!   character(len=*),intent(inout)::astrng
-! 
-!   do i=1,len_trim(astrng)
-!     !
-!     j=ichar(astrng(i:i))
-!     !
-!     if ((j >= 65) .and. (j <= 90)) astrng(i:i) = char(j+32)
-!     !
-!   end do
-!         
-! end subroutine lowcas
+ subroutine lowcas(astrng)
+ 
+ ! Subroutine LOWCAS converts a string to lower case.
+ 
+   implicit none
+ 
+   integer::i,j
+   character(len=*),intent(inout)::astrng
+ 
+   do i=1,len_trim(astrng)
+     !
+     j=ichar(astrng(i:i))
+     !
+     if ((j >= 65) .and. (j <= 90)) astrng(i:i) = char(j+32)
+     !
+   end do
+         
+ end subroutine lowcas
