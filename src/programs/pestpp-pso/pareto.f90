@@ -5,28 +5,13 @@ subroutine psopareto(basnam)
 !========================================================================================
 !========================================================================================
   use psodat
-#ifdef __INTEL_COMPILER
-  use ifport
-#endif  
 
   implicit none
 
 ! specifications:
 !----------------------------------------------------------------------------------------
 !---------------------------------------------------------------------------------------- 
-! interfaces
-!----------------------------------------------------------------------------------------
-  interface 
-  subroutine readrst(basnam)
-  integer::ipart,iparm,irep,iobs,igp,ipto
-  integer,dimension(:),allocatable::measgp
-  
-  character(len=100), optional, intent(in)::basnam
-  character(len=100)::scrc,fnam
-  end subroutine readrst
-  end interface
-!---------------------------------------------------------------------------------------- 
-! external routines for run management via PANTHER
+! external routines for run management via YAMR
 !----------------------------------------------------------------------------------------
   external rmif_run
   integer rmif_run
@@ -48,8 +33,6 @@ subroutine psopareto(basnam)
   double precision::alpha
   
   character(len=100),intent(in)::basnam
-  integer :: n_seed, ierr
-  integer, dimension(:), allocatable :: a_seed
 !----------------------------------------------------------------------------------------
 !----------------------------------------------------------------------------------------
 
@@ -60,11 +43,7 @@ subroutine psopareto(basnam)
   alpha    = 0.0d+00
   !
 ! remove all repository output files from previous runs
-#ifdef __windows__  
-!  ierr = system('del *.rep')
-#else
-!  ierr = system('rm ./*.rep')
-#endif  
+  call system('rm ./*.rep')
   !
 ! restart from previous run if requested
   if (rstpso == 1) then
@@ -104,12 +83,8 @@ subroutine psopareto(basnam)
 !   write initial conditions to record file
     call listipt(basnam)
     !
-!-- generate random parameter sets and velocities, set pbest, and add corresponding runs to the queue  
-    call random_seed (size = n_seed)
-    allocate(a_seed(1:n_seed))
-    a_seed = iseed
-    call random_seed(put = a_seed)
-    deallocate(a_seed)
+!-- generate random parameter sets and velocities, set pbest, and add corresponding runs to the queue
+    call random_seed()
     !
     inpar = 0
     !
@@ -176,8 +151,7 @@ subroutine psopareto(basnam)
       modfail(ipart) = 0
       !
 !     get model run results
-      irun = ipart-1
-      call modelrm(0,irun,fail)
+      call modelrm(0,ipart-1,fail)
       !
       modfail(ipart) = fail
       !
@@ -308,8 +282,7 @@ subroutine psopareto(basnam)
       modfail(ipart) = 0
       !
 !---- get model run results
-      irun = ipart-1
-      call modelrm(0,irun,fail)
+      call modelrm(0,ipart-1,fail)
       !
       modfail(ipart) = fail
       !

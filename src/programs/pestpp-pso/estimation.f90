@@ -7,23 +7,11 @@ subroutine psoest(basnam)
   use psodat
 
   implicit none
-  
+
 ! specifications:
-!---------------------------------------------------------------------------------------- 
-!---------------------------------------------------------------------------------------- 
-! interfaces
 !----------------------------------------------------------------------------------------
-  interface 
-  subroutine readrst(basnam)
-  integer::ipart,iparm,irep,iobs,igp,ipto
-  integer,dimension(:),allocatable::measgp
-  
-  character(len=100), optional, intent(in)::basnam
-  character(len=100)::scrc,fnam
-  end subroutine readrst
-  end interface
 !---------------------------------------------------------------------------------------- 
-! external routines for run management via PANTHER
+! external routines for run management via YAMR
 !----------------------------------------------------------------------------------------
   external rmif_run
   integer rmif_run
@@ -44,8 +32,6 @@ subroutine psoest(basnam)
   double precision::gbest,gmbest,gpbest,objmin
   
   character(len=100),intent(in)::basnam
-  integer :: n_seed
-  integer, dimension(:), allocatable :: a_seed
 !----------------------------------------------------------------------------------------
 !----------------------------------------------------------------------------------------
 
@@ -75,13 +61,8 @@ subroutine psoest(basnam)
 !   write initial conditions to record file
     call listini(basnam,gindex)
     !
-!-- generate random parameter sets and velocities, set pbest, and add corresponding runs to the queue  
-    call random_seed (size = n_seed)
-    allocate(a_seed(1:n_seed))
-    a_seed = iseed
-    call random_seed(put = a_seed)
-    deallocate(a_seed)
-    
+!-- generate random parameter sets and velocities, set pbest, and add corresponding runs to the queue
+    call random_seed()
     !
     inpar = 0
     !
@@ -148,8 +129,7 @@ subroutine psoest(basnam)
       modfail(ipart) = 0
       !
 !     get model run results
-      irun = ipart-1
-      call modelrm(0,irun,fail)
+      call modelrm(0,ipart-1,fail)
       !
       modfail(ipart) = fail
       !
@@ -175,6 +155,15 @@ subroutine psoest(basnam)
           objgpopt(ipart,igp) = 1.00d+30
         end do
         !
+        if (nptocon > 0) violate(ipart) = 1.0d+30
+        !
+      end if
+      !
+      if (nptocon > 0) then
+        !
+!       since this is the initial condition, vioopt set directly to initial violate
+        vioopt(ipart) = violate(ipart)
+        !
       end if
       !
     end do
@@ -183,7 +172,7 @@ subroutine psoest(basnam)
     call getgbest(gindex,gbest,gmbest,gpbest)
     !
     objmin = gbest
-    !  
+    !
 !   list output for initial conditions
     call listout(0,gbest,gmbest,gpbest,gindex,objmin,iphistp)
     !
@@ -244,8 +233,7 @@ subroutine psoest(basnam)
       modfail(ipart) = 0
       !
 !---- get model run results
-      irun = ipart-1
-      call modelrm(0,irun,fail)
+      call modelrm(0,ipart-1,fail)
       !
       modfail(ipart) = fail
       !
@@ -267,7 +255,19 @@ subroutine psoest(basnam)
     end do
     !
 !-- set pbest
-    call getpbest()
+    if (nptocon > 0) then
+      !
+      do ipart=1,npop
+        call pbestcon(ipart)
+      end do
+      !
+    else
+      !
+      do ipart=1,npop
+        call getpbest(ipart)
+      end do
+      !
+    end if
     !
 !-- set gbest
     call getgbest(gindex,gbest,gmbest,gpbest)
@@ -312,6 +312,9 @@ subroutine psoest(basnam)
     !
     objmin = gbest
     !
+!   write pbest and gbest to file
+    call writebest(gindex,basnam)
+    !
   end do
 ! end main loop of PSO iterative procedure
 !-----------------------------------------
@@ -330,13 +333,6 @@ subroutine psoest(basnam)
   !    
 ! execute model run
   err = rmif_run()
-  !
-! get model run results
-  irun = 0
-  call modelrm(0,irun,fail)
-  !
-! write pbest and gbest to file
-  call writebest(gindex,basnam)
   
   
 end subroutine psoest
