@@ -28,7 +28,10 @@ OBJECTS := \
     DifferentialEvolution \
     Ensemble \
     EnsembleSmoother \
-    Localizer
+    Localizer\
+    logger\
+    linear_analysis\
+    covariance
 OBJECTS := $(addsuffix $(OBJ_EXT),$(OBJECTS))
 
 

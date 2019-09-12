@@ -25,8 +25,8 @@
 				<Tool Name="VFPostBuildEventTool"/>
 				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
 		<Configuration Name="Debug|x64" OutputDirectory="$(SolutionDir)\..\exe\windows\$(Platform)\$(Configuration)\">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" PreprocessorDefinitions="__windows__" WarnInterfaces="true" ExternalNameInterpretation="extNameLowerCase" ExternalNameUnderscore="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
-				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" AdditionalLibraryDirectories="$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)" GenerateDebugInformation="true" SubSystem="subSystemConsole" AdditionalDependencies="common.lib mio.lib ws2_32.lib advapi32.lib pest_routines.lib yamr.lib  serial.lib external.lib wrappers.lib abstract_base.lib"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" PreprocessorDefinitions="__windows__" ExternalNameInterpretation="extNameLowerCase" ExternalNameUnderscore="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" AdditionalLibraryDirectories="$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)" GenerateDebugInformation="true" SubSystem="subSystemConsole" AdditionalDependencies="common.lib mio.lib ws2_32.lib advapi32.lib yamr.lib  serial.lib external.lib wrappers.lib abstract_base.lib"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>
@@ -35,8 +35,8 @@
 				<Tool Name="VFPostBuildEventTool"/>
 				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
 		<Configuration Name="Release|x64" OutputDirectory="$(SolutionDir)\..\bin\win\" TargetName="pestpp-pso">
-				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" PreprocessorDefinitions="__windows__" ExternalNameInterpretation="extNameLowerCase" ExternalNameUnderscore="true"/>
-				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" AdditionalLibraryDirectories="$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)" SubSystem="subSystemConsole" AdditionalDependencies="common.lib mio.lib ws2_32.lib advapi32.lib pest_routines.lib yamr.lib serial.lib external.lib wrappers.lib abstract_base.lib"/>
+				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" Preprocess="preprocessYes" PreprocessorDefinitions="__windows__" ExternalNameInterpretation="extNameLowerCase" ExternalNameUnderscore="true" UseMkl="mklSequential"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" AdditionalLibraryDirectories="$(IFORT_COMPILER19)\compiler\lib\intel64;$(IFORT_COMPILER19)\mkl\lib\intel64;$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)" SubSystem="subSystemConsole" AdditionalDependencies="mkl_lapack95_lp64.lib mkl_blas95_lp64.lib common.lib mio.lib ws2_32.lib advapi32.lib yamr.lib serial.lib external.lib wrappers.lib abstract_base.lib"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>
@@ -54,6 +54,7 @@
 		<File RelativePath=".\pareto.f90"/>
 		<File RelativePath=".\paretosubs.f90"/>
 		<File RelativePath=".\parsubs.f90"/>
+		<File RelativePath=".\parunc.f90"/>
 		<File RelativePath=".\pertsubs.f90"/>
 		<File RelativePath=".\psomain.f90"/>
 		<File RelativePath=".\readsubs.f90"/>
