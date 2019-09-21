@@ -13,13 +13,15 @@ subroutine getgbest(gindex,gbest,gmbest,gpbest)
 ! specifications:
 !----------------------------------------------------------------------------------------  
   integer,intent(out)::gindex
-  integer::i,j,ipart,left,right,ineibr,iineibr
+  integer::i,j,ipart,left,right,ineibr,iineibr,ifeas
   
   double precision,intent(out)::gbest,gmbest,gpbest
   double precision::gnbest
 !----------------------------------------------------------------------------------------
 
   if (neibr == 1) then
+    !
+    if (nptocon > 0) call killrm('Neighborhoods not yet supported with constraints')
     !
 !   find gbest within each neighborhood
     gnbest = 0.0d+00
@@ -60,29 +62,89 @@ subroutine getgbest(gindex,gbest,gmbest,gpbest)
     !
   end if
   !
-! find gbest of the swarm
-  !
-  i = 0
-  !
-  do ipart=1,npop
+  ! if using constraints, check for feasibility
+  if (nptocon > 0) then
     !
-    i = i + 1
+    ifeas = 0
+    i     = 0
     !
-    if (objopt(ipart) < gbest .or. i == 1) then
-      gbest  = objopt(ipart)
-      gmbest = objmopt(ipart)
-      gpbest = objpopt(ipart)
-      gindex = ipart
+    do ipart=1,npop
+      if (feas(ipart) == 1) ifeas = 1
+    end do
+    !
+!   find gbest of the swarm:
+!   at least one pbest position is feasible
+    if (ifeas == 1) then
+      !
+      do ipart=1,npop
+        !
+        if (vioopt(ipart) > 1.0d-16) then
+          !
+          cycle
+          !
+        else
+          !
+          i = i + 1
+          !
+          if (objopt(ipart) < gbest .or. i == 1) then
+            gbest  = objopt(ipart)
+            gindex = ipart
+          end if
+          !
+        end if
+        !
+      end do
+      !
+!   no pbest position is feasible
+    else
+      !
+      do ipart=1,npop
+        !
+        if (vioopt(ipart) < gbest .or. ipart == 1) then
+          gbest  = vioopt(ipart)
+          gindex = ipart
+        end if
+        !
+      end do
+      !
     end if
     !
-  end do
+  else
+    !
+    do ipart=1,npop
+      !
+      if (objopt(ipart) < gbest .or. ipart == 1) then
+        gbest  = objopt(ipart)
+        gindex = ipart
+      end if
+      !
+    end do
+    !
+  end if
+  !
+! ! find gbest of the swarm
+!   !
+!   i = 0
+!   !
+!   do ipart=1,npop
+!     !
+!     i = i + 1
+!     !
+!     if (objopt(ipart) < gbest .or. i == 1) then
+!       gbest  = objopt(ipart)
+!       gmbest = objmopt(ipart)
+!       gpbest = objpopt(ipart)
+!       gindex = ipart
+!     end if
+!     !
+!   end do
   
   
 end subroutine getgbest  
 
 
 
-subroutine getpbest()
+subroutine getpbest(ipart)
 !========================================================================================
 !==== This subroutine determines the personal best particle position.                ====
 !====    by Adam Siade                                                               ====
@@ -94,33 +156,103 @@ subroutine getpbest()
   implicit none
   
 ! specifications:
-!----------------------------------------------------------------------------------------  
-  integer::ipart,iparm,igp
+!----------------------------------------------------------------------------------------
+  integer,intent(in)::ipart
+  integer::iparm,igp
 !----------------------------------------------------------------------------------------
 
 ! if running standard PSO, set pbest based on composite objective function
-  do ipart=1,npop
+  if (obj(ipart) < objopt(ipart)) then
     !
-    if (obj(ipart) < objopt(ipart)) then
+    objopt(ipart)  = obj(ipart)
+    objmopt(ipart) = objm(ipart)
+    objpopt(ipart) = objp(ipart)
+    !
+    do igp=1,nobsgp
+      objgpopt(ipart,igp) = objgp(ipart,igp)
+    end do
+    !
+    do iparm=1,npar
+      pbest(ipart,iparm) = partval(ipart,iparm)
+    end do
+    !
+  end if
+  !
+end subroutine getpbest
+
+
+
+subroutine pbestcon(ipart)
+!========================================================================================
+!==== This subroutine determines the personal best particle positions for either     ====
+!==== constrained or unconstrained MOPSO.                                            ====
+!====    by Adam Siade                                                               ====
+!========================================================================================
+!========================================================================================
+
+  use psodat
+
+  implicit none
+
+! specifications:
+!----------------------------------------------------------------------------------------  
+  integer,intent(in)::ipart
+  integer::iparm,ipto,igp
+!----------------------------------------------------------------------------------------
+
+  if (nptocon > 0) then
+    !
+    if (feas(ipart) == 0) then
       !
-      objopt(ipart)  = obj(ipart)
-      objmopt(ipart) = objm(ipart)
-      objpopt(ipart) = objp(ipart)
+!     particle has never been feasible, set pbest based on violate
+      if (violate(ipart) < vioopt(ipart)) then
+        !
+        vioopt(ipart) = violate(ipart)
+        !
+        do iparm=1,npar
+          pbest(ipart,iparm) = partval(ipart,iparm)
+        end do
+        !
+        objopt(ipart) = obj(ipart)
+        !
+      end if
       !
-      do igp=1,nobsgp
-        objgpopt(ipart,igp) = objgp(ipart,igp)
-      end do
+    else
       !
-      do iparm=1,npar
-        pbest(ipart,iparm) = partval(ipart,iparm)
-      end do
+!     particle has been feasible before, but is not right now - do nothing
+      if (violate(ipart) > 1.0d-16) return
+      !
+!     particle is feasible now for the first time, update pbest and zero vioopt
+      if (vioopt(ipart) > 1.0d-16) then
+        !
+        vioopt(ipart) = 0.0d+00
+        !
+        do iparm=1,npar
+          pbest(ipart,iparm) = partval(ipart,iparm)
+        end do
+        !
+        objopt(ipart) = obj(ipart)
+        !
+        do igp=1,nobsgp
+          objgpopt(ipart,igp) = objgp(ipart,igp)
+        end do
+        !
+!     particle is feasible now and has been before, update pbest as usual
+      else
+        !
+        call getpbest(ipart)
+        !
+      end if
       !
     end if
     !
-  end do
+  else
+    !
+    call killrm('Something is wrong with the declaration of constraints')
+    !
+  end if
 
-
-end subroutine getpbest
+end subroutine pbestcon
 
 
 

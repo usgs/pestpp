@@ -3,9 +3,6 @@ top_builddir = ..
 include $(top_builddir)/global.mak
 
 SUBDIRS := \
-    ascii2pbin \
-    pbin2ascii \
-    pbin_dump \
     sweep
 
 

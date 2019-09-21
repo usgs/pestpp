@@ -33,7 +33,7 @@
 				<Tool Name="VFPreBuildEventTool"/>
 				<Tool Name="VFPostBuildEventTool"/>
 				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
-		<Configuration Name="Release|x64" OutputDirectory="$(SolutionDir)i$(Platform)\$(Configuration)\" IntermediateDirectory="i$(Platform)\$(Configuration)\" ConfigurationType="typeStaticLibrary">
+		<Configuration Name="Release|x64" OutputDirectory="$(SolutionDir)$(Platform)\$(Configuration)\" IntermediateDirectory="$(Platform)\$(Configuration)\" ConfigurationType="typeStaticLibrary">
 				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" FavorSizeOrSpeed="favorNone" InterproceduralOptimizations="ipoMultiFile" OpenMPConditionalCompilation="false" FloatingPointExceptionHandling="fpe0" RuntimeChecks="rtChecksNone" UseMkl="mklSequential"/>
 				<Tool Name="VFLibrarianTool" LinkLibraryDependencies="true"/>
 				<Tool Name="VFResourceCompilerTool"/>
