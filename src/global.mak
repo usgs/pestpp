@@ -128,8 +128,8 @@ ifeq ($(COMPILER),intel)  # Intel compilers
         endif
         EXT_LIBS += -lifcore -lpthread -lm -ldl
     else ifeq ($(SYSTEM),mac)
-        MKLROOT ?= /opt/intel/compilers_and_libraries_2018.1.126/mac/mkl
-        EXTRADIR = /opt/intel/compilers_and_libraries_2018.1.126/mac/compiler
+        MKLROOT ?= /opt/intel/compilers_and_libraries_2019.4.233/mac/mkl
+        EXTRADIR = /opt/intel/compilers_and_libraries_2019.4.233/mac/compiler
         EXT_INCLUDES = -I${MKLROOT}/include/intel64/lp64 -I${MKLROOT}/include
         EXT_LIBS = \
              ${MKLROOT}/lib/libmkl_lapack95_ilp64.a \
@@ -186,8 +186,7 @@ PESTPP_INCLUDES := \
     -I $(LIBS_DIR)/run_managers/external \
     -I $(LIBS_DIR)/run_managers/wrappers \
     -I $(LIBS_DIR)/pestpp_common \
-    -I $(LIBS_DIR)/opt \
-    -I $(LIBS_DIR)/linear_analysis $(EXT_INCLUDES)
+    -I $(LIBS_DIR)/opt $(EXT_INCLUDES)
 
 # Be careful with the order of library dependencies
 PESTPP_LIBS := \
@@ -200,8 +199,6 @@ PESTPP_LIBS := \
     -L$(LIBS_DIR)/mio -lmio \
     -L$(LIBS_DIR)/common -lcommon \
     -L$(LIBS_DIR)/propack -lpropack \
-    -L$(LIBS_DIR)/linear_analysis -llinear_analysis \
-    -L$(LIBS_DIR)/pest_routines -lpest_routines \
     -L$(LIBS_DIR)/opt -lopt \
      $(EXT_LIBS)
 

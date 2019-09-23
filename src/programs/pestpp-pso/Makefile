@@ -15,6 +15,7 @@ OBJECTS := \
     readsubs \
     rmsubs \
     utilsubs \
+    parunc \
     writesubs
 OBJECTS	:= $(addsuffix $(OBJ_EXT),$(OBJECTS))
 

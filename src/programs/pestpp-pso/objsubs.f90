@@ -13,56 +13,97 @@ subroutine estobjeval(ipart)
 ! specifications:
 !----------------------------------------------------------------------------------------  
   integer,intent(in)::ipart
-  integer::iobs,igp,gpnum
+  integer::iobs,igp,gpnum,icon
   
   double precision::priobj
 !----------------------------------------------------------------------------------------
 
-  obj(ipart)   = 0.0d+00
-  objm(ipart)  = 0.0d+00
-  objp(ipart)  = 0.0d+00
+! initialization
+  obj(ipart) = 0.0d+00
   do igp=1,nobsgp
     objgp(ipart,igp) = 0.0d+00
   end do
-  !
-! calculate overall measurement objective
-  do iobs=1,nobs
-    !
-    if (objmeth(iobs) == 1) then
-      objm(ipart) = objm(ipart) + (weight(iobs)*(obsval(iobs) - mobsval(iobs)))**2
-    else if (objmeth(iobs) == 2) then
-      objm(ipart) = objm(ipart) + (weight(iobs)*mobsval(iobs))
-    end if
-    !
-  end do
+  if (nptocon > 0) then
+    do icon=1,nptocon
+      ptocon(ipart,icon) = 0.0d+00
+    end do
+    violate(ipart) = 0.0d+00
+  end if
   !
 ! calculate measurement objective for each observation group
   do iobs=1,nobs
-    !
     do igp=1,nobsgp
-      if (trim(obsgp(iobs)) == trim(obgnme(igp))) gpnum = igp
+      !
+      if (trim(obsgp(iobs)) == trim(obgnme(igp))) then
+        !
+        gpnum = igp
+        !
+!       toggle objective
+        if (objmeth(igp) == 1) then
+          objgp(ipart,gpnum) = objgp(ipart,gpnum) + (weight(iobs)*(obsval(iobs) - mobsval(iobs)))**2
+        else if (objmeth(igp) == 2) then
+          objgp(ipart,gpnum) = objgp(ipart,gpnum) + weight(iobs)*mobsval(iobs)
+        end if
+        !
+        exit
+        !
+      end if
+      !
     end do
-    !
-    if (objmeth(iobs) == 1) then
-      objgp(ipart,gpnum) = objgp(ipart,gpnum) + (weight(iobs)*(obsval(iobs) - mobsval(iobs)))**2
-    else if (objmeth(iobs) == 2) then
-      objgp(ipart,gpnum) = objgp(ipart,gpnum) + mobsval(iobs)
-    end if
-    !
   end do
   !
 ! calculate the objective functions associated with prior information
   if (nprior > 0) then
-    !
     call priobjeval(ipart,priobj)
+  end if
+  !
+! calculate overall objective function
+  do igp=1,nobsgp
+    obj(ipart) = obj(ipart) + objgp(ipart,igp)
+  end do
+  !
+! evaluate constraints
+  if (nptocon > 0) then
     !
-    objp(ipart) = priobj
+    do iobs=1,nobs
+      do icon=1,nptocon
+        !
+        if (trim(obsgp(iobs)) == trim(ptcnme(icon))) then
+          !
+          gpnum = icon
+          !
+!         toggle objective
+          if (conmeth(gpnum) == 1) then
+            ptocon(ipart,gpnum) = ptocon(ipart,gpnum) + (weight(iobs)*(obsval(iobs) - mobsval(iobs)))**2
+          else if (conmeth(gpnum) == 2) then
+            ptocon(ipart,gpnum) = ptocon(ipart,gpnum) + weight(iobs)*mobsval(iobs)
+          end if
+          !
+          exit
+          !
+        end if
+        !
+      end do
+    end do
+    !
+!   check if constraints are violated
+    do icon=1,nptocon
+      !
+      if (ptocon(ipart,icon) > ptoeps(icon)) then
+        violate(ipart) = violate(ipart) + (ptocon(ipart,icon) - ptoeps(icon))
+      end if
+      !
+    end do
+    !
+!   if no constraints are violated, particle is feasible
+    if (violate(ipart) < 1.00d-16) then
+      feas(ipart) = 1
+    end if
     !
   end if
   !
-! calculate composite objective function used by basic PSO
-  obj(ipart) = objm(ipart) + objp(ipart)
-    
+  !
+  !
 end subroutine estobjeval
 
 
@@ -83,7 +124,7 @@ subroutine ptoobjeval(ipart)
 ! specifications:
 !----------------------------------------------------------------------------------------  
   integer,intent(in)::ipart
-  integer::iobs,igp,gpnum,ipto
+  integer::iobs,igp,gpnum,ipto,icon
   
   double precision::priobj
 !----------------------------------------------------------------------------------------
@@ -103,19 +144,41 @@ subroutine ptoobjeval(ipart)
   !
 ! calculate measurement objective for each observation group
   do iobs=1,nobs
-    !
     do igp=1,nobsgp
-      if (trim(obsgp(iobs)) == trim(obgnme(igp))) gpnum = igp
+      !
+      if (trim(obsgp(iobs)) == trim(obgnme(igp))) then
+        !
+        gpnum = igp
+        !
+!       toggle objective
+        if (objmeth(igp) == 1) then
+          objgp(ipart,gpnum) = objgp(ipart,gpnum) + (weight(iobs)*(obsval(iobs) - mobsval(iobs)))**2
+        else if (objmeth(igp) == 2) then
+          objgp(ipart,gpnum) = objgp(ipart,gpnum) + weight(iobs)*mobsval(iobs)
+        end if
+        !
+        exit
+        !
+      end if
+      !
     end do
-    !
-!   toggle objective
-    if (objmeth(iobs) == 1) then
-      objgp(ipart,gpnum) = objgp(ipart,gpnum) + (weight(iobs)*(obsval(iobs) - mobsval(iobs)))**2
-    else if (objmeth(iobs) == 2) then
-      objgp(ipart,gpnum) = objgp(ipart,gpnum) + weight(iobs)*mobsval(iobs)
-    end if
-    !
   end do
+  !
+! ! calculate measurement objective for each observation group
+!   do iobs=1,nobs
+!     !
+!     do igp=1,nobsgp
+!       if (trim(obsgp(iobs)) == trim(obgnme(igp))) gpnum = igp
+!     end do
+!     !
+! !   toggle objective
+!     if (objmeth(iobs) == 1) then
+!       objgp(ipart,gpnum) = objgp(ipart,gpnum) + (weight(iobs)*(obsval(iobs) - mobsval(iobs)))**2
+!     else if (objmeth(iobs) == 2) then
+!       objgp(ipart,gpnum) = objgp(ipart,gpnum) + weight(iobs)*mobsval(iobs)
+!     end if
+!     !
+!   end do
   !
 ! calculate the objective functions associated with prior information
   if (nprior > 0) then
@@ -133,31 +196,71 @@ subroutine ptoobjeval(ipart)
     end do
   end do
   !
-! evaluate epsilon-constraints
+! evaluate constraints
   if (nptocon > 0) then
     !
-    do ipto=1,nptocon
-      !
-      do igp=1,nobsgp
+    do iobs=1,nobs
+      do icon=1,nptocon
         !
-        if (trim(ptcnme(ipto)) == trim(ptgpnme(igp))) then
-          ptocon(ipart,ipto) = ptocon(ipart,ipto) + ptow(igp)*objgp(ipart,igp)
+        if (trim(obsgp(iobs)) == trim(ptcnme(icon))) then
+          !
+          gpnum = icon
+          !
+!         toggle objective
+          if (conmeth(gpnum) == 1) then
+            ptocon(ipart,gpnum) = ptocon(ipart,gpnum) + (weight(iobs)*(obsval(iobs) - mobsval(iobs)))**2
+          else if (conmeth(gpnum) == 2) then
+            ptocon(ipart,gpnum) = ptocon(ipart,gpnum) + weight(iobs)*mobsval(iobs)
+          end if
+          !
+          exit
+          !
         end if
         !
       end do
+    end do
+    !
+!   check if constraints are violated
+    do icon=1,nptocon
       !
-!     check for constraint violation
-      if (ptocon(ipart,ipto) > ptoeps(ipto)) then
-        violate(ipart) = violate(ipart) + (ptocon(ipart,ipto) - ptoeps(ipto))
+      if (ptocon(ipart,icon) > ptoeps(icon)) then
+        violate(ipart) = violate(ipart) + (ptocon(ipart,icon) - ptoeps(icon))
       end if
       !
     end do
     !
+!   if no constraints are violated, particle is feasible
     if (violate(ipart) < 1.00d-16) then
       feas(ipart) = 1
     end if
     !
   end if
+  !
+! ! evaluate epsilon-constraints
+!   if (nptocon > 0) then
+!     !
+!     do ipto=1,nptocon
+!       !
+!       do igp=1,nobsgp
+!         !
+!         if (trim(ptcnme(ipto)) == trim(ptgpnme(igp))) then
+!           ptocon(ipart,ipto) = ptocon(ipart,ipto) + ptow(igp)*objgp(ipart,igp)
+!         end if
+!         !
+!       end do
+!       !
+! !     check for constraint violation
+!       if (ptocon(ipart,ipto) > ptoeps(ipto)) then
+!         violate(ipart) = violate(ipart) + (ptocon(ipart,ipto) - ptoeps(ipto))
+!       end if
+!       !
+!     end do
+!     !
+!     if (violate(ipart) < 1.00d-16) then
+!       feas(ipart) = 1
+!     end if
+!     !
+!   end if
     
 end subroutine ptoobjeval
 
