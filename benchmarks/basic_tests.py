@@ -552,6 +552,89 @@ def secondary_marker_test():
     #    raise Exception(e)
     os.chdir(b_d)
 
+def sen_invest():
+    local = True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        # print("travis_prep")
+        # prep_for_travis(model_d)
+        local = False
+    par_names = ["p1","p2"]
+    obs_names = ["p1","p2","p1+p2","p1*p2","p1^p2","const"]
+    model_d = "sen_invest"
+    t_d = os.path.join(model_d,"template")
+    if os.path.exists(model_d):
+        shutil.rmtree(model_d)
+    os.makedirs(t_d)
+    tpl_file = os.path.join(t_d,"in.dat.tpl")
+    with open(tpl_file,'w') as f:
+        f.write("ptf ~\n")
+        for par_name in par_names:
+            f.write("{0}  ~     {0}      ~\n".format(par_name))
+    ins_file = os.path.join(t_d,"out.dat.ins")
+    with open(ins_file,'w') as f:
+        f.write("pif ~\n")
+        for obs_name in obs_names:
+            f.write("l1 w !{0}!\n".format(obs_name))
+
+    with open(os.path.join(t_d,"forward_run.py"),'w') as f:
+        f.write("import pandas as pd\n")
+        f.write("df = pd.read_csv('in.dat',index_col=0,delim_whitespace=True,names=['name','value'])\n")
+        f.write("df.loc['p1+p2','value'] = df.loc['p1','value'] + df.loc['p2','value']\n")
+        f.write("df.loc['p1*p2','value'] = df.loc['p1','value'] * df.loc['p2','value']\n")
+        f.write("df.loc['p1^p2','value'] = df.loc['p1','value'] * df.loc['p2','value']\n")
+        f.write("df.loc['const','value'] = 1.0\n")
+        f.write("df.to_csv('out.dat',sep=' ',header=False)\n")
+
+    with open(os.path.join(t_d,"in.dat"),'w') as f:
+        f.write("p1 1.0\n")
+        f.write("p2 1.0\n")
+        f.write("p3 1.0\n")
+    pyemu.os_utils.run("python forward_run.py",cwd=t_d)
+
+    pst = pyemu.Pst.from_io_files(tpl_files=tpl_file,in_files=tpl_file.replace(".tpl",""),
+                                  ins_files=ins_file,out_files=ins_file.replace(".ins",""))
+    pst.model_command = "python forward_run.py"
+    pst.control_data.noptmax = 0
+    pst.parameter_data.loc[:,"partrans"] = "log"
+    pst.parameter_data.loc[:,"parchglim"] = "relative"
+    pst.parameter_data.loc[:,"parubnd"] = 10.0
+    pst.parameter_data.loc[:,"parlbnd"] = .1
+    pst.parameter_data.loc[:,"parval1"] = 1.0
+
+    msn_file = os.path.join(t_d,"pest.msn")
+    mio_file = os.path.join(t_d, "pest.mio")
+
+
+    obs = pst.observation_data
+    obs.loc[:, "weight"] = 0.0
+    obs.loc["const", "weight"] = 1.0
+    pst.write(os.path.join(t_d, "pest.pst"))
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies", "-sen")), cwd=t_d)
+    df = pd.read_csv(msn_file, index_col=0)
+    df.columns = df.columns.map(str.lower)
+    df.columns = df.columns.map(str.strip)
+    df.index = df.index.map(str.lower)
+    print(df)
+    assert df.sen_mean_abs.sum() == 0.0
+    assert df.sen_std_dev.sum() == 0.0
+    df = pd.read_csv(mio_file, index_col=0)
+    df.columns = df.columns.map(str.lower)
+
+    df.loc[:, "parameter_name"] = df.parameter_name.apply(str.lower)
+    df.index = df.index.map(str.lower)
+    print(df)
+    assert df.loc[df.parameter_name == "p2", :].loc["p1", "sen_mean_abs"] == 0
+    assert df.loc[df.parameter_name == "p1", :].loc["p2", "sen_mean_abs"] == 0
+
+    pst.pestpp_options["gsa_method"] = "sobol"
+    pst.write(os.path.join(t_d, "pest.pst"))
+    #pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies", "-sen")), cwd=t_dir)
+    m_d = os.path.join(model_d,"master_sobol")
+
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-sen"), "pest.pst", 10, master_dir=m_d,
+                                 worker_root=model_d, local=local, port=port)
+
+
 if __name__ == "__main__":
     #glm_long_name_test()
     #sen_plusplus_test()
@@ -562,4 +645,5 @@ if __name__ == "__main__":
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
-    tie_by_group_test()
+    #tie_by_group_test()
+    sen_invest()
