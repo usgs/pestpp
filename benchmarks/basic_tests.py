@@ -627,12 +627,12 @@ def sen_invest():
     assert df.loc[df.parameter_name == "p1", :].loc["p2", "sen_mean_abs"] == 0
 
     pst.pestpp_options["gsa_method"] = "sobol"
+    pst.pestpp_options["gsa_sobol_samples"] = 5
     pst.write(os.path.join(t_d, "pest.pst"))
-    #pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies", "-sen")), cwd=t_dir)
-    m_d = os.path.join(model_d,"master_sobol")
-
-    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-sen"), "pest.pst", 10, master_dir=m_d,
-                                 worker_root=model_d, local=local, port=port)
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies", "-sen")), cwd=t_d)
+    #m_d = os.path.join(model_d,"master_sobol")
+    #pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-sen"), "pest.pst", 5, master_dir=m_d,
+    #                             worker_root=model_d, local=local, port=port)
 
 
 if __name__ == "__main__":

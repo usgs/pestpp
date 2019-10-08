@@ -290,7 +290,7 @@ void MorrisMethod::assemble_runs(RunManagerAbstract &run_manager)
 	vector<string> var_names = pest_scenario_ptr->get_ctl_ordered_par_names();
 	fout << "run_id";
 	for (auto pname : var_names)
-		fout << "," << pname;
+		fout << "," << pest_utils::lower_cp(pname);
 	fout << endl;
 	for (auto &p : par_map)
 	{
@@ -397,7 +397,7 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 			double p1 = pars1[par_name_1];
 			// compute standard Morris Sensitivity on the global objective function
 			double sen = (phi1 - phi0) / delta;
-			fout_raw << par_name_1 << ",  " << phi1 << ",  " << phi0 << ",  " << p1 << ",  " << p0 << ", " << sen << endl;
+			fout_raw << pest_utils::lower_cp(par_name_1) << ",  " << phi1 << ",  " << phi0 << ",  " << p1 << ",  " << p0 << ", " << sen << endl;
 
 			const auto &it_senmap = sen_map.find(par_name_1);
 			if (it_senmap != sen_map.end())
@@ -523,7 +523,7 @@ void MorrisMethod::calc_morris_obs(ostream &fout, MorrisObsSenFile &morris_sen_f
 			const auto &it_senmap = morris_sen_file.map_obs_stats.find(make_pair(i_par, i_obs));
 			if (it_senmap != morris_sen_file.map_obs_stats.end())
 			{
-				fout << i_obs <<"," << i_par << "," << it_senmap->second.comp_nsamples() << "," << it_senmap->second.comp_mean() << "," << it_senmap->second.comp_abs_mean() << "," << sqrt(it_senmap->second.comp_var()) << endl;
+				fout << pest_utils::lower_cp(i_obs) <<"," << pest_utils::lower_cp(i_par) << "," << it_senmap->second.comp_nsamples() << "," << it_senmap->second.comp_mean() << "," << it_senmap->second.comp_abs_mean() << "," << sqrt(it_senmap->second.comp_var()) << endl;
 			}
 		}
 		//fout << endl;
