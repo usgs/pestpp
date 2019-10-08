@@ -627,13 +627,40 @@ def sen_invest():
     assert df.loc[df.parameter_name == "p1", :].loc["p2", "sen_mean_abs"] == 0
 
     pst.pestpp_options["gsa_method"] = "sobol"
-    pst.pestpp_options["gsa_sobol_samples"] = 5
+    pst.pestpp_options["gsa_sobol_samples"] = 100
     pst.write(os.path.join(t_d, "pest.pst"))
-    pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies", "-sen")), cwd=t_d)
-    #m_d = os.path.join(model_d,"master_sobol")
-    #pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-sen"), "pest.pst", 5, master_dir=m_d,
-    #                             worker_root=model_d, local=local, port=port)
+    #pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies", "-sen")), cwd=t_d)
+    m_d = os.path.join(model_d,"master_sobol")
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-sen"), "pest.pst", 15, master_dir=m_d,
+                                 worker_root=model_d, local=local, port=port)
 
+def salib_verf():
+    import pyemu
+    from SALib.sample import saltelli
+    from SALib.analyze import sobol
+    m_d = os.path.join("sen_invest","master_sobol")
+    pst = pyemu.Pst(os.path.join(m_d,"pest.pst"))
+    pst.add_transform_columns()
+    bounds = [[l,u] for l,u in zip(pst.parameter_data.parlbnd_trans,pst.parameter_data.parubnd_trans)]
+    problem = {"num_vars":pst.npar_adj,"names":pst.par_names,"bounds":bounds}
+    test = saltelli.sample(problem,100,calc_second_order=False)
+    out_df = pd.read_csv(os.path.join(m_d,"pest.sobol.obs.csv"),index_col=0)
+    
+    for obs_name in pst.obs_names:
+        si = sobol.analyze(problem,out_df.loc[:,obs_name].values,calc_second_order=False)
+        print(obs_name,si)
+
+    in_df = pd.read_csv(os.path.join(m_d,"pest.sobol.par.csv"),index_col=0)
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(1,1)
+    print(test)
+    test = test ** 10
+    print(test)
+    ax.scatter(test[:,0],test[:,1],marker='.',color='g')
+    ax.scatter(in_df.iloc[:,0],in_df.iloc[:,1],marker='.',color='r')
+
+
+    plt.show()
 
 if __name__ == "__main__":
     #glm_long_name_test()
@@ -646,4 +673,5 @@ if __name__ == "__main__":
     #sweep_forgive_test()
     #inv_regul_test()
     #tie_by_group_test()
-    sen_invest()
+    #sen_invest()
+    salib_verf()
