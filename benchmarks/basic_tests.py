@@ -627,7 +627,7 @@ def sen_invest():
     assert df.loc[df.parameter_name == "p1", :].loc["p2", "sen_mean_abs"] == 0
 
     pst.pestpp_options["gsa_method"] = "sobol"
-    pst.pestpp_options["gsa_sobol_samples"] = 100
+    pst.pestpp_options["gsa_sobol_samples"] = 5
     pst.write(os.path.join(t_d, "pest.pst"))
     #pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies", "-sen")), cwd=t_d)
     m_d = os.path.join(model_d,"master_sobol")
@@ -647,7 +647,9 @@ def salib_verf():
     out_df = pd.read_csv(os.path.join(m_d,"pest.sobol.obs.csv"),index_col=0)
     
     for obs_name in pst.obs_names:
-        si = sobol.analyze(problem,out_df.loc[:,obs_name].values,calc_second_order=False)
+        if obs_name != "p1":
+            continue
+        si = sobol.analyze(problem,out_df.loc[:,obs_name].values,calc_second_order=False,num_resamples=5)
         print(obs_name,si)
 
     in_df = pd.read_csv(os.path.join(m_d,"pest.sobol.par.csv"),index_col=0)
