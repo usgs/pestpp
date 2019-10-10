@@ -554,17 +554,18 @@ def secondary_marker_test():
 
 def sen_basic_test():
     local = True
+    model_d = "sen_invest"
+    t_d = os.path.join(model_d, "template")
+    if os.path.exists(t_d):
+        shutil.rmtree(t_d)
+    os.makedirs(t_d)
     if "linux" in platform.platform().lower() and "10par" in model_d:
         # print("travis_prep")
         # prep_for_travis(model_d)
         local = False
     par_names = ["p1","p2"]
     obs_names = ["p1","p2","p1+p2","p1*p2","p1^p2","const"]
-    model_d = "sen_invest"
-    t_d = os.path.join(model_d,"template")
-    if os.path.exists(t_d):
-        shutil.rmtree(t_d)
-    os.makedirs(t_d)
+
     tpl_file = os.path.join(t_d,"in.dat.tpl")
     with open(tpl_file,'w') as f:
         f.write("ptf ~\n")
