@@ -430,7 +430,7 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 		const auto &it_senmap = sen_map.find(it_par);
 		if (it_senmap != sen_map.end())
 		{
-			fout_morris << it_par << ", " << it_senmap->second.comp_nsamples() << ", " << it_senmap->second.comp_mean() << ", " << it_senmap->second.comp_abs_mean() << ", " << sqrt(it_senmap->second.comp_var()) << endl;
+			fout_morris << pest_utils::lower_cp(it_par) << ", " << it_senmap->second.comp_nsamples() << ", " << it_senmap->second.comp_mean() << ", " << it_senmap->second.comp_abs_mean() << ", " << sqrt(it_senmap->second.comp_var()) << endl;
 		}
 	}
 	if (calc_morris_obs_sen)

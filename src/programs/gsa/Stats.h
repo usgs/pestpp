@@ -10,6 +10,9 @@ double vec_mean_missing_data(const std::vector<double> &data_vec, double missing
 std::pair<double, size_t> sum_of_prod_missing_data(const std::vector<double> &x_vec, const std::vector<double> &y_vec, double missing_val);
 double sobol_u_missing_data(const std::vector<double> &x_vec, const std::vector<double> &y_vec, double missing_val);
 
+double si_saltelli_numer(const std::vector<double>& y_a, const std::vector<double>& y_b, const std::vector<double>& y_c, double missing_val);
+double sti_saltelli_numer(const std::vector<double>& y_a, const std::vector<double>& y_c, double missing_val);
+
 class RunningStats
 {
 	//Based on paper "Computing the standard deviation efficiently" by Mark Hoemmen, Berkeley

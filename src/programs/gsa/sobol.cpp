@@ -14,6 +14,7 @@
 #include "Stats.h"
 #include "FileManager.h"
 #include "utilities.h"
+#include "eigen_tools.h"
 
 using namespace std;
 using namespace Eigen;
@@ -78,10 +79,10 @@ void Sobol::gen_m1_m2()
 
 MatrixXd Sobol::gen_N_matrix(const MatrixXd &m1, const MatrixXd &m2, const vector<int> &idx_vec)
 {
-  MatrixXd n = m2;
+  MatrixXd n = m1;
   for (int i : idx_vec)
   {
-	n.col(i) = m1.col(i);
+	n.col(i) = m2.col(i);
   }
   return n;
 }
@@ -124,8 +125,8 @@ void Sobol::assemble_runs(RunManagerAbstract &run_manager)
 	add_model_runs(run_manager, m1, f_out);
 	add_model_runs(run_manager, m2, f_out);
 
-	//cout << m1 << endl << endl;
-	//cout << m2 << endl << endl;
+	cout << m1 << endl << endl;
+	cout << m2 << endl << endl;
 	//calculate first order runs a1,....an
 	vector<int> idx_vec;
 	for (int ai=0; ai<n_adj_par; ++ai)
@@ -134,7 +135,7 @@ void Sobol::assemble_runs(RunManagerAbstract &run_manager)
 
 		idx_vec.push_back(ai);
 		c = gen_N_matrix(m1, m2, idx_vec);
-		//cout << c << endl << endl;
+		cout << c << endl << endl;
 		add_model_runs(run_manager, c, f_out);
 	}
 	f_out.close();
@@ -200,8 +201,33 @@ void Sobol::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run)
 {
 	ofstream &fout_sbl = file_manager_ptr->open_ofile_ext("sbl");
 	ofstream &f_out = file_manager_ptr->open_ofile_ext("sobol.obs.csv");
+	ofstream& f_si = file_manager_ptr->open_ofile_ext("sobol.si.csv");
+	ofstream& f_sti = file_manager_ptr->open_ofile_ext("sobol.sti.csv");
+
+	f_si << "output";
+	f_sti << "output";
+
+	for (auto pname : pest_scenario_ptr->get_ctl_ordered_adj_par_names())
+	{
+		f_si << "," << pest_utils::lower_cp(pname);
+		f_sti << "," << pest_utils::lower_cp(pname);
+	}
+	f_si << endl;
+	f_sti << endl;
+
+	//phi
 	fout_sbl << "Sobol Sensitivity for PHI" << endl;
-	calc_sen_single(run_manager, model_run, fout_sbl, string());
+	pair<vector<double>, vector<double>> vals;
+	vals = calc_sen_single(run_manager, model_run, fout_sbl, string());
+	f_si << "phi";
+	f_sti << "phi";
+	for (auto v : vals.first)
+		f_si << "," << v;
+	f_si << endl;
+	for (auto v : vals.second)
+		f_sti << "," << v;
+	f_sti << endl;
+
 
 	vector<string> obs_names = run_manager.get_obs_name_vec();
 	f_out << "run_id,failed_flag";
@@ -228,20 +254,32 @@ void Sobol::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run)
 		}
 		f_out << endl;
 	}
-	f_out.close();
-
+	file_manager_ptr->close_file("sobol.obs.csv");
+	
 	for (const string &iobs : obs_names)
 	{
 		fout_sbl << endl << endl;
 		fout_sbl << "Sobol Sensitivity for observation \"" << iobs <<"\"" << endl;
-		calc_sen_single(run_manager, model_run, fout_sbl, iobs);
+		vals = calc_sen_single(run_manager, model_run, fout_sbl, iobs);
+		string low_obs = pest_utils::lower_cp(iobs);
+		f_si << low_obs;
+		f_sti << low_obs;
+		for (auto v : vals.first)
+			f_si << "," << v;
+		f_si << endl;
+		for (auto v : vals.second)
+			f_sti << "," << v;
+		f_sti << endl;
 	}
 
 	file_manager_ptr->close_file("sbl");
+	file_manager_ptr->close_file("sobol.si.csv");
+	file_manager_ptr->close_file("sobol.sti.csv");
+
 }
 
 
-void Sobol::calc_sen_single(RunManagerAbstract &run_manager, ModelRun model_run, ofstream &fout_sbl, const string &obs_name)
+void Sobol::calc_sen_single_old(RunManagerAbstract& run_manager, ModelRun model_run, ofstream& fout_sbl, const string& obs_name)
 {
 	vector<double> ya;
 	vector<double> yb;
@@ -280,7 +318,7 @@ void Sobol::calc_sen_single(RunManagerAbstract &run_manager, ModelRun model_run,
 	size_t npar = adj_par_name_vec.size();
 
 	fout_sbl << "parameter_name, s_i, st_i, n_runs" << endl;
-	for (size_t i=0; i<npar; ++i)
+	for (size_t i = 0; i < npar; ++i)
 	{
 		vector<double> yci;
 		if (obs_name.empty())
@@ -302,4 +340,84 @@ void Sobol::calc_sen_single(RunManagerAbstract &run_manager, ModelRun model_run,
 
 		fout_sbl << adj_par_name_vec[i] << ", " << si << ", " << sti << ", " << n_runs << endl;
 	}
+}
+
+
+pair<vector<double>, vector<double>> Sobol::calc_sen_single(RunManagerAbstract &run_manager, ModelRun model_run, ofstream &fout_sbl, const string &obs_name)
+{
+	vector<double> ya;
+	vector<double> yb;
+	if (obs_name.empty())
+	{
+		ya = get_phi_vec(run_manager, 0, model_run);
+		yb = get_phi_vec(run_manager, 1, model_run);
+	}
+	else
+	{
+		ya = get_obs_vec(run_manager, 0, model_run, obs_name);
+		yb = get_obs_vec(run_manager, 1, model_run, obs_name);
+	}
+
+	vector<double> y_ab;
+	y_ab.reserve(ya.size() + yb.size()); // preallocate memory
+	y_ab.insert(y_ab.end(), ya.begin(), ya.end());
+	y_ab.insert(y_ab.end(), yb.begin(), yb.end());
+
+	size_t npar = adj_par_name_vec.size();
+	
+
+	//Compute Mean for the S_i's
+	double mean_sq_si = pow(vec_mean_missing_data(y_ab, MISSING_DATA),2.0);
+	// Compute Var for S_i's
+	pair<double, size_t> data = sum_of_prod_missing_data(y_ab, y_ab, MISSING_DATA);
+	//double var_si = data.first / (data.second - 2.0) - mean_sq_si;
+	double var_si = (data.first / data.second) - mean_sq_si;
+
+	fout_sbl << "parameter_name, s_i, st_i, n_runs" << endl;
+	vector<double> si_vals, sti_vals,r_yci, r_ya, r_yb;
+	si_vals.reserve(npar);
+	sti_vals.reserve(npar);
+	double si, sti, numer;
+	pair<double, int> sumprod;
+	long int n_runs = 0;
+	int r;
+	for (size_t i=0; i<npar; ++i)
+	{
+		vector<double> yci;
+		if (obs_name.empty())
+		{
+			yci = get_phi_vec(run_manager, i + 2, model_run);
+		}
+		else
+		{
+			yci = get_obs_vec(run_manager, i + 2, model_run, obs_name);
+		}
+		
+		if (var_si == 0)
+		{
+			si = 0.0;
+		}
+
+		else
+		{
+			numer = si_saltelli_numer(ya, yb, yci, MISSING_DATA);
+			si = numer / var_si;
+		}
+
+		
+		if (var_si == 0.0)
+			sti = 0.0;
+		else
+		{
+			numer = sti_saltelli_numer(ya, yci, MISSING_DATA);
+			sti = numer / var_si;
+		}
+		fout_sbl << adj_par_name_vec[i] << ", " << si << ", " << sti << ", " << n_runs << endl;
+		si_vals.push_back(si);
+		sti_vals.push_back(sti);
+	}
+
+	pair<vector<double>, vector<double>> vals(si_vals, sti_vals);
+	return vals;
+
 }
