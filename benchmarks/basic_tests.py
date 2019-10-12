@@ -552,6 +552,149 @@ def secondary_marker_test():
     #    raise Exception(e)
     os.chdir(b_d)
 
+def sen_basic_test():
+    local = True
+    model_d = "sen_invest"
+    t_d = os.path.join(model_d, "template")
+    if os.path.exists(t_d):
+        shutil.rmtree(t_d)
+    os.makedirs(t_d)
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        # print("travis_prep")
+        # prep_for_travis(model_d)
+        local = False
+    par_names = ["p1","p2"]
+    obs_names = ["p1","p2","p1+p2","p1*p2","p1^p2","const"]
+
+    tpl_file = os.path.join(t_d,"in.dat.tpl")
+    with open(tpl_file,'w') as f:
+        f.write("ptf ~\n")
+        for par_name in par_names:
+            f.write("{0}  ~     {0}      ~\n".format(par_name))
+    ins_file = os.path.join(t_d,"out.dat.ins")
+    with open(ins_file,'w') as f:
+        f.write("pif ~\n")
+        for obs_name in obs_names:
+            f.write("l1 w !{0}!\n".format(obs_name))
+
+    with open(os.path.join(t_d,"forward_run.py"),'w') as f:
+        f.write("import pandas as pd\n")
+        f.write("df = pd.read_csv('in.dat',index_col=0,delim_whitespace=True,names=['name','value'])\n")
+        f.write("df.loc['p1+p2','value'] = df.loc['p1','value'] + df.loc['p2','value']\n")
+        f.write("df.loc['p1*p2','value'] = df.loc['p1','value'] * df.loc['p2','value']\n")
+        f.write("df.loc['p1^p2','value'] = df.loc['p1','value'] * df.loc['p2','value']\n")
+        f.write("df.loc['const','value'] = 1.0\n")
+        f.write("df.to_csv('out.dat',sep=' ',header=False)\n")
+
+    with open(os.path.join(t_d,"in.dat"),'w') as f:
+        f.write("p1 1.0\n")
+        f.write("p2 1.0\n")
+        f.write("p3 1.0\n")
+    pyemu.os_utils.run("python forward_run.py",cwd=t_d)
+
+    pst = pyemu.Pst.from_io_files(tpl_files=tpl_file,in_files=tpl_file.replace(".tpl",""),
+                                  ins_files=ins_file,out_files=ins_file.replace(".ins",""))
+    pst.model_command = "python forward_run.py"
+    pst.control_data.noptmax = 0
+    pst.parameter_data.loc[:,"partrans"] = "log"
+    pst.parameter_data.loc[:,"parchglim"] = "relative"
+    pst.parameter_data.loc[:,"parubnd"] = 10.0
+    pst.parameter_data.loc[:,"parlbnd"] = .1
+    pst.parameter_data.loc[:,"parval1"] = 1.0
+
+    msn_file = os.path.join(t_d,"pest.msn")
+    mio_file = os.path.join(t_d, "pest.mio")
+
+    obs = pst.observation_data
+    obs.loc[:, "weight"] = 0.0
+    obs.loc["const", "weight"] = 1.0
+    pst.write(os.path.join(t_d, "pest.pst"))
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies", "-sen")), cwd=t_d)
+    df = pd.read_csv(msn_file, index_col=0)
+    df.columns = df.columns.map(str.lower)
+    df.columns = df.columns.map(str.strip)
+    df.index = df.index.map(str.lower)
+    print(df)
+    assert df.sen_mean_abs.sum() == 0.0
+    assert df.sen_std_dev.sum() == 0.0
+    df = pd.read_csv(mio_file, index_col=0)
+    df.columns = df.columns.map(str.lower)
+
+    df.loc[:, "parameter_name"] = df.parameter_name.apply(str.lower)
+    df.index = df.index.map(str.lower)
+    print(df)
+    assert df.loc[df.parameter_name == "p2", :].loc["p1", "sen_mean_abs"] == 0
+    assert df.loc[df.parameter_name == "p1", :].loc["p2", "sen_mean_abs"] == 0
+
+    pst.pestpp_options["gsa_method"] = "sobol"
+    pst.pestpp_options["gsa_sobol_samples"] = 5
+    pst.write(os.path.join(t_d, "pest.pst"))
+    #pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies", "-sen")), cwd=t_d)
+    m_d = os.path.join(model_d,"master_sobol")
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-sen"), "pest.pst", 5, master_dir=m_d,
+                                 worker_root=model_d, local=local, port=port)
+    si_vals = pd.read_csv(os.path.join(m_d,"pest.sobol.si.csv"),index_col=0)
+    sti_vals = pd.read_csv(os.path.join(m_d,"pest.sobol.sti.csv"),index_col=0)
+    v_d = os.path.join("sen_invest","verf")
+    si_verf_vals = pd.read_csv(os.path.join(v_d, "si.csv"), index_col=0)
+    sti_verf_vals = pd.read_csv(os.path.join(v_d, "sti.csv"), index_col=0)
+    d_si = (si_vals.loc[pst.obs_names,:] - si_verf_vals.loc[pst.obs_names,:]).apply(np.abs)
+    print(d_si.max())
+    assert d_si.max().max() < .001
+    d_sti = (sti_vals.loc[pst.obs_names, :] - sti_verf_vals.loc[pst.obs_names, :]).apply(np.abs)
+    print(d_sti.max())
+    assert d_sti.max().max() < .001
+
+
+def salib_verf():
+    import pyemu
+    from SALib.sample import saltelli
+    from SALib.analyze import sobol
+    m_d = os.path.join("sen_invest","master_sobol")
+    v_d = os.path.join("sen_invest","verf")
+    if os.path.exists(v_d):
+        shutil.rmtree(v_d)
+    os.makedirs(v_d)
+    pst = pyemu.Pst(os.path.join(m_d,"pest.pst"))
+    pst.add_transform_columns()
+    bounds = [[l,u] for l,u in zip(pst.parameter_data.parlbnd_trans,pst.parameter_data.parubnd_trans)]
+    problem = {"num_vars":pst.npar_adj,"names":pst.par_names,"bounds":bounds}
+    test = saltelli.sample(problem,100,calc_second_order=False)
+    out_df = pd.read_csv(os.path.join(m_d,"pest.sobol.obs.csv"),index_col=0)
+    reorder_df = out_df.copy()
+    idx = [0,3,1,2]
+    for i in range(4):
+        s = i*5
+        e = s + 5
+        chunk = out_df.iloc[s:e,:].copy()
+        reorder_df.iloc[idx[i]::4,:] = chunk.values
+        print(chunk.p1,reorder_df.iloc[idx[i]::4,:].p1)
+        pass
+    si_vals = pd.DataFrame(columns=pst.par_names,index=pst.obs_names)
+    sti_vals = pd.DataFrame(columns=pst.par_names, index=pst.obs_names)
+
+    for obs_name in pst.obs_names:
+        #if obs_name != "p1":
+        #    continue
+        si = sobol.analyze(problem,reorder_df.loc[:,obs_name].values,calc_second_order=False,num_resamples=5)
+        print(obs_name,si)
+        si_vals.loc[obs_name,:] = si["S1"]
+        sti_vals.loc[obs_name, :] = si["ST"]
+    si_vals.to_csv(os.path.join(v_d,"si.csv"))
+    sti_vals.to_csv(os.path.join(v_d, "sti.csv"))
+
+    # in_df = pd.read_csv(os.path.join(m_d,"pest.sobol.par.csv"),index_col=0)
+    # import matplotlib.pyplot as plt
+    # fig, ax = plt.subplots(1,1)
+    # print(test)
+    # test = test ** 10
+    # print(test)
+    # ax.scatter(test[:,0],test[:,1],marker='.',color='g')
+    # ax.scatter(in_df.iloc[:,0],in_df.iloc[:,1],marker='.',color='r')
+    #
+    #
+    # plt.show()
+
 if __name__ == "__main__":
     #glm_long_name_test()
     #sen_plusplus_test()
@@ -562,4 +705,6 @@ if __name__ == "__main__":
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
-    tie_by_group_test()
+    #tie_by_group_test()
+    sen_basic_test()
+    #salib_verf()
