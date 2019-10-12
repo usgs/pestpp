@@ -95,13 +95,13 @@ int main(int argc, char* argv[])
 			cerr << "--------------------------------------------------------" << endl;
 			cerr << "usage:" << endl << endl;
 			cerr << "    serial run manager:" << endl;
-			cerr << "        pest++ pest_ctl_file.pst" << endl << endl;
+			cerr << "        pestpp-glm control_file.pst" << endl << endl;
 			cerr << "    PANTHER master:" << endl;
-			cerr << "        pest++ control_file.pst /H :port" << endl << endl;
+			cerr << "        pestpp-glm control_file.pst /H :port" << endl << endl;
 			cerr << "    PANTHER runner:" << endl;
-			cerr << "        pest++ control_file.pst /H hostname:port " << endl << endl;
+			cerr << "        pestpp-glm control_file.pst /H hostname:port " << endl << endl;
 			cerr << "    external run manager:" << endl;
-			cerr << "        pest++ control_file.pst /E" << endl << endl;
+			cerr << "        pestpp-glm control_file.pst /E" << endl << endl;
 			cerr << " additional options can be found in the PEST++ manual" << endl;
 			cerr << "--------------------------------------------------------" << endl;
 			exit(0);
