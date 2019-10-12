@@ -638,12 +638,18 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 
 	}
 	performance_log->log_event("commencing check of parameter bounds");
-	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_ctl_del_pars, grad_ctl_del_pars);
+	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, grad_ctl_del_pars);
 	prev_frozen_active_ctl_pars.insert(new_frozen_active_ctl_pars.begin(), new_frozen_active_ctl_pars.end());
 
 
 	performance_log->log_event("limiting out of bounds pars");
-	pest_scenario.enforce_par_limits(upgrade_active_ctl_pars, base_run_active_ctl_pars, true, true);
+	Parameters notfrozen_upgrade_active_ctl_pars = upgrade_active_ctl_pars;
+	notfrozen_upgrade_active_ctl_pars.erase(prev_frozen_active_ctl_pars.get_keys());
+	pest_scenario.enforce_par_limits(notfrozen_upgrade_active_ctl_pars, base_run_active_ctl_pars, true, true);
+	upgrade_active_ctl_pars = notfrozen_upgrade_active_ctl_pars;
+	for (auto p : prev_frozen_active_ctl_pars)
+		upgrade_active_ctl_pars[p.first] = p.second;
+
 	performance_log->log_event("checking for denormal floating point values");
 	if (upgrade_active_ctl_pars.get_notnormal_keys().size() > 0)
 	{
@@ -907,12 +913,11 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 
 		Parameters base_run_active_ctl_par = par_transform.ctl2active_ctl_cp(base_run.get_ctl_pars());
 
-		//If running in regularization mode, adjust the regularization weights
-		// define a function type for upgrade methods
 		
 		Parameters tmp_new_par;
 		Parameters frozen_active_ctl_pars = failed_jac_pars;
 		Pest::LimitType limit_type;
+		
 		//use call to calc_upgrade_vec to compute frozen parameters
 		test_upgrade_to_find_freeze_pars(0.0, frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
 			obs_names_vec, base_run_active_ctl_par,
@@ -942,6 +947,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 
 		ofstream &fout_frz = file_manager.open_ofile_ext("fpr");
 		ofstream &fout_rec = file_manager.rec_ofstream();
+		frozen_active_ctl_pars.insert(failed_jac_pars.begin(), failed_jac_pars.end());
 		for (double i_lambda : lambda_vec)
 		{
 			prf_message.str("");
@@ -956,15 +962,15 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 
 			Parameters new_pars;
 			
-			Parameters frozen_active_ctl_pars = failed_jac_pars;
+			Parameters lam_frozen_active_ctl_pars = frozen_active_ctl_pars;	
 			try
 			{
 				//test for pars to freeze
-				test_upgrade_to_find_freeze_pars(i_lambda, frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
+				test_upgrade_to_find_freeze_pars(i_lambda, lam_frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
 					obs_names_vec, base_run_active_ctl_par,
 					tmp_new_par, mar_mat, false);
 
-				calc_upgrade_vec(i_lambda, frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
+				calc_upgrade_vec(i_lambda, lam_frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
 					obs_names_vec, base_run_active_ctl_par, new_pars, mar_mat, limit_type, false);
 			}
 			catch (const runtime_error& error)

@@ -92,6 +92,51 @@ double sobol_u_missing_data(const std::vector<double> &x_vec, const std::vector<
 	return u;
 }
 
+double si_saltelli_numer(const std::vector<double>& y_a, const std::vector<double>& y_b, const std::vector<double>& y_c, double missing_val)
+{
+	assert (y_a.size() == y_b.size());
+	assert (y_a.size() == y_c.size());
+	int valid_count = 0;
+	double a, b, c;
+	double t = 0;
+	for (int i = 0; i < y_a.size(); i++)
+	{
+		a = y_a[i], b = y_b[i], c = y_c[i];
+		if ((a == missing_val) ||
+			(b == missing_val) ||
+			(c == missing_val))
+			continue;
+		valid_count++;
+		t = t + (b * (c - a));
+
+	}
+	t = t / valid_count;
+
+	return t;
+
+}
+
+
+double sti_saltelli_numer(const std::vector<double>& y_a, const std::vector<double>& y_c, double missing_val)
+{
+	assert(y_a.size() == y_c.size());
+	int valid_count = 0;
+	double a, b, c;
+	double t = 0;
+	for (int i = 0; i < y_a.size(); i++)
+	{
+		a = y_a[i], c = y_c[i];
+		if ((a == missing_val) ||
+			(c == missing_val))
+			continue;
+		valid_count++;
+		t = t + pow((a - c), 2);
+
+	}
+	t = t / (2.0 * valid_count);
+	return t;
+}
+
 void RunningStats::reset()
 {
 	n = 0;

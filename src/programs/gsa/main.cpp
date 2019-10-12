@@ -87,11 +87,11 @@ int main(int argc, char* argv[])
 		cerr << "--------------------------------------------------------" << endl;
 		cerr << "usage:" << endl << endl;
 		cerr << "    serial run manager:" << endl;
-		cerr << "        gsa pest_ctl_file.pst" << endl << endl;
+		cerr << "        pestpp-sen control_file.pst" << endl << endl;
 		cerr << "    PANTHER master:" << endl;
-		cerr << "        gsa control_file.pst /H :port" << endl;
+		cerr << "        pestpp-sen control_file.pst /H :port" << endl;
 		cerr << "    PANTHER worker:" << endl;
-		cerr << "        gsa control_file.pst /H hostname:port " << endl << endl;
+		cerr << "        pestpp-sen control_file.pst /H hostname:port " << endl << endl;
 		cerr << " additional options can be found in the PEST++ manual" << endl;
 		cerr << "--------------------------------------------------------" << endl;
 		exit(0);

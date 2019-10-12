@@ -987,6 +987,7 @@ void Pest::enforce_par_limits(Parameters & upgrade_active_ctl_pars, const Parame
 	double bnd_tol = 0.001;
 	double scaled_bnd_val;
 	string controlling_par = "";
+	string control_type = "";
 	ParameterInfo &p_info = ctl_parameter_info;
 	const ParameterRec *p_rec;
 	Parameters upgrade_ctl_pars;
@@ -1005,6 +1006,8 @@ void Pest::enforce_par_limits(Parameters & upgrade_active_ctl_pars, const Parame
 	}
 	for (auto p : upgrade_ctl_pars)
 	{
+		/*if (pest_utils::lower_cp(p.first) == "s_xomehgwat")
+			cout << p.first << endl;*/
 		last_val = last_ctl_pars.get_rec(p.first);
 		
 		p_rec = p_info.get_parameter_rec_ptr(p.first);
@@ -1084,6 +1087,7 @@ void Pest::enforce_par_limits(Parameters & upgrade_active_ctl_pars, const Parame
 				{
 					scaling_factor = temp;
 					controlling_par = p.first;
+					control_type = "upper change limit";
 				}
 			}
 
@@ -1100,6 +1104,7 @@ void Pest::enforce_par_limits(Parameters & upgrade_active_ctl_pars, const Parame
 			{
 				scaling_factor = temp;
 				controlling_par = p.first;
+				control_type = "lower change limit";
 			}
 		}
 
@@ -1133,6 +1138,7 @@ void Pest::enforce_par_limits(Parameters & upgrade_active_ctl_pars, const Parame
 				{
 					scaling_factor = temp;
 					controlling_par = p.first;
+					control_type = "upper bound";
 				}
 			}
 			scaled_bnd_val = p_rec->lbnd - (p_rec->lbnd * bnd_tol);
@@ -1150,6 +1156,7 @@ void Pest::enforce_par_limits(Parameters & upgrade_active_ctl_pars, const Parame
 				{
 					scaling_factor = temp;
 					controlling_par = p.first;
+					control_type == "lower bound";
 				}
 			}
 		}	
@@ -1157,7 +1164,10 @@ void Pest::enforce_par_limits(Parameters & upgrade_active_ctl_pars, const Parame
 
 	if (scaling_factor == 0.0)
 	{
-		throw runtime_error("Pest::enforce_par_change_limits error : zero length parameter vector");
+		ss.str("");
+		ss << "Pest::enforce_par_change_limits error : zero length parameter vector" << endl;
+		ss << "parameter: " << controlling_par << ", control type: " << control_type;
+		throw runtime_error(ss.str());
 	}
 
 	if (scaling_factor != 1.0)
