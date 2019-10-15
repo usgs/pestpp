@@ -785,110 +785,25 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	}
 #endif
 	fin.close();
-	// process pest++ options last
-	pestpp_options.set_n_iter_super(0);
-	pestpp_options.set_n_iter_base(max(1, control_info.noptmax));
-	pestpp_options.set_super_eigthres(svd_info.eigthresh);
-	pestpp_options.set_max_n_super(ctl_parameters.size());
-	pestpp_options.set_max_super_frz_iter(5);
-	pestpp_options.set_max_n_super(n_adj_par);
-	pestpp_options.set_max_reg_iter(20);
-	pestpp_options.set_uncert_flag(true);
-	pestpp_options.set_prediction_names(vector<string>());
-	pestpp_options.set_parcov_filename(string());
-	pestpp_options.set_obscov_filename(string());
-	pestpp_options.set_basejac_filename(string());
-	pestpp_options.set_sweep_parameter_csv_file(string());
-	pestpp_options.set_sweep_output_csv_file("sweep_out.csv");
-	pestpp_options.set_sweep_base_run(false);
-	pestpp_options.set_sweep_forgive(false);
-	pestpp_options.set_sweep_chunk(500);
-	pestpp_options.set_tie_by_group(false);
-	pestpp_options.set_enforce_tied_bounds(false);
 	
-	pestpp_options.set_jac_scale(true);
-	pestpp_options.set_opt_obj_func("");
-	pestpp_options.set_opt_coin_log(true);
-	pestpp_options.set_opt_skip_final(false);
-	pestpp_options.set_opt_std_weights(false);
-	pestpp_options.set_opt_dec_var_groups(vector<string>());
-	pestpp_options.set_opt_ext_var_groups(vector<string>());
-	pestpp_options.set_opt_constraint_groups(vector<string>());
-	pestpp_options.set_opt_risk(0.5);
-	pestpp_options.set_opt_direction(1.0);
-	pestpp_options.set_opt_iter_tol(0.001);
-	pestpp_options.set_opt_recalc_fosm_every(1);
-	pestpp_options.set_opt_iter_derinc_fac(1.0);
-	pestpp_options.set_opt_include_bnd_pi(true);
-	pestpp_options.set_hotstart_resfile(string());
-	pestpp_options.set_ies_par_csv("");
-	pestpp_options.set_ies_obs_csv("");
-	pestpp_options.set_ies_obs_restart_csv("");
-	pestpp_options.set_ies_par_restart_csv("");
-	pestpp_options.set_ies_lam_mults(vector<double>());
-	pestpp_options.set_ies_init_lam(-999);
-	pestpp_options.set_ies_use_approx(true);
-	pestpp_options.set_ies_subset_size(5);
-	pestpp_options.set_ies_reg_factor(0.0);
-	pestpp_options.set_ies_verbose_level(0);
-	pestpp_options.set_ies_use_prior_scaling(false);
-	pestpp_options.set_ies_num_reals(50);
-	pestpp_options.set_ies_bad_phi(1.0e+300);
-	pestpp_options.set_ies_bad_phi_sigma(1.0e+300);
-	pestpp_options.set_ies_include_base(true);
-	pestpp_options.set_ies_use_empirical_prior(false);
-	pestpp_options.set_ies_group_draws(true);
-	//pestpp_options.set_ies_num_reals_passed(false);
-	pestpp_options.set_ies_enforce_bounds(true);
-	pestpp_options.set_par_sigma_range(4.0);
-	pestpp_options.set_ies_save_binary(false);
-	pestpp_options.set_ies_localizer("");
-	pestpp_options.set_ies_accept_phi_fac(1.05);
-	pestpp_options.set_ies_lambda_inc_fac(10.0);
-	pestpp_options.set_ies_lambda_dec_fac(0.75);
-	pestpp_options.set_ies_save_lambda_en(false);
-	pestpp_options.set_ies_weight_csv("");
-	pestpp_options.set_ies_subset_how("RANDOM");
-	pestpp_options.set_ies_localize_how("PARAMETERS");
-	pestpp_options.set_ies_num_threads(-1);
-	pestpp_options.set_ies_debug_fail_subset(false);
-	pestpp_options.set_ies_debug_fail_remainder(false);
-	pestpp_options.set_ies_debug_bad_phi(false);
-	pestpp_options.set_ies_debug_upgrade_only(false);
-	pestpp_options.set_ies_debug_high_subset_phi(false);
-	pestpp_options.set_ies_debug_high_upgrade_phi(false);
-	pestpp_options.set_ies_csv_by_reals(true);
-	pestpp_options.set_ies_autoadaloc(false);
-	pestpp_options.set_ies_autoadaloc_sigma_dist(1.0);
-	pestpp_options.set_ies_enforce_chglim(false);
-	pestpp_options.set_ies_center_on("");
-
-	pestpp_options.set_gsa_method("MORRIS");
-	//many of these defaults are also redefined in gsa main
-	pestpp_options.set_gsa_morris_p(4);
-	pestpp_options.set_gsa_morris_r(4);
-	pestpp_options.set_gsa_morris_delta(0.6666);
-	pestpp_options.set_gsa_morris_obs_sen(true);
-	pestpp_options.set_gsa_morris_pooled_obs(false);
-	pestpp_options.set_gsa_sobol_par_dist("norm");
-	pestpp_options.set_gsa_sobol_samples(4);
-	pestpp_options.set_gsa_rand_seed(2);
-
-	pestpp_options.set_condor_submit_file(string());
-	pestpp_options.set_overdue_giveup_minutes(1.0e+30);
-
+	map<string, PestppOptions::PPARG_STATUS> arg_map, line_arg_map;
 	for(vector<string>::const_iterator b=pestpp_input.begin(),e=pestpp_input.end();
 		b!=e; ++b) {
 
-			pestpp_options.parce_line(*b);
+		try 
+		{
+			line_arg_map = pestpp_options.parse_plusplus_line(*b);
+		}
+		catch (...)
+		{
+			throw runtime_error("error parsing ++ line '" + line + "'");
+		}
+		arg_map.insert(line_arg_map.begin(),line_arg_map.end());
 	}
+	//check for not "accepted" args here...
+
 	
 	regul_scheme_ptr->set_max_reg_iter(pestpp_options.get_max_reg_iter());
-//	//Make sure we use Q1/2J is PROPACK is chosen
-//	if (pestpp_options.get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
-//	{
-//		pestpp_options.set_mat_inv(PestppOptions::MAT_INV::Q12J);
-//	}
 
 	if (pestpp_options.get_tie_by_group())
 	{

@@ -216,14 +216,20 @@ public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
 	enum MAT_INV { Q12J, JTQJ };
 	enum GLOBAL_OPT { NONE, OPT_DE };
-	PestppOptions(int _n_iter_base = 50, int _n_iter_super = 0, int _max_n_super = 50,
+	enum PPARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
+	/*PestppOptions(int _n_iter_base = 50, int _n_iter_super = 0, int _max_n_super = 50,
 		double _super_eigthres = 1.0E-6, SVD_PACK _svd_pack = PestppOptions::REDSVD,
 		double _super_relparmax = 0.1, int max_run_fail = 3,
 		bool iter_summary_flag = true, bool der_forgive = true,
 		double overdue_reched_fac = 1.15, double overdue_giveup_fac = 100,
 		GLOBAL_OPT _global_opt = PestppOptions::NONE,
-		double _de_f = 0.8, double _de_cr = 0.9, int _de_npopulation = 40, int _de_max_gen = 100, bool _de_dither_f = true);
-	void parce_line(const string &line);
+		double _de_f = 0.8, double _de_cr = 0.9, int _de_npopulation = 40, int _de_max_gen = 100, bool _de_dither_f = true);*/
+	PestppOptions() { ; }
+
+	//void parce_line(const string &line);
+	map<string,PPARG_STATUS> parse_plusplus_line(const string &line);
+	PPARG_STATUS parse_plusplus_arg(string key, const string org_value);
+	PPARG_STATUS assign_plusplus_value_by_name(const string &name, const string &value, string& line);
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
 	int get_n_iter_base() const { return n_iter_base; }
@@ -238,12 +244,18 @@ public:
 	void set_lambda_scale_vec(vector<double> sv) {lambda_scale_vec = sv; }
 	bool get_iter_summary_flag() const { return iter_summary_flag; }
 	bool get_der_forgive() const { return der_forgive; }
+	void set_der_forgive(bool _flag) { der_forgive = _flag; }
 	GLOBAL_OPT get_global_opt() const { return global_opt; }
 	double get_de_f() const { return de_f; }
+	void set_de_f(double _val) { de_f = _val; }
 	double get_de_cr() const { return de_cr; }
+	void set_de_cr(double _val) { de_cr = _val; }
 	int get_de_npopulation() const { return de_npopulation; }
+	void set_de_npopulation(double _val) { de_npopulation = _val; }
 	int get_de_max_gen() const { return de_max_gen; }
+	void set_de_max_gen(int _val ) { de_max_gen = _val; }
 	bool get_de_dither_f() const { return de_dither_f; }
+	void set_de_dither_f(bool _val) {de_dither_f = _val; }
 	void set_global_opt(const GLOBAL_OPT _global_opt) { global_opt = _global_opt; }
 	void set_max_n_super(int _max_n_super) { max_n_super = _max_n_super; }
 	void set_super_eigthres(double _super_eigthres) { super_eigthres = _super_eigthres; }
@@ -438,6 +450,7 @@ public:
 
 
 private:
+
 	int n_iter_base;
 	int n_iter_super;
 	int max_n_super;
@@ -548,6 +561,8 @@ private:
 	int gsa_rand_seed;
 
 	bool enforce_tied_bounds;
+
+	void set_plusplus_defaults();
 		
 };
 
