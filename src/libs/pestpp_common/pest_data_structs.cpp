@@ -1063,7 +1063,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	return ARG_STATUS::ARG_ACCEPTED;
 }
 
-void PestppOptions::set_plusplus_defaults()
+void PestppOptions::set_defaults()
 {
 
 	set_svd_pack(PestppOptions::SVD_PACK::REDSVD);
@@ -1408,6 +1408,39 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 	else
 		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
+}
+
+void ControlInfo::set_defaults()
+{
+	/*ControlInfo() : relparmax(0.0), facparmax(0.0), facorig(0.0), phiredswh(0.0), noptmax(0),
+		phiredstp(0.0), nphistp(0), nphinored(0), relparstp(0.0), nrelpar(0), noptswitch(0),
+		splitswh(0.0), pestmode(PestMode::ESTIMATION) {}*/
+	facparmax = 1.1;
+	relparmax = 1.0;
+	facorig = 0.001;
+	phiredswh = 0.1;
+	noptmax = 0;
+	phiredstp = 0.01;
+	nphistp = 3;
+	nphinored = 3;
+	relparstp = 0.01;
+	nrelpar = 3;
+	noptswitch = 1;
+	splitswh = 1.1;
+	pestmode = PestMode::ESTIMATION;
+
+}
+
+SVDInfo::SVDInfo()
+{
+	set_defaults();
+}
+
+void SVDInfo::set_defaults()
+{
+	maxsing = 1000000;
+	eigthresh = 1.0e-6;
+	eigwrite = 0;
 }
 
 PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const const string key, string org_value)

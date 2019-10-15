@@ -419,6 +419,7 @@ public:
 	void set_debug_parse_only(bool _flag) { debug_parse_only = _flag; }
 	bool get_debug_parse_only() const { return debug_parse_only; }
 
+	void set_defaults();
 
 
 private:
@@ -535,7 +536,7 @@ private:
 	bool enforce_tied_bounds;
 	bool debug_parse_only;
 
-	void set_plusplus_defaults();
+	
 		
 };
 
@@ -562,9 +563,11 @@ public:
 	double splitswh;
 	PestMode pestmode;
 	PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value);
-	ControlInfo() : relparmax(0.0), facparmax(0.0), facorig(0.0), phiredswh(0.0), noptmax(0),
+	/*ControlInfo() : relparmax(0.0), facparmax(0.0), facorig(0.0), phiredswh(0.0), noptmax(0),
 		phiredstp(0.0), nphistp(0), nphinored(0), relparstp(0.0), nrelpar(0), noptswitch(0),
-		splitswh(0.0), pestmode(PestMode::ESTIMATION) {}
+		splitswh(0.0), pestmode(PestMode::ESTIMATION) {}*/
+	ControlInfo() { ; }
+	void set_defaults();
 
 private:
 	set<string> passed_args;
@@ -576,7 +579,8 @@ public:
 	int maxsing;
 	int eigwrite;
 	double eigthresh;
-	SVDInfo() : maxsing(0), eigwrite(0), eigthresh(1.0e-7) {}
+	SVDInfo();
+	void set_defaults();
 	PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value);
 private:
 	set<string> passed_args;

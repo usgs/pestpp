@@ -276,6 +276,12 @@ int main(int argc, char* argv[])
 	 	}
 		pest_scenario.check_inputs(fout_rec);
 
+		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
+		{
+			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+			exit(0);
+		}
+
 		//if base jco arg read from control file, reset restart controller
 		if (!pest_scenario.get_pestpp_options().get_basejac_filename().empty())
 		{

@@ -213,6 +213,12 @@ int main(int argc, char* argv[])
 		//throw(e);
 		return 1;
 	}
+	pest_scenario.check_inputs(fout_rec);
+	if (pest_scenario.get_pestpp_options().get_debug_parse_only())
+	{
+		cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+		exit(0);
+	}
 
 
 	RunManagerAbstract *run_manager_ptr;

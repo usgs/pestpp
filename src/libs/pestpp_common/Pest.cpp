@@ -43,8 +43,11 @@ Pest::Pest() : base_par_transform("PEST base_par_transform"), regul_scheme_ptr(0
 
 void Pest::set_defaults()
 {
-	svd_info.maxsing = 0;
-	svd_info.eigthresh = 1.0e-6;
+	pestpp_options.set_defaults();
+	svd_info.set_defaults();
+	regul_scheme_ptr = new DynamicRegularization;
+	regul_scheme_ptr->set_defaults();
+	control_info.set_defaults();
 }
 
 void Pest::check_inputs(ostream &f_rec)
@@ -889,18 +892,11 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	int num_tpl_file;
 	int dercom;
 	int i_tpl_ins = 0;
-	double phimlim;
-	double phimaccept;
-	double fracphim;
-	double wfinit = 1.0;
-	double wfmin = numeric_limits<double>::min();
-	double wfmax = numeric_limits<double>::max();
-	double wffac;
-	double wftol;
 	bool use_dynamic_reg = false;
 	bool reg_adj_grp_weights = false;
 	vector<string> pestpp_input;
-	regul_scheme_ptr = new DynamicRegularization(use_dynamic_reg);
+	/*regul_scheme_ptr = new DynamicRegularization();
+	regul_scheme_ptr->set_defaults();*/
 
 	//dont change these text names - they are used in ParamTransformSeq
 	TranTied* t_tied = new TranTied("PEST to model tied transformation");
@@ -916,6 +912,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	base_par_transform.push_back_ctl2active_ctl(t_fixed);
 	base_par_transform.push_back_active_ctl2numeric(t_log);
 
+	pestpp_options.set_defaults();
 
 	set<string> tied_names;
 	pst_filename = _pst_filename;
@@ -976,8 +973,12 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				cout << endl;
 				PestppOptions::ARG_STATUS stat = pestpp_options.assign_value_by_key(kv.first, kv.second);
 				if (stat == PestppOptions::ARG_STATUS::ARG_ACCEPTED)
-				{ 
+				{
 				}
+				else if (stat == PestppOptions::ARG_STATUS::ARG_DUPLICATE)
+					throw runtime_error("Control file error: duplicate entry for '" + kv.first + "', possibly through an alias");
+				else if (stat == PestppOptions::ARG_STATUS::ARG_INVALID)
+					throw runtime_error("Control file error: invalid entry for '" + kv.first + "'");
 
 
 				//try to use this as a control data arg
@@ -985,16 +986,39 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				{
 					stat = control_info.assign_value_by_key(kv.first,kv.second);
 				}
+				if (stat == PestppOptions::ARG_STATUS::ARG_ACCEPTED)
+				{
+				}
+				else if (stat == PestppOptions::ARG_STATUS::ARG_DUPLICATE)
+					throw runtime_error("Control file error: duplicate entry for '" + kv.first + "', possibly through an alias");
+				else if (stat == PestppOptions::ARG_STATUS::ARG_INVALID)
+					throw runtime_error("Control file error: invalid entry for '" + kv.first + "'");
+
 
 				//try to use as an SVD arg
 				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
 				{
 					stat = svd_info.assign_value_by_key(kv.first, kv.second);
 				}
+				if (stat == PestppOptions::ARG_STATUS::ARG_ACCEPTED)
+				{
+				}
+				else if (stat == PestppOptions::ARG_STATUS::ARG_DUPLICATE)
+					throw runtime_error("Control file error: duplicate entry for '" + kv.first + "', possibly through an alias");
+				else if (stat == PestppOptions::ARG_STATUS::ARG_INVALID)
+					throw runtime_error("Control file error: invalid entry for '" + kv.first + "'");
+
 
 				//try to use as a regul arg
 				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)	
 					stat = regul_scheme_ptr->assign_value_by_key(kv.first, kv.second);
+				if (stat == PestppOptions::ARG_STATUS::ARG_ACCEPTED)
+				{
+				}
+				else if (stat == PestppOptions::ARG_STATUS::ARG_DUPLICATE)
+					throw runtime_error("Control file error: duplicate entry for '" + kv.first + "', possibly through an alias");
+				else if (stat == PestppOptions::ARG_STATUS::ARG_INVALID)
+					throw runtime_error("Control file error: invalid entry for '" + kv.first + "'");
 
 				//ok, found no home for this line
 				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
@@ -1321,28 +1345,37 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (section == "REGULARISATION" || section == "REGULARIZATION")
 			{
 				if (sec_lnum == 1) {
-					convert_ip(tokens[0], phimlim);
+					regul_scheme_ptr->assign_value_by_key("PHIMLIM", tokens[0]);
+					regul_scheme_ptr->assign_value_by_key("PHIMACCEPT", tokens[1]);
+					if (tokens.size() >= 3)
+						regul_scheme_ptr->assign_value_by_key("FRACPHIM", tokens[2]);
+					/*convert_ip(tokens[0], phimlim);
 					convert_ip(tokens[1], phimaccept);
 					fracphim = 0.0;
-					if (tokens.size() >= 3) convert_ip(tokens[2], fracphim);
+					if (tokens.size() >= 3) convert_ip(tokens[2], fracphim);*/
 				}
 				else if (sec_lnum == 2) {
-					convert_ip(tokens[0], wfinit);
+					/*convert_ip(tokens[0], wfinit);
 					convert_ip(tokens[1], wfmin);
-					convert_ip(tokens[2], wfmax);
+					convert_ip(tokens[2], wfmax);*/
+					regul_scheme_ptr->assign_value_by_key("WFINIT", tokens[0]);
+					regul_scheme_ptr->assign_value_by_key("WFMIN", tokens[1]);
+					regul_scheme_ptr->assign_value_by_key("WFMAX", tokens[2]);
 				}
 				else if (sec_lnum == 3) {
 					int iregadj;
-					convert_ip(tokens[0], wffac);
-					convert_ip(tokens[1], wftol);
+					/*convert_ip(tokens[0], wffac);
+					convert_ip(tokens[1], wftol);*/
+					regul_scheme_ptr->assign_value_by_key("WFFAC", tokens[0]);
+					regul_scheme_ptr->assign_value_by_key("WFTOL", tokens[1]);
+
 					if (tokens.size() > 2)
 					{
-						convert_ip(tokens[2], iregadj);
-						if (iregadj == 1) reg_adj_grp_weights = true;
+						regul_scheme_ptr->assign_value_by_key("IREGADJ", tokens[2]);
 					}
-					delete regul_scheme_ptr;
+					/*delete regul_scheme_ptr;
 					regul_scheme_ptr = new DynamicRegularization(use_dynamic_reg, reg_adj_grp_weights, phimlim,
-						phimaccept, fracphim, wfmin, wfmax, wffac, wftol, wfinit);
+						phimaccept, fracphim, wfmin, wfmax, wffac, wftol, wfinit);*/
 				}
 				else
 				{
@@ -1475,10 +1508,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		}
 	}
 
-	if (pestpp_options.get_debug_parse_only())
-	{
-		cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
-	}
+	
 
 	return 0;
 }

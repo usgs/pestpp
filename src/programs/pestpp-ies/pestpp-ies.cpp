@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
 		//rns file is really large. so let's remove it explicitly and wait a few seconds before continuing...
 		string rns_file = file_manager.build_filename("rns");
 		int flag = remove(rns_file.c_str());
-		w_sleep(2000);
+		//w_sleep(2000);
 		//by default use the serial run manager.  This will be changed later if another
 		//run manger is specified on the command line.
 		RunManagerType run_manager_type = RunManagerType::SERIAL;
@@ -227,7 +227,7 @@ int main(int argc, char* argv[])
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
-
+		pest_scenario.set_defaults();
 		try {
 			performance_log.log_event("starting to process control file", 1);
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
@@ -244,7 +244,11 @@ int main(int argc, char* argv[])
 			throw(e);
 		}
 		pest_scenario.check_inputs(fout_rec);
-
+		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
+		{
+			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+			exit(0);
+		}
 
 
 		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
