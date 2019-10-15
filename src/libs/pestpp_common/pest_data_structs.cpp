@@ -366,7 +366,7 @@ ostream& operator<< (ostream &os, const PestppOptions& val)
 //{
 //}
 
-map<string,PestppOptions::PPARG_STATUS> PestppOptions::parse_plusplus_line(const string& line)
+map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const string& line)
 {
 	string key;
 	string value;
@@ -385,26 +385,26 @@ map<string,PestppOptions::PPARG_STATUS> PestppOptions::parse_plusplus_line(const
 	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\''), tmp_line.end());
 	//upper_ip(tmp_line);
 
-	map<string, PPARG_STATUS> arg_map;
-	PPARG_STATUS stat;
+	map<string, ARG_STATUS> arg_map;
+	ARG_STATUS stat;
 	for (std::sregex_iterator i(tmp_line.begin(), tmp_line.end(), lambda_reg); i != end_reg; ++i)
 	{
 		string key = (*i)[1];
 		string org_value = strip_cp((*i)[2]);
 		try
 		{
-			stat = parse_plusplus_arg(key, org_value);
+			stat = assign_value_by_key(key, org_value);
 			arg_map[key] = stat;
 		}
 		catch (...)
 		{
-			arg_map[key] = PPARG_STATUS::ARG_INVALID;
+			arg_map[key] = ARG_STATUS::ARG_INVALID;
 		}
 	}
 	return arg_map;
 }
 
-PestppOptions::PPARG_STATUS PestppOptions::parse_plusplus_arg(string key, const string org_value)
+PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const string org_value)
 {
 	upper_ip(key);
 
@@ -415,7 +415,7 @@ PestppOptions::PPARG_STATUS PestppOptions::parse_plusplus_arg(string key, const 
 		{
 			//throw PestParsingError(line, "Duplicate key word \"" + key + "\", possibly through an alias");
 			//cout << "parse_plusplus_line() Error: Duplicate key word " << key << ", possibly through an alias" << endl;
-			return PPARG_STATUS::ARG_DUPLICATE;
+			return ARG_STATUS::ARG_DUPLICATE;
 		}
 		passed_args.insert(key);
 		arg_map[key] = value;
@@ -447,7 +447,7 @@ PestppOptions::PPARG_STATUS PestppOptions::parse_plusplus_arg(string key, const 
 			svd_pack = EIGEN;
 		else
 			//throw PestParsingError(line, "Invalid ++svd_pack: \"" + value + "\"");
-			return PPARG_STATUS::ARG_INVALID;
+			return ARG_STATUS::ARG_INVALID;
 	}
 		
 	else if (key == "SUPER_RELPARMAX"){
@@ -1048,12 +1048,19 @@ PestppOptions::PPARG_STATUS PestppOptions::parse_plusplus_arg(string key, const 
 		istringstream is(value);
 		is >> boolalpha >> enforce_tied_bounds;
 	}
+	else if (key == "DEBUG_PARSE_ONLY")
+	{
+	transform(value.begin(), value.end(), value.begin(), ::tolower);
+	istringstream is(value);
+	is >> boolalpha >> debug_parse_only;
+	}
 	else 
 	{
 
 		//throw PestParsingError(line, "Invalid key word \"" + key +"\"");
-		return PPARG_STATUS::ARG_NOTFOUND;
+		return ARG_STATUS::ARG_NOTFOUND;
 	}
+	return ARG_STATUS::ARG_ACCEPTED;
 }
 
 void PestppOptions::set_plusplus_defaults()
@@ -1161,6 +1168,9 @@ void PestppOptions::set_plusplus_defaults()
 	set_overdue_giveup_minutes(1.0e+30);
 	set_overdue_reched_fac(1.15);
 	set_overdue_giveup_fac(100);
+
+	set_debug_parse_only(false);
+	
 }
 
 ostream& operator<< (ostream &os, const ParameterInfo& val)
@@ -1345,4 +1355,74 @@ ostream& operator<< (ostream &os, const SVDInfo& val)
 	os << "    maxsing = " << val.maxsing << endl;
 	os << "    eigthresh = " << val.eigthresh << endl;
 	return os;
+}
+
+PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, const string org_value)
+{
+	/*enum PestMode { ESTIMATION, REGUL, PARETO, UNKNOWN };
+	double phiredswh;
+	int noptmax;
+	int jacfile;
+	int numcom;
+	double phiredstp;
+	int nphistp;
+	int nphinored;
+	double relparstp;
+	int nrelpar;
+	int noptswitch;
+	double splitswh;
+	PestMode pestmode;*/
+	string value = upper_cp(org_value);
+	if (passed_args.find(key) != passed_args.end())
+		return PestppOptions::ARG_STATUS::ARG_DUPLICATE;
+	passed_args.insert(key);
+	if (key == "RELPARMAX")
+		convert_ip(value, relparmax);
+	else if (key == "FACPARMAX")
+		convert_ip(value, facparmax);
+	else if (key == "FACORIG")
+		convert_ip(value, facorig);
+	else if (key == "PHIREDSTP")
+		convert_ip(value, phiredstp);
+	else if (key == "NPHISTP")
+		convert_ip(value, nphistp);
+	else if (key == "NPHINORED")
+		convert_ip(value, nphinored);
+	else if (key == "RELPARSTP")
+		convert_ip(value, relparstp);
+	else if (key == "NOPTSWITCH")
+		convert_ip(value, noptswitch);
+	else if (key == "SPLITSWH")
+		convert_ip(value, splitswh);
+	else if (key == "PESTMODE")
+	{
+		if (value == "ESTIMATION")
+			pestmode = PestMode::ESTIMATION;
+		else if ((value == "REGULARIZATION") || (value == "REGULARISATION"))
+			pestmode = PestMode::REGUL;
+		else if (value == "PARETO")
+			pestmode = PestMode::PARETO;
+		else
+			return PestppOptions::ARG_STATUS::ARG_INVALID;
+	}
+	else
+		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;
+	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
+}
+
+PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const const string key, string org_value)
+{
+	string value = upper_cp(org_value);
+	if (passed_args.find(key) != passed_args.end())
+		return PestppOptions::ARG_STATUS::ARG_DUPLICATE;
+	passed_args.insert(key);
+	if (key == "EIGTHRESH")
+		convert_ip(value, eigthresh);
+	else if (key == "MAXSING")
+		convert_ip(value, maxsing);
+	else if (key == "EIGWRITE")
+		convert_ip(value, eigwrite);
+	else
+		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;
+	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
 }

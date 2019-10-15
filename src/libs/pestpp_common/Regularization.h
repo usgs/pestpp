@@ -21,6 +21,7 @@
 
 #include <unordered_map>
 #include <string>
+#include "pest_data_structs.h"
 class ModelRun;
 
 class DynamicRegularization
@@ -49,6 +50,7 @@ public:
 	static DynamicRegularization get_unit_reg_instance() { return DynamicRegularization(); }
 	static DynamicRegularization get_zero_reg_instance() { return DynamicRegularization(true, false, 0,0,0,0,0,0,0,0); }
 	virtual ~DynamicRegularization(void){}
+	PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value);
 protected:
 	bool use_dynamic_reg;
 	bool adj_grp_weights;
@@ -63,6 +65,7 @@ protected:
 	double wf_init;
 	double tikhonov_weight;
 	std::unordered_map<std::string, double> regul_grp_weights;
+	set<string> passed_args;
 };
 
 

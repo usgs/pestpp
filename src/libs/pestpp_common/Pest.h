@@ -41,8 +41,11 @@ public:
 	void set_defaults();
 	void check_inputs(ostream &f_rec);
 	void check_io();
-	int process_ctl_file(ifstream &fin, string pst_filename, ofstream &f_rec);
-	int process_ctl_file(ifstream &fin, string pst_filename);
+	int process_ctl_file_old(ifstream &fin, string pst_filename, ofstream &f_rec);
+	int process_ctl_file_old(ifstream &fin, string pst_filename);
+	int process_ctl_file(ifstream& fin, string pst_filename, ofstream& f_rec);
+	int process_ctl_file(ifstream& fin, string pst_filename);
+
 	int get_n_adj_par(){ return n_adj_par; }
 	const Parameters& get_ctl_parameters() const {return ctl_parameters;}
 	const Observations& get_ctl_observations() const {return observation_values;}
@@ -106,6 +109,9 @@ private:
 	DynamicRegularization *regul_scheme_ptr;
 	map<int,string> other_lines;
 	string pst_filename;
+
+	pair<string, string> parse_keyword_line(const string line);
+
 };
 ostream& operator<< (ostream &os, const Pest& val);
 #endif /* PEST_H_ */

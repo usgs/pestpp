@@ -30,40 +30,9 @@
 //class TransformSeq<;
 class LaTridiagMatDouble;
 
-class ControlInfo {
-
-public:
-	enum PestMode { ESTIMATION, REGUL, PARETO, UNKNOWN };
-	double relparmax;
-	double facparmax;
-	double facorig;
-	double phiredswh;
-	int noptmax;
-	int jacfile;
-	int numcom;
-	double phiredstp;
-	int nphistp;
-	int nphinored;
-	double relparstp;
-	int nrelpar;
-	int noptswitch;
-	double splitswh;
-	PestMode pestmode;
-	ControlInfo() : relparmax(0.0), facparmax(0.0), facorig(0.0), phiredswh(0.0), noptmax(0),
-		phiredstp(0.0), nphistp(0), nphinored(0), relparstp(0.0), nrelpar(0), noptswitch(0),
-		splitswh(0.0), pestmode(PestMode::ESTIMATION){}
-};
-ostream& operator<< (ostream &os, const ControlInfo& val);
 
 
-class SVDInfo {
-public:
-	int maxsing;
-	int eigwrite;
-	double eigthresh;
-	SVDInfo() : maxsing(0), eigwrite(0), eigthresh(1.0e-7) {}
-};
-ostream& operator<< (ostream &os, const SVDInfo& val);
+
 
 class ParameterGroupRec {
 public:
@@ -216,7 +185,7 @@ public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
 	enum MAT_INV { Q12J, JTQJ };
 	enum GLOBAL_OPT { NONE, OPT_DE };
-	enum PPARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
+	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
 	/*PestppOptions(int _n_iter_base = 50, int _n_iter_super = 0, int _max_n_super = 50,
 		double _super_eigthres = 1.0E-6, SVD_PACK _svd_pack = PestppOptions::REDSVD,
 		double _super_relparmax = 0.1, int max_run_fail = 3,
@@ -227,9 +196,8 @@ public:
 	PestppOptions() { ; }
 
 	//void parce_line(const string &line);
-	map<string,PPARG_STATUS> parse_plusplus_line(const string &line);
-	PPARG_STATUS parse_plusplus_arg(string key, const string org_value);
-	PPARG_STATUS assign_plusplus_value_by_name(const string &name, const string &value, string& line);
+	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
+	ARG_STATUS assign_value_by_key(string key, const string org_value);
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
 	int get_n_iter_base() const { return n_iter_base; }
@@ -251,7 +219,7 @@ public:
 	double get_de_cr() const { return de_cr; }
 	void set_de_cr(double _val) { de_cr = _val; }
 	int get_de_npopulation() const { return de_npopulation; }
-	void set_de_npopulation(double _val) { de_npopulation = _val; }
+	void set_de_npopulation(int _val) { de_npopulation = _val; }
 	int get_de_max_gen() const { return de_max_gen; }
 	void set_de_max_gen(int _val ) { de_max_gen = _val; }
 	bool get_de_dither_f() const { return de_dither_f; }
@@ -430,9 +398,9 @@ public:
 	bool get_gsa_morris_obs_sen() const { return gsa_morris_obs_sen; }
 	void set_gsa_morris_obs_sen(bool _flag) { gsa_morris_obs_sen = _flag; }
 	double get_gsa_morris_p() const { return gsa_morris_p; }
-	void set_gsa_morris_p(double _p) { gsa_morris_p = _p; }
+	void set_gsa_morris_p(int _p) { gsa_morris_p = _p; }
 	double get_gsa_morris_r() const { return gsa_morris_r; }
-	void set_gsa_morris_r(double _r) { gsa_morris_r = _r; }
+	void set_gsa_morris_r(int _r) { gsa_morris_r = _r; }
 	double get_gsa_morris_delta() const { return gsa_morris_delta; }
 	void set_gsa_morris_delta(double _d) { gsa_morris_delta = _d; }
 	int get_gsa_sobol_samples() const { return gsa_sobol_samples; }
@@ -447,6 +415,10 @@ public:
 
 	void set_enforce_tied_bounds(bool _flag) { enforce_tied_bounds = _flag; }
 	bool get_enforce_tied_bounds() const { return enforce_tied_bounds; }
+
+	void set_debug_parse_only(bool _flag) { debug_parse_only = _flag; }
+	bool get_debug_parse_only() const { return debug_parse_only; }
+
 
 
 private:
@@ -561,6 +533,7 @@ private:
 	int gsa_rand_seed;
 
 	bool enforce_tied_bounds;
+	bool debug_parse_only;
 
 	void set_plusplus_defaults();
 		
@@ -568,4 +541,46 @@ private:
 
 ostream& operator<< (ostream &os, const PestppOptions& val);
 ostream& operator<< (ostream &os, const ObservationInfo& val);
+
+class ControlInfo {
+
+public:
+	enum PestMode { ESTIMATION, REGUL, PARETO, UNKNOWN };
+	double relparmax;
+	double facparmax;
+	double facorig;
+	double phiredswh;
+	int noptmax;
+	int jacfile;
+	int numcom;
+	double phiredstp;
+	int nphistp;
+	int nphinored;
+	double relparstp;
+	int nrelpar;
+	int noptswitch;
+	double splitswh;
+	PestMode pestmode;
+	PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value);
+	ControlInfo() : relparmax(0.0), facparmax(0.0), facorig(0.0), phiredswh(0.0), noptmax(0),
+		phiredstp(0.0), nphistp(0), nphinored(0), relparstp(0.0), nrelpar(0), noptswitch(0),
+		splitswh(0.0), pestmode(PestMode::ESTIMATION) {}
+
+private:
+	set<string> passed_args;
+};
+ostream& operator<< (ostream& os, const ControlInfo& val);
+
+class SVDInfo {
+public:
+	int maxsing;
+	int eigwrite;
+	double eigthresh;
+	SVDInfo() : maxsing(0), eigwrite(0), eigthresh(1.0e-7) {}
+	PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value);
+private:
+	set<string> passed_args;
+};
+ostream& operator<< (ostream& os, const SVDInfo& val);
+
 #endif  /* PEST_DATAS_STRUCTS_H_ */

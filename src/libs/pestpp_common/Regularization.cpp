@@ -19,6 +19,8 @@
 #include "Regularization.h"
 #include "ObjectiveFunc.h"
 #include "ModelRunPP.h"
+#include "utilities.h"
+#include "pest_data_structs.h"
 
 
 DynamicRegularization::DynamicRegularization(bool _use_dynamic_reg, bool _adj_grp_weights, double _phi_m_lim,
@@ -41,7 +43,7 @@ double DynamicRegularization::get_weight() const
 	return tikhonov_weight;
 }
 
-double DynamicRegularization::get_grp_weight_fact(const string &grp_name) const
+double DynamicRegularization::get_grp_weight_fact(const std::string &grp_name) const
 {
 	double fact = 1.0;
 	auto iter = regul_grp_weights.find(grp_name);
@@ -50,4 +52,20 @@ double DynamicRegularization::get_grp_weight_fact(const string &grp_name) const
 		fact = iter->second;
 	}
 	return fact;
+}
+
+PestppOptions::ARG_STATUS DynamicRegularization::assign_value_by_key(const std::string key, const std::string org_value)
+{
+	/*DynamicRegularization(bool _use_dynamic_reg = false, bool _grp_weight_adj = false, double _phi_m_lim = 0,
+		double _phi_m_accept = 0, double _frac_phi_m = 1, double _wf_min = 1e-10, double _wf_max = 1e10,
+		double _wffac = 0, double _wftol = 1000, double _wf_init = 1.0, int _max_reg_iter = 20);*/
+	std::string value = pest_utils::upper_cp(org_value);
+	if (passed_args.find(key) != passed_args.end())
+		return PestppOptions::ARG_STATUS::ARG_DUPLICATE;
+	passed_args.insert(key);
+	if (key == "PHIMLIM")
+		pest_utils::convert_ip(value, phi_m_lim);
+
+
+	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
 }
