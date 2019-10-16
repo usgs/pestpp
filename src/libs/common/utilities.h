@@ -310,22 +310,23 @@ public:
 	template<class t>
 	void fill_col_map(map<string, t>& col_map);
 	template<class t>
-	void fill_row_vector(vector<t>& row_vector, vector<string> names = vector<string>());
+	void fill_row_vector(int idx,vector<t>& row_vector, vector<string> names = vector<string>());
 	template<class t>
-	void fill_col_vector(vector<t>& col_vector, vector<string> names = vector<string>());
+	void fill_row_vector(string key, string col_name, vector<t>& row_vector, vector<string> names = vector<string>());
+	template<class t>
+	void fill_col_vector(string col_name, vector<t>& col_vector, vector<string> names = vector<string>());
 
 private:
 	ofstream& f_rec;
 	string line, filename;
-
+	string delim,missing_val;
 	vector<string> col_names;
 	vector<string> row_names;
 	void read_file();
 	void read_next_line(ofstream& f);
 	void parse_control_record();
-	map<string, map<string, string>> data;
+	map<int, map<string, string>> data;
 	void throw_externalctrlfile_error(string message);
-
 
 };
 

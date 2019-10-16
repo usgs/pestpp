@@ -904,6 +904,9 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line): f_rec(_f_rec)
 {
 	line = _line;
+	delim = ",";
+	missing_val = "";
+	parse_control_record();
 	read_file();
 
 
@@ -913,9 +916,75 @@ ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line): f_rec(_
 
 void ExternalCtlFile::read_file()
 {
-	parse_control_record();
-	//check that file exists
-	//open file for reading
+	stringstream ss;
+	if (!pest_utils::check_exist_in(filename))
+	{
+		throw_externalctrlfile_error("filename '" + filename + "' not found");
+	}
+	ifstream f_in(filename);
+	if (!f_in.good())
+	{
+		throw_externalctrlfile_error("error opening filename '" + filename + "' for reading");
+	}
+	string org_next_line, next_line;
+	string org_header_line,header_line;
+	getline(f_in, org_header_line);
+	header_line = upper_cp(org_header_line);
+	
+	tokenize(header_line, col_names, delim,false);
+	int hsize = col_names.size();
+	set<string> tset;
+	tset.insert(col_names.begin(), col_names.end());
+	if ((missing_val.size() > 0) && (tset.find(missing_val) != tset.end()))
+		throw_externalctrlfile_error("missing_value '"+missing_val+"' found in header row");
+	
+	//if these arent the same size, there must be duplicates...
+	if (tset.size() != row_names.size())
+	{
+		vector<string> dups;
+		tset.clear();
+		ss.str("");
+		ss << "the following col names are duplicated: ";
+		for (auto col_name : col_names)
+		{
+			if (tset.find(col_name) != tset.end())
+			{
+				dups.push_back(col_name);
+				ss << col_name << ",";
+			}
+			tset.insert(col_name);
+
+		}
+		if (dups.size() > 0)
+		{
+			throw_externalctrlfile_error(ss.str());
+		}
+			
+	}
+	map<string, string> row_map;
+	vector<string> tokens;
+	int lcount = 1;
+	while (getline(f_in, org_next_line))
+	{
+		next_line = upper_cp(org_next_line);
+		upper_ip(next_line);
+		strip_ip(next_line, "both");
+		tokenize(next_line, tokens, delim, false);
+		if (tokens.size() != hsize)
+		{
+			ss.str("");
+			ss << "wrong number of tokens on line " << lcount;
+			ss << "of file '" << filename << "'.  Expecting ";
+			ss << hsize << ", found " << tokens.size();
+			throw_externalctrlfile_error(ss.str());
+
+		}
+		row_map.clear();
+		for (int i = 0; i < hsize; i++)
+			row_map[col_names[i]] = strip_cp(tokens[i], "both");
+		data[lcount - 1] = row_map;
+		lcount++;
+	}
 
 }
 
@@ -937,14 +1006,57 @@ void ExternalCtlFile::parse_control_record()
 	tokenize(tmp_line, tokens, "\t ");
 	if (tokens.size() < 2)
 	{
-		throw_externalctrlfile_error("external file error: too few tokens on 'external' line '" + line + "', need atleast 2");
+		throw_externalctrlfile_error("too few tokens on 'external' line '" + line + "', need atleast 2 (e.g. 'external filename.csv')");
 	}
 	string directive = tokens[0];
 	upper_ip(directive);
 	if (directive != "EXTERNAL")
-		throw_externalctrlfile_error("external file error: unsupported directive '"+directive+"', expecting 'EXTERNAL' on line '" + line);
+		throw_externalctrlfile_error("unsupported directive '"+directive+"', expecting 'EXTERNAL' on line '" + line);
 	filename = tokens[1];
 
+	//any remaining tokens are optional and are used in pairs
+	if (tokens.size() % 2 != 0)
+	{
+		throw_externalctrlfile_error("wrong number of options - should be form of 'keyword <space> value'");
+	}
+	string key, value;
+	for (int i = 2; i < tokens.size(); i + 2)
+	{
+		key = tokens[i];
+		upper_ip(key);
+		strip_ip(key, "both");
+		value = tokens[i + 1];
+		strip_ip(value, "both");
+		if (key == "DELIMITER")
+		{
+			if (value.size() > 1)
+				throw_externalctrlfile_error("'delimiter' value '" + value + "' on line:\n '"+line+"' \ncan only be one character (use 'w' for whitespace)");
+			delim = upper_cp(value);
+		}
+		else if (key == "MISSING_VALUE")
+		{
+			missing_val = upper_cp(value);
+
+		}
+		else
+		{
+			throw_externalctrlfile_error("unrecognized option: '" + key + "'");
+		}
+	}
+
+
+
+}
+
+void ExternalCtlFile::throw_externalctrlfile_error(string message)
+{
+	stringstream ss;
+	ss << "External file error: " << message << endl;
+	cerr << ss.str();
+	cout << ss.str();
+	f_rec << ss.str();
+	f_rec.close();
+	throw runtime_error(ss.str());
 }
 
 } // end of namespace pest_utils
