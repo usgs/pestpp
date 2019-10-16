@@ -1443,7 +1443,7 @@ void SVDInfo::set_defaults()
 	eigwrite = 0;
 }
 
-PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const const string key, string org_value)
+PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const string key, const string org_value)
 {
 	string value = upper_cp(org_value);
 	if (passed_args.find(key) != passed_args.end())
