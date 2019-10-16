@@ -919,6 +919,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	set<string> sections_found;
 	set<string> nonkeyword_sections = { "SINGULAR VALUE DECOMPOSITION","REGULARIZATION",
 		"REGULARISATION","PLUSPLUS","CONTROL DATA" };
+	stringstream ss;
+	PestppOptions::ARG_STATUS stat;
+
 #ifndef _DEBUG
 	try {
 #endif
@@ -935,7 +938,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens[0] != "PCF")
 				{
-					cout << "WARNING: fist line of control file should be 'PCF' not " << tokens[0] << endl;
+					throw_control_file_error(f_rec, "fist line of control file should be 'PCF' not " + tokens[0]);
 				}
 			}
 
@@ -950,7 +953,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (line_upper.substr(0, 2) == "++")
 			{
 				if (sections_found.find("CONTROL DATA KEYWORD") != sections_found.end())
-					throw runtime_error("'control data keyword' cant be used with '++' args");
+					throw_control_file_error(f_rec, "'control data keyword' cant be used with '++' args");
 				sections_found.insert("PLUSPLUS");
 				pestpp_input.push_back(line);
 			}
@@ -958,76 +961,59 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (line_upper[0] == '*')
 			{
 				section = upper_cp(strip_cp(line_upper, "both", " *\t\n"));
+				if (sections_found.find(section) != sections_found.end())
+				{
+					ss.str("");
+					ss << "control file error: duplicate entries for section: '" << section << "'";
+					throw_control_file_error(f_rec, ss.str());
+				}
 				sections_found.insert(section);
 				if ((nonkeyword_sections.find(section) != nonkeyword_sections.end()) &&
 					(sections_found.find("CONTROL DATA KEYWORD") != sections_found.end()))
-					throw runtime_error("non-keyword section '" + section + "' not allowed to be used with 'control data keyword'");
+					
+					throw_control_file_error(f_rec,"non-keyword section '" + section + "' not allowed to be used with 'control data keyword'");
 				
 
 				sec_begin_lnum = lnum;
 			}
 			else if (section == "CONTROL DATA KEYWORD")
 			{
-				pair<string, string> kv = parse_keyword_line(line);
+				pair<string, string> kv = parse_keyword_line(f_rec, line);
 				cout << kv.first << ", " << kv.second << endl;
 				cout << endl;
-				PestppOptions::ARG_STATUS stat = pestpp_options.assign_value_by_key(kv.first, kv.second);
-				if (stat == PestppOptions::ARG_STATUS::ARG_ACCEPTED)
-				{
-				}
-				else if (stat == PestppOptions::ARG_STATUS::ARG_DUPLICATE)
-					throw runtime_error("Control file error: duplicate entry for '" + kv.first + "', possibly through an alias");
-				else if (stat == PestppOptions::ARG_STATUS::ARG_INVALID)
-					throw runtime_error("Control file error: invalid entry for '" + kv.first + "'");
-
+				//PestppOptions::ARG_STATUS stat = pestpp_options.assign_value_by_key(kv.first, kv.second);
+				stat = pestpp_options.assign_value_by_key(kv.first,kv.second);
+				check_report_assignment(f_rec, stat, kv.first, kv.second);
 
 				//try to use this as a control data arg
-				else if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
+				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
 				{
 					stat = control_info.assign_value_by_key(kv.first,kv.second);
+					check_report_assignment(f_rec, stat, kv.first, kv.second);
 				}
-				if (stat == PestppOptions::ARG_STATUS::ARG_ACCEPTED)
-				{
-				}
-				else if (stat == PestppOptions::ARG_STATUS::ARG_DUPLICATE)
-					throw runtime_error("Control file error: duplicate entry for '" + kv.first + "', possibly through an alias");
-				else if (stat == PestppOptions::ARG_STATUS::ARG_INVALID)
-					throw runtime_error("Control file error: invalid entry for '" + kv.first + "'");
-
-
+				
 				//try to use as an SVD arg
 				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
 				{
-					stat = svd_info.assign_value_by_key(kv.first, kv.second);
+					stat = svd_info.assign_value_by_key(kv.first,kv.second);
+					check_report_assignment(f_rec, stat, kv.first, kv.second);
 				}
-				if (stat == PestppOptions::ARG_STATUS::ARG_ACCEPTED)
-				{
-				}
-				else if (stat == PestppOptions::ARG_STATUS::ARG_DUPLICATE)
-					throw runtime_error("Control file error: duplicate entry for '" + kv.first + "', possibly through an alias");
-				else if (stat == PestppOptions::ARG_STATUS::ARG_INVALID)
-					throw runtime_error("Control file error: invalid entry for '" + kv.first + "'");
-
 
 				//try to use as a regul arg
-				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)	
-					stat = regul_scheme_ptr->assign_value_by_key(kv.first, kv.second);
-				if (stat == PestppOptions::ARG_STATUS::ARG_ACCEPTED)
+				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
 				{
+					stat = regul_scheme_ptr->assign_value_by_key(kv.first,kv.second);
+					check_report_assignment(f_rec, stat, kv.first, kv.second);
 				}
-				else if (stat == PestppOptions::ARG_STATUS::ARG_DUPLICATE)
-					throw runtime_error("Control file error: duplicate entry for '" + kv.first + "', possibly through an alias");
-				else if (stat == PestppOptions::ARG_STATUS::ARG_INVALID)
-					throw runtime_error("Control file error: invalid entry for '" + kv.first + "'");
-
+				
 				//ok, found no home for this line
 				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
 				{
-					cout << "unrecognized control data keyword key-value pair on line" << line << endl;
-					//throw here?
+					ss.str("");
+					ss << "unrecognized control data keyword key-value pair on line" << line << endl;
+					throw_control_file_error(f_rec, ss.str(), false);
 				}		
 			}
-
 
 			else if (section == "CONTROL DATA")
 			{
@@ -1128,22 +1114,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				}
 				else
 				{
-					ParameterGroupRec pgi;
-					name = tokens[0];
-					size_t n_tokens = tokens.size();
-					pgi.name = name;
-					ctl_ordered_par_group_names.push_back(name);
-					convert_ip(tokens[1], pgi.inctyp);
-					convert_ip(tokens[2], pgi.derinc);
-					convert_ip(tokens[3], pgi.derinclb);
-					convert_ip(tokens[4], pgi.forcen);
-					convert_ip(tokens[5], pgi.derincmul);
-					convert_ip(tokens[6], pgi.dermthd);
-					if (n_tokens >= 8) convert_ip(tokens[7], pgi.splitthresh);
-					if (n_tokens >= 9) convert_ip(tokens[8], pgi.splitreldiff);
-					base_group_info.insert_group(name, pgi);
+					tokens_to_par_group_rec(f_rec, tokens);
 				}
-
 			}
 			else if (section == "PARAMETER DATA")
 			{
@@ -1153,68 +1125,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				else
 				{
 					if (sec_lnum <= num_par) {
-						double scale;
-						double offset;
-						ParameterRec pi;
-						name = tokens[0];
-						trans_type = &tokens[1];
-						convert_ip(tokens[2], pi.chglim);
-						convert_ip(tokens[3], pi.init_value);
-						convert_ip(tokens[4], pi.lbnd);
-						convert_ip(tokens[5], pi.ubnd);
-						convert_ip(tokens[6], pi.group);
-						convert_ip(tokens[7], scale);
-						convert_ip(tokens[8], offset);
-						if (control_info.numcom > 1)
-							convert_ip(tokens[9], pi.dercom);
-						else
-							pi.dercom = 1;
-						pi.scale = scale;
-						pi.offset = offset;
-						// add parameters to model parameter and paramter_info datasets
-						ctl_ordered_par_names.push_back(name);
-						if (*trans_type == "FIXED")
-						{
-							pi.tranform_type = ParameterRec::TRAN_TYPE::FIXED;
-						}
-						else if (*trans_type == "LOG")
-						{
-							pi.tranform_type = ParameterRec::TRAN_TYPE::LOG;
-							n_adj_par++;
-						}
-						else if (*trans_type == "TIED")
-						{
-							pi.tranform_type = ParameterRec::TRAN_TYPE::TIED;
-						}
-						else if (*trans_type == "NONE")
-						{
-							pi.tranform_type = ParameterRec::TRAN_TYPE::NONE;
-							n_adj_par++;
-						}
-						else
-						{
-							//pi.tranform_type = ParameterRec::TRAN_TYPE::NONE;
-							//assert(true);
-							//n_adj_par++;
-							throw PestError("unrecognized partrans for par " + name + ": " + *trans_type);
-						}
-						ctl_parameter_info.insert(name, pi);
-						ctl_parameters.insert(name, pi.init_value);
-						base_group_info.insert_parameter_link(name, pi.group);
-
-						// build appropriate transformations
-						if (*trans_type == "FIXED") {
-							t_fixed->insert(name, pi.init_value);
-						}
-						else if (*trans_type == "LOG") {
-							t_log->insert(name);
-						}
-						if (offset != 0) {
-							t_offset->insert(name, offset);
-						}
-						if (scale != 1) {
-							t_scale->insert(name, scale);
-						}
+						tokens_to_par_rec(f_rec, tokens, t_fixed, t_log, t_scale, t_offset);
 					}
 					// Get rest of information for tied paramters
 					else {
@@ -1234,22 +1145,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				}
 				else
 				{
-
-					string name = tokens[0];
-					if (tokens.size() > 1)
-					{
-						stringstream ss;
-						ss << "observation covariance matrix detected for group '" << tokens[0] << "' - these are not supported...yet!";
-						string s = ss.str();
-						throw PestError(s);
-					}
-					ObservationGroupRec group_rec;
-					observation_info.groups[name] = group_rec;
-					vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
-					if (is == ctl_ordered_obs_group_names.end())
-					{
-						ctl_ordered_obs_group_names.push_back(name);
-					}
+					tokens_to_obs_group_rec(f_rec, tokens);
 				}
 			}
 			else if (section == "OBSERVATION DATA")
@@ -1259,14 +1155,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				}
 				else
 				{
-					ObservationRec obs_i;
-					name = tokens[0];
-					convert_ip(tokens[1], value);
-					convert_ip(tokens[2], obs_i.weight);
-					obs_i.group = tokens[3];
-					ctl_ordered_obs_names.push_back(name);
-					observation_info.observations[name] = obs_i;
-					observation_values.insert(name, value);
+					tokens_to_obs_rec(f_rec, tokens);
 				}
 			}
 
@@ -1828,7 +1717,7 @@ Pest::~Pest() {
 	}*/
 }
 
-pair<string, string> Pest::parse_keyword_line(const string line)
+pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string line)
 {
 	string key;
 	string value;
@@ -1850,7 +1739,7 @@ pair<string, string> Pest::parse_keyword_line(const string line)
 	tokenize(tmp_line,tokens,"\t ");
 	if (tokens.size() < 2)
 	{
-		throw runtime_error("Pest::parse_keyword_line() error: too few tokens on line '" + line + "', need atleast 2");
+		throw_control_file_error(f_rec, "Pest::parse_keyword_line() error: too few tokens on line '" + line + "', need atleast 2");
 	}
 	key = tokens[0];
 	upper_ip(key);
@@ -1860,6 +1749,153 @@ pair<string, string> Pest::parse_keyword_line(const string line)
 
 	return pair<string, string>(key,value);
 }
+
+void Pest::throw_control_file_error(ofstream& f_rec,string message, bool should_throw)
+{
+	stringstream ss;
+	if (should_throw)
+		ss << "control file parsing error: " << message << endl;
+	else
+		ss << "control file parsing warning: " << message << endl;
+	
+	cout << ss.str();
+	f_rec << ss.str();
+	
+	if (should_throw)
+	{
+		cerr << ss.str();
+		f_rec.close();
+		throw runtime_error(ss.str());
+	}
+	
+}
+
+void Pest::check_report_assignment(ofstream &f_rec, PestppOptions::ARG_STATUS stat, const string key, const string org_value)
+{
+	if (stat == PestppOptions::ARG_STATUS::ARG_INVALID)
+	{
+		throw_control_file_error(f_rec, "invalid value for key,value pair '" + key + ", " + org_value);
+	}
+	if (stat == PestppOptions::ARG_STATUS::ARG_DUPLICATE)
+	{
+		throw_control_file_error(f_rec, "duplicate entry for key,value pair '" + key + ", " + org_value);
+	}
+}
+
+void Pest::tokens_to_par_group_rec(ofstream &f_rec, const vector<string>& tokens)
+{
+	ParameterGroupRec pgi;
+	string name = tokens[0];
+	size_t n_tokens = tokens.size();
+	pgi.name = name;
+	ctl_ordered_par_group_names.push_back(name);
+	convert_ip(tokens[1], pgi.inctyp);
+	convert_ip(tokens[2], pgi.derinc);
+	convert_ip(tokens[3], pgi.derinclb);
+	convert_ip(tokens[4], pgi.forcen);
+	convert_ip(tokens[5], pgi.derincmul);
+	convert_ip(tokens[6], pgi.dermthd);
+	if (n_tokens >= 8) convert_ip(tokens[7], pgi.splitthresh);
+	if (n_tokens >= 9) convert_ip(tokens[8], pgi.splitreldiff);
+	base_group_info.insert_group(name, pgi);
+
+}
+
+void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, TranFixed* t_fixed, TranLog10* t_log, TranScale* t_scale, TranOffset* t_offset)
+{
+	ParameterRec pi;
+	double scale;
+	double offset;
+	string name = tokens[0];
+	string trans_type = tokens[1];
+	convert_ip(tokens[2], pi.chglim);
+	convert_ip(tokens[3], pi.init_value);
+	convert_ip(tokens[4], pi.lbnd);
+	convert_ip(tokens[5], pi.ubnd);
+	convert_ip(tokens[6], pi.group);
+	convert_ip(tokens[7], scale);
+	convert_ip(tokens[8], offset);
+	if (control_info.numcom > 1)
+		convert_ip(tokens[9], pi.dercom);
+	else
+		pi.dercom = 1;
+	pi.scale = scale;
+	pi.offset = offset;
+	// add parameters to model parameter and paramter_info datasets
+	ctl_ordered_par_names.push_back(name);
+	if (trans_type == "FIXED")
+	{
+		pi.tranform_type = ParameterRec::TRAN_TYPE::FIXED;
+	}
+	else if (trans_type == "LOG")
+	{
+		pi.tranform_type = ParameterRec::TRAN_TYPE::LOG;
+		n_adj_par++;
+	}
+	else if (trans_type == "TIED")
+	{
+		pi.tranform_type = ParameterRec::TRAN_TYPE::TIED;
+	}
+	else if (trans_type == "NONE")
+	{
+		pi.tranform_type = ParameterRec::TRAN_TYPE::NONE;
+		n_adj_par++;
+	}
+	else
+	{
+		throw_control_file_error(f_rec, "unrecognized partrans for par " + name + ": " + trans_type);
+	}
+	ctl_parameter_info.insert(name, pi);
+	ctl_parameters.insert(name, pi.init_value);
+	base_group_info.insert_parameter_link(name, pi.group);
+
+	// build appropriate transformations
+	if (trans_type == "FIXED") {
+		t_fixed->insert(name, pi.init_value);
+	}
+	else if (trans_type == "LOG") {
+		t_log->insert(name);
+	}
+	if (offset != 0) {
+		t_offset->insert(name, offset);
+	}
+	if (scale != 1) {
+		t_scale->insert(name, scale);
+	}
+
+}
+
+void Pest::tokens_to_obs_group_rec(ofstream& f_rec, const vector<string>& tokens)
+{
+	string name = tokens[0];
+	if (tokens.size() > 1)
+	{
+		stringstream ss;
+		ss << "observation covariance matrix detected for group '" << tokens[0] << "' - these are not supported...yet!";
+		throw_control_file_error(f_rec, ss.str());
+	}
+	ObservationGroupRec group_rec;
+	observation_info.groups[name] = group_rec;
+	vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
+	if (is == ctl_ordered_obs_group_names.end())
+	{
+		ctl_ordered_obs_group_names.push_back(name);
+	}
+}
+
+void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
+{
+	ObservationRec obs_i;
+	string name = tokens[0];
+	double value;
+	convert_ip(tokens[1], value);
+	convert_ip(tokens[2], obs_i.weight);
+	obs_i.group = tokens[3];
+	ctl_ordered_obs_names.push_back(name);
+	observation_info.observations[name] = obs_i;
+	observation_values.insert(name, value);
+}
+
 
 ostream& operator<< (ostream &os, const Pest& val)
 {

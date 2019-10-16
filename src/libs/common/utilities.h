@@ -299,5 +299,35 @@ void save_binary(const string &filename, const vector<string> &row_names, const 
 void save_binary_extfmt(const string &filename,const  vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix);
 void save_binary_orgfmt(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix);
 
+class ExternalCtlFile
+{
+public:
+	ExternalCtlFile(ofstream &_f_rec, const string& _line);
+	
+	vector<string> get_column_names();
+	vector<string> get_row_names();
+	map<string, string> get_row_map(string row_name);
+	template<class t>
+	void fill_col_map(map<string, t>& col_map);
+	template<class t>
+	void fill_row_vector(vector<t>& row_vector, vector<string> names = vector<string>());
+	template<class t>
+	void fill_col_vector(vector<t>& col_vector, vector<string> names = vector<string>());
+
+private:
+	ofstream& f_rec;
+	string line, filename;
+
+	vector<string> col_names;
+	vector<string> row_names;
+	void read_file();
+	void read_next_line(ofstream& f);
+	void parse_control_record();
+	map<string, map<string, string>> data;
+	void throw_externalctrlfile_error(string message);
+
+
+};
+
 }  // end namespace pest_utils
 #endif /* UTILITIES_H_ */

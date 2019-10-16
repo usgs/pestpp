@@ -901,6 +901,52 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 }
 
 
+ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line): f_rec(_f_rec)
+{
+	line = _line;
+	read_file();
+
+
+}
+
+
+
+void ExternalCtlFile::read_file()
+{
+	parse_control_record();
+	//check that file exists
+	//open file for reading
+
+}
+
+void ExternalCtlFile::parse_control_record()
+{
+	// look for a comment char
+	size_t found = line.find_first_of("#");
+	if (found == string::npos) {
+		found = line.length();
+	}
+	string tmp_line = line.substr(0, found);
+	//strip any leading or trailing whitespace
+	strip_ip(tmp_line, "both", "\t\n\r+ ");
+	//remove any quote chars
+	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\"'), tmp_line.end());
+	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\''), tmp_line.end());
+	//split on whitespaces
+	vector<string> tokens;
+	tokenize(tmp_line, tokens, "\t ");
+	if (tokens.size() < 2)
+	{
+		throw_externalctrlfile_error("external file error: too few tokens on 'external' line '" + line + "', need atleast 2");
+	}
+	string directive = tokens[0];
+	upper_ip(directive);
+	if (directive != "EXTERNAL")
+		throw_externalctrlfile_error("external file error: unsupported directive '"+directive+"', expecting 'EXTERNAL' on line '" + line);
+	filename = tokens[1];
+
+}
+
 } // end of namespace pest_utils
 
 
