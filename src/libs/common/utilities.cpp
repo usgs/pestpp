@@ -912,6 +912,43 @@ ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line): f_rec(_
 
 }
 
+map<string, string> pest_utils::ExternalCtlFile::get_row_map(string key, string col_name, vector<string> include_cols)
+{
+	set<string> cnames = get_col_set();
+	if (cnames.find(col_name) == cnames.end())
+		throw_externalctrlfile_error("get_row_map() error: col_name '" + col_name + "' not found in col_names");
+	int idx = distance(col_names.begin(),find(col_names.begin(), col_names.end(), col_name));
+	return get_row_map(idx,include_cols);
+}
+
+map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<string> include_cols)
+{
+	
+	
+	stringstream ss;
+	if (data.find(idx) == data.end())
+	{
+		ss.str("");
+		ss << "get_row_map() error: idx: " << idx << " not found";
+		throw_externalctrlfile_error(ss.str());
+
+	}
+	if (include_cols.size() == 0)
+	{
+		return data[idx];
+	}
+	else
+	{
+		map<string, string> rmap;
+		for (auto col : include_cols)
+		{
+			//check exists
+			//check missing val
+
+		}
+		return rmap;
+	}
+}
 
 
 void ExternalCtlFile::read_file()
@@ -966,6 +1003,7 @@ void ExternalCtlFile::read_file()
 	int lcount = 1;
 	while (getline(f_in, org_next_line))
 	{
+		tokens.clear();
 		next_line = upper_cp(org_next_line);
 		upper_ip(next_line);
 		strip_ip(next_line, "both");

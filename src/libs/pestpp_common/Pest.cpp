@@ -979,8 +979,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (section == "CONTROL DATA KEYWORD")
 			{
 				pair<string, string> kv = parse_keyword_line(f_rec, line);
-				cout << kv.first << ", " << kv.second << endl;
-				cout << endl;
+				//cout << kv.first << ", " << kv.second << endl;
+				//cout << endl;
 				//PestppOptions::ARG_STATUS stat = pestpp_options.assign_value_by_key(kv.first, kv.second);
 				stat = pestpp_options.assign_value_by_key(kv.first,kv.second);
 				check_report_assignment(f_rec, stat, kv.first, kv.second);
@@ -1110,6 +1110,15 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens[0] == "EXTERNAL")
 				{
+					pest_utils::ExternalCtlFile efile(f_rec, line);
+					map<string, string> m = efile.get_row_map("LK", "PARGPNME");
+					cout << endl;
+
+					//check for required columns
+
+					//process each row
+
+
 
 				}
 				else

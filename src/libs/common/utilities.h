@@ -302,19 +302,18 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 class ExternalCtlFile
 {
 public:
-	ExternalCtlFile(ofstream &_f_rec, const string& _line);
-	
-	vector<string> get_column_names();
-	vector<string> get_row_names();
-	map<string, string> get_row_map(string row_name);
+	ExternalCtlFile(ofstream& _f_rec, const string& _line);
+
+	vector<string> get_col_names() { return col_names; }
+	vector<string> get_row_names() { return row_names; }
+	set<string> get_col_set() { return set<string>(col_names.begin(), col_names.end()); }
+	set<string> get_row_set() { return set<string>(row_names.begin(), row_names.end()); }
+
+	map<string, string> get_row_map(int idx, vector<string> include_cols=vector<string>());
+	map<string, string> get_row_map(string key, string col_name, vector<string> include_cols=vector<string>());
 	template<class t>
-	void fill_col_map(map<string, t>& col_map);
-	template<class t>
-	void fill_row_vector(int idx,vector<t>& row_vector, vector<string> names = vector<string>());
-	template<class t>
-	void fill_row_vector(string key, string col_name, vector<t>& row_vector, vector<string> names = vector<string>());
-	template<class t>
-	void fill_col_vector(string col_name, vector<t>& col_vector, vector<string> names = vector<string>());
+	vector<t> get_col_vector(string col_name, vector<string> names = vector<string>());
+	//todo: how to handle missing_vals in the get methods - raise exception
 
 private:
 	ofstream& f_rec;
@@ -323,10 +322,10 @@ private:
 	vector<string> col_names;
 	vector<string> row_names;
 	void read_file();
-	void read_next_line(ofstream& f);
 	void parse_control_record();
 	map<int, map<string, string>> data;
 	void throw_externalctrlfile_error(string message);
+
 
 };
 
