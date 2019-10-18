@@ -28,6 +28,7 @@
 #include "pest_data_structs.h"
 #include "PriorInformation.h"
 #include "Regularization.h"
+#include "utilities.h"
 
 using namespace std;
 class FileManager;
@@ -118,6 +119,8 @@ private:
 	void tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens,TranFixed *t_fixed, TranLog10 *t_log, TranScale *t_scale, TranOffset *t_offset);
 	void tokens_to_obs_group_rec(ofstream& f_rec, const vector<string>& tokens);
 	void tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens);
+
+	map<string, pest_utils::ExternalCtlFile> efile_map;
 };
 ostream& operator<< (ostream &os, const Pest& val);
 #endif /* PEST_H_ */

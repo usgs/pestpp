@@ -1110,8 +1110,30 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens[0] == "EXTERNAL")
 				{
+					vector<string> par_group_formal_names{ "PARGPNME","INCTYP","DERINC","DERINCLB","FORCEN","DERINCMUL","DERMTHD" };
+					vector<string> optional_par_group_formal_names{ "SPLITTHRESH","SPLITRELDIFF" };
 					pest_utils::ExternalCtlFile efile(f_rec, line);
-					map<string, string> m = efile.get_row_map("LK", "PARGPNME");
+					set<string> cnames = efile.get_col_set();
+					for (auto n : par_group_formal_names)
+					{
+						if (cnames.find(n) == cnames.end())
+						{
+							ss.str("");
+							ss << "external file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+							throw_control_file_error(f_rec, ss.str());
+						}
+					}
+					for (auto oname : optional_par_group_formal_names)
+					{
+						if (cnames.find(oname) != cnames.end())
+							par_group_formal_names.push_back(oname);
+					}
+					vector<string> par_group_tokens;
+					for (auto ro : efile.get_row_order())
+					{
+						par_group_tokens = efile.get_row_vector(ro, par_group_formal_names);
+						tokens_to_par_group_rec(f_rec, par_group_tokens);
+					}
 					cout << endl;
 
 					//check for required columns

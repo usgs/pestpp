@@ -303,31 +303,58 @@ class ExternalCtlFile
 {
 public:
 	ExternalCtlFile(ofstream& _f_rec, const string& _line);
-
+	string get_filename() { return filename;  }
 	vector<string> get_col_names() { return col_names; }
-	vector<string> get_row_names() { return row_names; }
+	vector<int> get_row_order() { return row_order; }
 	set<string> get_col_set() { return set<string>(col_names.begin(), col_names.end()); }
-	set<string> get_row_set() { return set<string>(row_names.begin(), row_names.end()); }
+	set<int> get_row_set() { return set<int>(row_order.begin(), row_order.end()); }
 
 	map<string, string> get_row_map(int idx, vector<string> include_cols=vector<string>());
 	map<string, string> get_row_map(string key, string col_name, vector<string> include_cols=vector<string>());
-	template<class t>
-	vector<t> get_col_vector(string col_name, vector<string> names = vector<string>());
-	//todo: how to handle missing_vals in the get methods - raise exception
+	vector<string> get_row_vector(int idx, vector<string> include_cols = vector<string>());
+	vector<string> get_row_vector(string key, string col_name, vector<string> include_cols = vector<string>());
+
+	template<typename t>
+	inline void fill_col_vector(string col_name, vector<t> &col_vector);
 
 private:
 	ofstream& f_rec;
 	string line, filename;
 	string delim,missing_val;
 	vector<string> col_names;
-	vector<string> row_names;
+	vector<int> row_order;
 	void read_file();
 	void parse_control_record();
 	map<int, map<string, string>> data;
 	void throw_externalctrlfile_error(string message);
-
-
+	bool isduplicated(string col_name);
+	int get_row_idx(string key, string col_name);
 };
+
+
+template<typename t>
+inline void ExternalCtlFile::fill_col_vector(string col_name, vector<t>& col_vector)
+{
+	stringstream ss;
+	set<string> cnames = get_col_set();
+	if (cnames.find(col_name) == cnames.end())
+		throw_externalctrlfile_error("get_col_vector() error: col_name '" + col_name + "' not in col_names");
+	t tval;
+	string sval;
+	for (auto ro : row_order)
+	{
+		sval = data[ro][col_name];
+		if (sval == missing_val)
+		{
+			ss.str("");
+			ss << "get_col_vector() error: missing value in row " << ro << " and column '" + col_name + "'";
+			throw_externalctrlfile_error(ss.str());
+		}
+		convert_ip(sval, tval);
+		col_vector.push_back(tval);
+	}
+}
+
 
 }  // end namespace pest_utils
 #endif /* UTILITIES_H_ */

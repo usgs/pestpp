@@ -912,19 +912,8 @@ ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line): f_rec(_
 
 }
 
-map<string, string> pest_utils::ExternalCtlFile::get_row_map(string key, string col_name, vector<string> include_cols)
+vector<string> pest_utils::ExternalCtlFile::get_row_vector(int idx, vector<string> include_cols)
 {
-	set<string> cnames = get_col_set();
-	if (cnames.find(col_name) == cnames.end())
-		throw_externalctrlfile_error("get_row_map() error: col_name '" + col_name + "' not found in col_names");
-	int idx = distance(col_names.begin(),find(col_names.begin(), col_names.end(), col_name));
-	return get_row_map(idx,include_cols);
-}
-
-map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<string> include_cols)
-{
-	
-	
 	stringstream ss;
 	if (data.find(idx) == data.end())
 	{
@@ -933,6 +922,58 @@ map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<str
 		throw_externalctrlfile_error(ss.str());
 
 	}
+	vector<string> rvector;
+	string sval;
+	//if no include_cols, then dont sweat missing vals...
+	if (include_cols.size() == 0)
+	{
+		for (auto col : col_names)
+		{
+			sval = data[idx][col];
+			rvector.push_back(sval);
+		}
+	}
+	else
+	{
+		set<string> cnames = get_col_set();
+		
+		for (auto col : include_cols)
+		{
+			//check exists
+			if (cnames.find(col) == cnames.end())
+				throw_externalctrlfile_error("get_row_vector() error: include_col '" + col + "' not found in col names");
+			//check missing val
+			sval = data[idx][col];
+			if (sval == missing_val)
+			{
+				ss.str("");
+				ss << "get_row_vector() error: value at row idx " << idx << " and column '" << col << "' is a missing_val (" << sval << ")";
+				throw_externalctrlfile_error(ss.str());
+			}
+			rvector.push_back(sval);
+
+		}
+		return rvector;
+	}
+}
+
+map<string, string> pest_utils::ExternalCtlFile::get_row_map(string key, string col_name, vector<string> include_cols)
+{
+	int idx = get_row_idx(key, col_name);
+	return get_row_map(idx,include_cols);
+}
+
+map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<string> include_cols)
+{
+	stringstream ss;
+	if (data.find(idx) == data.end())
+	{
+		ss.str("");
+		ss << "get_row_map() error: idx: " << idx << " not found";
+		throw_externalctrlfile_error(ss.str());
+
+	}
+	//if no include_cols, dont sweat missing vals
 	if (include_cols.size() == 0)
 	{
 		return data[idx];
@@ -940,11 +981,22 @@ map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<str
 	else
 	{
 		map<string, string> rmap;
+		set<string> cnames = get_col_set();
+		string sval;
 		for (auto col : include_cols)
 		{
 			//check exists
+			if (cnames.find(col) == cnames.end())
+				throw_externalctrlfile_error("get_row_map() error: include_col '" + col + "' not found in col names");
 			//check missing val
-
+			sval = data[idx][col];
+			if (sval == missing_val)
+			{
+				ss.str("");
+				ss << "get_row_map() error: value at row idx " << idx << " and column '" << col << "' is a missing_val (" << sval << ")";
+				throw_externalctrlfile_error(ss.str());
+			}
+			rmap[col] = sval;
 		}
 		return rmap;
 	}
@@ -976,7 +1028,7 @@ void ExternalCtlFile::read_file()
 		throw_externalctrlfile_error("missing_value '"+missing_val+"' found in header row");
 	
 	//if these arent the same size, there must be duplicates...
-	if (tset.size() != row_names.size())
+	if (tset.size() != col_names.size())
 	{
 		vector<string> dups;
 		tset.clear();
@@ -1021,6 +1073,7 @@ void ExternalCtlFile::read_file()
 		for (int i = 0; i < hsize; i++)
 			row_map[col_names[i]] = strip_cp(tokens[i], "both");
 		data[lcount - 1] = row_map;
+		row_order.push_back(lcount - 1);
 		lcount++;
 	}
 
@@ -1081,9 +1134,6 @@ void ExternalCtlFile::parse_control_record()
 			throw_externalctrlfile_error("unrecognized option: '" + key + "'");
 		}
 	}
-
-
-
 }
 
 void ExternalCtlFile::throw_externalctrlfile_error(string message)
@@ -1095,6 +1145,38 @@ void ExternalCtlFile::throw_externalctrlfile_error(string message)
 	f_rec << ss.str();
 	f_rec.close();
 	throw runtime_error(ss.str());
+}
+
+bool ExternalCtlFile::isduplicated(string col_name)
+{
+	set<string> cnames = get_col_set();
+	if (cnames.find(col_name) == cnames.end())
+		throw_externalctrlfile_error("isduplicated() error: col_name '" + col_name + "' not in col_names");
+	cnames.clear();
+	for (auto kv : data)
+	{
+		cnames.insert(kv.second[col_name]);
+	}
+	if (cnames.size() != data.size())
+		return true;
+	return false;
+}
+
+int ExternalCtlFile::get_row_idx(string key, string col_name)
+{
+	set<string> cnames = get_col_set();
+	if (cnames.find(col_name) == cnames.end())
+		throw_externalctrlfile_error("get_row_idx() error: col_name '" + col_name + "' not found in col_names");
+	if (isduplicated(col_name))
+		throw_externalctrlfile_error("get_row_idx() error: cant use key-col_name retrieval for duplicated column '" + col_name + "'");
+	vector<string> col_vector;
+	fill_col_vector(col_name, col_vector);
+	vector<string>::iterator it = find(col_vector.begin(), col_vector.end(), key);
+	if (it == col_vector.end())
+		throw_externalctrlfile_error("get_row_idx() error: key '" + key + "' not found in column '" + col_name + "'");
+
+	int idx = distance(col_vector.begin(), it);
+	return idx;
 }
 
 } // end of namespace pest_utils

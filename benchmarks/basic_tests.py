@@ -696,7 +696,7 @@ def salib_verf():
     # plt.show()
 
 if __name__ == "__main__":
-    #glm_long_name_test()
+    glm_long_name_test()
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
