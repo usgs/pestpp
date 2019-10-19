@@ -57,8 +57,9 @@ double DynamicRegularization::get_grp_weight_fact(const std::string &grp_name) c
 DynamicRegularization DynamicRegularization::get_zero_reg_instance()
 {
 	DynamicRegularization new_reg;
+	new_reg.set_zero();
 	//{ return DynamicRegularization(true, false, 0,0,0,0,0,0,0,0); }
-	new_reg.assign_value_by_key("PHIMLIM", 0);
+	/*new_reg.assign_value_by_key("PHIMLIM", 0);
 	new_reg.assign_value_by_key("PHIMACCEPT", 0);
 	new_reg.assign_value_by_key("FRACPHIM", 0);
 	new_reg.assign_value_by_key("PHIMLIM", 0);
@@ -66,10 +67,10 @@ DynamicRegularization DynamicRegularization::get_zero_reg_instance()
 	new_reg.assign_value_by_key("WFMAX", 0);
 	new_reg.assign_value_by_key("WFMIN", 0);
 	new_reg.assign_value_by_key("WFFAC", 0);
-	new_reg.assign_value_by_key("WFTOL", 0);
+	new_reg.assign_value_by_key("WFTOL", 0);*/
 
-	new_reg.use_dynamic_reg = true;
-	new_reg.adj_grp_weights = false;
+	//new_reg.use_dynamic_reg = true;
+	//new_reg.adj_grp_weights = false;
 
 	return new_reg;
 }
@@ -130,4 +131,19 @@ void DynamicRegularization::set_defaults()
 	wftol = 1000;
 	wf_init = 1.0;
 	max_reg_iter = 20;
+}
+
+void DynamicRegularization::set_zero()
+{
+	use_dynamic_reg = true;
+	adj_grp_weights = false;
+	phi_m_lim = 0;
+	phi_m_accept = 0;
+	frac_phi_m = 0;
+	wf_min = 0;
+	wf_max = 0;
+	wffac = 0;
+	wftol = 0;
+	wf_init = 0;
+	max_reg_iter = 0;
 }

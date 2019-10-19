@@ -53,6 +53,7 @@ public:
 	virtual ~DynamicRegularization(void){}
 	virtual PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value);
 	virtual void set_defaults();
+	virtual void set_zero();
 protected:
 	bool use_dynamic_reg;
 	bool adj_grp_weights;
