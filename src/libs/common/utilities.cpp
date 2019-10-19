@@ -953,8 +953,9 @@ vector<string> pest_utils::ExternalCtlFile::get_row_vector(int idx, vector<strin
 			rvector.push_back(sval);
 
 		}
-		return rvector;
+		
 	}
+	return rvector;
 }
 
 map<string, string> pest_utils::ExternalCtlFile::get_row_map(string key, string col_name, vector<string> include_cols)
