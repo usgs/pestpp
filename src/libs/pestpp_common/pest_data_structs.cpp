@@ -1072,6 +1072,7 @@ void PestppOptions::set_defaults()
 	set_iter_summary_flag(true);
 	set_der_forgive(true);
 	
+	base_lambda_vec = { 0.1, 1.0, 10.0, 100.0, 1000.0 };
 	set_global_opt(PestppOptions::GLOBAL_OPT::NONE);
 	set_de_cr(0.9);
 	set_de_f(0.8);

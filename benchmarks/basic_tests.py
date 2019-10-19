@@ -705,6 +705,6 @@ if __name__ == "__main__":
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
-    #tie_by_group_test()
-    sen_basic_test()
+    tie_by_group_test()
+    #sen_basic_test()
     #salib_verf()
