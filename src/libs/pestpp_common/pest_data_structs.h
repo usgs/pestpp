@@ -53,6 +53,7 @@ public:
 		splitreldiff(_splitreldiff){}
 	ParameterGroupRec(const ParameterGroupRec &rhs) {*this=rhs;}
 	ParameterGroupRec& operator=(const ParameterGroupRec &rhs);
+	void set_defaults();
 };
 
 ostream& operator<< (ostream &os, const ParameterGroupRec& val);
@@ -246,6 +247,9 @@ public:
 	string get_obscov_filename()const { return obscov_filename; }
 	void set_basejac_filename(string _filename) { basejac_filename = _filename; }
 	string get_basejac_filename()const { return basejac_filename; }
+	int get_glm_num_reals() const { return glm_num_reals; }
+	void set_glm_num_reals(int _glm_num_reals) { glm_num_reals = _glm_num_reals; }
+
 	double get_overdue_reched_fac()const { return overdue_reched_fac; }
 	void set_overdue_reched_fac(double _val) { overdue_reched_fac = _val; }
 	double get_overdue_giveup_fac()const { return overdue_giveup_fac; }
@@ -434,6 +438,7 @@ private:
 	int max_run_fail;
 	int max_super_frz_iter;
 	int max_reg_iter;
+	int glm_num_reals;
 	vector<double> base_lambda_vec;
 	vector<double> lambda_scale_vec;
 	bool iter_summary_flag;

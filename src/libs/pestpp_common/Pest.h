@@ -122,6 +122,8 @@ private:
 	void tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens);
 	void tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens, const string line_upper);
 
+	void rectify_par_groups();
+
 	map<string, vector<pest_utils::ExternalCtlFile>> efiles_map;
 
 };

@@ -69,6 +69,19 @@ ParameterGroupRec& ParameterGroupRec::operator=(const ParameterGroupRec &rhs)
 	return *this;
 }
 
+void ParameterGroupRec::set_defaults()
+{
+	name = "PARGP";
+	inctyp = "RELATIVE";
+	derinc = 0.01;
+	derinclb = 0.0;
+	forcen = "SWITCH";
+	derincmul = 2.0;
+	dermthd = "PARABOLIC";
+	splitthresh = 1.0e-5;
+	splitreldiff = 0.5;
+}
+
 ostream& operator<< (ostream &os, const ParameterGroupRec& val)
 {
 	os << "PEST Parameter Group Information" << endl;
@@ -549,6 +562,11 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		hotstart_resfile = org_value;
 	}
 
+	else if (key == "GLM_NUM_REALS")
+	{
+		convert_ip(value, glm_num_reals);
+	}
+
 	else if (key == "OVERDUE_RESCHED_FAC"){
 		convert_ip(value, overdue_reched_fac);
 	}
@@ -837,12 +855,9 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		istringstream is(value);
 		is >> boolalpha >> ies_use_prior_scaling;
 	}
-	else if ((key == "IES_NUM_REALS") || (key == "NUM_REALS"))
+	else if (key == "IES_NUM_REALS")
 	{
-		passed_args.insert("IES_NUM_REALS");
-		passed_args.insert("NUM_REALS");
 		convert_ip(value, ies_num_reals);
-		//ies_num_reals_passed = true;
 	}
 	else if (key == "IES_BAD_PHI")
 	{
@@ -1088,6 +1103,7 @@ void PestppOptions::set_defaults()
 	set_max_super_frz_iter(5);
 	set_max_reg_iter(20);
 	set_uncert_flag(true);
+	set_glm_num_reals(0);
 	set_prediction_names(vector<string>());
 	set_parcov_filename(string());
 	set_obscov_filename(string());

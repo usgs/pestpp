@@ -924,8 +924,10 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	vector<string> par_group_formal_names{ "PARGPNME","INCTYP","DERINC","DERINCLB","FORCEN","DERINCMUL","DERMTHD" };
 	vector<string> optional_par_group_formal_names{ "SPLITTHRESH","SPLITRELDIFF" };
 	vector<string> par_formal_names{ "PARNME","PARTRANS","PARCHGLIM","PARVAL1","PARLBND","PARUBND","PARGP","SCALE","OFFSET","DERCOM" };
+	vector<string> par_easy_names{ "NAME","TRANSFORM","CHANGE_LIM","VALUE","UPPER_BOUND","LOWER_BOUND","GROUP","SCALE","OFFSET","DERCOM" };
 	map <string,string> row_map, temp_tied_map;
 	vector<string> obs_formal_names{ "OBSNME","OBSVAL","WEIGHT","OBGNME" };
+	vector<string> obs_easy_names{ "NAME","VALUE","WEIGHT","GROUP" };
 	vector<string> obs_group_formal_names{ "OBGNME" };
 	vector<string> pi_formal_names{ "PILBL","EQUATION","WEIGHT","OBGNME" };
 	vector<string> tokens_case_sen;
@@ -940,6 +942,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			strip_ip(line);
 			line_upper = upper_cp(line);
 			tokens.clear();
+			tokens_case_sen.clear();
 			tokenize(line_upper, tokens);
 			tokenize(line, tokens_case_sen);
 			sec_lnum = lnum - sec_begin_lnum;
@@ -1190,14 +1193,26 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						continue;
 					}
 					set<string> cnames = efile.get_col_set();
-					for (auto n : par_formal_names)
+					vector<string> get_names;
+					//for (auto n : par_formal_names)
+					for (int i=0;i<par_formal_names.size();i++)
 					{
+						string n = par_formal_names[i];
 						if (cnames.find(n) == cnames.end())
 						{
-							ss.str("");
-							ss << "external '* parameter data' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
-							throw_control_file_error(f_rec, ss.str());
+							string nn = par_easy_names[i];
+							if (cnames.find(nn) == cnames.end())
+							{
+								ss.str("");
+								ss << "external '* parameter data' file '" << efile.get_filename() << "' missing reqiured column '";
+								ss << n << "' (alias '" + nn + "' also not found";
+								throw_control_file_error(f_rec, ss.str());
+							}
+							else
+								get_names.push_back(nn);
 						}
+						else
+							get_names.push_back(n);
 					}
 					vector<string> partrans = efile.get_col_string_vector("PARTRANS");
 					set<string> s_partrans(partrans.begin(), partrans.end());
@@ -1213,7 +1228,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					vector<string> par_tokens;
 					for (auto ro : efile.get_row_order())
 					{
-						par_tokens = efile.get_row_vector(ro, par_formal_names);
+						par_tokens = efile.get_row_vector(ro, get_names);
 						tokens_to_par_rec(f_rec, par_tokens, t_fixed, t_log, t_scale, t_offset);
 						//save any tied pars for processing later bc the par its tied to
 						//might not have been processed yet.
@@ -1300,21 +1315,33 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						tokens_to_obs_rec(f_rec, tokens);
 						continue;
 					}
+					vector<string> get_names;
 					set<string> cnames = efile.get_col_set();
-					for (auto n : obs_formal_names)
+					//for (auto n : obs_formal_names)
+					for (int i=0;i<obs_formal_names.size();i++)
 					{
+						string n = obs_formal_names[i];
 						if (cnames.find(n) == cnames.end())
 						{
-							ss.str("");
-							ss << "external '* observation data' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
-							throw_control_file_error(f_rec, ss.str());
+							string nn = obs_easy_names[i];
+							if (cnames.find(nn) == cnames.end())
+							{
+								ss.str("");
+								ss << "external '* observation data' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+								throw_control_file_error(f_rec, ss.str());
+							}
+							else
+								get_names.push_back(nn);
+
 						}
+						else
+							get_names.push_back(n);
 					}
 
 					vector<string> obs_tokens;
 					for (auto ro : efile.get_row_order())
 					{
-						obs_tokens = efile.get_row_vector(ro, obs_formal_names);
+						obs_tokens = efile.get_row_vector(ro, get_names);
 						tokens_to_obs_rec(f_rec, obs_tokens);
 					}
 					
@@ -1604,7 +1631,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	}
 	catch (PestConversionError& e) {
 		std::stringstream out;
-		out << "Error parsing \"" << pst_filename << "\" on line number " << lnum << endl;
+		out << "Error processing \"" << pst_filename << "\" on line number " << lnum << endl;
 		out << e.what() << endl;
 		e.add_front(out.str());
 		e.raise();
@@ -1616,7 +1643,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	//todo: alias external file names
 	//todo: PI external files cant used whitespace delim (lazy!)
 
-
+	// handle any tied pars found in external files
 	for (auto p: temp_tied_map)
 	{
 		string name = p.first;
@@ -1626,7 +1653,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		tied_names.insert(name_tied);
 	}
 
+	//process pestpp options
 	map<string, PestppOptions::ARG_STATUS> arg_map, line_arg_map;
+	
 	for (vector<string>::const_iterator b = pestpp_input.begin(), e = pestpp_input.end();
 		b != e; ++b) {
 
@@ -1640,8 +1669,27 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		}
 		arg_map.insert(line_arg_map.begin(), line_arg_map.end());
 	}
-	//check for not "accepted" args here...
 
+	vector<string> not_accepted;
+	for (auto kv : arg_map)
+	{
+		if (kv.second != PestppOptions::ARG_STATUS::ARG_ACCEPTED)
+		{
+			not_accepted.push_back(kv.first);
+		}
+	}
+	if (not_accepted.size() > 0)
+	{
+		ss.str("");
+		ss << " the following '++' args were not accepted:" << endl;
+		for (auto n : not_accepted)
+			ss << n << ",";
+		throw_control_file_error(f_rec, ss.str());
+	}
+	
+
+	//since par groups are optional, make sure every par has a group...
+	rectify_par_groups();
 
 	regul_scheme_ptr->set_max_reg_iter(pestpp_options.get_max_reg_iter());
 
@@ -1696,7 +1744,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		n_adj_par = new_n_adj_par;
 		if (tied_names.size() > 0)
 		{
-			f_rec << "-->existing adjustable parameters that others tie to have been maintained:" << endl;
+			f_rec << "-->the following existing adjustable parameters that others tied to it have been maintained:" << endl;
 			for (auto tname : tied_names)
 				f_rec << tname << endl;
 		}
@@ -2219,6 +2267,32 @@ void Pest::tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens, const 
 		prior_info_string.append(" ");
 	}
 	prior_info_string.append(line_upper);
+}
+
+void Pest::rectify_par_groups()
+{
+	const ParameterRec *pr;
+	ParameterGroupRec pgi;
+	vector<string> temp = base_group_info.get_group_names();
+	set<string> group_names(temp.begin(), temp.end());
+	for (auto p : ctl_ordered_par_names)
+	{
+		pr = ctl_parameter_info.get_parameter_rec_ptr(p);
+		if (group_names.find(pr->group) == group_names.end())
+		{
+			ParameterGroupRec pgi;
+			pgi.set_defaults();
+			pgi.name = pr->group;
+			
+			//update containers
+			ctl_ordered_par_group_names.push_back(pr->group);
+			base_group_info.insert_group(pr->group, pgi);
+			temp = base_group_info.get_group_names();
+			group_names.clear();
+			group_names.insert(temp.begin(), temp.end());
+
+		}
+	}
 }
 
 

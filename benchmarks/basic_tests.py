@@ -701,10 +701,11 @@ if __name__ == "__main__":
     #parchglim_test()
     #unc_file_test()
     #secondary_marker_test()
-    #basic_test("ies_10par_xsec")
+    basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
-    tie_by_group_test()
+    #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
+
