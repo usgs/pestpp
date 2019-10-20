@@ -208,6 +208,7 @@ public:
 	int get_max_super_frz_iter()const { return max_super_frz_iter; }
 	int get_max_reg_iter()const { return max_reg_iter; }
 	const vector<double>& get_base_lambda_vec() const { return base_lambda_vec; }
+	void set_base_lambda_vec(vector<double> _vals) { base_lambda_vec = _vals; }
 	const vector<double>& get_lambda_scale_vec() const { return lambda_scale_vec; }
 	void set_lambda_scale_vec(vector<double> sv) {lambda_scale_vec = sv; }
 	bool get_iter_summary_flag() const { return iter_summary_flag; }
@@ -563,9 +564,6 @@ public:
 	double splitswh;
 	PestMode pestmode;
 	PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value);
-	/*ControlInfo() : relparmax(0.0), facparmax(0.0), facorig(0.0), phiredswh(0.0), noptmax(0),
-		phiredstp(0.0), nphistp(0), nphinored(0), relparstp(0.0), nrelpar(0), noptswitch(0),
-		splitswh(0.0), pestmode(PestMode::ESTIMATION) {}*/
 	ControlInfo() { ; }
 	void set_defaults();
 

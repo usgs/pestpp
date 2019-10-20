@@ -1072,7 +1072,9 @@ void PestppOptions::set_defaults()
 	set_iter_summary_flag(true);
 	set_der_forgive(true);
 	
-	base_lambda_vec = { 0.1, 1.0, 10.0, 100.0, 1000.0 };
+	
+	set_base_lambda_vec(vector<double>{ 0.1, 1.0, 10.0, 100.0, 1000.0 });
+	set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1});
 	set_global_opt(PestppOptions::GLOBAL_OPT::NONE);
 	set_de_cr(0.9);
 	set_de_f(0.8);
@@ -1120,7 +1122,7 @@ void PestppOptions::set_defaults()
 	set_ies_lam_mults(vector<double>());
 	set_ies_init_lam(-999);
 	set_ies_use_approx(true);
-	set_ies_subset_size(5);
+	set_ies_subset_size(4);
 	set_ies_reg_factor(0.0);
 	set_ies_verbose_level(0);
 	set_ies_use_prior_scaling(false);
@@ -1153,6 +1155,9 @@ void PestppOptions::set_defaults()
 	set_ies_autoadaloc_sigma_dist(1.0);
 	set_ies_enforce_chglim(false);
 	set_ies_center_on("");
+	set_ies_lam_mults(vector<double>{0.1, 1.0, 2.0});
+
+	
 
 	set_gsa_method("MORRIS");
 	//many of these defaults are also redefined in gsa main

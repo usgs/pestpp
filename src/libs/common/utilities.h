@@ -313,9 +313,12 @@ public:
 	map<string, string> get_row_map(string key, string col_name, vector<string> include_cols=vector<string>());
 	vector<string> get_row_vector(int idx, vector<string> include_cols = vector<string>());
 	vector<string> get_row_vector(string key, string col_name, vector<string> include_cols = vector<string>());
+	vector<string> get_col_string_vector(string col_name);
 
 	template<typename t>
 	inline void fill_col_vector(string col_name, vector<t> &col_vector);
+	void read_file();
+	
 
 private:
 	ofstream& f_rec;
@@ -323,7 +326,6 @@ private:
 	string delim,missing_val;
 	vector<string> col_names;
 	vector<int> row_order;
-	void read_file();
 	void parse_control_record();
 	map<int, map<string, string>> data;
 	void throw_externalctrlfile_error(string message);
@@ -335,19 +337,25 @@ private:
 template<typename t>
 inline void ExternalCtlFile::fill_col_vector(string col_name, vector<t>& col_vector)
 {
-	stringstream ss;
+	/*stringstream ss;
 	set<string> cnames = get_col_set();
 	if (cnames.find(col_name) == cnames.end())
 		throw_externalctrlfile_error("get_col_vector() error: col_name '" + col_name + "' not in col_names");
 	t tval;
 	string sval;
 	for (auto ro : row_order)
+	{*/
+	stringstream ss;
+	string sval;
+	t tval;
+	vector<string> s_col_vector = get_col_string_vector(col_name);
+	for (auto ro : row_order)
 	{
-		sval = data[ro][col_name];
+		sval = s_col_vector[ro];
 		if (sval == missing_val)
 		{
 			ss.str("");
-			ss << "get_col_vector() error: missing value in row " << ro << " and column '" + col_name + "'";
+			ss << "fill_col_vector() error: missing value in row " << ro << " and column '" + col_name + "'";
 			throw_externalctrlfile_error(ss.str());
 		}
 		convert_ip(sval, tval);

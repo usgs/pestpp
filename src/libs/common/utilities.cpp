@@ -906,8 +906,7 @@ ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line): f_rec(_
 	line = _line;
 	delim = ",";
 	missing_val = "";
-	parse_control_record();
-	read_file();
+	
 
 
 }
@@ -958,6 +957,22 @@ vector<string> pest_utils::ExternalCtlFile::get_row_vector(int idx, vector<strin
 	return rvector;
 }
 
+vector<string> ExternalCtlFile::get_col_string_vector(string col_name)
+{
+	stringstream ss;
+	set<string> cnames = get_col_set();
+	if (cnames.find(col_name) == cnames.end())
+		throw_externalctrlfile_error("get_col_string_vector() error: col_name '" + col_name + "' not in col_names");
+	string sval;
+	vector<string> col_vector;
+	for (auto ro : row_order)
+	{
+		sval = data[ro][col_name];
+		col_vector.push_back(sval);
+	}
+	return col_vector;
+}
+
 map<string, string> pest_utils::ExternalCtlFile::get_row_map(string key, string col_name, vector<string> include_cols)
 {
 	int idx = get_row_idx(key, col_name);
@@ -1006,6 +1021,7 @@ map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<str
 
 void ExternalCtlFile::read_file()
 {
+	parse_control_record();
 	stringstream ss;
 	if (!pest_utils::check_exist_in(filename))
 	{
@@ -1143,8 +1159,8 @@ void ExternalCtlFile::throw_externalctrlfile_error(string message)
 	ss << "External file error: " << message << endl;
 	cerr << ss.str();
 	cout << ss.str();
-	f_rec << ss.str();
-	f_rec.close();
+	//f_rec << ss.str();
+	//f_rec.close();
 	throw runtime_error(ss.str());
 }
 

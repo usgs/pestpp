@@ -885,7 +885,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	double value;
 	string name;
 	string* trans_type;
-	string prior_info_string;
+	//string prior_info_string;
 	pair<string, string> pi_name_group;
 	int lnum;
 	int num_par;
@@ -921,7 +921,16 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		"REGULARISATION","PLUSPLUS","CONTROL DATA" };
 	stringstream ss;
 	PestppOptions::ARG_STATUS stat;
-
+	vector<string> par_group_formal_names{ "PARGPNME","INCTYP","DERINC","DERINCLB","FORCEN","DERINCMUL","DERMTHD" };
+	vector<string> optional_par_group_formal_names{ "SPLITTHRESH","SPLITRELDIFF" };
+	vector<string> par_formal_names{ "PARNME","PARTRANS","PARCHGLIM","PARVAL1","PARLBND","PARUBND","PARGP","SCALE","OFFSET","DERCOM" };
+	map <string,string> row_map, temp_tied_map;
+	vector<string> obs_formal_names{ "OBSNME","OBSVAL","WEIGHT","OBGNME" };
+	vector<string> obs_group_formal_names{ "OBGNME" };
+	vector<string> pi_formal_names{ "PILBL","EQUATION","WEIGHT","OBGNME" };
+	vector<string> tokens_case_sen;
+	vector<string> model_input_formal_names{ "TEMPLATE_FILE","MODEL_INPUT_FILE" };
+	vector<string> model_output_formal_names{ "INSTRUCTION_FILE","MODEL_OUTPUT_FILE" };
 #ifndef _DEBUG
 	try {
 #endif
@@ -932,6 +941,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			line_upper = upper_cp(line);
 			tokens.clear();
 			tokenize(line_upper, tokens);
+			tokenize(line, tokens_case_sen);
 			sec_lnum = lnum - sec_begin_lnum;
 
 			if (lnum == 1)
@@ -973,6 +983,18 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					
 					throw_control_file_error(f_rec,"non-keyword section '" + section + "' not allowed to be used with 'control data keyword'");
 				
+				if (section == "MODEL INPUT/OUTPUT")
+				{
+					if (sections_found.find("MODEL INPUT") != sections_found.end())
+						throw_control_file_error(f_rec, "'MODEL INPUT/OUTPUT section can't be used with 'MODEL INPUT' section");
+					if (sections_found.find("MODEL OUTPUT") != sections_found.end())
+						throw_control_file_error(f_rec, "'MODEL INPUT/OUTPUT section can't be used with 'MODEL OUTPUT' section");
+				}
+				if ((section == "MODEL INPUT") && (sections_found.find("MODEL INPUT/OUTPUT") != sections_found.end()))
+					throw_control_file_error(f_rec, "'MODEL INPUT' section can't be used with 'MODEL INPUT/OUTPUT' section");
+				if ((section == "MODEL OUTPUT") && (sections_found.find("MODEL INPUT/OUTPUT") != sections_found.end()))
+					throw_control_file_error(f_rec, "'MODEL OUTPUT' section can't be used with 'MODEL INPUT/OUTPUT' section");
+
 
 				sec_begin_lnum = lnum;
 			}
@@ -1010,7 +1032,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
 				{
 					ss.str("");
-					ss << "unrecognized control data keyword key-value pair on line" << line << endl;
+					ss << "unrecognized '* control data keyword' key-value pair on line" << line << endl;
 					throw_control_file_error(f_rec, ss.str(), false);
 				}		
 			}
@@ -1110,16 +1132,24 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens[0] == "EXTERNAL")
 				{
-					vector<string> par_group_formal_names{ "PARGPNME","INCTYP","DERINC","DERINCLB","FORCEN","DERINCMUL","DERMTHD" };
-					vector<string> optional_par_group_formal_names{ "SPLITTHRESH","SPLITRELDIFF" };
 					pest_utils::ExternalCtlFile efile(f_rec, line);
+					try
+					{
+						efile.read_file();
+					}
+					//if the efile failed to read, could be an input named "external"
+					catch (...)
+					{
+						tokens_to_par_group_rec(f_rec, tokens);
+						continue;
+					}
 					set<string> cnames = efile.get_col_set();
 					for (auto n : par_group_formal_names)
 					{
 						if (cnames.find(n) == cnames.end())
 						{
 							ss.str("");
-							ss << "external file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+							ss << "external '* parameter group' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
 							throw_control_file_error(f_rec, ss.str());
 						}
 					}
@@ -1134,14 +1164,10 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						par_group_tokens = efile.get_row_vector(ro, par_group_formal_names);
 						tokens_to_par_group_rec(f_rec, par_group_tokens);
 					}
-					cout << endl;
-
-					//check for required columns
-
-					//process each row
-
-
-
+					if (efiles_map.find(section) == efiles_map.end())
+						efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+					else
+						efiles_map[section].push_back(efile);
 				}
 				else
 				{
@@ -1152,6 +1178,53 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens[0] == "EXTERNAL")
 				{
+					pest_utils::ExternalCtlFile efile(f_rec, line);
+					try
+					{
+						efile.read_file();
+					}
+					//if the efile failed to read, could be an input named "external"
+					catch (...)
+					{
+						tokens_to_par_rec(f_rec, tokens, t_fixed, t_log, t_scale, t_offset);
+						continue;
+					}
+					set<string> cnames = efile.get_col_set();
+					for (auto n : par_formal_names)
+					{
+						if (cnames.find(n) == cnames.end())
+						{
+							ss.str("");
+							ss << "external '* parameter data' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+							throw_control_file_error(f_rec, ss.str());
+						}
+					}
+					vector<string> partrans = efile.get_col_string_vector("PARTRANS");
+					set<string> s_partrans(partrans.begin(), partrans.end());
+					if (s_partrans.find("TIED") != s_partrans.end())
+						if (cnames.find("PARTIED") == cnames.end())
+						{
+							ss.str("");
+							ss << "external '* parameter data' file '" << efile.get_filename() << "' included 'tied' parameters";
+							ss << "but doesnt have 'PARTIED' column";
+							throw_control_file_error(f_rec, ss.str());
+						}
+
+					vector<string> par_tokens;
+					for (auto ro : efile.get_row_order())
+					{
+						par_tokens = efile.get_row_vector(ro, par_formal_names);
+						tokens_to_par_rec(f_rec, par_tokens, t_fixed, t_log, t_scale, t_offset);
+						//save any tied pars for processing later bc the par its tied to
+						//might not have been processed yet.
+						row_map = efile.get_row_map(ro);
+						if (row_map["PARTRANS"] == "TIED")
+							temp_tied_map[row_map["PARNME"]] = row_map["PARTIED"];
+					}
+					if (efiles_map.find(section) == efiles_map.end())
+						efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+					else
+						efiles_map[section].push_back(efile);
 				}
 				else
 				{
@@ -1172,10 +1245,43 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens[0] == "EXTERNAL")
 				{
+					pest_utils::ExternalCtlFile efile(f_rec, line);
+					try
+					{
+						efile.read_file();
+					}
+					//if the efile failed to read, could be an input named "external"
+					catch (...)
+					{
+						tokens_to_obs_group_rec(f_rec, tokens);
+						continue;
+					}
+					set<string> cnames = efile.get_col_set();
+					for (auto n : obs_group_formal_names)
+					{
+						if (cnames.find(n) == cnames.end())
+						{
+							ss.str("");
+							ss << "external '* observation group' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+							throw_control_file_error(f_rec, ss.str());
+						}
+					}
+					
+					vector<string> obs_group_tokens;
+					for (auto ro : efile.get_row_order())
+					{
+						obs_group_tokens = efile.get_row_vector(ro, obs_group_formal_names);
+						tokens_to_obs_group_rec(f_rec, obs_group_tokens);
+					}
+					if (efiles_map.find(section) == efiles_map.end())
+						efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+					else
+						efiles_map[section].push_back(efile);
 
 				}
 				else
 				{
+
 					tokens_to_obs_group_rec(f_rec, tokens);
 				}
 			}
@@ -1183,6 +1289,39 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens[0] == "EXTERNAL")
 				{
+					pest_utils::ExternalCtlFile efile(f_rec, line);
+					try
+					{
+						efile.read_file();
+					}
+					//if the efile failed to read, could be an input named "external"
+					catch (...)
+					{
+						tokens_to_obs_rec(f_rec, tokens);
+						continue;
+					}
+					set<string> cnames = efile.get_col_set();
+					for (auto n : obs_formal_names)
+					{
+						if (cnames.find(n) == cnames.end())
+						{
+							ss.str("");
+							ss << "external '* observation data' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+							throw_control_file_error(f_rec, ss.str());
+						}
+					}
+
+					vector<string> obs_tokens;
+					for (auto ro : efile.get_row_order())
+					{
+						obs_tokens = efile.get_row_vector(ro, obs_formal_names);
+						tokens_to_obs_rec(f_rec, obs_tokens);
+					}
+					
+					if (efiles_map.find(section) == efiles_map.end())
+						efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+					else
+						efiles_map[section].push_back(efile);
 				}
 				else
 				{
@@ -1194,26 +1333,43 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens[0] == "EXTERNAL")
 				{
+					pest_utils::ExternalCtlFile efile(f_rec, line);
+					try
+					{
+						efile.read_file();
+					}
+					//if the efile failed to read, could be an input named "external"
+					catch (...)
+					{
+						tokens_to_pi_rec(f_rec, tokens, line_upper);
+						continue;
+					}
+					set<string> cnames = efile.get_col_set();
+					for (auto n : pi_formal_names)
+					{
+						if (cnames.find(n) == cnames.end())
+						{
+							ss.str("");
+							ss << "external '* prior information' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+							throw_control_file_error(f_rec, ss.str());
+						}
+					}
+
+					vector<string> pi_tokens;
+					for (auto ro : efile.get_row_order())
+					{
+						pi_tokens = efile.get_row_vector(ro, pi_formal_names);
+						tokens_to_pi_rec(f_rec, pi_tokens, line_upper);
+					}
+
+					if (efiles_map.find(section) == efiles_map.end())
+						efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+					else
+						efiles_map[section].push_back(efile);
 				}
 				else
 				{
-
-					//This section processes the prior information.  It does not write out the
-					//last prior infomration.  THis is because it must check for line continuations
-					if (!prior_info_string.empty() && tokens[0] != "&") {
-						pi_name_group = prior_info.AddRecord(prior_info_string);
-						ctl_ordered_pi_names.push_back(pi_name_group.first);
-						vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
-						if (is == ctl_ordered_obs_group_names.end())
-						{
-							ctl_ordered_obs_group_names.push_back(pi_name_group.second);
-						}
-						prior_info_string.clear();
-					}
-					else if (tokens[0] == "&") {
-						prior_info_string.append(" ");
-					}
-					prior_info_string.append(line_upper);
+					tokens_to_pi_rec(f_rec, tokens, line_upper);
 				}
 			}
 
@@ -1221,35 +1377,146 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens[0] == "EXTERNAL")
 				{
+					pest_utils::ExternalCtlFile efile(f_rec, line);
+					try
+					{
+						efile.read_file();
+					}
+					//if the efile failed to read, could be an input named "external"
+					catch (...)
+					{
+						tokens_to_pi_rec(f_rec, tokens, line_upper);
+						continue;
+					}
+					set<string> cnames = efile.get_col_set();
+					for (auto n : pi_formal_names)
+					{
+						if (cnames.find(n) == cnames.end())
+						{
+							ss.str("");
+							ss << "external '* prior information' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+							throw_control_file_error(f_rec, ss.str());
+						}
+					}
+
+					vector<string> pi_tokens;
+					for (auto ro : efile.get_row_order())
+					{
+						pi_tokens = efile.get_row_vector(ro, pi_formal_names);
+						tokens_to_pi_rec(f_rec, pi_tokens, line_upper);
+					}
+
+					if (efiles_map.find(section) == efiles_map.end())
+						efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+					else
+						efiles_map[section].push_back(efile);
 				}
 				else
 				{
-					//This section processes the prior information.  It does not write out the
-					//last prior infomration
-					if (!prior_info_string.empty() && tokens[0] != "&") {
-						pi_name_group = prior_info.AddRecord(prior_info_string);
-						ctl_ordered_pi_names.push_back(pi_name_group.first);
-						vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
-						if (is == ctl_ordered_obs_group_names.end())
-						{
-							ctl_ordered_obs_group_names.push_back(pi_name_group.second);
-						}
-						prior_info_string.clear();
-					}
-					else if (tokens[0] != "&") {
-						prior_info_string.append(" ");
-					}
-					prior_info_string.append(line);
+					tokens_to_pi_rec(f_rec, tokens, line_upper);
 				}
+				
 			}
 			else if (section == "MODEL COMMAND LINE")
 			{
 				model_exec_info.comline_vec.push_back(line);
 			}
+			else if (section == "MODEL INPUT")
+			{
+				if (tokens[0] == "EXTERNAL")
+				{
+					pest_utils::ExternalCtlFile efile(f_rec, line);
+					try
+					{
+						efile.read_file();
+					}
+					//if the efile failed to read, could be an input named "external"
+					catch (...)
+					{
+						model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
+						model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
+						continue;
+					}
+					set<string> cnames = efile.get_col_set();
+					for (auto n : model_input_formal_names)
+					{
+						if (cnames.find(n) == cnames.end())
+						{
+							ss.str("");
+							ss << "external '* model input' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+							throw_control_file_error(f_rec, ss.str());
+						}
+					}
+
+					vector<string> mi_tokens;
+					for (auto ro : efile.get_row_order())
+					{
+						mi_tokens = efile.get_row_vector(ro, model_input_formal_names);
+						model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
+						model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
+					}
+
+					if (efiles_map.find(section) == efiles_map.end())
+						efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+					else
+						efiles_map[section].push_back(efile);
+				}
+				else
+				{
+					model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
+					model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
+				}
+			
+			}
+			else if (section == "MODEL OUTPUT")
+			{
+			if (tokens[0] == "EXTERNAL")
+			{
+				pest_utils::ExternalCtlFile efile(f_rec, line);
+				try
+				{
+					efile.read_file();
+				}
+				//if the efile failed to read, could be an input named "external"
+				catch (...)
+				{
+					model_exec_info.insfile_vec.push_back(tokens_case_sen[0]);
+					model_exec_info.outfile_vec.push_back(tokens_case_sen[1]);
+					continue;
+				}
+				set<string> cnames = efile.get_col_set();
+				for (auto n : model_output_formal_names)
+				{
+					if (cnames.find(n) == cnames.end())
+					{
+						ss.str("");
+						ss << "external '* model output' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						throw_control_file_error(f_rec, ss.str());
+					}
+				}
+
+				vector<string> mo_tokens;
+				for (auto ro : efile.get_row_order())
+				{
+					mo_tokens = efile.get_row_vector(ro, model_output_formal_names);
+					model_exec_info.insfile_vec.push_back(tokens_case_sen[0]);
+					model_exec_info.outfile_vec.push_back(tokens_case_sen[1]);
+				}
+
+				if (efiles_map.find(section) == efiles_map.end())
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+				else
+					efiles_map[section].push_back(efile);
+			}
+			else
+			{
+				model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
+				model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
+			}
+
+			}
 			else if (section == "MODEL INPUT/OUTPUT")
 			{
-				vector<string> tokens_case_sen;
-				tokenize(line, tokens_case_sen);
 				if (i_tpl_ins < num_tpl_file)
 				{
 					model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
@@ -1331,14 +1598,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		// write out last prior information record
 		if (!prior_info_string.empty())
 		{
-			pi_name_group = prior_info.AddRecord(prior_info_string);
-			ctl_ordered_pi_names.push_back(pi_name_group.first);
-			vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
-			if (is == ctl_ordered_obs_group_names.end())
-			{
-				ctl_ordered_obs_group_names.push_back(pi_name_group.second);
-			}
-			prior_info_string.clear();
+			tokens_to_pi_rec(f_rec, tokens, line_upper);
 		}
 #ifndef _DEBUG
 	}
@@ -1351,6 +1611,20 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	}
 #endif
 	fin.close();
+
+	//todo: check that keyword control data was used if model input or model output used
+	//todo: alias external file names
+	//todo: PI external files cant used whitespace delim (lazy!)
+
+
+	for (auto p: temp_tied_map)
+	{
+		string name = p.first;
+		string name_tied = p.second;
+		double ratio = ctl_parameters[name] / ctl_parameters[name_tied];
+		t_tied->insert(name, pair<string, double>(name_tied, ratio));
+		tied_names.insert(name_tied);
+	}
 
 	map<string, PestppOptions::ARG_STATUS> arg_map, line_arg_map;
 	for (vector<string>::const_iterator b = pestpp_input.begin(), e = pestpp_input.end();
@@ -1925,6 +2199,26 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
 	observation_values.insert(name, value);
+}
+
+void Pest::tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens, const string line_upper)
+{
+	//This section processes the prior information.  It does not write out the
+					//last prior infomration.  THis is because it must check for line continuations
+	if (!prior_info_string.empty() && tokens[0] != "&") {
+		pair<string,string> pi_name_group = prior_info.AddRecord(prior_info_string);
+		ctl_ordered_pi_names.push_back(pi_name_group.first);
+		vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
+		if (is == ctl_ordered_obs_group_names.end())
+		{
+			ctl_ordered_obs_group_names.push_back(pi_name_group.second);
+		}
+		prior_info_string.clear();
+	}
+	else if (tokens[0] == "&") {
+		prior_info_string.append(" ");
+	}
+	prior_info_string.append(line_upper);
 }
 
 

@@ -90,6 +90,7 @@ public:
 	
 private:
 	int n_adj_par = 0;
+	string prior_info_string;
 	ControlInfo control_info;
 	ParetoInfo pareto_info;
 	SVDInfo svd_info;
@@ -119,8 +120,10 @@ private:
 	void tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens,TranFixed *t_fixed, TranLog10 *t_log, TranScale *t_scale, TranOffset *t_offset);
 	void tokens_to_obs_group_rec(ofstream& f_rec, const vector<string>& tokens);
 	void tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens);
+	void tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens, const string line_upper);
 
-	map<string, pest_utils::ExternalCtlFile> efile_map;
+	map<string, vector<pest_utils::ExternalCtlFile>> efiles_map;
+
 };
 ostream& operator<< (ostream &os, const Pest& val);
 #endif /* PEST_H_ */
