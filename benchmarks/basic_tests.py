@@ -154,7 +154,7 @@ def glm_save_binary_test():
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d, "pest.pst"))
-    pst.pestpp_options = {"num_reals":30,"save_binary":True}
+    pst.pestpp_options = {"glm_num_reals":30,"save_binary":True}
     pst.control_data.noptmax = 1
     pst.write(os.path.join(t_d, "pest_save_binary.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-glm"), "pest_save_binary.pst", 10, master_dir=m_d,
@@ -403,6 +403,7 @@ def parchglim_test():
     
     pst.control_data.noptmax = 1
     pst.pestpp_options["lambdas"] = 1.0
+    pst.pestpp_options["lambda_scale_fac"] = 1.0
     pst.write(os.path.join(m_d,"pest_parchglim.pst"))
     pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
     p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
@@ -698,10 +699,10 @@ def salib_verf():
 if __name__ == "__main__":
     #glm_long_name_test()
     #sen_plusplus_test()
-    #parchglim_test()
+    parchglim_test()
     #unc_file_test()
     #secondary_marker_test()
-    basic_test("ies_10par_xsec")
+    #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
