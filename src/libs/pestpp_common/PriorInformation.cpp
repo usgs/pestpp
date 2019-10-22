@@ -154,7 +154,14 @@ pair<string, string> PriorInformation::AddRecord(const string& pi_line)
 
 pair<string, string> PriorInformation::AddRecord(const vector<string> tokens)
 {
-
+	//here we expect tokens to have the entire pi equation as a string, so we need to split it up and insert it into tokens
+	vector<string> eq_tokens;// , full_tokens;
+	tokenize(tokens[1], eq_tokens);
+	//full_tokens = tokens;
+	//vector<string>::iterator it = full_tokens.begin() + 1;// distance(full_tokens.begin(), 1);
+	//full_tokens.insert(it, eq_tokens.begin(), eq_tokens.end());
+	//it = full_tokens.end() - 3;
+	//full_tokens.erase(it);
 	string par_name;
 	double pifac;
 	double pival;
@@ -164,18 +171,20 @@ pair<string, string> PriorInformation::AddRecord(const vector<string> tokens)
 	bool plus_sign;
 	vector<PIAtom> pi_atoms;
 	int n_tokens = tokens.size();
+	int n_tokens_eq = eq_tokens.size();
+
 	group = tokens[n_tokens-1];
 	convert_ip(tokens[n_tokens-2], weight);
-	convert_ip(tokens[n_tokens-3], pival);
+	convert_ip(eq_tokens[n_tokens_eq-1], pival);
 
 	string prior_info_name = tokens[0];
 	// process prior information equation
 	plus_sign = true;
-	for (int i=1; i< n_tokens-4; i+=4)
+	for (int i=0; i< n_tokens_eq-4; i+=4)
 	{
-		convert_ip(tokens[i], pifac);
+		convert_ip(eq_tokens[i], pifac);
 		// token i+1 = "*"
-		par_name = tokens[i+2];
+		par_name = eq_tokens[i+2];
 		if (par_name.find("LOG") == 0) // parameter name
 		{
 			log_trans = true;

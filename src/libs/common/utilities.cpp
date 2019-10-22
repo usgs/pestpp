@@ -906,6 +906,7 @@ ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line): f_rec(_
 	line = _line;
 	delim = ",";
 	missing_val = "";
+	filename = "";
 	
 
 
@@ -1021,7 +1022,9 @@ map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<str
 
 void ExternalCtlFile::read_file()
 {
+	
 	parse_control_record();
+	f_rec << "...reading external file '" << filename << "'" << endl;
 	if (delim == "W")
 	{
 		delim = "\t ";
@@ -1160,7 +1163,10 @@ void ExternalCtlFile::parse_control_record()
 void ExternalCtlFile::throw_externalctrlfile_error(string message)
 {
 	stringstream ss;
-	ss << "External file error: " << message << endl;
+	if (filename.size() > 0)
+		ss << "External file '" << filename << "' error: " << message << endl;
+	else
+		ss << "External file error: " << message << endl;
 	cerr << ss.str();
 	cout << ss.str();
 	//f_rec << ss.str();
