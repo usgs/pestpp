@@ -1171,7 +1171,7 @@ void PestppOptions::set_defaults()
 	set_ies_autoadaloc_sigma_dist(1.0);
 	set_ies_enforce_chglim(false);
 	set_ies_center_on("");
-	set_ies_lam_mults(vector<double>{0.1, 1.0, 2.0});
+	set_ies_lam_mults(vector<double>{0.1, 1.0, 10.0});
 
 	
 
