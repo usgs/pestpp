@@ -1021,8 +1021,7 @@ map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<str
 
 
 void ExternalCtlFile::read_file()
-{
-	
+{	
 	parse_control_record();
 	f_rec << "...reading external file '" << filename << "'" << endl;
 	if (delim == "W")

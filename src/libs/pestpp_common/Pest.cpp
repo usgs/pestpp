@@ -921,7 +921,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	vector<string> par_group_formal_names{ "PARGPNME","INCTYP","DERINC","DERINCLB","FORCEN","DERINCMUL","DERMTHD" };
 	vector<string> optional_par_group_formal_names{ "SPLITTHRESH","SPLITRELDIFF" };
 	vector<string> par_formal_names{ "PARNME","PARTRANS","PARCHGLIM","PARVAL1","PARLBND","PARUBND","PARGP","SCALE","OFFSET","DERCOM" };
-	vector<string> par_easy_names{ "NAME","TRANSFORM","CHANGE_LIM","VALUE","UPPER_BOUND","LOWER_BOUND","GROUP","SCALE","OFFSET","DERCOM" };
+	vector<string> par_easy_names{ "NAME","TRANSFORM","CHANGE_LIMIT","VALUE","LOWER_BOUND","UPPER_BOUND","GROUP","SCALE","OFFSET","DERCOM" };
 	map <string,string> row_map, temp_tied_map;
 	vector<string> obs_formal_names{ "OBSNME","OBSVAL","WEIGHT","OBGNME" };
 	vector<string> obs_easy_names{ "NAME","VALUE","WEIGHT","GROUP" };
@@ -1226,7 +1226,12 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						else
 							get_names.push_back(n);
 					}
-					vector<string> partrans = efile.get_col_string_vector("PARTRANS");
+					string tcol;
+					if (cnames.find("PARTRANS") != cnames.end())
+						tcol = "PARTRANS";
+					else
+						tcol = "TRANSFORM";
+					vector<string> partrans = efile.get_col_string_vector(tcol);
 					set<string> s_partrans(partrans.begin(), partrans.end());
 					if (s_partrans.find("TIED") != s_partrans.end())
 						if (cnames.find("PARTIED") == cnames.end())

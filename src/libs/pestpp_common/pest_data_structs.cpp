@@ -135,11 +135,16 @@ void ParameterGroupInfo::insert_parameter_link(const string &parameter_name, con
 
 	g_iter = groups.find(group_name);
 	if(g_iter == groups.end()) {
-		throw PestIndexError(group_name, "Invalid parameter group name");
+		//throw PestIndexError(group_name, "Invalid parameter group name");
+		ParameterGroupRec pgr;
+		pgr.set_defaults();
+		insert_group(group_name, pgr);
+		g_iter = groups.find(group_name);
 	}
-	else {
+	/*else {
 		parameter2group[parameter_name] = (*g_iter).second;
-	}
+	}*/
+	parameter2group[parameter_name] = (*g_iter).second;
 
 }
 
