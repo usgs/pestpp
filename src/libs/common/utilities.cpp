@@ -1152,7 +1152,7 @@ void ExternalCtlFile::parse_control_record()
 		}
 		else
 		{
-			throw_externalctrlfile_error("unrecognized option: '" + key + "'");
+			throw_externalctrlfile_error("unrecognized option: '" + key + "' on line '"+line+"'");
 		}
 	}
 }

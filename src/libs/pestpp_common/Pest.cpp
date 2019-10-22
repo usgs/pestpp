@@ -1438,6 +1438,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				if (tokens[0] == "EXTERNAL")
 				{
 					pest_utils::ExternalCtlFile efile(f_rec, line);
+					
 					try
 					{
 						efile.read_file();
@@ -2320,7 +2321,7 @@ void Pest::tokens_to_pi_rec(ostream& f_rec, const string& line_upper)
 {
 	string first = line_upper.substr(0, 1);
 	if (!prior_info_string.empty() && first != "&") {
-		pair<string, string> pi_name_group = prior_info.AddRecord(line_upper);
+		pair<string, string> pi_name_group = prior_info.AddRecord(prior_info_string);
 		ctl_ordered_pi_names.push_back(pi_name_group.first);
 		vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
 		if (is == ctl_ordered_obs_group_names.end())
