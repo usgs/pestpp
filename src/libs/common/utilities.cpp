@@ -1166,8 +1166,8 @@ void ExternalCtlFile::throw_externalctrlfile_error(string message)
 		ss << "External file '" << filename << "' error: " << message << endl;
 	else
 		ss << "External file error: " << message << endl;
-	cerr << ss.str();
-	cout << ss.str();
+	//cerr << ss.str();
+	//cout << ss.str();
 	//f_rec << ss.str();
 	//f_rec.close();
 	throw runtime_error(ss.str());
