@@ -70,6 +70,7 @@ public:
 	PriorInformation() {}
 	~PriorInformation() {}
 	std::pair<std::string, std::string> AddRecord(const std::string &pi_line);
+	std::pair<std::string, std::string> AddRecord(const std::vector<std::string> tokens);
 	void AddRecord(const std::string &name, const PriorInformationRec* pi_rec_ptr);
 	PriorInformation::iterator begin(){return prior_info_map.begin();}
 	PriorInformation::const_iterator begin() const {return prior_info_map.begin();}

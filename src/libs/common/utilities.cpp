@@ -1022,6 +1022,10 @@ map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<str
 void ExternalCtlFile::read_file()
 {
 	parse_control_record();
+	if (delim == "W")
+	{
+		delim = "\t ";
+	}
 	stringstream ss;
 	if (!pest_utils::check_exist_in(filename))
 	{
@@ -1128,17 +1132,17 @@ void ExternalCtlFile::parse_control_record()
 		throw_externalctrlfile_error("wrong number of options - should be form of 'keyword <space> value'");
 	}
 	string key, value;
-	for (int i = 2; i < tokens.size(); i + 2)
+	for (int i = 2; i < tokens.size(); i = i + 2)
 	{
 		key = tokens[i];
 		upper_ip(key);
 		strip_ip(key, "both");
 		value = tokens[i + 1];
 		strip_ip(value, "both");
-		if (key == "DELIMITER")
+		if (key == "SEP")
 		{
 			if (value.size() > 1)
-				throw_externalctrlfile_error("'delimiter' value '" + value + "' on line:\n '"+line+"' \ncan only be one character (use 'w' for whitespace)");
+				throw_externalctrlfile_error("'sep' value '" + value + "' on line:\n '"+line+"' \ncan only be one character (use 'w' for whitespace)");
 			delim = upper_cp(value);
 		}
 		else if (key == "MISSING_VALUE")

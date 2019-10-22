@@ -144,8 +144,17 @@ void PriorInformation::AddRecord(const string &name, const PriorInformationRec* 
 
 }
 
-pair<string,string> PriorInformation::AddRecord(const string &pi_line)
+pair<string, string> PriorInformation::AddRecord(const string& pi_line)
 {
+	vector<string> tokens;
+	tokenize(upper_cp(strip_cp(pi_line)), tokens);
+	return AddRecord(tokens);
+}
+
+
+pair<string, string> PriorInformation::AddRecord(const vector<string> tokens)
+{
+
 	string par_name;
 	double pifac;
 	double pival;
@@ -154,8 +163,6 @@ pair<string,string> PriorInformation::AddRecord(const string &pi_line)
 	string group;
 	bool plus_sign;
 	vector<PIAtom> pi_atoms;
-	vector<string> tokens;
-	tokenize(upper_cp(strip_cp(pi_line)), tokens);
 	int n_tokens = tokens.size();
 	group = tokens[n_tokens-1];
 	convert_ip(tokens[n_tokens-2], weight);

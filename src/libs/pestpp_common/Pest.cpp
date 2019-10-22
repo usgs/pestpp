@@ -885,7 +885,6 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	double value;
 	string name;
 	string* trans_type;
-	//string prior_info_string;
 	pair<string, string> pi_name_group;
 	int lnum;
 	int num_par;
@@ -895,9 +894,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	bool use_dynamic_reg = false;
 	bool reg_adj_grp_weights = false;
 	vector<string> pestpp_input;
-	/*regul_scheme_ptr = new DynamicRegularization();
-	regul_scheme_ptr->set_defaults();*/
-
+	
 	//dont change these text names - they are used in ParamTransformSeq
 	TranTied* t_tied = new TranTied("PEST to model tied transformation");
 	TranOffset* t_offset = new TranOffset("PEST to model offset transformation");
@@ -931,8 +928,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	vector<string> obs_group_formal_names{ "OBGNME" };
 	vector<string> pi_formal_names{ "PILBL","EQUATION","WEIGHT","OBGNME" };
 	vector<string> tokens_case_sen;
-	vector<string> model_input_formal_names{ "TEMPLATE_FILE","MODEL_INPUT_FILE" };
-	vector<string> model_output_formal_names{ "INSTRUCTION_FILE","MODEL_OUTPUT_FILE" };
+	vector<string> model_input_formal_names{ "PEST_FILE","MODEL_FILE" };
+	vector<string> model_output_formal_names{ "PEST_FILE","MODEL_FILE" };
 #ifndef _DEBUG
 	try {
 #endif
@@ -966,7 +963,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (line_upper.substr(0, 2) == "++")
 			{
 				if (sections_found.find("CONTROL DATA KEYWORD") != sections_found.end())
-					throw_control_file_error(f_rec, "'control data keyword' cant be used with '++' args");
+					throw_control_file_error(f_rec, "'* control data keyword' cant be used with '++' args");
 				sections_found.insert("PLUSPLUS");
 				pestpp_input.push_back(line);
 			}
@@ -984,7 +981,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				if ((nonkeyword_sections.find(section) != nonkeyword_sections.end()) &&
 					(sections_found.find("CONTROL DATA KEYWORD") != sections_found.end()))
 					
-					throw_control_file_error(f_rec,"non-keyword section '" + section + "' not allowed to be used with 'control data keyword'");
+					throw_control_file_error(f_rec,"non-keyword section '" + section + "' not allowed to be used with '* control data keyword'");
 				
 				if (section == "MODEL INPUT/OUTPUT")
 				{
@@ -1141,11 +1138,19 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						efile.read_file();
 					}
 					//if the efile failed to read, could be an input named "external"
-					catch (...)
+					catch (exception& e)
 					{
-						tokens_to_par_group_rec(f_rec, tokens);
-						continue;
+						try 
+						{
+							tokens_to_par_group_rec(f_rec, tokens);
+							continue;
+						}
+						catch (...)
+						{
+							throw_control_file_error(f_rec, "error processing '* parameter group' line '" + line + "' as external file:" + e.what());
+						}
 					}
+				
 					set<string> cnames = efile.get_col_set();
 					for (auto n : par_group_formal_names)
 					{
@@ -1187,10 +1192,17 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						efile.read_file();
 					}
 					//if the efile failed to read, could be an input named "external"
-					catch (...)
+					catch (exception& e)
 					{
-						tokens_to_par_rec(f_rec, tokens, t_fixed, t_log, t_scale, t_offset);
-						continue;
+						try
+						{
+							tokens_to_par_rec(f_rec, tokens,t_fixed,t_log,t_scale,t_offset);
+							continue;
+						}
+						catch (...)
+						{
+							throw_control_file_error(f_rec, "error processing '* parameter data' line '" + line + "' as external file:" + e.what());
+						}
 					}
 					set<string> cnames = efile.get_col_set();
 					vector<string> get_names;
@@ -1266,10 +1278,17 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						efile.read_file();
 					}
 					//if the efile failed to read, could be an input named "external"
-					catch (...)
+					catch (exception& e)
 					{
-						tokens_to_obs_group_rec(f_rec, tokens);
-						continue;
+						try
+						{
+							tokens_to_obs_group_rec(f_rec, tokens);
+							continue;
+						}
+						catch (...)
+						{
+							throw_control_file_error(f_rec, "error processing '* observation group' line '" + line + "' as external file:" + e.what());
+						}
 					}
 					set<string> cnames = efile.get_col_set();
 					for (auto n : obs_group_formal_names)
@@ -1310,10 +1329,17 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						efile.read_file();
 					}
 					//if the efile failed to read, could be an input named "external"
-					catch (...)
+					catch (exception& e)
 					{
-						tokens_to_obs_rec(f_rec, tokens);
-						continue;
+						try
+						{
+							tokens_to_obs_rec(f_rec, tokens);
+							continue;
+						}
+						catch (...)
+						{
+							throw_control_file_error(f_rec, "error processing '* observation data' line '" + line + "' as external file:" + e.what());
+						}
 					}
 					vector<string> get_names;
 					set<string> cnames = efile.get_col_set();
@@ -1366,10 +1392,17 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						efile.read_file();
 					}
 					//if the efile failed to read, could be an input named "external"
-					catch (...)
+					catch (exception& e)
 					{
-						tokens_to_pi_rec(f_rec, tokens, line_upper);
-						continue;
+						try
+						{
+							tokens_to_pi_rec(f_rec, line_upper);
+							continue;
+						}
+						catch (...)
+						{
+							throw_control_file_error(f_rec, "error processing '* prior information' line '" + line + "' as external file:" + e.what());
+						}
 					}
 					set<string> cnames = efile.get_col_set();
 					for (auto n : pi_formal_names)
@@ -1386,7 +1419,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					for (auto ro : efile.get_row_order())
 					{
 						pi_tokens = efile.get_row_vector(ro, pi_formal_names);
-						tokens_to_pi_rec(f_rec, pi_tokens, line_upper);
+						tokens_to_pi_rec(f_rec, pi_tokens);
 					}
 
 					if (efiles_map.find(section) == efiles_map.end())
@@ -1396,7 +1429,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				}
 				else
 				{
-					tokens_to_pi_rec(f_rec, tokens, line_upper);
+					tokens_to_pi_rec(f_rec, line_upper);
 				}
 			}
 
@@ -1410,10 +1443,17 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						efile.read_file();
 					}
 					//if the efile failed to read, could be an input named "external"
-					catch (...)
+					catch (exception& e)
 					{
-						tokens_to_pi_rec(f_rec, tokens, line_upper);
-						continue;
+						try
+						{
+							tokens_to_pi_rec(f_rec, line_upper);
+							continue;
+						}
+						catch (...)
+						{
+							throw_control_file_error(f_rec, "error processing '* prior information' line '" + line + "' as external file:" + e.what());
+						}
 					}
 					set<string> cnames = efile.get_col_set();
 					for (auto n : pi_formal_names)
@@ -1430,7 +1470,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					for (auto ro : efile.get_row_order())
 					{
 						pi_tokens = efile.get_row_vector(ro, pi_formal_names);
-						tokens_to_pi_rec(f_rec, pi_tokens, line_upper);
+						tokens_to_pi_rec(f_rec, pi_tokens);
 					}
 
 					if (efiles_map.find(section) == efiles_map.end())
@@ -1440,7 +1480,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				}
 				else
 				{
-					tokens_to_pi_rec(f_rec, tokens, line_upper);
+					tokens_to_pi_rec(f_rec,line_upper);
 				}
 				
 			}
@@ -1458,11 +1498,24 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						efile.read_file();
 					}
 					//if the efile failed to read, could be an input named "external"
-					catch (...)
+					/*catch (...)
 					{
 						model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
 						model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
 						continue;
+					}*/
+					catch (exception& e)
+					{
+						try
+						{
+							model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
+							model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
+							continue;
+						}
+						catch (...)
+						{
+							throw_control_file_error(f_rec, "error processing '* model input' line '" + line + "' as external file:" + e.what());
+						}
 					}
 					set<string> cnames = efile.get_col_set();
 					for (auto n : model_input_formal_names)
@@ -1505,12 +1558,26 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					efile.read_file();
 				}
 				//if the efile failed to read, could be an input named "external"
-				catch (...)
+				/*catch (...)
 				{
 					model_exec_info.insfile_vec.push_back(tokens_case_sen[0]);
 					model_exec_info.outfile_vec.push_back(tokens_case_sen[1]);
 					continue;
+				}*/
+				catch (exception& e)
+				{
+					try
+					{
+						model_exec_info.insfile_vec.push_back(tokens_case_sen[0]);
+						model_exec_info.outfile_vec.push_back(tokens_case_sen[1]);
+						continue;
+					}
+					catch (...)
+					{
+						throw_control_file_error(f_rec, "error processing '* model output' line '" + line + "' as external file:" + e.what());
+					}
 				}
+
 				set<string> cnames = efile.get_col_set();
 				for (auto n : model_output_formal_names)
 				{
@@ -1625,7 +1692,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		// write out last prior information record
 		if (!prior_info_string.empty())
 		{
-			tokens_to_pi_rec(f_rec, tokens, line_upper);
+			tokens_to_pi_rec(f_rec, line_upper);
 		}
 #ifndef _DEBUG
 	}
@@ -2249,12 +2316,11 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	observation_values.insert(name, value);
 }
 
-void Pest::tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens, const string line_upper)
+void Pest::tokens_to_pi_rec(ostream& f_rec, const string& line_upper)
 {
-	//This section processes the prior information.  It does not write out the
-					//last prior infomration.  THis is because it must check for line continuations
-	if (!prior_info_string.empty() && tokens[0] != "&") {
-		pair<string,string> pi_name_group = prior_info.AddRecord(prior_info_string);
+	string first = line_upper.substr(0, 1);
+	if (!prior_info_string.empty() && first != "&") {
+		pair<string, string> pi_name_group = prior_info.AddRecord(line_upper);
 		ctl_ordered_pi_names.push_back(pi_name_group.first);
 		vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
 		if (is == ctl_ordered_obs_group_names.end())
@@ -2263,10 +2329,27 @@ void Pest::tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens, const 
 		}
 		prior_info_string.clear();
 	}
-	else if (tokens[0] == "&") {
+	else if (first == "&") {
 		prior_info_string.append(" ");
+		
 	}
 	prior_info_string.append(line_upper);
+
+}
+
+
+void Pest::tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens)
+{
+	
+	
+	pair<string,string> pi_name_group = prior_info.AddRecord(tokens);
+	ctl_ordered_pi_names.push_back(pi_name_group.first);
+	vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
+	if (is == ctl_ordered_obs_group_names.end())
+	{
+		ctl_ordered_obs_group_names.push_back(pi_name_group.second);
+	}
+	
 }
 
 void Pest::rectify_par_groups()
