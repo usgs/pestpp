@@ -302,7 +302,7 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 class ExternalCtlFile
 {
 public:
-	ExternalCtlFile(ofstream& _f_rec, const string& _line);
+	ExternalCtlFile(ofstream& _f_rec, const string& _line, bool _cast=true);
 	string get_filename() { return filename;  }
 	vector<string> get_col_names() { return col_names; }
 	vector<int> get_row_order() { return row_order; }
@@ -321,6 +321,7 @@ public:
 	
 
 private:
+	bool cast;
 	ofstream& f_rec;
 	string line, filename;
 	string delim,missing_val;

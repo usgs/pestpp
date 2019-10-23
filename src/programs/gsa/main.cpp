@@ -214,6 +214,11 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 	pest_scenario.check_inputs(fout_rec);
+	//OutputFileWriter(FileManager &_file_manager, Pest &_pest_scenario, bool restart_flag = false, bool _save_rei = true, int _eigenwrite = 0);
+	
+	OutputFileWriter ofw(file_manager,pest_scenario,false,false,0);
+	ofw.scenario_report(fout_rec);
+
 	if (pest_scenario.get_pestpp_options().get_debug_parse_only())
 	{
 		cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;

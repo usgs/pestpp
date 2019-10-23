@@ -1498,7 +1498,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens[0] == "EXTERNAL")
 				{
-					pest_utils::ExternalCtlFile efile(f_rec, line);
+					pest_utils::ExternalCtlFile efile(f_rec, line, false);
 					try
 					{
 						efile.read_file();
@@ -1511,17 +1511,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						continue;
 					}*/
 					catch (exception& e)
-					{
-						try
-						{
-							model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
-							model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
-							continue;
-						}
-						catch (...)
-						{
-							throw_control_file_error(f_rec, "error processing '* model input' line '" + line + "' as external file:" + e.what());
-						}
+					{	
+						throw_control_file_error(f_rec, "error processing '* model input' line '" + line + "' as external file:" + e.what());	
 					}
 					set<string> cnames = efile.get_col_set();
 					for (auto n : model_input_formal_names)
@@ -1538,8 +1529,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					for (auto ro : efile.get_row_order())
 					{
 						mi_tokens = efile.get_row_vector(ro, model_input_formal_names);
-						model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
-						model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
+						model_exec_info.tplfile_vec.push_back(mi_tokens[0]);
+						model_exec_info.inpfile_vec.push_back(mi_tokens[1]);
 					}
 
 					if (efiles_map.find(section) == efiles_map.end())
@@ -1549,6 +1540,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				}
 				else
 				{
+					if (tokens.size() != 2)
+						throw_control_file_error(f_rec,"wrong number of tokens on '* model input' line '" + line + "' expecting 2");
 					model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
 					model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
 				}
@@ -1558,7 +1551,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 			if (tokens[0] == "EXTERNAL")
 			{
-				pest_utils::ExternalCtlFile efile(f_rec, line);
+				pest_utils::ExternalCtlFile efile(f_rec, line, false);
 				try
 				{
 					efile.read_file();
@@ -1571,17 +1564,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					continue;
 				}*/
 				catch (exception& e)
-				{
-					try
-					{
-						model_exec_info.insfile_vec.push_back(tokens_case_sen[0]);
-						model_exec_info.outfile_vec.push_back(tokens_case_sen[1]);
-						continue;
-					}
-					catch (...)
-					{
-						throw_control_file_error(f_rec, "error processing '* model output' line '" + line + "' as external file:" + e.what());
-					}
+				{	
+					throw_control_file_error(f_rec, "error processing '* model output' line '" + line + "' as external file:" + e.what());	
 				}
 
 				set<string> cnames = efile.get_col_set();
@@ -1599,8 +1583,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				for (auto ro : efile.get_row_order())
 				{
 					mo_tokens = efile.get_row_vector(ro, model_output_formal_names);
-					model_exec_info.insfile_vec.push_back(tokens_case_sen[0]);
-					model_exec_info.outfile_vec.push_back(tokens_case_sen[1]);
+					model_exec_info.insfile_vec.push_back(mo_tokens[0]);
+					model_exec_info.outfile_vec.push_back(mo_tokens[1]);
 				}
 
 				if (efiles_map.find(section) == efiles_map.end())
@@ -1610,6 +1594,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			}
 			else
 			{
+				if (tokens.size() != 2)
+					throw_control_file_error(f_rec, "wrong number of tokens on '* model output' line '" + line + "' expecting 2");
 				model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
 				model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
 			}
@@ -1617,6 +1603,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			}
 			else if (section == "MODEL INPUT/OUTPUT")
 			{
+			if (tokens.size() != 2)
+				throw_control_file_error(f_rec, "wrong number of tokens on '* model input/output' line '" + line + "' expecting 2");
+
 				if (i_tpl_ins < num_tpl_file)
 				{
 					model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);

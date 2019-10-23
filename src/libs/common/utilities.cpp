@@ -901,15 +901,13 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 }
 
 
-ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line): f_rec(_f_rec)
+ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line, bool _cast): f_rec(_f_rec)
 {
+	cast = _cast;
 	line = _line;
 	delim = ",";
 	missing_val = "";
 	filename = "";
-	
-
-
 }
 
 vector<string> pest_utils::ExternalCtlFile::get_row_vector(int idx, vector<string> include_cols)
@@ -1023,10 +1021,12 @@ map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<str
 void ExternalCtlFile::read_file()
 {	
 	parse_control_record();
+	string delim_upper = upper_cp(delim);
 	f_rec << "...reading external file '" << filename << "'" << endl;
-	if (delim == "W")
+	if (delim_upper == "W") 
 	{
 		delim = "\t ";
+		delim_upper = "\t ";
 	}
 	stringstream ss;
 	if (!pest_utils::check_exist_in(filename))
@@ -1038,8 +1038,9 @@ void ExternalCtlFile::read_file()
 	{
 		throw_externalctrlfile_error("error opening filename '" + filename + "' for reading");
 	}
-	string org_next_line, next_line;
+	string org_next_line, next_line, nocast_next_line;
 	string org_header_line,header_line;
+	
 	getline(f_in, org_header_line);
 	header_line = upper_cp(org_header_line);
 	
@@ -1074,15 +1075,18 @@ void ExternalCtlFile::read_file()
 			
 	}
 	map<string, string> row_map;
-	vector<string> tokens;
+	vector<string> tokens, nocast_tokens;
 	int lcount = 1;
 	while (getline(f_in, org_next_line))
 	{
 		tokens.clear();
+		nocast_tokens.clear();
+		nocast_next_line = org_next_line;
 		next_line = upper_cp(org_next_line);
-		upper_ip(next_line);
 		strip_ip(next_line, "both");
-		tokenize(next_line, tokens, delim, false);
+		strip_ip(nocast_next_line, "both");
+		tokenize(next_line, tokens, delim_upper, false);
+		tokenize(nocast_next_line, nocast_tokens, delim, false);
 		if (tokens.size() != hsize)
 		{
 			ss.str("");
@@ -1090,11 +1094,22 @@ void ExternalCtlFile::read_file()
 			ss << "of file '" << filename << "'.  Expecting ";
 			ss << hsize << ", found " << tokens.size();
 			throw_externalctrlfile_error(ss.str());
-
+		}
+		if (tokens.size() != nocast_tokens.size())
+		{
+			throw_externalctrlfile_error("programming error: nocast token size != token size");
 		}
 		row_map.clear();
-		for (int i = 0; i < hsize; i++)
-			row_map[col_names[i]] = strip_cp(tokens[i], "both");
+		if (cast)
+		{
+			for (int i = 0; i < hsize; i++)
+				row_map[col_names[i]] = strip_cp(tokens[i], "both");
+		}
+		else
+		{
+			for (int i = 0; i < hsize; i++)
+				row_map[col_names[i]] = strip_cp(nocast_tokens[i], "both");
+		}
 		data[lcount - 1] = row_map;
 		row_order.push_back(lcount - 1);
 		lcount++;
@@ -1145,7 +1160,8 @@ void ExternalCtlFile::parse_control_record()
 		{
 			if (value.size() > 1)
 				throw_externalctrlfile_error("'sep' value '" + value + "' on line:\n '"+line+"' \ncan only be one character (use 'w' for whitespace)");
-			delim = upper_cp(value);
+			//delim = upper_cp(value);
+			delim = value;
 		}
 		else if (key == "MISSING_VALUE")
 		{

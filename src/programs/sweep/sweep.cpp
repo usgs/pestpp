@@ -478,11 +478,9 @@ int main(int argc, char* argv[])
 			throw(e);
 		}
 		pest_scenario.check_inputs(fout_rec);
-		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
-		{
-			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
-			exit(0);
-		}
+		
+		OutputFileWriter ofw(file_manager, pest_scenario, false, false, 0);
+		ofw.scenario_report(fout_rec);
 		PestppOptions ppopt = pest_scenario.get_pestpp_options();
 
 		fout_rec << "    sweep parameter csv file = " << left << setw(50) << ppopt.get_sweep_parameter_csv_file() << endl;
@@ -491,6 +489,11 @@ int main(int argc, char* argv[])
 		//fout_rec << "    sweep base run = " << left << setw(10) << ppopt.get_sweep_base_run() << endl;
 		fout_rec << "    sweep forgive failed runs = " << left << setw(10) << ppopt.get_sweep_forgive() << endl;
 
+		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
+		{
+			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+			exit(0);
+		}
 
 		// process the parameter csv file
 		string par_csv_file;

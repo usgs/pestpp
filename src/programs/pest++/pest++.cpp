@@ -279,27 +279,29 @@ int main(int argc, char* argv[])
 #endif
 		pest_scenario.check_inputs(fout_rec);
 
+		
+
+		//Initialize OutputFileWriter to hadle IO of suplementary files (.par, .par, .svd)
+		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
+		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
+		
+		if (!restart_flag)
+		{
+			output_file_writer.scenario_report(fout_rec);
+		}
 		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
 		{
 			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
 			exit(0);
 		}
-
+		output_file_writer.prep_glm_files(restart_flag);
+		output_file_writer.set_svd_output_opt(pest_scenario.get_svd_info().eigwrite);
 		//if base jco arg read from control file, reset restart controller
 		if (!pest_scenario.get_pestpp_options().get_basejac_filename().empty())
 		{
 			restart_ctl.get_restart_option() = RestartController::RestartOption::REUSE_JACOBIAN;
 		}
 
-		//Initialize OutputFileWriter to hadle IO of suplementary files (.par, .par, .svd)
-		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
-		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
-		output_file_writer.prep_glm_files(restart_flag);
-		output_file_writer.set_svd_output_opt(pest_scenario.get_svd_info().eigwrite);
-		if (!restart_flag)
-		{
-			output_file_writer.scenario_report(fout_rec);
-		}
 		if (pest_scenario.get_pestpp_options().get_iter_summary_flag())
 		{
 			output_file_writer.write_par_iter(0, pest_scenario.get_ctl_parameters());

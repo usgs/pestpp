@@ -244,11 +244,7 @@ int main(int argc, char* argv[])
 			throw(e);
 		}
 		pest_scenario.check_inputs(fout_rec);
-		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
-		{
-			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
-			exit(0);
-		}
+		
 
 
 		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
@@ -263,9 +259,8 @@ int main(int argc, char* argv[])
 			output_file_writer.scenario_par_report(fout_rec);
 			output_file_writer.scenario_obs_report(fout_rec);
 		}
-		//fout_rec << "    pestpp-ies parameter csv file = " << left << setw(50) << ppopt.get_ies_par_csv() << endl;
-		//fout_rec << "    pestpp-ies observation csv file = " << left << setw(50) << ppopt.get_ies_obs_csv() << endl;
-
+		
+		
 
 		//reset some default args for ies here:
 		PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
@@ -276,6 +271,13 @@ int main(int argc, char* argv[])
 			ppo->set_overdue_giveup_fac(2.0);
 		if (pp_args.find("OVERDUE_resched_FAC") == pp_args.end())
 			ppo->set_overdue_reched_fac(1.15);
+		
+		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
+		{
+			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+			exit(0);
+		}
+
 		RunManagerAbstract *run_manager_ptr;
 
 
