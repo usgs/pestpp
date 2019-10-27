@@ -1133,23 +1133,19 @@ void ExternalCtlFile::parse_control_record()
 	//split on whitespaces
 	vector<string> tokens;
 	tokenize(tmp_line, tokens, "\t ");
-	if (tokens.size() < 2)
+	if (tokens.size() < 1)
 	{
-		throw_externalctrlfile_error("too few tokens on 'external' line '" + line + "', need atleast 2 (e.g. 'external filename.csv')");
+		throw_externalctrlfile_error("too few tokens on 'external' line '" + line + "', need atleast 1 (e.g. 'filename.csv')");
 	}
-	string directive = tokens[0];
-	upper_ip(directive);
-	if (directive != "EXTERNAL")
-		throw_externalctrlfile_error("unsupported directive '"+directive+"', expecting 'EXTERNAL' on line '" + line);
-	filename = tokens[1];
+	filename = tokens[0];
 
 	//any remaining tokens are optional and are used in pairs
-	if (tokens.size() % 2 != 0)
+	if ((tokens.size()-1) % 2 != 0)
 	{
 		throw_externalctrlfile_error("wrong number of options - should be form of 'keyword <space> value'");
 	}
 	string key, value;
-	for (int i = 2; i < tokens.size(); i = i + 2)
+	for (int i = 1; i < tokens.size(); i = i + 2)
 	{
 		key = tokens[i];
 		upper_ip(key);
