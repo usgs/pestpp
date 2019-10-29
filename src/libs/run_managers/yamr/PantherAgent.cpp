@@ -172,32 +172,33 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 	poll_interval_seconds = 1;
 	for (auto &line : pestpp_lines)
 	{
-		string key;
-		string value;
-		regex lambda_reg("(\\w+)(?:\\s*\\()([^\\)]+)(?:\\))");
-		const std::sregex_iterator end_reg;
+		//string key;
+		//string value;
+		//regex lambda_reg("(\\w+)(?:\\s*\\()([^\\)]+)(?:\\))");
+		//const std::sregex_iterator end_reg;
 		//regex lambda_reg("((\\w+\\s*\\([^\\)]+\\))+?)");
-		cmatch mr;
+		//cmatch mr;
 
-		size_t found = line.find_first_of("#");
-		if (found == string::npos) {
-			found = line.length();
-		}
-		string tmp_line = line.substr(0, found);
-		strip_ip(tmp_line, "both", "\t\n\r+ ");
+		//size_t found = line.find_first_of("#");
+		//if (found == string::npos) {
+		//	found = line.length();
+		//}
+		//string tmp_line = line.substr(0, found);
+		//strip_ip(tmp_line, "both", "\t\n\r+ ");
 		//upper_ip(tmp_line);
 
-		for (std::sregex_iterator i(tmp_line.begin(), tmp_line.end(), lambda_reg); i != end_reg; ++i)
-		{
-			string key = (*i)[1];
-			string org_value = (*i)[2];
-			upper_ip(key);
-			string value = upper_cp(org_value);
-			if (key == "YAMR_POLL_INTERVAL") {
-				convert_ip(value, poll_interval_seconds);
+		//for (std::sregex_iterator i(tmp_line.begin(), tmp_line.end(), lambda_reg); i != end_reg; ++i)
+		//{
+		//	string key = (*i)[1];
+		//	string org_value = (*i)[2];
+		//	upper_ip(key);
+		//	string value = upper_cp(org_value);
+		//	if (key == "YAMR_POLL_INTERVAL") {
+		//		convert_ip(value, poll_interval_seconds);
 
-			}
-		}
+		//	}
+		//
+//}
 	}
 }
 
@@ -300,32 +301,32 @@ void PANTHERAgent::process_panther_ctl_file(const string &ctl_filename)
 	poll_interval_seconds = 1;
 	for (auto &line : pestpp_lines)
 	{
-		string key;
-		string value;
-		regex lambda_reg("(\\w+)(?:\\s*\\()([^\\)]+)(?:\\))");
-		const std::sregex_iterator end_reg;
+		//string key;
+		//string value;
+		//regex lambda_reg("(\\w+)(?:\\s*\\()([^\\)]+)(?:\\))");
+		//const std::sregex_iterator end_reg;
 		//regex lambda_reg("((\\w+\\s*\\([^\\)]+\\))+?)");
-		cmatch mr;
+		//cmatch mr;
 
-		size_t found = line.find_first_of("#");
-		if (found == string::npos) {
-			found = line.length();
-		}
-		string tmp_line = line.substr(0, found);
-		strip_ip(tmp_line, "both", "\t\n\r+ ");
+		//size_t found = line.find_first_of("#");
+		//if (found == string::npos) {
+		//	found = line.length();
+		//}
+		//string tmp_line = line.substr(0, found);
+		//strip_ip(tmp_line, "both", "\t\n\r+ ");
 		//upper_ip(tmp_line);
 
-		for (std::sregex_iterator i(tmp_line.begin(), tmp_line.end(), lambda_reg); i != end_reg; ++i)
-		{
-			string key = (*i)[1];
-			string org_value = (*i)[2];
-			upper_ip(key);
-			string value = upper_cp(org_value);
-			if (key == "YAMR_POLL_INTERVAL") {
-				convert_ip(value, poll_interval_seconds);
+		//for (std::sregex_iterator i(tmp_line.begin(), tmp_line.end(), lambda_reg); i != end_reg; ++i)
+		//{
+		//	string key = (*i)[1];
+		//	string org_value = (*i)[2];
+		//	upper_ip(key);
+		//	string value = upper_cp(org_value);
+		//	if (key == "YAMR_POLL_INTERVAL") {
+		//		convert_ip(value, poll_interval_seconds);
 
-			}
-		}
+		//	}
+		//}
 	}
 
 

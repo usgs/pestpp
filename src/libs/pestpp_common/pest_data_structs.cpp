@@ -388,8 +388,8 @@ map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const s
 {
 	string key;
 	string value;
-	regex lambda_reg("(\\w+)(?:\\s*\\()([^\\)]+)(?:\\))");
-	const std::sregex_iterator end_reg;
+	//regex lambda_reg("(\\w+)(?:\\s*\\()([^\\)]+)(?:\\))");
+	//const std::sregex_iterator end_reg;
 	//regex lambda_reg("((\\w+\\s*\\([^\\)]+\\))+?)");
 	cmatch mr;
 
@@ -405,19 +405,19 @@ map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const s
 
 	map<string, ARG_STATUS> arg_map;
 	ARG_STATUS stat;
-	for (std::sregex_iterator i(tmp_line.begin(), tmp_line.end(), lambda_reg); i != end_reg; ++i)
+	//for (std::sregex_iterator i(tmp_line.begin(), tmp_line.end(), lambda_reg); i != end_reg; ++i)
 	{
-		string key = (*i)[1];
-		string org_value = strip_cp((*i)[2]);
-		try
-		{
-			stat = assign_value_by_key(key, org_value);
-			arg_map[key] = stat;
-		}
-		catch (...)
-		{
-			arg_map[key] = ARG_STATUS::ARG_INVALID;
-		}
+		//string key = (*i)[1];
+		//string org_value = strip_cp((*i)[2]);
+		//try
+		//{
+		//	stat = assign_value_by_key(key, org_value);
+		//	arg_map[key] = stat;
+		//}
+		//catch (...)
+		//{
+		//	arg_map[key] = ARG_STATUS::ARG_INVALID;
+		//}
 	}
 	return arg_map;
 }
