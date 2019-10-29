@@ -5,11 +5,10 @@
 ####################################################################
 
 SHELL = /bin/sh
-
 #  CC is the C compiler, normally invoked with options CFLAGS.
 #
-CC     = gcc
-CFLAGS = -O3
+CC     = $(CXX)
+CFLAGS = -O2
 
 #  Modify the FORTRAN and OPTS definitions to refer to the compiler
 #  and desired compiler options for your machine.  NOOPT refers to
@@ -47,14 +46,21 @@ RANLIB    = ranlib
 #TIMER = EXT_ETIME_
 #  For gfortran compiler:  SECOND and DSECND will use a call to the
 #  INTERNAL FUNCTION ETIME
-TIMER = INT_ETIME
+#TIMER = INT_ETIME
 #  If your Fortran compiler does not provide etime (like Nag Fortran
 #  Compiler, etc...) SECOND and DSECND will use a call to the
 #  INTERNAL FUNCTION CPU_TIME
 #TIMER = INT_CPU_TIME
 #  If none of these work, you can use the NONE value.
 #  In that case, SECOND and DSECND will always return 0.
-#TIMER = NONE
+TIMER = NONE
+#ifeq ($(FC),ifort)
+#    TIMER = EXT_ETIME
+#else
+#    TIMER = INT_ETIME
+#endif
+#$(info $$FC is [${FC}])
+#$(info $$TIMER is [${TIMER}])
 
 #  Uncomment the following line to include deprecated routines in
 #  the LAPACK library.

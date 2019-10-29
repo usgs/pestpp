@@ -1,4 +1,4 @@
-include ../make.inc
+include ../make.inc ../../../global.mak
 
 #######################################################################
 #  This is the makefile to create a library for LAPACK.
@@ -55,7 +55,7 @@ include ../make.inc
 #  installation guide, LAPACK Working Note 41, for instructions.
 #
 #######################################################################
-
+FORTRAN = $(FC)
 ALLAUX = ilaenv.o ilaenv2stage.o ieeeck.o lsamen.o xerbla.o xerbla_array.o \
    iparmq.o iparam2stage.o \
    ilaprec.o ilatrans.o ilauplo.o iladiag.o chla_transtype.o \

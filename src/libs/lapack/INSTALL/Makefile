@@ -1,5 +1,5 @@
-include ../make.inc
-
+include ../make.inc ../../../global.mak
+FORTRAN = $(FC)
 all: testlsame testslamch testdlamch testsecond testdsecnd testieee testversion
 
 testlsame: lsame.o lsametst.o

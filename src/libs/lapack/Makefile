@@ -4,7 +4,7 @@
 #  April 2012
 #
 
-include make.inc
+include make.inc.ifort
 
 all: lib blaslib
 
