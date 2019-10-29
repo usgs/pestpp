@@ -386,38 +386,17 @@ ostream& operator<< (ostream &os, const PestppOptions& val)
 
 map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const string& line)
 {
-	string key;
-	string value;
-	//regex lambda_reg("(\\w+)(?:\\s*\\()([^\\)]+)(?:\\))");
-	//const std::sregex_iterator end_reg;
-	//regex lambda_reg("((\\w+\\s*\\([^\\)]+\\))+?)");
-	cmatch mr;
-
-	size_t found = line.find_first_of("#");
-	if (found == string::npos) {
-		found = line.length();
-	}
-	string tmp_line = line.substr(0, found);
-	strip_ip(tmp_line, "both", "\t\n\r+ ");
-	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\"'), tmp_line.end());
-	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\''), tmp_line.end());
-	//upper_ip(tmp_line);
-
 	map<string, ARG_STATUS> arg_map;
 	ARG_STATUS stat;
-	//for (std::sregex_iterator i(tmp_line.begin(), tmp_line.end(), lambda_reg); i != end_reg; ++i)
+	pair<string, string> spair = pest_utils::parse_plusplus_line(line);
+	try
 	{
-		//string key = (*i)[1];
-		//string org_value = strip_cp((*i)[2]);
-		//try
-		//{
-		//	stat = assign_value_by_key(key, org_value);
-		//	arg_map[key] = stat;
-		//}
-		//catch (...)
-		//{
-		//	arg_map[key] = ARG_STATUS::ARG_INVALID;
-		//}
+		stat = assign_value_by_key(spair.first, spair.second);
+		arg_map[spair.first] = stat;
+	}
+	catch (...)
+	{
+		arg_map[spair.first] = ARG_STATUS::ARG_INVALID;
 	}
 	return arg_map;
 }
@@ -910,8 +889,9 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		convert_ip(value, par_sigma_range);
 	}
-	else if (key == "YAMR_POLL_INTERVAL") {
-		//doesn't apply here
+	else if (key == "YAMR_POLL_INTERVAL") 
+	{
+		convert_ip(value, worker_poll_interval);
 	}
 	else if (key == "IES_LOCALIZER")
 	{
@@ -1088,7 +1068,7 @@ void PestppOptions::set_defaults()
 
 	set_svd_pack(PestppOptions::SVD_PACK::REDSVD);
 	set_super_relparmax(0.1);
-	set_max_run_fail(3);
+	
 	set_iter_summary_flag(true);
 	set_der_forgive(true);
 	
@@ -1195,6 +1175,9 @@ void PestppOptions::set_defaults()
 	set_overdue_giveup_minutes(1.0e+30);
 	set_overdue_reched_fac(1.15);
 	set_overdue_giveup_fac(100);
+	set_worker_poll_interval(1.0);
+	set_max_run_fail(3);
+
 
 	set_debug_parse_only(false);
 	

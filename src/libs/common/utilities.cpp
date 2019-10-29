@@ -578,6 +578,34 @@ void  thread_exceptions::rethrow()
 	}
 }
 
+pair<string, string> parse_plusplus_line(const string& line)
+{
+	string key;
+	string value, org_value;
+
+	size_t found = line.find_first_of("#");
+	if (found == string::npos) {
+		found = line.length();
+	}
+	string tmp_line = line.substr(0, found);
+	strip_ip(tmp_line, "both", "\t\n\r+ ");
+	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\"'), tmp_line.end());
+	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\''), tmp_line.end());
+	//upper_ip(tmp_line);
+
+	found = tmp_line.find_first_of("(");
+	if (found == string::npos)
+		throw runtime_error("incorrect format for '++' line (missing'('):" + line);
+	key = tmp_line.substr(0, found);
+	tmp_line = tmp_line.substr(found);
+	found = tmp_line.find_first_of(")");
+	if (found == string::npos)
+		throw runtime_error("incorrect format for '++' line (missing')'):" + line);
+	org_value = tmp_line.substr(1, found - 1);
+	return pair < string, string>(key, org_value);
+}
+
+
 bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::SparseMatrix<double> &matrix)
 {
 
@@ -1116,6 +1144,7 @@ void ExternalCtlFile::read_file()
 	}
 
 }
+
 
 void ExternalCtlFile::parse_control_record()
 {

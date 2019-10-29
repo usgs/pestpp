@@ -206,6 +206,8 @@ public:
 	SVD_PACK get_svd_pack() const { return svd_pack; }
 	double get_super_relparmax() const { return super_relparmax; }
 	int get_max_run_fail() const { return max_run_fail; }
+	void set_worker_poll_interval(double _val) { worker_poll_interval = _val; }
+	double get_worker_poll_interval() const { return worker_poll_interval; }
 	int get_max_super_frz_iter()const { return max_super_frz_iter; }
 	int get_max_reg_iter()const { return max_reg_iter; }
 	const vector<double>& get_base_lambda_vec() const { return base_lambda_vec; }
@@ -451,6 +453,7 @@ private:
 	double overdue_reched_fac;
 	double overdue_giveup_fac;
 	double overdue_giveup_minutes;
+	double worker_poll_interval;
 	string condor_submit_file;
 
 	string sweep_parameter_csv_file;

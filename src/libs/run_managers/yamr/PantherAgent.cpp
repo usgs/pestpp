@@ -9,6 +9,7 @@
 #include "system_variables.h"
 #include "utilities.h"
 #include <regex>
+#include "Pest.h"
 
 using namespace pest_utils;
 
@@ -91,247 +92,142 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 	insfile_vec.clear();
 	outfile_vec.clear();
 	std::vector<std::string> pestpp_lines;
+
+	Pest pest_scenario;
+	
+
+
 	fin.open(ctl_filename);
 	if (!fin)
 	{
 		throw PestError("PANTHER worker unable to open pest control file: " + ctl_filename);
 	}
-	try {
-		for (lnum = 1, sec_begin_lnum = 1; getline(fin, line); ++lnum)
-		{
-			strip_ip(line);
-			line_upper = upper_cp(line);
-			//cout << line << endl;
-			sec_lnum = lnum - sec_begin_lnum;
-			if (line.size() == 0)
-			{
-				//skip blank line
-			}
-			else if (line_upper[0] == '#')
-			{
-
-			}
-			else if (line_upper.substr(0, 2) == "++")
-			{
-				//cout << line << endl;
-				pestpp_lines.push_back(line);
-			}
-
-			else if (line_upper[0] == '*')
-			{
-				section = upper_cp(strip_cp(line_upper, "both", " *\t\n"));
-				sec_begin_lnum = lnum;
-			}
-			else if (section == "CONTROL DATA")
-			{
-				tokens.clear();
-				tokenize(line_upper, tokens);
-				if (sec_lnum == 2)
-				{
-					convert_ip(tokens[0], num_par);
-				}
-				if (sec_lnum == 3)
-				{
-					convert_ip(tokens[0], num_tpl_file);
-				}
-			}
-			else if (section == "MODEL COMMAND LINE")
-			{
-				tokens.clear();
-				tokenize(line_upper, tokens);
-				comline_vec.push_back(line);
-			}
-			else if (section == "MODEL INPUT/OUTPUT")
-			{
-				tokens.clear();
-				tokenize(line_upper, tokens);
-				vector<string> tokens_case_sen;
-				tokenize(line, tokens_case_sen);
-				if (sec_lnum <= num_tpl_file)
-				{
-					tplfile_vec.push_back(tokens_case_sen[0]);
-					inpfile_vec.push_back(tokens_case_sen[1]);
-				}
-				else
-				{
-					insfile_vec.push_back(tokens_case_sen[0]);
-					outfile_vec.push_back(tokens_case_sen[1]);
-				}
-			}
-		}
-	}
-	catch (PestConversionError &e) {
-		std::stringstream out;
-		out << "Error parsing \"" << ctl_filename << "\" on line number " << lnum << endl;
-		out << e.what() << endl;
-		e.add_front(out.str());
-		e.raise();
-	}
-	fin.close();
-
-	poll_interval_seconds = 1;
+	ofstream fout("panther_worker.rec");
+	if (!fout)
+		throw PestError("PANTHER worker unable to open output file 'panther_worker.rec'");
+	pest_scenario.process_ctl_file(fin,ctl_filename,fout);
+	comline_vec = pest_scenario.get_comline_vec();
+	tplfile_vec = pest_scenario.get_tplfile_vec();
+	inpfile_vec = pest_scenario.get_inpfile_vec();
+	insfile_vec = pest_scenario.get_insfile_vec();
+	outfile_vec = pest_scenario.get_outfile_vec();
+	
+	poll_interval_seconds = pest_scenario.get_pestpp_options().get_worker_poll_interval();
+	/*pair<string, string> spair;
 	for (auto &line : pestpp_lines)
 	{
-		//string key;
-		//string value;
-		//regex lambda_reg("(\\w+)(?:\\s*\\()([^\\)]+)(?:\\))");
-		//const std::sregex_iterator end_reg;
-		//regex lambda_reg("((\\w+\\s*\\([^\\)]+\\))+?)");
-		//cmatch mr;
+		spair = pest_utils::parse_plusplus_line(line);
+		if (spair.first == "YAMR_POLL_INTERVAL")
+			convert_ip(spair.second, poll_interval_seconds);
+	}*/
+}
 
-		//size_t found = line.find_first_of("#");
-		//if (found == string::npos) {
-		//	found = line.length();
-		//}
-		//string tmp_line = line.substr(0, found);
-		//strip_ip(tmp_line, "both", "\t\n\r+ ");
-		//upper_ip(tmp_line);
 
-		//for (std::sregex_iterator i(tmp_line.begin(), tmp_line.end(), lambda_reg); i != end_reg; ++i)
-		//{
-		//	string key = (*i)[1];
-		//	string org_value = (*i)[2];
-		//	upper_ip(key);
-		//	string value = upper_cp(org_value);
-		//	if (key == "YAMR_POLL_INTERVAL") {
-		//		convert_ip(value, poll_interval_seconds);
 
-		//	}
-		//
+//void PANTHERAgent::process_panther_ctl_file(const string &ctl_filename)
+//{
+//	ifstream fin;
+//	long lnum;
+//	long sec_begin_lnum;
+//	long sec_lnum;
+//	string section("");
+//	string line;
+//	string line_upper;
+//	vector<string> tokens;
+//
+//	int i_tpl_ins = 0, n_tpl_file = 0;
+//
+//	comline_vec.clear();
+//	tplfile_vec.clear();
+//	inpfile_vec.clear();
+//	insfile_vec.clear();
+//	outfile_vec.clear();
+//	std::vector<std::string> pestpp_lines;
+//	fin.open(ctl_filename);
+//	try {
+//		for (lnum = 1, sec_begin_lnum = 1; getline(fin, line); ++lnum)
+//		{
+//			strip_ip(line);
+//			line_upper = upper_cp(line);
+//			tokens.clear();
+//			tokenize(line_upper, tokens);
+//			sec_lnum = lnum - sec_begin_lnum;
+//			if (tokens.empty())
+//			{
+//				//skip blank line
+//			}
+//			else if (line_upper.substr(0, 2) == "++")
+//			{
+//				pestpp_lines.push_back(line);
+//			}
+//
+//			else if (line_upper[0] == '*')
+//			{
+//				section = upper_cp(strip_cp(line_upper, "both", " *\t\n"));
+//				sec_begin_lnum = lnum;
+//			}
+//			else if (section == "MODEL COMMAND LINE")
+//			{
+//				comline_vec.push_back(line);
+//			}
+//			else if (section == "MODEL INPUT")
+//			{
+//				vector<string> tokens_case_sen;
+//				tokenize(line, tokens_case_sen);
+//				tplfile_vec.push_back(tokens_case_sen[0]);
+//				inpfile_vec.push_back(tokens_case_sen[1]);
+//			}
+//			else if (section == "MODEL OUTPUT")
+//			{
+//				vector<string> tokens_case_sen;
+//				tokenize(line, tokens_case_sen);
+//				insfile_vec.push_back(tokens_case_sen[0]);
+//				outfile_vec.push_back(tokens_case_sen[1]);
+//			}
+//			else if (section == "MODEL INPUT/OUTPUT")
+//			{
+//				vector<string> tokens_case_sen;
+//				tokenize(line, tokens_case_sen);
+//				if (i_tpl_ins < n_tpl_file)
+//				{
+//					tplfile_vec.push_back(tokens_case_sen[0]);
+//					inpfile_vec.push_back(tokens_case_sen[1]);
+//				}
+//				else
+//				{
+//					insfile_vec.push_back(tokens_case_sen[0]);
+//					outfile_vec.push_back(tokens_case_sen[1]);
+//				}
+//				++i_tpl_ins;
+//			}
+//			else if (section == "CONTROL DATA")
+//			{
+//				if (sec_lnum == 3)
+//				{
+//					convert_ip(tokens[0], n_tpl_file);
+//				}
+//			}
+//		}
+//	}
+//	catch (PestConversionError &e) {
+//		std::stringstream out;
+//		out << "Error parsing \"" << ctl_filename << "\" on line number " << lnum << endl;
+//		out << e.what() << endl;
+//		e.add_front(out.str());
+//		e.raise();
+//	}
+//
+//	fin.close();
+//	
+//	poll_interval_seconds = 1;
+//	pair<string, string> spair;
+//	for (auto& line : pestpp_lines)
+//	{
+//		spair = pest_utils::parse_plusplus_line(line);
+//		if (spair.first == "YAMR_POLL_INTERVAL")
+//			convert_ip(spair.second, poll_interval_seconds);
+//	}
 //}
-	}
-}
-
-
-
-void PANTHERAgent::process_panther_ctl_file(const string &ctl_filename)
-{
-	ifstream fin;
-	long lnum;
-	long sec_begin_lnum;
-	long sec_lnum;
-	string section("");
-	string line;
-	string line_upper;
-	vector<string> tokens;
-
-	int i_tpl_ins = 0, n_tpl_file = 0;
-
-	comline_vec.clear();
-	tplfile_vec.clear();
-	inpfile_vec.clear();
-	insfile_vec.clear();
-	outfile_vec.clear();
-	std::vector<std::string> pestpp_lines;
-	fin.open(ctl_filename);
-	try {
-		for (lnum = 1, sec_begin_lnum = 1; getline(fin, line); ++lnum)
-		{
-			strip_ip(line);
-			line_upper = upper_cp(line);
-			tokens.clear();
-			tokenize(line_upper, tokens);
-			sec_lnum = lnum - sec_begin_lnum;
-			if (tokens.empty())
-			{
-				//skip blank line
-			}
-			else if (line_upper.substr(0, 2) == "++")
-			{
-				pestpp_lines.push_back(line);
-			}
-
-			else if (line_upper[0] == '*')
-			{
-				section = upper_cp(strip_cp(line_upper, "both", " *\t\n"));
-				sec_begin_lnum = lnum;
-			}
-			else if (section == "MODEL COMMAND LINE")
-			{
-				comline_vec.push_back(line);
-			}
-			else if (section == "MODEL INPUT")
-			{
-				vector<string> tokens_case_sen;
-				tokenize(line, tokens_case_sen);
-				tplfile_vec.push_back(tokens_case_sen[0]);
-				inpfile_vec.push_back(tokens_case_sen[1]);
-			}
-			else if (section == "MODEL OUTPUT")
-			{
-				vector<string> tokens_case_sen;
-				tokenize(line, tokens_case_sen);
-				insfile_vec.push_back(tokens_case_sen[0]);
-				outfile_vec.push_back(tokens_case_sen[1]);
-			}
-			else if (section == "MODEL INPUT/OUTPUT")
-			{
-				vector<string> tokens_case_sen;
-				tokenize(line, tokens_case_sen);
-				if (i_tpl_ins < n_tpl_file)
-				{
-					tplfile_vec.push_back(tokens_case_sen[0]);
-					inpfile_vec.push_back(tokens_case_sen[1]);
-				}
-				else
-				{
-					insfile_vec.push_back(tokens_case_sen[0]);
-					outfile_vec.push_back(tokens_case_sen[1]);
-				}
-				++i_tpl_ins;
-			}
-			else if (section == "CONTROL DATA")
-			{
-				if (sec_lnum == 3)
-				{
-					convert_ip(tokens[0], n_tpl_file);
-				}
-			}
-		}
-	}
-	catch (PestConversionError &e) {
-		std::stringstream out;
-		out << "Error parsing \"" << ctl_filename << "\" on line number " << lnum << endl;
-		out << e.what() << endl;
-		e.add_front(out.str());
-		e.raise();
-	}
-
-	fin.close();
-	poll_interval_seconds = 1;
-	for (auto &line : pestpp_lines)
-	{
-		//string key;
-		//string value;
-		//regex lambda_reg("(\\w+)(?:\\s*\\()([^\\)]+)(?:\\))");
-		//const std::sregex_iterator end_reg;
-		//regex lambda_reg("((\\w+\\s*\\([^\\)]+\\))+?)");
-		//cmatch mr;
-
-		//size_t found = line.find_first_of("#");
-		//if (found == string::npos) {
-		//	found = line.length();
-		//}
-		//string tmp_line = line.substr(0, found);
-		//strip_ip(tmp_line, "both", "\t\n\r+ ");
-		//upper_ip(tmp_line);
-
-		//for (std::sregex_iterator i(tmp_line.begin(), tmp_line.end(), lambda_reg); i != end_reg; ++i)
-		//{
-		//	string key = (*i)[1];
-		//	string org_value = (*i)[2];
-		//	upper_ip(key);
-		//	string value = upper_cp(org_value);
-		//	if (key == "YAMR_POLL_INTERVAL") {
-		//		convert_ip(value, poll_interval_seconds);
-
-		//	}
-		//}
-	}
-
-
-
-}
 
 
 int PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
