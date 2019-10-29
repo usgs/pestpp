@@ -18,7 +18,7 @@ blaslib:
 	$(MAKE) -C BLAS
 
 lapacklib:
-	$(MAKE) -C SRC
+	$(MAKE) -C SRC double
 
 clean:
 	$(MAKE) -C INSTALL clean

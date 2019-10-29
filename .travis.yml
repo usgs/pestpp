@@ -40,19 +40,17 @@ addons:
     packages:
       - g++-6
       - gfortran-6
-      - liblapack-dev
-
 git:
   depth: 1
 env:
   global:
-    - MAKEFLAGS="-j 2"
+    - MAKEFLAGS="-j 10"
 
 before_script:
   - cd src
   - rm -r -f ../bin/linux/
   - make clean
-  - COMPILER=gcc6 CXX=g++-6 FC=gfortran-6 STATIC=no make install
+  - COMPILER=gcc6 CXX=g++-6 FC=gfortran-6 STATIC=no make -j 10 install
   - cd ..
   - wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
   - bash miniconda.sh -b -p $HOME/miniconda
