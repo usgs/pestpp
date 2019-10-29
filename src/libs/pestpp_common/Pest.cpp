@@ -1596,7 +1596,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	//since par groups are optional, make sure every par has a group...
 	rectify_par_groups();
 
-	regul_scheme_ptr->set_max_reg_iter(pestpp_options.get_max_reg_iter());
+	if (regul_scheme_ptr)
+		regul_scheme_ptr->set_max_reg_iter(pestpp_options.get_max_reg_iter());
 
 	if (pestpp_options.get_tie_by_group())
 	{
