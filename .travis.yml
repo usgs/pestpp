@@ -40,7 +40,6 @@ addons:
     packages:
       - g++-6
       - gfortran-6
-      - liblapack-dev
 
 git:
   depth: 1

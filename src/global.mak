@@ -160,7 +160,7 @@ else  # $(COMPILER))
     CXXFLAGS ?= $(OPT_FLAGS) -std=c++11
     FFLAGS ?= $(OPT_FLAGS) -cpp
     FFREE = -free
-    EXT_LIBS = -lpthread -lgfortran -lquadmath -llapack -lblas
+    EXT_LIBS = -lpthread -lgfortran -lquadmath
 # else
 #     $(error COMPILER not understood: $(COMPILER). Use one of intel or gcc.)
 endif  # $(COMPILER)
@@ -200,6 +200,7 @@ PESTPP_LIBS := \
     -L$(LIBS_DIR)/common -lcommon \
     -L$(LIBS_DIR)/propack -lpropack \
     -L$(LIBS_DIR)/opt -lopt \
+    -L$(LIBS_DIR)/lapack -llapack -lrefblas \
      $(EXT_LIBS)
 
 
