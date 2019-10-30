@@ -8,8 +8,7 @@ SUBDIRS := \
     pestpp_common \
     propack \
     run_managers \
-    opt \
-    lapack
+    opt
 
 
 all:	$(foreach d,$(SUBDIRS),$(d)-target)
