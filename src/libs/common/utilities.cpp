@@ -606,6 +606,28 @@ pair<string, string> parse_plusplus_line(const string& line)
 }
 
 
+bool parse_string_arg_to_bool(string arg)
+{
+	upper_ip(arg);
+	if ((arg.substr(0, 1) != "T") && (arg.substr(0, 1) != "F"))
+	{
+		int iarg;
+		convert_ip(arg, iarg);
+		if (iarg == 0)
+			return false;
+		else
+			return true;
+	}
+	else
+	{
+		bool barg;
+		transform(arg.begin(), arg.end(), arg.begin(), ::tolower);
+		istringstream is(arg);
+		is >> boolalpha >> barg;
+		return barg;
+	}
+}
+
 bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::SparseMatrix<double> &matrix)
 {
 
