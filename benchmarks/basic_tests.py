@@ -593,7 +593,8 @@ def sen_basic_test():
     pyemu.os_utils.run("python forward_run.py",cwd=t_d)
 
     pst = pyemu.Pst.from_io_files(tpl_files=tpl_file,in_files=tpl_file.replace(".tpl",""),
-                                  ins_files=ins_file,out_files=ins_file.replace(".ins",""))
+                                  ins_files=ins_file,out_files=ins_file.replace(".ins",""),
+                                  pst_path=".")
     pst.model_command = "python forward_run.py"
     pst.control_data.noptmax = 0
     pst.parameter_data.loc[:,"partrans"] = "log"
@@ -698,7 +699,7 @@ def salib_verf():
 if __name__ == "__main__":
     #glm_long_name_test()
     #sen_plusplus_test()
-    #parchglim_test()
+    parchglim_test()
     #unc_file_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
@@ -706,5 +707,5 @@ if __name__ == "__main__":
     #sweep_forgive_test()
     #inv_regul_test()
     #tie_by_group_test()
-    sen_basic_test()
+    #sen_basic_test()
     #salib_verf()
