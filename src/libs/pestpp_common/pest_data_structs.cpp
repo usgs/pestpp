@@ -389,6 +389,8 @@ map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const s
 	map<string, ARG_STATUS> arg_map;
 	ARG_STATUS stat;
 	pair<string, string> spair = pest_utils::parse_plusplus_line(line);
+	if (spair.second.size() == 0)
+		return arg_map;
 	try
 	{
 		stat = assign_value_by_key(spair.first, spair.second);
