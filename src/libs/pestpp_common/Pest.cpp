@@ -82,36 +82,36 @@ void Pest::check_inputs(ostream &f_rec)
 
 	if (control_info.pestmode == ControlInfo::PestMode::PARETO)
 	{
-		bool found_pareto = false, found_other = false;
-		if (pareto_info.obsgroup.substr(0, 5) == "REGUL")
-			found_pareto = true;
-		else if (find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pareto_info.obsgroup) == ctl_ordered_obs_group_names.end())
-			throw PestError("pareto obsgroup not found: " + pareto_info.obsgroup);
-		//make sure at least one other obs group has a nonzero weight obs in it
+		//bool found_pareto = false, found_other = false;
+		//if (pareto_info.obsgroup.substr(0, 5) == "REGUL")
+		//	found_pareto = true;
+		//else if (find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pareto_info.obsgroup) == ctl_ordered_obs_group_names.end())
+		//	throw PestError("pareto obsgroup not found: " + pareto_info.obsgroup);
+		////make sure at least one other obs group has a nonzero weight obs in it
 
 
-		for (auto &on : ctl_ordered_obs_names)
-		{
-				if (observation_info.get_group(on) == pareto_info.obsgroup)
-					found_pareto = true;
-				else if (observation_info.get_weight(on) > 0.0)
-					found_other = true;
-		}
+		//for (auto &on : ctl_ordered_obs_names)
+		//{
+		//		if (observation_info.get_group(on) == pareto_info.obsgroup)
+		//			found_pareto = true;
+		//		else if (observation_info.get_weight(on) > 0.0)
+		//			found_other = true;
+		//}
 
-		if (!found_pareto || !found_other)
-		{
-			for (auto &pi : ctl_ordered_pi_names)
-			{
-				if (prior_info.get_pi_rec_ptr(pi).get_group() == pareto_info.obsgroup)
-					found_pareto = true;
-				else if (prior_info.get_pi_rec_ptr(pi).get_weight() > 0.0)
-					found_other = true;
-			}
-		}
-		if (!found_pareto)
-			throw PestError("no non-zero weighted obs found in pareto obsgroup: " + pareto_info.obsgroup);
-		if (!found_other)
-			throw PestError("no non-zero weighted obs found outside of pareto obsgroup");
+		//if (!found_pareto || !found_other)
+		//{
+		//	for (auto &pi : ctl_ordered_pi_names)
+		//	{
+		//		if (prior_info.get_pi_rec_ptr(pi).get_group() == pareto_info.obsgroup)
+		//			found_pareto = true;
+		//		else if (prior_info.get_pi_rec_ptr(pi).get_weight() > 0.0)
+		//			found_other = true;
+		//	}
+		//}
+		//if (!found_pareto)
+		//	throw PestError("no non-zero weighted obs found in pareto obsgroup: " + pareto_info.obsgroup);
+		//if (!found_other)
+		//	throw PestError("no non-zero weighted obs found outside of pareto obsgroup");
 	}
 
 	vector<string> par_warnings;

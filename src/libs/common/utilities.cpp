@@ -1125,41 +1125,76 @@ void ExternalCtlFile::read_file()
 			
 	}
 	map<string, string> row_map;
-	vector<string> tokens, nocast_tokens;
-	int lcount = 1;
+	vector<string> tokens, temp_tokens,quote_tokens;
+	string ddelim;
+	int lcount = 1,last_size;
 	while (getline(f_in, org_next_line))
 	{
 		tokens.clear();
-		nocast_tokens.clear();
-		nocast_next_line = org_next_line;
-		next_line = upper_cp(org_next_line);
+		quote_tokens.clear();
+		//nocast_next_line = org_next_line;
+
+		next_line = org_next_line;
+		ddelim = delim;
+		if (cast)
+		{
+			upper_ip(next_line);
+			upper_ip(ddelim);
+		}
+
 		strip_ip(next_line, "both");
-		strip_ip(nocast_next_line, "both");
-		tokenize(next_line, tokens, delim_upper, false);
-		tokenize(nocast_next_line, nocast_tokens, delim, false);
+		if ((next_line.size() == 0) || (next_line.substr(0,1) == "#"))
+		{
+			lcount++;
+			continue;
+		}
+		
+		//check for double quotes
+		tokenize(next_line, quote_tokens, "\"", false);
+		if (quote_tokens.size() > 1)
+		{
+			int nqt = quote_tokens.size();
+			if (nqt % 2 == 0)
+				throw_externalctrlfile_error("unbalanced double quotes on line " + org_next_line);
+			tokens.clear();
+			for (int i = 0; i < nqt; i++)
+			{
+				
+				if (i % 2 == 0)
+				{
+					if (quote_tokens[i].size() == 0)
+					{
+						continue;
+					}
+					temp_tokens.clear();
+					tokenize(strip_cp(quote_tokens[i]), temp_tokens, ddelim,false);
+					
+					last_size = quote_tokens[i].size();
+					if (quote_tokens[i].substr(last_size-1,last_size) == ddelim)
+						temp_tokens.pop_back();
+					for (auto t : temp_tokens)
+						tokens.push_back(t);
+				}
+				else if (quote_tokens[i].size() > 0)
+					tokens.push_back(quote_tokens[i]);
+
+			}
+
+		}
+		else
+			tokenize(next_line, tokens, ddelim, false);
+
 		if (tokens.size() != hsize)
 		{
 			ss.str("");
 			ss << "wrong number of tokens on line " << lcount;
-			ss << "of file '" << filename << "'.  Expecting ";
+			ss << " of file '" << filename << "'.  Expecting ";
 			ss << hsize << ", found " << tokens.size();
 			throw_externalctrlfile_error(ss.str());
 		}
-		if (tokens.size() != nocast_tokens.size())
-		{
-			throw_externalctrlfile_error("programming error: nocast token size != token size");
-		}
 		row_map.clear();
-		if (cast)
-		{
-			for (int i = 0; i < hsize; i++)
-				row_map[col_names[i]] = strip_cp(tokens[i], "both");
-		}
-		else
-		{
-			for (int i = 0; i < hsize; i++)
-				row_map[col_names[i]] = strip_cp(nocast_tokens[i], "both");
-		}
+		for (int i = 0; i < hsize; i++)
+			row_map[col_names[i]] = strip_cp(tokens[i], "both");
 		data[lcount - 1] = row_map;
 		row_order.push_back(lcount - 1);
 		lcount++;
