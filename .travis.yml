@@ -31,8 +31,6 @@ matrix:
     - name: "basic tests"
       env: TEST_REPO="https://github.com/usgs/pestpp" TEST_SCRIPT="basic_tests.py" TEST_DIR="benchmarks"
           
-
-
 addons:
   apt:
     sources:
