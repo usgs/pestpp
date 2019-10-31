@@ -9,6 +9,7 @@ SUBDIRS := \
     propack \
     run_managers \
     opt \
+    lapack \
 
 
 all:	$(foreach d,$(SUBDIRS),$(d)-target)

@@ -19,7 +19,7 @@ CFLAGS = -O2
 #  should not compile LAPACK with flags such as -ffpe-trap=overflow.
 #
 FORTRAN = gfortran
-OPTS    = -O2 -frecursive
+OPTS    = -O2 -frecursive -funroll-loops
 DRVOPTS = $(OPTS)
 NOOPT   = -O0 -frecursive
 
