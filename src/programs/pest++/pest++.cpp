@@ -797,6 +797,13 @@ int main(int argc, char* argv[])
 			pfm << "-----------------------------------" << endl << endl;
 			Logger unc_log(pfm);
 
+			if (base_jacobian_ptr->get_base_numeric_par_names().size() == 0)
+			{
+				cout << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
+				fout_rec << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
+				return 0;
+			}
+
 			//instance of a Mat for the jco
 			Mat j(base_jacobian_ptr->get_sim_obs_names(), base_jacobian_ptr->get_base_numeric_par_names(),
 				base_jacobian_ptr->get_matrix_ptr());
