@@ -59,6 +59,8 @@ public:
 	double get_runtime_minute() const;
 	double get_linpack_time() const;
 	int add_failed_ping();
+	int add_failed_run();
+	int get_failed_runs() const { return failed_runs; }
 	void set_ping(bool val);
 	bool get_ping() const;
 	int get_failed_pings() const;
@@ -73,6 +75,7 @@ private:
 	int group_id;
 	bool ping;
 	int failed_pings;
+	int failed_runs;
 	State state;
 	std::chrono::system_clock::duration linpack_time;
 	std::chrono::system_clock::duration run_time;

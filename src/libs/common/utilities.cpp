@@ -578,6 +578,56 @@ void  thread_exceptions::rethrow()
 	}
 }
 
+pair<string, string> parse_plusplus_line(const string& line)
+{
+	string key;
+	string value, org_value;
+
+	size_t found = line.find_first_of("#");
+	if (found == string::npos) {
+		found = line.length();
+	}
+	string tmp_line = line.substr(0, found);
+	strip_ip(tmp_line, "both", "\t\n\r+ ");
+	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\"'), tmp_line.end());
+	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\''), tmp_line.end());
+	//upper_ip(tmp_line);
+
+	found = tmp_line.find_first_of("(");
+	if (found == string::npos)
+		throw runtime_error("incorrect format for '++' line (missing'('):" + line);
+	key = tmp_line.substr(0, found);
+	tmp_line = tmp_line.substr(found);
+	found = tmp_line.find_first_of(")");
+	if (found == string::npos)
+		throw runtime_error("incorrect format for '++' line (missing')'):" + line);
+	org_value = tmp_line.substr(1, found - 1);
+	return pair < string, string>(key, org_value);
+}
+
+
+bool parse_string_arg_to_bool(string arg)
+{
+	upper_ip(arg);
+	if ((arg.substr(0, 1) != "T") && (arg.substr(0, 1) != "F"))
+	{
+		int iarg;
+		convert_ip(arg, iarg);
+		if (iarg == 0)
+			return false;
+		else
+			return true;
+	}
+	else
+	{
+		bool barg;
+		transform(arg.begin(), arg.end(), arg.begin(), ::tolower);
+		istringstream is(arg);
+		is >> boolalpha >> barg;
+		return barg;
+	}
+}
+
 bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::SparseMatrix<double> &matrix)
 {
 
@@ -1075,47 +1125,83 @@ void ExternalCtlFile::read_file()
 			
 	}
 	map<string, string> row_map;
-	vector<string> tokens, nocast_tokens;
-	int lcount = 1;
+	vector<string> tokens, temp_tokens,quote_tokens;
+	string ddelim;
+	int lcount = 1,last_size;
 	while (getline(f_in, org_next_line))
 	{
 		tokens.clear();
-		nocast_tokens.clear();
-		nocast_next_line = org_next_line;
-		next_line = upper_cp(org_next_line);
+		quote_tokens.clear();
+		//nocast_next_line = org_next_line;
+
+		next_line = org_next_line;
+		ddelim = delim;
+		if (cast)
+		{
+			upper_ip(next_line);
+			upper_ip(ddelim);
+		}
+
 		strip_ip(next_line, "both");
-		strip_ip(nocast_next_line, "both");
-		tokenize(next_line, tokens, delim_upper, false);
-		tokenize(nocast_next_line, nocast_tokens, delim, false);
+		if ((next_line.size() == 0) || (next_line.substr(0,1) == "#"))
+		{
+			lcount++;
+			continue;
+		}
+		
+		//check for double quotes
+		tokenize(next_line, quote_tokens, "\"", false);
+		if (quote_tokens.size() > 1)
+		{
+			int nqt = quote_tokens.size();
+			if (nqt % 2 == 0)
+				throw_externalctrlfile_error("unbalanced double quotes on line " + org_next_line);
+			tokens.clear();
+			for (int i = 0; i < nqt; i++)
+			{
+				
+				if (i % 2 == 0)
+				{
+					if (quote_tokens[i].size() == 0)
+					{
+						continue;
+					}
+					temp_tokens.clear();
+					tokenize(strip_cp(quote_tokens[i]), temp_tokens, ddelim,false);
+					
+					last_size = quote_tokens[i].size();
+					if (quote_tokens[i].substr(last_size-1,last_size) == ddelim)
+						temp_tokens.pop_back();
+					for (auto t : temp_tokens)
+						tokens.push_back(t);
+				}
+				else if (quote_tokens[i].size() > 0)
+					tokens.push_back(quote_tokens[i]);
+
+			}
+
+		}
+		else
+			tokenize(next_line, tokens, ddelim, false);
+
 		if (tokens.size() != hsize)
 		{
 			ss.str("");
 			ss << "wrong number of tokens on line " << lcount;
-			ss << "of file '" << filename << "'.  Expecting ";
+			ss << " of file '" << filename << "'.  Expecting ";
 			ss << hsize << ", found " << tokens.size();
 			throw_externalctrlfile_error(ss.str());
 		}
-		if (tokens.size() != nocast_tokens.size())
-		{
-			throw_externalctrlfile_error("programming error: nocast token size != token size");
-		}
 		row_map.clear();
-		if (cast)
-		{
-			for (int i = 0; i < hsize; i++)
-				row_map[col_names[i]] = strip_cp(tokens[i], "both");
-		}
-		else
-		{
-			for (int i = 0; i < hsize; i++)
-				row_map[col_names[i]] = strip_cp(nocast_tokens[i], "both");
-		}
+		for (int i = 0; i < hsize; i++)
+			row_map[col_names[i]] = strip_cp(tokens[i], "both");
 		data[lcount - 1] = row_map;
 		row_order.push_back(lcount - 1);
 		lcount++;
 	}
 
 }
+
 
 void ExternalCtlFile::parse_control_record()
 {

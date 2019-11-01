@@ -82,36 +82,36 @@ void Pest::check_inputs(ostream &f_rec)
 
 	if (control_info.pestmode == ControlInfo::PestMode::PARETO)
 	{
-		bool found_pareto = false, found_other = false;
-		if (pareto_info.obsgroup.substr(0, 5) == "REGUL")
-			found_pareto = true;
-		else if (find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pareto_info.obsgroup) == ctl_ordered_obs_group_names.end())
-			throw PestError("pareto obsgroup not found: " + pareto_info.obsgroup);
-		//make sure at least one other obs group has a nonzero weight obs in it
+		//bool found_pareto = false, found_other = false;
+		//if (pareto_info.obsgroup.substr(0, 5) == "REGUL")
+		//	found_pareto = true;
+		//else if (find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pareto_info.obsgroup) == ctl_ordered_obs_group_names.end())
+		//	throw PestError("pareto obsgroup not found: " + pareto_info.obsgroup);
+		////make sure at least one other obs group has a nonzero weight obs in it
 
 
-		for (auto &on : ctl_ordered_obs_names)
-		{
-				if (observation_info.get_group(on) == pareto_info.obsgroup)
-					found_pareto = true;
-				else if (observation_info.get_weight(on) > 0.0)
-					found_other = true;
-		}
+		//for (auto &on : ctl_ordered_obs_names)
+		//{
+		//		if (observation_info.get_group(on) == pareto_info.obsgroup)
+		//			found_pareto = true;
+		//		else if (observation_info.get_weight(on) > 0.0)
+		//			found_other = true;
+		//}
 
-		if (!found_pareto || !found_other)
-		{
-			for (auto &pi : ctl_ordered_pi_names)
-			{
-				if (prior_info.get_pi_rec_ptr(pi).get_group() == pareto_info.obsgroup)
-					found_pareto = true;
-				else if (prior_info.get_pi_rec_ptr(pi).get_weight() > 0.0)
-					found_other = true;
-			}
-		}
-		if (!found_pareto)
-			throw PestError("no non-zero weighted obs found in pareto obsgroup: " + pareto_info.obsgroup);
-		if (!found_other)
-			throw PestError("no non-zero weighted obs found outside of pareto obsgroup");
+		//if (!found_pareto || !found_other)
+		//{
+		//	for (auto &pi : ctl_ordered_pi_names)
+		//	{
+		//		if (prior_info.get_pi_rec_ptr(pi).get_group() == pareto_info.obsgroup)
+		//			found_pareto = true;
+		//		else if (prior_info.get_pi_rec_ptr(pi).get_weight() > 0.0)
+		//			found_other = true;
+		//	}
+		//}
+		//if (!found_pareto)
+		//	throw PestError("no non-zero weighted obs found in pareto obsgroup: " + pareto_info.obsgroup);
+		//if (!found_other)
+		//	throw PestError("no non-zero weighted obs found outside of pareto obsgroup");
 	}
 
 	vector<string> par_warnings;
@@ -1464,10 +1464,14 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (section == "REGULARISATION" || section == "REGULARIZATION")
 			{
 				if (sec_lnum == 1) {
-					regul_scheme_ptr->assign_value_by_key("PHIMLIM", tokens[0]);
-					regul_scheme_ptr->assign_value_by_key("PHIMACCEPT", tokens[1]);
+					if (regul_scheme_ptr)
+					{
+						regul_scheme_ptr->assign_value_by_key("PHIMLIM", tokens[0]);
+						regul_scheme_ptr->assign_value_by_key("PHIMACCEPT", tokens[1]);
+					}
 					if (tokens.size() >= 3)
-						regul_scheme_ptr->assign_value_by_key("FRACPHIM", tokens[2]);
+						if (regul_scheme_ptr)
+							regul_scheme_ptr->assign_value_by_key("FRACPHIM", tokens[2]);
 					/*convert_ip(tokens[0], phimlim);
 					convert_ip(tokens[1], phimaccept);
 					fracphim = 0.0;
@@ -1477,20 +1481,27 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					/*convert_ip(tokens[0], wfinit);
 					convert_ip(tokens[1], wfmin);
 					convert_ip(tokens[2], wfmax);*/
-					regul_scheme_ptr->assign_value_by_key("WFINIT", tokens[0]);
-					regul_scheme_ptr->assign_value_by_key("WFMIN", tokens[1]);
-					regul_scheme_ptr->assign_value_by_key("WFMAX", tokens[2]);
+					if (regul_scheme_ptr)
+					{
+						regul_scheme_ptr->assign_value_by_key("WFINIT", tokens[0]);
+						regul_scheme_ptr->assign_value_by_key("WFMIN", tokens[1]);
+						regul_scheme_ptr->assign_value_by_key("WFMAX", tokens[2]);
+					}
 				}
 				else if (sec_lnum == 3) {
 					int iregadj;
 					/*convert_ip(tokens[0], wffac);
 					convert_ip(tokens[1], wftol);*/
-					regul_scheme_ptr->assign_value_by_key("WFFAC", tokens[0]);
-					regul_scheme_ptr->assign_value_by_key("WFTOL", tokens[1]);
+					if (regul_scheme_ptr)
+					{
+						regul_scheme_ptr->assign_value_by_key("WFFAC", tokens[0]);
+						regul_scheme_ptr->assign_value_by_key("WFTOL", tokens[1]);
+					}
 
 					if (tokens.size() > 2)
 					{
-						regul_scheme_ptr->assign_value_by_key("IREGADJ", tokens[2]);
+						if (regul_scheme_ptr)
+							regul_scheme_ptr->assign_value_by_key("IREGADJ", tokens[2]);
 					}
 					/*delete regul_scheme_ptr;
 					regul_scheme_ptr = new DynamicRegularization(use_dynamic_reg, reg_adj_grp_weights, phimlim,
@@ -1596,7 +1607,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	//since par groups are optional, make sure every par has a group...
 	rectify_par_groups();
 
-	regul_scheme_ptr->set_max_reg_iter(pestpp_options.get_max_reg_iter());
+	if (regul_scheme_ptr)
+		regul_scheme_ptr->set_max_reg_iter(pestpp_options.get_max_reg_iter());
 
 	if (pestpp_options.get_tie_by_group())
 	{

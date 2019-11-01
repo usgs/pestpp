@@ -386,38 +386,19 @@ ostream& operator<< (ostream &os, const PestppOptions& val)
 
 map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const string& line)
 {
-	string key;
-	string value;
-	regex lambda_reg("(\\w+)(?:\\s*\\()([^\\)]+)(?:\\))");
-	const std::sregex_iterator end_reg;
-	//regex lambda_reg("((\\w+\\s*\\([^\\)]+\\))+?)");
-	cmatch mr;
-
-	size_t found = line.find_first_of("#");
-	if (found == string::npos) {
-		found = line.length();
-	}
-	string tmp_line = line.substr(0, found);
-	strip_ip(tmp_line, "both", "\t\n\r+ ");
-	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\"'), tmp_line.end());
-	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\''), tmp_line.end());
-	//upper_ip(tmp_line);
-
 	map<string, ARG_STATUS> arg_map;
 	ARG_STATUS stat;
-	for (std::sregex_iterator i(tmp_line.begin(), tmp_line.end(), lambda_reg); i != end_reg; ++i)
+	pair<string, string> spair = pest_utils::parse_plusplus_line(line);
+	if (spair.second.size() == 0)
+		return arg_map;
+	try
 	{
-		string key = (*i)[1];
-		string org_value = strip_cp((*i)[2]);
-		try
-		{
-			stat = assign_value_by_key(key, org_value);
-			arg_map[key] = stat;
-		}
-		catch (...)
-		{
-			arg_map[key] = ARG_STATUS::ARG_INVALID;
-		}
+		stat = assign_value_by_key(spair.first, spair.second);
+		arg_map[spair.first] = stat;
+	}
+	catch (...)
+	{
+		arg_map[spair.first] = ARG_STATUS::ARG_INVALID;
 	}
 	return arg_map;
 }
@@ -503,21 +484,15 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	}
 	else if (key == "ITERATION_SUMMARY")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> iter_summary_flag;
+		iter_summary_flag = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "DER_FORGIVE")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> der_forgive;
+		der_forgive = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "UNCERTAINTY")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> uncert;
+		uncert = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "PREDICTIONS" || key == "FORECASTS")
 	{
@@ -607,53 +582,40 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		convert_ip(value, sweep_chunk);
 	else if (key == "SWEEP_FORGIVE")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> sweep_forgive;
+		sweep_forgive = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "SWEEP_BASE_RUN")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> sweep_base_run;
+		sweep_base_run = pest_utils::parse_string_arg_to_bool(value);
 	}
 
 	else if (key == "TIE_BY_GROUP")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> tie_by_group;
+		tie_by_group = pest_utils::parse_string_arg_to_bool(value);
 	}
 
 	else if (key == "JAC_SCALE")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> jac_scale;
+		jac_scale = pest_utils::parse_string_arg_to_bool(value);
 
 	}
 
 	else if (key == "UPGRADE_AUGMENT")
 	{
-	cout << "++UPGRADE_AUGMENT is deprecated and no longer supported...ignoring" << endl;
-
+		cout << "++UPGRADE_AUGMENT is deprecated and no longer supported...ignoring" << endl;
 	}
 
 	else if (key == "UPGRADE_BOUNDS")
 	{
-	cout << "++UPGRADE_BOUNDS is deprecated and no longer supported...ignoring" << endl;
-
+		cout << "++UPGRADE_BOUNDS is deprecated and no longer supported...ignoring" << endl;
 	}
-
 	else if (key == "AUTO_NORM")
 	{
 		cout << "++AUTO_NORM is deprecated and no longer supported...ignoring" << endl;
-
 	}
 	else if (key == "MAT_INV")
 	{
 		cout << "++MAT_INV is deprecated (JtQJ is the only form now supported) and no longer supported...ignoring" << endl;
-
 	}
 
 	else if (key == "GLOBAL_OPT")
@@ -678,9 +640,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	}
 	else if (key == "DE_DITHER_F")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> de_dither_f;
+		de_dither_f = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if ((key == "OPT_OBJ_FUNC") || (key == "OPT_OBJECTIVE_FUNCTION"))
 	{
@@ -690,22 +650,16 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	}
 	else if (key == "OPT_COIN_LOG")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> opt_coin_log;
+		opt_coin_log = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "OPT_SKIP_FINAL")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> opt_skip_final;
+		opt_skip_final = pest_utils::parse_string_arg_to_bool(value);
 	}
 
 	else if (key == "OPT_STD_WEIGHTS")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> opt_std_weights;
+		opt_std_weights = pest_utils::parse_string_arg_to_bool(value);
 	}
 
 	else if ((key == "OPT_DEC_VAR_GROUPS") || (key == "OPT_DECISION_VARIABLE_GROUPS"))
@@ -778,9 +732,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	}
 	else if (key == "OPT_INCLUDE_BND_PI")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> opt_include_bnd_pi;
+		opt_include_bnd_pi = pest_utils::parse_string_arg_to_bool(value);
 	}
 
 	else if ((key == "IES_PAR_EN") || (key == "IES_PARAMETER_ENSEMBLE"))
@@ -816,9 +768,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		passed_args.insert("IES_USE_APPROXIMATE_SOLUTION");
 		passed_args.insert("IES_USE_APPROX");
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_use_approx;
+		ies_use_approx = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "IES_LAMBDA_MULTS")
 	{
@@ -856,9 +806,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	}
 	else if (key == "IES_USE_PRIOR_SCALING")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_use_prior_scaling;
+		ies_use_prior_scaling = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "IES_NUM_REALS")
 	{
@@ -876,42 +824,33 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		passed_args.insert("IES_INCLUDE_BASE");
 		passed_args.insert("IES_ADD_BASE");
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_include_base;
+		ies_include_base = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "IES_USE_EMPIRICAL_PRIOR")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_use_empirical_prior;
+		ies_use_empirical_prior = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "IES_GROUP_DRAWS")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_group_draws;
+		ies_group_draws = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "IES_ENFORCE_BOUNDS")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_enforce_bounds;
+		ies_enforce_bounds = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if ((key == "IES_SAVE_BINARY") || (key == "SAVE_BINARY"))
 	{
 		passed_args.insert("IES_SAVE_BINARY");
 		passed_args.insert("SAVE_BINARY");
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_save_binary;
+		ies_save_binary = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "PAR_SIGMA_RANGE")
 	{
 		convert_ip(value, par_sigma_range);
 	}
-	else if (key == "YAMR_POLL_INTERVAL") {
-		//doesn't apply here
+	else if (key == "YAMR_POLL_INTERVAL") 
+	{
+		convert_ip(value, worker_poll_interval);
 	}
 	else if (key == "IES_LOCALIZER")
 	{
@@ -934,9 +873,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		passed_args.insert("IES_SAVE_LAMBDA_EN");
 		passed_args.insert("IES_SAVE_LAMBDA_ENSEMBLES");
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_save_lambda_en;
+		ies_save_lambda_en = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if ((key == "IES_WEIGHTS_EN") || (key == "IES_WEIGHTS_ENSEMBLE"))
 	{
@@ -958,51 +895,35 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	}
 	else if (key == "IES_DEBUG_FAIL_SUBSET")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_debug_fail_subset;
+		ies_debug_fail_subset = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "IES_DEBUG_FAIL_REMAINDER")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_debug_fail_remainder;
+		ies_debug_fail_remainder = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "IES_DEBUG_BAD_PHI")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_debug_bad_phi;
+		ies_debug_bad_phi = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "IES_DEBUG_UPGRADE_ONLY")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_debug_upgrade_only;
+		ies_debug_upgrade_only = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "IES_DEBUG_HIGH_SUBSET_PHI")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_debug_high_subset_phi;
+		ies_debug_high_subset_phi = pest_utils::parse_string_arg_to_bool(value);;
 	}
 	else if (key == "IES_DEBUG_HIGH_UPGRADE_PHI")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_debug_high_upgrade_phi;
+		ies_debug_high_upgrade_phi = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "IES_CSV_BY_REALS")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_csv_by_reals;
+		ies_csv_by_reals = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "IES_AUTOADALOC")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_autoadaloc;
+		ies_autoadaloc = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "IES_AUTOADALOC_SIGMA_DIST")
 	{
@@ -1010,31 +931,23 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	}
 	else if (key == "IES_ENFORCE_CHGLIM")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> ies_enforce_chglim;
+		ies_enforce_chglim = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "IES_CENTER_ON")
 	{
 		convert_ip(value, ies_center_on);
 	}
-
-
 	else if (key == "GSA_METHOD")
 	{
 		convert_ip(value, gsa_method);
 	}
 	else if (key == "GSA_MORRIS_POOLED_OBS")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> gsa_morris_pooled_obs;
+		gsa_morris_pooled_obs = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "GSA_MORRIS_OBS_SEN")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> gsa_morris_obs_sen;
+		gsa_morris_obs_sen = pest_utils::parse_string_arg_to_bool(value);
 	}
 	else if (key == "GSA_MORRIS_P")
 	{
@@ -1064,15 +977,13 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	}
 	else if (key == "ENFORCE_TIED_BOUNDS")
 	{
-		transform(value.begin(), value.end(), value.begin(), ::tolower);
-		istringstream is(value);
-		is >> boolalpha >> enforce_tied_bounds;
+		enforce_tied_bounds = pest_utils::parse_string_arg_to_bool(value);
 	}
+
 	else if (key == "DEBUG_PARSE_ONLY")
 	{
-	transform(value.begin(), value.end(), value.begin(), ::tolower);
-	istringstream is(value);
-	is >> boolalpha >> debug_parse_only;
+		debug_parse_only = pest_utils::parse_string_arg_to_bool(value);
+	
 	}
 	else 
 	{
@@ -1088,7 +999,7 @@ void PestppOptions::set_defaults()
 
 	set_svd_pack(PestppOptions::SVD_PACK::REDSVD);
 	set_super_relparmax(0.1);
-	set_max_run_fail(3);
+	
 	set_iter_summary_flag(true);
 	set_der_forgive(true);
 	
@@ -1195,6 +1106,9 @@ void PestppOptions::set_defaults()
 	set_overdue_giveup_minutes(1.0e+30);
 	set_overdue_reched_fac(1.15);
 	set_overdue_giveup_fac(100);
+	set_worker_poll_interval(1.0);
+	set_max_run_fail(3);
+
 
 	set_debug_parse_only(false);
 	

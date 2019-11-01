@@ -185,9 +185,10 @@ pair<vector<string>,vector<Parameters>> load_parameters_from_csv(map<string,int>
 }
 
 
-ofstream prep_sweep_output_file(Pest &pest_scenario)
+void prep_sweep_output_file(Pest &pest_scenario, ofstream &csv)
 {
-	ofstream csv(pest_scenario.get_pestpp_options().get_sweep_output_csv_file());
+	//ofstream csv(pest_scenario.get_pestpp_options().get_sweep_output_csv_file());
+	csv.open(pest_scenario.get_pestpp_options().get_sweep_output_csv_file());	
 	if (!csv.good())
 	{
 		throw runtime_error("could not open sweep_output_csv_file for writing: " +
@@ -204,7 +205,7 @@ ofstream prep_sweep_output_file(Pest &pest_scenario)
 		csv << ',' << pest_utils::lower_cp(oname);
 	csv << endl;
 	csv.flush();
-	return csv;
+	//return csv;
 
 }
 
@@ -365,18 +366,11 @@ int main(int argc, char* argv[])
 				PANTHERAgent yam_agent;
 				string ctl_file = "";
 				try {
-					string ctl_file;
-					if (upper_cp(file_ext) == "YMR")
-					{
-						ctl_file = file_manager.build_filename("ymr");
-						yam_agent.process_panther_ctl_file(ctl_file);
-					}
-					else
-					{
-						// process traditional PEST control file
-						ctl_file = file_manager.build_filename("pst");
-						yam_agent.process_ctl_file(ctl_file);
-					}
+					
+					// process traditional PEST control file
+					ctl_file = file_manager.build_filename("pst");
+					yam_agent.process_ctl_file(ctl_file);
+					
 				}
 				catch (PestError e)
 				{
@@ -602,7 +596,8 @@ int main(int argc, char* argv[])
 		}
 
 		// prepare the output file
-		ofstream obs_stream = prep_sweep_output_file(pest_scenario);
+		ofstream obs_stream;
+		prep_sweep_output_file(pest_scenario,obs_stream);
 
 		int chunk = pest_scenario.get_pestpp_options().get_sweep_chunk();
 		vector<int> run_ids;
@@ -706,6 +701,7 @@ int main(int argc, char* argv[])
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));
+		return 1;
 	}
 #endif
 }

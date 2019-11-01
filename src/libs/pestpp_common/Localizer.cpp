@@ -414,7 +414,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 		ss.str("");
 		ss << pst_filename.substr(0, pst_filename.size() - 4) << "." << iter << ".autoadaloc.csv";
 		string filename = ss.str();
-		f_out = ofstream(filename);
+		f_out.open(filename);
 		if (!f_out.good())
 			throw runtime_error("autoadaloc error opening filename " + filename + " for verbose output");
 		f_out << "obsnme,parnme,correlation_coeff,background_mean,background_stdev,threshold,kept";

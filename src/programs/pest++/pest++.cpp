@@ -151,18 +151,11 @@ int main(int argc, char* argv[])
 				PANTHERAgent yam_agent;
 				string ctl_file = "";
 				try {
-					string ctl_file;
-					if (upper_cp(file_ext) == "YMR")
-					{
-						ctl_file = file_manager.build_filename("ymr");
-						yam_agent.process_panther_ctl_file(ctl_file);
-					}
-					else
-					{
-						// process traditional PEST control file
-						ctl_file = file_manager.build_filename("pst");
-						yam_agent.process_panther_ctl_file(ctl_file);
-					}
+					
+					// process traditional PEST control file
+					ctl_file = file_manager.build_filename("pst");
+					yam_agent.process_ctl_file(ctl_file);
+					
 				}
 				catch (PestError e)
 				{
@@ -804,6 +797,13 @@ int main(int argc, char* argv[])
 			pfm << "-----------------------------------" << endl << endl;
 			Logger unc_log(pfm);
 
+			if (base_jacobian_ptr->get_base_numeric_par_names().size() == 0)
+			{
+				cout << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
+				fout_rec << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
+				return 0;
+			}
+
 			//instance of a Mat for the jco
 			Mat j(base_jacobian_ptr->get_sim_obs_names(), base_jacobian_ptr->get_base_numeric_par_names(),
 				base_jacobian_ptr->get_matrix_ptr());
@@ -940,6 +940,7 @@ int main(int argc, char* argv[])
 	catch (exception &e)
 	{
 		cout << "Error condition prevents further execution: " << endl << e.what() << endl;
+		return 1;
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));

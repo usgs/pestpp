@@ -9,7 +9,7 @@
 
 #include <string>
 #include <stdexcept>
-#include <sstream>
+//#include <sstream>
 #include <vector>
 #include <map>
 #include <set>
@@ -229,12 +229,16 @@ bool check_exist_in(std::string filename);
 
 bool check_exist_out(std::string filename);
 
+pair<string, string> parse_plusplus_line(const string& line);
+
 //template <class dataType>
 //void read_twocol_ascii_to_map(std::map<std::string, dataType> &result,std::string filename, int header_lines=0, int data_col=1);
 
 map<string, double> read_twocol_ascii_to_map(std::string filename, int header_lines = 0, int data_col = 1);
 
 vector<string> read_onecol_ascii_to_vector(std::string filename);
+
+bool parse_string_arg_to_bool(string arg);
 
 class thread_flag
 {
