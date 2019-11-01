@@ -306,84 +306,6 @@ Parameters ParameterInfo::get_init_value(const vector<string> &keys) const
 }
 
 
-ostream& operator<< (ostream &os, const PestppOptions& val)
-{
-	os << "PEST++ Options" << endl;
-	os << "    n_iter_base = " << left << setw(20) << val.get_n_iter_base() << endl;
-	os << "    n_iter_super = " << left << setw(20) << val.get_n_iter_super() << endl;
-	os << "    max_n_super = " << left << setw(20) << val.get_max_n_super() << endl;
-	os << "    super eigthres = " << left << setw(20) << val.get_super_eigthres() << endl;
-	os << "    svd pack = " << left << setw(20) << val.get_svd_pack() << endl;
-	os << "    super relparmax = " << left << setw(20) << val.get_super_relparmax() << endl;
-	os << "    max super frz iter = " << left << setw(20) << val.get_max_super_frz_iter() << endl;
-	os << "    max run fail = " << left << setw(20) << val.get_max_run_fail() << endl;
-	os << "    max reg iter = " << left << setw(20) << val.get_max_reg_iter() << endl;
-	os << "    use jacobian scaling a la PEST? = ";
-	if (val.get_jac_scale())
-		os << " yes" << endl;
-	else
-		os << " no" << endl;
-	os << "    lambdas = " << endl;
-	for (auto &lam : val.get_base_lambda_vec())
-	{
-		os << right << setw(15) << lam << endl;
-	}
-	os << "    lambda scaling factors = " << endl;
-	for (auto &ls : val.get_lambda_scale_vec())
-		os << right << setw(15) << ls << endl;
-
-	if (!val.get_basejac_filename().empty())
-	{
-		os << "   restarting with existing jacobian matrix file: " << val.get_basejac_filename() << endl;
-		if (!val.get_hotstart_resfile().empty())
-		{
-			os << "   and using existing residual file " << val.get_hotstart_resfile() << " to forego initial model run" << endl;
-		}
-	}
-	if (val.get_uncert_flag())
-	{
-		os << "    using FOSM-based uncertainty estimation for parameters" << endl;
-		os << "    parameter covariance file = " << left << setw(20) << val.get_parcov_filename() << endl;
-		if (val.get_prediction_names().size() > 0)
-		{
-			os << "    using FOSM-based uncertainty for forecasts" << endl;
-			os << "    forecast names = " << endl;
-		}
-
-	}
-	for (auto &pname : val.get_prediction_names())
-		os << right << setw(15) << pname << endl;
-	os << "    derivative run failure forgive = " << left << setw(15) << val.get_der_forgive() << endl;
-	os << "    run overdue reschedule factor = " << left << setw(20) << val.get_overdue_reched_fac() << endl;
-	os << "    run overdue giveup factor = " << left << setw(20) << val.get_overdue_giveup_fac() << endl;
-	os << "    base parameter jacobian filename = " << left << setw(20) << val.get_basejac_filename() << endl;
-	if (val.get_global_opt() == PestppOptions::GLOBAL_OPT::OPT_DE)
-	{
-		os << "    global optimizer = differential evolution (DE)" << endl;
-		os << "    DE CR = " << left << setw(10) << val.get_de_cr() << endl;
-		os << "    DE F = " << left << setw(10) << val.get_de_f() << endl;
-		os << "    DE population size = " << setw(10) << val.get_de_npopulation() << endl;
-		os << "    DE max generations = " << setw(10) << val.get_de_max_gen() << endl;
-		os << "    DE F dither = " << left << setw(10) << val.get_de_dither_f() << endl;
-	}
-	os << endl;
-	return os;
-}
-
-//PestppOptions::PestppOptions(int _n_iter_base, int _n_iter_super, int _max_n_super, double _super_eigthres,
-//	SVD_PACK _svd_pack, double _super_relparmax, int _max_run_fail,
-//	bool _iter_summary_flag, bool _der_forgive, double _overdue_reched_fac, double _overdue_giveup_fac,
-//	GLOBAL_OPT _global_opt, double _de_f, double _de_cr, int _de_npopulation, int _de_max_gen, bool _de_dither_f)
-//	: n_iter_base(_n_iter_base), n_iter_super(_n_iter_super), max_n_super(_max_n_super), super_eigthres(_super_eigthres),
-//	svd_pack(_svd_pack), super_relparmax(_super_relparmax),
-//	max_run_fail(_max_run_fail), max_super_frz_iter(50), max_reg_iter(50), base_lambda_vec({ 0.1, 1.0, 10.0, 100.0, 1000.0 }),
-//	lambda_scale_vec({1.0}),
-//	iter_summary_flag(_iter_summary_flag), der_forgive(_der_forgive), overdue_reched_fac(_overdue_reched_fac),
-//	overdue_giveup_fac(_overdue_giveup_fac), global_opt(_global_opt),
-//	de_f(_de_f), de_cr(_de_cr), de_npopulation(_de_npopulation), de_max_gen(_de_max_gen), de_dither_f(_de_dither_f)
-//{
-//}
-
 map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const string& line)
 {
 	map<string, ARG_STATUS> arg_map;
@@ -788,7 +710,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	}
 	else if (key == "IES_USE_APPROX")
 	{
-		convert_ip(value, ies_obs_restart_csv);
+		convert_ip(value, ies_use_approx);
 	}
 	else if (key == "IES_SUBSET_SIZE")
 	{
@@ -966,10 +888,6 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		convert_ip(value, gsa_sobol_samples);
 	}
-	else if (key == "GSA_SOBOL_PAR_DIST")
-	{
-		convert_ip(value, gsa_sobol_par_dist);
-	}
 
 	else if (key == "GSA_SOBOL_PAR_DIST")
 	{
@@ -992,6 +910,156 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		return ARG_STATUS::ARG_NOTFOUND;
 	}
 	return ARG_STATUS::ARG_ACCEPTED;
+}
+
+
+void PestppOptions::summary(ostream& os) const
+{
+
+	os << endl << "    PEST++ OPTIONS: " << endl << endl;
+	os << "...general options (used in multiple tools): " << endl;
+	os << "svd_pack: ";
+	if (svd_pack == PROPACK)
+		os << "propack" << endl;
+	if (svd_pack == REDSVD)
+		os << "redsvd" << endl;
+	if (svd_pack == EIGEN)
+		os << "eigen" << endl;
+	os << "lambda_scale_fac: ";
+	for (auto s : lambda_scale_vec)
+		os << s << ",";
+	os << endl;
+	os << "max_run_fail: " << max_run_fail << endl;
+	os << "yamr_poll_interval: " << worker_poll_interval << endl;
+	os << "parameter_covariance: " << parcov_filename << endl;
+	os << "observation_covariance: " << obscov_filename << endl;
+	os << "hotstart_resfile: " << hotstart_resfile << endl;
+	os << "overdue_resched_fac: " << overdue_giveup_fac;
+	os << "overdue_giveup_minutes: " << overdue_giveup_minutes << endl;
+	os << "condor_submit_file: " << condor_submit_file << endl;
+	os << "tie_by_group: " << tie_by_group << endl;
+	os << "par_sigma_range: " << par_sigma_range << endl;
+	os << "enforce_tied_bounds: " << enforce_tied_bounds << endl;
+	os << "debug_parse_only: " << debug_parse_only << endl;
+	
+
+	os << endl << "...pestpp-glm specific options:" << endl;
+	os << "max_n_super: " << max_n_super << endl;
+	os << "super_eigthresh: " << super_eigthres << endl;
+	os << "n_iter_base: " << n_iter_base << endl;
+	os << "n_iter_super: " << n_iter_super << endl;;
+	os << "super_relparmax: " << super_relparmax << endl;
+	os << "max_super_frz_iter: " << max_super_frz_iter << endl;	
+	os << "max_reg_iter: " << max_reg_iter << endl;
+	os << "lambdas: ";
+	for (auto l : base_lambda_vec)
+		os << l << ",";
+	os << endl;
+	os << "iteration_summary: " << iter_summary_flag << endl;
+	os << "der_forgive: " << der_forgive << endl;
+	os << "uncertainty: " << uncert << endl;
+	os << "forecasts: ";
+	for (auto f : prediction_names)
+		os << f << ",";
+	os << endl;
+	os << "base_jacobian: " << basejac_filename << endl;
+	os << "glm_num_reals: " << glm_num_reals << endl;
+	os << "jac_scale: " << jac_scale << endl;
+	if (global_opt == OPT_DE)
+		os << "global_opt: de" << endl;
+	os << "de_f: " << de_f << endl;
+	os << "de_cr: " << de_cr << endl;
+	os << "de_pop_size: " << de_npopulation << endl;
+	os << "de_max_gen: " << de_max_gen << endl;
+	os << "de_dither_f: " << de_dither_f << endl;
+	
+	os << endl << "...pestpp-swp options:" << endl;
+	os << "sweep_parameter_csv_file: " << sweep_parameter_csv_file << endl;
+	os << "sweep_output_csv_file: " << sweep_output_csv_file << endl;
+	os << "sweep_chunk: " << sweep_chunk << endl;
+	os << "sweep_forgive: " << sweep_forgive << endl;
+	os << "sweep_base_run: " << sweep_base_run << endl;
+	
+	os << endl << "...pestpp-opt options:" << endl;
+	os << "opt_objective_function: " <<  opt_obj_func << endl;
+	os << "opt_coin_log: " << opt_coin_log << endl;
+	os << "opt_skip_final: " << opt_skip_final << endl;
+	os << "opt_std_weights" << opt_std_weights << endl;
+	os << "opt_decision_variable_groups: ";
+	for (auto v : opt_dec_var_groups)
+		os << v << ",";
+	os << endl;
+	os << "opt_external_variable_groups: ";
+	for (auto v : opt_external_var_groups)
+		os << v << ",";
+	os << endl;
+	os << "opt_constraint_groups: ";
+	for (auto v : opt_constraint_groups)
+		os << v << ",";
+	os << endl;
+	os << "opt_risk: " << opt_risk << endl;
+	os << "opt_iter_derinc_fac: " << opt_iter_derinc_fac << endl;
+	os << "opt_direction: " << opt_direction << endl;
+	os << "opt_iter_tol: " << opt_iter_tol << endl;
+	os << "opt_recalc_fosm_every: " << opt_recalc_fosm_every << endl;
+	os << "opt_include_bnd_pi: " << opt_include_bnd_pi << endl;
+
+	os << endl << "...pestpp-ies options:" << endl;
+	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
+	os << "ies_observation_ensemble: " << ies_obs_csv << endl;
+	os << "ies_restart_parameter_ensemble: " << ies_par_restart_csv << endl;
+	os << "ies_restart_observation_ensemble: " << ies_obs_restart_csv << endl;
+	os << "ies_use_approximate_solution: " << ies_use_approx << endl;
+	os << "ies_lambda_mults: ";
+	for (auto v : ies_lam_mults)
+		os << v << ",";
+	os << endl;
+	os << "ies_initial_lambda: " << ies_init_lam << endl;
+	os << "ies_use_approx: " << ies_use_approx << endl;
+	os << "ies_subset_size: "<< ies_subset_size << endl;
+	os << "ies_reg_factor: " << ies_reg_factor << endl;
+	os << "ies_verbose_level: " << ies_verbose_level << endl;
+	os << "ies_use_prior_scaling: " << ies_use_prior_scaling << endl;
+	os << "ies_num_reals: " << ies_num_reals << endl;
+	os << "ies_bad_phi: " << ies_bad_phi << endl;
+	os << "ies_bad_phi_sigma: " << ies_bad_phi_sigma << endl;
+	os << "ies_include_base: " << ies_include_base << endl;
+	os << "ies_use_empirical_prior: " << ies_use_empirical_prior << endl;
+	os << "ies_group_draws: " << ies_group_draws << endl;
+	os << "ies_enforce_bounds: " << ies_enforce_bounds << endl;
+	os << "ies_save_binary: " << ies_save_binary << endl;
+	os << "ies_localizer: " << ies_localizer << endl;
+	os << "ies_accept_phi_fac: " << ies_accept_phi_fac << endl;
+	os << "ies_lambda_inc_fac: " << ies_lambda_inc_fac << endl;
+	os << "ies_lambda_dec_fac: " << ies_lambda_dec_fac << endl;
+	os << "ies_save_lambda_ensembles: " << ies_save_lambda_en << endl;
+	os << "ies_weights_ensemble: " << ies_weight_csv << endl;
+	os << "ies_subset_how: " << ies_subset_how << endl;
+	os << "ies_localize_how: " << ies_localize_how << endl;
+	os << "ies_num_threads: " << ies_num_threads << endl;
+	os << "ies_debug_fail_subset: " << ies_debug_fail_subset << endl;
+	os << "ies_debug_fail_remainder: " << ies_debug_fail_remainder << endl;
+	os << "ies_debug_bad_phi: " << ies_debug_bad_phi << endl;
+	os << "ies_debug_upgrade_only: " << ies_debug_upgrade_only << endl;
+	os << "ies_debug_high_subset_phi: " << ies_debug_high_subset_phi << endl;
+	os << "ies_debug_high_upgrade_phi: " << ies_debug_high_upgrade_phi << endl;
+	os << "ies_csv_by_reals: " << ies_csv_by_reals << endl;
+	os << "ies_autoadaloc: " << ies_autoadaloc << endl;
+	os << "ies_autoadaloc_sigma_dist: " << ies_autoadaloc_sigma_dist << endl;
+	os << "ies_enforce_chglim: " << ies_enforce_chglim << endl;
+	os << "ies_center_on: " << ies_center_on << endl;
+
+	os << endl << "pestpp-sen options: " << endl;
+	os << "gsa_method: " << gsa_method << endl;
+	os << "gsa_morris_pooled_obs: " << gsa_morris_pooled_obs << endl;
+	os << "gsa_morris_obs_sen: " << gsa_morris_obs_sen << endl;
+	os << "gsa_morris_p: " << gsa_morris_p << endl;
+	os << "gsa_morris_r: " << gsa_morris_r << endl;
+	os << "gsa_morris_delta: " <<  gsa_morris_delta << endl;
+	os << "gsa_sobol_samples: " << gsa_sobol_samples << endl;
+	os << "gsa_sobol_par_dist: " << gsa_sobol_par_dist << endl;
+	
+	
 }
 
 void PestppOptions::set_defaults()

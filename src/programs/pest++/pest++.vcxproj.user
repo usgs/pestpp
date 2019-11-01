@@ -15,7 +15,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>29Oct19_wt_adj_Windows_pest_transient_coarse_rjh_Ss_Sy_SFR_changed.pst /h localhost:4004</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>scale_offest_test.pst</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug2_dll|x64'">
     <LocalDebuggerCommandArguments>pest.pst /H :4005</LocalDebuggerCommandArguments>

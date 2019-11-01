@@ -129,6 +129,11 @@ void Pest::check_inputs(ostream &f_rec)
 		const ParameterRec *prec = ctl_parameter_info.get_parameter_rec_ptr(pname);
 		if (prec->tranform_type != ParameterRec::TRAN_TYPE::FIXED)
 			unfixed_par = true;
+		if (prec->lbnd >= prec->ubnd)
+			if (forgive_bound)
+				par_warnings.push_back(pname + ": bounds are busted");
+			else
+				par_problems.push_back(pname + ": bounds are busted");
 		if (prec->init_value < prec->lbnd)
 			if (forgive_bound)
 				par_warnings.push_back(pname + " is less than lower bound, but noptmax=0, continuing...");
@@ -155,14 +160,20 @@ void Pest::check_inputs(ostream &f_rec)
 		}
 		if (((prec->tranform_type != ParameterRec::TRAN_TYPE::FIXED) && (prec->tranform_type != ParameterRec::TRAN_TYPE::TIED)) && 
 			(prec->chglim != "RELATIVE") && (prec->chglim != "FACTOR"))
-			par_problems.push_back(pname + " 'parchglim not in ['factor','relative']: " + prec->chglim);
+				par_problems.push_back(pname + " 'parchglim not in ['factor','relative']: " + prec->chglim);
 		
 		if ((prec->ubnd > 0.0) && (prec->lbnd < 0.0))
 		{
 			if (prec->chglim == "FACTOR")
-				par_problems.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
+				if (forgive_bound)
+					par_warnings.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
+				else
+					par_problems.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
 			else if ((prec->chglim == "RELATIVE") && (control_info.relparmax < 1.0))
-				par_problems.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
+				if (forgive_bound)
+					par_warnings.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
+				else
+					par_problems.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
 		}
 	}
 
