@@ -427,7 +427,7 @@ public:
 	bool get_debug_parse_only() const { return debug_parse_only; }
 
 	void set_defaults();
-
+	void summary(ostream& os) const;
 
 private:
 
@@ -548,8 +548,7 @@ private:
 	
 		
 };
-
-ostream& operator<< (ostream &os, const PestppOptions& val);
+//ostream& operator<< (ostream &os, const PestppOptions& val);
 ostream& operator<< (ostream &os, const ObservationInfo& val);
 
 class ControlInfo {
