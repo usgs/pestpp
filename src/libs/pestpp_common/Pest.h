@@ -40,7 +40,7 @@ public:
 	friend ostream& operator<< (ostream &os, const Pest& val);
 	Pest();
 	void set_defaults();
-	void check_inputs(ostream &f_rec);
+	void check_inputs(ostream &f_rec, bool forgive_bound=false);
 	void check_io();
 	//int process_ctl_file_old(ifstream &fin, string pst_filename, ofstream &f_rec);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename);

@@ -471,7 +471,7 @@ int main(int argc, char* argv[])
 			fout_rec.close();
 			throw(e);
 		}
-		pest_scenario.check_inputs(fout_rec);
+		pest_scenario.check_inputs(fout_rec, true);
 		
 		OutputFileWriter ofw(file_manager, pest_scenario, false, false, 0);
 		ofw.scenario_report(fout_rec);

@@ -50,7 +50,7 @@ void Pest::set_defaults()
 	control_info.set_defaults();
 }
 
-void Pest::check_inputs(ostream &f_rec)
+void Pest::check_inputs(ostream &f_rec, bool forgive_bound)
 {
 	if (other_lines.size() > 0)
 	{
@@ -116,10 +116,9 @@ void Pest::check_inputs(ostream &f_rec)
 
 	vector<string> par_warnings;
 	vector<string> par_problems;
-	bool unfixed_par = false;
+	bool adj_par = false;
 	int par_ub = 0;
 	int par_lb = 0;
-	bool forgive_bound = false;
 	if (control_info.noptmax == 0)
 		forgive_bound = true;
 	for (auto &pname : ctl_ordered_par_names)
@@ -127,28 +126,29 @@ void Pest::check_inputs(ostream &f_rec)
 		//double pval = ctl_parameters[pname];
 		//double lb = ctl_parameter_info.get_low_bnd(pname);
 		const ParameterRec *prec = ctl_parameter_info.get_parameter_rec_ptr(pname);
-		if (prec->tranform_type != ParameterRec::TRAN_TYPE::FIXED)
-			unfixed_par = true;
+		adj_par = true;
+		if ((prec->tranform_type == ParameterRec::TRAN_TYPE::FIXED) || (prec->tranform_type == ParameterRec::TRAN_TYPE::TIED))
+			adj_par = false;
 		if (prec->lbnd >= prec->ubnd)
-			if (forgive_bound)
+			if ((forgive_bound) || (!adj_par))
 				par_warnings.push_back(pname + ": bounds are busted");
 			else
 				par_problems.push_back(pname + ": bounds are busted");
 		if (prec->init_value < prec->lbnd)
-			if (forgive_bound)
-				par_warnings.push_back(pname + " is less than lower bound, but noptmax=0, continuing...");
+			if ((forgive_bound) || (!adj_par))
+				par_warnings.push_back(pname + " initial value is less than lower bound");
 			else
-				par_problems.push_back(pname + " is less than lower bound");
+				par_problems.push_back(pname + " initial value is less than lower bound");
 		else if (prec->init_value == prec->lbnd)
 		{
 			//par_warnings.push_back(pname + " is at lower bound");
 			par_lb++;
 		}
 		if (prec->init_value > prec->ubnd)
-			if (forgive_bound)
-				par_warnings.push_back(pname + " is greater than upper bound, but noptmax=0, continuing...");
+			if ((forgive_bound) || (!adj_par))
+				par_warnings.push_back(pname + " initial value is greater than upper bound");
 			else
-				par_problems.push_back(pname + " is greater than upper bound");
+				par_problems.push_back(pname + " initial value is greater than upper bound");
 		else if (prec->init_value == prec->ubnd)
 		{
 			//par_warnings.push_back(pname + " is at upper bound");
@@ -158,19 +158,18 @@ void Pest::check_inputs(ostream &f_rec)
 		{
 			par_warnings.push_back(pname + " has 'dercom' > 1, pestpp suite doesn't support 'dercom' > 1, ignoring");
 		}
-		if (((prec->tranform_type != ParameterRec::TRAN_TYPE::FIXED) && (prec->tranform_type != ParameterRec::TRAN_TYPE::TIED)) && 
-			(prec->chglim != "RELATIVE") && (prec->chglim != "FACTOR"))
+		if ((!adj_par) && (prec->chglim != "RELATIVE") && (prec->chglim != "FACTOR"))
 				par_problems.push_back(pname + " 'parchglim not in ['factor','relative']: " + prec->chglim);
 		
 		if ((prec->ubnd > 0.0) && (prec->lbnd < 0.0))
 		{
 			if (prec->chglim == "FACTOR")
-				if (forgive_bound)
+				if ((forgive_bound) || (!adj_par))
 					par_warnings.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
 				else
 					par_problems.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
 			else if ((prec->chglim == "RELATIVE") && (control_info.relparmax < 1.0))
-				if (forgive_bound)
+				if ((forgive_bound) || (!adj_par))
 					par_warnings.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
 				else
 					par_problems.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
@@ -203,7 +202,7 @@ void Pest::check_inputs(ostream &f_rec)
 		err = true;
 	}
 
-	if (!unfixed_par)
+	if (!adj_par)
 	{
 		cout << "parameter error: no adjustable parameters" << endl;
 		f_rec << "parameter error: no adjustable parameters" << endl;
@@ -1590,9 +1589,13 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		{
 			line_arg_map = pestpp_options.parse_plusplus_line(*b);
 		}
+		catch (exception &e)
+		{
+			throw runtime_error("error parsing '++' line :'" + *b + "': "+ e.what());
+		}
 		catch (...)
 		{
-			throw runtime_error("error parsing ++ line '" + line + "'");
+			throw runtime_error("error parsing '++' line :'" + *b + "'");
 		}
 		arg_map.insert(line_arg_map.begin(), line_arg_map.end());
 	}
