@@ -417,8 +417,9 @@ vector<string> read_onecol_ascii_to_vector(std::string filename)
 		if ((line.size() == 0) || (line.at(0) == '#'))
 			continue;
 		tokens.clear();
-		tokenize(line, tokens, "\t\r, ");
-		result.push_back(tokens[0]);
+		tokenize(line, tokens, ",\t ");
+		for (auto t : tokens)
+			result.push_back(t);
 	}
 	fin.close();
 	return result;
@@ -583,11 +584,22 @@ pair<string, string> parse_plusplus_line(const string& line)
 	string key;
 	string value, org_value;
 
+	string tmp_line = line;
+	pest_utils::strip_ip(tmp_line, "both");
+	vector<string> tmp_tokens;
+	pest_utils::tokenize(tmp_line, tmp_tokens, " \t", false);
+	if (tmp_tokens.size() > 1)
+		if (tmp_tokens[0] == "++")
+			if (tmp_tokens[1].substr(0, 1) == "#")
+				return pair<string,string>("","");
+	if (tmp_line.substr(0, 3) == "++#")
+		return pair<string, string>("", "");
+
 	size_t found = line.find_first_of("#");
 	if (found == string::npos) {
 		found = line.length();
 	}
-	string tmp_line = line.substr(0, found);
+	tmp_line = line.substr(0, found);
 	strip_ip(tmp_line, "both", "\t\n\r+ ");
 	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\"'), tmp_line.end());
 	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\''), tmp_line.end());

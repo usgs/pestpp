@@ -50,8 +50,19 @@ void Pest::set_defaults()
 	control_info.set_defaults();
 }
 
-void Pest::check_inputs(ostream &f_rec, bool forgive_bound)
+void Pest::check_inputs(ostream &f_rec, bool forgive)
 {
+	if (control_info.noptmax == 0)
+	{
+		if (!forgive)
+		{
+			cout << "'NOPTMAX == 0, switching to forgiveness mode in check_inputs" << endl;
+			f_rec << "'NOPTMAX == 0, switching to forgiveness mode in check_inputs" << endl;
+		}
+
+		forgive = true;
+	}
+
 	if (other_lines.size() > 0)
 	{
 		stringstream ss;
@@ -78,7 +89,13 @@ void Pest::check_inputs(ostream &f_rec, bool forgive_bound)
 	}
 
 	if (control_info.facparmax <= 1.0)
-		throw PestError("'facparmax' must be greater than 1.0");
+		if (forgive)
+		{
+			cout << "WARNING: 'facparmax` should be greater than 1.0" << endl;
+			f_rec << "WARNING: 'facparmax` should be greater than 1.0" << endl;
+		}
+		else
+			throw PestError("'facparmax' must be greater than 1.0");
 
 	if (control_info.pestmode == ControlInfo::PestMode::PARETO)
 	{
@@ -119,8 +136,7 @@ void Pest::check_inputs(ostream &f_rec, bool forgive_bound)
 	bool adj_par = false;
 	int par_ub = 0;
 	int par_lb = 0;
-	if (control_info.noptmax == 0)
-		forgive_bound = true;
+	
 	for (auto &pname : ctl_ordered_par_names)
 	{
 		//double pval = ctl_parameters[pname];
@@ -130,28 +146,26 @@ void Pest::check_inputs(ostream &f_rec, bool forgive_bound)
 		if ((prec->tranform_type == ParameterRec::TRAN_TYPE::FIXED) || (prec->tranform_type == ParameterRec::TRAN_TYPE::TIED))
 			adj_par = false;
 		if (prec->lbnd >= prec->ubnd)
-			if ((forgive_bound) || (!adj_par))
+			if ((forgive) || (!adj_par))
 				par_warnings.push_back(pname + ": bounds are busted");
 			else
 				par_problems.push_back(pname + ": bounds are busted");
 		if (prec->init_value < prec->lbnd)
-			if ((forgive_bound) || (!adj_par))
+			if ((forgive) || (!adj_par))
 				par_warnings.push_back(pname + " initial value is less than lower bound");
 			else
 				par_problems.push_back(pname + " initial value is less than lower bound");
 		else if (prec->init_value == prec->lbnd)
 		{
-			//par_warnings.push_back(pname + " is at lower bound");
 			par_lb++;
 		}
 		if (prec->init_value > prec->ubnd)
-			if ((forgive_bound) || (!adj_par))
+			if ((forgive) || (!adj_par))
 				par_warnings.push_back(pname + " initial value is greater than upper bound");
 			else
 				par_problems.push_back(pname + " initial value is greater than upper bound");
 		else if (prec->init_value == prec->ubnd)
 		{
-			//par_warnings.push_back(pname + " is at upper bound");
 			par_ub++;
 		}
 		if (prec->dercom > 1)
@@ -164,12 +178,12 @@ void Pest::check_inputs(ostream &f_rec, bool forgive_bound)
 		if ((prec->ubnd > 0.0) && (prec->lbnd < 0.0))
 		{
 			if (prec->chglim == "FACTOR")
-				if ((forgive_bound) || (!adj_par))
+				if ((forgive) || (!adj_par))
 					par_warnings.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
 				else
 					par_problems.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
 			else if ((prec->chglim == "RELATIVE") && (control_info.relparmax < 1.0))
-				if ((forgive_bound) || (!adj_par))
+				if ((forgive) || (!adj_par))
 					par_warnings.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
 				else
 					par_problems.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
@@ -202,11 +216,21 @@ void Pest::check_inputs(ostream &f_rec, bool forgive_bound)
 		err = true;
 	}
 
-	if (!adj_par)
+	if (get_n_adj_par() == 0)
 	{
-		cout << "parameter error: no adjustable parameters" << endl;
-		f_rec << "parameter error: no adjustable parameters" << endl;
-		err = true;
+		if (forgive)
+		{
+			cout << "parameter warning: no adjustable parameters" << endl;
+			f_rec << "parameter warning: no adjustable parameters" << endl;
+		}
+		else
+		{
+			cout << "parameter error: no adjustable parameters" << endl;
+			f_rec << "parameter error: no adjustable parameters" << endl;
+			err = true;
+		}
+
+		
 	}
 
 	if (err)
@@ -221,7 +245,8 @@ void Pest::check_inputs(ostream &f_rec, bool forgive_bound)
 		stringstream ss;
 		ss << "pest++ option 'n_iter_base' must either be -1 or greater than 0, not " << n_base;
 		f_rec << "pest++ option 'n_iter_base' must either be -1 or greater than 0, not " << n_base;
-		throw PestError(ss.str());
+		if (!forgive)
+			throw PestError(ss.str());
 	}
 
 	int n_super = get_pestpp_options().get_n_iter_super();
@@ -230,7 +255,8 @@ void Pest::check_inputs(ostream &f_rec, bool forgive_bound)
 		stringstream ss;
 		ss << "pest++ option 'n_iter_super' must be >= 0, not " << n_super;
 		f_rec << "pest++ option 'n_iter_super' must be >= 0, not " << n_super;
-		throw PestError(ss.str());
+		if (!forgive)
+			throw PestError(ss.str());
 	}
 
 	if ((n_base == -1) && (n_super == 0))
@@ -238,7 +264,8 @@ void Pest::check_inputs(ostream &f_rec, bool forgive_bound)
 		stringstream ss;
 		ss << "pest++ option 'n_iter_base' == -1 so 'n_iter_super' must be > 0, not " << n_super;
 		f_rec << "pest++ option 'n_iter_base' == -1 so 'n_iter_super' must be > 0, not " << n_super;
-		throw PestError(ss.str());
+		if (!forgive)
+			throw PestError(ss.str());
 	}
 
 	//check that prediction names are list in obs
@@ -261,7 +288,8 @@ void Pest::check_inputs(ostream &f_rec, bool forgive_bound)
 				ss << m << ',';
 			f_rec << ss.str() << endl;
 			cout << ss.str() << endl;
-			throw PestError(ss.str());
+			if (!forgive)
+				throw PestError(ss.str());
 		}
 	}
 
@@ -1565,10 +1593,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 #endif
 	fin.close();
 
-	//todo: check that keyword control data was used if model input or model output used
-	//todo: alias external file names
-	//todo: PI external files cant used whitespace delim (lazy!)
-
+	
 	// handle any tied pars found in external files
 	for (auto p: temp_tied_map)
 	{
@@ -1617,6 +1642,19 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		throw_control_file_error(f_rec, ss.str());
 	}
 	
+	//check if the predictions ++ arg might be a file name?
+	vector<string> pred_arg = pestpp_options.get_prediction_names();
+	if ((pestpp_options.get_uncert_flag()) && (pred_arg.size() == 1))
+	{
+		string fname = pred_arg[0];
+		if (pest_utils::check_exist_in(fname))
+		{
+			f_rec << "filename '" << fname << "' detected for prediction names, reading...";
+			vector<string> pred_names = pest_utils::read_onecol_ascii_to_vector(fname);
+			f_rec << pred_names.size() << " predictions found" << endl;
+			pestpp_options.set_prediction_names(pred_names);
+		}
+	}
 
 	//since par groups are optional, make sure every par has a group...
 	rectify_par_groups();
