@@ -125,8 +125,6 @@ void Sobol::assemble_runs(RunManagerAbstract &run_manager)
 	add_model_runs(run_manager, m1, f_out);
 	add_model_runs(run_manager, m2, f_out);
 
-	cout << m1 << endl << endl;
-	cout << m2 << endl << endl;
 	//calculate first order runs a1,....an
 	vector<int> idx_vec;
 	for (int ai=0; ai<n_adj_par; ++ai)
