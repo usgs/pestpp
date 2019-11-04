@@ -203,11 +203,14 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		cout << "parameter warning: " << par_ub << " parameters are at upper bound" << endl;
 		f_rec << "parameter warning: " << par_ub << " parameters are at upper bound" << endl;
 	}
-	for (auto &str : par_warnings)
+	
+	for (auto& str : par_warnings)
 	{
-		cout << "parameter warning: " << str << endl;
+			
 		f_rec << "parameter warning: " << str << endl;
 	}
+	cout << par_warnings.size() << " parameter warnings, see rec file " << endl;
+	
 	for (auto &str : par_problems)
 	{
 		cout << "parameter error: " << str << endl;
