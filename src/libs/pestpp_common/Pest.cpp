@@ -209,7 +209,8 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 			
 		f_rec << "parameter warning: " << str << endl;
 	}
-	cout << par_warnings.size() << " parameter warnings, see rec file " << endl;
+	if (par_warnings.size() > 0)
+		cout << par_warnings.size() << " parameter warnings, see rec file " << endl;
 	
 	for (auto &str : par_problems)
 	{

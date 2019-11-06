@@ -496,7 +496,7 @@ int main(int argc, char* argv[])
 			de_solver.initialize_population(*run_manager_ptr, np);
 			de_solver.solve(*run_manager_ptr, restart_ctl, max_gen, f, cr, dither_f, init_run);
 			run_manager_ptr->free_memory();
-			exit(1);
+			exit(0);
 		}
 
 

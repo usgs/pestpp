@@ -15,13 +15,13 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>test.pst</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>freyberg.pst</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug2_dll|x64'">
     <LocalDebuggerCommandArguments>pest.pst /H :4005</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)../pestpp-glm_benchmarks/ctl_read_test/pst</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>C:\Dev\extraction_sire_freyberg_demo\resp_master</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerDebuggerType>Auto</LocalDebuggerDebuggerType>
   </PropertyGroup>
