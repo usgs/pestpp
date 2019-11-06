@@ -880,8 +880,8 @@ void save_binary_extfmt(const string &filename, const vector<string> &row_names,
 			jout.write((char*) &(n), sizeof(n));
 
 			jout.write((char*) &(data), sizeof(data));
-			cout << icol << "," << col_names[icol] << " - " << it.row() << "," << row_names[it.row()] << ":" << data << endl;
-			cout << endl;
+			//cout << icol << "," << col_names[icol] << " - " << it.row() << "," << row_names[it.row()] << ":" << data << endl;
+			
 		}
 	}
 	//save parameter names
@@ -939,8 +939,7 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 		for (Eigen::SparseMatrix<double>::InnerIterator it(matrix_T, icol); it; ++it)
 		{
 			data = it.value();
-			cout << icol << "," << col_names[icol] << " - " << it.row() << "," << row_names[it.row()] << ":" << data << endl;
-			cout << endl;
+			//cout << icol << "," << col_names[icol] << " - " << it.row() << "," << row_names[it.row()] << ":" << data << endl;
 			n = it.row() + 1 + it.col() * matrix_T.rows();
 			jout.write((char*) &(n), sizeof(n));
 			jout.write((char*) &(data), sizeof(data));
