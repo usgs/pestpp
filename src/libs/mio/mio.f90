@@ -50,7 +50,7 @@ module model_input_output_interface
       character (len=200)                :: afile        ! Temporary character storage
       character (len=80)                 :: errsub       ! Character string for error header
       character*500               :: amessage=' ' ! Error message string
-      character (len=20000)               :: dline        ! Character string for text storage
+      character (len=2000000)               :: dline        ! Character string for text storage
 
 ! -- SUBROUTINES
 
@@ -845,7 +845,7 @@ subroutine mio_read_model_output_files(ifail,nobs,aobs,obs,instruction)
         character*200 :: aobs(nobs)
         double precision, intent(out), dimension(nobs)  :: obs     ! observation values
         !character (len=*), intent(out)                  :: instruction ! instruction of error
-        character (len=20000)  :: instruction
+        character (len=2000000)  :: instruction
         !character (len=*), optional                     :: asldir   ! slave working directory
         character (len=1)                               :: asldir   ! slave working directory - jwhite
         
@@ -2246,7 +2246,7 @@ end module model_input_output_interface
         character*200 :: aobs(nobs)
         double precision, intent(out), dimension(nobs)  :: obs     ! observation values
         !character (len=*), intent(out)                  :: instruction ! instruction of error
-        character (len=20000)  :: instruction
+        character (len=2000000)  :: instruction
         call mio_read_model_output_files(ifail,nobs,aobs,obs,instruction)
         return
     end subroutine mio_read_model_output_files_w
