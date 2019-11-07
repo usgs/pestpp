@@ -50,7 +50,7 @@ module model_input_output_interface
       character (len=200)                :: afile        ! Temporary character storage
       character (len=80)                 :: errsub       ! Character string for error header
       character*500               :: amessage=' ' ! Error message string
-      character (len=500000)               :: dline        ! Character string for text storage
+      character (len=300000)               :: dline        ! Character string for text storage
       
 
 ! -- SUBROUTINES

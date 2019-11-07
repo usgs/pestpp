@@ -447,10 +447,17 @@ int main(int argc, char* argv[])
 			fout_rec << "                 by the PEST++ developement team" << endl << endl << endl;
 			fout_rec << endl;
 			fout_rec << "using control file: \"" << complete_path << "\"" << endl << endl;
+			fout_rec << endl << endl << "version: " << version << endl;
+			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+			fout_rec << "using control file: \"" << complete_path << "\"" << endl << endl;
+			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
 		}
 
 		cout << endl;
+		cout << endl << endl << "version: " << version << endl;
+		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 		cout << "using control file: \"" << complete_path << "\"" << endl << endl;
+		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
