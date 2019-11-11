@@ -1220,7 +1220,22 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				{
 					name = tokens[0];
 					string name_tied = tokens[1];
-					double ratio = ctl_parameters[name] / ctl_parameters[name_tied];
+					double numer = ctl_parameters[name];
+					double demon = ctl_parameters[name_tied];
+					double ratio;
+					if (demon == 0.0)
+					{
+						if (numer == 0.0)
+							ratio = 1.0;
+						else
+						{
+							ss.str();
+							ss << "tied parameter '" << name << "' has an initial value of 0.0 - cant calculate tied ratio";
+							throw_control_file_error(f_rec, ss.str());
+						}
+					}
+					else
+						ratio = numer / demon;
 					t_tied->insert(name, pair<string, double>(name_tied, ratio));
 					tied_names.insert(name_tied);
 				}
@@ -1599,11 +1614,26 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 
 	
 	// handle any tied pars found in external files
+	double numer, demon, ratio;
 	for (auto p: temp_tied_map)
 	{
 		string name = p.first;
 		string name_tied = p.second;
-		double ratio = ctl_parameters[name] / ctl_parameters[name_tied];
+		numer = ctl_parameters[name];
+		demon = ctl_parameters[name_tied];
+		if (demon == 0.0)
+		{
+			if (numer == 0.0)
+				ratio = 1.0;
+			else
+			{
+				ss.str();
+				ss << "tied parameter '" << name << "' has an initial value of 0.0 - cant calculate tied ratio";
+				throw_control_file_error(f_rec, ss.str());
+			}
+		}
+		else
+			ratio = numer / demon;
 		t_tied->insert(name, pair<string, double>(name_tied, ratio));
 		tied_names.insert(name_tied);
 	}
