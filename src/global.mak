@@ -189,20 +189,65 @@ PESTPP_INCLUDES := \
     -I $(LIBS_DIR)/opt $(EXT_INCLUDES)
 
 # Be careful with the order of library dependencies
-PESTPP_LIBS := \
-    -L$(LIBS_DIR)/pestpp_common -lpestpp_com \
-    -L$(LIBS_DIR)/run_managers/wrappers -lrm_wrappers \
-    -L$(LIBS_DIR)/run_managers/yamr -lrm_yamr \
-    -L$(LIBS_DIR)/run_managers/serial -lrm_serial \
-    -L$(LIBS_DIR)/run_managers/external -lrm_external \
-    -L$(LIBS_DIR)/run_managers/abstract_base -lrm_abstract \
-    -L$(LIBS_DIR)/mio -lmio \
-    -L$(LIBS_DIR)/common -lcommon \
-    -L$(LIBS_DIR)/propack -lpropack \
-    -L$(LIBS_DIR)/opt -lopt \
-    -L$(LIBS_DIR)/lapack -llapack -lrefblas \
-     $(EXT_LIBS)
+# PESTPP_LIBS := \
+#     -L$(LIBS_DIR)/pestpp_common -lpestpp_com \
+#     -L$(LIBS_DIR)/run_managers/wrappers -lrm_wrappers \
+#     -L$(LIBS_DIR)/run_managers/yamr -lrm_yamr \
+#     -L$(LIBS_DIR)/run_managers/serial -lrm_serial \
+#     -L$(LIBS_DIR)/run_managers/external -lrm_external \
+#     -L$(LIBS_DIR)/run_managers/abstract_base -lrm_abstract \
+#     -L$(LIBS_DIR)/mio -lmio \
+#     -L$(LIBS_DIR)/common -lcommon \
+#     -L$(LIBS_DIR)/propack -lpropack \
+#     -L$(LIBS_DIR)/opt -lopt \
+#     -L$(LIBS_DIR)/lapack -llapack -lrefblas \
+#      $(EXT_LIBS)
 
+# hack for linux intel build to use mkl lapack and blas
+ifeq ($(SYSTEM),linux)
+	ifeq ($(COMPILER),intel)
+		PESTPP_LIBS := \
+		    -L$(LIBS_DIR)/pestpp_common -lpestpp_com \
+		    -L$(LIBS_DIR)/run_managers/wrappers -lrm_wrappers \
+		    -L$(LIBS_DIR)/run_managers/yamr -lrm_yamr \
+		    -L$(LIBS_DIR)/run_managers/serial -lrm_serial \
+		    -L$(LIBS_DIR)/run_managers/external -lrm_external \
+		    -L$(LIBS_DIR)/run_managers/abstract_base -lrm_abstract \
+		    -L$(LIBS_DIR)/mio -lmio \
+		    -L$(LIBS_DIR)/common -lcommon \
+		    -L$(LIBS_DIR)/propack -lpropack \
+		    -L$(LIBS_DIR)/opt -lopt \
+		     $(EXT_LIBS)
+	else
+		PESTPP_LIBS := \
+		    -L$(LIBS_DIR)/pestpp_common -lpestpp_com \
+		    -L$(LIBS_DIR)/run_managers/wrappers -lrm_wrappers \
+		    -L$(LIBS_DIR)/run_managers/yamr -lrm_yamr \
+		    -L$(LIBS_DIR)/run_managers/serial -lrm_serial \
+		    -L$(LIBS_DIR)/run_managers/external -lrm_external \
+		    -L$(LIBS_DIR)/run_managers/abstract_base -lrm_abstract \
+		    -L$(LIBS_DIR)/mio -lmio \
+		    -L$(LIBS_DIR)/common -lcommon \
+		    -L$(LIBS_DIR)/propack -lpropack \
+		    -L$(LIBS_DIR)/opt -lopt \
+		    -L$(LIBS_DIR)/lapack -llapack -lrefblas \
+		     $(EXT_LIBS)
+	endif
+else
+	PESTPP_LIBS := \
+	    -L$(LIBS_DIR)/pestpp_common -lpestpp_com \
+	    -L$(LIBS_DIR)/run_managers/wrappers -lrm_wrappers \
+	    -L$(LIBS_DIR)/run_managers/yamr -lrm_yamr \
+	    -L$(LIBS_DIR)/run_managers/serial -lrm_serial \
+	    -L$(LIBS_DIR)/run_managers/external -lrm_external \
+	    -L$(LIBS_DIR)/run_managers/abstract_base -lrm_abstract \
+	    -L$(LIBS_DIR)/mio -lmio \
+	    -L$(LIBS_DIR)/common -lcommon \
+	    -L$(LIBS_DIR)/propack -lpropack \
+	    -L$(LIBS_DIR)/opt -lopt \
+	    -L$(LIBS_DIR)/lapack -llapack -lrefblas \
+	     $(EXT_LIBS)
+endif
 
 # Generic pattern rules
 

@@ -18,7 +18,7 @@ CFLAGS = -O2
 #  and handle these quantities appropriately. As a consequence, one
 #  should not compile LAPACK with flags such as -ffpe-trap=overflow.
 #
-FORTRAN = gfortran
+FORTRAN = ifort
 OPTS    = -O2 -frecursive -funroll-loops
 DRVOPTS = $(OPTS)
 NOOPT   = -O0 -frecursive
@@ -26,7 +26,7 @@ NOOPT   = -O0 -frecursive
 #  Define LOADER and LOADOPTS to refer to the loader and desired
 #  load options for your machine.
 #
-LOADER   = gfortran
+LOADER   = ifort
 LOADOPTS =
 
 #  The archiver and the flag(s) to use when building an archive
