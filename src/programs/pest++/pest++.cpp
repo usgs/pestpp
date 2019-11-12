@@ -905,7 +905,7 @@ int main(int argc, char* argv[])
 			if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
 			{
 				bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
-				int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
+				int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
 				fout_rec << "drawing " << num_reals << " posterior parameter realizations";
 				ParameterEnsemble pe(&pest_scenario);
 				Covariance cov = la.posterior_parameter_matrix();
