@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
 				cerr << perr.what();
 				throw(perr);
 			}
-			cout << endl << "Simulation Complete..." << endl;
+			cout << endl << "Work Done..." << endl;
 			exit(0);
 		}
 		//Check for PANTHER Master
@@ -203,8 +203,9 @@ int main(int argc, char* argv[])
 		debug_initialize(file_manager.build_filename("dbg"));
 		if (it_find_j != cmd_arg_vec.end())
 		{
-			restart_ctl.get_restart_option() = RestartController::RestartOption::REUSE_JACOBIAN;
-			file_manager.open_default_files();
+			cout << endl << "ERROR: '/j' restart option is deprecated.  Please use ++base_jacobian() instead." << endl << endl;
+			//restart_ctl.get_restart_option() = RestartController::RestartOption::REUSE_JACOBIAN;
+			//file_manager.open_default_files();
 		}
 		else if (it_find_r != cmd_arg_vec.end())
 		{
@@ -522,7 +523,8 @@ int main(int argc, char* argv[])
 			//base parameter iterations
 			try
 			{
-				if (restart_ctl.get_restart_option() != RestartController::RestartOption::NONE  && restart_ctl.get_iteration_type() == RestartController::IterationType::SUPER)
+				if (restart_ctl.get_restart_option() != RestartController::RestartOption::NONE  &&
+					restart_ctl.get_iteration_type() == RestartController::IterationType::SUPER)
 				{
 					try
 					{
@@ -933,8 +935,9 @@ int main(int argc, char* argv[])
 		delete base_jacobian_ptr;
 		delete super_jacobian_ptr;
 		delete run_manager_ptr;
-		cout << endl << endl << "Simulation Complete..." << endl;
+		cout << endl << endl << "PESTPP-GLM Analysis Complete..." << endl;
 		cout << flush;
+		return 0;
 #ifndef _DEBUG
 	}
 	catch (exception &e)

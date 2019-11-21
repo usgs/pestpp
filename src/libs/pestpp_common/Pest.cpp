@@ -1230,8 +1230,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						else
 						{
 							ss.str();
-							ss << "tied parameter '" << name << "' has an initial value of 0.0 - cant calculate tied ratio";
-							throw_control_file_error(f_rec, ss.str());
+							ss << "tied parameter '" << name << "' is tied to a parameter that has an initial value of 0.0, using tied ratio of 1.0";
+							throw_control_file_error(f_rec, ss.str(),false);
+							ratio = 1.0;
 						}
 					}
 					else
@@ -1628,8 +1629,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else
 			{
 				ss.str();
-				ss << "tied parameter '" << name << "' has an initial value of 0.0 - cant calculate tied ratio";
-				throw_control_file_error(f_rec, ss.str());
+				ss << "tied parameter '" << name << "' has an initial value of 0.0.  Using a tied ratio of 1.0";
+				throw_control_file_error(f_rec, ss.str(),false);
+				ratio = 1.0;
 			}
 		}
 		else

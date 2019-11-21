@@ -150,7 +150,7 @@ int main(int argc, char* argv[])
 				cerr << perr.what();
 				throw(perr);
 			}
-			cout << endl << "Simulation Complete..." << endl;
+			cout << endl << "Work Done..." << endl;
 			exit(0);
 		}
 		//Check for PANTHER master
@@ -427,8 +427,9 @@ int main(int argc, char* argv[])
 		// clean up
 		//fout_rec.close();
 		delete run_manager_ptr;
-		cout << endl << endl << "Simulation Complete..." << endl;
+		cout << endl << endl << "PESTPP-OPT Analysis Complete..." << endl;
 		cout << flush;
+		return 0;
 #ifndef _DEBUG
 	}
 	catch (exception &e)

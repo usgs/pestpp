@@ -386,7 +386,7 @@ int main(int argc, char* argv[])
 				cerr << perr.what();
 				throw(perr);
 			}
-			cout << endl << "Simulation Complete..." << endl;
+			cout << endl << "Work Done..." << endl;
 			exit(0);
 		}
 		//Check for PANTHER master
@@ -698,8 +698,9 @@ int main(int argc, char* argv[])
 		fout_rec.close();
 		obs_stream.close();
 		delete run_manager_ptr;
-		cout << endl << endl << "Sweep Complete..." << endl;
+		cout << endl << endl << "PESTPP-SWP Analysis Complete..." << endl;
 		cout << flush;
+		return 0;
 #ifndef _DEBUG
 	}
 	catch (exception &e)
