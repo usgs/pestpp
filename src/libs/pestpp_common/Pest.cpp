@@ -56,8 +56,8 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 	{
 		if (!forgive)
 		{
-			cout << "'NOPTMAX == 0, switching to forgiveness mode in check_inputs" << endl;
-			f_rec << "'NOPTMAX == 0, switching to forgiveness mode in check_inputs" << endl;
+			cout << endl << "Note: 'NOPTMAX' == 0, switching to forgiveness mode when checking inputs" << endl << endl;
+			f_rec << endl << "Note 'NOPTMAX' == 0, switching to forgiveness mode when checking inputs" << endl << endl;
 		}
 
 		forgive = true;

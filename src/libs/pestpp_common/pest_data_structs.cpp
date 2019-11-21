@@ -1059,6 +1059,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "gsa_morris_delta: " <<  gsa_morris_delta << endl;
 	os << "gsa_sobol_samples: " << gsa_sobol_samples << endl;
 	os << "gsa_sobol_par_dist: " << gsa_sobol_par_dist << endl;
+	os << endl << endl << endl;
 }
 
 
