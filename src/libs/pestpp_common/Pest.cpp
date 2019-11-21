@@ -43,12 +43,26 @@ Pest::Pest() : base_par_transform("PEST base_par_transform"), regul_scheme_ptr(0
 
 void Pest::set_defaults()
 {
-	svd_info.maxsing = 0;
-	svd_info.eigthresh = 1.0e-6;
+	pestpp_options.set_defaults();
+	svd_info.set_defaults();
+	regul_scheme_ptr = new DynamicRegularization;
+	regul_scheme_ptr->set_defaults();
+	control_info.set_defaults();
 }
 
-void Pest::check_inputs(ostream &f_rec)
+void Pest::check_inputs(ostream &f_rec, bool forgive)
 {
+	if (control_info.noptmax == 0)
+	{
+		if (!forgive)
+		{
+			cout << endl << "Note: 'NOPTMAX' == 0, switching to forgiveness mode when checking inputs" << endl << endl;
+			f_rec << endl << "Note 'NOPTMAX' == 0, switching to forgiveness mode when checking inputs" << endl << endl;
+		}
+
+		forgive = true;
+	}
+
 	if (other_lines.size() > 0)
 	{
 		stringstream ss;
@@ -75,91 +89,104 @@ void Pest::check_inputs(ostream &f_rec)
 	}
 
 	if (control_info.facparmax <= 1.0)
-		throw PestError("'facparmax' must be greater than 1.0");
+		if (forgive)
+		{
+			cout << "WARNING: 'facparmax` should be greater than 1.0" << endl;
+			f_rec << "WARNING: 'facparmax` should be greater than 1.0" << endl;
+		}
+		else
+			throw PestError("'facparmax' must be greater than 1.0");
 
 	if (control_info.pestmode == ControlInfo::PestMode::PARETO)
 	{
-		bool found_pareto = false, found_other = false;
-		if (pareto_info.obsgroup.substr(0, 5) == "REGUL")
-			found_pareto = true;
-		else if (find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pareto_info.obsgroup) == ctl_ordered_obs_group_names.end())
-			throw PestError("pareto obsgroup not found: " + pareto_info.obsgroup);
-		//make sure at least one other obs group has a nonzero weight obs in it
+		//bool found_pareto = false, found_other = false;
+		//if (pareto_info.obsgroup.substr(0, 5) == "REGUL")
+		//	found_pareto = true;
+		//else if (find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pareto_info.obsgroup) == ctl_ordered_obs_group_names.end())
+		//	throw PestError("pareto obsgroup not found: " + pareto_info.obsgroup);
+		////make sure at least one other obs group has a nonzero weight obs in it
 
 
-		for (auto &on : ctl_ordered_obs_names)
-		{
-				if (observation_info.get_group(on) == pareto_info.obsgroup)
-					found_pareto = true;
-				else if (observation_info.get_weight(on) > 0.0)
-					found_other = true;
-		}
+		//for (auto &on : ctl_ordered_obs_names)
+		//{
+		//		if (observation_info.get_group(on) == pareto_info.obsgroup)
+		//			found_pareto = true;
+		//		else if (observation_info.get_weight(on) > 0.0)
+		//			found_other = true;
+		//}
 
-		if (!found_pareto || !found_other)
-		{
-			for (auto &pi : ctl_ordered_pi_names)
-			{
-				if (prior_info.get_pi_rec_ptr(pi).get_group() == pareto_info.obsgroup)
-					found_pareto = true;
-				else if (prior_info.get_pi_rec_ptr(pi).get_weight() > 0.0)
-					found_other = true;
-			}
-		}
-		if (!found_pareto)
-			throw PestError("no non-zero weighted obs found in pareto obsgroup: " + pareto_info.obsgroup);
-		if (!found_other)
-			throw PestError("no non-zero weighted obs found outside of pareto obsgroup");
+		//if (!found_pareto || !found_other)
+		//{
+		//	for (auto &pi : ctl_ordered_pi_names)
+		//	{
+		//		if (prior_info.get_pi_rec_ptr(pi).get_group() == pareto_info.obsgroup)
+		//			found_pareto = true;
+		//		else if (prior_info.get_pi_rec_ptr(pi).get_weight() > 0.0)
+		//			found_other = true;
+		//	}
+		//}
+		//if (!found_pareto)
+		//	throw PestError("no non-zero weighted obs found in pareto obsgroup: " + pareto_info.obsgroup);
+		//if (!found_other)
+		//	throw PestError("no non-zero weighted obs found outside of pareto obsgroup");
 	}
 
 	vector<string> par_warnings;
 	vector<string> par_problems;
-	bool unfixed_par = false;
+	bool adj_par = false;
 	int par_ub = 0;
 	int par_lb = 0;
-	bool forgive_bound = false;
-	if (control_info.noptmax == 0)
-		forgive_bound = true;
+	
 	for (auto &pname : ctl_ordered_par_names)
 	{
 		//double pval = ctl_parameters[pname];
 		//double lb = ctl_parameter_info.get_low_bnd(pname);
 		const ParameterRec *prec = ctl_parameter_info.get_parameter_rec_ptr(pname);
-		if (prec->tranform_type != ParameterRec::TRAN_TYPE::FIXED)
-			unfixed_par = true;
-		if (prec->init_value < prec->lbnd)
-			if (forgive_bound)
-				par_warnings.push_back(pname + " is less than lower bound, but noptmax=0, continuing...");
+		adj_par = true;
+		if ((prec->tranform_type == ParameterRec::TRAN_TYPE::FIXED) || (prec->tranform_type == ParameterRec::TRAN_TYPE::TIED))
+			adj_par = false;
+		if (prec->lbnd >= prec->ubnd)
+			if ((forgive) || (!adj_par))
+				par_warnings.push_back(pname + ": bounds are busted");
 			else
-				par_problems.push_back(pname + " is less than lower bound");
+				par_problems.push_back(pname + ": bounds are busted");
+		if (prec->init_value < prec->lbnd)
+			if ((forgive) || (!adj_par))
+				par_warnings.push_back(pname + " initial value is less than lower bound");
+			else
+				par_problems.push_back(pname + " initial value is less than lower bound");
 		else if (prec->init_value == prec->lbnd)
 		{
-			//par_warnings.push_back(pname + " is at lower bound");
 			par_lb++;
 		}
 		if (prec->init_value > prec->ubnd)
-			if (forgive_bound)
-				par_warnings.push_back(pname + " is greater than upper bound, but noptmax=0, continuing...");
+			if ((forgive) || (!adj_par))
+				par_warnings.push_back(pname + " initial value is greater than upper bound");
 			else
-				par_problems.push_back(pname + " is greater than upper bound");
+				par_problems.push_back(pname + " initial value is greater than upper bound");
 		else if (prec->init_value == prec->ubnd)
 		{
-			//par_warnings.push_back(pname + " is at upper bound");
 			par_ub++;
 		}
 		if (prec->dercom > 1)
 		{
 			par_warnings.push_back(pname + " has 'dercom' > 1, pestpp suite doesn't support 'dercom' > 1, ignoring");
 		}
-		if (((prec->tranform_type != ParameterRec::TRAN_TYPE::FIXED) && (prec->tranform_type != ParameterRec::TRAN_TYPE::TIED)) && 
-			(prec->chglim != "RELATIVE") && (prec->chglim != "FACTOR"))
-			par_problems.push_back(pname + " 'parchglim not in ['factor','relative']: " + prec->chglim);
+		if ((!adj_par) && (prec->chglim != "RELATIVE") && (prec->chglim != "FACTOR"))
+				par_problems.push_back(pname + " 'parchglim not in ['factor','relative']: " + prec->chglim);
 		
 		if ((prec->ubnd > 0.0) && (prec->lbnd < 0.0))
 		{
 			if (prec->chglim == "FACTOR")
-				par_problems.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
+				if ((forgive) || (!adj_par))
+					par_warnings.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
+				else
+					par_problems.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
 			else if ((prec->chglim == "RELATIVE") && (control_info.relparmax < 1.0))
-				par_problems.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
+				if ((forgive) || (!adj_par))
+					par_warnings.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
+				else
+					par_problems.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
 		}
 	}
 
@@ -176,11 +203,15 @@ void Pest::check_inputs(ostream &f_rec)
 		cout << "parameter warning: " << par_ub << " parameters are at upper bound" << endl;
 		f_rec << "parameter warning: " << par_ub << " parameters are at upper bound" << endl;
 	}
-	for (auto &str : par_warnings)
+	
+	for (auto& str : par_warnings)
 	{
-		cout << "parameter warning: " << str << endl;
+			
 		f_rec << "parameter warning: " << str << endl;
 	}
+	if (par_warnings.size() > 0)
+		cout << par_warnings.size() << " parameter warnings, see rec file " << endl;
+	
 	for (auto &str : par_problems)
 	{
 		cout << "parameter error: " << str << endl;
@@ -189,11 +220,21 @@ void Pest::check_inputs(ostream &f_rec)
 		err = true;
 	}
 
-	if (!unfixed_par)
+	if (get_n_adj_par() == 0)
 	{
-		cout << "parameter error: no adjustable parameters" << endl;
-		f_rec << "parameter error: no adjustable parameters" << endl;
-		err = true;
+		if (forgive)
+		{
+			cout << "parameter warning: no adjustable parameters" << endl;
+			f_rec << "parameter warning: no adjustable parameters" << endl;
+		}
+		else
+		{
+			cout << "parameter error: no adjustable parameters" << endl;
+			f_rec << "parameter error: no adjustable parameters" << endl;
+			err = true;
+		}
+
+		
 	}
 
 	if (err)
@@ -208,7 +249,8 @@ void Pest::check_inputs(ostream &f_rec)
 		stringstream ss;
 		ss << "pest++ option 'n_iter_base' must either be -1 or greater than 0, not " << n_base;
 		f_rec << "pest++ option 'n_iter_base' must either be -1 or greater than 0, not " << n_base;
-		throw PestError(ss.str());
+		if (!forgive)
+			throw PestError(ss.str());
 	}
 
 	int n_super = get_pestpp_options().get_n_iter_super();
@@ -217,7 +259,8 @@ void Pest::check_inputs(ostream &f_rec)
 		stringstream ss;
 		ss << "pest++ option 'n_iter_super' must be >= 0, not " << n_super;
 		f_rec << "pest++ option 'n_iter_super' must be >= 0, not " << n_super;
-		throw PestError(ss.str());
+		if (!forgive)
+			throw PestError(ss.str());
 	}
 
 	if ((n_base == -1) && (n_super == 0))
@@ -225,7 +268,8 @@ void Pest::check_inputs(ostream &f_rec)
 		stringstream ss;
 		ss << "pest++ option 'n_iter_base' == -1 so 'n_iter_super' must be > 0, not " << n_super;
 		f_rec << "pest++ option 'n_iter_base' == -1 so 'n_iter_super' must be > 0, not " << n_super;
-		throw PestError(ss.str());
+		if (!forgive)
+			throw PestError(ss.str());
 	}
 
 	//check that prediction names are list in obs
@@ -248,7 +292,8 @@ void Pest::check_inputs(ostream &f_rec)
 				ss << m << ',';
 			f_rec << ss.str() << endl;
 			cout << ss.str() << endl;
-			throw PestError(ss.str());
+			if (!forgive)
+				throw PestError(ss.str());
 		}
 	}
 
@@ -343,13 +388,536 @@ vector<string> Pest::get_nonregul_obs() const
 	return ret_val;
 }
 
-int Pest::process_ctl_file(ifstream &fin, string pst_filename)
+//int Pest::process_ctl_file_old(ifstream &fin, string pst_filename)
+//{
+//	ofstream f_out("ctl_process.out");
+//	return process_ctl_file_old(fin, pst_filename, f_out);
+//}
+
+int Pest::process_ctl_file(ifstream& fin, string pst_filename)
 {
 	ofstream f_out("ctl_process.out");
 	return process_ctl_file(fin, pst_filename, f_out);
 }
 
-int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
+
+//int Pest::process_ctl_file_old(ifstream &fin, string _pst_filename, ofstream &f_rec)
+//{
+//	string line;
+//	string line_upper;
+//	string section("");
+//	vector<string> tokens;
+//	int sec_begin_lnum, sec_lnum;
+//	double value;
+//	string name;
+//	string *trans_type;
+//	string prior_info_string;
+//	pair<string, string> pi_name_group;
+//	int lnum;
+//	int num_par;
+//	int num_tpl_file;
+//	int dercom;
+//	int i_tpl_ins = 0;
+//	double phimlim;
+//	double phimaccept;
+//	double fracphim;
+//	double wfinit = 1.0;
+//	double wfmin = numeric_limits<double>::min();
+//	double wfmax = numeric_limits<double>::max();
+//	double wffac;
+//	double wftol;
+//	bool use_dynamic_reg = false;
+//	bool reg_adj_grp_weights = false;
+//	vector<string> pestpp_input;
+//	regul_scheme_ptr = new DynamicRegularization(use_dynamic_reg);
+//
+//	//dont change these text names - they are used in ParamTransformSeq
+//	TranTied *t_tied = new TranTied("PEST to model tied transformation");
+//	TranOffset *t_offset = new TranOffset("PEST to model offset transformation");
+//	TranScale *t_scale = new TranScale("PEST to model scale transformation");
+//	TranLog10 *t_log = new TranLog10("PEST to model log transformation");
+//	TranFixed *t_fixed = new TranFixed("PEST to model fixed transformation");
+//	//TranNormalize *t_auto_norm = new TranNormalize("PEST auto-normalization transformation");
+//
+//	base_par_transform.push_back_ctl2model(t_scale);
+//	base_par_transform.push_back_ctl2model(t_offset);
+//	base_par_transform.push_back_ctl2active_ctl(t_tied);
+//	base_par_transform.push_back_ctl2active_ctl(t_fixed);
+//	base_par_transform.push_back_active_ctl2numeric(t_log);
+//	
+//
+//	set<string> tied_names;
+//	pst_filename = _pst_filename;
+//
+//#ifndef _DEBUG
+//	try {
+//#endif
+//	prior_info_string = "";
+//	for(lnum=1, sec_begin_lnum=1; getline(fin, line); ++ lnum)
+//	{
+//		strip_ip(line);
+//		line_upper = upper_cp(line);
+//		tokens.clear();
+//		tokenize(line_upper, tokens);
+//		sec_lnum = lnum - sec_begin_lnum;
+//		
+//		if (lnum == 1)
+//		{
+//			if (tokens[0] != "PCF")
+//			{
+//				cout << "WARNING: fist line of control file should be 'PCF' not " << tokens[0] << endl;
+//			}
+//		}
+//
+//		else if (tokens.empty())
+//		{
+//			//skip blank line
+//		}
+//		else if (line[0] == '#')
+//		{
+//
+//		}
+//		else if (line_upper.substr(0,2) == "++")
+//		{
+//			pestpp_input.push_back(line);
+//		}
+//
+//		else if (line_upper[0] == '*')
+//		{
+//			section = upper_cp(strip_cp(line_upper, "both", " *\t\n"));
+//			sec_begin_lnum = lnum;
+//		}
+//		else if (section == "CONTROL DATA")
+//		{
+//			if (sec_lnum == 1)
+//			{
+//				if (tokens[1] == "REGULARIZATION" || tokens[1] == "REGULARISATION")
+//				{
+//					use_dynamic_reg = true;
+//					control_info.pestmode = ControlInfo::PestMode::REGUL;
+//
+//				}
+//				else if (tokens[1] == "ESTIMATION")
+//					control_info.pestmode = ControlInfo::PestMode::ESTIMATION;
+//				else if (tokens[1] == "PARETO")
+//					control_info.pestmode = ControlInfo::PestMode::PARETO;
+//			}
+//
+//
+//			else if (sec_lnum == 2)
+//			{
+//				convert_ip(tokens[0], num_par);
+//			}
+//			else if (sec_lnum == 3)
+//			{
+//				convert_ip(tokens[0], num_tpl_file);
+//				if(tokens.size() >= 5) {
+//					convert_ip(tokens[4], control_info.numcom);
+//				}
+//				else {
+//					control_info.numcom = 0;
+//				}
+//				if(tokens.size() >= 6) {
+//					convert_ip(tokens[5], control_info.jacfile);
+//				}
+//				else {
+//					control_info.jacfile = 0;
+//				}
+//			}
+//			else if (sec_lnum == 5)
+//			{
+//				convert_ip(tokens[0], control_info.relparmax);
+//				convert_ip(tokens[1], control_info.facparmax);
+//				convert_ip(tokens[2], control_info.facorig);
+//			}
+//			else if (sec_lnum == 6)
+//			{
+//				// remove text arguements from the line as these can be specified out of order
+//				// and PEST++ does not use them
+//				set<string> remove_tags = { "aui", "auid", "noaui", "senreuse", "nsenreuse", "boundscale", "noboundscale" };
+//				auto end_iter = std::remove_if(tokens.begin(), tokens.end(),
+//					[&remove_tags](string &str)->bool{return (remove_tags.find(upper_cp(str)) != remove_tags.end()
+//					|| remove_tags.find(lower_cp(str)) != remove_tags.end()); });
+//				tokens.resize(std::distance(tokens.begin(), end_iter));
+//
+//				convert_ip(tokens[0], control_info.phiredswh);
+//				if (tokens.size() >= 2) {
+//					convert_ip(tokens[1], control_info.noptswitch);
+//				}
+//				if (tokens.size() >= 3) {
+//					convert_ip(tokens[2], control_info.splitswh);
+//				}
+//
+//			}
+//			else if (sec_lnum == 7)
+//			{
+//				convert_ip(tokens[0], control_info.noptmax);
+//				convert_ip(tokens[1], control_info.phiredstp);
+//				convert_ip(tokens[2], control_info.nphistp);
+//				convert_ip(tokens[3], control_info.nphinored);
+//				convert_ip(tokens[4], control_info.relparstp);
+//				convert_ip(tokens[5], control_info.nrelpar);
+//			}
+//			else
+//			{
+//				other_lines[lnum] = line;
+//			}
+//		}
+//		else if (section == "SINGULAR VALUE DECOMPOSITION")
+//		{
+//			if (sec_lnum == 2) {
+//				convert_ip(tokens[0], svd_info.maxsing);
+//				convert_ip(tokens[1], svd_info.eigthresh);
+//			}
+//			else if (sec_lnum == 3) {
+//				convert_ip(tokens[0], svd_info.eigwrite);
+//			}
+//			else
+//			{
+//				other_lines[lnum] = line;
+//			}
+//		}
+//		else if (section == "PARAMETER GROUPS")
+//		{
+//			ParameterGroupRec pgi;
+//			name = tokens[0];
+//			size_t n_tokens = tokens.size();
+//			pgi.name = name;
+//			ctl_ordered_par_group_names.push_back(name);
+//			convert_ip(tokens[1], pgi.inctyp);
+//			convert_ip(tokens[2], pgi.derinc);
+//			convert_ip(tokens[3], pgi.derinclb);
+//			convert_ip(tokens[4], pgi.forcen);
+//			convert_ip(tokens[5], pgi.derincmul);
+//			convert_ip(tokens[6], pgi.dermthd);
+//			if (n_tokens >= 8) convert_ip(tokens[7], pgi.splitthresh);
+//			if (n_tokens >= 9) convert_ip(tokens[8], pgi.splitreldiff);
+//			base_group_info.insert_group(name, pgi);
+//		}
+//		else if (section == "PARAMETER DATA")
+//		{
+//			if (sec_lnum <= num_par) {
+//				double scale;
+//				double offset;
+//				ParameterRec pi;
+//				name = tokens[0];
+//				trans_type = &tokens[1];
+//				convert_ip(tokens[2], pi.chglim);
+//				convert_ip(tokens[3], pi.init_value);
+//				convert_ip(tokens[4], pi.lbnd);
+//				convert_ip(tokens[5], pi.ubnd);
+//				convert_ip(tokens[6], pi.group);
+//				convert_ip(tokens[7], scale);
+//				convert_ip(tokens[8], offset);
+//				if (control_info.numcom > 1)
+//					convert_ip(tokens[9], pi.dercom);
+//				else
+//					pi.dercom = 1;
+//				pi.scale = scale;
+//				pi.offset = offset;
+//				// add parameters to model parameter and paramter_info datasets
+//				ctl_ordered_par_names.push_back(name);
+//				if (*trans_type == "FIXED")
+//				{
+//					pi.tranform_type = ParameterRec::TRAN_TYPE::FIXED;
+//				}
+//				else if (*trans_type == "LOG")
+//				{
+//					pi.tranform_type = ParameterRec::TRAN_TYPE::LOG;
+//					n_adj_par++;
+//				}
+//				else if (*trans_type == "TIED")
+//				{
+//					pi.tranform_type = ParameterRec::TRAN_TYPE::TIED;
+//				}
+//				else if (*trans_type == "NONE")
+//				{
+//					pi.tranform_type = ParameterRec::TRAN_TYPE::NONE;
+//					n_adj_par++;
+//				}
+//				else
+//				{
+//					//pi.tranform_type = ParameterRec::TRAN_TYPE::NONE;
+//					//assert(true);
+//					//n_adj_par++;
+//					throw PestError("unrecognized partrans for par " + name + ": " + *trans_type);
+//				}
+//				ctl_parameter_info.insert(name, pi);
+//				ctl_parameters.insert(name, pi.init_value);
+//				base_group_info.insert_parameter_link(name, pi.group);
+//
+//				// build appropriate transformations
+//				if (*trans_type == "FIXED") {
+//					t_fixed->insert(name, pi.init_value);}
+//				else if (*trans_type == "LOG") {
+//					t_log->insert(name);
+//				}
+//				if (offset!=0) {
+//					t_offset->insert(name, offset);
+//				}
+//				if (scale !=1) {
+//					t_scale->insert(name, scale);
+//				}
+//			}
+//			// Get rest of information for tied paramters
+//			else {
+//				name = tokens[0];
+//				string name_tied =  tokens[1];
+//				double ratio =  ctl_parameters[name] / ctl_parameters[name_tied];
+//				t_tied->insert(name, pair<string, double>(name_tied, ratio));
+//				tied_names.insert(name_tied);
+//			}
+//		}
+//		else if (section == "OBSERVATION GROUPS")
+//		{
+//			string name = tokens[0];
+//			if (tokens.size() > 1)
+//			{
+//				stringstream ss;
+//				ss << "observation covariance matrix detected for group '" << tokens[0] << "' - these are not supported...yet!";
+//				string s = ss.str();
+//				throw PestError(s);
+//			}
+//			ObservationGroupRec group_rec;
+//			observation_info.groups[name] = group_rec;
+//			vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
+//			if (is == ctl_ordered_obs_group_names.end())
+//			{
+//				ctl_ordered_obs_group_names.push_back(name);
+//			}
+//		}
+//		else if (section == "OBSERVATION DATA")
+//		{
+//			ObservationRec obs_i;
+//			name = tokens[0];
+//			convert_ip(tokens[1], value);
+//			convert_ip(tokens[2], obs_i.weight);
+//			obs_i.group = tokens[3];
+//			ctl_ordered_obs_names.push_back(name);
+//			observation_info.observations[name] = obs_i;
+//			observation_values.insert(name, value);
+//		}
+//
+//		else if (section == "PRIOR INFORMATION")
+//		{
+//			//This section processes the prior information.  It does not write out the
+//			//last prior infomration.  THis is because it must check for line continuations
+//			if (!prior_info_string.empty() && tokens[0] != "&"){
+//				pi_name_group = prior_info.AddRecord(prior_info_string);
+//				ctl_ordered_pi_names.push_back(pi_name_group.first);
+//				vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
+//				if (is == ctl_ordered_obs_group_names.end())
+//				{
+//					ctl_ordered_obs_group_names.push_back(pi_name_group.second);
+//				}
+//				prior_info_string.clear();
+//			}
+//			else if (tokens[0] == "&") {
+//				prior_info_string.append(" ");
+//			}
+//			prior_info_string.append(line_upper);
+//		}
+//
+//		else if (section == "PRIOR INFORMATION" )
+//		{
+//			//This section processes the prior information.  It does not write out the
+//			//last prior infomration
+//			if (!prior_info_string.empty() && tokens[0] != "&") {
+//				pi_name_group = prior_info.AddRecord(prior_info_string);
+//				ctl_ordered_pi_names.push_back(pi_name_group.first);
+//				vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
+//				if (is == ctl_ordered_obs_group_names.end())
+//				{
+//					ctl_ordered_obs_group_names.push_back(pi_name_group.second);
+//				}
+//				prior_info_string.clear();
+//			}
+//			else if (tokens[0] != "&") {
+//				prior_info_string.append(" ");
+//			}
+//			prior_info_string.append(line);
+//		}
+//		else if (section == "MODEL COMMAND LINE" )
+//		{
+//			model_exec_info.comline_vec.push_back(line);
+//		}
+//		else if (section == "MODEL INPUT/OUTPUT" )
+//		{
+//			vector<string> tokens_case_sen;
+//			tokenize(line, tokens_case_sen);
+//			if(i_tpl_ins < num_tpl_file)
+//			{
+//				model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
+//				model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
+//			}
+//			else
+//			{
+//				model_exec_info.insfile_vec.push_back(tokens_case_sen[0]);
+//				model_exec_info.outfile_vec.push_back(tokens_case_sen[1]);
+//			}
+//			++i_tpl_ins;
+//		}
+//		else if (section == "REGULARISATION" || section=="REGULARIZATION" )
+//		{
+//			if (sec_lnum == 1) {
+//				convert_ip(tokens[0], phimlim);
+//				convert_ip(tokens[1], phimaccept);
+//				fracphim = 0.0;
+//				if(tokens.size() >=3) convert_ip(tokens[2], fracphim);
+//			}
+//			else if (sec_lnum == 2) {
+//				convert_ip(tokens[0], wfinit);
+//				convert_ip(tokens[1], wfmin);
+//				convert_ip(tokens[2], wfmax);
+//			}
+//			else if (sec_lnum == 3) {
+//				int iregadj;
+//				convert_ip(tokens[0], wffac);
+//				convert_ip(tokens[1], wftol);
+//				if (tokens.size() > 2)
+//				{
+//					convert_ip(tokens[2], iregadj);
+//					if (iregadj == 1) reg_adj_grp_weights = true;
+//				}
+//				delete regul_scheme_ptr;
+//				regul_scheme_ptr = new DynamicRegularization(use_dynamic_reg, reg_adj_grp_weights, phimlim,
+//					phimaccept, fracphim, wfmin, wfmax, wffac, wftol, wfinit);
+//			}
+//			else
+//			{
+//				other_lines[lnum] = line;
+//			}
+//		}
+//		else if (section == "PARETO")
+//		{
+//			if (sec_lnum == 1)
+//			{
+//				convert_ip(tokens[0], pareto_info.obsgroup);
+//			}
+//			else if (sec_lnum == 2)
+//			{
+//				convert_ip(tokens[0], pareto_info.wf_start);
+//				convert_ip(tokens[1], pareto_info.wf_fin);
+//				convert_ip(tokens[2], pareto_info.wf_inc);
+//			}
+//			else if (sec_lnum == 3)
+//			{
+//				convert_ip(tokens[0], pareto_info.niter_start);
+//				convert_ip(tokens[1], pareto_info.niter_gen);
+//				convert_ip(tokens[2], pareto_info.niter_fin);
+//			}
+//
+//		}
+//		else
+//		{
+//			other_lines[lnum] = line;
+//		}
+//	}
+//
+//	// write out last prior information record
+//	if (!prior_info_string.empty())
+//	{
+//		pi_name_group = prior_info.AddRecord(prior_info_string);
+//		ctl_ordered_pi_names.push_back(pi_name_group.first);
+//		vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
+//		if (is == ctl_ordered_obs_group_names.end())
+//		{
+//			ctl_ordered_obs_group_names.push_back(pi_name_group.second);
+//		}
+//		prior_info_string.clear();
+//	}
+//#ifndef _DEBUG
+//	}
+//	catch (PestConversionError &e) {
+//		std::stringstream out;
+//		out << "Error parsing \"" << pst_filename << "\" on line number " << lnum << endl;
+//		out << e.what() << endl;
+//		e.add_front(out.str());
+//		e.raise();
+//	}
+//#endif
+//	fin.close();
+//	
+//	map<string, PestppOptions::ARG_STATUS> arg_map, line_arg_map;
+//	for(vector<string>::const_iterator b=pestpp_input.begin(),e=pestpp_input.end();
+//		b!=e; ++b) {
+//
+//		try 
+//		{
+//			line_arg_map = pestpp_options.parse_plusplus_line(*b);
+//		}
+//		catch (...)
+//		{
+//			throw runtime_error("error parsing ++ line '" + line + "'");
+//		}
+//		arg_map.insert(line_arg_map.begin(),line_arg_map.end());
+//	}
+//	//check for not "accepted" args here...
+//
+//	
+//	regul_scheme_ptr->set_max_reg_iter(pestpp_options.get_max_reg_iter());
+//
+//	if (pestpp_options.get_tie_by_group())
+//	{
+//		cout << "Note: ++tie_by_group(true) - tying adjustable parameters by groups" << endl;
+//		f_rec << "Note: ++tie_by_group(true) - tying adjustable parameters by groups" << endl;
+//		map<string, vector<string>> group_map;
+//		string gname;
+//		ParameterRec::TRAN_TYPE tlog = ParameterRec::TRAN_TYPE::LOG, 
+//			tnone = ParameterRec::TRAN_TYPE::NONE, 
+//			ttied = ParameterRec::TRAN_TYPE::TIED;
+//		int new_n_adj_par = 0;
+//		for (auto pname : ctl_ordered_par_names)
+//		{
+//			if ((ctl_parameter_info.get_parameter_rec_ptr(pname)->tranform_type == tlog) ||
+//				(ctl_parameter_info.get_parameter_rec_ptr(pname)->tranform_type == tnone))
+//			{
+//
+//				if (tied_names.find(pname) != tied_names.end())
+//				{
+//					new_n_adj_par++;
+//					continue;
+//				}
+//				gname = ctl_parameter_info.get_parameter_rec_ptr(pname)->group;
+//				if (group_map.find(gname) == group_map.end())
+//					group_map[gname] = vector<string>();
+//				group_map[gname].push_back(pname);
+//			}
+//			
+//		}
+//		string tie_to_name;
+//		vector<string> to_tie_names;
+//		vector<string>::const_iterator first, last;
+//		for (auto gm : group_map)
+//		{
+//			tie_to_name = gm.second[0];
+//			new_n_adj_par++;
+//			first = gm.second.begin() + 1;
+//			last = gm.second.end();
+//			to_tie_names = vector<string>(first, last);
+//			for (auto pname : to_tie_names)
+//			{
+//				double ratio = ctl_parameters[pname] / ctl_parameters[tie_to_name];
+//				t_tied->insert(pname, pair<string, double>(tie_to_name, ratio));
+//				ctl_parameter_info.get_parameter_rec_ptr_4_mod(pname)->tranform_type = ttied;
+//			}
+//
+//		}
+//		f_rec << "-->number of adjustable parameters reduced from " << n_adj_par << " to " << new_n_adj_par << endl;
+//		cout << "-->number of adjustable parameters reduced from " << n_adj_par << " to " << new_n_adj_par << endl;
+//		n_adj_par = new_n_adj_par;
+//		if (tied_names.size() > 0)
+//		{
+//			f_rec << "-->existing adjustable parameters that others tie to have been maintained:" << endl;
+//			for (auto tname : tied_names)
+//				f_rec << tname << endl;
+//		}
+//	}
+//
+//	return 0;
+//}
+
+int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 {
 	string line;
 	string line_upper;
@@ -358,33 +926,23 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	int sec_begin_lnum, sec_lnum;
 	double value;
 	string name;
-	string *trans_type;
-	string prior_info_string;
+	string* trans_type;
 	pair<string, string> pi_name_group;
 	int lnum;
-	int num_par;
+	int num_par = -1;
 	int num_tpl_file;
 	int dercom;
 	int i_tpl_ins = 0;
-	double phimlim;
-	double phimaccept;
-	double fracphim;
-	double wfinit = 1.0;
-	double wfmin = numeric_limits<double>::min();
-	double wfmax = numeric_limits<double>::max();
-	double wffac;
-	double wftol;
 	bool use_dynamic_reg = false;
 	bool reg_adj_grp_weights = false;
 	vector<string> pestpp_input;
-	regul_scheme_ptr = new DynamicRegularization(use_dynamic_reg);
-
+	
 	//dont change these text names - they are used in ParamTransformSeq
-	TranTied *t_tied = new TranTied("PEST to model tied transformation");
-	TranOffset *t_offset = new TranOffset("PEST to model offset transformation");
-	TranScale *t_scale = new TranScale("PEST to model scale transformation");
-	TranLog10 *t_log = new TranLog10("PEST to model log transformation");
-	TranFixed *t_fixed = new TranFixed("PEST to model fixed transformation");
+	TranTied* t_tied = new TranTied("PEST to model tied transformation");
+	TranOffset* t_offset = new TranOffset("PEST to model offset transformation");
+	TranScale* t_scale = new TranScale("PEST to model scale transformation");
+	TranLog10* t_log = new TranLog10("PEST to model log transformation");
+	TranFixed* t_fixed = new TranFixed("PEST to model fixed transformation");
 	//TranNormalize *t_auto_norm = new TranNormalize("PEST auto-normalization transformation");
 
 	base_par_transform.push_back_ctl2model(t_scale);
@@ -392,503 +950,753 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 	base_par_transform.push_back_ctl2active_ctl(t_tied);
 	base_par_transform.push_back_ctl2active_ctl(t_fixed);
 	base_par_transform.push_back_active_ctl2numeric(t_log);
-	
+
+	pestpp_options.set_defaults();
 
 	set<string> tied_names;
 	pst_filename = _pst_filename;
-
+	set<string> sections_found;
+	set<string> nonkeyword_sections = { "SINGULAR VALUE DECOMPOSITION","REGULARIZATION",
+		"REGULARISATION","PLUSPLUS","CONTROL DATA" };
+	stringstream ss;
+	PestppOptions::ARG_STATUS stat;
+	vector<string> par_group_formal_names{ "PARGPNME","INCTYP","DERINC","DERINCLB","FORCEN","DERINCMUL","DERMTHD" };
+	vector<string> optional_par_group_formal_names{ "SPLITTHRESH","SPLITRELDIFF" };
+	vector<string> par_formal_names{ "PARNME","PARTRANS","PARCHGLIM","PARVAL1","PARLBND","PARUBND","PARGP","SCALE","OFFSET","DERCOM" };
+	vector<string> par_easy_names{ "NAME","TRANSFORM","CHANGE_LIMIT","VALUE","LOWER_BOUND","UPPER_BOUND","GROUP","SCALE","OFFSET","DERCOM" };
+	map <string,string> row_map, temp_tied_map;
+	vector<string> obs_formal_names{ "OBSNME","OBSVAL","WEIGHT","OBGNME" };
+	vector<string> obs_easy_names{ "NAME","VALUE","WEIGHT","GROUP" };
+	vector<string> obs_group_formal_names{ "OBGNME" };
+	vector<string> pi_formal_names{ "PILBL","EQUATION","WEIGHT","OBGNME" };
+	vector<string> tokens_case_sen;
+	vector<string> model_input_formal_names{ "PEST_FILE","MODEL_FILE" };
+	vector<string> model_output_formal_names{ "PEST_FILE","MODEL_FILE" };
 #ifndef _DEBUG
 	try {
 #endif
-	prior_info_string = "";
-	for(lnum=1, sec_begin_lnum=1; getline(fin, line); ++ lnum)
-	{
-		strip_ip(line);
-		line_upper = upper_cp(line);
-		tokens.clear();
-		tokenize(line_upper, tokens);
-		sec_lnum = lnum - sec_begin_lnum;
-		
-		if (lnum == 1)
+		prior_info_string = "";
+		for (lnum = 1, sec_begin_lnum = 1; getline(fin, line); ++lnum)
 		{
-			if (tokens[0] != "PCF")
-			{
-				cout << "WARNING: fist line of control file should be 'PCF' not " << tokens[0] << endl;
-			}
-		}
-
-		else if (tokens.empty())
-		{
-			//skip blank line
-		}
-		else if (line[0] == '#')
-		{
-
-		}
-		else if (line_upper.substr(0,2) == "++")
-		{
-			pestpp_input.push_back(line);
-		}
-
-		else if (line_upper[0] == '*')
-		{
-			section = upper_cp(strip_cp(line_upper, "both", " *\t\n"));
-			sec_begin_lnum = lnum;
-		}
-		else if (section == "CONTROL DATA")
-		{
-			if (sec_lnum == 1)
-			{
-				if (tokens[1] == "REGULARIZATION" || tokens[1] == "REGULARISATION")
-				{
-					use_dynamic_reg = true;
-					control_info.pestmode = ControlInfo::PestMode::REGUL;
-
-				}
-				else if (tokens[1] == "ESTIMATION")
-					control_info.pestmode = ControlInfo::PestMode::ESTIMATION;
-				else if (tokens[1] == "PARETO")
-					control_info.pestmode = ControlInfo::PestMode::PARETO;
-			}
-
-
-			else if (sec_lnum == 2)
-			{
-				convert_ip(tokens[0], num_par);
-			}
-			else if (sec_lnum == 3)
-			{
-				convert_ip(tokens[0], num_tpl_file);
-				if(tokens.size() >= 5) {
-					convert_ip(tokens[4], control_info.numcom);
-				}
-				else {
-					control_info.numcom = 0;
-				}
-				if(tokens.size() >= 6) {
-					convert_ip(tokens[5], control_info.jacfile);
-				}
-				else {
-					control_info.jacfile = 0;
-				}
-			}
-			else if (sec_lnum == 5)
-			{
-				convert_ip(tokens[0], control_info.relparmax);
-				convert_ip(tokens[1], control_info.facparmax);
-				convert_ip(tokens[2], control_info.facorig);
-			}
-			else if (sec_lnum == 6)
-			{
-				// remove text arguements from the line as these can be specified out of order
-				// and PEST++ does not use them
-				set<string> remove_tags = { "aui", "auid", "noaui", "senreuse", "nsenreuse", "boundscale", "noboundscale" };
-				auto end_iter = std::remove_if(tokens.begin(), tokens.end(),
-					[&remove_tags](string &str)->bool{return (remove_tags.find(upper_cp(str)) != remove_tags.end()
-					|| remove_tags.find(lower_cp(str)) != remove_tags.end()); });
-				tokens.resize(std::distance(tokens.begin(), end_iter));
-
-				convert_ip(tokens[0], control_info.phiredswh);
-				if (tokens.size() >= 2) {
-					convert_ip(tokens[1], control_info.noptswitch);
-				}
-				if (tokens.size() >= 3) {
-					convert_ip(tokens[2], control_info.splitswh);
-				}
-
-			}
-			else if (sec_lnum == 7)
-			{
-				convert_ip(tokens[0], control_info.noptmax);
-				convert_ip(tokens[1], control_info.phiredstp);
-				convert_ip(tokens[2], control_info.nphistp);
-				convert_ip(tokens[3], control_info.nphinored);
-				convert_ip(tokens[4], control_info.relparstp);
-				convert_ip(tokens[5], control_info.nrelpar);
-			}
-			else
-			{
-				other_lines[lnum] = line;
-			}
-		}
-		else if (section == "SINGULAR VALUE DECOMPOSITION")
-		{
-			if (sec_lnum == 2) {
-				convert_ip(tokens[0], svd_info.maxsing);
-				convert_ip(tokens[1], svd_info.eigthresh);
-			}
-			else if (sec_lnum == 3) {
-				convert_ip(tokens[0], svd_info.eigwrite);
-			}
-			else
-			{
-				other_lines[lnum] = line;
-			}
-		}
-		else if (section == "PARAMETER GROUPS")
-		{
-			ParameterGroupRec pgi;
-			name = tokens[0];
-			size_t n_tokens = tokens.size();
-			pgi.name = name;
-			ctl_ordered_par_group_names.push_back(name);
-			convert_ip(tokens[1], pgi.inctyp);
-			convert_ip(tokens[2], pgi.derinc);
-			convert_ip(tokens[3], pgi.derinclb);
-			convert_ip(tokens[4], pgi.forcen);
-			convert_ip(tokens[5], pgi.derincmul);
-			convert_ip(tokens[6], pgi.dermthd);
-			if (n_tokens >= 8) convert_ip(tokens[7], pgi.splitthresh);
-			if (n_tokens >= 9) convert_ip(tokens[8], pgi.splitreldiff);
-			base_group_info.insert_group(name, pgi);
-		}
-		else if (section == "PARAMETER DATA")
-		{
-			if (sec_lnum <= num_par) {
-				double scale;
-				double offset;
-				ParameterRec pi;
-				name = tokens[0];
-				trans_type = &tokens[1];
-				convert_ip(tokens[2], pi.chglim);
-				convert_ip(tokens[3], pi.init_value);
-				convert_ip(tokens[4], pi.lbnd);
-				convert_ip(tokens[5], pi.ubnd);
-				convert_ip(tokens[6], pi.group);
-				convert_ip(tokens[7], scale);
-				convert_ip(tokens[8], offset);
-				if (control_info.numcom > 1)
-					convert_ip(tokens[9], pi.dercom);
-				else
-					pi.dercom = 1;
-				pi.scale = scale;
-				pi.offset = offset;
-				// add parameters to model parameter and paramter_info datasets
-				ctl_ordered_par_names.push_back(name);
-				if (*trans_type == "FIXED")
-				{
-					pi.tranform_type = ParameterRec::TRAN_TYPE::FIXED;
-				}
-				else if (*trans_type == "LOG")
-				{
-					pi.tranform_type = ParameterRec::TRAN_TYPE::LOG;
-					n_adj_par++;
-				}
-				else if (*trans_type == "TIED")
-				{
-					pi.tranform_type = ParameterRec::TRAN_TYPE::TIED;
-				}
-				else if (*trans_type == "NONE")
-				{
-					pi.tranform_type = ParameterRec::TRAN_TYPE::NONE;
-					n_adj_par++;
-				}
-				else
-				{
-					//pi.tranform_type = ParameterRec::TRAN_TYPE::NONE;
-					//assert(true);
-					//n_adj_par++;
-					throw PestError("unrecognized partrans for par " + name + ": " + *trans_type);
-				}
-				ctl_parameter_info.insert(name, pi);
-				ctl_parameters.insert(name, pi.init_value);
-				base_group_info.insert_parameter_link(name, pi.group);
-
-				// build appropriate transformations
-				if (*trans_type == "FIXED") {
-					t_fixed->insert(name, pi.init_value);}
-				else if (*trans_type == "LOG") {
-					t_log->insert(name);
-				}
-				if (offset!=0) {
-					t_offset->insert(name, offset);
-				}
-				if (scale !=1) {
-					t_scale->insert(name, scale);
-				}
-			}
-			// Get rest of information for tied paramters
-			else {
-				name = tokens[0];
-				string name_tied =  tokens[1];
-				double ratio =  ctl_parameters[name] / ctl_parameters[name_tied];
-				t_tied->insert(name, pair<string, double>(name_tied, ratio));
-				tied_names.insert(name_tied);
-			}
-		}
-		else if (section == "OBSERVATION GROUPS")
-		{
-			string name = tokens[0];
-			if (tokens.size() > 1)
-			{
-				stringstream ss;
-				ss << "observation covariance matrix detected for group '" << tokens[0] << "' - these are not supported...yet!";
-				string s = ss.str();
-				throw PestError(s);
-			}
-			ObservationGroupRec group_rec;
-			observation_info.groups[name] = group_rec;
-			vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
-			if (is == ctl_ordered_obs_group_names.end())
-			{
-				ctl_ordered_obs_group_names.push_back(name);
-			}
-		}
-		else if (section == "OBSERVATION DATA")
-		{
-			ObservationRec obs_i;
-			name = tokens[0];
-			convert_ip(tokens[1], value);
-			convert_ip(tokens[2], obs_i.weight);
-			obs_i.group = tokens[3];
-			ctl_ordered_obs_names.push_back(name);
-			observation_info.observations[name] = obs_i;
-			observation_values.insert(name, value);
-		}
-
-		else if (section == "PRIOR INFORMATION")
-		{
-			//This section processes the prior information.  It does not write out the
-			//last prior infomration.  THis is because it must check for line continuations
-			if (!prior_info_string.empty() && tokens[0] != "&"){
-				pi_name_group = prior_info.AddRecord(prior_info_string);
-				ctl_ordered_pi_names.push_back(pi_name_group.first);
-				vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
-				if (is == ctl_ordered_obs_group_names.end())
-				{
-					ctl_ordered_obs_group_names.push_back(pi_name_group.second);
-				}
-				prior_info_string.clear();
-			}
-			else if (tokens[0] == "&") {
-				prior_info_string.append(" ");
-			}
-			prior_info_string.append(line_upper);
-		}
-
-		else if (section == "PRIOR INFORMATION" )
-		{
-			//This section processes the prior information.  It does not write out the
-			//last prior infomration
-			if (!prior_info_string.empty() && tokens[0] != "&") {
-				pi_name_group = prior_info.AddRecord(prior_info_string);
-				ctl_ordered_pi_names.push_back(pi_name_group.first);
-				vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
-				if (is == ctl_ordered_obs_group_names.end())
-				{
-					ctl_ordered_obs_group_names.push_back(pi_name_group.second);
-				}
-				prior_info_string.clear();
-			}
-			else if (tokens[0] != "&") {
-				prior_info_string.append(" ");
-			}
-			prior_info_string.append(line);
-		}
-		else if (section == "MODEL COMMAND LINE" )
-		{
-			model_exec_info.comline_vec.push_back(line);
-		}
-		else if (section == "MODEL INPUT/OUTPUT" )
-		{
-			vector<string> tokens_case_sen;
+			strip_ip(line);
+			line_upper = upper_cp(line);
+			tokens.clear();
+			tokens_case_sen.clear();
+			tokenize(line_upper, tokens);
 			tokenize(line, tokens_case_sen);
-			if(i_tpl_ins < num_tpl_file)
+			sec_lnum = lnum - sec_begin_lnum;
+
+			if (lnum == 1)
 			{
+				if (tokens[0] != "PCF")
+				{
+					throw_control_file_error(f_rec, "fist line of control file should be 'PCF' not " + tokens[0]);
+				}
+			}
+
+			else if (tokens.empty())
+			{
+				//skip blank line
+			}
+			else if (line[0] == '#')
+			{
+
+			}
+			else if (line_upper.substr(0, 2) == "++")
+			{
+				if (sections_found.find("CONTROL DATA KEYWORD") != sections_found.end())
+					throw_control_file_error(f_rec, "'* control data keyword' cant be used with '++' args");
+				sections_found.insert("PLUSPLUS");
+				pestpp_input.push_back(line);
+			}
+
+			else if (line_upper[0] == '*')
+			{
+				section = upper_cp(strip_cp(line_upper, "both", " *\t\n"));
+				if (sections_found.find(section) != sections_found.end())
+				{
+					ss.str("");
+					ss << "control file error: duplicate entries for section: '" << section << "'";
+					throw_control_file_error(f_rec, ss.str());
+				}
+				sections_found.insert(section);
+				if ((nonkeyword_sections.find(section) != nonkeyword_sections.end()) &&
+					(sections_found.find("CONTROL DATA KEYWORD") != sections_found.end()))
+					
+					throw_control_file_error(f_rec,"non-keyword section '" + section + "' not allowed to be used with '* control data keyword'");
+				
+				if (section == "MODEL INPUT/OUTPUT")
+				{
+					if (sections_found.find("MODEL INPUT") != sections_found.end())
+						throw_control_file_error(f_rec, "'MODEL INPUT/OUTPUT section can't be used with 'MODEL INPUT' section");
+					if (sections_found.find("MODEL OUTPUT") != sections_found.end())
+						throw_control_file_error(f_rec, "'MODEL INPUT/OUTPUT section can't be used with 'MODEL OUTPUT' section");
+				}
+				if ((section == "MODEL INPUT") && (sections_found.find("MODEL INPUT/OUTPUT") != sections_found.end()))
+					throw_control_file_error(f_rec, "'MODEL INPUT' section can't be used with 'MODEL INPUT/OUTPUT' section");
+				if ((section == "MODEL OUTPUT") && (sections_found.find("MODEL INPUT/OUTPUT") != sections_found.end()))
+					throw_control_file_error(f_rec, "'MODEL OUTPUT' section can't be used with 'MODEL INPUT/OUTPUT' section");
+
+
+				sec_begin_lnum = lnum;
+			}
+			else if (section == "CONTROL DATA KEYWORD")
+			{
+				pair<string, string> kv = parse_keyword_line(f_rec, line);
+				//cout << kv.first << ", " << kv.second << endl;
+				//cout << endl;
+				//PestppOptions::ARG_STATUS stat = pestpp_options.assign_value_by_key(kv.first, kv.second);
+				stat = pestpp_options.assign_value_by_key(kv.first,kv.second);
+				check_report_assignment(f_rec, stat, kv.first, kv.second);
+
+				//try to use this as a control data arg
+				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
+				{
+					stat = control_info.assign_value_by_key(kv.first,kv.second);
+					check_report_assignment(f_rec, stat, kv.first, kv.second);
+				}
+				
+				//try to use as an SVD arg
+				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
+				{
+					stat = svd_info.assign_value_by_key(kv.first,kv.second);
+					check_report_assignment(f_rec, stat, kv.first, kv.second);
+				}
+
+				//try to use as a regul arg
+				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
+				{
+					stat = regul_scheme_ptr->assign_value_by_key(kv.first,kv.second);
+					check_report_assignment(f_rec, stat, kv.first, kv.second);
+				}
+				
+				//ok, found no home for this line
+				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
+				{
+					ss.str("");
+					ss << "unrecognized '* control data keyword' key-value pair on line" << line << endl;
+					throw_control_file_error(f_rec, ss.str(), false);
+				}		
+			}
+
+			else if (section == "CONTROL DATA")
+			{
+
+				if (sec_lnum == 1)
+				{
+					if (tokens[1] == "REGULARIZATION" || tokens[1] == "REGULARISATION")
+					{
+						use_dynamic_reg = true;
+						control_info.pestmode = ControlInfo::PestMode::REGUL;
+
+					}
+					else if (tokens[1] == "ESTIMATION")
+						control_info.pestmode = ControlInfo::PestMode::ESTIMATION;
+					else if (tokens[1] == "PARETO")
+						control_info.pestmode = ControlInfo::PestMode::PARETO;
+				}
+
+
+				else if (sec_lnum == 2)
+				{
+					convert_ip(tokens[0], num_par);
+				}
+				else if (sec_lnum == 3)
+				{
+					convert_ip(tokens[0], num_tpl_file);
+					if (tokens.size() >= 5) {
+						convert_ip(tokens[4], control_info.numcom);
+					}
+					else {
+						control_info.numcom = 0;
+					}
+					if (tokens.size() >= 6) {
+						convert_ip(tokens[5], control_info.jacfile);
+					}
+					else {
+						control_info.jacfile = 0;
+					}
+				}
+				else if (sec_lnum == 5)
+				{
+					convert_ip(tokens[0], control_info.relparmax);
+					convert_ip(tokens[1], control_info.facparmax);
+					convert_ip(tokens[2], control_info.facorig);
+				}
+				else if (sec_lnum == 6)
+				{
+					// remove text arguements from the line as these can be specified out of order
+					// and PEST++ does not use them
+					set<string> remove_tags = { "aui", "auid", "noaui", "senreuse", "nsenreuse", "boundscale", "noboundscale" };
+					auto end_iter = std::remove_if(tokens.begin(), tokens.end(),
+						[&remove_tags](string& str)->bool {return (remove_tags.find(upper_cp(str)) != remove_tags.end()
+							|| remove_tags.find(lower_cp(str)) != remove_tags.end()); });
+					tokens.resize(std::distance(tokens.begin(), end_iter));
+
+					convert_ip(tokens[0], control_info.phiredswh);
+					if (tokens.size() >= 2) {
+						convert_ip(tokens[1], control_info.noptswitch);
+					}
+					if (tokens.size() >= 3) {
+						convert_ip(tokens[2], control_info.splitswh);
+					}
+
+				}
+				else if (sec_lnum == 7)
+				{
+					convert_ip(tokens[0], control_info.noptmax);
+					convert_ip(tokens[1], control_info.phiredstp);
+					convert_ip(tokens[2], control_info.nphistp);
+					convert_ip(tokens[3], control_info.nphinored);
+					convert_ip(tokens[4], control_info.relparstp);
+					convert_ip(tokens[5], control_info.nrelpar);
+				}
+				else
+				{
+					other_lines[lnum] = line;
+				}
+			}
+			else if (section == "SINGULAR VALUE DECOMPOSITION")
+			{
+				if (sec_lnum == 2) {
+					convert_ip(tokens[0], svd_info.maxsing);
+					convert_ip(tokens[1], svd_info.eigthresh);
+				}
+				else if (sec_lnum == 3) {
+					convert_ip(tokens[0], svd_info.eigwrite);
+				}
+				else
+				{
+					other_lines[lnum] = line;
+				}
+			}
+			else if (section == "PARAMETER GROUPS EXTERNAL")
+			{
+				pest_utils::ExternalCtlFile efile(f_rec, line);
+				efile.read_file();
+				
+				set<string> cnames = efile.get_col_set();
+				for (auto n : par_group_formal_names)
+				{
+					if (cnames.find(n) == cnames.end())
+					{
+						ss.str("");
+						ss << "external '* parameter group' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						throw_control_file_error(f_rec, ss.str());
+					}
+				}
+				for (auto oname : optional_par_group_formal_names)
+				{
+					if (cnames.find(oname) != cnames.end())
+						par_group_formal_names.push_back(oname);
+				}
+				vector<string> par_group_tokens;
+				for (auto ro : efile.get_row_order())
+				{
+					par_group_tokens = efile.get_row_vector(ro, par_group_formal_names);
+					tokens_to_par_group_rec(f_rec, par_group_tokens);
+				}
+				if (efiles_map.find(section) == efiles_map.end())
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+				else
+					efiles_map[section].push_back(efile);
+ 
+			}
+			else if (section == "PARAMETER GROUPS")
+			{	
+				tokens_to_par_group_rec(f_rec, tokens);				
+			}
+
+			else if (section == "PARAMETER DATA")
+			{
+			if (num_par == -1)
+				throw_control_file_error(f_rec,"'* parameter data' section found before '* control data'");
+				if (sec_lnum <= num_par) 
+				{
+					tokens_to_par_rec(f_rec, tokens, t_fixed, t_log, t_scale, t_offset);
+				}
+				// Get rest of information for tied paramters
+				else 
+				{
+					name = tokens[0];
+					string name_tied = tokens[1];
+					double numer = ctl_parameters[name];
+					double demon = ctl_parameters[name_tied];
+					double ratio;
+					if (demon == 0.0)
+					{
+						if (numer == 0.0)
+							ratio = 1.0;
+						else
+						{
+							ss.str();
+							ss << "tied parameter '" << name << "' is tied to a parameter that has an initial value of 0.0, using tied ratio of 1.0";
+							throw_control_file_error(f_rec, ss.str(),false);
+							ratio = 1.0;
+						}
+					}
+					else
+						ratio = numer / demon;
+					t_tied->insert(name, pair<string, double>(name_tied, ratio));
+					tied_names.insert(name_tied);
+				}
+			}
+
+			else if (section == "PARAMETER DATA EXTERNAL")
+			{
+				
+				pest_utils::ExternalCtlFile efile(f_rec, line);	
+				efile.read_file();
+				set<string> cnames = efile.get_col_set();
+				vector<string> get_names;
+				//for (auto n : par_formal_names)
+				for (int i=0;i<par_formal_names.size();i++)
+				{
+					string n = par_formal_names[i];
+					if (cnames.find(n) == cnames.end())
+					{
+						string nn = par_easy_names[i];
+						if (cnames.find(nn) == cnames.end())
+						{
+							ss.str("");
+							ss << "external '* parameter data' file '" << efile.get_filename() << "' missing reqiured column '";
+							ss << n << "' (alias '" + nn + "' also not found";
+							throw_control_file_error(f_rec, ss.str());
+						}
+						else
+							get_names.push_back(nn);
+					}
+					else
+						get_names.push_back(n);
+				}
+				string tcol;
+				if (cnames.find("PARTRANS") != cnames.end())
+					tcol = "PARTRANS";
+				else
+					tcol = "TRANSFORM";
+				vector<string> partrans = efile.get_col_string_vector(tcol);
+				set<string> s_partrans(partrans.begin(), partrans.end());
+				if (s_partrans.find("TIED") != s_partrans.end())
+					if (cnames.find("PARTIED") == cnames.end())
+					{
+						ss.str("");
+						ss << "external '* parameter data' file '" << efile.get_filename() << "' included 'tied' parameters";
+						ss << "but doesnt have 'PARTIED' column";
+						throw_control_file_error(f_rec, ss.str());
+					}
+
+				vector<string> par_tokens;
+				for (auto ro : efile.get_row_order())
+				{
+					par_tokens = efile.get_row_vector(ro, get_names);
+					tokens_to_par_rec(f_rec, par_tokens, t_fixed, t_log, t_scale, t_offset);
+					//save any tied pars for processing later bc the par its tied to
+					//might not have been processed yet.
+					row_map = efile.get_row_map(ro);
+					if (row_map["PARTRANS"] == "TIED")
+						temp_tied_map[row_map["PARNME"]] = row_map["PARTIED"];
+				}
+				if (efiles_map.find(section) == efiles_map.end())
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+				else
+					efiles_map[section].push_back(efile);
+	
+			}
+			else if (section == "OBSERVATION GROUPS")
+			{
+				tokens_to_obs_group_rec(f_rec, tokens);
+			}
+
+			else if (section == "OBSERVATION GROUPS EXTERNAL")
+			{
+				pest_utils::ExternalCtlFile efile(f_rec, line);		
+				efile.read_file();
+					
+				set<string> cnames = efile.get_col_set();
+				for (auto n : obs_group_formal_names)
+				{
+					if (cnames.find(n) == cnames.end())
+					{
+						ss.str("");
+						ss << "external '* observation group' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						throw_control_file_error(f_rec, ss.str());
+					}
+				}
+					
+				vector<string> obs_group_tokens;
+				for (auto ro : efile.get_row_order())
+				{
+					obs_group_tokens = efile.get_row_vector(ro, obs_group_formal_names);
+					tokens_to_obs_group_rec(f_rec, obs_group_tokens);
+				}
+				if (efiles_map.find(section) == efiles_map.end())
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+				else
+					efiles_map[section].push_back(efile);
+			}
+
+			else if (section == "OBSERVATION DATA")
+			{
+				tokens_to_obs_rec(f_rec, tokens);
+			}
+
+			else if (section == "OBSERVATION DATA EXTERNAL")
+			{
+				
+				pest_utils::ExternalCtlFile efile(f_rec, line);		
+				efile.read_file();
+					
+				vector<string> get_names;
+				set<string> cnames = efile.get_col_set();
+				//for (auto n : obs_formal_names)
+				for (int i = 0; i < obs_formal_names.size(); i++)
+				{
+					string n = obs_formal_names[i];
+					if (cnames.find(n) == cnames.end())
+					{
+						string nn = obs_easy_names[i];
+						if (cnames.find(nn) == cnames.end())
+						{
+							ss.str("");
+							ss << "external '* observation data' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+							throw_control_file_error(f_rec, ss.str());
+						}
+						else
+							get_names.push_back(nn);
+
+					}
+					else
+						get_names.push_back(n);
+
+				}
+
+				vector<string> obs_tokens;
+				for (auto ro : efile.get_row_order())
+				{
+					obs_tokens = efile.get_row_vector(ro, get_names);
+					tokens_to_obs_rec(f_rec, obs_tokens);
+				}
+
+				if (efiles_map.find(section) == efiles_map.end())
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+				else
+					efiles_map[section].push_back(efile);
+			}
+
+			else if (section == "PRIOR INFORMATION")
+			{
+				tokens_to_pi_rec(f_rec, line_upper);
+			}
+
+			else if (section == "PRIOR INFORMATION EXTERNAL")
+
+			{
+				
+				pest_utils::ExternalCtlFile efile(f_rec, line);
+				efile.read_file();
+				set<string> cnames = efile.get_col_set();
+				for (auto n : pi_formal_names)
+				{
+					if (cnames.find(n) == cnames.end())
+					{
+						ss.str("");
+						ss << "external '* prior information' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						throw_control_file_error(f_rec, ss.str());
+					}
+				}
+
+				vector<string> pi_tokens;
+				for (auto ro : efile.get_row_order())
+				{
+					pi_tokens = efile.get_row_vector(ro, pi_formal_names);
+					tokens_to_pi_rec(f_rec, pi_tokens);
+				}
+
+				if (efiles_map.find(section) == efiles_map.end())
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+				else
+					efiles_map[section].push_back(efile);	
+			}
+
+		
+			else if (section == "MODEL COMMAND LINE")
+			{
+				model_exec_info.comline_vec.push_back(line);
+			}
+
+			else if (section == "MODEL INPUT")
+			{
+				if (tokens.size() != 2)
+					throw_control_file_error(f_rec, "wrong number of tokens on '* model input' line '" + line + "' expecting 2");
 				model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
 				model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
 			}
-			else
+
+			else if (section == "MODEL INPUT EXTERNAL")
 			{
-				model_exec_info.insfile_vec.push_back(tokens_case_sen[0]);
-				model_exec_info.outfile_vec.push_back(tokens_case_sen[1]);
-			}
-			++i_tpl_ins;
-		}
-		else if (section == "REGULARISATION" || section=="REGULARIZATION" )
-		{
-			if (sec_lnum == 1) {
-				convert_ip(tokens[0], phimlim);
-				convert_ip(tokens[1], phimaccept);
-				fracphim = 0.0;
-				if(tokens.size() >=3) convert_ip(tokens[2], fracphim);
-			}
-			else if (sec_lnum == 2) {
-				convert_ip(tokens[0], wfinit);
-				convert_ip(tokens[1], wfmin);
-				convert_ip(tokens[2], wfmax);
-			}
-			else if (sec_lnum == 3) {
-				int iregadj;
-				convert_ip(tokens[0], wffac);
-				convert_ip(tokens[1], wftol);
-				if (tokens.size() > 2)
+				
+				pest_utils::ExternalCtlFile efile(f_rec, line, false);	
+				efile.read_file();
+					
+				set<string> cnames = efile.get_col_set();
+				for (auto n : model_input_formal_names)
 				{
-					convert_ip(tokens[2], iregadj);
-					if (iregadj == 1) reg_adj_grp_weights = true;
+					if (cnames.find(n) == cnames.end())
+					{
+						ss.str("");
+						ss << "external '* model input' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						throw_control_file_error(f_rec, ss.str());
+					}
 				}
-				delete regul_scheme_ptr;
-				regul_scheme_ptr = new DynamicRegularization(use_dynamic_reg, reg_adj_grp_weights, phimlim,
-					phimaccept, fracphim, wfmin, wfmax, wffac, wftol, wfinit);
+
+				vector<string> mi_tokens;
+				for (auto ro : efile.get_row_order())
+				{
+					mi_tokens = efile.get_row_vector(ro, model_input_formal_names);
+					model_exec_info.tplfile_vec.push_back(mi_tokens[0]);
+					model_exec_info.inpfile_vec.push_back(mi_tokens[1]);
+				}
+
+				if (efiles_map.find(section) == efiles_map.end())
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+				else
+					efiles_map[section].push_back(efile);	
+			
+			}
+
+			else if (section == "MODEL OUTPUT")
+			{
+				if (tokens.size() != 2)
+					throw_control_file_error(f_rec, "wrong number of tokens on '* model output' line '" + line + "' expecting 2");
+				model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
+				model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
+			}
+
+
+			else if (section == "MODEL OUTPUT EXTERNAL")
+			{
+				pest_utils::ExternalCtlFile efile(f_rec, line, false);	
+				efile.read_file();
+				set<string> cnames = efile.get_col_set();
+				for (auto n : model_output_formal_names)
+				{
+					if (cnames.find(n) == cnames.end())
+					{
+						ss.str("");
+						ss << "external '* model output' file '" << efile.get_filename() << "' missing reqiured column '" << n << "'";
+						throw_control_file_error(f_rec, ss.str());
+					}
+				}
+
+				vector<string> mo_tokens;
+				for (auto ro : efile.get_row_order())
+				{
+					mo_tokens = efile.get_row_vector(ro, model_output_formal_names);
+					model_exec_info.insfile_vec.push_back(mo_tokens[0]);
+					model_exec_info.outfile_vec.push_back(mo_tokens[1]);
+				}
+
+				if (efiles_map.find(section) == efiles_map.end())
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
+				else
+					efiles_map[section].push_back(efile);
+			
+			}
+			else if (section == "MODEL INPUT/OUTPUT")
+			{
+			if (tokens.size() != 2)
+				throw_control_file_error(f_rec, "wrong number of tokens on '* model input/output' line '" + line + "' expecting 2");
+
+				if (i_tpl_ins < num_tpl_file)
+				{
+					model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
+					model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
+				}
+				else
+				{
+					model_exec_info.insfile_vec.push_back(tokens_case_sen[0]);
+					model_exec_info.outfile_vec.push_back(tokens_case_sen[1]);
+				}
+				++i_tpl_ins;
+			}
+			else if (section == "REGULARISATION" || section == "REGULARIZATION")
+			{
+				if (sec_lnum == 1) {
+					if (regul_scheme_ptr)
+					{
+						regul_scheme_ptr->assign_value_by_key("PHIMLIM", tokens[0]);
+						regul_scheme_ptr->assign_value_by_key("PHIMACCEPT", tokens[1]);
+					}
+					if (tokens.size() >= 3)
+						if (regul_scheme_ptr)
+							regul_scheme_ptr->assign_value_by_key("FRACPHIM", tokens[2]);
+					/*convert_ip(tokens[0], phimlim);
+					convert_ip(tokens[1], phimaccept);
+					fracphim = 0.0;
+					if (tokens.size() >= 3) convert_ip(tokens[2], fracphim);*/
+				}
+				else if (sec_lnum == 2) {
+					/*convert_ip(tokens[0], wfinit);
+					convert_ip(tokens[1], wfmin);
+					convert_ip(tokens[2], wfmax);*/
+					if (regul_scheme_ptr)
+					{
+						regul_scheme_ptr->assign_value_by_key("WFINIT", tokens[0]);
+						regul_scheme_ptr->assign_value_by_key("WFMIN", tokens[1]);
+						regul_scheme_ptr->assign_value_by_key("WFMAX", tokens[2]);
+					}
+				}
+				else if (sec_lnum == 3) {
+					int iregadj;
+					/*convert_ip(tokens[0], wffac);
+					convert_ip(tokens[1], wftol);*/
+					if (regul_scheme_ptr)
+					{
+						regul_scheme_ptr->assign_value_by_key("WFFAC", tokens[0]);
+						regul_scheme_ptr->assign_value_by_key("WFTOL", tokens[1]);
+					}
+
+					if (tokens.size() > 2)
+					{
+						if (regul_scheme_ptr)
+							regul_scheme_ptr->assign_value_by_key("IREGADJ", tokens[2]);
+					}
+					/*delete regul_scheme_ptr;
+					regul_scheme_ptr = new DynamicRegularization(use_dynamic_reg, reg_adj_grp_weights, phimlim,
+						phimaccept, fracphim, wfmin, wfmax, wffac, wftol, wfinit);*/
+				}
+				else
+				{
+					other_lines[lnum] = line;
+				}
+			}
+			else if (section == "PARETO")
+			{
+				if (sec_lnum == 1)
+				{
+					convert_ip(tokens[0], pareto_info.obsgroup);
+				}
+				else if (sec_lnum == 2)
+				{
+					convert_ip(tokens[0], pareto_info.wf_start);
+					convert_ip(tokens[1], pareto_info.wf_fin);
+					convert_ip(tokens[2], pareto_info.wf_inc);
+				}
+				else if (sec_lnum == 3)
+				{
+					convert_ip(tokens[0], pareto_info.niter_start);
+					convert_ip(tokens[1], pareto_info.niter_gen);
+					convert_ip(tokens[2], pareto_info.niter_fin);
+				}
+
 			}
 			else
 			{
 				other_lines[lnum] = line;
 			}
 		}
-		else if (section == "PARETO")
-		{
-			if (sec_lnum == 1)
-			{
-				convert_ip(tokens[0], pareto_info.obsgroup);
-			}
-			else if (sec_lnum == 2)
-			{
-				convert_ip(tokens[0], pareto_info.wf_start);
-				convert_ip(tokens[1], pareto_info.wf_fin);
-				convert_ip(tokens[2], pareto_info.wf_inc);
-			}
-			else if (sec_lnum == 3)
-			{
-				convert_ip(tokens[0], pareto_info.niter_start);
-				convert_ip(tokens[1], pareto_info.niter_gen);
-				convert_ip(tokens[2], pareto_info.niter_fin);
-			}
 
-		}
-		else
+		// write out last prior information record
+		if (!prior_info_string.empty())
 		{
-			other_lines[lnum] = line;
+			tokens_to_pi_rec(f_rec, line_upper);
 		}
-	}
-
-	// write out last prior information record
-	if (!prior_info_string.empty())
-	{
-		pi_name_group = prior_info.AddRecord(prior_info_string);
-		ctl_ordered_pi_names.push_back(pi_name_group.first);
-		vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
-		if (is == ctl_ordered_obs_group_names.end())
-		{
-			ctl_ordered_obs_group_names.push_back(pi_name_group.second);
-		}
-		prior_info_string.clear();
-	}
 #ifndef _DEBUG
 	}
-	catch (PestConversionError &e) {
+	catch (PestConversionError& e) {
 		std::stringstream out;
-		out << "Error parsing \"" << pst_filename << "\" on line number " << lnum << endl;
+		out << "Error processing \"" << pst_filename << "\" on line number " << lnum << endl;
 		out << e.what() << endl;
 		e.add_front(out.str());
 		e.raise();
 	}
 #endif
 	fin.close();
-	// process pest++ options last
-	pestpp_options.set_n_iter_super(0);
-	pestpp_options.set_n_iter_base(max(1, control_info.noptmax));
-	pestpp_options.set_super_eigthres(svd_info.eigthresh);
-	pestpp_options.set_max_n_super(ctl_parameters.size());
-	pestpp_options.set_max_super_frz_iter(5);
-	pestpp_options.set_max_n_super(n_adj_par);
-	pestpp_options.set_max_reg_iter(20);
-	pestpp_options.set_uncert_flag(true);
-	pestpp_options.set_prediction_names(vector<string>());
-	pestpp_options.set_parcov_filename(string());
-	pestpp_options.set_obscov_filename(string());
-	pestpp_options.set_basejac_filename(string());
-	pestpp_options.set_sweep_parameter_csv_file(string());
-	pestpp_options.set_sweep_output_csv_file("sweep_out.csv");
-	pestpp_options.set_sweep_base_run(false);
-	pestpp_options.set_sweep_forgive(false);
-	pestpp_options.set_sweep_chunk(500);
-	pestpp_options.set_tie_by_group(false);
-	pestpp_options.set_enforce_tied_bounds(false);
+
 	
-	pestpp_options.set_jac_scale(true);
-	pestpp_options.set_opt_obj_func("");
-	pestpp_options.set_opt_coin_log(true);
-	pestpp_options.set_opt_skip_final(false);
-	pestpp_options.set_opt_std_weights(false);
-	pestpp_options.set_opt_dec_var_groups(vector<string>());
-	pestpp_options.set_opt_ext_var_groups(vector<string>());
-	pestpp_options.set_opt_constraint_groups(vector<string>());
-	pestpp_options.set_opt_risk(0.5);
-	pestpp_options.set_opt_direction(1.0);
-	pestpp_options.set_opt_iter_tol(0.001);
-	pestpp_options.set_opt_recalc_fosm_every(1);
-	pestpp_options.set_opt_iter_derinc_fac(1.0);
-	pestpp_options.set_opt_include_bnd_pi(true);
-	pestpp_options.set_hotstart_resfile(string());
-	pestpp_options.set_ies_par_csv("");
-	pestpp_options.set_ies_obs_csv("");
-	pestpp_options.set_ies_obs_restart_csv("");
-	pestpp_options.set_ies_par_restart_csv("");
-	pestpp_options.set_ies_lam_mults(vector<double>());
-	pestpp_options.set_ies_init_lam(-999);
-	pestpp_options.set_ies_use_approx(true);
-	pestpp_options.set_ies_subset_size(5);
-	pestpp_options.set_ies_reg_factor(0.0);
-	pestpp_options.set_ies_verbose_level(0);
-	pestpp_options.set_ies_use_prior_scaling(false);
-	pestpp_options.set_ies_num_reals(50);
-	pestpp_options.set_ies_bad_phi(1.0e+300);
-	pestpp_options.set_ies_bad_phi_sigma(1.0e+300);
-	pestpp_options.set_ies_include_base(true);
-	pestpp_options.set_ies_use_empirical_prior(false);
-	pestpp_options.set_ies_group_draws(true);
-	//pestpp_options.set_ies_num_reals_passed(false);
-	pestpp_options.set_ies_enforce_bounds(true);
-	pestpp_options.set_par_sigma_range(4.0);
-	pestpp_options.set_ies_save_binary(false);
-	pestpp_options.set_ies_localizer("");
-	pestpp_options.set_ies_accept_phi_fac(1.05);
-	pestpp_options.set_ies_lambda_inc_fac(10.0);
-	pestpp_options.set_ies_lambda_dec_fac(0.75);
-	pestpp_options.set_ies_save_lambda_en(false);
-	pestpp_options.set_ies_weight_csv("");
-	pestpp_options.set_ies_subset_how("RANDOM");
-	pestpp_options.set_ies_localize_how("PARAMETERS");
-	pestpp_options.set_ies_num_threads(-1);
-	pestpp_options.set_ies_debug_fail_subset(false);
-	pestpp_options.set_ies_debug_fail_remainder(false);
-	pestpp_options.set_ies_debug_bad_phi(false);
-	pestpp_options.set_ies_debug_upgrade_only(false);
-	pestpp_options.set_ies_debug_high_subset_phi(false);
-	pestpp_options.set_ies_debug_high_upgrade_phi(false);
-	pestpp_options.set_ies_csv_by_reals(true);
-	pestpp_options.set_ies_autoadaloc(false);
-	pestpp_options.set_ies_autoadaloc_sigma_dist(1.0);
-	pestpp_options.set_ies_enforce_chglim(false);
-	pestpp_options.set_ies_center_on("");
+	// handle any tied pars found in external files
+	double numer, demon, ratio;
+	for (auto p: temp_tied_map)
+	{
+		string name = p.first;
+		string name_tied = p.second;
+		numer = ctl_parameters[name];
+		demon = ctl_parameters[name_tied];
+		if (demon == 0.0)
+		{
+			if (numer == 0.0)
+				ratio = 1.0;
+			else
+			{
+				ss.str();
+				ss << "tied parameter '" << name << "' has an initial value of 0.0.  Using a tied ratio of 1.0";
+				throw_control_file_error(f_rec, ss.str(),false);
+				ratio = 1.0;
+			}
+		}
+		else
+			ratio = numer / demon;
+		t_tied->insert(name, pair<string, double>(name_tied, ratio));
+		tied_names.insert(name_tied);
+	}
 
-	pestpp_options.set_gsa_method("MORRIS");
-	//many of these defaults are also redefined in gsa main
-	pestpp_options.set_gsa_morris_p(4);
-	pestpp_options.set_gsa_morris_r(4);
-	pestpp_options.set_gsa_morris_delta(0.6666);
-	pestpp_options.set_gsa_morris_obs_sen(true);
-	pestpp_options.set_gsa_morris_pooled_obs(false);
-	pestpp_options.set_gsa_sobol_par_dist("norm");
-	pestpp_options.set_gsa_sobol_samples(4);
-	pestpp_options.set_gsa_rand_seed(2);
+	//process pestpp options
+	map<string, PestppOptions::ARG_STATUS> arg_map, line_arg_map;
+	
+	for (vector<string>::const_iterator b = pestpp_input.begin(), e = pestpp_input.end();
+		b != e; ++b) {
 
-	pestpp_options.set_condor_submit_file(string());
-	pestpp_options.set_overdue_giveup_minutes(1.0e+30);
+		try
+		{
+			line_arg_map = pestpp_options.parse_plusplus_line(*b);
+		}
+		catch (exception &e)
+		{
+			throw runtime_error("error parsing '++' line :'" + *b + "': "+ e.what());
+		}
+		catch (...)
+		{
+			throw runtime_error("error parsing '++' line :'" + *b + "'");
+		}
+		arg_map.insert(line_arg_map.begin(), line_arg_map.end());
+	}
 
-	for(vector<string>::const_iterator b=pestpp_input.begin(),e=pestpp_input.end();
-		b!=e; ++b) {
-
-			pestpp_options.parce_line(*b);
+	vector<string> not_accepted;
+	for (auto kv : arg_map)
+	{
+		if (kv.second != PestppOptions::ARG_STATUS::ARG_ACCEPTED)
+		{
+			not_accepted.push_back(kv.first);
+		}
+	}
+	if (not_accepted.size() > 0)
+	{
+		ss.str("");
+		ss << " the following '++' args were not accepted:" << endl;
+		for (auto n : not_accepted)
+			ss << n << ",";
+		throw_control_file_error(f_rec, ss.str());
 	}
 	
-	regul_scheme_ptr->set_max_reg_iter(pestpp_options.get_max_reg_iter());
-//	//Make sure we use Q1/2J is PROPACK is chosen
-//	if (pestpp_options.get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
-//	{
-//		pestpp_options.set_mat_inv(PestppOptions::MAT_INV::Q12J);
-//	}
+	//check if the predictions ++ arg might be a file name?
+	vector<string> pred_arg = pestpp_options.get_prediction_names();
+	if ((pestpp_options.get_uncert_flag()) && (pred_arg.size() == 1))
+	{
+		string fname = pred_arg[0];
+		if (pest_utils::check_exist_in(fname))
+		{
+			f_rec << "filename '" << fname << "' detected for prediction names, reading...";
+			vector<string> pred_names = pest_utils::read_onecol_ascii_to_vector(fname);
+			f_rec << pred_names.size() << " predictions found" << endl;
+			pestpp_options.set_prediction_names(pred_names);
+		}
+	}
+
+	//since par groups are optional, make sure every par has a group...
+	rectify_par_groups();
+
+	if (regul_scheme_ptr)
+		regul_scheme_ptr->set_max_reg_iter(pestpp_options.get_max_reg_iter());
 
 	if (pestpp_options.get_tie_by_group())
 	{
@@ -896,8 +1704,8 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 		f_rec << "Note: ++tie_by_group(true) - tying adjustable parameters by groups" << endl;
 		map<string, vector<string>> group_map;
 		string gname;
-		ParameterRec::TRAN_TYPE tlog = ParameterRec::TRAN_TYPE::LOG, 
-			tnone = ParameterRec::TRAN_TYPE::NONE, 
+		ParameterRec::TRAN_TYPE tlog = ParameterRec::TRAN_TYPE::LOG,
+			tnone = ParameterRec::TRAN_TYPE::NONE,
 			ttied = ParameterRec::TRAN_TYPE::TIED;
 		int new_n_adj_par = 0;
 		for (auto pname : ctl_ordered_par_names)
@@ -916,7 +1724,7 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 					group_map[gname] = vector<string>();
 				group_map[gname].push_back(pname);
 			}
-			
+
 		}
 		string tie_to_name;
 		vector<string> to_tie_names;
@@ -941,11 +1749,13 @@ int Pest::process_ctl_file(ifstream &fin, string _pst_filename, ofstream &f_rec)
 		n_adj_par = new_n_adj_par;
 		if (tied_names.size() > 0)
 		{
-			f_rec << "-->existing adjustable parameters that others tie to have been maintained:" << endl;
+			f_rec << "-->the following existing adjustable parameters that others tied to it have been maintained:" << endl;
 			for (auto tname : tied_names)
 				f_rec << tname << endl;
 		}
 	}
+
+	
 
 	return 0;
 }
@@ -1264,6 +2074,248 @@ Pest::~Pest() {
 		}
 	}*/
 }
+
+pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string line)
+{
+	string key;
+	string value;
+	
+	// look for a comment char
+	size_t found = line.find_first_of("#");
+	if (found == string::npos) {
+		found = line.length();
+	}
+	string tmp_line = line.substr(0, found);
+	//strip any leading or trailing whitespace
+	strip_ip(tmp_line, "both", "\t\n\r+ ");
+	//remove any quote chars
+	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\"'), tmp_line.end());
+	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\''), tmp_line.end());
+	
+	//split on whitespaces
+	vector<string> tokens;
+	tokenize(tmp_line,tokens,"\t ");
+	if (tokens.size() < 2)
+	{
+		throw_control_file_error(f_rec, "Pest::parse_keyword_line() error: too few tokens on line '" + line + "', need atleast 2");
+	}
+	key = tokens[0];
+	upper_ip(key);
+	//the other chars to the right are the "value" (could have spaces, commas, etc)
+	value = tmp_line.substr(key.size(), tmp_line.size());
+	strip_ip(value, "both", "\t\n\r+ ");
+
+	return pair<string, string>(key,value);
+}
+
+void Pest::throw_control_file_error(ofstream& f_rec,string message, bool should_throw)
+{
+	stringstream ss;
+	if (should_throw)
+		ss << "control file parsing error: " << message << endl;
+	else
+		ss << "control file parsing warning: " << message << endl;
+	
+	cout << ss.str();
+	f_rec << ss.str();
+	
+	if (should_throw)
+	{
+		cerr << ss.str();
+		f_rec.close();
+		throw runtime_error(ss.str());
+	}
+	
+}
+
+void Pest::check_report_assignment(ofstream &f_rec, PestppOptions::ARG_STATUS stat, const string key, const string org_value)
+{
+	if (stat == PestppOptions::ARG_STATUS::ARG_INVALID)
+	{
+		throw_control_file_error(f_rec, "invalid value for key,value pair '" + key + ", " + org_value);
+	}
+	if (stat == PestppOptions::ARG_STATUS::ARG_DUPLICATE)
+	{
+		throw_control_file_error(f_rec, "duplicate entry for key,value pair '" + key + ", " + org_value);
+	}
+}
+
+void Pest::tokens_to_par_group_rec(ofstream &f_rec, const vector<string>& tokens)
+{
+	ParameterGroupRec pgi;
+	string name = tokens[0];
+	size_t n_tokens = tokens.size();
+	pgi.name = name;
+	ctl_ordered_par_group_names.push_back(name);
+	convert_ip(tokens[1], pgi.inctyp);
+	convert_ip(tokens[2], pgi.derinc);
+	convert_ip(tokens[3], pgi.derinclb);
+	convert_ip(tokens[4], pgi.forcen);
+	convert_ip(tokens[5], pgi.derincmul);
+	convert_ip(tokens[6], pgi.dermthd);
+	if (n_tokens >= 8) convert_ip(tokens[7], pgi.splitthresh);
+	if (n_tokens >= 9) convert_ip(tokens[8], pgi.splitreldiff);
+	base_group_info.insert_group(name, pgi);
+
+}
+
+void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, TranFixed* t_fixed, TranLog10* t_log, TranScale* t_scale, TranOffset* t_offset)
+{
+	ParameterRec pi;
+	double scale;
+	double offset;
+	string name = tokens[0];
+	string trans_type = tokens[1];
+	convert_ip(tokens[2], pi.chglim);
+	convert_ip(tokens[3], pi.init_value);
+	convert_ip(tokens[4], pi.lbnd);
+	convert_ip(tokens[5], pi.ubnd);
+	convert_ip(tokens[6], pi.group);
+	convert_ip(tokens[7], scale);
+	convert_ip(tokens[8], offset);
+	if (control_info.numcom > 1)
+		convert_ip(tokens[9], pi.dercom);
+	else
+		pi.dercom = 1;
+	pi.scale = scale;
+	pi.offset = offset;
+	// add parameters to model parameter and paramter_info datasets
+	ctl_ordered_par_names.push_back(name);
+	if (trans_type == "FIXED")
+	{
+		pi.tranform_type = ParameterRec::TRAN_TYPE::FIXED;
+	}
+	else if (trans_type == "LOG")
+	{
+		pi.tranform_type = ParameterRec::TRAN_TYPE::LOG;
+		n_adj_par++;
+	}
+	else if (trans_type == "TIED")
+	{
+		pi.tranform_type = ParameterRec::TRAN_TYPE::TIED;
+	}
+	else if (trans_type == "NONE")
+	{
+		pi.tranform_type = ParameterRec::TRAN_TYPE::NONE;
+		n_adj_par++;
+	}
+	else
+	{
+		throw_control_file_error(f_rec, "unrecognized partrans for par " + name + ": " + trans_type);
+	}
+	ctl_parameter_info.insert(name, pi);
+	ctl_parameters.insert(name, pi.init_value);
+	base_group_info.insert_parameter_link(name, pi.group);
+
+	// build appropriate transformations
+	if (trans_type == "FIXED") {
+		t_fixed->insert(name, pi.init_value);
+	}
+	else if (trans_type == "LOG") {
+		t_log->insert(name);
+	}
+	if (offset != 0) {
+		t_offset->insert(name, offset);
+	}
+	if (scale != 1) {
+		t_scale->insert(name, scale);
+	}
+
+}
+
+void Pest::tokens_to_obs_group_rec(ofstream& f_rec, const vector<string>& tokens)
+{
+	string name = tokens[0];
+	if (tokens.size() > 1)
+	{
+		stringstream ss;
+		ss << "observation covariance matrix detected for group '" << tokens[0] << "' - these are not supported...yet!";
+		throw_control_file_error(f_rec, ss.str());
+	}
+	ObservationGroupRec group_rec;
+	observation_info.groups[name] = group_rec;
+	vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
+	if (is == ctl_ordered_obs_group_names.end())
+	{
+		ctl_ordered_obs_group_names.push_back(name);
+	}
+}
+
+void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
+{
+	ObservationRec obs_i;
+	string name = tokens[0];
+	double value;
+	convert_ip(tokens[1], value);
+	convert_ip(tokens[2], obs_i.weight);
+	obs_i.group = tokens[3];
+	ctl_ordered_obs_names.push_back(name);
+	observation_info.observations[name] = obs_i;
+	observation_values.insert(name, value);
+}
+
+void Pest::tokens_to_pi_rec(ostream& f_rec, const string& line_upper)
+{
+	string first = line_upper.substr(0, 1);
+	if (!prior_info_string.empty() && first != "&") {
+		pair<string, string> pi_name_group = prior_info.AddRecord(prior_info_string);
+		ctl_ordered_pi_names.push_back(pi_name_group.first);
+		vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
+		if (is == ctl_ordered_obs_group_names.end())
+		{
+			ctl_ordered_obs_group_names.push_back(pi_name_group.second);
+		}
+		prior_info_string.clear();
+	}
+	else if (first == "&") {
+		prior_info_string.append(" ");
+		
+	}
+	prior_info_string.append(line_upper);
+
+}
+
+
+void Pest::tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens)
+{
+	
+	
+	pair<string,string> pi_name_group = prior_info.AddRecord(tokens);
+	ctl_ordered_pi_names.push_back(pi_name_group.first);
+	vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
+	if (is == ctl_ordered_obs_group_names.end())
+	{
+		ctl_ordered_obs_group_names.push_back(pi_name_group.second);
+	}
+	
+}
+
+void Pest::rectify_par_groups()
+{
+	const ParameterRec *pr;
+	ParameterGroupRec pgi;
+	vector<string> temp = base_group_info.get_group_names();
+	set<string> group_names(temp.begin(), temp.end());
+	for (auto p : ctl_ordered_par_names)
+	{
+		pr = ctl_parameter_info.get_parameter_rec_ptr(p);
+		if (group_names.find(pr->group) == group_names.end())
+		{
+			ParameterGroupRec pgi;
+			pgi.set_defaults();
+			pgi.name = pr->group;
+			
+			//update containers
+			ctl_ordered_par_group_names.push_back(pr->group);
+			base_group_info.insert_group(pr->group, pgi);
+			temp = base_group_info.get_group_names();
+			group_names.clear();
+			group_names.insert(temp.begin(), temp.end());
+
+		}
+	}
+}
+
 
 ostream& operator<< (ostream &os, const Pest& val)
 {

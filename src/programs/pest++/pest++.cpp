@@ -151,18 +151,11 @@ int main(int argc, char* argv[])
 				PANTHERAgent yam_agent;
 				string ctl_file = "";
 				try {
-					string ctl_file;
-					if (upper_cp(file_ext) == "YMR")
-					{
-						ctl_file = file_manager.build_filename("ymr");
-						yam_agent.process_panther_ctl_file(ctl_file);
-					}
-					else
-					{
-						// process traditional PEST control file
-						ctl_file = file_manager.build_filename("pst");
-						yam_agent.process_panther_ctl_file(ctl_file);
-					}
+					
+					// process traditional PEST control file
+					ctl_file = file_manager.build_filename("pst");
+					yam_agent.process_ctl_file(ctl_file);
+					
 				}
 				catch (PestError e)
 				{
@@ -178,7 +171,7 @@ int main(int argc, char* argv[])
 				cerr << perr.what();
 				throw(perr);
 			}
-			cout << endl << "Simulation Complete..." << endl;
+			cout << endl << "Work Done..." << endl;
 			exit(0);
 		}
 		//Check for PANTHER Master
@@ -210,8 +203,9 @@ int main(int argc, char* argv[])
 		debug_initialize(file_manager.build_filename("dbg"));
 		if (it_find_j != cmd_arg_vec.end())
 		{
-			restart_ctl.get_restart_option() = RestartController::RestartOption::REUSE_JACOBIAN;
-			file_manager.open_default_files();
+			cout << endl << "ERROR: '/j' restart option is deprecated.  Please use ++base_jacobian() instead." << endl << endl;
+			//restart_ctl.get_restart_option() = RestartController::RestartOption::REUSE_JACOBIAN;
+			//file_manager.open_default_files();
 		}
 		else if (it_find_r != cmd_arg_vec.end())
 		{
@@ -261,12 +255,14 @@ int main(int argc, char* argv[])
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
 		pest_scenario.set_defaults();
-
+#ifndef _DEBUG
 		try {
+#endif
 			performance_log.log_event("starting to process control file", 1);
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
 			file_manager.close_file("pst");
 			performance_log.log_event("finished processing control file");
+#ifndef _DEBUG
 		}
 		catch (PestError e)
 		{
@@ -274,23 +270,32 @@ int main(int argc, char* argv[])
 			cerr << e.what() << endl << endl;
 			throw(e);
 	 	}
+#endif
 		pest_scenario.check_inputs(fout_rec);
 
+		
+
+		//Initialize OutputFileWriter to hadle IO of suplementary files (.par, .par, .svd)
+		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
+		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
+		
+		if (!restart_flag)
+		{
+			output_file_writer.scenario_report(fout_rec);
+		}
+		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
+		{
+			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+			exit(0);
+		}
+		output_file_writer.prep_glm_files(restart_flag);
+		output_file_writer.set_svd_output_opt(pest_scenario.get_svd_info().eigwrite);
 		//if base jco arg read from control file, reset restart controller
 		if (!pest_scenario.get_pestpp_options().get_basejac_filename().empty())
 		{
 			restart_ctl.get_restart_option() = RestartController::RestartOption::REUSE_JACOBIAN;
 		}
 
-		//Initialize OutputFileWriter to hadle IO of suplementary files (.par, .par, .svd)
-		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
-		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
-		output_file_writer.prep_glm_files(restart_flag);
-		output_file_writer.set_svd_output_opt(pest_scenario.get_svd_info().eigwrite);
-		if (!restart_flag)
-		{
-			output_file_writer.scenario_report(fout_rec);
-		}
 		if (pest_scenario.get_pestpp_options().get_iter_summary_flag())
 		{
 			output_file_writer.write_par_iter(0, pest_scenario.get_ctl_parameters());
@@ -492,7 +497,7 @@ int main(int argc, char* argv[])
 			de_solver.initialize_population(*run_manager_ptr, np);
 			de_solver.solve(*run_manager_ptr, restart_ctl, max_gen, f, cr, dither_f, init_run);
 			run_manager_ptr->free_memory();
-			exit(1);
+			exit(0);
 		}
 
 
@@ -518,7 +523,8 @@ int main(int argc, char* argv[])
 			//base parameter iterations
 			try
 			{
-				if (restart_ctl.get_restart_option() != RestartController::RestartOption::NONE  && restart_ctl.get_iteration_type() == RestartController::IterationType::SUPER)
+				if (restart_ctl.get_restart_option() != RestartController::RestartOption::NONE  &&
+					restart_ctl.get_iteration_type() == RestartController::IterationType::SUPER)
 				{
 					try
 					{
@@ -793,6 +799,13 @@ int main(int argc, char* argv[])
 			pfm << "-----------------------------------" << endl << endl;
 			Logger unc_log(pfm);
 
+			if (base_jacobian_ptr->get_base_numeric_par_names().size() == 0)
+			{
+				cout << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
+				fout_rec << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
+				return 0;
+			}
+
 			//instance of a Mat for the jco
 			Mat j(base_jacobian_ptr->get_sim_obs_names(), base_jacobian_ptr->get_base_numeric_par_names(),
 				base_jacobian_ptr->get_matrix_ptr());
@@ -891,10 +904,10 @@ int main(int argc, char* argv[])
 			}
 			set<string> args = pest_scenario.get_pestpp_options().get_passed_args();
 
-			if (args.find("NUM_REALS") != args.end() && pest_scenario.get_pestpp_options().get_ies_num_reals() > 0)
+			if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
 			{
 				bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
-				int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
+				int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
 				fout_rec << "drawing " << num_reals << " posterior parameter realizations";
 				ParameterEnsemble pe(&pest_scenario);
 				Covariance cov = la.posterior_parameter_matrix();
@@ -922,13 +935,15 @@ int main(int argc, char* argv[])
 		delete base_jacobian_ptr;
 		delete super_jacobian_ptr;
 		delete run_manager_ptr;
-		cout << endl << endl << "Simulation Complete..." << endl;
+		cout << endl << endl << "PESTPP-GLM Analysis Complete..." << endl;
 		cout << flush;
+		return 0;
 #ifndef _DEBUG
 	}
 	catch (exception &e)
 	{
 		cout << "Error condition prevents further execution: " << endl << e.what() << endl;
+		return 1;
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));

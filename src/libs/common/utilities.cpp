@@ -417,8 +417,9 @@ vector<string> read_onecol_ascii_to_vector(std::string filename)
 		if ((line.size() == 0) || (line.at(0) == '#'))
 			continue;
 		tokens.clear();
-		tokenize(line, tokens, "\t\r, ");
-		result.push_back(tokens[0]);
+		tokenize(line, tokens, ",\t ");
+		for (auto t : tokens)
+			result.push_back(t);
 	}
 	fin.close();
 	return result;
@@ -575,6 +576,67 @@ void  thread_exceptions::rethrow()
 	for (auto &iex : shared_exception_vec)
 	{
 		std::rethrow_exception(iex);
+	}
+}
+
+pair<string, string> parse_plusplus_line(const string& line)
+{
+	string key;
+	string value, org_value;
+
+	string tmp_line = line;
+	pest_utils::strip_ip(tmp_line, "both");
+	vector<string> tmp_tokens;
+	pest_utils::tokenize(tmp_line, tmp_tokens, " \t", false);
+	if (tmp_tokens.size() > 1)
+		if (tmp_tokens[0] == "++")
+			if (tmp_tokens[1].substr(0, 1) == "#")
+				return pair<string,string>("","");
+	if (tmp_line.substr(0, 3) == "++#")
+		return pair<string, string>("", "");
+
+	size_t found = line.find_first_of("#");
+	if (found == string::npos) {
+		found = line.length();
+	}
+	tmp_line = line.substr(0, found);
+	strip_ip(tmp_line, "both", "\t\n\r+ ");
+	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\"'), tmp_line.end());
+	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\''), tmp_line.end());
+	//upper_ip(tmp_line);
+
+	found = tmp_line.find_first_of("(");
+	if (found == string::npos)
+		throw runtime_error("incorrect format for '++' line (missing'('):" + line);
+	key = tmp_line.substr(0, found);
+	tmp_line = tmp_line.substr(found);
+	found = tmp_line.find_first_of(")");
+	if (found == string::npos)
+		throw runtime_error("incorrect format for '++' line (missing')'):" + line);
+	org_value = tmp_line.substr(1, found - 1);
+	return pair < string, string>(key, org_value);
+}
+
+
+bool parse_string_arg_to_bool(string arg)
+{
+	upper_ip(arg);
+	if ((arg.substr(0, 1) != "T") && (arg.substr(0, 1) != "F"))
+	{
+		int iarg;
+		convert_ip(arg, iarg);
+		if (iarg == 0)
+			return false;
+		else
+			return true;
+	}
+	else
+	{
+		bool barg;
+		transform(arg.begin(), arg.end(), arg.begin(), ::tolower);
+		istringstream is(arg);
+		is >> boolalpha >> barg;
+		return barg;
 	}
 }
 
@@ -812,12 +874,14 @@ void save_binary_extfmt(const string &filename, const vector<string> &row_names,
 		for (Eigen::SparseMatrix<double>::InnerIterator it(matrix_T, icol); it; ++it)
 		{
 			data = it.value();
-			n = it.row() - 1;
+			n = it.row();
 			jout.write((char*) &(n), sizeof(n));
-			n = it.col() - 1;
+			n = it.col();
 			jout.write((char*) &(n), sizeof(n));
 
 			jout.write((char*) &(data), sizeof(data));
+			//cout << icol << "," << col_names[icol] << " - " << it.row() << "," << row_names[it.row()] << ":" << data << endl;
+			
 		}
 	}
 	//save parameter names
@@ -900,6 +964,358 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 	jout.close();
 }
 
+
+ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line, bool _cast): f_rec(_f_rec)
+{
+	cast = _cast;
+	line = _line;
+	delim = ",";
+	missing_val = "";
+	filename = "";
+}
+
+vector<string> pest_utils::ExternalCtlFile::get_row_vector(int idx, vector<string> include_cols)
+{
+	stringstream ss;
+	if (data.find(idx) == data.end())
+	{
+		ss.str("");
+		ss << "get_row_map() error: idx: " << idx << " not found";
+		throw_externalctrlfile_error(ss.str());
+
+	}
+	vector<string> rvector;
+	string sval;
+	//if no include_cols, then dont sweat missing vals...
+	if (include_cols.size() == 0)
+	{
+		for (auto col : col_names)
+		{
+			sval = data[idx][col];
+			rvector.push_back(sval);
+		}
+	}
+	else
+	{
+		set<string> cnames = get_col_set();
+		
+		for (auto col : include_cols)
+		{
+			//check exists
+			if (cnames.find(col) == cnames.end())
+				throw_externalctrlfile_error("get_row_vector() error: include_col '" + col + "' not found in col names");
+			//check missing val
+			sval = data[idx][col];
+			if (sval == missing_val)
+			{
+				ss.str("");
+				ss << "get_row_vector() error: value at row idx " << idx << " and column '" << col << "' is a missing_val (" << sval << ")";
+				throw_externalctrlfile_error(ss.str());
+			}
+			rvector.push_back(sval);
+
+		}
+		
+	}
+	return rvector;
+}
+
+vector<string> ExternalCtlFile::get_col_string_vector(string col_name)
+{
+	stringstream ss;
+	set<string> cnames = get_col_set();
+	if (cnames.find(col_name) == cnames.end())
+		throw_externalctrlfile_error("get_col_string_vector() error: col_name '" + col_name + "' not in col_names");
+	string sval;
+	vector<string> col_vector;
+	for (auto ro : row_order)
+	{
+		sval = data[ro][col_name];
+		col_vector.push_back(sval);
+	}
+	return col_vector;
+}
+
+map<string, string> pest_utils::ExternalCtlFile::get_row_map(string key, string col_name, vector<string> include_cols)
+{
+	int idx = get_row_idx(key, col_name);
+	return get_row_map(idx,include_cols);
+}
+
+map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<string> include_cols)
+{
+	stringstream ss;
+	if (data.find(idx) == data.end())
+	{
+		ss.str("");
+		ss << "get_row_map() error: idx: " << idx << " not found";
+		throw_externalctrlfile_error(ss.str());
+
+	}
+	//if no include_cols, dont sweat missing vals
+	if (include_cols.size() == 0)
+	{
+		return data[idx];
+	}
+	else
+	{
+		map<string, string> rmap;
+		set<string> cnames = get_col_set();
+		string sval;
+		for (auto col : include_cols)
+		{
+			//check exists
+			if (cnames.find(col) == cnames.end())
+				throw_externalctrlfile_error("get_row_map() error: include_col '" + col + "' not found in col names");
+			//check missing val
+			sval = data[idx][col];
+			if (sval == missing_val)
+			{
+				ss.str("");
+				ss << "get_row_map() error: value at row idx " << idx << " and column '" << col << "' is a missing_val (" << sval << ")";
+				throw_externalctrlfile_error(ss.str());
+			}
+			rmap[col] = sval;
+		}
+		return rmap;
+	}
+}
+
+
+void ExternalCtlFile::read_file()
+{	
+	parse_control_record();
+	string delim_upper = upper_cp(delim);
+	f_rec << "...reading external file '" << filename << "'" << endl;
+	if (delim_upper == "W") 
+	{
+		delim = "\t ";
+		delim_upper = "\t ";
+	}
+	stringstream ss;
+	if (!pest_utils::check_exist_in(filename))
+	{
+		throw_externalctrlfile_error("filename '" + filename + "' not found");
+	}
+	ifstream f_in(filename);
+	if (!f_in.good())
+	{
+		throw_externalctrlfile_error("error opening filename '" + filename + "' for reading");
+	}
+	string org_next_line, next_line, nocast_next_line;
+	string org_header_line,header_line;
+	
+	getline(f_in, org_header_line);
+	header_line = upper_cp(org_header_line);
+	
+	tokenize(header_line, col_names, delim,false);
+	int hsize = col_names.size();
+	set<string> tset;
+	tset.insert(col_names.begin(), col_names.end());
+	if ((missing_val.size() > 0) && (tset.find(missing_val) != tset.end()))
+		throw_externalctrlfile_error("missing_value '"+missing_val+"' found in header row");
+	
+	//if these arent the same size, there must be duplicates...
+	if (tset.size() != col_names.size())
+	{
+		vector<string> dups;
+		tset.clear();
+		ss.str("");
+		ss << "the following col names are duplicated: ";
+		for (auto col_name : col_names)
+		{
+			if (tset.find(col_name) != tset.end())
+			{
+				dups.push_back(col_name);
+				ss << col_name << ",";
+			}
+			tset.insert(col_name);
+
+		}
+		if (dups.size() > 0)
+		{
+			throw_externalctrlfile_error(ss.str());
+		}
+			
+	}
+	map<string, string> row_map;
+	vector<string> tokens, temp_tokens,quote_tokens;
+	string ddelim;
+	int lcount = 1,last_size;
+	while (getline(f_in, org_next_line))
+	{
+		tokens.clear();
+		quote_tokens.clear();
+		//nocast_next_line = org_next_line;
+
+		next_line = org_next_line;
+		ddelim = delim;
+		if (cast)
+		{
+			upper_ip(next_line);
+			upper_ip(ddelim);
+		}
+
+		strip_ip(next_line, "both");
+		if ((next_line.size() == 0) || (next_line.substr(0,1) == "#"))
+		{
+			lcount++;
+			continue;
+		}
+		
+		//check for double quotes
+		tokenize(next_line, quote_tokens, "\"", false);
+		if (quote_tokens.size() > 1)
+		{
+			int nqt = quote_tokens.size();
+			if (nqt % 2 == 0)
+				throw_externalctrlfile_error("unbalanced double quotes on line " + org_next_line);
+			tokens.clear();
+			for (int i = 0; i < nqt; i++)
+			{
+				
+				if (i % 2 == 0)
+				{
+					if (quote_tokens[i].size() == 0)
+					{
+						continue;
+					}
+					temp_tokens.clear();
+					tokenize(strip_cp(quote_tokens[i]), temp_tokens, ddelim,false);
+					
+					last_size = quote_tokens[i].size();
+					if (quote_tokens[i].substr(last_size-1,last_size) == ddelim)
+						temp_tokens.pop_back();
+					for (auto t : temp_tokens)
+						tokens.push_back(t);
+				}
+				else if (quote_tokens[i].size() > 0)
+					tokens.push_back(quote_tokens[i]);
+
+			}
+
+		}
+		else
+			tokenize(next_line, tokens, ddelim, false);
+
+		if (tokens.size() != hsize)
+		{
+			ss.str("");
+			ss << "wrong number of tokens on line " << lcount;
+			ss << " of file '" << filename << "'.  Expecting ";
+			ss << hsize << ", found " << tokens.size();
+			throw_externalctrlfile_error(ss.str());
+		}
+		row_map.clear();
+		for (int i = 0; i < hsize; i++)
+			row_map[col_names[i]] = strip_cp(tokens[i], "both");
+		data[lcount - 1] = row_map;
+		row_order.push_back(lcount - 1);
+		lcount++;
+	}
+
+}
+
+
+void ExternalCtlFile::parse_control_record()
+{
+	// look for a comment char
+	size_t found = line.find_first_of("#");
+	if (found == string::npos) {
+		found = line.length();
+	}
+	string tmp_line = line.substr(0, found);
+	//strip any leading or trailing whitespace
+	strip_ip(tmp_line, "both", "\t\n\r+ ");
+	//remove any quote chars
+	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\"'), tmp_line.end());
+	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\''), tmp_line.end());
+	//split on whitespaces
+	vector<string> tokens;
+	tokenize(tmp_line, tokens, "\t ");
+	if (tokens.size() < 1)
+	{
+		throw_externalctrlfile_error("too few tokens on 'external' line '" + line + "', need atleast 1 (e.g. 'filename.csv')");
+	}
+	filename = tokens[0];
+
+	//any remaining tokens are optional and are used in pairs
+	if ((tokens.size()-1) % 2 != 0)
+	{
+		throw_externalctrlfile_error("wrong number of options - should be form of 'keyword <space> value'");
+	}
+	string key, value;
+	for (int i = 1; i < tokens.size(); i = i + 2)
+	{
+		key = tokens[i];
+		upper_ip(key);
+		strip_ip(key, "both");
+		value = tokens[i + 1];
+		strip_ip(value, "both");
+		if (key == "SEP")
+		{
+			if (value.size() > 1)
+				throw_externalctrlfile_error("'sep' value '" + value + "' on line:\n '"+line+"' \ncan only be one character (use 'w' for whitespace)");
+			//delim = upper_cp(value);
+			delim = value;
+		}
+		else if (key == "MISSING_VALUE")
+		{
+			missing_val = upper_cp(value);
+
+		}
+		else
+		{
+			throw_externalctrlfile_error("unrecognized option: '" + key + "' on line '"+line+"'");
+		}
+	}
+}
+
+void ExternalCtlFile::throw_externalctrlfile_error(string message)
+{
+	stringstream ss;
+	if (filename.size() > 0)
+		ss << "External file '" << filename << "' error: " << message << endl;
+	else
+		ss << "External file error: " << message << endl;
+	//cerr << ss.str();
+	//cout << ss.str();
+	//f_rec << ss.str();
+	//f_rec.close();
+	throw runtime_error(ss.str());
+}
+
+bool ExternalCtlFile::isduplicated(string col_name)
+{
+	set<string> cnames = get_col_set();
+	if (cnames.find(col_name) == cnames.end())
+		throw_externalctrlfile_error("isduplicated() error: col_name '" + col_name + "' not in col_names");
+	cnames.clear();
+	for (auto kv : data)
+	{
+		cnames.insert(kv.second[col_name]);
+	}
+	if (cnames.size() != data.size())
+		return true;
+	return false;
+}
+
+int ExternalCtlFile::get_row_idx(string key, string col_name)
+{
+	set<string> cnames = get_col_set();
+	if (cnames.find(col_name) == cnames.end())
+		throw_externalctrlfile_error("get_row_idx() error: col_name '" + col_name + "' not found in col_names");
+	if (isduplicated(col_name))
+		throw_externalctrlfile_error("get_row_idx() error: cant use key-col_name retrieval for duplicated column '" + col_name + "'");
+	vector<string> col_vector;
+	fill_col_vector(col_name, col_vector);
+	vector<string>::iterator it = find(col_vector.begin(), col_vector.end(), key);
+	if (it == col_vector.end())
+		throw_externalctrlfile_error("get_row_idx() error: key '" + key + "' not found in column '" + col_name + "'");
+
+	int idx = distance(col_vector.begin(), it);
+	return idx;
+}
 
 } // end of namespace pest_utils
 

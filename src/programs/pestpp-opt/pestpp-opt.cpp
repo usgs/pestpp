@@ -130,18 +130,11 @@ int main(int argc, char* argv[])
 				PANTHERAgent yam_agent;
 				string ctl_file = "";
 				try {
-					string ctl_file;
-					if (upper_cp(file_ext) == "YMR")
-					{
-						ctl_file = file_manager.build_filename("ymr");
-						yam_agent.process_panther_ctl_file(ctl_file);
-					}
-					else
-					{
-						// process traditional PEST control file
-						ctl_file = file_manager.build_filename("pst");
-						yam_agent.process_ctl_file(ctl_file);
-					}
+					
+					// process traditional PEST control file
+					ctl_file = file_manager.build_filename("pst");
+					yam_agent.process_ctl_file(ctl_file);
+					
 				}
 				catch (PestError e)
 				{
@@ -157,7 +150,7 @@ int main(int argc, char* argv[])
 				cerr << perr.what();
 				throw(perr);
 			}
-			cout << endl << "Simulation Complete..." << endl;
+			cout << endl << "Work Done..." << endl;
 			exit(0);
 		}
 		//Check for PANTHER master
@@ -230,6 +223,12 @@ int main(int argc, char* argv[])
 		}
 #endif
 		pest_scenario.check_inputs(fout_rec);
+		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
+		{
+			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+			exit(0);
+		}
+
 		pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
 
 		//if base jco arg read from control file, reset restart controller
@@ -428,8 +427,9 @@ int main(int argc, char* argv[])
 		// clean up
 		//fout_rec.close();
 		delete run_manager_ptr;
-		cout << endl << endl << "Simulation Complete..." << endl;
+		cout << endl << endl << "PESTPP-OPT Analysis Complete..." << endl;
 		cout << flush;
+		return 0;
 #ifndef _DEBUG
 	}
 	catch (exception &e)
@@ -438,6 +438,7 @@ int main(int argc, char* argv[])
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));
+		return 1;
 	}
 #endif
 }

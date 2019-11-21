@@ -810,6 +810,7 @@ ModelRun SVDSolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termina
 
 	//jacobian.save("jcb");
 	output_file_writer.write_jco(true, "jcb", jacobian);
+
 	// sen file for this iteration
 	output_file_writer.append_sen(file_manager.sen_ofstream(), termination_ctl.get_iteration_number() + 1,
 		jacobian, *(new_base_run.get_obj_func_ptr()), get_parameter_group_info(), *regul_scheme_ptr, false, par_transform);
@@ -870,10 +871,11 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 {
 	ostream &os = file_manager.rec_ofstream();
 	ostream &fout_restart = file_manager.get_ofstream("rst");
-
+	int num_success_calc = 0;
 	if (restart_runs)
 	{
 		run_manager.initialize_restart(file_manager.build_filename("rnu"));
+		num_success_calc = 1; //I guess...
 		{
 			Parameters tmp_pars;
 			Observations tmp_obs;
@@ -948,6 +950,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		ofstream &fout_frz = file_manager.open_ofile_ext("fpr");
 		ofstream &fout_rec = file_manager.rec_ofstream();
 		frozen_active_ctl_pars.insert(failed_jac_pars.begin(), failed_jac_pars.end());
+		
 		for (double i_lambda : lambda_vec)
 		{
 			prf_message.str("");
@@ -983,6 +986,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 				performance_log->add_indent(-1);
 				continue;
 			}
+			num_success_calc++;
 			performance_log->log_event("transforming upgrade pars to model pars");
 			Parameters new_par_model = par_transform.active_ctl2model_cp(new_pars);
 			performance_log->log_event("writing upgrade vector to csv file");
@@ -1028,6 +1032,11 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		}
 		file_manager.close_file("fpr");
 		RestartController::write_upgrade_runs_built(fout_restart);
+	}
+
+	if (num_success_calc == 0)
+	{
+		throw runtime_error("no upgrade vectors were calculated successfully");
 	}
 
 	cout << endl;

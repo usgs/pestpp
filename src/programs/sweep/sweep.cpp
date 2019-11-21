@@ -185,9 +185,10 @@ pair<vector<string>,vector<Parameters>> load_parameters_from_csv(map<string,int>
 }
 
 
-ofstream prep_sweep_output_file(Pest &pest_scenario)
+void prep_sweep_output_file(Pest &pest_scenario, ofstream &csv)
 {
-	ofstream csv(pest_scenario.get_pestpp_options().get_sweep_output_csv_file());
+	//ofstream csv(pest_scenario.get_pestpp_options().get_sweep_output_csv_file());
+	csv.open(pest_scenario.get_pestpp_options().get_sweep_output_csv_file());	
 	if (!csv.good())
 	{
 		throw runtime_error("could not open sweep_output_csv_file for writing: " +
@@ -204,7 +205,7 @@ ofstream prep_sweep_output_file(Pest &pest_scenario)
 		csv << ',' << pest_utils::lower_cp(oname);
 	csv << endl;
 	csv.flush();
-	return csv;
+	//return csv;
 
 }
 
@@ -326,7 +327,7 @@ int main(int argc, char* argv[])
 		//rns file is really large. so let's remove it explicitly and wait a few seconds before continuing...
 		string rns_file = file_manager.build_filename("rns");
 		int flag = remove(rns_file.c_str());
-		w_sleep(2000);
+		//w_sleep(2000);
 		//by default use the serial run manager.  This will be changed later if another
 		//run manger is specified on the command line.
 		RunManagerType run_manager_type = RunManagerType::SERIAL;
@@ -365,18 +366,11 @@ int main(int argc, char* argv[])
 				PANTHERAgent yam_agent;
 				string ctl_file = "";
 				try {
-					string ctl_file;
-					if (upper_cp(file_ext) == "YMR")
-					{
-						ctl_file = file_manager.build_filename("ymr");
-						yam_agent.process_panther_ctl_file(ctl_file);
-					}
-					else
-					{
-						// process traditional PEST control file
-						ctl_file = file_manager.build_filename("pst");
-						yam_agent.process_ctl_file(ctl_file);
-					}
+					
+					// process traditional PEST control file
+					ctl_file = file_manager.build_filename("pst");
+					yam_agent.process_ctl_file(ctl_file);
+					
 				}
 				catch (PestError e)
 				{
@@ -392,7 +386,7 @@ int main(int argc, char* argv[])
 				cerr << perr.what();
 				throw(perr);
 			}
-			cout << endl << "Simulation Complete..." << endl;
+			cout << endl << "Work Done..." << endl;
 			exit(0);
 		}
 		//Check for PANTHER master
@@ -453,10 +447,17 @@ int main(int argc, char* argv[])
 			fout_rec << "                 by the PEST++ developement team" << endl << endl << endl;
 			fout_rec << endl;
 			fout_rec << "using control file: \"" << complete_path << "\"" << endl << endl;
+			fout_rec << endl << endl << "version: " << version << endl;
+			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+			fout_rec << "using control file: \"" << complete_path << "\"" << endl << endl;
+			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
 		}
 
 		cout << endl;
+		cout << endl << endl << "version: " << version << endl;
+		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 		cout << "using control file: \"" << complete_path << "\"" << endl << endl;
+		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
@@ -477,8 +478,10 @@ int main(int argc, char* argv[])
 			fout_rec.close();
 			throw(e);
 		}
-		pest_scenario.check_inputs(fout_rec);
-
+		pest_scenario.check_inputs(fout_rec, true);
+		
+		OutputFileWriter ofw(file_manager, pest_scenario, false, false, 0);
+		ofw.scenario_report(fout_rec);
 		PestppOptions ppopt = pest_scenario.get_pestpp_options();
 
 		fout_rec << "    sweep parameter csv file = " << left << setw(50) << ppopt.get_sweep_parameter_csv_file() << endl;
@@ -487,6 +490,11 @@ int main(int argc, char* argv[])
 		//fout_rec << "    sweep base run = " << left << setw(10) << ppopt.get_sweep_base_run() << endl;
 		fout_rec << "    sweep forgive failed runs = " << left << setw(10) << ppopt.get_sweep_forgive() << endl;
 
+		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
+		{
+			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+			exit(0);
+		}
 
 		// process the parameter csv file
 		string par_csv_file;
@@ -595,7 +603,8 @@ int main(int argc, char* argv[])
 		}
 
 		// prepare the output file
-		ofstream obs_stream = prep_sweep_output_file(pest_scenario);
+		ofstream obs_stream;
+		prep_sweep_output_file(pest_scenario,obs_stream);
 
 		int chunk = pest_scenario.get_pestpp_options().get_sweep_chunk();
 		vector<int> run_ids;
@@ -689,8 +698,9 @@ int main(int argc, char* argv[])
 		fout_rec.close();
 		obs_stream.close();
 		delete run_manager_ptr;
-		cout << endl << endl << "Sweep Complete..." << endl;
+		cout << endl << endl << "PESTPP-SWP Analysis Complete..." << endl;
 		cout << flush;
+		return 0;
 #ifndef _DEBUG
 	}
 	catch (exception &e)
@@ -699,6 +709,7 @@ int main(int argc, char* argv[])
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));
+		return 1;
 	}
 #endif
 }

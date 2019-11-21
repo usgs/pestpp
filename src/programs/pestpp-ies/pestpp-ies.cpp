@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
 		//rns file is really large. so let's remove it explicitly and wait a few seconds before continuing...
 		string rns_file = file_manager.build_filename("rns");
 		int flag = remove(rns_file.c_str());
-		w_sleep(2000);
+		//w_sleep(2000);
 		//by default use the serial run manager.  This will be changed later if another
 		//run manger is specified on the command line.
 		RunManagerType run_manager_type = RunManagerType::SERIAL;
@@ -131,18 +131,11 @@ int main(int argc, char* argv[])
 				PANTHERAgent yam_agent;
 				string ctl_file = "";
 				try {
-					string ctl_file;
-					if (upper_cp(file_ext) == "YMR")
-					{
-						ctl_file = file_manager.build_filename("ymr");
-						yam_agent.process_panther_ctl_file(ctl_file);
-					}
-					else
-					{
-						// process traditional PEST control file
-						ctl_file = file_manager.build_filename("pst");
-						yam_agent.process_ctl_file(ctl_file);
-					}
+					
+					// process traditional PEST control file
+					ctl_file = file_manager.build_filename("pst");
+					yam_agent.process_ctl_file(ctl_file);
+					
 				}
 				catch (PestError e)
 				{
@@ -163,7 +156,7 @@ int main(int argc, char* argv[])
 				throw(perr);
 			}
 			
-			cout << endl << "Simulation Complete..." << endl;
+			cout << endl << "Work Done..." << endl;
 			exit(0);
 		}
 		//Check for PANTHER master
@@ -227,7 +220,7 @@ int main(int argc, char* argv[])
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
-
+		pest_scenario.set_defaults();
 		try {
 			performance_log.log_event("starting to process control file", 1);
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
@@ -244,7 +237,7 @@ int main(int argc, char* argv[])
 			throw(e);
 		}
 		pest_scenario.check_inputs(fout_rec);
-
+		
 
 
 		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
@@ -259,9 +252,8 @@ int main(int argc, char* argv[])
 			output_file_writer.scenario_par_report(fout_rec);
 			output_file_writer.scenario_obs_report(fout_rec);
 		}
-		//fout_rec << "    pestpp-ies parameter csv file = " << left << setw(50) << ppopt.get_ies_par_csv() << endl;
-		//fout_rec << "    pestpp-ies observation csv file = " << left << setw(50) << ppopt.get_ies_obs_csv() << endl;
-
+		
+		
 
 		//reset some default args for ies here:
 		PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
@@ -272,6 +264,13 @@ int main(int argc, char* argv[])
 			ppo->set_overdue_giveup_fac(2.0);
 		if (pp_args.find("OVERDUE_resched_FAC") == pp_args.end())
 			ppo->set_overdue_reched_fac(1.15);
+		
+		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
+		{
+			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+			exit(0);
+		}
+
 		RunManagerAbstract *run_manager_ptr;
 
 
@@ -333,6 +332,7 @@ int main(int argc, char* argv[])
 		delete run_manager_ptr;
 		cout << endl << endl << "pestpp-ies analysis complete..." << endl;
 		cout << flush;
+		return 0;
 #ifndef _DEBUG
 	}
 	catch (exception &e)
@@ -341,6 +341,7 @@ int main(int argc, char* argv[])
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));
+		return 1;
 	}
 	catch (...)
 	{
