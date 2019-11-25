@@ -8,6 +8,57 @@
 
 using namespace std;
 
+class TemplateFile {
+public:
+	TemplateFile(string _tpl_filename): tpl_filename(_tpl_filename),line_num(0) { ; }
+	set<string> parse_and_check(ofstream& f_rec);
+	void write_input_file(ofstream &f_rec, const string& input_filename, Parameters& pars);
+	void throw_tpl_error(ofstream& f_rec, const string& message, int lnum=0, bool warn=false);
+
+
+private:
+	int line_num;
+	string marker;
+	string tpl_filename;
+	set<string> names;
+	map<string, pair<int, int>> parse_tpl_line(ofstream& f_rec, const string& line);
+
+	string cast_to_fixed_len_string(ofstream& f_rec, int size, double value);
+	string read_line(ofstream& f_rec, ifstream& f);
+	void prep_file(ofstream& f_rec, ifstream& f);
+	set<string> get_names(ofstream& f_rec, ifstream& f);
+	vector<int> find_all_marker_indices(const string& line);
+};
+
+
+class InstructionFile {
+public:
+	InstructionFile(string _ins_filename): ins_filename(_ins_filename), line_num(0) { ; }
+	set<string> parse_and_check(ofstream& f_rec);
+	map<string, double> read_output_file(ofstream& f_rec, const string& output_filename);
+
+private:
+	int line_num;
+	string marker;
+	string ins_filename;
+	set<string> names;
+	double execute_fixed(ofstream& f_rec, ifstream& f);
+	double execute_semi(ofstream& f_rec, ifstream& f);
+	double execute_free(ofstream& f_rec, ifstream& f);
+	void execute_primary(ofstream& f_rec, ifstream& f);
+	void execute_secondary(ofstream& f_rec, ifstream& f);
+	void execute_w(ofstream& f_rec, ifstream& f);
+	void execute_dum(ofstream& f_rec, ifstream& f);
+
+	
+
+
+
+
+
+};
+
+
 class ModelInterface{
 public:
 	ModelInterface();

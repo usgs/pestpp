@@ -41,7 +41,7 @@ public:
 	Pest();
 	void set_defaults();
 	void check_inputs(ostream &f_rec, bool forgive_bound=false);
-	void check_io();
+	void check_io(ofstream& f_rec);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename, ofstream &f_rec);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename);
 	int process_ctl_file(ifstream& fin, string pst_filename, ofstream& f_rec);

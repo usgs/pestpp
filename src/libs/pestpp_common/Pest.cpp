@@ -23,6 +23,8 @@
 #include <vector>
 #include <map>
 #include <numeric>
+#include <iterator>
+#include <algorithm>
 #include "Pest.h"
 #include "utilities.h"
 #include "pest_error.h"
@@ -30,6 +32,7 @@
 #include "pest_data_structs.h"
 #include "Transformation.h"
 #include "FileManager.h"
+#include "model_interface.h"
 
 
 using namespace::std;
@@ -308,17 +311,19 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 
 }
 
-void Pest::check_io()
+void Pest::check_io(ofstream &f_rec)
 {
 
 	if (model_exec_info.tplfile_vec.size() == 0)
 	{
 		cout << "Error: number of template files = 0" << endl;
+		f_rec << "Error: number of template files = 0" << endl;
 		throw runtime_error("number of template files = 0");
 	}
 	if (model_exec_info.insfile_vec.size() == 0)
 	{
 		cout << "Error: number of instruction files = 0" << endl;
+		f_rec << "Error: number of instruction files = 0" << endl;
 		throw runtime_error("number of instruction files = 0");
 	}
 	//make sure we can atleast access the model IO files
@@ -338,10 +343,47 @@ void Pest::check_io()
 		for (auto &file : inaccessible_files)
 			missing += file + " , ";
 		cout << "Could not access the following model interface files: " << missing;
+		f_rec << "Could not access the following model interface files: " << missing;
+
 		throw PestError("Could not access the following model interface files: "+missing);
 		//cout << "WARNING: could not access the following model interface files: " << missing << endl;
 
 	}
+	set<string> tpl_par_names, file_par_names;
+	for (auto tpl_file : model_exec_info.tplfile_vec)
+	{
+		TemplateFile tf(tpl_file);
+		file_par_names = tf.parse_and_check(f_rec);
+		tpl_par_names.insert(file_par_names.begin(), file_par_names.end());
+	}
+	set<string> pst_par_names, diff;
+
+	pst_par_names.insert(ctl_ordered_par_names.begin(), ctl_ordered_par_names.end());
+	set<string>::iterator end = tpl_par_names.end();
+	for (auto p : pst_par_names)
+		if (tpl_par_names.find(p) == end)
+			diff.insert(p);
+	if (diff.size() > 0)
+	{
+		stringstream ss;
+		ss << "Error: the following parameters were found in the control file but not in the template files:" << endl;
+		for (auto d : diff)
+			ss << diff << endl;
+		throw_control_file_error(f_rec, ss.str());
+	}
+	end = pst_par_names.end();
+	for (auto p : tpl_par_names)
+		if (pst_par_names.find(p) == end)
+			diff.insert(p);
+	if (diff.size() > 0)
+	{
+		stringstream ss;
+		ss << "Error: the following parameters were found in the template files but not in the control file:" << endl;
+		for (auto d : diff)
+			ss << d << endl;
+		throw_control_file_error(f_rec, ss.str());
+	}
+	cout << endl;
 }
 
 const vector<string> Pest::get_ctl_ordered_nz_obs_names()

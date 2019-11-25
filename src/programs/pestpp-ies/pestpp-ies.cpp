@@ -296,7 +296,7 @@ int main(int argc, char* argv[])
 		{
 			performance_log.log_event("starting basic model IO error checking", 1);
 			cout << "checking model IO files...";
-			pest_scenario.check_io();
+			pest_scenario.check_io(fout_rec);
 			//pest_scenario.check_par_obs();
 			performance_log.log_event("finished basic model IO error checking");
 			cout << "done" << endl;

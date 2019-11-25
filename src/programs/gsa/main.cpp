@@ -268,7 +268,7 @@ int main(int argc, char* argv[])
 	output_writer.scenario_obs_report(frec);
 
 	pest_scenario.check_inputs(frec);
-	pest_scenario.check_io();
+	pest_scenario.check_io(frec);
 
 	//map<string, string> gsa_opt_map;
 	//process .gsa file

@@ -484,5 +484,112 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 
 }
 
+set<string> TemplateFile::parse_and_check(ofstream& f_rec)
+{
+	ifstream f(tpl_filename);
+	prep_file(f_rec, f);
+	return get_names(f_rec, f);
 
+}
 
+void TemplateFile::prep_file(ofstream& f_rec, ifstream& f)
+{
+	if (f.bad())
+	{
+		throw_tpl_error(f_rec, "couldn't open tpl file for reading");
+	}
+	string tag, line;
+	vector<string> tokens;
+	line = read_line(f_rec, f);
+	pest_utils::tokenize(line, tokens);
+	if (tokens.size() < 2)
+		throw_tpl_error(f_rec, "incorrect first line - expecting 'ptf <marker>'", line_num);
+	if (tokens.size() > 2)
+		throw_tpl_error(f_rec, "extra unused items on first line");
+	tag = pest_utils::upper_cp(tokens[0]);
+	if (tag != "PTF")
+		throw_tpl_error(f_rec, "first line should start with 'PTF', not: " + tag);
+	marker = tokens[1];
+	if (marker.size() != 1)
+		throw_tpl_error(f_rec, "marker on first line should be one character, not: " + marker);
+}
+
+set<string> TemplateFile::get_names(ofstream& f_rec, ifstream& f)
+{
+	set<string> names;
+	string line;
+	map<string, pair<int, int>> tpl_line_map;
+	
+	while (true)
+	{
+		if (f.eof())
+			break;
+		line = read_line(f_rec, f);
+		tpl_line_map = parse_tpl_line(f_rec, line);
+		for (auto t : tpl_line_map)
+			names.insert(t.first);
+	}
+	return names;
+}
+
+vector<int> TemplateFile::find_all_marker_indices(const string& line)
+{
+	vector<int> indices;
+	int pos = line.find(marker);
+	while (pos != string::npos)
+	{
+		indices.push_back(pos);
+		pos = line.find(marker, pos + marker.size());
+	}
+	return indices;
+}
+
+void TemplateFile::throw_tpl_error(ofstream& f_rec, const string& message, int lnum , bool warn)
+{
+	stringstream ss;
+	if (warn)
+		ss << "TemplateFile warning in " << tpl_filename;
+	else
+		ss << "TemplateFile error in " << tpl_filename;
+	if (lnum != 0)
+		ss << "on line: " << lnum;
+	ss <<" : " << message;
+	f_rec << endl << ss.str() << endl;
+	if (!warn)
+		throw runtime_error(ss.str());
+}
+
+map<string, pair<int, int>> TemplateFile::parse_tpl_line(ofstream& f_rec, const string& line)
+{
+	vector<int> indices = find_all_marker_indices(line);
+	if (indices.size() % 2 != 0)
+		throw_tpl_error(f_rec, "unbalanced marker ('" + marker + "') ", line_num);
+	int s, e, len;
+	string name;
+	pair<int, int> se_idx;
+	map<string, pair<int, int>> tpl_line_map;
+	for (int i = 0; i < indices.size(); i = i + 2)
+	{
+		s = indices[i];
+		e = indices[i + 1];
+		len = e - s;
+		name = line.substr(s+1, len-1);
+		pest_utils::upper_ip(name);
+		pest_utils::strip_ip(name);
+		tpl_line_map[name] = pair<int, int>(s, len);
+	}
+	return tpl_line_map;
+}
+
+string TemplateFile::read_line(ofstream& f_rec, ifstream& f)
+{
+	if (f.bad())
+		throw_tpl_error(f_rec, "cant read next line", line_num);
+	string line;
+	if (f.eof())
+		throw_tpl_error(f_rec, "unexpected eof", line_num);
+	
+	getline(f, line);
+	line_num++;
+	return line;
+}

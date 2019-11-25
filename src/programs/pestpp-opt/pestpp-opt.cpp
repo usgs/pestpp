@@ -293,7 +293,7 @@ int main(int argc, char* argv[])
 			{
 				try
 				{
-					pest_scenario.check_io();
+					pest_scenario.check_io(fout_rec);
 				}
 				catch (...)
 				{
@@ -303,7 +303,7 @@ int main(int argc, char* argv[])
 			}
 			else
 			{
-				pest_scenario.check_io();
+				pest_scenario.check_io(fout_rec);
 			}
 
 			performance_log.log_event("finished basic model IO error checking");

@@ -106,6 +106,7 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 	if (!fout)
 		throw PestError("PANTHER worker unable to open output file 'panther_worker.rec'");
 	pest_scenario.process_ctl_file(fin,ctl_filename,fout);
+	pest_scenario.check_io(fout);
 	comline_vec = pest_scenario.get_comline_vec();
 	tplfile_vec = pest_scenario.get_tplfile_vec();
 	inpfile_vec = pest_scenario.get_inpfile_vec();
