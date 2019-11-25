@@ -965,13 +965,9 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 }
 
 
-ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line, bool _cast): f_rec(_f_rec)
+ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line, bool _cast) :
+	f_rec(_f_rec), cast(_cast), line(_line), delim(","), missing_val(""), filename("")
 {
-	cast = _cast;
-	line = _line;
-	delim = ",";
-	missing_val = "";
-	filename = "";
 }
 
 vector<string> pest_utils::ExternalCtlFile::get_row_vector(int idx, vector<string> include_cols)
@@ -1271,7 +1267,7 @@ void ExternalCtlFile::parse_control_record()
 	}
 }
 
-void ExternalCtlFile::throw_externalctrlfile_error(string message)
+void ExternalCtlFile::throw_externalctrlfile_error(const string message)
 {
 	stringstream ss;
 	if (filename.size() > 0)

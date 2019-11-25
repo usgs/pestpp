@@ -333,7 +333,7 @@ private:
 	vector<int> row_order;
 	void parse_control_record();
 	map<int, map<string, string>> data;
-	void throw_externalctrlfile_error(string message);
+	void throw_externalctrlfile_error(const string message);
 	bool isduplicated(string col_name);
 	int get_row_idx(string key, string col_name);
 };

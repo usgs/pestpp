@@ -133,7 +133,7 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 
 	vector<string> par_warnings;
 	vector<string> par_problems;
-	bool adj_par = false;
+	bool adj_par;
 	int par_ub = 0;
 	int par_lb = 0;
 	
@@ -1628,7 +1628,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				ratio = 1.0;
 			else
 			{
-				ss.str();
+				ss.str("");
 				ss << "tied parameter '" << name << "' has an initial value of 0.0.  Using a tied ratio of 1.0";
 				throw_control_file_error(f_rec, ss.str(),false);
 				ratio = 1.0;
@@ -2075,7 +2075,7 @@ Pest::~Pest() {
 	}*/
 }
 
-pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string line)
+pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string &line)
 {
 	string key;
 	string value;
@@ -2108,7 +2108,7 @@ pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string line
 	return pair<string, string>(key,value);
 }
 
-void Pest::throw_control_file_error(ofstream& f_rec,string message, bool should_throw)
+void Pest::throw_control_file_error(ofstream& f_rec,const string &message, bool should_throw)
 {
 	stringstream ss;
 	if (should_throw)
@@ -2128,7 +2128,7 @@ void Pest::throw_control_file_error(ofstream& f_rec,string message, bool should_
 	
 }
 
-void Pest::check_report_assignment(ofstream &f_rec, PestppOptions::ARG_STATUS stat, const string key, const string org_value)
+void Pest::check_report_assignment(ofstream &f_rec, PestppOptions::ARG_STATUS stat, const string &key, const string &org_value)
 {
 	if (stat == PestppOptions::ARG_STATUS::ARG_INVALID)
 	{

@@ -112,9 +112,9 @@ private:
 	map<int,string> other_lines;
 	string pst_filename;
 
-	pair<string, string> parse_keyword_line(ofstream &f_rec, const string line);
-	void throw_control_file_error(ofstream& f_rec, string message, bool should_throw=true);
-	void check_report_assignment(ofstream& f_rec, PestppOptions::ARG_STATUS stat, const string key, const string org_value);
+	pair<string, string> parse_keyword_line(ofstream &f_rec, const string &line);
+	void throw_control_file_error(ofstream& f_rec, const string &message, bool should_throw=true);
+	void check_report_assignment(ofstream& f_rec, PestppOptions::ARG_STATUS stat, const string &key, const string &org_value);
 
 	void tokens_to_par_group_rec(ofstream &f_rec, const vector<string>& tokens);
 	void tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens,TranFixed *t_fixed, TranLog10 *t_log, TranScale *t_scale, TranOffset *t_offset);

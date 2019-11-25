@@ -65,6 +65,7 @@ AgentInfoRec::AgentInfoRec(int _socket_fd)
 	last_ping_time = std::chrono::system_clock::now();
 	ping = false;
 	failed_pings = 0;
+	failed_runs = 0;
 }
 
 bool AgentInfoRec::CompareTimes::operator() (const AgentInfoRec &a, const AgentInfoRec &b)
