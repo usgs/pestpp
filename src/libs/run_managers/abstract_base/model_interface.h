@@ -43,7 +43,7 @@ public:
 
 private:
 	int ins_line_num, out_line_num;
-	string marker;
+	char marker;
 	string ins_filename;
 	set<string> names;
 	vector<pair<char, char>> obs_tags;
@@ -53,7 +53,6 @@ private:
 	void execute_primary(const string& token, string& line, ifstream& f_out);
 	void execute_secondary(const string& token, string& line, ifstream& f_out);
 	void execute_whitespace(const string& token, string& line, ifstream& f_out);
-	void execute_dum(const string& token, string& line, ifstream& f_out);
 	void execute_line_advance(const string& token, string& line, ifstream& f_out);
 	void prep_ins_file_for_reading(ifstream& f);
 	string read_line(ifstream& f, int* line_num);

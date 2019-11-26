@@ -512,8 +512,11 @@ void TemplateFile::write_input_file(const string& input_filename, Parameters& pa
 	string line, val_str, name;
 	double val;
 	map<string, pair<int, int>> tpl_line_map;
-	while (getline(f_tpl,line))
+	while (true)
 	{
+		if (f_tpl.eof())
+			break;
+		line = read_line(f_tpl);
 		tpl_line_map = parse_tpl_line(line);
 		
 		for (auto t : tpl_line_map)
@@ -551,7 +554,7 @@ void TemplateFile::write_input_file(const string& input_filename, Parameters& pa
 			val_str = cast_to_fixed_len_string(t.second.second, val, name);
 			line.replace(t.second.first, t.second.second, val_str);
 		}
-		f_in << line;
+		f_in << line << endl;
 	}
 }
 
@@ -783,9 +786,10 @@ void InstructionFile::prep_ins_file_for_reading(ifstream& f)
 	tag = pest_utils::upper_cp(tokens[0]);
 	if (tag != "PIF")
 		throw_ins_error("first line should start with 'PIF', not: " + tag);
-	marker = tokens[1];
-	if (marker.size() != 1)
-		throw_ins_error("marker on first line should be one character, not: " + marker);
+	string s_marker = tokens[1];
+	if (s_marker.size() != 1)
+		throw_ins_error("marker on first line should be one character, not: " + s_marker);
+	marker = s_marker.c_str()[0];
 }
 
 
@@ -820,24 +824,34 @@ map<string, double> InstructionFile::read_output_file(const string& output_filen
 			{
 				execute_whitespace(token, out_line, f_out);
 			}
-			else if (token == "DUM")
-			{
-				execute_dum(token, out_line, f_out);
-			}
 			else if (token[0] == '[')
 			{
 				lhs = execute_fixed(token, out_line, f_out);
+				//check for dum
 				obs_map[lhs.first] = lhs.second;
 			}
 			else if (token[0] == '!')
 			{
 				lhs = execute_free(token, out_line, f_out);
+				//check for dum
 				obs_map[lhs.first] = lhs.second;
 			}
 			else if (token[0] == '(')
 			{
 				lhs = execute_free(token, out_line, f_out);
+				//check for dum
 				obs_map[lhs.first] = lhs.second;
+			}
+			else if (token[0] == marker)
+			{
+				if (token == tokens[0])
+				{
+					execute_primary(token, out_line, f_out);
+				}
+				else
+				{
+					execute_secondary(token, out_line, f_out);
+				}
 			}
 		}
 	}
@@ -898,19 +912,55 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 
 void InstructionFile::execute_primary(const string& token, string& line, ifstream& f_out)
 {
+	//check that a closing marker is found
+	int pos = token.substr(1).find(marker);
+	if (pos == string::npos)
+		throw_ins_error("primary marker token '" + token + "' doesnt have a closing marker char");
+
+	string primary_tag = token.substr(1, pos - 1);
+	while (true)
+	{
+		if (f_out.eof())
+			throw_ins_error("EOF encountered while executing marker search ('" + token + "')", ins_line_num);
+		line = read_line(f_out, &out_line_num);
+		pos = line.find(primary_tag);
+		if (pos != string::npos)
+		{
+			break;
+		}
+	}
+	pos = pos + primary_tag.size();
+	line = line.substr(pos);
+	return;
 }
+
 
 void InstructionFile::execute_secondary(const string& token, string& line, ifstream& f_out)
 {
+	//check that a closing marker is found
+	int pos = token.substr(1).find(marker);
+	if (pos == string::npos)
+		throw_ins_error("secondary marker token '" + token + "' doesnt have a closing marker char");
+	string secondary_tag = token.substr(1, pos-1);
+	pos = line.find(secondary_tag);
+	if (pos == string::npos)
+	{
+		throw_ins_error("EOL encountered while executing secondary marker ('" + secondary_tag + "') search on output line", out_line_num);
+	}
+	line = line.substr(pos + secondary_tag.size());
 }
+
 
 void InstructionFile::execute_whitespace(const string& token, string& line, ifstream& f_out)
 {
+	int pos = line.find_first_of(" \t");
+	if (pos == string::npos)
+	{
+		throw_ins_error("EOL encountered while executing whitespace instruction on output line", out_line_num);
+	}
+	line = line.substr(pos + 1);
 }
 
-void InstructionFile::execute_dum(const string& token, string& line, ifstream& f_out)
-{
-}
 
 void InstructionFile::execute_line_advance(const string& token, string& line, ifstream& f_out)
 {
