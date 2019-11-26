@@ -23,33 +23,42 @@ private:
 	set<string> names;
 	map<string, pair<int, int>> parse_tpl_line(const string& line);
 	string cast_to_fixed_len_string(int size, double value, string& name);
-	string read_line(ifstream& f);
-	void prep_tpl_file_for_reading(ifstream& f);
+	string read_line(ifstream& f_tpl);
+	void prep_tpl_file_for_reading(ifstream& f_tpl);
 	set<string> get_names(ifstream& f);
 	vector<int> find_all_marker_indices(const string& line);
+	
+
 
 };
 
 
 class InstructionFile {
+	
 public:
-	InstructionFile(string _ins_filename): ins_filename(_ins_filename), line_num(0) { ; }
+	InstructionFile(string _ins_filename);
 	set<string> parse_and_check();
 	map<string, double> read_output_file(const string& output_filename);
 
+
 private:
-	int line_num;
+	int ins_line_num, out_line_num;
 	string marker;
 	string ins_filename;
 	set<string> names;
-	double execute_fixed(ifstream& f);
-	double execute_semi(ifstream& f);
-	double execute_free(ifstream& f);
-	void execute_primary(ifstream& f);
-	void execute_secondary(ifstream& f);
-	void execute_w(ifstream& f);
-	void execute_dum(ifstream& f);
-
+	vector<pair<char, char>> obs_tags;
+	pair<string, double> execute_fixed(const string& token, const string& line, ifstream& f_out);
+	pair<string, double> execute_semi(const string& token, const string& line, ifstream& f_out);
+	pair<string, double> execute_free(const string& token, const string& line, ifstream& f_out);
+	void execute_primary(const string& token, const string& line, ifstream& f_out);
+	void execute_secondary(const string& token, const string& line, ifstream& f_out);
+	void execute_whitespace(const string& token, const string& line, ifstream& f_out);
+	void execute_dum(const string& token, const string& line, ifstream& f_out);
+	void execute_line_advance(const string& token, const string& line, ifstream& f_out);
+	void prep_ins_file_for_reading(ifstream& f);
+	string read_line(ifstream& f, int* line_num);
+	void throw_ins_error(const string& message, int lnum = 0, bool warn = false);
+	string parse_obs_name_from_token(const string& token);
 };
 
 

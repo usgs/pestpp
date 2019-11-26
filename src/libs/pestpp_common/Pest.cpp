@@ -349,6 +349,44 @@ void Pest::check_io(ofstream &f_rec)
 		//cout << "WARNING: could not access the following model interface files: " << missing << endl;
 
 	}
+
+	set<string> ins_obs_names, file_obs_names;
+	for (auto ins_file : model_exec_info.insfile_vec)
+	{
+		InstructionFile isf(ins_file);
+		file_obs_names = isf.parse_and_check();
+		ins_obs_names.insert(file_obs_names.begin(), file_obs_names.end());
+		//tf.write_input_file(f_rec, "test.dat", ctl_parameters);
+	}
+	set<string> pst_obs_names, diff;
+
+	pst_obs_names.insert(ctl_ordered_obs_names.begin(), ctl_ordered_obs_names.end());
+	set<string>::iterator end = ins_obs_names.end();
+	for (auto p : pst_obs_names)
+		if (ins_obs_names.find(p) == end)
+			diff.insert(p);
+	if (diff.size() > 0)
+	{
+		stringstream ss;
+		ss << "Error: the following observations were found in the control file but not in the instruction files:" << endl;
+		for (auto d : diff)
+			ss << diff << endl;
+		throw_control_file_error(f_rec, ss.str());
+	}
+	end = pst_obs_names.end();
+	for (auto p : ins_obs_names)
+		if (pst_obs_names.find(p) == end)
+			diff.insert(p);
+	if (diff.size() > 0)
+	{
+		stringstream ss;
+		ss << "Error: the following observations were found in the instruction files but not in the control file:" << endl;
+		for (auto d : diff)
+			ss << d << endl;
+		throw_control_file_error(f_rec, ss.str());
+	}
+
+
 	set<string> tpl_par_names, file_par_names;
 	for (auto tpl_file : model_exec_info.tplfile_vec)
 	{
@@ -357,10 +395,10 @@ void Pest::check_io(ofstream &f_rec)
 		tpl_par_names.insert(file_par_names.begin(), file_par_names.end());
 		//tf.write_input_file(f_rec, "test.dat", ctl_parameters);
 	}
-	set<string> pst_par_names, diff;
+	set<string> pst_par_names;
 
 	pst_par_names.insert(ctl_ordered_par_names.begin(), ctl_ordered_par_names.end());
-	set<string>::iterator end = tpl_par_names.end();
+	end = tpl_par_names.end();
 	for (auto p : pst_par_names)
 		if (tpl_par_names.find(p) == end)
 			diff.insert(p);
@@ -384,6 +422,9 @@ void Pest::check_io(ofstream &f_rec)
 			ss << d << endl;
 		throw_control_file_error(f_rec, ss.str());
 	}
+
+
+
 	cout << endl;
 }
 

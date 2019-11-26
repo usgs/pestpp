@@ -555,15 +555,15 @@ void TemplateFile::write_input_file(const string& input_filename, Parameters& pa
 	}
 }
 
-void TemplateFile::prep_tpl_file_for_reading(ifstream& f)
+void TemplateFile::prep_tpl_file_for_reading(ifstream& f_tpl)
 {
-	if (f.bad())
+	if (f_tpl.bad())
 	{
 		throw_tpl_error("couldn't open tpl file for reading");
 	}
 	string tag, line;
 	vector<string> tokens;
-	line = read_line(f);
+	line = read_line(f_tpl);
 	pest_utils::tokenize(line, tokens);
 	if (tokens.size() < 2)
 		throw_tpl_error("incorrect first line - expecting 'ptf <marker>'", line_num);
@@ -693,15 +693,218 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 	return val_str;
 }
 
-string TemplateFile::read_line( ifstream& f)
+string TemplateFile::read_line( ifstream& f_tpl)
 {
-	if (f.bad())
+	if (f_tpl.bad())
 		throw_tpl_error("cant read next line", line_num);
 	string line;
-	if (f.eof())
+	if (f_tpl.eof())
 		throw_tpl_error("unexpected eof", line_num);
 	
-	getline(f, line);
+	getline(f_tpl, line);
 	line_num++;
 	return line;
+}
+
+string InstructionFile::read_line(ifstream& f_ins, int* line_num)
+{
+	if (f_ins.bad())
+		throw_ins_error("cant read next line", *line_num);
+	string line;
+	if (f_ins.eof())
+		throw_ins_error("unexpected eof", *line_num);
+
+	getline(f_ins, line);
+	line_num++;
+	return line;
+}
+
+InstructionFile::InstructionFile(string _ins_filename): ins_filename(_ins_filename), ins_line_num(0),
+out_line_num(0)
+{
+	obs_tags.push_back(pair<char, char>('{', '}'));
+	obs_tags.push_back(pair<char, char>('[', ']'));
+	obs_tags.push_back(pair<char, char>('!', '!'));	
+}
+
+
+set<string> InstructionFile::parse_and_check()
+{
+	ifstream f_ins(ins_filename);
+	prep_ins_file_for_reading(f_ins);
+	string line, name;
+	vector<string> tokens;
+	int spos,epos;
+	while (true)
+	{
+		if (f_ins.eof())
+			break;
+		line = read_line(f_ins, &ins_line_num);
+		pest_utils::upper_ip(line);
+		pest_utils::tokenize(line, tokens);
+		set<string> stoken;
+		set<string>::iterator end;
+		for (auto token : tokens)
+		{
+			name = parse_obs_name_from_token(token);
+			if (name.size() > 0)
+			{
+				names.insert(name);
+			}
+		}
+	}
+	f_ins.close();
+	return names;
+}
+
+void InstructionFile::prep_ins_file_for_reading(ifstream& f)
+{
+	if (f.bad())
+	{
+		throw_ins_error("couldn't open ins file for reading");
+	}
+	string tag, line;
+	vector<string> tokens;
+	line = read_line(f, &ins_line_num);
+	pest_utils::tokenize(line, tokens);
+	if (tokens.size() < 2)
+		throw_ins_error("incorrect first line - expecting 'pif <marker>'", ins_line_num);
+	if (tokens.size() > 2)
+		throw_ins_error("extra unused items on first line");
+	tag = pest_utils::upper_cp(tokens[0]);
+	if (tag != "PIF")
+		throw_ins_error("first line should start with 'PIF', not: " + tag);
+	marker = tokens[1];
+	if (marker.size() != 1)
+		throw_ins_error("marker on first line should be one character, not: " + marker);
+}
+
+
+map<string, double> InstructionFile::read_output_file(const string& output_filename)
+{
+	ifstream f_ins(ins_filename);
+	ifstream f_out(output_filename);
+	prep_ins_file_for_reading(f_ins);
+	if (f_out.bad())
+	{
+		throw_ins_error("can't open output file'" + output_filename + "' for reading");
+	}
+	string line;
+	vector<string> tokens;
+	map<string, double> obs_map;
+	pair<string, double> lhs;
+	while (true)
+	{
+		if (f_ins.eof())
+			break;
+		line = read_line(f_ins, &ins_line_num);
+		pest_utils::upper_ip(line);
+		pest_utils::tokenize(line, tokens);
+		for (auto token : tokens)
+		{
+
+			if (token[0] == 'L')
+			{
+				execute_line_advance(token, line, f_out);
+			}
+			else if (token[0] == 'W')
+			{
+				execute_whitespace(token, line, f_out);
+			}
+			else if (token == "DUM")
+			{
+				execute_dum(token, line, f_out);
+			}
+			else if (token[0] == '[')
+			{
+				lhs = execute_fixed(token, line, f_out);
+				obs_map[lhs.first] = lhs.second;
+			}
+			else if (token[0] == '!')
+			{
+				lhs = execute_free(token, line, f_out);
+				obs_map[lhs.first] = lhs.second;
+			}
+			else if (token[0] == '(')
+			{
+				lhs = execute_free(token, line, f_out);
+				obs_map[lhs.first] = lhs.second;
+			}
+		}
+
+
+	}
+	return obs_map;	
+}
+
+
+void InstructionFile::throw_ins_error(const string& message, int lnum, bool warn)
+{
+	stringstream ss;
+	if (warn)
+		ss << "InstructionFile warning in " << ins_filename;
+	else
+		ss << "InstructionFile error in " << ins_filename;
+	if (lnum != 0)
+		ss << "on line: " << lnum;
+	ss << " : " << message;
+	if (warn)
+		cout << endl << ss.str() << endl;
+	else
+		throw runtime_error(ss.str());
+}
+
+string InstructionFile::parse_obs_name_from_token(const string& token)
+{
+	int spos, epos;
+	string name = "";
+	for (auto ot : obs_tags)
+	{
+		if (token[0] == ot.first)
+		{
+			if (token.find(ot.second) == string::npos)
+				throw_ins_error("unbalanced obs tag'" + string(1, ot.first) + "'", ins_line_num);
+			spos = token.find(ot.first);
+			epos = token.find(ot.second, spos + 1);
+			name = token.substr(spos + 1, (epos - spos) - 1);
+			pest_utils::strip_ip(name);
+			break;
+		}
+	}
+	return name;
+}
+
+pair<string, double> InstructionFile::execute_fixed(const string& token, const string& line, ifstream& f_out)
+{
+	return pair<string, double>();
+}
+
+pair<string, double> InstructionFile::execute_semi(const string& token, const string& line, ifstream& f_out)
+{
+	return pair<string, double>();
+}
+
+pair<string, double> InstructionFile::execute_free(const string& token, const string& line, ifstream& f_out)
+{
+	return pair<string, double>();
+}
+
+void InstructionFile::execute_primary(const string& token, const string& line, ifstream& f_out)
+{
+}
+
+void InstructionFile::execute_secondary(const string& token, const string& line, ifstream& f_out)
+{
+}
+
+void InstructionFile::execute_whitespace(const string& token, const string& line, ifstream& f_out)
+{
+}
+
+void InstructionFile::execute_dum(const string& token, const string& line, ifstream& f_out)
+{
+}
+
+void InstructionFile::execute_line_advance(const string& token, const string& line, ifstream& f_out)
+{
 }
