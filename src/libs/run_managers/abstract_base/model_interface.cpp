@@ -152,6 +152,13 @@ void ModelInterface::initialize(vector<string> &_par_name_vec, vector<string> &_
 	mio_process_template_files_w_(&ifail, &npar, pest_utils::StringvecFortranCharArray(par_name_vec, 200, pest_utils::TO_LOWER).get_prt());
 	if (ifail != 0)throw_mio_error("error in template files");
 
+	for (auto tplfile : tplfile_vec)
+	{
+		TemplateFile tpl(tplfile);
+		tpl.parse_and_check();
+		templatefiles.push_back(tpl);
+	}
+
 	////build instruction set
 	mio_store_instruction_set_w_(&ifail);
 	if (ifail != 0) throw_mio_error("error building instruction set");
@@ -281,7 +288,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		// 	throw PestError(ss.str());
 		// }
 
-		int npar = par_vals.size();
+		/*int npar = par_vals.size();
 		try
 		{
 			mio_write_model_input_files_w_(&ifail, &npar,
@@ -294,6 +301,9 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 			throw_mio_error("uncaught error writing model input files from template files:" + emess);
 		}
 		if (ifail != 0) throw_mio_error("error writing model input files from template files");
+*/
+		for (int i = 0; i < templatefiles.size(); i++)
+			templatefiles[i].write_input_file(inpfile_vec[i], *pars);
 
 
 #ifdef OS_WIN
@@ -484,87 +494,90 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 
 }
 
-set<string> TemplateFile::parse_and_check(ofstream& f_rec)
+set<string> TemplateFile::parse_and_check()
 {
 	ifstream f(tpl_filename);
-	prep_tpl_file_for_reading(f_rec, f);
-	return get_names(f_rec, f);
+	prep_tpl_file_for_reading(f);
+	return get_names(f);
 
 }
 
-void TemplateFile::write_input_file(ofstream& f_rec, const string& input_filename, Parameters& pars)
+void TemplateFile::write_input_file(const string& input_filename, Parameters& pars)
 {
 	ifstream f_tpl(tpl_filename);
-	prep_tpl_file_for_reading(f_rec,f_tpl);
+	prep_tpl_file_for_reading(f_tpl);
 	ofstream f_in(input_filename);
 	if (f_in.bad())
-		throw_tpl_error(f_rec, "couldn't open model input file '" + input_filename + "' for writing");
+		throw_tpl_error("couldn't open model input file '" + input_filename + "' for writing");
 	string line, val_str, name;
 	double val;
 	map<string, pair<int, int>> tpl_line_map;
 	while (getline(f_tpl,line))
 	{
-		tpl_line_map = parse_tpl_line(f_rec, line);
+		tpl_line_map = parse_tpl_line(line);
 		
 		for (auto t : tpl_line_map)
 		{
 			name = t.first;
+			
+			/*val = 1.23456789123456789123456789E+100;
+			val_str = cast_to_fixed_len_string(f_rec, 200, val, name);
 
 			val = 1.23456789123456789123456789E+100;
-			val_str = cast_to_fixed_len_string(f_rec, 6, val, name);
+			val_str = cast_to_fixed_len_string(f_rec, 8, val, name);
 
 			val = 1.23456789123456789123456789E-100;
-			val_str = cast_to_fixed_len_string(f_rec, 6, val, name);
+			val_str = cast_to_fixed_len_string(f_rec, 8, val, name);
 
 			val = -1.23456789123456789123456789E+100;
-			val_str = cast_to_fixed_len_string(f_rec, 7, val, name);
+			val_str = cast_to_fixed_len_string(f_rec, 9, val, name);
 
 			val = -1.23456789123456789123456789E-100;
-			val_str = cast_to_fixed_len_string(f_rec, 7, val, name);
+			val_str = cast_to_fixed_len_string(f_rec, 9, val, name);
 
 			val = 1.23456789123456789123456789E+10;
-			val_str = cast_to_fixed_len_string(f_rec, 5, val, name);
+			val_str = cast_to_fixed_len_string(f_rec, 7, val, name);
 				
 			val = 1.23456789123456789123456789E-10;
-			val_str = cast_to_fixed_len_string(f_rec, 5, val, name);
+			val_str = cast_to_fixed_len_string(f_rec, 7, val, name);
 
 			val = 1.23456789123456789123456789;
 			val_str = cast_to_fixed_len_string(f_rec, 1, val, name);
 
 			val = -1.23456789123456789123456789;
-			val_str = cast_to_fixed_len_string(f_rec, 2, val, name);
+			val_str = cast_to_fixed_len_string(f_rec, 2, val, name);*/
 
 			val = pars.get_rec(t.first);
-			val_str = cast_to_fixed_len_string(f_rec, t.second.second, val, name);
+			val_str = cast_to_fixed_len_string(t.second.second, val, name);
 			line.replace(t.second.first, t.second.second, val_str);
 		}
 		f_in << line;
 	}
 }
 
-void TemplateFile::prep_tpl_file_for_reading(ofstream& f_rec, ifstream& f)
+void TemplateFile::prep_tpl_file_for_reading(ifstream& f)
 {
 	if (f.bad())
 	{
-		throw_tpl_error(f_rec, "couldn't open tpl file for reading");
+		throw_tpl_error("couldn't open tpl file for reading");
 	}
 	string tag, line;
 	vector<string> tokens;
-	line = read_line(f_rec, f);
+	line = read_line(f);
 	pest_utils::tokenize(line, tokens);
 	if (tokens.size() < 2)
-		throw_tpl_error(f_rec, "incorrect first line - expecting 'ptf <marker>'", line_num);
+		throw_tpl_error("incorrect first line - expecting 'ptf <marker>'", line_num);
 	if (tokens.size() > 2)
-		throw_tpl_error(f_rec, "extra unused items on first line");
+		throw_tpl_error("extra unused items on first line");
 	tag = pest_utils::upper_cp(tokens[0]);
 	if (tag != "PTF")
-		throw_tpl_error(f_rec, "first line should start with 'PTF', not: " + tag);
+		throw_tpl_error("first line should start with 'PTF', not: " + tag);
 	marker = tokens[1];
 	if (marker.size() != 1)
-		throw_tpl_error(f_rec, "marker on first line should be one character, not: " + marker);
+		throw_tpl_error("marker on first line should be one character, not: " + marker);
 }
 
-set<string> TemplateFile::get_names(ofstream& f_rec, ifstream& f)
+set<string> TemplateFile::get_names(ifstream& f)
 {
 	set<string> names;
 	string line;
@@ -574,8 +587,8 @@ set<string> TemplateFile::get_names(ofstream& f_rec, ifstream& f)
 	{
 		if (f.eof())
 			break;
-		line = read_line(f_rec, f);
-		tpl_line_map = parse_tpl_line(f_rec, line);
+		line = read_line(f);
+		tpl_line_map = parse_tpl_line(line);
 		for (auto t : tpl_line_map)
 			names.insert(t.first);
 	}
@@ -594,7 +607,7 @@ vector<int> TemplateFile::find_all_marker_indices(const string& line)
 	return indices;
 }
 
-void TemplateFile::throw_tpl_error(ofstream& f_rec, const string& message, int lnum , bool warn)
+void TemplateFile::throw_tpl_error(const string& message, int lnum , bool warn)
 {
 	stringstream ss;
 	if (warn)
@@ -604,16 +617,17 @@ void TemplateFile::throw_tpl_error(ofstream& f_rec, const string& message, int l
 	if (lnum != 0)
 		ss << "on line: " << lnum;
 	ss <<" : " << message;
-	f_rec << endl << ss.str() << endl;
-	if (!warn)
+	if (warn)
+		cout << endl << ss.str() << endl;
+	else
 		throw runtime_error(ss.str());
 }
 
-map<string, pair<int, int>> TemplateFile::parse_tpl_line(ofstream& f_rec, const string& line)
+map<string, pair<int, int>> TemplateFile::parse_tpl_line(const string& line)
 {
 	vector<int> indices = find_all_marker_indices(line);
 	if (indices.size() % 2 != 0)
-		throw_tpl_error(f_rec, "unbalanced marker ('" + marker + "') ", line_num);
+		throw_tpl_error("unbalanced marker ('" + marker + "') ", line_num);
 	int s, e, len;
 	string name;
 	pair<int, int> se_idx;
@@ -622,8 +636,8 @@ map<string, pair<int, int>> TemplateFile::parse_tpl_line(ofstream& f_rec, const 
 	{
 		s = indices[i];
 		e = indices[i + 1];
-		len = e - s;
-		name = line.substr(s+1, len-1);
+		len = (e - s) + 1;
+		name = line.substr(s+1, len-2);
 		pest_utils::upper_ip(name);
 		pest_utils::strip_ip(name);
 		tpl_line_map[name] = pair<int, int>(s, len);
@@ -631,15 +645,24 @@ map<string, pair<int, int>> TemplateFile::parse_tpl_line(ofstream& f_rec, const 
 	return tpl_line_map;
 }
 
-string TemplateFile::cast_to_fixed_len_string(ofstream& f_rec, int size, double value, string& name)
+string TemplateFile::cast_to_fixed_len_string(int size, double value, string& name)
 {
 	string val_str;
 	stringstream ss;
-	int precision = 6;
+	int precision = size;
+	if (value < 0)
+		precision--; // for the minus sign
+	if ((abs(value) >= 10) || (abs(value) <= 1.0))
+	{
+		ss << scientific;
+		precision = precision - 2; //for the "e" and (at least) 1 exponent digit
+	}
 	ss.width(size);
+	
 	ss.fill('0');
 	while (true)
 	{
+		
 		ss.str("");
 		ss.precision(precision);
 		ss << value;
@@ -653,8 +676,9 @@ string TemplateFile::cast_to_fixed_len_string(ofstream& f_rec, int size, double 
 			ss.str("");
 			ss << "TemplateFile casting error: cant represent value " << value;
 			ss << " for " << name << " in space that is only " << size << " chars wide";
-			throw_tpl_error(f_rec, ss.str());
+			throw_tpl_error(ss.str());
 		}
+		
 	}
 	
 	
@@ -665,17 +689,17 @@ string TemplateFile::cast_to_fixed_len_string(ofstream& f_rec, int size, double 
 	ss << value;
 	val_str = ss.str();*/
 	if (val_str.size() != size)
-		throw_tpl_error(f_rec, "val_str != size: " + val_str);
+		throw_tpl_error("val_str != size: " + val_str);
 	return val_str;
 }
 
-string TemplateFile::read_line(ofstream& f_rec, ifstream& f)
+string TemplateFile::read_line( ifstream& f)
 {
 	if (f.bad())
-		throw_tpl_error(f_rec, "cant read next line", line_num);
+		throw_tpl_error("cant read next line", line_num);
 	string line;
 	if (f.eof())
-		throw_tpl_error(f_rec, "unexpected eof", line_num);
+		throw_tpl_error("unexpected eof", line_num);
 	
 	getline(f, line);
 	line_num++;
