@@ -798,7 +798,7 @@ map<string, double> InstructionFile::read_output_file(const string& output_filen
 	{
 		throw_ins_error("can't open output file'" + output_filename + "' for reading");
 	}
-	string line;
+	string ins_line, out_line;
 	vector<string> tokens;
 	map<string, double> obs_map;
 	pair<string, double> lhs;
@@ -806,37 +806,37 @@ map<string, double> InstructionFile::read_output_file(const string& output_filen
 	{
 		if (f_ins.eof())
 			break;
-		line = read_line(f_ins, &ins_line_num);
-		pest_utils::upper_ip(line);
-		pest_utils::tokenize(line, tokens);
+		ins_line = read_line(f_ins, &ins_line_num);
+		pest_utils::upper_ip(ins_line);
+		pest_utils::tokenize(ins_line, tokens);
 		for (auto token : tokens)
 		{
 
 			if (token[0] == 'L')
 			{
-				execute_line_advance(token, line, f_out);
+				execute_line_advance(token, out_line, f_out);
 			}
 			else if (token[0] == 'W')
 			{
-				execute_whitespace(token, line, f_out);
+				execute_whitespace(token, out_line, f_out);
 			}
 			else if (token == "DUM")
 			{
-				execute_dum(token, line, f_out);
+				execute_dum(token, out_line, f_out);
 			}
 			else if (token[0] == '[')
 			{
-				lhs = execute_fixed(token, line, f_out);
+				lhs = execute_fixed(token, out_line, f_out);
 				obs_map[lhs.first] = lhs.second;
 			}
 			else if (token[0] == '!')
 			{
-				lhs = execute_free(token, line, f_out);
+				lhs = execute_free(token, out_line, f_out);
 				obs_map[lhs.first] = lhs.second;
 			}
 			else if (token[0] == '(')
 			{
-				lhs = execute_free(token, line, f_out);
+				lhs = execute_free(token, out_line, f_out);
 				obs_map[lhs.first] = lhs.second;
 			}
 		}
@@ -883,37 +883,52 @@ string InstructionFile::parse_obs_name_from_token(const string& token)
 	return name;
 }
 
-pair<string, double> InstructionFile::execute_fixed(const string& token, const string& line, ifstream& f_out)
+pair<string, double> InstructionFile::execute_fixed(const string& token, string& line, ifstream& f_out)
 {
 	return pair<string, double>();
 }
 
-pair<string, double> InstructionFile::execute_semi(const string& token, const string& line, ifstream& f_out)
+pair<string, double> InstructionFile::execute_semi(const string& token, string& line, ifstream& f_out)
 {
 	return pair<string, double>();
 }
 
-pair<string, double> InstructionFile::execute_free(const string& token, const string& line, ifstream& f_out)
+pair<string, double> InstructionFile::execute_free(const string& token, string& line, ifstream& f_out)
 {
 	return pair<string, double>();
 }
 
-void InstructionFile::execute_primary(const string& token, const string& line, ifstream& f_out)
+void InstructionFile::execute_primary(const string& token, string& line, ifstream& f_out)
 {
 }
 
-void InstructionFile::execute_secondary(const string& token, const string& line, ifstream& f_out)
+void InstructionFile::execute_secondary(const string& token, string& line, ifstream& f_out)
 {
 }
 
-void InstructionFile::execute_whitespace(const string& token, const string& line, ifstream& f_out)
+void InstructionFile::execute_whitespace(const string& token, string& line, ifstream& f_out)
 {
 }
 
-void InstructionFile::execute_dum(const string& token, const string& line, ifstream& f_out)
+void InstructionFile::execute_dum(const string& token, string& line, ifstream& f_out)
 {
 }
 
-void InstructionFile::execute_line_advance(const string& token, const string& line, ifstream& f_out)
+void InstructionFile::execute_line_advance(const string& token, string& line, ifstream& f_out)
 {
+	stringstream ss;
+	int num;
+	pest_utils::convert_ip(token.substr(1), num);
+	for (int i = 0; i < num; i++)
+	{
+		if (f_out.bad())
+		{	
+			throw_ins_error("'bad' stream when executing line advance instruction", ins_line_num);
+		}
+		if (f_out.eof())
+		{
+			throw_ins_error("EOF encountered when executing line advance instruction", ins_line_num);
+		}
+		line = read_line(f_out, &out_line_num);
+	}
 }
