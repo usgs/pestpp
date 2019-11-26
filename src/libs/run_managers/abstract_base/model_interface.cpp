@@ -667,7 +667,7 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 		ss.precision(precision);
 		ss << value;
 		val_str = ss.str();
-		if (val_str.size() == size)
+		if (val_str.size() <= size)
 			break;
 		if (val_str.size() > size)
 			precision--;
@@ -680,7 +680,16 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 		}
 		
 	}
-	
+	//occasionally, when reducing precision, rounding will cause an 
+	// extra char to be dropped, so this left pads it back
+	if (val_str.size() < size) 
+	{
+		ss.str("");
+		for (int i = val_str.size(); i < size; i++)
+			ss << "0";
+		ss << val_str;
+		val_str = ss.str();
+	}
 	
 	/*int width = size;
 	if (value < 0.0)
