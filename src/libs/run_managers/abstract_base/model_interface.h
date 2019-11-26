@@ -22,12 +22,12 @@ private:
 	string tpl_filename;
 	set<string> names;
 	map<string, pair<int, int>> parse_tpl_line(ofstream& f_rec, const string& line);
-
-	string cast_to_fixed_len_string(ofstream& f_rec, int size, double value);
+	string cast_to_fixed_len_string(ofstream& f_rec, int size, double value, string& name);
 	string read_line(ofstream& f_rec, ifstream& f);
-	void prep_file(ofstream& f_rec, ifstream& f);
+	void prep_tpl_file_for_reading(ofstream& f_rec, ifstream& f);
 	set<string> get_names(ofstream& f_rec, ifstream& f);
 	vector<int> find_all_marker_indices(const string& line);
+
 };
 
 
@@ -49,12 +49,6 @@ private:
 	void execute_secondary(ofstream& f_rec, ifstream& f);
 	void execute_w(ofstream& f_rec, ifstream& f);
 	void execute_dum(ofstream& f_rec, ifstream& f);
-
-	
-
-
-
-
 
 };
 

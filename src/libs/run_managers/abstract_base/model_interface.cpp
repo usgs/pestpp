@@ -487,12 +487,62 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 set<string> TemplateFile::parse_and_check(ofstream& f_rec)
 {
 	ifstream f(tpl_filename);
-	prep_file(f_rec, f);
+	prep_tpl_file_for_reading(f_rec, f);
 	return get_names(f_rec, f);
 
 }
 
-void TemplateFile::prep_file(ofstream& f_rec, ifstream& f)
+void TemplateFile::write_input_file(ofstream& f_rec, const string& input_filename, Parameters& pars)
+{
+	ifstream f_tpl(tpl_filename);
+	prep_tpl_file_for_reading(f_rec,f_tpl);
+	ofstream f_in(input_filename);
+	if (f_in.bad())
+		throw_tpl_error(f_rec, "couldn't open model input file '" + input_filename + "' for writing");
+	string line, val_str, name;
+	double val;
+	map<string, pair<int, int>> tpl_line_map;
+	while (getline(f_tpl,line))
+	{
+		tpl_line_map = parse_tpl_line(f_rec, line);
+		
+		for (auto t : tpl_line_map)
+		{
+			name = t.first;
+
+			val = 1.23456789123456789123456789E+100;
+			val_str = cast_to_fixed_len_string(f_rec, 6, val, name);
+
+			val = 1.23456789123456789123456789E-100;
+			val_str = cast_to_fixed_len_string(f_rec, 6, val, name);
+
+			val = -1.23456789123456789123456789E+100;
+			val_str = cast_to_fixed_len_string(f_rec, 7, val, name);
+
+			val = -1.23456789123456789123456789E-100;
+			val_str = cast_to_fixed_len_string(f_rec, 7, val, name);
+
+			val = 1.23456789123456789123456789E+10;
+			val_str = cast_to_fixed_len_string(f_rec, 5, val, name);
+				
+			val = 1.23456789123456789123456789E-10;
+			val_str = cast_to_fixed_len_string(f_rec, 5, val, name);
+
+			val = 1.23456789123456789123456789;
+			val_str = cast_to_fixed_len_string(f_rec, 1, val, name);
+
+			val = -1.23456789123456789123456789;
+			val_str = cast_to_fixed_len_string(f_rec, 2, val, name);
+
+			val = pars.get_rec(t.first);
+			val_str = cast_to_fixed_len_string(f_rec, t.second.second, val, name);
+			line.replace(t.second.first, t.second.second, val_str);
+		}
+		f_in << line;
+	}
+}
+
+void TemplateFile::prep_tpl_file_for_reading(ofstream& f_rec, ifstream& f)
 {
 	if (f.bad())
 	{
@@ -579,6 +629,44 @@ map<string, pair<int, int>> TemplateFile::parse_tpl_line(ofstream& f_rec, const 
 		tpl_line_map[name] = pair<int, int>(s, len);
 	}
 	return tpl_line_map;
+}
+
+string TemplateFile::cast_to_fixed_len_string(ofstream& f_rec, int size, double value, string& name)
+{
+	string val_str;
+	stringstream ss;
+	int precision = 6;
+	ss.width(size);
+	ss.fill('0');
+	while (true)
+	{
+		ss.str("");
+		ss.precision(precision);
+		ss << value;
+		val_str = ss.str();
+		if (val_str.size() == size)
+			break;
+		if (val_str.size() > size)
+			precision--;
+		if (precision <= 0)
+		{
+			ss.str("");
+			ss << "TemplateFile casting error: cant represent value " << value;
+			ss << " for " << name << " in space that is only " << size << " chars wide";
+			throw_tpl_error(f_rec, ss.str());
+		}
+	}
+	
+	
+	/*int width = size;
+	if (value < 0.0)
+		width--;
+		
+	ss << value;
+	val_str = ss.str();*/
+	if (val_str.size() != size)
+		throw_tpl_error(f_rec, "val_str != size: " + val_str);
+	return val_str;
 }
 
 string TemplateFile::read_line(ofstream& f_rec, ifstream& f)

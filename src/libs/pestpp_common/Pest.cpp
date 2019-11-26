@@ -355,6 +355,7 @@ void Pest::check_io(ofstream &f_rec)
 		TemplateFile tf(tpl_file);
 		file_par_names = tf.parse_and_check(f_rec);
 		tpl_par_names.insert(file_par_names.begin(), file_par_names.end());
+		tf.write_input_file(f_rec, "test.dat", ctl_parameters);
 	}
 	set<string> pst_par_names, diff;
 
