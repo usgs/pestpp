@@ -840,8 +840,6 @@ map<string, double> InstructionFile::read_output_file(const string& output_filen
 				obs_map[lhs.first] = lhs.second;
 			}
 		}
-
-
 	}
 	return obs_map;	
 }
