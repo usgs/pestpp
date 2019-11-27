@@ -38,7 +38,7 @@ class InstructionFile {
 	
 public:
 	InstructionFile(string _ins_filename);
-	set<string> parse_and_check(const vector<string> obs_names);
+	set<string> parse_and_check(const vector<string>& obs_names);
 	Observations read_output_file(const string& output_filename);
 
 private:

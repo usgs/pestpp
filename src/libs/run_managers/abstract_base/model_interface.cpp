@@ -712,7 +712,7 @@ out_line_num(0),last_ins_line(""),last_out_line("")
 }
 
 
-set<string> InstructionFile::parse_and_check(const vector<string> obs_names)
+set<string> InstructionFile::parse_and_check(const vector<string>& obs_names)
 {
 	ifstream f_ins(ins_filename);
 	prep_ins_file_for_reading(f_ins);
