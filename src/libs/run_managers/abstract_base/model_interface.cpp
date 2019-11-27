@@ -432,10 +432,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		//todo: return updated (possibly truncated) par values
 		/*pars->update(par_name_vec, par_vals);
 		obs->update(obs_name_vec, obs_vals);
-		for (auto o : obs_map)
-			obs->update_rec(o.first, o.second);
-		for (auto p : par_map)
-			pars->update_rec(p.first, p.second);*/
+		*/
 
 		//set the finished flag for the listener thread
 		finished->set(true);
@@ -715,12 +712,14 @@ out_line_num(0),last_ins_line(""),last_out_line("")
 }
 
 
-set<string> InstructionFile::parse_and_check()
+set<string> InstructionFile::parse_and_check(const vector<string> obs_names)
 {
 	ifstream f_ins(ins_filename);
 	prep_ins_file_for_reading(f_ins);
 	string line, name;
-	vector<string> tokens, s_names;
+	vector<string> tokens;
+	vector<string> s_names;
+	s_names.reserve(obs_names.size());
 	int spos,epos;
 	while (true)
 	{
@@ -736,7 +735,6 @@ set<string> InstructionFile::parse_and_check()
 			if (name.size() > 0)
 			{
 				s_names.push_back(name);
-				
 			}
 		}
 	}
@@ -817,7 +815,7 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 			}
 			else if (token[0] == '(')
 			{
-				lhs = execute_free(token, out_line, f_out);
+				lhs = execute_semi(token, out_line, f_out);
 				if (lhs.first != "DUM")
 					obs.insert(lhs.first, lhs.second);
 			}
@@ -949,8 +947,8 @@ pair<string, pair<int, int>> InstructionFile::parse_obs_instruction(const string
 	{
 		throw_ins_error("unbalanced fixed observation instruction for token '" + token + "'", ins_line_num);
 	}
-	name = token.substr(1, pos);
-	temp = token.substr(pos);
+	name = token.substr(1, pos-1);
+	temp = token.substr(pos+1);
 	pos = temp.find(":");
 	if (pos == string::npos)
 		throw_ins_error("couldn't find ':' in fixed observation token '" + token + "'", ins_line_num);
@@ -964,39 +962,71 @@ pair<string, pair<int, int>> InstructionFile::parse_obs_instruction(const string
 	}
 	try
 	{
-		pest_utils::convert_ip(temp.substr(pos), e);
+		pest_utils::convert_ip(temp.substr(pos+1), e);
 	}
 	catch (...)
 	{
 		throw_ins_error("error casting second index '" + temp.substr(pos) + "' from observation instruction '" + token + "'");
 	}
-	pair<int, int> se(s, e);
+	pair<int, int> se(s-1, e-1);
 	return pair<string, pair<int, int>>(name,se);
 }
 
 pair<string, double> InstructionFile::execute_fixed(const string& token, string& line, ifstream& f_out)
 {
-	string name, temp;
+	string temp;
 	double value;
 	pair<string, pair<int, int>> info = parse_obs_instruction(token, "]");
 	//use the raw last_out_line since "line" has been getting progressively truncated
 	if (last_out_line.size() < info.second.second)
 		throw_ins_error("output line not long enough for fixed obs instruction '" + token + "',");
-	int len = info.second.second - info.second.first;
+	int len = (info.second.second - info.second.first) + 1;
+	temp = last_out_line.substr(info.second.first, len);
 	try
 	{
-		pest_utils::convert_ip(last_out_line.substr(info.second.first, len), value);
+		pest_utils::convert_ip(temp, value);
 	}
 	catch (...)
 	{
-		throw_ins_error("error casting fixed observation '" + token + "' from output string '" + last_out_line.substr(info.second.first, len) + "'");
+		throw_ins_error("error casting fixed observation '" + token + "' from output string '" + temp + "'");
 	}
-	return pair<string, double>(name,value);
+	int pos = line.find(temp);
+	if (pos == string::npos)
+		throw_ins_error("internal error: string t: '"+temp+"' not found in line: '"+line+"'",ins_line_num,out_line_num);
+	line = line.substr(pos + temp.size());
+	return pair<string, double>(info.first,value);
 }
 
 pair<string, double> InstructionFile::execute_semi(const string& token, string& line, ifstream& f_out)
 {
-	return pair<string, double>();
+	string temp;
+	vector<string> tokens;
+	double value;
+	pair<string, pair<int, int>> info = parse_obs_instruction(token, ")");
+	//use the raw last_out_line since "line" has been getting progressively truncated
+	if (last_out_line.size() < info.second.second)
+		throw_ins_error("output line not long enough for fixed obs instruction '" + token + "',");
+	int len = (info.second.second - info.second.first) + 1;
+	int pos = last_out_line.find_first_not_of(" \t", info.second.first);
+	if (pos == string::npos)
+		throw_ins_error("EOL encountered when looking for non-whitespace char in semi-fixed instruction '" + token + "'",ins_line_num,out_line_num);
+	if (pos > info.second.second)
+		throw_ins_error("no non-whitespace char found before end index in semi-fixed instruction '" + token + "'", ins_line_num,out_line_num);
+	pest_utils::tokenize(last_out_line.substr(pos), tokens);
+	temp = tokens[0];
+	try
+	{
+		pest_utils::convert_ip(temp, value);
+	}
+	catch (...)
+	{
+		throw_ins_error("error casting string '" + temp + "' to double for semi-fixed instruction", ins_line_num, out_line_num);
+	}
+	pos = line.find(temp);
+	if (pos == string::npos)
+		throw_ins_error("internal error: temp '" + temp + "' not found in line: '" + line + "'", ins_line_num, out_line_num);
+	line = line.substr(pos + temp.size());
+	return pair<string, double>(info.first,value);
 }
 
 pair<string, double> InstructionFile::execute_free(const string& token, string& line, ifstream& f_out)

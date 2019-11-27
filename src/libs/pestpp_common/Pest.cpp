@@ -354,7 +354,7 @@ void Pest::check_io(ofstream &f_rec)
 	for (auto ins_file : model_exec_info.insfile_vec)
 	{
 		InstructionFile isf(ins_file);
-		file_obs_names = isf.parse_and_check();
+		file_obs_names = isf.parse_and_check(ctl_ordered_obs_names);
 		ins_obs_names.insert(file_obs_names.begin(), file_obs_names.end());
 		//isf.read_output_file(model_exec_info.outfile_vec[0]);
 	}
