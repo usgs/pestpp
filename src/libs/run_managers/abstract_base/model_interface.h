@@ -57,7 +57,7 @@ private:
 	void prep_ins_file_for_reading(ifstream& f);
 	string read_line(ifstream& f, int* line_num);
 	void throw_ins_error(const string& message, int lnum = 0, bool warn = false);
-	string parse_obs_name_from_token(const string& token);
+	void parse_obs_name_from_token(const string& token, string& obs_name);
 };
 
 

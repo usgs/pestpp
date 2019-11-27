@@ -745,7 +745,7 @@ set<string> InstructionFile::parse_and_check()
 	ifstream f_ins(ins_filename);
 	prep_ins_file_for_reading(f_ins);
 	string line, name;
-	vector<string> tokens;
+	vector<string> tokens, s_names;
 	int spos,epos;
 	while (true)
 	{
@@ -754,18 +754,19 @@ set<string> InstructionFile::parse_and_check()
 		line = read_line(f_ins, &ins_line_num);
 		pest_utils::upper_ip(line);
 		pest_utils::tokenize(line, tokens);
-		set<string> stoken;
-		set<string>::iterator end;
-		for (auto token : tokens)
+		//for (auto token : tokens)
+		for (int i=0;i<tokens.size();i++)
 		{
-			name = parse_obs_name_from_token(token);
+			parse_obs_name_from_token(tokens[i], name);
 			if (name.size() > 0)
 			{
-				names.insert(name);
+				s_names.push_back(name);
+				
 			}
 		}
 	}
 	f_ins.close();
+	names.insert(s_names.begin(), s_names.end());
 	return names;
 }
 
@@ -875,24 +876,24 @@ void InstructionFile::throw_ins_error(const string& message, int lnum, bool warn
 		throw runtime_error(ss.str());
 }
 
-string InstructionFile::parse_obs_name_from_token(const string& token)
+void InstructionFile::parse_obs_name_from_token(const string& token, string& name)
 {
 	int spos, epos;
-	string name = "";
-	for (auto ot : obs_tags)
+	//for (auto ot : obs_tags)
+	for (int i=0;i<obs_tags.size();i++)
 	{
-		if (token[0] == ot.first)
+		if (token[0] == obs_tags[i].first)
 		{
-			if (token.find(ot.second) == string::npos)
-				throw_ins_error("unbalanced obs tag'" + string(1, ot.first) + "'", ins_line_num);
-			spos = token.find(ot.first);
-			epos = token.find(ot.second, spos + 1);
-			name = token.substr(spos + 1, (epos - spos) - 1);
-			pest_utils::strip_ip(name);
-			break;
+			if (token.find(obs_tags[i].second) == string::npos)
+				throw_ins_error("unbalanced obs tag'" + string(1, obs_tags[i].first) + "'", ins_line_num);
+			spos = token.find(obs_tags[i].first);
+			epos = token.find(obs_tags[i].second, spos + 1);
+			name = pest_utils::strip_cp(token.substr(spos + 1, (epos - spos) - 1));
+			
+			//break;
 		}
 	}
-	return name;
+	//return name;
 }
 
 pair<string, double> InstructionFile::execute_fixed(const string& token, string& line, ifstream& f_out)
