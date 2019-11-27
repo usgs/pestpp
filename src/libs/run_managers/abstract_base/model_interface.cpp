@@ -143,25 +143,30 @@ void ModelInterface::initialize(vector<string> &_par_name_vec, vector<string> &_
 	if (nins <= 0)
 		throw runtime_error("number of instructino files <=0");
 
-	mio_initialise_w_(&ifail, &ntpl, &nins, &npar, &nobs);
-	if (ifail != 0) throw_mio_error("initializing mio module");
-
-	set_files();
-
+	// old fortran processing routines...
+	//mio_initialise_w_(&ifail, &ntpl, &nins, &npar, &nobs);
+	//if (ifail != 0) throw_mio_error("initializing mio module");
+	//set_files();
 	//check template files
-	mio_process_template_files_w_(&ifail, &npar, pest_utils::StringvecFortranCharArray(par_name_vec, 200, pest_utils::TO_LOWER).get_prt());
-	if (ifail != 0)throw_mio_error("error in template files");
+	//mio_process_template_files_w_(&ifail, &npar, pest_utils::StringvecFortranCharArray(par_name_vec, 200, pest_utils::TO_LOWER).get_prt());
+	//if (ifail != 0)throw_mio_error("error in template files");
 
 	for (auto tplfile : tplfile_vec)
 	{
 		TemplateFile tpl(tplfile);
-		tpl.parse_and_check();
+		//tpl.parse_and_check();
 		templatefiles.push_back(tpl);
 	}
 
+	for (auto insfile : insfile_vec)
+	{
+		InstructionFile ins(insfile);
+		instructionfiles.push_back(ins);
+	}
+
 	////build instruction set
-	mio_store_instruction_set_w_(&ifail);
-	if (ifail != 0) throw_mio_error("error building instruction set");
+	//mio_store_instruction_set_w_(&ifail);
+	//if (ifail != 0) throw_mio_error("error building instruction set");
 
 	initialized = true;
 
@@ -202,9 +207,6 @@ void ModelInterface::run(Parameters* pars, Observations* obs)
 void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
 						Parameters* pars, Observations* obs)
 {
-
-
-
 	if (!initialized)
 	{
 		vector<string> pnames = pars->get_keys();
@@ -212,8 +214,10 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		initialize(pnames, onames);
 	}
 	//get par vals that are aligned with this::par_name_vec since the mio module was initialized with this::par_name_vec order
-	par_vals = pars->get_data_vec(par_name_vec);
-
+	//par_vals = pars->get_data_vec(par_name_vec);
+	//map<string, double> obs_map, isf_obs_map,par_map,tf_par_map;
+	Observations pro_obs;
+	vector<Parameters> pro_par_vec;
 	try
 	{
 		//first delete any existing input and output files
@@ -259,35 +263,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 
 		}
 
-		//check for nans in par vals before continuing
-		// vector<string> invalid;
-
-		// vector<double> ivals;
-		// for (int i = 0; i != par_name_vec.size(); i++)
-		// {
-		// 	if (OperSys::double_is_invalid(par_vals.at(i)))
-		// 	{
-		// 		invalid.push_back(par_name_vec.at(i));
-		// 		ivals.push_back(par_vals.at(i));
-		// 	}
-
-
-		// for (int i = 0; i != par_name_vec.size(); i++)
-		// {
-		// 	if (OperSys::double_is_invalid(par_vals.at(i)))
-		// 		invalid.push_back(par_name_vec.at(i));
-		// }
-		// if (invalid.size() > 0)
-		// {
-		// 	stringstream ss;
-		// 	ss << "internal PEST++ error: invalid parameter values passed to model_interface for the following parameters: ";
-		// 	for (auto &i : invalid)
-		// 		ss << i << '\n';
-		// 	for (auto &iv : ivals)
-		// 		ss << iv << "\n";
-		// 	throw PestError(ss.str());
-		// }
-
+		//this is the old fortran tpl processing
 		/*int npar = par_vals.size();
 		try
 		{
@@ -301,9 +277,13 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 			throw_mio_error("uncaught error writing model input files from template files:" + emess);
 		}
 		if (ifail != 0) throw_mio_error("error writing model input files from template files");
-*/
+        */
+		
 		for (int i = 0; i < templatefiles.size(); i++)
-			templatefiles[i].write_input_file(inpfile_vec[i], *pars);
+			pro_par_vec.push_back(templatefiles[i].write_input_file(inpfile_vec[i], *pars));
+		//update pars to account for possibly truncated par values...important for jco calcs
+		for (auto pro_pars : pro_par_vec)
+			pars->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
 
 
 #ifdef OS_WIN
@@ -424,11 +404,9 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		int nins = insfile_vec.size();
 		int nobs = obs_name_vec.size();
 		obs_vals.resize(nobs, -9999.00);
-		/*int nerr_len = 500;
-		char err_instruct[500];
-		for (int i = 0; i < 500; i++)
-			err_instruct[i] = '|';*/
-		try {
+	
+		//this is the old fortran ins processing
+		/*try {
 			mio_read_model_output_files_w_(&ifail, &nobs,
 				pest_utils::StringvecFortranCharArray(obs_name_vec, 200, pest_utils::TO_LOWER).get_prt(),
 				&obs_vals[0]);
@@ -440,47 +418,24 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		}
 		if (ifail != 0)
 		{
-			/*int jfail;
-			mio_get_message_string_w_(&jfail, &nerr_len, err_instruct);
-			string err = string(err_instruct);
-			auto s_end = err.find_last_not_of(' ',500);
-			err = err.substr(0, s_end);*/
 
 			throw_mio_error("error processing model output files");
 		}
+		*/
 
-		// invalid.clear();
-		// for (int i = 0; i != par_name_vec.size(); i++)
-		// {
-		// 	if (OperSys::double_is_invalid(par_vals.at(i)))
-		// 		invalid.push_back(par_name_vec.at(i));
-		// }
-		// if (invalid.size() > 0)
-		// {
-		// 	stringstream ss;
-		// 	ss << "invalid parameter values read for the following parameters: ";
-		// 	for (auto &i : invalid)
-		// 		ss << i << '\n';
-		// 	throw PestError(ss.str());
-		// }
+		for (int i = 0; i < insfile_vec.size(); i++)
+		{
+			pro_obs = instructionfiles[i].read_output_file(outfile_vec[i]);
+			obs->update_without_clear(pro_obs.get_keys(), pro_obs.get_data_vec(pro_obs.get_keys()));
+		}
 
-		// for (int i = 0; i != obs_name_vec.size(); i++)
-		// {
-		// 	if (OperSys::double_is_invalid(obs_vals.at(i)))
-		// 		invalid.push_back(obs_name_vec.at(i));
-		// }
-		// if (invalid.size() > 0)
-		// {
-		// 	stringstream ss;
-		// 	ss << "invalid observation values read for the following observations: ";
-		// 	for (auto &i : invalid)
-		// 		ss << i << '\n';
-		// 	throw PestError(ss.str());
-		// }
-
-		pars->update(par_name_vec, par_vals);
+		//todo: return updated (possibly truncated) par values
+		/*pars->update(par_name_vec, par_vals);
 		obs->update(obs_name_vec, obs_vals);
-
+		for (auto o : obs_map)
+			obs->update_rec(o.first, o.second);
+		for (auto p : par_map)
+			pars->update_rec(p.first, p.second);*/
 
 		//set the finished flag for the listener thread
 		finished->set(true);
@@ -502,7 +457,7 @@ set<string> TemplateFile::parse_and_check()
 
 }
 
-void TemplateFile::write_input_file(const string& input_filename, Parameters& pars)
+Parameters TemplateFile::write_input_file(const string& input_filename, Parameters& pars)
 {
 	ifstream f_tpl(tpl_filename);
 	prep_tpl_file_for_reading(f_tpl);
@@ -512,6 +467,7 @@ void TemplateFile::write_input_file(const string& input_filename, Parameters& pa
 	string line, val_str, name;
 	double val;
 	map<string, pair<int, int>> tpl_line_map;
+	Parameters pro_pars;
 	while (true)
 	{
 		if (f_tpl.eof())
@@ -553,9 +509,12 @@ void TemplateFile::write_input_file(const string& input_filename, Parameters& pa
 			val = pars.get_rec(t.first);
 			val_str = cast_to_fixed_len_string(t.second.second, val, name);
 			line.replace(t.second.first, t.second.second, val_str);
+			pest_utils::convert_ip(val_str, val);
+			pro_pars.insert(name, val);
 		}
 		f_in << line << endl;
 	}
+	return pro_pars;
 }
 
 void TemplateFile::prep_tpl_file_for_reading(ifstream& f_tpl)
@@ -718,21 +677,37 @@ string TemplateFile::read_line( ifstream& f_tpl)
 	return line;
 }
 
-string InstructionFile::read_line(ifstream& f_ins, int* line_num)
+string InstructionFile::read_ins_line(ifstream& f_ins)
 {
 	if (f_ins.bad())
-		throw_ins_error("cant read next line", *line_num);
+		throw_ins_error("cant read next instruction file line", ins_line_num);
 	string line;
 	if (f_ins.eof())
-		throw_ins_error("unexpected eof", *line_num);
+		throw_ins_error("unexpected instruction file eof ", ins_line_num);
 
 	getline(f_ins, line);
-	line_num++;
+	last_ins_line = line;
+	ins_line_num++;
 	return line;
 }
 
+
+string InstructionFile::read_out_line(ifstream& f_out)
+{
+	if (f_out.bad())
+		throw_ins_error("cant read next output file line", ins_line_num, out_line_num);
+	string line;
+	if (f_out.eof())
+		throw_ins_error("unexpected output file eof ", ins_line_num, out_line_num);
+	getline(f_out, line);
+	last_out_line = line;
+	out_line_num++;
+	return line;
+}
+
+
 InstructionFile::InstructionFile(string _ins_filename): ins_filename(_ins_filename), ins_line_num(0),
-out_line_num(0)
+out_line_num(0),last_ins_line(""),last_out_line("")
 {
 	obs_tags.push_back(pair<char, char>('{', '}'));
 	obs_tags.push_back(pair<char, char>('[', ']'));
@@ -751,7 +726,7 @@ set<string> InstructionFile::parse_and_check()
 	{
 		if (f_ins.eof())
 			break;
-		line = read_line(f_ins, &ins_line_num);
+		line = read_ins_line(f_ins);
 		pest_utils::upper_ip(line);
 		pest_utils::tokenize(line, tokens);
 		//for (auto token : tokens)
@@ -770,15 +745,15 @@ set<string> InstructionFile::parse_and_check()
 	return names;
 }
 
-void InstructionFile::prep_ins_file_for_reading(ifstream& f)
+void InstructionFile::prep_ins_file_for_reading(ifstream& f_ins)
 {
-	if (f.bad())
+	if (f_ins.bad())
 	{
 		throw_ins_error("couldn't open ins file for reading");
 	}
 	string tag, line;
 	vector<string> tokens;
-	line = read_line(f, &ins_line_num);
+	line = read_ins_line(f_ins);
 	pest_utils::tokenize(line, tokens);
 	if (tokens.size() < 2)
 		throw_ins_error("incorrect first line - expecting 'pif <marker>'", ins_line_num);
@@ -794,7 +769,7 @@ void InstructionFile::prep_ins_file_for_reading(ifstream& f)
 }
 
 
-map<string, double> InstructionFile::read_output_file(const string& output_filename)
+Observations InstructionFile::read_output_file(const string& output_filename)
 {
 	ifstream f_ins(ins_filename);
 	ifstream f_out(output_filename);
@@ -805,13 +780,15 @@ map<string, double> InstructionFile::read_output_file(const string& output_filen
 	}
 	string ins_line, out_line;
 	vector<string> tokens;
-	map<string, double> obs_map;
+	Observations obs;
 	pair<string, double> lhs;
 	while (true)
 	{
+
 		if (f_ins.eof())
 			break;
-		ins_line = read_line(f_ins, &ins_line_num);
+		tokens.clear();
+		ins_line = read_ins_line(f_ins);
 		pest_utils::upper_ip(ins_line);
 		pest_utils::tokenize(ins_line, tokens);
 		for (auto token : tokens)
@@ -828,23 +805,24 @@ map<string, double> InstructionFile::read_output_file(const string& output_filen
 			else if (token[0] == '[')
 			{
 				lhs = execute_fixed(token, out_line, f_out);
-				//check for dum
-				obs_map[lhs.first] = lhs.second;
+				if (lhs.first != "DUM")
+					obs.insert(lhs.first,lhs.second);
 			}
 			else if (token[0] == '!')
 			{
 				lhs = execute_free(token, out_line, f_out);
-				//check for dum
-				obs_map[lhs.first] = lhs.second;
+				if (lhs.first != "DUM")
+					obs.insert(lhs.first, lhs.second);
 			}
 			else if (token[0] == '(')
 			{
 				lhs = execute_free(token, out_line, f_out);
-				//check for dum
-				obs_map[lhs.first] = lhs.second;
+				if (lhs.first != "DUM")
+					obs.insert(lhs.first, lhs.second);
 			}
 			else if (token[0] == marker)
 			{
+				//if this is the first instruction, its a primary search
 				if (token == tokens[0])
 				{
 					execute_primary(token, out_line, f_out);
@@ -856,19 +834,21 @@ map<string, double> InstructionFile::read_output_file(const string& output_filen
 			}
 		}
 	}
-	return obs_map;	
+	return obs;	
 }
 
 
-void InstructionFile::throw_ins_error(const string& message, int lnum, bool warn)
+void InstructionFile::throw_ins_error(const string& message, int ins_lnum, int out_lnum, bool warn)
 {
 	stringstream ss;
 	if (warn)
 		ss << "InstructionFile warning in " << ins_filename;
 	else
 		ss << "InstructionFile error in " << ins_filename;
-	if (lnum != 0)
-		ss << "on line: " << lnum;
+	if (ins_lnum != 0)
+		ss << "on instruction file line: " << ins_lnum;
+	if (out_lnum != 0)
+		ss << "on output file line: " << out_lnum;
 	ss << " : " << message;
 	if (warn)
 		cout << endl << ss.str() << endl;
@@ -908,7 +888,28 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 
 pair<string, double> InstructionFile::execute_free(const string& token, string& line, ifstream& f_out)
 {
-	return pair<string, double>();
+	vector<string> tokens;
+	pest_utils::tokenize(line, tokens);
+	if (tokens.size() == 0)
+		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for whitespace instruction execution on line: "+last_ins_line, ins_line_num, out_line_num);
+	double value;
+	try
+	{
+		pest_utils::convert_ip(tokens[0], value);
+	}
+	catch (...)
+	{
+		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "'", ins_line_num, out_line_num);
+	}
+	string name = token.substr(1, token.size() - 2);
+	int pos = line.find(tokens[0]);
+	if (pos == string::npos)
+	{
+		throw_ins_error("internal error: could not find whitespace token", ins_line_num, out_line_num);
+	}
+	line = line.substr(pos + tokens[0].size());
+
+	return pair<string, double>(name,value);
 }
 
 void InstructionFile::execute_primary(const string& token, string& line, ifstream& f_out)
@@ -916,14 +917,14 @@ void InstructionFile::execute_primary(const string& token, string& line, ifstrea
 	//check that a closing marker is found
 	int pos = token.substr(1).find(marker);
 	if (pos == string::npos)
-		throw_ins_error("primary marker token '" + token + "' doesnt have a closing marker char");
+		throw_ins_error("primary marker token '" + token + "' doesn't have a closing marker char", ins_line_num);
 
 	string primary_tag = token.substr(1, pos - 1);
 	while (true)
 	{
 		if (f_out.eof())
-			throw_ins_error("EOF encountered while executing marker search ('" + token + "')", ins_line_num);
-		line = read_line(f_out, &out_line_num);
+			throw_ins_error("EOF encountered while executing marker search ('" + token + "')", ins_line_num, out_line_num);
+		line = read_out_line(f_out);
 		pos = line.find(primary_tag);
 		if (pos != string::npos)
 		{
@@ -946,7 +947,7 @@ void InstructionFile::execute_secondary(const string& token, string& line, ifstr
 	pos = line.find(secondary_tag);
 	if (pos == string::npos)
 	{
-		throw_ins_error("EOL encountered while executing secondary marker ('" + secondary_tag + "') search on output line", out_line_num);
+		throw_ins_error("EOL encountered while executing secondary marker ('" + secondary_tag + "') search on output line", ins_line_num,out_line_num);
 	}
 	line = line.substr(pos + secondary_tag.size());
 }
@@ -957,7 +958,7 @@ void InstructionFile::execute_whitespace(const string& token, string& line, ifst
 	int pos = line.find_first_of(" \t");
 	if (pos == string::npos)
 	{
-		throw_ins_error("EOL encountered while executing whitespace instruction on output line", out_line_num);
+		throw_ins_error("EOL encountered while executing whitespace instruction on output line", ins_line_num, out_line_num);
 	}
 	line = line.substr(pos + 1);
 }
@@ -972,12 +973,12 @@ void InstructionFile::execute_line_advance(const string& token, string& line, if
 	{
 		if (f_out.bad())
 		{	
-			throw_ins_error("'bad' stream when executing line advance instruction", ins_line_num);
+			throw_ins_error("'bad' stream when executing line advance instruction", ins_line_num, out_line_num);
 		}
 		if (f_out.eof())
 		{
-			throw_ins_error("EOF encountered when executing line advance instruction", ins_line_num);
+			throw_ins_error("EOF encountered when executing line advance instruction", ins_line_num, out_line_num);
 		}
-		line = read_line(f_out, &out_line_num);
+		line = read_out_line(f_out);
 	}
 }

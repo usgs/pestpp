@@ -356,7 +356,7 @@ void Pest::check_io(ofstream &f_rec)
 		InstructionFile isf(ins_file);
 		file_obs_names = isf.parse_and_check();
 		ins_obs_names.insert(file_obs_names.begin(), file_obs_names.end());
-		//tf.write_input_file(f_rec, "test.dat", ctl_parameters);
+		//isf.read_output_file(model_exec_info.outfile_vec[0]);
 	}
 	set<string> pst_obs_names, diff;
 
@@ -422,8 +422,6 @@ void Pest::check_io(ofstream &f_rec)
 			ss << d << endl;
 		throw_control_file_error(f_rec, ss.str());
 	}
-
-
 
 	cout << endl;
 }

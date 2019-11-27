@@ -12,7 +12,7 @@ class TemplateFile {
 public:
 	TemplateFile(string _tpl_filename): tpl_filename(_tpl_filename),line_num(0) { ; }
 	set<string> parse_and_check();
-	void write_input_file(const string& input_filename, Parameters& pars);
+	Parameters write_input_file(const string& input_filename, Parameters& pars);
 	void throw_tpl_error(const string& message, int lnum=0, bool warn=false);
 
 
@@ -38,13 +38,12 @@ class InstructionFile {
 public:
 	InstructionFile(string _ins_filename);
 	set<string> parse_and_check();
-	map<string, double> read_output_file(const string& output_filename);
-
+	Observations read_output_file(const string& output_filename);
 
 private:
 	int ins_line_num, out_line_num;
 	char marker;
-	string ins_filename;
+	string ins_filename, last_out_line, last_ins_line;
 	set<string> names;
 	vector<pair<char, char>> obs_tags;
 	pair<string, double> execute_fixed(const string& token, string& line, ifstream& f_out);
@@ -54,9 +53,10 @@ private:
 	void execute_secondary(const string& token, string& line, ifstream& f_out);
 	void execute_whitespace(const string& token, string& line, ifstream& f_out);
 	void execute_line_advance(const string& token, string& line, ifstream& f_out);
-	void prep_ins_file_for_reading(ifstream& f);
-	string read_line(ifstream& f, int* line_num);
-	void throw_ins_error(const string& message, int lnum = 0, bool warn = false);
+	void prep_ins_file_for_reading(ifstream& f_ins);
+	string read_ins_line(ifstream& f_ins);
+	string read_out_line(ifstream& f_out);
+	void throw_ins_error(const string& message, int ins_lnum = 0, int out_lnum=0, bool warn = false);
 	void parse_obs_name_from_token(const string& token, string& obs_name);
 };
 
@@ -67,10 +67,6 @@ public:
 	ModelInterface(vector<string> _tplfile_vec,vector<string> _inpfile_vec, vector<string> _insfile_vec, vector<string> _outfile_vec,vector<string> _comline_vec);
 	void throw_mio_error(string base_message);
 	void run(Parameters* pars, Observations* obs);
-	void run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
-		pest_utils::thread_exceptions *shared_execptions,
-		vector<string> &par_name_vec, vector<double> &par_values,
-		vector<string> &obs_name_vec, vector<double> &obs_vec);
 	void run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
 		pest_utils::thread_exceptions *shared_execptions,
 		Parameters* par, Observations* obs);
@@ -97,7 +93,7 @@ private:
 	vector<string> insfile_vec;
 	vector<string> comline_vec;
 	vector<TemplateFile> templatefiles;
-
+	vector<InstructionFile> instructionfiles;
 	vector<double> par_vals;
 	vector<double> obs_vals;
 
