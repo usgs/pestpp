@@ -10,6 +10,7 @@ using namespace std;
 
 class TemplateFile {
 public:
+	static vector<int> find_all_marker_indices(const string& line, const string& marker);
 	TemplateFile(string _tpl_filename): tpl_filename(_tpl_filename),line_num(0) { ; }
 	set<string> parse_and_check();
 	Parameters write_input_file(const string& input_filename, Parameters& pars);
@@ -26,7 +27,7 @@ private:
 	string read_line(ifstream& f_tpl);
 	void prep_tpl_file_for_reading(ifstream& f_tpl);
 	set<string> get_names(ifstream& f);
-	vector<int> find_all_marker_indices(const string& line);
+	
 	
 
 
@@ -58,6 +59,8 @@ private:
 	string read_out_line(ifstream& f_out);
 	void throw_ins_error(const string& message, int ins_lnum = 0, int out_lnum=0, bool warn = false);
 	void parse_obs_name_from_token(const string& token, string& obs_name);
+	vector<string> tokenize_ins_line(const string& line);
+	pair<string, pair<int, int>> parse_obs_instruction(const string& token, const string& close_tag);
 };
 
 

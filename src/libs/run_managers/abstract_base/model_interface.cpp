@@ -557,7 +557,7 @@ set<string> TemplateFile::get_names(ifstream& f)
 	return names;
 }
 
-vector<int> TemplateFile::find_all_marker_indices(const string& line)
+vector<int> TemplateFile::find_all_marker_indices(const string& line, const string& marker)
 {
 	vector<int> indices;
 	int pos = line.find(marker);
@@ -587,7 +587,7 @@ void TemplateFile::throw_tpl_error(const string& message, int lnum , bool warn)
 
 map<string, pair<int, int>> TemplateFile::parse_tpl_line(const string& line)
 {
-	vector<int> indices = find_all_marker_indices(line);
+	vector<int> indices = find_all_marker_indices(line, marker);
 	if (indices.size() % 2 != 0)
 		throw_tpl_error("unbalanced marker ('" + marker + "') ", line_num);
 	int s, e, len;
@@ -709,7 +709,7 @@ string InstructionFile::read_out_line(ifstream& f_out)
 InstructionFile::InstructionFile(string _ins_filename): ins_filename(_ins_filename), ins_line_num(0),
 out_line_num(0),last_ins_line(""),last_out_line("")
 {
-	obs_tags.push_back(pair<char, char>('{', '}'));
+	obs_tags.push_back(pair<char, char>('(', ')'));
 	obs_tags.push_back(pair<char, char>('[', ']'));
 	obs_tags.push_back(pair<char, char>('!', '!'));	
 }
@@ -771,6 +771,8 @@ void InstructionFile::prep_ins_file_for_reading(ifstream& f_ins)
 
 Observations InstructionFile::read_output_file(const string& output_filename)
 {
+	if (!pest_utils::check_exist_in(output_filename))
+		throw_ins_error("output file'" + output_filename + "' not found");
 	ifstream f_ins(ins_filename);
 	ifstream f_out(output_filename);
 	prep_ins_file_for_reading(f_ins);
@@ -789,8 +791,7 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 			break;
 		tokens.clear();
 		ins_line = read_ins_line(f_ins);
-		pest_utils::upper_ip(ins_line);
-		pest_utils::tokenize(ins_line, tokens);
+		tokens = tokenize_ins_line(ins_line);
 		for (auto token : tokens)
 		{
 
@@ -822,6 +823,10 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 			}
 			else if (token[0] == marker)
 			{
+				if (token.size() == 1)
+				{
+					throw_ins_error("markers with spaces not supported...", ins_line_num);
+				}
 				//if this is the first instruction, its a primary search
 				if (token == tokens[0])
 				{
@@ -831,6 +836,10 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 				{
 					execute_secondary(token, out_line, f_out);
 				}
+			}
+			else
+			{
+				throw_ins_error("unrecognized instruction '" + token + "'", ins_line_num);
 			}
 		}
 	}
@@ -844,11 +853,11 @@ void InstructionFile::throw_ins_error(const string& message, int ins_lnum, int o
 	if (warn)
 		ss << "InstructionFile warning in " << ins_filename;
 	else
-		ss << "InstructionFile error in " << ins_filename;
+		ss << "InstructionFile error in file " << ins_filename;
 	if (ins_lnum != 0)
-		ss << "on instruction file line: " << ins_lnum;
+		ss << " on line: " << ins_lnum;
 	if (out_lnum != 0)
-		ss << "on output file line: " << out_lnum;
+		ss << " on output file line: " << out_lnum;
 	ss << " : " << message;
 	if (warn)
 		cout << endl << ss.str() << endl;
@@ -876,9 +885,113 @@ void InstructionFile::parse_obs_name_from_token(const string& token, string& nam
 	//return name;
 }
 
+vector<string> InstructionFile::tokenize_ins_line(const string& ins_line)
+{
+	int s, e;
+	vector<string> tokens, temp_tokens, marker_tags;
+	vector<int> marker_indices;
+	//check for markers - might need to tokenized differently..
+	if (ins_line.find(marker) != string::npos)
+	{
+		//get the indices of all markers on the line
+		marker_indices = TemplateFile::find_all_marker_indices(ins_line, string(1, marker));
+		if (marker_indices.size() % 2 != 0)
+			throw_ins_error("unbalanced marker '" + string(1, marker) + "'", ins_line_num);
+		
+		//extract the un-altered marker tags (the strings between the markers)
+		int s, e;
+		for (int i = 0; i < marker_indices.size(); i = i + 2)
+		{
+			s = marker_indices[i];
+			e = marker_indices[i + 1];
+			//include the marker in the string b/c that is used later to decide
+			//how to handle the token
+			marker_tags.push_back(last_ins_line.substr(s, (e - s)+1));
+		}
+		
+		//now tokenize in pieces
+		// anything before the first marker
+		if (marker_indices[0] != 0)
+		{
+			temp_tokens.clear();
+			pest_utils::tokenize(pest_utils::upper_cp(ins_line.substr(0, marker_indices[0])), temp_tokens);
+			tokens.insert(tokens.end(), temp_tokens.begin(), temp_tokens.end());
+		}
+	
+		for (int i = 1; i < marker_indices.size()-1; i = i + 2)
+		{
+			tokens.push_back(marker_tags[i - 1]);
+			e = marker_indices[i+1];
+			s = marker_indices[i];
+			temp_tokens.clear();
+			pest_utils::tokenize(pest_utils::upper_cp(ins_line.substr(s + 1, (e - s) - 1)), temp_tokens);
+			tokens.insert(tokens.end(),temp_tokens.begin(), temp_tokens.end());
+			cout << endl;
+		}
+		tokens.push_back(marker_tags[marker_tags.size() - 1]);
+		temp_tokens.clear();
+		s = marker_indices[marker_indices.size() - 1];
+		e = ins_line.size();
+		pest_utils::tokenize(pest_utils::upper_cp(ins_line.substr(s+1, (e - s) - 1)), temp_tokens);
+		tokens.insert(tokens.end(), temp_tokens.begin(), temp_tokens.end());
+		cout << endl;
+	}
+	else
+		pest_utils::tokenize(pest_utils::upper_cp(ins_line), tokens);
+	return tokens;
+}
+
+pair<string, pair<int, int>> InstructionFile::parse_obs_instruction(const string& token, const string& close_tag)
+{
+	string name, temp;
+	int s, e, pos = token.find(close_tag);
+	if (pos == string::npos)
+	{
+		throw_ins_error("unbalanced fixed observation instruction for token '" + token + "'", ins_line_num);
+	}
+	name = token.substr(1, pos);
+	temp = token.substr(pos);
+	pos = temp.find(":");
+	if (pos == string::npos)
+		throw_ins_error("couldn't find ':' in fixed observation token '" + token + "'", ins_line_num);
+	try
+	{
+		pest_utils::convert_ip(temp.substr(0, pos), s);
+	}
+	catch (...)
+	{
+		throw_ins_error("error casting first index '" + temp.substr(0, pos) + "' from observation instruction '" + token + "'");
+	}
+	try
+	{
+		pest_utils::convert_ip(temp.substr(pos), e);
+	}
+	catch (...)
+	{
+		throw_ins_error("error casting second index '" + temp.substr(pos) + "' from observation instruction '" + token + "'");
+	}
+	pair<int, int> se(s, e);
+	return pair<string, pair<int, int>>(name,se);
+}
+
 pair<string, double> InstructionFile::execute_fixed(const string& token, string& line, ifstream& f_out)
 {
-	return pair<string, double>();
+	string name, temp;
+	double value;
+	pair<string, pair<int, int>> info = parse_obs_instruction(token, "]");
+	//use the raw last_out_line since "line" has been getting progressively truncated
+	if (last_out_line.size() < info.second.second)
+		throw_ins_error("output line not long enough for fixed obs instruction '" + token + "',");
+	int len = info.second.second - info.second.first;
+	try
+	{
+		pest_utils::convert_ip(last_out_line.substr(info.second.first, len), value);
+	}
+	catch (...)
+	{
+		throw_ins_error("error casting fixed observation '" + token + "' from output string '" + last_out_line.substr(info.second.first, len) + "'");
+	}
+	return pair<string, double>(name,value);
 }
 
 pair<string, double> InstructionFile::execute_semi(const string& token, string& line, ifstream& f_out)
@@ -915,11 +1028,11 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 void InstructionFile::execute_primary(const string& token, string& line, ifstream& f_out)
 {
 	//check that a closing marker is found
-	int pos = token.substr(1).find(marker);
-	if (pos == string::npos)
+	//this shouldnt be a prob,but good to check
+	if (token.substr(token.size()-1,1) != string(1,marker))
 		throw_ins_error("primary marker token '" + token + "' doesn't have a closing marker char", ins_line_num);
-
-	string primary_tag = token.substr(1, pos - 1);
+	int pos;
+	string primary_tag = token.substr(1, token.size() - 2);
 	while (true)
 	{
 		if (f_out.eof())
@@ -940,16 +1053,17 @@ void InstructionFile::execute_primary(const string& token, string& line, ifstrea
 void InstructionFile::execute_secondary(const string& token, string& line, ifstream& f_out)
 {
 	//check that a closing marker is found
-	int pos = token.substr(1).find(marker);
-	if (pos == string::npos)
+	int pos;
+	if (token.substr(token.size()-1,1) != string(1,marker))
 		throw_ins_error("secondary marker token '" + token + "' doesnt have a closing marker char");
-	string secondary_tag = token.substr(1, pos-1);
+	string secondary_tag = token.substr(1, token.size()-2);
 	pos = line.find(secondary_tag);
 	if (pos == string::npos)
 	{
 		throw_ins_error("EOL encountered while executing secondary marker ('" + secondary_tag + "') search on output line", ins_line_num,out_line_num);
 	}
 	line = line.substr(pos + secondary_tag.size());
+	return;
 }
 
 
