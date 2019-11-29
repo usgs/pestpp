@@ -529,28 +529,30 @@ def secondary_marker_test():
     tpl_file = "par.dat.tpl"
     b_d = os.getcwd()
     os.chdir(t_d)
-    #try:
+    try:
 
-    ins_files = [f for f in os.listdir(".") if f.endswith(".ins")]
-    with open("forward_run.py",'w') as f:
-        f.write("import shutil\n")
+        ins_files = [f for f in os.listdir(".") if f.endswith(".ins")]
+        with open("forward_run.py",'w') as f:
+            f.write("import shutil\n")
+            for ins_file in ins_files:
+                out_file = ins_file.replace(".ins","")
+                f.write("shutil.copy2('{0}','{1}')\n".format(out_file+"_bak",out_file))
+                
         for ins_file in ins_files:
-            out_file = ins_file.replace(".ins","")
-            f.write("shutil.copy2('{0}','{1}')\n".format(out_file+"_bak",out_file))
+           
+            shutil.copy2(out_file+"_bak",out_file)
+            pst = pyemu.Pst.from_io_files(tpl_file,tpl_file.replace(".tpl",""),
+                ins_file,ins_file.replace(".ins",""))
+            pst.control_data.noptmax = 0
+            pst.model_command = "python forward_run.py"
+            pst.write(os.path.join("test.pst"))
             
-    for ins_file in ins_files:
-       
-        shutil.copy2(out_file+"_bak",out_file)
-        pst = pyemu.Pst.from_io_files(tpl_file,tpl_file.replace(".tpl",""),
-            ins_file,ins_file.replace(".ins",""))
-        pst.control_data.noptmax = 0
-        pst.model_command = "python forward_run.py"
-        pst.write(os.path.join("test.pst"))
-        
-        pyemu.os_utils.run("{0} test.pst".format(exe_path))
-    #except Exception as e:
-    #    os.chdir(b_d)
-    #    raise Exception(e)
+            pyemu.os_utils.run("{0} test.pst".format(exe_path))
+            pst = pyemu.Pst("test.pst")
+            assert pst.res is not None
+    except Exception as e:
+       os.chdir(b_d)
+       raise Exception(e)
     os.chdir(b_d)
 
 def sen_basic_test():
@@ -727,7 +729,7 @@ if __name__ == "__main__":
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    #secondary_marker_test()
+    secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
@@ -735,4 +737,4 @@ if __name__ == "__main__":
     #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-    tplins1_test()
+    #tplins1_test()

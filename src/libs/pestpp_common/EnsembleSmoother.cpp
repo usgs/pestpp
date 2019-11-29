@@ -1790,7 +1790,7 @@ void IterEnsembleSmoother::initialize()
 		if (failed_idxs.size() != 0)
 		{
 			message(0, "control file parmeter value run failed...bummer");
-			return;
+			throw_ies_error("control file parmeter value run failed");
 		}
 		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
 		message(1, "saving results from control file parameter value run to ", obs_csv);

@@ -24,11 +24,12 @@
 #include <map>
 #include <numeric>
 #include <iterator>
+#include <unordered_set>
+#include <sstream>
 #include <algorithm>
 #include "Pest.h"
 #include "utilities.h"
 #include "pest_error.h"
-#include <sstream>
 #include "pest_data_structs.h"
 #include "Transformation.h"
 #include "FileManager.h"
@@ -355,18 +356,18 @@ void Pest::check_io(ofstream &f_rec)
 		return;
 
 	//rigorous checking of names in tpl and ins files vs control file
-	set<string> ins_obs_names, file_obs_names;
+	unordered_set<string> ins_obs_names, file_obs_names;
 	for (auto ins_file : model_exec_info.insfile_vec)
 	{
 		InstructionFile isf(ins_file);
-		file_obs_names = isf.parse_and_check(ctl_ordered_obs_names);
+		file_obs_names = isf.parse_and_check();
 		ins_obs_names.insert(file_obs_names.begin(), file_obs_names.end());
 		//isf.read_output_file(model_exec_info.outfile_vec[0]);
 	}
-	set<string> pst_obs_names, diff;
+	unordered_set<string> pst_obs_names, diff;
 
 	pst_obs_names.insert(ctl_ordered_obs_names.begin(), ctl_ordered_obs_names.end());
-	set<string>::iterator end = ins_obs_names.end();
+	unordered_set<string>::iterator end = ins_obs_names.end();
 	for (auto p : pst_obs_names)
 		if (ins_obs_names.find(p) == end)
 			diff.insert(p);
@@ -375,7 +376,7 @@ void Pest::check_io(ofstream &f_rec)
 		stringstream ss;
 		ss << "Error: the following observations were found in the control file but not in the instruction files:" << endl;
 		for (auto d : diff)
-			ss << diff << endl;
+			ss << d << endl;
 		throw_control_file_error(f_rec, ss.str());
 	}
 	end = pst_obs_names.end();
@@ -392,7 +393,7 @@ void Pest::check_io(ofstream &f_rec)
 	}
 
 
-	set<string> tpl_par_names, file_par_names;
+	unordered_set<string> tpl_par_names, file_par_names;
 	for (auto tpl_file : model_exec_info.tplfile_vec)
 	{
 		TemplateFile tf(tpl_file);
@@ -400,7 +401,7 @@ void Pest::check_io(ofstream &f_rec)
 		tpl_par_names.insert(file_par_names.begin(), file_par_names.end());
 		//tf.write_input_file(f_rec, "test.dat", ctl_parameters);
 	}
-	set<string> pst_par_names;
+	unordered_set<string> pst_par_names;
 
 	pst_par_names.insert(ctl_ordered_par_names.begin(), ctl_ordered_par_names.end());
 	end = tpl_par_names.end();
@@ -412,7 +413,7 @@ void Pest::check_io(ofstream &f_rec)
 		stringstream ss;
 		ss << "Error: the following parameters were found in the control file but not in the template files:" << endl;
 		for (auto d : diff)
-			ss << diff << endl;
+			ss << d << endl;
 		throw_control_file_error(f_rec, ss.str());
 	}
 	end = pst_par_names.end();

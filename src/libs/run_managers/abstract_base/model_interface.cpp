@@ -8,6 +8,7 @@
 #include <cstring>
 #include <sstream>
 #include <thread>
+#include <unordered_set>
 #include "model_interface.h"
 
 using namespace std;
@@ -284,7 +285,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		//update pars to account for possibly truncated par values...important for jco calcs
 		for (auto pro_pars : pro_par_vec)
 			pars->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
-		cout << "...done" << endl;
+		cout << "done" << endl;
 
 #ifdef OS_WIN
 		//a flag to track if the run was terminated
@@ -401,9 +402,9 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		if (term_break) return;
 
 		// process instruction files
-		int nins = insfile_vec.size();
-		int nobs = obs_name_vec.size();
-		obs_vals.resize(nobs, -9999.00);
+		//int nins = insfile_vec.size();
+		//int nobs = obs_name_vec.size();
+		//obs_vals.resize(nobs, -9999.00);
 	
 		//this is the old fortran ins processing
 		/*try {
@@ -423,16 +424,50 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		}
 		*/
 		cout << "processing ins files...";
+		Observations temp_obs;
 		for (int i = 0; i < insfile_vec.size(); i++)
 		{
 			pro_obs = instructionfiles[i].read_output_file(outfile_vec[i]);
-			obs->update_without_clear(pro_obs.get_keys(), pro_obs.get_data_vec(pro_obs.get_keys()));
+			temp_obs.update_without_clear(pro_obs.get_keys(), pro_obs.get_data_vec(pro_obs.get_keys()));
 		}
-		cout << "...done" << endl;
-		//todo: return updated (possibly truncated) par values
-		/*pars->update(par_name_vec, par_vals);
-		obs->update(obs_name_vec, obs_vals);
-		*/
+		unordered_set<string> ins_names, pst_names;
+		vector<string> t, diff;
+		t = obs->get_keys();
+		pst_names.insert(t.begin(), t.end());
+		t = temp_obs.get_keys();
+		ins_names.insert(t.begin(), t.end());
+		unordered_set<string>::iterator end = ins_names.end();
+		for (auto o : pst_names)
+		{
+			if (ins_names.find(o) == end)
+				diff.push_back(o);
+		}
+		if (diff.size() > 0)
+		{
+			stringstream ss;
+			ss << "ModelInterace error: the following instruction observations are not in the control file:";
+			for (auto d : diff)
+				ss << d << ",";
+			throw_mio_error(ss.str());
+		}
+		end = pst_names.end();
+		for (auto o : ins_names)
+		{
+			if (pst_names.find(o) == end)
+				diff.push_back(o);
+		}
+		if (diff.size() > 0)
+		{
+			stringstream ss;
+			ss << "ModelInterace error: the following control file observations are not in the instruction files:";
+			for (auto d : diff)
+				ss << d << ",";
+			throw_mio_error(ss.str());
+		}
+
+		cout << "done" << endl;
+
+		
 
 		//set the finished flag for the listener thread
 		finished->set(true);
@@ -446,7 +481,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 
 }
 
-set<string> TemplateFile::parse_and_check()
+unordered_set<string> TemplateFile::parse_and_check()
 {
 	ifstream f(tpl_filename);
 	prep_tpl_file_for_reading(f);
@@ -465,6 +500,10 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 	double val;
 	map<string, pair<int, int>> tpl_line_map;
 	Parameters pro_pars;
+	vector<string> t = pars.get_keys();
+	unordered_set<string> pnames(t.begin(), t.end());
+	unordered_set<string>::iterator end = pnames.end();
+	t.resize(0);
 	while (true)
 	{
 		if (f_tpl.eof())
@@ -475,7 +514,9 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 		for (auto t : tpl_line_map)
 		{
 			name = t.first;
-			
+			if (pnames.find(name) == end)
+				throw_tpl_error("parameter '" + name + "' not listed in control file");
+
 			/*val = 1.23456789123456789123456789E+100;
 			val_str = cast_to_fixed_len_string(f_rec, 200, val, name);
 
@@ -536,9 +577,9 @@ void TemplateFile::prep_tpl_file_for_reading(ifstream& f_tpl)
 		throw_tpl_error("marker on first line should be one character, not: " + marker);
 }
 
-set<string> TemplateFile::get_names(ifstream& f)
+unordered_set<string> TemplateFile::get_names(ifstream& f)
 {
-	set<string> names;
+	unordered_set<string> names;
 	string line;
 	map<string, pair<int, int>> tpl_line_map;
 	
@@ -707,40 +748,45 @@ InstructionFile::InstructionFile(string _ins_filename): ins_filename(_ins_filena
 out_line_num(0),last_ins_line(""),last_out_line("")
 {
 	obs_tags.push_back(pair<char, char>('(', ')'));
-	obs_tags.push_back(pair<char, char>('[', ']'));
-	obs_tags.push_back(pair<char, char>('!', '!'));	
+	obs_tags.push_back(pair<char, char>('[', ']'));	
 }
 
 
-set<string> InstructionFile::parse_and_check(const vector<string>& obs_names)
+unordered_set<string> InstructionFile::parse_and_check()
 {
-	names.clear();
+	unordered_set<string> names;
 	ifstream f_ins(ins_filename);
 	prep_ins_file_for_reading(f_ins);
 	string line, name;
 	vector<string> tokens;
-	vector<string> s_names;
-	s_names.resize(obs_names.size());
 	int spos,epos;
+	char first;
 	while (true)
 	{
 		if (f_ins.eof())
 			break;
 		line = read_ins_line(f_ins);
 		pest_utils::upper_ip(line);
+		tokens.clear();
 		pest_utils::tokenize(line, tokens);
-		//for (auto token : tokens)
-		for (int i=0;i<tokens.size();i++)
+		
+		for (int i = 0; i < tokens.size(); i++)
 		{
-			parse_obs_name_from_token(tokens[i], name);
-			if (name.size() > 0)
+			first = tokens[i].at(0);
+			if ((first == '!') || (first == '(') || (first == '['))
 			{
+				name = parse_obs_name_from_token(tokens[i]);
+				if (names.find(name) != names.end())
+				{
+					cout << line << endl;
+					throw_ins_error("observation '" + name + "' listed multiple times in ins file '" + ins_filename + "'");
+				}
 				names.emplace(name);
 			}
 		}
 	}
 	f_ins.close();
-	//names.insert(s_names.begin(), s_names.end());
+	
 	return names;
 }
 
@@ -864,21 +910,24 @@ void InstructionFile::throw_ins_error(const string& message, int ins_lnum, int o
 		throw runtime_error(ss.str());
 }
 
-void InstructionFile::parse_obs_name_from_token(const string& token, string& name)
+string InstructionFile::parse_obs_name_from_token(const string& token)
 {
 	int spos, epos;
-	//for (auto ot : obs_tags)
+	string name;
+	//whitespace obs
+	if (token.at(0) == '!')
+	{
+		return token.substr(1, token.size() - 2);
+	}
+	
+
+	pair<string, pair<int, int>> info;
 	for (int i=0;i<obs_tags.size();i++)
 	{
 		if (token[0] == obs_tags[i].first)
 		{
-			if (token.find(obs_tags[i].second) == string::npos)
-				throw_ins_error("unbalanced obs tag'" + string(1, obs_tags[i].first) + "'", ins_line_num);
-			spos = token.find(obs_tags[i].first);
-			epos = token.find(obs_tags[i].second, spos + 1);
-			name = pest_utils::strip_cp(token.substr(spos + 1, (epos - spos) - 1));
-			
-			//break;
+			info = parse_obs_instruction(token, string(1,obs_tags[i].second));
+			return info.first;
 		}
 	}
 	//return name;
@@ -946,20 +995,20 @@ pair<string, pair<int, int>> InstructionFile::parse_obs_instruction(const string
 	int s, e, pos = token.find(close_tag);
 	if (pos == string::npos)
 	{
-		throw_ins_error("unbalanced fixed observation instruction for token '" + token + "'", ins_line_num);
+		throw_ins_error("unbalanced (semi-)fixed observation instruction for token '" + token + "'", ins_line_num);
 	}
 	name = token.substr(1, pos-1);
 	temp = token.substr(pos+1);
 	pos = temp.find(":");
 	if (pos == string::npos)
-		throw_ins_error("couldn't find ':' in fixed observation token '" + token + "'", ins_line_num);
+		throw_ins_error("couldn't find ':' in (semi-)fixed observation token '" + token + "'", ins_line_num);
 	try
 	{
 		pest_utils::convert_ip(temp.substr(0, pos), s);
 	}
 	catch (...)
 	{
-		throw_ins_error("error casting first index '" + temp.substr(0, pos) + "' from observation instruction '" + token + "'");
+		throw_ins_error("error casting first index '" + temp.substr(0, pos) + "' from (semi-)fixed observation instruction '" + token + "'");
 	}
 	try
 	{
@@ -1008,7 +1057,7 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 	if (last_out_line.size() < info.second.second)
 		throw_ins_error("output line not long enough for fixed obs instruction '" + token + "',");
 	int len = (info.second.second - info.second.first) + 1;
-	int pos = last_out_line.find_first_not_of(" \t", info.second.first);
+	int pos = last_out_line.find_first_not_of(", \t\n\r", info.second.first); //include the comma here for csv files
 	if (pos == string::npos)
 		throw_ins_error("EOL encountered when looking for non-whitespace char in semi-fixed instruction '" + token + "'",ins_line_num,out_line_num);
 	if (pos > info.second.second)
@@ -1033,9 +1082,9 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 pair<string, double> InstructionFile::execute_free(const string& token, string& line, ifstream& f_out)
 {
 	vector<string> tokens;
-	pest_utils::tokenize(line, tokens);
+	pest_utils::tokenize(line, tokens,", \t\n\r"); //include the comma in the delimiters here
 	if (tokens.size() == 0)
-		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for whitespace instruction execution on line: "+last_ins_line, ins_line_num, out_line_num);
+		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);
 	double value;
 	try
 	{
@@ -1043,13 +1092,13 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	}
 	catch (...)
 	{
-		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "'", ins_line_num, out_line_num);
+		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for instruciton '"+token+"'", ins_line_num, out_line_num);
 	}
 	string name = token.substr(1, token.size() - 2);
 	int pos = line.find(tokens[0]);
 	if (pos == string::npos)
 	{
-		throw_ins_error("internal error: could not find whitespace token", ins_line_num, out_line_num);
+		throw_ins_error("internal error: could not find free obs token '"+tokens[0]+"'", ins_line_num, out_line_num);
 	}
 	line = line.substr(pos + tokens[0].size());
 

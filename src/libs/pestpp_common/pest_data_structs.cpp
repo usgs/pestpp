@@ -1186,7 +1186,7 @@ void PestppOptions::set_defaults()
 
 
 	set_debug_parse_only(false);
-	set_check_tplins(false);
+	set_check_tplins(true);
 }
 
 ostream& operator<< (ostream &os, const ParameterInfo& val)
