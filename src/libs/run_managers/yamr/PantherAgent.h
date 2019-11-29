@@ -43,14 +43,9 @@ public:
 	int recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs = 0);
 	int send_message(NetPackage &net_pack, const void *data=NULL, unsigned long data_len=0);
 	NetPackage::PackType run_model(Parameters &pars, Observations &obs, NetPackage &net_pack);
-	//int run_model(Parameters &pars, Observations &obs);
-	std::string tpl_err_msg(int i);
-	std::string ins_err_msg(int i);
 	void check_io();
-	//void listener(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished);
-	void listener();
+	
 	void process_ctl_file(const string &ctl_filename);
-	void process_panther_ctl_file(const string &ctl_filename);
 private:
 	int sockfd;
 	int fdmax;
@@ -78,6 +73,8 @@ private:
 	void run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
 		pest_utils::thread_exceptions *shared_execptions,
 		Parameters* pars, Observations* obs);
+	Observations ctl_obs;
+	Parameters ctl_pars;
 
 };
 

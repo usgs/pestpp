@@ -155,7 +155,6 @@ void ModelInterface::initialize(vector<string> &_par_name_vec, vector<string> &_
 	for (auto tplfile : tplfile_vec)
 	{
 		TemplateFile tpl(tplfile);
-		//tpl.parse_and_check();
 		templatefiles.push_back(tpl);
 	}
 
@@ -464,7 +463,8 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 				ss << d << ",";
 			throw_mio_error(ss.str());
 		}
-
+		t = temp_obs.get_keys();
+		obs->update(t, temp_obs.get_data_vec(t));
 		cout << "done" << endl;
 
 		

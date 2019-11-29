@@ -112,7 +112,8 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 	inpfile_vec = pest_scenario.get_inpfile_vec();
 	insfile_vec = pest_scenario.get_insfile_vec();
 	outfile_vec = pest_scenario.get_outfile_vec();
-	
+	ctl_obs = pest_scenario.get_ctl_observations();
+	ctl_pars = pest_scenario.get_ctl_parameters();
 	poll_interval_seconds = pest_scenario.get_pestpp_options().get_worker_poll_interval();
 	/*pair<string, string> spair;
 	for (auto &line : pestpp_lines)
@@ -487,7 +488,7 @@ void PANTHERAgent::check_io()
 void PANTHERAgent::start(const string &host, const string &port)
 {
 	NetPackage net_pack;
-	Observations obs;
+	Observations obs = ctl_obs;
 	Parameters pars;
 	vector<int8_t> serialized_data;
 	int err;
