@@ -12,6 +12,7 @@ cache:
     - $HOME/.cache/pip
     - $HOME/.local
 
+
 matrix:
   include:
     - name: "pestpp-opt tests"
@@ -28,8 +29,9 @@ matrix:
       env: TEST_REPO="https://github.com/usgs/pestpp-ies_benchmarks" TEST_SCRIPT="ies_test_base.py" TEST_DIR="pestpp-ies_benchmarks"
     - name: "pestpp-glm tests baseline"
       env: TEST_REPO="https://github.com/usgs/pestpp-glm_benchmarks" TEST_SCRIPT="glm_test_base.py" TEST_DIR="pestpp-glm_benchmarks"
-
-
+    - name: "basic tests"
+      env: TEST_REPO="https://github.com/usgs/pestpp" TEST_SCRIPT="basic_tests.py" TEST_DIR="benchmarks"
+          
 addons:
   apt:
     sources:
@@ -68,7 +70,7 @@ before_script:
   - cd ..
   - export PYTHONPATH=$PYTHONPATH:.
   - export PATH="./test_bin/linux:../test_bin/linux:../../test_bin/linux:$PATH"
-  - nosetests -v -w ./benchmarks basic_tests.py
+
 
 script:
   - git clone -b master --depth 1 $TEST_REPO  

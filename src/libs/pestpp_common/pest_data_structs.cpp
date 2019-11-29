@@ -69,6 +69,19 @@ ParameterGroupRec& ParameterGroupRec::operator=(const ParameterGroupRec &rhs)
 	return *this;
 }
 
+void ParameterGroupRec::set_defaults()
+{
+	name = "PARGP";
+	inctyp = "RELATIVE";
+	derinc = 0.01;
+	derinclb = 0.0;
+	forcen = "SWITCH";
+	derincmul = 2.0;
+	dermthd = "PARABOLIC";
+	splitthresh = 1.0e-5;
+	splitreldiff = 0.5;
+}
+
 ostream& operator<< (ostream &os, const ParameterGroupRec& val)
 {
 	os << "PEST Parameter Group Information" << endl;
@@ -122,11 +135,16 @@ void ParameterGroupInfo::insert_parameter_link(const string &parameter_name, con
 
 	g_iter = groups.find(group_name);
 	if(g_iter == groups.end()) {
-		throw PestIndexError(group_name, "Invalid parameter group name");
+		//throw PestIndexError(group_name, "Invalid parameter group name");
+		ParameterGroupRec pgr;
+		pgr.set_defaults();
+		insert_group(group_name, pgr);
+		g_iter = groups.find(group_name);
 	}
-	else {
+	/*else {
 		parameter2group[parameter_name] = (*g_iter).second;
-	}
+	}*/
+	parameter2group[parameter_name] = (*g_iter).second;
 
 }
 
@@ -288,751 +306,881 @@ Parameters ParameterInfo::get_init_value(const vector<string> &keys) const
 }
 
 
-ostream& operator<< (ostream &os, const PestppOptions& val)
+map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const string& line)
 {
-	os << "PEST++ Options" << endl;
-	os << "    n_iter_base = " << left << setw(20) << val.get_n_iter_base() << endl;
-	os << "    n_iter_super = " << left << setw(20) << val.get_n_iter_super() << endl;
-	os << "    max_n_super = " << left << setw(20) << val.get_max_n_super() << endl;
-	os << "    super eigthres = " << left << setw(20) << val.get_super_eigthres() << endl;
-	os << "    svd pack = " << left << setw(20) << val.get_svd_pack() << endl;
-	os << "    super relparmax = " << left << setw(20) << val.get_super_relparmax() << endl;
-	os << "    max super frz iter = " << left << setw(20) << val.get_max_super_frz_iter() << endl;
-	os << "    max run fail = " << left << setw(20) << val.get_max_run_fail() << endl;
-	os << "    max reg iter = " << left << setw(20) << val.get_max_reg_iter() << endl;
-	os << "    use jacobian scaling a la PEST? = ";
-	if (val.get_jac_scale())
-		os << " yes" << endl;
-	else
-		os << " no" << endl;
-	os << "    lambdas = " << endl;
-	for (auto &lam : val.get_base_lambda_vec())
+	map<string, ARG_STATUS> arg_map;
+	ARG_STATUS stat;
+	
+	pair<string, string> spair = pest_utils::parse_plusplus_line(line);
+	if (spair.second.size() == 0)
+		return arg_map;
+	try
 	{
-		os << right << setw(15) << lam << endl;
+		stat = assign_value_by_key(spair.first, spair.second);
+		arg_map[spair.first] = stat;
 	}
-	os << "    lambda scaling factors = " << endl;
-	for (auto &ls : val.get_lambda_scale_vec())
-		os << right << setw(15) << ls << endl;
-
-	if (!val.get_basejac_filename().empty())
+	catch (...)
 	{
-		os << "   restarting with existing jacobian matrix file: " << val.get_basejac_filename() << endl;
-		if (!val.get_hotstart_resfile().empty())
-		{
-			os << "   and using existing residual file " << val.get_hotstart_resfile() << " to forego initial model run" << endl;
-		}
+		arg_map[spair.first] = ARG_STATUS::ARG_INVALID;
 	}
-	if (val.get_uncert_flag())
-	{
-		os << "    using FOSM-based uncertainty estimation for parameters" << endl;
-		os << "    parameter covariance file = " << left << setw(20) << val.get_parcov_filename() << endl;
-		if (val.get_prediction_names().size() > 0)
-		{
-			os << "    using FOSM-based uncertainty for forecasts" << endl;
-			os << "    forecast names = " << endl;
-		}
-
-	}
-	for (auto &pname : val.get_prediction_names())
-		os << right << setw(15) << pname << endl;
-	os << "    derivative run failure forgive = " << left << setw(15) << val.get_der_forgive() << endl;
-	os << "    run overdue reschedule factor = " << left << setw(20) << val.get_overdue_reched_fac() << endl;
-	os << "    run overdue giveup factor = " << left << setw(20) << val.get_overdue_giveup_fac() << endl;
-	os << "    base parameter jacobian filename = " << left << setw(20) << val.get_basejac_filename() << endl;
-	if (val.get_global_opt() == PestppOptions::GLOBAL_OPT::OPT_DE)
-	{
-		os << "    global optimizer = differential evolution (DE)" << endl;
-		os << "    DE CR = " << left << setw(10) << val.get_de_cr() << endl;
-		os << "    DE F = " << left << setw(10) << val.get_de_f() << endl;
-		os << "    DE population size = " << setw(10) << val.get_de_npopulation() << endl;
-		os << "    DE max generations = " << setw(10) << val.get_de_max_gen() << endl;
-		os << "    DE F dither = " << left << setw(10) << val.get_de_dither_f() << endl;
-	}
-	os << endl;
-	return os;
+	return arg_map;
 }
 
-PestppOptions::PestppOptions(int _n_iter_base, int _n_iter_super, int _max_n_super, double _super_eigthres,
-	SVD_PACK _svd_pack, double _super_relparmax, int _max_run_fail,
-	bool _iter_summary_flag, bool _der_forgive, double _overdue_reched_fac, double _overdue_giveup_fac,
-	GLOBAL_OPT _global_opt, double _de_f, double _de_cr, int _de_npopulation, int _de_max_gen, bool _de_dither_f)
-	: n_iter_base(_n_iter_base), n_iter_super(_n_iter_super), max_n_super(_max_n_super), super_eigthres(_super_eigthres),
-	svd_pack(_svd_pack), super_relparmax(_super_relparmax),
-	max_run_fail(_max_run_fail), max_super_frz_iter(50), max_reg_iter(50), base_lambda_vec({ 0.1, 1.0, 10.0, 100.0, 1000.0 }),
-	lambda_scale_vec({1.0}),
-	iter_summary_flag(_iter_summary_flag), der_forgive(_der_forgive), overdue_reched_fac(_overdue_reched_fac),
-	overdue_giveup_fac(_overdue_giveup_fac), global_opt(_global_opt),
-	de_f(_de_f), de_cr(_de_cr), de_npopulation(_de_npopulation), de_max_gen(_de_max_gen), de_dither_f(_de_dither_f)
+PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const string org_value)
 {
-}
+	upper_ip(key);
 
-void PestppOptions::parce_line(const string &line)
-{
-	string key;
-	string value;
-	regex lambda_reg("(\\w+)(?:\\s*\\()([^\\)]+)(?:\\))");
-	const std::sregex_iterator end_reg;
-	//regex lambda_reg("((\\w+\\s*\\([^\\)]+\\))+?)");
-	cmatch mr;
+	string value = upper_cp(org_value);
+		
+	if (value.size() > 0)
+		if (passed_args.find(key) != passed_args.end())
+		{
+			//throw PestParsingError(line, "Duplicate key word \"" + key + "\", possibly through an alias");
+			//cout << "parse_plusplus_line() Error: Duplicate key word " << key << ", possibly through an alias" << endl;
+			return ARG_STATUS::ARG_DUPLICATE;
+		}
+		passed_args.insert(key);
+		arg_map[key] = value;
+		
 
-	size_t found = line.find_first_of("#");
-	if (found == string::npos) {
-		found = line.length();
+	if (key=="MAX_N_SUPER"){
+		convert_ip(value, max_n_super);
+
 	}
-	string tmp_line = line.substr(0, found);
-	strip_ip(tmp_line, "both", "\t\n\r+ ");
-	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\"'),tmp_line.end());
-	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\''), tmp_line.end());
-	//upper_ip(tmp_line);
-
-
-	for (std::sregex_iterator i(tmp_line.begin(), tmp_line.end(), lambda_reg); i != end_reg; ++i)
+	else if ((key=="SUPER_EIGTHRESH") || (key=="SUPER_EIGTHRES"))
 	{
-		string key = (*i)[1];
-		string org_value = strip_cp((*i)[2]);
-		upper_ip(key);
+		passed_args.insert("SUPER_EIGTHRESH");
+		passed_args.insert("SUPER_EIGTHRES");
+		convert_ip(value, super_eigthres);
+	}
+	else if (key=="N_ITER_BASE"){
+		convert_ip(value, n_iter_base);
+	}
+	else if (key=="N_ITER_SUPER"){
+		convert_ip(value, n_iter_super);
+	}
+	else if (key=="SVD_PACK"){
 
-		string value = upper_cp(org_value);
+		if (value == "PROPACK")
+			svd_pack = PROPACK;
+		else if (value == "REDSVD")
+			svd_pack = REDSVD;
+		else if ((value == "EIGEN") || (value == "JACOBI"))
+			svd_pack = EIGEN;
+		else
+			//throw PestParsingError(line, "Invalid ++svd_pack: \"" + value + "\"");
+			return ARG_STATUS::ARG_INVALID;
+	}
 		
-		if (value.size() > 0)
-			if (passed_args.find(key) != passed_args.end())
-				throw PestParsingError(line, "Duplicate key word \"" + key + "\", possibly through an alias");
-			passed_args.insert(key);
-			arg_map[key] = value;
-
-		if (key=="MAX_N_SUPER"){
-			convert_ip(value, max_n_super);
-
-		}
-		else if ((key=="SUPER_EIGTHRESH") || (key=="SUPER_EIGTHRES"))
-		{
-			passed_args.insert("SUPER_EIGTHRESH");
-			passed_args.insert("SUPER_EIGTHRES");
-			convert_ip(value, super_eigthres);
-		}
-		else if (key=="N_ITER_BASE"){
-			convert_ip(value, n_iter_base);
-		}
-		else if (key=="N_ITER_SUPER"){
-			convert_ip(value, n_iter_super);
-		}
-		else if (key=="SVD_PACK"){
-
-			if (value == "PROPACK")
-				svd_pack = PROPACK;
-			else if (value == "REDSVD")
-				svd_pack = REDSVD;
-			else if ((value == "EIGEN") || (value == "JACOBI"))
-				svd_pack = EIGEN;
-			else
-				throw PestParsingError(line, "Invalid ++svd_pack: \"" + value + "\"");
-
-
-		}
+	else if (key == "SUPER_RELPARMAX"){
+		convert_ip(value, super_relparmax);
+	}
+	else if (key == "MAX_SUPER_FRZ_ITER"){
+		convert_ip(value, max_super_frz_iter);
+	}
 		
-		else if (key == "SUPER_RELPARMAX"){
-			convert_ip(value, super_relparmax);
-		}
-		else if (key == "MAX_SUPER_FRZ_ITER"){
-			convert_ip(value, max_super_frz_iter);
-		}
-		
-		else if (key == "MAX_RUN_FAIL"){
-			convert_ip(value, max_run_fail);
-		}
-		else if (key == "MAX_REG_ITER"){
-			convert_ip(value, max_reg_iter);
-		}
-		else if (key == "LAMBDAS")
+	else if (key == "MAX_RUN_FAIL"){
+		convert_ip(value, max_run_fail);
+	}
+	else if (key == "MAX_REG_ITER"){
+		convert_ip(value, max_reg_iter);
+	}
+	else if (key == "LAMBDAS")
+	{
+		base_lambda_vec.clear();
+		vector<string> lambda_tok;
+		tokenize(value, lambda_tok, ",");
+		for (const auto &ilambda : lambda_tok)
 		{
-			base_lambda_vec.clear();
-			vector<string> lambda_tok;
-			tokenize(value, lambda_tok, ",");
-			for (const auto &ilambda : lambda_tok)
-			{
-				base_lambda_vec.push_back(convert_cp<double>(ilambda));
-			}
+			base_lambda_vec.push_back(convert_cp<double>(ilambda));
 		}
-		else if (key == "LAMBDA_SCALE_FAC")
+	}
+	else if (key == "LAMBDA_SCALE_FAC")
+	{
+		lambda_scale_vec.clear();
+		vector<string> scale_tok;
+		tokenize(value, scale_tok, ",");
+		for (const auto &iscale : scale_tok)
 		{
-			lambda_scale_vec.clear();
-			vector<string> scale_tok;
-			tokenize(value, scale_tok, ",");
-			for (const auto &iscale : scale_tok)
-			{
-				lambda_scale_vec.push_back(convert_cp<double>(iscale));
-			}
+			lambda_scale_vec.push_back(convert_cp<double>(iscale));
 		}
-		else if (key == "ITERATION_SUMMARY")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> iter_summary_flag;
-		}
-		else if (key == "DER_FORGIVE")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> der_forgive;
-		}
-		else if (key == "UNCERTAINTY")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> uncert;
-		}
-		else if (key == "PREDICTIONS" || key == "FORECASTS")
-		{
-			passed_args.insert("PREDICTIONS");
-			passed_args.insert("FORECASTS");
-			prediction_names.clear();
-			vector<string> prediction_tok;
-			tokenize(value, prediction_tok, ",");
-			for (const auto &pname : prediction_tok)
-			{ 
+	}
+	else if (key == "ITERATION_SUMMARY")
+	{
+		iter_summary_flag = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "DER_FORGIVE")
+	{
+		der_forgive = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "UNCERTAINTY")
+	{
+		uncert = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "PREDICTIONS" || key == "FORECASTS")
+	{
+		passed_args.insert("PREDICTIONS");
+		passed_args.insert("FORECASTS");
+		prediction_names.clear();
+		vector<string> prediction_tok;
+		tokenize(value, prediction_tok, ",");
+		for (const auto &pname : prediction_tok)
+		{ 
 				
-				prediction_names.push_back(strip_cp(pname));
-			}
-		}
-		else if ((key == "PARCOV") || (key == "PARAMETER_COVARIANCE")
-			|| (key == "PARCOV_FILENAME"))
-		{
-			passed_args.insert("PARCOV");
-			passed_args.insert("PARAMETER_COVARIANCE");
-			passed_args.insert("PARCOV_FILENAME");
-			//convert_ip(org_value, parcov_filename);
-			parcov_filename = org_value;
-		}
-
-		else if ((key == "OBSCOV") || (key == "OBSERVATION_COVARIANCE")
-			|| (key == "OBSCOV_FILENAME"))
-		{
-			passed_args.insert("OBSCOV");
-			passed_args.insert("OBSERVATION_COVARIANCE");
-			passed_args.insert("OBSCOV_FILENAME");
-			//convert_ip(org_value, parcov_filename);
-			obscov_filename = org_value;
-		}
-
-		else if ((key == "BASE_JACOBIAN") || (key == "BASE_JACOBIAN_FILENAME"))
-		{
-			passed_args.insert("BASE_JACOBIAN");
-			passed_args.insert("BASE_JACOBIAN_FILENAME");
-			
-			//convert_ip(org_value, basejac_filename);
-			basejac_filename = org_value;
-		}
-
-		else if (key == "HOTSTART_RESFILE")
-		{
-			//convert_ip(org_value, hotstart_resfile);
-			hotstart_resfile = org_value;
-		}
-
-		else if (key == "OVERDUE_RESCHED_FAC"){
-			convert_ip(value, overdue_reched_fac);
-		}
-		else if (key == "OVERDUE_GIVEUP_FAC"){
-			convert_ip(value, overdue_giveup_fac);
-		}
-		else if (key == "OVERDUE_GIVEUP_MINUTES")
-		{
-			convert_ip(value, overdue_giveup_minutes);
-		}
-		else if (key == "CONDOR_SUBMIT_FILE")
-		{
-			//convert_ip(value, condor_submit_file);
-			condor_submit_file = org_value;
-		}
-		else if ((key == "SWEEP_PARAMETER_CSV_FILE") || (key == "SWEEP_PAR_CSV"))
-		{
-			passed_args.insert("SWEEP_PARAMETER_CSV_FILE");
-			passed_args.insert("SWEEP_PAR_CSV");
-			
-			//convert_ip(org_value, sweep_parameter_csv_file);
-			sweep_parameter_csv_file = org_value;
-		}
-		else if ((key == "SWEEP_OUTPUT_CSV_FILE") || (key == "SWEEP_OBS_CSV"))
-		{
-			passed_args.insert("SWEEP_OUTPUT_CSV_FILE");
-			passed_args.insert("SWEEP_OBS_CSV");
-			
-			//convert_ip(org_value, sweep_output_csv_file);
-			sweep_output_csv_file = org_value;
-		}
-		else if (key == "SWEEP_CHUNK")
-			convert_ip(value, sweep_chunk);
-		else if (key == "SWEEP_FORGIVE")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> sweep_forgive;
-		}
-		else if (key == "SWEEP_BASE_RUN")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> sweep_base_run;
-		}
-
-		else if (key == "TIE_BY_GROUP")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> tie_by_group;
-		}
-
-		else if (key == "JAC_SCALE")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> jac_scale;
-
-		}
-
-		else if (key == "UPGRADE_AUGMENT")
-		{
-		cout << "++UPGRADE_AUGMENT is deprecated and no longer supported...ignoring" << endl;
-
-		}
-
-		else if (key == "UPGRADE_BOUNDS")
-		{
-		cout << "++UPGRADE_BOUNDS is deprecated and no longer supported...ignoring" << endl;
-
-		}
-
-		else if (key == "AUTO_NORM")
-		{
-			cout << "++AUTO_NORM is deprecated and no longer supported...ignoring" << endl;
-
-		}
-		else if (key == "MAT_INV")
-		{
-			cout << "++MAT_INV is deprecated (JtQJ only) and no longer supported...ignoring" << endl;
-
-		}
-
-		else if (key == "GLOBAL_OPT")
-		{
-			if (value == "DE") global_opt = OPT_DE;
-		}
-		else if (key == "DE_F")
-		{
-			convert_ip(value, de_f);
-		}
-		else if (key == "DE_CR")
-		{
-			convert_ip(value, de_cr);
-		}
-		else if (key == "DE_POP_SIZE")
-		{
-			convert_ip(value, de_npopulation);
-		}
-		else if (key == "DE_MAX_GEN")
-		{
-			convert_ip(value, de_max_gen);
-		}
-		else if (key == "DE_DITHER_F")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> de_dither_f;
-		}
-		else if ((key == "OPT_OBJ_FUNC") || (key == "OPT_OBJECTIVE_FUNCTION"))
-		{
-			passed_args.insert("OPT_OBJ_FUNC");
-			passed_args.insert("OPT_OBJECTIVE_FUNCTION");
-			convert_ip(value,opt_obj_func);
-		}
-		else if (key == "OPT_COIN_LOG")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> opt_coin_log;
-		}
-		else if (key == "OPT_SKIP_FINAL")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> opt_skip_final;
-		}
-
-		else if (key == "OPT_STD_WEIGHTS")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> opt_std_weights;
-		}
-
-		else if ((key == "OPT_DEC_VAR_GROUPS") || (key == "OPT_DECISION_VARIABLE_GROUPS"))
-		{
-			passed_args.insert("OPT_DEC_VAR_GROUPS");
-			passed_args.insert("OPT_DECISION_VARIABLE_GROUPS");
-			opt_dec_var_groups.clear();
-			vector<string> tok;
-			tokenize(value, tok, ", ");
-			for (const auto &name : tok)
-			{
-				opt_dec_var_groups.push_back(strip_cp(name));
-			}
-		}
-
-		else if ((key == "OPT_EXT_VAR_GROUPS") || (key == "OPT_EXTERNAL_VARIABLE_GROUPS"))
-		{
-			passed_args.insert("OPT_EXT_VAR_GROUPS");
-			passed_args.insert("OPT_EXTERNAL_VARIABLE_GROUPS");
-			opt_external_var_groups.clear();
-			vector<string> tok;
-			tokenize(value, tok, ", ");
-			for (const auto &name : tok)
-			{
-				opt_external_var_groups.push_back(strip_cp(name));
-			}
-		}
-
-		else if ((key == "OPT_CONSTRAINT_GROUPS"))
-		{
-			opt_constraint_groups.clear();
-			vector<string> tok;
-			tokenize(value, tok, ", ");
-			for (const auto &name : tok)
-			{
-				opt_constraint_groups.push_back(strip_cp(name));
-			}
-		}
-
-		else if (key == "OPT_RISK")
-		{
-			convert_ip(value, opt_risk);
-		}
-
-		else if (key == "OPT_ITER_DERINC_FAC")
-		{
-			convert_ip(value, opt_iter_derinc_fac);
-		}
-
-		else if (key == "OPT_DIRECTION")
-		{
-			string v;
-			convert_ip(value,v);
-			if (v == "MAX")
-				opt_direction = -1;
-			else if (v == "MIN")
-				opt_direction = 1;
-			else
-				throw runtime_error("++opt_direction arg must be in {MAX,MIN}, not " + v);
-		}
-
-		else if (key == "OPT_ITER_TOL")
-		{
-			convert_ip(value, opt_iter_tol);
-		}
-
-		else if (key == "OPT_RECALC_FOSM_EVERY")
-		{
-			convert_ip(value, opt_recalc_fosm_every);
-		}
-		else if (key == "OPT_INCLUDE_BND_PI")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> opt_include_bnd_pi;
-		}
-
-		else if ((key == "IES_PAR_EN") || (key == "IES_PARAMETER_ENSEMBLE"))
-		{
-			passed_args.insert("IES_PARAMETER_ENSEMBLE");
-			passed_args.insert("IES_PAR_EN");
-			//convert_ip(value, ies_par_csv);
-			ies_par_csv = org_value;
-		}
-		else if ((key == "IES_OBS_EN") || (key == "IES_OBSERVATION_ENSEMBLE"))
-		{
-			passed_args.insert("IES_OBSERVATION_ENSEMBLE");
-			passed_args.insert("IES_OBS_EN");
-			//convert_ip(value, ies_obs_csv);
-			ies_obs_csv = org_value;
-		}
-		else if ((key == "IES_RESTART_PARAMETER_ENSEMBLE") || (key == "IES_RESTART_PAR_EN"))
-		{
-			passed_args.insert("IES_RESTART_PARAMETER_ENSEMBLE");
-			passed_args.insert("IES_RESTART_PAR_EN");
-			//convert_ip(value, ies_obs_restart_csv);
-			ies_par_restart_csv = org_value;
-		}
-		else if ((key == "IES_RESTART_OBSERVATION_ENSEMBLE") || (key == "IES_RESTART_OBS_EN"))
-		{
-			passed_args.insert("IES_RESTART_OBSERVATION_ENSEMBLE");
-			passed_args.insert("IES_RESTART_OBS_EN");
-			//convert_ip(value, ies_obs_restart_csv);
-			ies_obs_restart_csv = org_value;
-		}
-
-		else if ((key == "IES_USE_APPROXIMATE_SOLUTION") || (key == "IES_USE_APPROX"))
-		{
-			passed_args.insert("IES_USE_APPROXIMATE_SOLUTION");
-			passed_args.insert("IES_USE_APPROX");
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_use_approx;
-		}
-		else if (key == "IES_LAMBDA_MULTS")
-		{
-			ies_lam_mults.clear();
-			vector<string> tok;
-			tokenize(value, tok, ",");
-			for (const auto &iscale : tok)
-			{
-				ies_lam_mults.push_back(convert_cp<double>(iscale));
-			}
-		}
-		else if ((key == "IES_INIT_LAM") || (key == "IES_INITIAL_LAMBDA"))
-		{
-			passed_args.insert("IES_INIT_LAM");
-			passed_args.insert("IES_INITIAL_LAMBDA");
-			convert_ip(value, ies_init_lam);
-		}
-		else if (key == "IES_USE_APPROX")
-		{
-			convert_ip(value, ies_obs_restart_csv);
-		}
-		else if (key == "IES_SUBSET_SIZE")
-		{
-			convert_ip(value, ies_subset_size);
-		}
-		else if  ((key == "IES_REG_FACTOR") || (key == "IES_REG_FAC"))
-		{
-			passed_args.insert("IES_REG_FACTOR");
-			passed_args.insert("IES_REG_FAC");
-			convert_ip(value, ies_reg_factor);
-		}
-		else if (key == "IES_VERBOSE_LEVEL")
-		{
-			convert_ip(value, ies_verbose_level);
-		}
-		else if (key == "IES_USE_PRIOR_SCALING")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_use_prior_scaling;
-		}
-		else if ((key == "IES_NUM_REALS") || (key == "NUM_REALS"))
-		{
-			passed_args.insert("IES_NUM_REALS");
-			passed_args.insert("NUM_REALS");
-			convert_ip(value, ies_num_reals);
-			//ies_num_reals_passed = true;
-		}
-		else if (key == "IES_BAD_PHI")
-		{
-			convert_ip(value, ies_bad_phi);
-		}
-		else if (key == "IES_BAD_PHI_SIGMA")
-		{
-			convert_ip(value, ies_bad_phi_sigma);
-		}
-		else if ((key == "IES_INCLUDE_BASE") || (key == "IES_ADD_BASE"))
-		{
-			passed_args.insert("IES_INCLUDE_BASE");
-			passed_args.insert("IES_ADD_BASE");
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_include_base;
-		}
-		else if (key == "IES_USE_EMPIRICAL_PRIOR")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_use_empirical_prior;
-		}
-		else if (key == "IES_GROUP_DRAWS")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_group_draws;
-		}
-		else if (key == "IES_ENFORCE_BOUNDS")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_enforce_bounds;
-		}
-		else if ((key == "IES_SAVE_BINARY") || (key == "SAVE_BINARY"))
-		{
-			passed_args.insert("IES_SAVE_BINARY");
-			passed_args.insert("SAVE_BINARY");
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_save_binary;
-		}
-		else if (key == "PAR_SIGMA_RANGE")
-		{
-			convert_ip(value, par_sigma_range);
-		}
-		else if (key == "YAMR_POLL_INTERVAL") {
-			//doesn't apply here
-		}
-		else if (key == "IES_LOCALIZER")
-		{
-			//convert_ip(value, ies_localizer);
-			ies_localizer = org_value;
-		}
-		else if (key == "IES_ACCEPT_PHI_FAC")
-		{
-			convert_ip(value, ies_accept_phi_fac);
-		}
-		else if (key == "IES_LAMBDA_INC_FAC")
-		{
-			convert_ip(value, ies_lambda_inc_fac);
-		}
-		else if (key == "IES_LAMBDA_DEC_FAC")
-		{
-			convert_ip(value, ies_lambda_dec_fac);
-		}
-		else if ((key == "IES_SAVE_LAMBDA_EN") || (key == "IES_SAVE_LAMBDA_ENSEMBLES"))
-		{
-			passed_args.insert("IES_SAVE_LAMBDA_EN");
-			passed_args.insert("IES_SAVE_LAMBDA_ENSEMBLES");
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_save_lambda_en;
-		}
-		else if ((key == "IES_WEIGHTS_EN") || (key == "IES_WEIGHTS_ENSEMBLE"))
-		{
-			passed_args.insert("IES_WEIGHTS_EN");
-			passed_args.insert("IES_WEIGHTS_ENSEMBLE");
-			ies_weight_csv = org_value;
-		}
-		else if (key == "IES_SUBSET_HOW")
-		{
-			convert_ip(value,ies_subset_how);
-		}
-		else if (key == "IES_LOCALIZE_HOW")
-		{
-			convert_ip(value, ies_localize_how);
-		}
-		else if (key == "IES_NUM_THREADS")
-		{
-			convert_ip(value, ies_num_threads);
-		}
-		else if (key == "IES_DEBUG_FAIL_SUBSET")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_debug_fail_subset;
-		}
-		else if (key == "IES_DEBUG_FAIL_REMAINDER")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_debug_fail_remainder;
-		}
-		else if (key == "IES_DEBUG_BAD_PHI")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_debug_bad_phi;
-		}
-		else if (key == "IES_DEBUG_UPGRADE_ONLY")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_debug_upgrade_only;
-		}
-		else if (key == "IES_DEBUG_HIGH_SUBSET_PHI")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_debug_high_subset_phi;
-		}
-		else if (key == "IES_DEBUG_HIGH_UPGRADE_PHI")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_debug_high_upgrade_phi;
-		}
-		else if (key == "IES_CSV_BY_REALS")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_csv_by_reals;
-		}
-		else if (key == "IES_AUTOADALOC")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_autoadaloc;
-		}
-		else if (key == "IES_AUTOADALOC_SIGMA_DIST")
-		{
-			convert_ip(value, ies_autoadaloc_sigma_dist);
-		}
-		else if (key == "IES_ENFORCE_CHGLIM")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> ies_enforce_chglim;
-		}
-		else if (key == "IES_CENTER_ON")
-		{
-			convert_ip(value, ies_center_on);
-		}
-
-
-		else if (key == "GSA_METHOD")
-		{
-			convert_ip(value, gsa_method);
-		}
-		else if (key == "GSA_MORRIS_POOLED_OBS")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> gsa_morris_pooled_obs;
-		}
-		else if (key == "GSA_MORRIS_OBS_SEN")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> gsa_morris_obs_sen;
-		}
-		else if (key == "GSA_MORRIS_P")
-		{
-			convert_ip(value, gsa_morris_p);
-		}
-		else if (key == "GSA_MORRIS_R")
-		{
-			convert_ip(value, gsa_morris_r);
-		}
-		else if (key == "GSA_MORRIS_DELTA")
-		{
-			convert_ip(value, gsa_morris_delta);
-		}
-
-		else if (key == "GSA_SOBOL_SAMPLES")
-		{
-			convert_ip(value, gsa_sobol_samples);
-		}
-		else if (key == "GSA_SOBOL_PAR_DIST")
-		{
-			convert_ip(value, gsa_sobol_par_dist);
-		}
-
-		else if (key == "GSA_SOBOL_PAR_DIST")
-		{
-			convert_ip(value, gsa_sobol_par_dist);
-		}
-		else if (key == "ENFORCE_TIED_BOUNDS")
-		{
-			transform(value.begin(), value.end(), value.begin(), ::tolower);
-			istringstream is(value);
-			is >> boolalpha >> enforce_tied_bounds;
-		 }
-		else {
-
-			throw PestParsingError(line, "Invalid key word \"" + key +"\"");
+			prediction_names.push_back(strip_cp(pname));
 		}
 	}
+	else if ((key == "PARCOV") || (key == "PARAMETER_COVARIANCE")
+		|| (key == "PARCOV_FILENAME"))
+	{
+		passed_args.insert("PARCOV");
+		passed_args.insert("PARAMETER_COVARIANCE");
+		passed_args.insert("PARCOV_FILENAME");
+		//convert_ip(org_value, parcov_filename);
+		parcov_filename = org_value;
+	}
+
+	else if ((key == "OBSCOV") || (key == "OBSERVATION_COVARIANCE")
+		|| (key == "OBSCOV_FILENAME"))
+	{
+		passed_args.insert("OBSCOV");
+		passed_args.insert("OBSERVATION_COVARIANCE");
+		passed_args.insert("OBSCOV_FILENAME");
+		//convert_ip(org_value, parcov_filename);
+		obscov_filename = org_value;
+	}
+
+	else if ((key == "BASE_JACOBIAN") || (key == "BASE_JACOBIAN_FILENAME"))
+	{
+		passed_args.insert("BASE_JACOBIAN");
+		passed_args.insert("BASE_JACOBIAN_FILENAME");
+			
+		//convert_ip(org_value, basejac_filename);
+		basejac_filename = org_value;
+	}
+
+	else if (key == "HOTSTART_RESFILE")
+	{
+		//convert_ip(org_value, hotstart_resfile);
+		hotstart_resfile = org_value;
+	}
+
+	else if (key == "GLM_NUM_REALS")
+	{
+		convert_ip(value, glm_num_reals);
+	}
+
+	else if (key == "OVERDUE_RESCHED_FAC"){
+		convert_ip(value, overdue_reched_fac);
+	}
+	else if (key == "OVERDUE_GIVEUP_FAC"){
+		convert_ip(value, overdue_giveup_fac);
+	}
+	else if (key == "OVERDUE_GIVEUP_MINUTES")
+	{
+		convert_ip(value, overdue_giveup_minutes);
+	}
+	else if (key == "CONDOR_SUBMIT_FILE")
+	{
+		//convert_ip(value, condor_submit_file);
+		condor_submit_file = org_value;
+	}
+	else if ((key == "SWEEP_PARAMETER_CSV_FILE") || (key == "SWEEP_PAR_CSV"))
+	{
+		passed_args.insert("SWEEP_PARAMETER_CSV_FILE");
+		passed_args.insert("SWEEP_PAR_CSV");
+			
+		//convert_ip(org_value, sweep_parameter_csv_file);
+		sweep_parameter_csv_file = org_value;
+	}
+	else if ((key == "SWEEP_OUTPUT_CSV_FILE") || (key == "SWEEP_OBS_CSV"))
+	{
+		passed_args.insert("SWEEP_OUTPUT_CSV_FILE");
+		passed_args.insert("SWEEP_OBS_CSV");
+			
+		//convert_ip(org_value, sweep_output_csv_file);
+		sweep_output_csv_file = org_value;
+	}
+	else if (key == "SWEEP_CHUNK")
+		convert_ip(value, sweep_chunk);
+	else if (key == "SWEEP_FORGIVE")
+	{
+		sweep_forgive = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "SWEEP_BASE_RUN")
+	{
+		sweep_base_run = pest_utils::parse_string_arg_to_bool(value);
+	}
+
+	else if (key == "TIE_BY_GROUP")
+	{
+		tie_by_group = pest_utils::parse_string_arg_to_bool(value);
+	}
+
+	else if (key == "JAC_SCALE")
+	{
+		jac_scale = pest_utils::parse_string_arg_to_bool(value);
+
+	}
+
+	else if (key == "UPGRADE_AUGMENT")
+	{
+		cout << "++UPGRADE_AUGMENT is deprecated and no longer supported...ignoring" << endl;
+	}
+
+	else if (key == "UPGRADE_BOUNDS")
+	{
+		cout << "++UPGRADE_BOUNDS is deprecated and no longer supported...ignoring" << endl;
+	}
+	else if (key == "AUTO_NORM")
+	{
+		cout << "++AUTO_NORM is deprecated and no longer supported...ignoring" << endl;
+	}
+	else if (key == "MAT_INV")
+	{
+		cout << "++MAT_INV is deprecated (JtQJ is the only form now supported) and no longer supported...ignoring" << endl;
+	}
+
+	else if (key == "GLOBAL_OPT")
+	{
+		if (value == "DE") global_opt = OPT_DE;
+	}
+	else if (key == "DE_F")
+	{
+		convert_ip(value, de_f);
+	}
+	else if (key == "DE_CR")
+	{
+		convert_ip(value, de_cr);
+	}
+	else if (key == "DE_POP_SIZE")
+	{
+		convert_ip(value, de_npopulation);
+	}
+	else if (key == "DE_MAX_GEN")
+	{
+		convert_ip(value, de_max_gen);
+	}
+	else if (key == "DE_DITHER_F")
+	{
+		de_dither_f = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if ((key == "OPT_OBJ_FUNC") || (key == "OPT_OBJECTIVE_FUNCTION"))
+	{
+		passed_args.insert("OPT_OBJ_FUNC");
+		passed_args.insert("OPT_OBJECTIVE_FUNCTION");
+		convert_ip(value,opt_obj_func);
+	}
+	else if (key == "OPT_COIN_LOG")
+	{
+		opt_coin_log = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "OPT_SKIP_FINAL")
+	{
+		opt_skip_final = pest_utils::parse_string_arg_to_bool(value);
+	}
+
+	else if (key == "OPT_STD_WEIGHTS")
+	{
+		opt_std_weights = pest_utils::parse_string_arg_to_bool(value);
+	}
+
+	else if ((key == "OPT_DEC_VAR_GROUPS") || (key == "OPT_DECISION_VARIABLE_GROUPS"))
+	{
+		passed_args.insert("OPT_DEC_VAR_GROUPS");
+		passed_args.insert("OPT_DECISION_VARIABLE_GROUPS");
+		opt_dec_var_groups.clear();
+		vector<string> tok;
+		tokenize(value, tok, ", ");
+		for (const auto &name : tok)
+		{
+			opt_dec_var_groups.push_back(strip_cp(name));
+		}
+	}
+
+	else if ((key == "OPT_EXT_VAR_GROUPS") || (key == "OPT_EXTERNAL_VARIABLE_GROUPS"))
+	{
+		passed_args.insert("OPT_EXT_VAR_GROUPS");
+		passed_args.insert("OPT_EXTERNAL_VARIABLE_GROUPS");
+		opt_external_var_groups.clear();
+		vector<string> tok;
+		tokenize(value, tok, ", ");
+		for (const auto &name : tok)
+		{
+			opt_external_var_groups.push_back(strip_cp(name));
+		}
+	}
+
+	else if ((key == "OPT_CONSTRAINT_GROUPS"))
+	{
+		opt_constraint_groups.clear();
+		vector<string> tok;
+		tokenize(value, tok, ", ");
+		for (const auto &name : tok)
+		{
+			opt_constraint_groups.push_back(strip_cp(name));
+		}
+	}
+
+	else if (key == "OPT_RISK")
+	{
+		convert_ip(value, opt_risk);
+	}
+
+	else if (key == "OPT_ITER_DERINC_FAC")
+	{
+		convert_ip(value, opt_iter_derinc_fac);
+	}
+
+	else if (key == "OPT_DIRECTION")
+	{
+		string v;
+		convert_ip(value,v);
+		if (v == "MAX")
+			opt_direction = -1;
+		else if (v == "MIN")
+			opt_direction = 1;
+		else
+			throw runtime_error("++opt_direction arg must be in {MAX,MIN}, not " + v);
+	}
+
+	else if (key == "OPT_ITER_TOL")
+	{
+		convert_ip(value, opt_iter_tol);
+	}
+
+	else if (key == "OPT_RECALC_FOSM_EVERY")
+	{
+		convert_ip(value, opt_recalc_fosm_every);
+	}
+	else if (key == "OPT_INCLUDE_BND_PI")
+	{
+		opt_include_bnd_pi = pest_utils::parse_string_arg_to_bool(value);
+	}
+
+	else if ((key == "IES_PAR_EN") || (key == "IES_PARAMETER_ENSEMBLE"))
+	{
+		passed_args.insert("IES_PARAMETER_ENSEMBLE");
+		passed_args.insert("IES_PAR_EN");
+		//convert_ip(value, ies_par_csv);
+		ies_par_csv = org_value;
+	}
+	else if ((key == "IES_OBS_EN") || (key == "IES_OBSERVATION_ENSEMBLE"))
+	{
+		passed_args.insert("IES_OBSERVATION_ENSEMBLE");
+		passed_args.insert("IES_OBS_EN");
+		//convert_ip(value, ies_obs_csv);
+		ies_obs_csv = org_value;
+	}
+	else if ((key == "IES_RESTART_PARAMETER_ENSEMBLE") || (key == "IES_RESTART_PAR_EN"))
+	{
+		passed_args.insert("IES_RESTART_PARAMETER_ENSEMBLE");
+		passed_args.insert("IES_RESTART_PAR_EN");
+		//convert_ip(value, ies_obs_restart_csv);
+		ies_par_restart_csv = org_value;
+	}
+	else if ((key == "IES_RESTART_OBSERVATION_ENSEMBLE") || (key == "IES_RESTART_OBS_EN"))
+	{
+		passed_args.insert("IES_RESTART_OBSERVATION_ENSEMBLE");
+		passed_args.insert("IES_RESTART_OBS_EN");
+		//convert_ip(value, ies_obs_restart_csv);
+		ies_obs_restart_csv = org_value;
+	}
+
+	else if ((key == "IES_USE_APPROXIMATE_SOLUTION") || (key == "IES_USE_APPROX"))
+	{
+		passed_args.insert("IES_USE_APPROXIMATE_SOLUTION");
+		passed_args.insert("IES_USE_APPROX");
+		ies_use_approx = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "IES_LAMBDA_MULTS")
+	{
+		ies_lam_mults.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",");
+		for (const auto &iscale : tok)
+		{
+			ies_lam_mults.push_back(convert_cp<double>(iscale));
+		}
+	}
+	else if ((key == "IES_INIT_LAM") || (key == "IES_INITIAL_LAMBDA"))
+	{
+		passed_args.insert("IES_INIT_LAM");
+		passed_args.insert("IES_INITIAL_LAMBDA");
+		convert_ip(value, ies_init_lam);
+	}
+	else if (key == "IES_USE_APPROX")
+	{
+		convert_ip(value, ies_use_approx);
+	}
+	else if (key == "IES_SUBSET_SIZE")
+	{
+		convert_ip(value, ies_subset_size);
+	}
+	else if  ((key == "IES_REG_FACTOR") || (key == "IES_REG_FAC"))
+	{
+		passed_args.insert("IES_REG_FACTOR");
+		passed_args.insert("IES_REG_FAC");
+		convert_ip(value, ies_reg_factor);
+	}
+	else if (key == "IES_VERBOSE_LEVEL")
+	{
+		convert_ip(value, ies_verbose_level);
+	}
+	else if (key == "IES_USE_PRIOR_SCALING")
+	{
+		ies_use_prior_scaling = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "IES_NUM_REALS")
+	{
+		convert_ip(value, ies_num_reals);
+	}
+	else if (key == "IES_BAD_PHI")
+	{
+		convert_ip(value, ies_bad_phi);
+	}
+	else if (key == "IES_BAD_PHI_SIGMA")
+	{
+		convert_ip(value, ies_bad_phi_sigma);
+	}
+	else if ((key == "IES_INCLUDE_BASE") || (key == "IES_ADD_BASE"))
+	{
+		passed_args.insert("IES_INCLUDE_BASE");
+		passed_args.insert("IES_ADD_BASE");
+		ies_include_base = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "IES_USE_EMPIRICAL_PRIOR")
+	{
+		ies_use_empirical_prior = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "IES_GROUP_DRAWS")
+	{
+		ies_group_draws = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "IES_ENFORCE_BOUNDS")
+	{
+		ies_enforce_bounds = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if ((key == "IES_SAVE_BINARY") || (key == "SAVE_BINARY"))
+	{
+		passed_args.insert("IES_SAVE_BINARY");
+		passed_args.insert("SAVE_BINARY");
+		ies_save_binary = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "PAR_SIGMA_RANGE")
+	{
+		convert_ip(value, par_sigma_range);
+	}
+	else if (key == "YAMR_POLL_INTERVAL") 
+	{
+		convert_ip(value, worker_poll_interval);
+	}
+	else if (key == "IES_LOCALIZER")
+	{
+		//convert_ip(value, ies_localizer);
+		ies_localizer = org_value;
+	}
+	else if (key == "IES_ACCEPT_PHI_FAC")
+	{
+		convert_ip(value, ies_accept_phi_fac);
+	}
+	else if (key == "IES_LAMBDA_INC_FAC")
+	{
+		convert_ip(value, ies_lambda_inc_fac);
+	}
+	else if (key == "IES_LAMBDA_DEC_FAC")
+	{
+		convert_ip(value, ies_lambda_dec_fac);
+	}
+	else if ((key == "IES_SAVE_LAMBDA_EN") || (key == "IES_SAVE_LAMBDA_ENSEMBLES"))
+	{
+		passed_args.insert("IES_SAVE_LAMBDA_EN");
+		passed_args.insert("IES_SAVE_LAMBDA_ENSEMBLES");
+		ies_save_lambda_en = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if ((key == "IES_WEIGHTS_EN") || (key == "IES_WEIGHTS_ENSEMBLE"))
+	{
+		passed_args.insert("IES_WEIGHTS_EN");
+		passed_args.insert("IES_WEIGHTS_ENSEMBLE");
+		ies_weight_csv = org_value;
+	}
+	else if (key == "IES_SUBSET_HOW")
+	{
+		convert_ip(value,ies_subset_how);
+	}
+	else if (key == "IES_LOCALIZE_HOW")
+	{
+		convert_ip(value, ies_localize_how);
+	}
+	else if (key == "IES_NUM_THREADS")
+	{
+		convert_ip(value, ies_num_threads);
+	}
+	else if (key == "IES_DEBUG_FAIL_SUBSET")
+	{
+		ies_debug_fail_subset = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "IES_DEBUG_FAIL_REMAINDER")
+	{
+		ies_debug_fail_remainder = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "IES_DEBUG_BAD_PHI")
+	{
+		ies_debug_bad_phi = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "IES_DEBUG_UPGRADE_ONLY")
+	{
+		ies_debug_upgrade_only = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "IES_DEBUG_HIGH_SUBSET_PHI")
+	{
+		ies_debug_high_subset_phi = pest_utils::parse_string_arg_to_bool(value);;
+	}
+	else if (key == "IES_DEBUG_HIGH_UPGRADE_PHI")
+	{
+		ies_debug_high_upgrade_phi = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "IES_CSV_BY_REALS")
+	{
+		ies_csv_by_reals = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "IES_AUTOADALOC")
+	{
+		ies_autoadaloc = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "IES_AUTOADALOC_SIGMA_DIST")
+	{
+		convert_ip(value, ies_autoadaloc_sigma_dist);
+	}
+	else if (key == "IES_ENFORCE_CHGLIM")
+	{
+		ies_enforce_chglim = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "IES_CENTER_ON")
+	{
+		convert_ip(value, ies_center_on);
+	}
+	else if (key == "GSA_METHOD")
+	{
+		convert_ip(value, gsa_method);
+	}
+	else if (key == "GSA_MORRIS_POOLED_OBS")
+	{
+		gsa_morris_pooled_obs = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "GSA_MORRIS_OBS_SEN")
+	{
+		gsa_morris_obs_sen = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "GSA_MORRIS_P")
+	{
+		convert_ip(value, gsa_morris_p);
+	}
+	else if (key == "GSA_MORRIS_R")
+	{
+		convert_ip(value, gsa_morris_r);
+	}
+	else if (key == "GSA_MORRIS_DELTA")
+	{
+		convert_ip(value, gsa_morris_delta);
+	}
+
+	else if (key == "GSA_SOBOL_SAMPLES")
+	{
+		convert_ip(value, gsa_sobol_samples);
+	}
+
+	else if (key == "GSA_SOBOL_PAR_DIST")
+	{
+		convert_ip(value, gsa_sobol_par_dist);
+	}
+	else if (key == "ENFORCE_TIED_BOUNDS")
+	{
+		enforce_tied_bounds = pest_utils::parse_string_arg_to_bool(value);
+	}
+
+	else if (key == "DEBUG_PARSE_ONLY")
+	{
+		debug_parse_only = pest_utils::parse_string_arg_to_bool(value);
+	
+	}
+	else 
+	{
+
+		//throw PestParsingError(line, "Invalid key word \"" + key +"\"");
+		return ARG_STATUS::ARG_NOTFOUND;
+	}
+	return ARG_STATUS::ARG_ACCEPTED;
+}
+
+
+void PestppOptions::summary(ostream& os) const
+{
+
+	os << endl << "    PEST++ OPTIONS: " << endl << endl;
+	os << "...general options (used in multiple tools): " << endl;
+	os << "svd_pack: ";
+	if (svd_pack == PROPACK)
+		os << "propack" << endl;
+	if (svd_pack == REDSVD)
+		os << "redsvd" << endl;
+	if (svd_pack == EIGEN)
+		os << "eigen" << endl;
+	os << "lambda_scale_fac: ";
+	for (auto s : lambda_scale_vec)
+		os << s << ",";
+	os << endl;
+	os << "max_run_fail: " << max_run_fail << endl;
+	os << "yamr_poll_interval: " << worker_poll_interval << endl;
+	os << "parameter_covariance: " << parcov_filename << endl;
+	os << "observation_covariance: " << obscov_filename << endl;
+	os << "hotstart_resfile: " << hotstart_resfile << endl;
+	os << "overdue_resched_fac: " << overdue_giveup_fac << endl;
+	os << "overdue_giveup_minutes: " << overdue_giveup_minutes << endl;
+	os << "condor_submit_file: " << condor_submit_file << endl;
+	os << "tie_by_group: " << tie_by_group << endl;
+	os << "par_sigma_range: " << par_sigma_range << endl;
+	os << "enforce_tied_bounds: " << enforce_tied_bounds << endl;
+	os << "debug_parse_only: " << debug_parse_only << endl;
+	
+
+	os << endl << "...pestpp-glm specific options:" << endl;
+	os << "max_n_super: " << max_n_super << endl;
+	os << "super_eigthresh: " << super_eigthres << endl;
+	os << "n_iter_base: " << n_iter_base << endl;
+	os << "n_iter_super: " << n_iter_super << endl;;
+	os << "super_relparmax: " << super_relparmax << endl;
+	os << "max_super_frz_iter: " << max_super_frz_iter << endl;	
+	os << "max_reg_iter: " << max_reg_iter << endl;
+	os << "lambdas: ";
+	for (auto l : base_lambda_vec)
+		os << l << ",";
+	os << endl;
+	os << "iteration_summary: " << iter_summary_flag << endl;
+	os << "der_forgive: " << der_forgive << endl;
+	os << "uncertainty: " << uncert << endl;
+	os << "forecasts: ";
+	for (auto f : prediction_names)
+		os << f << ",";
+	os << endl;
+	os << "base_jacobian: " << basejac_filename << endl;
+	os << "glm_num_reals: " << glm_num_reals << endl;
+	os << "jac_scale: " << jac_scale << endl;
+	if (global_opt == OPT_DE)
+		os << "global_opt: de" << endl;
+	os << "de_f: " << de_f << endl;
+	os << "de_cr: " << de_cr << endl;
+	os << "de_pop_size: " << de_npopulation << endl;
+	os << "de_max_gen: " << de_max_gen << endl;
+	os << "de_dither_f: " << de_dither_f << endl;
+	
+	os << endl << "...pestpp-swp options:" << endl;
+	os << "sweep_parameter_csv_file: " << sweep_parameter_csv_file << endl;
+	os << "sweep_output_csv_file: " << sweep_output_csv_file << endl;
+	os << "sweep_chunk: " << sweep_chunk << endl;
+	os << "sweep_forgive: " << sweep_forgive << endl;
+	os << "sweep_base_run: " << sweep_base_run << endl;
+	
+	os << endl << "...pestpp-opt options:" << endl;
+	os << "opt_objective_function: " <<  opt_obj_func << endl;
+	os << "opt_coin_log: " << opt_coin_log << endl;
+	os << "opt_skip_final: " << opt_skip_final << endl;
+	os << "opt_std_weights" << opt_std_weights << endl;
+	os << "opt_decision_variable_groups: ";
+	for (auto v : opt_dec_var_groups)
+		os << v << ",";
+	os << endl;
+	os << "opt_external_variable_groups: ";
+	for (auto v : opt_external_var_groups)
+		os << v << ",";
+	os << endl;
+	os << "opt_constraint_groups: ";
+	for (auto v : opt_constraint_groups)
+		os << v << ",";
+	os << endl;
+	os << "opt_risk: " << opt_risk << endl;
+	os << "opt_iter_derinc_fac: " << opt_iter_derinc_fac << endl;
+	os << "opt_direction: " << opt_direction << endl;
+	os << "opt_iter_tol: " << opt_iter_tol << endl;
+	os << "opt_recalc_fosm_every: " << opt_recalc_fosm_every << endl;
+	os << "opt_include_bnd_pi: " << opt_include_bnd_pi << endl;
+
+	os << endl << "...pestpp-ies options:" << endl;
+	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
+	os << "ies_observation_ensemble: " << ies_obs_csv << endl;
+	os << "ies_restart_parameter_ensemble: " << ies_par_restart_csv << endl;
+	os << "ies_restart_observation_ensemble: " << ies_obs_restart_csv << endl;
+	os << "ies_use_approximate_solution: " << ies_use_approx << endl;
+	os << "ies_lambda_mults: ";
+	for (auto v : ies_lam_mults)
+		os << v << ",";
+	os << endl;
+	os << "ies_initial_lambda: " << ies_init_lam << endl;
+	os << "ies_use_approx: " << ies_use_approx << endl;
+	os << "ies_subset_size: "<< ies_subset_size << endl;
+	os << "ies_reg_factor: " << ies_reg_factor << endl;
+	os << "ies_verbose_level: " << ies_verbose_level << endl;
+	os << "ies_use_prior_scaling: " << ies_use_prior_scaling << endl;
+	os << "ies_num_reals: " << ies_num_reals << endl;
+	os << "ies_bad_phi: " << ies_bad_phi << endl;
+	os << "ies_bad_phi_sigma: " << ies_bad_phi_sigma << endl;
+	os << "ies_include_base: " << ies_include_base << endl;
+	os << "ies_use_empirical_prior: " << ies_use_empirical_prior << endl;
+	os << "ies_group_draws: " << ies_group_draws << endl;
+	os << "ies_enforce_bounds: " << ies_enforce_bounds << endl;
+	os << "ies_save_binary: " << ies_save_binary << endl;
+	os << "ies_localizer: " << ies_localizer << endl;
+	os << "ies_accept_phi_fac: " << ies_accept_phi_fac << endl;
+	os << "ies_lambda_inc_fac: " << ies_lambda_inc_fac << endl;
+	os << "ies_lambda_dec_fac: " << ies_lambda_dec_fac << endl;
+	os << "ies_save_lambda_ensembles: " << ies_save_lambda_en << endl;
+	os << "ies_weights_ensemble: " << ies_weight_csv << endl;
+	os << "ies_subset_how: " << ies_subset_how << endl;
+	os << "ies_localize_how: " << ies_localize_how << endl;
+	os << "ies_num_threads: " << ies_num_threads << endl;
+	os << "ies_debug_fail_subset: " << ies_debug_fail_subset << endl;
+	os << "ies_debug_fail_remainder: " << ies_debug_fail_remainder << endl;
+	os << "ies_debug_bad_phi: " << ies_debug_bad_phi << endl;
+	os << "ies_debug_upgrade_only: " << ies_debug_upgrade_only << endl;
+	os << "ies_debug_high_subset_phi: " << ies_debug_high_subset_phi << endl;
+	os << "ies_debug_high_upgrade_phi: " << ies_debug_high_upgrade_phi << endl;
+	os << "ies_csv_by_reals: " << ies_csv_by_reals << endl;
+	os << "ies_autoadaloc: " << ies_autoadaloc << endl;
+	os << "ies_autoadaloc_sigma_dist: " << ies_autoadaloc_sigma_dist << endl;
+	os << "ies_enforce_chglim: " << ies_enforce_chglim << endl;
+	os << "ies_center_on: " << ies_center_on << endl;
+
+	os << endl << "pestpp-sen options: " << endl;
+	os << "gsa_method: " << gsa_method << endl;
+	os << "gsa_morris_pooled_obs: " << gsa_morris_pooled_obs << endl;
+	os << "gsa_morris_obs_sen: " << gsa_morris_obs_sen << endl;
+	os << "gsa_morris_p: " << gsa_morris_p << endl;
+	os << "gsa_morris_r: " << gsa_morris_r << endl;
+	os << "gsa_morris_delta: " <<  gsa_morris_delta << endl;
+	os << "gsa_sobol_samples: " << gsa_sobol_samples << endl;
+	os << "gsa_sobol_par_dist: " << gsa_sobol_par_dist << endl;
+	os << endl << endl << endl;
+}
+
+
+void PestppOptions::set_defaults()
+{
+
+	set_svd_pack(PestppOptions::SVD_PACK::REDSVD);
+	set_super_relparmax(0.1);
+	
+	set_iter_summary_flag(true);
+	set_der_forgive(true);
+	
+	
+	set_base_lambda_vec(vector<double>{ 0.1, 1.0, 10.0, 100.0, 1000.0 });
+	set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1});
+	set_global_opt(PestppOptions::GLOBAL_OPT::NONE);
+	set_de_cr(0.9);
+	set_de_f(0.8);
+	set_de_dither_f(true);
+	set_de_npopulation(40);
+	set_de_max_gen(100);
+	set_n_iter_super(0);
+	set_n_iter_base(1000000);
+	set_super_eigthres(1.0e-6);
+	set_max_n_super(1000000);
+	set_max_super_frz_iter(5);
+	set_max_reg_iter(20);
+	set_uncert_flag(true);
+	set_glm_num_reals(0);
+	set_prediction_names(vector<string>());
+	set_parcov_filename(string());
+	set_obscov_filename(string());
+	set_basejac_filename(string());
+	set_sweep_parameter_csv_file(string());
+	set_sweep_output_csv_file("sweep_out.csv");
+	set_sweep_base_run(false);
+	set_sweep_forgive(false);
+	set_sweep_chunk(500);
+	set_tie_by_group(false);
+	set_enforce_tied_bounds(false);
+
+	set_jac_scale(true);
+	set_opt_obj_func("");
+	set_opt_coin_log(true);
+	set_opt_skip_final(false);
+	set_opt_std_weights(false);
+	set_opt_dec_var_groups(vector<string>());
+	set_opt_ext_var_groups(vector<string>());
+	set_opt_constraint_groups(vector<string>());
+	set_opt_risk(0.5);
+	set_opt_direction(1.0);
+	set_opt_iter_tol(0.001);
+	set_opt_recalc_fosm_every(1);
+	set_opt_iter_derinc_fac(1.0);
+	set_opt_include_bnd_pi(true);
+	set_hotstart_resfile(string());
+	set_ies_par_csv("");
+	set_ies_obs_csv("");
+	set_ies_obs_restart_csv("");
+	set_ies_par_restart_csv("");
+	set_ies_lam_mults(vector<double>());
+	set_ies_init_lam(-999);
+	set_ies_use_approx(true);
+	set_ies_subset_size(4);
+	set_ies_reg_factor(0.0);
+	set_ies_verbose_level(0);
+	set_ies_use_prior_scaling(false);
+	set_ies_num_reals(50);
+	set_ies_bad_phi(1.0e+300);
+	set_ies_bad_phi_sigma(1.0e+300);
+	set_ies_include_base(true);
+	set_ies_use_empirical_prior(false);
+	set_ies_group_draws(true);
+	set_ies_enforce_bounds(true);
+	set_par_sigma_range(4.0);
+	set_ies_save_binary(false);
+	set_ies_localizer("");
+	set_ies_accept_phi_fac(1.05);
+	set_ies_lambda_inc_fac(10.0);
+	set_ies_lambda_dec_fac(0.75);
+	set_ies_save_lambda_en(false);
+	set_ies_weight_csv("");
+	set_ies_subset_how("RANDOM");
+	set_ies_localize_how("PARAMETERS");
+	set_ies_num_threads(-1);
+	set_ies_debug_fail_subset(false);
+	set_ies_debug_fail_remainder(false);
+	set_ies_debug_bad_phi(false);
+	set_ies_debug_upgrade_only(false);
+	set_ies_debug_high_subset_phi(false);
+	set_ies_debug_high_upgrade_phi(false);
+	set_ies_csv_by_reals(true);
+	set_ies_autoadaloc(false);
+	set_ies_autoadaloc_sigma_dist(1.0);
+	set_ies_enforce_chglim(false);
+	set_ies_center_on("");
+	set_ies_lam_mults(vector<double>{0.1, 1.0, 10.0});
+
+	
+
+	set_gsa_method("MORRIS");
+	//many of these defaults are also redefined in gsa main
+	set_gsa_morris_p(4);
+	set_gsa_morris_r(4);
+	set_gsa_morris_delta(0.6666);
+	set_gsa_morris_obs_sen(true);
+	set_gsa_morris_pooled_obs(false);
+	set_gsa_sobol_par_dist("norm");
+	set_gsa_sobol_samples(4);
+	set_gsa_rand_seed(2);
+
+	set_condor_submit_file(string());
+	set_overdue_giveup_minutes(1.0e+30);
+	set_overdue_reched_fac(1.15);
+	set_overdue_giveup_fac(100);
+	set_worker_poll_interval(1.0);
+	set_max_run_fail(3);
+
+
+	set_debug_parse_only(false);
+	
 }
 
 ostream& operator<< (ostream &os, const ParameterInfo& val)
@@ -1217,4 +1365,107 @@ ostream& operator<< (ostream &os, const SVDInfo& val)
 	os << "    maxsing = " << val.maxsing << endl;
 	os << "    eigthresh = " << val.eigthresh << endl;
 	return os;
+}
+
+PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, const string org_value)
+{
+	/*enum PestMode { ESTIMATION, REGUL, PARETO, UNKNOWN };
+	double phiredswh;
+	int noptmax;
+	int jacfile;
+	int numcom;
+	double phiredstp;
+	int nphistp;
+	int nphinored;
+	double relparstp;
+	int nrelpar;
+	int noptswitch;
+	double splitswh;
+	PestMode pestmode;*/
+	string value = upper_cp(org_value);
+	if (passed_args.find(key) != passed_args.end())
+		return PestppOptions::ARG_STATUS::ARG_DUPLICATE;
+	passed_args.insert(key);
+	if (key == "RELPARMAX")
+		convert_ip(value, relparmax);
+	else if (key == "FACPARMAX")
+		convert_ip(value, facparmax);
+	else if (key == "FACORIG")
+		convert_ip(value, facorig);
+	else if (key == "PHIREDSTP")
+		convert_ip(value, phiredstp);
+	else if (key == "NPHISTP")
+		convert_ip(value, nphistp);
+	else if (key == "NPHINORED")
+		convert_ip(value, nphinored);
+	else if (key == "RELPARSTP")
+		convert_ip(value, relparstp);
+	else if (key == "NOPTSWITCH")
+		convert_ip(value, noptswitch);
+	else if (key == "SPLITSWH")
+		convert_ip(value, splitswh);
+	else if (key == "PESTMODE")
+	{
+		if (value == "ESTIMATION")
+			pestmode = PestMode::ESTIMATION;
+		else if ((value == "REGULARIZATION") || (value == "REGULARISATION"))
+			pestmode = PestMode::REGUL;
+		else if (value == "PARETO")
+			pestmode = PestMode::PARETO;
+		else
+			return PestppOptions::ARG_STATUS::ARG_INVALID;
+	}
+	else
+		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;
+	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
+}
+
+void ControlInfo::set_defaults()
+{
+	/*ControlInfo() : relparmax(0.0), facparmax(0.0), facorig(0.0), phiredswh(0.0), noptmax(0),
+		phiredstp(0.0), nphistp(0), nphinored(0), relparstp(0.0), nrelpar(0), noptswitch(0),
+		splitswh(0.0), pestmode(PestMode::ESTIMATION) {}*/
+	facparmax = 1.1;
+	relparmax = 1.0;
+	facorig = 0.001;
+	phiredswh = 0.1;
+	noptmax = 0;
+	phiredstp = 0.01;
+	nphistp = 3;
+	nphinored = 3;
+	relparstp = 0.01;
+	nrelpar = 3;
+	noptswitch = 1;
+	splitswh = 1.1;
+	pestmode = PestMode::ESTIMATION;
+
+}
+
+SVDInfo::SVDInfo()
+{
+	set_defaults();
+}
+
+void SVDInfo::set_defaults()
+{
+	maxsing = 1000000;
+	eigthresh = 1.0e-6;
+	eigwrite = 0;
+}
+
+PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const string key, const string org_value)
+{
+	string value = upper_cp(org_value);
+	if (passed_args.find(key) != passed_args.end())
+		return PestppOptions::ARG_STATUS::ARG_DUPLICATE;
+	passed_args.insert(key);
+	if (key == "EIGTHRESH")
+		convert_ip(value, eigthresh);
+	else if (key == "MAXSING")
+		convert_ip(value, maxsing);
+	else if (key == "EIGWRITE")
+		convert_ip(value, eigwrite);
+	else
+		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;
+	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
 }

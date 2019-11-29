@@ -125,8 +125,6 @@ void Sobol::assemble_runs(RunManagerAbstract &run_manager)
 	add_model_runs(run_manager, m1, f_out);
 	add_model_runs(run_manager, m2, f_out);
 
-	cout << m1 << endl << endl;
-	cout << m2 << endl << endl;
 	//calculate first order runs a1,....an
 	vector<int> idx_vec;
 	for (int ai=0; ai<n_adj_par; ++ai)
@@ -181,6 +179,7 @@ vector<double> Sobol::get_phi_vec(RunManagerAbstract &run_manager, int run_set, 
 	Observations obs0;
 	int nrun = 0;
 	vector<double> phi_vec = vector<double>(n_sample, MISSING_DATA);
+	DynamicRegularization zero_reg = DynamicRegularization::get_zero_reg_instance();
 	for(int run_id=run_b; run_id<run_e; ++run_id)
 	{
 		double phi = MISSING_DATA;
@@ -188,7 +187,7 @@ vector<double> Sobol::get_phi_vec(RunManagerAbstract &run_manager, int run_set, 
 		if (success)
 		{
 			run0.update_ctl(pars0, obs0);
-			phi = run0.get_phi(0.0);
+			phi = run0.get_phi(zero_reg);
 		}
 		phi_vec[nrun] = phi;
 		nrun++;

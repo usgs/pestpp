@@ -65,6 +65,7 @@ AgentInfoRec::AgentInfoRec(int _socket_fd)
 	last_ping_time = std::chrono::system_clock::now();
 	ping = false;
 	failed_pings = 0;
+	failed_runs = 0;
 }
 
 bool AgentInfoRec::CompareTimes::operator() (const AgentInfoRec &a, const AgentInfoRec &b)
@@ -224,6 +225,12 @@ int AgentInfoRec::add_failed_ping()
 {
 	failed_pings++;
 	return failed_pings;
+}
+
+int AgentInfoRec::add_failed_run()
+{
+	failed_runs++;
+	return failed_runs;
 }
 
 void AgentInfoRec::set_ping(bool val)
@@ -1414,6 +1421,8 @@ void RunManagerPanther::kill_all_active_runs()
  {
 	 file_stor.update_run_failed(run_id);
 	 failure_map.insert(make_pair(run_id, socket_fd));
+	 list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(socket_fd);
+	 agent_info_iter->add_failed_run();
  }
 
  void RunManagerPanther::update_run_failed(int run_id)

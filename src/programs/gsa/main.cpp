@@ -133,18 +133,10 @@ int main(int argc, char* argv[])
 			PANTHERAgent yam_agent;
 			string ctl_file = "";
 			try {
-				string ctl_file;
-				if (upper_cp(file_ext) == "YMR")
-				{
-					ctl_file = file_manager.build_filename("ymr");
-					yam_agent.process_panther_ctl_file(ctl_file);
-				}
-				else
-				{
-					// process traditional PEST control file
-					ctl_file = file_manager.build_filename("pst");
-					yam_agent.process_ctl_file(ctl_file);
-				}
+				// process traditional PEST control file
+				ctl_file = file_manager.build_filename("pst");
+				yam_agent.process_ctl_file(ctl_file);
+				
 			}
 			catch (PestError e)
 			{
@@ -160,7 +152,7 @@ int main(int argc, char* argv[])
 			cerr << perr.what();
 			throw(perr);
 		}
-		cout << endl << "Simulation Complete..." << endl;
+		cout << endl << "Work Done..." << endl;
 		exit(0);
 	}
 	//Check for PANTHER master
@@ -212,6 +204,17 @@ int main(int argc, char* argv[])
 		fout_rec.close();
 		//throw(e);
 		return 1;
+	}
+	pest_scenario.check_inputs(fout_rec);
+	//OutputFileWriter(FileManager &_file_manager, Pest &_pest_scenario, bool restart_flag = false, bool _save_rei = true, int _eigenwrite = 0);
+	
+	OutputFileWriter ofw(file_manager,pest_scenario,false,false,0);
+	ofw.scenario_report(fout_rec);
+
+	if (pest_scenario.get_pestpp_options().get_debug_parse_only())
+	{
+		cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+		exit(0);
 	}
 
 
@@ -270,32 +273,7 @@ int main(int argc, char* argv[])
 	//map<string, string> gsa_opt_map;
 	//process .gsa file
 	string gsa_filename = file_manager.get_base_filename() + ".gsa";
-	/*if (!check_exist_in(gsa_filename))
-	{
-		cout << "WARNING: " << gsa_filename << " not found, using standard settings and Method of Morris:" << endl;
-		cout << "     MORRIS_P: 4" << endl;
-		cout << "     MORRIS_R: 4" << endl;
-		cout << "     MORRIS_DELTA: 0.666" << endl;
-		gsa_opt_map["METHOD"] = "MORRIS";
-		gsa_opt_map["MORRIS_DELTA"] = ".666666";
-		gsa_opt_map["MORRIS_P"] = "4";
-		gsa_opt_map["MORRIS_R"] = "4";
-		gsa_opt_map["RAND_SEED"] = "2";
-	}
-	else
-	{
-		try
-		{
-			gsa_opt_map = GsaAbstractBase::process_gsa_file(file_manager.open_ifile_ext("gsa"), file_manager);
-			file_manager.close_file("gsa");
-		}
-		catch (PestError e)
-		{
-			cerr << "Error prococessing .gsa file: " << file_manager.build_filename("gsa") << endl << endl;
-			cerr << e.what() << endl << endl;
-			throw(e);
-		}
-	}*/
+	
 	if (check_exist_in(gsa_filename))
 	{
 		cout << "WARNING: use of .gsa files is deprecated - .gsa file '" << gsa_filename << "' is being ignored, please use '++' args";
@@ -304,12 +282,7 @@ int main(int argc, char* argv[])
 
 	PestppOptions *pp_ptr = pest_scenario.get_pestpp_options_ptr();
 	map<string, string> gsa_opt_map = pp_ptr->get_arg_map();
-	/*gsa_opt_map["METHOD"] = pp_ptr->get_gsa_method();
-	gsa_opt_map["MORRIS_DELTA"] = pp_ptr->get_gsa_morris_delta();
-	gsa_opt_map["MORRIS_P"] = pp_ptr->get_gsa_morris_p();
-	gsa_opt_map["MORRIS_R"] = pp_ptr->get_gsa_morris_r;
-	gsa_opt_map["MORRIS_OBS_SEN"] = pp_ptr->get_gsa_morris_obs_sen();
-*/
+	
 	//Build Transformation with ctl_2_numberic
 	ParamTransformSeq base_partran_seq(pest_scenario.get_base_par_tran_seq());
 	Parameters ctl_par = pest_scenario.get_ctl_parameters();
@@ -454,7 +427,8 @@ int main(int argc, char* argv[])
 	file_manager.close_file("msn");
 	file_manager.close_file("orw");
 	delete run_manager_ptr;
-	cout << endl << endl << "Simulation Complete..." << endl;
+	cout << endl << endl << "PESTPP-SEN Analysis Complete..." << endl;
+	return 0;
 	//cout << endl << "Simulation Complete - Press RETURN to close window" << endl;
 	//char buf[256];
 	//OperSys::gets_s(buf, sizeof(buf));
@@ -466,6 +440,8 @@ int main(int argc, char* argv[])
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));
+		return 1;
 	}
+
 #endif
 }

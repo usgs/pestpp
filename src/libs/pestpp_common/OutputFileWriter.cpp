@@ -269,7 +269,7 @@ void OutputFileWriter::scenario_report(std::ostream &os)
 	os << setw(0) << "    Number of prior estimates = " << pest_scenario.get_ctl_ordered_pi_names().size() << endl << endl;
 
 	os << pest_scenario.get_control_info() << endl;
-	os << pest_scenario.get_pestpp_options() << endl;
+	pest_scenario.get_pestpp_options().summary(os);
 
 	scenario_io_report(os);
 	scenario_pargroup_report(os);

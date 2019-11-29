@@ -1823,12 +1823,12 @@ void IterEnsembleSmoother::initialize()
 	//set some defaults
 	PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
 
-	if (pp_args.find("IES_LAMBDA_MULTS") == pp_args.end())
+	/*if (pp_args.find("IES_LAMBDA_MULTS") == pp_args.end())
 		ppo->set_ies_lam_mults(vector<double>{0.1, 1.0, 2.0});
 	if (pp_args.find("IES_SUBSET_SIZE") == pp_args.end())
 		ppo->set_ies_subset_size(4);
 	if (pp_args.find("LAMBDA_SCALE_FAC") == pp_args.end())
-		ppo->set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1});
+		ppo->set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1});*/
 
 	verbose_level = pest_scenario.get_pestpp_options_ptr()->get_ies_verbose_level();
 	if (pest_scenario.get_n_adj_par() >= 1e6)
