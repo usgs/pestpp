@@ -278,13 +278,13 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		}
 		if (ifail != 0) throw_mio_error("error writing model input files from template files");
         */
-		
+		cout << "processing tpl files...";
 		for (int i = 0; i < templatefiles.size(); i++)
 			pro_par_vec.push_back(templatefiles[i].write_input_file(inpfile_vec[i], *pars));
 		//update pars to account for possibly truncated par values...important for jco calcs
 		for (auto pro_pars : pro_par_vec)
 			pars->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
-
+		cout << "...done" << endl;
 
 #ifdef OS_WIN
 		//a flag to track if the run was terminated
@@ -422,13 +422,13 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 			throw_mio_error("error processing model output files");
 		}
 		*/
-
+		cout << "processing ins files...";
 		for (int i = 0; i < insfile_vec.size(); i++)
 		{
 			pro_obs = instructionfiles[i].read_output_file(outfile_vec[i]);
 			obs->update_without_clear(pro_obs.get_keys(), pro_obs.get_data_vec(pro_obs.get_keys()));
 		}
-
+		cout << "...done" << endl;
 		//todo: return updated (possibly truncated) par values
 		/*pars->update(par_name_vec, par_vals);
 		obs->update(obs_name_vec, obs_vals);
@@ -714,12 +714,13 @@ out_line_num(0),last_ins_line(""),last_out_line("")
 
 set<string> InstructionFile::parse_and_check(const vector<string>& obs_names)
 {
+	names.clear();
 	ifstream f_ins(ins_filename);
 	prep_ins_file_for_reading(f_ins);
 	string line, name;
 	vector<string> tokens;
 	vector<string> s_names;
-	s_names.reserve(obs_names.size());
+	s_names.resize(obs_names.size());
 	int spos,epos;
 	while (true)
 	{
@@ -734,12 +735,12 @@ set<string> InstructionFile::parse_and_check(const vector<string>& obs_names)
 			parse_obs_name_from_token(tokens[i], name);
 			if (name.size() > 0)
 			{
-				s_names.push_back(name);
+				names.emplace(name);
 			}
 		}
 	}
 	f_ins.close();
-	names.insert(s_names.begin(), s_names.end());
+	//names.insert(s_names.begin(), s_names.end());
 	return names;
 }
 

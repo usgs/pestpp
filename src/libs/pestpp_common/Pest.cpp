@@ -350,6 +350,11 @@ void Pest::check_io(ofstream &f_rec)
 
 	}
 
+	cout << endl;
+	if (!pestpp_options.get_check_tplins())
+		return;
+
+	//rigorous checking of names in tpl and ins files vs control file
 	set<string> ins_obs_names, file_obs_names;
 	for (auto ins_file : model_exec_info.insfile_vec)
 	{

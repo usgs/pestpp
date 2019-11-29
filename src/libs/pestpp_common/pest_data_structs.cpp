@@ -904,6 +904,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		debug_parse_only = pest_utils::parse_string_arg_to_bool(value);
 	
 	}
+	else if (key == "CHECK_TPLINS")
+	{
+		check_tplins = pest_utils::parse_string_arg_to_bool(value);
+	}
 	else 
 	{
 
@@ -942,6 +946,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "par_sigma_range: " << par_sigma_range << endl;
 	os << "enforce_tied_bounds: " << enforce_tied_bounds << endl;
 	os << "debug_parse_only: " << debug_parse_only << endl;
+	os << "debug_parse_only: " << debug_parse_only << endl;
+	os << "check_tplins:" << check_tplins << endl;
 	
 
 	os << endl << "...pestpp-glm specific options:" << endl;
@@ -1180,7 +1186,7 @@ void PestppOptions::set_defaults()
 
 
 	set_debug_parse_only(false);
-	
+	set_check_tplins(true);
 }
 
 ostream& operator<< (ostream &os, const ParameterInfo& val)

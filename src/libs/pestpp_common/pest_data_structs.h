@@ -426,6 +426,9 @@ public:
 	void set_debug_parse_only(bool _flag) { debug_parse_only = _flag; }
 	bool get_debug_parse_only() const { return debug_parse_only; }
 
+	void set_check_tplins(bool _flag) { check_tplins = _flag; }
+	bool get_check_tplins() const { return check_tplins; }
+
 	void set_defaults();
 	void summary(ostream& os) const;
 
@@ -544,6 +547,7 @@ private:
 
 	bool enforce_tied_bounds;
 	bool debug_parse_only;
+	bool check_tplins;
 
 	
 		

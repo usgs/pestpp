@@ -696,17 +696,43 @@ def salib_verf():
     #
     # plt.show()
 
+
+def tplins1_test():
+    model_d = "tplins_test_1"
+    t_d = os.path.join(model_d, "test")
+    if os.path.exists(t_d):
+        shutil.rmtree(t_d)
+    shutil.copytree(os.path.join(model_d,"template"),t_d)
+    pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
+
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-glm")),cwd=t_d)
+    obf_df = pd.read_csv(os.path.join(t_d,"out1.dat.obf"),delim_whitespace=True,header=None,names=["obsnme","obsval"])
+    obf_df.index = obf_df.obsnme
+    pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
+    res_df = pst.res
+    
+    d = (obf_df.obsval - res_df.modelled).apply(np.abs)
+    #print(d)
+    print(d.max())
+    assert d.max() < 1.0e-5, d
+
+    jco = pyemu.Jco.from_binary(os.path.join(t_d,"pest.jcb")).to_dataframe().apply(np.abs)
+    assert jco.sum().sum() == 0, jco.sum()
+
+
+
+
 if __name__ == "__main__":
     #glm_long_name_test()
     #sen_plusplus_test()
-    parchglim_test()
+    #parchglim_test()
     #unc_file_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
-    tie_by_group_test()
+    #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-
+    tplins1_test()
