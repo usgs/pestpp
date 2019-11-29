@@ -930,7 +930,7 @@ string InstructionFile::parse_obs_name_from_token(const string& token)
 			return info.first;
 		}
 	}
-	//return name;
+	throw_ins_error("instruction type not recognized for observation instruction '" + token + "'");
 }
 
 vector<string> InstructionFile::tokenize_ins_line(const string& ins_line)
