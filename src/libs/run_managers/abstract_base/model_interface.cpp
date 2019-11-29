@@ -974,7 +974,6 @@ vector<string> InstructionFile::tokenize_ins_line(const string& ins_line)
 			temp_tokens.clear();
 			pest_utils::tokenize(pest_utils::upper_cp(ins_line.substr(s + 1, (e - s) - 1)), temp_tokens);
 			tokens.insert(tokens.end(),temp_tokens.begin(), temp_tokens.end());
-			cout << endl;
 		}
 		tokens.push_back(marker_tags[marker_tags.size() - 1]);
 		temp_tokens.clear();
@@ -982,7 +981,6 @@ vector<string> InstructionFile::tokenize_ins_line(const string& ins_line)
 		e = ins_line.size();
 		pest_utils::tokenize(pest_utils::upper_cp(ins_line.substr(s+1, (e - s) - 1)), temp_tokens);
 		tokens.insert(tokens.end(), temp_tokens.begin(), temp_tokens.end());
-		cout << endl;
 	}
 	else
 		pest_utils::tokenize(pest_utils::upper_cp(ins_line), tokens);

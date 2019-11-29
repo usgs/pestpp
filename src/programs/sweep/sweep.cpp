@@ -23,6 +23,7 @@ along with PEST++.  If not, see<http://www.gnu.org/licenses/>.
 #include <fstream>
 #include <algorithm>
 #include <iterator>
+#include <unordered_set>
 #include "config_os.h"
 #include "Pest.h"
 #include "Transformable.h"
@@ -97,11 +98,15 @@ map<string,int> prepare_parameter_csv(Parameters pars, ifstream &csv, bool forgi
 
 	//build up a list of idxs to use
 	vector<string> ctl_pnames = pars.get_keys();
+	unordered_set<string> s_pnames(ctl_pnames.begin(), ctl_pnames.end());
+	unordered_set<string>::iterator end = s_pnames.end();
+	ctl_pnames.resize(0);
 	vector<int> header_idxs;
 	map<string, int> header_info;
 	for (int i = 0; i < header_tokens.size(); i++)
 	{
-		if (find(ctl_pnames.begin(), ctl_pnames.end(), header_tokens[i]) != ctl_pnames.end())
+		//if (find(ctl_pnames.begin(), ctl_pnames.end(), header_tokens[i]) != ctl_pnames.end())
+		if (s_pnames.find(header_tokens[i]) != end)
 		{
 			//header_idxs.push_back(i);
 			header_info[header_tokens[i]] = i;
@@ -112,17 +117,22 @@ map<string,int> prepare_parameter_csv(Parameters pars, ifstream &csv, bool forgi
 
 pair<vector<string>,vector<Parameters>> load_parameters_from_csv(map<string,int> &header_info, ifstream &csv, int chunk, const Parameters &ctl_pars)
 {
+	cout << endl;
 	//process each parameter value line in the csv file
 	int lcount = 1;
 	//map<int,Parameters> sweep_pars;
 	vector<string> run_ids;
 	vector<Parameters> sweep_pars;
+	sweep_pars.resize(chunk);
 	double val;
 	string line;
 	vector<string> tokens,names;
 	vector<double> vals;
 	Parameters pars = ctl_pars;
 	string run_id;
+	istringstream i;
+	char c;
+	
 	while (getline(csv, line))
 	{
 		strip_ip(line);
@@ -160,7 +170,8 @@ pair<vector<string>,vector<Parameters>> load_parameters_from_csv(map<string,int>
 			//{
 			try
 			{
-				val = convert_cp<double>(tokens[hi.second]);
+				//val = convert_cp<double>(tokens[hi.second]);
+				val = stod(tokens[hi.second]);
 			}
 			catch (exception &e)
 			{
@@ -168,17 +179,21 @@ pair<vector<string>,vector<Parameters>> load_parameters_from_csv(map<string,int>
 				ss << "error converting token '" << tokens[hi.second] << "' at location "<< hi.first << " to double on line " << lcount << ": " << line << endl << e.what();
 				throw runtime_error(ss.str());
 			}
-			vals.push_back(val);
-			names.push_back(hi.first);
+			//vals.push_back(val);
+			//names.push_back(hi.first);
 			//pars[i] = val;
+			pars.update_rec(hi.first, val);
 			//}
 		}
-		pars.update_without_clear(names, vals);
+		//pars.update_without_clear(names, vals);
 		sweep_pars.push_back(pars);
+		//sweep_pars.emplace_back(pars);
 		run_ids.push_back(run_id);
 		lcount++;
 		if (lcount > chunk)
 			break;
+		if (pars.size() > 10000)
+			cout << lcount << "\r" << flush;
 	}
 	//csv.close();
 	return pair<vector<string>,vector<Parameters>> (run_ids,sweep_pars);
@@ -532,7 +547,6 @@ int main(int argc, char* argv[])
 		{
 			performance_log.log_event("starting basic model IO error checking", 1);
 			cout << "checking model IO files...";
-			pest_scenario.check_io(fout_rec);
 			pest_scenario.check_io(fout_rec);
 			//pest_scenario.check_par_obs();
 			performance_log.log_event("finished basic model IO error checking");

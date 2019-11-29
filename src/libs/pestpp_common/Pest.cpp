@@ -307,9 +307,6 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 			cout << "'base_jacobian' is none, so 'hotstart_resfile' being ignored..." << endl;
 			f_rec << "'base_jacobian' is none, so 'hotstart_resfile' being ignored..." << endl;
 		}
-
-	
-
 }
 
 void Pest::check_io(ofstream &f_rec)
@@ -428,8 +425,6 @@ void Pest::check_io(ofstream &f_rec)
 			ss << d << endl;
 		throw_control_file_error(f_rec, ss.str());
 	}
-
-	cout << endl;
 }
 
 const vector<string> Pest::get_ctl_ordered_nz_obs_names()
