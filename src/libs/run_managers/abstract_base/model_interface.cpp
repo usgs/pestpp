@@ -658,13 +658,15 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 		precision = precision - 2; //for the "e" and (at least) 1 exponent digit
 	}
 	ss.width(size);
-	
+	ss << internal;
+	int size_last = -1;
 	ss.fill('0');
 	while (true)
 	{
 		
 		ss.str("");
 		ss.precision(precision);
+
 		ss << value;
 		val_str = ss.str();
 		if (val_str.size() <= size)
@@ -678,15 +680,24 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 			ss << " for " << name << " in space that is only " << size << " chars wide";
 			throw_tpl_error(ss.str());
 		}
-		
+		if (val_str.size() == size_last)
+			throw_tpl_error("internal error: val_str size not decreasing over successive attempts:"+val_str);
+		size_last = val_str.size();
 	}
 	//occasionally, when reducing precision, rounding will cause an 
 	// extra char to be dropped, so this left pads it back
 	if (val_str.size() < size) 
 	{
 		ss.str("");
+		if (val_str.at(0) == '-')
+		{
+			ss << "-";
+			val_str = val_str.substr(1, val_str.size() - 1);
+		}
 		for (int i = val_str.size(); i < size; i++)
 			ss << "0";
+		
+				
 		ss << val_str;
 		val_str = ss.str();
 	}
