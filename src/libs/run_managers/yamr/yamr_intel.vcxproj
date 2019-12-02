@@ -222,7 +222,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(SolutionDir)\libs\pestpp_common;$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)libs\Eigen</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\libs\pestpp_common;$(SolutionDir)\libs\pestpp_common;$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)libs\Eigen</AdditionalIncludeDirectories>
       <OpenMPSupport>true</OpenMPSupport>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <EnableParallelCodeGeneration>

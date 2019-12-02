@@ -38,11 +38,14 @@ using namespace pest_utils;
 RunManagerSerial::RunManagerSerial(const vector<string> _comline_vec,
 	const vector<string> _tplfile_vec, const vector<string> _inpfile_vec,
 	const vector<string> _insfile_vec, const vector<string> _outfile_vec,
-	const string &stor_filename, const string &_run_dir, int _max_run_fail)
+	const string &stor_filename, const string &_run_dir, int _max_run_fail,
+	bool fill_tpl_zeros, string additional_ins_delimiters)
 	: RunManagerAbstract(_comline_vec, _tplfile_vec, _inpfile_vec,
 	_insfile_vec, _outfile_vec, stor_filename, _max_run_fail),
 	run_dir(_run_dir), mi(_tplfile_vec,_inpfile_vec,_insfile_vec,_outfile_vec, _comline_vec)
 {
+	mi.set_additional_ins_delimiters(additional_ins_delimiters);
+	mi.set_fill_tpl_zeros(fill_tpl_zeros);
 
 	cout << "              starting serial run manager ..." << endl << endl;
 }

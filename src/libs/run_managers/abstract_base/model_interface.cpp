@@ -122,7 +122,6 @@ void ModelInterface::check_tplins(const vector<string> &par_names, const vector<
 		TemplateFile tf(tpl_file);
 		file_par_names = tf.parse_and_check();
 		tpl_par_names.insert(file_par_names.begin(), file_par_names.end());
-		//tf.write_input_file(f_rec, "test.dat", ctl_parameters);
 	}
 	unordered_set<string> pst_par_names;
 	pst_par_names.insert(par_names.begin(), par_names.end());
@@ -174,6 +173,14 @@ void ModelInterface::run(Parameters* pars, Observations* obs)
 void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
 						Parameters* pars, Observations* obs)
 {
+
+	if (templatefiles.size() == 0)
+		for (auto t : tplfile_vec)
+			templatefiles.push_back(TemplateFile(t));
+
+	if (instructionfiles.size() == 0)
+		for (auto i : insfile_vec)
+			instructionfiles.push_back(InstructionFile(i));
 
 	Observations pro_obs;
 	vector<Parameters> pro_par_vec;
@@ -383,7 +390,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		*/
 		cout << "processing ins files...";
 		Observations temp_obs;
-		for (int i = 0; i < insfile_vec.size(); i++)
+		for (int i = 0; i < instructionfiles.size(); i++)
 		{
 			pro_obs = instructionfiles[i].read_output_file(outfile_vec[i]);
 			temp_obs.update_without_clear(pro_obs.get_keys(), pro_obs.get_data_vec(pro_obs.get_keys()));
@@ -627,10 +634,13 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 		precision = precision - 2; //for the "e" and (at least) 1 exponent digit
 	}
 	ss.width(size);
-	ss << internal;
+	
 	int size_last = -1;
 	if (fill_zeros)
+	{
 		ss.fill('0');
+		ss << internal;
+	}
 	while (true)
 	{
 		
@@ -1061,7 +1071,7 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 pair<string, double> InstructionFile::execute_free(const string& token, string& line, ifstream& f_out)
 {
 	vector<string> tokens;
-	pest_utils::tokenize(line, tokens,", \t\n\r") + additional_delimiters; //include the comma in the delimiters here
+	pest_utils::tokenize(line, tokens,", \t\n\r" + additional_delimiters) ; //include the comma in the delimiters here
 	if (tokens.size() == 0)
 		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);
 	double value;

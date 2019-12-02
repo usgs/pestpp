@@ -239,8 +239,11 @@ int main(int argc, char* argv[])
 	{
 		const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
 		run_manager_ptr = new RunManagerSerial(exi.comline_vec,
-		exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
-		file_manager.build_filename("rns"), pathname);
+			exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
+			file_manager.build_filename("rns"), pathname,
+			pest_scenario.get_pestpp_options().get_max_run_fail(),
+			pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
+			pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
 	}
 
 	cout << endl;

@@ -13,7 +13,7 @@ using namespace std;
 class TemplateFile {
 public:
 	static vector<int> find_all_marker_indices(const string& line, const string& marker);
-	TemplateFile(string _tpl_filename, bool _fill_zeros): tpl_filename(_tpl_filename),line_num(0),
+	TemplateFile(string _tpl_filename, bool _fill_zeros=false): tpl_filename(_tpl_filename),line_num(0),
 	fill_zeros(_fill_zeros){ ; }
 	unordered_set<string> parse_and_check();
 	Parameters write_input_file(const string& input_filename, Parameters& pars);
@@ -73,7 +73,7 @@ public:
 	ModelInterface(vector<string> _tplfile_vec, vector<string> _inpfile_vec, vector<string>
 		_insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec) :
 		insfile_vec(_insfile_vec), outfile_vec(_outfile_vec), tplfile_vec(_tplfile_vec),
-		inpfile_vec(_inpfile_vec), fill_tpl_zeros(false), additional_ins_delimiters("") {;}
+		inpfile_vec(_inpfile_vec), comline_vec(_comline_vec), fill_tpl_zeros(false), additional_ins_delimiters("") {;}
 	void throw_mio_error(string base_message);
 	void run(Parameters* pars, Observations* obs);
 	void run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
@@ -81,8 +81,8 @@ public:
 		Parameters* par, Observations* obs);
 	void check_io_access();
 	void check_tplins(const vector<string> &par_names, const vector<string> &obs_names);
-	void set_additional_ins_delimiters(string delims);
-	void set_fill_tpl_zeros(bool _flag);
+	void set_additional_ins_delimiters(string delims) { additional_ins_delimiters = delims; }
+	void set_fill_tpl_zeros(bool _flag) { fill_tpl_zeros = _flag; }
 
 private:
 	//Pest* pest_scenario_ptr;
@@ -94,7 +94,7 @@ private:
 	vector<string> tplfile_vec; 
 	vector<string> comline_vec; 
 	bool fill_tpl_zeros;
-	sting additional_ins_delimiters;
+	string additional_ins_delimiters;
 };
 
 #endif /* MODEL_INTERFACE_H_ */

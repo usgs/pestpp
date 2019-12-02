@@ -104,6 +104,8 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 	mi.check_io_access();
 	if (pest_scenario.get_pestpp_options().get_check_tplins())
 		mi.check_tplins(pest_scenario.get_ctl_ordered_par_names(), pest_scenario.get_ctl_ordered_obs_names());
+	mi.set_additional_ins_delimiters(pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
+	mi.set_fill_tpl_zeros(pest_scenario.get_pestpp_options().get_fill_tpl_zeros());
 }
 
 int PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
