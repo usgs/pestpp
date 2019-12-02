@@ -6,13 +6,15 @@
 #include <unordered_set>
 #include "Transformable.h"
 #include "utilities.h"
+#include "Pest.h"
 
 using namespace std;
 
 class TemplateFile {
 public:
 	static vector<int> find_all_marker_indices(const string& line, const string& marker);
-	TemplateFile(string _tpl_filename): tpl_filename(_tpl_filename),line_num(0) { ; }
+	TemplateFile(string _tpl_filename, bool _fill_zeros): tpl_filename(_tpl_filename),line_num(0),
+	fill_zeros(_fill_zeros){ ; }
 	unordered_set<string> parse_and_check();
 	Parameters write_input_file(const string& input_filename, Parameters& pars);
 	void throw_tpl_error(const string& message, int lnum=0, bool warn=false);
@@ -26,6 +28,7 @@ private:
 	string read_line(ifstream& f_tpl);
 	void prep_tpl_file_for_reading(ifstream& f_tpl);
 	unordered_set<string> get_names(ifstream& f);
+	bool fill_zeros;
 	
 	
 
@@ -36,7 +39,7 @@ private:
 class InstructionFile {
 	
 public:
-	InstructionFile(string _ins_filename);
+	InstructionFile(string _ins_filename, string _additional_delimiters="");
 	unordered_set<string> parse_and_check();
 	Observations read_output_file(const string& output_filename);
 
@@ -59,45 +62,39 @@ private:
 	string parse_obs_name_from_token(const string& token);
 	vector<string> tokenize_ins_line(const string& line);
 	pair<string, pair<int, int>> parse_obs_instruction(const string& token, const string& close_tag);
+	string additional_delimiters;
 };
 
 
 class ModelInterface{
 public:
-	ModelInterface();
-	ModelInterface(vector<string> _tplfile_vec,vector<string> _inpfile_vec, vector<string> _insfile_vec, vector<string> _outfile_vec,vector<string> _comline_vec);
+	ModelInterface() { ; }
+	//ModelInterface(Pest* _pest_scenario_ptr) { pest_scenario_ptr = _pest_scenario_ptr; }
+	ModelInterface(vector<string> _tplfile_vec, vector<string> _inpfile_vec, vector<string>
+		_insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec) :
+		insfile_vec(_insfile_vec), outfile_vec(_outfile_vec), tplfile_vec(_tplfile_vec),
+		inpfile_vec(_inpfile_vec), fill_tpl_zeros(false), additional_ins_delimiters("") {;}
 	void throw_mio_error(string base_message);
 	void run(Parameters* pars, Observations* obs);
 	void run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
 		pest_utils::thread_exceptions *shared_execptions,
 		Parameters* par, Observations* obs);
+	void check_io_access();
+	void check_tplins(const vector<string> &par_names, const vector<string> &obs_names);
+	void set_additional_ins_delimiters(string delims);
+	void set_fill_tpl_zeros(bool _flag);
 
-
-	void initialize(vector<string> &_par_name_vec, vector<string> &_obs_name_vec);
-	void initialize(vector<string> _tplfile_vec, vector<string> _inpfile_vec,
-		vector<string> _insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec,
-		vector<string> &_par_name_vec, vector<string> &_obs_name_vec);
-	void finalize();
-	~ModelInterface();
-	bool get_initialized(){ return initialized; }
 private:
-
-	void set_files();
-	
-	bool initialized;
-	int ifail;
-	vector<string> par_name_vec;
-	vector<string> obs_name_vec;
-	vector<string> tplfile_vec;
-	vector<string> inpfile_vec;
-	vector<string> outfile_vec;
-	vector<string> insfile_vec;
-	vector<string> comline_vec;
+	//Pest* pest_scenario_ptr;
 	vector<TemplateFile> templatefiles;
 	vector<InstructionFile> instructionfiles;
-	vector<double> par_vals;
-	vector<double> obs_vals;
-
+	vector<string> insfile_vec; 
+	vector<string> inpfile_vec; 
+	vector<string> outfile_vec; 
+	vector<string> tplfile_vec; 
+	vector<string> comline_vec; 
+	bool fill_tpl_zeros;
+	sting additional_ins_delimiters;
 };
 
 #endif /* MODEL_INTERFACE_H_ */

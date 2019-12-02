@@ -148,7 +148,10 @@ int main(int argc, char* argv[])
 					cerr << "PANTHER agent requires the master be specified as /H hostname:port" << endl << endl;
 					throw(PestCommandlineError(commandline));
 				}
-				PANTHERAgent yam_agent;
+				ofstream frec("panther_worker.rec");
+				if (frec.bad())
+					throw runtime_error("error opening 'panther_worker.rec'");
+				PANTHERAgent yam_agent(frec);
 				string ctl_file = "";
 				try {
 					

@@ -428,6 +428,11 @@ public:
 
 	void set_check_tplins(bool _flag) { check_tplins = _flag; }
 	bool get_check_tplins() const { return check_tplins; }
+	void set_fill_tpl_zeros(bool _flag) { fill_tpl_zeros = _flag; }
+	bool get_fill_tpl_zeros() const { return fill_tpl_zeros; }
+	void set_additional_ins_delimiters(string _delims) { additional_ins_delimiters = _delims; }
+	string get_additional_ins_delimiters() const { return additional_ins_delimiters; }
+
 
 	void set_defaults();
 	void summary(ostream& os) const;
@@ -548,6 +553,8 @@ private:
 	bool enforce_tied_bounds;
 	bool debug_parse_only;
 	bool check_tplins;
+	bool fill_tpl_zeros;
+	string additional_ins_delimiters;
 
 	
 		

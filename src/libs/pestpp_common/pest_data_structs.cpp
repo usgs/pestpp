@@ -908,6 +908,14 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		check_tplins = pest_utils::parse_string_arg_to_bool(value);
 	}
+	else if (key == "FILL_TPL_ZEROS")
+	{
+		fill_tpl_zeros = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "ADDITIONAL_INS_DELIMITERS")
+	{
+		convert_ip(value, additional_ins_delimiters);
+	}
 	else 
 	{
 
@@ -947,7 +955,9 @@ void PestppOptions::summary(ostream& os) const
 	os << "enforce_tied_bounds: " << enforce_tied_bounds << endl;
 	os << "debug_parse_only: " << debug_parse_only << endl;
 	os << "debug_parse_only: " << debug_parse_only << endl;
-	os << "check_tplins:" << check_tplins << endl;
+	os << "check_tplins: " << check_tplins << endl;
+	os << "fill_tpl_zeros: " << fill_tpl_zeros << endl;
+	os << "additional_ins_delimiters: " << additional_ins_delimiters << endl;
 	
 
 	os << endl << "...pestpp-glm specific options:" << endl;
@@ -1187,6 +1197,8 @@ void PestppOptions::set_defaults()
 
 	set_debug_parse_only(false);
 	set_check_tplins(true);
+	set_fill_tpl_zeros(false);
+	set_additional_ins_delimiters("");
 }
 
 ostream& operator<< (ostream &os, const ParameterInfo& val)

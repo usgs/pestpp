@@ -309,123 +309,44 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		}
 }
 
-void Pest::check_io(ofstream &f_rec)
+void Pest::check_io(ofstream& f_rec)
 {
+	ModelInterface mi(model_exec_info.tplfile_vec,model_exec_info.inpfile_vec,
+		model_exec_info.insfile_vec,model_exec_info.outfile_vec,model_exec_info.comline_vec);
 
-	if (model_exec_info.tplfile_vec.size() == 0)
+	try
 	{
-		cout << "Error: number of template files = 0" << endl;
-		f_rec << "Error: number of template files = 0" << endl;
-		throw runtime_error("number of template files = 0");
-	}
-	if (model_exec_info.insfile_vec.size() == 0)
-	{
-		cout << "Error: number of instruction files = 0" << endl;
-		f_rec << "Error: number of instruction files = 0" << endl;
-		throw runtime_error("number of instruction files = 0");
-	}
-	//make sure we can atleast access the model IO files
-	vector<string> inaccessible_files;
-	for (auto &file : model_exec_info.insfile_vec)
-		if (!check_exist_in(file)) inaccessible_files.push_back(file);
-	for (auto &file : model_exec_info.outfile_vec)
-		if (!check_exist_out(file)) inaccessible_files.push_back(file);
-	for (auto &file : model_exec_info.tplfile_vec)
-		if (!check_exist_in(file)) inaccessible_files.push_back(file);
-	for (auto &file : model_exec_info.inpfile_vec)
-		if (!check_exist_out(file)) inaccessible_files.push_back(file);
-
-	if (inaccessible_files.size() != 0)
-	{
-		string missing;
-		for (auto &file : inaccessible_files)
-			missing += file + " , ";
-		cout << "Could not access the following model interface files: " << missing;
-		f_rec << "Could not access the following model interface files: " << missing;
-
-		throw PestError("Could not access the following model interface files: "+missing);
-		//cout << "WARNING: could not access the following model interface files: " << missing << endl;
+		mi.check_io_access();
 
 	}
-
-	cout << endl;
-	if (!pestpp_options.get_check_tplins())
-		return;
-
-	//rigorous checking of names in tpl and ins files vs control file
-	unordered_set<string> ins_obs_names, file_obs_names;
-	for (auto ins_file : model_exec_info.insfile_vec)
+	catch (exception& e)
 	{
-		InstructionFile isf(ins_file);
-		file_obs_names = isf.parse_and_check();
-		ins_obs_names.insert(file_obs_names.begin(), file_obs_names.end());
-		//isf.read_output_file(model_exec_info.outfile_vec[0]);
+		string mess = e.what();
+		throw_control_file_error(f_rec, "error in model interface file access:" + mess);
 	}
-	unordered_set<string> pst_obs_names, diff;
-
-	pst_obs_names.insert(ctl_ordered_obs_names.begin(), ctl_ordered_obs_names.end());
-	unordered_set<string>::iterator end = ins_obs_names.end();
-	for (auto p : pst_obs_names)
-		if (ins_obs_names.find(p) == end)
-			diff.insert(p);
-	if (diff.size() > 0)
+	catch (...)
 	{
-		stringstream ss;
-		ss << "Error: the following observations were found in the control file but not in the instruction files:" << endl;
-		for (auto d : diff)
-			ss << d << endl;
-		throw_control_file_error(f_rec, ss.str());
+		throw_control_file_error(f_rec, "unspecified error in model interface file access checking");
 	}
-	end = pst_obs_names.end();
-	for (auto p : ins_obs_names)
-		if (pst_obs_names.find(p) == end)
-			diff.insert(p);
-	if (diff.size() > 0)
+	if (pestpp_options.get_check_tplins())
 	{
-		stringstream ss;
-		ss << "Error: the following observations were found in the instruction files but not in the control file:" << endl;
-		for (auto d : diff)
-			ss << d << endl;
-		throw_control_file_error(f_rec, ss.str());
-	}
+		try
+		{
+			mi.check_tplins(ctl_ordered_par_names,ctl_ordered_obs_names);
 
-
-	unordered_set<string> tpl_par_names, file_par_names;
-	for (auto tpl_file : model_exec_info.tplfile_vec)
-	{
-		TemplateFile tf(tpl_file);
-		file_par_names = tf.parse_and_check();
-		tpl_par_names.insert(file_par_names.begin(), file_par_names.end());
-		//tf.write_input_file(f_rec, "test.dat", ctl_parameters);
-	}
-	unordered_set<string> pst_par_names;
-
-	pst_par_names.insert(ctl_ordered_par_names.begin(), ctl_ordered_par_names.end());
-	end = tpl_par_names.end();
-	for (auto p : pst_par_names)
-		if (tpl_par_names.find(p) == end)
-			diff.insert(p);
-	if (diff.size() > 0)
-	{
-		stringstream ss;
-		ss << "Error: the following parameters were found in the control file but not in the template files:" << endl;
-		for (auto d : diff)
-			ss << d << endl;
-		throw_control_file_error(f_rec, ss.str());
-	}
-	end = pst_par_names.end();
-	for (auto p : tpl_par_names)
-		if (pst_par_names.find(p) == end)
-			diff.insert(p);
-	if (diff.size() > 0)
-	{
-		stringstream ss;
-		ss << "Error: the following parameters were found in the template files but not in the control file:" << endl;
-		for (auto d : diff)
-			ss << d << endl;
-		throw_control_file_error(f_rec, ss.str());
+		}
+		catch (exception& e)
+		{
+			string mess = e.what();
+			throw_control_file_error(f_rec, "error in model interface file checking:" + mess);
+		}
+		catch (...)
+		{
+			throw_control_file_error(f_rec, "unspecified error in model interface file checking");
+		}
 	}
 }
+
 
 const vector<string> Pest::get_ctl_ordered_nz_obs_names()
 {

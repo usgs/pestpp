@@ -13,177 +13,146 @@
 
 using namespace std;
 
-extern "C"
-{
-	void mio_initialise_w_(int *, int *, int *, int *, int *);
-	void mio_put_file_w_(int *, int *, int *, char *, long *);
-	void mio_get_file_w_(int *, int *, int *, char *);
-	void mio_store_instruction_set_w_(int *);
-	void mio_process_template_files_w_(int *, int *, char *);
-	void mio_delete_output_files_w_(int *, char *);
-	void mio_write_model_input_files_w_(int *, int *, char *, double *);
-	void mio_read_model_output_files_w_(int *, int *, char *, double *);
-	void mio_finalise_w_(int *);
-	void mio_get_status_w_(int *, int *);
-	void mio_get_dimensions_w_(int *, int *);
-	void mio_get_message_string_w_(int *, int *, char *);
-
-}
+//extern "C"
+//{
+//	void mio_initialise_w_(int *, int *, int *, int *, int *);
+//	void mio_put_file_w_(int *, int *, int *, char *, long *);
+//	void mio_get_file_w_(int *, int *, int *, char *);
+//	void mio_store_instruction_set_w_(int *);
+//	void mio_process_template_files_w_(int *, int *, char *);
+//	void mio_delete_output_files_w_(int *, char *);
+//	void mio_write_model_input_files_w_(int *, int *, char *, double *);
+//	void mio_read_model_output_files_w_(int *, int *, char *, double *);
+//	void mio_finalise_w_(int *);
+//	void mio_get_status_w_(int *, int *);
+//	void mio_get_dimensions_w_(int *, int *);
+//	void mio_get_message_string_w_(int *, int *, char *);
+//
+//}
 
 
 void ModelInterface::throw_mio_error(string base_message)
 {
-	int mess_len = 500;
-	char message[500];
-	int nerr_len = 500;
-	char err_instruct[500];
-	for (int i = 0; i < 500; i++)
-		err_instruct[i] = ' ';
-	//cout << endl << endl << " MODEL INTERFACE ERROR:" << endl;
-	mio_get_message_string_w_(&ifail, &mess_len, message);
-	string err = string(message);
-	auto s_end = err.find_last_not_of(" \t", 500);
-	err = err.substr(0, s_end);
-	throw runtime_error("model input/output error:" + base_message + "\n" + err);
+	throw runtime_error("model input/output error:" + base_message);
 }
 
 
-void ModelInterface::set_files()
+
+void ModelInterface::check_io_access()
 {
-	//put template files
-	int inum = 1;
-	int itype = 1;
-	for (auto &file : tplfile_vec)
+	
+	if (tplfile_vec.size() == 0)
 	{
-		long f_name_len = 180;
-		vector<char> f_name = pest_utils::string_as_fortran_char_ptr(file, f_name_len);
-		mio_put_file_w_(&ifail, &itype, &inum, f_name.data(), &f_name_len);
-		if (ifail != 0) throw_mio_error("putting template file" + file);
-		inum++;
+		throw_mio_error("number of template files = 0");
 	}
-
-	//put model in files
-	inum = 1;
-	itype = 2;
-	for (auto &file : inpfile_vec)
+	if (insfile_vec.size() == 0)
 	{
-		long f_name_len = 180;
-		vector<char> f_name = pest_utils::string_as_fortran_char_ptr(file, f_name_len);
-		mio_put_file_w_(&ifail, &itype, &inum, f_name.data(), &f_name_len);
-		if (ifail != 0) throw_mio_error("putting model input file" + file);
-		inum++;
+		throw_mio_error("number of instruction files = 0");
 	}
-
-	//put instructions files
-	inum = 1;
-	itype = 3;
-	for (auto &file : insfile_vec)
+	vector<string> inaccessible_files;
+	for (auto& file : insfile_vec)
+		if (!pest_utils::check_exist_in(file)) inaccessible_files.push_back(file);
+	for (auto& file : outfile_vec)
+		if (!pest_utils::check_exist_out(file)) inaccessible_files.push_back(file);
+	for (auto& file : tplfile_vec)
+		if (!pest_utils::check_exist_in(file)) inaccessible_files.push_back(file);
+	for (auto& file : inpfile_vec)
+		if (!pest_utils::check_exist_out(file)) inaccessible_files.push_back(file);
+	
+	if (inaccessible_files.size() != 0)
 	{
-		long f_name_len = 180;
-		vector<char> f_name = pest_utils::string_as_fortran_char_ptr(file, f_name_len);
-		mio_put_file_w_(&ifail, &itype, &inum, f_name.data(), &f_name_len);
-		if (ifail != 0) throw_mio_error("putting instruction file" + file);
-		inum++;
+		string missing;
+		for (auto& file : inaccessible_files)
+			missing += file + " , ";
+		cout << "Could not access the following model interface files: " << missing;
+		throw PestError("Could not access the following model interface files: " + missing);
+		
 	}
-
-	//put model out files
-	inum = 1;
-	itype = 4;
-	for (auto &file : outfile_vec)
+	if (inaccessible_files.size() != 0)
 	{
-		long f_name_len = 180;
-		vector<char> f_name = pest_utils::string_as_fortran_char_ptr(file, f_name_len);
-		mio_put_file_w_(&ifail, &itype, &inum, f_name.data(), &f_name_len);
-		if (ifail != 0) throw_mio_error("putting model output file" + file);
-		inum++;
+		string missing;
+		for (auto& file : inaccessible_files)
+			missing += file + " , ";
+		throw PestError("Could not access the following model interface files: " + missing);
 	}
 }
 
-ModelInterface::ModelInterface()
-{
-	initialized = false;
-}
-
-ModelInterface::ModelInterface(vector<string> _tplfile_vec, vector<string> _inpfile_vec,
-	vector<string> _insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec)
-{
-	tplfile_vec = _tplfile_vec;
-	inpfile_vec = _inpfile_vec;
-	insfile_vec = _insfile_vec;
-	outfile_vec = _outfile_vec;
-	comline_vec = _comline_vec;
-
-	initialized = false;
-}
-
-void ModelInterface::initialize(vector<string> _tplfile_vec, vector<string> _inpfile_vec,
-	vector<string> _insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec,
-	vector<string> &_par_name_vec, vector<string> &_obs_name_vec)
-{
-	tplfile_vec = _tplfile_vec;
-	inpfile_vec = _inpfile_vec;
-	insfile_vec = _insfile_vec;
-	outfile_vec = _outfile_vec;
-	comline_vec = _comline_vec;
-
-	initialize(_par_name_vec,_obs_name_vec);
-}
-
-
-void ModelInterface::initialize(vector<string> &_par_name_vec, vector<string> &_obs_name_vec)
-{
-	par_name_vec = _par_name_vec;
-	obs_name_vec = _obs_name_vec;
-	int npar = par_name_vec.size();
-	int nobs = obs_name_vec.size();
-	int ntpl = tplfile_vec.size();
-	int nins = insfile_vec.size();
-
-	if (ntpl <= 0)
-		throw runtime_error("number of template files <= 0");
-	if (nins <= 0)
-		throw runtime_error("number of instructino files <=0");
-
-	// old fortran processing routines...
-	//mio_initialise_w_(&ifail, &ntpl, &nins, &npar, &nobs);
-	//if (ifail != 0) throw_mio_error("initializing mio module");
-	//set_files();
-	//check template files
-	//mio_process_template_files_w_(&ifail, &npar, pest_utils::StringvecFortranCharArray(par_name_vec, 200, pest_utils::TO_LOWER).get_prt());
-	//if (ifail != 0)throw_mio_error("error in template files");
-
-	for (auto tplfile : tplfile_vec)
+void ModelInterface::check_tplins(const vector<string> &par_names, const vector<string> &obs_names)
+{	
+	//rigorous checking of names in tpl and ins files vs control file
+	unordered_set<string> ins_obs_names, file_obs_names;
+	for (auto ins_file : insfile_vec)
 	{
-		TemplateFile tpl(tplfile);
-		templatefiles.push_back(tpl);
+		InstructionFile isf(ins_file);
+		file_obs_names = isf.parse_and_check();
+		ins_obs_names.insert(file_obs_names.begin(), file_obs_names.end());
+		//isf.read_output_file(model_exec_info.outfile_vec[0]);
+	}
+	unordered_set<string> pst_obs_names, diff;
+	pst_obs_names.insert(obs_names.begin(), obs_names.end());
+	unordered_set<string>::iterator end = ins_obs_names.end();
+	for (auto p : pst_obs_names)
+		if (ins_obs_names.find(p) == end)
+			diff.insert(p);
+	if (diff.size() > 0)
+	{
+		stringstream ss;
+		ss << "Error: the following observations were found in the control file but not in the instruction files:" << endl;
+		for (auto d : diff)
+			ss << d << endl;
+		throw_mio_error(ss.str());
+	}
+	end = pst_obs_names.end();
+	for (auto p : ins_obs_names)
+		if (pst_obs_names.find(p) == end)
+			diff.insert(p);
+	if (diff.size() > 0)
+	{
+		stringstream ss;
+		ss << "Error: the following observations were found in the instruction files but not in the control file:" << endl;
+		for (auto d : diff)
+			ss << d << endl;
+		throw_mio_error(ss.str());
 	}
 
-	for (auto insfile : insfile_vec)
+
+	unordered_set<string> tpl_par_names, file_par_names;
+	for (auto tpl_file : tplfile_vec)
 	{
-		InstructionFile ins(insfile);
-		instructionfiles.push_back(ins);
+		TemplateFile tf(tpl_file);
+		file_par_names = tf.parse_and_check();
+		tpl_par_names.insert(file_par_names.begin(), file_par_names.end());
+		//tf.write_input_file(f_rec, "test.dat", ctl_parameters);
 	}
-
-	////build instruction set
-	//mio_store_instruction_set_w_(&ifail);
-	//if (ifail != 0) throw_mio_error("error building instruction set");
-
-	initialized = true;
-
+	unordered_set<string> pst_par_names;
+	pst_par_names.insert(par_names.begin(), par_names.end());
+	end = tpl_par_names.end();
+	for (auto p : pst_par_names)
+		if (tpl_par_names.find(p) == end)
+			diff.insert(p);
+	if (diff.size() > 0)
+	{
+		stringstream ss;
+		ss << "Error: the following parameters were found in the control file but not in the template files:" << endl;
+		for (auto d : diff)
+			ss << d << endl;
+		throw_mio_error(ss.str());
+	}
+	end = pst_par_names.end();
+	for (auto p : tpl_par_names)
+		if (pst_par_names.find(p) == end)
+			diff.insert(p);
+	if (diff.size() > 0)
+	{
+		stringstream ss;
+		ss << "Error: the following parameters were found in the template files but not in the control file:" << endl;
+		for (auto d : diff)
+			ss << d << endl;
+		throw_mio_error(ss.str());
+	}
 }
 
-void ModelInterface::finalize()
-{
-	mio_finalise_w_(&ifail);
-	if (ifail != 0) ModelInterface::throw_mio_error("error finalizing model interface");
-	initialized = false;
-}
 
-ModelInterface::~ModelInterface()
-{
-	finalize();
-
-}
 
 void ModelInterface::run(Parameters* pars, Observations* obs)
 {
@@ -192,12 +161,10 @@ void ModelInterface::run(Parameters* pars, Observations* obs)
 	pest_utils::thread_flag finished(false);
 	pest_utils::thread_exceptions shared_exceptions;
 
-
-
 	run(&terminate, &finished, &shared_exceptions, pars, obs);
 	if (shared_exceptions.size() > 0)
 	{
-		finalize();
+		//finalize();
 		shared_exceptions.rethrow();
 	}
 
@@ -207,15 +174,7 @@ void ModelInterface::run(Parameters* pars, Observations* obs)
 void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
 						Parameters* pars, Observations* obs)
 {
-	if (!initialized)
-	{
-		vector<string> pnames = pars->get_keys();
-		vector<string> onames = obs->get_keys();
-		initialize(pnames, onames);
-	}
-	//get par vals that are aligned with this::par_name_vec since the mio module was initialized with this::par_name_vec order
-	//par_vals = pars->get_data_vec(par_name_vec);
-	//map<string, double> obs_map, isf_obs_map,par_map,tf_par_map;
+
 	Observations pro_obs;
 	vector<Parameters> pro_par_vec;
 	try
@@ -518,31 +477,41 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 				throw_tpl_error("parameter '" + name + "' not listed in control file");
 
 			/*val = 1.23456789123456789123456789E+100;
-			val_str = cast_to_fixed_len_string(f_rec, 200, val, name);
+			val_str = cast_to_fixed_len_string(200, val, name);
+			pest_utils::convert_ip(val_str, val);
 
 			val = 1.23456789123456789123456789E+100;
-			val_str = cast_to_fixed_len_string(f_rec, 8, val, name);
+			val_str = cast_to_fixed_len_string(8, val, name);
+			pest_utils::convert_ip(val_str, val);
 
 			val = 1.23456789123456789123456789E-100;
-			val_str = cast_to_fixed_len_string(f_rec, 8, val, name);
+			val_str = cast_to_fixed_len_string(8, val, name);
+			pest_utils::convert_ip(val_str, val);
 
 			val = -1.23456789123456789123456789E+100;
-			val_str = cast_to_fixed_len_string(f_rec, 9, val, name);
+			val_str = cast_to_fixed_len_string(9, val, name);
+			pest_utils::convert_ip(val_str, val);
 
 			val = -1.23456789123456789123456789E-100;
-			val_str = cast_to_fixed_len_string(f_rec, 9, val, name);
+			val_str = cast_to_fixed_len_string(9, val, name);
+			pest_utils::convert_ip(val_str, val);
 
 			val = 1.23456789123456789123456789E+10;
-			val_str = cast_to_fixed_len_string(f_rec, 7, val, name);
-				
+			val_str = cast_to_fixed_len_string(7, val, name);
+			pest_utils::convert_ip(val_str, val);
+
 			val = 1.23456789123456789123456789E-10;
-			val_str = cast_to_fixed_len_string(f_rec, 7, val, name);
+			val_str = cast_to_fixed_len_string(7, val, name);
+			pest_utils::convert_ip(val_str, val);
 
 			val = 1.23456789123456789123456789;
-			val_str = cast_to_fixed_len_string(f_rec, 1, val, name);
+			val_str = cast_to_fixed_len_string(1, val, name);
+			pest_utils::convert_ip(val_str, val);
 
 			val = -1.23456789123456789123456789;
-			val_str = cast_to_fixed_len_string(f_rec, 2, val, name);*/
+			val_str = cast_to_fixed_len_string(2, val, name);
+			pest_utils::convert_ip(val_str, val);
+			*/
 
 			val = pars.get_rec(t.first);
 			val_str = cast_to_fixed_len_string(t.second.second, val, name);
@@ -660,7 +629,8 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 	ss.width(size);
 	ss << internal;
 	int size_last = -1;
-	ss.fill('0');
+	if (fill_zeros)
+		ss.fill('0');
 	while (true)
 	{
 		
@@ -686,7 +656,7 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 	}
 	//occasionally, when reducing precision, rounding will cause an 
 	// extra char to be dropped, so this left pads it back
-	if (val_str.size() < size) 
+	if ((fill_zeros) && (val_str.size() < size))
 	{
 		ss.str("");
 		if (val_str.at(0) == '-')
@@ -755,8 +725,8 @@ string InstructionFile::read_out_line(ifstream& f_out)
 }
 
 
-InstructionFile::InstructionFile(string _ins_filename): ins_filename(_ins_filename), ins_line_num(0),
-out_line_num(0),last_ins_line(""),last_out_line("")
+InstructionFile::InstructionFile(string _ins_filename, string _addtitional_delimiters): ins_filename(_ins_filename), ins_line_num(0),
+out_line_num(0),last_ins_line(""),last_out_line(""), additional_delimiters(_addtitional_delimiters)
 {
 	obs_tags.push_back(pair<char, char>('(', ')'));
 	obs_tags.push_back(pair<char, char>('[', ']'));	
@@ -1091,7 +1061,7 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 pair<string, double> InstructionFile::execute_free(const string& token, string& line, ifstream& f_out)
 {
 	vector<string> tokens;
-	pest_utils::tokenize(line, tokens,", \t\n\r"); //include the comma in the delimiters here
+	pest_utils::tokenize(line, tokens,", \t\n\r") + additional_delimiters; //include the comma in the delimiters here
 	if (tokens.size() == 0)
 		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);
 	double value;
@@ -1158,6 +1128,8 @@ void InstructionFile::execute_secondary(const string& token, string& line, ifstr
 
 void InstructionFile::execute_whitespace(const string& token, string& line, ifstream& f_out)
 {
+	string delims = " \t" + additional_delimiters;
+
 	int pos = line.find_first_of(" \t");
 	if (pos == string::npos)
 	{
