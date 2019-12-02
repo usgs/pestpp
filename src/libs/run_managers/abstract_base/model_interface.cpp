@@ -623,7 +623,7 @@ map<string, pair<int, int>> TemplateFile::parse_tpl_line(const string& line)
 
 string TemplateFile::cast_to_fixed_len_string(int size, double value, string& name)
 {
-	string val_str;
+	string val_str, fill_val=" ";
 	stringstream ss;
 	int precision = size;
 	if (value < 0)
@@ -640,6 +640,7 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 	{
 		ss.fill('0');
 		ss << internal;
+		fill_val = "0";
 	}
 	while (true)
 	{
@@ -666,7 +667,7 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 	}
 	//occasionally, when reducing precision, rounding will cause an 
 	// extra char to be dropped, so this left pads it back
-	if ((fill_zeros) && (val_str.size() < size))
+	if (val_str.size() < size)
 	{
 		ss.str("");
 		if (val_str.at(0) == '-')
@@ -675,9 +676,7 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 			val_str = val_str.substr(1, val_str.size() - 1);
 		}
 		for (int i = val_str.size(); i < size; i++)
-			ss << "0";
-		
-				
+			ss << fill_val;
 		ss << val_str;
 		val_str = ss.str();
 	}
@@ -1046,7 +1045,7 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 	if (last_out_line.size() < info.second.second)
 		throw_ins_error("output line not long enough for fixed obs instruction '" + token + "',");
 	int len = (info.second.second - info.second.first) + 1;
-	int pos = last_out_line.find_first_not_of(", \t\n\r", info.second.first); //include the comma here for csv files
+	int pos = last_out_line.find_first_not_of(", \t\n\r"+additional_delimiters, info.second.first); //include the comma here for csv files
 	if (pos == string::npos)
 		throw_ins_error("EOL encountered when looking for non-whitespace char in semi-fixed instruction '" + token + "'",ins_line_num,out_line_num);
 	if (pos > info.second.second)
