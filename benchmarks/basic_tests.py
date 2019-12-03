@@ -544,6 +544,7 @@ def secondary_marker_test():
             pst = pyemu.Pst.from_io_files(tpl_file,tpl_file.replace(".tpl",""),
                 ins_file,ins_file.replace(".ins",""))
             pst.control_data.noptmax = 0
+            pst.pestpp_options["additional_ins_delimiters"] = "|"
             pst.model_command = "python forward_run.py"
             pst.write(os.path.join("test.pst"))
             
@@ -729,8 +730,8 @@ if __name__ == "__main__":
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    #secondary_marker_test()
-    basic_test("ies_10par_xsec")
+    secondary_marker_test()
+    #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()

@@ -154,7 +154,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 		f << draws << endl;
 		f.close();
 	}
-	Eigen::MatrixXd draws_temp = draws;
+	//Eigen::MatrixXd draws_temp = draws;
 
 	Eigen::VectorXd std = cov.e_ptr()->diagonal().cwiseSqrt();
 	map<string, double> std_map;
@@ -2417,6 +2417,28 @@ ObservationEnsemble::ObservationEnsemble(Pest *_pest_scenario_ptr, Eigen::Matrix
 	real_names = _real_names;
 }
 
+
+void ObservationEnsemble::initialize_without_noise(int num_reals)
+{
+	var_names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+	Observations obs = pest_scenario_ptr->get_ctl_observations();
+	Eigen::VectorXd obsvals = obs.get_data_eigen_vec(var_names);
+	reals.resize(num_reals, var_names.size());
+	for (int i = 0; i < num_reals; i++)
+	{
+		reals.row(i) = obsvals;
+	}
+	real_names.clear();
+	stringstream ss;
+	for (int i = 0; i < num_reals; i++)
+	{
+		ss.str("");
+		ss << i;
+		real_names.push_back(ss.str());
+	}
+	org_real_names = real_names;
+
+}
 
 void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level)
 {

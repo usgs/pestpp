@@ -18,7 +18,7 @@ public:
 	unordered_set<string> parse_and_check();
 	Parameters write_input_file(const string& input_filename, Parameters& pars);
 	void throw_tpl_error(const string& message, int lnum=0, bool warn=false);
-
+	void set_fill_zeros(bool _flag) { fill_zeros = _flag; }
 private:
 	int line_num;
 	string marker;
@@ -42,7 +42,7 @@ public:
 	InstructionFile(string _ins_filename, string _additional_delimiters="");
 	unordered_set<string> parse_and_check();
 	Observations read_output_file(const string& output_filename);
-
+	void set_additional_delimiters(string delims) { additional_delimiters = delims; }
 private:
 	int ins_line_num, out_line_num;
 	char marker;

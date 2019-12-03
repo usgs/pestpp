@@ -176,11 +176,20 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 
 	if (templatefiles.size() == 0)
 		for (auto t : tplfile_vec)
-			templatefiles.push_back(TemplateFile(t));
+		{
+			TemplateFile tt(t);
+			tt.set_fill_zeros(fill_tpl_zeros);
+			templatefiles.push_back(tt);
+		}
+			
 
 	if (instructionfiles.size() == 0)
 		for (auto i : insfile_vec)
-			instructionfiles.push_back(InstructionFile(i));
+		{
+			InstructionFile ii(i);
+			ii.set_additional_delimiters(additional_ins_delimiters);
+			instructionfiles.push_back(ii);
+		}
 
 	Observations pro_obs;
 	vector<Parameters> pro_par_vec;

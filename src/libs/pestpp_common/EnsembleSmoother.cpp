@@ -1048,17 +1048,22 @@ bool IterEnsembleSmoother::initialize_oe(Covariance &cov)
 	stringstream ss;
 	int num_reals = pe.shape().first;
 
-	performance_log->log_event("load obscov");
 	string obs_csv = pest_scenario.get_pestpp_options().get_ies_obs_csv();
 	bool drawn = false;
 	if (obs_csv.size() == 0)
 	{
-		message(1, "drawing observation noise realizations: ", num_reals);
-		oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level());
-		// stringstream ss;
-		// ss << file_manager.get_base_filename() << ".base.obs.csv";
-		// message(1, "saving initial observation ensemble to ", ss.str());
-		// oe.to_csv(ss.str());
+		if (pest_scenario.get_pestpp_options().get_ies_no_noise())
+		{
+			message(1, "initializing no-noise observation ensemble of : ", num_reals);
+			oe.initialize_without_noise(num_reals);
+		
+		}
+		else
+		{
+			message(1, "drawing observation noise realizations: ", num_reals);
+			oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level());
+			
+		}
 		drawn = true;
 	}
 	else
@@ -1557,18 +1562,25 @@ void IterEnsembleSmoother::initialize_restart()
 			}
 		}*/
 		message(2, "reordering oe_base to align with restart obs en,num reals:", oe_real_names.size());
-		try
+		if ((oe_drawn) && (oe_base.shape().first == oe_real_names.size()))
 		{
-			oe_base.reorder(oe_real_names, vector<string>());
+			oe_base.set_real_names(oe_real_names);
 		}
-		catch (exception &e)
+		else
 		{
-			ss << "error reordering oe_base with restart oe:" << e.what();
-			throw_ies_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_ies_error(string("error reordering oe_base with restart oe"));
+			try
+			{
+				oe_base.reorder(oe_real_names, vector<string>());
+			}
+			catch (exception& e)
+			{
+				ss << "error reordering oe_base with restart oe:" << e.what();
+				throw_ies_error(ss.str());
+			}
+			catch (...)
+			{
+				throw_ies_error(string("error reordering oe_base with restart oe"));
+			}
 		}
 		//if (par_restart_csv.size() > 0)
 		if (true)
@@ -1902,9 +1914,6 @@ void IterEnsembleSmoother::initialize()
 	error_min_reals = 2;
 	consec_bad_lambda_cycles = 0;
 
-	
-
-	
 	if ((pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::PARETO))
 	{
 		message(1, "using pestpp-ies 'pareto' mode");
@@ -1983,7 +1992,7 @@ void IterEnsembleSmoother::initialize()
 
 	int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
 
-	bool pe_drawn = initialize_pe(parcov);
+	pe_drawn = initialize_pe(parcov);
 
 	if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
 	{
@@ -2003,11 +2012,9 @@ void IterEnsembleSmoother::initialize()
 		message(1, "not using prior parameter covariance matrix scaling");
 	}
 
-	bool oe_drawn = initialize_oe(obscov);
+	oe_drawn = initialize_oe(obscov);
 	string center_on = ppo->get_ies_center_on();
 	
-	
-
 	try
 	{
 		pe.check_for_dups();
@@ -2128,7 +2135,7 @@ void IterEnsembleSmoother::initialize()
 		pe.to_csv(ss.str());
 	}
 	message(1, "saved initial parameter ensemble to ", ss.str());
-	message(2, "cehcking for denormal values in base oe");
+	message(2, "checking for denormal values in base oe");
 	oe.check_for_normal("base observation ensemble");
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
