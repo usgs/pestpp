@@ -1600,7 +1600,8 @@ void Ensemble::read_csv_by_reals(int num_reals,ifstream &csv, map<string,int> &h
 		{
 			try
 			{
-				val = pest_utils::convert_cp<double>(tokens[hi.second]);
+				//val = pest_utils::convert_cp<double>(tokens[hi.second]);
+				val = stod(tokens[hi.second]);
 			}
 			catch (exception &e)
 			{
