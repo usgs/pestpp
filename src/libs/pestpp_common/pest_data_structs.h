@@ -397,6 +397,8 @@ public:
 	void set_ies_enforce_chglim(bool _flag) { ies_enforce_chglim = _flag; }
 	string get_ies_center_on()const { return ies_center_on; }
 	void set_ies_center_on(string _value) { ies_center_on = _value; }
+	bool get_ies_no_noise() const { return ies_no_noise; }
+	void set_ies_no_noise(bool _flag) { ies_no_noise = _flag; }
 
 	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -425,6 +427,14 @@ public:
 
 	void set_debug_parse_only(bool _flag) { debug_parse_only = _flag; }
 	bool get_debug_parse_only() const { return debug_parse_only; }
+
+	void set_check_tplins(bool _flag) { check_tplins = _flag; }
+	bool get_check_tplins() const { return check_tplins; }
+	void set_fill_tpl_zeros(bool _flag) { fill_tpl_zeros = _flag; }
+	bool get_fill_tpl_zeros() const { return fill_tpl_zeros; }
+	void set_additional_ins_delimiters(string _delims) { additional_ins_delimiters = _delims; }
+	string get_additional_ins_delimiters() const { return additional_ins_delimiters; }
+
 
 	void set_defaults();
 	void summary(ostream& os) const;
@@ -531,6 +541,7 @@ private:
 	double ies_autoadaloc_sigma_dist;
 	bool ies_enforce_chglim;
 	string ies_center_on;
+	bool ies_no_noise;
 
 	string gsa_method;
 	int gsa_morris_p;
@@ -544,6 +555,9 @@ private:
 
 	bool enforce_tied_bounds;
 	bool debug_parse_only;
+	bool check_tplins;
+	bool fill_tpl_zeros;
+	string additional_ins_delimiters;
 
 	
 		

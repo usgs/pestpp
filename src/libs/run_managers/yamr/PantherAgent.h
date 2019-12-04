@@ -34,24 +34,17 @@
 
 class PANTHERAgent{
 public:
-	PANTHERAgent();
+	PANTHERAgent(ofstream &_frec);
 	void init_network(const std::string &host, const std::string &port);
 	void start(const std::string &host, const std::string &port);
 	~PANTHERAgent();
-	void run();
 	int recv_message(NetPackage &net_pack, struct timeval *tv=NULL);
 	int recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs = 0);
 	int send_message(NetPackage &net_pack, const void *data=NULL, unsigned long data_len=0);
 	NetPackage::PackType run_model(Parameters &pars, Observations &obs, NetPackage &net_pack);
-	//int run_model(Parameters &pars, Observations &obs);
-	std::string tpl_err_msg(int i);
-	std::string ins_err_msg(int i);
-	void check_io();
-	//void listener(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished);
-	void listener();
 	void process_ctl_file(const string &ctl_filename);
-	void process_panther_ctl_file(const string &ctl_filename);
 private:
+	ofstream& frec;
 	int sockfd;
 	int fdmax;
 	double run_time;
@@ -66,18 +59,21 @@ private:
 	static const int recv_timeout_secs = 1;
 	bool terminate;
 	fd_set master;
-	std::vector<std::string> comline_vec;
+	/*std::vector<std::string> comline_vec;
 	std::vector<std::string> tplfile_vec;
 	std::vector<std::string> inpfile_vec;
 	std::vector<std::string> insfile_vec;
 	std::vector<std::string> outfile_vec;
 	std::vector<std::string> obs_name_vec;
-	std::vector<std::string> par_name_vec;
+	std::vector<std::string> par_name_vec;*/
 
 	ModelInterface mi;
 	void run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
 		pest_utils::thread_exceptions *shared_execptions,
 		Parameters* pars, Observations* obs);
+	//Observations ctl_obs;
+	//Parameters ctl_pars;
+	Pest pest_scenario;
 
 };
 

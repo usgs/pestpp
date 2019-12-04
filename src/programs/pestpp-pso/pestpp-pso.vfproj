@@ -26,7 +26,7 @@
 				<Tool Name="VFManifestTool" SuppressStartupBanner="true"/></Configuration>
 		<Configuration Name="Debug|x64" OutputDirectory="$(SolutionDir)\..\exe\windows\$(Platform)\$(Configuration)\">
 				<Tool Name="VFFortranCompilerTool" SuppressStartupBanner="true" DebugInformationFormat="debugEnabled" Optimization="optimizeDisabled" Preprocess="preprocessYes" PreprocessorDefinitions="__windows__" ExternalNameInterpretation="extNameLowerCase" ExternalNameUnderscore="true" Traceback="true" BoundsCheck="true" StackFrameCheck="true" RuntimeLibrary="rtMultiThreadedDebug"/>
-				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" AdditionalLibraryDirectories="$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)" GenerateDebugInformation="true" SubSystem="subSystemConsole" AdditionalDependencies="common.lib mio.lib ws2_32.lib advapi32.lib yamr.lib  serial.lib external.lib wrappers.lib abstract_base.lib"/>
+				<Tool Name="VFLinkerTool" LinkIncremental="linkIncrementalNo" SuppressStartupBanner="true" AdditionalLibraryDirectories="$(IFORT_COMPILER19)\compiler\lib\intel64;$(IFORT_COMPILER19)\mkl\lib\intel64;$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)" GenerateDebugInformation="true" SubSystem="subSystemConsole" AdditionalDependencies="mkl_lapack95_lp64.lib mkl_blas95_lp64.lib common.lib mio.lib ws2_32.lib advapi32.lib yamr.lib  serial.lib external.lib wrappers.lib abstract_base.lib"/>
 				<Tool Name="VFResourceCompilerTool"/>
 				<Tool Name="VFMidlTool" SuppressStartupBanner="true" TargetEnvironment="midlTargetAMD64"/>
 				<Tool Name="VFCustomBuildTool"/>

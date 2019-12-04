@@ -222,6 +222,8 @@ private:
 	//Eigen::MatrixXd Am;
 	Eigen::DiagonalMatrix<double,Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 
+	bool oe_drawn, pe_drawn;
+
 	//bool solve_old();
 	bool solve_new();
 	void adjust_pareto_weight(string &obsgroup, double wfac);

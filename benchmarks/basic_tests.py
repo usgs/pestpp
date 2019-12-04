@@ -529,28 +529,31 @@ def secondary_marker_test():
     tpl_file = "par.dat.tpl"
     b_d = os.getcwd()
     os.chdir(t_d)
-    #try:
+    try:
 
-    ins_files = [f for f in os.listdir(".") if f.endswith(".ins")]
-    with open("forward_run.py",'w') as f:
-        f.write("import shutil\n")
+        ins_files = [f for f in os.listdir(".") if f.endswith(".ins")]
+        with open("forward_run.py",'w') as f:
+            f.write("import shutil\n")
+            for ins_file in ins_files:
+                out_file = ins_file.replace(".ins","")
+                f.write("shutil.copy2('{0}','{1}')\n".format(out_file+"_bak",out_file))
+                
         for ins_file in ins_files:
-            out_file = ins_file.replace(".ins","")
-            f.write("shutil.copy2('{0}','{1}')\n".format(out_file+"_bak",out_file))
+           
+            shutil.copy2(out_file+"_bak",out_file)
+            pst = pyemu.Pst.from_io_files(tpl_file,tpl_file.replace(".tpl",""),
+                ins_file,ins_file.replace(".ins",""))
+            pst.control_data.noptmax = 0
+            pst.pestpp_options["additional_ins_delimiters"] = "|"
+            pst.model_command = "python forward_run.py"
+            pst.write(os.path.join("test.pst"))
             
-    for ins_file in ins_files:
-       
-        shutil.copy2(out_file+"_bak",out_file)
-        pst = pyemu.Pst.from_io_files(tpl_file,tpl_file.replace(".tpl",""),
-            ins_file,ins_file.replace(".ins",""))
-        pst.control_data.noptmax = 0
-        pst.model_command = "python forward_run.py"
-        pst.write(os.path.join("test.pst"))
-        
-        pyemu.os_utils.run("{0} test.pst".format(exe_path))
-    #except Exception as e:
-    #    os.chdir(b_d)
-    #    raise Exception(e)
+            pyemu.os_utils.run("{0} test.pst".format(exe_path))
+            pst = pyemu.Pst("test.pst")
+            assert pst.res is not None
+    except Exception as e:
+       os.chdir(b_d)
+       raise Exception(e)
     os.chdir(b_d)
 
 def sen_basic_test():
@@ -696,17 +699,43 @@ def salib_verf():
     #
     # plt.show()
 
+
+def tplins1_test():
+    model_d = "tplins_test_1"
+    t_d = os.path.join(model_d, "test")
+    if os.path.exists(t_d):
+        shutil.rmtree(t_d)
+    shutil.copytree(os.path.join(model_d,"template"),t_d)
+    pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
+
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-glm")),cwd=t_d)
+    obf_df = pd.read_csv(os.path.join(t_d,"out1.dat.obf"),delim_whitespace=True,header=None,names=["obsnme","obsval"])
+    obf_df.index = obf_df.obsnme
+    pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
+    res_df = pst.res
+    
+    d = (obf_df.obsval - res_df.modelled).apply(np.abs)
+    #print(d)
+    print(d.max())
+    assert d.max() < 1.0e-5, d
+
+    jco = pyemu.Jco.from_binary(os.path.join(t_d,"pest.jcb")).to_dataframe().apply(np.abs)
+    assert jco.sum().sum() == 0, jco.sum()
+
+
+
+
 if __name__ == "__main__":
     #glm_long_name_test()
     #sen_plusplus_test()
-    parchglim_test()
+    #parchglim_test()
     #unc_file_test()
-    #secondary_marker_test()
+    secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
-    tie_by_group_test()
+    #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-
+    #tplins1_test()

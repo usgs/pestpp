@@ -23,13 +23,17 @@
 #include <vector>
 #include <map>
 #include <numeric>
+#include <iterator>
+#include <unordered_set>
+#include <sstream>
+#include <algorithm>
 #include "Pest.h"
 #include "utilities.h"
 #include "pest_error.h"
-#include <sstream>
 #include "pest_data_structs.h"
 #include "Transformation.h"
 #include "FileManager.h"
+#include "model_interface.h"
 
 
 using namespace::std;
@@ -303,46 +307,46 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 			cout << "'base_jacobian' is none, so 'hotstart_resfile' being ignored..." << endl;
 			f_rec << "'base_jacobian' is none, so 'hotstart_resfile' being ignored..." << endl;
 		}
-
-	
-
 }
 
-void Pest::check_io()
+void Pest::check_io(ofstream& f_rec)
 {
+	ModelInterface mi(model_exec_info.tplfile_vec,model_exec_info.inpfile_vec,
+		model_exec_info.insfile_vec,model_exec_info.outfile_vec,model_exec_info.comline_vec);
 
-	if (model_exec_info.tplfile_vec.size() == 0)
+	try
 	{
-		cout << "Error: number of template files = 0" << endl;
-		throw runtime_error("number of template files = 0");
+		mi.check_io_access();
+
 	}
-	if (model_exec_info.insfile_vec.size() == 0)
+	catch (exception& e)
 	{
-		cout << "Error: number of instruction files = 0" << endl;
-		throw runtime_error("number of instruction files = 0");
+		string mess = e.what();
+		throw_control_file_error(f_rec, "error in model interface file access:" + mess);
 	}
-	//make sure we can atleast access the model IO files
-	vector<string> inaccessible_files;
-	for (auto &file : model_exec_info.insfile_vec)
-		if (!check_exist_in(file)) inaccessible_files.push_back(file);
-	for (auto &file : model_exec_info.outfile_vec)
-		if (!check_exist_out(file)) inaccessible_files.push_back(file);
-	for (auto &file : model_exec_info.tplfile_vec)
-		if (!check_exist_in(file)) inaccessible_files.push_back(file);
-	for (auto &file : model_exec_info.inpfile_vec)
-		if (!check_exist_out(file)) inaccessible_files.push_back(file);
-
-	if (inaccessible_files.size() != 0)
+	catch (...)
 	{
-		string missing;
-		for (auto &file : inaccessible_files)
-			missing += file + " , ";
-		cout << "Could not access the following model interface files: " << missing;
-		throw PestError("Could not access the following model interface files: "+missing);
-		//cout << "WARNING: could not access the following model interface files: " << missing << endl;
+		throw_control_file_error(f_rec, "unspecified error in model interface file access checking");
+	}
+	if (pestpp_options.get_check_tplins())
+	{
+		try
+		{
+			mi.check_tplins(ctl_ordered_par_names,ctl_ordered_obs_names);
 
+		}
+		catch (exception& e)
+		{
+			string mess = e.what();
+			throw_control_file_error(f_rec, "error in model interface file checking:" + mess);
+		}
+		catch (...)
+		{
+			throw_control_file_error(f_rec, "unspecified error in model interface file checking");
+		}
 	}
 }
+
 
 const vector<string> Pest::get_ctl_ordered_nz_obs_names()
 {

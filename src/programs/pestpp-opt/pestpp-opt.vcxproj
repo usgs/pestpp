@@ -151,7 +151,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\pestpp_common;$(SolutionDir)\libs\linear_analysis;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)\libs\run_managers\yamr;$(SolutionDir)\libs\run_managers\serial;$(SolutionDir)\libs\run_managers\external;$(SolutionDir)libs\opt;$(SolutionDir)libs\Eigen</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\libs\pestpp_common;$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\pestpp_common;$(SolutionDir)\libs\linear_analysis;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)\libs\run_managers\yamr;$(SolutionDir)\libs\run_managers\serial;$(SolutionDir)\libs\run_managers\external;$(SolutionDir)libs\opt;$(SolutionDir)libs\Eigen</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>true</FloatingPointExceptions>
       <FloatingPointModel>Strict</FloatingPointModel>

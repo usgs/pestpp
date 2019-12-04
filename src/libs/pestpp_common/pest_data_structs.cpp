@@ -860,6 +860,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		convert_ip(value, ies_center_on);
 	}
+	else if (key == "IES_NO_NOISE")
+	{
+		ies_no_noise = pest_utils::parse_string_arg_to_bool(value);
+	}
 	else if (key == "GSA_METHOD")
 	{
 		convert_ip(value, gsa_method);
@@ -904,6 +908,18 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		debug_parse_only = pest_utils::parse_string_arg_to_bool(value);
 	
 	}
+	else if (key == "CHECK_TPLINS")
+	{
+		check_tplins = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "FILL_TPL_ZEROS")
+	{
+		fill_tpl_zeros = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "ADDITIONAL_INS_DELIMITERS")
+	{
+		convert_ip(value, additional_ins_delimiters);
+	}
 	else 
 	{
 
@@ -942,6 +958,10 @@ void PestppOptions::summary(ostream& os) const
 	os << "par_sigma_range: " << par_sigma_range << endl;
 	os << "enforce_tied_bounds: " << enforce_tied_bounds << endl;
 	os << "debug_parse_only: " << debug_parse_only << endl;
+	os << "debug_parse_only: " << debug_parse_only << endl;
+	os << "check_tplins: " << check_tplins << endl;
+	os << "fill_tpl_zeros: " << fill_tpl_zeros << endl;
+	os << "additional_ins_delimiters: " << additional_ins_delimiters << endl;
 	
 
 	os << endl << "...pestpp-glm specific options:" << endl;
@@ -1049,6 +1069,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_autoadaloc_sigma_dist: " << ies_autoadaloc_sigma_dist << endl;
 	os << "ies_enforce_chglim: " << ies_enforce_chglim << endl;
 	os << "ies_center_on: " << ies_center_on << endl;
+	os << "ies_no_noise: " << ies_no_noise << endl;
 
 	os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -1157,6 +1178,7 @@ void PestppOptions::set_defaults()
 	set_ies_enforce_chglim(false);
 	set_ies_center_on("");
 	set_ies_lam_mults(vector<double>{0.1, 1.0, 10.0});
+	set_ies_no_noise(false);
 
 	
 
@@ -1180,7 +1202,9 @@ void PestppOptions::set_defaults()
 
 
 	set_debug_parse_only(false);
-	
+	set_check_tplins(true);
+	set_fill_tpl_zeros(false);
+	set_additional_ins_delimiters("");
 }
 
 ostream& operator<< (ostream &os, const ParameterInfo& val)

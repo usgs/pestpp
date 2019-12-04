@@ -155,7 +155,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\pestpp_common;$(SolutionDir)\libs\linear_analysis;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)\libs\run_managers\yamr;$(SolutionDir)\libs\run_managers\serial;$(SolutionDir)\libs\run_managers\external;$(SolutionDir)libs\opt;$(SolutionDir)libs\Eigen</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\libs\pestpp_common;$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\pestpp_common;$(SolutionDir)\libs\linear_analysis;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)\libs\run_managers\yamr;$(SolutionDir)\libs\run_managers\serial;$(SolutionDir)\libs\run_managers\external;$(SolutionDir)libs\opt;$(SolutionDir)libs\Eigen</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FloatingPointExceptions>true</FloatingPointExceptions>
       <FloatingPointModel>Strict</FloatingPointModel>
@@ -170,7 +170,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(IFORT_COMPILER19)\compiler\lib\intel64;$(IFORT_COMPILER19)\mkl\lib\intel64;$(SolutionDir)i$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libopt.lib;mkl_blas95_lp64.lib;mkl_lapack95_lp64.lib;ws2_32.lib;Advapi32.lib;propack.lib;common.lib;pestpp_common.lib;mio.lib;wrappers.lib;yamr.lib;external.lib;serial.lib;abstract_base.lib;linear_analysis.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libopt.lib;mkl_blas95_lp64.lib;mkl_lapack95_lp64.lib;ws2_32.lib;Advapi32.lib;propack.lib;common.lib;pestpp_common.lib;mio.lib;wrappers.lib;yamr.lib;external.lib;serial.lib;abstract_base.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
