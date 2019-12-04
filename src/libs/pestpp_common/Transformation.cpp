@@ -27,7 +27,6 @@
 #include <iostream>
 #include "Transformation.h"
 #include "Transformable.h"
-#include "SVD_PROPACK.h"
 #include "eigen_tools.h"
 #include "Jacobian.h"
 #include "QSqrtMatrix.h"
@@ -577,12 +576,12 @@ TranSVD::TranSVD(const TranSVD &rhs)
 }
 
 
-void TranSVD::set_SVD_pack_propack()
+void TranSVD::set_SVD_pack()
 {
 	int max_sing = tran_svd_pack->get_max_sing();
 	double eigthresh = tran_svd_pack->get_eign_thres();
 	delete tran_svd_pack;
-	tran_svd_pack = new SVD_PROPACK(max_sing, eigthresh);
+	tran_svd_pack = new SVD_REDSVD(max_sing, eigthresh);
 }
 
 void TranSVD::set_performance_log(PerformanceLog *performance_log)

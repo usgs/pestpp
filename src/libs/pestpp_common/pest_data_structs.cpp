@@ -362,14 +362,19 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	else if (key=="SVD_PACK"){
 
 		if (value == "PROPACK")
-			svd_pack = PROPACK;
+		{
+			cout << "++SVD_PACK(PROPACK) is deprecated, resorting to REDSVD" << endl;
+			svd_pack = REDSVD;			
+		}
 		else if (value == "REDSVD")
 			svd_pack = REDSVD;
 		else if ((value == "EIGEN") || (value == "JACOBI"))
 			svd_pack = EIGEN;
 		else
+		{
 			//throw PestParsingError(line, "Invalid ++svd_pack: \"" + value + "\"");
 			return ARG_STATUS::ARG_INVALID;
+		}
 	}
 		
 	else if (key == "SUPER_RELPARMAX"){

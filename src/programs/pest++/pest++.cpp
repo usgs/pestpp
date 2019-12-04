@@ -398,7 +398,7 @@ int main(int argc, char* argv[])
 
 		if (pest_scenario.get_pestpp_options().get_svd_pack() == PestppOptions::PROPACK)
 		{
-			tran_svd->set_SVD_pack_propack();
+			tran_svd->set_SVD_pack();
 		}
 		tran_svd->set_performance_log(&performance_log);
 

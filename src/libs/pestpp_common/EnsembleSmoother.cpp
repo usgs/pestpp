@@ -1848,15 +1848,15 @@ void IterEnsembleSmoother::initialize()
 		message(0, "You are a god among mere mortals!");
 	}
 
-	PestppOptions::SVD_PACK svd = ppo->get_svd_pack();
+	/*PestppOptions::SVD_PACK svd = ppo->get_svd_pack();
 	if (svd == PestppOptions::SVD_PACK::PROPACK)
 	{
 		message(1, "using PROPACK for truncated svd solve");
 	}
 	else
-	{
-		message(1, "using REDSVD for truncated svd solve");
-	}
+	{*/
+	message(1, "using REDSVD for truncated svd solve");
+	//}
 	message(1, "maxsing:", pest_scenario.get_svd_info().maxsing);
 	message(1, "eigthresh: ", pest_scenario.get_svd_info().eigthresh);
 
@@ -2911,8 +2911,6 @@ void LocalUpgradeThread::work(int thread_id, int iter, double cur_lam)
 		unique_lock<mutex> parcov_guard(parcov_lock, defer_lock);
 		unique_lock<mutex> am_guard(am_lock, defer_lock);
 
-		bool use_propack = false;
-
 		while (true)
 		{
 			if (((use_approx) || (par_resid.rows() > 0)) &&
@@ -2935,8 +2933,8 @@ void LocalUpgradeThread::work(int thread_id, int iter, double cur_lam)
 			if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
 			{
 				//piggy back here for thread safety
-				if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
-					use_propack = true;
+				//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
+				//	use_propack = true;
 				obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
 				obs_diff_guard.unlock();
 			}
@@ -3031,17 +3029,10 @@ void LocalUpgradeThread::work(int thread_id, int iter, double cur_lam)
 		//performance_log->log_event("SVD of obs diff");
 		Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
 		
-		if (!use_propack)
-		{
-			SVD_REDSVD rsvd;
-			rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
-		}
-		else
-		{
-			SVD_PROPACK psvd;
-			psvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
-		}
-
+		
+		SVD_REDSVD rsvd;
+		rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
+		
 		Ut.transposeInPlace();
 		obs_diff.resize(0, 0);
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Ut", Ut);
