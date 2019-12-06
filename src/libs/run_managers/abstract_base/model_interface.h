@@ -19,11 +19,12 @@ public:
 	Parameters write_input_file(const string& input_filename, Parameters& pars);
 	void throw_tpl_error(const string& message, int lnum=0, bool warn=false);
 	void set_fill_zeros(bool _flag) { fill_zeros = _flag; }
+	string get_tpl_filename() { return tpl_filename; }
 private:
 	int line_num;
 	string marker;
 	string tpl_filename;
-	map<string, pair<int, int>> parse_tpl_line(const string& line);
+	vector<pair<string, pair<int, int>>> parse_tpl_line(const string& line);
 	string cast_to_fixed_len_string(int size, double value, string& name);
 	string read_line(ifstream& f_tpl);
 	void prep_tpl_file_for_reading(ifstream& f_tpl);

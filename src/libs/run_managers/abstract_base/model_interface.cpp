@@ -255,7 +255,13 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
         */
 		cout << "processing tpl files...";
 		for (int i = 0; i < templatefiles.size(); i++)
+		{
+			string name = templatefiles[i].get_tpl_filename();
+			cout << name << endl;
+			if (name.substr(0,3) == "hk6")
+				int ii = i;
 			pro_par_vec.push_back(templatefiles[i].write_input_file(inpfile_vec[i], *pars));
+		}
 		//update pars to account for possibly truncated par values...important for jco calcs
 		for (auto pro_pars : pro_par_vec)
 			pars->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
@@ -473,7 +479,7 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 		throw_tpl_error("couldn't open model input file '" + input_filename + "' for writing");
 	string line, val_str, name;
 	double val;
-	map<string, pair<int, int>> tpl_line_map;
+	vector<pair<string, pair<int, int>>> tpl_line_map;
 	Parameters pro_pars;
 	vector<string> t = pars.get_keys();
 	unordered_set<string> pnames(t.begin(), t.end());
@@ -566,15 +572,14 @@ unordered_set<string> TemplateFile::get_names(ifstream& f)
 {
 	unordered_set<string> names;
 	string line;
-	map<string, pair<int, int>> tpl_line_map;
-	
+	vector<pair<string, pair<int, int>>> tpl_line_info;
 	while (true)
 	{
 		if (f.eof())
 			break;
 		line = read_line(f);
-		tpl_line_map = parse_tpl_line(line);
-		for (auto t : tpl_line_map)
+		tpl_line_info = parse_tpl_line(line);
+		for (auto t : tpl_line_info)
 			names.insert(t.first);
 	}
 	return names;
@@ -608,7 +613,7 @@ void TemplateFile::throw_tpl_error(const string& message, int lnum , bool warn)
 		throw runtime_error(ss.str());
 }
 
-map<string, pair<int, int>> TemplateFile::parse_tpl_line(const string& line)
+vector<pair<string,pair<int, int>>> TemplateFile::parse_tpl_line(const string& line)
 {
 	vector<int> indices = find_all_marker_indices(line, marker);
 	if (indices.size() % 2 != 0)
@@ -616,7 +621,8 @@ map<string, pair<int, int>> TemplateFile::parse_tpl_line(const string& line)
 	int s, e, len;
 	string name;
 	pair<int, int> se_idx;
-	map<string, pair<int, int>> tpl_line_map;
+	pair<string, pair<int, int>> entry;
+	vector<pair<string,pair<int,int>>> tpl_line_info;
 	for (int i = 0; i < indices.size(); i = i + 2)
 	{
 		s = indices[i];
@@ -625,9 +631,12 @@ map<string, pair<int, int>> TemplateFile::parse_tpl_line(const string& line)
 		name = line.substr(s+1, len-2);
 		pest_utils::upper_ip(name);
 		pest_utils::strip_ip(name);
-		tpl_line_map[name] = pair<int, int>(s, len);
+		//tpl_line_map[name] = pair<int, int>(s, len);
+		se_idx = pair<int, int>(s, len);
+		entry = pair<string, pair<int, int>>(name, se_idx);
+		tpl_line_info.push_back(entry);
 	}
-	return tpl_line_map;
+	return tpl_line_info;
 }
 
 string TemplateFile::cast_to_fixed_len_string(int size, double value, string& name)
