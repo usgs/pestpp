@@ -537,9 +537,9 @@ def secondary_marker_test():
             for ins_file in ins_files:
                 out_file = ins_file.replace(".ins","")
                 f.write("shutil.copy2('{0}','{1}')\n".format(out_file+"_bak",out_file))
-                
+
         for ins_file in ins_files:
-           
+
             shutil.copy2(out_file+"_bak",out_file)
             pst = pyemu.Pst.from_io_files(tpl_file,tpl_file.replace(".tpl",""),
                 ins_file,ins_file.replace(".ins",""))
@@ -547,10 +547,13 @@ def secondary_marker_test():
             pst.pestpp_options["additional_ins_delimiters"] = "|"
             pst.model_command = "python forward_run.py"
             pst.write(os.path.join("test.pst"))
-            
+
             pyemu.os_utils.run("{0} test.pst".format(exe_path))
             pst = pyemu.Pst("test.pst")
             assert pst.res is not None
+            d = pst.res.loc[pst.obs_names,"modelled"] - pst.observation_data.loc[pst.obs_names,"obsval"]
+            l2_d = (d.apply(np.abs)**2).sum()
+            
     except Exception as e:
        os.chdir(b_d)
        raise Exception(e)
@@ -732,7 +735,7 @@ if __name__ == "__main__":
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    #secondary_marker_test()
+    secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
@@ -740,4 +743,4 @@ if __name__ == "__main__":
     #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-    tplins1_test()
+    #tplins1_test()

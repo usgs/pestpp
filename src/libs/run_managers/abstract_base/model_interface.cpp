@@ -237,27 +237,11 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 			}
 
 		}
-
-		//this is the old fortran tpl processing
-		/*int npar = par_vals.size();
-		try
-		{
-			mio_write_model_input_files_w_(&ifail, &npar,
-				pest_utils::StringvecFortranCharArray(par_name_vec, 200, pest_utils::TO_LOWER).get_prt(),
-				&par_vals[0]);
-		}
-		catch (exception &e)
-		{
-			string emess = e.what();
-			throw_mio_error("uncaught error writing model input files from template files:" + emess);
-		}
-		if (ifail != 0) throw_mio_error("error writing model input files from template files");
-        */
 		cout << "processing tpl files...";
 		for (int i = 0; i < templatefiles.size(); i++)
 		{
 			string name = templatefiles[i].get_tpl_filename();
-			cout << name << endl;
+			//cout << name << endl;
 			if (name.substr(0,3) == "hk6")
 				int ii = i;
 			pro_par_vec.push_back(templatefiles[i].write_input_file(inpfile_vec[i], *pars));
@@ -381,28 +365,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 
 		if (term_break) return;
 
-		// process instruction files
-		//int nins = insfile_vec.size();
-		//int nobs = obs_name_vec.size();
-		//obs_vals.resize(nobs, -9999.00);
-	
-		//this is the old fortran ins processing
-		/*try {
-			mio_read_model_output_files_w_(&ifail, &nobs,
-				pest_utils::StringvecFortranCharArray(obs_name_vec, 200, pest_utils::TO_LOWER).get_prt(),
-				&obs_vals[0]);
-		}
-		catch (exception &e)
-		{
-			string emess = e.what();
-			throw_mio_error("uncaught error processing model output files:" + emess);
-		}
-		if (ifail != 0)
-		{
-
-			throw_mio_error("error processing model output files");
-		}
-		*/
+		
 		cout << "processing ins files...";
 		Observations temp_obs;
 		for (int i = 0; i < instructionfiles.size(); i++)
@@ -1157,12 +1120,31 @@ void InstructionFile::execute_whitespace(const string& token, string& line, ifst
 {
 	string delims = " \t" + additional_delimiters;
 
-	int pos = line.find_first_of(" \t");
+	int pos = line.find_first_not_of(delims);
 	if (pos == string::npos)
 	{
 		throw_ins_error("EOL encountered while executing whitespace instruction on output line", ins_line_num, out_line_num);
 	}
-	line = line.substr(pos + 1);
+	//if the cursor is already on a non-delim char, we need to read past that and then apply
+	//the search
+	if (pos == 0)
+	{
+		vector<string> tokens;
+		pest_utils::tokenize(line, tokens, delims);
+		pos = line.find(tokens[0]);
+		if (pos == string::npos)
+		{
+			throw_ins_error("internal error in execute_whitespace: couldnt find first token");
+		}
+		line = line.substr(pos + tokens[0].size());
+		pos = line.find_first_not_of(delims);
+		if (pos == string::npos)
+		{
+			throw_ins_error("EOL encountered while executing whitespace instruction on output line", ins_line_num, out_line_num);
+		}
+	}
+	//place the "cursor" on the first char not in delims
+	line = line.substr(pos);
 }
 
 
