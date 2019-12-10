@@ -35,6 +35,7 @@ public:
 
 
 private:
+	bool verbose;
 	int64_t data_len;
 	static int64_t last_group_id;
 	PackType type;

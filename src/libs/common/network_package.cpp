@@ -192,6 +192,7 @@ int  NetPackage::recv(int sockfd)
 	int64_t buf_sz = 0;
 	size_t i_start = 0;
 	int8_t rcv_security_code[5] = { 0, 0, 0, 0, 0 };
+	int temp,temp1,temp2;
 	int64_t rcv_security_code_size = sizeof(rcv_security_code);
 	bool corrupt_desc = false;
 
@@ -201,12 +202,30 @@ int  NetPackage::recv(int sockfd)
 		vector<int8_t> header_buf;
 		header_buf.resize(header_sz, '\0');
 		n = w_recvall(sockfd, &rcv_security_code[0], &rcv_security_code_size);
-		int security_cmp = memcmp(security_code, rcv_security_code, sizeof(security_code));
-		if (security_cmp != 0)
+		//int security_cmp = memcmp(security_code, rcv_security_code, sizeof(security_code));
+		bool wrong_code = false;
+		for (int i = 0; i < sizeof(security_code); i++)
+		{
+			temp1 = int(security_code[i]);
+			temp2 = int(rcv_security_code[i]);
+			if (temp1 != temp2)
+			{
+				wrong_code = true;
+				break;
+			}
+		}
+		if (wrong_code) //(security_cmp != 0)
 		{
 			// corrupt message; message did not originate from a PEST++ application
+			cerr << "NetPackage::recv wrong security code: ";
+			cerr << " raw value, int cast: ";
+			for (int i = 0; i < sizeof(security_code); i++)
+			{
+				temp = int(rcv_security_code[i]);
+				cerr << rcv_security_code[i] << "," << temp << "; ";
+			}
+			cerr << endl;
 			n = -2;
-			cerr << "NetPackage::recv error - message did not originate from a PEST++ application" << endl;
 			return n;
 		}
 
