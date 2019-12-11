@@ -9,7 +9,7 @@ using namespace std;
 
 //Static Memeber Initialization
 int64_t NetPackage::last_group_id = 0;
-int8_t NetPackage::security_code[5] = { 1, 5, 25, 50, 100 };
+int8_t NetPackage::security_code[5] = { 1, 3, 5, 7, 9 };
 
 //Static Methods
 int NetPackage::get_new_group_id()
