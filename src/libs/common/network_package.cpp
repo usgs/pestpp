@@ -201,6 +201,9 @@ int  NetPackage::recv(int sockfd)
 		vector<int8_t> header_buf;
 		header_buf.resize(header_sz, '\0');
 		n = w_recvall(sockfd, &rcv_security_code[0], &rcv_security_code_size);
+		if (n != 1) {
+			return n;
+		}
 		int security_cmp = memcmp(security_code, rcv_security_code, sizeof(security_code));
 		if (security_cmp != 0)
 		{
