@@ -9,7 +9,7 @@ using namespace std;
 
 //Static Memeber Initialization
 int64_t NetPackage::last_group_id = 0;
-int8_t NetPackage::security_code[5] = { 1, 5, 25, 50, 100 };
+int8_t NetPackage::security_code[5] = { 1, 3, 5, 7, 9 };
 
 //Static Methods
 int NetPackage::get_new_group_id()
@@ -192,7 +192,7 @@ int  NetPackage::recv(int sockfd)
 	int64_t buf_sz = 0;
 	size_t i_start = 0;
 	int8_t rcv_security_code[5] = { 0, 0, 0, 0, 0 };
-	int temp,temp1,temp2;
+	int temp,temp1,temp2, sum;
 	int64_t rcv_security_code_size = sizeof(rcv_security_code);
 	bool corrupt_desc = false;
 
@@ -202,17 +202,24 @@ int  NetPackage::recv(int sockfd)
 		vector<int8_t> header_buf;
 		header_buf.resize(header_sz, '\0');
 		n = w_recvall(sockfd, &rcv_security_code[0], &rcv_security_code_size);
-		//int security_cmp = memcmp(security_code, rcv_security_code, sizeof(security_code));
+		//int security_cmp = memcmp(security_code, rcv_security_code, sizeof(security_code))
+
+		sum = 0;
 		bool wrong_code = false;
 		for (int i = 0; i < sizeof(security_code); i++)
 		{
 			temp1 = int(security_code[i]);
 			temp2 = int(rcv_security_code[i]);
+			sum = sum + temp2;
 			if (temp1 != temp2)
 			{
 				wrong_code = true;
-				break;
 			}
+		}
+		if (sum == 0)
+		{
+			cerr << "NetPackage::recv empty security code, terminating connection..." << endl;
+			return -2;
 		}
 		if (wrong_code) //(security_cmp != 0)
 		{
