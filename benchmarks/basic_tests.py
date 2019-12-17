@@ -729,13 +729,18 @@ def tplins1_test():
     arr = np.loadtxt(os.path.join(t_d,"hk_Layer_1.ref"))
     assert arr[-2] == arr[-1]
 
+    lines_tpl = open(os.path.join(t_d,"hk_Layer_1.ref.tpl"),'r').readlines()
+    lines_in = open(os.path.join(t_d,"hk_Layer_1.ref"),'r').readlines()
+    assert len(lines_tpl) - 1 == len(lines_in)
+
+
 
 if __name__ == "__main__":
     #glm_long_name_test()
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    secondary_marker_test()
+    #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
@@ -743,4 +748,4 @@ if __name__ == "__main__":
     #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-    #tplins1_test()
+    tplins1_test()

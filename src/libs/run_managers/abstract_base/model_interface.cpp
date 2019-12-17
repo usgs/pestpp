@@ -242,8 +242,6 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		{
 			string name = templatefiles[i].get_tpl_filename();
 			//cout << name << endl;
-			if (name.substr(0,3) == "hk6")
-				int ii = i;
 			pro_par_vec.push_back(templatefiles[i].write_input_file(inpfile_vec[i], *pars));
 		}
 		//update pars to account for possibly truncated par values...important for jco calcs
@@ -453,8 +451,9 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 		if (f_tpl.eof())
 			break;
 		line = read_line(f_tpl);
+		if (line.size() == 0)
+			break;
 		tpl_line_map = parse_tpl_line(line);
-		
 		for (auto t : tpl_line_map)
 		{
 			name = t.first;
@@ -501,7 +500,8 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 			val = pars.get_rec(t.first);
 			val_str = cast_to_fixed_len_string(t.second.second, val, name);
 			line.replace(t.second.first, t.second.second, val_str);
-			pest_utils::convert_ip(val_str, val);
+			//pest_utils::convert_ip(val_str, val);
+			val = stod(val_str);
 			pro_pars.insert(name, val);
 		}
 		f_in << line << endl;
@@ -682,6 +682,7 @@ string TemplateFile::read_line( ifstream& f_tpl)
 		throw_tpl_error("unexpected eof", line_num);
 	
 	getline(f_tpl, line);
+	pest_utils::strip_ip(line, "\n\r");
 	line_num++;
 	return line;
 }
@@ -973,7 +974,8 @@ pair<string, pair<int, int>> InstructionFile::parse_obs_instruction(const string
 		throw_ins_error("couldn't find ':' in (semi-)fixed observation token '" + token + "'", ins_line_num);
 	try
 	{
-		pest_utils::convert_ip(temp.substr(0, pos), s);
+		//pest_utils::convert_ip(temp.substr(0, pos), s);
+		s = stoi(temp.substr(0, pos));
 	}
 	catch (...)
 	{
@@ -981,7 +983,8 @@ pair<string, pair<int, int>> InstructionFile::parse_obs_instruction(const string
 	}
 	try
 	{
-		pest_utils::convert_ip(temp.substr(pos+1), e);
+		//pest_utils::convert_ip(temp.substr(pos+1), e);
+		e = stoi(temp.substr(pos + 1));
 	}
 	catch (...)
 	{
@@ -1003,7 +1006,8 @@ pair<string, double> InstructionFile::execute_fixed(const string& token, string&
 	temp = last_out_line.substr(info.second.first, len);
 	try
 	{
-		pest_utils::convert_ip(temp, value);
+		//pest_utils::convert_ip(temp, value);
+		value = stod(temp);
 	}
 	catch (...)
 	{
@@ -1035,7 +1039,8 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 	temp = tokens[0];
 	try
 	{
-		pest_utils::convert_ip(temp, value);
+		//pest_utils::convert_ip(temp, value);
+		value = stod(temp);
 	}
 	catch (...)
 	{
@@ -1057,7 +1062,8 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	double value;
 	try
 	{
-		pest_utils::convert_ip(tokens[0], value);
+		//pest_utils::convert_ip(tokens[0], value);
+		value = stod(tokens[0]);
 	}
 	catch (...)
 	{
@@ -1152,7 +1158,8 @@ void InstructionFile::execute_line_advance(const string& token, string& line, if
 {
 	stringstream ss;
 	int num;
-	pest_utils::convert_ip(token.substr(1), num);
+	//pest_utils::convert_ip(token.substr(1), num);
+	num = stoi(token.substr(1));
 	for (int i = 0; i < num; i++)
 	{
 		if (f_out.bad())
