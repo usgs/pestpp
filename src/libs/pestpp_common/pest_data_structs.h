@@ -150,7 +150,7 @@ public:
 	unordered_map<string, ObservationGroupRec> groups;
 	unordered_map<string, ObservationRec> observations;
 	double get_weight(const string &obs_name) const;
-	void set_weight(const string &obs_name, double &value);
+	void set_weight(const string &obs_name, double value);
 	string get_group(const string &obs_name) const;
 	const ObservationRec* get_observation_rec_ptr(const string &name) const;
 	const ObservationGroupRec* get_group_rec_ptr(const string &name) const;

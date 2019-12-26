@@ -1344,7 +1344,7 @@ double ObservationInfo::get_weight(const string &obs_name) const
 	return observations.find(obs_name)->second.weight;
 }
 
-void ObservationInfo::set_weight(const string &obs_name, double &value)
+void ObservationInfo::set_weight(const string &obs_name, double value)
 {
 	if (observations.find(obs_name) == observations.end())
 		throw PestError("ObservationInfo::set_weight() error: observation\

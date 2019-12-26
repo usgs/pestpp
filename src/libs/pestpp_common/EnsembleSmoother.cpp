@@ -2415,9 +2415,18 @@ void IterEnsembleSmoother::detect_resolve_prior_data_conflict()
 		//drop from oe_base
 		oe_base.drop_cols(in_conflict);
 		//shouldnt need to update localizer since we dropping not adding
+		//updating weights in control file
+		 
+		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+		int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
+		for (auto n : in_conflict)
+		{
+			oi->set_weight(n,0.0);
+		}
+
 		stringstream ss;
-		ss << "number of non-zero weighted observations reduced from " << pest_scenario.get_ctl_ordered_nz_obs_names().size();
-		ss << " to " << oe_base.shape().second << endl;
+		ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
+		ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
 		message(1, ss.str());
 	}
 		
