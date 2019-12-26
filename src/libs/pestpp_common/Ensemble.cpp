@@ -616,6 +616,22 @@ void Ensemble::drop_rows(const vector<string> &drop_names)
 
 }
 
+void Ensemble::drop_cols(const vector<string>& drop_names)
+{
+	vector<string> keep_names;
+	vector<string>::const_iterator start = drop_names.begin(), end = drop_names.end();
+	for (auto& n : var_names)
+		if (find(start, end, n) == end)
+			keep_names.push_back(n);
+	if (keep_names.size() == 0)
+		reals = Eigen::MatrixXd();
+	else
+		reals = get_eigen(vector<string>(), keep_names);
+	var_names = keep_names;
+
+}
+
+
 
 void Ensemble::keep_rows(const vector<int> &row_idxs)
 {
