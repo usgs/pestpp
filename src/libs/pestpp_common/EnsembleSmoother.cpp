@@ -2322,7 +2322,15 @@ void IterEnsembleSmoother::initialize()
 		ss.str("");
 		ss << "WARNING: " << in_conflict.size() << " non-zero weighted observations are in conflict";
 		ss << " with the prior simulated ensemble." << endl;	
-		message(1, ss.str());
+		message(0, ss.str());
+	}
+	
+	cout << "...see rec file for listing of conflicted observations" << endl << endl;
+	ofstream& frec = file_manager.rec_ofstream();
+	frec << endl << "...conflicted observations: " << endl;
+	for (auto oname : in_conflict)
+	{
+		frec << oname << endl;
 	}
 	if (!ppo->get_ies_drop_conflicts())
 	{
@@ -2331,18 +2339,11 @@ void IterEnsembleSmoother::initialize()
 		ss << " in parameter bias and, ultimately, forecast bias";
 		message(1, ss.str());
 	}
-	cout << "...see rec file for listing of conflicted observations" << endl << endl;
-	ofstream& frec = file_manager.rec_ofstream();
-	frec << endl << "...conflicted observations: " << endl;
-	for (auto oname : in_conflict)
-	{
-		frec << oname << endl;
-	}
-	if (pest_scenario.get_pestpp_options().get_ies_drop_conflicts())
+	else
 	{
 
 		//check that all obs are in conflict
-		message(2, "dropping conflicted observations");
+		message(1, "dropping conflicted observations");
 		if (in_conflict.size() == oe.shape().second)
 		{
 			throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
