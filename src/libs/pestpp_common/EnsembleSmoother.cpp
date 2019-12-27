@@ -2313,6 +2313,68 @@ void IterEnsembleSmoother::initialize()
 		string s = ss.str();
 		message(0, s);
 	}
+	
+
+	pcs = ParChangeSummarizer(&pe_base, &file_manager);
+	vector<string> in_conflict = detect_prior_data_conflict();
+	if (in_conflict.size() > 0)
+	{
+		ss.str("");
+		ss << "WARNING: " << in_conflict.size() << " non-zero weighted observations are in conflict";
+		ss << " with the prior simulated ensemble." << endl;	
+		message(1, ss.str());
+	}
+	if (!ppo->get_ies_drop_conflicts())
+	{
+		ss.str("");
+		ss << "  Continuing with data assimilation will likely result ";
+		ss << " in parameter bias and, ultimately, forecast bias";
+		message(1, ss.str());
+	}
+	cout << "...see rec file for listing of conflicted observations" << endl << endl;
+	ofstream& frec = file_manager.rec_ofstream();
+	frec << endl << "...conflicted observations: " << endl;
+	for (auto oname : in_conflict)
+	{
+		frec << oname << endl;
+	}
+	if (pest_scenario.get_pestpp_options().get_ies_drop_conflicts())
+	{
+
+		//check that all obs are in conflict
+		message(2, "dropping conflicted observations");
+		if (in_conflict.size() == oe.shape().second)
+		{
+			throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
+		}
+		//drop from act_obs_names
+		vector<string> t;
+		set<string> sconflict(in_conflict.begin(), in_conflict.end());
+		for (auto oname : act_obs_names)
+			if (sconflict.find(oname) == sconflict.end())
+				t.push_back(oname);
+		act_obs_names = t;
+
+		//update obscov
+		obscov.drop(in_conflict);
+
+		//drop from oe_base
+		oe_base.drop_cols(in_conflict);
+		//shouldnt need to update localizer since we dropping not adding
+		//updating weights in control file
+
+		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+		int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
+		for (auto n : in_conflict)
+		{
+			oi->set_weight(n, 0.0);
+		}
+
+		stringstream ss;
+		ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
+		ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
+		message(1, ss.str());
+	}
 	performance_log->log_event("calc initial phi");
 	ph.update(oe, pe);
 	message(0, "initial phi summary");
@@ -2322,7 +2384,7 @@ void IterEnsembleSmoother::initialize()
 	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
 	{
 		message(1, "using full (MAP) update solution");
-	
+
 	}
 
 	last_best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
@@ -2332,19 +2394,13 @@ void IterEnsembleSmoother::initialize()
 	{
 		//double x = last_best_mean / (2.0 * double(oe.shape().second));
 		double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
-		last_best_lam = pow(10.0,(floor(log10(x))));
+		last_best_lam = pow(10.0, (floor(log10(x))));
 	}
-
-
 	message(1, "current lambda:", last_best_lam);
 	message(0, "initialization complete");
-
-	pcs = ParChangeSummarizer(&pe_base, &file_manager);
-	detect_resolve_prior_data_conflict();
-	
 }
 
-void IterEnsembleSmoother::detect_resolve_prior_data_conflict()
+vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
 {
 	message(1, "checking for prior-data conflict...");
 	//for now, just really simple metric - checking for overlap
@@ -2374,65 +2430,7 @@ void IterEnsembleSmoother::detect_resolve_prior_data_conflict()
 		if ((smin > omax) || (smax < omin))
 			in_conflict.push_back(oname);
 	}
-	if (in_conflict.size() > 0)
-	{
-		stringstream ss;
-		ss << "WARNING: " << in_conflict.size() << " non-zero weighted observations are in conflict";
-		ss << " with the prior simulated ensemble." << endl;
-		if (!pest_scenario.get_pestpp_options().get_ies_drop_conflicts())
-		{	ss << "  Continuing with data assimilation will likely result ";
-			ss << " in parameter bias and, ultimately, forecast bias";
-			}
-		message(1, ss.str());
-	}
-	cout << "...see rec file for listing of conflicted observations" << endl << endl;
-	ofstream& frec = file_manager.rec_ofstream();
-	frec << endl << "...conflicted observations: " << endl;
-	for (auto oname : in_conflict)
-	{
-		frec << oname << endl;
-	}
-	if (pest_scenario.get_pestpp_options().get_ies_drop_conflicts())
-	{
-		
-		//check that all obs are in conflict
-		message(2, "dropping conflicted observations");
-		if (in_conflict.size() == oe.shape().second)
-		{
-			throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
-		}
-		//drop from act_obs_names
-		vector<string> t;
-		set<string> sconflict(in_conflict.begin(), in_conflict.end());
-		for (auto oname : act_obs_names)
-			if (sconflict.find(oname) == sconflict.end())
-				t.push_back(oname);
-		act_obs_names = t;
-		
-		//update obscov
-		obscov.drop(in_conflict);	
-		
-		//drop from oe_base
-		oe_base.drop_cols(in_conflict);
-		//shouldnt need to update localizer since we dropping not adding
-		//updating weights in control file
-		 
-		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
-		int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
-		for (auto n : in_conflict)
-		{
-			oi->set_weight(n,0.0);
-		}
-
-		stringstream ss;
-		ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
-		ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
-		message(1, ss.str());
-	}
-		
-
-
-
+	return in_conflict;
 }
 
 Eigen::MatrixXd IterEnsembleSmoother::get_Am(const vector<string> &real_names, const vector<string> &par_names)
