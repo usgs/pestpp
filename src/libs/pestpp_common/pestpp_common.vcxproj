@@ -53,7 +53,6 @@
     <ClInclude Include="SVDASolver.h" />
     <ClInclude Include="SVDPackage.h" />
     <ClInclude Include="SVDSolver.h" />
-    <ClInclude Include="SVD_PROPACK.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TerminationController.h" />
     <ClInclude Include="Transformation.h" />
@@ -84,7 +83,6 @@
     <ClCompile Include="SVDASolver.cpp" />
     <ClCompile Include="SVDPackage.cpp" />
     <ClCompile Include="SVDSolver.cpp" />
-    <ClCompile Include="SVD_PROPACK.cpp" />
     <ClCompile Include="TerminationController.cpp" />
     <ClCompile Include="Transformation.cpp">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libsrun_managers\abstract_base</AdditionalIncludeDirectories>

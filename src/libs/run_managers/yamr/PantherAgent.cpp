@@ -140,9 +140,9 @@ int PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
 				err = net_pack.recv(i); // error or lost connection
 				if (err == -2) {
 					vector<string> sock_name = w_getnameinfo_vec(i);
-					cerr << "received corrupt message from to master: " << sock_name[0] << ":" << sock_name[1] << endl;
-					w_close(i); // bye!
-					FD_CLR(i, &master); // remove from master set
+					cerr << "received corrupt message from master: " << sock_name[0] << ":" << sock_name[1] << endl;
+					//w_close(i); // bye!
+					//FD_CLR(i, &master); // remove from master set
 					err = -999;
 					return err;
 				}
@@ -169,7 +169,7 @@ int PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
 			}
 		}
 	}
-	cerr << "send to master failed " << max_send_fails << " times, exiting..." << endl;
+	cerr << "recv from master failed " << max_recv_fails << " times, exiting..." << endl;
 	return err;
 	// returns -1  receive error
 	//         -990  error in call to select()
@@ -355,6 +355,20 @@ void PANTHERAgent::start(const string &host, const string &port)
 	{
 		//get message from master
 		err = recv_message(net_pack);
+		if (err == -999)
+		{
+			cout << "error receiving message from master, terminating" << endl;
+			terminate = true;
+			net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "recv security message error");
+			char data;
+			err = send_message(net_pack, &data, 0);
+			if (err != 1)
+			{
+				exit(-1);
+			}
+			
+
+		}
 		if (err < 0)
 		{
 			cout << "error receiving message from master, terminating" << endl;

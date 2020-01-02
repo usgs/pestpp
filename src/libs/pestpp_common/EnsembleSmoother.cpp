@@ -1801,8 +1801,8 @@ void IterEnsembleSmoother::initialize()
 		vector<int> failed_idxs = run_ensemble(_pe, _oe);
 		if (failed_idxs.size() != 0)
 		{
-			message(0, "control file parmeter value run failed...bummer");
-			throw_ies_error("control file parmeter value run failed");
+			message(0, "control file parameter value run failed...bummer");
+			throw_ies_error("control file parameter value run failed");
 		}
 		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
 		message(1, "saving results from control file parameter value run to ", obs_csv);
@@ -1848,15 +1848,15 @@ void IterEnsembleSmoother::initialize()
 		message(0, "You are a god among mere mortals!");
 	}
 
-	PestppOptions::SVD_PACK svd = ppo->get_svd_pack();
+	/*PestppOptions::SVD_PACK svd = ppo->get_svd_pack();
 	if (svd == PestppOptions::SVD_PACK::PROPACK)
 	{
 		message(1, "using PROPACK for truncated svd solve");
 	}
 	else
-	{
-		message(1, "using REDSVD for truncated svd solve");
-	}
+	{*/
+	message(1, "using REDSVD for truncated svd solve");
+	//}
 	message(1, "maxsing:", pest_scenario.get_svd_info().maxsing);
 	message(1, "eigthresh: ", pest_scenario.get_svd_info().eigthresh);
 
@@ -2313,6 +2313,69 @@ void IterEnsembleSmoother::initialize()
 		string s = ss.str();
 		message(0, s);
 	}
+	
+
+	pcs = ParChangeSummarizer(&pe_base, &file_manager);
+	vector<string> in_conflict = detect_prior_data_conflict();
+	if (in_conflict.size() > 0)
+	{
+		ss.str("");
+		ss << "WARNING: " << in_conflict.size() << " non-zero weighted observations are in conflict";
+		ss << " with the prior simulated ensemble." << endl;	
+		message(0, ss.str());
+	}
+	
+	cout << "...see rec file for listing of conflicted observations" << endl << endl;
+	ofstream& frec = file_manager.rec_ofstream();
+	frec << endl << "...conflicted observations: " << endl;
+	for (auto oname : in_conflict)
+	{
+		frec << oname << endl;
+	}
+	if (!ppo->get_ies_drop_conflicts())
+	{
+		ss.str("");
+		ss << "  Continuing with data assimilation will likely result ";
+		ss << " in parameter bias and, ultimately, forecast bias";
+		message(1, ss.str());
+	}
+	else
+	{
+
+		//check that all obs are in conflict
+		message(1, "dropping conflicted observations");
+		if (in_conflict.size() == oe.shape().second)
+		{
+			throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
+		}
+		//drop from act_obs_names
+		vector<string> t;
+		set<string> sconflict(in_conflict.begin(), in_conflict.end());
+		for (auto oname : act_obs_names)
+			if (sconflict.find(oname) == sconflict.end())
+				t.push_back(oname);
+		act_obs_names = t;
+
+		//update obscov
+		obscov.drop(in_conflict);
+
+		//drop from oe_base
+		oe_base.drop_cols(in_conflict);
+		//shouldnt need to update localizer since we dropping not adding
+		//updating weights in control file
+
+		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+		int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
+		for (auto n : in_conflict)
+		{
+			oi->set_weight(n, 0.0);
+		}
+
+		stringstream ss;
+		ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
+		ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
+		message(1, ss.str());
+	}
 	performance_log->log_event("calc initial phi");
 	ph.update(oe, pe);
 	message(0, "initial phi summary");
@@ -2322,7 +2385,7 @@ void IterEnsembleSmoother::initialize()
 	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
 	{
 		message(1, "using full (MAP) update solution");
-	
+
 	}
 
 	last_best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
@@ -2332,15 +2395,43 @@ void IterEnsembleSmoother::initialize()
 	{
 		//double x = last_best_mean / (2.0 * double(oe.shape().second));
 		double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
-		last_best_lam = pow(10.0,(floor(log10(x))));
+		last_best_lam = pow(10.0, (floor(log10(x))));
 	}
-
-
 	message(1, "current lambda:", last_best_lam);
 	message(0, "initialization complete");
+}
 
-	pcs = ParChangeSummarizer(&pe_base, &file_manager);
-	
+vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
+{
+	message(1, "checking for prior-data conflict...");
+	//for now, just really simple metric - checking for overlap
+	vector<string> in_conflict;
+	double smin, smax, omin, omax;
+	map<string, int> smap, omap;
+	vector<string> snames = oe.get_var_names();
+	vector<string> onames = oe_base.get_var_names();
+
+	for (int i = 0; i < snames.size(); i++)
+	{
+		smap[snames[i]] = i;
+	}
+	for (int i = 0; i < onames.size(); i++)
+	{
+		omap[onames[i]] = i;
+	}
+	int sidx, oidx;
+	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
+	{
+		sidx = smap[oname];
+		oidx = omap[oname];
+		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
+		omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
+		smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
+		omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
+		if ((smin > omax) || (smax < omin))
+			in_conflict.push_back(oname);
+	}
+	return in_conflict;
 }
 
 Eigen::MatrixXd IterEnsembleSmoother::get_Am(const vector<string> &real_names, const vector<string> &par_names)
@@ -2911,8 +3002,6 @@ void LocalUpgradeThread::work(int thread_id, int iter, double cur_lam)
 		unique_lock<mutex> parcov_guard(parcov_lock, defer_lock);
 		unique_lock<mutex> am_guard(am_lock, defer_lock);
 
-		bool use_propack = false;
-
 		while (true)
 		{
 			if (((use_approx) || (par_resid.rows() > 0)) &&
@@ -2935,8 +3024,8 @@ void LocalUpgradeThread::work(int thread_id, int iter, double cur_lam)
 			if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
 			{
 				//piggy back here for thread safety
-				if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
-					use_propack = true;
+				//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
+				//	use_propack = true;
 				obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
 				obs_diff_guard.unlock();
 			}
@@ -3031,17 +3120,10 @@ void LocalUpgradeThread::work(int thread_id, int iter, double cur_lam)
 		//performance_log->log_event("SVD of obs diff");
 		Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
 		
-		if (!use_propack)
-		{
-			SVD_REDSVD rsvd;
-			rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
-		}
-		else
-		{
-			SVD_PROPACK psvd;
-			psvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
-		}
-
+		
+		SVD_REDSVD rsvd;
+		rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
+		
 		Ut.transposeInPlace();
 		obs_diff.resize(0, 0);
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Ut", Ut);

@@ -268,6 +268,7 @@ private:
 
 	void update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe);
 
+	vector<string> detect_prior_data_conflict();
 
 	//map<int,int> get_subset_idx_map();
 	void set_subset_idx(int size);

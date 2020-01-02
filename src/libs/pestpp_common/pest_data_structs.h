@@ -150,7 +150,7 @@ public:
 	unordered_map<string, ObservationGroupRec> groups;
 	unordered_map<string, ObservationRec> observations;
 	double get_weight(const string &obs_name) const;
-	void set_weight(const string &obs_name, double &value);
+	void set_weight(const string &obs_name, double value);
 	string get_group(const string &obs_name) const;
 	const ObservationRec* get_observation_rec_ptr(const string &name) const;
 	const ObservationGroupRec* get_group_rec_ptr(const string &name) const;
@@ -399,6 +399,8 @@ public:
 	void set_ies_center_on(string _value) { ies_center_on = _value; }
 	bool get_ies_no_noise() const { return ies_no_noise; }
 	void set_ies_no_noise(bool _flag) { ies_no_noise = _flag; }
+	bool get_ies_drop_conflicts() const { return ies_drop_conflicts; }
+	void set_ies_drop_conflicts(bool _flag) { ies_drop_conflicts = _flag; }
 
 	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -542,6 +544,7 @@ private:
 	bool ies_enforce_chglim;
 	string ies_center_on;
 	bool ies_no_noise;
+	bool ies_drop_conflicts;
 
 	string gsa_method;
 	int gsa_morris_p;
