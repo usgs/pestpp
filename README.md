@@ -23,14 +23,13 @@ The lastest PEST++ manual is available [here](https://github.com/jtwhite79/pestp
 * [mac OS](https://github.com/usgs/pestpp/tree/master/bin/mac).  Direct zip download [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/usgs/pestpp/tree/master/bin/mac)
 
 ## Compiling
-The master branch includes a Visual Studio 2017 project, as well as makefiles for linux and mac. The suite has been succcessfully compiled with gcc (g++ and gfortran) 4,5,6 and 7 on ubuntu, fedora, centos, and on slurm/MPI clusters - to use gcc, you must C++11 support (if using gcc 4, only gcc4.9 has this) and you need to have both ``lapack`` and ``blas`` libraries available in the path.  Then, in the `src` directory:
+The master branch includes a Visual Studio project, as well as makefiles for linux and mac. The suite has been succcessfully compiled with gcc (g++) 4,5,6 and 7 on ubuntu, fedora, centos, and on slurm/MPI clusters - to use gcc, you must C++11 support (if using gcc 4, only gcc4.9 has this).  Then, in the `src` directory:
 
 `>>>make clean`
 
 `>>>STATIC=no make install`
 
-
-this should put the compiled binaries in the `bin/linux` directory.  See the `.travis.yml` file for an example
+This should put the compiled binaries in the `bin/linux` directory.  See the `.travis.yml` file for an example
 
 ## Overview
 The PEST++ software suite includes several stand-alone tools for model-independent (non-intrusive) computer model parameter estimation and uncertainty analysis.  Codes include:
@@ -45,7 +44,15 @@ The PEST++ software suite includes several stand-alone tools for model-independe
 
 * ``pestpp-ies``: iterative ensemble smoother implementation of GLM (based on the work Chen and Oliver 2013) with support for generic localization (local analysis and/or covariance localization)
 
-All members of the software suite can be compiled for PC, MAC, or Linux and have several run managers to support parallelization.  precompiled binaries are available in the "bin" folder.  Windows users with older OS versions should use the ``bin/iwin`` binaries (starting "i", compiled with intel C++) to avoid the dreaded MSVC missing runtime DLL issue
+* ``pestpp-pso``: particle-swarm based inversion.
+
+All members of the software suite can be compiled for PC, MAC, or Linux and have several run managers to support parallelization.  precompiled binaries are available in the "bin" folder.  Windows users with older OS versions should use the ``bin/iwin`` binaries (starting "i", compiled with intel C++) to avoid the dreaded MSVC missing runtime DLL issue.
+
+## Recent developements
+
+The PEST++ suite is currently be refactored to remove the fortran dependancy. Users who are interested in trying out the pure C++ implementation can use the binaries/code base on the ``develop`` branch.
+
+An updated control file format has been implemented on the ``develop`` branch code base.  All the existing PEST++ tools are still backward compatible with the standard control file format.  However, new tools that are in developement to support sequential data assimilation need the external file format.  Additional, new functionality is being developed that will require the updated control file format.  The new control file format is described in documentation.  
 
 ## PEST++ References:
 
@@ -64,7 +71,7 @@ Welter, D.E., Doherty, J.E., Hunt, R.J., Muffels, C.T., Tonkin, M.J., and Schre√
 
 ## Testing
 
-The ``benchmarks`` folder contains a simple worked example that is used for basic CI testing.  Many full-worked test problems of varying problem sizes are now located in separate repos:
+The ``benchmarks`` folder contains a simple worked example and basic testing routines that are used for basic CI testing.  Many full-worked test problems of varying problem sizes are now located in separate repos:
 
 * [https://github.com/usgs/pestpp_benchmarks](https://github.com/usgs/pestpp_benchmarks)
 * [https://github.com/usgs/pestpp-ies_benchmarks](https://github.com/usgs/pestpp-ies_benchmarks)
@@ -72,7 +79,7 @@ The ``benchmarks`` folder contains a simple worked example that is used for basi
 
 ## Dependencies
 
-Much work has been done to avoid additional external dependencies in PEST++.  As currently designed, the project is fully self-contained and statically linked. ``lapack`` and ``blas`` are also required - these are included with the intel fortran compiler; those using gcc will need to have these libraries available. 
+Much work has been done to avoid additional external dependencies in PEST++.  As currently designed, the project is fully self-contained and statically linked. 
 
 # optional ``++`` arguments
 
