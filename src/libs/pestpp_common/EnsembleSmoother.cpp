@@ -1801,8 +1801,8 @@ void IterEnsembleSmoother::initialize()
 		vector<int> failed_idxs = run_ensemble(_pe, _oe);
 		if (failed_idxs.size() != 0)
 		{
-			message(0, "control file parmeter value run failed...bummer");
-			throw_ies_error("control file parmeter value run failed");
+			message(0, "control file parameter value run failed...bummer");
+			throw_ies_error("control file parameter value run failed");
 		}
 		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
 		message(1, "saving results from control file parameter value run to ", obs_csv);

@@ -1001,7 +1001,10 @@ pair<string, double> InstructionFile::execute_fixed(const string& token, string&
 	pair<string, pair<int, int>> info = parse_obs_instruction(token, "]");
 	//use the raw last_out_line since "line" has been getting progressively truncated
 	if (last_out_line.size() < info.second.second)
-		throw_ins_error("output line not long enough for fixed obs instruction '" + token + "',");
+	{
+		//throw_ins_error("output line not long enough for fixed obs instruction '" + token + "',");
+		info.second.second = last_out_line.size();
+	}
 	int len = (info.second.second - info.second.first) + 1;
 	temp = last_out_line.substr(info.second.first, len);
 	try
@@ -1028,7 +1031,11 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 	pair<string, pair<int, int>> info = parse_obs_instruction(token, ")");
 	//use the raw last_out_line since "line" has been getting progressively truncated
 	if (last_out_line.size() < info.second.second)
-		throw_ins_error("output line not long enough for fixed obs instruction '" + token + "',");
+	{
+		//throw_ins_error("output line not long enough for semi-fixed obs instruction '" + token + "',");
+		info.second.second = last_out_line.size();
+	}
+
 	int len = (info.second.second - info.second.first) + 1;
 	int pos = last_out_line.find_first_not_of(", \t\n\r"+additional_delimiters, info.second.first); //include the comma here for csv files
 	if (pos == string::npos)
