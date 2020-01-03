@@ -46,37 +46,7 @@ PhiHandler::PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 	}
 
 
-	//build up obs group and par group idx maps for group reporting
-	vector<string> nnz_obs = oe_base->get_var_names();
-	ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
-	vector<int> idx;
-	for (auto &og : pest_scenario->get_ctl_ordered_obs_group_names())
-	{
-		idx.clear();
-		for (int i = 0; i < nnz_obs.size(); i++)
-		{
-			if (oinfo.get_group(nnz_obs[i]) == og)
-			{
-				idx.push_back(i);
-			}
-		}
-		if (idx.size() > 0)
-			obs_group_idx_map[og] = idx;
-	}
-
-	vector<string> pars = pe_base->get_var_names();
-	ParameterInfo pi = pest_scenario->get_ctl_parameter_info();
-	for (auto &pg : pest_scenario->get_ctl_ordered_par_group_names())
-	{
-		idx.clear();
-		for (int i = 0; i < pars.size(); i++)
-		{
-			if (pi.get_parameter_rec_ptr(pars[i])->group == pg)
-				idx.push_back(i);
-		}
-		if (idx.size() > 0)
-			par_group_idx_map[pg] = idx;
-	}
+	
 
 
 	reg_factor = _reg_factor;
@@ -198,6 +168,39 @@ map<string, double> PhiHandler::get_par_group_contrib(Eigen::VectorXd &phi_vec)
 
 void PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, bool include_regul)
 {
+	//build up obs group and par group idx maps for group reporting
+	obs_group_idx_map.clear();
+	vector<string> nnz_obs = oe_base->get_var_names();
+	ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
+	vector<int> idx;
+	for (auto& og : pest_scenario->get_ctl_ordered_obs_group_names())
+	{
+		idx.clear();
+		for (int i = 0; i < nnz_obs.size(); i++)
+		{
+			if (oinfo.get_group(nnz_obs[i]) == og)
+			{
+				idx.push_back(i);
+			}
+		}
+		if (idx.size() > 0)
+			obs_group_idx_map[og] = idx;
+	}
+
+	par_group_idx_map.clear();
+	vector<string> pars = pe_base->get_var_names();
+	ParameterInfo pi = pest_scenario->get_ctl_parameter_info();
+	for (auto& pg : pest_scenario->get_ctl_ordered_par_group_names())
+	{
+		idx.clear();
+		for (int i = 0; i < pars.size(); i++)
+		{
+			if (pi.get_parameter_rec_ptr(pars[i])->group == pg)
+				idx.push_back(i);
+		}
+		if (idx.size() > 0)
+			par_group_idx_map[pg] = idx;
+	}
 	//update the various phi component vectors
 	meas.clear();
 	obs_group_phi_map.clear();
@@ -2279,7 +2282,7 @@ void IterEnsembleSmoother::initialize()
 	message(1, "saved initial obs ensemble to", ss.str());
 
 
-	performance_log->log_event("calc initial phi");
+	performance_log->log_event("calc pre-drop phi");
 	//initialize the phi handler
 	ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, &reg_factor, &weights);
 
