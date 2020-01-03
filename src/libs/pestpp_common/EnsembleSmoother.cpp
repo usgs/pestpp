@@ -46,37 +46,7 @@ PhiHandler::PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 	}
 
 
-	//build up obs group and par group idx maps for group reporting
-	vector<string> nnz_obs = oe_base->get_var_names();
-	ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
-	vector<int> idx;
-	for (auto &og : pest_scenario->get_ctl_ordered_obs_group_names())
-	{
-		idx.clear();
-		for (int i = 0; i < nnz_obs.size(); i++)
-		{
-			if (oinfo.get_group(nnz_obs[i]) == og)
-			{
-				idx.push_back(i);
-			}
-		}
-		if (idx.size() > 0)
-			obs_group_idx_map[og] = idx;
-	}
-
-	vector<string> pars = pe_base->get_var_names();
-	ParameterInfo pi = pest_scenario->get_ctl_parameter_info();
-	for (auto &pg : pest_scenario->get_ctl_ordered_par_group_names())
-	{
-		idx.clear();
-		for (int i = 0; i < pars.size(); i++)
-		{
-			if (pi.get_parameter_rec_ptr(pars[i])->group == pg)
-				idx.push_back(i);
-		}
-		if (idx.size() > 0)
-			par_group_idx_map[pg] = idx;
-	}
+	
 
 
 	reg_factor = _reg_factor;
@@ -198,6 +168,39 @@ map<string, double> PhiHandler::get_par_group_contrib(Eigen::VectorXd &phi_vec)
 
 void PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, bool include_regul)
 {
+	//build up obs group and par group idx maps for group reporting
+	obs_group_idx_map.clear();
+	vector<string> nnz_obs = oe_base->get_var_names();
+	ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
+	vector<int> idx;
+	for (auto& og : pest_scenario->get_ctl_ordered_obs_group_names())
+	{
+		idx.clear();
+		for (int i = 0; i < nnz_obs.size(); i++)
+		{
+			if (oinfo.get_group(nnz_obs[i]) == og)
+			{
+				idx.push_back(i);
+			}
+		}
+		if (idx.size() > 0)
+			obs_group_idx_map[og] = idx;
+	}
+
+	par_group_idx_map.clear();
+	vector<string> pars = pe_base->get_var_names();
+	ParameterInfo pi = pest_scenario->get_ctl_parameter_info();
+	for (auto& pg : pest_scenario->get_ctl_ordered_par_group_names())
+	{
+		idx.clear();
+		for (int i = 0; i < pars.size(); i++)
+		{
+			if (pi.get_parameter_rec_ptr(pars[i])->group == pg)
+				idx.push_back(i);
+		}
+		if (idx.size() > 0)
+			par_group_idx_map[pg] = idx;
+	}
 	//update the various phi component vectors
 	meas.clear();
 	obs_group_phi_map.clear();
@@ -1048,17 +1051,22 @@ bool IterEnsembleSmoother::initialize_oe(Covariance &cov)
 	stringstream ss;
 	int num_reals = pe.shape().first;
 
-	performance_log->log_event("load obscov");
 	string obs_csv = pest_scenario.get_pestpp_options().get_ies_obs_csv();
 	bool drawn = false;
 	if (obs_csv.size() == 0)
 	{
-		message(1, "drawing observation noise realizations: ", num_reals);
-		oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level());
-		// stringstream ss;
-		// ss << file_manager.get_base_filename() << ".base.obs.csv";
-		// message(1, "saving initial observation ensemble to ", ss.str());
-		// oe.to_csv(ss.str());
+		if (pest_scenario.get_pestpp_options().get_ies_no_noise())
+		{
+			message(1, "initializing no-noise observation ensemble of : ", num_reals);
+			oe.initialize_without_noise(num_reals);
+		
+		}
+		else
+		{
+			message(1, "drawing observation noise realizations: ", num_reals);
+			oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level());
+			
+		}
 		drawn = true;
 	}
 	else
@@ -1557,18 +1565,25 @@ void IterEnsembleSmoother::initialize_restart()
 			}
 		}*/
 		message(2, "reordering oe_base to align with restart obs en,num reals:", oe_real_names.size());
-		try
+		if ((oe_drawn) && (oe_base.shape().first == oe_real_names.size()))
 		{
-			oe_base.reorder(oe_real_names, vector<string>());
+			oe_base.set_real_names(oe_real_names);
 		}
-		catch (exception &e)
+		else
 		{
-			ss << "error reordering oe_base with restart oe:" << e.what();
-			throw_ies_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_ies_error(string("error reordering oe_base with restart oe"));
+			try
+			{
+				oe_base.reorder(oe_real_names, vector<string>());
+			}
+			catch (exception& e)
+			{
+				ss << "error reordering oe_base with restart oe:" << e.what();
+				throw_ies_error(ss.str());
+			}
+			catch (...)
+			{
+				throw_ies_error(string("error reordering oe_base with restart oe"));
+			}
 		}
 		//if (par_restart_csv.size() > 0)
 		if (true)
@@ -1789,8 +1804,8 @@ void IterEnsembleSmoother::initialize()
 		vector<int> failed_idxs = run_ensemble(_pe, _oe);
 		if (failed_idxs.size() != 0)
 		{
-			message(0, "control file parmeter value run failed...bummer");
-			return;
+			message(0, "control file parameter value run failed...bummer");
+			throw_ies_error("control file parameter value run failed");
 		}
 		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
 		message(1, "saving results from control file parameter value run to ", obs_csv);
@@ -1836,15 +1851,15 @@ void IterEnsembleSmoother::initialize()
 		message(0, "You are a god among mere mortals!");
 	}
 
-	PestppOptions::SVD_PACK svd = ppo->get_svd_pack();
+	/*PestppOptions::SVD_PACK svd = ppo->get_svd_pack();
 	if (svd == PestppOptions::SVD_PACK::PROPACK)
 	{
 		message(1, "using PROPACK for truncated svd solve");
 	}
 	else
-	{
-		message(1, "using REDSVD for truncated svd solve");
-	}
+	{*/
+	message(1, "using REDSVD for truncated svd solve");
+	//}
 	message(1, "maxsing:", pest_scenario.get_svd_info().maxsing);
 	message(1, "eigthresh: ", pest_scenario.get_svd_info().eigthresh);
 
@@ -1902,9 +1917,6 @@ void IterEnsembleSmoother::initialize()
 	error_min_reals = 2;
 	consec_bad_lambda_cycles = 0;
 
-	
-
-	
 	if ((pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::PARETO))
 	{
 		message(1, "using pestpp-ies 'pareto' mode");
@@ -1983,7 +1995,7 @@ void IterEnsembleSmoother::initialize()
 
 	int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
 
-	bool pe_drawn = initialize_pe(parcov);
+	pe_drawn = initialize_pe(parcov);
 
 	if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
 	{
@@ -2003,11 +2015,9 @@ void IterEnsembleSmoother::initialize()
 		message(1, "not using prior parameter covariance matrix scaling");
 	}
 
-	bool oe_drawn = initialize_oe(obscov);
+	oe_drawn = initialize_oe(obscov);
 	string center_on = ppo->get_ies_center_on();
 	
-	
-
 	try
 	{
 		pe.check_for_dups();
@@ -2128,7 +2138,7 @@ void IterEnsembleSmoother::initialize()
 		pe.to_csv(ss.str());
 	}
 	message(1, "saved initial parameter ensemble to ", ss.str());
-	message(2, "cehcking for denormal values in base oe");
+	message(2, "checking for denormal values in base oe");
 	oe.check_for_normal("base observation ensemble");
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
@@ -2272,7 +2282,7 @@ void IterEnsembleSmoother::initialize()
 	message(1, "saved initial obs ensemble to", ss.str());
 
 
-	performance_log->log_event("calc initial phi");
+	performance_log->log_event("calc pre-drop phi");
 	//initialize the phi handler
 	ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, &reg_factor, &weights);
 
@@ -2306,6 +2316,69 @@ void IterEnsembleSmoother::initialize()
 		string s = ss.str();
 		message(0, s);
 	}
+	
+
+	pcs = ParChangeSummarizer(&pe_base, &file_manager);
+	vector<string> in_conflict = detect_prior_data_conflict();
+	if (in_conflict.size() > 0)
+	{
+		ss.str("");
+		ss << "WARNING: " << in_conflict.size() << " non-zero weighted observations are in conflict";
+		ss << " with the prior simulated ensemble." << endl;	
+		message(0, ss.str());
+	}
+	
+	cout << "...see rec file for listing of conflicted observations" << endl << endl;
+	ofstream& frec = file_manager.rec_ofstream();
+	frec << endl << "...conflicted observations: " << endl;
+	for (auto oname : in_conflict)
+	{
+		frec << oname << endl;
+	}
+	if (!ppo->get_ies_drop_conflicts())
+	{
+		ss.str("");
+		ss << "  Continuing with data assimilation will likely result ";
+		ss << " in parameter bias and, ultimately, forecast bias";
+		message(1, ss.str());
+	}
+	else
+	{
+
+		//check that all obs are in conflict
+		message(1, "dropping conflicted observations");
+		if (in_conflict.size() == oe.shape().second)
+		{
+			throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
+		}
+		//drop from act_obs_names
+		vector<string> t;
+		set<string> sconflict(in_conflict.begin(), in_conflict.end());
+		for (auto oname : act_obs_names)
+			if (sconflict.find(oname) == sconflict.end())
+				t.push_back(oname);
+		act_obs_names = t;
+
+		//update obscov
+		obscov.drop(in_conflict);
+
+		//drop from oe_base
+		oe_base.drop_cols(in_conflict);
+		//shouldnt need to update localizer since we dropping not adding
+		//updating weights in control file
+
+		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+		int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
+		for (auto n : in_conflict)
+		{
+			oi->set_weight(n, 0.0);
+		}
+
+		stringstream ss;
+		ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
+		ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
+		message(1, ss.str());
+	}
 	performance_log->log_event("calc initial phi");
 	ph.update(oe, pe);
 	message(0, "initial phi summary");
@@ -2315,7 +2388,7 @@ void IterEnsembleSmoother::initialize()
 	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
 	{
 		message(1, "using full (MAP) update solution");
-	
+
 	}
 
 	last_best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
@@ -2325,15 +2398,43 @@ void IterEnsembleSmoother::initialize()
 	{
 		//double x = last_best_mean / (2.0 * double(oe.shape().second));
 		double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
-		last_best_lam = pow(10.0,(floor(log10(x))));
+		last_best_lam = pow(10.0, (floor(log10(x))));
 	}
-
-
 	message(1, "current lambda:", last_best_lam);
 	message(0, "initialization complete");
+}
 
-	pcs = ParChangeSummarizer(&pe_base, &file_manager);
-	
+vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
+{
+	message(1, "checking for prior-data conflict...");
+	//for now, just really simple metric - checking for overlap
+	vector<string> in_conflict;
+	double smin, smax, omin, omax;
+	map<string, int> smap, omap;
+	vector<string> snames = oe.get_var_names();
+	vector<string> onames = oe_base.get_var_names();
+
+	for (int i = 0; i < snames.size(); i++)
+	{
+		smap[snames[i]] = i;
+	}
+	for (int i = 0; i < onames.size(); i++)
+	{
+		omap[onames[i]] = i;
+	}
+	int sidx, oidx;
+	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
+	{
+		sidx = smap[oname];
+		oidx = omap[oname];
+		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
+		omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
+		smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
+		omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
+		if ((smin > omax) || (smax < omin))
+			in_conflict.push_back(oname);
+	}
+	return in_conflict;
 }
 
 Eigen::MatrixXd IterEnsembleSmoother::get_Am(const vector<string> &real_names, const vector<string> &par_names)
@@ -2904,8 +3005,6 @@ void LocalUpgradeThread::work(int thread_id, int iter, double cur_lam)
 		unique_lock<mutex> parcov_guard(parcov_lock, defer_lock);
 		unique_lock<mutex> am_guard(am_lock, defer_lock);
 
-		bool use_propack = false;
-
 		while (true)
 		{
 			if (((use_approx) || (par_resid.rows() > 0)) &&
@@ -2928,8 +3027,8 @@ void LocalUpgradeThread::work(int thread_id, int iter, double cur_lam)
 			if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
 			{
 				//piggy back here for thread safety
-				if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
-					use_propack = true;
+				//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
+				//	use_propack = true;
 				obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
 				obs_diff_guard.unlock();
 			}
@@ -3024,17 +3123,10 @@ void LocalUpgradeThread::work(int thread_id, int iter, double cur_lam)
 		//performance_log->log_event("SVD of obs diff");
 		Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
 		
-		if (!use_propack)
-		{
-			SVD_REDSVD rsvd;
-			rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
-		}
-		else
-		{
-			SVD_PROPACK psvd;
-			psvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
-		}
-
+		
+		SVD_REDSVD rsvd;
+		rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
+		
 		Ut.transposeInPlace();
 		obs_diff.resize(0, 0);
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Ut", Ut);

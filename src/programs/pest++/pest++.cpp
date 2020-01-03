@@ -148,7 +148,10 @@ int main(int argc, char* argv[])
 					cerr << "PANTHER agent requires the master be specified as /H hostname:port" << endl << endl;
 					throw(PestCommandlineError(commandline));
 				}
-				PANTHERAgent yam_agent;
+				ofstream frec("panther_worker.rec");
+				if (frec.bad())
+					throw runtime_error("error opening 'panther_worker.rec'");
+				PANTHERAgent yam_agent(frec);
 				string ctl_file = "";
 				try {
 					
@@ -352,14 +355,16 @@ int main(int argc, char* argv[])
 		{
 			performance_log.log_event("starting basic model IO error checking", 1);
 			cout << "checking model IO files...";
-			pest_scenario.check_io();
+			pest_scenario.check_io(fout_rec);
 			performance_log.log_event("finished basic model IO error checking");
 			cout << "done" << endl;
 			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
 			run_manager_ptr = new RunManagerSerial(exi.comline_vec,
 				exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
 				file_manager.build_filename("rns"), pathname,
-				pest_scenario.get_pestpp_options().get_max_run_fail());
+				pest_scenario.get_pestpp_options().get_max_run_fail(),
+				pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
+				pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
 		}
 
 		const ParamTransformSeq &base_trans_seq = pest_scenario.get_base_par_tran_seq();
@@ -393,7 +398,7 @@ int main(int argc, char* argv[])
 
 		if (pest_scenario.get_pestpp_options().get_svd_pack() == PestppOptions::PROPACK)
 		{
-			tran_svd->set_SVD_pack_propack();
+			tran_svd->set_SVD_pack();
 		}
 		tran_svd->set_performance_log(&performance_log);
 
@@ -842,14 +847,37 @@ int main(int argc, char* argv[])
 			linear_analysis la(j, pest_scenario, file_manager, &unc_log);
 
 			//if needed, set the predictive sensitivity vectors
-			const vector<string> pred_names = pest_scenario.get_pestpp_options().get_prediction_names();
-			//make sure prediction weights are zero
-			for (auto &pname : pred_names)
+			vector<string> pred_names = pest_scenario.get_pestpp_options().get_prediction_names();
+			
+			//if no preds, check for zero-weighted obs to use
+			if (pred_names.size() == 0)
 			{
-				if (pest_scenario.get_ctl_observation_info().get_weight(pname) != 0.0)
+				
+				for (auto& oname : pest_scenario.get_ctl_ordered_obs_names())
 				{
-					cout << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
-					fout_rec << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
+					if (pest_scenario.get_ctl_observation_info().get_weight(oname) == 0.0)
+					{
+						pred_names.push_back(oname);
+					}
+				}
+				if (pred_names.size() > 0)
+				{
+					cout << "Note: since no forecast/predictions were passed, using " << pred_names.size() << " zero-weighted obs as forecasts" << endl;
+					fout_rec << "Note: since no forecast/predictions were passed, using " << pred_names.size() << " zero-weighted obs as forecasts" << endl;
+
+				}
+			}
+			
+			//make sure prediction weights are zero
+			else
+			{
+				for (auto& pname : pred_names)
+				{
+					if (pest_scenario.get_ctl_observation_info().get_weight(pname) != 0.0)
+					{
+						cout << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
+						fout_rec << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
+					}
 				}
 			}
 			if (pred_names.size() > 0)
@@ -874,6 +902,8 @@ int main(int argc, char* argv[])
 				pest_scenario.get_ctl_ordered_par_names());
 			fout_rec << "Note : the above parameter uncertainty summary was written to file '" + parsum_filename +
 				"'" << endl << endl;
+
+			
 			//if predictions were defined, write a prior and posterior summary to the rec file
 			if (pred_names.size() > 0)
 			{

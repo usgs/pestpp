@@ -34,7 +34,6 @@
 #include "Transformation.h"
 #include "PriorInformation.h"
 #include "Regularization.h"
-#include "SVD_PROPACK.h"
 #include "OutputFileWriter.h"
 #include "debug.h"
 #include "covariance.h"
@@ -110,11 +109,8 @@ SVDSolver::SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, Objective
 
 void SVDSolver::set_svd_package(PestppOptions::SVD_PACK _svd_pack)
 {
-	if (_svd_pack == PestppOptions::PROPACK){
-		delete svd_package;
-		svd_package = new SVD_PROPACK;
-	}
-	else if (_svd_pack == PestppOptions::EIGEN){
+	
+	if (_svd_pack == PestppOptions::EIGEN){
 		delete svd_package;
 		svd_package = new SVD_EIGEN;
 	}

@@ -291,7 +291,7 @@ class TranSVD: public Transformation {
 public:
 	TranSVD(int _max_sing, double _eign_thresh, const string &_name = "unnamed TranSVD");
 	TranSVD(const TranSVD &rhs);
-	void set_SVD_pack_propack();
+	void set_SVD_pack();
 	void update_reset_frozen_pars(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const Parameters &base_numeric_pars,
 		int maxsing, double eigthresh, const vector<string> &par_names, const vector<string> &obs_names,
 		const Parameters &_frozen_derivative_pars=Parameters());

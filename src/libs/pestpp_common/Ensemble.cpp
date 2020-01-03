@@ -154,7 +154,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 		f << draws << endl;
 		f.close();
 	}
-	Eigen::MatrixXd draws_temp = draws;
+	//Eigen::MatrixXd draws_temp = draws;
 
 	Eigen::VectorXd std = cov.e_ptr()->diagonal().cwiseSqrt();
 	map<string, double> std_map;
@@ -615,6 +615,22 @@ void Ensemble::drop_rows(const vector<string> &drop_names)
 	real_names = keep_names;
 
 }
+
+void Ensemble::drop_cols(const vector<string>& drop_names)
+{
+	vector<string> keep_names;
+	vector<string>::const_iterator start = drop_names.begin(), end = drop_names.end();
+	for (auto& n : var_names)
+		if (find(start, end, n) == end)
+			keep_names.push_back(n);
+	if (keep_names.size() == 0)
+		reals = Eigen::MatrixXd();
+	else
+		reals = get_eigen(vector<string>(), keep_names);
+	var_names = keep_names;
+
+}
+
 
 
 void Ensemble::keep_rows(const vector<int> &row_idxs)
@@ -1600,7 +1616,8 @@ void Ensemble::read_csv_by_reals(int num_reals,ifstream &csv, map<string,int> &h
 		{
 			try
 			{
-				val = pest_utils::convert_cp<double>(tokens[hi.second]);
+				//val = pest_utils::convert_cp<double>(tokens[hi.second]);
+				val = stod(tokens[hi.second]);
 			}
 			catch (exception &e)
 			{
@@ -2417,6 +2434,28 @@ ObservationEnsemble::ObservationEnsemble(Pest *_pest_scenario_ptr, Eigen::Matrix
 	real_names = _real_names;
 }
 
+
+void ObservationEnsemble::initialize_without_noise(int num_reals)
+{
+	var_names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+	Observations obs = pest_scenario_ptr->get_ctl_observations();
+	Eigen::VectorXd obsvals = obs.get_data_eigen_vec(var_names);
+	reals.resize(num_reals, var_names.size());
+	for (int i = 0; i < num_reals; i++)
+	{
+		reals.row(i) = obsvals;
+	}
+	real_names.clear();
+	stringstream ss;
+	for (int i = 0; i < num_reals; i++)
+	{
+		ss.str("");
+		ss << i;
+		real_names.push_back(ss.str());
+	}
+	org_real_names = real_names;
+
+}
 
 void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level)
 {

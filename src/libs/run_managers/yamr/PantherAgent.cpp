@@ -15,7 +15,7 @@ using namespace pest_utils;
 
 int  linpack_wrap(void);
 
-PANTHERAgent::PANTHERAgent() :mi()
+PANTHERAgent::PANTHERAgent(ofstream &_frec) :mi(), frec(_frec)
 {
 
 }
@@ -85,150 +85,28 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 
 	int num_par;
 	int num_tpl_file;
-
-	comline_vec.clear();
-	tplfile_vec.clear();
-	inpfile_vec.clear();
-	insfile_vec.clear();
-	outfile_vec.clear();
 	std::vector<std::string> pestpp_lines;
-
-	Pest pest_scenario;
-	
-
 
 	fin.open(ctl_filename);
 	if (!fin)
 	{
 		throw PestError("PANTHER worker unable to open pest control file: " + ctl_filename);
 	}
-	ofstream fout("panther_worker.rec");
-	if (!fout)
-		throw PestError("PANTHER worker unable to open output file 'panther_worker.rec'");
-	pest_scenario.process_ctl_file(fin,ctl_filename,fout);
-	comline_vec = pest_scenario.get_comline_vec();
-	tplfile_vec = pest_scenario.get_tplfile_vec();
-	inpfile_vec = pest_scenario.get_inpfile_vec();
-	insfile_vec = pest_scenario.get_insfile_vec();
-	outfile_vec = pest_scenario.get_outfile_vec();
-	
+	pest_scenario.process_ctl_file(fin,ctl_filename,frec);
+	pest_scenario.check_io(frec);
 	poll_interval_seconds = pest_scenario.get_pestpp_options().get_worker_poll_interval();
-	/*pair<string, string> spair;
-	for (auto &line : pestpp_lines)
-	{
-		spair = pest_utils::parse_plusplus_line(line);
-		if (spair.first == "YAMR_POLL_INTERVAL")
-			convert_ip(spair.second, poll_interval_seconds);
-	}*/
+
+	mi = ModelInterface(pest_scenario.get_model_exec_info().tplfile_vec, 
+		pest_scenario.get_model_exec_info().inpfile_vec,
+		pest_scenario.get_model_exec_info().insfile_vec,
+		pest_scenario.get_model_exec_info().outfile_vec,
+		pest_scenario.get_model_exec_info().comline_vec);
+	mi.check_io_access();
+	if (pest_scenario.get_pestpp_options().get_check_tplins())
+		mi.check_tplins(pest_scenario.get_ctl_ordered_par_names(), pest_scenario.get_ctl_ordered_obs_names());
+	mi.set_additional_ins_delimiters(pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
+	mi.set_fill_tpl_zeros(pest_scenario.get_pestpp_options().get_fill_tpl_zeros());
 }
-
-
-
-//void PANTHERAgent::process_panther_ctl_file(const string &ctl_filename)
-//{
-//	ifstream fin;
-//	long lnum;
-//	long sec_begin_lnum;
-//	long sec_lnum;
-//	string section("");
-//	string line;
-//	string line_upper;
-//	vector<string> tokens;
-//
-//	int i_tpl_ins = 0, n_tpl_file = 0;
-//
-//	comline_vec.clear();
-//	tplfile_vec.clear();
-//	inpfile_vec.clear();
-//	insfile_vec.clear();
-//	outfile_vec.clear();
-//	std::vector<std::string> pestpp_lines;
-//	fin.open(ctl_filename);
-//	try {
-//		for (lnum = 1, sec_begin_lnum = 1; getline(fin, line); ++lnum)
-//		{
-//			strip_ip(line);
-//			line_upper = upper_cp(line);
-//			tokens.clear();
-//			tokenize(line_upper, tokens);
-//			sec_lnum = lnum - sec_begin_lnum;
-//			if (tokens.empty())
-//			{
-//				//skip blank line
-//			}
-//			else if (line_upper.substr(0, 2) == "++")
-//			{
-//				pestpp_lines.push_back(line);
-//			}
-//
-//			else if (line_upper[0] == '*')
-//			{
-//				section = upper_cp(strip_cp(line_upper, "both", " *\t\n"));
-//				sec_begin_lnum = lnum;
-//			}
-//			else if (section == "MODEL COMMAND LINE")
-//			{
-//				comline_vec.push_back(line);
-//			}
-//			else if (section == "MODEL INPUT")
-//			{
-//				vector<string> tokens_case_sen;
-//				tokenize(line, tokens_case_sen);
-//				tplfile_vec.push_back(tokens_case_sen[0]);
-//				inpfile_vec.push_back(tokens_case_sen[1]);
-//			}
-//			else if (section == "MODEL OUTPUT")
-//			{
-//				vector<string> tokens_case_sen;
-//				tokenize(line, tokens_case_sen);
-//				insfile_vec.push_back(tokens_case_sen[0]);
-//				outfile_vec.push_back(tokens_case_sen[1]);
-//			}
-//			else if (section == "MODEL INPUT/OUTPUT")
-//			{
-//				vector<string> tokens_case_sen;
-//				tokenize(line, tokens_case_sen);
-//				if (i_tpl_ins < n_tpl_file)
-//				{
-//					tplfile_vec.push_back(tokens_case_sen[0]);
-//					inpfile_vec.push_back(tokens_case_sen[1]);
-//				}
-//				else
-//				{
-//					insfile_vec.push_back(tokens_case_sen[0]);
-//					outfile_vec.push_back(tokens_case_sen[1]);
-//				}
-//				++i_tpl_ins;
-//			}
-//			else if (section == "CONTROL DATA")
-//			{
-//				if (sec_lnum == 3)
-//				{
-//					convert_ip(tokens[0], n_tpl_file);
-//				}
-//			}
-//		}
-//	}
-//	catch (PestConversionError &e) {
-//		std::stringstream out;
-//		out << "Error parsing \"" << ctl_filename << "\" on line number " << lnum << endl;
-//		out << e.what() << endl;
-//		e.add_front(out.str());
-//		e.raise();
-//	}
-//
-//	fin.close();
-//	
-//	poll_interval_seconds = 1;
-//	pair<string, string> spair;
-//	for (auto& line : pestpp_lines)
-//	{
-//		spair = pest_utils::parse_plusplus_line(line);
-//		if (spair.first == "YAMR_POLL_INTERVAL")
-//			convert_ip(spair.second, poll_interval_seconds);
-//	}
-//}
-
 
 int PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
 {
@@ -262,9 +140,9 @@ int PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
 				err = net_pack.recv(i); // error or lost connection
 				if (err == -2) {
 					vector<string> sock_name = w_getnameinfo_vec(i);
-					cerr << "received corrupt message from to master: " << sock_name[0] << ":" << sock_name[1] << endl;
-					w_close(i); // bye!
-					FD_CLR(i, &master); // remove from master set
+					cerr << "received corrupt message from master: " << sock_name[0] << ":" << sock_name[1] << endl;
+					//w_close(i); // bye!
+					//FD_CLR(i, &master); // remove from master set
 					err = -999;
 					return err;
 				}
@@ -291,7 +169,7 @@ int PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
 			}
 		}
 	}
-	cerr << "send to master failed " << max_send_fails << " times, exiting..." << endl;
+	cerr << "recv from master failed " << max_recv_fails << " times, exiting..." << endl;
 	return err;
 	// returns -1  receive error
 	//         -990  error in call to select()
@@ -335,12 +213,12 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 	bool done = false;
 	int err = 0;
 
-	if (!mi.get_initialized())
-	{
-		//initialize the model interface
-		mi.initialize(tplfile_vec, inpfile_vec, insfile_vec,
-			outfile_vec, comline_vec, par_name_vec, obs_name_vec);
-	}
+	//if (!mi.get_initialized())
+	//{
+	//	//initialize the model interface
+	//	mi.initialize(tplfile_vec, inpfile_vec, insfile_vec,
+	//		outfile_vec, comline_vec, par_name_vec, obs_name_vec);
+	//}
 
 	thread_flag f_terminate(false);
 	thread_flag f_finished(false);
@@ -461,36 +339,14 @@ void PANTHERAgent::run_async(pest_utils::thread_flag* terminate, pest_utils::thr
 	mi.run(terminate,finished,shared_execptions, pars, obs);
 }
 
-
-void PANTHERAgent::check_io()
-{
-	vector<string> inaccessible_files;
-	for (auto &file : insfile_vec)
-	if (!check_exist_in(file)) inaccessible_files.push_back(file);
-	for (auto &file : outfile_vec)
-	if (!check_exist_out(file)) inaccessible_files.push_back(file);
-	for (auto &file : tplfile_vec)
-	if (!check_exist_in(file)) inaccessible_files.push_back(file);
-	for (auto &file : inpfile_vec)
-	if (!check_exist_out(file)) inaccessible_files.push_back(file);
-
-	if (inaccessible_files.size() != 0)
-	{
-		string missing;
-		for (auto &file : inaccessible_files)
-			missing += file + " , ";
-		throw PestError("Could not access the following model interface files: " + missing);
-	}
-}
-
 void PANTHERAgent::start(const string &host, const string &port)
 {
 	NetPackage net_pack;
-	Observations obs;
+	Observations obs = pest_scenario.get_ctl_observations();
 	Parameters pars;
 	vector<int8_t> serialized_data;
 	int err;
-
+	vector<string> par_name_vec, obs_name_vec;
 
 	//class attribute - can be modified in run_model()
 	terminate = false;
@@ -499,6 +355,20 @@ void PANTHERAgent::start(const string &host, const string &port)
 	{
 		//get message from master
 		err = recv_message(net_pack);
+		if (err == -999)
+		{
+			cout << "error receiving message from master, terminating" << endl;
+			terminate = true;
+			net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "recv security message error");
+			char data;
+			err = send_message(net_pack, &data, 0);
+			if (err != 1)
+			{
+				exit(-1);
+			}
+			
+
+		}
 		if (err < 0)
 		{
 			cout << "error receiving message from master, terminating" << endl;

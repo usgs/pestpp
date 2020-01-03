@@ -129,8 +129,10 @@ int main(int argc, char* argv[])
 			{
 				cerr << "PANTHER worker requires the master be specified as /H hostname:port" << endl << endl;
 				throw(PestCommandlineError(commandline));
-			}
-			PANTHERAgent yam_agent;
+			}ofstream frec("panther_worker.rec");
+			if (frec.bad())
+				throw runtime_error("error opening 'panther_worker.rec'");
+			PANTHERAgent yam_agent(frec);
 			string ctl_file = "";
 			try {
 				// process traditional PEST control file
@@ -237,8 +239,11 @@ int main(int argc, char* argv[])
 	{
 		const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
 		run_manager_ptr = new RunManagerSerial(exi.comline_vec,
-		exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
-		file_manager.build_filename("rns"), pathname);
+			exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
+			file_manager.build_filename("rns"), pathname,
+			pest_scenario.get_pestpp_options().get_max_run_fail(),
+			pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
+			pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
 	}
 
 	cout << endl;
@@ -268,7 +273,7 @@ int main(int argc, char* argv[])
 	output_writer.scenario_obs_report(frec);
 
 	pest_scenario.check_inputs(frec);
-	pest_scenario.check_io();
+	pest_scenario.check_io(frec);
 
 	//map<string, string> gsa_opt_map;
 	//process .gsa file

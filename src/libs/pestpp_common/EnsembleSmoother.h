@@ -222,6 +222,8 @@ private:
 	//Eigen::MatrixXd Am;
 	Eigen::DiagonalMatrix<double,Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 
+	bool oe_drawn, pe_drawn;
+
 	//bool solve_old();
 	bool solve_new();
 	void adjust_pareto_weight(string &obsgroup, double wfac);
@@ -266,6 +268,7 @@ private:
 
 	void update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe);
 
+	vector<string> detect_prior_data_conflict();
 
 	//map<int,int> get_subset_idx_map();
 	void set_subset_idx(int size);

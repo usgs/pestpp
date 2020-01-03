@@ -92,61 +92,13 @@ ifeq ($(COMPILER),intel)  # Intel compilers
     FC = ifort
 
     ifeq ($(SYSTEM),win)
-        EXT_INCLUDES = -I"$(MKLROOT)"\include
         EXT_LIBS = \
             mkl_blas95_lp64.lib \
             mkl_lapack95_lp64.lib
-        ifeq ($(STATIC),no)  # dynamic linking
-            EXT_LIBS += \
-                mkl_intel_lp64_dll.lib \
-                mkl_sequential_dll.lib \
-                mkl_core_dll.lib
-        else  # static linking
-            EXT_LIBS += \
-                mkl_intel_lp64.lib \
-                mkl_sequential.lib \
-                mkl_core.lib
-        endif
-    else ifeq ($(SYSTEM),linux)
-        MKLROOT ?= /opt/intel/compilers_and_libraries/linux/mkl
-        EXT_INCLUDES = -I${MKLROOT}/include/intel64/ilp64 -I${MKLROOT}/include
-        EXT_LIBS = \
-            ${MKLROOT}/lib/intel64/libmkl_blas95_lp64.a \
-            ${MKLROOT}/lib/intel64/libmkl_lapack95_lp64.a
-        ifeq ($(STATIC),no)  # dynamic linking
-            EXT_LIBS += \
-                -L${MKLROOT}/lib/intel64 \
-                -lmkl_intel_lp64 -lmkl_sequential -lmkl_core
-        else  # static linking
-            EXT_LIBS += \
-                -Wl,--start-group \
-                    ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a \
-                    ${MKLROOT}/lib/intel64/libmkl_sequential.a \
-                    ${MKLROOT}/lib/intel64/libmkl_core.a \
-                -Wl,--end-group \
-                -lifport
-        endif
-        EXT_LIBS += -lifcore -lpthread -lm -ldl
-    else ifeq ($(SYSTEM),mac)
-        MKLROOT ?= /opt/intel/compilers_and_libraries_2019.4.233/mac/mkl
-        EXTRADIR = /opt/intel/compilers_and_libraries_2019.4.233/mac/compiler
-        EXT_INCLUDES = -I${MKLROOT}/include/intel64/lp64 -I${MKLROOT}/include
-        EXT_LIBS = \
-             ${MKLROOT}/lib/libmkl_lapack95_ilp64.a \
-            ${MKLROOT}/lib/libmkl_blas95_ilp64.a
-        ifeq ($(STATIC),no)  # dynamic linking
-            EXT_LIBS += \
-                -L${MKLROOT}/lib \
-                -Wl,-rpath,${MKLROOT}/lib \
-                -lmkl_intel_lp64 -lmkl_sequential -lmkl_core
-        else  # static linking
-            EXT_LIBS += \
-                ${MKLROOT}/lib/libmkl_intel_ilp64.a \
-                ${MKLROOT}/lib/libmkl_sequential.a \
-                ${MKLROOT}/lib/libmkl_core.a \
-            ${EXTRADIR}/lib/libifcore.a
-        endif
+    else ifeq ($(SYSTEM),linux) 
         EXT_LIBS += -lpthread -lm -ldl
+    else ifeq ($(SYSTEM),mac)
+        EXT_LIBS = -lpthread -lm -ldl
     endif  # $(SYSTEM)
 else  # $(COMPILER))
     # Assume GNU Compiler Collection
@@ -186,7 +138,7 @@ PESTPP_INCLUDES := \
     -I $(LIBS_DIR)/run_managers/external \
     -I $(LIBS_DIR)/run_managers/wrappers \
     -I $(LIBS_DIR)/pestpp_common \
-    -I $(LIBS_DIR)/opt $(EXT_INCLUDES)
+    -I $(LIBS_DIR)/opt
 
 # Be careful with the order of library dependencies
 # PESTPP_LIBS := \
@@ -204,50 +156,18 @@ PESTPP_INCLUDES := \
 #      $(EXT_LIBS)
 
 # hack for linux intel build to use mkl lapack and blas
-ifeq ($(SYSTEM),linux)
-	ifeq ($(COMPILER),intel)
-		PESTPP_LIBS := \
-		    -L$(LIBS_DIR)/pestpp_common -lpestpp_com \
-		    -L$(LIBS_DIR)/run_managers/wrappers -lrm_wrappers \
-		    -L$(LIBS_DIR)/run_managers/yamr -lrm_yamr \
-		    -L$(LIBS_DIR)/run_managers/serial -lrm_serial \
-		    -L$(LIBS_DIR)/run_managers/external -lrm_external \
-		    -L$(LIBS_DIR)/run_managers/abstract_base -lrm_abstract \
-		    -L$(LIBS_DIR)/mio -lmio \
-		    -L$(LIBS_DIR)/common -lcommon \
-		    -L$(LIBS_DIR)/propack -lpropack \
-		    -L$(LIBS_DIR)/opt -lopt \
-		     $(EXT_LIBS)
-	else
-		PESTPP_LIBS := \
-		    -L$(LIBS_DIR)/pestpp_common -lpestpp_com \
-		    -L$(LIBS_DIR)/run_managers/wrappers -lrm_wrappers \
-		    -L$(LIBS_DIR)/run_managers/yamr -lrm_yamr \
-		    -L$(LIBS_DIR)/run_managers/serial -lrm_serial \
-		    -L$(LIBS_DIR)/run_managers/external -lrm_external \
-		    -L$(LIBS_DIR)/run_managers/abstract_base -lrm_abstract \
-		    -L$(LIBS_DIR)/mio -lmio \
-		    -L$(LIBS_DIR)/common -lcommon \
-		    -L$(LIBS_DIR)/propack -lpropack \
-		    -L$(LIBS_DIR)/opt -lopt \
-		    -L$(LIBS_DIR)/lapack -llapack -lrefblas \
-		     $(EXT_LIBS)
-	endif
-else
-	PESTPP_LIBS := \
-	    -L$(LIBS_DIR)/pestpp_common -lpestpp_com \
-	    -L$(LIBS_DIR)/run_managers/wrappers -lrm_wrappers \
-	    -L$(LIBS_DIR)/run_managers/yamr -lrm_yamr \
-	    -L$(LIBS_DIR)/run_managers/serial -lrm_serial \
-	    -L$(LIBS_DIR)/run_managers/external -lrm_external \
-	    -L$(LIBS_DIR)/run_managers/abstract_base -lrm_abstract \
-	    -L$(LIBS_DIR)/mio -lmio \
-	    -L$(LIBS_DIR)/common -lcommon \
-	    -L$(LIBS_DIR)/propack -lpropack \
-	    -L$(LIBS_DIR)/opt -lopt \
-	    -L$(LIBS_DIR)/lapack -llapack -lrefblas \
-	     $(EXT_LIBS)
-endif
+
+PESTPP_LIBS := \
+    -L$(LIBS_DIR)/pestpp_common -lpestpp_com \
+    -L$(LIBS_DIR)/run_managers/wrappers -lrm_wrappers \
+    -L$(LIBS_DIR)/run_managers/yamr -lrm_yamr \
+    -L$(LIBS_DIR)/run_managers/serial -lrm_serial \
+    -L$(LIBS_DIR)/run_managers/external -lrm_external \
+    -L$(LIBS_DIR)/run_managers/abstract_base -lrm_abstract \
+    -L$(LIBS_DIR)/common -lcommon \
+    -L$(LIBS_DIR)/opt -lopt \
+     $(EXT_LIBS)
+
 
 # Generic pattern rules
 

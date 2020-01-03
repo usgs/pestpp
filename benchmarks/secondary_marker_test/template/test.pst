@@ -19,14 +19,15 @@ pcf
 * observation groups
 obgnme               
 * observation data
- obs1_1                1.9623240000E+06      1.0000000000E+00       obgnme               
- obs1_2                1.0124440000E+06      1.0000000000E+00       obgnme               
- obs2_1                1.9623240000E+06      1.0000000000E+00       obgnme               
- obs2_2                1.0124440000E+06      1.0000000000E+00       obgnme               
- obs3_1                1.9623240000E+06      1.0000000000E+00       obgnme               
- obs3_2                1.0124440000E+06      1.0000000000E+00       obgnme               
+ obs1_1                1.0000000000E+10      1.0000000000E+00       obgnme               
+ obs1_2                1.0000000000E+10      1.0000000000E+00       obgnme               
+ obs2_1                1.0000000000E+10      1.0000000000E+00       obgnme               
+ obs2_2                1.0000000000E+10      1.0000000000E+00       obgnme               
+ obs3_1                1.0000000000E+10      1.0000000000E+00       obgnme               
+ obs3_2                1.0000000000E+10      1.0000000000E+00       obgnme               
 * model command line
 python forward_run.py
 * model input/output
 par.dat.tpl par.dat
-out2.dat.ins out2.dat
+out3.dat.ins out3.dat
+++additional_ins_delimiters(|)
