@@ -648,15 +648,21 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 	}
 	//occasionally, when reducing precision, rounding will cause an 
 	// extra char to be dropped, so this left pads it back
+	//this also pads for really large par spaces
 	if (val_str.size() < size)
 	{
 		ss.str("");
-		if (val_str.at(0) == '-')
+		//if the fill value isnt a space and its a negative value
+		// we need to push the dash into the stringstream, then 
+		//remove the dash from the val string
+		int s = size;
+		if ((fill_val != " ") && (val_str.at(0) == '-'))
 		{
 			ss << "-";
 			val_str = val_str.substr(1, val_str.size() - 1);
+			s--;
 		}
-		for (int i = val_str.size(); i < size; i++)
+		for (int i = val_str.size(); i < s; i++)
 			ss << fill_val;
 		ss << val_str;
 		val_str = ss.str();

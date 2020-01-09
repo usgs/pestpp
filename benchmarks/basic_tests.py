@@ -733,6 +733,31 @@ def tplins1_test():
     lines_in = open(os.path.join(t_d,"hk_Layer_1.ref"),'r').readlines()
     assert len(lines_tpl) - 1 == len(lines_in)
 
+    pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
+    pst.pestpp_options["fill_tpl_zeros"] = True
+    pst.write(os.path.join(t_d,"pest_fill.pst"))
+    pyemu.os_utils.run("{0} pest_fill.pst".format(exe_path.replace("-ies","-glm")),cwd=t_d)
+    obf_df = pd.read_csv(os.path.join(t_d,"out1.dat.obf"),delim_whitespace=True,header=None,names=["obsnme","obsval"])
+    obf_df.index = obf_df.obsnme
+    pst = pyemu.Pst(os.path.join(t_d,"pest_fill.pst"))
+    res_df = pst.res
+    
+    d = (obf_df.obsval - res_df.modelled).apply(np.abs)
+    #print(d)
+    print(d.max())
+    assert d.max() < 1.0e-5, d
+
+    jco = pyemu.Jco.from_binary(os.path.join(t_d,"pest_fill.jcb")).to_dataframe().apply(np.abs)
+    assert jco.sum().sum() == 0, jco.sum()
+
+    # check the input file - the last two number should be the same
+    arr = np.loadtxt(os.path.join(t_d,"hk_Layer_1.ref"))
+    assert arr[-2] == arr[-1]
+
+    lines_tpl = open(os.path.join(t_d,"hk_Layer_1.ref.tpl"),'r').readlines()
+    lines_in = open(os.path.join(t_d,"hk_Layer_1.ref"),'r').readlines()
+    assert len(lines_tpl) - 1 == len(lines_in)
+
 
 
 if __name__ == "__main__":
