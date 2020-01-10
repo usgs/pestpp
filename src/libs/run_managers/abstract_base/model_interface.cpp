@@ -452,8 +452,14 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 		if (f_tpl.eof())
 			break;
 		line = read_line(f_tpl);
+		
 		if (line.size() == 0)
-			break;
+		{
+			if (f_tpl.eof())
+				break;
+			f_in << endl;
+			continue;
+		}
 		tpl_line_map = parse_tpl_line(line);
 		for (auto t : tpl_line_map)
 		{
