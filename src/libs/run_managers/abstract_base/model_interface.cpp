@@ -3,6 +3,7 @@
 #include "utilities.h"
 #include "system_variables.h"
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <vector>
 #include <cstring>
@@ -451,8 +452,14 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 		if (f_tpl.eof())
 			break;
 		line = read_line(f_tpl);
+		
 		if (line.size() == 0)
-			break;
+		{
+			if (f_tpl.eof())
+				break;
+			f_in << endl;
+			continue;
+		}
 		tpl_line_map = parse_tpl_line(line);
 		for (auto t : tpl_line_map)
 		{
@@ -524,8 +531,8 @@ void TemplateFile::prep_tpl_file_for_reading(ifstream& f_tpl)
 	if (tokens.size() > 2)
 		throw_tpl_error("extra unused items on first line");
 	tag = pest_utils::upper_cp(tokens[0]);
-	if (tag != "PTF")
-		throw_tpl_error("first line should start with 'PTF', not: " + tag);
+	if ((tag != "PTF") && (tag != "JTF"))
+		throw_tpl_error("first line should start with 'PTF' or 'JTF', not: " + tag);
 	marker = tokens[1];
 	if (marker.size() != 1)
 		throw_tpl_error("marker on first line should be one character, not: " + marker);
@@ -607,12 +614,18 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 	string val_str, fill_val=" ";
 	stringstream ss;
 	int precision = size;
+	bool sci = false;
 	if (value < 0)
 		precision--; // for the minus sign
-	if ((abs(value) >= 10) || (abs(value) <= 1.0))
+	if ((abs(value) >= 100) || (abs(value) < 0.01))
 	{
 		ss << scientific;
 		precision = precision - 2; //for the "e" and (at least) 1 exponent digit
+		sci = true;
+	}
+	else
+	{
+		ss << fixed;
 	}
 	ss.width(size);
 	
@@ -637,13 +650,47 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 			precision--;
 		if (precision <= 0)
 		{
+			//time for desparate measures:
+			//if the exponent has a leading zero, drop it
+			if (val_str.substr(val_str.size() - 2, 1) == "0")
+			{
+				string t = val_str.substr(0, val_str.size() - 2);
+				val_str = t + val_str.substr(val_str.size() - 1, 1);
+				if (val_str.size() <= size)
+					break;
+			}
+			//if there is an unnesscary zero(s) between the radix and the exponent
+			int r_idx = val_str.find_first_of(".")+1; // to skip past the radix
+			int e_idx = val_str.find_first_of("Ee");
+			if (r_idx != e_idx)
+			{
+				string t = val_str.substr(r_idx, e_idx - r_idx);
+				if (stod(t) == 0.0)
+				{
+					t = val_str.substr(0, r_idx-1); // to skip the radix in the new number
+					val_str = t + val_str.substr(e_idx);
+					if (val_str.size() <= size)
+						break;
+				}
+			}
 			ss.str("");
-			ss << "TemplateFile casting error: cant represent value " << value;
+		 	ss << "TemplateFile casting error: cant represent value " << value;
 			ss << " for " << name << " in space that is only " << size << " chars wide";
 			throw_tpl_error(ss.str());
 		}
 		if (val_str.size() == size_last)
-			throw_tpl_error("internal error: val_str size not decreasing over successive attempts:"+val_str);
+		{
+			if (sci)
+				throw_tpl_error("internal error: val_str size not decreasing over successive attempts:" + val_str);
+			else
+			{
+				val_str = val_str.substr(0, size);
+				break;
+			}
+			
+
+			
+		}
 		size_last = val_str.size();
 	}
 	//occasionally, when reducing precision, rounding will cause an 
@@ -783,8 +830,8 @@ void InstructionFile::prep_ins_file_for_reading(ifstream& f_ins)
 	if (tokens.size() > 2)
 		throw_ins_error("extra unused items on first line");
 	tag = pest_utils::upper_cp(tokens[0]);
-	if (tag != "PIF")
-		throw_ins_error("first line should start with 'PIF', not: " + tag);
+	if ((tag != "PIF") && (tag != "JIF"))
+		throw_ins_error("first line should start with 'PIF' or 'JIF', not: " + tag);
 	string s_marker = tokens[1];
 	if (s_marker.size() != 1)
 		throw_ins_error("marker on first line should be one character, not: " + s_marker);

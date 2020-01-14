@@ -1786,7 +1786,7 @@ const vector<string> &Pest::get_outfile_vec()
 	return model_exec_info.outfile_vec;
 }
 
-void Pest::enforce_par_limits(Parameters & upgrade_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim, bool enforce_bounds)
+void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgrade_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim, bool enforce_bounds)
 {
 	if ((!enforce_chglim) && (!enforce_bounds))
 		return;
@@ -1975,6 +1975,8 @@ void Pest::enforce_par_limits(Parameters & upgrade_active_ctl_pars, const Parame
 			}
 		}	
 	}
+	ss.str("");
+	ss << "change enforcement controlling par:" << controlling_par << ", control_type: " << control_type << ", scaling_factor: " << scaling_factor << endl;
 
 	if (scaling_factor == 0.0)
 	{

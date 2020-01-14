@@ -130,7 +130,7 @@ public:
 
 	void from_eigen_mat(Eigen::MatrixXd mat, const vector<string> &_real_names, const vector<string> &_var_names,
 		transStatus _tstat = transStatus::NUM);
-	void enforce_limits(bool enforce_chglim);
+	void enforce_limits(PerformanceLog* plog, bool enforce_chglim);
 	void to_csv(string file_name);
 	void to_csv_by_reals(ofstream &csv);
 	void to_csv_by_vars(ofstream &csv);
