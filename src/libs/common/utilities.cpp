@@ -425,14 +425,14 @@ vector<string> read_onecol_ascii_to_vector(std::string filename)
 	return result;
 }
 
-void read_res(string &res_filename, Observations &obs)
+void read_res(string& res_filename, Observations& obs)
 {
 	map<string, double> result;
 	ifstream fin(res_filename);
 	if (!fin.good())
 		throw runtime_error("could not open residuals file " + res_filename + " for reading");
 	vector<string> tokens;
-	string line,name;
+	string line, name;
 	double value;
 	bool found = false;
 	int mod_idx;
@@ -455,14 +455,18 @@ void read_res(string &res_filename, Observations &obs)
 	vector<string> extra;
 	vector<string> visited;
 	vector<string> obs_names = obs.get_keys();
-	while (getline(fin,line))
+	set<string> oset(obs_names.begin(), obs_names.end());
+	set<string>::iterator oend = oset.end();
+	while (getline(fin, line))
 	{
 		strip_ip(line);
 		tokens.clear();
 		tokenize(line, tokens);
 		name = upper_cp(tokens[0]);
 		convert_ip(tokens[mod_idx], value);
-		if (find(obs_names.begin(), obs_names.end(), name) == obs_names.end())
+		value = stod(tokens[mod_idx]);
+		//if (find(obs_names.begin(), obs_names.end(), name) == obs_names.end())
+		if (oset.find(name) == oend)
 			extra.push_back(name);
 		else
 		{
@@ -474,11 +478,15 @@ void read_res(string &res_filename, Observations &obs)
 	stringstream missing;
 	missing << "the following obs were not found in the residual file: ";
 	int i = 0;
-	for (auto &oname : obs)
+	oset.clear();
+	oset.insert(visited.begin(), visited.end());
+	oend = oset.end();
+	for (auto& o : obs)
 	{
-		if (find(visited.begin(), visited.end(), oname.first) == visited.end())
+		//if (find(visited.begin(), visited.end(), oname.first) == visited.end())
+		if (oset.find(o.first) == oend)
 		{
-			missing << oname.first << ' ';
+			missing << o.first << ' ';
 			i++;
 			if (i % 5 == 0) missing << endl;
 		}
@@ -491,7 +499,7 @@ void read_res(string &res_filename, Observations &obs)
 		stringstream ss;
 		ss << "extra obs found res file...ignoring: ";
 		int i = 0;
-		for (auto &n : extra)
+		for (auto& n : extra)
 		{
 			ss << n << ' ';
 			i++;
@@ -500,7 +508,6 @@ void read_res(string &res_filename, Observations &obs)
 		cout << ss.str();
 	}
 }
-
 
 void read_par(ifstream &fin, Parameters &pars)
 {

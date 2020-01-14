@@ -1795,7 +1795,7 @@ void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, Per
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_enforce_bounds())
 		//dont enforce parchglim-style here - if a pars initial value is near its bound, lots of realizations 
 		//will be near zero length.  
-		enforce_limits(false);
+		enforce_limits(plog, false);
 
 
 }
@@ -2063,7 +2063,7 @@ void ParameterEnsemble::save_fixed()
 	}
 }
 
-void ParameterEnsemble::enforce_limits(bool enforce_chglim)
+void ParameterEnsemble::enforce_limits(PerformanceLog* plog, bool enforce_chglim)
 {
 	
 	if (tstat != ParameterEnsemble::transStatus::NUM)
@@ -2080,7 +2080,7 @@ void ParameterEnsemble::enforce_limits(bool enforce_chglim)
 
 			Parameters real(var_names, reals.row(i));
 
-			pest_scenario_ptr->enforce_par_limits(real, base, true, true);
+			pest_scenario_ptr->enforce_par_limits(plog, real, base, true, true);
 			//pest_scenario_ptr->enforce_par_limits(real, base, true, false);
 			reals.row(i) = real.get_data_eigen_vec(var_names);
 		}
