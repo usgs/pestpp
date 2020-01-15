@@ -2477,6 +2477,32 @@ void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *p
 		}
 	}
 	Ensemble::draw(num_reals, cov, obs, pest_scenario_ptr->get_ctl_ordered_nz_obs_names(), grouper, plog, level);
+
+	//now fill in all the zero-weighted obs
+	Eigen::MatrixXd drawn = reals;
+	vector<string> full_var_names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+	reals.resize(num_reals, full_var_names.size());
+	reals.setConstant(-1.0e30);
+	map<string, int> vmap;
+	for (int i = 0; i < var_names.size(); i++)
+		vmap[var_names[i]] = i;
+	map<string, int>::iterator end = vmap.end();
+	//for (auto n : full_var_names)
+	string n;
+	double val;
+	for (int i = 0; i < full_var_names.size(); i++)
+	{
+		n = full_var_names[i];
+		if (vmap.find(n) != end)
+			reals.col(i) = drawn.col(vmap[n]);
+		else
+		{
+			val = obs.get_rec(n);
+			reals.col(i).setConstant(val);
+		}
+	}
+	var_names = full_var_names;
+	
 }
 
 void ObservationEnsemble::update_from_obs(int row_idx, Observations &obs)

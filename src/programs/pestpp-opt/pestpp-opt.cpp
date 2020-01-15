@@ -191,7 +191,7 @@ int main(int argc, char* argv[])
 		file_manager.open_default_files();
 		
 		ofstream &fout_rec = file_manager.rec_ofstream();
-		PerformanceLog performance_log(file_manager.open_ofile_ext("pfm"));
+		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
 
 		
 		fout_rec << "             pestpp-opt version " << endl << endl;

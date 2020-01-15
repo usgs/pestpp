@@ -1104,7 +1104,7 @@ void sequentialLP::calc_chance_constraint_offsets()
 		Mat fosm_jco(fosm_row_names, adj_par_names, fosm_mat);
 
 		//create a linear object
-		Logger logger(file_mgr_ptr->get_ofstream("pfm"), false);
+		Logger logger(file_mgr_ptr->get_ofstream("log"), false);
 		linear_analysis la(fosm_jco, pest_scenario,*file_mgr_ptr, &logger);
 		la.set_obscov(obscov);
 

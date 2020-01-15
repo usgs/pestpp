@@ -2392,8 +2392,8 @@ void IterEnsembleSmoother::initialize()
 	if (!ppo->get_ies_drop_conflicts())
 	{
 		ss.str("");
-		ss << "  Continuing with data assimilation will likely result ";
-		ss << " in parameter bias and, ultimately, forecast bias";
+		ss << "  WARNING: Prior-data conflict detected.  Continuing with IES parameter adjustment will likely result " << endl;
+		ss << "           in parameter and forecast bias";
 		message(1, ss.str());
 	}
 	else
@@ -3616,7 +3616,7 @@ bool IterEnsembleSmoother::solve_new()
 		double cur_lam = last_best_lam * lam_mult;
 		ss << "starting calcs for lambda" << cur_lam;
 		message(1, "starting lambda calcs for lambda", cur_lam);
-		message(2, "see .pfm file for more details");
+		message(2, "see .log file for more details");
 		ParameterEnsemble pe_upgrade;
 		
 		pe_upgrade = calc_localized_upgrade_threaded(cur_lam, loc_map);

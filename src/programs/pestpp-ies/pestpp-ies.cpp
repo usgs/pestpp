@@ -204,7 +204,7 @@ int main(int argc, char* argv[])
 		}
 
 		ofstream &fout_rec = file_manager.rec_ofstream();
-		PerformanceLog performance_log(file_manager.open_ofile_ext("pfm"));
+		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
 
 		if (!restart_flag || save_restart_rec_header)
 		{
