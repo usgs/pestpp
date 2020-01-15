@@ -42,8 +42,8 @@ public:
 	void write_group(int iter_num, int total_runs, vector<double> extra);
 	vector<int> get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe);
 
-	Eigen::MatrixXd get_obs_resid(ObservationEnsemble &oe);
-	Eigen::MatrixXd get_obs_resid_subset(ObservationEnsemble &oe);
+	Eigen::MatrixXd get_obs_resid(ObservationEnsemble &oe, bool apply_ineq=true);
+	Eigen::MatrixXd get_obs_resid_subset(ObservationEnsemble &oe, bool apply_ineq=true);
 
 	Eigen::MatrixXd get_par_resid(ParameterEnsemble &pe);
 	Eigen::MatrixXd get_par_resid_subset(ParameterEnsemble &pe);
@@ -53,6 +53,9 @@ public:
 	vector<string> get_gt_obs_names() { return gt_obs_names; }
 
 	void apply_ineq_constraints(Eigen::MatrixXd &resid, vector<string> &names);
+
+	void save_residual_cov(ObservationEnsemble& oe, int iter);
+
 
 private:
 	map<string, double> get_summary_stats(phiType pt);

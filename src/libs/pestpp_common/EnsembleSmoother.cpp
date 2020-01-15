@@ -45,10 +45,6 @@ PhiHandler::PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 		}
 	}
 
-
-	
-
-
 	reg_factor = _reg_factor;
 	//save the org reg factor and org q vector
 	org_reg_factor = *_reg_factor;
@@ -70,23 +66,24 @@ PhiHandler::PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 
 }
 
-Eigen::MatrixXd PhiHandler::get_obs_resid(ObservationEnsemble &oe)
+Eigen::MatrixXd PhiHandler::get_obs_resid(ObservationEnsemble &oe, bool apply_ineq)
 {
 	vector<string> names = oe_base->get_var_names();
 	Eigen::MatrixXd resid = oe.get_eigen(vector<string>(),names) -
 		oe_base->get_eigen(oe.get_real_names(), vector<string>());
 	
-
-	apply_ineq_constraints(resid,names);
+	if (apply_ineq)
+		apply_ineq_constraints(resid,names);
 	return resid;
 }
 
 
-Eigen::MatrixXd PhiHandler::get_obs_resid_subset(ObservationEnsemble &oe)
+Eigen::MatrixXd PhiHandler::get_obs_resid_subset(ObservationEnsemble &oe, bool apply_ineq)
 {
 	vector<string> names = oe.get_var_names();
 	Eigen::MatrixXd resid = oe.get_eigen() - oe_base->get_eigen(oe.get_real_names(), names);
-	apply_ineq_constraints(resid, names);
+	if (apply_ineq)
+		apply_ineq_constraints(resid, names);
 	return resid;
 }
 
@@ -259,6 +256,28 @@ void PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, bool i
 	}
  	composite.clear();
 	composite = calc_composite(meas, regul);
+}
+
+void PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
+{
+	Eigen::MatrixXd rmat = get_obs_resid(oe, false); //dont apply ineq constraints
+	//ObservationEnsemble(Pest *_pest_scenario_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
+	rmat = rmat.transpose() * rmat;
+	vector<string> names = oe_base->get_var_names();
+	Covariance rcov(names, rmat.sparseView());
+	stringstream ss;
+	ss << file_manager->get_base_filename() << "." << iter << ".res.";
+	if (pest_scenario->get_pestpp_options().get_ies_save_binary())
+	{
+		ss << "jcb";
+		rcov.to_binary_new(ss.str());
+	}
+	else
+	{
+		ss << "cov";
+		rcov.to_ascii(ss.str());
+	}
+
 }
 
 map<string, double>* PhiHandler::get_phi_map(PhiHandler::phiType &pt)
@@ -2384,6 +2403,8 @@ void IterEnsembleSmoother::initialize()
 	message(0, "initial phi summary");
 	ph.report();
 	ph.write(0, run_mgr_ptr->get_total_runs());
+	if (ppo->get_ies_save_rescov())
+		ph.save_residual_cov(oe, 0);
 	best_mean_phis.push_back(ph.get_mean(PhiHandler::phiType::COMPOSITE));
 	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
 	{
@@ -2720,6 +2741,8 @@ void IterEnsembleSmoother::iterate_2_solution()
 			last_best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
 			ph.report();
 			ph.write(iter, run_mgr_ptr->get_total_runs());
+			if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
+				ph.save_residual_cov(oe,iter);
 			pcs.summarize(pe);
 			if (accept)
 				consec_bad_lambda_cycles = 0;

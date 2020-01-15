@@ -873,6 +873,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		ies_drop_conflicts = pest_utils::parse_string_arg_to_bool(value);
 	}
+	else if (key == "IES_SAVE_RESCOV")
+	{
+		ies_save_rescov = pest_utils::parse_string_arg_to_bool(value);
+	}
 
 	else if (key == "GSA_METHOD")
 	{
@@ -1081,6 +1085,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_center_on: " << ies_center_on << endl;
 	os << "ies_no_noise: " << ies_no_noise << endl;
 	os << "ies_drop_conflicts: " << ies_drop_conflicts << endl;
+	os << "ies_save_rescov:" << ies_save_rescov << endl;
 
 	os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -1191,6 +1196,7 @@ void PestppOptions::set_defaults()
 	set_ies_lam_mults(vector<double>{0.1, 1.0, 10.0});
 	set_ies_no_noise(false);
 	set_ies_drop_conflicts(false);
+	set_ies_save_rescov(false);
 	
 
 	set_gsa_method("MORRIS");
