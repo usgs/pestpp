@@ -127,7 +127,7 @@ public:
 	Covariance diagonal(double val);
 	void from_diagonal(Covariance &other);
 
-	string try_from(Pest &pest_scenario, FileManager &file_manager,bool is_parcov=true);
+	string try_from(Pest &pest_scenario, FileManager &file_manager,bool is_parcov=true, bool forgive_missing=false);
 	void from_uncertainty_file(const string &filename, vector<string> &ordered_names);
 	void from_parameter_bounds(Pest &pest_scenario);
 	void from_parameter_bounds(const vector<string> &par_names, const ParameterInfo &par_info, double sigma_range=4.0);

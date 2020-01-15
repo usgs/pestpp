@@ -2460,7 +2460,7 @@ void ObservationEnsemble::initialize_without_noise(int num_reals)
 void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level)
 {
 	//draw an obs ensemble using only nz obs names
-	var_names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+	var_names = pest_scenario_ptr->get_ctl_ordered_nz_obs_names();
 	Observations obs = pest_scenario_ptr->get_ctl_observations();
 	ObservationInfo oi = pest_scenario_ptr->get_ctl_observation_info();
 	map<string, vector<string>> grouper;

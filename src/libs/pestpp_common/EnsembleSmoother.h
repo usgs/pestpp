@@ -277,6 +277,8 @@ private:
 	void set_subset_idx(int size);
 	Eigen::MatrixXd get_Am(const vector<string> &real_names, const vector<string> &par_names);
 
+	void zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov=true,bool update_oe_base=true);
+
 };
 
 #endif

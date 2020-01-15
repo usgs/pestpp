@@ -1113,7 +1113,7 @@ Covariance Covariance::diagonal(double val)
 	return Covariance(*rn_ptr(), i);
 }
 
-string Covariance::try_from(Pest &pest_scenario, FileManager &file_manager, bool is_parcov)
+string Covariance::try_from(Pest &pest_scenario, FileManager &file_manager, bool is_parcov, bool forgive_missing)
 {
 	stringstream how;
 	stringstream ss;
@@ -1193,10 +1193,30 @@ string Covariance::try_from(Pest &pest_scenario, FileManager &file_manager, bool
 		}
 		if (missing.size() > 0)
 		{
-			stringstream ss;
-			for (auto &pname : missing)
-				ss << ',' << pname;
-			throw PestError("parcov missing parameters: " + ss.str());
+			ofstream& frec = file_manager.rec_ofstream();
+			frec << "...Note: parcov missing the following " << missing.size() << " adjustable parameters:" << endl;
+			int i = 0;
+			for (auto& pname : missing)
+			{
+				frec << ',' << pname;
+				i++;
+				if (i > 10)
+				{
+					frec << endl;
+					i = 0;
+				}
+			}
+			frec << endl;
+			if (forgive_missing)
+			{
+				cout << "WARNING: " << missing.size() << " adjustable parameters missing from parcov, continuing..." << endl;
+			}
+			else
+			{
+				ss.str("");
+				ss << "parcov missing " << missing.size() << "adjustable parameters, see rec file for listing";
+				throw PestError(ss.str());
+			}
 		}
 		
 	}
@@ -1205,7 +1225,7 @@ string Covariance::try_from(Pest &pest_scenario, FileManager &file_manager, bool
 		double weight;
 		set<string> cov_names(row_names.begin(), row_names.end());
 
-		for (auto &oname : pest_scenario.get_ctl_ordered_par_names())
+		for (auto &oname : pest_scenario.get_ctl_ordered_obs_names())
 		{
 			weight = pest_scenario.get_ctl_observation_info().get_weight(oname);
 			if (weight == 0.0)
@@ -1218,10 +1238,30 @@ string Covariance::try_from(Pest &pest_scenario, FileManager &file_manager, bool
 		}
 		if (missing.size() > 0)
 		{
-			stringstream ss;
-			for (auto &pname : missing)
-				ss << ',' << pname;
-			throw PestError("obscov missing parameters: " + ss.str());
+			ofstream& frec = file_manager.rec_ofstream();
+			frec << "...Note: obscov missing the following " << missing.size() << " non-zero weighted obs:" << endl;
+			int i = 0;
+			for (auto& name : missing)
+			{
+				frec << ',' << name;
+				i++;
+				if (i > 10)
+				{
+					frec << endl;
+					i = 0;
+				}
+			}
+			frec << endl;
+			if (forgive_missing)
+			{
+				cout << "WARNING: " << missing.size() << " non-zero weighted observations missing from obscov, continuing..." << endl;
+			}
+			else
+			{
+				ss.str("");
+				ss << "obscov missing " << missing.size() << "non-zero weighted observations, see rec file for listing";
+				throw PestError(ss.str());
+			}
 		}
 	}
 

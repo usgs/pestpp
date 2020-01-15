@@ -1771,9 +1771,44 @@ void IterEnsembleSmoother::initialize_obscov()
 	message(1, "initializing observation noise covariance matrix");
 	string obscov_filename = pest_scenario.get_pestpp_options().get_obscov_filename();
 
-	string how = obscov.try_from(pest_scenario, file_manager, false);
+	string how = obscov.try_from(pest_scenario, file_manager, false, true);
 	message(1, "obscov loaded ", how);
-	obscov = obscov.get(act_obs_names);
+	if (obscov_filename.size() > 0)
+	{
+		vector<string> cov_names = obscov.get_col_names();
+		vector<string> nz_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+		if (cov_names.size() < nz_obs_names.size())
+		{
+			//this means we need to drop some nz obs
+			set<string> scov(cov_names.begin(), cov_names.end());
+			set<string>::iterator end = scov.end();
+			vector<string> drop;
+			for (auto name : nz_obs_names)
+				if (scov.find(name) == end)
+					drop.push_back(name);
+			ofstream& frec = file_manager.rec_ofstream();
+			frec << "Note: zero-weighting the following " << drop.size() << " observations that are not in the obscov:" << endl;
+			int i = 0;
+			for (auto n : drop)
+			{
+				frec << ',' << n;
+				i++;
+				if (i > 10)
+				{
+					frec << endl;
+					i = 0;
+				}
+			}
+			frec << endl;
+			zero_weight_obs(drop, false, true);
+		}
+
+	}
+	else
+	{
+		obscov = obscov.get(act_obs_names);
+	}
+	
 }
 
 
@@ -2370,33 +2405,8 @@ void IterEnsembleSmoother::initialize()
 		{
 			throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
 		}
-		//drop from act_obs_names
-		vector<string> t;
-		set<string> sconflict(in_conflict.begin(), in_conflict.end());
-		for (auto oname : act_obs_names)
-			if (sconflict.find(oname) == sconflict.end())
-				t.push_back(oname);
-		act_obs_names = t;
-
-		//update obscov
-		obscov.drop(in_conflict);
-
-		//drop from oe_base
-		oe_base.drop_cols(in_conflict);
-		//shouldnt need to update localizer since we dropping not adding
-		//updating weights in control file
-
-		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
-		int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
-		for (auto n : in_conflict)
-		{
-			oi->set_weight(n, 0.0);
-		}
-
-		stringstream ss;
-		ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
-		ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
-		message(1, ss.str());
+		zero_weight_obs(in_conflict);
+		
 	}
 	performance_log->log_event("calc initial phi");
 	ph.update(oe, pe);
@@ -2423,6 +2433,40 @@ void IterEnsembleSmoother::initialize()
 	}
 	message(1, "current lambda:", last_best_lam);
 	message(0, "initialization complete");
+}
+
+void IterEnsembleSmoother::zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov, bool update_oe_base)
+{
+	//drop from act_obs_names
+	vector<string> t;
+	set<string> sdrop(obs_to_zero_weight.begin(), obs_to_zero_weight.end());
+	for (auto oname : act_obs_names)
+		if (sdrop.find(oname) == sdrop.end())
+			t.push_back(oname);
+	act_obs_names = t;
+
+	//update obscov
+	if (update_obscov)
+		obscov.drop(obs_to_zero_weight);
+
+	//drop from oe_base
+	if (update_oe_base)
+		oe_base.drop_cols(obs_to_zero_weight);
+	
+	//shouldnt need to update localizer since we dropping not adding
+	//updating weights in control file
+
+	ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+	int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
+	for (auto n : obs_to_zero_weight)
+	{
+		oi->set_weight(n, 0.0);
+	}
+
+	stringstream ss;
+	ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
+	ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
+	message(1, ss.str());
 }
 
 vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
