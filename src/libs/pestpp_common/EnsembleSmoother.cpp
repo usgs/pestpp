@@ -1801,8 +1801,14 @@ void IterEnsembleSmoother::initialize_obscov()
 			}
 			frec << endl;
 			zero_weight_obs(drop, false, true);
+			message(1, "resetting weights based on obscov diagonal");
+			Eigen::VectorXd diag = obscov.e_ptr()->diagonal();
+			ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+			for (int i = 0; i < diag.size(); i++)
+			{
+				oi->set_weight(cov_names[i], 1.0/sqrt(diag[i]));
+			}		
 		}
-
 	}
 	else
 	{
@@ -2378,35 +2384,35 @@ void IterEnsembleSmoother::initialize()
 	{
 		ss.str("");
 		ss << "WARNING: " << in_conflict.size() << " non-zero weighted observations are in conflict";
-		ss << " with the prior simulated ensemble." << endl;	
+		ss << " with the prior simulated ensemble." << endl;
 		message(0, ss.str());
-	}
-	
-	cout << "...see rec file for listing of conflicted observations" << endl << endl;
-	ofstream& frec = file_manager.rec_ofstream();
-	frec << endl << "...conflicted observations: " << endl;
-	for (auto oname : in_conflict)
-	{
-		frec << oname << endl;
-	}
-	if (!ppo->get_ies_drop_conflicts())
-	{
-		ss.str("");
-		ss << "  WARNING: Prior-data conflict detected.  Continuing with IES parameter adjustment will likely result " << endl;
-		ss << "           in parameter and forecast bias";
-		message(1, ss.str());
-	}
-	else
-	{
 
-		//check that all obs are in conflict
-		message(1, "dropping conflicted observations");
-		if (in_conflict.size() == oe.shape().second)
+		cout << "...see rec file for listing of conflicted observations" << endl << endl;
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << endl << "...conflicted observations: " << endl;
+		for (auto oname : in_conflict)
 		{
-			throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
+			frec << oname << endl;
 		}
-		zero_weight_obs(in_conflict);
-		
+		if (!ppo->get_ies_drop_conflicts())
+		{
+			ss.str("");
+			ss << "  WARNING: Prior-data conflict detected.  Continuing with IES parameter adjustment will likely result " << endl;
+			ss << "           in parameter and forecast bias.  Consider using 'ies_drop_conflicts' as a quick fix.";
+			message(1, ss.str());
+		}
+		else
+		{
+
+			//check that all obs are in conflict
+			message(1, "dropping conflicted observations");
+			if (in_conflict.size() == oe.shape().second)
+			{
+				throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
+			}
+			zero_weight_obs(in_conflict);
+
+		}
 	}
 	performance_log->log_event("calc initial phi");
 	ph.update(oe, pe);
