@@ -2490,7 +2490,12 @@ vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
 	map<string, int> smap, omap;
 	vector<string> snames = oe.get_var_names();
 	vector<string> onames = oe_base.get_var_names();
-
+	vector<string> temp = ph.get_lt_obs_names();
+	set<string> ineq(temp.begin(), temp.end());
+	set<string>::iterator end = ineq.end();
+	temp = ph.get_gt_obs_names();
+	ineq.insert(temp.begin(), temp.end());
+	temp.resize(0);
 	for (int i = 0; i < snames.size(); i++)
 	{
 		smap[snames[i]] = i;
@@ -2502,6 +2507,8 @@ vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
 	int sidx, oidx;
 	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
 	{
+		if (ineq.find(oname) != end)
+			continue;
 		sidx = smap[oname];
 		oidx = omap[oname];
 		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
