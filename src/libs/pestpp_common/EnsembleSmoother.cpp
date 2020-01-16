@@ -1806,8 +1806,8 @@ void IterEnsembleSmoother::initialize_obscov()
 			ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
 			for (int i = 0; i < diag.size(); i++)
 			{
-				oi->set_weight(cov_names[i], 1.0/sqrt(diag[i]));
-			}		
+				oi->set_weight(cov_names[i], min(1.0/sqrt(diag[i]),oi->get_weight(cov_names[i])));
+			}	
 		}
 	}
 	else
@@ -2305,7 +2305,6 @@ void IterEnsembleSmoother::initialize()
 	//reorder this for later
 	pe_base.reorder(vector<string>(), act_par_names);
 
-	
 
 	//the hard way to restart
 	if (obs_restart_csv.size() > 0)
@@ -2413,6 +2412,13 @@ void IterEnsembleSmoother::initialize()
 			zero_weight_obs(in_conflict);
 
 		}
+		string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
+		ofstream f_obs(filename);
+		if (f_obs.bad())
+			throw_ies_error("error opening: " + filename);
+		output_file_writer.scenario_obs_csv(f_obs);
+		f_obs.close();
+		message(1, "updated observation data information written to file ", filename);
 	}
 	performance_log->log_event("calc initial phi");
 	ph.update(oe, pe);

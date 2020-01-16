@@ -380,6 +380,20 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 	os << endl << endl;
 }
 
+void OutputFileWriter::scenario_obs_csv(ostream& os)
+{
+	if (os.bad())
+		throw runtime_error("OutputFileWriter::scenario_obs_csv(): os is bad");
+	os << "name,value,group,weight" << endl;
+	const ObservationRec* obs_rec;
+	const Observations& obs = pest_scenario.get_ctl_observations();
+	for (auto& obs_name : pest_scenario.get_ctl_ordered_obs_names())
+	{
+		obs_rec = pest_scenario.get_ctl_observation_info().get_observation_rec_ptr(obs_name);
+		os << lower_cp(obs_name) << "," << obs.get_rec(obs_name) << "," << lower_cp(obs_rec->group) << "," << obs_rec->weight << endl;
+	}
+}
+
 void OutputFileWriter::scenario_obs_report(std::ostream &os)
 {
 
