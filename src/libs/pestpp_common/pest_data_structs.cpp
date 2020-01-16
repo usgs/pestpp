@@ -972,7 +972,6 @@ void PestppOptions::summary(ostream& os) const
 	os << "par_sigma_range: " << par_sigma_range << endl;
 	os << "enforce_tied_bounds: " << enforce_tied_bounds << endl;
 	os << "debug_parse_only: " << debug_parse_only << endl;
-	os << "debug_parse_only: " << debug_parse_only << endl;
 	os << "check_tplins: " << check_tplins << endl;
 	os << "fill_tpl_zeros: " << fill_tpl_zeros << endl;
 	os << "additional_ins_delimiters: " << additional_ins_delimiters << endl;

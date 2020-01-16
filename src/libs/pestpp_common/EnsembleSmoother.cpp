@@ -1820,6 +1820,7 @@ void IterEnsembleSmoother::initialize_obscov()
 
 void IterEnsembleSmoother::initialize()
 {
+	
 	message(0, "initializing");
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 

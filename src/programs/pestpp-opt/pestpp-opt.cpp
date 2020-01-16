@@ -244,12 +244,12 @@ int main(int argc, char* argv[])
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;	=
 		OutputFileWriter output_file_writer(file_manager, pest_scenario,false);
 		
-		//output_file_writer.scenario_report(fout_rec);
-		output_file_writer.scenario_io_report(fout_rec);
+		output_file_writer.scenario_report(fout_rec, false);
+		/*output_file_writer.scenario_io_report(fout_rec);
 		output_file_writer.scenario_pargroup_report(fout_rec);
 		output_file_writer.scenario_par_report(fout_rec);
 		output_file_writer.scenario_obs_report(fout_rec);
-		output_file_writer.scenario_pi_report(fout_rec);
+		output_file_writer.scenario_pi_report(fout_rec);*/
 		
 		/*if (pest_scenario.get_pestpp_options().get_iter_summary_flag())
 		{

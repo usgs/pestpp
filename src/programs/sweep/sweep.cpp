@@ -503,7 +503,7 @@ int main(int argc, char* argv[])
 		pest_scenario.check_inputs(fout_rec, true);
 		
 		OutputFileWriter ofw(file_manager, pest_scenario, false, false, 0);
-		ofw.scenario_report(fout_rec);
+		ofw.scenario_report(fout_rec, false);
 		PestppOptions ppopt = pest_scenario.get_pestpp_options();
 
 		fout_rec << "    sweep parameter csv file = " << left << setw(50) << ppopt.get_sweep_parameter_csv_file() << endl;
