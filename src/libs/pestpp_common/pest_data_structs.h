@@ -401,6 +401,8 @@ public:
 	void set_ies_no_noise(bool _flag) { ies_no_noise = _flag; }
 	bool get_ies_drop_conflicts() const { return ies_drop_conflicts; }
 	void set_ies_drop_conflicts(bool _flag) { ies_drop_conflicts = _flag; }
+	bool get_ies_save_rescov() const { return ies_save_rescov; }
+	void set_ies_save_rescov(bool _flag) { ies_save_rescov = _flag; }
 
 	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -545,6 +547,7 @@ private:
 	string ies_center_on;
 	bool ies_no_noise;
 	bool ies_drop_conflicts;
+	bool ies_save_rescov;
 
 	string gsa_method;
 	int gsa_morris_p;

@@ -204,7 +204,7 @@ int main(int argc, char* argv[])
 		}
 
 		ofstream &fout_rec = file_manager.rec_ofstream();
-		PerformanceLog performance_log(file_manager.open_ofile_ext("pfm"));
+		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
 
 		if (!restart_flag || save_restart_rec_header)
 		{
@@ -247,8 +247,8 @@ int main(int argc, char* argv[])
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
 		pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
-		//output_file_writer.scenario_report(fout_rec);
-		output_file_writer.scenario_io_report(fout_rec);
+		output_file_writer.scenario_report(fout_rec,false);
+		//output_file_writer.scenario_io_report(fout_rec);
 		if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1)
 		{
 			output_file_writer.scenario_pargroup_report(fout_rec);

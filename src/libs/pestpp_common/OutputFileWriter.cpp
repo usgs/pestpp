@@ -224,7 +224,7 @@ void OutputFileWriter::write_obj_iter(int iter, int nruns, PhiData const &phi_da
 	os << endl;
 }
 
-void OutputFileWriter::scenario_report(std::ostream &os)
+void OutputFileWriter::scenario_report(std::ostream &os, bool report_mode)
 {
 	string mode;// = "estimation";
 	/*if (pest_scenario.get_regul_scheme_ptr()->get_use_dynamic_reg())
@@ -259,10 +259,11 @@ void OutputFileWriter::scenario_report(std::ostream &os)
 
 	default: mode = "WTF";
 	}
-	os << endl << endl << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-	os << endl << "pestmode:- " << endl << "   " << mode << endl << endl;
+	//os << endl << endl << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+	if (report_mode)
+		os << endl << "pestmode:- " << endl << "   " << mode << endl << endl;
 
-	os << "Case dimensions:- " << endl;
+	os << endl << "Case dimensions:- " << endl;
 	os << setw(0) << "    Number of parameters = " << pest_scenario.get_ctl_ordered_par_names().size() << endl;
 	os << setw(0) << "    Number of adjustable parameters = " << pest_scenario.get_n_adj_par() << endl;
 	os << setw(0) << "    Number of observations = " << pest_scenario.get_ctl_ordered_obs_names().size() << endl;
@@ -280,7 +281,7 @@ void OutputFileWriter::scenario_report(std::ostream &os)
 	os << endl << pest_scenario.get_svd_info() << endl;
 	os << endl;
 
-	if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
+	if ((report_mode) && (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL))
 	{
 		os << "Regularization information:" << endl;
 		os << setw(0) << "    phimlim = " << pest_scenario.get_regul_scheme_ptr()->get_phimlim() << endl;
@@ -289,9 +290,10 @@ void OutputFileWriter::scenario_report(std::ostream &os)
 		os << setw(0) << "    wfinit = " << pest_scenario.get_regul_scheme_ptr()->get_wfinit() << endl;
 
 	}
-	os << "PEST++ arguments:" << endl;
+	/*os << "PEST++ arguments:" << endl;
 	for (auto pp_arg : pest_scenario.get_pestpp_options().get_arg_map())
-		os << setw(0) << pp_arg.first << " = " << pp_arg.second << endl;
+		os << setw(0) << pp_arg.first << " = " << pp_arg.second << endl;*/
+
 
 	os << endl;
 	os << endl;
@@ -378,6 +380,20 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 		os << setw(20) << par_rec->dercom << endl;
 	}
 	os << endl << endl;
+}
+
+void OutputFileWriter::scenario_obs_csv(ostream& os)
+{
+	if (os.bad())
+		throw runtime_error("OutputFileWriter::scenario_obs_csv(): os is bad");
+	os << "name,value,group,weight" << endl;
+	const ObservationRec* obs_rec;
+	const Observations& obs = pest_scenario.get_ctl_observations();
+	for (auto& obs_name : pest_scenario.get_ctl_ordered_obs_names())
+	{
+		obs_rec = pest_scenario.get_ctl_observation_info().get_observation_rec_ptr(obs_name);
+		os << lower_cp(obs_name) << "," << obs.get_rec(obs_name) << "," << lower_cp(obs_rec->group) << "," << obs_rec->weight << endl;
+	}
 }
 
 void OutputFileWriter::scenario_obs_report(std::ostream &os)
