@@ -28,6 +28,8 @@
 #include "logger.h"
 #include "Ensemble.h"
 #include "EnsembleSmoother.h"
+#include "DataAssimilator.h"
+
 
 using namespace std;
 using namespace pest_utils;
@@ -326,12 +328,12 @@ int main(int argc, char* argv[])
 
 		run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), pest_scenario.get_ctl_observations());
 
-		IterEnsembleSmoother ies(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
+		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 
-		ies.initialize();
+		da.initialize();
 
-		ies.iterate_2_solution();
-		ies.finalize();
+		da.iterate_2_solution();
+		da.finalize();
 
 
 
