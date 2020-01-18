@@ -1,0 +1,6 @@
+pest_file,model_file,cycle,type
+stat_heads.ins,stat_heads_out.csv,-1,stat
+obs_hob_0.ins,obs_hob.csv,0,obs
+obs_hob_1.ins,obs_hob.csv,1,obs
+obs_hob_2.ins,obs_hob.csv,2,obs
+obs_hob_3.ins,obs_hob.csv,3,obs

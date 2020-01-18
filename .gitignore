@@ -60,4 +60,9 @@ pest++/pest++/pestpp
 pest++/run_manager_fortran_test/fortran_test
 pest++/sweep/sweep
 
+# tests large ouput
+*.hds
+*.list
+*.cbc
+
 .DS_Store

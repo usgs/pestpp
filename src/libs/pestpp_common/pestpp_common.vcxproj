@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="covariance.h" />
+    <ClInclude Include="DataAssimilator.h" />
     <ClInclude Include="DifferentialEvolution.h" />
     <ClInclude Include="eigen_tools.h" />
     <ClInclude Include="Ensemble.h" />
@@ -59,6 +60,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="covariance.cpp" />
+    <ClCompile Include="DataAssimilator.cpp" />
     <ClCompile Include="DifferentialEvolution.cpp" />
     <ClCompile Include="eigen_tools.cpp" />
     <ClCompile Include="Ensemble.cpp" />
