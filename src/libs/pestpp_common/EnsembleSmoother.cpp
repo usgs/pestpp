@@ -45,10 +45,6 @@ PhiHandler::PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 		}
 	}
 
-
-	
-
-
 	reg_factor = _reg_factor;
 	//save the org reg factor and org q vector
 	org_reg_factor = *_reg_factor;
@@ -70,23 +66,24 @@ PhiHandler::PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 
 }
 
-Eigen::MatrixXd PhiHandler::get_obs_resid(ObservationEnsemble &oe)
+Eigen::MatrixXd PhiHandler::get_obs_resid(ObservationEnsemble &oe, bool apply_ineq)
 {
 	vector<string> names = oe_base->get_var_names();
 	Eigen::MatrixXd resid = oe.get_eigen(vector<string>(),names) -
 		oe_base->get_eigen(oe.get_real_names(), vector<string>());
 	
-
-	apply_ineq_constraints(resid,names);
+	if (apply_ineq)
+		apply_ineq_constraints(resid,names);
 	return resid;
 }
 
 
-Eigen::MatrixXd PhiHandler::get_obs_resid_subset(ObservationEnsemble &oe)
+Eigen::MatrixXd PhiHandler::get_obs_resid_subset(ObservationEnsemble &oe, bool apply_ineq)
 {
 	vector<string> names = oe.get_var_names();
 	Eigen::MatrixXd resid = oe.get_eigen() - oe_base->get_eigen(oe.get_real_names(), names);
-	apply_ineq_constraints(resid, names);
+	if (apply_ineq)
+		apply_ineq_constraints(resid, names);
 	return resid;
 }
 
@@ -259,6 +256,28 @@ void PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, bool i
 	}
  	composite.clear();
 	composite = calc_composite(meas, regul);
+}
+
+void PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
+{
+	Eigen::MatrixXd rmat = get_obs_resid(oe, false); //dont apply ineq constraints
+	//ObservationEnsemble(Pest *_pest_scenario_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
+	rmat = rmat.transpose() * rmat;
+	vector<string> names = oe_base->get_var_names();
+	Covariance rcov(names, rmat.sparseView());
+	stringstream ss;
+	ss << file_manager->get_base_filename() << "." << iter << ".res.";
+	if (pest_scenario->get_pestpp_options().get_ies_save_binary())
+	{
+		ss << "jcb";
+		rcov.to_binary_new(ss.str());
+	}
+	else
+	{
+		ss << "cov";
+		rcov.to_ascii(ss.str());
+	}
+
 }
 
 map<string, double>* PhiHandler::get_phi_map(PhiHandler::phiType &pt)
@@ -1752,14 +1771,56 @@ void IterEnsembleSmoother::initialize_obscov()
 	message(1, "initializing observation noise covariance matrix");
 	string obscov_filename = pest_scenario.get_pestpp_options().get_obscov_filename();
 
-	string how = obscov.try_from(pest_scenario, file_manager, false);
+	string how = obscov.try_from(pest_scenario, file_manager, false, true);
 	message(1, "obscov loaded ", how);
-	obscov = obscov.get(act_obs_names);
+	if (obscov_filename.size() > 0)
+	{
+		vector<string> cov_names = obscov.get_col_names();
+		vector<string> nz_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+		if (cov_names.size() < nz_obs_names.size())
+		{
+			//this means we need to drop some nz obs
+			set<string> scov(cov_names.begin(), cov_names.end());
+			set<string>::iterator end = scov.end();
+			vector<string> drop;
+			for (auto name : nz_obs_names)
+				if (scov.find(name) == end)
+					drop.push_back(name);
+			ofstream& frec = file_manager.rec_ofstream();
+			frec << "Note: zero-weighting the following " << drop.size() << " observations that are not in the obscov:" << endl;
+			int i = 0;
+			for (auto n : drop)
+			{
+				frec << ',' << n;
+				i++;
+				if (i > 10)
+				{
+					frec << endl;
+					i = 0;
+				}
+			}
+			frec << endl;
+			zero_weight_obs(drop, false, true);
+			message(1, "resetting weights based on obscov diagonal");
+			Eigen::VectorXd diag = obscov.e_ptr()->diagonal();
+			ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+			for (int i = 0; i < diag.size(); i++)
+			{
+				oi->set_weight(cov_names[i], min(1.0/sqrt(diag[i]),oi->get_weight(cov_names[i])));
+			}	
+		}
+	}
+	else
+	{
+		obscov = obscov.get(act_obs_names);
+	}
+	
 }
 
 
 void IterEnsembleSmoother::initialize()
 {
+	
 	message(0, "initializing");
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 
@@ -2245,7 +2306,6 @@ void IterEnsembleSmoother::initialize()
 	//reorder this for later
 	pe_base.reorder(vector<string>(), act_par_names);
 
-	
 
 	//the hard way to restart
 	if (obs_restart_csv.size() > 0)
@@ -2324,66 +2384,50 @@ void IterEnsembleSmoother::initialize()
 	{
 		ss.str("");
 		ss << "WARNING: " << in_conflict.size() << " non-zero weighted observations are in conflict";
-		ss << " with the prior simulated ensemble." << endl;	
+		ss << " with the prior simulated ensemble." << endl;
 		message(0, ss.str());
-	}
-	
-	cout << "...see rec file for listing of conflicted observations" << endl << endl;
-	ofstream& frec = file_manager.rec_ofstream();
-	frec << endl << "...conflicted observations: " << endl;
-	for (auto oname : in_conflict)
-	{
-		frec << oname << endl;
-	}
-	if (!ppo->get_ies_drop_conflicts())
-	{
-		ss.str("");
-		ss << "  Continuing with data assimilation will likely result ";
-		ss << " in parameter bias and, ultimately, forecast bias";
-		message(1, ss.str());
-	}
-	else
-	{
 
-		//check that all obs are in conflict
-		message(1, "dropping conflicted observations");
-		if (in_conflict.size() == oe.shape().second)
+		cout << "...see rec file for listing of conflicted observations" << endl << endl;
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << endl << "...conflicted observations: " << endl;
+		for (auto oname : in_conflict)
 		{
-			throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
+			frec << oname << endl;
 		}
-		//drop from act_obs_names
-		vector<string> t;
-		set<string> sconflict(in_conflict.begin(), in_conflict.end());
-		for (auto oname : act_obs_names)
-			if (sconflict.find(oname) == sconflict.end())
-				t.push_back(oname);
-		act_obs_names = t;
-
-		//update obscov
-		obscov.drop(in_conflict);
-
-		//drop from oe_base
-		oe_base.drop_cols(in_conflict);
-		//shouldnt need to update localizer since we dropping not adding
-		//updating weights in control file
-
-		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
-		int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
-		for (auto n : in_conflict)
+		if (!ppo->get_ies_drop_conflicts())
 		{
-			oi->set_weight(n, 0.0);
+			ss.str("");
+			ss << "  WARNING: Prior-data conflict detected.  Continuing with IES parameter adjustment will likely result " << endl;
+			ss << "           in parameter and forecast bias.  Consider using 'ies_drop_conflicts' as a quick fix.";
+			message(1, ss.str());
 		}
+		else
+		{
 
-		stringstream ss;
-		ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
-		ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
-		message(1, ss.str());
+			//check that all obs are in conflict
+			message(1, "dropping conflicted observations");
+			if (in_conflict.size() == oe.shape().second)
+			{
+				throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
+			}
+			zero_weight_obs(in_conflict);
+
+		}
+		string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
+		ofstream f_obs(filename);
+		if (f_obs.bad())
+			throw_ies_error("error opening: " + filename);
+		output_file_writer.scenario_obs_csv(f_obs);
+		f_obs.close();
+		message(1, "updated observation data information written to file ", filename);
 	}
 	performance_log->log_event("calc initial phi");
 	ph.update(oe, pe);
 	message(0, "initial phi summary");
 	ph.report();
 	ph.write(0, run_mgr_ptr->get_total_runs());
+	if (ppo->get_ies_save_rescov())
+		ph.save_residual_cov(oe, 0);
 	best_mean_phis.push_back(ph.get_mean(PhiHandler::phiType::COMPOSITE));
 	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
 	{
@@ -2404,6 +2448,40 @@ void IterEnsembleSmoother::initialize()
 	message(0, "initialization complete");
 }
 
+void IterEnsembleSmoother::zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov, bool update_oe_base)
+{
+	//drop from act_obs_names
+	vector<string> t;
+	set<string> sdrop(obs_to_zero_weight.begin(), obs_to_zero_weight.end());
+	for (auto oname : act_obs_names)
+		if (sdrop.find(oname) == sdrop.end())
+			t.push_back(oname);
+	act_obs_names = t;
+
+	//update obscov
+	if (update_obscov)
+		obscov.drop(obs_to_zero_weight);
+
+	//drop from oe_base
+	if (update_oe_base)
+		oe_base.drop_cols(obs_to_zero_weight);
+	
+	//shouldnt need to update localizer since we dropping not adding
+	//updating weights in control file
+
+	ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+	int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
+	for (auto n : obs_to_zero_weight)
+	{
+		oi->set_weight(n, 0.0);
+	}
+
+	stringstream ss;
+	ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
+	ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
+	message(1, ss.str());
+}
+
 vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
 {
 	message(1, "checking for prior-data conflict...");
@@ -2413,7 +2491,12 @@ vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
 	map<string, int> smap, omap;
 	vector<string> snames = oe.get_var_names();
 	vector<string> onames = oe_base.get_var_names();
-
+	vector<string> temp = ph.get_lt_obs_names();
+	set<string> ineq(temp.begin(), temp.end());
+	set<string>::iterator end = ineq.end();
+	temp = ph.get_gt_obs_names();
+	ineq.insert(temp.begin(), temp.end());
+	temp.resize(0);
 	for (int i = 0; i < snames.size(); i++)
 	{
 		smap[snames[i]] = i;
@@ -2425,6 +2508,8 @@ vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
 	int sidx, oidx;
 	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
 	{
+		if (ineq.find(oname) != end)
+			continue;
 		sidx = smap[oname];
 		oidx = omap[oname];
 		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
@@ -2720,6 +2805,8 @@ void IterEnsembleSmoother::iterate_2_solution()
 			last_best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
 			ph.report();
 			ph.write(iter, run_mgr_ptr->get_total_runs());
+			if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
+				ph.save_residual_cov(oe,iter);
 			pcs.summarize(pe);
 			if (accept)
 				consec_bad_lambda_cycles = 0;
@@ -3549,7 +3636,7 @@ bool IterEnsembleSmoother::solve_new()
 		double cur_lam = last_best_lam * lam_mult;
 		ss << "starting calcs for lambda" << cur_lam;
 		message(1, "starting lambda calcs for lambda", cur_lam);
-		message(2, "see .pfm file for more details");
+		message(2, "see .log file for more details");
 		ParameterEnsemble pe_upgrade;
 		
 		pe_upgrade = calc_localized_upgrade_threaded(cur_lam, loc_map);

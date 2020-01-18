@@ -211,7 +211,7 @@ int main(int argc, char* argv[])
 	//OutputFileWriter(FileManager &_file_manager, Pest &_pest_scenario, bool restart_flag = false, bool _save_rei = true, int _eigenwrite = 0);
 	
 	OutputFileWriter ofw(file_manager,pest_scenario,false,false,0);
-	ofw.scenario_report(fout_rec);
+	ofw.scenario_report(fout_rec, false);
 
 	if (pest_scenario.get_pestpp_options().get_debug_parse_only())
 	{

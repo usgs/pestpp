@@ -191,7 +191,7 @@ int main(int argc, char* argv[])
 		file_manager.open_default_files();
 		
 		ofstream &fout_rec = file_manager.rec_ofstream();
-		PerformanceLog performance_log(file_manager.open_ofile_ext("pfm"));
+		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
 
 		
 		fout_rec << "             pestpp-opt version " << endl << endl;
@@ -244,12 +244,12 @@ int main(int argc, char* argv[])
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;	=
 		OutputFileWriter output_file_writer(file_manager, pest_scenario,false);
 		
-		//output_file_writer.scenario_report(fout_rec);
-		output_file_writer.scenario_io_report(fout_rec);
+		output_file_writer.scenario_report(fout_rec, false);
+		/*output_file_writer.scenario_io_report(fout_rec);
 		output_file_writer.scenario_pargroup_report(fout_rec);
 		output_file_writer.scenario_par_report(fout_rec);
 		output_file_writer.scenario_obs_report(fout_rec);
-		output_file_writer.scenario_pi_report(fout_rec);
+		output_file_writer.scenario_pi_report(fout_rec);*/
 		
 		/*if (pest_scenario.get_pestpp_options().get_iter_summary_flag())
 		{

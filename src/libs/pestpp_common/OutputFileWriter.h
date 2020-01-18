@@ -63,12 +63,14 @@ public:
 	void scenario_obs_report(std::ostream &os);
 	void scenario_pi_report(std::ostream &os);
 
+	void scenario_obs_csv(ostream& os);
+
 	void phi_report(std::ostream &os,int const iter, int const nruns, PhiData const &phi_comps,
 		double const dynamic_reg_weight,bool final=false, string tag="Starting");
 	void par_report(std::ostream &os, Parameters const &new_ctl_pars);
 	void par_report(std::ostream &os, int const iter, Parameters const &new_pars, Parameters const &old_pars, string par_type);
 	void iteration_report(std::ostream &os, int iter, int nruns, string iteration_type, string svd_type=string(""));
-	void scenario_report(std::ostream &os);
+	void scenario_report(std::ostream &os, bool report_mode=true);
 	void obs_report(std::ostream &os, const Observations &obs, const Observations &sim, ObservationInfo &oi);
 
 	void param_change_stats(double p_old, double p_new, bool &have_fac, double &fac_change, bool &have_rel, double &rel_change);

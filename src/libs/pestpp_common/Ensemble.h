@@ -86,6 +86,7 @@ public:
 	void draw(int num_reals, Covariance cov, Transformable &tran, const vector<string> &draw_names, const map<string,vector<string>> &grouper, PerformanceLog *plog, int level);
 	void update_var_map();
 	~Ensemble();
+
 protected:
 	Pest* pest_scenario_ptr;
 	//FileManager &file_manager;

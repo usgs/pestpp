@@ -236,7 +236,7 @@ int main(int argc, char* argv[])
 		}
 
 		ofstream &fout_rec = file_manager.rec_ofstream();
-		PerformanceLog performance_log(file_manager.open_ofile_ext("pfm"));
+		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
 
 		if (!restart_flag || save_restart_rec_header)
 		{
@@ -798,7 +798,7 @@ int main(int argc, char* argv[])
 			fout_rec << "      a PEST-compatible uncertainty file (.unc)." << endl << endl;
 
 
-			ofstream &pfm = file_manager.get_ofstream("pfm");
+			ofstream &pfm = file_manager.get_ofstream("log");
 			pfm << endl << endl << "-----------------------------------" << endl;
 			pfm << "starting linear uncertainty analyses" << endl;
 			pfm << "-----------------------------------" << endl << endl;
