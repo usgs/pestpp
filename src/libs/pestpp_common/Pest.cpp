@@ -966,10 +966,10 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	PestppOptions::ARG_STATUS stat;
 	vector<string> par_group_formal_names{ "PARGPNME","INCTYP","DERINC","DERINCLB","FORCEN","DERINCMUL","DERMTHD" };
 	vector<string> optional_par_group_formal_names{ "SPLITTHRESH","SPLITRELDIFF" };
-	vector<string> par_formal_names{ "PARNME","PARTRANS","PARCHGLIM","PARVAL1","PARLBND","PARUBND","PARGP","SCALE","OFFSET","DERCOM" };
-	vector<string> par_easy_names{ "NAME","TRANSFORM","CHANGE_LIMIT","VALUE","LOWER_BOUND","UPPER_BOUND","GROUP","SCALE","OFFSET","DERCOM" };
+	vector<string> par_formal_names{ "PARNME","PARTRANS","PARCHGLIM","PARVAL1","PARLBND","PARUBND","PARGP","SCALE","OFFSET","DERCOM", "CYCLE" };
+	vector<string> par_easy_names{ "NAME","TRANSFORM","CHANGE_LIMIT","VALUE","LOWER_BOUND","UPPER_BOUND","GROUP","SCALE","OFFSET","DERCOM", "CYCLE" };
 	map <string,string> row_map, temp_tied_map;
-	vector<string> obs_formal_names{ "OBSNME","OBSVAL","WEIGHT","OBGNME" };
+	vector<string> obs_formal_names{ "OBSNME","OBSVAL","WEIGHT","OBGNME", "CYCLE" };
 	vector<string> obs_easy_names{ "NAME","VALUE","WEIGHT","GROUP" };
 	vector<string> obs_group_formal_names{ "OBGNME" };
 	vector<string> pi_formal_names{ "PILBL","EQUATION","WEIGHT","OBGNME" };
@@ -2179,6 +2179,7 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 	convert_ip(tokens[6], pi.group);
 	convert_ip(tokens[7], scale);
 	convert_ip(tokens[8], offset);
+	convert_ip(tokens[10], pi.cycle);
 	if (control_info.numcom > 1)
 		convert_ip(tokens[9], pi.dercom);
 	else

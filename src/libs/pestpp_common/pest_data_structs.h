@@ -99,9 +99,10 @@ public:
 	double offset;
 	string group;
 	int dercom;
+	int cycle;
 	TRAN_TYPE tranform_type;
 	ParameterRec() : chglim(""), lbnd(0.0), ubnd(0.0), init_value(0.0), group(""),
-		dercom(1), tranform_type(TRAN_TYPE::NONE), scale(1.0), offset(0.0){}
+		dercom(1), tranform_type(TRAN_TYPE::NONE), scale(1.0), offset(0.0), cycle(0){}
 	bool is_active() const { return !(tranform_type == TRAN_TYPE::FIXED || tranform_type == TRAN_TYPE::TIED); }
 };
 ostream& operator<< (ostream &os, const ParameterRec& val);

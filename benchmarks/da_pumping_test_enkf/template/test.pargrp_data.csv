@@ -2,3 +2,4 @@ pargpnme,inctyp,derinc,derinclb,forcen,derincmul,dermthd,splitthresh,splitreldif
 kh,relative,0.01,0,switch,2,parabolic,1.00E-05,0.5,smaller,
 dis_pkg,relative,0.01,0,switch,2,parabolic,1.00E-05,0.5,smaller,
 hob_pkg,relative,0.01,0,switch,2,parabolic,1.00E-05,0.5,smaller,
+heads,relative,0.01,0,switch,3,parabolic,1.00E-05,0.5,smaller,

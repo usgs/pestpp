@@ -927,7 +927,7 @@ bool DataAssimilator::initialize_pe(Covariance& cov)
 			if (pest_scenario.get_pestpp_options().get_ies_obs_restart_csv().size() > 0)
 				message(1, "Warning: even though ies_enforce_bounds is true, a restart obs en was passed, so bounds will not be enforced on the initial par en");
 			else
-				pe.enforce_limits(pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+				pe.enforce_limits(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
 		}
 
 	}
@@ -3561,7 +3561,7 @@ bool DataAssimilator::solve_new()
 			pe_lam_scale.set_eigen(*pe_lam_scale.get_eigen_ptr() + (*pe_upgrade.get_eigen_ptr() * sf));
 			if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
 			{
-				pe_lam_scale.enforce_limits(pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+				pe_lam_scale.enforce_limits(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
 			}
 
 			pe_lams.push_back(pe_lam_scale);
