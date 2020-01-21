@@ -815,149 +815,152 @@ int main(int argc, char* argv[])
 			Mat j(base_jacobian_ptr->get_sim_obs_names(), base_jacobian_ptr->get_base_numeric_par_names(),
 				base_jacobian_ptr->get_matrix_ptr());
 
+			linear_analysis la(j, pest_scenario, file_manager, &unc_log);
+			la.glm_iter_fosm(optimum_run, output_file_writer, pest_scenario.get_control_info().noptmax, run_manager_ptr,performance_log);
+
 			//get a new obs info instance that accounts for residual phi (and expected objection value if passed)
 			// and report new weights to the rec file
-			fout_rec << endl;
-			ObservationInfo reweight;
-			Observations sim = optimum_run.get_obs();
-			reweight = normalize_weights_by_residual(pest_scenario, sim);
-			fout_rec << "Note: The observation covariance matrix has been constructed from " << endl;
-			fout_rec << "      weights listed in the pest control file that have been scaled by " << endl;
-			fout_rec << "      by the final residuals to account for " << endl;
-			fout_rec << "      the level of measurement noise implied by the original weights so" << endl;
-			fout_rec << "      the total objective function is equal to the number of  " << endl;
-			fout_rec << "      non-zero weighted observations." << endl;
+			//fout_rec << endl;
+			//ObservationInfo reweight;
+			//Observations sim = optimum_run.get_obs();
+			//reweight = normalize_weights_by_residual(pest_scenario, sim);
+			//fout_rec << "Note: The observation covariance matrix has been constructed from " << endl;
+			//fout_rec << "      weights listed in the pest control file that have been scaled by " << endl;
+			//fout_rec << "      by the final residuals to account for " << endl;
+			//fout_rec << "      the level of measurement noise implied by the original weights so" << endl;
+			//fout_rec << "      the total objective function is equal to the number of  " << endl;
+			//fout_rec << "      non-zero weighted observations." << endl;
 
 
-			fout_rec << endl;
-			/*fout_rec << "Scaled observation weights used to form observation noise covariance matrix written to residual file " <<  endl;
-			fout_rec << endl << setw(20) << "observation" << setw(20) << "group" << setw(20) << "scaled_weight" << endl;
-			for (auto &oi : reweight.observations)
-			if (oi.second.weight > 0.0)
-				fout_rec << setw(20) << oi.first << setw(20) << oi.second.group << setw(20) << oi.second.weight << endl;
-			fout_rec << endl << endl;*/
-			string reres_filename = file_manager.get_base_filename() + ".fosm_reweight.rei";
-			ofstream &reres_of = file_manager.open_ofile_absolute("fosm_reweight.rei",reres_filename);
-			
-			Observations obs = pest_scenario.get_ctl_observations();
-			output_file_writer.obs_report(reres_of, obs, sim, reweight);
-			fout_rec << "Scaled observation weights used to form observation noise covariance matrix written to residual file '" << reres_filename << "'" << endl << endl;
-			
-			//instance of linear analysis
-			linear_analysis la(j, pest_scenario, file_manager, &unc_log);
+			//fout_rec << endl;
+			///*fout_rec << "Scaled observation weights used to form observation noise covariance matrix written to residual file " <<  endl;
+			//fout_rec << endl << setw(20) << "observation" << setw(20) << "group" << setw(20) << "scaled_weight" << endl;
+			//for (auto &oi : reweight.observations)
+			//if (oi.second.weight > 0.0)
+			//	fout_rec << setw(20) << oi.first << setw(20) << oi.second.group << setw(20) << oi.second.weight << endl;
+			//fout_rec << endl << endl;*/
+			//string reres_filename = file_manager.get_base_filename() + ".fosm_reweight.rei";
+			//ofstream &reres_of = file_manager.open_ofile_absolute("fosm_reweight.rei",reres_filename);
+			//
+			//Observations obs = pest_scenario.get_ctl_observations();
+			//output_file_writer.obs_report(reres_of, obs, sim, reweight);
+			//fout_rec << "Scaled observation weights used to form observation noise covariance matrix written to residual file '" << reres_filename << "'" << endl << endl;
+			//
+			////instance of linear analysis
+			//linear_analysis la(j, pest_scenario, file_manager, &unc_log);
 
-			//if needed, set the predictive sensitivity vectors
-			vector<string> pred_names = pest_scenario.get_pestpp_options().get_prediction_names();
-			
-			//if no preds, check for zero-weighted obs to use
-			if (pred_names.size() == 0)
-			{
-				
-				for (auto& oname : pest_scenario.get_ctl_ordered_obs_names())
-				{
-					if (pest_scenario.get_ctl_observation_info().get_weight(oname) == 0.0)
-					{
-						pred_names.push_back(oname);
-					}
-				}
-				if (pred_names.size() > 0)
-				{
-					cout << "Note: since no forecast/predictions were passed, using " << pred_names.size() << " zero-weighted obs as forecasts" << endl;
-					fout_rec << "Note: since no forecast/predictions were passed, using " << pred_names.size() << " zero-weighted obs as forecasts" << endl;
+			////if needed, set the predictive sensitivity vectors
+			//vector<string> pred_names = pest_scenario.get_pestpp_options().get_prediction_names();
+			//
+			////if no preds, check for zero-weighted obs to use
+			//if (pred_names.size() == 0)
+			//{
+			//	
+			//	for (auto& oname : pest_scenario.get_ctl_ordered_obs_names())
+			//	{
+			//		if (pest_scenario.get_ctl_observation_info().get_weight(oname) == 0.0)
+			//		{
+			//			pred_names.push_back(oname);
+			//		}
+			//	}
+			//	if (pred_names.size() > 0)
+			//	{
+			//		cout << "Note: since no forecast/predictions were passed, using " << pred_names.size() << " zero-weighted obs as forecasts" << endl;
+			//		fout_rec << "Note: since no forecast/predictions were passed, using " << pred_names.size() << " zero-weighted obs as forecasts" << endl;
 
-				}
-			}
-			
-			//make sure prediction weights are zero
-			else
-			{
-				for (auto& pname : pred_names)
-				{
-					if (pest_scenario.get_ctl_observation_info().get_weight(pname) != 0.0)
-					{
-						cout << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
-						fout_rec << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
-					}
-				}
-			}
-			if (pred_names.size() > 0)
-				la.set_predictions(pred_names);
+			//	}
+			//}
+			//
+			////make sure prediction weights are zero
+			//else
+			//{
+			//	for (auto& pname : pred_names)
+			//	{
+			//		if (pest_scenario.get_ctl_observation_info().get_weight(pname) != 0.0)
+			//		{
+			//			cout << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
+			//			fout_rec << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
+			//		}
+			//	}
+			//}
+			//if (pred_names.size() > 0)
+			//	la.set_predictions(pred_names);
 
-			//drop all 'regul' obs and equations
-			la.drop_prior_information(pest_scenario);
+			////drop all 'regul' obs and equations
+			//la.drop_prior_information(pest_scenario);
 
-			//write the posterior covariance matrix
-			string postcov_filename = file_manager.get_base_filename() + ".post.cov";
-			la.posterior_parameter_ptr()->to_ascii(postcov_filename);
-			fout_rec << "Note : posterior parameter covariance matrix written to file '" + postcov_filename +
-				"'" << endl << endl;
+			////write the posterior covariance matrix
+			//string postcov_filename = file_manager.get_base_filename() + ".post.cov";
+			//la.posterior_parameter_ptr()->to_ascii(postcov_filename);
+			//fout_rec << "Note : posterior parameter covariance matrix written to file '" + postcov_filename +
+			//	"'" << endl << endl;
 
-			//write a parameter prior and posterior summary to the rec file
-			const ParamTransformSeq trans = pest_scenario.get_base_par_tran_seq();
-			Parameters pars = pest_scenario.get_ctl_parameters();
-			string parsum_filename = file_manager.get_base_filename() + ".par.usum.csv";
-			la.write_par_credible_range(fout_rec, parsum_filename, pest_scenario.get_ctl_parameter_info(),
-				trans.active_ctl2numeric_cp(pest_scenario.get_ctl_parameters()),
-				trans.active_ctl2numeric_cp(optimum_run.get_ctl_pars()),
-				pest_scenario.get_ctl_ordered_par_names());
-			fout_rec << "Note : the above parameter uncertainty summary was written to file '" + parsum_filename +
-				"'" << endl << endl;
+			////write a parameter prior and posterior summary to the rec file
+			//const ParamTransformSeq trans = pest_scenario.get_base_par_tran_seq();
+			//Parameters pars = pest_scenario.get_ctl_parameters();
+			//string parsum_filename = file_manager.get_base_filename() + ".par.usum.csv";
+			//la.write_par_credible_range(fout_rec, parsum_filename, pest_scenario.get_ctl_parameter_info(),
+			//	trans.active_ctl2numeric_cp(pest_scenario.get_ctl_parameters()),
+			//	trans.active_ctl2numeric_cp(optimum_run.get_ctl_pars()),
+			//	pest_scenario.get_ctl_ordered_par_names());
+			//fout_rec << "Note : the above parameter uncertainty summary was written to file '" + parsum_filename +
+			//	"'" << endl << endl;
 
-			
-			//if predictions were defined, write a prior and posterior summary to the rec file
-			if (pred_names.size() > 0)
-			{
-				map<string, pair<double, double>> init_final_pred_values;
-				double ival, fval;
-				for (auto &pred_name : pred_names)
-				{
-					fval = optimum_run.get_obs().get_rec(pred_name);
-					if (run_manager_ptr->get_init_sim().size() > 0)
-					{
-						int idx = distance(run_manager_ptr->get_obs_name_vec().begin(), find(run_manager_ptr->get_obs_name_vec().begin(),
-							run_manager_ptr->get_obs_name_vec().end(), pred_name));
-						ival = run_manager_ptr->get_init_sim()[idx];
-					}
-					else
-					{
-						cout << "WARNING: initial simulation results not available, falling back to optimum run outputs for prior forecast mean" << endl;
-						fout_rec << "WARNING: initial simulation results not available, falling back to optimum run outputs for prior forecast mean" << endl;
-						ival = fval;
-					}
-					
-					init_final_pred_values[pred_name] = pair<double, double>(ival, fval);
-				}
-				string predsum_filename = file_manager.get_base_filename() + ".pred.usum.csv";
-				la.write_pred_credible_range(fout_rec, predsum_filename, init_final_pred_values);
-				fout_rec << "Note : the above prediction uncertainty summary was written to file '" + predsum_filename +
-					"'" << endl << endl;
-			}
-			set<string> args = pest_scenario.get_pestpp_options().get_passed_args();
+			//
+			////if predictions were defined, write a prior and posterior summary to the rec file
+			//if (pred_names.size() > 0)
+			//{
+			//	map<string, pair<double, double>> init_final_pred_values;
+			//	double ival, fval;
+			//	for (auto &pred_name : pred_names)
+			//	{
+			//		fval = optimum_run.get_obs().get_rec(pred_name);
+			//		if (run_manager_ptr->get_init_sim().size() > 0)
+			//		{
+			//			int idx = distance(run_manager_ptr->get_obs_name_vec().begin(), find(run_manager_ptr->get_obs_name_vec().begin(),
+			//				run_manager_ptr->get_obs_name_vec().end(), pred_name));
+			//			ival = run_manager_ptr->get_init_sim()[idx];
+			//		}
+			//		else
+			//		{
+			//			cout << "WARNING: initial simulation results not available, falling back to optimum run outputs for prior forecast mean" << endl;
+			//			fout_rec << "WARNING: initial simulation results not available, falling back to optimum run outputs for prior forecast mean" << endl;
+			//			ival = fval;
+			//		}
+			//		
+			//		init_final_pred_values[pred_name] = pair<double, double>(ival, fval);
+			//	}
+			//	string predsum_filename = file_manager.get_base_filename() + ".pred.usum.csv";
+			//	la.write_pred_credible_range(fout_rec, predsum_filename, init_final_pred_values);
+			//	fout_rec << "Note : the above prediction uncertainty summary was written to file '" + predsum_filename +
+			//		"'" << endl << endl;
+			//}
+			//set<string> args = pest_scenario.get_pestpp_options().get_passed_args();
 
-			if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
-			{
-				bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
-				int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
-				fout_rec << "drawing " << num_reals << " posterior parameter realizations";
-				ParameterEnsemble pe(&pest_scenario);
-				Covariance cov = la.posterior_parameter_matrix();
-				pe.draw(num_reals,optimum_run.get_ctl_pars(),cov, &performance_log,1);
-				if (binary)
-					pe.to_binary(file_manager.get_base_filename() + ".post.paren.jcb");
-				else
-					pe.to_csv(file_manager.get_base_filename() + ".post.paren.csv");
-				map<int,int> run_map = pe.add_runs(run_manager_ptr);
-				run_manager_ptr->run();
-				ObservationEnsemble oe(&pest_scenario);
-				Covariance obscov = la.get_obscov();
-				oe.draw(num_reals, obscov, &performance_log, 1);
-				oe.update_from_runs(run_map, run_manager_ptr);
-				if (binary)
-					oe.to_binary(file_manager.get_base_filename() + ".post.obsen.jcb");
-				else
-					oe.to_csv(file_manager.get_base_filename() + ".post.obsen.csv");
-			}
-			cout << "  ---  finished uncertainty analysis calculations  ---  " << endl << endl << endl;
+			//if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
+			//{
+			//	bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
+			//	int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
+			//	fout_rec << "drawing " << num_reals << " posterior parameter realizations";
+			//	ParameterEnsemble pe(&pest_scenario);
+			//	Covariance cov = la.posterior_parameter_matrix();
+			//	pe.draw(num_reals,optimum_run.get_ctl_pars(),cov, &performance_log,1);
+			//	if (binary)
+			//		pe.to_binary(file_manager.get_base_filename() + ".post.paren.jcb");
+			//	else
+			//		pe.to_csv(file_manager.get_base_filename() + ".post.paren.csv");
+			//	map<int,int> run_map = pe.add_runs(run_manager_ptr);
+			//	run_manager_ptr->run();
+			//	ObservationEnsemble oe(&pest_scenario);
+			//	Covariance obscov = la.get_obscov();
+			//	oe.draw(num_reals, obscov, &performance_log, 1);
+			//	oe.update_from_runs(run_map, run_manager_ptr);
+			//	if (binary)
+			//		oe.to_binary(file_manager.get_base_filename() + ".post.obsen.jcb");
+			//	else
+			//		oe.to_csv(file_manager.get_base_filename() + ".post.obsen.csv");
+			//}
+			//cout << "  ---  finished uncertainty analysis calculations  ---  " << endl << endl << endl;
 		}
 
 		// clean up
