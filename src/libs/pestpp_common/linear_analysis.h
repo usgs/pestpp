@@ -18,7 +18,7 @@ class linear_analysis
 {
 public:
 	//empty constructor
-	linear_analysis():pest_scenario(Pest()),file_manager(FileManager()),jacobian(Mat()){;}
+	//linear_analysis():pest_scenario(Pest()),file_manager(FileManager()),jacobian(Mat()){;}
 
 	//constructor for pest++ integration
 	linear_analysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, Logger* _log = new Logger());
