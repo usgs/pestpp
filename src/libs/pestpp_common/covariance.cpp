@@ -1566,7 +1566,7 @@ void Covariance::from_observation_weights(const string &pst_filename)
 }
 
 
-void Covariance::from_observation_weights(vector<string> obs_names, ObservationInfo obs_info, vector<string> pi_names, const PriorInformation* pi)
+void Covariance::from_observation_weights(const vector<string>& obs_names, const ObservationInfo& obs_info, const vector<string>& pi_names, const PriorInformation* pi)
 {
 	vector<Eigen::Triplet<double>> triplet_list;
 	const ObservationRec* obs_rec;

@@ -8,30 +8,27 @@
 #include "covariance.h"
 #include "logger.h"
 #include "ObjectiveFunc.h"
+#include "ModelRunPP.h"
+#include "OutputFileWriter.h"
+#include "PerformanceLog.h"
+#include "RunManagerAbstract.h"
 
 using namespace std;
 class linear_analysis
 {
 public:
 	//empty constructor
-	linear_analysis(){;}
-
-	//the easiest constructor, builds parcov and obscov from the pst associated with jco_filename
-	//linear_analysis(string &jco_filename,Logger* _log = new Logger());
-
-	//loads parcov and obscov from files, can .pst, .mat or .unc files
-	//linear_analysis(string &jco_filename, string &parcov_filename, string &obscov_filename, Logger* _log = new Logger());
-
-	//load parcov and obscov from parameter bounds and observation weights
-	//linear_analysis(Mat _jacobian, Pest pest_scenario, Logger* _log = new Logger());
+	linear_analysis():pest_scenario(Pest()),file_manager(FileManager()),jacobian(Mat()){;}
 
 	//constructor for pest++ integration
-	linear_analysis(Mat &_jacobian, Pest &pest_scenario, FileManager &file_manager, Logger* _log = new Logger());
+	linear_analysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, Logger* _log = new Logger());
 	//linear_analysis(Mat* _jacobian, Pest* pest_scenario, Mat* _obscov, Logger* _log = new Logger());
 
 
 	//directly from Mat objects
-	linear_analysis(Mat _jacobian, Mat _parcov, Mat _obscov, map<string, Mat> _predictions,Logger* _log = new Logger());
+	//linear_analysis(Mat& _jacobian,Pest& _pest_scenario, FileManager& _file_manager, Mat& _parcov, Mat& _obscov, map<string, Mat> _predictions,Logger* _log = new Logger());
+
+	void glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter, RunManagerAbstract* run_mgr_ptr, PerformanceLog& pfm);
 
 	void set_predictions(vector<string> preds);
 	void set_predictions(vector<Mat> preds);
@@ -98,18 +95,6 @@ public:
 	map<string, double> second_prediction(int sv);
 	map<string, double> third_prediction(int sv);
 
-	//other stuff
-	//<par_names,ident>
-	map<string, double> parameter_ident(int sv);
-
-	//<singular_value,vector<sup_obs>>
-	map<int, vector<double>> super_obs(vector<int> sing_vals);
-	map<int, vector<double>> super_obs(vector<int> sing_vals, vector<string> &sup_obs_names);
-
-	//<singular_value,vector<sup_par>>
-	map<int, vector<double>> super_par(vector<int> sing_vals);
-	map<int, vector<double>> super_par(vector<int> sing_vals, vector<string> &sup_par_names);
-
 	Mat get_jacobian(){ return jacobian; }
 	Mat get_omitted_jacobian(){ return omitted_jacobian; }
 	Covariance get_parcov(){ return parcov; }
@@ -126,8 +111,6 @@ public:
 	Covariance* get_omitted_parcov_ptr(){ return &omitted_parcov; }
 
 	Mat* get_normal_ptr();
-	Mat* get_S_ptr(int sv);
-	Mat* get_V_ptr(int sv);
 
 	Mat* get_R_ptr(int sv);
 	Mat* get_G_ptr(int sv);
@@ -153,7 +136,9 @@ public:
 private:
 
 	Logger* log;
-	Mat jacobian;
+	FileManager& file_manager;
+	Pest& pest_scenario;
+	Mat& jacobian;
 	Mat S, V;
 	Mat normal;
 	Mat R, G, ImR, V1;

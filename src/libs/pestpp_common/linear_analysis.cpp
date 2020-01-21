@@ -7,7 +7,11 @@
 #include "covariance.h"
 #include "linear_analysis.h"
 #include <iomanip>
-
+#include "OutputFileWriter.h"
+#include "ModelRunPP.h"
+#include "Ensemble.h"
+#include <iterator>
+#include "PerformanceLog.h"
 
 vector<string> get_common(vector<string> v1, vector<string> v2)
 {
@@ -153,7 +157,7 @@ ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, PhiData obj_c
 
 ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, Observations &sim)
 {
-	ObservationInfo obs_info = pest_scenario.get_ctl_observation_info();
+	ObservationInfo obs_info(pest_scenario.get_ctl_observation_info());
 	Observations obs = pest_scenario.get_ctl_observations();
 
 	const ObservationRec* obs_rec;
@@ -178,7 +182,172 @@ ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, Observations 
 }
 
 
+void linear_analysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter, RunManagerAbstract* run_mgr_ptr, PerformanceLog& pfm)
+{
 
+	
+	ofstream& fout_rec = file_manager.rec_ofstream();
+	//ofstream& pfm = file_manager.get_ofstream("log");
+	stringstream ss;
+	ss << "starting linear uncertainty analyses for iteration " << iter;
+	pfm.log_event(ss.str());
+
+	/*if (base_jacobian_ptr->get_base_numeric_par_names().size() == 0)
+	{
+		cout << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
+		fout_rec << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
+		return 0;
+	}*/
+	if (jacobian.get_col_names().size() == 0)
+	{
+		throw runtime_error("LinearAnalysis::glml_iter_fosm() error: no parameters in jacobian");
+	}
+
+	//instance of a Mat for the jco
+	/*Mat j(base_jacobian_ptr->get_sim_obs_names(), base_jacobian_ptr->get_base_numeric_par_names(),
+		base_jacobian_ptr->get_matrix_ptr());*/
+
+	//get a new obs info instance that accounts for residual phi (and expected objection value if passed)
+	// and report new weights to the rec file
+	fout_rec << endl;
+	ObservationInfo reweight;
+	Observations sim = optimum_run.get_obs();
+	reweight = normalize_weights_by_residual(pest_scenario, sim);
+	fout_rec << "Note: The observation covariance matrix has been constructed from " << endl;
+	fout_rec << "      weights listed in the pest control file that have been scaled by " << endl;
+	fout_rec << "      by the final residuals to account for " << endl;
+	fout_rec << "      the level of measurement noise implied by the original weights so" << endl;
+	fout_rec << "      the total objective function is equal to the number of  " << endl;
+	fout_rec << "      non-zero weighted observations." << endl;
+
+
+	fout_rec << endl;
+	string reres_filename = file_manager.get_base_filename() + ".fosm_reweight.rei";
+	ofstream& reres_of = file_manager.open_ofile_absolute("fosm_reweight.rei", reres_filename);
+
+	Observations obs = pest_scenario.get_ctl_observations();
+	output_file_writer.obs_report(reres_of, obs, sim, reweight);
+	fout_rec << "Scaled observation weights used to form observation noise covariance matrix written to residual file '" << reres_filename << "'" << endl << endl;
+
+	//reset the obscov using the scaled residuals - pass empty prior info names so none are included
+	obscov.from_observation_weights(obscov.get_col_names(), reweight, vector<string>(), pest_scenario.get_prior_info_ptr());
+
+	//if needed, set the predictive sensitivity vectors
+	vector<string> pred_names = pest_scenario.get_pestpp_options().get_prediction_names();
+
+	//if no preds, check for zero-weighted obs to use
+	if (pred_names.size() == 0)
+	{
+
+		for (auto& oname : pest_scenario.get_ctl_ordered_obs_names())
+		{
+			if (pest_scenario.get_ctl_observation_info().get_weight(oname) == 0.0)
+			{
+				pred_names.push_back(oname);
+			}
+		}
+		if (pred_names.size() > 0)
+		{
+			cout << "Note: since no forecast/predictions were passed, using " << pred_names.size() << " zero-weighted obs as forecasts" << endl;
+			fout_rec << "Note: since no forecast/predictions were passed, using " << pred_names.size() << " zero-weighted obs as forecasts" << endl;
+
+		}
+	}
+
+	//make sure prediction weights are zero
+	else
+	{
+		for (auto& pname : pred_names)
+		{
+			if (pest_scenario.get_ctl_observation_info().get_weight(pname) != 0.0)
+			{
+				cout << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
+				fout_rec << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
+			}
+		}
+	}
+	if (pred_names.size() > 0)
+		set_predictions(pred_names);
+
+	//drop all 'regul' obs and equations
+	//no longer need to call this since the PI is not being added to the obscov during 
+	//reconstruction with scaled weights
+    //drop_prior_information(pest_scenario);
+
+	//write the posterior covariance matrix
+	string postcov_filename = file_manager.get_base_filename() + ".post.cov";
+	posterior_parameter_ptr()->to_ascii(postcov_filename);
+	fout_rec << "Note : posterior parameter covariance matrix written to file '" + postcov_filename +
+		"'" << endl << endl;
+
+	//write a parameter prior and posterior summary to the rec file
+	const ParamTransformSeq trans = pest_scenario.get_base_par_tran_seq();
+	Parameters pars = pest_scenario.get_ctl_parameters();
+	string parsum_filename = file_manager.get_base_filename() + ".par.usum.csv";
+	write_par_credible_range(fout_rec, parsum_filename, pest_scenario.get_ctl_parameter_info(),
+		trans.active_ctl2numeric_cp(pest_scenario.get_ctl_parameters()),
+		trans.active_ctl2numeric_cp(optimum_run.get_ctl_pars()),
+		pest_scenario.get_ctl_ordered_par_names());
+	fout_rec << "Note : the above parameter uncertainty summary was written to file '" + parsum_filename +
+		"'" << endl << endl;
+
+
+	//if predictions were defined, write a prior and posterior summary to the rec file
+	if (pred_names.size() > 0)
+	{
+		map<string, pair<double, double>> init_final_pred_values;
+		double ival, fval;
+		for (auto& pred_name : pred_names)
+		{
+			fval = optimum_run.get_obs().get_rec(pred_name);
+			if (run_mgr_ptr->get_init_sim().size() > 0)
+			{
+				int idx = std::distance(run_mgr_ptr->get_obs_name_vec().begin(), find(run_mgr_ptr->get_obs_name_vec().begin(),
+					run_mgr_ptr->get_obs_name_vec().end(), pred_name));
+				ival = run_mgr_ptr->get_init_sim()[idx];
+			}
+			else
+			{
+				cout << "WARNING: initial simulation results not available, falling back to optimum run outputs for prior forecast mean" << endl;
+				fout_rec << "WARNING: initial simulation results not available, falling back to optimum run outputs for prior forecast mean" << endl;
+				ival = fval;
+			}
+
+			init_final_pred_values[pred_name] = pair<double, double>(ival, fval);
+		}
+		string predsum_filename = file_manager.get_base_filename() + ".pred.usum.csv";
+		write_pred_credible_range(fout_rec, predsum_filename, init_final_pred_values);
+		fout_rec << "Note : the above prediction uncertainty summary was written to file '" + predsum_filename +
+			"'" << endl << endl;
+	}
+	set<string> args = pest_scenario.get_pestpp_options().get_passed_args();
+
+	if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
+	{
+		bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
+		int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
+		fout_rec << "drawing " << num_reals << " posterior parameter realizations";
+		ParameterEnsemble pe(&pest_scenario);
+		Covariance cov = posterior_parameter_matrix();
+		pe.draw(num_reals, optimum_run.get_ctl_pars(), cov, &pfm, 1);
+		if (binary)
+			pe.to_binary(file_manager.get_base_filename() + ".post.paren.jcb");
+		else
+			pe.to_csv(file_manager.get_base_filename() + ".post.paren.csv");
+		map<int, int> run_map = pe.add_runs(run_mgr_ptr);
+		run_mgr_ptr->run();
+		ObservationEnsemble oe(&pest_scenario);
+		Covariance obscov = get_obscov();
+		oe.draw(num_reals, obscov, &pfm, 1);
+		oe.update_from_runs(run_map, run_mgr_ptr);
+		if (binary)
+			oe.to_binary(file_manager.get_base_filename() + ".post.obsen.jcb");
+		else
+			oe.to_csv(file_manager.get_base_filename() + ".post.obsen.csv");
+	}
+	cout << "  ---  finished uncertainty analysis calculations  ---  " << endl << endl << endl;
+
+}
 
 
 void linear_analysis::throw_error(const string &message)
@@ -328,11 +497,12 @@ void linear_analysis::load_obscov(const string &obscov_filename)
 }
 
 
-linear_analysis::linear_analysis(Mat _jacobian, Mat _parcov, Mat _obscov, map<string, Mat> _predictions, Logger* _log)
-{
-	jacobian = _jacobian; parcov = _parcov; obscov = _obscov, predictions = _predictions;
-	log = _log;
-}
+//linear_analysis::linear_analysis(Mat& _jacobian, Pest& _pest_scenario, FileManager& _file_manager, Mat _parcov, Mat _obscov, map<string, Mat> _predictions, Logger* _log): 
+//	jacobian(_jacobian), file_manager(_file_manager),pest_scenario(_pest_scenario)
+//{
+//	jacobian = _jacobian; parcov = _parcov; obscov = _obscov, predictions = _predictions;
+//	log = _log;
+//}
 
 
 //linear_analysis::linear_analysis(string &jco_filename,Logger* _log)
@@ -432,13 +602,14 @@ linear_analysis::linear_analysis(Mat _jacobian, Mat _parcov, Mat _obscov, map<st
 //	R_sv = -999, G_sv = -999, ImR_sv = -999,V1_sv=-999;
 //}
 
-linear_analysis::linear_analysis(Mat &_jacobian, Pest &pest_scenario, FileManager &file_manager, Logger* _log)
+linear_analysis::linear_analysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, Logger* _log): pest_scenario(_pest_scenario),file_manager(_file_manager),
+			jacobian(_jacobian)
 {
 	bool parcov_success = false;
 	log = _log;
-	jacobian = _jacobian;
 	//if (jacobian.nrow() != pest_scenario.get_nonregul_obs().size())
 	//	jacobian = jacobian.get(pest_scenario.get_ctl_ordered_obs_names(), pest_scenario.get_ctl_ordered_adj_par_names());
+
 	const string parcov_filename = pest_scenario.get_pestpp_options().get_parcov_filename();
 	if (parcov_filename.size() > 0)
 	{
@@ -583,208 +754,208 @@ void linear_analysis::align()
 	log->log("align");
 }
 
-map<string, double> linear_analysis::worth(vector<string> &obs_names)
-{
-	if (predictions.size() == 0)
-		throw_error("linear_analysis::worth() error: no predictions are set");
-
-	log->log("worth");
-	try
-	{
-		align();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::worth() error in align() : " + string(e.what()));
-	}
-	for (int i = 0; i != obs_names.size(); i++)
-		pest_utils::upper_ip(obs_names[i]);
-
-	//check the inputs
-	vector<string> errors;
-	const vector<string>* jobs_names = jacobian.rn_ptr();
-	for (auto &oname : obs_names)
-	{
-		if (find(jobs_names->begin(), jobs_names->end(), oname) == jobs_names->end())
-			errors.push_back("obs not found in jacobian: "+oname);
-	}
-	if (errors.size() > 0)
-	{
-		stringstream ss;
-		for (auto &e : errors)
-			ss << e << ',';
-		throw_error("linear_analysis::worth() errors: " + ss.str());
-	}
-
-	//get a list of remaining obs
-	vector<string> keep_obs_names;
-	for (auto &oname : *jobs_names)
-	{
-		if (find(obs_names.begin(), obs_names.end(), oname) == obs_names.end())
-		{
-			keep_obs_names.push_back(oname);
-		}
-	}
-	if (keep_obs_names.size() == 0)
-		throw_error("linear_analysis::worth() error at least one observation must not be in the worth group");
-	//get a new linear analysis object with only the keep names
-	Covariance* parcov_ptr = &parcov;
-	map<string,Mat>* pred_ptr = &predictions;
-	linear_analysis keep;
-	try
-	{
-		keep = linear_analysis(jacobian.get(keep_obs_names, *jacobian.cn_ptr()), *parcov_ptr, obscov.get(keep_obs_names), *pred_ptr);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::worth() error getting 'keep' linear analysis object : "+string(e.what()));
-	}
-
-	//calculate posterior with all obs and with only keep obs
-	map<string, double> org_post, keep_post;
-	try
-	{
-		org_post = posterior_prediction_variance();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::worth() error calculating posterior variance for original problem : "+string(e.what()));
-	}
-	try
-	{
-		keep_post = keep.posterior_prediction_variance();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::worth() error calculating posterior variance for 'keep' problem : "+string(e.what()));
-	}
-
-	map<string, double> results;
-	for (auto &pred : predictions)
-		results[pred.first] = keep_post[pred.first] - org_post[pred.first];
-	log->log("worth");
-	return results;
-}
-
-
-map<string, pair<double, double>> linear_analysis::contribution(vector<string> &cond_par_names)
-{
-	if (predictions.size() == 0)
-		throw_error("linear_analysis::contribution() error: no predictions are set");
-	log->log("contribution");
-	try
-	{
-		align();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::contribution() error in align(): " + string(e.what()));
-	}
-
-	for (int i = 0; i != cond_par_names.size(); i++)
-		pest_utils::upper_ip(cond_par_names[i]);
-	//check the inputs
-	vector<string> errors;
-	const vector<string>* jpar_names = jacobian.cn_ptr();
-	for (auto par_name : cond_par_names)
-	{
-		if (find(jpar_names->begin(), jpar_names->end(), par_name) == jpar_names->end())
-			errors.push_back("par not found in jacobian: " + par_name);
-	}
-	if (errors.size() > 0)
-	{
-		stringstream ss;
-		for (auto e : errors)
-			ss << e << ',';
-		throw_error("linear_analysis::contribution() errors: " + ss.str());
-	}
-
-	//the parameters that will remain uncertain
-	vector<string> keep_par_names;
-	for (auto pname : *parcov.rn_ptr())
-	{
-		if (find(cond_par_names.begin(), cond_par_names.end(), pname) == cond_par_names.end())
-			keep_par_names.push_back(pname);
-	}
-	if (keep_par_names.size() == 0)
-		throw_error("linear_analysis::contribution() error atleast one parameter must not be in the contribution group");
+//map<string, double> linear_analysis::worth(vector<string> &obs_names)
+//{
+//	if (predictions.size() == 0)
+//		throw_error("linear_analysis::worth() error: no predictions are set");
+//
+//	log->log("worth");
+//	try
+//	{
+//		align();
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::worth() error in align() : " + string(e.what()));
+//	}
+//	for (int i = 0; i != obs_names.size(); i++)
+//		pest_utils::upper_ip(obs_names[i]);
+//
+//	//check the inputs
+//	vector<string> errors;
+//	const vector<string>* jobs_names = jacobian.rn_ptr();
+//	for (auto &oname : obs_names)
+//	{
+//		if (find(jobs_names->begin(), jobs_names->end(), oname) == jobs_names->end())
+//			errors.push_back("obs not found in jacobian: "+oname);
+//	}
+//	if (errors.size() > 0)
+//	{
+//		stringstream ss;
+//		for (auto &e : errors)
+//			ss << e << ',';
+//		throw_error("linear_analysis::worth() errors: " + ss.str());
+//	}
+//
+//	//get a list of remaining obs
+//	vector<string> keep_obs_names;
+//	for (auto &oname : *jobs_names)
+//	{
+//		if (find(obs_names.begin(), obs_names.end(), oname) == obs_names.end())
+//		{
+//			keep_obs_names.push_back(oname);
+//		}
+//	}
+//	if (keep_obs_names.size() == 0)
+//		throw_error("linear_analysis::worth() error at least one observation must not be in the worth group");
+//	//get a new linear analysis object with only the keep names
+//	Covariance* parcov_ptr = &parcov;
+//	map<string,Mat>* pred_ptr = &predictions;
+//	linear_analysis keep;
+//	try
+//	{
+//		keep = linear_analysis(jacobian.get(keep_obs_names, *jacobian.cn_ptr()), *parcov_ptr, obscov.get(keep_obs_names), *pred_ptr);
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::worth() error getting 'keep' linear analysis object : "+string(e.what()));
+//	}
+//
+//	//calculate posterior with all obs and with only keep obs
+//	map<string, double> org_post, keep_post;
+//	try
+//	{
+//		org_post = posterior_prediction_variance();
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::worth() error calculating posterior variance for original problem : "+string(e.what()));
+//	}
+//	try
+//	{
+//		keep_post = keep.posterior_prediction_variance();
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::worth() error calculating posterior variance for 'keep' problem : "+string(e.what()));
+//	}
+//
+//	map<string, double> results;
+//	for (auto &pred : predictions)
+//		results[pred.first] = keep_post[pred.first] - org_post[pred.first];
+//	log->log("worth");
+//	return results;
+//}
 
 
-	map<string,Mat> cond_preds;
-	for (auto &pred : predictions)
-	{
-		try
-		{
-			cond_preds[pred.first] = pred.second.get(keep_par_names, *pred.second.cn_ptr());
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::contribution() error getting conditional prediction: " + pred.first + " : " + string(e.what()));
-		}
-	}
-
-	//get a new linear analysis object - we can use the same obscov b/c it doesn't change
-	Covariance* obscov_ptr = &obscov;
-
-	linear_analysis cond_la;
-	try
-	{
-		cond_la = linear_analysis(jacobian.get(*jacobian.rn_ptr(), keep_par_names), condition_on(keep_par_names, cond_par_names), *obscov_ptr, cond_preds);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::contribution() error getting 'conditional' linear analysis object : " + string(e.what()));
-	}
-
-	//calculate the prior and posterior with all parameters
-	map<string, double> org_prior, org_post;
-	try
-	{
-		org_prior = prior_prediction_variance();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::contribution() error calculating org prior variance :" + string(e.what()));
-	}
-	try
-	{
-		org_post = posterior_prediction_variance();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::contribution() error calculating org posterior variance :" + string(e.what()));
-	}
-
-
-	//calculate the prior and posterior with some conditioned parameters
-	map<string, double> cond_prior, cond_post;
-	try
-	{
-		cond_prior = cond_la.prior_prediction_variance();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::contribution() error calculating cond prior variance :" + string(e.what()));
-	}
-	try
-	{
-		cond_post = cond_la.posterior_prediction_variance();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::contribution() error calculating cond posterior variance :" + string(e.what()));
-	}
-
-	//calculate the reduction in prior and posterior uncertainty for each prediction
-	map<string, pair<double, double>> results;
-	for (auto pred : predictions)
-	{
-		pair<double, double> reduction(org_prior[pred.first] - cond_prior[pred.first], org_post[pred.first] - cond_post[pred.first]);
-		results[pred.first] = reduction;
-	}
-	return results;
-	log->log("contribution");
-}
+//map<string, pair<double, double>> linear_analysis::contribution(vector<string> &cond_par_names)
+//{
+//	if (predictions.size() == 0)
+//		throw_error("linear_analysis::contribution() error: no predictions are set");
+//	log->log("contribution");
+//	try
+//	{
+//		align();
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::contribution() error in align(): " + string(e.what()));
+//	}
+//
+//	for (int i = 0; i != cond_par_names.size(); i++)
+//		pest_utils::upper_ip(cond_par_names[i]);
+//	//check the inputs
+//	vector<string> errors;
+//	const vector<string>* jpar_names = jacobian.cn_ptr();
+//	for (auto par_name : cond_par_names)
+//	{
+//		if (find(jpar_names->begin(), jpar_names->end(), par_name) == jpar_names->end())
+//			errors.push_back("par not found in jacobian: " + par_name);
+//	}
+//	if (errors.size() > 0)
+//	{
+//		stringstream ss;
+//		for (auto e : errors)
+//			ss << e << ',';
+//		throw_error("linear_analysis::contribution() errors: " + ss.str());
+//	}
+//
+//	//the parameters that will remain uncertain
+//	vector<string> keep_par_names;
+//	for (auto pname : *parcov.rn_ptr())
+//	{
+//		if (find(cond_par_names.begin(), cond_par_names.end(), pname) == cond_par_names.end())
+//			keep_par_names.push_back(pname);
+//	}
+//	if (keep_par_names.size() == 0)
+//		throw_error("linear_analysis::contribution() error atleast one parameter must not be in the contribution group");
+//
+//
+//	map<string,Mat> cond_preds;
+//	for (auto &pred : predictions)
+//	{
+//		try
+//		{
+//			cond_preds[pred.first] = pred.second.get(keep_par_names, *pred.second.cn_ptr());
+//		}
+//		catch (exception &e)
+//		{
+//			throw_error("linear_analysis::contribution() error getting conditional prediction: " + pred.first + " : " + string(e.what()));
+//		}
+//	}
+//
+//	//get a new linear analysis object - we can use the same obscov b/c it doesn't change
+//	Covariance* obscov_ptr = &obscov;
+//
+//	linear_analysis cond_la;
+//	try
+//	{
+//		cond_la = linear_analysis(jacobian.get(*jacobian.rn_ptr(), keep_par_names), condition_on(keep_par_names, cond_par_names), *obscov_ptr, cond_preds);
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::contribution() error getting 'conditional' linear analysis object : " + string(e.what()));
+//	}
+//
+//	//calculate the prior and posterior with all parameters
+//	map<string, double> org_prior, org_post;
+//	try
+//	{
+//		org_prior = prior_prediction_variance();
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::contribution() error calculating org prior variance :" + string(e.what()));
+//	}
+//	try
+//	{
+//		org_post = posterior_prediction_variance();
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::contribution() error calculating org posterior variance :" + string(e.what()));
+//	}
+//
+//
+//	//calculate the prior and posterior with some conditioned parameters
+//	map<string, double> cond_prior, cond_post;
+//	try
+//	{
+//		cond_prior = cond_la.prior_prediction_variance();
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::contribution() error calculating cond prior variance :" + string(e.what()));
+//	}
+//	try
+//	{
+//		cond_post = cond_la.posterior_prediction_variance();
+//	}
+//	catch (exception &e)
+//	{
+//		throw_error("linear_analysis::contribution() error calculating cond posterior variance :" + string(e.what()));
+//	}
+//
+//	//calculate the reduction in prior and posterior uncertainty for each prediction
+//	map<string, pair<double, double>> results;
+//	for (auto pred : predictions)
+//	{
+//		pair<double, double> reduction(org_prior[pred.first] - cond_prior[pred.first], org_post[pred.first] - cond_post[pred.first]);
+//		results[pred.first] = reduction;
+//	}
+//	return results;
+//	log->log("contribution");
+//}
 
 
 Covariance linear_analysis::condition_on(vector<string> &keep_par_names, vector<string> &cond_par_names)

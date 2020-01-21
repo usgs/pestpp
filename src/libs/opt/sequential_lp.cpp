@@ -994,7 +994,10 @@ void sequentialLP::initialize_and_check()
 
 			//build the nz_obs obs_cov
 			if (num_nz_obs() != 0)
-				obscov.from_observation_weights(nz_obs_names, pest_scenario.get_ctl_observation_info(), vector<string>(), null_prior);
+			{
+				ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+				obscov.from_observation_weights(nz_obs_names, oi, vector<string>(), null_prior);
+			}
 		}
 	}
 	else use_chance = false;
