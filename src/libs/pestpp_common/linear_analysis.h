@@ -33,8 +33,8 @@ public:
 		PerformanceLog& pfm, RunManagerAbstract* run_mgr_ptr);
 	pair<ParameterEnsemble,map<int,int>> draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter, PerformanceLog& pfm,
 		ModelRun& optimum_run);
-	ObservationEnsemble process_fosm_reals(RunManagerAbstract* run_mgr_ptr, map<int, int>& run_map, int iter,
-		PerformanceLog& pfm);
+	ObservationEnsemble process_fosm_reals(RunManagerAbstract* run_mgr_ptr, pair<ParameterEnsemble, map<int, int>>& fosm_real_info, int iter,
+		PerformanceLog& pfm, double last_best_phi);
 
 	void set_predictions(vector<string> preds,bool forgive=false);
 	

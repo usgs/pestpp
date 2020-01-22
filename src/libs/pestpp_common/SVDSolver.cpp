@@ -39,6 +39,7 @@
 #include "covariance.h"
 #include "linear_analysis.h"
 #include "Ensemble.h"
+#include "EnsembleSmoother.h"
 
 using namespace std;
 using namespace pest_utils;
@@ -997,7 +998,6 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	la.glm_iter_fosm(base_run, output_file_writer, termination_ctl.get_iteration_number(), pfm, &run_manager);
 	pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(&run_manager, termination_ctl.get_iteration_number(), pfm, base_run);
 
-
 	if (num_success_calc == 0)
 	{
 		throw runtime_error("no upgrade vectors were calculated successfully");
@@ -1008,7 +1008,6 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	cout << "  performing upgrade vector model runs... ";
 	run_manager.run();
 
-
 	// process model runs
 	cout << "  testing upgrade vectors... ";
 
@@ -1018,7 +1017,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	Parameters base_run_active_ctl_par_tmp = par_transform.ctl2active_ctl_cp(base_run.get_ctl_pars());
 	ModelRun best_upgrade_run(base_run);
 
-	os << "  Summary of upgrade runs:" << endl;
+	os << "  Summary of GLM lambda upgrade runs:" << endl;
 
 	//int n_runs = run_manager.get_nruns();
 	bool one_success = false;
@@ -1076,8 +1075,9 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	file_manager.close_file("fpr");
 
 	
-	ObservationEnsemble oe = la.process_fosm_reals(&run_manager, fosm_real_info.second, termination_ctl.get_iteration_number(), pfm);
-
+	ObservationEnsemble oe = la.process_fosm_reals(&run_manager, fosm_real_info, termination_ctl.get_iteration_number(), pfm, base_run.get_phi(*regul_scheme_ptr));
+	
+	
 	// Print frozen parameter information
 	const Parameters &frz_ctl_pars = best_upgrade_run.get_frozen_ctl_pars();
 

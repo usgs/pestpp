@@ -819,7 +819,8 @@ int main(int argc, char* argv[])
 			la.glm_iter_fosm(optimum_run, output_file_writer, -999,performance_log, run_manager_ptr);
 			pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(run_manager_ptr, -999, performance_log, optimum_run);
 			run_manager_ptr->run();
-			la.process_fosm_reals(run_manager_ptr, fosm_real_info.second, -999, performance_log);
+			DynamicRegularization ptr;
+			la.process_fosm_reals(run_manager_ptr, fosm_real_info, -999, performance_log, optimum_run.get_phi(ptr));
 
 		}
 
