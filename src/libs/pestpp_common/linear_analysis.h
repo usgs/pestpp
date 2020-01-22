@@ -12,6 +12,7 @@
 #include "OutputFileWriter.h"
 #include "PerformanceLog.h"
 #include "RunManagerAbstract.h"
+#include "Ensemble.h"
 
 using namespace std;
 class linear_analysis
@@ -28,11 +29,14 @@ public:
 	//directly from Mat objects
 	//linear_analysis(Mat& _jacobian,Pest& _pest_scenario, FileManager& _file_manager, Mat& _parcov, Mat& _obscov, map<string, Mat> _predictions,Logger* _log = new Logger());
 
-	void glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter, RunManagerAbstract* run_mgr_ptr, PerformanceLog& pfm);
+	map<int,int> glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter, 
+		RunManagerAbstract* run_mgr_ptr, PerformanceLog& pfm);
 
-	void set_predictions(vector<string> preds);
-	void set_predictions(vector<Mat> preds);
-	void set_predictions(Mat* preds);
+	ObservationEnsemble process_fosm_reals(RunManagerAbstract* run_mgr_ptr, map<int, int>& run_map, int iter,
+		PerformanceLog& pfm);
+
+	void set_predictions(vector<string> preds,bool forgive=false);
+	
 
 	void  set_parcov(Mat &_parcov);
 	void set_obscov(Mat &_obscov) { obscov = _obscov; }

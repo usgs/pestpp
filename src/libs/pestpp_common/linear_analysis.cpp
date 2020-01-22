@@ -181,10 +181,8 @@ ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, Observations 
 	return obs_info;
 }
 
-
-void linear_analysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter, RunManagerAbstract* run_mgr_ptr, PerformanceLog& pfm)
+map<int, int> linear_analysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter, RunManagerAbstract* run_mgr_ptr, PerformanceLog& pfm)
 {
-
 	
 	ofstream& fout_rec = file_manager.rec_ofstream();
 	//ofstream& pfm = file_manager.get_ofstream("log");
@@ -222,8 +220,14 @@ void linear_analysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& out
 
 
 	fout_rec << endl;
-	string reres_filename = file_manager.get_base_filename() + ".fosm_reweight.rei";
-	ofstream& reres_of = file_manager.open_ofile_absolute("fosm_reweight.rei", reres_filename);
+
+	ss.str("");
+	if (iter != -999)
+		ss << file_manager.get_base_filename() << "." << iter << ".fosm_reweight.rei";
+	else
+		ss << file_manager.get_base_filename() << ".fosm_reweight.rei";
+	string reres_filename = ss.str();
+	ofstream reres_of(reres_filename);
 
 	Observations obs = pest_scenario.get_ctl_observations();
 	output_file_writer.obs_report(reres_of, obs, sim, reweight);
@@ -267,7 +271,7 @@ void linear_analysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& out
 		}
 	}
 	if (pred_names.size() > 0)
-		set_predictions(pred_names);
+		set_predictions(pred_names, true);
 
 	//drop all 'regul' obs and equations
 	//no longer need to call this since the PI is not being added to the obscov during 
@@ -275,7 +279,12 @@ void linear_analysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& out
     //drop_prior_information(pest_scenario);
 
 	//write the posterior covariance matrix
-	string postcov_filename = file_manager.get_base_filename() + ".post.cov";
+	ss.str("");
+	if (iter != -999)
+		ss << file_manager.get_base_filename() << "." << iter << ".post.cov";
+	else
+		ss << file_manager.get_base_filename() << ".post.cov";
+	string postcov_filename = ss.str();
 	posterior_parameter_ptr()->to_ascii(postcov_filename);
 	fout_rec << "Note : posterior parameter covariance matrix written to file '" + postcov_filename +
 		"'" << endl << endl;
@@ -283,7 +292,12 @@ void linear_analysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& out
 	//write a parameter prior and posterior summary to the rec file
 	const ParamTransformSeq trans = pest_scenario.get_base_par_tran_seq();
 	Parameters pars = pest_scenario.get_ctl_parameters();
-	string parsum_filename = file_manager.get_base_filename() + ".par.usum.csv";
+	ss.str("");
+	if (iter != -999)
+		ss << file_manager.get_base_filename() << "." << iter << ".par.usum.csv";
+	else
+		ss << file_manager.get_base_filename() << ".par.usum.csv";
+	string parsum_filename = ss.str();
 	write_par_credible_range(fout_rec, parsum_filename, pest_scenario.get_ctl_parameter_info(),
 		trans.active_ctl2numeric_cp(pest_scenario.get_ctl_parameters()),
 		trans.active_ctl2numeric_cp(optimum_run.get_ctl_pars()),
@@ -315,12 +329,20 @@ void linear_analysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& out
 
 			init_final_pred_values[pred_name] = pair<double, double>(ival, fval);
 		}
-		string predsum_filename = file_manager.get_base_filename() + ".pred.usum.csv";
+
+		ss.str("");
+		if (iter != -999)
+			ss << file_manager.get_base_filename() << "." << iter << ".pred.usum.csv";
+		else
+			ss << file_manager.get_base_filename() << ".pred.usum.csv";
+		string predsum_filename = ss.str();
 		write_pred_credible_range(fout_rec, predsum_filename, init_final_pred_values);
 		fout_rec << "Note : the above prediction uncertainty summary was written to file '" + predsum_filename +
 			"'" << endl << endl;
 	}
 	set<string> args = pest_scenario.get_pestpp_options().get_passed_args();
+
+	map<int, int> run_map;
 
 	if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
 	{
@@ -330,25 +352,60 @@ void linear_analysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& out
 		ParameterEnsemble pe(&pest_scenario);
 		Covariance cov = posterior_parameter_matrix();
 		pe.draw(num_reals, optimum_run.get_ctl_pars(), cov, &pfm, 1);
-		if (binary)
-			pe.to_binary(file_manager.get_base_filename() + ".post.paren.jcb");
+		ss.str("");
+		if (iter != -999)
+			ss << file_manager.get_base_filename() << "." << iter << ".post.paren";
 		else
-			pe.to_csv(file_manager.get_base_filename() + ".post.paren.csv");
-		map<int, int> run_map = pe.add_runs(run_mgr_ptr);
+			ss << file_manager.get_base_filename() << ".post.paren";
+		if (binary)
+			pe.to_binary(ss.str() + ".jcb");
+		else
+			pe.to_csv(ss.str() + ".csv");
+		run_map = pe.add_runs(run_mgr_ptr);
+		
 		run_mgr_ptr->run();
+		
 		ObservationEnsemble oe(&pest_scenario);
 		Covariance obscov = get_obscov();
 		oe.draw(num_reals, obscov, &pfm, 1);
 		oe.update_from_runs(run_map, run_mgr_ptr);
-		if (binary)
-			oe.to_binary(file_manager.get_base_filename() + ".post.obsen.jcb");
+		ss.str("");
+		if (iter != -999)
+			ss << file_manager.get_base_filename() << "." << iter << ".post.obsen";
 		else
-			oe.to_csv(file_manager.get_base_filename() + ".post.obsen.csv");
+			ss << file_manager.get_base_filename() << ".post.obsen";
+		if (binary)
+			oe.to_binary(ss.str() + ".jcb");
+		else
+			oe.to_csv(ss.str() + ".csv");
 	}
 	cout << "  ---  finished uncertainty analysis calculations  ---  " << endl << endl << endl;
-
+	return run_map;
 }
 
+
+ObservationEnsemble linear_analysis::process_fosm_reals(RunManagerAbstract* run_mgr_ptr, map<int, int>& run_map, int iter,
+														PerformanceLog& pfm)
+{
+	int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
+	bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
+	ObservationEnsemble oe(&pest_scenario);
+	Covariance obscov = get_obscov();
+	oe.draw(num_reals, obscov, &pfm, 1);
+	oe.reserve(oe.get_generic_real_names(num_reals), pest_scenario.get_ctl_ordered_obs_names());
+	oe.update_from_runs(run_map, run_mgr_ptr);
+	stringstream ss;
+	ss.str("");
+	if (iter != -999)
+		ss << file_manager.get_base_filename() << "." << iter << ".post.obsen";
+	else
+		ss << file_manager.get_base_filename() << ".post.obsen";
+	if (binary)
+		oe.to_binary(ss.str() + ".jcb");
+	else
+		oe.to_csv(ss.str() + ".csv");
+	return oe;
+}
 
 void linear_analysis::throw_error(const string &message)
 {
@@ -1231,21 +1288,21 @@ void linear_analysis::calc_posterior()
 }
 
 
-void linear_analysis::set_predictions(Mat* preds)
-{
-
-}
-
-void linear_analysis::set_predictions(vector<string> preds)
+void linear_analysis::set_predictions(vector<string> preds, bool forgive)
 {
 	log->log("set_predictions");
 	const vector<string>* obs_names = jacobian.rn_ptr();
+	set<string> oset(obs_names->begin(), obs_names->end());
 	for (auto pred : preds)
 	{
 		pest_utils::upper_ip(pred);
-		if (predictions.find(pred) != predictions.end())
+		/*if (predictions.find(pred) != predictions.end())
+		{
 			throw_error("linear_analysis::set_predictions() error: pred:" + pred + " already in predictions");
-		if (find(obs_names->begin(), obs_names->end(), pred) != obs_names->end())
+		}*/
+			
+		//if (find(obs_names->begin(), obs_names->end(), pred) != obs_names->end())
+		if (oset.find(pred) != oset.end())
 		{
 			
 			Mat mpred;
@@ -1273,8 +1330,17 @@ void linear_analysis::set_predictions(vector<string> preds)
 		else
 		{
 			if (!pest_utils::check_exist_in(pred))
-				throw_error("linear_analysis::set_predictions() error: pred: " + pred + " not found in jco rows and is not an accessible file");
-			Mat mpred;
+			{
+				//if the pred is not in the jco rows and its not a file
+				//then...if forgive, just continue, otherwise throw
+				//forgive is so the glm iter fosm can be done repeatedly
+				if ((forgive) && (predictions.find(pred) != predictions.end()))
+					continue;
+				else
+					throw_error("linear_analysis::set_predictions() error: pred: " + pred + " not found in jco rows and is not an accessible file");
+
+			}
+				Mat mpred;
 			log->log("loading prediction " + pred + " from ASCII file");
 			try
 			{
@@ -1324,8 +1390,8 @@ void linear_analysis::set_predictions(vector<string> preds)
 				}
 			}
 			string pname = mpred.get_col_names()[0];
-			if (predictions.find(pname) != predictions.end())
-				throw_error("linear_analysis::set_predictions() error: pred:" + pred + " already in predictions");
+			//if (predictions.find(pname) != predictions.end())
+			//	throw_error("linear_analysis::set_predictions() error: pred:" + pred + " already in predictions");
 			if (mpred.e_ptr()->nonZeros() == 0)
 			{
 				log->warning("Prediction " + pred + " has no non-zero entries in jacobian row/");
@@ -1339,12 +1405,6 @@ void linear_analysis::set_predictions(vector<string> preds)
 	}
 	log->log("set_predictions");
 }
-
-void linear_analysis::set_predictions(vector<Mat> preds)
-{
-	throw_error("linear_analysis::set_predictions() not implemented vector<Mat> args");
-}
-
 void linear_analysis::svd()
 {
 	log->log("svd");

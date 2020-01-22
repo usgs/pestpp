@@ -45,6 +45,8 @@ public:
 	void add_2_cols_ip(const vector<string> &_var_names, const Eigen::MatrixXd &mat);
 	Ensemble zero_like();
 
+	vector<string> get_generic_real_names(int num_reals);
+
 	void reserve(vector<string> _real_names, vector<string> _var_names);
 
 	Eigen::VectorXd get_real_vector(int ireal);

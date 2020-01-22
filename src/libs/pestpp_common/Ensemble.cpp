@@ -385,15 +385,8 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 
 
 
-	//form some realization names
-	real_names.clear();
-	stringstream ss;
-	for (int i = 0; i < num_reals; i++)
-	{
-		ss.str("");
-		ss << i;
-		real_names.push_back(ss.str());
-	}
+	real_names = get_generic_real_names(num_reals);
+
 	org_real_names = real_names;
 	//add the mean values - using the Transformable instance (initial par value or observed value)
 	plog->log_event("resizing reals matrix");
@@ -428,6 +421,19 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 	}
 }
 
+vector<string> Ensemble::get_generic_real_names(int num_reals)
+{
+	//form some realization names
+	vector<string> rnames;
+	stringstream ss;
+	for (int i = 0; i < num_reals; i++)
+	{
+		ss.str("");
+		ss << i;
+		rnames.push_back(ss.str());
+	}
+	return rnames;
+}
 
 Covariance Ensemble::get_diagonal_cov_matrix()
 {
