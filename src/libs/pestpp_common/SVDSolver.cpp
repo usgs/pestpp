@@ -994,8 +994,8 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	LinearAnalysis la(j, pest_scenario, file_manager);
 	PerformanceLog pfm = *performance_log;
 	pfm.log_event("LinearAnalysis::glm_iter_fosm");
-	la.glm_iter_fosm(base_run, output_file_writer, 0, pfm, &run_manager);
-	pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(&run_manager, 0, pfm, base_run);
+	la.glm_iter_fosm(base_run, output_file_writer, termination_ctl.get_iteration_number(), pfm, &run_manager);
+	pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(&run_manager, termination_ctl.get_iteration_number(), pfm, base_run);
 
 
 	if (num_success_calc == 0)
@@ -1076,7 +1076,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	file_manager.close_file("fpr");
 
 	
-	ObservationEnsemble oe = la.process_fosm_reals(&run_manager, fosm_real_info.second, 0, pfm);
+	ObservationEnsemble oe = la.process_fosm_reals(&run_manager, fosm_real_info.second, termination_ctl.get_iteration_number(), pfm);
 
 	// Print frozen parameter information
 	const Parameters &frz_ctl_pars = best_upgrade_run.get_frozen_ctl_pars();
