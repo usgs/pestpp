@@ -138,7 +138,9 @@ class ObservationRec {
 public:
 	double weight;
 	string group;
-	ObservationRec(double _weight=0.0,const string &_group="") : weight(_weight), group(_group) {}
+	int cycle;
+	ObservationRec(double _weight=0.0,const string &_group="", int _cycle = 0)
+		: weight(_weight), group(_group),cycle(_cycle)  {}
 	bool is_regularization() const;
 };
 ostream& operator<< (ostream &os, const ObservationRec& val);

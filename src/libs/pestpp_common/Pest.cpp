@@ -970,12 +970,12 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	vector<string> par_easy_names{ "NAME","TRANSFORM","CHANGE_LIMIT","VALUE","LOWER_BOUND","UPPER_BOUND","GROUP","SCALE","OFFSET","DERCOM", "CYCLE" };
 	map <string,string> row_map, temp_tied_map;
 	vector<string> obs_formal_names{ "OBSNME","OBSVAL","WEIGHT","OBGNME", "CYCLE" };
-	vector<string> obs_easy_names{ "NAME","VALUE","WEIGHT","GROUP" };
+	vector<string> obs_easy_names{ "NAME","VALUE","WEIGHT","GROUP", "CYCLE" };
 	vector<string> obs_group_formal_names{ "OBGNME" };
-	vector<string> pi_formal_names{ "PILBL","EQUATION","WEIGHT","OBGNME" };
+	vector<string> pi_formal_names{ "PILBL","EQUATION","WEIGHT","OBGNME", "CYCLE" };
 	vector<string> tokens_case_sen;
-	vector<string> model_input_formal_names{ "PEST_FILE","MODEL_FILE" };
-	vector<string> model_output_formal_names{ "PEST_FILE","MODEL_FILE" };
+	vector<string> model_input_formal_names{ "PEST_FILE","MODEL_FILE", "CYCLE" };
+	vector<string> model_output_formal_names{ "PEST_FILE","MODEL_FILE", "CYCLE" };
 #ifndef _DEBUG
 	try {
 #endif
@@ -2256,6 +2256,7 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	convert_ip(tokens[1], value);
 	convert_ip(tokens[2], obs_i.weight);
 	obs_i.group = tokens[3];
+	convert_ip(tokens[4], obs_i.cycle);
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
 	observation_values.insert(name, value);

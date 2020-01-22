@@ -291,7 +291,7 @@ int main(int argc, char* argv[])
 			string port = socket_str;
 			strip_ip(port);
 			strip_ip(port, "front", ":");
-			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
+			const ModelExecInfo &exi = pest_scenario.get_model_exec_info(); //Ayman: why is this? it seems it is not used by panther 
 			run_manager_ptr = new RunManagerPanther(
 				rns_file, port,
 				file_manager.open_ofile_ext("rmr"),
@@ -325,7 +325,7 @@ int main(int argc, char* argv[])
 		//Allocates Space for Run Manager.  This initializes the model parameter names and observations names.
 		//Neither of these will change over the course of the simulation
 
-
+		//B* b3 = new B(*b2); to do copy
 		run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), pest_scenario.get_ctl_observations());
 
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
