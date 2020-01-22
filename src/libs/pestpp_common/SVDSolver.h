@@ -124,9 +124,7 @@ protected:
 	std::vector<double> lambda_scale_vec;
 	bool terminate_local_iteration;
 	bool der_forgive;
-	Eigen::SparseMatrix<double> JS;
-	//virtual void limit_parameters_ip(const Parameters &init_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
-	//	Pest::LimitType &limit_type, const Parameters &frozen_ative_ctl_pars);
+		
 	virtual Parameters limit_parameters_freeze_all_ip(const Parameters &init_active_ctl_pars,
 		Parameters &upgrade_active_ctl_pars, const Parameters &frozen_active_ctl_pars = Parameters());
 	virtual const string &get_description(){return description;}
@@ -139,27 +137,18 @@ protected:
 	void test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &frozen_ctl_pars, QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
 		Eigen::VectorXd &residuals_vec, vector<string> &obs_names_vec, const Parameters &base_run_ctl_pars,
 		Parameters &new_ctl_pars, MarquardtMatrix marquardt_type, bool scale_upgrade = false);
-	/*void calc_lambda_upgrade_vecQ12J(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
-		const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
-		const Parameters &base_active_ctl_pars, const Parameters &freeze_active_ctl_pars,
-		double lambda, Parameters &active_ctl_upgrade_pars, Parameters &upgrade_active_ctl_del_pars,
-		Parameters &grad_active_ctl_del_pars, MarquardtMatrix marquardt_type, bool scale_upgrade);*/
+	
 	void calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
 		const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
 		const Parameters &active_base_ctl_pars, const Parameters &freeze_active_ctl_pars,
 		double lambda, Parameters &active_ctl_upgrade_pars, Parameters &upgrade_active_ctl_del_pars,
 		Parameters &grad_active_ctl_del_pars, MarquardtMatrix marquardt_type, bool scale_upgrade=false);
-	//void check_limits(const Parameters &init_ctl_pars, const Parameters &upgrade_ctl_pars,
-	//	map<string, Pest::LimitType> &limit_type_map, Parameters &active_ctl_parameters_at_limit);
 	Eigen::VectorXd calc_residual_corrections(const Jacobian &jacobian, const Parameters &del_numeric_pars,
 							   const vector<string> obs_name_vec);
 	void dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jacobian, QSqrtMatrix &Q_sqrt,
 		const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
 		const Parameters &base_active_ctl_pars, const Parameters &freeze_active_ctl_pars);
-	void dynamic_weight_adj_percent(const ModelRun &base_run, double reg_frac);
 	bool par_heading_out_bnd(double org_par, double new_par, double lower_bnd, double upper_bnd);
-	double sidi_method(const vector<double> &x, const vector<double> &y);
-	double secant_method(double x0, double y0, double x1, double y1);
 	void save_frozen_pars(std::ostream &fout, const Parameters &frozen_pars, int id);
 	Parameters read_frozen_pars(std::istream &fin, int id);
 	PhiComponets phi_estimate(const ModelRun &base_run, const Jacobian &jacobian, QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,

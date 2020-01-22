@@ -15,23 +15,24 @@
 #include "Ensemble.h"
 
 using namespace std;
-class linear_analysis
+class LinearAnalysis
 {
 public:
 	//empty constructor
 	//linear_analysis():pest_scenario(Pest()),file_manager(FileManager()),jacobian(Mat()){;}
 
 	//constructor for pest++ integration
-	linear_analysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, Logger* _log = new Logger());
+	LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, Logger* _log = new Logger());
 	//linear_analysis(Mat* _jacobian, Pest* pest_scenario, Mat* _obscov, Logger* _log = new Logger());
 
 
 	//directly from Mat objects
 	//linear_analysis(Mat& _jacobian,Pest& _pest_scenario, FileManager& _file_manager, Mat& _parcov, Mat& _obscov, map<string, Mat> _predictions,Logger* _log = new Logger());
 
-	map<int,int> glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter, 
-		RunManagerAbstract* run_mgr_ptr, PerformanceLog& pfm);
-
+    void glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter, 
+		PerformanceLog& pfm, RunManagerAbstract* run_mgr_ptr);
+	pair<ParameterEnsemble,map<int,int>> draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter, PerformanceLog& pfm,
+		ModelRun& optimum_run);
 	ObservationEnsemble process_fosm_reals(RunManagerAbstract* run_mgr_ptr, map<int, int>& run_map, int iter,
 		PerformanceLog& pfm);
 
@@ -42,7 +43,7 @@ public:
 	void set_obscov(Mat &_obscov) { obscov = _obscov; }
 
 	//get a new linear analysis object consisting of a subset of par and obs names
-	linear_analysis get(vector<string> &new_par_names, vector<string> &new_obs_names);
+	LinearAnalysis get(vector<string> &new_par_names, vector<string> &new_obs_names);
 
 	//exposed schur functionality
 	//from the diagonal of parcov
@@ -129,7 +130,7 @@ public:
 
 	map<string, double> like_preds(double val);
 
-	~linear_analysis();
+	~LinearAnalysis();
 
 	//some convience methods for PEST++ integration
 	void write_par_credible_range(ofstream &fout, string sum_filename, ParameterInfo parinfo,

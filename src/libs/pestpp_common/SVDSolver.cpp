@@ -37,6 +37,8 @@
 #include "OutputFileWriter.h"
 #include "debug.h"
 #include "covariance.h"
+#include "linear_analysis.h"
+#include "Ensemble.h"
 
 using namespace std;
 using namespace pest_utils;
@@ -374,50 +376,6 @@ VectorXd SVDSolver::calc_residual_corrections(const Jacobian &jacobian, const Pa
 	return del_residuals;
 }
 
-Eigen::SparseMatrix<double> SVDSolver::get_normal_matrix(MarquardtMatrix marquardt_type, double lambda, Jacobian & jacobian, const QSqrtMatrix & Q_sqrt, const DynamicRegularization & regul, const vector<string> &par_name_vec, const vector<string> &obs_name_vec)
-{
-	VectorXd Sigma;
-	VectorXd Sigma_trunc;
-	Eigen::SparseMatrix<double> U;
-	Eigen::SparseMatrix<double> Vt;
-	// the last boolean arguement is an instruction to compute the square weights
-	Eigen::SparseMatrix<double> q_mat = Q_sqrt.get_sparse_matrix(obs_name_vec, regul, true);
-	Eigen::SparseMatrix<double> jac = jacobian.get_matrix(obs_name_vec,par_name_vec);
-	performance_log->log_event("forming initial JtQJ matrix for lambda scaling");
-	Eigen::SparseMatrix<double> JtQJ = jac.transpose() * q_mat * jac;
-	Eigen::VectorXd upgrade_vec;
-	if (marquardt_type == MarquardtMatrix::JTQJ)
-	{
-		stringstream info_str;
-		Eigen::SparseMatrix<double> S;
-
-
-		//Compute Scaling Matrix Sii
-		performance_log->log_event("commencing to scale JtQJ matrix");
-		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc, 0.0);
-		VectorXd Sigma_inv_sqrt = Sigma.array().inverse().sqrt();
-		S = Vt.transpose() * Sigma_inv_sqrt.asDiagonal() * U.transpose();
-		VectorXd S_diag = S.diagonal();
-		MatrixXd S_tmp = S_diag.asDiagonal();
-		S = S_tmp.sparseView();
-		stringstream info_str1;
-		info_str1 << "S info: " << "rows = " << S.rows() << ": cols = " << S.cols() << ": size = " << S.size() << ": nonzeros = " << S.nonZeros();
-		performance_log->log_event(info_str1.str());
-		performance_log->log_event("JS");
-		JS = jac * S;
-		performance_log->log_event("JS.transpose() * q_mat * JS + lambda * S.transpose() * S");
-		JtQJ = JS.transpose() * q_mat * JS + lambda * S.transpose() * S;
-	}
-	else if (marquardt_type == MarquardtMatrix::IDENT)
-	{
-
-	}
-	else if (marquardt_type == MarquardtMatrix::PRIOR)
-	{
-
-	}
-	return Eigen::SparseMatrix<double>();
-}
 
 void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
 	const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
@@ -485,7 +443,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		performance_log->log_event(info_str1.str());
 		performance_log->log_event("JS");
 		
-		JS = jac * S;
+		Eigen::SparseMatrix<double> JS = jac * S;
 		performance_log->log_event("JS.transpose() * q_mat * JS + lambda * S.transpose() * S");
 		
 		JtQJ = JS.transpose() * q_mat * JS + lambda * S.transpose() * S;
@@ -493,7 +451,6 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		info_str.str("");
 		info_str << "S info: " << "rows = " << S.rows() << ": cols = " << S.cols() << ": size = " << S.size() << ": nonzeros = " << S.nonZeros();
 		performance_log->log_event(info_str.str());
-
 
 		// Returns truncated Sigma, U and Vt arrays with small singular parameters trimed off
 		performance_log->log_event("commencing SVD factorization of lambda-scaled JtQJ");
@@ -570,7 +527,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	grad_vec = -2.0 * (jac.transpose() * (q_mat * Residuals));
 	performance_log->log_event("linear algebra multiplication to compute ugrade complete");
 
-	//tranfere newly computed componets of the ugrade vector to upgrade.svd_uvec
+	//tranfer newly computed components of the upgrade vector to upgrade.svd_uvec
 	upgrade_active_ctl_del_pars.clear();
 	grad_active_ctl_del_pars.clear();
 
@@ -756,6 +713,7 @@ ModelRun SVDSolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termina
 		read_res(rfile, temp_obs);
 		Parameters temp_pars = new_base_run.get_ctl_pars();
 		new_base_run.update_ctl(temp_pars, temp_obs);
+		run_manager.set_init_sim(temp_obs.get_data_vec(run_manager.get_obs_name_vec()));
 		rerun_base = false;
 		//message.clear();
 		//message << "done" << endl;
@@ -818,9 +776,7 @@ void SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContro
 {
 	ostream &os = file_manager.rec_ofstream();
 	ostream &fout_restart = file_manager.get_ofstream("rst");
-
 	set<string> out_ofbound_pars;
-
 	vector<string> numeric_parname_vec = par_transform.ctl2numeric_cp(base_run.get_ctl_pars()).get_keys();
 
 	if (!restart_runs)
@@ -868,6 +824,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	ostream &os = file_manager.rec_ofstream();
 	ostream &fout_restart = file_manager.get_ofstream("rst");
 	int num_success_calc = 0;
+	int num_lamb_runs = 0;
 	if (restart_runs)
 	{
 		run_manager.initialize_restart(file_manager.build_filename("rnu"));
@@ -926,12 +883,12 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 				base_run_active_ctl_par, frozen_active_ctl_pars);
 		}
 		
-
 		//Build model runs
 		run_manager.reinitialize(file_manager.build_filename("rnu"));
 		// Save base run as first model run so it is eassily accessible
 		Parameters base_model_pars = par_transform.ctl2model_cp(base_run.get_ctl_pars());
 		int run_id = run_manager.add_run(base_model_pars, "base_run");
+		//num_lamb_runs++; // dont count this one since its not a req run
 		run_manager.update_run(run_id, base_model_pars, base_run.get_obs());
 		//Marquardt Lambda Update Vector
 		vector<double> lambda_vec = base_lambda_vec;
@@ -988,6 +945,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			performance_log->log_event("writing upgrade vector to csv file");
 			output_file_writer.write_upgrade(termination_ctl.get_iteration_number(), 0, i_lambda, 1.0, new_pars);
 			int run_id = run_manager.add_run(new_par_model, "normal", i_lambda);
+			num_lamb_runs++;
 			save_frozen_pars(fout_frz, frozen_active_ctl_pars, run_id);
 
 			//Add Scaled Upgrade Vectors
@@ -1007,6 +965,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 				stringstream ss;
 				ss << "scale(" << std::fixed << std::setprecision(2) << i_scale << ")";
 				int run_id = run_manager.add_run(scaled_pars, ss.str(), i_lambda);
+				num_lamb_runs++;
 				fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_scale << endl;
 				save_frozen_pars(fout_frz, frozen_active_ctl_pars, run_id);
 			}
@@ -1029,6 +988,15 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		file_manager.close_file("fpr");
 		RestartController::write_upgrade_runs_built(fout_restart);
 	}
+	//instance of a Mat for the jco
+	Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
+		jacobian.get_matrix_ptr());
+	LinearAnalysis la(j, pest_scenario, file_manager);
+	PerformanceLog pfm = *performance_log;
+	pfm.log_event("LinearAnalysis::glm_iter_fosm");
+	la.glm_iter_fosm(base_run, output_file_writer, 0, pfm, &run_manager);
+	pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(&run_manager, 0, pfm, base_run);
+
 
 	if (num_success_calc == 0)
 	{
@@ -1039,6 +1007,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	performance_log->add_indent(-1);
 	cout << "  performing upgrade vector model runs... ";
 	run_manager.run();
+
 
 	// process model runs
 	cout << "  testing upgrade vectors... ";
@@ -1051,9 +1020,9 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 
 	os << "  Summary of upgrade runs:" << endl;
 
-	int n_runs = run_manager.get_nruns();
+	//int n_runs = run_manager.get_nruns();
 	bool one_success = false;
-	for (int i = 1; i < n_runs; ++i) {
+	for (int i = 1; i < num_lamb_runs; ++i) {
 		ModelRun upgrade_run(base_run);
 		Parameters tmp_pars;
 		Observations tmp_obs;
@@ -1105,6 +1074,9 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		}
 	}
 	file_manager.close_file("fpr");
+
+	
+	ObservationEnsemble oe = la.process_fosm_reals(&run_manager, fosm_real_info.second, 0, pfm);
 
 	// Print frozen parameter information
 	const Parameters &frz_ctl_pars = best_upgrade_run.get_frozen_ctl_pars();
@@ -1586,86 +1558,6 @@ PhiComponets SVDSolver::phi_estimate(const ModelRun &base_run, const Jacobian &j
 }
 
 
-void SVDSolver::dynamic_weight_adj_percent(const ModelRun &base_run, double reg_frac)
-{
-	ostream &os = file_manager.rec_ofstream();
-
-	double phimlim = regul_scheme_ptr->get_phimlim();
-	double fracphim = regul_scheme_ptr->get_fracphim();
-	double wfmin = regul_scheme_ptr->get_wfmin();
-	double wfmax = regul_scheme_ptr->get_wfmax();
-	double wffac = regul_scheme_ptr->get_wffac();
-	double wf_cur = regul_scheme_ptr->get_weight();
-	double wftol = regul_scheme_ptr->get_wftol();
-
-	Parameters new_pars;
-	vector<MuPoint> mu_vec;
-	mu_vec.resize(4);
-
-	// Equalize Reqularization Groups if IREGADJ = 1
-	if (regul_scheme_ptr->get_adj_grp_weights())
-	{
-		std::unordered_map<std::string, double> regul_grp_weights;
-		auto reg_grp_phi = base_run.get_obj_func_ptr()->get_group_phi(base_run.get_obs(), base_run.get_ctl_pars(),
-			DynamicRegularization::get_unit_reg_instance(), PhiComponets::OBS_TYPE::REGUL);
-		double avg_reg_grp_phi = 0;
-		for (const auto &igrp : reg_grp_phi)
-		{
-			avg_reg_grp_phi += igrp.second;
-		}
-		if (reg_grp_phi.size() > 0)
-		{
-			avg_reg_grp_phi /= reg_grp_phi.size();
-		}
-		if (avg_reg_grp_phi > 0)
-		{
-			for (const auto &igrp : reg_grp_phi)
-			{
-				if (igrp.second > 0)
-				{
-					regul_grp_weights[igrp.first] = sqrt(avg_reg_grp_phi / igrp.second);
-				}
-			}
-		}
-		regul_scheme_ptr->set_regul_grp_weights(regul_grp_weights);
-	}
-
-	DynamicRegularization tmp_regul_scheme = *regul_scheme_ptr;
-	PhiComponets phi_comp_cur = base_run.get_obj_func_ptr()->get_phi_comp(base_run.get_obs(), base_run.get_ctl_pars(), *regul_scheme_ptr);
-
-	double wf_new;
-	//if (phi_comp_cur.regul <= wfmin || reg_frac == 1.0)
-	if (reg_frac >= 1.0)
-	{
-		wf_new = wfmin;
-	}
-	else if (phi_comp_cur.regul < wfmin)
-	{
-		wf_new = reg_frac * phi_comp_cur.meas / (1.0 - reg_frac);
-		wf_new *= wf_cur;
-	}
-	else
-	{
-		wf_new = reg_frac * phi_comp_cur.meas / (phi_comp_cur.regul * (1.0 - reg_frac));
-		wf_new *= wf_cur;
-	}
-
-	wf_new = max(wf_new, wfmin);
-	wf_new = min(wf_new, wfmax);
-	regul_scheme_ptr->set_weight(wf_new);
-
-	PhiComponets phi_comp_new = base_run.get_obj_func_ptr()->get_phi_comp(base_run.get_obs(), base_run.get_ctl_pars(), *regul_scheme_ptr);
-
-	os << "  Regularization weight factor update (REG_FRAC = " << reg_frac << ")" << endl;
-	os << "    Initial values:" << endl;
-	os << "      regularization weight factor =  " << wf_cur << endl;
-	os << "      PHI (total=" << phi_comp_cur.meas + phi_comp_cur.regul <<
-		"; meas=" << phi_comp_cur.meas << "; reg=" << phi_comp_cur.regul << ")" << endl;
-	os << "    Updated values:" << endl;
-	os << "      regularization weight factor = " << wf_new << endl;
-	os << "      PHI (total=" << phi_comp_new.meas + phi_comp_new.regul <<
-		"; meas=" << phi_comp_new.meas << "; reg=" << phi_comp_new.regul << ")" << endl;
-}
 
 
 void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jacobian, QSqrtMatrix &Q_sqrt,

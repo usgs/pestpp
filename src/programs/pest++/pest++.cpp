@@ -815,11 +815,11 @@ int main(int argc, char* argv[])
 			Mat j(base_jacobian_ptr->get_sim_obs_names(), base_jacobian_ptr->get_base_numeric_par_names(),
 				base_jacobian_ptr->get_matrix_ptr());
 
-			linear_analysis la(j, pest_scenario, file_manager, &unc_log);
-			map<int,int> run_map = la.glm_iter_fosm(optimum_run, output_file_writer, pest_scenario.get_control_info().noptmax, run_manager_ptr,performance_log);
-			la.process_fosm_reals(run_manager_ptr, run_map, pest_scenario.get_control_info().noptmax, performance_log);
-			run_map = la.glm_iter_fosm(optimum_run, output_file_writer, -999, run_manager_ptr, performance_log);
-			la.process_fosm_reals(run_manager_ptr, run_map, -999, performance_log);
+			LinearAnalysis la(j, pest_scenario, file_manager, &unc_log);
+			la.glm_iter_fosm(optimum_run, output_file_writer, -999,performance_log, run_manager_ptr);
+			pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(run_manager_ptr, -999, performance_log, optimum_run);
+			run_manager_ptr->run();
+			la.process_fosm_reals(run_manager_ptr, fosm_real_info.second, -999, performance_log);
 
 		}
 
