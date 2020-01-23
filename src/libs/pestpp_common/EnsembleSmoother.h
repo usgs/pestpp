@@ -231,16 +231,11 @@ private:
 	bool solve_new();
 	void adjust_pareto_weight(string &obsgroup, double wfac);
 
-	//ParameterEnsemble calc_upgrade(vector<string> &obs_names, vector<string> &par_names,double lamb, int num_reals);
-
-	//ParameterEnsemble calc_localized_upgrade(double cur_lam);
 	ParameterEnsemble calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>> &loc_map);
 
-	//EnsemblePair run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe);
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
 	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble> &pe_lams, vector<double> &lam_vals, vector<double> &scale_vals);
-	//map<string, double> get_phi_vec_stats(map<string,PhiComponets> &phi_info);
-	//map<string,PhiComponets> get_phi_info(ObservationEnsemble &_oe);
+	
 	void report_and_save();
 	void save_mat(string prefix, Eigen::MatrixXd &mat);
 	bool initialize_pe(Covariance &cov);
@@ -250,20 +245,12 @@ private:
 	void initialize_parcov();
 	void initialize_obscov();
 	void drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe, bool is_subset=false);
-	//void check_ensembles(ObservationEnsemble &oe, ParameterEnsemble &pe);
 	template<typename T, typename A>
 	void message(int level, const string &_message, vector<T, A> _extras, bool echo=true);
 	void message(int level, const string &_message);
 
-	//template<typename T, typename A>
-	//void message(int level, char* _message, vector<T, A> _extras);// { message(level, string(_message), _extras); }
-	//void message(int level, char* _message);// { message(level, string(_message)); }
-
 	template<typename T>
 	void message(int level, const string &_message, T extra);
-
-	//template<typename T>
-	//void message(int level, char* _message, T extra);
 
 	void sanity_checks();
 
@@ -273,7 +260,6 @@ private:
 
 	vector<string> detect_prior_data_conflict();
 
-	//map<int,int> get_subset_idx_map();
 	void set_subset_idx(int size);
 	Eigen::MatrixXd get_Am(const vector<string> &real_names, const vector<string> &par_names);
 

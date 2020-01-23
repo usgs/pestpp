@@ -55,8 +55,10 @@ string PerformanceLog::time_to_string(const std::chrono::system_clock::time_poin
 string PerformanceLog::elapsed_time_to_string(std::chrono::system_clock::time_point &current_time, std::chrono::system_clock::time_point &prev_time)
 {
 	ostringstream ss;
+	std::chrono::duration<double, std::chrono::seconds::period> double_delta_t(current_time - prev_time);
 	auto delta_t = current_time - prev_time;
-	ss << std::chrono::duration_cast<std::chrono::seconds>(delta_t).count();
+	//double_delta_t = std::chrono::duration_cast<std::chrono::seconds>(delta_t);
+	ss << double_delta_t.count();
 	return ss.str();
 	/*if (delta_t < std::chrono::milliseconds(1))
 	{

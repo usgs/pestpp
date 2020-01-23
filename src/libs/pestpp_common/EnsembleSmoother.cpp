@@ -1198,7 +1198,7 @@ void IterEnsembleSmoother::message(int level, const string &_message, vector<T, 
 	if ((echo) && ((verbose_level >= 2) || (level < 2)))
 		cout << ss.str() << endl;
 	file_manager.rec_ofstream() <<ss.str() << endl;
-	performance_log->log_event(ss.str());
+	performance_log->log_event(_message);
 
 }
 
