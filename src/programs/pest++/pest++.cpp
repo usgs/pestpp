@@ -261,7 +261,7 @@ int main(int argc, char* argv[])
 #ifndef _DEBUG
 		try {
 #endif
-			performance_log.log_event("starting to process control file", 1);
+			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
 			file_manager.close_file("pst");
 			performance_log.log_event("finished processing control file");
@@ -353,7 +353,7 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			performance_log.log_event("starting basic model IO error checking", 1);
+			performance_log.log_event("starting basic model IO error checking");
 			cout << "checking model IO files...";
 			pest_scenario.check_io(fout_rec);
 			performance_log.log_event("finished basic model IO error checking");
@@ -762,7 +762,7 @@ int main(int argc, char* argv[])
 			(pest_scenario.get_pestpp_options().get_uncert_flag()))
 
 		{
-			cout << endl << endl << endl;
+			/*cout << endl << endl << endl;
 			cout << endl << endl << endl;
 			cout << "  ---  starting uncertainty analysis calculations  ---  " << endl << endl << endl;
 			cout << "  uncertainty estimates calculated using Schur's " << endl;
@@ -773,7 +773,7 @@ int main(int argc, char* argv[])
 			cout << "  Hydrologic Monitoring Networks : Example Applications " << endl;
 			cout << "  from the Great Lakes Water Availability Pilot Project'. " << endl;
 			cout << "  See PEST++ V3 documentation for implementation details." << endl;
-			cout << endl << endl << endl;
+			cout << endl << endl << endl;*/
 
 			fout_rec << endl << endl << endl << endl;
 			fout_rec << "-----------------------------------------------------------------------" << endl;
@@ -793,16 +793,12 @@ int main(int argc, char* argv[])
 			fout_rec << "      covariance matrices before uncertainty calculations.  Please" << endl;
 			fout_rec << "      make sure that all expert knowledge is expressed in the prior " << endl;
 			fout_rec << "      parameter bounds or through a covariance matix, which can be " << endl;
-			fout_rec << "      supplied as a ++ option as 'parameter_covariance(<matrix_file_name>)," << endl;
+			fout_rec << "      supplied as a ++ option as '++parcov(<matrix_file_name>)'," << endl;
 			fout_rec << "      where <matrix_file_name> can be an ASCII PEST-compatible matrix file (.mat) or" << endl;
 			fout_rec << "      a PEST-compatible uncertainty file (.unc)." << endl << endl;
 
 
-			ofstream &pfm = file_manager.get_ofstream("log");
-			pfm << endl << endl << "-----------------------------------" << endl;
-			pfm << "starting linear uncertainty analyses" << endl;
-			pfm << "-----------------------------------" << endl << endl;
-			Logger unc_log(pfm);
+			performance_log.log_event("FOSM-based posterior unc calcs");
 
 			if (base_jacobian_ptr->get_base_numeric_par_names().size() == 0)
 			{
@@ -815,13 +811,16 @@ int main(int argc, char* argv[])
 			Mat j(base_jacobian_ptr->get_sim_obs_names(), base_jacobian_ptr->get_base_numeric_par_names(),
 				base_jacobian_ptr->get_matrix_ptr());
 
-			LinearAnalysis la(j, pest_scenario, file_manager, &unc_log);
-			la.glm_iter_fosm(optimum_run, output_file_writer, -999,performance_log, run_manager_ptr);
-			pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(run_manager_ptr, -999, performance_log, optimum_run);
-			run_manager_ptr->run();
-			DynamicRegularization ptr;
-			la.process_fosm_reals(run_manager_ptr, fosm_real_info, -999, performance_log, optimum_run.get_phi(ptr));
-
+			LinearAnalysis la(j, pest_scenario, file_manager, performance_log);
+			la.glm_iter_fosm(optimum_run, output_file_writer, -999, run_manager_ptr);
+			if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
+			{
+				cout << endl << "drawing and running " << pest_scenario.get_pestpp_options().get_glm_num_reals() << " FOSM-based posterior realizations" << endl;
+				pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(run_manager_ptr, -999, optimum_run);
+				run_manager_ptr->run();
+				DynamicRegularization ptr;
+				la.process_fosm_reals(run_manager_ptr, fosm_real_info, -999, optimum_run.get_phi(ptr));
+			}
 		}
 
 		// clean up

@@ -22,7 +22,7 @@ public:
 	//linear_analysis():pest_scenario(Pest()),file_manager(FileManager()),jacobian(Mat()){;}
 
 	//constructor for pest++ integration
-	LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, Logger* _log = new Logger());
+	LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, PerformanceLog &pfm);
 	//linear_analysis(Mat* _jacobian, Pest* pest_scenario, Mat* _obscov, Logger* _log = new Logger());
 
 
@@ -30,11 +30,11 @@ public:
 	//linear_analysis(Mat& _jacobian,Pest& _pest_scenario, FileManager& _file_manager, Mat& _parcov, Mat& _obscov, map<string, Mat> _predictions,Logger* _log = new Logger());
 
     void glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter, 
-		PerformanceLog& pfm, RunManagerAbstract* run_mgr_ptr);
-	pair<ParameterEnsemble,map<int,int>> draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter, PerformanceLog& pfm,
+		RunManagerAbstract* run_mgr_ptr);
+	pair<ParameterEnsemble,map<int,int>> draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter,
 		ModelRun& optimum_run);
 	ObservationEnsemble process_fosm_reals(RunManagerAbstract* run_mgr_ptr, pair<ParameterEnsemble, map<int, int>>& fosm_real_info, int iter,
-		PerformanceLog& pfm, double last_best_phi);
+		double last_best_phi);
 
 	void set_predictions(vector<string> preds,bool forgive=false);
 	
@@ -140,7 +140,8 @@ public:
 
 private:
 
-	Logger* log;
+	//Logger* log;
+	PerformanceLog& pfm;
 	FileManager& file_manager;
 	Pest& pest_scenario;
 	Mat& jacobian;

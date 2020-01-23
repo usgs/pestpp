@@ -63,7 +63,7 @@ public:
 	Mat T();
 	Mat inv(Logger* log);
 	Mat inv(bool echo=false);
-	void inv_ip(Logger *log);
+	void inv_ip(PerformanceLog& pfm);
 	void inv_ip(bool echo=false);
 	void pseudo_inv_ip(double eigthresh, int maxsing);
 	void SVD();

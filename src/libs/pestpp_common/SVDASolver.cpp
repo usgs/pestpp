@@ -441,7 +441,6 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 			prf_message.str("");
 			prf_message << "beginning upgrade vector calculations, lambda = " << i_lambda;
 			performance_log->log_event(prf_message.str());
-			performance_log->add_indent();
 			//std::cout << string(message.str().size(), '\b');
 			message.str("");
 			message << "  computing upgrade vector (lambda = " << i_lambda << ")  " << ++i_update_vec << " / " << lambda_vec.size() << "             " << endl;
@@ -463,7 +462,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 			int run_id = run_manager.add_run(new_pars, "upgrade_nrm", i_lambda);
 			output_file_writer.write_upgrade(termination_ctl.get_iteration_number(), 1, i_lambda, 1.0, new_pars);
 			save_frozen_pars(fout_frz, frzn_pars, run_id);
-			performance_log->add_indent(-1);
+
 		}
 		file_manager.close_file("fpr");
 		RestartController::write_upgrade_runs_built(fout_restart);

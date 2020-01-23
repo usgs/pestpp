@@ -189,12 +189,9 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 			// write header for SVD file
 			output_file_writer.write_svd_iteration(global_iter_num);
 
-			performance_log->log_blank_lines();
-			performance_log->add_indent(-10);
-
 			tmp_str << "beginning iteration " << global_iter_num;
-			performance_log->log_event(tmp_str.str(), 0, "start_iter");
-			performance_log->add_indent();
+			performance_log->log_event(tmp_str.str());
+	
 			if (!calc_jacobian)
 			{
 				calc_jacobian = true;
@@ -283,13 +280,8 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 			break;
 		}
 		tmp_str.str("");
-		tmp_str.clear();
 		tmp_str << "completed iteration " << global_iter_num;
-		performance_log->log_event(tmp_str.str(), 0, "end_iter");
-		tmp_str.str("");
-		tmp_str.clear();
-		tmp_str << "time to complete iteration " << global_iter_num;
-		performance_log->log_summary(tmp_str.str(), "end_iter", "start_iter");
+		performance_log->log_event(tmp_str.str());
 		// write files that get wrtten at the end of each iteration
 		stringstream filename;
 		string complete_filename;
@@ -910,7 +902,6 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			prf_message.str("");
 			prf_message << "beginning upgrade vector calculations, lambda = " << i_lambda;
 			performance_log->log_event(prf_message.str());
-			performance_log->add_indent();
 			//std::cout << string(message.str().size(), '\b');
 			message.str("");
 			message << "  computing upgrade vector (lambda = " << i_lambda << ")  " << ++i_update_vec << " / " << lambda_vec.size() << "             " << endl;
@@ -937,7 +928,6 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 				fout_rec << endl << endl << ss.str() << endl;
 				std::cout << endl << ss.str() << endl;
 				performance_log->log_event(ss.str());
-				performance_log->add_indent(-1);
 				continue;
 			}
 			num_success_calc++;
@@ -983,8 +973,6 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 				int run_id = run_manager.add_run(new_par_model, "extended", i_lambda);
 				save_frozen_pars(fout_frz, frozen_active_ctl_pars, run_id);
 			}*/
-			performance_log->add_indent(-1);
-
 		}
 		file_manager.close_file("fpr");
 		RestartController::write_upgrade_runs_built(fout_restart);
@@ -992,19 +980,28 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	//instance of a Mat for the jco
 	Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
 		jacobian.get_matrix_ptr());
-	LinearAnalysis la(j, pest_scenario, file_manager);
-	PerformanceLog pfm = *performance_log;
-	pfm.log_event("LinearAnalysis::glm_iter_fosm");
-	la.glm_iter_fosm(base_run, output_file_writer, termination_ctl.get_iteration_number(), pfm, &run_manager);
-	pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(&run_manager, termination_ctl.get_iteration_number(), pfm, base_run);
+	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log);
+	performance_log->log_event("LinearAnalysis::glm_iter_fosm");
+	pair<ParameterEnsemble, map<int, int>> fosm_real_info;
+	try {
 
+
+		la.glm_iter_fosm(base_run, output_file_writer, termination_ctl.get_iteration_number(), &run_manager);
+
+		fosm_real_info = la.draw_fosm_reals(&run_manager, termination_ctl.get_iteration_number(), base_run);
+	}
+	catch (exception& e)
+	{
+		os << "Error in GLM iteration FOSM process:" << e.what() << ", continuing..." << endl;
+
+	}
 	if (num_success_calc == 0)
 	{
 		throw runtime_error("no upgrade vectors were calculated successfully");
 	}
 
 	cout << endl;
-	performance_log->add_indent(-1);
+
 	cout << "  performing upgrade vector model runs... ";
 	run_manager.run();
 
@@ -1075,7 +1072,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	file_manager.close_file("fpr");
 
 	
-	ObservationEnsemble oe = la.process_fosm_reals(&run_manager, fosm_real_info, termination_ctl.get_iteration_number(), pfm, base_run.get_phi(*regul_scheme_ptr));
+	ObservationEnsemble oe = la.process_fosm_reals(&run_manager, fosm_real_info, termination_ctl.get_iteration_number(), base_run.get_phi(*regul_scheme_ptr));
 	
 	
 	// Print frozen parameter information
