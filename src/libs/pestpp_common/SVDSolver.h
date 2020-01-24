@@ -133,16 +133,16 @@ protected:
 		double &rel_change);
 	void calc_upgrade_vec(double i_lambda, Parameters &frozen_ctl_pars, QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
 		Eigen::VectorXd &residuals_vec, vector<string> &obs_names_vec, const Parameters &base_run_ctl_pars,
-		Parameters &new_ctl_pars, MarquardtMatrix marquardt_type, Pest::LimitType &limit_type, bool scale_upgrade=false);
+		Parameters &new_ctl_pars, Pest::LimitType &limit_type);
 	void test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &frozen_ctl_pars, QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
 		Eigen::VectorXd &residuals_vec, vector<string> &obs_names_vec, const Parameters &base_run_ctl_pars,
-		Parameters &new_ctl_pars, MarquardtMatrix marquardt_type, bool scale_upgrade = false);
+		Parameters &new_ctl_pars);
 	
 	void calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
 		const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
 		const Parameters &active_base_ctl_pars, const Parameters &freeze_active_ctl_pars,
 		double lambda, Parameters &active_ctl_upgrade_pars, Parameters &upgrade_active_ctl_del_pars,
-		Parameters &grad_active_ctl_del_pars, MarquardtMatrix marquardt_type, bool scale_upgrade=false);
+		Parameters &grad_active_ctl_del_pars);
 	Eigen::VectorXd calc_residual_corrections(const Jacobian &jacobian, const Parameters &del_numeric_pars,
 							   const vector<string> obs_name_vec);
 	void dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jacobian, QSqrtMatrix &Q_sqrt,
@@ -156,7 +156,6 @@ protected:
 		const Parameters &base_run_active_ctl_par, const Parameters &freeze_active_ctl_pars,
 		DynamicRegularization &tmp_regul_scheme, bool scale_upgrade = false);
 	int check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Parameters &current_active_ctl_pars, const Parameters &new_upgrade_active_ctl_pars, const Parameters &new_grad_active_ctl_pars = Parameters());
-	Eigen::SparseMatrix<double> get_normal_matrix(MarquardtMatrix marquardt_type, double lambda, Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul, const vector<string> &par_name_vec, const vector<string> &obs_name_vec);
 };
 
 #endif /* SVDSOLVER_H_ */

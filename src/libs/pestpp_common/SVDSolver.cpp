@@ -101,12 +101,6 @@ SVDSolver::SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, Objective
 	performance_log(_performance_log), base_lambda_vec(_pest_scenario.get_pestpp_options().get_base_lambda_vec()), lambda_scale_vec(_pest_scenario.get_pestpp_options().get_lambda_scale_vec()),
 	terminate_local_iteration(false)
 {
-	if (_pest_scenario.get_pestpp_options().get_jac_scale())
-	{
-		mar_mat = MarquardtMatrix::JTQJ;
-	}
-	else
-		mar_mat = MarquardtMatrix::IDENT;
 	svd_package = new SVD_EIGEN();
 }
 
@@ -374,7 +368,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
 	const Parameters &base_active_ctl_pars, const Parameters &prev_frozen_active_ctl_pars,
 	double lambda, Parameters &active_ctl_upgrade_pars, Parameters &upgrade_active_ctl_del_pars,
-	Parameters &grad_active_ctl_del_pars, MarquardtMatrix marquardt_type, bool scale_upgrade)
+	Parameters &grad_active_ctl_del_pars)
 {
 	Parameters base_numeric_pars = par_transform.active_ctl2numeric_cp(base_active_ctl_pars);
 	//Create a set of Derivative Parameters which does not include the frozen Parameters
@@ -418,7 +412,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	cout << endl;*/
 	Eigen::VectorXd upgrade_vec;
 	stringstream info_str;
-	if (marquardt_type == MarquardtMatrix::JTQJ)
+	if (mar_mat == MarquardtMatrix::JTQJ)
 	{
 		
 		Eigen::SparseMatrix<double> S;
@@ -467,18 +461,18 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		upgrade_vec = S * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * ((jac * S).transpose()* (q_mat  * (corrected_residuals))))));
 		
 	}
-	else if ((marquardt_type == MarquardtMatrix::IDENT) || 
-		(marquardt_type == MarquardtMatrix::PRIOR))
+	else if ((mar_mat == MarquardtMatrix::IDENT) || 
+		(mar_mat == MarquardtMatrix::PRIOR))
 	{
 		JtQJ = jac.transpose() * q_mat * jac;
 		Eigen::VectorXd innovation = jac.transpose() * (q_mat * corrected_residuals);
 		
-		if (marquardt_type == MarquardtMatrix::IDENT)
+		if (mar_mat == MarquardtMatrix::IDENT)
 		{
 			//nothing to do here
 		}
 		
-		else if (marquardt_type == MarquardtMatrix::PRIOR)
+		else if (mar_mat == MarquardtMatrix::PRIOR)
 		{
 			
 			//work up the inverse prior par cov
@@ -527,7 +521,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		throw runtime_error("unrecognized marquardt scaling type");
 
 	// scale the upgrade vector using the technique described in the PEST manual
-	if (scale_upgrade)
+	if (pest_scenario.get_pestpp_options().get_jac_scale())
 	{
 		double beta = 1.0;
 		Eigen::VectorXd gama = jac * upgrade_vec;
@@ -586,7 +580,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active_ctl_pars, QSqrtMatrix &Q_sqrt,
 	const DynamicRegularization &regul, VectorXd &residuals_vec, vector<string> &obs_names_vec,
 	const Parameters &base_run_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
-	MarquardtMatrix marquardt_type, Pest::LimitType &limit_type, bool scale_upgrade)
+	Pest::LimitType &limit_type)
 {
 	Parameters upgrade_ctl_del_pars;
 	Parameters grad_ctl_del_pars;
@@ -599,7 +593,7 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 	performance_log->log_event("commencing calculation of upgrade vector");
 	calc_lambda_upgrade_vec_JtQJ(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
 		base_run_active_ctl_pars, prev_frozen_active_ctl_pars, i_lambda, upgrade_active_ctl_pars, upgrade_ctl_del_pars,
-		grad_ctl_del_pars, marquardt_type, scale_upgrade);
+		grad_ctl_del_pars);
 	if (upgrade_active_ctl_pars.get_notnormal_keys().size() > 0)
 	{
 		stringstream ss;
@@ -640,8 +634,7 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 
 void SVDSolver::test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &prev_frozen_active_ctl_pars, QSqrtMatrix &Q_sqrt,
 		const DynamicRegularization &regul, VectorXd &residuals_vec, vector<string> &obs_names_vec,
-		const Parameters &base_run_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
-		MarquardtMatrix marquardt_type, bool scale_upgrade)
+		const Parameters &base_run_active_ctl_pars, Parameters &upgrade_active_ctl_pars)
 {
 
 	Parameters upgrade_ctl_del_pars;
@@ -657,7 +650,7 @@ void SVDSolver::test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &pr
 	
 	calc_lambda_upgrade_vec_JtQJ(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
 		base_run_active_ctl_pars, prev_frozen_active_ctl_pars, i_lambda, upgrade_active_ctl_pars, upgrade_ctl_del_pars,
-		grad_ctl_del_pars, marquardt_type, scale_upgrade);
+		grad_ctl_del_pars);
 
 	performance_log->log_event("commencing check of parameter bounds and gradients");
 
@@ -897,7 +890,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		//use call to calc_upgrade_vec to compute frozen parameters
 		test_upgrade_to_find_freeze_pars(0.0, frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
 			obs_names_vec, base_run_active_ctl_par,
-			tmp_new_par, mar_mat, false);
+			tmp_new_par);
 		if (regul_scheme_ptr->get_use_dynamic_reg())
 		{
 			dynamic_weight_adj(base_run, jacobian, Q_sqrt, residuals_vec, obs_names_vec,
@@ -944,10 +937,10 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 				//test for pars to freeze
 				test_upgrade_to_find_freeze_pars(i_lambda, lam_frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
 					obs_names_vec, base_run_active_ctl_par,
-					tmp_new_par, mar_mat, false);
+					tmp_new_par);
 
 				calc_upgrade_vec(i_lambda, lam_frozen_active_ctl_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
-					obs_names_vec, base_run_active_ctl_par, new_pars, mar_mat, limit_type, false);
+					obs_names_vec, base_run_active_ctl_par, new_pars, limit_type);
 			}
 			catch (const runtime_error& error)
 			{
@@ -1552,14 +1545,14 @@ PhiComponets SVDSolver::phi_estimate(const ModelRun &base_run, const Jacobian &j
 		const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
 		const Parameters &base_ctl_pars, const Parameters &prev_frozen_ctl_pars,
 		double lambda, Parameters &ctl_upgrade_pars, Parameters &upgrade_ctl_del_pars,
-		Parameters &grad_ctl_del_pars, MarquardtMatrix marquardt_type, bool scale_upgrade);
+		Parameters &grad_ctl_del_pars);
 
 	UPGRADE_FUNCTION calc_lambda_upgrade = &SVDSolver::calc_lambda_upgrade_vec_JtQJ;
 
 
 	(*this.*calc_lambda_upgrade)(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
 		base_run_active_ctl_par, freeze_active_ctl_pars, 0, new_pars, upgrade_ctl_del_pars,
-		grad_ctl_del_pars, MarquardtMatrix::IDENT, scale_upgrade);
+		grad_ctl_del_pars);
 
 	//Don't limit parameters as this is just an estimate
 	//limit_parameters_ip(base_run_active_ctl_par, new_pars,
