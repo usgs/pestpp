@@ -527,6 +527,15 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		jac_scale = pest_utils::parse_string_arg_to_bool(value);
 
 	}
+	else if (key == "GLM_NORMAL_FORM")
+	{
+		if (value == "DIAG")
+			glm_normal_form = GLMNormalForm::DIAG;
+		else if (value == "IDENT")
+			glm_normal_form = GLMNormalForm::IDENT;
+		else if (value == "PRIOR")
+			glm_normal_form = GLMNormalForm::PRIOR;
+	}
 
 	else if (key == "UPGRADE_AUGMENT")
 	{
@@ -999,6 +1008,14 @@ void PestppOptions::summary(ostream& os) const
 	os << "base_jacobian: " << basejac_filename << endl;
 	os << "glm_num_reals: " << glm_num_reals << endl;
 	os << "jac_scale: " << jac_scale << endl;
+	string norm_str;
+	if (glm_normal_form == GLMNormalForm::DIAG)
+		norm_str = "DIAG";
+	else if (glm_normal_form == GLMNormalForm::IDENT)
+		norm_str = "IDENT";
+	else if (glm_normal_form == GLMNormalForm::PRIOR)
+		norm_str = "PRIOR";
+	os << "glm_normal_form: " << norm_str << endl;
 	if (global_opt == OPT_DE)
 		os << "global_opt: de" << endl;
 	os << "de_f: " << de_f << endl;
@@ -1125,6 +1142,7 @@ void PestppOptions::set_defaults()
 	set_max_reg_iter(20);
 	set_uncert_flag(true);
 	set_glm_num_reals(0);
+	set_glm_normal_form(GLMNormalForm::DIAG);
 	set_prediction_names(vector<string>());
 	set_parcov_filename(string());
 	set_obscov_filename(string());

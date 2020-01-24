@@ -395,24 +395,14 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	// removed this line when true added to end of the previous call to get_sparce_matrix
 	//q_mat = (q_mat * q_mat).eval();
 	Eigen::SparseMatrix<double> jac = jacobian.get_matrix(obs_name_vec, numeric_par_names);
-	//Eigen::SparseMatrix<double> ident;
-	//ident.resize(jac.cols(), jac.cols());
-	//ident.setIdentity();
+	
 	performance_log->log_event("forming JtQJ matrix");
-	//Eigen::SparseMatrix<double> JtQJ = jac.transpose() * q_mat * jac;
-	Eigen::SparseMatrix<double> JtQJ;
-	/*cout << "JTQJ" << endl;
-	cout << JtQJ.toDense() << endl;
-	cout << endl;
-	cout << "Q" << endl;
-	cout << q_mat.toDense() << endl;
-	cout << endl;
-	cout << "jac" << endl;
-	cout << jac.toDense() << endl;
-	cout << endl;*/
+	Eigen::SparseMatrix<double> JtQJ = jac.transpose() * q_mat * jac;
+	
 	Eigen::VectorXd upgrade_vec;
 	stringstream info_str;
-	if (mar_mat == MarquardtMatrix::JTQJ)
+	PestppOptions::GLMNormalForm mar_mat = pest_scenario.get_pestpp_options().get_glm_normal_form();
+	if (mar_mat == PestppOptions::GLMNormalForm::DIAG)
 	{
 		
 		Eigen::SparseMatrix<double> S;
@@ -461,18 +451,18 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		upgrade_vec = S * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * ((jac * S).transpose()* (q_mat  * (corrected_residuals))))));
 		
 	}
-	else if ((mar_mat == MarquardtMatrix::IDENT) || 
-		(mar_mat == MarquardtMatrix::PRIOR))
+	else if ((mar_mat == PestppOptions::GLMNormalForm::IDENT) ||
+		(mar_mat == PestppOptions::GLMNormalForm::PRIOR))
 	{
 		JtQJ = jac.transpose() * q_mat * jac;
 		Eigen::VectorXd innovation = jac.transpose() * (q_mat * corrected_residuals);
 		
-		if (mar_mat == MarquardtMatrix::IDENT)
+		if (mar_mat == PestppOptions::GLMNormalForm::IDENT)
 		{
 			//nothing to do here
 		}
 		
-		else if (mar_mat == MarquardtMatrix::PRIOR)
+		else if (mar_mat == PestppOptions::GLMNormalForm::PRIOR)
 		{
 			
 			//work up the inverse prior par cov

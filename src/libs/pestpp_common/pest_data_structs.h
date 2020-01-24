@@ -186,6 +186,7 @@ public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
 	enum MAT_INV { Q12J, JTQJ };
 	enum GLOBAL_OPT { NONE, OPT_DE };
+	enum GLMNormalForm { IDENT,DIAG, PRIOR };
 	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
 	/*PestppOptions(int _n_iter_base = 50, int _n_iter_super = 0, int _max_n_super = 50,
 		double _super_eigthres = 1.0E-6, SVD_PACK _svd_pack = PestppOptions::REDSVD,
@@ -251,6 +252,8 @@ public:
 	string get_basejac_filename()const { return basejac_filename; }
 	int get_glm_num_reals() const { return glm_num_reals; }
 	void set_glm_num_reals(int _glm_num_reals) { glm_num_reals = _glm_num_reals; }
+	GLMNormalForm get_glm_normal_form() const { return glm_normal_form;}
+	void set_glm_normal_form(GLMNormalForm form) { glm_normal_form = form; }
 
 	double get_overdue_reched_fac()const { return overdue_reched_fac; }
 	void set_overdue_reched_fac(double _val) { overdue_reched_fac = _val; }
@@ -455,6 +458,7 @@ private:
 	int max_super_frz_iter;
 	int max_reg_iter;
 	int glm_num_reals;
+	GLMNormalForm glm_normal_form;
 	vector<double> base_lambda_vec;
 	vector<double> lambda_scale_vec;
 	bool iter_summary_flag;

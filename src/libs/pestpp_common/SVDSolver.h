@@ -65,7 +65,7 @@ public:
 	enum class MAT_INV{ Q12J, JTQJ };
 protected:
 	//enum class LimitType {NONE, LBND, UBND, REL, FACT};
-	enum class MarquardtMatrix {IDENT, JTQJ, PRIOR};
+	//enum class MarquardtMatrix {IDENT, JTQJ, PRIOR};
 public:
 	SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
 		const ParamTransformSeq &_par_transform, Jacobian &_jacobian,
@@ -100,7 +100,7 @@ protected:
 	Pest &pest_scenario;
 	const static string svd_solver_type_name;
 	SVDPackage *svd_package;
-	MarquardtMatrix mar_mat;
+	//MarquardtMatrix mar_mat;
 	const string description;
 	const ControlInfo *ctl_info;
 	SVDInfo svd_info;
