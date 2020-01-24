@@ -405,7 +405,8 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	//ident.resize(jac.cols(), jac.cols());
 	//ident.setIdentity();
 	performance_log->log_event("forming JtQJ matrix");
-	Eigen::SparseMatrix<double> JtQJ = jac.transpose() * q_mat * jac;
+	//Eigen::SparseMatrix<double> JtQJ = jac.transpose() * q_mat * jac;
+	Eigen::SparseMatrix<double> JtQJ;
 	/*cout << "JTQJ" << endl;
 	cout << JtQJ.toDense() << endl;
 	cout << endl;
@@ -416,12 +417,11 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	cout << jac.toDense() << endl;
 	cout << endl;*/
 	Eigen::VectorXd upgrade_vec;
+	stringstream info_str;
 	if (marquardt_type == MarquardtMatrix::JTQJ)
 	{
-		stringstream info_str;
+		
 		Eigen::SparseMatrix<double> S;
-
-
 		//Compute Scaling Matrix Sii
 		performance_log->log_event("commencing to scale JtQJ matrix- first SVD...");
 		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc, 0.0);
@@ -467,8 +467,39 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		upgrade_vec = S * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * ((jac * S).transpose()* (q_mat  * (corrected_residuals))))));
 		
 	}
-	else if (marquardt_type == MarquardtMatrix::IDENT)
+	else if ((marquardt_type == MarquardtMatrix::IDENT) || 
+		(marquardt_type == MarquardtMatrix::PRIOR))
 	{
+		JtQJ = jac.transpose() * q_mat * jac;
+		Eigen::VectorXd innovation = jac.transpose() * (q_mat * corrected_residuals);
+		
+		if (marquardt_type == MarquardtMatrix::IDENT)
+		{
+			//nothing to do here
+		}
+		
+		else if (marquardt_type == MarquardtMatrix::PRIOR)
+		{
+			
+			//work up the inverse prior par cov
+			Covariance prior_inv;
+			prior_inv.try_from(pest_scenario, file_manager);
+			prior_inv = prior_inv.get(numeric_par_names);
+			prior_inv.inv_ip();
+
+			//form the regularized normal matrix
+			Eigen::MatrixXd lamb = (Eigen::MatrixXd::Ones(JtQJ.rows(), JtQJ.cols()) * (lambda + 1.0));
+			lamb = lamb + prior_inv.e_ptr()->toDense();
+			lamb = lamb + JtQJ.toDense();
+			JtQJ = lamb.sparseView();
+
+			//augment innovations with prior-scaled penalty
+			Parameters initial_numeric_pars = par_transform.ctl2numeric_cp(pest_scenario.get_ctl_parameters());
+			Eigen::VectorXd reg_innovation = *prior_inv.e_ptr() * (base_numeric_pars.get_data_eigen_vec(numeric_par_names) -
+				initial_numeric_pars.get_data_eigen_vec(numeric_par_names));
+			innovation = innovation + reg_innovation;
+		}
+
 		performance_log->log_event("commencing SVD factorization - using identity lambda scaling");
 		svd_package->solve_ip(JtQJ, Sigma, U, Vt, Sigma_trunc);
 		performance_log->log_event("SVD factorization complete");
@@ -487,16 +518,13 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		info_str.str("");
 		info_str << "jac info: " << "rows = " << jac.rows() << ": cols = " << jac.cols() << ": size = " << jac.size() << ": nonzeros = " << jac.nonZeros();
 		performance_log->log_event(info_str.str());
-		upgrade_vec = Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * (jac.transpose() * (q_mat  * corrected_residuals))));
-	}
-	else if (marquardt_type == MarquardtMatrix::PRIOR)
-	{
+		//upgrade_vec = Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * (jac.transpose() * (q_mat  * corrected_residuals))));
+		upgrade_vec = Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * innovation));
 
 	}
 
 	else
 		throw runtime_error("unrecognized marquardt scaling type");
-
 
 	// scale the upgrade vector using the technique described in the PEST manual
 	if (scale_upgrade)
