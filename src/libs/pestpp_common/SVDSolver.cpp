@@ -401,8 +401,8 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	
 	Eigen::VectorXd upgrade_vec;
 	stringstream info_str;
-	PestppOptions::GLMNormalForm mar_mat = pest_scenario.get_pestpp_options().get_glm_normal_form();
-	if (mar_mat == PestppOptions::GLMNormalForm::DIAG)
+	//PestppOptions::GLMNormalForm mar_mat = pest_scenario.get_pestpp_options().get_glm_normal_form();
+	if (glm_normal_form == PestppOptions::GLMNormalForm::DIAG)
 	{
 		
 		Eigen::SparseMatrix<double> S;
@@ -451,18 +451,18 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		upgrade_vec = S * (Vt.transpose() * (Sigma_inv.asDiagonal() * (U.transpose() * ((jac * S).transpose()* (q_mat  * (corrected_residuals))))));
 		
 	}
-	else if ((mar_mat == PestppOptions::GLMNormalForm::IDENT) ||
-		(mar_mat == PestppOptions::GLMNormalForm::PRIOR))
+	else if ((glm_normal_form == PestppOptions::GLMNormalForm::IDENT) ||
+		(glm_normal_form == PestppOptions::GLMNormalForm::PRIOR))
 	{
 		JtQJ = jac.transpose() * q_mat * jac;
 		Eigen::VectorXd innovation = jac.transpose() * (q_mat * corrected_residuals);
 		
-		if (mar_mat == PestppOptions::GLMNormalForm::IDENT)
+		if (glm_normal_form == PestppOptions::GLMNormalForm::IDENT)
 		{
 			//nothing to do here
 		}
 		
-		else if (mar_mat == PestppOptions::GLMNormalForm::PRIOR)
+		else if (glm_normal_form == PestppOptions::GLMNormalForm::PRIOR)
 		{
 			
 			//work up the inverse prior par cov

@@ -98,6 +98,7 @@ protected:
 		Parameters frozen_numeric_pars;
 	};
 	Pest &pest_scenario;
+	PestppOptions::GLMNormalForm glm_normal_form;
 	const static string svd_solver_type_name;
 	SVDPackage *svd_package;
 	//MarquardtMatrix mar_mat;

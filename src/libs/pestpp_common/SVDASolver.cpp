@@ -53,6 +53,12 @@ SVDASolver::SVDASolver(Pest &_pest_scenario, FileManager &_file_manager, Objecti
 		_output_file_writer, _performance_log,"super parameter solution", _phiredswh_flag, _splitswh_flag, false),
 		max_super_frz_iter(_pest_scenario.get_pestpp_options().get_max_super_frz_iter())
 {
+	PestppOptions::GLMNormalForm nf = pest_scenario.get_pestpp_options().get_glm_normal_form();
+	if (nf == PestppOptions::GLMNormalForm::PRIOR)
+	{
+		file_manager.rec_ofstream() << "Note: using 'GLM_NORMAL_FORM' = 'DIAG' for super iterations" << endl;
+		glm_normal_form = PestppOptions::GLMNormalForm::DIAG;
+	}
 }
 
 
@@ -134,7 +140,7 @@ void SVDASolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_activ
 		Parameters &grad_ctl_del_pars);
 
 	UPGRADE_FUNCTION calc_lambda_upgrade = &SVDASolver::calc_lambda_upgrade_vec_JtQJ;
-
+	
 
 		// need to remove parameters frozen due to failed jacobian runs when calling calc_lambda_upgrade_vec
 		//Freeze Parameters at the boundary whose ugrade vector and gradient both head out of bounds

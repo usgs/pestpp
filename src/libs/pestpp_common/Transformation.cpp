@@ -548,7 +548,6 @@ void TranTied::print(ostream &os) const
 	}
 }
 
-
 const  Eigen::SparseMatrix<double>& TranSVD::get_vt() const
 {
 	return Vt;
