@@ -101,7 +101,9 @@ SVDSolver::SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, Objective
 	performance_log(_performance_log), base_lambda_vec(_pest_scenario.get_pestpp_options().get_base_lambda_vec()), lambda_scale_vec(_pest_scenario.get_pestpp_options().get_lambda_scale_vec()),
 	terminate_local_iteration(false)
 {
-	svd_package = new SVD_EIGEN();
+	svd_package = new SVD_REDSVD();
+	glm_normal_form = pest_scenario.get_pestpp_options().get_glm_normal_form();
+
 }
 
 void SVDSolver::set_svd_package(PestppOptions::SVD_PACK _svd_pack)
