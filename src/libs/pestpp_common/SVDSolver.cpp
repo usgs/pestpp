@@ -1554,7 +1554,7 @@ PhiComponets SVDSolver::phi_estimate(const ModelRun &base_run, const Jacobian &j
 	Parameters delta_par = par_transform.active_ctl2numeric_cp(new_pars)
 		- par_transform.active_ctl2numeric_cp(base_run_active_ctl_par);
 	vector<string> numeric_par_names = delta_par.get_keys();
-	VectorXd delta_par_vec = transformable_2_egien_vec(delta_par, numeric_par_names);
+	VectorXd delta_par_vec = transformable_2_eigen_vec(delta_par, numeric_par_names);
 	Eigen::SparseMatrix<double> jac = jacobian.get_matrix(obs_names_vec, numeric_par_names);
 	VectorXd delta_obs_vec = jac * delta_par_vec;
 	//Transformable delta_obs(obs_names_vec, delta_obs_vec);

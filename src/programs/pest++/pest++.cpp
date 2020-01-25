@@ -685,6 +685,7 @@ int main(int argc, char* argv[])
 				Parameters base_numeric_pars = base_trans_seq.ctl2numeric_cp(cur_ctl_parameters);
 				const vector<string> &pars = base_numeric_pars.get_keys();
 				QSqrtMatrix Q_sqrt(&(pest_scenario.get_ctl_observation_info()), &pest_scenario.get_prior_info());
+				
 				if (restart_ctl.get_restart_option() == RestartController::RestartOption::RESUME_JACOBIAN_RUNS)
 				{
 					//read previously computed super parameter transformation
@@ -694,7 +695,15 @@ int main(int argc, char* argv[])
 				}
 				else
 				{
-					(*tran_svd).update_reset_frozen_pars(*base_jacobian_ptr, Q_sqrt, base_numeric_pars, max_n_super, super_eigthres, pars, nonregul_obs, cur_run.get_frozen_ctl_pars());
+					Eigen::SparseMatrix<double> parcov_inv;
+					if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::PRIOR)
+					{
+						Covariance parcov;
+						parcov.try_from(pest_scenario, file_manager);
+						parcov_inv = *parcov.get(base_jacobian_ptr->get_base_numeric_par_names()).inv().e_ptr();
+					}
+					(*tran_svd).update_reset_frozen_pars(*base_jacobian_ptr, Q_sqrt, base_numeric_pars, max_n_super, super_eigthres, 
+						pars, nonregul_obs, parcov_inv, cur_run.get_frozen_ctl_pars());
 					(*tr_svda_fixed).reset((*tran_svd).get_frozen_derivative_pars());
 				}
 				SVDASolver super_svd(pest_scenario, file_manager, &obj_func,

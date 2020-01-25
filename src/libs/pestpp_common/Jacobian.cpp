@@ -77,7 +77,7 @@ void Jacobian::remove_cols(std::set<string> &rm_parameter_names)
 	auto end_iter = std::remove_if(base_numeric_par_names.begin(), base_numeric_par_names.end(),
 		[&rm_parameter_names](string &str)->bool{return rm_parameter_names.find(str) != rm_parameter_names.end(); });
 	base_numeric_par_names.resize(std::distance(base_numeric_par_names.begin(), end_iter));
-	matrix_del_cols(matrix, del_col_ids);
+	matrix_del_rows_cols(matrix, del_col_ids,false,true);
 }
 
 void Jacobian::add_cols(set<string> &new_pars_names)
