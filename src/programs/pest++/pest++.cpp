@@ -832,6 +832,9 @@ int main(int argc, char* argv[])
 				ObservationEnsemble oe = la.process_fosm_reals(run_manager_ptr, fosm_real_info, -999, optimum_run.get_phi(ptr));
 				
 				//here is the adjustment process for each realization - one lambda each for now
+				//todo: make sure base_jco_ptr base par names includes only pars in the jacobian?
+				//todo: make sure to handle failed realizations - use oe real names to retrieve pe rows
+				//todo: what about lambda?
 				QSqrtMatrix q(&reweight, pest_scenario.get_prior_info_ptr());
 				DynamicRegularization reg;
 				reg.set_zero();
@@ -852,7 +855,7 @@ int main(int argc, char* argv[])
 						base_svd.calc_lambda_upgrade_vec_JtQJ(*base_jacobian_ptr, q, reg, res, nz_obs_names,
 							real_pars, freeze_pars, 0.0, upgrade_pars,
 							del_upgrade_pars, grad_upgrade_pars);
-
+						
 
 					}
 				}
