@@ -29,7 +29,7 @@ public:
 	//directly from Mat objects
 	//linear_analysis(Mat& _jacobian,Pest& _pest_scenario, FileManager& _file_manager, Mat& _parcov, Mat& _obscov, map<string, Mat> _predictions,Logger* _log = new Logger());
 
-    void glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter, 
+    ObservationInfo glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter, 
 		RunManagerAbstract* run_mgr_ptr);
 	pair<ParameterEnsemble,map<int,int>> draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter,
 		ModelRun& optimum_run);

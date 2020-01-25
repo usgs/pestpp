@@ -89,6 +89,13 @@ public:
 	bool local_iteration_terminatated()const { return terminate_local_iteration; }
 	virtual ~SVDSolver(void);
 	virtual string get_solver_type() const { return svd_solver_type_name; }
+
+	void calc_lambda_upgrade_vec_JtQJ(const Jacobian& jacobian, const QSqrtMatrix& Q_sqrt, const DynamicRegularization& regul,
+		const Eigen::VectorXd& Residuals, const vector<string>& obs_name_vec,
+		const Parameters& active_base_ctl_pars, const Parameters& freeze_active_ctl_pars,
+		double lambda, Parameters& active_ctl_upgrade_pars, Parameters& upgrade_active_ctl_del_pars,
+		Parameters& grad_active_ctl_del_pars);
+
 protected:
 	class Upgrade {
 	public:
@@ -139,11 +146,7 @@ protected:
 		Eigen::VectorXd &residuals_vec, vector<string> &obs_names_vec, const Parameters &base_run_ctl_pars,
 		Parameters &new_ctl_pars);
 	
-	void calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const DynamicRegularization &regul,
-		const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
-		const Parameters &active_base_ctl_pars, const Parameters &freeze_active_ctl_pars,
-		double lambda, Parameters &active_ctl_upgrade_pars, Parameters &upgrade_active_ctl_del_pars,
-		Parameters &grad_active_ctl_del_pars);
+	
 	Eigen::VectorXd calc_residual_corrections(const Jacobian &jacobian, const Parameters &del_numeric_pars,
 							   const vector<string> obs_name_vec);
 	void dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jacobian, QSqrtMatrix &Q_sqrt,

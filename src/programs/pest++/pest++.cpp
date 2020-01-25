@@ -51,6 +51,7 @@
 #include "logger.h"
 #include "covariance.h"
 #include "Ensemble.h"
+#include "eigen_tools.h"
 
 
 using namespace std;
@@ -821,14 +822,40 @@ int main(int argc, char* argv[])
 				base_jacobian_ptr->get_matrix_ptr());
 
 			LinearAnalysis la(j, pest_scenario, file_manager, performance_log);
-			la.glm_iter_fosm(optimum_run, output_file_writer, -999, run_manager_ptr);
+			ObservationInfo reweight = la.glm_iter_fosm(optimum_run, output_file_writer, -999, run_manager_ptr);
 			if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
 			{
 				cout << endl << "drawing and running " << pest_scenario.get_pestpp_options().get_glm_num_reals() << " FOSM-based posterior realizations" << endl;
 				pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(run_manager_ptr, -999, optimum_run);
 				run_manager_ptr->run();
 				DynamicRegularization ptr;
-				la.process_fosm_reals(run_manager_ptr, fosm_real_info, -999, optimum_run.get_phi(ptr));
+				ObservationEnsemble oe = la.process_fosm_reals(run_manager_ptr, fosm_real_info, -999, optimum_run.get_phi(ptr));
+				
+				//here is the adjustment process for each realization - one lambda each for now
+				QSqrtMatrix q(&reweight, pest_scenario.get_prior_info_ptr());
+				DynamicRegularization reg;
+				reg.set_zero();
+				Observations ctl_obs = pest_scenario.get_ctl_observations();
+				vector<string> nz_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+				Eigen::MatrixXd sim_reals = oe.get_eigen(oe.get_real_names(), nz_obs_names);
+				vector<string> active_par_names = base_jacobian_ptr->get_base_numeric_par_names();
+				Eigen::MatrixXd par_reals = fosm_real_info.first.get_eigen(fosm_real_info.first.get_real_names(), active_par_names);
+				Parameters freeze_pars,upgrade_pars,grad_upgrade_pars,del_upgrade_pars;
+				if (true)
+				{
+					for (int i = 0; i < oe.shape().first; i++)
+					{
+						Eigen::VectorXd res = ctl_obs.get_data_eigen_vec(nz_obs_names) - sim_reals.row(i).transpose();
+						Parameters real_pars = pest_scenario.get_ctl_parameters();
+						vector<double> vals(par_reals.row(i).data(), par_reals.row(i).data() + par_reals.row(i).size());
+						real_pars.update(active_par_names, vals);
+						base_svd.calc_lambda_upgrade_vec_JtQJ(*base_jacobian_ptr, q, reg, res, nz_obs_names,
+							real_pars, freeze_pars, 0.0, upgrade_pars,
+							del_upgrade_pars, grad_upgrade_pars);
+
+
+					}
+				}
 			}
 		}
 

@@ -182,7 +182,7 @@ ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, Observations 
 	return obs_info;
 }
 
-void LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter,
+ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter,
 	RunManagerAbstract* run_mgr_ptr)
 {
 	ofstream& fout_rec = file_manager.rec_ofstream();
@@ -347,6 +347,7 @@ void LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& outp
 		fout_rec << "Note : the above forecast uncertainty summary was written to file '" + predsum_filename +
 			"'" << endl << endl;
 	}
+	return reweight;
 }
 
 pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter, 
