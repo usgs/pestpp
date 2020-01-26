@@ -85,6 +85,7 @@ public:
 	void enforce_par_limits(PerformanceLog* perfomance_log, Parameters &update_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim=true, bool enforce_bounds=false);
 	map<string,double> get_pars_at_near_bounds(const Parameters &pars, double tol=0.0);
 	pair<Parameters,Parameters> get_effective_ctl_lower_upper_bnd(Parameters &pars);
+	Pest &get_child_pest(int icycle);	
 	
 	virtual ~Pest();
 	
@@ -108,6 +109,7 @@ private:
 	vector<string> ctl_ordered_par_group_names;
 	vector<string> ctl_ordered_obs_group_names;
 	vector<string> ctl_ordered_pi_names;
+	vector<int> assimilation_cycles;
 	DynamicRegularization *regul_scheme_ptr;
 	map<int,string> other_lines;
 	string pst_filename;
@@ -123,6 +125,7 @@ private:
 	void tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens);
 	void tokens_to_pi_rec(ostream& f_rec, const string& line_upper);
 	void rectify_par_groups();
+	void extract_da_cycles();
 
 	map<string, vector<pest_utils::ExternalCtlFile>> efiles_map;
 

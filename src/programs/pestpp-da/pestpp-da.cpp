@@ -279,9 +279,14 @@ int main(int argc, char* argv[])
 			exit(0);
 		}
 
+		// loop over assimilation cycles
+		
+		//get deep copy of pest_scenario for current cycle
+		Pest childPest;
+		childPest = pest_scenario.get_child_pest(0);
+		
 		RunManagerAbstract *run_manager_ptr;
-
-
+		
 		if (run_manager_type == RunManagerType::PANTHER)
 		{
 			if (pest_scenario.get_control_info().noptmax == 0)
@@ -325,7 +330,7 @@ int main(int argc, char* argv[])
 		//Allocates Space for Run Manager.  This initializes the model parameter names and observations names.
 		//Neither of these will change over the course of the simulation
 
-		//B* b3 = new B(*b2); to do copy
+		
 		run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), pest_scenario.get_ctl_observations());
 
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
@@ -339,6 +344,7 @@ int main(int argc, char* argv[])
 
 		// clean up
 		fout_rec.close();
+		childPest.~Pest(); // make explicit deletion
 		delete run_manager_ptr;
 		cout << endl << endl << "pestpp-ies analysis complete..." << endl;
 		cout << flush;

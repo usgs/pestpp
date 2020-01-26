@@ -1459,6 +1459,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					mi_tokens = efile.get_row_vector(ro, model_input_formal_names);
 					model_exec_info.tplfile_vec.push_back(mi_tokens[0]);
 					model_exec_info.inpfile_vec.push_back(mi_tokens[1]);
+					model_exec_info.incycle_vec.push_back(std::stoi(mi_tokens[2]));
 				}
 
 				if (efiles_map.find(section) == efiles_map.end())
@@ -1498,6 +1499,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					mo_tokens = efile.get_row_vector(ro, model_output_formal_names);
 					model_exec_info.insfile_vec.push_back(mo_tokens[0]);
 					model_exec_info.outfile_vec.push_back(mo_tokens[1]);
+					model_exec_info.outcycle_vec.push_back(std::stoi(mo_tokens[2]));
+					
 				}
 
 				if (efiles_map.find(section) == efiles_map.end())
@@ -2047,6 +2050,39 @@ pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &
 	return pair<Parameters,Parameters>(lbnd,ubnd);
 }
 
+Pest& Pest::get_child_pest(int icycle)
+{
+	// TODO: insert return statement here
+	
+	
+	Pest* child_pest = new Pest(*this);
+	//child_pest->ctl_parameters;
+	//ctl_parameter_info.insert(name, pi);
+	//ctl_parameters.insert(name, pi.init_value);
+	//base_group_info.insert_parameter_link(name, pi.group);
+
+	// todo: change number of parameters and obs to match current parm/obs number
+	//ParameterRec curr_param_inf;
+	//unordered_map<string, ParameterRec>::iterator p_iter;
+	ParameterInfo curr_params;
+	curr_params = child_pest->get_ctl_parameter_info();
+	ParameterInfo pi = get_ctl_parameter_info();
+	for (auto& p : get_ctl_ordered_par_names())
+		if (pi.get_parameter_rec_ptr(p)->cycle != icycle)
+		{
+			curr_params.erase(p);
+		}
+
+	//for (auto it = curr_params.begin(); it != curr_params.end(); ++it)
+	//	std::cout << " " << it->first << ":" << it->second;
+
+	
+	return *child_pest;
+	
+}
+
+
+
 map<string, double> Pest::get_pars_at_near_bounds(const Parameters & pars, double tol)
 {
 	 map<string, double> bnd_map;
@@ -2322,6 +2358,11 @@ void Pest::rectify_par_groups()
 
 		}
 	}
+}
+
+void Pest::extract_da_cycles()
+{
+	int xxx; 
 }
 
 

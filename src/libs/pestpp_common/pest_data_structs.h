@@ -116,6 +116,7 @@ public:
 	const ParameterRec* get_parameter_rec_ptr(const string &name) const;
 	ParameterRec* get_parameter_rec_ptr_4_mod(const string &name);
 	void insert(const string &name, const ParameterRec &rec) {parameter_info[name] = rec;}
+	void erase(const string& name) { parameter_info.erase(name);}
 	ParameterInfo() {}
 	~ParameterInfo() {}
 private:
@@ -173,6 +174,8 @@ public:
 	std::vector<std::string> inpfile_vec;
 	std::vector<std::string> insfile_vec;
 	std::vector<std::string> outfile_vec;
+	std::vector<int> incycle_vec;
+	std::vector<int> outcycle_vec;
 };
 
 class ParetoInfo {
