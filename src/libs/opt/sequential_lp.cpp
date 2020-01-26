@@ -16,7 +16,7 @@
 
 sequentialLP::sequentialLP(Pest &_pest_scenario, RunManagerAbstract* _run_mgr_ptr,
 	Covariance &_parcov, FileManager* _file_mgr, OutputFileWriter _of_wr, PerformanceLog& _pfm) : pest_scenario(_pest_scenario), run_mgr_ptr(_run_mgr_ptr),
-	parcov(_parcov), file_mgr_ptr(_file_mgr),jco(*_file_mgr,_of_wr), of_wr(_of_wr), pfm(_pfm)
+	parcov(_parcov), file_mgr_ptr(_file_mgr),jco(_pest_scenario, *_file_mgr,_of_wr), of_wr(_of_wr), pfm(_pfm)
 {
 	try
 	{

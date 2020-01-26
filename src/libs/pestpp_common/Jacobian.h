@@ -28,6 +28,7 @@
 #include<Eigen/Sparse>
 #include "Transformable.h"
 #include "Transformation.h"
+#include "Pest.h"
 
 class ParamTransformSeq;
 class ParameterInfo;
@@ -60,7 +61,8 @@ public:
 	friend void TranSVD::jacobian_forward(Jacobian &jac);
 	friend void TranSVD::jacobian_reverse(Jacobian &jac);
 	
-	Jacobian(FileManager &_file_manager);
+	Jacobian(Pest& _pest_scenario, FileManager &_file_manager);
+	
 	virtual const vector<string>& parameter_list() const{return base_numeric_par_names;}
 	virtual const vector<string>& observation_list() const {return  base_sim_obs_names;}
 	virtual const vector<string>& obs_and_reg_list() const;
@@ -106,6 +108,7 @@ public:
 	void set_base_sim_obs(Observations _base_sim_obs);
 
 protected:
+
 	vector<string> base_numeric_par_names;  //ordered names of base parameters used to calculate the jacobian
 	Parameters base_numeric_parameters;  //values of base parameters used to calculate the jacobian
 	set<string> failed_parameter_names;
@@ -116,6 +119,7 @@ protected:
 	//const vector<string> &ctl_file_ordered_pi_names;
 	Eigen::SparseMatrix<double> matrix;
 	FileManager &file_manager;  // filemanger used to get name of jaobian file
+	Pest& pest_scenario;
 
 	virtual std::vector<Eigen::Triplet<double> > calc_derivative(const string &numeric_par_name, double base_numeric_par_value, int jcol, list<JacobianRun> &run_list, const ParameterGroupInfo &group_info,
 		const PriorInformation &prior_info, bool splitswh_flag);

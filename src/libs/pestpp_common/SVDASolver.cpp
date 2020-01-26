@@ -500,6 +500,11 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		string lambda_type;
 		double i_lambda;
 		bool success = run_manager.get_run(i, tmp_pars, tmp_obs, lambda_type, i_lambda);
+		if ((pest_scenario.get_pestpp_options().get_glm_debug_lamb_fail()) && (i == 1))
+		{
+			file_manager.rec_ofstream() << "'GLM_DEBUG_LAMB_FAIL' is true, failing first lambda run" << endl;
+			success = false;
+		}
 		if (success)
 		{
 			one_success = true;

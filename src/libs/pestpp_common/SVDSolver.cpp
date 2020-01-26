@@ -849,6 +849,8 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	}
 	else
 	{
+		if (jacobian.get_base_numeric_par_names().size() == 0)
+			throw runtime_error("SVDSolver::iteration_upgrd() error: no parameters in jacobian, cannot continue");
 		vector<string> obs_names_vec;
 		Observations obs = base_run.get_obs();
 		for (auto &o : base_run.get_obs_template().get_keys())
@@ -991,7 +993,8 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		RestartController::write_upgrade_runs_built(fout_restart);
 	}
 	//instance of a Mat for the jco
-	Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
+	cout << "-->starting iteration FOSM process..." << endl;
+ 	Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
 		jacobian.get_matrix_ptr());
 	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log);
 	performance_log->log_event("LinearAnalysis::glm_iter_fosm");
@@ -1008,6 +1011,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		os << "Error in GLM iteration FOSM process:" << e.what() << ", continuing..." << endl;
 
 	}
+	cout << "-->finished iteration FOSM process..." << endl;
 	if (num_success_calc == 0)
 	{
 		throw runtime_error("no upgrade vectors were calculated successfully");
@@ -1039,6 +1043,11 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		double i_lambda;
 		//This must be outside the loop to insure all parrameter sets are read in order
 		bool success = run_manager.get_run(i, tmp_pars, tmp_obs, lambda_type, i_lambda);
+		if ((pest_scenario.get_pestpp_options().get_glm_debug_lamb_fail()) && (i == 1))
+		{
+			file_manager.rec_ofstream() << "NOTE: 'GLM_DEBUG_LAMB_FAIL' is true, failing first lambda run" << endl;
+			success = false;
+		}
 		if (success)
 		{
 			one_success = true;
@@ -1084,8 +1093,8 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	}
 	file_manager.close_file("fpr");
 
-	
-	ObservationEnsemble oe = la.process_fosm_reals(&run_manager, fosm_real_info, termination_ctl.get_iteration_number(), base_run.get_phi(*regul_scheme_ptr));
+	if (fosm_real_info.second.size() > 0)
+		ObservationEnsemble oe = la.process_fosm_reals(&run_manager, fosm_real_info, termination_ctl.get_iteration_number(), base_run.get_phi(*regul_scheme_ptr));
 	
 	
 	// Print frozen parameter information

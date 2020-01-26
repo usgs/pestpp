@@ -596,7 +596,7 @@ int main(int argc, char* argv[])
 		{
 			cout << "  ---  binary jco-type file detected for par_csv" << endl;
 			use_jco = true;
-			Jacobian jco(file_manager);
+			Jacobian jco(pest_scenario, file_manager);
 			jco.read(par_csv_file);
 			cout << jco.get_matrix_ptr()->rows() << " runs found in binary jco-type file" << endl;
 			//check that the jco is compatible with the control file

@@ -254,6 +254,11 @@ public:
 	void set_glm_num_reals(int _glm_num_reals) { glm_num_reals = _glm_num_reals; }
 	GLMNormalForm get_glm_normal_form() const { return glm_normal_form;}
 	void set_glm_normal_form(GLMNormalForm form) { glm_normal_form = form; }
+	bool get_glm_debug_der_fail() const { return glm_debug_der_fail; }
+	void set_glm_debug_der_fail(bool _flag) { glm_debug_der_fail = _flag;}
+	bool get_glm_debug_lamb_fail() const { return glm_debug_lamb_fail; }
+	void set_glm_debug_lamb_fail(bool _flag) { glm_debug_lamb_fail = _flag; }
+
 
 	double get_overdue_reched_fac()const { return overdue_reched_fac; }
 	void set_overdue_reched_fac(double _val) { overdue_reched_fac = _val; }
@@ -459,15 +464,29 @@ private:
 	int max_reg_iter;
 	int glm_num_reals;
 	GLMNormalForm glm_normal_form;
+	bool glm_debug_der_fail;
+	bool glm_debug_lamb_fail;
 	vector<double> base_lambda_vec;
 	vector<double> lambda_scale_vec;
 	bool iter_summary_flag;
 	bool der_forgive;
 	bool uncert;
 	vector<string> prediction_names;
+	string basejac_filename;
+	bool jac_scale;
+	string hotstart_resfile;
 	string parcov_filename;
 	string obscov_filename;
-	string basejac_filename;
+	
+	bool tie_by_group;
+	bool enforce_tied_bounds;
+	bool debug_parse_only;
+	bool check_tplins;
+	bool fill_tpl_zeros;
+	string additional_ins_delimiters;
+
+
+
 	double overdue_reched_fac;
 	double overdue_giveup_fac;
 	double overdue_giveup_minutes;
@@ -479,11 +498,6 @@ private:
 	bool sweep_forgive;
 	int sweep_chunk;
 	bool sweep_base_run;
-	bool jac_scale;
-	string hotstart_resfile;
-
-	bool tie_by_group;
-
 
 	GLOBAL_OPT global_opt;
 	double de_f;
@@ -562,12 +576,6 @@ private:
 	double gsa_morris_delta;
 	string gsa_sobol_par_dist;
 	int gsa_rand_seed;
-
-	bool enforce_tied_bounds;
-	bool debug_parse_only;
-	bool check_tplins;
-	bool fill_tpl_zeros;
-	string additional_ins_delimiters;
 
 	
 		

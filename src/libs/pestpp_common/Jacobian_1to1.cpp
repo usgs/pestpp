@@ -41,7 +41,7 @@
 using namespace std;
 using namespace pest_utils;
 
-Jacobian_1to1::Jacobian_1to1(FileManager &_file_manager, OutputFileWriter &_output_file_writer) : Jacobian(_file_manager)
+Jacobian_1to1::Jacobian_1to1(Pest& _pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer) : Jacobian(_pest_scenario, _file_manager)
 {
 	output_file_writer_ptr = &_output_file_writer;
 }
@@ -259,7 +259,11 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 		run_manager.get_model_parameters(i_run,  run_list.back().ctl_pars);
 	    bool success = run_manager.get_observations_vec(i_run, run_list.back().obs_vec);
 		run_list.back().numeric_derivative_par = cur_numeric_par_value;
-
+		if ((pest_scenario.get_pestpp_options().get_glm_debug_der_fail()) && (i_run == 1))
+		{
+			file_manager.rec_ofstream() << "NOTE: 'GLM_DEBUG_DER_FAIL' is true, failing jco run for parameter '" << cur_par_name << "'" << endl;
+			success = false;
+		}
 		if (success)
 		{
 			par_transform.model2ctl_ip(run_list.back().ctl_pars);
