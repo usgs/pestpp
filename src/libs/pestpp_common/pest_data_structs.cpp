@@ -1156,6 +1156,8 @@ void PestppOptions::set_defaults()
 	set_uncert_flag(true);
 	set_glm_num_reals(0);
 	set_glm_normal_form(GLMNormalForm::DIAG);
+	set_glm_debug_der_fail(false);
+	set_glm_debug_lamb_fail(false);
 	set_prediction_names(vector<string>());
 	set_parcov_filename(string());
 	set_obscov_filename(string());
