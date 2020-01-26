@@ -850,7 +850,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	else
 	{
 		if (jacobian.get_base_numeric_par_names().size() == 0)
-			throw runtime_error("SVDSolver::iteration_upgrd() error: no parameters in jacobian, cannot continue");
+			throw runtime_error("SVDSolver::iteration_upgrd() error: no parameter runs in jacobian, cannot continue");
 		vector<string> obs_names_vec;
 		Observations obs = base_run.get_obs();
 		for (auto &o : base_run.get_obs_template().get_keys())

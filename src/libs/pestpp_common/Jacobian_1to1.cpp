@@ -454,7 +454,7 @@ void Jacobian_1to1::report_errors(std::ostream &fout)
 {
 	if (failed_to_increment_parmaeters.size() > 0)
 	{
-		fout << "    Parameters that went out of bounds while comuting jacobian" << endl;
+		fout << "    Parameters that went out of bounds while computing jacobian" << endl;
 		fout << "      Parameter" << endl;
 		fout << "        Name" << endl;
 		fout << "      ----------" << endl;
