@@ -373,9 +373,17 @@ pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerA
 		else
 			ss << file_manager.get_base_filename() << ".post.paren";
 		if (binary)
+		{
 			pe.to_binary(ss.str() + ".jcb");
+			cout << "...posterior parameter ensemble saved to " << ss.str() << ".jcb" << endl;
+			file_manager.rec_ofstream() << "...posterior parameter ensemble saved to " << ss.str() << ".jcb" << endl;
+		}
 		else
+		{
 			pe.to_csv(ss.str() + ".csv");
+			cout << "...posterior parameter ensemble saved to " << ss.str() << ".csv" << endl;
+			file_manager.rec_ofstream() << "...posterior parameter ensemble saved to " << ss.str() << ".csv" << endl;
+		}
 		
 		pfm.log_event("queueing realizations");
 		run_map = pe.add_runs(run_mgr_ptr);
@@ -421,9 +429,18 @@ ObservationEnsemble LinearAnalysis::process_fosm_reals(RunManagerAbstract* run_m
 	else
 		ss << file_manager.get_base_filename() << ".post.obsen";
 	if (binary)
+	{
 		oe.to_binary(ss.str() + ".jcb");
+		cout << "...posterior observation ensemble saved to " << ss.str() << ".jcb" << endl;
+		file_manager.rec_ofstream() << "...posterior observation ensemble saved to " << ss.str() << ".jcb" << endl;
+	}
 	else
+	{
 		oe.to_csv(ss.str() + ".csv");
+		cout << "...posterior observation ensemble saved to " << ss.str() << ".csv" << endl;
+		file_manager.rec_ofstream() << "...posterior observation ensemble saved to " << ss.str() << ".csv" << endl;
+	}
+		
 	
 	if (oe.shape().first > 0)
 	{

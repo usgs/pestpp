@@ -259,6 +259,7 @@ int main(int argc, char* argv[])
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
 		pest_scenario.set_defaults();
+		
 #ifndef _DEBUG
 		try {
 #endif
@@ -276,7 +277,8 @@ int main(int argc, char* argv[])
 	 	}
 #endif
 		pest_scenario.check_inputs(fout_rec);
-
+		// reset this here because we want to draw from the FOSM posterior as a whole matrix
+		pest_scenario.get_pestpp_options_ptr()->set_ies_group_draws(false);
 		
 
 		//Initialize OutputFileWriter to hadle IO of suplementary files (.par, .par, .svd)
@@ -397,7 +399,7 @@ int main(int argc, char* argv[])
 		TranSVD *tran_svd = new TranSVD(pest_scenario.get_pestpp_options().get_max_n_super(),
 			pest_scenario.get_pestpp_options().get_super_eigthres(), "SVD Super Parameter Tranformation");
 
-		if (pest_scenario.get_pestpp_options().get_svd_pack() == PestppOptions::PROPACK)
+		if (pest_scenario.get_pestpp_options().get_svd_pack() != PestppOptions::SVD_PACK::REDSVD)
 		{
 			tran_svd->set_SVD_pack();
 		}
@@ -696,6 +698,7 @@ int main(int argc, char* argv[])
 				}
 				else
 				{
+					cout << "...forming super parameter transformation, requires forming and factoring JTQJ..." << endl;
 					Eigen::SparseMatrix<double> parcov_inv;
 					if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::PRIOR)
 					{
@@ -703,6 +706,8 @@ int main(int argc, char* argv[])
 						parcov.try_from(pest_scenario, file_manager);
 						parcov_inv = *parcov.get(base_jacobian_ptr->get_base_numeric_par_names()).inv().e_ptr();
 					}
+					performance_log.log_event("updating super parameter transformation, requires formation and SVD of JtQJ");
+					
 					(*tran_svd).update_reset_frozen_pars(*base_jacobian_ptr, Q_sqrt, base_numeric_pars, max_n_super, super_eigthres, 
 						pars, nonregul_obs, parcov_inv, cur_run.get_frozen_ctl_pars());
 					(*tr_svda_fixed).reset((*tran_svd).get_frozen_derivative_pars());
@@ -772,19 +777,8 @@ int main(int argc, char* argv[])
 			(pest_scenario.get_pestpp_options().get_uncert_flag()))
 
 		{
-			/*cout << endl << endl << endl;
-			cout << endl << endl << endl;
-			cout << "  ---  starting uncertainty analysis calculations  ---  " << endl << endl << endl;
-			cout << "  uncertainty estimates calculated using Schur's " << endl;
-			cout << "  complement for linear-based conditional uncertainty " << endl;
-			cout << "  propogation.  For a derviation from Bayes equation, see " << endl;
-			cout << "  M. N. Fienen, J. E. Doherty, R. J. Hunt, and H. W. Reeves. " << endl;
-			cout << "  2010. 'Using Prediction Uncertainty Analysis to Design " << endl;
-			cout << "  Hydrologic Monitoring Networks : Example Applications " << endl;
-			cout << "  from the Great Lakes Water Availability Pilot Project'. " << endl;
-			cout << "  See PEST++ V3 documentation for implementation details." << endl;
-			cout << endl << endl << endl;*/
-
+			cout << endl << endl << "...starting posterior FOSM calculations..." << endl;
+	
 			fout_rec << endl << endl << endl << endl;
 			fout_rec << "-----------------------------------------------------------------------" << endl;
 			fout_rec << "Note: The following uncertainty estimates were calculated using " << endl;
@@ -825,7 +819,8 @@ int main(int argc, char* argv[])
 			ObservationInfo reweight = la.glm_iter_fosm(optimum_run, output_file_writer, -999, run_manager_ptr);
 			if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
 			{
-				cout << endl << "drawing and running " << pest_scenario.get_pestpp_options().get_glm_num_reals() << " FOSM-based posterior realizations" << endl;
+				cout << endl << "...drawing and running " << pest_scenario.get_pestpp_options().get_glm_num_reals() << " FOSM-based posterior realizations" << endl;
+				
 				pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(run_manager_ptr, -999, optimum_run);
 				run_manager_ptr->run();
 				DynamicRegularization ptr;
@@ -844,8 +839,9 @@ int main(int argc, char* argv[])
 				vector<string> active_par_names = base_jacobian_ptr->get_base_numeric_par_names();
 				Eigen::MatrixXd par_reals = fosm_real_info.first.get_eigen(fosm_real_info.first.get_real_names(), active_par_names);
 				Parameters freeze_pars,upgrade_pars,grad_upgrade_pars,del_upgrade_pars;
-				if (true)
+				if (false)
 				{
+					cout << "...making upgrade calculations for each realization..." << endl;
 					for (int i = 0; i < oe.shape().first; i++)
 					{
 						Eigen::VectorXd res = ctl_obs.get_data_eigen_vec(nz_obs_names) - sim_reals.row(i).transpose();

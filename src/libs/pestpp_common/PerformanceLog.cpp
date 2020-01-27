@@ -38,7 +38,6 @@ void PerformanceLog::log_event(const string &message)
 	fout.flush();
 }
 
-
 string PerformanceLog::time_to_string(const std::chrono::system_clock::time_point &tmp_time)
 {
 	stringstream time_str;

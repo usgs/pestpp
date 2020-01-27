@@ -526,7 +526,8 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		{
 			beta = top / bot;
 		}
-		upgrade_vec *= beta;
+		if (isnormal(beta))
+			upgrade_vec *= beta;
 	}
 
 

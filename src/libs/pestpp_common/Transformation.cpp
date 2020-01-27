@@ -557,7 +557,7 @@ const  Eigen::SparseMatrix<double>& TranSVD::get_vt() const
 
 TranSVD::TranSVD(int _max_sing, double _eign_thresh, const string &_name) : Transformation(_name)
 {
-	tran_svd_pack = new SVD_EIGEN(_max_sing, _eign_thresh);
+	tran_svd_pack = new SVD_REDSVD(_max_sing, _eign_thresh);
 }
 
 
@@ -582,7 +582,7 @@ void TranSVD::set_SVD_pack()
 	int max_sing = tran_svd_pack->get_max_sing();
 	double eigthresh = tran_svd_pack->get_eign_thres();
 	delete tran_svd_pack;
-	tran_svd_pack = new SVD_REDSVD(max_sing, eigthresh);
+	tran_svd_pack = new SVD_EIGEN(max_sing, eigthresh);
 }
 
 void TranSVD::set_performance_log(PerformanceLog *performance_log)

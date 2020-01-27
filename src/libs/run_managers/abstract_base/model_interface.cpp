@@ -239,6 +239,11 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 
 		}
 		cout << "processing tpl files...";
+		vector<string> notnormal = pars->get_notnormal_keys();
+		if (notnormal.size() > 0)
+		{
+			throw runtime_error("denormal floating point parameter values found");
+		}
 		for (int i = 0; i < templatefiles.size(); i++)
 		{
 			string name = templatefiles[i].get_tpl_filename();
