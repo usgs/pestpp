@@ -352,7 +352,8 @@ void SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContr
 	jacobian.make_runs(run_manager);
 	performance_log->log_event("jacobian runs complete, processing runs");
 	bool success_process_runs = jacobian.process_runs(par_transform,
-		super_parameter_group_info, run_manager, *prior_info_ptr, splitswh_flag);
+		super_parameter_group_info, run_manager, *prior_info_ptr, splitswh_flag,
+		pest_scenario.get_pestpp_options().get_glm_debug_der_fail());
 	if (!success_process_runs)
 	{
 		throw PestError("Error in SVDASolver::iteration: Can not compute super parameter derivatives");

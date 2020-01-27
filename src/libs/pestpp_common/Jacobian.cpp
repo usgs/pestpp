@@ -40,7 +40,7 @@ using namespace std;
 using namespace pest_utils;
 using namespace Eigen;
 
-Jacobian::Jacobian(Pest& _pest_scenario, FileManager &_file_manager) : pest_scenario(_pest_scenario), file_manager(_file_manager)
+Jacobian::Jacobian(FileManager &_file_manager) : file_manager(_file_manager)
 {
 }
 
@@ -286,7 +286,9 @@ void Jacobian::make_runs(RunManagerAbstract &run_manager)
 
 bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 		const ParameterGroupInfo &group_info,
-		RunManagerAbstract &run_manager, const PriorInformation &prior_info, bool splitswh_flag)
+		RunManagerAbstract &run_manager, 
+		const PriorInformation &prior_info, bool splitswh_flag,
+		bool debug_fail)
 {
 	// calculate jacobian
   base_sim_obs_names = run_manager.get_obs_name_vec();
@@ -326,7 +328,7 @@ bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 				run_manager. get_info(i_run, r_status, cur_par_name, cur_numeric_par_value);
 		run_manager.get_model_parameters(i_run,  run_list.back().ctl_pars);
 			bool success = run_manager.get_observations_vec(i_run, run_list.back().obs_vec);
-			if ((pest_scenario.get_pestpp_options().get_glm_debug_der_fail()) && (i_run == 1))
+			if ((debug_fail) && (i_run == 1))
 			{
 		
 				file_manager.rec_ofstream() << "NOTE: 'GLM_DEBUG_DER_FAIL' is true, failing jco run for parameter '" << cur_par_name << "'" << endl;
@@ -693,7 +695,6 @@ Jacobian& Jacobian::operator=(const Jacobian &rhs)
 	base_sim_observations = rhs.base_sim_observations;
 	matrix = rhs.matrix;
 	file_manager = rhs.file_manager;
-	pest_scenario = rhs.pest_scenario;
 	return *this;
 }
 void Jacobian::transform(const ParamTransformSeq &par_trans, void(ParamTransformSeq::*meth_prt)(Jacobian &jac) const)

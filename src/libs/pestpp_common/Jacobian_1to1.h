@@ -21,7 +21,7 @@ class ParameterRec;
 class Jacobian_1to1 : public Jacobian{
 
 public:
-	Jacobian_1to1(Pest& _pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer);
+	Jacobian_1to1(FileManager &_file_manager, OutputFileWriter &_output_file_writer);
 	virtual bool build_runs(ModelRun &model_run, vector<string> numeric_par_names, ParamTransformSeq &par_transform,
 		const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info,
 		RunManagerAbstract &run_manager, set<string> &out_of_bound_par, bool phiredswh_flag=false, bool calc_init_obs=true);
@@ -31,7 +31,9 @@ public:
 	virtual void make_runs(RunManagerAbstract &run_manager);
 	virtual bool process_runs(ParamTransformSeq &par_transform,
 		const ParameterGroupInfo &group_info,
-		RunManagerAbstract &run_manager, const PriorInformation &prior_info, bool splitswh_flag);
+		RunManagerAbstract &run_manager, 
+		const PriorInformation &prior_info, bool splitswh_flag,
+		bool debug_fail);
 	virtual void report_errors(std::ostream &fout);
 	virtual ~Jacobian_1to1();
 protected:

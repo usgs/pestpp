@@ -61,7 +61,7 @@ public:
 	friend void TranSVD::jacobian_forward(Jacobian &jac);
 	friend void TranSVD::jacobian_reverse(Jacobian &jac);
 	
-	Jacobian(Pest& _pest_scenario, FileManager &_file_manager);
+	Jacobian(FileManager &_file_manager);
 	
 	virtual const vector<string>& parameter_list() const{return base_numeric_par_names;}
 	virtual const vector<string>& observation_list() const {return  base_sim_obs_names;}
@@ -79,7 +79,9 @@ public:
 	virtual void make_runs(RunManagerAbstract &run_manager);
 	virtual bool process_runs(ParamTransformSeq &par_transform,
 		const ParameterGroupInfo &group_info,
-		RunManagerAbstract &run_manager, const PriorInformation &prior_info, bool splitswh_flag);
+		RunManagerAbstract &run_manager, 
+		const PriorInformation &prior_info, bool splitswh_flag,
+		bool debug_fail);
 
 	//virtual void save_old(const std::string &ext="jco") const;
 	virtual void save(const std::string &ext = "jco") const;
@@ -119,7 +121,6 @@ protected:
 	//const vector<string> &ctl_file_ordered_pi_names;
 	Eigen::SparseMatrix<double> matrix;
 	FileManager &file_manager;  // filemanger used to get name of jaobian file
-	Pest& pest_scenario;
 
 	virtual std::vector<Eigen::Triplet<double> > calc_derivative(const string &numeric_par_name, double base_numeric_par_value, int jcol, list<JacobianRun> &run_list, const ParameterGroupInfo &group_info,
 		const PriorInformation &prior_info, bool splitswh_flag);

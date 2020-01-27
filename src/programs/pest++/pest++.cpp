@@ -373,7 +373,7 @@ int main(int argc, char* argv[])
 		const ParamTransformSeq &base_trans_seq = pest_scenario.get_base_par_tran_seq();
 
 		ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
-		Jacobian *base_jacobian_ptr = new Jacobian_1to1(pest_scenario, file_manager,output_file_writer);
+		Jacobian *base_jacobian_ptr = new Jacobian_1to1(file_manager,output_file_writer);
 
 		TerminationController termination_ctl(pest_scenario.get_control_info().noptmax, pest_scenario.get_control_info().phiredstp,
 			pest_scenario.get_control_info().nphistp, pest_scenario.get_control_info().nphinored, pest_scenario.get_control_info().relparstp,
@@ -392,7 +392,7 @@ int main(int argc, char* argv[])
 
 		base_svd.set_svd_package(pest_scenario.get_pestpp_options().get_svd_pack());
 		//Build Super-Parameter problem
-		Jacobian *super_jacobian_ptr = new Jacobian(pest_scenario, file_manager);
+		Jacobian *super_jacobian_ptr = new Jacobian(file_manager);
 		ParamTransformSeq trans_svda;
 		// method must be involked as pointer as the transformation sequence it is added to will
 		// take responsibility for destroying it

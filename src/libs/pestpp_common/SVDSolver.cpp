@@ -806,7 +806,8 @@ void SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContro
 	jacobian.make_runs(run_manager);
 	performance_log->log_event("jacobian runs complete, processing runs");
 	jacobian.process_runs(par_transform,
-		*par_group_info_ptr, run_manager, *prior_info_ptr, splitswh_flag);
+		*par_group_info_ptr, run_manager, *prior_info_ptr, splitswh_flag,
+		pest_scenario.get_pestpp_options().get_glm_debug_der_fail());
 	performance_log->log_event("processing jacobian runs complete");
 
 	performance_log->log_event("saving jacobian and sen files");

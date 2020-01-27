@@ -16,7 +16,7 @@
 
 sequentialLP::sequentialLP(Pest &_pest_scenario, RunManagerAbstract* _run_mgr_ptr,
 	Covariance &_parcov, FileManager* _file_mgr, OutputFileWriter _of_wr, PerformanceLog& _pfm) : pest_scenario(_pest_scenario), run_mgr_ptr(_run_mgr_ptr),
-	parcov(_parcov), file_mgr_ptr(_file_mgr),jco(_pest_scenario, *_file_mgr,_of_wr), of_wr(_of_wr), pfm(_pfm)
+	parcov(_parcov), file_mgr_ptr(_file_mgr),jco(*_file_mgr,_of_wr), of_wr(_of_wr), pfm(_pfm)
 {
 	try
 	{
@@ -1937,7 +1937,8 @@ void sequentialLP::iter_presolve()
 		set<int> failed = run_mgr_ptr->get_failed_run_ids();
 
 		//process the remaining responses
-		success = jco.process_runs(par_trans, pest_scenario.get_base_group_info(), *run_mgr_ptr, *null_prior, false);
+		success = jco.process_runs(par_trans, pest_scenario.get_base_group_info(), *run_mgr_ptr, 
+			*null_prior, false,false);
 		if (!success)
 			throw_sequentialLP_error("error processing response matrix runs ", jco.get_failed_parameter_names());
 
