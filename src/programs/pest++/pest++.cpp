@@ -836,48 +836,46 @@ int main(int argc, char* argv[])
 				//here is the adjustment process for each realization - one lambda each for now
 				//todo: make sure to handle failed realizations - use oe real names to retrieve pe rows
 				//todo: what about lambda?
-				QSqrtMatrix q(&reweight, pest_scenario.get_prior_info_ptr());
-				DynamicRegularization reg;
-				reg.set_zero();
-				Observations ctl_obs = pest_scenario.get_ctl_observations();
-				vector<string> nz_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
-				Eigen::MatrixXd sim_reals = oe.get_eigen(oe.get_real_names(), nz_obs_names);
-				vector<string> active_par_names = base_jacobian_ptr->get_base_numeric_par_names();
-				//Eigen::MatrixXd par_reals = fosm_real_info.first.get_eigen(fosm_real_info.first.get_real_names(), active_par_names);
-				Parameters freeze_pars,upgrade_pars,grad_upgrade_pars,del_upgrade_pars;
-				Eigen::MatrixXd upgraded_reals(oe.shape().first, active_par_names.size());
-				if (true)
-				{
-					cout << "...making upgrade calculations for each realization..." << endl;
-					vector<string> oe_real_names = oe.get_real_names();
-					vector<double> lamb = pest_scenario.get_pestpp_options().get_base_lambda_vec();
-					double min_lamb = lamb[0];
-					for (int i = 0; i < oe.shape().first; i++)
-					{
-						
-						Eigen::VectorXd res = ctl_obs.get_data_eigen_vec(nz_obs_names) - sim_reals.row(i).transpose();
-						Parameters real_pars = pest_scenario.get_ctl_parameters();
-						Eigen::VectorXd pe_vals = fosm_real_info.first.get_real_vector(oe_real_names[i]);
-						vector<double> vals(pe_vals.data(), pe_vals.data() + pe_vals.size());
-						real_pars.update(active_par_names, vals);
-						base_trans_seq.numeric2active_ctl_ip(real_pars);
-						base_svd.calc_lambda_upgrade_vec_JtQJ(*base_jacobian_ptr, q, reg, res, nz_obs_names,
-							real_pars, freeze_pars, 0.0, upgrade_pars,
-							del_upgrade_pars, grad_upgrade_pars);
-						upgraded_reals.row(i) = upgrade_pars.get_data_eigen_vec(active_par_names);
-					}
+				//QSqrtMatrix q(&reweight, pest_scenario.get_prior_info_ptr());
+				//DynamicRegularization reg;
+				//reg.set_zero();
+				//Observations ctl_obs = pest_scenario.get_ctl_observations();
+				//vector<string> nz_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+				//Eigen::MatrixXd sim_reals = oe.get_eigen(oe.get_real_names(), nz_obs_names);
+				//vector<string> active_par_names = base_jacobian_ptr->get_base_numeric_par_names();
+				////Eigen::MatrixXd par_reals = fosm_real_info.first.get_eigen(fosm_real_info.first.get_real_names(), active_par_names);
+				//Parameters freeze_pars,upgrade_pars,grad_upgrade_pars,del_upgrade_pars;
+				//Eigen::MatrixXd upgraded_reals(oe.shape().first, active_par_names.size());
+				//if (true)
+				//{
+				//	cout << "...making upgrade calculations for each realization..." << endl;
+				//	vector<string> oe_real_names = oe.get_real_names();
+				//	vector<double> lamb = pest_scenario.get_pestpp_options().get_base_lambda_vec();
+				//	double min_lamb = lamb[0];
+				//	for (int i = 0; i < oe.shape().first; i++)
+				//	{
+				//		
+				//		Eigen::VectorXd res = ctl_obs.get_data_eigen_vec(nz_obs_names) - sim_reals.row(i).transpose();
+				//		Parameters real_pars = pest_scenario.get_ctl_parameters();
+				//		Eigen::VectorXd pe_vals = fosm_real_info.first.get_real_vector(oe_real_names[i]);
+				//		vector<double> vals(pe_vals.data(), pe_vals.data() + pe_vals.size());
+				//		real_pars.update(active_par_names, vals);
+				//		base_trans_seq.numeric2active_ctl_ip(real_pars);
+				//		base_svd.calc_lambda_upgrade_vec_JtQJ(*base_jacobian_ptr, q, reg, res, nz_obs_names,
+				//			real_pars, freeze_pars, 0.0, upgrade_pars,
+				//			del_upgrade_pars, grad_upgrade_pars);
+				//		upgraded_reals.row(i) = upgrade_pars.get_data_eigen_vec(active_par_names);
+				//	}
 
-					ParameterEnsemble upgrade_pe(&pest_scenario, upgraded_reals, oe_real_names, active_par_names);
-					map<int, int> run_id_map = upgrade_pe.add_runs(run_manager_ptr);
-					run_manager_ptr->run();
-					/*ObservationEnsemble oe_upgrade(&pest_scenario);
-					oe_upgrade.reserve(oe_real_names, pest_scenario.get_ctl_ordered_obs_names());
-					oe_upgrade.update_from_runs(run_id_map, run_manager_ptr);*/
-					pair<ParameterEnsemble, map<int, int>> upgrade_fosm_real_info(upgrade_pe, run_id_map);
-					ObservationEnsemble upgrade_oe = la.process_fosm_reals(run_manager_ptr, upgrade_fosm_real_info,-999, optimum_run.get_phi(ptr));
-
-
-				}
+				//	ParameterEnsemble upgrade_pe(&pest_scenario, upgraded_reals, oe_real_names, active_par_names);
+				//	map<int, int> run_id_map = upgrade_pe.add_runs(run_manager_ptr);
+				//	run_manager_ptr->run();
+				//	/*ObservationEnsemble oe_upgrade(&pest_scenario);
+				//	oe_upgrade.reserve(oe_real_names, pest_scenario.get_ctl_ordered_obs_names());
+				//	oe_upgrade.update_from_runs(run_id_map, run_manager_ptr);*/
+				//	pair<ParameterEnsemble, map<int, int>> upgrade_fosm_real_info(upgrade_pe, run_id_map);
+				//	ObservationEnsemble upgrade_oe = la.process_fosm_reals(run_manager_ptr, upgrade_fosm_real_info,-999, optimum_run.get_phi(ptr));
+				//}
 			}
 		}
 

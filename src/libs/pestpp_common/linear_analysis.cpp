@@ -472,6 +472,7 @@ ObservationEnsemble LinearAnalysis::process_fosm_reals(RunManagerAbstract* run_m
 	return oe;
 }
 
+
 void LinearAnalysis::throw_error(const string &message)
 {
 	pfm.log_event("Error in LinearAnalysis:" + message);
