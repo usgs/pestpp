@@ -545,6 +545,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		glm_debug_lamb_fail = pest_utils::parse_string_arg_to_bool(value);
 	}
+	else if (key == "GLM_DEBUG_REAL_FAIL")
+	{
+		glm_debug_real_fail = pest_utils::parse_string_arg_to_bool(value);
+	}
 	else if (key == "UPGRADE_AUGMENT")
 	{
 		cout << "++UPGRADE_AUGMENT is deprecated and no longer supported...ignoring" << endl;
@@ -1026,6 +1030,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "glm_normal_form: " << norm_str << endl;
 	os << "glm_debug_der_fail: " << glm_debug_der_fail << endl;
 	os << "glm_debug_lamb_fail: " << glm_debug_lamb_fail << endl;
+	os << "glm_debug_real_fail: " << glm_debug_real_fail << endl;
+
 
 	if (global_opt == OPT_DE)
 	{
@@ -1158,6 +1164,7 @@ void PestppOptions::set_defaults()
 	set_glm_normal_form(GLMNormalForm::DIAG);
 	set_glm_debug_der_fail(false);
 	set_glm_debug_lamb_fail(false);
+	set_glm_debug_real_fail(false);
 	set_prediction_names(vector<string>());
 	set_parcov_filename(string());
 	set_obscov_filename(string());

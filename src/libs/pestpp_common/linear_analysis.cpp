@@ -422,6 +422,12 @@ ObservationEnsemble LinearAnalysis::process_fosm_reals(RunManagerAbstract* run_m
 	//oe.draw(num_reals, obscov, &pfm, 1);
 	oe.reserve(oe.get_generic_real_names(num_reals), pest_scenario.get_ctl_ordered_obs_names());
 	oe.update_from_runs(fosm_real_info.second, run_mgr_ptr);
+	if (pest_scenario.get_pestpp_options().get_glm_debug_real_fail())
+	{
+		vector<string> drop;
+		drop.push_back(oe.get_real_names()[0]);
+		oe.drop_rows(drop);
+	}
 	stringstream ss;
 	ss.str("");
 	if (iter != -999)
@@ -454,8 +460,14 @@ ObservationEnsemble LinearAnalysis::process_fosm_reals(RunManagerAbstract* run_m
 		map<string, double>* phi_map = ph.get_phi_map(pt);
 		os << endl << "  FOSM-based Monte Carlo phi summary:" << endl;
 		os << setw(15) << "realization" << setw(20) << "phi" << endl;
+		cout << endl << "  FOSM-based Monte Carlo phi summary:" << endl;
+		cout << setw(15) << "realization" << setw(20) << "phi" << endl;
 		for (auto real : oe.get_real_names())
+		{
 			os << setw(20) << real << setw(20) << phi_map->at(real) << " (" << (phi_map->at(real) / last_best_phi) * 100. << "% of starting phi)" << endl;
+			cout << setw(20) << real << setw(20) << phi_map->at(real) << " (" << (phi_map->at(real) / last_best_phi) * 100. << "% of starting phi)" << endl;
+
+		}
 	}
 	return oe;
 }

@@ -1711,6 +1711,7 @@ void Ensemble::read_csv_by_vars(int num_reals, ifstream &csv, map<string, int> &
 ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr):Ensemble(_pest_scenario_ptr)
 {
 	par_transform = pest_scenario_ptr->get_base_par_tran_seq();
+	tstat = transStatus::CTL;
 }
 
 ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, Eigen::MatrixXd _reals, 
@@ -1724,6 +1725,7 @@ ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, Eigen::MatrixXd _
 	reals = _reals;
 	var_names = _var_names;
 	real_names = _real_names;
+	tstat = transStatus::CTL;
 }
 
 
