@@ -393,9 +393,13 @@ int main(int argc, char* argv[])
 			restart_ctl.update_termination_ctl(termination_ctl);
 		}
 
-		//SVDSolver::MAT_INV mat_inv = SVDSolver::MAT_INV::JTQJ;
+		file_manager.rec_ofstream() << "...loading prior parameter covariance matrix";
+		performance_log.log_event("loading parcov");
+		Covariance parcov;
+		parcov.try_from(pest_scenario, file_manager);
+		
 		SVDSolver base_svd(pest_scenario, file_manager, &obj_func, base_trans_seq,
-			*base_jacobian_ptr, output_file_writer, &performance_log, "base parameter solution");
+			*base_jacobian_ptr, output_file_writer, &performance_log, parcov, "base parameter solution");
 
 		base_svd.set_svd_package(pest_scenario.get_pestpp_options().get_svd_pack());
 		//Build Super-Parameter problem
@@ -709,8 +713,7 @@ int main(int argc, char* argv[])
 					Eigen::SparseMatrix<double> parcov_inv;
 					if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::PRIOR)
 					{
-						Covariance parcov;
-						parcov.try_from(pest_scenario, file_manager);
+						
 						parcov_inv = *parcov.get(base_jacobian_ptr->get_base_numeric_par_names()).inv().e_ptr();
 					}
 					performance_log.log_event("updating super parameter transformation, requires formation and SVD of JtQJ");
@@ -721,7 +724,7 @@ int main(int argc, char* argv[])
 				}
 				SVDASolver super_svd(pest_scenario, file_manager, &obj_func,
 					trans_svda, *super_jacobian_ptr,
-					output_file_writer, &performance_log,
+					output_file_writer, &performance_log,parcov,
 					base_svd.get_phiredswh_flag(), base_svd.get_splitswh_flag());
 				super_svd.set_svd_package(pest_scenario.get_pestpp_options().get_svd_pack());
 				//use base jacobian to compute first super jacobian if there was not a super upgrade
@@ -822,7 +825,7 @@ int main(int argc, char* argv[])
 			Mat j(base_jacobian_ptr->get_sim_obs_names(), base_jacobian_ptr->get_base_numeric_par_names(),
 				base_jacobian_ptr->get_matrix_ptr());
 
-			LinearAnalysis la(j, pest_scenario, file_manager, performance_log);
+			LinearAnalysis la(j, pest_scenario, file_manager, performance_log,parcov);
 			ObservationInfo reweight = la.glm_iter_fosm(optimum_run, output_file_writer, -999, run_manager_ptr);
 			if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
 			{
@@ -831,7 +834,7 @@ int main(int argc, char* argv[])
 				pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(run_manager_ptr, -999, optimum_run);
 				run_manager_ptr->run();
 				DynamicRegularization ptr;
-				ObservationEnsemble oe = la.process_fosm_reals(run_manager_ptr, fosm_real_info, -999, optimum_run.get_phi(ptr));
+				pair<ObservationEnsemble,map<string,double>> fosm_obs_info = la.process_fosm_reals(run_manager_ptr, fosm_real_info, -999, optimum_run.get_phi(ptr));
 				
 				//here is the adjustment process for each realization - one lambda each for now
 				//todo: make sure to handle failed realizations - use oe real names to retrieve pe rows

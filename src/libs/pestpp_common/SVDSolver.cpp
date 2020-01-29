@@ -92,14 +92,15 @@ bool MuPoint::operator< (const MuPoint &rhs) const
 SVDSolver::SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
 	const ParamTransformSeq &_par_transform, Jacobian &_jacobian,
 	OutputFileWriter &_output_file_writer,
-	PerformanceLog *_performance_log, const string &_description, bool _phiredswh_flag, bool _splitswh_flag, bool _save_next_jacobian)
+	PerformanceLog *_performance_log, Covariance& _parcov,const string &_description, bool _phiredswh_flag, 
+	bool _splitswh_flag, bool _save_next_jacobian)
 	: pest_scenario(_pest_scenario), ctl_info(&_pest_scenario.get_control_info()), svd_info(_pest_scenario.get_svd_info()), par_group_info_ptr(&_pest_scenario.get_base_group_info()),
 	ctl_par_info_ptr(&_pest_scenario.get_ctl_parameter_info()), obs_info_ptr(&_pest_scenario.get_ctl_observation_info()), obj_func(_obj_func),
 	file_manager(_file_manager), observations_ptr(&_pest_scenario.get_ctl_observations()), par_transform(_par_transform), der_forgive(_pest_scenario.get_pestpp_options().get_der_forgive()), phiredswh_flag(_phiredswh_flag),
 	splitswh_flag(_splitswh_flag), save_next_jacobian(_save_next_jacobian), prior_info_ptr(_pest_scenario.get_prior_info_ptr()), jacobian(_jacobian),
 	regul_scheme_ptr(_pest_scenario.get_regul_scheme_ptr()), output_file_writer(_output_file_writer), description(_description), best_lambda(20.0),
 	performance_log(_performance_log), base_lambda_vec(_pest_scenario.get_pestpp_options().get_base_lambda_vec()), lambda_scale_vec(_pest_scenario.get_pestpp_options().get_lambda_scale_vec()),
-	terminate_local_iteration(false)
+	terminate_local_iteration(false), parcov(_parcov)
 {
 	svd_package = new SVD_REDSVD();
 	glm_normal_form = pest_scenario.get_pestpp_options().get_glm_normal_form();
@@ -468,9 +469,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		{
 			
 			//work up the inverse prior par cov
-			Covariance prior_inv;
-			prior_inv.try_from(pest_scenario, file_manager);
-			prior_inv = prior_inv.get(numeric_par_names);
+			Covariance prior_inv = parcov.get(numeric_par_names);
 			prior_inv.inv_ip();
 
 			//form the regularized normal matrix
@@ -998,14 +997,12 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	cout << "-->starting iteration FOSM process..." << endl;
  	Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
 		jacobian.get_matrix_ptr());
-	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log);
+	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov);
 	performance_log->log_event("LinearAnalysis::glm_iter_fosm");
 	pair<ParameterEnsemble, map<int, int>> fosm_real_info;
-	try {
-
-
+	try 
+	{
 		la.glm_iter_fosm(base_run, output_file_writer, termination_ctl.get_iteration_number(), &run_manager);
-
 		fosm_real_info = la.draw_fosm_reals(&run_manager, termination_ctl.get_iteration_number(), base_run);
 	}
 	catch (exception& e)
@@ -1096,8 +1093,32 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	file_manager.close_file("fpr");
 
 	if (fosm_real_info.second.size() > 0)
-		ObservationEnsemble oe = la.process_fosm_reals(&run_manager, fosm_real_info, termination_ctl.get_iteration_number(), base_run.get_phi(*regul_scheme_ptr));
-	
+	{
+		pair<ObservationEnsemble, map<string, double>> fosm_obs_info = la.process_fosm_reals(&run_manager, fosm_real_info,
+			termination_ctl.get_iteration_number(), base_run.get_phi(*regul_scheme_ptr));
+		if (pest_scenario.get_pestpp_options().get_glm_accept_mc_phi())
+		{
+			Eigen::VectorXd par_vals;
+			vector<string> pe_names = fosm_real_info.first.get_var_names();
+			vector<string> oe_names = fosm_obs_info.first.get_var_names();
+			for (auto info : fosm_obs_info.second)
+			{
+				
+				if (info.second < best_upgrade_run.get_phi(*regul_scheme_ptr))
+				{	
+					par_vals = fosm_real_info.first.get_real_vector(info.first);
+					Parameters tmp_pars(pe_names, fosm_real_info.first.get_real_vector(info.first));
+					Observations tmp_obs(oe_names, fosm_obs_info.first.get_real_vector(info.first));
+					par_transform.numeric2ctl_ip(tmp_pars);
+					best_upgrade_run.update_ctl(tmp_pars, tmp_obs);
+				}
+
+
+
+			}
+		}
+	}
+
 	
 	// Print frozen parameter information
 	const Parameters &frz_ctl_pars = best_upgrade_run.get_frozen_ctl_pars();

@@ -474,7 +474,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		convert_ip(value, glm_num_reals);
 	}
-
+	else if (key == "GLM_ACCEPT_MC_PHI")
+	{
+		glm_accept_mc_phi = pest_utils::parse_string_arg_to_bool(value);
+	}
 	else if (key == "OVERDUE_RESCHED_FAC"){
 		convert_ip(value, overdue_reched_fac);
 	}

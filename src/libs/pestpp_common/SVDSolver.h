@@ -67,10 +67,10 @@ protected:
 	//enum class LimitType {NONE, LBND, UBND, REL, FACT};
 	//enum class MarquardtMatrix {IDENT, JTQJ, PRIOR};
 public:
-	SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
-		const ParamTransformSeq &_par_transform, Jacobian &_jacobian,
-		OutputFileWriter &_output_file_writer,
-		PerformanceLog *_performance_log, const string &description = string("base parameter solution"),
+	SVDSolver(Pest& _pest_scenario, FileManager& _file_manager, ObjectiveFunc* _obj_func,
+		const ParamTransformSeq& _par_transform, Jacobian& _jacobian,
+		OutputFileWriter& _output_file_writer,
+		PerformanceLog* _performance_log, Covariance& _parcov, const string& description = string("base parameter solution"),
 		bool _phiredswh_flag = false, bool _splitswh_flag = false, bool _save_next_jacobian = true);
 
 	virtual ModelRun compute_jacobian(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &cur_run, bool restart_runs = false);
@@ -104,6 +104,7 @@ protected:
 		vector<string> par_name_vec;
 		Parameters frozen_numeric_pars;
 	};
+	Covariance& parcov;
 	Pest &pest_scenario;
 	PestppOptions::GLMNormalForm glm_normal_form;
 	const static string svd_solver_type_name;

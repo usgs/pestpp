@@ -409,7 +409,7 @@ pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerA
 }
 
 
-ObservationEnsemble LinearAnalysis::process_fosm_reals(RunManagerAbstract* run_mgr_ptr, pair<ParameterEnsemble,map<int, int>>& fosm_real_info, int iter,
+pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(RunManagerAbstract* run_mgr_ptr, pair<ParameterEnsemble,map<int, int>>& fosm_real_info, int iter,
 														double last_best_phi)
 {
 	int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
@@ -417,7 +417,7 @@ ObservationEnsemble LinearAnalysis::process_fosm_reals(RunManagerAbstract* run_m
 	pfm.log_event("processing FOSM realization runs");
 	ObservationEnsemble oe(&pest_scenario);
 	if (num_reals <= 0)
-		return oe;
+		return pair<ObservationEnsemble, map<string, double>>(oe, map<string, double>());
 	//Covariance obscov = get_obscov();
 	//oe.draw(num_reals, obscov, &pfm, 1);
 	oe.reserve(oe.get_generic_real_names(num_reals), pest_scenario.get_ctl_ordered_obs_names());
@@ -447,7 +447,7 @@ ObservationEnsemble LinearAnalysis::process_fosm_reals(RunManagerAbstract* run_m
 		file_manager.rec_ofstream() << "...posterior observation ensemble saved to " << ss.str() << ".csv" << endl;
 	}
 		
-	
+	map<string, double> t;
 	if (oe.shape().first > 0)
 	{
 		ofstream& os = file_manager.rec_ofstream();
@@ -457,19 +457,19 @@ ObservationEnsemble LinearAnalysis::process_fosm_reals(RunManagerAbstract* run_m
 			&reg_fac, &oe);
 		ph.update(oe, pe, false);
 		PhiHandler::phiType pt = PhiHandler::phiType::ACTUAL;
-		map<string, double>* phi_map = ph.get_phi_map(pt);
+		map<string,double>* phi_map = ph.get_phi_map(pt);
+		t = *phi_map;
 		os << endl << "  FOSM-based Monte Carlo phi summary:" << endl;
 		os << setw(15) << "realization" << setw(20) << "phi" << endl;
-		cout << endl << "  FOSM-based Monte Carlo phi summary:" << endl;
-		cout << setw(15) << "realization" << setw(20) << "phi" << endl;
+		//cout << endl << "  FOSM-based Monte Carlo phi summary:" << endl;
+		//cout << setw(15) << "realization" << setw(20) << "phi" << endl;
 		for (auto real : oe.get_real_names())
 		{
 			os << setw(20) << real << setw(20) << phi_map->at(real) << " (" << (phi_map->at(real) / last_best_phi) * 100. << "% of starting phi)" << endl;
-			cout << setw(20) << real << setw(20) << phi_map->at(real) << " (" << (phi_map->at(real) / last_best_phi) * 100. << "% of starting phi)" << endl;
-
+			//cout << setw(20) << real << setw(20) << phi_map->at(real) << " (" << (phi_map->at(real) / last_best_phi) * 100. << "% of starting phi)" << endl;
 		}
 	}
-	return oe;
+	return pair<ObservationEnsemble,map<string,double>>(oe,t);
 }
 
 
@@ -618,15 +618,15 @@ void LinearAnalysis::load_obscov(const string &obscov_filename)
 }
 
 
-LinearAnalysis::LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, PerformanceLog &_pfm): 
+LinearAnalysis::LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, PerformanceLog &_pfm, Covariance& _parcov): 
 	pest_scenario(_pest_scenario),file_manager(_file_manager),
-			jacobian(_jacobian), pfm(_pfm)
+			jacobian(_jacobian), pfm(_pfm),parcov(_parcov)
 {
 	bool parcov_success = false;
 	//if (jacobian.nrow() != pest_scenario.get_nonregul_obs().size())
 	//	jacobian = jacobian.get(pest_scenario.get_ctl_ordered_obs_names(), pest_scenario.get_ctl_ordered_adj_par_names());
 
-	const string parcov_filename = pest_scenario.get_pestpp_options().get_parcov_filename();
+	/*const string parcov_filename = pest_scenario.get_pestpp_options().get_parcov_filename();
 	if (parcov_filename.size() > 0)
 	{
 		try
@@ -649,7 +649,7 @@ LinearAnalysis::LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager
 		{
 			throw_error("linear_analysis::linear_analysis() error setting parcov from parameter bounds:" + string(e.what()));
 		}
-	}
+	}*/
 	const string obscov_filename = pest_scenario.get_pestpp_options().get_obscov_filename();
 	bool obscov_success = false;
 	if (obscov_filename.size() > 0)
@@ -743,7 +743,7 @@ map<string, double> LinearAnalysis::prior_parameter_variance()
 
 double LinearAnalysis::prior_parameter_variance(string &par_name)
 {
-	pfm.log_event("prior_parameter_variance");
+	//pfm.log_event("prior_parameter_variance");
 	int ipar = find(parcov.rn_ptr()->begin(), parcov.rn_ptr()->end(), par_name) - parcov.rn_ptr()->begin();
 	if (ipar == parcov.nrow())
 		throw_error("linear_analysis::prior_parameter_variance() error: parameter: " + par_name + " not found");
@@ -774,7 +774,7 @@ map<string, double> LinearAnalysis::posterior_parameter_variance()
 
 double LinearAnalysis::posterior_parameter_variance(string &par_name)
 {
-	pfm.log_event("posterior_parameter_variance");
+	//pfm.log_event("posterior_parameter_variance");
 	if (posterior.nrow() == 0) calc_posterior();
 	int ipar = find(posterior.rn_ptr()->begin(), posterior.rn_ptr()->end(), par_name) - posterior.rn_ptr()->begin();
 	if (ipar == posterior.nrow())
