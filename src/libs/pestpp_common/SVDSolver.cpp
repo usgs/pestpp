@@ -994,21 +994,26 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		RestartController::write_upgrade_runs_built(fout_restart);
 	}
 	//instance of a Mat for the jco
-	cout << "-->starting iteration FOSM process..." << endl;
- 	Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
+	pair<ParameterEnsemble, map<int, int>> fosm_real_info;
+	Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
 		jacobian.get_matrix_ptr());
 	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov);
-	performance_log->log_event("LinearAnalysis::glm_iter_fosm");
-	pair<ParameterEnsemble, map<int, int>> fosm_real_info;
-	try 
+	if (pest_scenario.get_pestpp_options().get_uncert_flag())
 	{
-		la.glm_iter_fosm(base_run, output_file_writer, termination_ctl.get_iteration_number(), &run_manager);
-		fosm_real_info = la.draw_fosm_reals(&run_manager, termination_ctl.get_iteration_number(), base_run);
-	}
-	catch (exception& e)
-	{
-		os << "Error in GLM iteration FOSM process:" << e.what() << ", continuing..." << endl;
+		cout << "-->starting iteration FOSM process..." << endl;
+		
+		performance_log->log_event("LinearAnalysis::glm_iter_fosm");
+		
+		try
+		{
+			la.glm_iter_fosm(base_run, output_file_writer, termination_ctl.get_iteration_number(), &run_manager);
+			fosm_real_info = la.draw_fosm_reals(&run_manager, termination_ctl.get_iteration_number(), base_run);
+		}
+		catch (exception& e)
+		{
+			os << "Error in GLM iteration FOSM process:" << e.what() << ", continuing..." << endl;
 
+		}
 	}
 	cout << "-->finished iteration FOSM process..." << endl;
 	if (num_success_calc == 0)

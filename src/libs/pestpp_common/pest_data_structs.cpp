@@ -1034,6 +1034,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "glm_debug_der_fail: " << glm_debug_der_fail << endl;
 	os << "glm_debug_lamb_fail: " << glm_debug_lamb_fail << endl;
 	os << "glm_debug_real_fail: " << glm_debug_real_fail << endl;
+	os << "glm_accept_mc_phi: " << glm_accept_mc_phi << endl;
 
 
 	if (global_opt == OPT_DE)
@@ -1168,6 +1169,7 @@ void PestppOptions::set_defaults()
 	set_glm_debug_der_fail(false);
 	set_glm_debug_lamb_fail(false);
 	set_glm_debug_real_fail(false);
+	set_glm_accept_mc_phi(false);
 	set_prediction_names(vector<string>());
 	set_parcov_filename(string());
 	set_obscov_filename(string());
