@@ -926,15 +926,11 @@ void Jacobian::report_errors(std::ostream &fout)
 {
 	if (failed_parameter_names.size() > 0)
 	{
-		fout << "    Parameters whose perturbation runs failed while computing jacobian" << endl;
-		fout << "      Parameter     Failed" << endl;
-		fout << "        Name        Value" << endl;
-		fout << "      ----------  ------------" << endl;
+		fout << "    Parameters whose perturbation runs failed while computing jacobian: " << endl;
 
 		for (const auto & ipar : failed_parameter_names)
 		{
-			fout << right;
-			fout << "  " << setw(12) << ipar;
+			fout << right << "  " << setw(12) << ipar;
 		}
 	}
 
