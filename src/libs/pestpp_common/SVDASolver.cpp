@@ -53,8 +53,9 @@ SVDASolver::SVDASolver(Pest &_pest_scenario, FileManager &_file_manager, Objecti
 		_output_file_writer, _performance_log,_parcov,"super parameter solution", _phiredswh_flag, _splitswh_flag, false),
 		max_super_frz_iter(_pest_scenario.get_pestpp_options().get_max_super_frz_iter())
 {
-	PestppOptions::GLMNormalForm nf = pest_scenario.get_pestpp_options().get_glm_normal_form();
-	if (nf == PestppOptions::GLMNormalForm::PRIOR)
+	//PestppOptions::GLMNormalForm nf = pest_scenario.get_pestpp_options().get_glm_normal_form();
+	glm_normal_form = pest_scenario.get_pestpp_options().get_glm_normal_form();
+	if (glm_normal_form == PestppOptions::GLMNormalForm::PRIOR)
 	{
 		file_manager.rec_ofstream() << "Note: using 'GLM_NORMAL_FORM' = 'DIAG' for super iterations" << endl;
 		glm_normal_form = PestppOptions::GLMNormalForm::DIAG;

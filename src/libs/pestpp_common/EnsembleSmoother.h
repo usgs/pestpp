@@ -106,12 +106,13 @@ class ParChangeSummarizer
 {
 public:
 	ParChangeSummarizer() { ; }
-	ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr);
-	void summarize(ParameterEnsemble &pe);
+	ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr);
+	void summarize(ParameterEnsemble &pe, int iiter);
 
 private:
 	ParameterEnsemble * base_pe_ptr;
 	FileManager *file_manager_ptr;
+	OutputFileWriter* output_file_writer_ptr;
 	map<string, set<string>> pargp2par_map;
 	pair<map<string,double>, map<string, double>> init_moments;
 

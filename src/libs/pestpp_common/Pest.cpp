@@ -238,7 +238,23 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 			err = true;
 		}
 
-		
+	}
+
+	if (get_ctl_ordered_nz_obs_names().size() == 0)
+	{
+		if (forgive)
+		{
+			cout << "observation warning: no non-zero weighted observations" << endl;
+			f_rec << "observation warning: no non-zero weighted observations" << endl;
+		}
+		else
+		{
+			cout << "observation error: no non-zero weighted observations" << endl;
+			f_rec << "observation error: no non-zero weighted observations" << endl;
+			err = true;
+		}
+
+
 	}
 
 	if (err)

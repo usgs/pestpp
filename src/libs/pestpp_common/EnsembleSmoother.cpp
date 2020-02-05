@@ -12,6 +12,7 @@
 #include "covariance.h"
 #include "RedSVD-h.h"
 #include "SVDPackage.h"
+#include "eigen_tools.h"
 
 
 PhiHandler::PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
@@ -575,6 +576,13 @@ map<string, Eigen::VectorXd> PhiHandler::calc_meas(ObservationEnsemble & oe, Eig
 	double phi;
 	string rname;
 
+	if (act_obs_names.size() == 0)
+	{
+		for (auto name : oe.get_real_names())
+			phi_map[name] = Eigen::VectorXd();
+		return phi_map;
+	}
+
 	Eigen::MatrixXd resid = get_obs_resid(oe);
 	assert(oe_real_names.size() == resid.rows());
 	for (int i = 0; i<resid.rows(); i++)
@@ -721,11 +729,12 @@ map<string, double> PhiHandler::calc_composite(map<string, double> &_meas, map<s
 }
 
 
-ParChangeSummarizer::ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr)
+ParChangeSummarizer::ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr)
 	//base_pe_ptr(_base_pe), file_manager_ptr(_file_manager)
 {
 	base_pe_ptr = _base_pe_ptr;
 	file_manager_ptr = _file_manager_ptr;
+	output_file_writer_ptr = _output_file_writer_ptr;
 	init_moments = base_pe_ptr->get_moment_maps();
 	ParameterGroupInfo gi = base_pe_ptr->get_pest_scenario().get_base_group_info();
 	string group;
@@ -739,7 +748,7 @@ ParChangeSummarizer::ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileMa
 }
 
 
-void ParChangeSummarizer::summarize(ParameterEnsemble &pe)
+void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter)
 {
 	
 	pair<map<string, double>, map<string, double>> moments = pe.get_moment_maps();
@@ -811,6 +820,23 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe)
 	}
 	cout << endl;
 	frec << endl;
+	vector<string> rnames = pe.get_real_names();
+
+	if (find(rnames.begin(), rnames.end(), "BASE") != rnames.end())
+	{
+		Eigen::VectorXd v = pe.get_real_vector("BASE");
+
+		Parameters pars = pe.get_pest_scenario_ptr()->get_ctl_parameters();
+		pars.update(pe.get_var_names(), egienvec_2_stlvec(v));
+		pe.get_pest_scenario_ptr()->get_base_par_tran_seq().numeric2ctl_ip(pars);
+		// save parameters to .par file
+		ss.str("");
+		ss << file_manager_ptr->get_base_filename() << "." << iiter << ".par";
+		string filename = ss.str();
+		output_file_writer_ptr->write_par(file_manager_ptr->open_ofile_absolute("par",filename), pars, *(pe.get_pest_scenario_ptr()->get_base_par_tran_seq().get_offset_ptr()),
+			*(pe.get_pest_scenario_ptr()->get_base_par_tran_seq().get_scale_ptr()));
+		file_manager_ptr->close_file("par");
+	}
 
 }
 
@@ -2378,7 +2404,7 @@ void IterEnsembleSmoother::initialize()
 	}
 	
 
-	pcs = ParChangeSummarizer(&pe_base, &file_manager);
+	pcs = ParChangeSummarizer(&pe_base, &file_manager,&output_file_writer);
 	vector<string> in_conflict = detect_prior_data_conflict();
 	if (in_conflict.size() > 0)
 	{
@@ -2807,7 +2833,9 @@ void IterEnsembleSmoother::iterate_2_solution()
 			ph.write(iter, run_mgr_ptr->get_total_runs());
 			if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
 				ph.save_residual_cov(oe,iter);
-			pcs.summarize(pe);
+			pcs.summarize(pe,iter);
+			
+			
 			if (accept)
 				consec_bad_lambda_cycles = 0;
 			else
