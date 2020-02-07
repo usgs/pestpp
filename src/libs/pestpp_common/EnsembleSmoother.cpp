@@ -1334,6 +1334,20 @@ void IterEnsembleSmoother::sanity_checks()
 		warnings.push_back("ies_verbose_level must be between 0 and 3, resetting to 3");
 		ppo->set_ies_verbose_level(3);
 	}
+	if ((ppo->get_ies_no_noise()) && (ppo->get_obscov_filename().size() > 0))
+	{
+		ss.str("");
+		ss << "ies_no_noise is true but obscov file supplied - these two are not compatible";
+		errors.push_back(ss.str());
+	}
+
+	if ((ppo->get_obscov_filename().size() > 0) && (ppo->get_ies_drop_conflicts()))
+	{
+		ss.str("");
+		ss << "use of a full obscov with ies_drop_conflicts is not currently supported";
+		errors.push_back(ss.str());
+	}
+
 
 	/*if (!ppo->get_ies_use_prior_scaling())
 	{

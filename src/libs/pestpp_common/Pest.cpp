@@ -1662,7 +1662,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 
 	//process pestpp options
 	map<string, PestppOptions::ARG_STATUS> arg_map, line_arg_map;
-	
+	vector<string> dup;
 	for (vector<string>::const_iterator b = pestpp_input.begin(), e = pestpp_input.end();
 		b != e; ++b) {
 
@@ -1678,7 +1678,22 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		{
 			throw runtime_error("error parsing '++' line :'" + *b + "'");
 		}
+		for (auto arg : line_arg_map)
+		{
+			if (arg_map.find(arg.first) != arg_map.end())
+				dup.push_back(arg.first);
+
+		}
 		arg_map.insert(line_arg_map.begin(), line_arg_map.end());
+	}
+
+	if (dup.size() > 0)
+	{
+		ss.str("");
+		ss << " the following '++' args are duplicates (possibly thru an alias):" << endl;
+		for (auto n : dup)
+			ss << n << ",";
+		throw_control_file_error(f_rec, ss.str());
 	}
 
 	vector<string> not_accepted;
@@ -1698,6 +1713,10 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		throw_control_file_error(f_rec, ss.str());
 	}
 	
+	
+	
+
+
 	//check if the predictions ++ arg might be a file name?
 	vector<string> pred_arg = pestpp_options.get_prediction_names();
 	if ((pestpp_options.get_uncert_flag()) && (pred_arg.size() == 1))
