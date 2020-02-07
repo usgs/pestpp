@@ -1827,13 +1827,14 @@ void IterEnsembleSmoother::initialize_obscov()
 			}
 			frec << endl;
 			zero_weight_obs(drop, false, true);
-			message(1, "resetting weights based on obscov diagonal");
-			Eigen::VectorXd diag = obscov.e_ptr()->diagonal();
-			ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
-			for (int i = 0; i < diag.size(); i++)
-			{
-				oi->set_weight(cov_names[i], min(1.0/sqrt(diag[i]),oi->get_weight(cov_names[i])));
-			}	
+			
+		}
+		message(1, "resetting weights based on obscov diagonal");
+		Eigen::VectorXd diag = obscov.e_ptr()->diagonal();
+		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+		for (int i = 0; i < diag.size(); i++)
+		{
+			oi->set_weight(cov_names[i], min(1.0 / sqrt(diag[i]), oi->get_weight(cov_names[i])));
 		}
 	}
 	else
