@@ -325,6 +325,9 @@ int main(int argc, char* argv[])
 
 		IterEnsembleSmoother ies(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 
+		std::srand(12345678);
+		
+
 		ies.initialize();
 
 		ies.iterate_2_solution();
