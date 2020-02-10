@@ -22,7 +22,7 @@ class Ensemble
 public:
 	static mt19937_64 rand_engine;
 	//Ensemble(Pest &_pest_scenario, FileManager &_file_manager,
-	//	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log, unsigned int seed = 1);
+	//	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log, unsigned int = 1);
 	Ensemble(Pest* _pest_scenario);
 	Ensemble() { ; }
 

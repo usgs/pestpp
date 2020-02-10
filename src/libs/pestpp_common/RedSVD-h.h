@@ -45,9 +45,9 @@ namespace RedSVD
 		using std::sin;
 		
 		const Scalar PI(3.1415926535897932384626433832795028841971693993751);
-
 		Scalar v1 = (Scalar)(std::rand() + Scalar(1)) / ((Scalar)RAND_MAX+Scalar(2));
 		Scalar v2 = (Scalar)(std::rand() + Scalar(1)) / ((Scalar)RAND_MAX+Scalar(2));
+		
 		
 		Scalar len = sqrt(Scalar(-2) * log(v1));
 		x = len * cos(Scalar(2) * PI * v2);
