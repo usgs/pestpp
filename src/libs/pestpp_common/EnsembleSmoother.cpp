@@ -2006,9 +2006,6 @@ void IterEnsembleSmoother::initialize()
 		else
 			message(1, "localizing by parameters");
 	}
-
-	
-	
 	iter = 0;
 	//ofstream &frec = file_manager.rec_ofstream();
 	last_best_mean = 1.0E+30;
@@ -2438,8 +2435,9 @@ void IterEnsembleSmoother::initialize()
 		if (!ppo->get_ies_drop_conflicts())
 		{
 			ss.str("");
-			ss << "  WARNING: Prior-data conflict detected.  Continuing with IES parameter adjustment will likely result " << endl;
-			ss << "           in parameter and forecast bias.  Consider using 'ies_drop_conflicts' as a quick fix.";
+			ss << "  WARNING: Prior-data conflict detected.  Continuing with IES parameter";
+			ss << "           adjustment will likely result in parameter and forecast bias.";
+			ss << "           Consider using 'ies_drop_conflicts' as a quick fix.";
 			message(1, ss.str());
 		}
 		else
@@ -2452,6 +2450,11 @@ void IterEnsembleSmoother::initialize()
 				throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
 			}
 			zero_weight_obs(in_conflict);
+			if (ppo->get_ies_localizer().size() > 0)
+			{
+				message(1, "updating localizer");
+					use_localizer = localizer.initialize(performance_log,true);
+			}
 
 		}
 		string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
