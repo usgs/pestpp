@@ -55,7 +55,7 @@ namespace RedSVD
 	}
 
 	template<typename MatrixType>
-	inline void sample_gaussian_precpp11(MatrixType& mat)
+	inline void sample_gaussian(MatrixType& mat)
 	{
 		typedef typename MatrixType::Index Index;
 
@@ -69,7 +69,7 @@ namespace RedSVD
 	}
 
 	template<typename MatrixType>
-	inline void sample_gaussian(MatrixType& mat)
+	inline void sample_gaussian_cpp11(MatrixType& mat)
 	{
 		typedef typename MatrixType::Index Index;
 		std::default_random_engine generator;
