@@ -847,7 +847,8 @@ IterEnsembleSmoother::IterEnsembleSmoother(Pest &_pest_scenario, FileManager &_f
 	output_file_writer(_output_file_writer), performance_log(_performance_log),
 	run_mgr_ptr(_run_mgr_ptr)
 {
-	rand_gen = std::mt19937();
+	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
+	subset_rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	pe.set_pest_scenario(&pest_scenario);
 	oe.set_pest_scenario(&pest_scenario);
 	pe.set_rand_gen(&rand_gen);
@@ -1351,8 +1352,13 @@ void IterEnsembleSmoother::sanity_checks()
 		ss << "use of a full obscov with ies_drop_conflicts is not currently supported";
 		errors.push_back(ss.str());
 	}
-
-
+	if ((ppo->get_ies_obs_csv().size() > 0) && (ppo->get_ies_no_noise()))
+	{
+		ss.str("");
+		ss << "ies_no_noise can't be used with an ies_observation_ensemble";
+		errors.push_back(ss.str());
+	}
+	
 	/*if (!ppo->get_ies_use_prior_scaling())
 	{
 		warnings.push_back("not using prior scaling - this is really a dev option, you should always use prior scaling...");
@@ -4100,11 +4106,13 @@ void IterEnsembleSmoother::set_subset_idx(int size)
 		{
 			if (subset_idxs.size() >= nreal_subset)
 				break;
-			idx = uni(rand_gen);
+			idx = uni(subset_rand_gen);
 			if (find(subset_idxs.begin(), subset_idxs.end(), idx) != subset_idxs.end())
 				continue;
 			subset_idxs.push_back(idx);
 		}
+		if (subset_idxs.size() != nreal_subset)
+			throw_ies_error("max iterations exceeded when trying to find random subset idxs");
 
 	}
 	else if (how == "PHI_BASED")

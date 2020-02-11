@@ -960,7 +960,12 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		convert_ip(value, additional_ins_delimiters);
 	}
+	else if (key == "RANDOM_SEED")
+	{
+		convert_ip(value, random_seed);
+	}
 	else 
+
 	{
 
 		//throw PestParsingError(line, "Invalid key word \"" + key +"\"");
@@ -1001,6 +1006,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "check_tplins: " << check_tplins << endl;
 	os << "fill_tpl_zeros: " << fill_tpl_zeros << endl;
 	os << "additional_ins_delimiters: " << additional_ins_delimiters << endl;
+	os << "random_seed: " << random_seed << endl;
 	
 
 	os << endl << "...pestpp-glm specific options:" << endl;
@@ -1150,7 +1156,7 @@ void PestppOptions::set_defaults()
 	set_iter_summary_flag(true);
 	set_der_forgive(true);
 	
-	
+	set_random_seed(358183147);
 	set_base_lambda_vec(vector<double>{ 0.1, 1.0, 10.0, 100.0, 1000.0 });
 	set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1});
 	set_global_opt(PestppOptions::GLOBAL_OPT::NONE);
@@ -1254,7 +1260,6 @@ void PestppOptions::set_defaults()
 	set_gsa_morris_pooled_obs(false);
 	set_gsa_sobol_par_dist("norm");
 	set_gsa_sobol_samples(4);
-	set_gsa_rand_seed(2);
 
 	set_condor_submit_file(string());
 	set_overdue_giveup_minutes(1.0e+30);

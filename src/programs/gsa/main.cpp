@@ -404,6 +404,7 @@ int main(int argc, char* argv[])
 		unsigned int seed = convert_cp<unsigned int>(morris_r_it->second);
 		gsa_method->set_seed(seed);
 	}
+	//gsa_method->set_seed(2);
 	frec << scientific << left << setw(30) << " gsa random seed " << gsa_method->get_seed() << endl;
 	// make model runs
 	if (gsa_restart == GSA_RESTART::NONE)
