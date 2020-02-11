@@ -398,13 +398,13 @@ int main(int argc, char* argv[])
 		throw PestError("A valid method for computing the sensitivity must be specified in the control file");
 	}
 
-	/*auto morris_r_it = gsa_opt_map.find("RAND_SEED");
+	auto morris_r_it = gsa_opt_map.find("RAND_SEED");
 	if (morris_r_it != gsa_opt_map.end())
 	{
 		unsigned int seed = convert_cp<unsigned int>(morris_r_it->second);
 		gsa_method->set_seed(seed);
-	}*/
-	gsa_method->set_seed(pest_scenario.get_pestpp_options().get_random_seed());
+	}
+	//gsa_method->set_seed(2);
 	frec << scientific << left << setw(30) << " gsa random seed " << gsa_method->get_seed() << endl;
 	// make model runs
 	if (gsa_restart == GSA_RESTART::NONE)
