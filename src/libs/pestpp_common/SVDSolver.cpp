@@ -92,7 +92,7 @@ bool MuPoint::operator< (const MuPoint &rhs) const
 SVDSolver::SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
 	const ParamTransformSeq &_par_transform, Jacobian &_jacobian,
 	OutputFileWriter &_output_file_writer,
-	PerformanceLog *_performance_log, Covariance& _parcov,const string &_description, bool _phiredswh_flag, 
+	PerformanceLog *_performance_log, Covariance& _parcov,std::mt19937* _rand_gen_ptr, const string &_description, bool _phiredswh_flag, 
 	bool _splitswh_flag, bool _save_next_jacobian)
 	: pest_scenario(_pest_scenario), ctl_info(&_pest_scenario.get_control_info()), svd_info(_pest_scenario.get_svd_info()), par_group_info_ptr(&_pest_scenario.get_base_group_info()),
 	ctl_par_info_ptr(&_pest_scenario.get_ctl_parameter_info()), obs_info_ptr(&_pest_scenario.get_ctl_observation_info()), obj_func(_obj_func),
@@ -100,7 +100,7 @@ SVDSolver::SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, Objective
 	splitswh_flag(_splitswh_flag), save_next_jacobian(_save_next_jacobian), prior_info_ptr(_pest_scenario.get_prior_info_ptr()), jacobian(_jacobian),
 	regul_scheme_ptr(_pest_scenario.get_regul_scheme_ptr()), output_file_writer(_output_file_writer), description(_description), best_lambda(20.0),
 	performance_log(_performance_log), base_lambda_vec(_pest_scenario.get_pestpp_options().get_base_lambda_vec()), lambda_scale_vec(_pest_scenario.get_pestpp_options().get_lambda_scale_vec()),
-	terminate_local_iteration(false), parcov(_parcov)
+	terminate_local_iteration(false), parcov(_parcov), rand_gen_ptr(_rand_gen_ptr)
 {
 	svd_package = new SVD_REDSVD();
 	glm_normal_form = pest_scenario.get_pestpp_options().get_glm_normal_form();
@@ -997,8 +997,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	pair<ParameterEnsemble, map<int, int>> fosm_real_info;
 	Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
 		jacobian.get_matrix_ptr());
-	std::mt19937 rand_gen;
-	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, &rand_gen);
+	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, rand_gen_ptr);
 	if (pest_scenario.get_pestpp_options().get_uncert_flag())
 	{
 		cout << "-->starting iteration FOSM process..." << endl;

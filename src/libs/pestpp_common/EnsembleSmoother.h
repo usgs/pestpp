@@ -185,6 +185,7 @@ private:
 	Pest &pest_scenario;
 	FileManager &file_manager;
 	std::mt19937 rand_gen;
+	std::mt19937 subset_rand_gen;
 	OutputFileWriter &output_file_writer;
 	PerformanceLog *performance_log;
 	RunManagerAbstract* run_mgr_ptr;

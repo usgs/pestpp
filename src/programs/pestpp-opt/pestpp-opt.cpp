@@ -425,8 +425,7 @@ int main(int argc, char* argv[])
 			
 			Covariance parcov;
 			parcov.try_from(pest_scenario, file_manager);
-			std::mt19937 rand_gen;
-			sequentialLP slp(pest_scenario, run_manager_ptr, parcov, &file_manager, output_file_writer, performance_log, &rand_gen);
+			sequentialLP slp(pest_scenario, run_manager_ptr, parcov, &file_manager, output_file_writer, performance_log);
 			slp.solve();
 			fout_rec << "Number of forward model runs performed during optimiztion: " << run_manager_ptr->get_total_runs() << endl;
 		}

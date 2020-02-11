@@ -37,7 +37,7 @@ public:
 	SVDASolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
 		const ParamTransformSeq &_par_transform, Jacobian &_jacobian,
 		OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log, Covariance& _parcov,
-		bool _phiredswh_flag, bool _splitswh_flag);
+		std::mt19937* _rand_gen_ptr, bool _phiredswh_flag, bool _splitswh_flag);
 	virtual Parameters limit_parameters_freeze_all_ip(const Parameters &init_active_ctl_pars,
 		Parameters &upgrade_active_ctl_pars, const Parameters &prev_frozen_active_ctl_pars);
 	virtual void calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active_ctl_pars, QSqrtMatrix &Q_sqrt,

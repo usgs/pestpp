@@ -432,8 +432,6 @@ public:
 	void set_gsa_sobol_samples(int _s) { gsa_sobol_samples = _s; }
 	string get_gsa_sobol_par_dist() const { return gsa_sobol_par_dist; }
 	void set_gsa_sobol_par_dist(string _d) { gsa_sobol_par_dist = _d; }
-	int get_gsa_rand_seed() const { return gsa_rand_seed; }
-	void set_gsa_rand_seed(int _r) { gsa_rand_seed = _r; }
 
 	set<string> get_passed_args() const { return passed_args; }
 	map<string, string> get_arg_map()const { return arg_map; }
@@ -450,6 +448,8 @@ public:
 	bool get_fill_tpl_zeros() const { return fill_tpl_zeros; }
 	void set_additional_ins_delimiters(string _delims) { additional_ins_delimiters = _delims; }
 	string get_additional_ins_delimiters() const { return additional_ins_delimiters; }
+	void set_random_seed(int seed) { random_seed = seed; }
+	int get_random_seed()const { return random_seed; }
 
 
 	void set_defaults();
@@ -492,7 +492,7 @@ private:
 	bool fill_tpl_zeros;
 	string additional_ins_delimiters;
 
-
+	int random_seed;
 
 	double overdue_reched_fac;
 	double overdue_giveup_fac;
@@ -582,9 +582,6 @@ private:
 	bool gsa_morris_obs_sen;
 	double gsa_morris_delta;
 	string gsa_sobol_par_dist;
-	int gsa_rand_seed;
-
-	
 		
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);

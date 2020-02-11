@@ -381,7 +381,7 @@ int main(int argc, char* argv[])
 
 		ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
 		Jacobian *base_jacobian_ptr = new Jacobian_1to1(file_manager,output_file_writer);
-		std::mt19937 rand_gen(1234567);
+		std::mt19937 rand_gen(pest_scenario.get_pestpp_options().get_random_seed());
 		TerminationController termination_ctl(pest_scenario.get_control_info().noptmax, pest_scenario.get_control_info().phiredstp,
 			pest_scenario.get_control_info().nphistp, pest_scenario.get_control_info().nphinored, pest_scenario.get_control_info().relparstp,
 			pest_scenario.get_control_info().nrelpar, pest_scenario.get_regul_scheme_ptr()->get_use_dynamic_reg(),
@@ -399,7 +399,7 @@ int main(int argc, char* argv[])
 		parcov.try_from(pest_scenario, file_manager);
 		
 		SVDSolver base_svd(pest_scenario, file_manager, &obj_func, base_trans_seq,
-			*base_jacobian_ptr, output_file_writer, &performance_log, parcov, "base parameter solution");
+			*base_jacobian_ptr, output_file_writer, &performance_log, parcov, &rand_gen, "base parameter solution");
 
 		base_svd.set_svd_package(pest_scenario.get_pestpp_options().get_svd_pack());
 		//Build Super-Parameter problem
@@ -724,7 +724,7 @@ int main(int argc, char* argv[])
 				}
 				SVDASolver super_svd(pest_scenario, file_manager, &obj_func,
 					trans_svda, *super_jacobian_ptr,
-					output_file_writer, &performance_log,parcov,
+					output_file_writer, &performance_log,parcov,&rand_gen,
 					base_svd.get_phiredswh_flag(), base_svd.get_splitswh_flag());
 				super_svd.set_svd_package(pest_scenario.get_pestpp_options().get_svd_pack());
 				//use base jacobian to compute first super jacobian if there was not a super upgrade
