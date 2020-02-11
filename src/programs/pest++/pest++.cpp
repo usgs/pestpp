@@ -825,7 +825,7 @@ int main(int argc, char* argv[])
 			Mat j(base_jacobian_ptr->get_sim_obs_names(), base_jacobian_ptr->get_base_numeric_par_names(),
 				base_jacobian_ptr->get_matrix_ptr());
 
-			LinearAnalysis la(j, pest_scenario, file_manager, performance_log,parcov,rand_gen);
+			LinearAnalysis la(j, pest_scenario, file_manager, performance_log,parcov,&rand_gen);
 			ObservationInfo reweight = la.glm_iter_fosm(optimum_run, output_file_writer, -999, run_manager_ptr);
 			if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
 			{

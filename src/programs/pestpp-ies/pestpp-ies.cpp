@@ -322,10 +322,8 @@ int main(int argc, char* argv[])
 
 
 		run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), pest_scenario.get_ctl_observations());
-
-		std::mt19937 rand_gen(123456);
 		
-		IterEnsembleSmoother ies(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr,rand_gen);
+		IterEnsembleSmoother ies(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 		
 
 		ies.initialize();

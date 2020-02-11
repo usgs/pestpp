@@ -998,7 +998,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
 		jacobian.get_matrix_ptr());
 	std::mt19937 rand_gen;
-	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, rand_gen);
+	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, &rand_gen);
 	if (pest_scenario.get_pestpp_options().get_uncert_flag())
 	{
 		cout << "-->starting iteration FOSM process..." << endl;

@@ -169,9 +169,9 @@ private:
 class IterEnsembleSmoother
 {
 public:
-	IterEnsembleSmoother(Pest &_pest_scenario, FileManager &_file_manager,
-		OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log,
-		RunManagerAbstract* _run_mgr_ptr, std::mt19937& _rand_gen);
+	IterEnsembleSmoother(Pest& _pest_scenario, FileManager& _file_manager,
+		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
+		RunManagerAbstract* _run_mgr_ptr);
 	
 	void initialize();
 	void iterate_2_solution();
@@ -184,7 +184,7 @@ private:
 	int  verbose_level;
 	Pest &pest_scenario;
 	FileManager &file_manager;
-	std::mt19937& rand_gen;
+	std::mt19937 rand_gen;
 	OutputFileWriter &output_file_writer;
 	PerformanceLog *performance_log;
 	RunManagerAbstract* run_mgr_ptr;

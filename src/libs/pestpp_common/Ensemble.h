@@ -22,8 +22,8 @@ class Ensemble
 public:
 	//Ensemble(Pest &_pest_scenario, FileManager &_file_manager,
 	//	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log, unsigned int = 1);
-	Ensemble(Pest* _pest_scenario, std::mt19937& _rand_gen);
-	Ensemble() :rand_gen(std::mt19937()){ ; }
+	Ensemble(Pest* _pest_scenario, std::mt19937* _rand_gen_ptr);
+	Ensemble(){ ; }
 
 	//Ensemble get(vector<string> &_real_names, vector<string> &_var_names);
 
@@ -87,11 +87,11 @@ public:
 	void draw(int num_reals, Covariance cov, Transformable &tran, const vector<string> &draw_names, const map<string,vector<string>> &grouper, PerformanceLog *plog, int level);
 	void update_var_map();
 	~Ensemble();
-	Ensemble& operator=(const Ensemble& other);
-	void set_rand_gen(std::mt19937& _rand_gen) { rand_gen = _rand_gen; }
+	//Ensemble& operator=(const Ensemble& other);
+	void set_rand_gen(std::mt19937* _rand_gen_ptr) { rand_gen_ptr = _rand_gen_ptr; }
 
 protected:
-	std::mt19937& rand_gen;
+	std::mt19937* rand_gen_ptr;
 	Pest* pest_scenario_ptr;
 	//FileManager &file_manager;
 	//ObjectiveFunc *obj_func_ptr;
@@ -121,8 +121,8 @@ public:
 		FileManager &_file_manager,OutputFileWriter &_output_file_writer,
 		PerformanceLog *_performance_log, unsigned int seed = 1);
 	*/
-	ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937& rand_gen);
-	ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937& rand_gen, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
+	ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr);
+	ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
 
 	ParameterEnsemble() { ; }
 	ParameterEnsemble zeros_like();
@@ -167,8 +167,8 @@ public:
 	/*ObservationEnsemble(ObjectiveFunc *_obj_func, Pest &_pest_scenario, FileManager &_file_manager,
     OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log, unsigned int seed = 1);
 	*/
-	ObservationEnsemble(Pest *_pest_scenario_prt, std::mt19937& rand_gen);
-	ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937& rand_gen, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
+	ObservationEnsemble(Pest *_pest_scenario_prt, std::mt19937* rand_gen_ptr);
+	ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
 
 	ObservationEnsemble() { ; }
 	void to_binary(string filename) { Ensemble::to_binary(filename, true); }

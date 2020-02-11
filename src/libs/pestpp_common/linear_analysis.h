@@ -22,7 +22,7 @@ public:
 	//linear_analysis():pest_scenario(Pest()),file_manager(FileManager()),jacobian(Mat()){;}
 
 	//constructor for pest++ integration
-	LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, PerformanceLog &pfm, Covariance& _parcov, std::mt19937& _rand_gen);
+	LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, PerformanceLog &pfm, Covariance& _parcov, std::mt19937* _rand_gen_ptr);
 	//linear_analysis(Mat* _jacobian, Pest* pest_scenario, Mat* _obscov, Logger* _log = new Logger());
 
 
@@ -70,36 +70,6 @@ public:
 	//map <pred_name,variance> from schur's complement
 	map<string, double> posterior_prediction_variance();
 
-	//the reduction in predictive variance from some obs
-	double posterior_predictive_worth(string &pred_name, vector<string> &obs_names);
-	//<pred_name,variance_reduction> from some obs
-	map<string, double> worth(vector<string> &obs_names);
-
-	//reduction in prior and posterior predictive variance from perfect knowledge of some pars
-	//<pred_name,prior and posterior variance_reduction> from perfect knowledge of some pars
-	map<string, pair<double, double>> contribution(vector<string> &par_names);
-
-
-
-	//exposed error variance functionality
-
-	//<err_var_component("null","solution","omitted"),error_variance> for a set of singular values and a parameter
-	map<string, vector<double>> parameter_error_variance_components(vector<int> sing_vals, string &par_name);
-	//<err_var_component("null","solution","omitted"),error_variance> for a set of singular values and a prediction
-	map<string, vector<double>> prediction_error_variance_components(vector<int> sing_vals, string &pred_name);
-
-	//extract elements from the jacobian, parcov, and predictions and set them as omitted
-	void extract_omitted(vector<string> &omitted_par_names);
-	void extract_omitted(string &omitted_par_name);
-
-	Covariance first_parameter(int sv);
-	Covariance second_parameter(int sv);
-	Covariance third_parameter(int sv);
-
-	map<string, double> first_prediction(int sv);
-	map<string, double> second_prediction(int sv);
-	map<string, double> third_prediction(int sv);
-
 	Mat get_jacobian(){ return jacobian; }
 	Mat get_omitted_jacobian(){ return omitted_jacobian; }
 	Covariance get_parcov(){ return parcov; }
@@ -114,13 +84,6 @@ public:
 	Covariance* get_obscov_ptr(){ return &obscov; }
 	Mat* get_omitted_jacobian_ptr(){ return &omitted_jacobian; }
 	Covariance* get_omitted_parcov_ptr(){ return &omitted_parcov; }
-
-	Mat* get_normal_ptr();
-
-	Mat* get_R_ptr(int sv);
-	Mat* get_G_ptr(int sv);
-	Mat* get_ImR_ptr(int sv);
-	Mat* get_V1_ptr(int sv);
 
 	map<string,Mat> get_predictions(){ return predictions; }
 	map<string,Mat> get_omitted_predictions(){ return omitted_predictions; }
@@ -141,7 +104,7 @@ public:
 private:
 
 	//Logger* log;
-	std::mt19937& rand_gen;
+	std::mt19937* rand_gen_ptr;
 	PerformanceLog& pfm;
 	FileManager& file_manager;
 	Pest& pest_scenario;
