@@ -15,8 +15,9 @@
 #include "utilities.h"
 
 sequentialLP::sequentialLP(Pest &_pest_scenario, RunManagerAbstract* _run_mgr_ptr,
-	Covariance &_parcov, FileManager* _file_mgr, OutputFileWriter _of_wr, PerformanceLog& _pfm) : pest_scenario(_pest_scenario), run_mgr_ptr(_run_mgr_ptr),
-	parcov(_parcov), file_mgr_ptr(_file_mgr),jco(*_file_mgr,_of_wr), of_wr(_of_wr), pfm(_pfm)
+	Covariance &_parcov, FileManager* _file_mgr, OutputFileWriter _of_wr, PerformanceLog& _pfm, std::mt19937* _rand_gen_ptr) 
+	: pest_scenario(_pest_scenario), run_mgr_ptr(_run_mgr_ptr),
+	parcov(_parcov), file_mgr_ptr(_file_mgr),jco(*_file_mgr,_of_wr), of_wr(_of_wr), pfm(_pfm), rand_gen_ptr(_rand_gen_ptr)
 {
 	try
 	{
@@ -1108,7 +1109,7 @@ void sequentialLP::calc_chance_constraint_offsets()
 
 		//create a linear object
 		//Logger logger(file_mgr_ptr->get_ofstream("log"), false);
-		LinearAnalysis la(fosm_jco, pest_scenario,*file_mgr_ptr,pfm, parcov);
+		LinearAnalysis la(fosm_jco, pest_scenario,*file_mgr_ptr,pfm, parcov, rand_gen_ptr);
 		la.set_obscov(obscov);
 
 		//set the prior parameter covariance matrix

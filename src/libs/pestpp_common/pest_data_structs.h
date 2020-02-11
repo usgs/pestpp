@@ -24,6 +24,7 @@
 #include <unordered_map>
 #include <set>
 #include <vector>
+#include <random>
 #include "Transformable.h"
 
 
@@ -629,5 +630,8 @@ private:
 	set<string> passed_args;
 };
 ostream& operator<< (ostream& os, const SVDInfo& val);
+
+double draw_standard_normal(std::mt19937& rand_gen);
+
 
 #endif  /* PEST_DATAS_STRUCTS_H_ */

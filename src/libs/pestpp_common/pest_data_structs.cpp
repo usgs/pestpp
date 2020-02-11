@@ -25,6 +25,7 @@
 #include <sstream>
 #include <list>
 #include <regex>
+#include <random>
 #include "pest_data_structs.h"
 #include "utilities.h"
 #include "pest_error.h"
@@ -32,6 +33,7 @@
 #include "Transformation.h"
 #include "pest_error.h"
 #include "Transformable.h"
+
 
 using namespace::std;
 using namespace::pest_utils;
@@ -1553,4 +1555,20 @@ PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const string key, const s
 	else
 		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
+}
+
+double draw_standard_normal(std::mt19937& rand_gen)
+{	
+	using std::sqrt;
+	using std::log;
+	using std::cos;
+	using std::sin;
+
+	const double pi = 3.14159265358979323846264338327950288419716939937511;
+	double scale = 1.0 / (rand_gen.max() - rand_gen.min() + 1.0);
+	double v1 = (rand_gen() - rand_gen.min()) * scale;
+	double v2 = (rand_gen() - rand_gen.min()) * scale;
+	
+	double r = sqrt(-2.0 * log(v1));
+	return r * sin(2.0 * pi * v2);
 }
