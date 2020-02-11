@@ -22,7 +22,7 @@ public:
 	//linear_analysis():pest_scenario(Pest()),file_manager(FileManager()),jacobian(Mat()){;}
 
 	//constructor for pest++ integration
-	LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, PerformanceLog &pfm, Covariance& _parcov);
+	LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, PerformanceLog &pfm, Covariance& _parcov, std::mt19937& _rand_gen);
 	//linear_analysis(Mat* _jacobian, Pest* pest_scenario, Mat* _obscov, Logger* _log = new Logger());
 
 
@@ -141,6 +141,7 @@ public:
 private:
 
 	//Logger* log;
+	std::mt19937& rand_gen;
 	PerformanceLog& pfm;
 	FileManager& file_manager;
 	Pest& pest_scenario;

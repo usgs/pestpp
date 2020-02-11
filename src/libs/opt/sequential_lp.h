@@ -19,7 +19,7 @@ class sequentialLP
 public:
 	sequentialLP(Pest &_pest_scenario, RunManagerAbstract* _run_mgr_ptr,
 		         Covariance &_parcov, FileManager* _file_mgr_ptr, OutputFileWriter of_wr,
-				PerformanceLog& _pfm);
+				PerformanceLog& _pfm, std::mt19937& _rand_gen);
 	void initialize_and_check();
 	void solve();
 
@@ -27,6 +27,7 @@ public:
 	//ModelRun get_optimum_run() { return optimum_run; }
 
 private:
+	std::mt19937& rand_gen;
 	PerformanceLog& pfm;
 	string obj_func_str;
 	bool use_chance;

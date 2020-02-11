@@ -843,9 +843,9 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter)
 
 IterEnsembleSmoother::IterEnsembleSmoother(Pest &_pest_scenario, FileManager &_file_manager,
 	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log,
-	RunManagerAbstract* _run_mgr_ptr) : pest_scenario(_pest_scenario), file_manager(_file_manager),
+	RunManagerAbstract* _run_mgr_ptr, std::mt19937& _rand_gen) : pest_scenario(_pest_scenario), file_manager(_file_manager),
 	output_file_writer(_output_file_writer), performance_log(_performance_log),
-	run_mgr_ptr(_run_mgr_ptr)
+	run_mgr_ptr(_run_mgr_ptr), rand_gen(_rand_gen)
 {
 	pe.set_pest_scenario(&pest_scenario);
 	oe.set_pest_scenario(&pest_scenario);
@@ -865,6 +865,7 @@ void IterEnsembleSmoother::throw_ies_error(string message)
 
 bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 {
+	pe.set_rand_gen(rand_gen);
 	stringstream ss;
 	int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
 	string par_csv = pest_scenario.get_pestpp_options().get_ies_par_csv();
@@ -1095,7 +1096,7 @@ bool IterEnsembleSmoother::initialize_oe(Covariance &cov)
 {
 	stringstream ss;
 	int num_reals = pe.shape().first;
-
+	oe.set_rand_gen(rand_gen);
 	string obs_csv = pest_scenario.get_pestpp_options().get_ies_obs_csv();
 	bool drawn = false;
 	if (obs_csv.size() == 0)
@@ -1860,8 +1861,7 @@ void IterEnsembleSmoother::initialize_obscov()
 
 
 void IterEnsembleSmoother::initialize()
-{
-	
+{	
 	message(0, "initializing");
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 
@@ -1877,7 +1877,7 @@ void IterEnsembleSmoother::initialize()
 		Parameters pars = pest_scenario.get_ctl_parameters();
 		ParamTransformSeq pts = pe.get_par_transform();
 
-		ParameterEnsemble _pe(&pest_scenario);
+		ParameterEnsemble _pe(&pest_scenario, rand_gen);
 		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
 		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
 		_pe.append("BASE", pars);
@@ -1886,7 +1886,7 @@ void IterEnsembleSmoother::initialize()
 		//_pe.to_csv(par_csv);
 		pe_base = _pe;
 		pe_base.reorder(vector<string>(), act_par_names);
-		ObservationEnsemble _oe(&pest_scenario);
+		ObservationEnsemble _oe(&pest_scenario, rand_gen);
 		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
 		_oe.append("BASE", pest_scenario.get_ctl_observations());
 		oe_base = _oe;
@@ -2276,7 +2276,7 @@ void IterEnsembleSmoother::initialize()
 		pars.update(pe.get_var_names(), pe.get_mean_stl_vector());
 		ParamTransformSeq pts = pe.get_par_transform();
 
-		ParameterEnsemble _pe(&pest_scenario);
+		ParameterEnsemble _pe(&pest_scenario, rand_gen);
 		_pe.reserve(vector<string>(), pe.get_var_names());
 		_pe.set_trans_status(pe.get_trans_status());
 		_pe.append("mean", pars);
@@ -2285,7 +2285,7 @@ void IterEnsembleSmoother::initialize()
 		_pe.to_csv(par_csv);
 		pe_base = _pe;
 		pe_base.reorder(vector<string>(), act_par_names);
-		ObservationEnsemble _oe(&pest_scenario);
+		ObservationEnsemble _oe(&pest_scenario, rand_gen);
 		_oe.reserve(vector<string>(), oe.get_var_names());
 		_oe.append("mean", pest_scenario.get_ctl_observations());
 		oe_base = _oe;
@@ -3365,8 +3365,8 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 {
 	stringstream ss;
 	
-	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
-	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(), pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
+	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
+	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(),rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
 	
 	//this copy of the localizer map will be consumed by the worker threads
 	//unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
@@ -4097,11 +4097,10 @@ void IterEnsembleSmoother::set_subset_idx(int size)
 		{
 			if (subset_idxs.size() >= nreal_subset)
 				break;
-			idx = uni(Ensemble::rand_engine);
+			idx = uni(rand_gen);
 			if (find(subset_idxs.begin(), subset_idxs.end(), idx) != subset_idxs.end())
 				continue;
 			subset_idxs.push_back(idx);
-
 		}
 
 	}

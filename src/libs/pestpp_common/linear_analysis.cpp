@@ -350,13 +350,12 @@ ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileW
 	return reweight;
 }
 
-pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter, 
-	ModelRun& optimum_run)
+pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter, ModelRun& optimum_run)
 {
 	set<string> args = pest_scenario.get_pestpp_options().get_passed_args();
 	ofstream& fout_rec = file_manager.rec_ofstream();
 	map<int, int> run_map;
-	ParameterEnsemble pe(&pest_scenario);
+	ParameterEnsemble pe(&pest_scenario,rand_gen);
 	if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
 	{
 		pfm.log_event("drawing, saving and queuing FOSM parameter realizations");
@@ -415,7 +414,7 @@ pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(
 	int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
 	bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
 	pfm.log_event("processing FOSM realization runs");
-	ObservationEnsemble oe(&pest_scenario);
+	ObservationEnsemble oe(&pest_scenario, rand_gen);
 	if (num_reals <= 0)
 		return pair<ObservationEnsemble, map<string, double>>(oe, map<string, double>());
 	//Covariance obscov = get_obscov();
@@ -618,9 +617,10 @@ void LinearAnalysis::load_obscov(const string &obscov_filename)
 }
 
 
-LinearAnalysis::LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, PerformanceLog &_pfm, Covariance& _parcov): 
+LinearAnalysis::LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, PerformanceLog &_pfm, Covariance& _parcov,
+	std::mt19937& _rand_gen): 
 	pest_scenario(_pest_scenario),file_manager(_file_manager),
-			jacobian(_jacobian), pfm(_pfm),parcov(_parcov)
+			jacobian(_jacobian), pfm(_pfm),parcov(_parcov), rand_gen(_rand_gen)
 {
 	bool parcov_success = false;
 	//if (jacobian.nrow() != pest_scenario.get_nonregul_obs().size())
