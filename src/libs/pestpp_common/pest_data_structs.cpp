@@ -996,7 +996,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "parameter_covariance: " << parcov_filename << endl;
 	os << "observation_covariance: " << obscov_filename << endl;
 	os << "hotstart_resfile: " << hotstart_resfile << endl;
-	os << "overdue_resched_fac: " << overdue_giveup_fac << endl;
+	os << "overdue_resched_fac: " << overdue_reched_fac << endl;
+	os << "overdue_giveup_fac: " << overdue_giveup_fac << endl;
 	os << "overdue_giveup_minutes: " << overdue_giveup_minutes << endl;
 	os << "condor_submit_file: " << condor_submit_file << endl;
 	os << "tie_by_group: " << tie_by_group << endl;
