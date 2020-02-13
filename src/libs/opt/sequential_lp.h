@@ -155,7 +155,7 @@ private:
 	//report the fosm chance constraint info before solving the current LP problem
 	void presolve_fosm_report();
 
-	void write_res_file(Observations &obs, string tag);
+	void write_res_file(Observations &obs, Parameters &par, string tag);
 
 	//report dec var info the newly solved LP solution.  returns the current and new obj func
 	pair<double,double> postsolve_decision_var_report(Parameters &upgrade_pars);
