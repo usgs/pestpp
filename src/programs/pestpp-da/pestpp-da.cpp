@@ -9,6 +9,7 @@
 #include <algorithm>
 #include "config_os.h"
 #include "Pest.h"
+#include "MultiPest.h"
 #include "Transformable.h"
 #include "Transformation.h"
 #include "ParamTransformSeq.h"
@@ -282,6 +283,8 @@ int main(int argc, char* argv[])
 		// loop over assimilation cycles
 		
 		//get deep copy of pest_scenario for current cycle
+		//MultiPest mPest (pest_scenario);
+		
 		Pest childPest;
 		childPest = pest_scenario.get_child_pest(0);
 		

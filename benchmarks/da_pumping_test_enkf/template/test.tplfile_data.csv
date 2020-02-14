@@ -3,8 +3,8 @@ stats_head.tpl,stat_heads_in.csv,-1,stat
 par_k.tpl,par_k.csv,-1,par
 misc_dis1.tpl,misc_dis.csv,0,misc
 misc_dis2.tpl,misc_dis.csv,1,misc
-misc_dis2.tpl,misc_dis.csv,2,misc
-misc_dis2.tpl,misc_dis.csv,3,misc
+misc_dis3.tpl,misc_dis.csv,2,misc
+misc_dis3.tpl,misc_dis.csv,3,misc
 misc_hob1.tpl,misc_hob.csv,0,misc
 misc_hob2.tpl,misc_hob.csv,1,misc
 misc_hob2.tpl,misc_hob.csv,2,misc

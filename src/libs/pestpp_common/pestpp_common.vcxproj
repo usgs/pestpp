@@ -40,6 +40,7 @@
     <ClInclude Include="Localizer.h" />
     <ClInclude Include="logger.h" />
     <ClInclude Include="ModelRunPP.h" />
+    <ClInclude Include="MultiPest.h" />
     <ClInclude Include="ObjectiveFunc.h" />
     <ClInclude Include="OutputFileWriter.h" />
     <ClInclude Include="ParamTransformSeq.h" />
@@ -72,6 +73,7 @@
     <ClCompile Include="Localizer.cpp" />
     <ClCompile Include="logger.cpp" />
     <ClCompile Include="ModelRunPP.cpp" />
+    <ClCompile Include="MultiPest.cpp" />
     <ClCompile Include="ObjectiveFunc.cpp" />
     <ClCompile Include="OutputFileWriter.cpp" />
     <ClCompile Include="ParamTransformSeq.cpp" />

@@ -80,6 +80,9 @@ public:
 	const ParameterGroupInfo& operator=(const ParameterGroupInfo &rhs);
 	bool have_switch_derivative() const;
 	vector<string> get_group_names() const;
+	void par_erase(const string& par_name) { parameter2group.erase(par_name); }
+	void grp_erase(const string& grp_name) { groups.erase(grp_name);
+	}
 	~ParameterGroupInfo();
 private:
 	unordered_map<string, ParameterGroupRec*> groups;
@@ -164,6 +167,8 @@ public:
 	vector<string> get_groups();
 	void reset_group_weights(string &group, double val);
 	void scale_group_weights(string &group, double scale_val);
+	void erase_ob(const string& name) { observations.erase(name);}
+	void erase_gp(const string& name) { groups.erase(name); }
 
 };
 

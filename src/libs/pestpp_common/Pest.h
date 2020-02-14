@@ -85,11 +85,14 @@ public:
 	void enforce_par_limits(PerformanceLog* perfomance_log, Parameters &update_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim=true, bool enforce_bounds=false);
 	map<string,double> get_pars_at_near_bounds(const Parameters &pars, double tol=0.0);
 	pair<Parameters,Parameters> get_effective_ctl_lower_upper_bnd(Parameters &pars);
-	Pest &get_child_pest(int icycle);	
+
+	Pest &get_child_pest(int icycle);
+	void child_pest_update(int icycle);
+	
 	
 	virtual ~Pest();
 	
-private:
+protected:
 	int n_adj_par = 0;
 	string prior_info_string;
 	ControlInfo control_info;

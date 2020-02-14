@@ -12,6 +12,8 @@ ies_parameter_ensemble     kh_ensemble0.csv
 test.pargrp_data.csv
 * parameter data external
 test.par_data.csv
+* observation groups external
+obsgrp.csv
 * observation data external
 test.obs_data.csv
 * model command line

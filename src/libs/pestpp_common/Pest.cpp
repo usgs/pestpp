@@ -2056,6 +2056,7 @@ Pest& Pest::get_child_pest(int icycle)
 	
 	
 	Pest* child_pest = new Pest(*this);
+	child_pest->child_pest_update(icycle);
 	//child_pest->ctl_parameters;
 	//ctl_parameter_info.insert(name, pi);
 	//ctl_parameters.insert(name, pi.init_value);
@@ -2064,6 +2065,7 @@ Pest& Pest::get_child_pest(int icycle)
 	// todo: change number of parameters and obs to match current parm/obs number
 	//ParameterRec curr_param_inf;
 	//unordered_map<string, ParameterRec>::iterator p_iter;
+	/*
 	ParameterInfo curr_params;
 	curr_params = child_pest->get_ctl_parameter_info();
 	ParameterInfo pi = get_ctl_parameter_info();
@@ -2072,6 +2074,7 @@ Pest& Pest::get_child_pest(int icycle)
 		{
 			curr_params.erase(p);
 		}
+		*/
 
 	//for (auto it = curr_params.begin(); it != curr_params.end(); ++it)
 	//	std::cout << " " << it->first << ":" << it->second;
@@ -2079,6 +2082,119 @@ Pest& Pest::get_child_pest(int icycle)
 	
 	return *child_pest;
 	
+}
+
+void Pest::child_pest_update(int icycle)
+{
+	/*
+	Update Pest members to reflect current cycle data only
+	*/
+	vector<string> cycle_grps, unique_cycle_grps, grps;	
+	vector<string> parnames, obsnames;
+	
+	//prior_info_string
+	//control_info
+	//pareto_info
+	//svd_info
+	
+	parnames = get_ctl_ordered_par_names();
+	obsnames = get_ctl_ordered_obs_names();
+	ParameterInfo pi = get_ctl_parameter_info();
+	for (auto& p : get_ctl_ordered_par_names())
+		if (pi.get_parameter_rec_ptr(p)->cycle != icycle && 
+			pi.get_parameter_rec_ptr(p)->cycle >= 0)
+		{
+			ctl_parameter_info.erase(p);
+			ctl_parameters.erase(p);
+			base_group_info.par_erase(p);// .parameter2group.erase(p);
+			parnames.erase(remove(parnames.begin(),
+				parnames.end(), p), parnames.end());
+
+		}
+		else
+		{
+			cycle_grps.push_back(base_group_info.get_group_name(p));
+			
+		}
+    // get unique groups
+	for (auto curr = cycle_grps.begin(); curr != cycle_grps.end(); curr++) {
+		if (find(unique_cycle_grps.begin(), unique_cycle_grps.end(), *curr) == unique_cycle_grps.end())
+		{
+			unique_cycle_grps.push_back(*curr);
+		}
+	}
+	// remove groups not in current cycle
+	grps = base_group_info.get_group_names();
+	for (auto grp = grps.begin(); grp != grps.end(); grp++)
+	{
+		if (find(unique_cycle_grps.begin(), unique_cycle_grps.end(), *grp) == unique_cycle_grps.end())
+			base_group_info.grp_erase(*grp);
+	}
+	// update observations
+	vector<string> cycle_grps_o, unique_cycle_grps_o, grps_o;
+	ObservationInfo obs_info = get_ctl_observation_info();
+	observation_values;
+	for (auto& ob : get_ctl_ordered_obs_names())
+		if (obs_info.get_observation_rec_ptr(ob)->cycle != icycle &&
+			obs_info.get_observation_rec_ptr(ob)->cycle >= 0)
+		{
+			observation_info.erase_ob(ob);
+			observation_values.erase(ob);
+			obsnames.erase(remove(obsnames.begin(),
+				obsnames.end(), ob), obsnames.end());
+		}
+		else
+		{
+			cycle_grps_o.push_back(obs_info.get_group(ob));
+		}
+
+	// get unique groups
+	for (auto curr = cycle_grps_o.begin(); curr != cycle_grps_o.end(); curr++) {
+		if (find(unique_cycle_grps_o.begin(), unique_cycle_grps_o.end(), *curr) == unique_cycle_grps_o.end())
+		{
+			unique_cycle_grps_o.push_back(*curr);
+		}
+	}
+	// remove groups not in current cycle
+	grps_o = observation_info.get_groups();
+	for (auto grp = grps_o.begin(); grp != grps_o.end(); grp++)
+	{
+		if (find(unique_cycle_grps_o.begin(), unique_cycle_grps_o.end(), *grp) == unique_cycle_grps_o.end())
+			observation_info.erase_gp(*grp);
+	}
+
+	// prior info
+
+	//ctl_parameters
+	//model_exec_info
+	//pestpp_options
+	//base_par_transform
+	//ctl_ordered_par_names
+	ctl_ordered_par_names = parnames;
+
+	//ctl_ordered_obs_names
+	ctl_ordered_obs_names = obsnames;
+
+	//ctl_ordered_par_group_names ----> TODO: Check if the groups order is preserved..
+	ctl_ordered_par_group_names = unique_cycle_grps;
+	ctl_ordered_obs_group_names = unique_cycle_grps_o;
+
+	//ctl_ordered_pi_names
+	//regul_scheme_ptr
+	//other_lines
+	//pst_filename  ----> TODO: do I need to change the file name
+	
+	// get number of adj par for current cycle
+	ParameterRec::TRAN_TYPE tfixed = ParameterRec::TRAN_TYPE::FIXED;
+	int new_n_adj_par = 0;
+	for (auto pname : ctl_ordered_par_names)
+	{
+		if (ctl_parameter_info.get_parameter_rec_ptr(pname)->tranform_type != tfixed)
+		{
+			new_n_adj_par++;
+		}
+	}
+	n_adj_par = new_n_adj_par;
 }
 
 
