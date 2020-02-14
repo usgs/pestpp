@@ -903,7 +903,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		ies_save_rescov = pest_utils::parse_string_arg_to_bool(value);
 	}
-
+	else if (key == "IES_PDC_SIGMA_DISTANCE")
+	{
+		convert_ip(value, ies_pdc_sigma_distance);
+	}
 	else if (key == "GSA_METHOD")
 	{
 		convert_ip(value, gsa_method);
@@ -1134,6 +1137,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_no_noise: " << ies_no_noise << endl;
 	os << "ies_drop_conflicts: " << ies_drop_conflicts << endl;
 	os << "ies_save_rescov:" << ies_save_rescov << endl;
+	os << "ies_pdc_sigma_distance: " << ies_pdc_sigma_distance << endl;
 
 	os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -1250,7 +1254,7 @@ void PestppOptions::set_defaults()
 	set_ies_no_noise(false);
 	set_ies_drop_conflicts(false);
 	set_ies_save_rescov(false);
-	
+	set_ies_pdc_sigma_distance(-1.0);
 
 	set_gsa_method("MORRIS");
 	//many of these defaults are also redefined in gsa main

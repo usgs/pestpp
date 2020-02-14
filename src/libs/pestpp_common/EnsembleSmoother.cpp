@@ -2550,6 +2550,7 @@ vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
 	temp = ph.get_gt_obs_names();
 	ineq.insert(temp.begin(), temp.end());
 	temp.resize(0);
+	
 	for (int i = 0; i < snames.size(); i++)
 	{
 		smap[snames[i]] = i;
@@ -2559,18 +2560,47 @@ vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
 		omap[onames[i]] = i;
 	}
 	int sidx, oidx;
-	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
+	if (pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance() <= 0.0)
 	{
-		if (ineq.find(oname) != end)
-			continue;
-		sidx = smap[oname];
-		oidx = omap[oname];
-		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
-		omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
-		smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
-		omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
-		if ((smin > omax) || (smax < omin))
-			in_conflict.push_back(oname);
+		for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
+		{
+			if (ineq.find(oname) != end)
+				continue;
+			sidx = smap[oname];
+			oidx = omap[oname];
+			smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
+			omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
+			smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
+			omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
+			if ((smin > omax) || (smax < omin))
+				in_conflict.push_back(oname);
+		}
+	}
+	else
+	{
+		double smn, sstd, omn, ostd;
+		double sd = pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance();
+		int oe_nr = oe.shape().first;
+		int oe_base_nr = oe_base.shape().first;
+		Eigen::VectorXd t;
+		for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
+		{
+			if (ineq.find(oname) != end)
+				continue;
+			sidx = smap[oname];
+			oidx = omap[oname];
+			t = oe.get_eigen_ptr()->col(sidx);
+			smn = t.mean();
+			sstd = std::sqrt((t.array() - smn).square().sum() / (oe_nr-1));
+			smin = smn - (sd * sstd);
+			smax = smn + (sd * sstd);
+			t = oe_base.get_eigen_ptr()->col(oidx);
+			omn = t.mean();
+			ostd = std::sqrt((t.array() - omn).square().sum() / (oe_base_nr-1));
+			omin = omn - (sd * ostd);
+			omax = omn + (sd * ostd);			if ((smin > omax) || (smax < omin))
+				in_conflict.push_back(oname);
+		}
 	}
 	return in_conflict;
 }
