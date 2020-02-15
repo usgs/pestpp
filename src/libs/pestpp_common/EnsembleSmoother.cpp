@@ -760,7 +760,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter)
 	cout << ss.str();
 	frec << ss.str();
 	ss.str("");
-	ss << setw(15) << "group" << setw(15) << "mean change" << setw(15) << "std change" << setw(25) << "number at/near bounds" << setw(20) << "% at/near bounds" << endl;
+	ss << setw(15) << "group" << setw(12) << "mean change" << setw(12) << "std change" << setw(18) << "num at/near bnds" << setw(16) << "% at/near bnds" << endl;
 	cout << ss.str();
 	frec << ss.str();
 	double mean_diff = 0.0, std_diff = 0.0;
@@ -812,8 +812,9 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter)
 		double percent_out = 0;
 		if (num_pars > 0)
 			percent_out = double(num_out) / double(num_pars * num_reals) * 100;
-		ss << setw(15) << pest_utils::lower_cp(grp_name) << setw(15) << mean_diff * 100.0 << setw(15) << std_diff * 100.0 << setw(25);
-		ss << num_out << setw(20) << setprecision(2) << percent_out << endl;
+		//ss << setw(15) << "group" << setw(12) << "mean change" << setw(12) << "std change" << setw(18) << "num at/near bnds" << setw(16) << "% at/near bnds" << endl;
+		ss << setw(15) << pest_utils::lower_cp(grp_name) << setw(12) << mean_diff * 100.0 << setw(12) << std_diff * 100.0 << setw(18);
+		ss << num_out << setw(16) << setprecision(2) << percent_out << endl;
 		cout << ss.str();
 		frec << ss.str();
 
@@ -2444,8 +2445,8 @@ void IterEnsembleSmoother::initialize()
 		if (!ppo->get_ies_drop_conflicts())
 		{
 			ss.str("");
-			ss << "  WARNING: Prior-data conflict detected.  Continuing with IES parameter";
-			ss << "           adjustment will likely result in parameter and forecast bias.";
+			ss << "  WARNING: Prior-data conflict detected.  Continuing with IES parameter" << endl;
+			ss << "           adjustment will likely result in parameter and forecast bias." << endl;
 			ss << "           Consider using 'ies_drop_conflicts' as a quick fix.";
 			message(1, ss.str());
 		}

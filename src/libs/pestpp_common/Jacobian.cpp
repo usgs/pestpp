@@ -930,8 +930,9 @@ void Jacobian::report_errors(std::ostream &fout)
 
 		for (const auto & ipar : failed_parameter_names)
 		{
-			fout << right << "  " << setw(12) << ipar;
+			fout << right << "  " << setw(12) << ipar << endl;
 		}
+		cout << "WARNING:  " << failed_parameter_names.size() << " parameter pertubation runs failed while computing jacobian, see rec file for listing" << endl;
 	}
 
 }

@@ -223,11 +223,7 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 				os << endl;
 				jacobian.report_errors(os);
 				os << endl;
-				cout << endl;
-				jacobian.report_errors(cout);
-				cout << endl;
 				os.flush();
-				cout.flush();
 				if (!der_forgive) exit(0);
 			}
 		}
