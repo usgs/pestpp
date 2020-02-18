@@ -263,11 +263,48 @@ void PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
 {
 	Eigen::MatrixXd rmat = get_obs_resid(oe, false); //dont apply ineq constraints
 	//ObservationEnsemble(Pest *_pest_scenario_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
-	rmat = rmat.transpose() * rmat;
+	Eigen::MatrixXd ercov = rmat.transpose() * rmat;
 	vector<string> names = oe_base->get_var_names();
-	Covariance rcov(names, rmat.sparseView());
+	Covariance rcov(names, ercov.sparseView());
 	stringstream ss;
 	ss << file_manager->get_base_filename() << "." << iter << ".res.";
+	if (pest_scenario->get_pestpp_options().get_ies_save_binary())
+	{
+		ss << "jcb";
+		rcov.to_binary_new(ss.str());
+	}
+	else
+	{
+		ss << "cov";
+		rcov.to_ascii(ss.str());
+	}
+
+	//calculate the optimal shrinkage factor from Target D of Schafer and  Strimmer 2005
+	ObservationEnsemble res(pest_scenario,oe.get_rand_gen_ptr());
+	res.reserve(oe_base->get_real_names(), oe_base->get_var_names());
+	res.set_eigen(rmat);
+	Eigen::MatrixXd anom = res.get_eigen_anomalies();
+	Eigen::VectorXd wij;
+	double num_reals = static_cast<double>(res.shape().first);
+	double wij_sum = 0;
+	for (int i = 0; i < res.shape().second; i++)
+	{
+		for (int j = 0; j < i; j++)
+		{
+			wij = anom.col(i).cwiseProduct(anom.col(j));
+			wij_sum = wij_sum + (wij.array() - wij.mean()).square().sum();
+		}
+	}
+	double scale = (num_reals / ((num_reals - 1.)* (num_reals - 1.)* (num_reals - 1.))) * wij_sum;
+	cout << "optimal residual covariance matrix shrinkage factor: " << scale << endl;
+	file_manager->rec_ofstream() << "optimal residual covariance matrix shrinkage factor : " <<scale << endl;
+	Covariance rcov_diag;
+	rcov_diag.from_diagonal(rcov);
+	Eigen::MatrixXd shrunk = rcov_diag.e_ptr()->toDense();
+	Eigen::MatrixXd t = (rcov_diag.e_ptr()->toDense().array() * scale) + (rcov.e_ptr()->toDense().array() * (1. - scale));
+	rcov = Covariance(rcov.get_row_names(), t.sparseView());
+	ss.str("");
+	ss << file_manager->get_base_filename() << "." << iter << ".shrunk_res.";
 	if (pest_scenario->get_pestpp_options().get_ies_save_binary())
 	{
 		ss << "jcb";
@@ -1950,35 +1987,16 @@ void IterEnsembleSmoother::initialize()
 	//set some defaults
 	PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
 
-	/*if (pp_args.find("IES_LAMBDA_MULTS") == pp_args.end())
-		ppo->set_ies_lam_mults(vector<double>{0.1, 1.0, 2.0});
-	if (pp_args.find("IES_SUBSET_SIZE") == pp_args.end())
-		ppo->set_ies_subset_size(4);
-	if (pp_args.find("LAMBDA_SCALE_FAC") == pp_args.end())
-		ppo->set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1});*/
-
 	verbose_level = pest_scenario.get_pestpp_options_ptr()->get_ies_verbose_level();
 	if (pest_scenario.get_n_adj_par() >= 1e6)
 	{
 		message(0, "You are a god among mere mortals!");
 	}
 
-	/*PestppOptions::SVD_PACK svd = ppo->get_svd_pack();
-	if (svd == PestppOptions::SVD_PACK::PROPACK)
-	{
-		message(1, "using PROPACK for truncated svd solve");
-	}
-	else
-	{*/
 	message(1, "using REDSVD for truncated svd solve");
-	//}
 	message(1, "maxsing:", pest_scenario.get_svd_info().maxsing);
 	message(1, "eigthresh: ", pest_scenario.get_svd_info().eigthresh);
 
-	//if ((ppo->get_ies_localizer().size() > 0) & (ppo->get_ies_autoadaloc()))
-	//{
-	//	throw_ies_error("use of localization matrix and autoadaloc not supported...yet!");
-	//}
 	message(1, "initializing localizer");
 	use_localizer = localizer.initialize(performance_log);
 	num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
@@ -1999,7 +2017,6 @@ void IterEnsembleSmoother::initialize()
 	}
 	if ((use_localizer) && (!localizer.get_autoadaloc()))
 	{
-
 		ss.str("");
 		ss << "using localized solution with " << localizer.get_num_upgrade_steps() << " sequential upgrade steps";
 		message(1, ss.str());
@@ -2180,7 +2197,6 @@ void IterEnsembleSmoother::initialize()
 					ss << m << ",";
 				}
 				throw_ies_error(ss.str());
-
 			}
 		}
 		else
@@ -2196,7 +2212,6 @@ void IterEnsembleSmoother::initialize()
 		throw_ies_error("separate weight csv support is not implemented...yet!");
 		initialize_weights();
 	}
-	
 		
 
 	//if pareto mode, reset the stochastic obs vals for the pareto obs to the value in the control file
@@ -2368,11 +2383,6 @@ void IterEnsembleSmoother::initialize()
 		if (pe.shape().first == 0)
 			throw_ies_error("all realizations failed during initial evaluation");
 
-		
-
-		//string obs_csv = file_manager.get_base_filename() + ".0.obs.csv";
-		//message(1, "saving results of initial ensemble run to", obs_csv);
-		//oe.to_csv(obs_csv);
 		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
 	
@@ -2424,7 +2434,6 @@ void IterEnsembleSmoother::initialize()
 		string s = ss.str();
 		message(0, s);
 	}
-	
 
 	pcs = ParChangeSummarizer(&pe_base, &file_manager,&output_file_writer);
 	vector<string> in_conflict = detect_prior_data_conflict();
@@ -2467,6 +2476,16 @@ void IterEnsembleSmoother::initialize()
 			}
 
 		}
+		string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
+		ofstream f_obs(filename);
+		if (f_obs.bad())
+			throw_ies_error("error opening: " + filename);
+		output_file_writer.scenario_obs_csv(f_obs);
+		f_obs.close();
+		message(1, "updated observation data information written to file ", filename);
+	}
+	else if (ppo->get_obscov_filename().size() > 0)
+	{
 		string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
 		ofstream f_obs(filename);
 		if (f_obs.bad())

@@ -2630,7 +2630,7 @@ void ObservationEnsemble::from_eigen_mat(Eigen::MatrixXd mat, const vector<strin
 		if (find(start, end, name) == end)
 			missing.push_back(name);
 	if (missing.size() > 0)
-		throw_ensemble_error("ObservationEnsemble.from_eigen_mat() the following obs names no found: ", missing);
+		throw_ensemble_error("ObservationEnsemble.from_eigen_mat() the following obs names not found: ", missing);
 	Ensemble::from_eigen_mat(mat, _real_names, _var_names);
 }
 
