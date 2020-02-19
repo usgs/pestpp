@@ -280,22 +280,36 @@ void PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
 	}
 
 	//calculate the optimal shrinkage factor from Target D of Schafer and  Strimmer 2005
-	ObservationEnsemble res(pest_scenario,oe.get_rand_gen_ptr());
+	ObservationEnsemble res(pest_scenario, oe.get_rand_gen_ptr());
 	res.reserve(oe_base->get_real_names(), oe_base->get_var_names());
 	res.set_eigen(rmat);
 	Eigen::MatrixXd anom = res.get_eigen_anomalies();
 	Eigen::VectorXd wij;
 	double num_reals = static_cast<double>(res.shape().first);
 	double wij_sum = 0;
+	double demon = 0;
+	for (int i = 0; i < ercov.rows(); i++)
+	{
+		for (int j = 0; j < ercov.cols(); j++)
+		{
+			if (i == j)
+				continue;
+			demon = demon + (ercov(i, j) * ercov(i, j));
+		}
+	}
 	for (int i = 0; i < res.shape().second; i++)
 	{
-		for (int j = 0; j < i; j++)
+		for (int j = 0; j < res.shape().second; j++)
 		{
+			if (i == j)
+				continue;
 			wij = anom.col(i).cwiseProduct(anom.col(j));
 			wij_sum = wij_sum + (wij.array() - wij.mean()).square().sum();
+			
 		}
 	}
 	double scale = (num_reals / ((num_reals - 1.)* (num_reals - 1.)* (num_reals - 1.))) * wij_sum;
+	scale = scale / demon;
 	cout << "optimal residual covariance matrix shrinkage factor: " << scale << endl;
 	file_manager->rec_ofstream() << "optimal residual covariance matrix shrinkage factor : " <<scale << endl;
 	Covariance rcov_diag;
