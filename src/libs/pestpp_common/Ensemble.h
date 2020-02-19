@@ -68,7 +68,7 @@ public:
 	void replace(int idx, const Transformable &trans, string real_name="");
 
 	Covariance get_diagonal_cov_matrix();
-
+	pair<Covariance,Covariance> get_empirical_cov_matrices(FileManager* file_manager_ptr);
 	void reorder(const vector<string> &_real_names, const vector<string> &_var_names);
 	void drop_rows(const vector<int> &row_idxs);
 	void drop_rows(const vector<string> &drop_names);

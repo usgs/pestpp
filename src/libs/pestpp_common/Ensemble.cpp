@@ -441,6 +441,51 @@ vector<string> Ensemble::get_generic_real_names(int num_reals)
 	return rnames;
 }
 
+pair<Covariance,Covariance> Ensemble::get_empirical_cov_matrices(FileManager* file_manager_ptr)
+{
+	//Eigen::MatrixXd rmat = get_obs_resid(oe, false); //dont apply ineq constraints
+	//ObservationEnsemble(Pest *_pest_scenario_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
+	Eigen::MatrixXd ercov = reals.transpose() * reals;
+	Covariance rcov(var_names, ercov.sparseView());
+	Eigen::MatrixXd anom = get_eigen_anomalies();
+	Eigen::VectorXd wij;
+	double num_reals = static_cast<double>(shape().first);
+	double wij_sum = 0;
+	double demon = 0;
+	for (int i = 0; i < ercov.rows(); i++)
+	{
+		for (int j = 0; j < ercov.cols(); j++)
+		{
+			if (i == j)
+				continue;
+			demon = demon + (ercov(i, j) * ercov(i, j));
+		}
+	}
+	for (int i = 0; i < shape().second; i++)
+	{
+		for (int j = 0; j < shape().second; j++)
+		{
+			if (i == j)
+				continue;
+			wij = anom.col(i).cwiseProduct(anom.col(j));
+			wij_sum = wij_sum + (wij.array() - wij.mean()).square().sum();
+
+		}
+	}
+	double scale = (num_reals / ((num_reals - 1.) * (num_reals - 1.) * (num_reals - 1.))) * wij_sum;
+	scale = scale / demon;
+	cout << "optimal residual covariance matrix shrinkage factor: " << scale << endl;
+	file_manager_ptr->rec_ofstream() << "optimal residual covariance matrix shrinkage factor : " << scale << endl;
+		
+	Covariance rcov_diag;
+	rcov_diag.from_diagonal(rcov);
+	Eigen::MatrixXd shrunk = rcov_diag.e_ptr()->toDense();
+	Eigen::MatrixXd t = (rcov_diag.e_ptr()->toDense().array() * scale) + (rcov.e_ptr()->toDense().array() * (1. - scale));
+	Covariance rcov_shrunk(rcov.get_row_names(), t.sparseView());
+
+	return pair<Covariance,Covariance> (rcov,rcov_shrunk);
+}
+
 Covariance Ensemble::get_diagonal_cov_matrix()
 {
 	//build an empirical diagonal covariance matrix from the realizations

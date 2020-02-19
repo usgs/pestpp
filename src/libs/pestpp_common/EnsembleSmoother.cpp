@@ -262,72 +262,35 @@ void PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, bool i
 void PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
 {
 	Eigen::MatrixXd rmat = get_obs_resid(oe, false); //dont apply ineq constraints
-	//ObservationEnsemble(Pest *_pest_scenario_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
-	Eigen::MatrixXd ercov = rmat.transpose() * rmat;
-	vector<string> names = oe_base->get_var_names();
-	Covariance rcov(names, ercov.sparseView());
+	ObservationEnsemble res(pest_scenario, oe.get_rand_gen_ptr());
+	res.reserve(oe.get_real_names(), oe_base->get_var_names());
+	res.set_eigen(rmat);
+	pair<Covariance,Covariance> rcovs = res.get_empirical_cov_matrices(file_manager);
 	stringstream ss;
 	ss << file_manager->get_base_filename() << "." << iter << ".res.";
 	if (pest_scenario->get_pestpp_options().get_ies_save_binary())
 	{
 		ss << "jcb";
-		rcov.to_binary_new(ss.str());
+		rcovs.first.to_binary_new(ss.str());
 	}
 	else
 	{
 		ss << "cov";
-		rcov.to_ascii(ss.str());
+		rcovs.first.to_ascii(ss.str());
 	}
 
-	//calculate the optimal shrinkage factor from Target D of Schafer and  Strimmer 2005
-	ObservationEnsemble res(pest_scenario, oe.get_rand_gen_ptr());
-	res.reserve(oe.get_real_names(), oe_base->get_var_names());
-	res.set_eigen(rmat);
-	Eigen::MatrixXd anom = res.get_eigen_anomalies();
-	Eigen::VectorXd wij;
-	double num_reals = static_cast<double>(res.shape().first);
-	double wij_sum = 0;
-	double demon = 0;
-	for (int i = 0; i < ercov.rows(); i++)
-	{
-		for (int j = 0; j < ercov.cols(); j++)
-		{
-			if (i == j)
-				continue;
-			demon = demon + (ercov(i, j) * ercov(i, j));
-		}
-	}
-	for (int i = 0; i < res.shape().second; i++)
-	{
-		for (int j = 0; j < res.shape().second; j++)
-		{
-			if (i == j)
-				continue;
-			wij = anom.col(i).cwiseProduct(anom.col(j));
-			wij_sum = wij_sum + (wij.array() - wij.mean()).square().sum();
-			
-		}
-	}
-	double scale = (num_reals / ((num_reals - 1.)* (num_reals - 1.)* (num_reals - 1.))) * wij_sum;
-	scale = scale / demon;
-	cout << "optimal residual covariance matrix shrinkage factor: " << scale << endl;
-	file_manager->rec_ofstream() << "optimal residual covariance matrix shrinkage factor : " <<scale << endl;
-	Covariance rcov_diag;
-	rcov_diag.from_diagonal(rcov);
-	Eigen::MatrixXd shrunk = rcov_diag.e_ptr()->toDense();
-	Eigen::MatrixXd t = (rcov_diag.e_ptr()->toDense().array() * scale) + (rcov.e_ptr()->toDense().array() * (1. - scale));
-	rcov = Covariance(rcov.get_row_names(), t.sparseView());
+	
 	ss.str("");
 	ss << file_manager->get_base_filename() << "." << iter << ".shrunk_res.";
 	if (pest_scenario->get_pestpp_options().get_ies_save_binary())
 	{
 		ss << "jcb";
-		rcov.to_binary_new(ss.str());
+		rcovs.second.to_binary_new(ss.str());
 	}
 	else
 	{
 		ss << "cov";
-		rcov.to_ascii(ss.str());
+		rcovs.second.to_ascii(ss.str());
 	}
 
 }
