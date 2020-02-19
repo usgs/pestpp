@@ -19,47 +19,22 @@ void PerformanceLog::writetime(stringstream &os, time_t tc) {
 	tp.put(os,os,' ',localtime(&tc),pat,pat+strlen(pat));
 }
 
-
 PerformanceLog::PerformanceLog(ofstream &_fout)
-: fout(_fout), indent_size(2), indent_level(0)
+: fout(_fout)
 {
-	indent_level_prev = 0;
 	prev_time = system_clock::now();
-	fout << "PEST++ performance logger started at:  " << time_to_string(prev_time) << endl;
+	//fout << "PEST++ performance logger started at:  " << time_to_string(prev_time) << endl;
+	fout << "time,elapsed_seconds,message" << endl;
+	log_event("PEST++ performance logger started");
+
 }
 
-void PerformanceLog::log_blank_lines(int n)
-{
-	for (int i = 0; i < n; ++i) fout << endl;
-}
-
-void PerformanceLog::add_indent(int n)
-{
-	indent_level += n;
-}
-void PerformanceLog::log_event(const string &message, int delta_indent, const std::string &tag)
+void PerformanceLog::log_event(const string &message)
 {
 	system_clock::time_point time_now = system_clock::now();
-	if (!tag.empty())
-	{
-		tagged_events[tag] = time_now;
-	}
-
-	indent_level = max(0, indent_level+delta_indent);
-	fout << string(indent_prev() + 8, ' ') << "( time = " << time_to_string(time_now) << ",  elapsed time = " <<
-		elapsed_time_to_string(time_now, prev_time) << " )" << endl;
-	fout << string(indent(), ' ') << message << endl;
+	string elapsed_str = elapsed_time_to_string(time_now, prev_time);
+	fout << time_to_string(time_now) << "," << elapsed_str << "," << message << endl;
 	prev_time = time_now;
-	indent_level_prev = indent_level;
-	fout.flush();
-}
-
-void PerformanceLog::log_summary(const string &message, const std::string &end_tag, const std::string &begin_tag, int delta_indent)
-{
-	indent_level = max(0, indent_level + delta_indent);
-	fout << string(indent(), ' ') << message << endl;
-	fout << string(indent()+8, ' ') << "( elapsed time = " << elapsed_time_to_string(tagged_events[end_tag], tagged_events[begin_tag]) << " )" << endl;
-	indent_level_prev = indent_level;
 	fout.flush();
 }
 
@@ -78,9 +53,13 @@ string PerformanceLog::time_to_string(const std::chrono::system_clock::time_poin
 
 string PerformanceLog::elapsed_time_to_string(std::chrono::system_clock::time_point &current_time, std::chrono::system_clock::time_point &prev_time)
 {
-	ostringstream str;
+	ostringstream ss;
+	std::chrono::duration<double, std::chrono::seconds::period> double_delta_t(current_time - prev_time);
 	auto delta_t = current_time - prev_time;
-	if (delta_t < std::chrono::milliseconds(1))
+	//double_delta_t = std::chrono::duration_cast<std::chrono::seconds>(delta_t);
+	ss << double_delta_t.count();
+	return ss.str();
+	/*if (delta_t < std::chrono::milliseconds(1))
 	{
 		str << std::chrono::duration_cast<std::chrono::microseconds>(delta_t).count() << "us";
 	}
@@ -100,7 +79,7 @@ string PerformanceLog::elapsed_time_to_string(std::chrono::system_clock::time_po
 	{
 		str << std::chrono::duration_cast<std::chrono::hours>(delta_t).count() << "hr";
 	}
-	return str.str();
+	return str.str();*/
 }
 
 

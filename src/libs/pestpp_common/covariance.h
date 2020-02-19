@@ -63,7 +63,7 @@ public:
 	Mat T();
 	Mat inv(Logger* log);
 	Mat inv(bool echo=false);
-	void inv_ip(Logger *log);
+	void inv_ip(PerformanceLog& pfm);
 	void inv_ip(bool echo=false);
 	void pseudo_inv_ip(double eigthresh, int maxsing);
 	void SVD();
@@ -133,8 +133,8 @@ public:
 	void from_parameter_bounds(const vector<string> &par_names, const ParameterInfo &par_info, double sigma_range=4.0);
 
 	void from_observation_weights(Pest &pest_scenario);
-	void from_observation_weights(vector<string> obs_names, ObservationInfo obs_info,
-		vector<string> pi_names, const PriorInformation* pi);
+	void from_observation_weights(const vector<string>& obs_names, const ObservationInfo& obs_info,
+		const vector<string>& pi_names, const PriorInformation* pi);
 	void from_parameter_bounds(const string &pst_filename);
 	void from_observation_weights(const string &pst_filename);
 

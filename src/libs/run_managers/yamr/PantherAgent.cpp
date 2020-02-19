@@ -437,6 +437,21 @@ void PANTHERAgent::start(const string &host, const string &port)
 			cout << "received parameters (group id = " << group_id << ", run id = " << run_id << ")" << endl;
 			cout << "starting model run..." << endl;
 
+			try
+			{
+				ofstream fout("run.info");
+				if (fout.good())
+				{
+					fout << "run_id, " << run_id << endl;
+					fout << "group_id, " << group_id << endl;
+				}
+				fout.close();
+			}
+			catch (...)
+			{
+				
+			}
+
 			std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
 			NetPackage::PackType final_run_status = run_model(pars, obs, net_pack);
 			if (final_run_status == NetPackage::PackType::RUN_FINISHED)

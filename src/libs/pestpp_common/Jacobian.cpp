@@ -34,6 +34,7 @@
 #include "PriorInformation.h"
 #include "debug.h"
 #include "eigen_tools.h"
+#include "Pest.h"
 
 using namespace std;
 using namespace pest_utils;
@@ -77,7 +78,7 @@ void Jacobian::remove_cols(std::set<string> &rm_parameter_names)
 	auto end_iter = std::remove_if(base_numeric_par_names.begin(), base_numeric_par_names.end(),
 		[&rm_parameter_names](string &str)->bool{return rm_parameter_names.find(str) != rm_parameter_names.end(); });
 	base_numeric_par_names.resize(std::distance(base_numeric_par_names.begin(), end_iter));
-	matrix_del_cols(matrix, del_col_ids);
+	matrix_del_rows_cols(matrix, del_col_ids,false,true);
 }
 
 void Jacobian::add_cols(set<string> &new_pars_names)
@@ -285,7 +286,9 @@ void Jacobian::make_runs(RunManagerAbstract &run_manager)
 
 bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 		const ParameterGroupInfo &group_info,
-		RunManagerAbstract &run_manager, const PriorInformation &prior_info, bool splitswh_flag)
+		RunManagerAbstract &run_manager, 
+		const PriorInformation &prior_info, bool splitswh_flag,
+		bool debug_fail)
 {
 	// calculate jacobian
   base_sim_obs_names = run_manager.get_obs_name_vec();
@@ -325,6 +328,12 @@ bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 				run_manager. get_info(i_run, r_status, cur_par_name, cur_numeric_par_value);
 		run_manager.get_model_parameters(i_run,  run_list.back().ctl_pars);
 			bool success = run_manager.get_observations_vec(i_run, run_list.back().obs_vec);
+			if ((debug_fail) && (i_run == 1))
+			{
+		
+				file_manager.rec_ofstream() << "NOTE: 'GLM_DEBUG_DER_FAIL' is true, failing jco run for parameter '" << cur_par_name << "'" << endl;
+				success = false;
+			}
 		if (success)
 		{
 			par_transform.model2ctl_ip(run_list.back().ctl_pars);
@@ -917,16 +926,13 @@ void Jacobian::report_errors(std::ostream &fout)
 {
 	if (failed_parameter_names.size() > 0)
 	{
-		fout << "    Parameters whose perturbation runs failed while computing jacobian" << endl;
-		fout << "      Parameter     Failed" << endl;
-		fout << "        Name        Value" << endl;
-		fout << "      ----------  ------------" << endl;
+		fout << "    Parameters whose perturbation runs failed while computing jacobian: " << endl;
 
 		for (const auto & ipar : failed_parameter_names)
 		{
-			fout << right;
-			fout << "  " << setw(12) << ipar;
+			fout << right << "  " << setw(12) << ipar << endl;
 		}
+		cout << "WARNING:  " << failed_parameter_names.size() << " parameter pertubation runs failed while computing jacobian, see rec file for listing" << endl;
 	}
 
 }

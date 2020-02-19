@@ -31,7 +31,9 @@ public:
 	virtual void make_runs(RunManagerAbstract &run_manager);
 	virtual bool process_runs(ParamTransformSeq &par_transform,
 		const ParameterGroupInfo &group_info,
-		RunManagerAbstract &run_manager, const PriorInformation &prior_info, bool splitswh_flag);
+		RunManagerAbstract &run_manager, 
+		const PriorInformation &prior_info, bool splitswh_flag,
+		bool debug_fail);
 	virtual void report_errors(std::ostream &fout);
 	virtual ~Jacobian_1to1();
 protected:

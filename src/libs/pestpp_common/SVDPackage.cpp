@@ -146,7 +146,6 @@ void SVD_REDSVD::solve_ip(Eigen::SparseMatrix<double>& A, Eigen::VectorXd &Sigma
 	if (performance_log)
 		performance_log->log_event("starting REDSVD");
 
-	
 	RedSVD::RedSVD<MatrixXd> red_svd(A,n_max_sing);
 	if (performance_log)
 		performance_log->log_event("retrieving REDSVD components");

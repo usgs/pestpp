@@ -214,7 +214,9 @@ void Jacobian_1to1::make_runs(RunManagerAbstract &run_manager)
 
 bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 		const ParameterGroupInfo &group_info,
-		RunManagerAbstract &run_manager, const PriorInformation &prior_info, bool splitswh_flag)
+		RunManagerAbstract &run_manager, 
+	const PriorInformation &prior_info, bool splitswh_flag,
+	bool debug_fail)
 {
 	debug_msg("Jacobian_1to1::process_runs begin");
        base_sim_obs_names = run_manager.get_obs_name_vec();
@@ -259,7 +261,11 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 		run_manager.get_model_parameters(i_run,  run_list.back().ctl_pars);
 	    bool success = run_manager.get_observations_vec(i_run, run_list.back().obs_vec);
 		run_list.back().numeric_derivative_par = cur_numeric_par_value;
-
+		if ((debug_fail) && (i_run == 1))
+		{
+			file_manager.rec_ofstream() << "NOTE: 'GLM_DEBUG_DER_FAIL' is true, failing jco run for parameter '" << cur_par_name << "'" << endl;
+			success = false;
+		}
 		if (success)
 		{
 			par_transform.model2ctl_ip(run_list.back().ctl_pars);
@@ -450,7 +456,7 @@ void Jacobian_1to1::report_errors(std::ostream &fout)
 {
 	if (failed_to_increment_parmaeters.size() > 0)
 	{
-		fout << "    Parameters that went out of bounds while comuting jacobian" << endl;
+		fout << "    Parameters that went out of bounds while computing jacobian" << endl;
 		fout << "      Parameter" << endl;
 		fout << "        Name" << endl;
 		fout << "      ----------" << endl;

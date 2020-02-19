@@ -25,6 +25,7 @@
 #include <sstream>
 #include <list>
 #include <regex>
+#include <random>
 #include "pest_data_structs.h"
 #include "utilities.h"
 #include "pest_error.h"
@@ -32,6 +33,7 @@
 #include "Transformation.h"
 #include "pest_error.h"
 #include "Transformable.h"
+
 
 using namespace::std;
 using namespace::pest_utils;
@@ -474,7 +476,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		convert_ip(value, glm_num_reals);
 	}
-
+	else if (key == "GLM_ACCEPT_MC_PHI")
+	{
+		glm_accept_mc_phi = pest_utils::parse_string_arg_to_bool(value);
+	}
 	else if (key == "OVERDUE_RESCHED_FAC"){
 		convert_ip(value, overdue_reched_fac);
 	}
@@ -527,7 +532,28 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		jac_scale = pest_utils::parse_string_arg_to_bool(value);
 
 	}
+	else if (key == "GLM_NORMAL_FORM")
+	{
+		if (value == "DIAG")
+			glm_normal_form = GLMNormalForm::DIAG;
+		else if (value == "IDENT")
+			glm_normal_form = GLMNormalForm::IDENT;
+		else if (value == "PRIOR")
+			glm_normal_form = GLMNormalForm::PRIOR;
+	}
 
+	else if (key == "GLM_DEBUG_DER_FAIL")
+	{
+		glm_debug_der_fail = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "GLM_DEBUG_LAMB_FAIL")
+	{
+		glm_debug_lamb_fail = pest_utils::parse_string_arg_to_bool(value);
+	}
+	else if (key == "GLM_DEBUG_REAL_FAIL")
+	{
+		glm_debug_real_fail = pest_utils::parse_string_arg_to_bool(value);
+	}
 	else if (key == "UPGRADE_AUGMENT")
 	{
 		cout << "++UPGRADE_AUGMENT is deprecated and no longer supported...ignoring" << endl;
@@ -877,7 +903,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		ies_save_rescov = pest_utils::parse_string_arg_to_bool(value);
 	}
-
+	else if (key == "IES_PDC_SIGMA_DISTANCE")
+	{
+		convert_ip(value, ies_pdc_sigma_distance);
+	}
 	else if (key == "GSA_METHOD")
 	{
 		convert_ip(value, gsa_method);
@@ -934,7 +963,12 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		convert_ip(value, additional_ins_delimiters);
 	}
+	else if (key == "RANDOM_SEED")
+	{
+		convert_ip(value, random_seed);
+	}
 	else 
+
 	{
 
 		//throw PestParsingError(line, "Invalid key word \"" + key +"\"");
@@ -965,7 +999,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "parameter_covariance: " << parcov_filename << endl;
 	os << "observation_covariance: " << obscov_filename << endl;
 	os << "hotstart_resfile: " << hotstart_resfile << endl;
-	os << "overdue_resched_fac: " << overdue_giveup_fac << endl;
+	os << "overdue_resched_fac: " << overdue_reched_fac << endl;
+	os << "overdue_giveup_fac: " << overdue_giveup_fac << endl;
 	os << "overdue_giveup_minutes: " << overdue_giveup_minutes << endl;
 	os << "condor_submit_file: " << condor_submit_file << endl;
 	os << "tie_by_group: " << tie_by_group << endl;
@@ -975,6 +1010,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "check_tplins: " << check_tplins << endl;
 	os << "fill_tpl_zeros: " << fill_tpl_zeros << endl;
 	os << "additional_ins_delimiters: " << additional_ins_delimiters << endl;
+	os << "random_seed: " << random_seed << endl;
 	
 
 	os << endl << "...pestpp-glm specific options:" << endl;
@@ -999,13 +1035,29 @@ void PestppOptions::summary(ostream& os) const
 	os << "base_jacobian: " << basejac_filename << endl;
 	os << "glm_num_reals: " << glm_num_reals << endl;
 	os << "jac_scale: " << jac_scale << endl;
+	string norm_str;
+	if (glm_normal_form == GLMNormalForm::DIAG)
+		norm_str = "DIAG";
+	else if (glm_normal_form == GLMNormalForm::IDENT)
+		norm_str = "IDENT";
+	else if (glm_normal_form == GLMNormalForm::PRIOR)
+		norm_str = "PRIOR";
+	os << "glm_normal_form: " << norm_str << endl;
+	os << "glm_debug_der_fail: " << glm_debug_der_fail << endl;
+	os << "glm_debug_lamb_fail: " << glm_debug_lamb_fail << endl;
+	os << "glm_debug_real_fail: " << glm_debug_real_fail << endl;
+	os << "glm_accept_mc_phi: " << glm_accept_mc_phi << endl;
+
+
 	if (global_opt == OPT_DE)
+	{
 		os << "global_opt: de" << endl;
-	os << "de_f: " << de_f << endl;
-	os << "de_cr: " << de_cr << endl;
-	os << "de_pop_size: " << de_npopulation << endl;
-	os << "de_max_gen: " << de_max_gen << endl;
-	os << "de_dither_f: " << de_dither_f << endl;
+		os << "de_f: " << de_f << endl;
+		os << "de_cr: " << de_cr << endl;
+		os << "de_pop_size: " << de_npopulation << endl;
+		os << "de_max_gen: " << de_max_gen << endl;
+		os << "de_dither_f: " << de_dither_f << endl;
+	}
 	
 	os << endl << "...pestpp-swp options:" << endl;
 	os << "sweep_parameter_csv_file: " << sweep_parameter_csv_file << endl;
@@ -1085,6 +1137,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_no_noise: " << ies_no_noise << endl;
 	os << "ies_drop_conflicts: " << ies_drop_conflicts << endl;
 	os << "ies_save_rescov:" << ies_save_rescov << endl;
+	os << "ies_pdc_sigma_distance: " << ies_pdc_sigma_distance << endl;
 
 	os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -1108,7 +1161,7 @@ void PestppOptions::set_defaults()
 	set_iter_summary_flag(true);
 	set_der_forgive(true);
 	
-	
+	set_random_seed(358183147);
 	set_base_lambda_vec(vector<double>{ 0.1, 1.0, 10.0, 100.0, 1000.0 });
 	set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1});
 	set_global_opt(PestppOptions::GLOBAL_OPT::NONE);
@@ -1121,10 +1174,15 @@ void PestppOptions::set_defaults()
 	set_n_iter_base(1000000);
 	set_super_eigthres(1.0e-6);
 	set_max_n_super(1000000);
-	set_max_super_frz_iter(5);
+	set_max_super_frz_iter(10);
 	set_max_reg_iter(20);
 	set_uncert_flag(true);
 	set_glm_num_reals(0);
+	set_glm_normal_form(GLMNormalForm::DIAG);
+	set_glm_debug_der_fail(false);
+	set_glm_debug_lamb_fail(false);
+	set_glm_debug_real_fail(false);
+	set_glm_accept_mc_phi(false);
 	set_prediction_names(vector<string>());
 	set_parcov_filename(string());
 	set_obscov_filename(string());
@@ -1196,7 +1254,7 @@ void PestppOptions::set_defaults()
 	set_ies_no_noise(false);
 	set_ies_drop_conflicts(false);
 	set_ies_save_rescov(false);
-	
+	set_ies_pdc_sigma_distance(-1.0);
 
 	set_gsa_method("MORRIS");
 	//many of these defaults are also redefined in gsa main
@@ -1207,7 +1265,6 @@ void PestppOptions::set_defaults()
 	set_gsa_morris_pooled_obs(false);
 	set_gsa_sobol_par_dist("norm");
 	set_gsa_sobol_samples(4);
-	set_gsa_rand_seed(2);
 
 	set_condor_submit_file(string());
 	set_overdue_giveup_minutes(1.0e+30);
@@ -1508,4 +1565,20 @@ PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const string key, const s
 	else
 		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
+}
+
+double draw_standard_normal(std::mt19937& rand_gen)
+{	
+	using std::sqrt;
+	using std::log;
+	using std::cos;
+	using std::sin;
+
+	const double pi = 3.14159265358979323846264338327950288419716939937511;
+	double scale = 1.0 / (rand_gen.max() - rand_gen.min() + 1.0);
+	double v1 = (rand_gen() - rand_gen.min()) * scale;
+	double v2 = (rand_gen() - rand_gen.min()) * scale;
+	
+	double r = sqrt(-2.0 * log(v1));
+	return r * sin(2.0 * pi * v2);
 }
