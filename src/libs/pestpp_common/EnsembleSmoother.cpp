@@ -281,7 +281,7 @@ void PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
 
 	//calculate the optimal shrinkage factor from Target D of Schafer and  Strimmer 2005
 	ObservationEnsemble res(pest_scenario, oe.get_rand_gen_ptr());
-	res.reserve(oe_base->get_real_names(), oe_base->get_var_names());
+	res.reserve(oe.get_real_names(), oe_base->get_var_names());
 	res.set_eigen(rmat);
 	Eigen::MatrixXd anom = res.get_eigen_anomalies();
 	Eigen::VectorXd wij;
