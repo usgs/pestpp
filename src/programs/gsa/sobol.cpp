@@ -133,7 +133,7 @@ void Sobol::assemble_runs(RunManagerAbstract &run_manager)
 
 		idx_vec.push_back(ai);
 		c = gen_N_matrix(m1, m2, idx_vec);
-		cout << c << endl << endl;
+		//cout << c << endl << endl;
 		add_model_runs(run_manager, c, f_out);
 	}
 	f_out.close();

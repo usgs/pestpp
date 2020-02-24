@@ -195,7 +195,7 @@ int main(int argc, char* argv[])
 	try {
 		pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
 		file_manager.close_file("pst");
-		pest_scenario.check_inputs(fout_rec);
+		//pest_scenario.check_inputs(fout_rec);
 	}
 	catch(PestError e)
 	{
@@ -211,7 +211,7 @@ int main(int argc, char* argv[])
 	//OutputFileWriter(FileManager &_file_manager, Pest &_pest_scenario, bool restart_flag = false, bool _save_rei = true, int _eigenwrite = 0);
 	
 	OutputFileWriter ofw(file_manager,pest_scenario,false,false,0);
-	ofw.scenario_report(fout_rec, false);
+	//ofw.scenario_report(fout_rec, false);
 
 	if (pest_scenario.get_pestpp_options().get_debug_parse_only())
 	{
@@ -404,6 +404,7 @@ int main(int argc, char* argv[])
 		unsigned int seed = convert_cp<unsigned int>(morris_r_it->second);
 		gsa_method->set_seed(seed);
 	}
+	//gsa_method->set_seed(2);
 	frec << scientific << left << setw(30) << " gsa random seed " << gsa_method->get_seed() << endl;
 	// make model runs
 	if (gsa_restart == GSA_RESTART::NONE)

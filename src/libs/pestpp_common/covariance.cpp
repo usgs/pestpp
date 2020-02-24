@@ -279,23 +279,19 @@ void Mat::pseudo_inv_ip(double eigthresh, int maxsing)
 
 void Mat::inv_ip(bool echo)
 {
-	Logger* log = new Logger();
-	log->set_echo(echo);
-	inv_ip(log);
+	ofstream flog("Mat.log");
+	PerformanceLog pfm(flog);
+	inv_ip(pfm);
 	return;
 }
 
-void Mat::inv_ip(Logger *log)
+void Mat::inv_ip(PerformanceLog& pfm)
 {
 	if (nrow() != ncol()) throw runtime_error("Mat::inv() error: only symmetric positive definite matrices can be inverted with Mat::inv()");
 	if (mattype == MatType::DIAGONAL)
 	{
-		log->log("inverting diagonal matrix in place");
-		log->log("extracting diagonal");
+		pfm.log_event("inverting diagonal matrix in place");
 		Eigen::VectorXd diag = matrix.diagonal().eval();
-		log->log("inverting diagonal");
-		//diag = 1.0 / diag.array();
-		log->log("building triplets");
 		vector<Eigen::Triplet<double>> triplet_list;
 		for (int i = 0; i != diag.size(); ++i)
 		{
@@ -304,7 +300,6 @@ void Mat::inv_ip(Logger *log)
 		//log->log("resizeing matrix to size " + triplet_list.size());
 		//matrix.conservativeResize(triplet_list.size(),triplet_list.size());
 		matrix.setZero();
-		log->log("setting matrix from triplets");
 		matrix.setFromTriplets(triplet_list.begin(),triplet_list.end());
 		//Eigen::SparseMatrix<double> inv_mat(triplet_list.size(), triplet_list.size());
 		//inv_mat.setZero();
@@ -318,17 +313,13 @@ void Mat::inv_ip(Logger *log)
 	}
 
 	//Eigen::ConjugateGradient<Eigen::SparseMatrix<double>> solver;
-	log->log("inverting non-diagonal matrix in place");
-	log->log("instantiate solver");
+	pfm.log_event("inverting non-diagonal matrix in place");
 	Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-	log->log("computing inverse");
 	solver.compute(matrix);
-	log->log("getting identity instance for solution");
 	Eigen::SparseMatrix<double> I(nrow(), nrow());
 	I.setIdentity();
 	//Eigen::SparseMatrix<double> inv_mat = solver.solve(I);
 	//matrix = inv_mat;
-	log->log("solving");
 	matrix = solver.solve(I);
 	//cout << "full inv_ip()" << endl;
 	/*matrix.setZero();
@@ -1566,7 +1557,7 @@ void Covariance::from_observation_weights(const string &pst_filename)
 }
 
 
-void Covariance::from_observation_weights(vector<string> obs_names, ObservationInfo obs_info, vector<string> pi_names, const PriorInformation* pi)
+void Covariance::from_observation_weights(const vector<string>& obs_names, const ObservationInfo& obs_info, const vector<string>& pi_names, const PriorInformation* pi)
 {
 	vector<Eigen::Triplet<double>> triplet_list;
 	const ObservationRec* obs_rec;

@@ -112,7 +112,7 @@ else  # $(COMPILER))
     CXXFLAGS ?= $(OPT_FLAGS) -std=c++11
     FFLAGS ?= $(OPT_FLAGS) -cpp
     FFREE = -free
-    EXT_LIBS = -lpthread -lgfortran -lquadmath
+    EXT_LIBS = -lpthread
 # else
 #     $(error COMPILER not understood: $(COMPILER). Use one of intel or gcc.)
 endif  # $(COMPILER)

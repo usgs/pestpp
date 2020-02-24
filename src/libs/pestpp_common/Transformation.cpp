@@ -35,6 +35,7 @@
 #include "Regularization.h"
 #include "Serialization.h"
 #include "eigen_tools.h"
+#include "covariance.h"
 
 using namespace std;
 using namespace Eigen;
@@ -548,7 +549,6 @@ void TranTied::print(ostream &os) const
 	}
 }
 
-
 const  Eigen::SparseMatrix<double>& TranSVD::get_vt() const
 {
 	return Vt;
@@ -557,15 +557,16 @@ const  Eigen::SparseMatrix<double>& TranSVD::get_vt() const
 
 TranSVD::TranSVD(int _max_sing, double _eign_thresh, const string &_name) : Transformation(_name)
 {
-	tran_svd_pack = new SVD_EIGEN(_max_sing, _eign_thresh);
+	tran_svd_pack = new SVD_REDSVD(_max_sing, _eign_thresh);
 }
 
 
-TranSVD::TranSVD(const TranSVD &rhs)
+TranSVD::TranSVD(const TranSVD& rhs)
 	: Transformation(rhs), base_parameter_names(rhs.base_parameter_names),
 	super_parameter_names(rhs.super_parameter_names),
 	obs_names(rhs.obs_names),
-	SqrtQ_J(rhs.SqrtQ_J),
+	//SqrtQ_J(rhs.SqrtQ_J),
+	jtqj(rhs.jtqj),
 	Sigma(rhs.Sigma),
 	U(rhs.U),
 	Vt(rhs.Vt),
@@ -581,7 +582,7 @@ void TranSVD::set_SVD_pack()
 	int max_sing = tran_svd_pack->get_max_sing();
 	double eigthresh = tran_svd_pack->get_eign_thres();
 	delete tran_svd_pack;
-	tran_svd_pack = new SVD_REDSVD(max_sing, eigthresh);
+	tran_svd_pack = new SVD_EIGEN(max_sing, eigthresh);
 }
 
 void TranSVD::set_performance_log(PerformanceLog *performance_log)
@@ -594,7 +595,8 @@ void TranSVD::calc_svd()
 	debug_msg("TranSVD::calc_svd begin");
 	stringstream sup_name;
 	VectorXd Sigma_trunc;
-	tran_svd_pack->solve_ip(SqrtQ_J, Sigma, U, Vt, Sigma_trunc);
+	//tran_svd_pack->solve_ip(SqrtQ_J, Sigma, U, Vt, Sigma_trunc);
+	tran_svd_pack->solve_ip(jtqj, Sigma, U, Vt, Sigma_trunc);
 	// calculate the number of singluar values above the threshold
 
 	debug_print(Sigma);
@@ -621,7 +623,7 @@ void TranSVD::calc_svd()
 }
 
 void TranSVD::update_reset_frozen_pars(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const Parameters &base_numeric_pars,
-		int maxsing, double _eigthresh, const vector<string> &par_names, const vector<string> &_obs_names,
+		int maxsing, double _eigthresh, const vector<string> &par_names, const vector<string> &_obs_names, Eigen::SparseMatrix<double>& parcov_inv,
 		const Parameters &_frozen_derivative_pars)
 {
 	debug_msg("TranSVD::update_reset_frozen_pars begin");
@@ -632,8 +634,6 @@ void TranSVD::update_reset_frozen_pars(const Jacobian &jacobian, const QSqrtMatr
 	tran_svd_pack->set_max_sing(maxsing);
 	tran_svd_pack->set_eign_thres(_eigthresh);
 	obs_names = _obs_names;
-
-
 
 	//these are where the derivative was computed so they can be different than the frozen values;
 	init_base_numeric_parameters = base_numeric_pars;
@@ -647,8 +647,18 @@ void TranSVD::update_reset_frozen_pars(const Jacobian &jacobian, const QSqrtMatr
 	std::remove_if(base_parameter_names.begin(), base_parameter_names.end(),
 		[this](string &str)->bool{return this->frozen_derivative_parameters.find(str)!=this->frozen_derivative_parameters.end();});
 
-	SqrtQ_J = Q_sqrt.get_sparse_matrix(obs_names, DynamicRegularization::get_unit_reg_instance()) * jacobian.get_matrix(obs_names, base_parameter_names);
-
+	//SqrtQ_J = Q_sqrt.get_sparse_matrix(obs_names, DynamicRegularization::get_unit_reg_instance()) * jacobian.get_matrix(obs_names, base_parameter_names);
+	Eigen::SparseMatrix<double> j = jacobian.get_matrix(obs_names, base_parameter_names);
+	jtqj = j.transpose() * Q_sqrt.get_sparse_matrix(obs_names, DynamicRegularization::get_unit_reg_instance(), true) * j;
+	//if (parcov.ncol() > 0)
+	if (parcov_inv.rows() > 0)
+	{
+		Eigen::MatrixXd lamb = Eigen::MatrixXd::Ones(jtqj.rows(), jtqj.cols());
+		lamb = lamb + parcov_inv.toDense();
+		lamb = lamb + jtqj.toDense();
+		jtqj = lamb.sparseView();
+		lamb.resize(0, 0);
+	}
 	calc_svd();
 	debug_print(this->base_parameter_names);
 	debug_print(this->frozen_derivative_parameters);
@@ -689,7 +699,8 @@ void TranSVD::update_add_frozen_pars(const Parameters &frozen_pars)
 	auto end_iter = std::remove_if(base_parameter_names.begin(), base_parameter_names.end(),
 		[&new_frozen_pars](string &str)->bool{return new_frozen_pars.find(str)!=new_frozen_pars.end();});
 	base_parameter_names.resize(std::distance(base_parameter_names.begin(), end_iter));
-	matrix_del_cols(SqrtQ_J, del_col_ids);
+	//matrix_del_rows_cols(SqrtQ_J, del_col_ids,false,true);
+	matrix_del_rows_cols(jtqj, del_col_ids, true, true);
 	calc_svd();
 	debug_print(this->base_parameter_names);
 	debug_print(this->frozen_derivative_parameters);
@@ -805,7 +816,8 @@ void TranSVD::save(ostream &fout) const
 	fout.write((char*)&size, sizeof(size));
 	fout.write((char*)serial_data.data(), size);
 
-	save_triplets_bin(SqrtQ_J, fout);
+	//save_triplets_bin(SqrtQ_J, fout);
+	save_triplets_bin(jtqj, fout);
 	save_vector_bin(Sigma, fout);
 	save_triplets_bin(U, fout);
 	save_triplets_bin(Vt, fout);
@@ -847,7 +859,8 @@ void TranSVD::read(istream &fin)
 	fin.read((char*)serial_data.data(), size);
 	Serialization::unserialize(serial_data, obs_names);
 
-	load_triplets_bin(SqrtQ_J, fin);
+	//load_triplets_bin(SqrtQ_J, fin);
+	load_triplets_bin(jtqj, fin);
 	load_vector_bin(Sigma, fin);
 	load_triplets_bin(U, fin);
 	load_triplets_bin(Vt, fin);

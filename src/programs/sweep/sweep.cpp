@@ -486,7 +486,7 @@ int main(int argc, char* argv[])
 		pest_scenario.set_defaults();
 
 		try {
-			performance_log.log_event("starting to process control file", 1);
+			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
 			file_manager.close_file("pst");
 			performance_log.log_event("finished processing control file");
@@ -552,7 +552,7 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			performance_log.log_event("starting basic model IO error checking", 1);
+			performance_log.log_event("starting basic model IO error checking");
 			cout << "checking model IO files...";
 			pest_scenario.check_io(fout_rec);
 			//pest_scenario.check_par_obs();
@@ -673,7 +673,7 @@ int main(int argc, char* argv[])
 			else
 			{
 				try {
-					performance_log.log_event("starting to read parameter csv file", 1);
+					performance_log.log_event("starting to read parameter csv file");
 					load_parameters_from_csv(header_info, par_stream, chunk, pest_scenario.get_ctl_parameters(), run_ids,sweep_pars);
 					performance_log.log_event("finished reading parameter csv file");
 				}
