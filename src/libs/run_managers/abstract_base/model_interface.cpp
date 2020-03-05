@@ -867,6 +867,19 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 		tokens.clear();
 		ins_line = read_ins_line(f_ins);
 		tokens = tokenize_ins_line(ins_line);
+		//check that the first token is either a marker or a line advance
+		if (tokens.size() > 0)
+		{
+			char first = tokens[0][0];
+			if ((first != 'L') && (first != marker))
+			{
+				stringstream ss;
+				ss << "first token on each instruction file line must be either a primary marker ";
+				ss << " or a line advance instruction, not '" << tokens[0] << "'";
+				throw_ins_error(ss.str());
+			}
+		}
+		int itoken = 0;
 		for (auto token : tokens)
 		{
 
@@ -903,7 +916,8 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 					throw_ins_error("markers with spaces not supported...", ins_line_num);
 				}
 				//if this is the first instruction, its a primary search
-				if (token == tokens[0])
+				//if (token == tokens[0])
+				if (itoken == 0)
 				{
 					execute_primary(token, out_line, f_out);
 				}
@@ -916,6 +930,7 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 			{
 				throw_ins_error("unrecognized instruction '" + token + "'", ins_line_num);
 			}
+			itoken++;
 		}
 	}
 	return obs;	
@@ -996,9 +1011,11 @@ vector<string> InstructionFile::tokenize_ins_line(const string& ins_line)
 			tokens.insert(tokens.end(), temp_tokens.begin(), temp_tokens.end());
 		}
 	
+		int im = 0;
 		for (int i = 1; i < marker_indices.size()-1; i = i + 2)
 		{
-			tokens.push_back(marker_tags[i - 1]);
+			tokens.push_back(marker_tags[im]);
+			im++;
 			e = marker_indices[i+1];
 			s = marker_indices[i];
 			temp_tokens.clear();

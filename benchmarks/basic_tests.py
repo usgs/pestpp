@@ -714,7 +714,7 @@ def tplins1_test():
         shutil.rmtree(t_d)
     shutil.copytree(os.path.join(model_d,"template"),t_d)
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
-
+    
     pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-glm")),cwd=t_d)
     obf_df = pd.read_csv(os.path.join(t_d,"out1.dat.obf"),delim_whitespace=True,header=None,names=["obsnme","obsval"])
     obf_df.index = obf_df.obsnme
@@ -775,6 +775,6 @@ if __name__ == "__main__":
     #sweep_forgive_test()
     #inv_regul_test()
     #tie_by_group_test()
-    sen_basic_test()
+    #sen_basic_test()
     #salib_verf()
-    #tplins1_test()
+    tplins1_test()
