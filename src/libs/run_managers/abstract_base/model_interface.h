@@ -53,7 +53,7 @@ private:
 	pair<string, double> execute_semi(const string& token, string& line, ifstream& f_out);
 	pair<string, double> execute_free(const string& token, string& line, ifstream& f_out);
 	void execute_primary(const string& token, string& line, ifstream& f_out);
-	void execute_secondary(const string& token, string& line, ifstream& f_out);
+	bool execute_secondary(const string& token, string& line, ifstream& f_out,bool all_markers_so_far);
 	void execute_whitespace(const string& token, string& line, ifstream& f_out);
 	void execute_line_advance(const string& token, string& line, ifstream& f_out);
 	void prep_ins_file_for_reading(ifstream& f_ins);
