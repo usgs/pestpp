@@ -338,8 +338,9 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 			double fac = cov.e_ptr()->diagonal().minCoeff();
 			ss.str("");
 			ss << "min variance: " << fac;
-			RedSVD::RedSymEigen<Eigen::SparseMatrix<double>> eig(*cov.e_ptr() * (1.0/fac), ncomps);
-			Eigen::MatrixXd proj = (eig.eigenvectors() * (fac * eig.eigenvalues()).cwiseSqrt().asDiagonal());
+			RedSVD::RedSymEigen<Eigen::SparseMatrix<double>> eig(*cov.e_ptr()* (1.0 / fac));
+			//dirty trick alert: apply the abs to make sure all eigen values are positive - nasty!
+			Eigen::MatrixXd proj = (eig.eigenvectors() * (fac * eig.eigenvalues()).cwiseAbs().cwiseSqrt().asDiagonal());
 
 			if (level > 2)
 			{
@@ -347,7 +348,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 				f << eig.eigenvectors() << endl;
 				f.close();
 				f.open("cov_sqrt_evals.dat");
-				f << (fac * eig.eigenvalues()).cwiseSqrt() << endl;
+				f << (fac * eig.eigenvalues()).cwiseAbs().cwiseSqrt() << endl;
 				f.close();
 				f.open("cov_projection_matrix.dat");
 				f << proj << endl;

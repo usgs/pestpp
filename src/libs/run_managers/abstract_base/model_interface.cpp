@@ -879,9 +879,12 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 				throw_ins_error(ss.str());
 			}
 		}
-		int itoken = 0;
-		for (auto token : tokens)
+		//int itoken = 0;
+		bool all_markers_so_far = true;
+		//for (auto token : tokens)
+		for (int itoken=0;itoken<tokens.size();itoken++)
 		{
+			string token = tokens[itoken];
 
 			if (token[0] == 'L')
 			{
@@ -896,18 +899,21 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 				lhs = execute_fixed(token, out_line, f_out);
 				if (lhs.first != "DUM")
 					obs.insert(lhs.first,lhs.second);
+				all_markers_so_far = false;
 			}
 			else if (token[0] == '!')
 			{
 				lhs = execute_free(token, out_line, f_out);
 				if (lhs.first != "DUM")
 					obs.insert(lhs.first, lhs.second);
+				all_markers_so_far = false;
 			}
 			else if (token[0] == '(')
 			{
 				lhs = execute_semi(token, out_line, f_out);
 				if (lhs.first != "DUM")
 					obs.insert(lhs.first, lhs.second);
+				all_markers_so_far = false;
 			}
 			else if (token[0] == marker)
 			{
@@ -923,14 +929,20 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 				}
 				else
 				{
-					execute_secondary(token, out_line, f_out);
+					bool rewind = execute_secondary(token, out_line, f_out, all_markers_so_far);
+					if (rewind)
+					{
+						itoken = -1; //-1 so that when the for loop increments we are back to zero
+						continue;
+					}
+
 				}
 			}
 			else
 			{
 				throw_ins_error("unrecognized instruction '" + token + "'", ins_line_num);
 			}
-			itoken++;
+			//itoken++;
 		}
 	}
 	return obs;	
@@ -1187,7 +1199,7 @@ void InstructionFile::execute_primary(const string& token, string& line, ifstrea
 }
 
 
-void InstructionFile::execute_secondary(const string& token, string& line, ifstream& f_out)
+bool InstructionFile::execute_secondary(const string& token, string& line, ifstream& f_out, bool all_markers_so_far)
 {
 	//check that a closing marker is found
 	int pos;
@@ -1197,10 +1209,13 @@ void InstructionFile::execute_secondary(const string& token, string& line, ifstr
 	pos = line.find(secondary_tag);
 	if (pos == string::npos)
 	{
-		throw_ins_error("EOL encountered while executing secondary marker ('" + secondary_tag + "') search on output line", ins_line_num,out_line_num);
+		if (all_markers_so_far)
+			return true;
+		else
+			throw_ins_error("EOL encountered while executing secondary marker ('" + secondary_tag + "') search on output line", ins_line_num,out_line_num);
 	}
 	line = line.substr(pos + secondary_tag.size());
-	return;
+	return false;
 }
 
 
