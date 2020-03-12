@@ -234,7 +234,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names)
 
 
 	//------------------------------------------
-	//  ---  chance constratints and fosm  ---
+	//  ---  chance constratints  ---
 	//------------------------------------------
 	risk = pest_scenario.get_pestpp_options().get_opt_risk();
 	if (risk != 0.5)
@@ -510,19 +510,26 @@ vector<double> Constraints::get_constraint_residual_vec(Observations& sim)
 	return residuals_vec;
 }
 
-pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Observations& sim, Parameters& pars_and_dec_vars, double dbl_max)
-{
 
-	//if needed update the fosm related attributes
-	//before calculating the residual vector!
+pair<vector<double>,vector<double>> Constraints::update_and_get_constraint_bound_vectors(Observations& constraints_sim, Parameters& pars_and_dec_vars, double dbl_max,int iter)
+{
+	current_pars_and_dec_vars = pars_and_dec_vars;
+	current_constraints_sim = constraints_sim;
 	vector<double> residuals;
 	if (use_chance)
 	{
-		Observations constraints_chance = get_chance_shifted_constraints(sim);
-		residuals = get_constraint_residual_vec(constraints_chance);
+		bool update = false;
+		if ((!std_weights) && ((iter == 1) || ((iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
+			update = true;
+		current_constraints_chance = get_chance_shifted_constraints(constraints_sim, update);
+		residuals = get_constraint_residual_vec(current_constraints_chance);
 	}
 	else
-		residuals = get_constraint_residual_vec(sim);
+	{
+		//current_constraints_sim = constraints_sim;
+		residuals = get_constraint_residual_vec(constraints_sim);
+	}
+
 	vector<double> constraint_ub, constraint_lb;
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
@@ -564,9 +571,10 @@ pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Ob
 			constraint_lb.push_back(residual);
 		}
 	}
-	return pair<vector<double>,vector<double>> (constraint_lb,constraint_ub);
-
+	current_bounds = pair<vector<double>, vector<double>>(constraint_lb, constraint_ub);
+	return current_bounds;
 }
+
 
 pair<Constraints::ConstraintSense, string> Constraints::get_sense_from_group_name(const string& name)
 {
@@ -640,5 +648,88 @@ double Constraints::get_probit()
 	*/
 	return output;
 
+}
 
+void Constraints::presolve_report(int iter)
+{
+	
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+	vector<double> residuals = get_constraint_residual_vec(current_constraints_sim);
+	f_rec << endl << "  observation constraint information at start of iteration " << iter << endl;
+	f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
+	f_rec << setw(15) << "residual" << setw(15) << "lower bound" << setw(15) << "upper bound" << endl;
+	Observations current;
+	if (use_chance)
+		current = current_constraints_chance;
+	else
+		current = current_constraints_sim;
+	for (int i = 0; i < num_obs_constraints(); ++i)
+	{
+		string name = ctl_ord_obs_constraint_names[i];
+		f_rec << setw(20) << left << name;
+		f_rec << setw(15) << right << constraint_sense_name[name];
+		f_rec << setw(15) << constraints_obs.get_rec(name);	
+		f_rec << setw(15) << current.get_rec(name);
+		f_rec << setw(15) << residuals[i];
+		f_rec << setw(15) << current_bounds.first[i];
+		f_rec << setw(15) << current_bounds.second[i] << endl;
+	}
+	if (num_pi_constraints() > 0)
+	{
+
+		//report prior information constraints
+		f_rec << endl << "  prior information constraint information at start of iteration " << iter << endl;
+		f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
+		f_rec << setw(15) << "residual" << setw(15) << "lower bound" << setw(15) << "upper bound" << endl;
+		for (int i = 0; i < num_pi_constraints(); ++i)
+		{
+			string name = ctl_ord_pi_constraint_names[i];
+			PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
+			f_rec << setw(20) << left << name;
+			f_rec << setw(15) << right << constraint_sense_name[name];
+			f_rec << setw(15) << pi_rec.get_obs_value();
+			f_rec << setw(15) << pi_rec.calc_residual_and_sim_val(current_pars_and_dec_vars).first;
+			f_rec << setw(15) << pi_rec.calc_residual(current_pars_and_dec_vars);
+			f_rec << setw(15) << current_bounds.first[num_obs_constraints() + i];
+			f_rec << setw(15) << current_bounds.second[num_obs_constraints() + i] << endl;
+
+		}
+	}
+
+	if (use_chance)
+		presolve_chance_report(iter);
+	 
+	return;
+}
+
+void Constraints::presolve_chance_report(int iter)
+{
+	if (!use_chance)
+		return;
+	
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+	//vector<double> residuals = get_constraint_residual_vec();
+	f_rec << endl << "  FOSM-based chance constraint information at start of iteration " << iter << endl;
+	f_rec << setw(20) << left << "name" << right << setw(10) << "sense" << setw(15) << "required" << setw(15) << "sim value";
+	f_rec << setw(15) << "prior stdev" << setw(15) << "post stdev" << setw(15) << "offset";
+	f_rec << setw(15) << "new sim value" << endl;
+	vector<string> out_of_bounds;
+	for (int i = 0; i < num_obs_constraints(); ++i)
+	{
+		string name = ctl_ord_obs_constraint_names[i];
+		f_rec << setw(20) << left << name;
+		f_rec << setw(10) << right << constraint_sense_name[name];
+		f_rec << setw(15) << constraints_obs[name];
+		f_rec << setw(15) << current_constraints_sim.get_rec(name);
+		f_rec << setw(15) << prior_constraint_stdev[name];
+		f_rec << setw(15) << post_constraint_stdev[name];
+		f_rec << setw(15) << post_constraint_offset[name];
+		f_rec << setw(15) << current_constraints_chance[name] << endl;
+	}
+	f_rec << "  note: 'offset' is the value added to the simulated constraint value to account" << endl;
+	f_rec << "        for the uncertainty in the constraint value arsing from uncertainty in the " << endl;
+	f_rec << "        adjustable parameters identified in the control file." << endl << endl;
+
+	return;
+	
 }

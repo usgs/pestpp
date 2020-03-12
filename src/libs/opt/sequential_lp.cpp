@@ -1277,8 +1277,8 @@ void sequentialLP::iter_solve()
 
 	build_dec_var_bounds();
 
-	pair<vector<double>, vector<double>> bounds = constraints.get_constraint_bound_vectors(constraints_sim, all_pars_and_dec_vars,COIN_DBL_MAX);
-
+	pair<vector<double>, vector<double>> bounds = constraints.update_and_get_constraint_bound_vectors(constraints_sim, all_pars_and_dec_vars,COIN_DBL_MAX,slp_iter);
+	constraints.presolve_report(slp_iter);
 	//load the linear simplex model
 	model.loadProblem(matrix, dec_var_lb, dec_var_ub, ctl_ord_obj_func_coefs, constraint_lb, constraint_ub);
 	for (int i = 0; i < num_obs_constraints(); ++i)
@@ -1749,7 +1749,6 @@ void sequentialLP::iter_presolve()
 	f_rec << "  ---  calculating response matrix for iteration " << slp_iter << "  ---  " << endl;
 	cout << "  ---  calculating response matrix for iteration " << slp_iter << "  ---  " << endl;
 
-
 	//read an existing jacobain
 	string basejac_filename = pest_scenario.get_pestpp_options().get_basejac_filename();
 	Parameters pars = all_pars_and_dec_vars_best;
@@ -1869,13 +1868,7 @@ void sequentialLP::iter_presolve()
 			}
 
 		}
-		//ParameterGroupInfo pinfo = pest_scenario.get_base_group_info();
-		//for (auto &name : pinfo.get_group_names())
-		//{
-		//	//pinfo.get_group_by_groupname_4_mod(name)->derinc *= 0.75;
-		//	double inc = pinfo.get_group_by_groupname_4_mod(name)->derinc;
-		//	cout << name << ',' << inc << endl;
-		//}
+		
 
 		bool init_obs = false;
 		if (slp_iter == 1) init_obs = true;
@@ -1960,17 +1953,7 @@ void sequentialLP::iter_presolve()
 	if (use_chance)
 	{
 		presolve_fosm_report();
-		//stringstream ss;
-		//ss << "jcb." << slp_iter << ".fosm.rei";
-		////vector<string> fosm_names = constraints_fosm.get_keys();
-		////Observations obs_fosm = pest_scenario.get_ctl_observations().get_subset(fosm_names.begin(),fosm_names.end());
-		//Observations obs_fosm = pest_scenario.get_ctl_observations();
-		//for (auto &i : constraints_fosm)
-		//{
-		//	obs_fosm[i.first] = i.second;
-		//}
-		//of_wr.write_opt_constraint_rei(file_mgr_ptr->open_ofile_ext(ss.str()), slp_iter, pest_scenario.get_ctl_parameters(),
-		//	pest_scenario.get_ctl_observations(), obs_fosm);
+		
 	}
 	//report to rec file
 	presolve_constraint_report();
