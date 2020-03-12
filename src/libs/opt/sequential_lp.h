@@ -12,6 +12,7 @@
 #include "OutputFileWriter.h"
 #include "Transformable.h"
 #include "ModelRunPP.h"
+#include "constraints.h"
 
 class sequentialLP
 {
@@ -56,6 +57,8 @@ private:
 	FILE* coin_log_ptr;
 	Jacobian_1to1 jco;
 	OutputFileWriter of_wr;
+
+	Constraints constraints;
 
 	map<ClpSimplex::Status, string> status_name_map = { {ClpSimplex::Status::atLowerBound,"at lower bound"},
 	{ ClpSimplex::Status::atUpperBound,"at upper bound"},{ClpSimplex::Status::basic,"basic"},

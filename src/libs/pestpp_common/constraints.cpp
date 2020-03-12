@@ -18,12 +18,29 @@
 #include "covariance.h"
 #include "FileManager.h"
 #include "constraints.h"
+#include "linear_analysis.h"
 
 using namespace std;
 
-Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, OutputFileWriter& _of_wr, vector<string>& ctl_ord_dec_var_names)
-	:pest_scenario(_pest_scenario), file_mgr_ptr(_file_mgr_ptr), of_wr(_of_wr), jco(*_file_mgr_ptr,_of_wr)
+Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, OutputFileWriter& _of_wr, PerformanceLog& _pfm)
+	:pest_scenario(_pest_scenario), file_mgr_ptr(_file_mgr_ptr), of_wr(_of_wr), pfm(_pfm), jco(*_file_mgr_ptr, _of_wr)
 {
+	;
+}
+
+
+void Constraints::initialize(vector<string>& ctl_ord_dec_var_names)
+{
+	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
+	ctl_ord_obs_constraint_names.clear();
+	ctl_ord_pi_constraint_names;
+	constraint_sense_map.clear();
+	constraint_sense_name.clear();
+	nz_obs_names.clear();
+	adj_par_names.clear();
+	prior_const_var.clear();
+	post_const_var.clear();
+
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 	if (pest_scenario.get_pestpp_options().get_opt_include_bnd_pi())
 	{
@@ -171,14 +188,6 @@ Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, Outpu
 	}
 
 
-	//if not ++opt_constraint_names was passed, use all observations and prior information as constraints
-	/*else
-	{
-		ctl_ord_obs_constraint_names = pest_scenario.get_ctl_ordered_obs_names();
-		ctl_ord_pi_constraint_names = pest_scenario.get_ctl_ordered_pi_names();
-	}*/
-
-
 	constraints_obs = pest_scenario.get_ctl_observations().get_subset(ctl_ord_obs_constraint_names.begin(), ctl_ord_obs_constraint_names.end());
 	//constraints_sim = Observations(constraints_obs);
 
@@ -220,8 +229,8 @@ Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, Outpu
 	}
 
 	//allocate the constraint bound arrays
-	constraint_lb = new double[num_constraints()];
-	constraint_ub = new double[num_constraints()];
+	//constraint_lb = new double[num_constraints()];
+	//constraint_ub = new double[num_constraints()];
 
 
 	//------------------------------------------
@@ -300,6 +309,7 @@ Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, Outpu
 				}
 			}
 
+			parcov.try_from(pest_scenario, *file_mgr_ptr);
 			vector<string> drop;
 			set<string> sadj(adj_par_names.begin(), adj_par_names.end());
 			for (auto& n : parcov.get_row_names())
@@ -319,6 +329,242 @@ Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, Outpu
 	}
 	else use_chance = false;
 
+
+}
+
+void Constraints::initial_report()
+{
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+
+	f_rec << endl << "  ---  observation constraints in SLP  ---  " << endl;
+	f_rec << setw(20) << "name" << setw(20) << "sense" << setw(20) << "value" << endl;
+	for (auto& name : ctl_ord_obs_constraint_names)
+	{
+		f_rec << setw(20) << left << name;
+		f_rec << setw(20) << constraint_sense_name[name];
+		f_rec << setw(20) << constraints_obs.get_rec(name) << endl;
+	}
+
+	if (num_pi_constraints() > 0)
+	{
+		f_rec << endl << "  ---  prior information constraints in SLP  ---  " << endl;
+		f_rec << setw(20) << "name" << setw(20) << "sense" << setw(20) << "value" << endl;
+		for (auto& name : ctl_ord_pi_constraint_names)
+		{
+			f_rec << setw(20) << left << name;
+			f_rec << setw(20) << constraint_sense_name[name];
+			f_rec << setw(20) << constraints_pi.get_pi_rec_ptr(name).get_obs_value() << endl;
+		}
+	}
+
+	if (use_chance)
+	{
+		f_rec << endl << endl << "  ---  chance constraint FOSM information  ---  " << endl;
+		f_rec << "   adjustable parameters used in FOSM calculations:" << endl;
+		int i = 1;
+		for (auto& name : adj_par_names)
+		{
+			f_rec << setw(15) << name;
+			if (i % 6 == 0)
+				f_rec << endl;
+			i++;
+		}
+		f_rec << endl;
+		if (num_nz_obs() == 0)
+		{
+			f_rec << endl << endl << "  ---  Note: No nonzero weight observations found." << endl;
+			f_rec << "           Prior constraint uncertainty will be used in chance constraint calculations" << endl;
+		}
+		else
+		{
+			f_rec << "  non-zero weight observations used for conditioning in FOSM calculations: " << endl;
+			int i = 0;
+			for (auto& name : nz_obs_names)
+			{
+				f_rec << setw(15) << name;
+				if (i % 6 == 0)
+					f_rec << endl;
+				i++;
+			}
+			f_rec << endl;
+		}
+	}
+}
+
+
+Observations Constraints::get_chance_shifted_constraints(Observations& constraints_sim, bool update_chance)
+{
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+	cout << "  ---  calculating FOSM-based chance constraint components  ---  " << endl;
+	f_rec << "  ---  calculating FOSM-based chance constraint components  ---  " << endl;
+	prior_constraint_offset.clear();
+	prior_constraint_stdev.clear();
+	post_constraint_offset.clear();
+	post_constraint_stdev.clear();
+	//if ((!std_weights) && ((slp_iter == 1) || ((slp_iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
+	if (update_chance)
+	{
+		//the rows of the fosm jacobian include nonzero weight obs (for schur comp)
+		//plus the names of the names of constraints, which get treated as forecasts
+		vector<string> fosm_row_names(nz_obs_names);
+		fosm_row_names.insert(fosm_row_names.end(), ctl_ord_obs_constraint_names.begin(), ctl_ord_obs_constraint_names.end());
+
+		//extract the part of the full jco we need for fosm
+		Eigen::SparseMatrix<double> fosm_mat = jco.get_matrix(fosm_row_names, adj_par_names);
+
+		Mat fosm_jco(fosm_row_names, adj_par_names, fosm_mat);
+
+		//create a linear object
+		//Logger logger(file_mgr_ptr->get_ofstream("log"), false);
+		LinearAnalysis la(fosm_jco, pest_scenario, *file_mgr_ptr, pfm, parcov, &rand_gen);
+		la.set_obscov(obscov);
+
+		//set the prior parameter covariance matrix
+		la.set_parcov(parcov);
+
+		//set the predictions (the constraints)
+		la.set_predictions(ctl_ord_obs_constraint_names);
+
+		//get the prior and posterior variance of the constraints
+		prior_const_var = la.prior_prediction_variance();
+
+		//if at least one nz obs was found, then use schur complment, otherwise,
+		//just use the prior constraint uncertainty
+		if (num_nz_obs() > 0)
+			post_const_var = la.posterior_prediction_variance();
+		else
+			post_const_var = prior_const_var;
+	}
+	//work out the offset for each constraint
+	//and set the values in the constraints_fosm Obseravtions
+	double new_constraint_val, old_constraint_val, required_val;
+	double pr_offset, pt_offset;
+	//constraints_fosm.clear();
+	Observations iter_fosm;
+
+	//map<string,double> out_of_bounds;
+	for (auto& name : ctl_ord_obs_constraint_names)
+	{
+		prior_constraint_stdev[name] = sqrt(prior_const_var[name]);
+		post_constraint_stdev[name] = sqrt(post_const_var[name]);
+		pr_offset = probit_val * prior_constraint_stdev[name];
+		pt_offset = probit_val * post_constraint_stdev[name];
+		//important: using the initial simulated constraint values
+		old_constraint_val = constraints_sim[name];
+		//old_constraint_val = constraints_sim_initial[name];
+		required_val = constraints_obs[name];
+
+		//if less_than constraint, then add to the sim value, to move positive
+		// WRT the required constraint value
+		if (constraint_sense_map[name] == ConstraintSense::less_than)
+		{
+
+			new_constraint_val = old_constraint_val + pt_offset;
+			post_constraint_offset[name] = pt_offset;
+			prior_constraint_offset[name] = pr_offset;
+		
+
+		}
+		//if greater_than constraint, the substract from the sim value to move
+		//negative WRT the required constraint value
+		else if (constraint_sense_map[name] == ConstraintSense::greater_than)
+		{
+			new_constraint_val = old_constraint_val - pt_offset;
+			post_constraint_offset[name] = -pt_offset;
+			prior_constraint_offset[name] = -pr_offset;
+			//}
+		}
+		else
+			new_constraint_val = constraints_sim[name];
+		iter_fosm.insert(name, new_constraint_val);
+	}
+
+	vector<string> names = iter_fosm.get_keys();
+	Observations constraints_chance(constraints_sim);
+	constraints_chance.update_without_clear(names, iter_fosm.get_data_vec(names));
+	cout << "  ---   done with FOSM-based chance constraint calculations  ---  " << endl << endl;
+	f_rec << "  ---   done with FOSM-based chance constraint calculations  ---  " << endl << endl;
+	return constraints_chance;
+}
+
+
+vector<double> Constraints::get_constraint_residual_vec(Observations& sim)
+{
+	vector<double> residuals_vec;
+	residuals_vec.resize(num_constraints(), 0.0);
+
+	Observations::const_iterator found_obs;
+	Observations::const_iterator not_found_obs = sim.end();
+	PriorInformation::const_iterator found_prior_info;
+
+	int i = 0;
+	for (vector<string>::iterator b = ctl_ord_obs_constraint_names.begin(), e = ctl_ord_obs_constraint_names.end(); b != e; ++b, ++i)
+	{
+		found_obs = sim.find(*b);
+		//double fosm_offset = post_constraint_offset[*b];
+		if (found_obs != not_found_obs)
+		{
+			residuals_vec[i] = constraints_obs.get_rec(*b) - ((*found_obs).second);
+		}
+	}
+	return residuals_vec;
+}
+
+pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Observations& sim, Parameters& pars_and_dec_vars, double dbl_max)
+{
+
+	//if needed update the fosm related attributes
+	//before calculating the residual vector!
+	vector<double> residuals;
+	if (use_chance)
+	{
+		Observations constraints_chance = get_chance_shifted_constraints(sim);
+		residuals = get_constraint_residual_vec(constraints_chance);
+	}
+	else
+		residuals = get_constraint_residual_vec(sim);
+	vector<double> constraint_ub, constraint_lb;
+	for (int i = 0; i < num_obs_constraints(); ++i)
+	{
+		string name = ctl_ord_obs_constraint_names[i];
+		if (constraint_sense_map[name] == ConstraintSense::less_than)
+			constraint_ub.push_back(residuals[i]);
+		else
+			constraint_ub.push_back(dbl_max);
+
+		if (constraint_sense_map[name] == ConstraintSense::greater_than)
+			constraint_lb.push_back(residuals[i]);
+		else
+			constraint_lb.push_back(-dbl_max);
+		if (constraint_sense_map[name] == ConstraintSense::equal_to)
+		{
+			constraint_ub.push_back(residuals[i]);
+			constraint_lb.push_back(residuals[i]);
+		}
+	}
+
+
+	int noc = num_obs_constraints();
+	for (int i = 0; i < num_pi_constraints(); ++i)
+	{
+		string name = ctl_ord_pi_constraint_names[i];
+		double residual = -constraints_pi.get_pi_rec_ptr(name).calc_residual(pars_and_dec_vars);
+		if (constraint_sense_map[name] == ConstraintSense::less_than)
+			constraint_ub.push_back(residual);
+		else
+			constraint_ub.push_back(dbl_max);
+
+		if (constraint_sense_map[name] == ConstraintSense::greater_than)
+			constraint_lb.push_back(residual);
+		else
+			constraint_lb.push_back(-dbl_max);
+		if (constraint_sense_map[name] == ConstraintSense::equal_to)
+		{
+			constraint_ub.push_back(residual);
+			constraint_lb.push_back(residual);
+		}
+	}
+	return pair<vector<double>,vector<double>> (constraint_lb,constraint_ub);
 
 }
 
@@ -361,7 +607,7 @@ void Constraints::throw_constraints_error(string message)
 	throw runtime_error(error_message);
 }
 
-double  ErfInv2(double x)
+double  Constraints::ErfInv2(double x)
 {
 	float tt1, tt2, lnx, sgn;
 	sgn = (x < 0) ? -1.0f : 1.0f;

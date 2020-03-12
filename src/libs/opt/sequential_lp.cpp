@@ -15,9 +15,10 @@
 #include "utilities.h"
 
 sequentialLP::sequentialLP(Pest &_pest_scenario, RunManagerAbstract* _run_mgr_ptr,
-	Covariance &_parcov, FileManager* _file_mgr, OutputFileWriter _of_wr, PerformanceLog& _pfm) 
+	Covariance &_parcov, FileManager* _file_mgr_ptr, OutputFileWriter _of_wr, PerformanceLog& _pfm) 
 	: pest_scenario(_pest_scenario), run_mgr_ptr(_run_mgr_ptr),
-	parcov(_parcov), file_mgr_ptr(_file_mgr),jco(*_file_mgr,_of_wr), of_wr(_of_wr), pfm(_pfm)
+	parcov(_parcov), file_mgr_ptr(_file_mgr_ptr),jco(*_file_mgr_ptr,_of_wr), of_wr(_of_wr), pfm(_pfm),
+	constraints(_pest_scenario,_file_mgr_ptr,_of_wr, _pfm)
 {
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	
@@ -98,6 +99,7 @@ vector<double> sequentialLP::get_constraint_residual_vec(Observations &sim_vals)
 	return residuals_vec;
 }
 
+
 void sequentialLP::initial_report()
 {
 	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
@@ -156,62 +158,9 @@ void sequentialLP::initial_report()
 	}
 	f_rec << " note: bound and initial value info reported in 'parameter data' section" << endl << endl;
 
+	constraints.initial_report();
 
-	f_rec << endl << "  ---  observation constraints in SLP  ---  " << endl;
-	f_rec << setw(20) << "name" << setw(20) << "sense" << setw(20) << "value" << endl;
-	for (auto &name : ctl_ord_obs_constraint_names)
-	{
-		f_rec << setw(20) << left << name;
-		f_rec << setw(20) << constraint_sense_name[name];
-		f_rec << setw(20) << constraints_obs.get_rec(name) << endl;
-	}
-
-	if (num_pi_constraints() > 0)
-	{
-		f_rec << endl << "  ---  prior information constraints in SLP  ---  " << endl;
-		f_rec << setw(20) << "name" << setw(20) << "sense" << setw(20) << "value" << endl;
-		for (auto &name : ctl_ord_pi_constraint_names)
-		{
-			f_rec << setw(20) << left << name;
-			f_rec << setw(20) << constraint_sense_name[name];
-			f_rec << setw(20) << constraints_pi.get_pi_rec_ptr(name).get_obs_value() << endl;
-		}
-	}
-
-	if (use_chance)
-	{
-		f_rec << endl << endl << "  ---  chance constraint FOSM information  ---  " << endl;
-		f_rec << "   adjustable parameters used in FOSM calculations:" << endl;
-		int i = 1;
-		for (auto &name : adj_par_names)
-		{
-			f_rec << setw(15) << name;
-			if (i % 6 == 0)
-				f_rec << endl;
-			i++;
-
-		}
-		f_rec << endl;
-		if (num_nz_obs() == 0)
-		{
-			f_rec << endl << endl << "  ---  Note: No nonzero weight observations found." << endl;
-			f_rec << "           Prior constraint uncertainty will be used in chance constraint calculations" << endl;
-		}
-		else
-		{
-			f_rec << "  non-zero weight observations used for conditioning in FOSM calculations: " << endl;
-			int i = 0;
-			for (auto &name : nz_obs_names)
-			{
-				f_rec << setw(15) << name;
-				if (i % 6 == 0)
-					f_rec << endl;
-				i++;
-			}
-			f_rec << endl;
-
-		}
-	}
+	
 	return;
 }
 
@@ -587,8 +536,6 @@ void sequentialLP::initialize_and_check()
 	if ((iter_derinc_fac > 1.0) || (iter_derinc_fac <= 0.0))
 		throw_sequentialLP_error("++opt_iter_derinc_fac must be greater than 0.0 and less than or equal to 1.0");
 
-
-
 	//-----------------------------
 	//  ---  decision vars  ---
 	//-----------------------------
@@ -648,6 +595,8 @@ void sequentialLP::initialize_and_check()
 			problem_trans.push_back(name);
 	if (problem_trans.size() > 0)
 		throw_sequentialLP_error("the following decision variables don't have 'none' type parameter transformation: ", problem_trans);
+
+ 	constraints.initialize(ctl_ord_dec_var_names);
 
 	if (pest_scenario.get_pestpp_options().get_opt_include_bnd_pi())
 	{
@@ -1327,6 +1276,8 @@ void sequentialLP::iter_solve()
 	CoinPackedMatrix matrix = jacobian_to_coinpackedmatrix();
 
 	build_dec_var_bounds();
+
+	pair<vector<double>, vector<double>> bounds = constraints.get_constraint_bound_vectors(constraints_sim, all_pars_and_dec_vars,COIN_DBL_MAX);
 
 	//load the linear simplex model
 	model.loadProblem(matrix, dec_var_lb, dec_var_ub, ctl_ord_obj_func_coefs, constraint_lb, constraint_ub);

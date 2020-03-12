@@ -1175,7 +1175,7 @@ bool IterEnsembleSmoother::initialize_oe(Covariance &cov)
 		}
 		else
 		{
-			ss << "unrecognized obs ensemble extension " << obs_ext << ", looing for csv, jcb, or jco";
+			ss << "unrecognized obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
 			throw_ies_error(ss.str());
 		}
 		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
