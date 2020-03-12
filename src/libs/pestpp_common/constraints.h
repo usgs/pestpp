@@ -15,52 +15,67 @@
 #include "Transformable.h"
 #include "covariance.h"
 #include "Jacobian_1to1.h"
+#include "Ensemble.h"
 
 using namespace std;
 
 class Constraints
 {
+	enum ConstraintSense { less_than, greater_than, equal_to, undefined };
+	enum ConstraintType { deter, pi, fosm, stack };
 public:
-	Constraints(Pest* _pest_scenario_ptr, FileManager* _file_manager_ptr, OutputFileWriter* _of_wr_ptr) :
-		pest_scenario_ptr(_pest_scenario_ptr), file_manager_ptr(_file_manager_ptr), of_wr_ptr(_of_wr_ptr) {;}
-	Constraints() { ; }
-	virtual map<string, double> get_residual_map(Observations& sim);
-	virtual map<string, double> get_chance_offsets(Observations& sim);
-	virtual void add_runs(RunManagerAbstract* run_mgr_ptr);
+	Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, OutputFileWriter& _of_wr, vector<string>& ctl_ord_dec_var_names);
+
+	map<string, double> get_residual_map(Observations& sim);
+	map<string, double> get_chance_map(Observations& sim);
 	void report(Observations& sim);
 	void chance_report(Observations& sim);
+	void add_runs(RunManagerAbstract* run_mgr_ptr);
 
+	
 private:
-	Pest* pest_scenario_ptr;
-	FileManager* file_manager_ptr;
-	OutputFileWriter* of_wr_ptr;
-};
+	Pest& pest_scenario;
+	FileManager* file_mgr_ptr;
+	OutputFileWriter& of_wr;
+	bool use_chance;
+	bool std_weights;
+	double risk;
+	double probit_val;
 
-class PiConstraints : public Constraints
-{
-public:
-	PiConstraints() { ; }
+	double* constraint_lb;
+	double* constraint_ub;
 
-private:
-
-};
-
-class FosmConstraints : public Constraints
-{
-public:
-	FosmConstraints() { ; }
-private:
+	Covariance obscov;
 	Covariance parcov;
 	Jacobian_1to1 jco;
+	
+	ParameterEnsemble pe;
+
+	PriorInformation* null_prior = new PriorInformation();
+	PriorInformation constraints_pi;
+
+	map<string, ConstraintSense> constraint_sense_map;
+	map<string, string> constraint_sense_name;
+	map<string, double> prior_const_var;
+	map<string, double> post_const_var;
+
+	pair<ConstraintSense, string> get_sense_from_group_name(const string& name);
+	
+	vector<string> nz_obs_names;
+	vector<string> adj_par_names;
+	vector<string> ctl_ord_obs_constraint_names;
+	vector<string> ctl_ord_pi_constraint_names;
+
+	Observations constraints_obs;
+
+	int num_obs_constraints() { return ctl_ord_obs_constraint_names.size(); }
+	int num_pi_constraints() { return ctl_ord_pi_constraint_names.size(); }
+	int num_constraints() { return num_obs_constraints() + num_pi_constraints(); }
+
+	void throw_constraints_error(string message);
+	void throw_constraints_error(string message, const vector<string>& messages);
+	void throw_constraints_error(string message, const set<string>& messages);
+
+	double get_probit();
 };
-
-class StackConstraints : public Constraints
-{
-public:
-	StackConstraints() { ; }
-private:
-
-		
-};
-
 #endif
