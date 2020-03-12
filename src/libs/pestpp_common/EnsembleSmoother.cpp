@@ -4276,7 +4276,8 @@ vector<ObservationEnsemble> IterEnsembleSmoother::run_lambda_ensembles(vector<Pa
 		vector<double> rep_vals{ lam_vals[i],scale_vals[i] };
 		real_run_ids = real_run_ids_vec[i];
 		//if using subset, reset the real_idx in real_run_ids to be just simple counter
-		if (subset_size < pe_lams[0].shape().first)
+		//if (subset_size < pe_lams[0].shape().first)
+		if ((use_subset) && (subset_size < pe_lams[i].shape().first))
 		{
 			_oe.keep_rows(subset_idxs);
 			int ireal = 0;
