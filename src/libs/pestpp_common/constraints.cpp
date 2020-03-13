@@ -750,14 +750,16 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr, Parameters& _current
 	{
 		pfm.log_event("building FOSM-based parameter pertubation runs");
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
-		//the last true arg is to run the parvals listed in _current_pars_and_dec_vars as the "base" run
+		//the  second-to-last true arg is to run the parvals listed in _current_pars_and_dec_vars as the "base" run
 		//this is to make sure we get good pertubations at the current point in par/dec var space.
 		//but this means we might have to run the base run twice at least for the SLP process.
 		//the way around this is to just add the runs all at once wihin the SLP add run
 		//bit using Constraints::get_fosm_par_names()
+		//the last false says not to reinitialize the run mgr since the calling process may have also
+		//added runs
 		bool success = jco.build_runs(_current_pars_and_dec_vars, _current_obs_and_constraints, adj_par_names, pts,
 			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
-			*run_mgr_ptr, set<string>(), false, true);
+			*run_mgr_ptr, set<string>(), false, true, false);
 		if (!success)
 		{
 			const set<string> failed = jco.get_failed_parameter_names();

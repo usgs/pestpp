@@ -51,17 +51,20 @@ Jacobian_1to1::~Jacobian_1to1() {
 
 bool Jacobian_1to1::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vector<string> numeric_par_names, ParamTransformSeq &par_transform,
 	const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info,
-	RunManagerAbstract &run_manager, set<string> &out_of_bound_par, bool phiredswh_flag, bool calc_init_obs)
+	RunManagerAbstract &run_manager, set<string> &out_of_bound_par, bool phiredswh_flag, bool calc_init_obs, bool reinitiailize)
 {
 	Parameters model_parameters(par_transform.ctl2model_cp(ctl_pars));
 	base_numeric_parameters = par_transform.ctl2numeric_cp(ctl_pars);
-	run_manager.reinitialize(file_manager.build_filename("rnj"));
+	if (reinitiailize)
+		run_manager.reinitialize(file_manager.build_filename("rnj"));
 	debug_msg("Jacobian_1to1::build_runs begin");
 
 	failed_parameter_names.clear();
 	failed_ctl_parameters.clear();
+	par_run_map.clear();
 	// add base run
 	int run_id = run_manager.add_run(model_parameters, "", 0);
+	par_run_map["__base__"] = vector<int>{ run_id };
 	//if base run is has already been complete, update it and mark it as complete
 	// compute runs for to jacobain calculation as it is influenced by derivative type( forward or central)
 	if (!calc_init_obs) {
@@ -74,7 +77,7 @@ bool Jacobian_1to1::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vect
 	Parameters base_derivative_parameters = par_transform.numeric2active_ctl_cp(base_numeric_parameters);
 	Parameters base_model_parameters = par_transform.numeric2model_cp(base_numeric_parameters);
 	//Loop through derivative parameters and build the parameter sets necessary for computing the jacobian
-	std::map<string, vector<int>> par_run_map;
+	
 	for (auto &i_name : numeric_par_names)
 	{
 		assert(base_derivative_parameters.find(i_name) != base_derivative_parameters.end());
@@ -138,8 +141,10 @@ bool Jacobian_1to1::build_runs(ModelRun &init_model_run, vector<string> numeric_
 
 	failed_parameter_names.clear();
 	failed_ctl_parameters.clear();
+	par_run_map.clear();
 	// add base run
 	int run_id = run_manager.add_run(model_parameters, "", 0);
+	par_run_map["__base__"] = vector<int>{ run_id };
 	//if base run is has already been complete, update it and mark it as complete
 	// compute runs for to jacobain calculation as it is influenced by derivative type( forward or central)
 	if (!calc_init_obs) {
@@ -152,7 +157,7 @@ bool Jacobian_1to1::build_runs(ModelRun &init_model_run, vector<string> numeric_
 	Parameters base_derivative_parameters = par_transform.numeric2active_ctl_cp(base_numeric_parameters);
 	Parameters base_model_parameters = par_transform.numeric2model_cp(base_numeric_parameters);
 	//Loop through derivative parameters and build the parameter sets necessary for computing the jacobian
-	std::map<string, vector<int>> par_run_map;
+	
 	for (auto &i_name : numeric_par_names)
 	{
 		assert(base_derivative_parameters.find(i_name) != base_derivative_parameters.end());
@@ -231,15 +236,28 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 	JacobianRun base_run;
 	int i_run = 0;
 	// get base run parameters and observation for initial model run from run manager storage
-	run_manager.get_model_parameters(i_run,  base_run.ctl_pars);
-	bool success = run_manager.get_observations_vec(i_run, base_run.obs_vec);
-	if (!success)
+	//run_manager.get_model_parameters(i_run,  base_run.ctl_pars);
+	//bool success = run_manager.get_observations_vec(i_run, base_run.obs_vec);
+	//if (!success)
+	//{
+	//	throw(PestError("Error: Base parameter run failed.  Can not compute the Jacobian"));
+	//}
+	//par_transform.model2ctl_ip(base_run.ctl_pars);
+	//base_numeric_parameters = par_transform.ctl2numeric_cp(base_run.ctl_pars);
+	//++i_run;
+	string base = "__base__";
+	if (par_run_map.find(base) != par_run_map.end())
 	{
-		throw(PestError("Error: Base parameter run failed.  Can not compute the Jacobian"));
+		run_manager.get_model_parameters(par_run_map[base][0],  base_run.ctl_pars);
+		bool success = run_manager.get_observations_vec(par_run_map[base][0], base_run.obs_vec);
+		if (!success)
+		{
+			throw(PestError("Error: Base parameter run failed.  Can not compute the Jacobian"));
+		}
+		par_transform.model2ctl_ip(base_run.ctl_pars);
+		base_numeric_parameters = par_transform.ctl2numeric_cp(base_run.ctl_pars);
+		par_run_map.erase(base);
 	}
-	par_transform.model2ctl_ip(base_run.ctl_pars);
-	base_numeric_parameters = par_transform.ctl2numeric_cp(base_run.ctl_pars);
-	++i_run;
 
 	// process the parameter pertubation runs
 	int nruns = run_manager.get_nruns();
@@ -252,7 +270,7 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 	int run_status_next;
 	double par_value_next;
 	double cur_numeric_par_value;
-
+	par_run_map;
 	list<JacobianRun> run_list;
 	for(; i_run<nruns; ++i_run)
 	{
@@ -270,6 +288,7 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 		{
 			par_transform.model2ctl_ip(run_list.back().ctl_pars);
 			// get the updated parameter value which reflects roundoff errors
+			
 			par_name_vec.clear();
 			par_name_vec.push_back(cur_par_name);
 			Parameters numeric_pars(run_list.back().ctl_pars, par_name_vec);
