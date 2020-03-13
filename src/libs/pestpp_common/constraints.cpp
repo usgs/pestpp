@@ -741,6 +741,25 @@ void Constraints::presolve_chance_report(int iter)
 	
 }
 
+void Constraints::update_from_runs(RunManagerAbstract* run_mgr_ptr)
+{
+	if (!use_chance)
+		return;
+	if (use_fosm)
+	{
+		pfm.log_event("reading FOSM-based parameter pertubation runs into JCO");
+		ParamTransformSeq par_trans = pest_scenario.get_base_par_tran_seq();
+		bool success = jco.process_runs(par_trans, pest_scenario.get_base_group_info(), *run_mgr_ptr,
+			*null_prior, false, false);
+		if (!success)
+			throw_constraints_error("error processing JCO matrix runs ", jco.get_failed_parameter_names());
+	}
+	else
+	{
+		throw runtime_error("non-FOSM update_from_runs() not implemented");
+	}
+
+}
 
 void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr, Parameters& _current_pars_and_dec_vars, Observations& _current_obs_and_constraints)
 {

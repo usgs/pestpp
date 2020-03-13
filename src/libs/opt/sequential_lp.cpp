@@ -1618,8 +1618,6 @@ void sequentialLP::iter_postsolve()
 		
 	}
 
-	
-
 	//track the objective function values
 	if (slp_iter == 1)
 	{
@@ -1663,7 +1661,6 @@ void sequentialLP::iter_postsolve()
 		f_rec << "super secret option active...done" << endl;
 		return;
 	}
-
 
 	//convergence check
 	double opt_iter_tol = pest_scenario.get_pestpp_options().get_opt_iter_tol();
@@ -1893,7 +1890,8 @@ void sequentialLP::iter_presolve()
 		}
 
 
-		jco.make_runs(*run_mgr_ptr);
+		//jco.make_runs(*run_mgr_ptr);
+		run_mgr_ptr->run();
 		set<int> failed = run_mgr_ptr->get_failed_run_ids();
 
 		//process the remaining responses
@@ -1901,7 +1899,7 @@ void sequentialLP::iter_presolve()
 			*null_prior, false,false);
 		if (!success)
 			throw_sequentialLP_error("error processing response matrix runs ", jco.get_failed_parameter_names());
-
+		constraints.update_from_runs(run_mgr_ptr);
 		stringstream ss;
 		ss << slp_iter << ".jcb";
 		string rspmat_file = file_mgr_ptr->build_filename(ss.str());
@@ -1910,7 +1908,6 @@ void sequentialLP::iter_presolve()
 
 		//check for failed runs
 		//TODO: something better than just dying
-
 		if (failed.size() > 0)
 			throw_sequentialLP_error("failed runs when filling decision var response matrix...cannot continue ");
 
@@ -1921,7 +1918,6 @@ void sequentialLP::iter_presolve()
 		{
 			Observations temp_obs;
 			run_mgr_ptr->get_run(0, pars, constraints_sim, false);
-
 		}
 		//par_trans.model2ctl_ip(temp_pars);
 
@@ -1965,7 +1961,7 @@ void sequentialLP::iter_presolve()
 	//set/update the constraint bound arrays
 	build_constraint_bound_arrays();
 
-	constraints.set_jco(jco);
+	//constraints.set_jco(jco);
 
 	if (use_chance)
 	{

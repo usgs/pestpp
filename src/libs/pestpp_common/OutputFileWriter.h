@@ -82,7 +82,7 @@ public:
 
 	void write_upgrade(int iteration, int is_super, double lambda, double scale_factor, Parameters &pars);
 	void write_jco_run_id(int groupid, std::map<string, vector<int>> &par_run_map);
-
+	
 private:
 	FileManager &file_manager;
 	Pest &pest_scenario;

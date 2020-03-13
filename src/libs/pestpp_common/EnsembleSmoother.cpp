@@ -3602,7 +3602,7 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 
 void IterEnsembleSmoother::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe)
 {
-	
+
 	vector<string> oe_names = _oe.get_real_names();
 	vector<string> pe_names = _pe.get_real_names();
 	vector<string> oe_base_names = oe.get_real_names();

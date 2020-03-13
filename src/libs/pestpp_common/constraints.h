@@ -44,6 +44,7 @@ public:
 	void set_initial_constraints_sim(Observations _initial_constraints_sim) { initial_constraints_sim = _initial_constraints_sim;  }
 	vector<string> get_fosm_par_names();
 
+	void update_from_runs(RunManagerAbstract* run_mgr_ptr);
 
 private:
 	Pest& pest_scenario;

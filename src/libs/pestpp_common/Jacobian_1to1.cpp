@@ -234,21 +234,22 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 	unordered_map<string, int>::iterator not_found = par2col_map.end();
 
 	JacobianRun base_run;
-	//int i_run = 0;
+	int i_run = 0;
 	// get base run parameters and observation for initial model run from run manager storage
-	//run_manager.get_model_parameters(i_run,  base_run.ctl_pars);
-	//bool success = run_manager.get_observations_vec(i_run, base_run.obs_vec);
-	//if (!success)
-	//{
-	//	throw(PestError("Error: Base parameter run failed.  Can not compute the Jacobian"));
-	//}
-	//par_transform.model2ctl_ip(base_run.ctl_pars);
-	//base_numeric_parameters = par_transform.ctl2numeric_cp(base_run.ctl_pars);
-	//++i_run;
+	/*run_manager.get_model_parameters(i_run,  base_run.ctl_pars);
+	bool success = run_manager.get_observations_vec(i_run, base_run.obs_vec);
+	if (!success)
+	{
+		throw(PestError("Error: Base parameter run failed.  Can not compute the Jacobian"));
+	}
+	par_transform.model2ctl_ip(base_run.ctl_pars);
+	base_numeric_parameters = par_transform.ctl2numeric_cp(base_run.ctl_pars);
+	++i_run;
+	*/
 	string base = "__base__";
 	if (par_run_map.find(base) != par_run_map.end())
 	{
-		run_manager.get_model_parameters(par_run_map[base][0],  base_run.ctl_pars);
+		run_manager.get_model_parameters(par_run_map[base][0], base_run.ctl_pars);
 		bool success = run_manager.get_observations_vec(par_run_map[base][0], base_run.obs_vec);
 		if (!success)
 		{
@@ -257,7 +258,12 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 		par_transform.model2ctl_ip(base_run.ctl_pars);
 		base_numeric_parameters = par_transform.ctl2numeric_cp(base_run.ctl_pars);
 		par_run_map.erase(base);
+		i_run++;
 	}
+	else
+		throw runtime_error("'__base__' run tag not in Jacobian.par_run_map, something is wrong");
+
+		
 
 	// process the parameter pertubation runs
 	int nruns = run_manager.get_nruns();
@@ -272,61 +278,114 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 	double cur_numeric_par_value;
 	par_run_map;
 	list<JacobianRun> run_list;
+	
+	//for(; i_run<nruns; ++i_run)
+	//{
+	//	run_list.push_back(JacobianRun());
+	//	run_manager. get_info(i_run, r_status, cur_par_name, cur_numeric_par_value);
+	//	run_manager.get_model_parameters(i_run,  run_list.back().ctl_pars);
+	//    bool success = run_manager.get_observations_vec(i_run, run_list.back().obs_vec);
+	//	run_list.back().numeric_derivative_par = cur_numeric_par_value;
+	//	/*if ((debug_fail) && (i_run == 1))
+	//	{
+	//		file_manager.rec_ofstream() << "NOTE: 'GLM_DEBUG_DER_FAIL' is true, failing jco run for parameter '" << cur_par_name << "'" << endl;
+	//		success = false;
+	//	}*/
+	//	if (success)
+	//	{
+	//		par_transform.model2ctl_ip(run_list.back().ctl_pars);
+	//		// get the updated parameter value which reflects roundoff errors
+	//		
+	//		par_name_vec.clear();
+	//		par_name_vec.push_back(cur_par_name);
+	//		Parameters numeric_pars(run_list.back().ctl_pars, par_name_vec);
+	//		par_transform.ctl2numeric_ip(numeric_pars);
+	//		run_list.back().numeric_derivative_par = numeric_pars.get_rec(cur_par_name);
+	//	}
+	//	else
+	//	{
+	//		run_list.pop_back();
+	//	}
+
+	//	// read information associated with the next model run;
+	//	if (i_run+1<nruns)
+	//	{
+	//		run_manager.get_info(i_run+1, run_status_next, par_name_next, par_value_next);
+	//	}
+
+	//	if( i_run+1>=nruns || (cur_par_name !=par_name_next) )
+	//	{
+	//		if (!run_list.empty())
+	//		{
+	//			base_numeric_par_names.push_back(cur_par_name);
+	//			base_run.numeric_derivative_par = base_numeric_parameters.get_rec(cur_par_name);
+	//			double cur_numeric_value = base_run.numeric_derivative_par;
+	//			run_list.push_front(base_run);
+	//			std::vector<Eigen::Triplet<double> > tmp_triplet_vec = calc_derivative(cur_par_name, cur_numeric_value, icol, run_list, group_info, prior_info, splitswh_flag);
+	//			triplet_list.insert( triplet_list.end(), tmp_triplet_vec.begin(), tmp_triplet_vec.end() );
+	//			icol++;
+	//		}
+	//		else
+	//		{
+	//			failed_parameter_names.insert(cur_par_name);
+	//			failed_ctl_parameters.insert(cur_par_name, cur_numeric_par_value);
+	//		}
+	//		run_list.clear();
+	//	}
+	//}
+
 	//for(; i_run<nruns; ++i_run)
 	for (auto par_run : par_run_map)
 	{
 		run_list.push_back(JacobianRun());
-		run_manager. get_info(par_run.second[0], r_status, cur_par_name, cur_numeric_par_value);
-		run_manager.get_model_parameters(par_run.second[0],  run_list.back().ctl_pars);
-	    bool success = run_manager.get_observations_vec(par_run.second[0], run_list.back().obs_vec);
-		run_list.back().numeric_derivative_par = cur_numeric_par_value;
-		/*if ((debug_fail) && (i_run == 1))
+		for (auto rid : par_run.second)
 		{
-			file_manager.rec_ofstream() << "NOTE: 'GLM_DEBUG_DER_FAIL' is true, failing jco run for parameter '" << cur_par_name << "'" << endl;
-			success = false;
-		}*/
-		if (success)
-		{
-			par_transform.model2ctl_ip(run_list.back().ctl_pars);
-			// get the updated parameter value which reflects roundoff errors
-			
-			par_name_vec.clear();
-			par_name_vec.push_back(cur_par_name);
-			Parameters numeric_pars(run_list.back().ctl_pars, par_name_vec);
-			par_transform.ctl2numeric_ip(numeric_pars);
-			run_list.back().numeric_derivative_par = numeric_pars.get_rec(cur_par_name);
-		}
-		else
-		{
-			run_list.pop_back();
-		}
-
-		// read information associated with the next model run;
-		if (i_run+1<nruns)
-		{
-			run_manager.get_info(i_run+1, run_status_next, par_name_next, par_value_next);
-		}
-
-		if( i_run+1>=nruns || (cur_par_name !=par_name_next) )
-		{
-			if (!run_list.empty())
+			run_manager.get_info(par_run.second[0], r_status, cur_par_name, cur_numeric_par_value);
+			run_manager.get_model_parameters(par_run.second[0], run_list.back().ctl_pars);
+			bool success = run_manager.get_observations_vec(par_run.second[0], run_list.back().obs_vec);
+			run_list.back().numeric_derivative_par = cur_numeric_par_value;
+			/*if ((debug_fail) && (i_run == 1))
 			{
-				base_numeric_par_names.push_back(cur_par_name);
-				base_run.numeric_derivative_par = base_numeric_parameters.get_rec(cur_par_name);
-				double cur_numeric_value = base_run.numeric_derivative_par;
-				run_list.push_front(base_run);
-				std::vector<Eigen::Triplet<double> > tmp_triplet_vec = calc_derivative(cur_par_name, cur_numeric_value, icol, run_list, group_info, prior_info, splitswh_flag);
-				triplet_list.insert( triplet_list.end(), tmp_triplet_vec.begin(), tmp_triplet_vec.end() );
-				icol++;
+				file_manager.rec_ofstream() << "NOTE: 'GLM_DEBUG_DER_FAIL' is true, failing jco run for parameter '" << cur_par_name << "'" << endl;
+				success = false;
+			}*/
+			if (success)
+			{
+				par_transform.model2ctl_ip(run_list.back().ctl_pars);
+				// get the updated parameter value which reflects roundoff errors
+
+				par_name_vec.clear();
+				par_name_vec.push_back(cur_par_name);
+				Parameters numeric_pars(run_list.back().ctl_pars, par_name_vec);
+				par_transform.ctl2numeric_ip(numeric_pars);
+				run_list.back().numeric_derivative_par = numeric_pars.get_rec(cur_par_name);
 			}
 			else
 			{
-				failed_parameter_names.insert(cur_par_name);
-				failed_ctl_parameters.insert(cur_par_name, cur_numeric_par_value);
+				run_list.pop_back();
 			}
-			run_list.clear();
 		}
+
+		
+		if (!run_list.empty())
+		{
+			base_numeric_par_names.push_back(cur_par_name);
+			base_run.numeric_derivative_par = base_numeric_parameters.get_rec(cur_par_name);
+			double cur_numeric_value = base_run.numeric_derivative_par;
+			run_list.push_front(base_run);
+			std::vector<Eigen::Triplet<double> > tmp_triplet_vec = calc_derivative(cur_par_name, cur_numeric_value, icol, run_list, group_info, prior_info, splitswh_flag);
+			triplet_list.insert(triplet_list.end(), tmp_triplet_vec.begin(), tmp_triplet_vec.end());
+			icol++;
+		}
+		else
+		{
+			failed_parameter_names.insert(cur_par_name);
+			failed_ctl_parameters.insert(cur_par_name, cur_numeric_par_value);
+		}
+		run_list.clear();
+
 	}
+
 	matrix.resize(base_sim_obs_names.size(), base_numeric_par_names.size());
 	matrix.setZero();
 	matrix.setFromTriplets(triplet_list.begin(), triplet_list.end());
