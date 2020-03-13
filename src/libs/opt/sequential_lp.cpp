@@ -15,9 +15,12 @@
 #include "utilities.h"
 
 sequentialLP::sequentialLP(Pest &_pest_scenario, RunManagerAbstract* _run_mgr_ptr,
-	Covariance &_parcov, FileManager* _file_mgr, OutputFileWriter _of_wr) : pest_scenario(_pest_scenario), run_mgr_ptr(_run_mgr_ptr),
-	parcov(_parcov), file_mgr_ptr(_file_mgr),jco(*_file_mgr,_of_wr), of_wr(_of_wr)
+	Covariance &_parcov, FileManager* _file_mgr, OutputFileWriter _of_wr, PerformanceLog& _pfm) 
+	: pest_scenario(_pest_scenario), run_mgr_ptr(_run_mgr_ptr),
+	parcov(_parcov), file_mgr_ptr(_file_mgr),jco(*_file_mgr,_of_wr), of_wr(_of_wr), pfm(_pfm)
 {
+	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
+	
 	try
 	{
 		initialize_and_check();
@@ -994,7 +997,10 @@ void sequentialLP::initialize_and_check()
 
 			//build the nz_obs obs_cov
 			if (num_nz_obs() != 0)
-				obscov.from_observation_weights(nz_obs_names, pest_scenario.get_ctl_observation_info(), vector<string>(), null_prior);
+			{
+				ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+				obscov.from_observation_weights(nz_obs_names, oi, vector<string>(), null_prior);
+			}
 		}
 	}
 	else use_chance = false;
@@ -1104,8 +1110,8 @@ void sequentialLP::calc_chance_constraint_offsets()
 		Mat fosm_jco(fosm_row_names, adj_par_names, fosm_mat);
 
 		//create a linear object
-		Logger logger(file_mgr_ptr->get_ofstream("log"), false);
-		linear_analysis la(fosm_jco, pest_scenario,*file_mgr_ptr, &logger);
+		//Logger logger(file_mgr_ptr->get_ofstream("log"), false);
+		LinearAnalysis la(fosm_jco, pest_scenario,*file_mgr_ptr,pfm, parcov, &rand_gen);
 		la.set_obscov(obscov);
 
 		//set the prior parameter covariance matrix
@@ -1540,7 +1546,7 @@ void sequentialLP::solve()
 			throw_sequentialLP_error("error running model with best decision variable values");
 		}
 		//write 'best' rei
-		of_wr.write_opt_constraint_rei(file_mgr_ptr->open_ofile_ext("res"), slp_iter, all_pars_and_dec_vars_best,
+		of_wr.write_opt_constraint_rei(file_mgr_ptr->open_ofile_ext("res"), slp_iter, all_pars_and_dec_vars,
 			pest_scenario.get_ctl_observations(), constraints_sim);
 		file_mgr_ptr->close_file("res");
 		//write 'best' parameters file
@@ -1550,11 +1556,11 @@ void sequentialLP::solve()
 	}
 }
 
-void sequentialLP::write_res_file(Observations &obs, string tag)
+void sequentialLP::write_res_file(Observations &obs, Parameters& pars, string tag)
 {
 	stringstream ss;
 	ss << slp_iter << "." << tag << ".rei";
-	of_wr.write_opt_constraint_rei(file_mgr_ptr->open_ofile_ext(ss.str()), slp_iter, all_pars_and_dec_vars,
+ 	of_wr.write_opt_constraint_rei(file_mgr_ptr->open_ofile_ext(ss.str()), slp_iter,pars,
 		pest_scenario.get_ctl_observations(), obs);
 	file_mgr_ptr->close_file(ss.str());
 
@@ -1626,14 +1632,14 @@ void sequentialLP::iter_postsolve()
 	Eigen::VectorXd est_obs_vec = constraints_sim.get_data_eigen_vec(ctl_ord_obs_constraint_names) +  jco.get_matrix(ctl_ord_obs_constraint_names, ctl_ord_dec_var_names) * dv_changes.get_partial_data_eigen_vec(ctl_ord_dec_var_names);
 	upgrade_obs.update_without_clear(ctl_ord_obs_constraint_names, est_obs_vec);
 	postsolve_model_constraint_report(upgrade_obs, "estimated");
-	write_res_file(upgrade_obs, "est");
+	write_res_file(upgrade_obs, upgrade_pars, "est");
 	if (use_chance)
 	{
 		Observations fosm_obs = upgrade_obs;
 		for (auto &o : ctl_ord_obs_constraint_names)
 			fosm_obs[o] = fosm_obs[o] + post_constraint_offset[o];
 		//postsolve_model_constraint_report(fosm_obs, "estimated + fosm");
-		write_res_file(fosm_obs, "est+fosm");
+		write_res_file(fosm_obs, upgrade_pars, "est+fosm");
 	}
 
 	if (!super_secret_option)
@@ -1648,14 +1654,14 @@ void sequentialLP::iter_postsolve()
 		
 		//postsolve_constraint_report(upgrade_obs, upgrade_pars, "simulated");
 		postsolve_model_constraint_report(upgrade_obs, "simulated");
-		write_res_file(upgrade_obs, "sim");
+		write_res_file(upgrade_obs, upgrade_pars, "sim");
 		if (use_chance)
 		{
 			Observations fosm_obs = upgrade_obs;
 			for (auto &o : ctl_ord_obs_constraint_names)
 				fosm_obs[o] = fosm_obs[o] + post_constraint_offset[o];
 			//postsolve_model_constraint_report(fosm_obs, "simulated + fosm");
-			write_res_file(fosm_obs, "sim+fosm");
+			write_res_file(fosm_obs, upgrade_pars, "sim+fosm");
 		}
 		
 	}
@@ -1795,6 +1801,7 @@ void sequentialLP::iter_presolve()
 
 	//read an existing jacobain
 	string basejac_filename = pest_scenario.get_pestpp_options().get_basejac_filename();
+	Parameters pars = all_pars_and_dec_vars_best;
 	if ((slp_iter == 1) && (basejac_filename.size() > 0))
 	{
 		jco.read(basejac_filename);
@@ -1934,7 +1941,8 @@ void sequentialLP::iter_presolve()
 		set<int> failed = run_mgr_ptr->get_failed_run_ids();
 
 		//process the remaining responses
-		success = jco.process_runs(par_trans, pest_scenario.get_base_group_info(), *run_mgr_ptr, *null_prior, false);
+		success = jco.process_runs(par_trans, pest_scenario.get_base_group_info(), *run_mgr_ptr, 
+			*null_prior, false,false);
 		if (!success)
 			throw_sequentialLP_error("error processing response matrix runs ", jco.get_failed_parameter_names());
 
@@ -1952,11 +1960,11 @@ void sequentialLP::iter_presolve()
 
 
 		//get the base run and update simulated constraint values
+		
 		if (init_obs)
 		{
-			Parameters temp_pars;
 			Observations temp_obs;
-			run_mgr_ptr->get_run(0, temp_pars, constraints_sim, false);
+			run_mgr_ptr->get_run(0, pars, constraints_sim, false);
 
 		}
 		//par_trans.model2ctl_ip(temp_pars);
@@ -2023,7 +2031,8 @@ void sequentialLP::iter_presolve()
 	//ss << slp_iter << "jcb.rei";
 	/*of_wr.write_opt_constraint_rei(file_mgr_ptr->open_ofile_ext(ss.str()), slp_iter, pest_scenario.get_ctl_parameters(),
 		pest_scenario.get_ctl_observations(), constraints_sim);*/
-	write_res_file(constraints_sim, "jcb");
+
+	write_res_file(constraints_sim, pars,"jcb");
 
 	return;
 }

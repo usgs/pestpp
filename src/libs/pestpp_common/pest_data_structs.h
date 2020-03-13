@@ -24,6 +24,7 @@
 #include <unordered_map>
 #include <set>
 #include <vector>
+#include <random>
 #include "Transformable.h"
 
 
@@ -197,6 +198,7 @@ public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
 	enum MAT_INV { Q12J, JTQJ };
 	enum GLOBAL_OPT { NONE, OPT_DE };
+	enum GLMNormalForm { IDENT,DIAG, PRIOR };
 	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
 	/*PestppOptions(int _n_iter_base = 50, int _n_iter_super = 0, int _max_n_super = 50,
 		double _super_eigthres = 1.0E-6, SVD_PACK _svd_pack = PestppOptions::REDSVD,
@@ -262,6 +264,16 @@ public:
 	string get_basejac_filename()const { return basejac_filename; }
 	int get_glm_num_reals() const { return glm_num_reals; }
 	void set_glm_num_reals(int _glm_num_reals) { glm_num_reals = _glm_num_reals; }
+	GLMNormalForm get_glm_normal_form() const { return glm_normal_form;}
+	void set_glm_normal_form(GLMNormalForm form) { glm_normal_form = form; }
+	bool get_glm_debug_der_fail() const { return glm_debug_der_fail; }
+	void set_glm_debug_der_fail(bool _flag) { glm_debug_der_fail = _flag;}
+	bool get_glm_debug_lamb_fail() const { return glm_debug_lamb_fail; }
+	void set_glm_debug_lamb_fail(bool _flag) { glm_debug_lamb_fail = _flag; }
+	bool get_glm_debug_real_fail() const { return glm_debug_real_fail; }
+	void set_glm_debug_real_fail(bool _flag) { glm_debug_real_fail = _flag; }
+	bool get_glm_accept_mc_phi() const { return glm_accept_mc_phi; }
+	void set_glm_accept_mc_phi(bool _flag) { glm_accept_mc_phi = _flag; }
 
 	double get_overdue_reched_fac()const { return overdue_reched_fac; }
 	void set_overdue_reched_fac(double _val) { overdue_reched_fac = _val; }
@@ -414,6 +426,8 @@ public:
 	void set_ies_drop_conflicts(bool _flag) { ies_drop_conflicts = _flag; }
 	bool get_ies_save_rescov() const { return ies_save_rescov; }
 	void set_ies_save_rescov(bool _flag) { ies_save_rescov = _flag; }
+	double get_ies_pdc_sigma_distance() const { return ies_pdc_sigma_distance; }
+	void set_ies_pdc_sigma_distance(double distance) { ies_pdc_sigma_distance = distance; }
 
 	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -431,8 +445,6 @@ public:
 	void set_gsa_sobol_samples(int _s) { gsa_sobol_samples = _s; }
 	string get_gsa_sobol_par_dist() const { return gsa_sobol_par_dist; }
 	void set_gsa_sobol_par_dist(string _d) { gsa_sobol_par_dist = _d; }
-	int get_gsa_rand_seed() const { return gsa_rand_seed; }
-	void set_gsa_rand_seed(int _r) { gsa_rand_seed = _r; }
 
 	set<string> get_passed_args() const { return passed_args; }
 	map<string, string> get_arg_map()const { return arg_map; }
@@ -449,6 +461,8 @@ public:
 	bool get_fill_tpl_zeros() const { return fill_tpl_zeros; }
 	void set_additional_ins_delimiters(string _delims) { additional_ins_delimiters = _delims; }
 	string get_additional_ins_delimiters() const { return additional_ins_delimiters; }
+	void set_random_seed(int seed) { random_seed = seed; }
+	int get_random_seed()const { return random_seed; }
 
 
 	void set_defaults();
@@ -466,15 +480,33 @@ private:
 	int max_super_frz_iter;
 	int max_reg_iter;
 	int glm_num_reals;
+	GLMNormalForm glm_normal_form;
+	bool glm_debug_der_fail;
+	bool glm_debug_lamb_fail;
+	bool glm_debug_real_fail;
+	bool glm_accept_mc_phi;
+
 	vector<double> base_lambda_vec;
 	vector<double> lambda_scale_vec;
 	bool iter_summary_flag;
 	bool der_forgive;
 	bool uncert;
 	vector<string> prediction_names;
+	string basejac_filename;
+	bool jac_scale;
+	string hotstart_resfile;
 	string parcov_filename;
 	string obscov_filename;
-	string basejac_filename;
+	
+	bool tie_by_group;
+	bool enforce_tied_bounds;
+	bool debug_parse_only;
+	bool check_tplins;
+	bool fill_tpl_zeros;
+	string additional_ins_delimiters;
+
+	int random_seed;
+
 	double overdue_reched_fac;
 	double overdue_giveup_fac;
 	double overdue_giveup_minutes;
@@ -486,11 +518,6 @@ private:
 	bool sweep_forgive;
 	int sweep_chunk;
 	bool sweep_base_run;
-	bool jac_scale;
-	string hotstart_resfile;
-
-	bool tie_by_group;
-
 
 	GLOBAL_OPT global_opt;
 	double de_f;
@@ -559,6 +586,7 @@ private:
 	bool ies_no_noise;
 	bool ies_drop_conflicts;
 	bool ies_save_rescov;
+	double ies_pdc_sigma_distance;
 
 	string gsa_method;
 	int gsa_morris_p;
@@ -568,15 +596,6 @@ private:
 	bool gsa_morris_obs_sen;
 	double gsa_morris_delta;
 	string gsa_sobol_par_dist;
-	int gsa_rand_seed;
-
-	bool enforce_tied_bounds;
-	bool debug_parse_only;
-	bool check_tplins;
-	bool fill_tpl_zeros;
-	string additional_ins_delimiters;
-
-	
 		
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);
@@ -622,5 +641,8 @@ private:
 	set<string> passed_args;
 };
 ostream& operator<< (ostream& os, const SVDInfo& val);
+
+double draw_standard_normal(std::mt19937& rand_gen);
+
 
 #endif  /* PEST_DATAS_STRUCTS_H_ */

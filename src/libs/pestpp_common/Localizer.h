@@ -56,7 +56,7 @@ public:
 	enum How { PARAMETERS, OBSERVATIONS};
 	Localizer() { ; }
 	Localizer(Pest *_pest_scenario_ptr) { pest_scenario_ptr = _pest_scenario_ptr; }
-	bool initialize(PerformanceLog *performance_log);
+	bool initialize(PerformanceLog *performance_log, bool forgive_missing=false);
 	unordered_map<string, pair<vector<string>, vector<string>>> get_localizer_map(int iter, ObservationEnsemble &oe, ParameterEnsemble &pe, PerformanceLog *performance_log);// { return localizer_map; }
 	void set_pest_scenario(Pest *_pest_scenario_ptr) { pest_scenario_ptr = _pest_scenario_ptr; }
 	Eigen::MatrixXd get_localizing_obs_hadamard_matrix(int num_reals,string col_name,vector<string> &obs_names);
@@ -79,7 +79,7 @@ private:
 	map<string, set<string>> listed_obs;
 	map<string, int> obs2row_map, par2col_map;
 
-	void process_mat(PerformanceLog *performance_log);	
+	void process_mat(PerformanceLog *performance_log, bool forgive_missing=false);	
 };
 
 void aal_upgrade_thread_function(int id, AutoAdaLocThread &worker, exception_ptr &eptr);

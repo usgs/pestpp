@@ -45,9 +45,9 @@ namespace RedSVD
 		using std::sin;
 		
 		const Scalar PI(3.1415926535897932384626433832795028841971693993751);
-
 		Scalar v1 = (Scalar)(std::rand() + Scalar(1)) / ((Scalar)RAND_MAX+Scalar(2));
 		Scalar v2 = (Scalar)(std::rand() + Scalar(1)) / ((Scalar)RAND_MAX+Scalar(2));
+		
 		
 		Scalar len = sqrt(Scalar(-2) * log(v1));
 		x = len * cos(Scalar(2) * PI * v2);
@@ -72,7 +72,7 @@ namespace RedSVD
 	inline void sample_gaussian(MatrixType& mat)
 	{
 		typedef typename MatrixType::Index Index;
-		std::default_random_engine generator;
+		std::mt19937 generator;
 		std::normal_distribution<double> distribution(0.0, 1.0);
 		for (Index i = 0; i < mat.rows(); ++i)
 		{

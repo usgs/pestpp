@@ -48,11 +48,18 @@ SVDSolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_
 */
 SVDASolver::SVDASolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func_ptr,
 	const ParamTransformSeq &_par_transform, Jacobian &_jacobian,	OutputFileWriter &_output_file_writer,
-	PerformanceLog *_performance_log, bool _phiredswh_flag, bool _splitswh_flag)
+	PerformanceLog *_performance_log, Covariance& _parcov, std::mt19937* _rand_gen_ptr, bool _phiredswh_flag, bool _splitswh_flag)
 	: SVDSolver(_pest_scenario, _file_manager, _obj_func_ptr, _par_transform, _jacobian,
-		_output_file_writer, _performance_log,"super parameter solution", _phiredswh_flag, _splitswh_flag, false),
+		_output_file_writer, _performance_log,_parcov,_rand_gen_ptr, "super parameter solution", _phiredswh_flag, _splitswh_flag, false),
 		max_super_frz_iter(_pest_scenario.get_pestpp_options().get_max_super_frz_iter())
 {
+	//PestppOptions::GLMNormalForm nf = pest_scenario.get_pestpp_options().get_glm_normal_form();
+	glm_normal_form = pest_scenario.get_pestpp_options().get_glm_normal_form();
+	if (glm_normal_form == PestppOptions::GLMNormalForm::PRIOR)
+	{
+		file_manager.rec_ofstream() << "Note: using 'GLM_NORMAL_FORM' = 'DIAG' for super iterations" << endl;
+		glm_normal_form = PestppOptions::GLMNormalForm::DIAG;
+	}
 }
 
 
@@ -119,7 +126,7 @@ Parameters SVDASolver::limit_parameters_freeze_all_ip(const Parameters &init_act
 void SVDASolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active_ctl_pars, QSqrtMatrix &Q_sqrt,
 	const DynamicRegularization &regul, VectorXd &residuals_vec,
 	vector<string> &obs_names_vec, const Parameters &base_run_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
-	MarquardtMatrix marquardt_type, Pest::LimitType &limit_type, bool scale_upgrade)
+	Pest::LimitType &limit_type)
 {
 	Parameters upgrade_ctl_del_pars;
 	Parameters grad_ctl_del_pars;
@@ -131,16 +138,16 @@ void SVDASolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_activ
 		const Eigen::VectorXd &Residuals, const vector<string> &obs_name_vec,
 		const Parameters &base_ctl_pars, const Parameters &prev_frozen_ctl_pars,
 		double lambda, Parameters &ctl_upgrade_pars, Parameters &upgrade_ctl_del_pars,
-		Parameters &grad_ctl_del_pars, MarquardtMatrix marquardt_type, bool scale_upgrade);
+		Parameters &grad_ctl_del_pars);
 
 	UPGRADE_FUNCTION calc_lambda_upgrade = &SVDASolver::calc_lambda_upgrade_vec_JtQJ;
-
+	
 
 		// need to remove parameters frozen due to failed jacobian runs when calling calc_lambda_upgrade_vec
 		//Freeze Parameters at the boundary whose ugrade vector and gradient both head out of bounds
 	(*this.*calc_lambda_upgrade)(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
 			base_run_active_ctl_pars, prev_frozen_active_ctl_pars, i_lambda, upgrade_active_ctl_pars, upgrade_ctl_del_pars,
-			grad_ctl_del_pars, marquardt_type, scale_upgrade);
+			grad_ctl_del_pars);
 		num_upgrade_out_grad_in = check_bnd_par(new_frozen_ctl_pars, base_run_active_ctl_pars, upgrade_ctl_del_pars, grad_ctl_del_pars);
 		prev_frozen_active_ctl_pars.insert(new_frozen_ctl_pars.begin(), new_frozen_ctl_pars.end());
 		//Recompute the ugrade vector without the newly frozen parameters and freeze those at the boundary whose upgrade still goes heads out of bounds
@@ -149,7 +156,7 @@ void SVDASolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_activ
 			new_frozen_ctl_pars.clear();
 			(*this.*calc_lambda_upgrade)(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
 				base_run_active_ctl_pars, prev_frozen_active_ctl_pars, i_lambda, upgrade_active_ctl_pars, upgrade_ctl_del_pars,
-				grad_ctl_del_pars, marquardt_type, scale_upgrade);
+				grad_ctl_del_pars);
 			check_bnd_par(new_frozen_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars);
 			prev_frozen_active_ctl_pars.insert(new_frozen_ctl_pars.begin(), new_frozen_ctl_pars.end());
 			new_frozen_ctl_pars.clear();
@@ -159,7 +166,7 @@ void SVDASolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_activ
 		{
 			(*this.*calc_lambda_upgrade)(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
 				base_run_active_ctl_pars, prev_frozen_active_ctl_pars, i_lambda, upgrade_active_ctl_pars, upgrade_ctl_del_pars,
-				grad_ctl_del_pars, marquardt_type, scale_upgrade);
+				grad_ctl_del_pars);
 		}
 		//Freeze any new parameters that want to go out of bounds
 		new_frozen_ctl_pars.clear();
@@ -346,7 +353,8 @@ void SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContr
 	jacobian.make_runs(run_manager);
 	performance_log->log_event("jacobian runs complete, processing runs");
 	bool success_process_runs = jacobian.process_runs(par_transform,
-		super_parameter_group_info, run_manager, *prior_info_ptr, splitswh_flag);
+		super_parameter_group_info, run_manager, *prior_info_ptr, splitswh_flag,
+		pest_scenario.get_pestpp_options().get_glm_debug_der_fail());
 	if (!success_process_runs)
 	{
 		throw PestError("Error in SVDASolver::iteration: Can not compute super parameter derivatives");
@@ -441,7 +449,6 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 			prf_message.str("");
 			prf_message << "beginning upgrade vector calculations, lambda = " << i_lambda;
 			performance_log->log_event(prf_message.str());
-			performance_log->add_indent();
 			//std::cout << string(message.str().size(), '\b');
 			message.str("");
 			message << "  computing upgrade vector (lambda = " << i_lambda << ")  " << ++i_update_vec << " / " << lambda_vec.size() << "             " << endl;
@@ -456,14 +463,14 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 			Pest::LimitType limit_type;
 			calc_upgrade_vec(i_lambda, frzn_pars, Q_sqrt, *regul_scheme_ptr, residuals_vec,
 				obs_names_vec, base_run_active_ctl_pars,
-				new_pars, MarquardtMatrix::IDENT, limit_type,false);
+				new_pars,limit_type);
 
 			//transform new_pars to model parameters
 			par_transform.active_ctl2model_ip(new_pars);
 			int run_id = run_manager.add_run(new_pars, "upgrade_nrm", i_lambda);
 			output_file_writer.write_upgrade(termination_ctl.get_iteration_number(), 1, i_lambda, 1.0, new_pars);
 			save_frozen_pars(fout_frz, frzn_pars, run_id);
-			performance_log->add_indent(-1);
+
 		}
 		file_manager.close_file("fpr");
 		RestartController::write_upgrade_runs_built(fout_restart);
@@ -495,6 +502,11 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		string lambda_type;
 		double i_lambda;
 		bool success = run_manager.get_run(i, tmp_pars, tmp_obs, lambda_type, i_lambda);
+		if ((pest_scenario.get_pestpp_options().get_glm_debug_lamb_fail()) && (i == 1))
+		{
+			file_manager.rec_ofstream() << "'GLM_DEBUG_LAMB_FAIL' is true, failing first lambda run" << endl;
+			success = false;
+		}
 		if (success)
 		{
 			one_success = true;

@@ -239,6 +239,11 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 
 		}
 		cout << "processing tpl files...";
+		vector<string> notnormal = pars->get_notnormal_keys();
+		if (notnormal.size() > 0)
+		{
+			throw runtime_error("denormal floating point parameter values found");
+		}
 		for (int i = 0; i < templatefiles.size(); i++)
 		{
 			string name = templatefiles[i].get_tpl_filename();
@@ -862,8 +867,24 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 		tokens.clear();
 		ins_line = read_ins_line(f_ins);
 		tokens = tokenize_ins_line(ins_line);
-		for (auto token : tokens)
+		//check that the first token is either a marker or a line advance
+		if (tokens.size() > 0)
 		{
+			char first = tokens[0][0];
+			if ((first != 'L') && (first != marker))
+			{
+				stringstream ss;
+				ss << "first token on each instruction file line must be either a primary marker ";
+				ss << " or a line advance instruction, not '" << tokens[0] << "'";
+				throw_ins_error(ss.str());
+			}
+		}
+		//int itoken = 0;
+		bool all_markers_so_far = true;
+		//for (auto token : tokens)
+		for (int itoken=0;itoken<tokens.size();itoken++)
+		{
+			string token = tokens[itoken];
 
 			if (token[0] == 'L')
 			{
@@ -878,18 +899,21 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 				lhs = execute_fixed(token, out_line, f_out);
 				if (lhs.first != "DUM")
 					obs.insert(lhs.first,lhs.second);
+				all_markers_so_far = false;
 			}
 			else if (token[0] == '!')
 			{
 				lhs = execute_free(token, out_line, f_out);
 				if (lhs.first != "DUM")
 					obs.insert(lhs.first, lhs.second);
+				all_markers_so_far = false;
 			}
 			else if (token[0] == '(')
 			{
 				lhs = execute_semi(token, out_line, f_out);
 				if (lhs.first != "DUM")
 					obs.insert(lhs.first, lhs.second);
+				all_markers_so_far = false;
 			}
 			else if (token[0] == marker)
 			{
@@ -898,19 +922,27 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 					throw_ins_error("markers with spaces not supported...", ins_line_num);
 				}
 				//if this is the first instruction, its a primary search
-				if (token == tokens[0])
+				//if (token == tokens[0])
+				if (itoken == 0)
 				{
 					execute_primary(token, out_line, f_out);
 				}
 				else
 				{
-					execute_secondary(token, out_line, f_out);
+					bool rewind = execute_secondary(token, out_line, f_out, all_markers_so_far);
+					if (rewind)
+					{
+						itoken = -1; //-1 so that when the for loop increments we are back to zero
+						continue;
+					}
+
 				}
 			}
 			else
 			{
 				throw_ins_error("unrecognized instruction '" + token + "'", ins_line_num);
 			}
+			//itoken++;
 		}
 	}
 	return obs;	
@@ -991,9 +1023,11 @@ vector<string> InstructionFile::tokenize_ins_line(const string& ins_line)
 			tokens.insert(tokens.end(), temp_tokens.begin(), temp_tokens.end());
 		}
 	
+		int im = 0;
 		for (int i = 1; i < marker_indices.size()-1; i = i + 2)
 		{
-			tokens.push_back(marker_tags[i - 1]);
+			tokens.push_back(marker_tags[im]);
+			im++;
 			e = marker_indices[i+1];
 			s = marker_indices[i];
 			temp_tokens.clear();
@@ -1165,7 +1199,7 @@ void InstructionFile::execute_primary(const string& token, string& line, ifstrea
 }
 
 
-void InstructionFile::execute_secondary(const string& token, string& line, ifstream& f_out)
+bool InstructionFile::execute_secondary(const string& token, string& line, ifstream& f_out, bool all_markers_so_far)
 {
 	//check that a closing marker is found
 	int pos;
@@ -1175,10 +1209,13 @@ void InstructionFile::execute_secondary(const string& token, string& line, ifstr
 	pos = line.find(secondary_tag);
 	if (pos == string::npos)
 	{
-		throw_ins_error("EOL encountered while executing secondary marker ('" + secondary_tag + "') search on output line", ins_line_num,out_line_num);
+		if (all_markers_so_far)
+			return true;
+		else
+			throw_ins_error("EOL encountered while executing secondary marker ('" + secondary_tag + "') search on output line", ins_line_num,out_line_num);
 	}
 	line = line.substr(pos + secondary_tag.size());
-	return;
+	return false;
 }
 
 

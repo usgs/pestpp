@@ -7,7 +7,12 @@
 #include "covariance.h"
 #include "linear_analysis.h"
 #include <iomanip>
-
+#include "OutputFileWriter.h"
+#include "ModelRunPP.h"
+#include "Ensemble.h"
+#include <iterator>
+#include "PerformanceLog.h"
+#include "EnsembleSmoother.h"
 
 vector<string> get_common(vector<string> v1, vector<string> v2)
 {
@@ -153,7 +158,7 @@ ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, PhiData obj_c
 
 ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, Observations &sim)
 {
-	ObservationInfo obs_info = pest_scenario.get_ctl_observation_info();
+	ObservationInfo obs_info(pest_scenario.get_ctl_observation_info());
 	Observations obs = pest_scenario.get_ctl_observations();
 
 	const ObservationRec* obs_rec;
@@ -177,18 +182,304 @@ ObservationInfo normalize_weights_by_residual(Pest &pest_scenario, Observations 
 	return obs_info;
 }
 
-
-
-
-
-void linear_analysis::throw_error(const string &message)
+ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter,
+	RunManagerAbstract* run_mgr_ptr)
 {
-	log->error(message);
+	ofstream& fout_rec = file_manager.rec_ofstream();
+
+	//ofstream& pfm = file_manager.get_ofstream("log");
+	stringstream ss;
+	ss << "starting FOSM uncertainty analyses for iteration " << iter;
+	pfm.log_event(ss.str());
+	fout_rec << ss.str() << endl << endl;
+
+	/*if (base_jacobian_ptr->get_base_numeric_par_names().size() == 0)
+	{
+		cout << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
+		fout_rec << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
+		return 0;
+	}*/
+	if (jacobian.get_col_names().size() == 0)
+	{
+		throw runtime_error("LinearAnalysis::glml_iter_fosm() error: no parameters in jacobian");
+	}
+
+	//instance of a Mat for the jco
+	/*Mat j(base_jacobian_ptr->get_sim_obs_names(), base_jacobian_ptr->get_base_numeric_par_names(),
+		base_jacobian_ptr->get_matrix_ptr());*/
+
+		//get a new obs info instance that accounts for residual phi (and expected objection value if passed)
+		// and report new weights to the rec file
+	fout_rec << endl;
+	ObservationInfo reweight;
+	Observations sim = optimum_run.get_obs();
+	reweight = normalize_weights_by_residual(pest_scenario, sim);
+	
+	/*fout_rec << "Note: The observation covariance matrix has been constructed from " << endl;
+	fout_rec << "      weights listed in the pest control file that have been scaled by " << endl;
+	fout_rec << "      by the final residuals to account for " << endl;
+	fout_rec << "      the level of measurement noise implied by the original weights so" << endl;
+	fout_rec << "      the total objective function is equal to the number of  " << endl;
+	fout_rec << "      non-zero weighted observations." << endl;
+	fout_rec << endl;*/
+
+	ss.str("");
+	if (iter != -999)
+		ss << file_manager.get_base_filename() << "." << iter << ".fosm_reweight.rei";
+	else
+		ss << file_manager.get_base_filename() << ".fosm_reweight.rei";
+	string reres_filename = ss.str();
+	ofstream reres_of(reres_filename);
+
+	Observations obs = pest_scenario.get_ctl_observations();
+	output_file_writer.obs_report(reres_of, obs, sim, reweight);
+	//fout_rec << "Scaled observation weights used to form observation noise covariance matrix written to residual file '" << reres_filename << "'" << endl << endl;
+
+	//reset the obscov using the scaled residuals - pass empty prior info names so none are included
+	obscov.from_observation_weights(obscov.get_col_names(), reweight, vector<string>(), pest_scenario.get_prior_info_ptr());
+
+	//if needed, set the predictive sensitivity vectors
+	vector<string> pred_names = pest_scenario.get_pestpp_options().get_prediction_names();
+
+	//if no preds, check for zero-weighted obs to use
+	if (pred_names.size() == 0)
+	{
+
+		for (auto& oname : pest_scenario.get_ctl_ordered_obs_names())
+		{
+			if (pest_scenario.get_ctl_observation_info().get_weight(oname) == 0.0)
+			{
+				pred_names.push_back(oname);
+			}
+		}
+		if (pred_names.size() > 0)
+		{
+			//cout << "Note: since no forecast/predictions were passed, using " << pred_names.size() << " zero-weighted obs as forecasts" << endl;
+			//fout_rec << "Note: since no forecast/predictions were passed, using " << pred_names.size() << " zero-weighted obs as forecasts" << endl;
+
+		}
+	}
+
+	//make sure prediction weights are zero
+	else
+	{
+		for (auto& pname : pred_names)
+		{
+			if (pest_scenario.get_ctl_observation_info().get_weight(pname) != 0.0)
+			{
+				//cout << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
+				fout_rec << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
+			}
+		}
+	}
+	if (pred_names.size() > 0)
+		set_predictions(pred_names, true);
+
+	//drop all 'regul' obs and equations
+	//no longer need to call this since the PI is not being added to the obscov during 
+	//reconstruction with scaled weights
+	//drop_prior_information(pest_scenario);
+
+	//write the posterior covariance matrix
+	ss.str("");
+	if (iter != -999)
+		ss << file_manager.get_base_filename() << "." << iter << ".post.cov";
+	else
+		ss << file_manager.get_base_filename() << ".post.cov";
+	string postcov_filename = ss.str();
+	pfm.log_event("parameter fosm calcs");
+	posterior_parameter_ptr()->to_ascii(postcov_filename);
+	fout_rec << "posterior parameter covariance matrix written to file '" + postcov_filename +
+		"'" << endl << endl;
+
+	//write a parameter prior and posterior summary to the rec file
+	const ParamTransformSeq trans = pest_scenario.get_base_par_tran_seq();
+	Parameters pars = pest_scenario.get_ctl_parameters();
+	ss.str("");
+	if (iter != -999)
+		ss << file_manager.get_base_filename() << "." << iter << ".par.usum.csv";
+	else
+		ss << file_manager.get_base_filename() << ".par.usum.csv";
+	string parsum_filename = ss.str();
+	write_par_credible_range(fout_rec, parsum_filename, pest_scenario.get_ctl_parameter_info(),
+		trans.active_ctl2numeric_cp(pest_scenario.get_ctl_parameters()),
+		trans.active_ctl2numeric_cp(optimum_run.get_ctl_pars()),
+		pest_scenario.get_ctl_ordered_par_names());
+	fout_rec << "the above parameter uncertainty summary was written to file '" + parsum_filename +
+		"'" << endl << endl;
+
+
+	//if predictions were defined, write a prior and posterior summary to the rec file
+	if (pred_names.size() > 0)
+	{
+		pfm.log_event("forecast FOSM calcs");
+		map<string, pair<double, double>> init_final_pred_values;
+		double ival, fval;
+		vector<string> run_mgr_obs_names = run_mgr_ptr->get_obs_name_vec();
+		vector<double> run_mgr_obs_vals = run_mgr_ptr->get_init_sim();
+		for (auto& pred_name : pred_names)
+		{
+			fval = optimum_run.get_obs().get_rec(pred_name);
+			if (run_mgr_ptr->get_init_sim().size() > 0)
+			{
+				int idx = std::distance(run_mgr_obs_names.begin(), find(run_mgr_obs_names.begin(),
+					run_mgr_obs_names.end(), pred_name));
+				ival = run_mgr_obs_vals[idx];
+			}
+			else
+			{
+				//cout << "WARNING: initial simulation results not available, falling back to optimum run outputs for prior forecast mean" << endl;
+				// << "WARNING: initial simulation results not available for FOSM calcs, falling back to optimum run outputs for prior forecast mean" << endl;
+				pfm.log_event("no initial sim results, using curernt run instead: " + pred_name);
+				ival = fval;
+			}
+
+			init_final_pred_values[pred_name] = pair<double, double>(ival, fval);
+		}
+
+		ss.str("");
+		if (iter != -999)
+			ss << file_manager.get_base_filename() << "." << iter << ".pred.usum.csv";
+		else
+			ss << file_manager.get_base_filename() << ".pred.usum.csv";
+		string predsum_filename = ss.str();
+		write_pred_credible_range(fout_rec, predsum_filename, init_final_pred_values);
+		fout_rec << "Note : the above forecast uncertainty summary was written to file '" + predsum_filename +
+			"'" << endl << endl;
+	}
+	return reweight;
+}
+
+pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter, ModelRun& optimum_run)
+{
+	set<string> args = pest_scenario.get_pestpp_options().get_passed_args();
+	ofstream& fout_rec = file_manager.rec_ofstream();
+	map<int, int> run_map;
+	ParameterEnsemble pe(&pest_scenario,rand_gen_ptr);
+	if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
+	{
+		pfm.log_event("drawing, saving and queuing FOSM parameter realizations");
+		bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
+		int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
+		//fout_rec << "drawing " << num_reals << " posterior parameter realizations";
+		
+		Covariance cov = posterior_parameter_matrix();
+		pe.draw(num_reals, optimum_run.get_ctl_pars(), cov, &pfm, 1);
+		stringstream ss;
+		ss.str("");
+		if (iter != -999)
+			ss << file_manager.get_base_filename() << "." << iter << ".post.paren";
+		else
+			ss << file_manager.get_base_filename() << ".post.paren";
+		if (binary)
+		{
+			pe.to_binary(ss.str() + ".jcb");
+			cout << "...posterior parameter ensemble saved to " << ss.str() << ".jcb" << endl;
+			file_manager.rec_ofstream() << "...posterior parameter ensemble saved to " << ss.str() << ".jcb" << endl;
+		}
+		else
+		{
+			pe.to_csv(ss.str() + ".csv");
+			cout << "...posterior parameter ensemble saved to " << ss.str() << ".csv" << endl;
+			file_manager.rec_ofstream() << "...posterior parameter ensemble saved to " << ss.str() << ".csv" << endl;
+		}
+		
+		pfm.log_event("queueing realizations");
+		run_map = pe.add_runs(run_mgr_ptr);
+		
+		/*run_mgr_ptr->run();
+		
+		ObservationEnsemble oe(&pest_scenario);
+		Covariance obscov = get_obscov();
+		oe.draw(num_reals, obscov, &pfm, 1);
+		oe.update_from_runs(run_map, run_mgr_ptr);
+		ss.str("");
+		if (iter != -999)
+			ss << file_manager.get_base_filename() << "." << iter << ".post.obsen";
+		else
+			ss << file_manager.get_base_filename() << ".post.obsen";
+		if (binary)
+			oe.to_binary(ss.str() + ".jcb");
+		else
+			oe.to_csv(ss.str() + ".csv");*/
+	}
+	//fout_rec << "  ---  finished uncertainty analysis calculations  ---  " << endl << endl << endl;
+	return pair<ParameterEnsemble,map<int,int>>(pe,run_map);
+}
+
+
+pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(RunManagerAbstract* run_mgr_ptr, pair<ParameterEnsemble,map<int, int>>& fosm_real_info, int iter,
+														double last_best_phi)
+{
+	int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
+	bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
+	pfm.log_event("processing FOSM realization runs");
+	ObservationEnsemble oe(&pest_scenario, rand_gen_ptr);
+	if (num_reals <= 0)
+		return pair<ObservationEnsemble, map<string, double>>(oe, map<string, double>());
+	//Covariance obscov = get_obscov();
+	//oe.draw(num_reals, obscov, &pfm, 1);
+	oe.reserve(oe.get_generic_real_names(num_reals), pest_scenario.get_ctl_ordered_obs_names());
+	oe.update_from_runs(fosm_real_info.second, run_mgr_ptr);
+	if (pest_scenario.get_pestpp_options().get_glm_debug_real_fail())
+	{
+		vector<string> drop;
+		drop.push_back(oe.get_real_names()[0]);
+		oe.drop_rows(drop);
+	}
+	stringstream ss;
+	ss.str("");
+	if (iter != -999)
+		ss << file_manager.get_base_filename() << "." << iter << ".post.obsen";
+	else
+		ss << file_manager.get_base_filename() << ".post.obsen";
+	if (binary)
+	{
+		oe.to_binary(ss.str() + ".jcb");
+		cout << "...posterior observation ensemble saved to " << ss.str() << ".jcb" << endl;
+		file_manager.rec_ofstream() << "...posterior observation ensemble saved to " << ss.str() << ".jcb" << endl;
+	}
+	else
+	{
+		oe.to_csv(ss.str() + ".csv");
+		cout << "...posterior observation ensemble saved to " << ss.str() << ".csv" << endl;
+		file_manager.rec_ofstream() << "...posterior observation ensemble saved to " << ss.str() << ".csv" << endl;
+	}
+		
+	map<string, double> t;
+	if (oe.shape().first > 0)
+	{
+		ofstream& os = file_manager.rec_ofstream();
+		ParameterEnsemble pe = fosm_real_info.first;
+		double reg_fac = 0.0;
+		PhiHandler ph(&pest_scenario, &file_manager, &oe, &pe, get_parcov_ptr(),
+			&reg_fac, &oe);
+		ph.update(oe, pe, false);
+		PhiHandler::phiType pt = PhiHandler::phiType::ACTUAL;
+		map<string,double>* phi_map = ph.get_phi_map(pt);
+		t = *phi_map;
+		os << endl << "  FOSM-based Monte Carlo phi summary:" << endl;
+		os << setw(15) << "realization" << setw(20) << "phi" << endl;
+		//cout << endl << "  FOSM-based Monte Carlo phi summary:" << endl;
+		//cout << setw(15) << "realization" << setw(20) << "phi" << endl;
+		for (auto real : oe.get_real_names())
+		{
+			os << setw(20) << real << setw(20) << phi_map->at(real) << " (" << (phi_map->at(real) / last_best_phi) * 100. << "% of starting phi)" << endl;
+			//cout << setw(20) << real << setw(20) << phi_map->at(real) << " (" << (phi_map->at(real) / last_best_phi) * 100. << "% of starting phi)" << endl;
+		}
+	}
+	return pair<ObservationEnsemble,map<string,double>>(oe,t);
+}
+
+
+void LinearAnalysis::throw_error(const string &message)
+{
+	pfm.log_event("Error in LinearAnalysis:" + message);
 	throw runtime_error(message);
 }
 
 
-void linear_analysis::load_pst(Pest &pest_scenario, const string &pst_filename)
+void LinearAnalysis::load_pst(Pest &pest_scenario, const string &pst_filename)
 {
 	ifstream ipst(pst_filename);
 	if (!ipst.good())
@@ -205,9 +496,9 @@ void linear_analysis::load_pst(Pest &pest_scenario, const string &pst_filename)
 }
 
 
-void linear_analysis::load_jco(Mat &jco, const string &jco_filename)
+void LinearAnalysis::load_jco(Mat& jco, const string& jco_filename)
 {
-	log->log("load_jco");
+	pfm.log_event("LinearAnalysis::load_jco");
 	if (!pest_utils::check_exist_in(jco_filename))
 		throw_error("linear_analysis::load_jco() error: jco_filename does not exist");
 	string ext = jco_filename.substr(jco_filename.find_last_of(".") + 1);
@@ -218,7 +509,7 @@ void linear_analysis::load_jco(Mat &jco, const string &jco_filename)
 		{
 			jco.from_binary(jco_filename);
 		}
-		catch (exception &e)
+		catch (exception& e)
 		{
 			throw_error("linear_analysis::load_jco() error loading jco from binary: " + string(e.what()));
 		}
@@ -229,18 +520,17 @@ void linear_analysis::load_jco(Mat &jco, const string &jco_filename)
 		{
 			jco.from_ascii(jco_filename);
 		}
-		catch (exception &e)
+		catch (exception& e)
 		{
 			throw_error("linear_analysis::load_jco() error loading jco from ascii: " + string(e.what()));
 		}
 	}
-	log->log("load_jco");
 }
 
 
-void linear_analysis::load_parcov(const string &parcov_filename)
+void LinearAnalysis::load_parcov(const string &parcov_filename)
 {
-	log->log("load_parcov from "+parcov_filename);
+	pfm.log_event("Linear_Analysis::load_parcov from "+parcov_filename);
 	if (!pest_utils::check_exist_in(parcov_filename))
 		throw_error("linear_analysis::load_parcov() error: parcov_filename does not exist");
 	string ext = parcov_filename.substr(parcov_filename.find_last_of(".") + 1);
@@ -279,13 +569,13 @@ void linear_analysis::load_parcov(const string &parcov_filename)
 			throw_error("linear_analysis::load_parcov() error loading parcov from ASCII file:" + parcov_filename + " : " + string(e.what()));
 		}
 	}
-	log->log("load_parcov from " + parcov_filename);
+	
 }
 
 
-void linear_analysis::load_obscov(const string &obscov_filename)
+void LinearAnalysis::load_obscov(const string &obscov_filename)
 {
-	log->log("load_obscov from "+obscov_filename);
+	pfm.log_event("LinearAnalysis::load_obscov from "+obscov_filename);
 	if (!pest_utils::check_exist_in(obscov_filename))
 		throw_error("linear_analysis::load_obscov() error: obscov_filename does not exist");
 	string ext = obscov_filename.substr(obscov_filename.find_last_of(".") + 1);
@@ -324,122 +614,19 @@ void linear_analysis::load_obscov(const string &obscov_filename)
 			throw_error("linear_analysis::load_obscov() error loading obscov from ASCII file:" + obscov_filename + " : " + string(e.what()));
 		}
 	}
-	log->log("load_obscov from " + obscov_filename);
 }
 
 
-linear_analysis::linear_analysis(Mat _jacobian, Mat _parcov, Mat _obscov, map<string, Mat> _predictions, Logger* _log)
-{
-	jacobian = _jacobian; parcov = _parcov; obscov = _obscov, predictions = _predictions;
-	log = _log;
-}
-
-
-//linear_analysis::linear_analysis(string &jco_filename,Logger* _log)
-//{
-//	log = _log;
-//	string pst_filename = jco_filename;
-//	pst_filename.replace(jco_filename.size() - 4, jco_filename.size() - 1, ".pst");
-//	if (pest_utils::check_exist_in(pst_filename))
-//	{
-//		pest_utils::upper_ip(jco_filename);
-//		Mat jco;
-//		Pest pest_scenario;
-//		try
-//		{
-//			load_jco(jco, jco_filename);
-//		}
-//		catch (exception &e)
-//		{
-//			throw_error("linear_analysis::linear_analysis() error loading jco: " + string(e.what()));
-//		}
-//		try
-//		{
-//			load_pst(pest_scenario, pst_filename);
-//		}
-//		catch (exception &e)
-//		{
-//			throw_error("linear_analysis::linear_analysis() error loading pst: " + string(e.what()));
-//		}
-//		linear_analysis(jco, pest_scenario);
-//	}
-//	else
-//	{
-//		try
-//		{
-//			load_jco(jacobian, jco_filename);
-//		}
-//		catch (exception &e)
-//		{
-//			throw_error("linear_analysis::linear_analysis() error loading jco: " + string(e.what()));
-//		}
-//	}
-//	R_sv = -999, G_sv = -999, ImR_sv = -999, V1_sv = -999;
-//}
-
-
-//linear_analysis::linear_analysis(string &jco_filename, string &parcov_filename, string &obscov_filename,Logger* _log)
-//{
-//	log = _log;
-//	try
-//	{
-//		load_jco(jacobian, jco_filename);
-//	}
-//	catch (exception &e)
-//	{
-//		throw_error("linear_analysis::linear_analysis() error loading jco: " + string(e.what()));
-//	}
-//	try
-//	{
-//		load_parcov(parcov_filename);
-//	}
-//	catch (exception &e)
-//	{
-//		throw_error("linear_analysis::linear_analysis() error loading parcov: " + string(e.what()));
-//	}
-//	try
-//	{
-//		load_obscov(obscov_filename);
-//	}
-//	catch (exception &e)
-//	{
-//		throw_error("linear_analysis::linear_analysis() error loading obscov: " + string(e.what()));
-//	}
-//	R_sv = -999, G_sv = -999, ImR_sv = -999, V1_sv = -999;
-//}
-
-
-//linear_analysis::linear_analysis(Mat _jacobian, Pest pest_scenario,Logger* _log)
-//{
-//	log = _log;
-//	jacobian = _jacobian;
-//	try
-//	{
-//		parcov.from_parameter_bounds(pest_scenario);
-//	}
-//	catch (exception &e)
-//	{
-//		throw_error("linear_analysis::linear_analysis() error setting parcov from parameter bounds:" + string(e.what()));
-//	}
-//	try
-//	{
-//		obscov.from_observation_weights(pest_scenario);
-//	}
-//	catch (exception &e)
-//	{
-//		throw_error("linear_analysis::linear_analysis() error setting obscov from observation weights:" + string(e.what()));
-//	}
-//	R_sv = -999, G_sv = -999, ImR_sv = -999,V1_sv=-999;
-//}
-
-linear_analysis::linear_analysis(Mat &_jacobian, Pest &pest_scenario, FileManager &file_manager, Logger* _log)
+LinearAnalysis::LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager& _file_manager, PerformanceLog &_pfm, Covariance& _parcov,
+	std::mt19937* _rand_gen_ptr): 
+	pest_scenario(_pest_scenario),file_manager(_file_manager),
+			jacobian(_jacobian), pfm(_pfm),parcov(_parcov), rand_gen_ptr(_rand_gen_ptr)
 {
 	bool parcov_success = false;
-	log = _log;
-	jacobian = _jacobian;
 	//if (jacobian.nrow() != pest_scenario.get_nonregul_obs().size())
 	//	jacobian = jacobian.get(pest_scenario.get_ctl_ordered_obs_names(), pest_scenario.get_ctl_ordered_adj_par_names());
-	const string parcov_filename = pest_scenario.get_pestpp_options().get_parcov_filename();
+
+	/*const string parcov_filename = pest_scenario.get_pestpp_options().get_parcov_filename();
 	if (parcov_filename.size() > 0)
 	{
 		try
@@ -449,7 +636,7 @@ linear_analysis::linear_analysis(Mat &_jacobian, Pest &pest_scenario, FileManage
 		}
 		catch (exception &e)
 		{
-			log->warning("unable to load parcov from file: " + parcov_filename + ", reverting to parameter bounds "+e.what());
+			pfm.log_event("unable to load parcov from file: " + parcov_filename + ", reverting to parameter bounds "+e.what());
 		}
 	}
 	if (!parcov_success)
@@ -462,7 +649,7 @@ linear_analysis::linear_analysis(Mat &_jacobian, Pest &pest_scenario, FileManage
 		{
 			throw_error("linear_analysis::linear_analysis() error setting parcov from parameter bounds:" + string(e.what()));
 		}
-	}
+	}*/
 	const string obscov_filename = pest_scenario.get_pestpp_options().get_obscov_filename();
 	bool obscov_success = false;
 	if (obscov_filename.size() > 0)
@@ -474,7 +661,7 @@ linear_analysis::linear_analysis(Mat &_jacobian, Pest &pest_scenario, FileManage
 		}
 		catch (exception &e)
 		{
-			log->warning("unable to load obscov from file: " + obscov_filename + ", reverting to observation weights " + e.what());
+			pfm.log_event("unable to load obscov from file: " + obscov_filename + ", reverting to observation weights " + e.what());
 		}
 	}
 	if (!obscov_success)
@@ -492,53 +679,15 @@ linear_analysis::linear_analysis(Mat &_jacobian, Pest &pest_scenario, FileManage
 	R_sv = -999, G_sv = -999, ImR_sv = -999, V1_sv = -999;
 }
 
-void  linear_analysis::set_parcov(Mat &_parcov)
+void  LinearAnalysis::set_parcov(Mat& _parcov)
 {
 	parcov = _parcov;
-	//check that everything is kosher
-	//vector<string> missing;
-	//bool aligned = true;
-	//if (jacobian.get_col_names().size() != _parcov.get_row_names.size())
 }
 
-//linear_analysis::linear_analysis(Mat* _jacobian, Pest* pest_scenario, Mat* _obscov, Logger* _log)
-//{
-//	bool parcov_success = false;
-//	log = _log;
-//	jacobian = *_jacobian;
-//	obscov = *_obscov;
-//	const string parcov_filename = pest_scenario->get_pestpp_options().get_parcov_filename();
-//	if (parcov_filename.size() > 0)
-//	{
-//		try
-//		{
-//			load_parcov(parcov_filename);
-//			parcov_success = true;
-//		}
-//		catch (exception &e)
-//		{
-//			log->warning("unable to load parcov from file: " + parcov_filename + ", reverting to parameter bounds " + e.what());
-//			cout << "WARNING: unable to load parcov from file : " << parcov_filename << ", reverting to parameter bounds" << endl;
-//		}
-//	}
-//	if (!parcov_success)
-//	{
-//		try
-//		{
-//			parcov.from_parameter_bounds(*pest_scenario);
-//		}
-//		catch (exception &e)
-//		{
-//			throw_error("linear_analysis::linear_analysis() error setting parcov from parameter bounds:" + string(e.what()));
-//		}
-//	}
-//	R_sv = -999, G_sv = -999, ImR_sv = -999, V1_sv = -999;
-//
-//	}
 
-void linear_analysis::align()
+void LinearAnalysis::align()
 {
-	log->log("align");
+	pfm.log_event("LinearAnalysis::align");
 	vector<string> common;
 	if (jacobian.get_col_names() != parcov.get_col_names())
 	{
@@ -580,278 +729,10 @@ void linear_analysis::align()
 			predictions[p.first] = new_pred;
 		}
 	}
-	log->log("align");
-}
-
-map<string, double> linear_analysis::worth(vector<string> &obs_names)
-{
-	if (predictions.size() == 0)
-		throw_error("linear_analysis::worth() error: no predictions are set");
-
-	log->log("worth");
-	try
-	{
-		align();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::worth() error in align() : " + string(e.what()));
-	}
-	for (int i = 0; i != obs_names.size(); i++)
-		pest_utils::upper_ip(obs_names[i]);
-
-	//check the inputs
-	vector<string> errors;
-	const vector<string>* jobs_names = jacobian.rn_ptr();
-	for (auto &oname : obs_names)
-	{
-		if (find(jobs_names->begin(), jobs_names->end(), oname) == jobs_names->end())
-			errors.push_back("obs not found in jacobian: "+oname);
-	}
-	if (errors.size() > 0)
-	{
-		stringstream ss;
-		for (auto &e : errors)
-			ss << e << ',';
-		throw_error("linear_analysis::worth() errors: " + ss.str());
-	}
-
-	//get a list of remaining obs
-	vector<string> keep_obs_names;
-	for (auto &oname : *jobs_names)
-	{
-		if (find(obs_names.begin(), obs_names.end(), oname) == obs_names.end())
-		{
-			keep_obs_names.push_back(oname);
-		}
-	}
-	if (keep_obs_names.size() == 0)
-		throw_error("linear_analysis::worth() error at least one observation must not be in the worth group");
-	//get a new linear analysis object with only the keep names
-	Covariance* parcov_ptr = &parcov;
-	map<string,Mat>* pred_ptr = &predictions;
-	linear_analysis keep;
-	try
-	{
-		keep = linear_analysis(jacobian.get(keep_obs_names, *jacobian.cn_ptr()), *parcov_ptr, obscov.get(keep_obs_names), *pred_ptr);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::worth() error getting 'keep' linear analysis object : "+string(e.what()));
-	}
-
-	//calculate posterior with all obs and with only keep obs
-	map<string, double> org_post, keep_post;
-	try
-	{
-		org_post = posterior_prediction_variance();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::worth() error calculating posterior variance for original problem : "+string(e.what()));
-	}
-	try
-	{
-		keep_post = keep.posterior_prediction_variance();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::worth() error calculating posterior variance for 'keep' problem : "+string(e.what()));
-	}
-
-	map<string, double> results;
-	for (auto &pred : predictions)
-		results[pred.first] = keep_post[pred.first] - org_post[pred.first];
-	log->log("worth");
-	return results;
 }
 
 
-map<string, pair<double, double>> linear_analysis::contribution(vector<string> &cond_par_names)
-{
-	if (predictions.size() == 0)
-		throw_error("linear_analysis::contribution() error: no predictions are set");
-	log->log("contribution");
-	try
-	{
-		align();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::contribution() error in align(): " + string(e.what()));
-	}
-
-	for (int i = 0; i != cond_par_names.size(); i++)
-		pest_utils::upper_ip(cond_par_names[i]);
-	//check the inputs
-	vector<string> errors;
-	const vector<string>* jpar_names = jacobian.cn_ptr();
-	for (auto par_name : cond_par_names)
-	{
-		if (find(jpar_names->begin(), jpar_names->end(), par_name) == jpar_names->end())
-			errors.push_back("par not found in jacobian: " + par_name);
-	}
-	if (errors.size() > 0)
-	{
-		stringstream ss;
-		for (auto e : errors)
-			ss << e << ',';
-		throw_error("linear_analysis::contribution() errors: " + ss.str());
-	}
-
-	//the parameters that will remain uncertain
-	vector<string> keep_par_names;
-	for (auto pname : *parcov.rn_ptr())
-	{
-		if (find(cond_par_names.begin(), cond_par_names.end(), pname) == cond_par_names.end())
-			keep_par_names.push_back(pname);
-	}
-	if (keep_par_names.size() == 0)
-		throw_error("linear_analysis::contribution() error atleast one parameter must not be in the contribution group");
-
-
-	map<string,Mat> cond_preds;
-	for (auto &pred : predictions)
-	{
-		try
-		{
-			cond_preds[pred.first] = pred.second.get(keep_par_names, *pred.second.cn_ptr());
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::contribution() error getting conditional prediction: " + pred.first + " : " + string(e.what()));
-		}
-	}
-
-	//get a new linear analysis object - we can use the same obscov b/c it doesn't change
-	Covariance* obscov_ptr = &obscov;
-
-	linear_analysis cond_la;
-	try
-	{
-		cond_la = linear_analysis(jacobian.get(*jacobian.rn_ptr(), keep_par_names), condition_on(keep_par_names, cond_par_names), *obscov_ptr, cond_preds);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::contribution() error getting 'conditional' linear analysis object : " + string(e.what()));
-	}
-
-	//calculate the prior and posterior with all parameters
-	map<string, double> org_prior, org_post;
-	try
-	{
-		org_prior = prior_prediction_variance();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::contribution() error calculating org prior variance :" + string(e.what()));
-	}
-	try
-	{
-		org_post = posterior_prediction_variance();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::contribution() error calculating org posterior variance :" + string(e.what()));
-	}
-
-
-	//calculate the prior and posterior with some conditioned parameters
-	map<string, double> cond_prior, cond_post;
-	try
-	{
-		cond_prior = cond_la.prior_prediction_variance();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::contribution() error calculating cond prior variance :" + string(e.what()));
-	}
-	try
-	{
-		cond_post = cond_la.posterior_prediction_variance();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::contribution() error calculating cond posterior variance :" + string(e.what()));
-	}
-
-	//calculate the reduction in prior and posterior uncertainty for each prediction
-	map<string, pair<double, double>> results;
-	for (auto pred : predictions)
-	{
-		pair<double, double> reduction(org_prior[pred.first] - cond_prior[pred.first], org_post[pred.first] - cond_post[pred.first]);
-		results[pred.first] = reduction;
-	}
-	return results;
-	log->log("contribution");
-}
-
-
-Covariance linear_analysis::condition_on(vector<string> &keep_par_names, vector<string> &cond_par_names)
-{
-	log->log("condition_on");
-	//C11
-	Covariance new_parcov;
-	try
-	{
-		new_parcov = parcov.get(keep_par_names);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::condition_on() error getting C11 matrix :" + string(e.what()));
-	}
-	//if parcov is diagonal, then there is no conditioning
-	if (parcov.get_mattype() == Mat::MatType::DIAGONAL)
-	{
-		return new_parcov;
-	}
-	//the portion of parcov that is becoming "known": C22
-	Covariance cond_parcov;
-	try
-	{
-		cond_parcov = parcov.get(cond_par_names);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::condition_on() error getting C22 matrix :" + string(e.what()));
-	}
-	//C22^-1
-	try
-	{
-		cond_parcov.inv_ip();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::condition_on() error inverting C22 matrix :" + string(e.what()));
-	}
-	//C12
-	Mat upper_off_diag;
-	try
-	{
-		upper_off_diag = parcov.get(keep_par_names, cond_par_names);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::condition_on() error getting C12 matrix :" + string(e.what()));
-	}
-	//C11 - (C12*C22^-1*C21)
-	Covariance new_cond_parcov;
-	try
-	{
-		Eigen::SparseMatrix<double> mcond = *new_parcov.e_ptr() - (*upper_off_diag.e_ptr() * *cond_parcov.e_ptr() *
-			*upper_off_diag.transpose().e_ptr());
-		new_cond_parcov = Covariance(keep_par_names, mcond);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::condition_on() error calculating conditional parcov :" + string(e.what()));
-	}
-	log->log("condition_on");
-	return new_cond_parcov;
-}
-
-
-map<string, double> linear_analysis::prior_parameter_variance()
+map<string, double> LinearAnalysis::prior_parameter_variance()
 {
 	map<string, double> results;
 	for (auto &pname : parcov.get_col_names())
@@ -860,9 +741,9 @@ map<string, double> linear_analysis::prior_parameter_variance()
 }
 
 
-double linear_analysis::prior_parameter_variance(string &par_name)
+double LinearAnalysis::prior_parameter_variance(string &par_name)
 {
-	log->log("prior_parameter_variance");
+	//pfm.log_event("prior_parameter_variance");
 	int ipar = find(parcov.rn_ptr()->begin(), parcov.rn_ptr()->end(), par_name) - parcov.rn_ptr()->begin();
 	if (ipar == parcov.nrow())
 		throw_error("linear_analysis::prior_parameter_variance() error: parameter: " + par_name + " not found");
@@ -878,12 +759,11 @@ double linear_analysis::prior_parameter_variance(string &par_name)
 		ss << ipar;
 		throw_error("linear_analysis::prior_parameter_variance() error accessing parameter variance at index " + ss.str() + " : " + string(e.what()));
 	}
-	log->log("prior_parameter_variance");
 	return val;
 }
 
 
-map<string, double> linear_analysis::posterior_parameter_variance()
+map<string, double> LinearAnalysis::posterior_parameter_variance()
 {
 	map<string, double> results;
 	for (auto &pname : parcov.get_col_names())
@@ -892,9 +772,9 @@ map<string, double> linear_analysis::posterior_parameter_variance()
 }
 
 
-double linear_analysis::posterior_parameter_variance(string &par_name)
+double LinearAnalysis::posterior_parameter_variance(string &par_name)
 {
-	log->log("posterior_parameter_variance");
+	//pfm.log_event("posterior_parameter_variance");
 	if (posterior.nrow() == 0) calc_posterior();
 	int ipar = find(posterior.rn_ptr()->begin(), posterior.rn_ptr()->end(), par_name) - posterior.rn_ptr()->begin();
 	if (ipar == posterior.nrow())
@@ -911,32 +791,31 @@ double linear_analysis::posterior_parameter_variance(string &par_name)
 		ss << ipar;
 		throw_error("linear_analysis::posterior_parameter_variance() error accessing parameter variance at index " + ss.str() + " : " + string(e.what()));
 	}
-	log->log("posterior_parameter_variance");
 	return val;
 }
 
 
-Mat linear_analysis::posterior_parameter_matrix()
+Mat LinearAnalysis::posterior_parameter_matrix()
 {
 	if (posterior.nrow() == 0) calc_posterior();
 	return posterior;
 }
 
-Mat* linear_analysis::posterior_parameter_ptr()
+Mat* LinearAnalysis::posterior_parameter_ptr()
 {
 	if (posterior.nrow() == 0) calc_posterior();
 	Mat* ptr = &posterior;
 	return ptr;
 }
 
-Covariance linear_analysis::posterior_parameter_covariance_matrix()
+Covariance LinearAnalysis::posterior_parameter_covariance_matrix()
 {
 	if (posterior.nrow() == 0) calc_posterior();
 	return posterior;
 }
 
 
-double linear_analysis::prior_prediction_variance(string &pred_name)
+double LinearAnalysis::prior_prediction_variance(string &pred_name)
 {
 	pest_utils::upper_ip(pred_name);
 	map<string, Mat>::iterator p_iter = predictions.find(pred_name);
@@ -958,20 +837,19 @@ double linear_analysis::prior_prediction_variance(string &pred_name)
 	return val;
 }
 
-map<string, double> linear_analysis::prior_prediction_variance()
+map<string, double> LinearAnalysis::prior_prediction_variance()
 {
-	log->log("prior_prediction_variance");
+	pfm.log_event("LinearAnalysis::prior_prediction_variance");
 	map<string, double> result;
 	for (auto &pred : predictions)
 	{
 		string pname(pred.first);
 		result[pname] = prior_prediction_variance(pname);
 	}
-	log->log("prior_prediction_variance");
 	return result;
 }
 
-double linear_analysis::posterior_prediction_variance(string &pred_name)
+double LinearAnalysis::posterior_prediction_variance(string &pred_name)
 {
 	pest_utils::upper_ip(pred_name);
 	map<string, Mat>::iterator p_iter = predictions.find(pred_name);
@@ -995,24 +873,21 @@ double linear_analysis::posterior_prediction_variance(string &pred_name)
 
 }
 
-map<string, double> linear_analysis::posterior_prediction_variance()
+map<string, double> LinearAnalysis::posterior_prediction_variance()
 {
-	log->log("posterior_prediction_variance");
+	pfm.log_event("LinearAnalysis::prior_prediction_variance");
 	map<string, double> result;
 	for (auto &pred : predictions)
 	{
 		string pname(pred.first);
 		result[pname] = posterior_prediction_variance(pname);
 	}
-	log->log("posterior_prediction_variance");
 	return result;
 }
 
-
-
-void linear_analysis::calc_posterior()
+void LinearAnalysis::calc_posterior()
 {
-	log->log("calc_posterior");
+	pfm.log_event("LinearAnalysis::calc_posterior");
 	try
 	{
 		align();
@@ -1022,63 +897,59 @@ void linear_analysis::calc_posterior()
 		throw_error("linear_analysis::calc_posterior() error in align() : " + string(e.what()));
 	}
 
-	log->log("invert obscov");
+	pfm.log_event("LinearAnalysis::prior_prediction_variance()::invert obscov");
 	try
 	{
-		obscov.inv_ip(log);
+		obscov.inv_ip(pfm);
 	}
 	catch (exception &e)
 	{
 		throw_error("linear_analysis::calc_posterior() error inverting obscov : " + string(e.what()));
 	}
-	log->log("invert obscov");
+	
 
 	try
 	{
-		log->log("form JtQJ");
+		pfm.log_event("LinearAnalysis::calc_posterior() form JtQJ");
 		Covariance JtQJ(*parcov.rn_ptr(), (*jacobian.transpose().e_ptr() * *obscov.e_ptr() *
 			*jacobian.e_ptr()));
-		log->log("form JtQJ");
-
-		log->log("invert parcov");
+		
+		pfm.log_event("LinearAnalysis::calc_posterior() invert prior parcov");
 		Covariance parcov_inv = parcov.inv();
-		log->log("invert parcov");
 
-		log->log("form posterior");
+		pfm.log_event("LinearAnalysis::calc_posterior() form posterior parcov");
 		posterior = Covariance(*parcov.rn_ptr(), (*JtQJ.e_ptr() + *parcov_inv.e_ptr()));
-		log->log("form posterior");
-
-		log->log("invert posterior");
-		posterior.inv_ip(log);
-		log->log("invert posterior");
+		
+		pfm.log_event("LinearAnalysis::calc_posterior() invert posterior parcov");
+		posterior.inv_ip(pfm);
 	}
 	catch (exception &e)
 	{
 		throw_error("linear_analysis::calc_posterior() error calculating posterior : " + string(e.what()));
 	}
-	log->log("calc_posterior");
-}
-
-
-void linear_analysis::set_predictions(Mat* preds)
-{
 
 }
 
-void linear_analysis::set_predictions(vector<string> preds)
+
+void LinearAnalysis::set_predictions(vector<string> preds, bool forgive)
 {
-	log->log("set_predictions");
+	pfm.log_event("set_predictions");
 	const vector<string>* obs_names = jacobian.rn_ptr();
+	set<string> oset(obs_names->begin(), obs_names->end());
 	for (auto pred : preds)
 	{
 		pest_utils::upper_ip(pred);
-		if (predictions.find(pred) != predictions.end())
+		/*if (predictions.find(pred) != predictions.end())
+		{
 			throw_error("linear_analysis::set_predictions() error: pred:" + pred + " already in predictions");
-		if (find(obs_names->begin(), obs_names->end(), pred) != obs_names->end())
+		}*/
+			
+		//if (find(obs_names->begin(), obs_names->end(), pred) != obs_names->end())
+		if (oset.find(pred) != oset.end())
 		{
 			
 			Mat mpred;
-			log->log("extracting prediction " + pred + " from jacobian");
+			pfm.log_event("extracting prediction " + pred + " from jacobian");
 			try
 			{
 				mpred = jacobian.extract(pred, vector<string>());
@@ -1087,14 +958,13 @@ void linear_analysis::set_predictions(vector<string> preds)
 			{
 				throw_error("linear_analysis::set_predictions() error extracting prediction " + pred + " : " + string(e.what()));
 			}
-			log->log("extracting prediction " + pred + " from jacobian");
 			if (mpred.e_ptr()->nonZeros() == 0)
 			{
-				log->warning("Prediction " + pred + " has no non-zero entries in jacobian row/");
-				cerr << endl << "WARNING: Prediction " + pred + " has no non-zero entries in jacobian. " << endl;
+				pfm.log_event("Prediction " + pred + " has no non-zero entries in jacobian row/");
+				/*cerr << endl << "WARNING: Prediction " + pred + " has no non-zero entries in jacobian. " << endl;
 				cerr << "         This mean that the adjustable parameters have no effect on " << endl;
 				cerr << "         prediction " + pred + ".  The uncertainty for this prediction " << endl;
-				cerr << "         is essentially infinite." << endl << endl;
+				cerr << "         is essentially infinite." << endl << endl;*/
 			}
 			mpred.transpose_ip();
 			predictions[pred] = mpred;
@@ -1102,9 +972,18 @@ void linear_analysis::set_predictions(vector<string> preds)
 		else
 		{
 			if (!pest_utils::check_exist_in(pred))
-				throw_error("linear_analysis::set_predictions() error: pred: " + pred + " not found in jco rows and is not an accessible file");
-			Mat mpred;
-			log->log("loading prediction " + pred + " from ASCII file");
+			{
+				//if the pred is not in the jco rows and its not a file
+				//then...if forgive, just continue, otherwise throw
+				//forgive is so the glm iter fosm can be done repeatedly
+				if ((forgive) && (predictions.find(pred) != predictions.end()))
+					continue;
+				else
+					throw_error("linear_analysis::set_predictions() error: pred: " + pred + " not found in jco rows and is not an accessible file");
+
+			}
+				Mat mpred;
+			pfm.log_event("loading prediction " + pred + " from ASCII file");
 			try
 			{
 				mpred.from_ascii(pred);
@@ -1113,7 +992,7 @@ void linear_analysis::set_predictions(vector<string> preds)
 			{
 				throw_error("linear_analysis::set_predictions() error loading prediction " + pred + " from ASCII file :" + string(e.what()));
 			}
-			log->log("loading prediction " + pred + " from ASCII file");
+			pfm.log_event("loading prediction " + pred + " from ASCII file");
 			if (mpred.ncol() != 1)
 			{
 				if (mpred.nrow() == 1)
@@ -1153,621 +1032,26 @@ void linear_analysis::set_predictions(vector<string> preds)
 				}
 			}
 			string pname = mpred.get_col_names()[0];
-			if (predictions.find(pname) != predictions.end())
-				throw_error("linear_analysis::set_predictions() error: pred:" + pred + " already in predictions");
+			//if (predictions.find(pname) != predictions.end())
+			//	throw_error("linear_analysis::set_predictions() error: pred:" + pred + " already in predictions");
 			if (mpred.e_ptr()->nonZeros() == 0)
 			{
-				log->warning("Prediction " + pred + " has no non-zero entries in jacobian row/");
-				cerr << endl << "WARNING: Prediction " + pred + " has no non-zero entries in jacobian. " << endl;
+				pfm.log_event("Prediction " + pred + " has no non-zero entries in jacobian row/");
+				/*cerr << endl << "WARNING: Prediction " + pred + " has no non-zero entries in jacobian. " << endl;
 				cerr << "         This mean that the adjustable parameters have no effect on " << endl;
 				cerr << "         prediction " + pred + ".  The uncertainty for this prediction " << endl;
-				cerr << "         is essential infinite." << endl << endl;
+				cerr << "         is essential infinite." << endl << endl;*/
 			}
 			predictions[pname] = mpred;
 		}
 	}
-	log->log("set_predictions");
-}
-
-void linear_analysis::set_predictions(vector<Mat> preds)
-{
-	throw_error("linear_analysis::set_predictions() not implemented vector<Mat> args");
-}
-
-void linear_analysis::svd()
-{
-	log->log("svd");
-	//Eigen::JacobiSVD<Eigen::MatrixXd> svd_fac(*get_normal_ptr()->eptr(), Eigen::DecompositionOptions::ComputeFullU | Eigen::DecompositionOptions::ComputeFullV);
-	//Eigen::JacobiSVD<Eigen::MatrixXd> svd_fac(*get_normal_ptr()->eptr(), Eigen::DecompositionOptions::ComputeFullV);
-	log->log("svd - factorization");
-	Eigen::JacobiSVD<Eigen::MatrixXd> svd_fac;
-	try
-	{
-		svd_fac = Eigen::JacobiSVD<Eigen::MatrixXd>(*get_normal_ptr()->e_ptr(), Eigen::DecompositionOptions::ComputeThinV);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::svd() error calculating svd: " + string(e.what()));
-	}
-	log->log("svd - factorization");
-	vector<string> sv_names,rs_names;
-	stringstream ss;
-	for (int i = 0; i != jacobian.cn_ptr()->size(); i++)
-	{
-		ss.str(string());
-		ss.clear();
-		ss << "singular_value_" << i;
-		sv_names.push_back(ss.str());
-		ss.str(string());
-		ss.clear();
-		ss << "right_singular_vector_" << i;
-		rs_names.push_back(ss.str());
-	}
-	try
-	{
-		V = Mat(jacobian.get_col_names(), rs_names, svd_fac.matrixV().sparseView());
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::svd() error setting V :" + string(e.what()));
-	}
-	try
-	{
-		S = Covariance(sv_names, eigenvec_2_diagsparse(svd_fac.singularValues()));
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::svd() error setting S :" + string(e.what()));
-	}
-
-	log->log("svd");
+	
 }
 
 
-Mat* linear_analysis::get_R_ptr(int sv)
-{
-	if (R_sv != sv)
-		build_R(sv);
-	Mat* ptr = &R;
-	return ptr;
-
-}
-
-void linear_analysis::build_R(int sv)
-{
-	log->log("build_R");
-	if (V.nrow() == 0)
-	{
-		try
-		{
-			svd();
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::build_R() error in svd() :" + string(e.what()));
-		}
-	}
-	if (sv == 0)
-	{
-		try
-		{
-
-			Eigen::SparseMatrix<double> Z(V.nrow(), V.ncol());
-			Z.setZero();
-			R = Mat(V.get_row_names(), V.get_col_names(), Z);
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::build_R() error setting R to zero :" + string(e.what()));
-		}
-	}
-	else if (sv > jacobian.ncol())
-	{
-		R = V.identity();
-	}
-	else
-	{
-		vector<string> cnames;
-		vector<string> base_cnames = *V.cn_ptr();
-		for (int i = 0; i < sv; i++)
-			cnames.push_back(base_cnames[i]);
-		log->log("build_R - MM");
-		try
-		{
-			R = Mat(V.get_row_names(), V.get_row_names(), *get_V1_ptr(sv)->e_ptr() * get_V1_ptr(sv)->e_ptr()->transpose());
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::build_R() error calculating R : " + string(e.what()));
-		}
-		log->log("build_R - MM");
-	}
-	R_sv = sv;
-	log->log("build_R");
-}
-
-Mat* linear_analysis::get_V1_ptr(int sv)
-{
-	if (sv != V1_sv)
-		build_V1(sv);
-	Mat* ptr = &V1;
-	return ptr;
-}
-
-void linear_analysis::build_V1(int sv)
-{
-	log->log("build_V1");
-	if (V.nrow() == 0)
-	{
-		try
-		{
-			svd();
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::build_V1() error in svd() :" + string(e.what()));
-		}
-	}
-	vector<string> cnames;
-	vector<string> base_cnames = *V.cn_ptr();
-	for (int i = 0; i < sv; i++)
-		cnames.push_back(base_cnames[i]);
-	try
-	{
-		//V1 = Mat(V.get_row_names(), cnames, V.eptr()->leftCols(sv));
-		V1 = V.leftCols(sv);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::build_V1() error forming V1 matrix:" + string(e.what()));
-	}
-	V1_sv = sv;
-	log->log("build_V1");
-}
-
-Mat* linear_analysis::get_G_ptr(int sv)
-{
-	if (G_sv != sv)
-		build_G(sv);
-	Mat* ptr = &G;
-	return ptr;
-}
-
-void linear_analysis::build_G(int sv)
-{
-	log->log("build_G");
-	if (V.nrow() == 0)
-	{
-		try
-		{
-			svd();
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::build_G() error in svd() :" + string(e.what()));
-		}
-	}
-	Eigen::SparseMatrix<double> s_inv;
-	try
-	{
-		s_inv = S.inv().e_ptr()->topLeftCorner(sv, sv);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::build_G() error building s_inv matrix : " + string(e.what()));
-	}
-	log->log("build_G - MMM");
-	try
-	{
-		Eigen::SparseMatrix<double> g = *get_V1_ptr(sv)->e_ptr() * s_inv * get_V1_ptr(sv)->e_ptr()->transpose() *
-			jacobian.e_ptr()->transpose() * *obscov.e_ptr();
-		log->log("build_G - MMM");
-		G = Mat(jacobian.get_col_names(), jacobian.get_row_names(), g);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::build_G() error calculating G : " + string(e.what()));
-	}
-	G_sv = sv;
-	log->log("build_G");
-}
-
-Mat* linear_analysis::get_ImR_ptr(int sv)
-{
-	if (ImR_sv != sv)
-		build_ImR(sv);
-	Mat* ptr = &ImR;
-	return ptr;
-}
-
-void linear_analysis::build_ImR(int sv)
-{
-	log->log("build_ImR");
-	if (sv == 0)
-		ImR = parcov.identity();
-	else
-	{
-		if (V.nrow() == 0)
-		{
-			try
-			{
-				svd();
-			}
-			catch (exception &e)
-			{
-				throw_error("linear_analysis::build_G() error in svd() :" + string(e.what()));
-			}
-		}
-		Mat V2;
-		try
-		{
-			V2 = V.rightCols(V.ncol() - sv);
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::build_ImR() error forming V2 matrix " + string(e.what()));
-		}
-		log->log("build_ImR - MM");
-		try
-		{
-			ImR = Mat(V2.get_row_names(), V2.get_row_names(), *V2.e_ptr() * V2.e_ptr()->transpose());
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::build_ImR() error calculating ImR :" + string(e.what()));
-		}
-		log->log("build_ImR - MM");
-	}
-	ImR_sv = sv;
-	log->log("build_ImR");
-}
 
 
-Mat * linear_analysis::get_normal_ptr()
-{
-	if (normal.nrow() == 0)
-		build_normal();
-	Mat* ptr = &normal;
-	return ptr;
-}
-
-void linear_analysis::build_normal()
-{
-	log->log("build_normal");
-	try
-	{
-		align();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::build_normal() error in align() : " + string(e.what()));
-	}
-	log->log("build_normal - MMM");
-	try
-	{
-		normal = Mat(jacobian.get_col_names(), jacobian.get_col_names(), jacobian.e_ptr()->transpose() * *obscov.e_ptr() *
-			*jacobian.e_ptr());
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::build_normal() error calculating normal matrix :" + string(e.what()));
-	}
-	log->log("build_normal - MMM");
-	log->log("build_normal");
-}
-
-Covariance linear_analysis::first_parameter(int sv)
-{
-	stringstream ss;
-	ss << sv;
-	string sv_str = ss.str();
-
-	if (sv >= jacobian.ncol())
-		return parcov.zero();
-	else
-	{
-		try
-		{
-			log->log("first_parameter @" + sv_str);
-			Eigen::SparseMatrix<double> first = *get_ImR_ptr(sv)->e_ptr() * *parcov.e_ptr() * *get_ImR_ptr(sv)->e_ptr();
-			Covariance f(parcov.get_col_names(), first);
-			log->log("first_parameter @" + sv_str);
-			return f;
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::first_parameter() error @" +sv_str + " : " + string(e.what()));
-		}
-	}
-
-}
-
-Covariance linear_analysis::second_parameter(int sv)
-{
-	stringstream ss;
-	ss << sv;
-	string sv_str = ss.str();
-
-	if (sv == 0)
-		return parcov.zero();
-	else if (sv >= jacobian.ncol())
-		return parcov.diagonal(1.0E+20);
-	else
-	{
-		try
-		{
-			log->log("second_parameter @" + sv_str);
-			Eigen::SparseMatrix<double> second = *get_G_ptr(sv)->e_ptr() * *obscov.e_ptr() * get_G_ptr(sv)->e_ptr()->transpose();
-			Covariance s(parcov.get_col_names(), second);
-			log->log("second_parameter @" + sv_str);
-			return s;
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::second_parameter() error @"+sv_str+ " : " + string(e.what()));
-		}
-
-	}
-
-}
-
-Covariance linear_analysis::third_parameter(int sv)
-{
-	stringstream ss;
-	ss << sv;
-	string sv_str = ss.str();
-	log->log("third_parameter @"+sv_str);
-	if (sv == 0)
-		return parcov.zero();
-	else if (sv >= jacobian.ncol())
-		return parcov.diagonal(1.0E+20);
-	else
-	{
-		Eigen::SparseMatrix<double> GZo, third;
-		try
-		{
-			GZo = *get_G_ptr(sv)->e_ptr() * *omitted_jacobian.e_ptr();
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::third_parameter() error calculating GZo matrix @"+sv_str+ " : " + string(e.what()));
-		}
-		try
-		{
-			third = GZo * *omitted_parcov.e_ptr() * GZo.transpose();
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::third_parameter() error calculating thrid matrix@"+sv_str+" : " + string(e.what()));
-		}
-		return Covariance(parcov.get_col_names(), third);
-	}
-	log->log("third_parameter @" + sv_str);
-}
-
-map<string, double> linear_analysis::first_prediction(int sv)
-{
-	stringstream ss;
-	ss << sv;
-	string sv_str = ss.str();
-	map<string, double> result;
-	if (sv >= jacobian.ncol())
-		return like_preds(0.0);
-	else
-	{
-		log->log("first_prediction @" + sv_str);
-		Covariance first;
-		try
-		{
-			first = first_parameter(sv);
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::first_prediction() error calculation first matrix : " + string(e.what()));
-		}
-
-		for (auto &p : predictions)
-		{
-			try
-			{
-				result[p.first] = (p.second.e_ptr()->transpose() * *first.e_ptr() * *p.second.e_ptr()).eval().valuePtr()[0];
-			}
-			catch (exception &e)
-			{
-				stringstream ss;
-				ss << sv;
-				throw_error("linear_analysis::first_prediction() error calculating result for prediction " + p.first + " for sv " + ss.str()+ " : " + string(e.what()));
-			}
-		}
-		log->log("first_prediction @" + sv_str);
-		return result;
-	}
-}
-
-map<string, double> linear_analysis::second_prediction(int sv)
-{
-	stringstream ss;
-	ss << sv;
-	string sv_str = ss.str();
-	map<string, double> result;
-	if (sv == 0)
-		return like_preds(0.0);
-	else if (sv >= jacobian.ncol())
-		return like_preds(1.0E+20);
-	else
-	{
-		log->log("second_prediction @" + sv_str);
-		Covariance second;
-		try
-		{
-			second = second_parameter(sv);
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::second_prediction() error calculation second matrix : " + string(e.what()));
-		}
-		for (auto &p : predictions)
-		{
-			try
-			{
-				result[p.first] = (p.second.e_ptr()->transpose() * *second.e_ptr() * *p.second.e_ptr()).eval().valuePtr()[0];
-			}
-			catch (exception &e)
-			{
-				throw_error("linear_analysis::second_prediction() error calculating result for prediction " + p.first + " : " + string(e.what()));
-			}
-		}
-		log->log("second_prediction @" + sv_str);
-		return result;
-	}
-}
-
-map<string, double> linear_analysis::third_prediction(int sv)
-{
-	stringstream ss;
-	ss << sv;
-	string sv_str = ss.str();
-	map<string, double> result;
-	if (sv >= jacobian.ncol())
-		return like_preds(1.0E+20);
-	else if (sv == 0)
-	{
-		log->log("third_prediction @" + sv_str);
-		for (auto &opred : omitted_predictions)
-		{
-			try
-			{
-				result[opred.first] = (opred.second.e_ptr()->transpose() * *omitted_parcov.e_ptr() * *opred.second.e_ptr()).eval().valuePtr()[0];
-			}
-			catch (exception &e)
-			{
-				throw_error("linear_analysis::third_prediction() error calculating result for prediction " + opred.first + " : " + string(e.what()));
-			}
-		}
-		log->log("third_prediction @" + sv_str);
-		return result;
-	}
-	else
-	{
-		log->log("third_prediction with 'p' @" + sv_str);
-		for (auto &pred : predictions)
-		{
-
-			Eigen::SparseMatrix<double, Eigen::RowMajor> p;
-			try
-			{
-				p = (pred.second.e_ptr()->transpose() * *get_G_ptr(sv)->e_ptr() * *omitted_jacobian.e_ptr()).eval();
-			}
-			catch (exception &e)
-			{
-				throw_error("linear_analysis::third_prediction() error calculating p vector for prediction " + pred.first + " : " + string(e.what()));
-			}
-			try
-			{
-				p = (p - omitted_predictions[pred.first].e_ptr()->transpose()).eval().transpose();
-			}
-			catch (exception &e)
-			{
-				throw_error("linear_analysis::third_prediction() error differencing p vector for prediction " + pred.first + " : " + string(e.what()));
-			}
-			try
-			{
-				result[pred.first] = (p.transpose() * *omitted_parcov.e_ptr() * p).eval().valuePtr()[0];
-			}
-			catch (exception &e)
-			{
-				throw_error("linear_analysis::third_prediction() error calculating result for prediction " + pred.first + " : " + string(e.what()));
-			}
-		}
-		log->log("third_prediction with 'p' @" + sv_str);
-		return result;
-	}
-}
-
-void linear_analysis::extract_omitted(vector<string> &omitted_par_names)
-{
-	log->log("extract_omitted");
-	try
-	{
-		align();
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::extract_omitted() error in align() : " + string(e.what()));
-	}
-	if (omitted_par_names.size() == 0)
-		throw_error("linear_analysis::extract_omitted() error: omitted par name vector empty");
-	const vector<string>* jpar_names = jacobian.cn_ptr();
-	vector<string> missing;
-	for (auto &o : omitted_par_names)
-	{
-		pest_utils::upper_ip(o);
-		if (find(jpar_names->begin(), jpar_names->end(), o) == jpar_names->end())
-			missing.push_back(o);
-	}
-
-	if (missing.size() > 0)
-	{
-		stringstream ss;
-		for (auto m : missing)
-			ss << m << ",";
-		throw_error("linear_analysis::extract_omitted() error some omitted par names were not found: " + ss.str());
-	}
-	try
-	{
-		omitted_jacobian = jacobian.extract(vector<string>(), omitted_par_names);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::extract_omitted() error extracting omitted jco from jco : " + string(e.what()));
-	}
-	if (omitted_jacobian.e_ptr()->nonZeros() == 0)
-	{
-		log->warning("omitted Jacobian has no non-zero entries.");
-		cerr << endl << "WARNING: omitted parameter Jacobian has no non-zero entries in jacobian. " << endl;
-		cerr << "         This mean that the observations are not sensitive to the " << endl;
-		cerr << "         omitted parameters." << endl;
-	}
-	try
-	{
-		omitted_parcov = parcov.extract(omitted_par_names);
-	}
-	catch (exception &e)
-	{
-		throw_error("linear_analysis::extract_omitted() error extracting omitted parcov from parcov : " + string(e.what()));
-	}
-	for (auto &p : predictions)
-	{
-		try
-		{
-			Mat opred = p.second.extract(omitted_par_names, vector<string>());
-			if (opred.e_ptr()->nonZeros() == 0)
-			{
-				log->warning("omitted prediction "+p.first +" has no non-zero entries.");
-				cerr << endl << "WARNING: omitted prediction "+p.first+" has no non-zero entries." << endl;
-				cerr << "         This mean that this prediction is not sensitive to the " << endl;
-				cerr << "         omitted parameters." << endl;
-			}
-			omitted_predictions[p.first] = opred;
-		}
-		catch (exception &e)
-		{
-			throw_error("linear_analysis::extract_omitted() error extracting omitted prediction from prediction "+p.first+ " : " + string(e.what()));
-		}
-
-	}
-	log->log("extract_omitted");
-}
-
-void linear_analysis::extract_omitted(string &omitted_par_name)
-{
-  vector<string> tmp_vec;
-  tmp_vec.push_back(omitted_par_name);
-  extract_omitted(tmp_vec);
-}
-
-
-map<string, double> linear_analysis::like_preds(double val)
+map<string, double> LinearAnalysis::like_preds(double val)
 {
 	map<string, double> result;
 	for (auto &pred : predictions)
@@ -1776,12 +1060,11 @@ map<string, double> linear_analysis::like_preds(double val)
 }
 
 
-void linear_analysis::write_par_credible_range(ofstream &fout, string sum_filename, ParameterInfo parinfo,
+void LinearAnalysis::write_par_credible_range(ofstream &fout, string sum_filename, ParameterInfo parinfo,
 	Parameters init_pars, Parameters opt_pars, vector<string> ordered_names)
 {
-	fout << endl << "---------------------------------------" << endl;
-	fout << "---- parameter uncertainty summary ----" << endl;
-	fout << "---------------------------------------" << endl << endl << endl;
+	
+	fout << "current parameter uncertainty summary: " << endl << endl;
 	fout << setw(20) << "name" << setw(20) << "prior_mean" << setw(20) << "prior_stdev" ;
 	fout << setw(20) << "prior_lower_bound" << setw(20) << "prior_upper_bound";
 	fout << setw(20) << "post_mean" << setw(20) << "post_stdev";
@@ -1825,7 +1108,7 @@ void linear_analysis::write_par_credible_range(ofstream &fout, string sum_filena
 				value - (2.0*stdev) << "," << value + (2.0*stdev) << endl;
 		}
 	}
-	if (missing.size() > 0)
+	/*if (missing.size() > 0)
 	{
 		fout << endl;
 		fout << "WARNING: the following parameters were not found in the final " << endl;
@@ -1844,48 +1127,22 @@ void linear_analysis::write_par_credible_range(ofstream &fout, string sum_filena
 				i = 0;
 			}
 		}
-		fout << endl;
-	}
-	fout << endl;
+		fout << endl;*/
+	//}
+	/*fout << endl;
 	fout << "Note: Upper and lower uncertainty bounds reported above are " << endl;
 	fout << "      calculated as: <prior,post>_mean +/- (2.0 * <prior,post>_stdev). " << endl;
 	fout << "      For log-transformed parameters, the mean, stdev and range are reported " << endl;
-	fout << "      with respect to the log of the parameter value. " << endl << endl;
+	fout << "      with respect to the log of the parameter value. " << endl << endl;*/
 }
 
-pair<double, double> linear_analysis::get_range(double value, double variance, const ParameterRec::TRAN_TYPE &tt)
-{
-	double stdev = 0.0, lower = 0.0 , upper = 0.0 ,lvalue = 0.0 ;
-	if (variance > numeric_limits<double>::min())
-		stdev = sqrt(variance);
-	//stdev = sqrt(variance);
-	if (tt == ParameterRec::TRAN_TYPE::LOG)
-	{
-		lvalue = log10(value);
-		lower = pow(10, (lvalue - (2.0*stdev)));
-		upper = pow(10, (lvalue + (2.0*stdev)));
-	}
-	else if (tt == ParameterRec::TRAN_TYPE::NONE)
-	{
-		lower = value - (2.0 * stdev);
-		upper = value + (2.0 * stdev);
-	}
-	else
-	{
-		stringstream ss;
-		ss << "linear_analysis::get_range() unsupported trans type " << static_cast<int>(tt);
-		throw PestError(ss.str());
-	}
-	return pair<double, double>(lower, upper);
-}
 
-void linear_analysis::write_pred_credible_range(ofstream &fout, string sum_filename,
+void LinearAnalysis::write_pred_credible_range(ofstream &fout, string sum_filename,
 	map<string,pair<double,double>> init_final_pred_values)
 {
-	fout << endl << "----------------------------------------" << endl;
-	fout << "---- prediction uncertainty summary ----" << endl;
-	fout << "----------------------------------------" << endl << endl << endl;
-	fout << setw(20) << "prediction_name" << setw(20) << "prior_mean";
+	//fout << endl << "----------------------------------------" << endl;
+	fout << "current forecast uncertainty summary: " << endl << endl;
+	fout << setw(20) << "name" << setw(20) << "prior_mean";
 	fout << setw(20) << "prior_stdev" << setw(20) << "prior_lower_bound";
 	fout << setw(20) << "prior_upper_bound" << setw(20) << "post_mean";
 	fout << setw(20) << "post_stdev" << setw(20) << "post_lower_bound";
@@ -1919,17 +1176,17 @@ void linear_analysis::write_pred_credible_range(ofstream &fout, string sum_filen
 		sout << "," << lower << "," << upper << endl;
 	}
 
-	fout << endl << endl;
+	/*fout << endl << endl;
 	fout << "Note: predictive sensitivity vectors for both prior and " << endl;
 	fout << "      posterior uncertainty calculations are the same " << endl;
 	fout << "      and were extracted from final base parameter jacobian." << endl;
 	fout << "      The upper and lower uncertainty bounds were calculated " << endl;
-	fout << "      as: <prior,post>_mean +/- (2.0*<prior,post>_stdev" << endl;
+	fout << "      as: <prior,post>_mean +/- (2.0*<prior,post>_stdev" << endl;*/
 	sout.close();
 }
 
 
-void linear_analysis::drop_prior_information(const Pest &pest_scenario)
+void LinearAnalysis::drop_prior_information(const Pest &pest_scenario)
 {
 	vector<string> pi_names;
 	vector<string> obs_names = jacobian.get_row_names();
@@ -1970,6 +1227,6 @@ void linear_analysis::drop_prior_information(const Pest &pest_scenario)
 }
 
 
-linear_analysis::~linear_analysis()
+LinearAnalysis::~LinearAnalysis()
 {
 }

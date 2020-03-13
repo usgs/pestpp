@@ -470,9 +470,13 @@ def parchglim_test():
     par.loc[pst.par_names[0],"parval1"] = 0.0
     pst.control_data.relparmax = rpm
     pst.write(os.path.join(m_d,"pest_parchglim.pst"))
-    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
-    p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
-    print(p_df)
+    try:
+
+        pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
+    except:
+        pass
+    else:
+        raise Exception("should have failed")
     
 
     rpm = 100
@@ -710,7 +714,7 @@ def tplins1_test():
         shutil.rmtree(t_d)
     shutil.copytree(os.path.join(model_d,"template"),t_d)
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
-
+    
     pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-glm")),cwd=t_d)
     obf_df = pd.read_csv(os.path.join(t_d,"out1.dat.obf"),delim_whitespace=True,header=None,names=["obsnme","obsval"])
     obf_df.index = obf_df.obsnme
@@ -765,7 +769,7 @@ if __name__ == "__main__":
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    #secondary_marker_test()
+    secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
@@ -773,4 +777,4 @@ if __name__ == "__main__":
     #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-    tplins1_test()
+    #tplins1_test()
