@@ -46,6 +46,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names)
 	post_const_var.clear();
 
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+	pfm.log_event("initializing constraints");
 	if (pest_scenario.get_pestpp_options().get_opt_include_bnd_pi())
 	{
 		PriorInformation* pi_ptr = pest_scenario.get_prior_info_ptr();
@@ -243,6 +244,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names)
 	risk = pest_scenario.get_pestpp_options().get_opt_risk();
 	if (risk != 0.5)
 	{
+		pfm.log_event("initializing chance constraints");
 		use_chance = true;
 		std_weights = pest_scenario.get_pestpp_options().get_opt_std_weights();
 
@@ -281,8 +283,9 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names)
 
 			}
 		}
-		else
+		else if (use_fosm)
 		{
+
 			//make sure there is at least one non-decision var adjustable parameter
 			vector<string>::iterator start = ctl_ord_dec_var_names.begin();
 			vector<string>::iterator end = ctl_ord_dec_var_names.end();
@@ -313,6 +316,8 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names)
 				}
 			}
 
+			f_rec << "  using FOSM-based chance constraints with risk = " << risk << endl;
+
 			parcov.try_from(pest_scenario, *file_mgr_ptr);
 			vector<string> drop;
 			set<string> sadj(adj_par_names.begin(), adj_par_names.end());
@@ -328,6 +333,64 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names)
 			{
 				ObservationInfo oi = pest_scenario.get_ctl_observation_info();
 				obscov.from_observation_weights(nz_obs_names, oi, vector<string>(), null_prior);
+			}
+		}
+		else
+		{
+			string par_csv = pest_scenario.get_pestpp_options().get_ies_par_csv();
+			int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
+			if (par_csv.size() == 0)
+			{
+			
+				f_rec << "drawing " << num_reals << "parameter realizations" << endl;
+				pfm.log_event("loading parcov");
+				parcov.try_from(pest_scenario, *file_mgr_ptr);
+				pfm.log_event("drawing parameter realizations");
+				stack_pe.draw(num_reals, pest_scenario.get_ctl_parameters(), parcov, &pfm, 
+					pest_scenario.get_pestpp_options().get_ies_verbose_level());	
+			}
+			else
+			{
+				string par_ext = pest_utils::lower_cp(par_csv).substr(par_csv.size() - 3, par_csv.size());
+				pfm.log_event("processing par csv " + par_csv);
+				if (par_ext.compare("csv") == 0)
+				{
+					pfm.log_event("loading par ensemble from csv file: " + par_csv);
+					try
+					{
+						stack_pe.from_csv(par_csv);
+					}
+					catch (const exception& e)
+					{
+
+						throw_constraints_error("error processing par csv: " + string(e.what()));
+					}
+					catch (...)
+					{
+						throw_constraints_error(string("error processing par csv"));
+					}
+				}
+				else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+				{
+					pfm.log_event("loading par ensemble from binary file+ " + par_csv);
+					try
+					{
+						stack_pe.from_binary(par_csv);
+					}
+					catch (const exception& e)
+					{
+
+						throw_constraints_error("error processing par ensemble binary file: " + string(e.what()));
+					}
+					catch (...)
+					{
+						throw_constraints_error("error processing par ensemble binary file");
+					}
+				}
+				else
+				{
+					throw_constraints_error("unrecognized par ensemble extension, looking for csv, jcb, jco.  found: " + par_ext);
+				}
 			}
 		}
 	}
@@ -777,9 +840,7 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr, Parameters& _current
 		//bit using Constraints::get_fosm_par_names()
 		//the last false says not to reinitialize the run mgr since the calling process may have also
 		//added runs
-		/*bool success = jco.build_runs(all_pars_and_dec_vars, constraints_sim, names_to_run, par_trans,
-			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
-			*run_mgr_ptr, out_of_bounds, false, init_obs);*/
+		
 		bool success = jco.build_runs(_current_pars_and_dec_vars, _current_obs_and_constraints, adj_par_names, pts,
 			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
 			*run_mgr_ptr, out_of_bounds, false, true, false);
