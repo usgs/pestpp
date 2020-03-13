@@ -284,71 +284,80 @@ int main(int argc, char* argv[])
 		
 		//get deep copy of pest_scenario for current cycle
 		//MultiPest mPest (pest_scenario);
-		
-		Pest childPest;
-		childPest = pest_scenario.get_child_pest(0);
-		
-		RunManagerAbstract *run_manager_ptr;
-		
-		if (run_manager_type == RunManagerType::PANTHER)
+		vector<int> assimilation_cycles;		
+		assimilation_cycles = pest_scenario.get_assim_cycles();
+		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 		{
-			if (pest_scenario.get_control_info().noptmax == 0)
+			cout << endl;
+			cout << " =======================================" << endl;
+			cout << " >>>> Assimilating data in cycle " << *icycle << endl;
+			cout << " =======================================" << endl;
+
+			Pest childPest;
+			childPest = pest_scenario.get_child_pest(*icycle);
+
+			RunManagerAbstract* run_manager_ptr;
+
+			if (run_manager_type == RunManagerType::PANTHER)
 			{
-				cout << endl << endl << "WARNING: 'noptmax' = 0 but using parallel run mgr.  This prob isn't what you want to happen..." << endl << endl;
+				if (childPest.get_control_info().noptmax == 0)
+				{
+					cout << endl << endl << "WARNING: 'noptmax' = 0 but using parallel run mgr.  This prob isn't what you want to happen..." << endl << endl;
+				}
+				string port = socket_str;
+				strip_ip(port);
+				strip_ip(port, "front", ":");
+				const ModelExecInfo& exi = childPest.get_model_exec_info(); //Ayman: why is this? it seems it is not used by panther 
+				run_manager_ptr = new RunManagerPanther(
+					rns_file, port,
+					file_manager.open_ofile_ext("rmr"),
+					childPest.get_pestpp_options().get_max_run_fail(),
+					childPest.get_pestpp_options().get_overdue_reched_fac(),
+					childPest.get_pestpp_options().get_overdue_giveup_fac(),
+					childPest.get_pestpp_options().get_overdue_giveup_minutes());
 			}
-			string port = socket_str;
-			strip_ip(port);
-			strip_ip(port, "front", ":");
-			const ModelExecInfo &exi = pest_scenario.get_model_exec_info(); //Ayman: why is this? it seems it is not used by panther 
-			run_manager_ptr = new RunManagerPanther(
-				rns_file, port,
-				file_manager.open_ofile_ext("rmr"),
-				pest_scenario.get_pestpp_options().get_max_run_fail(),
-				pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
-				pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
-				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes());
-		}
-		else
-		{
-			performance_log.log_event("starting basic model IO error checking", 1);
-			cout << "checking model IO files...";
-			pest_scenario.check_io(fout_rec);
-			//pest_scenario.check_par_obs();
-			performance_log.log_event("finished basic model IO error checking");
-			cout << "done" << endl;
-			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
-			run_manager_ptr = new RunManagerSerial(exi.comline_vec,
-				exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
-				file_manager.build_filename("rns"), pathname,
-				pest_scenario.get_pestpp_options().get_max_run_fail(),
-				pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
-				pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
-		}
+			else
+			{
+				performance_log.log_event("starting basic model IO error checking", 1);
+				cout << "checking model IO files...";
+				childPest.check_io(fout_rec);
+				//pest_scenario.check_par_obs();
+				performance_log.log_event("finished basic model IO error checking");
+				cout << "done" << endl;
+				const ModelExecInfo& exi = childPest.get_model_exec_info();
+				run_manager_ptr = new RunManagerSerial(exi.comline_vec,
+					exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
+					file_manager.build_filename("rns"), pathname,
+					childPest.get_pestpp_options().get_max_run_fail(),
+					childPest.get_pestpp_options().get_fill_tpl_zeros(),
+					childPest.get_pestpp_options().get_additional_ins_delimiters());
+			}
 
 
-		const ParamTransformSeq &base_trans_seq = pest_scenario.get_base_par_tran_seq();
-		ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
+			const ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq();
+			ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
 
-		Parameters cur_ctl_parameters = pest_scenario.get_ctl_parameters();
-		//Allocates Space for Run Manager.  This initializes the model parameter names and observations names.
-		//Neither of these will change over the course of the simulation
+			Parameters cur_ctl_parameters = childPest.get_ctl_parameters();
+			//Allocates Space for Run Manager.  This initializes the model parameter names and observations names.
+			//Neither of these will change over the course of the simulation
 
-		
-		run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), pest_scenario.get_ctl_observations());
 
-		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
+			run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), childPest.get_ctl_observations());
 
-		da.initialize();
+			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 
-		da.iterate_2_solution();
-		da.finalize();
+			da.initialize();
+
+			da.iterate_2_solution();
+			da.finalize();
 
 
 
-		// clean up
-		fout_rec.close();
-		childPest.~Pest(); // make explicit deletion
-		delete run_manager_ptr;
+			// clean up
+			fout_rec.close();
+			childPest.~Pest(); // make explicit deletion
+			delete run_manager_ptr;
+		} // end cycle loop
 		cout << endl << endl << "pestpp-ies analysis complete..." << endl;
 		cout << flush;
 		return 0;

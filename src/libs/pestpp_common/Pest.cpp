@@ -2167,11 +2167,47 @@ void Pest::child_pest_update(int icycle)
 
 	//ctl_parameters
 	//model_exec_info
+	ModelExecInfo curr_mod_exe = model_exec_info;
+	std::vector<std::string> _tpl_vec, _infile_vec, _ins_vec, _out_vec;
+	std::vector<int> incy, outcy;
+	int index = 0;
+	for (auto ic : model_exec_info.incycle_vec)
+	{
+		if ((ic == icycle) || (ic < 0))
+		{
+			_tpl_vec.push_back(model_exec_info.tplfile_vec[index]);
+			_infile_vec.push_back(model_exec_info.inpfile_vec[index]);
+			incy.push_back(model_exec_info.incycle_vec[index]);
+		}
+
+		index = index + 1;
+	}
+	//output files
+	index = 0;
+	for (auto ic : model_exec_info.outcycle_vec)
+	{
+		if ((ic == icycle) || (ic < 0))
+		{
+			_ins_vec.push_back(model_exec_info.insfile_vec[index]);
+			_out_vec.push_back(model_exec_info.outfile_vec[index]);
+			outcy.push_back(model_exec_info.outcycle_vec[index]);
+		}
+
+		index = index + 1;
+	}
+	model_exec_info.tplfile_vec = _tpl_vec;
+	model_exec_info.inpfile_vec = _infile_vec;
+	model_exec_info.incycle_vec = incy;
+	model_exec_info.insfile_vec = _ins_vec;
+	model_exec_info.outfile_vec = _out_vec;
+	model_exec_info.outcycle_vec = outcy;
+
+
 	//pestpp_options
 	//base_par_transform
 	//ctl_ordered_par_names
 	ctl_ordered_par_names = parnames;
-
+	
 	//ctl_ordered_obs_names
 	ctl_ordered_obs_names = obsnames;
 
@@ -2195,6 +2231,35 @@ void Pest::child_pest_update(int icycle)
 		}
 	}
 	n_adj_par = new_n_adj_par;
+}
+
+vector<int> Pest::get_assim_cycles()
+{
+	int curr_cycle;
+	vector<int> cycles_ordered_list, unique_cycles;
+	for (auto pname : ctl_ordered_par_names)
+	{
+		curr_cycle = ctl_parameter_info.get_parameter_rec_ptr(pname)->cycle;
+		if (curr_cycle>= 0)
+			cycles_ordered_list.push_back(curr_cycle);
+	}
+	for (auto oname : ctl_ordered_obs_names)
+	{
+		curr_cycle = observation_info.get_observation_rec_ptr(oname)->cycle;
+		if (curr_cycle >= 0)
+			cycles_ordered_list.push_back(curr_cycle);
+	}
+	// get unique groups
+	for (auto curr = cycles_ordered_list.begin(); curr != cycles_ordered_list.end(); curr++) {
+		if (find(unique_cycles.begin(), unique_cycles.end(), *curr) == unique_cycles.end())
+		{
+			unique_cycles.push_back(*curr);
+		}
+	}
+	sort(unique_cycles.begin(), unique_cycles.end());
+	return unique_cycles;
+	
+
 }
 
 
