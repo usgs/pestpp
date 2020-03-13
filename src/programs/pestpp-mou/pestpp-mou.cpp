@@ -41,7 +41,7 @@ int main(int argc, char* argv[])
 #endif
 		string version = PESTPP_VERSION;
 		cout << endl << endl;
-		cout << "             pestpp-ies: a GLM iterative ensemble smoother" << endl << endl;
+		cout << "             pestpp-mou: a GLM iterative ensemble smoother" << endl << endl;
 		//cout << "                     for PEST(++) datasets " << endl << endl;
 		cout << "                   by the PEST++ development team" << endl;
 		cout << endl << endl << "version: " << version << endl;
@@ -72,11 +72,11 @@ int main(int argc, char* argv[])
 			cerr << "--------------------------------------------------------" << endl;
 			cerr << "usage:" << endl << endl;
 			cerr << "    serial run manager:" << endl;
-			cerr << "        pestpp-ies control_file.pst" << endl << endl;
+			cerr << "        pestpp-mou control_file.pst" << endl << endl;
 			cerr << "    PANTHER master:" << endl;
-			cerr << "        pestpp-ies control_file.pst /H :port" << endl << endl;
+			cerr << "        pestpp-mou control_file.pst /H :port" << endl << endl;
 			cerr << "    PANTHER worker:" << endl;
-			cerr << "        pestpp-ies control_file.pst /H hostname:port " << endl << endl;
+			cerr << "        pestpp-mou control_file.pst /H hostname:port " << endl << endl;
 			
 			cerr << " additional options can be found in the PEST++ manual" << endl;
 			cerr << "--------------------------------------------------------" << endl;
@@ -104,7 +104,7 @@ int main(int argc, char* argv[])
 		it_find = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/e");
 		if (it_find != cmd_arg_vec.end())
 		{
-			throw runtime_error("External run manager not supported by pestpp-ies");
+			throw runtime_error("External run manager not supported by pestpp-mou");
 		}
 		//Check for PANTHER worker
 		it_find = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/h");
@@ -191,11 +191,11 @@ int main(int argc, char* argv[])
 		debug_initialize(file_manager.build_filename("dbg"));
 		if (it_find_j != cmd_arg_vec.end())
 		{
-			throw runtime_error("/j option not supported by pestpp-ies");
+			throw runtime_error("/j option not supported by pestpp-mou");
 		}
 		else if (it_find_r != cmd_arg_vec.end())
 		{
-			throw runtime_error("/r option not supported by pestpp-ies");
+			throw runtime_error("/r option not supported by pestpp-mou");
 		}
 		else
 		{
@@ -208,7 +208,7 @@ int main(int argc, char* argv[])
 
 		if (!restart_flag || save_restart_rec_header)
 		{
-			fout_rec << "             pestpp-ies.exe - a GLM iterative Ensemble Smoother" << endl << "for PEST(++) datasets " << endl << endl;
+			fout_rec << "             pestpp-mou.exe - a GLM iterative Ensemble Smoother" << endl << "for PEST(++) datasets " << endl << endl;
 			fout_rec << "                 by the PEST++ developement team" << endl << endl << endl;
 			fout_rec << endl;
 			fout_rec << endl << endl << "version: " << version << endl;
@@ -336,7 +336,7 @@ int main(int argc, char* argv[])
 		// clean up
 		fout_rec.close();
 		delete run_manager_ptr;
-		cout << endl << endl << "pestpp-ies analysis complete..." << endl;
+		cout << endl << endl << "pestpp-mou analysis complete..." << endl;
 		cout << flush;
 		return 0;
 #ifndef _DEBUG
