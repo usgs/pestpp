@@ -31,6 +31,10 @@ Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, Outpu
 
 void Constraints::initialize(vector<string>& ctl_ord_dec_var_names)
 {
+	//for now...
+	use_fosm = true;
+
+
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	ctl_ord_obs_constraint_names.clear();
 	ctl_ord_pi_constraint_names;
@@ -735,4 +739,39 @@ void Constraints::presolve_chance_report(int iter)
 
 	return;
 	
+}
+
+
+void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr, Parameters& _current_pars_and_dec_vars, Observations& _current_obs_and_constraints)
+{
+	if (!use_chance)
+		return;
+	if (use_fosm)
+	{
+		pfm.log_event("building FOSM-based parameter pertubation runs");
+		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+		//the last true arg is to run the parvals listed in _current_pars_and_dec_vars as the "base" run
+		//this is to make sure we get good pertubations at the current point in par/dec var space.
+		//but this means we might have to run the base run twice at least for the SLP process.
+		//the way around this is to just add the runs all at once wihin the SLP add run
+		//bit using Constraints::get_fosm_par_names()
+		bool success = jco.build_runs(_current_pars_and_dec_vars, _current_obs_and_constraints, adj_par_names, pts,
+			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
+			*run_mgr_ptr, set<string>(), false, true);
+		if (!success)
+		{
+			const set<string> failed = jco.get_failed_parameter_names();
+			throw_constraints_error("failed to calc derviatives for the following FOSM parameters: ", failed);
+		}
+	}
+	else
+		throw_constraints_error("non-fosm add_runs() not implemented");
+}
+
+vector<string> Constraints::get_fosm_par_names()
+{
+	if (use_fosm)
+		return adj_par_names;
+	else
+		return vector<string>();
 }

@@ -1837,7 +1837,9 @@ void sequentialLP::iter_presolve()
 
 		if ((!std_weights) && ((slp_iter == 1) || ((slp_iter+1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
 		{
-			names_to_run.insert(names_to_run.end(), adj_par_names.begin(), adj_par_names.end());
+			//names_to_run.insert(names_to_run.end(), adj_par_names.begin(), adj_par_names.end());
+			vector<string> fosm_par_names = constraints.get_fosm_par_names();
+			names_to_run.insert(names_to_run.end(), fosm_par_names.begin(), fosm_par_names.end());
 		}
 
 		//turn down the purb value each iteration
@@ -1873,6 +1875,8 @@ void sequentialLP::iter_presolve()
 
 		bool init_obs = false;
 		if (slp_iter == 1) init_obs = true;
+		
+
 		bool success = jco.build_runs(all_pars_and_dec_vars, constraints_sim, names_to_run, par_trans,
 			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
 			*run_mgr_ptr, out_of_bounds,false,init_obs);
@@ -1881,6 +1885,13 @@ void sequentialLP::iter_presolve()
 			const set<string> failed = jco.get_failed_parameter_names();
 			throw_sequentialLP_error("failed to calc derviatives for the following decision vars: ", failed);
 		}
+
+		//this would be only for stack runs since we added the fosm runs earlier
+		if ((!std_weights) && ((slp_iter == 1) || ((slp_iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
+		{
+			constraints.add_runs(run_mgr_ptr, all_pars_and_dec_vars, constraints_sim);
+		}
+
 
 		jco.make_runs(*run_mgr_ptr);
 		set<int> failed = run_mgr_ptr->get_failed_run_ids();
@@ -1918,7 +1929,10 @@ void sequentialLP::iter_presolve()
 	}
 	//if this is the first time through, set the initial constraint simulated values
 	if (slp_iter == 1)
+	{
 		constraints_sim_initial = Observations(constraints_sim);
+		constraints.set_initial_constraints_sim(constraints_sim);
+	}
 
 	if (use_obj_obs)
 	{

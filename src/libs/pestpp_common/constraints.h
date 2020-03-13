@@ -35,10 +35,15 @@ public:
 	void presolve_chance_report(int iter);
 	void initial_report();
 	void chance_report(Observations& sim);
-	void add_runs(RunManagerAbstract* run_mgr_ptr);
+	//void add_runs(RunManagerAbstract* run_mgr_ptr);
+	void add_runs(RunManagerAbstract* run_mgr_ptr,Parameters& _current_pars_and_dec_vars, Observations& _current_obs_and_constraints);
+
 	pair<vector<double>,vector<double>> update_and_get_constraint_bound_vectors(Observations& constraints_sim, 
 		Parameters& par_and_dec_vars, double dbl_max, int iter);
 	void set_jco(Jacobian_1to1& _jco) { jco = _jco; }
+	void set_initial_constraints_sim(Observations _initial_constraints_sim) { initial_constraints_sim = _initial_constraints_sim;  }
+	vector<string> get_fosm_par_names();
+
 
 private:
 	Pest& pest_scenario;
@@ -47,6 +52,7 @@ private:
 	FileManager* file_mgr_ptr;
 	OutputFileWriter& of_wr;
 	bool use_chance;
+	bool use_fosm;
 	bool std_weights;
 	double risk;
 	double probit_val;
@@ -81,6 +87,7 @@ private:
 	Observations constraints_obs;
 	Observations current_constraints_sim;
 	Observations current_constraints_chance;
+	Observations initial_constraints_sim;
 	Parameters current_pars_and_dec_vars;
 	pair<vector<double>, vector<double>> current_bounds;
 	
