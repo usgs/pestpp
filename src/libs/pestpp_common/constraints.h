@@ -38,6 +38,7 @@ public:
 	void add_runs(RunManagerAbstract* run_mgr_ptr);
 	pair<vector<double>,vector<double>> update_and_get_constraint_bound_vectors(Observations& constraints_sim, 
 		Parameters& par_and_dec_vars, double dbl_max, int iter);
+	void set_jco(Jacobian_1to1& _jco) { jco = _jco; }
 
 private:
 	Pest& pest_scenario;

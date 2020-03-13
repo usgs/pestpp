@@ -412,6 +412,9 @@ Observations Constraints::get_chance_shifted_constraints(Observations& constrain
 		//extract the part of the full jco we need for fosm
 		Eigen::SparseMatrix<double> fosm_mat = jco.get_matrix(fosm_row_names, adj_par_names);
 
+		if (fosm_mat.size() == 0)
+			throw_constraints_error("FOSM-based chance constraint-to-parameter vectors are all zeros");
+
 		Mat fosm_jco(fosm_row_names, adj_par_names, fosm_mat);
 
 		//create a linear object

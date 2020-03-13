@@ -1280,7 +1280,8 @@ void sequentialLP::iter_solve()
 	pair<vector<double>, vector<double>> bounds = constraints.update_and_get_constraint_bound_vectors(constraints_sim, all_pars_and_dec_vars,COIN_DBL_MAX,slp_iter);
 	constraints.presolve_report(slp_iter);
 	//load the linear simplex model
-	model.loadProblem(matrix, dec_var_lb, dec_var_ub, ctl_ord_obj_func_coefs, constraint_lb, constraint_ub);
+	//model.loadProblem(matrix, dec_var_lb, dec_var_ub, ctl_ord_obj_func_coefs, constraint_lb, constraint_ub);
+	model.loadProblem(matrix, dec_var_lb, dec_var_ub, ctl_ord_obj_func_coefs, bounds.first.data(), bounds.second.data());
 	for (int i = 0; i < num_obs_constraints(); ++i)
 		model.setRowName(i, ctl_ord_obs_constraint_names[i]);
 	for (int i = 0; i < ctl_ord_pi_constraint_names.size(); ++i)
@@ -1949,6 +1950,8 @@ void sequentialLP::iter_presolve()
 
 	//set/update the constraint bound arrays
 	build_constraint_bound_arrays();
+
+	constraints.set_jco(jco);
 
 	if (use_chance)
 	{
