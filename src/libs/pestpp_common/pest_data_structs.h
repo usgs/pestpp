@@ -186,7 +186,7 @@ class PestppOptions {
 public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
 	enum MAT_INV { Q12J, JTQJ };
-	enum GLOBAL_OPT { NONE, OPT_DE };
+	enum GLOBAL_OPT { NONE, OPT_DE, OPT_MOEA};
 	enum GLMNormalForm { IDENT,DIAG, PRIOR };
 	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
 	/*PestppOptions(int _n_iter_base = 50, int _n_iter_super = 0, int _max_n_super = 50,
@@ -509,6 +509,7 @@ private:
 	bool sweep_base_run;
 
 	GLOBAL_OPT global_opt;
+	string moea_name;
 	double de_f;
 	double de_cr;
 	int de_npopulation;
