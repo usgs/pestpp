@@ -1070,7 +1070,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "opt_objective_function: " <<  opt_obj_func << endl;
 	os << "opt_coin_log: " << opt_coin_log << endl;
 	os << "opt_skip_final: " << opt_skip_final << endl;
-	os << "opt_std_weights" << opt_std_weights << endl;
+	os << "opt_std_weights: " << opt_std_weights << endl;
+	os << "opt_use_stack: " << opt_use_stack << endl;
 	os << "opt_decision_variable_groups: ";
 	for (auto v : opt_dec_var_groups)
 		os << v << ",";
@@ -1210,6 +1211,7 @@ void PestppOptions::set_defaults()
 	set_opt_iter_derinc_fac(1.0);
 	set_opt_include_bnd_pi(true);
 	set_hotstart_resfile(string());
+	set_opt_use_stack(false);
 	set_ies_par_csv("");
 	set_ies_obs_csv("");
 	set_ies_obs_restart_csv("");

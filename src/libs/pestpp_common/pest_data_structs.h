@@ -317,7 +317,8 @@ public:
 	void set_opt_include_bnd_pi(bool _include_bnd_pi) { opt_include_bnd_pi = _include_bnd_pi; }
 	bool get_opt_std_weights()const { return opt_std_weights; }
 	void set_opt_std_weights(bool _opt_std_weights) { opt_std_weights = _opt_std_weights; }
-
+	bool get_opt_use_stack()const { return opt_use_stack; }
+	void set_opt_use_stack(bool _flag) { opt_use_stack = _flag; }
 
 
 	string get_ies_par_csv()const { return ies_par_csv; }
@@ -528,6 +529,7 @@ private:
 	double opt_iter_derinc_fac;
 	bool opt_include_bnd_pi;
 	bool opt_std_weights;
+	bool opt_use_stack;
 
 	int ies_subset_size;
 	string ies_par_csv;
