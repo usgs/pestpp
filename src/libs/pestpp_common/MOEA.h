@@ -1,5 +1,5 @@
-#ifndef DIFFERENTIALEVOLUTION_H_
-#define DIFFERENTIALEVOLUTION_H_
+#ifndef MOEA_H_
+#define MOEA_H_
 
 #include <unordered_map>
 #include <random>
@@ -13,18 +13,20 @@ class Pest;
 class RunManagerAbstract;
 class RestartController;
 
-class DifferentialEvolution
+class MOEA
 {
 public:
 	static mt19937_64 rand_engine;
-	DifferentialEvolution(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
+	MOEA(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
 		const ParamTransformSeq &_par_transform, OutputFileWriter &_output_file_writer,
-		PerformanceLog *_performance_log, unsigned int seed = 1);
-	void initialize_population(RunManagerAbstract &run_manager, int d);
+		PerformanceLog *_performance_log, unsigned int seed = 1,
+		RunManagerAbstract* _run_mgr_ptr);
+	void initialize(RunManagerAbstract &run_manager, int d);
 	void solve(RunManagerAbstract &run_manager, RestartController &restart_controller,
 		int max_gen, double f, double cr, bool _dither_f, ModelRun &cur_run);
-	~DifferentialEvolution();
+	~MOEA();
 private:
+	Pest& pest_scenario;
 	const static string solver_type_name;
 	FileManager &file_manager;
 	ObjectiveFunc *obj_func_ptr;
@@ -33,6 +35,7 @@ private:
 	ParamTransformSeq par_transform;
 	OutputFileWriter &output_file_writer;
 	PerformanceLog *performance_log;
+	RunManagerAbstract* run_mgr_ptr;
 	const ObservationInfo *obs_info_ptr;
 	const PriorInformation *prior_info_ptr;
 	std::vector<std::string> par_list;
@@ -55,4 +58,4 @@ private:
 		int nrun_child, double avg_child, double min_child, double max_child);
 };
 
-#endif //DIFFERENTIALEVOLUTION_H_
+#endif //MOEA_H_

@@ -1,21 +1,25 @@
 #include <random>
 #include <iomanip>
-#include "DifferentialEvolution.h"
+#include "MOEA.h"
+#include "Ensemble.h"
 #include "RunManagerAbstract.h"
 #include "ModelRunPP.h"
 #include "RestartController.h"
 
-mt19937_64 DifferentialEvolution::rand_engine = mt19937_64(1);
+//ZAK: this should be done in the initialize() method
+mt19937_64 MOEA::rand_engine = mt19937_64(1);
 
-const string DifferentialEvolution::solver_type_name = "differential_evolution";
+const string MOEA::solver_type_name = "MOEA";
 
-DifferentialEvolution::DifferentialEvolution(Pest &_pest_scenario,
-	FileManager &_file_manager, ObjectiveFunc *_obj_func_ptr,
-	const ParamTransformSeq &_par_transform, OutputFileWriter &_output_file_writer,
-	PerformanceLog *_performance_log, unsigned int seed)
-	: file_manager(_file_manager), obj_func_ptr(_obj_func_ptr), par_transform(_par_transform),
+MOEA::MOEA(Pest &_pest_scenario, FileManager &_file_manager,
+	ObjectiveFunc *_obj_func_ptr, const ParamTransformSeq &_par_transform,
+	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log,
+	unsigned int seed, RunManagerAbstract* _run_mgr_ptr)
+	: pest_scenario(_pest_scenario), file_manager(_file_manager), obj_func_ptr(_obj_func_ptr), par_transform(_par_transform),
 	output_file_writer(_output_file_writer), performance_log(_performance_log),
-	gen_1(_file_manager.build_filename("de1"))
+	run_mgr_ptr(_run_mgr_ptr),
+	gen_1(_file_manager.build_filename("zak"))
+
 {
 	// initialize random number generator
 	rand_engine.seed(seed);
@@ -39,7 +43,7 @@ DifferentialEvolution::DifferentialEvolution(Pest &_pest_scenario,
 	par_transform.ctl2numeric_ip(min_numeric_pars);
 }
 
-void DifferentialEvolution::solve(RunManagerAbstract &run_manager,
+void MOEA::solve(RunManagerAbstract &run_manager,
 	RestartController &restart_controller,
 	int max_gen, double f, double cr, bool dither_f, ModelRun &cur_run)
 {
@@ -93,7 +97,7 @@ void DifferentialEvolution::solve(RunManagerAbstract &run_manager,
 }
 
 
-void DifferentialEvolution::initialize_population(RunManagerAbstract &run_manager, int d)
+void MOEA::initialize(RunManagerAbstract &run_manager, int d)
 {
 	ostream &fout_restart = file_manager.get_ofstream("rst");
 	int iter = 0;
@@ -141,7 +145,7 @@ void DifferentialEvolution::initialize_population(RunManagerAbstract &run_manage
 
 }
 
-void DifferentialEvolution::initialize_vector(Parameters &numeric_pars)
+void MOEA::initialize_vector(Parameters &numeric_pars)
 {
 	std::uniform_real_distribution<double> distribution(0.0, 1.0);
 
@@ -159,7 +163,7 @@ void DifferentialEvolution::initialize_vector(Parameters &numeric_pars)
 	}
 }
 
-void DifferentialEvolution::mutation(RunManagerAbstract &run_manager, double f, bool dither_f, double cr)
+void MOEA::mutation(RunManagerAbstract &run_manager, double f, bool dither_f, double cr)
 {
 	int d = gen_1.get_nruns();
 	int r_status;
@@ -243,7 +247,7 @@ void DifferentialEvolution::mutation(RunManagerAbstract &run_manager, double f, 
 	}
 }
 
-int DifferentialEvolution::recombination(RunManagerAbstract &run_manager)
+int MOEA::recombination(RunManagerAbstract &run_manager)
 {
 	ostream &os = file_manager.rec_ofstream();
 
@@ -385,7 +389,7 @@ int DifferentialEvolution::recombination(RunManagerAbstract &run_manager)
 	return best_run_idx;
 }
 
-void DifferentialEvolution::write_run_summary(std::ostream &os,
+void MOEA::write_run_summary(std::ostream &os,
 	int nrun_par, double avg_par, double min_par, double max_par,
 	int nrun_can, double avg_can, double min_can, double max_can,
 	int nrun_child, double avg_child, double min_child, double max_child)
@@ -418,6 +422,6 @@ void DifferentialEvolution::write_run_summary(std::ostream &os,
 		//cout << "    children : runs=" << n_good_runs_new << ";  phi(avg=" << phi_avg_new << "; min=" << phi_min_new << "; max=" << phi_max_new << endl;
 
 }
-DifferentialEvolution::~DifferentialEvolution()
+MOEA::~MOEA()
 {
 }

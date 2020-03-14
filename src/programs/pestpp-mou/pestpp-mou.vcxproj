@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{FAB19272-07D7-469B-BFA5-BA03DAD4854E}</ProjectGuid>
+    <ProjectGuid>{5097F67C-A0F3-4A67-BE63-36F86EDE8A36}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>pestppies</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>

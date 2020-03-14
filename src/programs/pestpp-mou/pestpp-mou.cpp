@@ -27,7 +27,7 @@
 #include "debug.h"
 #include "logger.h"
 #include "Ensemble.h"
-#include "EnsembleSmoother.h"
+#include "MOEA.h"
 
 using namespace std;
 using namespace pest_utils;
@@ -249,6 +249,7 @@ int main(int argc, char* argv[])
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
 		output_file_writer.scenario_report(fout_rec,false);
 		//output_file_writer.scenario_io_report(fout_rec);
+		//ZAK: define mou scenario 
 		if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1)
 		{
 			output_file_writer.scenario_pargroup_report(fout_rec);
@@ -323,13 +324,13 @@ int main(int argc, char* argv[])
 
 		run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), pest_scenario.get_ctl_observations());
 		
-		IterEnsembleSmoother ies(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
+		MOEA moea(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 		
+		//ZAK: Initialize random generator here
+		moea.initialize();
 
-		ies.initialize();
-
-		ies.iterate_2_solution();
-		ies.finalize();
+		moea.iterate_2_solution();
+		moea.finalize();
 
 
 
