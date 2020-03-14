@@ -64,6 +64,7 @@ public:
 	double get_max_constraint_change(Observations& upgrade_obs);
 	bool get_std_weights() { return std_weights; }
 	bool get_use_chance() { return use_chance; }
+	bool get_use_fosm() { return use_fosm; }
 
 	int num_obs_constraints() { return ctl_ord_obs_constraint_names.size(); }
 	int num_pi_constraints() { return ctl_ord_pi_constraint_names.size(); }

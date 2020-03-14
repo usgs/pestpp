@@ -464,7 +464,7 @@ void Constraints::initial_report()
 
 void Constraints::update_chance_offsets()
 {
-	if (!use_chance)
+	if ((!use_chance) || (std_weights))
 		return;
 
 	if (use_fosm)

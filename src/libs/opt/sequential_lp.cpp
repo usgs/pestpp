@@ -1192,7 +1192,8 @@ void sequentialLP::iter_presolve()
 				missing.push_back(name);
 		if (missing.size() > 0)
 			throw_sequentialLP_error("the following non-zero weight observations were not found in the jacobian " + basejac_filename + " : ", missing);
-
+		if ((constraints.get_use_chance()) && (constraints.get_use_fosm()))
+			constraints.set_jco(jco);
 		string res_filename = pest_scenario.get_pestpp_options().get_hotstart_resfile();
 		//Observations constraints_sim = constraints.get_current_constaints_sim();
 		if (!res_filename.empty())
