@@ -37,6 +37,7 @@ public:
 		bool debug_fail);
 	virtual void report_errors(std::ostream &fout);
 	virtual ~Jacobian_1to1();
+	map<string, vector<int>> get_par_run_map() const { return par_run_map; }
 protected:
 	Parameters failed_ctl_parameters;
 	Parameters failed_to_increment_parmaeters;

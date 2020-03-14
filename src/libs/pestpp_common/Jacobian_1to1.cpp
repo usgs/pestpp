@@ -261,7 +261,10 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 		i_run++;
 	}
 	else
+	{
 		throw runtime_error("'__base__' run tag not in Jacobian.par_run_map, something is wrong");
+	}
+		
 
 		
 
@@ -383,9 +386,10 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 			failed_ctl_parameters.insert(cur_par_name, cur_numeric_par_value);
 		}
 		run_list.clear();
+		
 
 	}
-
+	par_run_map.clear();
 	matrix.resize(base_sim_obs_names.size(), base_numeric_par_names.size());
 	matrix.setZero();
 	matrix.setFromTriplets(triplet_list.begin(), triplet_list.end());

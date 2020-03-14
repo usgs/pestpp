@@ -810,12 +810,14 @@ void Constraints::update_from_runs(RunManagerAbstract* run_mgr_ptr)
 		return;
 	if (use_fosm)
 	{
+		if (jco.get_par_run_map().size() == 0)
+			return;
 		pfm.log_event("reading FOSM-based parameter pertubation runs into JCO");
 		ParamTransformSeq par_trans = pest_scenario.get_base_par_tran_seq();
 		bool success = jco.process_runs(par_trans, pest_scenario.get_base_group_info(), *run_mgr_ptr,
 			*null_prior, false, false);
 		if (!success)
-			throw_constraints_error("error processing JCO matrix runs ", jco.get_failed_parameter_names());
+			throw_constraints_error("error processing FOSM JCO matrix runs ", jco.get_failed_parameter_names());
 	}
 	else
 	{
