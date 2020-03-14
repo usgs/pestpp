@@ -31,11 +31,11 @@ private:
 	std::mt19937 rand_gen;
 	PerformanceLog& pfm;
 	string obj_func_str;
-	bool use_chance;
+	//bool use_chance;
 	bool terminate;
 	bool super_secret_option;
 	bool use_obj_obs;
-	bool std_weights;
+	//bool std_weights;
 	string obj_obs;
 	int slp_iter;
 
@@ -65,24 +65,10 @@ private:
 	{ ClpSimplex::Status::isFree,"free"},{ ClpSimplex::Status::isFixed,"fixed"}};
 
 	map<string, double> obj_func_coef_map;
-	map<string, ConstraintSense> constraint_sense_map;
-	map <string, string> constraint_sense_name;
-	map<string, double> prior_constraint_stdev;
-	map<string, double> post_constraint_stdev;
-	map<string, double> prior_constraint_offset;
-	map<string, double> post_constraint_offset;
-	map<string, double> prior_const_var;
-	map<string, double> post_const_var;
-	//map<string, map<string, double>> pi_constraint_factors;
-	//map<string, double> pi_constraint_rhs;
 
 	vector<double> iter_obj_values;
 	vector<string> ctl_ord_dec_var_names;
-	vector<string> ctl_ord_obs_constraint_names;
-	vector<string> ctl_ord_pi_constraint_names;
 	vector<string> ctl_ord_ext_var_names;
-	vector<string> nz_obs_names;
-	vector<string> adj_par_names;
 
 	PriorInformation* null_prior = new PriorInformation();
 	Parameters all_pars_and_dec_vars;
@@ -94,6 +80,8 @@ private:
 	//Observations constraints_fosm;
 	//Observations constraints_sim_initial;
 	//PriorInformation constraints_pi;
+	Observations current_constraints_sim;
+	
 	Observations obj_func_obs;
 	ObservationInfo obj_func_info;
 	Pest pest_scenario;
@@ -104,11 +92,6 @@ private:
 	//OutputFileWriter* out_wtr_ptr;
 
 	int num_dec_vars() { return ctl_ord_dec_var_names.size(); }
-	int num_obs_constraints() { return ctl_ord_obs_constraint_names.size(); }
-	int num_pi_constraints() { return ctl_ord_pi_constraint_names.size(); }
-	int num_constraints() { return num_obs_constraints() + num_pi_constraints(); }
-	int num_adj_pars() { return adj_par_names.size(); }
-	int num_nz_obs() { return nz_obs_names.size(); }
 
 	void build_dec_var_bounds();
 
@@ -150,7 +133,7 @@ private:
 
 
 	//check that all constraints and dec vars are satified
-	pair < map < string, double > , map<string,double >> postsolve_check(Observations &upgrade_obs, Parameters &upgrade_pars);
+	map<string, double> get_out_of_bounds_dec_vars(Parameters &upgrade_pars);
 
 	//prepare for LP solution, including filling response matrix
 	void iter_presolve();

@@ -26,7 +26,8 @@ class Constraints
 
 public:
 	Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, OutputFileWriter& _of_wr, PerformanceLog& _pfm);
-	void initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_max);
+	void initialize(vector<string>& ctl_ord_dec_var_names, Parameters* _current_pars_and_dec_vars_ptr,
+		Observations* _current_constraints_sim_ptr, double _dbl_max);
 
 	//map<string, double> get_residual_map(Observations& sim);
 	//map<string, double> get_chance_map(Observations& sim);
@@ -43,7 +44,7 @@ public:
 	void initial_report();
 	void chance_report(Observations& sim);
 	
-	void add_runs(RunManagerAbstract* run_mgr_ptr,Parameters& _current_pars_and_dec_vars, Observations& _current_obs_and_constraints);
+	void add_runs(RunManagerAbstract* run_mgr_ptr);
 	void update_obs_and_pi_constraints(Observations& _constraints_sim, Parameters& _par_and_dec_vars);
 	pair<vector<double>,vector<double>> get_constraint_bound_vectors();
 	void set_jco(Jacobian_1to1& _jco) { jco = _jco; }
@@ -59,13 +60,21 @@ public:
 	map<string, double> get_unsatified_pi_constraints(Parameters& par_and_dec_vars, double tol=0.0);
 	map<string, double> get_unsatified_obs_constraints(Observations& constraints_sim, double tol=0.0);
 	int get_num_nz_pi_constraint_elements();
-	Observations get_current_constaints_sim() { return current_constraints_sim; }
-	void set_current_constraints_sim(Observations& _current_constraints_sim) { current_constraints_sim = _current_constraints_sim; }
-	Parameters get_current_pars_and_dec_vars() { return current_pars_and_dec_vars; }
-	void set_current_pars_and_dec_vars(Parameters& _current_pars_and_dec_vars) { current_pars_and_dec_vars = _current_pars_and_dec_vars; }
 	void update_chance_offsets();
+	double get_max_constraint_change(Observations& upgrade_obs);
+	bool get_std_weights() { return std_weights; }
+	bool get_use_chance() { return use_chance; }
 
+	int num_obs_constraints() { return ctl_ord_obs_constraint_names.size(); }
+	int num_pi_constraints() { return ctl_ord_pi_constraint_names.size(); }
+	int num_constraints() { return num_obs_constraints() + num_pi_constraints(); }
+	int num_adj_pars() { return adj_par_names.size(); }
+	int num_nz_obs() { return nz_obs_names.size(); }
 
+	vector<string> get_obs_constraint_names() { return ctl_ord_obs_constraint_names; }
+	vector<string> get_nz_obs_names() { return nz_obs_names; }
+	vector<string> get_pi_constraint_names() { return ctl_ord_pi_constraint_names; }
+	vector<string> get_adj_par_names() { return adj_par_names; }
 private:
 	Pest& pest_scenario;
 	PerformanceLog& pfm;
@@ -107,17 +116,13 @@ private:
 	vector<string> ctl_ord_pi_constraint_names;
 
 	Observations constraints_obs;
-	Observations current_constraints_sim;
-	Observations current_constraints_chance;
+	Observations* current_constraints_sim_ptr;
+	//Observations current_constraints_chance;
 	Observations initial_constraints_sim;
-	Parameters current_pars_and_dec_vars;
+	Parameters* current_pars_and_dec_vars_ptr;
 	pair<vector<double>, vector<double>> current_bounds;
 	
-	int num_obs_constraints() { return ctl_ord_obs_constraint_names.size(); }
-	int num_pi_constraints() { return ctl_ord_pi_constraint_names.size(); }
-	int num_constraints() { return num_obs_constraints() + num_pi_constraints(); }
-	int num_adj_pars() { return adj_par_names.size(); }
-	int num_nz_obs() { return nz_obs_names.size(); }
+	
 
 	void throw_constraints_error(string message);
 	void throw_constraints_error(string message, const vector<string>& messages);
