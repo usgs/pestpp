@@ -31,7 +31,7 @@ public:
 
 	//map<string, double> get_residual_map(Observations& sim);
 	//map<string, double> get_chance_map(Observations& sim);
-	void report(Observations& sim);
+	//void report(Observations& sim);
 	void presolve_report(int iter);
 	void presolve_chance_report(int iter);
 
@@ -42,16 +42,16 @@ public:
 
 	
 	void initial_report();
-	void chance_report(Observations& sim);
+	//void chance_report(Observations& sim);
 	
 	void add_runs(RunManagerAbstract* run_mgr_ptr);
-	void update_obs_and_pi_constraints(Observations& _constraints_sim, Parameters& _par_and_dec_vars);
+	//void update_obs_and_pi_constraints(Observations& _constraints_sim, Parameters& _par_and_dec_vars);
 	pair<vector<double>,vector<double>> get_constraint_bound_vectors();
 	void set_jco(Jacobian_1to1& _jco) { jco = _jco; }
 	void set_initial_constraints_sim(Observations _initial_constraints_sim) { initial_constraints_sim = _initial_constraints_sim;  }
 	vector<string> get_fosm_par_names();
 
-	void update_from_runs(RunManagerAbstract* run_mgr_ptr);
+	void process_runs(RunManagerAbstract* run_mgr_ptr,int iter);
 
 	void write_res_files(Observations& constraints_sim, Parameters& pars_and_dec_vars, string tag, int iter);
 	
@@ -59,8 +59,11 @@ public:
 
 	map<string, double> get_unsatified_pi_constraints(Parameters& par_and_dec_vars, double tol=0.0);
 	map<string, double> get_unsatified_obs_constraints(Observations& constraints_sim, double tol=0.0);
+	
 	int get_num_nz_pi_constraint_elements();
+	
 	void update_chance_offsets();
+	
 	double get_max_constraint_change(Observations& upgrade_obs);
 	bool get_std_weights() { return std_weights; }
 	bool get_use_chance() { return use_chance; }
@@ -82,6 +85,7 @@ private:
 	std::mt19937 rand_gen;
 	FileManager* file_mgr_ptr;
 	OutputFileWriter& of_wr;
+	int stack_size;
 	bool use_chance;
 	bool use_fosm;
 	bool std_weights;
@@ -94,6 +98,7 @@ private:
 	Jacobian_1to1 jco;
 	
 	ParameterEnsemble stack_pe;
+	ObservationEnsemble stack_oe;
 
 	PriorInformation* null_prior = new PriorInformation();
 	PriorInformation constraints_pi;
@@ -106,6 +111,8 @@ private:
 	map<string, double> prior_constraint_stdev;
 	map<string, double> post_constraint_offset;
 	map<string, double> post_constraint_stdev;
+
+	map<int, int> stack_pe_run_map;
 
 	pair<ConstraintSense, string> get_sense_from_group_name(const string& name);
 	Observations get_chance_shifted_constraints();

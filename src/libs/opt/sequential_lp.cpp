@@ -1207,7 +1207,11 @@ void sequentialLP::iter_presolve()
 			pest_utils::read_res(res_filename, current_constraints_sim);
 			f_rec << "done" << endl;
 			cout << "done" << endl;
-			//constraints.set_current_constraints_sim(constraints_sim);
+			//this would be only for stack runs since the fosm runs should have been in the jco
+			if ((!constraints.get_std_weights()) && ((slp_iter == 1) || ((slp_iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
+			{
+				constraints.add_runs(run_mgr_ptr);
+			}
 
 		}
 		else
@@ -1215,6 +1219,15 @@ void sequentialLP::iter_presolve()
 			//make the intial base run
 			cout << "  ---  running the model once with initial decision variables  ---  " << endl;
 			int run_id = run_mgr_ptr->add_run(par_trans.ctl2model_cp(all_pars_and_dec_vars));
+			//this would be only for stack runs since the fosm runs should have been in the jco
+			if ((!constraints.get_std_weights()) && ((slp_iter == 1) || ((slp_iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
+			{
+				constraints.add_runs(run_mgr_ptr);
+			}
+			else
+			{
+				cout << "  ---  running the model once with initial decision variables  ---  " << endl;
+			}
 			run_mgr_ptr->run();
 			Parameters pars;
 			bool success = run_mgr_ptr->get_run(run_id, pars, current_constraints_sim);
@@ -1222,6 +1235,7 @@ void sequentialLP::iter_presolve()
 				throw_sequentialLP_error("initial (base) run with initial decision vars failed...cannot continue");
 
 		}
+		constraints.process_runs(run_mgr_ptr, slp_iter);
 	}
 
 	//otherwise, fill the jacobian
@@ -1236,9 +1250,12 @@ void sequentialLP::iter_presolve()
 		}
 		if ((!constraints.get_std_weights()) && ((slp_iter == 1) || ((slp_iter+1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
 		{
-			//names_to_run.insert(names_to_run.end(), adj_par_names.begin(), adj_par_names.end());
-			vector<string> fosm_par_names = constraints.get_fosm_par_names();
-			names_to_run.insert(names_to_run.end(), fosm_par_names.begin(), fosm_par_names.end());
+			if (constraints.get_use_fosm())
+			{
+				//names_to_run.insert(names_to_run.end(), adj_par_names.begin(), adj_par_names.end());
+				vector<string> fosm_par_names = constraints.get_fosm_par_names();
+				names_to_run.insert(names_to_run.end(), fosm_par_names.begin(), fosm_par_names.end());
+			}
 		}
 
 		//turn down the purb value each iteration
@@ -1300,7 +1317,7 @@ void sequentialLP::iter_presolve()
 			*null_prior, false,false);
 		if (!success)
 			throw_sequentialLP_error("error processing response matrix runs ", jco.get_failed_parameter_names());
-		constraints.update_from_runs(run_mgr_ptr);
+		constraints.process_runs(run_mgr_ptr, slp_iter);
 		stringstream ss;
 		ss << slp_iter << ".jcb";
 		string rspmat_file = file_mgr_ptr->build_filename(ss.str());

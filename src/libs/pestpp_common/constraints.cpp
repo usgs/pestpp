@@ -34,9 +34,12 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 {
 	current_constraints_sim_ptr = _current_constraints_sim_ptr;
 	current_pars_and_dec_vars_ptr = _current_pars_and_dec_vars_ptr;
-	//for now...
+	stack_size = pest_scenario.get_pestpp_options().get_opt_stack_size();
 	use_fosm = true;
-
+	if (stack_size > 0)
+		use_fosm = false;
+	stack_pe.set_pest_scenario(&pest_scenario);
+	stack_pe.set_rand_gen(&rand_gen);
 	dbl_max = _dbl_max;
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	ctl_ord_obs_constraint_names.clear();
@@ -341,16 +344,16 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 		else
 		{
 			string par_csv = pest_scenario.get_pestpp_options().get_ies_par_csv();
-			int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
+			
 			if (par_csv.size() == 0)
 			{
 			
-				f_rec << "drawing " << num_reals << "parameter realizations" << endl;
+				f_rec << "drawing " << stack_size << "stack realizations" << endl;
 				pfm.log_event("loading parcov");
 				parcov.try_from(pest_scenario, *file_mgr_ptr);
-				pfm.log_event("drawing parameter realizations");
-				stack_pe.draw(num_reals, pest_scenario.get_ctl_parameters(), parcov, &pfm, 
-					pest_scenario.get_pestpp_options().get_ies_verbose_level());	
+				pfm.log_event("drawing stack realizations");
+				stack_pe.draw(stack_size, pest_scenario.get_ctl_parameters(), parcov, &pfm, 
+					pest_scenario.get_pestpp_options().get_ies_verbose_level());
 			}
 			else
 			{
@@ -394,12 +397,30 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 				{
 					throw_constraints_error("unrecognized par ensemble extension, looking for csv, jcb, jco.  found: " + par_ext);
 				}
+				if (stack_pe.shape().first > stack_size)
+				{
+					vector<int> drop_rows;
+					for (int i = stack_size - 1; i < stack_pe.shape().first; i++)
+						drop_rows.push_back(i);
+					f_rec << "droppping " << drop_rows.size() << "realizations from stack b/c of ++opt_stack_size req" << endl;
+					stack_pe.drop_rows(drop_rows);
+				}
 			}
+			string filename = file_mgr_ptr->get_base_filename() + ".0.stack";
+			if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+			{
+				filename = filename + ".jcb";
+				stack_pe.to_binary(filename);
+			}
+			else
+			{
+				filename = filename + ".csv";
+				stack_pe.to_csv(filename);
+			}
+			f_rec << "saved initial stack to " << filename << endl;
 		}
 	}
 	else use_chance = false;
-
-
 }
 
 void Constraints::initial_report()
@@ -511,9 +532,8 @@ void Constraints::update_chance_offsets()
 	}
 	else
 	{
-		throw_constraints_error("constraints::get_chance () not implemented for non-fosm chances");
+		throw_constraints_error("constraints::get_chance() not implemented for non-fosm chances");
 	}
-
 }
 
 double Constraints::get_max_constraint_change(Observations& upgrade_obs)
@@ -960,10 +980,9 @@ void Constraints::postsolve_pi_constraints_report(Parameters& pars_and_dec_vars,
 	}
 	
 	return;
-
 }
 
-void Constraints::update_from_runs(RunManagerAbstract* run_mgr_ptr)
+void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 {
 	if (!use_chance)
 		return;
@@ -980,7 +999,22 @@ void Constraints::update_from_runs(RunManagerAbstract* run_mgr_ptr)
 	}
 	else
 	{
-		throw runtime_error("non-FOSM update_from_runs() not implemented");
+		//throw runtime_error("non-FOSM update_from_runs() not implemented");
+		//string filename = file_mgr_ptr->get_base_filename() + "..stack";
+		stringstream ss;
+		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".stack";
+		if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+		{
+			ss << ".jcb";
+			stack_pe.to_binary(ss.str());
+		}
+		else
+		{
+			ss << ".csv";
+			stack_pe.to_csv(ss.str());
+		}
+
+
 	}
 
 }
@@ -1001,7 +1035,7 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 		//bit using Constraints::get_fosm_par_names()
 		//the last false says not to reinitialize the run mgr since the calling process may have also
 		//added runs
-		
+		cout << "  ---  running " << num_adj_pars() << " model runs for FOSM-based chance constraints  ---  " << endl;
 		bool success = jco.build_runs(*current_pars_and_dec_vars_ptr, *current_constraints_sim_ptr, adj_par_names, pts,
 			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
 			*run_mgr_ptr, out_of_bounds, false, true, false);
@@ -1012,7 +1046,14 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 		}
 	}
 	else
-		throw_constraints_error("non-fosm add_runs() not implemented");
+	{
+		//throw_constraints_error("non-fosm add_runs() not implemented");
+		//todo: update stack_pe parameter values for decision variables using current_pars_and_dec_vars_ptr
+		pfm.log_event("building stack-based parameter runs");
+		cout << "  ---  running " << stack_pe.shape().first << " model runs for stack-based chance constraints  ---  " << endl;
+		stack_pe_run_map.clear();
+		stack_pe_run_map = stack_pe.add_runs(run_mgr_ptr);
+	}
 }
 
 vector<string> Constraints::get_fosm_par_names()
