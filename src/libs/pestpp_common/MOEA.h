@@ -12,15 +12,16 @@
 class Pest;
 class RunManagerAbstract;
 class RestartController;
+class Objectives;
+class Constraints;
 
 class MOEA
 {
 public:
 	static mt19937_64 rand_engine;
-	MOEA(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
+	MOEA(Pest &_pest_scenario, FileManager &_file_manager, Objectives *_objs, Constraints *_cons,
 		const ParamTransformSeq &_par_transform, OutputFileWriter &_output_file_writer,
-		PerformanceLog *_performance_log, unsigned int seed = 1,
-		RunManagerAbstract* _run_mgr_ptr);
+		PerformanceLog *_performance_log, RunManagerAbstract* _run_mgr_ptr);
 	void initialize(RunManagerAbstract &run_manager, int d);
 	void solve(RunManagerAbstract &run_manager, RestartController &restart_controller,
 		int max_gen, double f, double cr, bool _dither_f, ModelRun &cur_run);
@@ -29,7 +30,8 @@ private:
 	Pest& pest_scenario;
 	const static string solver_type_name;
 	FileManager &file_manager;
-	ObjectiveFunc *obj_func_ptr;
+	Objectives *objs_ptr;
+	Constraints *cons_ptr;
 	const ParameterInfo *ctl_par_info_ptr;
 	const ParameterGroupInfo *par_group_info_ptr;
 	ParamTransformSeq par_transform;

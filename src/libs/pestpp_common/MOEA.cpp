@@ -12,9 +12,8 @@ mt19937_64 MOEA::rand_engine = mt19937_64(1);
 const string MOEA::solver_type_name = "MOEA";
 
 MOEA::MOEA(Pest &_pest_scenario, FileManager &_file_manager,
-	ObjectiveFunc *_obj_func_ptr, const ParamTransformSeq &_par_transform,
-	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log,
-	unsigned int seed, RunManagerAbstract* _run_mgr_ptr)
+	Objectives *_objs_ptr, Constraints *_cons_ptr, const ParamTransformSeq &_par_transform,
+	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log, RunManagerAbstract* _run_mgr_ptr)
 	: pest_scenario(_pest_scenario), file_manager(_file_manager), obj_func_ptr(_obj_func_ptr), par_transform(_par_transform),
 	output_file_writer(_output_file_writer), performance_log(_performance_log),
 	run_mgr_ptr(_run_mgr_ptr),

@@ -83,7 +83,8 @@ int main(int argc, char* argv[])
 			exit(0);
 		}
 
-
+		Objectives objective_functions;
+		Constraints constraint_functions;
 		FileManager file_manager;
 		string filename = complete_path;
 		string pathname = ".";
@@ -324,12 +325,11 @@ int main(int argc, char* argv[])
 
 		run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), pest_scenario.get_ctl_observations());
 		
-		MOEA moea(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
+		MOEA moea(pest_scenario, file_manager, objective_functions, constraint_functions, output_file_writer, &performance_log, run_manager_ptr);
 		
 		//ZAK: Initialize random generator here
 		moea.initialize();
-
-		moea.iterate_2_solution();
+		moea.solve();
 		moea.finalize();
 
 
