@@ -3,11 +3,17 @@
 
 #include <unordered_map>
 #include <random>
+#include <vector>
+#include <utility>
+#include <iostream>
+#include <fstream>
+#include <string>
 #include "FileManager.h"
 #include "ObjectiveFunc.h"
 #include "OutputFileWriter.h"
 #include "PerformanceLog.h"
 #include "RunStorage.h"
+#include "MOUglobal.h"
 
 class Pest;
 class RunManagerAbstract;
@@ -28,10 +34,11 @@ public:
     // the following is from NSGA2.h
 	void advance();
 	void evolve();
-    void set_seed(int s) {
-        //seed = s;
-        rgen.set_seed(s);
-    };
+    // 
+    //void set_seed(int s) {
+    //    //seed = s;
+    //    rgen.set_seed(s);
+    //};
     void set_function(individual_config::funcType f) {
         this->function = f;
     };
@@ -177,7 +184,7 @@ private:
     bool load_backup();
     
     void selection(population& oldpop, population& newpop)
-        throw (nsga2::MOEAexception);
+        throw (mou::MOEAexception);
     individual& tournament(individual& ind1, individual& ind2) const;
     void crossover(const individual& parent1, const individual& parent2,
         individual& child1, individual& child2);

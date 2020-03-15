@@ -5,6 +5,13 @@
 #include "RunManagerAbstract.h"
 #include "ModelRunPP.h"
 #include "RestartController.h"
+#include <iostream>
+#include <numeric>
+#include <string>
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <fstream>
 
 using namespace mou;
 using namespace std;
@@ -583,8 +590,89 @@ void MOEA::write_run_summary(std::ostream &os,
 		//cout << "    parents  : runs=" << n_good_runs_targ << ";  phi(avg=" << phi_avg_targ << "; min=" << phi_min_targ << "; max=" << phi_max_targ << endl;
 		//cout << "    canidates: runs=" << n_good_runs_can << ";  phi(avg=" << phi_avg_can << "; min=" << phi_min_can << "; max=" << phi_max_can << endl;
 		//cout << "    children : runs=" << n_good_runs_new << ";  phi(avg=" << phi_avg_new << "; min=" << phi_min_new << "; max=" << phi_max_new << endl;
-
 }
+
+void MOEA::advance() {
+
+	cout << "Advancing to generation " << t + 1 << endl;
+
+	std::pair<int, int> res;
+
+	// create next population Qt
+	selection(*parent_pop, *child_pop);
+	res = child_pop->mutate();
+	child_pop->generation = t + 1;
+	child_pop->decode();
+	child_pop->custom_evaluate();
+
+	// mutation book-keeping
+	nrealmut += res.first;
+	nbinmut += res.second;
+
+	// fpt4 << "#Child pop\n";
+	// report_pop(*child_pop,fpt4);
+
+	// create population Rt = Pt U Qt
+	mixed_pop->merge(*parent_pop, *child_pop);
+	mixed_pop->generation = t + 1;
+
+	// fpt4 << "#Mixed\n";
+	// report_pop(*mixed_pop, fpt4);
+
+	mixed_pop->fast_nds();
+	//mixed_pop->crowding_distance_all();
+
+	// fpt4 << "#Mixed nfs\n";
+	// report_pop(*mixed_pop, fpt4);
+
+
+	// Pt+1 = empty
+	parent_pop->ind.clear();
+
+	int i = 0;
+	// until |Pt+1| + |Fi| <= N, i.e. until parent population is filled
+	while (parent_pop->size() + mixed_pop->front[i].size() < popsize) {
+		std::vector<int>& Fi = mixed_pop->front[i];
+		mixed_pop->crowding_distance(i);           // calculate crowding in Fi
+		for (int j = 0; j < Fi.size(); ++j)        // Pt+1 = Pt+1 U Fi
+			parent_pop->ind.push_back(mixed_pop->ind[Fi[j]]);
+		i += 1;
+	}
+
+	mixed_pop->crowding_distance(i);           // calculate crowding in Fi
+	std::sort(mixed_pop->front[i].begin(),
+		mixed_pop->front[i].end(),
+		sort_n(*mixed_pop));// sort remaining front using <n
+
+	const int extra = popsize - parent_pop->size();
+	for (int j = 0; j < extra; ++j) // Pt+1 = Pt+1 U Fi[1:N-|Pt+1|]
+		parent_pop->ind.push_back(mixed_pop->ind[mixed_pop->front[i][j]]);
+
+	t += 1;
+
+	// if (popFunction) {
+	//   (*popFunction)(*parent_pop);
+	// }
+
+	parent_pop->generation = t;
+	custom_report(*parent_pop);
+
+	if (t % nreport == 0) {
+		fpt4 << "# gen = " << t << '\n';
+		report_pop(*parent_pop, fpt4);
+		fpt4.flush();
+	}
+
+	// save a backup
+	save_backup();
+}
+
+void MOEA::evolve() {
+	while (t < ngen)
+		advance();
+	report_pop(*parent_pop, fpt2);
+}
+
 MOEA::~MOEA()
 {
 	if (parent_pop) {
