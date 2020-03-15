@@ -319,6 +319,10 @@ public:
 	void set_opt_std_weights(bool _opt_std_weights) { opt_std_weights = _opt_std_weights; }
 	int get_opt_stack_size()const { return opt_stack_size; }
 	void set_opt_stack_size(int _size) { opt_stack_size = _size; }
+	string get_opt_par_stack()const { return opt_par_stack; }
+	void set_opt_par_stack(string _stack) { opt_par_stack = _stack; }
+	string get_opt_obs_stack()const { return opt_obs_stack; }
+	void set_opt_obs_stack(string _stack) { opt_obs_stack = _stack; }
 
 
 	string get_ies_par_csv()const { return ies_par_csv; }
@@ -530,6 +534,8 @@ private:
 	bool opt_include_bnd_pi;
 	bool opt_std_weights;
 	int opt_stack_size;
+	string opt_par_stack;
+	string opt_obs_stack;
 
 	int ies_subset_size;
 	string ies_par_csv;

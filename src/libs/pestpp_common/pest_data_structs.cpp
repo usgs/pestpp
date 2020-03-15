@@ -620,7 +620,14 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		convert_ip(value,opt_stack_size);
 	}
-
+	else if (key == "OPT_PAR_STACK")
+	{
+		convert_ip(value, opt_par_stack);
+	}
+	else if (key == "OPT_OBS_STACK")
+	{
+		convert_ip(value, opt_obs_stack);
+	}
 	else if ((key == "OPT_DEC_VAR_GROUPS") || (key == "OPT_DECISION_VARIABLE_GROUPS"))
 	{
 		passed_args.insert("OPT_DEC_VAR_GROUPS");
@@ -1077,6 +1084,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "opt_skip_final: " << opt_skip_final << endl;
 	os << "opt_std_weights: " << opt_std_weights << endl;
 	os << "opt_stack_size: " << opt_stack_size << endl;
+	os << "opt_par_stack: " << opt_par_stack << endl;
+	os << "opt_obs_stack: " << opt_obs_stack << endl;
 	os << "opt_decision_variable_groups: ";
 	for (auto v : opt_dec_var_groups)
 		os << v << ",";
@@ -1217,6 +1226,9 @@ void PestppOptions::set_defaults()
 	set_opt_include_bnd_pi(true);
 	set_hotstart_resfile(string());
 	set_opt_stack_size(0);
+	set_opt_par_stack("");
+	set_opt_obs_stack("");
+
 	set_ies_par_csv("");
 	set_ies_obs_csv("");
 	set_ies_obs_restart_csv("");

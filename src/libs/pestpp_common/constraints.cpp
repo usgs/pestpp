@@ -241,9 +241,18 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 		throw_constraints_error("the following prior info constraints do not have a correct group name prefix {'l_','less','g_','greater','e_','equal'}: ", problem_constraints);
 	}
 
-	//allocate the constraint bound arrays
-	//constraint_lb = new double[num_constraints()];
-	//constraint_ub = new double[num_constraints()];
+	set<string> dec_set(ctl_ord_dec_var_names.begin(), ctl_ord_dec_var_names.end());
+	for (auto& name : pest_scenario.get_ctl_ordered_par_names())
+	{
+		//if this parameter is not a decision var
+		//if (find(start, end, name) == end)
+		if (dec_set.find(name) == dec_set.end())
+		{
+			ParameterRec::TRAN_TYPE tt = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type;
+			if ((tt == ParameterRec::TRAN_TYPE::LOG) || (tt == ParameterRec::TRAN_TYPE::NONE))
+				adj_par_names.push_back(name);
+		}
+	}
 
 
 	//------------------------------------------
@@ -287,34 +296,17 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 				f_rec << setw(25) << cname << setw(15) << std << setw(15) << var << endl;
 				prior_const_var[cname] = var;
 				post_const_var[cname] = var;
-
-
 			}
 		}
 		else if (use_fosm)
 		{
-
 			//make sure there is at least one non-decision var adjustable parameter
-			vector<string>::iterator start = ctl_ord_dec_var_names.begin();
-			vector<string>::iterator end = ctl_ord_dec_var_names.end();
-			set<string> dec_set(ctl_ord_dec_var_names.begin(), ctl_ord_dec_var_names.end());
-			for (auto& name : pest_scenario.get_ctl_ordered_par_names())
-			{
-				//if this parameter is not a decision var
-				//if (find(start, end, name) == end)
-				if (dec_set.find(name) == dec_set.end())
-				{
-					ParameterRec::TRAN_TYPE tt = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type;
-					if ((tt == ParameterRec::TRAN_TYPE::LOG) || (tt == ParameterRec::TRAN_TYPE::NONE))
-						adj_par_names.push_back(name);
-				}
-			}
 			if (adj_par_names.size() == 0)
 				throw_constraints_error("++opt_risk != 0.5, but no adjustable parameters found in control file");
 
 			//look for non-zero weighted obs
-			start = ctl_ord_obs_constraint_names.begin();
-			end = ctl_ord_obs_constraint_names.end();
+			vector<string>::iterator start = ctl_ord_obs_constraint_names.begin();
+			vector<string>::iterator end = ctl_ord_obs_constraint_names.end();
 			for (auto& name : pest_scenario.get_ctl_ordered_obs_names())
 			{
 				if (find(start, end, name) == end)
@@ -346,28 +338,13 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 		else
 		{
 			//make sure there is at least one non-decision var adjustable parameter
-			vector<string>::iterator start = ctl_ord_dec_var_names.begin();
-			vector<string>::iterator end = ctl_ord_dec_var_names.end();
-			set<string> dec_set(ctl_ord_dec_var_names.begin(), ctl_ord_dec_var_names.end());
-			for (auto& name : pest_scenario.get_ctl_ordered_par_names())
-			{
-				//if this parameter is not a decision var
-				//if (find(start, end, name) == end)
-				if (dec_set.find(name) == dec_set.end())
-				{
-					ParameterRec::TRAN_TYPE tt = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type;
-					if ((tt == ParameterRec::TRAN_TYPE::LOG) || (tt == ParameterRec::TRAN_TYPE::NONE))
-						adj_par_names.push_back(name);
-				}
-			}
 			if (adj_par_names.size() == 0)
 				throw_constraints_error("++opt_risk != 0.5, but no adjustable parameters found in control file");
 			
-			string par_csv = pest_scenario.get_pestpp_options().get_ies_par_csv();
+			string par_csv = pest_scenario.get_pestpp_options().get_opt_par_stack();
 			
 			if (par_csv.size() == 0)
 			{
-			
 				f_rec << "drawing " << stack_size << "stack realizations" << endl;
 				pfm.log_event("loading parcov");
 				parcov.try_from(pest_scenario, *file_mgr_ptr);
@@ -378,10 +355,10 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 			else
 			{
 				string par_ext = pest_utils::lower_cp(par_csv).substr(par_csv.size() - 3, par_csv.size());
-				pfm.log_event("processing par csv " + par_csv);
+				pfm.log_event("processing par stack file " + par_csv);
 				if (par_ext.compare("csv") == 0)
 				{
-					pfm.log_event("loading par ensemble from csv file: " + par_csv);
+					pfm.log_event("loading par stack from csv file: " + par_csv);
 					try
 					{
 						stack_pe.from_csv(par_csv);
@@ -389,16 +366,16 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 					catch (const exception& e)
 					{
 
-						throw_constraints_error("error processing par csv: " + string(e.what()));
+						throw_constraints_error("error processing par stack: " + string(e.what()));
 					}
 					catch (...)
 					{
-						throw_constraints_error(string("error processing par csv"));
+						throw_constraints_error(string("error processing par stack"));
 					}
 				}
 				else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
 				{
-					pfm.log_event("loading par ensemble from binary file+ " + par_csv);
+					pfm.log_event("loading par stack from binary file+ " + par_csv);
 					try
 					{
 						stack_pe.from_binary(par_csv);
@@ -406,23 +383,44 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 					catch (const exception& e)
 					{
 
-						throw_constraints_error("error processing par ensemble binary file: " + string(e.what()));
+						throw_constraints_error("error processing par stack binary file: " + string(e.what()));
 					}
 					catch (...)
 					{
-						throw_constraints_error("error processing par ensemble binary file");
+						throw_constraints_error("error processing par stack binary file");
 					}
 				}
 				else
 				{
-					throw_constraints_error("unrecognized par ensemble extension, looking for csv, jcb, jco.  found: " + par_ext);
+					throw_constraints_error("unrecognized par stack extension, looking for csv, jcb, jco.  found: " + par_ext);
 				}
+				vector<string> snames = stack_pe.get_var_names();
+				set<string> pset(snames.begin(), snames.end());
+				vector<string> missing;
+				for (auto name : adj_par_names)
+					if (pset.find(name) == pset.end())
+						missing.push_back(name);
+				if (missing.size() > 0)
+					throw_constraints_error("par stack missing the following adjustable parameters: ", missing);
+
+				missing.clear();
+				for (auto name : dec_var_names)
+					if (pset.find(name) == pset.end())
+						missing.push_back(name);
+				if (missing.size() > 0)
+				{
+					Eigen::MatrixXd dmat(stack_pe.shape().first, missing.size());
+					dmat.setZero();
+					stack_pe.extend_cols(dmat,missing);
+				}
+					
+
 				if (stack_pe.shape().first > stack_size)
 				{
 					vector<int> drop_rows;
 					for (int i = stack_size - 1; i < stack_pe.shape().first; i++)
 						drop_rows.push_back(i);
-					f_rec << "droppping " << drop_rows.size() << "realizations from stack b/c of ++opt_stack_size req" << endl;
+					f_rec << "droppping " << drop_rows.size() << "realizations from par stack b/c of ++opt_stack_size req" << endl;
 					stack_pe.drop_rows(drop_rows);
 				}
 			}
@@ -438,15 +436,75 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 				stack_pe.to_csv(filename);
 			}
 			f_rec << "saved initial parameter stack to " << filename << endl;
-			//todo: deal with user passed obs en
-			string obs_csv = pest_scenario.get_pestpp_options().get_ies_obs_csv();
-			if (obs_csv.size() > 0)
+			
+
+
+
+
+			string obs_csv = pest_scenario.get_pestpp_options().get_opt_obs_stack();
+			if (obs_csv.size() == 0)
 			{
-				throw_constraints_error("user-specified obs en for stack not implemented");
+				stack_oe.reserve(stack_pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
 			}
 			else
 			{
-				stack_oe.reserve(stack_pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
+				string obs_ext = pest_utils::lower_cp(obs_csv).substr(obs_csv.size() - 3, obs_csv.size());
+				pfm.log_event("processing obs stack file " + obs_csv);
+				if (obs_ext.compare("csv") == 0)
+				{
+					pfm.log_event("loading obs stack from csv file: " + obs_csv);
+					try
+					{
+						stack_oe.from_csv(obs_csv);
+					}
+					catch (const exception& e)
+					{
+
+						throw_constraints_error("error processing obs stack: " + string(e.what()));
+					}
+					catch (...)
+					{
+						throw_constraints_error(string("error processing obs stack"));
+					}
+				}
+				else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
+				{
+					pfm.log_event("loading obs stack from binary file+ " + obs_csv);
+					try
+					{
+						stack_oe.from_binary(obs_csv);
+					}
+					catch (const exception& e)
+					{
+
+						throw_constraints_error("error processing obs stack binary file: " + string(e.what()));
+					}
+					catch (...)
+					{
+						throw_constraints_error("error processing obs stack binary file");
+					}
+				}
+				else
+				{
+					throw_constraints_error("unrecognized obs stack extension, looking for csv, jcb, jco.  found: " + obs_ext);
+				}
+				vector<string> snames = stack_oe.get_var_names();
+				set<string> pset(snames.begin(), snames.end());
+				vector<string> missing;
+				for (auto name : ctl_ord_obs_constraint_names)
+					if (pset.find(name) == pset.end())
+						missing.push_back(name);
+				if (missing.size() > 0)
+					throw_constraints_error("obs stack missing the following constraints: ", missing);
+
+				if (stack_oe.shape().first > stack_size)
+				{
+					vector<int> drop_rows;
+					for (int i = stack_size - 1; i < stack_oe.shape().first; i++)
+						drop_rows.push_back(i);
+					f_rec << "droppping " << drop_rows.size() << "realizations from obs stack b/c of ++opt_stack_size req" << endl;
+					stack_oe.drop_rows(drop_rows);
+				}
 			}
 		}
 	}
