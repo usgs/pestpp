@@ -1210,7 +1210,8 @@ void sequentialLP::iter_presolve()
 			//this would be only for stack runs since the fosm runs should have been in the jco
 			if ((!constraints.get_std_weights()) && ((slp_iter == 1) || ((slp_iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
 			{
-				constraints.add_runs(run_mgr_ptr);
+				if (!constraints.get_use_fosm())
+					constraints.add_runs(run_mgr_ptr);
 			}
 
 		}
@@ -1222,6 +1223,7 @@ void sequentialLP::iter_presolve()
 			//this would be only for stack runs since the fosm runs should have been in the jco
 			if ((!constraints.get_std_weights()) && ((slp_iter == 1) || ((slp_iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
 			{
+				if (!constraints.get_use_fosm())
 				constraints.add_runs(run_mgr_ptr);
 			}
 			else
