@@ -40,6 +40,8 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 		use_fosm = false;
 	stack_pe.set_pest_scenario(&pest_scenario);
 	stack_pe.set_rand_gen(&rand_gen);
+	stack_oe.set_pest_scenario(&pest_scenario);
+	stack_oe.set_rand_gen(&rand_gen);
 	dbl_max = _dbl_max;
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	ctl_ord_obs_constraint_names.clear();
@@ -159,7 +161,6 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 				//pi_constraint_factors[pi_name] = pi_rec.get_atom_factors();
 				//pi_constraint_rhs[pi_name] = pi_rec.get_obs_value();
 				constraints_pi.AddRecord(pi_name, &pi_rec);
-
 			}
 		}
 
@@ -343,6 +344,24 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 		}
 		else
 		{
+			//make sure there is at least one non-decision var adjustable parameter
+			vector<string>::iterator start = ctl_ord_dec_var_names.begin();
+			vector<string>::iterator end = ctl_ord_dec_var_names.end();
+			set<string> dec_set(ctl_ord_dec_var_names.begin(), ctl_ord_dec_var_names.end());
+			for (auto& name : pest_scenario.get_ctl_ordered_par_names())
+			{
+				//if this parameter is not a decision var
+				//if (find(start, end, name) == end)
+				if (dec_set.find(name) == dec_set.end())
+				{
+					ParameterRec::TRAN_TYPE tt = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type;
+					if ((tt == ParameterRec::TRAN_TYPE::LOG) || (tt == ParameterRec::TRAN_TYPE::NONE))
+						adj_par_names.push_back(name);
+				}
+			}
+			if (adj_par_names.size() == 0)
+				throw_constraints_error("++opt_risk != 0.5, but no adjustable parameters found in control file");
+			
 			string par_csv = pest_scenario.get_pestpp_options().get_ies_par_csv();
 			
 			if (par_csv.size() == 0)
@@ -406,7 +425,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 					stack_pe.drop_rows(drop_rows);
 				}
 			}
-			string filename = file_mgr_ptr->get_base_filename() + ".0.stack";
+			string filename = file_mgr_ptr->get_base_filename() + ".0.par_stack";
 			if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 			{
 				filename = filename + ".jcb";
@@ -417,7 +436,17 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 				filename = filename + ".csv";
 				stack_pe.to_csv(filename);
 			}
-			f_rec << "saved initial stack to " << filename << endl;
+			f_rec << "saved initial parameter stack to " << filename << endl;
+			//todo: deal with user passed obs en
+			string obs_csv = pest_scenario.get_pestpp_options().get_ies_obs_csv();
+			if (obs_csv.size() > 0)
+			{
+				throw_constraints_error("user-specified obs en for stack not implemented");
+			}
+			else
+			{
+				stack_oe.reserve(stack_pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
+			}
 		}
 	}
 	else use_chance = false;
@@ -487,7 +516,8 @@ void Constraints::update_chance_offsets()
 {
 	if ((!use_chance) || (std_weights))
 		return;
-
+	prior_const_var.clear();
+	post_const_var.clear();
 	if (use_fosm)
 	{
 		ofstream& f_rec = file_mgr_ptr->rec_ofstream();
@@ -532,7 +562,14 @@ void Constraints::update_chance_offsets()
 	}
 	else
 	{
-		throw_constraints_error("constraints::get_chance() not implemented for non-fosm chances");
+		pair<map<string, double>, map<string, double>> stack_oe_mean_stdev = stack_oe.get_moment_maps();
+		for (auto cname : ctl_ord_obs_constraint_names)
+		{
+			prior_const_var[cname] = stack_oe_mean_stdev.second[cname] * stack_oe_mean_stdev.second[cname];
+			post_const_var[cname] = prior_const_var[cname];
+		}
+		cout << "test" << endl;
+		//throw_constraints_error("constraints::get_chance() not implemented for non-fosm chances");
 	}
 }
 
@@ -568,43 +605,88 @@ Observations Constraints::get_chance_shifted_constraints()
 	//constraints_fosm.clear();
 	Observations iter_fosm;
 
-	//map<string,double> out_of_bounds;
-	for (auto& name : ctl_ord_obs_constraint_names)
+	if (use_fosm)
 	{
-		prior_constraint_stdev[name] = sqrt(prior_const_var[name]);
-		post_constraint_stdev[name] = sqrt(post_const_var[name]);
-		pr_offset = probit_val * prior_constraint_stdev[name];
-		pt_offset = probit_val * post_constraint_stdev[name];
-		//important: using the initial simulated constraint values
-		old_constraint_val = current_constraints_sim_ptr->get_rec(name);
-		//old_constraint_val = constraints_sim_initial[name];
-		required_val = constraints_obs[name];
-
-		//if less_than constraint, then add to the sim value, to move positive
-		// WRT the required constraint value
-		if (constraint_sense_map[name] == ConstraintSense::less_than)
+		for (auto& name : ctl_ord_obs_constraint_names)
 		{
+			prior_constraint_stdev[name] = sqrt(prior_const_var[name]);
+			post_constraint_stdev[name] = sqrt(post_const_var[name]);
+			pr_offset = probit_val * prior_constraint_stdev[name];
+			pt_offset = probit_val * post_constraint_stdev[name];
+			//important: using the initial simulated constraint values
+			old_constraint_val = current_constraints_sim_ptr->get_rec(name);
+			//old_constraint_val = constraints_sim_initial[name];
+			required_val = constraints_obs[name];
 
-			new_constraint_val = old_constraint_val + pt_offset;
-			post_constraint_offset[name] = pt_offset;
-			prior_constraint_offset[name] = pr_offset;
-		
+			//if less_than constraint, then add to the sim value, to move positive
+			// WRT the required constraint value
+			if (constraint_sense_map[name] == ConstraintSense::less_than)
+			{
 
+				new_constraint_val = old_constraint_val + pt_offset;
+				post_constraint_offset[name] = pt_offset;
+				prior_constraint_offset[name] = pr_offset;
+
+
+			}
+			//if greater_than constraint, the substract from the sim value to move
+			//negative WRT the required constraint value
+			else if (constraint_sense_map[name] == ConstraintSense::greater_than)
+			{
+				new_constraint_val = old_constraint_val - pt_offset;
+				post_constraint_offset[name] = -pt_offset;
+				prior_constraint_offset[name] = -pr_offset;
+				//}
+			}
+			else
+				new_constraint_val = current_constraints_sim_ptr->get_rec(name);
+			iter_fosm.insert(name, new_constraint_val);
 		}
-		//if greater_than constraint, the substract from the sim value to move
-		//negative WRT the required constraint value
-		else if (constraint_sense_map[name] == ConstraintSense::greater_than)
-		{
-			new_constraint_val = old_constraint_val - pt_offset;
-			post_constraint_offset[name] = -pt_offset;
-			prior_constraint_offset[name] = -pr_offset;
-			//}
-		}
-		else
-			new_constraint_val = current_constraints_sim_ptr->get_rec(name);
-		iter_fosm.insert(name, new_constraint_val);
 	}
+	else
+	{
+		//work out which realization index corresponds to the risk value
+		int cur_num_reals = stack_oe.shape().first;
+		int lt_idx = int(risk * cur_num_reals);
+		int gt_idx = int((1.0-risk) * cur_num_reals);
+		int eq_idx = int(0.5 * cur_num_reals);
+		Eigen::MatrixXd anom = stack_oe.get_eigen_anomalies();
+		map<string, int> var_map = stack_oe.get_var_map();
+		for (auto& name : ctl_ord_obs_constraint_names)
+		{
+			old_constraint_val = current_constraints_sim_ptr->get_rec(name);
+			required_val = constraints_obs[name];
+			Eigen::VectorXd cvec = anom.col(var_map[name]).array() + old_constraint_val;
+			std::sort(cvec.data(), cvec.data() + cvec.size());
+			cout << cvec << endl;
+			cout << lt_idx << "," << cvec[lt_idx] << endl;
+			cout << gt_idx << "," << cvec[gt_idx] << endl;
+			cout << eq_idx << "," << cvec[eq_idx] << endl;
 
+			//if less_than constraint, then add to the sim value, to move positive
+			// WRT the required constraint value
+			if (constraint_sense_map[name] == ConstraintSense::less_than)
+			{
+				pt_offset = old_constraint_val - cvec[lt_idx];
+				new_constraint_val = cvec[lt_idx];
+				post_constraint_offset[name] = pt_offset;
+				prior_constraint_offset[name] = pt_offset;
+			}
+			//if greater_than constraint, the substract from the sim value to move
+			//negative WRT the required constraint value
+			else if (constraint_sense_map[name] == ConstraintSense::greater_than)
+			{
+				pt_offset = old_constraint_val + cvec[gt_idx];
+				new_constraint_val = cvec[gt_idx];
+				post_constraint_offset[name] = pt_offset;
+				prior_constraint_offset[name] = pt_offset;
+				//}
+			}
+			else
+				new_constraint_val = old_constraint_val;
+			iter_fosm.insert(name, new_constraint_val);
+		}
+	}
 	vector<string> names = iter_fosm.get_keys();
 	Observations constraints_chance(*current_constraints_sim_ptr);
 	constraints_chance.update_without_clear(names, iter_fosm.get_data_vec(names));
@@ -984,6 +1066,7 @@ void Constraints::postsolve_pi_constraints_report(Parameters& pars_and_dec_vars,
 
 void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 {
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 	if (!use_chance)
 		return;
 	if (use_fosm)
@@ -1001,8 +1084,15 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 	{
 		//throw runtime_error("non-FOSM update_from_runs() not implemented");
 		//string filename = file_mgr_ptr->get_base_filename() + "..stack";
+		vector<int> failed_runs = stack_oe.update_from_runs(stack_pe_run_map, run_mgr_ptr);
+
+		if (failed_runs.size() > 0)
+		{
+			f_rec << "WARNING: " << failed_runs.size() << " stack realizations failed" << endl;
+			stack_pe.drop_rows(failed_runs);
+		}
 		stringstream ss;
-		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".stack";
+		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".par_stack";
 		if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 		{
 			ss << ".jcb";
@@ -1013,6 +1103,19 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 			ss << ".csv";
 			stack_pe.to_csv(ss.str());
 		}
+		ss.str("");
+		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".obs_stack";
+		if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+		{
+			ss << ".jcb";
+			stack_oe.to_binary(ss.str());
+		}
+		else
+		{
+			ss << ".csv";
+			stack_oe.to_csv(ss.str());
+		}
+		f_rec << "Note: " << stack_oe.shape().first << "stack realizations active" << endl;
 
 
 	}
