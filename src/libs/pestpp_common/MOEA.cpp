@@ -6,6 +6,9 @@
 #include "ModelRunPP.h"
 #include "RestartController.h"
 
+using namespace mou;
+using namespace std;
+
 //ZAK: this should be done in the initialize() method
 mt19937_64 MOEA::rand_engine = mt19937_64(1);
 
@@ -14,11 +17,46 @@ const string MOEA::solver_type_name = "MOEA";
 MOEA::MOEA(Pest &_pest_scenario, FileManager &_file_manager,
 	Objectives *_objs_ptr, Constraints *_cons_ptr, const ParamTransformSeq &_par_transform,
 	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log, RunManagerAbstract* _run_mgr_ptr)
-	: pest_scenario(_pest_scenario), file_manager(_file_manager), obj_func_ptr(_obj_func_ptr), par_transform(_par_transform),
+	: pest_scenario(_pest_scenario), file_manager(_file_manager), par_transform(_par_transform),
 	output_file_writer(_output_file_writer), performance_log(_performance_log),
 	run_mgr_ptr(_run_mgr_ptr),
-	gen_1(_file_manager.build_filename("zak"))
-
+	gen_1(_file_manager.build_filename("zak")),
+	nreal(-1),
+	nbin(-1),
+	nobj(-1),
+	ncon(-1),
+	popsize(-1),
+	ngen(-1),
+	nreport(1),
+	pcross_real(-1),
+	pcross_bin(-1),
+	pmut_real(-1),
+	pmut_bin(-1),
+	eta_c(-1),
+	eta_m(-1),
+	epsilon_c(EPS),
+	nbits(0),
+	limits_realvar(0),
+	limits_binvar(0),
+	function(0),
+	popFunction(0),
+	reportFunction(0),
+	// choice(0),
+	// obj1(0),
+	// obj2(0),
+	// obj3(0),
+	// angle1(0),
+	// angle2(0),
+	backupFilename("nsga2_backup_pop.data"),
+	nbinmut(0),
+	nrealmut(0),
+	nbincross(0),
+	nrealcross(0),
+	bitlength(0),
+	parent_pop(0),
+	child_pop(0),
+	mixed_pop(0),
+	crowd_obj(true)
 {
 	// initialize random number generator
 	rand_engine.seed(seed);
@@ -96,7 +134,7 @@ void MOEA::solve(RunManagerAbstract &run_manager,
 }
 
 
-void MOEA::initialize(RunManagerAbstract &run_manager, int d)
+void MOEA::initialize(RunManagerAbstract &run_manager, int d) throw (MOEAexception)
 {
 	ostream &fout_restart = file_manager.get_ofstream("rst");
 	int iter = 0;
@@ -125,7 +163,133 @@ void MOEA::initialize(RunManagerAbstract &run_manager, int d)
 
 	Parameters tmp_pars;
 	Observations tmp_obs;
-	ModelRun tmp_run(obj_func_ptr);
+	ModelRun tmp_run(objs_ptr);
+	// copied from NSGA2.cpp
+	cout << "Initializing NSGA-II v0.2.1\n"
+		<< "Checking configuration" << endl;
+
+	if (nreal < 0)
+		throw MOEAexception("Invalid number of real variables");
+	if (nbin < 0)
+		throw MOEAexception("Invalid number of binary variables");
+	if (nreal == 0 && nbin == 0)
+		throw MOEAexception("Zero real and binary variables");
+	if (nobj < 1)
+		throw MOEAexception("Invalid number of objective functions");
+	if (ncon < 0)
+		throw MOEAexception("Invalid number of constraints");
+	if (popsize < 4 || (popsize % 4) != 0)
+		throw MOEAexception("Invalid size of population");
+	if (pcross_real < 0.0 || pcross_real>1.0)
+		throw MOEAexception("Invalid probability of real crossover");
+	if (pmut_real < 0.0 || pmut_real>1.0)
+		throw MOEAexception("Invalid probability of real mutation");
+	if (pcross_bin < 0.0 || pcross_bin>1.0)
+		throw MOEAexception("Invalid probability of binary crossover");
+	if (pmut_bin < 0.0 || pmut_bin>1.0)
+		throw MOEAexception("Invalid probability of binary mutation");
+	if (eta_c <= 0)
+		throw MOEAexception("Invalid distribution index for crossover");
+	if (eta_m <= 0)
+		throw MOEAexception("Invalid distribution index for mutation");
+	if (ngen < 1)
+		throw MOEAexception("Invalid number of generations");
+	if (nbin != 0 && nbits.size() == 0)
+		throw MOEAexception("Invalid number of bits for binary variables");
+	if (limits_realvar.size() != nreal)
+		throw MOEAexception("Invalid number of real variable limits");
+	if (limits_binvar.size() != nbin)
+		throw MOEAexception("Invalid number of binary variable limits");
+	if (function == 0)
+		throw MOEAexception("Evaluation function not defined");
+
+	init_streams();
+	report_parameters(fpt5);
+
+	nbinmut = 0;
+	nrealmut = 0;
+	nbincross = 0;
+	nrealcross = 0;
+	bitlength = std::accumulate(nbits.begin(), nbits.end(), 0);
+
+	parent_pop = new population(popsize,
+		nreal,
+		nbin,
+		ncon,
+		nbits,
+		limits_realvar,
+		limits_binvar,
+		nobj,
+		pmut_real,
+		pmut_bin,
+		eta_m,
+		epsilon_c,
+		function);
+	child_pop = new population(popsize,
+		nreal,
+		nbin,
+		ncon,
+		nbits,
+		limits_realvar,
+		limits_binvar,
+		nobj,
+		pmut_real,
+		pmut_bin,
+		eta_m,
+		epsilon_c,
+		function);
+	mixed_pop = new population(popsize * 2,
+		nreal,
+		nbin,
+		ncon,
+		nbits,
+		limits_realvar,
+		limits_binvar,
+		nobj,
+		pmut_real,
+		pmut_bin,
+		eta_m,
+		epsilon_c,
+		function);
+
+	if (popFunction) {
+		parent_pop->set_popfunction(popFunction);
+		child_pop->set_popfunction(popFunction);
+		mixed_pop->set_popfunction(popFunction);
+	}
+
+	parent_pop->crowd_obj = crowd_obj;
+	child_pop->crowd_obj = crowd_obj;
+	mixed_pop->crowd_obj = crowd_obj;
+
+	//randomize();
+
+	bool fromBackup = load_backup();
+	if (!fromBackup) {
+		parent_pop->initialize();
+		cout << "Initialization done, now performing first generation" << endl;
+
+		parent_pop->decode();
+		parent_pop->custom_evaluate();
+		parent_pop->fast_nds();
+		parent_pop->crowding_distance_all();
+
+		t = 1;
+	}
+	else {
+		cout << "Initialization made from backup file" << endl;
+	}
+
+	custom_report(*parent_pop);
+
+	report_pop(*parent_pop, fpt1);
+	fpt4 << "# gen = " << t << '\n';
+	report_pop(*parent_pop, fpt4);
+
+	fpt1.flush();
+	fpt4.flush();
+	fpt5.flush();
+	// end copy
 	for (int i_run = 0; i_run < d; ++i_run)
 	{
 		bool r_status = gen_1.get_run(i_run, tmp_pars, tmp_obs);
@@ -423,4 +587,16 @@ void MOEA::write_run_summary(std::ostream &os,
 }
 MOEA::~MOEA()
 {
+	if (parent_pop) {
+		delete parent_pop;
+		parent_pop = 0;
+	}
+	if (child_pop) {
+		delete child_pop;
+		child_pop = 0;
+	}
+	if (mixed_pop) {
+		delete mixed_pop;
+		mixed_pop = 0;
+	}
 }
