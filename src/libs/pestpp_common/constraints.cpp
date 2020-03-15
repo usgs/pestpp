@@ -32,6 +32,7 @@ Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, Outpu
 void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* _current_pars_and_dec_vars_ptr,
 	Observations* _current_constraints_sim_ptr, double _dbl_max)
 {
+	dec_var_names = ctl_ord_dec_var_names;
 	current_constraints_sim_ptr = _current_constraints_sim_ptr;
 	current_pars_and_dec_vars_ptr = _current_pars_and_dec_vars_ptr;
 	stack_size = pest_scenario.get_pestpp_options().get_opt_stack_size();
@@ -1150,8 +1151,16 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 	}
 	else
 	{
-		//throw_constraints_error("non-fosm add_runs() not implemented");
-		//todo: update stack_pe parameter values for decision variables using current_pars_and_dec_vars_ptr
+		
+		//update stack_pe parameter values for decision variables using current_pars_and_dec_vars_ptr
+		int num_reals = stack_pe.shape().first;
+		map<string, int> var_map = stack_pe.get_var_map();
+		for (auto dname : dec_var_names)
+		{
+			Eigen::VectorXd dvec(num_reals);
+			dvec.setConstant(current_pars_and_dec_vars_ptr->get_rec(dname));
+			stack_pe.replace_col(dname, dvec);
+		}
 		pfm.log_event("building stack-based parameter runs");
 		cout << "  ---  running " << stack_pe.shape().first << " model runs for stack-based chance constraints  ---  " << endl;
 		stack_pe_run_map.clear();

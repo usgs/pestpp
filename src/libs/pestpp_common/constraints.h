@@ -118,6 +118,7 @@ private:
 	Observations get_chance_shifted_constraints();
 	vector<double> get_constraint_residual_vec(Observations& sim);
 	
+	vector<string> dec_var_names;
 	vector<string> nz_obs_names;
 	vector<string> adj_par_names;
 	vector<string> ctl_ord_obs_constraint_names;
