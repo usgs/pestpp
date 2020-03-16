@@ -627,7 +627,6 @@ void Constraints::update_chance_offsets()
 			prior_const_var[cname] = stack_oe_mean_stdev.second[cname] * stack_oe_mean_stdev.second[cname];
 			post_const_var[cname] = prior_const_var[cname];
 		}
-		cout << "test" << endl;
 		//throw_constraints_error("constraints::get_chance() not implemented for non-fosm chances");
 	}
 }
@@ -649,6 +648,11 @@ double Constraints::get_max_constraint_change(Observations& upgrade_obs)
 }
 
 Observations Constraints::get_chance_shifted_constraints()
+{
+	return get_chance_shifted_constraints(*current_constraints_sim_ptr);
+}
+
+Observations Constraints::get_chance_shifted_constraints(Observations& _constraints_sim)
 {
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 	prior_constraint_offset.clear();
@@ -673,7 +677,7 @@ Observations Constraints::get_chance_shifted_constraints()
 			pr_offset = probit_val * prior_constraint_stdev[name];
 			pt_offset = probit_val * post_constraint_stdev[name];
 			//important: using the initial simulated constraint values
-			old_constraint_val = current_constraints_sim_ptr->get_rec(name);
+			old_constraint_val = _constraints_sim.get_rec(name);
 			//old_constraint_val = constraints_sim_initial[name];
 			required_val = constraints_obs[name];
 
@@ -685,8 +689,6 @@ Observations Constraints::get_chance_shifted_constraints()
 				new_constraint_val = old_constraint_val + pt_offset;
 				post_constraint_offset[name] = pt_offset;
 				prior_constraint_offset[name] = pr_offset;
-
-
 			}
 			//if greater_than constraint, the substract from the sim value to move
 			//negative WRT the required constraint value
@@ -695,7 +697,6 @@ Observations Constraints::get_chance_shifted_constraints()
 				new_constraint_val = old_constraint_val - pt_offset;
 				post_constraint_offset[name] = -pt_offset;
 				prior_constraint_offset[name] = -pr_offset;
-				//}
 			}
 			else
 				new_constraint_val = current_constraints_sim_ptr->get_rec(name);
@@ -710,36 +711,34 @@ Observations Constraints::get_chance_shifted_constraints()
 		int gt_idx = int((1.0-risk) * cur_num_reals);
 		int eq_idx = int(0.5 * cur_num_reals);
 		Eigen::MatrixXd anom = stack_oe.get_eigen_anomalies();
+		stack_oe.update_var_map();
 		map<string, int> var_map = stack_oe.get_var_map();
+		pair<map<string, double>, map<string, double>> mm = stack_oe.get_moment_maps();
 		for (auto& name : ctl_ord_obs_constraint_names)
 		{
-			old_constraint_val = current_constraints_sim_ptr->get_rec(name);
+			old_constraint_val = _constraints_sim.get_rec(name);
 			required_val = constraints_obs[name];
 			Eigen::VectorXd cvec = anom.col(var_map[name]).array() + old_constraint_val;
-			std::sort(cvec.data(), cvec.data() + cvec.size());
-			cout << cvec << endl;
-			cout << lt_idx << "," << cvec[lt_idx] << endl;
-			cout << gt_idx << "," << cvec[gt_idx] << endl;
-			cout << eq_idx << "," << cvec[eq_idx] << endl;
-
-			//if less_than constraint, then add to the sim value, to move positive
-			// WRT the required constraint value
+			sort(cvec.data(), cvec.data() + cvec.size());
+			prior_constraint_stdev[name] = mm.second[name];
+			post_constraint_stdev[name] = mm.second[name];
+			
 			if (constraint_sense_map[name] == ConstraintSense::less_than)
 			{
-				pt_offset = old_constraint_val - cvec[lt_idx];
+				pt_offset = cvec[lt_idx] - old_constraint_val;
 				new_constraint_val = cvec[lt_idx];
 				post_constraint_offset[name] = pt_offset;
 				prior_constraint_offset[name] = pt_offset;
+				
 			}
-			//if greater_than constraint, the substract from the sim value to move
-			//negative WRT the required constraint value
+			
 			else if (constraint_sense_map[name] == ConstraintSense::greater_than)
 			{
-				pt_offset = old_constraint_val + cvec[gt_idx];
+				pt_offset = cvec[gt_idx] - old_constraint_val;
 				new_constraint_val = cvec[gt_idx];
-				post_constraint_offset[name] = pt_offset;
-				prior_constraint_offset[name] = pt_offset;
-				//}
+				post_constraint_offset[name] = -pt_offset;
+				prior_constraint_offset[name] = -pt_offset;
+
 			}
 			else
 				new_constraint_val = old_constraint_val;
@@ -747,7 +746,7 @@ Observations Constraints::get_chance_shifted_constraints()
 		}
 	}
 	vector<string> names = iter_fosm.get_keys();
-	Observations constraints_chance(*current_constraints_sim_ptr);
+	Observations constraints_chance(_constraints_sim);
 	constraints_chance.update_without_clear(names, iter_fosm.get_data_vec(names));
 	
 	return constraints_chance;
@@ -923,15 +922,20 @@ void Constraints::presolve_report(int iter)
 {
 	
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
-	vector<double> residuals = get_constraint_residual_vec(*current_constraints_sim_ptr);
+	vector<double> residuals;
 	f_rec << endl << "  observation constraint information at start of iteration " << iter << endl;
 	f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
 	f_rec << setw(15) << "residual" << setw(15) << "lower bound" << setw(15) << "upper bound" << endl;
 	Observations current;
 	if (use_chance)
-		current = get_chance_shifted_constraints();
+	{
+		current = get_chance_shifted_constraints();	
+	}
 	else
+	{
 		current = *current_constraints_sim_ptr;
+	}
+	residuals = get_constraint_residual_vec(current);
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
@@ -1048,8 +1052,13 @@ void Constraints::postsolve_obs_constraints_report(Observations& constraints_sim
 		f_rec << setw(15) << "fosm offset";
 	f_rec << setw(15) << "current" << setw(15) << "residual";
 	f_rec << setw(15) << "new" << setw(15) << "residual" << endl;
+
 	vector<double> cur_residuals = get_constraint_residual_vec(*current_constraints_sim_ptr);
-	vector<double> new_residuals = get_constraint_residual_vec(constraints_sim);
+	vector<double> new_residuals;
+	if (use_chance)
+		new_residuals = get_constraint_residual_vec(get_chance_shifted_constraints(constraints_sim));
+	else
+		new_residuals = get_constraint_residual_vec(constraints_sim);
 	double sim_val;
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
@@ -1262,6 +1271,9 @@ map<string, double> Constraints::get_unsatified_obs_constraints(Observations& co
 {
 	double sim_val, obs_val, scaled_diff;
 	map<string, double> unsatisfied;
+	Observations _constraints_sim = constraints_sim;
+	if (use_chance)
+		_constraints_sim = get_chance_shifted_constraints(constraints_sim);
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];

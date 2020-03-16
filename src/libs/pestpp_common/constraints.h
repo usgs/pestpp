@@ -116,6 +116,8 @@ private:
 
 	pair<ConstraintSense, string> get_sense_from_group_name(const string& name);
 	Observations get_chance_shifted_constraints();
+	Observations get_chance_shifted_constraints(Observations& _constraints_sim);
+
 	vector<double> get_constraint_residual_vec(Observations& sim);
 	
 	vector<string> dec_var_names;
