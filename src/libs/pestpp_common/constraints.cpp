@@ -1076,14 +1076,14 @@ void Constraints::postsolve_obs_constraints_report(Observations& constraints_sim
 			double offset = post_constraint_offset[name];
 			sim_val += offset;
 			f_rec << setw(15) << offset;
-			f_rec << setw(15) << constraints_sim.get_rec(name) + offset;
+			f_rec << setw(15) << current_constraints_sim_ptr->get_rec(name);
 			f_rec << setw(15) << cur_residuals[i];
 			f_rec << setw(15) << sim_val;
-			f_rec << setw(15) << new_residuals[i] - offset << endl;
+			f_rec << setw(15) << new_residuals[i] << endl;
 		}
 		else
 		{
-			f_rec << setw(15) << constraints_sim.get_rec(name);
+			f_rec << setw(15) << current_constraints_sim_ptr->get_rec(name);
 			f_rec << setw(15) << cur_residuals[i];
 			f_rec << setw(15) << sim_val;
 			f_rec << setw(15) << new_residuals[i] << endl;
