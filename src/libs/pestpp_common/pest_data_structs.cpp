@@ -622,11 +622,11 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	}
 	else if (key == "OPT_PAR_STACK")
 	{
-		convert_ip(value, opt_par_stack);
+		opt_par_stack = org_value;
 	}
 	else if (key == "OPT_OBS_STACK")
 	{
-		convert_ip(value, opt_obs_stack);
+		opt_obs_stack = org_value;
 	}
 	else if ((key == "OPT_DEC_VAR_GROUPS") || (key == "OPT_DECISION_VARIABLE_GROUPS"))
 	{
