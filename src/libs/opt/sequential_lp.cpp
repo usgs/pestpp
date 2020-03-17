@@ -979,7 +979,7 @@ void sequentialLP::iter_presolve()
 			pest_utils::read_res(res_filename, current_constraints_sim);
 			f_rec << "done" << endl;
 			cout << "done" << endl;
-			if (constraints.should_update_chance(slp_iter))
+			if ((constraints.should_update_chance(slp_iter)) && (!constraints.get_use_fosm()))
 				constraints.add_runs(run_mgr_ptr);
 			
 
@@ -990,12 +990,12 @@ void sequentialLP::iter_presolve()
 			cout << "  ---  running the model once with initial decision variables  ---  " << endl;
 			int run_id = run_mgr_ptr->add_run(par_trans.ctl2model_cp(all_pars_and_dec_vars));
 			//this would be only for stack runs since the fosm runs should have been in the jco
-			if (constraints.should_update_chance(slp_iter))
+			if ((constraints.should_update_chance(slp_iter)) && (!constraints.get_use_fosm()))
 				constraints.add_runs(run_mgr_ptr);
-			else
+			/*else
 			{
 				cout << "  ---  running the model once with initial decision variables  ---  " << endl;
-			}
+			}*/
 			run_mgr_ptr->run();
 			Parameters pars;
 			bool success = run_mgr_ptr->get_run(run_id, pars, current_constraints_sim);
