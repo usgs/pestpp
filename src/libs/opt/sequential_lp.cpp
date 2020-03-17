@@ -1122,8 +1122,9 @@ void sequentialLP::iter_postsolve()
 	all_pars_and_dec_vars.update_without_clear(ctl_ord_dec_var_names, upgrade_pars.get_data_vec(ctl_ord_dec_var_names));
 
 	//constraints_sim.update(ctl_ord_obs_constraint_names,upgrade_obs.get_data_vec(ctl_ord_obs_constraint_names));
-	constraints_sim.update_without_clear(constraints.get_obs_constraint_names(), 
-		upgrade_obs.get_data_vec(constraints.get_obs_constraint_names()));
+	//constraints_sim.update_without_clear(constraints.get_obs_constraint_names(), 
+	//	upgrade_obs.get_data_vec(constraints.get_obs_constraint_names()));
+	current_constraints_sim = upgrade_obs;
 	return;
 }
 
