@@ -692,7 +692,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		convert_ip(value, opt_iter_tol);
 	}
 
-	else if (key == "OPT_RECALC_FOSM_EVERY")
+	else if ((key == "OPT_RECALC_FOSM_EVERY") || (key == "OPT_RECALC_CHANCE_EVERY"))
 	{
 		convert_ip(value, opt_recalc_fosm_every);
 	}
