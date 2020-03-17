@@ -515,7 +515,7 @@ void Constraints::initial_report()
 {
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 
-	f_rec << endl << "  ---  observation constraints in SLP  ---  " << endl;
+	f_rec << endl << "  ---  observation constraints ---  " << endl;
 	f_rec << setw(20) << "name" << setw(20) << "sense" << setw(20) << "value" << endl;
 	for (auto& name : ctl_ord_obs_constraint_names)
 	{
@@ -526,7 +526,7 @@ void Constraints::initial_report()
 
 	if (num_pi_constraints() > 0)
 	{
-		f_rec << endl << "  ---  prior information constraints in SLP  ---  " << endl;
+		f_rec << endl << "  ---  prior information constraints   ---  " << endl;
 		f_rec << setw(20) << "name" << setw(20) << "sense" << setw(20) << "value" << endl;
 		for (auto& name : ctl_ord_pi_constraint_names)
 		{
@@ -539,6 +539,19 @@ void Constraints::initial_report()
 	if (use_chance)
 	{
 		f_rec << endl << endl << "  ---  chance constraint FOSM information  ---  " << endl;
+		if (use_fosm)
+		{
+			f_rec << "-->using FOSM-based chance constraints" << endl;
+			f_rec << "-->++opt_risk and corresponding probit function value: " << setw(10) << risk << setw(20) << probit_val << endl;
+			f_rec << "-->number of non-zero weight observations for FOSM calcs: " << num_nz_obs() << endl;
+		}
+		else
+		{ 
+			f_rec << "-->using stack-based chance constraints" << endl;
+		}
+		f_rec << "-->number of adjustable parameters for chance constraint calcs: " << num_adj_pars() << endl;
+		
+		f_rec << "-->repeat chance constraint calculations every: " << pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() << " iterations" << endl << endl;
 		f_rec << "   adjustable parameters used in FOSM calculations:" << endl;
 		int i = 1;
 		for (auto& name : adj_par_names)
@@ -549,14 +562,14 @@ void Constraints::initial_report()
 			i++;
 		}
 		f_rec << endl;
-		if (num_nz_obs() == 0)
+		if ((num_nz_obs() == 0) && (use_fosm))
 		{
 			f_rec << endl << endl << "  ---  Note: No nonzero weight observations found." << endl;
-			f_rec << "           Prior constraint uncertainty will be used in chance constraint calculations" << endl;
+			f_rec << "           Prior constraint uncertainty will be used in FOSM-based chance constraint calculations" << endl;
 		}
-		else
+		else if (use_fosm)
 		{
-			f_rec << "  non-zero weight observations used for conditioning in FOSM calculations: " << endl;
+			f_rec << "  non-zero weight observations used for conditioning in FOSM-based chance constraint calculations: " << endl;
 			int i = 0;
 			for (auto& name : nz_obs_names)
 			{
@@ -627,7 +640,6 @@ void Constraints::update_chance_offsets()
 			prior_const_var[cname] = stack_oe_mean_stdev.second[cname] * stack_oe_mean_stdev.second[cname];
 			post_const_var[cname] = prior_const_var[cname];
 		}
-		//throw_constraints_error("constraints::get_chance() not implemented for non-fosm chances");
 	}
 }
 
@@ -659,13 +671,8 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 	prior_constraint_stdev.clear();
 	post_constraint_offset.clear();
 	post_constraint_stdev.clear();
-	//if ((!std_weights) && ((slp_iter == 1) || ((slp_iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
-	
-	//work out the offset for each constraint
-	//and set the values in the constraints_fosm Obseravtions
 	double new_constraint_val, old_constraint_val, required_val;
 	double pr_offset, pt_offset;
-	//constraints_fosm.clear();
 	Observations iter_fosm;
 
 	if (use_fosm)
@@ -676,9 +683,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 			post_constraint_stdev[name] = sqrt(post_const_var[name]);
 			pr_offset = probit_val * prior_constraint_stdev[name];
 			pt_offset = probit_val * post_constraint_stdev[name];
-			//important: using the initial simulated constraint values
 			old_constraint_val = _constraints_sim.get_rec(name);
-			//old_constraint_val = constraints_sim_initial[name];
 			required_val = constraints_obs[name];
 
 			//if less_than constraint, then add to the sim value, to move positive
@@ -706,10 +711,14 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 	else
 	{
 		//work out which realization index corresponds to the risk value
+		if (stack_oe.shape().first < 3)
+			throw_constraints_error("too few (<3) stack members, cannot continue with stack-based chance constraints");
 		int cur_num_reals = stack_oe.shape().first;
+		//get the idx of the sense locations
 		int lt_idx = int(risk * cur_num_reals);
 		int gt_idx = int((1.0-risk) * cur_num_reals);
 		int eq_idx = int(0.5 * cur_num_reals);
+		//get the mean-centered anomalies
 		Eigen::MatrixXd anom = stack_oe.get_eigen_anomalies();
 		stack_oe.update_var_map();
 		map<string, int> var_map = stack_oe.get_var_map();
@@ -718,6 +727,9 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 		{
 			old_constraint_val = _constraints_sim.get_rec(name);
 			required_val = constraints_obs[name];
+			// the realized values of this stack are the anomalies added to the
+			//current constraint value - this assumes the current value 
+			//is the mean of the stack distribution
 			Eigen::VectorXd cvec = anom.col(var_map[name]).array() + old_constraint_val;
 			sort(cvec.data(), cvec.data() + cvec.size());
 			prior_constraint_stdev[name] = mm.second[name];
@@ -766,7 +778,6 @@ vector<double> Constraints::get_constraint_residual_vec(Observations& sim)
 	for (vector<string>::iterator b = ctl_ord_obs_constraint_names.begin(), e = ctl_ord_obs_constraint_names.end(); b != e; ++b, ++i)
 	{
 		found_obs = sim.find(*b);
-		//double fosm_offset = post_constraint_offset[*b];
 		if (found_obs != not_found_obs)
 		{
 			residuals_vec[i] = constraints_obs.get_rec(*b) - ((*found_obs).second);
@@ -775,26 +786,16 @@ vector<double> Constraints::get_constraint_residual_vec(Observations& sim)
 	return residuals_vec;
 }
 
-//void Constraints::update_obs_and_pi_constraints(Observations& _constraints_sim, Parameters& _pars_and_dec_vars) 
-//{
-//	current_pars_and_dec_vars = _pars_and_dec_vars;
-//	current_constraints_sim = _constraints_sim;
-//}
-
 pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors()
 {
 	vector<double> residuals;
 	if (use_chance)
 	{
-		/*bool update = false;
-		if ((!std_weights) && ((iter == 1) || ((iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
-			update = true;*/
 		Observations current_constraints_chance = get_chance_shifted_constraints();
 		residuals = get_constraint_residual_vec(current_constraints_chance);
 	}
 	else
 	{
-		//current_constraints_sim = constraints_sim;
 		residuals = get_constraint_residual_vec(*current_constraints_sim_ptr);
 	}
 
@@ -900,22 +901,8 @@ double  Constraints::ErfInv2(double x)
 
 double Constraints::get_probit()
 {
-
-	//double probit = 0.0;
-	//vector<double>::iterator start = probit_inputs.begin();
-	//vector<double>::iterator end = probit_inputs.end();
-
 	double output = sqrt(2.0) * ErfInv2((2.0 * risk) - 1.0);
-
-	//find the nearest values in the probit_input vector
-	/*auto const it = std::lower_bound(start, end, risk);
-	int idx = find(start, end, *it) - start;
-	if (idx >= probit_inputs.size())
-		throw_sequentialLP_error("error looking up probit function value");
-	double output = probit_outputs[idx];
-	*/
 	return output;
-
 }
 
 void Constraints::presolve_report(int iter)
@@ -1034,6 +1021,26 @@ void Constraints::presolve_chance_report(int iter)
 
 	return;
 	
+}
+
+
+bool Constraints::should_update_chance(int iter)
+{
+	if (!use_chance)
+		return false;
+	if (std_weights)
+		return false;
+	if (iter == 1)
+	{
+		if (use_fosm)
+			return true;
+		if (pest_scenario.get_pestpp_options().get_opt_obs_stack().size() > 0)
+			return false;
+		else
+			return true;
+	}
+	else if ((iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)
+		return true;
 }
 
 
@@ -1183,8 +1190,7 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 			ss << ".csv";
 			stack_oe.to_csv(ss.str());
 		}
-		f_rec << "Note: " << stack_oe.shape().first << "stack realizations active" << endl;
-
+		f_rec << "Note: " << stack_oe.shape().first << " stack realizations active" << endl;
 
 	}
 

@@ -25,31 +25,24 @@ public:
 	void solve();
 
 	~sequentialLP();
-	//ModelRun get_optimum_run() { return optimum_run; }
 
 private:
 	std::mt19937 rand_gen;
 	PerformanceLog& pfm;
 	string obj_func_str;
-	//bool use_chance;
 	bool terminate;
 	bool super_secret_option;
 	bool use_obj_obs;
-	//bool std_weights;
 	string obj_obs;
 	int slp_iter;
 
 	double* dec_var_lb;
 	double* dec_var_ub;
-	//double* constraint_lb;
-	//double* constraint_ub;
 	double* ctl_ord_obj_func_coefs;
 	const double* row_price;
-	double risk;
 	double iter_derinc_fac;
 	double obj_best;
 	double obj_init;
-	double probit_val;
 
 	string obj_sense;
 	ClpSimplex model;
@@ -75,11 +68,6 @@ private:
 	Parameters all_pars_and_dec_vars_initial;
 	Parameters all_pars_and_dec_vars_best;
 	ParamTransformSeq par_trans;
-	//Observations constraints_obs;
-	//Observations constraints_sim;
-	//Observations constraints_fosm;
-	//Observations constraints_sim_initial;
-	//PriorInformation constraints_pi;
 	Observations current_constraints_sim;
 	
 	Observations obj_func_obs;
@@ -95,14 +83,8 @@ private:
 
 	void build_dec_var_bounds();
 
-	//get the interpolated probit value
-	double get_probit();
-
 	//report the infeasible info
 	void iter_infeasible_report();
-
-	//get the number of non zero elements in the prior information constraints
-	//int num_nz_pi_constraint_elements();
 
 	//parse the obs or pi group name to get the constraint sense
 	pair<ConstraintSense,string> get_sense_from_group_name(const string &name);
@@ -113,24 +95,8 @@ private:
 	//report initial conditions to rec file
 	void initial_report();
 
-	//report the constraint info before the solving the current LP problem
-	//void presolve_constraint_report();
-
-	//report the fosm chance constraint info before solving the current LP problem
-	//void presolve_fosm_report();
-
-	//void write_res_file(Observations &obs, Parameters &par, string tag);
-
 	//report dec var info the newly solved LP solution.  returns the current and new obj func
 	pair<double,double> postsolve_decision_var_report(Parameters &upgrade_pars);
-
-	//report the current and newly solved LP constraint info
-	//void postsolve_constraint_report(Observations &upgrade_obs, Parameters &upgrade_pars, string tag="simulated");
-
-	//void postsolve_model_constraint_report(Observations &upgrade_obs, string tag);
-
-	//void postsolve_pi_constraint_report(Parameters &upgrade_pars);
-
 
 	//check that all constraints and dec vars are satified
 	map<string, double> get_out_of_bounds_dec_vars(Parameters &upgrade_pars);
@@ -147,27 +113,16 @@ private:
 	//convert the jacobian to a coin packed matrix instance
 	CoinPackedMatrix jacobian_to_coinpackedmatrix();
 
-	//convert the constraint info from Transformable to double*
-	//void build_constraint_bound_arrays();
-
 	//error handlers
 	void throw_sequentialLP_error(string message);
 	void throw_sequentialLP_error(string message,const vector<string> &messages);
 	void throw_sequentialLP_error(string message, const set<string> &messages);
 
-	//get the current constraint residual vector
-	//vector<double> get_constraint_residual_vec();
-
-	//get a residual vector comparing constraints_obs and sim_vals
-	//vector<double> get_constraint_residual_vec(Observations &sim_vals);
-
 	//set the double* obj_func array
 	void build_obj_func_coef_array();
 
-	//calc FOSM-based chance constraint offsets
-	//void calc_chance_constraint_offsets();
-
 	double obj_func_report();
+
 };
 
 

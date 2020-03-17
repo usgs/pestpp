@@ -68,38 +68,6 @@ void sequentialLP::throw_sequentialLP_error(string message)
 	throw runtime_error(error_message);
 }
 
-//vector<double> sequentialLP::get_constraint_residual_vec()
-//{
-//	if (use_chance)
-//		return get_constraint_residual_vec(constraints_fosm);
-//	else
-//		return get_constraint_residual_vec(constraints_sim);
-//}
-
-//vector<double> sequentialLP::get_constraint_residual_vec(Observations &sim_vals)
-//{
-//	vector<double> residuals_vec;
-//	residuals_vec.resize(num_constraints(), 0.0);
-//
-//	Observations::const_iterator found_obs;
-//	Observations::const_iterator not_found_obs = sim_vals.end();
-//	PriorInformation::const_iterator found_prior_info;
-//
-//	int i = 0;
-//	for (vector<string>::iterator b = ctl_ord_obs_constraint_names.begin(), e = ctl_ord_obs_constraint_names.end(); b != e; ++b, ++i)
-//	{
-//		found_obs = sim_vals.find(*b);
-//		//double fosm_offset = post_constraint_offset[*b];
-//		if (found_obs != not_found_obs)
-//		{
-//			residuals_vec[i] = constraints_obs.get_rec(*b) - ((*found_obs).second);
-//		}
-//
-//	}
-//	return residuals_vec;
-//}
-
-
 void sequentialLP::initial_report()
 {
 	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
@@ -117,14 +85,7 @@ void sequentialLP::initial_report()
 	f_rec << "-->number of prior information constraints: " << constraints.num_pi_constraints() << endl;
 	if (iter_derinc_fac != 1.0)
 		f_rec << "-->iteration DERINC reduction factor (++opt_iter_derinc_fac): " << iter_derinc_fac << endl;
-	if (constraints.get_use_chance())
-	{
-		f_rec << "-->using FOSM-based chance constraints - good choice!" << endl;
-		f_rec << "-->++opt_risk and corresponding probit function value: " << setw(10) << risk << setw(20) << probit_val << endl;
-		f_rec << "-->number of adjustable parameters for FOSM calcs: " << constraints.num_adj_pars() << endl;
-		f_rec << "-->number of non-zero weight observations for FOSM calcs: " << constraints.num_nz_obs() << endl;
-		f_rec << "-->repeat FOSM calcs every: " << pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() << " iterations" << endl << endl;
-	}
+	
 	string bj = pest_scenario.get_pestpp_options().get_basejac_filename();
 	if (!bj.empty())
 		f_rec << "-->start with existing jacobian: " << bj << endl;
@@ -204,157 +165,6 @@ double sequentialLP::obj_func_report()
 
 }
 
-//void sequentialLP::presolve_fosm_report()
-//{
-//	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
-//	vector<double> residuals = get_constraint_residual_vec();
-//	f_rec << endl << "  FOSM-based chance constraint information at start of iteration " << slp_iter << endl;
-//	f_rec << setw(20) << left << "name" << right << setw(10) << "sense" << setw(15) << "required" << setw(15) << "sim value";
-//	f_rec << setw(15) << "prior stdev" << setw(15) << "post stdev" << setw(15) << "offset";
-//	f_rec << setw(15) << "new sim value" << endl;
-//	vector<string> out_of_bounds;
-//	for (int i = 0; i<num_obs_constraints(); ++i)
-//	{
-//		string name = ctl_ord_obs_constraint_names[i];
-//		f_rec << setw(20) << left << name;
-//		f_rec << setw(10) << right << constraint_sense_name[name];
-//		f_rec << setw(15) << constraints_obs[name];
-//		f_rec << setw(15) << constraints_sim_initial.get_rec(name);
-//		f_rec << setw(15) << prior_constraint_stdev[name];
-//		f_rec << setw(15) << post_constraint_stdev[name];
-//		f_rec << setw(15) << post_constraint_offset[name];
-//		f_rec << setw(15) << constraints_fosm[name] << endl;
-//	}
-//	f_rec << "  note: 'offset' is the value added to the simulated constraint value to account" << endl;
-//	f_rec << "        for the uncertainty in the constraint value arsing from uncertainty in the " << endl;
-//	f_rec << "        adjustable parameters identified in the control file." << endl << endl;
-//
-//	return;
-//}
-
-//void sequentialLP::presolve_constraint_report()
-//{
-//	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
-//	vector<double> residuals = get_constraint_residual_vec();
-//	f_rec << endl << "  observation constraint information at start of iteration " << slp_iter << endl;
-//	f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
-//	f_rec << setw(15) << "residual" << setw(15) << "lower bound" << setw(15) << "upper bound" << endl;
-//
-//	for (int i=0;i<num_obs_constraints();++i)
-//	{
-//		string name = ctl_ord_obs_constraint_names[i];
-//		f_rec << setw(20) << left << name;
-//		f_rec << setw(15) << right << constraint_sense_name[name];
-//		f_rec << setw(15) << constraints_obs.get_rec(name);
-//		if (use_chance)
-//			f_rec << setw(15) << constraints_fosm.get_rec(name);
-//		else
-//			f_rec << setw(15) << constraints_sim.get_rec(name);
-//		f_rec << setw(15) << residuals[i];
-//		f_rec << setw(15) << constraint_lb[i];
-//		f_rec << setw(15) << constraint_ub[i] << endl;
-//
-//	}
-//
-//	if (num_pi_constraints() == 0) return;
-//
-//	//report prior information constraints
-//	f_rec << endl << "  prior information constraint information at start of iteration " << slp_iter << endl;
-//	f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
-//	f_rec << setw(15) << "residual" << setw(15) << "lower bound" << setw(15) << "upper bound" << endl;
-//	for (int i = 0; i<num_pi_constraints(); ++i)
-//	{
-//		string name = ctl_ord_pi_constraint_names[i];
-//		PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
-//		f_rec << setw(20) << left << name;
-//		f_rec << setw(15) << right << constraint_sense_name[name];
-//		f_rec << setw(15) << pi_rec.get_obs_value();
-//		f_rec << setw(15) << pi_rec.calc_residual_and_sim_val(all_pars_and_dec_vars).first;
-//		f_rec << setw(15) << pi_rec.calc_residual(all_pars_and_dec_vars);
-//		f_rec << setw(15) << constraint_lb[num_obs_constraints() + i];
-//		f_rec << setw(15) << constraint_ub[num_obs_constraints() + i] << endl;
-//
-//	}
-//	return;
-//}
-
-//void sequentialLP::postsolve_model_constraint_report(Observations &upgrade_obs, string tag)
-//{
-//	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
-//	f_rec << endl << endl << "     " << tag << " constraint information at end of SLP iteration " << slp_iter << endl << endl;
-//	f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(25) << "simplex status";
-//	f_rec << setw(15) << "price";
-//	if (use_chance)
-//		f_rec << setw(15) << "fosm offset";
-//	f_rec << setw(15) << "current" << setw(15) << "residual";
-//	f_rec << setw(15) << "new" << setw(15) << "residual" << endl;
-//	vector<double> cur_residuals = get_constraint_residual_vec();
-//	vector<double> new_residuals = get_constraint_residual_vec(upgrade_obs);
-//	double sim_val;
-//	for (int i = 0; i < num_obs_constraints(); ++i)
-//	{
-//		string name = ctl_ord_obs_constraint_names[i];
-//		sim_val = upgrade_obs[name];
-//		f_rec << setw(20) << left << name;
-//		f_rec << setw(15) << right << constraint_sense_name[name];
-//		f_rec << setw(15) << constraints_obs.get_rec(name);
-//		f_rec << setw(25) << status_name_map[model.getRowStatus(i)];
-//		f_rec << setw(15) << row_price[i];
-//		if (use_chance)
-//		{
-//			double offset = post_constraint_offset[name];
-//			sim_val += offset;
-//			f_rec << setw(15) << offset;
-//			f_rec << setw(15) << constraints_sim.get_rec(name) + offset;
-//			f_rec << setw(15) << cur_residuals[i];
-//			f_rec << setw(15) << sim_val;
-//			f_rec << setw(15) << new_residuals[i] - offset << endl;
-//		}
-//		else
-//		{
-//			f_rec << setw(15) << constraints_sim.get_rec(name);
-//			f_rec << setw(15) << cur_residuals[i];
-//			f_rec << setw(15) << sim_val;
-//			f_rec << setw(15) << new_residuals[i] << endl;
-//
-//		}
-//	}
-//
-//}
-
-//void sequentialLP::postsolve_pi_constraint_report(Parameters &upgrade_pars)
-//{
-//	//report prior information constraints
-//	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
-//	PriorInformation constraints_pi = constraints.get_pi_constraints();
-//	if (num_pi_constraints() > 0)
-//	{
-//		f_rec << endl << endl << "     prior information constraint information at end of SLP iteration " << slp_iter << endl << endl;
-//		f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(25) << "simplex status";
-//		f_rec << setw(15) << "price" << setw(15) << "current" << setw(15) << "residual";
-//		f_rec << setw(15) << "new" << setw(15) << "residual" << endl;
-//		int i = 0;
-//		for (auto &name : ctl_ord_pi_constraint_names)
-//		{
-//			PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
-//			pair<double,double> cur_sim_resid = pi_rec.calc_residual_and_sim_val(all_pars_and_dec_vars);
-//			pair<double,double> new_sim_resid = pi_rec.calc_residual_and_sim_val(upgrade_pars);
-//			f_rec << setw(20) << left << name;
-//			f_rec << setw(15) << right << constraint_sense_name[name];
-//			f_rec << setw(15) << pi_rec.get_obs_value();
-//			f_rec << setw(25) << status_name_map[model.getRowStatus(i+num_obs_constraints())];
-//			f_rec << setw(15) << row_price[i + num_obs_constraints()];
-//			f_rec << setw(15) << cur_sim_resid.first;
-//			f_rec << setw(15) << cur_sim_resid.second;
-//			f_rec << setw(15) << new_sim_resid.first;
-//			f_rec << setw(15) << new_sim_resid.second << endl;
-//			i++;
-//		}
-//	}
-//	
-//	return;
-//}
-
 map<string,double> sequentialLP::get_out_of_bounds_dec_vars(Parameters &upgrade_pars)
 {
 	double opt_tol = pest_scenario.get_pestpp_options().get_opt_iter_tol();
@@ -432,41 +242,6 @@ pair<sequentialLP::ConstraintSense,string> sequentialLP::get_sense_from_group_na
 		return pair<ConstraintSense,string>(ConstraintSense::undefined,"undefined");
 }
 
-
-double  ErfInv2(double x) 
-{
-	float tt1, tt2, lnx, sgn;
-	sgn = (x < 0) ? -1.0f : 1.0f;
-
-	x = (1 - x)*(1 + x);        // x = 1 - x*x;
-	lnx = logf(x);
-	//double PI = 3.14159265358979323846;
-	tt1 = 2 / (M_PI*0.147) + 0.5f * lnx;
-	tt2 = 1 / (0.147) * lnx;
-
-	return(sgn*sqrtf(-tt1 + sqrtf(tt1*tt1 - tt2)));
-}
-
-double sequentialLP::get_probit()
-{
-
-	//double probit = 0.0;
-	//vector<double>::iterator start = probit_inputs.begin();
-	//vector<double>::iterator end = probit_inputs.end();
-
-	double output = sqrt(2.0) * ErfInv2((2.0 * risk) - 1.0);
-
-	//find the nearest values in the probit_input vector
-	/*auto const it = std::lower_bound(start, end, risk);
-	int idx = find(start, end, *it) - start;
-	if (idx >= probit_inputs.size())
-		throw_sequentialLP_error("error looking up probit function value");
-	double output = probit_outputs[idx];
-	*/
-	return output;
-
-
-}
 
 void sequentialLP::initialize_and_check()
 {
@@ -932,7 +707,6 @@ void sequentialLP::iter_postsolve()
 	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
 	f_rec << "  ---  processing results for iteration " << slp_iter << " LP solution  ---  " << endl << endl;
 	
-
 	//extract (optimal) decision vars
 	//and track some info for convergence checking
 	const double *dec_var_vals = model.getColSolution();
@@ -1073,8 +847,8 @@ void sequentialLP::iter_postsolve()
 		for (auto &name : invalid_dec_vars)
 			f_rec << "-->   " << name.first << setw(15) << name.second << endl;
 	}
-	map<string, double> invalid_constraints = constraints.get_unsatified_obs_constraints(upgrade_obs);
-	map<string, double> invalid_pi_constraints = constraints.get_unsatified_pi_constraints(upgrade_pars);
+	map<string, double> invalid_constraints = constraints.get_unsatified_obs_constraints(upgrade_obs, opt_iter_tol);
+	map<string, double> invalid_pi_constraints = constraints.get_unsatified_pi_constraints(upgrade_pars, opt_iter_tol);
 	invalid_constraints.insert(invalid_pi_constraints.begin(), invalid_pi_constraints.end());
 	if (invalid_constraints.size() > 0)
 	{
@@ -1120,10 +894,6 @@ void sequentialLP::iter_postsolve()
 
 	//if continuing, update the master decision var instance
 	all_pars_and_dec_vars.update_without_clear(ctl_ord_dec_var_names, upgrade_pars.get_data_vec(ctl_ord_dec_var_names));
-
-	//constraints_sim.update(ctl_ord_obs_constraint_names,upgrade_obs.get_data_vec(ctl_ord_obs_constraint_names));
-	//constraints_sim.update_without_clear(constraints.get_obs_constraint_names(), 
-	//	upgrade_obs.get_data_vec(constraints.get_obs_constraint_names()));
 	current_constraints_sim = upgrade_obs;
 	return;
 }
@@ -1139,6 +909,7 @@ bool sequentialLP::make_upgrade_run(Parameters &upgrade_pars, Observations &upgr
 		par_trans.model2ctl_ip(upgrade_pars);
 	return success;
 }
+
 
 void sequentialLP::iter_presolve()
 {
@@ -1208,12 +979,9 @@ void sequentialLP::iter_presolve()
 			pest_utils::read_res(res_filename, current_constraints_sim);
 			f_rec << "done" << endl;
 			cout << "done" << endl;
-			//this would be only for stack runs since the fosm runs should have been in the jco
-			if ((!constraints.get_std_weights()) && ((slp_iter == 1) || ((slp_iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
-			{
-				if (!constraints.get_use_fosm())
-					constraints.add_runs(run_mgr_ptr);
-			}
+			if (constraints.should_update_chance(slp_iter))
+				constraints.add_runs(run_mgr_ptr);
+			
 
 		}
 		else
@@ -1222,11 +990,8 @@ void sequentialLP::iter_presolve()
 			cout << "  ---  running the model once with initial decision variables  ---  " << endl;
 			int run_id = run_mgr_ptr->add_run(par_trans.ctl2model_cp(all_pars_and_dec_vars));
 			//this would be only for stack runs since the fosm runs should have been in the jco
-			if ((!constraints.get_std_weights()) && ((slp_iter == 1) || ((slp_iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
-			{
-				if (!constraints.get_use_fosm())
+			if (constraints.should_update_chance(slp_iter))
 				constraints.add_runs(run_mgr_ptr);
-			}
 			else
 			{
 				cout << "  ---  running the model once with initial decision variables  ---  " << endl;
@@ -1251,14 +1016,11 @@ void sequentialLP::iter_presolve()
 			if (find(ctl_ord_ext_var_names.begin(), ctl_ord_ext_var_names.end(), name) == ctl_ord_ext_var_names.end())
 				names_to_run.push_back(name);
 		}
-		if ((!constraints.get_std_weights()) && ((slp_iter == 1) || ((slp_iter+1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
+		if ((constraints.should_update_chance(slp_iter)) && (constraints.get_use_fosm()))
 		{
-			if (constraints.get_use_fosm())
-			{
 				//names_to_run.insert(names_to_run.end(), adj_par_names.begin(), adj_par_names.end());
 				vector<string> fosm_par_names = constraints.get_fosm_par_names();
 				names_to_run.insert(names_to_run.end(), fosm_par_names.begin(), fosm_par_names.end());
-			}
 		}
 
 		//turn down the purb value each iteration
@@ -1288,10 +1050,8 @@ void sequentialLP::iter_presolve()
 				pinfo->get_group_by_groupname_4_mod(name)->derinc = new_derinc;
 				frec << setw(20) << left << name << setw(20) << left << org_derinc << setw(20) << left << new_derinc << endl;
 			}
-
 		}
 		
-
 		bool init_obs = false;
 		if (slp_iter == 1) init_obs = true;
 		
@@ -1304,8 +1064,7 @@ void sequentialLP::iter_presolve()
 			throw_sequentialLP_error("failed to calc derviatives for the following decision vars: ", failed);
 		}
 
-		//this would be only for stack runs since we added the fosm runs earlier
-		if ((!constraints.get_std_weights()) && ((slp_iter == 1) || ((slp_iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)))
+		if (constraints.should_update_chance(slp_iter))
 		{
 			constraints.add_runs(run_mgr_ptr);
 		}
