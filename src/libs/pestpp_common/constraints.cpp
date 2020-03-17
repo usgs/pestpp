@@ -1063,7 +1063,10 @@ void Constraints::postsolve_obs_constraints_report(Observations& constraints_sim
 	vector<double> cur_residuals = get_constraint_residual_vec(*current_constraints_sim_ptr);
 	vector<double> new_residuals;
 	if (use_chance)
-		new_residuals = get_constraint_residual_vec(get_chance_shifted_constraints(constraints_sim));
+	{
+		Observations constraints_shift = get_chance_shifted_constraints(constraints_sim);
+		new_residuals = get_constraint_residual_vec(constraints_shift);
+	}
 	else
 		new_residuals = get_constraint_residual_vec(constraints_sim);
 	double sim_val;
