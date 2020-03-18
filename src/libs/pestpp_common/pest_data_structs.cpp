@@ -616,6 +616,18 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		opt_std_weights = pest_utils::parse_string_arg_to_bool(value);
 	}
 
+	else if (key == "OPT_STACK_SIZE")
+	{
+		convert_ip(value,opt_stack_size);
+	}
+	else if (key == "OPT_PAR_STACK")
+	{
+		opt_par_stack = org_value;
+	}
+	else if (key == "OPT_OBS_STACK")
+	{
+		opt_obs_stack = org_value;
+	}
 	else if ((key == "OPT_DEC_VAR_GROUPS") || (key == "OPT_DECISION_VARIABLE_GROUPS"))
 	{
 		passed_args.insert("OPT_DEC_VAR_GROUPS");
@@ -680,7 +692,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		convert_ip(value, opt_iter_tol);
 	}
 
-	else if (key == "OPT_RECALC_FOSM_EVERY")
+	else if ((key == "OPT_RECALC_FOSM_EVERY") || (key == "OPT_RECALC_CHANCE_EVERY"))
 	{
 		convert_ip(value, opt_recalc_fosm_every);
 	}
@@ -1070,7 +1082,10 @@ void PestppOptions::summary(ostream& os) const
 	os << "opt_objective_function: " <<  opt_obj_func << endl;
 	os << "opt_coin_log: " << opt_coin_log << endl;
 	os << "opt_skip_final: " << opt_skip_final << endl;
-	os << "opt_std_weights" << opt_std_weights << endl;
+	os << "opt_std_weights: " << opt_std_weights << endl;
+	os << "opt_stack_size: " << opt_stack_size << endl;
+	os << "opt_par_stack: " << opt_par_stack << endl;
+	os << "opt_obs_stack: " << opt_obs_stack << endl;
 	os << "opt_decision_variable_groups: ";
 	for (auto v : opt_dec_var_groups)
 		os << v << ",";
@@ -1210,6 +1225,10 @@ void PestppOptions::set_defaults()
 	set_opt_iter_derinc_fac(1.0);
 	set_opt_include_bnd_pi(true);
 	set_hotstart_resfile(string());
+	set_opt_stack_size(0);
+	set_opt_par_stack("");
+	set_opt_obs_stack("");
+
 	set_ies_par_csv("");
 	set_ies_obs_csv("");
 	set_ies_obs_restart_csv("");
@@ -1483,7 +1502,9 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 	if (passed_args.find(key) != passed_args.end())
 		return PestppOptions::ARG_STATUS::ARG_DUPLICATE;
 	passed_args.insert(key);
-	if (key == "RELPARMAX")
+	if (key == "NOPTMAX")
+		convert_ip(value, noptmax);
+	else if (key == "RELPARMAX")
 		convert_ip(value, relparmax);
 	else if (key == "FACPARMAX")
 		convert_ip(value, facparmax);

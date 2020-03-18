@@ -47,7 +47,7 @@ public:
 	vector<string> get_generic_real_names(int num_reals);
 
 	void reserve(vector<string> _real_names, vector<string> _var_names);
-
+	void replace_col(string var_name, Eigen::VectorXd & vec);
 	Eigen::VectorXd get_real_vector(int ireal);
 	Eigen::VectorXd get_real_vector(const string &real_name);
 	void update_real_ip(string &rname, Eigen::VectorXd &real);
@@ -90,6 +90,7 @@ public:
 	//Ensemble& operator=(const Ensemble& other);
 	void set_rand_gen(std::mt19937* _rand_gen_ptr) { rand_gen_ptr = _rand_gen_ptr; }
 	std::mt19937* get_rand_gen_ptr() { return rand_gen_ptr; }
+	map<string, int> get_var_map() { return var_map; }
 
 protected:
 	std::mt19937* rand_gen_ptr;
