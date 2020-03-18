@@ -31,7 +31,8 @@ OBJECTS := \
     Localizer\
     logger\
     linear_analysis\
-    covariance
+    covariance \
+    constraints
 OBJECTS := $(addsuffix $(OBJ_EXT),$(OBJECTS))
 
 

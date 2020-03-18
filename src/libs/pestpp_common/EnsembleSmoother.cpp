@@ -1175,7 +1175,7 @@ bool IterEnsembleSmoother::initialize_oe(Covariance &cov)
 		}
 		else
 		{
-			ss << "unrecognized obs ensemble extension " << obs_ext << ", looing for csv, jcb, or jco";
+			ss << "unrecognized obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
 			throw_ies_error(ss.str());
 		}
 		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
@@ -3602,7 +3602,7 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 
 void IterEnsembleSmoother::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe)
 {
-	
+
 	vector<string> oe_names = _oe.get_real_names();
 	vector<string> pe_names = _pe.get_real_names();
 	vector<string> oe_base_names = oe.get_real_names();
