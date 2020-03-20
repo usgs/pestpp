@@ -27,7 +27,7 @@ public:
 	PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 		       ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
 		       Covariance *_parcov, double *_reg_factor, ObservationEnsemble *_weights);
-	void update(ObservationEnsemble &oe, ParameterEnsemble &pe, bool include_regul=true);
+	void update(ObservationEnsemble &oe, ParameterEnsemble &pe);
 	double get_mean(phiType pt);
 	double get_std(phiType pt);
 	double get_max(phiType pt);
@@ -37,7 +37,7 @@ public:
 	double calc_std(map<string, double> *phi_map);
 
 	map<string, double>* get_phi_map(PhiHandler::phiType &pt);
-	void report(bool echo=true, bool include_regul=true);
+	void report(bool echo=true);
 	void write(int iter_num, int total_runs, bool write_group = true);
 	void write_group(int iter_num, int total_runs, vector<double> extra);
 	vector<int> get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe);
@@ -175,7 +175,6 @@ public:
 	
 	void initialize();
 	void iterate_2_solution();
-	void pareto_iterate_2_solution();
 	void finalize();
 	void throw_ies_error(string message);
 	bool should_terminate();
@@ -215,10 +214,7 @@ private:
 	double lambda_max, lambda_min;
 	int warn_min_reals, error_min_reals;
 	vector<double> lam_mults;
-	map<string, double> pareto_obs;
-	map<string, double> pareto_weights;
-	//string fphi_name;
-	//ofstream fphi;
+	
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
 	vector<int> subset_idxs;
@@ -233,7 +229,6 @@ private:
 
 	//bool solve_old();
 	bool solve_new();
-	void adjust_pareto_weight(string &obsgroup, double wfac);
 
 	ParameterEnsemble calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>> &loc_map);
 
