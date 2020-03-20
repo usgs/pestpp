@@ -603,6 +603,19 @@ pair<map<string, double>, map<string, double>>  Ensemble::get_moment_maps(const 
 	return pair<map<string, double>, map<string, double>>(mean_map,std_map);
 }
 
+void Ensemble::replace_col(string var_name, Eigen::VectorXd& vec)
+{
+	update_var_map();
+	if (var_map.find(var_name) == var_map.end())
+		throw_ensemble_error("replace_col(): var_name not found: " + var_name);
+	if (vec.size() != reals.rows())
+	{
+		stringstream ss;
+		ss << "replace_col(): vec of length " << vec.size() << " not aligned with reals first dimen " << reals.rows();
+		throw_ensemble_error(ss.str());
+	}
+	reals.col(var_map[var_name]) = vec;
+}
 
 //Ensemble Ensemble::get_mean()
 //{

@@ -27,6 +27,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="constraints.h" />
     <ClInclude Include="covariance.h" />
     <ClInclude Include="DifferentialEvolution.h" />
     <ClInclude Include="eigen_tools.h" />
@@ -58,6 +59,7 @@
     <ClInclude Include="Transformation.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="constraints.cpp" />
     <ClCompile Include="covariance.cpp" />
     <ClCompile Include="DifferentialEvolution.cpp" />
     <ClCompile Include="eigen_tools.cpp" />
