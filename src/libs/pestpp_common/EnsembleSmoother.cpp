@@ -1503,6 +1503,7 @@ void IterEnsembleSmoother::initialize_restart()
 				ss << m << ",";
 			throw_ies_error(ss.str());
 		}
+		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
 
 	if (pp_args.find("IES_NUM_REALS") != pp_args.end())
@@ -3468,6 +3469,7 @@ bool IterEnsembleSmoother::solve_new()
 		subset_size = pe.shape().first;
 	}
 
+	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 
 	vector<ParameterEnsemble> pe_lams;
 	vector<double> lam_vals, scale_vals;
