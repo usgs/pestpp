@@ -665,13 +665,13 @@ vector<int> PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_sig
 map<string, Eigen::VectorXd> PhiHandler::calc_meas(ObservationEnsemble & oe, Eigen::VectorXd &q_vec)
 {
 	map<string, Eigen::VectorXd> phi_map;
-	Eigen::VectorXd oe_base_vec, oe_vec, diff,w_vec;
+	Eigen::VectorXd oe_base_vec, oe_vec, diff, w_vec;
 	//Eigen::VectorXd q = get_q_vector();
 	vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
 	vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
 	vector<string>::iterator start = base_real_names.begin(), end = base_real_names.end();
 
-	Eigen::MatrixXd w_mat;
+	
 	double phi;
 	string rname;
 
@@ -683,6 +683,13 @@ map<string, Eigen::VectorXd> PhiHandler::calc_meas(ObservationEnsemble & oe, Eig
 	}
 
 	Eigen::MatrixXd resid = get_obs_resid(oe);
+	ObservationInfo oi = pest_scenario->get_ctl_observation_info();
+	w_vec.resize(act_obs_names.size());
+	for (int i=0;i<act_obs_names.size();i++)
+	{
+		w_vec(i) = oi.get_weight(act_obs_names[i]);
+	}
+	
 	assert(oe_real_names.size() == resid.rows());
 	for (int i = 0; i<resid.rows(); i++)
 	{
@@ -690,7 +697,7 @@ map<string, Eigen::VectorXd> PhiHandler::calc_meas(ObservationEnsemble & oe, Eig
 		if (find(start, end, rname) == end)
 			continue;
 		diff = resid.row(i);
-		w_vec = w_mat.row(i);
+		
 		diff = diff.cwiseProduct(w_vec);
 		
 		phi = (diff.cwiseProduct(diff)).sum();
