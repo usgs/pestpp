@@ -684,10 +684,11 @@ map<string, Eigen::VectorXd> PhiHandler::calc_meas(ObservationEnsemble & oe, Eig
 
 	Eigen::MatrixXd resid = get_obs_resid(oe);
 	ObservationInfo oi = pest_scenario->get_ctl_observation_info();
-	w_vec.resize(act_obs_names.size());
-	for (int i=0;i<act_obs_names.size();i++)
+	vector<string> names = oe_base->get_var_names();
+	w_vec.resize(names.size());
+	for (int i=0;i<names.size();i++)
 	{
-		w_vec(i) = oi.get_weight(act_obs_names[i]);
+		w_vec(i) = oi.get_weight(names[i]);
 	}
 	
 	assert(oe_real_names.size() == resid.rows());
