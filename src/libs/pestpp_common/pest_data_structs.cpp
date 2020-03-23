@@ -841,12 +841,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		passed_args.insert("IES_SAVE_LAMBDA_ENSEMBLES");
 		ies_save_lambda_en = pest_utils::parse_string_arg_to_bool(value);
 	}
-	else if ((key == "IES_WEIGHTS_EN") || (key == "IES_WEIGHTS_ENSEMBLE"))
-	{
-		passed_args.insert("IES_WEIGHTS_EN");
-		passed_args.insert("IES_WEIGHTS_ENSEMBLE");
-		ies_weight_csv = org_value;
-	}
+	
 	else if (key == "IES_SUBSET_HOW")
 	{
 		convert_ip(value,ies_subset_how);
@@ -1134,7 +1129,6 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_lambda_inc_fac: " << ies_lambda_inc_fac << endl;
 	os << "ies_lambda_dec_fac: " << ies_lambda_dec_fac << endl;
 	os << "ies_save_lambda_ensembles: " << ies_save_lambda_en << endl;
-	os << "ies_weights_ensemble: " << ies_weight_csv << endl;
 	os << "ies_subset_how: " << ies_subset_how << endl;
 	os << "ies_localize_how: " << ies_localize_how << endl;
 	os << "ies_num_threads: " << ies_num_threads << endl;
@@ -1254,7 +1248,6 @@ void PestppOptions::set_defaults()
 	set_ies_lambda_inc_fac(10.0);
 	set_ies_lambda_dec_fac(0.75);
 	set_ies_save_lambda_en(false);
-	set_ies_weight_csv("");
 	set_ies_subset_how("RANDOM");
 	set_ies_localize_how("PARAMETERS");
 	set_ies_num_threads(-1);

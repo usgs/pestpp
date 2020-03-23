@@ -26,7 +26,7 @@ public:
 	PhiHandler() { ; }
 	PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 		       ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
-		       Covariance *_parcov, double *_reg_factor, ObservationEnsemble *_weights);
+		       Covariance *_parcov);
 	void update(ObservationEnsemble &oe, ParameterEnsemble &pe);
 	double get_mean(phiType pt);
 	double get_std(phiType pt);
@@ -74,7 +74,6 @@ private:
 	void write_group_csv(int iter_num, int total_runs, ofstream &csv,
 		vector<double> extra = vector<double>());
 
-	double *reg_factor;
 	double org_reg_factor;
 	Eigen::VectorXd org_q_vec;
 	vector<string> oreal_names,preal_names;
@@ -82,7 +81,6 @@ private:
 	FileManager* file_manager;
 	ObservationEnsemble* oe_base;
 	ParameterEnsemble* pe_base;
-	ObservationEnsemble *weights;
 	//Covariance parcov_inv;
 	Eigen::VectorXd parcov_inv_diag;
 	map<string, double> meas;
@@ -220,7 +218,7 @@ private:
 	vector<int> subset_idxs;
 
 	ParameterEnsemble pe, pe_base;
-	ObservationEnsemble oe, oe_base, weights;
+	ObservationEnsemble oe, oe_base;
 	//Eigen::MatrixXd prior_pe_diff;
 	//Eigen::MatrixXd Am;
 	Eigen::DiagonalMatrix<double,Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
@@ -240,7 +238,6 @@ private:
 	bool initialize_pe(Covariance &cov);
 	bool initialize_oe(Covariance &cov);
 	void initialize_restart();
-	void initialize_weights();
 	void initialize_parcov();
 	void initialize_obscov();
 	void drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe, bool is_subset=false);

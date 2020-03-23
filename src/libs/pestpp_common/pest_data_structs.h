@@ -378,8 +378,6 @@ public:
 	void set_ies_lambda_dec_fac(double _dec_fac) { ies_lambda_dec_fac = _dec_fac; }
 	bool get_ies_save_lambda_en() const { return ies_save_lambda_en; }
 	void set_ies_save_lambda_en(bool _ies_save_lambda_en) { ies_save_lambda_en = _ies_save_lambda_en; }
-	string get_ies_weight_csv() const { return ies_weight_csv; }
-	void set_ies_weight_csv(string _ies_weight_csv) { ies_weight_csv = _ies_weight_csv; }
 	string get_ies_subset_how() const { return ies_subset_how; }
 	void set_ies_subset_how(string _ies_subset_how) { ies_subset_how = _ies_subset_how; }
 	void set_ies_localize_how(string _how) { ies_localize_how = _how; }
@@ -565,7 +563,6 @@ private:
 	bool ies_save_lambda_en;
 	set<string> passed_args;
 	map<string, string> arg_map;
-	string ies_weight_csv;
 	string ies_subset_how;
 	string ies_localize_how;
 	int ies_num_threads;
