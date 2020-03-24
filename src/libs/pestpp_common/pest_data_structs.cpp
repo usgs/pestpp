@@ -1183,7 +1183,7 @@ void PestppOptions::set_defaults()
 	set_n_iter_base(1000000);
 	set_super_eigthres(1.0e-6);
 	set_max_n_super(1000000);
-	set_max_super_frz_iter(10);
+	set_max_super_frz_iter(20);
 	set_max_reg_iter(20);
 	set_uncert_flag(true);
 	set_glm_num_reals(0);

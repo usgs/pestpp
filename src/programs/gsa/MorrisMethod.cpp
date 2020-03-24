@@ -362,10 +362,7 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 	base_partran_seq_ptr->model2numeric_ip(pars1);
 	for (int i_run=1; i_run<n_runs; ++i_run)
 	{
-		std::cout << string(message.str().size(), '\b');
-		message.str("");
-		message << "processing run " << i_run+1 << " / " << n_runs;
-		std::cout << message.str();
+
 
 		run0_ok = run1_ok;
 		pars0 = pars1;

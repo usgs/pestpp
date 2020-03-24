@@ -458,8 +458,6 @@ def parchglim_test():
     d = np.abs(p_df.loc["stage","parval1"] - (par.loc["stage","parval1"] + rpm))
     assert d < 1.0e-6,d
 
-    # currently something is up with the upgrade calcs in pestpp-glm
-    # so this test just makes sure it runs without throwing an exception
     rpm = 1.1
     par.loc[pst.par_names[1:],"partrans"] = "fixed"
     par.loc[pst.par_names[1:],"parchglim"] = "factor"
@@ -767,10 +765,10 @@ def tplins1_test():
 if __name__ == "__main__":
     #glm_long_name_test()
     #sen_plusplus_test()
-    #parchglim_test()
+    parchglim_test()
     #unc_file_test()
     #secondary_marker_test()
-    basic_test("ies_10par_xsec")
+    #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
