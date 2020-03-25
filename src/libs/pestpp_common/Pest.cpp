@@ -1084,7 +1084,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				}
 
 				//try to use as a regul arg
-				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
+				if ((stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND) && (regul_scheme_ptr))
 				{
 					stat = regul_scheme_ptr->assign_value_by_key(kv.first,kv.second);
 					check_report_assignment(f_rec, stat, kv.first, kv.second);
@@ -1094,7 +1094,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
 				{
 					ss.str("");
-					ss << "unrecognized '* control data keyword' key-value pair on line" << line << endl;
+					ss << "unrecognized '* control data keyword' key-value pair on line: " << endl << "    '" << line << "'" <<  endl;
 					throw_control_file_error(f_rec, ss.str(), false);
 				}		
 			}
