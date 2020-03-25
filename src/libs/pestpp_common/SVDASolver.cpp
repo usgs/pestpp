@@ -242,7 +242,7 @@ ModelRun SVDASolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termin
 	return new_base_run;
 }
 
-void SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs, bool restart_runs)
+bool SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs, bool restart_runs)
 {
 	ostream &fout_restart = file_manager.get_ofstream("rst");
 	ostream &os = file_manager.rec_ofstream();
@@ -292,7 +292,7 @@ void SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContr
 				cout << "Max number of iterations to freeze parameters to compute jacobian exceeded" << endl;
 				os << "Terminating super parameter iterations." << endl;
 				os << "Max number of iterations to freeze parameters to compute jacobian exceeded" << endl;
-				return;
+				return false;
 			}
 			// fix frozen parameters in SVDA transformation
 			debug_print(base_run.get_frozen_ctl_pars());
@@ -376,6 +376,7 @@ void SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContr
 	// sen file for this iteration
 	output_file_writer.append_sen(file_manager.sen_ofstream(), termination_ctl.get_iteration_number() + 1,
 		jacobian, *(base_run.get_obj_func_ptr()), get_parameter_group_info(), *regul_scheme_ptr, true, par_transform);
+	return true;
 }
 
 ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool restart_runs)

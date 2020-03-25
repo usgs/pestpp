@@ -452,8 +452,7 @@ pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(
 		ofstream& os = file_manager.rec_ofstream();
 		ParameterEnsemble pe = fosm_real_info.first;
 		double reg_fac = 0.0;
-		PhiHandler ph(&pest_scenario, &file_manager, &oe, &pe, get_parcov_ptr(),
-			&reg_fac, &oe);
+		PhiHandler ph(&pest_scenario, &file_manager, &oe, &pe, get_parcov_ptr());
 		ph.update(oe, pe);
 		PhiHandler::phiType pt = PhiHandler::phiType::ACTUAL;
 		map<string,double>* phi_map = ph.get_phi_map(pt);

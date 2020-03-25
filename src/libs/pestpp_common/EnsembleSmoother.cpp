@@ -17,14 +17,13 @@
 
 PhiHandler::PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 	ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
-	Covariance *_parcov, double *_reg_factor, ObservationEnsemble *_weights)
+	Covariance *_parcov)
 {
 	pest_scenario = _pest_scenario;
 	file_manager = _file_manager;
 	oe_base = _oe_base;
 	pe_base = _pe_base;
-	weights = _weights;
-
+	
 	//check for inequality constraints
 	//for (auto &og : pest_scenario.get_ctl_ordered_obs_group_names())
 	string og;
@@ -46,9 +45,8 @@ PhiHandler::PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 		}
 	}
 
-	reg_factor = _reg_factor;
 	//save the org reg factor and org q vector
-	org_reg_factor = *_reg_factor;
+	org_reg_factor = pest_scenario->get_pestpp_options().get_ies_reg_factor();
 	org_q_vec = get_q_vector();
 	//Eigen::VectorXd parcov_inv_diag = parcov_inv.e_ptr()->diagonal();
 	parcov_inv_diag = _parcov->e_ptr()->diagonal();
@@ -397,69 +395,173 @@ string PhiHandler::get_summary_header()
 	return ss.str();
 }
 
+
 void PhiHandler::report(bool echo)
 {
-	ofstream &f = file_manager->rec_ofstream();
-	f << get_summary_header();
-	if (echo)
-		cout << get_summary_header();
-	string s = get_summary_string(PhiHandler::phiType::COMPOSITE);
-	f << s;
-	if (echo)
-		cout << s;
-	s = get_summary_string(PhiHandler::phiType::MEAS);
-	f << s;
-	if (echo)
-		cout << s;
-	if (org_reg_factor != 0.0)
+	ofstream& f = file_manager->rec_ofstream();
+	string s;
+
+	if (pest_scenario->get_pestpp_options().get_ies_no_noise())
 	{
-		s = get_summary_string(PhiHandler::phiType::REGUL);
-		f << s;
-		if (echo)
-			cout << s;
-	}
-	s = get_summary_string(PhiHandler::phiType::ACTUAL);
-	f << s;
-	if (echo)
-		cout << s;
-	if (org_reg_factor != 0.0)
-	{
-		if (*reg_factor == 0.0)
+		if (org_reg_factor == 0)
 		{
-			f << "    (note: reg_factor is zero; regularization phi reported but not used)" << endl;
+			s = get_summary_string(PhiHandler::phiType::ACTUAL);
+			f << s;
 			if (echo)
-				cout << "    (note: reg_factor is zero; regularization phi reported but not used)" << endl;
+				cout << s;
 		}
 		else
 		{
-			f << "     current reg_factor: " << *reg_factor << endl;
+			f << get_summary_header();
 			if (echo)
-				cout << "     current reg_factor: " << *reg_factor << endl;
+				cout << get_summary_header();
+			string s = get_summary_string(PhiHandler::phiType::COMPOSITE);
+			f << s;
+			if (echo)
+				cout << s;
+			s = get_summary_string(PhiHandler::phiType::REGUL);
+			f << s;
+			if (echo)
+				cout << s;
+			s = get_summary_string(PhiHandler::phiType::ACTUAL);
+			f << s;
+			if (echo)
+				cout << s;
 		}
-		if (*reg_factor != 0.0)
+		
+	}
+	else
+	{
+		s = get_summary_string(PhiHandler::phiType::MEAS);
+		f << s;
+		if (echo)
+			cout << s;
+		if (org_reg_factor == 0.0)
 		{
-
-			f << "     note: regularization phi reported above does not " << endl;
-			f << "           include the effects of reg_factor, " << endl;
-			f << "           but composite phi does." << endl;
+			s = get_summary_string(PhiHandler::phiType::ACTUAL);
+			f << s;
 			if (echo)
-			{
-				cout << "     note: regularization phi reported above does not " << endl;
-				cout << "           include the effects of reg_factor, " << endl;
-				cout << "           but composite phi does." << endl;
-			}
+				cout << s;	
+		}
+		else
+		{
+			f << get_summary_header();
+			if (echo)
+				cout << get_summary_header();
+			string s = get_summary_string(PhiHandler::phiType::COMPOSITE);
+			f << s;
+			if (echo)
+				cout << s;
+			s = get_summary_string(PhiHandler::phiType::REGUL);
+			f << s;
+			if (echo)
+				cout << s;
+			s = get_summary_string(PhiHandler::phiType::ACTUAL);
+			f << s;
+			if (echo)
+				cout << s;
+		}
+
+	}
+		
+	if (org_reg_factor != 0.0)
+	{
+
+		f << "     note: 'regularization' phi reported above does not " << endl;
+		f << "           include the effects of reg_factor, " << endl;
+		f << "           but 'composite' phi does." << endl;
+		if (echo)
+		{
+			cout << "     note: 'regularization' phi reported above does not " << endl;
+			cout << "           include the effects of reg_factor, " << endl;
+			cout << "           but 'composite' phi does." << endl;
 		}
 	}
+	if (!pest_scenario->get_pestpp_options().get_ies_no_noise())
+	{
+		f << "     note: 'measured' phi reported above includes " << endl;
+		f << "           realizations of measurement noise, " << endl;
+		f << "           'actual' phi does not." << endl;
+		if (echo)
+		{
+			f << "     note: 'measured' phi reported above includes " << endl;
+			f << "           realizations of measurement noise, " << endl;
+			f << "           'actual' phi does not." << endl;
+		}
+	}
+	
+
 	f << endl << endl;
 	f.flush();
 }
+
+
+
+//void PhiHandler::report(bool echo)
+//{
+//	ofstream &f = file_manager->rec_ofstream();
+//	f << get_summary_header();
+//	if (echo)
+//		cout << get_summary_header();
+//	string s = get_summary_string(PhiHandler::phiType::COMPOSITE);
+//	f << s;
+//	if (echo)
+//		cout << s;
+//	s = get_summary_string(PhiHandler::phiType::MEAS);
+//	f << s;
+//	if (echo)
+//		cout << s;
+//	if (org_reg_factor != 0.0)
+//	{
+//		s = get_summary_string(PhiHandler::phiType::REGUL);
+//		f << s;
+//		if (echo)
+//			cout << s;
+//	}
+//	s = get_summary_string(PhiHandler::phiType::ACTUAL);
+//	f << s;
+//	if (echo)
+//		cout << s;
+//	if (org_reg_factor != 0.0)
+//	{
+//		if (*reg_factor == 0.0)
+//		{
+//			f << "    (note: reg_factor is zero; regularization phi reported but not used)" << endl;
+//			if (echo)
+//				cout << "    (note: reg_factor is zero; regularization phi reported but not used)" << endl;
+//		}
+//		else
+//		{
+//			f << "     current reg_factor: " << *reg_factor << endl;
+//			if (echo)
+//				cout << "     current reg_factor: " << *reg_factor << endl;
+//		}
+//		if (*reg_factor != 0.0)
+//		{
+//
+//			f << "     note: regularization phi reported above does not " << endl;
+//			f << "           include the effects of reg_factor, " << endl;
+//			f << "           but composite phi does." << endl;
+//			if (echo)
+//			{
+//				cout << "     note: regularization phi reported above does not " << endl;
+//				cout << "           include the effects of reg_factor, " << endl;
+//				cout << "           but composite phi does." << endl;
+//			}
+//		}
+//	}
+//	f << endl << endl;
+//	f.flush();
+//}
 
 void PhiHandler::write(int iter_num, int total_runs, bool write_group)
 {
 	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.actual.csv"), phiType::ACTUAL,oreal_names);
 	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.meas.csv"), phiType::MEAS, oreal_names);
 	if (pest_scenario->get_pestpp_options().get_ies_reg_factor() != 0.0)
-		write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.regul.csv"), phiType::REGUL, preal_names);
+	{
+		write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.regul.csv"), phiType::REGUL, preal_names);	
+	}
 	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.composite.csv"), phiType::COMPOSITE, oreal_names);
 	if (write_group)
 		write_group_csv(iter_num, total_runs, file_manager->get_ofstream("phi.group.csv"));
@@ -563,15 +665,13 @@ vector<int> PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_sig
 map<string, Eigen::VectorXd> PhiHandler::calc_meas(ObservationEnsemble & oe, Eigen::VectorXd &q_vec)
 {
 	map<string, Eigen::VectorXd> phi_map;
-	Eigen::VectorXd oe_base_vec, oe_vec, diff,w_vec;
+	Eigen::VectorXd oe_base_vec, oe_vec, diff, w_vec;
 	//Eigen::VectorXd q = get_q_vector();
 	vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
 	vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
 	vector<string>::iterator start = base_real_names.begin(), end = base_real_names.end();
 
-	Eigen::MatrixXd w_mat;
-	if (weights->shape().first > 0)
-		w_mat = weights->get_eigen(vector<string>(), oe_base->get_var_names());
+	
 	double phi;
 	string rname;
 
@@ -583,6 +683,14 @@ map<string, Eigen::VectorXd> PhiHandler::calc_meas(ObservationEnsemble & oe, Eig
 	}
 
 	Eigen::MatrixXd resid = get_obs_resid(oe);
+	ObservationInfo oi = pest_scenario->get_ctl_observation_info();
+	vector<string> names = oe_base->get_var_names();
+	w_vec.resize(names.size());
+	for (int i=0;i<names.size();i++)
+	{
+		w_vec(i) = oi.get_weight(names[i]);
+	}
+	
 	assert(oe_real_names.size() == resid.rows());
 	for (int i = 0; i<resid.rows(); i++)
 	{
@@ -590,14 +698,9 @@ map<string, Eigen::VectorXd> PhiHandler::calc_meas(ObservationEnsemble & oe, Eig
 		if (find(start, end, rname) == end)
 			continue;
 		diff = resid.row(i);
-
-		if (weights->shape().first == 0)
-			diff = diff.cwiseProduct(q_vec);
-		else
-		{
-			w_vec = w_mat.row(i);
-			diff = diff.cwiseProduct(w_vec);
-		}
+		
+		diff = diff.cwiseProduct(w_vec);
+		
 		phi = (diff.cwiseProduct(diff)).sum();
 		phi_map[rname] = diff.cwiseProduct(diff);
 	}
@@ -721,7 +824,7 @@ map<string, double> PhiHandler::calc_composite(map<string, double> &_meas, map<s
 		{
 			mea = _meas[orn];
 			reg = _regul[prn];
-			phi_map[orn] = mea + (reg * *reg_factor);
+			phi_map[orn] = mea + (reg * org_reg_factor);
 		}
 	}
 	return phi_map;
@@ -853,8 +956,6 @@ IterEnsembleSmoother::IterEnsembleSmoother(Pest &_pest_scenario, FileManager &_f
 	oe.set_pest_scenario(&pest_scenario);
 	pe.set_rand_gen(&rand_gen);
 	oe.set_rand_gen(&rand_gen);
-
-	weights.set_pest_scenario(&pest_scenario);
 	localizer.set_pest_scenario(&pest_scenario);
 	
 }
@@ -1041,58 +1142,6 @@ void IterEnsembleSmoother::add_bases()
 			vector<int> drop{ oe.shape().first - 1 };
 			oe.drop_rows(drop);
 			oe.append(base_name, obs);
-		}
-	}
-
-	//check that 'base' isn't already in ensemble
-	rnames = weights.get_real_names();
-	if (rnames.size() == 0)
-		return;
-	if (find(rnames.begin(), rnames.end(), base_name) != rnames.end())
-	{
-		message(1, "'base' realization already in weights ensemble, ignoring '++ies_include_base'");
-	}
-	else
-	{
-		//Observations obs = pest_scenario.get_ctl_observations();
-		ObservationInfo oinfo = pest_scenario.get_ctl_observation_info();
-		Eigen::VectorXd q;
-		//vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
-		vector<string> vnames = weights.get_var_names();
-		q.resize(vnames.size());
-		double w;
-		for (int i = 0; i < vnames.size(); i++)
-		{
-			q(i) = oinfo.get_weight(vnames[i]);
-		}
-
-		Observations wobs(vnames, q);
-		if (inpar)
-		{
-			vector<string> prnames = pe.get_real_names();
-
-			int idx = find(prnames.begin(), prnames.end(), base_name) - prnames.begin();
-			//cout << idx << "," << rnames.size() << endl;
-			string oreal = rnames[idx];
-			stringstream ss;
-			ss << "warning: 'base' realization in par ensenmble but not in weights ensemble," << endl;
-			ss << "         replacing weights realization '" << oreal << "' with 'base'";
-			string mess = ss.str();
-			message(1, mess);
-			vector<string> drop;
-			drop.push_back(oreal);
-			weights.drop_rows(drop);
-			weights.append(base_name, wobs);
-			//rnames.insert(rnames.begin() + idx, string(base_name));
-			rnames[idx] = base_name;
-			weights.reorder(rnames, vector<string>());
-		}
-		else
-		{
-			message(1, "adding 'base' weight values to weights");
-
-
-			weights.append(base_name, wobs);
 		}
 	}
 }
@@ -1698,110 +1747,6 @@ void IterEnsembleSmoother::initialize_restart()
 }
 
 
-void IterEnsembleSmoother::initialize_weights()
-{
-	string weights_csv = pest_scenario.get_pestpp_options().get_ies_weight_csv();
-	//message(1, "loading weights ensemble from ", weights_csv);
-
-	stringstream ss;
-	string obs_ext = pest_utils::lower_cp(weights_csv).substr(weights_csv.size() - 3, weights_csv.size());
-	if (obs_ext.compare("csv") == 0)
-	{
-		message(1, "loading weights ensemble from csv file", weights_csv);
-		try
-		{
-			weights.from_csv(weights_csv);
-		}
-		catch (const exception &e)
-		{
-			ss << "error processing weights csv: " << e.what();
-			throw_ies_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_ies_error(string("error processing weights csv"));
-		}
-	}
-	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
-	{
-		message(1, "loading weights ensemble from binary file", weights_csv);
-		try
-		{
-			weights.from_binary(weights_csv);
-		}
-		catch (const exception &e)
-		{
-			ss << "error processing weights binary file: " << e.what();
-			throw_ies_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_ies_error(string("error processing weights binary file"));
-		}
-	}
-	else
-	{
-		ss << "unrecognized weights ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
-		throw_ies_error(ss.str());
-	}
-
-	if (pp_args.find("IES_NUM_REALS") != pp_args.end())
-	{
-		int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
-		if (num_reals < oe.shape().first)
-		{
-			message(1, "ies_num_reals arg passed, truncated weights ensemble to ", num_reals);
-			vector<string> keep_names, real_names = weights.get_real_names();
-			for (int i = 0; i<num_reals; i++)
-			{
-				keep_names.push_back(real_names[i]);
-			}
-			weights.keep_rows(keep_names);
-		}
-	}
-
-	//check that restart oe is in sync
-	vector<string> weights_real_names = weights.get_real_names(), oe_real_names = oe.get_real_names();
-	vector<string>::const_iterator start, end;
-	vector<string> missing;
-	start = oe_real_names.begin();
-	end = oe_real_names.end();
-	for (auto &rname : weights_real_names)
-		if (find(start, end, rname) == end)
-			missing.push_back(rname);
-	if (missing.size() > 0)
-	{
-		ss << "the following realization names were not found in the weight csv:";
-		for (auto &m : missing)
-			ss << m << ",";
-		throw_ies_error(ss.str());
-
-	}
-
-
-	if (weights.shape().first > oe.shape().first) //something is wrong
-	{
-		ss << "weight ensemble has too many rows: " << weights.shape().first << " compared to oe: " << oe.shape().first;
-		throw_ies_error(ss.str());
-	}
-	vector<string> weights_names = weights.get_var_names();
-	set<string> weights_set(weights_names.begin(), weights_names.end());
-	for (auto &name : oe.get_var_names())
-	{
-		if (weights_set.find(name) == weights_set.end())
-			missing.push_back(name);
-	}
-
-	if (missing.size() > 0)
-	{
-		ss << "weights ensemble is missing the following observations: ";
-		for (auto m : missing)
-			ss << ',' << m;
-		throw_ies_error(ss.str());
-	}
-
-}
-
 void IterEnsembleSmoother::initialize_parcov()
 {
 	stringstream ss;
@@ -1902,7 +1847,7 @@ void IterEnsembleSmoother::initialize()
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
-		ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, &reg_factor, &weights);
+		ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
 		if (ph.get_lt_obs_names().size() > 0)
 		{
 			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
@@ -2124,12 +2069,6 @@ void IterEnsembleSmoother::initialize()
 		}
 	}
 
-	if (ppo->get_ies_weight_csv().size() > 0)
-	{
-		throw_ies_error("separate weight csv support is not implemented...yet!");
-		initialize_weights();
-	}
-		
 
 	//need this here for Am calcs...
 	//message(1, "transforming parameter ensemble to numeric");
@@ -2211,7 +2150,7 @@ void IterEnsembleSmoother::initialize()
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
-		ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, &reg_factor, &weights);
+		ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
 		if (ph.get_lt_obs_names().size() > 0)
 		{
 			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
@@ -2297,7 +2236,7 @@ void IterEnsembleSmoother::initialize()
 
 	performance_log->log_event("calc pre-drop phi");
 	//initialize the phi handler
-	ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, &reg_factor, &weights);
+	ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
 
 	if (ph.get_lt_obs_names().size() > 0)
 	{
