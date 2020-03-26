@@ -273,7 +273,7 @@ void MorrisMethod::assemble_runs(RunManagerAbstract &run_manager)
 			// convert control parameters to model parameters
 			base_partran_seq_ptr->numeric2model_ip(pars);
 			// convert control parameters to model parameters
-			base_partran_seq_ptr->ctl2model_ip(pars);
+			//base_partran_seq_ptr->ctl2model_ip(pars);
 			if (i>0)
 			{
 				par_name = adj_par_name_vec[i-1];

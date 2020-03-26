@@ -1576,6 +1576,9 @@ PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const string key, const s
 		convert_ip(value, maxsing);
 	else if (key == "EIGWRITE")
 		convert_ip(value, eigwrite);
+	else if (key == "SVDMODE")
+	{
+	}
 	else
 		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
