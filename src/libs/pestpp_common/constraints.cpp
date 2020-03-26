@@ -36,8 +36,10 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 	current_constraints_sim_ptr = _current_constraints_sim_ptr;
 	current_pars_and_dec_vars_ptr = _current_pars_and_dec_vars_ptr;
 	stack_size = pest_scenario.get_pestpp_options().get_opt_stack_size();
+	string par_stack_name = pest_scenario.get_pestpp_options().get_opt_par_stack();
+	string obs_stack_name = pest_scenario.get_pestpp_options().get_opt_obs_stack();
 	use_fosm = true;
-	if (stack_size > 0)
+	if ((stack_size > 0) || (par_stack_name.size() > 0) || (obs_stack_name.size() > 0))
 		use_fosm = false;
 	stack_pe.set_pest_scenario(&pest_scenario);
 	stack_pe.set_rand_gen(&rand_gen);
@@ -147,7 +149,8 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 
 			}
 		}
-		cout << "Warning: " << nobszw << " of the observation constraints (see rec file for list) have 0.0 weight, skipping" << endl;
+		if (nobszw > 0)
+			cout << "Warning: " << nobszw << " of the observation constraints (see rec file for list) have 0.0 weight, skipping" << endl;
 
 		//look for prior information constraints
 		const PriorInformation* pinfo = pest_scenario.get_prior_info_ptr();
@@ -340,17 +343,25 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 			//make sure there is at least one non-decision var adjustable parameter
 			if (adj_par_names.size() == 0)
 				throw_constraints_error("++opt_risk != 0.5, but no adjustable parameters found in control file");
-			
+			bool size_passed = true;
+			set<string> passed = pest_scenario.get_pestpp_options().get_passed_args();
+			if (passed.find("OPT_STACK_SIZE") == passed.end())
+				size_passed = false;
 			string par_csv = pest_scenario.get_pestpp_options().get_opt_par_stack();
 			
 			if (par_csv.size() == 0)
 			{
-				f_rec << "drawing " << stack_size << "stack realizations" << endl;
-				pfm.log_event("loading parcov");
-				parcov.try_from(pest_scenario, *file_mgr_ptr);
-				pfm.log_event("drawing stack realizations");
-				stack_pe.draw(stack_size, pest_scenario.get_ctl_parameters(), parcov, &pfm, 
-					pest_scenario.get_pestpp_options().get_ies_verbose_level());
+				if ((stack_size == 0) && (obs_stack_name.size() == 0))
+					throw_constraints_error("++opt_stack_size is zero");
+				else if (stack_size > 0)
+				{
+					f_rec << "drawing " << stack_size << "stack realizations" << endl;
+					pfm.log_event("loading parcov");
+					parcov.try_from(pest_scenario, *file_mgr_ptr);
+					pfm.log_event("drawing stack realizations");
+					stack_pe.draw(stack_size, pest_scenario.get_ctl_parameters(), parcov, &pfm,
+						pest_scenario.get_pestpp_options().get_ies_verbose_level());
+				}
 			}
 			else
 			{
@@ -415,7 +426,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 				}
 					
 
-				if (stack_pe.shape().first > stack_size)
+				if ((size_passed) && (stack_pe.shape().first > stack_size))
 				{
 					vector<int> drop_rows;
 					for (int i = stack_size - 1; i < stack_pe.shape().first; i++)
@@ -497,7 +508,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 				if (missing.size() > 0)
 					throw_constraints_error("obs stack missing the following constraints: ", missing);
 
-				if (stack_oe.shape().first > stack_size)
+				if (((size_passed) || (stack_pe.shape().first > 0)) && (stack_oe.shape().first > stack_size))
 				{
 					vector<int> drop_rows;
 					for (int i = stack_size - 1; i < stack_oe.shape().first; i++)
