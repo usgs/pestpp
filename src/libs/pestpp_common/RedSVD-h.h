@@ -37,7 +37,7 @@
 namespace RedSVD
 {
 	template<typename Scalar>
-	inline void sample_gaussian(Scalar& x, Scalar& y)
+	inline void sample_gaussian_old(Scalar& x, Scalar& y)
 	{
 		using std::sqrt;
 		using std::log;
@@ -58,7 +58,7 @@ namespace RedSVD
 	}
 
 	template<typename MatrixType>
-	inline void sample_gaussian(MatrixType& mat)
+	inline void sample_gaussian_old(MatrixType& mat)
 	{
 		typedef typename MatrixType::Index Index;
 
@@ -72,7 +72,7 @@ namespace RedSVD
 	}
 
 	//while elegant, the C++11 random stuff is not consistent across platforms
-	/*template<typename MatrixType>
+	template<typename MatrixType>
 	inline void sample_gaussian(MatrixType& mat)
 	{
 		typedef typename MatrixType::Index Index;
@@ -83,7 +83,7 @@ namespace RedSVD
 			for (Index j = 0; j < mat.cols(); ++j )
 				mat(i,j) = distribution(generator);
 		}
-	}*/
+	}
 
 
 	template<typename MatrixType>
