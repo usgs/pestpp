@@ -960,16 +960,17 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			Parameters del_numeric_pars = new_numeric_pars - base_numeric_pars;
 			for (double i_scale : lambda_scale_vec)
 			{
-				if (i_scale == 1.0)
+				if (i_scale >= 1.0)
 					continue;
 				Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
-				par_transform.numeric2model_ip(scaled_pars);
+				
 				Parameters scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
 				output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
 					0, i_lambda, i_scale, scaled_ctl_pars);
 
 				stringstream ss;
 				ss << "scale(" << std::fixed << std::setprecision(2) << i_scale << ")";
+				par_transform.numeric2model_ip(scaled_pars);
 				int run_id = run_manager.add_run(scaled_pars, ss.str(), i_lambda);
 				num_lamb_runs++;
 				fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_scale << endl;

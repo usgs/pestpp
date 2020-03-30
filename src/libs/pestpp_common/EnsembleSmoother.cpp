@@ -484,9 +484,9 @@ void PhiHandler::report(bool echo)
 		f << "           'actual' phi does not." << endl;
 		if (echo)
 		{
-			f << "     note: 'measured' phi reported above includes " << endl;
-			f << "           realizations of measurement noise, " << endl;
-			f << "           'actual' phi does not." << endl;
+			cout << "     note: 'measured' phi reported above includes " << endl;
+			cout << "           realizations of measurement noise, " << endl;
+			cout << "           'actual' phi does not." << endl;
 		}
 	}
 	
