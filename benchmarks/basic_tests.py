@@ -71,7 +71,7 @@ def basic_test(model_d="ies_10par_xsec"):
     # wipe all pestpp options
     pst.pestpp_options = {}
     pst.pestpp_options["ies_num_reals"] = num_reals
-    pst.pestpp_options["lambda_scale_fac"] = 1.0
+    pst.pestpp_options["lambda_scale_fac"] = [0.5,0.75,1.0]
     pst.pestpp_options["ies_lambda_mults"] = 1.0
     # write a generic 2D cov
     if os.path.exists(os.path.join(new_d,"prior.jcb")):
@@ -768,11 +768,11 @@ if __name__ == "__main__":
     #parchglim_test()
     #unc_file_test()
     #secondary_marker_test()
-    #basic_test("ies_10par_xsec")
+    basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
     #tie_by_group_test()
-    sen_basic_test()
+    #sen_basic_test()
     #salib_verf()
     #tplins1_test()
