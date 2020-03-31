@@ -2278,12 +2278,19 @@ void IterEnsembleSmoother::initialize()
 		ss << " with the prior simulated ensemble." << endl;
 		message(0, ss.str());
 
-		cout << "...see rec file for listing of conflicted observations" << endl << endl;
+		cout << "...see rec file or " << file_manager.get_base_filename() << ".pdc.csv" << "for listing of conflicted observations" << endl << endl;
 		ofstream& frec = file_manager.rec_ofstream();
 		frec << endl << "...conflicted observations: " << endl;
 		for (auto oname : in_conflict)
 		{
 			frec << oname << endl;
+		}
+		// write out conflicted parameters to a csv file
+		ofstream pdccsv(file_manager.get_base_filename() + ".pdc.csv");
+		pdccsv << "name" << endl;
+		for (auto oname : in_conflict)
+		{
+			pdccsv << oname << endl;
 		}
 		if (!ppo->get_ies_drop_conflicts())
 		{
