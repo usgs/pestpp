@@ -2174,7 +2174,7 @@ void IterEnsembleSmoother::initialize()
 		ph.update(_oe, _pe);
 		message(0, "mean parameter phi report:");
 		ph.report(true);
-
+		ph.write(0, 1);
 		return;
 	}
 

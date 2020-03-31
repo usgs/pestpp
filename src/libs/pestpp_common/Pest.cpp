@@ -1714,7 +1714,25 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	}
 	
 	
-	
+	if (ctl_ordered_obs_group_names.size() == 0)
+	{
+		set<string> found;
+		string gname;
+		for (auto name : ctl_ordered_obs_names)
+		{
+			gname = observation_info.get_group(name);
+			if (found.find(gname) == found.end())
+			{
+				found.insert(gname);
+				ctl_ordered_obs_group_names.push_back(gname);
+			}
+		}
+	}
+	if (ctl_ordered_par_group_names.size() == 0)
+	{
+		ctl_ordered_par_group_names = base_group_info.get_group_names();
+	}
+
 
 
 	//check if the predictions ++ arg might be a file name?
