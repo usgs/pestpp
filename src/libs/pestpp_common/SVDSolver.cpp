@@ -196,7 +196,9 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 			else
 			{
 				bool restart_runs = (restart_controller.get_restart_option() == RestartController::RestartOption::RESUME_JACOBIAN_RUNS);
-				iteration_jac(run_manager, termination_ctl, best_upgrade_run, false, restart_runs);
+				bool success = iteration_jac(run_manager, termination_ctl, best_upgrade_run, false, restart_runs);
+				if (!success)
+					return best_upgrade_run;
 				if (restart_runs) restart_controller.get_restart_option() = RestartController::RestartOption::NONE;
 			}
 
@@ -774,7 +776,7 @@ ModelRun SVDSolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termina
 	return new_base_run;
 }
 
-void SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs, bool restart_runs)
+bool SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs, bool restart_runs)
 {
 	ostream &os = file_manager.rec_ofstream();
 	ostream &fout_restart = file_manager.get_ofstream("rst");
@@ -820,6 +822,7 @@ void SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContro
 	// sen file for this iteration
 	output_file_writer.append_sen(file_manager.sen_ofstream(), termination_ctl.get_iteration_number() + 1, jacobian,
 		*(base_run.get_obj_func_ptr()), get_parameter_group_info(), *regul_scheme_ptr, false, par_transform);
+	return true;
 }
 
 ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool restart_runs)
@@ -957,16 +960,17 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			Parameters del_numeric_pars = new_numeric_pars - base_numeric_pars;
 			for (double i_scale : lambda_scale_vec)
 			{
-				if (i_scale == 1.0)
+				if (i_scale >= 1.0)
 					continue;
 				Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
-				par_transform.numeric2model_ip(scaled_pars);
+				
 				Parameters scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
 				output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
 					0, i_lambda, i_scale, scaled_ctl_pars);
 
 				stringstream ss;
 				ss << "scale(" << std::fixed << std::setprecision(2) << i_scale << ")";
+				par_transform.numeric2model_ip(scaled_pars);
 				int run_id = run_manager.add_run(scaled_pars, ss.str(), i_lambda);
 				num_lamb_runs++;
 				fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_scale << endl;

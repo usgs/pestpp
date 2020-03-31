@@ -452,9 +452,8 @@ pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(
 		ofstream& os = file_manager.rec_ofstream();
 		ParameterEnsemble pe = fosm_real_info.first;
 		double reg_fac = 0.0;
-		PhiHandler ph(&pest_scenario, &file_manager, &oe, &pe, get_parcov_ptr(),
-			&reg_fac, &oe);
-		ph.update(oe, pe, false);
+		PhiHandler ph(&pest_scenario, &file_manager, &oe, &pe, get_parcov_ptr());
+		ph.update(oe, pe);
 		PhiHandler::phiType pt = PhiHandler::phiType::ACTUAL;
 		map<string,double>* phi_map = ph.get_phi_map(pt);
 		t = *phi_map;
@@ -1092,7 +1091,7 @@ void LinearAnalysis::write_par_credible_range(ofstream &fout, string sum_filenam
 			//range = get_range(value, prior_vars[pname], parinfo.get_parameter_rec_ptr(pname)->tranform_type);
 			stdev = sqrt(prior_vars[pname]);
 
-			fout << setw(20) << pname << setw(20) << value << setw(20) << stdev << setw(20) <<
+			fout << setw(20) << pest_utils::lower_cp(pname) << setw(20) << value << setw(20) << stdev << setw(20) <<
 				value - (2.0*stdev) << setw(20) << value + (2.0*stdev);
 			sout << pname << "," << value << "," << stdev << "," <<
 				value - (2.0*stdev) << "," << value + (2.0*stdev);
@@ -1161,7 +1160,7 @@ void LinearAnalysis::write_pred_credible_range(ofstream &fout, string sum_filena
 		stdev = sqrt(prior_vars[pred.first]);
 		lower = val - (2.0 * stdev);
 		upper = val + (2.0 * stdev);
-		fout << setw(20) << pred.first << setw(20) << val << setw(20) << stdev;
+		fout << setw(20) << pest_utils::lower_cp(pred.first) << setw(20) << val << setw(20) << stdev;
 		fout << setw(20) << lower << setw(20) << upper;
 		sout << pred.first << "," << val << "," << stdev;
 		sout << "," << lower << "," << upper;

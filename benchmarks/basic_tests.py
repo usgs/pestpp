@@ -71,7 +71,7 @@ def basic_test(model_d="ies_10par_xsec"):
     # wipe all pestpp options
     pst.pestpp_options = {}
     pst.pestpp_options["ies_num_reals"] = num_reals
-    pst.pestpp_options["lambda_scale_fac"] = 1.0
+    pst.pestpp_options["lambda_scale_fac"] = [0.5,0.75,1.0]
     pst.pestpp_options["ies_lambda_mults"] = 1.0
     # write a generic 2D cov
     if os.path.exists(os.path.join(new_d,"prior.jcb")):
@@ -458,8 +458,6 @@ def parchglim_test():
     d = np.abs(p_df.loc["stage","parval1"] - (par.loc["stage","parval1"] + rpm))
     assert d < 1.0e-6,d
 
-    # currently something is up with the upgrade calcs in pestpp-glm
-    # so this test just makes sure it runs without throwing an exception
     rpm = 1.1
     par.loc[pst.par_names[1:],"partrans"] = "fixed"
     par.loc[pst.par_names[1:],"parchglim"] = "factor"
@@ -769,8 +767,8 @@ if __name__ == "__main__":
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    secondary_marker_test()
-    #basic_test("ies_10par_xsec")
+    #secondary_marker_test()
+    basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()

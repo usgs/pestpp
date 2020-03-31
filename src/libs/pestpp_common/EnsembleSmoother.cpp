@@ -17,14 +17,13 @@
 
 PhiHandler::PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 	ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
-	Covariance *_parcov, double *_reg_factor, ObservationEnsemble *_weights)
+	Covariance *_parcov)
 {
 	pest_scenario = _pest_scenario;
 	file_manager = _file_manager;
 	oe_base = _oe_base;
 	pe_base = _pe_base;
-	weights = _weights;
-
+	
 	//check for inequality constraints
 	//for (auto &og : pest_scenario.get_ctl_ordered_obs_group_names())
 	string og;
@@ -46,9 +45,8 @@ PhiHandler::PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 		}
 	}
 
-	reg_factor = _reg_factor;
 	//save the org reg factor and org q vector
-	org_reg_factor = *_reg_factor;
+	org_reg_factor = pest_scenario->get_pestpp_options().get_ies_reg_factor();
 	org_q_vec = get_q_vector();
 	//Eigen::VectorXd parcov_inv_diag = parcov_inv.e_ptr()->diagonal();
 	parcov_inv_diag = _parcov->e_ptr()->diagonal();
@@ -164,7 +162,7 @@ map<string, double> PhiHandler::get_par_group_contrib(Eigen::VectorXd &phi_vec)
 	return group_phi_map;
 }
 
-void PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, bool include_regul)
+void PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 {
 	//build up obs group and par group idx maps for group reporting
 	obs_group_idx_map.clear();
@@ -185,20 +183,7 @@ void PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, bool i
 			obs_group_idx_map[og] = idx;
 	}
 
-	par_group_idx_map.clear();
-	vector<string> pars = pe_base->get_var_names();
-	ParameterInfo pi = pest_scenario->get_ctl_parameter_info();
-	for (auto& pg : pest_scenario->get_ctl_ordered_par_group_names())
-	{
-		idx.clear();
-		for (int i = 0; i < pars.size(); i++)
-		{
-			if (pi.get_parameter_rec_ptr(pars[i])->group == pg)
-				idx.push_back(i);
-		}
-		if (idx.size() > 0)
-			par_group_idx_map[pg] = idx;
-	}
+	
 	//update the various phi component vectors
 	meas.clear();
 	obs_group_phi_map.clear();
@@ -209,18 +194,22 @@ void PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, bool i
 		meas[pv.first] = pv.second.sum();
 
 	}
-	/*if (pest_scenario->get_control_info().pestmode == ControlInfo::PestMode::PARETO)
+	if (org_reg_factor != 0.0)
 	{
-		meas_map.clear();
-		meas_map = calc_meas(oe, org_q_vec);
-
-	}
-	for (auto &pv : meas_map)
-	{
-		obs_group_phi_map[pv.first] = get_obs_group_contrib(pv.second);
-	}*/
-	if (include_regul)
-	{
+		par_group_idx_map.clear();
+		vector<string> pars = pe_base->get_var_names();
+		ParameterInfo pi = pest_scenario->get_ctl_parameter_info();
+		for (auto& pg : pest_scenario->get_ctl_ordered_par_group_names())
+		{
+			idx.clear();
+			for (int i = 0; i < pars.size(); i++)
+			{
+				if (pi.get_parameter_rec_ptr(pars[i])->group == pg)
+					idx.push_back(i);
+			}
+			if (idx.size() > 0)
+				par_group_idx_map[pg] = idx;
+		}
 		regul.clear();
 		map<string, Eigen::VectorXd> reg_map = calc_regul(pe);//, *reg_factor);
 		//for (auto &pv : calc_regul(pe))
@@ -236,19 +225,7 @@ void PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, bool i
 			par_group_phi_map[name] = get_par_group_contrib(reg_map[name]);
 		}
 	}
-
-	/*if (pest_scenario->get_control_info().pestmode == ControlInfo::PestMode::PARETO)
-	{
-		reg_map.clear();
-		reg_map = calc_regul(pe, org_reg_factor);
-	}
-
-	for (int i = 0; i<oe.shape().first; i++)
-	{
-		name = preal_names[i];
-		par_group_phi_map[name] = get_par_group_contrib(reg_map[name]);
-	}*/
-
+	
 	actual.clear();
 	for (auto &pv : calc_actual(oe, q))
 	{
@@ -418,68 +395,173 @@ string PhiHandler::get_summary_header()
 	return ss.str();
 }
 
-void PhiHandler::report(bool echo, bool include_regul)
+
+void PhiHandler::report(bool echo)
 {
-	ofstream &f = file_manager->rec_ofstream();
-	f << get_summary_header();
-	if (echo)
-		cout << get_summary_header();
-	string s = get_summary_string(PhiHandler::phiType::COMPOSITE);
-	f << s;
-	if (echo)
-		cout << s;
-	s = get_summary_string(PhiHandler::phiType::MEAS);
-	f << s;
-	if (echo)
-		cout << s;
-	if (include_regul)
+	ofstream& f = file_manager->rec_ofstream();
+	string s;
+
+	if (pest_scenario->get_pestpp_options().get_ies_no_noise())
 	{
-		s = get_summary_string(PhiHandler::phiType::REGUL);
-		f << s;
-		if (echo)
-			cout << s;
-	}
-	s = get_summary_string(PhiHandler::phiType::ACTUAL);
-	f << s;
-	if (echo)
-		cout << s;
-	if (include_regul)
-	{
-		if (*reg_factor == 0.0)
+		if (org_reg_factor == 0)
 		{
-			f << "    (note: reg_factor is zero; regularization phi reported but not used)" << endl;
+			s = get_summary_string(PhiHandler::phiType::ACTUAL);
+			f << s;
 			if (echo)
-				cout << "    (note: reg_factor is zero; regularization phi reported but not used)" << endl;
+				cout << s;
 		}
 		else
 		{
-			f << "     current reg_factor: " << *reg_factor << endl;
+			f << get_summary_header();
 			if (echo)
-				cout << "     current reg_factor: " << *reg_factor << endl;
+				cout << get_summary_header();
+			string s = get_summary_string(PhiHandler::phiType::COMPOSITE);
+			f << s;
+			if (echo)
+				cout << s;
+			s = get_summary_string(PhiHandler::phiType::REGUL);
+			f << s;
+			if (echo)
+				cout << s;
+			s = get_summary_string(PhiHandler::phiType::ACTUAL);
+			f << s;
+			if (echo)
+				cout << s;
 		}
-		if (*reg_factor != 0.0)
+		
+	}
+	else
+	{
+		s = get_summary_string(PhiHandler::phiType::MEAS);
+		f << s;
+		if (echo)
+			cout << s;
+		if (org_reg_factor == 0.0)
 		{
-
-			f << "     note: regularization phi reported above does not " << endl;
-			f << "           include the effects of reg_factor, " << endl;
-			f << "           but composite phi does." << endl;
+			s = get_summary_string(PhiHandler::phiType::ACTUAL);
+			f << s;
 			if (echo)
-			{
-				cout << "     note: regularization phi reported above does not " << endl;
-				cout << "           include the effects of reg_factor, " << endl;
-				cout << "           but composite phi does." << endl;
-			}
+				cout << s;	
+		}
+		else
+		{
+			f << get_summary_header();
+			if (echo)
+				cout << get_summary_header();
+			string s = get_summary_string(PhiHandler::phiType::COMPOSITE);
+			f << s;
+			if (echo)
+				cout << s;
+			s = get_summary_string(PhiHandler::phiType::REGUL);
+			f << s;
+			if (echo)
+				cout << s;
+			s = get_summary_string(PhiHandler::phiType::ACTUAL);
+			f << s;
+			if (echo)
+				cout << s;
+		}
+
+	}
+		
+	if (org_reg_factor != 0.0)
+	{
+
+		f << "     note: 'regularization' phi reported above does not " << endl;
+		f << "           include the effects of reg_factor, " << endl;
+		f << "           but 'composite' phi does." << endl;
+		if (echo)
+		{
+			cout << "     note: 'regularization' phi reported above does not " << endl;
+			cout << "           include the effects of reg_factor, " << endl;
+			cout << "           but 'composite' phi does." << endl;
 		}
 	}
+	if (!pest_scenario->get_pestpp_options().get_ies_no_noise())
+	{
+		f << "     note: 'measured' phi reported above includes " << endl;
+		f << "           realizations of measurement noise, " << endl;
+		f << "           'actual' phi does not." << endl;
+		if (echo)
+		{
+			cout << "     note: 'measured' phi reported above includes " << endl;
+			cout << "           realizations of measurement noise, " << endl;
+			cout << "           'actual' phi does not." << endl;
+		}
+	}
+	
+
 	f << endl << endl;
 	f.flush();
 }
+
+
+
+//void PhiHandler::report(bool echo)
+//{
+//	ofstream &f = file_manager->rec_ofstream();
+//	f << get_summary_header();
+//	if (echo)
+//		cout << get_summary_header();
+//	string s = get_summary_string(PhiHandler::phiType::COMPOSITE);
+//	f << s;
+//	if (echo)
+//		cout << s;
+//	s = get_summary_string(PhiHandler::phiType::MEAS);
+//	f << s;
+//	if (echo)
+//		cout << s;
+//	if (org_reg_factor != 0.0)
+//	{
+//		s = get_summary_string(PhiHandler::phiType::REGUL);
+//		f << s;
+//		if (echo)
+//			cout << s;
+//	}
+//	s = get_summary_string(PhiHandler::phiType::ACTUAL);
+//	f << s;
+//	if (echo)
+//		cout << s;
+//	if (org_reg_factor != 0.0)
+//	{
+//		if (*reg_factor == 0.0)
+//		{
+//			f << "    (note: reg_factor is zero; regularization phi reported but not used)" << endl;
+//			if (echo)
+//				cout << "    (note: reg_factor is zero; regularization phi reported but not used)" << endl;
+//		}
+//		else
+//		{
+//			f << "     current reg_factor: " << *reg_factor << endl;
+//			if (echo)
+//				cout << "     current reg_factor: " << *reg_factor << endl;
+//		}
+//		if (*reg_factor != 0.0)
+//		{
+//
+//			f << "     note: regularization phi reported above does not " << endl;
+//			f << "           include the effects of reg_factor, " << endl;
+//			f << "           but composite phi does." << endl;
+//			if (echo)
+//			{
+//				cout << "     note: regularization phi reported above does not " << endl;
+//				cout << "           include the effects of reg_factor, " << endl;
+//				cout << "           but composite phi does." << endl;
+//			}
+//		}
+//	}
+//	f << endl << endl;
+//	f.flush();
+//}
 
 void PhiHandler::write(int iter_num, int total_runs, bool write_group)
 {
 	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.actual.csv"), phiType::ACTUAL,oreal_names);
 	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.meas.csv"), phiType::MEAS, oreal_names);
-	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.regul.csv"), phiType::REGUL, preal_names);
+	if (pest_scenario->get_pestpp_options().get_ies_reg_factor() != 0.0)
+	{
+		write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.regul.csv"), phiType::REGUL, preal_names);	
+	}
 	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.composite.csv"), phiType::COMPOSITE, oreal_names);
 	if (write_group)
 		write_group_csv(iter_num, total_runs, file_manager->get_ofstream("phi.group.csv"));
@@ -536,12 +618,14 @@ void PhiHandler::write_group_csv(int iter_num, int total_runs, ofstream &csv, ve
 				csv << ',' << 0.0;
 			else
 				csv  << ',' << obs_group_phi_map[oreal][name];
-
-		for (auto &name : pest_scenario->get_ctl_ordered_par_group_names())
-			if (par_group_phi_map[preal].find(name) == par_group_phi_map[preal].end())
-				csv << ',' << 0.0;
-			else
-				csv << ',' << par_group_phi_map[preal][name];
+		if (org_reg_factor != 0.0)
+		{
+			for (auto& name : pest_scenario->get_ctl_ordered_par_group_names())
+				if (par_group_phi_map[preal].find(name) == par_group_phi_map[preal].end())
+					csv << ',' << 0.0;
+				else
+					csv << ',' << par_group_phi_map[preal][name];
+		}
 		csv << endl;;
 		csv.flush();
 	}
@@ -554,8 +638,11 @@ void PhiHandler::prepare_group_csv(ofstream &csv, vector<string> extra)
 		csv << ',' << pest_utils::lower_cp(name);
 	for (auto &name : pest_scenario->get_ctl_ordered_obs_group_names())
 		csv << ',' << pest_utils::lower_cp(name);
-	for (auto &name : pest_scenario->get_ctl_ordered_par_group_names())
-		csv << ',' << pest_utils::lower_cp(name);
+	if (org_reg_factor != 0.0)
+	{
+		for (auto& name : pest_scenario->get_ctl_ordered_par_group_names())
+			csv << ',' << pest_utils::lower_cp(name);
+	}
 	csv << endl;
 }
 
@@ -578,15 +665,13 @@ vector<int> PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_sig
 map<string, Eigen::VectorXd> PhiHandler::calc_meas(ObservationEnsemble & oe, Eigen::VectorXd &q_vec)
 {
 	map<string, Eigen::VectorXd> phi_map;
-	Eigen::VectorXd oe_base_vec, oe_vec, diff,w_vec;
+	Eigen::VectorXd oe_base_vec, oe_vec, diff, w_vec;
 	//Eigen::VectorXd q = get_q_vector();
 	vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
 	vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
 	vector<string>::iterator start = base_real_names.begin(), end = base_real_names.end();
 
-	Eigen::MatrixXd w_mat;
-	if (weights->shape().first > 0)
-		w_mat = weights->get_eigen(vector<string>(), oe_base->get_var_names());
+	
 	double phi;
 	string rname;
 
@@ -598,6 +683,14 @@ map<string, Eigen::VectorXd> PhiHandler::calc_meas(ObservationEnsemble & oe, Eig
 	}
 
 	Eigen::MatrixXd resid = get_obs_resid(oe);
+	ObservationInfo oi = pest_scenario->get_ctl_observation_info();
+	vector<string> names = oe_base->get_var_names();
+	w_vec.resize(names.size());
+	for (int i=0;i<names.size();i++)
+	{
+		w_vec(i) = oi.get_weight(names[i]);
+	}
+	
 	assert(oe_real_names.size() == resid.rows());
 	for (int i = 0; i<resid.rows(); i++)
 	{
@@ -605,14 +698,9 @@ map<string, Eigen::VectorXd> PhiHandler::calc_meas(ObservationEnsemble & oe, Eig
 		if (find(start, end, rname) == end)
 			continue;
 		diff = resid.row(i);
-
-		if (weights->shape().first == 0)
-			diff = diff.cwiseProduct(q_vec);
-		else
-		{
-			w_vec = w_mat.row(i);
-			diff = diff.cwiseProduct(w_vec);
-		}
+		
+		diff = diff.cwiseProduct(w_vec);
+		
 		phi = (diff.cwiseProduct(diff)).sum();
 		phi_map[rname] = diff.cwiseProduct(diff);
 	}
@@ -736,7 +824,7 @@ map<string, double> PhiHandler::calc_composite(map<string, double> &_meas, map<s
 		{
 			mea = _meas[orn];
 			reg = _regul[prn];
-			phi_map[orn] = mea + (reg * *reg_factor);
+			phi_map[orn] = mea + (reg * org_reg_factor);
 		}
 	}
 	return phi_map;
@@ -868,8 +956,6 @@ IterEnsembleSmoother::IterEnsembleSmoother(Pest &_pest_scenario, FileManager &_f
 	oe.set_pest_scenario(&pest_scenario);
 	pe.set_rand_gen(&rand_gen);
 	oe.set_rand_gen(&rand_gen);
-
-	weights.set_pest_scenario(&pest_scenario);
 	localizer.set_pest_scenario(&pest_scenario);
 	
 }
@@ -1056,58 +1142,6 @@ void IterEnsembleSmoother::add_bases()
 			vector<int> drop{ oe.shape().first - 1 };
 			oe.drop_rows(drop);
 			oe.append(base_name, obs);
-		}
-	}
-
-	//check that 'base' isn't already in ensemble
-	rnames = weights.get_real_names();
-	if (rnames.size() == 0)
-		return;
-	if (find(rnames.begin(), rnames.end(), base_name) != rnames.end())
-	{
-		message(1, "'base' realization already in weights ensemble, ignoring '++ies_include_base'");
-	}
-	else
-	{
-		//Observations obs = pest_scenario.get_ctl_observations();
-		ObservationInfo oinfo = pest_scenario.get_ctl_observation_info();
-		Eigen::VectorXd q;
-		//vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
-		vector<string> vnames = weights.get_var_names();
-		q.resize(vnames.size());
-		double w;
-		for (int i = 0; i < vnames.size(); i++)
-		{
-			q(i) = oinfo.get_weight(vnames[i]);
-		}
-
-		Observations wobs(vnames, q);
-		if (inpar)
-		{
-			vector<string> prnames = pe.get_real_names();
-
-			int idx = find(prnames.begin(), prnames.end(), base_name) - prnames.begin();
-			//cout << idx << "," << rnames.size() << endl;
-			string oreal = rnames[idx];
-			stringstream ss;
-			ss << "warning: 'base' realization in par ensenmble but not in weights ensemble," << endl;
-			ss << "         replacing weights realization '" << oreal << "' with 'base'";
-			string mess = ss.str();
-			message(1, mess);
-			vector<string> drop;
-			drop.push_back(oreal);
-			weights.drop_rows(drop);
-			weights.append(base_name, wobs);
-			//rnames.insert(rnames.begin() + idx, string(base_name));
-			rnames[idx] = base_name;
-			weights.reorder(rnames, vector<string>());
-		}
-		else
-		{
-			message(1, "adding 'base' weight values to weights");
-
-
-			weights.append(base_name, wobs);
 		}
 	}
 }
@@ -1518,6 +1552,7 @@ void IterEnsembleSmoother::initialize_restart()
 				ss << m << ",";
 			throw_ies_error(ss.str());
 		}
+		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
 
 	if (pp_args.find("IES_NUM_REALS") != pp_args.end())
@@ -1712,110 +1747,6 @@ void IterEnsembleSmoother::initialize_restart()
 }
 
 
-void IterEnsembleSmoother::initialize_weights()
-{
-	string weights_csv = pest_scenario.get_pestpp_options().get_ies_weight_csv();
-	//message(1, "loading weights ensemble from ", weights_csv);
-
-	stringstream ss;
-	string obs_ext = pest_utils::lower_cp(weights_csv).substr(weights_csv.size() - 3, weights_csv.size());
-	if (obs_ext.compare("csv") == 0)
-	{
-		message(1, "loading weights ensemble from csv file", weights_csv);
-		try
-		{
-			weights.from_csv(weights_csv);
-		}
-		catch (const exception &e)
-		{
-			ss << "error processing weights csv: " << e.what();
-			throw_ies_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_ies_error(string("error processing weights csv"));
-		}
-	}
-	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
-	{
-		message(1, "loading weights ensemble from binary file", weights_csv);
-		try
-		{
-			weights.from_binary(weights_csv);
-		}
-		catch (const exception &e)
-		{
-			ss << "error processing weights binary file: " << e.what();
-			throw_ies_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_ies_error(string("error processing weights binary file"));
-		}
-	}
-	else
-	{
-		ss << "unrecognized weights ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
-		throw_ies_error(ss.str());
-	}
-
-	if (pp_args.find("IES_NUM_REALS") != pp_args.end())
-	{
-		int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
-		if (num_reals < oe.shape().first)
-		{
-			message(1, "ies_num_reals arg passed, truncated weights ensemble to ", num_reals);
-			vector<string> keep_names, real_names = weights.get_real_names();
-			for (int i = 0; i<num_reals; i++)
-			{
-				keep_names.push_back(real_names[i]);
-			}
-			weights.keep_rows(keep_names);
-		}
-	}
-
-	//check that restart oe is in sync
-	vector<string> weights_real_names = weights.get_real_names(), oe_real_names = oe.get_real_names();
-	vector<string>::const_iterator start, end;
-	vector<string> missing;
-	start = oe_real_names.begin();
-	end = oe_real_names.end();
-	for (auto &rname : weights_real_names)
-		if (find(start, end, rname) == end)
-			missing.push_back(rname);
-	if (missing.size() > 0)
-	{
-		ss << "the following realization names were not found in the weight csv:";
-		for (auto &m : missing)
-			ss << m << ",";
-		throw_ies_error(ss.str());
-
-	}
-
-
-	if (weights.shape().first > oe.shape().first) //something is wrong
-	{
-		ss << "weight ensemble has too many rows: " << weights.shape().first << " compared to oe: " << oe.shape().first;
-		throw_ies_error(ss.str());
-	}
-	vector<string> weights_names = weights.get_var_names();
-	set<string> weights_set(weights_names.begin(), weights_names.end());
-	for (auto &name : oe.get_var_names())
-	{
-		if (weights_set.find(name) == weights_set.end())
-			missing.push_back(name);
-	}
-
-	if (missing.size() > 0)
-	{
-		ss << "weights ensemble is missing the following observations: ";
-		for (auto m : missing)
-			ss << ',' << m;
-		throw_ies_error(ss.str());
-	}
-
-}
-
 void IterEnsembleSmoother::initialize_parcov()
 {
 	stringstream ss;
@@ -1916,7 +1847,7 @@ void IterEnsembleSmoother::initialize()
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
-		ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, &reg_factor, &weights);
+		ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
 		if (ph.get_lt_obs_names().size() > 0)
 		{
 			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
@@ -1937,9 +1868,9 @@ void IterEnsembleSmoother::initialize()
 		message(1, "saving results from control file parameter value run to ", obs_csv);
 		_oe.to_csv(obs_csv);
 
-		ph.update(_oe, _pe, false);
+		ph.update(_oe, _pe);
 		message(0, "control file parameter phi report:");
-		ph.report(true,false);
+		ph.report(true);
 		ph.write(0, 1);
 		ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
 		Observations obs;
@@ -2020,51 +1951,6 @@ void IterEnsembleSmoother::initialize()
 	error_min_reals = 2;
 	consec_bad_lambda_cycles = 0;
 
-	if ((pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::PARETO))
-	{
-		message(1, "using pestpp-ies 'pareto' mode");
-		string pobs_group = pest_scenario.get_pareto_info().obsgroup;
-		message(1, "pareto obs group: ", pobs_group);
-
-		if (pobs_group.substr(0, 5) == "REGUL")
-		{
-			message(1, "'regul' detected in pareto obs group name");
-			//if (pest_scenario.get_pestpp_options().get_ies_reg_factor() == 0.0)
-			//	throw_ies_error("pareto model problem: pareto obs group is 'regul'-ish but ies_reg_fac is zero");
-
-		}
-		else
-		{
-
-			ObservationInfo *oi = pest_scenario.get_observation_info_ptr();
-			Observations obs = pest_scenario.get_ctl_observations();
-			vector<string> zero;
-			for (auto &oname : pest_scenario.get_ctl_ordered_obs_names())
-				if (oi->get_group(oname) == pobs_group)
-				{
-					if (oi->get_weight(oname) == 0.0)
-						zero.push_back(oname);
-					pareto_obs[oname] = obs[oname];
-					pareto_weights[oname] = oi->get_weight(oname);
-				}
-
-			if (pareto_obs.size() == 0)
-				throw_ies_error("no observations found for pareto obs group");
-
-
-			if (zero.size() > 0)
-			{
-				message(0, "error: the following pareto obs have zero weight:", zero);
-				throw_ies_error("atleast one pareto obs has zero weight");
-			}
-
-
-		}
-		//throw_ies_error("pareto mode not finished");
-	}
-
-	
-
 	lam_mults = pest_scenario.get_pestpp_options().get_ies_lam_mults();
 	if (lam_mults.size() == 0)
 		lam_mults.push_back(1.0);
@@ -2080,7 +1966,6 @@ void IterEnsembleSmoother::initialize()
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
 	sanity_checks();
-
 
 	bool echo = false;
 	if (verbose_level > 1)
@@ -2184,34 +2069,6 @@ void IterEnsembleSmoother::initialize()
 		}
 	}
 
-	if (ppo->get_ies_weight_csv().size() > 0)
-	{
-		throw_ies_error("separate weight csv support is not implemented...yet!");
-		initialize_weights();
-	}
-		
-
-	//if pareto mode, reset the stochastic obs vals for the pareto obs to the value in the control file
-	if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::PARETO)
-	{
-		throw_ies_error("PARETO mode is not implemented...yet!");
-		string oname;
-		vector<string> oe_names = oe.get_var_names();
-		double val;
-		Eigen::VectorXd col;
-		Eigen::MatrixXd oe_reals = *oe.get_eigen_ptr();
-		for (int i = 0; i < oe.shape().second; i++)
-		{
-			if (pareto_obs.find(oe_names[i]) != pareto_obs.end())
-			{
-				val = pareto_obs[oe_names[i]];
-				col = Eigen::VectorXd::Zero(oe.shape().first);
-				col.setConstant(val);
-				oe_reals.col(i) = col;
-			}
-		}
-		oe.set_eigen(oe_reals);
-	}
 
 	//need this here for Am calcs...
 	//message(1, "transforming parameter ensemble to numeric");
@@ -2293,7 +2150,7 @@ void IterEnsembleSmoother::initialize()
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
-		ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, &reg_factor, &weights);
+		ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
 		if (ph.get_lt_obs_names().size() > 0)
 		{
 			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
@@ -2316,7 +2173,7 @@ void IterEnsembleSmoother::initialize()
 
 		ph.update(_oe, _pe);
 		message(0, "mean parameter phi report:");
-		ph.report();
+		ph.report(true);
 
 		return;
 	}
@@ -2379,7 +2236,7 @@ void IterEnsembleSmoother::initialize()
 
 	performance_log->log_event("calc pre-drop phi");
 	//initialize the phi handler
-	ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, &reg_factor, &weights);
+	ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
 
 	if (ph.get_lt_obs_names().size() > 0)
 	{
@@ -2392,7 +2249,7 @@ void IterEnsembleSmoother::initialize()
 
 	ph.update(oe, pe);
 	message(0, "pre-drop initial phi summary");
-	ph.report();
+	ph.report(true);
 	drop_bad_phi(pe, oe);
 	if (oe.shape().first == 0)
 	{
@@ -2474,7 +2331,7 @@ void IterEnsembleSmoother::initialize()
 	performance_log->log_event("calc initial phi");
 	ph.update(oe, pe);
 	message(0, "initial phi summary");
-	ph.report();
+	ph.report(true);
 	ph.write(0, run_mgr_ptr->get_total_runs());
 	if (ppo->get_ies_save_rescov())
 		ph.save_residual_cov(oe, 0);
@@ -2727,177 +2584,38 @@ void IterEnsembleSmoother::save_mat(string prefix, Eigen::MatrixXd &mat)
 	}
 }
 
-void IterEnsembleSmoother::adjust_pareto_weight(string &obsgroup, double wfac)
-
-{
-	if (obsgroup.substr(0, 5) == "REGUL")
-
-	{
-		message(1, "resetting reg fac for pareto to ", wfac);
-		reg_factor = wfac;
-	}
-	else
-	{
-		message(1, "applying weight factor for pareto obs group of ", wfac);
-
-		//pest_scenario.get_observation_info_ptr()->scale_group_weights(obsgroup, wfac);
-		ObservationInfo *oi = pest_scenario.get_observation_info_ptr();
-		double val;
-		for (auto &pw : pareto_weights)
-		{
-			val = wfac * pw.second;
-			oi->set_weight(pw.first, val);
-		}
-
-
-		Covariance obscov;
-		obscov.from_observation_weights(pest_scenario);
-		obscov = obscov.get(act_obs_names);
-		cout << obscov_inv_sqrt.diagonal() << endl;
-		obscov_inv_sqrt = obscov.inv().get_matrix().diagonal().cwiseSqrt().asDiagonal();
-	    cout << obscov_inv_sqrt.diagonal() << endl;
-		cout << endl;
-	}
-}
-
-void IterEnsembleSmoother::pareto_iterate_2_solution()
-{
-	//todo:
-	//get initial obsgroup weight and use wf mults intead of vals
-	ParetoInfo pi = pest_scenario.get_pareto_info();
-	stringstream ss;
-	//double init_lam = last_best_lam, init_mean = last_best_mean, init_std = last_best_std;
-	double init_lam = last_best_lam, init_mean = 1.0e+30, init_std = 1.0e+30;
-
-	message(0, "starting pareto analysis");
-	message(0, "initial pareto wfac", pi.wf_start);
-	message(1, "starting initial pareto iterations", pi.niter_start);
-	adjust_pareto_weight(pi.obsgroup, pi.wf_start);
-	last_best_lam = init_lam, last_best_mean = init_mean, last_best_std = init_std;
-	for (int i = 0; i < pi.niter_start; i++)
-	{
-		iter++;
-		message(1, "starting solve for iteration:", iter);
-		ss.str("");
-		ss << "starting solve for iteration: " << iter;
-		performance_log->log_event(ss.str());
-		solve_new();
-		report_and_save();
-		ph.update(oe, pe);
-		last_best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
-		last_best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
-		ph.report();
-		ph.write(iter, run_mgr_ptr->get_total_runs(),false);
-
-	}
-	ph.write_group(iter, run_mgr_ptr->get_total_runs(),vector<double>());
-	double wfac = pi.wf_start + pi.wf_inc;
-	vector<double> wfacs;
-	wfacs.push_back(pi.wf_start + pi.wf_inc);
-	while (true)
-	{
-		if (pi.wf_inc < 0.0)
-		{
-			if (wfac < pi.wf_fin)
-				break;
-			//wfac = wfac - pi.wf_inc;
-		}
-		else
-		{
-			if (wfac > pi.wf_fin)
-				break;
-
-		}
-		wfac = wfac + pi.wf_inc;
-		wfacs.push_back(wfac);
-	}
-	//while (wfac < pi.wf_fin)
-	//pe = pe_base;
-	//oe = oe_base;
-	for (auto &wfac : wfacs)
-	{
-		last_best_lam = init_lam, last_best_mean = init_mean, last_best_std = init_std;
-		message(0, "using pareto wfac", wfac);
-		message(0, "starting pareto iterations", pi.niter_gen);
-		adjust_pareto_weight(pi.obsgroup, wfac);
-		for (int i = 0; i < pi.niter_gen; i++)
-		{
-			iter++;
-			message(0, "starting solve for iteration:", iter);
-			ss << "starting solve for iteration: " << iter;
-			performance_log->log_event(ss.str());
-			solve_new();
-			report_and_save();
-			ph.update(oe, pe);
-			last_best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
-			last_best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
-			ph.report();
-			ph.write(iter, run_mgr_ptr->get_total_runs(),false);
-		}
-		ph.write_group(iter, run_mgr_ptr->get_total_runs(), vector<double>());
-		//pe = pe_base;
-		//oe = oe_base;
-	}
-	message(1, "final pareto wfac", pi.niter_fin);
-	message(0, "starting final pareto iterations", pi.niter_fin);
-	adjust_pareto_weight(pi.obsgroup, pi.wf_fin);
-	last_best_lam = init_lam, last_best_mean = init_mean, last_best_std = init_std;
-	//pe = pe_base;
-	//oe = oe_base;
-	for (int i = 0; i < pi.niter_fin; i++)
-	{
-		iter++;
-		message(0, "starting solve for iteration:", iter);
-		ss << "starting solve for iteration: " << iter;
-		performance_log->log_event(ss.str());
-		solve_new();
-		report_and_save();
-		ph.update(oe,pe);
-		last_best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
-		last_best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
-		ph.report();
-		ph.write(iter, run_mgr_ptr->get_total_runs(),false);
-	}
-	ph.write_group(iter, run_mgr_ptr->get_total_runs(), vector<double>());
-
-
-}
 
 void IterEnsembleSmoother::iterate_2_solution()
 {
 	stringstream ss;
 	ofstream &frec = file_manager.rec_ofstream();
-	if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::PARETO)
-		pareto_iterate_2_solution();
-	else
+	
+	bool accept;
+	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
-		bool accept;
-		for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
-		{
-			iter++;
-			message(0, "starting solve for iteration:", iter);
-			ss << "starting solve for iteration: " << iter;
-			performance_log->log_event(ss.str());
-			accept = solve_new();
-			report_and_save();
-			ph.update(oe,pe);
-			last_best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
-			last_best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
-			ph.report();
-			ph.write(iter, run_mgr_ptr->get_total_runs());
-			if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
-				ph.save_residual_cov(oe,iter);
-			pcs.summarize(pe,iter);
+		iter++;
+		message(0, "starting solve for iteration:", iter);
+		ss << "starting solve for iteration: " << iter;
+		performance_log->log_event(ss.str());
+		accept = solve_new();
+		report_and_save();
+		ph.update(oe,pe);
+		last_best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
+		last_best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
+		ph.report(true);
+		ph.write(iter, run_mgr_ptr->get_total_runs());
+		if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
+			ph.save_residual_cov(oe,iter);
+		pcs.summarize(pe,iter);
 			
 			
-			if (accept)
-				consec_bad_lambda_cycles = 0;
-			else
-				consec_bad_lambda_cycles++;
+		if (accept)
+			consec_bad_lambda_cycles = 0;
+		else
+			consec_bad_lambda_cycles++;
 
-			if (should_terminate())
-				break;
-		}
+		if (should_terminate())
+			break;
 	}
 }
 
@@ -3690,6 +3408,7 @@ bool IterEnsembleSmoother::solve_new()
 		subset_size = pe.shape().first;
 	}
 
+	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 
 	vector<ParameterEnsemble> pe_lams;
 	vector<double> lam_vals, scale_vals;
@@ -3903,7 +3622,7 @@ bool IterEnsembleSmoother::solve_new()
 			}
 		message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 		ph.update(oe_lams[best_idx], pe_lams[best_idx]);
-		ph.report();
+		ph.report(true);
 		message(0, "running remaining realizations for best lambda, scale:", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 
 		//pe_keep_names and oe_keep_names are names of the remaining reals to eval
@@ -3964,7 +3683,7 @@ bool IterEnsembleSmoother::solve_new()
 		best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
 		best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
 		message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
-		ph.report();
+		ph.report(true);
 	}
 	else
 	{

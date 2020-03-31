@@ -841,12 +841,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		passed_args.insert("IES_SAVE_LAMBDA_ENSEMBLES");
 		ies_save_lambda_en = pest_utils::parse_string_arg_to_bool(value);
 	}
-	else if ((key == "IES_WEIGHTS_EN") || (key == "IES_WEIGHTS_ENSEMBLE"))
-	{
-		passed_args.insert("IES_WEIGHTS_EN");
-		passed_args.insert("IES_WEIGHTS_ENSEMBLE");
-		ies_weight_csv = org_value;
-	}
+	
 	else if (key == "IES_SUBSET_HOW")
 	{
 		convert_ip(value,ies_subset_how);
@@ -1134,7 +1129,6 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_lambda_inc_fac: " << ies_lambda_inc_fac << endl;
 	os << "ies_lambda_dec_fac: " << ies_lambda_dec_fac << endl;
 	os << "ies_save_lambda_ensembles: " << ies_save_lambda_en << endl;
-	os << "ies_weights_ensemble: " << ies_weight_csv << endl;
 	os << "ies_subset_how: " << ies_subset_how << endl;
 	os << "ies_localize_how: " << ies_localize_how << endl;
 	os << "ies_num_threads: " << ies_num_threads << endl;
@@ -1189,7 +1183,7 @@ void PestppOptions::set_defaults()
 	set_n_iter_base(1000000);
 	set_super_eigthres(1.0e-6);
 	set_max_n_super(1000000);
-	set_max_super_frz_iter(10);
+	set_max_super_frz_iter(20);
 	set_max_reg_iter(20);
 	set_uncert_flag(true);
 	set_glm_num_reals(0);
@@ -1254,7 +1248,6 @@ void PestppOptions::set_defaults()
 	set_ies_lambda_inc_fac(10.0);
 	set_ies_lambda_dec_fac(0.75);
 	set_ies_save_lambda_en(false);
-	set_ies_weight_csv("");
 	set_ies_subset_how("RANDOM");
 	set_ies_localize_how("PARAMETERS");
 	set_ies_num_threads(-1);
@@ -1583,6 +1576,9 @@ PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const string key, const s
 		convert_ip(value, maxsing);
 	else if (key == "EIGWRITE")
 		convert_ip(value, eigwrite);
+	else if (key == "SVDMODE")
+	{
+	}
 	else
 		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;

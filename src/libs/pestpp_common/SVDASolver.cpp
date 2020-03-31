@@ -242,7 +242,7 @@ ModelRun SVDASolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termin
 	return new_base_run;
 }
 
-void SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs, bool restart_runs)
+bool SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs, bool restart_runs)
 {
 	ostream &fout_restart = file_manager.get_ofstream("rst");
 	ostream &os = file_manager.rec_ofstream();
@@ -292,7 +292,7 @@ void SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContr
 				cout << "Max number of iterations to freeze parameters to compute jacobian exceeded" << endl;
 				os << "Terminating super parameter iterations." << endl;
 				os << "Max number of iterations to freeze parameters to compute jacobian exceeded" << endl;
-				return;
+				return false;
 			}
 			// fix frozen parameters in SVDA transformation
 			debug_print(base_run.get_frozen_ctl_pars());
@@ -376,6 +376,7 @@ void SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContr
 	// sen file for this iteration
 	output_file_writer.append_sen(file_manager.sen_ofstream(), termination_ctl.get_iteration_number() + 1,
 		jacobian, *(base_run.get_obj_func_ptr()), get_parameter_group_info(), *regul_scheme_ptr, true, par_transform);
+	return true;
 }
 
 ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool restart_runs)
@@ -443,6 +444,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		stringstream prf_message;
 
 		ofstream &fout_frz = file_manager.open_ofile_ext("fpr");
+		ofstream& fout_rec = file_manager.rec_ofstream();
 		int i_update_vec = 0;
 		for (double i_lambda : lambda_vec)
 		{
@@ -470,6 +472,30 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 			int run_id = run_manager.add_run(new_pars, "upgrade_nrm", i_lambda);
 			output_file_writer.write_upgrade(termination_ctl.get_iteration_number(), 1, i_lambda, 1.0, new_pars);
 			save_frozen_pars(fout_frz, frzn_pars, run_id);
+			
+			//Add Scaled Upgrade Vectors
+			Parameters new_numeric_pars = par_transform.model2numeric_cp(new_pars);
+			Parameters base_numeric_pars1 = par_transform.model2numeric_cp(base_model_pars);
+			Parameters del_numeric_pars = new_numeric_pars - base_numeric_pars1;
+			for (double i_scale : lambda_scale_vec)
+			{
+				if (i_scale >= 1.0)
+					continue;
+				Parameters scaled_pars = base_numeric_pars1 + del_numeric_pars * i_scale;
+				
+				Parameters scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
+				output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
+					0, i_lambda, i_scale, scaled_ctl_pars);
+
+				stringstream ss;
+				ss << "scale(" << std::fixed << std::setprecision(2) << i_scale << ")";
+				par_transform.numeric2model_ip(scaled_pars);
+				int run_id = run_manager.add_run(scaled_pars, ss.str(), i_lambda);
+				//num_lamb_runs++;
+				fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_scale << endl;
+				save_frozen_pars(fout_frz, frzn_pars, run_id);
+			}
+
 
 		}
 		file_manager.close_file("fpr");
