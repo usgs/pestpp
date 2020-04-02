@@ -1072,7 +1072,7 @@ pair<map<string,int>, map<string, int>> Ensemble::prepare_csv(const vector<strin
 	for (auto &name : names)
 		if (hset.find(name) == end)
 			missing_names.push_back(name);
-	if (pest_scenario_ptr->get_pestpp_options().get_ies_csv_by_reals())
+	/*if (pest_scenario_ptr->get_pestpp_options().get_ies_csv_by_reals())
 	{
 		if (missing_names.size() > 0)
 		{
@@ -1084,6 +1084,19 @@ pair<map<string,int>, map<string, int>> Ensemble::prepare_csv(const vector<strin
 			else
 				cout << ss.str() << endl << "continuing anyway..." << endl;
 		}
+	}*/
+	if (missing_names.size() > 0)
+	{
+		stringstream ss;
+		if (csv_by_reals)
+			ss << " the following names were not found in the csv file header:" << endl;
+		else
+			ss << " the following names were not found in the first column of the csv file:" << endl;
+		for (auto& n : missing_names) ss << n << endl;
+		if (!forgive)
+			throw runtime_error(ss.str());
+		else
+			cout << ss.str() << endl << "continuing anyway..." << endl;
 	}
 
 	vector<string> header_names;
@@ -2655,7 +2668,7 @@ void ObservationEnsemble::from_csv(string file_name)
 	ifstream csv(file_name);
 	if (!csv.good())
 		throw runtime_error("error opening observation csv " + file_name + " for reading");
-	pair<map<string,int>, map<string, int>> p =prepare_csv(pest_scenario_ptr->get_ctl_ordered_nz_obs_names(), csv, false);
+	pair<map<string,int>, map<string, int>> p = prepare_csv(pest_scenario_ptr->get_ctl_ordered_nz_obs_names(), csv, false);
 
 	map<string, int> header_info = p.first, index_info = p.second;
 	//blast through the file to get number of reals

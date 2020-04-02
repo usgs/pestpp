@@ -32,7 +32,8 @@ OBJECTS := \
     logger\
     linear_analysis\
     covariance \
-    constraints
+    constraints \
+    EnsembleMethodUtils
 OBJECTS := $(addsuffix $(OBJ_EXT),$(OBJECTS))
 
 
