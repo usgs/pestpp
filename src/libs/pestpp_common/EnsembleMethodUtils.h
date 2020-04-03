@@ -26,7 +26,7 @@ public:
 	L2PhiHandler() { ; }
 	L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 		       ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
-		       Covariance *_parcov);
+		       Covariance *_parcov, bool should_prep_csv = true);
 	void update(ObservationEnsemble &oe, ParameterEnsemble &pe);
 	double get_mean(phiType pt);
 	double get_std(phiType pt);
