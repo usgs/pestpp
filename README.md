@@ -48,6 +48,10 @@ The PEST++ software suite includes several stand-alone tools for model-independe
 
 All members of the software suite can be compiled for PC, MAC, or Linux and have several run managers to support parallelization.  precompiled binaries are available in the "bin" folder.  Windows users with older OS versions should use the ``bin/iwin`` binaries (starting "i", compiled with intel C++) to avoid the dreaded MSVC missing runtime DLL issue.
 
+## Funding
+
+Funding for PEST++ has been provided by the U.S. Geologial Survey. The New Zealand Strategic Science Investment Fund as part of GNS Science’s (https://www.gns.cri.nz/) Groundwater Research Programme has also funded contributions 2018-present.
+
 ## Recent developements
 
 The PEST++ suite is currently be refactored to remove the fortran dependancy. Users who are interested in trying out the pure C++ implementation can use the binaries/code base on the ``develop`` branch.
