@@ -44,5 +44,5 @@
 		<Filter Name="Resource Files" Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe">
 		<Filter Name="Header Files" Filter="fi;fd"/></Filter>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
-		<File RelativePath=".\mio.f90"/></Filter></Files>
+		<File RelativePath=".\mio.F90"/></Filter></Files>
 	<Globals/></VisualStudioProject>
