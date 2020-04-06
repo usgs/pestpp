@@ -28,6 +28,8 @@
 
 # User files
 /src/local.mak
+*.suo
+*.u2d
 
 # Makefile object
 /src/libs/build-stamp
