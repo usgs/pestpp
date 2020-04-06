@@ -17,7 +17,7 @@
 
 L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 	ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
-	Covariance *_parcov)
+	Covariance *_parcov, bool should_prep_csv)
 {
 	pest_scenario = _pest_scenario;
 	file_manager = _file_manager;
@@ -57,11 +57,14 @@ L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 	//parcov.inv_ip();
 	oreal_names = oe_base->get_real_names();
 	preal_names = pe_base->get_real_names();
-	prepare_csv(file_manager->open_ofile_ext("phi.actual.csv"),oreal_names);
-	prepare_csv(file_manager->open_ofile_ext("phi.meas.csv"),oreal_names);
-	prepare_csv(file_manager->open_ofile_ext("phi.composite.csv"),oreal_names);
-	prepare_csv(file_manager->open_ofile_ext("phi.regul.csv"),preal_names);
-	prepare_group_csv(file_manager->open_ofile_ext("phi.group.csv"));
+	if (should_prep_csv)
+	{
+		prepare_csv(file_manager->open_ofile_ext("phi.actual.csv"), oreal_names);
+		prepare_csv(file_manager->open_ofile_ext("phi.meas.csv"), oreal_names);
+		prepare_csv(file_manager->open_ofile_ext("phi.composite.csv"), oreal_names);
+		prepare_csv(file_manager->open_ofile_ext("phi.regul.csv"), preal_names);
+		prepare_group_csv(file_manager->open_ofile_ext("phi.group.csv"));
+	}
 
 }
 

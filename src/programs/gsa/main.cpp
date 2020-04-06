@@ -268,9 +268,9 @@ int main(int argc, char* argv[])
 	OutputFileWriter output_writer(file_manager, pest_scenario, false, false);
 	ofstream &frec = file_manager.rec_ofstream();
 	output_writer.scenario_report(frec);
-	output_writer.scenario_io_report(frec);
-	output_writer.scenario_par_report(frec);
-	output_writer.scenario_obs_report(frec);
+	//output_writer.scenario_io_report(frec);
+	//output_writer.scenario_par_report(frec);
+	//output_writer.scenario_obs_report(frec);
 
 	pest_scenario.check_inputs(frec);
 	pest_scenario.check_io(frec);
