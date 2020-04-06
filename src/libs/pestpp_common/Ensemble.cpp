@@ -2044,8 +2044,10 @@ void ParameterEnsemble::from_csv(string file_name)
 	map<string, int>::iterator end = map_ptr->end();
 
 	for (auto p : pest_scenario_ptr->get_ctl_ordered_adj_par_names())
+	{
 		if (map_ptr->find(p) == end)
 			missing.push_back(p);
+	}
 	if (missing.size() > 0)
 		throw_ensemble_error("ParameterEnsemble.from_csv() error: the following adjustable pars not in csv:",missing);
 

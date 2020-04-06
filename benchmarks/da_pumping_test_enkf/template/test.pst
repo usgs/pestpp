@@ -1,13 +1,16 @@
 pcf version=2
 * control data keyword
 pestmode                                 estimation
-noptmax                                 0
+noptmax                                 1
 svdmode                                 1
 maxsing                          10000000
 eigthresh                           1e-06
 eigwrite                                1
 #debug_parse_only               True
 ies_parameter_ensemble     kh_ensemble0.csv
+ies_num_reals 5
+ies_lambda_mults 1.0
+lambda_scale_fac 1.0
 * parameter groups external
 test.pargrp_data.csv
 * parameter data external

@@ -168,17 +168,23 @@ public:
 	DataAssimilator(Pest& _pest_scenario, FileManager& _file_manager,
 		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 		RunManagerAbstract* _run_mgr_ptr);
-	void initialize();
+	void initialize(int icycle);
 	void iterate_2_solution();
+	void kf_upate();
 	void pareto_iterate_2_solution();
 	void finalize();
 	void throw_ies_error(string message);
 	bool should_terminate();
+	ParameterEnsemble get_pe() { return pe;}
+	void set_pe(ParameterEnsemble new_pe) { pe = new_pe;}
+	bool use_ies; 
 
 private:
 	int  verbose_level;
 	Pest& pest_scenario;
 	FileManager& file_manager;
+	std::mt19937 rand_gen;
+	std::mt19937 subset_rand_gen;
 	OutputFileWriter& output_file_writer;
 	PerformanceLog* performance_log;
 	RunManagerAbstract* run_mgr_ptr;
@@ -233,6 +239,18 @@ private:
 	//ParameterEnsemble calc_localized_upgrade(double cur_lam);
 	ParameterEnsemble calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
 
+	ParameterEnsemble calc_kf_upgrade(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
+
+	ParameterEnsemble kf_work(PerformanceLog* _performance_log, unordered_map<string, 
+		Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map, 
+		unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, 
+		Eigen::VectorXd>& _obs_diff_map, Localizer& _localizer, unordered_map<string, 
+		double>& _parcov_inv_map, unordered_map<string, 
+		double>& _weight_map, ParameterEnsemble& _pe_upgrade, unordered_map<string, 
+		pair<vector<string>, vector<string>>>& _cases, unordered_map<string, 
+		Eigen::VectorXd>& _Am_map, Localizer::How& _how);
+
+	
 	//EnsemblePair run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe);
 	vector<int> run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>());
 	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals);
@@ -267,6 +285,8 @@ private:
 	void add_bases();
 
 	void update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
+
+	//void initialize();
 
 	vector<string> detect_prior_data_conflict();
 

@@ -231,7 +231,7 @@ int main(int argc, char* argv[])
 		Pest pest_scenario;
 		pest_scenario.set_defaults();
 		try {
-			performance_log.log_event("starting to process control file", 1);
+			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
 			file_manager.close_file("pst");
 			performance_log.log_event("finished processing control file");
@@ -286,6 +286,7 @@ int main(int argc, char* argv[])
 		//MultiPest mPest (pest_scenario);
 		vector<int> assimilation_cycles;		
 		assimilation_cycles = pest_scenario.get_assim_cycles();
+		ParameterEnsemble curr_pe;
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 		{
 			cout << endl;
@@ -297,6 +298,8 @@ int main(int argc, char* argv[])
 			childPest = pest_scenario.get_child_pest(*icycle);
 
 			RunManagerAbstract* run_manager_ptr;
+
+			output_file_writer.set_pest_scenario(childPest);
 
 			if (run_manager_type == RunManagerType::PANTHER)
 			{
@@ -318,7 +321,7 @@ int main(int argc, char* argv[])
 			}
 			else
 			{
-				performance_log.log_event("starting basic model IO error checking", 1);
+				performance_log.log_event("starting basic model IO error checking");
 				cout << "checking model IO files...";
 				childPest.check_io(fout_rec);
 				//pest_scenario.check_par_obs();
@@ -345,18 +348,39 @@ int main(int argc, char* argv[])
 			run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), childPest.get_ctl_observations());
 
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
+			da.use_ies = false;
+			if (*icycle > 0)
+			{
+				da.set_pe(curr_pe);
+			}
 
-			da.initialize();
+			
+			da.initialize(*icycle);
 
-			da.iterate_2_solution();
-			da.finalize();
+			if (da.use_ies) // if ies
+			{
+				da.iterate_2_solution();
+				curr_pe = da.get_pe();
+				curr_pe.to_csv("cncnc.csv");
+			}
+			else
+			{
+				da.kf_upate();
+				curr_pe = da.get_pe();
+				curr_pe.to_csv("cncnc.csv");
+
+			}
+
+			
+			
+			//da.finalize();
 
 
 
 			// clean up
 			fout_rec.close();
-			childPest.~Pest(); // make explicit deletion
-			delete run_manager_ptr;
+			//childPest.~Pest(); // make explicit deletion
+			//delete run_manager_ptr;
 		} // end cycle loop
 		cout << endl << endl << "pestpp-ies analysis complete..." << endl;
 		cout << flush;

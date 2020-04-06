@@ -300,6 +300,7 @@ void OutputFileWriter::scenario_report(std::ostream &os, bool report_mode)
 	os << endl;
 
 }
+void OutputFileWriter::set_pest_scenario(Pest& _pest_scenario) { pest_scenario = _pest_scenario; }
 
 void OutputFileWriter::scenario_io_report(std::ostream &os)
 {

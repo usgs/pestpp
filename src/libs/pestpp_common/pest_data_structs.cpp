@@ -165,7 +165,8 @@ const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo
 	end =  rhs.parameter2group.end();
 	for (; it != end; ++it) {
 		it_find = old2new.find((*it).second);
-		parameter2group[(*it).first] = (*it_find).second;
+		if (it_find != old2new.end())
+			parameter2group[(*it).first] = (*it_find).second;
 	}
 	return *this;
 }
@@ -1483,7 +1484,9 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 	if (passed_args.find(key) != passed_args.end())
 		return PestppOptions::ARG_STATUS::ARG_DUPLICATE;
 	passed_args.insert(key);
-	if (key == "RELPARMAX")
+	if (key == "NOPTMAX") 
+		convert_ip(value, noptmax);
+	else if (key == "RELPARMAX")
 		convert_ip(value, relparmax);
 	else if (key == "FACPARMAX")
 		convert_ip(value, facparmax);
