@@ -129,11 +129,12 @@ ostream& operator<< (ostream& out, const PriorInformationRec &rhs)
 				out << "LOG(" << (*b).par_name << ")";
 			else
 				out << (*b).par_name;
-			out << " = " << rhs.pival;
-			out << "   " << rhs.weight;
-			out << "   " << rhs.group;
-			out << endl;
+			
 	}
+	out << " = " << rhs.pival;
+	out << "   " << rhs.weight;
+	out << "   " << rhs.group;
+	out << endl;
 	return out;
 }
 
