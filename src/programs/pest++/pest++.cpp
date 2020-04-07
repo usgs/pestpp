@@ -564,7 +564,7 @@ int main(int argc, char* argv[])
 						string filename = pest_scenario.get_pestpp_options().get_basejac_filename();
 						string res_filename = pest_scenario.get_pestpp_options().get_hotstart_resfile();
 						filename = ((filename.empty()) ? file_manager.build_filename("jco") : filename);
-						base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, true, filename, res_filename);
+						cur_run = base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, true, filename, res_filename);
 					}
 					catch (exception &e)
 					{
@@ -737,7 +737,17 @@ int main(int argc, char* argv[])
 					super_svd.get_jacobian().transform(base_trans_seq, &ParamTransformSeq::jac_numeric2active_ctl_ip);
 					super_svd.get_jacobian().transform(trans_svda, &ParamTransformSeq::jac_active_ctl_ip2numeric_ip);
 					//rerun base run to account for round off error in super parameters
-					cur_run = super_svd.update_run(*run_manager_ptr, cur_run);
+					if (pest_scenario.get_pestpp_options().get_hotstart_resfile().size() > 0)
+					{
+						fout_rec << "...using hotstart_resfile modelled outputs as super-par-truncated base residuals..." << endl;
+						cout << "...using hotstart_resfile modelled outputs as super-par-truncated base residuals..." << endl;
+					}
+					else
+					{
+						cout << "...running super-par-truncated base parameter values once to account for roundoff in super par transformation" << endl;
+						fout_rec << "...running super-par-truncated base parameter values once to account for roundoff in super par transformation" << endl;
+						cur_run = super_svd.update_run(*run_manager_ptr, cur_run);
+					}
 					calc_first_jacobian = false;
 					//bool success = run_manager_ptr->get_observations_vec(0, init_sim);
 				}
