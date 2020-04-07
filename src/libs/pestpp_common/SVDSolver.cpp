@@ -1019,8 +1019,9 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			os << "Error in GLM iteration FOSM process:" << e.what() << ", continuing..." << endl;
 
 		}
+		cout << "-->finished iteration FOSM process..." << endl;
 	}
-	cout << "-->finished iteration FOSM process..." << endl;
+	
 	if (num_success_calc == 0)
 	{
 		throw runtime_error("no upgrade vectors were calculated successfully");

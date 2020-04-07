@@ -33,6 +33,8 @@
 #include "PriorInformation.h"
 #include "debug.h"
 #include "covariance.h"
+#include "ensemble.h"
+#include "linear_analysis.h"
 
 using namespace std;
 using namespace pest_utils;
@@ -383,7 +385,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 {
 	ostream &os = file_manager.rec_ofstream();
 	ostream &fout_restart = file_manager.get_ofstream("rst");
-
+	int num_lam_runs = 0;
 	if (restart_runs)
 	{
 		run_manager.initialize_restart(file_manager.build_filename("rnu"));
@@ -446,6 +448,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		ofstream &fout_frz = file_manager.open_ofile_ext("fpr");
 		ofstream& fout_rec = file_manager.rec_ofstream();
 		int i_update_vec = 0;
+		
 		for (double i_lambda : lambda_vec)
 		{
 			prf_message.str("");
@@ -470,6 +473,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 			//transform new_pars to model parameters
 			par_transform.active_ctl2model_ip(new_pars);
 			int run_id = run_manager.add_run(new_pars, "upgrade_nrm", i_lambda);
+			num_lam_runs++;
 			output_file_writer.write_upgrade(termination_ctl.get_iteration_number(), 1, i_lambda, 1.0, new_pars);
 			save_frozen_pars(fout_frz, frzn_pars, run_id);
 			
@@ -491,7 +495,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 				ss << "scale(" << std::fixed << std::setprecision(2) << i_scale << ")";
 				par_transform.numeric2model_ip(scaled_pars);
 				int run_id = run_manager.add_run(scaled_pars, ss.str(), i_lambda);
-				//num_lamb_runs++;
+				num_lam_runs++;
 				fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_scale << endl;
 				save_frozen_pars(fout_frz, frzn_pars, run_id);
 			}
@@ -501,6 +505,40 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		file_manager.close_file("fpr");
 		RestartController::write_upgrade_runs_built(fout_restart);
 	}
+
+	//instance of a Mat for the jco
+	pair<ParameterEnsemble, map<int, int>> fosm_real_info;
+	Jacobian base_jco = jacobian; //copy
+	par_transform.jac_numeric2active_ctl_ip(base_jco);
+	pest_scenario.get_base_par_tran_seq().jac_active_ctl_ip2numeric_ip(base_jco);
+	Mat j(base_jco.get_sim_obs_names(), base_jco.get_base_numeric_par_names(),
+		base_jco.get_matrix_ptr());
+	if (pest_scenario.get_prior_info_ptr()->get_nnz_pi() > 0)
+	{
+		vector<string> pi_names = pest_scenario.get_ctl_ordered_pi_names();
+		j.drop_rows(pi_names);
+	}
+	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, rand_gen_ptr);
+	if (pest_scenario.get_pestpp_options().get_uncert_flag())
+	{
+		cout << "-->starting iteration FOSM process..." << endl;
+
+		performance_log->log_event("LinearAnalysis::glm_iter_fosm");
+
+		try
+		{
+			la.glm_iter_fosm(base_run, output_file_writer, termination_ctl.get_iteration_number(), &run_manager);
+			fosm_real_info = la.draw_fosm_reals(&run_manager, termination_ctl.get_iteration_number(), base_run);
+		}
+		catch (exception& e)
+		{
+			os << "Error in GLM iteration FOSM process:" << e.what() << ", continuing..." << endl;
+
+		}
+		cout << "-->finished iteration FOSM process..." << endl;
+	}
+
+
 
 	cout << endl;
 
@@ -521,7 +559,9 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 
 	int n_runs = run_manager.get_nruns();
 	bool one_success = false;
-	for (int i = 1; i < n_runs; ++i) {
+	//for (int i = 1; i < n_runs; ++i) {
+	for (int i = 1; i < num_lam_runs; ++i) 
+	{
 		ModelRun upgrade_run(base_run);
 		Parameters tmp_pars;
 		Observations tmp_obs;
@@ -576,6 +616,13 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 			os << ";    run failed" << endl;
 		}
 	}
+
+	if (fosm_real_info.second.size() > 0)
+	{
+		pair<ObservationEnsemble, map<string, double>> fosm_obs_info = la.process_fosm_reals(&run_manager, fosm_real_info,
+			termination_ctl.get_iteration_number(), base_run.get_phi(*regul_scheme_ptr));
+	}
+
 	// Print frozen parameter information for parameters frozen in SVD transformation
 	const Parameters &frz_ctl_pars_svd = best_upgrade_run.get_frozen_ctl_pars();
 	if (frz_ctl_pars_svd.size() > 0)

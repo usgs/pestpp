@@ -849,7 +849,10 @@ int main(int argc, char* argv[])
 				pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(run_manager_ptr, -999, optimum_run);
 				run_manager_ptr->run();
 				DynamicRegularization ptr;
-				pair<ObservationEnsemble,map<string,double>> fosm_obs_info = la.process_fosm_reals(run_manager_ptr, fosm_real_info, -999, optimum_run.get_phi(ptr));
+				ptr.set_defaults();
+				ptr.set_weight(0.0);
+				double phi = optimum_run.get_phi(ptr);
+				pair<ObservationEnsemble,map<string,double>> fosm_obs_info = la.process_fosm_reals(run_manager_ptr, fosm_real_info, -999, phi);
 				
 				//here is the adjustment process for each realization - one lambda each for now
 				//todo: make sure to handle failed realizations - use oe real names to retrieve pe rows
