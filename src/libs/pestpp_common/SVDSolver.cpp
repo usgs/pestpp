@@ -700,7 +700,7 @@ ModelRun SVDSolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termina
 	file_manager.get_ofstream("rec") << "  reading previously computed jacobian:  " << jac_filename << endl;
 	jacobian.read(jac_filename);
 	Parameters pars = pest_scenario.get_ctl_parameters();
-	par_transform.active_ctl2numeric_ip(pars);
+	par_transform.ctl2numeric_ip(pars);
 	jacobian.set_base_numeric_pars(pars);
 	//todo: make sure the jco has the right pars and obs
 	
@@ -997,6 +997,11 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	pair<ParameterEnsemble, map<int, int>> fosm_real_info;
 	Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
 		jacobian.get_matrix_ptr());
+	if (pest_scenario.get_prior_info_ptr()->get_nnz_pi() > 0)
+	{
+		vector<string> pi_names = pest_scenario.get_ctl_ordered_pi_names();
+		j.drop_rows(pi_names);
+	}
 	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, rand_gen_ptr);
 	if (pest_scenario.get_pestpp_options().get_uncert_flag())
 	{

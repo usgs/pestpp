@@ -393,7 +393,7 @@ int main(int argc, char* argv[])
 			restart_ctl.update_termination_ctl(termination_ctl);
 		}
 
-		file_manager.rec_ofstream() << "...loading prior parameter covariance matrix";
+		file_manager.rec_ofstream() << "...loading prior parameter covariance matrix" << endl << endl;
 		performance_log.log_event("loading parcov");
 		Covariance parcov;
 		parcov.try_from(pest_scenario, file_manager);
@@ -710,6 +710,7 @@ int main(int argc, char* argv[])
 				else
 				{
 					cout << "...forming super parameter transformation, requires forming and factoring JTQJ..." << endl;
+					fout_rec << "...forming super parameter transformation, requires forming and factoring JTQJ..." << endl;
 					Eigen::SparseMatrix<double> parcov_inv;
 					if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::PRIOR)
 					{
@@ -824,7 +825,11 @@ int main(int argc, char* argv[])
 			//instance of a Mat for the jco
 			Mat j(base_jacobian_ptr->get_sim_obs_names(), base_jacobian_ptr->get_base_numeric_par_names(),
 				base_jacobian_ptr->get_matrix_ptr());
-
+			if (pest_scenario.get_prior_info_ptr()->get_nnz_pi() > 0)
+			{
+				vector<string> pi_names = pest_scenario.get_ctl_ordered_pi_names();
+				j.drop_rows(pi_names);
+			}
 			LinearAnalysis la(j, pest_scenario, file_manager, performance_log,parcov,&rand_gen);
 			ObservationInfo reweight = la.glm_iter_fosm(optimum_run, output_file_writer, -999, run_manager_ptr);
 			if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)

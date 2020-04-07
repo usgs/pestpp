@@ -692,7 +692,7 @@ void LinearAnalysis::align()
 	{
 		try
 		{
-       		  vector<string> tmp_vec = jacobian.get_col_names();
+       		vector<string> tmp_vec = jacobian.get_col_names();
 			parcov = parcov.get(tmp_vec);
 		}
 		catch (exception &e)
