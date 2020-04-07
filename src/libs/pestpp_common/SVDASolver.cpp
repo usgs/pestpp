@@ -33,7 +33,7 @@
 #include "PriorInformation.h"
 #include "debug.h"
 #include "covariance.h"
-#include "ensemble.h"
+#include "Ensemble.h"
 #include "linear_analysis.h"
 
 using namespace std;

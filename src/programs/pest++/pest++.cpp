@@ -737,10 +737,10 @@ int main(int argc, char* argv[])
 					super_svd.get_jacobian().transform(base_trans_seq, &ParamTransformSeq::jac_numeric2active_ctl_ip);
 					super_svd.get_jacobian().transform(trans_svda, &ParamTransformSeq::jac_active_ctl_ip2numeric_ip);
 					//rerun base run to account for round off error in super parameters
-					if (pest_scenario.get_pestpp_options().get_hotstart_resfile().size() > 0)
+					if ((cur_run.obs_valid()) && (!pest_scenario.get_pestpp_options().get_glm_rebase_super()))
 					{
-						fout_rec << "...using hotstart_resfile modelled outputs as super-par-truncated base residuals..." << endl;
-						cout << "...using hotstart_resfile modelled outputs as super-par-truncated base residuals..." << endl;
+						fout_rec << "...glm_rebase_super is false, using existing residuals as super-par-truncated base residuals..." << endl;
+						cout << "...glm_rebase_super is false, using existing residuals as super-par-truncated base residuals..." << endl;
 					}
 					else
 					{
