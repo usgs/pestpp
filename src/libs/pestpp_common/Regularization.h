@@ -43,6 +43,7 @@ public:
 	virtual double get_wftol() const { return wftol; }
 	virtual double get_wfinit() const { return wf_init; }
 	virtual bool get_use_dynamic_reg() const { return use_dynamic_reg; }
+	virtual void set_use_dynamic_reg(bool _flag) { use_dynamic_reg = _flag; }
 	virtual bool get_adj_grp_weights() const { return adj_grp_weights; }
 	virtual double get_grp_weight_fact(const std::string &grp_name) const;
 	virtual void set_weight(double _tikhonov_weight) {tikhonov_weight = _tikhonov_weight;}

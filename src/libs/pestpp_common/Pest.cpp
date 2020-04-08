@@ -1106,7 +1106,6 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				{
 					if (tokens[1] == "REGULARIZATION" || tokens[1] == "REGULARISATION")
 					{
-						use_dynamic_reg = true;
 						control_info.pestmode = ControlInfo::PestMode::REGUL;
 
 					}
@@ -1114,8 +1113,11 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						control_info.pestmode = ControlInfo::PestMode::ESTIMATION;
 					else if (tokens[1] == "PARETO")
 						control_info.pestmode = ControlInfo::PestMode::PARETO;
+					else
+					{
+						throw_control_file_error(f_rec, "unrecognized 'pestmode': " + tokens[1]);
+					}
 				}
-
 
 				else if (sec_lnum == 2)
 				{
@@ -1712,7 +1714,11 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			ss << n << ",";
 		throw_control_file_error(f_rec, ss.str());
 	}
-	
+
+	if (control_info.pestmode == ControlInfo::PestMode::REGUL)
+	{
+		regul_scheme_ptr->set_use_dynamic_reg(true);
+	}
 	
 	if (ctl_ordered_obs_group_names.size() == 0)
 	{
@@ -1902,7 +1908,8 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 			chg_fac = last_val / p.second;
 		else
 			chg_fac = p.second / last_val;
-		if (p.second > 0.0)
+		//if (p.second > 0.0)
+		if (last_val > 0.0)
 		{
 			fac_lb = last_val / fpm;
 			fac_ub = last_val * fpm;

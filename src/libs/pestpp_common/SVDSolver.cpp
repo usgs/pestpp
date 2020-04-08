@@ -918,6 +918,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			prf_message << "beginning upgrade vector calculations, lambda = " << i_lambda;
 			performance_log->log_event(prf_message.str());
 			//std::cout << string(message.str().size(), '\b');
+			fout_rec << "   ...calculating lambda upgrade vector: " << i_lambda << endl;
 			message.str("");
 			message << "  computing upgrade vector (lambda = " << i_lambda << ")  " << ++i_update_vec << " / " << lambda_vec.size() << "             " << endl;
 			std::cout << message.str();
@@ -973,7 +974,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 				par_transform.numeric2model_ip(scaled_pars);
 				int run_id = run_manager.add_run(scaled_pars, ss.str(), i_lambda);
 				num_lamb_runs++;
-				fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_scale << endl;
+				fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_lambda << ", " << i_scale << endl;
 				save_frozen_pars(fout_frz, frozen_active_ctl_pars, run_id);
 			}
 
