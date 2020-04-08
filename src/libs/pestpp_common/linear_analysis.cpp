@@ -236,7 +236,37 @@ ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileW
 	//fout_rec << "Scaled observation weights used to form observation noise covariance matrix written to residual file '" << reres_filename << "'" << endl << endl;
 
 	//reset the obscov using the scaled residuals - pass empty prior info names so none are included
+	pfm.log_event("loading obscov");
 	obscov.from_observation_weights(obscov.get_col_names(), reweight, vector<string>(), pest_scenario.get_prior_info_ptr());
+
+	//reset the parcov since pars are being frozen and unfrozen iter by iter
+	pfm.log_event("loading parcov");
+	const string parcov_filename = pest_scenario.get_pestpp_options().get_parcov_filename();
+	parcov = Covariance();
+	bool parcov_success = false;
+	if (parcov_filename.size() > 0)
+	{
+		try
+		{
+			parcov.try_from(pest_scenario, file_manager, true);
+			parcov_success = true;
+		}
+		catch (exception &e)
+		{
+			pfm.log_event("unable to load parcov from file: " + parcov_filename + ", reverting to parameter bounds "+e.what());
+		}
+	}
+	if (!parcov_success)
+	{
+		try
+		{
+			parcov.from_parameter_bounds(pest_scenario);
+		}
+		catch (exception &e)
+		{
+			throw_error("linear_analysis::glm_fosm_iter() error setting parcov from parameter bounds:" + string(e.what()));
+		}
+	}
 
 	//if needed, set the predictive sensitivity vectors
 	vector<string> pred_names = pest_scenario.get_pestpp_options().get_prediction_names();
@@ -273,6 +303,7 @@ ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileW
 		}
 	}
 	if (pred_names.size() > 0)
+		pfm.log_event("setting predictions");
 		set_predictions(pred_names, true);
 
 	//drop all 'regul' obs and equations
@@ -283,7 +314,7 @@ ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileW
 	//write the posterior covariance matrix
 	ss.str("");
 	if (iter != -999)
-		ss << file_manager.get_base_filename() << "." << iter << ".post.cov";
+		ss << file_manager.get_base_filename() << "." << iter + 1 << ".post.cov";
 	else
 		ss << file_manager.get_base_filename() << ".post.cov";
 	string postcov_filename = ss.str();
@@ -350,25 +381,44 @@ ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileW
 	return reweight;
 }
 
-pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter, ModelRun& optimum_run)
+pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter, 
+	ModelRun& optimum_run)
 {
 	set<string> args = pest_scenario.get_pestpp_options().get_passed_args();
 	ofstream& fout_rec = file_manager.rec_ofstream();
 	map<int, int> run_map;
+	Covariance cov = posterior_parameter_matrix();
+	//check for missing adjustable pars
+	/*vector<string> adj_names = pest_scenario.get_ctl_ordered_adj_par_names();
+	set<string> sadj_names(adj_names.begin(), adj_names.end());
+	vector<string> missing;
+	for (auto name : cov.get_row_names())
+	{
+		if (sadj_names.find(name) == sadj_names.end())
+			missing.push_back(name);
+	}
+	if (missing.size() > 0)
+	{
+		for (auto m : missing)
+		{
+			pest_scenario.
+		}
+	}*/
 	ParameterEnsemble pe(&pest_scenario,rand_gen_ptr);
+	
 	if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
 	{
 		pfm.log_event("drawing, saving and queuing FOSM parameter realizations");
 		bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
 		int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
-		//fout_rec << "drawing " << num_reals << " posterior parameter realizations";
 		
-		Covariance cov = posterior_parameter_matrix();
+		
+
 		pe.draw(num_reals, optimum_run.get_ctl_pars(), cov, &pfm, 1);
 		stringstream ss;
 		ss.str("");
 		if (iter != -999)
-			ss << file_manager.get_base_filename() << "." << iter << ".post.paren";
+			ss << file_manager.get_base_filename() << "." << iter + 1 << ".post.paren";
 		else
 			ss << file_manager.get_base_filename() << ".post.paren";
 		if (binary)
@@ -430,7 +480,7 @@ pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(
 	stringstream ss;
 	ss.str("");
 	if (iter != -999)
-		ss << file_manager.get_base_filename() << "." << iter << ".post.obsen";
+		ss << file_manager.get_base_filename() << "." << iter + 1 << ".post.obsen";
 	else
 		ss << file_manager.get_base_filename() << ".post.obsen";
 	if (binary)
@@ -699,6 +749,10 @@ void LinearAnalysis::align()
 		{
 			throw_error("linear_analysis::align() error getting aligned parcov: " + string(e.what()));
 		}
+		catch (...)
+		{
+			throw_error("linear_analysis::align() error getting aligned parcov");
+		}
 	}
 	if (jacobian.get_row_names() != obscov.get_col_names())
 	{
@@ -710,6 +764,10 @@ void LinearAnalysis::align()
 		catch (exception &e)
 		{
 			throw_error("linear_analysis::align() error getting aligned obscov: " + string(e.what()));
+		}
+		catch (...)
+		{
+			throw_error("linear_analysis::align() error getting aligned parcov");
 		}
 	}
 	for (auto &p : predictions)

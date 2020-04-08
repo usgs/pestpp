@@ -550,7 +550,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 	run_manager.run();
 
 	// process model runs
-	cout << "  testing upgrade vectors... ";
+	cout << "  testing upgrade vectors... " << endl;
 	ifstream &fin_frz = file_manager.open_ifile_ext("fpr");
 	bool best_run_updated_flag = false;
 	Parameters base_run_active_ctl_par_tmp = par_transform.ctl2active_ctl_cp(base_run.get_ctl_pars());
