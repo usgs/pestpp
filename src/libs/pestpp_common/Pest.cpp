@@ -1717,7 +1717,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 
 	if (control_info.pestmode == ControlInfo::PestMode::REGUL)
 	{
-		regul_scheme_ptr->set_use_dynamic_reg(true);
+		if (regul_scheme_ptr)
+			regul_scheme_ptr->set_use_dynamic_reg(true);
 	}
 	
 	if (ctl_ordered_obs_group_names.size() == 0)
