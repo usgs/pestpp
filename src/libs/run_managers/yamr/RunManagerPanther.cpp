@@ -47,8 +47,10 @@ using namespace pest_utils;
 const int RunManagerPanther::BACKLOG = 10;
 const int RunManagerPanther::MAX_FAILED_PINGS = 60;
 const int RunManagerPanther::N_PINGS_UNRESPONSIVE = 3;
-const int RunManagerPanther::PING_INTERVAL_SECS = 60;
+const int RunManagerPanther::MIN_PING_INTERVAL_SECS = 60;				// Ping each slave at most once every minute
+const int RunManagerPanther::MAX_PING_INTERVAL_SECS = 120;				// Ping each slave at least once every 2 minutes
 const int RunManagerPanther::MAX_CONCURRENT_RUNS_LOWER_LIMIT = 1;
+const int RunManagerPanther::IDLE_THREAD_SIGNAL_TIMEOUT_SECS = 10;		// Allow up to 10s for the run_idle_async() thread to acknowledge signals (pause idling, terminate)
 
 
 AgentInfoRec::AgentInfoRec(int _socket_fd)
@@ -269,7 +271,9 @@ RunManagerPanther::RunManagerPanther(const string &stor_filename, const string &
 	: RunManagerAbstract(vector<string>(), vector<string>(), vector<string>(),
 	vector<string>(), vector<string>(), stor_filename, _max_n_failure),
 	overdue_reched_fac(_overdue_reched_fac), overdue_giveup_fac(_overdue_giveup_fac),
-	port(_port), f_rmr(_f_rmr), n_no_ops(0), overdue_giveup_minutes(_overdue_giveup_minutes)
+	port(_port), f_rmr(_f_rmr), n_no_ops(0), overdue_giveup_minutes(_overdue_giveup_minutes),
+	terminate_idle_thread(false), currently_idle(true), idling(false), idle_thread_finished(false),
+	idle_thread(nullptr), idle_thread_raii(nullptr)
 {
 	max_concurrent_runs = max(MAX_CONCURRENT_RUNS_LOWER_LIMIT, _max_n_failure);
 	w_init();
@@ -307,7 +311,6 @@ RunManagerPanther::RunManagerPanther(const string &stor_filename, const string &
 	fdmax = listener;
 	FD_ZERO(&master);
 	FD_SET(listener, &master);
-	return;
 }
 
 int RunManagerPanther::get_n_concurrent(int run_id)
@@ -423,6 +426,9 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	stringstream message;
 	NetPackage net_pack;
 
+	// Pause idle pinging thread
+	pause_idle();
+
 	model_runs_done = 0;
 	model_runs_failed = 0;
 	model_runs_timed_out = 0;
@@ -516,19 +522,198 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 			int status = file_stor.get_run(0, pars, init_sim);
 		}
 	}
+
+	// Resume idle pinging thread
+	resume_idle();
+
 	return terminate_reason;
 }
 
-bool RunManagerPanther::ping()
+bool RunManagerPanther::ping(pest_utils::thread_flag* terminate/* = nullptr*/)
 {
 	bool ping_sent = false;
 	for (auto &i : socket_to_iter_map)
 	{
+		if (terminate && terminate->get())
+		{
+			break;
+		}
 
 		if (ping(i.first))
+		{
 			ping_sent = true;
 	}
+	}
 	return ping_sent;
+}
+
+void RunManagerPanther::run_idle_async()
+{
+	try
+	{
+		// Initialise idle thread state flags
+		idle_thread_finished.set(false);
+		idling.set(false);
+
+		// Continue to accept new connections and ping agents while the manager is alive and not processing any runs
+		while (!terminate_idle_thread.get())
+		{
+			// Don't do anything unless the run manager is currently idle (in between calls to run())
+			if(!currently_idle.get())
+			{
+				idling.set(false);
+
+				// Sleep 1s to avoid spinlock
+				w_sleep(1000);
+				continue;
+			}
+
+			// Confirm that the thread has started idling
+			idling.set(true);
+
+			// Initialise any new agents
+			init_agents(&terminate_idle_thread);
+
+			if(terminate_idle_thread.get())
+			{
+				break;
+			}
+
+			// Receive any waiting data from agents
+			listen(&terminate_idle_thread);
+
+			if(terminate_idle_thread.get())
+			{
+				break;
+			}
+
+			// Ping agents periodically to ensure connections are not dropped
+			ping(&terminate_idle_thread);
+		}
+	}
+	catch(...)
+	{
+		try
+		{
+			idle_thread_finished.set(true);
+			idling.set(false);
+		}
+		catch(...)
+		{
+			// Don't hide original exception if something goes wrong with flag lock and set
+		}
+
+		throw;
+	}
+
+	idle_thread_finished.set(true);
+	idling.set(false);
+}
+
+void RunManagerPanther::start_run_idle_async()
+{
+	if(idle_thread)
+	{
+		return;
+	}
+
+	// Initialise idle thread flags
+	idling.set(false);
+	idle_thread_finished.set(false);
+	terminate_idle_thread.set(false);
+	currently_idle.set(true);
+
+	// Start thread
+	idle_thread = new thread(&RunManagerPanther::run_idle_async, this);
+	idle_thread_raii = new pest_utils::thread_RAII(*idle_thread);
+
+	report("Started idle ping thread.", false);
+}
+
+void RunManagerPanther::end_run_idle_async()
+{
+	if(!idle_thread)
+	{
+		return;
+	}
+
+	// Signal thread to terminate
+	terminate_idle_thread.set(true);
+
+	// Wait for termination
+	bool timed_out = false;
+	std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
+	while (!idle_thread_finished.get())
+	{
+		// Give up if we've spent too much time waiting already
+		auto wait_time = std::chrono::system_clock::now() - start_time;
+		if (wait_time > std::chrono::seconds(IDLE_THREAD_SIGNAL_TIMEOUT_SECS))
+		{
+			timed_out = true;
+			break;
+		}
+		
+		// Sleep to avoid spinlock
+		w_sleep(50);
+	}
+
+	report("Stopped idle ping thread, as Panther manager is shutting down.", false);
+	if(timed_out)
+	{
+		report("Warning: timed out waiting for acknowledgement of signal from idle thread.", false);
+	}
+
+	// Clean up
+	delete idle_thread_raii;
+	delete idle_thread;
+	idle_thread_raii = nullptr;
+	idle_thread = nullptr;
+}
+
+void RunManagerPanther::pause_idle()
+{
+	if(!idle_thread)
+	{
+		return;
+	}
+
+	// Signal thread to stop idle pings
+	currently_idle.set(false);
+
+	// Wait for the signal to be acknowledged
+	bool timed_out = false;
+	auto start_time = std::chrono::system_clock::now();
+	while (idling.get() && !idle_thread_finished.get())
+	{
+		// Give up if we've spent too much time waiting already
+		auto waited = std::chrono::system_clock::now() - start_time;
+		if (waited > std::chrono::seconds(IDLE_THREAD_SIGNAL_TIMEOUT_SECS))
+		{
+			timed_out = true;
+			break;
+		}
+		
+		// Sleep to avoid spinlock
+		w_sleep(50);
+	}
+
+	report("Panther idle ping thread paused prior to scheduling runs.", false);
+	if(timed_out)
+	{
+		report("Warning: timed out waiting for acknowledgement of signal from idle thread.", false);
+	}
+}
+
+void RunManagerPanther::resume_idle()
+{
+	// Start up the thread if it has not already been started
+	start_run_idle_async();
+
+	// Signal thread to continue idle pings
+	currently_idle.set(true);
+
+	// Don't bother waiting for acknowledgement here, as none of the management code relies on it; we can happily go off and do other processing while the thread gets around to resuming idle pings
+	report("Panther idle ping thread resumed.", false);
 }
 
 bool RunManagerPanther::ping(int i_sock)
@@ -562,13 +747,15 @@ bool RunManagerPanther::ping(int i_sock)
 	}
 	//check if it is time to ping again...
 	double duration = (double)agent_info_iter->seconds_since_last_ping_time();
-	double ping_time = max(double(PING_INTERVAL_SECS), agent_info_iter->get_runtime_sec());
+	double ping_time = min(MAX_PING_INTERVAL_SECS, max(double(MIN_PING_INTERVAL_SECS), agent_info_iter->get_runtime_sec()));
 	if (duration >= ping_time)
 	{
 		ping_sent = true;
 		const char* data = "\0";
+
 		NetPackage net_pack(NetPackage::PackType::PING, 0, 0, "");
 		int err = net_pack.send(i_sock, data, 0);
+		
 		if (err <= 0)
 		{
 			int fails = agent_info_iter->add_failed_ping();
@@ -589,7 +776,7 @@ bool RunManagerPanther::ping(int i_sock)
 }
 
 
-bool RunManagerPanther::listen()
+bool RunManagerPanther::listen(pest_utils::thread_flag* terminate/* = nullptr*/)
 {
 	bool got_message = false;
 	struct sockaddr_storage remote_addr;
@@ -606,7 +793,14 @@ bool RunManagerPanther::listen()
 		return got_message;
 	}
 	// run through the existing connections looking for data to read
-	for(int i = 0; i <= fdmax; i++) {
+	for (int i = 0; i <= fdmax; i++)
+	{
+		// Stop early if we're requested to terminate
+	 	if(terminate && terminate->get())
+	 	{
+	 		break;
+	 	}
+
 		if (FD_ISSET(i, &read_fds)) { // we got one!!
 			got_message = true;
 			if (i == listener)  // handle new connections
@@ -1197,10 +1391,16 @@ void RunManagerPanther::kill_all_active_runs()
 	}
 }
 
- void RunManagerPanther::init_agents()
+ void RunManagerPanther::init_agents(pest_utils::thread_flag* terminate/* = nullptr*/)
  {
 	 for (auto &i_agent : agent_info_set)
 	 {
+	 	// Stop early if we're requested to terminate
+	 	if(terminate && terminate->get())
+	 	{
+	 		break;
+	 	}
+
 		int i_sock = i_agent.get_socket_fd();
 		AgentInfoRec::State cur_state = i_agent.get_state();
 		if (cur_state == AgentInfoRec::State::NEW)
@@ -1433,13 +1633,17 @@ void RunManagerPanther::kill_all_active_runs()
 
 RunManagerPanther::~RunManagerPanther(void)
 {
+	// Shut down idle agent management thread
+	end_run_idle_async();
+
 	//close sockets and cleanup
 	int err;
 	err = w_close(listener);
 	FD_CLR(listener, &master);
 	// this is needed to ensure that the first slave closes properly
 	w_sleep(2000);
-	for(int i = 0; i <= fdmax; i++) {
+	for (int i = 0; i <= fdmax; i++)
+	{
 		if (FD_ISSET(i, &master))
 		{
 			NetPackage netpack(NetPackage::PackType::TERMINATE, 0, 0,"");
