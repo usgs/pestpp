@@ -747,7 +747,7 @@ bool RunManagerPanther::ping(int i_sock)
 	}
 	//check if it is time to ping again...
 	double duration = (double)agent_info_iter->seconds_since_last_ping_time();
-	double ping_time = min(MAX_PING_INTERVAL_SECS, max(double(MIN_PING_INTERVAL_SECS), agent_info_iter->get_runtime_sec()));
+	double ping_time = min(double(MAX_PING_INTERVAL_SECS), max(double(MIN_PING_INTERVAL_SECS), agent_info_iter->get_runtime_sec()));
 	if (duration >= ping_time)
 	{
 		ping_sent = true;
