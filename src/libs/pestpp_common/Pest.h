@@ -85,7 +85,7 @@ public:
 	void enforce_par_limits(PerformanceLog* perfomance_log, Parameters &update_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim=true, bool enforce_bounds=false);
 	map<string,double> get_pars_at_near_bounds(const Parameters &pars, double tol=0.0);
 	pair<Parameters,Parameters> get_effective_ctl_lower_upper_bnd(Parameters &pars);
-	
+	map<string, double> calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform);
 	virtual ~Pest();
 	
 private:

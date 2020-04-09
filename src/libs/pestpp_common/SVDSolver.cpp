@@ -379,6 +379,9 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	par_transform.active_ctl2numeric_ip(pars_nf);
 	vector<string> numeric_par_names = pars_nf.get_keys();
 
+	//get the dss map to zero out insen pars
+	map<string, double> dss = pest_scenario.calc_par_dss(jacobian, par_transform);
+
 	//Compute effect of frozen parameters on the residuals vector
 	Parameters delta_freeze_pars = prev_frozen_active_ctl_pars;
 	Parameters base_freeze_pars(base_active_ctl_pars, delta_freeze_pars.get_keys());
@@ -469,10 +472,20 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 			//work up the inverse prior par cov
 			Covariance prior_inv = parcov.get(numeric_par_names);
 			prior_inv.inv_ip();
-
+			
+			
 			//form the regularized normal matrix
 			Eigen::MatrixXd lamb = (Eigen::MatrixXd::Ones(JtQJ.rows(), JtQJ.cols()) * (lambda + 1.0));
+			
 			lamb = lamb + prior_inv.e_ptr()->toDense();
+			for (int i = 0; i < numeric_par_names.size(); i++)
+			{
+				if (abs(dss[numeric_par_names[i]]) < 1.0e-6)
+				{
+					lamb.col(i).setZero();
+					lamb.row(i).setZero();
+				}
+			}
 			lamb = lamb + JtQJ.toDense();
 			JtQJ = lamb.sparseView();
 

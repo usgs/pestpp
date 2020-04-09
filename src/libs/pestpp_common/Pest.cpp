@@ -34,6 +34,8 @@
 #include "Transformation.h"
 #include "FileManager.h"
 #include "model_interface.h"
+#include "Jacobian.h"
+#include "QSqrtMatrix.h"
 
 
 using namespace::std;
@@ -2381,6 +2383,29 @@ void Pest::rectify_par_groups()
 
 		}
 	}
+}
+
+map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform)
+{
+	Parameters pars = jac.get_base_numeric_parameters();
+	Parameters ctl_pars = par_transform.numeric2ctl_cp(pars);
+	const vector<string>& par_list = jac.parameter_list();
+	const vector<string>& obs_list = jac.obs_and_reg_list();
+	Eigen::VectorXd par_vec = pars.get_data_eigen_vec(par_list);
+	Eigen::MatrixXd par_mat_tmp = par_vec.asDiagonal();
+	Eigen::SparseMatrix<double> par_mat = par_mat_tmp.sparseView();
+	QSqrtMatrix Q_sqrt(&observation_info, &prior_info);
+	Eigen::SparseMatrix<double> q_sqrt_no_reg = Q_sqrt.get_sparse_matrix(obs_list, DynamicRegularization::get_zero_reg_instance());
+	Eigen::SparseMatrix<double> dss_mat_no_reg_pest = q_sqrt_no_reg * jac.get_matrix(obs_list, par_list);
+	int n_nonzero_weights_no_reg = observation_info.get_nnz_obs();
+	map<string, double> par_sens;
+	double val;
+	for (int i = 0; i < par_list.size(); ++i)
+	{
+		val = dss_mat_no_reg_pest.col(i).norm() / n_nonzero_weights_no_reg;
+		par_sens[par_list[i]] = val;
+		}
+	return par_sens;
 }
 
 
