@@ -25,10 +25,12 @@
 #include <unordered_map>
 #include <chrono>
 #include <list>
+#include <thread>
 #include "network_wrapper.h"
 #include "network_package.h"
 #include "RunManagerAbstract.h"
 #include "RunStorage.h"
+#include "utilities.h"
 
 class AgentInfoRec {
 public:
@@ -111,15 +113,15 @@ public:
 	int get_n_waiting_runs() { return waiting_runs.size(); }
 	void close_agents();
 
-
-
 private:
 	std::string port;
 	static const int BACKLOG;
 	static const int MAX_FAILED_PINGS;
 	static const int N_PINGS_UNRESPONSIVE;
-	static const int PING_INTERVAL_SECS;
+	static const int MIN_PING_INTERVAL_SECS;
+	static const int MAX_PING_INTERVAL_SECS;
 	static const int MAX_CONCURRENT_RUNS_LOWER_LIMIT;
+	static const int IDLE_THREAD_SIGNAL_TIMEOUT_SECS;
 
 	double overdue_reched_fac;
 	double overdue_giveup_fac;
@@ -137,6 +139,12 @@ private:
 	multimap<int, list<AgentInfoRec>::iterator> active_runid_to_iterset_map;
 	std::deque<int> waiting_runs;
 	std::unordered_multimap<int, int> failure_map;
+	pest_utils::thread_flag terminate_idle_thread;
+	pest_utils::thread_flag currently_idle;
+	pest_utils::thread_flag idling;
+	pest_utils::thread_flag idle_thread_finished;
+	thread* idle_thread;
+	pest_utils::thread_RAII* idle_thread_raii;
 
 	int schedule_run(int run_id, std::list<list<AgentInfoRec>::iterator> &free_agent_list, int n_responsive_agents);
 	void unschedule_run(list<AgentInfoRec>::iterator agent_info_iter);
@@ -146,16 +154,22 @@ private:
 	void close_agent(int i_sock);
 	void close_agent(list<AgentInfoRec>::iterator agent_info_iter);
 
+	void run_idle_async();
+	void start_run_idle_async();
+	void end_run_idle_async();
+	void pause_idle();
+	void resume_idle();
+
 	std::ofstream &f_rmr;
-	bool listen();
+	bool listen(pest_utils::thread_flag* terminate = nullptr);
 	bool process_model_run(int sock_id, NetPackage &net_pack);
 	void process_message(int i);
 	void schedule_runs();
-	void init_agents();
+	void init_agents(pest_utils::thread_flag* terminate = nullptr);
 	list<AgentInfoRec>::iterator add_agent(int sock_id);
 	void erase_agent(int sock_id);
 	bool ping(int i_sock);
-	bool ping();
+	bool ping(pest_utils::thread_flag* terminate = nullptr);
 	void report(std::string message,bool to_cout);
 	string get_time_string();
 	string get_time_string_short();

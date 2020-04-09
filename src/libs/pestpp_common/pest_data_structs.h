@@ -201,6 +201,7 @@ public:
 	//void parce_line(const string &line);
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
+	bool assign_value_by_key_continued(const string& key, const string& value);
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
 	int get_n_iter_base() const { return n_iter_base; }
@@ -459,6 +460,10 @@ public:
 	void set_random_seed(int seed) { random_seed = seed; }
 	int get_random_seed()const { return random_seed; }
 
+	void set_panther_agent_restart_on_error(bool _flag) { panther_agent_restart_on_error = _flag; }
+	bool get_panther_agent_restart_on_error() const { return panther_agent_restart_on_error; }
+	void set_panther_agent_no_ping_timeout_secs(int _timeout_secs) { panther_agent_no_ping_timeout_secs = _timeout_secs; }
+	int get_panther_agent_no_ping_timeout_secs() const { return panther_agent_no_ping_timeout_secs; }
 
 	void set_defaults();
 	void summary(ostream& os) const;
@@ -594,6 +599,9 @@ private:
 	bool gsa_morris_obs_sen;
 	double gsa_morris_delta;
 	string gsa_sobol_par_dist;
+
+	bool panther_agent_restart_on_error;
+	int panther_agent_no_ping_timeout_secs;
 		
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);
