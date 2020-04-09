@@ -432,8 +432,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			// Timeout on socket receive
 			// Optionally: die if no data received from master for a long time (e.g. 5 minutes)
 			// Set max_time_without_master_ping_seconds <= 0 to disable and wait forever
-			__int64 time_without_master_ping_seconds = chrono::duration_cast<std::chrono::seconds>(chrono::system_clock::now() - last_ping_time).count();
-			if (max_time_without_master_ping_seconds > 0 && time_without_master_ping_seconds > (__int64)max_time_without_master_ping_seconds)
+			auto time_without_master_ping_seconds = chrono::duration_cast<std::chrono::seconds>(chrono::system_clock::now() - last_ping_time).count();
+			if (max_time_without_master_ping_seconds > 0 && time_without_master_ping_seconds > max_time_without_master_ping_seconds)
 			{
 				cerr << "no ping received from master in the last " << max_time_without_master_ping_seconds << " seconds, terminating" << endl;
 				//terminate = true;
