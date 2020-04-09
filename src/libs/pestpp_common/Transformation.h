@@ -331,6 +331,7 @@ protected:
 	Parameters init_base_numeric_parameters;
 	Parameters frozen_derivative_parameters;
 	void calc_svd();
+	map<string, double> dss;
 };
 
 //class TranNormalize: public Transformation {
