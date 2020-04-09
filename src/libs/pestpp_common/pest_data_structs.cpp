@@ -998,10 +998,12 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 	else if (key == "ADDITIONAL_INS_DELIMITERS")
 	{
 		convert_ip(value, additional_ins_delimiters);
+		return true;
 	}
 	else if (key == "RANDOM_SEED")
 	{
 		convert_ip(value, random_seed);
+		return true;
 	}
 
 	return false;
