@@ -1823,6 +1823,14 @@ void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, Per
 {
 	///draw a parameter ensemble
 	var_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names(); //only draw for adjustable pars
+	vector<string> cov_names = cov.get_col_names();
+	set<string> scov_names(cov_names.begin(), cov_names.end());
+	var_names.clear();
+	for (auto name : pest_scenario_ptr->get_ctl_ordered_adj_par_names())
+	{
+		if (scov_names.find(name) != scov_names.end())
+			var_names.push_back(name);
+	}
 	//Parameters par = pest_scenario_ptr->get_ctl_parameters();
 	par_transform.active_ctl2numeric_ip(par);//removes fixed/tied pars
 	tstat = transStatus::NUM;

@@ -31,8 +31,7 @@ public:
 
     ObservationInfo glm_iter_fosm(ModelRun& optimum_run, OutputFileWriter& output_file_writer, int iter, 
 		RunManagerAbstract* run_mgr_ptr);
-	pair<ParameterEnsemble,map<int,int>> draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter,
-		ModelRun& optimum_run);
+	pair<ParameterEnsemble,map<int,int>> draw_fosm_reals(RunManagerAbstract* run_mgr_ptr, int iter,ModelRun& optimum_run);
 	pair<ObservationEnsemble,map<string,double>> process_fosm_reals(RunManagerAbstract* run_mgr_ptr, pair<ParameterEnsemble, map<int, int>>& fosm_real_info, int iter,
 		double last_best_phi);
 

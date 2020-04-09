@@ -393,7 +393,7 @@ int main(int argc, char* argv[])
 			restart_ctl.update_termination_ctl(termination_ctl);
 		}
 
-		file_manager.rec_ofstream() << "...loading prior parameter covariance matrix";
+		file_manager.rec_ofstream() << "...loading prior parameter covariance matrix" << endl << endl;
 		performance_log.log_event("loading parcov");
 		Covariance parcov;
 		parcov.try_from(pest_scenario, file_manager);
@@ -564,7 +564,7 @@ int main(int argc, char* argv[])
 						string filename = pest_scenario.get_pestpp_options().get_basejac_filename();
 						string res_filename = pest_scenario.get_pestpp_options().get_hotstart_resfile();
 						filename = ((filename.empty()) ? file_manager.build_filename("jco") : filename);
-						base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, true, filename, res_filename);
+						cur_run = base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, true, filename, res_filename);
 					}
 					catch (exception &e)
 					{
@@ -710,6 +710,7 @@ int main(int argc, char* argv[])
 				else
 				{
 					cout << "...forming super parameter transformation, requires forming and factoring JTQJ..." << endl;
+					fout_rec << "...forming super parameter transformation, requires forming and factoring JTQJ..." << endl;
 					Eigen::SparseMatrix<double> parcov_inv;
 					if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::PRIOR)
 					{
@@ -736,7 +737,17 @@ int main(int argc, char* argv[])
 					super_svd.get_jacobian().transform(base_trans_seq, &ParamTransformSeq::jac_numeric2active_ctl_ip);
 					super_svd.get_jacobian().transform(trans_svda, &ParamTransformSeq::jac_active_ctl_ip2numeric_ip);
 					//rerun base run to account for round off error in super parameters
-					cur_run = super_svd.update_run(*run_manager_ptr, cur_run);
+					if ((cur_run.obs_valid()) && (!pest_scenario.get_pestpp_options().get_glm_rebase_super()))
+					{
+						fout_rec << "...glm_rebase_super is false, using existing residuals as super-par-truncated base residuals..." << endl;
+						cout << "...glm_rebase_super is false, using existing residuals as super-par-truncated base residuals..." << endl;
+					}
+					else
+					{
+						cout << "...running super-par-truncated base parameter values once to account for roundoff in super par transformation" << endl;
+						fout_rec << "...running super-par-truncated base parameter values once to account for roundoff in super par transformation" << endl;
+						cur_run = super_svd.update_run(*run_manager_ptr, cur_run);
+					}
 					calc_first_jacobian = false;
 					//bool success = run_manager_ptr->get_observations_vec(0, init_sim);
 				}
@@ -824,7 +835,11 @@ int main(int argc, char* argv[])
 			//instance of a Mat for the jco
 			Mat j(base_jacobian_ptr->get_sim_obs_names(), base_jacobian_ptr->get_base_numeric_par_names(),
 				base_jacobian_ptr->get_matrix_ptr());
-
+			if (pest_scenario.get_prior_info_ptr()->get_nnz_pi() > 0)
+			{
+				vector<string> pi_names = pest_scenario.get_ctl_ordered_pi_names();
+				j.drop_rows(pi_names);
+			}
 			LinearAnalysis la(j, pest_scenario, file_manager, performance_log,parcov,&rand_gen);
 			ObservationInfo reweight = la.glm_iter_fosm(optimum_run, output_file_writer, -999, run_manager_ptr);
 			if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
@@ -834,7 +849,10 @@ int main(int argc, char* argv[])
 				pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(run_manager_ptr, -999, optimum_run);
 				run_manager_ptr->run();
 				DynamicRegularization ptr;
-				pair<ObservationEnsemble,map<string,double>> fosm_obs_info = la.process_fosm_reals(run_manager_ptr, fosm_real_info, -999, optimum_run.get_phi(ptr));
+				ptr.set_defaults();
+				ptr.set_weight(0.0);
+				double phi = optimum_run.get_phi(ptr);
+				pair<ObservationEnsemble,map<string,double>> fosm_obs_info = la.process_fosm_reals(run_manager_ptr, fosm_real_info, -999, phi);
 				
 				//here is the adjustment process for each realization - one lambda each for now
 				//todo: make sure to handle failed realizations - use oe real names to retrieve pe rows
