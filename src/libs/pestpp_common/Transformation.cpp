@@ -623,7 +623,8 @@ void TranSVD::calc_svd()
 }
 
 void TranSVD::update_reset_frozen_pars(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const Parameters &base_numeric_pars,
-		int maxsing, double _eigthresh, const vector<string> &par_names, const vector<string> &_obs_names, Eigen::SparseMatrix<double>& parcov_inv,
+		int maxsing, double _eigthresh, const vector<string> &par_names, const vector<string> &_obs_names, 
+		Eigen::SparseMatrix<double>& parcov_inv, map<string,double> dss,
 		const Parameters &_frozen_derivative_pars)
 {
 	debug_msg("TranSVD::update_reset_frozen_pars begin");
@@ -653,9 +654,18 @@ void TranSVD::update_reset_frozen_pars(const Jacobian &jacobian, const QSqrtMatr
 	//if (parcov.ncol() > 0)
 	if (parcov_inv.rows() > 0)
 	{
+		vector<string> numeric_par_names = jacobian.get_base_numeric_par_names();
 		Eigen::MatrixXd lamb = Eigen::MatrixXd::Ones(jtqj.rows(), jtqj.cols());
 		lamb = lamb + parcov_inv.toDense();
 		lamb = lamb + jtqj.toDense();
+		for (int i = 0; i < numeric_par_names.size(); i++)
+		{
+			if (abs(dss[numeric_par_names[i]]) < 1.0e-6)
+			{
+				lamb.col(i).setZero();
+				lamb.row(i).setZero();
+			}
+		}
 		jtqj = lamb.sparseView();
 		lamb.resize(0, 0);
 	}

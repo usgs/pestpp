@@ -294,8 +294,8 @@ public:
 	TranSVD(const TranSVD &rhs);
 	void set_SVD_pack();
 	void update_reset_frozen_pars(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const Parameters &base_numeric_pars,
-		int maxsing, double eigthresh, const vector<string> &par_names, const vector<string> &obs_names, Eigen::SparseMatrix<double>& parcov_inv,
-		const Parameters &_frozen_derivative_pars=Parameters());
+		int maxsing, double eigthresh, const vector<string> &par_names, const vector<string> &obs_names, 
+		Eigen::SparseMatrix<double>& parcov_inv, map<string,double> dss,const Parameters &_frozen_derivative_pars=Parameters());
 	void update_add_frozen_pars(const Parameters &_frozen_derivative_pars);
 	Parameters& get_frozen_derivative_pars() {return frozen_derivative_parameters;}
 	const vector<string>& get_super_parameter_names(){return super_parameter_names;}

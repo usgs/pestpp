@@ -712,6 +712,8 @@ int main(int argc, char* argv[])
 					cout << "...forming super parameter transformation, requires forming and factoring JTQJ..." << endl;
 					fout_rec << "...forming super parameter transformation, requires forming and factoring JTQJ..." << endl;
 					Eigen::SparseMatrix<double> parcov_inv;
+					ParamTransformSeq par_transform = pest_scenario.get_base_par_tran_seq();
+					map<string, double> dss = pest_scenario.calc_par_dss(*base_jacobian_ptr,par_transform);
 					if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::PRIOR)
 					{
 						
@@ -720,7 +722,7 @@ int main(int argc, char* argv[])
 					performance_log.log_event("updating super parameter transformation, requires formation and SVD of JtQJ");
 					
 					(*tran_svd).update_reset_frozen_pars(*base_jacobian_ptr, Q_sqrt, base_numeric_pars, max_n_super, super_eigthres, 
-						pars, nonregul_obs, parcov_inv, cur_run.get_frozen_ctl_pars());
+						pars, nonregul_obs, parcov_inv, dss, cur_run.get_frozen_ctl_pars());
 					(*tr_svda_fixed).reset((*tran_svd).get_frozen_derivative_pars());
 				}
 				SVDASolver super_svd(pest_scenario, file_manager, &obj_func,
