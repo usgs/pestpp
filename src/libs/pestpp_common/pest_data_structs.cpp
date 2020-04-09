@@ -974,14 +974,32 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		convert_ip(value, random_seed);
 	}
-	else 
-
+	else if (!assign_value_by_key_continued(key, value))
 	{
 
 		//throw PestParsingError(line, "Invalid key word \"" + key +"\"");
 		return ARG_STATUS::ARG_NOTFOUND;
 	}
 	return ARG_STATUS::ARG_ACCEPTED;
+}
+
+
+bool PestppOptions::assign_value_by_key_continued(const string& key, const string& value)
+{
+	// This method was added as a workaround for a compiler limit of at most 128 nesting levels (MSVC); no more else if blocks could be added to assign_value_by_key()
+	if (key == "PANTHER_AGENT_RESTART_ON_ERROR")
+	{
+		panther_agent_restart_on_error = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+
+	if (key == "PANTHER_AGENT_NO_PING_TIMEOUT_SECS")
+	{
+		convert_ip(value, panther_agent_no_ping_timeout_secs);
+		return true;
+	}
+
+	return false;
 }
 
 
@@ -1157,6 +1175,10 @@ void PestppOptions::summary(ostream& os) const
 	os << "gsa_morris_delta: " <<  gsa_morris_delta << endl;
 	os << "gsa_sobol_samples: " << gsa_sobol_samples << endl;
 	os << "gsa_sobol_par_dist: " << gsa_sobol_par_dist << endl;
+
+	os << endl;
+	os << "panther_agent_restart_on_error: " << panther_agent_restart_on_error << endl;
+	os << "panther_agent_no_ping_timeout_secs: " << panther_agent_no_ping_timeout_secs << endl;
 	os << endl << endl << endl;
 }
 
@@ -1290,6 +1312,9 @@ void PestppOptions::set_defaults()
 	set_check_tplins(true);
 	set_fill_tpl_zeros(false);
 	set_additional_ins_delimiters("");
+
+	set_panther_agent_restart_on_error(false);
+	set_panther_agent_no_ping_timeout_secs(300);
 }
 
 ostream& operator<< (ostream &os, const ParameterInfo& val)
