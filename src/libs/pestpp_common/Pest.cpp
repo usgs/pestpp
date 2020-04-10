@@ -34,6 +34,8 @@
 #include "Transformation.h"
 #include "FileManager.h"
 #include "model_interface.h"
+#include "Jacobian.h"
+#include "QSqrtMatrix.h"
 
 
 using namespace::std;
@@ -1106,7 +1108,6 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				{
 					if (tokens[1] == "REGULARIZATION" || tokens[1] == "REGULARISATION")
 					{
-						use_dynamic_reg = true;
 						control_info.pestmode = ControlInfo::PestMode::REGUL;
 
 					}
@@ -1114,8 +1115,11 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						control_info.pestmode = ControlInfo::PestMode::ESTIMATION;
 					else if (tokens[1] == "PARETO")
 						control_info.pestmode = ControlInfo::PestMode::PARETO;
+					else
+					{
+						throw_control_file_error(f_rec, "unrecognized 'pestmode': " + tokens[1]);
+					}
 				}
-
 
 				else if (sec_lnum == 2)
 				{
@@ -1712,7 +1716,12 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			ss << n << ",";
 		throw_control_file_error(f_rec, ss.str());
 	}
-	
+
+	if (control_info.pestmode == ControlInfo::PestMode::REGUL)
+	{
+		if (regul_scheme_ptr)
+			regul_scheme_ptr->set_use_dynamic_reg(true);
+	}
 	
 	if (ctl_ordered_obs_group_names.size() == 0)
 	{
@@ -1902,7 +1911,8 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 			chg_fac = last_val / p.second;
 		else
 			chg_fac = p.second / last_val;
-		if (p.second > 0.0)
+		//if (p.second > 0.0)
+		if (last_val > 0.0)
 		{
 			fac_lb = last_val / fpm;
 			fac_ub = last_val * fpm;
@@ -2373,6 +2383,29 @@ void Pest::rectify_par_groups()
 
 		}
 	}
+}
+
+map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform)
+{
+	Parameters pars = jac.get_base_numeric_parameters();
+	Parameters ctl_pars = par_transform.numeric2ctl_cp(pars);
+	const vector<string>& par_list = jac.parameter_list();
+	const vector<string>& obs_list = jac.obs_and_reg_list();
+	Eigen::VectorXd par_vec = pars.get_data_eigen_vec(par_list);
+	Eigen::MatrixXd par_mat_tmp = par_vec.asDiagonal();
+	Eigen::SparseMatrix<double> par_mat = par_mat_tmp.sparseView();
+	QSqrtMatrix Q_sqrt(&observation_info, &prior_info);
+	Eigen::SparseMatrix<double> q_sqrt_no_reg = Q_sqrt.get_sparse_matrix(obs_list, DynamicRegularization::get_zero_reg_instance());
+	Eigen::SparseMatrix<double> dss_mat_no_reg_pest = q_sqrt_no_reg * jac.get_matrix(obs_list, par_list);
+	int n_nonzero_weights_no_reg = observation_info.get_nnz_obs();
+	map<string, double> par_sens;
+	double val;
+	for (int i = 0; i < par_list.size(); ++i)
+	{
+		val = dss_mat_no_reg_pest.col(i).norm() / n_nonzero_weights_no_reg;
+		par_sens[par_list[i]] = val;
+		}
+	return par_sens;
 }
 
 

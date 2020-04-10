@@ -264,6 +264,9 @@ public:
 	void set_glm_debug_real_fail(bool _flag) { glm_debug_real_fail = _flag; }
 	bool get_glm_accept_mc_phi() const { return glm_accept_mc_phi; }
 	void set_glm_accept_mc_phi(bool _flag) { glm_accept_mc_phi = _flag; }
+	bool get_glm_rebase_super() const { return glm_rebase_super; }
+	void set_glm_rebase_super(bool _flag) { glm_rebase_super = _flag; }
+
 
 	double get_overdue_reched_fac()const { return overdue_reched_fac; }
 	void set_overdue_reched_fac(double _val) { overdue_reched_fac = _val; }
@@ -482,6 +485,7 @@ private:
 	bool glm_debug_lamb_fail;
 	bool glm_debug_real_fail;
 	bool glm_accept_mc_phi;
+	bool glm_rebase_super;
 
 	vector<double> base_lambda_vec;
 	vector<double> lambda_scale_vec;

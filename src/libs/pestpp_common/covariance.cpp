@@ -1482,6 +1482,9 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 
 void Covariance::from_parameter_bounds(const vector<string> &par_names,const ParameterInfo &par_info, double sigma_range)
 {
+	matrix.resize(0, 0);
+	row_names.clear();
+	col_names.clear();
 	vector<Eigen::Triplet<double>> triplet_list;
 	const ParameterRec* par_rec;
 	int i = 0;
@@ -1547,6 +1550,9 @@ void Covariance::from_observation_weights(const string &pst_filename)
 
 void Covariance::from_observation_weights(const vector<string>& obs_names, const ObservationInfo& obs_info, const vector<string>& pi_names, const PriorInformation* pi)
 {
+	matrix.resize(0, 0);
+	row_names.clear();
+	col_names.clear();
 	vector<Eigen::Triplet<double>> triplet_list;
 	const ObservationRec* obs_rec;
 	int i = 0;
@@ -1566,7 +1572,7 @@ void Covariance::from_observation_weights(const vector<string>& obs_names, const
 		i++;
 	}
 
-	PriorInformation::const_iterator pi_iter;
+	/*PriorInformation::const_iterator pi_iter;
 	PriorInformation::const_iterator not_pi_iter = pi->end();
 
 	for (auto pi_name : pi_names)
@@ -1581,7 +1587,7 @@ void Covariance::from_observation_weights(const vector<string>& obs_names, const
 			col_names.push_back(pi_name);
 			i++;
 		}
-	}
+	}*/
 	if (row_names.size() > 0)
 	{
 		matrix.resize(row_names.size(), row_names.size());

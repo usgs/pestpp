@@ -480,6 +480,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		glm_accept_mc_phi = pest_utils::parse_string_arg_to_bool(value);
 	}
+	else if (key == "GLM_REBASE_SUPER")
+	{	
+		glm_rebase_super = pest_utils::parse_string_arg_to_bool(value);
+	}
 	else if (key == "OVERDUE_RESCHED_FAC"){
 		convert_ip(value, overdue_reched_fac);
 	}
@@ -966,14 +970,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		fill_tpl_zeros = pest_utils::parse_string_arg_to_bool(value);
 	}
-	else if (key == "ADDITIONAL_INS_DELIMITERS")
-	{
-		convert_ip(value, additional_ins_delimiters);
-	}
-	else if (key == "RANDOM_SEED")
-	{
-		convert_ip(value, random_seed);
-	}
+	
 	else if (!assign_value_by_key_continued(key, value))
 	{
 
@@ -996,6 +993,16 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 	if (key == "PANTHER_AGENT_NO_PING_TIMEOUT_SECS")
 	{
 		convert_ip(value, panther_agent_no_ping_timeout_secs);
+		return true;
+	}
+	else if (key == "ADDITIONAL_INS_DELIMITERS")
+	{
+		convert_ip(value, additional_ins_delimiters);
+		return true;
+	}
+	else if (key == "RANDOM_SEED")
+	{
+		convert_ip(value, random_seed);
 		return true;
 	}
 
@@ -1072,6 +1079,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "glm_debug_lamb_fail: " << glm_debug_lamb_fail << endl;
 	os << "glm_debug_real_fail: " << glm_debug_real_fail << endl;
 	os << "glm_accept_mc_phi: " << glm_accept_mc_phi << endl;
+	os << "glm_rebase_super: " << glm_rebase_super;
 
 
 	if (global_opt == OPT_DE)
@@ -1214,6 +1222,7 @@ void PestppOptions::set_defaults()
 	set_glm_debug_lamb_fail(false);
 	set_glm_debug_real_fail(false);
 	set_glm_accept_mc_phi(false);
+	set_glm_rebase_super(false);
 	set_prediction_names(vector<string>());
 	set_parcov_filename(string());
 	set_obscov_filename(string());
@@ -1306,7 +1315,6 @@ void PestppOptions::set_defaults()
 	set_overdue_giveup_fac(100);
 	set_worker_poll_interval(1.0);
 	set_max_run_fail(3);
-
 
 	set_debug_parse_only(false);
 	set_check_tplins(true);
