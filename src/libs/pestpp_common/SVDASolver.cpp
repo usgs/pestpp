@@ -317,9 +317,14 @@ bool SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContr
 			}
 			else if (!success_build_runs && out_of_bound_pars.size() > 0)
 			{
-				cout << "  can not compute jacobian without the following parameters going out of bounds... " << endl;
+
+				cout << "  can not compute super-par jacobian without the following parameters going out of bounds... " << endl;
+				os << "  can not compute super-par jacobian without the following parameters going out of bounds... " << endl;
 				print(out_of_bound_pars, cout, 4);
+				print(out_of_bound_pars, os, 4);
+
 				cout << "  freezing parameters and recalculating the jacobian" << endl;
+				os << "  freezing parameters and recalculating the jacobian" << endl;
 				//add out of bound parameters to frozen parameter list
 				Parameters new_frz_derivative_pars;
 				for (auto &ipar : out_of_bound_pars)
@@ -330,7 +335,21 @@ bool SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContr
 				}
 				if (new_frz_derivative_pars.size() > 0)
 				{
+					Parameters frz_pars = base_run.get_frozen_ctl_pars();
+					for (auto p : new_frz_derivative_pars)
+					{
+						if (frz_pars.find(p.first) != frz_pars.end())
+						{
+							cout << "SDVA::iteration_jac() WARNING: parameter " << p.first << " already in frozen par names" << endl;
+							os << "SDVA::iteration_jac() WARNING: parameter " << p.first << " already in frozen par names" << endl;
+						}
+					}
+
 					base_run.add_frozen_ctl_parameters(new_frz_derivative_pars);
+				}
+				else
+				{
+
 				}
 			}
 			else

@@ -189,18 +189,18 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 			tmp_str << "beginning iteration " << global_iter_num;
 			performance_log->log_event(tmp_str.str());
 	
-			if (!calc_jacobian)
+			/*if (!calc_jacobian)
 			{
 				calc_jacobian = true;
 			}
 			else
-			{
+			{*/
 				bool restart_runs = (restart_controller.get_restart_option() == RestartController::RestartOption::RESUME_JACOBIAN_RUNS);
 				bool success = iteration_jac(run_manager, termination_ctl, best_upgrade_run, false, restart_runs);
 				if (!success)
 					return best_upgrade_run;
 				if (restart_runs) restart_controller.get_restart_option() = RestartController::RestartOption::NONE;
-			}
+			//}
 
 			// Update Regularization weights if REG_FRAC is used
 			ModelRun prev_run(best_upgrade_run);
