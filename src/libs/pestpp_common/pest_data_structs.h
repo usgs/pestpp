@@ -459,6 +459,8 @@ public:
 	string get_additional_ins_delimiters() const { return additional_ins_delimiters; }
 	void set_random_seed(int seed) { random_seed = seed; }
 	int get_random_seed()const { return random_seed; }
+	bool get_glm_iter_mc() const { return glm_iter_mc; }
+	void set_glm_iter_mc(bool _flag) { glm_iter_mc = _flag; }
 
 	void set_panther_agent_restart_on_error(bool _flag) { panther_agent_restart_on_error = _flag; }
 	bool get_panther_agent_restart_on_error() const { return panther_agent_restart_on_error; }
@@ -486,6 +488,7 @@ private:
 	bool glm_debug_real_fail;
 	bool glm_accept_mc_phi;
 	bool glm_rebase_super;
+	bool glm_iter_mc;
 
 	vector<double> base_lambda_vec;
 	vector<double> lambda_scale_vec;
