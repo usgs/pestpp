@@ -655,13 +655,13 @@ bool Jacobian::out_of_bounds(const Parameters &ctl_parameters,
 	double min, max;
 	const ParameterRec *par_info_ptr;
 	bool out_of_bounds=false;
-
+	double bnd_tol = 0.001;
 	for(Parameters::const_iterator b=ctl_parameters.begin(), e=ctl_parameters.end();
 		b!=e; ++b) {
 			par_name = &(*b).first;
 			par_info_ptr = ctl_par_info.get_parameter_rec_ptr(*par_name);
-			max = par_info_ptr->ubnd;
-			min = par_info_ptr->lbnd;
+			max = par_info_ptr->ubnd + abs(par_info_ptr->ubnd * bnd_tol);
+			min = par_info_ptr->lbnd - abs(par_info_ptr->lbnd * bnd_tol);
 		if ((*b).second > max || (*b).second < min) {
 			out_of_bounds = true;
 			out_of_bound_par.insert(*par_name);
