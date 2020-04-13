@@ -438,6 +438,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		// Save base run as first model run so it is eassily accessible
 		Parameters base_model_pars = par_transform.ctl2model_cp(base_run.get_ctl_pars());
 		int run_id = run_manager.add_run(base_model_pars, "base_run");
+		num_lam_runs++;
 		run_manager.update_run(run_id, base_model_pars, base_run.get_obs());
 
 		//Marquardt Lambda Update Vector
