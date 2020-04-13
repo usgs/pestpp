@@ -2058,6 +2058,18 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 			p.second =last_val + (p.second - last_val) *  scaling_factor;
 		}
 	}
+	
+	//check for slightly out of bounds
+	for (auto &p : upgrade_ctl_pars)
+	{
+		p_rec = p_info.get_parameter_rec_ptr(p.first);
+		if (p.second < p_rec->lbnd)
+			p.second = p_rec->lbnd;
+		else if (p.second > p_rec->ubnd)
+			p.second = p_rec->ubnd;
+
+	}
+
 }
 
 pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &pars)
