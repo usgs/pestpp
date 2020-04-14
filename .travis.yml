@@ -11,12 +11,6 @@ services:
 compiler:
   - gcc
 
-addons:
-  apt:
-    packages:
-      - gfortran
-      - liblapack-dev
-
 jobs:
   include:
     - name: "pestpp-opt tests"
@@ -61,10 +55,9 @@ jobs:
         TEST_DIR="benchmarks"
 
 before_script:
-  - cd src
-  - rm -r -f ../bin/linux/
-  - make clean
-  - STATIC=no make -j2
+  - mkdir build && cd build
+  - cmake -DCMAKE_BUILD_TYPE=Release ..
+  - make -j2
   - make install
   - cd ..
   - wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
