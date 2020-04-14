@@ -205,6 +205,10 @@ bool Jacobian_1to1::build_runs(ModelRun &init_model_run, vector<string> numeric_
 	debug_msg("Jacobian_1to1::build_runs end");
 
 	output_file_writer_ptr->write_jco_run_id(run_manager.get_cur_groupid(), par_run_map);
+	if (failed_parameter_names.size() == numeric_par_names.size())
+	{
+		throw runtime_error("Jacobian_1to1::build_runs() error: parameter derivative calculations failed for all parameters");
+	}
 	if (failed_parameter_names.size() > 0)
 		return false;
 	return true;

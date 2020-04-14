@@ -767,9 +767,9 @@ def tplins1_test():
 
 if __name__ == "__main__":
     
-    glm_long_name_test()
+    #glm_long_name_test()
     #sen_plusplus_test()
-    #parchglim_test()
+    parchglim_test()
     #unc_file_test()
     # secondary_marker_test()
     #basic_test("ies_10par_xsec")

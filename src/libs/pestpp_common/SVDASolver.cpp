@@ -297,7 +297,19 @@ bool SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContr
 				return false;
 			}
 			// fix frozen parameters in SVDA transformation
+			//check one more time for base parameters at bounds...
+			map<string, double> at_bounds = pest_scenario.get_pars_at_near_bounds(base_run.get_ctl_pars());
+			if (at_bounds.size() > 0)
+			{
+				Parameters frz;
+				for (auto item : at_bounds)
+				{
+					frz.insert(item.first, item.second);
+				}
+				base_run.add_frozen_ctl_parameters(frz);
+			}
 			debug_print(base_run.get_frozen_ctl_pars());
+			
 			par_transform.get_svda_ptr()->update_add_frozen_pars(base_run.get_frozen_ctl_pars());
 			par_transform.get_svda_fixed_ptr()->reset(par_transform.get_svda_ptr()->get_frozen_derivative_pars());
 			Parameters numeric_pars = par_transform.ctl2numeric_cp(base_run.get_ctl_pars());
@@ -317,9 +329,14 @@ bool SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContr
 			}
 			else if (!success_build_runs && out_of_bound_pars.size() > 0)
 			{
-				cout << "  can not compute jacobian without the following parameters going out of bounds... " << endl;
+
+				cout << "  can not compute super-par jacobian without the following parameters going out of bounds... " << endl;
+				os << "  can not compute super-par jacobian without the following parameters going out of bounds... " << endl;
 				print(out_of_bound_pars, cout, 4);
+				print(out_of_bound_pars, os, 4);
+
 				cout << "  freezing parameters and recalculating the jacobian" << endl;
+				os << "  freezing parameters and recalculating the jacobian" << endl;
 				//add out of bound parameters to frozen parameter list
 				Parameters new_frz_derivative_pars;
 				for (auto &ipar : out_of_bound_pars)
@@ -330,7 +347,21 @@ bool SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContr
 				}
 				if (new_frz_derivative_pars.size() > 0)
 				{
+					Parameters frz_pars = base_run.get_frozen_ctl_pars();
+					for (auto p : new_frz_derivative_pars)
+					{
+						if (frz_pars.find(p.first) != frz_pars.end())
+						{
+							cout << "SDVA::iteration_jac() WARNING: parameter " << p.first << " already in frozen par names" << endl;
+							os << "SDVA::iteration_jac() WARNING: parameter " << p.first << " already in frozen par names" << endl;
+						}
+					}
+
 					base_run.add_frozen_ctl_parameters(new_frz_derivative_pars);
+				}
+				else
+				{
+
 				}
 			}
 			else
@@ -419,6 +450,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		// Save base run as first model run so it is eassily accessible
 		Parameters base_model_pars = par_transform.ctl2model_cp(base_run.get_ctl_pars());
 		int run_id = run_manager.add_run(base_model_pars, "base_run");
+		num_lam_runs++;
 		run_manager.update_run(run_id, base_model_pars, base_run.get_obs());
 
 		//Marquardt Lambda Update Vector
@@ -530,7 +562,8 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		try
 		{
 			la.glm_iter_fosm(base_run, output_file_writer, termination_ctl.get_iteration_number(), &run_manager);
-			fosm_real_info = la.draw_fosm_reals(&run_manager, termination_ctl.get_iteration_number(), base_run);
+			if (pest_scenario.get_pestpp_options().get_glm_iter_mc())
+				fosm_real_info = la.draw_fosm_reals(&run_manager, termination_ctl.get_iteration_number(), base_run);
 		}
 		catch (exception& e)
 		{

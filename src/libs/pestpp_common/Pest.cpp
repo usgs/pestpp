@@ -2000,7 +2000,7 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 				ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at lower bound";
 				throw runtime_error(ss.str());
 			}*/
-			scaled_bnd_val = p_rec->ubnd + (p_rec->ubnd * bnd_tol);
+			scaled_bnd_val = p_rec->ubnd + abs(p_rec->ubnd * bnd_tol);
 			if (p.second > scaled_bnd_val)
 			{
 				temp = abs((p_rec->ubnd - last_val) / (p.second - last_val));
@@ -2018,7 +2018,7 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 					control_type = "upper bound";
 				}
 			}
-			scaled_bnd_val = p_rec->lbnd - (p_rec->lbnd * bnd_tol);
+			scaled_bnd_val = p_rec->lbnd - abs(p_rec->lbnd * bnd_tol);
 			if (p.second < p_rec->lbnd)
 			{
 				temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
@@ -2058,6 +2058,18 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 			p.second =last_val + (p.second - last_val) *  scaling_factor;
 		}
 	}
+	
+	//check for slightly out of bounds
+	for (auto &p : upgrade_ctl_pars)
+	{
+		p_rec = p_info.get_parameter_rec_ptr(p.first);
+		if (p.second < p_rec->lbnd)
+			p.second = p_rec->lbnd;
+		else if (p.second > p_rec->ubnd)
+			p.second = p_rec->ubnd;
+
+	}
+
 }
 
 pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &pars)
