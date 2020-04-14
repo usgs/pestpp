@@ -1,11 +1,12 @@
+image: Visual Studio 2017
+platform: x64
+
 environment:
   
   matrix:
     - PYTHON_VERSION: "3.6"
       CONDA_INSTALL_LOCN: "C:\\Miniconda36-x64"
 
-platform:
-    - x64
 clone_depth: 1
 shallow_clone: true
 
@@ -23,6 +24,14 @@ init:
   - echo %PYTHON_VERSION% %CONDA_INSTALL_LOCN%
 
 install:
+  - call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
+  - mkdir build
+  - cd build
+  - cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
+  - cmake --build .
+  - cmake --install .
+  - cd ..
+
   - set PATH=%CONDA_INSTALL_LOCN%;%CONDA_INSTALL_LOCN%\scripts;%PATH%;
   - set PYTHONUNBUFFERED=1
   # for msinttypes and newer stuff
@@ -35,10 +44,8 @@ install:
   - call %CONDA_INSTALL_LOCN%\scripts\activate
   - conda info -a
 
-  - conda install --yes python=%PYTHON_VERSION% pip numpy scipy pandas nose matplotlib
-  - pip install coveralls
-  - pip install pyshp
-  - pip install nose-timer
+  - conda install --yes python=%PYTHON_VERSION% pip numpy scipy pandas matplotlib nose
+  - pip install coveralls pyshp nose-timer
   - pip install git+https://github.com/modflowpy/flopy.git@develop
   - pip install git+https://github.com/jtwhite79/pyemu.git@develop
   # Show the installed packages + versions

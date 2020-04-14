@@ -33,6 +33,7 @@
 
 # Makefile object
 /src/libs/build-stamp
+/*build*
 
 /morris_meth/ipch
 /morris_meth/Debug

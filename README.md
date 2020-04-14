@@ -23,13 +23,9 @@ The lastest PEST++ manual is available [here](https://github.com/jtwhite79/pestp
 * [mac OS](https://github.com/usgs/pestpp/tree/master/bin/mac).  Direct zip download [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/usgs/pestpp/tree/master/bin/mac)
 
 ## Compiling
-The master branch includes a Visual Studio project, as well as makefiles for linux and mac. The suite has been succcessfully compiled with gcc (g++) 4,5,6 and 7 on ubuntu, fedora, centos, and on slurm/MPI clusters - to use gcc, you must C++11 support (if using gcc 4, only gcc4.9 has this).  Then, in the `src` directory:
+The develop branch includes a Visual Studio project, as well as CMake files for cross-compilation on all operating systems.
 
-`>>>make clean`
-
-`>>>STATIC=no make install`
-
-This should put the compiled binaries in the `bin/linux` directory.  See the `.travis.yml` file for an example
+See details [here](documentation/cmake.md) to compile using CMake.
 
 ## Overview
 The PEST++ software suite includes several stand-alone tools for model-independent (non-intrusive) computer model parameter estimation and uncertainty analysis.  Codes include:
