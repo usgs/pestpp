@@ -259,6 +259,10 @@ bool Jacobian::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vector<st
 	}
 	debug_print(failed_parameter_names);
 	debug_msg("Jacobian::build_runs method: end");
+	if (failed_parameter_names.size() == numeric_par_names.size())
+	{
+		throw runtime_error("Jacobian_1to1::build_runs() error: parameter derivative calculations failed for all parameters");
+	}
 	if (failed_parameter_names.size() > 0)
 	{
 		return false;
