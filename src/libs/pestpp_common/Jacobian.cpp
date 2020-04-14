@@ -391,7 +391,7 @@ bool Jacobian::get_derivative_parameters(const string &par_name, Parameters &num
 		ss << "Jacobian::get_derivative_parameters() error: the following parameters are already out of bounds: " << endl;
 		for (auto p : out_of_bound_par)
 			ss << p << endl;
-		throw runtime_error(ss.str());
+		//throw runtime_error(ss.str());
 
 	}
 	bool success = false;

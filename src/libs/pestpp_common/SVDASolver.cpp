@@ -297,7 +297,19 @@ bool SVDASolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContr
 				return false;
 			}
 			// fix frozen parameters in SVDA transformation
+			//check one more time for base parameters at bounds...
+			map<string, double> at_bounds = pest_scenario.get_pars_at_near_bounds(base_run.get_ctl_pars());
+			if (at_bounds.size() > 0)
+			{
+				Parameters frz;
+				for (auto item : at_bounds)
+				{
+					frz.insert(item.first, item.second);
+				}
+				base_run.add_frozen_ctl_parameters(frz);
+			}
 			debug_print(base_run.get_frozen_ctl_pars());
+			
 			par_transform.get_svda_ptr()->update_add_frozen_pars(base_run.get_frozen_ctl_pars());
 			par_transform.get_svda_fixed_ptr()->reset(par_transform.get_svda_ptr()->get_frozen_derivative_pars());
 			Parameters numeric_pars = par_transform.ctl2numeric_cp(base_run.get_ctl_pars());
