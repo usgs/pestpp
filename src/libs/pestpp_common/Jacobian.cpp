@@ -259,6 +259,7 @@ bool Jacobian::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vector<st
 	}
 	debug_print(failed_parameter_names);
 	debug_msg("Jacobian::build_runs method: end");
+	
 	if (failed_parameter_names.size() > 0)
 	{
 		return false;
@@ -379,9 +380,21 @@ bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 	return true;
 }
 
-bool Jacobian::get_derivative_parameters(const string &par_name, Parameters &numeric_pars, ParamTransformSeq &par_transform, const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info,
+bool Jacobian::get_derivative_parameters(const string &par_name, Parameters &numeric_pars, ParamTransformSeq &par_transform, 
+	const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info,
 		vector<double> &delta_numeric_par_vec, bool phiredswh_flag, set<string> &out_of_bound_par)
 {
+	//first check that all active pars are in bounds
+	bool already_out = out_of_bounds(par_transform.numeric2ctl_cp(numeric_pars), ctl_par_info, out_of_bound_par);
+	if (already_out)
+	{
+		stringstream ss;
+		ss << "Jacobian::get_derivative_parameters() error: the following parameters are already out of bounds: " << endl;
+		for (auto p : out_of_bound_par)
+			ss << p << endl;
+		//throw runtime_error(ss.str());
+
+	}
 	bool success = false;
 	const ParameterGroupRec *g_rec;
 	debug_msg("Jacobian::get_derivative_parameters begin");
@@ -643,13 +656,13 @@ bool Jacobian::out_of_bounds(const Parameters &ctl_parameters,
 	double min, max;
 	const ParameterRec *par_info_ptr;
 	bool out_of_bounds=false;
-
+	double bnd_tol = 0.001;
 	for(Parameters::const_iterator b=ctl_parameters.begin(), e=ctl_parameters.end();
 		b!=e; ++b) {
 			par_name = &(*b).first;
 			par_info_ptr = ctl_par_info.get_parameter_rec_ptr(*par_name);
-			max = par_info_ptr->ubnd;
-			min = par_info_ptr->lbnd;
+			max = par_info_ptr->ubnd + abs(par_info_ptr->ubnd * bnd_tol);
+			min = par_info_ptr->lbnd - abs(par_info_ptr->lbnd * bnd_tol);
 		if ((*b).second > max || (*b).second < min) {
 			out_of_bounds = true;
 			out_of_bound_par.insert(*par_name);

@@ -718,6 +718,8 @@ void TranSVD::update_add_frozen_pars(const Parameters &frozen_pars)
 	{
 		throw PestError("TranSVD::update_add_frozen_pars - All parameters are frozen in SVD transformation");
 	}
+	if ((del_col_ids.size() == 0) && (frozen_pars.size() > 0))
+		cout << "WARNING: TravSVD::update_add_froze_pars(): all pars to freeze already frozen" << endl;
 	//remove frozen parameters from base_parameter_names
 	auto end_iter = std::remove_if(base_parameter_names.begin(), base_parameter_names.end(),
 		[&new_frozen_pars](string &str)->bool{return new_frozen_pars.find(str)!=new_frozen_pars.end();});

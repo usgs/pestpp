@@ -1005,6 +1005,11 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		convert_ip(value, random_seed);
 		return true;
 	}
+	else if (key == "GLM_ITER_MC")
+	{
+		glm_iter_mc = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
 
 	return false;
 }
@@ -1080,6 +1085,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "glm_debug_real_fail: " << glm_debug_real_fail << endl;
 	os << "glm_accept_mc_phi: " << glm_accept_mc_phi << endl;
 	os << "glm_rebase_super: " << glm_rebase_super;
+	os << "glm_iter_mc: " << glm_iter_mc;
 
 
 	if (global_opt == OPT_DE)
@@ -1223,6 +1229,7 @@ void PestppOptions::set_defaults()
 	set_glm_debug_real_fail(false);
 	set_glm_accept_mc_phi(false);
 	set_glm_rebase_super(false);
+	set_glm_iter_mc(false);
 	set_prediction_names(vector<string>());
 	set_parcov_filename(string());
 	set_obscov_filename(string());
