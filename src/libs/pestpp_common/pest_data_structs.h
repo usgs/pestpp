@@ -81,6 +81,9 @@ public:
 	const ParameterGroupInfo& operator=(const ParameterGroupInfo &rhs);
 	bool have_switch_derivative() const;
 	vector<string> get_group_names() const;
+	void par_erase(const string& par_name) { parameter2group.erase(par_name); }
+	void grp_erase(const string& grp_name) { groups.erase(grp_name);
+	}
 	~ParameterGroupInfo();
 private:
 	unordered_map<string, ParameterGroupRec*> groups;
@@ -100,9 +103,10 @@ public:
 	double offset;
 	string group;
 	int dercom;
+	int cycle;
 	TRAN_TYPE tranform_type;
 	ParameterRec() : chglim(""), lbnd(0.0), ubnd(0.0), init_value(0.0), group(""),
-		dercom(1), tranform_type(TRAN_TYPE::NONE), scale(1.0), offset(0.0){}
+		dercom(1), tranform_type(TRAN_TYPE::NONE), scale(1.0), offset(0.0), cycle(0){}
 	bool is_active() const { return !(tranform_type == TRAN_TYPE::FIXED || tranform_type == TRAN_TYPE::TIED); }
 };
 ostream& operator<< (ostream &os, const ParameterRec& val);
@@ -116,6 +120,7 @@ public:
 	const ParameterRec* get_parameter_rec_ptr(const string &name) const;
 	ParameterRec* get_parameter_rec_ptr_4_mod(const string &name);
 	void insert(const string &name, const ParameterRec &rec) {parameter_info[name] = rec;}
+	void erase(const string& name) { parameter_info.erase(name);}
 	ParameterInfo() {}
 	~ParameterInfo() {}
 private:
@@ -138,7 +143,9 @@ class ObservationRec {
 public:
 	double weight;
 	string group;
-	ObservationRec(double _weight=0.0,const string &_group="") : weight(_weight), group(_group) {}
+	int cycle;
+	ObservationRec(double _weight=0.0,const string &_group="", int _cycle = 0)
+		: weight(_weight), group(_group),cycle(_cycle)  {}
 	bool is_regularization() const;
 };
 ostream& operator<< (ostream &os, const ObservationRec& val);
@@ -161,6 +168,8 @@ public:
 	vector<string> get_groups();
 	void reset_group_weights(string &group, double val);
 	void scale_group_weights(string &group, double scale_val);
+	void erase_ob(const string& name) { observations.erase(name);}
+	void erase_gp(const string& name) { groups.erase(name); }
 
 };
 
@@ -171,6 +180,8 @@ public:
 	std::vector<std::string> inpfile_vec;
 	std::vector<std::string> insfile_vec;
 	std::vector<std::string> outfile_vec;
+	std::vector<int> incycle_vec;
+	std::vector<int> outcycle_vec;
 };
 
 class ParetoInfo {

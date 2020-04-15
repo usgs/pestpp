@@ -86,9 +86,14 @@ public:
 	map<string,double> get_pars_at_near_bounds(const Parameters &pars, double tol=0.0);
 	pair<Parameters,Parameters> get_effective_ctl_lower_upper_bnd(Parameters &pars);
 	map<string, double> calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform);
+
+	Pest &get_child_pest(int icycle);
+	void child_pest_update(int icycle);
+	vector<int> get_assim_cycles();
+	
 	virtual ~Pest();
 	
-private:
+protected:
 	int n_adj_par = 0;
 	string prior_info_string;
 	ControlInfo control_info;
@@ -108,6 +113,7 @@ private:
 	vector<string> ctl_ordered_par_group_names;
 	vector<string> ctl_ordered_obs_group_names;
 	vector<string> ctl_ordered_pi_names;
+	vector<int> assimilation_cycles;
 	DynamicRegularization *regul_scheme_ptr;
 	map<int,string> other_lines;
 	string pst_filename;
@@ -123,6 +129,7 @@ private:
 	void tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens);
 	void tokens_to_pi_rec(ostream& f_rec, const string& line_upper);
 	void rectify_par_groups();
+	void extract_da_cycles();
 
 	map<string, vector<pest_utils::ExternalCtlFile>> efiles_map;
 

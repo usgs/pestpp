@@ -984,16 +984,16 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	PestppOptions::ARG_STATUS stat;
 	vector<string> par_group_formal_names{ "PARGPNME","INCTYP","DERINC","DERINCLB","FORCEN","DERINCMUL","DERMTHD" };
 	vector<string> optional_par_group_formal_names{ "SPLITTHRESH","SPLITRELDIFF" };
-	vector<string> par_formal_names{ "PARNME","PARTRANS","PARCHGLIM","PARVAL1","PARLBND","PARUBND","PARGP","SCALE","OFFSET","DERCOM" };
-	vector<string> par_easy_names{ "NAME","TRANSFORM","CHANGE_LIMIT","VALUE","LOWER_BOUND","UPPER_BOUND","GROUP","SCALE","OFFSET","DERCOM" };
+	vector<string> par_formal_names{ "PARNME","PARTRANS","PARCHGLIM","PARVAL1","PARLBND","PARUBND","PARGP","SCALE","OFFSET","DERCOM", "CYCLE" };
+	vector<string> par_easy_names{ "NAME","TRANSFORM","CHANGE_LIMIT","VALUE","LOWER_BOUND","UPPER_BOUND","GROUP","SCALE","OFFSET","DERCOM", "CYCLE" };
 	map <string,string> row_map, temp_tied_map;
-	vector<string> obs_formal_names{ "OBSNME","OBSVAL","WEIGHT","OBGNME" };
-	vector<string> obs_easy_names{ "NAME","VALUE","WEIGHT","GROUP" };
+	vector<string> obs_formal_names{ "OBSNME","OBSVAL","WEIGHT","OBGNME", "CYCLE" };
+	vector<string> obs_easy_names{ "NAME","VALUE","WEIGHT","GROUP", "CYCLE" };
 	vector<string> obs_group_formal_names{ "OBGNME" };
-	vector<string> pi_formal_names{ "PILBL","EQUATION","WEIGHT","OBGNME" };
+	vector<string> pi_formal_names{ "PILBL","EQUATION","WEIGHT","OBGNME", "CYCLE" };
 	vector<string> tokens_case_sen;
-	vector<string> model_input_formal_names{ "PEST_FILE","MODEL_FILE" };
-	vector<string> model_output_formal_names{ "PEST_FILE","MODEL_FILE" };
+	vector<string> model_input_formal_names{ "PEST_FILE","MODEL_FILE", "CYCLE" };
+	vector<string> model_output_formal_names{ "PEST_FILE","MODEL_FILE", "CYCLE" };
 #ifndef _DEBUG
 	try {
 #endif
@@ -1479,6 +1479,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					mi_tokens = efile.get_row_vector(ro, model_input_formal_names);
 					model_exec_info.tplfile_vec.push_back(mi_tokens[0]);
 					model_exec_info.inpfile_vec.push_back(mi_tokens[1]);
+					model_exec_info.incycle_vec.push_back(std::stoi(mi_tokens[2]));
 				}
 
 				if (efiles_map.find(section) == efiles_map.end())
@@ -1518,6 +1519,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					mo_tokens = efile.get_row_vector(ro, model_output_formal_names);
 					model_exec_info.insfile_vec.push_back(mo_tokens[0]);
 					model_exec_info.outfile_vec.push_back(mo_tokens[1]);
+					model_exec_info.outcycle_vec.push_back(std::stoi(mo_tokens[2]));
+					
 				}
 
 				if (efiles_map.find(section) == efiles_map.end())
@@ -2122,6 +2125,220 @@ pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &
 	return pair<Parameters,Parameters>(lbnd,ubnd);
 }
 
+Pest& Pest::get_child_pest(int icycle)
+{
+	// TODO: insert return statement here
+	
+	
+	Pest* child_pest = new Pest(*this);
+	child_pest->child_pest_update(icycle);
+	//child_pest->ctl_parameters;
+	//ctl_parameter_info.insert(name, pi);
+	//ctl_parameters.insert(name, pi.init_value);
+	//base_group_info.insert_parameter_link(name, pi.group);
+
+	// todo: change number of parameters and obs to match current parm/obs number
+	//ParameterRec curr_param_inf;
+	//unordered_map<string, ParameterRec>::iterator p_iter;
+	/*
+	ParameterInfo curr_params;
+	curr_params = child_pest->get_ctl_parameter_info();
+	ParameterInfo pi = get_ctl_parameter_info();
+	for (auto& p : get_ctl_ordered_par_names())
+		if (pi.get_parameter_rec_ptr(p)->cycle != icycle)
+		{
+			curr_params.erase(p);
+		}
+		*/
+
+	//for (auto it = curr_params.begin(); it != curr_params.end(); ++it)
+	//	std::cout << " " << it->first << ":" << it->second;
+
+	
+	return *child_pest;
+	
+}
+
+void Pest::child_pest_update(int icycle)
+{
+	/*
+	Update Pest members to reflect current cycle data only
+	*/
+	vector<string> cycle_grps, unique_cycle_grps, grps;	
+	vector<string> parnames, obsnames;
+	
+	//prior_info_string
+	//control_info
+	//pareto_info
+	//svd_info
+	
+	parnames = get_ctl_ordered_par_names();
+	obsnames = get_ctl_ordered_obs_names();
+	ParameterInfo pi = get_ctl_parameter_info();
+	for (auto& p : get_ctl_ordered_par_names())
+		if (pi.get_parameter_rec_ptr(p)->cycle != icycle && 
+			pi.get_parameter_rec_ptr(p)->cycle >= 0)
+		{
+			ctl_parameter_info.erase(p);
+			ctl_parameters.erase(p);
+			base_group_info.par_erase(p);// .parameter2group.erase(p);
+			parnames.erase(remove(parnames.begin(),
+				parnames.end(), p), parnames.end());
+
+		}
+		else
+		{
+			cycle_grps.push_back(base_group_info.get_group_name(p));
+			
+		}
+    // get unique groups
+	for (auto curr = cycle_grps.begin(); curr != cycle_grps.end(); curr++) {
+		if (find(unique_cycle_grps.begin(), unique_cycle_grps.end(), *curr) == unique_cycle_grps.end())
+		{
+			unique_cycle_grps.push_back(*curr);
+		}
+	}
+	// remove groups not in current cycle
+	grps = base_group_info.get_group_names();
+	for (auto grp = grps.begin(); grp != grps.end(); grp++)
+	{
+		if (find(unique_cycle_grps.begin(), unique_cycle_grps.end(), *grp) == unique_cycle_grps.end())
+			base_group_info.grp_erase(*grp);
+	}
+	// update observations
+	vector<string> cycle_grps_o, unique_cycle_grps_o, grps_o;
+	ObservationInfo obs_info = get_ctl_observation_info();
+	observation_values;
+	for (auto& ob : get_ctl_ordered_obs_names())
+		if (obs_info.get_observation_rec_ptr(ob)->cycle != icycle &&
+			obs_info.get_observation_rec_ptr(ob)->cycle >= 0)
+		{
+			observation_info.erase_ob(ob);
+			observation_values.erase(ob);
+			obsnames.erase(remove(obsnames.begin(),
+				obsnames.end(), ob), obsnames.end());
+		}
+		else
+		{
+			cycle_grps_o.push_back(obs_info.get_group(ob));
+		}
+
+	// get unique groups
+	for (auto curr = cycle_grps_o.begin(); curr != cycle_grps_o.end(); curr++) {
+		if (find(unique_cycle_grps_o.begin(), unique_cycle_grps_o.end(), *curr) == unique_cycle_grps_o.end())
+		{
+			unique_cycle_grps_o.push_back(*curr);
+		}
+	}
+	// remove groups not in current cycle
+	grps_o = observation_info.get_groups();
+	for (auto grp = grps_o.begin(); grp != grps_o.end(); grp++)
+	{
+		if (find(unique_cycle_grps_o.begin(), unique_cycle_grps_o.end(), *grp) == unique_cycle_grps_o.end())
+			observation_info.erase_gp(*grp);
+	}
+
+	// prior info
+
+	//ctl_parameters
+	//model_exec_info
+	ModelExecInfo curr_mod_exe = model_exec_info;
+	std::vector<std::string> _tpl_vec, _infile_vec, _ins_vec, _out_vec;
+	std::vector<int> incy, outcy;
+	int index = 0;
+	for (auto ic : model_exec_info.incycle_vec)
+	{
+		if ((ic == icycle) || (ic < 0))
+		{
+			_tpl_vec.push_back(model_exec_info.tplfile_vec[index]);
+			_infile_vec.push_back(model_exec_info.inpfile_vec[index]);
+			incy.push_back(model_exec_info.incycle_vec[index]);
+		}
+
+		index = index + 1;
+	}
+	//output files
+	index = 0;
+	for (auto ic : model_exec_info.outcycle_vec)
+	{
+		if ((ic == icycle) || (ic < 0))
+		{
+			_ins_vec.push_back(model_exec_info.insfile_vec[index]);
+			_out_vec.push_back(model_exec_info.outfile_vec[index]);
+			outcy.push_back(model_exec_info.outcycle_vec[index]);
+		}
+
+		index = index + 1;
+	}
+	model_exec_info.tplfile_vec = _tpl_vec;
+	model_exec_info.inpfile_vec = _infile_vec;
+	model_exec_info.incycle_vec = incy;
+	model_exec_info.insfile_vec = _ins_vec;
+	model_exec_info.outfile_vec = _out_vec;
+	model_exec_info.outcycle_vec = outcy;
+
+
+	//pestpp_options
+	//base_par_transform
+	//ctl_ordered_par_names
+	ctl_ordered_par_names = parnames;
+	
+	//ctl_ordered_obs_names
+	ctl_ordered_obs_names = obsnames;
+
+	//ctl_ordered_par_group_names ----> TODO: Check if the groups order is preserved..
+	ctl_ordered_par_group_names = unique_cycle_grps;
+	ctl_ordered_obs_group_names = unique_cycle_grps_o;
+
+	//ctl_ordered_pi_names
+	//regul_scheme_ptr
+	//other_lines
+	//pst_filename  ----> TODO: do I need to change the file name
+	
+	// get number of adj par for current cycle
+	ParameterRec::TRAN_TYPE tfixed = ParameterRec::TRAN_TYPE::FIXED;
+	int new_n_adj_par = 0;
+	for (auto pname : ctl_ordered_par_names)
+	{
+		if (ctl_parameter_info.get_parameter_rec_ptr(pname)->tranform_type != tfixed)
+		{
+			new_n_adj_par++;
+		}
+	}
+	n_adj_par = new_n_adj_par;
+}
+
+vector<int> Pest::get_assim_cycles()
+{
+	int curr_cycle;
+	vector<int> cycles_ordered_list, unique_cycles;
+	for (auto pname : ctl_ordered_par_names)
+	{
+		curr_cycle = ctl_parameter_info.get_parameter_rec_ptr(pname)->cycle;
+		if (curr_cycle>= 0)
+			cycles_ordered_list.push_back(curr_cycle);
+	}
+	for (auto oname : ctl_ordered_obs_names)
+	{
+		curr_cycle = observation_info.get_observation_rec_ptr(oname)->cycle;
+		if (curr_cycle >= 0)
+			cycles_ordered_list.push_back(curr_cycle);
+	}
+	// get unique groups
+	for (auto curr = cycles_ordered_list.begin(); curr != cycles_ordered_list.end(); curr++) {
+		if (find(unique_cycles.begin(), unique_cycles.end(), *curr) == unique_cycles.end())
+		{
+			unique_cycles.push_back(*curr);
+		}
+	}
+	sort(unique_cycles.begin(), unique_cycles.end());
+	return unique_cycles;
+	
+
+}
+
+
+
 map<string, double> Pest::get_pars_at_near_bounds(const Parameters & pars, double tol)
 {
 	 map<string, double> bnd_map;
@@ -2254,6 +2471,7 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 	convert_ip(tokens[6], pi.group);
 	convert_ip(tokens[7], scale);
 	convert_ip(tokens[8], offset);
+	convert_ip(tokens[10], pi.cycle);
 	if (control_info.numcom > 1)
 		convert_ip(tokens[9], pi.dercom);
 	else
@@ -2330,6 +2548,7 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	convert_ip(tokens[1], value);
 	convert_ip(tokens[2], obs_i.weight);
 	obs_i.group = tokens[3];
+	convert_ip(tokens[4], obs_i.cycle);
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
 	observation_values.insert(name, value);
@@ -2416,8 +2635,13 @@ map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& p
 	{
 		val = dss_mat_no_reg_pest.col(i).norm() / n_nonzero_weights_no_reg;
 		par_sens[par_list[i]] = val;
-		}
+	}
 	return par_sens;
+}
+
+void Pest::extract_da_cycles()
+{
+	int xxx; 
 }
 
 

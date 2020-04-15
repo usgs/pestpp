@@ -1,0 +1,15 @@
+OUT = pestpp-ies
+OBJECTS	:= pestpp-ies.o
+
+$(OUT): $(OBJECTS)
+	$(CXX) $(OBJECTS) $(CFLAGS) $(LFLAGS) $(LIBLDIR) $(LIBS) -o $(OUT)
+
+
+%.o: %.cpp
+	$(CXX) $(CFLAGS) $(INCLUDES) $< -c $(input) -o $@
+
+%.o: %.for
+	$(FC) $(FFLAGS) $(INCLUDES) $< -c $(input) -o $@
+
+clean:
+	rm $(OBJECTS) $(OUT)
