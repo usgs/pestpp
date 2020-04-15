@@ -90,6 +90,7 @@ public:
 	Pest &get_child_pest(int icycle);
 	void child_pest_update(int icycle);
 	vector<int> get_assim_cycles();
+	void assign_da_cycles(ofstream& f_rec);
 	virtual ~Pest();
 	
 protected:
@@ -129,7 +130,7 @@ protected:
 	void tokens_to_pi_rec(ostream& f_rec, const string& line_upper);
 	void rectify_par_groups();
 	void extract_da_cycles();
-
+	map<string, int> extract_cycle_numbers(ofstream& f_rec, string section_name, vector<string> possible_name_cols);
 	map<string, vector<pest_utils::ExternalCtlFile>> efiles_map;
 
 };

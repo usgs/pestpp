@@ -161,6 +161,7 @@ public:
 	void set_weight(const string &obs_name, double value);
 	string get_group(const string &obs_name) const;
 	const ObservationRec* get_observation_rec_ptr(const string &name) const;
+	ObservationRec* get_observation_rec_ptr_4_mod(const string& name);
 	const ObservationGroupRec* get_group_rec_ptr(const string &name) const;
 	Observations get_regulatization_obs(const Observations &obs_in);
 	int get_nnz_obs() const;

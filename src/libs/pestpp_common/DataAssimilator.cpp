@@ -31,7 +31,7 @@ DataAssimilator::DataAssimilator(Pest& _pest_scenario, FileManager& _file_manage
 	localizer.set_pest_scenario(&pest_scenario);
 }
 
-void DataAssimilator::throw_ies_error(string message)
+void DataAssimilator::throw_da_error(string message)
 {
 	performance_log->log_event("DataAssimilator error: " + message);
 	cout << endl << "   ************   " << endl << "    DataAssimilator error: " << message << endl << endl;
@@ -71,11 +71,11 @@ bool DataAssimilator::initialize_pe(Covariance& cov)
 			catch (const exception & e)
 			{
 				ss << "error processing par csv: " << e.what();
-				throw_ies_error(ss.str());
+				throw_da_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error processing par csv"));
+				throw_da_error(string("error processing par csv"));
 			}
 		}
 		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
@@ -88,17 +88,17 @@ bool DataAssimilator::initialize_pe(Covariance& cov)
 			catch (const exception & e)
 			{
 				ss << "error processing par jcb: " << e.what();
-				throw_ies_error(ss.str());
+				throw_da_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error processing par jcb"));
+				throw_da_error(string("error processing par jcb"));
 			}
 		}
 		else
 		{
 			ss << "unrecognized par csv extension " << par_ext << ", looking for csv, jcb, or jco";
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 
 		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
@@ -306,11 +306,11 @@ bool DataAssimilator::initialize_oe(Covariance& cov)
 			catch (const exception & e)
 			{
 				ss << "error processing obs csv: " << e.what();
-				throw_ies_error(ss.str());
+				throw_da_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error processing obs csv"));
+				throw_da_error(string("error processing obs csv"));
 			}
 		}
 		else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
@@ -324,17 +324,17 @@ bool DataAssimilator::initialize_oe(Covariance& cov)
 			{
 				stringstream ss;
 				ss << "error processing obs binary file: " << e.what();
-				throw_ies_error(ss.str());
+				throw_da_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error processing obs binary file"));
+				throw_da_error(string("error processing obs binary file"));
 			}
 		}
 		else
 		{
 			ss << "unrecognized obs ensemble extension " << obs_ext << ", looing for csv, jcb, or jco";
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
 		{
@@ -435,7 +435,7 @@ void DataAssimilator::sanity_checks()
 	if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
 	{
 		warnings.push_back("'pestmode' == 'regularization', in pestpp-ies, this is controlled with the ++ies_reg_factor argument, resetting to 'estimation'");
-		//throw_ies_error("'pestmode' == 'regularization', please reset to 'estimation'");
+		//throw_da_error("'pestmode' == 'regularization', please reset to 'estimation'");
 	}
 	else if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::UNKNOWN)
 	{
@@ -539,7 +539,7 @@ void DataAssimilator::sanity_checks()
 		message(0, "sanity_check errors - uh oh");
 		for (auto& e : errors)
 			message(1, e);
-		throw_ies_error(string("sanity_check() found some problems - please review rec file"));
+		throw_da_error(string("sanity_check() found some problems - please review rec file"));
 	}
 	//cout << endl << endl;
 }
@@ -563,11 +563,11 @@ void DataAssimilator::initialize_restart()
 		catch (const exception & e)
 		{
 			ss << "error processing restart obs csv: " << e.what();
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_ies_error(string("error processing restart obs csv"));
+			throw_da_error(string("error processing restart obs csv"));
 		}
 	}
 	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
@@ -580,17 +580,17 @@ void DataAssimilator::initialize_restart()
 		catch (const exception & e)
 		{
 			ss << "error processing restart obs binary file: " << e.what();
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_ies_error(string("error processing restart obs binary file"));
+			throw_da_error(string("error processing restart obs binary file"));
 		}
 	}
 	else
 	{
 		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
-		throw_ies_error(ss.str());
+		throw_da_error(ss.str());
 	}
 	if (par_restart_csv.size() > 0)
 	{
@@ -605,11 +605,11 @@ void DataAssimilator::initialize_restart()
 			catch (const exception & e)
 			{
 				ss << "error processing restart par csv: " << e.what();
-				throw_ies_error(ss.str());
+				throw_da_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error processing restart par csv"));
+				throw_da_error(string("error processing restart par csv"));
 			}
 		}
 		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
@@ -622,23 +622,23 @@ void DataAssimilator::initialize_restart()
 			catch (const exception & e)
 			{
 				ss << "error processing restart par binary file: " << e.what();
-				throw_ies_error(ss.str());
+				throw_da_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error processing restart par binary file"));
+				throw_da_error(string("error processing restart par binary file"));
 			}
 		}
 		else
 		{
 			ss << "unrecognized restart par ensemble extension " << par_ext << ", looking for csv, jcb, or jco";
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 		if (pe.shape().first != oe.shape().first)
 		{
 			ss.str("");
 			ss << "restart par en has " << pe.shape().first << " realizations but restart obs en has " << oe.shape().first;
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 
 		//check that restart pe is in sync with pe_base
@@ -655,7 +655,7 @@ void DataAssimilator::initialize_restart()
 			ss << "the following realization names were found in the restart par en but not in the 'base' par en:";
 			for (auto& m : missing)
 				ss << m << ",";
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 	}
 
@@ -715,7 +715,7 @@ void DataAssimilator::initialize_restart()
 			else
 			{
 				ss << "the 'base' realization was not found in the restart obs en and also not found in the par en";
-				throw_ies_error(ss.str());
+				throw_da_error(ss.str());
 			}
 
 		}
@@ -724,7 +724,7 @@ void DataAssimilator::initialize_restart()
 			ss << "the following realization names were found in the restart obs en but not in the 'base' obs en:";
 			for (auto& m : missing)
 				ss << m << ",";
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 
 	}
@@ -746,7 +746,7 @@ void DataAssimilator::initialize_restart()
 			ss << " and realization names could not be aligned:";
 			for (auto& m : missing)
 				ss << m << ",";
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 
 		message(2, "reordering pe to align with restart obs en, num reals: ", oe_real_names.size());
@@ -757,11 +757,11 @@ void DataAssimilator::initialize_restart()
 		catch (exception & e)
 		{
 			ss << "error reordering pe with restart oe:" << e.what();
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_ies_error(string("error reordering pe with restart oe"));
+			throw_da_error(string("error reordering pe with restart oe"));
 		}
 
 	}
@@ -801,11 +801,11 @@ void DataAssimilator::initialize_restart()
 			catch (exception & e)
 			{
 				ss << "error reordering oe_base with restart oe:" << e.what();
-				throw_ies_error(ss.str());
+				throw_da_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error reordering oe_base with restart oe"));
+				throw_da_error(string("error reordering oe_base with restart oe"));
 			}
 		}
 		//if (par_restart_csv.size() > 0)
@@ -820,11 +820,11 @@ void DataAssimilator::initialize_restart()
 			catch (exception & e)
 			{
 				ss << "error reordering pe_base with restart pe:" << e.what();
-				throw_ies_error(ss.str());
+				throw_da_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error reordering pe_base with restart pe"));
+				throw_da_error(string("error reordering pe_base with restart pe"));
 			}
 		}
 
@@ -836,17 +836,17 @@ void DataAssimilator::initialize_restart()
 		catch (exception &e)
 		{
 			ss << "error reordering pe with restart oe:" << e.what();
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_ies_error(string("error reordering pe with restart oe"));
+			throw_da_error(string("error reordering pe with restart oe"));
 		}*/
 	}
 	else if (oe.shape().first > oe_base.shape().first) //something is wrong
 	{
 		ss << "restart oe has too many rows: " << oe.shape().first << " compared to oe_base: " << oe_base.shape().first;
-		throw_ies_error(ss.str());
+		throw_da_error(ss.str());
 	}
 }
 
@@ -881,12 +881,24 @@ void DataAssimilator::initialize_obscov()
 void DataAssimilator::initialize()
 {
 	message(0, "initializing");
+	stringstream ss;
+	ofstream& f_rec = file_manager.rec_ofstream();
+	try
+	{
+		pest_scenario.assign_da_cycles(f_rec);
+	}
+	catch (exception& e)
+	{
+		ss.str("");
+		ss << "error assigning cycle info: " << e.what();
+		throw_da_error(ss.str());
+	}
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
 
-	stringstream ss;
+	
 
 	if (pest_scenario.get_control_info().noptmax == 0)
 	{
@@ -925,7 +937,7 @@ void DataAssimilator::initialize()
 		if (failed_idxs.size() != 0)
 		{
 			message(0, "control file parameter value run failed...bummer");
-			throw_ies_error("control file parameter value run failed");
+			throw_da_error("control file parameter value run failed");
 		}
 		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
 		message(1, "saving results from control file parameter value run to ", obs_csv);
@@ -985,7 +997,7 @@ void DataAssimilator::initialize()
 
 	//if ((ppo->get_ies_localizer().size() > 0) & (ppo->get_ies_autoadaloc()))
 	//{
-	//	throw_ies_error("use of localization matrix and autoadaloc not supported...yet!");
+	//	throw_da_error("use of localization matrix and autoadaloc not supported...yet!");
 	//}
 	message(1, "initializing localizer");
 	use_localizer = localizer.initialize(performance_log);
@@ -1047,7 +1059,7 @@ void DataAssimilator::initialize()
 		{
 			message(1, "'regul' detected in pareto obs group name");
 			//if (pest_scenario.get_pestpp_options().get_ies_reg_factor() == 0.0)
-			//	throw_ies_error("pareto model problem: pareto obs group is 'regul'-ish but ies_reg_fac is zero");
+			//	throw_da_error("pareto model problem: pareto obs group is 'regul'-ish but ies_reg_fac is zero");
 
 		}
 		else
@@ -1066,18 +1078,18 @@ void DataAssimilator::initialize()
 				}
 
 			if (pareto_obs.size() == 0)
-				throw_ies_error("no observations found for pareto obs group");
+				throw_da_error("no observations found for pareto obs group");
 
 
 			if (zero.size() > 0)
 			{
 				message(0, "error: the following pareto obs have zero weight:", zero);
-				throw_ies_error("atleast one pareto obs has zero weight");
+				throw_da_error("atleast one pareto obs has zero weight");
 			}
 
 
 		}
-		//throw_ies_error("pareto mode not finished");
+		//throw_da_error("pareto mode not finished");
 	}
 
 
@@ -1145,7 +1157,7 @@ void DataAssimilator::initialize()
 	catch (const exception & e)
 	{
 		string message = e.what();
-		throw_ies_error("error in parameter ensemble: " + message);
+		throw_da_error("error in parameter ensemble: " + message);
 	}
 
 	try
@@ -1155,7 +1167,7 @@ void DataAssimilator::initialize()
 	catch (const exception & e)
 	{
 		string message = e.what();
-		throw_ies_error("error in observation ensemble: " + message);
+		throw_da_error("error in observation ensemble: " + message);
 	}
 
 	if (pe.shape().first != oe.shape().first)
@@ -1190,7 +1202,7 @@ void DataAssimilator::initialize()
 				{
 					ss << m << ",";
 				}
-				throw_ies_error(ss.str());
+				throw_da_error(ss.str());
 
 			}
 		}
@@ -1198,7 +1210,7 @@ void DataAssimilator::initialize()
 		{
 			ss.str("");
 			ss << "parameter ensemble rows (" << pe.shape().first << ") not equal to observation ensemble rows (" << oe.shape().first << ")";
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 	}
 
@@ -1207,7 +1219,7 @@ void DataAssimilator::initialize()
 	//if pareto mode, reset the stochastic obs vals for the pareto obs to the value in the control file
 	if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::PARETO)
 	{
-		throw_ies_error("PARETO mode is not implemented...yet!");
+		throw_da_error("PARETO mode is not implemented...yet!");
 		string oname;
 		vector<string> oe_names = oe.get_var_names();
 		double val;
@@ -1274,10 +1286,10 @@ void DataAssimilator::initialize()
 		message(1, ss.str());
 		vector<string> names = pe.get_real_names();
 		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_ies_error("'ies_center_on' realization not found in par en: " + center_on);
+			throw_da_error("'ies_center_on' realization not found in par en: " + center_on);
 		names = oe.get_real_names();
 		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_ies_error("'ies_center_on' realization not found in obs en: " + center_on);
+			throw_da_error("'ies_center_on' realization not found in obs en: " + center_on);
 	}
 	else
 		message(1, "centering on ensemble mean vector");
@@ -1372,7 +1384,7 @@ void DataAssimilator::initialize()
 		message(1, "running initial ensemble of size", oe.shape().first);
 		vector<int> failed = run_ensemble(pe, oe);
 		if (pe.shape().first == 0)
-			throw_ies_error("all realizations failed during initial evaluation");
+			throw_da_error("all realizations failed during initial evaluation");
 
 
 
@@ -1415,13 +1427,13 @@ void DataAssimilator::initialize()
 	drop_bad_phi(pe, oe);
 	if (oe.shape().first == 0)
 	{
-		throw_ies_error(string("all realizations dropped as 'bad'"));
+		throw_da_error(string("all realizations dropped as 'bad'"));
 	}
 	if (oe.shape().first <= error_min_reals)
 	{
 		message(0, "too few active realizations:", oe.shape().first);
 		message(1, "need at least ", error_min_reals);
-		throw_ies_error(string("too few active realizations, cannot continue"));
+		throw_da_error(string("too few active realizations, cannot continue"));
 	}
 	if (oe.shape().first < warn_min_reals)
 	{
@@ -1463,7 +1475,7 @@ void DataAssimilator::initialize()
 		message(1, "dropping conflicted observations");
 		if (in_conflict.size() == oe.shape().second)
 		{
-			throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
+			throw_da_error("all non-zero weighted observations in conflict state, cannot continue");
 		}
 		//drop from act_obs_names
 		vector<string> t;
@@ -1581,7 +1593,7 @@ void DataAssimilator::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& 
 	//don't use this assert because _pe maybe full size, but _oe might be subset size
 	if (!is_subset)
 		if (_pe.shape().first != _oe.shape().first)
-			throw_ies_error("DataAssimilator::drop_bad_phi() error: _pe != _oe and not subset");
+			throw_da_error("DataAssimilator::drop_bad_phi() error: _pe != _oe and not subset");
 
 	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
 	double bad_phi_sigma = pest_scenario.get_pestpp_options().get_ies_bad_phi_sigma();
@@ -1625,7 +1637,7 @@ void DataAssimilator::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& 
 				{
 					ss.str("");
 					ss << "drop_bad_phi() error: idx " << pidx << " not found in subset_idxs";
-					throw_ies_error(ss.str());
+					throw_da_error(ss.str());
 				}
 				pname = full_pnames[pidx];
 			}
@@ -1650,11 +1662,11 @@ void DataAssimilator::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& 
 		{
 			stringstream ss;
 			ss << "drop_bad_phi() error : " << e.what();
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_ies_error(string("drop_bad_phi() error"));
+			throw_da_error(string("drop_bad_phi() error"));
 		}
 	}
 }
@@ -2508,7 +2520,7 @@ bool DataAssimilator::solve_new()
 	{
 		message(0, "too few active realizations:", oe.shape().first);
 		message(1, "need at least ", error_min_reals);
-		throw_ies_error(string("too few active realizations, cannot continue"));
+		throw_da_error(string("too few active realizations, cannot continue"));
 	}
 	if (pe.shape().first < warn_min_reals)
 	{
@@ -2602,7 +2614,7 @@ bool DataAssimilator::solve_new()
 	if (pest_scenario.get_pestpp_options().get_ies_debug_upgrade_only())
 	{
 		message(0, "ies_debug_upgrade_only is true, exiting");
-		throw_ies_error("ies_debug_upgrade_only is true, exiting");
+		throw_da_error("ies_debug_upgrade_only is true, exiting");
 	}
 
 	vector<map<int, int>> real_run_ids_lams;
@@ -2762,7 +2774,7 @@ bool DataAssimilator::solve_new()
 
 		//if any of the remaining runs failed
 		if (fails.size() == org_pe_idxs.size())
-			throw_ies_error(string("all remaining realizations failed...something is prob wrong"));
+			throw_da_error(string("all remaining realizations failed...something is prob wrong"));
 		if (fails.size() > 0)
 		{
 
@@ -2796,7 +2808,7 @@ bool DataAssimilator::solve_new()
 		drop_bad_phi(pe_lams[best_idx], oe_lam_best);
 		if (oe_lam_best.shape().first == 0)
 		{
-			throw_ies_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
+			throw_da_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
 		}
 		performance_log->log_event("updating phi");
 		ph.update(oe_lam_best, pe_lams[best_idx]);
@@ -3044,7 +3056,7 @@ void DataAssimilator::set_subset_idx(int size)
 	else
 	{
 		//throw runtime_error("unkonwn 'subset_how'");
-		throw_ies_error("unknown 'subset_how'");
+		throw_da_error("unknown 'subset_how'");
 	}
 	stringstream ss;
 	for (auto i : subset_idxs)
@@ -3076,11 +3088,11 @@ vector<ObservationEnsemble> DataAssimilator::run_lambda_ensembles(vector<Paramet
 		{
 			stringstream ss;
 			ss << "run_ensemble() error queueing runs: " << e.what();
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_ies_error(string("run_ensembles() error queueing runs"));
+			throw_da_error(string("run_ensembles() error queueing runs"));
 		}
 	}
 	performance_log->log_event("making runs");
@@ -3093,11 +3105,11 @@ vector<ObservationEnsemble> DataAssimilator::run_lambda_ensembles(vector<Paramet
 	{
 		stringstream ss;
 		ss << "error running ensembles: " << e.what();
-		throw_ies_error(ss.str());
+		throw_da_error(ss.str());
 	}
 	catch (...)
 	{
-		throw_ies_error(string("error running ensembles"));
+		throw_da_error(string("error running ensembles"));
 	}
 
 	performance_log->log_event("processing runs");
@@ -3136,13 +3148,13 @@ vector<ObservationEnsemble> DataAssimilator::run_lambda_ensembles(vector<Paramet
 		{
 			stringstream ss;
 			ss << "error processing runs for lambda,scale: " << lam_vals[i] << ',' << scale_vals[i] << ':' << e.what();
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 		catch (...)
 		{
 			stringstream ss;
 			ss << "error processing runs for lambda,scale: " << lam_vals[i] << ',' << scale_vals[i];
-			throw_ies_error(ss.str());
+			throw_da_error(ss.str());
 		}
 
 		if (pest_scenario.get_pestpp_options().get_ies_debug_fail_subset())
@@ -3203,11 +3215,11 @@ vector<int> DataAssimilator::run_ensemble(ParameterEnsemble& _pe, ObservationEns
 	{
 		stringstream ss;
 		ss << "run_ensemble() error queueing runs: " << e.what();
-		throw_ies_error(ss.str());
+		throw_da_error(ss.str());
 	}
 	catch (...)
 	{
-		throw_ies_error(string("run_ensemble() error queueing runs"));
+		throw_da_error(string("run_ensemble() error queueing runs"));
 	}
 	performance_log->log_event("making runs");
 	try
@@ -3218,11 +3230,11 @@ vector<int> DataAssimilator::run_ensemble(ParameterEnsemble& _pe, ObservationEns
 	{
 		stringstream ss;
 		ss << "error running ensemble: " << e.what();
-		throw_ies_error(ss.str());
+		throw_da_error(ss.str());
 	}
 	catch (...)
 	{
-		throw_ies_error(string("error running ensemble"));
+		throw_da_error(string("error running ensemble"));
 	}
 
 	performance_log->log_event("processing runs");
@@ -3239,11 +3251,11 @@ vector<int> DataAssimilator::run_ensemble(ParameterEnsemble& _pe, ObservationEns
 	{
 		stringstream ss;
 		ss << "error processing runs: " << e.what();
-		throw_ies_error(ss.str());
+		throw_da_error(ss.str());
 	}
 	catch (...)
 	{
-		throw_ies_error(string("error processing runs"));
+		throw_da_error(string("error processing runs"));
 	}
 	//for testing
 	//failed_real_indices.push_back(0);

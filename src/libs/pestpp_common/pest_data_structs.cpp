@@ -1401,6 +1401,19 @@ const ObservationRec* ObservationInfo::get_observation_rec_ptr(const string &nam
 	return ret_val;
 }
 
+ObservationRec* ObservationInfo::get_observation_rec_ptr_4_mod(const string& name)
+{
+	ObservationRec* ret_val = 0;
+	unordered_map<string, ObservationRec>::iterator p_iter;
+
+	p_iter = observations.find(name);
+	if (p_iter != observations.end()) {
+		ret_val = &((*p_iter).second);
+	}
+	return ret_val;
+}
+
+
 const ObservationGroupRec* ObservationInfo::get_group_rec_ptr(const string &name) const
 {
 	const ObservationGroupRec *ret_val = 0;
