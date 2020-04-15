@@ -2471,11 +2471,15 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 	convert_ip(tokens[6], pi.group);
 	convert_ip(tokens[7], scale);
 	convert_ip(tokens[8], offset);
-	convert_ip(tokens[10], pi.cycle);
+	
 	if (control_info.numcom > 1)
 		convert_ip(tokens[9], pi.dercom);
 	else
 		pi.dercom = 1;
+	if (tokens.size() > 10)
+	{
+		convert_ip(tokens[10], pi.cycle);
+	}
 	pi.scale = scale;
 	pi.offset = offset;
 	// add parameters to model parameter and paramter_info datasets
@@ -2548,7 +2552,8 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	convert_ip(tokens[1], value);
 	convert_ip(tokens[2], obs_i.weight);
 	obs_i.group = tokens[3];
-	convert_ip(tokens[4], obs_i.cycle);
+	if (tokens.size() > 4)
+		convert_ip(tokens[4], obs_i.cycle);
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
 	observation_values.insert(name, value);
