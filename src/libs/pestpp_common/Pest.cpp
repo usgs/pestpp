@@ -984,16 +984,16 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	PestppOptions::ARG_STATUS stat;
 	vector<string> par_group_formal_names{ "PARGPNME","INCTYP","DERINC","DERINCLB","FORCEN","DERINCMUL","DERMTHD" };
 	vector<string> optional_par_group_formal_names{ "SPLITTHRESH","SPLITRELDIFF" };
-	vector<string> par_formal_names{ "PARNME","PARTRANS","PARCHGLIM","PARVAL1","PARLBND","PARUBND","PARGP","SCALE","OFFSET","DERCOM", "CYCLE" };
-	vector<string> par_easy_names{ "NAME","TRANSFORM","CHANGE_LIMIT","VALUE","LOWER_BOUND","UPPER_BOUND","GROUP","SCALE","OFFSET","DERCOM", "CYCLE" };
+	vector<string> par_formal_names{ "PARNME","PARTRANS","PARCHGLIM","PARVAL1","PARLBND","PARUBND","PARGP","SCALE","OFFSET","DERCOM" };
+	vector<string> par_easy_names{ "NAME","TRANSFORM","CHANGE_LIMIT","VALUE","LOWER_BOUND","UPPER_BOUND","GROUP","SCALE","OFFSET","DERCOM" };
 	map <string,string> row_map, temp_tied_map;
-	vector<string> obs_formal_names{ "OBSNME","OBSVAL","WEIGHT","OBGNME", "CYCLE" };
-	vector<string> obs_easy_names{ "NAME","VALUE","WEIGHT","GROUP", "CYCLE" };
+	vector<string> obs_formal_names{ "OBSNME","OBSVAL","WEIGHT","OBGNME" };
+	vector<string> obs_easy_names{ "NAME","VALUE","WEIGHT","GROUP" };
 	vector<string> obs_group_formal_names{ "OBGNME" };
-	vector<string> pi_formal_names{ "PILBL","EQUATION","WEIGHT","OBGNME", "CYCLE" };
+	vector<string> pi_formal_names{ "PILBL","EQUATION","WEIGHT","OBGNME" };
 	vector<string> tokens_case_sen;
-	vector<string> model_input_formal_names{ "PEST_FILE","MODEL_FILE", "CYCLE" };
-	vector<string> model_output_formal_names{ "PEST_FILE","MODEL_FILE", "CYCLE" };
+	vector<string> model_input_formal_names{ "PEST_FILE","MODEL_FILE" };
+	vector<string> model_output_formal_names{ "PEST_FILE","MODEL_FILE" };
 #ifndef _DEBUG
 	try {
 #endif
@@ -1293,6 +1293,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					else
 						get_names.push_back(n);
 				}
+				
 				string tcol;
 				if (cnames.find("PARTRANS") != cnames.end())
 					tcol = "PARTRANS";
@@ -1479,7 +1480,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					mi_tokens = efile.get_row_vector(ro, model_input_formal_names);
 					model_exec_info.tplfile_vec.push_back(mi_tokens[0]);
 					model_exec_info.inpfile_vec.push_back(mi_tokens[1]);
-					model_exec_info.incycle_vec.push_back(std::stoi(mi_tokens[2]));
+					//model_exec_info.incycle_vec.push_back(std::stoi(mi_tokens[2]));
 				}
 
 				if (efiles_map.find(section) == efiles_map.end())
@@ -1519,7 +1520,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					mo_tokens = efile.get_row_vector(ro, model_output_formal_names);
 					model_exec_info.insfile_vec.push_back(mo_tokens[0]);
 					model_exec_info.outfile_vec.push_back(mo_tokens[1]);
-					model_exec_info.outcycle_vec.push_back(std::stoi(mo_tokens[2]));
+					//model_exec_info.outcycle_vec.push_back(std::stoi(mo_tokens[2]));
 					
 				}
 
@@ -1640,6 +1641,40 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 #endif
 	fin.close();
 
+	map<string, int> par_cycle_map;
+	if (efiles_map.find("PARAMETER DATA EXTERNAL") == efiles_map.end())
+		throw_control_file_error(f_rec, "could not found 'parameter data external' section for cycle info");
+	vector<string> str_values, str_names;
+	set<string> col_names;
+	string name_col;
+	int cycle;
+	for (auto efile : this->efiles_map["PARAMETER DATA EXTERNAL"])
+	{
+		col_names = efile.get_col_set();
+		if (col_names.find("PARNME") != col_names.end())
+			name_col = "PARNME";
+		else if (col_names.find("NAME") != col_names.end())
+			name_col = "NAME";
+		else
+			throw_control_file_error(f_rec, "could not find 'PARNME' or 'NAME' in efile " + efile.get_filename() + " columns");
+		if (col_names.find("CYCLE") == col_names.end())
+			continue;
+		str_values = efile.get_col_string_vector("CYCLE");
+		str_names = efile.get_col_string_vector(name_col);
+		for (int i = 0; i < str_values.size(); i++)
+		{
+			try
+			{
+				cycle = stoi(str_values[i]);
+				par_cycle_map[str_names[i]] = cycle;
+			}
+			catch (...)
+			{
+				throw_control_file_error(f_rec,"error casting cycle '" + str_values[i]+"' to int, continuing...",false);
+			}
+
+		}
+	}
 	
 	// handle any tied pars found in external files
 	double numer, demon, ratio;
@@ -2171,7 +2206,7 @@ void Pest::child_pest_update(int icycle)
 	//control_info
 	//pareto_info
 	//svd_info
-	
+
 	parnames = get_ctl_ordered_par_names();
 	obsnames = get_ctl_ordered_obs_names();
 	ParameterInfo pi = get_ctl_parameter_info();
@@ -2476,10 +2511,7 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 		convert_ip(tokens[9], pi.dercom);
 	else
 		pi.dercom = 1;
-	if (tokens.size() > 10)
-	{
-		convert_ip(tokens[10], pi.cycle);
-	}
+	
 	pi.scale = scale;
 	pi.offset = offset;
 	// add parameters to model parameter and paramter_info datasets
@@ -2552,8 +2584,6 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	convert_ip(tokens[1], value);
 	convert_ip(tokens[2], obs_i.weight);
 	obs_i.group = tokens[3];
-	if (tokens.size() > 4)
-		convert_ip(tokens[4], obs_i.cycle);
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
 	observation_values.insert(name, value);
