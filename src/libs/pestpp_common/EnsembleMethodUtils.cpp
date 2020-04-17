@@ -172,7 +172,8 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 	vector<string> nnz_obs = oe_base->get_var_names();
 	ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
 	vector<int> idx;
-	for (auto& og : pest_scenario->get_ctl_ordered_obs_group_names())
+
+	/*for (auto& og : pest_scenario->get_ctl_ordered_obs_group_names())
 	{
 		idx.clear();
 		for (int i = 0; i < nnz_obs.size(); i++)
@@ -184,8 +185,15 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 		}
 		if (idx.size() > 0)
 			obs_group_idx_map[og] = idx;
-	}
+	}*/
+	for (auto& og : pest_scenario->get_ctl_ordered_obs_group_names())
+		obs_group_idx_map[og] = vector<int>();
 
+	for (int i = 0; i < nnz_obs.size(); i++)
+	{
+		obs_group_idx_map[oinfo.get_group(nnz_obs[i])].push_back(i);
+	}
+	
 	
 	//update the various phi component vectors
 	meas.clear();
