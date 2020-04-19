@@ -28,8 +28,10 @@ install:
   - mkdir build
   - cd build
   - cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
-  - cmake --build .
-  - cmake --install .
+  # - cmake --build .
+  - ninja -j2
+  # executable targets are automatically installed into bin; create artifact
+  - cpack -G ZIP
   - cd ..
 
   - set PATH=%CONDA_INSTALL_LOCN%;%CONDA_INSTALL_LOCN%\scripts;%PATH%;
@@ -66,5 +68,10 @@ test_script:
 
 after_test:
  - echo done
+
 matrix:
   fast_finish: true
+
+artifacts:
+  - path: build\*.zip
+    name: zip

@@ -9,4 +9,4 @@ target_link_libraries(pestpp-swp
   rm_yamr
 )
 
-install(TARGETS pestpp-swp RUNTIME DESTINATION ${BINDIR})
+install(TARGETS pestpp-swp RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
