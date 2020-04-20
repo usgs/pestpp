@@ -13,10 +13,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   )
 endif()
 
-if(WIN32)
-  add_compile_definitions(_WIN32_WINNT=0x0600)
-endif()
-
 add_subdirectory(common)
 add_subdirectory(opt)
 add_subdirectory(pestpp_common)
