@@ -90,7 +90,6 @@ endif()
 if(WIN32)
   set(_local_install_COMMAND
     cd "${PESTPP_SOURCE_DIR}\\bin" &&
-    rmdir /q /s ${_ostag} &&
     mklink /j ${_ostag} .
   )
 else()
