@@ -2286,6 +2286,15 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 	}
 	ctl_parameter_info.insert(name, pi);
 	ctl_parameters.insert(name, pi.init_value);
+	
+	if (find(ctl_ordered_par_group_names.begin(), ctl_ordered_par_group_names.end(), pi.group) == ctl_ordered_par_group_names.end())
+	{
+		ParameterGroupRec pgr;
+		pgr.set_defaults();
+		pgr.set_name(pi.group);
+		base_group_info.insert_group(pi.group,pgr);
+		ctl_ordered_par_group_names.push_back(pi.group);
+	}
 	base_group_info.insert_parameter_link(name, pi.group);
 
 	// build appropriate transformations
@@ -2392,9 +2401,11 @@ void Pest::rectify_par_groups()
 			temp = base_group_info.get_group_names();
 			group_names.clear();
 			group_names.insert(temp.begin(), temp.end());
+			ctl_ordered_par_group_names.push_back(pr->group);
 
 		}
 	}
+
 }
 
 map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform)
