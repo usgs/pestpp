@@ -7,4 +7,4 @@ add_executable(inschekpp
   space.F
 )
 
-install(TARGETS inschekpp RUNTIME DESTINATION ${BINDIR})
+install(TARGETS inschekpp RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

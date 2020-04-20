@@ -10,4 +10,4 @@ target_link_libraries(pestpp-glm
   rm_yamr
 )
 
-install(TARGETS pestpp-glm RUNTIME DESTINATION ${BINDIR})
+install(TARGETS pestpp-glm RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
