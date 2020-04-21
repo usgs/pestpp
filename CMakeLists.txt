@@ -88,24 +88,26 @@ endif()
 # https://www.linux.com/training-tutorials/cmake-recipe-2-install-local-folder-build-dir-testing/
 # Use an extra command to copy binaries into a sub-directory within bin -- please remove soon
 if(WIN32)
-  set(_local_install_COMMAND
+  set(_local_install_COMMAND_to_be_removed
     cd "${PESTPP_SOURCE_DIR}\\bin" &&
-    mklink /j ${_ostag} .
+    rd /q /s ${_ostag} &&
+    md ${_ostag} &&
+    copy /b pestpp-* ${_ostag}\\
   )
 else()
-  set(_local_install_COMMAND
+  set(_local_install_COMMAND_to_be_removed
     cd "${PESTPP_SOURCE_DIR}/bin" &&
     rm -rf ${_ostag} &&
-    ln -s . ${_ostag}
+    mkdir ${_ostag} &&
+    cp pestpp-* ${_ostag}/
   )
 endif()
 add_custom_target(local_install
   ALL
   "${CMAKE_COMMAND}"
-    -D CMAKE_INSTALL_BINDIR=bin/${_ostag}
     -D CMAKE_INSTALL_PREFIX=${PESTPP_SOURCE_DIR}
     -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_install.cmake"
-  COMMAND ${_local_install_COMMAND}
+  COMMAND ${_local_install_COMMAND_to_be_removed}
   DEPENDS
     pestpp-glm
     pestpp-ies
