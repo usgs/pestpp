@@ -20,24 +20,10 @@ os.environ["PATH"] += os.pathsep + bin_path
 
 
 bin_path = os.path.join("..","..","..","bin")
-
-
-use_intel= os.getenv('USE_INTEL', False)
-# if len(sys.argv) > 1 and sys.argv[1].lower() == 'intel':
-#     use_intel = True
-#     print("using intel windows binaries")
-
-
+exe = ""
 if "windows" in platform.platform().lower():
-    if use_intel:
-        print("using intel windows binaries")
-        exe_path = os.path.join(bin_path, "iwin", "ipestpp-ies.exe")
-    else:
-        exe_path = os.path.join(bin_path, "win", "pestpp-ies.exe")
-elif "darwin" in platform.platform().lower():
-    exe_path = os.path.join(bin_path,  "mac", "pestpp-ies")
-else:
-    exe_path = os.path.join(bin_path, "linux", "pestpp-ies")
+    exe = ".exe"
+exe_path = os.path.join(bin_path, "pestpp-ies" + exe)
 
 
 noptmax = 4
