@@ -90,7 +90,6 @@ endif()
 if(WIN32)
   set(_local_install_COMMAND_to_be_removed
     cd "${PESTPP_SOURCE_DIR}\\bin" &&
-    rd /q /s ${_ostag} &&
     md ${_ostag} &&
     copy /b pestpp-* ${_ostag}\\
   )
