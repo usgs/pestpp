@@ -34,6 +34,8 @@
 #include "Transformation.h"
 #include "FileManager.h"
 #include "model_interface.h"
+#include "Jacobian.h"
+#include "QSqrtMatrix.h"
 
 
 using namespace::std;
@@ -238,7 +240,23 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 			err = true;
 		}
 
-		
+	}
+
+	if (get_ctl_ordered_nz_obs_names().size() == 0)
+	{
+		if (forgive)
+		{
+			cout << "observation warning: no non-zero weighted observations" << endl;
+			f_rec << "observation warning: no non-zero weighted observations" << endl;
+		}
+		else
+		{
+			cout << "observation error: no non-zero weighted observations" << endl;
+			f_rec << "observation error: no non-zero weighted observations" << endl;
+			err = true;
+		}
+
+
 	}
 
 	if (err)
@@ -966,16 +984,16 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	PestppOptions::ARG_STATUS stat;
 	vector<string> par_group_formal_names{ "PARGPNME","INCTYP","DERINC","DERINCLB","FORCEN","DERINCMUL","DERMTHD" };
 	vector<string> optional_par_group_formal_names{ "SPLITTHRESH","SPLITRELDIFF" };
-	vector<string> par_formal_names{ "PARNME","PARTRANS","PARCHGLIM","PARVAL1","PARLBND","PARUBND","PARGP","SCALE","OFFSET","DERCOM", "CYCLE" };
-	vector<string> par_easy_names{ "NAME","TRANSFORM","CHANGE_LIMIT","VALUE","LOWER_BOUND","UPPER_BOUND","GROUP","SCALE","OFFSET","DERCOM", "CYCLE" };
+	vector<string> par_formal_names{ "PARNME","PARTRANS","PARCHGLIM","PARVAL1","PARLBND","PARUBND","PARGP","SCALE","OFFSET","DERCOM" };
+	vector<string> par_easy_names{ "NAME","TRANSFORM","CHANGE_LIMIT","VALUE","LOWER_BOUND","UPPER_BOUND","GROUP","SCALE","OFFSET","DERCOM" };
 	map <string,string> row_map, temp_tied_map;
-	vector<string> obs_formal_names{ "OBSNME","OBSVAL","WEIGHT","OBGNME", "CYCLE" };
-	vector<string> obs_easy_names{ "NAME","VALUE","WEIGHT","GROUP", "CYCLE" };
+	vector<string> obs_formal_names{ "OBSNME","OBSVAL","WEIGHT","OBGNME" };
+	vector<string> obs_easy_names{ "NAME","VALUE","WEIGHT","GROUP" };
 	vector<string> obs_group_formal_names{ "OBGNME" };
-	vector<string> pi_formal_names{ "PILBL","EQUATION","WEIGHT","OBGNME", "CYCLE" };
+	vector<string> pi_formal_names{ "PILBL","EQUATION","WEIGHT","OBGNME" };
 	vector<string> tokens_case_sen;
-	vector<string> model_input_formal_names{ "PEST_FILE","MODEL_FILE", "CYCLE" };
-	vector<string> model_output_formal_names{ "PEST_FILE","MODEL_FILE", "CYCLE" };
+	vector<string> model_input_formal_names{ "PEST_FILE","MODEL_FILE" };
+	vector<string> model_output_formal_names{ "PEST_FILE","MODEL_FILE" };
 #ifndef _DEBUG
 	try {
 #endif
@@ -1068,7 +1086,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				}
 
 				//try to use as a regul arg
-				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
+				if ((stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND) && (regul_scheme_ptr))
 				{
 					stat = regul_scheme_ptr->assign_value_by_key(kv.first,kv.second);
 					check_report_assignment(f_rec, stat, kv.first, kv.second);
@@ -1078,7 +1096,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
 				{
 					ss.str("");
-					ss << "unrecognized '* control data keyword' key-value pair on line" << line << endl;
+					ss << "unrecognized '* control data keyword' key-value pair on line: " << endl << "    '" << line << "'" <<  endl;
 					throw_control_file_error(f_rec, ss.str(), false);
 				}		
 			}
@@ -1090,7 +1108,6 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				{
 					if (tokens[1] == "REGULARIZATION" || tokens[1] == "REGULARISATION")
 					{
-						use_dynamic_reg = true;
 						control_info.pestmode = ControlInfo::PestMode::REGUL;
 
 					}
@@ -1098,8 +1115,11 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						control_info.pestmode = ControlInfo::PestMode::ESTIMATION;
 					else if (tokens[1] == "PARETO")
 						control_info.pestmode = ControlInfo::PestMode::PARETO;
+					else
+					{
+						throw_control_file_error(f_rec, "unrecognized 'pestmode': " + tokens[1]);
+					}
 				}
-
 
 				else if (sec_lnum == 2)
 				{
@@ -1273,6 +1293,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					else
 						get_names.push_back(n);
 				}
+				
 				string tcol;
 				if (cnames.find("PARTRANS") != cnames.end())
 					tcol = "PARTRANS";
@@ -1459,7 +1480,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					mi_tokens = efile.get_row_vector(ro, model_input_formal_names);
 					model_exec_info.tplfile_vec.push_back(mi_tokens[0]);
 					model_exec_info.inpfile_vec.push_back(mi_tokens[1]);
-					model_exec_info.incycle_vec.push_back(std::stoi(mi_tokens[2]));
+					//model_exec_info.incycle_vec.push_back(std::stoi(mi_tokens[2]));
 				}
 
 				if (efiles_map.find(section) == efiles_map.end())
@@ -1499,7 +1520,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					mo_tokens = efile.get_row_vector(ro, model_output_formal_names);
 					model_exec_info.insfile_vec.push_back(mo_tokens[0]);
 					model_exec_info.outfile_vec.push_back(mo_tokens[1]);
-					model_exec_info.outcycle_vec.push_back(std::stoi(mo_tokens[2]));
+					//model_exec_info.outcycle_vec.push_back(std::stoi(mo_tokens[2]));
 					
 				}
 
@@ -1621,6 +1642,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	fin.close();
 
 	
+	
 	// handle any tied pars found in external files
 	double numer, demon, ratio;
 	for (auto p: temp_tied_map)
@@ -1649,7 +1671,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 
 	//process pestpp options
 	map<string, PestppOptions::ARG_STATUS> arg_map, line_arg_map;
-	
+	vector<string> dup;
 	for (vector<string>::const_iterator b = pestpp_input.begin(), e = pestpp_input.end();
 		b != e; ++b) {
 
@@ -1665,7 +1687,22 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		{
 			throw runtime_error("error parsing '++' line :'" + *b + "'");
 		}
+		for (auto arg : line_arg_map)
+		{
+			if (arg_map.find(arg.first) != arg_map.end())
+				dup.push_back(arg.first);
+
+		}
 		arg_map.insert(line_arg_map.begin(), line_arg_map.end());
+	}
+
+	if (dup.size() > 0)
+	{
+		ss.str("");
+		ss << " the following '++' args are duplicates (possibly thru an alias):" << endl;
+		for (auto n : dup)
+			ss << n << ",";
+		throw_control_file_error(f_rec, ss.str());
 	}
 
 	vector<string> not_accepted;
@@ -1684,7 +1721,34 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			ss << n << ",";
 		throw_control_file_error(f_rec, ss.str());
 	}
+
+	if (control_info.pestmode == ControlInfo::PestMode::REGUL)
+	{
+		if (regul_scheme_ptr)
+			regul_scheme_ptr->set_use_dynamic_reg(true);
+	}
 	
+	if (ctl_ordered_obs_group_names.size() == 0)
+	{
+		set<string> found;
+		string gname;
+		for (auto name : ctl_ordered_obs_names)
+		{
+			gname = observation_info.get_group(name);
+			if (found.find(gname) == found.end())
+			{
+				found.insert(gname);
+				ctl_ordered_obs_group_names.push_back(gname);
+			}
+		}
+	}
+	if (ctl_ordered_par_group_names.size() == 0)
+	{
+		ctl_ordered_par_group_names = base_group_info.get_group_names();
+	}
+
+
+
 	//check if the predictions ++ arg might be a file name?
 	vector<string> pred_arg = pestpp_options.get_prediction_names();
 	if ((pestpp_options.get_uncert_flag()) && (pred_arg.size() == 1))
@@ -1852,7 +1916,8 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 			chg_fac = last_val / p.second;
 		else
 			chg_fac = p.second / last_val;
-		if (p.second > 0.0)
+		//if (p.second > 0.0)
+		if (last_val > 0.0)
 		{
 			fac_lb = last_val / fpm;
 			fac_ub = last_val * fpm;
@@ -1940,7 +2005,7 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 				ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at lower bound";
 				throw runtime_error(ss.str());
 			}*/
-			scaled_bnd_val = p_rec->ubnd + (p_rec->ubnd * bnd_tol);
+			scaled_bnd_val = p_rec->ubnd + abs(p_rec->ubnd * bnd_tol);
 			if (p.second > scaled_bnd_val)
 			{
 				temp = abs((p_rec->ubnd - last_val) / (p.second - last_val));
@@ -1958,7 +2023,7 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 					control_type = "upper bound";
 				}
 			}
-			scaled_bnd_val = p_rec->lbnd - (p_rec->lbnd * bnd_tol);
+			scaled_bnd_val = p_rec->lbnd - abs(p_rec->lbnd * bnd_tol);
 			if (p.second < p_rec->lbnd)
 			{
 				temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
@@ -1998,6 +2063,18 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 			p.second =last_val + (p.second - last_val) *  scaling_factor;
 		}
 	}
+	
+	//check for slightly out of bounds
+	for (auto &p : upgrade_ctl_pars)
+	{
+		p_rec = p_info.get_parameter_rec_ptr(p.first);
+		if (p.second < p_rec->lbnd)
+			p.second = p_rec->lbnd;
+		else if (p.second > p_rec->ubnd)
+			p.second = p_rec->ubnd;
+
+	}
+
 }
 
 pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &pars)
@@ -2084,6 +2161,160 @@ Pest& Pest::get_child_pest(int icycle)
 	
 }
 
+
+void Pest::assign_da_cycles(ofstream &f_rec)
+{
+	vector<string> str_values, str_names;
+	stringstream ss;
+	set<string> col_names;
+	string name_col;
+	int cycle;
+	if (efiles_map.find("PARAMETER DATA EXTERNAL") == efiles_map.end())
+		throw_control_file_error(f_rec, "could not find 'parameter data external' section for cycle info, all parameter quantities being assigned 'cycle'=-1", false);
+	else
+	{
+		map<string, int> par_cycle_map = extract_cycle_numbers(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
+		if (par_cycle_map.size() == 0)
+		{
+			f_rec << "NOTE: no parameter cycle information was found so all adjustable parameters will be estimated every cycle " << endl;
+
+		}
+		for (auto pc : par_cycle_map)
+		{
+			ctl_parameter_info.get_parameter_rec_ptr_4_mod(pc.first)->cycle = pc.second;
+		}
+	}
+		
+	
+
+	if (efiles_map.find("OBSERVATION DATA EXTERNAL") == efiles_map.end())
+		throw_control_file_error(f_rec, "could not find 'observation data external' section - this is required for assigning cycle info");
+	else
+	{
+		map<string, int> obs_cycle_map = extract_cycle_numbers(f_rec, "OBSERVATION DATA EXTERNAL", vector<string>{"OBSNME", "NAME"});
+		if (obs_cycle_map.size() == 0)
+		{
+			throw_control_file_error(f_rec, "no observation cycle information was found, this required and cannot continue");
+
+		}
+		vector<string> missing;
+		for (auto name : get_ctl_ordered_nz_obs_names())
+		{
+			if (obs_cycle_map.find(name) == obs_cycle_map.end())
+				missing.push_back(name);
+		}
+		if (missing.size() > 0)
+		{
+			ss.str("");
+			ss << "the following non-zero weighted observations do not have cycle information:";
+			for (auto m : missing)
+				ss << m << ",";
+			throw_control_file_error(f_rec, ss.str());
+		}
+		for (auto oc : obs_cycle_map)
+		{
+			observation_info.get_observation_rec_ptr_4_mod(oc.first)->cycle = oc.second;
+		}
+	}
+
+	if (efiles_map.find("MODEL INPUT EXTERNAL") == efiles_map.end())
+		throw_control_file_error(f_rec, "could not find 'model input external' section - all template/model input files will be used eveyr cycle", false);
+	else
+	{
+		map<string, int> mi_cycle_map = extract_cycle_numbers(f_rec, "MODEL INPUT EXTERNAL", vector<string>{"PEST_FILE"});
+		if (mi_cycle_map.size() == 0)
+		{
+			throw_control_file_error(f_rec, "no model input cycle information was found...continuing",false);
+			
+
+		}
+		//AYMAN - please check this!
+		for (auto tpl_file : model_exec_info.tplfile_vec)
+		{
+			if (mi_cycle_map.find(tpl_file) == mi_cycle_map.end())
+				model_exec_info.incycle_vec.push_back(-1);
+			else
+				model_exec_info.incycle_vec.push_back(mi_cycle_map[tpl_file]);
+		}
+	}
+
+	if (efiles_map.find("MODEL OUTPUT EXTERNAL") == efiles_map.end())
+		throw_control_file_error(f_rec, "could not find 'model output external' section - this is required, cannot continue");
+	else
+	{
+		map<string, int> mi_cycle_map = extract_cycle_numbers(f_rec, "MODEL OUTPUT EXTERNAL", vector<string>{"PEST_FILE"});
+		if (mi_cycle_map.size() == 0)
+		{
+			throw_control_file_error(f_rec, "no model output cycle information was found, cannot continue");
+		}
+		//AYMAN - please check this!
+		for (auto ins_file : model_exec_info.insfile_vec)
+		{
+			if (mi_cycle_map.find(ins_file) == mi_cycle_map.end())
+				throw_control_file_error(f_rec, "no model output cycle information listed for instruction file '"+ins_file+"', cannot continue");
+			else
+				model_exec_info.incycle_vec.push_back(mi_cycle_map[ins_file]);
+		}
+	}
+	//TODO: prior info...
+}
+
+map<string, int> Pest::extract_cycle_numbers(ofstream& f_rec, string section_name, vector<string> possible_name_cols)
+{
+	vector<string> str_values, str_names;
+	stringstream ss;
+	set<string> col_names;
+	string name_col = "";
+	int cycle;
+	map<string, int> cycle_map;
+	if (this->efiles_map.find(section_name) == this->efiles_map.end())
+		return cycle_map;
+	for (auto efile : this->efiles_map[section_name])
+	{
+		col_names = efile.get_col_set();
+		for (auto possible_name : possible_name_cols)
+		{
+			if (col_names.find(possible_name) != col_names.end())
+			{
+				name_col = possible_name;
+				break;
+			}
+				
+		}
+		
+		if (name_col.size() == 0)
+		{
+			ss.str("");
+			ss << "could not find any possible name cols: ";
+			for (auto name : possible_name_cols)
+				ss << name << ",";
+			ss << " in efile '" << efile.get_filename() << "' columns";
+
+			throw_control_file_error(f_rec, ss.str());
+		}
+		if (col_names.find("CYCLE") == col_names.end())
+			continue;
+		str_values = efile.get_col_string_vector("CYCLE");
+		str_names = efile.get_col_string_vector(name_col);
+		for (int i = 0; i < str_values.size(); i++)
+		{
+			try
+			{
+				cycle = stoi(str_values[i]);
+				cycle_map[str_names[i]] = cycle;
+			}
+			catch (...)
+			{
+				ss.str("");
+				ss << "error casting cycle '" << str_values[i] << "' to int on row " << i << "of external file " << efile.get_filename() << " , continuing...";
+				throw_control_file_error(f_rec, ss.str(), false);
+			}
+
+		}
+	}
+	return cycle_map;
+}
+
 void Pest::child_pest_update(int icycle)
 {
 	/*
@@ -2096,7 +2327,7 @@ void Pest::child_pest_update(int icycle)
 	//control_info
 	//pareto_info
 	//svd_info
-	
+
 	parnames = get_ctl_ordered_par_names();
 	obsnames = get_ctl_ordered_obs_names();
 	ParameterInfo pi = get_ctl_parameter_info();
@@ -2396,11 +2627,12 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 	convert_ip(tokens[6], pi.group);
 	convert_ip(tokens[7], scale);
 	convert_ip(tokens[8], offset);
-	convert_ip(tokens[10], pi.cycle);
+	
 	if (control_info.numcom > 1)
 		convert_ip(tokens[9], pi.dercom);
 	else
 		pi.dercom = 1;
+	
 	pi.scale = scale;
 	pi.offset = offset;
 	// add parameters to model parameter and paramter_info datasets
@@ -2473,7 +2705,6 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	convert_ip(tokens[1], value);
 	convert_ip(tokens[2], obs_i.weight);
 	obs_i.group = tokens[3];
-	convert_ip(tokens[4], obs_i.cycle);
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
 	observation_values.insert(name, value);
@@ -2539,6 +2770,29 @@ void Pest::rectify_par_groups()
 
 		}
 	}
+}
+
+map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform)
+{
+	Parameters pars = jac.get_base_numeric_parameters();
+	Parameters ctl_pars = par_transform.numeric2ctl_cp(pars);
+	const vector<string>& par_list = jac.parameter_list();
+	const vector<string>& obs_list = jac.obs_and_reg_list();
+	Eigen::VectorXd par_vec = pars.get_data_eigen_vec(par_list);
+	Eigen::MatrixXd par_mat_tmp = par_vec.asDiagonal();
+	Eigen::SparseMatrix<double> par_mat = par_mat_tmp.sparseView();
+	QSqrtMatrix Q_sqrt(&observation_info, &prior_info);
+	Eigen::SparseMatrix<double> q_sqrt_no_reg = Q_sqrt.get_sparse_matrix(obs_list, DynamicRegularization::get_zero_reg_instance());
+	Eigen::SparseMatrix<double> dss_mat_no_reg_pest = q_sqrt_no_reg * jac.get_matrix(obs_list, par_list);
+	int n_nonzero_weights_no_reg = observation_info.get_nnz_obs();
+	map<string, double> par_sens;
+	double val;
+	for (int i = 0; i < par_list.size(); ++i)
+	{
+		val = dss_mat_no_reg_pest.col(i).norm() / n_nonzero_weights_no_reg;
+		par_sens[par_list[i]] = val;
+	}
+	return par_sens;
 }
 
 void Pest::extract_da_cycles()

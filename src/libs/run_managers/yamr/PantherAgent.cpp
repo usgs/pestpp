@@ -15,10 +15,13 @@ using namespace pest_utils;
 
 int  linpack_wrap(void);
 
-PANTHERAgent::PANTHERAgent(ofstream &_frec) :mi(), frec(_frec)
+PANTHERAgent::PANTHERAgent(ofstream &_frec)
+	: frec(_frec),
+	  max_time_without_master_ping_seconds(300),
+	  restart_on_error(false)
 {
-
 }
+
 
 void PANTHERAgent::init_network(const string &host, const string &port)
 {
@@ -106,6 +109,9 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 		mi.check_tplins(pest_scenario.get_ctl_ordered_par_names(), pest_scenario.get_ctl_ordered_obs_names());
 	mi.set_additional_ins_delimiters(pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
 	mi.set_fill_tpl_zeros(pest_scenario.get_pestpp_options().get_fill_tpl_zeros());
+
+	restart_on_error = pest_scenario.get_pestpp_options().get_panther_agent_restart_on_error();
+	max_time_without_master_ping_seconds = pest_scenario.get_pestpp_options().get_panther_agent_no_ping_timeout_secs();
 }
 
 int PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
@@ -169,6 +175,7 @@ int PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
 			}
 		}
 	}
+
 	cerr << "recv from master failed " << max_recv_fails << " times, exiting..." << endl;
 	return err;
 	// returns -1  receive error
@@ -259,7 +266,7 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 			if (err < 0)
 			{
 				f_terminate.set(true);
-				exit(-1);
+				terminate_or_restart(-1);
 			}
 			//timeout on recv
 			else if (err == 2)
@@ -275,7 +282,7 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 				{
 					cerr << "Error sending ping response to master...quit" << endl;
 					f_terminate.set(true);
-					exit(-1);
+					terminate_or_restart(-1);
 				}
 				//cout << "ping response sent" << endl;
 			}
@@ -303,7 +310,7 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 				cerr << "something is wrong...exiting" << endl;
 				f_terminate.set(true);
 				final_run_status = NetPackage::PackType::TERMINATE;
-				exit(-1);
+				terminate_or_restart(-1);
 			}
 			if (done) break;
 		}
@@ -312,6 +319,11 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 		{
 			final_run_status = NetPackage::PackType::RUN_FINISHED;
 		}
+	}
+	catch(const PANTHERAgentRestartError&)
+	{
+		// Rethrow for start() method to handle
+		throw;
 	}
 	catch(const std::exception& ex)
 	{
@@ -339,7 +351,37 @@ void PANTHERAgent::run_async(pest_utils::thread_flag* terminate, pest_utils::thr
 	mi.run(terminate,finished,shared_execptions, pars, obs);
 }
 
+
 void PANTHERAgent::start(const string &host, const string &port)
+{
+	if(restart_on_error)
+	{
+		cout << "PANTHER worker will restart on any communication error." << endl;
+	}
+
+	do
+	{
+		try
+		{
+			// Start the agent
+			start_impl(host, port);
+
+			// If we make it this far, there was no error, so we do not need to restart
+			return;
+		}
+		catch(const PANTHERAgentRestartError& ex)
+		{
+			// A fatal comms error occurred; wait a bit and then restart
+			this_thread::sleep_for(chrono::seconds(5));
+			cout << endl;
+			cout << "Restarting PANTHER worker..." << endl;
+			cout << endl;
+		}
+	} while(restart_on_error);
+}
+
+
+void PANTHERAgent::start_impl(const string &host, const string &port)
 {
 	NetPackage net_pack;
 	Observations obs = pest_scenario.get_ctl_observations();
@@ -351,28 +393,52 @@ void PANTHERAgent::start(const string &host, const string &port)
 	//class attribute - can be modified in run_model()
 	terminate = false;
 	init_network(host, port);
+
+	std::chrono::system_clock::time_point last_ping_time = chrono::system_clock::now();
 	while (!terminate)
 	{
 		//get message from master
-		err = recv_message(net_pack);
+		err = recv_message(net_pack, recv_timeout_secs, 0);
+
+		// Refresh ping timer
+		if (err != 2)
+		{
+			last_ping_time = chrono::system_clock::now();
+		}
+
 		if (err == -999)
 		{
 			cout << "error receiving message from master, terminating" << endl;
-			terminate = true;
+			//terminate = true;
 			net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "recv security message error");
 			char data;
 			err = send_message(net_pack, &data, 0);
-			if (err != 1)
-			{
-				exit(-1);
+			//if (err != 1)
+			//{
+			//	terminate_or_restart(-1);
+			//}
+
+			terminate_or_restart(-1);
 			}
 			
-
-		}
 		if (err < 0)
 		{
 			cout << "error receiving message from master, terminating" << endl;
-			terminate = true;
+			//terminate = true;
+			terminate_or_restart(-1);
+		}
+		else if (err == 2)
+		{
+			// Timeout on socket receive
+			// Optionally: die if no data received from master for a long time (e.g. 5 minutes)
+			// Set max_time_without_master_ping_seconds <= 0 to disable and wait forever
+			auto time_without_master_ping_seconds = chrono::duration_cast<std::chrono::seconds>(chrono::system_clock::now() - last_ping_time).count();
+			if (max_time_without_master_ping_seconds > 0 && time_without_master_ping_seconds > max_time_without_master_ping_seconds)
+			{
+				cerr << "no ping received from master in the last " << max_time_without_master_ping_seconds << " seconds, terminating" << endl;
+				//terminate = true;
+				terminate_or_restart(-1);
+			}
 		}
 		else if(net_pack.get_type() == NetPackage::PackType::REQ_RUNDIR)
 		{
@@ -383,7 +449,7 @@ void PANTHERAgent::start(const string &host, const string &port)
 			err = send_message(net_pack, cwd.c_str(), cwd.size());
 			if (err != 1)
 			{
-				exit(-1);
+				terminate_or_restart(-1);
 			}
 		}
 		else if (net_pack.get_type() == NetPackage::PackType::PAR_NAMES)
@@ -397,7 +463,7 @@ void PANTHERAgent::start(const string &host, const string &port)
 				net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "");
 				char data;
 				int np_err = send_message(net_pack, &data, 0);
-				exit(-1);
+				terminate_or_restart(-1);
 			}
 			Serialization::unserialize(net_pack.get_data(), par_name_vec);
 		}
@@ -412,7 +478,7 @@ void PANTHERAgent::start(const string &host, const string &port)
 				net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "");
 				char data;
 				int np_err = send_message(net_pack, &data, 0);
-				exit(-1);
+				terminate_or_restart(-1);
 			}
 			Serialization::unserialize(net_pack.get_data(), obs_name_vec);
 		}
@@ -424,7 +490,7 @@ void PANTHERAgent::start(const string &host, const string &port)
 			err = send_message(net_pack, &data, 0);
 			if (err != 1)
 			{
-				exit(-1);
+				terminate_or_restart(-1);
 			}
 		}
 		else if(net_pack.get_type() == NetPackage::PackType::START_RUN)
@@ -436,6 +502,21 @@ void PANTHERAgent::start(const string &host, const string &port)
 			
 			cout << "received parameters (group id = " << group_id << ", run id = " << run_id << ")" << endl;
 			cout << "starting model run..." << endl;
+
+			try
+			{
+				ofstream fout("run.info");
+				if (fout.good())
+				{
+					fout << "run_id, " << run_id << endl;
+					fout << "group_id, " << group_id << endl;
+				}
+				fout.close();
+			}
+			catch (...)
+			{
+				
+			}
 
 			std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
 			NetPackage::PackType final_run_status = run_model(pars, obs, net_pack);
@@ -451,7 +532,7 @@ void PANTHERAgent::start(const string &host, const string &port)
 				err = send_message(net_pack, serialized_data.data(), serialized_data.size());
 				if (err != 1)
 				{
-					exit(-1);
+					terminate_or_restart(-1);
 				}
 			}
 			else if (final_run_status == NetPackage::PackType::RUN_FAILED)
@@ -462,7 +543,7 @@ void PANTHERAgent::start(const string &host, const string &port)
 				err = send_message(net_pack, &data, 0);
 				if (err != 1)
 				{
-					exit(-1);
+					terminate_or_restart(-1);
 				}
 			}
 			else if (final_run_status == NetPackage::PackType::RUN_KILLED)
@@ -473,7 +554,7 @@ void PANTHERAgent::start(const string &host, const string &port)
 				err = send_message(net_pack, &data, 0);
 				if (err != 1)
 				{
-					exit(-1);
+					terminate_or_restart(-1);
 				}
 			}
 			else if (final_run_status == NetPackage::PackType::TERMINATE)
@@ -491,7 +572,7 @@ void PANTHERAgent::start(const string &host, const string &port)
 				err = send_message(net_pack, &data, 0);
 				if (err != 1)
 				{
-					exit(-1);
+					terminate_or_restart(-1);
 				}
 			}
 		}
@@ -512,7 +593,7 @@ void PANTHERAgent::start(const string &host, const string &port)
 			err = send_message(net_pack, &data, 0);
 			if (err != 1)
 			{
-					exit(-1);
+				terminate_or_restart(-1);
 			}
 			cout << "ping response sent" << endl;
 		}
@@ -525,3 +606,16 @@ void PANTHERAgent::start(const string &host, const string &port)
 	}
 }
 
+
+void PANTHERAgent::terminate_or_restart(int error_code) const
+{
+	if(!restart_on_error)
+	{
+		exit(error_code);
+	}
+	
+	// Cleanup sockets and throw exception to signal restart
+	w_close(sockfd);
+	w_cleanup();
+	throw PANTHERAgentRestartError("");
+}

@@ -71,7 +71,7 @@ def basic_test(model_d="ies_10par_xsec"):
     # wipe all pestpp options
     pst.pestpp_options = {}
     pst.pestpp_options["ies_num_reals"] = num_reals
-    pst.pestpp_options["lambda_scale_fac"] = 1.0
+    pst.pestpp_options["lambda_scale_fac"] = [0.5,0.75,1.0]
     pst.pestpp_options["ies_lambda_mults"] = 1.0
     # write a generic 2D cov
     if os.path.exists(os.path.join(new_d,"prior.jcb")):
@@ -429,7 +429,8 @@ def parchglim_test():
     pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
     p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
     print(p_df)
-    assert p_df.loc["stage","parval1"] == par.loc["stage","parval1"] + np.abs(par.loc["stage","parval1"] * (fpm-1))
+    print(p_df.loc["stage","parval1"],par.loc["stage","parval1"] + np.abs(par.loc["stage","parval1"] * (fpm-1)))
+    assert p_df.loc["stage","parval1"] <= par.loc["stage","parval1"] + np.abs(par.loc["stage","parval1"] * (fpm-1))
 
     rpm = 1.1
     par.loc[pst.par_names[0],"partrans"] = "none"
@@ -458,8 +459,6 @@ def parchglim_test():
     d = np.abs(p_df.loc["stage","parval1"] - (par.loc["stage","parval1"] + rpm))
     assert d < 1.0e-6,d
 
-    # currently something is up with the upgrade calcs in pestpp-glm
-    # so this test just makes sure it runs without throwing an exception
     rpm = 1.1
     par.loc[pst.par_names[1:],"partrans"] = "fixed"
     par.loc[pst.par_names[1:],"parchglim"] = "factor"
@@ -470,9 +469,13 @@ def parchglim_test():
     par.loc[pst.par_names[0],"parval1"] = 0.0
     pst.control_data.relparmax = rpm
     pst.write(os.path.join(m_d,"pest_parchglim.pst"))
-    pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
-    p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
-    print(p_df)
+    try:
+
+        pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
+    except:
+        pass
+    else:
+        raise Exception("should have failed")
     
 
     rpm = 100
@@ -710,7 +713,7 @@ def tplins1_test():
         shutil.rmtree(t_d)
     shutil.copytree(os.path.join(model_d,"template"),t_d)
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
-
+    
     pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-glm")),cwd=t_d)
     obf_df = pd.read_csv(os.path.join(t_d,"out1.dat.obf"),delim_whitespace=True,header=None,names=["obsnme","obsval"])
     obf_df.index = obf_df.obsnme
@@ -758,19 +761,22 @@ def tplins1_test():
     lines_in = open(os.path.join(t_d,"hk_Layer_1.ref"),'r').readlines()
     assert len(lines_tpl) - 1 == len(lines_in)
 
+    
+    
 
 
 if __name__ == "__main__":
+    
     #glm_long_name_test()
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    #secondary_marker_test()
-    #basic_test("ies_10par_xsec")
+    # secondary_marker_test()
+    basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
     #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-    tplins1_test()
+    #tplins1_test()

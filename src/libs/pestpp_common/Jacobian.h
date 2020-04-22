@@ -28,6 +28,7 @@
 #include<Eigen/Sparse>
 #include "Transformable.h"
 #include "Transformation.h"
+#include "Pest.h"
 
 class ParamTransformSeq;
 class ParameterInfo;
@@ -61,6 +62,7 @@ public:
 	friend void TranSVD::jacobian_reverse(Jacobian &jac);
 	
 	Jacobian(FileManager &_file_manager);
+	
 	virtual const vector<string>& parameter_list() const{return base_numeric_par_names;}
 	virtual const vector<string>& observation_list() const {return  base_sim_obs_names;}
 	virtual const vector<string>& obs_and_reg_list() const;
@@ -77,7 +79,9 @@ public:
 	virtual void make_runs(RunManagerAbstract &run_manager);
 	virtual bool process_runs(ParamTransformSeq &par_transform,
 		const ParameterGroupInfo &group_info,
-		RunManagerAbstract &run_manager, const PriorInformation &prior_info, bool splitswh_flag);
+		RunManagerAbstract &run_manager, 
+		const PriorInformation &prior_info, bool splitswh_flag,
+		bool debug_fail);
 
 	//virtual void save_old(const std::string &ext="jco") const;
 	virtual void save(const std::string &ext = "jco") const;
@@ -106,6 +110,7 @@ public:
 	void set_base_sim_obs(Observations _base_sim_obs);
 
 protected:
+
 	vector<string> base_numeric_par_names;  //ordered names of base parameters used to calculate the jacobian
 	Parameters base_numeric_parameters;  //values of base parameters used to calculate the jacobian
 	set<string> failed_parameter_names;

@@ -225,7 +225,7 @@ int main(int argc, char* argv[])
 		Pest pest_scenario;
 		pest_scenario.set_defaults();
 		try {
-			performance_log.log_event("starting to process control file", 1);
+			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
 			file_manager.close_file("pst");
 			performance_log.log_event("finished processing control file");
@@ -297,7 +297,7 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			performance_log.log_event("starting basic model IO error checking", 1);
+			performance_log.log_event("starting basic model IO error checking");
 			cout << "checking model IO files...";
 			pest_scenario.check_io(fout_rec);
 			//pest_scenario.check_par_obs();
@@ -322,8 +322,9 @@ int main(int argc, char* argv[])
 
 
 		run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), pest_scenario.get_ctl_observations());
-
+		
 		IterEnsembleSmoother ies(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
+		
 
 		ies.initialize();
 

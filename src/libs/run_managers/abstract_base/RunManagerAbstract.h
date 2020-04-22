@@ -27,6 +27,7 @@
 #include <chrono>
 
 
+
 class ModelExecInfo;
 class Parameters;
 class Observations;
@@ -78,6 +79,8 @@ public:
 	virtual void print_run_summary(std::ostream &fout) { file_stor.print_run_summary(fout); }
 	//virtual Observations get_init_run_obs() { return init_run_obs; }
 	virtual std::vector<double> get_init_sim() { return init_sim;  }
+	virtual void set_init_sim(std::vector<double> _init_sim) { init_sim = _init_sim; }
+
 protected:
 	int total_runs;
 	int max_n_failure; // maximium number of times to retry a failed model run

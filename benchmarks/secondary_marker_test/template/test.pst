@@ -1,7 +1,7 @@
 pcf
 * control data
              restart          estimation
-         1         6         1         0         1         0
+         1         2         1         0         1         0
          1         1              single               point         1         0         0          noobsreref
    2.000000E+01  -3.000000E+00   3.000000E-01   1.000000E-02        -7       999          lamforgive        noderforgive
    1.000000E+01   1.000000E+01   1.000000E-03         0         0
@@ -19,15 +19,11 @@ pcf
 * observation groups
 obgnme               
 * observation data
- obs1_1                1.0000000000E+10      1.0000000000E+00       obgnme               
- obs1_2                1.0000000000E+10      1.0000000000E+00       obgnme               
- obs2_1                1.0000000000E+10      1.0000000000E+00       obgnme               
- obs2_2                1.0000000000E+10      1.0000000000E+00       obgnme               
- obs3_1                1.0000000000E+10      1.0000000000E+00       obgnme               
- obs3_2                1.0000000000E+10      1.0000000000E+00       obgnme               
+ part_status           2.0000000000E+00      1.0000000000E+00       obgnme               
+ part_time             9.0770180000E+02      1.0000000000E+00       obgnme               
 * model command line
 python forward_run.py
 * model input/output
 par.dat.tpl par.dat
-out3.dat.ins out3.dat
+freyberg.mpenpt.ins freyberg.mpenpt
 ++additional_ins_delimiters(|)

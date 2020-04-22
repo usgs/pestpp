@@ -31,7 +31,9 @@ OBJECTS := \
     Localizer\
     logger\
     linear_analysis\
-    covariance
+    covariance \
+    constraints \
+    EnsembleMethodUtils
 OBJECTS := $(addsuffix $(OBJ_EXT),$(OBJECTS))
 
 
