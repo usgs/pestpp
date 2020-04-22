@@ -1,6 +1,1 @@
 iteration,total_runs,obs_realization,par_realization,hob,heads,kh,dis_pkg,hob_pkg,heads
-0,5,0,0,7.96998,1522.92,0,0,0,0
-0,5,1,1,14.5271,790.198,0,0,0,0
-0,5,2,2,9.63069,1573.86,0,0,0,0
-0,5,3,3,7.84238,1446.39,0,0,0,0
-0,5,base,base,2.25982e+15,1.15297e+16,0,0,0,0

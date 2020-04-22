@@ -2436,7 +2436,8 @@ vector<string> DataAssimilator::detect_prior_data_conflict()
 	{
 		omap[onames[i]] = i;
 	}
-	int sidx, oidx;
+	int sidx, oidx; // Ayman: this is to check if the model predictions does not envelop obs values. 
+				    // If yes, we still can run KF, but it means that our prior is not wide enough or the model is biased!
 	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
 	{
 		sidx = smap[oname];
@@ -3912,7 +3913,7 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 
 		//if (use_localizer)
 			//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "loc", loc);
-		if (use_localizer)
+		if (use_localizer) // todo: check localizer for kf
 		{
 			if (loc_by_obs)
 				par_diff = par_diff.cwiseProduct(loc);
@@ -3921,20 +3922,24 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 
 		}
 
-		obs_diff = scale * (weights * obs_diff);
-		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
-		if (use_prior_scaling)
+		// old // obs_diff = scale * (weights * obs_diff);
+		obs_diff = scale * obs_diff;
+		// todo: check using parcovinv for enkf
+		if (use_prior_scaling) 
 			par_diff = scale * parcov_inv * par_diff;
 		else
 			par_diff = scale * par_diff;
 
+		// todo: what is the error ensemble ????
+		// compute D' = D-H 
 
-		//performance_log->log_event("SVD of obs diff");
 		Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
 
 
 		SVD_REDSVD rsvd;
-		rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
+		Eigen::MatrixXd C;
+		C = obs_diff; //  todo: add error ensemble
+		rsvd.solve_ip(C, s, Ut, V, eigthresh, maxsing);
 
 		Ut.transposeInPlace();
 		obs_diff.resize(0, 0);
@@ -3944,9 +3949,14 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 
 		Eigen::MatrixXd s2 = s.cwiseProduct(s);
 
-		ivec = ((Eigen::VectorXd::Ones(s2.size()) * (cur_lam + 1.0)) + s2).asDiagonal().inverse();
+		// old // ivec = ((Eigen::VectorXd::Ones(s2.size()) * (cur_lam + 1.0)) + s2).asDiagonal().inverse();
+		ivec = s2.asDiagonal().inverse();
+		
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "ivec", ivec);
-		Eigen::MatrixXd X1 = Ut * scaled_residual;
+		//old// Eigen::MatrixXd X1 = Ut * scaled_residual;
+		Eigen::MatrixXd X1 = ivec * Ut;
+		X1 = X1 * 1; 
+		//X1 = 1;
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
 		Eigen::MatrixXd X2 = ivec * X1;
 		X1.resize(0, 0);
