@@ -196,7 +196,9 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 			else
 			{
 				bool restart_runs = (restart_controller.get_restart_option() == RestartController::RestartOption::RESUME_JACOBIAN_RUNS);
-				iteration_jac(run_manager, termination_ctl, best_upgrade_run, false, restart_runs);
+				bool success = iteration_jac(run_manager, termination_ctl, best_upgrade_run, false, restart_runs);
+				if (!success)
+					return best_upgrade_run;
 				if (restart_runs) restart_controller.get_restart_option() = RestartController::RestartOption::NONE;
 			}
 
@@ -377,6 +379,9 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 	par_transform.active_ctl2numeric_ip(pars_nf);
 	vector<string> numeric_par_names = pars_nf.get_keys();
 
+	//get the dss map to zero out insen pars
+	map<string, double> dss = pest_scenario.calc_par_dss(jacobian, par_transform);
+
 	//Compute effect of frozen parameters on the residuals vector
 	Parameters delta_freeze_pars = prev_frozen_active_ctl_pars;
 	Parameters base_freeze_pars(base_active_ctl_pars, delta_freeze_pars.get_keys());
@@ -467,10 +472,20 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 			//work up the inverse prior par cov
 			Covariance prior_inv = parcov.get(numeric_par_names);
 			prior_inv.inv_ip();
-
+			
+			
 			//form the regularized normal matrix
 			Eigen::MatrixXd lamb = (Eigen::MatrixXd::Ones(JtQJ.rows(), JtQJ.cols()) * (lambda + 1.0));
+			
 			lamb = lamb + prior_inv.e_ptr()->toDense();
+			for (int i = 0; i < numeric_par_names.size(); i++)
+			{
+				if (abs(dss[numeric_par_names[i]]) < 1.0e-6)
+				{
+					lamb.col(i).setZero();
+					lamb.row(i).setZero();
+				}
+			}
 			lamb = lamb + JtQJ.toDense();
 			JtQJ = lamb.sparseView();
 
@@ -698,7 +713,7 @@ ModelRun SVDSolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termina
 	file_manager.get_ofstream("rec") << "  reading previously computed jacobian:  " << jac_filename << endl;
 	jacobian.read(jac_filename);
 	Parameters pars = pest_scenario.get_ctl_parameters();
-	par_transform.active_ctl2numeric_ip(pars);
+	par_transform.ctl2numeric_ip(pars);
 	jacobian.set_base_numeric_pars(pars);
 	//todo: make sure the jco has the right pars and obs
 	
@@ -774,7 +789,7 @@ ModelRun SVDSolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termina
 	return new_base_run;
 }
 
-void SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs, bool restart_runs)
+bool SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs, bool restart_runs)
 {
 	ostream &os = file_manager.rec_ofstream();
 	ostream &fout_restart = file_manager.get_ofstream("rst");
@@ -820,6 +835,7 @@ void SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContro
 	// sen file for this iteration
 	output_file_writer.append_sen(file_manager.sen_ofstream(), termination_ctl.get_iteration_number() + 1, jacobian,
 		*(base_run.get_obj_func_ptr()), get_parameter_group_info(), *regul_scheme_ptr, false, par_transform);
+	return true;
 }
 
 ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool restart_runs)
@@ -915,6 +931,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			prf_message << "beginning upgrade vector calculations, lambda = " << i_lambda;
 			performance_log->log_event(prf_message.str());
 			//std::cout << string(message.str().size(), '\b');
+			fout_rec << "   ...calculating lambda upgrade vector: " << i_lambda << endl;
 			message.str("");
 			message << "  computing upgrade vector (lambda = " << i_lambda << ")  " << ++i_update_vec << " / " << lambda_vec.size() << "             " << endl;
 			std::cout << message.str();
@@ -957,19 +974,20 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			Parameters del_numeric_pars = new_numeric_pars - base_numeric_pars;
 			for (double i_scale : lambda_scale_vec)
 			{
-				if (i_scale == 1.0)
+				if (i_scale >= 1.0)
 					continue;
 				Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
-				par_transform.numeric2model_ip(scaled_pars);
+				
 				Parameters scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
 				output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
 					0, i_lambda, i_scale, scaled_ctl_pars);
 
 				stringstream ss;
 				ss << "scale(" << std::fixed << std::setprecision(2) << i_scale << ")";
+				par_transform.numeric2model_ip(scaled_pars);
 				int run_id = run_manager.add_run(scaled_pars, ss.str(), i_lambda);
 				num_lamb_runs++;
-				fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_scale << endl;
+				fout_rec << "   ...calculating scaled lambda vector-scale factor: " << i_lambda << ", " << i_scale << endl;
 				save_frozen_pars(fout_frz, frozen_active_ctl_pars, run_id);
 			}
 
@@ -993,6 +1011,11 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	pair<ParameterEnsemble, map<int, int>> fosm_real_info;
 	Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
 		jacobian.get_matrix_ptr());
+	if (pest_scenario.get_prior_info_ptr()->get_nnz_pi() > 0)
+	{
+		vector<string> pi_names = pest_scenario.get_ctl_ordered_pi_names();
+		j.drop_rows(pi_names);
+	}
 	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, rand_gen_ptr);
 	if (pest_scenario.get_pestpp_options().get_uncert_flag())
 	{
@@ -1003,15 +1026,17 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		try
 		{
 			la.glm_iter_fosm(base_run, output_file_writer, termination_ctl.get_iteration_number(), &run_manager);
-			fosm_real_info = la.draw_fosm_reals(&run_manager, termination_ctl.get_iteration_number(), base_run);
+			if (pest_scenario.get_pestpp_options().get_glm_iter_mc())
+				fosm_real_info = la.draw_fosm_reals(&run_manager, termination_ctl.get_iteration_number(), base_run);
 		}
 		catch (exception& e)
 		{
 			os << "Error in GLM iteration FOSM process:" << e.what() << ", continuing..." << endl;
 
 		}
+		cout << "-->finished iteration FOSM process..." << endl;
 	}
-	cout << "-->finished iteration FOSM process..." << endl;
+	
 	if (num_success_calc == 0)
 	{
 		throw runtime_error("no upgrade vectors were calculated successfully");
@@ -1023,7 +1048,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	run_manager.run();
 
 	// process model runs
-	cout << "  testing upgrade vectors... ";
+	cout << "  testing upgrade vectors... "  << endl;
 
 	ifstream &fin_frz = file_manager.open_ifile_ext("fpr");
 	bool best_run_updated_flag = false;

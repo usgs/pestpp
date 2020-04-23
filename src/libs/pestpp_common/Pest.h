@@ -85,12 +85,12 @@ public:
 	void enforce_par_limits(PerformanceLog* perfomance_log, Parameters &update_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim=true, bool enforce_bounds=false);
 	map<string,double> get_pars_at_near_bounds(const Parameters &pars, double tol=0.0);
 	pair<Parameters,Parameters> get_effective_ctl_lower_upper_bnd(Parameters &pars);
+	map<string, double> calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform);
 
 	Pest &get_child_pest(int icycle);
 	void child_pest_update(int icycle);
-	vector<int> Pest::get_assim_cycles();
-	
-	
+	vector<int> get_assim_cycles();
+	void assign_da_cycles(ofstream& f_rec);
 	virtual ~Pest();
 	
 protected:
@@ -130,7 +130,7 @@ protected:
 	void tokens_to_pi_rec(ostream& f_rec, const string& line_upper);
 	void rectify_par_groups();
 	void extract_da_cycles();
-
+	map<string, int> extract_cycle_numbers(ofstream& f_rec, string section_name, vector<string> possible_name_cols);
 	map<string, vector<pest_utils::ExternalCtlFile>> efiles_map;
 
 };

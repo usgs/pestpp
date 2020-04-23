@@ -33,6 +33,8 @@ private:
 	vector<double> get_obs_vec(RunManagerAbstract &run_manager, int run_set, ModelRun &model_run, const string &obs_name );
 	vector<double> get_phi_vec(RunManagerAbstract &run_manager, int run_set, ModelRun &model_run);
 	int n_sample;
+	void process_runs(RunManagerAbstract& run_manager, ModelRun &model_run);
+	map<int, Observations> run_map;
 	Eigen::MatrixXd m1;
 	Eigen::MatrixXd m2;
 };

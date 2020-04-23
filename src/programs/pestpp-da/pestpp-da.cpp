@@ -284,7 +284,8 @@ int main(int argc, char* argv[])
 		
 		//get deep copy of pest_scenario for current cycle
 		//MultiPest mPest (pest_scenario);
-		vector<int> assimilation_cycles;		
+		vector<int> assimilation_cycles;
+		pest_scenario.assign_da_cycles(fout_rec); 
 		assimilation_cycles = pest_scenario.get_assim_cycles();
 		ParameterEnsemble curr_pe;
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)

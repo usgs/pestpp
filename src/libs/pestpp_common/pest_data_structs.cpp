@@ -481,6 +481,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		glm_accept_mc_phi = pest_utils::parse_string_arg_to_bool(value);
 	}
+	else if (key == "GLM_REBASE_SUPER")
+	{	
+		glm_rebase_super = pest_utils::parse_string_arg_to_bool(value);
+	}
 	else if (key == "OVERDUE_RESCHED_FAC"){
 		convert_ip(value, overdue_reched_fac);
 	}
@@ -617,6 +621,18 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		opt_std_weights = pest_utils::parse_string_arg_to_bool(value);
 	}
 
+	else if (key == "OPT_STACK_SIZE")
+	{
+		convert_ip(value,opt_stack_size);
+	}
+	else if (key == "OPT_PAR_STACK")
+	{
+		opt_par_stack = org_value;
+	}
+	else if (key == "OPT_OBS_STACK")
+	{
+		opt_obs_stack = org_value;
+	}
 	else if ((key == "OPT_DEC_VAR_GROUPS") || (key == "OPT_DECISION_VARIABLE_GROUPS"))
 	{
 		passed_args.insert("OPT_DEC_VAR_GROUPS");
@@ -681,7 +697,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		convert_ip(value, opt_iter_tol);
 	}
 
-	else if (key == "OPT_RECALC_FOSM_EVERY")
+	else if ((key == "OPT_RECALC_FOSM_EVERY") || (key == "OPT_RECALC_CHANCE_EVERY"))
 	{
 		convert_ip(value, opt_recalc_fosm_every);
 	}
@@ -830,12 +846,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		passed_args.insert("IES_SAVE_LAMBDA_ENSEMBLES");
 		ies_save_lambda_en = pest_utils::parse_string_arg_to_bool(value);
 	}
-	else if ((key == "IES_WEIGHTS_EN") || (key == "IES_WEIGHTS_ENSEMBLE"))
-	{
-		passed_args.insert("IES_WEIGHTS_EN");
-		passed_args.insert("IES_WEIGHTS_ENSEMBLE");
-		ies_weight_csv = org_value;
-	}
+	
 	else if (key == "IES_SUBSET_HOW")
 	{
 		convert_ip(value,ies_subset_how);
@@ -960,22 +971,48 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		fill_tpl_zeros = pest_utils::parse_string_arg_to_bool(value);
 	}
-	else if (key == "ADDITIONAL_INS_DELIMITERS")
-	{
-		convert_ip(value, additional_ins_delimiters);
-	}
-	else if (key == "RANDOM_SEED")
-	{
-		convert_ip(value, random_seed);
-	}
-	else 
-
+	
+	else if (!assign_value_by_key_continued(key, value))
 	{
 
 		//throw PestParsingError(line, "Invalid key word \"" + key +"\"");
 		return ARG_STATUS::ARG_NOTFOUND;
 	}
 	return ARG_STATUS::ARG_ACCEPTED;
+}
+
+
+bool PestppOptions::assign_value_by_key_continued(const string& key, const string& value)
+{
+	// This method was added as a workaround for a compiler limit of at most 128 nesting levels (MSVC); no more else if blocks could be added to assign_value_by_key()
+	if (key == "PANTHER_AGENT_RESTART_ON_ERROR")
+	{
+		panther_agent_restart_on_error = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+
+	if (key == "PANTHER_AGENT_NO_PING_TIMEOUT_SECS")
+	{
+		convert_ip(value, panther_agent_no_ping_timeout_secs);
+		return true;
+	}
+	else if (key == "ADDITIONAL_INS_DELIMITERS")
+	{
+		convert_ip(value, additional_ins_delimiters);
+		return true;
+	}
+	else if (key == "RANDOM_SEED")
+	{
+		convert_ip(value, random_seed);
+		return true;
+	}
+	else if (key == "GLM_ITER_MC")
+	{
+		glm_iter_mc = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+
+	return false;
 }
 
 
@@ -1048,6 +1085,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "glm_debug_lamb_fail: " << glm_debug_lamb_fail << endl;
 	os << "glm_debug_real_fail: " << glm_debug_real_fail << endl;
 	os << "glm_accept_mc_phi: " << glm_accept_mc_phi << endl;
+	os << "glm_rebase_super: " << glm_rebase_super;
+	os << "glm_iter_mc: " << glm_iter_mc;
 
 
 	if (global_opt == OPT_DE)
@@ -1071,7 +1110,10 @@ void PestppOptions::summary(ostream& os) const
 	os << "opt_objective_function: " <<  opt_obj_func << endl;
 	os << "opt_coin_log: " << opt_coin_log << endl;
 	os << "opt_skip_final: " << opt_skip_final << endl;
-	os << "opt_std_weights" << opt_std_weights << endl;
+	os << "opt_std_weights: " << opt_std_weights << endl;
+	os << "opt_stack_size: " << opt_stack_size << endl;
+	os << "opt_par_stack: " << opt_par_stack << endl;
+	os << "opt_obs_stack: " << opt_obs_stack << endl;
 	os << "opt_decision_variable_groups: ";
 	for (auto v : opt_dec_var_groups)
 		os << v << ",";
@@ -1120,7 +1162,6 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_lambda_inc_fac: " << ies_lambda_inc_fac << endl;
 	os << "ies_lambda_dec_fac: " << ies_lambda_dec_fac << endl;
 	os << "ies_save_lambda_ensembles: " << ies_save_lambda_en << endl;
-	os << "ies_weights_ensemble: " << ies_weight_csv << endl;
 	os << "ies_subset_how: " << ies_subset_how << endl;
 	os << "ies_localize_how: " << ies_localize_how << endl;
 	os << "ies_num_threads: " << ies_num_threads << endl;
@@ -1149,6 +1190,10 @@ void PestppOptions::summary(ostream& os) const
 	os << "gsa_morris_delta: " <<  gsa_morris_delta << endl;
 	os << "gsa_sobol_samples: " << gsa_sobol_samples << endl;
 	os << "gsa_sobol_par_dist: " << gsa_sobol_par_dist << endl;
+
+	os << endl;
+	os << "panther_agent_restart_on_error: " << panther_agent_restart_on_error << endl;
+	os << "panther_agent_no_ping_timeout_secs: " << panther_agent_no_ping_timeout_secs << endl;
 	os << endl << endl << endl;
 }
 
@@ -1175,7 +1220,7 @@ void PestppOptions::set_defaults()
 	set_n_iter_base(1000000);
 	set_super_eigthres(1.0e-6);
 	set_max_n_super(1000000);
-	set_max_super_frz_iter(10);
+	set_max_super_frz_iter(20);
 	set_max_reg_iter(20);
 	set_uncert_flag(true);
 	set_glm_num_reals(0);
@@ -1184,6 +1229,8 @@ void PestppOptions::set_defaults()
 	set_glm_debug_lamb_fail(false);
 	set_glm_debug_real_fail(false);
 	set_glm_accept_mc_phi(false);
+	set_glm_rebase_super(false);
+	set_glm_iter_mc(false);
 	set_prediction_names(vector<string>());
 	set_parcov_filename(string());
 	set_obscov_filename(string());
@@ -1211,6 +1258,10 @@ void PestppOptions::set_defaults()
 	set_opt_iter_derinc_fac(1.0);
 	set_opt_include_bnd_pi(true);
 	set_hotstart_resfile(string());
+	set_opt_stack_size(0);
+	set_opt_par_stack("");
+	set_opt_obs_stack("");
+
 	set_ies_par_csv("");
 	set_ies_obs_csv("");
 	set_ies_obs_restart_csv("");
@@ -1236,7 +1287,6 @@ void PestppOptions::set_defaults()
 	set_ies_lambda_inc_fac(10.0);
 	set_ies_lambda_dec_fac(0.75);
 	set_ies_save_lambda_en(false);
-	set_ies_weight_csv("");
 	set_ies_subset_how("RANDOM");
 	set_ies_localize_how("PARAMETERS");
 	set_ies_num_threads(-1);
@@ -1274,11 +1324,13 @@ void PestppOptions::set_defaults()
 	set_worker_poll_interval(1.0);
 	set_max_run_fail(3);
 
-
 	set_debug_parse_only(false);
 	set_check_tplins(true);
 	set_fill_tpl_zeros(false);
 	set_additional_ins_delimiters("");
+
+	set_panther_agent_restart_on_error(false);
+	set_panther_agent_no_ping_timeout_secs(300);
 }
 
 ostream& operator<< (ostream &os, const ParameterInfo& val)
@@ -1349,6 +1401,19 @@ const ObservationRec* ObservationInfo::get_observation_rec_ptr(const string &nam
 	}
 	return ret_val;
 }
+
+ObservationRec* ObservationInfo::get_observation_rec_ptr_4_mod(const string& name)
+{
+	ObservationRec* ret_val = 0;
+	unordered_map<string, ObservationRec>::iterator p_iter;
+
+	p_iter = observations.find(name);
+	if (p_iter != observations.end()) {
+		ret_val = &((*p_iter).second);
+	}
+	return ret_val;
+}
+
 
 const ObservationGroupRec* ObservationInfo::get_group_rec_ptr(const string &name) const
 {
@@ -1484,6 +1549,7 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 	if (passed_args.find(key) != passed_args.end())
 		return PestppOptions::ARG_STATUS::ARG_DUPLICATE;
 	passed_args.insert(key);
+
 	if (key == "NOPTMAX") 
 		convert_ip(value, noptmax);
 	else if (key == "RELPARMAX")
@@ -1565,6 +1631,9 @@ PestppOptions::ARG_STATUS SVDInfo::assign_value_by_key(const string key, const s
 		convert_ip(value, maxsing);
 	else if (key == "EIGWRITE")
 		convert_ip(value, eigwrite);
+	else if (key == "SVDMODE")
+	{
+	}
 	else
 		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;

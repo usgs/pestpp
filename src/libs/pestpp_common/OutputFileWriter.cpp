@@ -359,8 +359,12 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 	trans_type[1] = "fixed";
 	trans_type[2] = "tied";
 	trans_type[3] = "log";
+	int par_len = 12;
+	for (auto& par_name : pest_scenario.get_ctl_ordered_par_names())
+		par_len = max((int)par_name.size(), par_len);
+	par_len++;
 	os << endl << "Parameter information" << endl;
-	os << left << setw(15) << "NAME" << setw(10) << "TRANSFORMATION" << right << setw(20) << "CHANGE LIMIT" << setw(15) << "INITIAL VALUE";
+	os << left << setw(par_len) << "NAME" << setw(10) << "TRANSFORMATION" << right << setw(20) << "CHANGE LIMIT" << setw(15) << "INITIAL VALUE";
 	os << setw(15) << "LOWER BOUND";
 	os << setw(15) << "UPPER BOUND" << setw(15) << "GROUP";
 
@@ -369,7 +373,7 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 	for (auto &par_name : pest_scenario.get_ctl_ordered_par_names())
 	{
 		par_rec = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(par_name);
-		os << left << setw(15) << lower_cp(par_name);
+		os << left << setw(par_len) << lower_cp(par_name);
 		os << setw(10) << trans_type[static_cast<int>(par_rec->tranform_type)];
 		os << right << setw(20) << par_rec->chglim;
 		os << setw(15) << par_rec->init_value;
@@ -399,15 +403,18 @@ void OutputFileWriter::scenario_obs_csv(ostream& os)
 
 void OutputFileWriter::scenario_obs_report(std::ostream &os)
 {
-
+	int obs_len = 20;
+	for (auto& obs_name : pest_scenario.get_ctl_ordered_obs_names())
+		obs_len = max((int)obs_name.size(), obs_len);
+	obs_len++;
 	os << endl << "Observation information" << endl;
-	os << left << setw(25) << "NAME" << right << setw(20) << "VALUE" << setw(20) << "GROUP" << setw(20) << "WEIGHT" << endl;
+	os << left << setw(obs_len) << "NAME" << right << setw(20) << "VALUE" << setw(20) << "GROUP" << setw(20) << "WEIGHT" << endl;
 	const ObservationRec* obs_rec;
 	const Observations &obs = pest_scenario.get_ctl_observations();
 	for (auto &obs_name : pest_scenario.get_ctl_ordered_obs_names())
 	{
 		obs_rec = pest_scenario.get_ctl_observation_info().get_observation_rec_ptr(obs_name);
-		os << left << setw(25) << lower_cp(obs_name);
+		os << left << setw(obs_len) << lower_cp(obs_name);
 		os << right << setw(20) << obs.get_rec(obs_name);
 		os << setw(20) << lower_cp(obs_rec->group);
 		os << setw(20) << obs_rec->weight << endl;
@@ -684,6 +691,7 @@ void OutputFileWriter::write_rei(ofstream &fout, int iter_no, const Observations
 		<< " " << showpoint << setw(20)  << pi_rec_ptr->get_weight() << endl;
 	}
 }
+
 
 
 void OutputFileWriter::write_par(ofstream &fout, const Parameters &pars, const TranOffset &offset_tran, const TranScale &scale_tran)

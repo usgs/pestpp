@@ -618,14 +618,27 @@ void TranSVD::calc_svd()
 	{
 		throw PestError("TranSVD::update() - super parameter transformation returned 0 super parameters.  Jacobian must equal 0.");
 	}
+
+	Eigen::MatrixXd temp = Vt.toDense();
+	//for (auto name : base_parameter_names)
+	for (int i=0;i<base_parameter_names.size();i++)
+	{
+		if ((dss.find(base_parameter_names[i]) != dss.end()) && (abs(dss[base_parameter_names[i]]) < 1.0e-6))
+		{
+			temp.col(i).setZero();
+		}
+	}
+	Vt = temp.sparseView();
 	debug_print(super_parameter_names);
 	debug_msg("TranSVD::calc_svd end");
 }
 
 void TranSVD::update_reset_frozen_pars(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const Parameters &base_numeric_pars,
-		int maxsing, double _eigthresh, const vector<string> &par_names, const vector<string> &_obs_names, Eigen::SparseMatrix<double>& parcov_inv,
+		int maxsing, double _eigthresh, const vector<string> &par_names, const vector<string> &_obs_names, 
+		Eigen::SparseMatrix<double>& parcov_inv, map<string,double> _dss,
 		const Parameters &_frozen_derivative_pars)
 {
+	dss = _dss;
 	debug_msg("TranSVD::update_reset_frozen_pars begin");
 	debug_print(_frozen_derivative_pars);
 	stringstream sup_name;
@@ -653,13 +666,23 @@ void TranSVD::update_reset_frozen_pars(const Jacobian &jacobian, const QSqrtMatr
 	//if (parcov.ncol() > 0)
 	if (parcov_inv.rows() > 0)
 	{
+		vector<string> numeric_par_names = jacobian.get_base_numeric_par_names();
 		Eigen::MatrixXd lamb = Eigen::MatrixXd::Ones(jtqj.rows(), jtqj.cols());
 		lamb = lamb + parcov_inv.toDense();
+		for (int i = 0; i < numeric_par_names.size(); i++)
+		{
+			if (abs(dss[numeric_par_names[i]]) < 1.0e-6)
+			{
+				lamb.col(i).setZero();
+				lamb.row(i).setZero();
+			}
+		}
 		lamb = lamb + jtqj.toDense();
 		jtqj = lamb.sparseView();
 		lamb.resize(0, 0);
 	}
 	calc_svd();
+
 	debug_print(this->base_parameter_names);
 	debug_print(this->frozen_derivative_parameters);
 	debug_msg("TranSVD::update_reset_frozen_pars end");
@@ -695,6 +718,8 @@ void TranSVD::update_add_frozen_pars(const Parameters &frozen_pars)
 	{
 		throw PestError("TranSVD::update_add_frozen_pars - All parameters are frozen in SVD transformation");
 	}
+	if ((del_col_ids.size() == 0) && (frozen_pars.size() > 0))
+		cout << "WARNING: TravSVD::update_add_froze_pars(): all pars to freeze already frozen" << endl;
 	//remove frozen parameters from base_parameter_names
 	auto end_iter = std::remove_if(base_parameter_names.begin(), base_parameter_names.end(),
 		[&new_frozen_pars](string &str)->bool{return new_frozen_pars.find(str)!=new_frozen_pars.end();});

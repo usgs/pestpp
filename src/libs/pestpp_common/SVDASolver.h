@@ -46,7 +46,7 @@ public:
 		Pest::LimitType &limit_type);
 	ModelRun update_run(RunManagerAbstract &run_manager, ModelRun &base_run);
 	virtual ModelRun iteration_reuse_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool rerun_base = true, const std::string &filename = "");
-	void iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs = false, bool restart_runs = false);
+	bool iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs = false, bool restart_runs = false);
 	ModelRun iteration_upgrd(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool restart_runs = false);
 	virtual const string &get_description(){return description;}
 	virtual ParameterGroupInfo get_parameter_group_info() const { return super_parameter_group_info; }
