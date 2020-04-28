@@ -1066,7 +1066,7 @@ void sequentialLP::iter_presolve()
 			throw_sequentialLP_error("failed to calc derviatives for the following decision vars: ", failed);
 		}
 
-		if (constraints.should_update_chance(slp_iter))
+		if ((constraints.should_update_chance(slp_iter)) && (!constraints.get_use_fosm()))
 		{
 			constraints.add_runs(run_mgr_ptr);
 		}
