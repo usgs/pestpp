@@ -1139,6 +1139,8 @@ void sequentialLP::iter_presolve()
 	build_obj_func_coef_array();
 
 	stringstream ss;
+	if ((constraints.get_use_chance()) && (constraints.get_use_fosm()))
+		constraints.set_jco(jco);
 	constraints.update_chance_offsets();
 	constraints.presolve_chance_report(slp_iter);
 	constraints.write_res_files(current_constraints_sim, pars,"jcb",slp_iter);
