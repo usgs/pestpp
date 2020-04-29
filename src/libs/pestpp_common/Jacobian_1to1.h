@@ -34,11 +34,10 @@ public:
 		const ParameterGroupInfo &group_info,
 		RunManagerAbstract &run_manager, 
 		const PriorInformation &prior_info, bool splitswh_flag,
-		bool debug_fail, bool clear_map=true);
+		bool debug_fail);
 	virtual void report_errors(std::ostream &fout);
 	virtual ~Jacobian_1to1();
 	map<string, vector<int>> get_par_run_map() const { return par_run_map; }
-	void clear_map() { par_run_map.clear(); }
 protected:
 	Parameters failed_ctl_parameters;
 	Parameters failed_to_increment_parmaeters;

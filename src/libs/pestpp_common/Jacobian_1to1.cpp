@@ -225,7 +225,7 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 		const ParameterGroupInfo &group_info,
 		RunManagerAbstract &run_manager, 
 	const PriorInformation &prior_info, bool splitswh_flag,
-	bool debug_fail, bool clear_map)
+	bool debug_fail)
 {
 	debug_msg("Jacobian_1to1::process_runs begin");
        base_sim_obs_names = run_manager.get_obs_name_vec();
@@ -261,8 +261,7 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 		}
 		par_transform.model2ctl_ip(base_run.ctl_pars);
 		base_numeric_parameters = par_transform.ctl2numeric_cp(base_run.ctl_pars);
-		if (clear_map)
-			par_run_map.erase(base);
+		par_run_map.erase(base);
 		i_run++;
 	}
 	else
@@ -345,8 +344,6 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 	//for(; i_run<nruns; ++i_run)
 	for (auto par_run : par_run_map)
 	{
-		if (par_run.first == base)
-			continue;
 		run_list.push_back(JacobianRun());
 		for (auto rid : par_run.second)
 		{
@@ -396,8 +393,7 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 		
 
 	}
-	if (clear_map)
-		par_run_map.clear();
+	par_run_map.clear();
 	matrix.resize(base_sim_obs_names.size(), base_numeric_par_names.size());
 	matrix.setZero();
 	matrix.setFromTriplets(triplet_list.begin(), triplet_list.end());
