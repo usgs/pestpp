@@ -523,7 +523,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		throw runtime_error("unrecognized marquardt scaling type");
 
 	// scale the upgrade vector using the technique described in the PEST manual
-	if ((glm_normal_form != PestppOptions::GLMNormalForm::PRIOR) && (pest_scenario.get_pestpp_options().get_jac_scale()))
+	if (pest_scenario.get_pestpp_options().get_jac_scale())
 	{
 		double beta = 1.0;
 		Eigen::VectorXd gama = jac * upgrade_vec;
@@ -536,7 +536,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		{
 			beta = top / bot;
 		}
-		if (isnormal(beta))
+		if ((isnormal(beta)) && (beta > 0.0) && (beta < 1.0))
 			upgrade_vec *= beta;
 	}
 
