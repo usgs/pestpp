@@ -578,7 +578,14 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 
 	else if (key == "GLOBAL_OPT")
 	{
-		if (value == "DE") global_opt = OPT_DE;
+	if (value == "DE") global_opt = OPT_DE;
+	else if (value == "MOEA") global_opt = OPT_MOEA;
+	else
+		throw runtime_error(value + "is not a supported global optimization option");
+	}
+	else if (key == "MOEA_NAME")
+	{
+	convert_ip(value, moea_name);
 	}
 	else if (key == "DE_F")
 	{
@@ -1091,6 +1098,16 @@ void PestppOptions::summary(ostream& os) const
 	if (global_opt == OPT_DE)
 	{
 		os << "global_opt: de" << endl;
+		os << "de_f: " << de_f << endl;
+		os << "de_cr: " << de_cr << endl;
+		os << "de_pop_size: " << de_npopulation << endl;
+		os << "de_max_gen: " << de_max_gen << endl;
+		os << "de_dither_f: " << de_dither_f << endl;
+	}
+
+	if (global_opt == OPT_MOEA)
+	{
+		os << "global_opt: MOEA" << endl;
 		os << "de_f: " << de_f << endl;
 		os << "de_cr: " << de_cr << endl;
 		os << "de_pop_size: " << de_npopulation << endl;
