@@ -1209,6 +1209,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
+				efile.set_index_col_name(par_group_formal_names[0]);
 				for (auto oname : optional_par_group_formal_names)
 				{
 					if (cnames.find(oname) != cnames.end())
@@ -1288,10 +1289,19 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 							throw_control_file_error(f_rec, ss.str());
 						}
 						else
+						{
 							get_names.push_back(nn);
+							if (i == 0)
+								efile.set_index_col_name(par_easy_names[i]);
+						}
 					}
 					else
+					{
 						get_names.push_back(n);
+						if (i == 0)
+							efile.set_index_col_name(par_formal_names[i]);
+					}
+						
 				}
 				string tcol;
 				if (cnames.find("PARTRANS") != cnames.end())
@@ -1346,7 +1356,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
-					
+				efile.set_index_col_name(obs_group_formal_names[0]);
 				vector<string> obs_group_tokens;
 				for (auto ro : efile.get_row_order())
 				{
@@ -1386,11 +1396,19 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 							throw_control_file_error(f_rec, ss.str());
 						}
 						else
+						{
 							get_names.push_back(nn);
+							if (i == 0)
+								efile.set_index_col_name(obs_easy_names[i]);
+						}
 
 					}
 					else
+					{
 						get_names.push_back(n);
+						if (i == 0)
+							efile.set_index_col_name(obs_formal_names[i]);
+					}
 
 				}
 
@@ -1428,7 +1446,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
-
+				efile.set_index_col_name(pi_formal_names[0]);
 				vector<string> pi_tokens;
 				for (auto ro : efile.get_row_order())
 				{
@@ -1472,7 +1490,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
-
+				efile.set_index_col_name(model_input_formal_names[0]);
 				vector<string> mi_tokens;
 				for (auto ro : efile.get_row_order())
 				{
@@ -1511,7 +1529,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
-
+				efile.set_index_col_name(model_output_formal_names[0]);
 				vector<string> mo_tokens;
 				for (auto ro : efile.get_row_order())
 				{
@@ -2436,6 +2454,45 @@ map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& p
 		par_sens[par_list[i]] = val;
 		}
 	return par_sens;
+}
+
+map<string,double> Pest::get_ext_file_double_map(const string& section_name, const string& col_name)
+{
+	string sname_upper = pest_utils::upper_cp(section_name);
+	map<string, double> val_map;
+	if (efiles_map.find(sname_upper) == efiles_map.end())
+		return val_map;
+	set<string> col_names;
+	string cname_upper = pest_utils::upper_cp(col_name);
+	string idx_col;
+	vector<string> svals, sidx;
+	double val;
+	for (auto efile : efiles_map[sname_upper])
+	{
+		idx_col = efile.get_index_col_name();
+		if (idx_col.size() == 0)
+			continue;
+		col_names = efile.get_col_set();
+		if (col_names.find(cname_upper) != col_names.end())
+		{
+			svals = efile.get_col_string_vector(cname_upper);
+			sidx = efile.get_col_string_vector(idx_col);
+			for (int i = 0; i < svals.size(); i++)
+			{
+				try
+				{
+					val = stod(svals[i]);
+					val_map[sidx[i]] = val;
+				}
+				catch (...)
+				{
+					continue;
+				}
+			}
+		}
+	}
+	return val_map;
+	
 }
 
 

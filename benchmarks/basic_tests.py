@@ -747,15 +747,35 @@ def tplins1_test():
     lines_in = open(os.path.join(t_d,"hk_Layer_1.ref"),'r').readlines()
     assert len(lines_tpl) - 1 == len(lines_in)
 
+def ext_stdcol_test():
+    model_d = "ies_10par_xsec"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
     
-    
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_ext_stdcol")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(t_d,m_d)
+    pst = pyemu.Pst(os.path.join(m_d,"pest.pst"))  
+    obs = pst.observation_data
+    obs.loc[pst.nnz_obs_names,"standard_deviation"] = 1/obs.loc[pst.nnz_obs_names,"weight"]
+    pst.add_transform_columns()
+    par = pst.parameter_data
+    par.loc[pst.adj_par_names,"standard_deviation"] = (par.loc[pst.adj_par_names,"parubnd_trans"] - par.loc[pst.adj_par_names,"parlbnd_trans"]) / 4.0
+
+    pst.write(os.path.join(t_d,"pest_ext_stdcol.pst"),version=2)
+
 
 
 if __name__ == "__main__":
     
     #glm_long_name_test()
     #sen_plusplus_test()
-    parchglim_test()
+    #parchglim_test()
     #unc_file_test()
     # secondary_marker_test()
     #basic_test("ies_10par_xsec")
@@ -766,3 +786,4 @@ if __name__ == "__main__":
     #sen_basic_test()
     #salib_verf()
     #tplins1_test()
+    ext_stdcol_test()

@@ -1480,7 +1480,8 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 	col_names = names;
 }
 
-void Covariance::from_parameter_bounds(const vector<string> &par_names,const ParameterInfo &par_info, double sigma_range)
+void Covariance::from_parameter_bounds(const vector<string> &par_names,const ParameterInfo &par_info, 
+	double sigma_range, map<string,double>& par_std)
 {
 	matrix.resize(0, 0);
 	row_names.clear();
@@ -1493,15 +1494,26 @@ void Covariance::from_parameter_bounds(const vector<string> &par_names,const Par
 	{
 		pest_utils::upper_ip(par_name);
 		par_rec = par_info.get_parameter_rec_ptr(par_name);
-		upper = par_rec->ubnd;
-		lower = par_rec->lbnd;
-		if (par_rec->tranform_type == ParameterRec::TRAN_TYPE::LOG)
+		if ((par_rec->tranform_type == ParameterRec::TRAN_TYPE::FIXED) || (par_rec->tranform_type == ParameterRec::TRAN_TYPE::TIED))
 		{
-			upper = log10(upper);
-			lower = log10(lower);
+			continue;
 		}
-		if ((par_rec->tranform_type != ParameterRec::TRAN_TYPE::FIXED) && (par_rec->tranform_type != ParameterRec::TRAN_TYPE::TIED))
+		if (par_std.find(par_name) != par_std.end())
 		{
+			triplet_list.push_back(Eigen::Triplet<double>(i, i, pow(par_std[par_name], 2.0)));
+			row_names.push_back(par_name);
+			col_names.push_back(par_name);
+			i++;
+		}
+		else
+		{
+			upper = par_rec->ubnd;
+			lower = par_rec->lbnd;
+			if (par_rec->tranform_type == ParameterRec::TRAN_TYPE::LOG)
+			{
+				upper = log10(upper);
+				lower = log10(lower);
+			}
 			row_names.push_back(par_name);
 			col_names.push_back(par_name);
 			//double temp = pow((upper - lower) / 4.0,2.0);
@@ -1525,7 +1537,10 @@ void Covariance::from_parameter_bounds(const vector<string> &par_names,const Par
 
 void Covariance::from_parameter_bounds(Pest &pest_scenario)
 {
-	from_parameter_bounds(pest_scenario.get_ctl_ordered_par_names(), pest_scenario.get_ctl_parameter_info(),pest_scenario.get_pestpp_options().get_par_sigma_range());
+	map<string, double> par_std = pest_scenario.get_ext_file_double_map("parameter data external", "standard_deviation");
+	
+	from_parameter_bounds(pest_scenario.get_ctl_ordered_par_names(), pest_scenario.get_ctl_parameter_info(),
+		pest_scenario.get_pestpp_options().get_par_sigma_range(), par_std);
 }
 
 void Covariance::from_parameter_bounds(const string &pst_filename)
@@ -1548,7 +1563,8 @@ void Covariance::from_observation_weights(const string &pst_filename)
 }
 
 
-void Covariance::from_observation_weights(const vector<string>& obs_names, const ObservationInfo& obs_info, const vector<string>& pi_names, const PriorInformation* pi)
+void Covariance::from_observation_weights(const vector<string>& obs_names, const ObservationInfo& obs_info, 
+	const vector<string>& pi_names, const PriorInformation* pi, map<string,double>& obs_std)
 {
 	matrix.resize(0, 0);
 	row_names.clear();
@@ -1560,16 +1576,26 @@ void Covariance::from_observation_weights(const vector<string>& obs_names, const
 	for (auto obs_name : obs_names)
 	{
 		pest_utils::upper_ip(obs_name);
-		obs_rec = obs_info.get_observation_rec_ptr(obs_name);
-		weight = obs_rec->weight;
-		if (weight <= 0.0)
-			weight = 1.0e+60;
+		if (obs_std.find(obs_name) != obs_std.end())
+		{
+			triplet_list.push_back(Eigen::Triplet<double>(i, i, pow(obs_std[obs_name], 2)));
+			row_names.push_back(obs_name);
+			col_names.push_back(obs_name);
+			i++;
+		}
 		else
-			weight = pow(1.0 / obs_rec->weight, 2.0);
-		triplet_list.push_back(Eigen::Triplet<double>(i, i, weight));
-		row_names.push_back(obs_name);
-		col_names.push_back(obs_name);
-		i++;
+		{
+			obs_rec = obs_info.get_observation_rec_ptr(obs_name);
+			weight = obs_rec->weight;
+			if (weight <= 0.0)
+				weight = 1.0e+60;
+			else
+				weight = pow(1.0 / obs_rec->weight, 2.0);
+			triplet_list.push_back(Eigen::Triplet<double>(i, i, weight));
+			row_names.push_back(obs_name);
+			col_names.push_back(obs_name);
+			i++;
+		}
 	}
 
 	/*PriorInformation::const_iterator pi_iter;
@@ -1605,8 +1631,9 @@ void Covariance::from_observation_weights(const vector<string>& obs_names, const
 
 void Covariance::from_observation_weights(Pest &pest_scenario)
 {
+	map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
 	from_observation_weights(pest_scenario.get_ctl_ordered_obs_names(), pest_scenario.get_ctl_observation_info(),
-		pest_scenario.get_ctl_ordered_pi_names(), pest_scenario.get_prior_info_ptr());
+		pest_scenario.get_ctl_ordered_pi_names(), pest_scenario.get_prior_info_ptr(), obs_std);
 
 }
 

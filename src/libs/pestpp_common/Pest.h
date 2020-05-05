@@ -86,6 +86,7 @@ public:
 	map<string,double> get_pars_at_near_bounds(const Parameters &pars, double tol=0.0);
 	pair<Parameters,Parameters> get_effective_ctl_lower_upper_bnd(Parameters &pars);
 	map<string, double> calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform);
+	map<string, double> get_ext_file_double_map(const string& section_name, const string& col_name);
 	virtual ~Pest();
 	
 private:
