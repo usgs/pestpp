@@ -760,14 +760,64 @@ def ext_stdcol_test():
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
     shutil.copytree(t_d,m_d)
+    
+
     pst = pyemu.Pst(os.path.join(m_d,"pest.pst"))  
     obs = pst.observation_data
     obs.loc[pst.nnz_obs_names,"standard_deviation"] = 1/obs.loc[pst.nnz_obs_names,"weight"]
     pst.add_transform_columns()
     par = pst.parameter_data
     par.loc[pst.adj_par_names,"standard_deviation"] = (par.loc[pst.adj_par_names,"parubnd_trans"] - par.loc[pst.adj_par_names,"parlbnd_trans"]) / 4.0
+    pst.pestpp_options["ies_num_reals"] = 10
+    pst.control_data.noptmax = -1
+    pst.write(os.path.join(m_d,"pest_base.pst"))
+    pyemu.os_utils.run("{0} pest_base.pst".format(exe_path),cwd=m_d)
 
-    pst.write(os.path.join(t_d,"pest_ext_stdcol.pst"),version=2)
+    pst.write(os.path.join(m_d,"pest_ext_stdcol.pst"),version=2)
+    pyemu.os_utils.run("{0} pest_ext_stdcol.pst".format(exe_path),cwd=m_d)
+
+    df1 = pd.read_csv(os.path.join(m_d,"pest_base.phi.meas.csv"),index_col=0)
+    df2 = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.phi.meas.csv"),index_col=0)
+
+    d = (df1 - df2).apply(np.abs)
+    print(d.max())
+    assert d.max().max() < 1.0e-6,d.max().max()
+
+    pst.pestpp_options["ies_num_reals"] = 100000
+    pst.control_data.noptmax = -2
+    obs = pst.observation_data
+    obs.loc[pst.nnz_obs_names,"standard_deviation"] = 7.5
+    pst.write(os.path.join(m_d,"pest_ext_stdcol.pst"),version=2)
+    pyemu.os_utils.run("{0} pest_ext_stdcol.pst".format(exe_path),cwd=m_d)
+    df = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.base.obs.csv"),index_col=0).loc[:,pst.nnz_obs_names]
+    d = (df.std() - obs.loc[pst.nnz_obs_names,"standard_deviation"]).apply(np.abs)
+    print(d)
+    assert d.max() < 0.1,d.max()
+    obs = pst.observation_data
+    obs.loc[pst.nnz_obs_names,"upper_bound"] = obs.loc[pst.nnz_obs_names,"obsval"] * 1.1
+    obs.loc[pst.nnz_obs_names,"lower_bound"] = obs.loc[pst.nnz_obs_names,"obsval"] * 0.9
+    pst.write(os.path.join(m_d,"pest_ext_stdcol.pst"),version=2)
+    pyemu.os_utils.run("{0} pest_ext_stdcol.pst".format(exe_path),cwd=m_d)
+    df = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.base.obs.csv"),index_col=0).loc[:,pst.nnz_obs_names]
+    mn = df.min()
+    mx = df.max()
+    dmn = mn - obs.loc[pst.nnz_obs_names,"obsval"] * 0.9
+    print(obs.loc[pst.nnz_obs_names,"obsval"] * 0.9)
+    print(mn)  
+    print(dmn)
+    dmx = mx - obs.loc[pst.nnz_obs_names,"obsval"] * 1.1
+    print(obs.loc[pst.nnz_obs_names,"obsval"] * 1.1)
+    print(mx)
+    print(dmx)
+
+    dmn = dmn.apply(np.abs)
+    dmx = dmx.apply(np.abs)
+
+    assert dmn.max() < 1.0e-6,dmn
+    assert dmx.max() < 1.0e-6,dmx
+
+
+ 
 
 
 
