@@ -52,7 +52,7 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 	if (par_csv.size() == 0)
 	{
 		message(1, "drawing parameter realizations: ", num_reals);
-		pe.draw(num_reals, pest_scenario.get_ctl_parameters(),cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level());
+		pe.draw(num_reals, pest_scenario.get_ctl_parameters(),cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
 		// stringstream ss;
 		// ss << file_manager.get_base_filename() << ".0.par.csv";
 		// message(1, "saving initial parameter ensemble to ", ss.str());
@@ -236,7 +236,7 @@ bool IterEnsembleSmoother::initialize_oe(Covariance &cov)
 		else
 		{
 			message(1, "drawing observation noise realizations: ", num_reals);
-			oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level());
+			oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
 			
 		}
 		drawn = true;

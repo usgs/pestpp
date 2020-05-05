@@ -1821,7 +1821,7 @@ ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _ra
 
 
 
-void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level)
+void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
 {
 	///draw a parameter ensemble
 	var_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names(); //only draw for adjustable pars
@@ -2562,7 +2562,7 @@ void ObservationEnsemble::initialize_without_noise(int num_reals)
 
 }
 
-void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level)
+void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
 {
 	//draw an obs ensemble using only nz obs names
 	var_names = pest_scenario_ptr->get_ctl_ordered_nz_obs_names();
@@ -2592,6 +2592,8 @@ void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *p
 	string var_name;
 	if ((lower_bnd.size() > 0) || (upper_bnd.size() > 0))
 	{
+		frec << "Note: the following observations contain 'lower_bound' and/or 'upper_bound' information that will be" << endl;
+		frec << "      enforced on the additive noise realizations: " << endl;
 		for (int j = 0; j < reals.cols(); j++)
 		{
 			var_name = var_names[j];
@@ -2605,7 +2607,9 @@ void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *p
 			{
 				ub = upper_bnd[var_name];
 			}
+			frec << var_name << " " << lb << " " << ub << endl;
 			col = reals.col(j);
+
 			for (int i = 0; i < reals.rows(); i++)
 			{
 				v = col(i);

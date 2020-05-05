@@ -54,6 +54,7 @@ void Pest::set_defaults()
 	regul_scheme_ptr = new DynamicRegularization;
 	regul_scheme_ptr->set_defaults();
 	control_info.set_defaults();
+
 }
 
 void Pest::check_inputs(ostream &f_rec, bool forgive)

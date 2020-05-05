@@ -1143,12 +1143,12 @@ string Covariance::try_from(Pest &pest_scenario, FileManager &file_manager, bool
 	{
 		if (is_parcov)
 		{
-			from_parameter_bounds(pest_scenario);
+			from_parameter_bounds(pest_scenario, file_manager.rec_ofstream());
 			how << "from parameter bounds, using par_sigma_range " << pest_scenario.get_pestpp_options().get_par_sigma_range();
 		}
 		else
 		{
-			from_observation_weights(pest_scenario);
+			from_observation_weights(pest_scenario, file_manager.rec_ofstream());
 			how << "from observation weights";
 		}
 		}
@@ -1203,7 +1203,6 @@ string Covariance::try_from(Pest &pest_scenario, FileManager &file_manager, bool
 	{
 		double weight;
 		set<string> cov_names(row_names.begin(), row_names.end());
-
 		for (auto &oname : pest_scenario.get_ctl_ordered_obs_names())
 		{
 			weight = pest_scenario.get_ctl_observation_info().get_weight(oname);
@@ -1480,8 +1479,8 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 	col_names = names;
 }
 
-void Covariance::from_parameter_bounds(const vector<string> &par_names,const ParameterInfo &par_info, 
-	double sigma_range, map<string,double>& par_std)
+void Covariance::from_parameter_bounds(ofstream& frec, const vector<string> &par_names,const ParameterInfo &par_info, 
+	map<string, double>& par_std, double sigma_range)
 {
 	matrix.resize(0, 0);
 	row_names.clear();
@@ -1535,35 +1534,45 @@ void Covariance::from_parameter_bounds(const vector<string> &par_names,const Par
 
 
 
-void Covariance::from_parameter_bounds(Pest &pest_scenario)
+void Covariance::from_parameter_bounds(Pest &pest_scenario, ofstream& frec)
 {
 	map<string, double> par_std = pest_scenario.get_ext_file_double_map("parameter data external", "standard_deviation");
-	
-	from_parameter_bounds(pest_scenario.get_ctl_ordered_par_names(), pest_scenario.get_ctl_parameter_info(),
-		pest_scenario.get_pestpp_options().get_par_sigma_range(), par_std);
+	if (par_std.size() > 0)
+	{
+		frec << "Note: the following parameters have 'standard_deviation' defined - this will be used" << endl;
+		frec << "      instead of bounds for the prior parameter covariance matrix : " << endl;
+		for (auto pname : pest_scenario.get_ctl_ordered_par_names())
+		{
+			if (par_std.find(pname) != par_std.end())
+				frec << pname << ' ' << par_std[pname] << endl;
+		}
+	}
+
+	from_parameter_bounds(frec, pest_scenario.get_ctl_ordered_par_names(), pest_scenario.get_ctl_parameter_info(),
+		par_std,pest_scenario.get_pestpp_options().get_par_sigma_range());
 }
 
-void Covariance::from_parameter_bounds(const string &pst_filename)
+void Covariance::from_parameter_bounds(const string &pst_filename, ofstream& frec)
 {
 	ifstream ipst(pst_filename);
 	if (!ipst.good()) throw runtime_error("Cov::from_parameter_bounds() error opening pst file: " + pst_filename);
 	Pest pest_scenario;
 	pest_scenario.process_ctl_file(ipst, pst_filename);
-	from_parameter_bounds(pest_scenario);
+	from_parameter_bounds(pest_scenario, frec);
 }
 
-void Covariance::from_observation_weights(const string &pst_filename)
+void Covariance::from_observation_weights(const string &pst_filename, ofstream& frec)
 {
 	ifstream ipst(pst_filename);
 	if (!ipst.good()) throw runtime_error("Cov::from_observation_weights() error opening pst file: " + pst_filename);
 	Pest pest_scenario;
 	pest_scenario.process_ctl_file(ipst, pst_filename);
-	from_observation_weights(pest_scenario);
+	from_observation_weights(pest_scenario,frec);
 
 }
 
 
-void Covariance::from_observation_weights(const vector<string>& obs_names, const ObservationInfo& obs_info, 
+void Covariance::from_observation_weights(ofstream& frec, const vector<string>& obs_names, const ObservationInfo& obs_info, 
 	const vector<string>& pi_names, const PriorInformation* pi, map<string,double>& obs_std)
 {
 	matrix.resize(0, 0);
@@ -1576,6 +1585,7 @@ void Covariance::from_observation_weights(const vector<string>& obs_names, const
 	for (auto obs_name : obs_names)
 	{
 		pest_utils::upper_ip(obs_name);
+		obs_rec = obs_info.get_observation_rec_ptr(obs_name);
 		if (obs_std.find(obs_name) != obs_std.end())
 		{
 			triplet_list.push_back(Eigen::Triplet<double>(i, i, pow(obs_std[obs_name], 2)));
@@ -1629,10 +1639,21 @@ void Covariance::from_observation_weights(const vector<string>& obs_names, const
 }
 
 
-void Covariance::from_observation_weights(Pest &pest_scenario)
+void Covariance::from_observation_weights(Pest &pest_scenario, ofstream& frec)
 {
 	map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
-	from_observation_weights(pest_scenario.get_ctl_ordered_obs_names(), pest_scenario.get_ctl_observation_info(),
+	if (obs_std.size() > 0)
+	{
+		frec << "Note: the following observations have 'standard_deviation' defined - this will be used" << endl;
+		frec << "      instead of weight for the observation noise covariance matrix : " << endl;
+		for (auto oname : pest_scenario.get_ctl_ordered_obs_names())
+		{
+			if (obs_std.find(oname) != obs_std.end())
+				frec << oname << ' ' << obs_std[oname] << endl;
+		}
+	}
+
+	from_observation_weights(frec, pest_scenario.get_ctl_ordered_obs_names(), pest_scenario.get_ctl_observation_info(),
 		pest_scenario.get_ctl_ordered_pi_names(), pest_scenario.get_prior_info_ptr(), obs_std);
 
 }

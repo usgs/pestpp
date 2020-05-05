@@ -237,7 +237,9 @@ ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileW
 
 	//reset the obscov using the scaled residuals - pass empty prior info names so none are included
 	pfm.log_event("loading obscov");
-	obscov.from_observation_weights(obscov.get_col_names(), reweight, vector<string>(), pest_scenario.get_prior_info_ptr());
+	map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
+	obscov.from_observation_weights(file_manager.rec_ofstream(), obscov.get_col_names(), reweight, vector<string>(), 
+		pest_scenario.get_prior_info_ptr(),obs_std);
 
 	//reset the parcov since pars are being frozen and unfrozen iter by iter
 	pfm.log_event("loading parcov");
@@ -260,7 +262,7 @@ ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileW
 	{
 		try
 		{
-			parcov.from_parameter_bounds(pest_scenario);
+			parcov.from_parameter_bounds(pest_scenario, file_manager.rec_ofstream());
 		}
 		catch (exception &e)
 		{
@@ -414,7 +416,7 @@ pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerA
 		
 		
 
-		pe.draw(num_reals, optimum_run.get_ctl_pars(), cov, &pfm, 1);
+		pe.draw(num_reals, optimum_run.get_ctl_pars(), cov, &pfm, 1, file_manager.rec_ofstream());
 		stringstream ss;
 		ss.str("");
 		if (iter != -999)
@@ -600,7 +602,7 @@ void LinearAnalysis::load_parcov(const string &parcov_filename)
 	{
 		try
 		{
-			parcov.from_parameter_bounds(parcov_filename);
+			parcov.from_parameter_bounds(parcov_filename, file_manager.rec_ofstream());
 		}
 		catch (exception &e)
 		{
@@ -645,7 +647,7 @@ void LinearAnalysis::load_obscov(const string &obscov_filename)
 	{
 		try
 		{
-			obscov.from_observation_weights(obscov_filename);
+			obscov.from_observation_weights(obscov_filename, file_manager.rec_ofstream());
 		}
 		catch (exception &e)
 		{
@@ -717,7 +719,7 @@ LinearAnalysis::LinearAnalysis(Mat &_jacobian, Pest &_pest_scenario, FileManager
 	{
 		try
 		{
-			obscov.from_observation_weights(pest_scenario);
+			obscov.from_observation_weights(pest_scenario, file_manager.rec_ofstream());
 		}
 		catch (exception &e)
 		{

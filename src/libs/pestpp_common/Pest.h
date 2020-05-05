@@ -126,7 +126,6 @@ private:
 	void rectify_par_groups();
 
 	map<string, vector<pest_utils::ExternalCtlFile>> efiles_map;
-
 };
 ostream& operator<< (ostream &os, const Pest& val);
 #endif /* PEST_H_ */

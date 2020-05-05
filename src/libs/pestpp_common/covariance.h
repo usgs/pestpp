@@ -129,15 +129,15 @@ public:
 
 	string try_from(Pest &pest_scenario, FileManager &file_manager,bool is_parcov=true, bool forgive_missing=false);
 	void from_uncertainty_file(const string &filename, vector<string> &ordered_names);
-	void from_parameter_bounds(Pest &pest_scenario);
-	void from_parameter_bounds(const vector<string> &par_names, const ParameterInfo &par_info, 
-		double sigma_range=4.0,map<string,double>& par_std=map<string,double>());
+	void from_parameter_bounds(Pest &pest_scenario, ofstream& frec);
+	void from_parameter_bounds(ofstream& frec, const vector<string> &par_names, const ParameterInfo &par_info, map<string,
+		double>& par_std,double sigma_range=4.0);
 
-	void from_observation_weights(Pest &pest_scenario);
-	void from_observation_weights(const vector<string>& obs_names, const ObservationInfo& obs_info,
-		const vector<string>& pi_names, const PriorInformation* pi,map<string,double>& obs_std=map<string,double>());
-	void from_parameter_bounds(const string &pst_filename);
-	void from_observation_weights(const string &pst_filename);
+	void from_observation_weights(Pest &pest_scenario, ofstream& frec);
+	void from_observation_weights(ofstream& frec, const vector<string>& obs_names, const ObservationInfo& obs_info,
+		const vector<string>& pi_names, const PriorInformation* pi,map<string,double>& obs_std);
+	void from_parameter_bounds(const string &pst_filename, ofstream& frec);
+	void from_observation_weights(const string &pst_filename, ofstream& frec);
 
 	void to_uncertainty_file(const string &filename);
 
