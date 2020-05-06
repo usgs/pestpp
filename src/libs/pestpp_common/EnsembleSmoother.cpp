@@ -51,8 +51,41 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 	bool drawn = false;
 	if (par_csv.size() == 0)
 	{
+		ofstream& frec = file_manager.rec_ofstream();
 		message(1, "drawing parameter realizations: ", num_reals);
-		pe.draw(num_reals, pest_scenario.get_ctl_parameters(),cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
+		map<string, double> par_means = pest_scenario.get_ext_file_double_map("parameter data external", "mean");
+		Parameters draw_par = pest_scenario.get_ctl_parameters();
+		if (par_means.size() > 0)
+		{
+			
+			frec << "Note: the following parameters contain 'mean' value information that will be used in place of " << endl;
+			frec << "      the 'parval1' values as mean values during ensemble generation" << endl;
+			double lb, ub;
+			for (auto par_mean : par_means)
+			{
+				if (draw_par.find(par_mean.first) != draw_par.end())
+				{
+					lb = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(par_mean.first)->lbnd;
+					ub = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(par_mean.first)->ubnd;
+					if (par_mean.second < lb)
+					{
+						frec << "Warning: 'mean' value for parameter " << par_mean.first << " less than lower bound, using 'parval1'";
+					}
+					else if (par_mean.second > ub)
+					{
+						frec << "Warning: 'mean' value for parameter " << par_mean.first << " greater than upper bound, using 'parval1'";
+					}
+					else
+					{
+						draw_par[par_mean.first] = par_mean.second;
+						frec << par_mean.first << " " << par_mean.second << endl;
+					}
+					
+				}
+
+			}
+		}
+		pe.draw(num_reals, draw_par,cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
 		// stringstream ss;
 		// ss << file_manager.get_base_filename() << ".0.par.csv";
 		// message(1, "saving initial parameter ensemble to ", ss.str());

@@ -768,6 +768,7 @@ def ext_stdcol_test():
     pst.add_transform_columns()
     par = pst.parameter_data
     par.loc[pst.adj_par_names,"standard_deviation"] = (par.loc[pst.adj_par_names,"parubnd_trans"] - par.loc[pst.adj_par_names,"parlbnd_trans"]) / 4.0
+    #par.loc[pst.adj_par_names[0],"mean"] = par.loc[pst.adj_par_names[0],"parubnd"]
     pst.pestpp_options["ies_num_reals"] = 10
     pst.control_data.noptmax = -1
     pst.write(os.path.join(m_d,"pest_base.pst"))
@@ -775,7 +776,6 @@ def ext_stdcol_test():
 
     pst.write(os.path.join(m_d,"pest_ext_stdcol.pst"),version=2)
     pyemu.os_utils.run("{0} pest_ext_stdcol.pst".format(exe_path),cwd=m_d)
-
     df1 = pd.read_csv(os.path.join(m_d,"pest_base.phi.meas.csv"),index_col=0)
     df2 = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.phi.meas.csv"),index_col=0)
 
@@ -796,6 +796,8 @@ def ext_stdcol_test():
     obs = pst.observation_data
     obs.loc[pst.nnz_obs_names,"upper_bound"] = obs.loc[pst.nnz_obs_names,"obsval"] * 1.1
     obs.loc[pst.nnz_obs_names,"lower_bound"] = obs.loc[pst.nnz_obs_names,"obsval"] * 0.9
+    par = pst.parameter_data
+    par.loc[pst.adj_par_names[0],"mean"] = par.loc[pst.adj_par_names[0],"parubnd"]
     pst.write(os.path.join(m_d,"pest_ext_stdcol.pst"),version=2)
     pyemu.os_utils.run("{0} pest_ext_stdcol.pst".format(exe_path),cwd=m_d)
     df = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.base.obs.csv"),index_col=0).loc[:,pst.nnz_obs_names]

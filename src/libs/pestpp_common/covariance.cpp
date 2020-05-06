@@ -1541,11 +1541,23 @@ void Covariance::from_parameter_bounds(Pest &pest_scenario, ofstream& frec)
 	{
 		frec << "Note: the following parameters have 'standard_deviation' defined - this will be used" << endl;
 		frec << "      instead of bounds for the prior parameter covariance matrix : " << endl;
+		vector<string> remove;
 		for (auto pname : pest_scenario.get_ctl_ordered_par_names())
 		{
 			if (par_std.find(pname) != par_std.end())
-				frec << pname << ' ' << par_std[pname] << endl;
+			{
+				if (par_std[pname] <= 0.0)
+				{
+					frec << "Warning: parameter " << pname << " 'standard_deviation' less than or equal to zero, using bounds instead" << endl;
+					remove.push_back(pname);
+				}
+				else
+					frec << pname << ' ' << par_std[pname] << endl;
+			}
+				
 		}
+		for (auto r : remove)
+			par_std.erase(r);
 	}
 
 	from_parameter_bounds(frec, pest_scenario.get_ctl_ordered_par_names(), pest_scenario.get_ctl_parameter_info(),
@@ -1642,6 +1654,7 @@ void Covariance::from_observation_weights(ofstream& frec, const vector<string>& 
 void Covariance::from_observation_weights(Pest &pest_scenario, ofstream& frec)
 {
 	map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
+	vector<string> remove;
 	if (obs_std.size() > 0)
 	{
 		frec << "Note: the following observations have 'standard_deviation' defined - this will be used" << endl;
@@ -1649,8 +1662,18 @@ void Covariance::from_observation_weights(Pest &pest_scenario, ofstream& frec)
 		for (auto oname : pest_scenario.get_ctl_ordered_obs_names())
 		{
 			if (obs_std.find(oname) != obs_std.end())
-				frec << oname << ' ' << obs_std[oname] << endl;
+			{
+				if (obs_std[oname] <= 0.0)
+				{
+					frec << "Warning: observation " << oname << " 'standard_deviation' less than or equal to zero, using weight" << endl;
+					remove.push_back(oname);
+				}
+				else
+					frec << oname << ' ' << obs_std[oname] << endl;
+			}
 		}
+		for (auto r : remove)
+			obs_std.erase(r);
 	}
 
 	from_observation_weights(frec, pest_scenario.get_ctl_ordered_obs_names(), pest_scenario.get_ctl_observation_info(),

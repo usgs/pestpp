@@ -1833,6 +1833,7 @@ void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, Per
 		if (scov_names.find(name) != scov_names.end())
 			var_names.push_back(name);
 	}
+	
 	//Parameters par = pest_scenario_ptr->get_ctl_parameters();
 	par_transform.active_ctl2numeric_ip(par);//removes fixed/tied pars
 	tstat = transStatus::NUM;
