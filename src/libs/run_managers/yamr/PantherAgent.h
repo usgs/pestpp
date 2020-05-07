@@ -49,6 +49,9 @@ private:
 	int fdmax;
 	double run_time;
 	int poll_interval_seconds;
+	int max_time_without_master_ping_seconds;
+	bool restart_on_error;
+
 #ifdef _DEBUG
 	static const int max_recv_fails = 100;
 	static const int max_send_fails = 100;
@@ -56,7 +59,7 @@ private:
 	static const int max_recv_fails = 1000;
 	static const int max_send_fails = 1000;
 #endif
-	static const int recv_timeout_secs = 1;
+	static const int recv_timeout_secs = 10;
 	bool terminate;
 	fd_set master;
 	/*std::vector<std::string> comline_vec;
@@ -67,14 +70,36 @@ private:
 	std::vector<std::string> obs_name_vec;
 	std::vector<std::string> par_name_vec;*/
 
+	void start_impl(const std::string &host, const std::string &port);
+
 	ModelInterface mi;
 	void run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
 		pest_utils::thread_exceptions *shared_execptions,
 		Parameters* pars, Observations* obs);
+
+	void terminate_or_restart(int error_code) const;
+
 	//Observations ctl_obs;
 	//Parameters ctl_pars;
 	Pest pest_scenario;
 
 };
+
+
+class PANTHERAgentRestartError final : public std::runtime_error {
+public:
+	PANTHERAgentRestartError(const string &_message="") : runtime_error(_message), message(_message) {}
+	virtual ~PANTHERAgentRestartError() throw () {}
+	void add_front(const string &s) {message = s + message;}
+	void add_back(const string &s) {message += s;}
+	void raise() {throw *this;}
+	virtual const char* what() const throw()
+	{
+		return message.c_str();
+	}
+protected:
+	string message;
+};
+
 
 #endif /* PANTHERAGENT_H_ */

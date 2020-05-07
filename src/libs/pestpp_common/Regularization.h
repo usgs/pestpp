@@ -43,12 +43,13 @@ public:
 	virtual double get_wftol() const { return wftol; }
 	virtual double get_wfinit() const { return wf_init; }
 	virtual bool get_use_dynamic_reg() const { return use_dynamic_reg; }
+	virtual void set_use_dynamic_reg(bool _flag) { use_dynamic_reg = _flag; }
 	virtual bool get_adj_grp_weights() const { return adj_grp_weights; }
 	virtual double get_grp_weight_fact(const std::string &grp_name) const;
 	virtual void set_weight(double _tikhonov_weight) {tikhonov_weight = _tikhonov_weight;}
 	virtual void set_max_reg_iter(int _max_reg_iter) { max_reg_iter = _max_reg_iter; }
 	virtual void set_regul_grp_weights(const std::unordered_map<std::string, double> &_regul_grp_weights) { regul_grp_weights = _regul_grp_weights; }
-	static DynamicRegularization get_unit_reg_instance() { return DynamicRegularization(); }
+	static DynamicRegularization get_unit_reg_instance();
 	static DynamicRegularization get_zero_reg_instance(); //{ return DynamicRegularization(true, false, 0,0,0,0,0,0,0,0); }
 	virtual ~DynamicRegularization(void){}
 	virtual PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value);

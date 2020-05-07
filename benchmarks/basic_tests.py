@@ -20,24 +20,10 @@ os.environ["PATH"] += os.pathsep + bin_path
 
 
 bin_path = os.path.join("..","..","..","bin")
-
-
-use_intel= os.getenv('USE_INTEL', False)
-# if len(sys.argv) > 1 and sys.argv[1].lower() == 'intel':
-#     use_intel = True
-#     print("using intel windows binaries")
-
-
+exe = ""
 if "windows" in platform.platform().lower():
-    if use_intel:
-        print("using intel windows binaries")
-        exe_path = os.path.join(bin_path, "iwin", "ipestpp-ies.exe")
-    else:
-        exe_path = os.path.join(bin_path, "win", "pestpp-ies.exe")
-elif "darwin" in platform.platform().lower():
-    exe_path = os.path.join(bin_path,  "mac", "pestpp-ies")
-else:
-    exe_path = os.path.join(bin_path, "linux", "pestpp-ies")
+    exe = ".exe"
+exe_path = os.path.join(bin_path, "pestpp-ies" + exe)
 
 
 noptmax = 4
@@ -71,7 +57,7 @@ def basic_test(model_d="ies_10par_xsec"):
     # wipe all pestpp options
     pst.pestpp_options = {}
     pst.pestpp_options["ies_num_reals"] = num_reals
-    pst.pestpp_options["lambda_scale_fac"] = 1.0
+    pst.pestpp_options["lambda_scale_fac"] = [0.5,0.75,1.0]
     pst.pestpp_options["ies_lambda_mults"] = 1.0
     # write a generic 2D cov
     if os.path.exists(os.path.join(new_d,"prior.jcb")):
@@ -429,7 +415,8 @@ def parchglim_test():
     pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
     p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
     print(p_df)
-    assert p_df.loc["stage","parval1"] == par.loc["stage","parval1"] + np.abs(par.loc["stage","parval1"] * (fpm-1))
+    print(p_df.loc["stage","parval1"],par.loc["stage","parval1"] + np.abs(par.loc["stage","parval1"] * (fpm-1)))
+    assert p_df.loc["stage","parval1"] <= par.loc["stage","parval1"] + np.abs(par.loc["stage","parval1"] * (fpm-1))
 
     rpm = 1.1
     par.loc[pst.par_names[0],"partrans"] = "none"
@@ -458,8 +445,6 @@ def parchglim_test():
     d = np.abs(p_df.loc["stage","parval1"] - (par.loc["stage","parval1"] + rpm))
     assert d < 1.0e-6,d
 
-    # currently something is up with the upgrade calcs in pestpp-glm
-    # so this test just makes sure it runs without throwing an exception
     rpm = 1.1
     par.loc[pst.par_names[1:],"partrans"] = "fixed"
     par.loc[pst.par_names[1:],"parchglim"] = "factor"
@@ -762,14 +747,17 @@ def tplins1_test():
     lines_in = open(os.path.join(t_d,"hk_Layer_1.ref"),'r').readlines()
     assert len(lines_tpl) - 1 == len(lines_in)
 
+    
+    
 
 
 if __name__ == "__main__":
+    
     #glm_long_name_test()
     #sen_plusplus_test()
-    #parchglim_test()
+    parchglim_test()
     #unc_file_test()
-    secondary_marker_test()
+    # secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()

@@ -28,9 +28,12 @@
 
 # User files
 /src/local.mak
+*.suo
+*.u2d
 
 # Makefile object
 /src/libs/build-stamp
+/*build*
 
 /morris_meth/ipch
 /morris_meth/Debug
@@ -61,3 +64,46 @@ pest++/run_manager_fortran_test/fortran_test
 pest++/sweep/sweep
 
 .DS_Store
+/src/.vs
+/src/libs/common/ix64/Release
+/src/libs/common/common.vcxproj.user
+*.user
+/src/libs/pestpp_common/ix64/Release/pestpp_common_intel.log
+/src/libs/propack/propack_intel.u2d
+/src/libs/run_managers/abstract_base/ix64/Release/abstract_base_intel.log
+/src/libs/run_managers/external/ix64/Release/external_intel.log
+/src/libs/run_managers/serial/ix64/Release/serial_intel.log
+/src/libs/run_managers/yamr/ix64/Release/yamr_intel.log
+/src/libs/run_managers/wrappers/ix64/Release/wrappers_intel.log
+/src/UpgradeLog.htm
+/src/programs/sweep/Release/sweep_intel.log
+/src/programs/sweep/ix64/Release/sweep_intel.log
+/src/programs/pestpp-ies/Release/pestpp-ies_intel.log
+/src/programs/pestpp-ies/ix64/Release/pestpp-ies_intel.log
+/src/programs/pest++/Release/pest++_intel.log
+/src/programs/pest++/ix64/Release/pest++_intel.log
+/src/programs/gsa/Release/gsa_intel.log
+/src/programs/gsa/ix64/Release/gsa_intel.log
+/bin/win/pestpp-swp.pdb
+/bin/win/pestpp-swp.ipdb
+/bin/win/pestpp-swp.iobj
+/bin/win/pestpp-sen.pdb
+/bin/win/pestpp-sen.ipdb
+/bin/win/pestpp-sen.iobj
+/bin/win/pestpp-opt.pdb
+/bin/win/pestpp-opt.ipdb
+/bin/win/pestpp-opt.iobj
+/bin/win/pestpp-ies.pdb
+/bin/win/pestpp-ies.ipdb
+/bin/win/pestpp-ies.iobj
+/bin/win/pestpp-glm.pdb
+/bin/win/pestpp-glm.ipdb
+/bin/win/pestpp-glm.iobj
+/src/libs/opt/libopt/Release/libopt_intel.log
+/src/libs/opt/libopt/ix64/Release/libopt_intel.log
+/src/programs/sweep/ix64/Release/ipestpp-swp.Build.CppClean.log
+/src/programs/pestpp-opt/ix64/Release/pestpp-opt_intel.log
+/src/programs/pestpp-opt/ix64/Release/ipestpp-opt.Build.CppClean.log
+/src/programs/pestpp-ies/ix64/Release/ipestpp-ies.Build.CppClean.log
+/src/programs/pest++/ix64/Release/ipestpp-glm.Build.CppClean.log
+/src/programs/gsa/ix64/Release/ipestpp-sen.Build.CppClean.log
