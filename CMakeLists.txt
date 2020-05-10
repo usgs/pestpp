@@ -117,6 +117,14 @@ else()
   set(_ostag "unknown")
 endif()
 
+# Detect if using a 32-bit compiler, show warning and modify _ostag
+if(CMAKE_SIZEOF_VOID_P STREQUAL 4)
+  message(WARNING
+    "A 32-bit compiler has been detected. It is recommended that "
+    "PEST++ should be compiled using a 64-bit compiler.")
+  set(_ostag "${_ostag}32")
+endif()
+
 # Use a custom command to locally install binaries after compiling
 # https://www.linux.com/training-tutorials/cmake-recipe-2-install-local-folder-build-dir-testing/
 # Use an extra command to copy binaries into a sub-directory within bin -- please remove soon
