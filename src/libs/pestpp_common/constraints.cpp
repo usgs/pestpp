@@ -335,7 +335,8 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 			if (nz_obs_names.size() != 0)
 			{
 				ObservationInfo oi = pest_scenario.get_ctl_observation_info();
-				obscov.from_observation_weights(nz_obs_names, oi, vector<string>(), null_prior);
+				map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
+				obscov.from_observation_weights(file_mgr_ptr->rec_ofstream(), nz_obs_names, oi, vector<string>(), null_prior, obs_std);
 			}
 		}
 		else
@@ -360,7 +361,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 					parcov.try_from(pest_scenario, *file_mgr_ptr);
 					pfm.log_event("drawing stack realizations");
 					stack_pe.draw(stack_size, pest_scenario.get_ctl_parameters(), parcov, &pfm,
-						pest_scenario.get_pestpp_options().get_ies_verbose_level());
+						pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_mgr_ptr->rec_ofstream());
 				}
 			}
 			else
