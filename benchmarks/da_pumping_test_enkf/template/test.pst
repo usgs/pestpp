@@ -4,11 +4,11 @@ pestmode                                 estimation
 noptmax                                 1
 svdmode                                 1
 maxsing                          10000000
-eigthresh                           1e-06
+eigthresh                           1e-05
 eigwrite                                1
 #debug_parse_only               True
 ies_parameter_ensemble     kh_ensemble0.csv
-ies_num_reals 5
+ies_num_reals 100
 ies_lambda_mults 1.0
 lambda_scale_fac 1.0
 * parameter groups external

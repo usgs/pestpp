@@ -297,10 +297,20 @@ int main(int argc, char* argv[])
 
 			Pest childPest;
 			childPest = pest_scenario.get_child_pest(*icycle);
+			vector <string> xxxx=childPest.get_ctl_ordered_par_names();
+			//childPest.get_pestpp_options.set_check_tplins(false);
 
 			RunManagerAbstract* run_manager_ptr;
-
-			output_file_writer.set_pest_scenario(childPest);
+			// -----------------------------  
+			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);			
+			output_file_writer.scenario_io_report(fout_rec);
+			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1)
+			{
+				output_file_writer.scenario_pargroup_report(fout_rec);
+				output_file_writer.scenario_par_report(fout_rec);
+				output_file_writer.scenario_obs_report(fout_rec);
+			}
+			//------------------------------
 
 			if (run_manager_type == RunManagerType::PANTHER)
 			{
@@ -349,7 +359,7 @@ int main(int argc, char* argv[])
 			run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), childPest.get_ctl_observations());
 
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
-			da.use_ies = false;
+			da.use_ies = true;
 			if (*icycle > 0)
 			{
 				da.set_pe(curr_pe);

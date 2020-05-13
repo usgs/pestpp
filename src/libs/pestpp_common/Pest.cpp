@@ -2165,7 +2165,7 @@ Pest& Pest::get_child_pest(int icycle)
 void Pest::assign_da_cycles(ofstream &f_rec)
 {
 	vector<string> str_values, str_names;
-	stringstream ss;
+	stringstream ss, ss_tpl;
 	set<string> col_names;
 	string name_col;
 	int cycle;
@@ -2173,7 +2173,7 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 		throw_control_file_error(f_rec, "could not find 'parameter data external' section for cycle info, all parameter quantities being assigned 'cycle'=-1", false);
 	else
 	{
-		map<string, int> par_cycle_map = extract_cycle_numbers(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
+		vector<pair<string, int>> par_cycle_map = extract_cycle_numbers2(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
 		if (par_cycle_map.size() == 0)
 		{
 			f_rec << "NOTE: no parameter cycle information was found so all adjustable parameters will be estimated every cycle " << endl;
@@ -2191,16 +2191,20 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 		throw_control_file_error(f_rec, "could not find 'observation data external' section - this is required for assigning cycle info");
 	else
 	{
-		map<string, int> obs_cycle_map = extract_cycle_numbers(f_rec, "OBSERVATION DATA EXTERNAL", vector<string>{"OBSNME", "NAME"});
+		vector<pair<string, int>> obs_cycle_map = extract_cycle_numbers2(f_rec, "OBSERVATION DATA EXTERNAL", vector<string>{"OBSNME", "NAME"});
 		if (obs_cycle_map.size() == 0)
 		{
 			throw_control_file_error(f_rec, "no observation cycle information was found, this required and cannot continue");
 
 		}
-		vector<string> missing;
+		vector<string> missing, obs_vec;
+		for (auto pp: obs_cycle_map)
+		{
+			obs_vec.push_back(pp.first);
+		}
 		for (auto name : get_ctl_ordered_nz_obs_names())
 		{
-			if (obs_cycle_map.find(name) == obs_cycle_map.end())
+			if (std::find(obs_vec.begin(), obs_vec.end(), name) == obs_vec.end())			
 				missing.push_back(name);
 		}
 		if (missing.size() > 0)
@@ -2221,42 +2225,97 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 		throw_control_file_error(f_rec, "could not find 'model input external' section - all template/model input files will be used eveyr cycle", false);
 	else
 	{
-		map<string, int> mi_cycle_map = extract_cycle_numbers(f_rec, "MODEL INPUT EXTERNAL", vector<string>{"PEST_FILE"});
+		vector<pair<string, int>> mi_cycle_map = extract_cycle_numbers2(f_rec, "MODEL INPUT EXTERNAL", vector<string>{"PEST_FILE"});
 		if (mi_cycle_map.size() == 0)
 		{
 			throw_control_file_error(f_rec, "no model input cycle information was found...continuing",false);
 			
 
-		}
-		//AYMAN - please check this!
-		for (auto tpl_file : model_exec_info.tplfile_vec)
+		}	
+		
+
+		for (auto tpl : mi_cycle_map)
 		{
-			if (mi_cycle_map.find(tpl_file) == mi_cycle_map.end())
-				model_exec_info.incycle_vec.push_back(-1);
-			else
-				model_exec_info.incycle_vec.push_back(mi_cycle_map[tpl_file]);
-		}
+			model_exec_info.incycle_vec.push_back(tpl.second); // we can do that becuase row order does not change. 
+		}	
+		
+		
 	}
 
 	if (efiles_map.find("MODEL OUTPUT EXTERNAL") == efiles_map.end())
 		throw_control_file_error(f_rec, "could not find 'model output external' section - this is required, cannot continue");
 	else
 	{
-		map<string, int> mi_cycle_map = extract_cycle_numbers(f_rec, "MODEL OUTPUT EXTERNAL", vector<string>{"PEST_FILE"});
+		vector<pair<string, int>> mi_cycle_map = extract_cycle_numbers2(f_rec, "MODEL OUTPUT EXTERNAL", vector<string>{"PEST_FILE"});
 		if (mi_cycle_map.size() == 0)
 		{
 			throw_control_file_error(f_rec, "no model output cycle information was found, cannot continue");
 		}
-		//AYMAN - please check this!
-		for (auto ins_file : model_exec_info.insfile_vec)
+		
+		for (auto ins : mi_cycle_map)
 		{
-			if (mi_cycle_map.find(ins_file) == mi_cycle_map.end())
-				throw_control_file_error(f_rec, "no model output cycle information listed for instruction file '"+ins_file+"', cannot continue");
-			else
-				model_exec_info.incycle_vec.push_back(mi_cycle_map[ins_file]);
-		}
+			model_exec_info.outcycle_vec.push_back(ins.second); // we can do that becuase row order does not change. 
+		}		
+		
+		
 	}
 	//TODO: prior info...
+}
+vector<pair<string, int>> Pest::extract_cycle_numbers2(ofstream& f_rec, string section_name, vector<string> possible_name_cols)
+{
+	vector<string> str_values, str_names;
+	stringstream ss;
+	set<string> col_names;
+	string name_col = "";
+	int cycle;
+	vector<pair<string, int>> cycle_map;
+	if (this->efiles_map.find(section_name) == this->efiles_map.end())
+		return cycle_map;
+	for (auto efile : this->efiles_map[section_name])
+	{
+		col_names = efile.get_col_set();
+		for (auto possible_name : possible_name_cols)
+		{
+			if (col_names.find(possible_name) != col_names.end())
+			{
+				name_col = possible_name;
+				break;
+			}
+
+		}
+
+		if (name_col.size() == 0)
+		{
+			ss.str("");
+			ss << "could not find any possible name cols: ";
+			for (auto name : possible_name_cols)
+				ss << name << ",";
+			ss << " in efile '" << efile.get_filename() << "' columns";
+
+			throw_control_file_error(f_rec, ss.str());
+		}
+		if (col_names.find("CYCLE") == col_names.end())
+			continue;
+		str_values = efile.get_col_string_vector("CYCLE");
+		str_names = efile.get_col_string_vector(name_col);
+		for (int i = 0; i < str_values.size(); i++)
+		{
+			try
+			{
+				cycle = stoi(str_values[i]);
+				cycle_map.push_back(make_pair(str_names[i], cycle));
+			}
+			catch (...)
+			{
+				ss.str("");
+				ss << "error casting cycle '" << str_values[i] << "' to int on row " << i << "of external file " << efile.get_filename() << " , Stopped...";
+				throw_control_file_error(f_rec, ss.str());
+			}
+
+		}
+	}
+	return cycle_map;
+
 }
 
 map<string, int> Pest::extract_cycle_numbers(ofstream& f_rec, string section_name, vector<string> possible_name_cols)
@@ -2462,6 +2521,9 @@ void Pest::child_pest_update(int icycle)
 		}
 	}
 	n_adj_par = new_n_adj_par;
+	this->get_pestpp_options_ptr()->set_check_tplins(false);
+	//get_pestpp_options_ptr->set_check_tplins(false);
+	//this.check_inputs();
 }
 
 vector<int> Pest::get_assim_cycles()

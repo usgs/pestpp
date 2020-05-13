@@ -14,6 +14,8 @@
 #include "SVDPackage.h"
 #include "DataAssimilator.h"
 #include "EnsembleMethodUtils.h"
+//#include <Eigen/SVD>
+//using namespace Eigen;
 
 
 
@@ -887,7 +889,7 @@ void DataAssimilator::initialize(int icycle)
 	message(0, "initializing");
 	stringstream ss;
 	ofstream& f_rec = file_manager.rec_ofstream();
-	try
+	/*try
 	{
 		pest_scenario.assign_da_cycles(f_rec);
 	}
@@ -896,7 +898,7 @@ void DataAssimilator::initialize(int icycle)
 		ss.str("");
 		ss << "error assigning cycle info: " << e.what();
 		throw_da_error(ss.str());
-	}
+	}*/
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
@@ -1400,16 +1402,28 @@ void DataAssimilator::initialize(int icycle)
 		performance_log->log_event("running initial ensemble");
 		message(1, "running initial ensemble of size", oe.shape().first);
 		vector<int> failed = run_ensemble(pe, oe);
+
 		if (pe.shape().first == 0)
 			throw_da_error("all realizations failed during initial evaluation");
-
-
+		if (failed.size() > 0)
+			oe_base.drop_rows(failed);
+		
 
 		//string obs_csv = file_manager.get_base_filename() + ".0.obs.csv";
 		//message(1, "saving results of initial ensemble run to", obs_csv);
 		//oe.to_csv(obs_csv);
-		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+		if (icycle == 0)
+		{
+			pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+		}
 	}
+	// extract states forecast from oe and add them to pe. States have zero weights and exist in both oe and pe
+	vector <string> dyn_states;
+	dyn_states = get_dynamic_states();
+	add_dynamic_state_to_pe();
+	// loop over names
+	// and change by using replace_col
+	//pe.replace_col(name, value_eigen)
 
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
@@ -1546,7 +1560,44 @@ void DataAssimilator::initialize(int icycle)
 	message(1, "current lambda:", last_best_lam);
 	message(0, "initialization complete");
 }
+void DataAssimilator::add_dynamic_state_to_pe()
+{
+	
+	vector<string> real_names = oe.get_real_names();
+	
+	if (dyn_states_names.size() > 0)	{	
+			
+		Eigen::MatrixXd mat = oe.get_eigen(real_names, dyn_states_names);
+		pe.add_2_cols_ip(dyn_states_names, mat);
+		
+	}
+}
+vector<string> DataAssimilator::get_dynamic_states()
+{
+	// find a list of dynamic states
+	//vector <string> dyn_states_names;	
+	if (dyn_states_names.size() > 0)
+	{
+		return dyn_states_names;
+	}
 
+	vector<string> obs_names = oe.get_var_names();
+	vector<string> par_names = pe.get_var_names();	
+	double w;
+	string name;
+	for (int i = 0; i < obs_names.size(); i++)	{
+		name = obs_names[i];
+		
+		w = pest_scenario.get_observation_info_ptr()->get_weight(obs_names[i]);		
+		if ((w == 0) & (std::count(par_names.begin(), par_names.end(), name)))
+		{
+			dyn_states_names.push_back(name);
+		}
+
+	}
+	return dyn_states_names;
+
+}
 vector<string> DataAssimilator::detect_prior_data_conflict()
 {
 	message(1, "checking for prior-data conflict...");
@@ -2585,8 +2636,9 @@ ParameterEnsemble DataAssimilator::calc_kf_upgrade(double cur_lam, unordered_map
 	}
 	else
 	{
-		pair<vector<string>, vector<string>> p(act_obs_names, act_par_names);
-		loc_map["all"] = p;
+		// Ayman noticed that p is empty when no localizer is used
+		//pair<vector<string>, vector<string>> p(act_obs_names, act_par_names);
+		//loc_map["all"] = p;
 	}
 
 	//prep the fast look par cov info
@@ -2620,13 +2672,18 @@ ParameterEnsemble DataAssimilator::calc_kf_upgrade(double cur_lam, unordered_map
 	unordered_map<string, double> weight_map;
 	weight_map.reserve(oe_upgrade.shape().second);
 	vector<string> obs_names = oe_upgrade.get_var_names();
+	Observations obs_value = pest_scenario.get_ctl_observations();
+	vector<string> names = oe.get_var_names();	
+	Eigen::MatrixXd meas_errors = oe_base.get_eigen(oe_base.get_real_names(), obs_names);// -obs_value.get_rec(obs_names);
+	unordered_map<string, Eigen::VectorXd> obs_err_map;
+	obs_err_map.reserve(obs_names.size());
+	
 	double w;
 	for (int i = 0; i < obs_names.size(); i++)
 	{
 		w = pest_scenario.get_observation_info_ptr()->get_weight(obs_names[i]);
-		//don't want to filter on weight here - might be changing weights, etc...
-		//if (w == 0.0)
-		//	continue;
+		meas_errors.col(i).array() = meas_errors.col(i).array() - obs_value.get_rec(obs_names[i]);// ;
+		obs_err_map[obs_names[i]] = meas_errors.col(i);		
 		weight_map[obs_names[i]] = w;
 	}
 
@@ -2638,7 +2695,7 @@ ParameterEnsemble DataAssimilator::calc_kf_upgrade(double cur_lam, unordered_map
 	Am_map.reserve(par_names.size());
 	obs_resid_map.reserve(obs_names.size());
 	obs_diff_map.reserve(obs_names.size());
-
+	
 	//check for the 'center_on' real - it may have been dropped...
 	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
 	if (center_on.size() > 0)
@@ -2657,7 +2714,7 @@ ParameterEnsemble DataAssimilator::calc_kf_upgrade(double cur_lam, unordered_map
 		}
 	}
 
-	Eigen::MatrixXd mat = ph.get_obs_resid_subset(oe_upgrade);
+	Eigen::MatrixXd mat = ph.get_obs_resid_subset(oe_upgrade); // oe - oe_base --->(H-D)
 	for (int i = 0; i < obs_names.size(); i++)
 	{
 		obs_resid_map[obs_names[i]] = mat.col(i);
@@ -2692,7 +2749,7 @@ ParameterEnsemble DataAssimilator::calc_kf_upgrade(double cur_lam, unordered_map
 
 
 
-	kf_work(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map,
+	kf_work(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map, obs_err_map,
 		localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
 	/*
 	if ((num_threads < 1) || (loc_map.size() == 1))
@@ -2764,15 +2821,18 @@ bool DataAssimilator::solve_new()
 		message(1, s);
 	}
 
-	if ((use_subset) && (subset_size > pe.shape().first))
+	if (use_ies) // use iterative solver
 	{
-		ss.str("");
-		ss << "++ies_subset size (" << subset_size << ") greater than ensemble size (" << pe.shape().first << ")";
-		frec << "  ---  " << ss.str() << endl;
-		cout << "  ---  " << ss.str() << endl;
-		frec << "  ...reducing ++ies_subset_size to " << pe.shape().first << endl;
-		cout << "  ...reducing ++ies_subset_size to " << pe.shape().first << endl;
-		subset_size = pe.shape().first;
+		if ((use_subset) && (subset_size > pe.shape().first))
+		{
+			ss.str("");
+			ss << "++ies_subset size (" << subset_size << ") greater than ensemble size (" << pe.shape().first << ")";
+			frec << "  ---  " << ss.str() << endl;
+			cout << "  ---  " << ss.str() << endl;
+			frec << "  ...reducing ++ies_subset_size to " << pe.shape().first << endl;
+			cout << "  ...reducing ++ies_subset_size to " << pe.shape().first << endl;
+			subset_size = pe.shape().first;
+		}
 	}
 
 	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
@@ -2858,9 +2918,19 @@ bool DataAssimilator::solve_new()
 	int best_idx = -1;
 	double best_mean = 1.0e+30, best_std = 1.0e+30;
 	double mean, std;
-
-	message(0, "running lambda ensembles");
-	vector<ObservationEnsemble> oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
+	vector<ObservationEnsemble> oe_lams;
+	
+	if (use_ies)
+	{
+		message(0, "running lambda ensembles");
+		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
+	}
+	else
+	{
+		// Ayman, only run the averages
+		message(0, "running lambda ensembles");
+		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
+	}
 
 	message(0, "evaluting lambda ensembles");
 	message(1, "last mean: ", last_best_mean);
@@ -2923,145 +2993,156 @@ bool DataAssimilator::solve_new()
 		return false;
 
 	}
+
+	if (~use_ies)
+	{
+		pe = pe_lams[best_idx];
+		oe = oe_lam_best;
+		return true;
+
+	}
+
 	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
 	double lam_inc = pest_scenario.get_pestpp_options().get_ies_lambda_inc_fac();
 	double lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
 
 
 	//subset stuff here
-	if ((best_idx != -1) && (use_subset) && (subset_size < pe.shape().first))
+	if (use_ies)
 	{
-
-		double acc_phi = last_best_mean * acc_fac;
-
-		if (pest_scenario.get_pestpp_options().get_ies_debug_high_subset_phi())
+		if ((best_idx != -1) && (use_subset) && (subset_size < pe.shape().first))
 		{
-			cout << "ies_debug_high_subset_phi active" << endl;
-			best_mean = acc_phi + 1.0;
-		}
 
-		if (best_mean > acc_phi)
-		{
-			//ph.update(oe_lams[best_idx],pe_lams[best_idx]);
+			double acc_phi = last_best_mean * acc_fac;
 
-			double new_lam = last_best_lam * lam_inc;
-			new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
-			last_best_lam = new_lam;
-			ss.str("");
-			ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
-			string m = ss.str();
-			message(0, m);
-			message(1, "abandoning current lambda ensembles, increasing lambda to ", new_lam);
-			message(1, "updating realizations with reduced phi");
-			update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx]);
-			message(1, "returing to lambda calculations...");
-			return false;
-		}
-
-		//release the memory of the unneeded pe_lams
-		for (int i = 0; i < pe_lams.size(); i++)
-		{
-			if (i == best_idx)
-				continue;
-			pe_lams[i] = ParameterEnsemble();
-		}
-		//need to work out which par and obs en real names to run - some may have failed during subset testing...
-		ObservationEnsemble remaining_oe_lam = oe;//copy
-		ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
-		vector<string> pe_keep_names, oe_keep_names;
-		vector<string> pe_names = pe.get_real_names(), oe_names = oe.get_real_names();
-
-		vector<string> org_pe_idxs, org_oe_idxs;
-		set<string> ssub;
-		for (auto& i : subset_idxs)
-			ssub.emplace(pe_names[i]);
-		for (int i = 0; i < pe_names.size(); i++)
-			if (ssub.find(pe_names[i]) == ssub.end())
+			if (pest_scenario.get_pestpp_options().get_ies_debug_high_subset_phi())
 			{
-				pe_keep_names.push_back(pe_names[i]);
-				//oe_keep_names.push_back(oe_names[i]);
+				cout << "ies_debug_high_subset_phi active" << endl;
+				best_mean = acc_phi + 1.0;
 			}
-		ssub.clear();
-		for (auto& i : subset_idxs)
-			ssub.emplace(oe_names[i]);
-		for (int i = 0; i < oe_names.size(); i++)
-			if (ssub.find(oe_names[i]) == ssub.end())
+
+			if (best_mean > acc_phi)
 			{
-				oe_keep_names.push_back(oe_names[i]);
+				//ph.update(oe_lams[best_idx],pe_lams[best_idx]);
+
+				double new_lam = last_best_lam * lam_inc;
+				new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
+				last_best_lam = new_lam;
+				ss.str("");
+				ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
+				string m = ss.str();
+				message(0, m);
+				message(1, "abandoning current lambda ensembles, increasing lambda to ", new_lam);
+				message(1, "updating realizations with reduced phi");
+				update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx]);
+				message(1, "returing to lambda calculations...");
+				return false;
 			}
-		message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
-		ph.update(oe_lams[best_idx], pe_lams[best_idx]);
-		ph.report(true);
-		message(0, "running remaining realizations for best lambda, scale:", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 
-		//pe_keep_names and oe_keep_names are names of the remaining reals to eval
-		performance_log->log_event("dropping subset idxs from remaining_pe_lam");
-		remaining_pe_lam.keep_rows(pe_keep_names);
-		performance_log->log_event("dropping subset idxs from remaining_oe_lam");
-		remaining_oe_lam.keep_rows(oe_keep_names);
-		//save these names for later
-		org_pe_idxs = remaining_pe_lam.get_real_names();
-		org_oe_idxs = remaining_oe_lam.get_real_names();
-		///run
-		vector<int> fails = run_ensemble(remaining_pe_lam, remaining_oe_lam);
+			//release the memory of the unneeded pe_lams
+			for (int i = 0; i < pe_lams.size(); i++)
+			{
+				if (i == best_idx)
+					continue;
+				pe_lams[i] = ParameterEnsemble();
+			}
+			//need to work out which par and obs en real names to run - some may have failed during subset testing...
+			ObservationEnsemble remaining_oe_lam = oe;//copy
+			ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
+			vector<string> pe_keep_names, oe_keep_names;
+			vector<string> pe_names = pe.get_real_names(), oe_names = oe.get_real_names();
 
-		//for testing
-		if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder())
-			fails.push_back(0);
+			vector<string> org_pe_idxs, org_oe_idxs;
+			set<string> ssub;
+			for (auto& i : subset_idxs)
+				ssub.emplace(pe_names[i]);
+			for (int i = 0; i < pe_names.size(); i++)
+				if (ssub.find(pe_names[i]) == ssub.end())
+				{
+					pe_keep_names.push_back(pe_names[i]);
+					//oe_keep_names.push_back(oe_names[i]);
+				}
+			ssub.clear();
+			for (auto& i : subset_idxs)
+				ssub.emplace(oe_names[i]);
+			for (int i = 0; i < oe_names.size(); i++)
+				if (ssub.find(oe_names[i]) == ssub.end())
+				{
+					oe_keep_names.push_back(oe_names[i]);
+				}
+			message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
+			ph.update(oe_lams[best_idx], pe_lams[best_idx]);
+			ph.report(true);
+			message(0, "running remaining realizations for best lambda, scale:", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 
-		//if any of the remaining runs failed
-		if (fails.size() == org_pe_idxs.size())
-			throw_da_error(string("all remaining realizations failed...something is prob wrong"));
-		if (fails.size() > 0)
+			//pe_keep_names and oe_keep_names are names of the remaining reals to eval
+			performance_log->log_event("dropping subset idxs from remaining_pe_lam");
+			remaining_pe_lam.keep_rows(pe_keep_names);
+			performance_log->log_event("dropping subset idxs from remaining_oe_lam");
+			remaining_oe_lam.keep_rows(oe_keep_names);
+			//save these names for later
+			org_pe_idxs = remaining_pe_lam.get_real_names();
+			org_oe_idxs = remaining_oe_lam.get_real_names();
+			///run
+			vector<int> fails = run_ensemble(remaining_pe_lam, remaining_oe_lam);
+
+			//for testing
+			if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder())
+				fails.push_back(0);
+
+			//if any of the remaining runs failed
+			if (fails.size() == org_pe_idxs.size())
+				throw_da_error(string("all remaining realizations failed...something is prob wrong"));
+			if (fails.size() > 0)
+			{
+
+				vector<string> new_pe_idxs, new_oe_idxs;
+				vector<int>::iterator start = fails.begin(), end = fails.end();
+				stringstream ss;
+				ss << "the following par:obs realizations failed during evaluation of the remaining ensemble: ";
+				for (int i = 0; i < org_pe_idxs.size(); i++)
+					if (find(start, end, i) == end)
+					{
+						new_pe_idxs.push_back(org_pe_idxs[i]);
+						new_oe_idxs.push_back(org_oe_idxs[i]);
+					}
+					else
+					{
+						ss << org_pe_idxs[i] << ":" << org_oe_idxs[i] << " , ";
+					}
+				string s = ss.str();
+				message(1, s);
+				remaining_oe_lam.keep_rows(new_oe_idxs);
+				remaining_pe_lam.keep_rows(new_pe_idxs);
+
+			}
+			//drop the remaining runs from the par en then append the remaining par runs (in case some failed)
+			performance_log->log_event("assembling ensembles");
+			pe_lams[best_idx].drop_rows(pe_keep_names);
+			pe_lams[best_idx].append_other_rows(remaining_pe_lam);
+			//append the remaining obs en
+			oe_lam_best.append_other_rows(remaining_oe_lam);
+			assert(pe_lams[best_idx].shape().first == oe_lam_best.shape().first);
+			drop_bad_phi(pe_lams[best_idx], oe_lam_best);
+			if (oe_lam_best.shape().first == 0)
+			{
+				throw_da_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
+			}
+			performance_log->log_event("updating phi");
+			ph.update(oe_lam_best, pe_lams[best_idx]);
+			best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+			best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+			message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
+			ph.report(true);
+		}
+		else
 		{
-
-			vector<string> new_pe_idxs, new_oe_idxs;
-			vector<int>::iterator start = fails.begin(), end = fails.end();
-			stringstream ss;
-			ss << "the following par:obs realizations failed during evaluation of the remaining ensemble: ";
-			for (int i = 0; i < org_pe_idxs.size(); i++)
-				if (find(start, end, i) == end)
-				{
-					new_pe_idxs.push_back(org_pe_idxs[i]);
-					new_oe_idxs.push_back(org_oe_idxs[i]);
-				}
-				else
-				{
-					ss << org_pe_idxs[i] << ":" << org_oe_idxs[i] << " , ";
-				}
-			string s = ss.str();
-			message(1, s);
-			remaining_oe_lam.keep_rows(new_oe_idxs);
-			remaining_pe_lam.keep_rows(new_pe_idxs);
+			ph.update(oe_lam_best, pe_lams[best_idx]);
+			best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+			best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 
 		}
-		//drop the remaining runs from the par en then append the remaining par runs (in case some failed)
-		performance_log->log_event("assembling ensembles");
-		pe_lams[best_idx].drop_rows(pe_keep_names);
-		pe_lams[best_idx].append_other_rows(remaining_pe_lam);
-		//append the remaining obs en
-		oe_lam_best.append_other_rows(remaining_oe_lam);
-		assert(pe_lams[best_idx].shape().first == oe_lam_best.shape().first);
-		drop_bad_phi(pe_lams[best_idx], oe_lam_best);
-		if (oe_lam_best.shape().first == 0)
-		{
-			throw_da_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
-		}
-		performance_log->log_event("updating phi");
-		ph.update(oe_lam_best, pe_lams[best_idx]);
-		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
-		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-		message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
-		ph.report(true);
 	}
-	else
-	{
-		ph.update(oe_lam_best, pe_lams[best_idx]);
-		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
-		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-
-	}
-
 	ph.update(oe_lam_best, pe_lams[best_idx]);
 	best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 	best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
@@ -3115,10 +3196,26 @@ bool DataAssimilator::solve_new()
 	return true;
 }
 
+void DataAssimilator::eig2csv(string name, Eigen::MatrixXd matrix)
+{
+	ofstream file(name.c_str());
 
+	for (int i = 0; i < matrix.rows(); i++) {
+		for (int j = 0; j < matrix.cols(); j++) {
+			string str = std::to_string(matrix(i, j));
+			if (j + 1 == matrix.cols()) {
+				file << str;
+			}
+			else {
+				file << str << ',';
+			}
+		}
+		file << '\n';
+	}
+}
 ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unordered_map<string, Eigen::VectorXd>& par_resid_map,
 	unordered_map<string, Eigen::VectorXd>& par_diff_map, 	unordered_map<string, Eigen::VectorXd>& obs_resid_map,
-	unordered_map<string, Eigen::VectorXd>& obs_diff_map, Localizer& localizer,
+	unordered_map<string, Eigen::VectorXd>& obs_diff_map, unordered_map<string, Eigen::VectorXd>& obs_err_map, Localizer& localizer,
 	unordered_map<string, double>& parcov_inv_map, 	unordered_map<string, double>& weight_map,
 	ParameterEnsemble& pe_upgrade, 	unordered_map<string, pair<vector<string>, vector<string>>>& loc_map,
 	unordered_map<string, Eigen::VectorXd>& Am_map, Localizer::How& how)
@@ -3204,8 +3301,7 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 	use_prior_scaling = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_use_prior_scaling();
 	num_reals = pe_upgrade.shape().first;
 	verbose_level = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_verbose_level();
-	//ctrl_guard.unlock();
-	//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_localize_how()[0] == 'P')
+	
 	if (how == Localizer::How::PARAMETERS)
 		loc_by_obs = false;
 	//break;
@@ -3213,7 +3309,7 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 	ofstream f_thread;
 	
 	Eigen::MatrixXd par_resid, par_diff, Am;
-	Eigen::MatrixXd obs_resid, obs_diff, loc;
+	Eigen::MatrixXd obs_resid, obs_diff, obs_err, loc;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> weights, parcov_inv;
 	vector<string> par_names, obs_names;
 	while (true)
@@ -3224,52 +3320,6 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 		use_localizer = false;
 		//the end condition
 		//the end condition
-		/*
-		while (true)
-		{
-			if (next_guard.try_lock())
-			{
-				if (count == keys.size())
-				{
-					if (verbose_level > 1)
-					{
-						cout << "upgrade thread: " << thread_id << " processed " << pcount << " upgrade parts" << endl;
-					}
-					if (f_thread.good())
-						f_thread.close();
-					return;
-				}
-				string k = keys[count];
-				pair<vector<string>, vector<string>> p = cases.at(k);
-				par_names = p.second;
-				obs_names = p.first;
-				if (localizer.get_use())
-				{
-					if ((loc_by_obs) && (par_names.size() == 1) && (k == par_names[0]))
-						use_localizer = true;
-					else if ((!loc_by_obs) && (obs_names.size() == 1) && (k == obs_names[0]))
-					{
-						use_localizer = true;
-						//loc_by_obs = false;
-					}
-				}
-				if (count % 1000 == 0)
-				{
-					ss.str("");
-					ss << "upgrade thread progress: " << count << " of " << total << " parts done";
-					if (verbose_level > 1)
-						cout << ss.str() << endl;
-					performance_log->log_event(ss.str());
-				}
-				count++;
-				t_count = count;
-				pcount++;
-				next_guard.unlock();
-				break;
-			}
-		}
-		*/
-
 
 		if (verbose_level > 2)
 		{
@@ -3280,7 +3330,8 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 				f_thread << "," << name;
 			f_thread << endl;
 		}
-
+		obs_names = loc_map.at("all").first;
+		par_names = loc_map.at("all").second;
 		par_resid.resize(0, 0);
 		par_diff.resize(0, 0);
 		obs_resid.resize(0, 0);
@@ -3290,93 +3341,41 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 		weights.resize(0);
 		parcov_inv.resize(0);
 		Am.resize(0, 0);
-		/*
-		unique_lock<mutex> obs_diff_guard(obs_diff_lock, defer_lock);
-		unique_lock<mutex> obs_resid_guard(obs_resid_lock, defer_lock);
-		unique_lock<mutex> par_diff_guard(par_diff_lock, defer_lock);
-		unique_lock<mutex> par_resid_guard(par_resid_lock, defer_lock);
-		unique_lock<mutex> loc_guard(loc_lock, defer_lock);
-		unique_lock<mutex> weight_guard(weight_lock, defer_lock);
-		unique_lock<mutex> parcov_guard(parcov_lock, defer_lock);
-		unique_lock<mutex> am_guard(am_lock, defer_lock);
-		*/
-		/*
-		while (true)
+		
+		obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
+		par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
+		par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
+		weights = local_utils::get_matrix_from_map(obs_names, weight_map);
+		obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
+		obs_err = local_utils::get_matrix_from_map(num_reals, obs_names, obs_err_map);
+		parcov_inv = local_utils::get_matrix_from_map(par_names, parcov_inv_map);
+		if ((!use_approx) && (Am.rows() == 0))
 		{
-			if (((use_approx) || (par_resid.rows() > 0)) &&
-				(weights.size() > 0) &&
-				(parcov_inv.size() > 0) &&
-				(par_diff.rows() > 0) &&
-				(obs_resid.rows() > 0) &&
-				(obs_diff.rows() > 0) &&
-				((!use_localizer) || (loc.rows() > 0)) &&
-				((use_approx) || (Am.rows() > 0)))
-				break;
-			if ((use_localizer) && (loc.rows() == 0) && (loc_guard.try_lock()))
-			{
-				if (loc_by_obs)
-					loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
-				else
-					loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
-				loc_guard.unlock();
-			}
-			if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
-			{
-				//piggy back here for thread safety
-				//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
-				//	use_propack = true;
-				obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
-				obs_diff_guard.unlock();
-			}
-			if ((obs_resid.rows() == 0) && (obs_resid_guard.try_lock()))
-			{
-				obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
-				obs_resid_guard.unlock();
-			}
-			if ((par_diff.rows() == 0) && (par_diff_guard.try_lock()))
-			{
-				par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
-				par_diff_guard.unlock();
-			}
-			if ((par_resid.rows() == 0) && (par_resid_guard.try_lock()))
-			{
-				par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
-				par_resid_guard.unlock();
-			}
-			if ((weights.rows() == 0) && (weight_guard.try_lock()))
-			{
-				weights = local_utils::get_matrix_from_map(obs_names, weight_map);
-				weight_guard.unlock();
-			}
-			if ((parcov_inv.rows() == 0) && (parcov_guard.try_lock()))
-			{
-				parcov_inv = local_utils::get_matrix_from_map(par_names, parcov_inv_map);
-				parcov_guard.unlock();
-			}
-			if ((!use_approx) && (Am.rows() == 0) && (am_guard.try_lock()))
-			{
-				//Am = local_utils::get_matrix_from_map(num_reals, par_names, Am_map).transpose();
-				int am_cols = Am_map[par_names[0]].size();
-				Am.resize(par_names.size(), am_cols);
-				Am.setZero();
+			//Am = local_utils::get_matrix_from_map(num_reals, par_names, Am_map).transpose();
+			int am_cols = Am_map[par_names[0]].size();
+			Am.resize(par_names.size(), am_cols);
+			Am.setZero();
 
-				for (int j = 0; j < par_names.size(); j++)
-				{
-					Am.row(j) = Am_map[par_names[j]];
-				}
-				am_guard.unlock();
+			for (int j = 0; j < par_names.size(); j++)
+			{
+				Am.row(j) = Am_map[par_names[j]];
 			}
+			
 		}
-		*/
+
+
+
+		
+		// *******************************************************
 		par_diff.transposeInPlace();
 		obs_diff.transposeInPlace();
 		obs_resid.transposeInPlace();
 		par_resid.transposeInPlace();
+		obs_err.transposeInPlace();
 
+		
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
 		Eigen::MatrixXd scaled_residual = weights * obs_resid;
-
-
 
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_resid", par_resid);
 		Eigen::MatrixXd scaled_par_resid;
@@ -3409,26 +3408,39 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 		}
 
 		// old // obs_diff = scale * (weights * obs_diff);
-		obs_diff = scale * obs_diff;
-		// todo: check using parcovinv for enkf
-		if (use_prior_scaling) 
-			par_diff = scale * parcov_inv * par_diff;
-		else
-			par_diff = scale * par_diff;
+		obs_diff = scale * obs_diff;// (H-Hm)/sqrt(N-1)		
+		par_diff = scale * par_diff;// (K-Km)/sqrt(N-1)		
+		obs_err = scale * obs_err; //  (E-Em)/sqrt(N-1)	
+		obs_resid = (-1.0) * obs_resid; // D-H  , the negative one is becuase obs_resid is calculated as H-D ???
+		if (true) // just debuging
+		{
+			eig2csv("kdash.csv", par_diff);
+			eig2csv("hdash.csv", obs_diff);
+			eig2csv("H_D.csv", obs_resid);
+			eig2csv("noise.csv", obs_err);
+		}
 
 		// todo: what is the error ensemble ????
 		// compute D' = D-H 
 
-		Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
+		Eigen::MatrixXd s2_, upgrade_1, s, V, U, s_perc;
 
 
 		SVD_REDSVD rsvd;
 		Eigen::MatrixXd C;
-		C = obs_diff; //  todo: add error ensemble
-		rsvd.solve_ip(C, s, Ut, V, eigthresh, maxsing);
-
-		Ut.transposeInPlace();
-		obs_diff.resize(0, 0);
+		C = obs_diff + obs_err; //  todo: add error ensemble
+		eig2csv("C.csv", C);
+		eigthresh = 0;
+		//rsvd.solve_ip(C, s, U, V, eigthresh, maxsing);
+		//Eigen::BDCSVD<Eigen::MatrixXd> SVD(A, Eigen::ComputeThinU | Eigen::ComputeThinV);
+		Eigen::JacobiSVD<Eigen::MatrixXd> svd(C, Eigen::ComputeThinU | Eigen::ComputeThinV);
+		U = svd.matrixU();
+		s = svd.singularValues();
+		eig2csv("s.csv", s);
+		s_perc = s * (100.0/s.sum());
+		
+		
+		//obs_diff.resize(0, 0);
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Ut", Ut);
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "s", s);
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "V", V);
@@ -3436,36 +3448,48 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 		Eigen::MatrixXd s2 = s.cwiseProduct(s);
 
 		// old // ivec = ((Eigen::VectorXd::Ones(s2.size()) * (cur_lam + 1.0)) + s2).asDiagonal().inverse();
-		ivec = s2.asDiagonal().inverse();
-		
+		s2_ = s2.asDiagonal().inverse();
+		eig2csv("s2_.csv", s2_);
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "ivec", ivec);
 		//old// Eigen::MatrixXd X1 = Ut * scaled_residual;
-		Eigen::MatrixXd X1 = ivec * Ut;
-		X1 = X1 * 1; 
+		Eigen::MatrixXd X1 = s2_ * U.transpose();
+		eig2csv("X1.csv", X1);
+		X1 = X1 * obs_resid; 
+		eig2csv("X2.csv", X1);
+		X1 = U * X1;
+		eig2csv("X3.csv", X1);
+		X1 = obs_diff.transpose() * X1;
+		eig2csv("X4.csv", X1);
+		upgrade_1 = par_diff * X1;
+		eig2csv("upgrade.csv", upgrade_1);
+		pe_upgrade.add_2_cols_ip(par_names, upgrade_1.transpose());
+		return pe_upgrade;
+		break;
+		
 		//X1 = 1;
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
-		Eigen::MatrixXd X2 = ivec * X1;
-		X1.resize(0, 0);
+		//Eigen::MatrixXd X2 = ivec * X1;
+		//X1.resize(0, 0);
 
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X2", X2);
-		Eigen::MatrixXd X3 = V * s.asDiagonal() * X2;
-		X2.resize(0, 0);
+		//Eigen::MatrixXd X3 = V * s.asDiagonal() * X2;
+		//X2.resize(0, 0);
 
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X3", X3);
-		if (use_prior_scaling)
+		/*if (use_prior_scaling)
 		{
 			upgrade_1 = -1.0 * parcov_inv * par_diff * X3;
 		}
 		else
 		{
 			upgrade_1 = -1.0 * par_diff * X3;
-		}
-		upgrade_1.transposeInPlace();
+		}*/
+		//upgrade_1.transposeInPlace();
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
-		X3.resize(0, 0);
+		//X3.resize(0, 0);
 
 
-		Eigen::MatrixXd upgrade_2;
+		/*Eigen::MatrixXd upgrade_2;
 		if ((!use_approx) && (iter > 1))
 		{
 			//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Am", Am);
@@ -3500,7 +3524,7 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 			//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_2", upgrade_2);
 			upgrade_2.resize(0, 0);
 
-		}
+		} */
 
 		//unique_lock<mutex> put_guard(put_lock, defer_lock);
 		/*

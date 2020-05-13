@@ -91,6 +91,7 @@ public:
 	void child_pest_update(int icycle);
 	vector<int> get_assim_cycles();
 	void assign_da_cycles(ofstream& f_rec);
+	vector<pair<string, int>> extract_cycle_numbers2(ofstream& f_rec, string section_name, vector<string> possible_name_cols);
 	virtual ~Pest();
 	
 protected:

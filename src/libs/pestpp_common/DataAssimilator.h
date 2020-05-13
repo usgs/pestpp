@@ -75,6 +75,8 @@ public:
 		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 		RunManagerAbstract* _run_mgr_ptr);
 	void initialize(int icycle);
+	void add_dynamic_state_to_pe();
+	vector<string> get_dynamic_states();
 	void iterate_2_solution();
 
 	void kf_upate();
@@ -116,6 +118,7 @@ private:
 	double last_best_lam, last_best_mean, last_best_std;
 	vector<double> best_mean_phis;
 	double best_phi_yet;
+	vector<string> dyn_states_names;
 
 	int consec_bad_lambda_cycles;
 
@@ -149,12 +152,13 @@ private:
 
 	ParameterEnsemble calc_kf_upgrade(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
 
-	ParameterEnsemble kf_work(PerformanceLog* _performance_log, unordered_map<string, 
+	void eig2csv(string name, Eigen::MatrixXd matrix);
+
+	ParameterEnsemble kf_work(PerformanceLog* _performance_log, unordered_map<string,
 		Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map, 
 		unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, 
-		Eigen::VectorXd>& _obs_diff_map, Localizer& _localizer, unordered_map<string, 
-		double>& _parcov_inv_map, unordered_map<string, 
-		double>& _weight_map, ParameterEnsemble& _pe_upgrade, unordered_map<string, 
+		Eigen::VectorXd>& _obs_diff_map, unordered_map<string, Eigen::VectorXd>& obs_err_map,  Localizer& _localizer, unordered_map<string,
+		double>& _parcov_inv_map, unordered_map<string,double>& _weight_map, ParameterEnsemble& _pe_upgrade, unordered_map<string, 
 		pair<vector<string>, vector<string>>>& _cases, unordered_map<string, 
 		Eigen::VectorXd>& _Am_map, Localizer::How& _how);
 
