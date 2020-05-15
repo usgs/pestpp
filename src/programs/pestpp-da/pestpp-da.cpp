@@ -359,7 +359,7 @@ int main(int argc, char* argv[])
 			run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), childPest.get_ctl_observations());
 
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
-			da.use_ies = true;
+			da.use_ies = false;
 			if (*icycle > 0)
 			{
 				da.set_pe(curr_pe);

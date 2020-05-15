@@ -2750,7 +2750,7 @@ ParameterEnsemble DataAssimilator::calc_kf_upgrade(double cur_lam, unordered_map
 
 
 	kf_work(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map, obs_err_map,
-		localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
+		localizer, parcov_inv_map, weight_map, pe_upgrade, cur_lam, loc_map, Am_map, _how);
 	/*
 	if ((num_threads < 1) || (loc_map.size() == 1))
 		//if (num_threads < 1)
@@ -2861,15 +2861,25 @@ bool DataAssimilator::solve_new()
 	for (auto& lam_mult : lam_mults)
 	{
 		ss.str("");
-		double cur_lam = last_best_lam * lam_mult;
-		ss << "starting calcs for lambda" << cur_lam;
-		message(1, "starting lambda calcs for lambda", cur_lam);
-		message(2, "see .log file for more details");
+		double cur_lam;
+		
 		ParameterEnsemble pe_upgrade;
 		if (use_ies)
+		{    
+			cur_lam = last_best_lam * lam_mult;
+			ss << "starting calcs for lambda" << cur_lam;
+			message(1, "starting lambda calcs for lambda", cur_lam);
+			message(2, "see .log file for more details");			
 			pe_upgrade = calc_localized_upgrade_threaded(cur_lam, loc_map);
+		}
 		else
+		{
+			cur_lam = lam_mult;
+			ss << "starting calcs for lambda" << cur_lam;
+			message(1, "starting lambda calcs for lambda", cur_lam);
+			message(2, "see .log file for more details");
 			pe_upgrade = calc_kf_upgrade(cur_lam, loc_map);
+		}
 
 		for (auto sf : pest_scenario.get_pestpp_options().get_lambda_scale_vec())
 		{
@@ -3217,7 +3227,7 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 	unordered_map<string, Eigen::VectorXd>& par_diff_map, 	unordered_map<string, Eigen::VectorXd>& obs_resid_map,
 	unordered_map<string, Eigen::VectorXd>& obs_diff_map, unordered_map<string, Eigen::VectorXd>& obs_err_map, Localizer& localizer,
 	unordered_map<string, double>& parcov_inv_map, 	unordered_map<string, double>& weight_map,
-	ParameterEnsemble& pe_upgrade, 	unordered_map<string, pair<vector<string>, vector<string>>>& loc_map,
+	ParameterEnsemble& pe_upgrade, double cur_lam,	unordered_map<string, pair<vector<string>, vector<string>>>& loc_map,
 	unordered_map<string, Eigen::VectorXd>& Am_map, Localizer::How& how)
 	
 {
@@ -3290,10 +3300,6 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 	bool use_prior_scaling;
 	bool use_localizer = false;
 	bool loc_by_obs = true;
-	double cur_lam;
-
-	cur_lam = 1.0;
-
 
 	maxsing = pe_upgrade.get_pest_scenario_ptr()->get_svd_info().maxsing;
 	eigthresh = pe_upgrade.get_pest_scenario_ptr()->get_svd_info().eigthresh;
@@ -3363,9 +3369,7 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 			
 		}
 
-
-
-		
+	
 		// *******************************************************
 		par_diff.transposeInPlace();
 		obs_diff.transposeInPlace();
@@ -3394,10 +3398,7 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 		stringstream ss;
 
 		double scale = (1.0 / (sqrt(double(num_reals - 1))));
-		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
 
-		//if (use_localizer)
-			//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "loc", loc);
 		if (use_localizer) // todo: check localizer for kf
 		{
 			if (loc_by_obs)
@@ -3407,7 +3408,6 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 
 		}
 
-		// old // obs_diff = scale * (weights * obs_diff);
 		obs_diff = scale * obs_diff;// (H-Hm)/sqrt(N-1)		
 		par_diff = scale * par_diff;// (K-Km)/sqrt(N-1)		
 		obs_err = scale * obs_err; //  (E-Em)/sqrt(N-1)	
@@ -3420,15 +3420,13 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 			eig2csv("noise.csv", obs_err);
 		}
 
-		// todo: what is the error ensemble ????
-		// compute D' = D-H 
 
 		Eigen::MatrixXd s2_, upgrade_1, s, V, U, s_perc;
 
 
 		SVD_REDSVD rsvd;
 		Eigen::MatrixXd C;
-		C = obs_diff + obs_err; //  todo: add error ensemble
+		C = obs_diff + cur_lam * obs_err; 
 		eig2csv("C.csv", C);
 		eigthresh = 0;
 		//rsvd.solve_ip(C, s, U, V, eigthresh, maxsing);
