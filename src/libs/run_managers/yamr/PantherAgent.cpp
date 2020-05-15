@@ -608,13 +608,27 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					}
 					catch (exception& e)
 					{
-						frec << "ERROR: could not process 'DA_CYCLE' " << da_cycle << ": " << e.what() << endl;
-						cout << "ERROR: could not process 'DA_CYCLE' " << da_cycle << ": " << e.what() << endl;
+						stringstream ss;
+						ss << "ERROR: could not process 'DA_CYCLE' " << da_cycle << ": " << e.what();
+						frec << ss.str() << endl;
+						cout << ss.str() << endl;
+						net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
+						char data;
+						err = send_message(net_pack, &data, 0);
+						terminate = true;
+						continue;
 					}
 					catch (...)
 					{
-						frec << "ERROR: could not process 'DA_CYCLE' " << da_cycle << endl;
-						cout << "ERROR: could not process 'DA_CYCLE' " << da_cycle << endl;
+						stringstream ss;
+						ss << "ERROR: could not process 'DA_CYCLE' " << da_cycle;
+						frec << ss.str() << endl;
+						cout << ss.str() << endl;
+						net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
+						char data;
+						err = send_message(net_pack, &data, 0);
+						terminate = true;
+						continue;
 					}
 				}
 				else
