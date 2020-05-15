@@ -973,7 +973,8 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 
 
 ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line, bool _cast) :
-	f_rec(_f_rec), cast(_cast), line(_line), delim(","), missing_val(""), filename("")
+	f_rec(_f_rec), cast(_cast), line(_line), delim(","), missing_val(""), filename(""),
+	index_col_name("")
 {
 }
 
@@ -1301,6 +1302,15 @@ bool ExternalCtlFile::isduplicated(string col_name)
 	if (cnames.size() != data.size())
 		return true;
 	return false;
+}
+
+void ExternalCtlFile::set_index_col_name(string& _col_name)
+{
+	set<string> cnames = get_col_set();
+	if (cnames.find(_col_name) == cnames.end())
+		throw_externalctrlfile_error("set_index_col_name() error: _col_name '" + _col_name + "' not found in col_names");
+	index_col_name = _col_name;
+
 }
 
 int ExternalCtlFile::get_row_idx(string key, string col_name)

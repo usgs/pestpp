@@ -806,12 +806,15 @@ unordered_set<string> InstructionFile::parse_and_check()
 			if ((first == '!') || (first == '(') || (first == '['))
 			{
 				name = parse_obs_name_from_token(tokens[i]);
-				if (names.find(name) != names.end())
+				if (!(name.find("DUM") != std::string::npos))
 				{
-					cout << line << endl;
-					throw_ins_error("observation '" + name + "' listed multiple times in ins file '" + ins_filename + "'");
+					if (names.find(name) != names.end())
+					{
+						cout << line << endl;
+						throw_ins_error("observation '" + name + "' listed multiple times in ins file '" + ins_filename + "'");
+					}
+					names.emplace(name);
 				}
-				names.emplace(name);
 			}
 		}
 	}

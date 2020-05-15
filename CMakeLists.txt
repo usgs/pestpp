@@ -10,9 +10,45 @@ if("${PESTPP_VERSION}" STREQUAL "")
     "Could not find PESTPP_VERSION in src/libs/common/config_os.h")
 endif()
 
+message(STATUS
+  "Configuring CMake ${CMAKE_VERSION} to build PESTPP ${PESTPP_VERSION}")
+
+# This logic needs to be considered before project()
+set(_change_MSVC_flags FALSE)
+if(WIN32)
+  if(CMAKE_VERSION VERSION_LESS 3.15.0)
+    set(_change_MSVC_flags TRUE)
+  else()
+    # Set MSVC runtime to MultiThreaded (/MT)
+    cmake_policy(SET CMP0091 NEW)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  endif()
+endif()
+
 project(PESTPP
   VERSION ${PESTPP_VERSION}
   LANGUAGES CXX)
+
+# Prevent running cmake in source dir
+if("${PESTPP_SOURCE_DIR}" STREQUAL "${PESTPP_BINARY_DIR}")
+   message(SEND_ERROR "In-source builds are not allowed")
+endif()
+
+if(_change_MSVC_flags)
+  # Modify compile flags to change MSVC runtime from /MD to /MT
+  set(_re_match "([\\/\\-]M)D")
+  set(_re_replace "\\1T")
+  string(REGEX REPLACE ${_re_match} ${_re_replace}
+    CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  string(REGEX REPLACE ${_re_match} ${_re_replace}
+    CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+  string(REGEX REPLACE ${_re_match} ${_re_replace}
+    CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+  string(REGEX REPLACE ${_re_match} ${_re_replace}
+    CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL}")
+  string(REGEX REPLACE ${_re_match} ${_re_replace}
+    CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+endif()
 
 # Fortran is not required (anymore), but can be enabled using either:
 #  1. ENABLE_Fortran=ON and use whatever default compiler is available
@@ -45,57 +81,79 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Use global "-fvisibility=hidden" see https://gcc.gnu.org/wiki/Visibility
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+
 # Global warning flags
 set(PESTPP_CXX_WARN_FLAGS "${PESTPP_CXX_WARN_FLAGS}"
   CACHE STRING "C++ flags used to compile PEST++ targets")
 
+# Global definitions
+if(WIN32)
+  add_compile_definitions(_WIN32_WINNT=0x0600)
+endif()
+
 option(BUILD_SHARED_LIBS "Build PEST++ shared (default is static)" OFF)
 message(STATUS "BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}")
 
-# Default install directory is custom layout in source dir ./bin
-if(WIN32)
-  if("${CMAKE_C_COMPILER_ID}" STREQUAL "Intel")
-    set(_osdir "iwin")
-  else()
-    set(_osdir "win")
-  endif()
-elseif(APPLE)
-  set(_osdir "mac")
-elseif(UNIX)
-  set(_osdir "linux")
-else()
-  message(SEND_ERROR "Could not detect OS")
-endif()
-set(_default_INSTALL_PREFIX "${PESTPP_SOURCE_DIR}/bin/${_osdir}")
-
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(CMAKE_INSTALL_PREFIX "${_default_INSTALL_PREFIX}"
-    CACHE PATH "Default custom install prefix" FORCE)
-endif()
-
-if("${CMAKE_INSTALL_PREFIX}" STREQUAL "${_default_INSTALL_PREFIX}")
-  if(BUILD_SHARED_LIBS AND UNIX)
-    message(WARNING
-      "Shared libraries may not be found correctly when installed to default "
-      "source dir, unless LD_LIBRARY_PATH is also set to that path. "
-      "It is advised to use BUILD_SHARED_LIBS=OFF or set "
-      "CMAKE_INSTALL_PREFIX to a common system prefix.")
-  endif()
-  message(STATUS
-    "Install location is default, to local source tree: "
-    "${CMAKE_INSTALL_PREFIX}")
-  set(BINDIR "${CMAKE_INSTALL_PREFIX}")
-  set(LIBDIR "${CMAKE_INSTALL_PREFIX}")
-  # Remove old files before installing new ones
-  install(CODE
-    "MESSAGE(\"Cleaning up previous files in ${CMAKE_INSTALL_PREFIX}\")")
-  install(CODE "file(REMOVE_RECURSE ${CMAKE_INSTALL_PREFIX})")
-else()
-  message(STATUS
-    "Install prefix set by CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
-  set(BINDIR "bin")
-  set(LIBDIR "lib")
-endif()
+# Default install directories
+include(GNUInstallDirs)
 
 # Build main targets in src
 add_subdirectory(src)
+
+# Define an custom OS tag for CPACK_SYSTEM_NAME and (for now) local bin sub-directory
+if(WIN32)
+  if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+    set(_ostag "iwin")
+  else()
+    set(_ostag "win")
+  endif()
+elseif(APPLE)
+  set(_ostag "mac")
+elseif(UNIX)
+  set(_ostag "linux")
+else()
+  set(_ostag "unknown")
+endif()
+
+# Use a custom command to locally install binaries after compiling
+# https://www.linux.com/training-tutorials/cmake-recipe-2-install-local-folder-build-dir-testing/
+# Use an extra command to copy binaries into a sub-directory within bin -- please remove soon
+if(WIN32)
+  set(_local_install_COMMAND_to_be_removed
+    cd "${PESTPP_SOURCE_DIR}\\bin" &&
+    md ${_ostag} &
+    copy /b pestpp-* ${_ostag}\\
+  )
+else()
+  set(_local_install_COMMAND_to_be_removed
+    cd "${PESTPP_SOURCE_DIR}/bin" &&
+    rm -rf ${_ostag} &&
+    mkdir ${_ostag} &&
+    cp pestpp-* ${_ostag}/
+  )
+endif()
+add_custom_target(local_install
+  ALL
+  "${CMAKE_COMMAND}"
+    -D CMAKE_INSTALL_PREFIX=${PESTPP_SOURCE_DIR}
+    -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_install.cmake"
+  COMMAND ${_local_install_COMMAND_to_be_removed}
+  DEPENDS
+    pestpp-glm
+    pestpp-ies
+    pestpp-opt
+    pestpp-sen
+    pestpp-swp
+  COMMENT "Installing local binaries to ${PESTPP_SOURCE_DIR}/bin"
+)
+
+# Packaging
+string(TOLOWER ${PROJECT_NAME} CPACK_PACKAGE_NAME)
+set(CPACK_PACKAGE_VERSION_MAJOR ${PESTPP_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${PESTPP_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${PESTPP_VERSION_PATCH})
+set(CPACK_SYSTEM_NAME ${_ostag})
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
+include(CPack)

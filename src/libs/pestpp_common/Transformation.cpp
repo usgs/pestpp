@@ -616,6 +616,7 @@ void TranSVD::calc_svd()
 	}
 	if (n_sing_val <= 0 )
 	{
+		cout << jtqj.rows() << "," << jtqj.cols() << endl;
 		throw PestError("TranSVD::update() - super parameter transformation returned 0 super parameters.  Jacobian must equal 0.");
 	}
 

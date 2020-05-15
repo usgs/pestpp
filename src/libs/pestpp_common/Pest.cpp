@@ -54,6 +54,7 @@ void Pest::set_defaults()
 	regul_scheme_ptr = new DynamicRegularization;
 	regul_scheme_ptr->set_defaults();
 	control_info.set_defaults();
+
 }
 
 void Pest::check_inputs(ostream &f_rec, bool forgive)
@@ -1209,6 +1210,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
+				efile.set_index_col_name(par_group_formal_names[0]);
 				for (auto oname : optional_par_group_formal_names)
 				{
 					if (cnames.find(oname) != cnames.end())
@@ -1288,10 +1290,19 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 							throw_control_file_error(f_rec, ss.str());
 						}
 						else
+						{
 							get_names.push_back(nn);
+							if (i == 0)
+								efile.set_index_col_name(par_easy_names[i]);
+						}
 					}
 					else
+					{
 						get_names.push_back(n);
+						if (i == 0)
+							efile.set_index_col_name(par_formal_names[i]);
+					}
+						
 				}
 				
 				string tcol;
@@ -1347,7 +1358,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
-					
+				efile.set_index_col_name(obs_group_formal_names[0]);
 				vector<string> obs_group_tokens;
 				for (auto ro : efile.get_row_order())
 				{
@@ -1387,11 +1398,19 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 							throw_control_file_error(f_rec, ss.str());
 						}
 						else
+						{
 							get_names.push_back(nn);
+							if (i == 0)
+								efile.set_index_col_name(obs_easy_names[i]);
+						}
 
 					}
 					else
+					{
 						get_names.push_back(n);
+						if (i == 0)
+							efile.set_index_col_name(obs_formal_names[i]);
+					}
 
 				}
 
@@ -1429,7 +1448,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
-
+				efile.set_index_col_name(pi_formal_names[0]);
 				vector<string> pi_tokens;
 				for (auto ro : efile.get_row_order())
 				{
@@ -1473,7 +1492,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
-
+				efile.set_index_col_name(model_input_formal_names[0]);
 				vector<string> mi_tokens;
 				for (auto ro : efile.get_row_order())
 				{
@@ -1513,7 +1532,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						throw_control_file_error(f_rec, ss.str());
 					}
 				}
-
+				efile.set_index_col_name(model_output_formal_names[0]);
 				vector<string> mo_tokens;
 				for (auto ro : efile.get_row_order())
 				{
@@ -2723,6 +2742,15 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 	}
 	ctl_parameter_info.insert(name, pi);
 	ctl_parameters.insert(name, pi.init_value);
+	
+	if (find(ctl_ordered_par_group_names.begin(), ctl_ordered_par_group_names.end(), pi.group) == ctl_ordered_par_group_names.end())
+	{
+		ParameterGroupRec pgr;
+		pgr.set_defaults();
+		pgr.set_name(pi.group);
+		base_group_info.insert_group(pi.group,pgr);
+		ctl_ordered_par_group_names.push_back(pi.group);
+	}
 	base_group_info.insert_parameter_link(name, pi.group);
 
 	// build appropriate transformations
@@ -2769,7 +2797,14 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	obs_i.group = tokens[3];
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
+
 	observation_values.insert(name, value);
+	name = obs_i.group;
+	vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
+	if (is == ctl_ordered_obs_group_names.end())
+	{
+		ctl_ordered_obs_group_names.push_back(name);
+	}
 }
 
 void Pest::tokens_to_pi_rec(ostream& f_rec, const string& line_upper)
@@ -2829,9 +2864,11 @@ void Pest::rectify_par_groups()
 			temp = base_group_info.get_group_names();
 			group_names.clear();
 			group_names.insert(temp.begin(), temp.end());
+			ctl_ordered_par_group_names.push_back(pr->group);
 
 		}
 	}
+
 }
 
 map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform)
@@ -2857,9 +2894,49 @@ map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& p
 	return par_sens;
 }
 
+<<<<<<< HEAD
 void Pest::extract_da_cycles()
 {
 	int xxx; 
+=======
+map<string,double> Pest::get_ext_file_double_map(const string& section_name, const string& col_name)
+{
+	string sname_upper = pest_utils::upper_cp(section_name);
+	map<string, double> val_map;
+	if (efiles_map.find(sname_upper) == efiles_map.end())
+		return val_map;
+	set<string> col_names;
+	string cname_upper = pest_utils::upper_cp(col_name);
+	string idx_col;
+	vector<string> svals, sidx;
+	double val;
+	for (auto efile : efiles_map[sname_upper])
+	{
+		idx_col = efile.get_index_col_name();
+		if (idx_col.size() == 0)
+			continue;
+		col_names = efile.get_col_set();
+		if (col_names.find(cname_upper) != col_names.end())
+		{
+			svals = efile.get_col_string_vector(cname_upper);
+			sidx = efile.get_col_string_vector(idx_col);
+			for (int i = 0; i < svals.size(); i++)
+			{
+				try
+				{
+					val = stod(svals[i]);
+					val_map[sidx[i]] = val;
+				}
+				catch (...)
+				{
+					continue;
+				}
+			}
+		}
+	}
+	return val_map;
+	
+>>>>>>> 05f50cefdaaccde0448752541a42221fb16bbfb5
 }
 
 

@@ -9,5 +9,5 @@ target_compile_options(rm_serial PRIVATE ${PESTPP_CXX_WARN_FLAGS})
 target_link_libraries(rm_serial rm_abstract)
 
 if(BUILD_SHARED_LIBS)
-  install(TARGETS rm_serial LIBRARY DESTINATION ${LIBDIR})
+  install(TARGETS rm_serial LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()

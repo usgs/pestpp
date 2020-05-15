@@ -536,7 +536,7 @@ void SVDSolver::calc_lambda_upgrade_vec_JtQJ(const Jacobian &jacobian, const QSq
 		{
 			beta = top / bot;
 		}
-		if (isnormal(beta))
+		if ((isnormal(beta)) && (beta > 0.0) && (beta < 1.0))
 			upgrade_vec *= beta;
 	}
 
@@ -833,8 +833,18 @@ bool SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContro
 		base_run.update_ctl(tmp_pars, tmp_obs);
 	}
 	// sen file for this iteration
-	output_file_writer.append_sen(file_manager.sen_ofstream(), termination_ctl.get_iteration_number() + 1, jacobian,
-		*(base_run.get_obj_func_ptr()), get_parameter_group_info(), *regul_scheme_ptr, false, par_transform);
+	try
+	{
+
+
+		output_file_writer.append_sen(file_manager.sen_ofstream(), termination_ctl.get_iteration_number() + 1, jacobian,
+			*(base_run.get_obj_func_ptr()), get_parameter_group_info(), *regul_scheme_ptr, false, par_transform);
+	}
+	catch (...)
+	{
+		file_manager.rec_ofstream() << "error saving sensitivities, continuing..." << endl;
+
+	}
 	return true;
 }
 

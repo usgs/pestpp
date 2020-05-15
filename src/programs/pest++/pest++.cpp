@@ -771,6 +771,13 @@ int main(int argc, char* argv[])
 				ofstream &fout_restart = file_manager.get_ofstream("rst");
 				RestartController::write_start_failed_super(fout_restart);
 				restart_ctl.get_restart_option() = RestartController::RestartOption::NONE;
+				if (pest_scenario.get_pestpp_options().get_n_iter_base() == -1)
+				{
+					cout << "resetting n_iter_base to 1 since super parameter process failed" << endl;
+					fout_rec << "resetting n_iter_base to 1 since super parameter process failed" << endl;
+					pest_scenario.get_pestpp_options_ptr()->set_n_iter_base(1);
+					n_base_iter = -1;
+				}	
 			}
 		}
 		cout << endl;
