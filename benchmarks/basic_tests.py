@@ -852,7 +852,7 @@ def parallel_consist_test():
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_parallel")
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
-    pst.pestpp_options = {"ies_num_reals":10}
+    pst.pestpp_options = {"ies_num_reals":10,"ies_lambda_mults":1,"lambda_scale_fac":1}
     pst.control_data.noptmax = 1
     pst.write(os.path.join(t_d,"pest_par.pst"))
     pyemu.os_utils.run("{0} pest_par.pst".format(exe_path),cwd=t_d)
@@ -861,10 +861,11 @@ def parallel_consist_test():
 
     for i in range(pst.control_data.noptmax):
         ser_df = pd.read_csv(os.path.join(t_d,"pest_par.{0}.obs.csv".format(i)),index_col=0)
-        par_df = pd.read_csv(os.path.join(t_d,"pest_par.{1}.obs.csv".format(i)),index_col=0)
+        par_df = pd.read_csv(os.path.join(t_d,"pest_par.{0}.obs.csv".format(i)),index_col=0)
         diff = (ser_df - par_df).apply(np.abs)
         print(diff.sum())
         print(diff.sum().sum())
+        assert diff.sum().sum() == 0
 
 
 
