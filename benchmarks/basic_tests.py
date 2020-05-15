@@ -841,7 +841,33 @@ def ext_stdcol_test():
     assert dmx.max() < 1.0e-6,dmx
 
 
- 
+def parallel_consist_test():
+    model_d = "ies_10par_xsec"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
+    
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_parallel")
+    pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
+    pst.pestpp_options = {"ies_num_reals":10}
+    pst.control_data.noptmax = 1
+    pst.write(os.path.join(t_d,"pest_par.pst"))
+    pyemu.os_utils.run("{0} pest_par.pst".format(exe_path),cwd=t_d)
+    pyemu.os_utils.start_workers(t_d, exe_path, "pest_par.pst", 2, master_dir=m_d,
+                                 worker_root=model_d, local=local, port=port)
+
+    for i in range(pst.control_data.noptmax):
+        ser_df = pd.read_csv(os.path.join(t_d,"pest_par.{0}.obs.csv".format(i)),index_col=0)
+        par_df = pd.read_csv(os.path.join(t_d,"pest_par.{1}.obs.csv".format(i)),index_col=0)
+        diff = (ser_df - par_df).apply(np.abs)
+        print(diff.sum())
+        print(diff.sum().sum())
+
+
+
 
 
 
@@ -852,7 +878,7 @@ if __name__ == "__main__":
     #parchglim_test()
     #unc_file_test()
     # secondary_marker_test()
-    basic_test("ies_10par_xsec")
+    #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
@@ -861,3 +887,4 @@ if __name__ == "__main__":
     #salib_verf()
     #tplins1_test()
     #ext_stdcol_test()
+    parallel_consist_test()
