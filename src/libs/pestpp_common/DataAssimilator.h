@@ -155,13 +155,21 @@ private:
 
 	void eig2csv(string name, Eigen::MatrixXd matrix);
 
+	ParameterEnsemble kf_work(PerformanceLog* performance_log, unordered_map<string, 
+		Eigen::VectorXd>& par_resid_map, unordered_map<string, Eigen::VectorXd>& par_diff_map,
+		unordered_map<string, Eigen::VectorXd>& obs_resid_map, unordered_map<string, Eigen::VectorXd>& obs_diff_map,
+		unordered_map<string, Eigen::VectorXd>& obs_err_map, Localizer& localizer,
+		unordered_map<string, double>& parcov_inv_map, unordered_map<string, double>& weight_map,
+		ParameterEnsemble& pe_upgrade, double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map,
+		unordered_map<string, Eigen::VectorXd>& Am_map, Localizer::How& how);
+	/*
 	ParameterEnsemble kf_work(PerformanceLog* _performance_log, unordered_map<string,
 		Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map, 
 		unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, 
 		Eigen::VectorXd>& _obs_diff_map, unordered_map<string, Eigen::VectorXd>& obs_err_map,  Localizer& _localizer, unordered_map<string,
 		double>& _parcov_inv_map, unordered_map<string,double>& _weight_map, ParameterEnsemble& _pe_upgrade, unordered_map<string, 
 		pair<vector<string>, vector<string>>>& _cases, unordered_map<string, 
-		Eigen::VectorXd>& _Am_map, Localizer::How& _how);
+		Eigen::VectorXd>& _Am_map, Localizer::How& _how);*/
 
 	
 	//EnsemblePair run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe);

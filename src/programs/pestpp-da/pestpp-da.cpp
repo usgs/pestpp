@@ -364,7 +364,7 @@ int main(int argc, char* argv[])
 			run_manager_ptr->initialize(par_names,obs_names);
 
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
-			da.use_ies = true;
+			da.use_ies = false;
 			if (*icycle > 0)
 			{
 				da.set_pe(curr_pe);
