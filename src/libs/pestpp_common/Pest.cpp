@@ -2894,11 +2894,10 @@ map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& p
 	return par_sens;
 }
 
-<<<<<<< HEAD
 void Pest::extract_da_cycles()
 {
-	int xxx; 
-=======
+	int xxx;
+}
 map<string,double> Pest::get_ext_file_double_map(const string& section_name, const string& col_name)
 {
 	string sname_upper = pest_utils::upper_cp(section_name);
@@ -2935,8 +2934,6 @@ map<string,double> Pest::get_ext_file_double_map(const string& section_name, con
 		}
 	}
 	return val_map;
-	
->>>>>>> 05f50cefdaaccde0448752541a42221fb16bbfb5
 }
 
 

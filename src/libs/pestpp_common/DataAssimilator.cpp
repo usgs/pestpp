@@ -56,7 +56,7 @@ bool DataAssimilator::initialize_pe(Covariance& cov)
 	if (par_csv.size() == 0)
 	{
 		message(1, "drawing parameter realizations: ", num_reals);
-		pe.draw(num_reals, pest_scenario.get_ctl_parameters(), cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level());
+		pe.draw(num_reals, pest_scenario.get_ctl_parameters(), cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(),file_manager.rec_ofstream());
 		// stringstream ss;
 		// ss << file_manager.get_base_filename() << ".0.par.csv";
 		// message(1, "saving initial parameter ensemble to ", ss.str());
@@ -293,7 +293,7 @@ bool DataAssimilator::initialize_oe(Covariance& cov)
 		else
 		{
 			message(1, "drawing observation noise realizations: ", num_reals);
-			oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level());
+			oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(),file_manager.rec_ofstream());
 
 		}
 		drawn = true;
@@ -1781,7 +1781,7 @@ void DataAssimilator::adjust_pareto_weight(string& obsgroup, double wfac)
 
 
 		Covariance obscov;
-		obscov.from_observation_weights(pest_scenario);
+		obscov.from_observation_weights(pest_scenario, file_manager.rec_ofstream());
 		obscov = obscov.get(act_obs_names);
 		cout << obscov_inv_sqrt.diagonal() << endl;
 		obscov_inv_sqrt = obscov.inv().get_matrix().diagonal().cwiseSqrt().asDiagonal();

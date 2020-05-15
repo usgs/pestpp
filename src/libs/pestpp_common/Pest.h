@@ -86,16 +86,13 @@ public:
 	map<string,double> get_pars_at_near_bounds(const Parameters &pars, double tol=0.0);
 	pair<Parameters,Parameters> get_effective_ctl_lower_upper_bnd(Parameters &pars);
 	map<string, double> calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform);
-<<<<<<< HEAD
 
 	Pest &get_child_pest(int icycle);
 	void child_pest_update(int icycle);
 	vector<int> get_assim_cycles();
 	void assign_da_cycles(ofstream& f_rec);
 	vector<pair<string, int>> extract_cycle_numbers2(ofstream& f_rec, string section_name, vector<string> possible_name_cols);
-=======
 	map<string, double> get_ext_file_double_map(const string& section_name, const string& col_name);
->>>>>>> 05f50cefdaaccde0448752541a42221fb16bbfb5
 	virtual ~Pest();
 	
 protected:

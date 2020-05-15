@@ -9,6 +9,7 @@
 #include "system_variables.h"
 #include "utilities.h"
 #include <regex>
+
 #include "Pest.h"
 
 using namespace pest_utils;
@@ -214,9 +215,10 @@ int PANTHERAgent::send_message(NetPackage &net_pack, const void *data, unsigned 
 }
 
 
-NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs, NetPackage &net_pack)
+std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &pars, Observations &obs, NetPackage &net_pack)
 {
 	NetPackage::PackType final_run_status = NetPackage::PackType::RUN_FAILED;
+	stringstream smessage;
 	bool done = false;
 	int err = 0;
 
@@ -250,7 +252,9 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 
 			if (shared_execptions.size() > 0)
 			{
-				cout << "exception raised by run thread " << std::endl;
+				cout << "exception raised by run thread: " << std::endl;
+				cout << shared_execptions.what() << std::endl;
+				smessage << shared_execptions.what();
 				//don't break here, need to check one last time for incoming messages
 				done = true;
 			}
@@ -259,6 +263,7 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 			{
 				cout << "received finished signal from run thread " << std::endl;
 				//don't break here, need to check one last time for incoming messages
+				smessage << "received finished signal from run thread ";
 				done = true;
 			}
 			//this call includes a "sleep" for the timeout
@@ -283,6 +288,7 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 					cerr << "Error sending ping response to master...quit" << endl;
 					f_terminate.set(true);
 					terminate_or_restart(-1);
+					smessage << "Error sending ping response to master...quit";
 				}
 				//cout << "ping response sent" << endl;
 			}
@@ -292,6 +298,7 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 				cout << "sending terminate signal to run thread" << endl;
 				f_terminate.set(true);
 				final_run_status = NetPackage::PackType::RUN_KILLED;
+				smessage << "received kill request signal from master";
 				break;
 			}
 			else if (net_pack.get_type() == NetPackage::PackType::TERMINATE)
@@ -301,6 +308,7 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 				f_terminate.set(true);
 				terminate = true;
 				final_run_status = NetPackage::PackType::TERMINATE;
+				smessage << "received terminate signal from master";
 				break;
 			}
 			else
@@ -310,6 +318,7 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 				cerr << "something is wrong...exiting" << endl;
 				f_terminate.set(true);
 				final_run_status = NetPackage::PackType::TERMINATE;
+				smessage << "Received unsupported message from master, only PING REQ_KILL or TERMINATE can be sent during model run";
 				terminate_or_restart(-1);
 			}
 			if (done) break;
@@ -330,7 +339,9 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 		cerr << endl;
 		cerr << "   " << ex.what() << endl;
 		cerr << "   Aborting model run" << endl << endl;
+		smessage << ex.what();
 		NetPackage::PackType::RUN_FAILED;
+		
 	}
 	catch(...)
 	{
@@ -341,7 +352,7 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 
 	//sleep here just to give the os a chance to cleanup any remaining file handles
 	w_sleep(poll_interval_seconds * 1000);
-	return final_run_status;
+	return pair<NetPackage::PackType,std::string> (final_run_status,smessage.str());
 }
 
 
@@ -566,8 +577,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			}
 
 			std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
-			NetPackage::PackType final_run_status = run_model(pars, obs, net_pack);
-			if (final_run_status == NetPackage::PackType::RUN_FINISHED)
+			pair<NetPackage::PackType,std::string> final_run_status = run_model(pars, obs, net_pack);
+			if (final_run_status.first == NetPackage::PackType::RUN_FINISHED)
 			{
 				double run_time = pest_utils::get_duration_sec(start_time);
 				//send model results back
@@ -575,17 +586,17 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				cout << "sending results to master (group id = " << group_id << ", run id = " << run_id << ")..." << endl;
 				cout << "results sent" << endl << endl;
 				serialized_data = Serialization::serialize(pars, par_name_vec, obs, obs_name_vec, run_time);
-				net_pack.reset(NetPackage::PackType::RUN_FINISHED, group_id, run_id, "");
+				net_pack.reset(NetPackage::PackType::RUN_FINISHED, group_id, run_id, final_run_status.second);
 				err = send_message(net_pack, serialized_data.data(), serialized_data.size());
 				if (err != 1)
 				{
 					terminate_or_restart(-1);
 				}
 			}
-			else if (final_run_status == NetPackage::PackType::RUN_FAILED)
+			else if (final_run_status.first == NetPackage::PackType::RUN_FAILED)
 			{
 				cout << "run failed" << endl;
-				net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, "");
+				net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id,final_run_status.second);
 				char data;
 				err = send_message(net_pack, &data, 0);
 				if (err != 1)
@@ -593,10 +604,10 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					terminate_or_restart(-1);
 				}
 			}
-			else if (final_run_status == NetPackage::PackType::RUN_KILLED)
+			else if (final_run_status.first == NetPackage::PackType::RUN_KILLED)
 			{
 				cout << "run killed" << endl;
-				net_pack.reset(NetPackage::PackType::RUN_KILLED, group_id, run_id, "");
+				net_pack.reset(NetPackage::PackType::RUN_KILLED, group_id, run_id, final_run_status.second);
 				char data;
 				err = send_message(net_pack, &data, 0);
 				if (err != 1)
@@ -604,7 +615,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					terminate_or_restart(-1);
 				}
 			}
-			else if (final_run_status == NetPackage::PackType::TERMINATE)
+			else if (final_run_status.first == NetPackage::PackType::TERMINATE)
 			{
 				cout << "run preempted by termination requested" << endl;
 				terminate = true;
@@ -614,7 +625,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			{
 				// Send READY Message to master
 				cout << "sending ready signal to master" << endl;
-				net_pack.reset(NetPackage::PackType::READY, 0, 0, "");
+				net_pack.reset(NetPackage::PackType::READY, 0, 0, final_run_status.second);
 				char data;
 				err = send_message(net_pack, &data, 0);
 				if (err != 1)
