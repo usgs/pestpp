@@ -41,6 +41,11 @@ bool NetPackage::check_string(const int8_t *data_src, size_t _size)
 	return safe_data;
 }
 
+string NetPackage::get_info_txt()
+{
+	return extract_string(desc, DESC_LEN);
+}
+
 bool NetPackage::check_string(const vector<int8_t> &data_src, size_t index1, size_t _size)
 {
 	size_t index2 = min(index1 + _size, data_src.size());
@@ -258,7 +263,7 @@ int  NetPackage::recv(int sockfd)
 			// is use to represent a standard char
 			for (int i = 0; i < DESC_LEN; ++i)
 			{
-				if (!allowable_ascii_char(header_buf[i_start + 1]))
+				if (!allowable_ascii_char(header_buf[i_start + i]))
 				{
 					corrupt_desc = true;
 					n = -2;
@@ -266,7 +271,7 @@ int  NetPackage::recv(int sockfd)
 				}
 				else
 				{
-					desc[i] = header_buf[i_start + 1];
+					desc[i] = header_buf[i_start + i];
 				}
 			}
 			i_start += sizeof(desc);

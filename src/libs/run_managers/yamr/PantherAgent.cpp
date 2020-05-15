@@ -496,6 +496,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		else if(net_pack.get_type() == NetPackage::PackType::START_RUN)
 		{
 			Serialization::unserialize(net_pack.get_data(), pars, par_name_vec);
+			string info_txt = net_pack.get_info_txt();
+			cout << "PantherAgent received info_txt: " << info_txt << endl;
 			// run model
 			int group_id = net_pack.get_group_id();
 			int run_id = net_pack.get_run_id();

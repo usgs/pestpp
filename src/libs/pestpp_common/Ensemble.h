@@ -147,7 +147,7 @@ public:
 	ParamTransformSeq get_par_transform() const { return par_transform; }
 	void transform_ip(transStatus to_tstat);
 	void set_pest_scenario(Pest *_pest_scenario);
-	map<int,int> add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs=vector<int>());
+	map<int,int> add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs=vector<int>(),int da_cycle=NetPackage::NULL_DA_CYCLE);
 
 	void draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level);
 	Covariance get_diagonal_cov_matrix();

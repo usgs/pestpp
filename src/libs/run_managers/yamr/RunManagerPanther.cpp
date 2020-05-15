@@ -1063,8 +1063,12 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::it
 	{
 		int socket_fd = (*it_agent)->get_socket_fd();
 		vector<char> data = file_stor.get_serial_pars(run_id);
+		string info_txt;
+		double info_val;
+		int rstat;
+		file_stor.get_info(run_id, rstat, info_txt, info_val);
 		string host_name = (*it_agent)->get_hostname();
-		NetPackage net_pack(NetPackage::PackType::START_RUN, cur_group_id, run_id, "");
+		NetPackage net_pack(NetPackage::PackType::START_RUN, cur_group_id, run_id, info_txt);
 		int err = net_pack.send(socket_fd, &data[0], data.size());
 		if (err > 0)
 		{

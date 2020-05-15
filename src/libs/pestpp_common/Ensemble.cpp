@@ -1927,7 +1927,7 @@ ParameterEnsemble ParameterEnsemble::zeros_like()
 
 }
 
-map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs)
+map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs, int da_cycle)
 {
 	//add runs to the run manager using int indices
 	map<int,int> real_run_ids;
@@ -1958,6 +1958,14 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 	for (int i = 0; i < real_names.size(); i++)
 		rmap[real_names[i]] = i;
 	vector<string> nn;
+
+	string info_txt = "";
+	//if (da_cycle != NetPackage::NULL_DA_CYCLE)
+	{
+		stringstream ss;
+		ss << " da_cycle=" << da_cycle << " ";
+		info_txt = ss.str();
+	}
 	for (auto &rname : run_real_names)
 	{
 		//idx = find(real_names.begin(), real_names.end(), rname) - real_names.begin();
@@ -1980,7 +1988,7 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 				ss << n << ",";
 			throw_ensemble_error(ss.str());
 		}
-		run_id = run_mgr_ptr->add_run(pars_real);
+		run_id = run_mgr_ptr->add_run(pars_real,info_txt);
 		real_run_ids[idx]  = run_id;
 	}
 	return real_run_ids;
