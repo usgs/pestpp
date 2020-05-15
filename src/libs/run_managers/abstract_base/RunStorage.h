@@ -26,6 +26,7 @@
 #include <vector>
 #include <cstdint>
 #include <Eigen/Dense>
+#include "network_package.h"
 
 class Parameters;
 class Observations;
@@ -88,7 +89,7 @@ public:
 	void print_run_summary(std::ostream &fout);
 	~RunStorage();
 private:
-	static const int info_txt_length = 41;
+	static const int info_txt_length = NetPackage::DESC_LEN;
 	std::string filename;
 	mutable std::fstream buf_stream;
 	std::streamoff beg_run0;

@@ -496,11 +496,56 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		else if(net_pack.get_type() == NetPackage::PackType::START_RUN)
 		{
 			Serialization::unserialize(net_pack.get_data(), pars, par_name_vec);
-			string info_txt = net_pack.get_info_txt();
-			cout << "PantherAgent received info_txt: " << info_txt << endl;
-			// run model
 			int group_id = net_pack.get_group_id();
 			int run_id = net_pack.get_run_id();
+			string info_txt = net_pack.get_info_txt();
+			pest_utils::upper_ip(info_txt);
+			if (info_txt.find("DA_CYCLE=") != string::npos)
+			{
+				frec << "Note: 'DA_CYCLE' information passed in START_RUN command" << endl;
+				frec << "      info txt for group_id:run_id " << group_id << ":" << run_id << endl;
+				cout << "Note: 'DA_CYCLE' information passed in START_RUN command" << endl;
+				cout << "      info txt for group_id:run_id " << group_id << ":" << run_id << endl;
+				vector<string> tokens,ttokens;
+				pest_utils::tokenize(info_txt, tokens, " ");
+				int da_cycle = NetPackage::NULL_DA_CYCLE;
+				for (auto token : tokens)
+				{
+					if (token.find("=") != string::npos)
+					{
+						pest_utils::tokenize(token, ttokens, "=");
+						if (ttokens[0] == "DA_CYCLE")
+						{
+							if (ttokens[1].size() > 0)
+							{
+								string s_cycle;
+								try
+								{
+									da_cycle = stoi(s_cycle);
+								}
+								catch (...)
+								{
+									frec << "WARNING: error casting '" + ttokens[1] + "' to int for da_cycle...continuing" << endl;
+									frec << "WARNING: error casting '" + ttokens[1] + "' to int for da_cycle...continuing" << endl;
+
+								}
+							}
+						}
+					}
+				}
+				if (da_cycle != NetPackage::NULL_DA_CYCLE)
+				{
+					throw runtime_error("PantherAgent da_cycle support not implemented yet...");
+				}
+				else
+				{
+					frec << "Note: parsed 'DA_CYCLE' is null, continuing..." << endl;
+					cout << "Note: parsed 'DA_CYCLE' is null, continuing..." << endl;
+				}
+			}
+			
+			// run model
+			
 			
 			cout << "received parameters (group id = " << group_id << ", run id = " << run_id << ")" << endl;
 			cout << "starting model run..." << endl;
