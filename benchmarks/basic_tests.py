@@ -747,6 +747,28 @@ def tplins1_test():
     lines_in = open(os.path.join(t_d,"hk_Layer_1.ref"),'r').readlines()
     assert len(lines_tpl) - 1 == len(lines_in)
 
+    pst = pyemu.Pst(os.path.join(t_d, "pest.pst"))
+    dum_obs = ['h01_03', 'h01_07']
+    pst.observation_data.drop(index=dum_obs, inplace=True)
+    pst.instruction_files = ['out1dum.dat.ins']
+    pst.write(os.path.join(t_d, "pest_dum.pst"))
+    pyemu.os_utils.run("{0} pest_dum.pst".format(exe_path.replace("-ies", "-glm")), cwd=t_d)
+    obf_df = pd.read_csv(os.path.join(t_d, "out1.dat.obf"), delim_whitespace=True, header=None,
+                         names=["obsnme", "obsval"])
+    obf_df.index = obf_df.obsnme
+    pst = pyemu.Pst(os.path.join(t_d, "pest_dum.pst"))
+    res_df = pst.res
+
+    d = (obf_df.obsval - res_df.modelled).apply(np.abs)
+    # print(d)
+    print(d.max())
+    assert d.max() < 1.0e-5, d
+
+    jco = pyemu.Jco.from_binary(os.path.join(t_d, "pest_dum.jcb")).to_dataframe().apply(np.abs)
+    assert jco.sum().sum() == 0, jco.sum()
+
+
+
 def ext_stdcol_test():
     model_d = "ies_10par_xsec"
     local=True
@@ -837,5 +859,5 @@ if __name__ == "__main__":
     #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-    #tplins1_test()
-    ext_stdcol_test()
+    tplins1_test()
+    #ext_stdcol_test()
