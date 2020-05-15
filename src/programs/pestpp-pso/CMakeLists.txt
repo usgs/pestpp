@@ -21,9 +21,13 @@ target_link_libraries(pestpp-pso
   ${LAPACK_LIBRARIES}
 )
 
+if(WIN32)
+  target_compile_definitions(opt PRIVATE __windows__)
+endif()
+
 if(NOT "${BUILD_SHARED_LIBS}" AND
     "${CMAKE_Fortran_COMPILER_ID}" STREQUAL "Intel")
   set_property(TARGET pestpp-pso PROPERTY LINKER_LANGUAGE Fortran)
 endif()
 
-install(TARGETS pestpp-pso RUNTIME DESTINATION ${BINDIR})
+install(TARGETS pestpp-pso RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

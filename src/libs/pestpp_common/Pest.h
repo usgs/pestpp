@@ -92,6 +92,7 @@ public:
 	vector<int> get_assim_cycles();
 	void assign_da_cycles(ofstream& f_rec);
 	vector<pair<string, int>> extract_cycle_numbers2(ofstream& f_rec, string section_name, vector<string> possible_name_cols);
+	map<string, double> get_ext_file_double_map(const string& section_name, const string& col_name);
 	virtual ~Pest();
 	
 protected:
@@ -133,7 +134,6 @@ protected:
 	void extract_da_cycles();
 	map<string, int> extract_cycle_numbers(ofstream& f_rec, string section_name, vector<string> possible_name_cols);
 	map<string, vector<pest_utils::ExternalCtlFile>> efiles_map;
-
 };
 ostream& operator<< (ostream &os, const Pest& val);
 #endif /* PEST_H_ */

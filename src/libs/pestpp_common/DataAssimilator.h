@@ -74,7 +74,7 @@ public:
 	DataAssimilator(Pest& _pest_scenario, FileManager& _file_manager,
 		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 		RunManagerAbstract* _run_mgr_ptr);
-	void initialize(int icycle);
+	void initialize(int _icycle);
 	void add_dynamic_state_to_pe();
 	vector<string> get_dynamic_states();
 	void iterate_2_solution();
@@ -88,6 +88,7 @@ public:
 	bool use_ies; 
 
 private:
+	int icycle;
 	int  verbose_level;
 	Pest& pest_scenario;
 	std::mt19937 rand_gen;

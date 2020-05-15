@@ -20,24 +20,10 @@ os.environ["PATH"] += os.pathsep + bin_path
 
 
 bin_path = os.path.join("..","..","..","bin")
-
-
-use_intel= os.getenv('USE_INTEL', False)
-# if len(sys.argv) > 1 and sys.argv[1].lower() == 'intel':
-#     use_intel = True
-#     print("using intel windows binaries")
-
-
+exe = ""
 if "windows" in platform.platform().lower():
-    if use_intel:
-        print("using intel windows binaries")
-        exe_path = os.path.join(bin_path, "iwin", "ipestpp-ies.exe")
-    else:
-        exe_path = os.path.join(bin_path, "win", "pestpp-ies.exe")
-elif "darwin" in platform.platform().lower():
-    exe_path = os.path.join(bin_path,  "mac", "pestpp-ies")
-else:
-    exe_path = os.path.join(bin_path, "linux", "pestpp-ies")
+    exe = ".exe"
+exe_path = os.path.join(bin_path, "pestpp-ies" + exe)
 
 
 noptmax = 4
@@ -761,8 +747,129 @@ def tplins1_test():
     lines_in = open(os.path.join(t_d,"hk_Layer_1.ref"),'r').readlines()
     assert len(lines_tpl) - 1 == len(lines_in)
 
+    pst = pyemu.Pst(os.path.join(t_d, "pest.pst"))
+    dum_obs = ['h01_03', 'h01_07']
+    pst.observation_data.drop(index=dum_obs, inplace=True)
+    pst.instruction_files = ['out1dum.dat.ins']
+    pst.write(os.path.join(t_d, "pest_dum.pst"))
+    pyemu.os_utils.run("{0} pest_dum.pst".format(exe_path.replace("-ies", "-glm")), cwd=t_d)
+    obf_df = pd.read_csv(os.path.join(t_d, "out1.dat.obf"), delim_whitespace=True, header=None,
+                         names=["obsnme", "obsval"])
+    obf_df.index = obf_df.obsnme
+    pst = pyemu.Pst(os.path.join(t_d, "pest_dum.pst"))
+    res_df = pst.res
+
+    d = (obf_df.obsval - res_df.modelled).apply(np.abs)
+    # print(d)
+    print(d.max())
+    assert d.max() < 1.0e-5, d
+
+    jco = pyemu.Jco.from_binary(os.path.join(t_d, "pest_dum.jcb")).to_dataframe().apply(np.abs)
+    assert jco.sum().sum() == 0, jco.sum()
+
+
+
+def ext_stdcol_test():
+    model_d = "ies_10par_xsec"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
     
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_ext_stdcol")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(t_d,m_d)
     
+
+    pst = pyemu.Pst(os.path.join(m_d,"pest.pst"))  
+    obs = pst.observation_data
+    obs.loc[pst.nnz_obs_names,"standard_deviation"] = 1/obs.loc[pst.nnz_obs_names,"weight"]
+    pst.add_transform_columns()
+    par = pst.parameter_data
+    par.loc[pst.adj_par_names,"standard_deviation"] = (par.loc[pst.adj_par_names,"parubnd_trans"] - par.loc[pst.adj_par_names,"parlbnd_trans"]) / 4.0
+    #par.loc[pst.adj_par_names[0],"mean"] = par.loc[pst.adj_par_names[0],"parubnd"]
+    pst.pestpp_options["ies_num_reals"] = 10
+    pst.control_data.noptmax = -1
+    pst.write(os.path.join(m_d,"pest_base.pst"))
+    pyemu.os_utils.run("{0} pest_base.pst".format(exe_path),cwd=m_d)
+
+    pst.write(os.path.join(m_d,"pest_ext_stdcol.pst"),version=2)
+    pyemu.os_utils.run("{0} pest_ext_stdcol.pst".format(exe_path),cwd=m_d)
+    df1 = pd.read_csv(os.path.join(m_d,"pest_base.phi.meas.csv"),index_col=0)
+    df2 = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.phi.meas.csv"),index_col=0)
+
+    d = (df1 - df2).apply(np.abs)
+    print(d.max())
+    assert d.max().max() < 1.0e-6,d.max().max()
+
+    pst.pestpp_options["ies_num_reals"] = 100000
+    pst.control_data.noptmax = -2
+    obs = pst.observation_data
+    obs.loc[pst.nnz_obs_names,"standard_deviation"] = 7.5
+    pst.write(os.path.join(m_d,"pest_ext_stdcol.pst"),version=2)
+    pyemu.os_utils.run("{0} pest_ext_stdcol.pst".format(exe_path),cwd=m_d)
+    df = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.base.obs.csv"),index_col=0).loc[:,pst.nnz_obs_names]
+    d = (df.std() - obs.loc[pst.nnz_obs_names,"standard_deviation"]).apply(np.abs)
+    print(d)
+    assert d.max() < 0.1,d.max()
+    obs = pst.observation_data
+    obs.loc[pst.nnz_obs_names,"upper_bound"] = obs.loc[pst.nnz_obs_names,"obsval"] * 1.1
+    obs.loc[pst.nnz_obs_names,"lower_bound"] = obs.loc[pst.nnz_obs_names,"obsval"] * 0.9
+    par = pst.parameter_data
+    par.loc[pst.adj_par_names[0],"mean"] = par.loc[pst.adj_par_names[0],"parubnd"]
+    pst.write(os.path.join(m_d,"pest_ext_stdcol.pst"),version=2)
+    pyemu.os_utils.run("{0} pest_ext_stdcol.pst".format(exe_path),cwd=m_d)
+    df = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.base.obs.csv"),index_col=0).loc[:,pst.nnz_obs_names]
+    mn = df.min()
+    mx = df.max()
+    dmn = mn - obs.loc[pst.nnz_obs_names,"obsval"] * 0.9
+    print(obs.loc[pst.nnz_obs_names,"obsval"] * 0.9)
+    print(mn)  
+    print(dmn)
+    dmx = mx - obs.loc[pst.nnz_obs_names,"obsval"] * 1.1
+    print(obs.loc[pst.nnz_obs_names,"obsval"] * 1.1)
+    print(mx)
+    print(dmx)
+
+    dmn = dmn.apply(np.abs)
+    dmx = dmx.apply(np.abs)
+
+    assert dmn.max() < 1.0e-6,dmn
+    assert dmx.max() < 1.0e-6,dmx
+
+
+def parallel_consist_test():
+    model_d = "ies_10par_xsec"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
+    
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_parallel")
+    pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
+    pst.pestpp_options = {"ies_num_reals":10,"ies_lambda_mults":1,"lambda_scale_fac":1}
+    pst.control_data.noptmax = 1
+    pst.write(os.path.join(t_d,"pest_par.pst"))
+    pyemu.os_utils.run("{0} pest_par.pst".format(exe_path),cwd=t_d)
+    pyemu.os_utils.start_workers(t_d, exe_path, "pest_par.pst", 2, master_dir=m_d,
+                                 worker_root=model_d, local=local, port=port)
+
+    for i in range(pst.control_data.noptmax):
+        ser_df = pd.read_csv(os.path.join(t_d,"pest_par.{0}.obs.csv".format(i)),index_col=0)
+        par_df = pd.read_csv(os.path.join(t_d,"pest_par.{0}.obs.csv".format(i)),index_col=0)
+        diff = (ser_df - par_df).apply(np.abs)
+        print(diff.sum())
+        print(diff.sum().sum())
+        assert diff.sum().sum() == 0
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -772,7 +879,7 @@ if __name__ == "__main__":
     #parchglim_test()
     #unc_file_test()
     # secondary_marker_test()
-    basic_test("ies_10par_xsec")
+    #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
@@ -780,3 +887,5 @@ if __name__ == "__main__":
     #sen_basic_test()
     #salib_verf()
     #tplins1_test()
+    #ext_stdcol_test()
+    parallel_consist_test()

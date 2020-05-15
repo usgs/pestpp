@@ -14,8 +14,12 @@ add_library(propack
 
 target_link_libraries(propack ${LAPACK_LIBRARIES})
 
+if(WIN32)
+  target_compile_definitions(opt PRIVATE __windows__)
+endif()
+
 if(BUILD_SHARED_LIBS)
-  install(TARGETS propack LIBRARY DESTINATION ${LIBDIR})
+  install(TARGETS propack LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 else()
   # pthread required for static linking
   target_link_libraries(propack Threads::Threads)

@@ -139,7 +139,7 @@ def run_model():
 
     # run the model
 
-    mf.exe_name = r".\mfnwt.exe"
+    mf.exe_name = "mfnwt.exe"
 
     (success, buff) = mf.run_model()
 

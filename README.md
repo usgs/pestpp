@@ -9,21 +9,16 @@ PEST++ is a software suite aimed at supporting complex numerical models in the d
 [![Travis Status](https://travis-ci.org/usgs/pestpp.svg?branch=master)](https://travis-ci.org/usgs/pestpp)
 [![Appveyor status](https://ci.appveyor.com/api/projects/status/rqadojcv8bkj5gr0/branch/master?svg=true)](https://ci.appveyor.com/project/jwhite-usgs/pestpp/branch/master)
 
-
-
-
 ## Documentation
 
-The lastest PEST++ manual is available [here](https://github.com/jtwhite79/pestpp/tree/develop/documentation). Direct zip download [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/jtwhite79/pestpp/tree/develop/documentation)
+The lastest PEST++ users manual is available [here](https://github.com/jtwhite79/pestpp/tree/develop/documentation). Direct zip download [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/jtwhite79/pestpp/tree/develop/documentation)
 
 ## Links to latest binaries
 
-* [windows (users with current visual studio installed)](https://github.com/usgs/pestpp/tree/master/bin/win).  Direct zip download [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/usgs/pestpp/tree/master/bin/win)
-* [windows compiled with intel C++ (the 'i' prefix)](https://github.com/usgs/pestpp/tree/master/bin/iwin).  Direct zip download [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/usgs/pestpp/tree/master/bin/iwin)
-* [mac OS](https://github.com/usgs/pestpp/tree/master/bin/mac).  Direct zip download [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/usgs/pestpp/tree/master/bin/mac)
+As of version 4.3.11, PEST++ pre-compiled binaries for windows and mac are available as a github release.  For older version of PEST++, precompiled binaries are in the `bin` directory
 
 ## Compiling
-The develop branch includes a Visual Studio project, as well as CMake files for cross-compilation on all operating systems.
+The develop branch includes a Visual Studio solution, as well as CMake files for cross-compilation on all operating systems.
 
 See details [here](documentation/cmake.md) to compile using CMake.
 
@@ -50,7 +45,7 @@ Funding for PEST++ has been provided by the U.S. Geologial Survey. The New Zeala
 
 ## Recent developements
 
-The PEST++ suite is currently be refactored to remove the fortran dependancy. Users who are interested in trying out the pure C++ implementation can use the binaries/code base on the ``develop`` branch.
+The PEST++ suite has been refactored to remove the fortran dependancy.
 
 An updated control file format has been implemented on the ``develop`` branch code base.  All the existing PEST++ tools are still backward compatible with the standard control file format.  However, new tools that are in developement to support sequential data assimilation need the external file format.  Additional, new functionality is being developed that will require the updated control file format.  The new control file format is described in documentation.  
 
@@ -79,11 +74,11 @@ The ``benchmarks`` folder contains a simple worked example and basic testing rou
 
 ## Dependencies
 
-Much work has been done to avoid additional external dependencies in PEST++.  As currently designed, the project is fully self-contained and statically linked. 
+Much work has been done to avoid additional external dependencies in PEST++.  As currently designed, the project is fully self-contained.  
 
 # optional ``++`` arguments
 
-## please see the PEST++ version 4 manual in the ``documentation`` directory for a current and complete description of all ``++`` options
+## please see the PEST++ users manual in the ``documentation`` directory for a current and complete description of all ``++`` options
 
 ### USGS disclaimer
 

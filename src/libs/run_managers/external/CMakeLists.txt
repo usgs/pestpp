@@ -9,5 +9,5 @@ target_compile_options(rm_external PRIVATE ${PESTPP_CXX_WARN_FLAGS})
 target_link_libraries(rm_external rm_abstract)
 
 if(BUILD_SHARED_LIBS)
-  install(TARGETS rm_external LIBRARY DESTINATION ${LIBDIR})
+  install(TARGETS rm_external LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()

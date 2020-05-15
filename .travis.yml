@@ -58,7 +58,7 @@ before_script:
   - mkdir build && cd build
   - cmake -DCMAKE_BUILD_TYPE=Release ..
   - make -j2
-  - make install
+  # executable targets are automatically installed into bin
   - cd ..
   - wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
   - bash miniconda.sh -b -p $HOME/miniconda

@@ -41,6 +41,13 @@ bool NetPackage::check_string(const int8_t *data_src, size_t _size)
 	return safe_data;
 }
 
+string NetPackage::get_info_txt()
+{
+	string info_txt = extract_string(desc, DESC_LEN);
+	info_txt.erase(std::find(info_txt.begin(), info_txt.end(), '\0'), info_txt.end());
+	return info_txt;
+}
+
 bool NetPackage::check_string(const vector<int8_t> &data_src, size_t index1, size_t _size)
 {
 	size_t index2 = min(index1 + _size, data_src.size());
@@ -258,7 +265,7 @@ int  NetPackage::recv(int sockfd)
 			// is use to represent a standard char
 			for (int i = 0; i < DESC_LEN; ++i)
 			{
-				if (!allowable_ascii_char(header_buf[i_start + 1]))
+				if (!allowable_ascii_char(header_buf[i_start + i]))
 				{
 					corrupt_desc = true;
 					n = -2;
@@ -266,7 +273,7 @@ int  NetPackage::recv(int sockfd)
 				}
 				else
 				{
-					desc[i] = header_buf[i_start + 1];
+					desc[i] = header_buf[i_start + i];
 				}
 			}
 			i_start += sizeof(desc);
@@ -304,6 +311,7 @@ void NetPackage::print_header(std::ostream &fout)
 	fout << "NetPackage: type = " << int(type) <<", group = " << group << ", run_id = " << run_id << ", description = " << desc <<
 		", data package size = " << data.size() << endl;
 }
+
 
 //template std::string NetPackage::extract_string< std::vector<int8_t>::iterator>(std::vector<int8_t>::iterator first, std::vector<int8_t>::iterator last);
 template std::vector<int8_t> NetPackage::pack_string< std::string::iterator>(std::string::iterator first, std::string::iterator last);

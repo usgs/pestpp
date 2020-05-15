@@ -55,6 +55,7 @@ public:
 	ParameterGroupRec(const ParameterGroupRec &rhs) {*this=rhs;}
 	ParameterGroupRec& operator=(const ParameterGroupRec &rhs);
 	void set_defaults();
+	void set_name(string& _name) { name = _name; }
 };
 
 ostream& operator<< (ostream &os, const ParameterGroupRec& val);

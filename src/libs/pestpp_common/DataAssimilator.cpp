@@ -35,6 +35,7 @@ DataAssimilator::DataAssimilator(Pest& _pest_scenario, FileManager& _file_manage
 	oe.set_rand_gen(&rand_gen);
 	weights.set_pest_scenario(&pest_scenario);
 	localizer.set_pest_scenario(&pest_scenario);
+	icycle = 0;
 }
 
 void DataAssimilator::throw_da_error(string message)
@@ -56,7 +57,7 @@ bool DataAssimilator::initialize_pe(Covariance& cov)
 	if (par_csv.size() == 0)
 	{
 		message(1, "drawing parameter realizations: ", num_reals);
-		pe.draw(num_reals, pest_scenario.get_ctl_parameters(), cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level());
+		pe.draw(num_reals, pest_scenario.get_ctl_parameters(), cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(),file_manager.rec_ofstream());
 		// stringstream ss;
 		// ss << file_manager.get_base_filename() << ".0.par.csv";
 		// message(1, "saving initial parameter ensemble to ", ss.str());
@@ -293,7 +294,7 @@ bool DataAssimilator::initialize_oe(Covariance& cov)
 		else
 		{
 			message(1, "drawing observation noise realizations: ", num_reals);
-			oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level());
+			oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(),file_manager.rec_ofstream());
 
 		}
 		drawn = true;
@@ -884,9 +885,10 @@ void DataAssimilator::initialize_obscov()
 }
 
 
-void DataAssimilator::initialize(int icycle)
+void DataAssimilator::initialize(int _icycle)
 {
-	message(0, "initializing");
+	icycle = _icycle;
+	message(0, "initializing cycle",icycle);
 	stringstream ss;
 	ofstream& f_rec = file_manager.rec_ofstream();
 	/*try
@@ -1781,7 +1783,7 @@ void DataAssimilator::adjust_pareto_weight(string& obsgroup, double wfac)
 
 
 		Covariance obscov;
-		obscov.from_observation_weights(pest_scenario);
+		obscov.from_observation_weights(pest_scenario, file_manager.rec_ofstream());
 		obscov = obscov.get(act_obs_names);
 		cout << obscov_inv_sqrt.diagonal() << endl;
 		obscov_inv_sqrt = obscov.inv().get_matrix().diagonal().cwiseSqrt().asDiagonal();
@@ -3777,7 +3779,7 @@ vector<ObservationEnsemble> DataAssimilator::run_lambda_ensembles(vector<Paramet
 	{
 		try
 		{
-			real_run_ids_vec.push_back(pe_lam.add_runs(run_mgr_ptr, subset_idxs));
+			real_run_ids_vec.push_back(pe_lam.add_runs(run_mgr_ptr, subset_idxs,icycle));
 		}
 		catch (const exception & e)
 		{
@@ -3904,7 +3906,7 @@ vector<int> DataAssimilator::run_ensemble(ParameterEnsemble& _pe, ObservationEns
 	map<int, int> real_run_ids;
 	try
 	{
-		real_run_ids = _pe.add_runs(run_mgr_ptr, real_idxs);
+		real_run_ids = _pe.add_runs(run_mgr_ptr, real_idxs,icycle);
 	}
 	catch (const exception & e)
 	{

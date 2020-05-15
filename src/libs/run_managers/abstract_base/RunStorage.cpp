@@ -73,7 +73,7 @@ void RunStorage::reset(const vector<string> &_par_names, const vector<string> &_
 	run_data_byte_size = run_par_byte_size + obs_names.size() * sizeof(double);
 	//compute the amount of memeory required to store a single model run
 	// run_byte_size = size of run_status + size of info_txt + size of info_value + size of parameter oand observation data
-	run_byte_size =  sizeof(std::int8_t) + 41*sizeof(char) * sizeof(double) + run_data_byte_size;
+	run_byte_size =  sizeof(std::int8_t) + info_txt_length*sizeof(char) * sizeof(double) + run_data_byte_size;
 	std::int64_t  run_size_64 = run_byte_size;
 	beg_run0 = 4 * sizeof(std::int64_t) + serial_pnames.size() + serial_onames.size();
 	std::int64_t n_runs_64=0;
