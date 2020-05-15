@@ -503,7 +503,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		}
 		else if(net_pack.get_type() == NetPackage::PackType::START_RUN)
 		{
-			Serialization::unserialize(net_pack.get_data(), pars, par_name_vec);
+			
 			int group_id = net_pack.get_group_id();
 			int run_id = net_pack.get_run_id();
 			string info_txt = net_pack.get_info_txt();
@@ -543,7 +543,79 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				}
 				if (da_cycle != NetPackage::NULL_DA_CYCLE)
 				{
-					throw runtime_error("PantherAgent da_cycle support not implemented yet...");
+					try
+					{
+						Pest childPest = pest_scenario.get_child_pest(da_cycle);
+						const ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq();
+						Parameters cur_ctl_parameters = childPest.get_ctl_parameters();
+						vector<string> par_names = base_trans_seq.ctl2model_cp(cur_ctl_parameters).get_keys();
+						sort(par_names.begin(), par_names.end());
+						vector<string> obs_names = childPest.get_ctl_observations().get_keys();
+						sort(obs_names.begin(), obs_names.end());
+						par_name_vec = par_names;
+						obs_name_vec = obs_names;
+						mi = ModelInterface(childPest.get_tplfile_vec(), childPest.get_inpfile_vec(),
+							childPest.get_insfile_vec(), childPest.get_outfile_vec(), childPest.get_comline_vec());
+						
+						stringstream ss;
+						ss << "Updated components for DA_CYCLE " << da_cycle << " as follows: " << endl;
+						int i = 0;
+						ss << "parameter names:" << endl;
+						for (int i = 0; i < par_name_vec.size(); i++)
+						{
+							ss << par_name_vec[i] << " ";
+							if (i % 10 == 0)
+								ss << endl;
+						}
+						frec << ss.str() << endl;
+						cout << ss.str() << endl;
+						ss.str("");
+						ss << endl << "observation names:" << endl;
+						for (int i = 0; i < obs_name_vec.size(); i++)
+						{
+							ss << obs_name_vec[i] << " ";
+							if (i % 10 == 0)
+								ss << endl;
+						}
+						frec << ss.str() << endl;
+						cout << ss.str() << endl;
+						ss.str("");
+						ss << endl << "tpl:in file names:" << endl;
+						vector<string> tpl_vec = childPest.get_tplfile_vec();
+						vector<string> in_vec = childPest.get_inpfile_vec();
+						for (int i = 0; i < tpl_vec.size(); i++)
+						{
+							ss << tpl_vec[i] << ":" << in_vec[i] << " ";
+							if (i % 5 == 0)
+								ss << endl;
+						}
+						frec << ss.str() << endl;
+						cout << ss.str() << endl;
+						ss.str("");
+						ss << endl << "ins:out file names:" << endl;
+						vector<string> ins_vec = childPest.get_insfile_vec();
+						vector<string> out_vec = childPest.get_outfile_vec();
+						for (int i = 0; i < ins_vec.size(); i++)
+						{
+							ss << ins_vec[i] << ":" << out_vec[i] << " ";
+							if (i % 5 == 0)
+								ss << endl;
+						}
+						frec << ss.str() << endl << endl;
+						cout << ss.str() << endl << endl;
+
+
+					}
+					catch (exception& e)
+					{
+						frec << "ERROR: could not process 'DA_CYCLE' " << da_cycle << ": " << e.what() << endl;
+						cout << "ERROR: could not process 'DA_CYCLE' " << da_cycle << ": " << e.what() << endl;
+					}
+					catch (...)
+					{
+						frec << "ERROR: could not process 'DA_CYCLE' " << da_cycle << endl;
+						cout << "ERROR: could not process 'DA_CYCLE' " << da_cycle << endl;
+					}
 				}
 				else
 				{
@@ -552,6 +624,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				}
 			}
 			
+			//do this after we handle a cycle change so that par_name_vec is updated
+			Serialization::unserialize(net_pack.get_data(), pars, par_name_vec);
 			// run model
 			
 			

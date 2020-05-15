@@ -354,9 +354,14 @@ int main(int argc, char* argv[])
 			Parameters cur_ctl_parameters = childPest.get_ctl_parameters();
 			//Allocates Space for Run Manager.  This initializes the model parameter names and observations names.
 			//Neither of these will change over the course of the simulation
-
-
-			run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), childPest.get_ctl_observations());
+			//make sure we use the vector-based initializer so that the pars and obs are in order on the 
+			//workers - PantherAgent uses this same strategy (child pest with cycle number, then sorted par and 
+			//obs names)
+			vector<string> par_names = base_trans_seq.ctl2model_cp(cur_ctl_parameters).get_keys();
+			sort(par_names.begin(), par_names.end());
+			vector<string> obs_names = childPest.get_ctl_observations().get_keys();
+			sort(obs_names.begin(), obs_names.end());
+			run_manager_ptr->initialize(par_names,obs_names);
 
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 			da.use_ies = true;

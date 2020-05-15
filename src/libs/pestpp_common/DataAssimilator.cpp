@@ -35,6 +35,7 @@ DataAssimilator::DataAssimilator(Pest& _pest_scenario, FileManager& _file_manage
 	oe.set_rand_gen(&rand_gen);
 	weights.set_pest_scenario(&pest_scenario);
 	localizer.set_pest_scenario(&pest_scenario);
+	icycle = 0;
 }
 
 void DataAssimilator::throw_da_error(string message)
@@ -884,9 +885,10 @@ void DataAssimilator::initialize_obscov()
 }
 
 
-void DataAssimilator::initialize(int icycle)
+void DataAssimilator::initialize(int _icycle)
 {
-	message(0, "initializing");
+	icycle = _icycle;
+	message(0, "initializing cycle",icycle);
 	stringstream ss;
 	ofstream& f_rec = file_manager.rec_ofstream();
 	/*try
@@ -3779,7 +3781,7 @@ vector<ObservationEnsemble> DataAssimilator::run_lambda_ensembles(vector<Paramet
 	{
 		try
 		{
-			real_run_ids_vec.push_back(pe_lam.add_runs(run_mgr_ptr, subset_idxs));
+			real_run_ids_vec.push_back(pe_lam.add_runs(run_mgr_ptr, subset_idxs,icycle));
 		}
 		catch (const exception & e)
 		{
@@ -3906,7 +3908,7 @@ vector<int> DataAssimilator::run_ensemble(ParameterEnsemble& _pe, ObservationEns
 	map<int, int> real_run_ids;
 	try
 	{
-		real_run_ids = _pe.add_runs(run_mgr_ptr, real_idxs);
+		real_run_ids = _pe.add_runs(run_mgr_ptr, real_idxs,icycle);
 	}
 	catch (const exception & e)
 	{
