@@ -18,3 +18,4 @@ ninja
 cpack -G ZIP
 copy /y *.zip ..\
 cd ..
+pause

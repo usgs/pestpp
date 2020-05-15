@@ -598,6 +598,10 @@ string thread_exceptions::what()
 void  thread_exceptions::rethrow()
 {
 	std::lock_guard<std::mutex> lock(m);
+	if (shared_exception_vec.size() == 0)
+	{
+		return;
+	}
 	stringstream ss;
 	for (auto eptr : shared_exception_vec)
 	{
