@@ -43,7 +43,9 @@ bool NetPackage::check_string(const int8_t *data_src, size_t _size)
 
 string NetPackage::get_info_txt()
 {
-	return extract_string(desc, DESC_LEN);
+	string info_txt = extract_string(desc, DESC_LEN);
+	info_txt.erase(std::find(info_txt.begin(), info_txt.end(), '\0'), info_txt.end());
+	return info_txt;
 }
 
 bool NetPackage::check_string(const vector<int8_t> &data_src, size_t index1, size_t _size)

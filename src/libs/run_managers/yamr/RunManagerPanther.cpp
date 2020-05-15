@@ -1249,6 +1249,11 @@ void RunManagerPanther::process_message(int i_sock)
 		if (!run_finished(run_id))
 		{
 			ss << "Run " << run_id << " failed on agent:" << host_name << "$" << agent_info_iter->get_work_dir() << "  (group id: " << group_id << ", run id: " << run_id << ", concurrent: " << n_concur << ") ";
+			string netpack_message = net_pack.get_info_txt();
+			if (netpack_message.size() > 0)
+			{
+				ss << ", worker message: " << netpack_message;
+			}
 			report(ss.str(), false);
 			model_runs_failed++;
 			update_run_failed(run_id, i_sock);

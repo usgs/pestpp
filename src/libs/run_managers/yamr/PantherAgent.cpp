@@ -254,7 +254,6 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 			{
 				cout << "exception raised by run thread: " << std::endl;
 				cout << shared_execptions.what() << std::endl;
-				smessage << shared_execptions.what();
 				//don't break here, need to check one last time for incoming messages
 				done = true;
 			}
@@ -263,7 +262,6 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 			{
 				cout << "received finished signal from run thread " << std::endl;
 				//don't break here, need to check one last time for incoming messages
-				smessage << "received finished signal from run thread ";
 				done = true;
 			}
 			//this call includes a "sleep" for the timeout
@@ -308,7 +306,6 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 				f_terminate.set(true);
 				terminate = true;
 				final_run_status = NetPackage::PackType::TERMINATE;
-				smessage << "received terminate signal from master";
 				break;
 			}
 			else
