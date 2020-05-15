@@ -23,7 +23,7 @@ public:
 	static int get_new_group_id();
 	NetPackage(PackType _type=PackType::UNKN, int _group=-1, int _run_id=-1, const std::string &desc_str="");
 	~NetPackage(){}
-	const static int DESC_LEN = 41;
+	const static int DESC_LEN = 201;
 	const static int NULL_DA_CYCLE = -9999;
 	int send(int sockfd, const void *data, int64_t data_len_l);
 	int recv(int sockfd);
