@@ -62,6 +62,34 @@ Ensemble Ensemble::zero_like()
 	return new_en;
 }
 
+void Ensemble::replace_col_vals(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
+{
+
+	if (shape().first != mat.rows())
+		throw_ensemble_error("Ensemble::add_2_cols_ip(): first dimensions don't match");
+
+	map<string, int> this_varmap, other_varmap;
+	for (int i = 0; i < var_names.size(); i++)
+		this_varmap[var_names[i]] = i;
+
+	vector<string> missing;
+	set<string> svnames(var_names.begin(), var_names.end());
+	set<string>::iterator end = svnames.end();
+	for (int i = 0; i < other_var_names.size(); i++)
+	{
+		if (svnames.find(other_var_names[i]) == end)
+			missing.push_back(other_var_names[i]);
+		other_varmap[other_var_names[i]] = i;
+	}
+	if (missing.size() > 0)
+		throw_ensemble_error("Ensemble::add_2_cols_ip(): the following var names in other were not found", missing);
+	for (auto& ovm : other_varmap)
+	{
+		reals.col(this_varmap[ovm.first]) = mat.col(ovm.second);
+	}
+}
+
+
 
 void Ensemble::add_2_cols_ip(const vector<string> &other_var_names, const Eigen::MatrixXd &mat)
 {

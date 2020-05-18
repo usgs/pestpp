@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <mutex>
 #include <thread>
+#include <math.h>
 #include "Ensemble.h"
 #include "RestartController.h"
 #include "utilities.h"
@@ -1270,17 +1271,19 @@ void DataAssimilator::initialize(int _icycle)
 	message(2, "checking for denormal values in pe");
 	if (icycle == 0)
 		pe.check_for_normal("initial transformed parameter ensemble");
-
-	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (false) // we need to save the forecast matrix, not the initial matrix
 	{
-		ss << file_manager.get_base_filename() << ".0.par.jcb";
-		pe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << ".0.par.csv";
-		pe.to_csv(ss.str());
+		ss.str("");
+		if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+		{
+			ss << file_manager.get_base_filename() << ".0.par.jcb";
+			pe.to_binary(ss.str());
+		}
+		else
+		{
+			ss << file_manager.get_base_filename() << "_cycle_" << icycle << ".par.csv";
+			pe.to_csv(ss.str());
+		}
 	}
 	message(1, "saved initial parameter ensemble to ", ss.str());
 	message(2, "checking for denormal values in base oe");
@@ -1422,10 +1425,20 @@ void DataAssimilator::initialize(int _icycle)
 	// extract states forecast from oe and add them to pe. States have zero weights and exist in both oe and pe
 	vector <string> dyn_states;
 	dyn_states = get_dynamic_states();
+	pe.to_csv("ggg.csv");
 	add_dynamic_state_to_pe();
-	// loop over names
-	// and change by using replace_col
-	//pe.replace_col(name, value_eigen)
+	ss.str("");
+	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	{
+		ss << file_manager.get_base_filename() << "_cycle_" << icycle << ".0.par.jcb";
+		pe.to_binary(ss.str());
+	}
+	else
+	{
+		ss << file_manager.get_base_filename() << "_cycle_" << icycle << ".par.csv";
+		pe.to_csv(ss.str());
+	}
+	
 
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
@@ -1570,7 +1583,7 @@ void DataAssimilator::add_dynamic_state_to_pe()
 	if (dyn_states_names.size() > 0)	{	
 			
 		Eigen::MatrixXd mat = oe.get_eigen(real_names, dyn_states_names);
-		pe.add_2_cols_ip(dyn_states_names, mat);
+		pe.replace_col_vals(dyn_states_names, mat);
 		
 	}
 }
@@ -3349,7 +3362,7 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 		weights.resize(0);
 		parcov_inv.resize(0);
 		Am.resize(0, 0);
-		
+
 		obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
 		par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
 		par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
@@ -3368,10 +3381,10 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 			{
 				Am.row(j) = Am_map[par_names[j]];
 			}
-			
+
 		}
 
-	
+
 		// *******************************************************
 		par_diff.transposeInPlace();
 		obs_diff.transposeInPlace();
@@ -3379,7 +3392,7 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 		par_resid.transposeInPlace();
 		obs_err.transposeInPlace();
 
-		
+
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
 		Eigen::MatrixXd scaled_residual = weights * obs_resid;
 
@@ -3423,21 +3436,43 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 		}
 
 
-		Eigen::MatrixXd s2_, upgrade_1, s, V, U, s_perc;
+		Eigen::MatrixXd s2_, upgrade_1, s, V, U, cum_sum;
 
 
 		SVD_REDSVD rsvd;
 		Eigen::MatrixXd C;
-		C = obs_diff + cur_lam * obs_err; 
+		C = obs_diff + obs_err;
 		eig2csv("C.csv", C);
-		eigthresh = 0;
-		//rsvd.solve_ip(C, s, U, V, eigthresh, maxsing);
-		//Eigen::BDCSVD<Eigen::MatrixXd> SVD(A, Eigen::ComputeThinU | Eigen::ComputeThinV);
-		Eigen::JacobiSVD<Eigen::MatrixXd> svd(C, Eigen::ComputeThinU | Eigen::ComputeThinV);
-		U = svd.matrixU();
-		s = svd.singularValues();
+		Eigen::VectorXd s2;
+		//eigthresh = 0;
+		if (false)
+		{
+			rsvd.solve_ip(C, s, U, V, eigthresh, maxsing);
+		}
+		else
+		{
+		
+			//Eigen::BDCSVD<Eigen::MatrixXd> svd(C, Eigen::ComputeThinU | Eigen::ComputeThinV);
+			Eigen::JacobiSVD<Eigen::MatrixXd> svd(C, Eigen::ComputeThinU | Eigen::ComputeThinV);
+			U = svd.matrixU();
+			s = svd.singularValues();
+			
+			int ssize = s.size();			
+			double threshold_frac;
+			s2 = s.cwiseProduct(s);
+			double s_sum = s.sum();
+			cum_sum = s;
+			for (int i=0; i<ssize; i++)
+			{			
+				
+				threshold_frac = s(i) / s_sum;
+				if (threshold_frac < eigthresh)
+					s2(i) = 0;				
+			}		
+
+	    }
 		eig2csv("s.csv", s);
-		s_perc = s * (100.0/s.sum());
+		
 		
 		
 		//obs_diff.resize(0, 0);
@@ -3445,10 +3480,18 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "s", s);
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "V", V);
 
-		Eigen::MatrixXd s2 = s.cwiseProduct(s);
+		
 
 		// old // ivec = ((Eigen::VectorXd::Ones(s2.size()) * (cur_lam + 1.0)) + s2).asDiagonal().inverse();
+
 		s2_ = s2.asDiagonal().inverse();
+		for (int i=0; i < s2.size(); i++)
+		{
+			if (s2(i)<1e-50)
+			{
+				s2_(i, i) = 0;
+			}
+		}
 		eig2csv("s2_.csv", s2_);
 		//local_utils::save_mat(verbose_level, thread_id, iter, t_count, "ivec", ivec);
 		//old// Eigen::MatrixXd X1 = Ut * scaled_residual;
