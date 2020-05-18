@@ -20,6 +20,7 @@ Variables and options are passed to CMake using `-D<var>=<value>` options to the
 * `CMAKE_CXX_COMPILER` - Normally this is detected, but it can be overridden to use a different C++ compiler.
 * `CMAKE_Fortran_COMPILER` - If specified (such as `ifort`), this enables Fortran support to build additional targets.
 * `ENABLE_Fortran=OFF` - If set `ON`, enable Fortran support, using default Fortran compiler to build additional targets.
+* `INSTALL_LOCAL=ON` - By default, executables are installed locally in ./bin after they are built, which is handy for testing.
 
 ## Linux and macOS
 
