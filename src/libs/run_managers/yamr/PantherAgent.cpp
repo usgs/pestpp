@@ -9,6 +9,7 @@
 #include "system_variables.h"
 #include "utilities.h"
 #include <regex>
+#include "network_package.h"
 
 #include "Pest.h"
 
@@ -19,7 +20,8 @@ int  linpack_wrap(void);
 PANTHERAgent::PANTHERAgent(ofstream &_frec)
 	: frec(_frec),
 	  max_time_without_master_ping_seconds(300),
-	  restart_on_error(false)
+	  restart_on_error(false),
+	  current_da_cycle(NetPackage::NULL_DA_CYCLE)
 {
 }
 
@@ -526,7 +528,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 						{
 							if (ttokens[1].size() > 0)
 							{
-								string s_cycle;
+								string s_cycle = ttokens[1];
 								try
 								{
 									da_cycle = stoi(s_cycle);
@@ -543,92 +545,102 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				}
 				if (da_cycle != NetPackage::NULL_DA_CYCLE)
 				{
-					try
+					if (da_cycle != current_da_cycle)
 					{
-						Pest childPest = pest_scenario.get_child_pest(da_cycle);
-						const ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq();
-						Parameters cur_ctl_parameters = childPest.get_ctl_parameters();
-						vector<string> par_names = base_trans_seq.ctl2model_cp(cur_ctl_parameters).get_keys();
-						sort(par_names.begin(), par_names.end());
-						vector<string> obs_names = childPest.get_ctl_observations().get_keys();
-						sort(obs_names.begin(), obs_names.end());
-						par_name_vec = par_names;
-						obs_name_vec = obs_names;
-						mi = ModelInterface(childPest.get_tplfile_vec(), childPest.get_inpfile_vec(),
-							childPest.get_insfile_vec(), childPest.get_outfile_vec(), childPest.get_comline_vec());
-						
-						stringstream ss;
-						ss << "Updated components for DA_CYCLE " << da_cycle << " as follows: " << endl;
-						int i = 0;
-						ss << "parameter names:" << endl;
-						for (int i = 0; i < par_name_vec.size(); i++)
+						try
 						{
-							ss << par_name_vec[i] << " ";
-							if (i % 10 == 0)
-								ss << endl;
+							pest_scenario.assign_da_cycles(frec);
+							Pest childPest = pest_scenario.get_child_pest(da_cycle);
+							const ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq();
+							Parameters cur_ctl_parameters = childPest.get_ctl_parameters();
+							vector<string> par_names = base_trans_seq.ctl2model_cp(cur_ctl_parameters).get_keys();
+							sort(par_names.begin(), par_names.end());
+							vector<string> obs_names = childPest.get_ctl_observations().get_keys();
+							sort(obs_names.begin(), obs_names.end());
+							par_name_vec = par_names;
+							obs_name_vec = obs_names;
+							mi = ModelInterface(childPest.get_tplfile_vec(), childPest.get_inpfile_vec(),
+								childPest.get_insfile_vec(), childPest.get_outfile_vec(), childPest.get_comline_vec());
+							obs = childPest.get_ctl_observations();
+							stringstream ss;
+							ss << "Updated components for DA_CYCLE " << da_cycle << " as follows: " << endl;
+							int i = 0;
+							ss << "parameter names:" << endl;
+							for (int i = 0; i < par_name_vec.size(); i++)
+							{
+								ss << par_name_vec[i] << " ";
+								if (i % 10 == 0)
+									ss << endl;
+							}
+							frec << ss.str() << endl;
+							cout << ss.str() << endl;
+							ss.str("");
+							ss << endl << "observation names:" << endl;
+							for (int i = 0; i < obs_name_vec.size(); i++)
+							{
+								ss << obs_name_vec[i] << " ";
+								if (i % 10 == 0)
+									ss << endl;
+							}
+							frec << ss.str() << endl;
+							cout << ss.str() << endl;
+							ss.str("");
+							ss << endl << "tpl:in file names:" << endl;
+							vector<string> tpl_vec = childPest.get_tplfile_vec();
+							vector<string> in_vec = childPest.get_inpfile_vec();
+							for (int i = 0; i < tpl_vec.size(); i++)
+							{
+								ss << tpl_vec[i] << ":" << in_vec[i] << " ";
+								if (i % 5 == 0)
+									ss << endl;
+							}
+							frec << ss.str() << endl;
+							cout << ss.str() << endl;
+							ss.str("");
+							ss << endl << "ins:out file names:" << endl;
+							vector<string> ins_vec = childPest.get_insfile_vec();
+							vector<string> out_vec = childPest.get_outfile_vec();
+							for (int i = 0; i < ins_vec.size(); i++)
+							{
+								ss << ins_vec[i] << ":" << out_vec[i] << " ";
+								if (i % 5 == 0)
+									ss << endl;
+							}
+							frec << ss.str() << endl << endl;
+							cout << ss.str() << endl << endl;
+							current_da_cycle = da_cycle;
 						}
-						frec << ss.str() << endl;
-						cout << ss.str() << endl;
-						ss.str("");
-						ss << endl << "observation names:" << endl;
-						for (int i = 0; i < obs_name_vec.size(); i++)
+						catch (exception& e)
 						{
-							ss << obs_name_vec[i] << " ";
-							if (i % 10 == 0)
-								ss << endl;
+							stringstream ss;
+							ss << "ERROR: could not process 'DA_CYCLE' " << da_cycle << ": " << e.what();
+							frec << ss.str() << endl;
+							cout << ss.str() << endl;
+							net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
+							char data;
+							err = send_message(net_pack, &data, 0);
+							terminate = true;
+							continue;
 						}
-						frec << ss.str() << endl;
-						cout << ss.str() << endl;
-						ss.str("");
-						ss << endl << "tpl:in file names:" << endl;
-						vector<string> tpl_vec = childPest.get_tplfile_vec();
-						vector<string> in_vec = childPest.get_inpfile_vec();
-						for (int i = 0; i < tpl_vec.size(); i++)
+						catch (...)
 						{
-							ss << tpl_vec[i] << ":" << in_vec[i] << " ";
-							if (i % 5 == 0)
-								ss << endl;
+							stringstream ss;
+							ss << "ERROR: could not process 'DA_CYCLE' " << da_cycle;
+							frec << ss.str() << endl;
+							cout << ss.str() << endl;
+							net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
+							char data;
+							err = send_message(net_pack, &data, 0);
+							terminate = true;
+							continue;
 						}
-						frec << ss.str() << endl;
-						cout << ss.str() << endl;
-						ss.str("");
-						ss << endl << "ins:out file names:" << endl;
-						vector<string> ins_vec = childPest.get_insfile_vec();
-						vector<string> out_vec = childPest.get_outfile_vec();
-						for (int i = 0; i < ins_vec.size(); i++)
-						{
-							ss << ins_vec[i] << ":" << out_vec[i] << " ";
-							if (i % 5 == 0)
-								ss << endl;
-						}
-						frec << ss.str() << endl << endl;
-						cout << ss.str() << endl << endl;
-
-
 					}
-					catch (exception& e)
+					else
 					{
 						stringstream ss;
-						ss << "ERROR: could not process 'DA_CYCLE' " << da_cycle << ": " << e.what();
+						ss << "reusing 'DA_CYCLE' " << da_cycle;
 						frec << ss.str() << endl;
 						cout << ss.str() << endl;
-						net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
-						char data;
-						err = send_message(net_pack, &data, 0);
-						terminate = true;
-						continue;
-					}
-					catch (...)
-					{
-						stringstream ss;
-						ss << "ERROR: could not process 'DA_CYCLE' " << da_cycle;
-						frec << ss.str() << endl;
-						cout << ss.str() << endl;
-						net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
-						char data;
-						err = send_message(net_pack, &data, 0);
-						terminate = true;
-						continue;
 					}
 				}
 				else

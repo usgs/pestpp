@@ -51,6 +51,7 @@ private:
 	int poll_interval_seconds;
 	int max_time_without_master_ping_seconds;
 	bool restart_on_error;
+	int current_da_cycle;
 
 #ifdef _DEBUG
 	static const int max_recv_fails = 100;
