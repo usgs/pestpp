@@ -280,6 +280,44 @@ int main(int argc, char* argv[])
 			exit(0);
 		}
 
+		RunManagerAbstract* run_manager_ptr;
+
+		if (run_manager_type == RunManagerType::PANTHER)
+		{
+			if (pest_scenario.get_control_info().noptmax == 0)
+			{
+				cout << endl << endl << "WARNING: 'noptmax' = 0 but using parallel run mgr.  This prob isn't what you want to happen..." << endl << endl;
+			}
+			string port = socket_str;
+			strip_ip(port);
+			strip_ip(port, "front", ":");
+			run_manager_ptr = new RunManagerPanther(
+				rns_file, port,
+				file_manager.open_ofile_ext("rmr"),
+				pest_scenario.get_pestpp_options().get_max_run_fail(),
+				pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
+				pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
+				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes());
+		}
+		else
+		{
+			performance_log.log_event("starting basic model IO error checking");
+			cout << "checking model IO files...";
+			pest_scenario.check_io(fout_rec);
+			//pest_scenario.check_par_obs();
+			performance_log.log_event("finished basic model IO error checking");
+			cout << "done" << endl;
+			const ModelExecInfo& exi = pest_scenario.get_model_exec_info();
+			run_manager_ptr = new RunManagerSerial(exi.comline_vec,
+				exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
+				file_manager.build_filename("rns"), pathname,
+				pest_scenario.get_pestpp_options().get_max_run_fail(),
+				pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
+				pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
+		}
+
+
+
 		// loop over assimilation cycles
 		
 		//get deep copy of pest_scenario for current cycle
@@ -300,7 +338,6 @@ int main(int argc, char* argv[])
 			vector <string> xxxx=childPest.get_ctl_ordered_par_names();
 			//childPest.get_pestpp_options.set_check_tplins(false);
 
-			RunManagerAbstract* run_manager_ptr;
 			// -----------------------------  
 			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);			
 			output_file_writer.scenario_io_report(fout_rec);
@@ -314,21 +351,7 @@ int main(int argc, char* argv[])
 
 			if (run_manager_type == RunManagerType::PANTHER)
 			{
-				if (childPest.get_control_info().noptmax == 0)
-				{
-					cout << endl << endl << "WARNING: 'noptmax' = 0 but using parallel run mgr.  This prob isn't what you want to happen..." << endl << endl;
-				}
-				string port = socket_str;
-				strip_ip(port);
-				strip_ip(port, "front", ":");
-				const ModelExecInfo& exi = childPest.get_model_exec_info(); //Ayman: why is this? it seems it is not used by panther 
-				run_manager_ptr = new RunManagerPanther(
-					rns_file, port,
-					file_manager.open_ofile_ext("rmr"),
-					childPest.get_pestpp_options().get_max_run_fail(),
-					childPest.get_pestpp_options().get_overdue_reched_fac(),
-					childPest.get_pestpp_options().get_overdue_giveup_fac(),
-					childPest.get_pestpp_options().get_overdue_giveup_minutes());
+				//dont do anything here...
 			}
 			else
 			{
