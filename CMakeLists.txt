@@ -119,6 +119,10 @@ endif()
 
 # Use a custom command to locally install binaries after compiling
 # https://www.linux.com/training-tutorials/cmake-recipe-2-install-local-folder-build-dir-testing/
+option(INSTALL_LOCAL "Install local executables in ./bin" ON)
+if(INSTALL_LOCAL)
+  set(_OPTION_INSTALL_LOCAL_ALL ALL)
+endif()
 # Use an extra command to copy binaries into a sub-directory within bin -- please remove soon
 if(WIN32)
   set(_local_install_COMMAND_to_be_removed
@@ -135,7 +139,7 @@ else()
   )
 endif()
 add_custom_target(local_install
-  ALL
+  ${_OPTION_INSTALL_LOCAL_ALL}
   "${CMAKE_COMMAND}"
     -D CMAKE_INSTALL_PREFIX=${PESTPP_SOURCE_DIR}
     -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_install.cmake"
@@ -146,7 +150,7 @@ add_custom_target(local_install
     pestpp-opt
     pestpp-sen
     pestpp-swp
-  COMMENT "Installing local binaries to ${PESTPP_SOURCE_DIR}/bin"
+  COMMENT "Installing local executables to ${PESTPP_SOURCE_DIR}/bin"
 )
 
 # Packaging
