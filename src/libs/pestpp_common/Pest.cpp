@@ -2252,7 +2252,8 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 
 		}	
 		
-
+		model_exec_info.incycle_vec.clear();
+		model_exec_info.outcycle_vec.clear();
 		for (auto tpl : mi_cycle_map)
 		{
 			model_exec_info.incycle_vec.push_back(tpl.second); // we can do that becuase row order does not change. 

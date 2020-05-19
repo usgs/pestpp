@@ -8,7 +8,7 @@ eigthresh                           1e-5
 eigwrite                                1
 #debug_parse_only               True
 ies_parameter_ensemble     kh_ensemble0.csv
-ies_num_reals 100
+ies_num_reals 10
 ies_lambda_mults 1.0
 lambda_scale_fac 1.0
 * parameter groups external
@@ -20,7 +20,7 @@ obsgrp.csv
 * observation data external
 test.obs_data.csv
 * model command line
-model_run.bat
+python forward_run.py
 * model input external
 test.tplfile_data.csv
 * model output external
