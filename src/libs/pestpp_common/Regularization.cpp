@@ -54,6 +54,14 @@ double DynamicRegularization::get_grp_weight_fact(const std::string &grp_name) c
 	return fact;
 }
 
+DynamicRegularization DynamicRegularization::get_unit_reg_instance()
+{
+	DynamicRegularization new_reg;
+	new_reg.set_defaults();
+	new_reg.set_weight(1.0);
+	return new_reg;
+}
+
 DynamicRegularization DynamicRegularization::get_zero_reg_instance()
 {
 	DynamicRegularization new_reg;

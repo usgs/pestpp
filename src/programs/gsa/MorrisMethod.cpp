@@ -150,6 +150,7 @@ MorrisMethod::MorrisMethod(Pest &_pest_scenario,
 		_par_dist, _seed),
 	calc_obs_sen(_calc_pooled_obs), calc_morris_obs_sen(_calc_morris_obs_sen)
 {
+	rand_gen = mt19937(_pest_scenario.get_pestpp_options().get_random_seed());
 	initialize(_p, _r, _delta);
 }
 
@@ -226,7 +227,7 @@ VectorXd MorrisMethod::create_x_vec(int k)
 	int max_num = 1+(p-2)/2;
 	for (int i=0; i<k; ++i)
 	{
-		rnum = rand_engine() % max_num;
+		rnum = rand_gen() % max_num;
 		x(i) = rnum / (p - 1);
 	}
 	return x;
@@ -235,7 +236,8 @@ VectorXd MorrisMethod::create_x_vec(int k)
 
 int MorrisMethod::rand_plus_minus_1(void)
 {
-	return (rand_engine() % 2 * 2) - 1;
+	//return (rand_engine() % 2 * 2) - 1;
+	return (rand_gen() % 2 * 2) - 1;
 }
 
 
@@ -273,7 +275,7 @@ void MorrisMethod::assemble_runs(RunManagerAbstract &run_manager)
 			// convert control parameters to model parameters
 			base_partran_seq_ptr->numeric2model_ip(pars);
 			// convert control parameters to model parameters
-			base_partran_seq_ptr->ctl2model_ip(pars);
+			//base_partran_seq_ptr->ctl2model_ip(pars);
 			if (i>0)
 			{
 				par_name = adj_par_name_vec[i-1];
@@ -362,10 +364,7 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 	base_partran_seq_ptr->model2numeric_ip(pars1);
 	for (int i_run=1; i_run<n_runs; ++i_run)
 	{
-		std::cout << string(message.str().size(), '\b');
-		message.str("");
-		message << "processing run " << i_run+1 << " / " << n_runs;
-		std::cout << message.str();
+
 
 		run0_ok = run1_ok;
 		pars0 = pars1;

@@ -37,7 +37,7 @@
 namespace RedSVD
 {
 	template<typename Scalar>
-	inline void sample_gaussian(Scalar& x, Scalar& y)
+	inline void sample_gaussian_old(Scalar& x, Scalar& y)
 	{
 		using std::sqrt;
 		using std::log;
@@ -47,6 +47,9 @@ namespace RedSVD
 		const Scalar PI(3.1415926535897932384626433832795028841971693993751);
 		Scalar v1 = (Scalar)(std::rand() + Scalar(1)) / ((Scalar)RAND_MAX+Scalar(2));
 		Scalar v2 = (Scalar)(std::rand() + Scalar(1)) / ((Scalar)RAND_MAX+Scalar(2));
+		/*Scalar v1 = (Scalar)(rand_gen() + Scalar(1)) / ((Scalar)rand_gen.max() + Scalar(2));
+		Scalar v1 = (Scalar)(rand_gen() + Scalar(1)) / ((Scalar)rand_gen.max() + Scalar(2));*/
+
 		
 		
 		Scalar len = sqrt(Scalar(-2) * log(v1));
@@ -55,7 +58,7 @@ namespace RedSVD
 	}
 
 	template<typename MatrixType>
-	inline void sample_gaussian_precpp11(MatrixType& mat)
+	inline void sample_gaussian_old(MatrixType& mat)
 	{
 		typedef typename MatrixType::Index Index;
 
@@ -68,6 +71,7 @@ namespace RedSVD
 		}
 	}
 
+	//while elegant, the C++11 random stuff is not consistent across platforms
 	template<typename MatrixType>
 	inline void sample_gaussian(MatrixType& mat)
 	{

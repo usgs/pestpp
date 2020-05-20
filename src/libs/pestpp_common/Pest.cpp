@@ -34,6 +34,8 @@
 #include "Transformation.h"
 #include "FileManager.h"
 #include "model_interface.h"
+#include "Jacobian.h"
+#include "QSqrtMatrix.h"
 
 
 using namespace::std;
@@ -1084,7 +1086,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				}
 
 				//try to use as a regul arg
-				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
+				if ((stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND) && (regul_scheme_ptr))
 				{
 					stat = regul_scheme_ptr->assign_value_by_key(kv.first,kv.second);
 					check_report_assignment(f_rec, stat, kv.first, kv.second);
@@ -1094,7 +1096,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
 				{
 					ss.str("");
-					ss << "unrecognized '* control data keyword' key-value pair on line" << line << endl;
+					ss << "unrecognized '* control data keyword' key-value pair on line: " << endl << "    '" << line << "'" <<  endl;
 					throw_control_file_error(f_rec, ss.str(), false);
 				}		
 			}
@@ -1106,7 +1108,6 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				{
 					if (tokens[1] == "REGULARIZATION" || tokens[1] == "REGULARISATION")
 					{
-						use_dynamic_reg = true;
 						control_info.pestmode = ControlInfo::PestMode::REGUL;
 
 					}
@@ -1114,8 +1115,11 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						control_info.pestmode = ControlInfo::PestMode::ESTIMATION;
 					else if (tokens[1] == "PARETO")
 						control_info.pestmode = ControlInfo::PestMode::PARETO;
+					else
+					{
+						throw_control_file_error(f_rec, "unrecognized 'pestmode': " + tokens[1]);
+					}
 				}
-
 
 				else if (sec_lnum == 2)
 				{
@@ -1712,9 +1716,32 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			ss << n << ",";
 		throw_control_file_error(f_rec, ss.str());
 	}
+
+	if (control_info.pestmode == ControlInfo::PestMode::REGUL)
+	{
+		if (regul_scheme_ptr)
+			regul_scheme_ptr->set_use_dynamic_reg(true);
+	}
 	
-	
-	
+	if (ctl_ordered_obs_group_names.size() == 0)
+	{
+		set<string> found;
+		string gname;
+		for (auto name : ctl_ordered_obs_names)
+		{
+			gname = observation_info.get_group(name);
+			if (found.find(gname) == found.end())
+			{
+				found.insert(gname);
+				ctl_ordered_obs_group_names.push_back(gname);
+			}
+		}
+	}
+	if (ctl_ordered_par_group_names.size() == 0)
+	{
+		ctl_ordered_par_group_names = base_group_info.get_group_names();
+	}
+
 
 
 	//check if the predictions ++ arg might be a file name?
@@ -1884,7 +1911,8 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 			chg_fac = last_val / p.second;
 		else
 			chg_fac = p.second / last_val;
-		if (p.second > 0.0)
+		//if (p.second > 0.0)
+		if (last_val > 0.0)
 		{
 			fac_lb = last_val / fpm;
 			fac_ub = last_val * fpm;
@@ -1972,7 +2000,7 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 				ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at lower bound";
 				throw runtime_error(ss.str());
 			}*/
-			scaled_bnd_val = p_rec->ubnd + (p_rec->ubnd * bnd_tol);
+			scaled_bnd_val = p_rec->ubnd + abs(p_rec->ubnd * bnd_tol);
 			if (p.second > scaled_bnd_val)
 			{
 				temp = abs((p_rec->ubnd - last_val) / (p.second - last_val));
@@ -1990,7 +2018,7 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 					control_type = "upper bound";
 				}
 			}
-			scaled_bnd_val = p_rec->lbnd - (p_rec->lbnd * bnd_tol);
+			scaled_bnd_val = p_rec->lbnd - abs(p_rec->lbnd * bnd_tol);
 			if (p.second < p_rec->lbnd)
 			{
 				temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
@@ -2030,6 +2058,18 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 			p.second =last_val + (p.second - last_val) *  scaling_factor;
 		}
 	}
+	
+	//check for slightly out of bounds
+	for (auto &p : upgrade_ctl_pars)
+	{
+		p_rec = p_info.get_parameter_rec_ptr(p.first);
+		if (p.second < p_rec->lbnd)
+			p.second = p_rec->lbnd;
+		else if (p.second > p_rec->ubnd)
+			p.second = p_rec->ubnd;
+
+	}
+
 }
 
 pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &pars)
@@ -2246,6 +2286,15 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 	}
 	ctl_parameter_info.insert(name, pi);
 	ctl_parameters.insert(name, pi.init_value);
+	
+	if (find(ctl_ordered_par_group_names.begin(), ctl_ordered_par_group_names.end(), pi.group) == ctl_ordered_par_group_names.end())
+	{
+		ParameterGroupRec pgr;
+		pgr.set_defaults();
+		pgr.set_name(pi.group);
+		base_group_info.insert_group(pi.group,pgr);
+		ctl_ordered_par_group_names.push_back(pi.group);
+	}
 	base_group_info.insert_parameter_link(name, pi.group);
 
 	// build appropriate transformations
@@ -2292,7 +2341,14 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	obs_i.group = tokens[3];
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
+
 	observation_values.insert(name, value);
+	name = obs_i.group;
+	vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
+	if (is == ctl_ordered_obs_group_names.end())
+	{
+		ctl_ordered_obs_group_names.push_back(name);
+	}
 }
 
 void Pest::tokens_to_pi_rec(ostream& f_rec, const string& line_upper)
@@ -2352,9 +2408,34 @@ void Pest::rectify_par_groups()
 			temp = base_group_info.get_group_names();
 			group_names.clear();
 			group_names.insert(temp.begin(), temp.end());
+			ctl_ordered_par_group_names.push_back(pr->group);
 
 		}
 	}
+
+}
+
+map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform)
+{
+	Parameters pars = jac.get_base_numeric_parameters();
+	Parameters ctl_pars = par_transform.numeric2ctl_cp(pars);
+	const vector<string>& par_list = jac.parameter_list();
+	const vector<string>& obs_list = jac.obs_and_reg_list();
+	Eigen::VectorXd par_vec = pars.get_data_eigen_vec(par_list);
+	Eigen::MatrixXd par_mat_tmp = par_vec.asDiagonal();
+	Eigen::SparseMatrix<double> par_mat = par_mat_tmp.sparseView();
+	QSqrtMatrix Q_sqrt(&observation_info, &prior_info);
+	Eigen::SparseMatrix<double> q_sqrt_no_reg = Q_sqrt.get_sparse_matrix(obs_list, DynamicRegularization::get_zero_reg_instance());
+	Eigen::SparseMatrix<double> dss_mat_no_reg_pest = q_sqrt_no_reg * jac.get_matrix(obs_list, par_list);
+	int n_nonzero_weights_no_reg = observation_info.get_nnz_obs();
+	map<string, double> par_sens;
+	double val;
+	for (int i = 0; i < par_list.size(); ++i)
+	{
+		val = dss_mat_no_reg_pest.col(i).norm() / n_nonzero_weights_no_reg;
+		par_sens[par_list[i]] = val;
+		}
+	return par_sens;
 }
 
 

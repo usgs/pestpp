@@ -55,6 +55,7 @@ public:
 	ParameterGroupRec(const ParameterGroupRec &rhs) {*this=rhs;}
 	ParameterGroupRec& operator=(const ParameterGroupRec &rhs);
 	void set_defaults();
+	void set_name(string& _name) { name = _name; }
 };
 
 ostream& operator<< (ostream &os, const ParameterGroupRec& val);
@@ -201,6 +202,7 @@ public:
 	//void parce_line(const string &line);
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
+	bool assign_value_by_key_continued(const string& key, const string& value);
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
 	int get_n_iter_base() const { return n_iter_base; }
@@ -263,6 +265,9 @@ public:
 	void set_glm_debug_real_fail(bool _flag) { glm_debug_real_fail = _flag; }
 	bool get_glm_accept_mc_phi() const { return glm_accept_mc_phi; }
 	void set_glm_accept_mc_phi(bool _flag) { glm_accept_mc_phi = _flag; }
+	bool get_glm_rebase_super() const { return glm_rebase_super; }
+	void set_glm_rebase_super(bool _flag) { glm_rebase_super = _flag; }
+
 
 	double get_overdue_reched_fac()const { return overdue_reched_fac; }
 	void set_overdue_reched_fac(double _val) { overdue_reched_fac = _val; }
@@ -317,7 +322,12 @@ public:
 	void set_opt_include_bnd_pi(bool _include_bnd_pi) { opt_include_bnd_pi = _include_bnd_pi; }
 	bool get_opt_std_weights()const { return opt_std_weights; }
 	void set_opt_std_weights(bool _opt_std_weights) { opt_std_weights = _opt_std_weights; }
-
+	int get_opt_stack_size()const { return opt_stack_size; }
+	void set_opt_stack_size(int _size) { opt_stack_size = _size; }
+	string get_opt_par_stack()const { return opt_par_stack; }
+	void set_opt_par_stack(string _stack) { opt_par_stack = _stack; }
+	string get_opt_obs_stack()const { return opt_obs_stack; }
+	void set_opt_obs_stack(string _stack) { opt_obs_stack = _stack; }
 
 
 	string get_ies_par_csv()const { return ies_par_csv; }
@@ -373,8 +383,6 @@ public:
 	void set_ies_lambda_dec_fac(double _dec_fac) { ies_lambda_dec_fac = _dec_fac; }
 	bool get_ies_save_lambda_en() const { return ies_save_lambda_en; }
 	void set_ies_save_lambda_en(bool _ies_save_lambda_en) { ies_save_lambda_en = _ies_save_lambda_en; }
-	string get_ies_weight_csv() const { return ies_weight_csv; }
-	void set_ies_weight_csv(string _ies_weight_csv) { ies_weight_csv = _ies_weight_csv; }
 	string get_ies_subset_how() const { return ies_subset_how; }
 	void set_ies_subset_how(string _ies_subset_how) { ies_subset_how = _ies_subset_how; }
 	void set_ies_localize_how(string _how) { ies_localize_how = _how; }
@@ -452,7 +460,13 @@ public:
 	string get_additional_ins_delimiters() const { return additional_ins_delimiters; }
 	void set_random_seed(int seed) { random_seed = seed; }
 	int get_random_seed()const { return random_seed; }
+	bool get_glm_iter_mc() const { return glm_iter_mc; }
+	void set_glm_iter_mc(bool _flag) { glm_iter_mc = _flag; }
 
+	void set_panther_agent_restart_on_error(bool _flag) { panther_agent_restart_on_error = _flag; }
+	bool get_panther_agent_restart_on_error() const { return panther_agent_restart_on_error; }
+	void set_panther_agent_no_ping_timeout_secs(int _timeout_secs) { panther_agent_no_ping_timeout_secs = _timeout_secs; }
+	int get_panther_agent_no_ping_timeout_secs() const { return panther_agent_no_ping_timeout_secs; }
 
 	void set_defaults();
 	void summary(ostream& os) const;
@@ -474,6 +488,8 @@ private:
 	bool glm_debug_lamb_fail;
 	bool glm_debug_real_fail;
 	bool glm_accept_mc_phi;
+	bool glm_rebase_super;
+	bool glm_iter_mc;
 
 	vector<double> base_lambda_vec;
 	vector<double> lambda_scale_vec;
@@ -529,6 +545,9 @@ private:
 	double opt_iter_derinc_fac;
 	bool opt_include_bnd_pi;
 	bool opt_std_weights;
+	int opt_stack_size;
+	string opt_par_stack;
+	string opt_obs_stack;
 
 	int ies_subset_size;
 	string ies_par_csv;
@@ -558,7 +577,6 @@ private:
 	bool ies_save_lambda_en;
 	set<string> passed_args;
 	map<string, string> arg_map;
-	string ies_weight_csv;
 	string ies_subset_how;
 	string ies_localize_how;
 	int ies_num_threads;
@@ -586,6 +604,9 @@ private:
 	bool gsa_morris_obs_sen;
 	double gsa_morris_delta;
 	string gsa_sobol_par_dist;
+
+	bool panther_agent_restart_on_error;
+	int panther_agent_no_ping_timeout_secs;
 		
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);

@@ -265,18 +265,6 @@ Mat Mat::inv(Logger* log)
 	return Mat(row_names, col_names, inv_mat);
 }
 
-void Mat::pseudo_inv_ip(double eigthresh, int maxsing)
-{
-	//Eigen::MatrixXd ivec, upgrade_1, s, V, U, st;
-	Eigen::SparseMatrix<double> Vt, U;
-	Eigen::VectorXd s, st;
-	SVD_REDSVD rsvd(eigthresh,maxsing);
-	//rsvd.set_performance_log(performance_log);
-
-	rsvd.solve_ip(matrix, s, U, Vt, st);
-	matrix = Vt.transpose() * st * U.transpose();
-}
-
 void Mat::inv_ip(bool echo)
 {
 	ofstream flog("Mat.log");
@@ -1494,6 +1482,9 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 
 void Covariance::from_parameter_bounds(const vector<string> &par_names,const ParameterInfo &par_info, double sigma_range)
 {
+	matrix.resize(0, 0);
+	row_names.clear();
+	col_names.clear();
 	vector<Eigen::Triplet<double>> triplet_list;
 	const ParameterRec* par_rec;
 	int i = 0;
@@ -1559,6 +1550,9 @@ void Covariance::from_observation_weights(const string &pst_filename)
 
 void Covariance::from_observation_weights(const vector<string>& obs_names, const ObservationInfo& obs_info, const vector<string>& pi_names, const PriorInformation* pi)
 {
+	matrix.resize(0, 0);
+	row_names.clear();
+	col_names.clear();
 	vector<Eigen::Triplet<double>> triplet_list;
 	const ObservationRec* obs_rec;
 	int i = 0;
@@ -1578,7 +1572,7 @@ void Covariance::from_observation_weights(const vector<string>& obs_names, const
 		i++;
 	}
 
-	PriorInformation::const_iterator pi_iter;
+	/*PriorInformation::const_iterator pi_iter;
 	PriorInformation::const_iterator not_pi_iter = pi->end();
 
 	for (auto pi_name : pi_names)
@@ -1593,7 +1587,7 @@ void Covariance::from_observation_weights(const vector<string>& obs_names, const
 			col_names.push_back(pi_name);
 			i++;
 		}
-	}
+	}*/
 	if (row_names.size() > 0)
 	{
 		matrix.resize(row_names.size(), row_names.size());
