@@ -1053,6 +1053,7 @@ bool Constraints::should_update_chance(int iter)
 	}
 	else if ((iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)
 		return true;
+	return false;
 }
 
 
