@@ -2986,7 +2986,7 @@ void IterEnsembleSmoother::set_subset_idx(int size)
 		map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
 
 		int i = 0;
-		for (pi; pi != end; ++pi)
+		for (; pi != end; ++pi)
 		{
 			phis.push_back(make_pair(pi->second, i)); //phival,idx?
 			++i;

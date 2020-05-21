@@ -330,13 +330,13 @@ NetPackage::PackType PANTHERAgent::run_model(Parameters &pars, Observations &obs
 		cerr << endl;
 		cerr << "   " << ex.what() << endl;
 		cerr << "   Aborting model run" << endl << endl;
-		NetPackage::PackType::RUN_FAILED;
+		final_run_status = NetPackage::PackType::RUN_FAILED;
 	}
 	catch(...)
 	{
  		cerr << "   Error running model" << endl;
 		cerr << "   Aborting model run" << endl;
-		NetPackage::PackType::RUN_FAILED;
+		final_run_status = NetPackage::PackType::RUN_FAILED;
 	}
 
 	//sleep here just to give the os a chance to cleanup any remaining file handles

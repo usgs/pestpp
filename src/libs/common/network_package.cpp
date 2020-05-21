@@ -22,7 +22,7 @@ bool NetPackage::allowable_ascii_char(int8_t value)
 	// This is for security resasons.  Only \0
 	//  and printable characters are allowed
 	bool ret_val = false;
-	if (value == 0 || (value >= 32 && value <= 176))
+	if (value == 0 || (value >= 32 && value <= 126))
 		ret_val = true;
 	return ret_val;
 }

@@ -845,8 +845,6 @@ Mat Mat::get(const vector<string> &new_row_names, const vector<string> &new_col_
 
 	const string *row_name;
 	const string *col_name;
-	col_names;
-	row_names;
 	std::vector<Eigen::Triplet<double> > triplet_list;
 	for (int icol = 0; icol<matrix.outerSize(); ++icol)
 	{

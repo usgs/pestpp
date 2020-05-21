@@ -48,7 +48,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 	dbl_max = _dbl_max;
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	ctl_ord_obs_constraint_names.clear();
-	ctl_ord_pi_constraint_names;
+	ctl_ord_pi_constraint_names.clear();
 	constraint_sense_map.clear();
 	constraint_sense_name.clear();
 	nz_obs_names.clear();
@@ -1053,6 +1053,7 @@ bool Constraints::should_update_chance(int iter)
 	}
 	else if ((iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)
 		return true;
+	return false;
 }
 
 
