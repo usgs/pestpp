@@ -7,7 +7,7 @@ add_library(rm_abstract STATIC
   model_interface.cpp
   RunManagerAbstract.cpp
   RunStorage.cpp
-  Serializeation.cpp
+  Serialization.cpp
 )
 
 target_include_directories(rm_abstract INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
