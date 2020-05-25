@@ -23,13 +23,15 @@ public:
 	static int get_new_group_id();
 	NetPackage(PackType _type=PackType::UNKN, int _group=-1, int _run_id=-1, const std::string &desc_str="");
 	~NetPackage(){}
-	const static int DESC_LEN = 41;
+	const static int DESC_LEN = 1001;
+	const static int NULL_DA_CYCLE = -9999;
 	int send(int sockfd, const void *data, int64_t data_len_l);
 	int recv(int sockfd);
 	void reset(PackType _type, int _group, int _run_id, const std::string &_desc);
 	PackType get_type() const {return type;}
 	int64_t get_run_id() const { return run_id; }
 	int64_t get_group_id() const { return group; }
+	std::string get_info_txt();
 	const std::vector<int8_t> &get_data(){ return data; }
 	void print_header(std::ostream &fout);
 
