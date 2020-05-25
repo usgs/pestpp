@@ -94,7 +94,6 @@ public:
 	virtual int get_outersize() const { return matrix.outerSize(); }
 	virtual void report_errors(std::ostream &fout);
 	virtual void remove_cols(std::set<string> &rm_parameter_names);
-	virtual void remove_rows(std::set<string>& rm_obs_names);
 	virtual void add_cols(set<string> &new_pars_names);
 	virtual void transform(const ParamTransformSeq &par_trans, void(ParamTransformSeq::*meth_prt)(Jacobian &jac) const);
 	Jacobian& operator=(const Jacobian &rhs);
