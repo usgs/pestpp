@@ -49,6 +49,7 @@ public:
 
 	int get_n_adj_par(){ return n_adj_par; }
 	const Parameters& get_ctl_parameters() const {return ctl_parameters;}
+	Parameters& get_ctl_parameters_4_mod() { return ctl_parameters; }
 	const Observations& get_ctl_observations() const {return observation_values;}
 	const ParameterInfo& get_ctl_parameter_info()const {return ctl_parameter_info;}
 	const ParameterGroupInfo& get_base_group_info() const {return  base_group_info;}
@@ -60,6 +61,7 @@ public:
 	const SVDInfo& get_svd_info() const {return svd_info;}
 	const ControlInfo&  get_control_info() const {return control_info;}
 	const ParamTransformSeq& get_base_par_tran_seq() const {return base_par_transform;}
+	ParamTransformSeq& get_base_par_tran_seq_4_mod() { return base_par_transform; }
 	const vector<string> &get_ctl_ordered_par_names() const {return ctl_ordered_par_names;}
 	const vector<string> &get_ctl_ordered_obs_names() const {return ctl_ordered_obs_names;}
 	const vector<string> &get_ctl_ordered_par_group_names() { return ctl_ordered_par_group_names; }

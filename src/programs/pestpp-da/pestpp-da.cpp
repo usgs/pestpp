@@ -467,7 +467,20 @@ int main(int argc, char* argv[])
 			}
 
 
-			const ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq();
+
+			ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq_4_mod();
+			
+			//check for entries in the cycle table
+			if (par_cycle_info.find(*icycle) != par_cycle_info.end())
+			{
+				map<string, double> cycle_map = par_cycle_info[*icycle];
+				for (auto item : cycle_map)
+				{
+					base_trans_seq.get_fixed_ptr_4_mod()->insert(item.first, item.second);
+					childPest.get_ctl_parameters_4_mod().update_rec(item.first, item.second);
+				}
+			}
+
 			ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
 
 			Parameters cur_ctl_parameters = childPest.get_ctl_parameters();
