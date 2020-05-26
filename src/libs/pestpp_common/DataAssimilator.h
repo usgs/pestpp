@@ -182,7 +182,6 @@ private:
 	bool initialize_pe(Covariance& cov);
 	bool initialize_oe(Covariance& cov);
 	void initialize_restart();
-	void initialize_weights();
 	void initialize_parcov();
 	void initialize_obscov();
 	void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, bool is_subset = false);
@@ -214,6 +213,8 @@ private:
 	//map<int,int> get_subset_idx_map();
 	void set_subset_idx(int size);
 	Eigen::MatrixXd get_Am(const vector<string>& real_names, const vector<string>& par_names);
+
+	pest_utils::ExternalCtlFile da_cycle_table;
 
 };
 

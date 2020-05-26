@@ -972,7 +972,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		fill_tpl_zeros = pest_utils::parse_string_arg_to_bool(value);
 	}
 	
-	else if (!assign_value_by_key_continued(key, value))
+	else if (!assign_value_by_key_continued(key, value, org_value))
 	{
 
 		//throw PestParsingError(line, "Invalid key word \"" + key +"\"");
@@ -982,7 +982,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 }
 
 
-bool PestppOptions::assign_value_by_key_continued(const string& key, const string& value)
+bool PestppOptions::assign_value_by_key_continued(const string& key, const string& value, const string& org_value)
 {
 	// This method was added as a workaround for a compiler limit of at most 128 nesting levels (MSVC); no more else if blocks could be added to assign_value_by_key()
 	if (key == "PANTHER_AGENT_RESTART_ON_ERROR")
@@ -1009,6 +1009,11 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 	else if (key == "GLM_ITER_MC")
 	{
 		glm_iter_mc = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if (key == "DA_PARAMETER_CYCLE_TABLE")
+	{
+		da_par_cycle_table = org_value;
 		return true;
 	}
 
@@ -1190,6 +1195,9 @@ void PestppOptions::summary(ostream& os) const
 	os << "gsa_morris_delta: " <<  gsa_morris_delta << endl;
 	os << "gsa_sobol_samples: " << gsa_sobol_samples << endl;
 	os << "gsa_sobol_par_dist: " << gsa_sobol_par_dist << endl;
+	
+	os << "pestpp-da options:" << endl;
+	os << "da_parameter_cycle_table: " << da_par_cycle_table << endl;
 
 	os << endl;
 	os << "panther_agent_restart_on_error: " << panther_agent_restart_on_error << endl;
@@ -1328,6 +1336,8 @@ void PestppOptions::set_defaults()
 	set_check_tplins(true);
 	set_fill_tpl_zeros(false);
 	set_additional_ins_delimiters("");
+
+	set_da_par_cycle_table("");
 
 	set_panther_agent_restart_on_error(false);
 	set_panther_agent_no_ping_timeout_secs(300);
