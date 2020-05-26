@@ -820,8 +820,8 @@ ModelRun SVDSolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termina
 		cout << "ERROR: jacobian has prior info eqs are not in the control file - see rec file for listing" << endl;
 		snames.clear();
 		snames.insert(extra.begin(), extra.end());
-		throw runtime_error("ERROR: jacobian has prior info eqs are not in the control file - see rec file for listing");
-		//jacobian.remove_rows(snames);
+		//throw runtime_error("ERROR: jacobian has prior info eqs are not in the control file - see rec file for listing");
+		jacobian.remove_rows(snames);
 	}
 	
 	jacobian.set_base_numeric_pars(pars);

@@ -733,14 +733,47 @@ void sequentialLP::iter_postsolve()
 
 		return;
 	}
-	Parameters dv_changes = upgrade_pars;
+
+	//check for denormal solution values and values (slightly) out of bounds - reset accordingly...
 	string name;
+	vector<double> optimal_vals;
+
+	for (int i = 0; i < num_dec_vars(); ++i)
+	{
+		name = ctl_ord_dec_var_names[i];
+		val = dec_var_vals[i];
+		
+		
+		if (val < dec_var_lb[i])
+		{
+			f_rec << "resetting optimal value for " << name << "from " << val << "to lower bound of" << dec_var_lb[i] << endl;
+			optimal_vals.push_back(dec_var_lb[i]);
+		}
+		else if (val > dec_var_ub[i])
+		{
+			f_rec << "resetting optimal value for " << name << "from " << val << "to upper bound of" << dec_var_ub[i] << endl;
+			optimal_vals.push_back(dec_var_ub[i]);
+		}
+		else
+		{
+			if (abs(val) < 1.0e-30) // in case forward model is single precision
+			{
+				f_rec << "flushing optimal value for " << name << "from " << val << "to 0.0" << endl;
+				optimal_vals.push_back(0.0);
+			}
+			else
+				optimal_vals.push_back(val);
+		}
+	}
+	delete dec_var_vals;
+
+	Parameters dv_changes = upgrade_pars;
 	for (int i = 0; i < num_dec_vars(); ++i)
 	{
 		name = ctl_ord_dec_var_names[i];
 		val = all_pars_and_dec_vars[name];
-		diff = abs(dec_var_vals[i] - all_pars_and_dec_vars[name]);
-		upgrade_pars.update_rec(name,dec_var_vals[i] + val);
+		diff = abs(optimal_vals[i] - all_pars_and_dec_vars[name]);
+		upgrade_pars.update_rec(name,optimal_vals[i] + val);
 		dv_changes.update_rec(name,upgrade_pars[name] - val);
 		max_abs_dec_var_change = (diff > max_abs_dec_var_change) ? diff : max_abs_dec_var_change;
 		max_abs_dec_var_val = (abs(val) > max_abs_dec_var_val) ? val : max_abs_dec_var_val;

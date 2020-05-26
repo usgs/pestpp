@@ -81,28 +81,28 @@ void Jacobian::remove_cols(std::set<string> &rm_parameter_names)
 	matrix_del_rows_cols(matrix, del_col_ids,false,true);
 }
 
-//void Jacobian::remove_rows(std::set<string>& rm_obs_names)
-//{
-//	vector<size_t> del_row_ids;
-//
-//	// build list of columns that needs to be removed from the matrix
-//	auto iter_rm_end = rm_obs_names.end();
-//	vector<string> row_names = observation_list();
-//	size_t nobs = row_names.size();
-//
-//	for (int i = 0; i < nobs; ++i)
-//	{
-//		if (rm_obs_names.find(row_names[i]) != iter_rm_end)
-//		{
-//			del_row_ids.push_back(i);
-//		}
-//	}
-//
-//	auto end_iter = std::remove_if(base_sim_obs_names.begin(), base_sim_obs_names.end(),
-//		[&rm_obs_names](string& str)->bool {return rm_obs_names.find(str) != rm_obs_names.end(); });
-//	base_sim_obs_names.resize(std::distance(base_sim_obs_names.begin(), end_iter));
-//	matrix_del_rows_cols(matrix, del_row_ids, true, false);
-//}
+void Jacobian::remove_rows(std::set<string>& rm_obs_names)
+{
+	vector<size_t> del_row_ids;
+
+	// build list of columns that needs to be removed from the matrix
+	auto iter_rm_end = rm_obs_names.end();
+	vector<string> row_names = observation_list();
+	size_t nobs = row_names.size();
+
+	for (int i = 0; i < nobs; ++i)
+	{
+		if (rm_obs_names.find(row_names[i]) != iter_rm_end)
+		{
+			del_row_ids.push_back(i);
+		}
+	}
+
+	auto end_iter = std::remove_if(base_sim_obs_names.begin(), base_sim_obs_names.end(),
+		[&rm_obs_names](string& str)->bool {return rm_obs_names.find(str) != rm_obs_names.end(); });
+	base_sim_obs_names.resize(std::distance(base_sim_obs_names.begin(), end_iter));
+	matrix_del_rows_cols(matrix, del_row_ids, true, false);
+}
 
 void Jacobian::add_cols(set<string> &new_pars_names)
 {
