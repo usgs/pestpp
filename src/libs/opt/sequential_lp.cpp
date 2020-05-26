@@ -765,7 +765,7 @@ void sequentialLP::iter_postsolve()
 				optimal_vals.push_back(val);
 		}
 	}
-	delete dec_var_vals;
+	//delete dec_var_vals;
 
 	Parameters dv_changes = upgrade_pars;
 	for (int i = 0; i < num_dec_vars(); ++i)
