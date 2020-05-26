@@ -316,8 +316,104 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
 		}
 
+		//process da par cycle table
+		filename = pest_scenario.get_pestpp_options().get_da_par_cycle_table();
+		map<int, map<string, double>> par_cycle_info;
+		if (filename.size() > 0)
+		{
+			fout_rec << "processing 'DA_PARAMETER_CYCLE_TABLE' file " << filename;
+			pest_utils::ExternalCtlFile cycle_table(fout_rec, filename);
+			vector<string> col_names = cycle_table.get_col_names();
+			fout_rec << "...using the first column ('" << col_names[0] << "') as parameter names" << endl;
+			vector<string> pnames = pest_scenario.get_ctl_ordered_par_names();
+			set<string> par_names(pnames.begin(), pnames.end());
+			pnames = cycle_table.get_col_string_vector(col_names[0]);
+			ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
+			vector<string> missing, notfixed, tbl_par_names;
 
+			for (auto pname : pnames)
+			{
+				pest_utils::upper_ip(pname);
+				if (par_names.find(pname) == par_names.end())
+				{
+					missing.push_back(pname);
+					continue;
+				}
+				else if (pi.get_parameter_rec_ptr(pname)->tranform_type != ParameterRec::TRAN_TYPE::FIXED)
+				{
+					notfixed.push_back(pname);
+					continue;
+				}
+				else
+				{
+					tbl_par_names.push_back(pname);
+				}
+			}
+			if (missing.size() > 0)
+			{
+				fout_rec << "ERROR: The following parameters in DA_PARAMETER_CYCLE_TABLE are not the control file:" << endl;
+				for (auto p : missing)
+				{
+					fout_rec << p << endl;
+				}
+				throw runtime_error("DA_PARAMTER_CYCLE_TABLE contains missing parameters, see rec file for listing");
+			}
+			if (notfixed.size() > 0)
+			{
+				fout_rec << "ERROR: The following parameters in DA_PARAMETER_CYCLE_TABLE are not 'fixed':" << endl;
+				for (auto p : notfixed)
+				{
+					fout_rec << p << endl;
+				}
+				throw runtime_error("DA_PARAMTER_CYCLE_TABLE contains non-fixed parameters, see rec file for listing");
+			}
+			//process the remaining columns - these should be cycle numbers
+			string col_name;
+			vector<string> cycle_vals;
+			int cycle;
+			double val;
+			bool parse_fail = false;
+			for (int i = 1; i < col_names.size(); i++)
+			{
+				col_name = col_names[i];
+				try
+				{
+					cycle = stoi(col_name);
+				}
+				catch (...)
+				{
+					fout_rec << "ERROR: could not parse DA_PARAMETER_CYCLE_TABLE column '" << col_name << "' to integer" << endl;
+					throw runtime_error("ERROR parsing DA_PARAMETER CYCLE TABLE column " + col_name + " to integer");
+				}
+				if (par_cycle_info.find(cycle) != par_cycle_info.end())
+				{
+					throw runtime_error("ERROR: DA_PARAMETER_CYCLE_TABLE cycle column '" + col_name + "' isted more than once");
+				}
+				cycle_vals = cycle_table.get_col_string_vector(col_name);
+				map<string, double> cycle_map;
+				for (int i = 0; i < cycle_vals.size(); i++)
+				{
+					try
+					{
+						val = stod(cycle_vals[i]);
+					}
+					catch (...)
+					{
+						fout_rec << "WARNING: error parsing '" << cycle_vals[i] << "' for parameter " << tbl_par_names[i] << " in cycle " << cycle << ", continuing..." << endl;
+						parse_fail = true;
+						continue;
+					}
+					cycle_map[tbl_par_names[i]] = val;
+				}
+				par_cycle_info[cycle] = cycle_map;
+			}
+			if (parse_fail)
+			{
+				cout << "WARNING: error parsing at least one cycle-based parameter value" << endl;
+				cout << "         from DA_PARAMETER_CYCLE_TABLE, see rec file for listing." << endl;
+			}
 
+		}
 		// loop over assimilation cycles
 		
 		//get deep copy of pest_scenario for current cycle

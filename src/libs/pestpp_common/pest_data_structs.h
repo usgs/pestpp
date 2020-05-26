@@ -480,7 +480,7 @@ public:
 	void set_panther_agent_no_ping_timeout_secs(int _timeout_secs) { panther_agent_no_ping_timeout_secs = _timeout_secs; }
 	int get_panther_agent_no_ping_timeout_secs() const { return panther_agent_no_ping_timeout_secs; }
 
-	string get_da_par_cycle_table() { return da_par_cycle_table; }
+	string get_da_par_cycle_table() const { return da_par_cycle_table; }
 	void set_da_par_cycle_table(string _filename) { da_par_cycle_table = _filename; }
 
 	void set_defaults();

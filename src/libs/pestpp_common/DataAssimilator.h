@@ -214,8 +214,6 @@ private:
 	void set_subset_idx(int size);
 	Eigen::MatrixXd get_Am(const vector<string>& real_names, const vector<string>& par_names);
 
-	pest_utils::ExternalCtlFile da_cycle_table;
-
 };
 
 #endif
