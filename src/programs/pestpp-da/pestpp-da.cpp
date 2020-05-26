@@ -234,6 +234,7 @@ int main(int argc, char* argv[])
 			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
 			file_manager.close_file("pst");
+			pest_scenario.assign_da_cycles(fout_rec);
 			performance_log.log_event("finished processing control file");
 		}
 		catch (PestError e)
@@ -323,14 +324,15 @@ int main(int argc, char* argv[])
 		{
 			fout_rec << "processing 'DA_PARAMETER_CYCLE_TABLE' file " << filename;
 			pest_utils::ExternalCtlFile cycle_table(fout_rec, filename);
+			cycle_table.read_file();
 			vector<string> col_names = cycle_table.get_col_names();
 			fout_rec << "...using the first column ('" << col_names[0] << "') as parameter names" << endl;
 			vector<string> pnames = pest_scenario.get_ctl_ordered_par_names();
 			set<string> par_names(pnames.begin(), pnames.end());
 			pnames = cycle_table.get_col_string_vector(col_names[0]);
 			ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
-			vector<string> missing, notfixed, tbl_par_names;
-
+			vector<string> missing, notfixed, notneg, tbl_par_names;
+			
 			for (auto pname : pnames)
 			{
 				pest_utils::upper_ip(pname);
@@ -342,6 +344,11 @@ int main(int argc, char* argv[])
 				else if (pi.get_parameter_rec_ptr(pname)->tranform_type != ParameterRec::TRAN_TYPE::FIXED)
 				{
 					notfixed.push_back(pname);
+					continue;
+				}
+				else if (pi.get_parameter_rec_ptr(pname)->cycle != -1)
+				{
+					notneg.push_back(pname);
 					continue;
 				}
 				else
@@ -367,6 +374,15 @@ int main(int argc, char* argv[])
 				}
 				throw runtime_error("DA_PARAMTER_CYCLE_TABLE contains non-fixed parameters, see rec file for listing");
 			}
+			if (notneg.size() > 0)
+			{
+				fout_rec << "ERROR: The following parameters in DA_PARAMETER_CYCLE_TABLE do not have cycle=-1:" << endl;
+				for (auto p : notneg)
+				{
+					fout_rec << p << endl;
+				}
+				throw runtime_error("DA_PARAMTER_CYCLE_TABLE contains parameters with cycle!=-1, see rec file for listing");
+			}
 			//process the remaining columns - these should be cycle numbers
 			string col_name;
 			vector<string> cycle_vals;
@@ -376,6 +392,7 @@ int main(int argc, char* argv[])
 			for (int i = 1; i < col_names.size(); i++)
 			{
 				col_name = col_names[i];
+				
 				try
 				{
 					cycle = stoi(col_name);
@@ -387,7 +404,7 @@ int main(int argc, char* argv[])
 				}
 				if (par_cycle_info.find(cycle) != par_cycle_info.end())
 				{
-					throw runtime_error("ERROR: DA_PARAMETER_CYCLE_TABLE cycle column '" + col_name + "' isted more than once");
+					throw runtime_error("ERROR: DA_PARAMETER_CYCLE_TABLE cycle column '" + col_name + "' listed more than once");
 				}
 				cycle_vals = cycle_table.get_col_string_vector(col_name);
 				map<string, double> cycle_map;
@@ -480,6 +497,11 @@ int main(int argc, char* argv[])
 					childPest.get_ctl_parameters_4_mod().update_rec(item.first, item.second);
 				}
 			}
+
+			Parameters par1 = childPest.get_ctl_parameters();
+			base_trans_seq.ctl2numeric_ip(par1);
+			base_trans_seq.numeric2model_ip(par1);
+
 
 			ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
 
