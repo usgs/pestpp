@@ -2532,10 +2532,12 @@ void Pest::child_pest_update(int icycle)
 	
 	// get number of adj par for current cycle
 	ParameterRec::TRAN_TYPE tfixed = ParameterRec::TRAN_TYPE::FIXED;
+	ParameterRec::TRAN_TYPE ttied = ParameterRec::TRAN_TYPE::TIED;
 	int new_n_adj_par = 0;
 	for (auto pname : ctl_ordered_par_names)
 	{
-		if (ctl_parameter_info.get_parameter_rec_ptr(pname)->tranform_type != tfixed)
+		if ((ctl_parameter_info.get_parameter_rec_ptr(pname)->tranform_type != tfixed) &&
+			(ctl_parameter_info.get_parameter_rec_ptr(pname)->tranform_type != ttied))
 		{
 			new_n_adj_par++;
 		}

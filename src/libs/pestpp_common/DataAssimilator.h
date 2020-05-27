@@ -182,7 +182,6 @@ private:
 	bool initialize_pe(Covariance& cov);
 	bool initialize_oe(Covariance& cov);
 	void initialize_restart();
-	void initialize_weights();
 	void initialize_parcov();
 	void initialize_obscov();
 	void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, bool is_subset = false);

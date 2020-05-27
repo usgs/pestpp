@@ -214,7 +214,7 @@ public:
 	//void parce_line(const string &line);
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
-	bool assign_value_by_key_continued(const string& key, const string& value);
+	bool assign_value_by_key_continued(const string& key, const string& value, const string& org_value);
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
 	int get_n_iter_base() const { return n_iter_base; }
@@ -480,6 +480,9 @@ public:
 	void set_panther_agent_no_ping_timeout_secs(int _timeout_secs) { panther_agent_no_ping_timeout_secs = _timeout_secs; }
 	int get_panther_agent_no_ping_timeout_secs() const { return panther_agent_no_ping_timeout_secs; }
 
+	string get_da_par_cycle_table() const { return da_par_cycle_table; }
+	void set_da_par_cycle_table(string _filename) { da_par_cycle_table = _filename; }
+
 	void set_defaults();
 	void summary(ostream& os) const;
 
@@ -615,6 +618,8 @@ private:
 	bool gsa_morris_obs_sen;
 	double gsa_morris_delta;
 	string gsa_sobol_par_dist;
+
+	string da_par_cycle_table;
 
 	bool panther_agent_restart_on_error;
 	int panther_agent_no_ping_timeout_secs;
