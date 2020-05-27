@@ -24,3 +24,4 @@ cpack -G ZIP
 copy /y *.zip ..\
 
 cd %first_path%
+pause

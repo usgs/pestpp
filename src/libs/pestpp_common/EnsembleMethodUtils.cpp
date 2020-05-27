@@ -303,7 +303,7 @@ double L2PhiHandler::calc_mean(map<string, double> *phi_map)
 {
 	double mean = 0.0;
 	map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-	for (pi; pi != end; ++pi)
+	for (; pi != end; ++pi)
 		mean = mean + pi->second;
 	return mean / phi_map->size();
 }
@@ -313,7 +313,7 @@ double L2PhiHandler::calc_std(map<string, double> *phi_map)
 	double mean = calc_mean(phi_map);
 	double var = 0.0;
 	map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-	for (pi; pi != end; ++pi)
+	for (; pi != end; ++pi)
 		var = var + (pow(pi->second - mean, 2));
 	if (var == 0.0)
 		return 0.0;
@@ -325,7 +325,7 @@ double L2PhiHandler::get_mean(phiType pt)
 	//double mean = 0.0;
 	map<string, double>* phi_map = get_phi_map(pt);
 	/*map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-	for (pi;pi != end; ++pi)
+	for (;pi != end; ++pi)
 		mean = mean + pi->second;
 	return mean / phi_map->size();*/
 	return calc_mean(phi_map);
@@ -337,7 +337,7 @@ double L2PhiHandler::get_std(phiType pt)
 	//double var = 0.0;
 	map<string, double>* phi_map = get_phi_map(pt);
 	/*map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-	for (pi; pi != end; ++pi)
+	for (; pi != end; ++pi)
 		var = var + (pow(pi->second - mean,2));
 	if (var == 0.0)
 		return 0.0;
@@ -350,7 +350,7 @@ double L2PhiHandler::get_max(phiType pt)
 	double mx = -1.0e+30;
 	map<string, double>* phi_map = get_phi_map(pt);
 	map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-	for (pi; pi != end; ++pi)
+	for (; pi != end; ++pi)
 		mx = (pi->second > mx) ? pi->second : mx;
 	return mx;
 }
@@ -360,7 +360,7 @@ double L2PhiHandler::get_min(phiType pt)
 	double mn = 1.0e+30;
 	map<string, double>* phi_map = get_phi_map(pt);
 	map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-	for (pi; pi != end; ++pi)
+	for (; pi != end; ++pi)
 		mn = (pi->second < mn) ? pi->second : mn;
 	return mn;
 }

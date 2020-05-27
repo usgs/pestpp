@@ -1,5 +1,7 @@
 #!/bin/sh
-
+realpath() {
+    [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
+}
 set -e
 
 full_path=$(realpath $0)
