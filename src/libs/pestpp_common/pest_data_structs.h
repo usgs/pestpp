@@ -437,6 +437,13 @@ public:
 	void set_ies_save_rescov(bool _flag) { ies_save_rescov = _flag; }
 	double get_ies_pdc_sigma_distance() const { return ies_pdc_sigma_distance; }
 	void set_ies_pdc_sigma_distance(double distance) { ies_pdc_sigma_distance = distance; }
+	// DA parameters
+	void set_da_use_ies(bool _use) { da_use_ies = _use; }
+	bool get_da_use_ies() const { return da_use_ies; }
+	void set_da_mode(string _mode) { da_mode = _mode; }
+	string get_da_mode() const { return da_mode; }
+
+	// End of Data parameters
 
 	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -606,6 +613,12 @@ private:
 	bool ies_drop_conflicts;
 	bool ies_save_rescov;
 	double ies_pdc_sigma_distance;
+
+	// Data Assimilation parameters
+	string da_mode;
+	bool da_use_ies;
+
+	// End of Data Assimilation Parameters
 
 	string gsa_method;
 	int gsa_morris_p;

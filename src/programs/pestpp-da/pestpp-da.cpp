@@ -318,14 +318,14 @@ int main(int argc, char* argv[])
 
 
 
-		// loop over assimilation cycles
+			
 		
-		//get deep copy of pest_scenario for current cycle
-		//MultiPest mPest (pest_scenario);
 		vector<int> assimilation_cycles;
 		pest_scenario.assign_da_cycles(fout_rec); 
 		assimilation_cycles = pest_scenario.get_assim_cycles();
 		ParameterEnsemble curr_pe;
+
+		// loop over assimilation cycles
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 		{
 			cout << endl;
@@ -387,7 +387,8 @@ int main(int argc, char* argv[])
 			run_manager_ptr->initialize(par_names,obs_names);
 
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
-			da.use_ies = false;
+			// use ies or da?
+			da.use_ies = pest_scenario.get_pestpp_options_ptr()->get_da_use_ies();
 			if (*icycle > 0)
 			{
 				da.set_pe(curr_pe);
@@ -396,13 +397,13 @@ int main(int argc, char* argv[])
 			
 			da.initialize(*icycle);
 
-			if (da.use_ies) // if ies
+			if (da.use_ies) // use ies
 			{
 				da.iterate_2_solution();
 				curr_pe = da.get_pe();
 				curr_pe.to_csv("cncnc.csv");
 			}
-			else
+			else // use da
 			{
 				da.kf_upate();
 				curr_pe = da.get_pe();
@@ -410,16 +411,8 @@ int main(int argc, char* argv[])
 
 			}
 
-			
-			
-			//da.finalize();
 
-
-
-			// clean up
-			fout_rec.close();
-			//childPest.~Pest(); // make explicit deletion
-			//delete run_manager_ptr;
+			fout_rec.close();			
 		} // end cycle loop
 		cout << endl << endl << "pestpp-ies analysis complete..." << endl;
 		cout << flush;

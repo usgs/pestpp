@@ -919,6 +919,12 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		convert_ip(value, ies_pdc_sigma_distance);
 	}
+	//DA parameters
+	else if (key == "DA_USE_IES")
+	{
+	 da_use_ies= pest_utils::parse_string_arg_to_bool(value);
+	}
+	// End of DA parameters
 	else if (key == "GSA_METHOD")
 	{
 		convert_ip(value, gsa_method);
@@ -1307,6 +1313,10 @@ void PestppOptions::set_defaults()
 	set_ies_save_rescov(false);
 	set_ies_pdc_sigma_distance(-1.0);
 
+	// DA parameters
+	set_da_use_ies(false);
+
+	// End of DA parameters
 	set_gsa_method("MORRIS");
 	//many of these defaults are also redefined in gsa main
 	set_gsa_morris_p(4);
