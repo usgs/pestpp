@@ -337,14 +337,14 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 		cerr << "   " << ex.what() << endl;
 		cerr << "   Aborting model run" << endl << endl;
 		smessage << ex.what();
-		NetPackage::PackType::RUN_FAILED;
+		final_run_status = NetPackage::PackType::RUN_FAILED;
 		
 	}
 	catch(...)
 	{
  		cerr << "   Error running model" << endl;
 		cerr << "   Aborting model run" << endl;
-		NetPackage::PackType::RUN_FAILED;
+		final_run_status = NetPackage::PackType::RUN_FAILED;
 	}
 
 	//sleep here just to give the os a chance to cleanup any remaining file handles
