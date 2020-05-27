@@ -1353,7 +1353,9 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 					// keep line in original case to preserve filename
 					line.erase(remove(line.begin(), line.end(), '\"'), line.end());
 					line.erase(remove(line.begin(), line.end(), '\''), line.end());
-					if (line.find("END") != string::npos) break;
+					string upper_line = line;
+					pest_utils::upper_ip(upper_line);
+					if (upper_line.find("END") != string::npos) break;
 
 					tokens.clear();
 					pest_utils::tokenize(line, tokens);

@@ -577,13 +577,44 @@ void thread_exceptions::add(std::exception_ptr ex_ptr)
 	shared_exception_vec.push_back(ex_ptr);
 }
 
+string thread_exceptions::what()
+{
+	stringstream ss;
+	std::lock_guard<std::mutex> lock(m);
+	for (auto eptr : shared_exception_vec)
+	{
+		try
+		{
+			std::rethrow_exception(eptr);
+		}
+		catch (const std::exception& e)
+		{
+			ss << e.what() << ", ";
+		}
+	}
+	return ss.str();
+}
+
 void  thread_exceptions::rethrow()
 {
 	std::lock_guard<std::mutex> lock(m);
-	for (auto &iex : shared_exception_vec)
+	if (shared_exception_vec.size() == 0)
 	{
-		std::rethrow_exception(iex);
+		return;
 	}
+	stringstream ss;
+	for (auto eptr : shared_exception_vec)
+	{
+		try
+		{
+			std::rethrow_exception(eptr);
+		}
+		catch (const std::exception& e)
+		{
+			ss << e.what() << ", ";
+		}
+	}
+	throw runtime_error(ss.str());
 }
 
 pair<string, string> parse_plusplus_line(const string& line)

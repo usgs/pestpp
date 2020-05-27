@@ -8,7 +8,7 @@ OBJECTS := \
     model_interface \
     RunManagerAbstract \
     RunStorage \
-    Serialization
+    Serializeation
 OBJECTS := $(addsuffix $(OBJ_EXT),$(OBJECTS))
 
 

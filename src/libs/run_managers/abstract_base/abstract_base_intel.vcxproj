@@ -149,7 +149,7 @@
     <ClCompile Include="model_interface.cpp" />
     <ClCompile Include="RunManagerAbstract.cpp" />
     <ClCompile Include="RunStorage.cpp" />
-    <ClCompile Include="Serialization.cpp" />
+    <ClCompile Include="Serializeation.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="debug.h" />
