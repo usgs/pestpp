@@ -234,6 +234,7 @@ int main(int argc, char* argv[])
 			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
 			file_manager.close_file("pst");
+			pest_scenario.assign_da_cycles(fout_rec);
 			performance_log.log_event("finished processing control file");
 		}
 		catch (PestError e)
@@ -316,9 +317,123 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
 		}
 
-
-
+		//process da par cycle table
+		filename = pest_scenario.get_pestpp_options().get_da_par_cycle_table();
+		map<int, map<string, double>> par_cycle_info;
+		if (filename.size() > 0)
+		{
+			fout_rec << "processing 'DA_PARAMETER_CYCLE_TABLE' file " << filename;
+			pest_utils::ExternalCtlFile cycle_table(fout_rec, filename);
+			cycle_table.read_file();
+			vector<string> col_names = cycle_table.get_col_names();
+			fout_rec << "...using the first column ('" << col_names[0] << "') as parameter names" << endl;
+			vector<string> pnames = pest_scenario.get_ctl_ordered_par_names();
+			set<string> par_names(pnames.begin(), pnames.end());
+			pnames = cycle_table.get_col_string_vector(col_names[0]);
+			ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
+			vector<string> missing, notfixed, notneg, tbl_par_names;
 			
+			for (auto pname : pnames)
+			{
+				pest_utils::upper_ip(pname);
+				if (par_names.find(pname) == par_names.end())
+				{
+					missing.push_back(pname);
+					continue;
+				}
+				else if (pi.get_parameter_rec_ptr(pname)->tranform_type != ParameterRec::TRAN_TYPE::FIXED)
+				{
+					notfixed.push_back(pname);
+					continue;
+				}
+				else if (pi.get_parameter_rec_ptr(pname)->cycle != -1)
+				{
+					notneg.push_back(pname);
+					continue;
+				}
+				else
+				{
+					tbl_par_names.push_back(pname);
+				}
+			}
+			if (missing.size() > 0)
+			{
+				fout_rec << "ERROR: The following parameters in DA_PARAMETER_CYCLE_TABLE are not the control file:" << endl;
+				for (auto p : missing)
+				{
+					fout_rec << p << endl;
+				}
+				throw runtime_error("DA_PARAMTER_CYCLE_TABLE contains missing parameters, see rec file for listing");
+			}
+			if (notfixed.size() > 0)
+			{
+				fout_rec << "ERROR: The following parameters in DA_PARAMETER_CYCLE_TABLE are not 'fixed':" << endl;
+				for (auto p : notfixed)
+				{
+					fout_rec << p << endl;
+				}
+				throw runtime_error("DA_PARAMTER_CYCLE_TABLE contains non-fixed parameters, see rec file for listing");
+			}
+			if (notneg.size() > 0)
+			{
+				fout_rec << "ERROR: The following parameters in DA_PARAMETER_CYCLE_TABLE do not have cycle=-1:" << endl;
+				for (auto p : notneg)
+				{
+					fout_rec << p << endl;
+				}
+				throw runtime_error("DA_PARAMTER_CYCLE_TABLE contains parameters with cycle!=-1, see rec file for listing");
+			}
+			//process the remaining columns - these should be cycle numbers
+			string col_name;
+			vector<string> cycle_vals;
+			int cycle;
+			double val;
+			bool parse_fail = false;
+			for (int i = 1; i < col_names.size(); i++)
+			{
+				col_name = col_names[i];
+				
+				try
+				{
+					cycle = stoi(col_name);
+				}
+				catch (...)
+				{
+					fout_rec << "ERROR: could not parse DA_PARAMETER_CYCLE_TABLE column '" << col_name << "' to integer" << endl;
+					throw runtime_error("ERROR parsing DA_PARAMETER CYCLE TABLE column " + col_name + " to integer");
+				}
+				if (par_cycle_info.find(cycle) != par_cycle_info.end())
+				{
+					throw runtime_error("ERROR: DA_PARAMETER_CYCLE_TABLE cycle column '" + col_name + "' listed more than once");
+				}
+				cycle_vals = cycle_table.get_col_string_vector(col_name);
+				map<string, double> cycle_map;
+				for (int i = 0; i < cycle_vals.size(); i++)
+				{
+					try
+					{
+						val = stod(cycle_vals[i]);
+					}
+					catch (...)
+					{
+						fout_rec << "WARNING: error parsing '" << cycle_vals[i] << "' for parameter " << tbl_par_names[i] << " in cycle " << cycle << ", continuing..." << endl;
+						parse_fail = true;
+						continue;
+					}
+					cycle_map[tbl_par_names[i]] = val;
+				}
+				par_cycle_info[cycle] = cycle_map;
+			}
+			if (parse_fail)
+			{
+				cout << "WARNING: error parsing at least one cycle-based parameter value" << endl;
+				cout << "         from DA_PARAMETER_CYCLE_TABLE, see rec file for listing." << endl;
+			}
+
+
+		}
+		// loop over assimilation cycles
+
 		
 		vector<int> assimilation_cycles;
 		pest_scenario.assign_da_cycles(fout_rec); 
@@ -371,7 +486,25 @@ int main(int argc, char* argv[])
 			}
 
 
-			const ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq();
+
+			ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq_4_mod();
+			
+			//check for entries in the cycle table
+			if (par_cycle_info.find(*icycle) != par_cycle_info.end())
+			{
+				map<string, double> cycle_map = par_cycle_info[*icycle];
+				for (auto item : cycle_map)
+				{
+					base_trans_seq.get_fixed_ptr_4_mod()->insert(item.first, item.second);
+					childPest.get_ctl_parameters_4_mod().update_rec(item.first, item.second);
+				}
+			}
+
+			Parameters par1 = childPest.get_ctl_parameters();
+			base_trans_seq.ctl2numeric_ip(par1);
+			base_trans_seq.numeric2model_ip(par1);
+
+
 			ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
 
 			Parameters cur_ctl_parameters = childPest.get_ctl_parameters();
