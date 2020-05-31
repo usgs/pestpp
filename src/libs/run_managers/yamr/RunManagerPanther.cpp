@@ -44,7 +44,7 @@
 using namespace std;
 using namespace pest_utils;
 
-const int RunManagerPanther::BACKLOG = 10;
+const int RunManagerPanther::BACKLOG = 1000;
 const int RunManagerPanther::MAX_FAILED_PINGS = 60;
 const int RunManagerPanther::N_PINGS_UNRESPONSIVE = 3;
 const int RunManagerPanther::MIN_PING_INTERVAL_SECS = 60;				// Ping each slave at most once every minute
@@ -1085,10 +1085,15 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::it
 			free_agent_list.erase(it_agent);
 			scheduled = 1;
 		}
+		else
+		{
+			stringstream ss;
+			ss << "error sending run " << run_id << "to: " << host_name << "$" << (*it_agent)->get_work_dir();
+			report(ss.str(), false);
+		}
 	}
 	return scheduled;  // 1 = run scheduled; -1 failed to schedule run; 0 run not needed
 }
-
 
 
 void RunManagerPanther::echo()

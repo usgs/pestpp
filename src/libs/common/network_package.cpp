@@ -151,9 +151,12 @@ int NetPackage::send(int sockfd, const void *data, int64_t data_len_l)
 
 	// first send security code
 	int64_t security_code_size = sizeof(security_code);
+	int i = 0;
 	n = w_sendall(sockfd, &security_code[0], &security_code_size);
-	if (n<1) {
-		cerr << "NetPackage::send error: could not send security code" << endl;
+	
+	if (n < 1)
+	{
+		//cerr << "NetPackage::send error: could not send security code" << endl;
 		return n;
 	}
 	int64_t buf_sz = 0;
@@ -184,9 +187,14 @@ int NetPackage::send(int sockfd, const void *data, int64_t data_len_l)
 		i_start += data_len_l;
 	}
 	n = w_sendall(sockfd, buf.data(), &buf_sz);
+	if (n < 1)
+	{
+		//cerr << "NetPackage::send error: could not send data" << endl;
+		return n;
+	}
 	if (i_start != buf_sz) {
-		cerr << "NetPackage::send error: could only send" << i_start
-			<< " out of " << buf_sz << "bytes" << endl;
+		//cerr << "NetPackage::send error: could only send" << i_start
+		//	<< " out of " << buf_sz << "bytes" << endl;
 		n = -2;
 	}
 	return n;  // return -2 on corrupt send, -1 on failure, 0 closed connection or 1 on success
@@ -225,7 +233,7 @@ int  NetPackage::recv(int sockfd)
 		}
 		if (sum == 0)
 		{
-			cerr << "NetPackage::recv empty security code, terminating connection..." << endl;
+			//cerr << "NetPackage::recv empty security code, terminating connection..." << endl;
 			return -2;
 		}
 		if (wrong_code) //(security_cmp != 0)

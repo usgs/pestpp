@@ -468,7 +468,7 @@ public:
 	void set_panther_agent_no_ping_timeout_secs(int _timeout_secs) { panther_agent_no_ping_timeout_secs = _timeout_secs; }
 	int get_panther_agent_no_ping_timeout_secs() const { return panther_agent_no_ping_timeout_secs; }
 	void set_panther_debug_cycle(bool _flag) { panther_debug_cycle = _flag; }
-	bool get_panther_debug_cycle() { return panther_debug_cycle; }
+	bool get_panther_debug_cycle() const { return panther_debug_cycle; }
 
 	void set_defaults();
 	void summary(ostream& os) const;
