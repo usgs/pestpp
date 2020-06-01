@@ -30,7 +30,7 @@ void PANTHERAgent::init_network(const string &host, const string &port)
 	w_init();
 
 
-	int status;
+	pair<int,string> status;
 	struct addrinfo hints;
 	struct addrinfo *servinfo;
 	//cout << "setting hints" << endl;
@@ -43,7 +43,11 @@ void PANTHERAgent::init_network(const string &host, const string &port)
 	hints.ai_flags = AI_PASSIVE;
 	//cout << "atttemping w_getaddrinfo" << endl;
 	status = w_getaddrinfo(host.c_str(), port.c_str(), &hints, &servinfo);
-	
+	if (status.first != 0)
+	{
+		cout << "ERROR: getaddrinfo returned non-zero: " << status.second << endl;
+		throw(PestError("ERROR: getaddrinfo returned non-zero: " + status.second));
+	}
 	w_print_servinfo(servinfo, cout);
 	cout << endl;
 	// connect

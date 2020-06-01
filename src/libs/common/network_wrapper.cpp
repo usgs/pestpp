@@ -27,15 +27,16 @@
 
 using namespace std;
 
-void w_init()
+string w_init()
 {
 #ifdef OS_WIN
 	WSADATA wsaData;
-
+	stringstream ss;
 	if (WSAStartup(MAKEWORD(2,0),  &wsaData)!=0)
 	{
-		cerr << "WSAStartup failed " << w_get_error_msg() << endl;
+		ss << "WSAStartup failed " << w_get_error_msg() << endl;
 	}
+	return ss.str();
 #endif
 }
 
@@ -46,7 +47,7 @@ int w_close(int sockfd)
 	shutdown(sockfd, SD_BOTH);
 	if ((n = closesocket(sockfd)) != 0)
 	{
-		cerr << "error closing socket: "  << w_get_error_msg() << endl;
+		//cerr << "error closing socket: "  << w_get_error_msg() << endl;
 	}
 	return n;
 	#endif
@@ -63,15 +64,16 @@ void w_cleanup()
 }
 
 
-int w_getaddrinfo(const char *node, const char *service,
+std::pair<int,std::string> w_getaddrinfo(const char *node, const char *service,
 			  const struct addrinfo *hints, struct addrinfo **res)
 {
 	int status;
+	stringstream ss;
 	if ((status = getaddrinfo(node, service, hints, res)) !=0)
 	{
-		cerr << "getaddrinfo error: " << gai_strerror(status) << endl;
+		ss << "getaddrinfo error: " << gai_strerror(status) << endl;
 	}
-	return status;
+	return std::pair<int,string> (status,ss.str());
 }
 
 vector<string> w_getnameinfo_vec(int sockfd, int flags)
@@ -101,7 +103,7 @@ int w_socket(int domain, int type, int protocol)
 {
 	int sockfd = socket(domain, type, protocol);
 	if (sockfd < 0) {
-		cerr << "socket error: "  << w_get_error_msg() << endl;
+		//cerr << "socket error: "  << w_get_error_msg() << endl;
 	}
 	return sockfd;
 }
@@ -111,7 +113,7 @@ int w_connect(int sockfd, struct sockaddr *serv_addr, socklen_t addrlen)
 	int n=0;
 	if ((n=connect(sockfd, serv_addr, addrlen)) == -1 )
 	{
-		cerr << "connect error: " << w_get_error_msg() << endl;
+		//cerr << "connect error: " << w_get_error_msg() << endl;
 	}
 	return n;
 }
@@ -122,7 +124,7 @@ int w_bind(int sockfd, struct sockaddr *my_addr, socklen_t addrlen)
 	if ((n=::bind(sockfd, my_addr, addrlen)) == -1 )
 	{
 
-		cerr << "bind error: " << w_get_error_msg() << endl;
+		//cerr << "bind error: " << w_get_error_msg() << endl;
 	}
 	return n;
 }
@@ -132,7 +134,7 @@ int w_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 	int n=0;
 	if ((n=accept(sockfd, addr, addrlen)) == -1)
 	{
-		cerr << "bind error: " << w_get_error_msg() << endl;
+		//cerr << "bind error: " << w_get_error_msg() << endl;
 	}
 	return n;
 }
@@ -143,7 +145,7 @@ int w_listen(int sockfd, int backlog)
 	int n;
 	if ((n = listen(sockfd, backlog)) == -1)
 	{
-		cerr << "listen error: "  << w_get_error_msg() << endl;
+		//cerr << "listen error: "  << w_get_error_msg() << endl;
 	}
 	return n;
 }
@@ -153,7 +155,7 @@ int w_recv(int sockfd, int8_t *buf, int64_t len, int flags)
 	int n;
 	n = recv(sockfd, (char*)buf, len, flags);
 	if (n < 0){
-		cerr << "recv error: "  << w_get_error_msg() << endl;
+		//cerr << "recv error: "  << w_get_error_msg() << endl;
 	}
 	return n;
 }
@@ -162,7 +164,7 @@ int w_send(int sockfd, int8_t *buf, int64_t len, int flags)
 	int n;
 	n = send(sockfd, (char*)buf, len, flags);
 	if (n < 0){
-		cerr << "send error: "  << w_get_error_msg() << endl;
+		//cerr << "send error: "  << w_get_error_msg() << endl;
 	}
 	return n;
 }
@@ -181,7 +183,7 @@ int w_sendall(int sockfd, int8_t *buf, int64_t *len)
 	}
 	*len = total; // return number actually sent here
 		if (n < 0){
-		cerr << "w_sendall error: " << n << endl;
+		//cerr << "w_sendall error: " << n << endl;
 	}
 	if (n > 0) {n = 1;}
 	return n; // return -1 on failure, 0 closed connection or 1 on success
@@ -231,7 +233,7 @@ addrinfo* w_bind_first_avl(addrinfo *servinfo, int &sockfd)
 	break;
 	}
 	if (p == nullptr) {
-		cerr << "server: failed to bind" << endl;
+		//cerr << "server: failed to bind" << endl;
 	}
 	return p;
 }

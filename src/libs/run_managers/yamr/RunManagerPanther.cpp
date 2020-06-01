@@ -275,9 +275,10 @@ RunManagerPanther::RunManagerPanther(const string &stor_filename, const string &
 	terminate_idle_thread(false), currently_idle(true), idling(false), idle_thread_finished(false),
 	idle_thread(nullptr), idle_thread_raii(nullptr)
 {
+	cout << "          starting PANTHER master..." << endl << endl;
 	max_concurrent_runs = max(MAX_CONCURRENT_RUNS_LOWER_LIMIT, _max_n_failure);
 	w_init();
-	int status;
+	std::pair<int,string> status;
 	struct addrinfo hints;
 	struct addrinfo *servinfo;
 	memset(&hints, 0, sizeof hints);
@@ -289,7 +290,12 @@ RunManagerPanther::RunManagerPanther(const string &stor_filename, const string &
 	hints.ai_flags = AI_PASSIVE;
 
 	status = w_getaddrinfo(NULL, port.c_str(), &hints, &servinfo);
-	cout << "          starting PANTHER master..." << endl << endl;
+	if (status.first != 0)
+	{
+		cout << "ERROR: getaddrinfo returned non-zero: " << status.second << endl;
+		throw(PestError("ERROR: getaddrinfo returned non-zero: " + status.second));
+	}
+	
 	w_print_servinfo(servinfo, cout);
 	cout << endl;
 	//make socket, bind and listen
