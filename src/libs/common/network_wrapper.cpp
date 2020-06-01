@@ -29,6 +29,7 @@ using namespace std;
 
 string w_init()
 {
+	stringstream ss;
 #ifdef OS_WIN
 	WSADATA wsaData;
 	stringstream ss;
@@ -36,8 +37,8 @@ string w_init()
 	{
 		ss << "WSAStartup failed " << w_get_error_msg() << endl;
 	}
-	return ss.str();
 #endif
+	return ss.str();
 }
 
 int w_close(int sockfd)
