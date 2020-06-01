@@ -32,7 +32,6 @@ string w_init()
 	stringstream ss;
 #ifdef OS_WIN
 	WSADATA wsaData;
-	stringstream ss;
 	if (WSAStartup(MAKEWORD(2,0),  &wsaData)!=0)
 	{
 		ss << "WSAStartup failed " << w_get_error_msg() << endl;
