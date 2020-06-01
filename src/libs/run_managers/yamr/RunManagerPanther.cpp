@@ -754,12 +754,12 @@ bool RunManagerPanther::ping(int i_sock)
 		const char* data = "\0";
 
 		NetPackage net_pack(NetPackage::PackType::PING, 0, 0, "");
-		int err = net_pack.send(i_sock, data, 0);
+		pair<int,string> err = net_pack.send(i_sock, data, 0);
 		
-		if (err <= 0)
+		if (err.first <= 0)
 		{
 			int fails = agent_info_iter->add_failed_ping();
-			report("failed to send ping request to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
+			report("failed to send ping request to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir() + ": " + err.second, false);
 			if (fails >= MAX_FAILED_PINGS)
 			{
 				report("max failed ping communications since last successful run for agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir() + "  -> terminating", true);
@@ -1069,8 +1069,8 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::it
 		file_stor.get_info(run_id, rstat, info_txt, info_val);
 		string host_name = (*it_agent)->get_hostname();
 		NetPackage net_pack(NetPackage::PackType::START_RUN, cur_group_id, run_id, info_txt);
-		int err = net_pack.send(socket_fd, &data[0], data.size());
-		if (err > 0)
+		pair<int,string> err = net_pack.send(socket_fd, &data[0], data.size());
+		if (err.first > 0)
 		{
 			(*it_agent)->set_state(AgentInfoRec::State::ACTIVE, run_id, cur_group_id);
 			//start run timer
@@ -1088,7 +1088,7 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::it
 		else
 		{
 			stringstream ss;
-			ss << "error sending run " << run_id << "to: " << host_name << "$" << (*it_agent)->get_work_dir();
+			ss << "error sending run " << run_id << "to: " << host_name << "$" << (*it_agent)->get_work_dir() + ": " + err.second;
 			report(ss.str(), false);
 		}
 	}
@@ -1145,23 +1145,23 @@ void RunManagerPanther::report(std::string message,bool to_cout)
 void RunManagerPanther::process_message(int i_sock)
 {
 	NetPackage net_pack;
-	int err;
+	pair<int,string>  err;
 	list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(i_sock);
 
 	string host_name = agent_info_iter->get_hostname();
 	string port_name = agent_info_iter->get_port();
 	string socket_name = agent_info_iter->get_socket_name();
-
-	if(( err=net_pack.recv(i_sock)) <=0) // error or lost connection
+	err = net_pack.recv(i_sock);
+	if( err.first <=0) // error or lost connection
 	{
-		if (err  == -2) {
-			report("received corrupt message from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + " - terminating agent", false);
+		if (err.first  == -2) {
+			report("received corrupt message from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second + " - terminating agent", false);
 		}
-		else if (err < 0) {
-			report("receive failed from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + " - terminating agent", false);
+		else if (err.first < 0) {
+			report("receive failed from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second + " - terminating agent", false);
 		}
 		else {
-			report("lost connection to agent: " + host_name + "$" + agent_info_iter->get_work_dir(), false);
+			report("lost connection to agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second, false);
 		}
 		close_agent(i_sock);
 	}
@@ -1295,6 +1295,7 @@ void RunManagerPanther::process_message(int i_sock)
 		report("error in model IO files on agent: " + host_name + "$" + agent_info_iter->get_work_dir() + "-terminating agent. ", true);
 		close_agent(i_sock);
 	}
+
 	else
 	{
 		report("received unsupported message from agent: ", false);
@@ -1347,15 +1348,15 @@ void RunManagerPanther::kill_run(list<AgentInfoRec>::iterator agent_info_iter, c
 		report(ss.str(), false);
 		NetPackage net_pack(NetPackage::PackType::REQ_KILL, 0, 0, "");
 		char data = '\0';
-		int err = net_pack.send(socket_id, &data, sizeof(data));
-		if (err == 1)
+		pair<int,string> err = net_pack.send(socket_id, &data, sizeof(data));
+		if (err.first == 1)
 		{
 			agent_info_iter->set_state(AgentInfoRec::State::KILLED);
 		}
 		else
 		{
 			report("error sending kill request to agent:" + host_name + "$" +
-				agent_info_iter->get_work_dir(), true);
+				agent_info_iter->get_work_dir() + ": " + err.second, true);
 			agent_info_iter->set_state(AgentInfoRec::State::KILLED_FAILED);
 		}
 	}
@@ -1421,8 +1422,8 @@ void RunManagerPanther::kill_all_active_runs()
 		{
 			NetPackage net_pack(NetPackage::PackType::REQ_RUNDIR, 0, 0, "");
 			char data = '\0';
-			int err = net_pack.send(i_sock, &data, sizeof(data));
-			if (err > 0)
+			pair<int,string> err = net_pack.send(i_sock, &data, sizeof(data));
+			if (err.first > 0)
 			{
 				i_agent.set_state(AgentInfoRec::State::CWD_REQ);
 			}
@@ -1436,27 +1437,39 @@ void RunManagerPanther::kill_all_active_runs()
 			// send parameter names
 			tmp_vec = file_stor.get_par_name_vec();
 			data = Serialization::serialize(tmp_vec);
-			int err_par = net_pack.send(i_sock, &data[0], data.size());
+			pair<int,string> err_par = net_pack.send(i_sock, &data[0], data.size());
 			//send observation names
 			net_pack = NetPackage(NetPackage::PackType::OBS_NAMES, 0, 0, "");
 			tmp_vec = file_stor.get_obs_name_vec();
 			data = Serialization::serialize(tmp_vec);
-			int err_obs = net_pack.send(i_sock, &data[0], data.size());
+			pair<int,string> err_obs = net_pack.send(i_sock, &data[0], data.size());
 
-			if (err_par > 0 && err_obs > 0)
+			if (err_par.first > 0 && err_obs.first > 0)
 			{
 				i_agent.set_state(AgentInfoRec::State::NAMES_SENT);
+			}
+			else if (err_par.first <= 0)
+			{
+				report("Error sending par names to " + i_agent.get_hostname() + "$" + i_agent.get_work_dir() + ": " + err_par.second,false);
+			}
+			else if (err_obs.first <= 0)
+			{
+				report("Error sending obs names to " + i_agent.get_hostname() + "$" + i_agent.get_work_dir() + ": " + err_obs.second, false);
 			}
 		}
 		else if (cur_state == AgentInfoRec::State::NAMES_SENT)
 		{
 			NetPackage net_pack(NetPackage::PackType::REQ_LINPACK, 0, 0, "");
 			char data = '\0';
-			int err = net_pack.send(i_sock, &data, sizeof(data));
-			if (err  > 0)
+			pair<int,string> err = net_pack.send(i_sock, &data, sizeof(data));
+			if (err.first  > 0)
 			{
 				i_agent.set_state(AgentInfoRec::State::LINPACK_REQ);
 				i_agent.start_timer();
+			}
+			else
+			{
+				report("error sending linpack request to " + i_agent.get_hostname() + "$" + i_agent.get_work_dir() + ": " + err.second,false);
 			}
 		}
 		else if (cur_state == AgentInfoRec::State::LINPACK_RCV)
