@@ -516,6 +516,57 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				terminate_or_restart(-1);
 			}
 			Serialization::unserialize(net_pack.get_data(), par_name_vec);
+			//make sure all par names are found in the scenario
+			vector<string> vnames = pest_scenario.get_ctl_ordered_par_names();
+			set<string> snames(vnames.begin(), vnames.end());
+			vnames.clear();
+			for (auto pname : par_name_vec)
+			{
+				if (snames.find(pname) == snames.end())
+					vnames.push_back(pname);
+			}
+			if (vnames.size() > 0)
+			{
+				stringstream ss;
+				ss << vnames.size() << " par names not found in agent ctl file: ";
+				cerr << "ERROR: " << vnames.size() << " par names not found in agent ctl file, see rec file for listing";
+				frec << "ERROR: " << vnames.size() << " par names not found in agent ctl file: ";
+				for (auto vname : vnames)
+				{
+					ss << vname << ",";
+					frec << vname << endl;
+				}
+				net_pack.reset(NetPackage::PackType::IO_ERROR, 0, 0, ss.str());
+				err = send_message(net_pack);
+				w_close(sockfd);
+				w_cleanup();
+				exit(-1);
+			}	
+			snames.clear();
+			snames.insert(par_name_vec.begin(), par_name_vec.end());
+			for (auto name : pest_scenario.get_ctl_ordered_par_names())
+			{
+				if (snames.find(name) == snames.end())
+					vnames.push_back(name);
+			}
+			if (vnames.size() > 0)
+			{
+				stringstream ss;
+				ss << vnames.size() << " extra par names found in agent ctl file: ";
+				cerr << "ERROR: " << vnames.size() << " extra par names found in agent ctl file, see rec file for listing";
+				frec << "ERROR: " << vnames.size() << " extra par names found in agent ctl file: ";
+				for (auto vname : vnames)
+				{
+					ss << vname << ",";
+					frec << vname << endl;
+				}
+				net_pack.reset(NetPackage::PackType::IO_ERROR, 0, 0, ss.str());
+				err = send_message(net_pack);
+				w_close(sockfd);
+				w_cleanup();
+				exit(-1);
+			}
+
 		}
 		else if (net_pack.get_type() == NetPackage::PackType::OBS_NAMES)
 		{
@@ -533,6 +584,58 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				terminate_or_restart(-1);
 			}
 			Serialization::unserialize(net_pack.get_data(), obs_name_vec);
+			//make sure all par names are found in the scenario
+			vector<string> vnames = pest_scenario.get_ctl_ordered_obs_names();
+			set<string> snames(vnames.begin(), vnames.end());
+			vnames.clear();
+			for (auto oname : obs_name_vec)
+			{
+				if (snames.find(oname) == snames.end())
+					vnames.push_back(oname);
+			}
+			if (vnames.size() > 0)
+			{
+				stringstream ss;
+				ss << vnames.size() << " obs names not found in agent ctl file: ";
+				cerr << "ERROR: " << vnames.size() << " obs names not found in agent ctl file, see rec file for listing";
+				frec << "ERROR: " << vnames.size() << " obs names not found in agent ctl file: ";
+				for (auto vname : vnames)
+				{
+					ss << vname << ",";
+					frec << vname << endl;
+				}
+				for (auto vname : vnames)
+					ss << vname << ",";
+				net_pack.reset(NetPackage::PackType::IO_ERROR, 0, 0, ss.str());
+				err = send_message(net_pack);
+				w_close(sockfd);
+				w_cleanup();
+				exit(-1);
+			}
+			snames.clear();
+			snames.insert(obs_name_vec.begin(), obs_name_vec.end());
+			for (auto name : pest_scenario.get_ctl_ordered_obs_names())
+			{
+				if (snames.find(name) == snames.end())
+					vnames.push_back(name);
+			}
+			if (vnames.size() > 0)
+			{
+				stringstream ss;
+				ss << vnames.size() << " extra obs names found in agent ctl file: ";
+				cerr << "ERROR: " << vnames.size() << " extra obs names found in agent ctl file, see rec file for listing";
+				frec << "ERROR: " << vnames.size() << " extra obs names found in agent ctl file: ";
+				for (auto vname : vnames)
+				{
+					ss << vname << ",";
+					frec << vname << endl;
+				}
+				net_pack.reset(NetPackage::PackType::IO_ERROR, 0, 0, ss.str());
+				err = send_message(net_pack);
+				w_close(sockfd);
+				w_cleanup();
+				exit(-1);
+			}
 		}
 		else if(net_pack.get_type() == NetPackage::PackType::REQ_LINPACK)
 		{

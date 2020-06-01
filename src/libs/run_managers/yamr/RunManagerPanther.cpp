@@ -1292,7 +1292,7 @@ void RunManagerPanther::process_message(int i_sock)
 	else if (net_pack.get_type() == NetPackage::PackType::IO_ERROR)
 	{
 		//string err(net_pack.get_data().begin(),net_pack.get_data().end());
-		report("error in model IO files on agent: " + host_name + "$" + agent_info_iter->get_work_dir() + "-terminating agent. ", true);
+		report("error in model IO files on agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + net_pack.get_info_txt() + "-terminating agent. ", true);
 		close_agent(i_sock);
 	}
 
