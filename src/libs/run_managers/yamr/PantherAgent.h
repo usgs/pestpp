@@ -83,6 +83,8 @@ private:
 	//Parameters ctl_pars;
 	Pest pest_scenario;
 
+	void report(const string& _message, bool to_cout);
+
 };
 
 

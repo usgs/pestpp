@@ -437,6 +437,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	int num_runs = waiting_runs.size();
 	cout << "    running model " << num_runs << " times" << endl;
 	f_rmr << "running model " << num_runs << " times" << endl;
+	cout << "    starting at " << pest_utils::get_time_string() << endl;
 	if (agent_info_set.size() == 0) // first entry is the listener, slave apears after this
 	{
 		cout << endl << "      waiting for agents to appear..." << endl << endl;
@@ -1108,36 +1109,9 @@ void RunManagerPanther::echo()
 		<< "| U=" << setw(4) << left << stats_map["unavailable"] << ")\r" << flush;
 }
 
-string RunManagerPanther::get_time_string()
-{
-	time_t rawtime;
-	struct tm * timeinfo;
-	char buffer[80];
-
-	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-	strftime(buffer, 80, "%m/%d/%y %H:%M:%S", timeinfo);
-	string t_str(buffer);
-	return t_str;
-}
-
-string RunManagerPanther::get_time_string_short()
-{
-	time_t rawtime;
-	struct tm * timeinfo;
-	char buffer[80];
-
-	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-	strftime(buffer, 80, "%m/%d %H:%M:%S", timeinfo);
-	string t_str(buffer);
-	return t_str;
-}
-
-
 void RunManagerPanther::report(std::string message,bool to_cout)
 {
-	string t_str = get_time_string();
+	string t_str = pest_utils::get_time_string();
 	f_rmr << t_str << "->" << message << endl;
 	if (to_cout) cout << endl << t_str << "->" << message << endl;
 }

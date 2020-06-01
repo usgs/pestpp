@@ -171,8 +171,8 @@ private:
 	bool ping(int i_sock);
 	bool ping(pest_utils::thread_flag* terminate = nullptr);
 	void report(std::string message,bool to_cout);
-	string get_time_string();
-	string get_time_string_short();
+	/*string get_time_string();
+	string get_time_string_short();*/
 	void echo();
 	vector<int> get_overdue_runs_over_kill_threshold(int run_id);
 	bool all_runs_complete();

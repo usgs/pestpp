@@ -1708,6 +1708,7 @@ void IterEnsembleSmoother::iterate_2_solution()
 	{
 		iter++;
 		message(0, "starting solve for iteration:", iter);
+		ss.str("");
 		ss << "starting solve for iteration: " << iter;
 		performance_log->log_event(ss.str());
 		accept = solve_new();
