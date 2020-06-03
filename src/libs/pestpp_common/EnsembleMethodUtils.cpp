@@ -411,7 +411,9 @@ void L2PhiHandler::report(bool echo)
 {
 	ofstream& f = file_manager->rec_ofstream();
 	string s;
-
+	f << get_summary_header();
+	if (echo)
+		cout << get_summary_header();
 	if (pest_scenario->get_pestpp_options().get_ies_no_noise())
 	{
 		if (org_reg_factor == 0)
@@ -423,9 +425,7 @@ void L2PhiHandler::report(bool echo)
 		}
 		else
 		{
-			f << get_summary_header();
-			if (echo)
-				cout << get_summary_header();
+			
 			string s = get_summary_string(L2PhiHandler::phiType::COMPOSITE);
 			f << s;
 			if (echo)
@@ -456,9 +456,6 @@ void L2PhiHandler::report(bool echo)
 		}
 		else
 		{
-			f << get_summary_header();
-			if (echo)
-				cout << get_summary_header();
 			string s = get_summary_string(L2PhiHandler::phiType::COMPOSITE);
 			f << s;
 			if (echo)
