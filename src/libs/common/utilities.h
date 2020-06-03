@@ -262,7 +262,7 @@ public:
 	void add(std::exception_ptr ex_ptr);
 	void rethrow();
 	int size(){ return shared_exception_vec.size(); }
-
+	string what();
 private:
 	std::vector<std::exception_ptr> shared_exception_vec;
 	std::mutex m;
@@ -318,16 +318,16 @@ public:
 	vector<string> get_row_vector(int idx, vector<string> include_cols = vector<string>());
 	vector<string> get_row_vector(string key, string col_name, vector<string> include_cols = vector<string>());
 	vector<string> get_col_string_vector(string col_name);
-
+	void set_index_col_name(string& _col_name);
+	string get_index_col_name() { return index_col_name; }
 	template<typename t>
 	inline void fill_col_vector(string col_name, vector<t> &col_vector);
 	void read_file();
 	
-
 private:
 	bool cast;
 	ofstream& f_rec;
-	string line, filename;
+	string line, filename, index_col_name;
 	string delim,missing_val;
 	vector<string> col_names;
 	vector<int> row_order;

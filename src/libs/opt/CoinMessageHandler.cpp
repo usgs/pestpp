@@ -831,7 +831,7 @@ CoinMessageHandler::operator<< (double doublevalue)
 	  sprintf(messageOut_,g_format_,doublevalue);
 	  if (next != format_+2) {
 	    messageOut_+=strlen(messageOut_);
-	    sprintf(messageOut_,format_+2);
+	    strcpy(messageOut_,format_+2);
 	  }
 	}
 	messageOut_+=strlen(messageOut_);

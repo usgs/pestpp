@@ -16,7 +16,7 @@
 bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing)
 {
 	stringstream ss;
-	how == How::OBSERVATIONS; //set this for the case with no localization
+	how = How::OBSERVATIONS; //set this for the case with no localization
 	string how_str = pest_scenario_ptr->get_pestpp_options().get_ies_localize_how();
 	if (how_str[0] == 'P')
 	{

@@ -41,7 +41,7 @@ public:
 	int recv_message(NetPackage &net_pack, struct timeval *tv=NULL);
 	int recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs = 0);
 	int send_message(NetPackage &net_pack, const void *data=NULL, unsigned long data_len=0);
-	NetPackage::PackType run_model(Parameters &pars, Observations &obs, NetPackage &net_pack);
+	std::pair<NetPackage::PackType,std::string> run_model(Parameters &pars, Observations &obs, NetPackage &net_pack);
 	void process_ctl_file(const string &ctl_filename);
 private:
 	ofstream& frec;

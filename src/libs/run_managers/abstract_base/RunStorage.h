@@ -26,6 +26,7 @@
 #include <vector>
 #include <cstdint>
 #include <Eigen/Dense>
+#include "network_package.h"
 
 class Parameters;
 class Observations;
@@ -44,7 +45,7 @@ class RunStorage {
 	//			    run_status=-100   run was canceled
 	//				run_status<0 and >-100  run completed and failed.  This is the number of times it failed
 	//				run_status=1   run and been sucessfully completed
-	//       info_txt  (description of model run)                                     char*41
+	//       info_txt  (description of model run)                                     char*
 	//       info_value (variable used to store an important value.  The varaible     double
 	//                   depends on the type of model run being stored  )
 	//       parameter_values  (parameters values for model runs)                     double*number of parameters
@@ -88,7 +89,7 @@ public:
 	void print_run_summary(std::ostream &fout);
 	~RunStorage();
 private:
-	static const int info_txt_length = 41;
+	static const int info_txt_length = NetPackage::DESC_LEN;
 	std::string filename;
 	mutable std::fstream buf_stream;
 	std::streamoff beg_run0;

@@ -577,13 +577,44 @@ void thread_exceptions::add(std::exception_ptr ex_ptr)
 	shared_exception_vec.push_back(ex_ptr);
 }
 
+string thread_exceptions::what()
+{
+	stringstream ss;
+	std::lock_guard<std::mutex> lock(m);
+	for (auto eptr : shared_exception_vec)
+	{
+		try
+		{
+			std::rethrow_exception(eptr);
+		}
+		catch (const std::exception& e)
+		{
+			ss << e.what() << ", ";
+		}
+	}
+	return ss.str();
+}
+
 void  thread_exceptions::rethrow()
 {
 	std::lock_guard<std::mutex> lock(m);
-	for (auto &iex : shared_exception_vec)
+	if (shared_exception_vec.size() == 0)
 	{
-		std::rethrow_exception(iex);
+		return;
 	}
+	stringstream ss;
+	for (auto eptr : shared_exception_vec)
+	{
+		try
+		{
+			std::rethrow_exception(eptr);
+		}
+		catch (const std::exception& e)
+		{
+			ss << e.what() << ", ";
+		}
+	}
+	throw runtime_error(ss.str());
 }
 
 pair<string, string> parse_plusplus_line(const string& line)
@@ -973,7 +1004,8 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 
 
 ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line, bool _cast) :
-	f_rec(_f_rec), cast(_cast), line(_line), delim(","), missing_val(""), filename("")
+	f_rec(_f_rec), cast(_cast), line(_line), delim(","), missing_val(""), filename(""),
+	index_col_name("")
 {
 }
 
@@ -1301,6 +1333,15 @@ bool ExternalCtlFile::isduplicated(string col_name)
 	if (cnames.size() != data.size())
 		return true;
 	return false;
+}
+
+void ExternalCtlFile::set_index_col_name(string& _col_name)
+{
+	set<string> cnames = get_col_set();
+	if (cnames.find(_col_name) == cnames.end())
+		throw_externalctrlfile_error("set_index_col_name() error: _col_name '" + _col_name + "' not found in col_names");
+	index_col_name = _col_name;
+
 }
 
 int ExternalCtlFile::get_row_idx(string key, string col_name)

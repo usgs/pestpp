@@ -2,6 +2,8 @@
 #include <iomanip>
 #include <unordered_set>
 #include <iterator>
+#include <limits>
+#include <cstddef>
 #include "Ensemble.h"
 #include "RestartController.h"
 #include "utilities.h"
@@ -1819,7 +1821,7 @@ ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _ra
 
 
 
-void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level)
+void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
 {
 	///draw a parameter ensemble
 	var_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names(); //only draw for adjustable pars
@@ -1831,6 +1833,7 @@ void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, Per
 		if (scov_names.find(name) != scov_names.end())
 			var_names.push_back(name);
 	}
+	
 	//Parameters par = pest_scenario_ptr->get_ctl_parameters();
 	par_transform.active_ctl2numeric_ip(par);//removes fixed/tied pars
 	tstat = transStatus::NUM;
@@ -2205,7 +2208,7 @@ void ParameterEnsemble::enforce_limits(PerformanceLog* plog, bool enforce_chglim
 				real.update_without_clear(var_names, reals.row(i));
 				Parameters real_ctl = pest_scenario_ptr->get_base_par_tran_seq().numeric2ctl_cp(real);
 
-				cout << "";
+				//cout << "";
 				for (auto n : var_names)
 				{
 					v = real_ctl[n];
@@ -2560,7 +2563,7 @@ void ObservationEnsemble::initialize_without_noise(int num_reals)
 
 }
 
-void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level)
+void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
 {
 	//draw an obs ensemble using only nz obs names
 	var_names = pest_scenario_ptr->get_ctl_ordered_nz_obs_names();
@@ -2580,6 +2583,46 @@ void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *p
 		}
 	}
 	Ensemble::draw(num_reals, cov, obs, pest_scenario_ptr->get_ctl_ordered_nz_obs_names(), grouper, plog, level);
+
+	//apply any bounds that were supplied
+	map<string, double> lower_bnd = pest_scenario_ptr->get_ext_file_double_map("observation data external", "lower_bound");
+	map<string, double> upper_bnd = pest_scenario_ptr->get_ext_file_double_map("observation data external", "upper_bound");
+	set<string> snames(var_names.begin(), var_names.end());
+	double v, lb, ub;
+	Eigen::VectorXd col;
+	string var_name;
+	if ((lower_bnd.size() > 0) || (upper_bnd.size() > 0))
+	{
+		frec << "Note: the following observations contain 'lower_bound' and/or 'upper_bound' information that will be" << endl;
+		frec << "      enforced on the additive noise realizations: " << endl;
+		for (int j = 0; j < reals.cols(); j++)
+		{
+			var_name = var_names[j];
+			lb = std::numeric_limits<double>::lowest();
+			ub = 1.79769e+308;//std::numeric_limits<double>::max();
+			if (lower_bnd.find(var_name) != lower_bnd.end())
+			{
+				lb = lower_bnd[var_name];
+			}
+			if (upper_bnd.find(var_name) != upper_bnd.end())
+			{
+				ub = upper_bnd[var_name];
+			}
+			frec << var_name << " " << lb << " " << ub << endl;
+			col = reals.col(j);
+
+			for (int i = 0; i < reals.rows(); i++)
+			{
+				v = col(i);
+				v = v < lb ? lb : v;
+				col(i) = v > ub ? ub : v;
+			}
+			reals.col(j) = col;
+			
+		}
+	}
+	
+
 
 	//now fill in all the zero-weighted obs
 	Eigen::MatrixXd drawn = reals;

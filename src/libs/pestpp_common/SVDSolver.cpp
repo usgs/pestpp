@@ -712,10 +712,120 @@ ModelRun SVDSolver::iteration_reuse_jac(RunManagerAbstract &run_manager, Termina
 	cout << "  reading previously computed jacobian:  " << jac_filename << endl;
 	file_manager.get_ofstream("rec") << "  reading previously computed jacobian:  " << jac_filename << endl;
 	jacobian.read(jac_filename);
+	
 	Parameters pars = pest_scenario.get_ctl_parameters();
 	par_transform.ctl2numeric_ip(pars);
+
+	// check for adj pars missing from jco
+	vector<string> vnames = jacobian.parameter_list();;
+	set<string> snames(vnames.begin(), vnames.end());
+	vector<string> missing;
+	vnames = pars.get_keys();
+	for (auto jname : vnames)
+	{
+		if (snames.find(jname) == snames.end())
+			missing.push_back(jname);
+	}
+	if (missing.size() > 0)
+	{
+		os << "ERROR: the following adjustable parameters were not found in the jacobian:" << endl;
+		for (auto m : missing)
+			os << m << endl;
+		cout << "ERROR: jacobian missing adjustable parameters - see rec file for listing" << endl;
+		throw runtime_error("ERROR: jacobian missing adjustable parameters - see rec file for listing");
+ 	}
+	
+	//check for obs missing from jco
+	snames.clear();
+	vnames = jacobian.observation_list(); 
+	snames.insert(vnames.begin(),vnames.end());
+	//vnames = pest_scenario.get_prior_info().get_keys();
+	//set<string> pi_names(vnames.begin(), vnames.end());
+	vnames = pest_scenario.get_ctl_ordered_obs_names();
+	for (auto jname : vnames)
+	{
+		if (snames.find(jname) == snames.end())
+			missing.push_back(jname);
+	}
+	
+	if (missing.size() > 0)
+	{
+		os << "ERROR: the following observations were not found in the jacobian:" << endl;
+		for (auto m : missing)
+			os << m << endl;
+		cout << "ERROR: jacobian missing observations - see rec file for listing" << endl;
+		throw runtime_error("ERROR: jacobian missing observations - see rec file for listing");
+	}
+	vnames = pest_scenario.get_prior_info().get_keys();
+	for (auto jname : vnames)
+	{
+		if (snames.find(jname) == snames.end())
+			missing.push_back(jname);
+	}
+
+	if (missing.size() > 0)
+	{
+		os << "ERROR: the following prior info eqs were not found in the jacobian:" << endl;
+		for (auto m : missing)
+			os << m << endl;
+		cout << "ERROR: jacobian missing prior info eqs - see rec file for listing" << endl;
+		throw runtime_error("ERROR: jacobian missing prior info eqs - see rec file for listing");
+	}
+
+	//now check for extra columns in the jco
+	snames.clear();
+	vnames = pars.get_keys();
+	snames.insert(vnames.begin(), vnames.end());
+	vector<string> extra;
+	vnames = jacobian.parameter_list();
+	for (auto pname : vnames)
+	{
+		if (snames.find(pname) == snames.end())
+			extra.push_back(pname);
+	}
+	if (extra.size() > 0)
+	{
+		os << "WARNING: the following jacobian parameters are not adjustable, dropping..." << endl;
+		for (auto e : extra)
+			os << e << endl;
+		cout << "WARNING: jacobian has extra columns, dropping - see rec file for listing" << endl;
+		snames.clear();
+		snames.insert(extra.begin(), extra.end());
+		jacobian.remove_cols(snames);
+	}
+
+	//and check for unneeded pi eqs
+	extra.clear();
+	snames.clear();
+	vnames = pest_scenario.get_prior_info().get_keys();
+	snames.insert(vnames.begin(), vnames.end());
+	vnames = pest_scenario.get_ctl_ordered_obs_names();
+	set<string> osnames(vnames.begin(), vnames.end());
+	vnames = jacobian.observation_list();
+	for (auto name : vnames)
+	{
+		if (osnames.find(name) == osnames.end())
+		{
+			if (snames.find(name) == snames.end())
+			{
+				extra.push_back(name);
+			}
+		}
+	}
+	if (extra.size() > 0)
+	{
+		os << "ERROR: the following jacobian prior info eqs are not in the control file..." << endl;
+		for (auto e : extra)
+			os << e << endl;
+		cout << "ERROR: jacobian has prior info eqs are not in the control file - see rec file for listing" << endl;
+		snames.clear();
+		snames.insert(extra.begin(), extra.end());
+		//throw runtime_error("ERROR: jacobian has prior info eqs are not in the control file - see rec file for listing");
+		jacobian.remove_rows(snames);
+	}
+	
 	jacobian.set_base_numeric_pars(pars);
-	//todo: make sure the jco has the right pars and obs
+	
 	
 	if (!res_filename.empty())
 	{
@@ -833,8 +943,18 @@ bool SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContro
 		base_run.update_ctl(tmp_pars, tmp_obs);
 	}
 	// sen file for this iteration
-	output_file_writer.append_sen(file_manager.sen_ofstream(), termination_ctl.get_iteration_number() + 1, jacobian,
-		*(base_run.get_obj_func_ptr()), get_parameter_group_info(), *regul_scheme_ptr, false, par_transform);
+	try
+	{
+
+
+		output_file_writer.append_sen(file_manager.sen_ofstream(), termination_ctl.get_iteration_number() + 1, jacobian,
+			*(base_run.get_obj_func_ptr()), get_parameter_group_info(), *regul_scheme_ptr, false, par_transform);
+	}
+	catch (...)
+	{
+		file_manager.rec_ofstream() << "error saving sensitivities, continuing..." << endl;
+
+	}
 	return true;
 }
 
