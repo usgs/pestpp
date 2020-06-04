@@ -1334,7 +1334,7 @@ void PestppOptions::set_defaults()
 	set_additional_ins_delimiters("");
 
 	set_panther_agent_restart_on_error(false);
-	set_panther_agent_no_ping_timeout_secs(300);
+	set_panther_agent_no_ping_timeout_secs(-1);
 	set_panther_debug_cycle(false);
 }
 

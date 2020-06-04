@@ -1458,11 +1458,20 @@ void IterEnsembleSmoother::initialize()
 	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
+	if (last_best_mean < 1.0e-10)
+	{
+		throw_ies_error("initial composite phi too low, something is wrong...");
+	}
 	if (last_best_lam <= 0.0)
 	{
 		//double x = last_best_mean / (2.0 * double(oe.shape().second));
 		double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
 		last_best_lam = pow(10.0, (floor(log10(x))));
+		if (last_best_lam < 1.0e-10)
+		{
+			message(1, "lambda estimate from phi failed, using 10000");
+			last_best_lam = 10000;
+		}
 	}
 	message(1, "current lambda:", last_best_lam);
 	message(0, "initialization complete");

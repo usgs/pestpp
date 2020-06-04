@@ -511,8 +511,15 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			auto time_without_master_ping_seconds = chrono::duration_cast<std::chrono::seconds>(chrono::system_clock::now() - last_ping_time).count();
 			if (max_time_without_master_ping_seconds > 0 && time_without_master_ping_seconds > max_time_without_master_ping_seconds)
 			{
+				time_t rawtime = std::chrono::system_clock::to_time_t(last_ping_time);
+				struct tm* timeinfo;
+				char buffer[80];
+				time(&rawtime);
+				timeinfo = localtime(&rawtime);
+				strftime(buffer, 80, "%m/%d/%y %H:%M:%S", timeinfo);
+				string t_str(buffer);
 				ss.str("");
-				ss << "no ping received from master in the last " << max_time_without_master_ping_seconds << " seconds, terminating";
+				ss << "no ping received from master in the last " << max_time_without_master_ping_seconds << " seconds, last ping time: " <<  t_str << ",  terminating";
 				report(ss.str(), true);
 				//terminate = true;
 				terminate_or_restart(-1);
