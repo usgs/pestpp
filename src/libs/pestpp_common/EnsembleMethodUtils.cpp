@@ -938,7 +938,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter)
 		Eigen::VectorXd v = pe.get_real_vector("BASE");
 
 		Parameters pars = pe.get_pest_scenario_ptr()->get_ctl_parameters();
-		pars.update(pe.get_var_names(), egienvec_2_stlvec(v));
+		pars.update(pe.get_var_names(), eigenvec_2_stlvec(v));
 		pe.get_pest_scenario_ptr()->get_base_par_tran_seq().numeric2ctl_ip(pars);
 		// save parameters to .par file
 		ss.str("");
@@ -951,4 +951,44 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter)
 
 }
 
+
+void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
+	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter)
+{
+	stringstream ss;
+	map<string, int> vmap = pe.get_var_map();
+	if (vmap.find("BASE") != vmap.end())
+	{
+		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+		Parameters pars;
+		pars.update(pe.get_var_names(), eigenvec_2_stlvec(pe.get_real_vector("BASE")));
+		// save parameters to .par file
+		if (iter >= 0)
+			ss << iter << ".";
+		ss << "base.par";
+		output_file_writer.write_par(file_manager.open_ofile_ext(ss.str()), pars, *(pts.get_offset_ptr()),
+			*(pts.get_scale_ptr()));
+		file_manager.close_file("par");
+
+		vmap = oe.get_var_map();
+		if (vmap.find("BASE") == vmap.end())
+		{
+			//message(2, "unable to find 'BASE' realization in obs ensemble for saving .base.rei file, continuing...");
+		}
+		else
+		{
+			Observations obs;
+			obs.update(oe.get_var_names(), eigenvec_2_stlvec(oe.get_real_vector("BASE")));
+			ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
+			// save new residuals to .rei file
+			ss.str("");
+			if (iter >= 0)
+				ss << iter << ".";
+			ss << "base.rei";
+			output_file_writer.write_rei(file_manager.open_ofile_ext(ss.str()), 0,
+				pest_scenario.get_ctl_observations(), obs, obj_func, pars);
+		}
+	}
+
+}
 

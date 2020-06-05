@@ -978,22 +978,23 @@ void IterEnsembleSmoother::initialize()
 		message(0, "control file parameter phi report:");
 		ph.report(true);
 		ph.write(0, 1);
-		ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
-		Observations obs;
-		Eigen::VectorXd v = _oe.get_real_vector("BASE");
-		vector<double> vv;
-		vv.resize(v.size());
-		Eigen::VectorXd::Map(&vv[0], v.size()) = v;
-		obs.update(_oe.get_var_names(), vv);
+		save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1);
+		//ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
+		//Observations obs;
+		//Eigen::VectorXd v = _oe.get_real_vector("BASE");
+		//vector<double> vv;
+		//vv.resize(v.size());
+		//Eigen::VectorXd::Map(&vv[0], v.size()) = v;
+		//obs.update(_oe.get_var_names(), vv);
 	
-		// save parameters to .par file
-		output_file_writer.write_par(file_manager.open_ofile_ext("base.par"),pars, *(pts.get_offset_ptr()),
-			*(pts.get_scale_ptr()));
-		file_manager.close_file("par");
+		//// save parameters to .par file
+		//output_file_writer.write_par(file_manager.open_ofile_ext("base.par"),pars, *(pts.get_offset_ptr()),
+		//	*(pts.get_scale_ptr()));
+		//file_manager.close_file("par");
 
-		// save new residuals to .rei file
-		output_file_writer.write_rei(file_manager.open_ofile_ext("base.rei"), 0,
-			pest_scenario.get_ctl_observations(),obs,obj_func,pars);
+		//// save new residuals to .rei file
+		//output_file_writer.write_rei(file_manager.open_ofile_ext("base.rei"), 0,
+		//	pest_scenario.get_ctl_observations(),obs,obj_func,pars);
 			
 		return;
 	}
@@ -1281,6 +1282,7 @@ void IterEnsembleSmoother::initialize()
 		message(0, "mean parameter phi report:");
 		ph.report(true);
 		ph.write(0, 1);
+
 		return;
 	}
 
@@ -1338,6 +1340,10 @@ void IterEnsembleSmoother::initialize()
 		oe.to_csv(ss.str());
 	}
 	message(1, "saved initial obs ensemble to", ss.str());
+
+	//save the 0th iter par and rei and well as the untagged par and rei
+	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter);
+	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1);
 
 
 	performance_log->log_event("calc pre-drop phi");
@@ -1469,7 +1475,7 @@ void IterEnsembleSmoother::initialize()
 		last_best_lam = pow(10.0, (floor(log10(x))));
 		if (last_best_lam < 1.0e-10)
 		{
-			message(1, "lambda estimate from phi failed, using 10000");
+			message(1, "initial lambda estimation from phi failed, using 10,000");
 			last_best_lam = 10000;
 		}
 	}
@@ -2870,7 +2876,6 @@ bool IterEnsembleSmoother::solve_new()
 }
 
 
-
 void IterEnsembleSmoother::report_and_save()
 {
 	ofstream &frec = file_manager.rec_ofstream();
@@ -2906,6 +2911,8 @@ void IterEnsembleSmoother::report_and_save()
 		ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
 		pe.to_csv(ss.str());
 	}
+	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter);
+	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1);
 	//ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
 	//pe.to_csv(ss.str());
 	frec << "      current par ensemble saved to " << ss.str() << endl;

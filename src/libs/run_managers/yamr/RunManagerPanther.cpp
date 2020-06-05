@@ -734,7 +734,6 @@ bool RunManagerPanther::ping(int i_sock)
 	AgentInfoRec::State state = agent_info_iter->get_state();
 	if (state != AgentInfoRec::State::WAITING
 		&& state != AgentInfoRec::State::ACTIVE
-		&& state != AgentInfoRec::State::COMPLETE
 		&& state != AgentInfoRec::State::KILLED
 		&& state != AgentInfoRec::State::KILLED_FAILED)
 	{
@@ -1303,7 +1302,7 @@ bool RunManagerPanther::process_model_run(int sock_id, NetPackage &net_pack)
 		double run_time = 0;
 		Serialization::unserialize(net_pack.get_data(), pars, get_par_name_vec(), obs, get_obs_name_vec(), run_time);
 		file_stor.update_run(run_id, pars, obs);
-		agent_info_iter->set_state(AgentInfoRec::State::COMPLETE);
+		agent_info_iter->set_state(AgentInfoRec::State::WAITING);
 		//slave_info_iter->set_state(SlaveInfoRec::State::WAITING);
 		use_run = true;
 		model_runs_done++;
