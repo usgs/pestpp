@@ -833,14 +833,16 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			//do this after we handle a cycle change so that par_name_vec is updated
 			Serialization::unserialize(net_pack.get_data(), pars, par_name_vec);
 			// run model
-			if (pest_scenario.get_pestpp_options().get_panther_debug_cycle())
+			if (pest_scenario.get_pestpp_options().get_panther_debug_loop())
 			{
 				ss.str("");
-				ss << "PANTHER_DEBUG_CYCLE = true, returning ctl obs values";
+				ss << "PANTHER_DEBUG_LOOP = true, returning ctl obs values";
 				
 				report(ss.str(), true);
 				serialized_data = Serialization::serialize(pars, par_name_vec, obs, obs_name_vec, run_time);
-				net_pack.reset(NetPackage::PackType::RUN_FINISHED, group_id, run_id, "debug cycle returning ctl obs");
+				ss.str("");
+				ss << "debug loop returning ctl obs for run_id, group_id: " << run_id << "," << group_id;
+				net_pack.reset(NetPackage::PackType::RUN_FINISHED, group_id, run_id, ss.str());
 				err = send_message(net_pack, serialized_data.data(), serialized_data.size());
 				if (err.first != 1)
 				{
@@ -850,6 +852,10 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					report(ss.str(), true);
 					terminate_or_restart(-1);
 				}
+				ss.str("");
+				ss << "results of run_id " << run_id << "sent";
+				report(ss.str(), true);
+				continue;
 
 			}
 

@@ -266,10 +266,10 @@ int AgentInfoRec::seconds_since_last_ping_time() const
 }
 
 
-RunManagerPanther::RunManagerPanther(const string &stor_filename, const string &_port, ofstream &_f_rmr, int _max_n_failure,
+RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& _port, ofstream& _f_rmr, int _max_n_failure,
 	double _overdue_reched_fac, double _overdue_giveup_fac, double _overdue_giveup_minutes)
 	: RunManagerAbstract(vector<string>(), vector<string>(), vector<string>(),
-	vector<string>(), vector<string>(), stor_filename, _max_n_failure),
+		vector<string>(), vector<string>(), stor_filename, _max_n_failure),
 	overdue_reched_fac(_overdue_reched_fac), overdue_giveup_fac(_overdue_giveup_fac),
 	port(_port), f_rmr(_f_rmr), n_no_ops(0), overdue_giveup_minutes(_overdue_giveup_minutes),
 	terminate_idle_thread(false), currently_idle(true), idling(false), idle_thread_finished(false),
@@ -278,9 +278,9 @@ RunManagerPanther::RunManagerPanther(const string &stor_filename, const string &
 	cout << "          starting PANTHER master..." << endl << endl;
 	max_concurrent_runs = max(MAX_CONCURRENT_RUNS_LOWER_LIMIT, _max_n_failure);
 	w_init();
-	std::pair<int,string> status;
+	std::pair<int, string> status;
 	struct addrinfo hints;
-	struct addrinfo *servinfo;
+	struct addrinfo* servinfo;
 	memset(&hints, 0, sizeof hints);
 	//Use this for IPv4 aand IPv6
 	//hints.ai_family = AF_UNSPEC;
@@ -295,11 +295,11 @@ RunManagerPanther::RunManagerPanther(const string &stor_filename, const string &
 		cout << "ERROR: getaddrinfo returned non-zero: " << status.second << endl;
 		throw(PestError("ERROR: getaddrinfo returned non-zero: " + status.second));
 	}
-	
+
 	w_print_servinfo(servinfo, cout);
 	cout << endl;
 	//make socket, bind and listen
-	addrinfo *connect_addr = w_bind_first_avl(servinfo, listener);
+	addrinfo* connect_addr = w_bind_first_avl(servinfo, listener);
 	if (connect_addr == nullptr)
 	{
 		stringstream err_str;
@@ -307,9 +307,7 @@ RunManagerPanther::RunManagerPanther(const string &stor_filename, const string &
 		throw(PestError(err_str.str()));
 	}
 	else {
-		f_rmr << endl;
-		cout << "PANTHER master listening on socket: " << w_get_addrinfo_string(connect_addr) << endl;
-		f_rmr << "PANTHER master listening on socket:" << w_get_addrinfo_string(connect_addr) << endl;
+
 	}
 	w_listen(listener, BACKLOG);
 	//free servinfo
@@ -317,6 +315,12 @@ RunManagerPanther::RunManagerPanther(const string &stor_filename, const string &
 	fdmax = listener;
 	FD_ZERO(&master);
 	FD_SET(listener, &master);
+	//cant do this here because the run manager doesnt yet know the par and obs names
+	//resume_idle();
+	f_rmr << endl;
+	cout << "PANTHER master listening on socket: " << w_get_addrinfo_string(connect_addr) << endl;
+	f_rmr << "PANTHER master listening on socket:" << w_get_addrinfo_string(connect_addr) << endl;
+	
 }
 
 int RunManagerPanther::get_n_concurrent(int run_id)
@@ -1191,8 +1195,9 @@ void RunManagerPanther::process_message(int i_sock)
 		// just ignore it
 		int run_id = net_pack.get_run_id();
 		int group_id = net_pack.get_group_id();
-		//stringstream ss;
-		//ss << "run " << run_id << " received from unexpected group id: " << group_id << ", should be group: " << cur_group_id;
+		stringstream ss;
+		ss << "run " << run_id << " received from unexpected group id: " << group_id << ", should be group: " << cur_group_id << "...ignoring";
+		report(ss.str(), false);
 		//throw PestError(ss.str());
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::RUN_FINISHED)
