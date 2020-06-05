@@ -962,6 +962,8 @@ void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, Observat
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
 		Parameters pars;
 		pars.update(pe.get_var_names(), eigenvec_2_stlvec(pe.get_real_vector("BASE")));
+		if (pe.get_trans_status() == ParameterEnsemble::transStatus::NUM)
+			pts.numeric2ctl_ip(pars);
 		// save parameters to .par file
 		if (iter >= 0)
 			ss << iter << ".";
