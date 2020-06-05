@@ -68,6 +68,9 @@ AgentInfoRec::AgentInfoRec(int _socket_fd)
 	ping = false;
 	failed_pings = 0;
 	failed_runs = 0;
+	state_strings = vector<string>({ "NEW", "CWD_REQ", "CWD_RCV", "NAMES_SENT", "LINPACK_REQ", "LINPACK_RCV", "WAITING", "ACTIVE",
+	"KILLED", "KILLED_FAILED", "COMPLETE" });
+
 }
 
 bool AgentInfoRec::CompareTimes::operator() (const AgentInfoRec &a, const AgentInfoRec &b)
@@ -320,6 +323,7 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	f_rmr << endl;
 	cout << "PANTHER master listening on socket: " << w_get_addrinfo_string(connect_addr) << endl;
 	f_rmr << "PANTHER master listening on socket:" << w_get_addrinfo_string(connect_addr) << endl;
+	
 	
 }
 
@@ -1078,11 +1082,13 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::it
 		int rstat;
 		file_stor.get_info(run_id, rstat, info_txt, info_val);
 		string host_name = (*it_agent)->get_hostname();
+		//  info_txt = "sending run to " + host_name + ":" + (*it_agent)->get_work_dir() + " at " + pest_utils::get_time_string();
 		NetPackage net_pack(NetPackage::PackType::START_RUN, cur_group_id, run_id, info_txt);
 		pair<int,string> err = net_pack.send(socket_fd, &data[0], data.size());
 		if (err.first > 0)
 		{
 			(*it_agent)->set_state(AgentInfoRec::State::ACTIVE, run_id, cur_group_id);
+			report("changed agent " + host_name + ":" + (*it_agent)->get_work_dir() + " to 'active'",false);
 			//start run timer
 			(*it_agent)->start_timer();
 			//reset the last ping time so we don't ping immediately after run is started
@@ -1176,7 +1182,7 @@ void RunManagerPanther::process_message(int i_sock)
 		agent_info_iter->end_linpack();
 		agent_info_iter->set_state(AgentInfoRec::State::LINPACK_RCV);
 		stringstream ss;
-		ss << "new agent ready: " << socket_name;
+		ss << "new agent ready: " << socket_name << ":" << agent_info_iter->get_work_dir();
 		report(ss.str(), false);
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::READY)
@@ -1302,11 +1308,17 @@ bool RunManagerPanther::process_model_run(int sock_id, NetPackage &net_pack)
 		double run_time = 0;
 		Serialization::unserialize(net_pack.get_data(), pars, get_par_name_vec(), obs, get_obs_name_vec(), run_time);
 		file_stor.update_run(run_id, pars, obs);
-		agent_info_iter->set_state(AgentInfoRec::State::WAITING);
+		agent_info_iter->set_state(AgentInfoRec::State::COMPLETE);
 		//slave_info_iter->set_state(SlaveInfoRec::State::WAITING);
 		use_run = true;
 		model_runs_done++;
 
+	}
+	else
+	{
+		stringstream ss;
+		ss << "run_id " << run_id << "already finished";
+		report(ss.str(), false);
 	}
 	// remove currently completed run from the active list
 	auto it = get_active_run_iter(sock_id);
@@ -1460,6 +1472,10 @@ void RunManagerPanther::kill_all_active_runs()
 		{
 			i_agent.set_state(AgentInfoRec::State::WAITING);
 		}
+		/*else if (cur_state == AgentInfoRec::State::COMPLETE)
+		{
+			i_agent.set_state(AgentInfoRec::State::WAITING);
+		}*/
 	}
  }
 
@@ -1564,10 +1580,15 @@ void RunManagerPanther::kill_all_active_runs()
  {
 	 list<list<AgentInfoRec>::iterator> iter_list;
 	 list<AgentInfoRec>::iterator iter_b, iter_e;
+	 stringstream ss;
 	 for (iter_b = agent_info_set.begin(), iter_e = agent_info_set.end();
 		 iter_b != iter_e; ++iter_b)
 	 {
 		 AgentInfoRec::State cur_state = iter_b->get_state();
+		 ss.str("");
+		 ss << iter_b->get_hostname() << ":" << iter_b->get_work_dir() << "," << iter_b->state_strings[static_cast<int>(cur_state)];
+		 report(ss.str(), false);
+		 
 		 if (cur_state == AgentInfoRec::State::WAITING)
 		 {
 			 iter_list.push_back(iter_b);

@@ -20,10 +20,12 @@ public:
 	enum class PackType :uint32_t {
 		UNKN, OK, CONFIRM_OK, READY, REQ_RUNDIR, RUNDIR, REQ_LINPACK, LINPACK, PAR_NAMES, OBS_NAMES,
 		START_RUN, RUN_FINISHED, RUN_FAILED, RUN_KILLED, TERMINATE,PING,REQ_KILL,IO_ERROR,CORRUPT_MESG,
-		DEBUG_CYCLE};
+		DEBUG_LOOP};
+	
 	static int get_new_group_id();
 	NetPackage(PackType _type=PackType::UNKN, int _group=-1, int _run_id=-1, const std::string &desc_str="");
 	~NetPackage(){}
+	std::vector<std::string> pack_strings;
 	const static int DESC_LEN = 1001;
 	const static int NULL_DA_CYCLE = -9999;
 	std::pair<int,std::string> send(int sockfd, const void *data, int64_t data_len_l);
@@ -48,5 +50,6 @@ private:
 	static int8_t security_code[5];
 	std::vector<int8_t> data;
 };
+
 
 #endif /* NET_PACKAGE_H_ */
