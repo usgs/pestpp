@@ -91,6 +91,7 @@ public:
 	void set_rand_gen(std::mt19937* _rand_gen_ptr) { rand_gen_ptr = _rand_gen_ptr; }
 	std::mt19937* get_rand_gen_ptr() { return rand_gen_ptr; }
 	map<string, int> get_var_map() { return var_map; }
+	map<string, int> get_real_map();
 
 protected:
 	std::mt19937* rand_gen_ptr;

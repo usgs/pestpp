@@ -374,7 +374,6 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 				smessage << "Received unsupported message from master, only PING REQ_KILL or TERMINATE can be sent during model run, not:";
 				smessage << net_pack.pack_strings[static_cast<int>(net_pack.get_type())] << ", run_id: " << net_pack.get_run_id();
 				//terminate_or_restart(-1);
-
 				break;
 			}
 			if (done) break;
@@ -942,6 +941,23 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					report(ss.str(), true);
 					terminate_or_restart(-1);
 				}
+			}
+			else if (final_run_status.first == NetPackage::PackType::CORRUPT_MESG)
+			{
+				ss << "corrupt/incorrect message recieved from master: " << final_run_status.second << ", quitting for safety";
+				net_pack.reset(NetPackage::PackType::RUN_KILLED, group_id, run_id, ss.str());
+				char data;
+				err = send_message(net_pack, &data, 0);
+				if (err.first != 1)
+				{
+					ss.str("");
+					ss << "error sending CORRUPT_MESG message to master: " << err.second << ", terminating";
+					report(ss.str(), true);
+					terminate_or_restart(-1);
+				}
+				report(ss.str(), true);
+				terminate_or_restart(-1);
+
 			}
 			else if (final_run_status.first == NetPackage::PackType::TERMINATE)
 			{

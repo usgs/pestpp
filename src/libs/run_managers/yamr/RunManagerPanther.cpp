@@ -1088,7 +1088,7 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::it
 		if (err.first > 0)
 		{
 			(*it_agent)->set_state(AgentInfoRec::State::ACTIVE, run_id, cur_group_id);
-			report("changed agent " + host_name + ":" + (*it_agent)->get_work_dir() + " to 'active'",false);
+			//report("changed agent " + host_name + ":" + (*it_agent)->get_work_dir() + " to 'active'",false);
 			//start run timer
 			(*it_agent)->start_timer();
 			//reset the last ping time so we don't ping immediately after run is started
@@ -1585,9 +1585,9 @@ void RunManagerPanther::kill_all_active_runs()
 		 iter_b != iter_e; ++iter_b)
 	 {
 		 AgentInfoRec::State cur_state = iter_b->get_state();
-		 ss.str("");
+		 /*ss.str("");
 		 ss << iter_b->get_hostname() << ":" << iter_b->get_work_dir() << "," << iter_b->state_strings[static_cast<int>(cur_state)];
-		 report(ss.str(), false);
+		 report(ss.str(), false);*/
 		 
 		 if (cur_state == AgentInfoRec::State::WAITING)
 		 {

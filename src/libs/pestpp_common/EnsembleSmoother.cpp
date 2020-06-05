@@ -978,7 +978,7 @@ void IterEnsembleSmoother::initialize()
 		message(0, "control file parameter phi report:");
 		ph.report(true);
 		ph.write(0, 1);
-		save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1);
+		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);
 		//ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
 		//Observations obs;
 		//Eigen::VectorXd v = _oe.get_real_vector("BASE");

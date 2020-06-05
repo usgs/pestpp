@@ -956,7 +956,7 @@ void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, Observat
 	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter)
 {
 	stringstream ss;
-	map<string, int> vmap = pe.get_var_map();
+	map<string, int> vmap = pe.get_real_map();
 	if (vmap.find("BASE") != vmap.end())
 	{
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
@@ -970,7 +970,7 @@ void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, Observat
 			*(pts.get_scale_ptr()));
 		file_manager.close_file("par");
 
-		vmap = oe.get_var_map();
+		vmap = oe.get_real_map();
 		if (vmap.find("BASE") == vmap.end())
 		{
 			//message(2, "unable to find 'BASE' realization in obs ensemble for saving .base.rei file, continuing...");

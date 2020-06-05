@@ -1004,6 +1004,15 @@ Ensemble::~Ensemble()
 {
 }
 
+map<string, int> Ensemble::get_real_map()
+{
+
+	map<string, int> real_map;
+	for (int i = 0; i < real_names.size(); i++)
+		real_map[real_names[i]] = i;
+	return real_map;
+}
+
 //Ensemble& Ensemble::operator=(const Ensemble& other)
 //{
 //	if (this != &other)
