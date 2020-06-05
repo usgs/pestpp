@@ -437,7 +437,7 @@ int main(int argc, char* argv[])
 		
 		vector<int> assimilation_cycles;
 		pest_scenario.assign_da_cycles(fout_rec); 
-		assimilation_cycles = pest_scenario.get_assim_cycles();
+		assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec);
 		ParameterEnsemble curr_pe;
 
 		// loop over assimilation cycles

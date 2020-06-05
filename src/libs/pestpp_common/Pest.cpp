@@ -2234,18 +2234,6 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 				ss << m << ",";
 			throw_control_file_error(f_rec, ss.str());
 		}
-		vector<int> cycle_vec;
-		for (auto pp : obs_cycle_map)
-		{
-			cycle_vec.push_back(pp.second);
-		}
-		//catches non-zero-indexing cycle input
-		if (std::all_of(cycle_vec.begin(), cycle_vec.end(), [](int i) {return i != 0; }))
-		{
-			ss.str("");
-			ss << "a cycle of zero does not exist; cycling needs to start at zero for initialization...";
-			throw_control_file_error(f_rec, ss.str());
-		}
 		for (auto oc : obs_cycle_map)
 		{
 			observation_info.get_observation_rec_ptr_4_mod(oc.first)->cycle = oc.second;
@@ -2560,7 +2548,7 @@ void Pest::child_pest_update(int icycle)
 	//this.check_inputs();
 }
 
-vector<int> Pest::get_assim_cycles()
+vector<int> Pest::get_assim_cycles(ofstream& f_rec)
 {
 	int curr_cycle;
 	vector<int> cycles_ordered_list, unique_cycles;
@@ -2584,6 +2572,14 @@ vector<int> Pest::get_assim_cycles()
 		}
 	}
 	sort(unique_cycles.begin(), unique_cycles.end());
+	stringstream ss;
+	//to catch common non-zero-indexing
+	if (unique_cycles.front() != 0)  //recall a cycle of -1 is just a flag
+	{
+		ss.str("");
+		ss << "a cycle with index of zero does not exist; cycling needs to start at zero for initialization...";
+		throw_control_file_error(f_rec, ss.str());;
+	}
 	return unique_cycles;
 	
 
