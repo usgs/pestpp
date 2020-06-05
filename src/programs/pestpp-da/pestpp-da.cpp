@@ -547,7 +547,7 @@ int main(int argc, char* argv[])
 
 			fout_rec.close();			
 		} // end cycle loop
-		cout << endl << endl << "pestpp-ies analysis complete..." << endl;
+		cout << endl << endl << "pestpp-da analysis complete..." << endl;
 		cout << flush;
 		return 0;
 #ifndef _DEBUG
