@@ -334,7 +334,7 @@ pair<int,string>  NetPackage::recv(int sockfd)
 void NetPackage::print_header(std::ostream &fout)
 {
 	fout << "NetPackage: type = " << int(type) <<", group = " << group << ", run_id = " << run_id << ", description = " << desc <<
-		", data package size = " << data.size() << endl;
+		", data package size = " << data.size() <<", pack type = " << pack_strings[static_cast<int>(get_type())] << endl;
 }
 
 

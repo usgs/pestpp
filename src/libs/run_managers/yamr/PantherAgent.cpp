@@ -329,6 +329,7 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 				//cout << "ping request received...";
 				net_pack.reset(NetPackage::PackType::PING, 0, 0, "");
 				const char* data = "\0";
+				report("sending ping response to master",false);
 				err = send_message(net_pack, &data, 0);
 				if (err.first != 1)
 				{
@@ -483,7 +484,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		if (err.first == -999)
 		{
 			ss.str("");
-			ss << "error receiving message from master: " << err.second << " , terminating";
+			ss << "error receiving message from master: " << err.second << " , terminating, header follows:";
+			net_pack.print_header(ss);
 			report(ss.str(), true);
 			//terminate = true;
 			net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "recv security message error");
@@ -500,7 +502,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		if (err.first < 0)
 		{
 			ss.str("");
-			ss << "error receiving message from master: " << err.second << ", terminating";
+			ss << "error receiving message from master: " << err.second << ", terminating, header follows: ";
+			net_pack.print_header(ss);
 			report(ss.str(), true);
 			//terminate = true;
 			terminate_or_restart(-1);
@@ -531,6 +534,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		{
 			// Send Master the local run directory.  This information is only used by the master
 			// for reporting purposes
+			report("responding to REQ_RUNDIR", true);
 			net_pack.reset(NetPackage::PackType::RUNDIR, 0, 0,"");
 			string cwd =  OperSys::getcwd();
 			err = send_message(net_pack, cwd.c_str(), cwd.size());
@@ -544,6 +548,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		}
 		else if (net_pack.get_type() == NetPackage::PackType::PAR_NAMES)
 		{
+			report("received PAR_NAMES", true);
 			//Don't check first8 bytes as these contain an interger which stores the size of the data.
 			bool safe_data = NetPackage::check_string(net_pack.get_data(), 0, net_pack.get_data().size());
 			if (!safe_data)
@@ -611,6 +616,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		}
 		else if (net_pack.get_type() == NetPackage::PackType::OBS_NAMES)
 		{
+			report("received OBS_NAMES", true);
 			//Don't check first8 bytes as these contain an interger which stores the size of the data.
 			bool safe_data = NetPackage::check_string(net_pack.get_data(), 0, net_pack.get_data().size());
 			if (!safe_data)
@@ -678,7 +684,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		}
 		else if(net_pack.get_type() == NetPackage::PackType::REQ_LINPACK)
 		{
-			frec << "running linpack" << endl;
+			report("received REQ_LINPACK",true);
 			linpack_wrap();
 			net_pack.reset(NetPackage::PackType::LINPACK, 0, 0,"");
 			char data;
@@ -833,6 +839,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			}*/
 			
 			//do this after we handle a cycle change so that par_name_vec is updated
+
 			Serialization::unserialize(net_pack.get_data(), pars, par_name_vec);
 			// run model
 			if (pest_scenario.get_pestpp_options().get_panther_debug_loop())

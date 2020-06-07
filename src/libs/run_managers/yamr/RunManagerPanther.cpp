@@ -1144,10 +1144,12 @@ void RunManagerPanther::process_message(int i_sock)
 	if( err.first <=0) // error or lost connection
 	{
 		if (err.first  == -2) {
-			report("received corrupt message from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second + " - terminating agent", false);
+			report("received corrupt message from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second + ", NetPack header follows", false);
+			net_pack.print_header(f_rmr);
 		}
 		else if (err.first < 0) {
-			report("receive failed from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second + " - terminating agent", false);
+			report("receive failed from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second + ", NetPack header follows", false);
+			net_pack.print_header(f_rmr);
 		}
 		else {
 			report("lost connection to agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second, false);
@@ -1156,7 +1158,7 @@ void RunManagerPanther::process_message(int i_sock)
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::CORRUPT_MESG)
 	{
-		report("agent reporting corrupt message: " + host_name + "$" + agent_info_iter->get_work_dir() + " - terminating agent", false);
+		report("agent reporting corrupt message: " + host_name + "$" + agent_info_iter->get_work_dir(), false);
 		close_agent(i_sock);
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::RUNDIR)
@@ -1166,7 +1168,7 @@ void RunManagerPanther::process_message(int i_sock)
 		{
 			string work_dir = NetPackage::extract_string(net_pack.get_data(), 0, net_pack.get_data().size());
 			stringstream ss;
-			ss << "initializing new agent connection from: " << socket_name << ", number of agents: " << socket_to_iter_map.size() << ", working dir: " << work_dir;
+			ss << "initializing new agent connection from: " << agent_info_iter->get_hostname() << "$" << work_dir << ":" << socket_name << ", number of agents: " << socket_to_iter_map.size();
 			report(ss.str(), false);
 			agent_info_iter->set_work_dir(work_dir);
 			agent_info_iter->set_state(AgentInfoRec::State::CWD_RCV);
@@ -1182,12 +1184,12 @@ void RunManagerPanther::process_message(int i_sock)
 		agent_info_iter->end_linpack();
 		agent_info_iter->set_state(AgentInfoRec::State::LINPACK_RCV);
 		stringstream ss;
-		ss << "new agent ready: " << socket_name << ":" << agent_info_iter->get_work_dir();
+		ss << "new agent ready: " << agent_info_iter->get_hostname() << "$" << agent_info_iter->get_work_dir() << ":" << agent_info_iter->get_socket_name() ;
 		report(ss.str(), false);
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::READY)
 	{
-		// ready message received from slave
+		// ready message received from agent
 		agent_info_iter->set_state(AgentInfoRec::State::WAITING);
 	}
 
@@ -1201,7 +1203,8 @@ void RunManagerPanther::process_message(int i_sock)
 		int run_id = net_pack.get_run_id();
 		int group_id = net_pack.get_group_id();
 		stringstream ss;
-		ss << "run " << run_id << " received from unexpected group id: " << group_id << ", should be group: " << cur_group_id << "...ignoring";
+		ss << "run " << run_id << " received from unexpected group id: " << group_id << ", should be group: " << cur_group_id;
+		ss << "from " << agent_info_iter->get_hostname() << "$" << agent_info_iter->get_work_dir() << "...ignoring";
 		report(ss.str(), false);
 		//throw PestError(ss.str());
 	}
