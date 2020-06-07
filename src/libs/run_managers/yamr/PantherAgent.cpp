@@ -377,7 +377,10 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 				//terminate_or_restart(-1);
 				break;
 			}
-			if (done) break;
+			if (done)
+			{
+				break;
+			}
 		}
 		shared_execptions.rethrow();
 		if (!f_terminate.get())
@@ -526,6 +529,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss.str("");
 				ss << "no ping received from master in the last " << max_time_without_master_ping_seconds << " seconds, last ping time: " <<  t_str << ",  terminating";
 				report(ss.str(), true);
+				net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "ping overdue from master, exiting");
+				send_message(net_pack);
 				//terminate = true;
 				terminate_or_restart(-1);
 			}
@@ -862,8 +867,21 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					terminate_or_restart(-1);
 				}
 				ss.str("");
-				ss << "results of run_id " << run_id << "sent";
+				ss << "results of run_id " << run_id << " sent successfully";
 				report(ss.str(), true);
+				ss.str("");
+				ss << "sending ready signal to master";
+				report(ss.str(), true);
+				net_pack.reset(NetPackage::PackType::READY, 0, 0, "lets do it");
+				char data;
+				err = send_message(net_pack, &data, 0);
+				if (err.first != 1)
+				{
+					ss.str("");
+					ss << "error sending READY message to master: " << err.second << ", terminating";
+					report(ss.str(), true);
+					terminate_or_restart(-1);
+				}
 				continue;
 
 			}
@@ -914,7 +932,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					terminate_or_restart(-1);
 				}
 				ss.str("");
-				ss << "results of run_id " << run_id << "sent";
+				ss << "results of run_id " << run_id << "sent successfully";
 				report(ss.str(), true);
 			}
 			else if (final_run_status.first == NetPackage::PackType::RUN_FAILED)
@@ -1039,7 +1057,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 
 void PANTHERAgent::terminate_or_restart(int error_code) const
 {
-	w_sleep(poll_interval_seconds * 1000);
+	
+	w_sleep(poll_interval_seconds * 10000);
 	if(!restart_on_error)
 	{
 		exit(error_code);

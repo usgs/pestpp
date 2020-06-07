@@ -224,7 +224,14 @@ pair<int,string>  NetPackage::recv(int sockfd)
 		header_buf.resize(header_sz, '\0');
 		n = w_recvall(sockfd, &rcv_security_code[0], &rcv_security_code_size);
 		//int security_cmp = memcmp(security_code, rcv_security_code, sizeof(security_code))
-
+		if (n == -1)
+		{
+			return pair<int, string>(-1, "NetPackage::lost connection");
+		}
+		if (n == 0)
+		{
+			return pair<int, string>(0, "NetPackage::connection closed");
+		}
 		sum = 0;
 		bool wrong_code = false;
 		for (int i = 0; i < sizeof(security_code); i++)

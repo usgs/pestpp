@@ -1144,21 +1144,24 @@ void RunManagerPanther::process_message(int i_sock)
 	if( err.first <=0) // error or lost connection
 	{
 		if (err.first  == -2) {
-			report("received corrupt message from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second + ", NetPack header follows", false);
-			net_pack.print_header(f_rmr);
+			report("received corrupt message from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second, false);
 		}
 		else if (err.first < 0) {
-			report("receive failed from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second + ", NetPack header follows", false);
-			net_pack.print_header(f_rmr);
+			report("receive failed from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second, false);
 		}
 		else {
 			report("lost connection to agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second, false);
 		}
 		close_agent(i_sock);
 	}
+	else if (net_pack.get_type() == NetPackage::PackType::TERMINATE)
+	{
+		report("agent exiting: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + net_pack.get_info_txt(), false);
+		close_agent(i_sock);
+	}
 	else if (net_pack.get_type() == NetPackage::PackType::CORRUPT_MESG)
 	{
-		report("agent reporting corrupt message: " + host_name + "$" + agent_info_iter->get_work_dir(), false);
+		report("agent reporting corrupt message: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + net_pack.get_info_txt(), false);
 		close_agent(i_sock);
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::RUNDIR)
@@ -1232,6 +1235,9 @@ void RunManagerPanther::process_message(int i_sock)
 				", run id: " << run_id << " concurrent:" << get_n_concurrent(run_id) << ")";
 			report(ss.str(), false);
 			process_model_run(i_sock, net_pack);
+			ss.str("");
+			ss << "run " << run_id << " processed";
+			report(ss.str(), false);
 		}
 
 
