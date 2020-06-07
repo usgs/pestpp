@@ -1461,12 +1461,26 @@ void IterEnsembleSmoother::initialize()
 
 	}
 
+	if (ph.get_mean(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
+	{	
+		throw_ies_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");	
+	}
+	if (ph.get_std(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
+	{
+		throw_ies_error("initial actual phi stdev too low, something is wrong...");
+	}
+
+
 	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
 	if (last_best_mean < 1.0e-10)
 	{
-		throw_ies_error("initial composite phi too low, something is wrong...");
+		throw_ies_error("initial composite phi mean too low, something is wrong...");
+	}
+	if (last_best_std < 1.0e-10)
+	{
+		throw_ies_error("initial composite phi stdev too low, something is wrong...");
 	}
 	if (last_best_lam <= 0.0)
 	{
