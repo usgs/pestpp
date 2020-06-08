@@ -1005,7 +1005,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		// build weights matrix sqrt(Q)
 		QSqrtMatrix Q_sqrt(obs_info_ptr, prior_info_ptr);
 		//build residuals vector
-		VectorXd residuals_vec = -1.0 * stlvec_2_egienvec(base_run.get_residuals_vec(obs_names_vec));
+		VectorXd residuals_vec = -1.0 * stlvec_2_eigenvec(base_run.get_residuals_vec(obs_names_vec));
 
 		Parameters base_run_active_ctl_par = par_transform.ctl2active_ctl_cp(base_run.get_ctl_pars());
 

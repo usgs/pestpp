@@ -745,7 +745,7 @@ void TranSVD::reverse(Transformable &data)
 	}
 	Transformable ret_base_pars;
 	int n_sing_val = Sigma.size();
-	VectorXd delta_base_mat = Vt.block(0,0,n_sing_val, Vt.cols()).transpose() *  stlvec_2_egienvec(super_par_vec);
+	VectorXd delta_base_mat = Vt.block(0,0,n_sing_val, Vt.cols()).transpose() *  stlvec_2_eigenvec(super_par_vec);
 	for (int i=0; i<n_base; ++i) {
 		ret_base_pars.insert(base_parameter_names[i], delta_base_mat(i) + init_base_numeric_parameters.get_rec(base_parameter_names[i]));
 	}
