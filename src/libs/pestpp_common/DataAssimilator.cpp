@@ -1271,20 +1271,20 @@ void DataAssimilator::initialize(int _icycle)
 	message(2, "checking for denormal values in pe");
 	if (icycle == 0)
 		pe.check_for_normal("initial transformed parameter ensemble");
-	if (false) // we need to save the forecast matrix, not the initial matrix
+	//if (false) // we need to save the forecast matrix, not the initial matrix
+	//{
+	ss.str("");
+	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
-		ss.str("");
-		if (pest_scenario.get_pestpp_options().get_ies_save_binary())
-		{
-			ss << file_manager.get_base_filename() << ".0.par.jcb";
-			pe.to_binary(ss.str());
-		}
-		else
-		{
-			ss << file_manager.get_base_filename() << "_cycle_" << icycle << ".par.csv";
-			pe.to_csv(ss.str());
-		}
+		ss << file_manager.get_base_filename() << "_cycle_" << icycle << ".par.jcb";
+		pe.to_binary(ss.str());
 	}
+	else
+	{
+		ss << file_manager.get_base_filename() << "_cycle_" << icycle << ".par.csv";
+		pe.to_csv(ss.str());
+	}
+	//}
 	message(1, "saved initial parameter ensemble to ", ss.str());
 	message(2, "checking for denormal values in base oe");
 	oe.check_for_normal("base observation ensemble");
