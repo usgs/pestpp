@@ -50,7 +50,7 @@ void get_MatrixXd_row_abs_max(const MatrixXd &m, int row, int *max_col, double *
 	}
 }
 
-VectorXd stlvec_2_egienvec(const std::vector<double> &stl_vec)
+VectorXd stlvec_2_eigenvec(const std::vector<double> &stl_vec)
 {
 	size_t len = stl_vec.size();
 	VectorXd la_vec(len);
@@ -61,7 +61,7 @@ VectorXd stlvec_2_egienvec(const std::vector<double> &stl_vec)
 	return la_vec;
 }
 
-vector<double> egienvec_2_stlvec(const VectorXd &eigen_vec)
+vector<double> eigenvec_2_stlvec(const VectorXd &eigen_vec)
 {
 	size_t len = eigen_vec.size();
 	vector<double> stl_vec;

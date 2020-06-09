@@ -1361,6 +1361,33 @@ int ExternalCtlFile::get_row_idx(string key, string col_name)
 	return idx;
 }
 
+string get_time_string()
+{
+	time_t rawtime;
+	struct tm* timeinfo;
+	char buffer[80];
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	strftime(buffer, 80, "%m/%d/%y %H:%M:%S", timeinfo);
+	string t_str(buffer);
+	return t_str;
+}
+
+string get_time_string_short()
+{
+	time_t rawtime;
+	struct tm* timeinfo;
+	char buffer[80];
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	strftime(buffer, 80, "%m/%d %H:%M:%S", timeinfo);
+	string t_str(buffer);
+	return t_str;
+}
+
+
 } // end of namespace pest_utils
 
 
