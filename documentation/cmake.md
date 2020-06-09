@@ -14,7 +14,8 @@ The normal approach to compile a project with CMake is outside of the source tre
 
 Variables and options are passed to CMake using `-D<var>=<value>` options to the command-line interface.
 
-* `BUILD_SHARED_LIBS=OFF` - Static libraries are built by default, but shared libraries can be enabled by setting value to `ON`.
+* `BUILD_SHARED_LIBS=OFF` - Static libraries are built by default, but shared libraries can be enabled by setting value to `ON`. Note that shared libraries are not actively developed or tested.
+* `FORCE_STATIC=OFF` - Force `-static` flag to link PEST++ applications. This may be required in certain situations to avoid segmentation faults, but is generally not recommended.
 * `CMAKE_BUILD_TYPE` - Specify the build type for single-configuration generators, including Makefile and Ninja. Possible values are `Debug`, `Release`, `RelWithDebInfo`, or `MinSizeRel`.
 * `CMAKE_INSTALL_PREFIX` - If CMake is used to install, specify an install prefix, such as `$HOME/.local`.
 * `CMAKE_CXX_COMPILER` - Normally this is detected, but it can be overridden to use a different C++ compiler.
