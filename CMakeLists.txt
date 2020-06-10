@@ -164,12 +164,8 @@ add_custom_target(local_install
     pestpp-opt
     pestpp-sen
     pestpp-swp
-<<<<<<< HEAD
     pestpp-da
-  COMMENT "Installing local binaries to ${PESTPP_SOURCE_DIR}/bin"
-=======
   COMMENT "Installing local executables to ${PESTPP_SOURCE_DIR}/bin"
->>>>>>> 469dd6558baac4cdcff6287ed707297a5f229ceb
 )
 
 # Packaging
