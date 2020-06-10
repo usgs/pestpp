@@ -38,9 +38,9 @@ public:
 	void init_network(const std::string &host, const std::string &port);
 	void start(const std::string &host, const std::string &port);
 	~PANTHERAgent();
-	int recv_message(NetPackage &net_pack, struct timeval *tv=NULL);
-	int recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs = 0);
-	int send_message(NetPackage &net_pack, const void *data=NULL, unsigned long data_len=0);
+	pair<int,string> recv_message(NetPackage &net_pack, struct timeval *tv=NULL);
+	pair<int,string> recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs = 0);
+	pair<int,string> send_message(NetPackage &net_pack, const void *data=NULL, unsigned long data_len=0);
 	std::pair<NetPackage::PackType,std::string> run_model(Parameters &pars, Observations &obs, NetPackage &net_pack);
 	void process_ctl_file(const string &ctl_filename);
 private:
@@ -83,6 +83,8 @@ private:
 	//Observations ctl_obs;
 	//Parameters ctl_pars;
 	Pest pest_scenario;
+
+	void report(const string& _message, bool to_cout);
 
 };
 

@@ -1,0 +1,185 @@
+                                   MODFLOW 6
+                U.S. GEOLOGICAL SURVEY MODULAR HYDROLOGIC MODEL
+                            VERSION 6.1.0 12/12/2019
+
+   MODFLOW 6 compiled Dec 13 2019 09:25:31 with IFORT compiler (ver. 19.0.5)
+
+This software has been approved for release by the U.S. Geological 
+Survey (USGS). Although the software has been subjected to rigorous 
+review, the USGS reserves the right to update the software as needed 
+pursuant to further analysis and review. No warranty, expressed or 
+implied, is made by the USGS or the U.S. Government as to the 
+functionality of the software and related material nor shall the 
+fact of release constitute any such warranty. Furthermore, the 
+software is released on condition that neither the USGS nor the U.S. 
+Government shall be held liable for any damages resulting from its 
+authorized or unauthorized use. Also refer to the USGS Water 
+Resources Software User Rights Notice for complete use, copyright, 
+and distribution information.
+
+
+System command used to initiate simulation:
+"C:\bin\mf6.exe"
+
+MODFLOW was compiled using uniform precision.
+Real Variables
+  PRECISION: 15
+  KIND: 8
+  TINY (smallest non-zero value):    2.225074-308
+  HUGE (largest value):    1.797693+308
+Integer Variables
+  KIND: 4
+  HUGE (largest value): 2147483647
+  BIT_SIZE: 32
+ 
+
+ OPENED mfsim.nam
+ FILE TYPE:NAM   UNIT 1001   STATUS:OLD                 
+ FORMAT:FORMATTED              ACCESS:SEQUENTIAL          
+ ACTION:READ                
+
+
+ READING SIMULATION OPTIONS
+    SIMULATION WILL CONTINUE EVEN IF THERE IS NONCONVERGENCE.
+ END OF SIMULATION OPTIONS
+
+ READING SIMULATION TIMING
+
+ OPENED freyberg6.tdis
+ FILE TYPE:TDIS   UNIT 1002   STATUS:OLD                 
+ FORMAT:FORMATTED              ACCESS:SEQUENTIAL          
+ ACTION:READ                
+
+
+ TDIS -- TEMPORAL DISCRETIZATION PACKAGE,
+ VERSION 1 : 11/13/2014 - INPUT READ FROM UNIT 1002
+ PROCESSING TDIS OPTIONS
+    SIMULATION TIME UNIT IS DAYS
+ END OF TDIS OPTIONS
+ PROCESSING TDIS DIMENSIONS
+    1 STRESS PERIOD(S) IN SIMULATION
+ END OF TDIS DIMENSIONS
+ PROCESSING TDIS PERIODDATA
+
+
+ STRESS PERIOD     LENGTH       TIME STEPS     MULTIPLIER FOR DELT
+ ----------------------------------------------------------------------------
+        1         31.00000          1                    1.000
+ END OF TDIS PERIODDATA
+ END OF SIMULATION TIMING
+
+ READING SIMULATION MODELS
+    GWF6 model FREYBERG6 will be created as model 1
+ END OF SIMULATION MODELS
+
+ READING SIMULATION EXCHANGES
+ END OF SIMULATION EXCHANGES
+
+ READING SOLUTIONGROUP
+
+ Creating solution: SLN_1           
+
+ OPENED freyberg6.ims
+ FILE TYPE:IMS   UNIT 1015   STATUS:OLD                 
+ FORMAT:FORMATTED              ACCESS:SEQUENTIAL          
+ ACTION:READ                
+
+ END OF SIMULATION SOLUTIONGROUP
+
+ IMS -- ITERATIVE MODEL SOLUTION PACKAGE, VERSION 6, 4/28/2017
+         INPUT READ FROM UNIT 1015
+
+ PROCESSING IMS OPTIONS
+ SIMPLE OPTION:
+ DEFAULT SOLVER INPUT VALUES FOR FAST SOLUTIONS
+ END OF IMS OPTIONS
+
+ PROCESSING IMS NONLINEAR
+ END OF IMS NONLINEAR DATA
+ **UNDER-RELAXATION WILL BE USED***
+ 
+ ***IMS LINEAR SOLVER WILL BE USED***
+
+ IMSLINEAR -- UNSTRUCTURED LINEAR SOLUTION PACKAGE, VERSION 8, 04/28/2017
+
+ PROCESSING LINEAR DATA
+ END OF LINEAR DATA
+ 
+ OUTER ITERATION CONVERGENCE CRITERION     (HCLOSE) =    0.100000E-01
+ OUTER ITERATION BOUNDARY FLOW RESIDUAL (RCLOSEBND) =    0.100000E+00
+ MAXIMUM NUMBER OF OUTER ITERATIONS        (MXITER) =       100
+ SOLVER PRINTOUT INDEX                     (IPRIMS) =         1
+ NONLINEAR ITERATION METHOD            (NONLINMETH) =         3
+ LINEAR SOLUTION METHOD                   (LINMETH) =         1
+ UNDER-RELAXATION WEIGHT REDUCTION FACTOR   (THETA) =    0.850000E+00
+ UNDER-RELAXATION WEIGHT INCREASE INCREMENT (KAPPA) =    0.100000E-04
+ UNDER-RELAXATION PREVIOUS HISTORY FACTOR   (GAMMA) =    0.000000E+00
+ UNDER-RELAXATIONMOMENTUM TERM          (AMOMENTUM) =    0.100000E+00
+    MAXIMUM NUMBER OF BACKTRACKS         (NUMTRACK) =        50
+ BACKTRACKING TOLERANCE FACTOR               (BTOL) =    0.110000E+01
+ BACKTRACKING REDUCTION FACTOR             (BREDUC) =    0.700000E+00
+ BACKTRACKING RESIDUAL LIMIT              (RES_LIM) =    0.100000E+03
+
+       SOLUTION BY THE BICONJUGATE-GRADIENT STABILIZED METHOD
+ ------------------------------------------------------------------
+ MAXIMUM OF    100 CALLS OF SOLUTION ROUTINE
+ MAXIMUM OF     50 INTERNAL ITERATIONS PER CALL TO SOLUTION ROUTINE
+ LINEAR ACCELERATION METHOD            = BCGS      
+ MATRIX PRECONDITIONING TYPE           = INCOMPLETE LUT      
+ MATRIX SCALING APPROACH               = NO SCALING          
+ MATRIX REORDERING APPROACH            = RCM ORDERING             
+ NUMBER OF ORTHOGONALIZATIONS          =        2
+ HEAD CHANGE CRITERION FOR CLOSURE     =    0.10000E-03
+ RESIDUAL CHANGE CRITERION FOR CLOSURE =    0.10000E+00
+ RESIDUAL CONVERGENCE OPTION           =        0
+ RESIDUAL CONVERGENCE NORM             = INFINITY NORM   
+ RELAXATION FACTOR                     =    0.00000E+00
+ NUMBER OF LEVELS                      =              1
+ DROP TOLERANCE                        =    0.10000E-02
+
+
+1
+                            STRESS PERIOD NO.    1, LENGTH =   31.00000    
+                            -----------------------------------------------
+
+                              NUMBER OF TIME STEPS =     1
+
+                               MULTIPLIER FOR DELT =     1.000
+
+                            INITIAL TIME STEP SIZE =   31.00000    
+
+
+ OUTER ITERATION SUMMARY
+ -------------------------------------------------------------------------------------------------------------------------------------------
+                       OUTER     INNER BACKTRACK BACKTRACK        INCOMING        OUTGOING         MAXIMUM                    MAXIMUM CHANGE
+                   ITERATION ITERATION      FLAG    NUMBER        RESIDUAL        RESIDUAL          CHANGE                    MODEL-(CELLID)
+ -------------------------------------------------------------------------------------------------------------------------------------------
+ Backtracking              1                   0         0    2.237762E+06    2.237762E+06
+ Linear Solver             1        50                                                         1036.32                       1_GWF-(1,40,16)
+ Under-relaxation          1                                                                   1036.32                       1_GWF-(1,40,16)
+ Backtracking              2                   0         0     1773.81         1773.81    
+ Linear Solver             2        24                                                        -2.59920                       1_GWF-(1,40,16)
+ Under-relaxation          2                                                                  -2.20932                       1_GWF-(1,40,16)
+ Backtracking              3                   0         0     254.462         254.462    
+ Linear Solver             3        19                                                       -0.373979                       1_GWF-(1,40,16)
+ Under-relaxation          3                                                                 -0.317886                       1_GWF-(1,40,16)
+ Backtracking              4                   0         0     39.2811         39.2811    
+ Linear Solver             4        16                                                       -5.794561E-02                   1_GWF-(1,40,16)
+ Under-relaxation          4                                                                 -4.925492E-02                   1_GWF-(1,40,16)
+ Backtracking              5                   0         0     6.26896         6.26896    
+ Linear Solver             5         6                                                       -8.465043E-03                   1_GWF-(1,40,16)
+
+ 5 CALLS TO NUMERICAL SOLUTION IN TIME STEP 1 STRESS PERIOD 1
+ 115 TOTAL ITERATIONS
+
+ INFORMATION ON VARIABLES STORED IN THE MEMORY MANAGER
+ 
+ Number of allocated integer variables:   151846
+ Number of allocated real variables:    146017
+ Allocated memory in megabytes:     1.77552    
+ 
+
+ Run end date and time (yyyy/mm/dd hh:mm:ss): 2020/06/10 13:49:47
+ Elapsed run time:  0.233 Seconds
+
+ Normal termination of simulation.

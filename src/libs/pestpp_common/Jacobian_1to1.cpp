@@ -283,7 +283,6 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 	int run_status_next;
 	double par_value_next;
 	double cur_numeric_par_value;
-	par_run_map;
 	list<JacobianRun> run_list;
 	
 	//for(; i_run<nruns; ++i_run)

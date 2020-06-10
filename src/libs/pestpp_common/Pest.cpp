@@ -2057,7 +2057,7 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 				{
 					scaling_factor = temp;
 					controlling_par = p.first;
-					control_type == "lower bound";
+					control_type = "lower bound";
 				}
 			}
 		}	

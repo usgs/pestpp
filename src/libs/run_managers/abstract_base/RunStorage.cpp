@@ -515,13 +515,13 @@ int RunStorage::get_run(int run_id, double *pars, size_t npars, double *obs, siz
 	size_t p_size = par_names.size();
 	size_t o_size = obs_names.size();
 
-	assert(npars == p_size);
-	assert(nobs == o_size);
+	//assert(npars == p_size);
+	//assert(nobs == o_size);
 
-	if (npars != npars) {
+	if (npars != p_size) {
 		throw(PestIndexError("RunStorage::get_run: parameter dimension in incorrect"));
 	}
-	if (nobs != nobs) {
+	if (nobs != o_size) {
 		throw(PestIndexError("RunStorage::get_run: observation dimension in incorrect"));
 	}
 
@@ -733,7 +733,7 @@ void RunStorage::export_diff_to_text_file(const std::string &in1_filename, const
 	for (size_t ipar = 0; ipar < npar; ++ipar)
 	{
 		if (par_name_vec_1[ipar] != par_name_vec_2[ipar])
-			fout << "Parmeter name diff index =  " << ipar << ": " << par_name_vec_1[ipar] << ", " << par_name_vec_2[ipar] << endl;
+			fout << "Parameter name diff index =  " << ipar << ": " << par_name_vec_1[ipar] << ", " << par_name_vec_2[ipar] << endl;
 	}
 
 	//check observation names are the same

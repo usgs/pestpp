@@ -51,6 +51,7 @@ public:
 	const Parameters& get_ctl_parameters() const {return ctl_parameters;}
 	Parameters& get_ctl_parameters_4_mod() { return ctl_parameters; }
 	const Observations& get_ctl_observations() const {return observation_values;}
+	Observations& get_ctl_observations_4_mod() { return observation_values;  }
 	const ParameterInfo& get_ctl_parameter_info()const {return ctl_parameter_info;}
 	const ParameterGroupInfo& get_base_group_info() const {return  base_group_info;}
 	ParameterGroupInfo* get_base_group_info_ptr() { return  &base_group_info; }
