@@ -467,6 +467,8 @@ public:
 	bool get_panther_agent_restart_on_error() const { return panther_agent_restart_on_error; }
 	void set_panther_agent_no_ping_timeout_secs(int _timeout_secs) { panther_agent_no_ping_timeout_secs = _timeout_secs; }
 	int get_panther_agent_no_ping_timeout_secs() const { return panther_agent_no_ping_timeout_secs; }
+	void set_panther_debug_loop(bool _flag) { panther_debug_loop = _flag; }
+	bool get_panther_debug_loop() const { return panther_debug_loop; }
 
 	void set_defaults();
 	void summary(ostream& os) const;
@@ -517,6 +519,7 @@ private:
 	double overdue_giveup_minutes;
 	double worker_poll_interval;
 	string condor_submit_file;
+	
 
 	string sweep_parameter_csv_file;
 	string sweep_output_csv_file;
@@ -607,6 +610,7 @@ private:
 
 	bool panther_agent_restart_on_error;
 	int panther_agent_no_ping_timeout_secs;
+	bool panther_debug_loop;
 		
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);

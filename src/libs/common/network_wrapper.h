@@ -28,12 +28,12 @@
 #include <vector>
 #include <string>
 
-void w_init();
+std::string w_init();
 int w_close(int sockfd);
 void w_cleanup();
 std::vector<std::string> w_getnameinfo_vec(int sockfd, int flags=0);
 std::string w_getnameinfo_string(int sockfd, int flags = 0);
-int w_getaddrinfo(const char *node, const char *service,
+std::pair<int,string> w_getaddrinfo(const char *node, const char *service,
 			  const struct addrinfo *hints, struct addrinfo **res);
 int w_socket(int domain, int type, int protocol);
 int w_connect(int sockfd, struct sockaddr *serv_addr, socklen_t addr_len);

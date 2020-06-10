@@ -9,7 +9,7 @@ cd "$script_path"/..
 rm -r build
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icpc ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icpc -DFORCE_STATIC=ON ..
 make -j
 cpack -G TGZ
 cp *.tar.gz ../

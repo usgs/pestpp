@@ -281,7 +281,8 @@ void OutputFileWriter::scenario_report(std::ostream &os, bool report_mode)
 	os << endl << pest_scenario.get_svd_info() << endl;
 	os << endl;
 
-	if ((report_mode) && (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL))
+	if (((report_mode) && (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)) &&
+		(pest_scenario.get_regul_scheme_ptr()))
 	{
 		os << "Regularization information:" << endl;
 		os << setw(0) << "    phimlim = " << pest_scenario.get_regul_scheme_ptr()->get_phimlim() << endl;

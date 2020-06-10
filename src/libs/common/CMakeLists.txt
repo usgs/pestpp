@@ -18,6 +18,9 @@ target_link_libraries(common
   Eigen
   Threads::Threads
 )
+if(FORCE_STATIC)
+  target_link_libraries(common -static)
+endif()
 
 target_compile_features(common PUBLIC cxx_std_11)
 set_target_properties(common PROPERTIES CXX_EXTENSIONS OFF)
