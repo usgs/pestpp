@@ -1,4 +1,4 @@
-// pestpp-ies.cpp : Defines the entry point for the console application.
+// pestpp-mou.cpp : Defines the entry point for the console application.
 //
 
 #include "RunManagerPanther.h" //needs to be first because it includes winsock2.h
@@ -41,7 +41,7 @@ int main(int argc, char* argv[])
 #endif
 		string version = PESTPP_VERSION;
 		cout << endl << endl;
-		cout << "             pestpp-mou: a GLM iterative ensemble smoother" << endl << endl;
+		cout << "             pestpp-mou: multi-objective optimization with uncertainty" << endl << endl;
 		//cout << "                     for PEST(++) datasets " << endl << endl;
 		cout << "                   by the PEST++ development team" << endl;
 		cout << endl << endl << "version: " << version << endl;
@@ -82,9 +82,10 @@ int main(int argc, char* argv[])
 			cerr << "--------------------------------------------------------" << endl;
 			exit(0);
 		}
-
+		// problem formulation
 		Objectives objective_functions;
 		Constraints constraint_functions;
+
 		FileManager file_manager;
 		string filename = complete_path;
 		string pathname = ".";
@@ -242,8 +243,6 @@ int main(int argc, char* argv[])
 		}
 		pest_scenario.check_inputs(fout_rec);
 		
-
-
 		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
 		pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
@@ -257,10 +256,8 @@ int main(int argc, char* argv[])
 			output_file_writer.scenario_par_report(fout_rec);
 			output_file_writer.scenario_obs_report(fout_rec);
 		}
-		
-		
 
-		//reset some default args for ies here:
+		//reset some default args here:
 		PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
 		set<string> pp_args = ppo->get_passed_args();
 		if (pp_args.find("MAX_RUN_FAIL") == pp_args.end())
