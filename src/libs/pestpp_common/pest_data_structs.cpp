@@ -1022,6 +1022,11 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		da_par_cycle_table = org_value;
 		return true;
 	}
+	else if (key == "DA_OBSERVATION_CYCLE_TABLE")
+	{
+		da_obs_cycle_table = org_value;
+		return true;
+	}
 	else if (key == "PANTHER_DEBUG_LOOP")
 	{
 		panther_debug_loop = pest_utils::parse_string_arg_to_bool(value);
@@ -1208,6 +1213,7 @@ void PestppOptions::summary(ostream& os) const
 	
 	os << "pestpp-da options:" << endl;
 	os << "da_parameter_cycle_table: " << da_par_cycle_table << endl;
+	os << "da_observation_cycle_table: " << da_obs_cycle_table << endl;
 
 	os << endl;
 	os << "panther_agent_restart_on_error: " << panther_agent_restart_on_error << endl;
@@ -1328,6 +1334,8 @@ void PestppOptions::set_defaults()
 
 	// DA parameters
 	set_da_use_ies(false);
+	set_da_par_cycle_table("");
+	set_da_obs_cycle_table("");
 
 	// End of DA parameters
 	set_gsa_method("MORRIS");
@@ -1352,7 +1360,7 @@ void PestppOptions::set_defaults()
 	set_fill_tpl_zeros(false);
 	set_additional_ins_delimiters("");
 
-	set_da_par_cycle_table("");
+	
 
 	set_panther_agent_restart_on_error(false);
 	set_panther_agent_no_ping_timeout_secs(-1);

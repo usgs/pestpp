@@ -1271,7 +1271,7 @@ void IterEnsembleSmoother::initialize()
 		vector<int> failed_idxs = run_ensemble(_pe, _oe);
 		if (failed_idxs.size() != 0)
 		{
-			message(0, "mean parmeter value run failed...bummer");
+			message(0, "mean parameter value run failed...bummer");
 			return;
 		}
 		string obs_csv = file_manager.get_base_filename() + ".mean.obs.csv";

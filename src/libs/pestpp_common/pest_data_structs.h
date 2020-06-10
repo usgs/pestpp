@@ -491,6 +491,9 @@ public:
 
 	string get_da_par_cycle_table() const { return da_par_cycle_table; }
 	void set_da_par_cycle_table(string _filename) { da_par_cycle_table = _filename; }
+	string get_da_obs_cycle_table() const { return da_obs_cycle_table; }
+	void set_da_obs_cycle_table(string _filename) { da_obs_cycle_table = _filename; }
+
 
 	void set_defaults();
 	void summary(ostream& os) const;
@@ -636,6 +639,7 @@ private:
 	string gsa_sobol_par_dist;
 
 	string da_par_cycle_table;
+	string da_obs_cycle_table;
 
 	bool panther_agent_restart_on_error;
 	int panther_agent_no_ping_timeout_secs;

@@ -733,7 +733,7 @@ void RunStorage::export_diff_to_text_file(const std::string &in1_filename, const
 	for (size_t ipar = 0; ipar < npar; ++ipar)
 	{
 		if (par_name_vec_1[ipar] != par_name_vec_2[ipar])
-			fout << "Parmeter name diff index =  " << ipar << ": " << par_name_vec_1[ipar] << ", " << par_name_vec_2[ipar] << endl;
+			fout << "Parameter name diff index =  " << ipar << ": " << par_name_vec_1[ipar] << ", " << par_name_vec_2[ipar] << endl;
 	}
 
 	//check observation names are the same

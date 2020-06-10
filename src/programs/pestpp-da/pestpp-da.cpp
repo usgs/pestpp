@@ -317,121 +317,13 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
 		}
 
+
+
 		//process da par cycle table
-		filename = pest_scenario.get_pestpp_options().get_da_par_cycle_table();
-		map<int, map<string, double>> par_cycle_info;
-		if (filename.size() > 0)
-		{
-			fout_rec << "processing 'DA_PARAMETER_CYCLE_TABLE' file " << filename;
-			pest_utils::ExternalCtlFile cycle_table(fout_rec, filename);
-			cycle_table.read_file();
-			vector<string> col_names = cycle_table.get_col_names();
-			fout_rec << "...using the first column ('" << col_names[0] << "') as parameter names" << endl;
-			vector<string> pnames = pest_scenario.get_ctl_ordered_par_names();
-			set<string> par_names(pnames.begin(), pnames.end());
-			pnames = cycle_table.get_col_string_vector(col_names[0]);
-			ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
-			vector<string> missing, notfixed, notneg, tbl_par_names;
-			
-			for (auto pname : pnames)
-			{
-				pest_utils::upper_ip(pname);
-				if (par_names.find(pname) == par_names.end())
-				{
-					missing.push_back(pname);
-					continue;
-				}
-				else if (pi.get_parameter_rec_ptr(pname)->tranform_type != ParameterRec::TRAN_TYPE::FIXED)
-				{
-					notfixed.push_back(pname);
-					continue;
-				}
-				else if (pi.get_parameter_rec_ptr(pname)->cycle != -1)
-				{
-					notneg.push_back(pname);
-					continue;
-				}
-				else
-				{
-					tbl_par_names.push_back(pname);
-				}
-			}
-			if (missing.size() > 0)
-			{
-				fout_rec << "ERROR: The following parameters in DA_PARAMETER_CYCLE_TABLE are not the control file:" << endl;
-				for (auto p : missing)
-				{
-					fout_rec << p << endl;
-				}
-				throw runtime_error("DA_PARAMTER_CYCLE_TABLE contains missing parameters, see rec file for listing");
-			}
-			if (notfixed.size() > 0)
-			{
-				fout_rec << "ERROR: The following parameters in DA_PARAMETER_CYCLE_TABLE are not 'fixed':" << endl;
-				for (auto p : notfixed)
-				{
-					fout_rec << p << endl;
-				}
-				throw runtime_error("DA_PARAMTER_CYCLE_TABLE contains non-fixed parameters, see rec file for listing");
-			}
-			if (notneg.size() > 0)
-			{
-				fout_rec << "ERROR: The following parameters in DA_PARAMETER_CYCLE_TABLE do not have cycle=-1:" << endl;
-				for (auto p : notneg)
-				{
-					fout_rec << p << endl;
-				}
-				throw runtime_error("DA_PARAMTER_CYCLE_TABLE contains parameters with cycle!=-1, see rec file for listing");
-			}
-			//process the remaining columns - these should be cycle numbers
-			string col_name;
-			vector<string> cycle_vals;
-			int cycle;
-			double val;
-			bool parse_fail = false;
-			for (int i = 1; i < col_names.size(); i++)
-			{
-				col_name = col_names[i];
-				
-				try
-				{
-					cycle = stoi(col_name);
-				}
-				catch (...)
-				{
-					fout_rec << "ERROR: could not parse DA_PARAMETER_CYCLE_TABLE column '" << col_name << "' to integer" << endl;
-					throw runtime_error("ERROR parsing DA_PARAMETER CYCLE TABLE column " + col_name + " to integer");
-				}
-				if (par_cycle_info.find(cycle) != par_cycle_info.end())
-				{
-					throw runtime_error("ERROR: DA_PARAMETER_CYCLE_TABLE cycle column '" + col_name + "' listed more than once");
-				}
-				cycle_vals = cycle_table.get_col_string_vector(col_name);
-				map<string, double> cycle_map;
-				for (int i = 0; i < cycle_vals.size(); i++)
-				{
-					try
-					{
-						val = stod(cycle_vals[i]);
-					}
-					catch (...)
-					{
-						fout_rec << "WARNING: error parsing '" << cycle_vals[i] << "' for parameter " << tbl_par_names[i] << " in cycle " << cycle << ", continuing..." << endl;
-						parse_fail = true;
-						continue;
-					}
-					cycle_map[tbl_par_names[i]] = val;
-				}
-				par_cycle_info[cycle] = cycle_map;
-			}
-			if (parse_fail)
-			{
-				cout << "WARNING: error parsing at least one cycle-based parameter value" << endl;
-				cout << "         from DA_PARAMETER_CYCLE_TABLE, see rec file for listing." << endl;
-			}
-
-
-		}
+		map<int, map<string, double>> par_cycle_info = process_da_par_cycle_table(pest_scenario, fout_rec);
+		// process da obs cycle table
+		set<string> obs_in_tbl; //we need this so we can set weights to zero in childpest if a value isnt listed for a given cycle
+		map<int, map<string, double>> obs_cycle_info = process_da_obs_cycle_table(pest_scenario, fout_rec, obs_in_tbl);
 		// loop over assimilation cycles
 
 		
@@ -489,21 +381,40 @@ int main(int argc, char* argv[])
 
 			ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq_4_mod();
 			
-			//check for entries in the cycle table
+			//check for entries in the par cycle table
 			if (par_cycle_info.find(*icycle) != par_cycle_info.end())
 			{
+				Parameters pars = childPest.get_ctl_parameters_4_mod();
+				TranFixed* fixed_ptr = base_trans_seq.get_fixed_ptr_4_mod();
 				map<string, double> cycle_map = par_cycle_info[*icycle];
 				for (auto item : cycle_map)
 				{
-					base_trans_seq.get_fixed_ptr_4_mod()->insert(item.first, item.second);
-					childPest.get_ctl_parameters_4_mod().update_rec(item.first, item.second);
+					fixed_ptr->insert(item.first, item.second);
+					pars.update_rec(item.first, item.second);
+				}
+			}
+			//check for entries in the obs cycle table
+			if (obs_cycle_info.find(*icycle) != obs_cycle_info.end())
+			{
+				Observations obs = childPest.get_ctl_observations();
+				ObservationInfo* oi_ptr = childPest.get_observation_info_ptr();
+				map<string, double> cycle_map = obs_cycle_info[*icycle];
+				for (auto tbl_obs_name : obs_in_tbl)
+				{
+					if (cycle_map.find(tbl_obs_name) == cycle_map.end())
+					{
+						oi_ptr->set_weight(tbl_obs_name,0.0);
+					}
+					else
+					{
+						obs.update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);
+					}
 				}
 			}
 
 			Parameters par1 = childPest.get_ctl_parameters();
 			base_trans_seq.ctl2numeric_ip(par1);
 			base_trans_seq.numeric2model_ip(par1);
-
 
 			ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
 
