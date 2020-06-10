@@ -77,7 +77,6 @@
     <ClCompile Include="Localizer.cpp" />
     <ClCompile Include="logger.cpp" />
     <ClCompile Include="ModelRunPP.cpp" />
-    <ClCompile Include="MultiPest.cpp" />
     <ClCompile Include="ObjectiveFunc.cpp" />
     <ClCompile Include="OutputFileWriter.cpp" />
     <ClCompile Include="ParamTransformSeq.cpp" />
