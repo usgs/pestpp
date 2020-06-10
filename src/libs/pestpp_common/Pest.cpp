@@ -2548,7 +2548,7 @@ void Pest::child_pest_update(int icycle)
 	//this.check_inputs();
 }
 
-vector<int> Pest::get_assim_cycles()
+vector<int> Pest::get_assim_cycles(ofstream& f_rec)
 {
 	int curr_cycle;
 	vector<int> cycles_ordered_list, unique_cycles;
@@ -2572,6 +2572,14 @@ vector<int> Pest::get_assim_cycles()
 		}
 	}
 	sort(unique_cycles.begin(), unique_cycles.end());
+	stringstream ss;
+	//to catch common non-zero-indexing
+	if (unique_cycles.front() != 0)  //recall a cycle of -1 is just a flag
+	{
+		ss.str("");
+		ss << "a cycle with index of zero does not exist; cycling needs to start at zero for initialization...";
+		throw_control_file_error(f_rec, ss.str());;
+	}
 	return unique_cycles;
 	
 
