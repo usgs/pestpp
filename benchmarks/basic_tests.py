@@ -878,7 +878,7 @@ if __name__ == "__main__":
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    # secondary_marker_test()
+    #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
@@ -889,3 +889,4 @@ if __name__ == "__main__":
     #tplins1_test()
     #ext_stdcol_test()
     parallel_consist_test()
+    ext_stdcol_test()

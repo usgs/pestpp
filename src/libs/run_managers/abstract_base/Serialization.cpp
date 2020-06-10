@@ -125,16 +125,8 @@ vector<int8_t> Serialization::serialize(const Parameters &pars, const Observatio
 vector<int8_t> Serialization::serialize(const Parameters &pars, const vector<string> &par_names_vec, const Observations &obs, const vector<string> &obs_names_vec, double run_time)
 {
 
-	//assert(pars.size() == par_names_vec.size());
-	//assert(obs.size() == obs_names_vec.size());
-	if (pars.size() != par_names_vec.size())
-	{
-		throw runtime_error("Serialization::serialize() error: pars.size() != par_names_vec.size()");
-	}
-	if (obs.size() != obs_names_vec.size())
-	{
-		throw runtime_error("Serialization::serialize() error: obs.size() != obs_names_vec.size()");
-	}
+	assert(pars.size() == par_names_vec.size());
+	assert(obs.size() == obs_names_vec.size());
 	vector<int8_t> serial_data;
 	size_t npar = par_names_vec.size();
 	size_t nobs = obs_names_vec.size();

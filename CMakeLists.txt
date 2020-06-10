@@ -74,7 +74,10 @@ else()
   set(Fortran_ENABLED FALSE)
 endif()
 
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
+message(STATUS "CMAKE_THREAD_LIBS_INIT=${CMAKE_THREAD_LIBS_INIT}")
 
 # Ensure C++11 is used
 set(CMAKE_CXX_STANDARD 11)
@@ -93,8 +96,11 @@ if(WIN32)
   add_compile_definitions(_WIN32_WINNT=0x0600)
 endif()
 
-option(BUILD_SHARED_LIBS "Build PEST++ shared (default is static)" OFF)
+option(BUILD_SHARED_LIBS "Build PEST++ shared (default is static, OFF)" OFF)
 message(STATUS "BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}")
+
+option(FORCE_STATIC "Force '-static' flag to link applications (default OFF)" OFF)
+message(STATUS "FORCE_STATIC=${FORCE_STATIC}")
 
 # Default install directories
 include(GNUInstallDirs)
@@ -117,8 +123,20 @@ else()
   set(_ostag "unknown")
 endif()
 
+# Detect if using a 32-bit compiler, show warning and modify _ostag
+if(CMAKE_SIZEOF_VOID_P STREQUAL 4)
+  message(WARNING
+    "A 32-bit compiler has been detected. It is recommended that "
+    "PEST++ should be compiled using a 64-bit compiler.")
+  set(_ostag "${_ostag}32")
+endif()
+
 # Use a custom command to locally install binaries after compiling
 # https://www.linux.com/training-tutorials/cmake-recipe-2-install-local-folder-build-dir-testing/
+option(INSTALL_LOCAL "Install local executables in ./bin" ON)
+if(INSTALL_LOCAL)
+  set(_OPTION_INSTALL_LOCAL_ALL ALL)
+endif()
 # Use an extra command to copy binaries into a sub-directory within bin -- please remove soon
 if(WIN32)
   set(_local_install_COMMAND_to_be_removed
@@ -135,7 +153,7 @@ else()
   )
 endif()
 add_custom_target(local_install
-  ALL
+  ${_OPTION_INSTALL_LOCAL_ALL}
   "${CMAKE_COMMAND}"
     -D CMAKE_INSTALL_PREFIX=${PESTPP_SOURCE_DIR}
     -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_install.cmake"
@@ -146,8 +164,12 @@ add_custom_target(local_install
     pestpp-opt
     pestpp-sen
     pestpp-swp
+<<<<<<< HEAD
     pestpp-da
   COMMENT "Installing local binaries to ${PESTPP_SOURCE_DIR}/bin"
+=======
+  COMMENT "Installing local executables to ${PESTPP_SOURCE_DIR}/bin"
+>>>>>>> 469dd6558baac4cdcff6287ed707297a5f229ceb
 )
 
 # Packaging

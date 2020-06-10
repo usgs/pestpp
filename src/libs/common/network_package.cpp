@@ -22,7 +22,7 @@ bool NetPackage::allowable_ascii_char(int8_t value)
 	// This is for security resasons.  Only \0
 	//  and printable characters are allowed
 	bool ret_val = false;
-	if (value == 0 || (value >= 32 && value <= 176))
+	if (value == 0 || (value >= 32 && value <= 126))
 		ret_val = true;
 	return ret_val;
 }
@@ -120,6 +120,9 @@ NetPackage::NetPackage(PackType _type, int _group, int _run_id, const string &de
 	}
 	//strncpy(desc, desc_str.c_str(), DESC_LEN-1);
 	data_len = 1;
+	pack_strings = vector<std::string>({ "unkn", "ok", "confirm_ok", "ready", "req_rundir", "rundir", "req_linpack", "linpack", "par_names",
+	"obs_names","start_run","run_finished","run_failed","run_killed","terminate","ping","req_kill","io_error","corrupt_mesg",
+		"debug_loop" });
 }
 void NetPackage::reset(PackType _type, int _group, int _run_id, const string &_desc)
 {
@@ -145,16 +148,19 @@ void NetPackage::reset(PackType _type, int _group, int _run_id, const string &_d
 	data.clear();
 }
 
-int NetPackage::send(int sockfd, const void *data, int64_t data_len_l)
+std::pair<int,std::string> NetPackage::send(int sockfd, const void *data, int64_t data_len_l)
 {
 	int n;
 
 	// first send security code
 	int64_t security_code_size = sizeof(security_code);
+	int i = 0;
 	n = w_sendall(sockfd, &security_code[0], &security_code_size);
-	if (n<1) {
-		cerr << "NetPackage::send error: could not send security code" << endl;
-		return n;
+	
+	if (n < 1)
+	{
+		//cerr << "NetPackage::send error: could not send security code" << endl;
+		return pair<int,string>(n,"NetPackage::send error: could not send security code");
 	}
 	int64_t buf_sz = 0;
 	//calculate the size of buffer
@@ -184,15 +190,23 @@ int NetPackage::send(int sockfd, const void *data, int64_t data_len_l)
 		i_start += data_len_l;
 	}
 	n = w_sendall(sockfd, buf.data(), &buf_sz);
-	if (i_start != buf_sz) {
-		cerr << "NetPackage::send error: could only send" << i_start
-			<< " out of " << buf_sz << "bytes" << endl;
-		n = -2;
+	if (n < 1)
+	{
+		//cerr << "NetPackage::send error: could not send data" << endl;
+		return pair<int,string> (n, "NetPackage::send error : could not send data");
 	}
-	return n;  // return -2 on corrupt send, -1 on failure, 0 closed connection or 1 on success
+	if (i_start != buf_sz) {
+		stringstream ss;
+		ss << "NetPackage::send error: could only send" << i_start
+			<< " out of " << buf_sz << "bytes" << endl;
+		return pair<int, string>(-2, ss.str());
+	}
+	stringstream ss;
+	ss << "sent " << buf_sz << " bytes";
+	return pair<int,string>(n,ss.str());  // return -2 on corrupt send, -1 on failure, 0 closed connection or 1 on success
 }
 
-int  NetPackage::recv(int sockfd)
+pair<int,string>  NetPackage::recv(int sockfd)
 {
 	long n;
 	int64_t header_sz = 0;
@@ -202,7 +216,7 @@ int  NetPackage::recv(int sockfd)
 	int temp,temp1,temp2, sum;
 	int64_t rcv_security_code_size = sizeof(rcv_security_code);
 	bool corrupt_desc = false;
-
+	stringstream ss;
 	try{
 		//get header (ie size, seq_id, id and name)
 		header_sz = sizeof(buf_sz) + sizeof(type) + sizeof(group) + sizeof(run_id) + sizeof(desc);
@@ -210,7 +224,14 @@ int  NetPackage::recv(int sockfd)
 		header_buf.resize(header_sz, '\0');
 		n = w_recvall(sockfd, &rcv_security_code[0], &rcv_security_code_size);
 		//int security_cmp = memcmp(security_code, rcv_security_code, sizeof(security_code))
-
+		if (n == -1)
+		{
+			return pair<int, string>(-1, "NetPackage::lost connection");
+		}
+		if (n == 0)
+		{
+			return pair<int, string>(0, "NetPackage::connection closed");
+		}
 		sum = 0;
 		bool wrong_code = false;
 		for (int i = 0; i < sizeof(security_code); i++)
@@ -225,29 +246,34 @@ int  NetPackage::recv(int sockfd)
 		}
 		if (sum == 0)
 		{
-			cerr << "NetPackage::recv empty security code, terminating connection..." << endl;
-			return -2;
+			//cerr << "NetPackage::recv empty security code, terminating connection..." << endl;
+			return pair<int,string> (-2, "NetPackage::recv empty security code");
 		}
 		if (wrong_code) //(security_cmp != 0)
 		{
 			// corrupt message; message did not originate from a PEST++ application
-			cerr << "NetPackage::recv wrong security code: ";
-			cerr << " raw value, int cast: ";
+			//cerr << "NetPackage::recv wrong security code: ";
+			//cerr << " raw value, int cast: ";
+			ss.str("");
+			ss << "NetPackage::recv wrong security code: ";
 			for (int i = 0; i < sizeof(security_code); i++)
 			{
 				temp = int(rcv_security_code[i]);
-				cerr << rcv_security_code[i] << "," << temp << "; ";
+				ss << rcv_security_code[i] << "," << temp << "; ";
 			}
-			cerr << endl;
+			//cerr << endl;
 			n = -2;
-			return n;
+			return pair<int,string> (n,ss.str());
 		}
 
 		n = w_recvall(sockfd, &header_buf[0], &header_sz);
+		
+		ss << "recv'd " << buf_sz << " bytes";
 		if (n > 0 && header_sz != header_buf.size()) {
 			// corrupt message; message not the correct length
 			n = -2;
-			cerr << "NetPackage::recv error reading header: expected" << header_buf.size()
+			ss.str("");
+			ss << "NetPackage::recv error reading header: expected" << header_buf.size()
 				<< " bytes, but received " << header_sz << "bytes" << endl;
 		}
 		else if (n > 0) {
@@ -269,7 +295,9 @@ int  NetPackage::recv(int sockfd)
 				{
 					corrupt_desc = true;
 					n = -2;
-					return n;
+					ss.str("");
+					ss << "non - ascii char in header buffer at position " << i << ": " << header_buf[i_start + i];
+					return pair<int,string> (n,ss.str());
 				}
 				else
 				{
@@ -286,7 +314,8 @@ int  NetPackage::recv(int sockfd)
 				if (data_len != buf_sz - header_sz)
 				{
 					n = -2;
-					cerr << "NetPackage::recv error reading data: expected" << buf_sz - header_sz
+					ss.str("");
+					ss << "NetPackage::recv error reading data: expected" << buf_sz - header_sz
 						<< " bytes, but received " << data_len << "bytes" << endl;
 				}
 			}
@@ -295,21 +324,24 @@ int  NetPackage::recv(int sockfd)
 	}
 	catch (exception& e)
 	{
-		cerr << "NetPackage::recv error" << endl;
-		cerr << e.what() << endl;;
+		ss.str("");
+		ss << "NetPackage::recv error: ";
+		ss << e.what();
 		n = -1;
 	}
 	catch (...)
 	{
+		ss.str("");
+		ss << "uncaught exception in NetPackage::recv";
 		n = -1;
 	}
-	return n;  // -2 on corrupt read, -1 on failure, 0 on a close connection or 1 on success
+	return pair<int,string> (n,ss.str());  // -2 on corrupt read, -1 on failure, 0 on a close connection or 1 on success
 }
 
 void NetPackage::print_header(std::ostream &fout)
 {
 	fout << "NetPackage: type = " << int(type) <<", group = " << group << ", run_id = " << run_id << ", description = " << desc <<
-		", data package size = " << data.size() << endl;
+		", data package size = " << data.size() <<", pack type = " << pack_strings[static_cast<int>(get_type())] << endl;
 }
 
 

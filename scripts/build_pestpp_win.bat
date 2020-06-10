@@ -1,3 +1,8 @@
+@echo off
+
+set first_path=%cd%
+cd "%~dp0\.."
+
 rmdir /Q /S bin
 rmdir /Q /S build
 mkdir build
@@ -17,5 +22,5 @@ cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
 ninja
 cpack -G ZIP
 copy /y *.zip ..\
-cd ..
+cd %first_path%
 pause

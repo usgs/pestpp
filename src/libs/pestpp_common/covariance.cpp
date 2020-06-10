@@ -845,8 +845,6 @@ Mat Mat::get(const vector<string> &new_row_names, const vector<string> &new_col_
 
 	const string *row_name;
 	const string *col_name;
-	col_names;
-	row_names;
 	std::vector<Eigen::Triplet<double> > triplet_list;
 	for (int icol = 0; icol<matrix.outerSize(); ++icol)
 	{
@@ -1355,7 +1353,9 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 					// keep line in original case to preserve filename
 					line.erase(remove(line.begin(), line.end(), '\"'), line.end());
 					line.erase(remove(line.begin(), line.end(), '\''), line.end());
-					if (line.find("END") != string::npos) break;
+					string upper_line = line;
+					pest_utils::upper_ip(upper_line);
+					if (upper_line.find("END") != string::npos) break;
 
 					tokens.clear();
 					pest_utils::tokenize(line, tokens);
