@@ -38,6 +38,7 @@ public:
 	void init_network(const std::string &host, const std::string &port);
 	void start(const std::string &host, const std::string &port);
 	~PANTHERAgent();
+
 	pair<int,string> recv_message(NetPackage &net_pack, struct timeval *tv=NULL);
 	pair<int,string> recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs = 0);
 	pair<int,string> send_message(NetPackage &net_pack, const void *data=NULL, unsigned long data_len=0);

@@ -859,6 +859,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss << "PANTHER_DEBUG_LOOP = true, returning ctl obs values";
 				
 				report(ss.str(), true);
+				
 				serialized_data = Serialization::serialize(pars, par_name_vec, obs, obs_name_vec, run_time);
 				ss.str("");
 				ss << "debug loop returning ctl obs for run_id, group_id: " << run_id << "," << group_id;
@@ -867,7 +868,6 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				if (err.first != 1)
 				{
 					ss.str("");
-					
 					ss << "error sending RUN_FINISHED message to master: " << err.second << ", terminating";
 					report(ss.str(), true);
 					terminate_or_restart(-1);
@@ -938,7 +938,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					terminate_or_restart(-1);
 				}
 				ss.str("");
-				ss << "results of run_id " << run_id << "sent successfully";
+				ss << "results of run_id " << run_id << " sent successfully";
 				report(ss.str(), true);
 			}
 			else if (final_run_status.first == NetPackage::PackType::RUN_FAILED)
