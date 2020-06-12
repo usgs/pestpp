@@ -2723,8 +2723,15 @@ void ObservationEnsemble::update_from_obs(string real_name, Observations &obs)
 	update_from_obs(real - start, obs);
 }
 
-vector<int> ObservationEnsemble::update_from_runs(map<int,int> &real_run_ids, RunManagerAbstract *run_mgr_ptr)
+vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr)
 {
+	ParameterEnsemble run_mgr_pe(pest_scenario_ptr, rand_gen_ptr);
+	return update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe);
+}
+
+vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe)
+{
+
 	//update the obs ensemble in place from the run manager
 	set<int> failed_runs = run_mgr_ptr->get_failed_run_ids();
 	vector<int> failed_real_idxs;

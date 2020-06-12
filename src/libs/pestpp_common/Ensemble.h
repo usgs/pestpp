@@ -184,6 +184,8 @@ public:
 	void from_eigen_mat(Eigen::MatrixXd mat, const vector<string> &_real_names, const vector<string> &_var_names);
 	void from_binary(string file_name);// { Ensemble::from_binary(file_name, true); }
 	vector<int> update_from_runs(map<int,int> &real_run_ids, RunManagerAbstract *run_mgr_ptr);
+	vector<int> update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe);
+
 	void draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
 	void initialize_without_noise(int num_reals);
 	//ObservationEnsemble get_mean_diff();

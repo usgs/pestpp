@@ -1089,9 +1089,18 @@ def da_prep_4_freyberg_seq():
 
 
     # now add a tdis tpl for perlen
-    tdis_file = os.path.join(new_ws,"freyberg6.tdis")
-    lines = open()
-
+    tdis_file = os.path.join(seq_ws,"freyberg6.tdis")
+    lines = open(tdis_file,'r').readlines()
+    with open(tdis_file+".tpl",'w') as f:
+        f.write("ptf ~\n")
+        for line in lines:
+            if "TSMULT" in line.upper():
+                raw = line.strip().split()
+                raw[0] = "~     perlen   ~"
+                line = ' '.join(raw) + "\n"
+            f.write(line)
+    pst.add_parameters(tdis_file+".tpl",pst_path='.')
+    
 
 if __name__ == "__main__":
     

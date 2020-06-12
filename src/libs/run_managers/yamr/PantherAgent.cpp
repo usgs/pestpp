@@ -714,6 +714,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			//so that I can pull in the run mgr message passing enhancements
 			//will uncommented later when merging in pestpp-da
 			pest_utils::upper_ip(info_txt);
+			int da_cycle = NetPackage::NULL_DA_CYCLE;
 			if (info_txt.find("DA_CYCLE=") != string::npos)
 			{
 				frec << "Note: 'DA_CYCLE' information passed in START_RUN command" << endl;
@@ -722,7 +723,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				cout << "      info txt for group_id:run_id " << group_id << ":" << run_id << endl;
 				vector<string> tokens,ttokens;
 				pest_utils::tokenize(info_txt, tokens, " ");
-				int da_cycle = NetPackage::NULL_DA_CYCLE;
+				
 				for (auto token : tokens)
 				{
 					if (token.find("=") != string::npos)
@@ -852,6 +853,17 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			
 			//do this after we handle a cycle change so that par_name_vec is updated
 			Serialization::unserialize(net_pack.get_data(), pars, par_name_vec);
+
+			/*frec << "parameters for run_id: " << run_id << ", group_id: " << group_id;
+			if (da_cycle != NetPackage::NULL_DA_CYCLE)
+				frec << ", da_cycle: " << da_cycle;
+			frec << endl << "name value " << endl;
+
+			for (auto name : par_name_vec)
+			{
+				frec << name << " " << pars.get_rec(name) << endl;
+			}*/
+
 			// run model
 			if (pest_scenario.get_pestpp_options().get_panther_debug_loop())
 			{
@@ -872,6 +884,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					report(ss.str(), true);
 					terminate_or_restart(-1);
 				}
+				
 				ss.str("");
 				ss << "results of run_id " << run_id << " sent successfully";
 				report(ss.str(), true);
