@@ -2759,7 +2759,8 @@ vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, R
 			run_mgr_ptr->get_run(real_run_id.second, pars, obs);
 			//real_name = real_names[real_run_id.first];
 			update_from_obs(real_run_id.first, obs);
-			run_mgr_pe.update_real_ip(real_names[real_run_id.first], pars.get_data_eigen_vec(var_names));
+			Eigen::VectorXd real = pars.get_data_eigen_vec(var_names);
+			run_mgr_pe.update_real_ip(real_names[real_run_id.first], real);
 			//update_from_obs(ireal, obs);
 		}
 	}
