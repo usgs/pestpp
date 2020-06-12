@@ -343,6 +343,11 @@ int main(int argc, char* argv[])
 			cout << " >>>> Assimilating data in cycle " << *icycle << endl;
 			cout << " =======================================" << endl;
 
+			fout_rec << endl;
+			fout_rec << " =======================================" << endl;
+			fout_rec << " >>>> Assimilating data in cycle " << *icycle << endl;
+			fout_rec << " =======================================" << endl;
+
 			Pest childPest;
 			childPest = pest_scenario.get_child_pest(*icycle);
 			vector <string> xxxx=childPest.get_ctl_ordered_par_names();
@@ -459,8 +464,9 @@ int main(int argc, char* argv[])
 			}
 
 
-			fout_rec.close();			
+					
 		} // end cycle loop
+		fout_rec.close();
 		cout << endl << endl << "pestpp-da analysis complete..." << endl;
 		cout << flush;
 		return 0;

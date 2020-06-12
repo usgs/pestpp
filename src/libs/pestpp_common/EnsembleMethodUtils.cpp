@@ -994,3 +994,133 @@ void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, Observat
 
 }
 
+
+vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,ParameterEnsemble& _pe, ObservationEnsemble& _oe, 
+	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, int da_cycle)
+{
+	stringstream ss;
+	ss << "queuing " << _pe.shape().first << " runs";
+	performance_log->log_event(ss.str());
+	run_mgr_ptr->reinitialize();
+	map<int, int> real_run_ids;
+	try
+	{
+		real_run_ids = _pe.add_runs(run_mgr_ptr, real_idxs,da_cycle);
+	}
+	catch (const exception& e)
+	{
+		ss.str("");
+		ss << "run_ensemble() error queueing runs: " << e.what();
+		throw runtime_error(ss.str());
+	}
+	catch (...)
+	{
+		throw runtime_error(string("run_ensemble() error queueing runs"));
+	}
+	performance_log->log_event("making runs");
+	try
+	{
+		run_mgr_ptr->run();
+	}
+	catch (const exception& e)
+	{
+		ss.str("");
+		ss << "error running ensemble: " << e.what();
+		throw runtime_error(ss.str());
+	}
+	catch (...)
+	{
+		throw runtime_error(string("error running ensemble"));
+	}
+
+	performance_log->log_event("processing runs");
+	if (real_idxs.size() > 0)
+	{
+		_oe.keep_rows(real_idxs);
+	}
+	vector<int> failed_real_indices;
+	ParameterEnsemble run_mgr_pe;
+	try
+	{
+		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe);
+	} 
+	catch (const exception& e)
+	{
+		ss.str("");
+		ss << "error processing runs: " << e.what();
+		throw runtime_error(ss.str());
+	}
+	catch (...)
+	{
+		throw runtime_error(string("error processing runs"));
+	}
+	
+	if (failed_real_indices.size() > 0)
+	{
+		ss.str("");
+		vector<string> par_real_names = _pe.get_real_names();
+		vector<string> obs_real_names = _oe.get_real_names();
+		ss << "the following par:obs realization runs failed: ";
+		for (auto& i : failed_real_indices)
+		{
+			ss << par_real_names[i] << ":" << obs_real_names[i] << ',';
+		}
+		performance_log->log_event(ss.str());
+		performance_log->log_event("dropping failed realizations");
+		_pe.drop_rows(failed_real_indices);
+		_oe.drop_rows(failed_real_indices);
+	}
+	if (check_pe_consistency)
+	{
+		if (_pe.shape().first != run_mgr_pe.shape().first)
+		{
+			ss.str("");
+			ss << "error checking pe consistency: run_mgr_pe has different number of rows than _pe: " << run_mgr_pe.shape().first << " vs " << _pe.shape().first;
+			throw runtime_error(ss.str());
+		}
+		run_mgr_pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+		if (_pe.shape().second != run_mgr_pe.shape().second)
+		{
+			ss.str("");
+			ss << "error checking pe consistency: run_mgr_pe has different number of columns than _pe: " << run_mgr_pe.shape().second << " vs " << _pe.shape().second;
+			throw runtime_error(ss.str());
+		}
+
+		
+		Eigen::VectorXd org_real, new_real, diff;
+		double percent_diff_max;
+		int max_idx;
+		vector<string> real_names = _pe.get_real_names(), par_names = _pe.get_var_names();
+		ss.str("");
+		frec << "checking for consistency in parameter ensemble" << endl;
+		frec << "   full listing of consistency check results:" << endl;
+		vector<string> failing_reals;
+		for (auto rri : real_run_ids)
+		{
+			org_real = _pe.get_real_vector(rri.first);
+			new_real = run_mgr_pe.get_real_vector(rri.first);
+			diff = (org_real.array() - new_real.array()).cwiseAbs();
+			diff = 100.0 * diff.cwiseQuotient(org_real);
+			percent_diff_max = diff.maxCoeff(&max_idx);
+			frec << "   realization: " << real_names[rri.first] << ", run_id: " << rri.second << ", max % diff: " << percent_diff_max << " at parameter: " << par_names[max_idx] << endl;
+			if (percent_diff_max > 2.0)
+			{
+				failing_reals.push_back(real_names[rri.first]);
+			}
+		}
+		if (failing_reals.size() > 0)
+		{
+			cout << "parameter ensemble consisteny check failed for " << failing_reals.size() << ", see .rec file for listing" << endl;
+			frec << "ERROR: the following realizations failed consistency check:" << endl;
+			for (auto fr : failing_reals)
+				frec << fr << ",";
+			frec << endl;
+			throw runtime_error("parameter ensemble consistency check failed, see .rec file");
+			
+			
+
+		}
+	}
+	return failed_real_indices;
+}
+
