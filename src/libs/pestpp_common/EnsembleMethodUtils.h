@@ -120,4 +120,9 @@ private:
 void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
 	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter);
 
+vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
+	ObservationEnsemble& _oe, RunManagerAbstract* run_mgr_ptr,
+	bool check_pe_consistency = false, const vector<int>& real_idxs = vector<int>(),int da_cycle=NetPackage::NULL_DA_CYCLE);
+
+
 #endif

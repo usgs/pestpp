@@ -134,9 +134,9 @@ int main(int argc, char* argv[])
 					cerr << "PANTHER worker requires the master be specified as /H hostname:port" << endl << endl;
 					throw(PestCommandlineError(commandline));
 				}
-				ofstream frec("panther_worker.rec");
+				ofstream frec("panther_agent.rec");
 				if (frec.bad())
-					throw runtime_error("error opening 'panther_worker.rec'");
+					throw runtime_error("error opening 'panther_agent.rec'");
 				PANTHERAgent yam_agent(frec);
 				string ctl_file = "";
 				try {
@@ -298,7 +298,10 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_max_run_fail(),
 				pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
 				pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
-				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes());
+				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
+				pest_scenario.get_ctl_ordered_par_names(),
+				pest_scenario.get_ctl_ordered_obs_names());
+			run_manager_ptr->initialize(pest_scenario.get_ctl_parameters(), pest_scenario.get_ctl_observations());
 		}
 		else
 		{
@@ -340,6 +343,11 @@ int main(int argc, char* argv[])
 			cout << " >>>> Assimilating data in cycle " << *icycle << endl;
 			cout << " =======================================" << endl;
 
+			fout_rec << endl;
+			fout_rec << " =======================================" << endl;
+			fout_rec << " >>>> Assimilating data in cycle " << *icycle << endl;
+			fout_rec << " =======================================" << endl;
+
 			Pest childPest;
 			childPest = pest_scenario.get_child_pest(*icycle);
 			vector <string> xxxx=childPest.get_ctl_ordered_par_names();
@@ -358,7 +366,7 @@ int main(int argc, char* argv[])
 
 			if (run_manager_type == RunManagerType::PANTHER)
 			{
-				//dont do anything here...
+				run_manager_ptr->initialize(childPest.get_ctl_parameters(), childPest.get_ctl_observations());
 			}
 			else
 			{
@@ -456,8 +464,9 @@ int main(int argc, char* argv[])
 			}
 
 
-			fout_rec.close();			
+					
 		} // end cycle loop
+		fout_rec.close();
 		cout << endl << endl << "pestpp-da analysis complete..." << endl;
 		cout << flush;
 		return 0;

@@ -270,7 +270,7 @@ int AgentInfoRec::seconds_since_last_ping_time() const
 
 
 RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& _port, ofstream& _f_rmr, int _max_n_failure,
-	double _overdue_reched_fac, double _overdue_giveup_fac, double _overdue_giveup_minutes)
+	double _overdue_reched_fac, double _overdue_giveup_fac, double _overdue_giveup_minutes, const vector<string>& par_names,const vector<string>& obs_names)
 	: RunManagerAbstract(vector<string>(), vector<string>(), vector<string>(),
 		vector<string>(), vector<string>(), stor_filename, _max_n_failure),
 	overdue_reched_fac(_overdue_reched_fac), overdue_giveup_fac(_overdue_giveup_fac),
@@ -323,7 +323,8 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	f_rmr << endl;
 	cout << "PANTHER master listening on socket: " << w_get_addrinfo_string(connect_addr) << endl;
 	f_rmr << "PANTHER master listening on socket:" << w_get_addrinfo_string(connect_addr) << endl;
-	
+	par_names_to_check_worker = par_names;
+	obs_names_to_check_worker = obs_names;
 	
 }
 
@@ -360,6 +361,7 @@ void RunManagerPanther::initialize(const Parameters &model_pars, const Observati
 {
 	RunManagerAbstract::initialize(model_pars, obs, _filename);
 	cur_group_id = NetPackage::get_new_group_id();
+	
 }
 
 void RunManagerPanther::initialize_restart(const std::string &_filename)
@@ -1441,12 +1443,20 @@ void RunManagerPanther::kill_all_active_runs()
 			vector<int8_t> data;
 			vector<string> tmp_vec;
 			// send parameter names
-			tmp_vec = file_stor.get_par_name_vec();
+			if (par_names_to_check_worker.size() > 0)
+				tmp_vec = par_names_to_check_worker;
+			else
+				tmp_vec = file_stor.get_par_name_vec();
 			data = Serialization::serialize(tmp_vec);
 			pair<int,string> err_par = net_pack.send(i_sock, &data[0], data.size());
+			
 			//send observation names
 			net_pack = NetPackage(NetPackage::PackType::OBS_NAMES, 0, 0, "");
-			tmp_vec = file_stor.get_obs_name_vec();
+			// send parameter names
+			if (obs_names_to_check_worker.size() > 0)
+				tmp_vec = obs_names_to_check_worker;
+			else
+				tmp_vec = file_stor.get_obs_name_vec();
 			data = Serialization::serialize(tmp_vec);
 			pair<int,string> err_obs = net_pack.send(i_sock, &data[0], data.size());
 

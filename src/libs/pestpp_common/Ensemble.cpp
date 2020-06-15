@@ -2723,15 +2723,29 @@ void ObservationEnsemble::update_from_obs(string real_name, Observations &obs)
 	update_from_obs(real - start, obs);
 }
 
-vector<int> ObservationEnsemble::update_from_runs(map<int,int> &real_run_ids, RunManagerAbstract *run_mgr_ptr)
+vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr)
 {
+	ParameterEnsemble run_mgr_pe(pest_scenario_ptr, rand_gen_ptr);
+	return update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe);
+}
+
+vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe)
+{
+	//run_mgr_pe is reset here and filled with the parameter value from the run mgr - these can be used to check that the 
+	//par values from the run mgr are consistent with what par values were desired
+
 	//update the obs ensemble in place from the run manager
+	
 	set<int> failed_runs = run_mgr_ptr->get_failed_run_ids();
 	vector<int> failed_real_idxs;
 	Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 	Observations obs = pest_scenario_ptr->get_ctl_observations();
 	string real_name;
 	int ireal = 0;
+	run_mgr_pe = ParameterEnsemble(pest_scenario_ptr, rand_gen_ptr);
+	vector<string> var_names = pars.get_keys();
+	run_mgr_pe.reserve(real_names,var_names);
+	run_mgr_pe.set_zeros();
 	for (auto &real_run_id : real_run_ids)
 	{
 		if (failed_runs.find(real_run_id.second) != failed_runs.end())
@@ -2745,6 +2759,8 @@ vector<int> ObservationEnsemble::update_from_runs(map<int,int> &real_run_ids, Ru
 			run_mgr_ptr->get_run(real_run_id.second, pars, obs);
 			//real_name = real_names[real_run_id.first];
 			update_from_obs(real_run_id.first, obs);
+			Eigen::VectorXd real = pars.get_data_eigen_vec(var_names);
+			run_mgr_pe.update_real_ip(real_names[real_run_id.first], real);
 			//update_from_obs(ireal, obs);
 		}
 	}

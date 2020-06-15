@@ -714,6 +714,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			//so that I can pull in the run mgr message passing enhancements
 			//will uncommented later when merging in pestpp-da
 			pest_utils::upper_ip(info_txt);
+			int da_cycle = NetPackage::NULL_DA_CYCLE;
 			if (info_txt.find("DA_CYCLE=") != string::npos)
 			{
 				frec << "Note: 'DA_CYCLE' information passed in START_RUN command" << endl;
@@ -722,7 +723,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				cout << "      info txt for group_id:run_id " << group_id << ":" << run_id << endl;
 				vector<string> tokens,ttokens;
 				pest_utils::tokenize(info_txt, tokens, " ");
-				int da_cycle = NetPackage::NULL_DA_CYCLE;
+				
 				for (auto token : tokens)
 				{
 					if (token.find("=") != string::npos)
@@ -852,6 +853,17 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			
 			//do this after we handle a cycle change so that par_name_vec is updated
 			Serialization::unserialize(net_pack.get_data(), pars, par_name_vec);
+
+			/*frec << "parameters for run_id: " << run_id << ", group_id: " << group_id;
+			if (da_cycle != NetPackage::NULL_DA_CYCLE)
+				frec << ", da_cycle: " << da_cycle;
+			frec << endl << "name value " << endl;
+
+			for (auto name : par_name_vec)
+			{
+				frec << name << " " << pars.get_rec(name) << endl;
+			}*/
+
 			// run model
 			if (pest_scenario.get_pestpp_options().get_panther_debug_loop())
 			{
@@ -859,6 +871,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss << "PANTHER_DEBUG_LOOP = true, returning ctl obs values";
 				
 				report(ss.str(), true);
+				
 				serialized_data = Serialization::serialize(pars, par_name_vec, obs, obs_name_vec, run_time);
 				ss.str("");
 				ss << "debug loop returning ctl obs for run_id, group_id: " << run_id << "," << group_id;
@@ -867,11 +880,11 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				if (err.first != 1)
 				{
 					ss.str("");
-					
 					ss << "error sending RUN_FINISHED message to master: " << err.second << ", terminating";
 					report(ss.str(), true);
 					terminate_or_restart(-1);
 				}
+				
 				ss.str("");
 				ss << "results of run_id " << run_id << " sent successfully";
 				report(ss.str(), true);
@@ -938,7 +951,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					terminate_or_restart(-1);
 				}
 				ss.str("");
-				ss << "results of run_id " << run_id << "sent successfully";
+				ss << "results of run_id " << run_id << " sent successfully";
 				report(ss.str(), true);
 			}
 			else if (final_run_status.first == NetPackage::PackType::RUN_FAILED)

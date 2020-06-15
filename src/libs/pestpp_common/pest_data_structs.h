@@ -494,6 +494,8 @@ public:
 	string get_da_obs_cycle_table() const { return da_obs_cycle_table; }
 	void set_da_obs_cycle_table(string _filename) { da_obs_cycle_table = _filename; }
 
+	bool get_debug_check_par_en_consistency() const { return debug_check_paren_consistency; }
+	void set_debug_check_par_en_consistency(bool _flag) { debug_check_paren_consistency = _flag; }
 
 	void set_defaults();
 	void summary(ostream& os) const;
@@ -644,6 +646,7 @@ private:
 	bool panther_agent_restart_on_error;
 	int panther_agent_no_ping_timeout_secs;
 	bool panther_debug_loop;
+	bool debug_check_paren_consistency;
 		
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);
