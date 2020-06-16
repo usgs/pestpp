@@ -442,7 +442,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 		}
 
 		//build residuals vector
-		VectorXd residuals_vec = -1.0 * stlvec_2_egienvec(base_run.get_residuals_vec(obs_names_vec));
+		VectorXd residuals_vec = -1.0 * stlvec_2_eigenvec(base_run.get_residuals_vec(obs_names_vec));
 
 		//Build model runs
 		run_manager.reinitialize(file_manager.build_filename("rnu"));

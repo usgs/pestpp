@@ -74,7 +74,10 @@ else()
   set(Fortran_ENABLED FALSE)
 endif()
 
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
+message(STATUS "CMAKE_THREAD_LIBS_INIT=${CMAKE_THREAD_LIBS_INIT}")
 
 # Ensure C++11 is used
 set(CMAKE_CXX_STANDARD 11)
@@ -93,8 +96,11 @@ if(WIN32)
   add_compile_definitions(_WIN32_WINNT=0x0600)
 endif()
 
-option(BUILD_SHARED_LIBS "Build PEST++ shared (default is static)" OFF)
+option(BUILD_SHARED_LIBS "Build PEST++ shared (default is static, OFF)" OFF)
 message(STATUS "BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}")
+
+option(FORCE_STATIC "Force '-static' flag to link applications (default OFF)" OFF)
+message(STATUS "FORCE_STATIC=${FORCE_STATIC}")
 
 # Default install directories
 include(GNUInstallDirs)
@@ -115,6 +121,14 @@ elseif(UNIX)
   set(_ostag "linux")
 else()
   set(_ostag "unknown")
+endif()
+
+# Detect if using a 32-bit compiler, show warning and modify _ostag
+if(CMAKE_SIZEOF_VOID_P STREQUAL 4)
+  message(WARNING
+    "A 32-bit compiler has been detected. It is recommended that "
+    "PEST++ should be compiled using a 64-bit compiler.")
+  set(_ostag "${_ostag}32")
 endif()
 
 # Use a custom command to locally install binaries after compiling

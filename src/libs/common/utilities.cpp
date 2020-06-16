@@ -1142,7 +1142,7 @@ void ExternalCtlFile::read_file()
 	
 	getline(f_in, org_header_line);
 	header_line = upper_cp(org_header_line);
-	
+	f_rec << "...header line: " << header_line << endl;
 	tokenize(header_line, col_names, delim,false);
 	int hsize = col_names.size();
 	set<string> tset;
@@ -1194,6 +1194,7 @@ void ExternalCtlFile::read_file()
 		strip_ip(next_line, "both");
 		if ((next_line.size() == 0) || (next_line.substr(0,1) == "#"))
 		{
+			f_rec << "... skipping comment line in external file:" << endl << org_next_line << endl;
 			lcount++;
 			continue;
 		}
@@ -1248,6 +1249,7 @@ void ExternalCtlFile::read_file()
 		row_order.push_back(lcount - 1);
 		lcount++;
 	}
+	f_rec << "...read " << lcount << " lines from external file" << endl;
 
 }
 
@@ -1360,6 +1362,33 @@ int ExternalCtlFile::get_row_idx(string key, string col_name)
 	int idx = distance(col_vector.begin(), it);
 	return idx;
 }
+
+string get_time_string()
+{
+	time_t rawtime;
+	struct tm* timeinfo;
+	char buffer[80];
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	strftime(buffer, 80, "%m/%d/%y %H:%M:%S", timeinfo);
+	string t_str(buffer);
+	return t_str;
+}
+
+string get_time_string_short()
+{
+	time_t rawtime;
+	struct tm* timeinfo;
+	char buffer[80];
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	strftime(buffer, 80, "%m/%d %H:%M:%S", timeinfo);
+	string t_str(buffer);
+	return t_str;
+}
+
 
 } // end of namespace pest_utils
 

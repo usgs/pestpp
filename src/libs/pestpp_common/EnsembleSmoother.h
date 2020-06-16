@@ -20,8 +20,6 @@
 
 
 
-
-
 class LocalUpgradeThread
 {
 public:
