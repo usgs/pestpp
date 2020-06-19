@@ -978,24 +978,7 @@ void IterEnsembleSmoother::initialize()
 		message(0, "control file parameter phi report:");
 		ph.report(true);
 		ph.write(0, 1);
-		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);
-		//ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
-		//Observations obs;
-		//Eigen::VectorXd v = _oe.get_real_vector("BASE");
-		//vector<double> vv;
-		//vv.resize(v.size());
-		//Eigen::VectorXd::Map(&vv[0], v.size()) = v;
-		//obs.update(_oe.get_var_names(), vv);
-	
-		//// save parameters to .par file
-		//output_file_writer.write_par(file_manager.open_ofile_ext("base.par"),pars, *(pts.get_offset_ptr()),
-		//	*(pts.get_scale_ptr()));
-		//file_manager.close_file("par");
-
-		//// save new residuals to .rei file
-		//output_file_writer.write_rei(file_manager.open_ofile_ext("base.rei"), 0,
-		//	pest_scenario.get_ctl_observations(),obs,obj_func,pars);
-			
+		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);			
 		return;
 	}
 
@@ -1188,6 +1171,39 @@ void IterEnsembleSmoother::initialize()
 		}
 		else
 			add_bases();
+
+
+	//now we check to see if we need to try to align the par and obs en
+	//this would only be needed if either of these were not drawn
+	if (!pe_drawn || !oe_drawn)
+	{
+		bool aligned = pe.try_align_other_rows(performance_log, oe);
+		if (aligned)
+		{
+			message(2, "observation ensemble reordered to align rows with parameter ensemble");
+		}
+	}
+
+	//just check to see if common real names are found but are not in the same location
+	map<string, int> pe_map = pe.get_real_map(), oe_map = oe.get_real_map();
+	vector<string> misaligned;
+	for (auto item : pe_map)
+	{
+		if (oe_map.find(item.first) == oe_map.end())
+			continue;
+		if (item.second != oe_map[item.first])
+			misaligned.push_back(item.first);
+	}
+	if (misaligned.size() > 0)
+	{
+		message(1, "WARNING: common realization names shared between the parameter and observation ensembles but they are not in the same row locations, see .rec file for listing");
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << endl <<  "WARNING: the following " << misaligned.size() << " realization names are shared between the parameter and observation ensembles but they are not in the same row locations:" << endl;
+		for (auto ma : misaligned)
+			frec << ma << endl;
+	}
+
+
 
 	message(2, "checking for denormal values in pe");
 	pe.check_for_normal("initial transformed parameter ensemble");

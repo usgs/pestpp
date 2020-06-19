@@ -931,24 +931,6 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter)
 	}
 	cout << endl;
 	frec << endl;
-	vector<string> rnames = pe.get_real_names();
-
-	if (find(rnames.begin(), rnames.end(), "BASE") != rnames.end())
-	{
-		Eigen::VectorXd v = pe.get_real_vector("BASE");
-
-		Parameters pars = pe.get_pest_scenario_ptr()->get_ctl_parameters();
-		pars.update(pe.get_var_names(), eigenvec_2_stlvec(v));
-		pe.get_pest_scenario_ptr()->get_base_par_tran_seq().numeric2ctl_ip(pars);
-		// save parameters to .par file
-		ss.str("");
-		ss << file_manager_ptr->get_base_filename() << "." << iiter << ".par";
-		string filename = ss.str();
-		output_file_writer_ptr->write_par(file_manager_ptr->open_ofile_absolute("par",filename), pars, *(pe.get_pest_scenario_ptr()->get_base_par_tran_seq().get_offset_ptr()),
-			*(pe.get_pest_scenario_ptr()->get_base_par_tran_seq().get_scale_ptr()));
-		file_manager_ptr->close_file("par");
-	}
-
 }
 
 
