@@ -909,6 +909,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 
 			std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
 			pair<NetPackage::PackType,std::string> final_run_status = run_model(pars, obs, net_pack);
+			
 			if (final_run_status.first == NetPackage::PackType::RUN_FINISHED)
 			{
 				double run_time = pest_utils::get_duration_sec(start_time);
@@ -949,6 +950,28 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					ss << "error sending RUN_FAILED message to master: " << err.second << ", terminating";
 					report(ss.str(), true);
 					terminate_or_restart(-1);
+				}
+				if (pest_scenario.get_pestpp_options().get_panther_debug_fail_freeze())
+				{
+					ss.str("");
+					ss << "debug_panther_fail_freeze = true, entering frozen state...";
+					report(ss.str(), true);
+					net_pack.reset(NetPackage::PackType::DEBUG_FAIL_FREEZE, group_id, run_id, final_run_status.second);
+					char data;
+					err = send_message(net_pack, &data, 0);
+					if (err.first != 1)
+					{
+						ss.str("");
+						ss << "error sending DEBUG_FAIL_FREEZE message to master: " << err.second << "...freezing anyway";
+						report(ss.str(), true);
+					}
+					while (true)
+					{
+						ss.str("");
+						ss << "frozen";
+						report(ss.str(), true);
+						w_sleep(30 * 1000);
+					}
 				}
 			}
 			else if (final_run_status.first == NetPackage::PackType::RUN_KILLED)
