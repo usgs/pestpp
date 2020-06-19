@@ -62,3 +62,4 @@ pest++/sweep/sweep
 *.u2d
 *.log
 /src/UpgradeLog.htm
+*_z
