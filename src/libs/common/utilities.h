@@ -229,6 +229,8 @@ bool check_exist_in(std::string filename);
 
 bool check_exist_out(std::string filename);
 
+void try_clean_up_run_storage_files(const string& case_name);
+
 pair<string, string> parse_plusplus_line(const string& line);
 
 //template <class dataType>
