@@ -12,6 +12,7 @@
 #include "OutputFileWriter.h"
 
 #include "Pest.h"
+#include "config_os.h"
 
 using namespace pest_utils;
 
@@ -27,9 +28,10 @@ PANTHERAgent::PANTHERAgent(ofstream &_frec)
 
 void PANTHERAgent::init_network(const string &host, const string &port)
 {
+	report("initializing network connection", true);
 	w_init();
 
-
+	stringstream ss;
 	pair<int,string> status;
 	struct addrinfo hints;
 	struct addrinfo *servinfo;
@@ -45,13 +47,15 @@ void PANTHERAgent::init_network(const string &host, const string &port)
 	status = w_getaddrinfo(host.c_str(), port.c_str(), &hints, &servinfo);
 	if (status.first != 0)
 	{
-		cout << "ERROR: getaddrinfo returned non-zero: " << status.second << endl;
+		ss.str("");
+		ss << "ERROR: getaddrinfo returned non-zero: " << status.second;
+		report(ss.str(), true);
 		throw(PestError("ERROR: getaddrinfo returned non-zero: " + status.second));
 	}
 	w_print_servinfo(servinfo, cout);
 	cout << endl;
 	// connect
-	stringstream ss;
+	ss.str("");
 	ss << "PANTHER Agent will poll for master connection every " << poll_interval_seconds << " seconds" << endl;
 	report(ss.str(), true);
 	addrinfo* connect_addr = nullptr;
@@ -88,6 +92,19 @@ PANTHERAgent::~PANTHERAgent()
 
 void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 {
+	string version = PESTPP_VERSION;
+	frec << "panther agent starting..." << endl;
+	frec << "using control file: \"" << ctl_filename << "\"" << endl << endl;
+	frec << endl << endl << "version: " << version << endl;
+	frec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+	frec << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+
+	cout << "panther agent starting..." << endl;
+	cout << "using control file: \"" << ctl_filename << "\"" << endl << endl;
+	cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+
+	report("processing control file", true);
+
 	ifstream fin;
 	long lnum;
 	long sec_begin_lnum;

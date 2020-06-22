@@ -468,7 +468,6 @@ int main(int argc, char* argv[])
 			fout_rec << "             pestpp-swp.exe - a parameteric sweep utility" << endl << "for PEST(++) datasets " << endl << endl;
 			fout_rec << "                 by the PEST++ developement team" << endl << endl << endl;
 			fout_rec << endl;
-			fout_rec << "using control file: \"" << complete_path << "\"" << endl << endl;
 			fout_rec << endl << endl << "version: " << version << endl;
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 			fout_rec << "using control file: \"" << complete_path << "\"" << endl << endl;
