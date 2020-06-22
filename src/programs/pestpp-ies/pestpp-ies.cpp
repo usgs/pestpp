@@ -334,6 +334,10 @@ int main(int argc, char* argv[])
 		// clean up
 		fout_rec.close();
 		delete run_manager_ptr;
+		string case_name = file_manager.get_base_filename();
+		file_manager.close_file("rst");
+		pest_utils::try_clean_up_run_storage_files(case_name);
+		
 		cout << endl << endl << "pestpp-ies analysis complete..." << endl;
 		cout << flush;
 		return 0;
@@ -349,7 +353,8 @@ int main(int argc, char* argv[])
 	}
 	catch (...)
 	{
-		cout << "Error condition prevents further execution: " << endl;
+		cout << "Error condition prevents further execution" << endl;
+		return 1;
 	}
 #endif
 }

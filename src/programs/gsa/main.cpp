@@ -433,6 +433,11 @@ int main(int argc, char* argv[])
 	file_manager.close_file("msn");
 	file_manager.close_file("orw");
 	delete run_manager_ptr;
+
+	string case_name = file_manager.get_base_filename();
+	file_manager.close_file("rst");
+	pest_utils::try_clean_up_run_storage_files(case_name);
+
 	cout << endl << endl << "PESTPP-SEN Analysis Complete..." << endl;
 	return 0;
 	//cout << endl << "Simulation Complete - Press RETURN to close window" << endl;
@@ -446,6 +451,11 @@ int main(int argc, char* argv[])
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));
+		return 1;
+	}
+	catch (...)
+	{
+		cout << "Error condition prevents further execution" << endl;
 		return 1;
 	}
 
