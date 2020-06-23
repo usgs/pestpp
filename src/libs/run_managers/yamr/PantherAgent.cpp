@@ -12,6 +12,7 @@
 #include "OutputFileWriter.h"
 
 #include "Pest.h"
+#include "config_os.h"
 
 using namespace pest_utils;
 
@@ -27,9 +28,10 @@ PANTHERAgent::PANTHERAgent(ofstream &_frec)
 
 void PANTHERAgent::init_network(const string &host, const string &port)
 {
+	report("initializing network connection", true);
 	w_init();
 
-
+	stringstream ss;
 	pair<int,string> status;
 	struct addrinfo hints;
 	struct addrinfo *servinfo;
@@ -45,13 +47,15 @@ void PANTHERAgent::init_network(const string &host, const string &port)
 	status = w_getaddrinfo(host.c_str(), port.c_str(), &hints, &servinfo);
 	if (status.first != 0)
 	{
-		cout << "ERROR: getaddrinfo returned non-zero: " << status.second << endl;
+		ss.str("");
+		ss << "ERROR: getaddrinfo returned non-zero: " << status.second;
+		report(ss.str(), true);
 		throw(PestError("ERROR: getaddrinfo returned non-zero: " + status.second));
 	}
 	w_print_servinfo(servinfo, cout);
 	cout << endl;
 	// connect
-	stringstream ss;
+	ss.str("");
 	ss << "PANTHER Agent will poll for master connection every " << poll_interval_seconds << " seconds" << endl;
 	report(ss.str(), true);
 	addrinfo* connect_addr = nullptr;
@@ -88,6 +92,19 @@ PANTHERAgent::~PANTHERAgent()
 
 void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 {
+	string version = PESTPP_VERSION;
+	frec << "panther agent starting..." << endl;
+	frec << "using control file: \"" << ctl_filename << "\"" << endl << endl;
+	frec << endl << endl << "version: " << version << endl;
+	frec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+	frec << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+
+	cout << "panther agent starting..." << endl;
+	cout << "using control file: \"" << ctl_filename << "\"" << endl << endl;
+	cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+
+	report("processing control file", true);
+
 	ifstream fin;
 	long lnum;
 	long sec_begin_lnum;
@@ -909,6 +926,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 
 			std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
 			pair<NetPackage::PackType,std::string> final_run_status = run_model(pars, obs, net_pack);
+			
 			if (final_run_status.first == NetPackage::PackType::RUN_FINISHED)
 			{
 				double run_time = pest_utils::get_duration_sec(start_time);
@@ -949,6 +967,28 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					ss << "error sending RUN_FAILED message to master: " << err.second << ", terminating";
 					report(ss.str(), true);
 					terminate_or_restart(-1);
+				}
+				if (pest_scenario.get_pestpp_options().get_panther_debug_fail_freeze())
+				{
+					ss.str("");
+					ss << "debug_panther_fail_freeze = true, entering frozen state...";
+					report(ss.str(), true);
+					net_pack.reset(NetPackage::PackType::DEBUG_FAIL_FREEZE, group_id, run_id, final_run_status.second);
+					char data;
+					err = send_message(net_pack, &data, 0);
+					if (err.first != 1)
+					{
+						ss.str("");
+						ss << "error sending DEBUG_FAIL_FREEZE message to master: " << err.second << "...freezing anyway";
+						report(ss.str(), true);
+					}
+					while (true)
+					{
+						ss.str("");
+						ss << "frozen";
+						report(ss.str(), true);
+						w_sleep(30 * 1000);
+					}
 				}
 			}
 			else if (final_run_status.first == NetPackage::PackType::RUN_KILLED)
