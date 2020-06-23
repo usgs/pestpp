@@ -34,6 +34,7 @@
 #include "PriorInformation.h"
 #include "debug.h"
 #include "eigen_tools.h"
+#include "Pest.h"
 
 using namespace std;
 using namespace pest_utils;
@@ -77,7 +78,30 @@ void Jacobian::remove_cols(std::set<string> &rm_parameter_names)
 	auto end_iter = std::remove_if(base_numeric_par_names.begin(), base_numeric_par_names.end(),
 		[&rm_parameter_names](string &str)->bool{return rm_parameter_names.find(str) != rm_parameter_names.end(); });
 	base_numeric_par_names.resize(std::distance(base_numeric_par_names.begin(), end_iter));
-	matrix_del_cols(matrix, del_col_ids);
+	matrix_del_rows_cols(matrix, del_col_ids,false,true);
+}
+
+void Jacobian::remove_rows(std::set<string>& rm_obs_names)
+{
+	vector<size_t> del_row_ids;
+
+	// build list of columns that needs to be removed from the matrix
+	auto iter_rm_end = rm_obs_names.end();
+	vector<string> row_names = observation_list();
+	size_t nobs = row_names.size();
+
+	for (int i = 0; i < nobs; ++i)
+	{
+		if (rm_obs_names.find(row_names[i]) != iter_rm_end)
+		{
+			del_row_ids.push_back(i);
+		}
+	}
+
+	auto end_iter = std::remove_if(base_sim_obs_names.begin(), base_sim_obs_names.end(),
+		[&rm_obs_names](string& str)->bool {return rm_obs_names.find(str) != rm_obs_names.end(); });
+	base_sim_obs_names.resize(std::distance(base_sim_obs_names.begin(), end_iter));
+	matrix_del_rows_cols(matrix, del_row_ids, true, false);
 }
 
 void Jacobian::add_cols(set<string> &new_pars_names)
@@ -251,13 +275,14 @@ bool Jacobian::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vector<st
 		else
 		{
 			debug_msg("fail");
-			cout << endl << " warning: failed to compute parameter deriviative for " << ipar_name << endl;
+			//cout << endl << " warning: failed to compute parameter deriviative for " << ipar_name << endl;
 			file_manager.rec_ofstream() << " warning: failed to compute parameter deriviative for " << ipar_name << endl;
 			failed_parameter_names.insert(ipar_name);
 		}
 	}
 	debug_print(failed_parameter_names);
 	debug_msg("Jacobian::build_runs method: end");
+	
 	if (failed_parameter_names.size() > 0)
 	{
 		return false;
@@ -285,7 +310,9 @@ void Jacobian::make_runs(RunManagerAbstract &run_manager)
 
 bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 		const ParameterGroupInfo &group_info,
-		RunManagerAbstract &run_manager, const PriorInformation &prior_info, bool splitswh_flag)
+		RunManagerAbstract &run_manager, 
+		const PriorInformation &prior_info, bool splitswh_flag,
+		bool debug_fail)
 {
 	// calculate jacobian
   base_sim_obs_names = run_manager.get_obs_name_vec();
@@ -325,6 +352,12 @@ bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 				run_manager. get_info(i_run, r_status, cur_par_name, cur_numeric_par_value);
 		run_manager.get_model_parameters(i_run,  run_list.back().ctl_pars);
 			bool success = run_manager.get_observations_vec(i_run, run_list.back().obs_vec);
+			if ((debug_fail) && (i_run == 1))
+			{
+		
+				file_manager.rec_ofstream() << "NOTE: 'GLM_DEBUG_DER_FAIL' is true, failing jco run for parameter '" << cur_par_name << "'" << endl;
+				success = false;
+			}
 		if (success)
 		{
 			par_transform.model2ctl_ip(run_list.back().ctl_pars);
@@ -370,9 +403,21 @@ bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 	return true;
 }
 
-bool Jacobian::get_derivative_parameters(const string &par_name, Parameters &numeric_pars, ParamTransformSeq &par_transform, const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info,
+bool Jacobian::get_derivative_parameters(const string &par_name, Parameters &numeric_pars, ParamTransformSeq &par_transform, 
+	const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info,
 		vector<double> &delta_numeric_par_vec, bool phiredswh_flag, set<string> &out_of_bound_par)
 {
+	//first check that all active pars are in bounds
+	bool already_out = out_of_bounds(par_transform.numeric2ctl_cp(numeric_pars), ctl_par_info, out_of_bound_par);
+	if (already_out)
+	{
+		stringstream ss;
+		ss << "Jacobian::get_derivative_parameters() error: the following parameters are already out of bounds: " << endl;
+		for (auto p : out_of_bound_par)
+			ss << p << endl;
+		//throw runtime_error(ss.str());
+
+	}
 	bool success = false;
 	const ParameterGroupRec *g_rec;
 	debug_msg("Jacobian::get_derivative_parameters begin");
@@ -634,13 +679,13 @@ bool Jacobian::out_of_bounds(const Parameters &ctl_parameters,
 	double min, max;
 	const ParameterRec *par_info_ptr;
 	bool out_of_bounds=false;
-
+	double bnd_tol = 0.001;
 	for(Parameters::const_iterator b=ctl_parameters.begin(), e=ctl_parameters.end();
 		b!=e; ++b) {
 			par_name = &(*b).first;
 			par_info_ptr = ctl_par_info.get_parameter_rec_ptr(*par_name);
-			max = par_info_ptr->ubnd;
-			min = par_info_ptr->lbnd;
+			max = par_info_ptr->ubnd + abs(par_info_ptr->ubnd * bnd_tol);
+			min = par_info_ptr->lbnd - abs(par_info_ptr->lbnd * bnd_tol);
 		if ((*b).second > max || (*b).second < min) {
 			out_of_bounds = true;
 			out_of_bound_par.insert(*par_name);
@@ -917,16 +962,13 @@ void Jacobian::report_errors(std::ostream &fout)
 {
 	if (failed_parameter_names.size() > 0)
 	{
-		fout << "    Parameters whose perturbation runs failed while computing jacobian" << endl;
-		fout << "      Parameter     Failed" << endl;
-		fout << "        Name        Value" << endl;
-		fout << "      ----------  ------------" << endl;
+		fout << "    Parameters whose perturbation runs failed while computing jacobian: " << endl;
 
 		for (const auto & ipar : failed_parameter_names)
 		{
-			fout << right;
-			fout << "  " << setw(12) << ipar;
+			fout << right << "  " << setw(12) << ipar << endl;
 		}
+		cout << "WARNING:  " << failed_parameter_names.size() << " parameter pertubation runs failed while computing jacobian, see rec file for listing" << endl;
 	}
 
 }

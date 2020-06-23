@@ -4,11 +4,9 @@ include $(top_builddir)/global.mak
 
 SUBDIRS := \
     common \
-    mio \
     pestpp_common \
-    propack \
     run_managers \
-    opt
+    opt \
 
 
 all:	$(foreach d,$(SUBDIRS),$(d)-target)

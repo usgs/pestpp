@@ -127,21 +127,17 @@ int main(int argc, char* argv[])
 					cerr << "PANTHER worker requires the master be specified as /H hostname:port" << endl << endl;
 					throw(PestCommandlineError(commandline));
 				}
-				PANTHERAgent yam_agent;
+				ofstream frec("panther_worker.rec");
+				if (frec.bad())
+					throw runtime_error("error opening 'panther_worker.rec'");
+				PANTHERAgent yam_agent(frec);
 				string ctl_file = "";
 				try {
-					string ctl_file;
-					if (upper_cp(file_ext) == "YMR")
-					{
-						ctl_file = file_manager.build_filename("ymr");
-						yam_agent.process_panther_ctl_file(ctl_file);
-					}
-					else
-					{
-						// process traditional PEST control file
-						ctl_file = file_manager.build_filename("pst");
-						yam_agent.process_ctl_file(ctl_file);
-					}
+					
+					// process traditional PEST control file
+					ctl_file = file_manager.build_filename("pst");
+					yam_agent.process_ctl_file(ctl_file);
+					
 				}
 				catch (PestError e)
 				{
@@ -157,7 +153,7 @@ int main(int argc, char* argv[])
 				cerr << perr.what();
 				throw(perr);
 			}
-			cout << endl << "Simulation Complete..." << endl;
+			cout << endl << "Work Done..." << endl;
 			exit(0);
 		}
 		//Check for PANTHER master
@@ -195,7 +191,7 @@ int main(int argc, char* argv[])
 		file_manager.open_default_files();
 		
 		ofstream &fout_rec = file_manager.rec_ofstream();
-		PerformanceLog performance_log(file_manager.open_ofile_ext("pfm"));
+		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
 
 		
 		fout_rec << "             pestpp-opt version " << endl << endl;
@@ -216,7 +212,7 @@ int main(int argc, char* argv[])
 #ifndef _DEBUG
 		try {
 #endif
-			performance_log.log_event("starting to process control file", 1);
+			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
 			file_manager.close_file("pst");
 			performance_log.log_event("finished processing control file");
@@ -230,6 +226,12 @@ int main(int argc, char* argv[])
 		}
 #endif
 		pest_scenario.check_inputs(fout_rec);
+		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
+		{
+			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+			exit(0);
+		}
+
 		pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
 
 		//if base jco arg read from control file, reset restart controller
@@ -242,12 +244,12 @@ int main(int argc, char* argv[])
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;	=
 		OutputFileWriter output_file_writer(file_manager, pest_scenario,false);
 		
-		//output_file_writer.scenario_report(fout_rec);
-		output_file_writer.scenario_io_report(fout_rec);
+		output_file_writer.scenario_report(fout_rec, false);
+		/*output_file_writer.scenario_io_report(fout_rec);
 		output_file_writer.scenario_pargroup_report(fout_rec);
 		output_file_writer.scenario_par_report(fout_rec);
 		output_file_writer.scenario_obs_report(fout_rec);
-		output_file_writer.scenario_pi_report(fout_rec);
+		output_file_writer.scenario_pi_report(fout_rec);*/
 		
 		/*if (pest_scenario.get_pestpp_options().get_iter_summary_flag())
 		{
@@ -285,7 +287,7 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			performance_log.log_event("starting basic model IO error checking", 1);
+			performance_log.log_event("starting basic model IO error checking");
 			cout << "checking model IO files...";
 			if ((pest_scenario.get_pestpp_options().get_opt_skip_final()) &&
 				(pest_scenario.get_pestpp_options().get_basejac_filename().size()) > 0 &&
@@ -294,7 +296,7 @@ int main(int argc, char* argv[])
 			{
 				try
 				{
-					pest_scenario.check_io();
+					pest_scenario.check_io(fout_rec);
 				}
 				catch (...)
 				{
@@ -304,7 +306,7 @@ int main(int argc, char* argv[])
 			}
 			else
 			{
-				pest_scenario.check_io();
+				pest_scenario.check_io(fout_rec);
 			}
 
 			performance_log.log_event("finished basic model IO error checking");
@@ -313,7 +315,9 @@ int main(int argc, char* argv[])
 			run_manager_ptr = new RunManagerSerial(exi.comline_vec,
 				exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
 				file_manager.build_filename("rns"), pathname,
-				pest_scenario.get_pestpp_options().get_max_run_fail());
+				pest_scenario.get_pestpp_options().get_max_run_fail(),
+				pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
+				pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
 		}
 
 		//setup the parcov, if needed
@@ -421,15 +425,21 @@ int main(int argc, char* argv[])
 			
 			Covariance parcov;
 			parcov.try_from(pest_scenario, file_manager);
-			sequentialLP slp(pest_scenario, run_manager_ptr, parcov, &file_manager, output_file_writer);
+			sequentialLP slp(pest_scenario, run_manager_ptr, parcov, &file_manager, output_file_writer, performance_log);
 			slp.solve();
 			fout_rec << "Number of forward model runs performed during optimiztion: " << run_manager_ptr->get_total_runs() << endl;
 		}
 		// clean up
 		//fout_rec.close();
 		delete run_manager_ptr;
-		cout << endl << endl << "Simulation Complete..." << endl;
+
+		string case_name = file_manager.get_base_filename();
+		file_manager.close_file("rst");
+		pest_utils::try_clean_up_run_storage_files(case_name);
+
+		cout << endl << endl << "PESTPP-OPT Analysis Complete..." << endl;
 		cout << flush;
+		return 0;
 #ifndef _DEBUG
 	}
 	catch (exception &e)
@@ -438,6 +448,12 @@ int main(int argc, char* argv[])
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));
+		return 1;
+	}
+	catch (...)
+	{
+		cout << "Error condition prevents further execution" << endl;
+		return 1;
 	}
 #endif
 }

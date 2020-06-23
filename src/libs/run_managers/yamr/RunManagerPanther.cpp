@@ -44,11 +44,13 @@
 using namespace std;
 using namespace pest_utils;
 
-const int RunManagerPanther::BACKLOG = 10;
+const int RunManagerPanther::BACKLOG = 1000;
 const int RunManagerPanther::MAX_FAILED_PINGS = 60;
 const int RunManagerPanther::N_PINGS_UNRESPONSIVE = 3;
-const int RunManagerPanther::PING_INTERVAL_SECS = 60;
+const int RunManagerPanther::MIN_PING_INTERVAL_SECS = 60;				// Ping each slave at most once every minute
+const int RunManagerPanther::MAX_PING_INTERVAL_SECS = 120;				// Ping each slave at least once every 2 minutes
 const int RunManagerPanther::MAX_CONCURRENT_RUNS_LOWER_LIMIT = 1;
+const int RunManagerPanther::IDLE_THREAD_SIGNAL_TIMEOUT_SECS = 10;		// Allow up to 10s for the run_idle_async() thread to acknowledge signals (pause idling, terminate)
 
 
 AgentInfoRec::AgentInfoRec(int _socket_fd)
@@ -65,6 +67,10 @@ AgentInfoRec::AgentInfoRec(int _socket_fd)
 	last_ping_time = std::chrono::system_clock::now();
 	ping = false;
 	failed_pings = 0;
+	failed_runs = 0;
+	state_strings = vector<string>({ "NEW", "CWD_REQ", "CWD_RCV", "NAMES_SENT", "LINPACK_REQ", "LINPACK_RCV", "WAITING", "ACTIVE",
+	"KILLED", "KILLED_FAILED", "COMPLETE" });
+
 }
 
 bool AgentInfoRec::CompareTimes::operator() (const AgentInfoRec &a, const AgentInfoRec &b)
@@ -226,6 +232,12 @@ int AgentInfoRec::add_failed_ping()
 	return failed_pings;
 }
 
+int AgentInfoRec::add_failed_run()
+{
+	failed_runs++;
+	return failed_runs;
+}
+
 void AgentInfoRec::set_ping(bool val)
 {
 	ping = val;
@@ -257,18 +269,21 @@ int AgentInfoRec::seconds_since_last_ping_time() const
 }
 
 
-RunManagerPanther::RunManagerPanther(const string &stor_filename, const string &_port, ofstream &_f_rmr, int _max_n_failure,
+RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& _port, ofstream& _f_rmr, int _max_n_failure,
 	double _overdue_reched_fac, double _overdue_giveup_fac, double _overdue_giveup_minutes)
 	: RunManagerAbstract(vector<string>(), vector<string>(), vector<string>(),
-	vector<string>(), vector<string>(), stor_filename, _max_n_failure),
+		vector<string>(), vector<string>(), stor_filename, _max_n_failure),
 	overdue_reched_fac(_overdue_reched_fac), overdue_giveup_fac(_overdue_giveup_fac),
-	port(_port), f_rmr(_f_rmr), n_no_ops(0), overdue_giveup_minutes(_overdue_giveup_minutes)
+	port(_port), f_rmr(_f_rmr), n_no_ops(0), overdue_giveup_minutes(_overdue_giveup_minutes),
+	terminate_idle_thread(false), currently_idle(true), idling(false), idle_thread_finished(false),
+	idle_thread(nullptr), idle_thread_raii(nullptr)
 {
+	cout << "          starting PANTHER master..." << endl << endl;
 	max_concurrent_runs = max(MAX_CONCURRENT_RUNS_LOWER_LIMIT, _max_n_failure);
 	w_init();
-	int status;
+	std::pair<int, string> status;
 	struct addrinfo hints;
-	struct addrinfo *servinfo;
+	struct addrinfo* servinfo;
 	memset(&hints, 0, sizeof hints);
 	//Use this for IPv4 aand IPv6
 	//hints.ai_family = AF_UNSPEC;
@@ -278,11 +293,16 @@ RunManagerPanther::RunManagerPanther(const string &stor_filename, const string &
 	hints.ai_flags = AI_PASSIVE;
 
 	status = w_getaddrinfo(NULL, port.c_str(), &hints, &servinfo);
-	cout << "          starting PANTHER master..." << endl << endl;
+	if (status.first != 0)
+	{
+		cout << "ERROR: getaddrinfo returned non-zero: " << status.second << endl;
+		throw(PestError("ERROR: getaddrinfo returned non-zero: " + status.second));
+	}
+
 	w_print_servinfo(servinfo, cout);
 	cout << endl;
 	//make socket, bind and listen
-	addrinfo *connect_addr = w_bind_first_avl(servinfo, listener);
+	addrinfo* connect_addr = w_bind_first_avl(servinfo, listener);
 	if (connect_addr == nullptr)
 	{
 		stringstream err_str;
@@ -290,9 +310,7 @@ RunManagerPanther::RunManagerPanther(const string &stor_filename, const string &
 		throw(PestError(err_str.str()));
 	}
 	else {
-		f_rmr << endl;
-		cout << "PANTHER master listening on socket: " << w_get_addrinfo_string(connect_addr) << endl;
-		f_rmr << "PANTHER master listening on socket:" << w_get_addrinfo_string(connect_addr) << endl;
+
 	}
 	w_listen(listener, BACKLOG);
 	//free servinfo
@@ -300,7 +318,13 @@ RunManagerPanther::RunManagerPanther(const string &stor_filename, const string &
 	fdmax = listener;
 	FD_ZERO(&master);
 	FD_SET(listener, &master);
-	return;
+	//cant do this here because the run manager doesnt yet know the par and obs names
+	//resume_idle();
+	f_rmr << endl;
+	cout << "PANTHER master listening on socket: " << w_get_addrinfo_string(connect_addr) << endl;
+	f_rmr << "PANTHER master listening on socket:" << w_get_addrinfo_string(connect_addr) << endl;
+	
+	
 }
 
 int RunManagerPanther::get_n_concurrent(int run_id)
@@ -416,6 +440,9 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	stringstream message;
 	NetPackage net_pack;
 
+	// Pause idle pinging thread
+	pause_idle();
+
 	model_runs_done = 0;
 	model_runs_failed = 0;
 	model_runs_timed_out = 0;
@@ -424,6 +451,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	int num_runs = waiting_runs.size();
 	cout << "    running model " << num_runs << " times" << endl;
 	f_rmr << "running model " << num_runs << " times" << endl;
+	cout << "    starting at " << pest_utils::get_time_string() << endl;
 	if (agent_info_set.size() == 0) // first entry is the listener, slave apears after this
 	{
 		cout << endl << "      waiting for agents to appear..." << endl << endl;
@@ -509,19 +537,198 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 			int status = file_stor.get_run(0, pars, init_sim);
 		}
 	}
+
+	// Resume idle pinging thread
+	resume_idle();
+
 	return terminate_reason;
 }
 
-bool RunManagerPanther::ping()
+bool RunManagerPanther::ping(pest_utils::thread_flag* terminate/* = nullptr*/)
 {
 	bool ping_sent = false;
 	for (auto &i : socket_to_iter_map)
 	{
+		if (terminate && terminate->get())
+		{
+			break;
+		}
 
 		if (ping(i.first))
+		{
 			ping_sent = true;
 	}
+	}
 	return ping_sent;
+}
+
+void RunManagerPanther::run_idle_async()
+{
+	try
+	{
+		// Initialise idle thread state flags
+		idle_thread_finished.set(false);
+		idling.set(false);
+
+		// Continue to accept new connections and ping agents while the manager is alive and not processing any runs
+		while (!terminate_idle_thread.get())
+		{
+			// Don't do anything unless the run manager is currently idle (in between calls to run())
+			if(!currently_idle.get())
+			{
+				idling.set(false);
+
+				// Sleep 1s to avoid spinlock
+				w_sleep(1000);
+				continue;
+			}
+
+			// Confirm that the thread has started idling
+			idling.set(true);
+
+			// Initialise any new agents
+			init_agents(&terminate_idle_thread);
+
+			if(terminate_idle_thread.get())
+			{
+				break;
+			}
+
+			// Receive any waiting data from agents
+			listen(&terminate_idle_thread);
+
+			if(terminate_idle_thread.get())
+			{
+				break;
+			}
+
+			// Ping agents periodically to ensure connections are not dropped
+			ping(&terminate_idle_thread);
+		}
+	}
+	catch(...)
+	{
+		try
+		{
+			idle_thread_finished.set(true);
+			idling.set(false);
+		}
+		catch(...)
+		{
+			// Don't hide original exception if something goes wrong with flag lock and set
+		}
+
+		throw;
+	}
+
+	idle_thread_finished.set(true);
+	idling.set(false);
+}
+
+void RunManagerPanther::start_run_idle_async()
+{
+	if(idle_thread)
+	{
+		return;
+	}
+
+	// Initialise idle thread flags
+	idling.set(false);
+	idle_thread_finished.set(false);
+	terminate_idle_thread.set(false);
+	currently_idle.set(true);
+
+	// Start thread
+	idle_thread = new thread(&RunManagerPanther::run_idle_async, this);
+	idle_thread_raii = new pest_utils::thread_RAII(*idle_thread);
+
+	report("Started idle ping thread.", false);
+}
+
+void RunManagerPanther::end_run_idle_async()
+{
+	if(!idle_thread)
+	{
+		return;
+	}
+
+	// Signal thread to terminate
+	terminate_idle_thread.set(true);
+
+	// Wait for termination
+	bool timed_out = false;
+	std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
+	while (!idle_thread_finished.get())
+	{
+		// Give up if we've spent too much time waiting already
+		auto wait_time = std::chrono::system_clock::now() - start_time;
+		if (wait_time > std::chrono::seconds(IDLE_THREAD_SIGNAL_TIMEOUT_SECS))
+		{
+			timed_out = true;
+			break;
+		}
+		
+		// Sleep to avoid spinlock
+		w_sleep(50);
+	}
+
+	report("Stopped idle ping thread, as Panther manager is shutting down.", false);
+	if(timed_out)
+	{
+		report("Warning: timed out waiting for acknowledgement of signal from idle thread.", false);
+	}
+
+	// Clean up
+	delete idle_thread_raii;
+	delete idle_thread;
+	idle_thread_raii = nullptr;
+	idle_thread = nullptr;
+}
+
+void RunManagerPanther::pause_idle()
+{
+	if(!idle_thread)
+	{
+		return;
+	}
+
+	// Signal thread to stop idle pings
+	currently_idle.set(false);
+
+	// Wait for the signal to be acknowledged
+	bool timed_out = false;
+	auto start_time = std::chrono::system_clock::now();
+	while (idling.get() && !idle_thread_finished.get())
+	{
+		// Give up if we've spent too much time waiting already
+		auto waited = std::chrono::system_clock::now() - start_time;
+		if (waited > std::chrono::seconds(IDLE_THREAD_SIGNAL_TIMEOUT_SECS))
+		{
+			timed_out = true;
+			break;
+		}
+		
+		// Sleep to avoid spinlock
+		w_sleep(50);
+	}
+
+	report("Panther idle ping thread paused prior to scheduling runs.", false);
+	if(timed_out)
+	{
+		report("Warning: timed out waiting for acknowledgement of signal from idle thread.", false);
+	}
+}
+
+void RunManagerPanther::resume_idle()
+{
+	// Start up the thread if it has not already been started
+	start_run_idle_async();
+
+	// Signal thread to continue idle pings
+	currently_idle.set(true);
+
+	// Don't bother waiting for acknowledgement here, as none of the management code relies on it; we can happily go off and do other processing while the thread gets around to resuming idle pings
+	report("Panther idle ping thread resumed.", false);
 }
 
 bool RunManagerPanther::ping(int i_sock)
@@ -531,7 +738,6 @@ bool RunManagerPanther::ping(int i_sock)
 	AgentInfoRec::State state = agent_info_iter->get_state();
 	if (state != AgentInfoRec::State::WAITING
 		&& state != AgentInfoRec::State::ACTIVE
-		&& state != AgentInfoRec::State::COMPLETE
 		&& state != AgentInfoRec::State::KILLED
 		&& state != AgentInfoRec::State::KILLED_FAILED)
 	{
@@ -555,17 +761,19 @@ bool RunManagerPanther::ping(int i_sock)
 	}
 	//check if it is time to ping again...
 	double duration = (double)agent_info_iter->seconds_since_last_ping_time();
-	double ping_time = max(double(PING_INTERVAL_SECS), agent_info_iter->get_runtime_sec());
+	double ping_time = min(double(MAX_PING_INTERVAL_SECS), max(double(MIN_PING_INTERVAL_SECS), agent_info_iter->get_runtime_sec()));
 	if (duration >= ping_time)
 	{
 		ping_sent = true;
 		const char* data = "\0";
+
 		NetPackage net_pack(NetPackage::PackType::PING, 0, 0, "");
-		int err = net_pack.send(i_sock, data, 0);
-		if (err <= 0)
+		pair<int,string> err = net_pack.send(i_sock, data, 0);
+		
+		if (err.first <= 0)
 		{
 			int fails = agent_info_iter->add_failed_ping();
-			report("failed to send ping request to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
+			report("failed to send ping request to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir() + ": " + err.second, false);
 			if (fails >= MAX_FAILED_PINGS)
 			{
 				report("max failed ping communications since last successful run for agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir() + "  -> terminating", true);
@@ -582,7 +790,7 @@ bool RunManagerPanther::ping(int i_sock)
 }
 
 
-bool RunManagerPanther::listen()
+bool RunManagerPanther::listen(pest_utils::thread_flag* terminate/* = nullptr*/)
 {
 	bool got_message = false;
 	struct sockaddr_storage remote_addr;
@@ -599,7 +807,14 @@ bool RunManagerPanther::listen()
 		return got_message;
 	}
 	// run through the existing connections looking for data to read
-	for(int i = 0; i <= fdmax; i++) {
+	for (int i = 0; i <= fdmax; i++)
+	{
+		// Stop early if we're requested to terminate
+	 	if(terminate && terminate->get())
+	 	{
+	 		break;
+	 	}
+
 		if (FD_ISSET(i, &read_fds)) { // we got one!!
 			got_message = true;
 			if (i == listener)  // handle new connections
@@ -862,12 +1077,18 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::it
 	{
 		int socket_fd = (*it_agent)->get_socket_fd();
 		vector<char> data = file_stor.get_serial_pars(run_id);
+		string info_txt;
+		double info_val;
+		int rstat;
+		file_stor.get_info(run_id, rstat, info_txt, info_val);
 		string host_name = (*it_agent)->get_hostname();
-		NetPackage net_pack(NetPackage::PackType::START_RUN, cur_group_id, run_id, "");
-		int err = net_pack.send(socket_fd, &data[0], data.size());
-		if (err > 0)
+		//  info_txt = "sending run to " + host_name + ":" + (*it_agent)->get_work_dir() + " at " + pest_utils::get_time_string();
+		NetPackage net_pack(NetPackage::PackType::START_RUN, cur_group_id, run_id, info_txt);
+		pair<int,string> err = net_pack.send(socket_fd, &data[0], data.size());
+		if (err.first > 0)
 		{
 			(*it_agent)->set_state(AgentInfoRec::State::ACTIVE, run_id, cur_group_id);
+			//report("changed agent " + host_name + ":" + (*it_agent)->get_work_dir() + " to 'active'",false);
 			//start run timer
 			(*it_agent)->start_timer();
 			//reset the last ping time so we don't ping immediately after run is started
@@ -880,10 +1101,15 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::it
 			free_agent_list.erase(it_agent);
 			scheduled = 1;
 		}
+		else
+		{
+			stringstream ss;
+			ss << "error sending run " << run_id << "to: " << host_name << "$" << (*it_agent)->get_work_dir() + ": " + err.second;
+			report(ss.str(), false);
+		}
 	}
 	return scheduled;  // 1 = run scheduled; -1 failed to schedule run; 0 run not needed
 }
-
 
 
 void RunManagerPanther::echo()
@@ -898,36 +1124,9 @@ void RunManagerPanther::echo()
 		<< "| U=" << setw(4) << left << stats_map["unavailable"] << ")\r" << flush;
 }
 
-string RunManagerPanther::get_time_string()
-{
-	time_t rawtime;
-	struct tm * timeinfo;
-	char buffer[80];
-
-	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-	strftime(buffer, 80, "%m/%d/%y %H:%M:%S", timeinfo);
-	string t_str(buffer);
-	return t_str;
-}
-
-string RunManagerPanther::get_time_string_short()
-{
-	time_t rawtime;
-	struct tm * timeinfo;
-	char buffer[80];
-
-	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-	strftime(buffer, 80, "%m/%d %H:%M:%S", timeinfo);
-	string t_str(buffer);
-	return t_str;
-}
-
-
 void RunManagerPanther::report(std::string message,bool to_cout)
 {
-	string t_str = get_time_string();
+	string t_str = pest_utils::get_time_string();
 	f_rmr << t_str << "->" << message << endl;
 	if (to_cout) cout << endl << t_str << "->" << message << endl;
 }
@@ -935,29 +1134,34 @@ void RunManagerPanther::report(std::string message,bool to_cout)
 void RunManagerPanther::process_message(int i_sock)
 {
 	NetPackage net_pack;
-	int err;
+	pair<int,string>  err;
 	list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(i_sock);
 
 	string host_name = agent_info_iter->get_hostname();
 	string port_name = agent_info_iter->get_port();
 	string socket_name = agent_info_iter->get_socket_name();
-
-	if(( err=net_pack.recv(i_sock)) <=0) // error or lost connection
+	err = net_pack.recv(i_sock);
+	if( err.first <=0) // error or lost connection
 	{
-		if (err  == -2) {
-			report("received corrupt message from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + " - terminating agent", false);
+		if (err.first  == -2) {
+			report("received corrupt message from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second, false);
 		}
-		else if (err < 0) {
-			report("receive failed from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + " - terminating agent", false);
+		else if (err.first < 0) {
+			report("receive failed from agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second, false);
 		}
 		else {
-			report("lost connection to agent: " + host_name + "$" + agent_info_iter->get_work_dir(), false);
+			report("lost connection to agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + err.second, false);
 		}
+		close_agent(i_sock);
+	}
+	else if (net_pack.get_type() == NetPackage::PackType::TERMINATE)
+	{
+		report("agent exiting: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + net_pack.get_info_txt(), false);
 		close_agent(i_sock);
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::CORRUPT_MESG)
 	{
-		report("agent reporting corrupt message: " + host_name + "$" + agent_info_iter->get_work_dir() + " - terminating agent", false);
+		report("agent reporting corrupt message: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + net_pack.get_info_txt(), false);
 		close_agent(i_sock);
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::RUNDIR)
@@ -967,7 +1171,7 @@ void RunManagerPanther::process_message(int i_sock)
 		{
 			string work_dir = NetPackage::extract_string(net_pack.get_data(), 0, net_pack.get_data().size());
 			stringstream ss;
-			ss << "initializing new agent connection from: " << socket_name << ", number of agents: " << socket_to_iter_map.size() << ", working dir: " << work_dir;
+			ss << "initializing new agent connection from: " << agent_info_iter->get_hostname() << "$" << work_dir << ":" << socket_name << ", number of agents: " << socket_to_iter_map.size();
 			report(ss.str(), false);
 			agent_info_iter->set_work_dir(work_dir);
 			agent_info_iter->set_state(AgentInfoRec::State::CWD_RCV);
@@ -983,12 +1187,12 @@ void RunManagerPanther::process_message(int i_sock)
 		agent_info_iter->end_linpack();
 		agent_info_iter->set_state(AgentInfoRec::State::LINPACK_RCV);
 		stringstream ss;
-		ss << "new agent ready: " << socket_name;
+		ss << "new agent ready: " << agent_info_iter->get_hostname() << "$" << agent_info_iter->get_work_dir() << ":" << agent_info_iter->get_socket_name() ;
 		report(ss.str(), false);
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::READY)
 	{
-		// ready message received from slave
+		// ready message received from agent
 		agent_info_iter->set_state(AgentInfoRec::State::WAITING);
 	}
 
@@ -1001,8 +1205,10 @@ void RunManagerPanther::process_message(int i_sock)
 		// just ignore it
 		int run_id = net_pack.get_run_id();
 		int group_id = net_pack.get_group_id();
-		//stringstream ss;
-		//ss << "run " << run_id << " received from unexpected group id: " << group_id << ", should be group: " << cur_group_id;
+		stringstream ss;
+		ss << "run " << run_id << " received from unexpected group id: " << group_id << ", should be group: " << cur_group_id;
+		ss << "from " << agent_info_iter->get_hostname() << "$" << agent_info_iter->get_work_dir() << "...ignoring";
+		report(ss.str(), false);
 		//throw PestError(ss.str());
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::RUN_FINISHED)
@@ -1029,6 +1235,9 @@ void RunManagerPanther::process_message(int i_sock)
 				", run id: " << run_id << " concurrent:" << get_n_concurrent(run_id) << ")";
 			report(ss.str(), false);
 			process_model_run(i_sock, net_pack);
+			ss.str("");
+			ss << "run " << run_id << " processed";
+			report(ss.str(), false);
 		}
 
 
@@ -1044,6 +1253,11 @@ void RunManagerPanther::process_message(int i_sock)
 		if (!run_finished(run_id))
 		{
 			ss << "Run " << run_id << " failed on agent:" << host_name << "$" << agent_info_iter->get_work_dir() << "  (group id: " << group_id << ", run id: " << run_id << ", concurrent: " << n_concur << ") ";
+			string netpack_message = net_pack.get_info_txt();
+			if (netpack_message.size() > 0)
+			{
+				ss << ", worker message: " << netpack_message;
+			}
 			report(ss.str(), false);
 			model_runs_failed++;
 			update_run_failed(run_id, i_sock);
@@ -1056,6 +1270,13 @@ void RunManagerPanther::process_message(int i_sock)
 				waiting_runs.push_front(run_id);
 			}
 		}
+	}
+	else if (net_pack.get_type() == NetPackage::PackType::DEBUG_FAIL_FREEZE)
+	{
+		stringstream ss;
+		ss << "Frozen agent: " << host_name << "$" << agent_info_iter->get_work_dir() << " is frozen because of panther_debug_freeze_on_fail = true...";
+		report(ss.str(), false);
+
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::RUN_KILLED)
 	{
@@ -1077,9 +1298,10 @@ void RunManagerPanther::process_message(int i_sock)
 	else if (net_pack.get_type() == NetPackage::PackType::IO_ERROR)
 	{
 		//string err(net_pack.get_data().begin(),net_pack.get_data().end());
-		report("error in model IO files on agent: " + host_name + "$" + agent_info_iter->get_work_dir() + "-terminating agent. ", true);
+		report("error in model IO files on agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + net_pack.get_info_txt() + "-terminating agent. ", true);
 		close_agent(i_sock);
 	}
+
 	else
 	{
 		report("received unsupported message from agent: ", false);
@@ -1108,6 +1330,12 @@ bool RunManagerPanther::process_model_run(int sock_id, NetPackage &net_pack)
 		model_runs_done++;
 
 	}
+	else
+	{
+		stringstream ss;
+		ss << "run_id " << run_id << "already finished";
+		report(ss.str(), false);
+	}
 	// remove currently completed run from the active list
 	auto it = get_active_run_iter(sock_id);
 	unschedule_run(it);
@@ -1132,15 +1360,15 @@ void RunManagerPanther::kill_run(list<AgentInfoRec>::iterator agent_info_iter, c
 		report(ss.str(), false);
 		NetPackage net_pack(NetPackage::PackType::REQ_KILL, 0, 0, "");
 		char data = '\0';
-		int err = net_pack.send(socket_id, &data, sizeof(data));
-		if (err == 1)
+		pair<int,string> err = net_pack.send(socket_id, &data, sizeof(data));
+		if (err.first == 1)
 		{
 			agent_info_iter->set_state(AgentInfoRec::State::KILLED);
 		}
 		else
 		{
 			report("error sending kill request to agent:" + host_name + "$" +
-				agent_info_iter->get_work_dir(), true);
+				agent_info_iter->get_work_dir() + ": " + err.second, true);
 			agent_info_iter->set_state(AgentInfoRec::State::KILLED_FAILED);
 		}
 	}
@@ -1190,18 +1418,24 @@ void RunManagerPanther::kill_all_active_runs()
 	}
 }
 
- void RunManagerPanther::init_agents()
+ void RunManagerPanther::init_agents(pest_utils::thread_flag* terminate/* = nullptr*/)
  {
 	 for (auto &i_agent : agent_info_set)
 	 {
+	 	// Stop early if we're requested to terminate
+	 	if(terminate && terminate->get())
+	 	{
+	 		break;
+	 	}
+
 		int i_sock = i_agent.get_socket_fd();
 		AgentInfoRec::State cur_state = i_agent.get_state();
 		if (cur_state == AgentInfoRec::State::NEW)
 		{
 			NetPackage net_pack(NetPackage::PackType::REQ_RUNDIR, 0, 0, "");
 			char data = '\0';
-			int err = net_pack.send(i_sock, &data, sizeof(data));
-			if (err > 0)
+			pair<int,string> err = net_pack.send(i_sock, &data, sizeof(data));
+			if (err.first > 0)
 			{
 				i_agent.set_state(AgentInfoRec::State::CWD_REQ);
 			}
@@ -1215,33 +1449,49 @@ void RunManagerPanther::kill_all_active_runs()
 			// send parameter names
 			tmp_vec = file_stor.get_par_name_vec();
 			data = Serialization::serialize(tmp_vec);
-			int err_par = net_pack.send(i_sock, &data[0], data.size());
+			pair<int,string> err_par = net_pack.send(i_sock, &data[0], data.size());
 			//send observation names
 			net_pack = NetPackage(NetPackage::PackType::OBS_NAMES, 0, 0, "");
 			tmp_vec = file_stor.get_obs_name_vec();
 			data = Serialization::serialize(tmp_vec);
-			int err_obs = net_pack.send(i_sock, &data[0], data.size());
+			pair<int,string> err_obs = net_pack.send(i_sock, &data[0], data.size());
 
-			if (err_par > 0 && err_obs > 0)
+			if (err_par.first > 0 && err_obs.first > 0)
 			{
 				i_agent.set_state(AgentInfoRec::State::NAMES_SENT);
+			}
+			else if (err_par.first <= 0)
+			{
+				report("Error sending par names to " + i_agent.get_hostname() + "$" + i_agent.get_work_dir() + ": " + err_par.second,false);
+			}
+			else if (err_obs.first <= 0)
+			{
+				report("Error sending obs names to " + i_agent.get_hostname() + "$" + i_agent.get_work_dir() + ": " + err_obs.second, false);
 			}
 		}
 		else if (cur_state == AgentInfoRec::State::NAMES_SENT)
 		{
 			NetPackage net_pack(NetPackage::PackType::REQ_LINPACK, 0, 0, "");
 			char data = '\0';
-			int err = net_pack.send(i_sock, &data, sizeof(data));
-			if (err  > 0)
+			pair<int,string> err = net_pack.send(i_sock, &data, sizeof(data));
+			if (err.first  > 0)
 			{
 				i_agent.set_state(AgentInfoRec::State::LINPACK_REQ);
 				i_agent.start_timer();
+			}
+			else
+			{
+				report("error sending linpack request to " + i_agent.get_hostname() + "$" + i_agent.get_work_dir() + ": " + err.second,false);
 			}
 		}
 		else if (cur_state == AgentInfoRec::State::LINPACK_RCV)
 		{
 			i_agent.set_state(AgentInfoRec::State::WAITING);
 		}
+		/*else if (cur_state == AgentInfoRec::State::COMPLETE)
+		{
+			i_agent.set_state(AgentInfoRec::State::WAITING);
+		}*/
 	}
  }
 
@@ -1346,10 +1596,15 @@ void RunManagerPanther::kill_all_active_runs()
  {
 	 list<list<AgentInfoRec>::iterator> iter_list;
 	 list<AgentInfoRec>::iterator iter_b, iter_e;
+	 stringstream ss;
 	 for (iter_b = agent_info_set.begin(), iter_e = agent_info_set.end();
 		 iter_b != iter_e; ++iter_b)
 	 {
 		 AgentInfoRec::State cur_state = iter_b->get_state();
+		 /*ss.str("");
+		 ss << iter_b->get_hostname() << ":" << iter_b->get_work_dir() << "," << iter_b->state_strings[static_cast<int>(cur_state)];
+		 report(ss.str(), false);*/
+		 
 		 if (cur_state == AgentInfoRec::State::WAITING)
 		 {
 			 iter_list.push_back(iter_b);
@@ -1414,6 +1669,8 @@ void RunManagerPanther::kill_all_active_runs()
  {
 	 file_stor.update_run_failed(run_id);
 	 failure_map.insert(make_pair(run_id, socket_fd));
+	 list<AgentInfoRec>::iterator agent_info_iter = socket_to_iter_map.at(socket_fd);
+	 agent_info_iter->add_failed_run();
  }
 
  void RunManagerPanther::update_run_failed(int run_id)
@@ -1424,13 +1681,17 @@ void RunManagerPanther::kill_all_active_runs()
 
 RunManagerPanther::~RunManagerPanther(void)
 {
+	// Shut down idle agent management thread
+	end_run_idle_async();
+
 	//close sockets and cleanup
 	int err;
 	err = w_close(listener);
 	FD_CLR(listener, &master);
 	// this is needed to ensure that the first slave closes properly
 	w_sleep(2000);
-	for(int i = 0; i <= fdmax; i++) {
+	for (int i = 0; i <= fdmax; i++)
+	{
 		if (FD_ISSET(i, &master))
 		{
 			NetPackage netpack(NetPackage::PackType::TERMINATE, 0, 0,"");

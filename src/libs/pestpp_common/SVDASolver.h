@@ -36,17 +36,17 @@ class SVDASolver : public SVDSolver
 public:
 	SVDASolver(Pest &_pest_scenario, FileManager &_file_manager, ObjectiveFunc *_obj_func,
 		const ParamTransformSeq &_par_transform, Jacobian &_jacobian,
-		OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log,
-		bool _phiredswh_flag, bool _splitswh_flag);
+		OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log, Covariance& _parcov,
+		std::mt19937* _rand_gen_ptr, bool _phiredswh_flag, bool _splitswh_flag);
 	virtual Parameters limit_parameters_freeze_all_ip(const Parameters &init_active_ctl_pars,
 		Parameters &upgrade_active_ctl_pars, const Parameters &prev_frozen_active_ctl_pars);
 	virtual void calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active_ctl_pars, QSqrtMatrix &Q_sqrt,
 		const DynamicRegularization &regul, Eigen::VectorXd &residuals_vec,
 		std::vector<std::string> &obs_names_vec, const Parameters &base_run_active_ctl_pars, Parameters &new_active_ctl_pars,
-		MarquardtMatrix marquardt_type, Pest::LimitType &limit_type, bool scale_upgrade=false);
+		Pest::LimitType &limit_type);
 	ModelRun update_run(RunManagerAbstract &run_manager, ModelRun &base_run);
 	virtual ModelRun iteration_reuse_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool rerun_base = true, const std::string &filename = "");
-	void iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs = false, bool restart_runs = false);
+	bool iteration_jac(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool calc_init_obs = false, bool restart_runs = false);
 	ModelRun iteration_upgrd(RunManagerAbstract &run_manager, TerminationController &termination_ctl, ModelRun &base_run, bool restart_runs = false);
 	virtual const string &get_description(){return description;}
 	virtual ParameterGroupInfo get_parameter_group_info() const { return super_parameter_group_info; }

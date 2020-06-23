@@ -24,46 +24,16 @@
 #include <unordered_map>
 #include <set>
 #include <vector>
+#include <random>
 #include "Transformable.h"
 
 
 //class TransformSeq<;
 class LaTridiagMatDouble;
 
-class ControlInfo {
-
-public:
-	enum PestMode { ESTIMATION, REGUL, PARETO, UNKNOWN };
-	double relparmax;
-	double facparmax;
-	double facorig;
-	double phiredswh;
-	int noptmax;
-	int jacfile;
-	int numcom;
-	double phiredstp;
-	int nphistp;
-	int nphinored;
-	double relparstp;
-	int nrelpar;
-	int noptswitch;
-	double splitswh;
-	PestMode pestmode;
-	ControlInfo() : relparmax(0.0), facparmax(0.0), facorig(0.0), phiredswh(0.0), noptmax(0),
-		phiredstp(0.0), nphistp(0), nphinored(0), relparstp(0.0), nrelpar(0), noptswitch(0),
-		splitswh(0.0), pestmode(PestMode::ESTIMATION){}
-};
-ostream& operator<< (ostream &os, const ControlInfo& val);
 
 
-class SVDInfo {
-public:
-	int maxsing;
-	int eigwrite;
-	double eigthresh;
-	SVDInfo() : maxsing(0), eigwrite(0), eigthresh(1.0e-7) {}
-};
-ostream& operator<< (ostream &os, const SVDInfo& val);
+
 
 class ParameterGroupRec {
 public:
@@ -84,6 +54,8 @@ public:
 		splitreldiff(_splitreldiff){}
 	ParameterGroupRec(const ParameterGroupRec &rhs) {*this=rhs;}
 	ParameterGroupRec& operator=(const ParameterGroupRec &rhs);
+	void set_defaults();
+	void set_name(string& _name) { name = _name; }
 };
 
 ostream& operator<< (ostream &os, const ParameterGroupRec& val);
@@ -180,7 +152,7 @@ public:
 	unordered_map<string, ObservationGroupRec> groups;
 	unordered_map<string, ObservationRec> observations;
 	double get_weight(const string &obs_name) const;
-	void set_weight(const string &obs_name, double &value);
+	void set_weight(const string &obs_name, double value);
 	string get_group(const string &obs_name) const;
 	const ObservationRec* get_observation_rec_ptr(const string &name) const;
 	const ObservationGroupRec* get_group_rec_ptr(const string &name) const;
@@ -216,14 +188,21 @@ public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
 	enum MAT_INV { Q12J, JTQJ };
 	enum GLOBAL_OPT { NONE, OPT_DE };
-	PestppOptions(int _n_iter_base = 50, int _n_iter_super = 0, int _max_n_super = 50,
+	enum GLMNormalForm { IDENT,DIAG, PRIOR };
+	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
+	/*PestppOptions(int _n_iter_base = 50, int _n_iter_super = 0, int _max_n_super = 50,
 		double _super_eigthres = 1.0E-6, SVD_PACK _svd_pack = PestppOptions::REDSVD,
 		double _super_relparmax = 0.1, int max_run_fail = 3,
 		bool iter_summary_flag = true, bool der_forgive = true,
 		double overdue_reched_fac = 1.15, double overdue_giveup_fac = 100,
 		GLOBAL_OPT _global_opt = PestppOptions::NONE,
-		double _de_f = 0.8, double _de_cr = 0.9, int _de_npopulation = 40, int _de_max_gen = 100, bool _de_dither_f = true);
-	void parce_line(const string &line);
+		double _de_f = 0.8, double _de_cr = 0.9, int _de_npopulation = 40, int _de_max_gen = 100, bool _de_dither_f = true);*/
+	PestppOptions() { ; }
+
+	//void parce_line(const string &line);
+	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
+	ARG_STATUS assign_value_by_key(string key, const string org_value);
+	bool assign_value_by_key_continued(const string& key, const string& value);
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
 	int get_n_iter_base() const { return n_iter_base; }
@@ -231,19 +210,28 @@ public:
 	SVD_PACK get_svd_pack() const { return svd_pack; }
 	double get_super_relparmax() const { return super_relparmax; }
 	int get_max_run_fail() const { return max_run_fail; }
+	void set_worker_poll_interval(double _val) { worker_poll_interval = _val; }
+	double get_worker_poll_interval() const { return worker_poll_interval; }
 	int get_max_super_frz_iter()const { return max_super_frz_iter; }
 	int get_max_reg_iter()const { return max_reg_iter; }
 	const vector<double>& get_base_lambda_vec() const { return base_lambda_vec; }
+	void set_base_lambda_vec(vector<double> _vals) { base_lambda_vec = _vals; }
 	const vector<double>& get_lambda_scale_vec() const { return lambda_scale_vec; }
 	void set_lambda_scale_vec(vector<double> sv) {lambda_scale_vec = sv; }
 	bool get_iter_summary_flag() const { return iter_summary_flag; }
 	bool get_der_forgive() const { return der_forgive; }
+	void set_der_forgive(bool _flag) { der_forgive = _flag; }
 	GLOBAL_OPT get_global_opt() const { return global_opt; }
 	double get_de_f() const { return de_f; }
+	void set_de_f(double _val) { de_f = _val; }
 	double get_de_cr() const { return de_cr; }
+	void set_de_cr(double _val) { de_cr = _val; }
 	int get_de_npopulation() const { return de_npopulation; }
+	void set_de_npopulation(int _val) { de_npopulation = _val; }
 	int get_de_max_gen() const { return de_max_gen; }
+	void set_de_max_gen(int _val ) { de_max_gen = _val; }
 	bool get_de_dither_f() const { return de_dither_f; }
+	void set_de_dither_f(bool _val) {de_dither_f = _val; }
 	void set_global_opt(const GLOBAL_OPT _global_opt) { global_opt = _global_opt; }
 	void set_max_n_super(int _max_n_super) { max_n_super = _max_n_super; }
 	void set_super_eigthres(double _super_eigthres) { super_eigthres = _super_eigthres; }
@@ -265,6 +253,22 @@ public:
 	string get_obscov_filename()const { return obscov_filename; }
 	void set_basejac_filename(string _filename) { basejac_filename = _filename; }
 	string get_basejac_filename()const { return basejac_filename; }
+	int get_glm_num_reals() const { return glm_num_reals; }
+	void set_glm_num_reals(int _glm_num_reals) { glm_num_reals = _glm_num_reals; }
+	GLMNormalForm get_glm_normal_form() const { return glm_normal_form;}
+	void set_glm_normal_form(GLMNormalForm form) { glm_normal_form = form; }
+	bool get_glm_debug_der_fail() const { return glm_debug_der_fail; }
+	void set_glm_debug_der_fail(bool _flag) { glm_debug_der_fail = _flag;}
+	bool get_glm_debug_lamb_fail() const { return glm_debug_lamb_fail; }
+	void set_glm_debug_lamb_fail(bool _flag) { glm_debug_lamb_fail = _flag; }
+	bool get_glm_debug_real_fail() const { return glm_debug_real_fail; }
+	void set_glm_debug_real_fail(bool _flag) { glm_debug_real_fail = _flag; }
+	bool get_glm_accept_mc_phi() const { return glm_accept_mc_phi; }
+	void set_glm_accept_mc_phi(bool _flag) { glm_accept_mc_phi = _flag; }
+	bool get_glm_rebase_super() const { return glm_rebase_super; }
+	void set_glm_rebase_super(bool _flag) { glm_rebase_super = _flag; }
+
+
 	double get_overdue_reched_fac()const { return overdue_reched_fac; }
 	void set_overdue_reched_fac(double _val) { overdue_reched_fac = _val; }
 	double get_overdue_giveup_fac()const { return overdue_giveup_fac; }
@@ -318,7 +322,12 @@ public:
 	void set_opt_include_bnd_pi(bool _include_bnd_pi) { opt_include_bnd_pi = _include_bnd_pi; }
 	bool get_opt_std_weights()const { return opt_std_weights; }
 	void set_opt_std_weights(bool _opt_std_weights) { opt_std_weights = _opt_std_weights; }
-
+	int get_opt_stack_size()const { return opt_stack_size; }
+	void set_opt_stack_size(int _size) { opt_stack_size = _size; }
+	string get_opt_par_stack()const { return opt_par_stack; }
+	void set_opt_par_stack(string _stack) { opt_par_stack = _stack; }
+	string get_opt_obs_stack()const { return opt_obs_stack; }
+	void set_opt_obs_stack(string _stack) { opt_obs_stack = _stack; }
 
 
 	string get_ies_par_csv()const { return ies_par_csv; }
@@ -374,8 +383,6 @@ public:
 	void set_ies_lambda_dec_fac(double _dec_fac) { ies_lambda_dec_fac = _dec_fac; }
 	bool get_ies_save_lambda_en() const { return ies_save_lambda_en; }
 	void set_ies_save_lambda_en(bool _ies_save_lambda_en) { ies_save_lambda_en = _ies_save_lambda_en; }
-	string get_ies_weight_csv() const { return ies_weight_csv; }
-	void set_ies_weight_csv(string _ies_weight_csv) { ies_weight_csv = _ies_weight_csv; }
 	string get_ies_subset_how() const { return ies_subset_how; }
 	void set_ies_subset_how(string _ies_subset_how) { ies_subset_how = _ies_subset_how; }
 	void set_ies_localize_how(string _how) { ies_localize_how = _how; }
@@ -410,6 +417,14 @@ public:
 	void set_ies_enforce_chglim(bool _flag) { ies_enforce_chglim = _flag; }
 	string get_ies_center_on()const { return ies_center_on; }
 	void set_ies_center_on(string _value) { ies_center_on = _value; }
+	bool get_ies_no_noise() const { return ies_no_noise; }
+	void set_ies_no_noise(bool _flag) { ies_no_noise = _flag; }
+	bool get_ies_drop_conflicts() const { return ies_drop_conflicts; }
+	void set_ies_drop_conflicts(bool _flag) { ies_drop_conflicts = _flag; }
+	bool get_ies_save_rescov() const { return ies_save_rescov; }
+	void set_ies_save_rescov(bool _flag) { ies_save_rescov = _flag; }
+	double get_ies_pdc_sigma_distance() const { return ies_pdc_sigma_distance; }
+	void set_ies_pdc_sigma_distance(double distance) { ies_pdc_sigma_distance = distance; }
 
 	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -418,17 +433,15 @@ public:
 	bool get_gsa_morris_obs_sen() const { return gsa_morris_obs_sen; }
 	void set_gsa_morris_obs_sen(bool _flag) { gsa_morris_obs_sen = _flag; }
 	double get_gsa_morris_p() const { return gsa_morris_p; }
-	void set_gsa_morris_p(double _p) { gsa_morris_p = _p; }
+	void set_gsa_morris_p(int _p) { gsa_morris_p = _p; }
 	double get_gsa_morris_r() const { return gsa_morris_r; }
-	void set_gsa_morris_r(double _r) { gsa_morris_r = _r; }
+	void set_gsa_morris_r(int _r) { gsa_morris_r = _r; }
 	double get_gsa_morris_delta() const { return gsa_morris_delta; }
 	void set_gsa_morris_delta(double _d) { gsa_morris_delta = _d; }
 	int get_gsa_sobol_samples() const { return gsa_sobol_samples; }
 	void set_gsa_sobol_samples(int _s) { gsa_sobol_samples = _s; }
 	string get_gsa_sobol_par_dist() const { return gsa_sobol_par_dist; }
 	void set_gsa_sobol_par_dist(string _d) { gsa_sobol_par_dist = _d; }
-	int get_gsa_rand_seed() const { return gsa_rand_seed; }
-	void set_gsa_rand_seed(int _r) { gsa_rand_seed = _r; }
 
 	set<string> get_passed_args() const { return passed_args; }
 	map<string, string> get_arg_map()const { return arg_map; }
@@ -436,8 +449,34 @@ public:
 	void set_enforce_tied_bounds(bool _flag) { enforce_tied_bounds = _flag; }
 	bool get_enforce_tied_bounds() const { return enforce_tied_bounds; }
 
+	void set_debug_parse_only(bool _flag) { debug_parse_only = _flag; }
+	bool get_debug_parse_only() const { return debug_parse_only; }
+
+	void set_check_tplins(bool _flag) { check_tplins = _flag; }
+	bool get_check_tplins() const { return check_tplins; }
+	void set_fill_tpl_zeros(bool _flag) { fill_tpl_zeros = _flag; }
+	bool get_fill_tpl_zeros() const { return fill_tpl_zeros; }
+	void set_additional_ins_delimiters(string _delims) { additional_ins_delimiters = _delims; }
+	string get_additional_ins_delimiters() const { return additional_ins_delimiters; }
+	void set_random_seed(int seed) { random_seed = seed; }
+	int get_random_seed()const { return random_seed; }
+	bool get_glm_iter_mc() const { return glm_iter_mc; }
+	void set_glm_iter_mc(bool _flag) { glm_iter_mc = _flag; }
+
+	void set_panther_agent_restart_on_error(bool _flag) { panther_agent_restart_on_error = _flag; }
+	bool get_panther_agent_restart_on_error() const { return panther_agent_restart_on_error; }
+	void set_panther_agent_no_ping_timeout_secs(int _timeout_secs) { panther_agent_no_ping_timeout_secs = _timeout_secs; }
+	int get_panther_agent_no_ping_timeout_secs() const { return panther_agent_no_ping_timeout_secs; }
+	void set_panther_debug_loop(bool _flag) { panther_debug_loop = _flag; }
+	bool get_panther_debug_loop() const { return panther_debug_loop; }
+	void set_panther_debug_fail_freeze(bool _flag) { panther_debug_fail_freeze = _flag; }
+	bool get_panther_debug_fail_freeze() const { return panther_debug_fail_freeze; }
+
+	void set_defaults();
+	void summary(ostream& os) const;
 
 private:
+
 	int n_iter_base;
 	int n_iter_super;
 	int max_n_super;
@@ -447,30 +486,48 @@ private:
 	int max_run_fail;
 	int max_super_frz_iter;
 	int max_reg_iter;
+	int glm_num_reals;
+	GLMNormalForm glm_normal_form;
+	bool glm_debug_der_fail;
+	bool glm_debug_lamb_fail;
+	bool glm_debug_real_fail;
+	bool glm_accept_mc_phi;
+	bool glm_rebase_super;
+	bool glm_iter_mc;
+
 	vector<double> base_lambda_vec;
 	vector<double> lambda_scale_vec;
 	bool iter_summary_flag;
 	bool der_forgive;
 	bool uncert;
 	vector<string> prediction_names;
+	string basejac_filename;
+	bool jac_scale;
+	string hotstart_resfile;
 	string parcov_filename;
 	string obscov_filename;
-	string basejac_filename;
+	
+	bool tie_by_group;
+	bool enforce_tied_bounds;
+	bool debug_parse_only;
+	bool check_tplins;
+	bool fill_tpl_zeros;
+	string additional_ins_delimiters;
+
+	int random_seed;
+
 	double overdue_reched_fac;
 	double overdue_giveup_fac;
 	double overdue_giveup_minutes;
+	double worker_poll_interval;
 	string condor_submit_file;
+	
 
 	string sweep_parameter_csv_file;
 	string sweep_output_csv_file;
 	bool sweep_forgive;
 	int sweep_chunk;
 	bool sweep_base_run;
-	bool jac_scale;
-	string hotstart_resfile;
-
-	bool tie_by_group;
-
 
 	GLOBAL_OPT global_opt;
 	double de_f;
@@ -492,6 +549,9 @@ private:
 	double opt_iter_derinc_fac;
 	bool opt_include_bnd_pi;
 	bool opt_std_weights;
+	int opt_stack_size;
+	string opt_par_stack;
+	string opt_obs_stack;
 
 	int ies_subset_size;
 	string ies_par_csv;
@@ -521,7 +581,6 @@ private:
 	bool ies_save_lambda_en;
 	set<string> passed_args;
 	map<string, string> arg_map;
-	string ies_weight_csv;
 	string ies_subset_how;
 	string ies_localize_how;
 	int ies_num_threads;
@@ -536,6 +595,10 @@ private:
 	double ies_autoadaloc_sigma_dist;
 	bool ies_enforce_chglim;
 	string ies_center_on;
+	bool ies_no_noise;
+	bool ies_drop_conflicts;
+	bool ies_save_rescov;
+	double ies_pdc_sigma_distance;
 
 	string gsa_method;
 	int gsa_morris_p;
@@ -545,12 +608,57 @@ private:
 	bool gsa_morris_obs_sen;
 	double gsa_morris_delta;
 	string gsa_sobol_par_dist;
-	int gsa_rand_seed;
 
-	bool enforce_tied_bounds;
-		
+	bool panther_agent_restart_on_error;
+	int panther_agent_no_ping_timeout_secs;
+	bool panther_debug_loop;
+	bool panther_debug_fail_freeze;
 };
-
-ostream& operator<< (ostream &os, const PestppOptions& val);
+//ostream& operator<< (ostream &os, const PestppOptions& val);
 ostream& operator<< (ostream &os, const ObservationInfo& val);
+
+class ControlInfo {
+
+public:
+	enum PestMode { ESTIMATION, REGUL, PARETO, UNKNOWN };
+	double relparmax;
+	double facparmax;
+	double facorig;
+	double phiredswh;
+	int noptmax;
+	int jacfile;
+	int numcom;
+	double phiredstp;
+	int nphistp;
+	int nphinored;
+	double relparstp;
+	int nrelpar;
+	int noptswitch;
+	double splitswh;
+	PestMode pestmode;
+	PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value);
+	ControlInfo() { ; }
+	void set_defaults();
+
+private:
+	set<string> passed_args;
+};
+ostream& operator<< (ostream& os, const ControlInfo& val);
+
+class SVDInfo {
+public:
+	int maxsing;
+	int eigwrite;
+	double eigthresh;
+	SVDInfo();
+	void set_defaults();
+	PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value);
+private:
+	set<string> passed_args;
+};
+ostream& operator<< (ostream& os, const SVDInfo& val);
+
+double draw_standard_normal(std::mt19937& rand_gen);
+
+
 #endif  /* PEST_DATAS_STRUCTS_H_ */

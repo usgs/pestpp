@@ -27,10 +27,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="constraints.h" />
     <ClInclude Include="covariance.h" />
     <ClInclude Include="DifferentialEvolution.h" />
     <ClInclude Include="eigen_tools.h" />
     <ClInclude Include="Ensemble.h" />
+    <ClInclude Include="EnsembleMethodUtils.h" />
     <ClInclude Include="EnsembleSmoother.h" />
     <ClInclude Include="FileManager.h" />
     <ClInclude Include="Jacobian.h" />
@@ -53,16 +55,17 @@
     <ClInclude Include="SVDASolver.h" />
     <ClInclude Include="SVDPackage.h" />
     <ClInclude Include="SVDSolver.h" />
-    <ClInclude Include="SVD_PROPACK.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TerminationController.h" />
     <ClInclude Include="Transformation.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="constraints.cpp" />
     <ClCompile Include="covariance.cpp" />
     <ClCompile Include="DifferentialEvolution.cpp" />
     <ClCompile Include="eigen_tools.cpp" />
     <ClCompile Include="Ensemble.cpp" />
+    <ClCompile Include="EnsembleMethodUtils.cpp" />
     <ClCompile Include="EnsembleSmoother.cpp" />
     <ClCompile Include="FileManager.cpp" />
     <ClCompile Include="Jacobian.cpp" />
@@ -84,7 +87,6 @@
     <ClCompile Include="SVDASolver.cpp" />
     <ClCompile Include="SVDPackage.cpp" />
     <ClCompile Include="SVDSolver.cpp" />
-    <ClCompile Include="SVD_PROPACK.cpp" />
     <ClCompile Include="TerminationController.cpp" />
     <ClCompile Include="Transformation.cpp">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libsrun_managers\abstract_base</AdditionalIncludeDirectories>

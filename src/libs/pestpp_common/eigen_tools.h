@@ -28,14 +28,14 @@ class Transformable;
 
 void get_MatrixXd_row_abs_max(const Eigen::MatrixXd &m, int row, int *max_col, double *max_val);
 
-Eigen::VectorXd stlvec_2_egienvec(const std::vector<double> &stl_vec);
-std::vector<double> egienvec_2_stlvec(const Eigen::VectorXd &eigen_vec);
+Eigen::VectorXd stlvec_2_eigenvec(const std::vector<double> &stl_vec);
+std::vector<double> eigenvec_2_stlvec(const Eigen::VectorXd &eigen_vec);
 
-Eigen::VectorXd transformable_2_egien_vec(const Transformable &data, std::vector<std::string> oredered_names);
+Eigen::VectorXd transformable_2_eigen_vec(const Transformable &data, std::vector<std::string> oredered_names);
 
 void print(const Eigen::MatrixXd &mat, std::ostream &fout);
 
-void matrix_del_cols(Eigen::SparseMatrix<double> &mat, const std::vector<size_t> &col_id_vec);
+void matrix_del_rows_cols(Eigen::SparseMatrix<double> &mat, const std::vector<size_t> &col_id_vec, bool perm_rows, bool perm_cols);
 Eigen::SparseMatrix<double> get_diag_matrix(const Eigen::SparseMatrix<double> &mat);
 
 void print(const Eigen::MatrixXd &mat, std::ostream & fout, int n_per_line=7);

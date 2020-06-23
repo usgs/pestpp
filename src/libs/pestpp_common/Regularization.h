@@ -21,14 +21,16 @@
 
 #include <unordered_map>
 #include <string>
+#include "pest_data_structs.h"
 class ModelRun;
 
 class DynamicRegularization
 {
 public:
-	DynamicRegularization(bool _use_dynamic_reg = false, bool _grp_weight_adj = false, double _phi_m_lim = 0,
+	/*DynamicRegularization(bool _use_dynamic_reg = false, bool _grp_weight_adj = false, double _phi_m_lim = 0,
 		double _phi_m_accept = 0, double _frac_phi_m = 1, double _wf_min = 1e-10, double _wf_max = 1e10,
-		double _wffac = 0, double _wftol = 1000, double _wf_init = 1.0, int _max_reg_iter=20);
+		double _wffac = 0, double _wftol = 1000, double _wf_init = 1.0, int _max_reg_iter=20);*/
+	DynamicRegularization() { ; }
 	DynamicRegularization(const DynamicRegularization &rhs);
 	virtual double get_weight() const;
 	virtual int get_max_reg_iter() const { return max_reg_iter; }
@@ -41,14 +43,18 @@ public:
 	virtual double get_wftol() const { return wftol; }
 	virtual double get_wfinit() const { return wf_init; }
 	virtual bool get_use_dynamic_reg() const { return use_dynamic_reg; }
+	virtual void set_use_dynamic_reg(bool _flag) { use_dynamic_reg = _flag; }
 	virtual bool get_adj_grp_weights() const { return adj_grp_weights; }
 	virtual double get_grp_weight_fact(const std::string &grp_name) const;
 	virtual void set_weight(double _tikhonov_weight) {tikhonov_weight = _tikhonov_weight;}
 	virtual void set_max_reg_iter(int _max_reg_iter) { max_reg_iter = _max_reg_iter; }
 	virtual void set_regul_grp_weights(const std::unordered_map<std::string, double> &_regul_grp_weights) { regul_grp_weights = _regul_grp_weights; }
-	static DynamicRegularization get_unit_reg_instance() { return DynamicRegularization(); }
-	static DynamicRegularization get_zero_reg_instance() { return DynamicRegularization(true, false, 0,0,0,0,0,0,0,0); }
+	static DynamicRegularization get_unit_reg_instance();
+	static DynamicRegularization get_zero_reg_instance(); //{ return DynamicRegularization(true, false, 0,0,0,0,0,0,0,0); }
 	virtual ~DynamicRegularization(void){}
+	virtual PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value);
+	virtual void set_defaults();
+	virtual void set_zero();
 protected:
 	bool use_dynamic_reg;
 	bool adj_grp_weights;
@@ -63,6 +69,7 @@ protected:
 	double wf_init;
 	double tikhonov_weight;
 	std::unordered_map<std::string, double> regul_grp_weights;
+	set<string> passed_args;
 };
 
 

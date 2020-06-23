@@ -2,6 +2,8 @@
 #include <iomanip>
 #include <unordered_set>
 #include <iterator>
+#include <limits>
+#include <cstddef>
 #include "Ensemble.h"
 #include "RestartController.h"
 #include "utilities.h"
@@ -11,13 +13,32 @@
 #include "covariance.h"
 #include "PerformanceLog.h"
 #include "system_variables.h"
+#include "pest_data_structs.h"
 
-mt19937_64 Ensemble::rand_engine = mt19937_64(1);
-
-Ensemble::Ensemble(Pest *_pest_scenario_ptr): pest_scenario_ptr(_pest_scenario_ptr)
+Ensemble::Ensemble(Pest *_pest_scenario_ptr, std::mt19937* _rand_gen_ptr): pest_scenario_ptr(_pest_scenario_ptr),
+rand_gen_ptr(_rand_gen_ptr)
 {
-	// initialize random number generator
-	rand_engine.seed(1123433458);
+}
+
+bool Ensemble::try_align_other_rows(PerformanceLog* performance_log, Ensemble& other)
+{
+	map<string, int> other_real_map = other.get_real_map(), this_real_map = get_real_map();
+	bool need_to_align = false;
+	for (auto item : this_real_map)
+	{
+		//if even one realization name is not common, we are done here
+		if (other_real_map.find(item.first) == other_real_map.end())
+			return false;
+		//if this realization name is not at the same location then we do need to reorder
+		if (item.second != other_real_map[item.first])
+			need_to_align = true;
+	}
+	//if we made it to here and need_to_align is false, then two ensembles are already row aligned
+	if (!need_to_align)
+		return false;
+	performance_log->log_event("Ensemble::try_align_other_rows(): reorderig other ensemble");
+	other.reorder(real_names, vector<string>(),true);
+	return true;
 }
 
 void Ensemble::check_for_dups()
@@ -57,7 +78,7 @@ void Ensemble::reserve(vector<string> _real_names, vector<string> _var_names)
 Ensemble Ensemble::zero_like()
 {
 	Eigen::MatrixXd new_reals = Eigen::MatrixXd::Zero(real_names.size(), var_names.size());
-	Ensemble new_en(pest_scenario_ptr);
+	Ensemble new_en(pest_scenario_ptr, rand_gen_ptr);
 	new_en.from_eigen_mat(new_reals, real_names, var_names);
 	return new_en;
 }
@@ -147,14 +168,22 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 
 	//make standard normal draws
 	plog->log_event("making standard normal draws");
-	RedSVD::sample_gaussian(draws);
+	//RedSVD::sample_gaussian(draws);
+	for (int i = 0; i < num_reals; i++)
+	{
+		for (int j = 0; j < draw_names.size(); j++)
+		{
+			draws(i, j) = draw_standard_normal(*rand_gen_ptr);
+		}
+	}
+
 	if (level > 2)
 	{
 		ofstream f("standard_normal_draws.dat");
 		f << draws << endl;
 		f.close();
 	}
-	Eigen::MatrixXd draws_temp = draws;
+	//Eigen::MatrixXd draws_temp = draws;
 
 	Eigen::VectorXd std = cov.e_ptr()->diagonal().cwiseSqrt();
 	map<string, double> std_map;
@@ -332,8 +361,9 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 			double fac = cov.e_ptr()->diagonal().minCoeff();
 			ss.str("");
 			ss << "min variance: " << fac;
-			RedSVD::RedSymEigen<Eigen::SparseMatrix<double>> eig(*cov.e_ptr() * (1.0/fac), ncomps);
-			Eigen::MatrixXd proj = (eig.eigenvectors() * (fac * eig.eigenvalues()).cwiseSqrt().asDiagonal());
+			RedSVD::RedSymEigen<Eigen::SparseMatrix<double>> eig(*cov.e_ptr()* (1.0 / fac));
+			//dirty trick alert: apply the abs to make sure all eigen values are positive - nasty!
+			Eigen::MatrixXd proj = (eig.eigenvectors() * (fac * eig.eigenvalues()).cwiseAbs().cwiseSqrt().asDiagonal());
 
 			if (level > 2)
 			{
@@ -341,7 +371,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 				f << eig.eigenvectors() << endl;
 				f.close();
 				f.open("cov_sqrt_evals.dat");
-				f << (fac * eig.eigenvalues()).cwiseSqrt() << endl;
+				f << (fac * eig.eigenvalues()).cwiseAbs().cwiseSqrt() << endl;
 				f.close();
 				f.open("cov_projection_matrix.dat");
 				f << proj << endl;
@@ -385,15 +415,8 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 
 
 
-	//form some realization names
-	real_names.clear();
-	stringstream ss;
-	for (int i = 0; i < num_reals; i++)
-	{
-		ss.str("");
-		ss << i;
-		real_names.push_back(ss.str());
-	}
+	real_names = get_generic_real_names(num_reals);
+
 	org_real_names = real_names;
 	//add the mean values - using the Transformable instance (initial par value or observed value)
 	plog->log_event("resizing reals matrix");
@@ -428,6 +451,64 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 	}
 }
 
+vector<string> Ensemble::get_generic_real_names(int num_reals)
+{
+	//form some realization names
+	vector<string> rnames;
+	stringstream ss;
+	for (int i = 0; i < num_reals; i++)
+	{
+		ss.str("");
+		ss << i;
+		rnames.push_back(ss.str());
+	}
+	return rnames;
+}
+
+pair<Covariance,Covariance> Ensemble::get_empirical_cov_matrices(FileManager* file_manager_ptr)
+{
+	//Eigen::MatrixXd rmat = get_obs_resid(oe, false); //dont apply ineq constraints
+	//ObservationEnsemble(Pest *_pest_scenario_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
+	Eigen::MatrixXd ercov = reals.transpose() * reals;
+	Covariance rcov(var_names, ercov.sparseView());
+	Eigen::MatrixXd anom = get_eigen_anomalies();
+	Eigen::VectorXd wij;
+	double num_reals = static_cast<double>(shape().first);
+	double wij_sum = 0;
+	double demon = 0;
+	for (int i = 0; i < ercov.rows(); i++)
+	{
+		for (int j = 0; j < ercov.cols(); j++)
+		{
+			if (i == j)
+				continue;
+			demon = demon + (ercov(i, j) * ercov(i, j));
+		}
+	}
+	for (int i = 0; i < shape().second; i++)
+	{
+		for (int j = 0; j < shape().second; j++)
+		{
+			if (i == j)
+				continue;
+			wij = anom.col(i).cwiseProduct(anom.col(j));
+			wij_sum = wij_sum + (wij.array() - wij.mean()).square().sum();
+
+		}
+	}
+	double scale = (num_reals / ((num_reals - 1.) * (num_reals - 1.) * (num_reals - 1.))) * wij_sum;
+	scale = scale / demon;
+	cout << "optimal residual covariance matrix shrinkage factor: " << scale << endl;
+	file_manager_ptr->rec_ofstream() << "optimal residual covariance matrix shrinkage factor : " << scale << endl;
+		
+	Covariance rcov_diag;
+	rcov_diag.from_diagonal(rcov);
+	Eigen::MatrixXd shrunk = rcov_diag.e_ptr()->toDense();
+	Eigen::MatrixXd t = (rcov_diag.e_ptr()->toDense().array() * scale) + (rcov.e_ptr()->toDense().array() * (1. - scale));
+	Covariance rcov_shrunk(rcov.get_row_names(), t.sparseView());
+
+	return pair<Covariance,Covariance> (rcov,rcov_shrunk);
+}
 
 Covariance Ensemble::get_diagonal_cov_matrix()
 {
@@ -545,6 +626,19 @@ pair<map<string, double>, map<string, double>>  Ensemble::get_moment_maps(const 
 	return pair<map<string, double>, map<string, double>>(mean_map,std_map);
 }
 
+void Ensemble::replace_col(string var_name, Eigen::VectorXd& vec)
+{
+	update_var_map();
+	if (var_map.find(var_name) == var_map.end())
+		throw_ensemble_error("replace_col(): var_name not found: " + var_name);
+	if (vec.size() != reals.rows())
+	{
+		stringstream ss;
+		ss << "replace_col(): vec of length " << vec.size() << " not aligned with reals first dimen " << reals.rows();
+		throw_ensemble_error(ss.str());
+	}
+	reals.col(var_map[var_name]) = vec;
+}
 
 //Ensemble Ensemble::get_mean()
 //{
@@ -577,14 +671,18 @@ void Ensemble::set_eigen(Eigen::MatrixXd _reals)
 }
 
 
-void Ensemble::reorder(const vector<string> &_real_names, const vector<string> &_var_names)
+void Ensemble::reorder(const vector<string> &_real_names, const vector<string> &_var_names, bool update_org_real_names)
 {
 	//reorder inplace
 	reals = get_eigen(_real_names, _var_names);
 	if (_var_names.size() != 0)
 		var_names = _var_names;
 	if (_real_names.size() != 0)
+	{
 		real_names = _real_names;
+		if (update_org_real_names)
+			org_real_names = _real_names;
+	}
 }
 
 void Ensemble::drop_rows(const vector<int> &row_idxs)
@@ -615,6 +713,22 @@ void Ensemble::drop_rows(const vector<string> &drop_names)
 	real_names = keep_names;
 
 }
+
+void Ensemble::drop_cols(const vector<string>& drop_names)
+{
+	vector<string> keep_names;
+	vector<string>::const_iterator start = drop_names.begin(), end = drop_names.end();
+	for (auto& n : var_names)
+		if (find(start, end, n) == end)
+			keep_names.push_back(n);
+	if (keep_names.size() == 0)
+		reals = Eigen::MatrixXd();
+	else
+		reals = get_eigen(vector<string>(), keep_names);
+	var_names = keep_names;
+
+}
+
 
 
 void Ensemble::keep_rows(const vector<int> &row_idxs)
@@ -915,6 +1029,26 @@ Ensemble::~Ensemble()
 {
 }
 
+map<string, int> Ensemble::get_real_map()
+{
+
+	map<string, int> real_map;
+	for (int i = 0; i < real_names.size(); i++)
+		real_map[real_names[i]] = i;
+	return real_map;
+}
+
+//Ensemble& Ensemble::operator=(const Ensemble& other)
+//{
+//	if (this != &other)
+//	{
+//		pest_scenario_ptr = other.pest_scenario_ptr;
+//		rand_gen_ptr = other.rand_gen_ptr;
+//	}
+//	return *this;
+//	
+//}
+
 pair<map<string,int>, map<string, int>> Ensemble::prepare_csv(const vector<string> &names, ifstream &csv, bool forgive)
 {
 	//prepare the input csv for reading checks for compatibility with var_names, forgives extra names in csv
@@ -974,7 +1108,7 @@ pair<map<string,int>, map<string, int>> Ensemble::prepare_csv(const vector<strin
 	for (auto &name : names)
 		if (hset.find(name) == end)
 			missing_names.push_back(name);
-	if (pest_scenario_ptr->get_pestpp_options().get_ies_csv_by_reals())
+	/*if (pest_scenario_ptr->get_pestpp_options().get_ies_csv_by_reals())
 	{
 		if (missing_names.size() > 0)
 		{
@@ -986,6 +1120,19 @@ pair<map<string,int>, map<string, int>> Ensemble::prepare_csv(const vector<strin
 			else
 				cout << ss.str() << endl << "continuing anyway..." << endl;
 		}
+	}*/
+	if (missing_names.size() > 0)
+	{
+		stringstream ss;
+		if (csv_by_reals)
+			ss << " the following names were not found in the csv file header:" << endl;
+		else
+			ss << " the following names were not found in the first column of the csv file:" << endl;
+		for (auto& n : missing_names) ss << n << endl;
+		if (!forgive)
+			throw runtime_error(ss.str());
+		else
+			cout << ss.str() << endl << "continuing anyway..." << endl;
 	}
 
 	vector<string> header_names;
@@ -1600,7 +1747,8 @@ void Ensemble::read_csv_by_reals(int num_reals,ifstream &csv, map<string,int> &h
 		{
 			try
 			{
-				val = pest_utils::convert_cp<double>(tokens[hi.second]);
+				//val = pest_utils::convert_cp<double>(tokens[hi.second]);
+				val = stod(tokens[hi.second]);
 			}
 			catch (exception &e)
 			{
@@ -1685,13 +1833,14 @@ void Ensemble::read_csv_by_vars(int num_reals, ifstream &csv, map<string, int> &
 
 
 
-ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr):Ensemble(_pest_scenario_ptr)
+ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr):Ensemble(_pest_scenario_ptr, rand_gen_ptr)
 {
 	par_transform = pest_scenario_ptr->get_base_par_tran_seq();
+	tstat = transStatus::CTL;
 }
 
-ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, Eigen::MatrixXd _reals, 
-	vector<string> _real_names, vector<string> _var_names):Ensemble(_pest_scenario_ptr)
+ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _rand_gen_ptr, Eigen::MatrixXd _reals,
+	vector<string> _real_names, vector<string> _var_names):Ensemble(_pest_scenario_ptr, _rand_gen_ptr)
 {
 	par_transform = pest_scenario_ptr->get_base_par_tran_seq();
 	if (_reals.rows() != _real_names.size())
@@ -1701,14 +1850,24 @@ ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, Eigen::MatrixXd _
 	reals = _reals;
 	var_names = _var_names;
 	real_names = _real_names;
+	tstat = transStatus::CTL;
 }
 
 
 
-void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level)
+void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
 {
 	///draw a parameter ensemble
 	var_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names(); //only draw for adjustable pars
+	vector<string> cov_names = cov.get_col_names();
+	set<string> scov_names(cov_names.begin(), cov_names.end());
+	var_names.clear();
+	for (auto name : pest_scenario_ptr->get_ctl_ordered_adj_par_names())
+	{
+		if (scov_names.find(name) != scov_names.end())
+			var_names.push_back(name);
+	}
+	
 	//Parameters par = pest_scenario_ptr->get_ctl_parameters();
 	par_transform.active_ctl2numeric_ip(par);//removes fixed/tied pars
 	tstat = transStatus::NUM;
@@ -1753,7 +1912,6 @@ void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, Per
 			var_names = sorted_var_names;
 		}
 	}
-
 	Ensemble::draw(num_reals, cov, par, var_names, grouper, plog, level);
 	/*map<string, int> header_info;
 	for (int i = 0; i < var_names.size(); i++)
@@ -1778,7 +1936,7 @@ void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, Per
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_enforce_bounds())
 		//dont enforce parchglim-style here - if a pars initial value is near its bound, lots of realizations 
 		//will be near zero length.  
-		enforce_limits(false);
+		enforce_limits(plog, false);
 
 
 }
@@ -1788,7 +1946,6 @@ void ParameterEnsemble::set_pest_scenario(Pest *_pest_scenario)
 	pest_scenario_ptr = _pest_scenario;
 	par_transform = pest_scenario_ptr->get_base_par_tran_seq();
 }
-
 
 void ParameterEnsemble::set_zeros()
 {
@@ -1800,7 +1957,7 @@ ParameterEnsemble ParameterEnsemble::zeros_like()
 
 	Eigen::MatrixXd new_reals = Eigen::MatrixXd::Zero(real_names.size(), var_names.size());
 	
-	ParameterEnsemble new_en(pest_scenario_ptr);
+	ParameterEnsemble new_en(pest_scenario_ptr, rand_gen_ptr);
 	new_en.from_eigen_mat(new_reals, real_names, var_names);
 	return new_en;
 
@@ -2046,7 +2203,7 @@ void ParameterEnsemble::save_fixed()
 	}
 }
 
-void ParameterEnsemble::enforce_limits(bool enforce_chglim)
+void ParameterEnsemble::enforce_limits(PerformanceLog* plog, bool enforce_chglim)
 {
 	
 	if (tstat != ParameterEnsemble::transStatus::NUM)
@@ -2063,7 +2220,7 @@ void ParameterEnsemble::enforce_limits(bool enforce_chglim)
 
 			Parameters real(var_names, reals.row(i));
 
-			pest_scenario_ptr->enforce_par_limits(real, base, true, true);
+			pest_scenario_ptr->enforce_par_limits(plog, real, base, true, true);
 			//pest_scenario_ptr->enforce_par_limits(real, base, true, false);
 			reals.row(i) = real.get_data_eigen_vec(var_names);
 		}
@@ -2085,7 +2242,7 @@ void ParameterEnsemble::enforce_limits(bool enforce_chglim)
 				real.update_without_clear(var_names, reals.row(i));
 				Parameters real_ctl = pest_scenario_ptr->get_base_par_tran_seq().numeric2ctl_cp(real);
 
-				cout << "";
+				//cout << "";
 				for (auto n : var_names)
 				{
 					v = real_ctl[n];
@@ -2401,12 +2558,12 @@ Covariance ParameterEnsemble::get_diagonal_cov_matrix()
 	return Ensemble::get_diagonal_cov_matrix();
 }
 
-ObservationEnsemble::ObservationEnsemble(Pest *_pest_scenario_ptr): Ensemble(_pest_scenario_ptr)
+ObservationEnsemble::ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _rand_gen_ptr): Ensemble(_pest_scenario_ptr, _rand_gen_ptr)
 {
 }
 
-ObservationEnsemble::ObservationEnsemble(Pest *_pest_scenario_ptr, Eigen::MatrixXd _reals,
-	vector<string> _real_names, vector<string> _var_names) : Ensemble(_pest_scenario_ptr)
+ObservationEnsemble::ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _rand_gen_ptr, Eigen::MatrixXd _reals,
+	vector<string> _real_names, vector<string> _var_names) : Ensemble(_pest_scenario_ptr, _rand_gen_ptr)
 {
 	if (_reals.rows() != _real_names.size())
 		throw_ensemble_error("ParameterEnsemble() _reals.rows() != _real_names.size()");
@@ -2418,10 +2575,32 @@ ObservationEnsemble::ObservationEnsemble(Pest *_pest_scenario_ptr, Eigen::Matrix
 }
 
 
-void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level)
+void ObservationEnsemble::initialize_without_noise(int num_reals)
+{
+	var_names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+	Observations obs = pest_scenario_ptr->get_ctl_observations();
+	Eigen::VectorXd obsvals = obs.get_data_eigen_vec(var_names);
+	reals.resize(num_reals, var_names.size());
+	for (int i = 0; i < num_reals; i++)
+	{
+		reals.row(i) = obsvals;
+	}
+	real_names.clear();
+	stringstream ss;
+	for (int i = 0; i < num_reals; i++)
+	{
+		ss.str("");
+		ss << i;
+		real_names.push_back(ss.str());
+	}
+	org_real_names = real_names;
+
+}
+
+void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
 {
 	//draw an obs ensemble using only nz obs names
-	var_names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+	var_names = pest_scenario_ptr->get_ctl_ordered_nz_obs_names();
 	Observations obs = pest_scenario_ptr->get_ctl_observations();
 	ObservationInfo oi = pest_scenario_ptr->get_ctl_observation_info();
 	map<string, vector<string>> grouper;
@@ -2438,6 +2617,72 @@ void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *p
 		}
 	}
 	Ensemble::draw(num_reals, cov, obs, pest_scenario_ptr->get_ctl_ordered_nz_obs_names(), grouper, plog, level);
+
+	//apply any bounds that were supplied
+	map<string, double> lower_bnd = pest_scenario_ptr->get_ext_file_double_map("observation data external", "lower_bound");
+	map<string, double> upper_bnd = pest_scenario_ptr->get_ext_file_double_map("observation data external", "upper_bound");
+	set<string> snames(var_names.begin(), var_names.end());
+	double v, lb, ub;
+	Eigen::VectorXd col;
+	string var_name;
+	if ((lower_bnd.size() > 0) || (upper_bnd.size() > 0))
+	{
+		frec << "Note: the following observations contain 'lower_bound' and/or 'upper_bound' information that will be" << endl;
+		frec << "      enforced on the additive noise realizations: " << endl;
+		for (int j = 0; j < reals.cols(); j++)
+		{
+			var_name = var_names[j];
+			lb = std::numeric_limits<double>::lowest();
+			ub = 1.79769e+308;//std::numeric_limits<double>::max();
+			if (lower_bnd.find(var_name) != lower_bnd.end())
+			{
+				lb = lower_bnd[var_name];
+			}
+			if (upper_bnd.find(var_name) != upper_bnd.end())
+			{
+				ub = upper_bnd[var_name];
+			}
+			frec << var_name << " " << lb << " " << ub << endl;
+			col = reals.col(j);
+
+			for (int i = 0; i < reals.rows(); i++)
+			{
+				v = col(i);
+				v = v < lb ? lb : v;
+				col(i) = v > ub ? ub : v;
+			}
+			reals.col(j) = col;
+			
+		}
+	}
+	
+
+
+	//now fill in all the zero-weighted obs
+	Eigen::MatrixXd drawn = reals;
+	vector<string> full_var_names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+	reals.resize(num_reals, full_var_names.size());
+	reals.setConstant(-1.0e30);
+	map<string, int> vmap;
+	for (int i = 0; i < var_names.size(); i++)
+		vmap[var_names[i]] = i;
+	map<string, int>::iterator end = vmap.end();
+	//for (auto n : full_var_names)
+	string n;
+	double val;
+	for (int i = 0; i < full_var_names.size(); i++)
+	{
+		n = full_var_names[i];
+		if (vmap.find(n) != end)
+			reals.col(i) = drawn.col(vmap[n]);
+		else
+		{
+			val = obs.get_rec(n);
+			reals.col(i).setConstant(val);
+		}
+	}
+	var_names = full_var_names;
+	
 }
 
 void ObservationEnsemble::update_from_obs(int row_idx, Observations &obs)
@@ -2508,7 +2753,7 @@ void ObservationEnsemble::from_csv(string file_name)
 	ifstream csv(file_name);
 	if (!csv.good())
 		throw runtime_error("error opening observation csv " + file_name + " for reading");
-	pair<map<string,int>, map<string, int>> p =prepare_csv(pest_scenario_ptr->get_ctl_ordered_nz_obs_names(), csv, false);
+	pair<map<string,int>, map<string, int>> p = prepare_csv(pest_scenario_ptr->get_ctl_ordered_nz_obs_names(), csv, false);
 
 	map<string, int> header_info = p.first, index_info = p.second;
 	//blast through the file to get number of reals
@@ -2542,7 +2787,7 @@ void ObservationEnsemble::from_eigen_mat(Eigen::MatrixXd mat, const vector<strin
 		if (find(start, end, name) == end)
 			missing.push_back(name);
 	if (missing.size() > 0)
-		throw_ensemble_error("ObservationEnsemble.from_eigen_mat() the following obs names no found: ", missing);
+		throw_ensemble_error("ObservationEnsemble.from_eigen_mat() the following obs names not found: ", missing);
 	Ensemble::from_eigen_mat(mat, _real_names, _var_names);
 }
 

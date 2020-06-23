@@ -129,11 +129,12 @@ ostream& operator<< (ostream& out, const PriorInformationRec &rhs)
 				out << "LOG(" << (*b).par_name << ")";
 			else
 				out << (*b).par_name;
-			out << " = " << rhs.pival;
-			out << "   " << rhs.weight;
-			out << "   " << rhs.group;
-			out << endl;
+			
 	}
+	out << " = " << rhs.pival;
+	out << "   " << rhs.weight;
+	out << "   " << rhs.group;
+	out << endl;
 	return out;
 }
 
@@ -144,8 +145,10 @@ void PriorInformation::AddRecord(const string &name, const PriorInformationRec* 
 
 }
 
-pair<string,string> PriorInformation::AddRecord(const string &pi_line)
+pair<string, string> PriorInformation::AddRecord(const string& pi_line)
 {
+	vector<string> tokens;
+	tokenize(upper_cp(strip_cp(pi_line)), tokens);
 	string par_name;
 	double pifac;
 	double pival;
@@ -154,21 +157,20 @@ pair<string,string> PriorInformation::AddRecord(const string &pi_line)
 	string group;
 	bool plus_sign;
 	vector<PIAtom> pi_atoms;
-	vector<string> tokens;
-	tokenize(upper_cp(strip_cp(pi_line)), tokens);
 	int n_tokens = tokens.size();
-	group = tokens[n_tokens-1];
-	convert_ip(tokens[n_tokens-2], weight);
-	convert_ip(tokens[n_tokens-3], pival);
+
+	group = tokens[n_tokens - 1];
+	convert_ip(tokens[n_tokens - 2], weight);
+	convert_ip(tokens[n_tokens - 3], pival);
 
 	string prior_info_name = tokens[0];
 	// process prior information equation
 	plus_sign = true;
-	for (int i=1; i< n_tokens-4; i+=4)
+	for (int i = 1; i < n_tokens - 4; i += 4)
 	{
 		convert_ip(tokens[i], pifac);
 		// token i+1 = "*"
-		par_name = tokens[i+2];
+		par_name = tokens[i + 2];
 		if (par_name.find("LOG") == 0) // parameter name
 		{
 			log_trans = true;
@@ -184,7 +186,67 @@ pair<string,string> PriorInformation::AddRecord(const string &pi_line)
 		pi_atoms.push_back(PIAtom(par_name, log_trans, pifac));
 
 
-		if (tokens[i+3] == "+") {
+		if (tokens[i + 3] == "+") {
+			plus_sign = true;
+		}
+		else {
+			plus_sign = false;
+		}
+	}
+	prior_info_map[prior_info_name] = PriorInformationRec(pival, weight, group, pi_atoms);
+	return pair<string, string>(prior_info_name, group);
+}
+
+
+pair<string, string> PriorInformation::AddRecord(const vector<string> tokens)
+{
+	//here we expect tokens to have the entire pi equation as a string, so we need to split it up and insert it into tokens
+	vector<string> eq_tokens;// , full_tokens;
+	tokenize(tokens[1], eq_tokens);
+	//full_tokens = tokens;
+	//vector<string>::iterator it = full_tokens.begin() + 1;// distance(full_tokens.begin(), 1);
+	//full_tokens.insert(it, eq_tokens.begin(), eq_tokens.end());
+	//it = full_tokens.end() - 3;
+	//full_tokens.erase(it);
+	string par_name;
+	double pifac;
+	double pival;
+	double weight;
+	bool log_trans;
+	string group;
+	bool plus_sign;
+	vector<PIAtom> pi_atoms;
+	int n_tokens = tokens.size();
+	int n_tokens_eq = eq_tokens.size();
+
+	group = tokens[n_tokens-1];
+	convert_ip(tokens[n_tokens-2], weight);
+	convert_ip(eq_tokens[n_tokens_eq-1], pival);
+
+	string prior_info_name = tokens[0];
+	// process prior information equation
+	plus_sign = true;
+	for (int i=0; i< n_tokens_eq-4; i+=4)
+	{
+		convert_ip(eq_tokens[i], pifac);
+		// token i+1 = "*"
+		par_name = eq_tokens[i+2];
+		if (par_name.find("LOG") == 0) // parameter name
+		{
+			log_trans = true;
+			par_name = par_name.substr(4, par_name.size() - 5); // remove "log(" from front and ")" from rear of tokens[i+1]
+		}
+		else {
+			log_trans = false;
+		}
+		if (!plus_sign)
+			pifac *= -1.0;
+
+		// add term to vector storing prior information equation
+		pi_atoms.push_back(PIAtom(par_name, log_trans, pifac));
+
+
+		if (eq_tokens[i+3] == "+") {
 			plus_sign = true;
 		}
 		else {

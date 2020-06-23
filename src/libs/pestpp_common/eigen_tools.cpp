@@ -50,7 +50,7 @@ void get_MatrixXd_row_abs_max(const MatrixXd &m, int row, int *max_col, double *
 	}
 }
 
-VectorXd stlvec_2_egienvec(const std::vector<double> &stl_vec)
+VectorXd stlvec_2_eigenvec(const std::vector<double> &stl_vec)
 {
 	size_t len = stl_vec.size();
 	VectorXd la_vec(len);
@@ -61,7 +61,7 @@ VectorXd stlvec_2_egienvec(const std::vector<double> &stl_vec)
 	return la_vec;
 }
 
-vector<double> egienvec_2_stlvec(const VectorXd &eigen_vec)
+vector<double> eigenvec_2_stlvec(const VectorXd &eigen_vec)
 {
 	size_t len = eigen_vec.size();
 	vector<double> stl_vec;
@@ -74,7 +74,7 @@ vector<double> egienvec_2_stlvec(const VectorXd &eigen_vec)
 }
 
 
-Eigen::VectorXd transformable_2_egien_vec(const Transformable &data, vector<string> oredered_names)
+Eigen::VectorXd transformable_2_eigen_vec(const Transformable &data, vector<string> oredered_names)
 {
 	size_t len = oredered_names.size();
 	VectorXd new_vec(len);
@@ -90,29 +90,29 @@ Eigen::VectorXd transformable_2_egien_vec(const Transformable &data, vector<stri
 }
 
 
-void matrix_del_cols(Eigen::SparseMatrix<double> &mat, const vector<size_t> &col_id_vec)
+void matrix_del_rows_cols(Eigen::SparseMatrix<double> &mat, const vector<size_t> &id_vec, bool perm_rows, bool perm_cols)
 {
-	if (!col_id_vec.empty())
+	if (!id_vec.empty())
 	{
 		size_t ncols = mat.cols();
-		set<int> del_col_set(col_id_vec.begin(), col_id_vec.end());
+		set<int> del_set(id_vec.begin(), id_vec.end());
 
 		std::vector<Eigen::Triplet<int> > triplet_list;
 
 		// add rows to be retained to the beginning of the  permuatation matrix
 		int icol_new = 0;
-		int n_col_save = 0;
+		int n_save = 0;
 		for (int icol_old = 0; icol_old<ncols; ++icol_old)
 		{
-			if (del_col_set.find(icol_old) == del_col_set.end())
+			if (del_set.find(icol_old) == del_set.end())
 			{
 				triplet_list.push_back(Eigen::Triplet<int>(icol_old, icol_new, 1));
 				++icol_new;
-				++n_col_save;
+				++n_save;
 			}
 		}
 		// add rows to be deleted to end to permuatation matrix
-		for (int icol_old :  col_id_vec)
+		for (int icol_old :  id_vec)
 		{
 			triplet_list.push_back(Eigen::Triplet<int>(icol_old, icol_new, 1));
 			++icol_new;
@@ -120,8 +120,23 @@ void matrix_del_cols(Eigen::SparseMatrix<double> &mat, const vector<size_t> &col
 		Eigen::SparseMatrix<double> perm_sparse_matrix(ncols, ncols);
 		perm_sparse_matrix.setZero();
 		perm_sparse_matrix.setFromTriplets(triplet_list.begin(), triplet_list.end());
-		Eigen::SparseMatrix<double> new_matrix = mat * perm_sparse_matrix;
-		mat = new_matrix.leftCols(n_col_save);
+		Eigen::SparseMatrix<double> new_matrix;
+		if ((perm_rows) && (perm_cols))
+		{
+			new_matrix = perm_sparse_matrix.transpose() * mat * perm_sparse_matrix;
+			mat = new_matrix.topLeftCorner(n_save, n_save);
+		}
+		else if (perm_cols)
+		{
+			new_matrix = mat * perm_sparse_matrix;
+			mat = new_matrix.leftCols(n_save);
+		}
+		else if (perm_rows)
+		{
+			new_matrix = perm_sparse_matrix.transpose() * mat;
+			mat = new_matrix.topRows(n_save);
+		}
+
 	}
 }
 

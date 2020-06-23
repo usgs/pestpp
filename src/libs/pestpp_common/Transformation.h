@@ -34,6 +34,7 @@
 #include <Eigen/Sparse>
 #include "Transformable.h"
 #include "SVD_PROPACK.h"
+//#include "covariance.h"
 
 class Jacobian;
 class QSqrtMatrix;
@@ -291,10 +292,10 @@ class TranSVD: public Transformation {
 public:
 	TranSVD(int _max_sing, double _eign_thresh, const string &_name = "unnamed TranSVD");
 	TranSVD(const TranSVD &rhs);
-	void set_SVD_pack_propack();
+	void set_SVD_pack();
 	void update_reset_frozen_pars(const Jacobian &jacobian, const QSqrtMatrix &Q_sqrt, const Parameters &base_numeric_pars,
-		int maxsing, double eigthresh, const vector<string> &par_names, const vector<string> &obs_names,
-		const Parameters &_frozen_derivative_pars=Parameters());
+		int maxsing, double eigthresh, const vector<string> &par_names, const vector<string> &obs_names, 
+		Eigen::SparseMatrix<double>& parcov_inv, map<string,double> dss,const Parameters &_frozen_derivative_pars=Parameters());
 	void update_add_frozen_pars(const Parameters &_frozen_derivative_pars);
 	Parameters& get_frozen_derivative_pars() {return frozen_derivative_parameters;}
 	const vector<string>& get_super_parameter_names(){return super_parameter_names;}
@@ -322,13 +323,15 @@ protected:
 	vector<string> base_parameter_names;
 	vector<string> super_parameter_names;
 	vector<string> obs_names;
-	Eigen::SparseMatrix<double> SqrtQ_J;
+	//Eigen::SparseMatrix<double> SqrtQ_J;
+	Eigen::SparseMatrix<double> jtqj;
 	Eigen::VectorXd Sigma;
 	Eigen::SparseMatrix<double> U;
 	Eigen::SparseMatrix<double> Vt;
 	Parameters init_base_numeric_parameters;
 	Parameters frozen_derivative_parameters;
 	void calc_svd();
+	map<string, double> dss;
 };
 
 //class TranNormalize: public Transformation {

@@ -28,6 +28,7 @@
 #include "pest_data_structs.h"
 #include "PriorInformation.h"
 #include "Regularization.h"
+#include "utilities.h"
 
 using namespace std;
 class FileManager;
@@ -39,10 +40,13 @@ public:
 	friend ostream& operator<< (ostream &os, const Pest& val);
 	Pest();
 	void set_defaults();
-	void check_inputs(ostream &f_rec);
-	void check_io();
-	int process_ctl_file(ifstream &fin, string pst_filename, ofstream &f_rec);
-	int process_ctl_file(ifstream &fin, string pst_filename);
+	void check_inputs(ostream &f_rec, bool forgive_bound=false);
+	void check_io(ofstream& f_rec);
+	//int process_ctl_file_old(ifstream &fin, string pst_filename, ofstream &f_rec);
+	//int process_ctl_file_old(ifstream &fin, string pst_filename);
+	int process_ctl_file(ifstream& fin, string pst_filename, ofstream& f_rec);
+	int process_ctl_file(ifstream& fin, string pst_filename);
+
 	int get_n_adj_par(){ return n_adj_par; }
 	const Parameters& get_ctl_parameters() const {return ctl_parameters;}
 	const Observations& get_ctl_observations() const {return observation_values;}
@@ -78,14 +82,16 @@ public:
 	const ParetoInfo &get_pareto_info() const { return pareto_info; }
 	vector<string> get_nonregul_obs() const;
 	string get_pst_filename() { return pst_filename; }
-	void enforce_par_limits(Parameters &update_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim=true, bool enforce_bounds=false);
+	void enforce_par_limits(PerformanceLog* perfomance_log, Parameters &update_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim=true, bool enforce_bounds=false);
 	map<string,double> get_pars_at_near_bounds(const Parameters &pars, double tol=0.0);
 	pair<Parameters,Parameters> get_effective_ctl_lower_upper_bnd(Parameters &pars);
-	
+	map<string, double> calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform);
+	map<string, double> get_ext_file_double_map(const string& section_name, const string& col_name);
 	virtual ~Pest();
 	
 private:
 	int n_adj_par = 0;
+	string prior_info_string;
 	ControlInfo control_info;
 	ParetoInfo pareto_info;
 	SVDInfo svd_info;
@@ -106,6 +112,21 @@ private:
 	DynamicRegularization *regul_scheme_ptr;
 	map<int,string> other_lines;
 	string pst_filename;
+
+	pair<string, string> parse_keyword_line(ofstream &f_rec, const string &line);
+	void throw_control_file_error(ofstream& f_rec, const string &message, bool should_throw=true);
+	void check_report_assignment(ofstream& f_rec, PestppOptions::ARG_STATUS stat, const string &key, const string &org_value);
+
+	void tokens_to_par_group_rec(ofstream &f_rec, const vector<string>& tokens);
+	void tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens,TranFixed *t_fixed, TranLog10 *t_log, TranScale *t_scale, TranOffset *t_offset);
+	void tokens_to_obs_group_rec(ofstream& f_rec, const vector<string>& tokens);
+	void tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens);
+	void tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens);
+	void tokens_to_pi_rec(ostream& f_rec, const string& line_upper);
+	void rectify_par_groups();
+
+	map<string, vector<pest_utils::ExternalCtlFile>> efiles_map;
 };
 ostream& operator<< (ostream &os, const Pest& val);
+
 #endif /* PEST_H_ */

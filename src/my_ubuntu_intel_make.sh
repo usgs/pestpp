@@ -1,0 +1,1 @@
+COMPILER=intel STATIC=-static MKLROOT=/home/parallels/intel/mkl/ make -j 5 install

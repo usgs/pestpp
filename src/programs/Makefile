@@ -5,7 +5,6 @@ include $(top_builddir)/global.mak
 SUBDIRS := \
     gsa \
     pest++ \
-    pestpp-pso \
     pestpp-ies \
     pestpp-opt \
     sweep \

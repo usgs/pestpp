@@ -224,7 +224,7 @@ void OutputFileWriter::write_obj_iter(int iter, int nruns, PhiData const &phi_da
 	os << endl;
 }
 
-void OutputFileWriter::scenario_report(std::ostream &os)
+void OutputFileWriter::scenario_report(std::ostream &os, bool report_mode)
 {
 	string mode;// = "estimation";
 	/*if (pest_scenario.get_regul_scheme_ptr()->get_use_dynamic_reg())
@@ -259,17 +259,18 @@ void OutputFileWriter::scenario_report(std::ostream &os)
 
 	default: mode = "WTF";
 	}
-	os << endl << endl << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-	os << endl << "pestmode:- " << endl << "   " << mode << endl << endl;
+	//os << endl << endl << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+	if (report_mode)
+		os << endl << "pestmode:- " << endl << "   " << mode << endl << endl;
 
-	os << "Case dimensions:- " << endl;
+	os << endl << "Case dimensions:- " << endl;
 	os << setw(0) << "    Number of parameters = " << pest_scenario.get_ctl_ordered_par_names().size() << endl;
 	os << setw(0) << "    Number of adjustable parameters = " << pest_scenario.get_n_adj_par() << endl;
 	os << setw(0) << "    Number of observations = " << pest_scenario.get_ctl_ordered_obs_names().size() << endl;
 	os << setw(0) << "    Number of prior estimates = " << pest_scenario.get_ctl_ordered_pi_names().size() << endl << endl;
 
 	os << pest_scenario.get_control_info() << endl;
-	os << pest_scenario.get_pestpp_options() << endl;
+	pest_scenario.get_pestpp_options().summary(os);
 
 	scenario_io_report(os);
 	scenario_pargroup_report(os);
@@ -280,7 +281,8 @@ void OutputFileWriter::scenario_report(std::ostream &os)
 	os << endl << pest_scenario.get_svd_info() << endl;
 	os << endl;
 
-	if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
+	if (((report_mode) && (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)) &&
+		(pest_scenario.get_regul_scheme_ptr()))
 	{
 		os << "Regularization information:" << endl;
 		os << setw(0) << "    phimlim = " << pest_scenario.get_regul_scheme_ptr()->get_phimlim() << endl;
@@ -289,9 +291,10 @@ void OutputFileWriter::scenario_report(std::ostream &os)
 		os << setw(0) << "    wfinit = " << pest_scenario.get_regul_scheme_ptr()->get_wfinit() << endl;
 
 	}
-	os << "PEST++ arguments:" << endl;
+	/*os << "PEST++ arguments:" << endl;
 	for (auto pp_arg : pest_scenario.get_pestpp_options().get_arg_map())
-		os << setw(0) << pp_arg.first << " = " << pp_arg.second << endl;
+		os << setw(0) << pp_arg.first << " = " << pp_arg.second << endl;*/
+
 
 	os << endl;
 	os << endl;
@@ -356,8 +359,12 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 	trans_type[1] = "fixed";
 	trans_type[2] = "tied";
 	trans_type[3] = "log";
+	int par_len = 12;
+	for (auto& par_name : pest_scenario.get_ctl_ordered_par_names())
+		par_len = max((int)par_name.size(), par_len);
+	par_len++;
 	os << endl << "Parameter information" << endl;
-	os << left << setw(15) << "NAME" << setw(10) << "TRANSFORMATION" << right << setw(20) << "CHANGE LIMIT" << setw(15) << "INITIAL VALUE";
+	os << left << setw(par_len) << "NAME" << setw(10) << "TRANSFORMATION" << right << setw(20) << "CHANGE LIMIT" << setw(15) << "INITIAL VALUE";
 	os << setw(15) << "LOWER BOUND";
 	os << setw(15) << "UPPER BOUND" << setw(15) << "GROUP";
 
@@ -366,7 +373,7 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 	for (auto &par_name : pest_scenario.get_ctl_ordered_par_names())
 	{
 		par_rec = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(par_name);
-		os << left << setw(15) << lower_cp(par_name);
+		os << left << setw(par_len) << lower_cp(par_name);
 		os << setw(10) << trans_type[static_cast<int>(par_rec->tranform_type)];
 		os << right << setw(20) << par_rec->chglim;
 		os << setw(15) << par_rec->init_value;
@@ -380,17 +387,34 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 	os << endl << endl;
 }
 
+void OutputFileWriter::scenario_obs_csv(ostream& os)
+{
+	if (os.bad())
+		throw runtime_error("OutputFileWriter::scenario_obs_csv(): os is bad");
+	os << "name,value,group,weight" << endl;
+	const ObservationRec* obs_rec;
+	const Observations& obs = pest_scenario.get_ctl_observations();
+	for (auto& obs_name : pest_scenario.get_ctl_ordered_obs_names())
+	{
+		obs_rec = pest_scenario.get_ctl_observation_info().get_observation_rec_ptr(obs_name);
+		os << lower_cp(obs_name) << "," << obs.get_rec(obs_name) << "," << lower_cp(obs_rec->group) << "," << obs_rec->weight << endl;
+	}
+}
+
 void OutputFileWriter::scenario_obs_report(std::ostream &os)
 {
-
+	int obs_len = 20;
+	for (auto& obs_name : pest_scenario.get_ctl_ordered_obs_names())
+		obs_len = max((int)obs_name.size(), obs_len);
+	obs_len++;
 	os << endl << "Observation information" << endl;
-	os << left << setw(25) << "NAME" << right << setw(20) << "VALUE" << setw(20) << "GROUP" << setw(20) << "WEIGHT" << endl;
+	os << left << setw(obs_len) << "NAME" << right << setw(20) << "VALUE" << setw(20) << "GROUP" << setw(20) << "WEIGHT" << endl;
 	const ObservationRec* obs_rec;
 	const Observations &obs = pest_scenario.get_ctl_observations();
 	for (auto &obs_name : pest_scenario.get_ctl_ordered_obs_names())
 	{
 		obs_rec = pest_scenario.get_ctl_observation_info().get_observation_rec_ptr(obs_name);
-		os << left << setw(25) << lower_cp(obs_name);
+		os << left << setw(obs_len) << lower_cp(obs_name);
 		os << right << setw(20) << obs.get_rec(obs_name);
 		os << setw(20) << lower_cp(obs_rec->group);
 		os << setw(20) << obs_rec->weight << endl;
@@ -725,7 +749,8 @@ void OutputFileWriter::append_sen(std::ostream &fout, int iter_no, const Jacobia
 	fout.precision(12);
 	fout << "NUMERIC PARAMETER SENSITIVITIES FOR OPTIMISATION ITERATION NO. " << setw(3) << iter_no << " ----->" << endl;
 	//fout << " Parameter name   Group        Current Value           CSS w/reg           CSS w/o reg" << endl;
-	  fout << "  Parameter name   Group        Current Value        HILL_CSS_w_reg       PEST_CSS_w_reg       HILL_CSS_wo_reg      PEST_CSS_wo_reg" << endl;
+	  //fout << "  Parameter name   Group        Current Value        HILL_CSS_w_reg       PEST_CSS_w_reg       HILL_CSS_wo_reg      PEST_CSS_wo_reg" << endl;
+	fout << "  Parameter name   Group        Current Value        PEST_CSS_wo_reg" << endl;
 	const vector<string> &par_list = jac.parameter_list();
 	//const vector<string> &par_list = pest_scenario.get_ctl_ordered_par_names();
 	const vector<string> &obs_list = jac.obs_and_reg_list();
@@ -742,11 +767,11 @@ void OutputFileWriter::append_sen(std::ostream &fout, int iter_no, const Jacobia
 		MatrixXd par_mat_tmp = par_vec.asDiagonal();
 		Eigen::SparseMatrix<double> par_mat = par_mat_tmp.sparseView();
 		QSqrtMatrix Q_sqrt(obj_func.get_obs_info_ptr(), obj_func.get_prior_info_ptr());
-		Eigen::SparseMatrix<double> q_sqrt_reg = Q_sqrt.get_sparse_matrix(obs_list, regul);
-		Eigen::SparseMatrix<double> dss_mat_reg = q_sqrt_reg * jac.get_matrix(obs_list, par_list) * par_mat;
+		//Eigen::SparseMatrix<double> q_sqrt_reg = Q_sqrt.get_sparse_matrix(obs_list, regul);
+		//Eigen::SparseMatrix<double> dss_mat_reg = q_sqrt_reg * jac.get_matrix(obs_list, par_list) * par_mat;
 		Eigen::SparseMatrix<double> q_sqrt_no_reg = Q_sqrt.get_sparse_matrix(obs_list, DynamicRegularization::get_zero_reg_instance());
-		Eigen::SparseMatrix<double> dss_mat_no_reg = q_sqrt_no_reg * jac.get_matrix(obs_list, par_list) * par_mat;
-		Eigen::SparseMatrix<double> dss_mat_reg_pest = q_sqrt_reg * jac.get_matrix(obs_list, par_list);
+		//Eigen::SparseMatrix<double> dss_mat_no_reg = q_sqrt_no_reg * jac.get_matrix(obs_list, par_list) * par_mat;
+		//Eigen::SparseMatrix<double> dss_mat_reg_pest = q_sqrt_reg * jac.get_matrix(obs_list, par_list);
 		Eigen::SparseMatrix<double> dss_mat_no_reg_pest = q_sqrt_no_reg * jac.get_matrix(obs_list, par_list);
 
 		//cout << q_sqrt_reg << endl << endl;
@@ -792,7 +817,7 @@ void OutputFileWriter::append_sen(std::ostream &fout, int iter_no, const Jacobia
 			else
 				fout << " " << showpoint << setw(20) << ctl_pars.get_rec(pname);
 
-			if (n_nonzero_weights_reg > 0)
+			/*if (n_nonzero_weights_reg > 0)
 			{
 				fout << " " << showpoint << setw(20) << dss_mat_reg.col(i).norm() / pow(n_nonzero_weights_reg, 2.0);
 				fout << " " << showpoint << setw(20) << dss_mat_reg_pest.col(i).norm() / n_nonzero_weights_reg;
@@ -801,11 +826,11 @@ void OutputFileWriter::append_sen(std::ostream &fout, int iter_no, const Jacobia
 			{
 				fout << " " << showpoint << setw(20) << "NA";
 				fout << " " << showpoint << setw(20) << "NA";
-			}
+			}*/
 			if (n_nonzero_weights_no_reg > 0)
 			{
-				val = dss_mat_no_reg.col(i).norm() / pow(n_nonzero_weights_no_reg, 2.0);
-				fout << " " << showpoint << setw(20) << val;
+				//val = dss_mat_no_reg.col(i).norm() / pow(n_nonzero_weights_no_reg, 2.0);
+				//fout << " " << showpoint << setw(20) << val;
 				val = dss_mat_no_reg_pest.col(i).norm() / n_nonzero_weights_no_reg;
 				par_sens[pname] = val;
 				fout << " " << showpoint << setw(20) << val;

@@ -125,8 +125,6 @@ void Sobol::assemble_runs(RunManagerAbstract &run_manager)
 	add_model_runs(run_manager, m1, f_out);
 	add_model_runs(run_manager, m2, f_out);
 
-	cout << m1 << endl << endl;
-	cout << m2 << endl << endl;
 	//calculate first order runs a1,....an
 	vector<int> idx_vec;
 	for (int ai=0; ai<n_adj_par; ++ai)
@@ -135,7 +133,7 @@ void Sobol::assemble_runs(RunManagerAbstract &run_manager)
 
 		idx_vec.push_back(ai);
 		c = gen_N_matrix(m1, m2, idx_vec);
-		cout << c << endl << endl;
+		//cout << c << endl << endl;
 		add_model_runs(run_manager, c, f_out);
 	}
 	f_out.close();
@@ -145,10 +143,8 @@ void Sobol::assemble_runs(RunManagerAbstract &run_manager)
 vector<double> Sobol::get_obs_vec(RunManagerAbstract &run_manager, int run_set, ModelRun &model_run, const string &obs_name)
 {
 	ModelRun run0 = model_run;
-
 	int run_b = run_set * n_sample;
 	int run_e = run_b + n_sample;
-
 	Parameters pars0;
 	Observations obs0;
 	int nrun = 0;
@@ -156,11 +152,14 @@ vector<double> Sobol::get_obs_vec(RunManagerAbstract &run_manager, int run_set, 
 	for (int run_id = run_b; run_id<run_e; ++run_id)
 	{
 		double obs = MISSING_DATA;
-		bool success = run_manager.get_run(run_id, pars0, obs0);
-		if (success)
+		
+		//bool success = run_manager.get_run(run_id, pars0, obs0);
+		//if (success)
+		if (run_map.find(run_id) != run_map.end())
 		{
-			run0.update_ctl(pars0, obs0);
-			obs = obs0.get_rec(obs_name);
+			//obs0 = run_map[run_id];
+			//run0.update_ctl(pars0, obs0);
+			obs = run_map[run_id].get_rec(obs_name);
 			if (obs == Observations::no_data) obs = MISSING_DATA;
 		}
 		obs_vec[nrun] = obs;
@@ -181,6 +180,7 @@ vector<double> Sobol::get_phi_vec(RunManagerAbstract &run_manager, int run_set, 
 	Observations obs0;
 	int nrun = 0;
 	vector<double> phi_vec = vector<double>(n_sample, MISSING_DATA);
+	DynamicRegularization zero_reg = DynamicRegularization::get_zero_reg_instance();
 	for(int run_id=run_b; run_id<run_e; ++run_id)
 	{
 		double phi = MISSING_DATA;
@@ -188,7 +188,7 @@ vector<double> Sobol::get_phi_vec(RunManagerAbstract &run_manager, int run_set, 
 		if (success)
 		{
 			run0.update_ctl(pars0, obs0);
-			phi = run0.get_phi(0.0);
+			phi = run0.get_phi(zero_reg);
 		}
 		phi_vec[nrun] = phi;
 		nrun++;
@@ -196,9 +196,27 @@ vector<double> Sobol::get_phi_vec(RunManagerAbstract &run_manager, int run_set, 
 	return phi_vec;
 }
 
+void Sobol::process_runs(RunManagerAbstract& run_manager, ModelRun &model_run)
+{
+	run_map.clear();
+	Parameters pars;
+	Observations obs;
+	ModelRun run = model_run;
+	for (int run_id = 0; run_id < run_manager.get_nruns(); run_id++)
+	{
+		bool success = run_manager.get_run(run_id, pars, obs);
+		if (success)
+		{
+			//run.update_ctl(pars, obs);
+			run_map[run_id] = obs;
+		}
+	}
+}
 
 void Sobol::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run)
 {
+	process_runs(run_manager, model_run);
+
 	ofstream &fout_sbl = file_manager_ptr->open_ofile_ext("sbl");
 	ofstream &f_out = file_manager_ptr->open_ofile_ext("sobol.obs.csv");
 	ofstream& f_si = file_manager_ptr->open_ofile_ext("sobol.si.csv");

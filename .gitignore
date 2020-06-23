@@ -16,21 +16,16 @@
 *.lib
 
 # Executables
-/src/programs/gsa/gsa
-/src/programs/pest++/pestpp
-/src/programs/pestpp-ies/pestpp-ies
-/src/programs/pestpp-opt/pestpp-opt
-/src/programs/pestpp-pso/psopp
-/src/utilities/ascii2pbin/ascii2pbin
-/src/utilities/pbin2ascii/pbin2ascii
-/src/utilities/pbin_dump/pbin_dump
-/src/utilities/sweep/sweep
+/bin
 
 # User files
 /src/local.mak
+*.suo
+*.u2d
 
 # Makefile object
 /src/libs/build-stamp
+/*build*
 
 /morris_meth/ipch
 /morris_meth/Debug
@@ -61,3 +56,9 @@ pest++/run_manager_fortran_test/fortran_test
 pest++/sweep/sweep
 
 .DS_Store
+/src/.vs
+/src/libs/common/ix64/Release
+*.user
+*.u2d
+*.log
+/src/UpgradeLog.htm

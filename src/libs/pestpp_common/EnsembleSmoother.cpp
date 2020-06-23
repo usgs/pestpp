@@ -12,785 +12,9 @@
 #include "covariance.h"
 #include "RedSVD-h.h"
 #include "SVDPackage.h"
+#include "eigen_tools.h"
+#include "EnsembleMethodUtils.h"
 
-
-PhiHandler::PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
-	ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
-	Covariance *_parcov, double *_reg_factor, ObservationEnsemble *_weights)
-{
-	pest_scenario = _pest_scenario;
-	file_manager = _file_manager;
-	oe_base = _oe_base;
-	pe_base = _pe_base;
-	weights = _weights;
-
-	//check for inequality constraints
-	//for (auto &og : pest_scenario.get_ctl_ordered_obs_group_names())
-	string og;
-	double weight;
-	ObservationInfo oi = pest_scenario->get_ctl_observation_info();
-	for (auto &oname : pest_scenario->get_ctl_ordered_nz_obs_names())
-	{
-		og = oi.get_group(oname);
-		weight = oi.get_weight(oname);
-		if (weight == 0)
-			continue;
-		if ((og.compare(0, 2, "L_") == 0) || (og.compare(0, 4, "LESS")==0))
-		{
-			lt_obs_names.push_back(oname);
-		}
-		else if ((og.compare(0, 2, "G_")==0) || (og.compare(0, 7, "GREATER")==0))
-		{
-			gt_obs_names.push_back(oname);
-		}
-	}
-
-
-	//build up obs group and par group idx maps for group reporting
-	vector<string> nnz_obs = oe_base->get_var_names();
-	ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
-	vector<int> idx;
-	for (auto &og : pest_scenario->get_ctl_ordered_obs_group_names())
-	{
-		idx.clear();
-		for (int i = 0; i < nnz_obs.size(); i++)
-		{
-			if (oinfo.get_group(nnz_obs[i]) == og)
-			{
-				idx.push_back(i);
-			}
-		}
-		if (idx.size() > 0)
-			obs_group_idx_map[og] = idx;
-	}
-
-	vector<string> pars = pe_base->get_var_names();
-	ParameterInfo pi = pest_scenario->get_ctl_parameter_info();
-	for (auto &pg : pest_scenario->get_ctl_ordered_par_group_names())
-	{
-		idx.clear();
-		for (int i = 0; i < pars.size(); i++)
-		{
-			if (pi.get_parameter_rec_ptr(pars[i])->group == pg)
-				idx.push_back(i);
-		}
-		if (idx.size() > 0)
-			par_group_idx_map[pg] = idx;
-	}
-
-
-	reg_factor = _reg_factor;
-	//save the org reg factor and org q vector
-	org_reg_factor = *_reg_factor;
-	org_q_vec = get_q_vector();
-	//Eigen::VectorXd parcov_inv_diag = parcov_inv.e_ptr()->diagonal();
-	parcov_inv_diag = _parcov->e_ptr()->diagonal();
-	for (int i = 0; i < parcov_inv_diag.size(); i++)
-		parcov_inv_diag(i) = 1.0 / parcov_inv_diag(i);
-
-	//parcov_inv = _parcov->inv();
-	//parcov.inv_ip();
-	oreal_names = oe_base->get_real_names();
-	preal_names = pe_base->get_real_names();
-	prepare_csv(file_manager->open_ofile_ext("phi.actual.csv"),oreal_names);
-	prepare_csv(file_manager->open_ofile_ext("phi.meas.csv"),oreal_names);
-	prepare_csv(file_manager->open_ofile_ext("phi.composite.csv"),oreal_names);
-	prepare_csv(file_manager->open_ofile_ext("phi.regul.csv"),preal_names);
-	prepare_group_csv(file_manager->open_ofile_ext("phi.group.csv"));
-
-}
-
-Eigen::MatrixXd PhiHandler::get_obs_resid(ObservationEnsemble &oe)
-{
-	vector<string> names = oe_base->get_var_names();
-	Eigen::MatrixXd resid = oe.get_eigen(vector<string>(),names) -
-		oe_base->get_eigen(oe.get_real_names(), vector<string>());
-	
-
-	apply_ineq_constraints(resid,names);
-	return resid;
-}
-
-
-Eigen::MatrixXd PhiHandler::get_obs_resid_subset(ObservationEnsemble &oe)
-{
-	vector<string> names = oe.get_var_names();
-	Eigen::MatrixXd resid = oe.get_eigen() - oe_base->get_eigen(oe.get_real_names(), names);
-	apply_ineq_constraints(resid, names);
-	return resid;
-}
-
-Eigen::MatrixXd PhiHandler::get_par_resid(ParameterEnsemble &pe)
-{
-	Eigen::MatrixXd resid = pe.get_eigen(vector<string>(), pe_base->get_var_names()) -
-		pe_base->get_eigen(pe.get_real_names(), vector<string>());
-	return resid;
-}
-
-Eigen::MatrixXd PhiHandler::get_par_resid_subset(ParameterEnsemble &pe)
-{
-	Eigen::MatrixXd resid = pe.get_eigen() - pe_base->get_eigen(pe.get_real_names(),pe.get_var_names());
-	return resid;
-}
-
-Eigen::MatrixXd PhiHandler::get_actual_obs_resid(ObservationEnsemble &oe)
-{
-	//vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
-	vector<string> act_obs_names = oe_base->get_var_names();
-	Eigen::MatrixXd resid(oe.shape().first, act_obs_names.size());
-	resid.setZero();
-	Observations obs = pest_scenario->get_ctl_observations();
-	Eigen::MatrixXd oe_vals = oe.get_eigen(vector<string>(), act_obs_names);
-	Eigen::MatrixXd ovals = obs.get_data_eigen_vec(act_obs_names);
-	ovals.transposeInPlace();
-	for (int i = 0; i < resid.rows(); i++)
-		resid.row(i) = oe_vals.row(i) - ovals;
-	apply_ineq_constraints(resid, act_obs_names);
-	return resid;
-}
-
-Eigen::VectorXd PhiHandler::get_q_vector()
-{
-	ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
-	Eigen::VectorXd q;
-	//vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
-	vector<string> act_obs_names = oe_base->get_var_names();
-
-	/*if (act_obs_names.size() == 0)
-		act_obs_names = oe_base->get_var_names();*/
-	q.resize(act_obs_names.size());
-	double w;
-	for (int i = 0; i < act_obs_names.size(); i++)
-	{
-		q(i) = oinfo.get_weight(act_obs_names[i]);
-	}
-	return q;
-}
-
-map<string, double> PhiHandler::get_obs_group_contrib(Eigen::VectorXd &phi_vec)
-{
-	map<string, double> group_phi_map;
-	double sum;
-	for (auto &og : obs_group_idx_map)
-	{
-		sum = 0.0;
-		for (auto i : og.second)
-			sum += phi_vec[i];
-		group_phi_map[og.first] = sum;
-	}
-
-	return group_phi_map;
-}
-
-map<string, double> PhiHandler::get_par_group_contrib(Eigen::VectorXd &phi_vec)
-{
-	map<string, double> group_phi_map;
-	double sum;
-	for (auto &pg : par_group_idx_map)
-	{
-		sum = 0.0;
-		for (auto i : pg.second)
-			sum += phi_vec[i];
-		group_phi_map[pg.first] = sum;
-	}
-	return group_phi_map;
-}
-
-void PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, bool include_regul)
-{
-	//update the various phi component vectors
-	meas.clear();
-	obs_group_phi_map.clear();
-	Eigen::VectorXd q = get_q_vector();
-	map<string, Eigen::VectorXd> meas_map = calc_meas(oe, q);
-	for (auto &pv : meas_map)
-	{
-		meas[pv.first] = pv.second.sum();
-
-	}
-	/*if (pest_scenario->get_control_info().pestmode == ControlInfo::PestMode::PARETO)
-	{
-		meas_map.clear();
-		meas_map = calc_meas(oe, org_q_vec);
-
-	}
-	for (auto &pv : meas_map)
-	{
-		obs_group_phi_map[pv.first] = get_obs_group_contrib(pv.second);
-	}*/
-	if (include_regul)
-	{
-		regul.clear();
-		map<string, Eigen::VectorXd> reg_map = calc_regul(pe);//, *reg_factor);
-		//for (auto &pv : calc_regul(pe))
-		string name;
-		//big assumption - if oe is a diff shape, then this
-		//must be a subset, so just use the first X rows of pe
-		for (int i = 0; i < oe.shape().first; i++)
-		{
-			//name = preal_names[i];
-			name = pe.get_real_names()[i];
-			//cout << name << endl;
-			regul[name] = reg_map[name].sum();
-			par_group_phi_map[name] = get_par_group_contrib(reg_map[name]);
-		}
-	}
-
-	/*if (pest_scenario->get_control_info().pestmode == ControlInfo::PestMode::PARETO)
-	{
-		reg_map.clear();
-		reg_map = calc_regul(pe, org_reg_factor);
-	}
-
-	for (int i = 0; i<oe.shape().first; i++)
-	{
-		name = preal_names[i];
-		par_group_phi_map[name] = get_par_group_contrib(reg_map[name]);
-	}*/
-
-	actual.clear();
-	for (auto &pv : calc_actual(oe, q))
-	{
-		actual[pv.first] = pv.second.sum();
-		obs_group_phi_map[pv.first] = get_obs_group_contrib(pv.second);
-	}
- 	composite.clear();
-	composite = calc_composite(meas, regul);
-}
-
-map<string, double>* PhiHandler::get_phi_map(PhiHandler::phiType &pt)
-{
-	switch (pt)
-	{
-	case PhiHandler::phiType::ACTUAL:
-		return &actual;
-	case PhiHandler::phiType::COMPOSITE:
-		return &composite;
-	case PhiHandler::phiType::MEAS:
-		return &meas;
-	case PhiHandler::phiType::REGUL:
-		return &regul;
-	}
-	throw runtime_error("PhiHandler::get_phi_map() didn't find a phi map...");
-}
-
-double PhiHandler::calc_mean(map<string, double> *phi_map)
-{
-	double mean = 0.0;
-	map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-	for (pi; pi != end; ++pi)
-		mean = mean + pi->second;
-	return mean / phi_map->size();
-}
-
-double PhiHandler::calc_std(map<string, double> *phi_map)
-{
-	double mean = calc_mean(phi_map);
-	double var = 0.0;
-	map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-	for (pi; pi != end; ++pi)
-		var = var + (pow(pi->second - mean, 2));
-	if (var == 0.0)
-		return 0.0;
-	return sqrt(var / (phi_map->size() - 1));
-}
-
-double PhiHandler::get_mean(phiType pt)
-{
-	//double mean = 0.0;
-	map<string, double>* phi_map = get_phi_map(pt);
-	/*map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-	for (pi;pi != end; ++pi)
-		mean = mean + pi->second;
-	return mean / phi_map->size();*/
-	return calc_mean(phi_map);
-}
-
-double PhiHandler::get_std(phiType pt)
-{
-	//double mean = get_mean(pt);
-	//double var = 0.0;
-	map<string, double>* phi_map = get_phi_map(pt);
-	/*map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-	for (pi; pi != end; ++pi)
-		var = var + (pow(pi->second - mean,2));
-	if (var == 0.0)
-		return 0.0;
-	return sqrt(var/(phi_map->size()-1));*/
-	return calc_std(phi_map);
-}
-
-double PhiHandler::get_max(phiType pt)
-{
-	double mx = -1.0e+30;
-	map<string, double>* phi_map = get_phi_map(pt);
-	map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-	for (pi; pi != end; ++pi)
-		mx = (pi->second > mx) ? pi->second : mx;
-	return mx;
-}
-
-double PhiHandler::get_min(phiType pt)
-{
-	double mn = 1.0e+30;
-	map<string, double>* phi_map = get_phi_map(pt);
-	map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-	for (pi; pi != end; ++pi)
-		mn = (pi->second < mn) ? pi->second : mn;
-	return mn;
-}
-
-map<string, double> PhiHandler::get_summary_stats(PhiHandler::phiType pt)
-{
-	map<string, double> stats;
-	stats["mean"] = get_mean(pt);
-	stats["std"] = get_std(pt);
-	stats["max"] = get_max(pt);
-	stats["min"] = get_min(pt);
-	return stats;
-}
-
-string PhiHandler::get_summary_string(PhiHandler::phiType pt)
-{
-	map<string, double> stats = get_summary_stats(pt);
-	stringstream ss;
-	string typ;
-	switch (pt)
-	{
-	case PhiHandler::phiType::ACTUAL:
-		typ = "actual";
-		break;
-	case PhiHandler::phiType::MEAS:
-		typ = "measured";
-		break;
-	case PhiHandler::phiType::REGUL:
-		typ = "regularization";
-		break;
-	case PhiHandler::phiType::COMPOSITE:
-		typ = "composite";
-		break;
-	}
-	ss << setw(15) << typ << setw(15) << stats["mean"] << setw(15) << stats["std"] << setw(15) << stats["min"] << setw(15) << stats["max"] << endl;
-	return ss.str();
-}
-
-string PhiHandler::get_summary_header()
-{
-	stringstream ss;
-	ss << setw(15) << "phi type" << setw(15) << "mean" << setw(15) << "std" << setw(15) << "min" << setw(15) << "max" << endl;
-	return ss.str();
-}
-
-void PhiHandler::report(bool echo, bool include_regul)
-{
-	ofstream &f = file_manager->rec_ofstream();
-	f << get_summary_header();
-	if (echo)
-		cout << get_summary_header();
-	string s = get_summary_string(PhiHandler::phiType::COMPOSITE);
-	f << s;
-	if (echo)
-		cout << s;
-	s = get_summary_string(PhiHandler::phiType::MEAS);
-	f << s;
-	if (echo)
-		cout << s;
-	if (include_regul)
-	{
-		s = get_summary_string(PhiHandler::phiType::REGUL);
-		f << s;
-		if (echo)
-			cout << s;
-	}
-	s = get_summary_string(PhiHandler::phiType::ACTUAL);
-	f << s;
-	if (echo)
-		cout << s;
-	if (include_regul)
-	{
-		if (*reg_factor == 0.0)
-		{
-			f << "    (note: reg_factor is zero; regularization phi reported but not used)" << endl;
-			if (echo)
-				cout << "    (note: reg_factor is zero; regularization phi reported but not used)" << endl;
-		}
-		else
-		{
-			f << "     current reg_factor: " << *reg_factor << endl;
-			if (echo)
-				cout << "     current reg_factor: " << *reg_factor << endl;
-		}
-		if (*reg_factor != 0.0)
-		{
-
-			f << "     note: regularization phi reported above does not " << endl;
-			f << "           include the effects of reg_factor, " << endl;
-			f << "           but composite phi does." << endl;
-			if (echo)
-			{
-				cout << "     note: regularization phi reported above does not " << endl;
-				cout << "           include the effects of reg_factor, " << endl;
-				cout << "           but composite phi does." << endl;
-			}
-		}
-	}
-	f << endl << endl;
-	f.flush();
-}
-
-void PhiHandler::write(int iter_num, int total_runs, bool write_group)
-{
-	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.actual.csv"), phiType::ACTUAL,oreal_names);
-	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.meas.csv"), phiType::MEAS, oreal_names);
-	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.regul.csv"), phiType::REGUL, preal_names);
-	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.composite.csv"), phiType::COMPOSITE, oreal_names);
-	if (write_group)
-		write_group_csv(iter_num, total_runs, file_manager->get_ofstream("phi.group.csv"));
-}
-
-void PhiHandler::write_group(int iter_num, int total_runs, vector<double> extra)
-{
-	write_group_csv(iter_num, total_runs, file_manager->get_ofstream("phi.group.csv"),extra);
-}
-
-void PhiHandler::write_csv(int iter_num, int total_runs, ofstream &csv, phiType pt, vector<string> &names)
-{
-	map<string, double>* phi_map = get_phi_map(pt);
-	map<string, double>::iterator pmi = phi_map->end();
-	csv << iter_num << ',' << total_runs;
-	map<string, double> stats = get_summary_stats(pt);
-	csv << ',' << stats["mean"] << ',' << stats["std"] << ',' << stats["min"] << ',' << stats["max"];
-	for (auto &name : names)
-	{
-		csv << ',';
-		if (phi_map->find(name) != pmi)
-			csv << phi_map->at(name);
-	}
-	csv << endl;
-	csv.flush();
-}
-
-void PhiHandler::prepare_csv(ofstream & csv,vector<string> &names)
-{
-	csv << "iteration,total_runs,mean,standard_deviation,min,max";
-	for (auto &name : names)
-		csv << ',' << pest_utils::lower_cp(name);
-	csv << endl;
-}
-
-
-void PhiHandler::write_group_csv(int iter_num, int total_runs, ofstream &csv, vector<double> extra)
-{
-	//csv << "iteration,total_runs,realiation";
-	string oreal, preal;
-	for (int ireal = 0; ireal < oreal_names.size(); ireal++)
-	{
-		oreal = oreal_names[ireal];
-		preal = preal_names[ireal];
-		if (obs_group_phi_map.find(oreal) == obs_group_phi_map.end())
-			continue;
-
-		csv << iter_num << ',' << total_runs << ',' << pest_utils::lower_cp(oreal) << ',' << pest_utils::lower_cp(preal);
-		for (auto &e : extra)
-			csv << ',' << e;
-
-		for (auto &name : pest_scenario->get_ctl_ordered_obs_group_names())
-			if (obs_group_phi_map[oreal].find(name) == obs_group_phi_map[oreal].end())
-				csv << ',' << 0.0;
-			else
-				csv  << ',' << obs_group_phi_map[oreal][name];
-
-		for (auto &name : pest_scenario->get_ctl_ordered_par_group_names())
-			if (par_group_phi_map[preal].find(name) == par_group_phi_map[preal].end())
-				csv << ',' << 0.0;
-			else
-				csv << ',' << par_group_phi_map[preal][name];
-		csv << endl;;
-		csv.flush();
-	}
-}
-
-void PhiHandler::prepare_group_csv(ofstream &csv, vector<string> extra)
-{
-	csv << "iteration,total_runs,obs_realization,par_realization";
-	for (auto &name : extra)
-		csv << ',' << pest_utils::lower_cp(name);
-	for (auto &name : pest_scenario->get_ctl_ordered_obs_group_names())
-		csv << ',' << pest_utils::lower_cp(name);
-	for (auto &name : pest_scenario->get_ctl_ordered_par_group_names())
-		csv << ',' << pest_utils::lower_cp(name);
-	csv << endl;
-}
-
-vector<int> PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe)
-{
-	map<string, double> _meas;
-	Eigen::VectorXd q = get_q_vector();
-	for (auto &pv : calc_meas(oe, q))
-		_meas[pv.first] = pv.second.sum();
-	double mean = calc_mean(&_meas);
-	double std = calc_std(&_meas);
-	vector<int> idxs;
-	vector<string> names = oe.get_real_names();
-	for (int i=0;i<names.size();i++)
-		if ((_meas[names[i]] > bad_phi) || (_meas[names[i]] > mean + (std * bad_phi_sigma)))
-			idxs.push_back(i);
-	return idxs;
-}
-
-map<string, Eigen::VectorXd> PhiHandler::calc_meas(ObservationEnsemble & oe, Eigen::VectorXd &q_vec)
-{
-	map<string, Eigen::VectorXd> phi_map;
-	Eigen::VectorXd oe_base_vec, oe_vec, diff,w_vec;
-	//Eigen::VectorXd q = get_q_vector();
-	vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
-	vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
-	vector<string>::iterator start = base_real_names.begin(), end = base_real_names.end();
-
-	Eigen::MatrixXd w_mat;
-	if (weights->shape().first > 0)
-		w_mat = weights->get_eigen(vector<string>(), oe_base->get_var_names());
-	double phi;
-	string rname;
-
-	Eigen::MatrixXd resid = get_obs_resid(oe);
-	assert(oe_real_names.size() == resid.rows());
-	for (int i = 0; i<resid.rows(); i++)
-	{
-		rname = oe_real_names[i];
-		if (find(start, end, rname) == end)
-			continue;
-		diff = resid.row(i);
-
-		if (weights->shape().first == 0)
-			diff = diff.cwiseProduct(q_vec);
-		else
-		{
-			w_vec = w_mat.row(i);
-			diff = diff.cwiseProduct(w_vec);
-		}
-		phi = (diff.cwiseProduct(diff)).sum();
-		phi_map[rname] = diff.cwiseProduct(diff);
-	}
-	return phi_map;
-}
-
-map<string, Eigen::VectorXd> PhiHandler::calc_regul(ParameterEnsemble & pe)
-{
-	map<string, Eigen::VectorXd> phi_map;
-	vector<string> real_names = pe.get_real_names();
-	pe_base->transform_ip(ParameterEnsemble::transStatus::NUM);
-	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
-	Eigen::MatrixXd diff_mat = get_par_resid(pe);
-
-
-	Eigen::VectorXd diff;
-	for (int i = 0; i < real_names.size(); i++)
-	{
-		diff = diff_mat.row(i);
-		diff = diff.cwiseProduct(diff);
-		//cout << diff << endl;
-		diff = diff.cwiseProduct(parcov_inv_diag);
-		//cout << diff << endl;
-		//cout << parcov_inv_diag << endl;
-		//phi_map[real_names[i]] = _reg_fac * diff;
-		phi_map[real_names[i]] = diff;
-		
-	}
-	return phi_map;
-}
-
-
-void PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, vector<string> &names)
-{
-	
-	//vector<string> names = oe_base->get_var_names();
-	//vector<string> lt_names = get_lt_obs_names(), gt_names = get_gt_obs_names();
-	//vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
-	
-	assert(names.size() == resid.cols());
-
-	map<string, double> lt_vals,gt_vals;
-	Observations obs = pest_scenario->get_ctl_observations();
-	for (auto &n : lt_obs_names)
-		lt_vals[n] = obs.get_rec(n);
-	for (auto &n : gt_obs_names)
-		gt_vals[n] = obs.get_rec(n);
-	if ((lt_vals.size() == 0) && (gt_vals.size() == 0))
-		return;
-	map<string, int> idxs;
-	//for (int i = 0; i < act_obs_names.size(); i++)
-	//	idxs[act_obs_names[i]] = i;
-	for (int i = 0; i < names.size(); i++)
-		idxs[names[i]] = i;
-	int idx;
-	double val;
-	Eigen::VectorXd col;
-
-	for (auto iv : lt_vals)
-	{
-		idx = idxs[iv.first];
-		col = resid.col(idx);
-		val = iv.second;
-		//cout << resid.col(idx) << endl;
-		for (int i = 0; i < resid.rows(); i++)
-			col(i) = (col(i) < 0.0) ? 0.0 : col(i);
-		//cout << resid.col(idx) << endl;
-		resid.col(idx) = col;
-		//cout << resid.col(idx) << endl;
-	}
-
-	for (auto iv : gt_vals)
-	{
-		idx = idxs[iv.first];
-		col = resid.col(idx);
-		val = iv.second;
-		for (int i = 0; i < resid.rows(); i++)
-			col(i) = (col(i) > 0.0) ? 0.0 : col(i);
-		resid.col(idx) = col;
-	}
-}
-
-
-map<string, Eigen::VectorXd> PhiHandler::calc_actual(ObservationEnsemble & oe, Eigen::VectorXd &q_vec)
-{
-	map<string, Eigen::VectorXd> phi_map;
-	Eigen::MatrixXd resid = get_actual_obs_resid(oe);
-	vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
-	vector<string>::iterator start = base_real_names.begin(), end = base_real_names.end();
-	double phi;
-	string rname;
-
-	Eigen::MatrixXd oe_reals = oe.get_eigen(vector<string>(), oe_base->get_var_names());
-	Eigen::VectorXd diff;
-	for (int i = 0; i<oe.shape().first; i++)
-	{
-		rname = oe_real_names[i];
-		if (find(start, end, rname) == end)
-			continue;
-		//diff = (oe_vec - obs_val_vec).cwiseProduct(q);
-		diff = resid.row(i);
-		diff = diff.cwiseProduct(q_vec);
-		//phi = (diff.cwiseProduct(diff)).sum();
-		phi_map[rname] = diff.cwiseProduct(diff);
-	}
-	return phi_map;
-}
-
-
-map<string, double> PhiHandler::calc_composite(map<string, double> &_meas, map<string, double> &_regul)
-{
-	map<string, double> phi_map;
-	string prn, orn;
-	double reg, mea;
-	map<string, double>::iterator meas_end = _meas.end(), regul_end = _regul.end();
-	for (int i = 0; i < oe_base->shape().first; i++)
-	{
-		prn = preal_names[i];
-		orn = oreal_names[i];
-		if (meas.find(orn) != meas_end)
-		{
-			mea = _meas[orn];
-			reg = _regul[prn];
-			phi_map[orn] = mea + (reg * *reg_factor);
-		}
-	}
-	return phi_map;
-}
-
-
-ParChangeSummarizer::ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr)
-	//base_pe_ptr(_base_pe), file_manager_ptr(_file_manager)
-{
-	base_pe_ptr = _base_pe_ptr;
-	file_manager_ptr = _file_manager_ptr;
-	init_moments = base_pe_ptr->get_moment_maps();
-	ParameterGroupInfo gi = base_pe_ptr->get_pest_scenario().get_base_group_info();
-	string group;
-	for (auto &n : base_pe_ptr->get_var_names())
-	{
-		group = gi.get_group_name(n);
-		if (pargp2par_map.find(group) == pargp2par_map.end())
-			pargp2par_map[group] = set<string>();	
-		pargp2par_map[group].emplace(n);
-	}
-}
-
-
-void ParChangeSummarizer::summarize(ParameterEnsemble &pe)
-{
-	
-	pair<map<string, double>, map<string, double>> moments = pe.get_moment_maps();
-	init_moments = base_pe_ptr->get_moment_maps(pe.get_real_names());
-	stringstream ss;
-	ofstream &frec = file_manager_ptr->rec_ofstream();
-	ss << endl << "   parameter group percent change summmary" << endl;
-	ss << "   (compared to the initial ensemble using active realizations)" << endl;
-	cout << ss.str();
-	frec << ss.str();
-	ss.str("");
-	ss << setw(15) << "group" << setw(15) << "mean change" << setw(15) << "std change" << setw(25) << "number at/near bounds" << setw(20) << "% at/near bounds" << endl;
-	cout << ss.str();
-	frec << ss.str();
-	double mean_diff = 0.0, std_diff = 0.0;
-	double dsize, value1, value2,v;
-	vector<string> pnames = pe.get_var_names();
-	Parameters lb = pe.get_pest_scenario_ptr()->get_ctl_parameter_info().get_low_bnd(pnames);
-	pe.get_pest_scenario_ptr()->get_base_par_tran_seq().active_ctl2numeric_ip(lb);
-	Parameters ub = pe.get_pest_scenario_ptr()->get_ctl_parameter_info().get_up_bnd(pnames);
-	pe.get_pest_scenario_ptr()->get_base_par_tran_seq().active_ctl2numeric_ip(ub);
-	vector<string> grp_names = base_pe_ptr->get_pest_scenario().get_ctl_ordered_par_group_names();
-	map<string, int> idx_map;
-	for (int i = 0; i < pnames.size(); i++)
-		idx_map[pnames[i]] = i;
-	int num_out,num_pars;
-	int num_reals = pe.get_real_names().size();
-	Eigen::ArrayXd arr;
-	for (auto &grp_name : grp_names)
-	{
-		mean_diff = 0.0, std_diff = 0.0;
-		num_pars = pargp2par_map[grp_name].size();
-		num_out = 0;
-		for (auto & par_name : pargp2par_map[grp_name])
-		{
-			
-			arr = pe.get_eigen_ptr()->col(idx_map[par_name]).array();
-			for (int i = 0; i < num_reals; i++)
-			{
-				v = arr[i];
-				if ((v > (ub[par_name] * 1.01)) || (v < (lb[par_name] * 0.99)))
-					num_out++;
-			}
-
-			value1 = init_moments.first[par_name];
-			value2 = value1 - moments.first[par_name];
-			if ((value1 != 0.0) && (value2 != 0.0))
-				mean_diff += value2 / value1;
-			value1 = init_moments.second[par_name];
-			value2 = value1 - moments.second[par_name];
-			if ((value1 != 0.0) && (value2 != 0.0))
-				std_diff += value2 / value1;
-		}
-		dsize = double(init_moments.first.size());
-		if (mean_diff != 0.0)
-			mean_diff = mean_diff / dsize;
-		if (std_diff != 0.0)
-			std_diff = std_diff / dsize;
-		
-		ss.str("");
-		double percent_out = 0;
-		if (num_pars > 0)
-			percent_out = double(num_out) / double(num_pars * num_reals) * 100;
-		ss << setw(15) << pest_utils::lower_cp(grp_name) << setw(15) << mean_diff * 100.0 << setw(15) << std_diff * 100.0 << setw(25);
-		ss << num_out << setw(20) << setprecision(2) << percent_out << endl;
-		cout << ss.str();
-		frec << ss.str();
-
-	}
-	cout << endl;
-	frec << endl;
-
-}
 
 
 IterEnsembleSmoother::IterEnsembleSmoother(Pest &_pest_scenario, FileManager &_file_manager,
@@ -799,10 +23,14 @@ IterEnsembleSmoother::IterEnsembleSmoother(Pest &_pest_scenario, FileManager &_f
 	output_file_writer(_output_file_writer), performance_log(_performance_log),
 	run_mgr_ptr(_run_mgr_ptr)
 {
+	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
+	subset_rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	pe.set_pest_scenario(&pest_scenario);
 	oe.set_pest_scenario(&pest_scenario);
-	weights.set_pest_scenario(&pest_scenario);
+	pe.set_rand_gen(&rand_gen);
+	oe.set_rand_gen(&rand_gen);
 	localizer.set_pest_scenario(&pest_scenario);
+	
 }
 
 void IterEnsembleSmoother::throw_ies_error(string message)
@@ -823,8 +51,41 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 	bool drawn = false;
 	if (par_csv.size() == 0)
 	{
+		ofstream& frec = file_manager.rec_ofstream();
 		message(1, "drawing parameter realizations: ", num_reals);
-		pe.draw(num_reals, pest_scenario.get_ctl_parameters(),cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level());
+		map<string, double> par_means = pest_scenario.get_ext_file_double_map("parameter data external", "mean");
+		Parameters draw_par = pest_scenario.get_ctl_parameters();
+		if (par_means.size() > 0)
+		{
+			
+			frec << "Note: the following parameters contain 'mean' value information that will be used in place of " << endl;
+			frec << "      the 'parval1' values as mean values during ensemble generation" << endl;
+			double lb, ub;
+			for (auto par_mean : par_means)
+			{
+				if (draw_par.find(par_mean.first) != draw_par.end())
+				{
+					lb = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(par_mean.first)->lbnd;
+					ub = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(par_mean.first)->ubnd;
+					if (par_mean.second < lb)
+					{
+						frec << "Warning: 'mean' value for parameter " << par_mean.first << " less than lower bound, using 'parval1'";
+					}
+					else if (par_mean.second > ub)
+					{
+						frec << "Warning: 'mean' value for parameter " << par_mean.first << " greater than upper bound, using 'parval1'";
+					}
+					else
+					{
+						draw_par[par_mean.first] = par_mean.second;
+						frec << par_mean.first << " " << par_mean.second << endl;
+					}
+					
+				}
+
+			}
+		}
+		pe.draw(num_reals, draw_par,cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
 		// stringstream ss;
 		// ss << file_manager.get_base_filename() << ".0.par.csv";
 		// message(1, "saving initial parameter ensemble to ", ss.str());
@@ -924,7 +185,7 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 			if (pest_scenario.get_pestpp_options().get_ies_obs_restart_csv().size() > 0)
 				message(1, "Warning: even though ies_enforce_bounds is true, a restart obs en was passed, so bounds will not be enforced on the initial par en");
 			else
-				pe.enforce_limits(pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+				pe.enforce_limits(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
 		}
 
 	}
@@ -989,76 +250,28 @@ void IterEnsembleSmoother::add_bases()
 			oe.append(base_name, obs);
 		}
 	}
-
-	//check that 'base' isn't already in ensemble
-	rnames = weights.get_real_names();
-	if (rnames.size() == 0)
-		return;
-	if (find(rnames.begin(), rnames.end(), base_name) != rnames.end())
-	{
-		message(1, "'base' realization already in weights ensemble, ignoring '++ies_include_base'");
-	}
-	else
-	{
-		//Observations obs = pest_scenario.get_ctl_observations();
-		ObservationInfo oinfo = pest_scenario.get_ctl_observation_info();
-		Eigen::VectorXd q;
-		//vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
-		vector<string> vnames = weights.get_var_names();
-		q.resize(vnames.size());
-		double w;
-		for (int i = 0; i < vnames.size(); i++)
-		{
-			q(i) = oinfo.get_weight(vnames[i]);
-		}
-
-		Observations wobs(vnames, q);
-		if (inpar)
-		{
-			vector<string> prnames = pe.get_real_names();
-
-			int idx = find(prnames.begin(), prnames.end(), base_name) - prnames.begin();
-			//cout << idx << "," << rnames.size() << endl;
-			string oreal = rnames[idx];
-			stringstream ss;
-			ss << "warning: 'base' realization in par ensenmble but not in weights ensemble," << endl;
-			ss << "         replacing weights realization '" << oreal << "' with 'base'";
-			string mess = ss.str();
-			message(1, mess);
-			vector<string> drop;
-			drop.push_back(oreal);
-			weights.drop_rows(drop);
-			weights.append(base_name, wobs);
-			//rnames.insert(rnames.begin() + idx, string(base_name));
-			rnames[idx] = base_name;
-			weights.reorder(rnames, vector<string>());
-		}
-		else
-		{
-			message(1, "adding 'base' weight values to weights");
-
-
-			weights.append(base_name, wobs);
-		}
-	}
 }
 
 bool IterEnsembleSmoother::initialize_oe(Covariance &cov)
 {
 	stringstream ss;
 	int num_reals = pe.shape().first;
-
-	performance_log->log_event("load obscov");
 	string obs_csv = pest_scenario.get_pestpp_options().get_ies_obs_csv();
 	bool drawn = false;
 	if (obs_csv.size() == 0)
 	{
-		message(1, "drawing observation noise realizations: ", num_reals);
-		oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level());
-		// stringstream ss;
-		// ss << file_manager.get_base_filename() << ".base.obs.csv";
-		// message(1, "saving initial observation ensemble to ", ss.str());
-		// oe.to_csv(ss.str());
+		if (pest_scenario.get_pestpp_options().get_ies_no_noise())
+		{
+			message(1, "initializing no-noise observation ensemble of : ", num_reals);
+			oe.initialize_without_noise(num_reals);
+		
+		}
+		else
+		{
+			message(1, "drawing observation noise realizations: ", num_reals);
+			oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
+			
+		}
 		drawn = true;
 	}
 	else
@@ -1102,7 +315,7 @@ bool IterEnsembleSmoother::initialize_oe(Covariance &cov)
 		}
 		else
 		{
-			ss << "unrecognized obs ensemble extension " << obs_ext << ", looing for csv, jcb, or jco";
+			ss << "unrecognized obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
 			throw_ies_error(ss.str());
 		}
 		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
@@ -1171,7 +384,7 @@ void IterEnsembleSmoother::message(int level, const string &_message, vector<T, 
 	if ((echo) && ((verbose_level >= 2) || (level < 2)))
 		cout << ss.str() << endl;
 	file_manager.rec_ofstream() <<ss.str() << endl;
-	performance_log->log_event(ss.str());
+	performance_log->log_event(_message);
 
 }
 
@@ -1281,7 +494,26 @@ void IterEnsembleSmoother::sanity_checks()
 		warnings.push_back("ies_verbose_level must be between 0 and 3, resetting to 3");
 		ppo->set_ies_verbose_level(3);
 	}
+	if ((ppo->get_ies_no_noise()) && (ppo->get_obscov_filename().size() > 0))
+	{
+		ss.str("");
+		ss << "ies_no_noise is true but obscov file supplied - these two are not compatible";
+		errors.push_back(ss.str());
+	}
 
+	if ((ppo->get_obscov_filename().size() > 0) && (ppo->get_ies_drop_conflicts()))
+	{
+		ss.str("");
+		ss << "use of a full obscov with ies_drop_conflicts is not currently supported";
+		errors.push_back(ss.str());
+	}
+	if ((ppo->get_ies_obs_csv().size() > 0) && (ppo->get_ies_no_noise()))
+	{
+		ss.str("");
+		ss << "ies_no_noise can't be used with an ies_observation_ensemble";
+		errors.push_back(ss.str());
+	}
+	
 	/*if (!ppo->get_ies_use_prior_scaling())
 	{
 		warnings.push_back("not using prior scaling - this is really a dev option, you should always use prior scaling...");
@@ -1426,6 +658,7 @@ void IterEnsembleSmoother::initialize_restart()
 				ss << m << ",";
 			throw_ies_error(ss.str());
 		}
+		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
 
 	if (pp_args.find("IES_NUM_REALS") != pp_args.end())
@@ -1557,18 +790,25 @@ void IterEnsembleSmoother::initialize_restart()
 			}
 		}*/
 		message(2, "reordering oe_base to align with restart obs en,num reals:", oe_real_names.size());
-		try
+		if ((oe_drawn) && (oe_base.shape().first == oe_real_names.size()))
 		{
-			oe_base.reorder(oe_real_names, vector<string>());
+			oe_base.set_real_names(oe_real_names);
 		}
-		catch (exception &e)
+		else
 		{
-			ss << "error reordering oe_base with restart oe:" << e.what();
-			throw_ies_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_ies_error(string("error reordering oe_base with restart oe"));
+			try
+			{
+				oe_base.reorder(oe_real_names, vector<string>());
+			}
+			catch (exception& e)
+			{
+				ss << "error reordering oe_base with restart oe:" << e.what();
+				throw_ies_error(ss.str());
+			}
+			catch (...)
+			{
+				throw_ies_error(string("error reordering oe_base with restart oe"));
+			}
 		}
 		//if (par_restart_csv.size() > 0)
 		if (true)
@@ -1613,110 +853,6 @@ void IterEnsembleSmoother::initialize_restart()
 }
 
 
-void IterEnsembleSmoother::initialize_weights()
-{
-	string weights_csv = pest_scenario.get_pestpp_options().get_ies_weight_csv();
-	//message(1, "loading weights ensemble from ", weights_csv);
-
-	stringstream ss;
-	string obs_ext = pest_utils::lower_cp(weights_csv).substr(weights_csv.size() - 3, weights_csv.size());
-	if (obs_ext.compare("csv") == 0)
-	{
-		message(1, "loading weights ensemble from csv file", weights_csv);
-		try
-		{
-			weights.from_csv(weights_csv);
-		}
-		catch (const exception &e)
-		{
-			ss << "error processing weights csv: " << e.what();
-			throw_ies_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_ies_error(string("error processing weights csv"));
-		}
-	}
-	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
-	{
-		message(1, "loading weights ensemble from binary file", weights_csv);
-		try
-		{
-			weights.from_binary(weights_csv);
-		}
-		catch (const exception &e)
-		{
-			ss << "error processing weights binary file: " << e.what();
-			throw_ies_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_ies_error(string("error processing weights binary file"));
-		}
-	}
-	else
-	{
-		ss << "unrecognized weights ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
-		throw_ies_error(ss.str());
-	}
-
-	if (pp_args.find("IES_NUM_REALS") != pp_args.end())
-	{
-		int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
-		if (num_reals < oe.shape().first)
-		{
-			message(1, "ies_num_reals arg passed, truncated weights ensemble to ", num_reals);
-			vector<string> keep_names, real_names = weights.get_real_names();
-			for (int i = 0; i<num_reals; i++)
-			{
-				keep_names.push_back(real_names[i]);
-			}
-			weights.keep_rows(keep_names);
-		}
-	}
-
-	//check that restart oe is in sync
-	vector<string> weights_real_names = weights.get_real_names(), oe_real_names = oe.get_real_names();
-	vector<string>::const_iterator start, end;
-	vector<string> missing;
-	start = oe_real_names.begin();
-	end = oe_real_names.end();
-	for (auto &rname : weights_real_names)
-		if (find(start, end, rname) == end)
-			missing.push_back(rname);
-	if (missing.size() > 0)
-	{
-		ss << "the following realization names were not found in the weight csv:";
-		for (auto &m : missing)
-			ss << m << ",";
-		throw_ies_error(ss.str());
-
-	}
-
-
-	if (weights.shape().first > oe.shape().first) //something is wrong
-	{
-		ss << "weight ensemble has too many rows: " << weights.shape().first << " compared to oe: " << oe.shape().first;
-		throw_ies_error(ss.str());
-	}
-	vector<string> weights_names = weights.get_var_names();
-	set<string> weights_set(weights_names.begin(), weights_names.end());
-	for (auto &name : oe.get_var_names())
-	{
-		if (weights_set.find(name) == weights_set.end())
-			missing.push_back(name);
-	}
-
-	if (missing.size() > 0)
-	{
-		ss << "weights ensemble is missing the following observations: ";
-		for (auto m : missing)
-			ss << ',' << m;
-		throw_ies_error(ss.str());
-	}
-
-}
-
 void IterEnsembleSmoother::initialize_parcov()
 {
 	stringstream ss;
@@ -1737,14 +873,56 @@ void IterEnsembleSmoother::initialize_obscov()
 	message(1, "initializing observation noise covariance matrix");
 	string obscov_filename = pest_scenario.get_pestpp_options().get_obscov_filename();
 
-	string how = obscov.try_from(pest_scenario, file_manager, false);
+	string how = obscov.try_from(pest_scenario, file_manager, false, true);
 	message(1, "obscov loaded ", how);
-	obscov = obscov.get(act_obs_names);
+	if (obscov_filename.size() > 0)
+	{
+		vector<string> cov_names = obscov.get_col_names();
+		vector<string> nz_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+		if (cov_names.size() < nz_obs_names.size())
+		{
+			//this means we need to drop some nz obs
+			set<string> scov(cov_names.begin(), cov_names.end());
+			set<string>::iterator end = scov.end();
+			vector<string> drop;
+			for (auto name : nz_obs_names)
+				if (scov.find(name) == end)
+					drop.push_back(name);
+			ofstream& frec = file_manager.rec_ofstream();
+			frec << "Note: zero-weighting the following " << drop.size() << " observations that are not in the obscov:" << endl;
+			int i = 0;
+			for (auto n : drop)
+			{
+				frec << ',' << n;
+				i++;
+				if (i > 10)
+				{
+					frec << endl;
+					i = 0;
+				}
+			}
+			frec << endl;
+			zero_weight_obs(drop, false, true);
+			
+		}
+		message(1, "resetting weights based on obscov diagonal");
+		Eigen::VectorXd diag = obscov.e_ptr()->diagonal();
+		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+		for (int i = 0; i < diag.size(); i++)
+		{
+			oi->set_weight(cov_names[i], min(1.0 / sqrt(diag[i]), oi->get_weight(cov_names[i])));
+		}
+	}
+	else
+	{
+		obscov = obscov.get(act_obs_names);
+	}
+	
 }
 
 
 void IterEnsembleSmoother::initialize()
-{
+{	
 	message(0, "initializing");
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 
@@ -1760,7 +938,7 @@ void IterEnsembleSmoother::initialize()
 		Parameters pars = pest_scenario.get_ctl_parameters();
 		ParamTransformSeq pts = pe.get_par_transform();
 
-		ParameterEnsemble _pe(&pest_scenario);
+		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
 		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
 		_pe.append("BASE", pars);
@@ -1769,13 +947,13 @@ void IterEnsembleSmoother::initialize()
 		//_pe.to_csv(par_csv);
 		pe_base = _pe;
 		pe_base.reorder(vector<string>(), act_par_names);
-		ObservationEnsemble _oe(&pest_scenario);
+		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
 		_oe.append("BASE", pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
-		ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, &reg_factor, &weights);
+		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
 		if (ph.get_lt_obs_names().size() > 0)
 		{
 			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
@@ -1789,46 +967,23 @@ void IterEnsembleSmoother::initialize()
 		vector<int> failed_idxs = run_ensemble(_pe, _oe);
 		if (failed_idxs.size() != 0)
 		{
-			message(0, "control file parmeter value run failed...bummer");
-			return;
+			message(0, "control file parameter value run failed...bummer");
+			throw_ies_error("control file parameter value run failed");
 		}
 		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
 		message(1, "saving results from control file parameter value run to ", obs_csv);
 		_oe.to_csv(obs_csv);
 
-		ph.update(_oe, _pe, false);
+		ph.update(_oe, _pe);
 		message(0, "control file parameter phi report:");
-		ph.report(true,false);
+		ph.report(true);
 		ph.write(0, 1);
-		ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
-		Observations obs;
-		Eigen::VectorXd v = _oe.get_real_vector("BASE");
-		vector<double> vv;
-		vv.resize(v.size());
-		Eigen::VectorXd::Map(&vv[0], v.size()) = v;
-		obs.update(_oe.get_var_names(), vv);
-	
-		// save parameters to .par file
-		output_file_writer.write_par(file_manager.open_ofile_ext("base.par"),pars, *(pts.get_offset_ptr()),
-			*(pts.get_scale_ptr()));
-		file_manager.close_file("par");
-
-		// save new residuals to .rei file
-		output_file_writer.write_rei(file_manager.open_ofile_ext("base.rei"), 0,
-			pest_scenario.get_ctl_observations(),obs,obj_func,pars);
-			
+		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);			
 		return;
 	}
 
 	//set some defaults
 	PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
-
-	if (pp_args.find("IES_LAMBDA_MULTS") == pp_args.end())
-		ppo->set_ies_lam_mults(vector<double>{0.1, 1.0, 2.0});
-	if (pp_args.find("IES_SUBSET_SIZE") == pp_args.end())
-		ppo->set_ies_subset_size(4);
-	if (pp_args.find("LAMBDA_SCALE_FAC") == pp_args.end())
-		ppo->set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1});
 
 	verbose_level = pest_scenario.get_pestpp_options_ptr()->get_ies_verbose_level();
 	if (pest_scenario.get_n_adj_par() >= 1e6)
@@ -1836,22 +991,10 @@ void IterEnsembleSmoother::initialize()
 		message(0, "You are a god among mere mortals!");
 	}
 
-	PestppOptions::SVD_PACK svd = ppo->get_svd_pack();
-	if (svd == PestppOptions::SVD_PACK::PROPACK)
-	{
-		message(1, "using PROPACK for truncated svd solve");
-	}
-	else
-	{
-		message(1, "using REDSVD for truncated svd solve");
-	}
+	message(1, "using REDSVD for truncated svd solve");
 	message(1, "maxsing:", pest_scenario.get_svd_info().maxsing);
 	message(1, "eigthresh: ", pest_scenario.get_svd_info().eigthresh);
 
-	//if ((ppo->get_ies_localizer().size() > 0) & (ppo->get_ies_autoadaloc()))
-	//{
-	//	throw_ies_error("use of localization matrix and autoadaloc not supported...yet!");
-	//}
 	message(1, "initializing localizer");
 	use_localizer = localizer.initialize(performance_log);
 	num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
@@ -1872,7 +1015,6 @@ void IterEnsembleSmoother::initialize()
 	}
 	if ((use_localizer) && (!localizer.get_autoadaloc()))
 	{
-
 		ss.str("");
 		ss << "using localized solution with " << localizer.get_num_upgrade_steps() << " sequential upgrade steps";
 		message(1, ss.str());
@@ -1889,9 +1031,6 @@ void IterEnsembleSmoother::initialize()
 		else
 			message(1, "localizing by parameters");
 	}
-
-	
-	
 	iter = 0;
 	//ofstream &frec = file_manager.rec_ofstream();
 	last_best_mean = 1.0E+30;
@@ -1901,54 +1040,6 @@ void IterEnsembleSmoother::initialize()
 	warn_min_reals = 10;
 	error_min_reals = 2;
 	consec_bad_lambda_cycles = 0;
-
-	
-
-	
-	if ((pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::PARETO))
-	{
-		message(1, "using pestpp-ies 'pareto' mode");
-		string pobs_group = pest_scenario.get_pareto_info().obsgroup;
-		message(1, "pareto obs group: ", pobs_group);
-
-		if (pobs_group.substr(0, 5) == "REGUL")
-		{
-			message(1, "'regul' detected in pareto obs group name");
-			//if (pest_scenario.get_pestpp_options().get_ies_reg_factor() == 0.0)
-			//	throw_ies_error("pareto model problem: pareto obs group is 'regul'-ish but ies_reg_fac is zero");
-
-		}
-		else
-		{
-
-			ObservationInfo *oi = pest_scenario.get_observation_info_ptr();
-			Observations obs = pest_scenario.get_ctl_observations();
-			vector<string> zero;
-			for (auto &oname : pest_scenario.get_ctl_ordered_obs_names())
-				if (oi->get_group(oname) == pobs_group)
-				{
-					if (oi->get_weight(oname) == 0.0)
-						zero.push_back(oname);
-					pareto_obs[oname] = obs[oname];
-					pareto_weights[oname] = oi->get_weight(oname);
-				}
-
-			if (pareto_obs.size() == 0)
-				throw_ies_error("no observations found for pareto obs group");
-
-
-			if (zero.size() > 0)
-			{
-				message(0, "error: the following pareto obs have zero weight:", zero);
-				throw_ies_error("atleast one pareto obs has zero weight");
-			}
-
-
-		}
-		//throw_ies_error("pareto mode not finished");
-	}
-
-	
 
 	lam_mults = pest_scenario.get_pestpp_options().get_ies_lam_mults();
 	if (lam_mults.size() == 0)
@@ -1966,7 +1057,6 @@ void IterEnsembleSmoother::initialize()
 
 	sanity_checks();
 
-
 	bool echo = false;
 	if (verbose_level > 1)
 		echo = true;
@@ -1983,7 +1073,7 @@ void IterEnsembleSmoother::initialize()
 
 	int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
 
-	bool pe_drawn = initialize_pe(parcov);
+	pe_drawn = initialize_pe(parcov);
 
 	if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
 	{
@@ -2003,11 +1093,9 @@ void IterEnsembleSmoother::initialize()
 		message(1, "not using prior parameter covariance matrix scaling");
 	}
 
-	bool oe_drawn = initialize_oe(obscov);
+	oe_drawn = initialize_oe(obscov);
 	string center_on = ppo->get_ies_center_on();
 	
-	
-
 	try
 	{
 		pe.check_for_dups();
@@ -2061,7 +1149,6 @@ void IterEnsembleSmoother::initialize()
 					ss << m << ",";
 				}
 				throw_ies_error(ss.str());
-
 			}
 		}
 		else
@@ -2072,35 +1159,6 @@ void IterEnsembleSmoother::initialize()
 		}
 	}
 
-	if (ppo->get_ies_weight_csv().size() > 0)
-	{
-		throw_ies_error("separate weight csv support is not implemented...yet!");
-		initialize_weights();
-	}
-	
-		
-
-	//if pareto mode, reset the stochastic obs vals for the pareto obs to the value in the control file
-	if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::PARETO)
-	{
-		throw_ies_error("PARETO mode is not implemented...yet!");
-		string oname;
-		vector<string> oe_names = oe.get_var_names();
-		double val;
-		Eigen::VectorXd col;
-		Eigen::MatrixXd oe_reals = *oe.get_eigen_ptr();
-		for (int i = 0; i < oe.shape().second; i++)
-		{
-			if (pareto_obs.find(oe_names[i]) != pareto_obs.end())
-			{
-				val = pareto_obs[oe_names[i]];
-				col = Eigen::VectorXd::Zero(oe.shape().first);
-				col.setConstant(val);
-				oe_reals.col(i) = col;
-			}
-		}
-		oe.set_eigen(oe_reals);
-	}
 
 	//need this here for Am calcs...
 	//message(1, "transforming parameter ensemble to numeric");
@@ -2113,6 +1171,39 @@ void IterEnsembleSmoother::initialize()
 		}
 		else
 			add_bases();
+
+
+	//now we check to see if we need to try to align the par and obs en
+	//this would only be needed if either of these were not drawn
+	if (!pe_drawn || !oe_drawn)
+	{
+		bool aligned = pe.try_align_other_rows(performance_log, oe);
+		if (aligned)
+		{
+			message(2, "observation ensemble reordered to align rows with parameter ensemble");
+		}
+	}
+
+	//just check to see if common real names are found but are not in the same location
+	map<string, int> pe_map = pe.get_real_map(), oe_map = oe.get_real_map();
+	vector<string> misaligned;
+	for (auto item : pe_map)
+	{
+		if (oe_map.find(item.first) == oe_map.end())
+			continue;
+		if (item.second != oe_map[item.first])
+			misaligned.push_back(item.first);
+	}
+	if (misaligned.size() > 0)
+	{
+		message(1, "WARNING: common realization names shared between the parameter and observation ensembles but they are not in the same row locations, see .rec file for listing");
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << endl <<  "WARNING: the following " << misaligned.size() << " realization names are shared between the parameter and observation ensembles but they are not in the same row locations:" << endl;
+		for (auto ma : misaligned)
+			frec << ma << endl;
+	}
+
+
 
 	message(2, "checking for denormal values in pe");
 	pe.check_for_normal("initial transformed parameter ensemble");
@@ -2128,7 +1219,7 @@ void IterEnsembleSmoother::initialize()
 		pe.to_csv(ss.str());
 	}
 	message(1, "saved initial parameter ensemble to ", ss.str());
-	message(2, "cehcking for denormal values in base oe");
+	message(2, "checking for denormal values in base oe");
 	oe.check_for_normal("base observation ensemble");
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
@@ -2167,7 +1258,7 @@ void IterEnsembleSmoother::initialize()
 		pars.update(pe.get_var_names(), pe.get_mean_stl_vector());
 		ParamTransformSeq pts = pe.get_par_transform();
 
-		ParameterEnsemble _pe(&pest_scenario);
+		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		_pe.reserve(vector<string>(), pe.get_var_names());
 		_pe.set_trans_status(pe.get_trans_status());
 		_pe.append("mean", pars);
@@ -2176,13 +1267,13 @@ void IterEnsembleSmoother::initialize()
 		_pe.to_csv(par_csv);
 		pe_base = _pe;
 		pe_base.reorder(vector<string>(), act_par_names);
-		ObservationEnsemble _oe(&pest_scenario);
+		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(vector<string>(), oe.get_var_names());
 		_oe.append("mean", pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
-		ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, &reg_factor, &weights);
+		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
 		if (ph.get_lt_obs_names().size() > 0)
 		{
 			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
@@ -2205,7 +1296,8 @@ void IterEnsembleSmoother::initialize()
 
 		ph.update(_oe, _pe);
 		message(0, "mean parameter phi report:");
-		ph.report();
+		ph.report(true);
+		ph.write(0, 1);
 
 		return;
 	}
@@ -2235,7 +1327,6 @@ void IterEnsembleSmoother::initialize()
 	//reorder this for later
 	pe_base.reorder(vector<string>(), act_par_names);
 
-	
 
 	//the hard way to restart
 	if (obs_restart_csv.size() > 0)
@@ -2250,11 +1341,6 @@ void IterEnsembleSmoother::initialize()
 		if (pe.shape().first == 0)
 			throw_ies_error("all realizations failed during initial evaluation");
 
-		
-
-		//string obs_csv = file_manager.get_base_filename() + ".0.obs.csv";
-		//message(1, "saving results of initial ensemble run to", obs_csv);
-		//oe.to_csv(obs_csv);
 		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
 	
@@ -2271,10 +1357,14 @@ void IterEnsembleSmoother::initialize()
 	}
 	message(1, "saved initial obs ensemble to", ss.str());
 
+	//save the 0th iter par and rei and well as the untagged par and rei
+	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter);
+	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1);
 
-	performance_log->log_event("calc initial phi");
+
+	performance_log->log_event("calc pre-drop phi");
 	//initialize the phi handler
-	ph = PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, &reg_factor, &weights);
+	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
 
 	if (ph.get_lt_obs_names().size() > 0)
 	{
@@ -2287,7 +1377,7 @@ void IterEnsembleSmoother::initialize()
 
 	ph.update(oe, pe);
 	message(0, "pre-drop initial phi summary");
-	ph.report();
+	ph.report(true);
 	drop_bad_phi(pe, oe);
 	if (oe.shape().first == 0)
 	{
@@ -2306,34 +1396,233 @@ void IterEnsembleSmoother::initialize()
 		string s = ss.str();
 		message(0, s);
 	}
+
+	pcs = ParChangeSummarizer(&pe_base, &file_manager,&output_file_writer);
+	vector<string> in_conflict = detect_prior_data_conflict();
+	if (in_conflict.size() > 0)
+	{
+		ss.str("");
+		ss << "WARNING: " << in_conflict.size() << " non-zero weighted observations are in conflict";
+		ss << " with the prior simulated ensemble." << endl;
+		message(0, ss.str());
+
+		cout << "...see rec file or " << file_manager.get_base_filename() << ".pdc.csv" << "for listing of conflicted observations" << endl << endl;
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << endl << "...conflicted observations: " << endl;
+		for (auto oname : in_conflict)
+		{
+			frec << oname << endl;
+		}
+		
+		if (!ppo->get_ies_drop_conflicts())
+		{
+			ss.str("");
+			ss << "  WARNING: Prior-data conflict detected.  Continuing with IES parameter" << endl;
+			ss << "           adjustment will likely result in parameter and forecast bias." << endl;
+			ss << "           Consider using 'ies_drop_conflicts' as a quick fix.";
+			message(1, ss.str());
+		}
+		else
+		{
+
+			//check that all obs are in conflict
+			message(1, "dropping conflicted observations");
+			if (in_conflict.size() == oe.shape().second)
+			{
+				throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
+			}
+			zero_weight_obs(in_conflict);
+			if (ppo->get_ies_localizer().size() > 0)
+			{
+				message(1, "updating localizer");
+					use_localizer = localizer.initialize(performance_log,true);
+			}
+
+		}
+		string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
+		ofstream f_obs(filename);
+		if (f_obs.bad())
+			throw_ies_error("error opening: " + filename);
+		output_file_writer.scenario_obs_csv(f_obs);
+		f_obs.close();
+		message(1, "updated observation data information written to file ", filename);
+	}
+	else if (ppo->get_obscov_filename().size() > 0)
+	{
+		string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
+		ofstream f_obs(filename);
+		if (f_obs.bad())
+			throw_ies_error("error opening: " + filename);
+		output_file_writer.scenario_obs_csv(f_obs);
+		f_obs.close();
+		message(1, "updated observation data information written to file ", filename);
+	}
 	performance_log->log_event("calc initial phi");
 	ph.update(oe, pe);
 	message(0, "initial phi summary");
-	ph.report();
+	ph.report(true);
 	ph.write(0, run_mgr_ptr->get_total_runs());
-	best_mean_phis.push_back(ph.get_mean(PhiHandler::phiType::COMPOSITE));
+	if (ppo->get_ies_save_rescov())
+		ph.save_residual_cov(oe, 0);
+	best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
 	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
 	{
 		message(1, "using full (MAP) update solution");
-	
+
 	}
 
-	last_best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
-	last_best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
+	if (ph.get_mean(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
+	{	
+		throw_ies_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");	
+	}
+	if (ph.get_std(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
+	{
+		throw_ies_error("initial actual phi stdev too low, something is wrong...");
+	}
+
+
+	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
+	if (last_best_mean < 1.0e-10)
+	{
+		throw_ies_error("initial composite phi mean too low, something is wrong...");
+	}
+	if (last_best_std < 1.0e-10)
+	{
+		throw_ies_error("initial composite phi stdev too low, something is wrong...");
+	}
 	if (last_best_lam <= 0.0)
 	{
 		//double x = last_best_mean / (2.0 * double(oe.shape().second));
 		double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
-		last_best_lam = pow(10.0,(floor(log10(x))));
+		last_best_lam = pow(10.0, (floor(log10(x))));
+		if (last_best_lam < 1.0e-10)
+		{
+			message(1, "initial lambda estimation from phi failed, using 10,000");
+			last_best_lam = 10000;
+		}
 	}
-
-
 	message(1, "current lambda:", last_best_lam);
 	message(0, "initialization complete");
+}
 
-	pcs = ParChangeSummarizer(&pe_base, &file_manager);
+void IterEnsembleSmoother::zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov, bool update_oe_base)
+{
+	//drop from act_obs_names
+	vector<string> t;
+	set<string> sdrop(obs_to_zero_weight.begin(), obs_to_zero_weight.end());
+	for (auto oname : act_obs_names)
+		if (sdrop.find(oname) == sdrop.end())
+			t.push_back(oname);
+	act_obs_names = t;
+
+	//update obscov
+	if (update_obscov)
+		obscov.drop(obs_to_zero_weight);
+
+	//drop from oe_base
+	if (update_oe_base)
+		oe_base.drop_cols(obs_to_zero_weight);
 	
+	//shouldnt need to update localizer since we dropping not adding
+	//updating weights in control file
+
+	ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+	int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
+	for (auto n : obs_to_zero_weight)
+	{
+		oi->set_weight(n, 0.0);
+	}
+
+	stringstream ss;
+	ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
+	ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
+	message(1, ss.str());
+}
+
+vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
+{
+	message(1, "checking for prior-data conflict...");
+	//for now, just really simple metric - checking for overlap
+	// write out conflicted obs and some related info to a csv file
+	ofstream pdccsv(file_manager.get_base_filename() + ".pdc.csv");
+	
+	vector<string> in_conflict;
+	double smin, smax, omin, omax,smin_stat, smax_stat, omin_stat,omax_stat;
+	map<string, int> smap, omap;
+	vector<string> snames = oe.get_var_names();
+	vector<string> onames = oe_base.get_var_names();
+	vector<string> temp = ph.get_lt_obs_names();
+	set<string> ineq(temp.begin(), temp.end());
+	set<string>::iterator end = ineq.end();
+	temp = ph.get_gt_obs_names();
+	ineq.insert(temp.begin(), temp.end());
+	temp.resize(0);
+	
+	for (int i = 0; i < snames.size(); i++)
+	{
+		smap[snames[i]] = i;
+	}
+	for (int i = 0; i < onames.size(); i++)
+	{
+		omap[onames[i]] = i;
+	}
+	int sidx, oidx;
+	bool use_stat_dist = true;
+	if (pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance() <= 0.0)
+		use_stat_dist = false;
+	
+	double smn, sstd, omn, ostd,dist;
+	double sd = pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance();
+	int oe_nr = oe.shape().first;
+	int oe_base_nr = oe_base.shape().first;
+	Eigen::VectorXd t;
+	pdccsv << "name,obs_mean,obs_std,obs_min,obs_max,obs_stat_min,obs_stat_max,sim_mean,sim_std,sim_min,sim_max,sim_stat_min,sim_stat_max,distance" << endl;
+	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
+	{
+		if (ineq.find(oname) != end)
+			continue;
+		sidx = smap[oname];
+		oidx = omap[oname];
+		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
+		omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
+		smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
+		omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
+		t = oe.get_eigen_ptr()->col(sidx);
+		smn = t.mean();
+		sstd = std::sqrt((t.array() - smn).square().sum() / (oe_nr-1));
+		smin_stat = smn - (sd * sstd);
+		smax_stat = smn + (sd * sstd);
+		t = oe_base.get_eigen_ptr()->col(oidx);
+		omn = t.mean();
+		ostd = std::sqrt((t.array() - omn).square().sum() / (oe_base_nr-1));
+		omin_stat = omn - (sd * ostd);
+		omax_stat = omn + (sd * ostd);	
+
+		if (use_stat_dist)
+		{
+			if ((smin_stat > omax_stat) || (smax_stat < omin_stat))
+			{
+				in_conflict.push_back(oname);
+				dist = max((smin_stat - omax_stat), (omin_stat - smax_stat));
+				pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
+				pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
+			}
+		}
+		else
+		{
+			if ((smin > omax) || (smax < omin))
+			{
+				in_conflict.push_back(oname);
+				dist = max((smin - omax), (omin - smax));
+				pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
+				pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
+			}
+		}
+	}
+	
+	return in_conflict;
 }
 
 Eigen::MatrixXd IterEnsembleSmoother::get_Am(const vector<string> &real_names, const vector<string> &par_names)
@@ -2461,173 +1750,39 @@ void IterEnsembleSmoother::save_mat(string prefix, Eigen::MatrixXd &mat)
 	}
 }
 
-void IterEnsembleSmoother::adjust_pareto_weight(string &obsgroup, double wfac)
-
-{
-	if (obsgroup.substr(0, 5) == "REGUL")
-
-	{
-		message(1, "resetting reg fac for pareto to ", wfac);
-		reg_factor = wfac;
-	}
-	else
-	{
-		message(1, "applying weight factor for pareto obs group of ", wfac);
-
-		//pest_scenario.get_observation_info_ptr()->scale_group_weights(obsgroup, wfac);
-		ObservationInfo *oi = pest_scenario.get_observation_info_ptr();
-		double val;
-		for (auto &pw : pareto_weights)
-		{
-			val = wfac * pw.second;
-			oi->set_weight(pw.first, val);
-		}
-
-
-		Covariance obscov;
-		obscov.from_observation_weights(pest_scenario);
-		obscov = obscov.get(act_obs_names);
-		cout << obscov_inv_sqrt.diagonal() << endl;
-		obscov_inv_sqrt = obscov.inv().get_matrix().diagonal().cwiseSqrt().asDiagonal();
-	    cout << obscov_inv_sqrt.diagonal() << endl;
-		cout << endl;
-	}
-}
-
-void IterEnsembleSmoother::pareto_iterate_2_solution()
-{
-	//todo:
-	//get initial obsgroup weight and use wf mults intead of vals
-	ParetoInfo pi = pest_scenario.get_pareto_info();
-	stringstream ss;
-	//double init_lam = last_best_lam, init_mean = last_best_mean, init_std = last_best_std;
-	double init_lam = last_best_lam, init_mean = 1.0e+30, init_std = 1.0e+30;
-
-	message(0, "starting pareto analysis");
-	message(0, "initial pareto wfac", pi.wf_start);
-	message(1, "starting initial pareto iterations", pi.niter_start);
-	adjust_pareto_weight(pi.obsgroup, pi.wf_start);
-	last_best_lam = init_lam, last_best_mean = init_mean, last_best_std = init_std;
-	for (int i = 0; i < pi.niter_start; i++)
-	{
-		iter++;
-		message(1, "starting solve for iteration:", iter);
-		ss.str("");
-		ss << "starting solve for iteration: " << iter;
-		performance_log->log_event(ss.str());
-		solve_new();
-		report_and_save();
-		ph.update(oe, pe);
-		last_best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
-		last_best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
-		ph.report();
-		ph.write(iter, run_mgr_ptr->get_total_runs(),false);
-
-	}
-	ph.write_group(iter, run_mgr_ptr->get_total_runs(),vector<double>());
-	double wfac = pi.wf_start + pi.wf_inc;
-	vector<double> wfacs;
-	wfacs.push_back(pi.wf_start + pi.wf_inc);
-	while (true)
-	{
-		if (pi.wf_inc < 0.0)
-		{
-			if (wfac < pi.wf_fin)
-				break;
-			//wfac = wfac - pi.wf_inc;
-		}
-		else
-		{
-			if (wfac > pi.wf_fin)
-				break;
-
-		}
-		wfac = wfac + pi.wf_inc;
-		wfacs.push_back(wfac);
-	}
-	//while (wfac < pi.wf_fin)
-	//pe = pe_base;
-	//oe = oe_base;
-	for (auto &wfac : wfacs)
-	{
-		last_best_lam = init_lam, last_best_mean = init_mean, last_best_std = init_std;
-		message(0, "using pareto wfac", wfac);
-		message(0, "starting pareto iterations", pi.niter_gen);
-		adjust_pareto_weight(pi.obsgroup, wfac);
-		for (int i = 0; i < pi.niter_gen; i++)
-		{
-			iter++;
-			message(0, "starting solve for iteration:", iter);
-			ss << "starting solve for iteration: " << iter;
-			performance_log->log_event(ss.str());
-			solve_new();
-			report_and_save();
-			ph.update(oe, pe);
-			last_best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
-			last_best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
-			ph.report();
-			ph.write(iter, run_mgr_ptr->get_total_runs(),false);
-		}
-		ph.write_group(iter, run_mgr_ptr->get_total_runs(), vector<double>());
-		//pe = pe_base;
-		//oe = oe_base;
-	}
-	message(1, "final pareto wfac", pi.niter_fin);
-	message(0, "starting final pareto iterations", pi.niter_fin);
-	adjust_pareto_weight(pi.obsgroup, pi.wf_fin);
-	last_best_lam = init_lam, last_best_mean = init_mean, last_best_std = init_std;
-	//pe = pe_base;
-	//oe = oe_base;
-	for (int i = 0; i < pi.niter_fin; i++)
-	{
-		iter++;
-		message(0, "starting solve for iteration:", iter);
-		ss << "starting solve for iteration: " << iter;
-		performance_log->log_event(ss.str());
-		solve_new();
-		report_and_save();
-		ph.update(oe,pe);
-		last_best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
-		last_best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
-		ph.report();
-		ph.write(iter, run_mgr_ptr->get_total_runs(),false);
-	}
-	ph.write_group(iter, run_mgr_ptr->get_total_runs(), vector<double>());
-
-
-}
 
 void IterEnsembleSmoother::iterate_2_solution()
 {
 	stringstream ss;
 	ofstream &frec = file_manager.rec_ofstream();
-	if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::PARETO)
-		pareto_iterate_2_solution();
-	else
+	
+	bool accept;
+	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
-		bool accept;
-		for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
-		{
-			iter++;
-			message(0, "starting solve for iteration:", iter);
-			ss << "starting solve for iteration: " << iter;
-			performance_log->log_event(ss.str());
-			accept = solve_new();
-			report_and_save();
-			ph.update(oe,pe);
-			last_best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
-			last_best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
-			ph.report();
-			ph.write(iter, run_mgr_ptr->get_total_runs());
-			pcs.summarize(pe);
-			if (accept)
-				consec_bad_lambda_cycles = 0;
-			else
-				consec_bad_lambda_cycles++;
+		iter++;
+		message(0, "starting solve for iteration:", iter);
+		ss.str("");
+		ss << "starting solve for iteration: " << iter;
+		performance_log->log_event(ss.str());
+		accept = solve_new();
+		report_and_save();
+		ph.update(oe,pe);
+		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+		last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+		ph.report(true);
+		ph.write(iter, run_mgr_ptr->get_total_runs());
+		if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
+			ph.save_residual_cov(oe,iter);
+		pcs.summarize(pe,iter);
+			
+			
+		if (accept)
+			consec_bad_lambda_cycles = 0;
+		else
+			consec_bad_lambda_cycles++;
 
-			if (should_terminate())
-				break;
-		}
+		if (should_terminate())
+			break;
 	}
 }
 
@@ -2904,8 +2059,6 @@ void LocalUpgradeThread::work(int thread_id, int iter, double cur_lam)
 		unique_lock<mutex> parcov_guard(parcov_lock, defer_lock);
 		unique_lock<mutex> am_guard(am_lock, defer_lock);
 
-		bool use_propack = false;
-
 		while (true)
 		{
 			if (((use_approx) || (par_resid.rows() > 0)) &&
@@ -2928,8 +2081,8 @@ void LocalUpgradeThread::work(int thread_id, int iter, double cur_lam)
 			if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
 			{
 				//piggy back here for thread safety
-				if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
-					use_propack = true;
+				//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
+				//	use_propack = true;
 				obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
 				obs_diff_guard.unlock();
 			}
@@ -3024,17 +2177,10 @@ void LocalUpgradeThread::work(int thread_id, int iter, double cur_lam)
 		//performance_log->log_event("SVD of obs diff");
 		Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
 		
-		if (!use_propack)
-		{
-			SVD_REDSVD rsvd;
-			rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
-		}
-		else
-		{
-			SVD_PROPACK psvd;
-			psvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
-		}
-
+		
+		SVD_REDSVD rsvd;
+		rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
+		
 		Ut.transposeInPlace();
 		obs_diff.resize(0, 0);
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Ut", Ut);
@@ -3140,8 +2286,8 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 {
 	stringstream ss;
 	
-	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
-	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(), pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
+	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
+	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(),&rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
 	
 	//this copy of the localizer map will be consumed by the worker threads
 	//unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
@@ -3341,7 +2487,7 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 
 void IterEnsembleSmoother::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe)
 {
-	
+
 	vector<string> oe_names = _oe.get_real_names();
 	vector<string> pe_names = _pe.get_real_names();
 	vector<string> oe_base_names = oe.get_real_names();
@@ -3359,7 +2505,7 @@ void IterEnsembleSmoother::update_reals_by_phi(ParameterEnsemble &_pe, Observati
 		pe_idx_to_name[i] = pe_base_names[i];
 	//store map of current phi values
 	ph.update(oe, pe);
-	PhiHandler::phiType pt = PhiHandler::phiType::COMPOSITE;
+	L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
 	map<string, double> *phi_map = ph.get_phi_map(pt);
 	map<string, double> cur_phi_map;
 	for (auto p : *phi_map)
@@ -3429,6 +2575,7 @@ bool IterEnsembleSmoother::solve_new()
 		subset_size = pe.shape().first;
 	}
 
+	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 
 	vector<ParameterEnsemble> pe_lams;
 	vector<double> lam_vals, scale_vals;
@@ -3457,7 +2604,7 @@ bool IterEnsembleSmoother::solve_new()
 		double cur_lam = last_best_lam * lam_mult;
 		ss << "starting calcs for lambda" << cur_lam;
 		message(1, "starting lambda calcs for lambda", cur_lam);
-		message(2, "see .pfm file for more details");
+		message(2, "see .log file for more details");
 		ParameterEnsemble pe_upgrade;
 		
 		pe_upgrade = calc_localized_upgrade_threaded(cur_lam, loc_map);
@@ -3469,7 +2616,7 @@ bool IterEnsembleSmoother::solve_new()
 			pe_lam_scale.set_eigen(*pe_lam_scale.get_eigen_ptr() + (*pe_upgrade.get_eigen_ptr() * sf));
 			if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
 			{
-				pe_lam_scale.enforce_limits(pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+				pe_lam_scale.enforce_limits(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
 			}
 
 			pe_lams.push_back(pe_lam_scale);
@@ -3557,8 +2704,8 @@ bool IterEnsembleSmoother::solve_new()
 		message(0, "phi summary for lambda, scale fac:", vals,echo);
 		ph.report(echo);
 		
-		mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
-		std = ph.get_std(PhiHandler::phiType::COMPOSITE);
+		mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+		std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		if (mean < best_mean)
 		{
 			oe_lam_best = oe_lams[i];
@@ -3642,7 +2789,7 @@ bool IterEnsembleSmoother::solve_new()
 			}
 		message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 		ph.update(oe_lams[best_idx], pe_lams[best_idx]);
-		ph.report();
+		ph.report(true);
 		message(0, "running remaining realizations for best lambda, scale:", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 
 		//pe_keep_names and oe_keep_names are names of the remaining reals to eval
@@ -3700,22 +2847,22 @@ bool IterEnsembleSmoother::solve_new()
 		}
 		performance_log->log_event("updating phi");
 		ph.update(oe_lam_best, pe_lams[best_idx]);
-		best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
-		best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
+		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
-		ph.report();
+		ph.report(true);
 	}
 	else
 	{
 		ph.update(oe_lam_best, pe_lams[best_idx]);
-		best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
-		best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
+		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		
 	}
 
 	ph.update(oe_lam_best, pe_lams[best_idx]);
-	best_mean = ph.get_mean(PhiHandler::phiType::COMPOSITE);
-	best_std = ph.get_std(PhiHandler::phiType::COMPOSITE);
+	best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+	best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	message(1, "last best mean phi * acceptable phi factor: ", last_best_mean * acc_fac);
 	message(1, "current best mean phi: ", best_mean);
 
@@ -3767,7 +2914,6 @@ bool IterEnsembleSmoother::solve_new()
 }
 
 
-
 void IterEnsembleSmoother::report_and_save()
 {
 	ofstream &frec = file_manager.rec_ofstream();
@@ -3803,6 +2949,8 @@ void IterEnsembleSmoother::report_and_save()
 		ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
 		pe.to_csv(ss.str());
 	}
+	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter);
+	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1);
 	//ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
 	//pe.to_csv(ss.str());
 	frec << "      current par ensemble saved to " << ss.str() << endl;
@@ -3872,12 +3020,13 @@ void IterEnsembleSmoother::set_subset_idx(int size)
 		{
 			if (subset_idxs.size() >= nreal_subset)
 				break;
-			idx = uni(Ensemble::rand_engine);
+			idx = uni(subset_rand_gen);
 			if (find(subset_idxs.begin(), subset_idxs.end(), idx) != subset_idxs.end())
 				continue;
 			subset_idxs.push_back(idx);
-
 		}
+		if (subset_idxs.size() != nreal_subset)
+			throw_ies_error("max iterations exceeded when trying to find random subset idxs");
 
 	}
 	else if (how == "PHI_BASED")
@@ -3887,12 +3036,12 @@ void IterEnsembleSmoother::set_subset_idx(int size)
 		//vector<int> sidx;
 		int step;
 		int idx;
-		PhiHandler::phiType pt = PhiHandler::phiType::COMPOSITE;
+		L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
 		map<string, double>* phi_map = ph.get_phi_map(pt);
 		map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
 
 		int i = 0;
-		for (pi; pi != end; ++pi)
+		for (; pi != end; ++pi)
 		{
 			phis.push_back(make_pair(pi->second, i)); //phival,idx?
 			++i;
@@ -4014,7 +3163,8 @@ vector<ObservationEnsemble> IterEnsembleSmoother::run_lambda_ensembles(vector<Pa
 		vector<double> rep_vals{ lam_vals[i],scale_vals[i] };
 		real_run_ids = real_run_ids_vec[i];
 		//if using subset, reset the real_idx in real_run_ids to be just simple counter
-		if (subset_size < pe_lams[0].shape().first)
+		//if (subset_size < pe_lams[0].shape().first)
+		if ((use_subset) && (subset_size < pe_lams[i].shape().first))
 		{
 			_oe.keep_rows(subset_idxs);
 			int ireal = 0;

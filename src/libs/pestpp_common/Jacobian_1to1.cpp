@@ -51,17 +51,20 @@ Jacobian_1to1::~Jacobian_1to1() {
 
 bool Jacobian_1to1::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vector<string> numeric_par_names, ParamTransformSeq &par_transform,
 	const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info,
-	RunManagerAbstract &run_manager, set<string> &out_of_bound_par, bool phiredswh_flag, bool calc_init_obs)
+	RunManagerAbstract &run_manager, set<string> &out_of_bound_par, bool phiredswh_flag, bool calc_init_obs, bool reinitiailize)
 {
 	Parameters model_parameters(par_transform.ctl2model_cp(ctl_pars));
 	base_numeric_parameters = par_transform.ctl2numeric_cp(ctl_pars);
-	run_manager.reinitialize(file_manager.build_filename("rnj"));
+	if (reinitiailize)
+		run_manager.reinitialize(file_manager.build_filename("rnj"));
 	debug_msg("Jacobian_1to1::build_runs begin");
 
 	failed_parameter_names.clear();
 	failed_ctl_parameters.clear();
+	par_run_map.clear();
 	// add base run
 	int run_id = run_manager.add_run(model_parameters, "", 0);
+	par_run_map["__base__"] = vector<int>{ run_id };
 	//if base run is has already been complete, update it and mark it as complete
 	// compute runs for to jacobain calculation as it is influenced by derivative type( forward or central)
 	if (!calc_init_obs) {
@@ -74,7 +77,7 @@ bool Jacobian_1to1::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vect
 	Parameters base_derivative_parameters = par_transform.numeric2active_ctl_cp(base_numeric_parameters);
 	Parameters base_model_parameters = par_transform.numeric2model_cp(base_numeric_parameters);
 	//Loop through derivative parameters and build the parameter sets necessary for computing the jacobian
-	std::map<string, vector<int>> par_run_map;
+	
 	for (auto &i_name : numeric_par_names)
 	{
 		assert(base_derivative_parameters.find(i_name) != base_derivative_parameters.end());
@@ -138,8 +141,10 @@ bool Jacobian_1to1::build_runs(ModelRun &init_model_run, vector<string> numeric_
 
 	failed_parameter_names.clear();
 	failed_ctl_parameters.clear();
+	par_run_map.clear();
 	// add base run
 	int run_id = run_manager.add_run(model_parameters, "", 0);
+	par_run_map["__base__"] = vector<int>{ run_id };
 	//if base run is has already been complete, update it and mark it as complete
 	// compute runs for to jacobain calculation as it is influenced by derivative type( forward or central)
 	if (!calc_init_obs) {
@@ -152,7 +157,7 @@ bool Jacobian_1to1::build_runs(ModelRun &init_model_run, vector<string> numeric_
 	Parameters base_derivative_parameters = par_transform.numeric2active_ctl_cp(base_numeric_parameters);
 	Parameters base_model_parameters = par_transform.numeric2model_cp(base_numeric_parameters);
 	//Loop through derivative parameters and build the parameter sets necessary for computing the jacobian
-	std::map<string, vector<int>> par_run_map;
+	
 	for (auto &i_name : numeric_par_names)
 	{
 		assert(base_derivative_parameters.find(i_name) != base_derivative_parameters.end());
@@ -200,6 +205,10 @@ bool Jacobian_1to1::build_runs(ModelRun &init_model_run, vector<string> numeric_
 	debug_msg("Jacobian_1to1::build_runs end");
 
 	output_file_writer_ptr->write_jco_run_id(run_manager.get_cur_groupid(), par_run_map);
+	if (failed_parameter_names.size() == numeric_par_names.size())
+	{
+		throw runtime_error("Jacobian_1to1::build_runs() error: parameter derivative calculations failed for all parameters");
+	}
 	if (failed_parameter_names.size() > 0)
 		return false;
 	return true;
@@ -214,7 +223,9 @@ void Jacobian_1to1::make_runs(RunManagerAbstract &run_manager)
 
 bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 		const ParameterGroupInfo &group_info,
-		RunManagerAbstract &run_manager, const PriorInformation &prior_info, bool splitswh_flag)
+		RunManagerAbstract &run_manager, 
+	const PriorInformation &prior_info, bool splitswh_flag,
+	bool debug_fail)
 {
 	debug_msg("Jacobian_1to1::process_runs begin");
        base_sim_obs_names = run_manager.get_obs_name_vec();
@@ -229,7 +240,7 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 	JacobianRun base_run;
 	int i_run = 0;
 	// get base run parameters and observation for initial model run from run manager storage
-	run_manager.get_model_parameters(i_run,  base_run.ctl_pars);
+	/*run_manager.get_model_parameters(i_run,  base_run.ctl_pars);
 	bool success = run_manager.get_observations_vec(i_run, base_run.obs_vec);
 	if (!success)
 	{
@@ -238,6 +249,28 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 	par_transform.model2ctl_ip(base_run.ctl_pars);
 	base_numeric_parameters = par_transform.ctl2numeric_cp(base_run.ctl_pars);
 	++i_run;
+	*/
+	string base = "__base__";
+	if (par_run_map.find(base) != par_run_map.end())
+	{
+		run_manager.get_model_parameters(par_run_map[base][0], base_run.ctl_pars);
+		bool success = run_manager.get_observations_vec(par_run_map[base][0], base_run.obs_vec);
+		if (!success)
+		{
+			throw(PestError("Error: Base parameter run failed.  Can not compute the Jacobian"));
+		}
+		par_transform.model2ctl_ip(base_run.ctl_pars);
+		base_numeric_parameters = par_transform.ctl2numeric_cp(base_run.ctl_pars);
+		par_run_map.erase(base);
+		i_run++;
+	}
+	else
+	{
+		throw runtime_error("'__base__' run tag not in Jacobian.par_run_map, something is wrong");
+	}
+		
+
+		
 
 	// process the parameter pertubation runs
 	int nruns = run_manager.get_nruns();
@@ -250,57 +283,116 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 	int run_status_next;
 	double par_value_next;
 	double cur_numeric_par_value;
-
 	list<JacobianRun> run_list;
-	for(; i_run<nruns; ++i_run)
+	
+	//for(; i_run<nruns; ++i_run)
+	//{
+	//	run_list.push_back(JacobianRun());
+	//	run_manager. get_info(i_run, r_status, cur_par_name, cur_numeric_par_value);
+	//	run_manager.get_model_parameters(i_run,  run_list.back().ctl_pars);
+	//    bool success = run_manager.get_observations_vec(i_run, run_list.back().obs_vec);
+	//	run_list.back().numeric_derivative_par = cur_numeric_par_value;
+	//	/*if ((debug_fail) && (i_run == 1))
+	//	{
+	//		file_manager.rec_ofstream() << "NOTE: 'GLM_DEBUG_DER_FAIL' is true, failing jco run for parameter '" << cur_par_name << "'" << endl;
+	//		success = false;
+	//	}*/
+	//	if (success)
+	//	{
+	//		par_transform.model2ctl_ip(run_list.back().ctl_pars);
+	//		// get the updated parameter value which reflects roundoff errors
+	//		
+	//		par_name_vec.clear();
+	//		par_name_vec.push_back(cur_par_name);
+	//		Parameters numeric_pars(run_list.back().ctl_pars, par_name_vec);
+	//		par_transform.ctl2numeric_ip(numeric_pars);
+	//		run_list.back().numeric_derivative_par = numeric_pars.get_rec(cur_par_name);
+	//	}
+	//	else
+	//	{
+	//		run_list.pop_back();
+	//	}
+
+	//	// read information associated with the next model run;
+	//	if (i_run+1<nruns)
+	//	{
+	//		run_manager.get_info(i_run+1, run_status_next, par_name_next, par_value_next);
+	//	}
+
+	//	if( i_run+1>=nruns || (cur_par_name !=par_name_next) )
+	//	{
+	//		if (!run_list.empty())
+	//		{
+	//			base_numeric_par_names.push_back(cur_par_name);
+	//			base_run.numeric_derivative_par = base_numeric_parameters.get_rec(cur_par_name);
+	//			double cur_numeric_value = base_run.numeric_derivative_par;
+	//			run_list.push_front(base_run);
+	//			std::vector<Eigen::Triplet<double> > tmp_triplet_vec = calc_derivative(cur_par_name, cur_numeric_value, icol, run_list, group_info, prior_info, splitswh_flag);
+	//			triplet_list.insert( triplet_list.end(), tmp_triplet_vec.begin(), tmp_triplet_vec.end() );
+	//			icol++;
+	//		}
+	//		else
+	//		{
+	//			failed_parameter_names.insert(cur_par_name);
+	//			failed_ctl_parameters.insert(cur_par_name, cur_numeric_par_value);
+	//		}
+	//		run_list.clear();
+	//	}
+	//}
+
+	//for(; i_run<nruns; ++i_run)
+	for (auto par_run : par_run_map)
 	{
 		run_list.push_back(JacobianRun());
-		run_manager. get_info(i_run, r_status, cur_par_name, cur_numeric_par_value);
-		run_manager.get_model_parameters(i_run,  run_list.back().ctl_pars);
-	    bool success = run_manager.get_observations_vec(i_run, run_list.back().obs_vec);
-		run_list.back().numeric_derivative_par = cur_numeric_par_value;
-
-		if (success)
+		for (auto rid : par_run.second)
 		{
-			par_transform.model2ctl_ip(run_list.back().ctl_pars);
-			// get the updated parameter value which reflects roundoff errors
-			par_name_vec.clear();
-			par_name_vec.push_back(cur_par_name);
-			Parameters numeric_pars(run_list.back().ctl_pars, par_name_vec);
-			par_transform.ctl2numeric_ip(numeric_pars);
-			run_list.back().numeric_derivative_par = numeric_pars.get_rec(cur_par_name);
-		}
-		else
-		{
-			run_list.pop_back();
-		}
-
-		// read information associated with the next model run;
-		if (i_run+1<nruns)
-		{
-			run_manager.get_info(i_run+1, run_status_next, par_name_next, par_value_next);
-		}
-
-		if( i_run+1>=nruns || (cur_par_name !=par_name_next) )
-		{
-			if (!run_list.empty())
+			run_manager.get_info(par_run.second[0], r_status, cur_par_name, cur_numeric_par_value);
+			run_manager.get_model_parameters(par_run.second[0], run_list.back().ctl_pars);
+			bool success = run_manager.get_observations_vec(par_run.second[0], run_list.back().obs_vec);
+			run_list.back().numeric_derivative_par = cur_numeric_par_value;
+			/*if ((debug_fail) && (i_run == 1))
 			{
-				base_numeric_par_names.push_back(cur_par_name);
-				base_run.numeric_derivative_par = base_numeric_parameters.get_rec(cur_par_name);
-				double cur_numeric_value = base_run.numeric_derivative_par;
-				run_list.push_front(base_run);
-				std::vector<Eigen::Triplet<double> > tmp_triplet_vec = calc_derivative(cur_par_name, cur_numeric_value, icol, run_list, group_info, prior_info, splitswh_flag);
-				triplet_list.insert( triplet_list.end(), tmp_triplet_vec.begin(), tmp_triplet_vec.end() );
-				icol++;
+				file_manager.rec_ofstream() << "NOTE: 'GLM_DEBUG_DER_FAIL' is true, failing jco run for parameter '" << cur_par_name << "'" << endl;
+				success = false;
+			}*/
+			if (success)
+			{
+				par_transform.model2ctl_ip(run_list.back().ctl_pars);
+				// get the updated parameter value which reflects roundoff errors
+
+				par_name_vec.clear();
+				par_name_vec.push_back(cur_par_name);
+				Parameters numeric_pars(run_list.back().ctl_pars, par_name_vec);
+				par_transform.ctl2numeric_ip(numeric_pars);
+				run_list.back().numeric_derivative_par = numeric_pars.get_rec(cur_par_name);
 			}
 			else
 			{
-				failed_parameter_names.insert(cur_par_name);
-				failed_ctl_parameters.insert(cur_par_name, cur_numeric_par_value);
+				run_list.pop_back();
 			}
-			run_list.clear();
 		}
+
+		
+		if (!run_list.empty())
+		{
+			base_numeric_par_names.push_back(cur_par_name);
+			base_run.numeric_derivative_par = base_numeric_parameters.get_rec(cur_par_name);
+			double cur_numeric_value = base_run.numeric_derivative_par;
+			run_list.push_front(base_run);
+			std::vector<Eigen::Triplet<double> > tmp_triplet_vec = calc_derivative(cur_par_name, cur_numeric_value, icol, run_list, group_info, prior_info, splitswh_flag);
+			triplet_list.insert(triplet_list.end(), tmp_triplet_vec.begin(), tmp_triplet_vec.end());
+			icol++;
+		}
+		else
+		{
+			failed_parameter_names.insert(cur_par_name);
+			failed_ctl_parameters.insert(cur_par_name, cur_numeric_par_value);
+		}
+		run_list.clear();
+		
+
 	}
+	par_run_map.clear();
 	matrix.resize(base_sim_obs_names.size(), base_numeric_par_names.size());
 	matrix.setZero();
 	matrix.setFromTriplets(triplet_list.begin(), triplet_list.end());
@@ -450,7 +542,7 @@ void Jacobian_1to1::report_errors(std::ostream &fout)
 {
 	if (failed_to_increment_parmaeters.size() > 0)
 	{
-		fout << "    Parameters that went out of bounds while comuting jacobian" << endl;
+		fout << "    Parameters that went out of bounds while computing jacobian" << endl;
 		fout << "      Parameter" << endl;
 		fout << "        Name" << endl;
 		fout << "      ----------" << endl;

@@ -13,10 +13,10 @@
 #include "system_variables.h"
 #include "Localizer.h"
 
-bool Localizer::initialize(PerformanceLog *performance_log)
+bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing)
 {
 	stringstream ss;
-	how == How::OBSERVATIONS; //set this for the case with no localization
+	how = How::OBSERVATIONS; //set this for the case with no localization
 	string how_str = pest_scenario_ptr->get_pestpp_options().get_ies_localize_how();
 	if (how_str[0] == 'P')
 	{
@@ -47,7 +47,7 @@ bool Localizer::initialize(PerformanceLog *performance_log)
 	mat.from_file(filename);
 	
 	performance_log->log_event("processing localizer matrix");
-	process_mat(performance_log);
+	process_mat(performance_log,forgive_missing);
 	if (autoadaloc)
 	{
 		//string how = pest_scenario_ptr->get_pestpp_options().get_ies_localize_how();
@@ -67,7 +67,7 @@ bool Localizer::initialize(PerformanceLog *performance_log)
 }
 
 
-void Localizer::process_mat(PerformanceLog *performance_log)
+void Localizer::process_mat(PerformanceLog *performance_log, bool forgive_missing)
 {
 	stringstream ss;
 	
@@ -150,14 +150,26 @@ void Localizer::process_mat(PerformanceLog *performance_log)
 		
 	if (missing.size() > 0)
 	{
-		ss << "Localizer::process_mat() error:  the following rows in " << filename << " were not found in the non-zero-weight observation names or observation group names: ";
-		for (auto &m : missing)
-			ss << m << ',';
-		performance_log->log_event("error:" + ss.str());
-		throw runtime_error(ss.str());
+		if (forgive_missing)
+		{
+			mat.drop_rows(missing);
+			ss.str("");
+			ss << "dropped " << missing.size() << " from localizer rows because forgive_missing is true";
+			performance_log->log_event(ss.str());
+		}
+		else
+		{
+			ss.str("");
+			ss << "Localizer::process_mat() error:  the following rows in " << filename << " were not found in the non-zero-weight observation names or observation group names: ";
+			for (auto& m : missing)
+				ss << m << ',';
+			performance_log->log_event("error:" + ss.str());
+			throw runtime_error(ss.str());
+		}
 	}
 	if (dups.size() > 0)
 	{
+		ss.str("");
 		ss << "Localizer::process_mat() error:  the following observations were listed more than once (possibly through an obs group): ";
 		for (auto & d : dups)
 			ss << d << ',';
@@ -170,7 +182,7 @@ void Localizer::process_mat(PerformanceLog *performance_log)
 	vector<vector<string>> par_map;
 	dup_check.clear();
 	string p;
-	
+	missing.clear();
 	//for (auto &p : mat.get_col_names())
 	for (int i=0;i<mat.ncol();++i)
 	{
@@ -213,11 +225,24 @@ void Localizer::process_mat(PerformanceLog *performance_log)
 	}
 	if (missing.size() > 0)
 	{
-		ss << "Localizer::process_mat() error: the following cols in " << filename << " were not found in the active parameter names or parameter group names: ";
-		for (auto &m : missing)
-			ss << m << ',';
-		performance_log->log_event("error:" + ss.str());
-		throw runtime_error(ss.str());
+		if (forgive_missing)
+		{
+
+			mat.drop_cols(missing);
+			ss.str("");
+			ss << "dropped " << missing.size() << " from localizer columns because forgive_missing is true";
+			performance_log->log_event(ss.str());
+		}
+		else
+		{
+			ss.str("");
+			ss << "Localizer::process_mat() error: the following cols in " << filename << " were not found in the active parameter names or parameter group names: ";
+			for (auto& m : missing)
+				ss << m << ',';
+			performance_log->log_event("error:" + ss.str());
+			throw runtime_error(ss.str());
+		}
+	
 	}
 	if (dups.size() > 0)
 	{
@@ -234,6 +259,8 @@ void Localizer::process_mat(PerformanceLog *performance_log)
 	vector<string> vobs, vpar;
 
 	//int i, j;
+	localizer_map.clear();
+
 	if (how == How::PARAMETERS)
 	{
 		vector<string> col_names = mat.get_col_names();
@@ -414,7 +441,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 		ss.str("");
 		ss << pst_filename.substr(0, pst_filename.size() - 4) << "." << iter << ".autoadaloc.csv";
 		string filename = ss.str();
-		f_out = ofstream(filename);
+		f_out.open(filename);
 		if (!f_out.good())
 			throw runtime_error("autoadaloc error opening filename " + filename + " for verbose output");
 		f_out << "obsnme,parnme,correlation_coeff,background_mean,background_stdev,threshold,kept";

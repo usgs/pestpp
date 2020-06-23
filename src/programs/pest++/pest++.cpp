@@ -51,6 +51,7 @@
 #include "logger.h"
 #include "covariance.h"
 #include "Ensemble.h"
+#include "eigen_tools.h"
 
 
 using namespace std;
@@ -148,21 +149,17 @@ int main(int argc, char* argv[])
 					cerr << "PANTHER agent requires the master be specified as /H hostname:port" << endl << endl;
 					throw(PestCommandlineError(commandline));
 				}
-				PANTHERAgent yam_agent;
+				ofstream frec("panther_worker.rec");
+				if (frec.bad())
+					throw runtime_error("error opening 'panther_worker.rec'");
+				PANTHERAgent yam_agent(frec);
 				string ctl_file = "";
 				try {
-					string ctl_file;
-					if (upper_cp(file_ext) == "YMR")
-					{
-						ctl_file = file_manager.build_filename("ymr");
-						yam_agent.process_panther_ctl_file(ctl_file);
-					}
-					else
-					{
-						// process traditional PEST control file
-						ctl_file = file_manager.build_filename("pst");
-						yam_agent.process_panther_ctl_file(ctl_file);
-					}
+					
+					// process traditional PEST control file
+					ctl_file = file_manager.build_filename("pst");
+					yam_agent.process_ctl_file(ctl_file);
+					
 				}
 				catch (PestError e)
 				{
@@ -178,7 +175,7 @@ int main(int argc, char* argv[])
 				cerr << perr.what();
 				throw(perr);
 			}
-			cout << endl << "Simulation Complete..." << endl;
+			cout << endl << "Work Done..." << endl;
 			exit(0);
 		}
 		//Check for PANTHER Master
@@ -210,8 +207,9 @@ int main(int argc, char* argv[])
 		debug_initialize(file_manager.build_filename("dbg"));
 		if (it_find_j != cmd_arg_vec.end())
 		{
-			restart_ctl.get_restart_option() = RestartController::RestartOption::REUSE_JACOBIAN;
-			file_manager.open_default_files();
+			cout << endl << "ERROR: '/j' restart option is deprecated.  Please use ++base_jacobian() instead." << endl << endl;
+			//restart_ctl.get_restart_option() = RestartController::RestartOption::REUSE_JACOBIAN;
+			//file_manager.open_default_files();
 		}
 		else if (it_find_r != cmd_arg_vec.end())
 		{
@@ -239,7 +237,7 @@ int main(int argc, char* argv[])
 		}
 
 		ofstream &fout_rec = file_manager.rec_ofstream();
-		PerformanceLog performance_log(file_manager.open_ofile_ext("pfm"));
+		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
 
 		if (!restart_flag || save_restart_rec_header)
 		{
@@ -261,12 +259,15 @@ int main(int argc, char* argv[])
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
 		pest_scenario.set_defaults();
-
+		
+#ifndef _DEBUG
 		try {
-			performance_log.log_event("starting to process control file", 1);
+#endif
+			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
 			file_manager.close_file("pst");
 			performance_log.log_event("finished processing control file");
+#ifndef _DEBUG
 		}
 		catch (PestError e)
 		{
@@ -274,23 +275,40 @@ int main(int argc, char* argv[])
 			cerr << e.what() << endl << endl;
 			throw(e);
 	 	}
+#endif
 		pest_scenario.check_inputs(fout_rec);
+		// reset this here because we want to draw from the FOSM posterior as a whole matrix
+		pest_scenario.get_pestpp_options_ptr()->set_ies_group_draws(false);
+		
+		if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::PRIOR)
+		{
+			if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
+			{
+				throw runtime_error("'GLM_NORMAL_FORM' = 'PRIOR' is incompatible with 'PESTMODE' = 'REGULARIZATION'");
+			}
+		}
 
+		//Initialize OutputFileWriter to hadle IO of suplementary files (.par, .par, .svd)
+		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
+		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
+		
+		if (!restart_flag)
+		{
+			output_file_writer.scenario_report(fout_rec);
+		}
+		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
+		{
+			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+			exit(0);
+		}
+		output_file_writer.prep_glm_files(restart_flag);
+		output_file_writer.set_svd_output_opt(pest_scenario.get_svd_info().eigwrite);
 		//if base jco arg read from control file, reset restart controller
 		if (!pest_scenario.get_pestpp_options().get_basejac_filename().empty())
 		{
 			restart_ctl.get_restart_option() = RestartController::RestartOption::REUSE_JACOBIAN;
 		}
 
-		//Initialize OutputFileWriter to hadle IO of suplementary files (.par, .par, .svd)
-		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
-		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
-		output_file_writer.prep_glm_files(restart_flag);
-		output_file_writer.set_svd_output_opt(pest_scenario.get_svd_info().eigwrite);
-		if (!restart_flag)
-		{
-			output_file_writer.scenario_report(fout_rec);
-		}
 		if (pest_scenario.get_pestpp_options().get_iter_summary_flag())
 		{
 			output_file_writer.write_par_iter(0, pest_scenario.get_ctl_parameters());
@@ -345,23 +363,25 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			performance_log.log_event("starting basic model IO error checking", 1);
+			performance_log.log_event("starting basic model IO error checking");
 			cout << "checking model IO files...";
-			pest_scenario.check_io();
+			pest_scenario.check_io(fout_rec);
 			performance_log.log_event("finished basic model IO error checking");
 			cout << "done" << endl;
 			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
 			run_manager_ptr = new RunManagerSerial(exi.comline_vec,
 				exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
 				file_manager.build_filename("rns"), pathname,
-				pest_scenario.get_pestpp_options().get_max_run_fail());
+				pest_scenario.get_pestpp_options().get_max_run_fail(),
+				pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
+				pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
 		}
 
 		const ParamTransformSeq &base_trans_seq = pest_scenario.get_base_par_tran_seq();
 
 		ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
 		Jacobian *base_jacobian_ptr = new Jacobian_1to1(file_manager,output_file_writer);
-
+		std::mt19937 rand_gen(pest_scenario.get_pestpp_options().get_random_seed());
 		TerminationController termination_ctl(pest_scenario.get_control_info().noptmax, pest_scenario.get_control_info().phiredstp,
 			pest_scenario.get_control_info().nphistp, pest_scenario.get_control_info().nphinored, pest_scenario.get_control_info().relparstp,
 			pest_scenario.get_control_info().nrelpar, pest_scenario.get_regul_scheme_ptr()->get_use_dynamic_reg(),
@@ -373,9 +393,13 @@ int main(int argc, char* argv[])
 			restart_ctl.update_termination_ctl(termination_ctl);
 		}
 
-		//SVDSolver::MAT_INV mat_inv = SVDSolver::MAT_INV::JTQJ;
+		file_manager.rec_ofstream() << "...loading prior parameter covariance matrix" << endl << endl;
+		performance_log.log_event("loading parcov");
+		Covariance parcov;
+		parcov.try_from(pest_scenario, file_manager);
+		
 		SVDSolver base_svd(pest_scenario, file_manager, &obj_func, base_trans_seq,
-			*base_jacobian_ptr, output_file_writer, &performance_log, "base parameter solution");
+			*base_jacobian_ptr, output_file_writer, &performance_log, parcov, &rand_gen, "base parameter solution");
 
 		base_svd.set_svd_package(pest_scenario.get_pestpp_options().get_svd_pack());
 		//Build Super-Parameter problem
@@ -386,9 +410,9 @@ int main(int argc, char* argv[])
 		TranSVD *tran_svd = new TranSVD(pest_scenario.get_pestpp_options().get_max_n_super(),
 			pest_scenario.get_pestpp_options().get_super_eigthres(), "SVD Super Parameter Tranformation");
 
-		if (pest_scenario.get_pestpp_options().get_svd_pack() == PestppOptions::PROPACK)
+		if (pest_scenario.get_pestpp_options().get_svd_pack() != PestppOptions::SVD_PACK::REDSVD)
 		{
-			tran_svd->set_SVD_pack_propack();
+			tran_svd->set_SVD_pack();
 		}
 		tran_svd->set_performance_log(&performance_log);
 
@@ -492,7 +516,7 @@ int main(int argc, char* argv[])
 			de_solver.initialize_population(*run_manager_ptr, np);
 			de_solver.solve(*run_manager_ptr, restart_ctl, max_gen, f, cr, dither_f, init_run);
 			run_manager_ptr->free_memory();
-			exit(1);
+			exit(0);
 		}
 
 
@@ -518,7 +542,8 @@ int main(int argc, char* argv[])
 			//base parameter iterations
 			try
 			{
-				if (restart_ctl.get_restart_option() != RestartController::RestartOption::NONE  && restart_ctl.get_iteration_type() == RestartController::IterationType::SUPER)
+				if (restart_ctl.get_restart_option() != RestartController::RestartOption::NONE  &&
+					restart_ctl.get_iteration_type() == RestartController::IterationType::SUPER)
 				{
 					try
 					{
@@ -539,7 +564,7 @@ int main(int argc, char* argv[])
 						string filename = pest_scenario.get_pestpp_options().get_basejac_filename();
 						string res_filename = pest_scenario.get_pestpp_options().get_hotstart_resfile();
 						filename = ((filename.empty()) ? file_manager.build_filename("jco") : filename);
-						base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, true, filename, res_filename);
+						cur_run = base_svd.iteration_reuse_jac(*run_manager_ptr, termination_ctl, cur_run, true, filename, res_filename);
 					}
 					catch (exception &e)
 					{
@@ -674,6 +699,7 @@ int main(int argc, char* argv[])
 				Parameters base_numeric_pars = base_trans_seq.ctl2numeric_cp(cur_ctl_parameters);
 				const vector<string> &pars = base_numeric_pars.get_keys();
 				QSqrtMatrix Q_sqrt(&(pest_scenario.get_ctl_observation_info()), &pest_scenario.get_prior_info());
+				
 				if (restart_ctl.get_restart_option() == RestartController::RestartOption::RESUME_JACOBIAN_RUNS)
 				{
 					//read previously computed super parameter transformation
@@ -683,12 +709,25 @@ int main(int argc, char* argv[])
 				}
 				else
 				{
-					(*tran_svd).update_reset_frozen_pars(*base_jacobian_ptr, Q_sqrt, base_numeric_pars, max_n_super, super_eigthres, pars, nonregul_obs, cur_run.get_frozen_ctl_pars());
+					cout << "...forming super parameter transformation, requires forming and factoring JTQJ..." << endl;
+					fout_rec << "...forming super parameter transformation, requires forming and factoring JTQJ..." << endl;
+					Eigen::SparseMatrix<double> parcov_inv;
+					ParamTransformSeq par_transform = pest_scenario.get_base_par_tran_seq();
+					map<string, double> dss = pest_scenario.calc_par_dss(*base_jacobian_ptr,par_transform);
+					if (pest_scenario.get_pestpp_options().get_glm_normal_form() == PestppOptions::GLMNormalForm::PRIOR)
+					{
+						
+						parcov_inv = *parcov.get(base_jacobian_ptr->get_base_numeric_par_names()).inv().e_ptr();
+					}
+					performance_log.log_event("updating super parameter transformation, requires formation and SVD of JtQJ");
+					
+					(*tran_svd).update_reset_frozen_pars(*base_jacobian_ptr, Q_sqrt, base_numeric_pars, max_n_super, super_eigthres, 
+						pars, nonregul_obs, parcov_inv, dss, cur_run.get_frozen_ctl_pars());
 					(*tr_svda_fixed).reset((*tran_svd).get_frozen_derivative_pars());
 				}
 				SVDASolver super_svd(pest_scenario, file_manager, &obj_func,
 					trans_svda, *super_jacobian_ptr,
-					output_file_writer, &performance_log,
+					output_file_writer, &performance_log,parcov,&rand_gen,
 					base_svd.get_phiredswh_flag(), base_svd.get_splitswh_flag());
 				super_svd.set_svd_package(pest_scenario.get_pestpp_options().get_svd_pack());
 				//use base jacobian to compute first super jacobian if there was not a super upgrade
@@ -700,7 +739,17 @@ int main(int argc, char* argv[])
 					super_svd.get_jacobian().transform(base_trans_seq, &ParamTransformSeq::jac_numeric2active_ctl_ip);
 					super_svd.get_jacobian().transform(trans_svda, &ParamTransformSeq::jac_active_ctl_ip2numeric_ip);
 					//rerun base run to account for round off error in super parameters
-					cur_run = super_svd.update_run(*run_manager_ptr, cur_run);
+					if ((cur_run.obs_valid()) && (!pest_scenario.get_pestpp_options().get_glm_rebase_super()))
+					{
+						fout_rec << "...glm_rebase_super is false, using existing residuals as super-par-truncated base residuals..." << endl;
+						cout << "...glm_rebase_super is false, using existing residuals as super-par-truncated base residuals..." << endl;
+					}
+					else
+					{
+						cout << "...running super-par-truncated base parameter values once to account for roundoff in super par transformation" << endl;
+						fout_rec << "...running super-par-truncated base parameter values once to account for roundoff in super par transformation" << endl;
+						cur_run = super_svd.update_run(*run_manager_ptr, cur_run);
+					}
 					calc_first_jacobian = false;
 					//bool success = run_manager_ptr->get_observations_vec(0, init_sim);
 				}
@@ -722,6 +771,13 @@ int main(int argc, char* argv[])
 				ofstream &fout_restart = file_manager.get_ofstream("rst");
 				RestartController::write_start_failed_super(fout_restart);
 				restart_ctl.get_restart_option() = RestartController::RestartOption::NONE;
+				if (pest_scenario.get_pestpp_options().get_n_iter_base() == -1)
+				{
+					cout << "resetting n_iter_base to 1 since super parameter process failed" << endl;
+					fout_rec << "resetting n_iter_base to 1 since super parameter process failed" << endl;
+					pest_scenario.get_pestpp_options_ptr()->set_n_iter_base(1);
+					n_base_iter = -1;
+				}	
 			}
 		}
 		cout << endl;
@@ -751,19 +807,8 @@ int main(int argc, char* argv[])
 			(pest_scenario.get_pestpp_options().get_uncert_flag()))
 
 		{
-			cout << endl << endl << endl;
-			cout << endl << endl << endl;
-			cout << "  ---  starting uncertainty analysis calculations  ---  " << endl << endl << endl;
-			cout << "  uncertainty estimates calculated using Schur's " << endl;
-			cout << "  complement for linear-based conditional uncertainty " << endl;
-			cout << "  propogation.  For a derviation from Bayes equation, see " << endl;
-			cout << "  M. N. Fienen, J. E. Doherty, R. J. Hunt, and H. W. Reeves. " << endl;
-			cout << "  2010. 'Using Prediction Uncertainty Analysis to Design " << endl;
-			cout << "  Hydrologic Monitoring Networks : Example Applications " << endl;
-			cout << "  from the Great Lakes Water Availability Pilot Project'. " << endl;
-			cout << "  See PEST++ V3 documentation for implementation details." << endl;
-			cout << endl << endl << endl;
-
+			cout << endl << endl << "...starting posterior FOSM calculations..." << endl;
+	
 			fout_rec << endl << endl << endl << endl;
 			fout_rec << "-----------------------------------------------------------------------" << endl;
 			fout_rec << "Note: The following uncertainty estimates were calculated using " << endl;
@@ -782,139 +827,86 @@ int main(int argc, char* argv[])
 			fout_rec << "      covariance matrices before uncertainty calculations.  Please" << endl;
 			fout_rec << "      make sure that all expert knowledge is expressed in the prior " << endl;
 			fout_rec << "      parameter bounds or through a covariance matix, which can be " << endl;
-			fout_rec << "      supplied as a ++ option as 'parameter_covariance(<matrix_file_name>)," << endl;
+			fout_rec << "      supplied as a ++ option as '++parcov(<matrix_file_name>)'," << endl;
 			fout_rec << "      where <matrix_file_name> can be an ASCII PEST-compatible matrix file (.mat) or" << endl;
 			fout_rec << "      a PEST-compatible uncertainty file (.unc)." << endl << endl;
 
 
-			ofstream &pfm = file_manager.get_ofstream("pfm");
-			pfm << endl << endl << "-----------------------------------" << endl;
-			pfm << "starting linear uncertainty analyses" << endl;
-			pfm << "-----------------------------------" << endl << endl;
-			Logger unc_log(pfm);
+			performance_log.log_event("FOSM-based posterior unc calcs");
+
+			if (base_jacobian_ptr->get_base_numeric_par_names().size() == 0)
+			{
+				cout << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
+				fout_rec << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
+				return 0;
+			}
 
 			//instance of a Mat for the jco
 			Mat j(base_jacobian_ptr->get_sim_obs_names(), base_jacobian_ptr->get_base_numeric_par_names(),
 				base_jacobian_ptr->get_matrix_ptr());
-
-			//get a new obs info instance that accounts for residual phi (and expected objection value if passed)
-			// and report new weights to the rec file
-			fout_rec << endl;
-			ObservationInfo reweight;
-			Observations sim = optimum_run.get_obs();
-			reweight = normalize_weights_by_residual(pest_scenario, sim);
-			fout_rec << "Note: The observation covariance matrix has been constructed from " << endl;
-			fout_rec << "      weights listed in the pest control file that have been scaled by " << endl;
-			fout_rec << "      by the final residuals to account for " << endl;
-			fout_rec << "      the level of measurement noise implied by the original weights so" << endl;
-			fout_rec << "      the total objective function is equal to the number of  " << endl;
-			fout_rec << "      non-zero weighted observations." << endl;
-
-
-			fout_rec << endl;
-			/*fout_rec << "Scaled observation weights used to form observation noise covariance matrix written to residual file " <<  endl;
-			fout_rec << endl << setw(20) << "observation" << setw(20) << "group" << setw(20) << "scaled_weight" << endl;
-			for (auto &oi : reweight.observations)
-			if (oi.second.weight > 0.0)
-				fout_rec << setw(20) << oi.first << setw(20) << oi.second.group << setw(20) << oi.second.weight << endl;
-			fout_rec << endl << endl;*/
-			string reres_filename = file_manager.get_base_filename() + ".fosm_reweight.rei";
-			ofstream &reres_of = file_manager.open_ofile_absolute("fosm_reweight.rei",reres_filename);
-			
-			Observations obs = pest_scenario.get_ctl_observations();
-			output_file_writer.obs_report(reres_of, obs, sim, reweight);
-			fout_rec << "Scaled observation weights used to form observation noise covariance matrix written to residual file '" << reres_filename << "'" << endl << endl;
-			
-			//instance of linear analysis
-			linear_analysis la(j, pest_scenario, file_manager, &unc_log);
-
-			//if needed, set the predictive sensitivity vectors
-			const vector<string> pred_names = pest_scenario.get_pestpp_options().get_prediction_names();
-			//make sure prediction weights are zero
-			for (auto &pname : pred_names)
+			if (pest_scenario.get_prior_info_ptr()->get_nnz_pi() > 0)
 			{
-				if (pest_scenario.get_ctl_observation_info().get_weight(pname) != 0.0)
-				{
-					cout << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
-					fout_rec << endl << "WARNING: prediction: " << pname << " has a non-zero weight" << endl << endl;
-				}
+				vector<string> pi_names = pest_scenario.get_ctl_ordered_pi_names();
+				j.drop_rows(pi_names);
 			}
-			if (pred_names.size() > 0)
-				la.set_predictions(pred_names);
-
-			//drop all 'regul' obs and equations
-			la.drop_prior_information(pest_scenario);
-
-			//write the posterior covariance matrix
-			string postcov_filename = file_manager.get_base_filename() + ".post.cov";
-			la.posterior_parameter_ptr()->to_ascii(postcov_filename);
-			fout_rec << "Note : posterior parameter covariance matrix written to file '" + postcov_filename +
-				"'" << endl << endl;
-
-			//write a parameter prior and posterior summary to the rec file
-			const ParamTransformSeq trans = pest_scenario.get_base_par_tran_seq();
-			Parameters pars = pest_scenario.get_ctl_parameters();
-			string parsum_filename = file_manager.get_base_filename() + ".par.usum.csv";
-			la.write_par_credible_range(fout_rec, parsum_filename, pest_scenario.get_ctl_parameter_info(),
-				trans.active_ctl2numeric_cp(pest_scenario.get_ctl_parameters()),
-				trans.active_ctl2numeric_cp(optimum_run.get_ctl_pars()),
-				pest_scenario.get_ctl_ordered_par_names());
-			fout_rec << "Note : the above parameter uncertainty summary was written to file '" + parsum_filename +
-				"'" << endl << endl;
-			//if predictions were defined, write a prior and posterior summary to the rec file
-			if (pred_names.size() > 0)
+			LinearAnalysis la(j, pest_scenario, file_manager, performance_log,parcov,&rand_gen);
+			ObservationInfo reweight = la.glm_iter_fosm(optimum_run, output_file_writer, -999, run_manager_ptr);
+			if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
 			{
-				map<string, pair<double, double>> init_final_pred_values;
-				double ival, fval;
-				for (auto &pred_name : pred_names)
-				{
-					fval = optimum_run.get_obs().get_rec(pred_name);
-					if (run_manager_ptr->get_init_sim().size() > 0)
-					{
-						int idx = distance(run_manager_ptr->get_obs_name_vec().begin(), find(run_manager_ptr->get_obs_name_vec().begin(),
-							run_manager_ptr->get_obs_name_vec().end(), pred_name));
-						ival = run_manager_ptr->get_init_sim()[idx];
-					}
-					else
-					{
-						cout << "WARNING: initial simulation results not available, falling back to optimum run outputs for prior forecast mean" << endl;
-						fout_rec << "WARNING: initial simulation results not available, falling back to optimum run outputs for prior forecast mean" << endl;
-						ival = fval;
-					}
-					
-					init_final_pred_values[pred_name] = pair<double, double>(ival, fval);
-				}
-				string predsum_filename = file_manager.get_base_filename() + ".pred.usum.csv";
-				la.write_pred_credible_range(fout_rec, predsum_filename, init_final_pred_values);
-				fout_rec << "Note : the above prediction uncertainty summary was written to file '" + predsum_filename +
-					"'" << endl << endl;
-			}
-			set<string> args = pest_scenario.get_pestpp_options().get_passed_args();
-
-			if (args.find("NUM_REALS") != args.end() && pest_scenario.get_pestpp_options().get_ies_num_reals() > 0)
-			{
-				bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
-				int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
-				fout_rec << "drawing " << num_reals << " posterior parameter realizations";
-				ParameterEnsemble pe(&pest_scenario);
-				Covariance cov = la.posterior_parameter_matrix();
-				pe.draw(num_reals,optimum_run.get_ctl_pars(),cov, &performance_log,1);
-				if (binary)
-					pe.to_binary(file_manager.get_base_filename() + ".post.paren.jcb");
-				else
-					pe.to_csv(file_manager.get_base_filename() + ".post.paren.csv");
-				map<int,int> run_map = pe.add_runs(run_manager_ptr);
+				cout << endl << "...drawing and running " << pest_scenario.get_pestpp_options().get_glm_num_reals() << " FOSM-based posterior realizations" << endl;
+				
+				pair<ParameterEnsemble, map<int, int>> fosm_real_info = la.draw_fosm_reals(run_manager_ptr, -999, optimum_run);
 				run_manager_ptr->run();
-				ObservationEnsemble oe(&pest_scenario);
-				Covariance obscov = la.get_obscov();
-				oe.draw(num_reals, obscov, &performance_log, 1);
-				oe.update_from_runs(run_map, run_manager_ptr);
-				if (binary)
-					oe.to_binary(file_manager.get_base_filename() + ".post.obsen.jcb");
-				else
-					oe.to_csv(file_manager.get_base_filename() + ".post.obsen.csv");
+				DynamicRegularization ptr;
+				ptr.set_defaults();
+				ptr.set_weight(0.0);
+				double phi = optimum_run.get_phi(ptr);
+				pair<ObservationEnsemble,map<string,double>> fosm_obs_info = la.process_fosm_reals(run_manager_ptr, fosm_real_info, -999, phi);
+				
+				//here is the adjustment process for each realization - one lambda each for now
+				//todo: make sure to handle failed realizations - use oe real names to retrieve pe rows
+				//todo: what about lambda?
+				//QSqrtMatrix q(&reweight, pest_scenario.get_prior_info_ptr());
+				//DynamicRegularization reg;
+				//reg.set_zero();
+				//Observations ctl_obs = pest_scenario.get_ctl_observations();
+				//vector<string> nz_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+				//Eigen::MatrixXd sim_reals = oe.get_eigen(oe.get_real_names(), nz_obs_names);
+				//vector<string> active_par_names = base_jacobian_ptr->get_base_numeric_par_names();
+				////Eigen::MatrixXd par_reals = fosm_real_info.first.get_eigen(fosm_real_info.first.get_real_names(), active_par_names);
+				//Parameters freeze_pars,upgrade_pars,grad_upgrade_pars,del_upgrade_pars;
+				//Eigen::MatrixXd upgraded_reals(oe.shape().first, active_par_names.size());
+				//if (true)
+				//{
+				//	cout << "...making upgrade calculations for each realization..." << endl;
+				//	vector<string> oe_real_names = oe.get_real_names();
+				//	vector<double> lamb = pest_scenario.get_pestpp_options().get_base_lambda_vec();
+				//	double min_lamb = lamb[0];
+				//	for (int i = 0; i < oe.shape().first; i++)
+				//	{
+				//		
+				//		Eigen::VectorXd res = ctl_obs.get_data_eigen_vec(nz_obs_names) - sim_reals.row(i).transpose();
+				//		Parameters real_pars = pest_scenario.get_ctl_parameters();
+				//		Eigen::VectorXd pe_vals = fosm_real_info.first.get_real_vector(oe_real_names[i]);
+				//		vector<double> vals(pe_vals.data(), pe_vals.data() + pe_vals.size());
+				//		real_pars.update(active_par_names, vals);
+				//		base_trans_seq.numeric2active_ctl_ip(real_pars);
+				//		base_svd.calc_lambda_upgrade_vec_JtQJ(*base_jacobian_ptr, q, reg, res, nz_obs_names,
+				//			real_pars, freeze_pars, 0.0, upgrade_pars,
+				//			del_upgrade_pars, grad_upgrade_pars);
+				//		upgraded_reals.row(i) = upgrade_pars.get_data_eigen_vec(active_par_names);
+				//	}
+
+				//	ParameterEnsemble upgrade_pe(&pest_scenario, upgraded_reals, oe_real_names, active_par_names);
+				//	map<int, int> run_id_map = upgrade_pe.add_runs(run_manager_ptr);
+				//	run_manager_ptr->run();
+				//	/*ObservationEnsemble oe_upgrade(&pest_scenario);
+				//	oe_upgrade.reserve(oe_real_names, pest_scenario.get_ctl_ordered_obs_names());
+				//	oe_upgrade.update_from_runs(run_id_map, run_manager_ptr);*/
+				//	pair<ParameterEnsemble, map<int, int>> upgrade_fosm_real_info(upgrade_pe, run_id_map);
+				//	ObservationEnsemble upgrade_oe = la.process_fosm_reals(run_manager_ptr, upgrade_fosm_real_info,-999, optimum_run.get_phi(ptr));
+				//}
 			}
-			cout << "  ---  finished uncertainty analysis calculations  ---  " << endl << endl << endl;
 		}
 
 		// clean up
@@ -922,16 +914,28 @@ int main(int argc, char* argv[])
 		delete base_jacobian_ptr;
 		delete super_jacobian_ptr;
 		delete run_manager_ptr;
-		cout << endl << endl << "Simulation Complete..." << endl;
+
+		string case_name = file_manager.get_base_filename();
+		file_manager.close_file("rst");
+		pest_utils::try_clean_up_run_storage_files(case_name);
+
+		cout << endl << endl << "PESTPP-GLM Analysis Complete..." << endl;
 		cout << flush;
+		return 0;
 #ifndef _DEBUG
 	}
 	catch (exception &e)
 	{
 		cout << "Error condition prevents further execution: " << endl << e.what() << endl;
+		return 1;
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));
+	}
+	catch (...)
+	{
+		cout << "Error condition prevents further execution" << endl;
+		return 1;
 	}
 #endif
 }
