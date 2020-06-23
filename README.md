@@ -37,7 +37,7 @@ The PEST++ software suite includes several stand-alone tools for model-independe
 
 * ``pestpp-pso``: particle-swarm based inversion.
 
-All members of the software suite can be compiled for PC, MAC, or Linux and have several run managers to support parallelization.  precompiled binaries are available in the "bin" folder.  Windows users with older OS versions should use the ``bin/iwin`` binaries (starting "i", compiled with intel C++) to avoid the dreaded MSVC missing runtime DLL issue.
+All members of the software suite can be compiled for PC, MAC, or Linux and have several run managers to support parallelization.  precompiled binaries are available in the "bin" folder.  Windows users with older OS versions should use the ``iwin`` binaries (starting "i", compiled with intel C++) to avoid the dreaded MSVC missing runtime DLL issue.
 
 ## Funding
 
@@ -45,9 +45,11 @@ Funding for PEST++ has been provided by the U.S. Geologial Survey. The New Zeala
 
 ## Recent developements
 
-The PEST++ suite has been refactored to remove the fortran dependancy.
+PEST++ version 5 will be released soon!
 
-An updated control file format has been implemented on the ``develop`` branch code base.  All the existing PEST++ tools are still backward compatible with the standard control file format.  However, new tools that are in developement to support sequential data assimilation need the external file format.  Additional, new functionality is being developed that will require the updated control file format.  The new control file format is described in documentation.  
+The PEST++ suite has been refactored to remove the fortran dependancy.  This includes the template and instruction file processing routines.
+
+An updated control file format has been implemented.  All the existing PEST++ tools are still backward compatible with the standard control file format.  However, new tools that are in developement to support sequential data assimilation need the external file format.  Additional, new functionality is being developed that will require the updated control file format.  The new control file format is described in documentation and pyEMU can operate on this new format interchangeably.
 
 ## PEST++ References:
 
@@ -62,7 +64,7 @@ Welter, D.E., Doherty, J.E., Hunt, R.J., Muffels, C.T., Tonkin, M.J., and Schre√
 ### Related Links:
 
 * <a ref="http://www.pesthomepage.org">http://www.pesthomepage.org </a>
-* <a ref="https://github.com/usgs/pyemu">https://github.com/usgs/pyemu </a>
+* <a ref="https://github.com/pypest/pyemu">https://github.com/pypest/pyemu </a>
 
 ## Testing
 
