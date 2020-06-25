@@ -628,7 +628,7 @@ int main(int argc, char* argv[])
 						}
 						catch (exception &e)
 						{
-							cout << "error filling base jacobian: " << e.what() << endl;
+							cout << "error filling base Jacobian: " << e.what() << endl;
 							throw runtime_error(e.what());
 						}
 					}
@@ -654,7 +654,7 @@ int main(int argc, char* argv[])
 					}
 					catch (exception &e)
 					{
-						cout << "error in base parameter iteration process with existing jacobian: " << e.what() << endl;
+						cout << "error in base parameter iteration process with existing Jacobian: " << e.what() << endl;
 						throw runtime_error(e.what());
 					}
 				}
@@ -800,7 +800,7 @@ int main(int argc, char* argv[])
 		output_file_writer.phi_report(fout_rec, termination_ctl.get_iteration_number() + 1, run_manager_ptr->get_total_runs(), phi_data, 0.0, true);
 		output_file_writer.phi_report(cout, termination_ctl.get_iteration_number() + 1, run_manager_ptr->get_total_runs(), phi_data, 0.0, true);
 		fout_rec << endl << endl;
-		fout_rec << "Number of forward model runs performed during optimiztion: " << run_manager_ptr->get_total_runs() << endl;
+		fout_rec << "Number of forward model runs performed during optimization: " << run_manager_ptr->get_total_runs() << endl;
 
 		//linear analysis stuff
 		if ((pest_scenario.get_control_info().noptmax != 0) &&
@@ -813,17 +813,17 @@ int main(int argc, char* argv[])
 			fout_rec << "-----------------------------------------------------------------------" << endl;
 			fout_rec << "Note: The following uncertainty estimates were calculated using " << endl;
 			fout_rec << "      Schur's complement for linear-based conditional uncertainty " << endl;
-			fout_rec << "      propogation.  For a derviation from Bayes equation, see " << endl;
+			fout_rec << "      propagation.  For a derivation from Bayes equation, see " << endl;
 			fout_rec << "      M. N. Fienen, J. E. Doherty, R. J. Hunt, and H. W. Reeves. " << endl;
 			fout_rec << "      2010. 'Using Prediction Uncertainty Analysis to Design " << endl;
-			fout_rec << "      Hydrologic Monitoring Networks : Example Applications " << endl;
+			fout_rec << "      Hydrologic Monitoring Networks: Example Applications " << endl;
 			fout_rec << "      from the Great Lakes Water Availability Pilot Project'. " << endl;
 			fout_rec << "      See PEST++ V3 documentation for implementation details." << endl;
 			fout_rec << "-----------------------------------------------------------------------" << endl;
 			fout_rec << endl;
 
 			fout_rec << "Note: Any observations or prior information equations with a group name" << endl;
-			fout_rec << "      starting with 'regul' are dropped from the jacobian and observation" << endl;
+			fout_rec << "      starting with 'regul' are dropped from the Jacobian and observation" << endl;
 			fout_rec << "      covariance matrices before uncertainty calculations.  Please" << endl;
 			fout_rec << "      make sure that all expert knowledge is expressed in the prior " << endl;
 			fout_rec << "      parameter bounds or through a covariance matix, which can be " << endl;
@@ -836,8 +836,8 @@ int main(int argc, char* argv[])
 
 			if (base_jacobian_ptr->get_base_numeric_par_names().size() == 0)
 			{
-				cout << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
-				fout_rec << "WARNING: no parameters in base jacobian, can't calculate uncertainty with FOSM" << endl;
+				cout << "WARNING: no parameters in base Jacobian, can't calculate uncertainty with FOSM" << endl;
+				fout_rec << "WARNING: no parameters in base Jacobian, can't calculate uncertainty with FOSM" << endl;
 				return 0;
 			}
 
