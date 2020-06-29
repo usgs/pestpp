@@ -7,7 +7,7 @@ add_library(rm_wrappers STATIC
 )
 
 if(WIN32)
-  target_compile_definitions(rm_wrappers PRIVATE _SCL_SECURE_NO_WARNINGS)
+  target_compile_definitions(rm_wrappers PRIVATE _SCL_SECURE_NO_WARNINGS EXTERNAL_UPPER)
 endif()
 
 target_compile_options(rm_wrappers PRIVATE ${PESTPP_CXX_WARN_FLAGS})

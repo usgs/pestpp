@@ -11,7 +11,7 @@ cd "$script_path"/..
 rm -r build
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icpc -DFORCE_STATIC=ON ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icpc -DCMAKE_Fortran_COMPILER=ifort ..
 make -j
 cpack -G TGZ
 cp *.tar.gz ../

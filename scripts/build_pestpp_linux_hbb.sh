@@ -5,14 +5,18 @@
 set -e
 
 # Activate Holy Build Box environment
-source /hbb_exe/activate
+hbb_prefix=/hbb_exe
+source /$hbb_prefix/activate
+
+# Dependencies
+yum install -y lapack-devel
 
 #unset LIBRARY_PATH
 unset LDFLAGS
 unset CXXFLAGS
 
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/hbb_exe -DINSTALL_LOCAL=OFF /io
+cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_Fortran=ON -DCMAKE_INSTALL_PREFIX=$hbb_prefix -DINSTALL_LOCAL=OFF /io
 make -j
 cpack -G TGZ
 

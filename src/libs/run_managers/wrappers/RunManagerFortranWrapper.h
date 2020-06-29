@@ -3,55 +3,23 @@
 #ifndef RUNMANAGER_FORTRAN_WRAP_H_
 #define RUNMANAGER_FORTRAN_WRAP_H_
 
-extern "C"
-{
-int RMIF_CREATE_SERIAL(char *f_comline, int  *comline_str_len, int *comline_array_len,
-	char *f_tpl, int  *tpl_str_len, int *tpl_array_len,
-	char *f_inp, int  *inp_str_len, int *inp_array_len,
-	char *f_ins, int  *ins_str_len, int *ins_array_len,
-	char *f_out, int  *out_str_len, int *out_array_len,
-	char *f_storfile, int *storfile_len,
-	char *f_rundir, int *rundir_len, int *n_max_fail);
+#ifdef EXTERNAL_UPPER
+/* E.g. Windows Intel uses different name conventions */
+#define rmif_create_serial_ RMIF_CREATE_SERIAL
+#define rmif_create_panther_ RMIF_CREATE_PANTHER
+#define rmif_add_run_ RMIF_ADD_RUN
+#define rmif_add_run_with_info_ RMIF_ADD_RUN_WITH_INFO
+#define rmif_initialize_ RMIF_INITIALIZE
+#define rmif_initialize_restart_ RMIF_INITIALIZE_RESTART
+#define rmif_reinitialize_ RMIF_REINITIALIZE
+#define rmif_run_ RMIF_RUN
+#define rmif_run_until_ RMIF_RUN_UNTIL
+#define rmif_get_run_ RMIF_GET_RUN
+#define rmif_get_run_with_info_ RMIF_GET_RUN_WITH_INFO
+#define rmif_delete_ RMIF_DELETE
+#define rmif_get_failed_run_ids_ RMIF_GET_FAILED_RUN_IDS
+#define rmif_get_num_total_runs_ RMIF_GET_NUM_TOTAL_RUNS
 
-int RMIF_CREATE_PANTHER(char *f_comline, int  *comline_str_len, int *comline_array_len,
-	char *f_tpl, int  *tpl_str_len, int *tpl_array_len,
-	char *f_inp, int  *inp_str_len, int *inp_array_len,
-	char *f_ins, int  *ins_str_len, int *ins_array_len,
-	char *f_out, int  *out_str_len, int *out_array_len,
-	char *f_storfile, int *storfile_len,
-	char *f_port, int *f_port_len,
-	char *f_info_filename, int *info_filename_len, int *n_max_fail);
+#endif //EXTERNAL_UPPER
 
-int RMIF_ADD_RUN(double *parameter_data, int *npar, int *id);
-
-int RMIF_ADD_RUN_WITH_INFO(double *parameter_data, int *npar, int *id,
-	char *f_info_txt, int  *info_txt_len, double *info_value);
-
-int RMIF_INITIALIZE(char *f_pname, int  *pname_str_len, int *pname_array_len,
-				 char *f_oname, int  *oname_str_len, int *oname_array_len);
-
-int RMIF_INITIALIZE_RESTART(char *f_storfile, int *storfile_len);
-
-int RMIF_REINITIALIZE();
-
-int RMIF_RUN();
-
-int RMIF_RUN_UNTIL(int *condition, int *no_ops, double *time_sec, int *return_cond);
-
-int RMIF_GET_RUN(int *run_id, double *parameter_data, int *npar, double *obs_data, int *nobs);
-
-int RMIF_GET_RUN_WITH_INFO(int *run_id, double *parameter_data, int *npar, double *obs_data, int *nobs,
-	char *f_info_txt, int  *info_txt_len, double *info_value);
-
-
-int RMIF_GET_NUM_FAILED_RUNS(int *nfail);
-
-int RMIF_GET_FAILED_RUN_IDS(int *run_id_array, int *len_run_id_array);
-
-int RMIF_GET_NUM_TOTAL_RUNS(int *nruns);
-
-int RMFI_DELETE();
-
-
-}
 #endif //RUNMANAGER_FORTRAN_WRAP_H_
