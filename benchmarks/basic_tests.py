@@ -854,6 +854,10 @@ def mf6_v5_ies_test():
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_ies.pst"))
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d,"freyberg6_run_ies.pst"))
+    pyemu.os_utils.run("pestpp-ies freyberg6_run_ies.pst",cwd=t_d)
+
     pst.control_data.noptmax = 2
     pst.write(os.path.join(t_d,"freyberg6_run_ies.pst"))
     pyemu.os_utils.start_workers(t_d, "pestpp-ies", "freyberg6_run_ies.pst", num_workers=15,
