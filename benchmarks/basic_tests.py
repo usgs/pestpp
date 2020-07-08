@@ -861,7 +861,7 @@ def mf6_v5_ies_test():
     pst.control_data.noptmax = 2
     pst.write(os.path.join(t_d,"freyberg6_run_ies.pst"))
     pyemu.os_utils.start_workers(t_d, "pestpp-ies", "freyberg6_run_ies.pst", num_workers=15,
-                                master_dir=m_d,worker_root=".")
+                                master_dir=m_d,worker_root=model_d,port=port)
 
     
     oe_file = os.path.join(m_d,"freyberg6_run_ies.{0}.obs.csv".format(pst.control_data.noptmax))
@@ -883,8 +883,9 @@ def mf6_v5_sen_test():
         shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_sen.pst"))
     m_d = os.path.join(model_d,"master_sen")
-    pyemu.os_utils.start_workers(t_d, "pestpp-sen", "freyberg6_run_sen.pst", 
-                                 num_workers=15, master_dir=m_d, worker_root='.')
+    pyemu.os_utils.start_workers(t_d, "pestpp-sen", "freyberg6_run_sen.pst",
+                                 num_workers=15, master_dir=m_d, worker_root=model_d,
+                                 port=port)
 
     
     mio_file = os.path.join(m_d,"freyberg6_run_sen.mio")
@@ -907,7 +908,8 @@ def mf6_v5_opt_stack_test():
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_opt.pst"))
     m_d = os.path.join(model_d,"master_opt_stack")
     pyemu.os_utils.start_workers(t_d, "pestpp-opt", "freyberg6_run_opt.pst", 
-                                 num_workers=15, master_dir=m_d,worker_root=".")
+                                 num_workers=15, master_dir=m_d,worker_root=model_d,
+                                 port=port)
 
     assert os.path.exists(os.path.join(m_d,"freyberg6_run_opt.1.sim+chance.rei"))
     assert os.path.exists(os.path.join(m_d,"freyberg6_run_opt.1.obs_stack.csv"))
@@ -933,4 +935,4 @@ if __name__ == "__main__":
     #ext_stdcol_test()
     #mf6_v5_ies_test()
     mf6_v5_sen_test()
-    mf6_v5_opt_stack()
+    #mf6_v5_opt_stack()
