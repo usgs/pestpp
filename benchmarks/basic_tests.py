@@ -887,9 +887,11 @@ def mf6_v5_sen_test():
                                  num_workers=15, master_dir=m_d, worker_root=model_d,
                                  port=port)
 
-    
+    pst = pyemu.Pst(os.path.join(m_d,"freyberg6_run_sen.pst"))
     mio_file = os.path.join(m_d,"freyberg6_run_sen.mio")
     assert os.path.exists(mio_file)
+    df = pd.read_csv(mio_file)
+    assert df.shape[0] > 1
     msn_file = mio_file.replace(".mio",".msn")
     assert os.path.exists(msn_file)
 
@@ -914,8 +916,30 @@ def mf6_v5_opt_stack_test():
     assert os.path.exists(os.path.join(m_d,"freyberg6_run_opt.1.sim+chance.rei"))
     assert os.path.exists(os.path.join(m_d,"freyberg6_run_opt.1.obs_stack.csv"))
 
-    
 
+def mf6_v5_glm_test():
+    model_d = "mf6_freyberg"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
+    
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_glm")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_glm.pst"))
+    m_d = os.path.join(model_d,"master_glm")
+    pyemu.os_utils.start_workers(t_d, "pestpp-glm", "freyberg6_run_glm.pst", 
+                                 num_workers=15, master_dir=m_d,worker_root=model_d,
+                                 port=port)
+
+    oe_file = os.path.join(m_d,"freyberg6_run_glm.post.obsen.csv")
+    assert os.path.exists(oe_file)
+    oe = pd.read_csv(oe_file)
+    assert oe.shape[0] == pst.pestpp_options["glm_num_reals"],"{0},{1}".\
+        format(oe.shape[0],pst.pestpp_options["glm_num_reals"])
 
 if __name__ == "__main__":
     
@@ -934,5 +958,6 @@ if __name__ == "__main__":
     #tplins1_test()
     #ext_stdcol_test()
     #mf6_v5_ies_test()
-    mf6_v5_sen_test()
-    #mf6_v5_opt_stack()
+    #mf6_v5_sen_test()
+    #mf6_v5_opt_stack_test()
+    mf6_v5_glm_test()
