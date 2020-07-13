@@ -1234,6 +1234,7 @@ void IterEnsembleSmoother::initialize()
 	}
 	message(1, "saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
 
+
 	if (center_on.size() > 0)
 	{
 		ss.str("");
