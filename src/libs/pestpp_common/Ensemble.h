@@ -84,7 +84,7 @@ public:
 	void check_for_dups();
 	void check_for_normal(string context="");
 
-	Eigen::MatrixXd draw_ip(int num_reals, Covariance cov, Transformable &tran, const vector<string> &draw_names, const map<string,vector<string>> &grouper, PerformanceLog *plog, int level);
+	void draw(int num_reals, Covariance cov, Transformable &tran, const vector<string> &draw_names, const map<string,vector<string>> &grouper, PerformanceLog *plog, int level);
 	void update_var_map();
 	~Ensemble();
 	//Ensemble& operator=(const Ensemble& other);
@@ -184,7 +184,7 @@ public:
 	void from_eigen_mat(Eigen::MatrixXd mat, const vector<string> &_real_names, const vector<string> &_var_names);
 	void from_binary(string file_name);// { Ensemble::from_binary(file_name, true); }
 	vector<int> update_from_runs(map<int,int> &real_run_ids, RunManagerAbstract *run_mgr_ptr);
-	ObservationEnsemble draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
+	void draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
 	void initialize_without_noise(int num_reals);
 	//ObservationEnsemble get_mean_diff();
 };

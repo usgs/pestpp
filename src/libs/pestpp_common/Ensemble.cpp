@@ -148,7 +148,7 @@ void draw_thread_function(int id, DrawThread &worker, int num_reals, int ies_ver
 }
 
 
-Eigen::MatrixXd Ensemble::draw_ip(int num_reals, Covariance cov, Transformable &tran, const vector<string> &draw_names,
+void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const vector<string> &draw_names,
 	const map<string, vector<string>> &grouper, PerformanceLog *plog, int level)
 {
 	//draw names should be "active" var_names (nonzero weight obs and not fixed/tied pars)
@@ -449,9 +449,6 @@ Eigen::MatrixXd Ensemble::draw_ip(int num_reals, Covariance cov, Transformable &
 		to_csv("trouble.csv");
 		throw_ensemble_error("invalid values in realization draws - trouble.csv written");
 	}
-	
-	return draws;
-
 }
 
 vector<string> Ensemble::get_generic_real_names(int num_reals)
@@ -1915,7 +1912,7 @@ void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, Per
 			var_names = sorted_var_names;
 		}
 	}
-	Ensemble::draw_ip(num_reals, cov, par, var_names, grouper, plog, level);
+	Ensemble::draw(num_reals, cov, par, var_names, grouper, plog, level);
 	/*map<string, int> header_info;
 	for (int i = 0; i < var_names.size(); i++)
 		header_info[var_names[i]] = i;
@@ -2600,7 +2597,7 @@ void ObservationEnsemble::initialize_without_noise(int num_reals)
 
 }
 
-ObservationEnsemble ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
+void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
 {
 	//draw an obs ensemble using only nz obs names
 	var_names = pest_scenario_ptr->get_ctl_ordered_nz_obs_names();
@@ -2619,7 +2616,7 @@ ObservationEnsemble ObservationEnsemble::draw(int num_reals, Covariance &cov, Pe
 			}
 		}
 	}
-	Eigen::MatrixXd noise = Ensemble::draw_ip(num_reals, cov, obs, pest_scenario_ptr->get_ctl_ordered_nz_obs_names(), grouper, plog, level);
+	Ensemble::draw(num_reals, cov, obs, pest_scenario_ptr->get_ctl_ordered_nz_obs_names(), grouper, plog, level);
 
 	//apply any bounds that were supplied
 	map<string, double> lower_bnd = pest_scenario_ptr->get_ext_file_double_map("observation data external", "lower_bound");
@@ -2659,8 +2656,7 @@ ObservationEnsemble ObservationEnsemble::draw(int num_reals, Covariance &cov, Pe
 		}
 	}
 	
-	//form the noise only ensemble
-	ObservationEnsemble noise_en(pest_scenario_ptr, rand_gen_ptr, noise, real_names, var_names);
+
 
 	//now fill in all the zero-weighted obs
 	Eigen::MatrixXd drawn = reals;
@@ -2687,9 +2683,6 @@ ObservationEnsemble ObservationEnsemble::draw(int num_reals, Covariance &cov, Pe
 	}
 	var_names = full_var_names;
 	
-	return noise_en;
-	
-
 }
 
 void ObservationEnsemble::update_from_obs(int row_idx, Observations &obs)
