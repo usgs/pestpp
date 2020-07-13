@@ -811,7 +811,7 @@ def ext_stdcol_test():
     obs.loc[pst.nnz_obs_names,"standard_deviation"] = 7.5
     pst.write(os.path.join(m_d,"pest_ext_stdcol.pst"),version=2)
     pyemu.os_utils.run("{0} pest_ext_stdcol.pst".format(exe_path),cwd=m_d)
-    df = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.base.obs.csv"),index_col=0).loc[:,pst.nnz_obs_names]
+    df = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.obs+noise.obs.csv"),index_col=0).loc[:,pst.nnz_obs_names]
     d = (df.std() - obs.loc[pst.nnz_obs_names,"standard_deviation"]).apply(np.abs)
     print(d)
     assert d.max() < 0.1,d.max()
@@ -822,7 +822,7 @@ def ext_stdcol_test():
     par.loc[pst.adj_par_names[0],"mean"] = par.loc[pst.adj_par_names[0],"parubnd"]
     pst.write(os.path.join(m_d,"pest_ext_stdcol.pst"),version=2)
     pyemu.os_utils.run("{0} pest_ext_stdcol.pst".format(exe_path),cwd=m_d)
-    df = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.base.obs.csv"),index_col=0).loc[:,pst.nnz_obs_names]
+    df = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.obs+noise.obs.csv"),index_col=0).loc[:,pst.nnz_obs_names]
     mn = df.min()
     mx = df.max()
     dmn = mn - obs.loc[pst.nnz_obs_names,"obsval"] * 0.9
