@@ -1220,19 +1220,19 @@ void IterEnsembleSmoother::initialize()
 	}
 	message(1, "saved initial parameter ensemble to ", ss.str());
 	message(2, "checking for denormal values in base oe");
-	oe.check_for_normal("base observation ensemble");
+	oe.check_for_normal("obs+noise observation ensemble");
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
-		ss << file_manager.get_base_filename() << ".base.obs.jcb";
+		ss << file_manager.get_base_filename() << ".obs+noise.jcb";
 		oe.to_binary(ss.str());
 	}
 	else
 	{
-		ss << file_manager.get_base_filename() << ".base.obs.csv";
+		ss << file_manager.get_base_filename() << ".obs+noise.csv";
 		oe.to_csv(ss.str());
 	}
-	message(1, "saved base observation ensemble (obsval+noise) to ", ss.str());
+	message(1, "saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
 
 	if (center_on.size() > 0)
 	{
