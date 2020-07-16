@@ -1,0 +1,27 @@
+pcf version=2
+* control data keyword
+pestmode                                 estimation
+noptmax                                 4
+svdmode                                 1
+maxsing                          10000000
+eigthresh                           1e-06
+eigwrite                                1
+ies_par_en                     prior.jcb
+forecasts                      headwater_20171130,tailwater_20161130,trgw_0_9_1_20161130
+n_iter_super                   4
+n_iter_base                    -1
+glm_num_reals                  200
+glm_normal_form                prior
+max_n_super                    36
+* parameter groups external
+freyberg6_run_glm.pargrp_data.csv
+* parameter data external
+freyberg6_run_glm.par_data.csv
+* observation data external
+freyberg6_run_glm.obs_data.csv
+* model command line
+mf6
+* model input external
+freyberg6_run_glm.tplfile_data.csv
+* model output external
+freyberg6_run_glm.insfile_data.csv
