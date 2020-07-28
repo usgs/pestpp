@@ -2,7 +2,7 @@
 
 add_executable(pestpp-mou pestpp-mou.cpp)
 
-target_compile_options(pestpp-ies PRIVATE ${PESTPP_CXX_WARN_FLAGS})
+target_compile_options(pestpp-mou PRIVATE ${PESTPP_CXX_WARN_FLAGS})
 
 target_link_libraries(pestpp-mou
   rm_serial
