@@ -9,4 +9,4 @@ target_link_libraries(pestpp-mou
   rm_yamr
 )
 
-install(TARGETS pestpp-ies RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS pestpp-mou RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
