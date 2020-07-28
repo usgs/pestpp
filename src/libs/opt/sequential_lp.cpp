@@ -972,7 +972,7 @@ void sequentialLP::iter_presolve()
 				missing.push_back(name);
 		if (missing.size() > 0)
 			throw_sequentialLP_error("the following decision vars were not found in the jacobian " + basejac_filename + " : ", missing);
-		if (constraints.get_use_fosm())
+		if ((constraints.get_use_chance()) && (constraints.get_use_fosm()))
 		{
 			for (auto& name : constraints.get_adj_par_names())
 				//if (find(start, end, name) == end)

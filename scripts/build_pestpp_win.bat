@@ -3,6 +3,7 @@
 set first_path=%cd%
 cd "%~dp0\.."
 
+rem fast but without fortran
 rmdir /Q /S bin
 rmdir /Q /S build
 mkdir build

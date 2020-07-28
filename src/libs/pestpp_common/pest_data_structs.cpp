@@ -1022,6 +1022,11 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		panther_debug_loop = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	else if (key == "PANTHER_AGENT_FREEZE_ON_FAIL")
+	{
+		panther_debug_fail_freeze = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
 	return false;
 }
 
@@ -1215,6 +1220,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "panther_agent_restart_on_error: " << panther_agent_restart_on_error << endl;
 	os << "panther_agent_no_ping_timeout_secs: " << panther_agent_no_ping_timeout_secs << endl;
 	os << "panther_debug_loop: " << panther_debug_loop << endl;
+	os << "panther_agent_freeze_on_fail: " << panther_debug_fail_freeze << endl;
 	os << endl << endl << endl;
 }
 
@@ -1353,6 +1359,7 @@ void PestppOptions::set_defaults()
 	set_panther_agent_restart_on_error(false);
 	set_panther_agent_no_ping_timeout_secs(-1);
 	set_panther_debug_loop(false);
+	set_panther_debug_fail_freeze(false);
 }
 
 ostream& operator<< (ostream &os, const ParameterInfo& val)

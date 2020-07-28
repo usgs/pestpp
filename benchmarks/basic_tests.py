@@ -811,7 +811,7 @@ def ext_stdcol_test():
     obs.loc[pst.nnz_obs_names,"standard_deviation"] = 7.5
     pst.write(os.path.join(m_d,"pest_ext_stdcol.pst"),version=2)
     pyemu.os_utils.run("{0} pest_ext_stdcol.pst".format(exe_path),cwd=m_d)
-    df = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.base.obs.csv"),index_col=0).loc[:,pst.nnz_obs_names]
+    df = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.obs+noise.csv"),index_col=0).loc[:,pst.nnz_obs_names]
     d = (df.std() - obs.loc[pst.nnz_obs_names,"standard_deviation"]).apply(np.abs)
     print(d)
     assert d.max() < 0.1,d.max()
@@ -822,7 +822,7 @@ def ext_stdcol_test():
     par.loc[pst.adj_par_names[0],"mean"] = par.loc[pst.adj_par_names[0],"parubnd"]
     pst.write(os.path.join(m_d,"pest_ext_stdcol.pst"),version=2)
     pyemu.os_utils.run("{0} pest_ext_stdcol.pst".format(exe_path),cwd=m_d)
-    df = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.base.obs.csv"),index_col=0).loc[:,pst.nnz_obs_names]
+    df = pd.read_csv(os.path.join(m_d,"pest_ext_stdcol.obs+noise.csv"),index_col=0).loc[:,pst.nnz_obs_names]
     mn = df.min()
     mx = df.max()
     dmn = mn - obs.loc[pst.nnz_obs_names,"obsval"] * 0.9
@@ -841,9 +841,105 @@ def ext_stdcol_test():
     assert dmx.max() < 1.0e-6,dmx
 
 
- 
+def mf6_v5_ies_test():
+    model_d = "mf6_freyberg"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
+    
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_ies")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_ies.pst"))
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d,"freyberg6_run_ies.pst"))
+    pyemu.os_utils.run("pestpp-ies freyberg6_run_ies.pst",cwd=t_d)
+
+    pst.control_data.noptmax = 2
+    pst.write(os.path.join(t_d,"freyberg6_run_ies.pst"))
+    pyemu.os_utils.start_workers(t_d, "pestpp-ies", "freyberg6_run_ies.pst", num_workers=15,
+                                master_dir=m_d,worker_root=model_d,port=port)
+
+    
+    oe_file = os.path.join(m_d,"freyberg6_run_ies.{0}.obs.csv".format(pst.control_data.noptmax))
+    assert os.path.exists(oe_file)
+    pe_file = oe_file.replace(".obs.",".par.")
+    assert os.path.exists(pe_file)
+
+def mf6_v5_sen_test():
+    model_d = "mf6_freyberg"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
+    
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_sen")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_sen.pst"))
+    m_d = os.path.join(model_d,"master_sen")
+    pyemu.os_utils.start_workers(t_d, "pestpp-sen", "freyberg6_run_sen.pst",
+                                 num_workers=15, master_dir=m_d, worker_root=model_d,
+                                 port=port)
+
+    pst = pyemu.Pst(os.path.join(m_d,"freyberg6_run_sen.pst"))
+    mio_file = os.path.join(m_d,"freyberg6_run_sen.mio")
+    assert os.path.exists(mio_file)
+    df = pd.read_csv(mio_file)
+    assert df.shape[0] > 1
+    msn_file = mio_file.replace(".mio",".msn")
+    assert os.path.exists(msn_file)
+
+def mf6_v5_opt_stack_test():
+    model_d = "mf6_freyberg"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
+    
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_opt_stack")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_opt.pst"))
+    m_d = os.path.join(model_d,"master_opt_stack")
+    pyemu.os_utils.start_workers(t_d, "pestpp-opt", "freyberg6_run_opt.pst", 
+                                 num_workers=15, master_dir=m_d,worker_root=model_d,
+                                 port=port)
+
+    assert os.path.exists(os.path.join(m_d,"freyberg6_run_opt.1.sim+chance.rei"))
+    assert os.path.exists(os.path.join(m_d,"freyberg6_run_opt.1.obs_stack.csv"))
 
 
+def mf6_v5_glm_test():
+    model_d = "mf6_freyberg"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
+    
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_glm")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_glm.pst"))
+    m_d = os.path.join(model_d,"master_glm")
+    pyemu.os_utils.start_workers(t_d, "pestpp-glm", "freyberg6_run_glm.pst", 
+                                 num_workers=15, master_dir=m_d,worker_root=model_d,
+                                 port=port)
+
+    oe_file = os.path.join(m_d,"freyberg6_run_glm.post.obsen.csv")
+    assert os.path.exists(oe_file)
+    oe = pd.read_csv(oe_file)
+    assert oe.shape[0] == pst.pestpp_options["glm_num_reals"],"{0},{1}".\
+        format(oe.shape[0],pst.pestpp_options["glm_num_reals"])
 
 if __name__ == "__main__":
     
@@ -860,4 +956,8 @@ if __name__ == "__main__":
     #sen_basic_test()
     #salib_verf()
     #tplins1_test()
-    ext_stdcol_test()
+    #ext_stdcol_test()
+    #mf6_v5_ies_test()
+    #mf6_v5_sen_test()
+    #mf6_v5_opt_stack_test()
+    mf6_v5_glm_test()
