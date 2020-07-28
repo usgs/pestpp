@@ -203,6 +203,8 @@ public:
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
 	bool assign_value_by_key_continued(const string& key, const string& value);
+	bool assign_mou_value_by_key(const string& key, const string& value, const string& org_value);
+
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
 	int get_n_iter_base() const { return n_iter_base; }
@@ -328,6 +330,13 @@ public:
 	void set_opt_par_stack(string _stack) { opt_par_stack = _stack; }
 	string get_opt_obs_stack()const { return opt_obs_stack; }
 	void set_opt_obs_stack(string _stack) { opt_obs_stack = _stack; }
+
+	int get_mou_population_size() const { return mou_population_size; }
+	void set_mou_population_size(int size) { mou_population_size = size; }
+	string get_mou_dv_population_file() const { return mou_dv_population_file; }
+	void set_mou_dv_population_file(string name) { mou_dv_population_file = name; }
+	string get_mou_obs_population_restart_file() const { return mou_obs_population_restart_file; }
+	void set_mou_obs_population_restart_file(string name) { mou_obs_population_restart_file = name; }
 
 
 	string get_ies_par_csv()const { return ies_par_csv; }
@@ -554,6 +563,11 @@ private:
 	string opt_par_stack;
 	string opt_obs_stack;
 
+	int mou_population_size;
+	string mou_dv_population_file;
+	string mou_obs_population_restart_file;
+
+
 	int ies_subset_size;
 	string ies_par_csv;
 	string ies_obs_csv;
@@ -660,6 +674,7 @@ private:
 ostream& operator<< (ostream& os, const SVDInfo& val);
 
 double draw_standard_normal(std::mt19937& rand_gen);
+vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bound, std::mt19937& rand_gen);
 
 
 #endif  /* PEST_DATAS_STRUCTS_H_ */

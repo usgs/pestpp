@@ -32,6 +32,7 @@ add_library(pestpp_com STATIC
   SVDSolver.cpp
   TerminationController.cpp
   Transformation.cpp
+  MOEA.cpp
 )
 
 target_include_directories(pestpp_com INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")

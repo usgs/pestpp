@@ -978,12 +978,12 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		fill_tpl_zeros = pest_utils::parse_string_arg_to_bool(value);
 	}
 	
-	else if (!assign_value_by_key_continued(key, value))
+	else if ((!assign_value_by_key_continued(key, value)) && (!assign_mou_value_by_key(key, value, org_value)))
 	{
-
-		//throw PestParsingError(line, "Invalid key word \"" + key +"\"");
 		return ARG_STATUS::ARG_NOTFOUND;
 	}
+	
+
 	return ARG_STATUS::ARG_ACCEPTED;
 }
 
@@ -1027,6 +1027,30 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		panther_debug_fail_freeze = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	return false;
+}
+
+bool PestppOptions::assign_mou_value_by_key(const string& key, const string& value, const string& org_value)
+{
+	if (key == "MOU_POPULATION_SIZE")
+	{
+		convert_ip(value, mou_population_size);
+		return true;
+	}
+
+	else if (key == "MOU_POPULATION_DV_FILE")
+	{
+		mou_dv_population_file = org_value;
+		return true;
+	}
+	else if (key == "MOU_POPULATION_OBS_RESTART_FILE")
+	{
+		mou_obs_population_restart_file = org_value;
+		return true;
+	}
+
+
+
 	return false;
 }
 
@@ -1158,6 +1182,11 @@ void PestppOptions::summary(ostream& os) const
 	os << "opt_recalc_fosm_every: " << opt_recalc_fosm_every << endl;
 	os << "opt_include_bnd_pi: " << opt_include_bnd_pi << endl;
 
+	os << endl << "...pestpp-mou options:" << endl;
+	os << "mou_population_size: " << mou_population_size << endl;
+	os << "mou_dv_population_file: " << mou_dv_population_file << endl;
+	os << "mou_obs_population_restart_file: " << mou_obs_population_restart_file << endl;
+
 	os << endl << "...pestpp-ies options:" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
 	os << "ies_observation_ensemble: " << ies_obs_csv << endl;
@@ -1288,6 +1317,10 @@ void PestppOptions::set_defaults()
 	set_opt_stack_size(0);
 	set_opt_par_stack("");
 	set_opt_obs_stack("");
+
+	set_mou_population_size(100);
+	set_mou_dv_population_file("");
+	set_mou_obs_population_restart_file("");
 
 	set_ies_par_csv("");
 	set_ies_obs_csv("");
@@ -1668,4 +1701,19 @@ double draw_standard_normal(std::mt19937& rand_gen)
 	
 	double r = sqrt(-2.0 * log(v1));
 	return r * sin(2.0 * pi * v2);
+}
+
+vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bound, std::mt19937& rand_gen)
+{
+	double scale = 1.0 / (rand_gen.max() - rand_gen.min() + 1.0);
+	vector<double> vals;
+	double bscale = 1.0 / (upper_bound - lower_bound + 1.0);
+	for (int i = 0; i < num_reals; i++)
+	{
+		double v1 = (rand_gen() - rand_gen.min()) * scale;
+		v1 = lower_bound + (v1 / scale);
+		vals.push_back(v1);
+	}
+	return vals;
+	
 }
