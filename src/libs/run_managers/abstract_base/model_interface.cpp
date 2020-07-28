@@ -1260,6 +1260,8 @@ void InstructionFile::execute_line_advance(const string& token, string& line, if
 	int num;
 	//pest_utils::convert_ip(token.substr(1), num);
 	num = stoi(token.substr(1));
+	if (num < 1)
+		throw_ins_error("line advance instruction error: number of lines must be greater or equal to 1, not " + token.substr(1));
 	for (int i = 0; i < num; i++)
 	{
 		if (f_out.bad())
