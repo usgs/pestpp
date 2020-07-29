@@ -88,7 +88,7 @@ void MOEA::message(int level, const string& _message, T extra)
 	message(level, s);
 }
 
-void MOEA::throw_moea_error(string message)
+void MOEA::throw_moea_error(const string& message)
 {
 	performance_log->log_event("MOEA error: " + message);
 	cout << endl << "   ************   " << endl << "    MOEAerror: " << message << endl << endl;

@@ -68,7 +68,7 @@ private:
 	ParameterEnsemble dp;
 	ObservationEnsemble op;
 
-	void throw_moea_error(string& message);
+	void throw_moea_error(const string& message);
 
 	template<typename T, typename A>
 	void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
