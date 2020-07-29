@@ -489,8 +489,6 @@ void MOEA::iterate_to_solution()
 }
 
 
-
-
 bool MOEA::initialize_dv_population()
 {
 	stringstream ss;
