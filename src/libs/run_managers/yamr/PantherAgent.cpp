@@ -13,6 +13,7 @@
 
 #include "Pest.h"
 #include "config_os.h"
+#include "pest_data_structs.h"
 
 using namespace pest_utils;
 
@@ -872,8 +873,17 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				report(ss.str(), true);
 				serialized_data = Serialization::serialize(pars, par_name_vec, obs, obs_name_vec, run_time);
 				ss.str("");
-				ss << "debug loop returning ctl obs for run_id, group_id: " << run_id << "," << group_id;
-				net_pack.reset(NetPackage::PackType::RUN_FINISHED, group_id, run_id, ss.str());
+				double rd = ((double)rand() / (double)RAND_MAX);
+				if (rd < 0.1)
+				{
+					ss << "debug loop returning failed run for: " << run_id << "," << group_id;
+					net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
+				}
+				else
+				{
+					ss << "debug loop returning ctl obs for run_id, group_id: " << run_id << "," << group_id;
+					net_pack.reset(NetPackage::PackType::RUN_FINISHED, group_id, run_id, ss.str());
+				}
 				err = send_message(net_pack, serialized_data.data(), serialized_data.size());
 				if (err.first != 1)
 				{

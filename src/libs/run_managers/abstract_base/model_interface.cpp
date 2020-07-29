@@ -1109,7 +1109,12 @@ pair<string, double> InstructionFile::execute_fixed(const string& token, string&
 	int pos = line.find(temp);
 	if (pos == string::npos)
 		throw_ins_error("internal error: string t: '"+temp+"' not found in line: '"+line+"'",ins_line_num,out_line_num);
+	if ((value != 0.0) && (!isnormal(value)))
+	{
+		throw_ins_error("casting '" + temp + "' to double yielded denormal value", ins_line_num, out_line_num);
+	}
 	line = line.substr(pos + temp.size());
+	
 	return pair<string, double>(info.first,value);
 }
 
@@ -1146,6 +1151,10 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 	pos = line.find(temp);
 	if (pos == string::npos)
 		throw_ins_error("internal error: temp '" + temp + "' not found in line: '" + line + "'", ins_line_num, out_line_num);
+	if ((value != 0.0) && (!isnormal(value)))
+	{
+		throw_ins_error("casting '" + temp + "' to double yielded denormal value", ins_line_num, out_line_num);
+	}
 	line = line.substr(pos + temp.size());
 	return pair<string, double>(info.first,value);
 }
@@ -1171,6 +1180,10 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	if (pos == string::npos)
 	{
 		throw_ins_error("internal error: could not find free obs token '"+tokens[0]+"'", ins_line_num, out_line_num);
+	}
+	if ((value != 0.0) && (!isnormal(value)))
+	{
+		throw_ins_error("casting '" + tokens[0] + "' to double yielded denormal value", ins_line_num, out_line_num);
 	}
 	line = line.substr(pos + tokens[0].size());
 
