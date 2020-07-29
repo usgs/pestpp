@@ -331,6 +331,8 @@ public:
 	string get_opt_obs_stack()const { return opt_obs_stack; }
 	void set_opt_obs_stack(string _stack) { opt_obs_stack = _stack; }
 
+	string get_mou_algorithm() const { return mou_algorithm; }
+	void set_mou_algorithm(string name) { mou_algorithm = name; }
 	int get_mou_population_size() const { return mou_population_size; }
 	void set_mou_population_size(int size) { mou_population_size = size; }
 	string get_mou_dv_population_file() const { return mou_dv_population_file; }
@@ -564,6 +566,7 @@ private:
 	string opt_obs_stack;
 
 	int mou_population_size;
+	string mou_algorithm; 
 	string mou_dv_population_file;
 	string mou_obs_population_restart_file;
 

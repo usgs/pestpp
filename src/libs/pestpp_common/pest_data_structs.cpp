@@ -1032,7 +1032,13 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 
 bool PestppOptions::assign_mou_value_by_key(const string& key, const string& value, const string& org_value)
 {
-	if (key == "MOU_POPULATION_SIZE")
+	if (key == "MOU_ALGORITHM")
+	{
+		mou_algorithm = org_value;
+		return true;
+	}
+
+	else if (key == "MOU_POPULATION_SIZE")
 	{
 		convert_ip(value, mou_population_size);
 		return true;
@@ -1183,6 +1189,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "opt_include_bnd_pi: " << opt_include_bnd_pi << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
+	os << "mou_algorithm: " << mou_algorithm << endl;
 	os << "mou_population_size: " << mou_population_size << endl;
 	os << "mou_dv_population_file: " << mou_dv_population_file << endl;
 	os << "mou_obs_population_restart_file: " << mou_obs_population_restart_file << endl;
