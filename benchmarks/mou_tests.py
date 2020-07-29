@@ -63,7 +63,7 @@ def zdt1(x):
     return x[0], g * (1 - np.sqrt(x[0] / g))
 
 def zdt2(x):
-     g = 1 + 9 * np.sum(x[1:]) / (len(x) - 1)
+    g = 1 + 9 * np.sum(x[1:]) / (len(x) - 1)
     return x[0], g * (1 - np.power(x[0] / g, 2))
 
 def zdt3(x):
@@ -81,7 +81,7 @@ def zdt6(x):
     return f1, g * (1 - np.power(f1 / g, 2))
 
 def constr(x):
-    return x[0],return (1 + x[1]) / x[0]
+    return x[0],(1 + x[1]) / x[0]
 
 def srn(x):
     const1 = np.power(x[0], 2) + np.power(x[1], 2)  # lest than or equal to 225
@@ -91,24 +91,89 @@ def srn(x):
     return const1, const2, f1, f2
 
 
+def zdt_helper(func):
+    pdf = pd.read_csv("dv.dat",delim_whitespace=True,index_col=0)
+    lhs = func(pdf.values)
+    with open("obj.dat",'w') as f:
+        f.write("obj_1 {0}\n".format(float(lhs[0])))
+        f.write("obj_2 {0}\n".format(float(lhs[1])))
+
 def setup_zdt_problem(name,num_dv):
+    test_d = os.path.join("mou_tests","{0}_template".format(name))
+    if os.path.exists(test_d):
+        shutil.rmtree(test_d)
+    os.makedirs(test_d)
     tpl_file = "dv.dat.tpl".format(name)
-    with open(os.path.join("{0}_template".format(name)tpl_file,'w') as f:
+    with open(os.path.join(test_d,tpl_file),'w') as f:
         f.write("ptf ~\n")
         for i in range(num_dv):
-            f.write("dv_{1} ~ {0}_dv_{1}     ~\n".format(name, i))
+            f.write("dv_{0} ~ dv_{0}     ~\n".format(i))
+    with open(os.path.join(test_d,tpl_file.replace(".tpl","")),'w') as f:
+        for i in range(num_dv):
+            f.write("dv_{0} 0.5\n".format(i))
+
     ins_file = "obj.dat.ins".format(name)
-    with open(os.path.join("{0}_template".format(name),ins_file,'w') as f:
+    with open(os.path.join(test_d,ins_file),'w') as f:
         f.write("pif ~\n")
-        f.write("l1 !obj_1!\n")
-        f.write("l2 !obj_2!\n")
+        f.write("l1 w !obj_1!\n")
+        f.write("l1 w !obj_2!\n")
 
-    
-    
+    lines = open("mou_tests.py",'r').readlines()
+    func_lines = []
+    for i in range(len(lines)):
+        if lines[i].startswith("def {0}(x):".format(name)):
+            func_lines.append(lines[i])
+            for ii in range(i+1,len(lines)):
+                if lines[ii][0] not in [" ","   ","\n"]:
+                    break
+                func_lines.append(lines[ii])
+            break
+    print(func_lines)
+    if len(func_lines) == 0:
+        raise Exception()
+    helper_lines = []
+    for i in range(len(lines)):
+        if lines[i].startswith("def zdt_helper(".format(name)):
+            helper_lines.append(lines[i])
+            for ii in range(i+1,len(lines)):
+                if lines[ii][0] not in [" ","   ","\n"]:
+                    break
+                helper_lines.append(lines[ii])
+            break
+    print(helper_lines)
+    if len(helper_lines) == 0:
+        raise Exception()
+    #helper_lines[0] = "def zdt_helper({0}):\n".format(name)
 
-    with open(os.path.join("{0}_template".format(name),"forward_run.py"),'w') as f:
+    with open(os.path.join(test_d,"forward_run.py"),'w') as f:
+        f.write("import numpy as np\nimport pandas as pd\n")
+        for func_line in func_lines:
+            f.write(func_line)
+        for helper_line in helper_lines:
+            f.write(helper_line)
+
+        f.write("if __name__ == '__main__':\n    zdt_helper({0})\n".format(name))
+
+    pyemu.os_utils.run("python forward_run.py",cwd=test_d)
+
+    tpl_file = os.path.join(test_d,tpl_file)
+    ins_file = os.path.join(test_d,ins_file)
+    pst = pyemu.Pst.from_io_files(tpl_files=tpl_file,in_files=tpl_file.replace(".tpl",""),
+                                   ins_files=ins_file,out_files=ins_file.replace(".ins",""),pst_path=".")
+    par = pst.parameter_data
+    par.loc[:,"parubnd"] = 1.0
+    par.loc[:,"parlbnd"] = 0.0
+    par.loc[:,"partrans"] = "none"
+    par.loc[:,"parval1"] = 0.5
+
+    pst.model_command = "python forward_run.py"
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(test_d,name+".pst"))
+    pyemu.os_utils.run("{0} {1}.pst".format(exe_path,name),cwd=test_d)
+
 
 
 if __name__ == "__main__":
         
-    zdt1_test()
+    #zdt1_test()
+    setup_zdt_problem("zdt1",30)
