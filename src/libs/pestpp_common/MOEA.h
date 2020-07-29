@@ -45,7 +45,6 @@ private:
 	vector<string> act_obs_names, act_par_names;
 	int iter, warn_min_members, error_min_members;
 	int member_count;
-
 	string population_dv_file, population_obs_restart_file;
 	string dv_pop_file_tag = "dv_pop";
 	string obs_pop_file_tag = "obs_pop";
@@ -68,7 +67,7 @@ private:
 	ParameterEnsemble dp;
 	ObservationEnsemble op;
 
-	void throw_moea_error(string& message);
+	void throw_moea_error(const string& message);
 
 	template<typename T, typename A>
 	void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);

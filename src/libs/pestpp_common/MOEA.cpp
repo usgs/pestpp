@@ -67,8 +67,8 @@ void MOEA::message(int level, const string& _message, vector<T, A> _extras, bool
 	}
 	if (level == 0)
 		ss << "  ---  ";
-	/*if ((echo) && ((verbose_level >= 2) || (level < 2)))
-		cout << ss.str() << endl;*/
+	if (echo)// && ((verbose_level >= 2) || (level < 2)))
+		cout << ss.str() << endl;
 	file_manager.rec_ofstream() << ss.str() << endl;
 	performance_log->log_event(_message);
 
@@ -88,7 +88,7 @@ void MOEA::message(int level, const string& _message, T extra)
 	message(level, s);
 }
 
-void MOEA::throw_moea_error(string& message)
+void MOEA::throw_moea_error(const string& message)
 {
 	performance_log->log_event("MOEA error: " + message);
 	cout << endl << "   ************   " << endl << "    MOEAerror: " << message << endl << endl;
@@ -145,6 +145,7 @@ void MOEA::sanity_checks()
 
 vector<int> MOEA::run_population(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs)
 {
+	message(1, "running population of size ", _pe.shape().first);
 	stringstream ss;
 	ss << "queuing " << _pe.shape().first << " runs";
 	performance_log->log_event(ss.str());
@@ -231,7 +232,8 @@ void MOEA::finalize()
 
 void MOEA::initialize()
 {
-	message(0, "initializing");
+	message(0, "initializing MOEA process");
+	
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
@@ -307,6 +309,103 @@ void MOEA::initialize()
 	
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
+	//TODO: how do we get info about the objective directions?  
+	//one option would be for objective to use the 
+	//constraint naming convention so that "less_than" would be minimize
+	//and greater_than would be maximize. This would also make the risk-based objectives easy as...
+	vector<string> obj_names = ppo->get_mou_objectives();
+	Constraints::ConstraintSense gt = Constraints::ConstraintSense::greater_than, lt = Constraints::ConstraintSense::less_than;
+	pair<Constraints::ConstraintSense, string> sense;
+	map<string, string> sense_map;
+	vector<string> onames = pest_scenario.get_ctl_ordered_nz_obs_names();
+	if (obj_names.size() == 0)
+	{
+		for (auto oname : onames)
+		{
+			sense = Constraints::get_sense_from_group_name(pest_scenario.get_ctl_observation_info().get_group(oname));
+			if (sense.first == gt)
+			{
+				obj_names.push_back(oname);
+				sense_map[oname] = "maximize";
+			}
+			else if (sense.first == lt)
+			{
+				obj_names.push_back(oname);
+				sense_map[oname] = "minimize";
+			}
+		}
+
+		message(1, "'mou_objectives' not passed, using all nonzero weighted obs that use the proper obs group naming convention");
+	}
+	else
+	{
+		vector<string> onames = pest_scenario.get_ctl_ordered_nz_obs_names();
+		set<string> oset(onames.begin(), onames.end());
+		onames.clear();
+		vector<string> missing,keep,err_sense;
+		for (auto obj_name : obj_names)
+		{
+			if (oset.find(obj_name) == oset.end())
+				missing.push_back(obj_name);
+			else
+			{
+				sense = Constraints::get_sense_from_group_name(pest_scenario.get_ctl_observation_info().get_group(obj_name));
+				if ((sense.first != gt) && (sense.first != lt))
+					err_sense.push_back(obj_name);
+				else
+				{
+					if (sense.first == gt)
+					{
+						keep.push_back(obj_name);
+						sense_map[obj_name] = "maximize";
+					}
+					else if (sense.first == lt)
+					{
+						keep.push_back(obj_name);
+						sense_map[obj_name] = "minimize";
+					}
+					
+				}
+			}
+		}
+		if (err_sense.size() > 0)
+		{
+			ss.str("");
+			ss << "the following non-zero weighted 'mou_objectives' do not have the correct obs group naming convention (needed to identify objective direction):";
+			for (auto e : err_sense)
+				ss << e << ";";
+			throw_moea_error(ss.str());
+		}
+		if (keep.size() == 0)
+		{
+			throw_moea_error("none of the supplied 'mou_objectives' were found in the zero-weighted observations");
+		}
+		
+		else if (missing.size() > 0)
+		{
+			ss.str("");
+			ss << "WARNING: the following mou_objectives were not found in the zero-weighted observations: ";
+			for (auto m : missing)
+				ss << m << ",";
+			message(1, ss.str());
+
+		}
+		obj_names = keep;
+
+
+	}
+	ss.str("");
+	ss << "...using the following observations as objectives: " << endl;
+	for (auto s : sense_map)
+	{
+		ss << setw(30) << s.first << "   " << s.second << endl;
+	}
+	file_manager.rec_ofstream() << ss.str();
+	cout << ss.str();
+
+	if (obj_names.size() > 5)
+		message(1, "WARNING: more than 5 objectives, this is pushing the limits!");
+
 	sanity_checks();
 
 	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
@@ -325,52 +424,12 @@ void MOEA::initialize()
 		throw_moea_error("error in dv population: " + message);
 	}
 
-	/*try
-	{
-		op.check_for_dups();
-	}
-	catch (const exception& e)
-	{
-		string message = e.what();
-		throw_moea_error("error in obs population: " + message);
-	}*/
-
 	//we are restarting
 	if (population_obs_restart_file.size() > 0)
 	{
 	
 		if (dp.shape().first != op.shape().first)
-		/*{
-			vector<string> oe_names = op.get_real_names();
-			set<string> oset(oe_names.begin(), oe_names.end());
-			vector<string> missing;
-			for (auto n : dp.get_real_names())
-				if (oset.find(n) == oset.end())
-				{
-					missing.push_back(n);
-				}
-			if (missing.size() == 0)
-			{
-				ss.str("");
-				ss << "dv population has " << dp.shape().first << " members, compared to " << op.shape().first << " obs members";
-				message(1, ss.str());
-				message(1, " the member names are compatible");
-				message(1, "re-indexing restart obs population to align with dv population...");
-
-				op.reorder(dp.get_real_names(), vector<string>());
-			}
-			else
-			{
-				ss.str("");
-				ss << "the following dv popiulation member names were not found in the obs population: ";
-				for (auto m : missing)
-				{
-					ss << m << ",";
-				}
-				throw_moea_error(ss.str());
-			}
-		}
-		else*/
+		
 		{
 			ss.str("");
 			ss << "dv population rows (" << dp.shape().first << ") not equal to observation population rows (" << op.shape().first << ")";
@@ -379,26 +438,6 @@ void MOEA::initialize()
 	}
 
 	//TODO: think about an include_base for MOEA
-	/*if (pest_scenario.get_pestpp_options().get_ies_include_base())
-		if (pp_args.find("IES_RESTART_OBS_EN") != pp_args.end())
-		{
-			message(1, "Warning: even though `ies_include_base` is true, you passed a restart obs en, not adding 'base' realization...");
-		}
-		else
-			add_bases();
-*/
-
-
-	//now we check to see if we need to try to align the par and obs en
-	//this would only be needed if either of these were not drawn
-	/*if (!dp_drawn || !op_drawn)
-	{
-		bool aligned = dp.try_align_other_rows(performance_log, op);
-		if (aligned)
-		{
-			message(2, "observation population reordered to align rows with dv population");
-		}
-	}*/
 
 	//just check to see if common real names are found but are not in the same location
 	map<string, int> pe_map = dp.get_real_map(), oe_map = op.get_real_map();
@@ -420,9 +459,8 @@ void MOEA::initialize()
 	}
 
 	message(2, "checking for denormal values in dv population");
-	dp.check_for_normal("initial transformed parameter ensemble");
+	dp.check_for_normal("initial transformed dv population");
 	ss.str("");
-	
 	ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag << ".csv";
 	dp.to_csv(ss.str());
 	message(1, "saved initial dv population to ", ss.str());
@@ -433,12 +471,6 @@ void MOEA::initialize()
 
 		message(2, "checking for denormal values in obs restart population");
 		op.check_for_normal("restart obs population");
-		ss.str("");
-		
-		ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".csv";
-		op.to_csv(ss.str());
-		message(1, "saved restart observation population to ", ss.str());
-
 	}
 	
 	else
@@ -451,17 +483,12 @@ void MOEA::initialize()
 
 		dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
-
+	ss.str("");
 	ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".csv";
 	op.to_csv(ss.str());
-	message(1, "saved processed restart observation population to ", ss.str());
+	message(1, "saved observation population to ", ss.str());
 
 	//TODO: think about a bad phi (or phis) for MOEA
-	/*drop_bad_phi(pe, oe);
-	if (oe.shape().first == 0)
-	{
-		throw_ies_error(string("all realizations dropped as 'bad'"));
-	}*/
 	
 	if (op.shape().first <= error_min_members)
 	{
@@ -487,8 +514,6 @@ void MOEA::iterate_to_solution()
 
 
 }
-
-
 
 
 bool MOEA::initialize_dv_population()
@@ -577,7 +602,10 @@ void MOEA::initialize_obs_restart_population()
 {
 	string obs_filename = pest_scenario.get_pestpp_options().get_mou_obs_population_restart_file();
 	if (obs_filename.size() == 0)
+	{
+		op.reserve(dp.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
 		return;
+	}
 	throw_moea_error(string("restart obs population not implemented"));
 
 }

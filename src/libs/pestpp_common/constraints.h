@@ -21,10 +21,11 @@ using namespace std;
 
 class Constraints
 {
-	enum ConstraintSense { less_than, greater_than, equal_to, undefined };
-	enum ConstraintType { deter, pi, fosm, stack };
+	
 
 public:
+	enum ConstraintSense { less_than, greater_than, equal_to, undefined };
+	enum ConstraintType { deter, pi, fosm, stack };
 	Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, OutputFileWriter& _of_wr, PerformanceLog& _pfm);
 	void initialize(vector<string>& ctl_ord_dec_var_names, Parameters* _current_pars_and_dec_vars_ptr,
 		Observations* _current_constraints_sim_ptr, double _dbl_max);
@@ -91,6 +92,9 @@ public:
 	//decide whether it is time to update the chance constraints
 	bool should_update_chance(int iter);
 
+	//workout a constraints sense
+	static pair<ConstraintSense, string> get_sense_from_group_name(const string& name);
+
 private:
 	Pest& pest_scenario;
 	PerformanceLog& pfm;
@@ -138,8 +142,7 @@ private:
 	Parameters* current_pars_and_dec_vars_ptr;
 	pair<vector<double>, vector<double>> current_bounds;
 
-	//workout a constraints sense
-	pair<ConstraintSense, string> get_sense_from_group_name(const string& name);
+	
 	//get risk-shifted simulated constraint values using current_constraints_sim_ptr
 	Observations get_chance_shifted_constraints();
 	//get risk-shifted simulated constraint values using _constraints_sim arg
