@@ -41,7 +41,7 @@ int main(int argc, char* argv[])
 #endif
 		string version = PESTPP_VERSION;
 		cout << endl << endl;
-		cout << "             pestpp-mou: multi-objective optimization with uncertainty" << endl << endl;
+		cout << "             pestpp-mou: multi-objective optimization with uncertainty for PEST++ datasets" << endl << endl;
 		//cout << "                     for PEST(++) datasets " << endl << endl;
 		cout << "                   by the PEST++ development team" << endl;
 		cout << endl << endl << "version: " << version << endl;
@@ -82,9 +82,7 @@ int main(int argc, char* argv[])
 			cerr << "--------------------------------------------------------" << endl;
 			exit(0);
 		}
-		// problem formulation
-		Objectives objective_functions;
-		Constraints constraint_functions;
+		
 
 		FileManager file_manager;
 		string filename = complete_path;
@@ -210,8 +208,8 @@ int main(int argc, char* argv[])
 
 		if (!restart_flag || save_restart_rec_header)
 		{
-			fout_rec << "             pestpp-mou.exe - a GLM iterative Ensemble Smoother" << endl << "for PEST(++) datasets " << endl << endl;
-			fout_rec << "                 by the PEST++ developement team" << endl << endl << endl;
+			fout_rec << "              pestpp-mou: multi-objective optimization with uncertainty" << endl;
+			fout_rec << "                         by the PEST++ developement team" << endl << endl << endl;
 			fout_rec << endl;
 			fout_rec << endl << endl << "version: " << version << endl;
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
@@ -258,7 +256,7 @@ int main(int argc, char* argv[])
 		}
 
 		//reset some default args here:
-		PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
+		/*PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
 		set<string> pp_args = ppo->get_passed_args();
 		if (pp_args.find("MAX_RUN_FAIL") == pp_args.end())
 			ppo->set_max_run_fail(1);
@@ -266,7 +264,7 @@ int main(int argc, char* argv[])
 			ppo->set_overdue_giveup_fac(2.0);
 		if (pp_args.find("OVERDUE_resched_FAC") == pp_args.end())
 			ppo->set_overdue_reched_fac(1.15);
-		
+		*/
 		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
 		{
 			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
@@ -322,13 +320,12 @@ int main(int argc, char* argv[])
 
 		run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), pest_scenario.get_ctl_observations());
 		
-		MOEA moea(pest_scenario, file_manager, objective_functions, constraint_functions, output_file_writer, &performance_log, run_manager_ptr);
+		MOEA moea(pest_scenario, file_manager,output_file_writer, &performance_log, run_manager_ptr);
 		
 		//ZAK: Initialize random generator here
 		moea.initialize();
-		moea.solve();
+		moea.iterate_to_solution();
 		moea.finalize();
-
 
 
 		// clean up
@@ -350,6 +347,7 @@ int main(int argc, char* argv[])
 	catch (...)
 	{
 		cout << "Error condition prevents further execution: " << endl;
+		return 1;
 	}
 #endif
 }

@@ -1220,19 +1220,20 @@ void IterEnsembleSmoother::initialize()
 	}
 	message(1, "saved initial parameter ensemble to ", ss.str());
 	message(2, "checking for denormal values in base oe");
-	oe.check_for_normal("base observation ensemble");
+	oe.check_for_normal("obs+noise observation ensemble");
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
-		ss << file_manager.get_base_filename() << ".base.obs.jcb";
+		ss << file_manager.get_base_filename() << ".obs+noise.jcb";
 		oe.to_binary(ss.str());
 	}
 	else
 	{
-		ss << file_manager.get_base_filename() << ".base.obs.csv";
+		ss << file_manager.get_base_filename() << ".obs+noise.csv";
 		oe.to_csv(ss.str());
 	}
-	message(1, "saved base observation ensemble (obsval+noise) to ", ss.str());
+	message(1, "saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
+
 
 	if (center_on.size() > 0)
 	{
@@ -1413,13 +1414,7 @@ void IterEnsembleSmoother::initialize()
 		{
 			frec << oname << endl;
 		}
-		// write out conflicted parameters to a csv file
-		ofstream pdccsv(file_manager.get_base_filename() + ".pdc.csv");
-		pdccsv << "name" << endl;
-		for (auto oname : in_conflict)
-		{
-			pdccsv << oname << endl;
-		}
+		
 		if (!ppo->get_ies_drop_conflicts())
 		{
 			ss.str("");
@@ -1551,8 +1546,11 @@ vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
 {
 	message(1, "checking for prior-data conflict...");
 	//for now, just really simple metric - checking for overlap
+	// write out conflicted obs and some related info to a csv file
+	ofstream pdccsv(file_manager.get_base_filename() + ".pdc.csv");
+	
 	vector<string> in_conflict;
-	double smin, smax, omin, omax;
+	double smin, smax, omin, omax,smin_stat, smax_stat, omin_stat,omax_stat;
 	map<string, int> smap, omap;
 	vector<string> snames = oe.get_var_names();
 	vector<string> onames = oe_base.get_var_names();
@@ -1572,48 +1570,59 @@ vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
 		omap[onames[i]] = i;
 	}
 	int sidx, oidx;
+	bool use_stat_dist = true;
 	if (pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance() <= 0.0)
+		use_stat_dist = false;
+	
+	double smn, sstd, omn, ostd,dist;
+	double sd = pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance();
+	int oe_nr = oe.shape().first;
+	int oe_base_nr = oe_base.shape().first;
+	Eigen::VectorXd t;
+	pdccsv << "name,obs_mean,obs_std,obs_min,obs_max,obs_stat_min,obs_stat_max,sim_mean,sim_std,sim_min,sim_max,sim_stat_min,sim_stat_max,distance" << endl;
+	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
 	{
-		for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
+		if (ineq.find(oname) != end)
+			continue;
+		sidx = smap[oname];
+		oidx = omap[oname];
+		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
+		omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
+		smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
+		omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
+		t = oe.get_eigen_ptr()->col(sidx);
+		smn = t.mean();
+		sstd = std::sqrt((t.array() - smn).square().sum() / (oe_nr-1));
+		smin_stat = smn - (sd * sstd);
+		smax_stat = smn + (sd * sstd);
+		t = oe_base.get_eigen_ptr()->col(oidx);
+		omn = t.mean();
+		ostd = std::sqrt((t.array() - omn).square().sum() / (oe_base_nr-1));
+		omin_stat = omn - (sd * ostd);
+		omax_stat = omn + (sd * ostd);	
+
+		if (use_stat_dist)
 		{
-			if (ineq.find(oname) != end)
-				continue;
-			sidx = smap[oname];
-			oidx = omap[oname];
-			smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
-			omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
-			smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
-			omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
+			if ((smin_stat > omax_stat) || (smax_stat < omin_stat))
+			{
+				in_conflict.push_back(oname);
+				dist = max((smin_stat - omax_stat), (omin_stat - smax_stat));
+				pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
+				pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
+			}
+		}
+		else
+		{
 			if ((smin > omax) || (smax < omin))
+			{
 				in_conflict.push_back(oname);
+				dist = max((smin - omax), (omin - smax));
+				pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
+				pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
+			}
 		}
 	}
-	else
-	{
-		double smn, sstd, omn, ostd;
-		double sd = pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance();
-		int oe_nr = oe.shape().first;
-		int oe_base_nr = oe_base.shape().first;
-		Eigen::VectorXd t;
-		for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
-		{
-			if (ineq.find(oname) != end)
-				continue;
-			sidx = smap[oname];
-			oidx = omap[oname];
-			t = oe.get_eigen_ptr()->col(sidx);
-			smn = t.mean();
-			sstd = std::sqrt((t.array() - smn).square().sum() / (oe_nr-1));
-			smin = smn - (sd * sstd);
-			smax = smn + (sd * sstd);
-			t = oe_base.get_eigen_ptr()->col(oidx);
-			omn = t.mean();
-			ostd = std::sqrt((t.array() - omn).square().sum() / (oe_base_nr-1));
-			omin = omn - (sd * ostd);
-			omax = omn + (sd * ostd);			if ((smin > omax) || (smax < omin))
-				in_conflict.push_back(oname);
-		}
-	}
+	
 	return in_conflict;
 }
 

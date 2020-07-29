@@ -1,0 +1,20 @@
+pcf version=2
+* control data keyword
+pestmode                                 estimation
+noptmax                                 0
+svdmode                                 1
+maxsing                          10000000
+eigthresh                           1e-06
+eigwrite                                1
+* parameter groups external
+truth.pargrp_data.csv
+* parameter data external
+truth.par_data.csv
+* observation data external
+truth.obs_data.csv
+* model command line
+mf6
+* model input external
+truth.tplfile_data.csv
+* model output external
+truth.insfile_data.csv

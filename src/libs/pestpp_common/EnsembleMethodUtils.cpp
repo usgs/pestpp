@@ -969,7 +969,7 @@ void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, Observat
 			if (iter >= 0)
 				ss << iter << ".";
 			ss << "base.rei";
-			output_file_writer.write_rei(file_manager.open_ofile_ext(ss.str()), 0,
+			output_file_writer.write_rei(file_manager.open_ofile_ext(ss.str()), iter,
 				pest_scenario.get_ctl_observations(), obs, obj_func, pars);
 		}
 	}

@@ -468,7 +468,6 @@ int main(int argc, char* argv[])
 			fout_rec << "             pestpp-swp.exe - a parameteric sweep utility" << endl << "for PEST(++) datasets " << endl << endl;
 			fout_rec << "                 by the PEST++ developement team" << endl << endl << endl;
 			fout_rec << endl;
-			fout_rec << "using control file: \"" << complete_path << "\"" << endl << endl;
 			fout_rec << endl << endl << "version: " << version << endl;
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 			fout_rec << "using control file: \"" << complete_path << "\"" << endl << endl;
@@ -726,6 +725,11 @@ int main(int argc, char* argv[])
 		fout_rec.close();
 		obs_stream.close();
 		delete run_manager_ptr;
+
+		string case_name = file_manager.get_base_filename();
+		file_manager.close_file("rst");
+		pest_utils::try_clean_up_run_storage_files(case_name);
+
 		cout << endl << endl << "PESTPP-SWP Analysis Complete..." << endl;
 		cout << flush;
 		return 0;
@@ -737,6 +741,11 @@ int main(int argc, char* argv[])
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));
+		return 1;
+	}
+	catch (...)
+	{
+		cout << "Error condition prevents further execution" << endl;
 		return 1;
 	}
 #endif
