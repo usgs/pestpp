@@ -103,6 +103,8 @@ def setup_zdt_problem(name,num_dv):
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     os.makedirs(test_d)
+    
+    # write a generic template file for the dec vars
     tpl_file = "dv.dat.tpl".format(name)
     with open(os.path.join(test_d,tpl_file),'w') as f:
         f.write("ptf ~\n")
@@ -112,12 +114,15 @@ def setup_zdt_problem(name,num_dv):
         for i in range(num_dv):
             f.write("dv_{0} 0.5\n".format(i))
 
+    # write a generic ins file for the two objectives
     ins_file = "obj.dat.ins".format(name)
     with open(os.path.join(test_d,ins_file),'w') as f:
         f.write("pif ~\n")
         f.write("l1 w !obj_1!\n")
         f.write("l1 w !obj_2!\n")
 
+    # now scape this python file to get the function lines and
+    # the helper lines
     lines = open("mou_tests.py",'r').readlines()
     func_lines = []
     for i in range(len(lines)):
@@ -128,7 +133,7 @@ def setup_zdt_problem(name,num_dv):
                     break
                 func_lines.append(lines[ii])
             break
-    print(func_lines)
+    #print(func_lines)
     if len(func_lines) == 0:
         raise Exception()
     helper_lines = []
@@ -140,11 +145,12 @@ def setup_zdt_problem(name,num_dv):
                     break
                 helper_lines.append(lines[ii])
             break
-    print(helper_lines)
+    #print(helper_lines)
     if len(helper_lines) == 0:
         raise Exception()
     #helper_lines[0] = "def zdt_helper({0}):\n".format(name)
 
+    # write these functions to the forward run script
     with open(os.path.join(test_d,"forward_run.py"),'w') as f:
         f.write("import numpy as np\nimport pandas as pd\n")
         for func_line in func_lines:
@@ -154,8 +160,10 @@ def setup_zdt_problem(name,num_dv):
 
         f.write("if __name__ == '__main__':\n    zdt_helper({0})\n".format(name))
 
+    # make sure it runs
     pyemu.os_utils.run("python forward_run.py",cwd=test_d)
 
+    # create the control file
     tpl_file = os.path.join(test_d,tpl_file)
     ins_file = os.path.join(test_d,ins_file)
     pst = pyemu.Pst.from_io_files(tpl_files=tpl_file,in_files=tpl_file.replace(".tpl",""),
@@ -169,11 +177,19 @@ def setup_zdt_problem(name,num_dv):
     pst.model_command = "python forward_run.py"
     pst.control_data.noptmax = 0
     pst.write(os.path.join(test_d,name+".pst"))
+    
+    # run mou with noptmax = 0 to make sure we are getting something
     pyemu.os_utils.run("{0} {1}.pst".format(exe_path,name),cwd=test_d)
-
+    pst = pyemu.Pst(os.path.join(test_d,name+".pst"))
+    print(pst.phi)
+    assert pst.phi < 1.0e-10
 
 
 if __name__ == "__main__":
         
     #zdt1_test()
     setup_zdt_problem("zdt1",30)
+    setup_zdt_problem("zdt2",30)
+    setup_zdt_problem("zdt3",30)
+    setup_zdt_problem("zdt4",10)
+    setup_zdt_problem("zdt6",10)
