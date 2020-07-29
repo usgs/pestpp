@@ -24,8 +24,8 @@ class Constraints
 	
 
 public:
-	static enum ConstraintSense { less_than, greater_than, equal_to, undefined };
-	static enum ConstraintType { deter, pi, fosm, stack };
+	enum ConstraintSense { less_than, greater_than, equal_to, undefined };
+	enum ConstraintType { deter, pi, fosm, stack };
 	Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, OutputFileWriter& _of_wr, PerformanceLog& _pfm);
 	void initialize(vector<string>& ctl_ord_dec_var_names, Parameters* _current_pars_and_dec_vars_ptr,
 		Observations* _current_constraints_sim_ptr, double _dbl_max);
