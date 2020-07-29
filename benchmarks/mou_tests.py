@@ -174,6 +174,10 @@ def setup_zdt_problem(name,num_dv):
     par.loc[:,"partrans"] = "none"
     par.loc[:,"parval1"] = 0.5
 
+    obs = pst.observation_data
+    obs.loc[:,"weight"] = 1.0
+    obs.loc[:,"obgnme"] = "less_than_obj" # all these zdt probs are min-min
+
     pst.model_command = "python forward_run.py"
     pst.control_data.noptmax = 0
     pst.write(os.path.join(test_d,name+".pst"))
@@ -183,13 +187,24 @@ def setup_zdt_problem(name,num_dv):
     pst = pyemu.Pst(os.path.join(test_d,name+".pst"))
     print(pst.phi)
     assert pst.phi < 1.0e-10
+    return test_d
+
+def test_zdt1():
+    test_d = setup_zdt_problem("zdt1",30)
+    pst = pyemu.Pst(os.path.join(test_d,"zdt1.pst"))
+    pst.control_data.noptmax = -1
+    pst.pestpp_options["mou_populations_size"] = 100
+    pst.write(os.path.join(test_d,"zdt1.pst"))
+    pyemu.os_utils.run("{0} zdt1.pst".format(exe_path),cwd=test_d)
 
 
 if __name__ == "__main__":
         
     #zdt1_test()
-    setup_zdt_problem("zdt1",30)
-    setup_zdt_problem("zdt2",30)
-    setup_zdt_problem("zdt3",30)
-    setup_zdt_problem("zdt4",10)
-    setup_zdt_problem("zdt6",10)
+    # setup_zdt_problem("zdt1",30)
+    # setup_zdt_problem("zdt2",30)
+    # setup_zdt_problem("zdt3",30)
+    # setup_zdt_problem("zdt4",10)
+    # setup_zdt_problem("zdt6",10)
+
+    test_zdt1()

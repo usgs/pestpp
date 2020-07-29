@@ -1881,6 +1881,7 @@ void ParameterEnsemble::draw_uniform(int num_reals, vector<string> par_names, Pe
 		ss << "member_" << i;
 		real_names.push_back(ss.str());
 	}
+	tstat = ParameterEnsemble::transStatus::NUM;
 }
 
 void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
