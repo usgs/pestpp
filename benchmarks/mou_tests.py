@@ -250,7 +250,7 @@ def test_sorting_fake_problem():
         f.write("ptf ~\n ~   par1    ~\n")
     with open(os.path.join(test_d,"obs.ins"),'w') as f:
         f.write("pif ~\n")
-        for i in range(6):
+        for i in range(6): # the number of objs in the test
             f.write("l1 !obj{0}!\n".format(i))
     pst = pyemu.Pst.from_io_files(os.path.join(test_d,"par.tpl"),"par.dat",os.path.join(test_d,"obs.ins"),"obs.dat",pst_path=".")
     obs = pst.observation_data

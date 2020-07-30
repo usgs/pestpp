@@ -18,42 +18,6 @@ ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_mana
 
 }
 
-//map<string,vector<string>> ParetoObjectives::sort_obj_struct(map<string, map<string, double>>& obj_struct)
-//{
-//
-//	typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
-//	// Defining a lambda function to compare two pairs. It will compare two pairs using second field
-//	Comparator lt_compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
-//	{
-//		return elem1.second < elem2.second;
-//	};
-//
-//	Comparator gt_compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
-//	{
-//		return elem1.second > elem2.second;
-//	};
-//
-//	map<string, vector<string>> sorted_obj_struct;
-//	map<string, double> org_map, new_map;
-//	map<double, string> test;
-//	for (auto obj : obj_struct)
-//	{
-//		org_map = obj.second;
-//		std::set<std::pair<std::string, double>, Comparator> obj_sort(
-//			org_map.begin(), org_map.end(), lt_compFunctor);
-//		new_map.clear();
-//		for (auto i : obj_sort)
-//		{
-//			new_map[i.first] = i.second;
-//			test[i.second] = i.first;
-//		}
-//
-//		//sorted_obj_struct[obj.first] = new_map;
-//	}
-//	return sorted_obj_struct;
-//}
-
-
 vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	//TODO: I think the nsga-II or spea-II sorts into levels, but this is just a dummy function for now
@@ -103,7 +67,30 @@ vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj
 	return vector<string>();
 }
 
+map<int, vector<string>> fast_nondominated_sort(map<string, map<double, string>>& member_struct)
+{
+	//the NSGA-II alg shown in the paper - sorts into fronts
+	map<int, vector<string>> sorted_to_fronts;
 
+	return sorted_to_fronts;
+}
+
+vector<string> sort_members_by_dominance(map<string, map<double, string>>& member_struct)
+{
+	
+	vector<string> dominance_ordered;
+	for (int i = 0; i < member_struct.size(); i++)
+		for (int j = 0; j < member_struct.size(); j++)
+			if (i == j)
+				continue;
+
+	return dominance_ordered;
+}
+
+bool first_dominates_second(map<double, string>& first, map<double, string>& second)
+{
+	return true;
+}
 
 MOEA::MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer, 
 	PerformanceLog *_performance_log, RunManagerAbstract* _run_mgr_ptr)
