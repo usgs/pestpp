@@ -29,7 +29,7 @@ exe_path = os.path.join(bin_path, "pestpp-mou" + exe)
 noptmax = 4
 num_reals = 20
 port = 4021
-
+test_root = "mou_tests"
 
 
 
@@ -99,7 +99,7 @@ def zdt_helper(func):
         f.write("obj_2 {0}\n".format(float(lhs[1])))
 
 def setup_zdt_problem(name,num_dv):
-    test_d = os.path.join("mou_tests","{0}_template".format(name))
+    test_d = os.path.join(test_root,"{0}_template".format(name))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
     os.makedirs(test_d)
@@ -196,14 +196,19 @@ def test_zdt1():
     pst.control_data.noptmax = -1
     pst.pestpp_options["mou_population_size"] = 200
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
-    pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
+    #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
+    master_d = test_d.replace("template","master")
+    pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
+                                  num_workers=15, master_dir=master_d,worker_root=test_root,
+                                  port=port)
+    
 
     dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
-    assert os.path.exists(os.path.join(test_d,dv_pop_file)),dv_pop_file
+    assert os.path.exists(os.path.join(master_d,dv_pop_file)),dv_pop_file
     obs_pop_file = "{0}.0.obs_pop.csv".format(test_case)
-    assert os.path.exists(os.path.join(test_d,obs_pop_file)),obs_pop_file
-    dv_df = pd.read_csv(os.path.join(test_d,dv_pop_file),index_col=0)
-    obs_df = pd.read_csv(os.path.join(test_d,obs_pop_file),index_col=0)
+    assert os.path.exists(os.path.join(master_d,obs_pop_file)),obs_pop_file
+    dv_df = pd.read_csv(os.path.join(master_d,dv_pop_file),index_col=0)
+    obs_df = pd.read_csv(os.path.join(master_d,obs_pop_file),index_col=0)
     assert dv_df.shape[0] == pst.pestpp_options["mou_population_size"]
     assert dv_df.shape[1] == pst.npar
     assert obs_df.shape[0] == pst.pestpp_options["mou_population_size"]
