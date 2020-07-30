@@ -17,13 +17,84 @@ ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_mana
 {
 
 }
-vector<string> ParetoObjectives::pareto_dominance_sort(ObservationEnsemble& op)
+
+//map<string,vector<string>> ParetoObjectives::sort_obj_struct(map<string, map<string, double>>& obj_struct)
+//{
+//
+//	typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
+//	// Defining a lambda function to compare two pairs. It will compare two pairs using second field
+//	Comparator lt_compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
+//	{
+//		return elem1.second < elem2.second;
+//	};
+//
+//	Comparator gt_compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
+//	{
+//		return elem1.second > elem2.second;
+//	};
+//
+//	map<string, vector<string>> sorted_obj_struct;
+//	map<string, double> org_map, new_map;
+//	map<double, string> test;
+//	for (auto obj : obj_struct)
+//	{
+//		org_map = obj.second;
+//		std::set<std::pair<std::string, double>, Comparator> obj_sort(
+//			org_map.begin(), org_map.end(), lt_compFunctor);
+//		new_map.clear();
+//		for (auto i : obj_sort)
+//		{
+//			new_map[i.first] = i.second;
+//			test[i.second] = i.first;
+//		}
+//
+//		//sorted_obj_struct[obj.first] = new_map;
+//	}
+//	return sorted_obj_struct;
+//}
+
+
+vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	//TODO: I think the nsga-II or spea-II sorts into levels, but this is just a dummy function for now
 	stringstream ss;
 	ss << "ParetoObjectives::pareto_dominance_sort() for " << op.shape().first << " population members";
 	performance_log->log_event(ss.str());
 	
+	//first prep two fast look up containers, one by obj and one by member name
+	map<string, map<double,string>> obj_struct;
+	vector<string> real_names = op.get_real_names();
+	Eigen::VectorXd obj_vals;
+	map<string, map<string, double>> temp;
+	for (auto obj_name : obj_names)
+	{
+		obj_vals = op.get_eigen(vector<string>(), vector<string>{obj_name});
+		map<double,string> obj_map;
+		map<string, double> t;
+		for (int i = 0; i < real_names.size(); i++)
+		{
+			obj_map[obj_vals[i]] = real_names[i];
+			t[real_names[i]] = obj_vals[i];
+		}
+		obj_struct[obj_name] = obj_map;
+		temp[obj_name] = t;
+
+	}
+
+	map<string, map<double,string>> member_struct;
+	for (auto real_name : real_names)
+	{
+		map<double,string> obj_map;
+		for (auto t : temp)
+		{
+			obj_map[t.second[real_name]] = t.first;
+		}
+			
+		member_struct[real_name] = obj_map;
+	}
+	temp.clear();
+	//sort_obj_struct(obj_struct);
+
 	int nondom = 0;
 	ss.str("");
 	ss << nondom << " non-dominated members found in " << op.shape().first << " population";
@@ -528,6 +599,10 @@ void MOEA::initialize()
 		message(0, s);
 	}
 
+
+	//do an initial pareto dominance sort
+	message(1, "performing initial pareto dominance sort");
+	objectives.pareto_dominance_sort(obj_names, op, dp);
 	
 	message(0, "initialization complete");
 }
