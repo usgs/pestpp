@@ -20,12 +20,16 @@ class ParetoObjectives
 {
 public:
 	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, PerformanceLog* _performance_log);
-	vector<string> pareto_dominance_sort(ObservationEnsemble& op);
+	vector<string> pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp);
 private:
 	Pest& pest_scenario;
 	FileManager& file_manager;
 	PerformanceLog* performance_log;
 	vector<string> obj_names;
+
+	map<string,vector<string>> sort_obj_struct(map<string, map<string, double>>& obj_struct);
+	void sort_member_struct(map<string, map<string, double>>& member_struct);
+
 };
 
 
@@ -50,7 +54,7 @@ private:
 	string obs_pop_file_tag = "obs_pop";
 	FileManager &file_manager; 
 	std::mt19937 rand_gen;
-
+	vector<string> obj_names;
 	vector<string> dv_names;
 
 	ParetoObjectives objectives;

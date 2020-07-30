@@ -1,5 +1,6 @@
 #include <random>
 #include <iomanip>
+#include <iterator>
 #include "MOEA.h"
 #include "Ensemble.h"
 #include "RunManagerAbstract.h"
@@ -16,13 +17,48 @@ ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_mana
 {
 
 }
-vector<string> ParetoObjectives::pareto_dominance_sort(ObservationEnsemble& op)
+
+vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	//TODO: I think the nsga-II or spea-II sorts into levels, but this is just a dummy function for now
 	stringstream ss;
 	ss << "ParetoObjectives::pareto_dominance_sort() for " << op.shape().first << " population members";
 	performance_log->log_event(ss.str());
 	
+	//first prep two fast look up containers, one by obj and one by member name
+	map<string, map<double,string>> obj_struct;
+	vector<string> real_names = op.get_real_names();
+	Eigen::VectorXd obj_vals;
+	map<string, map<string, double>> temp;
+	for (auto obj_name : obj_names)
+	{
+		obj_vals = op.get_eigen(vector<string>(), vector<string>{obj_name});
+		map<double,string> obj_map;
+		map<string, double> t;
+		for (int i = 0; i < real_names.size(); i++)
+		{
+			obj_map[obj_vals[i]] = real_names[i];
+			t[real_names[i]] = obj_vals[i];
+		}
+		obj_struct[obj_name] = obj_map;
+		temp[obj_name] = t;
+
+	}
+
+	map<string, map<double,string>> member_struct;
+	for (auto real_name : real_names)
+	{
+		map<double,string> obj_map;
+		for (auto t : temp)
+		{
+			obj_map[t.second[real_name]] = t.first;
+		}
+			
+		member_struct[real_name] = obj_map;
+	}
+	temp.clear();
+	//sort_obj_struct(obj_struct);
+
 	int nondom = 0;
 	ss.str("");
 	ss << nondom << " non-dominated members found in " << op.shape().first << " population";
@@ -31,7 +67,30 @@ vector<string> ParetoObjectives::pareto_dominance_sort(ObservationEnsemble& op)
 	return vector<string>();
 }
 
+map<int, vector<string>> fast_nondominated_sort(map<string, map<double, string>>& member_struct)
+{
+	//the NSGA-II alg shown in the paper - sorts into fronts
+	map<int, vector<string>> sorted_to_fronts;
 
+	return sorted_to_fronts;
+}
+
+vector<string> sort_members_by_dominance(map<string, map<double, string>>& member_struct)
+{
+	
+	vector<string> dominance_ordered;
+	for (int i = 0; i < member_struct.size(); i++)
+		for (int j = 0; j < member_struct.size(); j++)
+			if (i == j)
+				continue;
+
+	return dominance_ordered;
+}
+
+bool first_dominates_second(map<double, string>& first, map<double, string>& second)
+{
+	return true;
+}
 
 MOEA::MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer, 
 	PerformanceLog *_performance_log, RunManagerAbstract* _run_mgr_ptr)
@@ -313,7 +372,8 @@ void MOEA::initialize()
 	//one option would be for objective to use the 
 	//constraint naming convention so that "less_than" would be minimize
 	//and greater_than would be maximize. This would also make the risk-based objectives easy as...
-	vector<string> obj_names = ppo->get_mou_objectives();
+	
+	//TODO: deal with prior info objectives
 	Constraints::ConstraintSense gt = Constraints::ConstraintSense::greater_than, lt = Constraints::ConstraintSense::less_than;
 	pair<Constraints::ConstraintSense, string> sense;
 	map<string, string> sense_map;
@@ -408,10 +468,13 @@ void MOEA::initialize()
 
 	sanity_checks();
 
+
 	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
-
-	bool dp_drawn = initialize_dv_population();
-
+	population_dv_file = ppo->get_mou_dv_population_file();
+	population_obs_restart_file = ppo->get_mou_obs_population_restart_file();
+	
+	initialize_dv_population();
+	
 	initialize_obs_restart_population();
 	
 	try
@@ -424,69 +487,88 @@ void MOEA::initialize()
 		throw_moea_error("error in dv population: " + message);
 	}
 
+	try
+	{
+		op.check_for_dups();
+	}
+	catch (const exception& e)
+	{
+		string message = e.what();
+		throw_moea_error("error in obs population: " + message);
+	}
+
+
 	//we are restarting
 	if (population_obs_restart_file.size() > 0)
 	{
 	
-		if (dp.shape().first != op.shape().first)
+		//since mou reqs strict linking of realization names, let's see if we can find an intersection set 
+		vector<string> temp = dp.get_real_names();
+		set<string> dvnames(temp.begin(), temp.end());
+		temp = op.get_real_names();
+		set<string> obsnames(temp.begin(), temp.end());
+		set<string> common;
+		set_intersection(dvnames.begin(), dvnames.end(), obsnames.begin(), obsnames.end(),std::inserter(common,common.end()));
 		
+		// all members are common to both dp and op
+		if (common.size() == dp.shape().first)
+		{
+			op.reorder(dp.get_real_names(), vector<string>());
+		}
+		
+		//otherwise some members are not common
+		else
 		{
 			ss.str("");
-			ss << "dv population rows (" << dp.shape().first << ") not equal to observation population rows (" << op.shape().first << ")";
-			throw_moea_error(ss.str());
+			ss << "WARNING: only " << common.size() << " members are common between the dv population and obs restart population.";
+			message(1, ss.str());
+			if (common.size() < error_min_members)
+			{
+				throw_moea_error("too few members to continue");
+			}
+			
+			message(2,"aligning dv and obs populations");
+			temp.clear();
+			temp.resize(common.size());
+			copy(common.begin(), common.end(), temp.begin());
+			sort(temp.begin(), temp.end());
+			dp.reorder(temp, vector<string>(), true);
+			op.reorder(temp, vector<string>(), true);
+			message(2, "dv population size: ", dp.shape().first);
+			message(2, "obs population size", op.shape().first);
+			message(2, "checking for denormal values in dv population");
+			dp.check_for_normal("initial transformed dv population");
+			message(2, "checking for denormal values in obs restart population");
+			op.check_for_normal("restart obs population");
 		}
+		
 	}
-
-	//TODO: think about an include_base for MOEA
-
-	//just check to see if common real names are found but are not in the same location
-	map<string, int> pe_map = dp.get_real_map(), oe_map = op.get_real_map();
-	vector<string> misaligned;
-	for (auto item : pe_map)
-	{
-		if (oe_map.find(item.first) == oe_map.end())
-			continue;
-		if (item.second != oe_map[item.first])
-			misaligned.push_back(item.first);
-	}
-	if (misaligned.size() > 0)
-	{
-		message(1, "WARNING: common member names shared between the dv and observation restart populations but they are not in the same row locations, see .rec file for listing");
-		ofstream& frec = file_manager.rec_ofstream();
-		frec << endl << "WARNING: the following " << misaligned.size() << " member names are shared between the dv and observation restart populations but they are not in the same row locations:" << endl;
-		for (auto ma : misaligned)
-			frec << ma << endl;
-	}
-
-	message(2, "checking for denormal values in dv population");
-	dp.check_for_normal("initial transformed dv population");
-	ss.str("");
-	ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag << ".csv";
-	dp.to_csv(ss.str());
-	message(1, "saved initial dv population to ", ss.str());
-	
-	//only need to do this if we are using a restart
-	if (population_obs_restart_file.size() > 0)
-	{
-
-		message(2, "checking for denormal values in obs restart population");
-		op.check_for_normal("restart obs population");
-	}
-	
 	else
 	{
+		message(2, "checking for denormal values in dv population");
+		dp.check_for_normal("initial transformed dv population");
+		//save the initial population once here
+		ss.str("");
+		ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag << ".csv";
+		dp.to_csv(ss.str());
+		message(1, "saved initial dv population to ", ss.str());
 		performance_log->log_event("running initial ensemble");
 		message(1, "running initial ensemble of size", dp.shape().first);
 		vector<int> failed = run_population(dp, op);
 		if (dp.shape().first == 0)
 			throw_moea_error(string("all members failed during initial population evaluation"));
-
 		dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
 	ss.str("");
 	ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".csv";
 	op.to_csv(ss.str());
 	message(1, "saved observation population to ", ss.str());
+
+	//save the initial dv population again in case runs failed or members were dropped as part of restart
+	ss.str("");
+	ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag << ".csv";
+	dp.to_csv(ss.str());
+	message(1, "saved initial dv population to ", ss.str());
 
 	//TODO: think about a bad phi (or phis) for MOEA
 	
@@ -504,6 +586,10 @@ void MOEA::initialize()
 		message(0, s);
 	}
 
+
+	//do an initial pareto dominance sort
+	message(1, "performing initial pareto dominance sort");
+	objectives.pareto_dominance_sort(obj_names, op, dp);
 	
 	message(0, "initialization complete");
 }
@@ -576,6 +662,14 @@ bool MOEA::initialize_dv_population()
 		}
 
 		dp.transform_ip(ParameterEnsemble::transStatus::NUM);
+		ss.str("");
+		ss << "dv population with " << dp.shape().first << " members read from '" << dv_filename << "'" << endl;
+		message(1, ss.str());
+
+		if (dp.shape().first == 0)
+		{
+			throw_moea_error("zero members found in dv population file");
+		}
 
 		if (pp_args.find("MOU_POPULATION_SIZE") != pp_args.end())
 		{
@@ -592,6 +686,7 @@ bool MOEA::initialize_dv_population()
 				dp.keep_rows(keep_names);
 			}
 		}
+		
 	}
 	return drawn;
 
@@ -606,6 +701,57 @@ void MOEA::initialize_obs_restart_population()
 		op.reserve(dp.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
 		return;
 	}
-	throw_moea_error(string("restart obs population not implemented"));
+	stringstream ss;
+	//throw_moea_error(string("restart obs population not implemented"));
+	string par_ext = pest_utils::lower_cp(obs_filename).substr(obs_filename.size() - 3, obs_filename.size());
+	performance_log->log_event("processing obs population file " + obs_filename);
+	if (par_ext.compare("csv") == 0)
+	{
+		message(1, "loading obs population from csv file", obs_filename);
+		try
+		{
+			op.from_csv(obs_filename);
+		}
+		catch (const exception& e)
+		{
+			ss << "error processing obs population file: " << e.what();
+			throw_moea_error(ss.str());
+		}
+		catch (...)
+		{
+			throw_moea_error(string("error processing obs population file"));
+		}
+	}
+	else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+	{
+		message(1, "loading obs population from binary file", obs_filename);
+		try
+		{
+			op.from_binary(obs_filename);
+		}
+		catch (const exception& e)
+		{
+			ss << "error processing obs population binary file: " << e.what();
+			throw_moea_error(ss.str());
+		}
+		catch (...)
+		{
+			throw_moea_error(string("error processing obs population binary file"));
+		}
+	}
+	else
+	{
+		ss << "unrecognized obs population restart file extension " << par_ext << ", looking for csv, jcb, or jco";
+		throw_moea_error(ss.str());
+	}
+
+	ss.str("");
+	ss << "obs population with " << op.shape().first << " members read from '" << obs_filename << "'" << endl;
+	message(1, ss.str());
+	if (op.shape().first == 0)
+	{
+		throw_moea_error("zero members found in obs population restart file");
+	}
+
 
 }

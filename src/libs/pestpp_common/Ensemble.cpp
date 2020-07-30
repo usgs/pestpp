@@ -1881,6 +1881,7 @@ void ParameterEnsemble::draw_uniform(int num_reals, vector<string> par_names, Pe
 		ss << "member_" << i;
 		real_names.push_back(ss.str());
 	}
+	org_real_names = real_names;
 	tstat = ParameterEnsemble::transStatus::NUM;
 }
 

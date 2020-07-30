@@ -1044,12 +1044,12 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		return true;
 	}
 
-	else if (key == "MOU_POPULATION_DV_FILE")
+	else if (key == "MOU_DV_POPULATION_FILE")
 	{
 		mou_dv_population_file = org_value;
 		return true;
 	}
-	else if (key == "MOU_POPULATION_OBS_RESTART_FILE")
+	else if (key == "MOU_OBS_POPULATION_RESTART_FILE")
 	{
 		mou_obs_population_restart_file = org_value;
 		return true;
@@ -1731,11 +1731,12 @@ vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bou
 {
 	double scale = 1.0 / (rand_gen.max() - rand_gen.min() + 1.0);
 	vector<double> vals;
-	double bscale = 1.0 / (upper_bound - lower_bound + 1.0);
+	double bscale = upper_bound - lower_bound;
+	double v1;
 	for (int i = 0; i < num_reals; i++)
 	{
-		double v1 = (rand_gen() - rand_gen.min()) * scale;
-		v1 = lower_bound + (v1 / scale);
+		v1 = (rand_gen() - rand_gen.min()) * scale;
+		v1 = lower_bound + (v1 * bscale);
 		vals.push_back(v1);
 	}
 	return vals;
