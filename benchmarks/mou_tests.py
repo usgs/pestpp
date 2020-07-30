@@ -240,6 +240,35 @@ def test_zdt1():
     assert dv_df.index.to_list() == obs_df.index.to_list()
 
 
+def test_sorting_fake_problem():
+    test_d = os.path.join(test_root,"sorting_test")
+    if os.path.exists(test_d):
+        shutil.rmtree(test_d)
+    os.makedirs(test_d)
+
+    with open(os.path.join(test_d,"par.tpl"),'w') as f:
+        f.write("ptf ~\n ~   par1    ~\n")
+    with open(os.path.join(test_d,"obs.ins"),'w') as f:
+        f.write("pif ~\n")
+        for i in range(6):
+            f.write("l1 !obj{0}!\n".format(i))
+    pst = pyemu.Pst.from_io_files(os.path.join(test_d,"par.tpl"),"par.dat",os.path.join(test_d,"obs.ins"),"obs.dat",pst_path=".")
+    obs = pst.observation_data
+    obs.loc[:,"obgnme"] = "less_than_obj"
+    obs.loc[:,"obsval"] = 1.0
+    obs.loc[:,"weight"] = 1.0
+    pst.control_data.noptmax = -1
+    
+    pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst=pst,num_reals=1000)
+    oe = pyemu.ObservationEnsemble.from_gaussian_draw(pst=pst,num_reals=1000)
+    pe.to_csv(os.path.join(test_d,"par.csv"))
+    oe.to_csv(os.path.join(test_d,"obs.csv"))
+    pst.pestpp_options["mou_dv_population_file"] = "par.csv"
+    pst.pestpp_options["mou_obs_population_restart_file"] = "obs.csv"
+    pst.write(os.path.join(test_d,"test.pst"))
+    pyemu.os_utils.run("{0} test.pst".format(exe_path),cwd=test_d)
+
+
 
 if __name__ == "__main__":
         
@@ -251,4 +280,5 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt6",10)
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
-    test_zdt1()
+    #test_zdt1()
+    test_sorting_fake_problem()
