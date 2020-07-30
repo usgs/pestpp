@@ -75,6 +75,13 @@ map<int, vector<string>> fast_nondominated_sort(map<string, map<double, string>>
 	return sorted_to_fronts;
 }
 
+
+vector<string> sort_members_by_crowding_distance(vector<string>& members, ParameterEnsemble& dp)
+{
+	vector<string> crowd_ordered;
+	return crowd_ordered;
+}
+
 vector<string> sort_members_by_dominance(map<string, map<double, string>>& member_struct)
 {
 	
@@ -597,6 +604,18 @@ void MOEA::initialize()
 
 void MOEA::iterate_to_solution()
 {
+
+	//for iter in noptmax
+		//generate offspring
+
+		//run offspring thru the model
+
+		//append offspring dp and op to make new dp and op containers
+
+		//sort according to pareto dominance, crowding distance, and, eventually, feasibility
+
+		//drop shitty members
+
 
 
 }
