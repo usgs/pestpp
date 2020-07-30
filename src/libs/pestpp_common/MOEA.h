@@ -50,7 +50,7 @@ private:
 	string obs_pop_file_tag = "obs_pop";
 	FileManager &file_manager; 
 	std::mt19937 rand_gen;
-
+	vector<string> obj_names;
 	vector<string> dv_names;
 
 	ParetoObjectives objectives;

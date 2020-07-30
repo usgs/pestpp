@@ -313,7 +313,8 @@ void MOEA::initialize()
 	//one option would be for objective to use the 
 	//constraint naming convention so that "less_than" would be minimize
 	//and greater_than would be maximize. This would also make the risk-based objectives easy as...
-	vector<string> obj_names = ppo->get_mou_objectives();
+	
+	//TODO: deal with prior info objectives
 	Constraints::ConstraintSense gt = Constraints::ConstraintSense::greater_than, lt = Constraints::ConstraintSense::less_than;
 	pair<Constraints::ConstraintSense, string> sense;
 	map<string, string> sense_map;
