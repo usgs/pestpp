@@ -190,12 +190,50 @@ def setup_zdt_problem(name,num_dv):
     return test_d
 
 def test_zdt1():
-    test_d = setup_zdt_problem("zdt1",30)
-    pst = pyemu.Pst(os.path.join(test_d,"zdt1.pst"))
+    test_case = "zdt1"
+    test_d = setup_zdt_problem(test_case,30)
+    pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
     pst.control_data.noptmax = -1
-    pst.pestpp_options["mou_populations_size"] = 100
-    pst.write(os.path.join(test_d,"zdt1.pst"))
-    pyemu.os_utils.run("{0} zdt1.pst".format(exe_path),cwd=test_d)
+    pst.pestpp_options["mou_population_size"] = 20
+    pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
+    pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
+
+    dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
+    assert os.path.exists(os.path.join(test_d,dv_pop_file)),dv_pop_file
+    obs_pop_file = "{0}.0.obs_pop.csv".format(test_case)
+    assert os.path.exists(os.path.join(test_d,obs_pop_file)),obs_pop_file
+    dv_df = pd.read_csv(os.path.join(test_d,dv_pop_file),index_col=0)
+    obs_df = pd.read_csv(os.path.join(test_d,obs_pop_file),index_col=0)
+    assert dv_df.shape[0] == pst.pestpp_options["mou_population_size"]
+    assert dv_df.shape[1] == pst.npar
+    assert obs_df.shape[0] == pst.pestpp_options["mou_population_size"]
+    assert obs_df.shape[1] == pst.nobs
+    assert dv_df.index.to_list() == obs_df.index.to_list()
+
+    dv_df = dv_df.iloc[1:,:]
+    obs_df = obs_df.iloc[:-1,:]
+    dv_df.to_csv(os.path.join(test_d,"restart_dv.csv"))
+    obs_df.to_csv(os.path.join(test_d,"restart_obs.csv"))
+
+
+    #shutil.copy2(os.path.join(test_d,dv_pop_file),os.path.join(test_d,"restart_dv.csv"))
+    #shutil.copy2(os.path.join(test_d,obs_pop_file),os.path.join(test_d,"restart_obs.csv"))
+    pst.pestpp_options["mou_dv_population_file"] = "restart_dv.csv"
+    pst.pestpp_options["mou_obs_population_restart_file"] = "restart_obs.csv"
+    pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
+    pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
+    dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
+    assert os.path.exists(os.path.join(test_d,dv_pop_file)),dv_pop_file
+    obs_pop_file = "{0}.0.obs_pop.csv".format(test_case)
+    assert os.path.exists(os.path.join(test_d,obs_pop_file)),obs_pop_file
+    dv_df = pd.read_csv(os.path.join(test_d,dv_pop_file),index_col=0)
+    obs_df = pd.read_csv(os.path.join(test_d,obs_pop_file),index_col=0)
+    assert dv_df.shape[0] == pst.pestpp_options["mou_population_size"] - 2
+    assert dv_df.shape[1] == pst.npar
+    assert obs_df.shape[0] == pst.pestpp_options["mou_population_size"] - 2
+    assert obs_df.shape[1] == pst.nobs
+    assert dv_df.index.to_list() == obs_df.index.to_list()
+
 
 
 if __name__ == "__main__":
@@ -206,5 +244,6 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt3",30)
     # setup_zdt_problem("zdt4",10)
     # setup_zdt_problem("zdt6",10)
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
     test_zdt1()
