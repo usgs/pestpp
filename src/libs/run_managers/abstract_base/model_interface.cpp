@@ -956,13 +956,13 @@ void InstructionFile::throw_ins_error(const string& message, int ins_lnum, int o
 {
 	stringstream ss;
 	if (warn)
-		ss << "InstructionFile warning in " << ins_filename;
+		ss << "InstructionFile warning in '" << ins_filename << "'";
 	else
-		ss << "InstructionFile error in file " << ins_filename;
+		ss << "InstructionFile error in file '" << ins_filename << "'";
 	if (ins_lnum != 0)
-		ss << " on line: " << ins_lnum;
+		ss << " on instruction file line: " << ins_lnum;
 	if (out_lnum != 0)
-		ss << " on output file line: " << out_lnum;
+		ss << ", on output file line: " << out_lnum;
 	ss << " : " << message;
 	if (warn)
 		cout << endl << ss.str() << endl;
@@ -1069,7 +1069,7 @@ pair<string, pair<int, int>> InstructionFile::parse_obs_instruction(const string
 	}
 	catch (...)
 	{
-		throw_ins_error("error casting first index '" + temp.substr(0, pos) + "' from (semi-)fixed observation instruction '" + token + "'");
+		throw_ins_error("error casting first index '" + temp.substr(0, pos) + "' from (semi-)fixed observation instruction '" + token + "'", ins_line_num);
 	}
 	try
 	{
@@ -1078,7 +1078,7 @@ pair<string, pair<int, int>> InstructionFile::parse_obs_instruction(const string
 	}
 	catch (...)
 	{
-		throw_ins_error("error casting second index '" + temp.substr(pos) + "' from observation instruction '" + token + "'");
+		throw_ins_error("error casting second index '" + temp.substr(pos) + "' from (semi)-fixed observation instruction '" + token + "'");
 	}
 	pair<int, int> se(s-1, e-1);
 	return pair<string, pair<int, int>>(name,se);
@@ -1104,14 +1104,14 @@ pair<string, double> InstructionFile::execute_fixed(const string& token, string&
 	}
 	catch (...)
 	{
-		throw_ins_error("error casting fixed observation '" + token + "' from output string '" + temp + "'");
+		throw_ins_error("error casting fixed observation instruction '" + token + "' from output string '" + temp + "' on line '" + line + "'",ins_line_num, out_line_num);
 	}
 	int pos = line.find(temp);
 	if (pos == string::npos)
 		throw_ins_error("internal error: string t: '"+temp+"' not found in line: '"+line+"'",ins_line_num,out_line_num);
 	if ((value != 0.0) && (!isnormal(value)))
 	{
-		throw_ins_error("casting '" + temp + "' to double yielded denormal value", ins_line_num, out_line_num);
+		throw_ins_error("casting '" + temp + "' to double yielded denormal value on line '" + line + "' for fixed observation instruction '" + token + "'", ins_line_num, out_line_num);
 	}
 	line = line.substr(pos + temp.size());
 	
@@ -1134,9 +1134,9 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 	int len = (info.second.second - info.second.first) + 1;
 	int pos = last_out_line.find_first_not_of(", \t\n\r"+additional_delimiters, info.second.first); //include the comma here for csv files
 	if (pos == string::npos)
-		throw_ins_error("EOL encountered when looking for non-whitespace char in semi-fixed instruction '" + token + "'",ins_line_num,out_line_num);
+		throw_ins_error("EOL encountered when looking for non-whitespace char in semi-fixed instruction '" + token + "' on line: '" + line + "'",ins_line_num,out_line_num);
 	if (pos > info.second.second)
-		throw_ins_error("no non-whitespace char found before end index in semi-fixed instruction '" + token + "'", ins_line_num,out_line_num);
+		throw_ins_error("no non-whitespace char found before end index in semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num,out_line_num);
 	pest_utils::tokenize(last_out_line.substr(pos), tokens);
 	temp = tokens[0];
 	try
@@ -1146,14 +1146,14 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 	}
 	catch (...)
 	{
-		throw_ins_error("error casting string '" + temp + "' to double for semi-fixed instruction", ins_line_num, out_line_num);
+		throw_ins_error("error casting string '" + temp + "' to double for semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num, out_line_num);
 	}
 	pos = line.find(temp);
 	if (pos == string::npos)
 		throw_ins_error("internal error: temp '" + temp + "' not found in line: '" + line + "'", ins_line_num, out_line_num);
 	if ((value != 0.0) && (!isnormal(value)))
 	{
-		throw_ins_error("casting '" + temp + "' to double yielded denormal value", ins_line_num, out_line_num);
+		throw_ins_error("casting '" + temp + "' to double yielded denormal value for semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num, out_line_num);
 	}
 	line = line.substr(pos + temp.size());
 	return pair<string, double>(info.first,value);
@@ -1164,7 +1164,7 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	vector<string> tokens;
 	pest_utils::tokenize(line, tokens,", \t\n\r" + additional_delimiters) ; //include the comma in the delimiters here
 	if (tokens.size() == 0)
-		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);
+		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for free instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);
 	double value;
 	try
 	{
@@ -1173,7 +1173,7 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	}
 	catch (...)
 	{
-		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for instruciton '"+token+"'", ins_line_num, out_line_num);
+		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruciton: '"+token+"'", ins_line_num, out_line_num);
 	}
 	string name = token.substr(1, token.size() - 2);
 	int pos = line.find(tokens[0]);
@@ -1183,7 +1183,7 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	}
 	if ((value != 0.0) && (!isnormal(value)))
 	{
-		throw_ins_error("casting '" + tokens[0] + "' to double yielded denormal value", ins_line_num, out_line_num);
+		throw_ins_error("casting '" + tokens[0] + "' to double yielded denormal value for free instruction: '" + token + "' on line: '" + line + "'", ins_line_num, out_line_num);
 	}
 	line = line.substr(pos + tokens[0].size());
 
@@ -1274,7 +1274,7 @@ void InstructionFile::execute_line_advance(const string& token, string& line, if
 	//pest_utils::convert_ip(token.substr(1), num);
 	num = stoi(token.substr(1));
 	if (num < 1)
-		throw_ins_error("line advance instruction error: number of lines must be greater or equal to 1, not " + token.substr(1));
+		throw_ins_error("line advance instruction error: number of lines must be greater or equal to 1, not '" + token.substr(1) + "'",ins_line_num,out_line_num);
 	for (int i = 0; i < num; i++)
 	{
 		if (f_out.bad())

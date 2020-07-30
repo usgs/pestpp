@@ -505,8 +505,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		if (err.first == -999)
 		{
 			ss.str("");
-			ss << "error receiving message from master: " << err.second << " , terminating, header follows:";
-			net_pack.print_header(ss);
+			ss << "error receiving message from master: " << err.second << " , terminating";
 			report(ss.str(), true);
 			//terminate = true;
 			net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "recv security message error");
