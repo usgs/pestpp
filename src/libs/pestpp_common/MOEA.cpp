@@ -1,5 +1,6 @@
 #include <random>
 #include <iomanip>
+#include <iterator>
 #include "MOEA.h"
 #include "Ensemble.h"
 #include "RunManagerAbstract.h"
@@ -449,7 +450,7 @@ void MOEA::initialize()
 		temp = op.get_real_names();
 		set<string> obsnames(temp.begin(), temp.end());
 		set<string> common;
-		set_intersection(dvnames.begin(), dvnames.end(), obsnames.begin(), obsnames.end(),inserter(common,common.end()));
+		set_intersection(dvnames.begin(), dvnames.end(), obsnames.begin(), obsnames.end(),std::inserter(common,common.end()));
 		
 		// all members are common to both dp and op
 		if (common.size() == dp.shape().first)
