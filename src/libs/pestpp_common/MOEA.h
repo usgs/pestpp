@@ -27,8 +27,9 @@ private:
 	PerformanceLog* performance_log;
 	vector<string> obj_names;
 
-	map<string,vector<string>> sort_obj_struct(map<string, map<string, double>>& obj_struct);
-	void sort_member_struct(map<string, map<string, double>>& member_struct);
+	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, map<string, double>>& memeber_struct);
+	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
+	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& member_struct);
 
 };
 

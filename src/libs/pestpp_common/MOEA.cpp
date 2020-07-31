@@ -20,11 +20,17 @@ ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_mana
 
 vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp)
 {
-	//TODO: I think the nsga-II or spea-II sorts into levels, but this is just a dummy function for now
 	stringstream ss;
 	ss << "ParetoObjectives::pareto_dominance_sort() for " << op.shape().first << " population members";
 	performance_log->log_event(ss.str());
+	performance_log->log_event("preparing fast-lookup containers");
+	//TODO:add additional arg for prior info objectives and augment the below storage containers with PI-based objective values
 	
+	//TODO: check for a single objective and deal appropriately
+
+	//TODO:  change obj_names to an associative container that has obj direction info, and 
+	// swap max obj to min in the containers below
+
 	//first prep two fast look up containers, one by obj and one by member name
 	map<string, map<double,string>> obj_struct;
 	vector<string> real_names = op.get_real_names();
@@ -45,57 +51,167 @@ vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj
 
 	}
 
-	map<string, map<double,string>> member_struct;
+	map<string, map<string,double>> member_struct;
 	for (auto real_name : real_names)
 	{
-		map<double,string> obj_map;
+		map<string,double> obj_map;
 		for (auto t : temp)
 		{
-			obj_map[t.second[real_name]] = t.first;
+			//obj_map[t.second[real_name]] = t.first;
+			obj_map[t.first] = t.second[real_name];
 		}
 			
 		member_struct[real_name] = obj_map;
 	}
 	temp.clear();
-	//sort_obj_struct(obj_struct);
+	
+	map<int, vector<string>> front_map = sort_members_by_dominance_into_fronts(member_struct);
+	performance_log->log_event("sorting done");
+	ofstream& frec = file_manager.rec_ofstream();
+	
+	frec << "...pareto dominance sort yielded " << front_map.size() << " domination fronts" << endl;
+	for (auto front : front_map)
+	{
+		frec << front.second.size() << " in the front " << front.first << endl;
+	}
 
-	int nondom = 0;
-	ss.str("");
-	ss << nondom << " non-dominated members found in " << op.shape().first << " population";
-	performance_log->log_event(ss.str());
-	file_manager.rec_ofstream() << "...pareto dominance sort yielded " << nondom << "non-dominated members in population of " << op.shape().first << " members";
-	return vector<string>();
+	
+	//TODO: some kind of reporting here.  Probably to the rec and maybe a csv file too...
+	vector<string> dominance_crowd_ordered;
+	for (auto front : front_map)
+		//TODO: crowding distance sort here, including special treatment of end members
+		for (auto front_member : front.second)
+			dominance_crowd_ordered.push_back(front_member);
+	return dominance_crowd_ordered;
+
+
+
 }
 
-map<int, vector<string>> fast_nondominated_sort(map<string, map<double, string>>& member_struct)
+vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members, map<string,map<string,double>>& memeber_struct)
 {
-	//the NSGA-II alg shown in the paper - sorts into fronts
-	map<int, vector<string>> sorted_to_fronts;
+	
+	map<string, map<double, string>> obj_member_map;
+	map<string, double> crowd_distance_map;
+	string m = members[0];
+	vector<string> obj_names;
+	for (auto obj_map : memeber_struct[m])
+	{
+		obj_member_map[obj_map.first] = map<double, string>();
+		obj_names.push_back(obj_map.first);
+	}
 
-	return sorted_to_fronts;
-}
+	for (auto member : members)
+	{
+		crowd_distance_map[member] = 0.0;
+		for (auto obj_map : memeber_struct[member])
+			obj_member_map[obj_map.first][obj_map.second] = member;
 
+	}
 
-vector<string> sort_members_by_crowding_distance(vector<string>& members, ParameterEnsemble& dp)
-{
+	map<double,string>::iterator start, end;
+	map<double, string> omap;
+	double obj_range;
+	for (auto obj_map : obj_member_map)
+	{
+		
+		omap = obj_map.second;
+		obj_range = omap.end()->first - omap.begin()->first;
+		//the obj extrema
+		crowd_distance_map[omap.begin()->second] = 1.0e+30;
+		crowd_distance_map[omap.end()->second] = 1.0e+30;
+		//need iterators to start and stop one off from the edges
+		map<double, string>::iterator start = next(omap.begin(),1);
+		map<double, string>::iterator end = prev(omap.end(), 1);
+
+		map<double, string>::iterator it = start;
+		
+		map<double, string>::iterator inext, iprev;
+		for (; it != end; ++it)
+		{
+			iprev = prev(it, 1);
+			inext = next(it, 1);
+			crowd_distance_map[it->second] = crowd_distance_map[it->second] + ((inext->first - iprev->first) / obj_range);
+		}
+
+	}
 	vector<string> crowd_ordered;
+
 	return crowd_ordered;
 }
 
-vector<string> sort_members_by_dominance(map<string, map<double, string>>& member_struct)
+map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(map<string, map<string, double>>& member_struct)
 {
-	
-	vector<string> dominance_ordered;
-	for (int i = 0; i < member_struct.size(); i++)
-		for (int j = 0; j < member_struct.size(); j++)
-			if (i == j)
+	//following fast non-dom alg in Deb
+	performance_log->log_event("starting 'fast non-dom sort");
+	//map<string,map<string,double>> Sp, F1;
+	map<string, vector<string>> solutions_dominated_map;
+	int domination_counter;
+	map<string, int> num_dominating_map;
+	vector<string> solutions_dominated, first_front;
+	performance_log->log_event("finding first front");
+	for (auto solution_p : member_struct)
+	{
+		domination_counter = 0;
+		solutions_dominated.clear();
+		for (auto solution_q : member_struct)
+		{
+			if (solution_p.first == solution_q.first) //string compare real name
 				continue;
+			if (first_dominates_second(solution_p.second, solution_q.second))
+			{
+				solutions_dominated.push_back(solution_q.first);
+			}
+			else // org alg says q strictly dominates p but oh well
+			{
+				domination_counter++;
+			}
+		}
+		//solution_p is in the first front
+		if (domination_counter == 0)
+		{
+			first_front.push_back(solution_p.first);
+		}
+		num_dominating_map[solution_p.first] = domination_counter;
+		solutions_dominated_map[solution_p.first] = solutions_dominated;
 
-	return dominance_ordered;
+	}
+	performance_log->log_event("sorting remaining fronts");
+	int i = 1;
+	int nq;
+    vector<string> q_front;
+	map<int, vector<string>> front_map;
+	front_map[1] = first_front;
+	vector<string> front;
+	while (true)
+	{
+		if (front.size() == 0)
+			break;
+		q_front.clear();
+		for (auto solution_p : front)
+		{
+			solutions_dominated = solutions_dominated_map[solution_p];
+			for (auto solution_q : solutions_dominated)
+			{
+				num_dominating_map[solution_q]--;
+				if (num_dominating_map[solution_q] <= 0)
+					q_front.push_back(solution_q);
+			}
+		}
+		i++;
+		front_map[i] = q_front;
+	}
+	
+	return front_map;
 }
 
-bool first_dominates_second(map<double, string>& first, map<double, string>& second)
+bool ParetoObjectives::first_dominates_second(map<string,double>& first, map<string,double>& second)
 {
+	for (auto f: first)
+	{
+		if (f.second > second[f.first])
+			return false;
+	}
 	return true;
 }
 
