@@ -77,11 +77,11 @@ vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj
 	}
 
 	
-	//TODO: some kind of reporting here.  Probably to the rec and maybe a csv file too...
+	
 	vector<string> dominance_crowd_ordered;
 	vector<string> crowd_ordered_front;
 	for (auto front : front_map)
-	{	//TODO: deb says we only need to worry about crowding sort if not all
+	{	//TODO: Deb says we only need to worry about crowding sort if not all
 		//members of the front are going to be retained.  For now, just sorting all fronts...
 		if (front.second.size() == 1)
 			crowd_ordered_front = front.second;
@@ -90,7 +90,15 @@ vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj
 		for (auto front_member : crowd_ordered_front)
 			dominance_crowd_ordered.push_back(front_member);
 	}
-	//TODO: add some checks here that all solutions made it thru the sorting process
+	if (op.shape().first != dominance_crowd_ordered.size())
+	{
+		ss.str("");
+		ss << "ParetoObjectives::pareto_dominance_sort() internal error: final sorted population size: " << dominance_crowd_ordered.size() << " != initial population size: " << op.shape().first;
+		cout << ss.str();
+		throw runtime_error(ss.str());
+	}
+
+	//TODO: some kind of reporting here.  Probably to the rec and maybe a csv file too...
 
 	return dominance_crowd_ordered;
 
@@ -168,16 +176,15 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string
 		cs_vec.push_back(cd);
 
 	std::sort(cs_vec.begin(), cs_vec.end(),
-		[](auto&& lhs, auto&& rhs) {
-			return lhs.second > rhs.second;
-		});
+		compFunctor);
 
 	vector<string> crowd_ordered;
 	for (auto cs : cs_vec)
 		crowd_ordered.push_back(cs.first);
 
 	//TODO: check here that all solutions made it thru the crowd distance sorting
-
+	if (crowd_ordered.size() != members.size())
+		throw runtime_error("ParetoObjectives::sort_members_by_crowding_distance() error: final sort size != initial size");
 	return crowd_ordered;
 }
 
