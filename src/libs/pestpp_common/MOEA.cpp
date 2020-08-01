@@ -1,6 +1,7 @@
 #include <random>
 #include <iomanip>
 #include <iterator>
+#include <map>
 #include "MOEA.h"
 #include "Ensemble.h"
 #include "RunManagerAbstract.h"
@@ -78,10 +79,19 @@ vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj
 	
 	//TODO: some kind of reporting here.  Probably to the rec and maybe a csv file too...
 	vector<string> dominance_crowd_ordered;
+	vector<string> crowd_ordered_front;
 	for (auto front : front_map)
-		//TODO: crowding distance sort here, including special treatment of end members
-		for (auto front_member : front.second)
+	{	//TODO: deb says we only need to worry about crowding sort if not all
+		//members of the front are going to be retained.  For now, just sorting all fronts...
+		if (front.second.size() == 1)
+			crowd_ordered_front = front.second;
+		else
+			crowd_ordered_front = sort_members_by_crowding_distance(front.second, member_struct);
+		for (auto front_member : crowd_ordered_front)
 			dominance_crowd_ordered.push_back(front_member);
+	}
+	//TODO: add some checks here that all solutions made it thru the sorting process
+
 	return dominance_crowd_ordered;
 
 
@@ -91,6 +101,7 @@ vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj
 
 vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members, map<string,map<string,double>>& memeber_struct)
 {
+
 	typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
 	// Defining a lambda function to compare two pairs. It will compare two pairs using second field
 	Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
@@ -123,33 +134,49 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string
 	for (auto obj_map : obj_member_map)
 	{
 		omap = obj_map.second;
-		crowdset crowd_sorted(
-			omap.begin(),omap.end(), compFunctor);
+		crowdset crowd_sorted(omap.begin(),omap.end(), compFunctor);
 
-		crowdset::iterator start = crowd_sorted.begin(), end = crowd_sorted.end();
+		crowdset::iterator start = crowd_sorted.begin(), last = prev(crowd_sorted.end(), 1);
 
 
-		obj_range = end->second - start->second;
+		obj_range = last->second - start->second;
 
-		//the obj extrema
+		//the obj extrema - makes sure they are retained 
 		crowd_distance_map[start->first] = 1.0e+30;
-		crowd_distance_map[end->first] = 1.0e+30;
-		//need iterators to start and stop one off from the edges
-		start = next(crowd_sorted.begin(),1);
-		end = prev(crowd_sorted.end(), 1);
-
-		crowdset::iterator it = start;
-		
-		crowdset::iterator inext, iprev;
-		for (; it != end; ++it)
+		crowd_distance_map[last->first] = 1.0e+30;
+		if (members.size() > 2)
 		{
-			iprev = prev(it, 1);
-			inext = next(it, 1);
-			crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((inext->second - iprev->second) / obj_range);
+			//need iterators to start and stop one off from the edges
+			start = next(crowd_sorted.begin(), 1);
+			last = prev(crowd_sorted.end(), 2);
+
+			crowdset::iterator it = start;
+
+			crowdset::iterator inext, iprev;
+			for (; it != last; ++it)
+			{
+				iprev = prev(it, 1);
+				inext = next(it, 1);
+				crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((inext->second - iprev->second) / obj_range);
+			}
 		}
 
 	}
+
+	vector <pair<string, double>> cs_vec;
+	for (auto cd : crowd_distance_map)
+		cs_vec.push_back(cd);
+
+	std::sort(cs_vec.begin(), cs_vec.end(),
+		[](auto&& lhs, auto&& rhs) {
+			return lhs.second > rhs.second;
+		});
+
 	vector<string> crowd_ordered;
+	for (auto cs : cs_vec)
+		crowd_ordered.push_back(cs.first);
+
+	//TODO: check here that all solutions made it thru the crowd distance sorting
 
 	return crowd_ordered;
 }
@@ -176,7 +203,7 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 			{
 				solutions_dominated.push_back(solution_q.first);
 			}
-			else // org alg says q strictly dominates p but oh well
+			else if (first_dominates_second(solution_q.second, solution_p.second))
 			{
 				domination_counter++;
 			}
@@ -196,11 +223,10 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
     vector<string> q_front;
 	map<int, vector<string>> front_map;
 	front_map[1] = first_front;
-	vector<string> front;
+	vector<string> front = first_front;
 	while (true)
 	{
-		if (front.size() == 0)
-			break;
+		
 		q_front.clear();
 		for (auto solution_p : front)
 		{
@@ -212,10 +238,14 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 					q_front.push_back(solution_q);
 			}
 		}
+		if (q_front.size() == 0)
+			break;
 		i++;
 		front_map[i] = q_front;
+		
+		front = q_front;
 	}
-	
+	//TODO: check that all solutions made it thru the sorting process
 	return front_map;
 }
 

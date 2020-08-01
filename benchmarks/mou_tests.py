@@ -255,12 +255,22 @@ def test_sorting_fake_problem():
     pst = pyemu.Pst.from_io_files(os.path.join(test_d,"par.tpl"),"par.dat",os.path.join(test_d,"obs.ins"),"obs.dat",pst_path=".")
     obs = pst.observation_data
     obs.loc[:,"obgnme"] = "less_than_obj"
-    obs.loc[:,"obsval"] = 1.0
+    obs.loc[:,"obsval"] = 0.0
     obs.loc[:,"weight"] = 1.0
     pst.control_data.noptmax = -1
+    np.random.seed(111)
+    pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst=pst,num_reals=100)
+    oe = pyemu.ObservationEnsemble.from_gaussian_draw(pst=pst,num_reals=100)
     
-    pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst=pst,num_reals=1000)
-    oe = pyemu.ObservationEnsemble.from_gaussian_draw(pst=pst,num_reals=1000)
+    # add some non dom soutions
+
+    org_min = oe.min(axis=0)
+    # min for first obj, tied for others
+    oe.loc[0,pst.obs_names[0]] = -10
+    for o in pst.obs_names[1:]:
+        oe.loc[0,o] = org_min[o]
+    
+       
     pe.to_csv(os.path.join(test_d,"par.csv"))
     oe.to_csv(os.path.join(test_d,"obs.csv"))
     pst.pestpp_options["mou_dv_population_file"] = "par.csv"
