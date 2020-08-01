@@ -88,16 +88,23 @@ vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj
 
 }
 
+
 vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members, map<string,map<string,double>>& memeber_struct)
 {
+	typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
+	// Defining a lambda function to compare two pairs. It will compare two pairs using second field
+	Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
+	{
+		return elem1.second < elem2.second;
+	};
 	
-	map<string, map<double, string>> obj_member_map;
+	map<string, map<string,double>> obj_member_map;
 	map<string, double> crowd_distance_map;
 	string m = members[0];
 	vector<string> obj_names;
 	for (auto obj_map : memeber_struct[m])
 	{
-		obj_member_map[obj_map.first] = map<double, string>();
+		obj_member_map[obj_map.first] = map<string,double>();
 		obj_names.push_back(obj_map.first);
 	}
 
@@ -105,33 +112,40 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string
 	{
 		crowd_distance_map[member] = 0.0;
 		for (auto obj_map : memeber_struct[member])
-			obj_member_map[obj_map.first][obj_map.second] = member;
+			obj_member_map[obj_map.first][member] = obj_map.second;
 
 	}
 
-	map<double,string>::iterator start, end;
-	map<double, string> omap;
+	//map<double,string>::iterator start, end;
+	map<string,double> omap;
 	double obj_range;
+	typedef std::set<std::pair<std::string, double>, Comparator> crowdset;
 	for (auto obj_map : obj_member_map)
 	{
-		
 		omap = obj_map.second;
-		obj_range = omap.end()->first - omap.begin()->first;
-		//the obj extrema
-		crowd_distance_map[omap.begin()->second] = 1.0e+30;
-		crowd_distance_map[omap.end()->second] = 1.0e+30;
-		//need iterators to start and stop one off from the edges
-		map<double, string>::iterator start = next(omap.begin(),1);
-		map<double, string>::iterator end = prev(omap.end(), 1);
+		crowdset crowd_sorted(
+			omap.begin(),omap.end(), compFunctor);
 
-		map<double, string>::iterator it = start;
+		crowdset::iterator start = crowd_sorted.begin(), end = crowd_sorted.end();
+
+
+		obj_range = end->second - start->second;
+
+		//the obj extrema
+		crowd_distance_map[start->first] = 1.0e+30;
+		crowd_distance_map[end->first] = 1.0e+30;
+		//need iterators to start and stop one off from the edges
+		start = next(crowd_sorted.begin(),1);
+		end = prev(crowd_sorted.end(), 1);
+
+		crowdset::iterator it = start;
 		
-		map<double, string>::iterator inext, iprev;
+		crowdset::iterator inext, iprev;
 		for (; it != end; ++it)
 		{
 			iprev = prev(it, 1);
 			inext = next(it, 1);
-			crowd_distance_map[it->second] = crowd_distance_map[it->second] + ((inext->first - iprev->first) / obj_range);
+			crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((inext->second - iprev->second) / obj_range);
 		}
 
 	}
