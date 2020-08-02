@@ -414,9 +414,11 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	ss.str("");
 	ss << "adding " << keep.size() << " non-dominated members to archive";
 	message(2, ss.str());
-	op_archive.append_other_rows(keep, _op.get_eigen(keep, vector<string>()));
-	dp_archive.append_other_rows(keep, _dp.get_eigen(keep, vector<string>()));
-
+	Eigen::MatrixXd other = _op.get_eigen(keep, vector<string>());
+	op_archive.append_other_rows(keep, other);
+	other = _dp.get_eigen(keep, vector<string>());
+	dp_archive.append_other_rows(keep, other);
+	other.resize(0, 0);
 	performance_log->log_event("archive pareto sort");
 	DomPair dompair = objectives.pareto_dominance_sort(obj_names, op_archive, dp_archive, obj_dir_mult);
 	
