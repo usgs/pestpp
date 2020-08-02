@@ -397,6 +397,26 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		throw_moea_error(ss.str());
 	}
 
+	//check that solutions in nondominated solution in dompair.first are not in the archive already
+	vector<string> keep, temp = op.get_real_names();
+	set<string> archive_members(temp.begin(), temp.end());
+	for (auto& member : _op.get_real_names())
+	{
+		if (archive_members.find(member) != archive_members.end())
+			keep.push_back(member);
+	}
+	if (keep.size() == 0)
+	{
+		message(2, "all nondominated members in already in archive");
+		return;
+	}
+	
+	ss.str("");
+	ss << "adding " << keep.size() << " non-dominated members to archive";
+	message(2, ss.str());
+	op_archive.append_other_rows(keep, _op.get_eigen(keep, vector<string>()));
+	dp_archive.append_other_rows(keep, _dp.get_eigen(keep, vector<string>()));
+
 	performance_log->log_event("archive pareto sort");
 	DomPair dompair = objectives.pareto_dominance_sort(obj_names, op_archive, dp_archive, obj_dir_mult);
 	
@@ -411,7 +431,8 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		ss.str("");
 		ss << "trimming archive size from " << op_archive.shape().first << " to max archive size " << archive_size;
 		message(2, ss.str());
-		vector<string> keep, members = op_archive.get_real_names();
+		vector<string> members = op_archive.get_real_names();
+		keep.clear();
 		for (int i = 0; i < archive_size; i++)
 			keep.push_back(members[i]);
 		op_archive.keep_rows(keep);
@@ -886,6 +907,14 @@ void MOEA::initialize()
 	message(2, ss.str());
 	archive_size = ppo->get_mou_max_archive_size();
 
+	//ad hoc archive update test
+	/*vector<string> temp = op.get_real_names();
+	for (auto& m : temp)
+		m = "XXX" + m;
+	op.set_real_names(temp);
+	op.set_eigen(*op.get_eigen_ptr() * 2.0);
+	dp.set_real_names(temp);
+	update_archive(op, dp);*/
 
 	message(0, "initialization complete");
 }

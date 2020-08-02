@@ -259,8 +259,8 @@ def test_sorting_fake_problem():
     obs.loc[:,"weight"] = 1.0
     pst.control_data.noptmax = -1
     np.random.seed(111)
-    pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst=pst,num_reals=500)
-    oe = pyemu.ObservationEnsemble.from_gaussian_draw(pst=pst,num_reals=500)
+    pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst=pst,num_reals=50)
+    oe = pyemu.ObservationEnsemble.from_gaussian_draw(pst=pst,num_reals=50)
     
     # add some non dom soutions
 
@@ -288,7 +288,7 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt3",30)
     # setup_zdt_problem("zdt4",10)
     # setup_zdt_problem("zdt6",10)
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
+    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
     #test_zdt1()
     test_sorting_fake_problem()
