@@ -20,7 +20,7 @@ class ParetoObjectives
 {
 public:
 	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, PerformanceLog* _performance_log);
-	vector<string> pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp);
+	pair<vector<string>, vector<string>> pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp, map<string,double>& obj_dir_mult);
 private:
 	Pest& pest_scenario;
 	FileManager& file_manager;
@@ -43,13 +43,14 @@ public:
 	void initialize();
     void iterate_to_solution();
 	void finalize();
-
+	typedef pair<vector<string>, vector<string>> DomPair;
 private:
 	Pest& pest_scenario;
 	set<string> pp_args;
 	vector<string> act_obs_names, act_par_names;
 	int iter, warn_min_members, error_min_members;
 	int member_count;
+	int archive_size;
 	string population_dv_file, population_obs_restart_file;
 	string dv_pop_file_tag = "dv_pop";
 	string obs_pop_file_tag = "obs_pop";
@@ -57,6 +58,11 @@ private:
 	std::mt19937 rand_gen;
 	vector<string> obj_names;
 	vector<string> dv_names;
+	map<string, double> obj_dir_mult;
+
+	//these two instances are passed as pointers to the constraints
+	Parameters effective_constraint_pars;
+	Observations effective_constraint_obs;
 
 	ParetoObjectives objectives;
 	Constraints constraints;
@@ -69,8 +75,10 @@ private:
 	const ObservationInfo *obs_info_ptr;
 	const PriorInformation *prior_info_ptr;
 
-	ParameterEnsemble dp;
-	ObservationEnsemble op;
+	ParameterEnsemble dp, dp_archive;
+	ObservationEnsemble op, op_archive;
+
+	void update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp);
 
 	void throw_moea_error(const string& message);
 

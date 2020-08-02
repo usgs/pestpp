@@ -19,18 +19,16 @@ ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_mana
 
 }
 
-vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp)
+pair<vector<string>,vector<string>> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp, map<string,double>& obj_dir_mult)
 {
 	stringstream ss;
 	ss << "ParetoObjectives::pareto_dominance_sort() for " << op.shape().first << " population members";
 	performance_log->log_event(ss.str());
 	performance_log->log_event("preparing fast-lookup containers");
 	//TODO:add additional arg for prior info objectives and augment the below storage containers with PI-based objective values
+	//while accounting for obj dir mult
 	
 	//TODO: check for a single objective and deal appropriately
-
-	//TODO:  change obj_names to an associative container that has obj direction info, and 
-	// swap max obj to min in the containers below
 
 	//first prep two fast look up containers, one by obj and one by member name
 	map<string, map<double,string>> obj_struct;
@@ -40,6 +38,12 @@ vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj
 	for (auto obj_name : obj_names)
 	{
 		obj_vals = op.get_eigen(vector<string>(), vector<string>{obj_name});
+
+		//if this is a max obj, just flip the values here
+		if (obj_dir_mult.find(obj_name) != obj_dir_mult.end())
+		{
+			obj_vals *= obj_dir_mult[obj_name];
+		}
 		map<double,string> obj_map;
 		map<string, double> t;
 		for (int i = 0; i < real_names.size(); i++)
@@ -78,7 +82,7 @@ vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj
 
 	
 	
-	vector<string> dominance_crowd_ordered;
+	vector<string> nondom_crowd_ordered,dom_crowd_ordered;
 	vector<string> crowd_ordered_front;
 	for (auto front : front_map)
 	{	//TODO: Deb says we only need to worry about crowding sort if not all
@@ -87,25 +91,27 @@ vector<string> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj
 			crowd_ordered_front = front.second;
 		else
 			crowd_ordered_front = sort_members_by_crowding_distance(front.second, member_struct);
-		for (auto front_member : crowd_ordered_front)
-			dominance_crowd_ordered.push_back(front_member);
+		if (front.first == 1)
+			for (auto front_member : crowd_ordered_front)
+				nondom_crowd_ordered.push_back(front_member);
+		else
+			for (auto front_member : crowd_ordered_front)
+				dom_crowd_ordered.push_back(front_member);
 	}
-	if (op.shape().first != dominance_crowd_ordered.size())
+	if (op.shape().first != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
 	{
 		ss.str("");
-		ss << "ParetoObjectives::pareto_dominance_sort() internal error: final sorted population size: " << dominance_crowd_ordered.size() << " != initial population size: " << op.shape().first;
+		ss << "ParetoObjectives::pareto_dominance_sort() internal error: final sorted population size: " << 
+			nondom_crowd_ordered.size() + dom_crowd_ordered.size() << " != initial population size: " << op.shape().first;
 		cout << ss.str();
 		throw runtime_error(ss.str());
 	}
 
 	//TODO: some kind of reporting here.  Probably to the rec and maybe a csv file too...
 
-	return dominance_crowd_ordered;
-
-
+	return pair<vector<string>, vector<string>>(nondom_crowd_ordered, dom_crowd_ordered);
 
 }
-
 
 vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members, map<string,map<string,double>>& memeber_struct)
 {
@@ -279,6 +285,10 @@ MOEA::MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_
 	dp.set_pest_scenario(&pest_scenario);
 	op.set_rand_gen(&rand_gen);
 	op.set_pest_scenario(&pest_scenario);
+	dp_archive.set_rand_gen(&rand_gen);
+	dp_archive.set_pest_scenario(&pest_scenario);
+	op_archive.set_rand_gen(&rand_gen);
+	op_archive.set_pest_scenario(&pest_scenario);
 }
 
 
@@ -376,6 +386,41 @@ void MOEA::sanity_checks()
 }
 
 
+void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
+{
+	message(2, "updating archive");
+	stringstream ss;
+	if (op_archive.shape().first != dp_archive.shape().first)
+	{
+		ss.str("");
+		ss << "MOEA::update_archive(): op_archive members " << op_archive.shape().first << " != dp_archive members " << dp_archive.shape().first;
+		throw_moea_error(ss.str());
+	}
+
+	performance_log->log_event("archive pareto sort");
+	DomPair dompair = objectives.pareto_dominance_sort(obj_names, op_archive, dp_archive, obj_dir_mult);
+	
+	ss.str("");
+	ss << "resizing archive from " << op_archive.shape().first << " to " << dompair.first.size() << " current non-dominated solutions";
+	message(2, ss.str());
+	op_archive.keep_rows(dompair.first);
+	dp_archive.keep_rows(dompair.first);
+
+	if (op_archive.shape().first > archive_size)
+	{
+		ss.str("");
+		ss << "trimming archive size from " << op_archive.shape().first << " to max archive size " << archive_size;
+		message(2, ss.str());
+		vector<string> keep, members = op_archive.get_real_names();
+		for (int i = 0; i < archive_size; i++)
+			keep.push_back(members[i]);
+		op_archive.keep_rows(keep);
+		dp_archive.keep_rows(keep);
+	}
+	
+}
+
+
 vector<int> MOEA::run_population(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs)
 {
 	message(1, "running population of size ", _pe.shape().first);
@@ -465,6 +510,7 @@ void MOEA::finalize()
 
 void MOEA::initialize()
 {
+	stringstream ss;
 	message(0, "initializing MOEA process");
 	
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
@@ -472,10 +518,7 @@ void MOEA::initialize()
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
 
-	//TODO: add arg to specify dv names rather than just use all adj names - can copy from pestpp-opt
-	dv_names = act_par_names;
-
-	stringstream ss;
+	
 
 	if (pest_scenario.get_control_info().noptmax == 0)
 	{
@@ -533,7 +576,61 @@ void MOEA::initialize()
 	//set some defaults
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
-	
+	//process dec var args
+	vector<string> dec_var_groups = ppo->get_opt_dec_var_groups();
+	if (dec_var_groups.size() != 0)
+	{
+		//first make sure all the groups are actually listed in the control file
+		vector<string> missing;
+		vector<string> pst_groups = pest_scenario.get_ctl_ordered_par_group_names();
+		vector<string>::iterator end = pst_groups.end();
+		vector<string>::iterator start = pst_groups.begin();
+		for (auto grp : dec_var_groups)
+			if (find(start, end, grp) == end)
+				missing.push_back(grp);
+		if (missing.size() > 0)
+		{
+			ss.str("");
+			ss << "the following ++opt_dec_var_groups were not found: ";
+			for (auto m : missing)
+				ss << m << ",";
+			throw_moea_error(ss.str());
+		}
+
+
+		//find the parameter in the dec var groups
+		ParameterGroupInfo pinfo = pest_scenario.get_base_group_info();
+		string group;
+		end = dec_var_groups.end();
+		start = dec_var_groups.begin();
+		for (auto& par_name : pest_scenario.get_ctl_ordered_par_names())
+		{
+			group = pinfo.get_group_name(par_name);
+			if (find(start, end, group) != end)
+			{
+				dv_names.push_back(par_name);
+
+			}
+		}
+
+		if (dv_names.size() == 0)
+		{
+			ss.str("");
+			ss << "no decision variables found in supplied dec var groups : ";
+			for (auto g : dec_var_groups)
+			{
+				ss << g << ",";
+			}
+			throw_moea_error(ss.str());
+		}
+	}
+	//otherwise, just use all adjustable parameters as dec vars
+	else
+	{
+		dv_names = act_par_names;
+	}
+
+
 	iter = 0;
 	member_count = 0;
 	
@@ -542,15 +639,10 @@ void MOEA::initialize()
 	
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
-	//TODO: how do we get info about the objective directions?  
-	//one option would be for objective to use the 
-	//constraint naming convention so that "less_than" would be minimize
-	//and greater_than would be maximize. This would also make the risk-based objectives easy as...
-	
 	//TODO: deal with prior info objectives
 	Constraints::ConstraintSense gt = Constraints::ConstraintSense::greater_than, lt = Constraints::ConstraintSense::less_than;
 	pair<Constraints::ConstraintSense, string> sense;
-	map<string, string> sense_map;
+	map<string, string> obj_sense_map;
 	vector<string> onames = pest_scenario.get_ctl_ordered_nz_obs_names();
 	if (obj_names.size() == 0)
 	{
@@ -560,12 +652,14 @@ void MOEA::initialize()
 			if (sense.first == gt)
 			{
 				obj_names.push_back(oname);
-				sense_map[oname] = "maximize";
+				obj_sense_map[oname] = "maximize";
+				obj_dir_mult[oname] = -1.0;
 			}
 			else if (sense.first == lt)
 			{
 				obj_names.push_back(oname);
-				sense_map[oname] = "minimize";
+				obj_sense_map[oname] = "minimize";
+				obj_dir_mult[oname] = 1.0;
 			}
 		}
 
@@ -591,12 +685,14 @@ void MOEA::initialize()
 					if (sense.first == gt)
 					{
 						keep.push_back(obj_name);
-						sense_map[obj_name] = "maximize";
+						obj_sense_map[obj_name] = "maximize";
+						obj_dir_mult[obj_name] = -1.0;
 					}
 					else if (sense.first == lt)
 					{
 						keep.push_back(obj_name);
-						sense_map[obj_name] = "minimize";
+						obj_sense_map[obj_name] = "minimize";
+						obj_dir_mult[obj_name] = 1.0;
 					}
 					
 				}
@@ -625,12 +721,11 @@ void MOEA::initialize()
 
 		}
 		obj_names = keep;
-
-
 	}
+
 	ss.str("");
 	ss << "...using the following observations as objectives: " << endl;
-	for (auto s : sense_map)
+	for (auto s : obj_sense_map)
 	{
 		ss << setw(30) << s.first << "   " << s.second << endl;
 	}
@@ -641,6 +736,15 @@ void MOEA::initialize()
 		message(1, "WARNING: more than 5 objectives, this is pushing the limits!");
 
 	sanity_checks();
+
+
+	//initialize the constraints using ctl file pars and obs
+	//throughout the process, we can update these pars and obs
+	//to control where in dec var space the stack/fosm estimates are
+	//calculated
+	effective_constraint_pars = pest_scenario.get_ctl_parameters();
+	effective_constraint_obs = pest_scenario.get_ctl_observations();
+	constraints.initialize(dv_names, &effective_constraint_pars, &effective_constraint_obs, numeric_limits<double>::max());
 
 
 	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
@@ -715,6 +819,10 @@ void MOEA::initialize()
 			message(2, "checking for denormal values in obs restart population");
 			op.check_for_normal("restart obs population");
 		}
+		//TODO: make any risk runs that need to be done here or do we assume the 
+		//restart population has already been shifted?
+
+		//TODO: save both sim and sim+chance observation populations
 		
 	}
 	else
@@ -728,9 +836,11 @@ void MOEA::initialize()
 		message(1, "saved initial dv population to ", ss.str());
 		performance_log->log_event("running initial ensemble");
 		message(1, "running initial ensemble of size", dp.shape().first);
+		//TODO: add risk runs to run mgr queue
 		vector<int> failed = run_population(dp, op);
 		if (dp.shape().first == 0)
 			throw_moea_error(string("all members failed during initial population evaluation"));
+		//TODO: process risk runs, shift obj and constraint values
 		dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
 	ss.str("");
@@ -763,8 +873,20 @@ void MOEA::initialize()
 
 	//do an initial pareto dominance sort
 	message(1, "performing initial pareto dominance sort");
-	objectives.pareto_dominance_sort(obj_names, op, dp);
+	DomPair dompair = objectives.pareto_dominance_sort(obj_names, op, dp, obj_dir_mult);
 	
+	//initialize op and dp archives
+	op_archive = ObservationEnsemble(&pest_scenario, &rand_gen, 
+		op.get_eigen(dompair.first, vector<string>()),dompair.first,op.get_var_names());
+	
+	dp_archive = ParameterEnsemble(&pest_scenario, &rand_gen,
+		dp.get_eigen(dompair.first, vector<string>()), dompair.first, dp.get_var_names());
+	ss.str("");
+	ss << "initialized archives with " << dompair.first.size() << " nondominated members";
+	message(2, ss.str());
+	archive_size = ppo->get_mou_max_archive_size();
+
+
 	message(0, "initialization complete");
 }
 
@@ -775,9 +897,11 @@ void MOEA::iterate_to_solution()
 	//for iter in noptmax
 		//generate offspring
 
-		//run offspring thru the model
+		//run offspring thru the model while also running risk runs, possibly at many points in dec var space
 
-		//append offspring dp and op to make new dp and op containers
+		//risk shift obj and constraint values, updating op in place
+
+		//append offspring dp and (risk-shifted) op to make new dp and op containers
 
 		//sort according to pareto dominance, crowding distance, and, eventually, feasibility
 

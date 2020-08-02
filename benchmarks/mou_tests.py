@@ -259,16 +259,16 @@ def test_sorting_fake_problem():
     obs.loc[:,"weight"] = 1.0
     pst.control_data.noptmax = -1
     np.random.seed(111)
-    pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst=pst,num_reals=100)
-    oe = pyemu.ObservationEnsemble.from_gaussian_draw(pst=pst,num_reals=100)
+    pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst=pst,num_reals=500)
+    oe = pyemu.ObservationEnsemble.from_gaussian_draw(pst=pst,num_reals=500)
     
     # add some non dom soutions
 
-    org_min = oe.min(axis=0)
-    # min for first obj, tied for others
-    oe.loc[0,pst.obs_names[0]] = -10
-    for o in pst.obs_names[1:]:
-        oe.loc[0,o] = org_min[o]
+    # org_min = oe.min(axis=0)
+    # # min for first obj, tied for others
+    # oe.loc[0,pst.obs_names[0]] = -10
+    # for o in pst.obs_names[1:]:
+    #     oe.loc[0,o] = org_min[o]
     
        
     pe.to_csv(os.path.join(test_d,"par.csv"))
