@@ -704,10 +704,27 @@ void MOEA::initialize()
 			}
 			throw_moea_error(ss.str());
 		}
+		ss.str("");
+		ss << "'opt_dec_var_groups' passed, using " << dv_names.size() << " adjustable parameters as decision variables";
+		message(2, ss.str());
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << "decision variables:" << endl;
+		int icol = 0;
+		for (auto dv_name : dv_names)
+		{
+			frec << dv_name << " ";
+			icol++;
+			if (icol == 10)
+			{
+				frec << endl;
+				icol = 0;
+			}
+		}
 	}
 	//otherwise, just use all adjustable parameters as dec vars
 	else
 	{
+		message(2, "using all adjustable parameters as decision variables: ", act_par_names.size());
 		dv_names = act_par_names;
 	}
 
