@@ -231,6 +231,20 @@ void OutputFileWriter::scenario_report(std::ostream &os, bool report_mode)
 	{
 		mode = "regularization (with a \"z\")";
 	}*/
+
+	os << endl << "    This software has been approved for release by the" << endl;
+	os << "    U.S.Geological Survey(USGS).Although the software has " << endl;
+	os << "    been subjected to rigorous review, the USGS reserves the" << endl;
+	os << "    right to update the software as needed pursuant to further" << endl;
+	os << "    analysisand review.No warranty, expressed or implied, is " << endl;
+	os << "    made by the USGS or the U.S.Government as to the" << endl;
+	os << "    functionality of the softwareand related material nor shall" << endl;
+	os << "    the fact of release constitute any such warranty." << endl;
+	os << "    Furthermore, the software is released on condition that" << endl;
+	os << "    neither the USGS nor the U.S.Government shall be held" << endl;
+	os << "    liable for any damages resulting from its authorized " << endl;
+	os << "    or unauthorized use." << endl << endl;
+
 	switch (pest_scenario.get_control_info().pestmode)
 	{
 	case ControlInfo::PestMode::ESTIMATION: 
