@@ -597,7 +597,9 @@ void MOEA::initialize()
 
 void MOEA::iterate_to_solution()
 {
+	while (evaluations < maxEvaluations) {
 
+	}
 
 }
 
