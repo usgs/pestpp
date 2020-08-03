@@ -64,6 +64,7 @@ public:
 	pair<map<string, double>, map<string, double>>  get_moment_maps(const vector<string> &_real_names=vector<string>());
 
 	void append_other_rows(Ensemble &other);
+	void append_other_rows(const vector<string>& _real_names, Eigen::MatrixXd& _reals);
 	void append(string real_name, const Transformable &trans);
 	void replace(int idx, const Transformable &trans, string real_name="");
 

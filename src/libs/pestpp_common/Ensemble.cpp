@@ -1203,6 +1203,37 @@ void Ensemble::extend_cols(Eigen::MatrixXd &_reals, const vector<string> &_var_n
 	}
 }
 
+void Ensemble::append_other_rows(const vector<string>& _real_names, Eigen::MatrixXd& _reals)
+{
+
+	//append rows to the end of reals
+	if (_reals.cols() != shape().second)
+		throw_ensemble_error("append_other_rows(): different number of columns in _reals");
+	vector<string> probs;
+	set<string> rnames(real_names.begin(), real_names.end());
+	set<string>::iterator end = rnames.end();
+	for (auto& rname : _real_names)
+		//if (find(start, end, rname) != end)
+		if (rnames.find(rname) != end)
+			probs.push_back(rname);
+	if (probs.size() > 0)
+		throw_ensemble_error("append_other_rows(): the following _real_names are also in this::real_names: ", probs);
+	vector<string> new_real_names = real_names;
+	for (auto& rname : _real_names)
+	{
+		new_real_names.push_back(rname);
+		//org_real_names.push_back(rname);
+	}
+	reals.conservativeResize(new_real_names.size(), var_names.size());
+
+	int iother = 0;
+	for (int i = real_names.size(); i < new_real_names.size(); i++)
+	{
+		reals.row(i) = _reals.row(iother);
+		iother++;
+	}
+	real_names = new_real_names;
+}
 
 void Ensemble::append_other_rows(Ensemble &other)
 {
