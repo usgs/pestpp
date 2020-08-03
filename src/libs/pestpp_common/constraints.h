@@ -40,6 +40,12 @@ public:
 	
 	//queue up chance related runs
 	void add_runs(RunManagerAbstract* run_mgr_ptr);
+
+	//queue up chance related runs at several points in dev var space
+	void add_runs_at_multiple_points(RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& pe, vector<string> only_reals = vector<string>());
+
+	//shift the constraint columns of an obs ensemble in place, potentially accounting for multiple-point dec var evals
+	void risk_shift_obs_en_ip(ObservationEnsemble& oe);
 	
 	//get the (risk-shifted) distance to constraints (upper and lower bounds)
 	pair<vector<double>,vector<double>> get_constraint_bound_vectors();
