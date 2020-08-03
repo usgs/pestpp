@@ -1073,6 +1073,11 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		return true;
 	}
 
+	else if (key == "MOU_CHANCE_POINTS")
+	{
+		mou_chance_points = value;
+		return true;
+	}
 
 	return false;
 }
@@ -1214,6 +1219,8 @@ void PestppOptions::summary(ostream& os) const
 	for (auto obj : mou_objectives)
 		os << obj << endl;
 	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
+	os << "mou_chance_points: " << mou_chance_points << endl;
+
 
 	os << endl << "...pestpp-ies options:" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
@@ -1352,6 +1359,7 @@ void PestppOptions::set_defaults()
 	set_mou_obs_population_restart_file("");
 	set_mou_objectives(vector<string>());
 	set_mou_max_archive_size(5000);
+	set_mou_chance_points("optimal");
 
 
 	set_ies_par_csv("");

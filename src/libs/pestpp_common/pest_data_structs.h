@@ -343,7 +343,8 @@ public:
 	void set_mou_objectives(const vector<string>& objs) { mou_objectives = objs; }
 	int get_mou_max_archive_size() const { return mou_max_archive_size; }
 	void set_mou_max_archive_size(int size) { mou_max_archive_size = size; }
-
+	string get_mou_chance_points() const { return mou_chance_points; }
+	void set_mou_chance_points(string chance_points) { mou_chance_points = chance_points; }
 
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
@@ -575,6 +576,7 @@ private:
 	string mou_obs_population_restart_file;
 	vector<string> mou_objectives;
 	int mou_max_archive_size;
+	string mou_chance_points;
 
 	int ies_subset_size;
 	string ies_par_csv;

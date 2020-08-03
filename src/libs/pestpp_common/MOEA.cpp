@@ -9,6 +9,7 @@
 #include "RestartController.h"
 #include "EnsembleMethodUtils.h"
 #include "constraints.h"
+#include "eigen_tools.h"
 
 using namespace std;
 
@@ -444,8 +445,65 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 }
 
 
+void MOEA::queue_chance_runs()
+{
+	stringstream ss;
+	if (constraints.should_update_chance(iter))
+	{
+		if (chancepoints == chancePoints::OPTIMAL)
+		{
+			//calculate the optimal tradeoff point from the current op
+			//dont worry about pi-based obj since they are chance-based
+			message(2, "seeking optimal trade-off point for 'optimal' chance point runs");
+			vector<double> obj_extrema;
+			Eigen::VectorXd obj_vec;
+
+			for (auto obj_name : obj_names)
+			{
+				//if this is a max obj
+				if ((obj_dir_mult.find(obj_name) != obj_dir_mult.end()) &&
+					(obj_dir_mult[obj_name] == -1.0))
+					obj_extrema.push_back(op.get_var_vector(obj_name).maxCoeff());
+				else
+					obj_extrema.push_back(op.get_var_vector(obj_name).minCoeff());
+			}
+
+			Eigen::VectorXd opt_vec = stlvec_2_eigenvec(obj_extrema);
+
+			//find the member nearest the optimal tradeoff
+			int opt_idx = -1;
+			double dist, opt_dist = numeric_limits<double>::max();
+			for (int i = 0; i < op.shape().first; i++)
+			{
+				dist = opt_vec.dot(op.get_eigen_ptr()->row(i));
+				if (dist < opt_dist)
+				{
+					opt_idx = i;
+					opt_dist = dist;
+				}
+			}
+			string opt_member = op.get_real_names()[opt_idx];
+
+			effective_constraint_pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(opt_member));
+			effective_constraint_obs.update_without_clear(op.get_var_names(), op.get_real_vector(opt_member));
+
+
+			ss.str("");
+			ss << "using member " << opt_member << " as optimal chance point with distance of " << opt_dist << " from optimal trade-off";
+			message(2, ss.str());
+
+		}
+		else
+		{
+			throw_moea_error("internal error: trying to call unsupported chancePoints type");
+		}
+	}
+}
+
 vector<int> MOEA::run_population(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs)
 {
+	queue_chance_runs();
+
 	message(1, "running population of size ", _pe.shape().first);
 	stringstream ss;
 	ss << "queuing " << _pe.shape().first << " runs";
@@ -663,6 +721,35 @@ void MOEA::initialize()
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
 	//TODO: deal with prior info objectives
+
+
+	string chance_points = ppo->get_mou_chance_points();
+	if (chance_points == "ALL")
+	{
+		//evaluate the chance constraints at every individual, very costly, but most robust
+		throw_moea_error("'mou_chance_points' == 'all' not implemented");
+	}
+	else if (chance_points == "EXTREMA")
+	{
+		//evaluate the chance constraints at the obj extrema individuals and interpolate risk-shifts
+		//from the extrema to the rest of the population. not as costly as all, but still should 
+		//accomodate some nonlinear in the coupling
+		throw_moea_error("'mou_chance_points' == 'extrema' not implemented");
+	}
+	else if (chance_points == "optimal")
+	{
+		//evaluate the chance constraints only at the population member nearest the optimal tradeoff.
+		//much cheaper, but assumes constant/linear coupling
+		chancepoints = chancePoints::OPTIMAL;
+
+	}
+	else
+	{
+		ss.str("");
+		ss << "unrecognized 'mou_chance_points' value :" << chance_points << ", should be 'all', 'extrema', or 'optimal'";
+		throw_moea_error(ss.str());
+	}
+
 	Constraints::ConstraintSense gt = Constraints::ConstraintSense::greater_than, lt = Constraints::ConstraintSense::less_than;
 	pair<Constraints::ConstraintSense, string> sense;
 	map<string, string> obj_sense_map;

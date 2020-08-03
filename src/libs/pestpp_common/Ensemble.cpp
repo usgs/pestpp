@@ -962,6 +962,15 @@ Eigen::VectorXd Ensemble::get_real_vector(int ireal)
 	return reals.row(ireal);
 }
 
+
+Eigen::VectorXd Ensemble::get_var_vector(const string& var_name)
+{
+	if (var_map.find(var_name) == var_map.end())
+		throw_ensemble_error("Ensemble::get_var_vector(): var_name not found: " + var_name);
+	return reals.col(var_map[var_name]);
+
+}
+
 Eigen::VectorXd Ensemble::get_real_vector(const string &real_name)
 {
 	//get a row vector from reals by realization name

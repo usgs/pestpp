@@ -36,6 +36,7 @@ private:
 
 class MOEA
 {
+	enum chancePoints{ALL,EXTREMA,OPTIMAL};
 public:
 	static mt19937_64 rand_engine;
 	MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer,
@@ -54,6 +55,7 @@ private:
 	string population_dv_file, population_obs_restart_file;
 	string dv_pop_file_tag = "dv_pop";
 	string obs_pop_file_tag = "obs_pop";
+	chancePoints chancepoints;
 	FileManager &file_manager; 
 	std::mt19937 rand_gen;
 	vector<string> obj_names;
@@ -90,6 +92,10 @@ private:
 
 	void sanity_checks();
 	vector<int> run_population(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>());
+
+	void queue_chance_runs();
+
+
 
 	bool initialize_dv_population();
 	void initialize_obs_restart_population();
