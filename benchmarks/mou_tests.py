@@ -224,13 +224,14 @@ def setup_zdt_problem(name,num_dv,additive_chance=False):
     assert pst.phi < 1.0e-10
     return test_d
 
-def test_zdt1(additive_chance=False):
+def test_zdt1(additive_chance=True):
     test_case = "zdt1"
     test_d = setup_zdt_problem(test_case,30,additive_chance=additive_chance)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
     pst.control_data.noptmax = 1
     pst.pestpp_options["mou_population_size"] = 20
-    pst.pestpp_options["opt_risk"] = 0.95
+    if additive_chance:
+        pst.pestpp_options["opt_risk"] = 0.95
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
     master_d = test_d.replace("template","master")
@@ -239,14 +240,14 @@ def test_zdt1(additive_chance=False):
                                   port=port)
 
     #TODO: need some asserts here
+    if (additive_chance):
+        pst.pestpp_options["opt_stack_size"] = 15
+        pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
+        pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
+                                      num_workers=15, master_dir=master_d,worker_root=test_root,
+                                      port=port)
 
-    pst.pestpp_options["opt_stack_size"] = 15
-    pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
-    pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
-                                  num_workers=15, master_dir=master_d,worker_root=test_root,
-                                  port=port)
-
-    #TODO: need some asserts here
+        #TODO: need some asserts here
 
     
     # remove this for now since chances and restart arent supported yet
@@ -336,8 +337,8 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt3",30)
     # setup_zdt_problem("zdt4",10)
     # setup_zdt_problem("zdt6",10)
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
+    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
-    test_zdt1(additive_chance=True)
+    test_zdt1()
     #setup_zdt_problem("zdt1",30, additive_chance=True)
     #test_sorting_fake_problem(additive_chance=True)
