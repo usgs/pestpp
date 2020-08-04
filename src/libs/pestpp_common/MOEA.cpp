@@ -450,7 +450,31 @@ void MOEA::queue_chance_runs()
 	stringstream ss;
 	if (constraints.should_update_chance(iter))
 	{
-		if (chancepoints == chancePoints::OPTIMAL)
+		//if this is the first iter and no restart
+		if ((iter == 0) && (population_obs_restart_file.size() == 0))
+		{
+			//just use dp member nearest the mean dec var values
+			vector<double> t = dp.get_mean_stl_var_vector();
+			Eigen::VectorXd dp_mean = stlvec_2_eigenvec(t);
+			t.resize(0);
+			int idx_min;
+			double dist,dist_min = numeric_limits<double>::max();
+			for (int i = 0; i < dp.shape().first; i++)
+			{
+				dist = dp_mean.dot(dp.get_eigen_ptr()->row(i));
+				if (dist < dist_min)
+				{
+					idx_min = i;
+					dist_min = dist;
+				}
+			}
+			string min_member = dp.get_real_names()[idx_min];
+			ss.str("");
+			ss << "using member " << min_member << " as nearest-to-mean chance point with distance of " << dist_min << " from mean of decision population";
+			message(2, ss.str());
+			effective_constraint_pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(min_member));
+		}
+		else if (chancepoints == chancePoints::OPTIMAL)
 		{
 			//calculate the optimal tradeoff point from the current op
 			//dont worry about pi-based obj since they are chance-based
@@ -497,6 +521,7 @@ void MOEA::queue_chance_runs()
 		{
 			throw_moea_error("internal error: trying to call unsupported chancePoints type");
 		}
+		constraints.add_runs(run_mgr_ptr);
 	}
 }
 

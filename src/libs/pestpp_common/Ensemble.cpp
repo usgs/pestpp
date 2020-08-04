@@ -590,7 +590,7 @@ Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names,
 	return _reals;
 }
 
-vector<double> Ensemble::get_mean_stl_vector()
+vector<double> Ensemble::get_mean_stl_var_vector()
 {
 	vector<double> mean_vec;
 	mean_vec.reserve(var_names.size());
@@ -965,6 +965,7 @@ Eigen::VectorXd Ensemble::get_real_vector(int ireal)
 
 Eigen::VectorXd Ensemble::get_var_vector(const string& var_name)
 {
+	update_var_map();
 	if (var_map.find(var_name) == var_map.end())
 		throw_ensemble_error("Ensemble::get_var_vector(): var_name not found: " + var_name);
 	return reals.col(var_map[var_name]);

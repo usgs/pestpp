@@ -203,6 +203,10 @@ def setup_zdt_problem(name,num_dv,additive_chance=False):
         par.loc[adf.parnme,"parval1"] = 0.0
         par.loc[adf.parnme,"parlbnd"] = -1.0
         par.loc[adf.parnme,"parchglim"] = "relative"
+        par.loc[adf.parnme,"pargp"] = "obj_add"
+        pst.rectify_pgroups()
+        pst.parameter_groups.loc["obj_add","inctyp"] = "absolute"
+
 
     obs = pst.observation_data
     obs.loc[:,"weight"] = 1.0
@@ -224,15 +228,15 @@ def test_zdt1(additive_chance=False):
     test_case = "zdt1"
     test_d = setup_zdt_problem(test_case,30,additive_chance=additive_chance)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
-    pst.control_data.noptmax = -1
-    pst.pestpp_options["mou_population_size"] = 200
+    pst.control_data.noptmax = 1
+    pst.pestpp_options["mou_population_size"] = 20
+    pst.pestpp_options["opt_risk"] = 0.95
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
     master_d = test_d.replace("template","master")
     pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
                                   num_workers=15, master_dir=master_d,worker_root=test_root,
                                   port=port)
-    
 
     dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
     assert os.path.exists(os.path.join(master_d,dv_pop_file)),dv_pop_file

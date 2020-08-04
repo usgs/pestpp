@@ -61,7 +61,7 @@ public:
 	Eigen::MatrixXd get_eigen_anomalies(const vector<string> &_real_names, const vector<string> &_var_names, string on_real="");
 
 
-	vector<double> get_mean_stl_vector();
+	vector<double> get_mean_stl_var_vector();
 	pair<map<string, double>, map<string, double>>  get_moment_maps(const vector<string> &_real_names=vector<string>());
 
 	void append_other_rows(Ensemble &other);
