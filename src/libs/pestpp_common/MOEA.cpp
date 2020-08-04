@@ -447,6 +447,7 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 
 void MOEA::queue_chance_runs()
 {
+	/* queue up chance-related runs using the class attributes dp and op*/
 	stringstream ss;
 	if (constraints.should_update_chance(iter))
 	{
@@ -525,19 +526,20 @@ void MOEA::queue_chance_runs()
 	}
 }
 
-vector<int> MOEA::run_population(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs)
+vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
+	//queue up any chance related runs
 	queue_chance_runs();
 
-	message(1, "running population of size ", _pe.shape().first);
+	message(1, "running population of size ", _dp.shape().first);
 	stringstream ss;
-	ss << "queuing " << _pe.shape().first << " runs";
+	ss << "queuing " << _dp.shape().first << " runs";
 	performance_log->log_event(ss.str());
 	//run_mgr_ptr->reinitialize();
 	map<int, int> real_run_ids;
 	try
 	{
-		real_run_ids = _pe.add_runs(run_mgr_ptr, real_idxs);
+		real_run_ids = _dp.add_runs(run_mgr_ptr);
 	}
 	catch (const exception& e)
 	{
@@ -566,14 +568,11 @@ vector<int> MOEA::run_population(ParameterEnsemble& _pe, ObservationEnsemble& _o
 	}
 
 	performance_log->log_event("processing runs");
-	if (real_idxs.size() > 0)
-	{
-		_oe.keep_rows(real_idxs);
-	}
+	
 	vector<int> failed_real_indices;
 	try
 	{
-		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr);
+		failed_real_indices = _op.update_from_runs(real_run_ids, run_mgr_ptr);
 	}
 	catch (const exception& e)
 	{
@@ -591,8 +590,8 @@ vector<int> MOEA::run_population(ParameterEnsemble& _pe, ObservationEnsemble& _o
 	if (failed_real_indices.size() > 0)
 	{
 		stringstream ss;
-		vector<string> par_real_names = _pe.get_real_names();
-		vector<string> obs_real_names = _oe.get_real_names();
+		vector<string> par_real_names = _dp.get_real_names();
+		vector<string> obs_real_names = _op.get_real_names();
 		ss << "the following par:obs realization runs failed: ";
 		for (auto& i : failed_real_indices)
 		{
@@ -603,10 +602,40 @@ vector<int> MOEA::run_population(ParameterEnsemble& _pe, ObservationEnsemble& _o
 		string s = ss.str();
 		message(1, s);
 		performance_log->log_event("dropping failed realizations");
-		_pe.drop_rows(failed_real_indices);
-		_oe.drop_rows(failed_real_indices);
+		_dp.drop_rows(failed_real_indices);
+		_op.drop_rows(failed_real_indices);
 	}
+
+	//do this here in case something is wrong, we know sooner than later
+	constraints.process_runs(run_mgr_ptr, iter);
+	constraints.update_chance_offsets();
 	return failed_real_indices;
+}
+
+ObservationEnsemble MOEA::get_risk_shifted_op(ObservationEnsemble& _op)
+{
+	ObservationEnsemble shifted_op(_op);
+	if (chancepoints == chancePoints::OPTIMAL)
+	{
+		message(2, "risk-shifting observation population using 'optimal' chance point");
+		constraints.presolve_chance_report(iter);
+		Observations sim, sim_shifted;
+		Eigen::VectorXd real_vec;
+		vector<string> onames = shifted_op.get_var_names();
+		for (int i = 0; i < shifted_op.shape().first; i++)
+		{
+			real_vec = shifted_op.get_real_vector(i);
+			sim.update_without_clear(onames, real_vec);
+			sim_shifted = constraints.get_chance_shifted_constraints(sim);
+			shifted_op.replace(i, sim_shifted);
+		}
+	}
+	else
+	{
+		throw_moea_error("only 'optimal' chancepoint currently supported");
+	}
+
+	return shifted_op;
 }
 
 void MOEA::finalize()
@@ -764,7 +793,6 @@ void MOEA::initialize()
 
 	//TODO: deal with prior info objectives
 
-
 	string chance_points = ppo->get_mou_chance_points();
 	if (chance_points == "ALL")
 	{
@@ -778,10 +806,10 @@ void MOEA::initialize()
 		//accomodate some nonlinear in the coupling
 		throw_moea_error("'mou_chance_points' == 'extrema' not implemented");
 	}
-	else if (chance_points == "optimal")
+	else if (chance_points == "OPTIMAL")
 	{
 		//evaluate the chance constraints only at the population member nearest the optimal tradeoff.
-		//much cheaper, but assumes constant/linear coupling
+		//much cheaper, but assumes linear coupling
 		chancepoints = chancePoints::OPTIMAL;
 
 	}
@@ -898,7 +926,6 @@ void MOEA::initialize()
 	effective_constraint_obs = pest_scenario.get_ctl_observations();
 	constraints.initialize(dv_names, &effective_constraint_pars, &effective_constraint_obs, numeric_limits<double>::max());
 
-
 	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
 	population_dv_file = ppo->get_mou_dv_population_file();
 	population_obs_restart_file = ppo->get_mou_obs_population_restart_file();
@@ -931,6 +958,12 @@ void MOEA::initialize()
 	//we are restarting
 	if (population_obs_restart_file.size() > 0)
 	{
+		if (constraints.get_use_chance())
+		{
+			//this can be done, but we need to make sure the appropriate chance restart
+			//args were supplied: base_jacobian or obs_stack
+			throw_moea_error("chance constraints not yet supported with restart");
+		}
 	
 		//since mou reqs strict linking of realization names, let's see if we can find an intersection set 
 		vector<string> temp = dp.get_real_names();
@@ -988,7 +1021,7 @@ void MOEA::initialize()
 		message(1, "saved initial dv population to ", ss.str());
 		performance_log->log_event("running initial ensemble");
 		message(1, "running initial ensemble of size", dp.shape().first);
-		//TODO: add risk runs to run mgr queue
+		
 		vector<int> failed = run_population(dp, op);
 		if (dp.shape().first == 0)
 			throw_moea_error(string("all members failed during initial population evaluation"));
@@ -999,6 +1032,17 @@ void MOEA::initialize()
 	ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".csv";
 	op.to_csv(ss.str());
 	message(1, "saved observation population to ", ss.str());
+
+	if (constraints.get_use_chance())
+	{
+		ObservationEnsemble shifted_op = get_risk_shifted_op(op);
+		ss.str("");
+		ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".chance.csv";
+		op.to_csv(ss.str());
+		message(1, "saved risk_shifted observation population to ", ss.str());
+
+		op = shifted_op;
+	}
 
 	//save the initial dv population again in case runs failed or members were dropped as part of restart
 	ss.str("");

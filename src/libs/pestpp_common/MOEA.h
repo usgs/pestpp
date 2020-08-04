@@ -91,10 +91,10 @@ private:
 	void message(int level, const string& _message, T extra);
 
 	void sanity_checks();
-	vector<int> run_population(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>());
+	vector<int> run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
 	void queue_chance_runs();
-
+	ObservationEnsemble get_risk_shifted_op(ObservationEnsemble& _op);
 
 
 	bool initialize_dv_population();

@@ -1353,13 +1353,13 @@ void PestppOptions::set_defaults()
 	set_opt_par_stack("");
 	set_opt_obs_stack("");
 
-	set_mou_algorithm("nsga");
+	set_mou_algorithm("NSGA");
 	set_mou_population_size(100);
 	set_mou_dv_population_file("");
 	set_mou_obs_population_restart_file("");
 	set_mou_objectives(vector<string>());
 	set_mou_max_archive_size(5000);
-	set_mou_chance_points("optimal");
+	set_mou_chance_points("OPTIMAL");
 
 
 	set_ies_par_csv("");
