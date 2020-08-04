@@ -238,6 +238,17 @@ def test_zdt1(additive_chance=False):
                                   num_workers=15, master_dir=master_d,worker_root=test_root,
                                   port=port)
 
+    #TODO: need some asserts here
+
+    pst.pestpp_options["opt_stack_size"] = 15
+    pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
+    pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
+                                  num_workers=15, master_dir=master_d,worker_root=test_root,
+                                  port=port)
+
+    #TODO: need some asserts here
+
+    
     # remove this for now since chances and restart arent supported yet
     pst.pestpp_options.pop("opt_risk",None)
 

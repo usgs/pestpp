@@ -1323,7 +1323,7 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 			const set<string> failed = jco.get_failed_parameter_names();
 			throw_constraints_error("failed to calc derviatives for the following FOSM parameters: ", failed);
 		}
-		cout << "  ---  running " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints  ---  " << endl;
+		cout << "...running " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints" << endl;
 
 	}
 	//for stacks, we need to queue up the stack realizations, but replace the dec var entries in each realization
@@ -1341,7 +1341,7 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 			stack_pe.replace_col(dname, dvec);
 		}
 		pfm.log_event("building stack-based parameter runs");
-		cout << "  ---  running " << stack_pe.shape().first << " model runs for stack-based chance constraints  ---  " << endl;
+		cout << "...running " << stack_pe.shape().first << " model runs for stack-based chance constraints" << endl;
 		stack_pe_run_map.clear();
 		stack_pe_run_map = stack_pe.add_runs(run_mgr_ptr);
 	}
