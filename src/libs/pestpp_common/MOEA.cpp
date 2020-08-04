@@ -533,7 +533,7 @@ vector<int> MOEA::run_population(ParameterEnsemble& _pe, ObservationEnsemble& _o
 	stringstream ss;
 	ss << "queuing " << _pe.shape().first << " runs";
 	performance_log->log_event(ss.str());
-	run_mgr_ptr->reinitialize();
+	//run_mgr_ptr->reinitialize();
 	map<int, int> real_run_ids;
 	try
 	{

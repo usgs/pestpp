@@ -2088,7 +2088,7 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 				ss << n << ",";
 			throw_ensemble_error(ss.str());
 		}
-		run_id = run_mgr_ptr->add_run(pars_real);
+		run_id = run_mgr_ptr->add_run(pars_real,"realization: "+rname);
 		real_run_ids[idx]  = run_id;
 	}
 	return real_run_ids;

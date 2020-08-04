@@ -238,6 +238,8 @@ def test_zdt1(additive_chance=False):
                                   num_workers=15, master_dir=master_d,worker_root=test_root,
                                   port=port)
 
+    return
+
     dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
     assert os.path.exists(os.path.join(master_d,dv_pop_file)),dv_pop_file
     obs_pop_file = "{0}.0.obs_pop.csv".format(test_case)

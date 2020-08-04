@@ -1311,7 +1311,6 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 		//bit using Constraints::get_fosm_par_names()
 		//the last false says not to reinitialize the run mgr since the calling process may have also
 		//added runs
-		cout << "  ---  running " << num_adj_pars() << " model runs for FOSM-based chance constraints  ---  " << endl;
 		bool success = jco.build_runs(*current_pars_and_dec_vars_ptr, *current_constraints_sim_ptr, adj_par_names, pts,
 			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
 			*run_mgr_ptr, out_of_bounds, false, true, false);
@@ -1320,6 +1319,8 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 			const set<string> failed = jco.get_failed_parameter_names();
 			throw_constraints_error("failed to calc derviatives for the following FOSM parameters: ", failed);
 		}
+		cout << "  ---  running " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints  ---  " << endl;
+
 	}
 	//for stacks, we need to queue up the stack realizations, but replace the dec var entries in each realization
 	//with the current dec var values.
