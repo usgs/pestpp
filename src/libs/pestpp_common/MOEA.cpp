@@ -28,8 +28,6 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(con
 	performance_log->log_event(ss.str());
 	performance_log->log_event("preparing fast-lookup containers");
 
-	//TODO:add additional arg for prior info objectives and augment the below storage containers with PI-based objective values
-	//while accounting for obj dir mult
 
 	//TODO: check for a single objective and deal appropriately
 
@@ -94,6 +92,68 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(con
 		}
 	}
 
+	vector<string> infeas_ordered;
+	if (constraints_ptr)
+	{
+		//sort into feasible and infeasible 
+		map<string, double> violations;
+		double vsum;
+		Observations obs = pest_scenario.get_ctl_observations();
+		Parameters pars = pest_scenario.get_ctl_parameters();
+		vector<string> onames = op.get_var_names(), pnames=dp.get_var_names();
+		set<string> obs_obj_set(obs_obj_names.begin(), obs_obj_names.end());
+		set<string> pi_obj_set(pi_obj_names.begin(), pi_obj_names.end());
+		map<string,double> infeas;
+		map<string, map<string, double>> feas_member_struct;
+		for (auto real_name : real_names)
+		{
+			vsum = 0.0;
+			obs.update_without_clear(onames, op.get_real_vector(real_name));
+			//TODO: add a constraint tol ++ arg and use it here
+			// the 'false' arg is to not apply risk shifting to the satisfaction calcs since
+			// 'op' has already been shifted
+			violations = constraints_ptr->get_unsatified_obs_constraints(obs, 0.0, false);
+			for (auto v : violations)
+			{
+				if (obs_obj_set.find(v.first) == obs_obj_set.end())
+					vsum += v.second;
+			}
+			pars.update_without_clear(pnames, dp.get_real_vector(real_name));
+			violations = constraints_ptr->get_unsatified_pi_constraints(pars, 0.0);
+			for (auto v : violations)
+			{
+				if (pi_obj_set.find(v.first) == pi_obj_set.end())
+					vsum += v.second;
+			}
+			if (vsum > 0.0)
+			{
+				infeas[real_name] = vsum;
+			}
+			else
+				feas_member_struct[real_name] = member_struct[real_name];
+		}
+		if (feas_member_struct.size() == 0)
+		{
+			ss.str("");
+			ss << "WARNING: all members are infeasible" << endl;
+			file_manager.rec_ofstream() << ss.str();
+			cout << ss.str();
+		}
+		member_struct = feas_member_struct;
+		
+		//sort the infeasible members by violation
+		vector <pair<string, double>> infeas_vec;
+		for (auto inf : infeas)
+			infeas_vec.push_back(inf);
+
+		std::sort(infeas_vec.begin(), infeas_vec.end(),
+			compFunctor);
+
+		
+		for (auto inf : infeas_vec)
+			infeas_ordered.push_back(inf.first);
+		
+	}
 
 	map<int, vector<string>> front_map = sort_members_by_dominance_into_fronts(member_struct);
 	performance_log->log_event("sorting done");
@@ -105,8 +165,6 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(con
 		frec << front.second.size() << " in the front " << front.first << endl;
 	}
 
-	
-	
 	vector<string> nondom_crowd_ordered,dom_crowd_ordered;
 	vector<string> crowd_ordered_front;
 	for (auto front : front_map)
@@ -123,6 +181,17 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(con
 			for (auto front_member : crowd_ordered_front)
 				dom_crowd_ordered.push_back(front_member);
 	}
+
+	//now add the infeasible members
+	//if there is atleast one feasible nondom solution, then add the infeasible ones to dom solutions
+	if (nondom_crowd_ordered.size() > 0)
+		for (auto inf : infeas_ordered)
+			dom_crowd_ordered.push_back(inf);
+	else
+		for (auto inf : infeas_ordered)
+			nondom_crowd_ordered.push_back(inf);
+
+
 	if (op.shape().first != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
 	{
 		ss.str("");
@@ -141,12 +210,12 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(con
 vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members, map<string,map<string,double>>& memeber_struct)
 {
 
-	typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
-	// Defining a lambda function to compare two pairs. It will compare two pairs using second field
-	Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
-	{
-		return elem1.second < elem2.second;
-	};
+	//typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
+	//// Defining a lambda function to compare two pairs. It will compare two pairs using second field
+	//Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
+	//{
+	//	return elem1.second < elem2.second;
+	//};
 	
 	map<string, map<string,double>> obj_member_map;
 	map<string, double> crowd_distance_map;

@@ -66,7 +66,7 @@ public:
 
 	//get maps of obs and pi constraints that are not satified - the value is the distance to cosntraint RHS
 	map<string, double> get_unsatified_pi_constraints(Parameters& par_and_dec_vars, double tol=0.0);
-	map<string, double> get_unsatified_obs_constraints(Observations& constraints_sim, double tol=0.0);
+	map<string, double> get_unsatified_obs_constraints(Observations& constraints_sim, double tol=0.0, bool do_shift = true);
 	
 	//get the number of non-zero Prior info constraint elements
 	int get_num_nz_pi_constraint_elements();

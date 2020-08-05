@@ -41,6 +41,12 @@ private:
 	//in-feasibility driven evolution-ary algorithms Fan (2017)
 	//void apply_constraints_idea();
 
+	typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
+	// Defining a lambda function to compare two pairs. It will compare two pairs using second field
+	Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
+	{
+		return elem1.second < elem2.second;
+	};
 
 };
 

@@ -1384,7 +1384,7 @@ map<string, double> Constraints::get_unsatified_pi_constraints(Parameters& par_a
 	return unsatisfied;
 }
 
-map<string, double> Constraints::get_unsatified_obs_constraints(Observations& constraints_sim, double tol)
+map<string, double> Constraints::get_unsatified_obs_constraints(Observations& constraints_sim, double tol, bool do_shift)
 {
 	/* get a map of name, distance for each of the obs-based (e.g. model-based) constraints that are not satisfied in the constraint_obs container.
 	tol is a percent-based tolerance to accont for constraints that are very near their required (rhs) value
@@ -1392,14 +1392,14 @@ map<string, double> Constraints::get_unsatified_obs_constraints(Observations& co
 	*/
 	double sim_val, obs_val, scaled_diff;
 	map<string, double> unsatisfied;
-	Observations _constraints_sim = constraints_sim;
-	if (use_chance)
+	Observations _constraints_sim(constraints_sim);
+	if ((do_shift) && (use_chance))
 		_constraints_sim = get_chance_shifted_constraints(constraints_sim);
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
 		sim_val = constraints_sim[name];
-		if (use_chance)
+		if ((do_shift) && (use_chance))
 		{
 			double offset = post_constraint_offset[name];
 			sim_val += offset;
