@@ -13,8 +13,9 @@
 
 using namespace std;
 
-ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, PerformanceLog* _performance_log)
-	: pest_scenario(_pest_scenario),file_manager(_file_manager),performance_log(_performance_log)
+ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
+	PerformanceLog* _performance_log, Constraints* _constraints_ptr): 
+	pest_scenario(_pest_scenario),file_manager(_file_manager),performance_log(_performance_log), constraints_ptr()
 
 {
 

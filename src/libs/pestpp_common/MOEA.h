@@ -19,17 +19,26 @@
 class ParetoObjectives
 {
 public:
-	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, PerformanceLog* _performance_log);
-	pair<vector<string>, vector<string>> pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp, map<string,double>& obj_dir_mult);
+	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
+		PerformanceLog* _performance_log, Constraints* _constraints_ptr = nullptr);
+	pair<vector<string>, vector<string>> pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp, map<string, double>& obj_dir_mult);
 private:
 	Pest& pest_scenario;
 	FileManager& file_manager;
 	PerformanceLog* performance_log;
 	vector<string> obj_names;
-
+	Constraints* constraints_ptr;
 	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, map<string, double>>& memeber_struct);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& member_struct);
+
+	//constraint dominance principal Fan (2017) Tian (2020)
+	//void apply_constraints_cdp();
+	//self-adaptive constraint penalty Fan (2017), Woldesenbet (2009)
+	//void apply_constraints_sp();
+	//in-feasibility driven evolution-ary algorithms Fan (2017)
+	//void apply_constraints_idea();
+
 
 };
 
