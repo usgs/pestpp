@@ -21,12 +21,14 @@ class ParetoObjectives
 public:
 	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
 		PerformanceLog* _performance_log, Constraints* _constraints_ptr = nullptr);
-	pair<vector<string>, vector<string>> pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp, map<string, double>& obj_dir_mult);
+	pair<vector<string>, vector<string>> pareto_dominance_sort(const vector<string>& obs_obj_names, 
+		const vector<string>& pi_obj_names, ObservationEnsemble& op, ParameterEnsemble& dp, 
+		map<string, double>& obj_dir_mult);
 private:
 	Pest& pest_scenario;
 	FileManager& file_manager;
 	PerformanceLog* performance_log;
-	vector<string> obj_names;
+	//vector<string> obj_names;
 	Constraints* constraints_ptr;
 	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, map<string, double>>& memeber_struct);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
@@ -67,7 +69,7 @@ private:
 	chancePoints chancepoints;
 	FileManager &file_manager; 
 	std::mt19937 rand_gen;
-	vector<string> obj_names;
+	vector<string> obs_obj_names, pi_obj_names;
 	vector<string> dv_names;
 	map<string, double> obj_dir_mult;
 

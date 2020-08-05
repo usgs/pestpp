@@ -298,6 +298,8 @@ def test_sorting_fake_problem():
 
     with open(os.path.join(test_d,"par.tpl"),'w') as f:
         f.write("ptf ~\n ~   par1    ~\n")
+        f.write("~   par2    ~\n")
+        
     with open(os.path.join(test_d,"obs.ins"),'w') as f:
         f.write("pif ~\n")
         for i in range(6): # the number of objs in the test
@@ -307,24 +309,37 @@ def test_sorting_fake_problem():
     obs.loc[:,"obgnme"] = "less_than_obj"
     obs.loc[:,"obsval"] = 0.0
     obs.loc[:,"weight"] = 1.0
+    
+    par = pst.parameter_data
+    par.loc[:,"partrans"] = "none"
+    par.loc[:,"parval1"] = 1.0
+    par.loc[:,"parubnd"] = 1.5
+    par.loc[:,"parlbnd"] = 0.5
+
     pst.control_data.noptmax = -1
     np.random.seed(111)
+
     pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst=pst,num_reals=50)
     oe = pyemu.ObservationEnsemble.from_gaussian_draw(pst=pst,num_reals=50)
-    
-    # add some non dom soutions
 
-    # org_min = oe.min(axis=0)
-    # # min for first obj, tied for others
-    # oe.loc[0,pst.obs_names[0]] = -10
-    # for o in pst.obs_names[1:]:
-    #     oe.loc[0,o] = org_min[o]
-    
-       
     pe.to_csv(os.path.join(test_d,"par.csv"))
     oe.to_csv(os.path.join(test_d,"obs.csv"))
     pst.pestpp_options["mou_dv_population_file"] = "par.csv"
     pst.pestpp_options["mou_obs_population_restart_file"] = "obs.csv"
+    pst.write(os.path.join(test_d,"test.pst"))
+    pyemu.os_utils.run("{0} test.pst".format(exe_path),cwd=test_d)
+
+    cov = pyemu.Cov.from_parameter_data(pst).to_2d()
+    cov.x[0,1] = 0.0001
+    cov.x[1,0] = 0.0001
+
+
+    pyemu.helpers.first_order_pearson_tikhonov(pst=pst,cov=cov,abs_drop_tol=0.0)
+    print(pst.prior_information)
+    #pst.prior_information = pst.prior_information.loc[["pcc_3"],:]
+    pi = pst.prior_information
+    pi.loc["pcc_1","equation"] = pi.loc["pcc_1","equation"].replace("= 0.0","= 1.0").replace(" - "," + ")
+    pi.loc[:,"obgnme"] = "less_than_pi"
     pst.write(os.path.join(test_d,"test.pst"))
     pyemu.os_utils.run("{0} test.pst".format(exe_path),cwd=test_d)
 
@@ -337,8 +352,8 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt3",30)
     # setup_zdt_problem("zdt4",10)
     # setup_zdt_problem("zdt6",10)
-    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
-    test_zdt1()
+    #test_zdt1()
     #setup_zdt_problem("zdt1",30, additive_chance=True)
-    #test_sorting_fake_problem(additive_chance=True)
+    test_sorting_fake_problem()

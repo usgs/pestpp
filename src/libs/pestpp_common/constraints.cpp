@@ -1018,7 +1018,7 @@ void Constraints::presolve_report(int iter)
 			f_rec << setw(20) << left << name;
 			f_rec << setw(15) << right << constraint_sense_name[name];
 			f_rec << setw(15) << pi_rec.get_obs_value();
-			f_rec << setw(15) << pi_rec.calc_residual_and_sim_val(*current_pars_and_dec_vars_ptr).first;
+			f_rec << setw(15) << pi_rec.calc_sim_and_resid(*current_pars_and_dec_vars_ptr).first;
 			f_rec << setw(15) << pi_rec.calc_residual(*current_pars_and_dec_vars_ptr);
 			f_rec << setw(15) << current_bounds.first[num_obs_constraints() + i];
 			f_rec << setw(15) << current_bounds.second[num_obs_constraints() + i] << endl;
@@ -1209,8 +1209,8 @@ void Constraints::postsolve_pi_constraints_report(Parameters& pars_and_dec_vars,
 		for (auto &name : ctl_ord_pi_constraint_names)
 		{
 			PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
-			pair<double,double> cur_sim_resid = pi_rec.calc_residual_and_sim_val(*current_pars_and_dec_vars_ptr);
-			pair<double,double> new_sim_resid = pi_rec.calc_residual_and_sim_val(pars_and_dec_vars);
+			pair<double,double> cur_sim_resid = pi_rec.calc_sim_and_resid(*current_pars_and_dec_vars_ptr);
+			pair<double,double> new_sim_resid = pi_rec.calc_sim_and_resid(pars_and_dec_vars);
 			f_rec << setw(20) << left << name;
 			f_rec << setw(15) << right << constraint_sense_name[name];
 			f_rec << setw(15) << pi_rec.get_obs_value();
@@ -1369,7 +1369,7 @@ map<string, double> Constraints::get_unsatified_pi_constraints(Parameters& par_a
 	{
 		PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
 		//pair<double, double> cur_sim_resid = pi_rec.calc_residual_and_sim_val(*current_pars_and_dec_vars_ptr);
-		pair<double, double> new_sim_resid = pi_rec.calc_residual_and_sim_val(par_and_dec_vars);
+		pair<double, double> new_sim_resid = pi_rec.calc_sim_and_resid(par_and_dec_vars);
 		//check for invalid pi constraints
 		sim_val = new_sim_resid.first;
 		obs_val = pi_rec.get_obs_value();

@@ -21,23 +21,24 @@ ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_mana
 
 }
 
-pair<vector<string>,vector<string>> ParetoObjectives::pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp, map<string,double>& obj_dir_mult)
+pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(const vector<string>& obs_obj_names, const vector<string>& pi_obj_names, ObservationEnsemble& op, ParameterEnsemble& dp, map<string, double>& obj_dir_mult)
 {
 	stringstream ss;
 	ss << "ParetoObjectives::pareto_dominance_sort() for " << op.shape().first << " population members";
 	performance_log->log_event(ss.str());
 	performance_log->log_event("preparing fast-lookup containers");
+
 	//TODO:add additional arg for prior info objectives and augment the below storage containers with PI-based objective values
 	//while accounting for obj dir mult
-	
+
 	//TODO: check for a single objective and deal appropriately
 
 	//first prep two fast look up containers, one by obj and one by member name
-	map<string, map<double,string>> obj_struct;
+	map<string, map<double, string>> obj_struct;
 	vector<string> real_names = op.get_real_names();
 	Eigen::VectorXd obj_vals;
 	map<string, map<string, double>> temp;
-	for (auto obj_name : obj_names)
+	for (auto obj_name : obs_obj_names)
 	{
 		obj_vals = op.get_eigen(vector<string>(), vector<string>{obj_name});
 
@@ -46,7 +47,7 @@ pair<vector<string>,vector<string>> ParetoObjectives::pareto_dominance_sort(cons
 		{
 			obj_vals *= obj_dir_mult[obj_name];
 		}
-		map<double,string> obj_map;
+		map<double, string> obj_map;
 		map<string, double> t;
 		for (int i = 0; i < real_names.size(); i++)
 		{
@@ -58,20 +59,42 @@ pair<vector<string>,vector<string>> ParetoObjectives::pareto_dominance_sort(cons
 
 	}
 
-	map<string, map<string,double>> member_struct;
+
+
+	map<string, map<string, double>> member_struct;
 	for (auto real_name : real_names)
 	{
-		map<string,double> obj_map;
+		map<string, double> obj_map;
 		for (auto t : temp)
 		{
 			//obj_map[t.second[real_name]] = t.first;
 			obj_map[t.first] = t.second[real_name];
 		}
-			
+
 		member_struct[real_name] = obj_map;
 	}
 	temp.clear();
-	
+
+	//add any prior info obj values to member_struct
+	if (pi_obj_names.size() > 0)
+	{
+		PriorInformation* pi_ptr = pest_scenario.get_prior_info_ptr();
+		Parameters pars;
+		pair<double, double> pi_res_sim;
+		vector<string> pnames = dp.get_var_names();
+		for (auto real_name : real_names)
+		{
+			pars.update_without_clear(pnames, dp.get_real_vector(real_name));
+			for (auto obj_name : pi_obj_names)
+			{
+				pi_res_sim = pi_ptr->get_pi_rec_ptr(obj_name).calc_sim_and_resid(pars);
+				//account for dir mult here
+				member_struct[real_name][obj_name] = pi_res_sim.first * obj_dir_mult[obj_name];
+			}
+		}
+	}
+
+
 	map<int, vector<string>> front_map = sort_members_by_dominance_into_fronts(member_struct);
 	performance_log->log_event("sorting done");
 	ofstream& frec = file_manager.rec_ofstream();
@@ -422,7 +445,7 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	dp_archive.append_other_rows(keep, other);
 	other.resize(0, 0);
 	performance_log->log_event("archive pareto sort");
-	DomPair dompair = objectives.pareto_dominance_sort(obj_names, op_archive, dp_archive, obj_dir_mult);
+	DomPair dompair = objectives.pareto_dominance_sort(obs_obj_names, pi_obj_names, op_archive, dp_archive, obj_dir_mult);
 	
 	ss.str("");
 	ss << "resizing archive from " << op_archive.shape().first << " to " << dompair.first.size() << " current non-dominated solutions";
@@ -484,7 +507,7 @@ void MOEA::queue_chance_runs()
 			vector<double> obj_extrema;
 			Eigen::VectorXd obj_vec;
 
-			for (auto obj_name : obj_names)
+			for (auto obj_name : obs_obj_names)
 			{
 				//if this is a max obj
 				if ((obj_dir_mult.find(obj_name) != obj_dir_mult.end()) &&
@@ -712,6 +735,9 @@ void MOEA::initialize()
 	//set some defaults
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
+	//reset the par bound PI augmentation since that option is just for simplex
+	ppo->set_opt_include_bnd_pi(false);
+
 	//process dec var args
 	vector<string> dec_var_groups = ppo->get_opt_dec_var_groups();
 	if (dec_var_groups.size() != 0)
@@ -792,7 +818,7 @@ void MOEA::initialize()
 	
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
-	//TODO: deal with prior info objectives
+	
 
 	string chance_points = ppo->get_mou_chance_points();
 	if (chance_points == "ALL")
@@ -821,42 +847,67 @@ void MOEA::initialize()
 		throw_moea_error(ss.str());
 	}
 
+
+	//process objectives
 	Constraints::ConstraintSense gt = Constraints::ConstraintSense::greater_than, lt = Constraints::ConstraintSense::less_than;
 	pair<Constraints::ConstraintSense, string> sense;
 	map<string, string> obj_sense_map;
 	vector<string> onames = pest_scenario.get_ctl_ordered_nz_obs_names();
-	if (obj_names.size() == 0)
+	vector<string> passed_obj_names = ppo->get_mou_objectives();
+	if (passed_obj_names.size() == 0)
 	{
 		for (auto oname : onames)
 		{
 			sense = Constraints::get_sense_from_group_name(pest_scenario.get_ctl_observation_info().get_group(oname));
 			if (sense.first == gt)
 			{
-				obj_names.push_back(oname);
+				obs_obj_names.push_back(oname);
 				obj_sense_map[oname] = "maximize";
 				obj_dir_mult[oname] = -1.0;
 			}
 			else if (sense.first == lt)
 			{
-				obj_names.push_back(oname);
+				obs_obj_names.push_back(oname);
 				obj_sense_map[oname] = "minimize";
 				obj_dir_mult[oname] = 1.0;
 			}
 		}
 
-		message(1, "'mou_objectives' not passed, using all nonzero weighted obs that use the proper obs group naming convention");
+		onames = pest_scenario.get_ctl_ordered_pi_names();
+		for (auto oname : onames)
+		{
+			if (pest_scenario.get_prior_info().get_pi_rec_ptr(oname).get_weight() == 0.0)
+				continue;
+			sense = Constraints::get_sense_from_group_name(pest_scenario.get_prior_info().get_pi_rec_ptr(oname).get_group());
+			if (sense.first == gt)
+			{
+				pi_obj_names.push_back(oname);
+				obj_sense_map[oname] = "maximize";
+				obj_dir_mult[oname] = -1.0;
+			}
+			else if (sense.first == lt)
+			{
+				pi_obj_names.push_back(oname);
+				obj_sense_map[oname] = "minimize";
+				obj_dir_mult[oname] = 1.0;
+			}
+		}
+
+		message(1, "'mou_objectives' not passed, using all nonzero weighted obs and prior info eqs that use the proper obs group naming convention");
 	}
 	else
 	{
 		vector<string> onames = pest_scenario.get_ctl_ordered_nz_obs_names();
 		set<string> oset(onames.begin(), onames.end());
+		onames = pest_scenario.get_ctl_ordered_pi_names();
+		set<string> pinames(onames.begin(), onames.end());
 		onames.clear();
-		vector<string> missing,keep,err_sense;
-		for (auto obj_name : obj_names)
+		vector<string> missing,keep_obs, keep_pi,err_sense;
+		for (auto obj_name : obs_obj_names)
 		{
-			if (oset.find(obj_name) == oset.end())
+			if ((oset.find(obj_name) == oset.end()) && (pinames.find(obj_name) == pinames.end()))
 				missing.push_back(obj_name);
-			else
+			else if (oset.find(obj_name) != oset.end())
 			{
 				sense = Constraints::get_sense_from_group_name(pest_scenario.get_ctl_observation_info().get_group(obj_name));
 				if ((sense.first != gt) && (sense.first != lt))
@@ -865,17 +916,39 @@ void MOEA::initialize()
 				{
 					if (sense.first == gt)
 					{
-						keep.push_back(obj_name);
+						keep_obs.push_back(obj_name);
 						obj_sense_map[obj_name] = "maximize";
 						obj_dir_mult[obj_name] = -1.0;
 					}
 					else if (sense.first == lt)
 					{
-						keep.push_back(obj_name);
+						keep_obs.push_back(obj_name);
 						obj_sense_map[obj_name] = "minimize";
 						obj_dir_mult[obj_name] = 1.0;
 					}
 					
+				}
+			}
+			else
+			{
+				sense = Constraints::get_sense_from_group_name(pest_scenario.get_prior_info().get_pi_rec_ptr(obj_name).get_group());
+				if ((sense.first != gt) && (sense.first != lt))
+					err_sense.push_back(obj_name);
+				else
+				{
+					if (sense.first == gt)
+					{
+						keep_pi.push_back(obj_name);
+						obj_sense_map[obj_name] = "maximize";
+						obj_dir_mult[obj_name] = -1.0;
+					}
+					else if (sense.first == lt)
+					{
+						keep_pi.push_back(obj_name);
+						obj_sense_map[obj_name] = "minimize";
+						obj_dir_mult[obj_name] = 1.0;
+					}
+
 				}
 			}
 		}
@@ -887,34 +960,51 @@ void MOEA::initialize()
 				ss << e << ";";
 			throw_moea_error(ss.str());
 		}
-		if (keep.size() == 0)
+		if (keep_obs.size() == 0)
 		{
-			throw_moea_error("none of the supplied 'mou_objectives' were found in the zero-weighted observations");
+			throw_moea_error("none of the supplied observation-based 'mou_objectives' were found in the zero-weighted observations");
 		}
 		
 		else if (missing.size() > 0)
 		{
 			ss.str("");
-			ss << "WARNING: the following mou_objectives were not found in the zero-weighted observations: ";
+			ss << "WARNING: the following mou_objectives were not found in the zero-weighted observations or prior info eqs: ";
 			for (auto m : missing)
 				ss << m << ",";
 			message(1, ss.str());
 
 		}
-		obj_names = keep;
+		obs_obj_names = keep_obs;
+		pi_obj_names = keep_pi;
 	}
 
 	ss.str("");
 	ss << "...using the following observations as objectives: " << endl;
-	for (auto s : obj_sense_map)
+	for (auto name : obs_obj_names)
 	{
-		ss << setw(30) << s.first << "   " << s.second << endl;
+		ss << setw(30) << name << "   " << obj_sense_map[name] << endl;
 	}
 	file_manager.rec_ofstream() << ss.str();
 	cout << ss.str();
 
-	if (obj_names.size() > 5)
+	if (pi_obj_names.size() > 0)
+	{
+		ss.str("");
+		ss << "...using the following prior info eqs as objectives: " << endl;
+		for (auto name : pi_obj_names)
+		{
+			ss << setw(30) << name << "   " << obj_sense_map[name] << endl;
+		}
+		file_manager.rec_ofstream() << ss.str();
+		cout << ss.str();
+
+	}
+	
+	if (obs_obj_names.size() + pi_obj_names.size() > 5)
 		message(1, "WARNING: more than 5 objectives, this is pushing the limits!");
+
+
+	//TODO: report constraints being applied
 
 	sanity_checks();
 
@@ -1070,7 +1160,7 @@ void MOEA::initialize()
 
 	//do an initial pareto dominance sort
 	message(1, "performing initial pareto dominance sort");
-	DomPair dompair = objectives.pareto_dominance_sort(obj_names, op, dp, obj_dir_mult);
+	DomPair dompair = objectives.pareto_dominance_sort(obs_obj_names, pi_obj_names, op, dp, obj_dir_mult);
 	
 	//initialize op and dp archives
 	op_archive = ObservationEnsemble(&pest_scenario, &rand_gen, 

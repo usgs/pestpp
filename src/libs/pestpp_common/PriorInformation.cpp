@@ -80,7 +80,7 @@ double PriorInformationRec::calc_residual(const Parameters &pars) const
 }
 
 
-pair<double,double> PriorInformationRec::calc_residual_and_sim_val(const Parameters &pars) const
+pair<double,double> PriorInformationRec::calc_sim_and_resid(const Parameters &pars) const
 {
 	double sim_value = 0;
 	double par_value;
