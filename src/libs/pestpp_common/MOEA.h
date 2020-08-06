@@ -117,9 +117,9 @@ private:
 	bool initialize_dv_population();
 	void initialize_obs_restart_population();
 
-	void generate_nsga2_member();
-	void generate_de_member();
-	void generate_spea2_member();
+	ParameterEnsemble generate_diffevol_population(int num_members, ParameterEnsemble& _dp);
+
+	string get_new_member_name(string tag = string());
 
 };
 

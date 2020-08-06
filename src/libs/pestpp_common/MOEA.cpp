@@ -1429,3 +1429,59 @@ void MOEA::initialize_obs_restart_population()
 
 
 }
+
+ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterEnsemble& _dp)
+{
+	vector<int> member_count,working_count, selected;
+	for (int i = 0; i < _dp.shape().first; i++)
+		member_count.push_back(i);
+
+	Eigen::VectorXd diff, y, x;
+	double F = 1.2, CR = 0.5, R;
+	vector<double> cr_vals;
+	Eigen::MatrixXd new_reals(num_members, _dp.shape().second);
+	new_reals.setZero();
+	_dp.transform_ip(ParameterEnsemble::transStatus::NUM);
+	vector<string> new_member_names;
+	for (int i = 0; i < num_members; i++)
+	{
+		working_count = member_count;
+		shuffle(working_count.begin(), working_count.end(), rand_gen);
+		selected.clear();
+		//TODO: make sure 'i' isnt in selected
+		for (int ii = 0; ii < 3; ii++)
+			selected.push_back(working_count[ii]);
+
+		diff =  _dp.get_eigen_ptr()->row(selected[0]) - _dp.get_eigen_ptr()->row(selected[1]);
+		y = _dp.get_eigen_ptr()->row(selected[2]) + (F * diff);
+		x = _dp.get_eigen_ptr()->row(i);
+		cr_vals = uniform_draws(_dp.shape().second, 0.0, 1.0, rand_gen);
+		//TODO: work on R for single trait cross over
+		for (int ii = 0; ii < _dp.shape().second; ii++)
+		{
+			if (cr_vals[ii] >= CR)
+			{
+				y[ii] = x[ii];
+			}
+		}
+		new_member_names.push_back(get_new_member_name("diffevol"));
+		new_reals.row(i) = y;
+	}
+
+	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
+	new_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
+	
+	return new_dp;
+}
+
+string MOEA::get_new_member_name(string tag)
+{
+	stringstream ss;
+	ss << "gen_" << iter << "_member_" << member_count;
+	if (tag.size() > 0)
+	{
+		ss << "_" << tag;
+	}
+	member_count++;
+	return ss.str();
+}
