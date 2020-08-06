@@ -1580,6 +1580,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	}
 
 	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
+	new_dp.enforce_limits(performance_log, false);
 	new_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
 	
 	return new_dp;
