@@ -92,13 +92,18 @@ def srn(x):
 
 
 def zdt_helper(func):
-    pdf = pd.read_csv("dv.dat",delim_whitespace=True,index_col=0)
-    lhs = func(pdf.values)
-    with open("obj.dat",'w') as f:
-        f.write("obj_1 {0}\n".format(float(lhs[0])))
-        f.write("obj_2 {0}\n".format(float(lhs[1])))
+    pdf = pd.read_csv("dv.dat",delim_whitespace=True,index_col=0, header=None, names=["parnme","parval1"])
+    obj1,obj2 = func(pdf.values)
+    if os.path.exists("additive_par.dat"):
+        cdf = pd.read_csv("additive_par.dat", delim_whitespace=True, index_col=0,header=None, names=["parnme","parval1"])
+        obj1[0] += cdf.parval1.values[0]
+        obj2[0] += cdf.parval1.values[1]
 
-def setup_zdt_problem(name,num_dv):
+    with open("obj.dat",'w') as f:
+        f.write("obj_1 {0}\n".format(float(obj1)))
+        f.write("obj_2 {0}\n".format(float(obj2)))
+
+def setup_zdt_problem(name,num_dv,additive_chance=False):
     test_d = os.path.join(test_root,"{0}_template".format(name))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
@@ -110,6 +115,19 @@ def setup_zdt_problem(name,num_dv):
         f.write("ptf ~\n")
         for i in range(num_dv):
             f.write("dv_{0} ~ dv_{0}     ~\n".format(i))
+    
+    additive_chance_tpl_file = None
+    if additive_chance:
+        additive_chance_tpl_file = "additive_par.dat.tpl"
+        with open(os.path.join(test_d,additive_chance_tpl_file),'w') as f:
+            f.write("ptf ~\n")
+            f.write("obj1_add_par ~   obj1_add_par   ~\n")
+            f.write("obj2_add_par ~   obj2_add_par   ~\n")
+
+        with open(os.path.join(test_d,additive_chance_tpl_file.replace(".tpl","")),'w') as f:
+            f.write("obj1_add_par 0.0\n")
+            f.write("obj2_add_par 0.0\n")
+            
     with open(os.path.join(test_d,tpl_file.replace(".tpl","")),'w') as f:
         for i in range(num_dv):
             f.write("dv_{0} 0.5\n".format(i))
@@ -152,7 +170,7 @@ def setup_zdt_problem(name,num_dv):
 
     # write these functions to the forward run script
     with open(os.path.join(test_d,"forward_run.py"),'w') as f:
-        f.write("import numpy as np\nimport pandas as pd\n")
+        f.write("import os\nimport numpy as np\nimport pandas as pd\n")
         for func_line in func_lines:
             f.write(func_line)
         for helper_line in helper_lines:
@@ -162,22 +180,39 @@ def setup_zdt_problem(name,num_dv):
 
     # make sure it runs
     pyemu.os_utils.run("python forward_run.py",cwd=test_d)
-
+  
     # create the control file
     tpl_file = os.path.join(test_d,tpl_file)
     ins_file = os.path.join(test_d,ins_file)
     pst = pyemu.Pst.from_io_files(tpl_files=tpl_file,in_files=tpl_file.replace(".tpl",""),
                                    ins_files=ins_file,out_files=ins_file.replace(".ins",""),pst_path=".")
+
     par = pst.parameter_data
     par.loc[:,"parubnd"] = 1.0
     par.loc[:,"parlbnd"] = 0.0
     par.loc[:,"partrans"] = "none"
     par.loc[:,"parval1"] = 0.5
+    par.loc[:,"pargp"] = "decvars"
+    if additive_chance_tpl_file is not None:
+        adf = pst.add_parameters(os.path.join(test_d,additive_chance_tpl_file),pst_path=".")
+        print(adf)
+        
+        par = pst.parameter_data
+        par.loc[adf.parnme,"partrans"] = "none"
+        par.loc[adf.parnme,"parubnd"] = 1.0
+        par.loc[adf.parnme,"parval1"] = 0.0
+        par.loc[adf.parnme,"parlbnd"] = -1.0
+        par.loc[adf.parnme,"parchglim"] = "relative"
+        par.loc[adf.parnme,"pargp"] = "obj_add"
+        pst.rectify_pgroups()
+        pst.parameter_groups.loc["obj_add","inctyp"] = "absolute"
+
 
     obs = pst.observation_data
     obs.loc[:,"weight"] = 1.0
     obs.loc[:,"obgnme"] = "less_than_obj" # all these zdt probs are min-min
 
+    pst.pestpp_options["opt_dec_var_groups"] = "decvars"
     pst.model_command = "python forward_run.py"
     pst.control_data.noptmax = 0
     pst.write(os.path.join(test_d,name+".pst"))
@@ -189,19 +224,34 @@ def setup_zdt_problem(name,num_dv):
     assert pst.phi < 1.0e-10
     return test_d
 
-def test_zdt1():
+def test_zdt1(additive_chance=True):
     test_case = "zdt1"
-    test_d = setup_zdt_problem(test_case,30)
+    test_d = setup_zdt_problem(test_case,30,additive_chance=additive_chance)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
-    pst.control_data.noptmax = -1
-    pst.pestpp_options["mou_population_size"] = 200
+    pst.control_data.noptmax = 1
+    pst.pestpp_options["mou_population_size"] = 20
+    if additive_chance:
+        pst.pestpp_options["opt_risk"] = 0.95
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
     master_d = test_d.replace("template","master")
     pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
                                   num_workers=15, master_dir=master_d,worker_root=test_root,
                                   port=port)
+
+    #TODO: need some asserts here
+    if (additive_chance):
+        pst.pestpp_options["opt_stack_size"] = 15
+        pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
+        pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
+                                      num_workers=15, master_dir=master_d,worker_root=test_root,
+                                      port=port)
+
+        #TODO: need some asserts here
+
     
+    # remove this for now since chances and restart arent supported yet
+    pst.pestpp_options.pop("opt_risk",None)
 
     dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
     assert os.path.exists(os.path.join(master_d,dv_pop_file)),dv_pop_file
@@ -248,6 +298,8 @@ def test_sorting_fake_problem():
 
     with open(os.path.join(test_d,"par.tpl"),'w') as f:
         f.write("ptf ~\n ~   par1    ~\n")
+        f.write("~   par2    ~\n")
+        
     with open(os.path.join(test_d,"obs.ins"),'w') as f:
         f.write("pif ~\n")
         for i in range(6): # the number of objs in the test
@@ -257,20 +309,19 @@ def test_sorting_fake_problem():
     obs.loc[:,"obgnme"] = "less_than_obj"
     obs.loc[:,"obsval"] = 0.0
     obs.loc[:,"weight"] = 1.0
+    
+    par = pst.parameter_data
+    par.loc[:,"partrans"] = "none"
+    par.loc[:,"parval1"] = 1.0
+    par.loc[:,"parubnd"] = 1.5
+    par.loc[:,"parlbnd"] = 0.5
+
     pst.control_data.noptmax = -1
     np.random.seed(111)
+
     pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst=pst,num_reals=50)
     oe = pyemu.ObservationEnsemble.from_gaussian_draw(pst=pst,num_reals=50)
-    
-    # add some non dom soutions
 
-    # org_min = oe.min(axis=0)
-    # # min for first obj, tied for others
-    # oe.loc[0,pst.obs_names[0]] = -10
-    # for o in pst.obs_names[1:]:
-    #     oe.loc[0,o] = org_min[o]
-    
-       
     pe.to_csv(os.path.join(test_d,"par.csv"))
     oe.to_csv(os.path.join(test_d,"obs.csv"))
     pst.pestpp_options["mou_dv_population_file"] = "par.csv"
@@ -278,6 +329,19 @@ def test_sorting_fake_problem():
     pst.write(os.path.join(test_d,"test.pst"))
     pyemu.os_utils.run("{0} test.pst".format(exe_path),cwd=test_d)
 
+    cov = pyemu.Cov.from_parameter_data(pst).to_2d()
+    cov.x[0,1] = 0.0001
+    cov.x[1,0] = 0.0001
+
+
+    pyemu.helpers.first_order_pearson_tikhonov(pst=pst,cov=cov,abs_drop_tol=0.0)
+    print(pst.prior_information)
+    #pst.prior_information = pst.prior_information.loc[["pcc_3"],:]
+    pi = pst.prior_information
+    pi.loc["pcc_1","equation"] = pi.loc["pcc_1","equation"].replace("= 0.0","= 1.0").replace(" - "," + ")
+    pi.loc[:,"obgnme"] = "less_than_pi"
+    pst.write(os.path.join(test_d,"test.pst"))
+    pyemu.os_utils.run("{0} test.pst".format(exe_path),cwd=test_d)
 
 
 if __name__ == "__main__":
@@ -288,7 +352,8 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt3",30)
     # setup_zdt_problem("zdt4",10)
     # setup_zdt_problem("zdt6",10)
-    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
     #test_zdt1()
+    #setup_zdt_problem("zdt1",30, additive_chance=True)
     test_sorting_fake_problem()

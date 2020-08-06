@@ -1255,8 +1255,8 @@ void IterEnsembleSmoother::initialize()
 		message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
 		message(1, "calculating mean parameter values");
 		Parameters pars;
-		vector<double> mv = pe.get_mean_stl_vector();
-		pars.update(pe.get_var_names(), pe.get_mean_stl_vector());
+		vector<double> mv = pe.get_mean_stl_var_vector();
+		pars.update(pe.get_var_names(), pe.get_mean_stl_var_vector());
 		ParamTransformSeq pts = pe.get_par_transform();
 
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);

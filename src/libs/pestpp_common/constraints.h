@@ -42,10 +42,10 @@ public:
 	void add_runs(RunManagerAbstract* run_mgr_ptr);
 
 	//queue up chance related runs at several points in dev var space
-	void add_runs_at_multiple_points(RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& pe, vector<string> only_reals = vector<string>());
+	//void add_runs_at_multiple_points(RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& pe, vector<string> only_reals = vector<string>());
 
 	//shift the constraint columns of an obs ensemble in place, potentially accounting for multiple-point dec var evals
-	void risk_shift_obs_en_ip(ObservationEnsemble& oe);
+	//void risk_shift_obs_en_ip(ObservationEnsemble& oe);
 	
 	//get the (risk-shifted) distance to constraints (upper and lower bounds)
 	pair<vector<double>,vector<double>> get_constraint_bound_vectors();
@@ -66,7 +66,7 @@ public:
 
 	//get maps of obs and pi constraints that are not satified - the value is the distance to cosntraint RHS
 	map<string, double> get_unsatified_pi_constraints(Parameters& par_and_dec_vars, double tol=0.0);
-	map<string, double> get_unsatified_obs_constraints(Observations& constraints_sim, double tol=0.0);
+	map<string, double> get_unsatified_obs_constraints(Observations& constraints_sim, double tol=0.0, bool do_shift = true);
 	
 	//get the number of non-zero Prior info constraint elements
 	int get_num_nz_pi_constraint_elements();
@@ -100,6 +100,11 @@ public:
 
 	//workout a constraints sense
 	static pair<ConstraintSense, string> get_sense_from_group_name(const string& name);
+
+	//get risk-shifted simulated constraint values using current_constraints_sim_ptr
+	Observations get_chance_shifted_constraints();
+	//get risk-shifted simulated constraint values using _constraints_sim arg
+	Observations get_chance_shifted_constraints(Observations& _constraints_sim);
 
 private:
 	Pest& pest_scenario;
@@ -149,10 +154,7 @@ private:
 	pair<vector<double>, vector<double>> current_bounds;
 
 	
-	//get risk-shifted simulated constraint values using current_constraints_sim_ptr
-	Observations get_chance_shifted_constraints();
-	//get risk-shifted simulated constraint values using _constraints_sim arg
-	Observations get_chance_shifted_constraints(Observations& _constraints_sim);
+	
 
 	//get the (risk-shifted) residual (distance) vector between constraints RHS and sim arg
 	vector<double> get_constraint_residual_vec(Observations& sim);
