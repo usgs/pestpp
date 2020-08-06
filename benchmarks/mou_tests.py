@@ -289,6 +289,15 @@ def test_zdt1(additive_chance=False):
     assert obs_df.shape[1] == pst.nobs
     assert dv_df.index.to_list() == obs_df.index.to_list()
 
+    # pst.pestpp_options = {"mou_population_size":200}
+    # pst.control_data.noptmax = 100
+    # pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
+    # #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
+    # master_d = test_d.replace("template","master")
+    # pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
+    #                               num_workers=25, master_dir=master_d,worker_root=test_root,
+    #                               port=port)
+
 
 def test_sorting_fake_problem():
     test_d = os.path.join(test_root,"sorting_test")

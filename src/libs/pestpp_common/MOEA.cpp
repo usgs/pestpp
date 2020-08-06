@@ -1613,7 +1613,7 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 	fname = ss.str();
 	op.to_csv(fname);
 	ss.str("");
-	ss << "saved observation population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << fname << "'";
+	ss << "saved observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << fname << "'";
 	message(1, ss.str());
 
 }
