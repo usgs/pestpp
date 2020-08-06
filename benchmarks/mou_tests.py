@@ -224,7 +224,7 @@ def setup_zdt_problem(name,num_dv,additive_chance=False):
     assert pst.phi < 1.0e-10
     return test_d
 
-def test_zdt1(additive_chance=True):
+def test_zdt1(additive_chance=False):
     test_case = "zdt1"
     test_d = setup_zdt_problem(test_case,30,additive_chance=additive_chance)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
@@ -354,6 +354,6 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt6",10)
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
-    #test_zdt1()
+    test_zdt1()
     #setup_zdt_problem("zdt1",30, additive_chance=True)
-    test_sorting_fake_problem()
+    #test_sorting_fake_problem()

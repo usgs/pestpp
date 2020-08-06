@@ -117,9 +117,13 @@ private:
 	bool initialize_dv_population();
 	void initialize_obs_restart_population();
 
+	ParameterEnsemble generate_population();
+
 	ParameterEnsemble generate_diffevol_population(int num_members, ParameterEnsemble& _dp);
 
 	string get_new_member_name(string tag = string());
+
+	void save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag = string());
 
 };
 

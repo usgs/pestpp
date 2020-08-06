@@ -21,7 +21,8 @@ ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_mana
 
 }
 
-pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(const vector<string>& obs_obj_names, const vector<string>& pi_obj_names, ObservationEnsemble& op, ParameterEnsemble& dp, map<string, double>& obj_dir_mult)
+pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(const vector<string>& obs_obj_names, const vector<string>& pi_obj_names, 
+	ObservationEnsemble& op, ParameterEnsemble& dp, map<string, double>& obj_dir_mult)
 {
 	stringstream ss;
 	ss << "ParetoObjectives::pareto_dominance_sort() for " << op.shape().first << " population members";
@@ -491,12 +492,12 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		throw_moea_error(ss.str());
 	}
 
-	//check that solutions in nondominated solution in dompair.first are not in the archive already
+	//check that members of _op arent in the archive already
 	vector<string> keep, temp = op.get_real_names();
 	set<string> archive_members(temp.begin(), temp.end());
 	for (auto& member : _op.get_real_names())
 	{
-		if (archive_members.find(member) != archive_members.end())
+		if (archive_members.find(member) == archive_members.end())
 			keep.push_back(member);
 	}
 	if (keep.size() == 0)
@@ -513,7 +514,7 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	other = _dp.get_eigen(keep, vector<string>());
 	dp_archive.append_other_rows(keep, other);
 	other.resize(0, 0);
-	performance_log->log_event("archive pareto sort");
+	message(2, "pareto dominance sorting archive of size", op_archive.shape().first);
 	DomPair dompair = objectives.pareto_dominance_sort(obs_obj_names, pi_obj_names, op_archive, dp_archive, obj_dir_mult);
 	
 	ss.str("");
@@ -534,7 +535,8 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		op_archive.keep_rows(keep);
 		dp_archive.keep_rows(keep);
 	}
-	
+
+	save_populations(dp_archive, op_archive, "archive");
 }
 
 
@@ -746,6 +748,12 @@ void MOEA::initialize()
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
 
+	//define these here to make sure the iter loop later behaves
+	iter = 0;
+	member_count = 0;
+
+	warn_min_members = 20;
+	error_min_members = 4;
 	
 
 	if (pest_scenario.get_control_info().noptmax == 0)
@@ -878,17 +886,10 @@ void MOEA::initialize()
 		dv_names = act_par_names;
 	}
 
-
-	iter = 0;
-	member_count = 0;
-	
-	warn_min_members = 20;
-	error_min_members = 4;
-	
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
-	
 
+	//some risk-based stuff here
 	string chance_points = ppo->get_mou_chance_points();
 	if (chance_points == "ALL")
 	{
@@ -1179,13 +1180,13 @@ void MOEA::initialize()
 		ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag << ".csv";
 		dp.to_csv(ss.str());
 		message(1, "saved initial dv population to ", ss.str());
-		performance_log->log_event("running initial ensemble");
-		message(1, "running initial ensemble of size", dp.shape().first);
-		
+		performance_log->log_event("running initial population");
+		message(1, "running initial population of size", dp.shape().first);
+	
 		vector<int> failed = run_population(dp, op);
 		if (dp.shape().first == 0)
 			throw_moea_error(string("all members failed during initial population evaluation"));
-		//TODO: process risk runs, shift obj and constraint values
+		
 		dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
 	ss.str("");
@@ -1255,23 +1256,90 @@ void MOEA::initialize()
 }
 
 
+ParameterEnsemble MOEA::generate_population()
+{
+	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
+	//add new members for any missing
+	num_members += (num_members - dp.shape().first);
+
+	//TODO: work out which generator to use
+	return generate_diffevol_population(num_members, dp);
+
+}
+
 void MOEA::iterate_to_solution()
 {
+	iter = 1;
+	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
+	vector<string> keep;
+	stringstream ss;
+	while(iter <= pest_scenario.get_control_info().noptmax)
+	{
+		message(0, "starting iteration", iter);
 
-	//for iter in noptmax
 		//generate offspring
+		ParameterEnsemble new_dp = generate_population();
+		
+		//run offspring thru the model while also running risk runs, possibly at many points in dec var space	
+		ObservationEnsemble new_op(&pest_scenario, &rand_gen);
+		new_op.reserve(new_dp.get_real_names(), op.get_var_names());
+		run_population(new_dp, new_op);
+		
+		
 
-		//run offspring thru the model while also running risk runs, possibly at many points in dec var space
-
-		//risk shift obj and constraint values, updating op in place
+		//and risk-shift
+		ObservationEnsemble new_op_shifted = get_risk_shifted_op(new_op);
+			
+		//TODO: save new_dp, new_op and new_op_shifted?
 
 		//append offspring dp and (risk-shifted) op to make new dp and op containers
+		new_dp.append_other_rows(dp);
+		new_op.append_other_rows(op);
 
-		//sort according to pareto dominance, crowding distance, and, eventually, feasibility
+		//sort according to pareto dominance, crowding distance, and, optionally, feasibility
+		message(1, "pareto dominance sorting combined parent-child populations");
+		DomPair dompair = objectives.pareto_dominance_sort(obs_obj_names, pi_obj_names, new_op, new_dp, obj_dir_mult);
 
 		//drop shitty members
+		//TODO: this is just a cheap hack, prob something more meaningful to be done...
+		keep.clear();
+		for (auto nondom : dompair.first)
+		{
+			if (keep.size() >= num_members)
+				break;
+			keep.push_back(nondom);
+			
+		}
 
+		if (keep.size() > 0)
+		{
+			//update the archive of nondom members
+			ParameterEnsemble new_dp_nondom = new_dp;
+			new_dp_nondom.keep_rows(keep);
+			ObservationEnsemble new_op_nondom = new_op;
+			new_op_nondom.keep_rows(keep);
+			update_archive(new_op_nondom, new_dp_nondom);
+		}
 
+		//now fill out the rest of keep with dom solutions
+		for (auto dom : dompair.second)
+		{
+			if (keep.size() >= num_members)
+				break;
+			keep.push_back(dom);
+
+		}
+		
+		message(1, "resizing current populations to ", keep.size());
+		new_dp.keep_rows(keep);
+		new_op.keep_rows(keep);
+		dp = new_dp;
+		op = new_op;
+
+		save_populations(dp, op);
+
+		iter++;
+	}
 
 }
 
@@ -1432,36 +1500,79 @@ void MOEA::initialize_obs_restart_population()
 
 ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterEnsemble& _dp)
 {
-	vector<int> member_count,working_count, selected;
+	message(1, "generating diffevol population of size", num_members);
+	vector<int> member_count,working_count, selected, r_int_vec;
 	for (int i = 0; i < _dp.shape().first; i++)
 		member_count.push_back(i);
 
-	Eigen::VectorXd diff, y, x;
-	double F = 1.2, CR = 0.5, R;
+	for (int i = 0; i < dv_names.size(); i++)
+		r_int_vec.push_back(i);
+
+
+	Eigen::VectorXd y, x, diff;
+	double F = pest_scenario.get_pestpp_options().get_de_f();
+	double CR = pest_scenario.get_pestpp_options().get_de_cr();
+	double R;
+	
 	vector<double> cr_vals;
 	Eigen::MatrixXd new_reals(num_members, _dp.shape().second);
 	new_reals.setZero();
 	_dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 	vector<string> new_member_names;
+	
+	//since _dp migth contain both dev vars and pars, we want to 
+	//make sure we are only fooling with dec vars
+	//the var_map lets us map between dv name and col index
+
+	_dp.update_var_map();
+	map<string, int> var_map = _dp.get_var_map();
+	string dv_name;
+	int ii;
+	int i_last;
 	for (int i = 0; i < num_members; i++)
 	{
 		working_count = member_count;
 		shuffle(working_count.begin(), working_count.end(), rand_gen);
 		selected.clear();
-		//TODO: make sure 'i' isnt in selected
-		for (int ii = 0; ii < 3; ii++)
-			selected.push_back(working_count[ii]);
 
-		diff =  _dp.get_eigen_ptr()->row(selected[0]) - _dp.get_eigen_ptr()->row(selected[1]);
-		y = _dp.get_eigen_ptr()->row(selected[2]) + (F * diff);
-		x = _dp.get_eigen_ptr()->row(i);
-		cr_vals = uniform_draws(_dp.shape().second, 0.0, 1.0, rand_gen);
-		//TODO: work on R for single trait cross over
-		for (int ii = 0; ii < _dp.shape().second; ii++)
+		i_last = 0;
+		while (true)
 		{
-			if (cr_vals[ii] >= CR)
+			i_last += 1;
+			if (i_last > working_count.size())
+				throw_moea_error("MOEA::generate_diffevol_population(): internal error seeking random population members for differntial");
+			if (i_last == i)
+				continue;
+			selected.push_back(working_count[i_last]);
+			if (selected.size() == 3)
+				break;
+		}
+
+		//differential vector
+		diff = _dp.get_eigen_ptr()->row(selected[0]) + (F * (_dp.get_eigen_ptr()->row(selected[1]) - _dp.get_eigen_ptr()->row(selected[2])));
+
+		//current member if in range, otherwise, select randomly
+		if (i < _dp.shape().first)
+			x = _dp.get_eigen_ptr()->row(i);
+		else
+			//this risks "inbreeding" but maybe thats good?!
+			x = _dp.get_eigen_ptr()->row(working_count[i_last]);
+		//copy to perserve non-dec var values;
+		y = x; 
+		//random cross over probs - one per decision variable
+		cr_vals = uniform_draws(_dp.shape().second, 0.0, 1.0, rand_gen);
+		
+		//get the R values for this member;
+		shuffle(r_int_vec.begin(), r_int_vec.end(), rand_gen);
+		R = r_int_vec[0];
+
+		//only change dec vars
+		for(int idv=0;idv<dv_names.size();idv++)
+		{
+			ii = var_map[dv_names[idv]];
+			if ((cr_vals[ii] < CR) || (ii == R))
 			{
-				y[ii] = x[ii];
+				y[ii] = diff[ii];
 			}
 		}
 		new_member_names.push_back(get_new_member_name("diffevol"));
@@ -1473,6 +1584,38 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	
 	return new_dp;
 }
+
+void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag)
+{
+	stringstream ss;
+	string fname;
+	ss << file_manager.get_base_filename() << "." << iter ;
+	if (tag.size() > 0)
+	{
+		ss << "." << tag;
+	}
+	ss << "." << dv_pop_file_tag << ".csv";
+	fname = ss.str();
+	dp.to_csv(fname);
+	ss.str("");
+	ss << "saved decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << fname << "'";
+	message(1, ss.str());
+	
+	ss.str("");
+	ss << file_manager.get_base_filename() << "." << iter;
+	if (tag.size() > 0)
+	{
+		ss << "." << tag;
+	}
+	ss << "." << obs_pop_file_tag << ".csv";
+	fname = ss.str();
+	op.to_csv(fname);
+	ss.str("");
+	ss << "saved observation population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << fname << "'";
+	message(1, ss.str());
+
+}
+
 
 string MOEA::get_new_member_name(string tag)
 {

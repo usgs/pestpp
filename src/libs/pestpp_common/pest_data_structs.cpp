@@ -1302,8 +1302,8 @@ void PestppOptions::set_defaults()
 	set_base_lambda_vec(vector<double>{ 0.1, 1.0, 10.0, 100.0, 1000.0 });
 	set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1});
 	set_global_opt(PestppOptions::GLOBAL_OPT::NONE);
-	set_de_cr(0.9);
-	set_de_f(0.8);
+	set_de_cr(0.6);
+	set_de_f(0.7);
 	set_de_dither_f(true);
 	set_de_npopulation(40);
 	set_de_max_gen(100);
