@@ -1099,7 +1099,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					ss.str("");
 					ss << "unrecognized '* control data keyword' key-value pair on line: " << endl << "    '" << line << "'" <<  endl;
 					throw_control_file_error(f_rec, ss.str(), false);
-				}		
+					cout << ss.str();
+				}
+				
 			}
 
 			else if (section == "CONTROL DATA")

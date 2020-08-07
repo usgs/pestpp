@@ -144,6 +144,7 @@ private:
 
 	//bool solve_old();
 	bool solve_new();
+	bool solve_new_da();
 	void adjust_pareto_weight(string& obsgroup, double wfac);
 
 	//ParameterEnsemble calc_upgrade(vector<string> &obs_names, vector<string> &par_names,double lamb, int num_reals);

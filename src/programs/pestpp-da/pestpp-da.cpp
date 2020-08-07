@@ -350,7 +350,7 @@ int main(int argc, char* argv[])
 
 			Pest childPest;
 			childPest = pest_scenario.get_child_pest(*icycle);
-			vector <string> xxxx=childPest.get_ctl_ordered_par_names();
+			//vector <string> xxxx=childPest.get_ctl_ordered_par_names();
 			//childPest.get_pestpp_options.set_check_tplins(false);
 
 			// -----------------------------  
@@ -445,8 +445,7 @@ int main(int argc, char* argv[])
 			{
 				da.set_pe(curr_pe);
 			}
-
-			
+						
 			da.initialize(*icycle);
 
 			if (da.use_ies) // use ies

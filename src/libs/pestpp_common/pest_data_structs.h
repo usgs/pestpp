@@ -195,6 +195,81 @@ public:
 		obsgroup(""), niter_start(1), niter_gen(1), niter_fin(1) {};
 };
 
+
+class CtlPar_container
+{
+	/* A proposed class to simplify adding new control options*/
+public:
+	CtlPar_container() { ; };
+
+	// overload return data is impossible, so each function return different value. 
+	// Cons: user must know the type of the data before using it
+
+	
+	template<typename  T>
+	T get_value(string name);
+	
+	string get_svalue(string name);
+	int get_ivalue(string name);
+	double get_dvalue(string name);
+	bool get_bvalue(string name);
+	vector<double> get_vvalue(string name);
+
+	bool is_parameter(string name);
+	string get_type(string name);
+
+	void set_value(string name, bool val);
+	void set_value(string name, int val);
+	void set_value(string name, double val);
+	void set_value(string name, string val);
+	void set_value(string name, vector<double> val);
+
+private:
+	
+
+	std::unordered_map<string, int> int_parms = {
+		{ "DA_SUBSET_SIZE", 5 },
+		{ "DA_VERBOSE_LEVEL", 2 }
+	};
+
+	std::unordered_map<string, double> double_parms = {
+		{ "DA_BAD_PHI",1.0E300 },
+		{ "DA_BAD_PHI_SIGMA", 1.0E300 }
+	};
+
+	std::unordered_map<string, string> string_parms = {
+		{ "DA_OBSERVATION_ENSEMBLE", "" },
+		{"DA_RESTART_OBSERVATION_ENSEMBLE", ""},
+		{"DA_RESTART_PARAMETER_ENSEMBLE", ""}
+
+	};
+	std::unordered_map<string, bool> bool_parms = {
+		{ "DA_ADD_BASE", true },
+	    {"DA_ENFORCE_BOUNDS", true},
+		{"DA_USE_PRIOR_SCALING", true}
+
+	};
+	std::unordered_map<string, vector<double>> vector_parms
+	{
+		{"DA_LAMBDA_MULTS", {1.0}},
+		{"DA_SCALE_FAC", {1.0}},
+		{"DA_SVD_THRSH", {1e-3, 1e-4, 1e-5}}
+	    //LAMBDA_SCALE_FAC
+
+	};
+	// add map for vector or list data
+	/*
+	{"IES_INITIAL_LAMBDA", ?}
+	IES_LAMBDA_MULTS
+	LAMBDA_SCALE_FAC
+	ies_reg_factor double
+
+	*/
+
+	
+
+};
+
 class PestppOptions {
 public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
@@ -214,6 +289,7 @@ public:
 	//void parce_line(const string &line);
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
+	bool assign_DA_value_by_key(const string& key, const string& value, const string& org_value);
 	bool assign_value_by_key_continued(const string& key, const string& value, const string& org_value);
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
@@ -437,11 +513,19 @@ public:
 	void set_ies_save_rescov(bool _flag) { ies_save_rescov = _flag; }
 	double get_ies_pdc_sigma_distance() const { return ies_pdc_sigma_distance; }
 	void set_ies_pdc_sigma_distance(double distance) { ies_pdc_sigma_distance = distance; }
+
 	// DA parameters
+	CtlPar_container da_ctl_params;
 	void set_da_use_ies(bool _use) { da_use_ies = _use; }
 	bool get_da_use_ies() const { return da_use_ies; }
 	void set_da_mode(string _mode) { da_mode = _mode; }
-	string get_da_mode() const { return da_mode; }
+	string get_da_mode() const { return da_mode; }	
+	string get_da_par_csv()const { return da_par_csv; }
+	void set_da_par_csv(string _da_par_csv) { da_par_csv = _da_par_csv; }
+	int get_da_num_reals() const { return da_num_reals; }
+	void set_da_num_reals(int _da_num_reals) { da_num_reals = _da_num_reals; }
+	string get_da_obs_csv()const { return da_obs_csv; }
+	void set_da_obs_csv(string _da_obs_csv) { da_obs_csv = _da_obs_csv; }
 
 	// End of Data parameters
 
@@ -589,7 +673,7 @@ private:
 	vector<double> ies_lam_mults;
 	int ies_verbose_level;
 	bool ies_use_prior_scaling;
-	int ies_num_reals;
+	int ies_num_reals;	
 	double ies_bad_phi;
 	double ies_bad_phi_sigma;
 	bool ies_include_base;
@@ -628,6 +712,12 @@ private:
 	// Data Assimilation parameters
 	string da_mode;
 	bool da_use_ies;
+	string da_par_csv;
+	int da_num_reals;
+	string da_obs_csv;
+	string da_par_cycle_table;
+	string da_obs_cycle_table;
+	
 
 	// End of Data Assimilation Parameters
 
@@ -640,8 +730,6 @@ private:
 	double gsa_morris_delta;
 	string gsa_sobol_par_dist;
 
-	string da_par_cycle_table;
-	string da_obs_cycle_table;
 
 	bool panther_agent_restart_on_error;
 	int panther_agent_no_ping_timeout_secs;
@@ -694,6 +782,9 @@ private:
 ostream& operator<< (ostream& os, const SVDInfo& val);
 
 double draw_standard_normal(std::mt19937& rand_gen);
+
+
+
 
 
 #endif  /* PEST_DATAS_STRUCTS_H_ */

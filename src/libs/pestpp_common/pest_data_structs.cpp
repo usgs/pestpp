@@ -919,12 +919,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		convert_ip(value, ies_pdc_sigma_distance);
 	}
-	//DA parameters
-	else if (key == "DA_USE_IES")
-	{
-	 da_use_ies= pest_utils::parse_string_arg_to_bool(value);
-	}
-	// End of DA parameters
+	
 	else if (key == "GSA_METHOD")
 	{
 		convert_ip(value, gsa_method);
@@ -978,13 +973,114 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		fill_tpl_zeros = pest_utils::parse_string_arg_to_bool(value);
 	}
 	
+	else if (assign_DA_value_by_key(key, value, org_value))
+	{
+		// Read all DA parameters. 
+	}
 	else if (!assign_value_by_key_continued(key, value, org_value))
 	{
 
 		//throw PestParsingError(line, "Invalid key word \"" + key +"\"");
 		return ARG_STATUS::ARG_NOTFOUND;
 	}
+
+	
+	
 	return ARG_STATUS::ARG_ACCEPTED;
+}
+
+bool PestppOptions::assign_DA_value_by_key(const string& key, const string& value, const string& org_value)
+
+{
+	//DA parameters
+	if (key == "DA_USE_IES")
+	{
+		da_use_ies = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if ((key == "DA_PAR_EN") || (key == "DA_PARAMETER_ENSEMBLE"))
+	{
+		passed_args.insert("DA_PARAMETER_ENSEMBLE");
+		passed_args.insert("DA_PAR_EN");		
+		da_par_csv = org_value;
+		return true;
+	}
+	else if (key == "DA_PARAMETER_CYCLE_TABLE")
+	{
+		da_par_cycle_table = org_value;
+		return true;
+	}
+	else if (key == "DA_OBSERVATION_CYCLE_TABLE")
+	{
+		da_obs_cycle_table = org_value;
+		return true;
+	}
+	else if (key == "DA_NUM_REALS")
+	{
+		convert_ip(value, da_num_reals);
+		return true;
+	}
+	else if ((key == "DA_OBS_EN") || (key == "DA_OBSERVATION_ENSEMBLE"))
+	{
+		convert_ip(value, da_num_reals);
+		return true;
+	}
+
+	else if (da_ctl_params.is_parameter(key))
+		// this is a generic code to assign da data
+	{
+		string typ = da_ctl_params.get_type(key);
+		if (typ.compare("int") == 0)
+		{
+			int ival;
+			convert_ip(value, ival);
+			da_ctl_params.set_value(key, ival);
+			return true;
+		}
+		else if (typ.compare("string") == 0)
+		{
+			string ival;
+			convert_ip(value, ival);
+			da_ctl_params.set_value(key, ival);
+			return true;
+		}
+		else if (typ.compare("double") == 0)
+		{
+			double ival;
+			convert_ip(value, ival);
+			da_ctl_params.set_value(key, ival);
+			return true;
+		}
+		else if (typ.compare("bool") == 0)
+		{
+			bool ival;
+			ival = pest_utils::parse_string_arg_to_bool(value);			
+			da_ctl_params.set_value(key, ival);
+			return true;
+		}
+		else if (typ.compare("vector"))
+		{
+			vector <double> vval;
+			vval.clear();
+			vector<string> tok;
+			tokenize(value, tok, ",");
+			for (const auto& iscale : tok)
+			{
+				vval.push_back(convert_cp<double>(iscale));
+			}
+			da_ctl_params.set_value(key, vval);
+
+		}
+		else
+			return false;
+		
+
+	}
+
+	
+	
+	
+	return false;
 }
 
 
@@ -1017,16 +1113,7 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		glm_iter_mc = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
-	else if (key == "DA_PARAMETER_CYCLE_TABLE")
-	{
-		da_par_cycle_table = org_value;
-		return true;
-	}
-	else if (key == "DA_OBSERVATION_CYCLE_TABLE")
-	{
-		da_obs_cycle_table = org_value;
-		return true;
-	}
+	
 	else if (key == "PANTHER_DEBUG_LOOP")
 	{
 		panther_debug_loop = pest_utils::parse_string_arg_to_bool(value);
@@ -1036,7 +1123,7 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 	{
 		debug_check_paren_consistency = pest_utils::parse_string_arg_to_bool(value);
 		return true;
-	}
+	}	
 
 	return false;
 }
@@ -1343,6 +1430,8 @@ void PestppOptions::set_defaults()
 	set_da_use_ies(false);
 	set_da_par_cycle_table("");
 	set_da_obs_cycle_table("");
+	set_da_par_csv("");
+	set_da_num_reals(50);
 
 	// End of DA parameters
 	set_gsa_method("MORRIS");
@@ -1696,3 +1785,128 @@ double draw_standard_normal(std::mt19937& rand_gen)
 	double r = sqrt(-2.0 * log(v1));
 	return r * sin(2.0 * pi * v2);
 }
+
+
+
+template <typename  T>
+T CtlPar_container::get_value(string name) {
+	
+	if (!(int_parms.find(name) == int_parms.end()))
+	{
+		int ival;
+		ival = int_parms[name];
+		return ival;
+	}
+	/*
+	else if (!(string_parms.find(name) == string_parms.end()))
+	{
+		value = string_parms[name];
+		return value;
+	}
+
+	else if (!(double_parms.find(name) == double_parms.end()))
+	{
+		value = double_parms[name];
+		return value;
+	}*/
+
+	else if (!(bool_parms.find(name) == bool_parms.end()))
+	{
+		bool bvalue = bool_parms[name];
+		//value = bvalue;
+		return bvalue;
+	}
+	/*else
+	{
+		cout << "....... Unknow name ..........";
+		value = False;
+		return value;
+	}*/
+
+	
+}
+
+
+
+
+string CtlPar_container::get_svalue(string name)
+{
+	return string_parms[name];
+}
+
+int CtlPar_container::get_ivalue(string name)
+{
+	return int_parms[name];
+}
+
+double CtlPar_container::get_dvalue(string name)
+{
+	return double_parms[name];
+}
+
+bool CtlPar_container::get_bvalue(string name)
+{
+	return bool_parms[name];
+}
+
+vector<double> CtlPar_container::get_vvalue(string name)
+{
+	
+
+	return vector_parms[name];
+}
+
+
+void CtlPar_container::set_value(string name, string val)
+{
+	string_parms[name] = val;
+}
+
+void CtlPar_container::set_value(string name, vector<double> val)
+{
+	vector_parms[name] = val;
+}
+
+void CtlPar_container::set_value(string name, int val)
+{
+	int_parms[name] = val;
+}
+
+void CtlPar_container::set_value(string name, double val)
+{
+	double_parms[name] = val;
+}
+void CtlPar_container::set_value(string name, bool val)
+{
+	bool_parms[name] = val;
+}
+
+bool CtlPar_container::is_parameter(string name)
+{
+	if (!(int_parms.find(name) == int_parms.end()))
+		return true;
+	else if (!(string_parms.find(name) == string_parms.end()))
+		return true;
+	else if (!(double_parms.find(name) == double_parms.end()))
+		return true;
+	else if (!(bool_parms.find(name) == bool_parms.end()))
+		return true;
+	else if (!(vector_parms.find(name) == vector_parms.end()))
+		return true;
+	else
+		return false;
+}
+string CtlPar_container::get_type(string name)
+{
+	if (!(int_parms.find(name) == int_parms.end()))
+		return "int";
+	else if (!(string_parms.find(name) == string_parms.end()))
+		return "string";
+	else if (!(double_parms.find(name) == double_parms.end()))
+		return "double";
+	else if (!(bool_parms.find(name) == bool_parms.end()))
+		return "bool";
+	else
+		return "UNKNOWN";
+}
+;
