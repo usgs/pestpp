@@ -224,7 +224,7 @@ def setup_zdt_problem(name,num_dv,additive_chance=False):
     assert pst.phi < 1.0e-10
     return test_d
 
-def test_zdt1(additive_chance=True):
+def test_zdt1(additive_chance=False):
     test_case = "zdt1"
     test_d = setup_zdt_problem(test_case,30,additive_chance=additive_chance)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
@@ -288,6 +288,15 @@ def test_zdt1(additive_chance=True):
     assert obs_df.shape[0] == pst.pestpp_options["mou_population_size"] - 2
     assert obs_df.shape[1] == pst.nobs
     assert dv_df.index.to_list() == obs_df.index.to_list()
+
+    # pst.pestpp_options = {"mou_population_size":200}
+    # pst.control_data.noptmax = 100
+    # pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
+    # #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
+    # master_d = test_d.replace("template","master")
+    # pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
+    #                               num_workers=25, master_dir=master_d,worker_root=test_root,
+    #                               port=port)
 
 
 def test_sorting_fake_problem():
@@ -354,6 +363,6 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt6",10)
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
-    #test_zdt1()
+    test_zdt1()
     #setup_zdt_problem("zdt1",30, additive_chance=True)
-    test_sorting_fake_problem()
+    #test_sorting_fake_problem()
