@@ -113,6 +113,8 @@ private:
 	map<int,string> other_lines;
 	string pst_filename;
 
+	set<string> s_pargp, s_obgnme; 
+
 	pair<string, string> parse_keyword_line(ofstream &f_rec, const string &line);
 	void throw_control_file_error(ofstream& f_rec, const string &message, bool should_throw=true);
 	void check_report_assignment(ofstream& f_rec, PestppOptions::ARG_STATUS stat, const string &key, const string &org_value);

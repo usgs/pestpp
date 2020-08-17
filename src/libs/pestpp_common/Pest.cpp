@@ -1332,9 +1332,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						temp_tied_map[row_map["PARNME"]] = row_map["PARTIED"];
 				}
 				if (efiles_map.find(section) == efiles_map.end())
-					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
-				else
-					efiles_map[section].push_back(efile);
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>();
+				
+				efiles_map[section].push_back(efile);
 	
 			}
 			else if (section == "OBSERVATION GROUPS")
@@ -1365,9 +1365,10 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					tokens_to_obs_group_rec(f_rec, obs_group_tokens);
 				}
 				if (efiles_map.find(section) == efiles_map.end())
-					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
-				else
-					efiles_map[section].push_back(efile);
+				{
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>();
+				}	
+				efiles_map[section].push_back(efile);
 			}
 
 			else if (section == "OBSERVATION DATA")
@@ -1421,9 +1422,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				}
 
 				if (efiles_map.find(section) == efiles_map.end())
-					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
-				else
-					efiles_map[section].push_back(efile);
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>();
+				efiles_map[section].push_back(efile);
 			}
 
 			else if (section == "PRIOR INFORMATION")
@@ -1840,6 +1840,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		}
 	}
 
+	//clear temp containers
+	s_pargp.clear();
+	s_obgnme.clear();
 	
 
 	return 0;
@@ -2306,13 +2309,15 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 	ctl_parameter_info.insert(name, pi);
 	ctl_parameters.insert(name, pi.init_value);
 	
-	if (find(ctl_ordered_par_group_names.begin(), ctl_ordered_par_group_names.end(), pi.group) == ctl_ordered_par_group_names.end())
+	//if (find(ctl_ordered_par_group_names.begin(), ctl_ordered_par_group_names.end(), pi.group) == ctl_ordered_par_group_names.end())
+	if (s_pargp.find(pi.group) == s_pargp.end())
 	{
 		ParameterGroupRec pgr;
 		pgr.set_defaults();
 		pgr.set_name(pi.group);
 		base_group_info.insert_group(pi.group,pgr);
 		ctl_ordered_par_group_names.push_back(pi.group);
+		s_pargp.emplace(pi.group);
 	}
 	base_group_info.insert_parameter_link(name, pi.group);
 
@@ -2343,10 +2348,12 @@ void Pest::tokens_to_obs_group_rec(ofstream& f_rec, const vector<string>& tokens
 	}
 	ObservationGroupRec group_rec;
 	observation_info.groups[name] = group_rec;
-	vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
-	if (is == ctl_ordered_obs_group_names.end())
+	//vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
+	//if (is == ctl_ordered_obs_group_names.end())
+	if (s_obgnme.find(name) == s_obgnme.end())
 	{
 		ctl_ordered_obs_group_names.push_back(name);
+		s_obgnme.emplace(name);
 	}
 }
 
@@ -2363,10 +2370,12 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 
 	observation_values.insert(name, value);
 	name = obs_i.group;
-	vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
-	if (is == ctl_ordered_obs_group_names.end())
+	//vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
+	//if (is == ctl_ordered_obs_group_names.end())
+	if (s_obgnme.find(name) == s_obgnme.end())
 	{
 		ctl_ordered_obs_group_names.push_back(name);
+		s_obgnme.emplace(name);
 	}
 }
 
