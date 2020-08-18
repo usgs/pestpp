@@ -2248,17 +2248,22 @@ void Pest::tokens_to_par_group_rec(ofstream &f_rec, const vector<string>& tokens
 	ParameterGroupRec pgi;
 	string name = tokens[0];
 	size_t n_tokens = tokens.size();
-	pgi.name = name;
-	ctl_ordered_par_group_names.push_back(name);
-	convert_ip(tokens[1], pgi.inctyp);
-	convert_ip(tokens[2], pgi.derinc);
-	convert_ip(tokens[3], pgi.derinclb);
-	convert_ip(tokens[4], pgi.forcen);
-	convert_ip(tokens[5], pgi.derincmul);
-	convert_ip(tokens[6], pgi.dermthd);
-	if (n_tokens >= 8) convert_ip(tokens[7], pgi.splitthresh);
-	if (n_tokens >= 9) convert_ip(tokens[8], pgi.splitreldiff);
-	base_group_info.insert_group(name, pgi);
+	
+	if (s_pargp.find(name) != s_pargp.end())
+	{
+		pgi.name = name;
+		ctl_ordered_par_group_names.push_back(name);
+		convert_ip(tokens[1], pgi.inctyp);
+		convert_ip(tokens[2], pgi.derinc);
+		convert_ip(tokens[3], pgi.derinclb);
+		convert_ip(tokens[4], pgi.forcen);
+		convert_ip(tokens[5], pgi.derincmul);
+		convert_ip(tokens[6], pgi.dermthd);
+		if (n_tokens >= 8) convert_ip(tokens[7], pgi.splitthresh);
+		if (n_tokens >= 9) convert_ip(tokens[8], pgi.splitreldiff);
+		base_group_info.insert_group(name, pgi);
+		s_pargp.emplace(name);
+	}
 
 }
 
