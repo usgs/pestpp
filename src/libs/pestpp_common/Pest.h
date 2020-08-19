@@ -44,8 +44,8 @@ public:
 	void check_io(ofstream& f_rec);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename, ofstream &f_rec);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename);
-	int process_ctl_file(ifstream& fin, string pst_filename, ofstream& f_rec, set<string>& efile_keep_cols = set<string>());
-	int process_ctl_file(ifstream& fin, string pst_filename, set<string>& efile_keep_cols = set<string>());
+	int process_ctl_file(ifstream& fin, string pst_filename, ofstream& f_rec, set<string> efile_keep_cols = set<string>());
+	int process_ctl_file(ifstream& fin, string pst_filename, set<string> efile_keep_cols = set<string>());
 
 	int get_n_adj_par(){ return n_adj_par; }
 	const Parameters& get_ctl_parameters() const {return ctl_parameters;}

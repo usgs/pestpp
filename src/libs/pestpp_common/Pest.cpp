@@ -417,7 +417,7 @@ vector<string> Pest::get_nonregul_obs() const
 //	return process_ctl_file_old(fin, pst_filename, f_out);
 //}
 
-int Pest::process_ctl_file(ifstream& fin, string pst_filename, set<string>& efile_keep_cols)
+int Pest::process_ctl_file(ifstream& fin, string pst_filename, set<string> efile_keep_cols)
 {
 	ofstream f_out("ctl_process.out");
 	return process_ctl_file(fin, pst_filename, f_out, efile_keep_cols);
@@ -940,7 +940,7 @@ int Pest::process_ctl_file(ifstream& fin, string pst_filename, set<string>& efil
 //	return 0;
 //}
 
-int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec, set<string>& efile_keep_cols)
+int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec, set<string> efile_keep_cols)
 {
 	string line;
 	string line_upper;
@@ -1222,6 +1222,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec,
 					par_group_tokens = efile.get_row_vector(ro, par_group_formal_names);
 					tokens_to_par_group_rec(f_rec, par_group_tokens);
 				}
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
 					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
 				else
@@ -1331,9 +1332,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec,
 					if (row_map["PARTRANS"] == "TIED")
 						temp_tied_map[row_map["PARNME"]] = row_map["PARTIED"];
 				}
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
 					efiles_map[section] = vector<pest_utils::ExternalCtlFile>();
-				
 				efiles_map[section].push_back(efile);
 	
 			}
@@ -1364,6 +1365,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec,
 					obs_group_tokens = efile.get_row_vector(ro, obs_group_formal_names);
 					tokens_to_obs_group_rec(f_rec, obs_group_tokens);
 				}
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
 				{
 					efiles_map[section] = vector<pest_utils::ExternalCtlFile>();
@@ -1420,7 +1422,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec,
 					obs_tokens = efile.get_row_vector(ro, get_names);
 					tokens_to_obs_rec(f_rec, obs_tokens);
 				}
-
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
 					efiles_map[section] = vector<pest_utils::ExternalCtlFile>();
 				efiles_map[section].push_back(efile);
@@ -1454,7 +1456,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec,
 					pi_tokens = efile.get_row_vector(ro, pi_formal_names);
 					tokens_to_pi_rec(f_rec, pi_tokens);
 				}
-
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
 					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
 				else
@@ -1499,7 +1501,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec,
 					model_exec_info.tplfile_vec.push_back(mi_tokens[0]);
 					model_exec_info.inpfile_vec.push_back(mi_tokens[1]);
 				}
-
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
 					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
 				else
@@ -1538,7 +1540,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec,
 					model_exec_info.insfile_vec.push_back(mo_tokens[0]);
 					model_exec_info.outfile_vec.push_back(mo_tokens[1]);
 				}
-
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
 					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
 				else
@@ -1844,35 +1846,6 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec,
 	s_pargp.clear();
 	s_obgnme.clear();
 	
-	//drop unneeded efile info
-	if (efile_keep_cols.size() == 0)
-	{
-		efiles_map.clear();
-	}
-	else
-	{
-		for (auto& efiles : efiles_map)
-		{
-			for (auto& efile : efiles.second)
-			{
-				vector<string> keep;
-				for (auto col : efile.get_col_set())
-				{
-					if (efile_keep_cols.find(col) != efile_keep_cols.end())
-					{
-						keep.push_back(col);
-					}
-				}
-				if (keep.size() == 0)
-					efile.clear();
-				else
-				{
-					efile.keep_cols(keep);
-				}
-
-			}
-		}
-	}
 
 	return 0;
 }

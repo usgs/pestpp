@@ -1266,8 +1266,17 @@ void ExternalCtlFile::read_file()
 
 }
 
-void ExternalCtlFile::keep_cols(vector<string>& keep_cols)
+void ExternalCtlFile::keep_cols(set<string>& keep_cols)
 {
+	vector<string> keep;
+	for (auto c : col_names)
+		if (keep_cols.find(c) != keep_cols.end())
+			keep.push_back(c);
+	if (keep.size() == 0)
+	{
+		data.clear();
+		return;
+	}
 	map<string, string> t;
 	for (auto& d : data)
 	{
