@@ -264,6 +264,19 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 						}
 					}
 					threads[i].join();
+					if (exception_ptrs[i])
+					{
+						try
+						{
+							rethrow_exception(exception_ptrs[i]);
+						}
+						catch (const std::exception& e)
+						{
+							ss.str("");
+							ss << "thread " << i << "raised an exception: " << e.what();
+							throw runtime_error(ss.str());
+						}
+					}
 				}
 				plog->log_event("threaded draws done");
 

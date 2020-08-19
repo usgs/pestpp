@@ -170,36 +170,119 @@ void ModelInterface::run(Parameters* pars, Observations* obs)
 
 }
 
+void ThreadedTemplateProcess::work(int i, Parameters pars, Parameters& pro_pars)
+{
+	TemplateFile tpl(tplfile_vec[i]);
+	tpl.set_fill_zeros(fill);
+	Parameters ppars = tpl.write_input_file(inpfile_vec[i], pars);
+	unique_lock<mutex> par_guard(par_lock, defer_lock);
+	while (true)
+	{
+		if (par_guard.try_lock())
+		{
+			//pro_par_vec.push_back(pro_pars);
+			pro_pars.update_without_clear(ppars.get_keys(), ppars.get_data_vec(ppars.get_keys()));
+			par_guard.unlock();
+			return;
+		}
+	}
+}
+
+void process_template_file_thread(int i, ThreadedTemplateProcess& ttp, Parameters pars, Parameters& pro_pars, exception_ptr& eptr)
+{
+	
+	try
+	{
+		ttp.work(i, pars, pro_pars);
+	}
+	catch (...)
+	{
+		eptr = current_exception();
+	}
+
+	return;
+}
+
 
 void ModelInterface::write_input_files(Parameters *pars_ptr)
 {
-	if (templatefiles.size() == 0)
+	int num_threads = min(10,tplfile_vec.size());
+	cout << "processing tpl files with " << num_threads << " threads...";
+	vector<thread> threads;
+	vector<exception_ptr> exception_ptrs;
+	Parameters pro_pars = *pars_ptr; //copy
+	ThreadedTemplateProcess ttp(tplfile_vec, inpfile_vec, fill_tpl_zeros);
+
+	for (int i = 0; i < num_threads; i++)
 	{
-		for (auto t : tplfile_vec)
+		exception_ptrs.push_back(exception_ptr());
+	}
+
+	for (int i = 0; i < num_threads; i++)
+	{
+		threads.push_back(thread(process_template_file_thread, i, std::ref(ttp), *pars_ptr, std::ref(pro_pars), std::ref(exception_ptrs[i])));
+	}
+
+	for (int i = 0; i < num_threads; ++i)
+	{
+		if (exception_ptrs[i])
 		{
-			TemplateFile tt(t);
-			tt.set_fill_zeros(fill_tpl_zeros);
-			templatefiles.push_back(tt);
+			try
+			{
+				rethrow_exception(exception_ptrs[i]);
+			}
+			catch (const std::exception& e)
+			{
+				stringstream ss;
+				ss << "thread processing template file '" << tplfile_vec[i] << "' raised an exception: " << e.what();
+				throw runtime_error(ss.str());
+			}
+		}
+		threads[i].join();
+		if (exception_ptrs[i])
+		{
+			cout << "exception raised by " << i << endl;
+			try
+			{
+				rethrow_exception(exception_ptrs[i]);
+			}
+			catch (const std::exception& e)
+			{
+				stringstream ss;
+				ss << "thread processing template file '" << tplfile_vec[i] << "' raised an exception: " << e.what();
+				throw runtime_error(ss.str());
+			}
 		}
 	}
 
-	cout << "processing tpl files...";
-	vector<string> notnormal = pars_ptr->get_notnormal_keys();
-	if (notnormal.size() > 0)
-	{
-		throw runtime_error("denormal floating point parameter values found");
-	}
+	//if (templatefiles.size() == 0)
+	//{
+	//	for (auto t : tplfile_vec)
+	//	{
+	//		TemplateFile tt(t);
+	//		tt.set_fill_zeros(fill_tpl_zeros);
+	//		templatefiles.push_back(tt);
+	//	}
+	//}
 
-	vector<Parameters> pro_par_vec;
-	for (int i = 0; i < templatefiles.size(); i++)
-	{
-		string name = templatefiles[i].get_tpl_filename();
-		//cout << name << endl;
-		pro_par_vec.push_back(templatefiles[i].write_input_file(inpfile_vec[i], *pars_ptr));
-	}
+	//
+	//vector<string> notnormal = pars_ptr->get_notnormal_keys();
+	//if (notnormal.size() > 0)
+	//{
+	//	throw runtime_error("denormal floating point parameter values found");
+	//}
+
+	//vector<Parameters> pro_par_vec;
+	//for (int i = 0; i < templatefiles.size(); i++)
+	//{
+	//	string name = templatefiles[i].get_tpl_filename();
+	//	//cout << name << endl;
+	//	pro_par_vec.push_back(templatefiles[i].write_input_file(inpfile_vec[i], *pars_ptr));
+	//}
 	//update pars to account for possibly truncated par values...important for jco calcs
-	for (auto pro_pars : pro_par_vec)
-		pars_ptr->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
+	//for (auto pro_pars : pro_par_vec)
+	//	pars_ptr->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
+	pars_ptr->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
 	cout << "done" << endl;
 }
 
@@ -311,16 +394,11 @@ void ModelInterface::remove_existing()
 void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
 						Parameters* pars_ptr, Observations* obs_ptr)
 {
-
-
-	remove_existing();
-	write_input_files(pars_ptr);
 			
-	Observations pro_obs;
-	vector<Parameters> pro_par_vec;
 	try
 	{
-		
+		remove_existing();
+		write_input_files(pars_ptr);
 		
 
 #ifdef OS_WIN

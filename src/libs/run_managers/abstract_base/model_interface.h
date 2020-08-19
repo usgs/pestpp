@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <unordered_set>
+#include <mutex>
 #include "Transformable.h"
 #include "utilities.h"
 #include "Pest.h"
@@ -31,11 +32,19 @@ private:
 	unordered_set<string> get_names(ifstream& f);
 	bool fill_zeros;
 	
-	
-
-
 };
 
+class ThreadedTemplateProcess {
+public:
+	ThreadedTemplateProcess(vector<string> _tplfile_vec, vector<string> _inpfile_vec, bool _fill) : 
+		tplfile_vec(_tplfile_vec), inpfile_vec(_inpfile_vec), fill(_fill) {;};
+	void work(int i, Parameters pars, Parameters& pro_pars);
+private:
+	vector<string> tplfile_vec;
+	vector<string> inpfile_vec;
+	bool fill;
+	mutex par_lock;
+};
 
 class InstructionFile {
 	
