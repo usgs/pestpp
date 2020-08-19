@@ -817,7 +817,7 @@ def ext_stdcol_test():
     d = (df.std() - obs.loc[pst.nnz_obs_names,"standard_deviation"]).apply(np.abs)
     print(d)
     assert d.max() < 0.1,d.max()
-    return
+    
     obs = pst.observation_data
     obs.loc[pst.nnz_obs_names,"upper_bound"] = obs.loc[pst.nnz_obs_names,"obsval"] * 1.1
     obs.loc[pst.nnz_obs_names,"lower_bound"] = obs.loc[pst.nnz_obs_names,"obsval"] * 0.9
