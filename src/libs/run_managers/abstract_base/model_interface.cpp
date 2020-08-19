@@ -206,7 +206,7 @@ void process_template_file_thread(int i, ThreadedTemplateProcess& ttp, Parameter
 
 void ModelInterface::write_input_files(Parameters *pars_ptr)
 {
-	int num_threads = min(10,tplfile_vec.size());
+	int num_threads = min(int(10),tplfile_vec.size());
 	cout << "processing tpl files with " << num_threads << " threads...";
 	vector<thread> threads;
 	vector<exception_ptr> exception_ptrs;
