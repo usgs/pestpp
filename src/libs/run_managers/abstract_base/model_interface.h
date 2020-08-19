@@ -38,12 +38,12 @@ class ThreadedTemplateProcess {
 public:
 	ThreadedTemplateProcess(vector<string> _tplfile_vec, vector<string> _inpfile_vec, bool _fill) : 
 		tplfile_vec(_tplfile_vec), inpfile_vec(_inpfile_vec), fill(_fill) {;};
-	void work(int i, Parameters pars, Parameters& pro_pars);
+	void work(int tid, vector<int>& tpl_idx, Parameters pars, Parameters& pro_pars);
 private:
 	vector<string> tplfile_vec;
 	vector<string> inpfile_vec;
 	bool fill;
-	mutex par_lock;
+	mutex par_lock, idx_lock;
 };
 
 class InstructionFile {

@@ -368,6 +368,11 @@ void OutputFileWriter::scenario_pargroup_report(std::ostream &os)
 
 void OutputFileWriter::scenario_par_report(std::ostream &os)
 {
+	if (pest_scenario.get_ctl_ordered_par_names().size() > 100000)
+	{
+		os << endl << "...more than 100,000 pars, not writing par data" << endl;
+		return;
+	}
 	map<int, string> trans_type;
 	trans_type[0] = "none";
 	trans_type[1] = "fixed";
@@ -417,6 +422,11 @@ void OutputFileWriter::scenario_obs_csv(ostream& os)
 
 void OutputFileWriter::scenario_obs_report(std::ostream &os)
 {
+	if (pest_scenario.get_ctl_ordered_obs_names().size() > 100000)
+	{
+		os << endl << "...more than 100,000 obs, not writing obs data" << endl;
+		return;
+	}
 	int obs_len = 20;
 	for (auto& obs_name : pest_scenario.get_ctl_ordered_obs_names())
 		obs_len = max((int)obs_name.size(), obs_len);

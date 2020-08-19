@@ -28,11 +28,11 @@ L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 	//for (auto &og : pest_scenario.get_ctl_ordered_obs_group_names())
 	string og;
 	double weight;
-	ObservationInfo oi = pest_scenario->get_ctl_observation_info();
-	for (auto &oname : pest_scenario->get_ctl_ordered_nz_obs_names())
+	const ObservationInfo* oi = pest_scenario->get_ctl_observation_info_ptr();
+	for (auto &oname : pest_scenario->get_ctl_ordered_obs_names())
 	{
-		og = oi.get_group(oname);
-		weight = oi.get_weight(oname);
+		og = oi->get_group(oname);
+		weight = oi->get_weight(oname);
 		if (weight == 0)
 			continue;
 		if ((og.compare(0, 2, "L_") == 0) || (og.compare(0, 4, "LESS")==0))
@@ -120,7 +120,7 @@ Eigen::MatrixXd L2PhiHandler::get_actual_obs_resid(ObservationEnsemble &oe)
 
 Eigen::VectorXd L2PhiHandler::get_q_vector()
 {
-	ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
+	const ObservationInfo* oinfo = pest_scenario->get_ctl_observation_info_ptr();
 	Eigen::VectorXd q;
 	//vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
 	vector<string> act_obs_names = oe_base->get_var_names();
@@ -131,7 +131,7 @@ Eigen::VectorXd L2PhiHandler::get_q_vector()
 	double w;
 	for (int i = 0; i < act_obs_names.size(); i++)
 	{
-		q(i) = oinfo.get_weight(act_obs_names[i]);
+		q(i) = oinfo->get_weight(act_obs_names[i]);
 	}
 	return q;
 }

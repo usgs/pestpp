@@ -1266,6 +1266,17 @@ void ExternalCtlFile::read_file()
 
 }
 
+void ExternalCtlFile::keep_cols(vector<string>& keep_cols)
+{
+	map<string, string> t;
+	for (auto& d : data)
+	{
+		t.clear();
+		for (auto k : keep_cols)
+			t[k] = d.second[k];
+		d.second = t;
+	}
+}
 
 void ExternalCtlFile::parse_control_record()
 {

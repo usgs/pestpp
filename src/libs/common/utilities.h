@@ -325,6 +325,8 @@ public:
 	template<typename t>
 	inline void fill_col_vector(string col_name, vector<t> &col_vector);
 	void read_file();
+	void keep_cols(vector<string>& keep_cols);
+	void clear() { data.clear(); }
 	
 private:
 	bool cast;

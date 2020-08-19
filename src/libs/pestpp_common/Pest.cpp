@@ -417,10 +417,10 @@ vector<string> Pest::get_nonregul_obs() const
 //	return process_ctl_file_old(fin, pst_filename, f_out);
 //}
 
-int Pest::process_ctl_file(ifstream& fin, string pst_filename)
+int Pest::process_ctl_file(ifstream& fin, string pst_filename, set<string>& efile_keep_cols)
 {
 	ofstream f_out("ctl_process.out");
-	return process_ctl_file(fin, pst_filename, f_out);
+	return process_ctl_file(fin, pst_filename, f_out, efile_keep_cols);
 }
 
 
@@ -940,7 +940,7 @@ int Pest::process_ctl_file(ifstream& fin, string pst_filename)
 //	return 0;
 //}
 
-int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
+int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec, set<string>& efile_keep_cols)
 {
 	string line;
 	string line_upper;
@@ -1844,6 +1844,35 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	s_pargp.clear();
 	s_obgnme.clear();
 	
+	//drop unneeded efile info
+	if (efile_keep_cols.size() == 0)
+	{
+		efiles_map.clear();
+	}
+	else
+	{
+		for (auto& efiles : efiles_map)
+		{
+			for (auto& efile : efiles.second)
+			{
+				vector<string> keep;
+				for (auto col : efile.get_col_set())
+				{
+					if (efile_keep_cols.find(col) != efile_keep_cols.end())
+					{
+						keep.push_back(col);
+					}
+				}
+				if (keep.size() == 0)
+					efile.clear();
+				else
+				{
+					efile.keep_cols(keep);
+				}
+
+			}
+		}
+	}
 
 	return 0;
 }

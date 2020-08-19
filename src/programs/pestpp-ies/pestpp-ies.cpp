@@ -224,9 +224,10 @@ int main(int argc, char* argv[])
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
 		pest_scenario.set_defaults();
+		set<string> efile_keep_cols{ "standard_deviation" };
 		try {
 			performance_log.log_event("starting to process control file");
-			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
+			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec, efile_keep_cols);
 			file_manager.close_file("pst");
 			performance_log.log_event("finished processing control file");
 		}
@@ -239,6 +240,7 @@ int main(int argc, char* argv[])
 			fout_rec.close();
 			throw(e);
 		}
+		//pest_scenario.clear_ext_files();
 		pest_scenario.check_inputs(fout_rec);
 
 		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)

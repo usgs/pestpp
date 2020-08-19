@@ -44,8 +44,8 @@ public:
 	void check_io(ofstream& f_rec);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename, ofstream &f_rec);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename);
-	int process_ctl_file(ifstream& fin, string pst_filename, ofstream& f_rec);
-	int process_ctl_file(ifstream& fin, string pst_filename);
+	int process_ctl_file(ifstream& fin, string pst_filename, ofstream& f_rec, set<string>& efile_keep_cols = set<string>());
+	int process_ctl_file(ifstream& fin, string pst_filename, set<string>& efile_keep_cols = set<string>());
 
 	int get_n_adj_par(){ return n_adj_par; }
 	const Parameters& get_ctl_parameters() const {return ctl_parameters;}
@@ -54,6 +54,7 @@ public:
 	const ParameterGroupInfo& get_base_group_info() const {return  base_group_info;}
 	ParameterGroupInfo* get_base_group_info_ptr() { return  &base_group_info; }
 	const ObservationInfo &get_ctl_observation_info() const {return observation_info;}
+	const ObservationInfo* get_ctl_observation_info_ptr() const { return &observation_info; }
 	const std::map<std::string, std::string> get_observation_groups() const;
 	const PriorInformation &get_prior_info() {return prior_info;}
 	PriorInformation *get_prior_info_ptr() {return &prior_info;}
@@ -87,6 +88,9 @@ public:
 	pair<Parameters,Parameters> get_effective_ctl_lower_upper_bnd(Parameters &pars);
 	map<string, double> calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform);
 	map<string, double> get_ext_file_double_map(const string& section_name, const string& col_name);
+
+	void clear_ext_files() { efiles_map.clear(); }
+
 	virtual ~Pest();
 	
 private:

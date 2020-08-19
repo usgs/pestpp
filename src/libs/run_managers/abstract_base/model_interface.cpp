@@ -170,30 +170,52 @@ void ModelInterface::run(Parameters* pars, Observations* obs)
 
 }
 
-void ThreadedTemplateProcess::work(int i, Parameters pars, Parameters& pro_pars)
+void ThreadedTemplateProcess::work(int tid, vector<int>& tpl_idx, Parameters pars, Parameters& pro_pars)
 {
-	TemplateFile tpl(tplfile_vec[i]);
-	tpl.set_fill_zeros(fill);
-	Parameters ppars = tpl.write_input_file(inpfile_vec[i], pars);
+	int count = 0, i;
 	unique_lock<mutex> par_guard(par_lock, defer_lock);
+	unique_lock<mutex> idx_guard(idx_lock, defer_lock);
 	while (true)
 	{
-		if (par_guard.try_lock())
+		i = -999;
+		while (true)
 		{
-			//pro_par_vec.push_back(pro_pars);
-			pro_pars.update_without_clear(ppars.get_keys(), ppars.get_data_vec(ppars.get_keys()));
-			par_guard.unlock();
-			return;
+			if (idx_guard.try_lock())
+			{
+				if (tpl_idx.size() == 0)
+				{
+					cout << "thread " << tid << " processed " << count << " template files" << endl;
+					return;
+				}
+				i = tpl_idx[tpl_idx.size() - 1];
+				tpl_idx.pop_back();
+				idx_guard.unlock();
+				break;
+			}
 		}
+		TemplateFile tpl(tplfile_vec[i]);
+		tpl.set_fill_zeros(fill);
+		Parameters ppars = tpl.write_input_file(inpfile_vec[i], pars);
+		while (true)
+		{
+			if (par_guard.try_lock())
+			{
+				//pro_par_vec.push_back(pro_pars);
+				pro_pars.update_without_clear(ppars.get_keys(), ppars.get_data_vec(ppars.get_keys()));
+				par_guard.unlock();
+				break;
+			}
+		}
+		count++;
 	}
 }
 
-void process_template_file_thread(int i, ThreadedTemplateProcess& ttp, Parameters pars, Parameters& pro_pars, exception_ptr& eptr)
+void process_template_file_thread(int tid, vector<int>& tpl_idx, ThreadedTemplateProcess& ttp, Parameters pars, Parameters& pro_pars, exception_ptr& eptr)
 {
 	
 	try
 	{
-		ttp.work(i, pars, pro_pars);
+		ttp.work(tid, tpl_idx, pars, pro_pars);
 	}
 	catch (...)
 	{
@@ -206,7 +228,7 @@ void process_template_file_thread(int i, ThreadedTemplateProcess& ttp, Parameter
 
 void ModelInterface::write_input_files(Parameters *pars_ptr)
 {
-	int num_threads =tplfile_vec.size();
+	int num_threads =10;
 	if (num_threads > tplfile_vec.size())
 		num_threads = tplfile_vec.size();
 	cout << "processing tpl files with " << num_threads << " threads...";
@@ -220,9 +242,13 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 		exception_ptrs.push_back(exception_ptr());
 	}
 
+	vector<int> tpl_idx;
+	for (int i = 0; i < tplfile_vec.size(); i++)
+		tpl_idx.push_back(i);
+
 	for (int i = 0; i < num_threads; i++)
 	{
-		threads.push_back(thread(process_template_file_thread, i, std::ref(ttp), *pars_ptr, std::ref(pro_pars), std::ref(exception_ptrs[i])));
+		threads.push_back(thread(process_template_file_thread, i, std::ref(tpl_idx), std::ref(ttp), *pars_ptr, std::ref(pro_pars), std::ref(exception_ptrs[i])));
 	}
 
 	for (int i = 0; i < num_threads; ++i)
@@ -550,10 +576,10 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 	double val;
 	vector<pair<string, pair<int, int>>> tpl_line_map;
 	Parameters pro_pars;
-	vector<string> t = pars.get_keys();
-	unordered_set<string> pnames(t.begin(), t.end());
-	unordered_set<string>::iterator end = pnames.end();
-	t.resize(0);
+	//vector<string> t = pars.get_keys();
+	//unordered_set<string> pnames(t.begin(), t.end());
+	//unordered_set<string>::iterator end = pnames.end();
+	//t.resize(0);
 	while (true)
 	{
 		if (f_tpl.eof())
@@ -571,8 +597,8 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 		for (auto t : tpl_line_map)
 		{
 			name = t.first;
-			if (pnames.find(name) == end)
-				throw_tpl_error("parameter '" + name + "' not listed in control file");
+			//if (pnames.find(name) == end)
+			//	throw_tpl_error("parameter '" + name + "' not listed in control file");
 
 			/*val = 1.23456789123456789123456789E+100;
 			val_str = cast_to_fixed_len_string(200, val, name);
@@ -610,8 +636,14 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 			val_str = cast_to_fixed_len_string(2, val, name);
 			pest_utils::convert_ip(val_str, val);
 			*/
-
-			val = pars.get_rec(t.first);
+			try
+			{
+				val = pars.get_rec(t.first);
+			}
+			catch (...)
+			{
+				throw_tpl_error("parameter '" + name + "' not in parameters instance");
+			}
 			val_str = cast_to_fixed_len_string(t.second.second, val, name);
 			line.replace(t.second.first, t.second.second, val_str);
 			//pest_utils::convert_ip(val_str, val);
