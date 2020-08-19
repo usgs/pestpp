@@ -1286,7 +1286,7 @@ void ExternalCtlFile::keep_cols(set<string>& keep_cols)
 	for (auto& d : data)
 	{
 		t.clear();
-		for (auto k : keep_upper)
+		for (auto k : keep)
 			t[k] = d.second[k];
 		d.second = t;
 	}
