@@ -1269,9 +1269,14 @@ void ExternalCtlFile::read_file()
 void ExternalCtlFile::keep_cols(set<string>& keep_cols)
 {
 	vector<string> keep;
+	set<string> keep_upper;
+	for (auto k : keep_cols)
+		keep_upper.emplace(upper_cp(k));
 	for (auto c : col_names)
-		if (keep_cols.find(c) != keep_cols.end())
+	{
+		if (keep_upper.find(c) != keep_upper.end())
 			keep.push_back(c);
+	}
 	if (keep.size() == 0)
 	{
 		data.clear();
@@ -1281,7 +1286,7 @@ void ExternalCtlFile::keep_cols(set<string>& keep_cols)
 	for (auto& d : data)
 	{
 		t.clear();
-		for (auto k : keep_cols)
+		for (auto k : keep_upper)
 			t[k] = d.second[k];
 		d.second = t;
 	}
