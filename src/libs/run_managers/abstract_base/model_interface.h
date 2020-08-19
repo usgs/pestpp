@@ -96,6 +96,11 @@ private:
 	vector<string> comline_vec; 
 	bool fill_tpl_zeros;
 	string additional_ins_delimiters;
+
+	void write_input_files(Parameters *pars_ptr);
+	void read_output_files(Observations *obs_ptr);
+	void remove_existing();
+
 };
 
 #endif /* MODEL_INTERFACE_H_ */
