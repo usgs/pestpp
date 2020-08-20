@@ -209,7 +209,7 @@ int main(int argc, char* argv[])
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
 		pest_scenario.set_defaults();
-		set<string> efile_keep_cols{ "standard_deviation" };
+		set<string> efile_keep_cols{ "standard_deviation", "obsnme","parnme","name", "upper_bound","lower_bound" };
 #ifndef _DEBUG
 		try {
 #endif
