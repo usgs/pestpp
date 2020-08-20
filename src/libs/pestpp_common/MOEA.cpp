@@ -1258,13 +1258,17 @@ void MOEA::initialize()
 
 ParameterEnsemble MOEA::generate_population()
 {
+	string mou_alg = pest_scenario.get_pestpp_options().get_mou_algorithm();
 	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
 	//add new members for any missing
 	num_members += (num_members - dp.shape().first);
 
 	//TODO: work out which generator to use
-	return generate_diffevol_population(num_members, dp);
-
+	if (mou_alg == "DE")
+		return generate_diffevol_population(num_members, dp);
+	else if (mou_alg == "NSGA2")
+		// if using NSGA2
+		return generate_nsga2_population(num_members, dp);
 }
 
 void MOEA::iterate_to_solution()
@@ -1587,6 +1591,39 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	return new_dp;
 }
 
+ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnsemble& _dp)
+{
+	message(1, "generating NSGA2 population of size", num_members);
+	vector<int> member_count, working_count, selected, r_int_vec;
+	for (int i = 0; i < _dp.shape().first; i++)
+		member_count.push_back(i);
+
+	for (int i = 0; i < dv_names.size(); i++)
+		r_int_vec.push_back(i);
+
+	//TODO: move the operators to classes
+	//TODO: add algorithm parameters to pp args
+	// crossover
+	double crossover_probability = 0.9;
+	double crossover_distribution_index = 20.0;
+	// for each pair of parents
+	int p1_idx, p2_idx;
+	pair<Eigen::VectorXd, Eigen::VectorXd> children;
+	children = crossover(crossover_probability, crossover_distribution_index, p1_idx, p2_idx);
+	//TODO: compile children into new parameter ensemble
+	ParameterEnsemble tmp_dp;
+
+	//mutation
+	double mutation_probability = 1.0 / pest_scenario.get_n_adj_par();
+	double mutation_distribution_index = 20.0;
+	mutate(mutation_probability, mutation_distribution_index, tmp_dp);
+
+	//TODO: selection
+
+	//TODO: return parameter ensemble for the next generation
+
+}
+
 void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag)
 {
 	stringstream ss;
@@ -1618,7 +1655,6 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 
 }
 
-
 string MOEA::get_new_member_name(string tag)
 {
 	stringstream ss;
@@ -1629,4 +1665,196 @@ string MOEA::get_new_member_name(string tag)
 	}
 	member_count++;
 	return ss.str();
+}
+
+pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::crossover(double probability, double di, int idx1, int idx2)
+{
+	int i;
+	//double rnd1, rnd2, rnd3, rnd4;
+	vector<double> rnds;
+	double y1, y2, yL, yu;
+	double c1, c2;
+	double alpha, beta, betaq;
+	double valueX1, valueX2, valueX1initial, valueX2initial;
+	const double EPS = 1.0e-14;
+	// get parents from dp
+	Eigen::VectorXd x1 = dp.get_eigen_ptr()->row(idx1); // parent #1
+	Eigen::VectorXd x2 = dp.get_eigen_ptr()->row(idx2); // parent #2
+	// initialize offspring
+	Eigen::VectorXd offs1(x1.size()); // ofspring #1
+	Eigen::VectorXd offs2(x2.size()); // offspring #2
+
+	//ZQ: get upper and lower bounds for each variable
+	vector<string> var_names = dp.get_var_names();
+	string vname;
+	Parameters lbnd = pest_scenario.get_ctl_parameter_info().get_low_bnd(var_names);
+	Parameters ubnd = pest_scenario.get_ctl_parameter_info().get_up_bnd(var_names);
+	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(lbnd);
+	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(ubnd);
+
+	offs1.setZero();
+	offs2.setZero();
+
+	int n_var = pest_scenario.get_n_adj_par();
+	//can't set all rnds outside of loop or all vars will be treated the same
+	rnds = uniform_draws(4, 0.0, 1.0, rand_gen);
+
+	if (rnds[0] <= probability) {
+		for (i = 0; i < n_var; i++) {
+			valueX1 = x1[i];
+			valueX2 = x2[i];
+			valueX1initial = valueX1;
+			valueX2initial = valueX2;
+			vname = var_names[i];
+			// cout << "valueX1 "<<valueX1<<" valueX2 "<<valueX2<<std::endl;
+			if (rnds[1] <= 0.5) {
+				if (fabs(valueX1 - valueX2) > EPS) {
+
+					if (valueX1 < valueX2) {
+						y1 = valueX1;
+						y2 = valueX2;
+					}
+					else {
+						y1 = valueX2;
+						y2 = valueX1;
+					} // if                       
+
+					yL = lbnd[vname];
+					yu = ubnd[vname];
+
+					//cout << yL << " " << yu << endl;
+					//cout <<"yL "<< yL << " yu "<<yu<<endl;
+
+					beta = 1.0 + (2.0 * (y1 - yL) / (y2 - y1));
+					//cout <<"beta "<< beta<<endl;
+					alpha = 2.0 - pow(beta, -(di + 1.0));
+					//cout <<"alpha "<< beta<<endl;
+					//cout <<"distributionIndex_ "<< distributionIndex_<<endl;
+					if (rnds[2] <= (1.0 / alpha)) {
+						betaq = pow((rnds[2] * alpha), (1.0 / (di + 1.0)));
+					}
+					else {
+						betaq = pow((1.0 / (2.0 - rnds[2] * alpha)), (1.0 / (di + 1.0)));
+					} // if
+					//cout <<"betaq "<< betaq<<endl;
+					//cout <<"rand "<< rand<<endl;
+					c1 = 0.5 * ((y1 + y2) - betaq * (y2 - y1));
+					beta = 1.0 + (2.0 * (yu - y2) / (y2 - y1));
+					alpha = 2.0 - pow(beta, -(di + 1.0));
+					//cout <<"beta2 "<< beta<<endl;
+					//cout <<"alpha2 "<< alpha<<endl;
+					if (rnds[2] <= (1.0 / alpha)) {
+						betaq = pow((rnds[2] * alpha), (1.0 / (di + 1.0)));
+					}
+					else {
+						betaq = pow((1.0 / (2.0 - rnds[2] * alpha)), (1.0 / (di + 1.0)));
+					} // if
+					//cout <<"betaq2 "<< betaq<<endl;
+					c2 = 0.5 * ((y1 + y2) + betaq * (y2 - y1));
+
+					if (c1 < yL)
+						c1 = yL;
+
+					if (c2 < yL)
+						c2 = yL;
+
+					if (c1 > yu)
+						c1 = yu;
+
+					if (c2 > yu)
+						c2 = yu;
+
+					if (rnds[3] <= 0.5)
+					{
+						if (std::isnan(c2) || std::isnan(c1)) {
+							c2 = valueX1initial;
+							c1 = valueX2initial;
+						}
+						offs1[i] = c2;
+						offs2[i] = c1;
+					}
+					else {
+						if (std::isnan(c2) || std::isnan(c1)) { // sometimes, c1 or c2 can be nan, so in this case use the values from the parents
+							c1 = valueX1initial;
+							c2 = valueX2initial;
+						}
+						offs1[i] = c1;
+						offs2[i] = c2;
+					}
+				}
+				else {
+					offs1[i] = valueX1;
+					offs2[i] = valueX2;
+				}
+			}
+			else {
+				offs1[i] = valueX2;
+				offs2[i] = valueX1;
+			}
+		}
+	}
+	pair<Eigen::VectorXd, Eigen::VectorXd> vec_pair(offs1, offs2);
+	return vec_pair;
+}
+
+void MOEA::mutate(double probability, double eta_m, ParameterEnsemble& temp_dp)
+{
+	vector<double> rnds;
+	double delta1, delta2, mut_pow, deltaq;
+	double y, yl, yu, val, xy, initalval;
+	// for each decision variable, randomly decide to mutate or not
+	// for each individual
+	vector<string> var_names = temp_dp.get_var_names();
+	string vname;
+	Parameters lbnd = pest_scenario.get_ctl_parameter_info().get_low_bnd(var_names);
+	Parameters ubnd = pest_scenario.get_ctl_parameter_info().get_up_bnd(var_names);
+	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(lbnd);
+	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(ubnd);
+	for (int i = 0; i < temp_dp.shape().first; i++)
+	{
+		Eigen::VectorXd indiv = temp_dp.get_eigen_ptr()->row(i);
+		for (int var = 0; var < pest_scenario.get_n_adj_par(); var++)
+		{
+
+			vname = var_names[var];
+			rnds = uniform_draws(2, 0.0, 1.0, rand_gen);
+			if (rnds[0] <= probability)
+			{
+				// ZQ need to access the value for the current parameter
+				y = indiv[var];
+				initalval = y;
+				yl = lbnd[vname];
+				yu = ubnd[vname];
+				delta1 = (y - yl) / (yu - yl);
+				delta2 = (yu - y) / (yu - yl);
+				mut_pow = 1.0 / (eta_m + 1.0);
+				if (rnds[1] <= 0.5) {
+					xy = 1.0 - delta1;
+					val = 2.0 * rnds[1] + (1.0 - 2.0 * rnds[1]) * (pow(xy, (eta_m + 1.0)));
+					deltaq = pow(val, mut_pow) - 1.0;
+				}
+				else {
+					xy = 1.0 - delta2;
+					val = 2.0 * (1.0 - rnds[1]) + 2.0 * (rnds[1] - 0.5) * (pow(xy, (eta_m + 1.0)));
+					deltaq = 1.0 - (pow(val, mut_pow));
+				}
+				y = y + deltaq * (yu - yl);
+				if (y < yl)
+					y = yl;
+				if (y > yu)
+					y = yu;
+
+				if (std::isnan(y)) // y can be nan result from the pow
+					indiv[var] = initalval;
+				else
+					indiv[var] = y;
+			}
+		} // for
+		//get the ctl file parameters but only the ones in temp_dp
+		Parameters temp = pest_scenario.get_ctl_parameters().get_subset(var_names.begin(), var_names.end());
+		//update the values in temp Parameters with the indiv mutated values
+		temp.update_without_clear(var_names, indiv);
+		//replave the ith row in temp_dp
+		temp_dp.replace(i, temp);
+	}
 }

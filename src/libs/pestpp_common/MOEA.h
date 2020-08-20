@@ -120,11 +120,17 @@ private:
 	ParameterEnsemble generate_population();
 
 	ParameterEnsemble generate_diffevol_population(int num_members, ParameterEnsemble& _dp);
+	ParameterEnsemble generate_nsga2_population(int num_members, ParameterEnsemble& _dp);
 
 	string get_new_member_name(string tag = string());
 
 	void save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag = string());
+	void mutate(double probability, double eta_m, ParameterEnsemble& temp_dp);
+	pair<Eigen::VectorXd, Eigen::VectorXd> crossover(double probability, double eta_m, int idx1, int idx2);
 
+	void generate_nsga2_member();
+	void generate_de_member();
+	void generate_spea2_member();
 };
 
 #endif //MOEA_H_
