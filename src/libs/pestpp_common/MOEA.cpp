@@ -1606,19 +1606,41 @@ ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnse
 	// crossover
 	double crossover_probability = 0.9;
 	double crossover_distribution_index = 20.0;
-	// for each pair of parents
+	int i_member = 0;
 	int p1_idx, p2_idx;
+	Eigen::MatrixXd new_reals(num_members, _dp.shape().second);
+	new_reals.setZero();
 	pair<Eigen::VectorXd, Eigen::VectorXd> children;
-	children = crossover(crossover_probability, crossover_distribution_index, p1_idx, p2_idx);
-	//TODO: compile children into new parameter ensemble
-	ParameterEnsemble tmp_dp;
+	vector<string> new_names;
 
+	while (i_member < num_members)
+	{
+		//randomly select two parents - this is just a temp routine, something better needed...
+		working_count = member_count;//copy member count index to working count
+		shuffle(working_count.begin(), working_count.end(), rand_gen); //randomly shuffle working count
+		//just take the first two since this should change each time thru
+		p1_idx = working_count[0];
+		p2_idx = working_count[1];
+
+		//generate two children thru cross over
+		children = crossover(crossover_probability, crossover_distribution_index, p1_idx, p2_idx);
+
+		//put the two children into the child population
+		new_reals.row(i_member) = children.first;
+		new_names.push_back(get_new_member_name("nsga-ii"));
+		i_member++;
+		new_reals.row(i_member) = children.second;
+		new_names.push_back(get_new_member_name("nsga-ii"));
+		i_member++;
+	}
+		
+	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_names, _dp.get_var_names());
 	//mutation
 	double mutation_probability = 1.0 / pest_scenario.get_n_adj_par();
 	double mutation_distribution_index = 20.0;
 	mutate(mutation_probability, mutation_distribution_index, tmp_dp);
 
-	//TODO: selection
+	
 
 	//TODO: return parameter ensemble for the next generation
 	return tmp_dp;
