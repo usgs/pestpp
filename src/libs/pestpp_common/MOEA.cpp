@@ -1621,7 +1621,7 @@ ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnse
 	//TODO: selection
 
 	//TODO: return parameter ensemble for the next generation
-
+	return tmp_dp;
 }
 
 void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag)
