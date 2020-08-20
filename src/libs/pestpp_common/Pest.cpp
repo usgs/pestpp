@@ -2370,8 +2370,10 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	ObservationRec obs_i;
 	string name = tokens[0];
 	double value;
-	convert_ip(tokens[1], value);
-	convert_ip(tokens[2], obs_i.weight);
+	//convert_ip(tokens[1], value);
+	value = stod(tokens[1]);
+	//convert_ip(tokens[2], obs_i.weight);
+	obs_i.weight = stod(tokens[2]);
 	obs_i.group = tokens[3];
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;

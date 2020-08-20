@@ -1269,10 +1269,12 @@ void Ensemble::append(string real_name, const Transformable &trans)
 	}
 	//make sure all var_names are found
 	vector<string> keys = trans.get_keys();
-	set<string> tset(keys.begin(), keys.end());
+	//set<string> tset(keys.begin(), keys.end());
 	vector<string> missing;
+	Transformable::const_iterator end = trans.end();
 	for (auto &n : var_names)
-		if (tset.find(n) == tset.end())
+		//if (tset.find(n) == tset.end())
+		if (trans.find(n) == end)
 			missing.push_back(n);
 	if (missing.size() > 0)
 	{
