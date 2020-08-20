@@ -44,8 +44,8 @@ public:
 	void check_io(ofstream& f_rec);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename, ofstream &f_rec);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename);
-	int process_ctl_file(ifstream& fin, string pst_filename, ofstream& f_rec, set<string> efile_keep_cols = set<string>());
-	int process_ctl_file(ifstream& fin, string pst_filename, set<string> efile_keep_cols = set<string>());
+	int process_ctl_file(ifstream& fin, string pst_filename, ofstream& f_rec);
+	int process_ctl_file(ifstream& fin, string pst_filename);
 
 	int get_n_adj_par(){ return n_adj_par; }
 	const Parameters& get_ctl_parameters() const {return ctl_parameters;}
@@ -89,11 +89,13 @@ public:
 	map<string, double> calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform);
 	map<string, double> get_ext_file_double_map(const string& section_name, const string& col_name);
 
-	void clear_ext_files() { efiles_map.clear(); }
+    void clear_ext_files() { efiles_map.clear(); }
 
 	virtual ~Pest();
 	
 private:
+	//this is the list of external file cols that have meaning...
+	set<string> efile_keep_cols{ "standard_deviation", "obsnme","parnme","name", "upper_bound","lower_bound", "cycle" };
 	int n_adj_par = 0;
 	string prior_info_string;
 	ControlInfo control_info;

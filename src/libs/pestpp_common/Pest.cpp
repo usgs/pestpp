@@ -417,10 +417,10 @@ vector<string> Pest::get_nonregul_obs() const
 //	return process_ctl_file_old(fin, pst_filename, f_out);
 //}
 
-int Pest::process_ctl_file(ifstream& fin, string pst_filename, set<string> efile_keep_cols)
+int Pest::process_ctl_file(ifstream& fin, string pst_filename)
 {
 	ofstream f_out("ctl_process.out");
-	return process_ctl_file(fin, pst_filename, f_out, efile_keep_cols);
+	return process_ctl_file(fin, pst_filename, f_out);
 }
 
 
@@ -940,7 +940,7 @@ int Pest::process_ctl_file(ifstream& fin, string pst_filename, set<string> efile
 //	return 0;
 //}
 
-int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec, set<string> efile_keep_cols)
+int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 {
 	string line;
 	string line_upper;
