@@ -19,23 +19,41 @@
 class ParetoObjectives
 {
 public:
-	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, PerformanceLog* _performance_log);
-	pair<vector<string>, vector<string>> pareto_dominance_sort(const vector<string>& obj_names, ObservationEnsemble& op, ParameterEnsemble& dp, map<string,double>& obj_dir_mult);
+	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
+		PerformanceLog* _performance_log, Constraints* _constraints_ptr = nullptr);
+	pair<vector<string>, vector<string>> pareto_dominance_sort(const vector<string>& obs_obj_names, 
+		const vector<string>& pi_obj_names, ObservationEnsemble& op, ParameterEnsemble& dp, 
+		map<string, double>& obj_dir_mult);
 private:
 	Pest& pest_scenario;
 	FileManager& file_manager;
 	PerformanceLog* performance_log;
-	vector<string> obj_names;
-
+	//vector<string> obj_names;
+	Constraints* constraints_ptr;
 	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, map<string, double>>& memeber_struct);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& member_struct);
+
+	//constraint dominance principal Fan (2017) Tian (2020)
+	//void apply_constraints_cdp();
+	//self-adaptive constraint penalty Fan (2017), Woldesenbet (2009)
+	//void apply_constraints_sp();
+	//in-feasibility driven evolution-ary algorithms Fan (2017)
+	//void apply_constraints_idea();
+
+	typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
+	// Defining a lambda function to compare two pairs. It will compare two pairs using second field
+	Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
+	{
+		return elem1.second < elem2.second;
+	};
 
 };
 
 
 class MOEA
 {
+	enum chancePoints{ALL,EXTREMA,OPTIMAL};
 public:
 	static mt19937_64 rand_engine;
 	MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer,
@@ -54,9 +72,10 @@ private:
 	string population_dv_file, population_obs_restart_file;
 	string dv_pop_file_tag = "dv_pop";
 	string obs_pop_file_tag = "obs_pop";
+	chancePoints chancepoints;
 	FileManager &file_manager; 
 	std::mt19937 rand_gen;
-	vector<string> obj_names;
+	vector<string> obs_obj_names, pi_obj_names;
 	vector<string> dv_names;
 	map<string, double> obj_dir_mult;
 
@@ -89,14 +108,22 @@ private:
 	void message(int level, const string& _message, T extra);
 
 	void sanity_checks();
-	vector<int> run_population(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>());
+	vector<int> run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op);
+
+	void queue_chance_runs();
+	ObservationEnsemble get_risk_shifted_op(ObservationEnsemble& _op);
+
 
 	bool initialize_dv_population();
 	void initialize_obs_restart_population();
 
-	void generate_nsga2_member();
-	void generate_de_member();
-	void generate_spea2_member();
+	ParameterEnsemble generate_population();
+
+	ParameterEnsemble generate_diffevol_population(int num_members, ParameterEnsemble& _dp);
+
+	string get_new_member_name(string tag = string());
+
+	void save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag = string());
 
 };
 

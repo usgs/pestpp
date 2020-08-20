@@ -1073,6 +1073,11 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		return true;
 	}
 
+	else if (key == "MOU_CHANCE_POINTS")
+	{
+		mou_chance_points = value;
+		return true;
+	}
 
 	return false;
 }
@@ -1214,6 +1219,8 @@ void PestppOptions::summary(ostream& os) const
 	for (auto obj : mou_objectives)
 		os << obj << endl;
 	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
+	os << "mou_chance_points: " << mou_chance_points << endl;
+
 
 	os << endl << "...pestpp-ies options:" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
@@ -1295,8 +1302,8 @@ void PestppOptions::set_defaults()
 	set_base_lambda_vec(vector<double>{ 0.1, 1.0, 10.0, 100.0, 1000.0 });
 	set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1});
 	set_global_opt(PestppOptions::GLOBAL_OPT::NONE);
-	set_de_cr(0.9);
-	set_de_f(0.8);
+	set_de_cr(0.6);
+	set_de_f(0.7);
 	set_de_dither_f(true);
 	set_de_npopulation(40);
 	set_de_max_gen(100);
@@ -1346,12 +1353,13 @@ void PestppOptions::set_defaults()
 	set_opt_par_stack("");
 	set_opt_obs_stack("");
 
-	set_mou_algorithm("nsga");
+	set_mou_algorithm("NSGA");
 	set_mou_population_size(100);
 	set_mou_dv_population_file("");
 	set_mou_obs_population_restart_file("");
 	set_mou_objectives(vector<string>());
 	set_mou_max_archive_size(5000);
+	set_mou_chance_points("OPTIMAL");
 
 
 	set_ies_par_csv("");

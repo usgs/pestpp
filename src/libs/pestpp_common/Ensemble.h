@@ -50,6 +50,7 @@ public:
 	void replace_col(string var_name, Eigen::VectorXd & vec);
 	Eigen::VectorXd get_real_vector(int ireal);
 	Eigen::VectorXd get_real_vector(const string &real_name);
+	Eigen::VectorXd get_var_vector(const string& var_name);
 	void update_real_ip(string &rname, Eigen::VectorXd &real);
 	Eigen::MatrixXd get_eigen(vector<string> row_names, vector<string> col_names, bool update_vmap=true);
 	const Eigen::MatrixXd get_eigen() const { return reals; }
@@ -60,7 +61,7 @@ public:
 	Eigen::MatrixXd get_eigen_anomalies(const vector<string> &_real_names, const vector<string> &_var_names, string on_real="");
 
 
-	vector<double> get_mean_stl_vector();
+	vector<double> get_mean_stl_var_vector();
 	pair<map<string, double>, map<string, double>>  get_moment_maps(const vector<string> &_real_names=vector<string>());
 
 	void append_other_rows(Ensemble &other);
