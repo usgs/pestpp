@@ -65,5 +65,4 @@ pest++/sweep/sweep
 *.log
 /src/UpgradeLog.htm
 *_z
-*.vcxproj
 

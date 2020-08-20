@@ -1,0 +1,378 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\ClpCholeskyBase.cpp" />
+    <ClCompile Include="..\ClpCholeskyDense.cpp" />
+    <ClCompile Include="..\ClpCholeskyTaucs.cpp" />
+    <ClCompile Include="..\ClpCholeskyWssmp.cpp" />
+    <ClCompile Include="..\ClpCholeskyWssmpKKT.cpp" />
+    <ClCompile Include="..\ClpConstraint.cpp" />
+    <ClCompile Include="..\ClpConstraintLinear.cpp" />
+    <ClCompile Include="..\ClpConstraintQuadratic.cpp" />
+    <ClCompile Include="..\ClpDualRowDantzig.cpp" />
+    <ClCompile Include="..\ClpDualRowPivot.cpp" />
+    <ClCompile Include="..\ClpDualRowSteepest.cpp" />
+    <ClCompile Include="..\ClpDummyMatrix.cpp" />
+    <ClCompile Include="..\ClpDynamicExampleMatrix.cpp" />
+    <ClCompile Include="..\ClpDynamicMatrix.cpp" />
+    <ClCompile Include="..\ClpEventHandler.cpp" />
+    <ClCompile Include="..\ClpFactorization.cpp" />
+    <ClCompile Include="..\ClpGubDynamicMatrix.cpp" />
+    <ClCompile Include="..\ClpGubMatrix.cpp" />
+    <ClCompile Include="..\ClpHelperFunctions.cpp" />
+    <ClCompile Include="..\ClpInterior.cpp" />
+    <ClCompile Include="..\ClpLinearObjective.cpp" />
+    <ClCompile Include="..\ClpLsqr.cpp" />
+    <ClCompile Include="..\ClpMain.cpp" />
+    <ClCompile Include="..\ClpMatrixBase.cpp" />
+    <ClCompile Include="..\ClpMessage.cpp" />
+    <ClCompile Include="..\ClpModel.cpp" />
+    <ClCompile Include="..\ClpNetworkBasis.cpp" />
+    <ClCompile Include="..\ClpNetworkMatrix.cpp" />
+    <ClCompile Include="..\ClpNode.cpp" />
+    <ClCompile Include="..\ClpNonLinearCost.cpp" />
+    <ClCompile Include="..\ClpObjective.cpp" />
+    <ClCompile Include="..\ClpPackedMatrix.cpp" />
+    <ClCompile Include="..\ClpPdco.cpp" />
+    <ClCompile Include="..\ClpPdcoBase.cpp" />
+    <ClCompile Include="..\ClpPlusMinusOneMatrix.cpp" />
+    <ClCompile Include="..\ClpPredictorCorrector.cpp" />
+    <ClCompile Include="..\ClpPresolve.cpp" />
+    <ClCompile Include="..\ClpPrimalColumnDantzig.cpp" />
+    <ClCompile Include="..\ClpPrimalColumnPivot.cpp" />
+    <ClCompile Include="..\ClpPrimalColumnSteepest.cpp" />
+    <ClCompile Include="..\ClpQuadraticObjective.cpp" />
+    <ClCompile Include="..\ClpSimplex.cpp" />
+    <ClCompile Include="..\ClpSimplexDual.cpp" />
+    <ClCompile Include="..\ClpSimplexNonlinear.cpp" />
+    <ClCompile Include="..\ClpSimplexOther.cpp" />
+    <ClCompile Include="..\ClpSimplexPrimal.cpp" />
+    <ClCompile Include="..\ClpSolve.cpp" />
+    <ClCompile Include="..\ClpSolver.cpp" />
+    <ClCompile Include="..\Clp_ampl.cpp" />
+    <ClCompile Include="..\Clp_C_Interface.cpp" />
+    <ClCompile Include="..\CoinAlloc.cpp" />
+    <ClCompile Include="..\CoinBuild.cpp" />
+    <ClCompile Include="..\CoinDenseFactorization.cpp" />
+    <ClCompile Include="..\CoinDenseVector.cpp" />
+    <ClCompile Include="..\CoinError.cpp" />
+    <ClCompile Include="..\CoinFactorization1.cpp" />
+    <ClCompile Include="..\CoinFactorization2.cpp" />
+    <ClCompile Include="..\CoinFactorization3.cpp" />
+    <ClCompile Include="..\CoinFactorization4.cpp" />
+    <ClCompile Include="..\CoinFileIO.cpp" />
+    <ClCompile Include="..\CoinFinite.cpp" />
+    <ClCompile Include="..\CoinIndexedVector.cpp" />
+    <ClCompile Include="..\CoinLpIO.cpp" />
+    <ClCompile Include="..\CoinMessage.cpp" />
+    <ClCompile Include="..\CoinMessageHandler.cpp" />
+    <ClCompile Include="..\CoinModel.cpp" />
+    <ClCompile Include="..\CoinModelUseful.cpp" />
+    <ClCompile Include="..\CoinModelUseful2.cpp" />
+    <ClCompile Include="..\CoinMpsIO.cpp" />
+    <ClCompile Include="..\CoinOslFactorization.cpp" />
+    <ClCompile Include="..\CoinOslFactorization2.cpp" />
+    <ClCompile Include="..\CoinOslFactorization3.cpp" />
+    <ClCompile Include="..\CoinPackedMatrix.cpp" />
+    <ClCompile Include="..\CoinPackedVector.cpp" />
+    <ClCompile Include="..\CoinPackedVectorBase.cpp" />
+    <ClCompile Include="..\CoinParam.cpp" />
+    <ClCompile Include="..\CoinParamUtils.cpp" />
+    <ClCompile Include="..\CoinPostsolveMatrix.cpp" />
+    <ClCompile Include="..\CoinPrePostsolveMatrix.cpp" />
+    <ClCompile Include="..\CoinPresolveDoubleton.cpp" />
+    <ClCompile Include="..\CoinPresolveDual.cpp" />
+    <ClCompile Include="..\CoinPresolveDupcol.cpp" />
+    <ClCompile Include="..\CoinPresolveEmpty.cpp" />
+    <ClCompile Include="..\CoinPresolveFixed.cpp" />
+    <ClCompile Include="..\CoinPresolveForcing.cpp" />
+    <ClCompile Include="..\CoinPresolveHelperFunctions.cpp" />
+    <ClCompile Include="..\CoinPresolveImpliedFree.cpp" />
+    <ClCompile Include="..\CoinPresolveIsolated.cpp" />
+    <ClCompile Include="..\CoinPresolveMatrix.cpp" />
+    <ClCompile Include="..\CoinPresolveMonitor.cpp" />
+    <ClCompile Include="..\CoinPresolvePsdebug.cpp" />
+    <ClCompile Include="..\CoinPresolveSingleton.cpp" />
+    <ClCompile Include="..\CoinPresolveSubst.cpp" />
+    <ClCompile Include="..\CoinPresolveTighten.cpp" />
+    <ClCompile Include="..\CoinPresolveTripleton.cpp" />
+    <ClCompile Include="..\CoinPresolveUseless.cpp" />
+    <ClCompile Include="..\CoinPresolveZeros.cpp" />
+    <ClCompile Include="..\CoinRational.cpp" />
+    <ClCompile Include="..\CoinSearchTree.cpp" />
+    <ClCompile Include="..\CoinShallowPackedVector.cpp" />
+    <ClCompile Include="..\CoinSimpFactorization.cpp" />
+    <ClCompile Include="..\CoinSnapshot.cpp" />
+    <ClCompile Include="..\CoinStructuredModel.cpp" />
+    <ClCompile Include="..\CoinWarmStartBasis.cpp" />
+    <ClCompile Include="..\CoinWarmStartDual.cpp" />
+    <ClCompile Include="..\CoinWarmStartPrimalDual.cpp" />
+    <ClCompile Include="..\CoinWarmStartVector.cpp" />
+    <ClCompile Include="..\Idiot.cpp" />
+    <ClCompile Include="..\IdiSolve.cpp" />
+    <ClCompile Include="..\sequential_lp.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\ClpCholeskyBase.hpp" />
+    <ClInclude Include="..\ClpCholeskyDense.hpp" />
+    <ClInclude Include="..\ClpCholeskyTaucs.hpp" />
+    <ClInclude Include="..\ClpCholeskyWssmp.hpp" />
+    <ClInclude Include="..\ClpCholeskyWssmpKKT.hpp" />
+    <ClInclude Include="..\ClpConfig.h" />
+    <ClInclude Include="..\ClpConstraint.hpp" />
+    <ClInclude Include="..\ClpConstraintLinear.hpp" />
+    <ClInclude Include="..\ClpConstraintQuadratic.hpp" />
+    <ClInclude Include="..\ClpDualRowDantzig.hpp" />
+    <ClInclude Include="..\ClpDualRowPivot.hpp" />
+    <ClInclude Include="..\ClpDualRowSteepest.hpp" />
+    <ClInclude Include="..\ClpDummyMatrix.hpp" />
+    <ClInclude Include="..\ClpDynamicExampleMatrix.hpp" />
+    <ClInclude Include="..\ClpDynamicMatrix.hpp" />
+    <ClInclude Include="..\ClpEventHandler.hpp" />
+    <ClInclude Include="..\ClpFactorization.hpp" />
+    <ClInclude Include="..\ClpGubDynamicMatrix.hpp" />
+    <ClInclude Include="..\ClpGubMatrix.hpp" />
+    <ClInclude Include="..\ClpHelperFunctions.hpp" />
+    <ClInclude Include="..\ClpInterior.hpp" />
+    <ClInclude Include="..\ClpLinearObjective.hpp" />
+    <ClInclude Include="..\ClpLsqr.hpp" />
+    <ClInclude Include="..\ClpMatrixBase.hpp" />
+    <ClInclude Include="..\ClpMessage.hpp" />
+    <ClInclude Include="..\ClpModel.hpp" />
+    <ClInclude Include="..\ClpNetworkBasis.hpp" />
+    <ClInclude Include="..\ClpNetworkMatrix.hpp" />
+    <ClInclude Include="..\ClpNode.hpp" />
+    <ClInclude Include="..\ClpNonLinearCost.hpp" />
+    <ClInclude Include="..\ClpObjective.hpp" />
+    <ClInclude Include="..\ClpPackedMatrix.hpp" />
+    <ClInclude Include="..\ClpParameters.hpp" />
+    <ClInclude Include="..\ClpPdco.hpp" />
+    <ClInclude Include="..\ClpPdcoBase.hpp" />
+    <ClInclude Include="..\ClpPlusMinusOneMatrix.hpp" />
+    <ClInclude Include="..\ClpPredictorCorrector.hpp" />
+    <ClInclude Include="..\ClpPresolve.hpp" />
+    <ClInclude Include="..\ClpPrimalColumnDantzig.hpp" />
+    <ClInclude Include="..\ClpPrimalColumnPivot.hpp" />
+    <ClInclude Include="..\ClpPrimalColumnSteepest.hpp" />
+    <ClInclude Include="..\ClpPrimalQuadraticDantzig.hpp" />
+    <ClInclude Include="..\ClpQuadraticObjective.hpp" />
+    <ClInclude Include="..\ClpSimplex.hpp" />
+    <ClInclude Include="..\ClpSimplexDual.hpp" />
+    <ClInclude Include="..\ClpSimplexNonlinear.hpp" />
+    <ClInclude Include="..\ClpSimplexOther.hpp" />
+    <ClInclude Include="..\ClpSimplexPrimal.hpp" />
+    <ClInclude Include="..\ClpSolve.hpp" />
+    <ClInclude Include="..\Clp_ampl.h" />
+    <ClInclude Include="..\Clp_C_Interface.h" />
+    <ClInclude Include="..\CoinAlloc.hpp" />
+    <ClInclude Include="..\CoinBuild.hpp" />
+    <ClInclude Include="..\CoinDenseFactorization.hpp" />
+    <ClInclude Include="..\CoinDenseVector.hpp" />
+    <ClInclude Include="..\CoinDistance.hpp" />
+    <ClInclude Include="..\CoinError.hpp" />
+    <ClInclude Include="..\CoinFactorization.hpp" />
+    <ClInclude Include="..\CoinFileIO.hpp" />
+    <ClInclude Include="..\CoinFinite.hpp" />
+    <ClInclude Include="..\CoinFloatEqual.hpp" />
+    <ClInclude Include="..\CoinHelperFunctions.hpp" />
+    <ClInclude Include="..\CoinIndexedVector.hpp" />
+    <ClInclude Include="..\CoinLpIO.hpp" />
+    <ClInclude Include="..\CoinMessage.hpp" />
+    <ClInclude Include="..\CoinMessageHandler.hpp" />
+    <ClInclude Include="..\CoinModel.hpp" />
+    <ClInclude Include="..\CoinModelUseful.hpp" />
+    <ClInclude Include="..\CoinMpsIO.hpp" />
+    <ClInclude Include="..\CoinOslC.h" />
+    <ClInclude Include="..\CoinOslFactorization.hpp" />
+    <ClInclude Include="..\CoinPackedMatrix.hpp" />
+    <ClInclude Include="..\CoinPackedVector.hpp" />
+    <ClInclude Include="..\CoinPackedVectorBase.hpp" />
+    <ClInclude Include="..\CoinParam.hpp" />
+    <ClInclude Include="..\CoinPragma.hpp" />
+    <ClInclude Include="..\CoinPresolveDoubleton.hpp" />
+    <ClInclude Include="..\CoinPresolveDual.hpp" />
+    <ClInclude Include="..\CoinPresolveDupcol.hpp" />
+    <ClInclude Include="..\CoinPresolveEmpty.hpp" />
+    <ClInclude Include="..\CoinPresolveFixed.hpp" />
+    <ClInclude Include="..\CoinPresolveForcing.hpp" />
+    <ClInclude Include="..\CoinPresolveImpliedFree.hpp" />
+    <ClInclude Include="..\CoinPresolveIsolated.hpp" />
+    <ClInclude Include="..\CoinPresolveMatrix.hpp" />
+    <ClInclude Include="..\CoinPresolveMonitor.hpp" />
+    <ClInclude Include="..\CoinPresolvePsdebug.hpp" />
+    <ClInclude Include="..\CoinPresolveSingleton.hpp" />
+    <ClInclude Include="..\CoinPresolveSubst.hpp" />
+    <ClInclude Include="..\CoinPresolveTighten.hpp" />
+    <ClInclude Include="..\CoinPresolveTripleton.hpp" />
+    <ClInclude Include="..\CoinPresolveUseless.hpp" />
+    <ClInclude Include="..\CoinPresolveZeros.hpp" />
+    <ClInclude Include="..\CoinRational.hpp" />
+    <ClInclude Include="..\CoinSearchTree.hpp" />
+    <ClInclude Include="..\CoinShallowPackedVector.hpp" />
+    <ClInclude Include="..\CoinSignal.hpp" />
+    <ClInclude Include="..\CoinSimpFactorization.hpp" />
+    <ClInclude Include="..\CoinSmartPtr.hpp" />
+    <ClInclude Include="..\CoinSnapshot.hpp" />
+    <ClInclude Include="..\CoinSort.hpp" />
+    <ClInclude Include="..\CoinStructuredModel.hpp" />
+    <ClInclude Include="..\CoinTime.hpp" />
+    <ClInclude Include="..\CoinTypes.hpp" />
+    <ClInclude Include="..\CoinUtility.hpp" />
+    <ClInclude Include="..\CoinUtilsConfig.h" />
+    <ClInclude Include="..\CoinWarmStart.hpp" />
+    <ClInclude Include="..\CoinWarmStartBasis.hpp" />
+    <ClInclude Include="..\CoinWarmStartDual.hpp" />
+    <ClInclude Include="..\CoinWarmStartPrimalDual.hpp" />
+    <ClInclude Include="..\CoinWarmStartVector.hpp" />
+    <ClInclude Include="..\Coin_C_defines.h" />
+    <ClInclude Include="..\configall_system.h" />
+    <ClInclude Include="..\configall_system_msc.h" />
+    <ClInclude Include="..\config_clp_default.h" />
+    <ClInclude Include="..\config_coinutils_default.h" />
+    <ClInclude Include="..\config_default.h" />
+    <ClInclude Include="..\Idiot.hpp" />
+    <ClInclude Include="..\sequential_lp.h" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{12BD8598-769B-4078-8254-3032632CDE71}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>libopt</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>CLP_BUILD;_CRT_SECURE_NO_WARNINGS;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(SolutionDir)libs\Eigen;$(SolutionDir)libs\linear_analysis;$(SolutionDir)libs\opt;$(SolutionDir)libs\common;$(SolutionDir)libs\run_managers\abstract_base;$(SolutionDir)libs\pestpp_common</AdditionalIncludeDirectories>
+      <AdditionalOptions>/D_WIN32_WINNT=0x0600 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>CLP_BUILD;_CRT_SECURE_NO_WARNINGS;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(SolutionDir)libs\Eigen;$(SolutionDir)libs\linear_analysis;$(SolutionDir)libs\opt;$(SolutionDir)libs\common;$(SolutionDir)libs\run_managers\abstract_base;$(SolutionDir)libs\pestpp_common</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>CLP_BUILD;_CRT_SECURE_NO_WARNINGS;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir)libs\Eigen;$(SolutionDir)libs\linear_analysis;$(SolutionDir)libs\opt;$(SolutionDir)libs\common;$(SolutionDir)libs\run_managers\abstract_base;$(SolutionDir)libs\pestpp_common</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>/D_WIN32_WINNT=0x0600 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
