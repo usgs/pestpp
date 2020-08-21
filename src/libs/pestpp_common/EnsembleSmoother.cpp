@@ -2450,6 +2450,19 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 				}
 			}
 			threads[i].join();
+			if (exception_ptrs[i])
+			{
+				try
+				{
+					rethrow_exception(exception_ptrs[i]);
+				}
+				catch (const std::exception& e)
+				{
+					ss.str("");
+					ss << "thread " << i << "raised an exception: " << e.what();
+					throw runtime_error(ss.str());
+				}
+			}
 		}
 		message(2, "threaded localized upgrade calculation done");
 	}

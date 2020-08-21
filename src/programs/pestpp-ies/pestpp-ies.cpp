@@ -239,6 +239,7 @@ int main(int argc, char* argv[])
 			fout_rec.close();
 			throw(e);
 		}
+		//pest_scenario.clear_ext_files();
 		pest_scenario.check_inputs(fout_rec);
 
 		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)

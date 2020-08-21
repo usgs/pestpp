@@ -699,6 +699,8 @@ def tplins1_test():
         shutil.rmtree(t_d)
     shutil.copytree(os.path.join(model_d,"template"),t_d)
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
+    ins_file = os.path.join(t_d,"AOC_obs.txt.ins")
+    pst.add_observations(ins_file,ins_file.replace(".ins",""),pst_path=".")
     
     pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-glm")),cwd=t_d)
     obf_df = pd.read_csv(os.path.join(t_d,"out1.dat.obf"),delim_whitespace=True,header=None,names=["obsnme","obsval"])
@@ -815,6 +817,7 @@ def ext_stdcol_test():
     d = (df.std() - obs.loc[pst.nnz_obs_names,"standard_deviation"]).apply(np.abs)
     print(d)
     assert d.max() < 0.1,d.max()
+    
     obs = pst.observation_data
     obs.loc[pst.nnz_obs_names,"upper_bound"] = obs.loc[pst.nnz_obs_names,"obsval"] * 1.1
     obs.loc[pst.nnz_obs_names,"lower_bound"] = obs.loc[pst.nnz_obs_names,"obsval"] * 0.9
@@ -956,8 +959,8 @@ if __name__ == "__main__":
     #sen_basic_test()
     #salib_verf()
     #tplins1_test()
-    #ext_stdcol_test()
+    ext_stdcol_test()
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
     #mf6_v5_opt_stack_test()
-    mf6_v5_glm_test()
+    #mf6_v5_glm_test()
