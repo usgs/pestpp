@@ -264,6 +264,19 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 						}
 					}
 					threads[i].join();
+					if (exception_ptrs[i])
+					{
+						try
+						{
+							rethrow_exception(exception_ptrs[i]);
+						}
+						catch (const std::exception& e)
+						{
+							ss.str("");
+							ss << "thread " << i << "raised an exception: " << e.what();
+							throw runtime_error(ss.str());
+						}
+					}
 				}
 				plog->log_event("threaded draws done");
 
@@ -1256,10 +1269,12 @@ void Ensemble::append(string real_name, const Transformable &trans)
 	}
 	//make sure all var_names are found
 	vector<string> keys = trans.get_keys();
-	set<string> tset(keys.begin(), keys.end());
+	//set<string> tset(keys.begin(), keys.end());
 	vector<string> missing;
+	Transformable::const_iterator end = trans.end();
 	for (auto &n : var_names)
-		if (tset.find(n) == tset.end())
+		//if (tset.find(n) == tset.end())
+		if (trans.find(n) == end)
 			missing.push_back(n);
 	if (missing.size() > 0)
 	{
