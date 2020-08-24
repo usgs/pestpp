@@ -170,6 +170,45 @@ void ModelInterface::run(Parameters* pars, Observations* obs)
 
 }
 
+void ThreadedInstructionProcess::work(int tid, vector<int>& ins_idx, Observations& obs)
+{
+	int count = 0, i;
+	unique_lock<mutex> obs_guard(obs_lock, defer_lock);
+	unique_lock<mutex> idx_guard(idx_lock, defer_lock);
+	while (true)
+	{
+		i = -999;
+		while (true)
+		{
+			if (idx_guard.try_lock())
+			{
+				if (ins_idx.size() == 0)
+				{
+					cout << "thread " << tid << " processed " << count << " instruction files" << endl;
+					return;
+				}
+				i = ins_idx[ins_idx.size() - 1];
+				ins_idx.pop_back();
+				idx_guard.unlock();
+				break;
+			}
+		}
+		InstructionFile ins(insfile_vec[i]);
+		Observations oobs = ins.read_output_file(outfile_vec[i]);
+		while (true)
+		{
+			if (obs_guard.try_lock())
+			{
+				//pro_par_vec.push_back(pro_pars);
+				obs.update_without_clear(oobs.get_keys(), oobs.get_data_vec(oobs.get_keys()));
+				obs_guard.unlock();
+				break;
+			}
+		}
+		count++;
+	}
+}
+
 void ThreadedTemplateProcess::work(int tid, vector<int>& tpl_idx, Parameters pars, Parameters& pro_pars)
 {
 	int count = 0, i;
@@ -225,6 +264,21 @@ void process_template_file_thread(int tid, vector<int>& tpl_idx, ThreadedTemplat
 	return;
 }
 
+void process_instruction_file_thread(int tid, vector<int>& ins_idx, ThreadedInstructionProcess& tip, Observations& obs, exception_ptr& eptr)
+{
+
+	try
+	{
+		tip.work(tid, ins_idx, obs);
+	}
+	catch (...)
+	{
+		eptr = current_exception();
+	}
+
+	return;
+}
+
 
 void ModelInterface::write_input_files(Parameters *pars_ptr)
 {
@@ -232,7 +286,7 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 	if (num_threads > tplfile_vec.size())
 		num_threads = tplfile_vec.size();
 	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
-	cout << pest_utils::get_time_string() << " processing tpl files with " << num_threads << " threads..." << endl;
+	cout << pest_utils::get_time_string() << " processing template files with " << num_threads << " threads..." << endl;
 	vector<thread> threads;
 	vector<exception_ptr> exception_ptrs;
 	Parameters pro_pars = *pars_ptr; //copy
@@ -270,7 +324,6 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 		threads[i].join();
 		if (exception_ptrs[i])
 		{
-			cout << "exception raised by " << i << endl;
 			try
 			{
 				rethrow_exception(exception_ptrs[i]);
@@ -317,9 +370,65 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 
 void ModelInterface::read_output_files(Observations *obs)
 {
+	int num_threads = 10;
+	if (num_threads > insfile_vec.size())
+		num_threads = insfile_vec.size();
 	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
-	cout << pest_utils::get_time_string() <<  " processing ins files...";
-	if (instructionfiles.size() == 0)
+	cout << pest_utils::get_time_string() <<  " processing instruction files with " << num_threads << " threads...";
+	vector<thread> threads;
+	vector<exception_ptr> exception_ptrs;
+	Observations temp_obs;
+
+	ThreadedInstructionProcess tip(insfile_vec, outfile_vec);
+
+	for (int i = 0; i < num_threads; i++)
+	{
+		exception_ptrs.push_back(exception_ptr());
+	}
+
+	vector<int> ins_idx;
+	for (int i = 0; i < insfile_vec.size(); i++)
+		ins_idx.push_back(i);
+
+	for (int i = 0; i < num_threads; i++)
+	{
+		threads.push_back(thread(process_instruction_file_thread, i, std::ref(ins_idx), std::ref(tip), std::ref(temp_obs), std::ref(exception_ptrs[i])));
+	}
+
+	for (int i = 0; i < num_threads; ++i)
+	{
+		if (exception_ptrs[i])
+		{
+			try
+			{
+				rethrow_exception(exception_ptrs[i]);
+			}
+			catch (const std::exception& e)
+			{
+				stringstream ss;
+				ss << "thread processing instruction file '" << insfile_vec[i] << "' raised an exception: " << e.what();
+				throw runtime_error(ss.str());
+			}
+		}
+		threads[i].join();
+		if (exception_ptrs[i])
+		{
+			try
+			{
+				rethrow_exception(exception_ptrs[i]);
+			}
+			catch (const std::exception& e)
+			{
+				stringstream ss;
+				ss << "thread processing instruction file '" << insfile_vec[i] << "' raised an exception: " << e.what();
+				throw runtime_error(ss.str());
+			}
+		}
+	}
+	
+	
+	
+	/*if (instructionfiles.size() == 0)
 	{
 		for (auto i : insfile_vec)
 		{
@@ -334,7 +443,7 @@ void ModelInterface::read_output_files(Observations *obs)
 	{
 		pro_obs = instructionfiles[i].read_output_file(outfile_vec[i]);
 		temp_obs.update_without_clear(pro_obs.get_keys(), pro_obs.get_data_vec(pro_obs.get_keys()));
-	}
+	}*/
 	unordered_set<string> ins_names, pst_names;
 	vector<string> t, diff;
 	t = obs->get_keys();
