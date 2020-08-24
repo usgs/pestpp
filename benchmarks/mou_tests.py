@@ -229,7 +229,7 @@ def test_zdt1(additive_chance=False):
     test_d = setup_zdt_problem(test_case,30,additive_chance=additive_chance)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
     pst.control_data.noptmax = 1
-    pst.pestpp_options["mou_population_size"] = 20
+    pst.pestpp_options["mou_population_size"] = 100
     if additive_chance:
         pst.pestpp_options["opt_risk"] = 0.95
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))

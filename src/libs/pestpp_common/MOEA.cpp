@@ -1289,7 +1289,14 @@ void MOEA::iterate_to_solution()
 		new_op.reserve(new_dp.get_real_names(), op.get_var_names());
 		run_population(new_dp, new_op);
 		
-		
+		// evalute metrics
+		  // Setting initial values
+			//fitness_ = 0.0;
+			//kDistance_ = 0.0;
+			//crowdingDistance_ = 0.0;
+			//distanceToSolutionSet_ = std::numeric_limits<double>::max();
+			//variable_ = type_->createVariables();
+			//rank_ = 0;
 
 		//and risk-shift
 		ObservationEnsemble new_op_shifted = get_risk_shifted_op(new_op);
@@ -1595,6 +1602,7 @@ ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnse
 {
 	message(1, "generating NSGA2 population of size", num_members);
 	vector<int> member_count, working_count, selected, r_int_vec;
+	vector<double> rnds;
 	for (int i = 0; i < _dp.shape().first; i++)
 		member_count.push_back(i);
 
@@ -1613,10 +1621,29 @@ ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnse
 	pair<Eigen::VectorXd, Eigen::VectorXd> children;
 	vector<string> new_names;
 
+    // selection
+	// 
 	while (i_member < num_members)
+	// if we select two at a time and generate two offspring
+	// for (int i_member = 0; i < (num_members / 2); i_member++) {
 	{
+
+		// if member1 dominates member2, use member1
+		// else if member2 dominates member1, use member2
+		// else if member1 has greater crowding distance, use member1
+		// else if member2 has greater crowding distance, use member2
+		// else use one at random:
+		//  rnds = uniform_draws(2, 0.0, 1.0, rand_gen);
+		//    else
+		//    if (rnds[0] < 0.5)
+		//  	  return member1;
+		//    else
+		//  	  return member2;
+
+
 		//randomly select two parents - this is just a temp routine, something better needed...
 		working_count = member_count;//copy member count index to working count
+		// sampled with or without replacement? TODO: need to figure this out
 		shuffle(working_count.begin(), working_count.end(), rand_gen); //randomly shuffle working count
 		//just take the first two since this should change each time thru
 		p1_idx = working_count[0];
