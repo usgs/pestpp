@@ -13,38 +13,35 @@
 
 using namespace std;
 
-ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
-	PerformanceLog* _performance_log, Constraints* _constraints_ptr): 
-	pest_scenario(_pest_scenario),file_manager(_file_manager),performance_log(_performance_log), constraints_ptr()
+//util functions
+
+
+
+ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager,
+	PerformanceLog* _performance_log, Constraints* _constraints_ptr):
+	pest_scenario(_pest_scenario),file_manager(_file_manager),
+	performance_log(_performance_log),constraints_ptr(_constraints_ptr)
 
 {
 
 }
 
-pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(const vector<string>& obs_obj_names, const vector<string>& pi_obj_names, 
-	ObservationEnsemble& op, ParameterEnsemble& dp, map<string, double>& obj_dir_mult)
+void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
-	stringstream ss;
-	ss << "ParetoObjectives::pareto_dominance_sort() for " << op.shape().first << " population members";
-	performance_log->log_event(ss.str());
-	performance_log->log_event("preparing fast-lookup containers");
+	member_struct.clear();
 
-
-	//TODO: check for a single objective and deal appropriately
-
-	//first prep two fast look up containers, one by obj and one by member name
-	map<string, map<double, string>> obj_struct;
+	//map<string, map<double, string>> obj_struct;
 	vector<string> real_names = op.get_real_names();
 	Eigen::VectorXd obj_vals;
 	map<string, map<string, double>> temp;
-	for (auto obj_name : obs_obj_names)
+	for (auto obj_name : *obs_obj_names_ptr)
 	{
 		obj_vals = op.get_eigen(vector<string>(), vector<string>{obj_name});
 
 		//if this is a max obj, just flip the values here
-		if (obj_dir_mult.find(obj_name) != obj_dir_mult.end())
+		if (obj_dir_mult_ptr->find(obj_name) != obj_dir_mult_ptr->end())
 		{
-			obj_vals *= obj_dir_mult[obj_name];
+			obj_vals *= obj_dir_mult_ptr->at(obj_name);
 		}
 		map<double, string> obj_map;
 		map<string, double> t;
@@ -53,11 +50,10 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(con
 			obj_map[obj_vals[i]] = real_names[i];
 			t[real_names[i]] = obj_vals[i];
 		}
-		obj_struct[obj_name] = obj_map;
+		//obj_struct[obj_name] = obj_map;
 		temp[obj_name] = t;
 
 	}
-
 
 
 	map<string, map<string, double>> member_struct;
@@ -75,7 +71,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(con
 	temp.clear();
 
 	//add any prior info obj values to member_struct
-	if (pi_obj_names.size() > 0)
+	if (pi_obj_names_ptr->size() > 0)
 	{
 		PriorInformation* pi_ptr = pest_scenario.get_prior_info_ptr();
 		Parameters pars;
@@ -84,15 +80,31 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(con
 		for (auto real_name : real_names)
 		{
 			pars.update_without_clear(pnames, dp.get_real_vector(real_name));
-			for (auto obj_name : pi_obj_names)
+			for (auto obj_name : *pi_obj_names_ptr)
 			{
 				pi_res_sim = pi_ptr->get_pi_rec_ptr(obj_name).calc_sim_and_resid(pars);
 				//account for dir mult here
-				member_struct[real_name][obj_name] = pi_res_sim.first * obj_dir_mult[obj_name];
+				member_struct[real_name][obj_name] = pi_res_sim.first * obj_dir_mult_ptr->at(obj_name);
 			}
 		}
 	}
 
+}
+
+pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(ObservationEnsemble& op, ParameterEnsemble& dp)
+{
+	stringstream ss;
+	ss << "ParetoObjectives::pareto_dominance_sort() for " << op.shape().first << " population members";
+	performance_log->log_event(ss.str());
+	performance_log->log_event("preparing fast-lookup containers");
+
+
+	//TODO: check for a single objective and deal appropriately
+
+	//update the member struct container
+	update_member_struct(op, dp);
+	
+	vector<string> real_names = op.get_real_names();
 	vector<string> infeas_ordered;
 	if (constraints_ptr)
 	{
@@ -102,8 +114,8 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(con
 		Observations obs = pest_scenario.get_ctl_observations();
 		Parameters pars = pest_scenario.get_ctl_parameters();
 		vector<string> onames = op.get_var_names(), pnames=dp.get_var_names();
-		set<string> obs_obj_set(obs_obj_names.begin(), obs_obj_names.end());
-		set<string> pi_obj_set(pi_obj_names.begin(), pi_obj_names.end());
+		set<string> obs_obj_set(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
+		set<string> pi_obj_set(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());
 		map<string,double> infeas;
 		map<string, map<string, double>> feas_member_struct;
 		for (auto real_name : real_names)
@@ -174,7 +186,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(con
 		if (front.second.size() == 1)
 			crowd_ordered_front = front.second;
 		else
-			crowd_ordered_front = sort_members_by_crowding_distance(front.second, member_struct);
+			crowd_ordered_front = sort_members_by_crowding_distance(front.second);
 		if (front.first == 1)
 			for (auto front_member : crowd_ordered_front)
 				nondom_crowd_ordered.push_back(front_member);
@@ -208,42 +220,67 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(con
 
 }
 
-vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members, map<string,map<string,double>>& memeber_struct)
-{
 
-	//typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
-	//// Defining a lambda function to compare two pairs. It will compare two pairs using second field
-	//Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
-	//{
-	//	return elem1.second < elem2.second;
-	//};
+map<string, double> ParetoObjectives::get_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
+{
+	//this updates the complicated map-based structure that stores the member names: obj_names:value nested pairs
+	update_member_struct(op, dp);
+	//just reuse the same routine used for the pareto dominance sort...
+	return get_crowding_distance();
+}
+
+map<string, double> ParetoObjectives::get_hypervolume(ObservationEnsemble& op, ParameterEnsemble& dp)
+{
+	//this updates the complicated map-based structure that stores the member names: obj_names:value nested pairs
+	update_member_struct(op, dp);
+
+	map<string, double> hypervol_map;
+
+	//do something cool here...
 	
-	map<string, map<string,double>> obj_member_map;
+
+
+	return hypervol_map;
+
+}
+
+map<string, double> ParetoObjectives::get_crowding_distance()
+{
+	vector<string> members;
+	for (auto m : member_struct)
+		members.push_back(m.first);
+	return get_crowding_distance(members);
+}
+
+map<string, double> ParetoObjectives::get_crowding_distance(vector<string>& members)
+{
+	
+	map<string, map<string, double>> obj_member_map;
 	map<string, double> crowd_distance_map;
 	string m = members[0];
 	vector<string> obj_names;
-	for (auto obj_map : memeber_struct[m])
+	for (auto obj_map : member_struct[m])
 	{
-		obj_member_map[obj_map.first] = map<string,double>();
+		obj_member_map[obj_map.first] = map<string, double>();
 		obj_names.push_back(obj_map.first);
 	}
 
 	for (auto member : members)
 	{
 		crowd_distance_map[member] = 0.0;
-		for (auto obj_map : memeber_struct[member])
+		for (auto obj_map : member_struct[member])
 			obj_member_map[obj_map.first][member] = obj_map.second;
 
 	}
 
 	//map<double,string>::iterator start, end;
-	map<string,double> omap;
+	map<string, double> omap;
 	double obj_range;
 	typedef std::set<std::pair<std::string, double>, Comparator> crowdset;
 	for (auto obj_map : obj_member_map)
 	{
 		omap = obj_map.second;
-		crowdset crowd_sorted(omap.begin(),omap.end(), compFunctor);
+		crowdset crowd_sorted(omap.begin(), omap.end(), compFunctor);
 
 		crowdset::iterator start = crowd_sorted.begin(), last = prev(crowd_sorted.end(), 1);
 
@@ -271,6 +308,15 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string
 		}
 
 	}
+	return crowd_distance_map;
+}
+
+
+vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members)
+{
+
+	map<string, double> crowd_distance_map = get_crowding_distance(members);
+	
 
 	vector <pair<string, double>> cs_vec;
 	for (auto cd : crowd_distance_map)
@@ -515,7 +561,7 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	dp_archive.append_other_rows(keep, other);
 	other.resize(0, 0);
 	message(2, "pareto dominance sorting archive of size", op_archive.shape().first);
-	DomPair dompair = objectives.pareto_dominance_sort(obs_obj_names, pi_obj_names, op_archive, dp_archive, obj_dir_mult);
+	DomPair dompair = objectives.pareto_dominance_sort(op_archive, dp_archive);
 	
 	ss.str("");
 	ss << "resizing archive from " << op_archive.shape().first << " to " << dompair.first.size() << " current non-dominated solutions";
@@ -1230,7 +1276,8 @@ void MOEA::initialize()
 
 	//do an initial pareto dominance sort
 	message(1, "performing initial pareto dominance sort");
-	DomPair dompair = objectives.pareto_dominance_sort(obs_obj_names, pi_obj_names, op, dp, obj_dir_mult);
+	objectives.set_pointers(obs_obj_names, pi_obj_names, obj_dir_mult);
+	DomPair dompair = objectives.pareto_dominance_sort(op, dp);
 	
 	//initialize op and dp archives
 	op_archive = ObservationEnsemble(&pest_scenario, &rand_gen, 
@@ -1309,7 +1356,7 @@ void MOEA::iterate_to_solution()
 
 		//sort according to pareto dominance, crowding distance, and, optionally, feasibility
 		message(1, "pareto dominance sorting combined parent-child populations");
-		DomPair dompair = objectives.pareto_dominance_sort(obs_obj_names, pi_obj_names, new_op, new_dp, obj_dir_mult);
+		DomPair dompair = objectives.pareto_dominance_sort(new_op, new_dp);
 
 		//drop shitty members
 		//TODO: this is just a cheap hack, prob something more meaningful to be done...
@@ -1907,3 +1954,5 @@ void MOEA::mutate(double probability, double eta_m, ParameterEnsemble& temp_dp)
 		temp_dp.replace(i, temp);
 	}
 }
+
+
