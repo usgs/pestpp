@@ -231,7 +231,8 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 	int num_threads =10;
 	if (num_threads > tplfile_vec.size())
 		num_threads = tplfile_vec.size();
-	cout << "processing tpl files with " << num_threads << " threads...";
+	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
+	cout << pest_utils::get_time_string() << " processing tpl files with " << num_threads << " threads..." << endl;
 	vector<thread> threads;
 	vector<exception_ptr> exception_ptrs;
 	Parameters pro_pars = *pars_ptr; //copy
@@ -311,11 +312,13 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 	//for (auto pro_pars : pro_par_vec)
 	//	pars_ptr->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
 	pars_ptr->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
-	cout << "done" << endl;
+	cout << pest_utils::get_time_string() << " done, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
 }
 
 void ModelInterface::read_output_files(Observations *obs)
 {
+	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
+	cout << pest_utils::get_time_string() <<  " processing ins files...";
 	if (instructionfiles.size() == 0)
 	{
 		for (auto i : insfile_vec)
@@ -325,7 +328,7 @@ void ModelInterface::read_output_files(Observations *obs)
 			instructionfiles.push_back(ii);
 		}
 	}
-	cout << "processing ins files...";
+	
 	Observations temp_obs, pro_obs;
 	for (int i = 0; i < instructionfiles.size(); i++)
 	{
@@ -368,7 +371,7 @@ void ModelInterface::read_output_files(Observations *obs)
 	}
 	t = temp_obs.get_keys();
 	obs->update(t, temp_obs.get_data_vec(t));
-	cout << "done" << endl;
+	cout << pest_utils::get_time_string() << " done, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
 
 }
 
@@ -428,6 +431,8 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		remove_existing();
 		write_input_files(pars_ptr);
 		
+		std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
+		cout << pest_utils::get_time_string() << " calling forward run command(s)" << endl;
 
 #ifdef OS_WIN
 		//a flag to track if the run was terminated
@@ -540,6 +545,8 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 			if (term_break) break;
 		}
 #endif
+
+		cout << pest_utils::get_time_string() << " foward run command(s) finished, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
 
 		if (term_break) return;
 
