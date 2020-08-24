@@ -20,19 +20,39 @@ class ParetoObjectives
 {
 public:
 	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
-		PerformanceLog* _performance_log, Constraints* _constraints_ptr = nullptr);
-	pair<vector<string>, vector<string>> pareto_dominance_sort(const vector<string>& obs_obj_names, 
-		const vector<string>& pi_obj_names, ObservationEnsemble& op, ParameterEnsemble& dp, 
-		map<string, double>& obj_dir_mult);
+		PerformanceLog* _performance_log,Constraints* _constraints_ptr = nullptr);
+
+	pair<vector<string>, vector<string>> pareto_dominance_sort(ObservationEnsemble& op, ParameterEnsemble& dp);
+	
+	//this must be called at least once before the diversity metrixs can be called...
+	void set_pointers(vector<string>& _obs_obj_names, vector<string>& _pi_obj_names, map<string, double>& _obj_dir_mult)
+	{
+		obs_obj_names_ptr = &_obs_obj_names; 
+		pi_obj_names_ptr = &_pi_obj_names; 
+		obj_dir_mult_ptr = &_obj_dir_mult;
+	}
+	void update_member_struct(ObservationEnsemble& oe, ParameterEnsemble& dp);
+	
+	map<string,double> get_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
+	
+	map<string, double> get_hypervolume(ObservationEnsemble& oe, ParameterEnsemble& dp);
+	
+	 
 private:
 	Pest& pest_scenario;
 	FileManager& file_manager;
 	PerformanceLog* performance_log;
 	//vector<string> obj_names;
 	Constraints* constraints_ptr;
-	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, map<string, double>>& memeber_struct);
+	vector<string> sort_members_by_crowding_distance(vector<string>& members);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
+	
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& member_struct);
+
+	//sort specific members
+	map<string, double> get_crowding_distance(vector<string>& members);
+	//sort all members in member struct
+	map<string, double> get_crowding_distance();
 
 	//constraint dominance principal Fan (2017) Tian (2020)
 	//void apply_constraints_cdp();
@@ -40,6 +60,11 @@ private:
 	//void apply_constraints_sp();
 	//in-feasibility driven evolution-ary algorithms Fan (2017)
 	//void apply_constraints_idea();
+
+	map<string, map<string, double>> member_struct;
+	vector<string>* obs_obj_names_ptr;
+	vector<string>* pi_obj_names_ptr;
+	map<string, double>* obj_dir_mult_ptr;
 
 	typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
 	// Defining a lambda function to compare two pairs. It will compare two pairs using second field
