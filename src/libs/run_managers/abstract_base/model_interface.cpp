@@ -370,7 +370,7 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 
 void ModelInterface::read_output_files(Observations *obs)
 {
-	int num_threads = 10;
+	int num_threads = 30;
 	if (num_threads > insfile_vec.size())
 		num_threads = insfile_vec.size();
 	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
@@ -1409,10 +1409,12 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 	return pair<string, double>(info.first,value);
 }
 
+
+
 pair<string, double> InstructionFile::execute_free(const string& token, string& line, ifstream& f_out)
 {
 	vector<string> tokens;
-	pest_utils::tokenize(line, tokens,", \t\n\r" + additional_delimiters) ; //include the comma in the delimiters here
+	tokenize(line, tokens,", \t\n\r" + additional_delimiters) ; //include the comma in the delimiters here
 	if (tokens.size() == 0)
 		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for free instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);
 	double value;
@@ -1438,6 +1440,31 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	line = line.substr(pos + tokens[0].size());
 
 	return pair<string, double>(name,value);
+}
+
+void InstructionFile::tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty)
+{
+	std::string::size_type pos, lastPos = 0;
+	while (true)
+	{
+		pos = str.find_first_of(delimiters, lastPos);
+		if (pos == std::string::npos)
+		{
+			pos = str.length();
+			if (pos != lastPos || !trimEmpty)
+			{
+				tokens.push_back(string(str.data() + lastPos, string::size_type(pos - lastPos)));
+			}
+			break;
+		}
+		else
+		{
+			if (pos != lastPos || !trimEmpty)
+				tokens.push_back(string(str.data() + lastPos, string::size_type(pos - lastPos)));
+		}
+
+		lastPos = pos + 1;
+	}
 }
 
 void InstructionFile::execute_primary(const string& token, string& line, ifstream& f_out)

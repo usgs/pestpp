@@ -85,6 +85,10 @@ private:
 	vector<string> tokenize_ins_line(const string& line);
 	pair<string, pair<int, int>> parse_obs_instruction(const string& token, const string& close_tag);
 	string additional_delimiters;
+	
+	void tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty=true);
+	
+
 };
 
 
