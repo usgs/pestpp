@@ -113,7 +113,7 @@ void RunManagerSerial::run()
 	}
 	total_runs += success_runs;
 	message.str("");
-	message << endl << endl << "-->" << pest_utils::get_time_string() << " serial run manager runs summary:" << success_runs << "/" << failed_runs << "/" << nruns << " runs complete/failed/total, took: " << pest_utils::get_duration_sec(start_time_all) << " seconds" << endl << endl << endl;
+	message << endl << endl << "-->" << pest_utils::get_time_string() << " serial run manager runs summary:" << success_runs << " of " << " runs complete, " << failed_runs << " runs failed, process took: " << pest_utils::get_duration_sec(start_time_all) << " seconds" << endl << endl << endl;
 	std::cout << message.str();
 
 	if (prev_sucess_runs > 0)

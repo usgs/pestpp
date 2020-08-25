@@ -170,7 +170,7 @@ void ModelInterface::run(Parameters* pars, Observations* obs)
 
 }
 
-void ThreadedInstructionProcess::work(int tid, vector<int>& ins_idx, Observations& obs)
+void ThreadedInstructionProcess::work(int tid, vector<int>& ins_idx, Observations& obs, string additional_ins_delims)
 {
 	int count = 0, i;
 	unique_lock<mutex> obs_guard(obs_lock, defer_lock);
@@ -194,6 +194,7 @@ void ThreadedInstructionProcess::work(int tid, vector<int>& ins_idx, Observation
 			}
 		}
 		InstructionFile ins(insfile_vec[i]);
+		ins.set_additional_delimiters(additional_ins_delims);
 		Observations oobs = ins.read_output_file(outfile_vec[i]);
 		while (true)
 		{
@@ -264,12 +265,12 @@ void process_template_file_thread(int tid, vector<int>& tpl_idx, ThreadedTemplat
 	return;
 }
 
-void process_instruction_file_thread(int tid, vector<int>& ins_idx, ThreadedInstructionProcess& tip, Observations& obs, exception_ptr& eptr)
+void process_instruction_file_thread(int tid, vector<int>& ins_idx, ThreadedInstructionProcess& tip, Observations& obs, string additional_ins_delims, exception_ptr& eptr)
 {
 
 	try
 	{
-		tip.work(tid, ins_idx, obs);
+		tip.work(tid, ins_idx, obs, additional_ins_delims);
 	}
 	catch (...)
 	{
@@ -374,7 +375,7 @@ void ModelInterface::read_output_files(Observations *obs)
 	if (num_threads > insfile_vec.size())
 		num_threads = insfile_vec.size();
 	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
-	cout << pest_utils::get_time_string() <<  " processing instruction files with " << num_threads << " threads...";
+	cout << pest_utils::get_time_string() <<  " processing instruction files with " << num_threads << " threads..." << endl;
 	vector<thread> threads;
 	vector<exception_ptr> exception_ptrs;
 	Observations temp_obs;
@@ -392,7 +393,8 @@ void ModelInterface::read_output_files(Observations *obs)
 
 	for (int i = 0; i < num_threads; i++)
 	{
-		threads.push_back(thread(process_instruction_file_thread, i, std::ref(ins_idx), std::ref(tip), std::ref(temp_obs), std::ref(exception_ptrs[i])));
+		threads.push_back(thread(process_instruction_file_thread, i, std::ref(ins_idx), std::ref(tip), std::ref(temp_obs), additional_ins_delimiters,
+			std::ref(exception_ptrs[i])));
 	}
 
 	for (int i = 0; i < num_threads; ++i)
@@ -1413,7 +1415,11 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 
 pair<string, double> InstructionFile::execute_free(const string& token, string& line, ifstream& f_out)
 {
+	int tsize = line.size() / 20;
+	if (tsize > 50)
+		tsize = 50;
 	vector<string> tokens;
+	tokens.reserve(tsize);
 	tokenize(line, tokens,", \t\n\r" + additional_delimiters) ; //include the comma in the delimiters here
 	if (tokens.size() == 0)
 		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for free instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);

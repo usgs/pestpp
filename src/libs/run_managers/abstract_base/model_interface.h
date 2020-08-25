@@ -50,7 +50,7 @@ class ThreadedInstructionProcess {
 public:
 	ThreadedInstructionProcess(vector<string> _insfile_vec, vector<string> _outfile_vec) :
 		insfile_vec(_insfile_vec), outfile_vec(_outfile_vec){;};
-	void work(int tid, vector<int>& ins_idx, Observations& obs);
+	void work(int tid, vector<int>& ins_idx, Observations& obs, string additional_ins_delims);
 private:
 	vector<string> insfile_vec;
 	vector<string> outfile_vec;
