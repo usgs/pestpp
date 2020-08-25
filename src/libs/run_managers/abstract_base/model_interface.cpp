@@ -371,7 +371,7 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 
 void ModelInterface::read_output_files(Observations *obs)
 {
-	int num_threads = 30;
+	int num_threads = 10;
 	if (num_threads > insfile_vec.size())
 		num_threads = insfile_vec.size();
 	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
