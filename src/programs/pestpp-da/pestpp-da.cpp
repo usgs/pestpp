@@ -445,8 +445,15 @@ int main(int argc, char* argv[])
 			{
 				da.set_pe(curr_pe);
 			}
-						
-			da.initialize(*icycle);
+			
+			if (da.use_ies)
+			{
+				da.initialize(*icycle);
+			}
+			else
+			{
+				da.da_initialize(*icycle);
+			}
 
 			if (da.use_ies) // use ies
 			{
@@ -456,7 +463,7 @@ int main(int argc, char* argv[])
 			}
 			else // use da
 			{
-				da.kf_upate();
+				da.da_upate();
 				curr_pe = da.get_pe();
 				curr_pe.to_csv("cncnc.csv");
 

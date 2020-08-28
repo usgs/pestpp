@@ -690,7 +690,7 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_meas(ObservationEnsemble & oe, E
 		return phi_map;
 	}
 
-	Eigen::MatrixXd resid = get_obs_resid(oe);
+	Eigen::MatrixXd resid = get_obs_resid(oe);// this is (Ho - Hs)
 	ObservationInfo oi = pest_scenario->get_ctl_observation_info();
 	vector<string> names = oe_base->get_var_names();
 	w_vec.resize(names.size());

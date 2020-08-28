@@ -230,6 +230,7 @@ private:
 	std::unordered_map<string, int> int_parms = {
 		{ "DA_SUBSET_SIZE", 5 },
 		{ "DA_VERBOSE_LEVEL", 2 }
+		
 	};
 
 	std::unordered_map<string, double> double_parms = {
@@ -240,31 +241,27 @@ private:
 	std::unordered_map<string, string> string_parms = {
 		{ "DA_OBSERVATION_ENSEMBLE", "" },
 		{"DA_RESTART_OBSERVATION_ENSEMBLE", ""},
-		{"DA_RESTART_PARAMETER_ENSEMBLE", ""}
+		{"DA_RESTART_PARAMETER_ENSEMBLE", ""},
+	    {"DA_SUBSET_HOW", "random"}
 
 	};
 	std::unordered_map<string, bool> bool_parms = {
 		{ "DA_ADD_BASE", true },
 	    {"DA_ENFORCE_BOUNDS", true},
-		{"DA_USE_PRIOR_SCALING", true}
+		{"DA_USE_PRIOR_SCALING", true},
+		{"DA_SAVE_BINARY", false}
+
 
 	};
 	std::unordered_map<string, vector<double>> vector_parms
 	{
 		{"DA_LAMBDA_MULTS", {1.0}},
 		{"DA_SCALE_FAC", {1.0}},
-		{"DA_SVD_THRSH", {1e-3, 1e-4, 1e-5}}
+		{"DA_SVD_THRSH", {1e-3, 1e-4, 1e-6}}
 	    //LAMBDA_SCALE_FAC
 
 	};
-	// add map for vector or list data
-	/*
-	{"IES_INITIAL_LAMBDA", ?}
-	IES_LAMBDA_MULTS
-	LAMBDA_SCALE_FAC
-	ies_reg_factor double
-
-	*/
+	
 
 	
 

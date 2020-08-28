@@ -75,9 +75,12 @@ public:
 		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 		RunManagerAbstract* _run_mgr_ptr);
 	void initialize(int _icycle);
+	void da_initialize(int _icycle);
 	void add_dynamic_state_to_pe();
 	vector<string> get_dynamic_states();
 	void iterate_2_solution();
+
+	void da_upate();
 
 	void kf_upate();
 	void finalize();
@@ -145,6 +148,8 @@ private:
 	//bool solve_old();
 	bool solve_new();
 	bool solve_new_da();
+	void return_post_dyn_state(vector<ParameterEnsemble>& pe_lams, vector<ParameterEnsemble> poterior_dyn_states);
+	vector<ParameterEnsemble> temp_remove_dyn_state(vector<ParameterEnsemble>& pe_lams);
 	void adjust_pareto_weight(string& obsgroup, double wfac);
 
 	//ParameterEnsemble calc_upgrade(vector<string> &obs_names, vector<string> &par_names,double lamb, int num_reals);
