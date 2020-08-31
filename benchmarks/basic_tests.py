@@ -871,6 +871,15 @@ def mf6_v5_ies_test():
     assert os.path.exists(oe_file)
     pe_file = oe_file.replace(".obs.",".par.")
     assert os.path.exists(pe_file)
+    pcs_file = oe_file.replace(".obs.",".pcs.")
+    assert os.path.exists(pcs_file)
+    df = pd.read_csv(pcs_file,index_col=0)
+    pst_pargp = set(pst.parameter_data.pargp.unique().to_list())
+    df_pargp = set(df.columns.to_list())
+    d = pst_pargp.symmetric_difference(df_pargp)
+    print(d)
+    assert len(d) == 0,d
+
 
 def mf6_v5_sen_test():
     model_d = "mf6_freyberg"
@@ -959,8 +968,8 @@ if __name__ == "__main__":
     #sen_basic_test()
     #salib_verf()
     #tplins1_test()
-    ext_stdcol_test()
-    #mf6_v5_ies_test()
+    #ext_stdcol_test()
+    mf6_v5_ies_test()
     #mf6_v5_sen_test()
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()

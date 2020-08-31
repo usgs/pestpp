@@ -863,7 +863,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter, string fil
 
 	stringstream ss;
 	ofstream &frec = file_manager_ptr->rec_ofstream();
-	ss << endl << "   parameter group percent change summmary" << endl;
+	ss << endl << "   ---  Parameter Group Change Summmary  ---    " << endl;
 	ss << "   (compared to the initial ensemble using active realizations)" << endl;
 	cout << ss.str();
 	frec << ss.str();
@@ -933,7 +933,9 @@ void ParChangeSummarizer::write_to_csv(string& filename)
 		f << num_at_bounds[grp_name] << "," << percent_at_bounds[grp_name] << endl;
 	}
 	f.close();
-	
+	file_manager_ptr->rec_ofstream() << "...saved parameter change summary to " << filename << endl;
+	cout << "...saved parameter change summary to " << filename << endl;
+
 }
 
 
