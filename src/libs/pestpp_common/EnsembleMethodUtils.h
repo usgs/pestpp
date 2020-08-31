@@ -105,7 +105,8 @@ class ParChangeSummarizer
 public:
 	ParChangeSummarizer() { ; }
 	ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr);
-	void summarize(ParameterEnsemble &pe, int iiter);
+	void summarize(ParameterEnsemble &pe, int iiter, string filename = string());
+	
 
 private:
 	ParameterEnsemble * base_pe_ptr;
@@ -119,6 +120,7 @@ private:
 	map<string, int> percent_at_bounds;
 
 	void update(ParameterEnsemble& pe);
+	void write_to_csv(string& filename);
 
 };
 

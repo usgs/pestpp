@@ -858,7 +858,7 @@ ParChangeSummarizer::ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileMa
 }
 
 
-void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter)
+void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter, string filename)
 {
 
 	stringstream ss;
@@ -914,6 +914,26 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter)
 
 	cout << endl;
 	frec << endl;
+
+	if (filename.size() > 0)
+		write_to_csv(filename);
+
+}
+
+void ParChangeSummarizer::write_to_csv(string& filename)
+{
+	ofstream f(filename);
+	if (f.bad())
+		throw runtime_error("ParChangeSummarizer::write_to_csv() error opening file " + filename);
+
+	f << "group,mean_change,std_change,num_at_near_bounds,percent_at_near_bounds" << endl;
+	for (auto grp_name : base_pe_ptr->get_pest_scenario_ptr()->get_ctl_ordered_par_group_names())
+	{
+		f << grp_name << "," << mean_change[grp_name] << "," << std_change[grp_name] << ",";
+		f << num_at_bounds[grp_name] << "," << percent_at_bounds[grp_name] << endl;
+	}
+	f.close();
+	
 }
 
 
