@@ -113,7 +113,12 @@ private:
 	OutputFileWriter* output_file_writer_ptr;
 	map<string, set<string>> pargp2par_map;
 	pair<map<string,double>, map<string, double>> init_moments;
+	map<string, double> mean_change;
+	map<string, double> std_change;
+	map<string, int> num_at_bounds;
+	map<string, int> percent_at_bounds;
 
+	void update(ParameterEnsemble& pe);
 
 };
 
