@@ -872,20 +872,46 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter)
 	cout << ss.str();
 	frec << ss.str();	
 	update(pe);
-	vector<string> grp_names = base_pe_ptr->get_pest_scenario().get_ctl_ordered_par_group_names();
-	
+	vector<string> grp_names;// = base_pe_ptr->get_pest_scenario().get_ctl_ordered_par_group_names();
+	vector<pair<double, string>> mean_pairs;
+	for (auto m : mean_change)
+	{
+		mean_pairs.push_back(pair<double, string>(abs(m.second), m.first));
+	}
+	sort(mean_pairs.begin(), mean_pairs.end());
+	//for (auto m : mean_pairs)
+	for (int i = mean_pairs.size() - 1; i >= 0; i--)
+	{
+		grp_names.push_back(mean_pairs[i].second);
+	}
+
+	int i = 0;
 	for (auto &grp_name : grp_names)
 	{
 		double mean_diff = mean_change[grp_name];
 		double std_diff = std_change[grp_name];
 		int num_out = num_at_bounds[grp_name];
 		int percent_out = percent_at_bounds[grp_name];
-		
+		ss.str("");
 		ss << setw(15) << pest_utils::lower_cp(grp_name) << setw(12) << mean_diff * 100.0 << setw(12) << std_diff * 100.0 << setw(18);
 		ss << num_out << setw(16) << setprecision(2) << percent_out << endl;
-		cout << ss.str();
+		if (i < 15)
+			cout << ss.str();
 		frec << ss.str();
+		i++;
 	}
+
+	ss.str("");
+	ss << "    Note: parameter change summary sorted according to abs 'mean change'." << endl;
+	cout << ss.str();
+	frec << ss.str();
+	if (grp_names.size() > 15)
+	{
+		ss.str("");
+		ss << "    Note: Only the first 15 parameter groups shown, see rec file for full listing" << endl;
+		cout << ss.str();
+	}
+
 	cout << endl;
 	frec << endl;
 }
