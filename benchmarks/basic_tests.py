@@ -874,8 +874,8 @@ def mf6_v5_ies_test():
     pcs_file = oe_file.replace(".obs.",".pcs.")
     assert os.path.exists(pcs_file)
     df = pd.read_csv(pcs_file,index_col=0)
-    pst_pargp = set(pst.parameter_data.pargp.unique().to_list())
-    df_pargp = set(df.columns.to_list())
+    pst_pargp = set(list(pst.parameter_data.pargp.unique()))
+    df_pargp = set(df.index.to_list())
     d = pst_pargp.symmetric_difference(df_pargp)
     print(d)
     assert len(d) == 0,d
