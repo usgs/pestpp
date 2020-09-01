@@ -46,6 +46,18 @@ private:
 	mutex par_lock, idx_lock;
 };
 
+class ThreadedInstructionProcess {
+public:
+	ThreadedInstructionProcess(vector<string> _insfile_vec, vector<string> _outfile_vec) :
+		insfile_vec(_insfile_vec), outfile_vec(_outfile_vec){;};
+	void work(int tid, vector<int>& ins_idx, Observations& obs, string additional_ins_delims);
+private:
+	vector<string> insfile_vec;
+	vector<string> outfile_vec;
+	mutex obs_lock, idx_lock;
+};
+
+
 class InstructionFile {
 	
 public:
@@ -73,6 +85,10 @@ private:
 	vector<string> tokenize_ins_line(const string& line);
 	pair<string, pair<int, int>> parse_obs_instruction(const string& token, const string& close_tag);
 	string additional_delimiters;
+	
+	void tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty=true);
+	
+
 };
 
 

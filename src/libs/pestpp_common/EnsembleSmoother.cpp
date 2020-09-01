@@ -1774,7 +1774,9 @@ void IterEnsembleSmoother::iterate_2_solution()
 		ph.write(iter, run_mgr_ptr->get_total_runs());
 		if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
 			ph.save_residual_cov(oe,iter);
-		pcs.summarize(pe,iter);
+		ss.str("");
+		ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
+		pcs.summarize(pe,iter,ss.str());
 			
 			
 		if (accept)
