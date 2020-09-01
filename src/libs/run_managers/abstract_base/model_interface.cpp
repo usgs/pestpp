@@ -170,90 +170,380 @@ void ModelInterface::run(Parameters* pars, Observations* obs)
 
 }
 
+void ThreadedInstructionProcess::work(int tid, vector<int>& ins_idx, Observations& obs, string additional_ins_delims)
+{
+	int count = 0, i;
+	unique_lock<mutex> obs_guard(obs_lock, defer_lock);
+	unique_lock<mutex> idx_guard(idx_lock, defer_lock);
+	while (true)
+	{
+		i = -999;
+		while (true)
+		{
+			if (idx_guard.try_lock())
+			{
+				if (ins_idx.size() == 0)
+				{
+					cout << "thread " << tid << " processed " << count << " instruction files" << endl;
+					return;
+				}
+				i = ins_idx[ins_idx.size() - 1];
+				ins_idx.pop_back();
+				idx_guard.unlock();
+				break;
+			}
+		}
+		InstructionFile ins(insfile_vec[i]);
+		ins.set_additional_delimiters(additional_ins_delims);
+		Observations oobs = ins.read_output_file(outfile_vec[i]);
+		while (true)
+		{
+			if (obs_guard.try_lock())
+			{
+				//pro_par_vec.push_back(pro_pars);
+				obs.update_without_clear(oobs.get_keys(), oobs.get_data_vec(oobs.get_keys()));
+				obs_guard.unlock();
+				break;
+			}
+		}
+		count++;
+	}
+}
 
-void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
-						Parameters* pars, Observations* obs)
+void ThreadedTemplateProcess::work(int tid, vector<int>& tpl_idx, Parameters pars, Parameters& pro_pars)
+{
+	int count = 0, i;
+	unique_lock<mutex> par_guard(par_lock, defer_lock);
+	unique_lock<mutex> idx_guard(idx_lock, defer_lock);
+	while (true)
+	{
+		i = -999;
+		while (true)
+		{
+			if (idx_guard.try_lock())
+			{
+				if (tpl_idx.size() == 0)
+				{
+					cout << "thread " << tid << " processed " << count << " template files" << endl;
+					return;
+				}
+				i = tpl_idx[tpl_idx.size() - 1];
+				tpl_idx.pop_back();
+				idx_guard.unlock();
+				break;
+			}
+		}
+		TemplateFile tpl(tplfile_vec[i]);
+		tpl.set_fill_zeros(fill);
+		Parameters ppars = tpl.write_input_file(inpfile_vec[i], pars);
+		while (true)
+		{
+			if (par_guard.try_lock())
+			{
+				//pro_par_vec.push_back(pro_pars);
+				pro_pars.update_without_clear(ppars.get_keys(), ppars.get_data_vec(ppars.get_keys()));
+				par_guard.unlock();
+				break;
+			}
+		}
+		count++;
+	}
+}
+
+void process_template_file_thread(int tid, vector<int>& tpl_idx, ThreadedTemplateProcess& ttp, Parameters pars, Parameters& pro_pars, exception_ptr& eptr)
+{
+	
+	try
+	{
+		ttp.work(tid, tpl_idx, pars, pro_pars);
+	}
+	catch (...)
+	{
+		eptr = current_exception();
+	}
+
+	return;
+}
+
+void process_instruction_file_thread(int tid, vector<int>& ins_idx, ThreadedInstructionProcess& tip, Observations& obs, string additional_ins_delims, exception_ptr& eptr)
 {
 
-	if (templatefiles.size() == 0)
-		for (auto t : tplfile_vec)
-		{
-			TemplateFile tt(t);
-			tt.set_fill_zeros(fill_tpl_zeros);
-			templatefiles.push_back(tt);
-		}
-			
+	try
+	{
+		tip.work(tid, ins_idx, obs, additional_ins_delims);
+	}
+	catch (...)
+	{
+		eptr = current_exception();
+	}
 
-	if (instructionfiles.size() == 0)
+	return;
+}
+
+
+void ModelInterface::write_input_files(Parameters *pars_ptr)
+{
+	int num_threads =10;
+	if (num_threads > tplfile_vec.size())
+		num_threads = tplfile_vec.size();
+	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
+	cout << pest_utils::get_time_string() << " processing template files with " << num_threads << " threads..." << endl;
+	vector<thread> threads;
+	vector<exception_ptr> exception_ptrs;
+	Parameters pro_pars = *pars_ptr; //copy
+	ThreadedTemplateProcess ttp(tplfile_vec, inpfile_vec, fill_tpl_zeros);
+
+	for (int i = 0; i < num_threads; i++)
+	{
+		exception_ptrs.push_back(exception_ptr());
+	}
+
+	vector<int> tpl_idx;
+	for (int i = 0; i < tplfile_vec.size(); i++)
+		tpl_idx.push_back(i);
+
+	for (int i = 0; i < num_threads; i++)
+	{
+		threads.push_back(thread(process_template_file_thread, i, std::ref(tpl_idx), std::ref(ttp), *pars_ptr, std::ref(pro_pars), std::ref(exception_ptrs[i])));
+	}
+
+	for (int i = 0; i < num_threads; ++i)
+	{
+		if (exception_ptrs[i])
+		{
+			try
+			{
+				rethrow_exception(exception_ptrs[i]);
+			}
+			catch (const std::exception& e)
+			{
+				stringstream ss;
+				ss << "thread processing template file '" << tplfile_vec[i] << "' raised an exception: " << e.what();
+				throw runtime_error(ss.str());
+			}
+		}
+		threads[i].join();
+		if (exception_ptrs[i])
+		{
+			try
+			{
+				rethrow_exception(exception_ptrs[i]);
+			}
+			catch (const std::exception& e)
+			{
+				stringstream ss;
+				ss << "thread processing template file '" << tplfile_vec[i] << "' raised an exception: " << e.what();
+				throw runtime_error(ss.str());
+			}
+		}
+	}
+
+	//if (templatefiles.size() == 0)
+	//{
+	//	for (auto t : tplfile_vec)
+	//	{
+	//		TemplateFile tt(t);
+	//		tt.set_fill_zeros(fill_tpl_zeros);
+	//		templatefiles.push_back(tt);
+	//	}
+	//}
+
+	//
+	//vector<string> notnormal = pars_ptr->get_notnormal_keys();
+	//if (notnormal.size() > 0)
+	//{
+	//	throw runtime_error("denormal floating point parameter values found");
+	//}
+
+	//vector<Parameters> pro_par_vec;
+	//for (int i = 0; i < templatefiles.size(); i++)
+	//{
+	//	string name = templatefiles[i].get_tpl_filename();
+	//	//cout << name << endl;
+	//	pro_par_vec.push_back(templatefiles[i].write_input_file(inpfile_vec[i], *pars_ptr));
+	//}
+	//update pars to account for possibly truncated par values...important for jco calcs
+	//for (auto pro_pars : pro_par_vec)
+	//	pars_ptr->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
+	pars_ptr->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
+	cout << pest_utils::get_time_string() << " done, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
+}
+
+void ModelInterface::read_output_files(Observations *obs)
+{
+	int num_threads = 10;
+	if (num_threads > insfile_vec.size())
+		num_threads = insfile_vec.size();
+	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
+	cout << pest_utils::get_time_string() <<  " processing instruction files with " << num_threads << " threads..." << endl;
+	vector<thread> threads;
+	vector<exception_ptr> exception_ptrs;
+	Observations temp_obs;
+
+	ThreadedInstructionProcess tip(insfile_vec, outfile_vec);
+
+	for (int i = 0; i < num_threads; i++)
+	{
+		exception_ptrs.push_back(exception_ptr());
+	}
+
+	vector<int> ins_idx;
+	for (int i = 0; i < insfile_vec.size(); i++)
+		ins_idx.push_back(i);
+
+	for (int i = 0; i < num_threads; i++)
+	{
+		threads.push_back(thread(process_instruction_file_thread, i, std::ref(ins_idx), std::ref(tip), std::ref(temp_obs), additional_ins_delimiters,
+			std::ref(exception_ptrs[i])));
+	}
+
+	for (int i = 0; i < num_threads; ++i)
+	{
+		if (exception_ptrs[i])
+		{
+			try
+			{
+				rethrow_exception(exception_ptrs[i]);
+			}
+			catch (const std::exception& e)
+			{
+				stringstream ss;
+				ss << "thread processing instruction file '" << insfile_vec[i] << "' raised an exception: " << e.what();
+				throw runtime_error(ss.str());
+			}
+		}
+		threads[i].join();
+		if (exception_ptrs[i])
+		{
+			try
+			{
+				rethrow_exception(exception_ptrs[i]);
+			}
+			catch (const std::exception& e)
+			{
+				stringstream ss;
+				ss << "thread processing instruction file '" << insfile_vec[i] << "' raised an exception: " << e.what();
+				throw runtime_error(ss.str());
+			}
+		}
+	}
+	
+	
+	
+	/*if (instructionfiles.size() == 0)
+	{
 		for (auto i : insfile_vec)
 		{
 			InstructionFile ii(i);
 			ii.set_additional_delimiters(additional_ins_delimiters);
 			instructionfiles.push_back(ii);
 		}
-
-	Observations pro_obs;
-	vector<Parameters> pro_par_vec;
-	try
+	}
+	
+	Observations temp_obs, pro_obs;
+	for (int i = 0; i < instructionfiles.size(); i++)
 	{
-		//first delete any existing input and output files
+		pro_obs = instructionfiles[i].read_output_file(outfile_vec[i]);
+		temp_obs.update_without_clear(pro_obs.get_keys(), pro_obs.get_data_vec(pro_obs.get_keys()));
+	}*/
+	unordered_set<string> ins_names, pst_names;
+	vector<string> t, diff;
+	t = obs->get_keys();
+	pst_names.insert(t.begin(), t.end());
+	t = temp_obs.get_keys();
+	ins_names.insert(t.begin(), t.end());
+	unordered_set<string>::iterator end = ins_names.end();
+	for (auto o : pst_names)
+	{
+		if (ins_names.find(o) == end)
+			diff.push_back(o);
+	}
+	if (diff.size() > 0)
+	{
+		stringstream ss;
+		ss << "ModelInterace error: the following instruction observations are not in the control file:";
+		for (auto d : diff)
+			ss << d << ",";
+		throw_mio_error(ss.str());
+	}
+	end = pst_names.end();
+	for (auto o : ins_names)
+	{
+		if (pst_names.find(o) == end)
+			diff.push_back(o);
+	}
+	if (diff.size() > 0)
+	{
+		stringstream ss;
+		ss << "ModelInterace error: the following control file observations are not in the instruction files:";
+		for (auto d : diff)
+			ss << d << ",";
+		throw_mio_error(ss.str());
+	}
+	t = temp_obs.get_keys();
+	obs->update(t, temp_obs.get_data_vec(t));
+	cout << pest_utils::get_time_string() << " done, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
+
+}
+
+
+void ModelInterface::remove_existing()
+{
+	//first delete any existing input and output files
 		// This outer loop is a work around for a bug in windows.  Window can fail to release a file
 		// handle quick enough when the external run executes very quickly
-		bool failed_file_op = true;
-		int n_tries = 0;
-		while (failed_file_op)
+	bool failed_file_op = true;
+	int n_tries = 0;
+	while (failed_file_op)
+	{
+		vector<string> failed_file_vec;
+		failed_file_op = false;
+		for (auto& out_file : outfile_vec)
 		{
-			vector<string> failed_file_vec;
-			failed_file_op = false;
-			for (auto &out_file : outfile_vec)
+			if ((pest_utils::check_exist_out(out_file)) && (remove(out_file.c_str()) != 0))
 			{
-				if ((pest_utils::check_exist_out(out_file)) && (remove(out_file.c_str()) != 0))
-				{
-					failed_file_vec.push_back(out_file);
-					failed_file_op = true;
-				}
+				failed_file_vec.push_back(out_file);
+				failed_file_op = true;
 			}
-			for (auto &in_file : inpfile_vec)
+		}
+		for (auto& in_file : inpfile_vec)
+		{
+			if ((pest_utils::check_exist_out(in_file)) && (remove(in_file.c_str()) != 0))
 			{
-				if ((pest_utils::check_exist_out(in_file)) && (remove(in_file.c_str()) != 0))
-				{
-					failed_file_vec.push_back(in_file);
-					failed_file_op = true;
-				}
+				failed_file_vec.push_back(in_file);
+				failed_file_op = true;
 			}
-			if (failed_file_op)
+		}
+		if (failed_file_op)
+		{
+			++n_tries;
+			w_sleep(1000);
+			if (n_tries > 5)
 			{
-				++n_tries;
-				w_sleep(1000);
-				if (n_tries > 5)
+				ostringstream str;
+				str << "model interface error: Cannot delete existing following model files:";
+				for (const string& ifile : failed_file_vec)
 				{
-					ostringstream str;
-					str << "model interface error: Cannot delete existing following model files:";
-					for (const string &ifile : failed_file_vec)
-					{
-						str << " " << ifile;
-					}
-					throw PestError(str.str());
+					str << " " << ifile;
 				}
+				throw PestError(str.str());
 			}
+		}
+	}
+}
 
-		}
-		cout << "processing tpl files...";
-		vector<string> notnormal = pars->get_notnormal_keys();
-		if (notnormal.size() > 0)
-		{
-			throw runtime_error("denormal floating point parameter values found");
-		}
-		for (int i = 0; i < templatefiles.size(); i++)
-		{
-			string name = templatefiles[i].get_tpl_filename();
-			//cout << name << endl;
-			pro_par_vec.push_back(templatefiles[i].write_input_file(inpfile_vec[i], *pars));
-		}
-		//update pars to account for possibly truncated par values...important for jco calcs
-		for (auto pro_pars : pro_par_vec)
-			pars->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
-		cout << "done" << endl;
+
+void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
+						Parameters* pars_ptr, Observations* obs_ptr)
+{
+			
+	try
+	{
+		remove_existing();
+		write_input_files(pars_ptr);
+		
+		std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
+		cout << pest_utils::get_time_string() << " calling forward run command(s)" << endl;
 
 #ifdef OS_WIN
 		//a flag to track if the run was terminated
@@ -367,55 +657,11 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		}
 #endif
 
+		cout << pest_utils::get_time_string() << " foward run command(s) finished, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
+
 		if (term_break) return;
 
-		
-		cout << "processing ins files...";
-		Observations temp_obs;
-		for (int i = 0; i < instructionfiles.size(); i++)
-		{
-			pro_obs = instructionfiles[i].read_output_file(outfile_vec[i]);
-			temp_obs.update_without_clear(pro_obs.get_keys(), pro_obs.get_data_vec(pro_obs.get_keys()));
-		}
-		unordered_set<string> ins_names, pst_names;
-		vector<string> t, diff;
-		t = obs->get_keys();
-		pst_names.insert(t.begin(), t.end());
-		t = temp_obs.get_keys();
-		ins_names.insert(t.begin(), t.end());
-		unordered_set<string>::iterator end = ins_names.end();
-		for (auto o : pst_names)
-		{
-			if (ins_names.find(o) == end)
-				diff.push_back(o);
-		}
-		if (diff.size() > 0)
-		{
-			stringstream ss;
-			ss << "ModelInterace error: the following instruction observations are not in the control file:";
-			for (auto d : diff)
-				ss << d << ",";
-			throw_mio_error(ss.str());
-		}
-		end = pst_names.end();
-		for (auto o : ins_names)
-		{
-			if (pst_names.find(o) == end)
-				diff.push_back(o);
-		}
-		if (diff.size() > 0)
-		{
-			stringstream ss;
-			ss << "ModelInterace error: the following control file observations are not in the instruction files:";
-			for (auto d : diff)
-				ss << d << ",";
-			throw_mio_error(ss.str());
-		}
-		t = temp_obs.get_keys();
-		obs->update(t, temp_obs.get_data_vec(t));
-		cout << "done" << endl;
-
-		
+		read_output_files(obs_ptr);
 
 		//set the finished flag for the listener thread
 		finished->set(true);
@@ -448,10 +694,10 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 	double val;
 	vector<pair<string, pair<int, int>>> tpl_line_map;
 	Parameters pro_pars;
-	vector<string> t = pars.get_keys();
-	unordered_set<string> pnames(t.begin(), t.end());
-	unordered_set<string>::iterator end = pnames.end();
-	t.resize(0);
+	//vector<string> t = pars.get_keys();
+	//unordered_set<string> pnames(t.begin(), t.end());
+	//unordered_set<string>::iterator end = pnames.end();
+	//t.resize(0);
 	while (true)
 	{
 		if (f_tpl.eof())
@@ -469,8 +715,8 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 		for (auto t : tpl_line_map)
 		{
 			name = t.first;
-			if (pnames.find(name) == end)
-				throw_tpl_error("parameter '" + name + "' not listed in control file");
+			//if (pnames.find(name) == end)
+			//	throw_tpl_error("parameter '" + name + "' not listed in control file");
 
 			/*val = 1.23456789123456789123456789E+100;
 			val_str = cast_to_fixed_len_string(200, val, name);
@@ -508,8 +754,14 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 			val_str = cast_to_fixed_len_string(2, val, name);
 			pest_utils::convert_ip(val_str, val);
 			*/
-
-			val = pars.get_rec(t.first);
+			try
+			{
+				val = pars.get_rec(t.first);
+			}
+			catch (...)
+			{
+				throw_tpl_error("parameter '" + name + "' not in parameters instance");
+			}
 			val_str = cast_to_fixed_len_string(t.second.second, val, name);
 			line.replace(t.second.first, t.second.second, val_str);
 			//pest_utils::convert_ip(val_str, val);
@@ -1159,10 +1411,16 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 	return pair<string, double>(info.first,value);
 }
 
+
+
 pair<string, double> InstructionFile::execute_free(const string& token, string& line, ifstream& f_out)
 {
+	int tsize = line.size() / 20;
+	if (tsize > 50)
+		tsize = 50;
 	vector<string> tokens;
-	pest_utils::tokenize(line, tokens,", \t\n\r" + additional_delimiters) ; //include the comma in the delimiters here
+	tokens.reserve(tsize);
+	tokenize(line, tokens,", \t\n\r" + additional_delimiters) ; //include the comma in the delimiters here
 	if (tokens.size() == 0)
 		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for free instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);
 	double value;
@@ -1188,6 +1446,31 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	line = line.substr(pos + tokens[0].size());
 
 	return pair<string, double>(name,value);
+}
+
+void InstructionFile::tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty)
+{
+	std::string::size_type pos, lastPos = 0;
+	while (true)
+	{
+		pos = str.find_first_of(delimiters, lastPos);
+		if (pos == std::string::npos)
+		{
+			pos = str.length();
+			if (pos != lastPos || !trimEmpty)
+			{
+				tokens.push_back(string(str.data() + lastPos, string::size_type(pos - lastPos)));
+			}
+			break;
+		}
+		else
+		{
+			if (pos != lastPos || !trimEmpty)
+				tokens.push_back(string(str.data() + lastPos, string::size_type(pos - lastPos)));
+		}
+
+		lastPos = pos + 1;
+	}
 }
 
 void InstructionFile::execute_primary(const string& token, string& line, ifstream& f_out)

@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <unordered_set>
+#include <mutex>
 #include "Transformable.h"
 #include "utilities.h"
 #include "Pest.h"
@@ -31,9 +32,29 @@ private:
 	unordered_set<string> get_names(ifstream& f);
 	bool fill_zeros;
 	
-	
+};
 
+class ThreadedTemplateProcess {
+public:
+	ThreadedTemplateProcess(vector<string> _tplfile_vec, vector<string> _inpfile_vec, bool _fill) : 
+		tplfile_vec(_tplfile_vec), inpfile_vec(_inpfile_vec), fill(_fill) {;};
+	void work(int tid, vector<int>& tpl_idx, Parameters pars, Parameters& pro_pars);
+private:
+	vector<string> tplfile_vec;
+	vector<string> inpfile_vec;
+	bool fill;
+	mutex par_lock, idx_lock;
+};
 
+class ThreadedInstructionProcess {
+public:
+	ThreadedInstructionProcess(vector<string> _insfile_vec, vector<string> _outfile_vec) :
+		insfile_vec(_insfile_vec), outfile_vec(_outfile_vec){;};
+	void work(int tid, vector<int>& ins_idx, Observations& obs, string additional_ins_delims);
+private:
+	vector<string> insfile_vec;
+	vector<string> outfile_vec;
+	mutex obs_lock, idx_lock;
 };
 
 
@@ -64,6 +85,10 @@ private:
 	vector<string> tokenize_ins_line(const string& line);
 	pair<string, pair<int, int>> parse_obs_instruction(const string& token, const string& close_tag);
 	string additional_delimiters;
+	
+	void tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty=true);
+	
+
 };
 
 
@@ -96,6 +121,11 @@ private:
 	vector<string> comline_vec; 
 	bool fill_tpl_zeros;
 	string additional_ins_delimiters;
+
+	void write_input_files(Parameters *pars_ptr);
+	void read_output_files(Observations *obs_ptr);
+	void remove_existing();
+
 };
 
 #endif /* MODEL_INTERFACE_H_ */

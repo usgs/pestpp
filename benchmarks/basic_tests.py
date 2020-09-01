@@ -817,6 +817,7 @@ def ext_stdcol_test():
     d = (df.std() - obs.loc[pst.nnz_obs_names,"standard_deviation"]).apply(np.abs)
     print(d)
     assert d.max() < 0.1,d.max()
+    
     obs = pst.observation_data
     obs.loc[pst.nnz_obs_names,"upper_bound"] = obs.loc[pst.nnz_obs_names,"obsval"] * 1.1
     obs.loc[pst.nnz_obs_names,"lower_bound"] = obs.loc[pst.nnz_obs_names,"obsval"] * 0.9
@@ -870,6 +871,15 @@ def mf6_v5_ies_test():
     assert os.path.exists(oe_file)
     pe_file = oe_file.replace(".obs.",".par.")
     assert os.path.exists(pe_file)
+    pcs_file = oe_file.replace(".obs.",".pcs.")
+    assert os.path.exists(pcs_file)
+    df = pd.read_csv(pcs_file,index_col=0)
+    pst_pargp = set(list(pst.parameter_data.pargp.unique()))
+    df_pargp = set(df.index.to_list())
+    d = pst_pargp.symmetric_difference(df_pargp)
+    print(d)
+    assert len(d) == 0,d
+
 
 def mf6_v5_sen_test():
     model_d = "mf6_freyberg"
@@ -957,9 +967,9 @@ if __name__ == "__main__":
     #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-    tplins1_test()
+    #tplins1_test()
     #ext_stdcol_test()
-    #mf6_v5_ies_test()
+    mf6_v5_ies_test()
     #mf6_v5_sen_test()
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()

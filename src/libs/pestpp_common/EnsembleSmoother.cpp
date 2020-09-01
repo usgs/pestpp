@@ -1774,7 +1774,9 @@ void IterEnsembleSmoother::iterate_2_solution()
 		ph.write(iter, run_mgr_ptr->get_total_runs());
 		if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
 			ph.save_residual_cov(oe,iter);
-		pcs.summarize(pe,iter);
+		ss.str("");
+		ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
+		pcs.summarize(pe,iter,ss.str());
 			
 			
 		if (accept)
@@ -2450,6 +2452,19 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 				}
 			}
 			threads[i].join();
+			if (exception_ptrs[i])
+			{
+				try
+				{
+					rethrow_exception(exception_ptrs[i]);
+				}
+				catch (const std::exception& e)
+				{
+					ss.str("");
+					ss << "thread " << i << "raised an exception: " << e.what();
+					throw runtime_error(ss.str());
+				}
+			}
 		}
 		message(2, "threaded localized upgrade calculation done");
 	}

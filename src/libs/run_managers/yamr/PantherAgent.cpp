@@ -145,6 +145,7 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 	FileManager fm("panther_agent");
 	OutputFileWriter of(fm, pest_scenario);
 	of.scenario_report(frec);
+	pest_scenario.clear_ext_files();
 }
 
 pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)

@@ -368,6 +368,11 @@ void OutputFileWriter::scenario_pargroup_report(std::ostream &os)
 
 void OutputFileWriter::scenario_par_report(std::ostream &os)
 {
+	if (pest_scenario.get_ctl_ordered_par_names().size() > 100000)
+	{
+		os << endl << "...more than 100,000 pars, not writing par data" << endl;
+		return;
+	}
 	map<int, string> trans_type;
 	trans_type[0] = "none";
 	trans_type[1] = "fixed";
@@ -417,6 +422,11 @@ void OutputFileWriter::scenario_obs_csv(ostream& os)
 
 void OutputFileWriter::scenario_obs_report(std::ostream &os)
 {
+	if (pest_scenario.get_ctl_ordered_obs_names().size() > 100000)
+	{
+		os << endl << "...more than 100,000 obs, not writing obs data" << endl;
+		return;
+	}
 	int obs_len = 20;
 	for (auto& obs_name : pest_scenario.get_ctl_ordered_obs_names())
 		obs_len = max((int)obs_name.size(), obs_len);
@@ -622,17 +632,35 @@ void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Ob
 	//ObservationInfo oi = pest_scenario.get_ctl_observation_info();
 	//for(vector<string>::const_iterator b = obs_name_vec.begin(),
 	//	e = obs_name_vec.end(); b!=e; ++b)
-	for (auto &b : obs_name_vec)
+	if (obs_name_vec.size() < 100000)
 	{
-		obs_val = obs.get_rec(b);
-		sim_val = sim.get_rec(b);
-		os << " " << setw(20) << lower_cp(b)
-			<< " " << setw(12) << lower_cp(oi.get_observation_rec_ptr(b)->group)
-			<< " " << showpoint << setw(20) << obs_val
-			<< " " << showpoint << setw(20) << sim_val
-			<< " " << showpoint << setw(20) << obs_val - sim_val
-			<< " " << showpoint << setw(20) << oi.get_observation_rec_ptr(b)->weight << endl;
+		for (auto& b : obs_name_vec)
+		{
+			obs_val = obs.get_rec(b);
+			sim_val = sim.get_rec(b);
+			os << " " << setw(20) << lower_cp(b)
+				<< " " << setw(12) << lower_cp(oi.get_observation_rec_ptr(b)->group)
+				<< " " << showpoint << setw(20) << obs_val
+				<< " " << showpoint << setw(20) << sim_val
+				<< " " << showpoint << setw(20) << obs_val - sim_val
+				<< " " << showpoint << setw(20) << oi.get_observation_rec_ptr(b)->weight << endl;
+		}
 	}
+	else
+	{
+		for (auto& b : obs_name_vec)
+		{
+			obs_val = obs.get_rec(b);
+			sim_val = sim.get_rec(b);
+			os << " " << lower_cp(b) 
+				<< " " << lower_cp(oi.get_observation_rec_ptr(b)->group)
+				<< " " << obs_val
+				<< " " << sim_val
+				<< " " << obs_val - sim_val
+				<< " " << oi.get_observation_rec_ptr(b)->weight << endl;
+		}
+	}
+
 
 }
 
