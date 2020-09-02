@@ -170,6 +170,46 @@ void ModelInterface::run(Parameters* pars, Observations* obs)
 
 }
 
+void ThreadedInstructionProcess::work(int tid, vector<int>& ins_idx, Observations& obs, string additional_ins_delims)
+{
+	int count = 0, i;
+	unique_lock<mutex> obs_guard(obs_lock, defer_lock);
+	unique_lock<mutex> idx_guard(idx_lock, defer_lock);
+	while (true)
+	{
+		i = -999;
+		while (true)
+		{
+			if (idx_guard.try_lock())
+			{
+				if (ins_idx.size() == 0)
+				{
+					cout << "thread " << tid << " processed " << count << " instruction files" << endl;
+					return;
+				}
+				i = ins_idx[ins_idx.size() - 1];
+				ins_idx.pop_back();
+				idx_guard.unlock();
+				break;
+			}
+		}
+		InstructionFile ins(insfile_vec[i]);
+		ins.set_additional_delimiters(additional_ins_delims);
+		Observations oobs = ins.read_output_file(outfile_vec[i]);
+		while (true)
+		{
+			if (obs_guard.try_lock())
+			{
+				//pro_par_vec.push_back(pro_pars);
+				obs.update_without_clear(oobs.get_keys(), oobs.get_data_vec(oobs.get_keys()));
+				obs_guard.unlock();
+				break;
+			}
+		}
+		count++;
+	}
+}
+
 void ThreadedTemplateProcess::work(int tid, vector<int>& tpl_idx, Parameters pars, Parameters& pro_pars)
 {
 	int count = 0, i;
@@ -225,13 +265,29 @@ void process_template_file_thread(int tid, vector<int>& tpl_idx, ThreadedTemplat
 	return;
 }
 
+void process_instruction_file_thread(int tid, vector<int>& ins_idx, ThreadedInstructionProcess& tip, Observations& obs, string additional_ins_delims, exception_ptr& eptr)
+{
+
+	try
+	{
+		tip.work(tid, ins_idx, obs, additional_ins_delims);
+	}
+	catch (...)
+	{
+		eptr = current_exception();
+	}
+
+	return;
+}
+
 
 void ModelInterface::write_input_files(Parameters *pars_ptr)
 {
 	int num_threads =10;
 	if (num_threads > tplfile_vec.size())
 		num_threads = tplfile_vec.size();
-	cout << "processing tpl files with " << num_threads << " threads...";
+	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
+	cout << pest_utils::get_time_string() << " processing template files with " << num_threads << " threads..." << endl;
 	vector<thread> threads;
 	vector<exception_ptr> exception_ptrs;
 	Parameters pro_pars = *pars_ptr; //copy
@@ -269,7 +325,6 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 		threads[i].join();
 		if (exception_ptrs[i])
 		{
-			cout << "exception raised by " << i << endl;
 			try
 			{
 				rethrow_exception(exception_ptrs[i]);
@@ -311,12 +366,71 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 	//for (auto pro_pars : pro_par_vec)
 	//	pars_ptr->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
 	pars_ptr->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
-	cout << "done" << endl;
+	cout << pest_utils::get_time_string() << " done, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
 }
 
 void ModelInterface::read_output_files(Observations *obs)
 {
-	if (instructionfiles.size() == 0)
+	int num_threads = 10;
+	if (num_threads > insfile_vec.size())
+		num_threads = insfile_vec.size();
+	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
+	cout << pest_utils::get_time_string() <<  " processing instruction files with " << num_threads << " threads..." << endl;
+	vector<thread> threads;
+	vector<exception_ptr> exception_ptrs;
+	Observations temp_obs;
+
+	ThreadedInstructionProcess tip(insfile_vec, outfile_vec);
+
+	for (int i = 0; i < num_threads; i++)
+	{
+		exception_ptrs.push_back(exception_ptr());
+	}
+
+	vector<int> ins_idx;
+	for (int i = 0; i < insfile_vec.size(); i++)
+		ins_idx.push_back(i);
+
+	for (int i = 0; i < num_threads; i++)
+	{
+		threads.push_back(thread(process_instruction_file_thread, i, std::ref(ins_idx), std::ref(tip), std::ref(temp_obs), additional_ins_delimiters,
+			std::ref(exception_ptrs[i])));
+	}
+
+	for (int i = 0; i < num_threads; ++i)
+	{
+		if (exception_ptrs[i])
+		{
+			try
+			{
+				rethrow_exception(exception_ptrs[i]);
+			}
+			catch (const std::exception& e)
+			{
+				stringstream ss;
+				ss << "thread processing instruction file '" << insfile_vec[i] << "' raised an exception: " << e.what();
+				throw runtime_error(ss.str());
+			}
+		}
+		threads[i].join();
+		if (exception_ptrs[i])
+		{
+			try
+			{
+				rethrow_exception(exception_ptrs[i]);
+			}
+			catch (const std::exception& e)
+			{
+				stringstream ss;
+				ss << "thread processing instruction file '" << insfile_vec[i] << "' raised an exception: " << e.what();
+				throw runtime_error(ss.str());
+			}
+		}
+	}
+	
+	
+	
+	/*if (instructionfiles.size() == 0)
 	{
 		for (auto i : insfile_vec)
 		{
@@ -325,13 +439,13 @@ void ModelInterface::read_output_files(Observations *obs)
 			instructionfiles.push_back(ii);
 		}
 	}
-	cout << "processing ins files...";
+	
 	Observations temp_obs, pro_obs;
 	for (int i = 0; i < instructionfiles.size(); i++)
 	{
 		pro_obs = instructionfiles[i].read_output_file(outfile_vec[i]);
 		temp_obs.update_without_clear(pro_obs.get_keys(), pro_obs.get_data_vec(pro_obs.get_keys()));
-	}
+	}*/
 	unordered_set<string> ins_names, pst_names;
 	vector<string> t, diff;
 	t = obs->get_keys();
@@ -368,7 +482,7 @@ void ModelInterface::read_output_files(Observations *obs)
 	}
 	t = temp_obs.get_keys();
 	obs->update(t, temp_obs.get_data_vec(t));
-	cout << "done" << endl;
+	cout << pest_utils::get_time_string() << " done, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
 
 }
 
@@ -428,6 +542,8 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		remove_existing();
 		write_input_files(pars_ptr);
 		
+		std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
+		cout << pest_utils::get_time_string() << " calling forward run command(s)" << endl;
 
 #ifdef OS_WIN
 		//a flag to track if the run was terminated
@@ -540,6 +656,8 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 			if (term_break) break;
 		}
 #endif
+
+		cout << pest_utils::get_time_string() << " foward run command(s) finished, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
 
 		if (term_break) return;
 
@@ -1293,10 +1411,16 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 	return pair<string, double>(info.first,value);
 }
 
+
+
 pair<string, double> InstructionFile::execute_free(const string& token, string& line, ifstream& f_out)
 {
+	int tsize = line.size() / 20;
+	if (tsize > 50)
+		tsize = 50;
 	vector<string> tokens;
-	pest_utils::tokenize(line, tokens,", \t\n\r" + additional_delimiters) ; //include the comma in the delimiters here
+	tokens.reserve(tsize);
+	tokenize(line, tokens,", \t\n\r" + additional_delimiters) ; //include the comma in the delimiters here
 	if (tokens.size() == 0)
 		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for free instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);
 	double value;
@@ -1322,6 +1446,31 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	line = line.substr(pos + tokens[0].size());
 
 	return pair<string, double>(name,value);
+}
+
+void InstructionFile::tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty)
+{
+	std::string::size_type pos, lastPos = 0;
+	while (true)
+	{
+		pos = str.find_first_of(delimiters, lastPos);
+		if (pos == std::string::npos)
+		{
+			pos = str.length();
+			if (pos != lastPos || !trimEmpty)
+			{
+				tokens.push_back(string(str.data() + lastPos, string::size_type(pos - lastPos)));
+			}
+			break;
+		}
+		else
+		{
+			if (pos != lastPos || !trimEmpty)
+				tokens.push_back(string(str.data() + lastPos, string::size_type(pos - lastPos)));
+		}
+
+		lastPos = pos + 1;
+	}
 }
 
 void InstructionFile::execute_primary(const string& token, string& line, ifstream& f_out)

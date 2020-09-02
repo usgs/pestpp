@@ -54,6 +54,7 @@ void RunManagerSerial::run()
 {
 	int success_runs = 0;
 	int prev_sucess_runs = 0;
+	int failed_runs = 0;
 	const vector<string> &par_name_vec = file_stor.get_par_name_vec();
 	const vector<string> &obs_name_vec = file_stor.get_obs_name_vec();
 
@@ -61,12 +62,14 @@ void RunManagerSerial::run()
 	std::vector<double> obs_vec;
 	vector<int> run_id_vec;
 	int nruns = get_outstanding_run_ids().size();
+	std::chrono::system_clock::time_point start_time_all = std::chrono::system_clock::now();
 	while (!(run_id_vec = get_outstanding_run_ids()).empty())
 	{
 		for (int i_run : run_id_vec)
 		{
+			std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
 			try
-			{
+			{	
 				Observations obs;
 				vector<double> par_values;
 				Parameters pars;
@@ -78,42 +81,65 @@ void RunManagerSerial::run()
 				
 				OperSys::chdir(run_dir.c_str());
 				success_runs += 1;
-				std::cout << string(message.str().size(), '\b');
-				message.str("");
-				message << "(" << success_runs << "/" << nruns << " runs complete)";
-				std::cout << message.str();
+				//std::cout << string(message.str().size(), '\b');
+				//message.str("");
+				//message << "(" << success_runs << "/" << nruns << " runs complete)";
+				//std::cout << message.str();
 				file_stor.update_run(i_run, pars, obs);
 
 			}
 			catch (const std::exception& ex)
 			{
 				update_run_failed(i_run);
+				failed_runs++;
 				cerr << endl;
 				cerr << "  " << ex.what() << endl;
 				cerr << "  Aborting model run" << endl << endl;
+
 			}
 			catch (...)
 			{
 				update_run_failed(i_run);
+				failed_runs++;
 				cerr << endl;
 				cerr << "  Error running model" << endl;
 				cerr << "  Aborting model run" << endl << endl;
 			}
+			message.str("");
+			message << endl << endl << "-->" << pest_utils::get_time_string() << " run complete, took: " << pest_utils::get_duration_sec(start_time) << " seconds";
+			message << endl << "-->" << success_runs << " of " << nruns << " complete, "<<  failed_runs << " failed" << endl << endl << endl;
+			std::cout << message.str();
 		}
 	}
 	total_runs += success_runs;
-	std::cout << string(message.str().size(), '\b');
 	message.str("");
-	message << "(" << success_runs << "/" << nruns << " runs complete";
+	message << endl << endl << endl << "    ---  serial run manager runs summary:  ---    " << endl;
+	message << "    " << success_runs << " of " << nruns << " complete, " << failed_runs << " failed" << endl;
+	message << "    " << "process took : " << pest_utils::get_duration_sec(start_time_all) << " seconds" << endl << endl << endl;
+	std::cout << message.str();
+
 	if (prev_sucess_runs > 0)
 	{
+		message.str("");
 		message << " and " << prev_sucess_runs << " additional run completed previously";
+		std::cout << message.str();
 	}
-	message << ")";
-	std::cout << message.str();
-	if (success_runs < nruns)
+	
+	if (failed_runs > 0)
 	{			cout << endl << endl;
-		cout << "WARNING: " << nruns - success_runs << " out of " << nruns << " runs failed" << endl << endl;
+		cout << "WARNING: " << failed_runs << " out of " << nruns << " runs failed" << endl << endl;
+		cout << "    failed run ids:" << endl;
+		int i = 1;
+		for (auto id : get_failed_run_ids())
+		{
+			cout << id << ",";
+			i++;
+			if (i > 10)
+			{
+				cout << endl << "    ";
+				i = 1;
+			}		
+		}
 	}
 	std::cout << endl << endl;
 	if (init_sim.size() == 0)
