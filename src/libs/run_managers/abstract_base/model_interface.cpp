@@ -398,7 +398,7 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 	//	pars_ptr->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
 	if (num_exp > 0)
 	{
-		cout << "errors processing template files: " << endl << ss.str();
+		//cout << "errors processing template files: " << endl << ss.str();
 		throw runtime_error(ss.str());
 	}
 
@@ -509,7 +509,7 @@ void ModelInterface::read_output_files(Observations *obs)
 
 	if (num_exp > 0)
 	{
-		cout << "errors processing instruction files: " << endl << ss.str();
+		//cout << "errors processing instruction files: " << endl << ss.str();
 		throw runtime_error(ss.str());
 	}
 

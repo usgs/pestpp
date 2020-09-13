@@ -624,7 +624,7 @@ void  thread_exceptions::rethrow()
 		}
 		catch (const std::exception& e)
 		{
-			ss << e.what() << ", ";
+			ss << e.what() << " ";
 		}
 	}
 	throw runtime_error(ss.str());
