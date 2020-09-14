@@ -2480,7 +2480,7 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 				catch (...)
 				{
 					//ss.str("");
-					ss << " thread " << i << "raised an exception: " << e.what();
+					ss << " thread " << i << "raised an exception: ";
 					//throw runtime_error(ss.str());
 				}
 			}
