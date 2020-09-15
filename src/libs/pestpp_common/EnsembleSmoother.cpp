@@ -2436,35 +2436,58 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 		message(2, "waiting to join threads");
 		//for (auto &t : threads)
 		//	t.join();
+		ss.str("");
+		int num_exp = 0;
+
 		for (int i = 0; i < num_threads; ++i)
 		{
+			bool found = false;
 			if (exception_ptrs[i])
 			{
+				found = true;
+				num_exp++;
 				try
 				{
 					rethrow_exception(exception_ptrs[i]);
 				}
 				catch (const std::exception& e)
 				{
-					ss.str("");
-					ss << "thread " << i << "raised an exception: " << e.what();
-					throw runtime_error(ss.str());
+					//ss.str("");
+					ss << " thread " << i << "raised an exception: " << e.what();
+					//throw runtime_error(ss.str());
+				}
+				catch (...)
+				{
+					//ss.str("");
+					ss << " thread " << i << "raised an exception";
+					//throw runtime_error(ss.str());
 				}
 			}
 			threads[i].join();
-			if (exception_ptrs[i])
+			if ((exception_ptrs[i]) && (!found))
 			{
+				num_exp++;
 				try
 				{
 					rethrow_exception(exception_ptrs[i]);
 				}
 				catch (const std::exception& e)
 				{
-					ss.str("");
-					ss << "thread " << i << "raised an exception: " << e.what();
-					throw runtime_error(ss.str());
+					//ss.str("");
+					ss << " thread " << i << "raised an exception: " << e.what();
+					//throw runtime_error(ss.str());
+				}
+				catch (...)
+				{
+					//ss.str("");
+					ss << " thread " << i << "raised an exception: ";
+					//throw runtime_error(ss.str());
 				}
 			}
+		}
+		if (num_exp > 0)
+		{
+			throw runtime_error(ss.str());
 		}
 		message(2, "threaded localized upgrade calculation done");
 	}

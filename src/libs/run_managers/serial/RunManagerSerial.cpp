@@ -92,8 +92,7 @@ void RunManagerSerial::run()
 			{
 				update_run_failed(i_run);
 				failed_runs++;
-				cerr << endl;
-				cerr << "  " << ex.what() << endl;
+				cerr << "  Error running model: " << ex.what() << endl;
 				cerr << "  Aborting model run" << endl << endl;
 
 			}
@@ -101,7 +100,6 @@ void RunManagerSerial::run()
 			{
 				update_run_failed(i_run);
 				failed_runs++;
-				cerr << endl;
 				cerr << "  Error running model" << endl;
 				cerr << "  Aborting model run" << endl << endl;
 			}
