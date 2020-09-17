@@ -842,6 +842,10 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 			pro_pars.insert(name, val);
 		}
 		f_in << line << endl;
+		if (f_in.bad())
+		{
+			throw_tpl_error("ifstream is bad after writing line '" + line + "'", line_num);
+		}
 	}
 	return pro_pars;
 }
