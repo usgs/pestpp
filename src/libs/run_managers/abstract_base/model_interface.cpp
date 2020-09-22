@@ -842,6 +842,16 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 			pro_pars.insert(name, val);
 		}
 		f_in << line << endl;
+		if (f_in.bad())
+		{
+			throw_tpl_error("ofstream is bad after writing line '" + line + "'", line_num);
+		}
+	}
+	f_tpl.close();
+	f_in.close();
+	if (f_in.bad())
+	{
+		throw_tpl_error("ofstream is bad after closing file, something is probably corrupt");
 	}
 	return pro_pars;
 }
@@ -1189,7 +1199,6 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 	pair<string, double> lhs;
 	while (true)
 	{
-
 		if (f_ins.eof())
 			break;
 		tokens.clear();
@@ -1273,6 +1282,8 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 			//itoken++;
 		}
 	}
+	f_ins.close();
+	f_out.close();
 	return obs;	
 }
 
