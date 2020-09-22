@@ -20,6 +20,27 @@ rand_gen_ptr(_rand_gen_ptr)
 {
 }
 
+bool Ensemble::try_align_other_rows(PerformanceLog* performance_log, Ensemble& other)
+{
+	map<string, int> other_real_map = other.get_real_map(), this_real_map = get_real_map();
+	bool need_to_align = false;
+	for (auto item : this_real_map)
+	{
+		//if even one realization name is not common, we are done here
+		if (other_real_map.find(item.first) == other_real_map.end())
+			return false;
+		//if this realization name is not at the same location then we do need to reorder
+		if (item.second != other_real_map[item.first])
+			need_to_align = true;
+	}
+	//if we made it to here and need_to_align is false, then two ensembles are already row aligned
+	if (!need_to_align)
+		return false;
+	performance_log->log_event("Ensemble::try_align_other_rows(): reorderig other ensemble");
+	other.reorder(real_names, vector<string>(),true);
+	return true;
+}
+
 void Ensemble::check_for_dups()
 {
 	vector<string> dups;
@@ -271,6 +292,19 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 						}
 					}
 					threads[i].join();
+					if (exception_ptrs[i])
+					{
+						try
+						{
+							rethrow_exception(exception_ptrs[i]);
+						}
+						catch (const std::exception& e)
+						{
+							ss.str("");
+							ss << "thread " << i << "raised an exception: " << e.what();
+							throw runtime_error(ss.str());
+						}
+					}
 				}
 				plog->log_event("threaded draws done");
 
@@ -678,14 +712,18 @@ void Ensemble::set_eigen(Eigen::MatrixXd _reals)
 }
 
 
-void Ensemble::reorder(const vector<string> &_real_names, const vector<string> &_var_names)
+void Ensemble::reorder(const vector<string> &_real_names, const vector<string> &_var_names, bool update_org_real_names)
 {
 	//reorder inplace
 	reals = get_eigen(_real_names, _var_names);
 	if (_var_names.size() != 0)
 		var_names = _var_names;
 	if (_real_names.size() != 0)
+	{
 		real_names = _real_names;
+		if (update_org_real_names)
+			org_real_names = _real_names;
+	}
 }
 
 void Ensemble::drop_rows(const vector<int> &row_idxs)
@@ -1259,10 +1297,12 @@ void Ensemble::append(string real_name, const Transformable &trans)
 	}
 	//make sure all var_names are found
 	vector<string> keys = trans.get_keys();
-	set<string> tset(keys.begin(), keys.end());
+	//set<string> tset(keys.begin(), keys.end());
 	vector<string> missing;
+	Transformable::const_iterator end = trans.end();
 	for (auto &n : var_names)
-		if (tset.find(n) == tset.end())
+		//if (tset.find(n) == tset.end())
+		if (trans.find(n) == end)
 			missing.push_back(n);
 	if (missing.size() > 0)
 	{

@@ -49,84 +49,30 @@ int main(int argc, char* argv[])
 		cout << "                             by the PEST++ development team" << endl;
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-		// build commandline
-		string commandline = "";
-		for (int i = 0; i < argc; ++i)
-		{
-			commandline.append(" ");
-			commandline.append(argv[i]);
-		}
-
-		vector<string> cmd_arg_vec(argc);
-		copy(argv, argv + argc, cmd_arg_vec.begin());
-		for (vector<string>::iterator it = cmd_arg_vec.begin(); it != cmd_arg_vec.end(); ++it)
-		{
-			transform(it->begin(), it->end(), it->begin(), ::tolower);
-		}
-
-		string complete_path;
-		enum class RunManagerType { SERIAL, PANTHER, GENIE, EXTERNAL };
-
-		if (argc >= 2) {
-			complete_path = argv[1];
-		}
-		else {
-			cerr << "--------------------------------------------------------" << endl;
-			cerr << "usage:" << endl << endl;
-			cerr << "    serial run manager:" << endl;
-			cerr << "        pestpp-opt pest_ctl_file.pst" << endl << endl;
-			cerr << "    PANTHER master:" << endl;
-			cerr << "        pestpp-opt control_file.pst /H :port" << endl << endl;
-			cerr << "    PANTHER worker:" << endl;
-			cerr << "        pestpp-opt /H hostname:port " << endl << endl;
-			cerr << "    external run manager:" << endl;
-			cerr << "        pestpp-opt control_file.pst /E" << endl << endl;
-			cerr << " additional options can be found in the PEST++ manual" << endl;
-			cerr << "--------------------------------------------------------" << endl;
-			exit(0);
-		}
-
-
+		
+		CmdLine cmdline(argc, argv);
+		
 		FileManager file_manager;
-		string filename = complete_path;
+		string filename = cmdline.ctl_file_name;
 		string pathname = ".";
 		file_manager.initialize_path(get_filename_without_ext(filename), pathname);
-
-		//by default use the serial run manager.  This will be changed later if another
-		//run manger is specified on the command line.
-		RunManagerType run_manager_type = RunManagerType::SERIAL;
 
 		vector<string>::const_iterator it_find, it_find_next;
 		string next_item;
 		string socket_str = "";
-		//Check for external run manager
-		it_find = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/e");
-		if (it_find != cmd_arg_vec.end())
+		
+		if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
 		{
-			run_manager_type = RunManagerType::EXTERNAL;
+			cerr << "External run manager ('/e') not supported, please use panther instead" << endl;
+			exit(1);
 		}
-		//Check for PANTHER worker
-		it_find = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/h");
-		next_item.clear();
-		if (it_find != cmd_arg_vec.end() && it_find + 1 != cmd_arg_vec.end())
+		
+		if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_WORKER)
 		{
-			next_item = *(it_find + 1);
-			strip_ip(next_item);
-		}
-		if (it_find != cmd_arg_vec.end() && !next_item.empty() && next_item[0] != ':')
-		{
-			// This is a PANTHER worker, start PEST++ as a PANTHER worker
-			vector<string> sock_parts;
-			vector<string>::const_iterator it_find_yamr_ctl;
-			string file_ext = get_filename_ext(filename);
-			tokenize(next_item, sock_parts, ":");
+			
 			try
 			{
-				if (sock_parts.size() != 2)
-				{
-					cerr << "PANTHER worker requires the master be specified as /H hostname:port" << endl << endl;
-					throw(PestCommandlineError(commandline));
-				}
+				
 				ofstream frec("panther_worker.rec");
 				if (frec.bad())
 					throw runtime_error("error opening 'panther_worker.rec'");
@@ -146,7 +92,7 @@ int main(int argc, char* argv[])
 					throw(e);
 				}
 
-				yam_agent.start(sock_parts[0], sock_parts[1]);
+				yam_agent.start(cmdline.panther_host_name,cmdline.panther_port);
 			}
 			catch (PestError &perr)
 			{
@@ -156,32 +102,25 @@ int main(int argc, char* argv[])
 			cout << endl << "Work Done..." << endl;
 			exit(0);
 		}
-		//Check for PANTHER master
-		else if (it_find != cmd_arg_vec.end())
-		{
-			
-			run_manager_type = RunManagerType::PANTHER;
-			socket_str = next_item;
-		}
-
-		it_find = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/g");
-		next_item.clear();
-		if (it_find != cmd_arg_vec.end())
+		
+		
+		if (cmdline.runmanagertype == CmdLine::RunManagerType::GENIE)
 		{
 			cerr << "Genie run manager ('/g') no longer supported, please use PANTHER instead" << endl;
-			return 1;
+			exit(1);
+
+		}
+		if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
+		{
+			cerr << "external run manager ('/e') no longer supported, please use PANTHER instead" << endl;
+			exit(1);
 
 		}
 
 		RestartController restart_ctl;
 
-		//process restart and reuse jacobian directives
-		vector<string>::const_iterator it_find_j = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/j");
-		vector<string>::const_iterator it_find_r = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/r");
-		
-
 		debug_initialize(file_manager.build_filename("dbg"));
-		if ((it_find_j != cmd_arg_vec.end()) || (it_find_r != cmd_arg_vec.end()))
+		if (cmdline.restart)
 		{
 			cerr << "ERROR: pestpp-opt does not support restart options" << endl <<endl;
 
@@ -199,11 +138,11 @@ int main(int argc, char* argv[])
 		fout_rec << endl;
 		fout_rec << endl << endl << "version: " << version << endl;
 		fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-		fout_rec << "using control file: \"" << complete_path << "\"" << endl;
+		fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
 		fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
 		
 		cout << endl;
-		cout << "using control file: \"" << complete_path << "\"" << endl;
+		cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
 		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
 
 		// create pest run and process control file to initialize it
@@ -256,19 +195,16 @@ int main(int argc, char* argv[])
 			output_file_writer.write_par_iter(0, pest_scenario.get_ctl_parameters());
 		}*/
 		RunManagerAbstract *run_manager_ptr;
-		if (run_manager_type == RunManagerType::PANTHER)
+		if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_MASTER)
 		{
 			// using PANTHER run manager
 			if (pest_scenario.get_control_info().noptmax == 0)
 			{
 				cout << endl << endl << "WARNING: 'noptmax' = 0 but using parallel run mgr.  This prob isn't what you want to happen..." << endl << endl;
 			}
-			string port = socket_str;
-			strip_ip(port);
-			strip_ip(port, "front", ":");
 			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
 			run_manager_ptr = new RunManagerPanther(
-				file_manager.build_filename("rns"), port,
+				file_manager.build_filename("rns"), cmdline.panther_port,
 				file_manager.open_ofile_ext("rmr"),
 				pest_scenario.get_pestpp_options().get_max_run_fail(),
 				pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
@@ -276,15 +212,6 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes());
 		}
 
-		else if (run_manager_type == RunManagerType::EXTERNAL)
-		{
-			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
-			run_manager_ptr = new RunManagerExternal(exi.comline_vec,
-				exi.tplfile_vec, exi.inpfile_vec, exi.insfile_vec, exi.outfile_vec,
-				file_manager.build_filename("rns"), file_manager.build_filename("ext"),
-				file_manager.build_filename("exi"),
-				pest_scenario.get_pestpp_options().get_max_run_fail());
-		}
 		else
 		{
 			performance_log.log_event("starting basic model IO error checking");
@@ -427,11 +354,16 @@ int main(int argc, char* argv[])
 			parcov.try_from(pest_scenario, file_manager);
 			sequentialLP slp(pest_scenario, run_manager_ptr, parcov, &file_manager, output_file_writer, performance_log);
 			slp.solve();
-			fout_rec << "Number of forward model runs performed during optimiztion: " << run_manager_ptr->get_total_runs() << endl;
+			fout_rec << "Number of forward model runs performed during optimization: " << run_manager_ptr->get_total_runs() << endl;
 		}
 		// clean up
 		//fout_rec.close();
 		delete run_manager_ptr;
+
+		string case_name = file_manager.get_base_filename();
+		file_manager.close_file("rst");
+		pest_utils::try_clean_up_run_storage_files(case_name);
+
 		cout << endl << endl << "PESTPP-OPT Analysis Complete..." << endl;
 		cout << flush;
 		return 0;
@@ -443,6 +375,11 @@ int main(int argc, char* argv[])
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));
+		return 1;
+	}
+	catch (...)
+	{
+		cout << "Error condition prevents further execution" << endl;
 		return 1;
 	}
 #endif
