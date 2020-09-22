@@ -325,6 +325,8 @@ public:
 	template<typename t>
 	inline void fill_col_vector(string col_name, vector<t> &col_vector);
 	void read_file();
+	void keep_cols(set<string>& keep_cols);
+	void clear() { data.clear(); }
 	
 private:
 	bool cast;
@@ -374,6 +376,22 @@ string get_time_string();
 string get_time_string_short();
 
 
+class CmdLine {
+
+public:
+	enum class RunManagerType { SERIAL, PANTHER_MASTER, PANTHER_WORKER, GENIE, EXTERNAL };
+	CmdLine(int argc, char* argv[]);
+	string ctl_file_name;
+	string panther_host_name;
+	string org_cmdline_str;
+	string panther_port;
+	bool jac_restart;
+	bool restart;
+	RunManagerType runmanagertype;
+private:
+	void throw_cmdline_error(string message);
+
+};
 
 }  // end namespace pest_utils
 #endif /* UTILITIES_H_ */

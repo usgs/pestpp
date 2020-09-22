@@ -624,7 +624,7 @@ void  thread_exceptions::rethrow()
 		}
 		catch (const std::exception& e)
 		{
-			ss << e.what() << ", ";
+			ss << e.what() << " ";
 		}
 	}
 	throw runtime_error(ss.str());
@@ -1266,6 +1266,31 @@ void ExternalCtlFile::read_file()
 
 }
 
+void ExternalCtlFile::keep_cols(set<string>& keep_cols)
+{
+	vector<string> keep;
+	set<string> keep_upper;
+	for (auto k : keep_cols)
+		keep_upper.emplace(upper_cp(k));
+	for (auto c : col_names)
+	{
+		if (keep_upper.find(c) != keep_upper.end())
+			keep.push_back(c);
+	}
+	if (keep.size() == 0)
+	{
+		data.clear();
+		return;
+	}
+	map<string, string> t;
+	for (auto& d : data)
+	{
+		t.clear();
+		for (auto k : keep)
+			t[k] = d.second[k];
+		d.second = t;
+	}
+}
 
 void ExternalCtlFile::parse_control_record()
 {
@@ -1403,7 +1428,159 @@ string get_time_string_short()
 }
 
 
-} // end of namespace pest_utils
+CmdLine::CmdLine(int argc, char* argv[]) :
+	ctl_file_name(""), panther_host_name(""), panther_port(""), 
+	runmanagertype(RunManagerType::SERIAL),org_cmdline_str(""),
+	restart(false),jac_restart(false)
+{
+	for (int i = 0; i < argc; ++i)
+	{
+		org_cmdline_str.append(" ");
+		org_cmdline_str.append(argv[i]);
+	}
+	cout << "...processing command line: '" << org_cmdline_str << "'" << endl;
+	vector<string> org_cmdline_vec(argc);
+	copy(argv, argv + argc, org_cmdline_vec.begin());
+	vector<string> lower_cmdline_vec = org_cmdline_vec;
+	for (vector<string>::iterator it = lower_cmdline_vec.begin(); it != lower_cmdline_vec.end(); ++it)
+	{
+		transform(it->begin(), it->end(), it->begin(), ::tolower);
+	}
+	
+	if (org_cmdline_vec.size() >= 2) 
+	{
+		ctl_file_name = org_cmdline_vec[1];
+	}
+	else 
+	{
+		throw_cmdline_error("too few args, no control file name found");
+	}
+
+	//check for shitty restar flags
+	vector<string> temp, temp_lower;
+	for (int i = 0; i < lower_cmdline_vec.size(); i++)
+	{
+		if (lower_cmdline_vec[i] == "/r")
+		{
+			restart = true;
+		}
+		else if (lower_cmdline_vec[i] == "/j")
+		{
+			if (restart)
+				throw_cmdline_error("both '/r' and '/j' supplied");
+			jac_restart = true;
+		}
+		else
+		{
+			temp.push_back(org_cmdline_vec[i]);
+			temp_lower.push_back(lower_cmdline_vec[i]);
+		}
+	}
+	org_cmdline_vec = temp;
+	lower_cmdline_vec = temp_lower;
+
+
+	if ((lower_cmdline_vec.size() == 3) || (lower_cmdline_vec.size() > 4))
+	{
+		throw_cmdline_error("wrong number of args, expecting 2 (serial run mgr) or 4 (parallel run mgr)");
+	}
+	
+	//serial run mgr...done
+	if (lower_cmdline_vec.size() == 2)
+	{
+		cout << "...using serial run manager" << endl;
+		return;
+	}
+	
+	//check for various run mgr options
+	string third_arg = lower_cmdline_vec[2];
+	if (third_arg == "/e")
+	{
+		cout << "...using external run manager" << endl;
+		runmanagertype = RunManagerType::EXTERNAL;
+	}
+	else if (third_arg == "/g")
+	{
+		cout << "...using genie run manager" << endl;
+		runmanagertype = RunManagerType::GENIE;
+	}
+	else if (third_arg == "/h")
+	{
+		//assume worker, but check for master later...
+		runmanagertype = RunManagerType::PANTHER_WORKER;
+	}
+	else
+	{
+		throw_cmdline_error("unrecognized commandline arg '" + third_arg + "', expecting '/h','/e','/g'");
+	}
+
+	if (runmanagertype == RunManagerType::PANTHER_WORKER)
+	{
+		string forth_arg = org_cmdline_vec[3];
+		if (forth_arg.find(":") == string::npos)
+		{
+			throw_cmdline_error("panther master/worker arg '" + forth_arg + "' doesn't have a ':' char");
+		}
+		if (forth_arg[0] == ':')
+		{
+			//panther master
+			runmanagertype = RunManagerType::PANTHER_MASTER;
+			panther_port = forth_arg.substr(1);
+			try
+			{
+				int test = stoi(panther_port);
+			}
+			catch (...)
+			{
+				throw_cmdline_error("error casting master port number '" + panther_port + "' to int");
+			}
+			cout << "...using panther run manager in master mode using port " << panther_port << endl;
+		}
+		else
+		{
+			//panther worker
+			vector<string> tokens;
+			tokenize(forth_arg, tokens, ":");
+			if (tokens.size() != 2)
+				throw_cmdline_error("wrong number of colon-delimited tokens in panther worker arg '" + forth_arg);
+			panther_host_name = tokens[0];
+			panther_port = tokens[1];
+			try
+			{
+				int test = stoi(panther_port);
+			}
+			catch (...)
+			{
+				throw_cmdline_error("error casting master port number '" + panther_port + "' to int");
+			}
+			cout << "...using panther run manager in worker mode using hostname '" << panther_host_name << "' and port " << panther_port << endl;
+		}
+	}
+	return;
+
+}
+ 
+
+void CmdLine::throw_cmdline_error(string message)
+{
+	cerr << "--------------------------------------------------------" << endl;
+	cerr << "COMMAND LINE ERROR: " << message << endl;
+	cerr << "usage:" << endl << endl;
+	cerr << "    serial run manager:" << endl;
+	cerr << "        pestpp-xxx control_file.pst" << endl << endl;
+	cerr << "    PANTHER master:" << endl;
+	cerr << "        pestpp-xxx control_file.pst /H :port" << endl << endl;
+	cerr << "    PANTHER worker:" << endl;
+	cerr << "        pestpp-xxx control_file.pst /H hostname:port " << endl << endl;
+
+	cerr << " additional options can be found in the PEST++ users manual" << endl;
+	cerr << "--------------------------------------------------------" << endl;
+	exit(1);
+}
+
+// end of namespace pest_utils
+}
+
 
 
 

@@ -293,53 +293,14 @@ int main(int argc, char* argv[])
 		cout << "             pestpp-swp - a parameteric sweep utility, version " << version << endl;
 		cout << "                     for PEST(++) datasets " << endl << endl;
 		cout << "                 by the PEST++ development team" << endl << endl << endl;
-		// build commandline
-		string commandline = "";
-		for (int i = 0; i < argc; ++i)
-		{
-			commandline.append(" ");
-			commandline.append(argv[i]);
-		}
+		
 
-		vector<string> cmd_arg_vec(argc);
-		copy(argv, argv + argc, cmd_arg_vec.begin());
-		for (vector<string>::iterator it = cmd_arg_vec.begin(); it != cmd_arg_vec.end(); ++it)
-		{
-			transform(it->begin(), it->end(), it->begin(), ::tolower);
-		}
-
-		string complete_path;
-		enum class RunManagerType { SERIAL, PANTHER, GENIE, EXTERNAL };
-
-		if (argc >= 2) {
-			complete_path = argv[1];
-		}
-		else {
-			cerr << "--------------------------------------------------------" << endl;
-			cerr << "usage:" << endl << endl;
-			cerr << "    serial run manager:" << endl;
-			cerr << "        pestpp-swp control_file.pst" << endl << endl;
-			cerr << "    PANTHER master:" << endl;
-			cerr << "        pestpp-swp control_file.pst /H :port" << endl << endl;
-			cerr << "    PANTHER worker:" << endl;
-			cerr << "        pestpp-swp control_file.pst /H hostname:port " << endl << endl;
-			cerr << "control file pest++ options:" << endl;
-			cerr << "    ++sweep_parameter_csv_file(pars_file.csv)" << endl;
-			cerr << "        - csv file with each row as a par set" << endl;
-			cerr << "    ++sweep_forgive(true)" << endl;
-			cerr << "        - forgive control file pars missing from csv file" << endl;
-			cerr << "    ++sweep_output_csv_file(output.csv)" << endl;
-			cerr << "        - the csv to save run results to" << endl;
-			cerr << "    ++sweep_chunk(500)" << endl;
-			cerr << "        - number of runs to process in a single batch" << endl << endl;
-			cerr << " additional options can be found in the PEST++ manual" << endl;
-			cerr << "--------------------------------------------------------" << endl;
-			exit(0);
-		}
-
+		CmdLine cmdline(argc, argv);
+		
+		
 
 		FileManager file_manager;
-		string filename = complete_path;
+		string filename = cmdline.ctl_file_name;
 		string pathname = ".";
 		file_manager.initialize_path(get_filename_without_ext(filename), pathname);
 		//jwhite - something weird is happening with the machine is busy and an existing
@@ -349,39 +310,24 @@ int main(int argc, char* argv[])
 		//w_sleep(2000);
 		//by default use the serial run manager.  This will be changed later if another
 		//run manger is specified on the command line.
-		RunManagerType run_manager_type = RunManagerType::SERIAL;
-
-		vector<string>::const_iterator it_find, it_find_next;
-		string next_item;
-		string socket_str = "";
-		//Check for external run manager
-		it_find = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/e");
-		if (it_find != cmd_arg_vec.end())
+		
+		if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
 		{
-			throw runtime_error("External run manager not supported by sweep");
+			cerr << "External run manager ('/e') not supported by sweep, please use panther instead" << endl;
+			exit(1);
 		}
-		//Check for PANTHER worker
-		it_find = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/h");
-		next_item.clear();
-		if (it_find != cmd_arg_vec.end() && it_find + 1 != cmd_arg_vec.end())
+		if (cmdline.runmanagertype == CmdLine::RunManagerType::GENIE)
 		{
-			next_item = *(it_find + 1);
-			strip_ip(next_item);
+			cerr << "Genie run manager ('/e') deprecated, please use panther instead" << endl;
+			exit(1);
 		}
-		if (it_find != cmd_arg_vec.end() && !next_item.empty() && next_item[0] != ':')
+		
+		if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_WORKER)
 		{
-			// This is a PANTHER worker, start PEST++ as a PANTHER worker
-			vector<string> sock_parts;
-			vector<string>::const_iterator it_find_yamr_ctl;
-			string file_ext = get_filename_ext(filename);
-			tokenize(next_item, sock_parts, ":");
+			
 			try
 			{
-				if (sock_parts.size() != 2)
-				{
-					cerr << "PANTHER worker requires the master be specified as /H hostname:port" << endl << endl;
-					throw(PestCommandlineError(commandline));
-				}
+				
 				ofstream frec("panther_worker.rec");
 				if (frec.bad())
 					throw runtime_error("error opening 'panther_worker.rec'");
@@ -401,7 +347,7 @@ int main(int argc, char* argv[])
 					throw(e);
 				}
 
-				yam_agent.start(sock_parts[0], sock_parts[1]);
+				yam_agent.start(cmdline.panther_host_name,cmdline.panther_port);
 			}
 			catch (PestError &perr)
 			{
@@ -411,54 +357,29 @@ int main(int argc, char* argv[])
 			cout << endl << "Work Done..." << endl;
 			exit(0);
 		}
-		//Check for PANTHER master
-		else if (it_find != cmd_arg_vec.end())
-		{
-			// using PANTHER run manager
-			run_manager_type = RunManagerType::PANTHER;
-			socket_str = next_item;
-		}
-
-		it_find = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/g");
-		next_item.clear();
-		if (it_find != cmd_arg_vec.end())
-		{
-			cerr << "Genie run manager ('/g') no longer supported, please use PANTHER instead" << endl;
-			return 1;
-
-		}
+		
 
 		RestartController restart_ctl;
 
 		//process restart and reuse jacobian directives
-		vector<string>::const_iterator it_find_j = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/j");
-		vector<string>::const_iterator it_find_r = find(cmd_arg_vec.begin(), cmd_arg_vec.end(), "/r");
+		
 		bool restart_flag = false;
 		bool save_restart_rec_header = true;
 
 		debug_initialize(file_manager.build_filename("dbg"));
-		if (it_find_j != cmd_arg_vec.end())
+		if (cmdline.jac_restart)
 		{
 			throw runtime_error("/j option not supported by sweep");
 		}
-		else if (it_find_r != cmd_arg_vec.end())
+		if (cmdline.restart)
 		{
-			ifstream &fin_rst = file_manager.open_ifile_ext("rst");
-			restart_ctl.process_rst_file(fin_rst);
-			file_manager.close_file("rst");
-			restart_flag = true;
-			file_manager.open_default_files(true);
-			ofstream &fout_rec_tmp = file_manager.rec_ofstream();
-			fout_rec_tmp << endl << endl;
-			fout_rec_tmp << "Restarting sweep ....." << endl << endl;
-			cout << "    Restarting sweep ....." << endl << endl;
-
+			throw runtime_error("/r option not supported by sweep");
 		}
-		else
-		{
-			restart_ctl.get_restart_option() = RestartController::RestartOption::NONE;
-			file_manager.open_default_files();
-		}
+		
+		
+		restart_ctl.get_restart_option() = RestartController::RestartOption::NONE;
+		file_manager.open_default_files();
+		
 
 		ofstream &fout_rec = file_manager.rec_ofstream();
 		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
@@ -470,14 +391,14 @@ int main(int argc, char* argv[])
 			fout_rec << endl;
 			fout_rec << endl << endl << "version: " << version << endl;
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-			fout_rec << "using control file: \"" << complete_path << "\"" << endl << endl;
+			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl << endl;
 			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
 		}
 
 		cout << endl;
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-		cout << "using control file: \"" << complete_path << "\"" << endl << endl;
+		cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl << endl;
 		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
 
 		// create pest run and process control file to initialize it
@@ -535,14 +456,11 @@ int main(int argc, char* argv[])
 		}
 
 		RunManagerAbstract *run_manager_ptr;
-		if (run_manager_type == RunManagerType::PANTHER)
+		if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_MASTER)
 		{
-			string port = socket_str;
-			strip_ip(port);
-			strip_ip(port, "front", ":");
 			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
 			run_manager_ptr = new RunManagerPanther(
-				file_manager.build_filename("rns"), port,
+				file_manager.build_filename("rns"), cmdline.panther_port,
 				file_manager.open_ofile_ext("rmr"),
 				pest_scenario.get_pestpp_options().get_max_run_fail(),
 				pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
