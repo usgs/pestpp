@@ -69,7 +69,7 @@ public:
 
 	Covariance get_diagonal_cov_matrix();
 	pair<Covariance,Covariance> get_empirical_cov_matrices(FileManager* file_manager_ptr);
-	void reorder(const vector<string> &_real_names, const vector<string> &_var_names);
+	void reorder(const vector<string> &_real_names, const vector<string> &_var_names, bool update_org_real_names=false);
 	void drop_rows(const vector<int> &row_idxs);
 	void drop_rows(const vector<string> &drop_names);
 	void drop_cols(const vector<string>& drop_names);
@@ -91,6 +91,9 @@ public:
 	void set_rand_gen(std::mt19937* _rand_gen_ptr) { rand_gen_ptr = _rand_gen_ptr; }
 	std::mt19937* get_rand_gen_ptr() { return rand_gen_ptr; }
 	map<string, int> get_var_map() { return var_map; }
+	map<string, int> get_real_map();
+
+	bool try_align_other_rows(PerformanceLog* performance_log, Ensemble& other);
 
 protected:
 	std::mt19937* rand_gen_ptr;

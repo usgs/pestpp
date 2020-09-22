@@ -35,8 +35,9 @@
 class AgentInfoRec {
 public:
 	static const int UNKNOWN_ID = -9999;
-	enum class State { NEW, CWD_REQ, CWD_RCV, NAMES_SENT, LINPACK_REQ, LINPACK_RCV, WAITING, ACTIVE, KILLED, KILLED_FAILED, COMPLETE };
+	enum class State { NEW, CWD_REQ, CWD_RCV, NAMES_SENT, LINPACK_REQ, LINPACK_RCV, WAITING, ACTIVE, KILLED, KILLED_FAILED, COMPLETE};
 	AgentInfoRec(int _socket_fd);
+	std::vector<std::string> state_strings;
 	int get_socket_fd() const;
 	string get_hostname()const;
 	string get_port()const;
@@ -93,6 +94,7 @@ public:
 		bool operator() (const AgentInfoRec &a, const AgentInfoRec &b);
 	};
 };
+
 
 class RunManagerPanther : public RunManagerAbstract
 {
@@ -171,8 +173,9 @@ private:
 	bool ping(int i_sock);
 	bool ping(pest_utils::thread_flag* terminate = nullptr);
 	void report(std::string message,bool to_cout);
-	string get_time_string();
-	string get_time_string_short();
+	
+	/*string get_time_string();
+	string get_time_string_short();*/
 	void echo();
 	vector<int> get_overdue_runs_over_kill_threshold(int run_id);
 	bool all_runs_complete();

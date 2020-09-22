@@ -276,7 +276,7 @@ bool Jacobian::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vector<st
 		{
 			debug_msg("fail");
 			//cout << endl << " warning: failed to compute parameter deriviative for " << ipar_name << endl;
-			file_manager.rec_ofstream() << " warning: failed to compute parameter deriviative for " << ipar_name << endl;
+			file_manager.rec_ofstream() << " warning: failed to compute parameter derivative for " << ipar_name << endl;
 			failed_parameter_names.insert(ipar_name);
 		}
 	}

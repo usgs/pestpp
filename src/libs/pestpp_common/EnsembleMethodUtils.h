@@ -105,7 +105,8 @@ class ParChangeSummarizer
 public:
 	ParChangeSummarizer() { ; }
 	ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr);
-	void summarize(ParameterEnsemble &pe, int iiter);
+	void summarize(ParameterEnsemble &pe, int iiter, string filename = string());
+	
 
 private:
 	ParameterEnsemble * base_pe_ptr;
@@ -113,11 +114,17 @@ private:
 	OutputFileWriter* output_file_writer_ptr;
 	map<string, set<string>> pargp2par_map;
 	pair<map<string,double>, map<string, double>> init_moments;
+	map<string, double> mean_change;
+	map<string, double> std_change;
+	map<string, int> num_at_bounds;
+	map<string, int> percent_at_bounds;
 
+	void update(ParameterEnsemble& pe);
+	void write_to_csv(string& filename);
 
 };
 
-
-
+void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
+	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter);
 
 #endif

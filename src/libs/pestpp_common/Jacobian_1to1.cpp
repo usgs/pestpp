@@ -111,8 +111,8 @@ bool Jacobian_1to1::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vect
 		}
 		else
 		{
-			cout << endl << " warning: failed to compute parameter deriviative for " << i_name << endl;
-			file_manager.rec_ofstream() << " warning: failed to compute parameter deriviative for " << i_name << endl;
+			cout << endl << " warning: failed to compute parameter derivative for " << i_name << endl;
+			file_manager.rec_ofstream() << " warning: failed to compute parameter derivative for " << i_name << endl;
 			failed_parameter_names.insert(i_name);
 			failed_to_increment_parmaeters.insert(i_name, derivative_par_value);
 		}
@@ -192,8 +192,8 @@ bool Jacobian_1to1::build_runs(ModelRun &init_model_run, vector<string> numeric_
 		}
 		else
 		{
-			cout << endl << " warning: failed to compute parameter deriviative for " << i_name << endl;
-			file_manager.rec_ofstream() << " warning: failed to compute parameter deriviative for " << i_name << endl;
+			cout << endl << " warning: failed to compute parameter derivative for " << i_name << endl;
+			file_manager.rec_ofstream() << " warning: failed to compute parameter derivative for " << i_name << endl;
 			failed_parameter_names.insert(i_name);
 			failed_to_increment_parmaeters.insert(i_name, derivative_par_value);
 		}
