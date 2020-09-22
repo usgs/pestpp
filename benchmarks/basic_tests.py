@@ -966,11 +966,15 @@ def cmdline_test():
     pst_name = "freyberg6_run_glm.pst"
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_glm.pst"))
     pst.pestpp_options["debug_parse_only"] = True
-    pst.write(os.path.join(t_d,"cmdline_test.pst"))
-    pyemu.os_utils.run("{0} {1} /h :4004".format(exe_path,"cmdline_test.pst"),cwd=t_d)
-
+    pst_name = "CmdLine_test.pst" #camel case on purpose for linux testing
+    pst.write(os.path.join(t_d,pst_name))
+    pyemu.os_utils.run("{0} {1}".format(exe_path,pst_name),cwd=t_d)
+    pyemu.os_utils.run("{0} {1} /h :4004".format(exe_path,pst_name),cwd=t_d)
+    pyemu.os_utils.run("{0} {1} /r /h :4004".format(exe_path.replace("-ies","-glm"),pst_name),cwd=t_d) 
+    pyemu.os_utils.run("{0} {1} /r ".format(exe_path.replace("-ies","-glm"),pst_name),cwd=t_d) 
+    
     try:
-        pyemu.os_utils.run("{0} {1} \\h :4004".format(exe_path,"cmdline_test.pst"),cwd=t_d) 
+        pyemu.os_utils.run("{0} {1} \\h :4004".format(exe_path,pst_name),cwd=t_d) 
        
     except:
         pass
@@ -978,7 +982,7 @@ def cmdline_test():
         raise Exception("should have failed")
     
     try:
-        pyemu.os_utils.run("{0} {1} :4004".format(exe_path,"cmdline_test.pst"),cwd=t_d) 
+        pyemu.os_utils.run("{0} {1} :4004".format(exe_path,pst_name),cwd=t_d) 
        
     except:
         pass
@@ -986,14 +990,13 @@ def cmdline_test():
         raise Exception("should have failed")
 
     try:
-        pyemu.os_utils.run("{0} {1} /h 4004".format(exe_path,"cmdline_test.pst"),cwd=t_d) 
+        pyemu.os_utils.run("{0} {1} /h 4004".format(exe_path,pst_name),cwd=t_d) 
        
     except:
         pass
     else:
         raise Exception("should have failed")
-    pyemu.os_utils.run("{0} {1} /r /h :4004".format(exe_path.replace("-ies","-glm"),"cmdline_test.pst"),cwd=t_d) 
-    pyemu.os_utils.run("{0} {1} /r ".format(exe_path.replace("-ies","-glm"),"cmdline_test.pst"),cwd=t_d) 
+    
 
 if __name__ == "__main__":
     
