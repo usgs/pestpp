@@ -2,7 +2,7 @@
 
 add_executable(pestpp-sqp pestpp-sqp.cpp)
 
-target_compile_options(pestpp-ies PRIVATE ${PESTPP_CXX_WARN_FLAGS})
+target_compile_options(pestpp-sqp PRIVATE ${PESTPP_CXX_WARN_FLAGS})
 
 target_link_libraries(pestpp-sqp
   rm_serial
