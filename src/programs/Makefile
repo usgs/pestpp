@@ -8,6 +8,7 @@ SUBDIRS := \
     pestpp-ies \
     pestpp-opt \
     sweep \
+    pestpp-sqp \
 
 # Does not seem to compile
 # SUBDIRS += pestpp-ies
