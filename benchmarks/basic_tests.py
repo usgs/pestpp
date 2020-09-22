@@ -953,6 +953,48 @@ def mf6_v5_glm_test():
     assert oe.shape[0] == pst.pestpp_options["glm_num_reals"],"{0},{1}".\
         format(oe.shape[0],pst.pestpp_options["glm_num_reals"])
 
+
+def cmdline_test():
+    model_d = "mf6_freyberg"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
+    
+    t_d = os.path.join(model_d,"template")
+    pst_name = "freyberg6_run_glm.pst"
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_glm.pst"))
+    pst.pestpp_options["debug_parse_only"] = True
+    pst.write(os.path.join(t_d,"cmdline_test.pst"))
+    pyemu.os_utils.run("{0} {1} /h :4004".format(exe_path,"cmdline_test.pst"),cwd=t_d)
+
+    try:
+        pyemu.os_utils.run("{0} {1} \\h :4004".format(exe_path,"cmdline_test.pst"),cwd=t_d) 
+       
+    except:
+        pass
+    else:
+        raise Exception("should have failed")
+    
+    try:
+        pyemu.os_utils.run("{0} {1} :4004".format(exe_path,"cmdline_test.pst"),cwd=t_d) 
+       
+    except:
+        pass
+    else:
+        raise Exception("should have failed")
+
+    try:
+        pyemu.os_utils.run("{0} {1} /h 4004".format(exe_path,"cmdline_test.pst"),cwd=t_d) 
+       
+    except:
+        pass
+    else:
+        raise Exception("should have failed")
+    pyemu.os_utils.run("{0} {1} /r /h :4004".format(exe_path.replace("-ies","-glm"),"cmdline_test.pst"),cwd=t_d) 
+    pyemu.os_utils.run("{0} {1} /r ".format(exe_path.replace("-ies","-glm"),"cmdline_test.pst"),cwd=t_d) 
+
 if __name__ == "__main__":
     
     #glm_long_name_test()
@@ -969,7 +1011,8 @@ if __name__ == "__main__":
     #salib_verf()
     #tplins1_test()
     #ext_stdcol_test()
-    mf6_v5_ies_test()
+    #mf6_v5_ies_test()
     #mf6_v5_sen_test()
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
+    cmdline_test()
