@@ -978,23 +978,7 @@ void IterEnsembleSmoother::initialize()
 		message(0, "control file parameter phi report:");
 		ph.report(true);
 		ph.write(0, 1);
-		ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
-		Observations obs;
-		Eigen::VectorXd v = _oe.get_real_vector("BASE");
-		vector<double> vv;
-		vv.resize(v.size());
-		Eigen::VectorXd::Map(&vv[0], v.size()) = v;
-		obs.update(_oe.get_var_names(), vv);
-	
-		// save parameters to .par file
-		output_file_writer.write_par(file_manager.open_ofile_ext("base.par"),pars, *(pts.get_offset_ptr()),
-			*(pts.get_scale_ptr()));
-		file_manager.close_file("par");
-
-		// save new residuals to .rei file
-		output_file_writer.write_rei(file_manager.open_ofile_ext("base.rei"), 0,
-			pest_scenario.get_ctl_observations(),obs,obj_func,pars);
-			
+		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);			
 		return;
 	}
 
@@ -1188,6 +1172,39 @@ void IterEnsembleSmoother::initialize()
 		else
 			add_bases();
 
+
+	//now we check to see if we need to try to align the par and obs en
+	//this would only be needed if either of these were not drawn
+	if (!pe_drawn || !oe_drawn)
+	{
+		bool aligned = pe.try_align_other_rows(performance_log, oe);
+		if (aligned)
+		{
+			message(2, "observation ensemble reordered to align rows with parameter ensemble");
+		}
+	}
+
+	//just check to see if common real names are found but are not in the same location
+	map<string, int> pe_map = pe.get_real_map(), oe_map = oe.get_real_map();
+	vector<string> misaligned;
+	for (auto item : pe_map)
+	{
+		if (oe_map.find(item.first) == oe_map.end())
+			continue;
+		if (item.second != oe_map[item.first])
+			misaligned.push_back(item.first);
+	}
+	if (misaligned.size() > 0)
+	{
+		message(1, "WARNING: common realization names shared between the parameter and observation ensembles but they are not in the same row locations, see .rec file for listing");
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << endl <<  "WARNING: the following " << misaligned.size() << " realization names are shared between the parameter and observation ensembles but they are not in the same row locations:" << endl;
+		for (auto ma : misaligned)
+			frec << ma << endl;
+	}
+
+
+
 	message(2, "checking for denormal values in pe");
 	pe.check_for_normal("initial transformed parameter ensemble");
 	ss.str("");
@@ -1203,19 +1220,20 @@ void IterEnsembleSmoother::initialize()
 	}
 	message(1, "saved initial parameter ensemble to ", ss.str());
 	message(2, "checking for denormal values in base oe");
-	oe.check_for_normal("base observation ensemble");
+	oe.check_for_normal("obs+noise observation ensemble");
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
-		ss << file_manager.get_base_filename() << ".base.obs.jcb";
+		ss << file_manager.get_base_filename() << ".obs+noise.jcb";
 		oe.to_binary(ss.str());
 	}
 	else
 	{
-		ss << file_manager.get_base_filename() << ".base.obs.csv";
+		ss << file_manager.get_base_filename() << ".obs+noise.csv";
 		oe.to_csv(ss.str());
 	}
-	message(1, "saved base observation ensemble (obsval+noise) to ", ss.str());
+	message(1, "saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
+
 
 	if (center_on.size() > 0)
 	{
@@ -1281,6 +1299,7 @@ void IterEnsembleSmoother::initialize()
 		message(0, "mean parameter phi report:");
 		ph.report(true);
 		ph.write(0, 1);
+
 		return;
 	}
 
@@ -1339,6 +1358,10 @@ void IterEnsembleSmoother::initialize()
 	}
 	message(1, "saved initial obs ensemble to", ss.str());
 
+	//save the 0th iter par and rei and well as the untagged par and rei
+	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter);
+	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1);
+
 
 	performance_log->log_event("calc pre-drop phi");
 	//initialize the phi handler
@@ -1391,13 +1414,7 @@ void IterEnsembleSmoother::initialize()
 		{
 			frec << oname << endl;
 		}
-		// write out conflicted parameters to a csv file
-		ofstream pdccsv(file_manager.get_base_filename() + ".pdc.csv");
-		pdccsv << "name" << endl;
-		for (auto oname : in_conflict)
-		{
-			pdccsv << oname << endl;
-		}
+		
 		if (!ppo->get_ies_drop_conflicts())
 		{
 			ss.str("");
@@ -1455,14 +1472,37 @@ void IterEnsembleSmoother::initialize()
 
 	}
 
+	if (ph.get_mean(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
+	{	
+		throw_ies_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");	
+	}
+	if (ph.get_std(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
+	{
+		throw_ies_error("initial actual phi stdev too low, something is wrong...");
+	}
+
+
 	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
+	if (last_best_mean < 1.0e-10)
+	{
+		throw_ies_error("initial composite phi mean too low, something is wrong...");
+	}
+	if (last_best_std < 1.0e-10)
+	{
+		throw_ies_error("initial composite phi stdev too low, something is wrong...");
+	}
 	if (last_best_lam <= 0.0)
 	{
 		//double x = last_best_mean / (2.0 * double(oe.shape().second));
 		double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
 		last_best_lam = pow(10.0, (floor(log10(x))));
+		if (last_best_lam < 1.0e-10)
+		{
+			message(1, "initial lambda estimation from phi failed, using 10,000");
+			last_best_lam = 10000;
+		}
 	}
 	message(1, "current lambda:", last_best_lam);
 	message(0, "initialization complete");
@@ -1506,8 +1546,11 @@ vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
 {
 	message(1, "checking for prior-data conflict...");
 	//for now, just really simple metric - checking for overlap
+	// write out conflicted obs and some related info to a csv file
+	ofstream pdccsv(file_manager.get_base_filename() + ".pdc.csv");
+	
 	vector<string> in_conflict;
-	double smin, smax, omin, omax;
+	double smin, smax, omin, omax,smin_stat, smax_stat, omin_stat,omax_stat;
 	map<string, int> smap, omap;
 	vector<string> snames = oe.get_var_names();
 	vector<string> onames = oe_base.get_var_names();
@@ -1527,48 +1570,59 @@ vector<string> IterEnsembleSmoother::detect_prior_data_conflict()
 		omap[onames[i]] = i;
 	}
 	int sidx, oidx;
+	bool use_stat_dist = true;
 	if (pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance() <= 0.0)
+		use_stat_dist = false;
+	
+	double smn, sstd, omn, ostd,dist;
+	double sd = pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance();
+	int oe_nr = oe.shape().first;
+	int oe_base_nr = oe_base.shape().first;
+	Eigen::VectorXd t;
+	pdccsv << "name,obs_mean,obs_std,obs_min,obs_max,obs_stat_min,obs_stat_max,sim_mean,sim_std,sim_min,sim_max,sim_stat_min,sim_stat_max,distance" << endl;
+	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
 	{
-		for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
+		if (ineq.find(oname) != end)
+			continue;
+		sidx = smap[oname];
+		oidx = omap[oname];
+		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
+		omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
+		smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
+		omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
+		t = oe.get_eigen_ptr()->col(sidx);
+		smn = t.mean();
+		sstd = std::sqrt((t.array() - smn).square().sum() / (oe_nr-1));
+		smin_stat = smn - (sd * sstd);
+		smax_stat = smn + (sd * sstd);
+		t = oe_base.get_eigen_ptr()->col(oidx);
+		omn = t.mean();
+		ostd = std::sqrt((t.array() - omn).square().sum() / (oe_base_nr-1));
+		omin_stat = omn - (sd * ostd);
+		omax_stat = omn + (sd * ostd);	
+
+		if (use_stat_dist)
 		{
-			if (ineq.find(oname) != end)
-				continue;
-			sidx = smap[oname];
-			oidx = omap[oname];
-			smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
-			omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
-			smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
-			omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
+			if ((smin_stat > omax_stat) || (smax_stat < omin_stat))
+			{
+				in_conflict.push_back(oname);
+				dist = max((smin_stat - omax_stat), (omin_stat - smax_stat));
+				pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
+				pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
+			}
+		}
+		else
+		{
 			if ((smin > omax) || (smax < omin))
+			{
 				in_conflict.push_back(oname);
+				dist = max((smin - omax), (omin - smax));
+				pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
+				pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
+			}
 		}
 	}
-	else
-	{
-		double smn, sstd, omn, ostd;
-		double sd = pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance();
-		int oe_nr = oe.shape().first;
-		int oe_base_nr = oe_base.shape().first;
-		Eigen::VectorXd t;
-		for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
-		{
-			if (ineq.find(oname) != end)
-				continue;
-			sidx = smap[oname];
-			oidx = omap[oname];
-			t = oe.get_eigen_ptr()->col(sidx);
-			smn = t.mean();
-			sstd = std::sqrt((t.array() - smn).square().sum() / (oe_nr-1));
-			smin = smn - (sd * sstd);
-			smax = smn + (sd * sstd);
-			t = oe_base.get_eigen_ptr()->col(oidx);
-			omn = t.mean();
-			ostd = std::sqrt((t.array() - omn).square().sum() / (oe_base_nr-1));
-			omin = omn - (sd * ostd);
-			omax = omn + (sd * ostd);			if ((smin > omax) || (smax < omin))
-				in_conflict.push_back(oname);
-		}
-	}
+	
 	return in_conflict;
 }
 
@@ -1708,6 +1762,7 @@ void IterEnsembleSmoother::iterate_2_solution()
 	{
 		iter++;
 		message(0, "starting solve for iteration:", iter);
+		ss.str("");
 		ss << "starting solve for iteration: " << iter;
 		performance_log->log_event(ss.str());
 		accept = solve_new();
@@ -1719,7 +1774,9 @@ void IterEnsembleSmoother::iterate_2_solution()
 		ph.write(iter, run_mgr_ptr->get_total_runs());
 		if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
 			ph.save_residual_cov(oe,iter);
-		pcs.summarize(pe,iter);
+		ss.str("");
+		ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
+		pcs.summarize(pe,iter,ss.str());
 			
 			
 		if (accept)
@@ -2379,22 +2436,58 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 		message(2, "waiting to join threads");
 		//for (auto &t : threads)
 		//	t.join();
+		ss.str("");
+		int num_exp = 0;
+
 		for (int i = 0; i < num_threads; ++i)
 		{
+			bool found = false;
 			if (exception_ptrs[i])
 			{
+				found = true;
+				num_exp++;
 				try
 				{
 					rethrow_exception(exception_ptrs[i]);
 				}
 				catch (const std::exception& e)
 				{
-					ss.str("");
-					ss << "thread " << i << "raised an exception: " << e.what();
-					throw runtime_error(ss.str());
+					//ss.str("");
+					ss << " thread " << i << "raised an exception: " << e.what();
+					//throw runtime_error(ss.str());
+				}
+				catch (...)
+				{
+					//ss.str("");
+					ss << " thread " << i << "raised an exception";
+					//throw runtime_error(ss.str());
 				}
 			}
 			threads[i].join();
+			if ((exception_ptrs[i]) && (!found))
+			{
+				num_exp++;
+				try
+				{
+					rethrow_exception(exception_ptrs[i]);
+				}
+				catch (const std::exception& e)
+				{
+					//ss.str("");
+					ss << " thread " << i << "raised an exception: " << e.what();
+					//throw runtime_error(ss.str());
+				}
+				catch (...)
+				{
+					//ss.str("");
+					ss << " thread " << i << "raised an exception: ";
+					//throw runtime_error(ss.str());
+				}
+			}
+		}
+		if (num_exp > 0)
+		{
+			throw runtime_error(ss.str());
 		}
 		message(2, "threaded localized upgrade calculation done");
 	}
@@ -2860,7 +2953,6 @@ bool IterEnsembleSmoother::solve_new()
 }
 
 
-
 void IterEnsembleSmoother::report_and_save()
 {
 	ofstream &frec = file_manager.rec_ofstream();
@@ -2896,6 +2988,8 @@ void IterEnsembleSmoother::report_and_save()
 		ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
 		pe.to_csv(ss.str());
 	}
+	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter);
+	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1);
 	//ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
 	//pe.to_csv(ss.str());
 	frec << "      current par ensemble saved to " << ss.str() << endl;

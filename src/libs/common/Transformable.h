@@ -102,6 +102,7 @@ public:
 	Transformable::const_iterator begin() const {return items.begin();}
 	Transformable::iterator end() {return items.end();}
 	Transformable::const_iterator end() const {return items.end();}
+	Transformable::iterator find(string& key) { return items.find(key); }
 	double l2_norm() const;
 	static double l2_norm(const Transformable &d1, const Transformable &d2);
 	virtual ~Transformable(){}

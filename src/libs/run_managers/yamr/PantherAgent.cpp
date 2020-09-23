@@ -9,8 +9,11 @@
 #include "system_variables.h"
 #include "utilities.h"
 #include <regex>
+#include "OutputFileWriter.h"
 
 #include "Pest.h"
+#include "config_os.h"
+#include "pest_data_structs.h"
 
 using namespace pest_utils;
 
@@ -26,10 +29,11 @@ PANTHERAgent::PANTHERAgent(ofstream &_frec)
 
 void PANTHERAgent::init_network(const string &host, const string &port)
 {
+	report("initializing network connection", true);
 	w_init();
 
-
-	int status;
+	stringstream ss;
+	pair<int,string> status;
 	struct addrinfo hints;
 	struct addrinfo *servinfo;
 	//cout << "setting hints" << endl;
@@ -42,24 +46,35 @@ void PANTHERAgent::init_network(const string &host, const string &port)
 	hints.ai_flags = AI_PASSIVE;
 	//cout << "atttemping w_getaddrinfo" << endl;
 	status = w_getaddrinfo(host.c_str(), port.c_str(), &hints, &servinfo);
-	
+	if (status.first != 0)
+	{
+		ss.str("");
+		ss << "ERROR: getaddrinfo returned non-zero: " << status.second;
+		report(ss.str(), true);
+		throw(PestError("ERROR: getaddrinfo returned non-zero: " + status.second));
+	}
 	w_print_servinfo(servinfo, cout);
 	cout << endl;
 	// connect
-	cout << "PANTHER Agent will poll for master connection every " << poll_interval_seconds << " seconds" << endl;
+	ss.str("");
+	ss << "PANTHER Agent will poll for master connection every " << poll_interval_seconds << " seconds" << endl;
+	report(ss.str(), true);
 	addrinfo* connect_addr = nullptr;
 	while  (connect_addr == nullptr)
 	{
 
 		connect_addr = w_connect_first_avl(servinfo, sockfd);
 		if (connect_addr == nullptr) {
-			cerr << endl;
-			cerr << "failed to connect to master" << endl;
+			report("failed to connect to master", true);
 			w_sleep(poll_interval_seconds * 1000);
+
 		}
 
 	}
-	cout << "connection to master succeeded on socket: " << w_get_addrinfo_string(connect_addr) << endl << endl;
+	ss.str("");
+
+	ss << "connection to master succeeded on socket: " << w_get_addrinfo_string(connect_addr) << endl << endl;
+	report(ss.str(), true);
 	freeaddrinfo(servinfo);
 
 	fdmax = sockfd;
@@ -78,6 +93,19 @@ PANTHERAgent::~PANTHERAgent()
 
 void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 {
+	string version = PESTPP_VERSION;
+	frec << "panther agent starting..." << endl;
+	frec << "using control file: \"" << ctl_filename << "\"" << endl << endl;
+	frec << endl << endl << "version: " << version << endl;
+	frec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+	frec << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+
+	cout << "panther agent starting..." << endl;
+	cout << "using control file: \"" << ctl_filename << "\"" << endl << endl;
+	cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+
+	report("processing control file", true);
+
 	ifstream fin;
 	long lnum;
 	long sec_begin_lnum;
@@ -94,7 +122,8 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 	fin.open(ctl_filename);
 	if (!fin)
 	{
-		throw PestError("PANTHER worker unable to open pest control file: " + ctl_filename);
+		report("ERROR: PANTHER agent unable to open pest control file : " + ctl_filename, true);
+		throw PestError("PANTHER agent unable to open pest control file: " + ctl_filename);
 	}
 	pest_scenario.process_ctl_file(fin,ctl_filename,frec);
 	pest_scenario.check_io(frec);
@@ -113,71 +142,92 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 
 	restart_on_error = pest_scenario.get_pestpp_options().get_panther_agent_restart_on_error();
 	max_time_without_master_ping_seconds = pest_scenario.get_pestpp_options().get_panther_agent_no_ping_timeout_secs();
+	FileManager fm("panther_agent");
+	OutputFileWriter of(fm, pest_scenario);
+	of.scenario_report(frec);
+	pest_scenario.clear_ext_files();
 }
 
-int PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
+pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
 {
 	fd_set read_fds;
-	int err = -1;
+	std::pair<int, string> err;
+	err.first = -1;
 	int recv_fails = 0;
-	while (recv_fails < max_recv_fails && err != 1)
+	stringstream ss;
+	while (recv_fails < max_recv_fails && err.first != 1)
 	{
 		read_fds = master; // copy master
 		int result = w_select(fdmax + 1, &read_fds, NULL, NULL, tv);
 		if (result == -1)
 		{
-			cerr << "fatal network error while receiving messages. ERROR: select() failure";
-			return -990;
+			ss.str("");
+
+			ss << "fatal network error while receiving messages. ERROR: select() failure";
+			report(ss.str(), true);
+			return pair<int,string> (-990, "fatal network error while receiving messages. ERROR: select() failure");
 		}
 		if (result == 0)
 		{
 			// no messages available for reading
 			if (tv == NULL)
 			{
-				cerr << "fatal network error while receiving messages. ERROR: blocking select() call failure";
-				return -990;
+				ss.str("");
+				ss << "fatal network error while receiving messages. ERROR: blocking select() call failure";
+				report(ss.str(), true);
+				return pair<int, string>(-990, "fatal network error while receiving messages. ERROR: blocking select() call failure");
 			}
 			else
 			{
-				return 2;
+				return pair<int, string>(2, err.second);
 			}
 		}
 		for (int i = 0; i <= fdmax; i++) {
 			if (FD_ISSET(i, &read_fds)) { // got message to read
 				err = net_pack.recv(i); // error or lost connection
-				if (err == -2) {
+				if (err.first == -2) {
 					vector<string> sock_name = w_getnameinfo_vec(i);
-					cerr << "received corrupt message from master: " << sock_name[0] << ":" << sock_name[1] << endl;
+					ss.str("");
+					ss << "received corrupt message from master: " << sock_name[0] << ":" << sock_name[1] << ": " << err.second << endl;
+					report(ss.str(), true);
 					//w_close(i); // bye!
 					//FD_CLR(i, &master); // remove from master set
-					err = -999;
+					err.first = -999;
 					return err;
 				}
-				else if (err < 0) {
+				else if (err.first < 0) {
 					recv_fails++;
 					vector<string> sock_name = w_getnameinfo_vec(i);
-					cerr << "receive from master failed: " << sock_name[0] << ":" << sock_name[1] << endl;
-					err = -1;
+					ss.str("");
+					ss << "receive from master failed: " << sock_name[0] << ":" << sock_name[1] << endl;
+					report(ss.str(), true);
+					err.second = "receive from master failed";
+					err.first = -1;
 				}
-				else if(err == 0) {
+				else if(err.first == 0) {
 					vector<string> sock_name = w_getnameinfo_vec(i);
-					cerr << "lost connection to master: " << sock_name[0] << ":" << sock_name[1] << endl;
-						w_close(i); // bye!
-						FD_CLR(i, &master); // remove from master set
-						err = -999;
-						return err;
+					ss.str("");
+					ss << "lost connection to master: " << sock_name[0] << ":" << sock_name[1] << endl;
+					report(ss.str(), true);
+					w_close(i); // bye!
+					FD_CLR(i, &master); // remove from master set
+					err.first = -999;
+					err.second = "lost connection to master";
+					return err;
 				}
 				else
 				{
 					// received data sored in net_pack return to calling routine to process it
-					err = 1;
+					err.first = 1;
+					err.second = "successful receive from master";
 					return err;
 				}
 			}
 		}
 	}
-
-	cerr << "recv from master failed " << max_recv_fails << " times, exiting..." << endl;
+	ss.str("");
+	ss << "recv from master failed " << max_recv_fails << " times, exiting..." << endl;
+	report(ss.str(), true);
 	return err;
 	// returns -1  receive error
 	//         -990  error in call to select()
@@ -186,9 +236,10 @@ int PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
 	//          2  no message recieved
 }
 
-int PANTHERAgent::recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs)
+pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs)
 {
-	int err = -1;
+	pair<int, string> err;
+	err.first = -1;
 	int result = 0;
 	struct timeval tv;
 	tv.tv_sec = timeout_seconds;
@@ -198,18 +249,26 @@ int PANTHERAgent::recv_message(NetPackage &net_pack, long  timeout_seconds, long
 }
 
 
-int PANTHERAgent::send_message(NetPackage &net_pack, const void *data, unsigned long data_len)
+pair<int,string> PANTHERAgent::send_message(NetPackage &net_pack, const void *data, unsigned long data_len)
 {
-	int err;
+	pair<int,string> err;
 	int n;
-
-	for (err = -1, n = 0; err != 1 && n < max_send_fails; ++n)
+	stringstream ss;
+	for (err.first = -1, n = 0; err.first != 1 && n < max_send_fails; ++n)
 	{
 		err = net_pack.send(sockfd, data, data_len);
+		if (err.first <= 0)
+		{
+			ss.str("");
+			ss << "failed to send to master: " << err.second << ", trying again..." << endl;
+			report(ss.str(), true);
+		}
 	}
 	if (n >= max_send_fails)
 	{
-		cerr << "send to master failed " << max_send_fails << " times, giving up..." << endl;
+		ss.str("");
+		ss << "send to master failed " << max_send_fails << " times, giving up..." << endl;
+		report(ss.str(), true);
 	}
 	return err;
 }
@@ -220,7 +279,8 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 	NetPackage::PackType final_run_status = NetPackage::PackType::RUN_FAILED;
 	stringstream smessage;
 	bool done = false;
-	int err = 0;
+	pair<int, string> err;
+	err.first = 0;
 
 	//if (!mi.get_initialized())
 	//{
@@ -232,6 +292,7 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 	thread_flag f_terminate(false);
 	thread_flag f_finished(false);
 	thread_exceptions shared_execptions;
+	stringstream ss;
 	try
 	{
 		vector<string> par_name_vec;
@@ -246,33 +307,40 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 		thread run_thread(&PANTHERAgent::run_async, this, &f_terminate, &f_finished, &shared_execptions,
 		   &pars, &obs);
 		pest_utils::thread_RAII raii(run_thread);
-
+		
 		while (true)
 		{
 
 			if (shared_execptions.size() > 0)
 			{
-				cout << "exception raised by run thread: " << std::endl;
-				cout << shared_execptions.what() << std::endl;
+				ss.str("");
+				ss << "exception raised by run thread: " << std::endl;
+				ss << shared_execptions.what() << std::endl;
+				report(ss.str(), true);
 				//don't break here, need to check one last time for incoming messages
 				done = true;
 			}
 			//check if the runner thread has finished
 			if (f_finished.get())
 			{
-				cout << "received finished signal from run thread " << std::endl;
+				ss.str("");
+				ss << "received finished signal from run thread " << std::endl;
+				report(ss.str(), true);
 				//don't break here, need to check one last time for incoming messages
 				done = true;
 			}
 			//this call includes a "sleep" for the timeout
 			err = recv_message(net_pack, 0, 100000);
-			if (err < 0)
+			if (err.first < 0)
 			{
+				ss.str("");
+				ss << "error receiving message from master: " << err.second << endl;
+				report(ss.str(), true);
 				f_terminate.set(true);
 				terminate_or_restart(-1);
 			}
 			//timeout on recv
-			else if (err == 2)
+			else if (err.first == 2)
 			{
 			}
 			else if (net_pack.get_type() == NetPackage::PackType::PING)
@@ -280,20 +348,25 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 				//cout << "ping request received...";
 				net_pack.reset(NetPackage::PackType::PING, 0, 0, "");
 				const char* data = "\0";
+				report("sending ping response to master",false);
 				err = send_message(net_pack, &data, 0);
-				if (err != 1)
+				if (err.first != 1)
 				{
-					cerr << "Error sending ping response to master...quit" << endl;
+					ss.str("");
+					ss << "Error sending ping response to master: " << err.second << "...quitting" << endl;
+					report(ss.str(), true);
 					f_terminate.set(true);
 					terminate_or_restart(-1);
-					smessage << "Error sending ping response to master...quit";
+					smessage << "Error sending ping response to master...quitting";
 				}
 				//cout << "ping response sent" << endl;
 			}
 			else if (net_pack.get_type() == NetPackage::PackType::REQ_KILL)
 			{
-				cout << "received kill request signal from master" << endl;
-				cout << "sending terminate signal to run thread" << endl;
+				ss.str("");
+				ss << "received kill request signal from master, ";
+				ss << "sending terminate signal to run thread" << endl;
+				report(ss.str(), true);
 				f_terminate.set(true);
 				final_run_status = NetPackage::PackType::RUN_KILLED;
 				smessage << "received kill request signal from master";
@@ -301,8 +374,10 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 			}
 			else if (net_pack.get_type() == NetPackage::PackType::TERMINATE)
 			{
-				cout << "received terminate signal from master" << endl;
-				cout << "sending terminate signal to run thread" << endl;
+				ss.str("");
+				ss << "received terminate signal from master, ";
+				ss << "sending terminate signal to run thread" << endl;
+				report(ss.str(), true);
 				f_terminate.set(true);
 				terminate = true;
 				final_run_status = NetPackage::PackType::TERMINATE;
@@ -310,15 +385,21 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 			}
 			else
 			{
-				cerr << "Received unsupported message from master, only PING REQ_KILL or TERMINATE can be sent during model run" << endl;
-				cerr << static_cast<int>(net_pack.get_type()) << endl;
-				cerr << "something is wrong...exiting" << endl;
+				ss.str("");
+				ss << "Received unsupported message from master, only PING REQ_KILL or TERMINATE can be sent during model run, not: ";
+				ss << net_pack.pack_strings[static_cast<int>(net_pack.get_type())] <<  ", run_id: " << net_pack.get_run_id();
+				report(ss.str(), true);
 				f_terminate.set(true);
-				final_run_status = NetPackage::PackType::TERMINATE;
-				smessage << "Received unsupported message from master, only PING REQ_KILL or TERMINATE can be sent during model run";
-				terminate_or_restart(-1);
+				final_run_status = NetPackage::PackType::CORRUPT_MESG;
+				smessage << "Received unsupported message from master, only PING REQ_KILL or TERMINATE can be sent during model run, not:";
+				smessage << net_pack.pack_strings[static_cast<int>(net_pack.get_type())] << ", run_id: " << net_pack.get_run_id();
+				//terminate_or_restart(-1);
+				break;
 			}
-			if (done) break;
+			if (done)
+			{
+				break;
+			}
 		}
 		shared_execptions.rethrow();
 		if (!f_terminate.get())
@@ -333,17 +414,20 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 	}
 	catch(const std::exception& ex)
 	{
-		cerr << endl;
-		cerr << "   " << ex.what() << endl;
-		cerr << "   Aborting model run" << endl << endl;
+		ss.str("");
+	
+		ss << "error(s) thrown during async run: " << ex.what() << ", ";
+		ss << "Aborting model run";
+		report(ss.str(), true);
 		smessage << ex.what();
 		final_run_status = NetPackage::PackType::RUN_FAILED;
 		
 	}
 	catch(...)
 	{
- 		cerr << "   Error running model" << endl;
-		cerr << "   Aborting model run" << endl;
+		ss.str("");
+ 		ss << "   Error running model, aborting model run";
+		report(ss.str(), true);
 		final_run_status = NetPackage::PackType::RUN_FAILED;
 	}
 
@@ -362,9 +446,13 @@ void PANTHERAgent::run_async(pest_utils::thread_flag* terminate, pest_utils::thr
 
 void PANTHERAgent::start(const string &host, const string &port)
 {
+	stringstream ss;
 	if(restart_on_error)
 	{
-		cout << "PANTHER worker will restart on any communication error." << endl;
+		ss.str("");
+
+		ss << "PANTHER worker will restart on any communication error.";
+		report(ss.str(), true);
 	}
 
 	do
@@ -381,9 +469,10 @@ void PANTHERAgent::start(const string &host, const string &port)
 		{
 			// A fatal comms error occurred; wait a bit and then restart
 			this_thread::sleep_for(chrono::seconds(5));
-			cout << endl;
-			cout << "Restarting PANTHER worker..." << endl;
-			cout << endl;
+			ss.str("");
+			
+			ss << "Restarting PANTHER worker...";
+			report(ss.str(), true);
 		}
 	} while(restart_on_error);
 }
@@ -395,9 +484,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 	Observations obs = pest_scenario.get_ctl_observations();
 	Parameters pars;
 	vector<int8_t> serialized_data;
-	int err;
+	pair<int,string> err;
 	vector<string> par_name_vec, obs_name_vec;
-
+	stringstream ss;
 	//class attribute - can be modified in run_model()
 	terminate = false;
 	init_network(host, port);
@@ -409,14 +498,16 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		err = recv_message(net_pack, recv_timeout_secs, 0);
 
 		// Refresh ping timer
-		if (err != 2)
+		if (err.first != 2)
 		{
 			last_ping_time = chrono::system_clock::now();
 		}
 
-		if (err == -999)
+		if (err.first == -999)
 		{
-			cout << "error receiving message from master, terminating" << endl;
+			ss.str("");
+			ss << "error receiving message from master: " << err.second << " , terminating";
+			report(ss.str(), true);
 			//terminate = true;
 			net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "recv security message error");
 			char data;
@@ -429,13 +520,16 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			terminate_or_restart(-1);
 			}
 			
-		if (err < 0)
+		if (err.first < 0)
 		{
-			cout << "error receiving message from master, terminating" << endl;
+			ss.str("");
+			ss << "error receiving message from master: " << err.second << ", terminating, header follows: ";
+			net_pack.print_header(ss);
+			report(ss.str(), true);
 			//terminate = true;
 			terminate_or_restart(-1);
 		}
-		else if (err == 2)
+		else if (err.first == 2)
 		{
 			// Timeout on socket receive
 			// Optionally: die if no data received from master for a long time (e.g. 5 minutes)
@@ -443,7 +537,18 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			auto time_without_master_ping_seconds = chrono::duration_cast<std::chrono::seconds>(chrono::system_clock::now() - last_ping_time).count();
 			if (max_time_without_master_ping_seconds > 0 && time_without_master_ping_seconds > max_time_without_master_ping_seconds)
 			{
-				cerr << "no ping received from master in the last " << max_time_without_master_ping_seconds << " seconds, terminating" << endl;
+				time_t rawtime = std::chrono::system_clock::to_time_t(last_ping_time);
+				struct tm* timeinfo;
+				char buffer[80];
+				time(&rawtime);
+				timeinfo = localtime(&rawtime);
+				strftime(buffer, 80, "%m/%d/%y %H:%M:%S", timeinfo);
+				string t_str(buffer);
+				ss.str("");
+				ss << "no ping received from master in the last " << max_time_without_master_ping_seconds << " seconds, last ping time: " <<  t_str << ",  terminating";
+				report(ss.str(), true);
+				net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "ping overdue from master, exiting");
+				send_message(net_pack);
 				//terminate = true;
 				terminate_or_restart(-1);
 			}
@@ -452,52 +557,166 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		{
 			// Send Master the local run directory.  This information is only used by the master
 			// for reporting purposes
+			report("responding to REQ_RUNDIR", true);
 			net_pack.reset(NetPackage::PackType::RUNDIR, 0, 0,"");
 			string cwd =  OperSys::getcwd();
 			err = send_message(net_pack, cwd.c_str(), cwd.size());
-			if (err != 1)
+			if (err.first != 1)
 			{
+				ss.str("");
+				ss << "error sending RUNDIR message to master: " << err.second << ", terminating";
+				report(ss.str(), true);
 				terminate_or_restart(-1);
 			}
 		}
 		else if (net_pack.get_type() == NetPackage::PackType::PAR_NAMES)
 		{
+			report("received PAR_NAMES", true);
 			//Don't check first8 bytes as these contain an interger which stores the size of the data.
 			bool safe_data = NetPackage::check_string(net_pack.get_data(), 0, net_pack.get_data().size());
 			if (!safe_data)
 			{
-				cerr << "received corrupt parameter name packet from master" << endl;
-				cerr << "terminating execution ..." << endl << endl;
+				ss.str("");
+				ss << "received corrupt parameter name packet from master,";
+				ss << "terminating execution ..." << endl << endl;
+				report(ss.str(), true);
 				net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "");
 				char data;
-				int np_err = send_message(net_pack, &data, 0);
+				pair<int,string> np_err = send_message(net_pack, &data, 0);
 				terminate_or_restart(-1);
 			}
 			Serialization::unserialize(net_pack.get_data(), par_name_vec);
+			//make sure all par names are found in the scenario
+			vector<string> vnames = pest_scenario.get_ctl_ordered_par_names();
+			set<string> snames(vnames.begin(), vnames.end());
+			vnames.clear();
+			for (auto pname : par_name_vec)
+			{
+				if (snames.find(pname) == snames.end())
+					vnames.push_back(pname);
+			}
+			if (vnames.size() > 0)
+			{
+				ss.str("");
+				ss << vnames.size() << " par names not found in agent ctl file: ";
+				report(ss.str(), true);
+				
+				for (auto vname : vnames)
+				{
+					ss << vname << ",";
+					frec << vname << endl;
+				}
+				net_pack.reset(NetPackage::PackType::IO_ERROR, 0, 0, ss.str());
+				err = send_message(net_pack);
+				w_close(sockfd);
+				w_cleanup();
+				exit(-1);
+			}	
+			snames.clear();
+			snames.insert(par_name_vec.begin(), par_name_vec.end());
+			for (auto name : pest_scenario.get_ctl_ordered_par_names())
+			{
+				if (snames.find(name) == snames.end())
+					vnames.push_back(name);
+			}
+			if (vnames.size() > 0)
+			{
+				ss.str("");
+				ss << "ERROR:" << vnames.size() << " extra par names found in agent ctl file: ";
+				report(ss.str(), true);
+				for (auto vname : vnames)
+				{
+					ss << vname << ",";
+					frec << vname << endl;
+				}
+				net_pack.reset(NetPackage::PackType::IO_ERROR, 0, 0, ss.str());
+				err = send_message(net_pack);
+				w_close(sockfd);
+				w_cleanup();
+				exit(-1);
+			}
+
 		}
 		else if (net_pack.get_type() == NetPackage::PackType::OBS_NAMES)
 		{
+			report("received OBS_NAMES", true);
 			//Don't check first8 bytes as these contain an interger which stores the size of the data.
 			bool safe_data = NetPackage::check_string(net_pack.get_data(), 0, net_pack.get_data().size());
 			if (!safe_data)
 			{
-				cerr << "received corrupt observation name packet from master" << endl;
-				cerr << "terminating execution ..." << endl << endl;
+				ss.str("");
+				ss << "received corrupt observation name packet from master," ;
+				ss << "received corrupt observation name packet from master" << endl;
+				report(ss.str(), true);
 				net_pack.reset(NetPackage::PackType::CORRUPT_MESG, 0, 0, "");
 				char data;
-				int np_err = send_message(net_pack, &data, 0);
+				pair<int,string> np_err = send_message(net_pack, &data, 0);
 				terminate_or_restart(-1);
 			}
 			Serialization::unserialize(net_pack.get_data(), obs_name_vec);
+			//make sure all par names are found in the scenario
+			vector<string> vnames = pest_scenario.get_ctl_ordered_obs_names();
+			set<string> snames(vnames.begin(), vnames.end());
+			vnames.clear();
+			for (auto oname : obs_name_vec)
+			{
+				if (snames.find(oname) == snames.end())
+					vnames.push_back(oname);
+			}
+			if (vnames.size() > 0)
+			{
+				ss.str("");
+				ss << "ERROR: " << vnames.size() << " obs names not found in agent ctl file: ";
+				report(ss.str(), true);
+				for (auto vname : vnames)
+				{
+					ss << vname << ",";
+					frec << vname << endl;
+				}
+				for (auto vname : vnames)
+					ss << vname << ",";
+				net_pack.reset(NetPackage::PackType::IO_ERROR, 0, 0, ss.str());
+				err = send_message(net_pack);
+				w_close(sockfd);
+				w_cleanup();
+				exit(-1);
+			}
+			snames.clear();
+			snames.insert(obs_name_vec.begin(), obs_name_vec.end());
+			for (auto name : pest_scenario.get_ctl_ordered_obs_names())
+			{
+				if (snames.find(name) == snames.end())
+					vnames.push_back(name);
+			}
+			if (vnames.size() > 0)
+			{
+				ss.str("");
+				ss << "ERROR: " << vnames.size() << " extra obs names found in agent ctl file: ";
+				report(ss.str(), true);
+				for (auto vname : vnames)
+				{
+					ss << vname << ",";
+					frec << vname << endl;
+				}
+				net_pack.reset(NetPackage::PackType::IO_ERROR, 0, 0, ss.str());
+				err = send_message(net_pack);
+				w_close(sockfd);
+				w_cleanup();
+				exit(-1);
+			}
 		}
 		else if(net_pack.get_type() == NetPackage::PackType::REQ_LINPACK)
 		{
+			report("received REQ_LINPACK",true);
 			linpack_wrap();
 			net_pack.reset(NetPackage::PackType::LINPACK, 0, 0,"");
 			char data;
 			err = send_message(net_pack, &data, 0);
-			if (err != 1)
+			if (err.first != 1)
 			{
+				ss.str("");
+				ss << "error sending LINPACK message to master: " << err.second << ", terminating" << endl;
+				report(ss.str(), true);
 				terminate_or_restart(-1);
 			}
 		}
@@ -643,12 +862,62 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			}*/
 			
 			//do this after we handle a cycle change so that par_name_vec is updated
+
 			Serialization::unserialize(net_pack.get_data(), pars, par_name_vec);
 			// run model
-			
-			
-			cout << "received parameters (group id = " << group_id << ", run id = " << run_id << ")" << endl;
-			cout << "starting model run..." << endl;
+			if (pest_scenario.get_pestpp_options().get_panther_debug_loop())
+			{
+				ss.str("");
+				ss << "PANTHER_DEBUG_LOOP = true, returning ctl obs values";
+				
+				report(ss.str(), true);
+				serialized_data = Serialization::serialize(pars, par_name_vec, obs, obs_name_vec, run_time);
+				ss.str("");
+				double rd = ((double)rand() / (double)RAND_MAX);
+				if (rd < 0.1)
+				{
+					ss << "debug loop returning failed run for: " << run_id << "," << group_id;
+					net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
+				}
+				else
+				{
+					ss << "debug loop returning ctl obs for run_id, group_id: " << run_id << "," << group_id;
+					net_pack.reset(NetPackage::PackType::RUN_FINISHED, group_id, run_id, ss.str());
+				}
+				err = send_message(net_pack, serialized_data.data(), serialized_data.size());
+				if (err.first != 1)
+				{
+					ss.str("");
+					
+					ss << "error sending RUN_FINISHED message to master: " << err.second << ", terminating";
+					report(ss.str(), true);
+					terminate_or_restart(-1);
+				}
+				ss.str("");
+				ss << "results of run_id " << run_id << " sent successfully";
+				report(ss.str(), true);
+				ss.str("");
+				ss << "sending ready signal to master";
+				report(ss.str(), true);
+				net_pack.reset(NetPackage::PackType::READY, 0, 0, "lets do it");
+				char data;
+				err = send_message(net_pack, &data, 0);
+				if (err.first != 1)
+				{
+					ss.str("");
+					ss << "error sending READY message to master: " << err.second << ", terminating";
+					report(ss.str(), true);
+					terminate_or_restart(-1);
+				}
+				continue;
+
+			}
+
+
+			ss.str("");
+			ss << "received parameters (group id = " << group_id << ", run id = " << run_id << "), ";
+			ss << "starting model run..." << endl;
+			report(ss.str(), true);
 
 			try
 			{
@@ -667,86 +936,168 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 
 			std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
 			pair<NetPackage::PackType,std::string> final_run_status = run_model(pars, obs, net_pack);
+			
 			if (final_run_status.first == NetPackage::PackType::RUN_FINISHED)
 			{
 				double run_time = pest_utils::get_duration_sec(start_time);
 				//send model results back
-				cout << "run complete" << endl;
-				cout << "sending results to master (group id = " << group_id << ", run id = " << run_id << ")..." << endl;
-				cout << "results sent" << endl << endl;
+				ss.str("");
+				ss << "run complete, ";
+				ss << "sending results to master (group id = " << group_id << ", run id = " << run_id << ")...";
+				ss << "run took: " << run_time << " seconds";
+				report(ss.str(), true);
+				ss.str("");
+				ss << ", run took " << run_time << " seconds";
+				string message = final_run_status.second + ss.str();
 				serialized_data = Serialization::serialize(pars, par_name_vec, obs, obs_name_vec, run_time);
-				net_pack.reset(NetPackage::PackType::RUN_FINISHED, group_id, run_id, final_run_status.second);
+				net_pack.reset(NetPackage::PackType::RUN_FINISHED, group_id, run_id, message);
 				err = send_message(net_pack, serialized_data.data(), serialized_data.size());
-				if (err != 1)
+				if (err.first != 1)
 				{
+					ss.str("");
+					ss << "error sending RUN_FINISHED message to master: " << err.second << ", terminating";
+					report(ss.str(), true);
 					terminate_or_restart(-1);
 				}
+				ss.str("");
+				ss << "results of run_id " << run_id << "sent successfully";
+				report(ss.str(), true);
 			}
 			else if (final_run_status.first == NetPackage::PackType::RUN_FAILED)
 			{
-				cout << "run failed" << endl;
+				ss.str("");
+				ss << "run failed for run_id" << run_id << ": " << final_run_status.second;
+				report(ss.str(), true);
 				net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id,final_run_status.second);
 				char data;
 				err = send_message(net_pack, &data, 0);
-				if (err != 1)
+				if (err.first != 1)
 				{
+					ss.str("");
+					ss << "error sending RUN_FAILED message to master: " << err.second << ", terminating";
+					report(ss.str(), true);
 					terminate_or_restart(-1);
+				}
+				if (pest_scenario.get_pestpp_options().get_panther_debug_fail_freeze())
+				{
+					ss.str("");
+					ss << "debug_panther_fail_freeze = true, entering frozen state...";
+					report(ss.str(), true);
+					net_pack.reset(NetPackage::PackType::DEBUG_FAIL_FREEZE, group_id, run_id, final_run_status.second);
+					char data;
+					err = send_message(net_pack, &data, 0);
+					if (err.first != 1)
+					{
+						ss.str("");
+						ss << "error sending DEBUG_FAIL_FREEZE message to master: " << err.second << "...freezing anyway";
+						report(ss.str(), true);
+					}
+					while (true)
+					{
+						ss.str("");
+						ss << "frozen";
+						report(ss.str(), true);
+						w_sleep(30 * 1000);
+					}
 				}
 			}
 			else if (final_run_status.first == NetPackage::PackType::RUN_KILLED)
 			{
-				cout << "run killed" << endl;
+				ss.str("");
+				ss << "run_id " << run_id << " killed";
+				report(ss.str(), true);
 				net_pack.reset(NetPackage::PackType::RUN_KILLED, group_id, run_id, final_run_status.second);
 				char data;
 				err = send_message(net_pack, &data, 0);
-				if (err != 1)
+				if (err.first != 1)
 				{
+					ss.str("");
+					ss << "error sending RUN_KILLED message to master: " << err.second << ", terminating";
+					report(ss.str(), true);
 					terminate_or_restart(-1);
 				}
 			}
+			else if (final_run_status.first == NetPackage::PackType::CORRUPT_MESG)
+			{
+				ss << "corrupt/incorrect message recieved from master: " << final_run_status.second << ", quitting for safety";
+				net_pack.reset(NetPackage::PackType::RUN_KILLED, group_id, run_id, ss.str());
+				char data;
+				err = send_message(net_pack, &data, 0);
+				if (err.first != 1)
+				{
+					ss.str("");
+					ss << "error sending CORRUPT_MESG message to master: " << err.second << ", terminating";
+					report(ss.str(), true);
+					terminate_or_restart(-1);
+				}
+				report(ss.str(), true);
+				terminate_or_restart(-1);
+
+			}
 			else if (final_run_status.first == NetPackage::PackType::TERMINATE)
 			{
-				cout << "run preempted by termination requested" << endl;
+				ss.str("");
+				ss << "run preempted by termination requested";
+				report(ss.str(), true);
 				terminate = true;
 			}
 
 			if (!terminate)
 			{
 				// Send READY Message to master
-				cout << "sending ready signal to master" << endl;
+				ss.str("");
+				ss << "sending ready signal to master";
+				report(ss.str(), true);
 				net_pack.reset(NetPackage::PackType::READY, 0, 0, final_run_status.second);
 				char data;
 				err = send_message(net_pack, &data, 0);
-				if (err != 1)
+				if (err.first != 1)
 				{
+					ss.str("");
+					ss << "error sending READY message to master: " << err.second << ", terminating";
+					report(ss.str(), true);
 					terminate_or_restart(-1);
 				}
 			}
 		}
 		else if (net_pack.get_type() == NetPackage::PackType::TERMINATE)
 		{
-			cout << "terminated requested" << endl;
+			ss.str("");
+			ss << "terminate requested" << endl;
+			report(ss.str(), true);
 			terminate = true;
 		}
 		else if (net_pack.get_type() == NetPackage::PackType::REQ_KILL)
 		{
-			cout << "received kill request from master. run already finished" << endl;
+			ss.str("");
+			ss << "received kill request from master. run already finished";
+			report(ss.str(), true);
+			
 		}
 		else if (net_pack.get_type() == NetPackage::PackType::PING)
 		{
-			cout << "ping request received...";
+			ss.str("");
+			ss << "ping request received...";
+			report(ss.str(), true);
 			net_pack.reset(NetPackage::PackType::PING, 0, 0, "");
 			const char* data = "\0";
 			err = send_message(net_pack, &data, 0);
-			if (err != 1)
+			if (err.first != 1)
 			{
+				ss.str("");
+				ss << "error sending PING message to master: " << err.second << ", terminating";
+				report(ss.str(), true);
 				terminate_or_restart(-1);
 			}
-			cout << "ping response sent" << endl;
+		
+			report("ping response sent",true);
 		}
 		else
 		{
-			cout << "received unsupported messaged type: " << int(net_pack.get_type()) << endl;
+			ss.str("");
+
+			ss << "received unsupported messaged type: " << int(net_pack.get_type()) << ": " << net_pack.get_info_txt();
+			report(ss.str(), true);
 		}
 		//w_sleep(100);
 		this_thread::sleep_for(chrono::milliseconds(100));
@@ -756,6 +1107,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 
 void PANTHERAgent::terminate_or_restart(int error_code) const
 {
+	
+	w_sleep(poll_interval_seconds * 10000);
 	if(!restart_on_error)
 	{
 		exit(error_code);
@@ -765,4 +1118,11 @@ void PANTHERAgent::terminate_or_restart(int error_code) const
 	w_close(sockfd);
 	w_cleanup();
 	throw PANTHERAgentRestartError("");
+}
+
+void PANTHERAgent::report(const string& message, bool to_cout)
+{
+	string t_str = pest_utils::get_time_string();
+	frec << t_str << "->" << message << endl;
+	if (to_cout) cout << endl << t_str << "->" << message << endl;
 }
