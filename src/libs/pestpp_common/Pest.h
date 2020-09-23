@@ -56,6 +56,7 @@ public:
 	const ParameterGroupInfo& get_base_group_info() const {return  base_group_info;}
 	ParameterGroupInfo* get_base_group_info_ptr() { return  &base_group_info; }
 	const ObservationInfo &get_ctl_observation_info() const {return observation_info;}
+	const ObservationInfo* get_ctl_observation_info_ptr() const { return &observation_info; }
 	const std::map<std::string, std::string> get_observation_groups() const;
 	const PriorInformation &get_prior_info() {return prior_info;}
 	PriorInformation *get_prior_info_ptr() {return &prior_info;}
@@ -96,9 +97,14 @@ public:
 	void assign_da_cycles(ofstream& f_rec);
 	vector<pair<string, int>> extract_cycle_numbers2(ofstream& f_rec, string section_name, vector<string> possible_name_cols);
 	map<string, double> get_ext_file_double_map(const string& section_name, const string& col_name);
+
+    void clear_ext_files() { efiles_map.clear(); }
+
 	virtual ~Pest();
 	
 protected:
+	//this is the list of external file cols that have meaning...
+	set<string> efile_keep_cols{ "standard_deviation", "obsnme","parnme","name", "upper_bound","lower_bound", "cycle" };
 	int n_adj_par = 0;
 	string prior_info_string;
 	ControlInfo control_info;
@@ -123,6 +129,8 @@ protected:
 	map<int,string> other_lines;
 	string pst_filename;
 
+	set<string> s_pargp, s_obgnme; 
+
 	pair<string, string> parse_keyword_line(ofstream &f_rec, const string &line);
 	void throw_control_file_error(ofstream& f_rec, const string &message, bool should_throw=true);
 	void check_report_assignment(ofstream& f_rec, PestppOptions::ARG_STATUS stat, const string &key, const string &org_value);
@@ -139,4 +147,5 @@ protected:
 	map<string, vector<pest_utils::ExternalCtlFile>> efiles_map;
 };
 ostream& operator<< (ostream &os, const Pest& val);
+
 #endif /* PEST_H_ */

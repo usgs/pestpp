@@ -1224,6 +1224,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					par_group_tokens = efile.get_row_vector(ro, par_group_formal_names);
 					tokens_to_par_group_rec(f_rec, par_group_tokens);
 				}
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
 					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
 				else
@@ -1334,10 +1335,10 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					if (row_map["PARTRANS"] == "TIED")
 						temp_tied_map[row_map["PARNME"]] = row_map["PARTIED"];
 				}
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
-					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
-				else
-					efiles_map[section].push_back(efile);
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>();
+				efiles_map[section].push_back(efile);
 	
 			}
 			else if (section == "OBSERVATION GROUPS")
@@ -1367,10 +1368,12 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					obs_group_tokens = efile.get_row_vector(ro, obs_group_formal_names);
 					tokens_to_obs_group_rec(f_rec, obs_group_tokens);
 				}
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
-					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
-				else
-					efiles_map[section].push_back(efile);
+				{
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>();
+				}	
+				efiles_map[section].push_back(efile);
 			}
 
 			else if (section == "OBSERVATION DATA")
@@ -1422,11 +1425,10 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					obs_tokens = efile.get_row_vector(ro, get_names);
 					tokens_to_obs_rec(f_rec, obs_tokens);
 				}
-
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
-					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
-				else
-					efiles_map[section].push_back(efile);
+					efiles_map[section] = vector<pest_utils::ExternalCtlFile>();
+				efiles_map[section].push_back(efile);
 			}
 
 			else if (section == "PRIOR INFORMATION")
@@ -1457,7 +1459,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					pi_tokens = efile.get_row_vector(ro, pi_formal_names);
 					tokens_to_pi_rec(f_rec, pi_tokens);
 				}
-
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
 					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
 				else
@@ -1503,7 +1505,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					model_exec_info.inpfile_vec.push_back(mi_tokens[1]);
 					//model_exec_info.incycle_vec.push_back(std::stoi(mi_tokens[2]));
 				}
-
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
 					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
 				else
@@ -1544,7 +1546,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					//model_exec_info.outcycle_vec.push_back(std::stoi(mo_tokens[2]));
 					
 				}
-
+				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
 					efiles_map[section] = vector<pest_utils::ExternalCtlFile>{ efile };
 				else
@@ -1847,6 +1849,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		}
 	}
 
+	//clear temp containers
+	s_pargp.clear();
+	s_obgnme.clear();
 	
 
 	return 0;
@@ -2693,8 +2698,14 @@ void Pest::tokens_to_par_group_rec(ofstream &f_rec, const vector<string>& tokens
 	ParameterGroupRec pgi;
 	string name = tokens[0];
 	size_t n_tokens = tokens.size();
+	
+	if (s_pargp.find(name) == s_pargp.end())
+	{
+		ctl_ordered_par_group_names.push_back(name);
+		s_pargp.emplace(name);
+	}
+
 	pgi.name = name;
-	ctl_ordered_par_group_names.push_back(name);
 	convert_ip(tokens[1], pgi.inctyp);
 	convert_ip(tokens[2], pgi.derinc);
 	convert_ip(tokens[3], pgi.derinclb);
@@ -2756,13 +2767,15 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 	ctl_parameter_info.insert(name, pi);
 	ctl_parameters.insert(name, pi.init_value);
 	
-	if (find(ctl_ordered_par_group_names.begin(), ctl_ordered_par_group_names.end(), pi.group) == ctl_ordered_par_group_names.end())
+	//if (find(ctl_ordered_par_group_names.begin(), ctl_ordered_par_group_names.end(), pi.group) == ctl_ordered_par_group_names.end())
+	if (s_pargp.find(pi.group) == s_pargp.end())
 	{
 		ParameterGroupRec pgr;
 		pgr.set_defaults();
 		pgr.set_name(pi.group);
 		base_group_info.insert_group(pi.group,pgr);
 		ctl_ordered_par_group_names.push_back(pi.group);
+		s_pargp.emplace(pi.group);
 	}
 	base_group_info.insert_parameter_link(name, pi.group);
 
@@ -2793,10 +2806,12 @@ void Pest::tokens_to_obs_group_rec(ofstream& f_rec, const vector<string>& tokens
 	}
 	ObservationGroupRec group_rec;
 	observation_info.groups[name] = group_rec;
-	vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
-	if (is == ctl_ordered_obs_group_names.end())
+	//vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
+	//if (is == ctl_ordered_obs_group_names.end())
+	if (s_obgnme.find(name) == s_obgnme.end())
 	{
 		ctl_ordered_obs_group_names.push_back(name);
+		s_obgnme.emplace(name);
 	}
 }
 
@@ -2805,18 +2820,22 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	ObservationRec obs_i;
 	string name = tokens[0];
 	double value;
-	convert_ip(tokens[1], value);
-	convert_ip(tokens[2], obs_i.weight);
+	//convert_ip(tokens[1], value);
+	value = stod(tokens[1]);
+	//convert_ip(tokens[2], obs_i.weight);
+	obs_i.weight = stod(tokens[2]);
 	obs_i.group = tokens[3];
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
 
 	observation_values.insert(name, value);
 	name = obs_i.group;
-	vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
-	if (is == ctl_ordered_obs_group_names.end())
+	//vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
+	//if (is == ctl_ordered_obs_group_names.end())
+	if (s_obgnme.find(name) == s_obgnme.end())
 	{
 		ctl_ordered_obs_group_names.push_back(name);
+		s_obgnme.emplace(name);
 	}
 }
 
@@ -2848,8 +2867,9 @@ void Pest::tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens)
 	
 	pair<string,string> pi_name_group = prior_info.AddRecord(tokens);
 	ctl_ordered_pi_names.push_back(pi_name_group.first);
-	vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
-	if (is == ctl_ordered_obs_group_names.end())
+	//vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
+	//if (is == ctl_ordered_obs_group_names.end())
+	if (s_obgnme.find(pi_name_group.second) == s_obgnme.end())
 	{
 		ctl_ordered_obs_group_names.push_back(pi_name_group.second);
 	}

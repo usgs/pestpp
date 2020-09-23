@@ -569,6 +569,8 @@ public:
 	int get_panther_agent_no_ping_timeout_secs() const { return panther_agent_no_ping_timeout_secs; }
 	void set_panther_debug_loop(bool _flag) { panther_debug_loop = _flag; }
 	bool get_panther_debug_loop() const { return panther_debug_loop; }
+	void set_panther_debug_fail_freeze(bool _flag) { panther_debug_fail_freeze = _flag; }
+	bool get_panther_debug_fail_freeze() const { return panther_debug_fail_freeze; }
 
 	string get_da_par_cycle_table() const { return da_par_cycle_table; }
 	void set_da_par_cycle_table(string _filename) { da_par_cycle_table = _filename; }
@@ -731,8 +733,9 @@ private:
 	bool panther_agent_restart_on_error;
 	int panther_agent_no_ping_timeout_secs;
 	bool panther_debug_loop;
-	bool debug_check_paren_consistency;
-		
+	bool debug_check_paren_consistency;		
+	bool panther_debug_fail_freeze;
+
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);
 ostream& operator<< (ostream &os, const ObservationInfo& val);

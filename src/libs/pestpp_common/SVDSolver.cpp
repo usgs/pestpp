@@ -178,9 +178,9 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 			termination_ctl.save_state(fout_restart);
 			//write current parameters so we have a backup for restarting
 			RestartController::write_start_parameters_updated(fout_restart, file_manager.build_filename("parb", false));
-			output_file_writer.write_par(file_manager.open_ofile_ext("parb"), best_upgrade_run.get_ctl_pars(), *(par_transform.get_offset_ptr()),
+			output_file_writer.write_par(file_manager.open_ofile_ext("par"), best_upgrade_run.get_ctl_pars(), *(par_transform.get_offset_ptr()),
 				*(par_transform.get_scale_ptr()));
-			file_manager.close_file("parb");
+			file_manager.close_file("par");
 			RestartController::write_finish_parameters_updated(fout_restart, file_manager.build_filename("parb", false));
 
 			// write header for SVD file
@@ -294,7 +294,7 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 		file_manager.close_file("par");
 
 		filename.str(""); // reset the stringstream
-		filename << "par" << global_iter_num;
+		filename << global_iter_num << ".par";
 		output_file_writer.write_par(file_manager.open_ofile_ext(filename.str()), best_upgrade_run.get_ctl_pars(), *(par_transform.get_offset_ptr()),
 			*(par_transform.get_scale_ptr()));
 		file_manager.close_file(filename.str());
