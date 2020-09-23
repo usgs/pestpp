@@ -1014,8 +1014,14 @@ if __name__ == "__main__":
     #salib_verf()
     #tplins1_test()
     #ext_stdcol_test()
-    mf6_v5_ies_test()
-    #mf6_v5_sen_test()
+
+    # parallel_consist_test()
+    # ext_stdcol_test()
+    #da_prep_4_freyberg_batch()
+    #da_prep_4_freyberg_seq()
+    #mf6_v5_ies_test()
+    mf6_v5_sen_test()
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
     #cmdline_test()
+
