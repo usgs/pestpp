@@ -120,7 +120,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 
 	//if we still don't have any constraint groups, something is wrong
 	if (constraint_groups.size() == 0)
-		throw_constraints_error("no viable observation or prior information constraint groups found.  Constraint group names must start with the following: {'l_','less','g_','greater'}");
+		throw_constraints_error("no viable observation or prior information constraint/objective groups found.  Constraint/objective group names must start with the following: {'l_','less','g_','greater'}");
 
 	ctl_ord_obs_constraint_names.clear();
 	//if the ++opt_constraint_groups arg was passed
@@ -154,7 +154,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 				{
 					//cout << "Warning: observation constraint " << obs_name << " has 0.0 weight, skipping" << endl;
 					nobszw++;
-					f_rec << "Warning: observation constraint " << obs_name << " has 0.0 weight, skipping" << endl;
+					f_rec << "Warning: observation constraint/objective " << obs_name << " has 0.0 weight, skipping" << endl;
 				}
 				else
 				{
@@ -164,7 +164,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 			}
 		}
 		if (nobszw > 0)
-			cout << "Warning: " << nobszw << " of the observation constraints (see rec file for list) have 0.0 weight, skipping" << endl;
+			cout << "Warning: " << nobszw << " of the observation constraints/objectives (see rec file for list) have 0.0 weight, skipping" << endl;
 
 		//look for prior information constraints
 		const PriorInformation* pinfo = pest_scenario.get_prior_info_ptr();
@@ -214,7 +214,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 
 		//TODO: investigate a pi constraint only formulation
 		if (num_obs_constraints() == 0)
-			throw_constraints_error("no constraints found in groups: ", constraint_groups);
+			throw_constraints_error("no constraints/objectives found in groups: ", constraint_groups);
 	}
 
 
@@ -237,7 +237,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 	}
 	if (problem_constraints.size() > 0)
 	{
-		throw_constraints_error("the following obs constraints do not have a correct group name prefix {'l_','less','g_','greater','e_','equal'}: ", problem_constraints);
+		throw_constraints_error("the following obs constraints/objectives do not have a correct group name prefix {'l_','less','g_','greater','e_','equal'}: ", problem_constraints);
 	}
 
 	//build map of pi constraint sense
@@ -278,7 +278,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 	risk = pest_scenario.get_pestpp_options().get_opt_risk();
 	if (risk != 0.5)
 	{
-		pfm.log_event("initializing chance constraints");
+		pfm.log_event("initializing chance constraints/objectives");
 		use_chance = true;
 		std_weights = pest_scenario.get_pestpp_options().get_opt_std_weights();
 
@@ -303,9 +303,9 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 		if (std_weights)
 		{
 			double std, var;
-			cout << "++opt_std_weights = True, using weights as chance constraint uncertainty" << endl;
-			f_rec << "++opt_std_weights = True, using the following weights as prior and posterior chance constraint uncertainty: " << endl;
-			f_rec << setw(25) << "model-based constraint" << setw(15) << "std (weight)" << setw(15) << "variance" << endl;
+			cout << "++opt_std_weights = True, using weights as chance constraint/objective uncertainty" << endl;
+			f_rec << "++opt_std_weights = True, using the following weights as prior and posterior chance constraint/objective uncertainty: " << endl;
+			f_rec << setw(25) << "observation constraint/objective" << setw(15) << "std (weight)" << setw(15) << "variance" << endl;
 			for (auto& cname : ctl_ord_obs_constraint_names)
 			{
 				std = pest_scenario.get_observation_info_ptr()->get_weight(cname);
@@ -334,7 +334,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* 
 				}
 			}
 
-			f_rec << "  using FOSM-based chance constraints with risk = " << risk << endl;
+			f_rec << "  using FOSM-based chance constraints/objectives with risk = " << risk << endl;
 
 			parcov.try_from(pest_scenario, *file_mgr_ptr);
 			vector<string> drop;
@@ -545,7 +545,7 @@ void Constraints::initial_report()
 	/*make a rec file report before any iterations have happened*/
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 
-	f_rec << endl << "  ---  observation constraints ---  " << endl;
+	f_rec << endl << "  ---  observation constraints and/or objectives ---  " << endl;
 	f_rec << setw(20) << "name" << setw(20) << "sense" << setw(20) << "value" << endl;
 	for (auto& name : ctl_ord_obs_constraint_names)
 	{
@@ -568,20 +568,20 @@ void Constraints::initial_report()
 
 	if (use_chance)
 	{
-		f_rec << endl << endl << "  ---  chance constraint FOSM information  ---  " << endl;
+		f_rec << endl << endl << "  ---  chance constraint/objective FOSM information  ---  " << endl;
 		if (use_fosm)
 		{
-			f_rec << "-->using FOSM-based chance constraints" << endl;
+			f_rec << "-->using FOSM-based chance constraints/objectives" << endl;
 			f_rec << "-->++opt_risk and corresponding probit function value: " << setw(10) << risk << setw(20) << probit_val << endl;
 			f_rec << "-->number of non-zero weight observations for FOSM calcs: " << num_nz_obs() << endl;
 		}
 		else
 		{ 
-			f_rec << "-->using stack-based chance constraints" << endl;
+			f_rec << "-->using stack-based chance constraints/objectivew" << endl;
 		}
-		f_rec << "-->number of adjustable parameters for chance constraint calcs: " << num_adj_pars() << endl;
+		f_rec << "-->number of adjustable parameters for chance constraint/objective calcs: " << num_adj_pars() << endl;
 		
-		f_rec << "-->repeat chance constraint calculations every: " << pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() << " iterations" << endl << endl;
+		f_rec << "-->repeat chance constraint/objective calculations every: " << pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() << " iterations" << endl << endl;
 		f_rec << "   adjustable parameters used in FOSM calculations:" << endl;
 		int i = 1;
 		for (auto& name : adj_par_names)
@@ -595,11 +595,11 @@ void Constraints::initial_report()
 		if ((num_nz_obs() == 0) && (use_fosm))
 		{
 			f_rec << endl << endl << "  ---  Note: No nonzero weight observations found." << endl;
-			f_rec << "           Prior constraint uncertainty will be used in FOSM-based chance constraint calculations" << endl;
+			f_rec << "           Prior constraint/objective uncertainty will be used in FOSM-based calculations" << endl;
 		}
 		else if (use_fosm)
 		{
-			f_rec << "  non-zero weight observations used for conditioning in FOSM-based chance constraint calculations: " << endl;
+			f_rec << "  non-zero weight observations used for conditioning in FOSM-based chance constraint/objective calculations: " << endl;
 			int i = 0;
 			for (auto& name : nz_obs_names)
 			{
@@ -625,8 +625,8 @@ void Constraints::update_chance_offsets()
 	if (use_fosm)
 	{
 		ofstream& f_rec = file_mgr_ptr->rec_ofstream();
-		cout << "  ---  calculating FOSM-based chance constraint components  ---  " << endl;
-		f_rec << "  ---  calculating FOSM-based chance constraint components  ---  " << endl;
+		cout << "  ---  calculating FOSM-based chance constraint/objective components  ---  " << endl;
+		f_rec << "  ---  calculating FOSM-based chance constraint/objective components  ---  " << endl;
 
 		//the rows of the fosm jacobian include nonzero weight obs (for schur comp)
 		//plus the names of the names of constraints, which get treated as forecasts
@@ -637,7 +637,7 @@ void Constraints::update_chance_offsets()
 		Eigen::SparseMatrix<double> fosm_mat = jco.get_matrix(fosm_row_names, adj_par_names);
 
 		if (fosm_mat.size() == 0)
-			throw_constraints_error("FOSM-based chance constraint-to-parameter vectors are all zeros");
+			throw_constraints_error("FOSM-based chance constraint/objective-to-parameter vectors are all zeros");
 
 		Mat fosm_jco(fosm_row_names, adj_par_names, fosm_mat);
 
@@ -661,8 +661,8 @@ void Constraints::update_chance_offsets()
 			post_const_var = la.posterior_prediction_variance();
 		else
 			post_const_var = prior_const_var;
-		cout << "  ---   done with FOSM-based chance constraint calculations  ---  " << endl << endl;
-		f_rec << "  ---   done with FOSM-based chance constraint calculations  ---  " << endl << endl;
+		cout << "  ---   done with FOSM-based chance constraint/objective calculations  ---  " << endl << endl;
+		f_rec << "  ---   done with FOSM-based chance constraint/objective calculations  ---  " << endl << endl;
 	}
 	// or if we are using stacks, we just calculate a new token variance
 	//this isnt actually used in the shifting since we do a non-parametric shift along the PDF, but 
@@ -754,7 +754,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 	{
 		//work out which realization index corresponds to the risk value
 		if (stack_oe.shape().first < 3)
-			throw_constraints_error("too few (<3) stack members, cannot continue with stack-based chance constraints");
+			throw_constraints_error("too few (<3) stack members, cannot continue with stack-based chance constraints/objectives");
 		int cur_num_reals = stack_oe.shape().first;
 		//get the inde (which realization number) represents the risk value according to constraint sense
 		//
@@ -976,7 +976,7 @@ void Constraints::presolve_report(int iter)
 	
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 	vector<double> residuals;
-	f_rec << endl << "  observation constraint information at start of iteration " << iter << endl;
+	f_rec << endl << "  observation constraint/objective information at start of iteration " << iter << endl;
 	f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
 	f_rec << setw(15) << "residual" << setw(15) << "lower bound" << setw(15) << "upper bound" << endl;
 	
@@ -1018,7 +1018,7 @@ void Constraints::presolve_report(int iter)
 			f_rec << setw(20) << left << name;
 			f_rec << setw(15) << right << constraint_sense_name[name];
 			f_rec << setw(15) << pi_rec.get_obs_value();
-			f_rec << setw(15) << pi_rec.calc_residual_and_sim_val(*current_pars_and_dec_vars_ptr).first;
+			f_rec << setw(15) << pi_rec.calc_sim_and_resid(*current_pars_and_dec_vars_ptr).first;
 			f_rec << setw(15) << pi_rec.calc_residual(*current_pars_and_dec_vars_ptr);
 			f_rec << setw(15) << current_bounds.first[num_obs_constraints() + i];
 			f_rec << setw(15) << current_bounds.second[num_obs_constraints() + i] << endl;
@@ -1072,7 +1072,7 @@ void Constraints::presolve_chance_report(int iter)
 	
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 	//vector<double> residuals = get_constraint_residual_vec();
-	f_rec << endl << "  FOSM-based chance constraint information at start of iteration " << iter << endl;
+	f_rec << endl << "  FOSM-based chance constraint/objective information at start of iteration " << iter << endl;
 	f_rec << setw(20) << left << "name" << right << setw(10) << "sense" << setw(15) << "required" << setw(15) << "sim value";
 	f_rec << setw(15) << "prior stdev" << setw(15) << "post stdev" << setw(15) << "offset";
 	f_rec << setw(15) << "new sim value" << endl;
@@ -1090,8 +1090,8 @@ void Constraints::presolve_chance_report(int iter)
 		f_rec << setw(15) << post_constraint_offset[name];
 		f_rec << setw(15) << current_constraints_chance[name] << endl;
 	}
-	f_rec << "  note: 'offset' is the value added to the simulated constraint value to account" << endl;
-	f_rec << "        for the uncertainty in the constraint value arsing from uncertainty in the " << endl;
+	f_rec << "  note: 'offset' is the value added to the simulated constraint/objective value to account" << endl;
+	f_rec << "        for the uncertainty in the constraint/objective value arsing from uncertainty in the " << endl;
 	f_rec << "        adjustable parameters identified in the control file." << endl << endl;
 
 	return;
@@ -1132,7 +1132,7 @@ void Constraints::postsolve_obs_constraints_report(Observations& constraints_sim
 	project what the resulting constraint values should be*/
 
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
-	f_rec << endl << endl << "     " << tag << " constraint information at end of iteration " << iter << endl << endl;
+	f_rec << endl << endl << "     " << tag << " constraint/objective information at end of iteration " << iter << endl << endl;
 	f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(25);
 	if (status_map.size() > 0)
 		f_rec << "simplex status";
@@ -1209,8 +1209,8 @@ void Constraints::postsolve_pi_constraints_report(Parameters& pars_and_dec_vars,
 		for (auto &name : ctl_ord_pi_constraint_names)
 		{
 			PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
-			pair<double,double> cur_sim_resid = pi_rec.calc_residual_and_sim_val(*current_pars_and_dec_vars_ptr);
-			pair<double,double> new_sim_resid = pi_rec.calc_residual_and_sim_val(pars_and_dec_vars);
+			pair<double,double> cur_sim_resid = pi_rec.calc_sim_and_resid(*current_pars_and_dec_vars_ptr);
+			pair<double,double> new_sim_resid = pi_rec.calc_sim_and_resid(pars_and_dec_vars);
 			f_rec << setw(20) << left << name;
 			f_rec << setw(15) << right << constraint_sense_name[name];
 			f_rec << setw(15) << pi_rec.get_obs_value();
@@ -1235,6 +1235,7 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 	calculations
 	
 	*/
+	stringstream ss;
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 	if (!use_chance)
 		return;
@@ -1249,6 +1250,9 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 			*null_prior, false, false);
 		if (!success)
 			throw_constraints_error("error processing FOSM JCO matrix runs ", jco.get_failed_parameter_names());
+		ss.str("");
+		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".fosm.jcb";
+		jco.save(ss.str());
 	}
 	//otherwise, process some stack runs
 	else
@@ -1311,7 +1315,6 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 		//bit using Constraints::get_fosm_par_names()
 		//the last false says not to reinitialize the run mgr since the calling process may have also
 		//added runs
-		cout << "  ---  running " << num_adj_pars() << " model runs for FOSM-based chance constraints  ---  " << endl;
 		bool success = jco.build_runs(*current_pars_and_dec_vars_ptr, *current_constraints_sim_ptr, adj_par_names, pts,
 			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
 			*run_mgr_ptr, out_of_bounds, false, true, false);
@@ -1320,6 +1323,8 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 			const set<string> failed = jco.get_failed_parameter_names();
 			throw_constraints_error("failed to calc derviatives for the following FOSM parameters: ", failed);
 		}
+		cout << "...running " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints" << endl;
+
 	}
 	//for stacks, we need to queue up the stack realizations, but replace the dec var entries in each realization
 	//with the current dec var values.
@@ -1336,7 +1341,7 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 			stack_pe.replace_col(dname, dvec);
 		}
 		pfm.log_event("building stack-based parameter runs");
-		cout << "  ---  running " << stack_pe.shape().first << " model runs for stack-based chance constraints  ---  " << endl;
+		cout << "...running " << stack_pe.shape().first << " model runs for stack-based chance constraints" << endl;
 		stack_pe_run_map.clear();
 		stack_pe_run_map = stack_pe.add_runs(run_mgr_ptr);
 	}
@@ -1364,7 +1369,7 @@ map<string, double> Constraints::get_unsatified_pi_constraints(Parameters& par_a
 	{
 		PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
 		//pair<double, double> cur_sim_resid = pi_rec.calc_residual_and_sim_val(*current_pars_and_dec_vars_ptr);
-		pair<double, double> new_sim_resid = pi_rec.calc_residual_and_sim_val(par_and_dec_vars);
+		pair<double, double> new_sim_resid = pi_rec.calc_sim_and_resid(par_and_dec_vars);
 		//check for invalid pi constraints
 		sim_val = new_sim_resid.first;
 		obs_val = pi_rec.get_obs_value();
@@ -1379,7 +1384,7 @@ map<string, double> Constraints::get_unsatified_pi_constraints(Parameters& par_a
 	return unsatisfied;
 }
 
-map<string, double> Constraints::get_unsatified_obs_constraints(Observations& constraints_sim, double tol)
+map<string, double> Constraints::get_unsatified_obs_constraints(Observations& constraints_sim, double tol, bool do_shift)
 {
 	/* get a map of name, distance for each of the obs-based (e.g. model-based) constraints that are not satisfied in the constraint_obs container.
 	tol is a percent-based tolerance to accont for constraints that are very near their required (rhs) value
@@ -1387,14 +1392,14 @@ map<string, double> Constraints::get_unsatified_obs_constraints(Observations& co
 	*/
 	double sim_val, obs_val, scaled_diff;
 	map<string, double> unsatisfied;
-	Observations _constraints_sim = constraints_sim;
-	if (use_chance)
+	Observations _constraints_sim(constraints_sim);
+	if ((do_shift) && (use_chance))
 		_constraints_sim = get_chance_shifted_constraints(constraints_sim);
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
 		sim_val = constraints_sim[name];
-		if (use_chance)
+		if ((do_shift) && (use_chance))
 		{
 			double offset = post_constraint_offset[name];
 			sim_val += offset;

@@ -50,6 +50,8 @@ x64
 /pest++/benchmarks/kirishima/pestpp/
 /pest++/benchmarks/stor/pestpp/
 /pest++/benchmarks/tidal/pestpp/
+/pest++/benchmarks/mou_tests/
+
 pest++/mio/model_input_output_interface.mod
 pest++/pest++/pestpp
 pest++/run_manager_fortran_test/fortran_test
@@ -62,3 +64,5 @@ pest++/sweep/sweep
 *.u2d
 *.log
 /src/UpgradeLog.htm
+*_z
+

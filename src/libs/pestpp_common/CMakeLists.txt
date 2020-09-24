@@ -33,6 +33,7 @@ add_library(pestpp_com STATIC
   TerminationController.cpp
   Transformation.cpp
   SQP.cpp
+  MOEA.cpp
 )
 
 target_include_directories(pestpp_com INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")

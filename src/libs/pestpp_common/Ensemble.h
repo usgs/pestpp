@@ -50,6 +50,7 @@ public:
 	void replace_col(string var_name, Eigen::VectorXd & vec);
 	Eigen::VectorXd get_real_vector(int ireal);
 	Eigen::VectorXd get_real_vector(const string &real_name);
+	Eigen::VectorXd get_var_vector(const string& var_name);
 	void update_real_ip(string &rname, Eigen::VectorXd &real);
 	Eigen::MatrixXd get_eigen(vector<string> row_names, vector<string> col_names, bool update_vmap=true);
 	const Eigen::MatrixXd get_eigen() const { return reals; }
@@ -60,10 +61,11 @@ public:
 	Eigen::MatrixXd get_eigen_anomalies(const vector<string> &_real_names, const vector<string> &_var_names, string on_real="");
 
 
-	vector<double> get_mean_stl_vector();
+	vector<double> get_mean_stl_var_vector();
 	pair<map<string, double>, map<string, double>>  get_moment_maps(const vector<string> &_real_names=vector<string>());
 
 	void append_other_rows(Ensemble &other);
+	void append_other_rows(const vector<string>& _real_names, Eigen::MatrixXd& _reals);
 	void append(string real_name, const Transformable &trans);
 	void replace(int idx, const Transformable &trans, string real_name="");
 
@@ -153,6 +155,7 @@ public:
 	map<int,int> add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs=vector<int>());
 
 	void draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
+	void draw_uniform(int num_reals, vector<string> par_names, PerformanceLog* plog, int level, ofstream& frec);
 	Covariance get_diagonal_cov_matrix();
 	void to_binary(string filename);
 
@@ -172,7 +175,7 @@ public:
 	/*ObservationEnsemble(ObjectiveFunc *_obj_func, Pest &_pest_scenario, FileManager &_file_manager,
     OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log, unsigned int seed = 1);
 	*/
-	ObservationEnsemble(Pest *_pest_scenario_prt, std::mt19937* rand_gen_ptr);
+	ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr);
 	ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
 
 	ObservationEnsemble() { ; }

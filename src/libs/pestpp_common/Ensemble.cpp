@@ -14,6 +14,7 @@
 #include "PerformanceLog.h"
 #include "system_variables.h"
 #include "pest_data_structs.h"
+#include "eigen_tools.h"
 
 Ensemble::Ensemble(Pest *_pest_scenario_ptr, std::mt19937* _rand_gen_ptr): pest_scenario_ptr(_pest_scenario_ptr),
 rand_gen_ptr(_rand_gen_ptr)
@@ -602,7 +603,7 @@ Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names,
 	return _reals;
 }
 
-vector<double> Ensemble::get_mean_stl_vector()
+vector<double> Ensemble::get_mean_stl_var_vector()
 {
 	vector<double> mean_vec;
 	mean_vec.reserve(var_names.size());
@@ -974,6 +975,16 @@ Eigen::VectorXd Ensemble::get_real_vector(int ireal)
 	return reals.row(ireal);
 }
 
+
+Eigen::VectorXd Ensemble::get_var_vector(const string& var_name)
+{
+	update_var_map();
+	if (var_map.find(var_name) == var_map.end())
+		throw_ensemble_error("Ensemble::get_var_vector(): var_name not found: " + var_name);
+	return reals.col(var_map[var_name]);
+
+}
+
 Eigen::VectorXd Ensemble::get_real_vector(const string &real_name)
 {
 	//get a row vector from reals by realization name
@@ -1215,6 +1226,37 @@ void Ensemble::extend_cols(Eigen::MatrixXd &_reals, const vector<string> &_var_n
 	}
 }
 
+void Ensemble::append_other_rows(const vector<string>& _real_names, Eigen::MatrixXd& _reals)
+{
+
+	//append rows to the end of reals
+	if (_reals.cols() != shape().second)
+		throw_ensemble_error("append_other_rows(): different number of columns in _reals");
+	vector<string> probs;
+	set<string> rnames(real_names.begin(), real_names.end());
+	set<string>::iterator end = rnames.end();
+	for (auto& rname : _real_names)
+		//if (find(start, end, rname) != end)
+		if (rnames.find(rname) != end)
+			probs.push_back(rname);
+	if (probs.size() > 0)
+		throw_ensemble_error("append_other_rows(): the following _real_names are also in this::real_names: ", probs);
+	vector<string> new_real_names = real_names;
+	for (auto& rname : _real_names)
+	{
+		new_real_names.push_back(rname);
+		//org_real_names.push_back(rname);
+	}
+	reals.conservativeResize(new_real_names.size(), var_names.size());
+
+	int iother = 0;
+	for (int i = real_names.size(); i < new_real_names.size(); i++)
+	{
+		reals.row(i) = _reals.row(iother);
+		iother++;
+	}
+	real_names = new_real_names;
+}
 
 void Ensemble::append_other_rows(Ensemble &other)
 {
@@ -1868,7 +1910,36 @@ ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _ra
 	tstat = transStatus::CTL;
 }
 
+void ParameterEnsemble::draw_uniform(int num_reals, vector<string> par_names, PerformanceLog* plog, int level, ofstream& frec)
+{
+	var_names = par_names;
+	ParamTransformSeq ptrans = pest_scenario_ptr->get_base_par_tran_seq();
+	Parameters lb = pest_scenario_ptr->get_ctl_parameter_info().get_low_bnd(par_names);
+	Parameters ub = pest_scenario_ptr->get_ctl_parameter_info().get_up_bnd(par_names);
+	ptrans.ctl2numeric_ip(lb);
+	ptrans.ctl2numeric_ip(ub);
+	Parameters dist = ub - lb;
+	reals.resize(num_reals, var_names.size());
+	reals.setZero();
 
+	vector<double> vals;
+	for (int j=0;j<par_names.size();j++)
+	{
+		vals = uniform_draws(num_reals, lb[par_names[j]], ub[par_names[j]], *rand_gen_ptr);
+		reals.col(j) = stlvec_2_eigenvec(vals);
+	}
+
+	stringstream ss;
+	real_names.clear();
+	for (int i = 0; i < num_reals; i++)
+	{
+		ss.str("");
+		ss << "member_" << i;
+		real_names.push_back(ss.str());
+	}
+	org_real_names = real_names;
+	tstat = ParameterEnsemble::transStatus::NUM;
+}
 
 void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
 {
@@ -2032,7 +2103,7 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 				ss << n << ",";
 			throw_ensemble_error(ss.str());
 		}
-		run_id = run_mgr_ptr->add_run(pars_real);
+		run_id = run_mgr_ptr->add_run(pars_real,"realization: "+rname);
 		real_run_ids[idx]  = run_id;
 	}
 	return real_run_ids;

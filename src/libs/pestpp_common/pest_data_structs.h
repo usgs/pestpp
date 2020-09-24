@@ -187,7 +187,7 @@ class PestppOptions {
 public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
 	enum MAT_INV { Q12J, JTQJ };
-	enum GLOBAL_OPT { NONE, OPT_DE };
+	enum GLOBAL_OPT { NONE, OPT_DE, OPT_MOEA};
 	enum GLMNormalForm { IDENT,DIAG, PRIOR };
 	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
 	/*PestppOptions(int _n_iter_base = 50, int _n_iter_super = 0, int _max_n_super = 50,
@@ -203,7 +203,12 @@ public:
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
 	bool assign_value_by_key_continued(const string& key, const string& value);
+<<<<<<< HEAD
 	bool assign_value_by_key_sqp(const string& key, const string& value, const string& org_value);
+=======
+	bool assign_mou_value_by_key(const string& key, const string& value, const string& org_value);
+
+>>>>>>> zak/develop
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
 	int get_n_iter_base() const { return n_iter_base; }
@@ -330,6 +335,7 @@ public:
 	string get_opt_obs_stack()const { return opt_obs_stack; }
 	void set_opt_obs_stack(string _stack) { opt_obs_stack = _stack; }
 
+<<<<<<< HEAD
 	string get_sqp_dv_en()const { return sqp_dv_en; }
 	void set_sqp_dv_en(string _file) { sqp_dv_en = _file; }
 	string get_sqp_obs_restart_en()const { return sqp_obs_restart_en; }
@@ -338,6 +344,22 @@ public:
 	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
 
 
+=======
+	string get_mou_algorithm() const { return mou_algorithm; }
+	void set_mou_algorithm(string name) { mou_algorithm = name; }
+	int get_mou_population_size() const { return mou_population_size; }
+	void set_mou_population_size(int size) { mou_population_size = size; }
+	string get_mou_dv_population_file() const { return mou_dv_population_file; }
+	void set_mou_dv_population_file(string name) { mou_dv_population_file = name; }
+	string get_mou_obs_population_restart_file() const { return mou_obs_population_restart_file; }
+	void set_mou_obs_population_restart_file(string name) { mou_obs_population_restart_file = name; }
+	vector<string> get_mou_objectives() const { return mou_objectives; }
+	void set_mou_objectives(const vector<string>& objs) { mou_objectives = objs; }
+	int get_mou_max_archive_size() const { return mou_max_archive_size; }
+	void set_mou_max_archive_size(int size) { mou_max_archive_size = size; }
+	string get_mou_chance_points() const { return mou_chance_points; }
+	void set_mou_chance_points(string chance_points) { mou_chance_points = chance_points; }
+>>>>>>> zak/develop
 
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
@@ -539,6 +561,7 @@ private:
 	bool sweep_base_run;
 
 	GLOBAL_OPT global_opt;
+	string moea_name;
 	double de_f;
 	double de_cr;
 	int de_npopulation;
@@ -562,10 +585,20 @@ private:
 	string opt_par_stack;
 	string opt_obs_stack;
 
+<<<<<<< HEAD
 	string sqp_dv_en;
 	string sqp_obs_restart_en;
 	int sqp_num_reals;
 
+=======
+	int mou_population_size;
+	string mou_algorithm; 
+	string mou_dv_population_file;
+	string mou_obs_population_restart_file;
+	vector<string> mou_objectives;
+	int mou_max_archive_size;
+	string mou_chance_points;
+>>>>>>> zak/develop
 
 	int ies_subset_size;
 	string ies_par_csv;
@@ -673,6 +706,7 @@ private:
 ostream& operator<< (ostream& os, const SVDInfo& val);
 
 double draw_standard_normal(std::mt19937& rand_gen);
+vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bound, std::mt19937& rand_gen);
 
 
 #endif  /* PEST_DATAS_STRUCTS_H_ */
