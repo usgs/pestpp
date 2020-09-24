@@ -56,7 +56,7 @@ void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEn
 	}
 
 
-	map<string, map<string, double>> member_struct;
+	//map<string, map<string, double>> member_struct;
 	for (auto real_name : real_names)
 	{
 		map<string, double> obj_map;
@@ -175,6 +175,13 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(Obs
 	frec << "...pareto dominance sort yielded " << front_map.size() << " domination fronts" << endl;
 	for (auto front : front_map)
 	{
+		if (front.second.size() == 0)
+		{
+			ss.str("");
+			ss << "ParetoObjectives::pareto_dominance_sort() error: front " << front.first << " has no members";
+			performance_log->log_event(ss.str());
+			throw runtime_error(ss.str());
+		}
 		frec << front.second.size() << " in the front " << front.first << endl;
 	}
 

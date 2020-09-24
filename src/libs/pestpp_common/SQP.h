@@ -137,7 +137,7 @@ private:
 	void report_and_save();
 	void save_mat(string prefix, Eigen::MatrixXd &mat);
 	bool initialize_dv(Covariance &cov);
-	bool initialize_oe(Covariance &cov);
+	//bool initialize_oe(Covariance &cov);
 	void initialize_restart();
 	void initialize_parcov();
 	void initialize_obscov();

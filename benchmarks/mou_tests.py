@@ -363,6 +363,6 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt6",10)
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
-    test_zdt1()
+    #test_zdt1()
     #setup_zdt_problem("zdt1",30, additive_chance=True)
-    #test_sorting_fake_problem()
+    test_sorting_fake_problem()

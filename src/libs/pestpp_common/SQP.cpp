@@ -232,95 +232,6 @@ void SeqQuadProgram::add_bases()
 	}
 }
 
-bool SeqQuadProgram::initialize_oe(Covariance &cov)
-{
-	stringstream ss;
-	int num_reals = dv.shape().first;
-	string obs_csv = pest_scenario.get_pestpp_options().get_sqp_obs_restart_en();
-	bool drawn = false;
-	if (obs_csv.size() == 0)
-	{
-		if (pest_scenario.get_pestpp_options().get_ies_no_noise())
-		{
-			message(1, "initializing no-noise observation ensemble of : ", num_reals);
-			oe.initialize_without_noise(num_reals);
-		
-		}
-		else
-		{
-			message(1, "drawing observation noise realizations: ", num_reals);
-			oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
-			
-		}
-		drawn = true;
-	}
-	else
-	{
-		string obs_ext = pest_utils::lower_cp(obs_csv).substr(obs_csv.size() - 3, obs_csv.size());
-		performance_log->log_event("processing obs csv " + obs_csv);
-		if (obs_ext.compare("csv") == 0)
-		{
-			message(1, "loading obs ensemble from csv file", obs_csv);
-			try
-			{
-				oe.from_csv(obs_csv);
-			}
-			catch (const exception &e)
-			{
-				ss << "error processing obs csv: " << e.what();
-				throw_sqp_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_sqp_error(string("error processing obs csv"));
-			}
-		}
-		else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
-		{
-			message(1, "loading obs ensemble from binary file", obs_csv);
-			try
-			{
-				oe.from_binary(obs_csv);
-			}
-			catch (const exception &e)
-			{
-				stringstream ss;
-				ss << "error processing obs binary file: " << e.what();
-				throw_sqp_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_sqp_error(string("error processing obs binary file"));
-			}
-		}
-		else
-		{
-			ss << "unrecognized obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
-			throw_sqp_error(ss.str());
-		}
-		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
-		{
-			int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
-			/*if (pest_scenario.get_pestpp_options().get_ies_include_base())
-			{
-				message(1, "Note: increasing num_reals by 1 to account for 'base' realization in existing obs ensemble");
-				num_reals++;
-			}*/
-			if (num_reals < oe.shape().first)
-			{
-				message(1,"ies_num_reals arg passed, truncated observation ensemble to ",num_reals);
-				vector<string> keep_names,real_names=oe.get_real_names();
-				for (int i=0;i<num_reals;i++)
-				{
-					keep_names.push_back(real_names[i]);
-				}
-				oe.keep_rows(keep_names);
-			}
-		}
-	}
-	return drawn;
-
-}
 
 //template<typename T, typename A>
 //void SeqQuadProgram::message(int level, char* _message, vector<T, A> _extras)
@@ -529,9 +440,13 @@ void SeqQuadProgram::initialize_restart()
 {
 	stringstream ss;
 	string obs_restart_csv = pest_scenario.get_pestpp_options().get_sqp_obs_restart_en();
-	//string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
-
-	//performance_log->log_event("restart with existing obs ensemble: " + obs_restart_csv);
+	if (obs_restart_csv.size() == 0)
+	{
+		oe.initialize_without_noise(dv.shape().first);
+		vector<string> real_names = dv.get_real_names();
+		oe.set_real_names(real_names);
+		return;
+	}
 	message(1, "restarting with existing obs ensemble", obs_restart_csv);
 	string obs_ext = pest_utils::lower_cp(obs_restart_csv).substr(obs_restart_csv.size() - 3, obs_restart_csv.size());
 	if (obs_ext.compare("csv") == 0)
@@ -2291,7 +2206,6 @@ vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnse
 	{
 		throw_sqp_error(string("run_ensemble() error queueing runs"));
 	}
-
 
 	if (constraints.should_update_chance(iter))
 		constraints.add_runs(run_mgr_ptr);
