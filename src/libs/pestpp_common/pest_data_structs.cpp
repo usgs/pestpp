@@ -971,16 +971,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		fill_tpl_zeros = pest_utils::parse_string_arg_to_bool(value);
 	}
 	
-	else if (!assign_value_by_key_continued(key, value))
+	else if ((!assign_value_by_key_continued(key, value)) && 
+	(!assign_value_by_key_sqp(key, value, org_value)))
 	{
 		return ARG_STATUS::ARG_NOTFOUND;
-	}
-
-	else if (!assign_value_by_key_sqp(key, value, org_value))
-	{
-		return ARG_STATUS::ARG_NOTFOUND;
-	
-	return ARG_STATUS::ARG_NOTFOUND;
 	}
 
 	return ARG_STATUS::ARG_ACCEPTED;
@@ -1038,7 +1032,7 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		return true;
 	}
 
-	if (key == "SQP_OBS_RESTART_EN")
+	else if (key == "SQP_OBS_RESTART_EN")
 	{
 		sqp_obs_restart_en = org_value;
 		return true;
