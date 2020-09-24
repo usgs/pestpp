@@ -25,15 +25,14 @@ SeqQuadProgram::SeqQuadProgram(Pest &_pest_scenario, FileManager &_file_manager,
 {
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	subset_rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
-	pe.set_pest_scenario(&pest_scenario);
+	dv.set_pest_scenario(&pest_scenario);
 	oe.set_pest_scenario(&pest_scenario);
-	pe.set_rand_gen(&rand_gen);
+	dv.set_rand_gen(&rand_gen);
 	oe.set_rand_gen(&rand_gen);
-	localizer.set_pest_scenario(&pest_scenario);
 	
 }
 
-void SeqQuadProgram::throw_ies_error(string message)
+void SeqQuadProgram::throw_sqp_error(string message)
 {
 	performance_log->log_event("SeqQuadProgram error: " + message);
 	cout << endl << "   ************   " << endl << "    SeqQuadProgram error: " << message << endl << endl;
@@ -43,7 +42,7 @@ void SeqQuadProgram::throw_ies_error(string message)
 	throw runtime_error("SeqQuadProgram error: " + message);
 }
 
-bool SeqQuadProgram::initialize_pe(Covariance &cov)
+bool SeqQuadProgram::initialize_dv(Covariance &cov)
 {
 	stringstream ss;
 	int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
@@ -85,11 +84,11 @@ bool SeqQuadProgram::initialize_pe(Covariance &cov)
 
 			}
 		}
-		pe.draw(num_reals, draw_par,cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
+		dv.draw(num_reals, draw_par,cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
 		// stringstream ss;
 		// ss << file_manager.get_base_filename() << ".0.par.csv";
 		// message(1, "saving initial parameter ensemble to ", ss.str());
-		// pe.to_csv(ss.str());
+		// dv.to_csv(ss.str());
 		drawn = true;
 	}
 	else
@@ -101,16 +100,16 @@ bool SeqQuadProgram::initialize_pe(Covariance &cov)
 			message(1, "loading par ensemble from csv file", par_csv);
 			try
 			{
-				pe.from_csv(par_csv);
+				dv.from_csv(par_csv);
 			}
 			catch (const exception &e)
 			{
 				ss << "error processing par csv: " << e.what();
-				throw_ies_error(ss.str());
+				throw_sqp_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error processing par csv"));
+				throw_sqp_error(string("error processing par csv"));
 			}
 		}
 		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
@@ -118,25 +117,25 @@ bool SeqQuadProgram::initialize_pe(Covariance &cov)
 			message(1, "loading par ensemble from binary file", par_csv);
 			try
 			{
-				pe.from_binary(par_csv);
+				dv.from_binary(par_csv);
 			}
 			catch (const exception &e)
 			{
 				ss << "error processing par jcb: " << e.what();
-				throw_ies_error(ss.str());
+				throw_sqp_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error processing par jcb"));
+				throw_sqp_error(string("error processing par jcb"));
 			}
 		}
 		else
 		{
 			ss << "unrecognized par csv extension " << par_ext << ", looking for csv, jcb, or jco";
-			throw_ies_error(ss.str());
+			throw_sqp_error(ss.str());
 		}
 
-		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 		
 		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
 		{
@@ -146,15 +145,15 @@ bool SeqQuadProgram::initialize_pe(Covariance &cov)
 				message(1, "Note: increasing num_reals by 1 to account for 'base' realization in existing par ensemble");
 				num_reals++;
 			}*/
-			if (num_reals < pe.shape().first)
+			if (num_reals < dv.shape().first)
 			{
 				message(1,"ies_num_reals arg passed, truncated parameter ensemble to ",num_reals);
-				vector<string> keep_names,real_names=pe.get_real_names();
+				vector<string> keep_names,real_names=dv.get_real_names();
 				for (int i=0;i<num_reals;i++)
 				{
 					keep_names.push_back(real_names[i]);
 				}
-				pe.keep_rows(keep_names);
+				dv.keep_rows(keep_names);
 			}
 		}
 		
@@ -162,7 +161,7 @@ bool SeqQuadProgram::initialize_pe(Covariance &cov)
 		if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior())
 		{
 			message(1, "initializing prior parameter covariance matrix from ensemble (using diagonal matrix)");
-			parcov = pe.get_diagonal_cov_matrix();
+			parcov = dv.get_diagonal_cov_matrix();
 			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1)
 			{
 
@@ -185,7 +184,7 @@ bool SeqQuadProgram::initialize_pe(Covariance &cov)
 			if (pest_scenario.get_pestpp_options().get_ies_obs_restart_csv().size() > 0)
 				message(1, "Warning: even though ies_enforce_bounds is true, a restart obs en was passed, so bounds will not be enforced on the initial par en");
 			else
-				pe.enforce_limits(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+				dv.enforce_limits(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
 		}
 
 	}
@@ -196,7 +195,7 @@ bool SeqQuadProgram::initialize_pe(Covariance &cov)
 void SeqQuadProgram::add_bases()
 {
 	//check that 'base' isn't already in ensemble
-	vector<string> rnames = pe.get_real_names();
+	vector<string> rnames = dv.get_real_names();
 	bool inpar = false;
 	if (find(rnames.begin(), rnames.end(), base_name) != rnames.end())
 	{
@@ -207,10 +206,10 @@ void SeqQuadProgram::add_bases()
 	{
 		message(1, "adding 'base' parameter values to ensemble");
 		Parameters pars = pest_scenario.get_ctl_parameters();
-		pe.get_par_transform().active_ctl2numeric_ip(pars);
-		vector<int> drop{ pe.shape().first - 1 };
-		pe.drop_rows(drop);
-		pe.append(base_name, pars);
+		dv.get_par_transform().active_ctl2numeric_ip(pars);
+		vector<int> drop{ dv.shape().first - 1 };
+		dv.drop_rows(drop);
+		dv.append(base_name, pars);
 	}
 
 	//check that 'base' isn't already in ensemble
@@ -224,7 +223,7 @@ void SeqQuadProgram::add_bases()
 		Observations obs = pest_scenario.get_ctl_observations();
 		if (inpar)
 		{
-			vector<string> prnames = pe.get_real_names();
+			vector<string> prnames = dv.get_real_names();
 
 			int idx = find(prnames.begin(), prnames.end(), base_name) - prnames.begin();
 			//cout << idx << "," << rnames.size() << endl;
@@ -255,7 +254,7 @@ void SeqQuadProgram::add_bases()
 bool SeqQuadProgram::initialize_oe(Covariance &cov)
 {
 	stringstream ss;
-	int num_reals = pe.shape().first;
+	int num_reals = dv.shape().first;
 	string obs_csv = pest_scenario.get_pestpp_options().get_ies_obs_csv();
 	bool drawn = false;
 	if (obs_csv.size() == 0)
@@ -288,11 +287,11 @@ bool SeqQuadProgram::initialize_oe(Covariance &cov)
 			catch (const exception &e)
 			{
 				ss << "error processing obs csv: " << e.what();
-				throw_ies_error(ss.str());
+				throw_sqp_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error processing obs csv"));
+				throw_sqp_error(string("error processing obs csv"));
 			}
 		}
 		else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
@@ -306,17 +305,17 @@ bool SeqQuadProgram::initialize_oe(Covariance &cov)
 			{
 				stringstream ss;
 				ss << "error processing obs binary file: " << e.what();
-				throw_ies_error(ss.str());
+				throw_sqp_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error processing obs binary file"));
+				throw_sqp_error(string("error processing obs binary file"));
 			}
 		}
 		else
 		{
 			ss << "unrecognized obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
-			throw_ies_error(ss.str());
+			throw_sqp_error(ss.str());
 		}
 		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
 		{
@@ -417,7 +416,7 @@ void SeqQuadProgram::sanity_checks()
 	if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
 	{
 		warnings.push_back("'pestmode' == 'regularization', in pestpp-ies, this is controlled with the ++ies_reg_factor argument, resetting to 'estimation'");
-		//throw_ies_error("'pestmode' == 'regularization', please reset to 'estimation'");
+		//throw_sqp_error("'pestmode' == 'regularization', please reset to 'estimation'");
 	}
 	else if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::UNKNOWN)
 	{
@@ -540,7 +539,7 @@ void SeqQuadProgram::sanity_checks()
 		message(0, "sanity_check errors - uh oh");
 		for (auto &e : errors)
 			message(1, e);
-		throw_ies_error(string("sanity_check() found some problems - please review rec file"));
+		throw_sqp_error(string("sanity_check() found some problems - please review rec file"));
 	}
 	//cout << endl << endl;
 }
@@ -564,11 +563,11 @@ void SeqQuadProgram::initialize_restart()
 		catch (const exception &e)
 		{
 			ss << "error processing restart obs csv: " << e.what();
-			throw_ies_error(ss.str());
+			throw_sqp_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_ies_error(string("error processing restart obs csv"));
+			throw_sqp_error(string("error processing restart obs csv"));
 		}
 	}
 	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
@@ -581,17 +580,17 @@ void SeqQuadProgram::initialize_restart()
 		catch (const exception &e)
 		{
 			ss << "error processing restart obs binary file: " << e.what();
-			throw_ies_error(ss.str());
+			throw_sqp_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_ies_error(string("error processing restart obs binary file"));
+			throw_sqp_error(string("error processing restart obs binary file"));
 		}
 	}
 	else
 	{
 		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
-		throw_ies_error(ss.str());
+		throw_sqp_error(ss.str());
 	}
 	if (par_restart_csv.size() > 0)
 	{
@@ -601,16 +600,16 @@ void SeqQuadProgram::initialize_restart()
 			message(1, "loading restart par ensemble from csv file", par_restart_csv);
 			try
 			{
-				pe.from_csv(par_restart_csv);
+				dv.from_csv(par_restart_csv);
 			}
 			catch (const exception &e)
 			{
 				ss << "error processing restart par csv: " << e.what();
-				throw_ies_error(ss.str());
+				throw_sqp_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error processing restart par csv"));
+				throw_sqp_error(string("error processing restart par csv"));
 			}
 		}
 		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
@@ -618,32 +617,32 @@ void SeqQuadProgram::initialize_restart()
 			message(1, "loading restart par ensemble from binary file", par_restart_csv);
 			try
 			{
-				pe.from_binary(par_restart_csv);
+				dv.from_binary(par_restart_csv);
 			}
 			catch (const exception &e)
 			{
 				ss << "error processing restart par binary file: " << e.what();
-				throw_ies_error(ss.str());
+				throw_sqp_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error processing restart par binary file"));
+				throw_sqp_error(string("error processing restart par binary file"));
 			}
 		}
 		else
 		{
 			ss << "unrecognized restart par ensemble extension " << par_ext << ", looking for csv, jcb, or jco";
-			throw_ies_error(ss.str());
+			throw_sqp_error(ss.str());
 		}
-		if (pe.shape().first != oe.shape().first)
+		if (dv.shape().first != oe.shape().first)
 		{
 			ss.str("");
-			ss << "restart par en has " << pe.shape().first << " realizations but restart obs en has " << oe.shape().first;
-			throw_ies_error(ss.str());
+			ss << "restart par en has " << dv.shape().first << " realizations but restart obs en has " << oe.shape().first;
+			throw_sqp_error(ss.str());
 		}
 
-		//check that restart pe is in sync with pe_base
-		vector<string> pe_real_names = pe.get_real_names(), pe_base_real_names = pe_base.get_real_names();
+		//check that restart dv is in sync with dv_base
+		vector<string> pe_real_names = dv.get_real_names(), pe_base_real_names = dv_base.get_real_names();
 		vector<string>::const_iterator start, end;
 		vector<string> missing;
 		start = pe_base_real_names.begin();
@@ -656,9 +655,9 @@ void SeqQuadProgram::initialize_restart()
 			ss << "the following realization names were found in the restart par en but not in the 'base' par en:";
 			for (auto &m : missing)
 				ss << m << ",";
-			throw_ies_error(ss.str());
+			throw_sqp_error(ss.str());
 		}
-		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
 
 	if (pp_args.find("IES_NUM_REALS") != pp_args.end())
@@ -697,8 +696,8 @@ void SeqQuadProgram::initialize_restart()
 		{
 			//check that the base real is in the par en - restart_par_en should be accounted for by now
 			int base_par_idx = -1;
-			vector<string> pe_real_names = pe.get_real_names(), pe_base_real_names = pe_base.get_real_names();
-			for (int i = 0; i < pe_base.shape().first; i++)
+			vector<string> pe_real_names = dv.get_real_names(), pe_base_real_names = dv_base.get_real_names();
+			for (int i = 0; i < dv_base.shape().first; i++)
 			{
 				if (pe_base_real_names[i] == "BASE")
 				{
@@ -717,7 +716,7 @@ void SeqQuadProgram::initialize_restart()
 			else
 			{
 				ss << "the 'base' realization was not found in the restart obs en and also not found in the par en";
-				throw_ies_error(ss.str());
+				throw_sqp_error(ss.str());
 			}
 
 		}
@@ -726,16 +725,16 @@ void SeqQuadProgram::initialize_restart()
 			ss << "the following realization names were found in the restart obs en but not in the 'base' obs en:";
 			for (auto &m : missing)
 				ss << m << ",";
-			throw_ies_error(ss.str());
+			throw_sqp_error(ss.str());
 		}
 
 	}
 
-	if (oe.shape().first != pe.shape().first)
+	if (oe.shape().first != dv.shape().first)
 	{
 		//check if all oe names are found in par en, if so, we can reorder and proceed.  otherwise, die
 		missing.clear();
-		vector<string> pe_real_names = pe.get_real_names();
+		vector<string> pe_real_names = dv.get_real_names();
 		for (auto &oname : oe_real_names)
 		{
 			if (find(pe_real_names.begin(), pe_real_names.end(), oname) == pe_real_names.end())
@@ -744,26 +743,26 @@ void SeqQuadProgram::initialize_restart()
 
 		if (missing.size() > 0)
 		{
-			ss << "number of reals differ between restart obs en (" << oe.shape().first << ") and par en (" << pe.shape().first << ")";
+			ss << "number of reals differ between restart obs en (" << oe.shape().first << ") and par en (" << dv.shape().first << ")";
 			ss << " and realization names could not be aligned:";
 			for (auto &m : missing)
 				ss << m << ",";
-			throw_ies_error(ss.str());
+			throw_sqp_error(ss.str());
 		}
 
-		message(2, "reordering pe to align with restart obs en, num reals: ", oe_real_names.size());
+		message(2, "reordering dv to align with restart obs en, num reals: ", oe_real_names.size());
 		try
 		{
-			pe.reorder(oe_real_names, vector<string>());
+			dv.reorder(oe_real_names, vector<string>());
 		}
 		catch (exception &e)
 		{
-			ss << "error reordering pe with restart oe:" << e.what();
-			throw_ies_error(ss.str());
+			ss << "error reordering dv with restart oe:" << e.what();
+			throw_sqp_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_ies_error(string("error reordering pe with restart oe"));
+			throw_sqp_error(string("error reordering dv with restart oe"));
 		}
 
 	}
@@ -771,7 +770,7 @@ void SeqQuadProgram::initialize_restart()
 	//if (oe.shape().first < oe_base.shape().first) //maybe some runs failed...
 	if (oe.shape().first <= oe_base.shape().first)
 	{
-		//find which realizations are missing and reorder oe_base, pe and pe_base
+		//find which realizations are missing and reorder oe_base, dv and dv_base
 
 		//message(1, "shape mismatch detected with restart obs ensemble...checking for compatibility");
 		
@@ -803,52 +802,52 @@ void SeqQuadProgram::initialize_restart()
 			catch (exception& e)
 			{
 				ss << "error reordering oe_base with restart oe:" << e.what();
-				throw_ies_error(ss.str());
+				throw_sqp_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error reordering oe_base with restart oe"));
+				throw_sqp_error(string("error reordering oe_base with restart oe"));
 			}
 		}
 		//if (par_restart_csv.size() > 0)
 		if (true)
 		{
-			vector<string> pe_real_names = pe.get_real_names();
-			message(2, "reordering pe_base to align with restart par en,num reals:", pe_real_names.size());
+			vector<string> pe_real_names = dv.get_real_names();
+			message(2, "reordering dv_base to align with restart par en,num reals:", pe_real_names.size());
 			try
 			{
-				pe_base.reorder(pe_real_names, vector<string>());
+				dv_base.reorder(pe_real_names, vector<string>());
 			}
 			catch (exception &e)
 			{
-				ss << "error reordering pe_base with restart pe:" << e.what();
-				throw_ies_error(ss.str());
+				ss << "error reordering dv_base with restart dv:" << e.what();
+				throw_sqp_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_ies_error(string("error reordering pe_base with restart pe"));
+				throw_sqp_error(string("error reordering dv_base with restart dv"));
 			}
 		}
 
 
 		/*try
 		{
-			pe.reorder(pe_real_names, vector<string>());
+			dv.reorder(pe_real_names, vector<string>());
 		}
 		catch (exception &e)
 		{
-			ss << "error reordering pe with restart oe:" << e.what();
-			throw_ies_error(ss.str());
+			ss << "error reordering dv with restart oe:" << e.what();
+			throw_sqp_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_ies_error(string("error reordering pe with restart oe"));
+			throw_sqp_error(string("error reordering dv with restart oe"));
 		}*/
 	}
 	else if (oe.shape().first > oe_base.shape().first) //something is wrong
 	{
 		ss << "restart oe has too many rows: " << oe.shape().first << " compared to oe_base: " << oe_base.shape().first;
-		throw_ies_error(ss.str());
+		throw_sqp_error(ss.str());
 	}
 }
 
@@ -875,48 +874,6 @@ void SeqQuadProgram::initialize_obscov()
 
 	string how = obscov.try_from(pest_scenario, file_manager, false, true);
 	message(1, "obscov loaded ", how);
-	if (obscov_filename.size() > 0)
-	{
-		vector<string> cov_names = obscov.get_col_names();
-		vector<string> nz_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
-		if (cov_names.size() < nz_obs_names.size())
-		{
-			//this means we need to drop some nz obs
-			set<string> scov(cov_names.begin(), cov_names.end());
-			set<string>::iterator end = scov.end();
-			vector<string> drop;
-			for (auto name : nz_obs_names)
-				if (scov.find(name) == end)
-					drop.push_back(name);
-			ofstream& frec = file_manager.rec_ofstream();
-			frec << "Note: zero-weighting the following " << drop.size() << " observations that are not in the obscov:" << endl;
-			int i = 0;
-			for (auto n : drop)
-			{
-				frec << ',' << n;
-				i++;
-				if (i > 10)
-				{
-					frec << endl;
-					i = 0;
-				}
-			}
-			frec << endl;
-			zero_weight_obs(drop, false, true);
-			
-		}
-		message(1, "resetting weights based on obscov diagonal");
-		Eigen::VectorXd diag = obscov.e_ptr()->diagonal();
-		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
-		for (int i = 0; i < diag.size(); i++)
-		{
-			oi->set_weight(cov_names[i], min(1.0 / sqrt(diag[i]), oi->get_weight(cov_names[i])));
-		}
-	}
-	else
-	{
-		obscov = obscov.get(act_obs_names);
-	}
 	
 }
 
@@ -936,7 +893,7 @@ void SeqQuadProgram::initialize()
 		message(0, "'noptmax'=0, running control file parameter values and quitting");
 		
 		Parameters pars = pest_scenario.get_ctl_parameters();
-		ParamTransformSeq pts = pe.get_par_transform();
+		ParamTransformSeq pts = dv.get_par_transform();
 
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
@@ -945,15 +902,15 @@ void SeqQuadProgram::initialize()
 		string par_csv = file_manager.get_base_filename() + ".par.csv";
 		//message(1, "saving parameter values to ", par_csv);
 		//_pe.to_csv(par_csv);
-		pe_base = _pe;
-		pe_base.reorder(vector<string>(), act_par_names);
+		dv_base = _pe;
+		dv_base.reorder(vector<string>(), act_par_names);
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
 		_oe.append("BASE", pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
-		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
+		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &dv_base, &parcov);
 		if (ph.get_lt_obs_names().size() > 0)
 		{
 			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
@@ -968,7 +925,7 @@ void SeqQuadProgram::initialize()
 		if (failed_idxs.size() != 0)
 		{
 			message(0, "control file parameter value run failed...bummer");
-			throw_ies_error("control file parameter value run failed");
+			throw_sqp_error("control file parameter value run failed");
 		}
 		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
 		message(1, "saving results from control file parameter value run to ", obs_csv);
@@ -985,66 +942,15 @@ void SeqQuadProgram::initialize()
 	//set some defaults
 	PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
 
-	verbose_level = pest_scenario.get_pestpp_options_ptr()->get_ies_verbose_level();
-	if (pest_scenario.get_n_adj_par() >= 1e6)
-	{
-		message(0, "You are a god among mere mortals!");
-	}
-
-	message(1, "using REDSVD for truncated svd solve");
-	message(1, "maxsing:", pest_scenario.get_svd_info().maxsing);
-	message(1, "eigthresh: ", pest_scenario.get_svd_info().eigthresh);
-
-	message(1, "initializing localizer");
-	use_localizer = localizer.initialize(performance_log);
-	num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
-	if (!use_localizer)
-		message(1, "not using localization");
-	else
-	{
-		if (localizer.get_autoadaloc())
-		{
-			message(1, "using automatic adaptive localization");
-			message(2, "with autoadaloc_sigma_dist ", ppo->get_ies_autoadaloc_sigma_dist());
-		}
-		if (localizer.get_filename().size() > 0)
-		{
-			message(1, "using localization matrix " + localizer.get_filename());
-			localizer.report(file_manager.rec_ofstream());
-		}
-	}
-	if ((use_localizer) && (!localizer.get_autoadaloc()))
-	{
-		ss.str("");
-		ss << "using localized solution with " << localizer.get_num_upgrade_steps() << " sequential upgrade steps";
-		message(1, ss.str());
-		ss.str("");
-		if (num_threads > 0)
-		{
-			ss.str("");
-			ss << "using multithreaded localization calculation with " << num_threads << " threads";
-			message(1, ss.str());
-
-		}
-		if (localizer.get_how() == Localizer::How::OBSERVATIONS)
-			message(1, "localizing by obseravtions");
-		else
-			message(1, "localizing by parameters");
-	}
+	
 	iter = 0;
 	//ofstream &frec = file_manager.rec_ofstream();
 	last_best_mean = 1.0E+30;
 	last_best_std = 1.0e+30;
-	lambda_max = 1.0E+30;
-	lambda_min = 1.0E-30;
+	
 	warn_min_reals = 10;
 	error_min_reals = 2;
-	consec_bad_lambda_cycles = 0;
-
-	lam_mults = pest_scenario.get_pestpp_options().get_ies_lam_mults();
-	if (lam_mults.size() == 0)
-		lam_mults.push_back(1.0);
-	message(1, "using lambda multipliers: ", lam_mults);
+	
 	vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
 	message(1, "using lambda scaling factors: ", scale_facs);
 	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
@@ -1073,37 +979,19 @@ void SeqQuadProgram::initialize()
 
 	int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
 
-	pe_drawn = initialize_pe(parcov);
-
-	if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
-	{
-		message(1, "forming inverse sqrt of prior parameter covariance matrix");
-
-		if (parcov.isdiagonal())
-			parcov_inv_sqrt = parcov.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
-		else
-		{
-			message(1, "first extracting diagonal from prior parameter covariance matrix");
-			Covariance parcov_diag;
-			parcov_diag.from_diagonal(parcov);
-			parcov_inv_sqrt = parcov_diag.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
-		}
-	}
-	else {
-		message(1, "not using prior parameter covariance matrix scaling");
-	}
+	dv_drawn = initialize_dv(parcov);
 
 	oe_drawn = initialize_oe(obscov);
 	string center_on = ppo->get_ies_center_on();
 	
 	try
 	{
-		pe.check_for_dups();
+		dv.check_for_dups();
 	}
 	catch (const exception &e)
 	{
 		string message = e.what();
-		throw_ies_error("error in parameter ensemble: " + message);
+		throw_sqp_error("error in parameter ensemble: " + message);
 	}
 
 	try
@@ -1113,19 +1001,19 @@ void SeqQuadProgram::initialize()
 	catch (const exception &e)
 	{
 		string message = e.what();
-		throw_ies_error("error in observation ensemble: " + message);
+		throw_sqp_error("error in observation ensemble: " + message);
 	}
 
-	if (pe.shape().first != oe.shape().first)
+	if (dv.shape().first != oe.shape().first)
 	{
 		//the special case where par en < obs en and all par reals are found in obs en...
 
-		if (pe.shape().first < oe.shape().first)
+		if (dv.shape().first < oe.shape().first)
 		{
 			vector<string> oe_names = oe.get_real_names();
 			set<string> oset(oe_names.begin(), oe_names.end());
 			vector<string> missing;
-			for (auto n : pe.get_real_names())
+			for (auto n : dv.get_real_names())
 				if (oset.find(n) == oset.end())
 				{
 					missing.push_back(n);
@@ -1133,12 +1021,12 @@ void SeqQuadProgram::initialize()
 			if (missing.size() == 0)
 			{
 				ss.str("");
-				ss << "par en has " << pe.shape().first << " realizations, compared to " << oe.shape().first << " obs realizations";
+				ss << "par en has " << dv.shape().first << " realizations, compared to " << oe.shape().first << " obs realizations";
 				message(1, ss.str());
 				message(1," the realization names are compatible");
 				message(1, "re-indexing obs en to align with par en...");
 
-				oe.reorder(pe.get_real_names(), vector<string>());
+				oe.reorder(dv.get_real_names(), vector<string>());
 			}
 			else
 			{
@@ -1148,21 +1036,21 @@ void SeqQuadProgram::initialize()
 				{
 					ss << m << ",";
 				}
-				throw_ies_error(ss.str());
+				throw_sqp_error(ss.str());
 			}
 		}
 		else
 		{
 			ss.str("");
-			ss << "parameter ensemble rows (" << pe.shape().first << ") not equal to observation ensemble rows (" << oe.shape().first << ")";
-			throw_ies_error(ss.str());
+			ss << "parameter ensemble rows (" << dv.shape().first << ") not equal to observation ensemble rows (" << oe.shape().first << ")";
+			throw_sqp_error(ss.str());
 		}
 	}
 
 
 	//need this here for Am calcs...
 	//message(1, "transforming parameter ensemble to numeric");
-	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+	dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 
 	if (pest_scenario.get_pestpp_options().get_ies_include_base())
 		if (pp_args.find("IES_RESTART_OBS_EN") != pp_args.end())
@@ -1175,9 +1063,9 @@ void SeqQuadProgram::initialize()
 
 	//now we check to see if we need to try to align the par and obs en
 	//this would only be needed if either of these were not drawn
-	if (!pe_drawn || !oe_drawn)
+	if (!dv_drawn || !oe_drawn)
 	{
-		bool aligned = pe.try_align_other_rows(performance_log, oe);
+		bool aligned = dv.try_align_other_rows(performance_log, oe);
 		if (aligned)
 		{
 			message(2, "observation ensemble reordered to align rows with parameter ensemble");
@@ -1185,7 +1073,7 @@ void SeqQuadProgram::initialize()
 	}
 
 	//just check to see if common real names are found but are not in the same location
-	map<string, int> pe_map = pe.get_real_map(), oe_map = oe.get_real_map();
+	map<string, int> pe_map = dv.get_real_map(), oe_map = oe.get_real_map();
 	vector<string> misaligned;
 	for (auto item : pe_map)
 	{
@@ -1205,18 +1093,18 @@ void SeqQuadProgram::initialize()
 
 
 
-	message(2, "checking for denormal values in pe");
-	pe.check_for_normal("initial transformed parameter ensemble");
+	message(2, "checking for denormal values in dv");
+	dv.check_for_normal("initial transformed parameter ensemble");
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
 		ss << file_manager.get_base_filename() << ".0.par.jcb";
-		pe.to_binary(ss.str());
+		dv.to_binary(ss.str());
 	}
 	else
 	{
 		ss << file_manager.get_base_filename() << ".0.par.csv";
-		pe.to_csv(ss.str());
+		dv.to_csv(ss.str());
 	}
 	message(1, "saved initial parameter ensemble to ", ss.str());
 	message(2, "checking for denormal values in base oe");
@@ -1240,12 +1128,12 @@ void SeqQuadProgram::initialize()
 		ss.str("");
 		ss << "centering on realization: '" << center_on << "' ";
 		message(1, ss.str());
-		vector<string> names = pe.get_real_names();
+		vector<string> names = dv.get_real_names();
 		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_ies_error("'ies_center_on' realization not found in par en: " + center_on);
+			throw_sqp_error("'ies_center_on' realization not found in par en: " + center_on);
 		names = oe.get_real_names();
 		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_ies_error("'ies_center_on' realization not found in obs en: " + center_on);
+			throw_sqp_error("'ies_center_on' realization not found in obs en: " + center_on);
 	}
 	else
 		message(1, "centering on ensemble mean vector");
@@ -1255,26 +1143,26 @@ void SeqQuadProgram::initialize()
 		message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
 		message(1, "calculating mean parameter values");
 		Parameters pars;
-		vector<double> mv = pe.get_mean_stl_vector();
-		pars.update(pe.get_var_names(), pe.get_mean_stl_vector());
-		ParamTransformSeq pts = pe.get_par_transform();
+		vector<double> mv = dv.get_mean_stl_vector();
+		pars.update(dv.get_var_names(), dv.get_mean_stl_vector());
+		ParamTransformSeq pts = dv.get_par_transform();
 
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
-		_pe.reserve(vector<string>(), pe.get_var_names());
-		_pe.set_trans_status(pe.get_trans_status());
+		_pe.reserve(vector<string>(), dv.get_var_names());
+		_pe.set_trans_status(dv.get_trans_status());
 		_pe.append("mean", pars);
 		string par_csv = file_manager.get_base_filename() + ".mean.par.csv";
 		message(1, "saving mean parameter values to ", par_csv);
 		_pe.to_csv(par_csv);
-		pe_base = _pe;
-		pe_base.reorder(vector<string>(), act_par_names);
+		dv_base = _pe;
+		dv_base.reorder(vector<string>(), act_par_names);
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(vector<string>(), oe.get_var_names());
 		_oe.append("mean", pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
-		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
+		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &dv_base, &parcov);
 		if (ph.get_lt_obs_names().size() > 0)
 		{
 			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
@@ -1303,7 +1191,7 @@ void SeqQuadProgram::initialize()
 		return;
 	}
 
-	if (subset_size > pe.shape().first)
+	if (subset_size > dv.shape().first)
 	{
 		use_subset = false;
 	}
@@ -1316,7 +1204,7 @@ void SeqQuadProgram::initialize()
 	}
 
 	oe_org_real_names = oe.get_real_names();
-	pe_org_real_names = pe.get_real_names();
+	pe_org_real_names = dv.get_real_names();
 	string obs_restart_csv = pest_scenario.get_pestpp_options().get_ies_obs_restart_csv();
 	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
 
@@ -1324,9 +1212,9 @@ void SeqQuadProgram::initialize()
 	//reorder this for later...
 	oe_base.reorder(vector<string>(), act_obs_names);
 
-	pe_base = pe; //copy
+	dv_base = dv; //copy
 	//reorder this for later
-	pe_base.reorder(vector<string>(), act_par_names);
+	dv_base.reorder(vector<string>(), act_par_names);
 
 
 	//the hard way to restart
@@ -1338,11 +1226,11 @@ void SeqQuadProgram::initialize()
 	{
 		performance_log->log_event("running initial ensemble");
 		message(1, "running initial ensemble of size", oe.shape().first);
-		vector<int> failed = run_ensemble(pe, oe);
-		if (pe.shape().first == 0)
-			throw_ies_error("all realizations failed during initial evaluation");
+		vector<int> failed = run_ensemble(dv, oe);
+		if (dv.shape().first == 0)
+			throw_sqp_error("all realizations failed during initial evaluation");
 
-		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
 	
 	ss.str("");
@@ -1359,13 +1247,13 @@ void SeqQuadProgram::initialize()
 	message(1, "saved initial obs ensemble to", ss.str());
 
 	//save the 0th iter par and rei and well as the untagged par and rei
-	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter);
-	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1);
+	save_base_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, iter);
+	save_base_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, -1);
 
 
 	performance_log->log_event("calc pre-drop phi");
 	//initialize the phi handler
-	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
+	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &dv_base, &parcov);
 
 	if (ph.get_lt_obs_names().size() > 0)
 	{
@@ -1376,19 +1264,19 @@ void SeqQuadProgram::initialize()
 		message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
 	}
 
-	ph.update(oe, pe);
+	ph.update(oe, dv);
 	message(0, "pre-drop initial phi summary");
 	ph.report(true);
-	drop_bad_phi(pe, oe);
+	drop_bad_phi(dv, oe);
 	if (oe.shape().first == 0)
 	{
-		throw_ies_error(string("all realizations dropped as 'bad'"));
+		throw_sqp_error(string("all realizations dropped as 'bad'"));
 	}
 	if (oe.shape().first <= error_min_reals)
 	{
 		message(0, "too few active realizations:", oe.shape().first);
 		message(1, "need at least ", error_min_reals);
-		throw_ies_error(string("too few active realizations, cannot continue"));
+		throw_sqp_error(string("too few active realizations, cannot continue"));
 	}
 	if (oe.shape().first < warn_min_reals)
 	{
@@ -1398,265 +1286,19 @@ void SeqQuadProgram::initialize()
 		message(0, s);
 	}
 
-	pcs = ParChangeSummarizer(&pe_base, &file_manager,&output_file_writer);
-	vector<string> in_conflict = detect_prior_data_conflict();
-	if (in_conflict.size() > 0)
-	{
-		ss.str("");
-		ss << "WARNING: " << in_conflict.size() << " non-zero weighted observations are in conflict";
-		ss << " with the prior simulated ensemble." << endl;
-		message(0, ss.str());
+	pcs = ParChangeSummarizer(&dv_base, &file_manager,&output_file_writer);
+	
 
-		cout << "...see rec file or " << file_manager.get_base_filename() << ".pdc.csv" << "for listing of conflicted observations" << endl << endl;
-		ofstream& frec = file_manager.rec_ofstream();
-		frec << endl << "...conflicted observations: " << endl;
-		for (auto oname : in_conflict)
-		{
-			frec << oname << endl;
-		}
-		
-		if (!ppo->get_ies_drop_conflicts())
-		{
-			ss.str("");
-			ss << "  WARNING: Prior-data conflict detected.  Continuing with IES parameter" << endl;
-			ss << "           adjustment will likely result in parameter and forecast bias." << endl;
-			ss << "           Consider using 'ies_drop_conflicts' as a quick fix.";
-			message(1, ss.str());
-		}
-		else
-		{
-
-			//check that all obs are in conflict
-			message(1, "dropping conflicted observations");
-			if (in_conflict.size() == oe.shape().second)
-			{
-				throw_ies_error("all non-zero weighted observations in conflict state, cannot continue");
-			}
-			zero_weight_obs(in_conflict);
-			if (ppo->get_ies_localizer().size() > 0)
-			{
-				message(1, "updating localizer");
-					use_localizer = localizer.initialize(performance_log,true);
-			}
-
-		}
-		string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
-		ofstream f_obs(filename);
-		if (f_obs.bad())
-			throw_ies_error("error opening: " + filename);
-		output_file_writer.scenario_obs_csv(f_obs);
-		f_obs.close();
-		message(1, "updated observation data information written to file ", filename);
-	}
-	else if (ppo->get_obscov_filename().size() > 0)
-	{
-		string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
-		ofstream f_obs(filename);
-		if (f_obs.bad())
-			throw_ies_error("error opening: " + filename);
-		output_file_writer.scenario_obs_csv(f_obs);
-		f_obs.close();
-		message(1, "updated observation data information written to file ", filename);
-	}
-	performance_log->log_event("calc initial phi");
-	ph.update(oe, pe);
-	message(0, "initial phi summary");
-	ph.report(true);
-	ph.write(0, run_mgr_ptr->get_total_runs());
-	if (ppo->get_ies_save_rescov())
-		ph.save_residual_cov(oe, 0);
-	best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
-	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
-	{
-		message(1, "using full (MAP) update solution");
-
-	}
-
-	if (ph.get_mean(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
-	{	
-		throw_ies_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");	
-	}
-	if (ph.get_std(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
-	{
-		throw_ies_error("initial actual phi stdev too low, something is wrong...");
-	}
-
-
-	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
-	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-	last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
-	if (last_best_mean < 1.0e-10)
-	{
-		throw_ies_error("initial composite phi mean too low, something is wrong...");
-	}
-	if (last_best_std < 1.0e-10)
-	{
-		throw_ies_error("initial composite phi stdev too low, something is wrong...");
-	}
-	if (last_best_lam <= 0.0)
-	{
-		//double x = last_best_mean / (2.0 * double(oe.shape().second));
-		double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
-		last_best_lam = pow(10.0, (floor(log10(x))));
-		if (last_best_lam < 1.0e-10)
-		{
-			message(1, "initial lambda estimation from phi failed, using 10,000");
-			last_best_lam = 10000;
-		}
-	}
-	message(1, "current lambda:", last_best_lam);
 	message(0, "initialization complete");
 }
 
-void SeqQuadProgram::zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov, bool update_oe_base)
-{
-	//drop from act_obs_names
-	vector<string> t;
-	set<string> sdrop(obs_to_zero_weight.begin(), obs_to_zero_weight.end());
-	for (auto oname : act_obs_names)
-		if (sdrop.find(oname) == sdrop.end())
-			t.push_back(oname);
-	act_obs_names = t;
-
-	//update obscov
-	if (update_obscov)
-		obscov.drop(obs_to_zero_weight);
-
-	//drop from oe_base
-	if (update_oe_base)
-		oe_base.drop_cols(obs_to_zero_weight);
-	
-	//shouldnt need to update localizer since we dropping not adding
-	//updating weights in control file
-
-	ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
-	int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
-	for (auto n : obs_to_zero_weight)
-	{
-		oi->set_weight(n, 0.0);
-	}
-
-	stringstream ss;
-	ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
-	ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
-	message(1, ss.str());
-}
-
-vector<string> SeqQuadProgram::detect_prior_data_conflict()
-{
-	message(1, "checking for prior-data conflict...");
-	//for now, just really simple metric - checking for overlap
-	// write out conflicted obs and some related info to a csv file
-	ofstream pdccsv(file_manager.get_base_filename() + ".pdc.csv");
-	
-	vector<string> in_conflict;
-	double smin, smax, omin, omax,smin_stat, smax_stat, omin_stat,omax_stat;
-	map<string, int> smap, omap;
-	vector<string> snames = oe.get_var_names();
-	vector<string> onames = oe_base.get_var_names();
-	vector<string> temp = ph.get_lt_obs_names();
-	set<string> ineq(temp.begin(), temp.end());
-	set<string>::iterator end = ineq.end();
-	temp = ph.get_gt_obs_names();
-	ineq.insert(temp.begin(), temp.end());
-	temp.resize(0);
-	
-	for (int i = 0; i < snames.size(); i++)
-	{
-		smap[snames[i]] = i;
-	}
-	for (int i = 0; i < onames.size(); i++)
-	{
-		omap[onames[i]] = i;
-	}
-	int sidx, oidx;
-	bool use_stat_dist = true;
-	if (pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance() <= 0.0)
-		use_stat_dist = false;
-	
-	double smn, sstd, omn, ostd,dist;
-	double sd = pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance();
-	int oe_nr = oe.shape().first;
-	int oe_base_nr = oe_base.shape().first;
-	Eigen::VectorXd t;
-	pdccsv << "name,obs_mean,obs_std,obs_min,obs_max,obs_stat_min,obs_stat_max,sim_mean,sim_std,sim_min,sim_max,sim_stat_min,sim_stat_max,distance" << endl;
-	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
-	{
-		if (ineq.find(oname) != end)
-			continue;
-		sidx = smap[oname];
-		oidx = omap[oname];
-		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
-		omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
-		smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
-		omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
-		t = oe.get_eigen_ptr()->col(sidx);
-		smn = t.mean();
-		sstd = std::sqrt((t.array() - smn).square().sum() / (oe_nr-1));
-		smin_stat = smn - (sd * sstd);
-		smax_stat = smn + (sd * sstd);
-		t = oe_base.get_eigen_ptr()->col(oidx);
-		omn = t.mean();
-		ostd = std::sqrt((t.array() - omn).square().sum() / (oe_base_nr-1));
-		omin_stat = omn - (sd * ostd);
-		omax_stat = omn + (sd * ostd);	
-
-		if (use_stat_dist)
-		{
-			if ((smin_stat > omax_stat) || (smax_stat < omin_stat))
-			{
-				in_conflict.push_back(oname);
-				dist = max((smin_stat - omax_stat), (omin_stat - smax_stat));
-				pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
-				pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
-			}
-		}
-		else
-		{
-			if ((smin > omax) || (smax < omin))
-			{
-				in_conflict.push_back(oname);
-				dist = max((smin - omax), (omin - smax));
-				pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
-				pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
-			}
-		}
-	}
-	
-	return in_conflict;
-}
-
-Eigen::MatrixXd SeqQuadProgram::get_Am(const vector<string> &real_names, const vector<string> &par_names)
-{
-
-	double scale = (1.0 / (sqrt(double(real_names.size() - 1))));
-	Eigen::MatrixXd par_diff = scale * pe_base.get_eigen_anomalies(real_names,par_names,pest_scenario.get_pestpp_options().get_ies_center_on());
-	par_diff.transposeInPlace();
-	if (verbose_level > 1)
-	{
-		cout << "prior_par_diff: " << par_diff.rows() << ',' << par_diff.cols() << endl;
-		if (verbose_level > 2)
-			save_mat("prior_par_diff.dat", par_diff);
-	}
-
-	Eigen::MatrixXd ivec, upgrade_1, s, V, U, st;
-	SVD_REDSVD rsvd;
-	//SVD_EIGEN rsvd;
-	rsvd.set_performance_log(performance_log);
-
-	rsvd.solve_ip(par_diff, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-	par_diff.resize(0, 0);
-	Eigen::MatrixXd temp = s.asDiagonal();
-	Eigen::MatrixXd Am = U * temp;
-	return Am;
-}
 
 void SeqQuadProgram::drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe, bool is_subset)
 {
 	//don't use this assert because _pe maybe full size, but _oe might be subset size
 	if (!is_subset)
 		if (_pe.shape().first != _oe.shape().first)
-			throw_ies_error("SeqQuadProgram::drop_bad_phi() error: _pe != _oe and not subset");
+			throw_sqp_error("SeqQuadProgram::drop_bad_phi() error: _pe != _oe and not subset");
 		
 	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
 	double bad_phi_sigma = pest_scenario.get_pestpp_options().get_ies_bad_phi_sigma();
@@ -1687,7 +1329,7 @@ void SeqQuadProgram::drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_
 			full_onames = _oe.get_real_names();
 		}*/
 		full_onames = oe.get_real_names();
-		full_pnames = pe.get_real_names();
+		full_pnames = dv.get_real_names();
 		vector<string> pdrop, odrop;
 		for (auto i : idxs)
 		{
@@ -1700,7 +1342,7 @@ void SeqQuadProgram::drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_
 				{
 					ss.str("");
 					ss << "drop_bad_phi() error: idx " << pidx << " not found in subset_idxs";
-					throw_ies_error(ss.str());
+					throw_sqp_error(ss.str());
 				}
 				pname = full_pnames[pidx];
 			}
@@ -1725,11 +1367,11 @@ void SeqQuadProgram::drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_
 		{
 			stringstream ss;
 			ss << "drop_bad_phi() error : " << e.what();
-			throw_ies_error(ss.str());
+			throw_sqp_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_ies_error(string("drop_bad_phi() error"));
+			throw_sqp_error(string("drop_bad_phi() error"));
 		}
 	}
 }
@@ -1767,7 +1409,7 @@ void SeqQuadProgram::iterate_2_solution()
 		performance_log->log_event(ss.str());
 		accept = solve_new();
 		report_and_save();
-		ph.update(oe,pe);
+		ph.update(oe,dv);
 		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		ph.report(true);
@@ -1776,14 +1418,8 @@ void SeqQuadProgram::iterate_2_solution()
 			ph.save_residual_cov(oe,iter);
 		ss.str("");
 		ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
-		pcs.summarize(pe,iter,ss.str());
+		pcs.summarize(dv,iter,ss.str());
 			
-			
-		if (accept)
-			consec_bad_lambda_cycles = 0;
-		else
-			consec_bad_lambda_cycles++;
-
 		if (should_terminate())
 			break;
 	}
@@ -1791,738 +1427,67 @@ void SeqQuadProgram::iterate_2_solution()
 
 bool SeqQuadProgram::should_terminate()
 {
-	//todo: use ies accept fac here?
-	double phiredstp = pest_scenario.get_control_info().phiredstp;
-	int nphistp = pest_scenario.get_control_info().nphistp;
-	int nphinored = pest_scenario.get_control_info().nphinored;
-	bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
-	double phi, ratio;
-	int count = 0;
-	int nphired = 0;
-	//best_mean_phis = vector<double>{ 1.0,0.8,0.81,0.755,1.1,0.75,0.75,1.2 };
+	//todo: work out some SQP-based criteria here...
+	//double phiredstp = pest_scenario.get_control_info().phiredstp;
+	//int nphistp = pest_scenario.get_control_info().nphistp;
+	//int nphinored = pest_scenario.get_control_info().nphinored;
+	//bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
+	//double phi, ratio;
+	//int count = 0;
+	//int nphired = 0;
 
+	//message(0, "phi-based termination criteria check");
+	//message(1, "phiredstp: ", phiredstp);
+	//message(1, "nphistp: ", nphistp);
+	//message(1, "nphinored (also used for consecutive bad lambda cycles): ", nphinored);
+	//if (best_mean_phis.size() > 0)
+	//{
+	//	vector<double>::iterator idx = min_element(best_mean_phis.begin(), best_mean_phis.end());
+	//	nphired = (best_mean_phis.end() - idx) - 1;
+	//	best_phi_yet = best_mean_phis[idx - best_mean_phis.begin()];// *pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
+	//	message(1, "best mean phi sequence: ", best_mean_phis);
+	//	message(1, "best phi yet: ", best_phi_yet);
+	//}
+	//message(1, "number of consecutive bad lambda testing cycles: ", consec_bad_lambda_cycles);
+	//if (consec_bad_lambda_cycles >= nphinored)
+	//{
+	//	message(1, "number of consecutive bad lambda testing cycles > nphinored");
+	//	consec_sat = true;
+	//}
 
+	//for (auto &phi : best_mean_phis)
+	//{
+	//	ratio = (phi - best_phi_yet) / phi;
+	//	if (ratio <= phiredstp)
+	//		count++;
+	//}
+	//message(1, "number of iterations satisfying phiredstp criteria: ", count);
+	//if (count >= nphistp)
+	//{
+	//	message(1, "number iterations satisfying phiredstp criteria > nphistp");
+	//	phiredstp_sat = true;
+	//}
 
-	/*if ((!consec_sat )&& (best_mean_phis.size() == 0))
-		return false;*/
-	message(0, "phi-based termination criteria check");
-	message(1, "phiredstp: ", phiredstp);
-	message(1, "nphistp: ", nphistp);
-	message(1, "nphinored (also used for consecutive bad lambda cycles): ", nphinored);
-	if (best_mean_phis.size() > 0)
-	{
-		vector<double>::iterator idx = min_element(best_mean_phis.begin(), best_mean_phis.end());
-		nphired = (best_mean_phis.end() - idx) - 1;
-		best_phi_yet = best_mean_phis[idx - best_mean_phis.begin()];// *pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
-		message(1, "best mean phi sequence: ", best_mean_phis);
-		message(1, "best phi yet: ", best_phi_yet);
-	}
-	message(1, "number of consecutive bad lambda testing cycles: ", consec_bad_lambda_cycles);
-	if (consec_bad_lambda_cycles >= nphinored)
-	{
-		message(1, "number of consecutive bad lambda testing cycles > nphinored");
-		consec_sat = true;
-	}
+	//message(1, "number of iterations since best yet mean phi: ", nphired);
+	//if (nphired >= nphinored)
+	//{
+	//	message(1, "number of iterations since best yet mean phi > nphinored");
+	//	nphinored_sat = true;
+	//}
 
-	for (auto &phi : best_mean_phis)
-	{
-		ratio = (phi - best_phi_yet) / phi;
-		if (ratio <= phiredstp)
-			count++;
-	}
-	message(1, "number of iterations satisfying phiredstp criteria: ", count);
-	if (count >= nphistp)
-	{
-		message(1, "number iterations satisfying phiredstp criteria > nphistp");
-		phiredstp_sat = true;
-	}
-
-	message(1, "number of iterations since best yet mean phi: ", nphired);
-	if (nphired >= nphinored)
-	{
-		message(1, "number of iterations since best yet mean phi > nphinored");
-		nphinored_sat = true;
-	}
-
-	if ((nphinored_sat) || (phiredstp_sat) || (consec_sat))
-	{
-		message(1, "phi-based termination criteria satisfied, all done");
-		return true;
-	}
+	//if ((nphinored_sat) || (phiredstp_sat) || (consec_sat))
+	//{
+	//	message(1, "phi-based termination criteria satisfied, all done");
+	//	return true;
+	//}
 	return false;
 }
 
 
 
 
-LocalUpgradeThread::LocalUpgradeThread(PerformanceLog *_performance_log, unordered_map<string, Eigen::VectorXd> &_par_resid_map, unordered_map<string, Eigen::VectorXd> &_par_diff_map,
-	unordered_map<string, Eigen::VectorXd> &_obs_resid_map, unordered_map<string, Eigen::VectorXd> &_obs_diff_map,
-	Localizer &_localizer, unordered_map<string, double> &_parcov_inv_map, unordered_map<string, double> &_weight_map,
-	ParameterEnsemble &_pe_upgrade, unordered_map<string,pair<vector<string>,vector<string>>> &_cases,
-	unordered_map<string, Eigen::VectorXd> &_Am_map, Localizer::How &_how): par_resid_map(_par_resid_map),
-	par_diff_map(_par_diff_map), obs_resid_map(_obs_resid_map),obs_diff_map(_obs_diff_map),localizer(_localizer),
-	pe_upgrade(_pe_upgrade),cases(_cases), parcov_inv_map(_parcov_inv_map), weight_map(_weight_map), Am_map(_Am_map)
-{
-	performance_log = _performance_log;
-	how = _how;
-	parcov_inv_map = _parcov_inv_map;
-	weight_map = _weight_map;
-	count = 0;
-
-	for (auto &c : cases)
-	{
-		keys.push_back(c.first);
-	}
-	//sort(keys.begin(), keys.end());
-	total = keys.size();
-	//random_shuffle(keys.begin(), keys.end());
-
-}
 
 
-void LocalUpgradeThread::work(int thread_id, int iter, double cur_lam)
-{
-	class local_utils
-	{
-	public:
-		static Eigen::DiagonalMatrix<double, Eigen::Dynamic> get_matrix_from_map(vector<string> &names, unordered_map<string, double> &dmap)
-		{
-			Eigen::VectorXd vec(names.size());
-			int i = 0;
-			for (auto name : names)
-			{
-				vec[i] = dmap.at(name);
-				++i;
-			}
-			Eigen::DiagonalMatrix<double, Eigen::Dynamic> m = vec.asDiagonal();
-			return m;
-		}
-		static Eigen::MatrixXd get_matrix_from_map(int num_reals, vector<string> &names, unordered_map<string, Eigen::VectorXd> &emap)
-		{
-			Eigen::MatrixXd mat(num_reals, names.size());
-			mat.setZero();
-
-			for (int j = 0; j < names.size(); j++)
-			{
-				mat.col(j) = emap[names[j]];
-			}
-
-			return mat;
-		}
-		static void save_mat(int verbose_level, int tid, int iter, int t_count, string prefix, Eigen::MatrixXd &mat)
-		{
-			if (verbose_level < 2)
-				return;
-			
-			if (verbose_level < 3)
-				return;
-			//cout << "thread: " << tid << ", " << t_count << ", " << prefix << " rows:cols" << mat.rows() << ":" << mat.cols() << endl;
-			stringstream ss;
-			
-			ss << "thread_"<< tid << ".count_ " << t_count << ".iter_" << iter << "." << prefix << ".dat";
-			string fname = ss.str();
-			ofstream f(fname);
-			if (!f.good())
-				cout << "error getting ofstream " << fname << endl;
-			else
-			{
-
-				try
-				{
-					f << mat << endl;
-					f.close();
-				}
-				catch (...)
-				{
-					cout << "error saving matrix " << fname << endl;
-				}
-			}
-		}
-	};
-	
-	stringstream ss;
-	
-	
-	unique_lock<mutex> ctrl_guard(ctrl_lock, defer_lock);
-	int maxsing, num_reals, verbose_level, pcount=0,t_count;
-	double eigthresh;
-	bool use_approx;
-	bool use_prior_scaling;
-	bool use_localizer = false;
-	bool loc_by_obs = true;
-
-	while (true)
-	{
-		if (ctrl_guard.try_lock())
-		{
-			maxsing = pe_upgrade.get_pest_scenario_ptr()->get_svd_info().maxsing;
-			eigthresh = pe_upgrade.get_pest_scenario_ptr()->get_svd_info().eigthresh;
-			use_approx = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_use_approx();
-			use_prior_scaling = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_use_prior_scaling();
-			num_reals = pe_upgrade.shape().first;
-			verbose_level = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_verbose_level();
-			ctrl_guard.unlock();
-			//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_localize_how()[0] == 'P')
-			if (how == Localizer::How::PARAMETERS)
-				loc_by_obs = false;
-			break;
-		}
-	}
-	ofstream f_thread;
-	if (verbose_level > 2)
-	{
-		ss.str("");
-		ss << "thread_" << thread_id << "part_map.csv";
-		f_thread.open(ss.str());
-		ss.str("");
-	}
-	Eigen::MatrixXd par_resid, par_diff, Am;
-	Eigen::MatrixXd obs_resid, obs_diff, loc;
-	Eigen::DiagonalMatrix<double, Eigen::Dynamic> weights, parcov_inv;
-	vector<string> par_names, obs_names;
-	while (true)
-	{
-		unique_lock<mutex> next_guard(next_lock, defer_lock);
-		par_names.clear();
-		obs_names.clear();
-		use_localizer = false;
-		//the end condition
-		//the end condition
-		while (true)
-		{	
-			if (next_guard.try_lock())
-			{
-				if (count == keys.size())
-				{
-					if (verbose_level > 1)
-					{
-						cout << "upgrade thread: " << thread_id << " processed " << pcount << " upgrade parts" << endl;
-					}
-					if (f_thread.good())
-						f_thread.close();
-					return;
-				}
-				string k = keys[count];
-				pair<vector<string>, vector<string>> p = cases.at(k);
-				par_names = p.second;
-				obs_names = p.first;
-				if (localizer.get_use())
-				{
-					if ((loc_by_obs) && (par_names.size() == 1) && (k == par_names[0]))
-						use_localizer = true;
-					else if ((!loc_by_obs) && (obs_names.size() == 1) && (k == obs_names[0]))
-					{
-						use_localizer = true;
-						//loc_by_obs = false;
-					}
-				}
-				if (count % 1000 == 0)
-				{
-					ss.str("");
-					ss << "upgrade thread progress: " << count << " of " << total << " parts done";
-					if (verbose_level > 1)
-						cout << ss.str() << endl;
-					performance_log->log_event(ss.str());
-				}
-				count++;
-				t_count = count;
-				pcount++;
-				next_guard.unlock();
-				break;
-			}
-		}
-		
-
-		if (verbose_level > 2)
-		{
-			f_thread << t_count << "," << iter;
-			for (auto name : par_names)
-				f_thread << "," << name;
-			for (auto name : obs_names)
-				f_thread << "," << name;
-			f_thread << endl;
-		}
-
-		par_resid.resize(0, 0);
-		par_diff.resize(0, 0);
-		obs_resid.resize(0, 0);
-		obs_diff.resize(0, 0);
-		loc.resize(0, 0);
-		Am.resize(0, 0);
-		weights.resize(0);
-		parcov_inv.resize(0);
-		Am.resize(0, 0);
-
-		unique_lock<mutex> obs_diff_guard(obs_diff_lock, defer_lock);
-		unique_lock<mutex> obs_resid_guard(obs_resid_lock, defer_lock);
-		unique_lock<mutex> par_diff_guard(par_diff_lock, defer_lock);
-		unique_lock<mutex> par_resid_guard(par_resid_lock, defer_lock);
-		unique_lock<mutex> loc_guard(loc_lock, defer_lock);
-		unique_lock<mutex> weight_guard(weight_lock, defer_lock);
-		unique_lock<mutex> parcov_guard(parcov_lock, defer_lock);
-		unique_lock<mutex> am_guard(am_lock, defer_lock);
-
-		while (true)
-		{
-			if (((use_approx) || (par_resid.rows() > 0)) &&
-				(weights.size() > 0) &&
-				(parcov_inv.size() > 0) &&
-				(par_diff.rows() > 0) &&
-				(obs_resid.rows() > 0) &&
-				(obs_diff.rows() > 0) &&
-				((!use_localizer) || (loc.rows() > 0)) && 
-				((use_approx) || (Am.rows() > 0)))
-				break;
-			if ((use_localizer) && (loc.rows() == 0) && (loc_guard.try_lock()))
-			{
-				if (loc_by_obs)
-					loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
-				else
-					loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
-				loc_guard.unlock();
-			}
-			if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
-			{
-				//piggy back here for thread safety
-				//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
-				//	use_propack = true;
-				obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
-				obs_diff_guard.unlock();
-			}
-			if ((obs_resid.rows() == 0) && (obs_resid_guard.try_lock()))
-			{
-				obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
-				obs_resid_guard.unlock();
-			}
-			if ((par_diff.rows() == 0) && (par_diff_guard.try_lock()))
-			{
-				par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
-				par_diff_guard.unlock();
-			}
-			if ((par_resid.rows() == 0) && (par_resid_guard.try_lock()))
-			{
-				par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
-				par_resid_guard.unlock();
-			}
-			if ((weights.rows() == 0) && (weight_guard.try_lock()))
-			{
-				weights = local_utils::get_matrix_from_map(obs_names, weight_map);
-				weight_guard.unlock();
-			}
-			if ((parcov_inv.rows() == 0) && (parcov_guard.try_lock()))
-			{
-				parcov_inv = local_utils::get_matrix_from_map(par_names, parcov_inv_map);
-				parcov_guard.unlock();
-			}
-			if ((!use_approx) && (Am.rows() == 0) && (am_guard.try_lock()))
-			{
-				//Am = local_utils::get_matrix_from_map(num_reals, par_names, Am_map).transpose();
-				int am_cols = Am_map[par_names[0]].size();
-				Am.resize(par_names.size(),am_cols);
-				Am.setZero();
-
-				for (int j = 0; j < par_names.size(); j++)
-				{
-					Am.row(j) = Am_map[par_names[j]];
-				}
-				am_guard.unlock();
-			}
-		}
-		
-		par_diff.transposeInPlace();
-		obs_diff.transposeInPlace();
-		obs_resid.transposeInPlace();
-		par_resid.transposeInPlace();
-
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
-		Eigen::MatrixXd scaled_residual = weights * obs_resid;
-		
-		
-
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_resid", par_resid);
-		Eigen::MatrixXd scaled_par_resid;
-		if ((!use_approx) && (iter > 1))
-		{
-			if (use_prior_scaling)
-			{
-				scaled_par_resid = parcov_inv * par_resid;
-			}
-			else
-			{
-				scaled_par_resid = par_resid;
-			}
-		}
-
-		stringstream ss;
-
-		double scale = (1.0 / (sqrt(double(num_reals - 1))));
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
-
-		if (use_localizer)
-			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "loc", loc);
-		if (use_localizer)
-		{
-			if (loc_by_obs)
-				par_diff = par_diff.cwiseProduct(loc);
-			else	
-				obs_diff = obs_diff.cwiseProduct(loc);
-
-		}
-		
-		obs_diff = scale * (weights * obs_diff);
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
-		if (use_prior_scaling)
-			par_diff = scale * parcov_inv * par_diff;
-		else
-			par_diff = scale * par_diff;
-
-
-		//performance_log->log_event("SVD of obs diff");
-		Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
-		
-		
-		SVD_REDSVD rsvd;
-		rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
-		
-		Ut.transposeInPlace();
-		obs_diff.resize(0, 0);
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Ut", Ut);
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "s", s);
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "V", V);
-
-		Eigen::MatrixXd s2 = s.cwiseProduct(s);
-
-		ivec = ((Eigen::VectorXd::Ones(s2.size()) * (cur_lam + 1.0)) + s2).asDiagonal().inverse();
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "ivec", ivec);
-		Eigen::MatrixXd X1 = Ut * scaled_residual;
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
-		Eigen::MatrixXd X2 = ivec * X1;
-		X1.resize(0, 0);
-
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X2", X2);
-		Eigen::MatrixXd X3 = V * s.asDiagonal() * X2;
-		X2.resize(0, 0);
-
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X3", X3);
-		if (use_prior_scaling)
-		{
-			upgrade_1 = -1.0 * parcov_inv * par_diff * X3;
-		}
-		else
-		{
-			upgrade_1 = -1.0 * par_diff * X3;
-		}
-		upgrade_1.transposeInPlace();
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1",upgrade_1);
-		X3.resize(0, 0);
-
-
-		Eigen::MatrixXd upgrade_2;
-		if ((!use_approx) && (iter > 1))
-		{
-			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Am",Am);
-			Eigen::MatrixXd x4 = Am.transpose() * scaled_par_resid;
-			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X4", x4);
-			
-			par_resid.resize(0, 0);
-
-			Eigen::MatrixXd x5 = Am * x4;
-			x4.resize(0, 0);
-			Am.resize(0, 0);
-
-			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X5", x5);
-			Eigen::MatrixXd x6 = par_diff.transpose() * x5;
-			x5.resize(0, 0);
-
-			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X6", x6);
-			Eigen::MatrixXd x7 = V * ivec *V.transpose() * x6;
-			x6.resize(0, 0);
-
-			if (use_prior_scaling)
-			{
-				upgrade_2 = -1.0 * parcov_inv * par_diff * x7;
-			}
-			else
-			{
-				upgrade_2 = -1.0 * (par_diff * x7);
-			}
-			x7.resize(0, 0);
-
-			upgrade_1 = upgrade_1 + upgrade_2.transpose();
-			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_2", upgrade_2);
-			upgrade_2.resize(0, 0);
-
-		}
-		
-		unique_lock<mutex> put_guard(put_lock, defer_lock);
-		while (true)
-		{
-			if (put_guard.try_lock())
-			{
-				pe_upgrade.add_2_cols_ip(par_names, upgrade_1);
-				put_guard.unlock();
-				break;
-			}
-		}
-	}
-
-}
-
-
-
-void upgrade_thread_function(int id, int iter,double cur_lam, LocalUpgradeThread &worker, exception_ptr &eptr)
-{
-	try
-	{
-		worker.work(id, iter, cur_lam);
-	}
-	catch (...)
-	{
-		eptr = current_exception();
-	}
-	
-	return;
-}
-
-
-ParameterEnsemble SeqQuadProgram::calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>> &loc_map)
-{
-	stringstream ss;
-	
-	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
-	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(),&rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
-	
-	//this copy of the localizer map will be consumed by the worker threads
-	//unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
-	if (use_localizer)
-	{
-		
-		//loc_map = localizer.get_localizer_map(iter, oe, pe, performance_log);
-		//localizer.report(file_manager.rec_ofstream());
-	}
-	else
-	{
-		pair<vector<string>, vector<string>> p(act_obs_names, act_par_names);
-		loc_map["all"] = p;
-	}
-	
-	//prep the fast look par cov info
-	message(2, "preparing fast-look containers for threaded localization solve");
-	unordered_map<string, double> parcov_inv_map;
-	parcov_inv_map.reserve(pe_upgrade.shape().second);
-	Eigen::VectorXd parcov_inv;// = parcov.get(par_names).inv().e_ptr()->toDense().cwiseSqrt().asDiagonal();
-	if (!parcov.isdiagonal())
-	{
-		//parcov_inv = parcov.inv().get_matrix().diagonal().cwiseSqrt();
-		parcov_inv = parcov.get_matrix().diagonal();
-		
-	}
-	else
-	{
-		message(2, "extracting diagonal from prior parameter covariance matrix");
-		Covariance parcov_diag;
-		parcov_diag.from_diagonal(parcov);
-		//parcov_inv = parcov_diag.inv().get_matrix().diagonal().cwiseSqrt();
-		parcov_inv = parcov_diag.get_matrix().diagonal();
-		
-	}
-	parcov_inv = parcov_inv.cwiseSqrt().cwiseInverse();
-
-	vector<string> par_names = pe_upgrade.get_var_names();
-	for (int i = 0; i < parcov_inv.size(); i++)
-		parcov_inv_map[par_names[i]] = parcov_inv[i];
-
-
-	//prep the fast lookup weights info
-	unordered_map<string, double> weight_map;
-	weight_map.reserve(oe_upgrade.shape().second);
-	vector<string> obs_names = oe_upgrade.get_var_names();
-	double w;
-	for (int i = 0; i < obs_names.size(); i++)
-	{
-		w = pest_scenario.get_observation_info_ptr()->get_weight(obs_names[i]);
-		//don't want to filter on weight here - might be changing weights, etc...
-		//if (w == 0.0)
-		//	continue;
-		weight_map[obs_names[i]] = w;
-	}
-	
-	//prep a fast look for obs, par and resid matrices - stored as column vectors in a map
-	unordered_map<string, Eigen::VectorXd> par_resid_map, obs_resid_map, Am_map;
-	unordered_map<string, Eigen::VectorXd> par_diff_map, obs_diff_map;
-	par_resid_map.reserve(par_names.size());
-	par_diff_map.reserve(par_names.size());
-	Am_map.reserve(par_names.size());
-	obs_resid_map.reserve(obs_names.size());
-	obs_diff_map.reserve(obs_names.size());
-	
-	//check for the 'center_on' real - it may have been dropped...
-	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
-	if (center_on.size() > 0)
-	{
-		vector<string> real_names = oe_upgrade.get_real_names();
-		if (find(real_names.begin(), real_names.end(), center_on) == real_names.end())
-		{
-			message(0, "Warning: 'ies_center_on' real not found in obs en, reverting to mean...");
-			center_on = "";
-		}
-		real_names = pe_upgrade.get_real_names();
-		if ((center_on.size() > 0) && find(real_names.begin(), real_names.end(), center_on) == real_names.end())
-		{
-			message(0, "Warning: 'ies_center_on' real not found in par en, reverting to mean...");
-			center_on = "";
-		}
-	}
-
-	Eigen::MatrixXd mat = ph.get_obs_resid_subset(oe_upgrade);
-	for (int i = 0; i < obs_names.size(); i++)
-	{
-		obs_resid_map[obs_names[i]] = mat.col(i);
-	}
-	mat = oe_upgrade.get_eigen_anomalies(center_on);
-	for (int i = 0; i < obs_names.size(); i++)
-	{
-		obs_diff_map[obs_names[i]] = mat.col(i);
-	}
-	mat = ph.get_par_resid_subset(pe_upgrade);
-	for (int i = 0; i <par_names.size(); i++)
-	{
-		par_resid_map[par_names[i]] = mat.col(i);
-	}	
-	mat = pe_upgrade.get_eigen_anomalies(center_on);
-	for (int i = 0; i <par_names.size(); i++)
-	{
-		par_diff_map[par_names[i]] = mat.col(i);
-	}
-	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
-	{
-		mat = get_Am(pe_upgrade.get_real_names(), pe_upgrade.get_var_names());
-		for (int i = 0; i < par_names.size(); i++)
-		{
-			Am_map[par_names[i]] = mat.row(i);
-		}
-	}
-	mat.resize(0, 0);
-	// clear the upgrade ensemble
-	pe_upgrade.set_zeros();
-	Localizer::How _how = localizer.get_how();
-	LocalUpgradeThread worker(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map,
-		localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
-
-	if ((num_threads < 1) || (loc_map.size() == 1))
-	//if (num_threads < 1)
-	{
-		worker.work(0, iter, cur_lam);
-	}
-	else
-	{
-		Eigen::setNbThreads(1);
-		vector<thread> threads;
-		vector<exception_ptr> exception_ptrs;
-		message(2, "launching threads");
-		
-		for (int i = 0; i <num_threads; i++)
-		{
-			exception_ptrs.push_back(exception_ptr());
-		}
-
-		for (int i = 0; i < num_threads; i++)
-		{
-			//threads.push_back(thread(&LocalUpgradeThread::work, &worker, i, iter, cur_lam));
-			
-			threads.push_back(thread(upgrade_thread_function, i, iter, cur_lam, std::ref(worker),std::ref( exception_ptrs[i])));
-			
-		}
-		message(2, "waiting to join threads");
-		//for (auto &t : threads)
-		//	t.join();
-		ss.str("");
-		int num_exp = 0;
-
-		for (int i = 0; i < num_threads; ++i)
-		{
-			bool found = false;
-			if (exception_ptrs[i])
-			{
-				found = true;
-				num_exp++;
-				try
-				{
-					rethrow_exception(exception_ptrs[i]);
-				}
-				catch (const std::exception& e)
-				{
-					//ss.str("");
-					ss << " thread " << i << "raised an exception: " << e.what();
-					//throw runtime_error(ss.str());
-				}
-				catch (...)
-				{
-					//ss.str("");
-					ss << " thread " << i << "raised an exception";
-					//throw runtime_error(ss.str());
-				}
-			}
-			threads[i].join();
-			if ((exception_ptrs[i]) && (!found))
-			{
-				num_exp++;
-				try
-				{
-					rethrow_exception(exception_ptrs[i]);
-				}
-				catch (const std::exception& e)
-				{
-					//ss.str("");
-					ss << " thread " << i << "raised an exception: " << e.what();
-					//throw runtime_error(ss.str());
-				}
-				catch (...)
-				{
-					//ss.str("");
-					ss << " thread " << i << "raised an exception: ";
-					//throw runtime_error(ss.str());
-				}
-			}
-		}
-		if (num_exp > 0)
-		{
-			throw runtime_error(ss.str());
-		}
-		message(2, "threaded localized upgrade calculation done");
-	}
-	
-	return pe_upgrade;
-}
-
-
-//ParameterEnsemble SeqQuadProgram::calc_localized_upgrade(double cur_lam)
-//{
-//	stringstream ss;
-//	int i = 0;
-//	int lsize = localizer.get_localizer_map().size();
-//	ParameterEnsemble pe_upgrade = pe.zeros_like();
-//	for (auto local_pair : localizer.get_localizer_map())
-//	{
-//		ss.str("");
-//		ss << "localized upgrade part " << i + 1 << " of " << lsize;
-//		message(2, ss.str());
-//		ParameterEnsemble pe_local;
-//		if (localizer.get_how() == Localizer::How::PARAMETERS)
-//		{
-//			pe_local = calc_upgrade(local_pair.second.first, local_pair.second.second, cur_lam, pe.shape().first, local_pair.first);
-//		}
-//		else
-//		{
-//			pe_local = calc_upgrade(local_pair.second.first, local_pair.second.second, cur_lam, pe.shape().first);
-//		}
-//
-//		pe_upgrade.add_2_cols_ip(pe_local);
-//		i++;
-//	}
-//	return pe_upgrade;
-//
-//}
 
 void SeqQuadProgram::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe)
 {
@@ -2530,7 +1495,7 @@ void SeqQuadProgram::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnse
 	vector<string> oe_names = _oe.get_real_names();
 	vector<string> pe_names = _pe.get_real_names();
 	vector<string> oe_base_names = oe.get_real_names();
-	vector<string> pe_base_names = pe.get_real_names();
+	vector<string> pe_base_names = dv.get_real_names();
 
 	//if (pe_names.size() != oe_base_names.size())
 	//	throw runtime_error("SeqQuadProgram::update_reals_by_phi() error: pe_names != oe_base_names");
@@ -2543,7 +1508,7 @@ void SeqQuadProgram::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnse
 	for (int i = 0; i < pe_base_names.size(); i++)
 		pe_idx_to_name[i] = pe_base_names[i];
 	//store map of current phi values
-	ph.update(oe, pe);
+	ph.update(oe, dv);
 	L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
 	map<string, double> *phi_map = ph.get_phi_map(pt);
 	map<string, double> cur_phi_map;
@@ -2572,30 +1537,37 @@ void SeqQuadProgram::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnse
 			if (find(pe_names.begin(), pe_names.end(), pname) == pe_names.end())
 				throw runtime_error("SeqQuadProgram::update_reals_by_phi() error: pname not in pe_names: " + pname);
 			ss.str("");
-			ss << "updating pe:oe real =" << pname << ":" << oname << ", current phi: new phi  =" << cur_phi << ":" << new_phi;
+			ss << "updating dv:oe real =" << pname << ":" << oname << ", current phi: new phi  =" << cur_phi << ":" << new_phi;
 			message(3, ss.str());
 			
 			real = _pe.get_real_vector(pname);
-			pe.update_real_ip(pname, real);
+			dv.update_real_ip(pname, real);
 			real = _oe.get_real_vector(oname);
 			oe.update_real_ip(oname, real);
 		}
 	}
-	ph.update(oe, pe);
+	ph.update(oe, dv);
 
+}
+
+ParameterEnsemble SeqQuadProgram::fancy_solve_routine(double scale_val)
+{
+	ParameterEnsemble dv_candidate = dv; //copy
+	//lots of fancy maths here...
+	return dv_candidate;
 }
 
 bool SeqQuadProgram::solve_new()
 {
 	stringstream ss;
 	ofstream &frec = file_manager.rec_ofstream();
-	if (pe.shape().first <= error_min_reals)
+	if (dv.shape().first <= error_min_reals)
 	{
 		message(0, "too few active realizations:", oe.shape().first);
 		message(1, "need at least ", error_min_reals);
-		throw_ies_error(string("too few active realizations, cannot continue"));
+		throw_sqp_error(string("too few active realizations, cannot continue"));
 	}
-	if (pe.shape().first < warn_min_reals)
+	if (dv.shape().first < warn_min_reals)
 	{
 		ss.str("");
 		ss << "WARNING: less than " << warn_min_reals << " active realizations...might not be enough";
@@ -2603,92 +1575,68 @@ bool SeqQuadProgram::solve_new()
 		message(1, s);
 	}
 
-	if ((use_subset) && (subset_size > pe.shape().first))
+	if ((use_subset) && (subset_size > dv.shape().first))
 	{
 		ss.str("");
-		ss << "++ies_subset size (" << subset_size << ") greater than ensemble size (" << pe.shape().first << ")";
+		ss << "++ies_subset size (" << subset_size << ") greater than ensemble size (" << dv.shape().first << ")";
 		frec << "  ---  " << ss.str() << endl;
 		cout << "  ---  " << ss.str() << endl;
-		frec << "  ...reducing ++ies_subset_size to " << pe.shape().first << endl;
-		cout << "  ...reducing ++ies_subset_size to " << pe.shape().first << endl;
-		subset_size = pe.shape().first;
+		frec << "  ...reducing ++ies_subset_size to " << dv.shape().first << endl;
+		cout << "  ...reducing ++ies_subset_size to " << dv.shape().first << endl;
+		subset_size = dv.shape().first;
 	}
 
-	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+	dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 
-	vector<ParameterEnsemble> pe_lams;
-	vector<double> lam_vals, scale_vals;
-	//update all the fast-lookup structures
-	oe.update_var_map();
-	pe.update_var_map();
-	parcov.update_sets();
-	obscov.update_sets();
-	unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
-	if (use_localizer)
-	{
-
-		loc_map = localizer.get_localizer_map(iter, oe, pe, performance_log);
-		//localizer.report(file_manager.rec_ofstream());
-	}
-	else
-	{
-		pair<vector<string>, vector<string>> p(act_obs_names, act_par_names);
-		loc_map["all"] = p;
-	}
-
-
-	for (auto &lam_mult : lam_mults)
+	//vector to store candidate upgrade ensembles
+	vector<ParameterEnsemble> dv_candidates;
+	//the current candidate
+	ParameterEnsemble dv_candidate;
+	
+	//backtracking/line search factors
+	//TODO: make this a ++ arg or tunable or something clever
+	vector<double> scale_vals{ 0.1,0.5,1.0 };
+	
+	for (auto &scale_val : scale_vals)
 	{
 		ss.str("");
-		double cur_lam = last_best_lam * lam_mult;
-		ss << "starting calcs for lambda" << cur_lam;
-		message(1, "starting lambda calcs for lambda", cur_lam);
+		ss << "starting calcs for scaling factor" << scale_val;
+		message(1, "starting lambda calcs for scaling factor", scale_val);
 		message(2, "see .log file for more details");
-		ParameterEnsemble pe_upgrade;
 		
-		pe_upgrade = calc_localized_upgrade_threaded(cur_lam, loc_map);
+		dv_candidate = fancy_solve_routine(scale_val);
 
-		for (auto sf : pest_scenario.get_pestpp_options().get_lambda_scale_vec())
+		dv_candidates.push_back(dv_candidate);
+		//TODO: add sqp option to save candidates, but for now, just piggy back on 
+		//ies option
+		if (!pest_scenario.get_pestpp_options().get_ies_save_lambda_en())
+			continue;
+		ss.str("");
+		ss << file_manager.get_base_filename() << "." << iter << "." << scale_val << ".scale.par";
+
+		if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 		{
-
-			ParameterEnsemble pe_lam_scale = pe;
-			pe_lam_scale.set_eigen(*pe_lam_scale.get_eigen_ptr() + (*pe_upgrade.get_eigen_ptr() * sf));
-			if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
-			{
-				pe_lam_scale.enforce_limits(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
-			}
-
-			pe_lams.push_back(pe_lam_scale);
-			lam_vals.push_back(cur_lam);
-			scale_vals.push_back(sf);
-			if (!pest_scenario.get_pestpp_options().get_ies_save_lambda_en())
-				continue;
-			ss.str("");
-			ss << file_manager.get_base_filename() << "." << iter << "." << cur_lam << ".lambda." << sf << ".scale.par";
-
-			if (pest_scenario.get_pestpp_options().get_ies_save_binary())
-			{
-				ss << ".jcb";
-				pe_lam_scale.to_binary(ss.str());
-			}
-			else
-			{
-				ss << ".csv";
-				pe_lam_scale.to_csv(ss.str());
-			}
-			frec << "lambda, scale value " << cur_lam << ',' << sf << " pars saved to " << ss.str() << endl;
-
+			ss << ".jcb";
+			dv_candidate.to_binary(ss.str());
 		}
+		else
+		{
+			ss << ".csv";
+			dv_candidate.to_csv(ss.str());
+		}
+		frec << "scale value " << scale_val << " dv ensemble saved to " << ss.str() << endl;
+
+		
 
 		ss.str("");
-		message(1, "finished calcs for lambda:", cur_lam);
+		message(1, "finished calcs for scaling factor:", scale_val);
 
 	}
 	
 	if (pest_scenario.get_pestpp_options().get_ies_debug_upgrade_only())
 	{
 		message(0, "ies_debug_upgrade_only is true, exiting");
-		throw_ies_error("ies_debug_upgrade_only is true, exiting");
+		throw_sqp_error("ies_debug_upgrade_only is true, exiting");
 	}
 
 	vector<map<int, int>> real_run_ids_lams;
@@ -2696,27 +1644,26 @@ bool SeqQuadProgram::solve_new()
 	double best_mean = 1.0e+30, best_std = 1.0e+30;
 	double mean, std;
 
-	message(0, "running lambda ensembles");
-	vector<ObservationEnsemble> oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
+	message(0, "running candidate decision variable ensembles");
+	vector<ObservationEnsemble> oe_lams = run_candidate_ensembles(dv_candidates, scale_vals);
 
 	message(0, "evaluting lambda ensembles");
 	message(1, "last mean: ", last_best_mean);
 	message(1, "last stdev: ", last_best_std);
 
-	ObservationEnsemble oe_lam_best;
+	ObservationEnsemble oe_scale_best;
 	bool echo = false;
 	if (verbose_level > 1)
 		echo = true;
-	for (int i = 0; i<pe_lams.size(); i++)
+	for (int i = 0; i<dv_candidates.size(); i++)
 	{
 		if (oe_lams[i].shape().first == 0)
 			continue;
-		vector<double> vals({ lam_vals[i],scale_vals[i] });
 		if (pest_scenario.get_pestpp_options().get_ies_save_lambda_en())
 			
 		{
 			ss.str("");
-			ss << file_manager.get_base_filename() << "." << iter << "." << lam_vals[i] << ".lambda." << scale_vals[i] << ".scale.obs";
+			ss << file_manager.get_base_filename() << "." << iter << "." << scale_vals[i] << ".scale.obs";
 
 			if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 			{
@@ -2728,26 +1675,26 @@ bool SeqQuadProgram::solve_new()
 				ss << ".csv";
 				oe_lams[i].to_csv(ss.str());
 			}
-			frec << "lambda, scale value " << lam_vals[i] << ',' << scale_vals[i] << " pars saved to " << ss.str() << endl;
+			frec << "scale value " << scale_vals[i] << " observation scale value ensemble saved to " << ss.str() << endl;
 
 		}
-		drop_bad_phi(pe_lams[i], oe_lams[i], true);
+		drop_bad_phi(dv_candidates[i], oe_lams[i], true);
 		if (oe_lams[i].shape().first == 0)
 		{
-			message(1, "all realizations dropped as 'bad' for lambda, scale fac ", vals);
+			message(1, "all realizations dropped as 'bad' for scale value: ", scale_vals[i]);
 			continue;
 		}
 		
-		ph.update(oe_lams[i], pe_lams[i]);
+		ph.update(oe_lams[i], dv_candidates[i]);
 		
-		message(0, "phi summary for lambda, scale fac:", vals,echo);
+		message(0, "phi summary for scale value: ", scale_vals[i]);
 		ph.report(echo);
 		
 		mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		if (mean < best_mean)
 		{
-			oe_lam_best = oe_lams[i];
+			oe_scale_best = oe_lams[i];
 			best_mean = mean;
 			best_std = std;
 			best_idx = i;
@@ -2766,7 +1713,7 @@ bool SeqQuadProgram::solve_new()
 	
 
 	//subset stuff here
-	if ((best_idx != -1) && (use_subset) && (subset_size < pe.shape().first))
+	if ((best_idx != -1) && (use_subset) && (subset_size < dv.shape().first))
 	{
 
 		double acc_phi = last_best_mean * acc_fac;
@@ -2781,10 +1728,8 @@ bool SeqQuadProgram::solve_new()
 		{
 			//ph.update(oe_lams[best_idx],pe_lams[best_idx]);
 			
-			double new_lam = last_best_lam * lam_inc;
-			new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
-			last_best_lam = new_lam;
-			ss.str("");
+			//TODO: think about what bad sqp cycles look like and how to handle...
+			/*ss.str("");
 			ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
 			string m = ss.str();
 			message(0, m);
@@ -2792,21 +1737,21 @@ bool SeqQuadProgram::solve_new()
 			message(1, "updating realizations with reduced phi");
 			update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx]);
 			message(1, "returing to lambda calculations...");
-			return false;
+			return false;*/
 		}
 
 		//release the memory of the unneeded pe_lams
-		for (int i = 0; i < pe_lams.size(); i++)
+		for (int i = 0; i < dv_candidates.size(); i++)
 		{
 			if (i == best_idx)
 				continue;
-			pe_lams[i] = ParameterEnsemble();
+			dv_candidates[i] = ParameterEnsemble();
 		}
 		//need to work out which par and obs en real names to run - some may have failed during subset testing...
 		ObservationEnsemble remaining_oe_lam = oe;//copy
-		ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
+		ParameterEnsemble remaining_pe_lam = dv_candidates[best_idx];
 		vector<string> pe_keep_names, oe_keep_names;
-		vector<string> pe_names = pe.get_real_names(), oe_names = oe.get_real_names();
+		vector<string> pe_names = dv.get_real_names(), oe_names = oe.get_real_names();
 
 		vector<string> org_pe_idxs,org_oe_idxs;
 		set<string> ssub;
@@ -2826,10 +1771,10 @@ bool SeqQuadProgram::solve_new()
 			{
 				oe_keep_names.push_back(oe_names[i]);
 			}
-		message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
-		ph.update(oe_lams[best_idx], pe_lams[best_idx]);
+		message(0, "phi summary for best scale value: ", scale_vals[best_idx]);
+		ph.update(oe_lams[best_idx], dv_candidates[best_idx]);
 		ph.report(true);
-		message(0, "running remaining realizations for best lambda, scale:", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
+		message(0, "running remaining realizations for best scale value:", scale_vals[best_idx]);
 
 		//pe_keep_names and oe_keep_names are names of the remaining reals to eval
 		performance_log->log_event("dropping subset idxs from remaining_pe_lam");
@@ -2848,7 +1793,7 @@ bool SeqQuadProgram::solve_new()
 
 		//if any of the remaining runs failed
 		if (fails.size() == org_pe_idxs.size())
-			throw_ies_error(string("all remaining realizations failed...something is prob wrong"));
+			throw_sqp_error(string("all remaining realizations failed...something is prob wrong"));
 		if (fails.size() > 0)
 		{
 
@@ -2874,32 +1819,32 @@ bool SeqQuadProgram::solve_new()
 		}
 		//drop the remaining runs from the par en then append the remaining par runs (in case some failed)
 		performance_log->log_event("assembling ensembles");
-		pe_lams[best_idx].drop_rows(pe_keep_names);
-		pe_lams[best_idx].append_other_rows(remaining_pe_lam);
+		dv_candidates[best_idx].drop_rows(pe_keep_names);
+		dv_candidates[best_idx].append_other_rows(remaining_pe_lam);
 		//append the remaining obs en
-		oe_lam_best.append_other_rows(remaining_oe_lam);
-		assert(pe_lams[best_idx].shape().first == oe_lam_best.shape().first);
-		drop_bad_phi(pe_lams[best_idx], oe_lam_best);
-		if (oe_lam_best.shape().first == 0)
+		oe_scale_best.append_other_rows(remaining_oe_lam);
+		assert(dv_candidates[best_idx].shape().first == oe_scale_best.shape().first);
+		drop_bad_phi(dv_candidates[best_idx], oe_scale_best);
+		if (oe_scale_best.shape().first == 0)
 		{
-			throw_ies_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
+			throw_sqp_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
 		}
 		performance_log->log_event("updating phi");
-		ph.update(oe_lam_best, pe_lams[best_idx]);
+		ph.update(oe_scale_best, dv_candidates[best_idx]);
 		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-		message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
+		message(1, "phi summary for entire ensemble using scale value",scale_vals[best_idx]);
 		ph.report(true);
 	}
 	else
 	{
-		ph.update(oe_lam_best, pe_lams[best_idx]);
+		ph.update(oe_scale_best, dv_candidates[best_idx]);
 		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		
 	}
 
-	ph.update(oe_lam_best, pe_lams[best_idx]);
+	ph.update(oe_scale_best, dv_candidates[best_idx]);
 	best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 	best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	message(1, "last best mean phi * acceptable phi factor: ", last_best_mean * acc_fac);
@@ -2921,9 +1866,9 @@ bool SeqQuadProgram::solve_new()
 		performance_log->log_event("updating parameter ensemble");
 		last_best_mean = best_mean;
 
-		pe = pe_lams[best_idx];
-		oe = oe_lam_best;
-		if (best_std < last_best_std * acc_fac)
+		dv = dv_candidates[best_idx];
+		oe = oe_scale_best;
+		/*if (best_std < last_best_std * acc_fac)
 		{
 			double new_lam = lam_vals[best_idx] * lam_dec;
 			new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
@@ -2933,7 +1878,7 @@ bool SeqQuadProgram::solve_new()
 		else
 		{
 			message(0, "not updating lambda");
-		}
+		}*/
 		last_best_std = best_std;
 	}
 
@@ -2941,12 +1886,12 @@ bool SeqQuadProgram::solve_new()
 	{
 		//message(0, "not updating parameter ensemble");
 		message(0, "only updating realizations with reduced phi");
-		update_reals_by_phi(pe_lams[best_idx], oe_lam_best);
-		ph.update(oe, pe);
-		double new_lam = last_best_lam * lam_inc;
+		update_reals_by_phi(dv_candidates[best_idx], oe_scale_best);
+		ph.update(oe, dv);
+		/*double new_lam = last_best_lam * lam_inc;
 		new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
 		message(0, "incresing lambda to: ", new_lam);
-		last_best_lam = new_lam;
+		last_best_lam = new_lam;*/
 	}
 	//report_and_save();
 	return true;
@@ -2957,11 +1902,11 @@ void SeqQuadProgram::report_and_save()
 {
 	ofstream &frec = file_manager.rec_ofstream();
 	frec << endl << "  ---  SeqQuadProgram iteration " << iter << " report  ---  " << endl;
-	frec << "   number of active realizations:  " << pe.shape().first << endl;
+	frec << "   number of active realizations:  " << dv.shape().first << endl;
 	frec << "   number of model runs:           " << run_mgr_ptr->get_total_runs() << endl;
 
 	cout << endl << "  ---  SeqQuadProgram iteration " << iter << " report  ---  " << endl;
-	cout << "   number of active realizations:   " << pe.shape().first << endl;
+	cout << "   number of active realizations:   " << dv.shape().first << endl;
 	cout << "   number of model runs:            " << run_mgr_ptr->get_total_runs() << endl;
 
 	stringstream ss;
@@ -2981,17 +1926,17 @@ void SeqQuadProgram::report_and_save()
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".par.jcb";
-		pe.to_binary(ss.str());
+		dv.to_binary(ss.str());
 	}
 	else
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
-		pe.to_csv(ss.str());
+		dv.to_csv(ss.str());
 	}
-	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter);
-	save_base_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1);
+	save_base_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, iter);
+	save_base_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, -1);
 	//ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
-	//pe.to_csv(ss.str());
+	//dv.to_csv(ss.str());
 	frec << "      current par ensemble saved to " << ss.str() << endl;
 	cout << "      current par ensemble saved to " << ss.str() << endl;
 
@@ -3011,7 +1956,7 @@ void SeqQuadProgram::set_subset_idx(int size)
 			subset_idxs.push_back(i);
 		return;
 	}
-	vector<string> pe_names = pe.get_real_names();
+	vector<string> pe_names = dv.get_real_names();
 
 	vector<string>::iterator bidx = find(pe_names.begin(), pe_names.end(), base_name);
 	if (bidx != pe_names.end())
@@ -3019,7 +1964,7 @@ void SeqQuadProgram::set_subset_idx(int size)
 
 		subset_idxs.push_back(bidx - pe_names.begin());
 	}
-	//int size = pe.shape().first;
+	//int size = dv.shape().first;
 	string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
 	if (how == "FIRST")
 	{
@@ -3065,7 +2010,7 @@ void SeqQuadProgram::set_subset_idx(int size)
 			subset_idxs.push_back(idx);
 		}
 		if (subset_idxs.size() != nreal_subset)
-			throw_ies_error("max iterations exceeded when trying to find random subset idxs");
+			throw_sqp_error("max iterations exceeded when trying to find random subset idxs");
 
 	}
 	else if (how == "PHI_BASED")
@@ -3132,43 +2077,43 @@ void SeqQuadProgram::set_subset_idx(int size)
 	else
 	{
 		//throw runtime_error("unkonwn 'subset_how'");
-		throw_ies_error("unknown 'subset_how'");
+		throw_sqp_error("unknown 'subset_how'");
 	}
 	stringstream ss;
 	for (auto i : subset_idxs)
 		ss << i << ":" << pe_names[i] << ", ";
-	message(1,"subset idx:pe real name: ",ss.str());
+	message(1,"subset idx:dv real name: ",ss.str());
 	return;
 	//return subset_idx_map;
 }
 
-vector<ObservationEnsemble> SeqQuadProgram::run_lambda_ensembles(vector<ParameterEnsemble> &pe_lams, vector<double> &lam_vals, vector<double> &scale_vals)
+vector<ObservationEnsemble> SeqQuadProgram::run_candidate_ensembles(vector<ParameterEnsemble>& dv_candidates, vector<double> &scale_vals)
 {
 	ofstream &frec = file_manager.rec_ofstream();
 	stringstream ss;
-	ss << "queuing " << pe_lams.size() << " ensembles";
+	ss << "queuing " << dv_candidates.size() << " ensembles";
 	performance_log->log_event(ss.str());
 	run_mgr_ptr->reinitialize();
 	
-	set_subset_idx(pe_lams[0].shape().first);
+	set_subset_idx(dv_candidates[0].shape().first);
 	vector<map<int, int>> real_run_ids_vec;
 	//ParameterEnsemble pe_lam;
 	//for (int i=0;i<pe_lams.size();i++)
-	for (auto &pe_lam : pe_lams)
+	for (auto &dv_candidate : dv_candidates)
 	{
 		try
 		{
-			real_run_ids_vec.push_back(pe_lam.add_runs(run_mgr_ptr,subset_idxs));
+			real_run_ids_vec.push_back(dv_candidate.add_runs(run_mgr_ptr,subset_idxs));
 		}
 		catch (const exception &e)
 		{
 			stringstream ss;
 			ss << "run_ensemble() error queueing runs: " << e.what();
-			throw_ies_error(ss.str());
+			throw_sqp_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_ies_error(string("run_ensembles() error queueing runs"));
+			throw_sqp_error(string("run_ensembles() error queueing runs"));
 		}
 	}
 	performance_log->log_event("making runs");
@@ -3181,11 +2126,11 @@ vector<ObservationEnsemble> SeqQuadProgram::run_lambda_ensembles(vector<Paramete
 	{
 		stringstream ss;
 		ss << "error running ensembles: " << e.what();
-		throw_ies_error(ss.str());
+		throw_sqp_error(ss.str());
 	}
 	catch (...)
 	{
-		throw_ies_error(string("error running ensembles"));
+		throw_sqp_error(string("error running ensembles"));
 	}
 
 	performance_log->log_event("processing runs");
@@ -3196,14 +2141,14 @@ vector<ObservationEnsemble> SeqQuadProgram::run_lambda_ensembles(vector<Paramete
 	//	_oe.keep_rows(subset_idxs);
 	map<int, int> real_run_ids;
 	//for (auto &real_run_ids : real_run_ids_vec)
-	for (int i=0;i<pe_lams.size();i++)
+	for (int i=0;i<dv_candidates.size();i++)
 	{
 		ObservationEnsemble _oe = oe;//copy
-		vector<double> rep_vals{ lam_vals[i],scale_vals[i] };
+		//vector<double> rep_vals{ lam_vals[i],scale_vals[i] };
 		real_run_ids = real_run_ids_vec[i];
 		//if using subset, reset the real_idx in real_run_ids to be just simple counter
 		//if (subset_size < pe_lams[0].shape().first)
-		if ((use_subset) && (subset_size < pe_lams[i].shape().first))
+		if ((use_subset) && (subset_size < dv_candidates[i].shape().first))
 		{
 			_oe.keep_rows(subset_idxs);
 			int ireal = 0;
@@ -3224,14 +2169,14 @@ vector<ObservationEnsemble> SeqQuadProgram::run_lambda_ensembles(vector<Paramete
 		catch (const exception &e)
 		{
 			stringstream ss;
-			ss << "error processing runs for lambda,scale: " << lam_vals[i] << ',' << scale_vals[i] << ':' << e.what();
-			throw_ies_error(ss.str());
+			ss << "error processing runs for scale value: " << scale_vals[i] << ':' << e.what();
+			throw_sqp_error(ss.str());
 		}
 		catch (...)
 		{
 			stringstream ss;
-			ss << "error processing runs for lambda,scale: " << lam_vals[i] << ',' << scale_vals[i];
-			throw_ies_error(ss.str());
+			ss << "error processing runs for scale value: " << scale_vals[i];
+			throw_sqp_error(ss.str());
 		}
 
 		if (pest_scenario.get_pestpp_options().get_ies_debug_fail_subset())
@@ -3240,11 +2185,11 @@ vector<ObservationEnsemble> SeqQuadProgram::run_lambda_ensembles(vector<Paramete
 		if (failed_real_indices.size() > 0)
 		{
 			stringstream ss;
-			vector<string> par_real_names = pe.get_real_names();
+			vector<string> par_real_names = dv.get_real_names();
 			vector<string> obs_real_names = oe.get_real_names();
 			vector<string> failed_par_names, failed_obs_names;
 			string oname, pname;
-			ss << "the following par:obs realization runs failed for lambda,scale " << lam_vals[i] << ',' << scale_vals[i] << "-->";
+			ss << "the following dv:obs realization runs failed for scale value " << scale_vals[i] << "-->";
 			for (auto &i : failed_real_indices)
 			{
 				pname = par_real_names[subset_idxs[i]];
@@ -3257,7 +2202,7 @@ vector<ObservationEnsemble> SeqQuadProgram::run_lambda_ensembles(vector<Paramete
 			message(1,s);
 			if (failed_real_indices.size() == _oe.shape().first)
 			{
-				message(0, "WARNING: all realizations failed for lambda, scale :", rep_vals);
+				message(0, "WARNING: all realizations failed for scale value :", scale_vals[i]);
 				_oe = ObservationEnsemble();
 
 			}
@@ -3267,7 +2212,7 @@ vector<ObservationEnsemble> SeqQuadProgram::run_lambda_ensembles(vector<Paramete
 				//_oe.drop_rows(failed_real_indices);
 				//pe_lams[i].drop_rows(failed_real_indices);
 				_oe.drop_rows(failed_obs_names);
-				pe_lams[i].drop_rows(failed_par_names);
+				dv_candidates[i].drop_rows(failed_par_names);
 			}
 
 		}
@@ -3292,11 +2237,11 @@ vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnse
 	{
 		stringstream ss;
 		ss << "run_ensemble() error queueing runs: " << e.what();
-		throw_ies_error(ss.str());
+		throw_sqp_error(ss.str());
 	}
 	catch (...)
 	{
-		throw_ies_error(string("run_ensemble() error queueing runs"));
+		throw_sqp_error(string("run_ensemble() error queueing runs"));
 	}
 	performance_log->log_event("making runs");
 	try
@@ -3307,11 +2252,11 @@ vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnse
 	{
 		stringstream ss;
 		ss << "error running ensemble: " << e.what();
-		throw_ies_error(ss.str());
+		throw_sqp_error(ss.str());
 	}
 	catch (...)
 	{
-		throw_ies_error(string("error running ensemble"));
+		throw_sqp_error(string("error running ensemble"));
 	}
 
 	performance_log->log_event("processing runs");
@@ -3328,11 +2273,11 @@ vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnse
 	{
 		stringstream ss;
 		ss << "error processing runs: " << e.what();
-		throw_ies_error(ss.str());
+		throw_sqp_error(ss.str());
 	}
 	catch (...)
 	{
-		throw_ies_error(string("error processing runs"));
+		throw_sqp_error(string("error processing runs"));
 	}
 	//for testing
 	//failed_real_indices.push_back(0);
