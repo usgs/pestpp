@@ -1093,7 +1093,7 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		return true;
 	}
 
-	else if (key == "SQP_OBS_RESTART_EN")
+	else if (key == "SQP_RESTART_OBS_EN")
 	{
 		sqp_obs_restart_en = org_value;
 		return true;

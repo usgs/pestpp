@@ -17,6 +17,7 @@
 #include "ObjectiveFunc.h"
 #include "Localizer.h"
 #include "EnsembleMethodUtils.h"
+#include "constraints.h"
 
 
 
@@ -111,10 +112,17 @@ private:
 	
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
+	vector<string> dv_names;
 	vector<int> subset_idxs;
 
 	ParameterEnsemble dv, dv_base;
 	ObservationEnsemble oe, oe_base;
+
+	//these are used so that we can update the constraints based on the current best values
+	Parameters best_mean_dv_values;
+	Observations best_mean_obs_values;
+
+	Constraints constraints;
 
 	bool oe_drawn, dv_drawn;
 

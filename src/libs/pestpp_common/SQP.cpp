@@ -14,6 +14,7 @@
 #include "SVDPackage.h"
 #include "eigen_tools.h"
 #include "EnsembleMethodUtils.h"
+#include "constraints.h"
 
 
 
@@ -21,7 +22,7 @@ SeqQuadProgram::SeqQuadProgram(Pest &_pest_scenario, FileManager &_file_manager,
 	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log,
 	RunManagerAbstract* _run_mgr_ptr) : pest_scenario(_pest_scenario), file_manager(_file_manager),
 	output_file_writer(_output_file_writer), performance_log(_performance_log),
-	run_mgr_ptr(_run_mgr_ptr)
+	run_mgr_ptr(_run_mgr_ptr), constraints(_pest_scenario, &_file_manager, _output_file_writer, *_performance_log)
 {
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	subset_rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
@@ -922,6 +923,85 @@ void SeqQuadProgram::initialize()
 	//set some defaults
 	PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
 
+	//reset the par bound PI augmentation since that option is just for simplex
+	ppo->set_opt_include_bnd_pi(false);
+
+	//process dec var args
+	vector<string> dec_var_groups = ppo->get_opt_dec_var_groups();
+	if (dec_var_groups.size() != 0)
+	{
+		//first make sure all the groups are actually listed in the control file
+		vector<string> missing;
+		vector<string> pst_groups = pest_scenario.get_ctl_ordered_par_group_names();
+		vector<string>::iterator end = pst_groups.end();
+		vector<string>::iterator start = pst_groups.begin();
+		for (auto grp : dec_var_groups)
+			if (find(start, end, grp) == end)
+				missing.push_back(grp);
+		if (missing.size() > 0)
+		{
+			ss.str("");
+			ss << "the following ++opt_dec_var_groups were not found: ";
+			for (auto m : missing)
+				ss << m << ",";
+			throw_sqp_error(ss.str());
+		}
+
+
+		//find the parameter in the dec var groups
+		ParameterGroupInfo pinfo = pest_scenario.get_base_group_info();
+		string group;
+		end = dec_var_groups.end();
+		start = dec_var_groups.begin();
+		for (auto& par_name : pest_scenario.get_ctl_ordered_par_names())
+		{
+			group = pinfo.get_group_name(par_name);
+			if (find(start, end, group) != end)
+			{
+				dv_names.push_back(par_name);
+
+			}
+		}
+
+		if (dv_names.size() == 0)
+		{
+			ss.str("");
+			ss << "no decision variables found in supplied dec var groups : ";
+			for (auto g : dec_var_groups)
+			{
+				ss << g << ",";
+			}
+			throw_sqp_error(ss.str());
+		}
+		ss.str("");
+		ss << "'opt_dec_var_groups' passed, using " << dv_names.size() << " adjustable parameters as decision variables";
+		message(2, ss.str());
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << "decision variables:" << endl;
+		int icol = 0;
+		for (auto dv_name : dv_names)
+		{
+			frec << dv_name << " ";
+			icol++;
+			if (icol == 10)
+			{
+				frec << endl;
+				icol = 0;
+			}
+		}
+	}
+
+	//otherwise, just use all adjustable parameters as dec vars
+	else
+	{
+		message(2, "using all adjustable parameters as decision variables: ", act_par_names.size());
+		dv_names = act_par_names;
+	}
+
+	best_mean_dv_values = pest_scenario.get_ctl_parameters();
+	best_mean_obs_values = pest_scenario.get_ctl_observations();
+	constraints.initialize(dv_names, &best_mean_dv_values, &best_mean_obs_values, numeric_limits<double>::max());
+	constraints.initial_report();
 	
 	iter = 0;
 	//ofstream &frec = file_manager.rec_ofstream();
@@ -932,15 +1012,11 @@ void SeqQuadProgram::initialize()
 	error_min_reals = 2;
 	
 	vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
-	message(1, "using lambda scaling factors: ", scale_facs);
-	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
-	message(1, "acceptable phi factor: ", acc_fac);
-	double inc_fac = pest_scenario.get_pestpp_options().get_ies_lambda_inc_fac();
-	message(1, "lambda increase factor: ", inc_fac);
-	double dec_fac = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
-	message(1, "lambda decrease factor: ", dec_fac);
+	message(1, "using scaling factors: ", scale_facs);
+	
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
+	//TODO: update sanity checks for SQP context
 	sanity_checks();
 
 	bool echo = false;
@@ -948,21 +1024,21 @@ void SeqQuadProgram::initialize()
 		echo = true;
 
 	initialize_parcov();
-	initialize_obscov();
+	//I dont think SQP needs an obscov? 
+	//initialize_obscov();
 
 	subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
-	reg_factor = pest_scenario.get_pestpp_options().get_ies_reg_factor();
-	message(1,"using reg_factor: ", reg_factor);
+	
+	//I think a bad phi option has use in SQP?
 	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
 	if (bad_phi < 1.0e+30)
 		message(1, "using bad_phi: ", bad_phi);
 
-	int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
+	int num_reals = pest_scenario.get_pestpp_options().get_sqp_num_reals();
 
 	dv_drawn = initialize_dv(parcov);
 
-	oe_drawn = initialize_oe(obscov);
-	string center_on = ppo->get_ies_center_on();
+	//oe_drawn = initialize_oe(obscov);
 	
 	try
 	{
@@ -971,7 +1047,7 @@ void SeqQuadProgram::initialize()
 	catch (const exception &e)
 	{
 		string message = e.what();
-		throw_sqp_error("error in parameter ensemble: " + message);
+		throw_sqp_error("error in dv ensemble: " + message);
 	}
 
 	try
@@ -1001,17 +1077,17 @@ void SeqQuadProgram::initialize()
 			if (missing.size() == 0)
 			{
 				ss.str("");
-				ss << "par en has " << dv.shape().first << " realizations, compared to " << oe.shape().first << " obs realizations";
+				ss << "dv en has " << dv.shape().first << " realizations, compared to " << oe.shape().first << " obs realizations";
 				message(1, ss.str());
 				message(1," the realization names are compatible");
-				message(1, "re-indexing obs en to align with par en...");
+				message(1, "re-indexing obs en to align with dv en...");
 
 				oe.reorder(dv.get_real_names(), vector<string>());
 			}
 			else
 			{
 				ss.str("");
-				ss << "the following par en real names were not found in the obs en: ";
+				ss << "the following dv en real names were not found in the obs en: ";
 				for (auto m : missing)
 				{
 					ss << m << ",";
@@ -1022,7 +1098,7 @@ void SeqQuadProgram::initialize()
 		else
 		{
 			ss.str("");
-			ss << "parameter ensemble rows (" << dv.shape().first << ") not equal to observation ensemble rows (" << oe.shape().first << ")";
+			ss << "dv ensemble rows (" << dv.shape().first << ") not equal to observation ensemble rows (" << oe.shape().first << ")";
 			throw_sqp_error(ss.str());
 		}
 	}
@@ -1032,13 +1108,15 @@ void SeqQuadProgram::initialize()
 	//message(1, "transforming parameter ensemble to numeric");
 	dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 
-	if (pest_scenario.get_pestpp_options().get_ies_include_base())
-		if (pp_args.find("IES_RESTART_OBS_EN") != pp_args.end())
+
+	//TODO: think about what adding the base would do for SQP?
+	/*if (pest_scenario.get_pestpp_options().get_ies_include_base())
+		if (pp_args.find("SQP_RESTART_OBS_EN") != pp_args.end())
 		{
-			message(1, "Warning: even though `ies_include_base` is true, you passed a restart obs en, not adding 'base' realization...");
+			message(1, "Warning: even though `sqp_include_base` is true, you passed a restart obs en, not adding 'base' realization...");
 		}
 		else
-			add_bases();
+			add_bases();*/
 
 
 	//now we check to see if we need to try to align the par and obs en
@@ -1048,7 +1126,7 @@ void SeqQuadProgram::initialize()
 		bool aligned = dv.try_align_other_rows(performance_log, oe);
 		if (aligned)
 		{
-			message(2, "observation ensemble reordered to align rows with parameter ensemble");
+			message(2, "observation ensemble reordered to align rows with dv ensemble");
 		}
 	}
 
@@ -1064,9 +1142,9 @@ void SeqQuadProgram::initialize()
 	}
 	if (misaligned.size() > 0)
 	{
-		message(1, "WARNING: common realization names shared between the parameter and observation ensembles but they are not in the same row locations, see .rec file for listing");
+		message(1, "WARNING: common realization names shared between the dv and observation ensembles but they are not in the same row locations, see .rec file for listing");
 		ofstream& frec = file_manager.rec_ofstream();
-		frec << endl <<  "WARNING: the following " << misaligned.size() << " realization names are shared between the parameter and observation ensembles but they are not in the same row locations:" << endl;
+		frec << endl <<  "WARNING: the following " << misaligned.size() << " realization names are shared between the dv and observation ensembles but they are not in the same row locations:" << endl;
 		for (auto ma : misaligned)
 			frec << ma << endl;
 	}
@@ -1074,8 +1152,9 @@ void SeqQuadProgram::initialize()
 
 
 	message(2, "checking for denormal values in dv");
-	dv.check_for_normal("initial transformed parameter ensemble");
+	dv.check_for_normal("initial transformed dv ensemble");
 	ss.str("");
+	//TODO: setup an sqp save bin flag?  or piggy back?
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
 		ss << file_manager.get_base_filename() << ".0.par.jcb";
@@ -1086,10 +1165,12 @@ void SeqQuadProgram::initialize()
 		ss << file_manager.get_base_filename() << ".0.par.csv";
 		dv.to_csv(ss.str());
 	}
-	message(1, "saved initial parameter ensemble to ", ss.str());
+	message(1, "saved initial dv ensemble to ", ss.str());
 	message(2, "checking for denormal values in base oe");
 	oe.check_for_normal("obs+noise observation ensemble");
 	ss.str("");
+
+
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
 		ss << file_manager.get_base_filename() << ".obs+noise.jcb";
@@ -1101,27 +1182,12 @@ void SeqQuadProgram::initialize()
 		oe.to_csv(ss.str());
 	}
 	message(1, "saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
-
-
-	if (center_on.size() > 0)
-	{
-		ss.str("");
-		ss << "centering on realization: '" << center_on << "' ";
-		message(1, ss.str());
-		vector<string> names = dv.get_real_names();
-		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_sqp_error("'ies_center_on' realization not found in par en: " + center_on);
-		names = oe.get_real_names();
-		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_sqp_error("'ies_center_on' realization not found in obs en: " + center_on);
-	}
-	else
-		message(1, "centering on ensemble mean vector");
+	message(1, "centering on ensemble mean vector");
 
 	if (pest_scenario.get_control_info().noptmax == -2)
 	{
-		message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
-		message(1, "calculating mean parameter values");
+		message(0, "'noptmax'=-2, running mean dv ensemble values and quitting");
+		message(1, "calculating mean dv values");
 		Parameters pars;
 		vector<double> mv = dv.get_mean_stl_var_vector();
 		pars.update(dv.get_var_names(), dv.get_mean_stl_var_vector());
@@ -1132,7 +1198,7 @@ void SeqQuadProgram::initialize()
 		_pe.set_trans_status(dv.get_trans_status());
 		_pe.append("mean", pars);
 		string par_csv = file_manager.get_base_filename() + ".mean.par.csv";
-		message(1, "saving mean parameter values to ", par_csv);
+		message(1, "saving mean dv values to ", par_csv);
 		_pe.to_csv(par_csv);
 		dv_base = _pe;
 		dv_base.reorder(vector<string>(), act_par_names);
@@ -1151,16 +1217,16 @@ void SeqQuadProgram::initialize()
 		{
 			message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
 		}
-		message(1, "running mean parameter values");
+		message(1, "running mean dv values");
 
 		vector<int> failed_idxs = run_ensemble(_pe, _oe);
 		if (failed_idxs.size() != 0)
 		{
-			message(0, "mean parmeter value run failed...bummer");
+			message(0, "mean dv value run failed...bummer");
 			return;
 		}
 		string obs_csv = file_manager.get_base_filename() + ".mean.obs.csv";
-		message(1, "saving results from mean parameter value run to ", obs_csv);
+		message(1, "saving results from mean dv value run to ", obs_csv);
 		_oe.to_csv(obs_csv);
 
 		ph.update(_oe, _pe);
@@ -1177,7 +1243,7 @@ void SeqQuadProgram::initialize()
 	}
 	else
 	{
-		message(1, "using subset in lambda testing, number of realizations used in subset testing: ", subset_size);
+		message(1, "using subset in scale factor testing, number of realizations used in subset testing: ", subset_size);
 		string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
 		message(1, "subset how: ", how);
 		use_subset = true;
@@ -1188,8 +1254,10 @@ void SeqQuadProgram::initialize()
 	string obs_restart_csv = pest_scenario.get_pestpp_options().get_ies_obs_restart_csv();
 	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
 
+	//TODO: I think the base_oe should just be a "no noise" obs ensemble?
 	oe_base = oe; //copy
-	//reorder this for later...
+	
+    //reorder this for later...
 	oe_base.reorder(vector<string>(), act_obs_names);
 
 	dv_base = dv; //copy
@@ -2223,6 +2291,11 @@ vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnse
 	{
 		throw_sqp_error(string("run_ensemble() error queueing runs"));
 	}
+
+
+	if (constraints.should_update_chance(iter))
+		constraints.add_runs(run_mgr_ptr);
+
 	performance_log->log_event("making runs");
 	try
 	{
