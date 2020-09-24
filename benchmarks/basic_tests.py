@@ -998,6 +998,31 @@ def cmdline_test():
         raise Exception("should have failed")
     
 
+def basic_sqp_test():
+    model_d = "mf6_freyberg"
+    local=True
+    if "linux" in platform.platform().lower() and "10par" in model_d:
+        #print("travis_prep")
+        #prep_for_travis(model_d)
+        local=False
+    
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_sqp")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_opt.pst"))
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d,"freyberg6_run_sqp.pst"))
+    pyemu.os_utils.run("{0} freyberg6_run_sqp.pst".format(exe_path.replace("-ies","-sqp")),cwd=t_d)
+
+
+
+
+    assert os.path.exists(os.path.join(t_d,"freyberg6_run_sqp.base.par"))
+    assert os.path.exists(os.path.join(t_d,"freyberg6_run_sqp.base.rei"))
+
+
+
 if __name__ == "__main__":
     
     #glm_long_name_test()
@@ -1018,4 +1043,5 @@ if __name__ == "__main__":
     #mf6_v5_sen_test()
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
-    cmdline_test()
+    #cmdline_test()
+    basic_sqp_test()
