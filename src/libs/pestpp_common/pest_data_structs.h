@@ -203,6 +203,7 @@ public:
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
 	bool assign_value_by_key_continued(const string& key, const string& value);
+	bool assign_value_by_key_sqp(const string& key, const string& value, const string& org_value);
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
 	int get_n_iter_base() const { return n_iter_base; }
@@ -328,6 +329,14 @@ public:
 	void set_opt_par_stack(string _stack) { opt_par_stack = _stack; }
 	string get_opt_obs_stack()const { return opt_obs_stack; }
 	void set_opt_obs_stack(string _stack) { opt_obs_stack = _stack; }
+
+	string get_sqp_dv_en()const { return sqp_dv_en; }
+	void set_sqp_dv_en(string _file) { sqp_dv_en = _file; }
+	string get_sqp_obs_restart_en()const { return sqp_obs_restart_en; }
+	void set_sqp_obs_restart_en(string _file) { sqp_obs_restart_en = _file; }
+	int get_sqp_num_reals()const { return sqp_num_reals; }
+	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
+
 
 
 	string get_ies_par_csv()const { return ies_par_csv; }
@@ -552,6 +561,11 @@ private:
 	int opt_stack_size;
 	string opt_par_stack;
 	string opt_obs_stack;
+
+	string sqp_dv_en;
+	string sqp_obs_restart_en;
+	int sqp_num_reals;
+
 
 	int ies_subset_size;
 	string ies_par_csv;

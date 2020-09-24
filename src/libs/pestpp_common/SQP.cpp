@@ -45,19 +45,19 @@ void SeqQuadProgram::throw_sqp_error(string message)
 bool SeqQuadProgram::initialize_dv(Covariance &cov)
 {
 	stringstream ss;
-	int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
-	string par_csv = pest_scenario.get_pestpp_options().get_ies_par_csv();
+	int num_reals = pest_scenario.get_pestpp_options().get_sqp_num_reals();
+	string dv_file = pest_scenario.get_pestpp_options().get_sqp_dv_en();
 	bool drawn = false;
-	if (par_csv.size() == 0)
+	if (dv_file.size() == 0)
 	{
 		ofstream& frec = file_manager.rec_ofstream();
-		message(1, "drawing parameter realizations: ", num_reals);
+		message(1, "drawing decision variable realizations: ", num_reals);
 		map<string, double> par_means = pest_scenario.get_ext_file_double_map("parameter data external", "mean");
 		Parameters draw_par = pest_scenario.get_ctl_parameters();
 		if (par_means.size() > 0)
 		{
 			
-			frec << "Note: the following parameters contain 'mean' value information that will be used in place of " << endl;
+			frec << "Note: the following decision variables contain 'mean' value information that will be used in place of " << endl;
 			frec << "      the 'parval1' values as mean values during ensemble generation" << endl;
 			double lb, ub;
 			for (auto par_mean : par_means)
@@ -68,11 +68,11 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 					ub = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(par_mean.first)->ubnd;
 					if (par_mean.second < lb)
 					{
-						frec << "Warning: 'mean' value for parameter " << par_mean.first << " less than lower bound, using 'parval1'";
+						frec << "Warning: 'mean' value for decision variable " << par_mean.first << " less than lower bound, using 'parval1'";
 					}
 					else if (par_mean.second > ub)
 					{
-						frec << "Warning: 'mean' value for parameter " << par_mean.first << " greater than upper bound, using 'parval1'";
+						frec << "Warning: 'mean' value for decision variable " << par_mean.first << " greater than upper bound, using 'parval1'";
 					}
 					else
 					{
@@ -93,53 +93,53 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 	}
 	else
 	{
-		string par_ext = pest_utils::lower_cp(par_csv).substr(par_csv.size() - 3, par_csv.size());
-		performance_log->log_event("processing par csv " + par_csv);
+		string par_ext = pest_utils::lower_cp(dv_file).substr(dv_file.size() - 3, dv_file.size());
+		performance_log->log_event("processing par csv " + dv_file);
 		if (par_ext.compare("csv") == 0)
 		{
-			message(1, "loading par ensemble from csv file", par_csv);
+			message(1, "loading dv ensemble from csv file", dv_file);
 			try
 			{
-				dv.from_csv(par_csv);
+				dv.from_csv(dv_file);
 			}
 			catch (const exception &e)
 			{
-				ss << "error processing par csv: " << e.what();
+				ss << "error processing dv csv file: " << e.what();
 				throw_sqp_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_sqp_error(string("error processing par csv"));
+				throw_sqp_error(string("error processing dv csv file"));
 			}
 		}
 		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
 		{
-			message(1, "loading par ensemble from binary file", par_csv);
+			message(1, "loading dv ensemble from binary file", dv_file);
 			try
 			{
-				dv.from_binary(par_csv);
+				dv.from_binary(dv_file);
 			}
 			catch (const exception &e)
 			{
-				ss << "error processing par jcb: " << e.what();
+				ss << "error processing dv jcb file: " << e.what();
 				throw_sqp_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_sqp_error(string("error processing par jcb"));
+				throw_sqp_error(string("error processing dv jcb file"));
 			}
 		}
 		else
 		{
-			ss << "unrecognized par csv extension " << par_ext << ", looking for csv, jcb, or jco";
+			ss << "unrecognized dv ensemble file extension " << par_ext << ", looking for csv, jcb, or jco";
 			throw_sqp_error(ss.str());
 		}
 
 		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 		
-		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
+		if (pp_args.find("SQP_NUM_REALS") != pp_args.end())
 		{
-			int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
+			int num_reals = pest_scenario.get_pestpp_options().get_sqp_num_reals();
 			/*if (pest_scenario.get_pestpp_options().get_ies_include_base())
 			{
 				message(1, "Note: increasing num_reals by 1 to account for 'base' realization in existing par ensemble");
@@ -158,27 +158,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 		}
 		
 
-		if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior())
-		{
-			message(1, "initializing prior parameter covariance matrix from ensemble (using diagonal matrix)");
-			parcov = dv.get_diagonal_cov_matrix();
-			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1)
-			{
-
-				if (pest_scenario.get_pestpp_options().get_ies_save_binary())
-				{
-					string filename = file_manager.get_base_filename() + ".prior.jcb";
-					message(1, "saving emprirical parameter covariance matrix to binary file: ", filename);
-					parcov.to_binary(filename);
-				}
-				else
-				{
-					string filename = file_manager.get_base_filename() + ".prior.cov";
-					message(1, "saving emprirical parameter covariance matrix to ASCII file: ", filename);
-					parcov.to_ascii(filename);
-				}
-			}
-		}
+		//TODO: sqp version of this arg?
 		if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
 		{
 			if (pest_scenario.get_pestpp_options().get_ies_obs_restart_csv().size() > 0)
@@ -255,7 +235,7 @@ bool SeqQuadProgram::initialize_oe(Covariance &cov)
 {
 	stringstream ss;
 	int num_reals = dv.shape().first;
-	string obs_csv = pest_scenario.get_pestpp_options().get_ies_obs_csv();
+	string obs_csv = pest_scenario.get_pestpp_options().get_sqp_obs_restart_en();
 	bool drawn = false;
 	if (obs_csv.size() == 0)
 	{
@@ -547,8 +527,8 @@ void SeqQuadProgram::sanity_checks()
 void SeqQuadProgram::initialize_restart()
 {
 	stringstream ss;
-	string obs_restart_csv = pest_scenario.get_pestpp_options().get_ies_obs_restart_csv();
-	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
+	string obs_restart_csv = pest_scenario.get_pestpp_options().get_sqp_obs_restart_en();
+	//string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
 
 	//performance_log->log_event("restart with existing obs ensemble: " + obs_restart_csv);
 	message(1, "restarting with existing obs ensemble", obs_restart_csv);
@@ -592,75 +572,75 @@ void SeqQuadProgram::initialize_restart()
 		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
 		throw_sqp_error(ss.str());
 	}
-	if (par_restart_csv.size() > 0)
-	{
-		string par_ext = pest_utils::lower_cp(par_restart_csv).substr(par_restart_csv.size() - 3, par_restart_csv.size());
-		if (par_ext.compare("csv") == 0)
-		{
-			message(1, "loading restart par ensemble from csv file", par_restart_csv);
-			try
-			{
-				dv.from_csv(par_restart_csv);
-			}
-			catch (const exception &e)
-			{
-				ss << "error processing restart par csv: " << e.what();
-				throw_sqp_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_sqp_error(string("error processing restart par csv"));
-			}
-		}
-		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
-		{
-			message(1, "loading restart par ensemble from binary file", par_restart_csv);
-			try
-			{
-				dv.from_binary(par_restart_csv);
-			}
-			catch (const exception &e)
-			{
-				ss << "error processing restart par binary file: " << e.what();
-				throw_sqp_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_sqp_error(string("error processing restart par binary file"));
-			}
-		}
-		else
-		{
-			ss << "unrecognized restart par ensemble extension " << par_ext << ", looking for csv, jcb, or jco";
-			throw_sqp_error(ss.str());
-		}
-		if (dv.shape().first != oe.shape().first)
-		{
-			ss.str("");
-			ss << "restart par en has " << dv.shape().first << " realizations but restart obs en has " << oe.shape().first;
-			throw_sqp_error(ss.str());
-		}
+	//if (par_restart_csv.size() > 0)
+	//{
+	//	string par_ext = pest_utils::lower_cp(par_restart_csv).substr(par_restart_csv.size() - 3, par_restart_csv.size());
+	//	if (par_ext.compare("csv") == 0)
+	//	{
+	//		message(1, "loading restart par ensemble from csv file", par_restart_csv);
+	//		try
+	//		{
+	//			dv.from_csv(par_restart_csv);
+	//		}
+	//		catch (const exception &e)
+	//		{
+	//			ss << "error processing restart par csv: " << e.what();
+	//			throw_sqp_error(ss.str());
+	//		}
+	//		catch (...)
+	//		{
+	//			throw_sqp_error(string("error processing restart par csv"));
+	//		}
+	//	}
+	//	else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+	//	{
+	//		message(1, "loading restart par ensemble from binary file", par_restart_csv);
+	//		try
+	//		{
+	//			dv.from_binary(par_restart_csv);
+	//		}
+	//		catch (const exception &e)
+	//		{
+	//			ss << "error processing restart par binary file: " << e.what();
+	//			throw_sqp_error(ss.str());
+	//		}
+	//		catch (...)
+	//		{
+	//			throw_sqp_error(string("error processing restart par binary file"));
+	//		}
+	//	}
+	//	else
+	//	{
+	//		ss << "unrecognized restart par ensemble extension " << par_ext << ", looking for csv, jcb, or jco";
+	//		throw_sqp_error(ss.str());
+	//	}
+	//	if (dv.shape().first != oe.shape().first)
+	//	{
+	//		ss.str("");
+	//		ss << "restart par en has " << dv.shape().first << " realizations but restart obs en has " << oe.shape().first;
+	//		throw_sqp_error(ss.str());
+	//	}
 
-		//check that restart dv is in sync with dv_base
-		vector<string> pe_real_names = dv.get_real_names(), pe_base_real_names = dv_base.get_real_names();
-		vector<string>::const_iterator start, end;
-		vector<string> missing;
-		start = pe_base_real_names.begin();
-		end = pe_base_real_names.end();
-		for (auto &rname : pe_real_names)
-			if (find(start, end, rname) == end)
-				missing.push_back(rname);
-		if (missing.size() > 0)
-		{
-			ss << "the following realization names were found in the restart par en but not in the 'base' par en:";
-			for (auto &m : missing)
-				ss << m << ",";
-			throw_sqp_error(ss.str());
-		}
-		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
-	}
+	//	//check that restart dv is in sync with dv_base
+	//	vector<string> pe_real_names = dv.get_real_names(), pe_base_real_names = dv_base.get_real_names();
+	//	vector<string>::const_iterator start, end;
+	//	vector<string> missing;
+	//	start = pe_base_real_names.begin();
+	//	end = pe_base_real_names.end();
+	//	for (auto &rname : pe_real_names)
+	//		if (find(start, end, rname) == end)
+	//			missing.push_back(rname);
+	//	if (missing.size() > 0)
+	//	{
+	//		ss << "the following realization names were found in the restart par en but not in the 'base' par en:";
+	//		for (auto &m : missing)
+	//			ss << m << ",";
+	//		throw_sqp_error(ss.str());
+	//	}
+	//	dv.transform_ip(ParameterEnsemble::transStatus::NUM);
+	//}
 
-	if (pp_args.find("IES_NUM_REALS") != pp_args.end())
+	if (pp_args.find("SQP_NUM_REALS") != pp_args.end())
 	{
 		int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
 		/*if (pest_scenario.get_pestpp_options().get_ies_include_base())
@@ -670,7 +650,7 @@ void SeqQuadProgram::initialize_restart()
 		}*/
 		if (num_reals < oe.shape().first)
 		{
-			message(1, "ies_num_reals arg passed, truncated restart obs ensemble to ", num_reals);
+			message(1, "sqp_num_reals arg passed, truncated restart obs ensemble to ", num_reals);
 			vector<string> keep_names, real_names = oe.get_real_names();
 			for (int i = 0; i<num_reals; i++)
 			{
