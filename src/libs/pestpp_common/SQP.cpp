@@ -171,11 +171,15 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 	if (dv_names.size() < pest_scenario.get_ctl_ordered_adj_par_names().size())
 	{
 		performance_log->log_event("filling non-decision-variable columns with control file values");
-		Eigen::VectorXd ctl_vals = pest_scenario.get_ctl_parameters().get_data_eigen_vec(pest_scenario.get_ctl_ordered_adj_par_names());
+		Parameters ctl_num_pars = pest_scenario.get_ctl_parameters();
+		pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(ctl_num_pars);
+		vector<string> ctl_adj_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
+		Eigen::VectorXd ctl_vals = ctl_num_pars.get_data_eigen_vec(ctl_adj_par_names);
 		Eigen::MatrixXd temp(dv.shape().first, ctl_vals.size());
 		for (int i = 0; i < temp.rows(); i++)
 			temp.row(i) = ctl_vals;
-		ParameterEnsemble dv_full(&pest_scenario, &rand_gen, temp, dv.get_real_names(), pest_scenario.get_ctl_ordered_adj_par_names());
+		ParameterEnsemble dv_full(&pest_scenario, &rand_gen, temp, dv.get_real_names(), ctl_adj_par_names);
+		dv_full.set_trans_status(ParameterEnsemble::transStatus::NUM);
 		dv.update_var_map();
 		for (auto d : dv.get_var_map())
 		{
@@ -903,13 +907,13 @@ void SeqQuadProgram::initialize()
 	}
 	message(1, "saved initial dv ensemble to ", ss.str());
 	message(2, "checking for denormal values in base oe");
-	oe.check_for_normal("obs+noise observation ensemble");
+	oe.check_for_normal("observation ensemble");
 	ss.str("");
 
 
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	/*if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
-		ss << file_manager.get_base_filename() << ".obs+noise.jcb";
+		ss << file_manager.get_base_filename() << ".obs.jcb";
 		oe.to_binary(ss.str());
 	}
 	else
@@ -917,7 +921,7 @@ void SeqQuadProgram::initialize()
 		ss << file_manager.get_base_filename() << ".obs.csv";
 		oe.to_csv(ss.str());
 	}
-	message(1, "saved initial observation ensemble to ", ss.str());
+	message(1, "saved initial observation ensemble to ", ss.str());*/
 	message(1, "centering on ensemble mean vector");
 
 	if (pest_scenario.get_control_info().noptmax == -2)
