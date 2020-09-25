@@ -103,12 +103,11 @@ private:
 	int iter,subset_size;
 	bool use_subset;
 
-	double last_best_lam, last_best_mean,last_best_std;
+	double last_best_mean,last_best_std;
 	vector<double> best_mean_phis;
 	double best_phi_yet;
 
 	int warn_min_reals, error_min_reals;
-	
 	
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
@@ -138,10 +137,13 @@ private:
 	void save_mat(string prefix, Eigen::MatrixXd &mat);
 	bool initialize_dv(Covariance &cov);
 	//bool initialize_oe(Covariance &cov);
-	void initialize_restart();
+	bool initialize_restart();
 	void initialize_parcov();
 	void initialize_obscov();
 	void drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe, bool is_subset=false);
+	
+	void queue_chance_runs();
+	
 	template<typename T, typename A>
 	void message(int level, const string &_message, vector<T, A> _extras, bool echo=true);
 	void message(int level, const string &_message);

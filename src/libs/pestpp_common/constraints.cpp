@@ -610,6 +610,14 @@ void Constraints::initial_report()
 			}
 			f_rec << endl;
 		}
+		cout << "...risk = " << risk;
+		if (std_weights)
+			cout << ", using FOSM-based chance constraints with the weights of non-zero-weighted constraints as standard deviation" << endl;
+		else if (use_fosm)
+			cout << ", using FOSM-based chance constraints with " << adj_par_names.size() << " adjustable parameters" << endl;
+		else
+			cout << ", using stack-based chance constraints with " << stack_pe.shape().first << " realizations" << endl;
+
 	}
 }
 

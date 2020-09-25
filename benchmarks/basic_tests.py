@@ -1007,7 +1007,7 @@ def basic_sqp_test():
         local=False
     
     t_d = os.path.join(model_d,"template")
-    m_d = os.path.join(model_d,"master_sqp")
+    m_d = os.path.join(model_d,"master_sqp1")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_opt.pst"))
@@ -1019,6 +1019,7 @@ def basic_sqp_test():
     assert os.path.exists(os.path.join(t_d,"freyberg6_run_sqp.base.rei"))
 
     pst.pestpp_options["sqp_num_reals"] = 10
+
     pst.control_data.noptmax = -1
     pst.write(os.path.join(t_d,"freyberg6_run_sqp.pst"))
     pyemu.os_utils.start_workers(t_d, "pestpp-sqp", "freyberg6_run_sqp.pst", 
@@ -1054,4 +1055,6 @@ if __name__ == "__main__":
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
     #cmdline_test()
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sqp.exe"),os.path.join("..","bin","pestpp-sqp.exe"))
+
     basic_sqp_test()

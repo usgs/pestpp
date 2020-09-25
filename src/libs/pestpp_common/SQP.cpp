@@ -51,10 +51,12 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 	bool drawn = false;
 	if (dv_file.size() == 0)
 	{
+		//only draw for dv names
+		Covariance dv_cov = cov.get(dv_names);
 		ofstream& frec = file_manager.rec_ofstream();
 		message(1, "drawing decision variable realizations: ", num_reals);
 		map<string, double> par_means = pest_scenario.get_ext_file_double_map("parameter data external", "mean");
-		Parameters draw_par = pest_scenario.get_ctl_parameters();
+		Parameters draw_par = pest_scenario.get_ctl_parameters().get_subset(dv_names.begin(),dv_names.end());
 		if (par_means.size() > 0)
 		{
 			
@@ -85,11 +87,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 
 			}
 		}
-		dv.draw(num_reals, draw_par,cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
-		// stringstream ss;
-		// ss << file_manager.get_base_filename() << ".0.par.csv";
-		// message(1, "saving initial parameter ensemble to ", ss.str());
-		// dv.to_csv(ss.str());
+		dv.draw(num_reals, draw_par,dv_cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
 		drawn = true;
 	}
 	else
@@ -169,6 +167,24 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 		}
 
 	}
+
+	if (dv_names.size() < pest_scenario.get_ctl_ordered_adj_par_names().size())
+	{
+		performance_log->log_event("filling non-decision-variable columns with control file values");
+		Eigen::VectorXd ctl_vals = pest_scenario.get_ctl_parameters().get_data_eigen_vec(pest_scenario.get_ctl_ordered_adj_par_names());
+		Eigen::MatrixXd temp(dv.shape().first, ctl_vals.size());
+		for (int i = 0; i < temp.rows(); i++)
+			temp.row(i) = ctl_vals;
+		ParameterEnsemble dv_full(&pest_scenario, &rand_gen, temp, dv.get_real_names(), pest_scenario.get_ctl_ordered_adj_par_names());
+		dv.update_var_map();
+		for (auto d : dv.get_var_map())
+		{
+			Eigen::VectorXd col = dv.get_eigen_ptr()->col(d.second);
+			dv_full.replace_col(d.first, col);
+		}
+		dv = dv_full;
+	}
+
 	return drawn;
 
 }
@@ -436,7 +452,7 @@ void SeqQuadProgram::sanity_checks()
 	//cout << endl << endl;
 }
 
-void SeqQuadProgram::initialize_restart()
+bool SeqQuadProgram::initialize_restart()
 {
 	stringstream ss;
 	string obs_restart_csv = pest_scenario.get_pestpp_options().get_sqp_obs_restart_en();
@@ -445,7 +461,7 @@ void SeqQuadProgram::initialize_restart()
 		oe.initialize_without_noise(dv.shape().first);
 		vector<string> real_names = dv.get_real_names();
 		oe.set_real_names(real_names);
-		return;
+		return true;
 	}
 	message(1, "restarting with existing obs ensemble", obs_restart_csv);
 	string obs_ext = pest_utils::lower_cp(obs_restart_csv).substr(obs_restart_csv.size() - 3, obs_restart_csv.size());
@@ -488,73 +504,7 @@ void SeqQuadProgram::initialize_restart()
 		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
 		throw_sqp_error(ss.str());
 	}
-	//if (par_restart_csv.size() > 0)
-	//{
-	//	string par_ext = pest_utils::lower_cp(par_restart_csv).substr(par_restart_csv.size() - 3, par_restart_csv.size());
-	//	if (par_ext.compare("csv") == 0)
-	//	{
-	//		message(1, "loading restart par ensemble from csv file", par_restart_csv);
-	//		try
-	//		{
-	//			dv.from_csv(par_restart_csv);
-	//		}
-	//		catch (const exception &e)
-	//		{
-	//			ss << "error processing restart par csv: " << e.what();
-	//			throw_sqp_error(ss.str());
-	//		}
-	//		catch (...)
-	//		{
-	//			throw_sqp_error(string("error processing restart par csv"));
-	//		}
-	//	}
-	//	else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
-	//	{
-	//		message(1, "loading restart par ensemble from binary file", par_restart_csv);
-	//		try
-	//		{
-	//			dv.from_binary(par_restart_csv);
-	//		}
-	//		catch (const exception &e)
-	//		{
-	//			ss << "error processing restart par binary file: " << e.what();
-	//			throw_sqp_error(ss.str());
-	//		}
-	//		catch (...)
-	//		{
-	//			throw_sqp_error(string("error processing restart par binary file"));
-	//		}
-	//	}
-	//	else
-	//	{
-	//		ss << "unrecognized restart par ensemble extension " << par_ext << ", looking for csv, jcb, or jco";
-	//		throw_sqp_error(ss.str());
-	//	}
-	//	if (dv.shape().first != oe.shape().first)
-	//	{
-	//		ss.str("");
-	//		ss << "restart par en has " << dv.shape().first << " realizations but restart obs en has " << oe.shape().first;
-	//		throw_sqp_error(ss.str());
-	//	}
-
-	//	//check that restart dv is in sync with dv_base
-	//	vector<string> pe_real_names = dv.get_real_names(), pe_base_real_names = dv_base.get_real_names();
-	//	vector<string>::const_iterator start, end;
-	//	vector<string> missing;
-	//	start = pe_base_real_names.begin();
-	//	end = pe_base_real_names.end();
-	//	for (auto &rname : pe_real_names)
-	//		if (find(start, end, rname) == end)
-	//			missing.push_back(rname);
-	//	if (missing.size() > 0)
-	//	{
-	//		ss << "the following realization names were found in the restart par en but not in the 'base' par en:";
-	//		for (auto &m : missing)
-	//			ss << m << ",";
-	//		throw_sqp_error(ss.str());
-	//	}
-	//	dv.transform_ip(ParameterEnsemble::transStatus::NUM);
-	//}
+	
 
 	if (pp_args.find("SQP_NUM_REALS") != pp_args.end())
 	{
@@ -576,60 +526,12 @@ void SeqQuadProgram::initialize_restart()
 		}
 	}
 
-	//check that restart oe is in sync with oe_base
-	vector<string> oe_real_names = oe.get_real_names(), oe_base_real_names = oe_base.get_real_names();
-	vector<string>::const_iterator start, end;
-	vector<string> missing;
-	start = oe_base_real_names.begin();
-	end = oe_base_real_names.end();
-	for (auto &rname : oe_real_names)
-		if (find(start, end, rname) == end)
-			missing.push_back(rname);
-	if (missing.size() > 0)
-	{
-		//the special case where the base real is what is missing...
-		if ((missing.size() == 1) && (missing[0] == "BASE"))
-		{
-			//check that the base real is in the par en - restart_par_en should be accounted for by now
-			int base_par_idx = -1;
-			vector<string> pe_real_names = dv.get_real_names(), pe_base_real_names = dv_base.get_real_names();
-			for (int i = 0; i < dv_base.shape().first; i++)
-			{
-				if (pe_base_real_names[i] == "BASE")
-				{
-					base_par_idx = i;
-					break;
-				}
-			}
-			if (base_par_idx != -1)
-			{
-				ss.str("");
-				ss << "WARNING: replacing base obs en realization '" << oe_base_real_names[base_par_idx] << "' with 'base' (noise free) values to match par en 'base' location";
-				message(2, ss.str());
-				Observations obs = pest_scenario.get_ctl_observations();
-				oe_base.replace(base_par_idx, obs, "BASE");
-			}
-			else
-			{
-				ss << "the 'base' realization was not found in the restart obs en and also not found in the par en";
-				throw_sqp_error(ss.str());
-			}
-
-		}
-		else
-		{
-			ss << "the following realization names were found in the restart obs en but not in the 'base' obs en:";
-			for (auto &m : missing)
-				ss << m << ",";
-			throw_sqp_error(ss.str());
-		}
-
-	}
-
+	
 	if (oe.shape().first != dv.shape().first)
 	{
 		//check if all oe names are found in par en, if so, we can reorder and proceed.  otherwise, die
-		missing.clear();
+		vector<string> missing;
+		vector<string> oe_real_names = oe.get_real_names();
 		vector<string> pe_real_names = dv.get_real_names();
 		for (auto &oname : oe_real_names)
 		{
@@ -663,88 +565,7 @@ void SeqQuadProgram::initialize_restart()
 
 	}
 
-	//if (oe.shape().first < oe_base.shape().first) //maybe some runs failed...
-	if (oe.shape().first <= oe_base.shape().first)
-	{
-		//find which realizations are missing and reorder oe_base, dv and dv_base
-
-		//message(1, "shape mismatch detected with restart obs ensemble...checking for compatibility");
-		
-		/*vector<string> pe_real_names;
-		start = oe_base_real_names.begin();
-		end = oe_base_real_names.end();
-		vector<string>::const_iterator it;
-		int iit;
-		for (int i = 0; i < oe.shape().first; i++)
-		{
-			it = find(start, end, oe_real_names[i]);
-			if (it != end)
-			{
-				iit = it - start;
-				pe_real_names.push_back(pe_org_real_names[iit]);
-			}
-		}*/
-		message(2, "reordering oe_base to align with restart obs en,num reals:", oe_real_names.size());
-		if ((oe_drawn) && (oe_base.shape().first == oe_real_names.size()))
-		{
-			oe_base.set_real_names(oe_real_names);
-		}
-		else
-		{
-			try
-			{
-				oe_base.reorder(oe_real_names, vector<string>());
-			}
-			catch (exception& e)
-			{
-				ss << "error reordering oe_base with restart oe:" << e.what();
-				throw_sqp_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_sqp_error(string("error reordering oe_base with restart oe"));
-			}
-		}
-		//if (par_restart_csv.size() > 0)
-		if (true)
-		{
-			vector<string> pe_real_names = dv.get_real_names();
-			message(2, "reordering dv_base to align with restart par en,num reals:", pe_real_names.size());
-			try
-			{
-				dv_base.reorder(pe_real_names, vector<string>());
-			}
-			catch (exception &e)
-			{
-				ss << "error reordering dv_base with restart dv:" << e.what();
-				throw_sqp_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_sqp_error(string("error reordering dv_base with restart dv"));
-			}
-		}
-
-
-		/*try
-		{
-			dv.reorder(pe_real_names, vector<string>());
-		}
-		catch (exception &e)
-		{
-			ss << "error reordering dv with restart oe:" << e.what();
-			throw_sqp_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_sqp_error(string("error reordering dv with restart oe"));
-		}*/
-	}
-	else if (oe.shape().first > oe_base.shape().first) //something is wrong
-	{
-		ss << "restart oe has too many rows: " << oe.shape().first << " compared to oe_base: " << oe_base.shape().first;
-		throw_sqp_error(ss.str());
-	}
+	return false;
 }
 
 
@@ -953,7 +774,7 @@ void SeqQuadProgram::initialize()
 
 	dv_drawn = initialize_dv(parcov);
 
-	//oe_drawn = initialize_oe(obscov);
+	oe_drawn = initialize_restart();
 	
 	try
 	{
@@ -1093,10 +914,10 @@ void SeqQuadProgram::initialize()
 	}
 	else
 	{
-		ss << file_manager.get_base_filename() << ".obs+noise.csv";
+		ss << file_manager.get_base_filename() << ".obs.csv";
 		oe.to_csv(ss.str());
 	}
-	message(1, "saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
+	message(1, "saved initial observation ensemble to ", ss.str());
 	message(1, "centering on ensemble mean vector");
 
 	if (pest_scenario.get_control_info().noptmax == -2)
@@ -1179,13 +1000,8 @@ void SeqQuadProgram::initialize()
 	//reorder this for later
 	dv_base.reorder(vector<string>(), act_par_names);
 
-
-	//the hard way to restart
-	if (obs_restart_csv.size() > 0)
-		initialize_restart();
-	
 	//no restart
-	else
+	if (oe_drawn)
 	{
 		performance_log->log_event("running initial ensemble");
 		message(1, "running initial ensemble of size", oe.shape().first);
@@ -1665,15 +1481,13 @@ bool SeqQuadProgram::solve_new()
 	}
 	if (best_idx == -1)
 	{
-		message(0, "WARNING:  unsuccessful lambda testing, resetting lambda to 10000.0");
-		last_best_lam = 10000.0;
+		//TODO: how to handle bad testing...
+		message(0, "WARNING:  unsuccessful testing");
 		return false;
 
 	}
 	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
-	double lam_inc = pest_scenario.get_pestpp_options().get_ies_lambda_inc_fac();
-	double lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
-	
+
 
 	//subset stuff here
 	if ((best_idx != -1) && (use_subset) && (subset_size < dv.shape().first))
@@ -2184,6 +1998,24 @@ vector<ObservationEnsemble> SeqQuadProgram::run_candidate_ensembles(vector<Param
 	return obs_lams;
 }
 
+void SeqQuadProgram::queue_chance_runs()
+{
+	/* queue up chance-related runs using the class attributes dp and op*/
+	stringstream ss;
+	if (constraints.should_update_chance(iter))
+	{
+		//just use dp member nearest the mean dec var values
+		vector<double> t = dv.get_mean_stl_var_vector();
+		Eigen::VectorXd dv_mean = stlvec_2_eigenvec(t);
+		t.resize(0);
+			
+		ss << "using mean decision variables for chance calculations";
+		best_mean_dv_values.update_without_clear(dv.get_var_names(), dv_mean);
+		constraints.add_runs(run_mgr_ptr);
+	}
+}
+
+
 
 vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs)
 {
@@ -2207,8 +2039,7 @@ vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnse
 		throw_sqp_error(string("run_ensemble() error queueing runs"));
 	}
 
-	if (constraints.should_update_chance(iter))
-		constraints.add_runs(run_mgr_ptr);
+	queue_chance_runs();
 
 	performance_log->log_event("making runs");
 	try
@@ -2246,8 +2077,7 @@ vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnse
 	{
 		throw_sqp_error(string("error processing runs"));
 	}
-	//for testing
-	//failed_real_indices.push_back(0);
+	
 
 	if (failed_real_indices.size() > 0)
 	{
@@ -2267,6 +2097,9 @@ vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnse
 		_pe.drop_rows(failed_real_indices);
 		_oe.drop_rows(failed_real_indices);
 	}
+
+	constraints.process_runs(run_mgr_ptr, iter);
+
 	return failed_real_indices;
 }
 
