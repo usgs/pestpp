@@ -1318,11 +1318,15 @@ ParameterEnsemble MOEA::generate_population()
 	num_members += (num_members - dp.shape().first);
 
 	//TODO: work out which generator to use
+	//TODO: add sanity check for supported algs so that we 
+	//trap issues before getting here
 	if (mou_alg == "DE")
 		return generate_diffevol_population(num_members, dp);
 	else if (mou_alg == "NSGA2")
 		// if using NSGA2
 		return generate_nsga2_population(num_members, dp);
+	else
+		throw_moea_error("unrecognized mou algorithm (looking for 'NSGA2', 'DE'): " + mou_alg);
 }
 
 void MOEA::iterate_to_solution()

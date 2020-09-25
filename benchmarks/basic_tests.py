@@ -1022,7 +1022,7 @@ def basic_sqp_test():
 
     pst.control_data.noptmax = -1
     pst.write(os.path.join(t_d,"freyberg6_run_sqp.pst"))
-    pyemu.os_utils.start_workers(t_d, "pestpp-sqp", "freyberg6_run_sqp.pst", 
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sqp"), "freyberg6_run_sqp.pst", 
                                  num_workers=5, master_dir=m_d,worker_root=model_d,
                                  port=port)
 

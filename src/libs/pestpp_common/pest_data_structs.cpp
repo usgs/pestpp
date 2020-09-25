@@ -1385,7 +1385,7 @@ void PestppOptions::set_defaults()
 	set_sqp_obs_restart_en("");
 	set_sqp_num_reals(50);
 
-	set_mou_algorithm("NSGA");
+	set_mou_algorithm("NSGA2");
 	set_mou_population_size(100);
 	set_mou_dv_population_file("");
 	set_mou_obs_population_restart_file("");
