@@ -604,6 +604,8 @@ void SeqQuadProgram::initialize()
 	message(0, "initializing");
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 
+	iter = 1;
+
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
 
@@ -2005,6 +2007,8 @@ vector<ObservationEnsemble> SeqQuadProgram::run_candidate_ensembles(vector<Param
 void SeqQuadProgram::queue_chance_runs()
 {
 	/* queue up chance-related runs using the class attributes dp and op*/
+	if (pest_scenario.get_control_info().noptmax == 0)
+		return;
 	stringstream ss;
 	if (constraints.should_update_chance(iter))
 	{
