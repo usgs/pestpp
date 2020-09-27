@@ -1659,6 +1659,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnsemble& _dp)
 {
 	message(1, "generating NSGA2 population of size", num_members);
+	_dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 	vector<int> member_count, working_count, selected, r_int_vec;
 	vector<double> rnds;
 	for (int i = 0; i < _dp.shape().first; i++)
@@ -1714,12 +1715,16 @@ ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnse
 		new_reals.row(i_member) = children.first;
 		new_names.push_back(get_new_member_name("nsga-ii"));
 		i_member++;
+		if (i_member >= num_members)
+			break;
 		new_reals.row(i_member) = children.second;
 		new_names.push_back(get_new_member_name("nsga-ii"));
 		i_member++;
+
 	}
 		
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_names, _dp.get_var_names());
+	tmp_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
 	//mutation
 	double mutation_probability = 1.0 / pest_scenario.get_n_adj_par();
 	double mutation_distribution_index = 20.0;
