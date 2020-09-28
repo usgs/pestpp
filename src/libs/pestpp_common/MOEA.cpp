@@ -1782,30 +1782,33 @@ ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnse
 		//just take the first two since this should change each time thru
 		p1_idx = working_count[0];
 		p2_idx = working_count[1];
-
+		
 		//generate two children thru cross over
 		children = crossover(crossover_probability, crossover_distribution_index, p1_idx, p2_idx);
 
 		//put the two children into the child population
 		new_reals.row(i_member) = children.first;
 		new_names.push_back(get_new_member_name("nsga-ii"));
+		cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() - 1] << endl;
 		i_member++;
 		if (i_member >= num_members)
 			break;
 		new_reals.row(i_member) = children.second;
 		new_names.push_back(get_new_member_name("nsga-ii"));
+		cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() -1] << endl;
 		i_member++;
 
 	}
 		
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_names, _dp.get_var_names());
 	tmp_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
+	tmp_dp.to_csv("temp_cross.csv");
 	//mutation
 	double mutation_probability = 1.0 / pest_scenario.get_n_adj_par();
 	double mutation_distribution_index = 20.0;
 	mutate(mutation_probability, mutation_distribution_index, tmp_dp);
 
-	
+	tmp_dp.to_csv("temp_mut.csv");
 
 	//TODO: return parameter ensemble for the next generation
 	return tmp_dp;
