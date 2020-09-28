@@ -674,10 +674,15 @@ void MOEA::queue_chance_runs()
 	stringstream ss;
 	if (constraints.should_update_chance(iter))
 	{
+		dp.transform_ip(ParameterEnsemble::transStatus::NUM);
+		Parameters pars = pest_scenario.get_ctl_parameters();
+		pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(pars);
+		Observations obs = pest_scenario.get_ctl_observations();
 		//if this is the first iter and no restart
 		if ((iter == 0) && (population_obs_restart_file.size() == 0))
 		{
 			//just use dp member nearest the mean dec var values
+			
 			vector<double> t = dp.get_mean_stl_var_vector();
 			Eigen::VectorXd dp_mean = stlvec_2_eigenvec(t);
 			t.resize(0);
@@ -696,7 +701,9 @@ void MOEA::queue_chance_runs()
 			ss.str("");
 			ss << "using member " << min_member << " as nearest-to-mean chance point with distance of " << dist_min << " from mean of decision population";
 			message(2, ss.str());
-			effective_constraint_pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(min_member));
+			
+			pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(min_member));
+			
 		}
 		else if (chancepoints == chancePoints::OPTIMAL)
 		{
@@ -732,9 +739,8 @@ void MOEA::queue_chance_runs()
 			}
 			string opt_member = op.get_real_names()[opt_idx];
 
-			effective_constraint_pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(opt_member));
-			effective_constraint_obs.update_without_clear(op.get_var_names(), op.get_real_vector(opt_member));
-
+			pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(opt_member));
+			obs.update_without_clear(op.get_var_names(), op.get_real_vector(opt_member));
 
 			ss.str("");
 			ss << "using member " << opt_member << " as optimal chance point with distance of " << opt_dist << " from optimal trade-off";
@@ -745,7 +751,8 @@ void MOEA::queue_chance_runs()
 		{
 			throw_moea_error("internal error: trying to call unsupported chancePoints type");
 		}
-		constraints.add_runs(run_mgr_ptr);
+		pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
+		constraints.add_runs(pars, obs, run_mgr_ptr);
 	}
 }
 
@@ -841,7 +848,7 @@ ObservationEnsemble MOEA::get_risk_shifted_op(ObservationEnsemble& _op)
 	if (chancepoints == chancePoints::OPTIMAL)
 	{
 		message(2, "risk-shifting observation population using 'optimal' chance point");
-		constraints.presolve_chance_report(iter);
+		//constraints.presolve_chance_report(iter,);
 		Observations sim, sim_shifted;
 		Eigen::VectorXd real_vec;
 		vector<string> onames = shifted_op.get_var_names();
@@ -1211,9 +1218,9 @@ void MOEA::initialize()
 	//throughout the process, we can update these pars and obs
 	//to control where in dec var space the stack/fosm estimates are
 	//calculated
-	effective_constraint_pars = pest_scenario.get_ctl_parameters();
-	effective_constraint_obs = pest_scenario.get_ctl_observations();
-	constraints.initialize(dv_names, &effective_constraint_pars, &effective_constraint_obs, numeric_limits<double>::max());
+	//effective_constraint_pars = pest_scenario.get_ctl_parameters();
+	//effective_constraint_obs = pest_scenario.get_ctl_observations();
+	constraints.initialize(dv_names, numeric_limits<double>::max());
 
 	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
 	population_dv_file = ppo->get_mou_dv_population_file();

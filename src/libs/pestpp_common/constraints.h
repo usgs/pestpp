@@ -27,19 +27,18 @@ public:
 	enum ConstraintSense { less_than, greater_than, equal_to, undefined };
 	enum ConstraintType { deter, pi, fosm, stack };
 	Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, OutputFileWriter& _of_wr, PerformanceLog& _pfm);
-	void initialize(vector<string>& ctl_ord_dec_var_names, Parameters* _current_pars_and_dec_vars_ptr,
-		Observations* _current_constraints_sim_ptr, double _dbl_max);
+	void initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_max);
 
-	void presolve_report(int iter);
-	void presolve_chance_report(int iter);
-	void postsolve_obs_constraints_report(Observations& constraints_sim, string tag, int iter,
+	void presolve_report(int iter, Parameters& current_pars, Observations& current_obs);
+	void presolve_chance_report(int iter, Observations& current_obs);
+	void postsolve_obs_constraints_report(Observations& old_obs, Observations& new_obs, string tag, int iter,
 		map<string, string> status_map=map<string,string>(), map<string, double> price_map=map<string,double>());
-	void postsolve_pi_constraints_report(Parameters& pars_and_dec_vars, int iter,
+	void postsolve_pi_constraints_report(Parameters& old_pars, Parameters& new_pars, int iter,
 		map<string, string> status_map = map<string, string>(), map<string, double> price_map = map<string, double>());
 	void initial_report();
 	
 	//queue up chance related runs
-	void add_runs(RunManagerAbstract* run_mgr_ptr);
+	void add_runs(Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
 
 	//queue up chance related runs at several points in dev var space
 	//void add_runs_at_multiple_points(RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& pe, vector<string> only_reals = vector<string>());
@@ -48,7 +47,7 @@ public:
 	//void risk_shift_obs_en_ip(ObservationEnsemble& oe);
 	
 	//get the (risk-shifted) distance to constraints (upper and lower bounds)
-	pair<vector<double>,vector<double>> get_constraint_bound_vectors();
+	pair<vector<double>,vector<double>> get_constraint_bound_vectors(Parameters& current_pars, Observations &current_obs);
 	
 	//setters
 	void set_jco(Jacobian_1to1& _jco) { jco = _jco; }
@@ -75,7 +74,7 @@ public:
 	void update_chance_offsets();
 	
 	//get the max scale constraint change against upgrade_obs - used for convergence testing
-	double get_max_constraint_change(Observations& upgrade_obs);
+	double get_max_constraint_change(Observations& current_obs, Observations& upgrade_obs);
 	
 	//get the flags related to chance constraints
 	bool get_std_weights() { return std_weights; }
@@ -102,7 +101,7 @@ public:
 	static pair<ConstraintSense, string> get_sense_from_group_name(const string& name);
 
 	//get risk-shifted simulated constraint values using current_constraints_sim_ptr
-	Observations get_chance_shifted_constraints();
+	//Observations get_chance_shifted_constraints();
 	//get risk-shifted simulated constraint values using _constraints_sim arg
 	Observations get_chance_shifted_constraints(Observations& _constraints_sim);
 
@@ -148,9 +147,9 @@ private:
 	vector<string> ctl_ord_pi_constraint_names;
 
 	Observations constraints_obs;
-	Observations* current_constraints_sim_ptr;
+	//Observations* current_constraints_sim_ptr;
 	Observations initial_constraints_sim;
-	Parameters* current_pars_and_dec_vars_ptr;
+	//Parameters* current_pars_and_dec_vars_ptr;
 	pair<vector<double>, vector<double>> current_bounds;
 
 	

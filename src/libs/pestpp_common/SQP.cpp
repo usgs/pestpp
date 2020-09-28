@@ -740,9 +740,7 @@ void SeqQuadProgram::initialize()
 		dv_names = act_par_names;
 	}
 
-	best_mean_dv_values = pest_scenario.get_ctl_parameters();
-	best_mean_obs_values = pest_scenario.get_ctl_observations();
-	constraints.initialize(dv_names, &best_mean_dv_values, &best_mean_obs_values, numeric_limits<double>::max());
+	constraints.initialize(dv_names, numeric_limits<double>::max());
 	constraints.initial_report();
 	
 	iter = 0;
@@ -2013,13 +2011,19 @@ void SeqQuadProgram::queue_chance_runs()
 	if (constraints.should_update_chance(iter))
 	{
 		//just use dp member nearest the mean dec var values
+		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 		vector<double> t = dv.get_mean_stl_var_vector();
 		Eigen::VectorXd dv_mean = stlvec_2_eigenvec(t);
 		t.resize(0);
 			
 		ss << "using mean decision variables for chance calculations";
-		best_mean_dv_values.update_without_clear(dv.get_var_names(), dv_mean);
-		constraints.add_runs(run_mgr_ptr);
+		
+		Parameters pars = pest_scenario.get_ctl_parameters();
+		pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(pars);
+		pars.update_without_clear(dv.get_var_names(), dv_mean);
+		Observations obs = pest_scenario.get_ctl_observations();
+		pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
+		constraints.add_runs(pars, obs, run_mgr_ptr);
 	}
 }
 

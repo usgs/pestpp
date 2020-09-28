@@ -331,7 +331,7 @@ void sequentialLP::initialize_and_check()
 
 	current_constraints_sim = pest_scenario.get_ctl_observations();
 
- 	constraints.initialize(ctl_ord_dec_var_names, &all_pars_and_dec_vars, &current_constraints_sim, COIN_DBL_MAX);
+ 	constraints.initialize(ctl_ord_dec_var_names, COIN_DBL_MAX);
 
 	
 	//--------------------------------
@@ -482,8 +482,8 @@ void sequentialLP::iter_solve()
 
 	build_dec_var_bounds();
 
-	pair<vector<double>, vector<double>> bounds = constraints.get_constraint_bound_vectors();
-	constraints.presolve_report(slp_iter);
+	pair<vector<double>, vector<double>> bounds = constraints.get_constraint_bound_vectors(all_pars_and_dec_vars, current_constraints_sim);
+	constraints.presolve_report(slp_iter,all_pars_and_dec_vars, current_constraints_sim);
 	//load the linear simplex model
 	//model.loadProblem(matrix, dec_var_lb, dec_var_ub, ctl_ord_obj_func_coefs, constraint_lb, constraint_ub);
 	model.loadProblem(matrix, dec_var_lb, dec_var_ub, ctl_ord_obj_func_coefs, bounds.first.data(), bounds.second.data());
@@ -791,7 +791,7 @@ void sequentialLP::iter_postsolve()
 
 	row_price = model.getRowPrice();
 
-	constraints.postsolve_pi_constraints_report(upgrade_pars,slp_iter);
+	constraints.postsolve_pi_constraints_report(all_pars_and_dec_vars, upgrade_pars,slp_iter);
 
 	Observations upgrade_obs = current_constraints_sim;
 	
@@ -799,7 +799,7 @@ void sequentialLP::iter_postsolve()
 		jco.get_matrix(constraints.get_obs_constraint_names(), ctl_ord_dec_var_names) *
 		dv_changes.get_partial_data_eigen_vec(ctl_ord_dec_var_names);
 	upgrade_obs.update_without_clear(constraints.get_obs_constraint_names(), est_obs_vec);
-	constraints.postsolve_obs_constraints_report(upgrade_obs, "estimated",slp_iter);
+	constraints.postsolve_obs_constraints_report(current_constraints_sim, upgrade_obs, "estimated",slp_iter);
 	constraints.write_res_files(upgrade_obs, upgrade_pars, "est",slp_iter);
 	
 	if (!super_secret_option)
@@ -813,7 +813,7 @@ void sequentialLP::iter_postsolve()
 		}
 		
 		//postsolve_constraint_report(upgrade_obs, upgrade_pars, "simulated");
-		constraints.postsolve_obs_constraints_report(upgrade_obs, "simulated", slp_iter);
+		constraints.postsolve_obs_constraints_report(current_constraints_sim, upgrade_obs, "simulated", slp_iter);
 		constraints.write_res_files(upgrade_obs, upgrade_pars, "sim", slp_iter);
 		
 	}
@@ -843,7 +843,7 @@ void sequentialLP::iter_postsolve()
 		}
 
 	//check for changes for in constraints
-	double max_abs_constraint_change = constraints.get_max_constraint_change(upgrade_obs);
+	double max_abs_constraint_change = constraints.get_max_constraint_change(current_constraints_sim, upgrade_obs);
 	double max_abs_constraint_val = -1.0E+10;
 	Observations constraints_sim = current_constraints_sim;
 	for (auto &name : constraints.get_obs_constraint_names())
@@ -1015,7 +1015,7 @@ void sequentialLP::iter_presolve()
 			f_rec << "done" << endl;
 			cout << "done" << endl;
 			if ((constraints.should_update_chance(slp_iter)) && (!constraints.get_use_fosm()))
-				constraints.add_runs(run_mgr_ptr);
+				constraints.add_runs(all_pars_and_dec_vars,current_constraints_sim, run_mgr_ptr);
 			
 
 		}
@@ -1026,7 +1026,7 @@ void sequentialLP::iter_presolve()
 			int run_id = run_mgr_ptr->add_run(par_trans.ctl2model_cp(all_pars_and_dec_vars));
 			//this would be only for stack runs since the fosm runs should have been in the jco
 			if ((constraints.should_update_chance(slp_iter)) && (!constraints.get_use_fosm()))
-				constraints.add_runs(run_mgr_ptr);
+				constraints.add_runs(all_pars_and_dec_vars, current_constraints_sim, run_mgr_ptr);
 			/*else
 			{
 				cout << "  ---  running the model once with initial decision variables  ---  " << endl;
@@ -1101,7 +1101,7 @@ void sequentialLP::iter_presolve()
 
 		if ((constraints.should_update_chance(slp_iter)) && (!constraints.get_use_fosm()))
 		{
-			constraints.add_runs(run_mgr_ptr);
+			constraints.add_runs(all_pars_and_dec_vars, current_constraints_sim, run_mgr_ptr);
 		}
 
 
@@ -1175,7 +1175,7 @@ void sequentialLP::iter_presolve()
 	if ((constraints.get_use_chance()) && (constraints.get_use_fosm()))
 		constraints.set_jco(jco);
 	constraints.update_chance_offsets();
-	constraints.presolve_chance_report(slp_iter);
+	constraints.presolve_chance_report(slp_iter,current_constraints_sim);
 	constraints.write_res_files(current_constraints_sim, pars,"jcb",slp_iter);
 	return;
 }

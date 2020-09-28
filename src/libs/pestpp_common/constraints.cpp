@@ -29,17 +29,16 @@ Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, Outpu
 }
 
 
-void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* _current_pars_and_dec_vars_ptr,
-	Observations* _current_constraints_sim_ptr, double _dbl_max)
+void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_max)
 {
 	/* initialize the constraint class, most of this is to deal with chances*/
 	dec_var_names = ctl_ord_dec_var_names;
 	//store a pointer back to the original simulated constrain values 
 	//this is so that as these are updated, the constraints instance
 	//has access to the recent
-	current_constraints_sim_ptr = _current_constraints_sim_ptr;
+	//current_constraints_sim_ptr = _current_constraints_sim_ptr;
 	//same for dec var values
-	current_pars_and_dec_vars_ptr = _current_pars_and_dec_vars_ptr;
+	//current_pars_and_dec_vars_ptr = _current_pars_and_dec_vars_ptr;
 	//check for a stack size arg - if postive, then use stacks for chances
 	stack_size = pest_scenario.get_pestpp_options().get_opt_stack_size();
 	//an existing parameter stack for chances
@@ -686,7 +685,7 @@ void Constraints::update_chance_offsets()
 	}
 }
 
-double Constraints::get_max_constraint_change(Observations& upgrade_obs)
+double Constraints::get_max_constraint_change(Observations& current_obs, Observations& upgrade_obs)
 {
 	/* work out which constraint has changed the most between the pointer to 
 	current sim constraint values and upgrade_obs constraint values*/
@@ -695,8 +694,8 @@ double Constraints::get_max_constraint_change(Observations& upgrade_obs)
 	double val, diff;
 	for (auto& name : ctl_ord_obs_constraint_names)
 	{
-		val = current_constraints_sim_ptr->get_rec(name);
-		diff = abs(current_constraints_sim_ptr->get_rec(name) - upgrade_obs[name]);
+		val = current_obs.get_rec(name);
+		diff = abs(current_obs.get_rec(name) - upgrade_obs[name]);
 		max_abs_constraint_change = (diff > max_abs_constraint_change) ? diff : max_abs_constraint_change;
 		max_abs_constraint_val = (val > max_abs_constraint_val) ? val : max_abs_constraint_val;
 	}
@@ -704,14 +703,14 @@ double Constraints::get_max_constraint_change(Observations& upgrade_obs)
 	return max_abs_constraint_change;
 }
 
-Observations Constraints::get_chance_shifted_constraints()
-{
-	/* one version of this method that doesnt take any args just use the pointer to the
-	current sim constraint values*/
-	return get_chance_shifted_constraints(*current_constraints_sim_ptr);
-}
+//Observations Constraints::get_chance_shifted_constraints()
+//{
+//	/* one version of this method that doesnt take any args just use the pointer to the
+//	current sim constraint values*/
+//	return get_chance_shifted_constraints(*current_constraints_sim_ptr);
+//}
 
-Observations Constraints::get_chance_shifted_constraints(Observations& _constraints_sim)
+Observations Constraints::get_chance_shifted_constraints(Observations& current_obs)
 {
 	/* get the simulated constraint values with the chance shift applied*/
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
@@ -732,7 +731,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 			//the offset (shift) is just the stdev * the risk-based probit value
 			pr_offset = probit_val * prior_constraint_stdev[name];
 			pt_offset = probit_val * post_constraint_stdev[name];
-			old_constraint_val = _constraints_sim.get_rec(name);
+			old_constraint_val = current_obs.get_rec(name);
 			required_val = constraints_obs[name];
 
 			//if less_than constraint, then add to the sim value, to move positive
@@ -754,7 +753,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 			}
 			//if its not an ineq constraint, then there is no direction to shift
 			else
-				new_constraint_val = current_constraints_sim_ptr->get_rec(name);
+				new_constraint_val = current_obs.get_rec(name);
 			iter_fosm.insert(name, new_constraint_val);
 		}
 	}
@@ -782,7 +781,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 		pair<map<string, double>, map<string, double>> mm = stack_oe.get_moment_maps();
 		for (auto& name : ctl_ord_obs_constraint_names)
 		{
-			old_constraint_val = _constraints_sim.get_rec(name);
+			old_constraint_val = current_obs.get_rec(name);
 			//the value that must be statified (from the control file)
 			required_val = constraints_obs[name];
 			// the realized values of this stack are the anomalies added to the
@@ -825,7 +824,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 		}
 	}
 	vector<string> names = iter_fosm.get_keys();
-	Observations constraints_chance(_constraints_sim);
+	Observations constraints_chance(current_obs);
 	constraints_chance.update_without_clear(names, iter_fosm.get_data_vec(names));
 	
 	return constraints_chance;
@@ -854,7 +853,7 @@ vector<double> Constraints::get_constraint_residual_vec(Observations& sim)
 	return residuals_vec;
 }
 
-pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors()
+pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Parameters& current_pars, Observations& current_obs)
 {
 	/* get the upper and lower bound constraint vectors. For less than constraints, the lower bound is 
 	set to double max, for greater than constraints, the upper bound is set to double max.
@@ -862,12 +861,12 @@ pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors()
 	vector<double> residuals;
 	if (use_chance)
 	{
-		Observations current_constraints_chance = get_chance_shifted_constraints();
+		Observations current_constraints_chance = get_chance_shifted_constraints(current_obs);
 		residuals = get_constraint_residual_vec(current_constraints_chance);
 	}
 	else
 	{
-		residuals = get_constraint_residual_vec(*current_constraints_sim_ptr);
+		residuals = get_constraint_residual_vec(current_obs);
 	}
 
 	vector<double> constraint_ub, constraint_lb;
@@ -895,7 +894,7 @@ pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors()
 	for (int i = 0; i < num_pi_constraints(); ++i)
 	{
 		string name = ctl_ord_pi_constraint_names[i];
-		double residual = -constraints_pi.get_pi_rec_ptr(name).calc_residual(*current_pars_and_dec_vars_ptr);
+		double residual = -constraints_pi.get_pi_rec_ptr(name).calc_residual(current_pars);
 		if (constraint_sense_map[name] == ConstraintSense::less_than)
 			constraint_ub.push_back(residual);
 		else
@@ -978,7 +977,7 @@ double Constraints::get_probit()
 	return output;
 }
 
-void Constraints::presolve_report(int iter)
+void Constraints::presolve_report(int iter, Parameters& current_pars, Observations& current_obs)
 {
 	/* this is a report to the rec file for the status of the constraints before solving the current iteration*/
 	
@@ -992,12 +991,12 @@ void Constraints::presolve_report(int iter)
 	Observations current;
 	if (use_chance)
 	{
-		current = get_chance_shifted_constraints();	
+		current = get_chance_shifted_constraints(current_obs);	
 	}
 	//otherwise, just use the pointer to the current constraint info
 	else
 	{
-		current = *current_constraints_sim_ptr;
+		current = current_obs;
 	}
 
 	residuals = get_constraint_residual_vec(current);
@@ -1026,8 +1025,8 @@ void Constraints::presolve_report(int iter)
 			f_rec << setw(20) << left << name;
 			f_rec << setw(15) << right << constraint_sense_name[name];
 			f_rec << setw(15) << pi_rec.get_obs_value();
-			f_rec << setw(15) << pi_rec.calc_sim_and_resid(*current_pars_and_dec_vars_ptr).first;
-			f_rec << setw(15) << pi_rec.calc_residual(*current_pars_and_dec_vars_ptr);
+			f_rec << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
+			f_rec << setw(15) << pi_rec.calc_residual(current_pars);
 			f_rec << setw(15) << current_bounds.first[num_obs_constraints() + i];
 			f_rec << setw(15) << current_bounds.second[num_obs_constraints() + i] << endl;
 
@@ -1035,7 +1034,7 @@ void Constraints::presolve_report(int iter)
 	}
 
 	if (use_chance)
-		presolve_chance_report(iter);	 
+		presolve_chance_report(iter,current_obs);	 
 	
 	return;
 }
@@ -1072,7 +1071,7 @@ void Constraints::write_res_file(Observations& constraints, Parameters& pars_and
 
 }
 
-void Constraints::presolve_chance_report(int iter)
+void Constraints::presolve_chance_report(int iter, Observations& current_obs)
 {
 	/* write chance info to the rec file before undertaking the current iteration process*/
 	if (!use_chance)
@@ -1085,14 +1084,14 @@ void Constraints::presolve_chance_report(int iter)
 	f_rec << setw(15) << "prior stdev" << setw(15) << "post stdev" << setw(15) << "offset";
 	f_rec << setw(15) << "new sim value" << endl;
 	vector<string> out_of_bounds;
-	Observations current_constraints_chance = get_chance_shifted_constraints();
+	Observations current_constraints_chance = get_chance_shifted_constraints(current_obs);
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
 		f_rec << setw(20) << left << name;
 		f_rec << setw(10) << right << constraint_sense_name[name];
 		f_rec << setw(15) << constraints_obs[name];
-		f_rec << setw(15) << current_constraints_sim_ptr->get_rec(name);
+		f_rec << setw(15) << current_obs.get_rec(name);
 		f_rec << setw(15) << prior_constraint_stdev[name];
 		f_rec << setw(15) << post_constraint_stdev[name];
 		f_rec << setw(15) << post_constraint_offset[name];
@@ -1131,7 +1130,7 @@ bool Constraints::should_update_chance(int iter)
 }
 
 
-void Constraints::postsolve_obs_constraints_report(Observations& constraints_sim, string tag, int iter, 
+void Constraints::postsolve_obs_constraints_report(Observations& old_obs, Observations& new_obs, string tag, int iter, 
 									map<string,string> status_map, map<string,double> price_map)
 {
 	/* write out constraint info after the current iteration solution process is over to the rec file.  
@@ -1151,20 +1150,20 @@ void Constraints::postsolve_obs_constraints_report(Observations& constraints_sim
 	f_rec << setw(15) << "current" << setw(15) << "residual";
 	f_rec << setw(15) << "new" << setw(15) << "residual" << endl;
 
-	vector<double> cur_residuals = get_constraint_residual_vec(*current_constraints_sim_ptr);
+	vector<double> cur_residuals = get_constraint_residual_vec(old_obs);
 	vector<double> new_residuals;
 	if (use_chance)
 	{
-		Observations constraints_shift = get_chance_shifted_constraints(constraints_sim);
+		Observations constraints_shift = get_chance_shifted_constraints(new_obs);
 		new_residuals = get_constraint_residual_vec(constraints_shift);
 	}
 	else
-		new_residuals = get_constraint_residual_vec(constraints_sim);
+		new_residuals = get_constraint_residual_vec(new_obs);
 	double sim_val;
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
-		sim_val = constraints_sim[name];
+		sim_val = new_obs[name];
 		f_rec << setw(20) << left << name;
 		f_rec << setw(15) << right << constraint_sense_name[name];
 		f_rec << setw(15) << constraints_obs.get_rec(name);
@@ -1177,14 +1176,14 @@ void Constraints::postsolve_obs_constraints_report(Observations& constraints_sim
 			double offset = post_constraint_offset[name];
 			sim_val += offset;
 			f_rec << setw(15) << offset;
-			f_rec << setw(15) << current_constraints_sim_ptr->get_rec(name);
+			f_rec << setw(15) << old_obs.get_rec(name);
 			f_rec << setw(15) << cur_residuals[i];
 			f_rec << setw(15) << sim_val;
 			f_rec << setw(15) << new_residuals[i] << endl;
 		}
 		else
 		{
-			f_rec << setw(15) << current_constraints_sim_ptr->get_rec(name);
+			f_rec << setw(15) << old_obs.get_rec(name);
 			f_rec << setw(15) << cur_residuals[i];
 			f_rec << setw(15) << sim_val;
 			f_rec << setw(15) << new_residuals[i] << endl;
@@ -1194,7 +1193,7 @@ void Constraints::postsolve_obs_constraints_report(Observations& constraints_sim
 	}
 }
 
-void Constraints::postsolve_pi_constraints_report(Parameters& pars_and_dec_vars, int iter, map<string,string> status_map, map<string,double> price_map)
+void Constraints::postsolve_pi_constraints_report(Parameters& old_pars, Parameters& new_pars, int iter, map<string,string> status_map, map<string,double> price_map)
 {
 	
 	/*report prior information constraints stats to the rec file after the current iteration solution process.  
@@ -1217,8 +1216,8 @@ void Constraints::postsolve_pi_constraints_report(Parameters& pars_and_dec_vars,
 		for (auto &name : ctl_ord_pi_constraint_names)
 		{
 			PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
-			pair<double,double> cur_sim_resid = pi_rec.calc_sim_and_resid(*current_pars_and_dec_vars_ptr);
-			pair<double,double> new_sim_resid = pi_rec.calc_sim_and_resid(pars_and_dec_vars);
+			pair<double,double> cur_sim_resid = pi_rec.calc_sim_and_resid(old_pars);
+			pair<double,double> new_sim_resid = pi_rec.calc_sim_and_resid(new_pars);
 			f_rec << setw(20) << left << name;
 			f_rec << setw(15) << right << constraint_sense_name[name];
 			f_rec << setw(15) << pi_rec.get_obs_value();
@@ -1303,7 +1302,7 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 
 }
 
-void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
+void Constraints::add_runs(Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
 {
 	/* using the passed run mgr pointer, queue up chance runs
 	
@@ -1323,7 +1322,7 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 		//bit using Constraints::get_fosm_par_names()
 		//the last false says not to reinitialize the run mgr since the calling process may have also
 		//added runs
-		bool success = jco.build_runs(*current_pars_and_dec_vars_ptr, *current_constraints_sim_ptr, adj_par_names, pts,
+		bool success = jco.build_runs(current_pars, current_obs, adj_par_names, pts,
 			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
 			*run_mgr_ptr, out_of_bounds, false, true, false);
 		if (!success)
@@ -1345,7 +1344,7 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 		for (auto dname : dec_var_names)
 		{
 			Eigen::VectorXd dvec(num_reals);
-			dvec.setConstant(current_pars_and_dec_vars_ptr->get_rec(dname));
+			dvec.setConstant(current_pars.get_rec(dname));
 			stack_pe.replace_col(dname, dvec);
 		}
 		pfm.log_event("building stack-based parameter runs");

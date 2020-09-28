@@ -118,8 +118,8 @@ private:
 	ObservationEnsemble oe, oe_base;
 
 	//these are used so that we can update the constraints based on the current best values
-	Parameters best_mean_dv_values;
-	Observations best_mean_obs_values;
+	//Parameters best_mean_dv_values;
+	//Observations best_mean_obs_values;
 
 	Constraints constraints;
 

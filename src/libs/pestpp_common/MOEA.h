@@ -106,8 +106,8 @@ private:
 	map<string, double> obj_dir_mult;
 
 	//these two instances are passed as pointers to the constraints
-	Parameters effective_constraint_pars;
-	Observations effective_constraint_obs;
+	//Parameters effective_constraint_pars;
+	//Observations effective_constraint_obs;
 
 	ParetoObjectives objectives;
 	Constraints constraints;
