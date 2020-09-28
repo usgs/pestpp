@@ -271,8 +271,8 @@ def test_zdt1(additive_chance=False):
     obs_df.to_csv(os.path.join(test_d,"restart_obs.csv"))
 
 
-    #shutil.copy2(os.path.join(test_d,dv_pop_file),os.path.join(test_d,"restart_dv.csv"))
-    #shutil.copy2(os.path.join(test_d,obs_pop_file),os.path.join(test_d,"restart_obs.csv"))
+    shutil.copy2(os.path.join(test_d,dv_pop_file),os.path.join(test_d,"restart_dv.csv"))
+    shutil.copy2(os.path.join(test_d,obs_pop_file),os.path.join(test_d,"restart_obs.csv"))
     pst.pestpp_options["mou_dv_population_file"] = "restart_dv.csv"
     pst.pestpp_options["mou_obs_population_restart_file"] = "restart_obs.csv"
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))

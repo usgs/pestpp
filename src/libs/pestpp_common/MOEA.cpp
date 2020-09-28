@@ -91,6 +91,48 @@ void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEn
 
 }
 
+void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp)
+{
+	set<string> duplicates;
+	for (auto solution_p : member_struct)
+	{
+		for (auto solution_q : member_struct)
+		{
+			if (solution_p.first == solution_q.first)
+				continue;
+			if ((first_equals_second(solution_p.second, solution_q.second)) && (duplicates.find(solution_q.first) == duplicates.end()))
+			{
+				duplicates.emplace(solution_p.first);
+			}
+		}
+	}
+	if (duplicates.size() > 0)
+	{
+		stringstream ss;
+		ss << "WARNING: " << duplicates.size() << " duplicate solutions found, dropping (see rec file for listing)";
+		performance_log->log_event(ss.str());
+		cout << ss.str() << endl;
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << "WARNING: " << duplicates.size() << " duplicate solutions found:" << endl;
+		int i = 0;
+		for (auto d : duplicates)
+		{
+			frec << d << " ";
+			i++;
+			if (i > 5)
+			{
+				frec << endl;
+				i = 0;
+			}
+		}
+		vector<string> d(duplicates.begin(), duplicates.end());
+		op.drop_rows(d);
+		dp.drop_rows(d);
+		performance_log->log_event("updating member struct after dropping duplicates");
+		update_member_struct(op, dp);
+	}
+}
+
 pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	stringstream ss;
@@ -98,11 +140,15 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(Obs
 	performance_log->log_event(ss.str());
 	performance_log->log_event("preparing fast-lookup containers");
 
+	
 
 	//TODO: check for a single objective and deal appropriately
 
 	//update the member struct container
 	update_member_struct(op, dp);
+
+	//check for and drop duplictes
+	drop_duplicates(op, dp);
 	
 	vector<string> real_names = op.get_real_names();
 	vector<string> infeas_ordered;
@@ -360,7 +406,12 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 		{
 			if (solution_p.first == solution_q.first) //string compare real name
 				continue;
-			if (first_dominates_second(solution_p.second, solution_q.second))
+			//if the solutions are identical...
+			if (first_equals_second(solution_p.second, solution_q.second))
+			{
+				throw runtime_error("ParetoObjectives::sort_members_by_dominance_into_fronts(): solution '" + solution_p.first + "' and '" + solution_q.first + "' are identical");
+			}
+			else if (first_dominates_second(solution_p.second, solution_q.second))
 			{
 				solutions_dominated.push_back(solution_q.first);
 			}
@@ -368,6 +419,8 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 			{
 				domination_counter++;
 			}
+			
+
 		}
 		//solution_p is in the first front
 		if (domination_counter == 0)
@@ -385,6 +438,7 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 	map<int, vector<string>> front_map;
 	front_map[1] = first_front;
 	vector<string> front = first_front;
+	int num_front_solutions = front.size();
 	while (true)
 	{
 		
@@ -405,9 +459,30 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 		front_map[i] = q_front;
 		
 		front = q_front;
+		num_front_solutions += front.size();
 	}
-	//TODO: check that all solutions made it thru the sorting process
+	
+	if (num_front_solutions != member_struct.size())
+	{
+		stringstream ss;
+		ss << "ERROR: ParetoObjectives::sort_members_by_dominance_into_fronts(): number of solutions in fronts (";
+		ss << num_front_solutions << ") != member_stuct.size() (" << member_struct.size() << endl;
+		file_manager.rec_ofstream() << ss.str();
+		cout << ss.str();
+		throw runtime_error(ss.str());
+	}
+
 	return front_map;
+}
+
+bool ParetoObjectives::first_equals_second(map<string, double>& first, map<string, double>& second)
+{
+	for (auto f : first)
+	{
+		if (f.second != second[f.first])
+			return false;
+	}
+	return true;
 }
 
 bool ParetoObjectives::first_dominates_second(map<string,double>& first, map<string,double>& second)
@@ -1366,7 +1441,7 @@ void MOEA::iterate_to_solution()
 		new_op.append_other_rows(op);
 
 		//sort according to pareto dominance, crowding distance, and, optionally, feasibility
-		message(1, "pareto dominance sorting combined parent-child populations");
+		message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
 		DomPair dompair = objectives.pareto_dominance_sort(new_op, new_dp);
 
 		//drop shitty members
