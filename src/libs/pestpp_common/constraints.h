@@ -40,6 +40,9 @@ public:
 	//queue up chance related runs
 	void add_runs(Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
 
+	void add_runs(ParameterEnsemble& current_pe, Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
+
+
 	//queue up chance related runs at several points in dev var space
 	//void add_runs_at_multiple_points(RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& pe, vector<string> only_reals = vector<string>());
 
@@ -105,6 +108,8 @@ public:
 	//get risk-shifted simulated constraint values using _constraints_sim arg
 	Observations get_chance_shifted_constraints(Observations& _constraints_sim);
 
+	ObservationEnsemble get_chance_shifted_constraints(ObservationEnsemble& oe);
+
 private:
 	Pest& pest_scenario;
 	PerformanceLog& pfm;
@@ -125,6 +130,9 @@ private:
 	
 	ParameterEnsemble stack_pe;
 	ObservationEnsemble stack_oe;
+	
+	map<string, ObservationEnsemble> stack_oe_map;
+
 
 	PriorInformation* null_prior = new PriorInformation();
 	PriorInformation constraints_pi;
@@ -139,6 +147,7 @@ private:
 	map<string, double> post_constraint_stdev;
 
 	map<int, int> stack_pe_run_map;
+	map<string, map<int, int>> population_stack_pe_run_map;
 
 	vector<string> dec_var_names;
 	vector<string> nz_obs_names;
@@ -151,9 +160,6 @@ private:
 	Observations initial_constraints_sim;
 	//Parameters* current_pars_and_dec_vars_ptr;
 	pair<vector<double>, vector<double>> current_bounds;
-
-	
-	
 
 	//get the (risk-shifted) residual (distance) vector between constraints RHS and sim arg
 	vector<double> get_constraint_residual_vec(Observations& sim);
@@ -169,6 +175,10 @@ private:
 
 	//write residual file
 	void write_res_file(Observations& constraints, Parameters& pars_and_dec_vars, string tag, int iter, bool include_chance);
+
+	void process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter);
+	ObservationEnsemble process_stack_runs(string real_name, int iter, map<int, int> _stack_pe_run_map, 
+		RunManagerAbstract* run_mgr_ptr, bool drop_fails=true);
 
 };
 #endif

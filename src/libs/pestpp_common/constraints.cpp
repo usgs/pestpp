@@ -710,6 +710,39 @@ double Constraints::get_max_constraint_change(Observations& current_obs, Observa
 //	return get_chance_shifted_constraints(*current_constraints_sim_ptr);
 //}
 
+ObservationEnsemble Constraints::get_chance_shifted_constraints(ObservationEnsemble& oe)
+{
+	if (stack_oe_map.size() == 0)
+	{
+		throw_constraints_error("population-based stack_oe map is empty");
+	}
+	ObservationEnsemble shifted_oe(oe);//copy
+	//vector<string> real_names = shifted_oe.get_real_names();
+	vector<string> real_names = oe.get_real_names();
+	set<string> snames(real_names.begin(), real_names.end());
+	map<string, int> real_map = oe.get_real_map();
+	Observations sim, sim_shifted;
+	Eigen::VectorXd real_vec;
+	vector<string> onames = shifted_oe.get_var_names();
+	for (auto& real_info : stack_oe_map)
+	{
+		if (snames.find(real_info.first) == snames.end())
+		{
+			throw_constraints_error("dec var population realization name '" + real_info.first + "' not found in observation population realization names");
+		}
+		//overwrite the class stack_oe attribute with the realization stack
+		stack_oe = real_info.second;
+		real_vec = shifted_oe.get_real_vector(real_info.first);
+		sim.update_without_clear(onames, real_vec);
+		//this call uses the class stack_oe attribute;
+		sim_shifted = get_chance_shifted_constraints(sim);
+		shifted_oe.replace(real_map[real_info.first], sim_shifted);
+	}
+	
+	return shifted_oe;
+}
+
+
 Observations Constraints::get_chance_shifted_constraints(Observations& current_obs)
 {
 	/* get the simulated constraint values with the chance shift applied*/
@@ -1236,10 +1269,94 @@ void Constraints::postsolve_pi_constraints_report(Parameters& old_pars, Paramete
 	return;
 }
 
+ObservationEnsemble Constraints::process_stack_runs(string real_name, int iter, map<int, int> _stack_pe_run_map, 
+	RunManagerAbstract* run_mgr_ptr, bool drop_fails)
+{
+	ObservationEnsemble _stack_oe(stack_oe);//copy
+	vector<int> failed_runs = _stack_oe.update_from_runs(_stack_pe_run_map, run_mgr_ptr);
+	stringstream ss;
+	if (failed_runs.size() > 0)
+	{
+		ss.str("");
+		ss << "WARNING: " << failed_runs.size() << " stack runs failed for realization " << real_name;
+		pfm.log_event(ss.str());
+		cout << ss.str() << endl;
+		if (drop_fails)
+		{
+			ss.str("");
+			ss << "dropping failed runs from stack_pe";
+			pfm.log_event(ss.str());
+			stack_pe.drop_rows(failed_runs);
+		}
+	}
+	if (drop_fails)
+	{
+		ss << file_mgr_ptr->get_base_filename() << "." << iter << "." << real_name << ".par_stack";
+		if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+		{
+			ss << ".jcb";
+			stack_pe.to_binary(ss.str());
+		}
+		else
+		{
+			ss << ".csv";
+			stack_pe.to_csv(ss.str());
+		}
+		pfm.log_event("saved stack_pe to " + ss.str());
+	}
+
+	ss.str("");
+	ss << file_mgr_ptr->get_base_filename() << "." << iter << "." << real_name << ".obs_stack";
+	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	{
+		ss << ".jcb";
+		stack_oe.to_binary(ss.str());
+	}
+	else
+	{
+		ss << ".csv";
+		stack_oe.to_csv(ss.str());
+	}
+	ss.str("");
+	pfm.log_event("saved stack_oe to " + ss.str());
+	ss.str("");
+	ss << "Note: " << stack_oe.shape().first << " stack runs active for realization " << real_name;
+	pfm.log_event(ss.str());
+	return _stack_oe;
+}
+
+void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
+{
+	if (population_stack_pe_run_map.size() > 0)
+	{
+		stack_oe_map.clear();
+		//work out what var names for the stack_oe we dont need so we can drop them!
+		vector<string> drop_names;
+		set<string> s_obs_constraint_names(ctl_ord_obs_constraint_names.begin(), ctl_ord_obs_constraint_names.end());
+		for (auto name : stack_oe.get_var_names())
+		{
+			if (s_obs_constraint_names.find(name) == s_obs_constraint_names.end())
+				drop_names.push_back(name);
+		}
+		for (auto& real_info : population_stack_pe_run_map)
+		{
+			pfm.log_event("processing stack runs for realization " + real_info.first);
+			ObservationEnsemble _stack_oe = process_stack_runs(real_info.first, iter, real_info.second, run_mgr_ptr, false);
+			_stack_oe.drop_cols(drop_names);
+			stack_oe_map[real_info.first] = _stack_oe;
+		}
+	}
+	else
+	{
+		pfm.log_event("processing stack runs");
+		stack_oe = process_stack_runs("base", iter, stack_pe_run_map, run_mgr_ptr, true);
+	}
+}
+
 void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 {
 	/* using the passed in run mgr pointer, process any runs that were queued up for chance-based 
-	calculations
+	calculations. handles FOSM, single stack and population nested stacks
 	
 	*/
 	stringstream ss;
@@ -1265,38 +1382,7 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 	else
 	{
 
-		vector<int> failed_runs = stack_oe.update_from_runs(stack_pe_run_map, run_mgr_ptr);
-
-		if (failed_runs.size() > 0)
-		{
-			f_rec << "WARNING: " << failed_runs.size() << " stack realizations failed" << endl;
-			stack_pe.drop_rows(failed_runs);
-		}
-		stringstream ss;
-		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".par_stack";
-		if (pest_scenario.get_pestpp_options().get_ies_save_binary())
-		{
-			ss << ".jcb";
-			stack_pe.to_binary(ss.str());
-		}
-		else
-		{
-			ss << ".csv";
-			stack_pe.to_csv(ss.str());
-		}
-		ss.str("");
-		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".obs_stack";
-		if (pest_scenario.get_pestpp_options().get_ies_save_binary())
-		{
-			ss << ".jcb";
-			stack_oe.to_binary(ss.str());
-		}
-		else
-		{
-			ss << ".csv";
-			stack_oe.to_csv(ss.str());
-		}
-		f_rec << "Note: " << stack_oe.shape().first << " stack realizations active" << endl;
+		process_stack_runs(run_mgr_ptr,iter);
 
 	}
 
@@ -1351,6 +1437,29 @@ void Constraints::add_runs(Parameters& current_pars, Observations& current_obs, 
 		cout << "...running " << stack_pe.shape().first << " model runs for stack-based chance constraints" << endl;
 		stack_pe_run_map.clear();
 		stack_pe_run_map = stack_pe.add_runs(run_mgr_ptr);
+	}
+}
+
+void Constraints::add_runs(ParameterEnsemble& current_pe, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
+{
+	if (!use_chance)
+		return;
+	if (use_fosm)
+	{
+		throw_constraints_error("add_runs() error: FOSM-based chance constraints not supported for ensemble/population-based algorithms");
+	}
+	population_stack_pe_run_map.clear();
+	pfm.log_event("queuing up nested-sets of chance runs for decision-variable ensemble ");
+	Eigen::VectorXd par_vec;
+	vector<string> par_names = current_pe.get_var_names();
+	Parameters real_pars = pest_scenario.get_ctl_parameters();
+	current_pe.transform_ip(ParameterEnsemble::transStatus::CTL);
+	for (auto real_info : current_pe.get_real_map())
+	{
+		par_vec = current_pe.get_real_vector(real_info.first);
+		real_pars.update_without_clear(par_names, par_vec);
+		add_runs(real_pars, current_obs, run_mgr_ptr);
+		population_stack_pe_run_map[real_info.first] = stack_pe_run_map;
 	}
 }
 
