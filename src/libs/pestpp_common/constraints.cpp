@@ -52,7 +52,30 @@ void OptObjFunc::update_coef_map_from_jacobian(Jacobian& jco)
 
 double OptObjFunc::get_obj_func_value(Parameters& pars, Observations& obs)
 {
-	return 0.0;
+	double obj_val = 0.0;
+	if (use_obj_obs)
+
+	{
+		if (obj_func_coef_map.size() == 0)
+			obj_val = obs.get_rec(obj_obs);
+		else
+		{
+			for (auto dv_name : dv_names)
+			{
+				obj_val += pars.get_rec(dv_name) * obj_func_coef_map[dv_name];
+			}
+		}
+	}
+	else if (obj_func_coef_map.size() == 0)
+		throw_optobjfunc_error("get_obj_func_value: not using observation-based objective and obj coef map is empty");
+	else
+	{
+		for (auto dv_name : dv_names)
+		{
+			obj_val += pars.get_rec(dv_name) * obj_func_coef_map[dv_name];
+		}
+	}
+	return obj_val;
 }
 
 void OptObjFunc::report()

@@ -61,13 +61,13 @@ private:
 	//map<string, double> obj_func_coef_map;
 
 	vector<double> iter_obj_values;
-	vector<string> ctl_ord_dec_var_names;
-	vector<string> ctl_ord_ext_var_names;
+	vector<string> dv_names;
+	vector<string> ext_dv_names;
 
 	PriorInformation* null_prior = new PriorInformation();
-	Parameters all_pars_and_dec_vars;
-	Parameters all_pars_and_dec_vars_initial;
-	Parameters all_pars_and_dec_vars_best;
+	Parameters current_pars;
+	Parameters initial_pars;
+	Parameters best_pars;
 	ParamTransformSeq par_trans;
 	Observations current_constraints_sim;
 	
@@ -80,7 +80,7 @@ private:
 	FileManager* file_mgr_ptr;
 	//OutputFileWriter* out_wtr_ptr;
 
-	int num_dec_vars() { return ctl_ord_dec_var_names.size(); }
+	int num_dec_vars() { return dv_names.size(); }
 
 	void build_dec_var_bounds();
 
