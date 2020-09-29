@@ -129,7 +129,7 @@ void OptObjFunc::throw_optobjfunc_error(string message)
 	throw runtime_error(error_message);
 }
 
-void OptObjFunc::initialize(vector<string>& _constraint_names, vector<string>& _dv_names)
+void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv_names)
 {
 	//initialize the objective function
 	obj_func_str = pest_scenario.get_pestpp_options().get_opt_obj_func();

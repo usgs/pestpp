@@ -24,7 +24,7 @@ class OptObjFunc
 {
 public:
 	OptObjFunc(Pest& _pest_scenario, FileManager* _file_mgr_ptr, PerformanceLog& _pfm);
-	void initialize(vector<string>& _constraint_names, vector<string>& _dv_names);
+	void initialize(vector<string> _constraint_names, vector<string> _dv_names);
 	double get_obj_func_value(Parameters& pars, Observations& obs);
 	void report();
 	void update_coef_map_from_jacobian(Jacobian& jco);
