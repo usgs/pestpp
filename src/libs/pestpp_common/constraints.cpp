@@ -22,6 +22,169 @@
 
 using namespace std;
 
+OptObjFunc::OptObjFunc(Pest& _pest_scenario, FileManager* _file_mgr_ptr, PerformanceLog& _pfm):
+	pest_scenario(_pest_scenario), file_mgr_ptr(file_mgr_ptr), pfm(_pfm)
+{
+
+}
+
+void OptObjFunc::update_coef_map_from_jacobian(Jacobian& jco)
+{
+	if (!use_obj_obs)
+		return;
+
+	obj_func_coef_map.clear();
+	vector<string> onames = jco.get_sim_obs_names();
+	vector<string> pnames = jco.get_base_numeric_par_names();
+	set<string> sdecvar(dv_names.begin(), dv_names.end());
+
+	int idx = find(onames.begin(), onames.end(), obj_obs) - onames.begin();
+	if (idx >= onames.size())
+		throw_optobjfunc_error("obj function obs name '" + obj_obs +"' not found in jco row names, #sad");
+	Eigen::VectorXd vec = Eigen::VectorXd(jco.get_matrix_ptr()->row(idx));
+	for (int i = 0; i < vec.size(); i++)
+	{
+		if (sdecvar.find(pnames[i]) == sdecvar.end())
+			continue;
+		obj_func_coef_map[pnames[i]] = vec[i];
+	}
+}
+
+double OptObjFunc::get_obj_func_value(Parameters& pars, Observations& obs)
+{
+	return 0.0;
+}
+
+void OptObjFunc::report()
+{
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+	map<string, double>::iterator end = obj_func_coef_map.end();
+	vector<string> missing;
+	if (use_obj_obs)
+		f_rec << "objective function coefficients defined by observation: " << pest_scenario.get_pestpp_options().get_opt_obj_func() << endl;
+	else
+	{
+		f_rec << "  ---  objective function coefficients  ---  " << endl;
+		vector<string> missing;
+		ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+		map<string, double>::iterator end = obj_func_coef_map.end();
+		f_rec << setw(20) << left << "name" << setw(25) << "obj func coefficient" << endl;
+		for (auto& name : dv_names)
+		{
+			f_rec << setw(20) << left << name;
+			if (obj_func_coef_map.find(name) != end)
+			{
+				f_rec << setw(25) << obj_func_coef_map.at(name) << endl;
+			}
+			else
+			{
+				f_rec << setw(25) << "not listed" << endl;
+				missing.push_back(name);
+			}
+		}
+
+		if (missing.size() > 0)
+		{
+			f_rec << endl << endl << "WARNING: the following decision variables have '0.0' objective function coef:" << endl;
+			cout << endl << endl << "WARNING: the following decision variables have '0.0' objective function coef:" << endl;
+
+			for (auto& name : missing)
+			{
+				f_rec << "    " << name << endl;
+				f_rec << "    " << name << endl;
+			}
+		}
+	}
+}
+
+void OptObjFunc::throw_optobjfunc_error(string message)
+{
+	string error_message = "error in sequentialLP process: " + message;
+	file_mgr_ptr->rec_ofstream() << error_message << endl;
+	file_mgr_ptr->close_file("rec");
+	cout << endl << endl << error_message << endl << endl;
+	throw runtime_error(error_message);
+}
+
+void OptObjFunc::initialize(vector<string>& _constraint_names, vector<string>& _dv_names)
+{
+	//initialize the objective function
+	obj_func_str = pest_scenario.get_pestpp_options().get_opt_obj_func();
+	obj_sense = (pest_scenario.get_pestpp_options().get_opt_direction() == 1) ? "minimize" : "maximize";
+
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+
+	dv_names = _dv_names;
+	constraint_names = _constraint_names;
+
+	//check if the obj_str is an observation
+	use_obj_obs = false;
+	if (pest_scenario.get_ctl_observations().find(obj_func_str) != pest_scenario.get_ctl_observations().end())
+	{
+		use_obj_obs = true;
+		obj_obs = obj_func_str;
+		//check
+		set<string> names(constraint_names.begin(), constraint_names.end());
+		if (names.find(obj_obs) != names.end())
+		{
+			throw runtime_error("objective function obs is a constraint, #sad");
+		}
+		names.clear();
+		vector<string> cnames = pest_scenario.get_ctl_ordered_nz_obs_names();
+		names.insert(cnames.begin(), cnames.end());
+		if (names.find(obj_obs) != names.end())
+		{
+			throw runtime_error("objective function obs has non-zero weight and chance constraints are active");
+		}
+
+	}
+
+	else
+	{
+		if (obj_func_str.size() == 0)
+		{
+			f_rec << " warning: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
+			for (auto& name : dv_names)
+				obj_func_coef_map[name] = 1.0;
+		}
+
+		//or if it is a prior info equation
+		else if (pest_scenario.get_prior_info().find(obj_func_str) != pest_scenario.get_prior_info().end())
+		{
+			obj_func_coef_map = pest_scenario.get_prior_info().get_pi_rec_ptr(obj_func_str).get_atom_factors();
+			//throw_sequentialLP_error("prior-information-based objective function not implemented");
+		}
+		else
+		{
+			//check if this obj_str is a filename
+			ifstream if_obj(obj_func_str);
+			if (!if_obj.good())
+				throw_optobjfunc_error("unrecognized ++opt_objective_function arg: " + obj_func_str);
+			else
+				obj_func_coef_map = pest_utils::read_twocol_ascii_to_map(obj_func_str);
+		}
+
+
+		//check that all obj_coefs are decsision vars
+		vector<string> missing_vars;
+		set<string> s_dv_names(dv_names.begin(), dv_names.end());
+		for (auto& coef : obj_func_coef_map)
+			if (s_dv_names.find(coef.first) == s_dv_names.end())
+				missing_vars.push_back(coef.first);
+		if (missing_vars.size() > 0)
+		{
+			stringstream ss;
+			ss << "the following objective function components are not decision variables: ";
+			for (auto m : missing_vars)
+				ss << m << ",";
+			throw_optobjfunc_error(ss.str());
+		}
+			
+
+	}
+}
+
+
 Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, OutputFileWriter& _of_wr, PerformanceLog& _pfm)
 	:pest_scenario(_pest_scenario), file_mgr_ptr(_file_mgr_ptr), of_wr(_of_wr), pfm(_pfm), jco(*_file_mgr_ptr, _of_wr)
 {

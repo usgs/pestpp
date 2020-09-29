@@ -19,6 +19,38 @@
 
 using namespace std;
 
+
+class OptObjFunc
+{
+public:
+	OptObjFunc(Pest& _pest_scenario, FileManager* _file_mgr_ptr, PerformanceLog& _pfm);
+	void initialize(vector<string>& _constraint_names, vector<string>& _dv_names);
+	double get_obj_func_value(Parameters& pars, Observations& obs);
+	void report();
+	void update_coef_map_from_jacobian(Jacobian& jco);
+
+	const string get_obj_sense() { return obj_sense;  }
+	const bool get_use_obs_obj() { return use_obj_obs; }
+
+	const map<string, double> get_obj_func_coef_map() { return obj_func_coef_map;  }
+
+
+private:
+	Pest& pest_scenario;
+	FileManager* file_mgr_ptr;
+	PerformanceLog& pfm;
+
+	string obj_func_str;
+	string obj_obs;
+	string obj_sense;
+	bool use_obj_obs;
+	map<string, double> obj_func_coef_map;
+	vector<string> constraint_names;
+	vector<string> dv_names;
+
+	void throw_optobjfunc_error(string message);
+};
+
 class Constraints
 {
 	

@@ -29,11 +29,11 @@ public:
 private:
 	std::mt19937 rand_gen;
 	PerformanceLog& pfm;
-	string obj_func_str;
+	//string obj_func_str;
 	bool terminate;
 	bool super_secret_option;
-	bool use_obj_obs;
-	string obj_obs;
+	//bool use_obj_obs;
+	//string obj_obs;
 	int slp_iter;
 
 	double* dec_var_lb;
@@ -44,7 +44,7 @@ private:
 	double obj_best;
 	double obj_init;
 
-	string obj_sense;
+	//string obj_sense;
 	ClpSimplex model;
 	CoinMessageHandler coin_hr;
 	FILE* coin_log_ptr;
@@ -52,12 +52,13 @@ private:
 	OutputFileWriter of_wr;
 
 	Constraints constraints;
+	OptObjFunc optobjfunc;
 
 	map<ClpSimplex::Status, string> status_name_map = { {ClpSimplex::Status::atLowerBound,"at lower bound"},
 	{ ClpSimplex::Status::atUpperBound,"at upper bound"},{ClpSimplex::Status::basic,"basic"},
 	{ ClpSimplex::Status::isFree,"free"},{ ClpSimplex::Status::isFixed,"fixed"}};
 
-	map<string, double> obj_func_coef_map;
+	//map<string, double> obj_func_coef_map;
 
 	vector<double> iter_obj_values;
 	vector<string> ctl_ord_dec_var_names;
@@ -121,7 +122,7 @@ private:
 	//set the double* obj_func array
 	void build_obj_func_coef_array();
 
-	double obj_func_report();
+	//double obj_func_report();
 
 };
 
