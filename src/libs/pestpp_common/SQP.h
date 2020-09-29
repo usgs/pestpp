@@ -93,6 +93,7 @@ private:
 	ParChangeSummarizer pcs;
 	Covariance parcov, obscov;
 	double reg_factor;
+	chancePoints chancepoints;
 
 	string base_name = "BASE"; //this is also defined in Ensemble
 

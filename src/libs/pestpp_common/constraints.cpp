@@ -712,36 +712,56 @@ double Constraints::get_max_constraint_change(Observations& current_obs, Observa
 
 ObservationEnsemble Constraints::get_chance_shifted_constraints(ObservationEnsemble& oe)
 {
+	ObservationEnsemble shifted_oe(oe);//copy
+	ofstream& frec = file_mgr_ptr->rec_ofstream();
 	if (stack_oe_map.size() == 0)
 	{
-		throw_constraints_error("population-based stack_oe map is empty");
-	}
-	ObservationEnsemble shifted_oe(oe);//copy
-	//vector<string> real_names = shifted_oe.get_real_names();
-	vector<string> real_names = oe.get_real_names();
-	set<string> snames(real_names.begin(), real_names.end());
-	map<string, int> real_map = oe.get_real_map();
-	Observations sim, sim_shifted;
-	Eigen::VectorXd real_vec;
-	vector<string> onames = shifted_oe.get_var_names();
-	for (auto& real_info : stack_oe_map)
-	{
-		if (snames.find(real_info.first) == snames.end())
+		
+		pfm.log_event("risk-shifting observation population using a single, 'optimal' chance point");
+		frec << "risk - shifting observation population using a single, 'optimal' chance point" << endl;
+
+		
+		//constraints.presolve_chance_report(iter,);
+		Observations sim, sim_shifted;
+		Eigen::VectorXd real_vec;
+		vector<string> onames = shifted_oe.get_var_names();
+		for (int i = 0; i < shifted_oe.shape().first; i++)
 		{
-			throw_constraints_error("dec var population realization name '" + real_info.first + "' not found in observation population realization names");
+			real_vec = shifted_oe.get_real_vector(i);
+			sim.update_without_clear(onames, real_vec);
+			sim_shifted = get_chance_shifted_constraints(sim);
+			shifted_oe.replace(i, sim_shifted);
 		}
-		//overwrite the class stack_oe attribute with the realization stack
-		stack_oe = real_info.second;
-		real_vec = shifted_oe.get_real_vector(real_info.first);
-		sim.update_without_clear(onames, real_vec);
-		//this call uses the class stack_oe attribute;
-		sim_shifted = get_chance_shifted_constraints(sim);
-		shifted_oe.replace(real_map[real_info.first], sim_shifted);
+
 	}
-	
+	else
+	{
+		pfm.log_event("risk-shifting observation population using 'ALL' decision variable solutions as chance points");
+		frec << "risk-shifting observation population using 'ALL' decision variable solutions as chance points" << endl;
+		//vector<string> real_names = shifted_oe.get_real_names();
+		vector<string> real_names = oe.get_real_names();
+		set<string> snames(real_names.begin(), real_names.end());
+		map<string, int> real_map = oe.get_real_map();
+		Observations sim, sim_shifted;
+		Eigen::VectorXd real_vec;
+		vector<string> onames = shifted_oe.get_var_names();
+		for (auto& real_info : stack_oe_map)
+		{
+			if (snames.find(real_info.first) == snames.end())
+			{
+				throw_constraints_error("dec var population realization name '" + real_info.first + "' not found in observation population realization names");
+			}
+			//overwrite the class stack_oe attribute with the realization stack
+			stack_oe = real_info.second;
+			real_vec = shifted_oe.get_real_vector(real_info.first);
+			sim.update_without_clear(onames, real_vec);
+			//this call uses the class stack_oe attribute;
+			sim_shifted = get_chance_shifted_constraints(sim);
+			shifted_oe.replace(real_map[real_info.first], sim_shifted);
+		}
+	}
 	return shifted_oe;
 }
-
 
 Observations Constraints::get_chance_shifted_constraints(Observations& current_obs)
 {

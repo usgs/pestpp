@@ -742,6 +742,28 @@ void SeqQuadProgram::initialize()
 
 	constraints.initialize(dv_names, numeric_limits<double>::max());
 	constraints.initial_report();
+	//some risk-based stuff here
+	string chance_points = ppo->get_opt_chance_points();
+	if (chance_points == "ALL")
+	{
+		//evaluate the chance constraints at every individual, very costly, but most robust
+		//throw_sqp_error("'opt_chance_points' == 'all' not implemented");
+		chancepoints = chancePoints::ALL;
+	}
+
+	else if (chance_points == "SINGLE")
+	{
+		//evaluate the chance constraints only at the population member nearest the optimal tradeoff.
+		//much cheaper, but assumes linear coupling
+		chancepoints = chancePoints::SINGLE;
+
+	}
+	else
+	{
+		ss.str("");
+		ss << "unrecognized 'sqp_chance_points' value :" << chance_points << ", should be 'all' or 'single'";
+		throw_sqp_error(ss.str());
+	}
 	
 	iter = 0;
 	//ofstream &frec = file_manager.rec_ofstream();
@@ -969,6 +991,8 @@ void SeqQuadProgram::initialize()
 		message(1, "saving results from mean dv value run to ", obs_csv);
 		_oe.to_csv(obs_csv);
 
+
+		//TODO: rather than report l2 phi, report actual obj func and feas status
 		ph.update(_oe, _pe);
 		message(0, "mean parameter phi report:");
 		ph.report(true);

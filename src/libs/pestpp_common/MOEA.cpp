@@ -699,17 +699,17 @@ void MOEA::queue_chance_runs()
 			}
 			string min_member = dp.get_real_names()[idx_min];
 			ss.str("");
-			ss << "using member " << min_member << " as nearest-to-mean chance point with distance of " << dist_min << " from mean of decision population";
+			ss << "using member " << min_member << " as nearest-to-mean single chance point with distance of " << dist_min << " from mean of decision population";
 			message(2, ss.str());
 			
 			pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(min_member));
 			
 		}
-		else if (chancepoints == chancePoints::OPTIMAL)
+		else if (chancepoints == chancePoints::SINGLE)
 		{
 			//calculate the optimal tradeoff point from the current op
 			//dont worry about pi-based obj since they are chance-based
-			message(2, "seeking optimal trade-off point for 'optimal' chance point runs");
+			message(2, "seeking optimal trade-off point for aingle 'optimal' chance point runs");
 			vector<double> obj_extrema;
 			Eigen::VectorXd obj_vec;
 
@@ -743,7 +743,7 @@ void MOEA::queue_chance_runs()
 			obs.update_without_clear(op.get_var_names(), op.get_real_vector(opt_member));
 
 			ss.str("");
-			ss << "using member " << opt_member << " as optimal chance point with distance of " << opt_dist << " from optimal trade-off";
+			ss << "using member " << opt_member << " as singel, 'optimal' chance point with distance of " << opt_dist << " from optimal trade-off";
 			message(2, ss.str());
 
 		}
@@ -842,30 +842,34 @@ vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _o
 	return failed_real_indices;
 }
 
-ObservationEnsemble MOEA::get_risk_shifted_op(ObservationEnsemble& _op)
+ObservationEnsemble MOEA::get_chance_shifted_op(ObservationEnsemble& _op)
 {
-	ObservationEnsemble shifted_op(_op);
-	if (chancepoints == chancePoints::OPTIMAL)
-	{
-		message(2, "risk-shifting observation population using 'optimal' chance point");
-		//constraints.presolve_chance_report(iter,);
-		Observations sim, sim_shifted;
-		Eigen::VectorXd real_vec;
-		vector<string> onames = shifted_op.get_var_names();
-		for (int i = 0; i < shifted_op.shape().first; i++)
-		{
-			real_vec = shifted_op.get_real_vector(i);
-			sim.update_without_clear(onames, real_vec);
-			sim_shifted = constraints.get_chance_shifted_constraints(sim);
-			shifted_op.replace(i, sim_shifted);
-		}
-	}
-	else
-	{
-		throw_moea_error("only 'optimal' chancepoint currently supported");
-	}
+	//ObservationEnsemble shifted_op(_op);
+	//if (chancepoints == chancePoints::SINGLE)
+	//{
+	//	message(2, "risk-shifting observation population using a single, 'optimal' chance point");
+	//	//constraints.presolve_chance_report(iter,);
+	//	Observations sim, sim_shifted;
+	//	Eigen::VectorXd real_vec;
+	//	vector<string> onames = shifted_op.get_var_names();
+	//	for (int i = 0; i < shifted_op.shape().first; i++)
+	//	{
+	//		real_vec = shifted_op.get_real_vector(i);
+	//		sim.update_without_clear(onames, real_vec);
+	//		sim_shifted = constraints.get_chance_shifted_constraints(sim);
+	//		shifted_op.replace(i, sim_shifted);
+	//	}
+	//}
+	//else if (chancepoints == chancePoints::ALL)
+	//{
 
-	return shifted_op;
+	//}
+	//else
+	//{
+	//	throw_moea_error("only 'optimal' chancepoint currently supported");
+	//}
+
+	return constraints.get_chance_shifted_constraints(_op);
 }
 
 void MOEA::finalize()
@@ -1025,30 +1029,24 @@ void MOEA::initialize()
 
 
 	//some risk-based stuff here
-	string chance_points = ppo->get_mou_chance_points();
+	string chance_points = ppo->get_opt_chance_points();
 	if (chance_points == "ALL")
 	{
 		//evaluate the chance constraints at every individual, very costly, but most robust
 		throw_moea_error("'mou_chance_points' == 'all' not implemented");
 	}
-	else if (chance_points == "EXTREMA")
-	{
-		//evaluate the chance constraints at the obj extrema individuals and interpolate risk-shifts
-		//from the extrema to the rest of the population. not as costly as all, but still should 
-		//accomodate some nonlinear in the coupling
-		throw_moea_error("'mou_chance_points' == 'extrema' not implemented");
-	}
-	else if (chance_points == "OPTIMAL")
+	
+	else if (chance_points == "SINGLE")
 	{
 		//evaluate the chance constraints only at the population member nearest the optimal tradeoff.
 		//much cheaper, but assumes linear coupling
-		chancepoints = chancePoints::OPTIMAL;
+		chancepoints = chancePoints::SINGLE;
 
 	}
 	else
 	{
 		ss.str("");
-		ss << "unrecognized 'mou_chance_points' value :" << chance_points << ", should be 'all', 'extrema', or 'optimal'";
+		ss << "unrecognized 'mou_chance_points' value :" << chance_points << ", should be 'all' or 'single'";
 		throw_moea_error(ss.str());
 	}
 
@@ -1331,7 +1329,7 @@ void MOEA::initialize()
 
 	if (constraints.get_use_chance())
 	{
-		ObservationEnsemble shifted_op = get_risk_shifted_op(op);
+		ObservationEnsemble shifted_op = get_chance_shifted_op(op);
 		ss.str("");
 		ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".chance.csv";
 		op.to_csv(ss.str());
@@ -1439,7 +1437,7 @@ void MOEA::iterate_to_solution()
 			//rank_ = 0;
 
 		//and risk-shift
-		ObservationEnsemble new_op_shifted = get_risk_shifted_op(new_op);
+		ObservationEnsemble new_op_shifted = get_chance_shifted_op(new_op);
 			
 		//TODO: save new_dp, new_op and new_op_shifted?
 

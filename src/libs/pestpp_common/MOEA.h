@@ -14,6 +14,7 @@
 #include "PerformanceLog.h"
 #include "Ensemble.h"
 #include "constraints.h"
+#include "EnsembleMethodUtils.h"
 
 
 class ParetoObjectives
@@ -79,7 +80,6 @@ private:
 
 class MOEA
 {
-	enum chancePoints{ALL,EXTREMA,OPTIMAL};
 public:
 	static mt19937_64 rand_engine;
 	MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer,
@@ -104,6 +104,7 @@ private:
 	vector<string> obs_obj_names, pi_obj_names;
 	vector<string> dv_names;
 	map<string, double> obj_dir_mult;
+
 
 	//these two instances are passed as pointers to the constraints
 	//Parameters effective_constraint_pars;
@@ -137,8 +138,7 @@ private:
 	vector<int> run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
 	void queue_chance_runs();
-	ObservationEnsemble get_risk_shifted_op(ObservationEnsemble& _op);
-
+	ObservationEnsemble get_chance_shifted_op(ObservationEnsemble& _op);
 
 	bool initialize_dv_population();
 	void initialize_obs_restart_population();
