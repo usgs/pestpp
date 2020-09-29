@@ -34,6 +34,7 @@ add_library(pestpp_com STATIC
   Transformation.cpp
   SQP.cpp
   MOEA.cpp
+  sequential_lp.cp
 )
 
 target_include_directories(pestpp_com INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
