@@ -177,8 +177,12 @@ private:
 	void write_res_file(Observations& constraints, Parameters& pars_and_dec_vars, string tag, int iter, bool include_chance);
 
 	void process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter);
-	ObservationEnsemble process_stack_runs(string real_name, int iter, map<int, int> _stack_pe_run_map, 
+	pair<vector<int>,ObservationEnsemble> process_stack_runs(string real_name, int iter, map<int, int> _stack_pe_run_map, 
 		RunManagerAbstract* run_mgr_ptr, bool drop_fails=true);
+
+	void save_oe_stack(int iter, string real_name, ObservationEnsemble& _stack_oe);
+	void save_pe_stack(int iter, string real_name, ParameterEnsemble& _stack_pe);
+
 
 };
 #endif
