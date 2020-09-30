@@ -23,7 +23,7 @@
 using namespace std;
 
 OptObjFunc::OptObjFunc(Pest& _pest_scenario, FileManager* _file_mgr_ptr, PerformanceLog& _pfm):
-	pest_scenario(_pest_scenario), file_mgr_ptr(file_mgr_ptr), pfm(_pfm)
+	pest_scenario(_pest_scenario), file_mgr_ptr(_file_mgr_ptr), pfm(_pfm)
 {
 
 }

@@ -37,7 +37,7 @@ add_library(pestpp_com STATIC
   sequential_lp.cpp
 )
 
-target_include_directories(pestpp_com INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}"/src/libs/opt)
+target_include_directories(pestpp_com INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}" /src/libs/opt)
 
 target_compile_options(pestpp_com PRIVATE ${PESTPP_CXX_WARN_FLAGS})
 

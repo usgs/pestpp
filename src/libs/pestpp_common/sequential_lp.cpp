@@ -18,10 +18,10 @@ sequentialLP::sequentialLP(Pest &_pest_scenario, RunManagerAbstract* _run_mgr_pt
 	Covariance &_parcov, FileManager* _file_mgr_ptr, OutputFileWriter _of_wr, PerformanceLog& _pfm) 
 	: pest_scenario(_pest_scenario), run_mgr_ptr(_run_mgr_ptr),
 	parcov(_parcov), file_mgr_ptr(_file_mgr_ptr),jco(*_file_mgr_ptr,_of_wr), of_wr(_of_wr), pfm(_pfm),
-	constraints(_pest_scenario,_file_mgr_ptr,_of_wr, _pfm), optobjfunc(_pest_scenario, _file_mgr_ptr,_pfm)
+	constraints(_pest_scenario,_file_mgr_ptr,_of_wr,_pfm), optobjfunc(_pest_scenario, _file_mgr_ptr,_pfm)
 {
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
-	
+
 	try
 	{
 		initialize_and_check();
@@ -31,6 +31,7 @@ sequentialLP::sequentialLP(Pest &_pest_scenario, RunManagerAbstract* _run_mgr_pt
 		cout << "error initializing sequentialLP process: " << error.what() << endl;
 		exit(1);
 	}
+
 }
 
 sequentialLP::~sequentialLP()
