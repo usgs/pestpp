@@ -13,9 +13,9 @@ da_parameter_ensemble      kh_ensemble0.csv
 DA_SUBSET_SIZE 5
 ies_num_reals 100
 da_num_reals 10
-da_lambda_mults 100,50,1
+da_inflation_fac 1.2, 1
 DA_SUBSET_HOW  RANDOM
-lambda_scale_fac 1.0
+da_scale_fac 1.0
 * parameter groups external
 test.pargrp_data.csv
 * parameter data external

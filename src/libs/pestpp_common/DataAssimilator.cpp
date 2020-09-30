@@ -38,6 +38,7 @@ DataAssimilator::DataAssimilator(Pest& _pest_scenario, FileManager& _file_manage
 	weights.set_pest_scenario(&pest_scenario);
 	localizer.set_pest_scenario(&pest_scenario);
 	icycle = 0;
+	
 }
 
 void DataAssimilator::throw_da_error(string message)
@@ -1562,7 +1563,7 @@ void DataAssimilator::da_initialize(int _icycle)
 	stringstream ss;
 	ofstream& f_rec = file_manager.rec_ofstream();
 
-	CtlPar_container da_ctl_params = pest_scenario.get_pestpp_options().da_ctl_params;
+	da_ctl_params = pest_scenario.get_pestpp_options().da_ctl_params;
 
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
@@ -1732,7 +1733,7 @@ void DataAssimilator::da_initialize(int _icycle)
 	else
 	{
 		// report DA paramters use
-		lam_mults = da_ctl_params.get_vvalue("DA_LAMBDA_MULTS");	
+		lam_mults = da_ctl_params.get_vvalue("DA_INFLATION_FAC");	
 
 
 	}
@@ -2502,6 +2503,8 @@ void DataAssimilator::da_upate()
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
+
+	 
 
 	bool accept;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
@@ -3988,13 +3991,23 @@ bool DataAssimilator::solve_new_da()
 		else
 		{
 			cur_lam = lam_mult;
-			ss << "starting calcs for lambda" << cur_lam;
-			message(1, "starting lambda calcs for lambda", cur_lam);
+			ss << "starting calcs for inflation factors" << cur_lam;
+			message(1, "starting inflation calcs for inflation factor ", cur_lam);
 			message(2, "see .log file for more details");
 			pe_upgrade = calc_kf_upgrade(cur_lam, loc_map);
 		}
 
-		for (auto sf : pest_scenario.get_pestpp_options().get_lambda_scale_vec())
+		vector<double> scale_facs;
+		if (use_ies)
+		{
+			scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
+		}
+		else
+		{
+			scale_facs = da_ctl_params.get_vvalue("DA_SCALE_FAC");
+		}
+
+		for (auto sf : scale_facs)
 		{
 
 			ParameterEnsemble pe_lam_scale = pe;
@@ -4045,7 +4058,7 @@ bool DataAssimilator::solve_new_da()
 	double mean, std;
 	vector<ObservationEnsemble> oe_lams;
 
-	if (use_ies)
+	if (use_ies) /// todo: I think this should be removed 
 	{
 		message(0, "running lambda ensembles");
 		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
@@ -4053,7 +4066,7 @@ bool DataAssimilator::solve_new_da()
 	else
 	{
 		// 
-		message(0, "running lambda ensembles");
+		message(0, "running inflation ensembles");
 		vector<ParameterEnsemble> posterior_dyn_states;
 		if (dyn_states_names.size() > 0)
 		{
@@ -4073,8 +4086,14 @@ bool DataAssimilator::solve_new_da()
 	}
 
 	// ============= end of forward runs =================
-
-	message(0, "evaluting lambda ensembles");
+	if (use_ies)
+	{
+		message(0, "evaluting lambda ensembles");
+	}
+	else
+	{
+		message(0, "evaluting inflation factor ensembles");
+	}
 	message(1, "last mean: ", last_best_mean);
 	message(1, "last stdev: ", last_best_std);
 
@@ -4117,7 +4136,14 @@ bool DataAssimilator::solve_new_da()
 
 		ph.update(oe_lams[i], pe_lams[i]);
 
-		message(0, "phi summary for lambda, scale fac:", vals, echo);
+		if (use_ies)
+		{
+			message(0, "phi summary for lambda, scale fac:", vals, echo);
+		}
+		else
+		{
+			message(0, "phi summary for inflation, scale fac:", vals, echo);
+		}
 		ph.report(echo);
 
 
@@ -4141,7 +4167,7 @@ bool DataAssimilator::solve_new_da()
 
 	}
 	//use_ies = true;
-	if (!use_ies)
+	if (false)
 	{
 		pe = pe_lams[best_idx];
 		oe = oe_lam_best;
@@ -4155,9 +4181,8 @@ bool DataAssimilator::solve_new_da()
 
 
 	//subset stuff here
-	if (use_ies)
-	{
-		if ((best_idx != -1) && (use_subset) && (subset_size < pe.shape().first))
+	
+	if ((best_idx != -1) && (use_subset) && (subset_size < pe.shape().first))
 		{
 
 			double acc_phi = last_best_mean * acc_fac;
@@ -4231,7 +4256,34 @@ bool DataAssimilator::solve_new_da()
 			org_pe_idxs = remaining_pe_lam.get_real_names();
 			org_oe_idxs = remaining_oe_lam.get_real_names();
 			///run
-			vector<int> fails = run_ensemble(remaining_pe_lam, remaining_oe_lam);
+			//vector<int> fails = run_ensemble(remaining_pe_lam, remaining_oe_lam);
+
+			/// ***************** Run remaining ****************************
+			vector<ParameterEnsemble> pe_lams_remain;
+			vector<ParameterEnsemble> posterior_dyn_states;
+			pe_lams_remain.clear();
+			pe_lams_remain.push_back(remaining_pe_lam);
+			if (dyn_states_names.size() > 0)
+			{
+				// before forward runing remove the dynamic states temporarly 
+				// and replace them with prior dynamic states
+				posterior_dyn_states = temp_remove_dyn_state(pe_lams_remain);
+			}
+
+			//oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
+			vector<int> fails = run_ensemble(pe_lams_remain[0], remaining_oe_lam);
+			if (dyn_states_names.size() > 0)
+			{
+				// after forward running put the dynamic states back into pe
+				return_post_dyn_state(pe_lams_remain, posterior_dyn_states);
+			}
+			remaining_pe_lam = pe_lams_remain[0];
+			//clear posterior matrix
+			posterior_dyn_states.clear();
+			pe_lams_remain.clear();
+
+
+			///*************************************************************
 
 			//for testing
 			if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder())
@@ -4282,13 +4334,13 @@ bool DataAssimilator::solve_new_da()
 			message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 			ph.report(true);
 		}
-		else
+	else
 		{
 			ph.update(oe_lam_best, pe_lams[best_idx]);
 			best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 			best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		}
-	}
+	
 	ph.update(oe_lam_best, pe_lams[best_idx]);
 	best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 	best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
@@ -4854,7 +4906,7 @@ void DataAssimilator::set_subset_idx(int size)
 		nreal_subset = pest_scenario.get_pestpp_options().get_ies_subset_size();//todo: use da option
 	else
 	{
-		CtlPar_container da_ctl_params = pest_scenario.get_pestpp_options().da_ctl_params;
+		//CtlPar_container da_ctl_params = pest_scenario.get_pestpp_options().da_ctl_params;
 		nreal_subset = da_ctl_params.get_ivalue("DA_SUBSET_SIZE");
 	}
 	if ((!use_subset) || (nreal_subset >= size))
@@ -4875,7 +4927,7 @@ void DataAssimilator::set_subset_idx(int size)
 	string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
 	if (!use_ies)
 	{
-		CtlPar_container da_ctl_params = pest_scenario.get_pestpp_options().da_ctl_params;
+		//CtlPar_container da_ctl_params = pest_scenario.get_pestpp_options().da_ctl_params;
 		how = da_ctl_params.get_svalue("DA_SUBSET_HOW");
 	}
 

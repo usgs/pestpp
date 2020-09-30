@@ -94,6 +94,7 @@ private:
 	int icycle;
 	int  verbose_level;
 	Pest& pest_scenario;
+	CtlPar_container da_ctl_params;
 	std::mt19937 rand_gen;
 	std::mt19937 subset_rand_gen;
 	FileManager& file_manager;
@@ -144,6 +145,7 @@ private:
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 
 	bool oe_drawn, pe_drawn;
+	
 
 	//bool solve_old();
 	bool solve_new();

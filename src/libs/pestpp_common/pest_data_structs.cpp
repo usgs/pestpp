@@ -1058,7 +1058,7 @@ bool PestppOptions::assign_DA_value_by_key(const string& key, const string& valu
 			da_ctl_params.set_value(key, ival);
 			return true;
 		}
-		else if (typ.compare("vector"))
+		else if (typ.compare("vector")==0)
 		{
 			vector <double> vval;
 			vval.clear();
@@ -1069,6 +1069,7 @@ bool PestppOptions::assign_DA_value_by_key(const string& key, const string& valu
 				vval.push_back(convert_cp<double>(iscale));
 			}
 			da_ctl_params.set_value(key, vval);
+			return true;
 
 		}
 		else
@@ -1912,6 +1913,8 @@ string CtlPar_container::get_type(string name)
 		return "double";
 	else if (!(bool_parms.find(name) == bool_parms.end()))
 		return "bool";
+	else if (!(vector_parms.find(name) == vector_parms.end()))
+		return "vector";
 	else
 		return "UNKNOWN";
 }

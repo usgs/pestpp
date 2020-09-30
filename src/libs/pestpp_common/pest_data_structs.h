@@ -255,7 +255,7 @@ private:
 	};
 	std::unordered_map<string, vector<double>> vector_parms
 	{
-		{"DA_LAMBDA_MULTS", {1.0}},
+		{"DA_INFLATION_FAC", {1.0}},
 		{"DA_SCALE_FAC", {1.0}},
 		{"DA_SVD_THRSH", {1e-3, 1e-4, 1e-6}}
 	    //LAMBDA_SCALE_FAC
