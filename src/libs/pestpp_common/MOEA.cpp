@@ -57,6 +57,7 @@ void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEn
 
 
 	map<string, map<string, double>> member_struct;
+
 	for (auto real_name : real_names)
 	{
 		map<string, double> obj_map;
@@ -91,6 +92,49 @@ void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEn
 
 }
 
+
+void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp)
+{
+	set<string> duplicates;
+	for (auto solution_p : member_struct)
+	{
+		for (auto solution_q : member_struct)
+		{
+			if (solution_p.first == solution_q.first)
+				continue;
+			if ((first_equals_second(solution_p.second, solution_q.second)) && (duplicates.find(solution_q.first) == duplicates.end()))
+			{
+				duplicates.emplace(solution_p.first);
+			}
+		}
+	}
+	if (duplicates.size() > 0)
+	{
+		stringstream ss;
+		ss << "WARNING: " << duplicates.size() << " duplicate solutions found, dropping (see rec file for listing)";
+		performance_log->log_event(ss.str());
+		cout << ss.str() << endl;
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << "WARNING: " << duplicates.size() << " duplicate solutions found:" << endl;
+		int i = 0;
+		for (auto d : duplicates)
+		{
+			frec << d << " ";
+			i++;
+			if (i > 5)
+			{
+				frec << endl;
+				i = 0;
+			}
+		}
+		vector<string> d(duplicates.begin(), duplicates.end());
+		op.drop_rows(d);
+		dp.drop_rows(d);
+		performance_log->log_event("updating member struct after dropping duplicates");
+		update_member_struct(op, dp);
+	}
+}
+
 pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	stringstream ss;
@@ -98,11 +142,14 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(Obs
 	performance_log->log_event(ss.str());
 	performance_log->log_event("preparing fast-lookup containers");
 
-
 	//TODO: check for a single objective and deal appropriately
 
 	//update the member struct container
 	update_member_struct(op, dp);
+
+	//check for and drop duplictes
+	drop_duplicates(op, dp);
+
 	
 	vector<string> real_names = op.get_real_names();
 	vector<string> infeas_ordered;
@@ -175,6 +222,15 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(Obs
 	frec << "...pareto dominance sort yielded " << front_map.size() << " domination fronts" << endl;
 	for (auto front : front_map)
 	{
+
+		if (front.second.size() == 0)
+		{
+			ss.str("");
+			ss << "ParetoObjectives::pareto_dominance_sort() error: front " << front.first << " has no members";
+			performance_log->log_event(ss.str());
+			throw runtime_error(ss.str());
+		}
+
 		frec << front.second.size() << " in the front " << front.first << endl;
 	}
 
@@ -353,7 +409,14 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 		{
 			if (solution_p.first == solution_q.first) //string compare real name
 				continue;
-			if (first_dominates_second(solution_p.second, solution_q.second))
+
+			//if the solutions are identical...
+			if (first_equals_second(solution_p.second, solution_q.second))
+			{
+				throw runtime_error("ParetoObjectives::sort_members_by_dominance_into_fronts(): solution '" + solution_p.first + "' and '" + solution_q.first + "' are identical");
+			}
+			else if (first_dominates_second(solution_p.second, solution_q.second))
+
 			{
 				solutions_dominated.push_back(solution_q.first);
 			}
@@ -361,6 +424,7 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 			{
 				domination_counter++;
 			}
+
 		}
 		//solution_p is in the first front
 		if (domination_counter == 0)
@@ -378,6 +442,9 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 	map<int, vector<string>> front_map;
 	front_map[1] = first_front;
 	vector<string> front = first_front;
+
+	int num_front_solutions = front.size();
+
 	while (true)
 	{
 		
@@ -398,9 +465,31 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 		front_map[i] = q_front;
 		
 		front = q_front;
+
+		num_front_solutions += front.size();
 	}
-	//TODO: check that all solutions made it thru the sorting process
+	
+	if (num_front_solutions != member_struct.size())
+	{
+		stringstream ss;
+		ss << "ERROR: ParetoObjectives::sort_members_by_dominance_into_fronts(): number of solutions in fronts (";
+		ss << num_front_solutions << ") != member_stuct.size() (" << member_struct.size() << endl;
+		file_manager.rec_ofstream() << ss.str();
+		cout << ss.str();
+		throw runtime_error(ss.str());
+	}
+
 	return front_map;
+}
+
+bool ParetoObjectives::first_equals_second(map<string, double>& first, map<string, double>& second)
+{
+	for (auto f : first)
+	{
+		if (f.second != second[f.first])
+			return false;
+	}
+	return true;
 }
 
 bool ParetoObjectives::first_dominates_second(map<string,double>& first, map<string,double>& second)
@@ -1311,11 +1400,19 @@ ParameterEnsemble MOEA::generate_population()
 	num_members += (num_members - dp.shape().first);
 
 	//TODO: work out which generator to use
+
+	//TODO: add sanity check for supported algs so that we 
+	//trap issues before getting here
+
 	if (mou_alg == "DE")
 		return generate_diffevol_population(num_members, dp);
 	else if (mou_alg == "NSGA2")
 		// if using NSGA2
 		return generate_nsga2_population(num_members, dp);
+
+	else
+		throw_moea_error("unrecognized mou algorithm (looking for 'NSGA2', 'DE'): " + mou_alg);
+
 }
 
 void MOEA::iterate_to_solution()
@@ -1355,7 +1452,9 @@ void MOEA::iterate_to_solution()
 		new_op.append_other_rows(op);
 
 		//sort according to pareto dominance, crowding distance, and, optionally, feasibility
-		message(1, "pareto dominance sorting combined parent-child populations");
+
+		message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
+
 		DomPair dompair = objectives.pareto_dominance_sort(new_op, new_dp);
 
 		//drop shitty members
@@ -1648,6 +1747,9 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnsemble& _dp)
 {
 	message(1, "generating NSGA2 population of size", num_members);
+
+	_dp.transform_ip(ParameterEnsemble::transStatus::NUM);
+
 	vector<int> member_count, working_count, selected, r_int_vec;
 	vector<double> rnds;
 	for (int i = 0; i < _dp.shape().first; i++)
@@ -1702,19 +1804,30 @@ ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnse
 		//put the two children into the child population
 		new_reals.row(i_member) = children.first;
 		new_names.push_back(get_new_member_name("nsga-ii"));
+
+		cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() - 1] << endl;
 		i_member++;
+		if (i_member >= num_members)
+			break;
 		new_reals.row(i_member) = children.second;
 		new_names.push_back(get_new_member_name("nsga-ii"));
+		cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() -1] << endl;
 		i_member++;
+
 	}
 		
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_names, _dp.get_var_names());
+	tmp_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
+	tmp_dp.to_csv("temp_cross.csv");
+
 	//mutation
 	double mutation_probability = 1.0 / pest_scenario.get_n_adj_par();
 	double mutation_distribution_index = 20.0;
 	mutate(mutation_probability, mutation_distribution_index, tmp_dp);
 
-	
+
+	tmp_dp.to_csv("temp_mut.csv");
+
 
 	//TODO: return parameter ensemble for the next generation
 	return tmp_dp;

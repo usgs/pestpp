@@ -32,6 +32,7 @@ add_library(pestpp_com STATIC
   SVDSolver.cpp
   TerminationController.cpp
   Transformation.cpp
+  SQP.cpp
   MOEA.cpp
 )
 

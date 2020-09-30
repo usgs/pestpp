@@ -2577,7 +2577,10 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv)
 	for (int i = 0; i < real_names.size(); i++)
 		real_map[real_names[i]] = i;
 	map<string, int>::iterator end = real_map.end();
-	for (auto rname : org_real_names)
+	vector<string> rnames = org_real_names;
+	if (rnames.size() == 0)
+		rnames = real_names;
+	for (auto rname : rnames)
 	{
 		if (real_map.find(rname) == end)
 			continue;

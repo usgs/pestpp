@@ -270,9 +270,8 @@ def test_zdt1(additive_chance=False):
     dv_df.to_csv(os.path.join(test_d,"restart_dv.csv"))
     obs_df.to_csv(os.path.join(test_d,"restart_obs.csv"))
 
-
-    #shutil.copy2(os.path.join(test_d,dv_pop_file),os.path.join(test_d,"restart_dv.csv"))
-    #shutil.copy2(os.path.join(test_d,obs_pop_file),os.path.join(test_d,"restart_obs.csv"))
+    shutil.copy2(os.path.join(master_d,dv_pop_file),os.path.join(test_d,"restart_dv.csv"))
+    shutil.copy2(os.path.join(master_d,obs_pop_file),os.path.join(test_d,"restart_obs.csv"))
     pst.pestpp_options["mou_dv_population_file"] = "restart_dv.csv"
     pst.pestpp_options["mou_obs_population_restart_file"] = "restart_obs.csv"
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
@@ -283,9 +282,9 @@ def test_zdt1(additive_chance=False):
     assert os.path.exists(os.path.join(test_d,obs_pop_file)),obs_pop_file
     dv_df = pd.read_csv(os.path.join(test_d,dv_pop_file),index_col=0)
     obs_df = pd.read_csv(os.path.join(test_d,obs_pop_file),index_col=0)
-    assert dv_df.shape[0] == pst.pestpp_options["mou_population_size"] - 2
+    assert dv_df.shape[0] == pst.pestpp_options["mou_population_size"]
     assert dv_df.shape[1] == pst.npar
-    assert obs_df.shape[0] == pst.pestpp_options["mou_population_size"] - 2
+    assert obs_df.shape[0] == pst.pestpp_options["mou_population_size"]
     assert obs_df.shape[1] == pst.nobs
     assert dv_df.index.to_list() == obs_df.index.to_list()
 

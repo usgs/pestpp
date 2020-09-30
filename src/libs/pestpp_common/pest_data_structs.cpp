@@ -978,11 +978,13 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		fill_tpl_zeros = pest_utils::parse_string_arg_to_bool(value);
 	}
 	
-	else if ((!assign_value_by_key_continued(key, value)) && (!assign_mou_value_by_key(key, value, org_value)))
+
+	else if ((!assign_value_by_key_continued(key, value)) && 
+	(!assign_value_by_key_sqp(key, value, org_value)) &&
+	(!assign_mou_value_by_key(key, value, org_value)))
 	{
 		return ARG_STATUS::ARG_NOTFOUND;
 	}
-	
 
 	return ARG_STATUS::ARG_ACCEPTED;
 }
@@ -1082,6 +1084,28 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 	return false;
 }
 
+
+bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& value, const string& org_value)
+{
+	if (key == "SQP_DV_EN")
+	{
+		sqp_dv_en = org_value;
+		return true;
+	}
+
+	else if (key == "SQP_RESTART_OBS_EN")
+	{
+		sqp_obs_restart_en = org_value;
+		return true;
+	}
+	else if (key == "SQP_NUM_REALS")
+	{
+		convert_ip(value, sqp_num_reals);
+		return true;
+	}
+	
+	return false;
+}
 
 void PestppOptions::summary(ostream& os) const
 {
@@ -1208,7 +1232,23 @@ void PestppOptions::summary(ostream& os) const
 	os << "opt_direction: " << opt_direction << endl;
 	os << "opt_iter_tol: " << opt_iter_tol << endl;
 	os << "opt_recalc_fosm_every: " << opt_recalc_fosm_every << endl;
-	os << "opt_include_bnd_pi: " << opt_include_bnd_pi << endl;
+	
+
+	os << endl << "...pestpp-sqp options:" << endl;
+	os << "sqp_dv_en: " << sqp_dv_en << endl;
+	os << "sqp_obs_restart_en: " << sqp_obs_restart_en << endl;
+	os << "sqp_num_reals: " << sqp_num_reals << endl;
+
+	os << endl << "...pestpp-mou options:" << endl;
+	os << "mou_algorithm: " << mou_algorithm << endl;
+	os << "mou_population_size: " << mou_population_size << endl;
+	os << "mou_dv_population_file: " << mou_dv_population_file << endl;
+	os << "mou_obs_population_restart_file: " << mou_obs_population_restart_file << endl;
+	os << "mou_objectives: " << endl;
+	for (auto obj : mou_objectives)
+		os << obj << endl;
+	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
+	os << "mou_chance_points: " << mou_chance_points << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_algorithm: " << mou_algorithm << endl;
@@ -1353,14 +1393,19 @@ void PestppOptions::set_defaults()
 	set_opt_par_stack("");
 	set_opt_obs_stack("");
 
-	set_mou_algorithm("NSGA");
+
+	set_sqp_dv_en("");
+	set_sqp_obs_restart_en("");
+	set_sqp_num_reals(50);
+
+	set_mou_algorithm("NSGA2");
+
 	set_mou_population_size(100);
 	set_mou_dv_population_file("");
 	set_mou_obs_population_restart_file("");
 	set_mou_objectives(vector<string>());
 	set_mou_max_archive_size(5000);
 	set_mou_chance_points("OPTIMAL");
-
 
 	set_ies_par_csv("");
 	set_ies_obs_csv("");
