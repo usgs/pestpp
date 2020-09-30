@@ -1346,7 +1346,10 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs)
 	f_rec << "  note: 'offset' is the value added to the simulated constraint/objective value to account" << endl;
 	f_rec << "        for the uncertainty in the constraint/objective value arsing from uncertainty in the " << endl;
 	f_rec << "        adjustable parameters identified in the control file." << endl << endl;
-
+	if (!use_fosm)
+	{
+		f_rec << "note: the above standard deviations are empirical estimates from the stack" << endl;
+	}
 	return;
 	
 }
