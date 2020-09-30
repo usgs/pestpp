@@ -70,9 +70,9 @@ public:
 	void initial_report();
 	
 	//queue up chance related runs
-	void add_runs(Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
+	void add_runs(int iter, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
 
-	void add_runs(ParameterEnsemble& current_pe, Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
+	void add_runs(int iter, ParameterEnsemble& current_pe, Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
 
 
 	//queue up chance related runs at several points in dev var space

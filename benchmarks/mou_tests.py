@@ -226,7 +226,7 @@ def setup_zdt_problem(name,num_dv,additive_chance=False):
 
 def test_zdt1():
     test_case = "zdt1"
-    test_d = setup_zdt_problem(test_case,30,additive_chance=additive_chance)
+    test_d = setup_zdt_problem(test_case,30,additive_chance=False)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
     pst.control_data.noptmax = 1
     pst.pestpp_options["mou_population_size"] = 100
@@ -238,19 +238,6 @@ def test_zdt1():
                                   port=port)
 
     #TODO: need some asserts here
-    if (additive_chance):
-        pst.pestpp_options["opt_stack_size"] = 15
-        pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
-        pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
-                                      num_workers=15, master_dir=master_d,worker_root=test_root,
-                                      port=port)
-
-        #TODO: need some asserts here
-
-    
-    # remove this for now since chances and restart arent supported yet
-    pst.pestpp_options.pop("opt_risk",None)
-
     dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
     assert os.path.exists(os.path.join(master_d,dv_pop_file)),dv_pop_file
     obs_pop_file = "{0}.0.obs_pop.csv".format(test_case)
@@ -294,14 +281,14 @@ def test_zdt1_chance():
     test_case = "zdt1"
     test_d = setup_zdt_problem(test_case,30,additive_chance=True)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
-    pst.control_data.noptmax = 1
+    pst.control_data.noptmax = 3
     pst.pestpp_options["mou_population_size"] = 5    
     pst.pestpp_options["opt_risk"] = 0.95
-    pst.pestpp_options["opt_stack_size"] = 5
+    pst.pestpp_options["opt_stack_size"] = 3
     pst.pestpp_options["opt_chance_points"] = "all"
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
-    master_d = test_d.replace("template","master")
+    master_d = test_d.replace("template","master_chance")
     pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
                                   num_workers=15, master_dir=master_d,worker_root=test_root,
                                   port=port)

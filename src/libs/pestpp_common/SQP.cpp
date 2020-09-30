@@ -2041,7 +2041,7 @@ void SeqQuadProgram::queue_chance_runs()
 		pars.update_without_clear(dv.get_var_names(), dv_mean);
 		Observations obs = pest_scenario.get_ctl_observations();
 		pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
-		constraints.add_runs(pars, obs, run_mgr_ptr);
+		constraints.add_runs(iter, pars, obs, run_mgr_ptr);
 	}
 }
 

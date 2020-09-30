@@ -1572,10 +1572,10 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 		{
 			pfm.log_event("processing stack runs for realization " + real_info.first);
 			stack_info = process_stack_runs(real_info.first, iter, real_info.second, run_mgr_ptr, false);
-		
+			save_oe_stack(iter, real_info.first, stack_info.second);
 			stack_info.second.drop_cols(drop_names);
 			stack_oe_map[real_info.first] = stack_info.second;
-			save_oe_stack(iter, real_info.first, stack_info.second);
+			
 		}
 	}
 	else
@@ -1629,7 +1629,7 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 
 }
 
-void Constraints::add_runs(Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
+void Constraints::add_runs(int iter, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
 {
 	/* using the passed run mgr pointer, queue up chance runs
 	
@@ -1657,7 +1657,7 @@ void Constraints::add_runs(Parameters& current_pars, Observations& current_obs, 
 			const set<string> failed = jco.get_failed_parameter_names();
 			throw_constraints_error("failed to calc derviatives for the following FOSM parameters: ", failed);
 		}
-		cout << "...running " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints" << endl;
+		cout << "...adding " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints" << endl;
 
 	}
 	//for stacks, we need to queue up the stack realizations, but replace the dec var entries in each realization
@@ -1675,13 +1675,13 @@ void Constraints::add_runs(Parameters& current_pars, Observations& current_obs, 
 			stack_pe.replace_col(dname, dvec);
 		}
 		pfm.log_event("building stack-based parameter runs");
-		cout << "...running " << stack_pe.shape().first << " model runs for stack-based chance constraints" << endl;
+		cout << "...adding " << stack_pe.shape().first << " model runs for stack-based chance constraints" << endl;
 		stack_pe_run_map.clear();
 		stack_pe_run_map = stack_pe.add_runs(run_mgr_ptr);
 	}
 }
 
-void Constraints::add_runs(ParameterEnsemble& current_pe, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
+void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
 {
 	if (!use_chance)
 		return;
@@ -1691,17 +1691,26 @@ void Constraints::add_runs(ParameterEnsemble& current_pe, Observations& current_
 	}
 	population_stack_pe_run_map.clear();
 	pfm.log_event("queuing up nested-sets of chance runs for decision-variable ensemble ");
+	
 	Eigen::VectorXd par_vec;
 	vector<string> par_names = current_pe.get_var_names();
 	Parameters real_pars = pest_scenario.get_ctl_parameters();
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(real_pars);
 	current_pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+	f_rec << "queuing up nested-sets of chance runs ('opt_chance_points' == 'all') for decision-variable ensemble " << endl;
+	cout << "queuing up nested - sets of chance runs for decision-variable ensemble " << endl;
 	for (auto real_info : current_pe.get_real_map())
 	{
+
 		par_vec = current_pe.get_real_vector(real_info.first);
 		real_pars.update_without_clear(par_names, par_vec);
-		add_runs(real_pars, current_obs, run_mgr_ptr);
+		add_runs(iter, real_pars, current_obs, run_mgr_ptr);
+		//relying on class attribute being set in add_runs():
 		population_stack_pe_run_map[real_info.first] = stack_pe_run_map;
+		//relying on class attribute being set in add_runs():
+		save_pe_stack(iter, real_info.first, stack_pe);
+		f_rec << "...added " << stack_pe.shape().first << " runs for decision variable solution '" << real_info.first << "'" << endl;
 	}
 }
 

@@ -1012,7 +1012,7 @@ void sequentialLP::iter_presolve()
 			f_rec << "done" << endl;
 			cout << "done" << endl;
 			if ((constraints.should_update_chance(slp_iter)) && (!constraints.get_use_fosm()))
-				constraints.add_runs(current_pars,current_constraints_sim, run_mgr_ptr);
+				constraints.add_runs(slp_iter, current_pars,current_constraints_sim, run_mgr_ptr);
 			
 
 		}
@@ -1023,7 +1023,7 @@ void sequentialLP::iter_presolve()
 			int run_id = run_mgr_ptr->add_run(par_trans.ctl2model_cp(current_pars));
 			//this would be only for stack runs since the fosm runs should have been in the jco
 			if ((constraints.should_update_chance(slp_iter)) && (!constraints.get_use_fosm()))
-				constraints.add_runs(current_pars, current_constraints_sim, run_mgr_ptr);
+				constraints.add_runs(slp_iter, current_pars, current_constraints_sim, run_mgr_ptr);
 			/*else
 			{
 				cout << "  ---  running the model once with initial decision variables  ---  " << endl;
@@ -1098,7 +1098,7 @@ void sequentialLP::iter_presolve()
 
 		if ((constraints.should_update_chance(slp_iter)) && (!constraints.get_use_fosm()))
 		{
-			constraints.add_runs(current_pars, current_constraints_sim, run_mgr_ptr);
+			constraints.add_runs(slp_iter, current_pars, current_constraints_sim, run_mgr_ptr);
 		}
 
 

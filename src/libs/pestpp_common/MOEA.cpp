@@ -668,7 +668,7 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 }
 
 
-void MOEA::queue_chance_runs()
+void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 {
 	/* queue up chance-related runs using the class attributes dp and op*/
 	stringstream ss;
@@ -707,7 +707,7 @@ void MOEA::queue_chance_runs()
 
 				pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(min_member));
 				pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
-				constraints.add_runs(pars, obs, run_mgr_ptr);
+				constraints.add_runs(iter, pars, obs, run_mgr_ptr);
 
 			}
 			else
@@ -752,14 +752,14 @@ void MOEA::queue_chance_runs()
 				message(2, ss.str());
 
 				pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
-				constraints.add_runs(pars, obs, run_mgr_ptr);
+				constraints.add_runs(iter, pars, obs, run_mgr_ptr);
 			}
 
 		}
 		else if (chancepoints == chancePoints::ALL)
 		{
 
-			constraints.add_runs(dp, obs, run_mgr_ptr);
+			constraints.add_runs(iter, _dp, obs, run_mgr_ptr);
 		}
 
 		else
@@ -773,7 +773,7 @@ void MOEA::queue_chance_runs()
 vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
 	//queue up any chance related runs
-	queue_chance_runs();
+	queue_chance_runs(_dp);
 
 	message(1, "running population of size ", _dp.shape().first);
 	stringstream ss;
