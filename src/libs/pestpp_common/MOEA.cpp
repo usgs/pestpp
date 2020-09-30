@@ -679,80 +679,94 @@ void MOEA::queue_chance_runs()
 		pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(pars);
 		Observations obs = pest_scenario.get_ctl_observations();
 		//if this is the first iter and no restart
-		if ((iter == 0) && (population_obs_restart_file.size() == 0))
+		
+		if (chancepoints == chancePoints::SINGLE)
 		{
-			//just use dp member nearest the mean dec var values
-			
-			vector<double> t = dp.get_mean_stl_var_vector();
-			Eigen::VectorXd dp_mean = stlvec_2_eigenvec(t);
-			t.resize(0);
-			int idx_min;
-			double dist,dist_min = numeric_limits<double>::max();
-			for (int i = 0; i < dp.shape().first; i++)
+			if ((iter == 0) && (population_obs_restart_file.size() == 0))
 			{
-				dist = dp_mean.dot(dp.get_eigen_ptr()->row(i));
-				if (dist < dist_min)
+				//just use dp member nearest the mean dec var values
+
+				vector<double> t = dp.get_mean_stl_var_vector();
+				Eigen::VectorXd dp_mean = stlvec_2_eigenvec(t);
+				t.resize(0);
+				int idx_min;
+				double dist, dist_min = numeric_limits<double>::max();
+				for (int i = 0; i < dp.shape().first; i++)
 				{
-					idx_min = i;
-					dist_min = dist;
+					dist = dp_mean.dot(dp.get_eigen_ptr()->row(i));
+					if (dist < dist_min)
+					{
+						idx_min = i;
+						dist_min = dist;
+					}
 				}
+				string min_member = dp.get_real_names()[idx_min];
+				ss.str("");
+				ss << "using member " << min_member << " as nearest-to-mean single chance point with distance of " << dist_min << " from mean of decision population";
+				message(2, ss.str());
+
+				pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(min_member));
+				pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
+				constraints.add_runs(pars, obs, run_mgr_ptr);
+
 			}
-			string min_member = dp.get_real_names()[idx_min];
-			ss.str("");
-			ss << "using member " << min_member << " as nearest-to-mean single chance point with distance of " << dist_min << " from mean of decision population";
-			message(2, ss.str());
-			
-			pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(min_member));
-			
+			else
+			{
+				//calculate the optimal tradeoff point from the current op
+				//dont worry about pi-based obj since they are chance-based
+				message(2, "seeking optimal trade-off point for aingle 'optimal' chance point runs");
+				vector<double> obj_extrema;
+				Eigen::VectorXd obj_vec;
+
+				for (auto obj_name : obs_obj_names)
+				{
+					//if this is a max obj
+					if ((obj_dir_mult.find(obj_name) != obj_dir_mult.end()) &&
+						(obj_dir_mult[obj_name] == -1.0))
+						obj_extrema.push_back(op.get_var_vector(obj_name).maxCoeff());
+					else
+						obj_extrema.push_back(op.get_var_vector(obj_name).minCoeff());
+				}
+
+				Eigen::VectorXd opt_vec = stlvec_2_eigenvec(obj_extrema);
+
+				//find the member nearest the optimal tradeoff
+				int opt_idx = -1;
+				double dist, opt_dist = numeric_limits<double>::max();
+				for (int i = 0; i < op.shape().first; i++)
+				{
+					dist = opt_vec.dot(op.get_eigen_ptr()->row(i));
+					if (dist < opt_dist)
+					{
+						opt_idx = i;
+						opt_dist = dist;
+					}
+				}
+				string opt_member = op.get_real_names()[opt_idx];
+
+				pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(opt_member));
+				obs.update_without_clear(op.get_var_names(), op.get_real_vector(opt_member));
+
+				ss.str("");
+				ss << "using member " << opt_member << " as single, 'optimal' chance point with distance of " << opt_dist << " from optimal trade-off";
+				message(2, ss.str());
+
+				pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
+				constraints.add_runs(pars, obs, run_mgr_ptr);
+			}
+
 		}
-		else if (chancepoints == chancePoints::SINGLE)
+		else if (chancepoints == chancePoints::ALL)
 		{
-			//calculate the optimal tradeoff point from the current op
-			//dont worry about pi-based obj since they are chance-based
-			message(2, "seeking optimal trade-off point for aingle 'optimal' chance point runs");
-			vector<double> obj_extrema;
-			Eigen::VectorXd obj_vec;
 
-			for (auto obj_name : obs_obj_names)
-			{
-				//if this is a max obj
-				if ((obj_dir_mult.find(obj_name) != obj_dir_mult.end()) &&
-					(obj_dir_mult[obj_name] == -1.0))
-					obj_extrema.push_back(op.get_var_vector(obj_name).maxCoeff());
-				else
-					obj_extrema.push_back(op.get_var_vector(obj_name).minCoeff());
-			}
-
-			Eigen::VectorXd opt_vec = stlvec_2_eigenvec(obj_extrema);
-
-			//find the member nearest the optimal tradeoff
-			int opt_idx = -1;
-			double dist, opt_dist = numeric_limits<double>::max();
-			for (int i = 0; i < op.shape().first; i++)
-			{
-				dist = opt_vec.dot(op.get_eigen_ptr()->row(i));
-				if (dist < opt_dist)
-				{
-					opt_idx = i;
-					opt_dist = dist;
-				}
-			}
-			string opt_member = op.get_real_names()[opt_idx];
-
-			pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(opt_member));
-			obs.update_without_clear(op.get_var_names(), op.get_real_vector(opt_member));
-
-			ss.str("");
-			ss << "using member " << opt_member << " as singel, 'optimal' chance point with distance of " << opt_dist << " from optimal trade-off";
-			message(2, ss.str());
-
+			constraints.add_runs(dp, obs, run_mgr_ptr);
 		}
+
 		else
 		{
 			throw_moea_error("internal error: trying to call unsupported chancePoints type");
 		}
-		pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
-		constraints.add_runs(pars, obs, run_mgr_ptr);
+		
 	}
 }
 
@@ -1033,7 +1047,8 @@ void MOEA::initialize()
 	if (chance_points == "ALL")
 	{
 		//evaluate the chance constraints at every individual, very costly, but most robust
-		throw_moea_error("'mou_chance_points' == 'all' not implemented");
+		//throw_moea_error("'mou_chance_points' == 'all' not implemented");
+		chancepoints = chancePoints::ALL;
 	}
 	
 	else if (chance_points == "SINGLE")
@@ -1041,7 +1056,6 @@ void MOEA::initialize()
 		//evaluate the chance constraints only at the population member nearest the optimal tradeoff.
 		//much cheaper, but assumes linear coupling
 		chancepoints = chancePoints::SINGLE;
-
 	}
 	else
 	{

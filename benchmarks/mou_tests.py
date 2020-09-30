@@ -297,6 +297,8 @@ def test_zdt1_chance():
     pst.control_data.noptmax = 1
     pst.pestpp_options["mou_population_size"] = 5    
     pst.pestpp_options["opt_risk"] = 0.95
+    pst.pestpp_options["opt_stack_size"] = 5
+    pst.pestpp_options["opt_chance_points"] = "all"
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
     master_d = test_d.replace("template","master")

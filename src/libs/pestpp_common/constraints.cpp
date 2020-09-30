@@ -1694,7 +1694,8 @@ void Constraints::add_runs(ParameterEnsemble& current_pe, Observations& current_
 	Eigen::VectorXd par_vec;
 	vector<string> par_names = current_pe.get_var_names();
 	Parameters real_pars = pest_scenario.get_ctl_parameters();
-	current_pe.transform_ip(ParameterEnsemble::transStatus::CTL);
+	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(real_pars);
+	current_pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 	for (auto real_info : current_pe.get_real_map())
 	{
 		par_vec = current_pe.get_real_vector(real_info.first);
