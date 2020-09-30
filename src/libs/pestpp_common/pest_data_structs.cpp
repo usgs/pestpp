@@ -1250,6 +1250,18 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
 	os << "mou_chance_points: " << mou_chance_points << endl;
 
+	os << endl << "...pestpp-mou options:" << endl;
+	os << "mou_algorithm: " << mou_algorithm << endl;
+	os << "mou_population_size: " << mou_population_size << endl;
+	os << "mou_dv_population_file: " << mou_dv_population_file << endl;
+	os << "mou_obs_population_restart_file: " << mou_obs_population_restart_file << endl;
+	os << "mou_objectives: " << endl;
+	for (auto obj : mou_objectives)
+		os << obj << endl;
+	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
+	os << "mou_chance_points: " << mou_chance_points << endl;
+
+
 	os << endl << "...pestpp-ies options:" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
 	os << "ies_observation_ensemble: " << ies_obs_csv << endl;
@@ -1381,11 +1393,13 @@ void PestppOptions::set_defaults()
 	set_opt_par_stack("");
 	set_opt_obs_stack("");
 
+
 	set_sqp_dv_en("");
 	set_sqp_obs_restart_en("");
 	set_sqp_num_reals(50);
 
 	set_mou_algorithm("NSGA2");
+
 	set_mou_population_size(100);
 	set_mou_dv_population_file("");
 	set_mou_obs_population_restart_file("");

@@ -203,9 +203,9 @@ public:
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
 	bool assign_value_by_key_continued(const string& key, const string& value);
+
 	bool assign_value_by_key_sqp(const string& key, const string& value, const string& org_value);
 	bool assign_mou_value_by_key(const string& key, const string& value, const string& org_value);
-
 
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
@@ -339,7 +339,6 @@ public:
 	void set_sqp_obs_restart_en(string _file) { sqp_obs_restart_en = _file; }
 	int get_sqp_num_reals()const { return sqp_num_reals; }
 	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
-
 
 	string get_mou_algorithm() const { return mou_algorithm; }
 	void set_mou_algorithm(string name) { mou_algorithm = name; }
