@@ -1794,26 +1794,26 @@ ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnse
 		//put the two children into the child population
 		new_reals.row(i_member) = children.first;
 		new_names.push_back(get_new_member_name("nsga-ii"));
-		cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() - 1] << endl;
+		//cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() - 1] << endl;
 		i_member++;
 		if (i_member >= num_members)
 			break;
 		new_reals.row(i_member) = children.second;
 		new_names.push_back(get_new_member_name("nsga-ii"));
-		cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() -1] << endl;
+		//cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() -1] << endl;
 		i_member++;
 
 	}
 		
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_names, _dp.get_var_names());
 	tmp_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
-	tmp_dp.to_csv("temp_cross.csv");
+	//tmp_dp.to_csv("temp_cross.csv");
 	//mutation
 	double mutation_probability = 1.0 / pest_scenario.get_n_adj_par();
 	double mutation_distribution_index = 20.0;
 	mutate(mutation_probability, mutation_distribution_index, tmp_dp);
 
-	tmp_dp.to_csv("temp_mut.csv");
+	//tmp_dp.to_csv("temp_mut.csv");
 
 	//TODO: return parameter ensemble for the next generation
 	return tmp_dp;
@@ -1890,7 +1890,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::crossover(double probability, doubl
 	offs1.setZero();
 	offs2.setZero();
 
-	int n_var = pest_scenario.get_n_adj_par();
+	int n_var = dv_names.size();
 	//can't set all rnds outside of loop or all vars will be treated the same
 	rnds = uniform_draws(4, 0.0, 1.0, rand_gen);
 
@@ -2008,7 +2008,7 @@ void MOEA::mutate(double probability, double eta_m, ParameterEnsemble& temp_dp)
 	for (int i = 0; i < temp_dp.shape().first; i++)
 	{
 		Eigen::VectorXd indiv = temp_dp.get_eigen_ptr()->row(i);
-		for (int var = 0; var < pest_scenario.get_n_adj_par(); var++)
+		for (int var = 0; var < var_names.size(); var++)
 		{
 
 			vname = var_names[var];

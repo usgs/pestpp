@@ -224,14 +224,12 @@ def setup_zdt_problem(name,num_dv,additive_chance=False):
     assert pst.phi < 1.0e-10
     return test_d
 
-def test_zdt1(additive_chance=False):
+def test_zdt1():
     test_case = "zdt1"
     test_d = setup_zdt_problem(test_case,30,additive_chance=additive_chance)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
     pst.control_data.noptmax = 1
     pst.pestpp_options["mou_population_size"] = 100
-    if additive_chance:
-        pst.pestpp_options["opt_risk"] = 0.95
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
     master_d = test_d.replace("template","master")
@@ -276,27 +274,35 @@ def test_zdt1(additive_chance=False):
     pst.pestpp_options["mou_dv_population_file"] = "restart_dv.csv"
     pst.pestpp_options["mou_obs_population_restart_file"] = "restart_obs.csv"
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
-    pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
+    pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
+                                      num_workers=15, master_dir=master_d,worker_root=test_root,
+                                      port=port)
     dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
-    assert os.path.exists(os.path.join(test_d,dv_pop_file)),dv_pop_file
+    assert os.path.exists(os.path.join(master_d,dv_pop_file)),dv_pop_file
     obs_pop_file = "{0}.0.obs_pop.csv".format(test_case)
-    assert os.path.exists(os.path.join(test_d,obs_pop_file)),obs_pop_file
-    dv_df = pd.read_csv(os.path.join(test_d,dv_pop_file),index_col=0)
-    obs_df = pd.read_csv(os.path.join(test_d,obs_pop_file),index_col=0)
+    assert os.path.exists(os.path.join(master_d,obs_pop_file)),obs_pop_file
+    dv_df = pd.read_csv(os.path.join(master_d,dv_pop_file),index_col=0)
+    obs_df = pd.read_csv(os.path.join(master_d,obs_pop_file),index_col=0)
     assert dv_df.shape[0] == pst.pestpp_options["mou_population_size"]
     assert dv_df.shape[1] == pst.npar
     assert obs_df.shape[0] == pst.pestpp_options["mou_population_size"]
     assert obs_df.shape[1] == pst.nobs
     assert dv_df.index.to_list() == obs_df.index.to_list()
 
-    # pst.pestpp_options = {"mou_population_size":200}
-    # pst.control_data.noptmax = 100
-    # pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
-    # #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
-    # master_d = test_d.replace("template","master")
-    # pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
-    #                               num_workers=25, master_dir=master_d,worker_root=test_root,
-    #                               port=port)
+
+def test_zdt1_chance():
+    test_case = "zdt1"
+    test_d = setup_zdt_problem(test_case,30,additive_chance=True)
+    pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
+    pst.control_data.noptmax = 1
+    pst.pestpp_options["mou_population_size"] = 5    
+    pst.pestpp_options["opt_risk"] = 0.95
+    pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
+    #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
+    master_d = test_d.replace("template","master")
+    pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
+                                  num_workers=15, master_dir=master_d,worker_root=test_root,
+                                  port=port)
 
 
 def test_sorting_fake_problem():
@@ -362,6 +368,8 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt4",10)
     # setup_zdt_problem("zdt6",10)
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
-    test_zdt1()
+    #setup_zdt_problem("zdt1",30, additive_chance=True)
+    #test_zdt1()
+    test_zdt1_chance()
     #setup_zdt_problem("zdt1",30, additive_chance=True)
     #test_sorting_fake_problem()
