@@ -56,7 +56,7 @@ void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEn
 	}
 
 
-	map<string, map<string, double>> member_struct;
+	//map<string, map<string, double>> member_struct;
 
 	for (auto real_name : real_names)
 	{
