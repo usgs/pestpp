@@ -332,6 +332,9 @@ public:
 	void set_opt_par_stack(string _stack) { opt_par_stack = _stack; }
 	string get_opt_obs_stack()const { return opt_obs_stack; }
 	void set_opt_obs_stack(string _stack) { opt_obs_stack = _stack; }
+	string get_opt_chance_points() const { return opt_chance_points; }
+	void set_opt_chance_points(string chance_points) { opt_chance_points = chance_points; }
+
 
 	string get_sqp_dv_en()const { return sqp_dv_en; }
 	void set_sqp_dv_en(string _file) { sqp_dv_en = _file; }
@@ -352,9 +355,7 @@ public:
 	void set_mou_objectives(const vector<string>& objs) { mou_objectives = objs; }
 	int get_mou_max_archive_size() const { return mou_max_archive_size; }
 	void set_mou_max_archive_size(int size) { mou_max_archive_size = size; }
-	string get_mou_chance_points() const { return mou_chance_points; }
-	void set_mou_chance_points(string chance_points) { mou_chance_points = chance_points; }
-
+	
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
 	string get_ies_obs_csv()const { return ies_obs_csv; }
@@ -578,6 +579,7 @@ private:
 	int opt_stack_size;
 	string opt_par_stack;
 	string opt_obs_stack;
+	string opt_chance_points;
 
 	string sqp_dv_en;
 	string sqp_obs_restart_en;
@@ -589,8 +591,7 @@ private:
 	string mou_obs_population_restart_file;
 	vector<string> mou_objectives;
 	int mou_max_archive_size;
-	string mou_chance_points;
-
+	
 	int ies_subset_size;
 	string ies_par_csv;
 	string ies_obs_csv;

@@ -14,6 +14,7 @@
 #include "PerformanceLog.h"
 #include "Ensemble.h"
 #include "constraints.h"
+#include "EnsembleMethodUtils.h"
 
 
 class ParetoObjectives
@@ -22,7 +23,7 @@ public:
 	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
 		PerformanceLog* _performance_log,Constraints* _constraints_ptr = nullptr);
 
-	pair<vector<string>, vector<string>> pareto_dominance_sort(ObservationEnsemble& op, ParameterEnsemble& dp);
+	pair<vector<string>, vector<string>> pareto_dominance_sort(ObservationEnsemble& op, ParameterEnsemble& dp, bool report=true);
 	
 	//this must be called at least once before the diversity metrixs can be called...
 	void set_pointers(vector<string>& _obs_obj_names, vector<string>& _pi_obj_names, map<string, double>& _obj_dir_mult)
@@ -81,7 +82,6 @@ private:
 
 class MOEA
 {
-	enum chancePoints{ALL,EXTREMA,OPTIMAL};
 public:
 	static mt19937_64 rand_engine;
 	MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer,
@@ -107,9 +107,12 @@ private:
 	vector<string> dv_names;
 	map<string, double> obj_dir_mult;
 
+	map<string, map<string, double>> previous_obj_summary;
+
+
 	//these two instances are passed as pointers to the constraints
-	Parameters effective_constraint_pars;
-	Observations effective_constraint_obs;
+	//Parameters effective_constraint_pars;
+	//Observations effective_constraint_obs;
 
 	ParetoObjectives objectives;
 	Constraints constraints;
@@ -120,7 +123,7 @@ private:
 	PerformanceLog *performance_log;
 	RunManagerAbstract* run_mgr_ptr;
 	const ObservationInfo *obs_info_ptr;
-	const PriorInformation *prior_info_ptr;
+
 
 	ParameterEnsemble dp, dp_archive;
 	ObservationEnsemble op, op_archive;
@@ -138,9 +141,8 @@ private:
 	void sanity_checks();
 	vector<int> run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
-	void queue_chance_runs();
-	ObservationEnsemble get_risk_shifted_op(ObservationEnsemble& _op);
-
+	void queue_chance_runs(ParameterEnsemble& _dp);
+	ObservationEnsemble get_chance_shifted_op(ObservationEnsemble& _op);
 
 	bool initialize_dv_population();
 	void initialize_obs_restart_population();
@@ -156,9 +158,13 @@ private:
 	void mutate(double probability, double eta_m, ParameterEnsemble& temp_dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> crossover(double probability, double eta_m, int idx1, int idx2);
 
-	void generate_nsga2_member();
-	void generate_de_member();
-	void generate_spea2_member();
+	pair<Parameters, Observations> get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe, bool use_mean=false);
+
+	map<string, map<string, double>> obj_func_report(ParameterEnsemble& _dp, ObservationEnsemble& _oe);
+	map<string, map<string, double>> get_obj_func_summary_stats(ParameterEnsemble& _dp, ObservationEnsemble& _op);
+	map<string, map<string, double>> obj_func_change_report(map<string, map<string, double>>& current_obj_summary);
+
+	int get_max_len_obj_name();
 };
 
 #endif //MOEA_H_

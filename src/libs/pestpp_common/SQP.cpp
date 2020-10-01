@@ -327,7 +327,7 @@ void SeqQuadProgram::sanity_checks()
 
 	if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
 	{
-		warnings.push_back("'pestmode' == 'regularization', in pestpp-ies, this is controlled with the ++ies_reg_factor argument, resetting to 'estimation'");
+		warnings.push_back("'pestmode' == 'regularization', in pestpp-sqp, this has no meaning...");
 		//throw_sqp_error("'pestmode' == 'regularization', please reset to 'estimation'");
 	}
 	else if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::UNKNOWN)
@@ -335,62 +335,17 @@ void SeqQuadProgram::sanity_checks()
 		warnings.push_back("unrecognized 'pestmode', using 'estimation'");
 	}
 
-
-	if (pest_scenario.get_ctl_ordered_pi_names().size() > 0)
-	{
-		warnings.push_back("prior information equations not supported in pestpp-ies, ignoring...");
-	}
-	double acc_phi = ppo->get_ies_accept_phi_fac();
-	if (acc_phi < 1.0)
-		warnings.push_back("ies_accept_phi_fac < 1.0, not good!");
-	if (acc_phi > 10.0)
-		warnings.push_back("ies_accept_phi_fac > 10.0, this is prob too big, typical values 1.05 to 1.3");
-
-	double lam_inc = ppo->get_ies_lambda_inc_fac();
-	if (lam_inc < 1.0)
-		errors.push_back("ies_lambda_inc_fac < 1.0, nope! how can lambda increase if this is less than 1.0???");
-
-	double lam_dec = ppo->get_ies_lambda_dec_fac();
-	if (lam_dec > 1.0)
-		errors.push_back("ies_lambda_dec_fac > 1.0, nope!  how can lambda decrease if this is greater than 1.0???");
-
-	if ((ppo->get_ies_par_csv().size() == 0) && (ppo->get_ies_use_empirical_prior()))
-	{
-		warnings.push_back("no point in using an empirical prior if we are drawing the par ensemble...resetting ies_use_empirical_prior to false");
-		ppo->set_ies_use_empirical_prior(false);
-	}
-	if ((par_csv.size() == 0) && (restart_par.size() > 0))
-		errors.push_back("ies_par_en is empty but ies_restart_par_en is not - how can this work?");
-	if ((restart_par.size() > 0) && (restart_obs.size() == 0))
-		errors.push_back("use of ies_restart_par_en requires ies_restart_obs_en");
-	if ((par_csv.size() == 0) && (restart_obs.size() > 0))
-		errors.push_back("ies_par_en is empty but ies_restart_obs_en is not - how can this work?");
-	if (ppo->get_ies_bad_phi() <= 0.0)
-		errors.push_back("ies_bad_phi <= 0.0, really?");
-	if ((ppo->get_ies_num_reals() < error_min_reals) && (par_csv.size() == 0))
-	{
-		ss.str("");
-		ss << "ies_num_reals < " << error_min_reals << ", this is redic, increaing to " << warn_min_reals;
-		warnings.push_back(ss.str());
-		ppo->set_ies_num_reals(warn_min_reals);
-	}
-	if ((ppo->get_ies_num_reals() < warn_min_reals) && (par_csv.size() == 0))
+	
+	
+	
+	
+	if ((ppo->get_sqp_num_reals() < warn_min_reals) && (par_csv.size() == 0))
 	{
 		ss.str("");
 		ss << "ies_num_reals < " << warn_min_reals << ", this is prob too few";
 		warnings.push_back(ss.str());
 	}
-	if (ppo->get_ies_reg_factor() < 0.0)
-		errors.push_back("ies_reg_factor < 0.0 - WRONG!");
-	//if (ppo->get_ies_reg_factor() > 1.0)
-	//	errors.push_back("ies_reg_factor > 1.0 - nope");
-	if ((par_csv.size() == 0) && (ppo->get_ies_subset_size() < 10000000) && (ppo->get_ies_num_reals() < ppo->get_ies_subset_size() * 2))
-		warnings.push_back("ies_num_reals < 2*ies_subset_size: you not gaining that much using subset here");
-	//if ((ppo->get_ies_subset_size() < 100000001) && (ppo->get_ies_lam_mults().size() == 1))
-	//{
-	//	warnings.push_back("only one lambda mult to test, no point in using a subset");
-	//	//ppo->set_ies_subset_size(100000000);
-	//}
+	
 
 	string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
 	if ((how != "FIRST") && (how != "LAST") && (how != "RANDOM") && (how != "PHI_BASED"))
@@ -399,44 +354,6 @@ void SeqQuadProgram::sanity_checks()
 		ss << "'subset_how' is '" << how << "' but should be 'FIRST','LAST','RANDOM','PHI_BASED'";
 		errors.push_back(ss.str());
 	}
-
-	if ((ppo->get_ies_verbose_level() < 0) || (ppo->get_ies_verbose_level() > 3))
-	{
-		warnings.push_back("ies_verbose_level must be between 0 and 3, resetting to 3");
-		ppo->set_ies_verbose_level(3);
-	}
-	if ((ppo->get_ies_no_noise()) && (ppo->get_obscov_filename().size() > 0))
-	{
-		ss.str("");
-		ss << "ies_no_noise is true but obscov file supplied - these two are not compatible";
-		errors.push_back(ss.str());
-	}
-
-	if ((ppo->get_obscov_filename().size() > 0) && (ppo->get_ies_drop_conflicts()))
-	{
-		ss.str("");
-		ss << "use of a full obscov with ies_drop_conflicts is not currently supported";
-		errors.push_back(ss.str());
-	}
-	if ((ppo->get_ies_obs_csv().size() > 0) && (ppo->get_ies_no_noise()))
-	{
-		ss.str("");
-		ss << "ies_no_noise can't be used with an ies_observation_ensemble";
-		errors.push_back(ss.str());
-	}
-	
-	/*if (!ppo->get_ies_use_prior_scaling())
-	{
-		warnings.push_back("not using prior scaling - this is really a dev option, you should always use prior scaling...");
-	}*/
-
-	/*if ((ppo->get_ies_num_threads() > 0) && (!use_localizer))
-	{
-		warnings.push_back("'ies_num_threads > 0 but no localization, resetting 'ies_num_threads' = 0");
-		ppo->set_ies_num_threads(-1);
-		num_threads = -1;
-	}
-*/
 
 
 	if (warnings.size() > 0)
@@ -455,6 +372,83 @@ void SeqQuadProgram::sanity_checks()
 	}
 	//cout << endl << endl;
 }
+
+void SeqQuadProgram::initialize_objfunc()
+{
+	//initialize the objective function
+	obj_func_str = pest_scenario.get_pestpp_options().get_opt_obj_func();
+	obj_sense = (pest_scenario.get_pestpp_options().get_opt_direction() == 1) ? "minimize" : "maximize";
+
+	ofstream& f_rec = file_manager.rec_ofstream();
+
+
+	//check if the obj_str is an observation
+	use_obj_obs = false;
+	if (pest_scenario.get_ctl_observations().find(obj_func_str) != pest_scenario.get_ctl_observations().end())
+	{
+		use_obj_obs = true;
+		obj_obs = obj_func_str;
+		//check
+		vector<string> cnames = constraints.get_obs_constraint_names();
+		set<string> names(cnames.begin(), cnames.end());
+		if (names.find(obj_obs) != names.end())
+		{
+			throw_sqp_error("objective function obs is a constraint, #sad");
+		}
+		names.clear();
+		cnames = constraints.get_nz_obs_names();
+		names.insert(cnames.begin(), cnames.end());
+		if (names.find(obj_obs) != names.end())
+		{
+			throw_sqp_error("objective function obs has non-zero weight and chance constraints are active");
+		}
+	}
+
+	else
+	{
+		if (obj_func_str.size() == 0)
+		{
+			f_rec << " warning: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
+			for (auto& name : dv_names)
+				obj_func_coef_map[name] = 1.0;
+		}
+
+		//or if it is a prior info equation
+		else if (pest_scenario.get_prior_info().find(obj_func_str) != pest_scenario.get_prior_info().end())
+		{
+			obj_func_coef_map = pest_scenario.get_prior_info().get_pi_rec_ptr(obj_func_str).get_atom_factors();
+		}
+		else
+		{
+			//check if this obj_str is a filename
+			ifstream if_obj(obj_func_str);
+			if (!if_obj.good())
+				throw_sqp_error("unrecognized ++opt_objective_function arg (tried file name, obs name, prior info name): " + obj_func_str);
+			else
+				obj_func_coef_map = pest_utils::read_twocol_ascii_to_map(obj_func_str);
+		}
+
+
+		//check that all obj_coefs are decsision vars
+		vector<string> missing_vars;
+		set<string> s_dv_names(dv_names.begin(), dv_names.end());
+		for (auto& coef : obj_func_coef_map)
+			if (s_dv_names.find(coef.first) == s_dv_names.end())
+				missing_vars.push_back(coef.first);
+		if (missing_vars.size() > 0)
+		{
+			stringstream ss;
+			ss << "the following objective function components are not decision variables: ";
+			for (auto m : missing_vars)
+			{
+				ss << m << ",";
+				
+			}
+			throw_sqp_error(ss.str());
+		}
+	}
+}
+
 
 bool SeqQuadProgram::initialize_restart()
 {
@@ -740,10 +734,30 @@ void SeqQuadProgram::initialize()
 		dv_names = act_par_names;
 	}
 
-	best_mean_dv_values = pest_scenario.get_ctl_parameters();
-	best_mean_obs_values = pest_scenario.get_ctl_observations();
-	constraints.initialize(dv_names, &best_mean_dv_values, &best_mean_obs_values, numeric_limits<double>::max());
+	constraints.initialize(dv_names, numeric_limits<double>::max());
 	constraints.initial_report();
+	//some risk-based stuff here
+	string chance_points = ppo->get_opt_chance_points();
+	if (chance_points == "ALL")
+	{
+		//evaluate the chance constraints at every individual, very costly, but most robust
+		//throw_sqp_error("'opt_chance_points' == 'all' not implemented");
+		chancepoints = chancePoints::ALL;
+	}
+
+	else if (chance_points == "SINGLE")
+	{
+		//evaluate the chance constraints only at the population member nearest the optimal tradeoff.
+		//much cheaper, but assumes linear coupling
+		chancepoints = chancePoints::SINGLE;
+
+	}
+	else
+	{
+		ss.str("");
+		ss << "unrecognized 'sqp_chance_points' value :" << chance_points << ", should be 'all' or 'single'";
+		throw_sqp_error(ss.str());
+	}
 	
 	iter = 0;
 	//ofstream &frec = file_manager.rec_ofstream();
@@ -971,6 +985,8 @@ void SeqQuadProgram::initialize()
 		message(1, "saving results from mean dv value run to ", obs_csv);
 		_oe.to_csv(obs_csv);
 
+
+		//TODO: rather than report l2 phi, report actual obj func and feas status
 		ph.update(_oe, _pe);
 		message(0, "mean parameter phi report:");
 		ph.report(true);
@@ -2013,13 +2029,19 @@ void SeqQuadProgram::queue_chance_runs()
 	if (constraints.should_update_chance(iter))
 	{
 		//just use dp member nearest the mean dec var values
+		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 		vector<double> t = dv.get_mean_stl_var_vector();
 		Eigen::VectorXd dv_mean = stlvec_2_eigenvec(t);
 		t.resize(0);
 			
 		ss << "using mean decision variables for chance calculations";
-		best_mean_dv_values.update_without_clear(dv.get_var_names(), dv_mean);
-		constraints.add_runs(run_mgr_ptr);
+		
+		Parameters pars = pest_scenario.get_ctl_parameters();
+		pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(pars);
+		pars.update_without_clear(dv.get_var_names(), dv_mean);
+		Observations obs = pest_scenario.get_ctl_observations();
+		pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
+		constraints.add_runs(iter, pars, obs, run_mgr_ptr);
 	}
 }
 

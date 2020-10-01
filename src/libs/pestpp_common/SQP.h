@@ -93,6 +93,12 @@ private:
 	ParChangeSummarizer pcs;
 	Covariance parcov, obscov;
 	double reg_factor;
+	chancePoints chancepoints;
+	string obj_func_str;
+	string obj_obs;
+	string obj_sense;
+	bool use_obj_obs;
+	map<string, double> obj_func_coef_map;
 
 	string base_name = "BASE"; //this is also defined in Ensemble
 
@@ -113,13 +119,14 @@ private:
 	vector<string> act_obs_names, act_par_names;
 	vector<string> dv_names;
 	vector<int> subset_idxs;
+	
 
 	ParameterEnsemble dv, dv_base;
 	ObservationEnsemble oe, oe_base;
 
 	//these are used so that we can update the constraints based on the current best values
-	Parameters best_mean_dv_values;
-	Observations best_mean_obs_values;
+	//Parameters best_mean_dv_values;
+	//Observations best_mean_obs_values;
 
 	Constraints constraints;
 
@@ -140,6 +147,7 @@ private:
 	bool initialize_restart();
 	void initialize_parcov();
 	void initialize_obscov();
+	void initialize_objfunc();
 	void drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe, bool is_subset=false);
 	
 	void queue_chance_runs();

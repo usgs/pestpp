@@ -22,6 +22,192 @@
 
 using namespace std;
 
+OptObjFunc::OptObjFunc(Pest& _pest_scenario, FileManager* _file_mgr_ptr, PerformanceLog& _pfm):
+	pest_scenario(_pest_scenario), file_mgr_ptr(_file_mgr_ptr), pfm(_pfm)
+{
+
+}
+
+void OptObjFunc::update_coef_map_from_jacobian(Jacobian& jco)
+{
+	if (!use_obj_obs)
+		return;
+
+	obj_func_coef_map.clear();
+	vector<string> onames = jco.get_sim_obs_names();
+	vector<string> pnames = jco.get_base_numeric_par_names();
+	set<string> sdecvar(dv_names.begin(), dv_names.end());
+
+	int idx = find(onames.begin(), onames.end(), obj_obs) - onames.begin();
+	if (idx >= onames.size())
+		throw_optobjfunc_error("obj function obs name '" + obj_obs +"' not found in jco row names, #sad");
+	Eigen::VectorXd vec = Eigen::VectorXd(jco.get_matrix_ptr()->row(idx));
+	for (int i = 0; i < vec.size(); i++)
+	{
+		if (sdecvar.find(pnames[i]) == sdecvar.end())
+			continue;
+		obj_func_coef_map[pnames[i]] = vec[i];
+	}
+}
+
+double OptObjFunc::get_obj_func_value(Parameters& pars, Observations& obs)
+{
+	double obj_val = 0.0;
+	if (use_obj_obs)
+
+	{
+		if (obj_func_coef_map.size() == 0)
+			obj_val = obs.get_rec(obj_obs);
+		else
+		{
+			for (auto dv_name : dv_names)
+			{
+				obj_val += pars.get_rec(dv_name) * obj_func_coef_map[dv_name];
+			}
+		}
+	}
+	else if (obj_func_coef_map.size() == 0)
+		throw_optobjfunc_error("get_obj_func_value: not using observation-based objective and obj coef map is empty");
+	else
+	{
+		for (auto dv_name : dv_names)
+		{
+			obj_val += pars.get_rec(dv_name) * obj_func_coef_map[dv_name];
+		}
+	}
+	return obj_val;
+}
+
+void OptObjFunc::report()
+{
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+	map<string, double>::iterator end = obj_func_coef_map.end();
+	vector<string> missing;
+	if (use_obj_obs)
+		f_rec << "objective function coefficients defined by observation: " << pest_scenario.get_pestpp_options().get_opt_obj_func() << endl;
+	else
+	{
+		f_rec << "  ---  objective function coefficients  ---  " << endl;
+		vector<string> missing;
+		ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+		map<string, double>::iterator end = obj_func_coef_map.end();
+		f_rec << setw(20) << left << "name" << setw(25) << "obj func coefficient" << endl;
+		for (auto& name : dv_names)
+		{
+			f_rec << setw(20) << left << name;
+			if (obj_func_coef_map.find(name) != end)
+			{
+				f_rec << setw(25) << obj_func_coef_map.at(name) << endl;
+			}
+			else
+			{
+				f_rec << setw(25) << "not listed" << endl;
+				missing.push_back(name);
+			}
+		}
+
+		if (missing.size() > 0)
+		{
+			f_rec << endl << endl << "WARNING: the following decision variables have '0.0' objective function coef:" << endl;
+			cout << endl << endl << "WARNING: the following decision variables have '0.0' objective function coef:" << endl;
+
+			for (auto& name : missing)
+			{
+				f_rec << "    " << name << endl;
+				f_rec << "    " << name << endl;
+			}
+		}
+	}
+}
+
+void OptObjFunc::throw_optobjfunc_error(string message)
+{
+	string error_message = "error in sequentialLP process: " + message;
+	file_mgr_ptr->rec_ofstream() << error_message << endl;
+	file_mgr_ptr->close_file("rec");
+	cout << endl << endl << error_message << endl << endl;
+	throw runtime_error(error_message);
+}
+
+void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv_names)
+{
+	//initialize the objective function
+	obj_func_str = pest_scenario.get_pestpp_options().get_opt_obj_func();
+	obj_sense = (pest_scenario.get_pestpp_options().get_opt_direction() == 1) ? "minimize" : "maximize";
+
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+
+	dv_names = _dv_names;
+	constraint_names = _constraint_names;
+
+	//check if the obj_str is an observation
+	use_obj_obs = false;
+	if (pest_scenario.get_ctl_observations().find(obj_func_str) != pest_scenario.get_ctl_observations().end())
+	{
+		use_obj_obs = true;
+		obj_obs = obj_func_str;
+		//check
+		set<string> names(constraint_names.begin(), constraint_names.end());
+		if (names.find(obj_obs) != names.end())
+		{
+			throw runtime_error("objective function obs is a constraint, #sad");
+		}
+		names.clear();
+		vector<string> cnames = pest_scenario.get_ctl_ordered_nz_obs_names();
+		names.insert(cnames.begin(), cnames.end());
+		if (names.find(obj_obs) != names.end())
+		{
+			throw runtime_error("objective function obs has non-zero weight and chance constraints are active");
+		}
+
+	}
+
+	else
+	{
+		if (obj_func_str.size() == 0)
+		{
+			f_rec << " warning: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
+			for (auto& name : dv_names)
+				obj_func_coef_map[name] = 1.0;
+		}
+
+		//or if it is a prior info equation
+		else if (pest_scenario.get_prior_info().find(obj_func_str) != pest_scenario.get_prior_info().end())
+		{
+			obj_func_coef_map = pest_scenario.get_prior_info().get_pi_rec_ptr(obj_func_str).get_atom_factors();
+			//throw_sequentialLP_error("prior-information-based objective function not implemented");
+		}
+		else
+		{
+			//check if this obj_str is a filename
+			ifstream if_obj(obj_func_str);
+			if (!if_obj.good())
+				throw_optobjfunc_error("unrecognized ++opt_objective_function arg: " + obj_func_str);
+			else
+				obj_func_coef_map = pest_utils::read_twocol_ascii_to_map(obj_func_str);
+		}
+
+
+		//check that all obj_coefs are decsision vars
+		vector<string> missing_vars;
+		set<string> s_dv_names(dv_names.begin(), dv_names.end());
+		for (auto& coef : obj_func_coef_map)
+			if (s_dv_names.find(coef.first) == s_dv_names.end())
+				missing_vars.push_back(coef.first);
+		if (missing_vars.size() > 0)
+		{
+			stringstream ss;
+			ss << "the following objective function components are not decision variables: ";
+			for (auto m : missing_vars)
+				ss << m << ",";
+			throw_optobjfunc_error(ss.str());
+		}
+			
+
+	}
+}
+
+
 Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, OutputFileWriter& _of_wr, PerformanceLog& _pfm)
 	:pest_scenario(_pest_scenario), file_mgr_ptr(_file_mgr_ptr), of_wr(_of_wr), pfm(_pfm), jco(*_file_mgr_ptr, _of_wr)
 {
@@ -29,17 +215,16 @@ Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, Outpu
 }
 
 
-void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, Parameters* _current_pars_and_dec_vars_ptr,
-	Observations* _current_constraints_sim_ptr, double _dbl_max)
+void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_max)
 {
 	/* initialize the constraint class, most of this is to deal with chances*/
 	dec_var_names = ctl_ord_dec_var_names;
 	//store a pointer back to the original simulated constrain values 
 	//this is so that as these are updated, the constraints instance
 	//has access to the recent
-	current_constraints_sim_ptr = _current_constraints_sim_ptr;
+	//current_constraints_sim_ptr = _current_constraints_sim_ptr;
 	//same for dec var values
-	current_pars_and_dec_vars_ptr = _current_pars_and_dec_vars_ptr;
+	//current_pars_and_dec_vars_ptr = _current_pars_and_dec_vars_ptr;
 	//check for a stack size arg - if postive, then use stacks for chances
 	stack_size = pest_scenario.get_pestpp_options().get_opt_stack_size();
 	//an existing parameter stack for chances
@@ -577,31 +762,16 @@ void Constraints::initial_report()
 		}
 		else
 		{ 
-			f_rec << "-->using stack-based chance constraints/objectivew" << endl;
+			f_rec << "-->using stack-based chance constraints/objectives" << endl;
 		}
 		f_rec << "-->number of adjustable parameters for chance constraint/objective calcs: " << num_adj_pars() << endl;
 		
 		f_rec << "-->repeat chance constraint/objective calculations every: " << pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() << " iterations" << endl << endl;
-		f_rec << "   adjustable parameters used in FOSM calculations:" << endl;
-		int i = 1;
-		for (auto& name : adj_par_names)
+		if (use_fosm)
 		{
-			f_rec << setw(15) << name;
-			if (i % 6 == 0)
-				f_rec << endl;
-			i++;
-		}
-		f_rec << endl;
-		if ((num_nz_obs() == 0) && (use_fosm))
-		{
-			f_rec << endl << endl << "  ---  Note: No nonzero weight observations found." << endl;
-			f_rec << "           Prior constraint/objective uncertainty will be used in FOSM-based calculations" << endl;
-		}
-		else if (use_fosm)
-		{
-			f_rec << "  non-zero weight observations used for conditioning in FOSM-based chance constraint/objective calculations: " << endl;
-			int i = 0;
-			for (auto& name : nz_obs_names)
+			f_rec << "   adjustable parameters used in FOSM calculations:" << endl;
+			int i = 1;
+			for (auto& name : adj_par_names)
 			{
 				f_rec << setw(15) << name;
 				if (i % 6 == 0)
@@ -609,8 +779,26 @@ void Constraints::initial_report()
 				i++;
 			}
 			f_rec << endl;
+			if ((num_nz_obs() == 0) && (use_fosm))
+			{
+				f_rec << endl << endl << "  ---  Note: No nonzero weight observations found." << endl;
+				f_rec << "           Prior constraint/objective uncertainty will be used in FOSM-based calculations" << endl;
+			}
+			else
+			{
+				f_rec << "  non-zero weight observations used for conditioning in FOSM-based chance constraint/objective calculations: " << endl;
+				int i = 0;
+				for (auto& name : nz_obs_names)
+				{
+					f_rec << setw(15) << name;
+					if (i % 6 == 0)
+						f_rec << endl;
+					i++;
+				}
+				f_rec << endl;
+			}
 		}
-		cout << "...risk = " << risk;
+		cout << "...opt_risk = " << risk;
 		if (std_weights)
 			cout << ", using FOSM-based chance constraints with the weights of non-zero-weighted constraints as standard deviation" << endl;
 		else if (use_fosm)
@@ -686,7 +874,7 @@ void Constraints::update_chance_offsets()
 	}
 }
 
-double Constraints::get_max_constraint_change(Observations& upgrade_obs)
+double Constraints::get_max_constraint_change(Observations& current_obs, Observations& upgrade_obs)
 {
 	/* work out which constraint has changed the most between the pointer to 
 	current sim constraint values and upgrade_obs constraint values*/
@@ -695,8 +883,8 @@ double Constraints::get_max_constraint_change(Observations& upgrade_obs)
 	double val, diff;
 	for (auto& name : ctl_ord_obs_constraint_names)
 	{
-		val = current_constraints_sim_ptr->get_rec(name);
-		diff = abs(current_constraints_sim_ptr->get_rec(name) - upgrade_obs[name]);
+		val = current_obs.get_rec(name);
+		diff = abs(current_obs.get_rec(name) - upgrade_obs[name]);
 		max_abs_constraint_change = (diff > max_abs_constraint_change) ? diff : max_abs_constraint_change;
 		max_abs_constraint_val = (val > max_abs_constraint_val) ? val : max_abs_constraint_val;
 	}
@@ -704,14 +892,67 @@ double Constraints::get_max_constraint_change(Observations& upgrade_obs)
 	return max_abs_constraint_change;
 }
 
-Observations Constraints::get_chance_shifted_constraints()
+//Observations Constraints::get_chance_shifted_constraints()
+//{
+//	/* one version of this method that doesnt take any args just use the pointer to the
+//	current sim constraint values*/
+//	return get_chance_shifted_constraints(*current_constraints_sim_ptr);
+//}
+
+ObservationEnsemble Constraints::get_chance_shifted_constraints(ObservationEnsemble& oe)
 {
-	/* one version of this method that doesnt take any args just use the pointer to the
-	current sim constraint values*/
-	return get_chance_shifted_constraints(*current_constraints_sim_ptr);
+	ObservationEnsemble shifted_oe(oe);//copy
+	ofstream& frec = file_mgr_ptr->rec_ofstream();
+	if (stack_oe_map.size() == 0)
+	{
+		
+		pfm.log_event("risk-shifting observation population using a single, 'optimal' chance point");
+		frec << "risk - shifting observation population using a single, 'optimal' chance point" << endl;
+
+		
+		//constraints.presolve_chance_report(iter,);
+		Observations sim, sim_shifted;
+		Eigen::VectorXd real_vec;
+		vector<string> onames = shifted_oe.get_var_names();
+		for (int i = 0; i < shifted_oe.shape().first; i++)
+		{
+			real_vec = shifted_oe.get_real_vector(i);
+			sim.update_without_clear(onames, real_vec);
+			sim_shifted = get_chance_shifted_constraints(sim);
+			shifted_oe.replace(i, sim_shifted);
+		}
+
+	}
+	else
+	{
+		pfm.log_event("risk-shifting observation population using 'ALL' decision variable solutions as chance points");
+		frec << "risk-shifting observation population using 'ALL' decision variable solutions as chance points" << endl;
+		//vector<string> real_names = shifted_oe.get_real_names();
+		vector<string> real_names = oe.get_real_names();
+		set<string> snames(real_names.begin(), real_names.end());
+		map<string, int> real_map = oe.get_real_map();
+		Observations sim, sim_shifted;
+		Eigen::VectorXd real_vec;
+		vector<string> onames = shifted_oe.get_var_names();
+		for (auto& real_info : stack_oe_map)
+		{
+			if (snames.find(real_info.first) == snames.end())
+			{
+				throw_constraints_error("dec var population realization name '" + real_info.first + "' not found in observation population realization names");
+			}
+			//overwrite the class stack_oe attribute with the realization stack
+			stack_oe = real_info.second;
+			real_vec = shifted_oe.get_real_vector(real_info.first);
+			sim.update_without_clear(onames, real_vec);
+			//this call uses the class stack_oe attribute;
+			sim_shifted = get_chance_shifted_constraints(sim);
+			shifted_oe.replace(real_map[real_info.first], sim_shifted);
+		}
+	}
+	return shifted_oe;
 }
 
-Observations Constraints::get_chance_shifted_constraints(Observations& _constraints_sim)
+Observations Constraints::get_chance_shifted_constraints(Observations& current_obs)
 {
 	/* get the simulated constraint values with the chance shift applied*/
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
@@ -732,7 +973,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 			//the offset (shift) is just the stdev * the risk-based probit value
 			pr_offset = probit_val * prior_constraint_stdev[name];
 			pt_offset = probit_val * post_constraint_stdev[name];
-			old_constraint_val = _constraints_sim.get_rec(name);
+			old_constraint_val = current_obs.get_rec(name);
 			required_val = constraints_obs[name];
 
 			//if less_than constraint, then add to the sim value, to move positive
@@ -754,7 +995,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 			}
 			//if its not an ineq constraint, then there is no direction to shift
 			else
-				new_constraint_val = current_constraints_sim_ptr->get_rec(name);
+				new_constraint_val = current_obs.get_rec(name);
 			iter_fosm.insert(name, new_constraint_val);
 		}
 	}
@@ -782,7 +1023,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 		pair<map<string, double>, map<string, double>> mm = stack_oe.get_moment_maps();
 		for (auto& name : ctl_ord_obs_constraint_names)
 		{
-			old_constraint_val = _constraints_sim.get_rec(name);
+			old_constraint_val = current_obs.get_rec(name);
 			//the value that must be statified (from the control file)
 			required_val = constraints_obs[name];
 			// the realized values of this stack are the anomalies added to the
@@ -796,6 +1037,10 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 			prior_constraint_stdev[name] = mm.second[name];
 			post_constraint_stdev[name] = mm.second[name];
 			
+			if (prior_constraint_stdev[name] == 0.0)
+			{
+				throw_constraints_error("model-based constraint '" + name + "' has empirical (stack) standard deviation of 0.0, something is wrong");
+			}
 
 			// if this is a "less than" constraint
 			if (constraint_sense_map[name] == ConstraintSense::less_than)
@@ -825,7 +1070,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& _constrai
 		}
 	}
 	vector<string> names = iter_fosm.get_keys();
-	Observations constraints_chance(_constraints_sim);
+	Observations constraints_chance(current_obs);
 	constraints_chance.update_without_clear(names, iter_fosm.get_data_vec(names));
 	
 	return constraints_chance;
@@ -854,7 +1099,7 @@ vector<double> Constraints::get_constraint_residual_vec(Observations& sim)
 	return residuals_vec;
 }
 
-pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors()
+pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Parameters& current_pars, Observations& current_obs)
 {
 	/* get the upper and lower bound constraint vectors. For less than constraints, the lower bound is 
 	set to double max, for greater than constraints, the upper bound is set to double max.
@@ -862,12 +1107,12 @@ pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors()
 	vector<double> residuals;
 	if (use_chance)
 	{
-		Observations current_constraints_chance = get_chance_shifted_constraints();
+		Observations current_constraints_chance = get_chance_shifted_constraints(current_obs);
 		residuals = get_constraint_residual_vec(current_constraints_chance);
 	}
 	else
 	{
-		residuals = get_constraint_residual_vec(*current_constraints_sim_ptr);
+		residuals = get_constraint_residual_vec(current_obs);
 	}
 
 	vector<double> constraint_ub, constraint_lb;
@@ -895,7 +1140,7 @@ pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors()
 	for (int i = 0; i < num_pi_constraints(); ++i)
 	{
 		string name = ctl_ord_pi_constraint_names[i];
-		double residual = -constraints_pi.get_pi_rec_ptr(name).calc_residual(*current_pars_and_dec_vars_ptr);
+		double residual = -constraints_pi.get_pi_rec_ptr(name).calc_residual(current_pars);
 		if (constraint_sense_map[name] == ConstraintSense::less_than)
 			constraint_ub.push_back(residual);
 		else
@@ -978,7 +1223,7 @@ double Constraints::get_probit()
 	return output;
 }
 
-void Constraints::presolve_report(int iter)
+void Constraints::presolve_report(int iter, Parameters& current_pars, Observations& current_obs)
 {
 	/* this is a report to the rec file for the status of the constraints before solving the current iteration*/
 	
@@ -992,12 +1237,12 @@ void Constraints::presolve_report(int iter)
 	Observations current;
 	if (use_chance)
 	{
-		current = get_chance_shifted_constraints();	
+		current = get_chance_shifted_constraints(current_obs);	
 	}
 	//otherwise, just use the pointer to the current constraint info
 	else
 	{
-		current = *current_constraints_sim_ptr;
+		current = current_obs;
 	}
 
 	residuals = get_constraint_residual_vec(current);
@@ -1026,8 +1271,8 @@ void Constraints::presolve_report(int iter)
 			f_rec << setw(20) << left << name;
 			f_rec << setw(15) << right << constraint_sense_name[name];
 			f_rec << setw(15) << pi_rec.get_obs_value();
-			f_rec << setw(15) << pi_rec.calc_sim_and_resid(*current_pars_and_dec_vars_ptr).first;
-			f_rec << setw(15) << pi_rec.calc_residual(*current_pars_and_dec_vars_ptr);
+			f_rec << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
+			f_rec << setw(15) << pi_rec.calc_residual(current_pars);
 			f_rec << setw(15) << current_bounds.first[num_obs_constraints() + i];
 			f_rec << setw(15) << current_bounds.second[num_obs_constraints() + i] << endl;
 
@@ -1035,7 +1280,7 @@ void Constraints::presolve_report(int iter)
 	}
 
 	if (use_chance)
-		presolve_chance_report(iter);	 
+		presolve_chance_report(iter,current_obs);	 
 	
 	return;
 }
@@ -1072,7 +1317,7 @@ void Constraints::write_res_file(Observations& constraints, Parameters& pars_and
 
 }
 
-void Constraints::presolve_chance_report(int iter)
+void Constraints::presolve_chance_report(int iter, Observations& current_obs)
 {
 	/* write chance info to the rec file before undertaking the current iteration process*/
 	if (!use_chance)
@@ -1085,14 +1330,14 @@ void Constraints::presolve_chance_report(int iter)
 	f_rec << setw(15) << "prior stdev" << setw(15) << "post stdev" << setw(15) << "offset";
 	f_rec << setw(15) << "new sim value" << endl;
 	vector<string> out_of_bounds;
-	Observations current_constraints_chance = get_chance_shifted_constraints();
+	Observations current_constraints_chance = get_chance_shifted_constraints(current_obs);
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
 		f_rec << setw(20) << left << name;
 		f_rec << setw(10) << right << constraint_sense_name[name];
 		f_rec << setw(15) << constraints_obs[name];
-		f_rec << setw(15) << current_constraints_sim_ptr->get_rec(name);
+		f_rec << setw(15) << current_obs.get_rec(name);
 		f_rec << setw(15) << prior_constraint_stdev[name];
 		f_rec << setw(15) << post_constraint_stdev[name];
 		f_rec << setw(15) << post_constraint_offset[name];
@@ -1101,7 +1346,10 @@ void Constraints::presolve_chance_report(int iter)
 	f_rec << "  note: 'offset' is the value added to the simulated constraint/objective value to account" << endl;
 	f_rec << "        for the uncertainty in the constraint/objective value arsing from uncertainty in the " << endl;
 	f_rec << "        adjustable parameters identified in the control file." << endl << endl;
-
+	if (!use_fosm)
+	{
+		f_rec << "  note: the above standard deviations are empirical estimates from the stack" << endl;
+	}
 	return;
 	
 }
@@ -1131,7 +1379,7 @@ bool Constraints::should_update_chance(int iter)
 }
 
 
-void Constraints::postsolve_obs_constraints_report(Observations& constraints_sim, string tag, int iter, 
+void Constraints::postsolve_obs_constraints_report(Observations& old_obs, Observations& new_obs, string tag, int iter, 
 									map<string,string> status_map, map<string,double> price_map)
 {
 	/* write out constraint info after the current iteration solution process is over to the rec file.  
@@ -1151,20 +1399,20 @@ void Constraints::postsolve_obs_constraints_report(Observations& constraints_sim
 	f_rec << setw(15) << "current" << setw(15) << "residual";
 	f_rec << setw(15) << "new" << setw(15) << "residual" << endl;
 
-	vector<double> cur_residuals = get_constraint_residual_vec(*current_constraints_sim_ptr);
+	vector<double> cur_residuals = get_constraint_residual_vec(old_obs);
 	vector<double> new_residuals;
 	if (use_chance)
 	{
-		Observations constraints_shift = get_chance_shifted_constraints(constraints_sim);
+		Observations constraints_shift = get_chance_shifted_constraints(new_obs);
 		new_residuals = get_constraint_residual_vec(constraints_shift);
 	}
 	else
-		new_residuals = get_constraint_residual_vec(constraints_sim);
+		new_residuals = get_constraint_residual_vec(new_obs);
 	double sim_val;
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
-		sim_val = constraints_sim[name];
+		sim_val = new_obs[name];
 		f_rec << setw(20) << left << name;
 		f_rec << setw(15) << right << constraint_sense_name[name];
 		f_rec << setw(15) << constraints_obs.get_rec(name);
@@ -1177,14 +1425,14 @@ void Constraints::postsolve_obs_constraints_report(Observations& constraints_sim
 			double offset = post_constraint_offset[name];
 			sim_val += offset;
 			f_rec << setw(15) << offset;
-			f_rec << setw(15) << current_constraints_sim_ptr->get_rec(name);
+			f_rec << setw(15) << old_obs.get_rec(name);
 			f_rec << setw(15) << cur_residuals[i];
 			f_rec << setw(15) << sim_val;
 			f_rec << setw(15) << new_residuals[i] << endl;
 		}
 		else
 		{
-			f_rec << setw(15) << current_constraints_sim_ptr->get_rec(name);
+			f_rec << setw(15) << old_obs.get_rec(name);
 			f_rec << setw(15) << cur_residuals[i];
 			f_rec << setw(15) << sim_val;
 			f_rec << setw(15) << new_residuals[i] << endl;
@@ -1194,7 +1442,7 @@ void Constraints::postsolve_obs_constraints_report(Observations& constraints_sim
 	}
 }
 
-void Constraints::postsolve_pi_constraints_report(Parameters& pars_and_dec_vars, int iter, map<string,string> status_map, map<string,double> price_map)
+void Constraints::postsolve_pi_constraints_report(Parameters& old_pars, Parameters& new_pars, int iter, map<string,string> status_map, map<string,double> price_map)
 {
 	
 	/*report prior information constraints stats to the rec file after the current iteration solution process.  
@@ -1217,8 +1465,8 @@ void Constraints::postsolve_pi_constraints_report(Parameters& pars_and_dec_vars,
 		for (auto &name : ctl_ord_pi_constraint_names)
 		{
 			PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
-			pair<double,double> cur_sim_resid = pi_rec.calc_sim_and_resid(*current_pars_and_dec_vars_ptr);
-			pair<double,double> new_sim_resid = pi_rec.calc_sim_and_resid(pars_and_dec_vars);
+			pair<double,double> cur_sim_resid = pi_rec.calc_sim_and_resid(old_pars);
+			pair<double,double> new_sim_resid = pi_rec.calc_sim_and_resid(new_pars);
 			f_rec << setw(20) << left << name;
 			f_rec << setw(15) << right << constraint_sense_name[name];
 			f_rec << setw(15) << pi_rec.get_obs_value();
@@ -1237,10 +1485,122 @@ void Constraints::postsolve_pi_constraints_report(Parameters& pars_and_dec_vars,
 	return;
 }
 
+pair<vector<int>,ObservationEnsemble> Constraints::process_stack_runs(string real_name, int iter, map<int, int> _stack_pe_run_map, 
+	RunManagerAbstract* run_mgr_ptr, bool drop_fails)
+{
+	ObservationEnsemble _stack_oe(stack_oe);//copy
+	vector<int> failed_runs = _stack_oe.update_from_runs(_stack_pe_run_map, run_mgr_ptr);
+	stringstream ss;
+	if (failed_runs.size() > 0)
+	{
+		ss.str("");
+		ss << "WARNING: " << failed_runs.size() << " stack runs failed for realization " << real_name;
+		pfm.log_event(ss.str());
+		cout << ss.str() << endl;
+	}
+		
+	return pair<vector<int>,ObservationEnsemble>(failed_runs,_stack_oe);
+}
+
+void Constraints::save_oe_stack(int iter, string real_name, ObservationEnsemble& _stack_oe)
+{
+	stringstream ss;
+	ss.str("");
+	if (real_name.size() > 0)
+		ss << file_mgr_ptr->get_base_filename() << "." << iter << "." << real_name << ".obs_stack";
+	else
+		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".obs_stack";
+
+	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	{
+		ss << ".jcb";
+		_stack_oe.to_binary(ss.str());
+	}
+	else
+	{
+		ss << ".csv";
+		_stack_oe.to_csv(ss.str());
+	}
+	ss.str("");
+	if (real_name.size() > 0)
+		pfm.log_event("saved realization '" + real_name + "' stack_oe to " + ss.str());
+	else
+		pfm.log_event("saved stack_oe to " + ss.str());
+}
+
+
+void Constraints::save_pe_stack(int iter, string real_name, ParameterEnsemble& _stack_pe)
+{
+	stringstream ss;
+	ss.str("");
+	if (real_name.size() > 0)
+		ss << file_mgr_ptr->get_base_filename() << "." << iter << "." << real_name << ".par_stack";
+	else
+		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".par_stack";
+
+	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	{
+		ss << ".jcb";
+		_stack_pe.to_binary(ss.str());
+	}
+	else
+	{
+		ss << ".csv";
+		_stack_pe.to_csv(ss.str());
+	}
+	ss.str("");
+	if (real_name.size() > 0)
+		pfm.log_event("saved realization '" + real_name + "' stack_pe to " + ss.str());
+	else
+		pfm.log_event("saved stack_pe to " + ss.str());
+}
+
+
+void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
+{
+	pair<vector<int>, ObservationEnsemble> stack_info;
+	if (population_stack_pe_run_map.size() > 0)
+	{
+		stack_oe_map.clear();
+		//work out what var names for the stack_oe we dont need so we can drop them!
+		vector<string> drop_names;
+		pair<vector<int>, ObservationEnsemble> stack_info;
+		set<string> s_obs_constraint_names(ctl_ord_obs_constraint_names.begin(), ctl_ord_obs_constraint_names.end());
+		for (auto name : stack_oe.get_var_names())
+		{
+			if (s_obs_constraint_names.find(name) == s_obs_constraint_names.end())
+				drop_names.push_back(name);
+		}
+		for (auto& real_info : population_stack_pe_run_map)
+		{
+			pfm.log_event("processing stack runs for realization " + real_info.first);
+			stack_info = process_stack_runs(real_info.first, iter, real_info.second, run_mgr_ptr, false);
+			save_oe_stack(iter, real_info.first, stack_info.second);
+			stack_info.second.drop_cols(drop_names);
+			stack_oe_map[real_info.first] = stack_info.second;
+			
+		}
+	}
+	else
+	{
+		pfm.log_event("processing stack runs");
+		stack_info = process_stack_runs("", iter, stack_pe_run_map, run_mgr_ptr, true);
+		if (stack_info.first.size() > 0)
+		{
+			file_mgr_ptr->rec_ofstream() << "dropping " << stack_info.first.size() << " failed realizations for par stack";
+			pfm.log_event("dropping failed realizations from par stack");
+			stack_pe.drop_rows(stack_info.first);
+		}
+		save_oe_stack(iter, "", stack_info.second);
+		save_pe_stack(iter, "", stack_pe);
+		stack_oe = stack_info.second;
+	}
+}
+
 void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 {
 	/* using the passed in run mgr pointer, process any runs that were queued up for chance-based 
-	calculations
+	calculations. handles FOSM, single stack and population nested stacks
 	
 	*/
 	stringstream ss;
@@ -1266,44 +1626,13 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 	else
 	{
 
-		vector<int> failed_runs = stack_oe.update_from_runs(stack_pe_run_map, run_mgr_ptr);
-
-		if (failed_runs.size() > 0)
-		{
-			f_rec << "WARNING: " << failed_runs.size() << " stack realizations failed" << endl;
-			stack_pe.drop_rows(failed_runs);
-		}
-		stringstream ss;
-		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".par_stack";
-		if (pest_scenario.get_pestpp_options().get_ies_save_binary())
-		{
-			ss << ".jcb";
-			stack_pe.to_binary(ss.str());
-		}
-		else
-		{
-			ss << ".csv";
-			stack_pe.to_csv(ss.str());
-		}
-		ss.str("");
-		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".obs_stack";
-		if (pest_scenario.get_pestpp_options().get_ies_save_binary())
-		{
-			ss << ".jcb";
-			stack_oe.to_binary(ss.str());
-		}
-		else
-		{
-			ss << ".csv";
-			stack_oe.to_csv(ss.str());
-		}
-		f_rec << "Note: " << stack_oe.shape().first << " stack realizations active" << endl;
+		process_stack_runs(run_mgr_ptr,iter);
 
 	}
 
 }
 
-void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
+void Constraints::add_runs(int iter, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
 {
 	/* using the passed run mgr pointer, queue up chance runs
 	
@@ -1323,7 +1652,7 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 		//bit using Constraints::get_fosm_par_names()
 		//the last false says not to reinitialize the run mgr since the calling process may have also
 		//added runs
-		bool success = jco.build_runs(*current_pars_and_dec_vars_ptr, *current_constraints_sim_ptr, adj_par_names, pts,
+		bool success = jco.build_runs(current_pars, current_obs, adj_par_names, pts,
 			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
 			*run_mgr_ptr, out_of_bounds, false, true, false);
 		if (!success)
@@ -1331,7 +1660,7 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 			const set<string> failed = jco.get_failed_parameter_names();
 			throw_constraints_error("failed to calc derviatives for the following FOSM parameters: ", failed);
 		}
-		cout << "...running " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints" << endl;
+		cout << "...adding " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints" << endl;
 
 	}
 	//for stacks, we need to queue up the stack realizations, but replace the dec var entries in each realization
@@ -1345,13 +1674,46 @@ void Constraints::add_runs(RunManagerAbstract* run_mgr_ptr)
 		for (auto dname : dec_var_names)
 		{
 			Eigen::VectorXd dvec(num_reals);
-			dvec.setConstant(current_pars_and_dec_vars_ptr->get_rec(dname));
+			dvec.setConstant(current_pars.get_rec(dname));
 			stack_pe.replace_col(dname, dvec);
 		}
 		pfm.log_event("building stack-based parameter runs");
-		cout << "...running " << stack_pe.shape().first << " model runs for stack-based chance constraints" << endl;
+		cout << "...adding " << stack_pe.shape().first << " model runs for stack-based chance constraints" << endl;
 		stack_pe_run_map.clear();
 		stack_pe_run_map = stack_pe.add_runs(run_mgr_ptr);
+	}
+}
+
+void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
+{
+	if (!use_chance)
+		return;
+	if (use_fosm)
+	{
+		throw_constraints_error("add_runs() error: FOSM-based chance constraints not supported for ensemble/population-based algorithms");
+	}
+	population_stack_pe_run_map.clear();
+	pfm.log_event("queuing up nested-sets of chance runs for decision-variable ensemble ");
+	
+	Eigen::VectorXd par_vec;
+	vector<string> par_names = current_pe.get_var_names();
+	Parameters real_pars = pest_scenario.get_ctl_parameters();
+	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(real_pars);
+	current_pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+	f_rec << "queuing up nested-sets of chance runs ('opt_chance_points' == 'all') for decision-variable ensemble " << endl;
+	cout << "queuing up nested - sets of chance runs for decision-variable ensemble " << endl;
+	for (auto real_info : current_pe.get_real_map())
+	{
+
+		par_vec = current_pe.get_real_vector(real_info.first);
+		real_pars.update_without_clear(par_names, par_vec);
+		add_runs(iter, real_pars, current_obs, run_mgr_ptr);
+		//relying on class attribute being set in add_runs():
+		population_stack_pe_run_map[real_info.first] = stack_pe_run_map;
+		//relying on class attribute being set in add_runs():
+		save_pe_stack(iter, real_info.first, stack_pe);
+		f_rec << "...added " << stack_pe.shape().first << " runs for decision variable solution '" << real_info.first << "'" << endl;
 	}
 }
 

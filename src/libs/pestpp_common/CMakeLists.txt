@@ -34,15 +34,17 @@ add_library(pestpp_com STATIC
   Transformation.cpp
   SQP.cpp
   MOEA.cpp
+  sequential_lp.cpp
 )
 
-target_include_directories(pestpp_com INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(pestpp_com INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}" /src/libs/opt)
 
 target_compile_options(pestpp_com PRIVATE ${PESTPP_CXX_WARN_FLAGS})
 
 target_link_libraries(pestpp_com
   common
   rm_abstract
+  opt
 )
 
 if(BUILD_SHARED_LIBS)

@@ -921,7 +921,7 @@ def mf6_v5_opt_stack_test():
         shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_opt.pst"))
     m_d = os.path.join(model_d,"master_opt_stack")
-    pyemu.os_utils.start_workers(t_d, "pestpp-opt", "freyberg6_run_opt.pst", 
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-opt"), "freyberg6_run_opt.pst", 
                                  num_workers=15, master_dir=m_d,worker_root=model_d,
                                  port=port)
 
@@ -1052,9 +1052,9 @@ if __name__ == "__main__":
     #ext_stdcol_test()
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
+    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
     #cmdline_test()
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sqp.exe"),os.path.join("..","bin","pestpp-sqp.exe"))
-
     basic_sqp_test()

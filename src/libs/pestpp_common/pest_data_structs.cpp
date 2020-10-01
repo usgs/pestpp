@@ -1075,9 +1075,9 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		return true;
 	}
 
-	else if (key == "MOU_CHANCE_POINTS")
+	else if (key == "OPT_CHANCE_POINTS")
 	{
-		mou_chance_points = value;
+		opt_chance_points = value;
 		return true;
 	}
 
@@ -1232,6 +1232,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "opt_direction: " << opt_direction << endl;
 	os << "opt_iter_tol: " << opt_iter_tol << endl;
 	os << "opt_recalc_fosm_every: " << opt_recalc_fosm_every << endl;
+	os << "opt_chance_points: " << opt_chance_points << endl;
 	
 
 	os << endl << "...pestpp-sqp options:" << endl;
@@ -1248,7 +1249,7 @@ void PestppOptions::summary(ostream& os) const
 	for (auto obj : mou_objectives)
 		os << obj << endl;
 	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
-	os << "mou_chance_points: " << mou_chance_points << endl;
+	
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_algorithm: " << mou_algorithm << endl;
@@ -1259,7 +1260,7 @@ void PestppOptions::summary(ostream& os) const
 	for (auto obj : mou_objectives)
 		os << obj << endl;
 	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
-	os << "mou_chance_points: " << mou_chance_points << endl;
+	
 
 
 	os << endl << "...pestpp-ies options:" << endl;
@@ -1392,6 +1393,7 @@ void PestppOptions::set_defaults()
 	set_opt_stack_size(0);
 	set_opt_par_stack("");
 	set_opt_obs_stack("");
+	set_opt_chance_points("SINGLE");
 
 
 	set_sqp_dv_en("");
@@ -1405,7 +1407,7 @@ void PestppOptions::set_defaults()
 	set_mou_obs_population_restart_file("");
 	set_mou_objectives(vector<string>());
 	set_mou_max_archive_size(5000);
-	set_mou_chance_points("OPTIMAL");
+	
 
 	set_ies_par_csv("");
 	set_ies_obs_csv("");
