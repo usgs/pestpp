@@ -133,19 +133,21 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 	}
 }
 
-pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(ObservationEnsemble& op, ParameterEnsemble& dp)
+pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(ObservationEnsemble& op, ParameterEnsemble& dp, bool report)
 {
 	stringstream ss;
 	ss << "ParetoObjectives::pareto_dominance_sort() for " << op.shape().first << " population members";
 	performance_log->log_event(ss.str());
 	performance_log->log_event("preparing fast-lookup containers");
 
-	
+	ofstream& frec = file_manager.rec_ofstream();
 
 	//TODO: check for a single objective and deal appropriately
 
 	//update the member struct container
 	update_member_struct(op, dp);
+
+
 
 	//check for and drop duplictes
 	drop_duplicates(op, dp);
@@ -195,7 +197,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(Obs
 		{
 			ss.str("");
 			ss << "WARNING: all members are infeasible" << endl;
-			file_manager.rec_ofstream() << ss.str();
+			frec << ss.str();
 			cout << ss.str();
 		}
 		member_struct = feas_member_struct;
@@ -216,7 +218,6 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(Obs
 
 	map<int, vector<string>> front_map = sort_members_by_dominance_into_fronts(member_struct);
 	performance_log->log_event("sorting done");
-	ofstream& frec = file_manager.rec_ofstream();
 	
 	frec << "...pareto dominance sort yielded " << front_map.size() << " domination fronts" << endl;
 	for (auto front : front_map)
@@ -564,6 +565,106 @@ void MOEA::throw_moea_error(const string& message)
 	throw runtime_error("MOEA error: " + message);
 }
 
+void MOEA::obj_func_report(ParameterEnsemble& _dp, ObservationEnsemble& _op)
+{
+	map<string, map<string, double>> summary = get_obj_func_summary_stats(_dp, _op);
+	stringstream frec;
+	//frec << endl << "  ---  Objective Function Summary  ---  " << endl;
+
+	int max_len = 20;
+	for (auto obs_obj : obs_obj_names)
+	{
+		max_len = max(int(obs_obj.size()), max_len);
+	}
+	for (auto pi_obj : pi_obj_names)
+	{
+		max_len = max(int(pi_obj.size()), max_len);
+	}
+
+	frec << left << setw(max_len) << "objective function" << right << setw(10) << "mean" << setw(20) << "standard devation" << setw(10) << "min" << setw(10) << "max" << endl;
+	for (auto obs_obj : obs_obj_names)
+	{
+		frec << left << setw(max_len) << obs_obj;
+		frec << right << setw(10) << summary[obs_obj]["mean"];
+		frec << setw(20) << summary[obs_obj]["std"];
+		frec << setw(10) << summary[obs_obj]["min"];
+		frec << setw(10) << summary[obs_obj]["max"] << endl;
+	}
+
+	
+	for (auto pi_obj : pi_obj_names)
+	{
+		frec << left << setw(max_len) << pi_obj;
+		frec << right << setw(10) << summary[pi_obj]["mean"];
+		frec << setw(20) << summary[pi_obj]["std"];
+		frec << setw(10) << summary[pi_obj]["min"];
+		frec << setw(10) << summary[pi_obj]["max"] << endl;
+	}
+
+	frec << endl;
+	file_manager.rec_ofstream() << frec.str();
+	cout << frec.str();
+}
+
+map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsemble& _dp, ObservationEnsemble& _op)
+{
+
+	pair<map<string, double>, map<string, double>> mm = _op.get_moment_maps();
+	_op.update_var_map();
+	map<string, int> var_map = _op.get_var_map();
+	map<string, double> sum;
+	map<string, map<string, double>> summary_stats;
+	for (auto obs_obj : obs_obj_names)
+	{
+		sum.clear();
+		sum["mean"] = mm.first[obs_obj];
+		sum["std"] = mm.second[obs_obj];
+		sum["min"] = _op.get_eigen_ptr()->col(var_map[obs_obj]).minCoeff();
+		sum["max"] = _op.get_eigen_ptr()->col(var_map[obs_obj]).maxCoeff();
+		summary_stats[obs_obj] = sum;
+	}
+
+	mm = _dp.get_moment_maps();
+	_dp.update_var_map();
+	var_map = _dp.get_var_map();
+	vector<string> dp_names = _dp.get_var_names();
+	Parameters pars = pest_scenario.get_ctl_parameters();
+	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+	pts.ctl2numeric_ip(pars);
+	_dp.transform_ip(ParameterEnsemble::transStatus::NUM);
+	Eigen::VectorXd vec;
+	pair<double, double> sim_res;
+	map<string, vector<double>> pi_vals;
+	for (auto pi_obj : pi_obj_names)
+		pi_vals[pi_obj] = vector<double>();
+	for (int i = 0; i < _dp.shape().first; i++)
+	{
+		vec = _dp.get_eigen_ptr()->row(i);
+		pts.ctl2numeric_ip(pars);
+		pars.update_without_clear(dp_names, vec);
+		pts.numeric2ctl_ip(pars);
+		
+		for (auto pi_obj : pi_obj_names)
+		{
+			sim_res = prior_info_ptr->get_pi_rec_ptr(pi_obj).calc_sim_and_resid(pars);
+			pi_vals[pi_obj].push_back(sim_res.first);
+		}
+	}
+
+	for (auto pi_obj : pi_obj_names)
+	{
+		vec = stlvec_2_eigenvec(pi_vals[pi_obj]);
+		sum.clear();
+		sum["mean"] = vec.mean();
+		sum["std"] = sqrt((vec.array() - vec.mean()).pow(2).sum() / (vec.size() - 1));
+		sum["min"] = vec.minCoeff();
+		sum["max"] = vec.maxCoeff();
+		summary_stats[pi_obj] = sum;
+	}
+	return summary_stats;
+}
+
+
 void MOEA::sanity_checks()
 {
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
@@ -891,6 +992,10 @@ void MOEA::initialize()
 		ph.report(true);
 		ph.write(0, 1);
 		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);
+		
+		message(0, "control file parameter objective function summary: ");
+		obj_func_report(_pe, _oe);
+
 		return;
 	}
 
@@ -1273,15 +1378,20 @@ void MOEA::initialize()
 	op.to_csv(ss.str());
 	message(1, "saved observation population to ", ss.str());
 
+	message(0, "initial population objective function summary:");
+	obj_func_report(dp, op);
+
 	if (constraints.get_use_chance())
 	{
 		ObservationEnsemble shifted_op = get_chance_shifted_op(op);
 		ss.str("");
 		ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".chance.csv";
 		op.to_csv(ss.str());
-		message(1, "saved risk_shifted observation population to ", ss.str());
+		message(1, "saved chance-shifted observation population to ", ss.str());
 
 		op = shifted_op;
+		message(0, "chance-shifted initial population objective function summary");
+		obj_func_report(dp, op);
 	}
 
 	//save the initial dv population again in case runs failed or members were dropped as part of restart
@@ -1513,6 +1623,10 @@ void MOEA::iterate_to_solution()
 		op = new_op;
 
 		save_populations(dp, op);
+		ss.str("");
+		ss << "iteration " << iter << "objective function summary";
+		message(0, ss.str());
+		obj_func_report(dp, op);
 
 		iter++;
 	}

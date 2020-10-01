@@ -23,7 +23,7 @@ public:
 	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
 		PerformanceLog* _performance_log,Constraints* _constraints_ptr = nullptr);
 
-	pair<vector<string>, vector<string>> pareto_dominance_sort(ObservationEnsemble& op, ParameterEnsemble& dp);
+	pair<vector<string>, vector<string>> pareto_dominance_sort(ObservationEnsemble& op, ParameterEnsemble& dp, bool report=true);
 	
 	//this must be called at least once before the diversity metrixs can be called...
 	void set_pointers(vector<string>& _obs_obj_names, vector<string>& _pi_obj_names, map<string, double>& _obj_dir_mult)
@@ -155,6 +155,9 @@ private:
 	pair<Eigen::VectorXd, Eigen::VectorXd> crossover(double probability, double eta_m, int idx1, int idx2);
 
 	pair<Parameters, Observations> get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe, bool use_mean=false);
+
+	void obj_func_report(ParameterEnsemble& _dp, ObservationEnsemble& _oe);
+	map<string, map<string, double>> get_obj_func_summary_stats(ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
 };
 

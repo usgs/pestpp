@@ -1348,7 +1348,7 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs)
 	f_rec << "        adjustable parameters identified in the control file." << endl << endl;
 	if (!use_fosm)
 	{
-		f_rec << "note: the above standard deviations are empirical estimates from the stack" << endl;
+		f_rec << "  note: the above standard deviations are empirical estimates from the stack" << endl;
 	}
 	return;
 	

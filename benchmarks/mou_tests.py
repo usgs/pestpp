@@ -281,7 +281,7 @@ def test_zdt1_chance():
     test_case = "zdt1"
     test_d = setup_zdt_problem(test_case,30,additive_chance=True)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
-    pst.control_data.noptmax = 3
+    pst.control_data.noptmax = 1
     pst.pestpp_options["mou_population_size"] = 5    
     pst.pestpp_options["opt_risk"] = 0.95
     pst.pestpp_options["opt_stack_size"] = 3
