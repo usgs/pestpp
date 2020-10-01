@@ -255,7 +255,6 @@ def test_zdt1():
     dv_df.to_csv(os.path.join(test_d,"restart_dv.csv"))
     obs_df.to_csv(os.path.join(test_d,"restart_obs.csv"))
 
-
     shutil.copy2(os.path.join(master_d,dv_pop_file),os.path.join(test_d,"restart_dv.csv"))
     shutil.copy2(os.path.join(master_d,obs_pop_file),os.path.join(test_d,"restart_obs.csv"))
     pst.pestpp_options["mou_dv_population_file"] = "restart_dv.csv"

@@ -47,8 +47,10 @@ private:
 	Constraints* constraints_ptr;
 	vector<string> sort_members_by_crowding_distance(vector<string>& members);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
+
 	void drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp);
 	bool first_equals_second(map<string, double>& first, map<string, double>& second);
+
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& member_struct);
 
 	//sort specific members
