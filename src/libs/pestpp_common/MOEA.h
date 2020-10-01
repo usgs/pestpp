@@ -105,6 +105,8 @@ private:
 	vector<string> dv_names;
 	map<string, double> obj_dir_mult;
 
+	map<string, map<string, double>> previous_obj_summary;
+
 
 	//these two instances are passed as pointers to the constraints
 	//Parameters effective_constraint_pars;
@@ -119,7 +121,7 @@ private:
 	PerformanceLog *performance_log;
 	RunManagerAbstract* run_mgr_ptr;
 	const ObservationInfo *obs_info_ptr;
-	const PriorInformation *prior_info_ptr;
+
 
 	ParameterEnsemble dp, dp_archive;
 	ObservationEnsemble op, op_archive;
@@ -156,9 +158,11 @@ private:
 
 	pair<Parameters, Observations> get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe, bool use_mean=false);
 
-	void obj_func_report(ParameterEnsemble& _dp, ObservationEnsemble& _oe);
+	map<string, map<string, double>> obj_func_report(ParameterEnsemble& _dp, ObservationEnsemble& _oe);
 	map<string, map<string, double>> get_obj_func_summary_stats(ParameterEnsemble& _dp, ObservationEnsemble& _op);
+	map<string, map<string, double>> obj_func_change_report(map<string, map<string, double>>& current_obj_summary);
 
+	int get_max_len_obj_name();
 };
 
 #endif //MOEA_H_

@@ -565,12 +565,8 @@ void MOEA::throw_moea_error(const string& message)
 	throw runtime_error("MOEA error: " + message);
 }
 
-void MOEA::obj_func_report(ParameterEnsemble& _dp, ObservationEnsemble& _op)
+int MOEA::get_max_len_obj_name()
 {
-	map<string, map<string, double>> summary = get_obj_func_summary_stats(_dp, _op);
-	stringstream frec;
-	//frec << endl << "  ---  Objective Function Summary  ---  " << endl;
-
 	int max_len = 20;
 	for (auto obs_obj : obs_obj_names)
 	{
@@ -580,30 +576,115 @@ void MOEA::obj_func_report(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 	{
 		max_len = max(int(pi_obj.size()), max_len);
 	}
+	return max_len;
+}
 
-	frec << left << setw(max_len) << "objective function" << right << setw(10) << "mean" << setw(20) << "standard devation" << setw(10) << "min" << setw(10) << "max" << endl;
+map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, ObservationEnsemble& _op)
+{
+	map<string, map<string, double>> summary = get_obj_func_summary_stats(_dp, _op);
+	stringstream frec;
+	//frec << endl << "  ---  Objective Function Summary  ---  " << endl;
+
+	int max_len = get_max_len_obj_name();
+	string dir;
+	frec << left << setw(max_len) << "objective function" << right << setw(10) << "direction" << setw(10) << "mean" << setw(20) << "standard devation" << setw(12) << "min" << setw(12) << "max" << endl;
 	for (auto obs_obj : obs_obj_names)
 	{
+
 		frec << left << setw(max_len) << obs_obj;
+		dir = "minimize";
+		if (obj_dir_mult[obs_obj] == -1)
+			dir = "maximize";
+		frec << right << setw(10) << dir;
 		frec << right << setw(10) << summary[obs_obj]["mean"];
 		frec << setw(20) << summary[obs_obj]["std"];
-		frec << setw(10) << summary[obs_obj]["min"];
-		frec << setw(10) << summary[obs_obj]["max"] << endl;
+		frec << setw(12) << summary[obs_obj]["min"];
+		frec << setw(12) << summary[obs_obj]["max"] << endl;
 	}
 
 	
 	for (auto pi_obj : pi_obj_names)
 	{
 		frec << left << setw(max_len) << pi_obj;
+		dir = "minimize";
+		if (obj_dir_mult[pi_obj] == -1)
+			dir = "maximize";
+		frec << right << setw(10) << dir;
 		frec << right << setw(10) << summary[pi_obj]["mean"];
 		frec << setw(20) << summary[pi_obj]["std"];
-		frec << setw(10) << summary[pi_obj]["min"];
-		frec << setw(10) << summary[pi_obj]["max"] << endl;
+		frec << setw(12) << summary[pi_obj]["min"];
+		frec << setw(12) << summary[pi_obj]["max"] << endl;
 	}
 
 	frec << endl;
 	file_manager.rec_ofstream() << frec.str();
 	cout << frec.str();
+	return summary;
+}
+
+map<string, map<string, double>> MOEA::obj_func_change_report(map<string, map<string, double>>& current_obj_summary)
+{
+	map<string, map<string, double>> change_summary;
+	if (previous_obj_summary.size() == 0)
+		return change_summary;
+	double change, percent_change;
+	
+	stringstream ss;
+	int max_len = get_max_len_obj_name();
+	ss << left << setw(max_len) << "objective function" << right << setw(15) << "mean change";
+	ss << setw(15) << "% mean change" << setw(15) << "stdev change" << setw(15) << "% stdev change" << endl;
+
+
+	for (auto obs_obj : obs_obj_names)
+	{
+		change_summary[obs_obj] = map<string, double>();
+		if (previous_obj_summary.find(obs_obj) == previous_obj_summary.end())
+			throw_moea_error("obj_func_change_report() error: obs obj '" + obs_obj + "' not in previous summary");
+		if (current_obj_summary.find(obs_obj) == current_obj_summary.end())
+			throw_moea_error("obj_func_change_report() error: obs obj '" + obs_obj + "' not in current summary");
+		change = previous_obj_summary[obs_obj]["mean"] - current_obj_summary[obs_obj]["mean"];
+		percent_change = 100.0 * (change / previous_obj_summary[obs_obj]["mean"]);
+		ss << left << setw(max_len) << obs_obj;
+		ss << right << setw(15) << change;
+		ss << setw(15) << percent_change;
+		change_summary[obs_obj]["mean"] = change;
+		change_summary[obs_obj]["mean_percent"] = percent_change;
+
+		change = previous_obj_summary[obs_obj]["std"] - current_obj_summary[obs_obj]["std"];
+		percent_change = 100.0 * (change / previous_obj_summary[obs_obj]["std"]);
+		ss << setw(15) << change;
+		ss << setw(15) << percent_change;
+		change_summary[obs_obj]["std"] = change;
+		change_summary[obs_obj]["std_percent"] = percent_change;
+		ss << endl;
+
+	}
+	for (auto pi_obj : pi_obj_names)
+	{
+		change_summary[pi_obj] = map<string, double>();
+		if (previous_obj_summary.find(pi_obj) == previous_obj_summary.end())
+			throw_moea_error("obj_func_change_report() error: pi obj '" + pi_obj + "' not in previous summary");
+		if (current_obj_summary.find(pi_obj) == current_obj_summary.end())
+			throw_moea_error("obj_func_change_report() error: pi obj '" + pi_obj + "' not in current summary");
+		change = previous_obj_summary[pi_obj]["mean"] - current_obj_summary[pi_obj]["mean"];
+		percent_change = 100.0 * (change / previous_obj_summary[pi_obj]["mean"]);
+		ss << left << setw(max_len) << pi_obj;
+		ss << right << setw(15) << change;
+		ss << setw(15) << percent_change;
+		change_summary[pi_obj]["mean"] = change;
+		change_summary[pi_obj]["mean_percent"] = percent_change;
+
+		change = previous_obj_summary[pi_obj]["std"] - current_obj_summary[pi_obj]["std"];
+		percent_change = 100.0 * (change / previous_obj_summary[pi_obj]["std"]);
+		ss << setw(15) << change;
+		ss << setw(15) << percent_change;
+		change_summary[pi_obj]["std"] = change;
+		change_summary[pi_obj]["std_percent"] = percent_change;
+		ss << endl;
+	}
+	file_manager.rec_ofstream() << ss.str() << endl;
+	cout << ss.str() << endl;
+	return change_summary;
 }
 
 map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsemble& _dp, ObservationEnsemble& _op)
@@ -635,6 +716,7 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 	Eigen::VectorXd vec;
 	pair<double, double> sim_res;
 	map<string, vector<double>> pi_vals;
+	PriorInformation* prior_info_ptr = pest_scenario.get_prior_info_ptr();
 	for (auto pi_obj : pi_obj_names)
 		pi_vals[pi_obj] = vector<double>();
 	for (int i = 0; i < _dp.shape().first; i++)
@@ -1379,7 +1461,7 @@ void MOEA::initialize()
 	message(1, "saved observation population to ", ss.str());
 
 	message(0, "initial population objective function summary:");
-	obj_func_report(dp, op);
+	previous_obj_summary = obj_func_report(dp, op);
 
 	if (constraints.get_use_chance())
 	{
@@ -1391,7 +1473,7 @@ void MOEA::initialize()
 
 		op = shifted_op;
 		message(0, "chance-shifted initial population objective function summary");
-		obj_func_report(dp, op);
+		previous_obj_summary = obj_func_report(dp, op);
 	}
 
 	//save the initial dv population again in case runs failed or members were dropped as part of restart
@@ -1552,9 +1634,10 @@ void MOEA::iterate_to_solution()
 	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
 	vector<string> keep;
 	stringstream ss;
+	map<string, map<string, double>> summary;
 	while(iter <= pest_scenario.get_control_info().noptmax)
 	{
-		message(0, "starting iteration", iter);
+		message(0, "starting iteration ", iter);
 
 		//generate offspring
 		ParameterEnsemble new_dp = generate_population();
@@ -1624,9 +1707,14 @@ void MOEA::iterate_to_solution()
 
 		save_populations(dp, op);
 		ss.str("");
-		ss << "iteration " << iter << "objective function summary";
+		ss << "iteration " << iter << " objective function summary:";
 		message(0, ss.str());
-		obj_func_report(dp, op);
+		summary = obj_func_report(dp, op);
+		ss.str("");
+		ss << "iteration " << iter << " objective function change summary:";
+		message(0, ss.str());
+		obj_func_change_report(summary);
+		previous_obj_summary = summary;
 
 		iter++;
 	}
