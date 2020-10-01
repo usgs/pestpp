@@ -1260,7 +1260,7 @@ void PestppOptions::summary(ostream& os) const
 	for (auto obj : mou_objectives)
 		os << obj << endl;
 	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
-	os << "mou_chance_points: " << mou_chance_points << endl;
+	
 
 
 	os << endl << "...pestpp-ies options:" << endl;
