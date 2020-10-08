@@ -1013,7 +1013,7 @@ void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, Observat
 	{
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
 		Parameters pars;
-		pars.update(pe.get_var_names(), eigenvec_2_stlvec(pe.get_real_vector("BASE")));
+		pars.update(pe.get_var_names(), eigenvec_2_stlvec(pe.get_real_vector(IterEnsembleSmoother::base_name)));
 		if (pe.get_trans_status() == ParameterEnsemble::transStatus::NUM)
 			pts.numeric2ctl_ip(pars);
 		// save parameters to .par file
@@ -1032,7 +1032,7 @@ void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, Observat
 		else
 		{
 			Observations obs;
-			obs.update(oe.get_var_names(), eigenvec_2_stlvec(oe.get_real_vector("BASE")));
+			obs.update(oe.get_var_names(), eigenvec_2_stlvec(oe.get_real_vector(IterEnsembleSmoother::base_name)));
 			ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
 			// save new residuals to .rei file
 			ss.str("");

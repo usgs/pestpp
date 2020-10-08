@@ -693,14 +693,14 @@ void IterEnsembleSmoother::initialize_restart()
 	if (missing.size() > 0)
 	{
 		//the special case where the base real is what is missing...
-		if ((missing.size() == 1) && (missing[0] == "BASE"))
+		if ((missing.size() == 1) && (missing[0] == base_name))
 		{
 			//check that the base real is in the par en - restart_par_en should be accounted for by now
 			int base_par_idx = -1;
 			vector<string> pe_real_names = pe.get_real_names(), pe_base_real_names = pe_base.get_real_names();
 			for (int i = 0; i < pe_base.shape().first; i++)
 			{
-				if (pe_base_real_names[i] == "BASE")
+				if (pe_base_real_names[i] == base_name)
 				{
 					base_par_idx = i;
 					break;
@@ -708,11 +708,24 @@ void IterEnsembleSmoother::initialize_restart()
 			}
 			if (base_par_idx != -1)
 			{
+
 				ss.str("");
-				ss << "WARNING: replacing base obs en realization '" << oe_base_real_names[base_par_idx] << "' with 'base' (noise free) values to match par en 'base' location";
-				message(2, ss.str());
+				ss << "WARNING: replacing obs+noise obs en realization '" << oe_base_real_names[base_par_idx] << "' with 'base' (noise free) values to match par en 'base' location";
+				message(1, ss.str());
 				Observations obs = pest_scenario.get_ctl_observations();
-				oe_base.replace(base_par_idx, obs, "BASE");
+				oe_base.replace(base_par_idx, obs, base_name);
+				ss.str("");
+				if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+				{
+					ss << file_manager.get_base_filename() << ".obs+noise.jcb";
+					oe.to_binary(ss.str());
+				}
+				else
+				{
+					ss << file_manager.get_base_filename() << ".obs+noise.csv";
+					oe.to_csv(ss.str());
+				}
+				message(1, "re-saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
 			}
 			else
 			{
@@ -941,7 +954,7 @@ void IterEnsembleSmoother::initialize()
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
 		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
-		_pe.append("BASE", pars);
+		_pe.append(base_name, pars);
 		string par_csv = file_manager.get_base_filename() + ".par.csv";
 		//message(1, "saving parameter values to ", par_csv);
 		//_pe.to_csv(par_csv);
@@ -949,7 +962,7 @@ void IterEnsembleSmoother::initialize()
 		pe_base.reorder(vector<string>(), act_par_names);
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
-		_oe.append("BASE", pest_scenario.get_ctl_observations());
+		_oe.append(base_name, pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
