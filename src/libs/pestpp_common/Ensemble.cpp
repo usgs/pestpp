@@ -2207,12 +2207,12 @@ void ParameterEnsemble::save_fixed()
 		}
 	}
 	// add the "base" if its not in the real names already
-	if (find(real_names.begin(), real_names.end(), base_name) == real_names.end())
+	if (find(real_names.begin(), real_names.end(), BASE_REAL_NAME) == real_names.end())
 	{
 		Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 		for (auto fname : fixed_names)
 		{
-			pair<string, string> key(base_name, fname);
+			pair<string, string> key(BASE_REAL_NAME, fname);
 			fixed_map[key] = pars[fname];
 		}
 	}
