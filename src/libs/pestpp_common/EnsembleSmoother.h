@@ -79,7 +79,7 @@ public:
 	void finalize();
 	void throw_ies_error(string message);
 	bool should_terminate();
-	static constexpr const char* base_name = "BASE"; //this is also defined in Ensemble
+	
 
 private:
 	int  verbose_level;
