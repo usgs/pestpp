@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="documentation/pestpplogo.png">
+  <img src="documentation/pestpplogo.png" alt="pestpplogo image">
 </p>
 # PEST++
 
