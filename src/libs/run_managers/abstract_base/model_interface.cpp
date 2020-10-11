@@ -257,6 +257,10 @@ void process_template_file_thread(int tid, vector<int>& tpl_idx, ThreadedTemplat
 	{
 		ttp.work(tid, tpl_idx, pars, pro_pars);
 	}
+	catch (const std::exception& e)
+	{
+		eptr = current_exception();
+	}
 	catch (...)
 	{
 		eptr = current_exception();
@@ -271,6 +275,10 @@ void process_instruction_file_thread(int tid, vector<int>& ins_idx, ThreadedInst
 	try
 	{
 		tip.work(tid, ins_idx, obs, additional_ins_delims);
+	}
+	catch (const std::exception& e)
+	{
+		eptr = current_exception();
 	}
 	catch (...)
 	{
@@ -306,24 +314,37 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 	{
 		threads.push_back(thread(process_template_file_thread, i, std::ref(tpl_idx), std::ref(ttp), *pars_ptr, std::ref(pro_pars), std::ref(exception_ptrs[i])));
 	}
-
+	stringstream ss;
+	int num_exp = 0;
 	for (int i = 0; i < num_threads; ++i)
 	{
+		bool found = false;
 		if (exception_ptrs[i])
 		{
+			found = true;
 			try
 			{
 				rethrow_exception(exception_ptrs[i]);
 			}
 			catch (const std::exception& e)
 			{
-				stringstream ss;
-				ss << "thread processing template file '" << tplfile_vec[i] << "' raised an exception: " << e.what();
-				throw runtime_error(ss.str());
+				//stringstream ss;
+				ss << " thread processing template file '" << tplfile_vec[i] << "' raised an exception: " << e.what() << endl;
+				num_exp++;
+				//cout << "Error: " << ss.str();
+				//throw runtime_error(ss.str());
+			}
+			catch (...)
+			{
+				//stringstream ss;
+				ss << " thread processing template file '" << tplfile_vec[i] << "' raised an exception" << endl;
+				num_exp++;
+				//cout << "Error: " << ss.str();
+				//throw runtime_error(ss.str());
 			}
 		}
 		threads[i].join();
-		if (exception_ptrs[i])
+		if ((exception_ptrs[i]) && (!found))
 		{
 			try
 			{
@@ -331,9 +352,19 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 			}
 			catch (const std::exception& e)
 			{
-				stringstream ss;
-				ss << "thread processing template file '" << tplfile_vec[i] << "' raised an exception: " << e.what();
-				throw runtime_error(ss.str());
+				//stringstream ss;
+				ss << " thread processing template file '" << tplfile_vec[i] << "' raised an exception: " << e.what() << endl;
+				num_exp++;
+				//cout << "Error: " << ss.str();
+				//throw runtime_error(ss.str());
+			}
+			catch (...)
+			{
+				//stringstream ss;
+				ss << " thread processing template file '" << tplfile_vec[i] << "' raised an exception" << endl;
+				num_exp++;
+				//cout << "Error: " << ss.str();
+				//throw runtime_error(ss.str());
 			}
 		}
 	}
@@ -365,6 +396,12 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 	//update pars to account for possibly truncated par values...important for jco calcs
 	//for (auto pro_pars : pro_par_vec)
 	//	pars_ptr->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
+	if (num_exp > 0)
+	{
+		//cout << "errors processing template files: " << endl << ss.str();
+		throw runtime_error(ss.str());
+	}
+
 	pars_ptr->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
 	cout << pest_utils::get_time_string() << " done, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
 }
@@ -396,24 +433,37 @@ void ModelInterface::read_output_files(Observations *obs)
 		threads.push_back(thread(process_instruction_file_thread, i, std::ref(ins_idx), std::ref(tip), std::ref(temp_obs), additional_ins_delimiters,
 			std::ref(exception_ptrs[i])));
 	}
-
+	stringstream ss;
+	int num_exp = 0;
 	for (int i = 0; i < num_threads; ++i)
 	{
+		bool found = false;
 		if (exception_ptrs[i])
 		{
+			found = true;
 			try
 			{
 				rethrow_exception(exception_ptrs[i]);
 			}
 			catch (const std::exception& e)
 			{
-				stringstream ss;
-				ss << "thread processing instruction file '" << insfile_vec[i] << "' raised an exception: " << e.what();
-				throw runtime_error(ss.str());
+				//stringstream ss;
+				ss << " thread processing instruction file '" << insfile_vec[i] << "' raised an exception: " << e.what() << endl;
+				//cout << "Error: " << ss.str() << endl;
+				//throw runtime_error(ss.str());
+				num_exp++;
+			}
+			catch (...)
+			{
+				//stringstream ss;
+				ss << " thread processing instruction file '" << insfile_vec[i] << "' raised an exception" << endl;
+				//cout << "Error: " << ss.str() << endl;
+				//throw runtime_error(ss.str());
+				num_exp++;
 			}
 		}
 		threads[i].join();
-		if (exception_ptrs[i])
+		if ((exception_ptrs[i]) && (!found))
 		{
 			try
 			{
@@ -421,9 +471,19 @@ void ModelInterface::read_output_files(Observations *obs)
 			}
 			catch (const std::exception& e)
 			{
-				stringstream ss;
-				ss << "thread processing instruction file '" << insfile_vec[i] << "' raised an exception: " << e.what();
-				throw runtime_error(ss.str());
+				//stringstream ss;
+				ss << " thread processing instruction file '" << insfile_vec[i] << "' raised an exception: " << e.what() << endl;
+				//cout << "Error: " << ss.str() << endl;
+				//throw runtime_error(ss.str());
+				num_exp++;
+			}
+			catch (...)
+			{
+				//stringstream ss;
+				ss << " thread processing instruction file '" << insfile_vec[i] << "' raised an exception" << endl;
+				//cout << "Error: " << ss.str() << endl;
+				//throw runtime_error(ss.str());
+				num_exp++;
 			}
 		}
 	}
@@ -446,6 +506,13 @@ void ModelInterface::read_output_files(Observations *obs)
 		pro_obs = instructionfiles[i].read_output_file(outfile_vec[i]);
 		temp_obs.update_without_clear(pro_obs.get_keys(), pro_obs.get_data_vec(pro_obs.get_keys()));
 	}*/
+
+	if (num_exp > 0)
+	{
+		//cout << "errors processing instruction files: " << endl << ss.str();
+		throw runtime_error(ss.str());
+	}
+
 	unordered_set<string> ins_names, pst_names;
 	vector<string> t, diff;
 	t = obs->get_keys();
@@ -667,8 +734,14 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		finished->set(true);
 
 	}
+	catch (const std::exception& e)
+	{
+		cout << "exception raised by run thread: " << e.what() << endl;
+		shared_execptions->add(current_exception());
+	}
 	catch (...)
 	{
+		cout << "exception raised by run thread" << endl;
 		shared_execptions->add(current_exception());
 	}
 	return;
@@ -769,6 +842,16 @@ Parameters TemplateFile::write_input_file(const string& input_filename, Paramete
 			pro_pars.insert(name, val);
 		}
 		f_in << line << endl;
+		if (f_in.bad())
+		{
+			throw_tpl_error("ofstream is bad after writing line '" + line + "'", line_num);
+		}
+	}
+	f_tpl.close();
+	f_in.close();
+	if (f_in.bad())
+	{
+		throw_tpl_error("ofstream is bad after closing file, something is probably corrupt");
 	}
 	return pro_pars;
 }
@@ -1116,7 +1199,6 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 	pair<string, double> lhs;
 	while (true)
 	{
-
 		if (f_ins.eof())
 			break;
 		tokens.clear();
@@ -1200,6 +1282,8 @@ Observations InstructionFile::read_output_file(const string& output_filename)
 			//itoken++;
 		}
 	}
+	f_ins.close();
+	f_out.close();
 	return obs;	
 }
 
