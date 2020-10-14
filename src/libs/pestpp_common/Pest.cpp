@@ -1723,6 +1723,23 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		throw_control_file_error(f_rec, ss.str());
 	}
 
+	vector<string> invalid;
+	for (auto kv : arg_map)
+	{
+		if (kv.second == PestppOptions::ARG_STATUS::ARG_INVALID)
+		{
+			invalid.push_back(kv.first);
+		}
+	}
+	if (invalid.size() > 0)
+	{
+		ss.str("");
+		ss << " the following '++' args have invalid values:" << endl;
+		for (auto n : invalid)
+			ss << n << ",";
+		throw_control_file_error(f_rec, ss.str());
+	}
+
 	vector<string> not_accepted;
 	for (auto kv : arg_map)
 	{
