@@ -463,6 +463,9 @@ public:
 	bool get_panther_debug_loop() const { return panther_debug_loop; }
 	void set_panther_debug_fail_freeze(bool _flag) { panther_debug_fail_freeze = _flag; }
 	bool get_panther_debug_fail_freeze() const { return panther_debug_fail_freeze; }
+	
+	bool get_panther_echo() const { return panther_echo; }
+	void set_panther_echo(bool _flag) { panther_echo = _flag; }
 
 	void set_forgive_unknown_args(bool _flag) { forgive_unknown_args = _flag; }
 	bool get_forgive_unknown_args() const { return forgive_unknown_args; }
@@ -609,6 +612,7 @@ private:
 	int panther_agent_no_ping_timeout_secs;
 	bool panther_debug_loop;
 	bool panther_debug_fail_freeze;
+	bool panther_echo;
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);
 ostream& operator<< (ostream &os, const ObservationInfo& val);
