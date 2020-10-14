@@ -190,17 +190,11 @@ public:
 	enum GLOBAL_OPT { NONE, OPT_DE };
 	enum GLMNormalForm { IDENT,DIAG, PRIOR };
 	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
-	/*PestppOptions(int _n_iter_base = 50, int _n_iter_super = 0, int _max_n_super = 50,
-		double _super_eigthres = 1.0E-6, SVD_PACK _svd_pack = PestppOptions::REDSVD,
-		double _super_relparmax = 0.1, int max_run_fail = 3,
-		bool iter_summary_flag = true, bool der_forgive = true,
-		double overdue_reched_fac = 1.15, double overdue_giveup_fac = 100,
-		GLOBAL_OPT _global_opt = PestppOptions::NONE,
-		double _de_f = 0.8, double _de_cr = 0.9, int _de_npopulation = 40, int _de_max_gen = 100, bool _de_dither_f = true);*/
 	PestppOptions() { ; }
 
 	//void parce_line(const string &line);
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
+	vector<string> notfound_args;
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
 	bool assign_value_by_key_continued(const string& key, const string& value);
 	int get_max_n_super() const { return max_n_super; }
@@ -364,8 +358,6 @@ public:
 	void set_ies_use_empirical_prior(bool _ies_use_empirical_prior) { ies_use_empirical_prior = _ies_use_empirical_prior; }
 	bool get_ies_group_draws() const { return ies_group_draws; }
 	void set_ies_group_draws(bool _ies_group_draws) { ies_group_draws = _ies_group_draws; }
-	//bool get_ies_num_reals_passed() const { return ies_num_reals_passed; }
-	//void set_ies_num_reals_passed(bool _ies_num_reals_passed) { ies_num_reals_passed = _ies_num_reals_passed; }
 	bool get_ies_enforce_bounds() const { return ies_enforce_bounds; }
 	void set_ies_enforce_bounds(bool _ies_enforce_bounds) { ies_enforce_bounds = _ies_enforce_bounds; }
 
@@ -472,11 +464,15 @@ public:
 	void set_panther_debug_fail_freeze(bool _flag) { panther_debug_fail_freeze = _flag; }
 	bool get_panther_debug_fail_freeze() const { return panther_debug_fail_freeze; }
 
+	void set_forgive_unknown_args(bool _flag) { forgive_unknown_args = _flag; }
+	bool get_forgive_unknown_args() const { return forgive_unknown_args; }
+
 	void set_defaults();
 	void summary(ostream& os) const;
 
 private:
 
+	bool forgive_unknown_args;
 	int n_iter_base;
 	int n_iter_super;
 	int max_n_super;

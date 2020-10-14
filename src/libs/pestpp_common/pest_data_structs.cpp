@@ -962,14 +962,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		debug_parse_only = pest_utils::parse_string_arg_to_bool(value);
 	
 	}
-	else if (key == "CHECK_TPLINS")
-	{
-		check_tplins = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "FILL_TPL_ZEROS")
-	{
-		fill_tpl_zeros = pest_utils::parse_string_arg_to_bool(value);
-	}
+	
 	
 	else if (!assign_value_by_key_continued(key, value))
 	{
@@ -1020,6 +1013,22 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		panther_debug_fail_freeze = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	else if (key == "CHECK_TPLINS")
+	{
+		check_tplins = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if (key == "FILL_TPL_ZEROS")
+	{
+		fill_tpl_zeros = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if (key == "FORGIVE_UNKNOWN_ARGS")
+	{
+		forgive_unknown_args = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+
 	return false;
 }
 
@@ -1040,6 +1049,7 @@ void PestppOptions::summary(ostream& os) const
 	for (auto s : lambda_scale_vec)
 		os << s << ",";
 	os << endl;
+	os << "forgive_unknown_args: " << forgive_unknown_args << endl;
 	os << "max_run_fail: " << max_run_fail << endl;
 	os << "yamr_poll_interval: " << worker_poll_interval << endl;
 	os << "parameter_covariance: " << parcov_filename << endl;
@@ -1217,6 +1227,7 @@ void PestppOptions::set_defaults()
 	set_iter_summary_flag(true);
 	set_der_forgive(true);
 	
+	set_forgive_unknown_args(false);
 	set_random_seed(358183147);
 	set_base_lambda_vec(vector<double>{ 0.1, 1.0, 10.0, 100.0, 1000.0 });
 	set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1});
