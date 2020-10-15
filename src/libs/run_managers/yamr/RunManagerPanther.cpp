@@ -455,7 +455,8 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	if (agent_info_set.size() == 0) // first entry is the listener, slave apears after this
 	{
 		cout << endl << "      waiting for agents to appear..." << endl << endl;
-		f_rmr << endl << "    waiting for agents to appear..." << endl << endl;
+		//f_rmr << endl << "    waiting for agents to appear..." << endl << endl;
+		report("waiting for agents to appear", false);
 	}
 	else
 	{
@@ -473,7 +474,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	}
 	else
 	{
-		cout << "panther_echo is 'false', commencing runs - see rmr file for details" << endl;
+		cout << "'panther_echo' is 'false', running in silent mode - see rmr file for details" << endl;
 	}
 
 	std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
