@@ -83,6 +83,12 @@ Ensemble Ensemble::zero_like()
 	return new_en;
 }
 
+void Ensemble::broadcast_vec2mat(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
+{
+	//todo
+
+}
+
 void Ensemble::replace_col_vals(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
 {
 

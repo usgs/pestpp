@@ -548,6 +548,13 @@ void DataAssimilator::sanity_checks()
 		ss << "'subset_how' is '" << how << "' but should be 'FIRST','LAST','RANDOM','PHI_BASED'";
 		errors.push_back(ss.str());
 	}
+	
+	if ((da_type != "VANILLA") && (da_type != "ITERATIVE") && (da_type != "MDA"))
+	{
+		ss.str("");
+		ss << " DA_TYPE is '" << da_type << "' but must be 'VANILLA','ITERATIVE', or'MDA'";
+		errors.push_back(ss.str());
+	}
 
 	if ((ppo->get_ies_verbose_level() < 0) || (ppo->get_ies_verbose_level() > 3))
 	{
@@ -1562,14 +1569,18 @@ void DataAssimilator::da_initialize(int _icycle)
 	message(0, "initializing cycle", icycle);
 	stringstream ss;
 	ofstream& f_rec = file_manager.rec_ofstream();
+	vector <string> dyn_states;
 
 	da_ctl_params = pest_scenario.get_pestpp_options().da_ctl_params;
 
+	// da type that is lower case is ok, I should move this somewhere else
+	transform(da_type.begin(), da_type.end(), da_type.begin(), ::toupper);
+	
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
 
-
+	// ----------------------------------------------------------
 	// run the model one time using the initial parameters values. 
 	if (pest_scenario.get_control_info().noptmax == 0)
 	{
@@ -1635,8 +1646,11 @@ void DataAssimilator::da_initialize(int _icycle)
 
 		return;
 	}
+	// ---------- End of of best average simulation run ---------
 
+	// ---------- Monte Carlo Simulation (no assimilation) ------
 	// TODO: (Ayman) Maybe here we can add option to make one Monte Carlo forward run for all realizations
+	// ---------- End of Monte Carlo Simulation -----------------
 
 	//set some defaults
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
@@ -1648,22 +1662,11 @@ void DataAssimilator::da_initialize(int _icycle)
 		message(0, "You are a god among mere mortals!");
 	}
 
-	/*PestppOptions::SVD_PACK svd = ppo->get_svd_pack();
-	if (svd == PestppOptions::SVD_PACK::PROPACK)
-	{
-		message(1, "using PROPACK for truncated svd solve");
-	}
-	else
-	{*/
+	
 	message(1, "using REDSVD for truncated svd solve");
-	//}
+
 	message(1, "maxsing:", pest_scenario.get_svd_info().maxsing);
 	message(1, "eigthresh: ", pest_scenario.get_svd_info().eigthresh);
-
-	//if ((ppo->get_ies_localizer().size() > 0) & (ppo->get_ies_autoadaloc()))
-	//{
-	//	throw_da_error("use of localization matrix and autoadaloc not supported...yet!");
-	//}
 	message(1, "initializing localizer--");
 	use_localizer = localizer.initialize(performance_log);
 	num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
@@ -1705,7 +1708,6 @@ void DataAssimilator::da_initialize(int _icycle)
 
 
 	iter = 0;
-	//ofstream &frec = file_manager.rec_ofstream();
 	last_best_mean = 1.0E+30;
 	last_best_std = 1.0e+30;
 	lambda_max = 1.0E+30;
@@ -1948,6 +1950,7 @@ void DataAssimilator::da_initialize(int _icycle)
 	else
 		message(1, "centering on ensemble mean vector");
 
+	// Run the ensemble mean and move to the next cycle
 	if (pest_scenario.get_control_info().noptmax == -2)
 	{
 		message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
@@ -1996,6 +1999,23 @@ void DataAssimilator::da_initialize(int _icycle)
 		ph.update(_oe, _pe);
 		message(0, "mean parameter phi report:");
 		ph.report();
+
+		// for models y(t+1) = g(x, y(t)), extract y(t+1) and as initial state for next time cycle
+		dyn_states = get_dynamic_states();
+		if (dyn_states.size() != 0)
+		{
+			message(1, "update initial dynamic states for next time cycle. Dynamic states  matrix size is", dyn_states.size());
+		}
+		//add_dynamic_state_to_pe();
+		vector<string> real_names = _oe.get_real_names();
+		Eigen::MatrixXd obs_i;
+		
+		if (dyn_states_names.size() > 0) {
+			Eigen::MatrixXd mat = _oe.get_eigen(real_names, dyn_states_names);
+			obs_i = mat.replicate(pe.shape().first, 1);
+			pe.replace_col_vals(dyn_states_names, obs_i);
+
+		}
 
 		return;
 	}
@@ -2066,15 +2086,21 @@ void DataAssimilator::da_initialize(int _icycle)
 		}
 	}
 
+	// ======================================================================
 	// extract dynamic states forecast from oe and add them to pe.
+	// for a model y(t+1) = g(x,y(t)), this code use simulated y(t+1) as input for the next time
+	// cycle
+
 	//States are flaged as ones that have zero weights and exist in both oe and pe
-	vector <string> dyn_states;
+	
 	dyn_states = get_dynamic_states();
 	if (dyn_states.size() != 0)
 	{
 		message(1, "add dynamic states to forecast ensemble. Dynamic states  matrix size is ", dyn_states.size());
 	}
 	add_dynamic_state_to_pe();
+	// ==
+
 	ss.str("");
     
 	// todo: update for da
@@ -2504,7 +2530,8 @@ void DataAssimilator::da_upate()
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
 
-	 
+	string da_method = da_ctl_params.get_svalue("DA_TYPE");
+	message(0, "Assimilation Method :", da_method);
 
 	bool accept;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
@@ -3936,7 +3963,7 @@ bool DataAssimilator::solve_new_da()
 		message(1, s);
 	}
 
-	if (use_ies) // use iterative solver
+	if (true) // check subset size
 	{
 		if ((use_subset) && (subset_size > pe.shape().first))
 		{
@@ -3944,8 +3971,8 @@ bool DataAssimilator::solve_new_da()
 			ss << "++ies_subset size (" << subset_size << ") greater than ensemble size (" << pe.shape().first << ")";
 			frec << "  ---  " << ss.str() << endl;
 			cout << "  ---  " << ss.str() << endl;
-			frec << "  ...reducing ++ies_subset_size to " << pe.shape().first << endl;
-			cout << "  ...reducing ++ies_subset_size to " << pe.shape().first << endl;
+			frec << "  ...reducing subset_size to " << pe.shape().first << endl;
+			cout << "  ...reducing subset_size to " << pe.shape().first << endl;
 			subset_size = pe.shape().first;
 		}
 	}
@@ -4058,7 +4085,7 @@ bool DataAssimilator::solve_new_da()
 	double mean, std;
 	vector<ObservationEnsemble> oe_lams;
 
-	if (use_ies) /// todo: I think this should be removed 
+	if (false) /// todo: I think this should be removed 
 	{
 		message(0, "running lambda ensembles");
 		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
@@ -4101,8 +4128,9 @@ bool DataAssimilator::solve_new_da()
 	bool echo = false;
 	if (verbose_level > 1)
 		echo = true;
-	echo = true;
-	// ===== loop over all subsets to find best phi ======
+
+	//*******************************************************************************************
+	// ===== loop over all subsets to find best inflation factor and best scaling factor ======
 	for (int i = 0; i < pe_lams.size(); i++)
 	{
 		if (oe_lams[i].shape().first == 0)
@@ -4355,8 +4383,7 @@ bool DataAssimilator::solve_new_da()
 
 	//track this here for phi-based termination check
 	best_mean_phis.push_back(best_mean);
-
-
+	
 	if (best_mean < last_best_mean * acc_fac)
 	{
 		message(0, "updating parameter ensemble");

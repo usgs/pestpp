@@ -242,7 +242,8 @@ private:
 		{ "DA_OBSERVATION_ENSEMBLE", "" },
 		{"DA_RESTART_OBSERVATION_ENSEMBLE", ""},
 		{"DA_RESTART_PARAMETER_ENSEMBLE", ""},
-	    {"DA_SUBSET_HOW", "random"}
+	    {"DA_SUBSET_HOW", "random"},
+		{"DA_TYPE", "vanilla"}
 
 	};
 	std::unordered_map<string, bool> bool_parms = {

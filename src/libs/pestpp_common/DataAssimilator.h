@@ -89,6 +89,7 @@ public:
 	ParameterEnsemble get_pe() { return pe;}
 	void set_pe(ParameterEnsemble new_pe) { pe = new_pe;}
 	bool use_ies; 
+	string da_type;
 
 private:
 	int icycle;

@@ -285,7 +285,7 @@ int main(int argc, char* argv[])
 			// -----------------------------  
 			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);			
 			output_file_writer.scenario_io_report(fout_rec);
-			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1)
+			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1) // todo: add da verbose
 			{
 				output_file_writer.scenario_pargroup_report(fout_rec);
 				output_file_writer.scenario_par_report(fout_rec);
@@ -370,6 +370,8 @@ int main(int argc, char* argv[])
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 			// use ies or da?
 			da.use_ies = pest_scenario.get_pestpp_options_ptr()->get_da_use_ies();
+			da.da_type = pest_scenario.get_pestpp_options_ptr()->da_ctl_params.get_svalue("DA_TYPE");
+
 			if (*icycle > 0)
 			{
 				da.set_pe(curr_pe);
@@ -392,14 +394,13 @@ int main(int argc, char* argv[])
 			}
 			else // use da
 			{
-				da.da_upate();
+				if (pest_scenario.get_control_info().noptmax > 0) // 
+				{
+					da.da_upate();					
+				}
 				curr_pe = da.get_pe();
 				curr_pe.to_csv("cncnc.csv");
-
-			}
-
-
-					
+			}					
 		} // end cycle loop
 		fout_rec.close();
 		cout << endl << endl << "pestpp-da analysis complete..." << endl;

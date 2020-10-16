@@ -44,6 +44,8 @@ public:
 	void add_2_cols_ip(const vector<string> &_var_names, const Eigen::MatrixXd &mat);
 	Ensemble zero_like();
 
+	void broadcast_vec2mat(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);
+
 	void replace_col_vals(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);
 
 	vector<string> get_generic_real_names(int num_reals);
