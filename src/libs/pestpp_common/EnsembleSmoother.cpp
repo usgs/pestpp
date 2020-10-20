@@ -718,12 +718,12 @@ void IterEnsembleSmoother::initialize_restart()
 				if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 				{
 					ss << file_manager.get_base_filename() << ".obs+noise.jcb";
-					oe.to_binary(ss.str());
+					oe_base.to_binary(ss.str());
 				}
 				else
 				{
 					ss << file_manager.get_base_filename() << ".obs+noise.csv";
-					oe.to_csv(ss.str());
+					oe_base.to_csv(ss.str());
 				}
 				message(1, "re-saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
 			}
