@@ -76,6 +76,9 @@ public:
 		RunManagerAbstract* _run_mgr_ptr);
 	void initialize(int _icycle);
 	void da_initialize(int _icycle);
+	void da_save_ensemble_pe(string fprefix, string dtyp);
+	void da_save_ensemble_oe(string fprefix, string dtyp);
+	//void add_dynamic_state_to_pe();
 	void add_dynamic_state_to_pe();
 	vector<string> get_dynamic_states();
 	void iterate_2_solution();
@@ -130,7 +133,7 @@ private:
 
 	double lambda_max, lambda_min;
 	int warn_min_reals, error_min_reals;
-	vector<double> lam_mults;
+	vector<double> lam_mults, infl_facs;
 	map<string, double> pareto_obs;
 	map<string, double> pareto_weights;
 	//string fphi_name;
@@ -139,7 +142,7 @@ private:
 	vector<string> act_obs_names, act_par_names;
 	vector<int> subset_idxs;
 
-	ParameterEnsemble pe, pe_base;
+	ParameterEnsemble pe, pe_base, pe_post;
 	ObservationEnsemble oe, oe_base, weights;
 	//Eigen::MatrixXd prior_pe_diff;
 	//Eigen::MatrixXd Am;
@@ -151,6 +154,7 @@ private:
 	//bool solve_old();
 	bool solve_new();
 	bool solve_new_da();
+	void update_starting_state();
 	void return_post_dyn_state(vector<ParameterEnsemble>& pe_lams, vector<ParameterEnsemble> poterior_dyn_states);
 	vector<ParameterEnsemble> temp_remove_dyn_state(vector<ParameterEnsemble>& pe_lams);
 	void adjust_pareto_weight(string& obsgroup, double wfac);

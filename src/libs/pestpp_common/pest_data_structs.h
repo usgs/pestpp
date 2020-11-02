@@ -235,7 +235,12 @@ private:
 
 	std::unordered_map<string, double> double_parms = {
 		{ "DA_BAD_PHI",1.0E300 },
-		{ "DA_BAD_PHI_SIGMA", 1.0E300 }
+		{ "DA_BAD_PHI_SIGMA", 1.0E300 },
+	    {"DA_INITIAL_INF_FAC", -1.0},
+	    {"DA_LAMBDA_DEC_FAC", 0.75},
+	    {"DA_LAMBDA_INC_FAC", 10.0},
+		{"DA_ACCEPT_PHI_FAC", 1.05}
+
 	};
 
 	std::unordered_map<string, string> string_parms = {
@@ -243,21 +248,24 @@ private:
 		{"DA_RESTART_OBSERVATION_ENSEMBLE", ""},
 		{"DA_RESTART_PARAMETER_ENSEMBLE", ""},
 	    {"DA_SUBSET_HOW", "random"},
-		{"DA_TYPE", "vanilla"}
+		{"DA_TYPE", "mda"}
 
 	};
 	std::unordered_map<string, bool> bool_parms = {
 		{ "DA_ADD_BASE", true },
 	    {"DA_ENFORCE_BOUNDS", true},
 		{"DA_USE_PRIOR_SCALING", true},
-		{"DA_SAVE_BINARY", false}
+		{"DA_SAVE_BINARY", false},
+		{"DA_EVALUATE_UPDATE", true},
+	    {"DA_ENFORCE_CHGLIM", false}
 
 
 	};
 	std::unordered_map<string, vector<double>> vector_parms
 	{
 		{"DA_INFLATION_FAC", {1.0}},
-		{"DA_SCALE_FAC", {1.0}},
+		{"DA_INFLATION_MULT",{0.1, 1, 10}},
+		{"DA_SCALE_FAC", {0.75,1.0,1.1}},
 		{"DA_SVD_THRSH", {1e-3, 1e-4, 1e-6}}
 	    //LAMBDA_SCALE_FAC
 

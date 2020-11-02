@@ -316,7 +316,13 @@ bool DataAssimilator::initialize_oe(Covariance& cov)
 	stringstream ss;
 	int num_reals = pe.shape().first;
 
-	string obs_csv = pest_scenario.get_pestpp_options().get_ies_obs_csv();
+	string obs_csv;
+	if (use_ies)
+		obs_csv = pest_scenario.get_pestpp_options().get_ies_obs_csv();
+	else
+	{
+		obs_csv = da_ctl_params.get_svalue("DA_OBSERVATION_ENSEMBLE");
+	}
 	bool drawn = false;
 	if (obs_csv.size() == 0)
 	{
@@ -1575,7 +1581,7 @@ void DataAssimilator::da_initialize(int _icycle)
 
 	// da type that is lower case is ok, I should move this somewhere else
 	transform(da_type.begin(), da_type.end(), da_type.begin(), ::toupper);
-	
+
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
@@ -1592,7 +1598,15 @@ void DataAssimilator::da_initialize(int _icycle)
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
 		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
-		_pe.append("BASE", pars);
+		if (icycle == 0)
+		{
+			_pe.append("BASE", pars);
+			pe = _pe;
+		}
+		else
+		{
+			_pe = pe;
+		}
 		string par_csv = file_manager.get_base_filename() + ".par.csv";
 		pe_base = _pe;
 		pe_base.reorder(vector<string>(), act_par_names);
@@ -1600,6 +1614,8 @@ void DataAssimilator::da_initialize(int _icycle)
 		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
 		_oe.append("BASE", pest_scenario.get_ctl_observations());
 		oe_base = _oe;
+		oe = _oe; // when optmax = 0, oe should be initialized to make it easier to extract dynamic states
+				  // 
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
 		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
@@ -1644,6 +1660,23 @@ void DataAssimilator::da_initialize(int _icycle)
 		output_file_writer.write_rei(file_manager.open_ofile_ext("base.rei"), 0,
 			pest_scenario.get_ctl_observations(), obs, obj_func, pars);
 
+		// for models y(t+1) = g(x, y(t)), extract y(t+1) and as initial state for next time cycle
+		dyn_states = get_dynamic_states();
+		if (dyn_states.size() != 0)
+		{
+			message(1, "update initial dynamic states for next time cycle. Dynamic states  matrix size is", dyn_states.size());
+		}
+		//add_dynamic_state_to_pe();
+		vector<string> real_names = _oe.get_real_names();
+		Eigen::MatrixXd obs_i;
+
+		if (dyn_states_names.size() > 0) {
+			Eigen::MatrixXd mat = _oe.get_eigen(real_names, dyn_states_names);
+			obs_i = mat.replicate(pe.shape().first, 1);
+			pe.replace_col_vals(dyn_states_names, obs_i);
+
+		}
+		
 		return;
 	}
 	// ---------- End of of best average simulation run ---------
@@ -1662,7 +1695,7 @@ void DataAssimilator::da_initialize(int _icycle)
 		message(0, "You are a god among mere mortals!");
 	}
 
-	
+
 	message(1, "using REDSVD for truncated svd solve");
 
 	message(1, "maxsing:", pest_scenario.get_svd_info().maxsing);
@@ -1706,7 +1739,6 @@ void DataAssimilator::da_initialize(int _icycle)
 	}
 
 
-
 	iter = 0;
 	last_best_mean = 1.0E+30;
 	last_best_std = 1.0e+30;
@@ -1735,13 +1767,11 @@ void DataAssimilator::da_initialize(int _icycle)
 	else
 	{
 		// report DA paramters use
-		lam_mults = da_ctl_params.get_vvalue("DA_INFLATION_FAC");	
-
-
+		lam_mults = da_ctl_params.get_vvalue("DA_INFLATION_MULT");
+		infl_facs = da_ctl_params.get_vvalue("DA_INFLATION_FAC");
 	}
 
 	sanity_checks();
-
 
 	bool echo = false;
 	if (verbose_level > 1)
@@ -1761,7 +1791,7 @@ void DataAssimilator::da_initialize(int _icycle)
 			message(1, "using bad_phi: ", bad_phi);
 	}
 	else
-	{ 		
+	{
 		subset_size = da_ctl_params.get_ivalue("DA_SUBSET_SIZE");
 		reg_factor = pest_scenario.get_pestpp_options().get_ies_reg_factor(); //Todo: how this fit in da
 		message(1, "using reg_factor: ", reg_factor);
@@ -2009,7 +2039,7 @@ void DataAssimilator::da_initialize(int _icycle)
 		//add_dynamic_state_to_pe();
 		vector<string> real_names = _oe.get_real_names();
 		Eigen::MatrixXd obs_i;
-		
+
 		if (dyn_states_names.size() > 0) {
 			Eigen::MatrixXd mat = _oe.get_eigen(real_names, dyn_states_names);
 			obs_i = mat.replicate(pe.shape().first, 1);
@@ -2036,7 +2066,7 @@ void DataAssimilator::da_initialize(int _icycle)
 		{
 			how = da_ctl_params.get_svalue("DA_SUBSET_HOW");
 		}
-		
+
 		message(1, "subset how: ", how);
 		use_subset = true;
 	}
@@ -2055,9 +2085,9 @@ void DataAssimilator::da_initialize(int _icycle)
 	//reorder this for later
 	pe_base.reorder(vector<string>(), act_par_names);
 
-// ==================================================
-// ==================== forward run =================
-// ==================================================
+	// ==================================================
+	// ==================== forward run =================
+	// ==================================================
 
 	if (obs_restart_csv.size() > 0)
 		//the hard way to restart
@@ -2066,16 +2096,15 @@ void DataAssimilator::da_initialize(int _icycle)
 	//no restart
 	else
 	{
-		performance_log->log_event("running ensemble for data assimilation cycle No." + icycle);	
+		performance_log->log_event("running ensemble for data assimilation cycle No." + icycle);
 		message(1, "runing ensemble of size", oe.shape().first);
 
-		vector<int> failed = run_ensemble(pe, oe);		
+		vector<int> failed = run_ensemble(pe, oe);
 
 		if (pe.shape().first == 0)
 			throw_da_error("all realizations failed during initial evaluation");
 		if (failed.size() > 0)
 			oe_base.drop_rows(failed);
-
 
 		//string obs_csv = file_manager.get_base_filename() + ".0.obs.csv";
 		//message(1, "saving results of initial ensemble run to", obs_csv);
@@ -2092,7 +2121,7 @@ void DataAssimilator::da_initialize(int _icycle)
 	// cycle
 
 	//States are flaged as ones that have zero weights and exist in both oe and pe
-	
+
 	dyn_states = get_dynamic_states();
 	if (dyn_states.size() != 0)
 	{
@@ -2102,44 +2131,47 @@ void DataAssimilator::da_initialize(int _icycle)
 	// ==
 
 	ss.str("");
-    
-	// todo: update for da
-	bool save_binary;
-	if (use_ies)
+	da_save_ensemble_pe("_forecast_cycle_", ".par");
+	da_save_ensemble_oe("_forecast_cycle_", ".obs");
+	if (false)
 	{
-		save_binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
-	}
-	else
-	{
-		save_binary = da_ctl_params.get_bvalue("DA_SAVE_BINARY");
-	}
-
-	if (save_binary)
-	{
-		ss << file_manager.get_base_filename() << "_prior_cycle_" << icycle << ".0.par.jcb";
-		pe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << "_prior_cycle." << icycle << ".par.csv";
-		pe.to_csv(ss.str());
-	}
-	message(1, "saved forecast (parameter and state) ensemble to ", ss.str());
 	
-	
+		// todo: update for da
+		bool save_binary;
+		if (use_ies)
+		{
+			save_binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
+		}
+		else
+		{
+			save_binary = da_ctl_params.get_bvalue("DA_SAVE_BINARY");
+		}
 
-	ss.str("");
-	if (save_binary)
-	{
-		ss << file_manager.get_base_filename() << "_prior_cycle." << icycle << ".obs.jcb";
-		oe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << "_prior_cycle." << icycle << ".obs.csv";
-		oe.to_csv(ss.str()); // todo: check is this matrix is already saved in pe as dynamic states
-	}
-	message(1, "saved obs ensemble to", ss.str());
+		if (save_binary)
+		{
+			ss << file_manager.get_base_filename() << "_forecast_cycle_" << icycle << ".0.par.jcb";
+			pe.to_binary(ss.str());
+		}
+		else
+		{
+			ss << file_manager.get_base_filename() << "_forecast_cycle." << icycle << ".par.csv";
+			pe.to_csv(ss.str());
+		}
+		message(1, "saved forecast (parameter and state) ensemble to ", ss.str());
+
+		ss.str("");
+		if (save_binary)
+		{
+			ss << file_manager.get_base_filename() << "_forecast_cycle." << icycle << ".obs.jcb";
+			oe.to_binary(ss.str());
+		}
+		else
+		{
+			ss << file_manager.get_base_filename() << "_forecast_cycle." << icycle << ".obs.csv";
+			oe.to_csv(ss.str()); // todo: check is this matrix is already saved in pe as dynamic states
+		}
+		message(1, "saved obs ensemble to", ss.str());
+}
 
 
 	performance_log->log_event("calc pre-drop phi");
@@ -2253,7 +2285,14 @@ void DataAssimilator::da_initialize(int _icycle)
 
 	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-	last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
+	if (use_ies)
+	{
+		last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
+	}
+	else
+	{
+		last_best_lam = da_ctl_params.get_dvalue("DA_INITIAL_INF_FAC");
+	}
 	if (last_best_lam <= 0.0)
 	{
 		//double x = last_best_mean / (2.0 * double(oe.shape().second));
@@ -2262,6 +2301,61 @@ void DataAssimilator::da_initialize(int _icycle)
 	}
 	message(1, "current lambda:", last_best_lam);
 	message(0, "initialization complete");
+}
+
+void DataAssimilator:: da_save_ensemble_pe(string fprefix, string dtyp)
+{
+	// todo: update for da
+	stringstream ss;
+	ss.str("");
+	bool save_binary;
+	if (use_ies)
+	{
+		save_binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
+	}
+	else
+	{
+		save_binary = da_ctl_params.get_bvalue("DA_SAVE_BINARY");
+	}
+
+	if (save_binary)
+	{
+		ss << file_manager.get_base_filename() << fprefix << icycle << dtyp <<".jcb";
+		pe.to_binary(ss.str());
+	}
+	else
+	{
+		ss << file_manager.get_base_filename() << fprefix << icycle << dtyp <<".csv";
+		pe.to_csv(ss.str());
+	}
+	//message(1, "saved forecast (parameter and state) ensemble to ", ss.str());
+}
+void DataAssimilator::da_save_ensemble_oe(string fprefix, string dtyp)
+{
+	// todo: update for da
+	stringstream ss;
+	ss.str("");
+	bool save_binary;
+	if (use_ies)
+	{
+		save_binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
+	}
+	else
+	{
+		save_binary = da_ctl_params.get_bvalue("DA_SAVE_BINARY");
+	}
+
+	if (save_binary)
+	{
+		ss << file_manager.get_base_filename() << fprefix << icycle << dtyp << ".jcb";
+		oe.to_binary(ss.str());
+	}
+	else
+	{
+		ss << file_manager.get_base_filename() << fprefix << icycle << dtyp << ".csv";
+		oe.to_csv(ss.str());
+	}
+	//message(1, "saved forecast (parameter and state) ensemble to ", ss.str());
 }
 void DataAssimilator::add_dynamic_state_to_pe()
 {
@@ -2532,9 +2626,15 @@ void DataAssimilator::da_upate()
 
 	string da_method = da_ctl_params.get_svalue("DA_TYPE");
 	message(0, "Assimilation Method :", da_method);
-
+	int solution_iterations;
+	if (da_type == "MDA")
+		solution_iterations = infl_facs.size();
+	else if (da_type == "VANILLA")
+		solution_iterations = 1;
+	else
+		solution_iterations = pest_scenario.get_control_info().noptmax;
 	bool accept;
-	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
+	for (int i = 0; i < solution_iterations; i++)
 	{
 		iter++;
 		message(0, "starting solve for iteration:", iter);
@@ -2557,9 +2657,16 @@ void DataAssimilator::da_upate()
 		else
 			consec_bad_lambda_cycles++;
 
-		if (should_terminate())
+		if (should_terminate())		
 			break;
+
 	}
+	//todo return posterior here
+	da_save_ensemble_pe("_analysis_cycle_", ".par");
+	da_save_ensemble_oe("_analysis_cycle_", ".obs");
+
+	update_starting_state();
+
 
 }
 
@@ -3999,9 +4106,57 @@ bool DataAssimilator::solve_new_da()
 		loc_map["all"] = p;
 	}
 
-	// =========== test all lam and scales =======
+	
+	if ((da_type == "MDA") && ((iter == 1)))
+	{   
+		// Multiple data assimilation (MDA) only. Make sure that sum(1/infl_fac) = 1		
+		double inv_infl_sum = 0;
+		for (auto& inf_fac : infl_facs)
+		{
+			inv_infl_sum = inv_infl_sum + (1.0 / inf_fac);
+		}
+		if (abs(inv_infl_sum - 1.0) < 1e-5)
+		{
+			// ok close enough to 1, maybe msg later 
+		}
+		else
+		{			
+			message(0, "WARNING:  Summation of reciprocals of inflation factors should be 1. Now it is ", inv_infl_sum);
+			message(1, "Inflation factors are rescaled to correct this issue...", " ");
+		}
+		int fac_ii = 0;
+		//ss.str("");
+		for (auto& inf_fac : infl_facs)
+		{			 
+			infl_facs[fac_ii] = infl_facs[fac_ii] * inv_infl_sum;
+			fac_ii = fac_ii + 1;		
+		}
+	}
 
-	for (auto& lam_mult : lam_mults)
+	// from now on, beta's has different meaning in different contexts
+	vector<double> betas;
+	betas.clear();
+	if (da_type == "MDA") // beta is the inflation factor at each cycle
+	{		
+		betas.push_back(infl_facs[iter-1]);
+	}
+	else if (da_type == "ITERATIVE")
+	{
+		betas = lam_mults;
+	}
+	else if (da_type == "VANILLA")
+	{
+		betas.push_back(1.0);
+	}
+	if (use_ies) // overwrite anything from da options
+	{
+		betas = lam_mults;
+	}
+
+	// =========== test all lam and scales =======
+	for (auto& beta : betas) 
+		// NOTE : beta is inflation factor when da_type = MDA and is inflation factor 
+		//multiplier whehn da_type = ITERATIVE, and is 1 for Vanilla
 	{
 		ss.str("");
 		double cur_lam;
@@ -4009,7 +4164,7 @@ bool DataAssimilator::solve_new_da()
 		ParameterEnsemble pe_upgrade;
 		if (use_ies)
 		{
-			cur_lam = last_best_lam * lam_mult;
+			cur_lam = last_best_lam * beta;
 			ss << "starting calcs for lambda" << cur_lam;
 			message(1, "starting lambda calcs for lambda", cur_lam);
 			message(2, "see .log file for more details");
@@ -4017,10 +4172,23 @@ bool DataAssimilator::solve_new_da()
 		}
 		else
 		{
-			cur_lam = lam_mult;
+			if (da_type == "MDA")
+			{
+				cur_lam = beta;
+			}
+			else if (da_type == "ITERATIVE")
+			{
+				cur_lam = 1+beta * last_best_lam;
+			}
+			else if (da_type == "VANILLA")
+			{
+				cur_lam = beta;
+			}
 			ss << "starting calcs for inflation factors" << cur_lam;
 			message(1, "starting inflation calcs for inflation factor ", cur_lam);
 			message(2, "see .log file for more details");
+
+			// Here is the update .....
 			pe_upgrade = calc_kf_upgrade(cur_lam, loc_map);
 		}
 
@@ -4033,15 +4201,32 @@ bool DataAssimilator::solve_new_da()
 		{
 			scale_facs = da_ctl_params.get_vvalue("DA_SCALE_FAC");
 		}
+		if ((da_type == "MDA") || (da_type == "VANILLA"))
+		{
+			// mda makes no changes to scaling factors; maybe in the future, users  should choose this
+			scale_facs.clear();
+			scale_facs.push_back(1.0);
+		}
 
 		for (auto sf : scale_facs)
 		{
 
 			ParameterEnsemble pe_lam_scale = pe;
 			pe_lam_scale.set_eigen(*pe_lam_scale.get_eigen_ptr() + (*pe_upgrade.get_eigen_ptr() * sf));
-			if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
+			if (use_ies)
 			{
-				pe_lam_scale.enforce_limits(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+				if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
+				{
+					pe_lam_scale.enforce_limits(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+				}
+			}
+			else
+			{
+				if (da_ctl_params.get_bvalue("DA_ENFORCE_BOUNDS"))
+				{					
+					pe_lam_scale.enforce_limits(performance_log, da_ctl_params.get_bvalue("DA_ENFORCE_CHGLIM"));
+				}
+
 			}
 
 			pe_lams.push_back(pe_lam_scale); // This is a list of all pe's computed using different lam and scale
@@ -4084,34 +4269,43 @@ bool DataAssimilator::solve_new_da()
 	double best_mean = 1.0e+30, best_std = 1.0e+30;
 	double mean, std;
 	vector<ObservationEnsemble> oe_lams;
+	vector<ParameterEnsemble> posterior_dyn_states;
+	bool evaluate_update = da_ctl_params.get_bvalue("DA_EVALUATE_UPDATE");
 
-	if (false) /// todo: I think this should be removed 
+	if (use_ies) /// todo: I think this should be removed or run if ies
 	{
 		message(0, "running lambda ensembles");
 		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
 	}
-	else
-	{
-		// 
-		message(0, "running inflation ensembles");
-		vector<ParameterEnsemble> posterior_dyn_states;
+	else //da only
+	{			
+		if ((da_type == "MDA") || (da_type == "ITERATIVE"))
+		{
+			evaluate_update = true;
+		}
+		message(0, "running inflation ensembles");		
 		if (dyn_states_names.size() > 0)
 		{
 			// before forward runing remove the dynamic states temporarly 
 			// and replace them with prior dynamic states
 			posterior_dyn_states = temp_remove_dyn_state(pe_lams);
 		}		
-
-		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
+		if (evaluate_update)
+		{
+			oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
+		}
+		/*
 		if (dyn_states_names.size() > 0)
 		{
 			// after forward running put the dynamic states back into pe
-			return_post_dyn_state(pe_lams, posterior_dyn_states);
+			if (da_type == " VANILLA") {
+				return_post_dyn_state(pe_lams, posterior_dyn_states);
+			}
 		}
-		//clear posterior matrix
-		posterior_dyn_states.clear();
+		*/
+		
 	}
-
+	
 	// ============= end of forward runs =================
 	if (use_ies)
 	{
@@ -4131,69 +4325,106 @@ bool DataAssimilator::solve_new_da()
 
 	//*******************************************************************************************
 	// ===== loop over all subsets to find best inflation factor and best scaling factor ======
-	for (int i = 0; i < pe_lams.size(); i++)
+	if (evaluate_update)
 	{
-		if (oe_lams[i].shape().first == 0)
-			continue;
-		vector<double> vals({ lam_vals[i],scale_vals[i] });
-		if (pest_scenario.get_pestpp_options().get_ies_save_lambda_en())
-
+		for (int i = 0; i < pe_lams.size(); i++)
 		{
-			ss.str("");
-			ss << file_manager.get_base_filename() << "." << iter << "." << lam_vals[i] << ".lambda." << scale_vals[i] << ".scale.obs";
+			if (oe_lams[i].shape().first == 0)
+				continue;
+			vector<double> vals({ lam_vals[i],scale_vals[i] });
+			if (pest_scenario.get_pestpp_options().get_ies_save_lambda_en())
 
-			if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 			{
-				ss << ".jcb";
-				oe_lams[i].to_binary(ss.str());
+				ss.str("");
+				ss << file_manager.get_base_filename() << "." << iter << "." << lam_vals[i] << ".lambda." << scale_vals[i] << ".scale.obs";
+
+				if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+				{
+					ss << ".jcb";
+					oe_lams[i].to_binary(ss.str());
+				}
+				else
+				{
+					ss << ".csv";
+					oe_lams[i].to_csv(ss.str());
+				}
+				frec << "lambda, scale value " << lam_vals[i] << ',' << scale_vals[i] << " pars saved to " << ss.str() << endl;
+
+			}
+			drop_bad_phi(pe_lams[i], oe_lams[i], true);
+			if (oe_lams[i].shape().first == 0)
+			{
+				message(1, "all realizations dropped as 'bad' for lambda, scale fac ", vals);
+				continue;
+			}
+
+			ph.update(oe_lams[i], pe_lams[i]);
+
+			if (use_ies)
+			{
+				message(0, "phi summary for lambda, scale fac:", vals, echo);
 			}
 			else
 			{
-				ss << ".csv";
-				oe_lams[i].to_csv(ss.str());
+				message(0, "phi summary for inflation, scale fac:", vals, echo);
 			}
-			frec << "lambda, scale value " << lam_vals[i] << ',' << scale_vals[i] << " pars saved to " << ss.str() << endl;
-
-		}
-		drop_bad_phi(pe_lams[i], oe_lams[i], true);
-		if (oe_lams[i].shape().first == 0)
-		{
-			message(1, "all realizations dropped as 'bad' for lambda, scale fac ", vals);
-			continue;
-		}
-
-		ph.update(oe_lams[i], pe_lams[i]);
-
-		if (use_ies)
-		{
-			message(0, "phi summary for lambda, scale fac:", vals, echo);
-		}
-		else
-		{
-			message(0, "phi summary for inflation, scale fac:", vals, echo);
-		}
-		ph.report(echo);
+			ph.report(true);
 
 
-		mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
-		std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-		if (mean < best_mean)
-		{
-			oe_lam_best = oe_lams[i];
-			best_mean = mean;
-			best_std = std;
-			best_idx = i;
+			mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+			std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+			if (mean < best_mean)
+			{
+				oe_lam_best = oe_lams[i];
+				best_mean = mean;
+				best_std = std;
+				best_idx = i;
+			}
 		}
 	}
 	// ======== end of looping over subsets ==============
+	if (da_type == "VANILLA")
+	{
+		pe = pe_lams[0];
+		pe_post = posterior_dyn_states[0];
+		if (evaluate_update)
+		{
+			oe = oe_lams[0];
+		}
+		return true;
 
-	if (best_idx == -1) // here break to do another iteration
+	}
+	
+	if (da_type == "MDA") 
+	{			
+		if (iter == infl_facs.size()) // I thins is also not needed
+		{
+			if (dyn_states_names.size() > 0)
+			{
+				message(1, "Last MDA cycle; update dynamic forecast ");
+				return_post_dyn_state(pe_lams, posterior_dyn_states);
+			}			
+		}
+		pe = pe_lams[0];
+		//save best posterior ...
+		pe_post = posterior_dyn_states[0];
+		oe = oe_lams[0];
+		return true;
+	}
+	
+
+
+	if (best_idx == -1) // here break to do another iteration becuase prior phi is better than posterior phi
 	{
 		message(0, "WARNING:  unsuccessful lambda testing, resetting lambda to 10000.0");
 		last_best_lam = 10000.0;
 		return false;
-
 	}
+
+	//save best posterior ...
+	pe_post = posterior_dyn_states[best_idx];
+	posterior_dyn_states.clear();
+
 	//use_ies = true;
 	if (false)
 	{
@@ -4202,14 +4433,24 @@ bool DataAssimilator::solve_new_da()
 		return true;
 	}
 	// ============= if you are here, then update is not good enough =======
+	double acc_fac;
+	double lam_inc;
+	double lam_dec;
+	if (use_ies)
+	{
+		 acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
+		 lam_inc = pest_scenario.get_pestpp_options().get_ies_lambda_inc_fac();
+		lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
+	}
+	else
+	{
+		acc_fac = da_ctl_params.get_dvalue("DA_ACCEPT_PHI_FAC");
+		lam_inc = da_ctl_params.get_dvalue("DA_LAMBDA_INC_FAC");
+		lam_dec = da_ctl_params.get_dvalue("DA_LAMBDA_DEC_FAC");
+	}
 
-	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
-	double lam_inc = pest_scenario.get_pestpp_options().get_ies_lambda_inc_fac();
-	double lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
-
-
-	//subset stuff here
-	
+	// from this point till the end, it is only for the iterative mode
+	//subset stuff here	
 	if ((best_idx != -1) && (use_subset) && (subset_size < pe.shape().first))
 		{
 
@@ -4273,7 +4514,14 @@ bool DataAssimilator::solve_new_da()
 			message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 			ph.update(oe_lams[best_idx], pe_lams[best_idx]);
 			ph.report(true);
-			message(0, "running remaining realizations for best lambda, scale:", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
+			if (use_ies)
+			{
+				message(0, "running remaining realizations for best lambda, scale:", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
+			}
+			else
+			{
+				message(0, "running remaining realizations for best inflation factor, scale:", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
+			}
 
 			//pe_keep_names and oe_keep_names are names of the remaining reals to eval
 			performance_log->log_event("dropping subset idxs from remaining_pe_lam");
@@ -4288,29 +4536,31 @@ bool DataAssimilator::solve_new_da()
 
 			/// ***************** Run remaining ****************************
 			vector<ParameterEnsemble> pe_lams_remain;
-			vector<ParameterEnsemble> posterior_dyn_states;
+			vector<ParameterEnsemble> posterior_dyn_states; //todo: remove, not used!
 			pe_lams_remain.clear();
 			pe_lams_remain.push_back(remaining_pe_lam);
-			if (dyn_states_names.size() > 0)
-			{
-				// before forward runing remove the dynamic states temporarly 
-				// and replace them with prior dynamic states
-				posterior_dyn_states = temp_remove_dyn_state(pe_lams_remain);
-			}
+			// TODO: we do not need this here becuase we have already posteriors from all the ensembles 
+			if (true)
+				if (dyn_states_names.size() > 0)
+				{
+					// before forward runing remove the dynamic states temporarly 
+					// and replace them with prior dynamic states
+					posterior_dyn_states = temp_remove_dyn_state(pe_lams_remain);
+				}
 
 			//oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
 			vector<int> fails = run_ensemble(pe_lams_remain[0], remaining_oe_lam);
-			if (dyn_states_names.size() > 0)
-			{
-				// after forward running put the dynamic states back into pe
-				return_post_dyn_state(pe_lams_remain, posterior_dyn_states);
-			}
+			if (false) // only no need for this here
+				if (dyn_states_names.size() > 0)
+				{
+					// after forward running put the dynamic states back into pe
+					return_post_dyn_state(pe_lams_remain, posterior_dyn_states);
+				}
 			remaining_pe_lam = pe_lams_remain[0];
 			//clear posterior matrix
 			posterior_dyn_states.clear();
 			pe_lams_remain.clear();
-
-
+			
 			///*************************************************************
 
 			//for testing
@@ -4362,7 +4612,7 @@ bool DataAssimilator::solve_new_da()
 			message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 			ph.report(true);
 		}
-	else
+	else //no subsets
 		{
 			ph.update(oe_lam_best, pe_lams[best_idx]);
 			best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
@@ -4385,7 +4635,7 @@ bool DataAssimilator::solve_new_da()
 	best_mean_phis.push_back(best_mean);
 	
 	if (best_mean < last_best_mean * acc_fac)
-	{
+	{   // new phi is decreasing or slightly above best!! 
 		message(0, "updating parameter ensemble");
 		performance_log->log_event("updating parameter ensemble");
 		last_best_mean = best_mean;
@@ -4396,33 +4646,53 @@ bool DataAssimilator::solve_new_da()
 		{
 			double new_lam = lam_vals[best_idx] * lam_dec;
 			new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
-			message(0, "updating lambda to ", new_lam);
+			if (use_ies)
+				message(0, "updating lambda to ", new_lam);
+			else
+				message(0, "updating inflation factor to ", new_lam);
 			last_best_lam = new_lam;
 		}
 		else
 		{
-			message(0, "not updating lambda");
+			if (use_ies)
+				message(0, "not updating lambda");
+			else
+				message(0, "not updating inflation factor");
 		}
 		last_best_std = best_std;
 	}
 
 	else
-	{
+	{ //  ************ phi is not reduced!!!
 		//message(0, "not updating parameter ensemble");
 		message(0, "only updating realizations with reduced phi");
 		update_reals_by_phi(pe_lams[best_idx], oe_lam_best);
 		ph.update(oe, pe);
 		double new_lam = last_best_lam * lam_inc;
 		new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
-		message(0, "incresing lambda to: ", new_lam);
+		if (use_ies)
+			message(0, "incresing lambda to: ", new_lam);
+		else
+			message(0, "incresing inflation factor to: ", new_lam);
 		last_best_lam = new_lam;
 	}
 	//report_and_save();
 	return true;
 }
+void DataAssimilator::update_starting_state()
+{
+	
+	vector<string> real_names, var_names;	
+	real_names = pe.get_real_names();
+	var_names = pe_post.get_var_names();
+	pe_post.keep_rows(real_names);	
+	pe.replace_col_vals(var_names, pe_post.get_eigen());
+	
+	
+}
 void DataAssimilator::return_post_dyn_state(vector<ParameterEnsemble>& pe_lams, vector<ParameterEnsemble> posterior_dyn_states)
 {
-	vector<string> real_names_;
+	vector<string> real_names_; // it is not used!
 	int ireal = 0;
 	real_names_ = pe_base.get_real_names();	
 
@@ -4934,7 +5204,22 @@ void DataAssimilator::set_subset_idx(int size)
 	else
 	{
 		//CtlPar_container da_ctl_params = pest_scenario.get_pestpp_options().da_ctl_params;
-		nreal_subset = da_ctl_params.get_ivalue("DA_SUBSET_SIZE");
+		if ((da_type == "MDA")|| (da_type == "VANILLA"))
+		{
+			int nnreal = pe.get_real_names().size();
+			nreal_subset = nnreal;
+			use_subset = true;
+		}
+		else if (da_type == "ITERATIVE")
+		{
+			nreal_subset = da_ctl_params.get_ivalue("DA_SUBSET_SIZE");
+			if (nreal_subset <= 0)
+			{
+				int nnreal = pe.get_real_names().size();
+				nreal_subset = nnreal;
+			}
+			use_subset = true;
+		}
 	}
 	if ((!use_subset) || (nreal_subset >= size))
 	{
