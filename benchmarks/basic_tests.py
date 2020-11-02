@@ -998,6 +998,157 @@ def cmdline_test():
         raise Exception("should have failed")
     
 
+def da_prep_4_mf6_freyberg_seq():
+    t_d = os.path.join("mf6_freyberg","template_seq")
+    if os.path.exists(t_d):
+        shutil.rmtree(t_d)
+    shutil.copytree(os.path.join("mf6_freyberg","template"),t_d)
+
+    #first modify the tdis
+    with open(os.path.join(t_d,"freyberg6.tdis"),'w') as f:
+        f.write("BEGIN Options\n  TIME_UNITS  days\nEND Options\n")
+        f.write("BEGIN Dimensions\n  NPER  1\nEND Dimensions\n")
+        f.write("BEGIN PERIODDATA\n31.00000000  1       1.00000000\nEND PERIODDATA\n")
+    #make sure it runs
+    pyemu.os_utils.run("mf6",cwd=t_d)
+
+    # write a tdis template file - could possibly keep all 25 stress periods to
+    # simulate a 2-year-ahead forecast...
+
+    with open(os.path.join(t_d,"freyberg6.tdis.tpl"),'w') as f:
+        f.write("ptf  ~\n")
+        f.write("BEGIN Options\n  TIME_UNITS  days\nEND Options\n")
+        f.write("BEGIN Dimensions\n  NPER  1\nEND Dimensions\n")
+        f.write("BEGIN PERIODDATA\n~  perlen  ~  1       1.00000000\nEND PERIODDATA\n")
+    new_tpl,new_in = [os.path.join(t_d,"freyberg6.tdis.tpl")],[os.path.join(t_d,"freyberg6.tdis")]
+    new_tpl_cycle = [-1]
+    # mod the sto to make sp 1 transient - or should this be a pre-processor so that cycle 0 is 
+    # ss and the rest are transient?
+
+    # split out the head, sfr and list instruction files into multiple instruction file
+    lines = open(os.path.join(t_d,"heads.csv.ins"),'r').readlines()[2:]
+    new_ins,new_out,new_ins_cycle = [],[],[]
+    #print(lines)
+    for icycle, line in enumerate(lines):
+        ins_name = os.path.join(t_d,"heads_{0}.csv.ins".format(icycle))
+        with open(ins_name,'w') as f:
+            f.write("pif ~\nl1\n")
+            f.write(line)
+        new_ins.append(ins_name)
+        new_out.append(os.path.join(t_d,"heads.csv"))
+        new_ins_cycle.append(icycle)
+
+    lines = open(os.path.join(t_d,"sfr.csv.ins"),'r').readlines()[2:]
+    #print(lines)
+    for icycle, line in enumerate(lines):
+        ins_name = os.path.join(t_d,"sfr_{0}.csv.ins".format(icycle))
+        with open(ins_name,'w') as f:
+            f.write("pif ~\nl1\n")
+            f.write(line)
+        new_ins.append(ins_name)
+        new_out.append(os.path.join(t_d,"sfr.out"))
+        new_ins_cycle.append(icycle)
+
+    lines = open(os.path.join(t_d,"freyberg6.lst.ins"),'r').readlines()[1:]
+    icycle = 0
+    tag_line = lines[0]
+    for s in range(0,len(lines)-13,13):
+        ins_name = os.path.join(t_d,"freyberg6_{0}.lst.ins".format(icycle))
+        with open(os.path.join(t_d,"freyberg6_{0}.lst.ins".format(icycle)),'w') as f:
+            f.write("pif ~\n")
+            f.write(tag_line)
+            for line in lines[s+1:s+13]:
+                f.write(line)
+        new_ins.append(ins_name)
+        new_out.append(os.path.join(t_d,"freyberg6.lst"))
+        icycle += 1
+
+    # write a python script to extract final heads and save to files
+    with open(os.path.join(t_d,"forward_run.py"),'w') as f:
+        f.write("import numpy as np\nimport flopy\nimport pyemu\n")
+        f.write("pyemu.os_utils.run('mf6')\n")
+        f.write("hds = flopy.utils.HeadFile('freyberg6_freyberg.hds')\n")
+        f.write("arr = hds.get_data()\n")
+        f.write("for k,a in enumerate(arr):\n")
+        f.write("    np.savetxt('heads_'+str(k)+'.dat',a,fmt='%15.6E')\n")
+
+    # run it
+    pyemu.os_utils.run("python forward_run.py",cwd=t_d)
+
+    # now write ins file for these
+    for k in range(2):
+        fname = os.path.join(t_d,"heads_{0}.dat".format(k))
+        assert os.path.exists(fname),fname
+        arr = np.loadtxt(fname)
+        fname_ins = fname + "_out.ins"
+        fname_tpl = fname + "_in.tpl"
+        ft = open(fname_tpl,'w')
+        with open(fname_ins,'w') as f:
+            f.write("pif ~\n")
+            ft.write("ptf ~\n")
+            for i in range(arr.shape[0]):
+                f.write("l1 ")
+                for j in range(arr.shape[1]):
+                    if np.abs(arr[i,j]) > 1.0e10:
+                        f.write(" !dum! ")
+                        ft.write(" -1.0e+30 ")
+                    else:
+                        oname = "head_{0:03d}_{1:03d}".format(i,j)
+                        f.write(" !{0}! ".format(oname))
+                        ft.write(" ~  {0} ~ ".format(oname))
+                f.write("\n")
+                ft.write("\n")
+        ft.close()
+        new_tpl.append(fname_tpl)
+        new_in.append(fname_tpl.replace(".tpl",""))
+        new_tpl_cycle.append(-1)
+        new_ins.append(fname_ins)
+        new_out.append(fname_ins.replace(".ins",""))
+        new_ins_cycle.append(-1)
+
+        i = pyemu.pst_utils.InstructionFile(fname_ins)
+        df = i.read_output_file(fname)
+        print(df)
+
+    # split out the wel and rch tpl files into cycle files
+    lines = []
+    with open(os.path.join(t_d,"freyberg6.wel.tpl"),'r') as f:
+        for i in range(19):
+            lines.append(f.readline())
+    print(lines)
+
+    for icycle in range(25):
+        tpl_file = os.path.join(t_d,"freyberg6.wel_{0}.tpl".format(icycle))
+        with open(tpl_file,'w') as f:
+            for line in lines:
+                new_line = line.replace("_0","_{0}".format(icycle))
+                f.write(new_line)
+
+        new_tpl.append(tpl_file)
+        new_in.append(os.path.join(t_d,"freyberg6.wel"))
+        new_tpl_cycle.append(icycle)
+
+    lines = []
+    with open(os.path.join(t_d, "freyberg6.rch.tpl"), 'r') as f:
+        for i in range(11):
+            lines.append(f.readline())
+    print(lines)
+
+    for icycle in range(25):
+        tpl_file = os.path.join(t_d,"freyberg6.rch_{0}.tpl".format(icycle))
+        with open(tpl_file,'w') as f:
+            for line in lines:
+                new_line = line.replace("_0","_{0}".format(icycle))
+                f.write(new_line)
+
+        new_tpl.append(tpl_file)
+        new_in.append(os.path.join(t_d,"freyberg6.rch"))
+        new_tpl_cycle.append(icycle)
+
+    # now for the fun part: modify the pst
+    #pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run.pst"))
+
+
 if __name__ == "__main__":
     
     #glm_long_name_test()
@@ -1018,9 +1169,9 @@ if __name__ == "__main__":
     # parallel_consist_test()
     # ext_stdcol_test()
     #da_prep_4_freyberg_batch()
-    #da_prep_4_freyberg_seq()
+    da_prep_4_mf6_freyberg_seq()
     #mf6_v5_ies_test()
-    mf6_v5_sen_test()
+    #mf6_v5_sen_test()
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
     #cmdline_test()
