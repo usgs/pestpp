@@ -313,8 +313,13 @@ void DataAssimilator::add_bases()
 
 bool DataAssimilator::initialize_oe(Covariance& cov)
 {
+	//if there are no active obs, then just reserve a generic oe and return
 	if (act_obs_names.size() == 0)
-		return false;
+	{
+		oe.reserve(pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
+		return true;
+	}
+
 
 	stringstream ss;
 	int num_reals = pe.shape().first;
@@ -2115,7 +2120,7 @@ void DataAssimilator::da_initialize(int _icycle)
 	else
 	{
 		performance_log->log_event("running ensemble for data assimilation cycle No." + icycle);
-		message(1, "runing ensemble of size", oe.shape().first);
+		message(1, "runing ensemble of size", pe.shape().first);
 
 		vector<int> failed = run_ensemble(pe, oe);
 
