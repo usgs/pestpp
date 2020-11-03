@@ -1217,6 +1217,7 @@ def da_prep_4_mf6_freyberg_seq():
         for c in ["parval1","parubnd","parlbnd","pargp"]:
             pst.parameter_data.loc[df.parnme,c] = df.loc[:,c]
 
+    pst.control_data.noptmax = 0
     pst.write(os.path.join(t_d,"freyberg6_run_da1.pst"),version=2)
 
 
