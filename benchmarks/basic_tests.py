@@ -1022,10 +1022,12 @@ def da_prep_4_mf6_freyberg_seq():
         f.write("BEGIN PERIODDATA\n~  perlen  ~  1       1.00000000\nEND PERIODDATA\n")
     new_tpl,new_in = [os.path.join(t_d,"freyberg6.tdis.tpl")],[os.path.join(t_d,"freyberg6.tdis")]
     new_tpl_cycle = [-1]
+
     # mod the sto to make sp 1 transient - or should this be a pre-processor so that cycle 0 is 
     # ss and the rest are transient?
 
     # split out the head, sfr and list instruction files into multiple instruction file
+    #eventually, want to move to da par and obs cycle tables for heads and gage_1 obs
     lines = open(os.path.join(t_d,"heads.csv.ins"),'r').readlines()[2:]
     new_ins,new_out,new_ins_cycle = [],[],[]
     #print(lines)
@@ -1037,6 +1039,7 @@ def da_prep_4_mf6_freyberg_seq():
         new_ins.append(ins_name)
         new_out.append(os.path.join(t_d,"heads.csv"))
         new_ins_cycle.append(icycle)
+    remove_ins = ["heads.csv.ins"]
 
     lines = open(os.path.join(t_d,"sfr.csv.ins"),'r').readlines()[2:]
     #print(lines)
@@ -1046,13 +1049,14 @@ def da_prep_4_mf6_freyberg_seq():
             f.write("pif ~\nl1\n")
             f.write(line)
         new_ins.append(ins_name)
-        new_out.append(os.path.join(t_d,"sfr.out"))
+        new_out.append(os.path.join(t_d,"sfr.csv"))
         new_ins_cycle.append(icycle)
+    remove_ins.append("sfr.csv.ins")
 
     lines = open(os.path.join(t_d,"freyberg6.lst.ins"),'r').readlines()[1:]
     icycle = 0
     tag_line = lines[0]
-    for s in range(0,len(lines)-13,13):
+    for s in range(0,len(lines),13):
         ins_name = os.path.join(t_d,"freyberg6_{0}.lst.ins".format(icycle))
         with open(os.path.join(t_d,"freyberg6_{0}.lst.ins".format(icycle)),'w') as f:
             f.write("pif ~\n")
@@ -1061,7 +1065,41 @@ def da_prep_4_mf6_freyberg_seq():
                 f.write(line)
         new_ins.append(ins_name)
         new_out.append(os.path.join(t_d,"freyberg6.lst"))
+        new_ins_cycle.append(icycle)
         icycle += 1
+    remove_ins.append("freyberg6.lst.ins")
+
+    # modify the ic file
+    k = 0
+    with open(os.path.join(t_d,"freyberg6.ic"),'r') as f:
+        while True:
+            line = f.readline()
+            if line == "":
+                break
+            if line.lower().strip().startswith("internal"):
+                arr_lines = []
+                while True:
+                    line = f.readline()
+                    if line == "":
+                        raise Exception
+                    if line.lower().strip().startswith("end"):
+                        break
+                    if line.lower().strip().startswith("internal"):
+                        arr = np.array(arr_lines,dtype=np.float)
+                        np.savetxt(os.path.join(t_d,"heads_{0}.dat_in".format(k)),arr,fmt="%15.6E")
+                        k += 1
+                        arr_lines = []
+                    else:
+                        arr_lines.append(line.strip().split())
+
+        arr = np.array(arr_lines, dtype=np.float)
+        np.savetxt(os.path.join(t_d, "heads_{0}.dat_in".format(k)), arr, fmt="%15.6E")
+    with open(os.path.join(t_d,"freyberg6.ic"),'w') as f:
+        f.write("begin griddata\nstrt layered\n")
+        for k in range(3):
+            f.write("open/close 'heads_{0}.dat_in' FACTOR 1.0\n".format(k))
+        f.write("end griddata\n")
+
 
     # write a python script to extract final heads and save to files
     with open(os.path.join(t_d,"forward_run.py"),'w') as f:
@@ -1076,7 +1114,7 @@ def da_prep_4_mf6_freyberg_seq():
     pyemu.os_utils.run("python forward_run.py",cwd=t_d)
 
     # now write ins file for these
-    for k in range(2):
+    for k in range(3):
         fname = os.path.join(t_d,"heads_{0}.dat".format(k))
         assert os.path.exists(fname),fname
         arr = np.loadtxt(fname)
@@ -1093,7 +1131,7 @@ def da_prep_4_mf6_freyberg_seq():
                         f.write(" !dum! ")
                         ft.write(" -1.0e+30 ")
                     else:
-                        oname = "head_{0:03d}_{1:03d}".format(i,j)
+                        oname = "head_{0:02d}_{1:03d}_{2:03d}".format(k,i,j)
                         f.write(" !{0}! ".format(oname))
                         ft.write(" ~  {0} ~ ".format(oname))
                 f.write("\n")
@@ -1103,12 +1141,12 @@ def da_prep_4_mf6_freyberg_seq():
         new_in.append(fname_tpl.replace(".tpl",""))
         new_tpl_cycle.append(-1)
         new_ins.append(fname_ins)
-        new_out.append(fname_ins.replace(".ins",""))
+        new_out.append(os.path.join(t_d,"heads_{0}.dat".format(k)))
         new_ins_cycle.append(-1)
 
         i = pyemu.pst_utils.InstructionFile(fname_ins)
         df = i.read_output_file(fname)
-        print(df)
+        #print(df)
 
     # split out the wel and rch tpl files into cycle files
     lines = []
@@ -1127,6 +1165,7 @@ def da_prep_4_mf6_freyberg_seq():
         new_tpl.append(tpl_file)
         new_in.append(os.path.join(t_d,"freyberg6.wel"))
         new_tpl_cycle.append(icycle)
+    remove_tpl = ["freyberg6.wel.tpl"]
 
     lines = []
     with open(os.path.join(t_d, "freyberg6.rch.tpl"), 'r') as f:
@@ -1144,9 +1183,44 @@ def da_prep_4_mf6_freyberg_seq():
         new_tpl.append(tpl_file)
         new_in.append(os.path.join(t_d,"freyberg6.rch"))
         new_tpl_cycle.append(icycle)
+    remove_tpl.append('freyberg6.rch.tpl')
 
     # now for the fun part: modify the pst
-    #pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run.pst"))
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run.pst"))
+
+    print(pst.npar_adj,pst.nnz_obs)
+
+    # swap out obs info
+    dropped_dfs = []
+    for ins in remove_ins:
+        dropped_dfs.append(pst.drop_observations(os.path.join(t_d, ins), '.'))
+    for insf, outf, cy in zip(new_ins, new_out, new_ins_cycle):
+        df = pst.add_observations(insf,outf, pst_path=".")
+        pst.observation_data.loc[df.obsnme, "cycle"] = cy
+        pst.model_output_data.loc[os.path.join(".",os.path.split(insf)[1]),"cycle"] = cy
+    pst.observation_data.loc[:,"weight"] = 0.0
+    for df in dropped_dfs:
+        for c in ["obsval","weight"]:
+            pst.observation_data.loc[df.obsnme, c] = df.loc[:, c]
+
+    # swap out par info
+    dropped_dfs = []
+    for tpl in remove_tpl:
+        dropped_dfs.append(pst.drop_parameters(os.path.join(t_d,tpl),'.'))
+    pst.parameter_data.loc[:,"cycle"] = -1
+    pst.model_input_data.loc[:,"cycle"] = -1
+    for tplf, inf, cy in zip(new_tpl,new_in,new_tpl_cycle):
+        df = pst.add_parameters(tplf,inf,pst_path=".")
+        pst.parameter_data.loc[df.parnme,"cycle"] = cy
+        pst.model_input_data.loc[os.path.join(".",os.path.split(tplf)[1]),"cycle"] = cy
+    for df in dropped_dfs:
+        for c in ["parval1","parubnd","parlbnd","pargp"]:
+            pst.parameter_data.loc[df.parnme,c] = df.loc[:,c]
+
+    pst.write(os.path.join(t_d,"freyberg6_run_da1.pst"),version=2)
+
+
+
 
 
 if __name__ == "__main__":
