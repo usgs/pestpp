@@ -1218,6 +1218,9 @@ def da_prep_4_mf6_freyberg_seq():
             pst.parameter_data.loc[df.parnme,c] = df.loc[:,c]
 
     pst.control_data.noptmax = 0
+    pst.model_command = "python forward_run.py"
+    pst.pestpp_options.pop("ies_par_en")
+    pst.parameter_data.loc["perlen","partrans"] = "fixed"
     pst.write(os.path.join(t_d,"freyberg6_run_da1.pst"),version=2)
 
 

@@ -263,7 +263,15 @@ int main(int argc, char* argv[])
 		vector<int> assimilation_cycles;
 		pest_scenario.assign_da_cycles(fout_rec); 
 		assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec);
-		ParameterEnsemble curr_pe;
+
+		//ParameterEnsemble curr_pe;
+
+		//generate a parent ensemble which includes all parameters across all cycles
+		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
+		da.initialize_parcov();
+		da.initialize_pe(*da.get_parcov_ptr());
+		ParameterEnsemble curr_pe = da.get_pe();
+		//todo: add the base realization here so that it is present thru out the cycles below
 
 		// loop over assimilation cycles
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
@@ -372,10 +380,14 @@ int main(int argc, char* argv[])
 			// use ies or da?
 			da.use_ies = pest_scenario.get_pestpp_options_ptr()->get_da_use_ies();
 			da.da_type = pest_scenario.get_pestpp_options_ptr()->da_ctl_params.get_svalue("DA_TYPE");
+			std::mt19937 rand_gen = da.get_rand_gen();
+			vector<string> act_par_names = childPest.get_ctl_ordered_adj_par_names();
+			ParameterEnsemble cycle_curr_pe(&childPest, &rand_gen, curr_pe.get_eigen(vector<string>(),act_par_names), curr_pe.get_real_names(), act_par_names);
+			cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
 
 			if (*icycle > 0)
 			{
-				da.set_pe(curr_pe);
+				da.set_pe(cycle_curr_pe);
 			}
 			
 			if (da.use_ies)
@@ -390,8 +402,8 @@ int main(int argc, char* argv[])
 			if (da.use_ies) // use ies
 			{
 				da.iterate_2_solution();
-				curr_pe = da.get_pe();
-				curr_pe.to_csv("cncnc.csv");
+				/*curr_pe = da.get_pe();
+				curr_pe.to_csv("cncnc.csv");*/
 			}
 			else // use da
 			{
@@ -399,9 +411,14 @@ int main(int argc, char* argv[])
 				{
 					da.da_upate();					
 				}
-				curr_pe = da.get_pe();
-				curr_pe.to_csv("cncnc.csv");
-			}					
+				/*curr_pe = da.get_pe();
+				curr_pe.to_csv("cncnc.csv");*/
+			}	
+			//replace all the pars used in this cycle in the parent parameter ensemble
+			cycle_curr_pe.transform_ip(curr_pe.get_trans_status());
+			curr_pe.replace_col_vals(cycle_curr_pe.get_var_names(), *cycle_curr_pe.get_eigen_ptr());
+			curr_pe.to_csv("cncnc.csv");
+
 		} // end cycle loop
 		fout_rec.close();
 		cout << endl << endl << "pestpp-da analysis complete..." << endl;

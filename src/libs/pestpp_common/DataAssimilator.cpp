@@ -917,7 +917,10 @@ void DataAssimilator::initialize_parcov()
 	string how = parcov.try_from(pest_scenario, file_manager);
 	message(1, "parcov loaded ", how);
 	//if (parcov.e_ptr()->rows() > 0)
-	parcov = parcov.get(act_par_names);
+	if (act_par_names.size() > 0)
+	{
+		parcov = parcov.get(act_par_names);
+	}
 
 }
 
@@ -1597,15 +1600,15 @@ void DataAssimilator::da_initialize(int _icycle)
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
 		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
-		if (icycle == 0)
-		{
+		//if (icycle == 0)
+		//{
 			_pe.append("BASE", pars);
 			pe = _pe;
-		}
-		else
-		{
-			_pe = pe;
-		}
+		//}
+		//else
+		//{
+		//	_pe = pe;
+		//}
 		string par_csv = file_manager.get_base_filename() + ".par.csv";
 		pe_base = _pe;
 		pe_base.reorder(vector<string>(), act_par_names);

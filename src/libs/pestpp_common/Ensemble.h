@@ -160,6 +160,7 @@ public:
 	Covariance get_diagonal_cov_matrix();
 	void to_binary(string filename);
 
+
 private:
 	ParamTransformSeq par_transform;
 	transStatus tstat;
