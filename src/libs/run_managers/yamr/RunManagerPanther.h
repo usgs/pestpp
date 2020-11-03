@@ -100,8 +100,9 @@ class RunManagerPanther : public RunManagerAbstract
 {
 public:
 	RunManagerPanther(const std::string &stor_filename, const std::string &port, std::ofstream &_f_rmr, int _max_n_failure,
-		double overdue_reched_fac, double overdue_giveup_fac, double overdue_giveup_minutes,const vector<string>& par_names=vector<string>(),
+		double overdue_reched_fac, double overdue_giveup_fac, double overdue_giveup_minutes, bool _should_echo = true, const vector<string>& par_names=vector<string>(),
 		const vector<string>& obs_names=vector<string>());
+
 	virtual void initialize(const Parameters &model_pars, const Observations &obs, const std::string &_filename = std::string(""));
 	virtual void initialize_restart(const std::string &_filename);
 	virtual void reinitialize(const std::string &_filename = std::string(""));
@@ -137,6 +138,7 @@ private:
 	int model_runs_done;
 	int model_runs_failed;
 	int model_runs_timed_out;
+	bool should_echo;
 	fd_set master; // master file descriptor list
 	list<AgentInfoRec> agent_info_set;
 	map<int, list<AgentInfoRec>::iterator> socket_to_iter_map;

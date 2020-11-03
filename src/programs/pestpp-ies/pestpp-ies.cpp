@@ -145,12 +145,15 @@ int main(int argc, char* argv[])
 			fout_rec << endl << endl << "version: " << version << endl;
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
-			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
+			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
+
 		}
 
 		cout << endl;
 		cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
-		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
+		cout << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
@@ -218,7 +221,8 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_max_run_fail(),
 				pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
 				pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
-				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes());
+				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
+				pest_scenario.get_pestpp_options().get_panther_echo());
 		}
 		else
 		{

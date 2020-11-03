@@ -1433,7 +1433,6 @@ void DataAssimilator::initialize(int _icycle)
 		pe.to_csv(ss.str());
 	}
 	
-
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{

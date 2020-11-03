@@ -270,13 +270,15 @@ int AgentInfoRec::seconds_since_last_ping_time() const
 
 
 RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& _port, ofstream& _f_rmr, int _max_n_failure,
-	double _overdue_reched_fac, double _overdue_giveup_fac, double _overdue_giveup_minutes, const vector<string>& par_names,const vector<string>& obs_names)
+	double _overdue_reched_fac, double _overdue_giveup_fac, double _overdue_giveup_minutes, bool _should_echo, const vector<string>& par_names,
+	const vector<string>& obs_names)
+
 	: RunManagerAbstract(vector<string>(), vector<string>(), vector<string>(),
 		vector<string>(), vector<string>(), stor_filename, _max_n_failure),
 	overdue_reched_fac(_overdue_reched_fac), overdue_giveup_fac(_overdue_giveup_fac),
 	port(_port), f_rmr(_f_rmr), n_no_ops(0), overdue_giveup_minutes(_overdue_giveup_minutes),
 	terminate_idle_thread(false), currently_idle(true), idling(false), idle_thread_finished(false),
-	idle_thread(nullptr), idle_thread_raii(nullptr)
+	idle_thread(nullptr), idle_thread_raii(nullptr), should_echo(_should_echo)
 {
 	cout << "          starting PANTHER master..." << endl << endl;
 	max_concurrent_runs = max(MAX_CONCURRENT_RUNS_LOWER_LIMIT, _max_n_failure);
@@ -457,7 +459,8 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	if (agent_info_set.size() == 0) // first entry is the listener, slave apears after this
 	{
 		cout << endl << "      waiting for agents to appear..." << endl << endl;
-		f_rmr << endl << "    waiting for agents to appear..." << endl << endl;
+		//f_rmr << endl << "    waiting for agents to appear..." << endl << endl;
+		report("waiting for agents to appear", false);
 	}
 	else
 	{
@@ -466,11 +469,17 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	}
 	cout << endl;
 	f_rmr << endl;
-
-	cout << "PANTHER progress" << endl;
-	cout << "   runs(C = completed | F = failed | T = timed out)" << endl;
-	cout << "   agents(R = running | W = waiting | U = unavailable)" << endl;
-	cout << "------------------------------------------------------------------------------" << endl;
+	if (should_echo)
+	{
+		cout << "PANTHER progress" << endl;
+		cout << "   runs(C = completed | F = failed | T = timed out)" << endl;
+		cout << "   agents(R = running | W = waiting | U = unavailable)" << endl;
+		cout << "------------------------------------------------------------------------------" << endl;
+	}
+	else
+	{
+		cout << "'panther_echo' is 'false', running in silent mode - see rmr file for details" << endl;
+	}
 
 	std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
 	double run_time_sec = 0.0;
@@ -1117,6 +1126,8 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::it
 
 void RunManagerPanther::echo()
 {
+	if (!should_echo)
+		return;
 	map<string, int> stats_map = get_agent_stats();
 	cout << get_time_string_short() << " runs("
 		<< "C=" << setw(5) << left << model_runs_done
