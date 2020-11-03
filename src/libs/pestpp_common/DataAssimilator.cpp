@@ -313,6 +313,9 @@ void DataAssimilator::add_bases()
 
 bool DataAssimilator::initialize_oe(Covariance& cov)
 {
+	if (act_obs_names.size() == 0)
+		return false;
+
 	stringstream ss;
 	int num_reals = pe.shape().first;
 
@@ -927,12 +930,17 @@ void DataAssimilator::initialize_parcov()
 
 void DataAssimilator::initialize_obscov()
 {
-	message(1, "initializing observation noise covariance matrix");
-	string obscov_filename = pest_scenario.get_pestpp_options().get_obscov_filename();
+	if (act_obs_names.size() == 0)
+		message(1, "no non-zero weighted observations for cycle ", icycle);
+	else
+	{
+		message(1, "initializing observation noise covariance matrix");
+		string obscov_filename = pest_scenario.get_pestpp_options().get_obscov_filename();
 
-	string how = obscov.try_from(pest_scenario, file_manager, false);
-	message(1, "obscov loaded ", how);
-	obscov = obscov.get(act_obs_names);
+		string how = obscov.try_from(pest_scenario, file_manager, false);
+		message(1, "obscov loaded ", how);
+		obscov = obscov.get(act_obs_names);
+	}
 }
 
 
@@ -1142,28 +1150,30 @@ void DataAssimilator::initialize(int _icycle)
 	else
 		num_reals = pest_scenario.get_pestpp_options().get_da_num_reals();
 
-	if (icycle == 0) 
-	{
-		// Get Par realizations either from external file or by drawing internally
-		pe_drawn = initialize_pe(parcov);
-		
-		if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
-		{
-			message(1, "forming inverse sqrt of prior parameter covariance matrix");
+	//if (icycle == 0) 
+	//{
+	//	// Get Par realizations either from external file or by drawing internally
+	//	pe_drawn = initialize_pe(parcov);	
+	//	
+	//}
 
-			if (parcov.isdiagonal())
-				parcov_inv_sqrt = parcov.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
-			else
-			{
-				message(1, "first extracting diagonal from prior parameter covariance matrix");
-				Covariance parcov_diag;
-				parcov_diag.from_diagonal(parcov);
-				parcov_inv_sqrt = parcov_diag.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
-			}
+	if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
+	{
+		message(1, "forming inverse sqrt of prior parameter covariance matrix");
+
+		if (parcov.isdiagonal())
+			parcov_inv_sqrt = parcov.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
+		else
+		{
+			message(1, "first extracting diagonal from prior parameter covariance matrix");
+			Covariance parcov_diag;
+			parcov_diag.from_diagonal(parcov);
+			parcov_inv_sqrt = parcov_diag.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
 		}
-		else {
-			message(1, "not using prior parameter covariance matrix scaling");
-		}
+	}
+	else 
+	{
+		message(1, "not using prior parameter covariance matrix scaling");
 	}
 
 	oe_drawn = initialize_oe(obscov);
@@ -1240,9 +1250,9 @@ void DataAssimilator::initialize(int _icycle)
 		
 	//need this here for Am calcs...
 	//message(1, "transforming parameter ensemble to numeric");
-	if (icycle == 0)
+	//if (icycle == 0)
 		// parameters need to be transformed once ?
-		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+		//pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 
 	if (use_ies)
 	{
@@ -1267,8 +1277,8 @@ void DataAssimilator::initialize(int _icycle)
 
 	}
 	message(2, "checking for denormal values in pe");
-	if (icycle == 0)
-		pe.check_for_normal("initial transformed parameter ensemble");
+	//if (icycle == 0)
+	pe.check_for_normal("initial transformed parameter ensemble");
 	/* Ayman commented this and moved it after we update dynamic states exist in pe
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
@@ -1284,21 +1294,24 @@ void DataAssimilator::initialize(int _icycle)
 	*/
 
 
-	message(1, "saved initial parameter ensemble to ", ss.str());
-	message(2, "checking for denormal values in base oe");
-	oe.check_for_normal("base observation ensemble");
-	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	//message(1, "saved initial parameter ensemble to ", ss.str());
+	if (act_obs_names.size() > 0)
 	{
-		ss << file_manager.get_base_filename() << ".base.obs.jcb";
-		oe.to_binary(ss.str());
+		message(2, "checking for denormal values in base oe");
+		oe.check_for_normal("base observation ensemble");
+		ss.str("");
+		if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+		{
+			ss << file_manager.get_base_filename() << ".base.obs.jcb";
+			oe.to_binary(ss.str());
+		}
+		else
+		{
+			ss << file_manager.get_base_filename() << ".base.obs.csv";
+			oe.to_csv(ss.str());
+		}
+		message(1, "saved base observation ensemble (obsval+noise) to ", ss.str());
 	}
-	else
-	{
-		ss << file_manager.get_base_filename() << ".base.obs.csv";
-		oe.to_csv(ss.str());
-	}
-	message(1, "saved base observation ensemble (obsval+noise) to ", ss.str());
 
 	if (center_on.size() > 0)
 	{
@@ -1394,7 +1407,7 @@ void DataAssimilator::initialize(int _icycle)
 	pe_base.reorder(vector<string>(), act_par_names);
 	
 	//the hard way to restart
-	if (obs_restart_csv.size() > 0)
+	if ((act_obs_names.size() > 0) && (obs_restart_csv.size() > 0))
 		initialize_restart();
 
 	//no restart
@@ -1413,10 +1426,10 @@ void DataAssimilator::initialize(int _icycle)
 		//string obs_csv = file_manager.get_base_filename() + ".0.obs.csv";
 		//message(1, "saving results of initial ensemble run to", obs_csv);
 		//oe.to_csv(obs_csv);
-		if (icycle == 0)
+		/*if (icycle == 0)
 		{
 			pe.transform_ip(ParameterEnsemble::transStatus::NUM);
-		}
+		}*/
 	}
 
 	// extract dynamic states forecast from oe and add them to pe.
@@ -1812,7 +1825,9 @@ void DataAssimilator::da_initialize(int _icycle)
 	if (icycle == 0)
 	{
 		// Get Par realizations either from external file or by drawing internally
-		pe_drawn = initialize_pe(parcov);
+		//dont draw the pe here because we are setting it 
+		//pe_drawn = initialize_pe(parcov);
+		pe_drawn = true;
 
 		if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
 		{
@@ -1836,7 +1851,8 @@ void DataAssimilator::da_initialize(int _icycle)
 	oe_drawn = initialize_oe(obscov);
 	string center_on = ppo->get_ies_center_on();
 
-	if (icycle == 0)
+	//this is being done globally now
+	/*if (icycle == 0)
 	{
 		try
 		{
@@ -1848,7 +1864,7 @@ void DataAssimilator::da_initialize(int _icycle)
 			throw_da_error("error in parameter ensemble: " + message);
 		}
 
-	}
+	}*/
 
 	try
 	{
@@ -1860,7 +1876,7 @@ void DataAssimilator::da_initialize(int _icycle)
 		throw_da_error("error in observation ensemble: " + message);
 	}
 
-	if (pe.shape().first != oe.shape().first)
+	if ((act_obs_names.size() > 0) && (pe.shape().first != oe.shape().first))
 	{
 		//the special case where par en < obs en and all par reals are found in obs en...
 

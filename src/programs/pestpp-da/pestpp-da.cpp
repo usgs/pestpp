@@ -271,6 +271,15 @@ int main(int argc, char* argv[])
 		da.initialize_parcov();
 		da.initialize_pe(*da.get_parcov_ptr());
 		ParameterEnsemble curr_pe = da.get_pe();
+		try
+		{
+			curr_pe.check_for_dups();
+		}
+		catch (const exception& e)
+		{
+			string message = e.what();
+			throw runtime_error("error in parameter ensemble: " + message);
+		}
 		//todo: add the base realization here so that it is present thru out the cycles below
 
 		// loop over assimilation cycles
@@ -385,10 +394,10 @@ int main(int argc, char* argv[])
 			ParameterEnsemble cycle_curr_pe(&childPest, &rand_gen, curr_pe.get_eigen(vector<string>(),act_par_names), curr_pe.get_real_names(), act_par_names);
 			cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
 
-			if (*icycle > 0)
-			{
+			//if (*icycle > 0)
+			//{
 				da.set_pe(cycle_curr_pe);
-			}
+			//}
 			
 			if (da.use_ies)
 			{
