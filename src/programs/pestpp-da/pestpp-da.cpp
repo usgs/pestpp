@@ -275,6 +275,9 @@ int main(int argc, char* argv[])
 		da.initialize_parcov();
 		da.initialize_pe(*da.get_parcov_ptr());
 		ParameterEnsemble curr_pe = da.get_pe();
+		ObservationEnsemble curr_oe(&pest_scenario, &da.get_rand_gen());
+		curr_oe.reserve(curr_pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
+
 		try
 		{
 			curr_pe.check_for_dups();
@@ -286,11 +289,16 @@ int main(int argc, char* argv[])
 		}
 		//todo: add the base realization here so that it is present thru out the cycles below
 
-		cout << "...parent ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" <<  endl;
-		fout_rec << "...parent ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
-		curr_pe.to_csv(file_manager.get_base_filename() + ".parent_da_pe.csv");
+		cout << "...parent parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" <<  endl;
+		fout_rec << "...parent parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
+		curr_pe.to_csv(file_manager.get_base_filename() + ".parent.prior.pe.csv");
+		cout << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
+		fout_rec << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
+
+
 
 		// loop over assimilation cycles
+		stringstream ss;
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 		{
 			cout << endl;
@@ -449,9 +457,67 @@ int main(int argc, char* argv[])
 			}
 			//replace all the pars used in this cycle in the parent parameter ensemble
 			performance_log.log_event("updating parent ensemble with cycle ensemble columns");
+			
+			//if we lost some realizations...
+			if (curr_pe.shape().first > cycle_curr_pe.shape().first)
+			{
+				vector<string> missing;
+				vector<string> t = cycle_curr_pe.get_real_names();
+				set<string> ccp_reals(t.begin(), t.end());
+				for (auto r : curr_pe.get_real_names())
+					if (ccp_reals.find(r) == ccp_reals.end())
+						missing.push_back(r);
+				fout_rec << "...dropping the following " << missing.size() << " realizations from parent parameter ensemble:" << endl;
+				cout << "...dropping " << missing.size() << " realizations from parent parameter ensemble, see rec file for listing" << endl;
+				int i = 0;
+				for (auto m : missing)
+				{
+					fout_rec << m << ",";
+					if (i > 10)
+					{
+						fout_rec << endl;
+						i == 0;
+					}
+				}
+				curr_pe.drop_rows(missing);
+				curr_pe.reorder(t, vector<string>());
+			}
+
 			cycle_curr_pe.transform_ip(curr_pe.get_trans_status());
 			curr_pe.replace_col_vals(cycle_curr_pe.get_var_names(), *cycle_curr_pe.get_eigen_ptr());
 			curr_pe.to_csv("cncnc.csv");
+
+			ObservationEnsemble cycle_curr_oe = da.get_oe();
+			//if we lost some realizations...
+			if (curr_oe.shape().first > cycle_curr_oe.shape().first)
+			{
+				vector<string> missing;
+				vector<string> t = cycle_curr_oe.get_real_names();
+				set<string> ccp_reals(t.begin(), t.end());
+				for (auto r : curr_oe.get_real_names())
+					if (ccp_reals.find(r) == ccp_reals.end())
+						missing.push_back(r);
+				fout_rec << "...dropping the following " << missing.size() << " realizations from parent observation ensemble:" << endl;
+				cout << "...dropping " << missing.size() << " realizations from parent observation ensemble, see rec file for listing" << endl;
+				int i = 0;
+				for (auto m : missing)
+				{
+					fout_rec << m << ",";
+					if (i > 10)
+					{
+						fout_rec << endl;
+						i == 0;
+					}
+				}
+				curr_oe.drop_rows(missing);
+				curr_oe.reorder(t, vector<string>());
+			}
+
+			curr_oe.replace_col_vals(cycle_curr_oe.get_var_names(), *cycle_curr_oe.get_eigen_ptr());
+			ss.str("");
+			ss << "." << *icycle << ".parent.oe.csv";
+			curr_oe.to_csv(file_manager.get_base_filename()+ss.str());
+
 
 		} // end cycle loop
 		fout_rec.close();

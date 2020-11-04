@@ -99,6 +99,7 @@ public:
 	Covariance* get_parcov_ptr() { return &parcov; }
 	std::mt19937 get_rand_gen() { return rand_gen; }
 	vector<string> get_act_par_names() { return act_par_names; }
+	ObservationEnsemble get_oe() { return oe; }
 
 private:
 	int icycle;
