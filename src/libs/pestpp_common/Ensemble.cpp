@@ -70,6 +70,7 @@ void Ensemble::check_for_dups()
 void Ensemble::reserve(vector<string> _real_names, vector<string> _var_names)
 {
 	reals.resize(_real_names.size(), _var_names.size());
+	reals.setZero();
 	var_names = _var_names;
 	real_names = _real_names;
 	org_real_names = real_names;
@@ -2251,12 +2252,12 @@ void ParameterEnsemble::save_fixed()
 		}
 	}
 	// add the "base" if its not in the real names already
-	if (find(real_names.begin(), real_names.end(), base_name) == real_names.end())
+	if (find(real_names.begin(), real_names.end(), BASE_REAL_NAME) == real_names.end())
 	{
 		Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 		for (auto fname : fixed_names)
 		{
-			pair<string, string> key(base_name, fname);
+			pair<string, string> key(BASE_REAL_NAME, fname);
 			fixed_map[key] = pars[fname];
 		}
 	}

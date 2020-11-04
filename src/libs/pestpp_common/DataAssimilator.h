@@ -94,6 +94,12 @@ public:
 	bool use_ies; 
 	string da_type;
 
+	bool initialize_pe(Covariance& cov);
+	void initialize_parcov();
+	Covariance* get_parcov_ptr() { return &parcov; }
+	std::mt19937 get_rand_gen() { return rand_gen; }
+	vector<string> get_act_par_names() { return act_par_names; }
+
 private:
 	int icycle;
 	int  verbose_level;
@@ -192,10 +198,10 @@ private:
 	//map<string,PhiComponets> get_phi_info(ObservationEnsemble &_oe);
 	void report_and_save();
 	void save_mat(string prefix, Eigen::MatrixXd& mat);
-	bool initialize_pe(Covariance& cov);
+	
 	bool initialize_oe(Covariance& cov);
 	void initialize_restart();
-	void initialize_parcov();
+	
 	void initialize_obscov();
 	void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, bool is_subset = false);
 	//void check_ensembles(ObservationEnsemble &oe, ParameterEnsemble &pe);

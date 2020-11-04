@@ -151,12 +151,14 @@ int main(int argc, char* argv[])
 			fout_rec << endl << endl << "version: " << version << endl;
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
-			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
+			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
 		}
 
 		cout << endl;
 		cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
-		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
+		cout << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
@@ -228,6 +230,7 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
 				pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
 				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
+				pest_scenario.get_pestpp_options().get_panther_echo(),
 				pest_scenario.get_ctl_ordered_par_names(),
 				pest_scenario.get_ctl_ordered_obs_names());
 			run_manager_ptr->initialize(pest_scenario.get_ctl_parameters(), pest_scenario.get_ctl_observations());
@@ -262,7 +265,30 @@ int main(int argc, char* argv[])
 		vector<int> assimilation_cycles;
 		pest_scenario.assign_da_cycles(fout_rec); 
 		assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec);
-		ParameterEnsemble curr_pe;
+
+		//ParameterEnsemble curr_pe;
+
+		//generate a parent ensemble which includes all parameters across all cycles
+		cout << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
+		fout_rec << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
+		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
+		da.initialize_parcov();
+		da.initialize_pe(*da.get_parcov_ptr());
+		ParameterEnsemble curr_pe = da.get_pe();
+		try
+		{
+			curr_pe.check_for_dups();
+		}
+		catch (const exception& e)
+		{
+			string message = e.what();
+			throw runtime_error("error in parameter ensemble: " + message);
+		}
+		//todo: add the base realization here so that it is present thru out the cycles below
+
+		cout << "...parent ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" <<  endl;
+		fout_rec << "...parent ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
+		curr_pe.to_csv(file_manager.get_base_filename() + ".parent_da_pe.csv");
 
 		// loop over assimilation cycles
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
@@ -277,6 +303,7 @@ int main(int argc, char* argv[])
 			fout_rec << " >>>> Assimilating data in cycle " << *icycle << endl;
 			fout_rec << " =======================================" << endl;
 
+			performance_log.log_event("instantiating child pest object");
 			Pest childPest;
 			childPest = pest_scenario.get_child_pest(*icycle);
 			//vector <string> xxxx=childPest.get_ctl_ordered_par_names();
@@ -295,10 +322,12 @@ int main(int argc, char* argv[])
 
 			if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_MASTER)
 			{
+				performance_log.log_event("reinitializing panther master");
 				run_manager_ptr->initialize(childPest.get_ctl_parameters(), childPest.get_ctl_observations());
 			}
 			else
 			{
+
 				performance_log.log_event("starting basic model IO error checking");
 				cout << "checking model IO files...";
 				childPest.check_io(fout_rec);
@@ -321,6 +350,7 @@ int main(int argc, char* argv[])
 			//check for entries in the par cycle table
 			if (par_cycle_info.find(*icycle) != par_cycle_info.end())
 			{
+				performance_log.log_event("updating pars using da par cycle table info");
 				Parameters pars = childPest.get_ctl_parameters_4_mod();
 				TranFixed* fixed_ptr = base_trans_seq.get_fixed_ptr_4_mod();
 				map<string, double> cycle_map = par_cycle_info[*icycle];
@@ -333,6 +363,7 @@ int main(int argc, char* argv[])
 			//check for entries in the obs cycle table
 			if (obs_cycle_info.find(*icycle) != obs_cycle_info.end())
 			{
+				performance_log.log_event("updating obs using da obs cycle table info");
 				Observations obs = childPest.get_ctl_observations();
 				ObservationInfo* oi_ptr = childPest.get_observation_info_ptr();
 				map<string, double> cycle_map = obs_cycle_info[*icycle];
@@ -366,16 +397,22 @@ int main(int argc, char* argv[])
 			vector<string> obs_names = childPest.get_ctl_observations().get_keys();
 			sort(obs_names.begin(), obs_names.end());
 			run_manager_ptr->initialize(par_names,obs_names);
-
+			performance_log.log_event("instantiating DA instance");
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 			// use ies or da?
 			da.use_ies = pest_scenario.get_pestpp_options_ptr()->get_da_use_ies();
 			da.da_type = pest_scenario.get_pestpp_options_ptr()->da_ctl_params.get_svalue("DA_TYPE");
+			std::mt19937 rand_gen = da.get_rand_gen();
+			vector<string> act_par_names = childPest.get_ctl_ordered_adj_par_names();
+			performance_log.log_event("instantiating cycle parameter ensemble instance");
+			ParameterEnsemble cycle_curr_pe(&childPest, &rand_gen, curr_pe.get_eigen(vector<string>(),act_par_names), curr_pe.get_real_names(), act_par_names);
+			cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
 
-			if (*icycle > 0)
-			{
-				da.set_pe(curr_pe);
-			}
+			//if (*icycle > 0)
+			//{
+
+			da.set_pe(cycle_curr_pe);
+			//}
 			
 			if (da.use_ies)
 			{
@@ -385,22 +422,37 @@ int main(int argc, char* argv[])
 			{
 				da.da_initialize(*icycle);
 			}
-
-			if (da.use_ies) // use ies
+			if (childPest.get_ctl_ordered_nz_obs_names().size() > 0)
 			{
-				da.iterate_2_solution();
-				curr_pe = da.get_pe();
-				curr_pe.to_csv("cncnc.csv");
-			}
-			else // use da
-			{
-				if (pest_scenario.get_control_info().noptmax > 0) // 
+				if (da.use_ies) // use ies
 				{
-					da.da_upate();					
+					da.iterate_2_solution();
+					/*curr_pe = da.get_pe();
+					curr_pe.to_csv("cncnc.csv");*/
 				}
-				curr_pe = da.get_pe();
-				curr_pe.to_csv("cncnc.csv");
-			}					
+				else // use da
+				{
+					if (pest_scenario.get_control_info().noptmax > 0) // 
+					{
+						da.da_upate();
+					}
+					/*curr_pe = da.get_pe();
+					curr_pe.to_csv("cncnc.csv");*/
+				}
+			}
+			else
+			{
+				cout << "...Note: no non-zero-weighted observations in cycle " << *icycle << ", continuing..." << endl;
+				fout_rec << "...Note: no non-zero-weighted observations in cycle " << *icycle << ", continuing..." << endl;
+				performance_log.log_event("no non-zero-weighted observations in current cycle");
+				
+			}
+			//replace all the pars used in this cycle in the parent parameter ensemble
+			performance_log.log_event("updating parent ensemble with cycle ensemble columns");
+			cycle_curr_pe.transform_ip(curr_pe.get_trans_status());
+			curr_pe.replace_col_vals(cycle_curr_pe.get_var_names(), *cycle_curr_pe.get_eigen_ptr());
+			curr_pe.to_csv("cncnc.csv");
+
 		} // end cycle loop
 		fout_rec.close();
 		cout << endl << endl << "pestpp-da analysis complete..." << endl;

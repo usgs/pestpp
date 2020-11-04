@@ -1,3 +1,6 @@
+<p align="center">
+  <img src="documentation/pestpplogo.png" alt="pestpplogo image">
+</p>
 # PEST++
 
 ## Tools for non-intrusive and scalable parameter estimation and uncertainty quantification
