@@ -1110,16 +1110,18 @@ def da_prep_4_mf6_freyberg_seq():
         f.write("for k,a in enumerate(arr):\n")
         f.write("    np.savetxt('heads_'+str(k)+'.dat',a,fmt='%15.6E')\n")
 
-    # run it
+    # dont run it so we can harvest the ic values in the arrays for setting the parval1 values
     pyemu.os_utils.run("python forward_run.py",cwd=t_d)
 
-    # now write ins file for these
+    # now write ins and tpl file for these
+    ic_parvals = {}
     for k in range(3):
         fname = os.path.join(t_d,"heads_{0}.dat".format(k))
         assert os.path.exists(fname),fname
         arr = np.loadtxt(fname)
         fname_ins = fname + "_out.ins"
         fname_tpl = fname + "_in.tpl"
+        in_arr = np.loadtxt(fname_tpl.replace(".tpl",""))
         ft = open(fname_tpl,'w')
         with open(fname_ins,'w') as f:
             f.write("pif ~\n")
@@ -1134,6 +1136,7 @@ def da_prep_4_mf6_freyberg_seq():
                         oname = "head_{0:02d}_{1:03d}_{2:03d}".format(k,i,j)
                         f.write(" !{0}! ".format(oname))
                         ft.write(" ~  {0} ~ ".format(oname))
+                        ic_parvals[oname] = in_arr[i,j]
                 f.write("\n")
                 ft.write("\n")
         ft.close()
@@ -1217,7 +1220,17 @@ def da_prep_4_mf6_freyberg_seq():
         for c in ["parval1","parubnd","parlbnd","pargp"]:
             pst.parameter_data.loc[df.parnme,c] = df.loc[:,c]
 
-    pst.control_data.noptmax = 0
+    #set the state parameter info
+    for p,v in ic_parvals.items():
+        pst.parameter_data.loc[p,"parval1"] = v
+        pst.parameter_data.loc[p, "parlbnd"] = v * 0.5
+        pst.parameter_data.loc[p, "parubnd"] = v * 1.5
+        pst.parameter_data.loc[p,"pargp"] = "head_state"
+        pst.parameter_data.loc[p,"partrans"] = "none"
+
+
+
+    pst.control_data.noptmax = 2
     pst.model_command = "python forward_run.py"
     pst.pestpp_options.pop("ies_par_en")
     pst.parameter_data.loc["perlen","partrans"] = "fixed"

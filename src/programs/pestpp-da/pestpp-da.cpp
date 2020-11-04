@@ -407,22 +407,24 @@ int main(int argc, char* argv[])
 			{
 				da.da_initialize(*icycle);
 			}
-
-			if (da.use_ies) // use ies
+			if (childPest.get_ctl_ordered_nz_obs_names().size() > 0)
 			{
-				da.iterate_2_solution();
-				/*curr_pe = da.get_pe();
-				curr_pe.to_csv("cncnc.csv");*/
-			}
-			else // use da
-			{
-				if (pest_scenario.get_control_info().noptmax > 0) // 
+				if (da.use_ies) // use ies
 				{
-					da.da_upate();					
+					da.iterate_2_solution();
+					/*curr_pe = da.get_pe();
+					curr_pe.to_csv("cncnc.csv");*/
 				}
-				/*curr_pe = da.get_pe();
-				curr_pe.to_csv("cncnc.csv");*/
-			}	
+				else // use da
+				{
+					if (pest_scenario.get_control_info().noptmax > 0) // 
+					{
+						da.da_upate();
+					}
+					/*curr_pe = da.get_pe();
+					curr_pe.to_csv("cncnc.csv");*/
+				}
+			}
 			//replace all the pars used in this cycle in the parent parameter ensemble
 			cycle_curr_pe.transform_ip(curr_pe.get_trans_status());
 			curr_pe.replace_col_vals(cycle_curr_pe.get_var_names(), *cycle_curr_pe.get_eigen_ptr());
