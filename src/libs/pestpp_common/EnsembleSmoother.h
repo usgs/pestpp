@@ -68,6 +68,7 @@ private:
 
 class IterEnsembleSmoother
 {
+	
 public:
 	IterEnsembleSmoother(Pest& _pest_scenario, FileManager& _file_manager,
 		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
@@ -78,6 +79,7 @@ public:
 	void finalize();
 	void throw_ies_error(string message);
 	bool should_terminate();
+	
 
 private:
 	int  verbose_level;
@@ -93,7 +95,7 @@ private:
 	Covariance parcov, obscov;
 	double reg_factor;
 
-	string base_name = "BASE"; //this is also defined in Ensemble
+	
 
 	bool use_localizer;
 	Localizer localizer;

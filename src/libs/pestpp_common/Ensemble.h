@@ -16,6 +16,7 @@
 #include "PerformanceLog.h"
 
 
+const string BASE_REAL_NAME = "BASE";
 
 class Ensemble
 {
@@ -58,7 +59,9 @@ public:
 	Eigen::MatrixXd get_eigen(vector<string> row_names, vector<string> col_names, bool update_vmap=true);
 	const Eigen::MatrixXd get_eigen() const { return reals; }
 	const Eigen::MatrixXd* get_eigen_ptr() const { return &reals; }
+
 	void set_eigen(Eigen::MatrixXd _reals);
+
 
 	Eigen::MatrixXd get_eigen_anomalies(string on_real="");
 	Eigen::MatrixXd get_eigen_anomalies(const vector<string> &_real_names, const vector<string> &_var_names, string on_real="");
@@ -106,7 +109,6 @@ protected:
 	//ObjectiveFunc *obj_func_ptr;
 	//OutputFileWriter &output_file_writer;
 	//PerformanceLog *performance_log;
-	string base_name = "BASE";
 	Eigen::MatrixXd reals;
 	vector<string> var_names;
 	vector<string> real_names;	
@@ -159,6 +161,7 @@ public:
 	void draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
 	Covariance get_diagonal_cov_matrix();
 	void to_binary(string filename);
+
 
 private:
 	ParamTransformSeq par_transform;

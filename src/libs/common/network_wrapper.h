@@ -29,6 +29,7 @@
 #include <string>
 
 std::string w_init();
+std::string w_get_hostname();
 int w_close(int sockfd);
 void w_cleanup();
 std::vector<std::string> w_getnameinfo_vec(int sockfd, int flags=0);

@@ -146,7 +146,7 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 	FileManager fm("panther_agent");
 	OutputFileWriter of(fm, pest_scenario);
 	of.scenario_report(frec);
-	pest_scenario.clear_ext_files();
+	//pest_scenario.clear_ext_files();
 }
 
 pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
@@ -786,8 +786,10 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 								childPest.get_insfile_vec(), childPest.get_outfile_vec(), childPest.get_comline_vec());
 							obs = childPest.get_ctl_observations();
 							stringstream ss;
-							ss << "Updated components for DA_CYCLE " << da_cycle << " as follows: " << endl;
+							ss << "Updated interface components for DA_CYCLE " << da_cycle << " as follows: " << endl;
+							report(ss.str(), true);
 							int i = 0;
+							ss.str("");
 							ss << "parameter names:" << endl;
 							for (int i = 0; i < par_name_vec.size(); i++)
 							{
@@ -796,7 +798,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 									ss << endl;
 							}
 							frec << ss.str() << endl;
-							cout << ss.str() << endl;
+							//cout << ss.str() << endl;
+							
+							cout << par_name_vec.size() << " parameters in current cycle, see rec file for listing" << endl;
 							ss.str("");
 							ss << endl << "observation names:" << endl;
 							for (int i = 0; i < obs_name_vec.size(); i++)
@@ -806,7 +810,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 									ss << endl;
 							}
 							frec << ss.str() << endl;
-							cout << ss.str() << endl;
+							//cout << ss.str() << endl;
+							cout << obs_name_vec.size() << " observations in current cycle, see rec file for listing" << endl;
+
 							ss.str("");
 							ss << endl << "tpl:in file names:" << endl;
 							vector<string> tpl_vec = childPest.get_tplfile_vec();
@@ -818,7 +824,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 									ss << endl;
 							}
 							frec << ss.str() << endl;
-							cout << ss.str() << endl;
+							//cout << ss.str() << endl;
+							cout << tpl_vec.size() << " template files in current cycle, see rec file for listing" << endl;
+
 							ss.str("");
 							ss << endl << "ins:out file names:" << endl;
 							vector<string> ins_vec = childPest.get_insfile_vec();
@@ -830,7 +838,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 									ss << endl;
 							}
 							frec << ss.str() << endl << endl;
-							cout << ss.str() << endl << endl;
+							//cout << ss.str() << endl << endl;
+							cout << ins_vec.size() << " instruction files in current cycle, see rec file for listing" << endl;
+
 							current_da_cycle = da_cycle;
 						}
 						catch (exception& e)

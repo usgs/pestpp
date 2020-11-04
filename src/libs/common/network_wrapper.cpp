@@ -27,6 +27,35 @@
 
 using namespace std;
 
+string w_get_hostname()
+{
+	char* temp;
+	string hostname("");
+#ifdef OS_WIN
+	temp = getenv("COMPUTERNAME");
+	hostname = temp;
+	temp = 0;
+
+#else
+	temp = getenv("HOSTNAME");
+	if (temp != 0) {
+		hostname = temp;
+		temp = 0;
+}
+	else {
+		temp = new char[512];
+		if (gethostname(temp, 512) == 0) { // success = 0, failure = -1
+			hostname = temp;
+		}
+		delete[]temp;
+		temp = 0;
+	}
+
+#endif
+	return hostname;
+
+}
+
 string w_init()
 {
 	stringstream ss;
