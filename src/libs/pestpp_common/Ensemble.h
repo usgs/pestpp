@@ -59,7 +59,9 @@ public:
 	Eigen::MatrixXd get_eigen(vector<string> row_names, vector<string> col_names, bool update_vmap=true);
 	const Eigen::MatrixXd get_eigen() const { return reals; }
 	const Eigen::MatrixXd* get_eigen_ptr() const { return &reals; }
+
 	void set_eigen(Eigen::MatrixXd _reals);
+
 
 	Eigen::MatrixXd get_eigen_anomalies(string on_real="");
 	Eigen::MatrixXd get_eigen_anomalies(const vector<string> &_real_names, const vector<string> &_var_names, string on_real="");

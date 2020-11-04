@@ -17,12 +17,13 @@
 
 L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 	ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
-	Covariance *_parcov, bool should_prep_csv)
+	Covariance *_parcov, bool should_prep_csv, string _tag)
 {
 	pest_scenario = _pest_scenario;
 	file_manager = _file_manager;
 	oe_base = _oe_base;
 	pe_base = _pe_base;
+	tag = _tag;
 	
 	//check for inequality constraints
 	//for (auto &og : pest_scenario.get_ctl_ordered_obs_group_names())
@@ -59,11 +60,11 @@ L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 	preal_names = pe_base->get_real_names();
 	if (should_prep_csv)
 	{
-		prepare_csv(file_manager->open_ofile_ext("phi.actual.csv"), oreal_names);
-		prepare_csv(file_manager->open_ofile_ext("phi.meas.csv"), oreal_names);
-		prepare_csv(file_manager->open_ofile_ext("phi.composite.csv"), oreal_names);
-		prepare_csv(file_manager->open_ofile_ext("phi.regul.csv"), preal_names);
-		prepare_group_csv(file_manager->open_ofile_ext("phi.group.csv"));
+		prepare_csv(file_manager->open_ofile_ext(tag+"phi.actual.csv"), oreal_names);
+		prepare_csv(file_manager->open_ofile_ext(tag+"phi.meas.csv"), oreal_names);
+		prepare_csv(file_manager->open_ofile_ext(tag+"phi.composite.csv"), oreal_names);
+		prepare_csv(file_manager->open_ofile_ext(tag+"phi.regul.csv"), preal_names);
+		prepare_group_csv(file_manager->open_ofile_ext(tag+"phi.group.csv"));
 	}
 
 }
@@ -564,20 +565,20 @@ void L2PhiHandler::report(bool echo)
 
 void L2PhiHandler::write(int iter_num, int total_runs, bool write_group)
 {
-	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.actual.csv"), phiType::ACTUAL,oreal_names);
-	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.meas.csv"), phiType::MEAS, oreal_names);
+	write_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.actual.csv"), phiType::ACTUAL,oreal_names);
+	write_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.meas.csv"), phiType::MEAS, oreal_names);
 	if (pest_scenario->get_pestpp_options().get_ies_reg_factor() != 0.0)
 	{
-		write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.regul.csv"), phiType::REGUL, preal_names);	
+		write_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.regul.csv"), phiType::REGUL, preal_names);	
 	}
-	write_csv(iter_num, total_runs, file_manager->get_ofstream("phi.composite.csv"), phiType::COMPOSITE, oreal_names);
+	write_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.composite.csv"), phiType::COMPOSITE, oreal_names);
 	if (write_group)
-		write_group_csv(iter_num, total_runs, file_manager->get_ofstream("phi.group.csv"));
+		write_group_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.group.csv"));
 }
 
 void L2PhiHandler::write_group(int iter_num, int total_runs, vector<double> extra)
 {
-	write_group_csv(iter_num, total_runs, file_manager->get_ofstream("phi.group.csv"),extra);
+	write_group_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.group.csv"),extra);
 }
 
 void L2PhiHandler::write_csv(int iter_num, int total_runs, ofstream &csv, phiType pt, vector<string> &names)

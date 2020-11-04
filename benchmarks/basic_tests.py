@@ -752,7 +752,9 @@ def tplins1_test():
     pst = pyemu.Pst(os.path.join(t_d, "pest.pst"))
     dum_obs = ['h01_03', 'h01_07']
     pst.observation_data.drop(index=dum_obs, inplace=True)
-    pst.instruction_files = ['out1dum.dat.ins']
+    pst.model_output_data = pd.DataFrame({"pest_file":"out1dum.dat.ins",
+                                          "model_file":'out1.dat'},index=["out1dum.dat.ins"])
+    #pst.instruction_files = ['out1dum.dat.ins']
     pst.write(os.path.join(t_d, "pest_dum.pst"))
     pyemu.os_utils.run("{0} pest_dum.pst".format(exe_path.replace("-ies", "-glm")), cwd=t_d)
     obf_df = pd.read_csv(os.path.join(t_d, "out1.dat.obf"), delim_whitespace=True, header=None,
@@ -1003,6 +1005,10 @@ def da_prep_4_mf6_freyberg_seq():
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
     shutil.copytree(os.path.join("mf6_freyberg","template"),t_d)
+    for f in os.listdir(t_d):
+        for tag in ["ies","opt","glm"]:
+            if tag in f.lower():
+                os.remove(os.path.join(t_d,f))
 
     #first modify the tdis
     with open(os.path.join(t_d,"freyberg6.tdis"),'w') as f:
@@ -1129,9 +1135,9 @@ def da_prep_4_mf6_freyberg_seq():
             for i in range(arr.shape[0]):
                 f.write("l1 ")
                 for j in range(arr.shape[1]):
-                    if np.abs(arr[i,j]) > 1.0e10:
+                    if np.abs(arr[i,j]) > 100 or np.abs(in_arr[i,j]) > 100:
                         f.write(" !dum! ")
-                        ft.write(" -1.0e+30 ")
+                        ft.write(" 40 ")
                     else:
                         oname = "head_{0:02d}_{1:03d}_{2:03d}".format(k,i,j)
                         f.write(" !{0}! ".format(oname))
@@ -1228,17 +1234,25 @@ def da_prep_4_mf6_freyberg_seq():
         pst.parameter_data.loc[p,"pargp"] = "head_state"
         pst.parameter_data.loc[p,"partrans"] = "none"
 
-
-
     pst.control_data.noptmax = 2
     pst.model_command = "python forward_run.py"
     pst.pestpp_options.pop("ies_par_en")
     pst.parameter_data.loc["perlen","partrans"] = "fixed"
+    pst.pestpp_options["ies_num_reals"] = 5
+    pst.pestpp_options["da_num_reals"] = 5
     pst.write(os.path.join(t_d,"freyberg6_run_da1.pst"),version=2)
+    return pst
 
+def da_mf6_freyberg_test_1():
+    pst = da_prep_4_mf6_freyberg_seq()
+    test_d = "mf6_freyberg"
+    t_d = os.path.join(test_d,"template_seq")
+    print(exe_path.replace("ies","da"))
 
-
-
+    #pyemu.os_utils.run("{0} freyberg6_run_da1.pst".format(exe_path.replace("ies","da")),cwd=t_d)
+    pyemu.os_utils.start_workers(t_d,exe_path.replace("ies","da"),"freyberg6_run_da1.pst",
+                                 num_workers=5,worker_root=test_d,port=port,
+                                 master_dir=os.path.join(test_d,"master_da_1"),verbose=True)
 
 if __name__ == "__main__":
     
@@ -1260,7 +1274,8 @@ if __name__ == "__main__":
     # parallel_consist_test()
     # ext_stdcol_test()
     #da_prep_4_freyberg_batch()
-    da_prep_4_mf6_freyberg_seq()
+    #da_prep_4_mf6_freyberg_seq()
+    da_mf6_freyberg_test_1()
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
     #mf6_v5_opt_stack_test()

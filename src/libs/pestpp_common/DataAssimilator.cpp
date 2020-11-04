@@ -1638,7 +1638,9 @@ void DataAssimilator::da_initialize(int _icycle)
 				  // 
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
-		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
+		ss.str("");
+		ss << icycle << ".";
+		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov,true, ss.str());
 		if (ph.get_lt_obs_names().size() > 0)
 		{
 			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
@@ -1827,30 +1829,32 @@ void DataAssimilator::da_initialize(int _icycle)
 	else
 		num_reals = pest_scenario.get_pestpp_options().get_da_num_reals();
 
-	if (icycle == 0)
-	{
+	//if (icycle == 0)
+	//{
 		// Get Par realizations either from external file or by drawing internally
 		//dont draw the pe here because we are setting it 
 		//pe_drawn = initialize_pe(parcov);
 		pe_drawn = true;
 
-		if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
-		{
-			message(1, "forming inverse sqrt of prior parameter covariance matrix");
+		
+	//}
 
-			if (parcov.isdiagonal())
-				parcov_inv_sqrt = parcov.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
-			else
-			{
-				message(1, "first extracting diagonal from prior parameter covariance matrix");
-				Covariance parcov_diag;
-				parcov_diag.from_diagonal(parcov);
-				parcov_inv_sqrt = parcov_diag.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
-			}
+	if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
+	{
+		message(1, "forming inverse sqrt of prior parameter covariance matrix");
+
+		if (parcov.isdiagonal())
+			parcov_inv_sqrt = parcov.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
+		else
+		{
+			message(1, "first extracting diagonal from prior parameter covariance matrix");
+			Covariance parcov_diag;
+			parcov_diag.from_diagonal(parcov);
+			parcov_inv_sqrt = parcov_diag.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
 		}
-		else {
-			message(1, "not using prior parameter covariance matrix scaling");
-		}
+	}
+	else {
+		message(1, "not using prior parameter covariance matrix scaling");
 	}
 
 	oe_drawn = initialize_oe(obscov);
@@ -2199,7 +2203,9 @@ void DataAssimilator::da_initialize(int _icycle)
 
 	performance_log->log_event("calc pre-drop phi");
 	//initialize the phi handler
-	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
+	ss.str("");
+	ss << icycle << ".";
+	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, true, ss.str());
 
 	if (ph.get_lt_obs_names().size() > 0) // todo: (Ayman) how to handle those obs in DA? 
 	{
@@ -2639,7 +2645,6 @@ void DataAssimilator::iterate_2_solution()
 
 		if (should_terminate())
 			break;
-		
 	}
 }
 void DataAssimilator::da_upate()

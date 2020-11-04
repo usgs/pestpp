@@ -70,6 +70,7 @@ void Ensemble::check_for_dups()
 void Ensemble::reserve(vector<string> _real_names, vector<string> _var_names)
 {
 	reals.resize(_real_names.size(), _var_names.size());
+	reals.setZero();
 	var_names = _var_names;
 	real_names = _real_names;
 	org_real_names = real_names;
