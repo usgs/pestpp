@@ -1660,7 +1660,7 @@ void DataAssimilator::da_initialize(int _icycle)
 		output_file_writer.write_rei(file_manager.open_ofile_ext("base.rei"), 0,
 			pest_scenario.get_ctl_observations(), obs, obj_func, pars);
 
-		// for models y(t+1) = g(x, y(t)), extract y(t+1) and as initial state for next time cycle
+		// for models y(t+1) = g(x, y(t)), extract y(t+1) and use it as initial state for next time cycle
 		dyn_states = get_dynamic_states();
 		if (dyn_states.size() != 0)
 		{
@@ -1669,7 +1669,6 @@ void DataAssimilator::da_initialize(int _icycle)
 		//add_dynamic_state_to_pe();
 		vector<string> real_names = _oe.get_real_names();
 		Eigen::MatrixXd obs_i;
-
 		if (dyn_states_names.size() > 0) {
 			Eigen::MatrixXd mat = _oe.get_eigen(real_names, dyn_states_names);
 			obs_i = mat.replicate(pe.shape().first, 1);

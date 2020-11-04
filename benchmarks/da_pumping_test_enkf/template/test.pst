@@ -1,7 +1,7 @@
 pcf version=2
 * control data keyword
 pestmode                                 estimation
-noptmax                                 10
+noptmax                                 0
 svdmode                                 1
 maxsing                          10000000
 eigthresh                           1e-5
