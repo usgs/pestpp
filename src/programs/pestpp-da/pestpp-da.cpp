@@ -275,7 +275,10 @@ int main(int argc, char* argv[])
 		da.initialize_parcov();
 		da.initialize_pe(*da.get_parcov_ptr());
 		ParameterEnsemble curr_pe = da.get_pe();
-		ObservationEnsemble curr_oe(&pest_scenario, &da.get_rand_gen());
+		cout << "...preparing parent observation ensemble for all observations across all cycles" << endl;
+		fout_rec << "...preparing parent observation ensemble for all observations across all cycles" << endl;
+		mt19937 rand_gen = da.get_rand_gen();
+		ObservationEnsemble curr_oe(&pest_scenario, &rand_gen);
 		curr_oe.reserve(curr_pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
 
 		try
