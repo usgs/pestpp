@@ -38,6 +38,10 @@ DataAssimilator::DataAssimilator(Pest& _pest_scenario, FileManager& _file_manage
 	weights.set_pest_scenario(&pest_scenario);
 	localizer.set_pest_scenario(&pest_scenario);
 	icycle = 0;
+	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
+	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
+
 	
 }
 
@@ -1602,9 +1606,11 @@ void DataAssimilator::da_initialize(int _icycle)
 	// da type that is lower case is ok, I should move this somewhere else
 	transform(da_type.begin(), da_type.end(), da_type.begin(), ::toupper);
 
-	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
-	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
-	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
+	if (true) {//check again: although intialized when da objected is declared, initialization removed when entering the cycles loop.
+		pp_args = pest_scenario.get_pestpp_options().get_passed_args();
+		act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+		act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
+	}
 
 	// ----------------------------------------------------------
 	// run the model one time using the initial parameters values. 
@@ -1682,7 +1688,7 @@ void DataAssimilator::da_initialize(int _icycle)
 		output_file_writer.write_rei(file_manager.open_ofile_ext("base.rei"), 0,
 			pest_scenario.get_ctl_observations(), obs, obj_func, pars);
 
-		// for models y(t+1) = g(x, y(t)), extract y(t+1) and as initial state for next time cycle
+		// for models y(t+1) = g(x, y(t)), extract y(t+1) and use it as initial state for next time cycle
 		dyn_states = get_dynamic_states();
 		if (dyn_states.size() != 0)
 		{
@@ -1691,7 +1697,6 @@ void DataAssimilator::da_initialize(int _icycle)
 		//add_dynamic_state_to_pe();
 		vector<string> real_names = _oe.get_real_names();
 		Eigen::MatrixXd obs_i;
-
 		if (dyn_states_names.size() > 0) {
 			Eigen::MatrixXd mat = _oe.get_eigen(real_names, dyn_states_names);
 			obs_i = mat.replicate(pe.shape().first, 1);

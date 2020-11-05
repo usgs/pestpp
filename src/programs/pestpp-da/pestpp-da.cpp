@@ -272,6 +272,7 @@ int main(int argc, char* argv[])
 		cout << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
 		fout_rec << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
+		da.use_ies = pest_scenario.get_pestpp_options_ptr()->get_da_use_ies();
 		da.initialize_parcov();
 		da.initialize_pe(*da.get_parcov_ptr());
 		ParameterEnsemble curr_pe = da.get_pe();
@@ -315,6 +316,7 @@ int main(int argc, char* argv[])
 			fout_rec << " =======================================" << endl;
 
 			performance_log.log_event("instantiating child pest object");
+			
 			Pest childPest;
 			childPest = pest_scenario.get_child_pest(*icycle);
 			//vector <string> xxxx=childPest.get_ctl_ordered_par_names();
