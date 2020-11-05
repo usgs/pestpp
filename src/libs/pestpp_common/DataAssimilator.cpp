@@ -38,6 +38,10 @@ DataAssimilator::DataAssimilator(Pest& _pest_scenario, FileManager& _file_manage
 	weights.set_pest_scenario(&pest_scenario);
 	localizer.set_pest_scenario(&pest_scenario);
 	icycle = 0;
+	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
+	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
+
 	
 }
 
@@ -1602,9 +1606,11 @@ void DataAssimilator::da_initialize(int _icycle)
 	// da type that is lower case is ok, I should move this somewhere else
 	transform(da_type.begin(), da_type.end(), da_type.begin(), ::toupper);
 
-	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
-	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
-	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
+	if (true) {//check again: although intialized when da objected is declared, initialization removed when entering the cycles loop.
+		pp_args = pest_scenario.get_pestpp_options().get_passed_args();
+		act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+		act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
+	}
 
 	// ----------------------------------------------------------
 	// run the model one time using the initial parameters values. 
