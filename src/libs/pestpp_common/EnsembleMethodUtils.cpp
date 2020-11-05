@@ -664,9 +664,17 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
 	double std = calc_std(&_meas);
 	vector<int> idxs;
 	vector<string> names = oe.get_real_names();
-	for (int i=0;i<names.size();i++)
+	for (int i = 0; i < names.size(); i++)
+	{
+		
 		if ((_meas[names[i]] > bad_phi) || (_meas[names[i]] > mean + (std * bad_phi_sigma)))
-			idxs.push_back(i);
+		{
+			if (names[i] == BASE_REAL_NAME)
+				cout << "...not dropping 'base' real even though phi is 'bad'" << endl;
+			else
+				idxs.push_back(i);
+		}	
+	}
 	return idxs;
 }
 
