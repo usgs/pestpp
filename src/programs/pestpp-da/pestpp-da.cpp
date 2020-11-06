@@ -283,7 +283,8 @@ int main(int argc, char* argv[])
 			Parameters pars = pest_scenario.get_ctl_parameters();
 			ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
 			pts.ctl2numeric_ip(pars);
-			curr_pe.update_real_ip(BASE_REAL_NAME, pars.get_data_eigen_vec(pest_scenario.get_ctl_ordered_adj_par_names()));
+			Eigen::VectorXd v = pars.get_data_eigen_vec(pest_scenario.get_ctl_ordered_adj_par_names());
+			curr_pe.update_real_ip(BASE_REAL_NAME,v);
 		}
 
 		

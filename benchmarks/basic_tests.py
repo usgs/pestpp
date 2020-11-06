@@ -1357,10 +1357,11 @@ def da_mf6_freyberg_test_2():
     pst.control_data.noptmax = 0
     pst.write(os.path.join(t_d, "freyberg6_run_da2.pst"), version=2)
     pyemu.os_utils.run("{0} freyberg6_run_da2.pst".format(exe_path.replace("ies","da")),cwd=t_d)
-
-    #pyemu.os_utils.start_workers(t_d, exe_path.replace("ies", "da"), "freyberg6_run_da1.pst",
-    #                             num_workers=5, worker_root=test_d, port=port,
-    #                             master_dir=os.path.join(test_d, "master_da_1"), verbose=True)
+    pst.control_data.noptmax = 2
+    pst.write(os.path.join(t_d, "freyberg6_run_da2.pst"), version=2)
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("ies", "da"), "freyberg6_run_da2.pst",
+                                num_workers=5, worker_root=test_d, port=port,
+                                master_dir=os.path.join(test_d, "master_da_2"), verbose=True)
 
 
 if __name__ == "__main__":
