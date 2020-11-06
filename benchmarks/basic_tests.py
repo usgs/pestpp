@@ -1310,7 +1310,10 @@ def da_prep_4_mf6_freyberg_seq_tbl():
         head_name = "head_{0:02d}_{1:03d}_{2:03d}".format(site_obs.k[0],site_obs.i[0],site_obs.j[0])
         for i,oname in enumerate(site_obs.obsnme):
             obs_heads[oname] = (head_name,i)
-        pst.observation_data.loc[head_name,"weight"] = site_obs.weight[0]
+        # assign max weight in the control file since some have zero weight and
+        # we are covering weights in the weight table
+        #print(og,site_obs.weight.max())
+        pst.observation_data.loc[head_name,"weight"] = site_obs.weight.max()
         pst.observation_data.loc[head_name,"org_obgnme"] = og
         odf_names.append(head_name)
 
@@ -1323,14 +1326,23 @@ def da_prep_4_mf6_freyberg_seq_tbl():
         wdf.loc[icycle, head_name] = obs.loc[tr_name, "weight"]
 
     g_obs = obs.loc[obs.obsnme.str.startswith("gage_1"),:].copy()
-    pst.observation_data.loc["gage_1", "weight"] = g_obs.weight[0]
+    #give these obs the max weight since some have zero weight
+    pst.observation_data.loc["gage_1", "weight"] = g_obs.weight.max()
     g_obs.sort_index(inplace=True)
     for i,name in enumerate(g_obs.obsnme):
         odf.loc[i,"gage_1"] = g_obs.loc[name,"obsval"]
         wdf.loc[i, "gage_1"] = g_obs.loc[name, "weight"]
 
+    # now drop any entries that have zero weight across all cycles
+    print(pst.nnz_obs_names)
+    odf = odf.loc[:,pst.nnz_obs_names]
+    wdf = wdf.loc[:, pst.nnz_obs_names]
+
     odf.T.to_csv(os.path.join(t_d,"obs_cycle_tbl.csv"))
     pst.pestpp_options["da_observation_cycle_table"] = "obs_cycle_tbl.csv"
+    wdf.T.to_csv(os.path.join(t_d, "weight_cycle_tbl.csv"))
+    pst.pestpp_options["da_weight_cycle_table"] = "weight_cycle_tbl.csv"
+
     pst.observation_data.loc[:,"cycle"] = -1
     pst.model_output_data.loc[:,"cycle"] = -1
 
@@ -1372,7 +1384,7 @@ if __name__ == "__main__":
     # ext_stdcol_test()
     #da_prep_4_freyberg_batch()
     #da_prep_4_mf6_freyberg_seq()
-    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-da.exe"),os.path.join("..","bin","pestpp-da.exe"))
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-da.exe"),os.path.join("..","bin","pestpp-da.exe"))
     #da_mf6_freyberg_test_1()
 
     #da_prep_4_mf6_freyberg_seq_tbl()

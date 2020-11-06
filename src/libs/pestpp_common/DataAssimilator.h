@@ -239,4 +239,5 @@ private:
 
 map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ofstream& fout_rec);
 map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl);
+map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl);
 #endif

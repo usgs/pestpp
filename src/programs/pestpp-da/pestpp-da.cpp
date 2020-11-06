@@ -259,14 +259,13 @@ int main(int argc, char* argv[])
 		// process da obs cycle table
 		set<string> obs_in_tbl; //we need this so we can set weights to zero in childpest if a value isnt listed for a given cycle
 		map<int, map<string, double>> obs_cycle_info = process_da_obs_cycle_table(pest_scenario, fout_rec, obs_in_tbl);
-		// loop over assimilation cycles
-
+		//process weights table
+		set<string> weights_in_tbl; 
+		map<int, map<string, double>> weight_cycle_info = process_da_weight_cycle_table(pest_scenario, fout_rec, weights_in_tbl);
 		
 		vector<int> assimilation_cycles;
 		pest_scenario.assign_da_cycles(fout_rec); 
 		assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec);
-
-		//ParameterEnsemble curr_pe;
 
 		//generate a parent ensemble which includes all parameters across all cycles
 		cout << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
@@ -380,8 +379,12 @@ int main(int argc, char* argv[])
 				Observations obs = childPest.get_ctl_observations();
 				ObservationInfo* oi_ptr = childPest.get_observation_info_ptr();
 				map<string, double> cycle_map = obs_cycle_info[*icycle];
+				map<string, double> weight_cycle_map;
+				if (weight_cycle_info.find(*icycle) != weight_cycle_info.end())
+					weight_cycle_map = weight_cycle_info[*icycle];
 				for (auto tbl_obs_name : obs_in_tbl)
 				{
+					//if this obs is not in this cycle, give it a zero weight
 					if (cycle_map.find(tbl_obs_name) == cycle_map.end())
 					{
 						oi_ptr->set_weight(tbl_obs_name,0.0);
@@ -389,9 +392,19 @@ int main(int argc, char* argv[])
 					else
 					{
 						obs.update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);
+						//check if this obs is in this cycle's weight info
+						if (weight_cycle_map.find(tbl_obs_name) != weight_cycle_map.end())
+						{
+							oi_ptr->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+						}
 					}
 				}
+
+				
+
 			}
+
+
 
 			Parameters par1 = childPest.get_ctl_parameters();
 			base_trans_seq.ctl2numeric_ip(par1);

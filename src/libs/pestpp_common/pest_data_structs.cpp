@@ -1008,6 +1008,11 @@ bool PestppOptions::assign_DA_value_by_key(const string& key, const string& valu
 		da_obs_cycle_table = org_value;
 		return true;
 	}
+	else if (key == "DA_WEIGHT_CYCLE_TABLE")
+	{
+		da_weight_cycle_table = org_value;
+		return true;
+	}
 	else if (key == "DA_NUM_REALS")
 	{
 		convert_ip(value, da_num_reals);
