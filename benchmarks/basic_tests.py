@@ -1269,7 +1269,7 @@ def da_prep_4_mf6_freyberg_seq_tbl():
     with open(sfr_ins_file, 'w') as f:
         f.write("pif ~\n")
         f.write("l1\n")
-        f.write("l1 ~, ~ !headwater!  ~, ~ !tailwater!  ~, ~ !gage_1!\n")
+        f.write("l1 ~,~ !headwater!  ~,~ !tailwater!  ~,~ !gage_1!\n")
 
     # and lst budget
     lines = open(os.path.join(t_d, "freyberg6_0.lst.ins"), 'r').readlines()

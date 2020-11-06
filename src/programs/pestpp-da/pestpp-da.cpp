@@ -270,11 +270,23 @@ int main(int argc, char* argv[])
 		//generate a parent ensemble which includes all parameters across all cycles
 		cout << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
 		fout_rec << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
+	
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 		da.use_ies = pest_scenario.get_pestpp_options_ptr()->get_da_use_ies();
+		ParameterEnsemble curr_pe;
 		da.initialize_parcov();
 		da.initialize_pe(*da.get_parcov_ptr());
-		ParameterEnsemble curr_pe = da.get_pe();
+		curr_pe = da.get_pe();
+		if (pest_scenario.get_control_info().noptmax == 0)
+		{
+			curr_pe.reserve(vector<string>{BASE_REAL_NAME}, pest_scenario.get_ctl_ordered_adj_par_names());
+			Parameters pars = pest_scenario.get_ctl_parameters();
+			ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+			pts.ctl2numeric_ip(pars);
+			curr_pe.update_real_ip(BASE_REAL_NAME, pars.get_data_eigen_vec(pest_scenario.get_ctl_ordered_adj_par_names()));
+		}
+
+		
 		cout << "...preparing parent observation ensemble for all observations across all cycles" << endl;
 		fout_rec << "...preparing parent observation ensemble for all observations across all cycles" << endl;
 		mt19937 rand_gen = da.get_rand_gen();

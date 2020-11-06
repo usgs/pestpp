@@ -1022,7 +1022,7 @@ Eigen::VectorXd Ensemble::get_real_vector(const string &real_name)
 	return get_real_vector(idx);
 }
 
-void Ensemble::update_real_ip(string & rname, Eigen::VectorXd & real)
+void Ensemble::update_real_ip(const string & rname, Eigen::VectorXd & real)
 {
 	vector<string>::iterator idx = find(real_names.begin(), real_names.end(), rname);
 	if (idx == real_names.end())
