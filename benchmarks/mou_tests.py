@@ -259,7 +259,7 @@ def test_zdt1():
     shutil.copy2(os.path.join(master_d,obs_pop_file),os.path.join(test_d,"restart_obs.csv"))
     pst.pestpp_options["mou_dv_population_file"] = "restart_dv.csv"
     pst.pestpp_options["mou_obs_population_restart_file"] = "restart_obs.csv"
-    pst.control_data.noptmax = 3
+    pst.control_data.noptmax = 30
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
                                       num_workers=15, master_dir=master_d,worker_root=test_root,
@@ -275,6 +275,35 @@ def test_zdt1():
     assert obs_df.shape[0] == pst.pestpp_options["mou_population_size"]
     assert obs_df.shape[1] == pst.nobs
     assert dv_df.index.to_list() == obs_df.index.to_list()
+
+
+def plot_zdt1_results():
+    master_d = os.path.join("mou_tests","zdt1_master")
+    assert os.path.exists(master_d)
+
+    odf_files = [f for f in os.listdir(master_d) if f.endswith("obs_pop.csv") and "archive" not in f]
+    odfs = [pd.read_csv(os.path.join(master_d,f),index_col=0) for f in odf_files]
+    import matplotlib.pyplot as plt
+
+    cols = odfs[0].columns
+    mins,maxs = {},{}
+    for oname in cols:
+        mins[oname] = 1.0e+30
+        maxs[oname] = -1.0e+30
+        for df in odfs:
+            mins[oname] = min(mins[oname],df.loc[:,oname].min())
+            maxs[oname] = max(maxs[oname], df.loc[:, oname].max())
+    print(mins,maxs)
+
+    colors = ["0.5",'m','b','g','y','o','r']
+    fig,ax = plt.subplots(1,1,figsize=(10,10))
+    for i,df in enumerate(odfs):
+        ax.scatter(df.loc[:,cols[0]],df.loc[:,cols[1]],marker=".",c=colors[i])
+
+    #ax.set_xlim(mins[cols[0]],maxs[cols[0]])
+    #ax.set_xlim(mins[cols[1]], maxs[cols[1]])
+
+    plt.show()
 
 
 def test_zdt1_chance():
@@ -358,7 +387,8 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt6",10)
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
     #setup_zdt_problem("zdt1",30, additive_chance=True)
-    #test_zdt1()
+    test_zdt1()
+    plot_zdt1_results()
     #test_zdt1_chance()
     #setup_zdt_problem("zdt1",30, additive_chance=True)
-    test_sorting_fake_problem()
+    #test_sorting_fake_problem()
