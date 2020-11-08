@@ -259,23 +259,41 @@ int main(int argc, char* argv[])
 		// process da obs cycle table
 		set<string> obs_in_tbl; //we need this so we can set weights to zero in childpest if a value isnt listed for a given cycle
 		map<int, map<string, double>> obs_cycle_info = process_da_obs_cycle_table(pest_scenario, fout_rec, obs_in_tbl);
-		// loop over assimilation cycles
-
+		//process weights table
+		set<string> weights_in_tbl; 
+		map<int, map<string, double>> weight_cycle_info = process_da_weight_cycle_table(pest_scenario, fout_rec, weights_in_tbl);
 		
 		vector<int> assimilation_cycles;
 		pest_scenario.assign_da_cycles(fout_rec); 
 		assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec);
 
-		//ParameterEnsemble curr_pe;
-
 		//generate a parent ensemble which includes all parameters across all cycles
 		cout << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
 		fout_rec << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
+	
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 		da.use_ies = pest_scenario.get_pestpp_options_ptr()->get_da_use_ies();
+		ParameterEnsemble curr_pe;
 		da.initialize_parcov();
 		da.initialize_pe(*da.get_parcov_ptr());
-		ParameterEnsemble curr_pe = da.get_pe();
+		curr_pe = da.get_pe();
+		if (pest_scenario.get_control_info().noptmax == 0)
+		{
+			curr_pe.reserve(vector<string>{BASE_REAL_NAME}, pest_scenario.get_ctl_ordered_adj_par_names());
+			Parameters pars = pest_scenario.get_ctl_parameters();
+			ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+			pts.ctl2numeric_ip(pars);
+			Eigen::VectorXd v = pars.get_data_eigen_vec(pest_scenario.get_ctl_ordered_adj_par_names());
+			curr_pe.update_real_ip(BASE_REAL_NAME,v);
+		}
+
+		
+		cout << "...preparing parent observation ensemble for all observations across all cycles" << endl;
+		fout_rec << "...preparing parent observation ensemble for all observations across all cycles" << endl;
+		mt19937 rand_gen = da.get_rand_gen();
+		ObservationEnsemble curr_oe(&pest_scenario, &rand_gen);
+		curr_oe.reserve(curr_pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
+
 		try
 		{
 			curr_pe.check_for_dups();
@@ -287,11 +305,16 @@ int main(int argc, char* argv[])
 		}
 		//todo: add the base realization here so that it is present thru out the cycles below
 
-		cout << "...parent ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" <<  endl;
-		fout_rec << "...parent ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
-		curr_pe.to_csv(file_manager.get_base_filename() + ".parent_da_pe.csv");
+		cout << "...parent parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" <<  endl;
+		fout_rec << "...parent parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
+		curr_pe.to_csv(file_manager.get_base_filename() + ".parent.prior.pe.csv");
+		cout << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
+		fout_rec << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
+
+
 
 		// loop over assimilation cycles
+		stringstream ss;
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 		{
 			cout << endl;
@@ -369,8 +392,12 @@ int main(int argc, char* argv[])
 				Observations obs = childPest.get_ctl_observations();
 				ObservationInfo* oi_ptr = childPest.get_observation_info_ptr();
 				map<string, double> cycle_map = obs_cycle_info[*icycle];
+				map<string, double> weight_cycle_map;
+				if (weight_cycle_info.find(*icycle) != weight_cycle_info.end())
+					weight_cycle_map = weight_cycle_info[*icycle];
 				for (auto tbl_obs_name : obs_in_tbl)
 				{
+					//if this obs is not in this cycle, give it a zero weight
 					if (cycle_map.find(tbl_obs_name) == cycle_map.end())
 					{
 						oi_ptr->set_weight(tbl_obs_name,0.0);
@@ -378,9 +405,19 @@ int main(int argc, char* argv[])
 					else
 					{
 						obs.update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);
+						//check if this obs is in this cycle's weight info
+						if (weight_cycle_map.find(tbl_obs_name) != weight_cycle_map.end())
+						{
+							oi_ptr->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+						}
 					}
 				}
+
+				
+
 			}
+
+
 
 			Parameters par1 = childPest.get_ctl_parameters();
 			base_trans_seq.ctl2numeric_ip(par1);
@@ -451,9 +488,67 @@ int main(int argc, char* argv[])
 			}
 			//replace all the pars used in this cycle in the parent parameter ensemble
 			performance_log.log_event("updating parent ensemble with cycle ensemble columns");
+			
+			//if we lost some realizations...
+			if (curr_pe.shape().first > cycle_curr_pe.shape().first)
+			{
+				vector<string> missing;
+				vector<string> t = cycle_curr_pe.get_real_names();
+				set<string> ccp_reals(t.begin(), t.end());
+				for (auto r : curr_pe.get_real_names())
+					if (ccp_reals.find(r) == ccp_reals.end())
+						missing.push_back(r);
+				fout_rec << "...dropping the following " << missing.size() << " realizations from parent parameter ensemble:" << endl;
+				cout << "...dropping " << missing.size() << " realizations from parent parameter ensemble, see rec file for listing" << endl;
+				int i = 0;
+				for (auto m : missing)
+				{
+					fout_rec << m << ",";
+					if (i > 10)
+					{
+						fout_rec << endl;
+						i == 0;
+					}
+				}
+				curr_pe.drop_rows(missing);
+				curr_pe.reorder(t, vector<string>());
+			}
+
 			cycle_curr_pe.transform_ip(curr_pe.get_trans_status());
 			curr_pe.replace_col_vals(cycle_curr_pe.get_var_names(), *cycle_curr_pe.get_eigen_ptr());
 			curr_pe.to_csv("cncnc.csv");
+
+			ObservationEnsemble cycle_curr_oe = da.get_oe();
+			//if we lost some realizations...
+			if (curr_oe.shape().first > cycle_curr_oe.shape().first)
+			{
+				vector<string> missing;
+				vector<string> t = cycle_curr_oe.get_real_names();
+				set<string> ccp_reals(t.begin(), t.end());
+				for (auto r : curr_oe.get_real_names())
+					if (ccp_reals.find(r) == ccp_reals.end())
+						missing.push_back(r);
+				fout_rec << "...dropping the following " << missing.size() << " realizations from parent observation ensemble:" << endl;
+				cout << "...dropping " << missing.size() << " realizations from parent observation ensemble, see rec file for listing" << endl;
+				int i = 0;
+				for (auto m : missing)
+				{
+					fout_rec << m << ",";
+					if (i > 10)
+					{
+						fout_rec << endl;
+						i == 0;
+					}
+				}
+				curr_oe.drop_rows(missing);
+				curr_oe.reorder(t, vector<string>());
+			}
+
+			curr_oe.replace_col_vals(cycle_curr_oe.get_var_names(), *cycle_curr_oe.get_eigen_ptr());
+			ss.str("");
+			ss << "." << *icycle << ".parent.oe.csv";
+			curr_oe.to_csv(file_manager.get_base_filename()+ss.str());
+
 
 		} // end cycle loop
 		fout_rec.close();

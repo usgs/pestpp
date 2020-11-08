@@ -55,7 +55,7 @@ public:
 	void replace_col(string var_name, Eigen::VectorXd & vec);
 	Eigen::VectorXd get_real_vector(int ireal);
 	Eigen::VectorXd get_real_vector(const string &real_name);
-	void update_real_ip(string &rname, Eigen::VectorXd &real);
+	void update_real_ip(const string &rname, Eigen::VectorXd &real);
 	Eigen::MatrixXd get_eigen(vector<string> row_names, vector<string> col_names, bool update_vmap=true);
 	const Eigen::MatrixXd get_eigen() const { return reals; }
 	const Eigen::MatrixXd* get_eigen_ptr() const { return &reals; }

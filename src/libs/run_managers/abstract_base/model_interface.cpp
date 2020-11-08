@@ -329,7 +329,7 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 			catch (const std::exception& e)
 			{
 				//stringstream ss;
-				ss << " thread processing template file '" << tplfile_vec[i] << "' raised an exception: " << e.what() << endl;
+				ss << " thread processing template file raised an exception: " << e.what() << endl;
 				num_exp++;
 				//cout << "Error: " << ss.str();
 				//throw runtime_error(ss.str());
@@ -337,7 +337,7 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 			catch (...)
 			{
 				//stringstream ss;
-				ss << " thread processing template file '" << tplfile_vec[i] << "' raised an exception" << endl;
+				ss << " thread processing template file raised an exception" << endl;
 				num_exp++;
 				//cout << "Error: " << ss.str();
 				//throw runtime_error(ss.str());
@@ -353,7 +353,7 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 			catch (const std::exception& e)
 			{
 				//stringstream ss;
-				ss << " thread processing template file '" << tplfile_vec[i] << "' raised an exception: " << e.what() << endl;
+				ss << " thread processing template file raised an exception: " << e.what() << endl;
 				num_exp++;
 				//cout << "Error: " << ss.str();
 				//throw runtime_error(ss.str());
@@ -361,7 +361,7 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 			catch (...)
 			{
 				//stringstream ss;
-				ss << " thread processing template file '" << tplfile_vec[i] << "' raised an exception" << endl;
+				ss << " thread processing template file raised an exception" << endl;
 				num_exp++;
 				//cout << "Error: " << ss.str();
 				//throw runtime_error(ss.str());
@@ -448,7 +448,7 @@ void ModelInterface::read_output_files(Observations *obs)
 			catch (const std::exception& e)
 			{
 				//stringstream ss;
-				ss << " thread processing instruction file '" << insfile_vec[i] << "' raised an exception: " << e.what() << endl;
+				ss << " thread processing instruction file raised an exception: " << e.what() << endl;
 				//cout << "Error: " << ss.str() << endl;
 				//throw runtime_error(ss.str());
 				num_exp++;
@@ -456,7 +456,7 @@ void ModelInterface::read_output_files(Observations *obs)
 			catch (...)
 			{
 				//stringstream ss;
-				ss << " thread processing instruction file '" << insfile_vec[i] << "' raised an exception" << endl;
+				ss << " thread processing instruction file raised an exception" << endl;
 				//cout << "Error: " << ss.str() << endl;
 				//throw runtime_error(ss.str());
 				num_exp++;
@@ -472,7 +472,7 @@ void ModelInterface::read_output_files(Observations *obs)
 			catch (const std::exception& e)
 			{
 				//stringstream ss;
-				ss << " thread processing instruction file '" << insfile_vec[i] << "' raised an exception: " << e.what() << endl;
+				ss << " thread processing instruction file raised an exception: " << e.what() << endl;
 				//cout << "Error: " << ss.str() << endl;
 				//throw runtime_error(ss.str());
 				num_exp++;
@@ -480,7 +480,7 @@ void ModelInterface::read_output_files(Observations *obs)
 			catch (...)
 			{
 				//stringstream ss;
-				ss << " thread processing instruction file '" << insfile_vec[i] << "' raised an exception" << endl;
+				ss << " thread processing instruction file raised an exception" << endl;
 				//cout << "Error: " << ss.str() << endl;
 				//throw runtime_error(ss.str());
 				num_exp++;

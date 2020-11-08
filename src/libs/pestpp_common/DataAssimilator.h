@@ -99,6 +99,7 @@ public:
 	Covariance* get_parcov_ptr() { return &parcov; }
 	std::mt19937 get_rand_gen() { return rand_gen; }
 	vector<string> get_act_par_names() { return act_par_names; }
+	ObservationEnsemble get_oe() { return oe; }
 
 private:
 	int icycle;
@@ -238,4 +239,5 @@ private:
 
 map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ofstream& fout_rec);
 map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl);
+map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl);
 #endif

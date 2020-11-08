@@ -5740,6 +5740,115 @@ map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, of
 
 }
 
+map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl)
+{
+	//process da par cycle table
+	string filename = pest_scenario.get_pestpp_options().get_da_weight_cycle_table();
+	map<int, map<string, double>> weight_cycle_info;
+	if (filename.size() > 0)
+	{
+		fout_rec << "processing 'DA_WEIGHT_CYCLE_TABLE' file " << filename;
+		pest_utils::ExternalCtlFile cycle_table(fout_rec, filename);
+		cycle_table.read_file();
+		vector<string> col_names = cycle_table.get_col_names();
+		fout_rec << "...using the first column ('" << col_names[0] << "') as observation names" << endl;
+		vector<string> onames = pest_scenario.get_ctl_ordered_obs_names();
+		set<string> obs_names(onames.begin(), onames.end());
+		onames = cycle_table.get_col_string_vector(col_names[0]);
+		vector<string> missing, zeroweight, notneg, tbl_obs_names;
+		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+		for (auto oname : onames)
+		{
+			pest_utils::upper_ip(oname);
+			if (obs_names.find(oname) == obs_names.end())
+			{
+				missing.push_back(oname);
+				continue;
+			}
+			else if (oi->get_observation_rec_ptr(oname)->cycle != -1)
+			{
+				notneg.push_back(oname);
+				continue;
+			}
+			else
+			{
+				tbl_obs_names.push_back(oname);
+			}
+		}
+		if (missing.size() > 0)
+		{
+			fout_rec << "ERROR: The following observations in DA_WEIGHT_CYCLE_TABLE are not the control file:" << endl;
+			for (auto m : missing)
+			{
+				fout_rec << m << endl;
+			}
+			throw runtime_error("DA_WEIGHT_CYCLE_TABLE contains missing observations, see rec file for listing");
+		}
+		
+		if (notneg.size() > 0)
+		{
+			fout_rec << "ERROR: The following OBSERVATIONS in DA_WEIGHT_CYCLE_TABLE do not have cycle=-1:" << endl;
+			for (auto p : notneg)
+			{
+				fout_rec << p << endl;
+			}
+			throw runtime_error("DA_WEIGHT_CYCLE_TABLE contains observations with cycle!=-1, see rec file for listing");
+		}
+		//process the remaining columns - these should be cycle numbers
+		obs_in_tbl.insert(tbl_obs_names.begin(), tbl_obs_names.end());
+		string col_name;
+		vector<string> cycle_vals;
+		int cycle;
+		double val;
+		bool parse_fail = false;
+		for (int i = 1; i < col_names.size(); i++)
+		{
+			col_name = col_names[i];
+
+			try
+			{
+				cycle = stoi(col_name);
+			}
+			catch (...)
+			{
+				fout_rec << "ERROR: could not parse DA_WEIGHT_CYCLE_TABLE column '" << col_name << "' to integer" << endl;
+				throw runtime_error("ERROR parsing DA_WEIGHT_CYCLE_TABLE column " + col_name + " to integer");
+			}
+			if (weight_cycle_info.find(cycle) != weight_cycle_info.end())
+			{
+				throw runtime_error("ERROR: DA_WEIGHT_CYCLE_TABLE cycle column '" + col_name + "' listed more than once");
+			}
+			cycle_vals = cycle_table.get_col_string_vector(col_name);
+			map<string, double> cycle_map;
+			for (int i = 0; i < cycle_vals.size(); i++)
+			{
+				try
+				{
+					val = stod(cycle_vals[i]);
+				}
+				catch (...)
+				{
+					fout_rec << "WARNING: error parsing weight '" << cycle_vals[i] << "' for observation " << tbl_obs_names[i] << " in cycle " << cycle << ", continuing..." << endl;
+					parse_fail = true;
+					continue;
+				}
+				cycle_map[tbl_obs_names[i]] = val;
+			}
+			weight_cycle_info[cycle] = cycle_map;
+		}
+		if (parse_fail)
+		{
+			cout << "WARNING: error parsing at least one cycle-based observation value" << endl;
+			cout << "         from DA_WEIGHT_CYCLE_TABLE, see rec file for listing." << endl;
+		}
+
+
+	}
+	return weight_cycle_info;
+
+
+}
+
 map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ofstream& fout_rec)
 {
 	//process da par cycle table

@@ -1254,6 +1254,116 @@ def da_mf6_freyberg_test_1():
                                  num_workers=5,worker_root=test_d,port=port,
                                  master_dir=os.path.join(test_d,"master_da_1"),verbose=True)
 
+
+def da_prep_4_mf6_freyberg_seq_tbl():
+    test_d = "mf6_freyberg"
+    t_d = os.path.join(test_d,"template_seq")
+    assert os.path.exists(t_d)
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_da1.pst"))
+    pdf = pd.DataFrame({"perlen":31},index=np.arange(25))
+    pdf.T.to_csv(os.path.join(t_d,"par_cycle_tbl.csv"))
+    pst.pestpp_options["da_parameter_cycle_table"] = "par_cycle_tbl.csv"
+
+    # mod sfr_out
+    sfr_ins_file = os.path.join(t_d, "sfr.csv.ins")
+    with open(sfr_ins_file, 'w') as f:
+        f.write("pif ~\n")
+        f.write("l1\n")
+        f.write("l1 ~,~ !headwater!  ~,~ !tailwater!  ~,~ !gage_1!\n")
+
+    # and lst budget
+    lines = open(os.path.join(t_d, "freyberg6_0.lst.ins"), 'r').readlines()
+    lst_ins_file = os.path.join(t_d, "freyberg6.lst.ins")
+    with open(lst_ins_file, 'w') as f:
+        for line in lines:
+            f.write(line.replace("_20151231",""))
+
+    obs = pst.observation_data.copy()
+    tr_obs = obs.loc[obs.obsnme.str.startswith("trgw"),:].copy()
+    tr_obs.loc[tr_obs.obsnme,"datetime"] = pd.to_datetime(tr_obs.obsnme.apply(lambda x: x.split('_')[-1]))
+    tr_obs.loc[tr_obs.obsnme,"k"] = tr_obs.obsnme.apply(lambda x: np.int(x.split('_')[1]))
+    tr_obs.loc[tr_obs.obsnme, "i"] = tr_obs.obsnme.apply(lambda x: np.int(x.split('_')[2]))
+    tr_obs.loc[tr_obs.obsnme, "j"] = tr_obs.obsnme.apply(lambda x: np.int(x.split('_')[3]))
+    tr_obs.loc[tr_obs.obsnme,"obgnme"] = tr_obs.obsnme.apply(lambda x: "_".join(x.split("_")[:-1]))
+
+    head_obs = obs.loc[obs.obsnme.str.startswith("head_"),:].copy()
+    head_obs.loc[head_obs.obsnme, "k"] = head_obs.obsnme.apply(lambda x: np.int(x.split('_')[1]))
+    head_obs.loc[head_obs.obsnme, "i"] = head_obs.obsnme.apply(lambda x: np.int(x.split('_')[2]))
+    head_obs.loc[head_obs.obsnme, "j"] = head_obs.obsnme.apply(lambda x: np.int(x.split('_')[3]))
+
+    #print(pst.nobs)
+    for ins_file in pst.model_output_data.pest_file.copy():
+        if "heads_" in ins_file and ins_file.endswith("dat_out.ins"):
+            continue
+        pst.drop_observations(os.path.join(t_d,ins_file),pst_path=".")
+    for ins_file in [sfr_ins_file,lst_ins_file]:
+        pst.add_observations(ins_file,pst_path=".")
+
+    # work out which heads are obs site
+    obs_heads = {}
+    odf_names = []
+    pst.observation_data.loc[:,"org_obgnme"] = np.NaN
+    pst.observation_data.loc[:, "weight"] = 0.0
+    for og in tr_obs.obgnme.unique():
+        site_obs = tr_obs.loc[tr_obs.obgnme==og,:]
+        site_obs.sort_values(by="datetime",inplace=True)
+        head_name = "head_{0:02d}_{1:03d}_{2:03d}".format(site_obs.k[0],site_obs.i[0],site_obs.j[0])
+        for i,oname in enumerate(site_obs.obsnme):
+            obs_heads[oname] = (head_name,i)
+        # assign max weight in the control file since some have zero weight and
+        # we are covering weights in the weight table
+        #print(og,site_obs.weight.max())
+        pst.observation_data.loc[head_name,"weight"] = site_obs.weight.max()
+        pst.observation_data.loc[head_name,"org_obgnme"] = og
+        odf_names.append(head_name)
+
+    odf_names.append("gage_1")
+
+    odf = pd.DataFrame(columns=odf_names,index=np.arange(25))
+    wdf = pd.DataFrame(columns=odf_names,index=np.arange(25))
+    for tr_name,(head_name,icycle) in obs_heads.items():
+        odf.loc[icycle,head_name] = obs.loc[tr_name,"obsval"]
+        wdf.loc[icycle, head_name] = obs.loc[tr_name, "weight"]
+
+    g_obs = obs.loc[obs.obsnme.str.startswith("gage_1"),:].copy()
+    #give these obs the max weight since some have zero weight
+    pst.observation_data.loc["gage_1", "weight"] = g_obs.weight.max()
+    g_obs.sort_index(inplace=True)
+    for i,name in enumerate(g_obs.obsnme):
+        odf.loc[i,"gage_1"] = g_obs.loc[name,"obsval"]
+        wdf.loc[i, "gage_1"] = g_obs.loc[name, "weight"]
+
+    # now drop any entries that have zero weight across all cycles
+    print(pst.nnz_obs_names)
+    odf = odf.loc[:,pst.nnz_obs_names]
+    wdf = wdf.loc[:, pst.nnz_obs_names]
+
+    odf.T.to_csv(os.path.join(t_d,"obs_cycle_tbl.csv"))
+    pst.pestpp_options["da_observation_cycle_table"] = "obs_cycle_tbl.csv"
+    wdf.T.to_csv(os.path.join(t_d, "weight_cycle_tbl.csv"))
+    pst.pestpp_options["da_weight_cycle_table"] = "weight_cycle_tbl.csv"
+
+    pst.observation_data.loc[:,"cycle"] = -1
+    pst.model_output_data.loc[:,"cycle"] = -1
+
+    pst.write(os.path.join(t_d,"freyberg6_run_da2.pst"),version=2)
+    return pst
+
+def da_mf6_freyberg_test_2():
+    pst = da_prep_4_mf6_freyberg_seq_tbl()
+    test_d = "mf6_freyberg"
+    t_d = os.path.join(test_d, "template_seq")
+    print(exe_path.replace("ies", "da"))
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d, "freyberg6_run_da2.pst"), version=2)
+    pyemu.os_utils.run("{0} freyberg6_run_da2.pst".format(exe_path.replace("ies","da")),cwd=t_d)
+    pst.control_data.noptmax = 2
+    pst.write(os.path.join(t_d, "freyberg6_run_da2.pst"), version=2)
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("ies", "da"), "freyberg6_run_da2.pst",
+                                num_workers=5, worker_root=test_d, port=port,
+                                master_dir=os.path.join(test_d, "master_da_2"), verbose=True)
+
+
 if __name__ == "__main__":
     
     #glm_long_name_test()
@@ -1275,7 +1385,11 @@ if __name__ == "__main__":
     # ext_stdcol_test()
     #da_prep_4_freyberg_batch()
     #da_prep_4_mf6_freyberg_seq()
-    da_mf6_freyberg_test_1()
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-da.exe"),os.path.join("..","bin","pestpp-da.exe"))
+    #da_mf6_freyberg_test_1()
+
+    #da_prep_4_mf6_freyberg_seq_tbl()
+    da_mf6_freyberg_test_2()
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
     #mf6_v5_opt_stack_test()
