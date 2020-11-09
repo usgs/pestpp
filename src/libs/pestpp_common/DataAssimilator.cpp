@@ -2893,7 +2893,8 @@ void LocalUpgradeThread_da::work(int thread_id, int iter, double cur_lam)
 
 
 	unique_lock<mutex> ctrl_guard(ctrl_lock, defer_lock);
-	int maxsing, num_reals, verbose_level, pcount = 0, t_count;
+	int maxsing, num_reals, verbose_level, pcount = 0;
+	int t_count;
 	double eigthresh;
 	bool use_approx;
 	bool use_prior_scaling;
@@ -4872,7 +4873,7 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 
 
 	//unique_lock<mutex> ctrl_guard(ctrl_lock, defer_lock);
-	int maxsing, num_reals, verbose_level, pcount = 0, t_count;
+	int maxsing, num_reals, verbose_level, pcount = 0;
 	double eigthresh;
 	bool use_approx;
 	bool use_prior_scaling;
@@ -4907,7 +4908,7 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 
 		if (verbose_level > 2)
 		{
-			f_thread << t_count << "," << iter;
+			f_thread << iter;
 			for (auto name : par_names)
 				f_thread << "," << name;
 			for (auto name : obs_names)

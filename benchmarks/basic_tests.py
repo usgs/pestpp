@@ -1248,11 +1248,15 @@ def da_mf6_freyberg_test_1():
     test_d = "mf6_freyberg"
     t_d = os.path.join(test_d,"template_seq")
     print(exe_path.replace("ies","da"))
-
-    #pyemu.os_utils.run("{0} freyberg6_run_da1.pst".format(exe_path.replace("ies","da")),cwd=t_d)
-    pyemu.os_utils.start_workers(t_d,exe_path.replace("ies","da"),"freyberg6_run_da1.pst",
-                                 num_workers=5,worker_root=test_d,port=port,
-                                 master_dir=os.path.join(test_d,"master_da_1"),verbose=True)
+    pst.control_data.noptmax = 0
+    pst.pestpp_options["ies_verbose_level"] = 4
+    pst.write(os.path.join(t_d, "freyberg6_run_da1.pst"), version=2)
+    pyemu.os_utils.run("{0} freyberg6_run_da1.pst".format(exe_path.replace("ies","da")),cwd=t_d)
+    #pst.control_data.noptmax = 2
+    # pst.write(os.path.join(t_d, "freyberg6_run_da1.pst"), version=2)
+    # pyemu.os_utils.start_workers(t_d,exe_path.replace("ies","da"),"freyberg6_run_da1.pst",
+    #                              num_workers=5,worker_root=test_d,port=port,
+    #                              master_dir=os.path.join(test_d,"master_da_1"),verbose=True)
 
 
 def da_prep_4_mf6_freyberg_seq_tbl():
@@ -1355,13 +1359,26 @@ def da_mf6_freyberg_test_2():
     t_d = os.path.join(test_d, "template_seq")
     print(exe_path.replace("ies", "da"))
     pst.control_data.noptmax = 0
+    pst.pestpp_options["ies_verbose_level"] = 4
     pst.write(os.path.join(t_d, "freyberg6_run_da2.pst"), version=2)
     pyemu.os_utils.run("{0} freyberg6_run_da2.pst".format(exe_path.replace("ies","da")),cwd=t_d)
+    return
     pst.control_data.noptmax = 2
     pst.write(os.path.join(t_d, "freyberg6_run_da2.pst"), version=2)
     pyemu.os_utils.start_workers(t_d, exe_path.replace("ies", "da"), "freyberg6_run_da2.pst",
                                 num_workers=5, worker_root=test_d, port=port,
                                 master_dir=os.path.join(test_d, "master_da_2"), verbose=True)
+
+
+def invest():
+    t_d = os.path.join("mf6_freyberg","template_seq")
+    pst1 = pyemu.Pst(os.path.join(t_d,"freyberg6_run_da1.pst"))
+    pst2 = pyemu.Pst(os.path.join(t_d,"freyberg6_run_da2.pst"))
+    print(pst1.observation_data.loc[pst1.nnz_obs_names,["obsval","weight"]])
+    odf = pd.read_csv(os.path.join(t_d,pst2.pestpp_options["da_observation_cycle_table"]))
+    wdf = pd.read_csv(os.path.join(t_d, pst2.pestpp_options["da_weight_cycle_table"]))
+    print(odf)
+    print(wdf)
 
 
 if __name__ == "__main__":
@@ -1386,7 +1403,7 @@ if __name__ == "__main__":
     #da_prep_4_freyberg_batch()
     #da_prep_4_mf6_freyberg_seq()
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-da.exe"),os.path.join("..","bin","pestpp-da.exe"))
-    #da_mf6_freyberg_test_1()
+    da_mf6_freyberg_test_1()
 
     #da_prep_4_mf6_freyberg_seq_tbl()
     da_mf6_freyberg_test_2()
@@ -1395,3 +1412,4 @@ if __name__ == "__main__":
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
     #cmdline_test()
+    invest()

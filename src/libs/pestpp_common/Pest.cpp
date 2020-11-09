@@ -2187,6 +2187,7 @@ Pest& Pest::get_child_pest(int icycle)
 	
 	Pest* child_pest = new Pest(*this);
 	child_pest->child_pest_update(icycle);
+	
 	//child_pest->ctl_parameters;
 	//ctl_parameter_info.insert(name, pi);
 	//ctl_parameters.insert(name, pi.init_value);

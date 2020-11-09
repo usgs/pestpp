@@ -335,14 +335,8 @@ int main(int argc, char* argv[])
 			//childPest.get_pestpp_options.set_check_tplins(false);
 
 			// -----------------------------  
-			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);			
-			output_file_writer.scenario_io_report(fout_rec);
-			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1) // todo: add da verbose
-			{
-				output_file_writer.scenario_pargroup_report(fout_rec);
-				output_file_writer.scenario_par_report(fout_rec);
-				output_file_writer.scenario_obs_report(fout_rec);
-			}
+			
+			
 			//------------------------------
 
 			if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_MASTER)
@@ -376,48 +370,56 @@ int main(int argc, char* argv[])
 			if (par_cycle_info.find(*icycle) != par_cycle_info.end())
 			{
 				performance_log.log_event("updating pars using da par cycle table info");
-				Parameters pars = childPest.get_ctl_parameters_4_mod();
-				TranFixed* fixed_ptr = base_trans_seq.get_fixed_ptr_4_mod();
+				//Parameters pars = childPest.get_ctl_parameters_4_mod();
+				//TranFixed* fixed_ptr = base_trans_seq.get_fixed_ptr_4_mod();
 				map<string, double> cycle_map = par_cycle_info[*icycle];
 				for (auto item : cycle_map)
 				{
-					fixed_ptr->insert(item.first, item.second);
-					pars.update_rec(item.first, item.second);
+					base_trans_seq.get_fixed_ptr_4_mod()->insert(item.first, item.second);
+					childPest.get_ctl_parameters_4_mod().update_rec(item.first, item.second);
 				}
 			}
 			//check for entries in the obs cycle table
+			//cout << childPest.get_ctl_observations().get_rec("GAGE_1") << ", " << pest_scenario.get_observation_info_ptr()->get_weight("GAGE_1") << endl;
 			if (obs_cycle_info.find(*icycle) != obs_cycle_info.end())
 			{
 				performance_log.log_event("updating obs using da obs cycle table info");
-				Observations obs = childPest.get_ctl_observations();
-				ObservationInfo* oi_ptr = childPest.get_observation_info_ptr();
 				map<string, double> cycle_map = obs_cycle_info[*icycle];
 				map<string, double> weight_cycle_map;
 				if (weight_cycle_info.find(*icycle) != weight_cycle_info.end())
 					weight_cycle_map = weight_cycle_info[*icycle];
+				ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+				childPest.set_observation_info(oi);
 				for (auto tbl_obs_name : obs_in_tbl)
 				{
 					//if this obs is not in this cycle, give it a zero weight
 					if (cycle_map.find(tbl_obs_name) == cycle_map.end())
 					{
-						oi_ptr->set_weight(tbl_obs_name,0.0);
+						oi.set_weight(tbl_obs_name, 0.0);
 					}
 					else
 					{
-						obs.update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);
+						childPest.get_ctl_observations_4_mod().update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);
 						//check if this obs is in this cycle's weight info
 						if (weight_cycle_map.find(tbl_obs_name) != weight_cycle_map.end())
 						{
-							oi_ptr->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+							oi.set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+							//pest_scenario.get_observation_info_ptr()->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
 						}
 					}
 				}
-
-				
+				childPest.set_observation_info(oi);
 
 			}
-
-
+			//cout << childPest.get_ctl_observations().get_rec("GAGE_1") << ", " << childPest.get_ctl_observation_info().get_weight("GAGE_1") << endl;
+			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);
+			output_file_writer.scenario_io_report(fout_rec);
+			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1) // todo: add da verbose
+			{
+				output_file_writer.scenario_pargroup_report(fout_rec);
+				output_file_writer.scenario_par_report(fout_rec);
+				output_file_writer.scenario_obs_report(fout_rec);
+			}
 
 			Parameters par1 = childPest.get_ctl_parameters();
 			base_trans_seq.ctl2numeric_ip(par1);

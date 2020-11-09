@@ -56,7 +56,10 @@ public:
 	const ParameterGroupInfo& get_base_group_info() const {return  base_group_info;}
 	ParameterGroupInfo* get_base_group_info_ptr() { return  &base_group_info; }
 	const ObservationInfo &get_ctl_observation_info() const {return observation_info;}
+	ObservationInfo& get_ctl_observation_info_4_mod() { return observation_info; }
 	const ObservationInfo* get_ctl_observation_info_ptr() const { return &observation_info; }
+	void set_observation_info(ObservationInfo oi) { observation_info = oi; }
+
 	const std::map<std::string, std::string> get_observation_groups() const;
 	const PriorInformation &get_prior_info() {return prior_info;}
 	PriorInformation *get_prior_info_ptr() {return &prior_info;}
