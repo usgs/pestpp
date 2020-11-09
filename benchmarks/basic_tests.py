@@ -1252,11 +1252,11 @@ def da_mf6_freyberg_test_1():
     pst.pestpp_options["ies_verbose_level"] = 4
     pst.write(os.path.join(t_d, "freyberg6_run_da1.pst"), version=2)
     pyemu.os_utils.run("{0} freyberg6_run_da1.pst".format(exe_path.replace("ies","da")),cwd=t_d)
-    #pst.control_data.noptmax = 2
-    # pst.write(os.path.join(t_d, "freyberg6_run_da1.pst"), version=2)
-    # pyemu.os_utils.start_workers(t_d,exe_path.replace("ies","da"),"freyberg6_run_da1.pst",
-    #                              num_workers=5,worker_root=test_d,port=port,
-    #                              master_dir=os.path.join(test_d,"master_da_1"),verbose=True)
+    pst.control_data.noptmax = 2
+    pst.write(os.path.join(t_d, "freyberg6_run_da1.pst"), version=2)
+    pyemu.os_utils.start_workers(t_d,exe_path.replace("ies","da"),"freyberg6_run_da1.pst",
+                                 num_workers=5,worker_root=test_d,port=port,
+                                 master_dir=os.path.join(test_d,"master_da_1"),verbose=True)
 
 
 def da_prep_4_mf6_freyberg_seq_tbl():
@@ -1362,7 +1362,7 @@ def da_mf6_freyberg_test_2():
     pst.pestpp_options["ies_verbose_level"] = 4
     pst.write(os.path.join(t_d, "freyberg6_run_da2.pst"), version=2)
     pyemu.os_utils.run("{0} freyberg6_run_da2.pst".format(exe_path.replace("ies","da")),cwd=t_d)
-    return
+
     pst.control_data.noptmax = 2
     pst.write(os.path.join(t_d, "freyberg6_run_da2.pst"), version=2)
     pyemu.os_utils.start_workers(t_d, exe_path.replace("ies", "da"), "freyberg6_run_da2.pst",
