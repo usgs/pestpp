@@ -319,7 +319,7 @@ int main(int argc, char* argv[])
 		f_phi << "cycle,mean,standard_deviation,min,max";
 		vector<string> init_real_names = curr_oe.get_real_names();
 		for (auto real : init_real_names)
-			f_phi << "," << real;
+			f_phi << "," << pest_utils::lower_cp(real);
 		f_phi << endl;
 
 
@@ -430,10 +430,35 @@ int main(int argc, char* argv[])
 				output_file_writer.scenario_par_report(fout_rec);
 				output_file_writer.scenario_obs_report(fout_rec);
 			}
+			
+			
 
 			Parameters par1 = childPest.get_ctl_parameters();
 			base_trans_seq.ctl2numeric_ip(par1);
 			base_trans_seq.numeric2model_ip(par1);
+			ParameterInfo pi = childPest.get_ctl_parameter_info();
+
+			int nadj_par = 0;
+			for (auto par : par1)
+			{
+				if ((pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::FIXED) &&
+					(pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::TIED))
+					nadj_par++;
+
+			}
+
+			cout << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
+			fout_rec << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
+
+			ObservationInfo oi = childPest.get_ctl_observation_info();
+			int nnz_obs = 0;
+			for (auto o : childPest.get_ctl_observations())
+			{
+				if (oi.get_observation_rec_ptr(o.first)->weight != 0.0)
+					nnz_obs++;
+			}
+			cout << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
+			fout_rec << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
 
 			ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
 
@@ -561,6 +586,19 @@ int main(int argc, char* argv[])
 			ss << "." << *icycle << ".parent.oe.csv";
 			curr_oe.to_csv(file_manager.get_base_filename()+ss.str());
 
+			f_phi << *icycle << "," << da.get_phi_handler().get_mean(L2PhiHandler::phiType::ACTUAL);
+			f_phi << "," << da.get_phi_handler().get_std(L2PhiHandler::phiType::ACTUAL);
+			f_phi << "," << da.get_phi_handler().get_min(L2PhiHandler::phiType::ACTUAL);
+			f_phi << "," << da.get_phi_handler().get_max(L2PhiHandler::phiType::ACTUAL);
+			map<string, double> final_actual = da.get_phi_handler().get_phi_map(L2PhiHandler::phiType::ACTUAL);
+			for (auto rname : init_real_names)
+			{
+				if (final_actual.find(rname) != final_actual.end())
+					f_phi << "," << final_actual.at(rname);
+				else
+					f_phi << ",";
+			}
+			f_phi << endl;
 
 		} // end cycle loop
 		fout_rec.close();

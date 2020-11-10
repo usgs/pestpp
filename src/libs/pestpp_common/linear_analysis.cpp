@@ -507,7 +507,7 @@ pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(
 		L2PhiHandler ph(&pest_scenario, &file_manager, &oe, &pe, get_parcov_ptr(),false);
 		ph.update(oe, pe);
 		L2PhiHandler::phiType pt = L2PhiHandler::phiType::ACTUAL;
-		map<string,double>* phi_map = ph.get_phi_map(pt);
+		map<string,double>* phi_map = ph.get_phi_map_ptr(pt);
 		t = *phi_map;
 		os << endl << "  FOSM-based Monte Carlo phi summary:" << endl;
 		os << setw(15) << "realization" << setw(20) << "phi" << endl;

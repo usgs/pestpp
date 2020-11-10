@@ -2558,14 +2558,14 @@ void IterEnsembleSmoother::update_reals_by_phi(ParameterEnsemble &_pe, Observati
 	//store map of current phi values
 	ph.update(oe, pe);
 	L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
-	map<string, double> *phi_map = ph.get_phi_map(pt);
+	map<string, double> *phi_map = ph.get_phi_map_ptr(pt);
 	map<string, double> cur_phi_map;
 	for (auto p : *phi_map)
 		cur_phi_map[p.first] = p.second;
 
 	//now get a phi map of the new phi values
 	ph.update(_oe, _pe);
-	phi_map = ph.get_phi_map(pt);
+	phi_map = ph.get_phi_map_ptr(pt);
 	
 	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
 	double cur_phi, new_phi;
@@ -3111,7 +3111,7 @@ void IterEnsembleSmoother::set_subset_idx(int size)
 		int step;
 		int idx;
 		L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
-		map<string, double>* phi_map = ph.get_phi_map(pt);
+		map<string, double>* phi_map = ph.get_phi_map_ptr(pt);
 		map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
 
 		int i = 0;
