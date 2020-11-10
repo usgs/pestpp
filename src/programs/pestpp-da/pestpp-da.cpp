@@ -311,6 +311,16 @@ int main(int argc, char* argv[])
 		cout << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
 		fout_rec << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
 
+		//prepare a phi csv file for all cycles
+		string phi_file = file_manager.get_base_filename() + ".parent.actual.phi.csv";
+		ofstream f_phi(phi_file);
+		if (f_phi.bad())
+			throw runtime_error("error opening " + phi_file + " for writing");
+		f_phi << "cycle,mean,standard_deviation,min,max";
+		vector<string> init_real_names = curr_oe.get_real_names();
+		for (auto real : init_real_names)
+			f_phi << "," << real;
+		f_phi << endl;
 
 
 		// loop over assimilation cycles

@@ -284,7 +284,7 @@ void L2PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
 
 }
 
-map<string, double>* L2PhiHandler::get_phi_map(L2PhiHandler::phiType &pt)
+map<string, double>* L2PhiHandler::get_phi_map(L2PhiHandler::phiType pt)
 {
 	switch (pt)
 	{

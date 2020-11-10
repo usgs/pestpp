@@ -100,6 +100,7 @@ public:
 	std::mt19937 get_rand_gen() { return rand_gen; }
 	vector<string> get_act_par_names() { return act_par_names; }
 	ObservationEnsemble get_oe() { return oe; }
+	L2PhiHandler get_phi_handler() { return ph; }
 
 private:
 	int icycle;
