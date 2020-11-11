@@ -21,7 +21,6 @@
 
 
 
-
 class LocalUpgradeThread_da
 {
 public:
@@ -97,10 +96,13 @@ public:
 	bool initialize_pe(Covariance& cov);
 	void initialize_parcov();
 	Covariance* get_parcov_ptr() { return &parcov; }
-	std::mt19937 get_rand_gen() { return rand_gen; }
+	std::mt19937& get_rand_gen() { return rand_gen; }
 	vector<string> get_act_par_names() { return act_par_names; }
-	ObservationEnsemble get_oe() { return oe; }
-	L2PhiHandler get_phi_handler() { return ph; }
+	ObservationEnsemble& get_oe() { return oe; }
+	L2PhiHandler& get_phi_handler() { return ph; }
+	int get_iter() { return iter; }
+	FileManager& get_file_manager() { return file_manager; }
+	Pest& get_pest_scenario() { return pest_scenario; }
 
 private:
 	int icycle;
@@ -241,4 +243,11 @@ private:
 map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ofstream& fout_rec);
 map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl);
 map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl);
+
+void write_parent_phi_info(int cycle, ofstream& f_phi, DataAssimilator& da, vector<string>& init_real_names);
+
+void generate_parent_ensembles(DataAssimilator& da, ofstream& fout_rec, ParameterEnsemble& curr_pe, ObservationEnsemble& curr_oe);
+
+
+
 #endif

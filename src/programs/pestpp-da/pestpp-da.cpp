@@ -268,55 +268,18 @@ int main(int argc, char* argv[])
 		assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec);
 
 		//generate a parent ensemble which includes all parameters across all cycles
-		cout << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
-		fout_rec << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
 	
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
-		da.use_ies = pest_scenario.get_pestpp_options_ptr()->get_da_use_ies();
 		ParameterEnsemble curr_pe;
-		da.initialize_parcov();
-		da.initialize_pe(*da.get_parcov_ptr());
-		curr_pe = da.get_pe();
-		if (pest_scenario.get_control_info().noptmax == 0)
-		{
-			curr_pe.reserve(vector<string>{BASE_REAL_NAME}, pest_scenario.get_ctl_ordered_adj_par_names());
-			Parameters pars = pest_scenario.get_ctl_parameters();
-			ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
-			pts.ctl2numeric_ip(pars);
-			Eigen::VectorXd v = pars.get_data_eigen_vec(pest_scenario.get_ctl_ordered_adj_par_names());
-			curr_pe.update_real_ip(BASE_REAL_NAME,v);
-		}
-
+		ObservationEnsemble curr_oe;
+		generate_parent_ensembles(da, fout_rec, curr_pe, curr_oe);
 		
-		cout << "...preparing parent observation ensemble for all observations across all cycles" << endl;
-		fout_rec << "...preparing parent observation ensemble for all observations across all cycles" << endl;
-		mt19937 rand_gen = da.get_rand_gen();
-		ObservationEnsemble curr_oe(&pest_scenario, &rand_gen);
-		curr_oe.reserve(curr_pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
-
-		try
-		{
-			curr_pe.check_for_dups();
-		}
-		catch (const exception& e)
-		{
-			string message = e.what();
-			throw runtime_error("error in parameter ensemble: " + message);
-		}
-		//todo: add the base realization here so that it is present thru out the cycles below
-
-		cout << "...parent parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" <<  endl;
-		fout_rec << "...parent parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
-		curr_pe.to_csv(file_manager.get_base_filename() + ".parent.prior.pe.csv");
-		cout << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
-		fout_rec << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
-
 		//prepare a phi csv file for all cycles
 		string phi_file = file_manager.get_base_filename() + ".parent.actual.phi.csv";
 		ofstream f_phi(phi_file);
 		if (f_phi.bad())
 			throw runtime_error("error opening " + phi_file + " for writing");
-		f_phi << "cycle,mean,standard_deviation,min,max";
+		f_phi << "cycle,iteration,mean,standard_deviation,min,max";
 		vector<string> init_real_names = curr_oe.get_real_names();
 		for (auto real : init_real_names)
 			f_phi << "," << pest_utils::lower_cp(real);
@@ -498,6 +461,9 @@ int main(int argc, char* argv[])
 			{
 				da.da_initialize(*icycle);
 			}
+
+			write_parent_phi_info(*icycle, f_phi, da, init_real_names);
+
 			if (childPest.get_ctl_ordered_nz_obs_names().size() > 0)
 			{
 				if (da.use_ies) // use ies
@@ -515,6 +481,7 @@ int main(int argc, char* argv[])
 					/*curr_pe = da.get_pe();
 					curr_pe.to_csv("cncnc.csv");*/
 				}
+				write_parent_phi_info(*icycle, f_phi, da, init_real_names);
 			}
 			else
 			{
@@ -586,19 +553,7 @@ int main(int argc, char* argv[])
 			ss << "." << *icycle << ".parent.oe.csv";
 			curr_oe.to_csv(file_manager.get_base_filename()+ss.str());
 
-			f_phi << *icycle << "," << da.get_phi_handler().get_mean(L2PhiHandler::phiType::ACTUAL);
-			f_phi << "," << da.get_phi_handler().get_std(L2PhiHandler::phiType::ACTUAL);
-			f_phi << "," << da.get_phi_handler().get_min(L2PhiHandler::phiType::ACTUAL);
-			f_phi << "," << da.get_phi_handler().get_max(L2PhiHandler::phiType::ACTUAL);
-			map<string, double> final_actual = da.get_phi_handler().get_phi_map(L2PhiHandler::phiType::ACTUAL);
-			for (auto rname : init_real_names)
-			{
-				if (final_actual.find(rname) != final_actual.end())
-					f_phi << "," << final_actual.at(rname);
-				else
-					f_phi << ",";
-			}
-			f_phi << endl;
+			
 
 		} // end cycle loop
 		fout_rec.close();
