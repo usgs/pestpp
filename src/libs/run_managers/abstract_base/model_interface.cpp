@@ -291,17 +291,17 @@ void process_instruction_file_thread(int tid, vector<int>& ins_idx, ThreadedInst
 
 void ModelInterface::write_input_files(Parameters *pars_ptr)
 {
-	int num_threads =10;
-	if (num_threads > tplfile_vec.size())
-		num_threads = tplfile_vec.size();
+	int nnum_threads = num_threads;
+	if (nnum_threads > tplfile_vec.size())
+		nnum_threads = tplfile_vec.size();
 	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
-	cout << pest_utils::get_time_string() << " processing template files with " << num_threads << " threads..." << endl;
+	cout << pest_utils::get_time_string() << " processing template files with " << nnum_threads << " threads..." << endl;
 	vector<thread> threads;
 	vector<exception_ptr> exception_ptrs;
 	Parameters pro_pars = *pars_ptr; //copy
 	ThreadedTemplateProcess ttp(tplfile_vec, inpfile_vec, fill_tpl_zeros);
 
-	for (int i = 0; i < num_threads; i++)
+	for (int i = 0; i < nnum_threads; i++)
 	{
 		exception_ptrs.push_back(exception_ptr());
 	}
@@ -310,13 +310,13 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 	for (int i = 0; i < tplfile_vec.size(); i++)
 		tpl_idx.push_back(i);
 
-	for (int i = 0; i < num_threads; i++)
+	for (int i = 0; i < nnum_threads; i++)
 	{
 		threads.push_back(thread(process_template_file_thread, i, std::ref(tpl_idx), std::ref(ttp), *pars_ptr, std::ref(pro_pars), std::ref(exception_ptrs[i])));
 	}
 	stringstream ss;
 	int num_exp = 0;
-	for (int i = 0; i < num_threads; ++i)
+	for (int i = 0; i < nnum_threads; ++i)
 	{
 		bool found = false;
 		if (exception_ptrs[i])
@@ -408,18 +408,18 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 
 void ModelInterface::read_output_files(Observations *obs)
 {
-	int num_threads = 10;
-	if (num_threads > insfile_vec.size())
-		num_threads = insfile_vec.size();
+	int nnum_threads = num_threads;
+	if (nnum_threads > insfile_vec.size())
+		nnum_threads = insfile_vec.size();
 	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
-	cout << pest_utils::get_time_string() <<  " processing instruction files with " << num_threads << " threads..." << endl;
+	cout << pest_utils::get_time_string() <<  " processing instruction files with " << nnum_threads << " threads..." << endl;
 	vector<thread> threads;
 	vector<exception_ptr> exception_ptrs;
 	Observations temp_obs;
 
 	ThreadedInstructionProcess tip(insfile_vec, outfile_vec);
 
-	for (int i = 0; i < num_threads; i++)
+	for (int i = 0; i < nnum_threads; i++)
 	{
 		exception_ptrs.push_back(exception_ptr());
 	}
@@ -428,14 +428,14 @@ void ModelInterface::read_output_files(Observations *obs)
 	for (int i = 0; i < insfile_vec.size(); i++)
 		ins_idx.push_back(i);
 
-	for (int i = 0; i < num_threads; i++)
+	for (int i = 0; i < nnum_threads; i++)
 	{
 		threads.push_back(thread(process_instruction_file_thread, i, std::ref(ins_idx), std::ref(tip), std::ref(temp_obs), additional_ins_delimiters,
 			std::ref(exception_ptrs[i])));
 	}
 	stringstream ss;
 	int num_exp = 0;
-	for (int i = 0; i < num_threads; ++i)
+	for (int i = 0; i < nnum_threads; ++i)
 	{
 		bool found = false;
 		if (exception_ptrs[i])

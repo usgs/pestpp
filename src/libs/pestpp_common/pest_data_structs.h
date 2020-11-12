@@ -579,6 +579,7 @@ public:
 	void set_forgive_unknown_args(bool _flag) { forgive_unknown_args = _flag; }
 	bool get_forgive_unknown_args() const { return forgive_unknown_args; }
 
+
 	string get_da_par_cycle_table() const { return da_par_cycle_table; }
 	void set_da_par_cycle_table(string _filename) { da_par_cycle_table = _filename; }
 	string get_da_obs_cycle_table() const { return da_obs_cycle_table; }
@@ -588,6 +589,8 @@ public:
 
 	bool get_debug_check_par_en_consistency() const { return debug_check_paren_consistency; }
 	void set_debug_check_par_en_consistency(bool _flag) { debug_check_paren_consistency = _flag; }
+	void set_num_tpl_ins_threads(int num) { num_tpl_ins_threads = num; }
+	int get_num_tpl_ins_threads()const { return num_tpl_ins_threads; }
 
 	void set_defaults();
 	void summary(ostream& os) const;
@@ -639,6 +642,7 @@ private:
 	double overdue_giveup_minutes;
 	double worker_poll_interval;
 	string condor_submit_file;
+	int num_tpl_ins_threads;
 	
 
 	string sweep_parameter_csv_file;
