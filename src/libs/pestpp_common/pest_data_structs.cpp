@@ -1033,6 +1033,11 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		panther_echo = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	else if (key == "NUM_TPL_INS_THREADS")
+	{
+		convert_ip(value, num_tpl_ins_threads);
+		return true;
+	}
 
 	return false;
 }
@@ -1072,6 +1077,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "fill_tpl_zeros: " << fill_tpl_zeros << endl;
 	os << "additional_ins_delimiters: " << additional_ins_delimiters << endl;
 	os << "random_seed: " << random_seed << endl;
+	os << "num_tpl_ins_threads: " << num_tpl_ins_threads << endl;
 	
 	os << "panther_agent_restart_on_error: " << panther_agent_restart_on_error << endl;
 	os << "panther_agent_no_ping_timeout_secs: " << panther_agent_no_ping_timeout_secs << endl;
@@ -1357,6 +1363,7 @@ void PestppOptions::set_defaults()
 	set_check_tplins(true);
 	set_fill_tpl_zeros(false);
 	set_additional_ins_delimiters("");
+	set_num_tpl_ins_threads(1);
 
 	set_panther_agent_restart_on_error(false);
 	set_panther_agent_no_ping_timeout_secs(-1);
