@@ -99,7 +99,9 @@ public:
 	ModelInterface(vector<string> _tplfile_vec, vector<string> _inpfile_vec, vector<string>
 		_insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec) :
 		insfile_vec(_insfile_vec), outfile_vec(_outfile_vec), tplfile_vec(_tplfile_vec),
-		inpfile_vec(_inpfile_vec), comline_vec(_comline_vec), fill_tpl_zeros(false), additional_ins_delimiters("") {;}
+		inpfile_vec(_inpfile_vec), comline_vec(_comline_vec), fill_tpl_zeros(false), additional_ins_delimiters(""),
+		num_threads(1)
+		{;}
 	void throw_mio_error(string base_message);
 	void run(Parameters* pars, Observations* obs);
 	void run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
@@ -109,8 +111,10 @@ public:
 	void check_tplins(const vector<string> &par_names, const vector<string> &obs_names);
 	void set_additional_ins_delimiters(string delims) { additional_ins_delimiters = delims; }
 	void set_fill_tpl_zeros(bool _flag) { fill_tpl_zeros = _flag; }
+	void set_num_threads(int _num_threads) { num_threads = _num_threads; }
 
 private:
+	int num_threads;
 	//Pest* pest_scenario_ptr;
 	vector<TemplateFile> templatefiles;
 	vector<InstructionFile> instructionfiles;

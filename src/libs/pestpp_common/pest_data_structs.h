@@ -470,6 +470,9 @@ public:
 	void set_forgive_unknown_args(bool _flag) { forgive_unknown_args = _flag; }
 	bool get_forgive_unknown_args() const { return forgive_unknown_args; }
 
+	void set_num_tpl_ins_threads(int num) { num_tpl_ins_threads = num; }
+	int get_num_tpl_ins_threads()const { return num_tpl_ins_threads; }
+
 	void set_defaults();
 	void summary(ostream& os) const;
 
@@ -520,6 +523,7 @@ private:
 	double overdue_giveup_minutes;
 	double worker_poll_interval;
 	string condor_submit_file;
+	int num_tpl_ins_threads;
 	
 
 	string sweep_parameter_csv_file;

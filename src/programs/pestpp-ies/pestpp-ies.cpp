@@ -238,7 +238,8 @@ int main(int argc, char* argv[])
 				file_manager.build_filename("rns"), pathname,
 				pest_scenario.get_pestpp_options().get_max_run_fail(),
 				pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
-				pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
+				pest_scenario.get_pestpp_options().get_additional_ins_delimiters(),
+				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
 		}
 
 		const ParamTransformSeq &base_trans_seq = pest_scenario.get_base_par_tran_seq();

@@ -139,6 +139,7 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 		mi.check_tplins(pest_scenario.get_ctl_ordered_par_names(), pest_scenario.get_ctl_ordered_obs_names());
 	mi.set_additional_ins_delimiters(pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
 	mi.set_fill_tpl_zeros(pest_scenario.get_pestpp_options().get_fill_tpl_zeros());
+	mi.set_num_threads(pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
 
 	restart_on_error = pest_scenario.get_pestpp_options().get_panther_agent_restart_on_error();
 	max_time_without_master_ping_seconds = pest_scenario.get_pestpp_options().get_panther_agent_no_ping_timeout_secs();
