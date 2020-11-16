@@ -265,7 +265,7 @@ int main(int argc, char* argv[])
 		map<int, map<string, double>> weight_cycle_info = process_da_weight_cycle_table(pest_scenario, fout_rec, weights_in_tbl);
 		
 		vector<int> assimilation_cycles;
-		pest_scenario.assign_da_cycles(fout_rec); 
+		//pest_scenario.assign_da_cycles(fout_rec); 
 		assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec);
 
 		//generate a parent ensemble which includes all parameters across all cycles

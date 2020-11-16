@@ -2697,8 +2697,8 @@ void DataAssimilator::da_upate()
 	//todo return posterior here
 	da_save_ensemble_pe("_analysis_cycle_", ".par");
 	da_save_ensemble_oe("_analysis_cycle_", ".obs");
-
-	update_starting_state();
+	if (dyn_states_names.size() > 0)
+		update_starting_state();
 
 
 }
@@ -4441,7 +4441,8 @@ bool DataAssimilator::solve_new_da()
 		}
 		pe = pe_lams[0];
 		//save best posterior ...
-		pe_post = posterior_dyn_states[0];
+		if (posterior_dyn_states.size() > 0)
+			pe_post = posterior_dyn_states[0];
 		oe = oe_lams[0];
 		return true;
 	}

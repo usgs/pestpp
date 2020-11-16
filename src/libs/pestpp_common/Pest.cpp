@@ -2224,31 +2224,52 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 	string name_col;
 	int cycle;
 	if (efiles_map.find("PARAMETER DATA EXTERNAL") == efiles_map.end())
+	{
 		throw_control_file_error(f_rec, "could not find 'parameter data external' section for cycle info, all parameter quantities being assigned 'cycle'=-1", false);
+		for (auto pname : get_ctl_ordered_adj_par_names())
+		{
+			ctl_parameter_info.get_parameter_rec_ptr_4_mod(pname)->cycle = -1;
+		}
+	}
+
 	else
 	{
 		vector<pair<string, int>> par_cycle_map = extract_cycle_numbers2(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
 		if (par_cycle_map.size() == 0)
 		{
-			f_rec << "NOTE: no parameter cycle information was found so all adjustable parameters will be estimated every cycle " << endl;
+			throw_control_file_error(f_rec, "could not find cycle info in external file(s), all parameter quantities being assigned 'cycle'=-1", false);
+			for (auto pname : get_ctl_ordered_adj_par_names())
+			{
+				ctl_parameter_info.get_parameter_rec_ptr_4_mod(pname)->cycle = -1;
+			}
 
 		}
-		for (auto pc : par_cycle_map)
+		else
 		{
-			ctl_parameter_info.get_parameter_rec_ptr_4_mod(pc.first)->cycle = pc.second;
+			for (auto pc : par_cycle_map)
+			{
+				ctl_parameter_info.get_parameter_rec_ptr_4_mod(pc.first)->cycle = pc.second;
+			}
 		}
 	}
 		
 	
 
 	if (efiles_map.find("OBSERVATION DATA EXTERNAL") == efiles_map.end())
-		throw_control_file_error(f_rec, "could not find 'observation data external' section - this is required for assigning cycle info");
+	{
+		throw_control_file_error(f_rec, "could not find 'observation data external' section, assigning all observations to cycle '0', effectively forming an 'ensemble smoother' run", false);
+		for (auto name : get_ctl_ordered_nz_obs_names())
+		{
+			observation_info.get_observation_rec_ptr_4_mod(name)->cycle = 0;
+		}
+	}
+
 	else
 	{
 		vector<pair<string, int>> obs_cycle_map = extract_cycle_numbers2(f_rec, "OBSERVATION DATA EXTERNAL", vector<string>{"OBSNME", "NAME"});
 		if (obs_cycle_map.size() == 0)
 		{
-			throw_control_file_error(f_rec, "no observation cycle information was found, this required and cannot continue");
+			throw_control_file_error(f_rec, "no observation cycle information was found in external file(s), assigning all observations to cycle '0', effectively forming an 'ensemble smoother' run", false);
 
 		}
 		vector<string> missing, obs_vec;
@@ -2275,46 +2296,66 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 		}
 	}
 
+	model_exec_info.incycle_vec.clear();
 	if (efiles_map.find("MODEL INPUT EXTERNAL") == efiles_map.end())
-		throw_control_file_error(f_rec, "could not find 'model input external' section - all template/model input files will be used eveyr cycle", false);
+	{
+		throw_control_file_error(f_rec, "could not find 'model input external' section, all template/model input files will be used every cycle", false);
+		for (auto tpl : model_exec_info.tplfile_vec)
+		{
+			model_exec_info.incycle_vec.push_back(-1);
+		}
+	}
 	else
 	{
 		vector<pair<string, int>> mi_cycle_map = extract_cycle_numbers2(f_rec, "MODEL INPUT EXTERNAL", vector<string>{"PEST_FILE"});
 		if (mi_cycle_map.size() == 0)
 		{
-			throw_control_file_error(f_rec, "no model input cycle information was found...continuing",false);
-			
-
+			throw_control_file_error(f_rec, "could not find cycle info in external file(s), all template/model input files will be used every cycle", false);
+			for (auto tpl : model_exec_info.tplfile_vec)
+			{
+				model_exec_info.incycle_vec.push_back(-1);
+			}
 		}	
-		
-		model_exec_info.incycle_vec.clear();
-		model_exec_info.outcycle_vec.clear();
-		for (auto tpl : mi_cycle_map)
+		else
 		{
-			model_exec_info.incycle_vec.push_back(tpl.second); // we can do that becuase row order does not change. 
-		}	
-		
-		
+			
+			for (auto tpl : mi_cycle_map)
+			{
+				model_exec_info.incycle_vec.push_back(tpl.second); // we can do that becuase row order does not change. 
+			}
+		}
 	}
 
+
+	model_exec_info.outcycle_vec.clear();
 	if (efiles_map.find("MODEL OUTPUT EXTERNAL") == efiles_map.end())
-		throw_control_file_error(f_rec, "could not find 'model output external' section - this is required, cannot continue");
+	{
+		throw_control_file_error(f_rec, "could not find 'model output external' section, assigning all instruction/out files to cycle '0', effectively forming an 'ensemble smoother' run", false);
+		for (auto ins : model_exec_info.insfile_vec)
+		{
+			model_exec_info.outcycle_vec.push_back(0);
+		}
+	}
 	else
 	{
 		vector<pair<string, int>> mi_cycle_map = extract_cycle_numbers2(f_rec, "MODEL OUTPUT EXTERNAL", vector<string>{"PEST_FILE"});
 		if (mi_cycle_map.size() == 0)
 		{
-			throw_control_file_error(f_rec, "no model output cycle information was found, cannot continue");
+			throw_control_file_error(f_rec, "no model output cycle information was found in external file(s), assigning all instruction/out files to cycle '0', effectively forming an 'ensemble smoother' run",false);
+			for (auto ins : model_exec_info.insfile_vec)
+			{
+				model_exec_info.outcycle_vec.push_back(0);
+			}
 		}
-		
-		for (auto ins : mi_cycle_map)
-		{
-			model_exec_info.outcycle_vec.push_back(ins.second); // we can do that becuase row order does not change. 
-		}		
-		
-		
+		else
+		{		
+			for (auto ins : mi_cycle_map)
+			{
+				model_exec_info.outcycle_vec.push_back(ins.second); // we can do that becuase row order does not change. 
+			}
+		}
 	}
-	//TODO: prior info...
+	//TODO: prior info...with pi, need to check that parameters in each eqs are in the same cycle!
 }
 vector<pair<string, int>> Pest::extract_cycle_numbers2(ofstream& f_rec, string section_name, vector<string> possible_name_cols)
 {
