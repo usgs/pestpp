@@ -244,9 +244,9 @@ map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, of
 map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl);
 map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl);
 
-void write_parent_phi_info(int cycle, ofstream& f_phi, DataAssimilator& da, vector<string>& init_real_names);
+void write_global_phi_info(int cycle, ofstream& f_phi, DataAssimilator& da, vector<string>& init_real_names);
 
-void generate_parent_ensembles(DataAssimilator& da, ofstream& fout_rec, ParameterEnsemble& curr_pe, ObservationEnsemble& curr_oe);
+void generate_global_ensembles(DataAssimilator& da, ofstream& fout_rec, ParameterEnsemble& curr_pe, ObservationEnsemble& curr_oe);
 
 
 

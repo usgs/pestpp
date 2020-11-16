@@ -5972,7 +5972,7 @@ map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, of
 }
 
 
-void write_parent_phi_info(int icycle, ofstream& f_phi, DataAssimilator& da, vector<string>& init_real_names)
+void write_global_phi_info(int icycle, ofstream& f_phi, DataAssimilator& da, vector<string>& init_real_names)
 {
 	int iter = da.get_iter();
 	f_phi << icycle << "," << iter << "," << da.get_phi_handler().get_mean(L2PhiHandler::phiType::ACTUAL);
@@ -5990,11 +5990,11 @@ void write_parent_phi_info(int icycle, ofstream& f_phi, DataAssimilator& da, vec
 	f_phi << endl;
 }
 
-void generate_parent_ensembles(DataAssimilator& da, ofstream& fout_rec, ParameterEnsemble& curr_pe, ObservationEnsemble& curr_oe)
+void generate_global_ensembles(DataAssimilator& da, ofstream& fout_rec, ParameterEnsemble& curr_pe, ObservationEnsemble& curr_oe)
 {
 	//generate a parent ensemble which includes all parameters across all cycles
-	cout << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
-	fout_rec << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
+	cout << "...preparing global parameter ensemble for all parameters across all cycles" << endl;
+	fout_rec << "...preparing global parameter ensemble for all parameters across all cycles" << endl;
 	Pest pest_scenario = da.get_pest_scenario();
 	da.initialize_parcov();
 	da.initialize_pe(*da.get_parcov_ptr());
@@ -6012,13 +6012,13 @@ void generate_parent_ensembles(DataAssimilator& da, ofstream& fout_rec, Paramete
 	}
 	else if (pest_scenario.get_pestpp_options().get_ies_include_base())
 	{
-		cout << "...replacing last realization with 'base' realization in parent parameter ensemble" << endl;
-		fout_rec << "...replacing last realization with 'base' realization in parent parameter ensemble" << endl;
+		cout << "...replacing last realization with 'base' realization in global parameter ensemble" << endl;
+		fout_rec << "...replacing last realization with 'base' realization in global parameter ensemble" << endl;
 		curr_pe.replace(curr_pe.shape().first - 1, pars, BASE_REAL_NAME);
 	}
 
-	cout << "...preparing parent observation ensemble for all observations across all cycles" << endl;
-	fout_rec << "...preparing parent observation ensemble for all observations across all cycles" << endl;
+	cout << "...preparing global observation ensemble for all observations across all cycles" << endl;
+	fout_rec << "...preparing global observation ensemble for all observations across all cycles" << endl;
 	mt19937 rand_gen = da.get_rand_gen();
 	curr_oe.set_pest_scenario(&pest_scenario);
 	curr_oe.set_rand_gen(&rand_gen);
@@ -6035,11 +6035,11 @@ void generate_parent_ensembles(DataAssimilator& da, ofstream& fout_rec, Paramete
 	}
 	//todo: add the base realization here so that it is present thru out the cycles below
 
-	cout << "...parent parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
-	fout_rec << "...parent parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
-	curr_pe.to_csv(da.get_file_manager().get_base_filename() + ".parent.prior.pe.csv");
-	cout << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
-	fout_rec << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
+	cout << "...global parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
+	fout_rec << "...global parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
+	curr_pe.to_csv(da.get_file_manager().get_base_filename() + ".global.prior.pe.csv");
+	cout << "...global observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
+	fout_rec << "...global observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
 
 	return;
 }

@@ -273,10 +273,10 @@ int main(int argc, char* argv[])
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 		ParameterEnsemble curr_pe;
 		ObservationEnsemble curr_oe;
-		generate_parent_ensembles(da, fout_rec, curr_pe, curr_oe);
+		generate_global_ensembles(da, fout_rec, curr_pe, curr_oe);
 		
 		//prepare a phi csv file for all cycles
-		string phi_file = file_manager.get_base_filename() + ".parent.actual.phi.csv";
+		string phi_file = file_manager.get_base_filename() + ".global.phi.actual.csv";
 		ofstream f_phi(phi_file);
 		if (f_phi.bad())
 			throw runtime_error("error opening " + phi_file + " for writing");
@@ -463,7 +463,7 @@ int main(int argc, char* argv[])
 				da.da_initialize(*icycle);
 			}
 
-			write_parent_phi_info(*icycle, f_phi, da, init_real_names);
+			write_global_phi_info(*icycle, f_phi, da, init_real_names);
 
 			if (childPest.get_ctl_ordered_nz_obs_names().size() > 0)
 			{
@@ -482,7 +482,7 @@ int main(int argc, char* argv[])
 					/*curr_pe = da.get_pe();
 					curr_pe.to_csv("cncnc.csv");*/
 				}
-				write_parent_phi_info(*icycle, f_phi, da, init_real_names);
+				write_global_phi_info(*icycle, f_phi, da, init_real_names);
 			}
 			else
 			{
@@ -492,7 +492,7 @@ int main(int argc, char* argv[])
 				
 			}
 			//replace all the pars used in this cycle in the parent parameter ensemble
-			performance_log.log_event("updating parent ensemble with cycle ensemble columns");
+			performance_log.log_event("updating global ensemble with cycle ensemble columns");
 			
 			//if we lost some realizations...
 			if (curr_pe.shape().first > cycle_curr_pe.shape().first)
@@ -503,8 +503,8 @@ int main(int argc, char* argv[])
 				for (auto r : curr_pe.get_real_names())
 					if (ccp_reals.find(r) == ccp_reals.end())
 						missing.push_back(r);
-				fout_rec << "...dropping the following " << missing.size() << " realizations from parent parameter ensemble:" << endl;
-				cout << "...dropping " << missing.size() << " realizations from parent parameter ensemble, see rec file for listing" << endl;
+				fout_rec << "...dropping the following " << missing.size() << " realizations from global parameter ensemble:" << endl;
+				cout << "...dropping " << missing.size() << " realizations from global parameter ensemble, see rec file for listing" << endl;
 				int i = 0;
 				for (auto m : missing)
 				{
@@ -533,8 +533,8 @@ int main(int argc, char* argv[])
 				for (auto r : curr_oe.get_real_names())
 					if (ccp_reals.find(r) == ccp_reals.end())
 						missing.push_back(r);
-				fout_rec << "...dropping the following " << missing.size() << " realizations from parent observation ensemble:" << endl;
-				cout << "...dropping " << missing.size() << " realizations from parent observation ensemble, see rec file for listing" << endl;
+				fout_rec << "...dropping the following " << missing.size() << " realizations from global observation ensemble:" << endl;
+				cout << "...dropping " << missing.size() << " realizations from global observation ensemble, see rec file for listing" << endl;
 				int i = 0;
 				for (auto m : missing)
 				{
@@ -551,7 +551,7 @@ int main(int argc, char* argv[])
 
 			curr_oe.replace_col_vals(cycle_curr_oe.get_var_names(), *cycle_curr_oe.get_eigen_ptr());
 			ss.str("");
-			ss << "." << *icycle << ".parent.oe.csv";
+			ss << ".global." << *icycle << ".oe.csv";
 			curr_oe.to_csv(file_manager.get_base_filename()+ss.str());
 
 			
