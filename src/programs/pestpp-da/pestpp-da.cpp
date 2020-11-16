@@ -53,8 +53,7 @@ int main(int argc, char* argv[])
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 
-		CmdLine cmdline(argc, argv);
-		
+		CmdLine cmdline(argc, argv);		
 		
 		FileManager file_manager;
 		string filename = cmdline.ctl_file_name;
@@ -116,11 +115,9 @@ int main(int argc, char* argv[])
 			
 			cout << endl << "Work Done..." << endl;
 			exit(0);
-		}
-		
+		}		
 
 		RestartController restart_ctl;
-
 		//process restart and reuse jacobian directives
 		bool restart_flag = false;
 		bool save_restart_rec_header = true;
@@ -179,8 +176,7 @@ int main(int argc, char* argv[])
 			fout_rec.close();
 			throw(e);
 		}
-		pest_scenario.check_inputs(fout_rec);
-		
+		pest_scenario.check_inputs(fout_rec);	
 
 
 		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
@@ -189,17 +185,18 @@ int main(int argc, char* argv[])
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
 		//output_file_writer.scenario_report(fout_rec);
 		output_file_writer.scenario_io_report(fout_rec);
-		if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1)
+		int verbose_level;
+		PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
+		verbose_level = ppo->da_ctl_params.get_ivalue("DA_VERBOSE_LEVEL");
+		if (verbose_level > 1)
 		{
 			output_file_writer.scenario_pargroup_report(fout_rec);
 			output_file_writer.scenario_par_report(fout_rec);
 			output_file_writer.scenario_obs_report(fout_rec);
-		}
-		
+		}	
 		
 
-		//reset some default args for da here:
-		PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
+		//reset some default args for da here:		
 		set<string> pp_args = ppo->get_passed_args();
 		if (pp_args.find("MAX_RUN_FAIL") == pp_args.end())
 			ppo->set_max_run_fail(1);
@@ -251,20 +248,22 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
 				pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
 		}
+		
 
-
-
-		//process da par cycle table
+		//process da (recurrent??) par cycle table
 		map<int, map<string, double>> par_cycle_info = process_da_par_cycle_table(pest_scenario, fout_rec);
 		// process da obs cycle table
-		set<string> obs_in_tbl; //we need this so we can set weights to zero in childpest if a value isnt listed for a given cycle
+		set<string> obs_in_tbl; //we need this so we can set weights to zero in childpest of a value isnt listed for a given cycle
 		map<int, map<string, double>> obs_cycle_info = process_da_obs_cycle_table(pest_scenario, fout_rec, obs_in_tbl);
 		//process weights table
 		set<string> weights_in_tbl; 
 		map<int, map<string, double>> weight_cycle_info = process_da_weight_cycle_table(pest_scenario, fout_rec, weights_in_tbl);
 		
 		vector<int> assimilation_cycles;
-		pest_scenario.assign_da_cycles(fout_rec); 
+		if (false) // todo: I think we need to remove this 
+		{
+			pest_scenario.assign_da_cycles(fout_rec);
+		}
 		assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec);
 
 		//generate a parent ensemble which includes all parameters across all cycles
@@ -286,7 +285,6 @@ int main(int argc, char* argv[])
 			Eigen::VectorXd v = pars.get_data_eigen_vec(pest_scenario.get_ctl_ordered_adj_par_names());
 			curr_pe.update_real_ip(BASE_REAL_NAME,v);
 		}
-
 		
 		cout << "...preparing parent observation ensemble for all observations across all cycles" << endl;
 		fout_rec << "...preparing parent observation ensemble for all observations across all cycles" << endl;
@@ -303,14 +301,13 @@ int main(int argc, char* argv[])
 			string message = e.what();
 			throw runtime_error("error in parameter ensemble: " + message);
 		}
-		//todo: add the base realization here so that it is present thru out the cycles below
 
+		//todo: add the base realization here so that it is present thru out the cycles below
 		cout << "...parent parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" <<  endl;
 		fout_rec << "...parent parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
 		curr_pe.to_csv(file_manager.get_base_filename() + ".parent.prior.pe.csv");
 		cout << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
 		fout_rec << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
-
 
 
 		// loop over assimilation cycles
@@ -331,13 +328,10 @@ int main(int argc, char* argv[])
 			
 			Pest childPest;
 			childPest = pest_scenario.get_child_pest(*icycle);
-			//vector <string> xxxx=childPest.get_ctl_ordered_par_names();
-			//childPest.get_pestpp_options.set_check_tplins(false);
-
-			// -----------------------------  
+			
 			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);			
 			output_file_writer.scenario_io_report(fout_rec);
-			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1) // todo: add da verbose
+			if (verbose_level> 1) // 
 			{
 				output_file_writer.scenario_pargroup_report(fout_rec);
 				output_file_writer.scenario_par_report(fout_rec);
@@ -447,11 +441,7 @@ int main(int argc, char* argv[])
 			ParameterEnsemble cycle_curr_pe(&childPest, &rand_gen, curr_pe.get_eigen(vector<string>(),act_par_names), curr_pe.get_real_names(), act_par_names);
 			cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
 
-			//if (*icycle > 0)
-			//{
-
-			da.set_pe(cycle_curr_pe);
-			//}
+			da.set_pe(cycle_curr_pe);	
 			
 			if (da.use_ies)
 			{

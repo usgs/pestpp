@@ -1383,8 +1383,9 @@ if __name__ == "__main__":
 
     # parallel_consist_test()
     # ext_stdcol_test()
+
     #da_prep_4_freyberg_batch()
-    #da_prep_4_mf6_freyberg_seq()
+    da_prep_4_mf6_freyberg_seq()
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-da.exe"),os.path.join("..","bin","pestpp-da.exe"))
     #da_mf6_freyberg_test_1()
 
