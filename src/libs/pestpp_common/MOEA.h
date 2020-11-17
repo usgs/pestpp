@@ -76,6 +76,10 @@ private:
 	{
 		return elem1.second < elem2.second;
 	};
+	Comparator revcompFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
+	{
+		return elem1.second < elem2.second;
+	};
 
 };
 

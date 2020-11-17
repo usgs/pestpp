@@ -384,6 +384,9 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string
 	std::sort(cs_vec.begin(), cs_vec.end(),
 		compFunctor);
 
+	reverse(cs_vec.begin(), cs_vec.end());
+
+
 	vector<string> crowd_ordered;
 	for (auto cs : cs_vec)
 		crowd_ordered.push_back(cs.first);

@@ -152,14 +152,16 @@ int main(int argc, char* argv[])
 
 			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
 
-			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
+			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
 		}
 
 		cout << endl;
 
 		cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
 
-		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
+		fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
@@ -247,7 +249,8 @@ int main(int argc, char* argv[])
 				file_manager.build_filename("rns"), pathname,
 				pest_scenario.get_pestpp_options().get_max_run_fail(),
 				pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
-				pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
+				pest_scenario.get_pestpp_options().get_additional_ins_delimiters(),
+				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
 		}
 
 
