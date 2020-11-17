@@ -845,38 +845,6 @@ def ext_stdcol_test():
     assert dmn.max() < 1.0e-6,dmn
     assert dmx.max() < 1.0e-6,dmx
 
-def da_mf6_freyberg_smoother_test():
-    model_d = "mf6_freyberg"
-    local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-        local=False
-    
-    t_d = os.path.join(model_d,"template")
-    m_d = os.path.join(model_d,"master_da_smoother1")
-    if os.path.exists(m_d):
-        shutil.rmtree(m_d)
-    pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_ies.pst"))
-    pst.control_data.noptmax = 0
-    pst.write(os.path.join(t_d,"freyberg6_run_da.pst"))
-    pyemu.os_utils.run("{0} freyberg6_run_da.pst".format(exe_path.replace("-ies","-da")),cwd=t_d)
-
-    pst.control_data.noptmax = 2
-    pst.pestpp_options["ies_autoadaloc"] = False
-    pst.pestpp_options.pop("ies_localizer",None)
-    pst.pestpp_options["ies_num_reals"] = 15
-    pst.write(os.path.join(t_d,"freyberg6_run_da.pst"))
-    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-da"), "freyberg6_run_da.pst", num_workers=15,
-                                master_dir=m_d,worker_root=model_d,port=port)
-
-    
-    oe_file = os.path.join(m_d,"freyberg6_run_da.global.0.oe.csv")
-    assert os.path.exists(oe_file),oe_file
-    pe_file = os.path.join(m_d,"freyberg6_run_da.global.prior.pe.csv")
-    assert os.path.exists(pe_file),pe_file
-    phi_file = os.path.join(m_d,"freyberg6_run_da.global.phi.actual.csv")
-    assert os.path.exists(phi_file),phi_file
 
 def mf6_v5_ies_test():
     model_d = "mf6_freyberg"
@@ -1428,18 +1396,19 @@ def da_mf6_freyberg_smoother_test():
         local=False
     
     t_d = os.path.join(model_d,"template")
-    m_d = os.path.join(model_d,"master_da_smoother1")
+    m_d = os.path.join(model_d,"master_da_smoother")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_ies.pst"))
     pst.control_data.noptmax = 0
-    pst.write(os.path.join(t_d,"freyberg6_run_da.pst"))
-    pyemu.os_utils.run("{0} freyberg6_run_da.pst".format(exe_path.replace("-ies","-da")),cwd=t_d)
-
-    pst.control_data.noptmax = 2
     pst.pestpp_options["ies_autoadaloc"] = False
     pst.pestpp_options.pop("ies_localizer",None)
-    pst.pestpp_options["ies_num_reals"] = 15
+    pst.pestpp_options["da_num_reals"] = 15
+    pst.write(os.path.join(t_d,"freyberg6_run_da.pst"))
+    pyemu.os_utils.run("{0} freyberg6_run_da.pst".format(exe_path.replace("-ies","-da")),cwd=t_d)
+    
+    pst.control_data.noptmax = 2
+    
     pst.write(os.path.join(t_d,"freyberg6_run_da.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-da"), "freyberg6_run_da.pst", num_workers=15,
                                 master_dir=m_d,worker_root=model_d,port=port)

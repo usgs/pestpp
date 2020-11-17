@@ -1500,21 +1500,14 @@ void DataAssimilator::initialize(int _icycle)
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
 		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
-		//if (icycle == 0)
-		//{
-			_pe.append("BASE", pars);
-			pe = _pe;
-		//}
-		//else
-		//{
-		//	_pe = pe;
-		//}
+		_pe.append(BASE_REAL_NAME, pars);
+		pe = _pe;
 		string par_csv = file_manager.get_base_filename() + ".par.csv";
 		pe_base = _pe;
 		pe_base.reorder(vector<string>(), act_par_names);
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
-		_oe.append("BASE", pest_scenario.get_ctl_observations());
+		_oe.append(BASE_REAL_NAME, pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe = _oe; // when optmax = 0, oe should be initialized to make it easier to extract dynamic states
 				  // 
@@ -1549,7 +1542,7 @@ void DataAssimilator::initialize(int _icycle)
 		ph.write(0, 1);
 		ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
 		Observations obs;
-		Eigen::VectorXd v = _oe.get_real_vector("BASE");
+		Eigen::VectorXd v = _oe.get_real_vector(BASE_REAL_NAME);
 		vector<double> vv;
 		vv.resize(v.size());
 		Eigen::VectorXd::Map(&vv[0], v.size()) = v;
@@ -1582,23 +1575,13 @@ void DataAssimilator::initialize(int _icycle)
 		
 		return;
 	}
-	// ---------- End of of best average simulation run ---------
-
-	// ---------- Monte Carlo Simulation (no assimilation) ------
-	// TODO: (Ayman) Maybe here we can add option to make one Monte Carlo forward run for all realizations
-	// ---------- End of Monte Carlo Simulation -----------------
+	
 
 	//set some defaults
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
 	// TODO: (Ayman) We need to develop a da verbose level, for now ies is being used
 	verbose_level = pest_scenario.get_pestpp_options_ptr()->get_ies_verbose_level();
-	if (pest_scenario.get_n_adj_par() >= 1e6)
-	{
-		message(0, "You are a god among mere mortals!");
-	}
-
-
 	message(1, "using REDSVD for truncated svd solve");
 
 	message(1, "maxsing:", pest_scenario.get_svd_info().maxsing);
@@ -1679,16 +1662,8 @@ void DataAssimilator::initialize(int _icycle)
 
 	int num_reals = pest_scenario.get_pestpp_options().get_da_num_reals();
 
-	//if (icycle == 0)
-	//{
-		// Get Par realizations either from external file or by drawing internally
-		//dont draw the pe here because we are setting it 
-		//pe_drawn = initialize_pe(parcov);
-		pe_drawn = true;
-
-		
-	//}
-
+	
+	pe_drawn = true;
 	if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
 	{
 		message(1, "forming inverse sqrt of prior parameter covariance matrix");
