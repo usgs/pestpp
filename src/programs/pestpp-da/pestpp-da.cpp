@@ -440,7 +440,6 @@ int main(int argc, char* argv[])
 			performance_log.log_event("instantiating DA instance");
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 			// use ies or da?
-			da.use_ies = pest_scenario.get_pestpp_options_ptr()->get_da_use_ies();
 			da.da_type = pest_scenario.get_pestpp_options_ptr()->da_ctl_params.get_svalue("DA_TYPE");
 			std::mt19937 rand_gen = da.get_rand_gen();
 			vector<string> act_par_names = childPest.get_ctl_ordered_adj_par_names();
@@ -454,33 +453,17 @@ int main(int argc, char* argv[])
 			da.set_pe(cycle_curr_pe);
 			//}
 			
-			if (da.use_ies)
-			{
-				da.initialize(*icycle);
-			}
-			else
-			{
-				da.da_initialize(*icycle);
-			}
-
+			
+			da.initialize(*icycle);
+			
 			write_global_phi_info(*icycle, f_phi, da, init_real_names);
 
 			if (childPest.get_ctl_ordered_nz_obs_names().size() > 0)
 			{
-				if (da.use_ies) // use ies
+				
+				if (pest_scenario.get_control_info().noptmax > 0) // 
 				{
-					da.iterate_2_solution();
-					/*curr_pe = da.get_pe();
-					curr_pe.to_csv("cncnc.csv");*/
-				}
-				else // use da
-				{
-					if (pest_scenario.get_control_info().noptmax > 0) // 
-					{
-						da.da_upate();
-					}
-					/*curr_pe = da.get_pe();
-					curr_pe.to_csv("cncnc.csv");*/
+					da.da_upate();
 				}
 				write_global_phi_info(*icycle, f_phi, da, init_real_names);
 			}

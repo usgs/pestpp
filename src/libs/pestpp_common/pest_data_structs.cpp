@@ -983,13 +983,13 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 }
 
 bool PestppOptions::assign_DA_value_by_key(const string& key, const string& value, const string& org_value)
-
 {
 	//DA parameters
 	if (key == "DA_USE_IES")
 	{
-		da_use_ies = pest_utils::parse_string_arg_to_bool(value);
-		return true;
+		throw PestParsingError("'da_ues_ies' is not implemented yet");
+		//da_use_ies = pest_utils::parse_string_arg_to_bool(value);
+		//return true;
 	}
 	else if ((key == "DA_PAR_EN") || (key == "DA_PARAMETER_ENSEMBLE"))
 	{
