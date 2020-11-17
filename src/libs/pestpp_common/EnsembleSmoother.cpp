@@ -198,7 +198,7 @@ void IterEnsembleSmoother::add_bases()
 	//check that 'base' isn't already in ensemble
 	vector<string> rnames = pe.get_real_names();
 	bool inpar = false;
-	if (find(rnames.begin(), rnames.end(), base_name) != rnames.end())
+	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
 		message(1, "'base' realization already in parameter ensemble, ignoring '++ies_include_base'");
 		inpar = true;
@@ -210,12 +210,12 @@ void IterEnsembleSmoother::add_bases()
 		pe.get_par_transform().active_ctl2numeric_ip(pars);
 		vector<int> drop{ pe.shape().first - 1 };
 		pe.drop_rows(drop);
-		pe.append(base_name, pars);
+		pe.append(BASE_REAL_NAME, pars);
 	}
 
 	//check that 'base' isn't already in ensemble
 	rnames = oe.get_real_names();
-	if (find(rnames.begin(), rnames.end(), base_name) != rnames.end())
+	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
 		message(1, "'base' realization already in observation ensemble, ignoring '++ies_include_base'");
 	}
@@ -226,7 +226,7 @@ void IterEnsembleSmoother::add_bases()
 		{
 			vector<string> prnames = pe.get_real_names();
 
-			int idx = find(prnames.begin(), prnames.end(), base_name) - prnames.begin();
+			int idx = find(prnames.begin(), prnames.end(), BASE_REAL_NAME) - prnames.begin();
 			//cout << idx << "," << rnames.size() << endl;
 			string oreal = rnames[idx];
 			stringstream ss;
@@ -237,9 +237,9 @@ void IterEnsembleSmoother::add_bases()
 			vector<string> drop;
 			drop.push_back(oreal);
 			oe.drop_rows(drop);
-			oe.append(base_name, obs);
+			oe.append(BASE_REAL_NAME, obs);
 			//rnames.insert(rnames.begin() + idx, string(base_name));
-			rnames[idx] = base_name;
+			rnames[idx] = BASE_REAL_NAME;
 			oe.reorder(rnames, vector<string>());
 		}
 		else
@@ -247,7 +247,7 @@ void IterEnsembleSmoother::add_bases()
 			message(1, "adding 'base' observation values to ensemble");
 			vector<int> drop{ oe.shape().first - 1 };
 			oe.drop_rows(drop);
-			oe.append(base_name, obs);
+			oe.append(BASE_REAL_NAME, obs);
 		}
 	}
 }
@@ -693,14 +693,14 @@ void IterEnsembleSmoother::initialize_restart()
 	if (missing.size() > 0)
 	{
 		//the special case where the base real is what is missing...
-		if ((missing.size() == 1) && (missing[0] == "BASE"))
+		if ((missing.size() == 1) && (missing[0] == BASE_REAL_NAME))
 		{
 			//check that the base real is in the par en - restart_par_en should be accounted for by now
 			int base_par_idx = -1;
 			vector<string> pe_real_names = pe.get_real_names(), pe_base_real_names = pe_base.get_real_names();
 			for (int i = 0; i < pe_base.shape().first; i++)
 			{
-				if (pe_base_real_names[i] == "BASE")
+				if (pe_base_real_names[i] == BASE_REAL_NAME)
 				{
 					base_par_idx = i;
 					break;
@@ -708,11 +708,24 @@ void IterEnsembleSmoother::initialize_restart()
 			}
 			if (base_par_idx != -1)
 			{
+
 				ss.str("");
-				ss << "WARNING: replacing base obs en realization '" << oe_base_real_names[base_par_idx] << "' with 'base' (noise free) values to match par en 'base' location";
-				message(2, ss.str());
+				ss << "WARNING: replacing obs+noise obs en realization '" << oe_base_real_names[base_par_idx] << "' with 'base' (noise free) values to match par en 'base' location";
+				message(1, ss.str());
 				Observations obs = pest_scenario.get_ctl_observations();
-				oe_base.replace(base_par_idx, obs, "BASE");
+				oe_base.replace(base_par_idx, obs, BASE_REAL_NAME);
+				ss.str("");
+				if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+				{
+					ss << file_manager.get_base_filename() << ".obs+noise.jcb";
+					oe_base.to_binary(ss.str());
+				}
+				else
+				{
+					ss << file_manager.get_base_filename() << ".obs+noise.csv";
+					oe_base.to_csv(ss.str());
+				}
+				message(1, "re-saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
 			}
 			else
 			{
@@ -941,7 +954,7 @@ void IterEnsembleSmoother::initialize()
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
 		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
-		_pe.append("BASE", pars);
+		_pe.append(BASE_REAL_NAME, pars);
 		string par_csv = file_manager.get_base_filename() + ".par.csv";
 		//message(1, "saving parameter values to ", par_csv);
 		//_pe.to_csv(par_csv);
@@ -949,7 +962,7 @@ void IterEnsembleSmoother::initialize()
 		pe_base.reorder(vector<string>(), act_par_names);
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
-		_oe.append("BASE", pest_scenario.get_ctl_observations());
+		_oe.append(BASE_REAL_NAME, pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
@@ -2932,7 +2945,7 @@ bool IterEnsembleSmoother::solve_new()
 		}
 		else
 		{
-			message(0, "not updating lambda");
+			message(0, "not updating lambda (standard deviation reduction criteria not met)");
 		}
 		last_best_std = best_std;
 	}
@@ -2943,10 +2956,34 @@ bool IterEnsembleSmoother::solve_new()
 		message(0, "only updating realizations with reduced phi");
 		update_reals_by_phi(pe_lams[best_idx], oe_lam_best);
 		ph.update(oe, pe);
-		double new_lam = last_best_lam * lam_inc;
-		new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
-		message(0, "incresing lambda to: ", new_lam);
-		last_best_lam = new_lam;
+		//re-check phi
+		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+		//replace the last entry in the best mean phi tracker
+		best_mean_phis[best_mean_phis.size() - 1] = best_mean;
+		message(1, "current best mean phi (after updating reduced-phi reals): ", best_mean);
+		if (best_mean < last_best_mean * acc_fac)
+		{
+			if (best_std < last_best_std * acc_fac)
+			{
+				double new_lam = lam_vals[best_idx] * lam_dec;
+				new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
+				message(0, "updating lambda to ", new_lam);
+				last_best_lam = new_lam;
+			}
+			else
+			{
+				message(0, "not updating lambda (standard deviation reduction criteria not met)");
+			}
+			last_best_std = best_std;
+		}
+		else
+		{
+			double new_lam = last_best_lam * lam_inc;
+			new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
+			message(0, "incresing lambda to: ", new_lam);
+			last_best_lam = new_lam;
+		}
 	}
 	//report_and_save();
 	return true;
@@ -3013,7 +3050,7 @@ void IterEnsembleSmoother::set_subset_idx(int size)
 	}
 	vector<string> pe_names = pe.get_real_names();
 
-	vector<string>::iterator bidx = find(pe_names.begin(), pe_names.end(), base_name);
+	vector<string>::iterator bidx = find(pe_names.begin(), pe_names.end(), BASE_REAL_NAME);
 	if (bidx != pe_names.end())
 	{
 

@@ -1,3 +1,6 @@
+<p align="center">
+  <img src="documentation/pestpplogo.png" alt="pestpplogo image">
+</p>
 # PEST++
 
 ## Tools for non-intrusive and scalable parameter estimation and uncertainty quantification
@@ -11,7 +14,7 @@ PEST++ is a software suite aimed at supporting complex numerical models in the d
 
 ## Documentation
 
-The lastest PEST++ users manual is available [here](https://github.com/jtwhite79/pestpp/tree/develop/documentation). Direct zip download [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/jtwhite79/pestpp/tree/develop/documentation)
+The lastest PEST++ users manual is available [here](https://github.com/usgs/pestpp/tree/develop/documentation). Direct zip download [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/usgs/pestpp/tree/develop/documentation)
 
 ## Links to latest binaries
 
@@ -41,11 +44,11 @@ All members of the software suite can be compiled for PC, MAC, or Linux and have
 
 ## Funding
 
-Funding for PEST++ has been provided by the U.S. Geologial Survey. The New Zealand Strategic Science Investment Fund as part of GNS Science’s (https://www.gns.cri.nz/) Groundwater Research Programme has also funded contributions 2018-present.
+Funding for PEST++ has been provided by the U.S. Geologial Survey. The New Zealand Strategic Science Investment Fund as part of GNS Science’s (https://www.gns.cri.nz/) Groundwater Research Programme has also funded contributions 2018-present.  Intera, Inc. also provides ongoing support for PEST++.
 
 ## Recent developements
 
-PEST++ version 5 will be released soon!
+PEST++ version 5 has been released!  Please see the users manual for current input instructions and options for all PEST++ tools.  Also, several new tools are in development, include PESTPP-DA (generalized data assimilation including iterative ensemble Kalman filter), PESTPP-MOU (single and multiple objective constrained optimization under uncertainty) and PESTPP-SQP (ensemble-based constrainted sequential quadratic programming under uncertainty).  If you would like to be an early adopter/beta tester, please let us know!
 
 The PEST++ suite has been refactored to remove the fortran dependancy.  This includes the template and instruction file processing routines.
 

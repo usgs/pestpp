@@ -664,9 +664,17 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
 	double std = calc_std(&_meas);
 	vector<int> idxs;
 	vector<string> names = oe.get_real_names();
-	for (int i=0;i<names.size();i++)
+	for (int i = 0; i < names.size(); i++)
+	{
+		
 		if ((_meas[names[i]] > bad_phi) || (_meas[names[i]] > mean + (std * bad_phi_sigma)))
-			idxs.push_back(i);
+		{
+			if (names[i] == BASE_REAL_NAME)
+				cout << "...not dropping 'base' real even though phi is 'bad'" << endl;
+			else
+				idxs.push_back(i);
+		}	
+	}
 	return idxs;
 }
 
@@ -1009,11 +1017,11 @@ void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, Observat
 {
 	stringstream ss;
 	map<string, int> vmap = pe.get_real_map();
-	if (vmap.find("BASE") != vmap.end())
+	if (vmap.find(BASE_REAL_NAME) != vmap.end())
 	{
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
 		Parameters pars;
-		pars.update(pe.get_var_names(), eigenvec_2_stlvec(pe.get_real_vector("BASE")));
+		pars.update(pe.get_var_names(), eigenvec_2_stlvec(pe.get_real_vector(BASE_REAL_NAME)));
 		if (pe.get_trans_status() == ParameterEnsemble::transStatus::NUM)
 			pts.numeric2ctl_ip(pars);
 		// save parameters to .par file
@@ -1025,14 +1033,14 @@ void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, Observat
 		file_manager.close_file("par");
 
 		vmap = oe.get_real_map();
-		if (vmap.find("BASE") == vmap.end())
+		if (vmap.find(BASE_REAL_NAME) == vmap.end())
 		{
 			//message(2, "unable to find 'BASE' realization in obs ensemble for saving .base.rei file, continuing...");
 		}
 		else
 		{
 			Observations obs;
-			obs.update(oe.get_var_names(), eigenvec_2_stlvec(oe.get_real_vector("BASE")));
+			obs.update(oe.get_var_names(), eigenvec_2_stlvec(oe.get_real_vector(BASE_REAL_NAME)));
 			ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
 			// save new residuals to .rei file
 			ss.str("");

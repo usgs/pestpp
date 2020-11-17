@@ -999,6 +999,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	try {
 #endif
 		prior_info_string = "";
+		vector<string> notfound_args;
 		for (lnum = 1, sec_begin_lnum = 1; getline(fin, line); ++lnum)
 		{
 			strip_ip(line);
@@ -1099,6 +1100,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					ss.str("");
 					ss << "unrecognized '* control data keyword' key-value pair on line: " << endl << "    '" << line << "'" <<  endl;
 					throw_control_file_error(f_rec, ss.str(), false);
+					notfound_args.push_back(line);
 				}		
 			}
 
@@ -1721,6 +1723,23 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		throw_control_file_error(f_rec, ss.str());
 	}
 
+	vector<string> invalid;
+	for (auto kv : arg_map)
+	{
+		if (kv.second == PestppOptions::ARG_STATUS::ARG_INVALID)
+		{
+			invalid.push_back(kv.first);
+		}
+	}
+	if (invalid.size() > 0)
+	{
+		ss.str("");
+		ss << " the following '++' args have invalid values:" << endl;
+		for (auto n : invalid)
+			ss << n << ",";
+		throw_control_file_error(f_rec, ss.str());
+	}
+
 	vector<string> not_accepted;
 	for (auto kv : arg_map)
 	{
@@ -1729,15 +1748,25 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			not_accepted.push_back(kv.first);
 		}
 	}
+
 	if (not_accepted.size() > 0)
 	{
 		ss.str("");
 		ss << " the following '++' args were not accepted:" << endl;
 		for (auto n : not_accepted)
 			ss << n << ",";
-		throw_control_file_error(f_rec, ss.str());
+		if (pestpp_options.get_forgive_unknown_args())
+		{
+			ss << endl << "forgive_unknown_args is 'true', continuing" << endl;
+			throw_control_file_error(f_rec, ss.str(), false);
+		}
+		else
+		{
+			ss << endl << "forgive_unknown_args is 'false' so this is treated as an error" << endl;
+			throw_control_file_error(f_rec, ss.str(), true);
+		}
 	}
-
+	
 	if (control_info.pestmode == ControlInfo::PestMode::REGUL)
 	{
 		if (regul_scheme_ptr)

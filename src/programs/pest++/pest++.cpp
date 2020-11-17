@@ -168,13 +168,15 @@ int main(int argc, char* argv[])
 			fout_rec << endl << endl << "version: " << version << endl;
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl << endl;
-			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
+			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
 
 		}
 
 		cout << endl;
 		cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl << endl;
-		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl << endl;
+		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
+		cout << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
@@ -264,7 +266,8 @@ int main(int argc, char* argv[])
 					pest_scenario.get_pestpp_options().get_max_run_fail(),
 					pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
 					pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
-					pest_scenario.get_pestpp_options().get_overdue_giveup_minutes());
+					pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
+					pest_scenario.get_pestpp_options().get_panther_echo());
 			}
 		}
 		
@@ -290,7 +293,8 @@ int main(int argc, char* argv[])
 				file_manager.build_filename("rns"), pathname,
 				pest_scenario.get_pestpp_options().get_max_run_fail(),
 				pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
-				pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
+				pest_scenario.get_pestpp_options().get_additional_ins_delimiters(),
+				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
 		}
 
 		const ParamTransformSeq &base_trans_seq = pest_scenario.get_base_par_tran_seq();

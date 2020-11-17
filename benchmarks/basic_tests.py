@@ -752,7 +752,9 @@ def tplins1_test():
     pst = pyemu.Pst(os.path.join(t_d, "pest.pst"))
     dum_obs = ['h01_03', 'h01_07']
     pst.observation_data.drop(index=dum_obs, inplace=True)
-    pst.instruction_files = ['out1dum.dat.ins']
+    #pst.instruction_files = ['out1dum.dat.ins']
+    pst.model_output_data = pd.DataFrame({"pest_file":"out1dum.dat.ins","model_file":"out1.dat"},
+                                         index=["out1dum.dat.ins"])
     pst.write(os.path.join(t_d, "pest_dum.pst"))
     pyemu.os_utils.run("{0} pest_dum.pst".format(exe_path.replace("-ies", "-glm")), cwd=t_d)
     obf_df = pd.read_csv(os.path.join(t_d, "out1.dat.obf"), delim_whitespace=True, header=None,
@@ -1048,9 +1050,9 @@ if __name__ == "__main__":
     #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-    #tplins1_test()
+    tplins1_test()
     #ext_stdcol_test()
-    #mf6_v5_ies_test()
+    mf6_v5_ies_test()
     #mf6_v5_sen_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     #mf6_v5_opt_stack_test()
