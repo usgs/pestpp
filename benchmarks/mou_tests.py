@@ -229,7 +229,8 @@ def test_zdt1():
     test_d = setup_zdt_problem(test_case,30,additive_chance=False)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
     pst.control_data.noptmax = 3
-    pst.pestpp_options["mou_population_size"] = 100
+    pst.pestpp_options["mou_population_size"] = 200
+    pst.pestpp_options["panther_echo"] = False
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
     master_d = test_d.replace("template","master")
@@ -259,10 +260,10 @@ def test_zdt1():
     shutil.copy2(os.path.join(master_d,obs_pop_file),os.path.join(test_d,"restart_obs.csv"))
     pst.pestpp_options["mou_dv_population_file"] = "restart_dv.csv"
     pst.pestpp_options["mou_obs_population_restart_file"] = "restart_obs.csv"
-    pst.control_data.noptmax = 100
+    pst.control_data.noptmax = 1000
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
-                                      num_workers=15, master_dir=master_d,worker_root=test_root,
+                                      num_workers=25, master_dir=master_d,worker_root=test_root,
                                       port=port)
     dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
     assert os.path.exists(os.path.join(master_d,dv_pop_file)),dv_pop_file
@@ -281,8 +282,11 @@ def plot_zdt1_results():
     master_d = os.path.join("mou_tests","zdt1_master")
     assert os.path.exists(master_d)
 
-    odf_files = [f for f in os.listdir(master_d) if f.endswith("obs_pop.csv") and "archive" not in f]
+    odf_files = [f for f in os.listdir(master_d) if f.endswith("obs_pop.csv") and "archive" in f]
+    odf_files_all = [f for f in os.listdir(master_d) if f.endswith("obs_pop.csv") and "archive" not in f]
     odfs = [pd.read_csv(os.path.join(master_d,f),index_col=0) for f in odf_files]
+    odfs_all = [pd.read_csv(os.path.join(master_d,f),index_col=0) for f in odf_files_all]
+    
     import matplotlib.colors as colors
     import matplotlib.pyplot as plt
 
@@ -291,7 +295,7 @@ def plot_zdt1_results():
     for oname in cols:
         mins[oname] = 1.0e+30
         maxs[oname] = -1.0e+30
-        for df in odfs:
+        for df in odfs_all:
             mins[oname] = min(mins[oname],df.loc[:,oname].min())
             maxs[oname] = max(maxs[oname], df.loc[:, oname].max())
     print(mins,maxs)
@@ -299,7 +303,7 @@ def plot_zdt1_results():
     #colors = ["0.5",'m','b','c','g','y','r']
     cmap = plt.get_cmap("jet",lut=len(odfs))
     fig,ax = plt.subplots(1,1,figsize=(10,10))
-    for i,df in enumerate(odfs):
+    for i,df in enumerate(odfs_all):
 
         ax.scatter(df.loc[:,cols[0]],df.loc[:,cols[1]],marker=".",c=cmap(i/len(odfs)),s=50,alpha=0.25)
 
