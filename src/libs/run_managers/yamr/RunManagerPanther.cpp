@@ -520,7 +520,14 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		echo();
 		cout << endl << endl;
 		message.str("");
-		message << "   " << model_runs_done << " runs complete :  " << get_num_failed_runs() << " runs failed :  " << get_global_runtime_minute() << " avg run time (min)";
+		message << "   " << model_runs_done << " runs complete :  " << get_num_failed_runs() << " runs failed" << endl;
+		double duration = pest_utils::get_duration_sec(start_time) / 60.0;
+		message << "   " << setprecision(3) << get_global_runtime_minute() << " avg run time (min) : ";
+		message << setprecision(3) << duration << " run mgr time (min)" << endl;
+		message << "   " << agent_info_set.size() << " agents connected" << endl;
+		
+		
+		
 		cout << message.str() << endl << endl;
 		f_rmr << endl << "---------------------" << endl << message.str() << endl;
 

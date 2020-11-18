@@ -1692,7 +1692,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 
 ParameterEnsemble MOEA::generate_population()
 {
-	string mou_alg = pest_scenario.get_pestpp_options().get_mou_algorithm();
+	string mou_alg = pest_utils::upper_cp(pest_scenario.get_pestpp_options().get_mou_algorithm());
 	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
 	//add new members for any missing
 	num_members += (num_members - dp.shape().first);
@@ -2070,7 +2070,7 @@ ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnse
 	//TODO: add algorithm parameters to pp args
 	// crossover
 	double crossover_probability = 0.9;
-	double crossover_distribution_index = 20.0;
+	double crossover_distribution_index = 10.0;
 	int i_member = 0;
 	int p1_idx, p2_idx;
 	Eigen::MatrixXd new_reals(num_members, _dp.shape().second);
@@ -2114,7 +2114,7 @@ ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnse
 	//tmp_dp.to_csv("temp_cross.csv");
 	//mutation
 	double mutation_probability = 1.0 / pest_scenario.get_n_adj_par();
-	double mutation_distribution_index = 20.0;
+	double mutation_distribution_index = 10.0;
 	mutate(mutation_probability, mutation_distribution_index, tmp_dp);
 
 	//tmp_dp.to_csv("temp_mut.csv");

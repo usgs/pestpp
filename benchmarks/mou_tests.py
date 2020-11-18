@@ -231,6 +231,7 @@ def test_zdt1():
     pst.control_data.noptmax = 3
     pst.pestpp_options["mou_population_size"] = 100
     pst.pestpp_options["panther_echo"] = False
+    pst.pestpp_options["mou_algorithm"] = "de"
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
     master_d = test_d.replace("template","master")
@@ -314,13 +315,22 @@ def plot_zdt1_results():
     #for i,df in enumerate(odfs_all):
     for i,gen in enumerate(gens):
 
-        ax.scatter(df.loc[df.generation==gen,cols[0]],df.loc[df.generation==gen,cols[1]],marker=".",
+        ax.scatter(df_arc.loc[df_arc.generation==gen,cols[0]],df_arc.loc[df_arc.generation==gen,cols[1]],marker=".",
             c=cmap(i/len(gens)),s=50,alpha=0.25)
-
 
     ax.scatter(df_arc.loc[df_arc.generation==gen,cols[0]],
         df_arc.loc[df_arc.generation==gen,cols[1]],
         marker="+",c=cmap(i/len(gens)),s=100)
+
+    x0 = np.linspace(0,1,1000)
+    o1,o2 = [],[]
+    for xx0 in x0:
+        x = np.zeros(30)
+        x[0] = xx0
+        oo1,oo2 = zdt1(x)
+        o1.append(oo1)
+        o2.append(oo2)
+    ax.plot(o1,o2,"k")
 
     plt.show()
 

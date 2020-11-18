@@ -1278,18 +1278,6 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
 	
 
-	os << endl << "...pestpp-mou options:" << endl;
-	os << "mou_algorithm: " << mou_algorithm << endl;
-	os << "mou_population_size: " << mou_population_size << endl;
-	os << "mou_dv_population_file: " << mou_dv_population_file << endl;
-	os << "mou_obs_population_restart_file: " << mou_obs_population_restart_file << endl;
-	os << "mou_objectives: " << endl;
-	for (auto obj : mou_objectives)
-		os << obj << endl;
-	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
-	
-
-
 	os << endl << "...pestpp-ies options:" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
 	os << "ies_observation_ensemble: " << ies_obs_csv << endl;
