@@ -400,7 +400,7 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt6",10)
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
     #setup_zdt_problem("zdt1",30, additive_chance=True)
-    test_zdt1()
+    #test_zdt1()
     plot_zdt1_results()
     #test_zdt1_chance()
     #setup_zdt_problem("zdt1",30, additive_chance=True)

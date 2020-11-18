@@ -903,7 +903,7 @@ void Ensemble::to_csv_by_vars(ofstream &csv)
 		real_map[real_names[i]] = i;
 	map<string, int>::iterator end = real_map.end();
 	vector<string> names = org_real_names;
-	if (names.size() != reals.rows())
+	if (names.size() == 0)
 		names = real_names;
 	for (auto rname : names)
 	{
@@ -941,7 +941,7 @@ void Ensemble::to_csv_by_reals(ofstream &csv)
 		real_map[real_names[i]] = i;
 	map<string, int>::iterator end = real_map.end();
 	vector<string> names = org_real_names;
-	if (names.size() != reals.rows())
+	if (names.size() == 0)
 		names = real_names;
 	for (auto rname : names)
 	{
