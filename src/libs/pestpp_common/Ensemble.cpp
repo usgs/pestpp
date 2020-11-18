@@ -902,7 +902,10 @@ void Ensemble::to_csv_by_vars(ofstream &csv)
 	for (int i = 0; i < real_names.size(); i++)
 		real_map[real_names[i]] = i;
 	map<string, int>::iterator end = real_map.end();
-	for (auto rname : org_real_names)
+	vector<string> names = org_real_names;
+	if (names.size() != reals.rows())
+		names = real_names;
+	for (auto rname : names)
 	{
 		if (real_map.find(rname) == end)
 			continue;
@@ -914,7 +917,7 @@ void Ensemble::to_csv_by_vars(ofstream &csv)
 	for (int ivar = 0; ivar < reals.cols(); ivar++)
 	{
 		csv << pest_utils::lower_cp(var_names[ivar]);
-		for (auto rname : org_real_names)
+		for (auto rname : names)
 		{
 			if (real_map.find(rname) == end)
 				continue;
@@ -936,8 +939,11 @@ void Ensemble::to_csv_by_reals(ofstream &csv)
 	map<string, int> real_map;
 	for (int i = 0; i < real_names.size(); i++)
 		real_map[real_names[i]] = i;
-	map<string, int>::iterator end = real_map.end();	
-	for (auto rname : org_real_names)
+	map<string, int>::iterator end = real_map.end();
+	vector<string> names = org_real_names;
+	if (names.size() != reals.rows())
+		names = real_names;
+	for (auto rname : names)
 	{
 		if (real_map.find(rname) == end)
 			continue;
