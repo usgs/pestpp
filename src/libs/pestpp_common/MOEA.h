@@ -16,6 +16,8 @@
 #include "constraints.h"
 #include "EnsembleMethodUtils.h"
 
+const string POP_SUM_TAG = "pareto.summary.csv";
+const string ARC_SUM_TAG = "pareto.archive.summary.csv";
 
 class ParetoObjectives
 {
@@ -23,7 +25,7 @@ public:
 	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
 		PerformanceLog* _performance_log,Constraints* _constraints_ptr = nullptr);
 
-	pair<vector<string>, vector<string>> pareto_dominance_sort(ObservationEnsemble& op, ParameterEnsemble& dp, bool report=true);
+	pair<vector<string>, vector<string>> pareto_dominance_sort(int generation, ObservationEnsemble& op, ParameterEnsemble& dp, bool report=true, string sum_tag=string());
 	
 	//this must be called at least once before the diversity metrixs can be called...
 	void set_pointers(vector<string>& _obs_obj_names, vector<string>& _pi_obj_names, map<string, double>& _obj_dir_mult)
@@ -31,21 +33,23 @@ public:
 		obs_obj_names_ptr = &_obs_obj_names; 
 		pi_obj_names_ptr = &_pi_obj_names; 
 		obj_dir_mult_ptr = &_obj_dir_mult;
+		prep_pareto_summary_file(POP_SUM_TAG);
+		prep_pareto_summary_file(ARC_SUM_TAG);
 	}
 	void update_member_struct(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	
 	map<string,double> get_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	
 	map<string, double> get_hypervolume(ObservationEnsemble& oe, ParameterEnsemble& dp);
-	
 	 
 private:
+	
 	Pest& pest_scenario;
 	FileManager& file_manager;
 	PerformanceLog* performance_log;
 	//vector<string> obj_names;
 	Constraints* constraints_ptr;
-	vector<string> sort_members_by_crowding_distance(vector<string>& members);
+	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, double>& crowd_map);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
 
 	void drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp);
@@ -76,11 +80,11 @@ private:
 	{
 		return elem1.second < elem2.second;
 	};
-	Comparator revcompFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
-	{
-		return elem1.second < elem2.second;
-	};
-
+	
+	void prep_pareto_summary_file(string summary_tag);
+	void write_pareto_summary(string& sum_tag, int generation, vector<string>& member_names,
+		map<string, int>& front_map, map<string, double>& crowd_map, map<string, double>& infeas_map);
+	
 };
 
 

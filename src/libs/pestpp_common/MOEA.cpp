@@ -135,7 +135,8 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 	}
 }
 
-pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(ObservationEnsemble& op, ParameterEnsemble& dp, bool report)
+pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int generation, ObservationEnsemble& op, 
+	ParameterEnsemble& dp, bool report, string sum_tag)
 {
 	stringstream ss;
 	ss << "ParetoObjectives::pareto_dominance_sort() for " << op.shape().first << " population members";
@@ -157,6 +158,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(Obs
 	
 	vector<string> real_names = op.get_real_names();
 	vector<string> infeas_ordered;
+	map<string, double> infeas;
 	if (constraints_ptr)
 	{
 		//sort into feasible and infeasible 
@@ -166,8 +168,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(Obs
 		Parameters pars = pest_scenario.get_ctl_parameters();
 		vector<string> onames = op.get_var_names(), pnames=dp.get_var_names();
 		set<string> obs_obj_set(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
-		set<string> pi_obj_set(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());
-		map<string,double> infeas;
+		set<string> pi_obj_set(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());	
 		map<string, map<string, double>> feas_member_struct;
 		for (auto real_name : real_names)
 		{
@@ -239,13 +240,25 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(Obs
 
 	vector<string> nondom_crowd_ordered,dom_crowd_ordered;
 	vector<string> crowd_ordered_front;
+	map<string, double> crowd_map;
+	map<string, int> member_front_map;
 	for (auto front : front_map)
-	{	//TODO: Deb says we only need to worry about crowding sort if not all
+	{	
+		for (auto m : front.second)
+			member_front_map[m] = front.first;
+		//TODO: Deb says we only need to worry about crowding sort if not all
 		//members of the front are going to be retained.  For now, just sorting all fronts...
 		if (front.second.size() == 1)
+		{
 			crowd_ordered_front = front.second;
+			crowd_map[front.second[0]] = -999.0;
+		}
+
 		else
-			crowd_ordered_front = sort_members_by_crowding_distance(front.second);
+		{
+			crowd_ordered_front = sort_members_by_crowding_distance(front.second, crowd_map);
+		}
+
 		if (front.first == 1)
 			for (auto front_member : crowd_ordered_front)
 				nondom_crowd_ordered.push_back(front_member);
@@ -274,11 +287,58 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(Obs
 	}
 
 	//TODO: some kind of reporting here.  Probably to the rec and maybe a csv file too...
+	if (sum_tag.size() > 0)
+	{
 
+		write_pareto_summary(sum_tag, generation, real_names, member_front_map, crowd_map, infeas);
+	}
+		
 	return pair<vector<string>, vector<string>>(nondom_crowd_ordered, dom_crowd_ordered);
 
 }
 
+void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, vector<string>& member_names, 
+	map<string,int>& front_map, map<string,double>& crowd_map, map<string,double>& infeas_map)
+{
+	ofstream& sum = file_manager.get_ofstream(sum_tag);
+	for (auto& member : member_names)
+	{
+		sum << generation << "," << member;
+		for (auto obj : *obs_obj_names_ptr)
+		{
+			sum << "," << member_struct[member][obj];
+		}
+		for (auto obj : *pi_obj_names_ptr)
+		{
+			sum << "," << member_struct[member][obj];
+		}
+		sum << "," << front_map[member];
+		sum << "," << crowd_map[member];
+		if (infeas_map.find(member) != infeas_map.end())
+		{
+			sum << "," << 0 << "," << infeas_map[member];
+		}
+		else
+		{
+			sum << "," << 1 << "," << -999;
+		}
+		sum << endl;
+	}
+
+}
+
+void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
+{
+	file_manager.open_ofile_ext(summary_tag);
+	ofstream& sum = file_manager.get_ofstream(summary_tag);
+	sum << "generation,member";
+	for (auto obj : *obs_obj_names_ptr)
+		sum << "," << obj;
+	for (auto obj : *pi_obj_names_ptr)
+		sum << "," << obj;
+	sum << "front,crowding_distance,is_feasible,feasible_distance" << endl;
+
+}
 
 map<string, double> ParetoObjectives::get_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
@@ -371,7 +431,7 @@ map<string, double> ParetoObjectives::get_crowding_distance(vector<string>& memb
 }
 
 
-vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members)
+vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members, map<string,double>& crowd_map)
 {
 
 	map<string, double> crowd_distance_map = get_crowding_distance(members);
@@ -379,7 +439,10 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string
 
 	vector <pair<string, double>> cs_vec;
 	for (auto cd : crowd_distance_map)
+	{
 		cs_vec.push_back(cd);
+		crowd_map[cd.first] = cd.second;
+	}
 
 	std::sort(cs_vec.begin(), cs_vec.end(),
 		compFunctor);
@@ -838,7 +901,7 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	dp_archive.append_other_rows(keep, other);
 	other.resize(0, 0);
 	message(2, "pareto dominance sorting archive of size", op_archive.shape().first);
-	DomPair dompair = objectives.pareto_dominance_sort(op_archive, dp_archive);
+	DomPair dompair = objectives.pareto_dominance_sort(iter,op_archive, dp_archive,true,ARC_SUM_TAG);
 	
 	ss.str("");
 	ss << "resizing archive from " << op_archive.shape().first << " to " << dompair.first.size() << " current non-dominated solutions";
@@ -1514,7 +1577,7 @@ void MOEA::initialize()
 	//do an initial pareto dominance sort
 	message(1, "performing initial pareto dominance sort");
 	objectives.set_pointers(obs_obj_names, pi_obj_names, obj_dir_mult);
-	DomPair dompair = objectives.pareto_dominance_sort(op, dp);
+	DomPair dompair = objectives.pareto_dominance_sort(iter, op, dp,true,POP_SUM_TAG);
 	
 	//initialize op and dp archives
 	op_archive = ObservationEnsemble(&pest_scenario, &rand_gen, 
@@ -1685,7 +1748,7 @@ void MOEA::iterate_to_solution()
 
 		message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
 
-		DomPair dompair = objectives.pareto_dominance_sort(new_op, new_dp);
+		DomPair dompair = objectives.pareto_dominance_sort(iter, new_op, new_dp,true,POP_SUM_TAG);
 
 		//drop shitty members
 		//TODO: this is just a cheap hack, prob something more meaningful to be done...
