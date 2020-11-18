@@ -520,7 +520,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		echo();
 		cout << endl << endl;
 		message.str("");
-		message << "   " << model_runs_done << " runs complete :  " << get_num_failed_runs() << " runs failed";
+		message << "   " << model_runs_done << " runs complete :  " << get_num_failed_runs() << " runs failed :  " << get_global_runtime_minute() << " avg run time (min)";
 		cout << message.str() << endl << endl;
 		f_rmr << endl << "---------------------" << endl << message.str() << endl;
 

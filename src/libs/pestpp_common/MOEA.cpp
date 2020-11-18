@@ -324,6 +324,8 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, vec
 		}
 		sum << endl;
 	}
+	cout << "...wrote pareto summary to " << file_manager.get_base_filename() << "." << sum_tag << endl;
+	file_manager.rec_ofstream() << "...wrote pareto summary to " << file_manager.get_base_filename() << "." << sum_tag << endl;
 
 }
 
@@ -333,10 +335,10 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 	ofstream& sum = file_manager.get_ofstream(summary_tag);
 	sum << "generation,member";
 	for (auto obj : *obs_obj_names_ptr)
-		sum << "," << obj;
+		sum << "," << pest_utils::lower_cp(obj);
 	for (auto obj : *pi_obj_names_ptr)
-		sum << "," << obj;
-	sum << "front,crowding_distance,is_feasible,feasible_distance" << endl;
+		sum << "," << pest_utils::lower_cp(obj);
+	sum << ",front,crowding_distance,is_feasible,feasible_distance" << endl;
 
 }
 
@@ -706,10 +708,12 @@ map<string, map<string, double>> MOEA::obj_func_change_report(map<string, map<st
 	
 	stringstream ss;
 	int max_len = get_max_len_obj_name();
-	ss << left << setw(max_len) << "objective function" << right << setw(15) << "mean change";
-	ss << setw(15) << "% mean change" << setw(15) << "stdev change" << setw(15) << "% stdev change" << endl;
+	ss << left << setw(max_len) << "objective function" << right << setw(11) << "mean change";
+	ss << setw(11) << "% change";
+	ss << setw(11) << "max change" << setw(11) << "% change";
+	ss << setw(11) << "min change" << setw(11) << "% change" << endl;
 
-
+	vector<string> tags{ "mean","max","min" };
 	for (auto obs_obj : obs_obj_names)
 	{
 		change_summary[obs_obj] = map<string, double>();
@@ -717,22 +721,22 @@ map<string, map<string, double>> MOEA::obj_func_change_report(map<string, map<st
 			throw_moea_error("obj_func_change_report() error: obs obj '" + obs_obj + "' not in previous summary");
 		if (current_obj_summary.find(obs_obj) == current_obj_summary.end())
 			throw_moea_error("obj_func_change_report() error: obs obj '" + obs_obj + "' not in current summary");
-		change = previous_obj_summary[obs_obj]["mean"] - current_obj_summary[obs_obj]["mean"];
-		percent_change = 100.0 * (change / previous_obj_summary[obs_obj]["mean"]);
 		ss << left << setw(max_len) << obs_obj;
-		ss << right << setw(15) << change;
-		ss << setw(15) << percent_change;
-		change_summary[obs_obj]["mean"] = change;
-		change_summary[obs_obj]["mean_percent"] = percent_change;
-
-		change = previous_obj_summary[obs_obj]["std"] - current_obj_summary[obs_obj]["std"];
-		percent_change = 100.0 * (change / previous_obj_summary[obs_obj]["std"]);
-		ss << setw(15) << change;
-		ss << setw(15) << percent_change;
-		change_summary[obs_obj]["std"] = change;
-		change_summary[obs_obj]["std_percent"] = percent_change;
+		for (auto tag : tags)
+		{
+			
+			change = previous_obj_summary[obs_obj][tag] - current_obj_summary[obs_obj][tag];
+			if ((previous_obj_summary[obs_obj][tag] <= 0.0) || (change == 0.0))
+				percent_change = 0.0;
+			else
+				percent_change = 100.0 * (change / previous_obj_summary[obs_obj][tag]);
+			
+			ss << right << setw(11) << change;
+			ss << setw(11) << percent_change;
+			change_summary[obs_obj][tag] = change;
+			change_summary[obs_obj][tag+"_percent"] = percent_change;
+		}
 		ss << endl;
-
 	}
 	for (auto pi_obj : pi_obj_names)
 	{
@@ -741,21 +745,21 @@ map<string, map<string, double>> MOEA::obj_func_change_report(map<string, map<st
 			throw_moea_error("obj_func_change_report() error: pi obj '" + pi_obj + "' not in previous summary");
 		if (current_obj_summary.find(pi_obj) == current_obj_summary.end())
 			throw_moea_error("obj_func_change_report() error: pi obj '" + pi_obj + "' not in current summary");
-		change = previous_obj_summary[pi_obj]["mean"] - current_obj_summary[pi_obj]["mean"];
-		percent_change = 100.0 * (change / previous_obj_summary[pi_obj]["mean"]);
 		ss << left << setw(max_len) << pi_obj;
-		ss << right << setw(15) << change;
-		ss << setw(15) << percent_change;
-		change_summary[pi_obj]["mean"] = change;
-		change_summary[pi_obj]["mean_percent"] = percent_change;
-
-		change = previous_obj_summary[pi_obj]["std"] - current_obj_summary[pi_obj]["std"];
-		percent_change = 100.0 * (change / previous_obj_summary[pi_obj]["std"]);
-		ss << setw(15) << change;
-		ss << setw(15) << percent_change;
-		change_summary[pi_obj]["std"] = change;
-		change_summary[pi_obj]["std_percent"] = percent_change;
-		ss << endl;
+		for (auto tag : tags)
+		{
+			change = previous_obj_summary[pi_obj][tag] - current_obj_summary[pi_obj][tag];
+			if ((previous_obj_summary[pi_obj][tag] <= 0.0) || (change == 0.0))
+				percent_change = 0.0;
+			else
+				percent_change = 100.0 * (change / previous_obj_summary[pi_obj][tag]);
+			
+			ss << right << setw(11) << change;
+			ss << setw(11) << percent_change;
+			change_summary[pi_obj][tag] = change;
+			change_summary[pi_obj][tag + "_percent"] = percent_change;
+		}
+		ss << endl; ss << endl;
 	}
 	file_manager.rec_ofstream() << ss.str() << endl;
 	cout << ss.str() << endl;
@@ -1099,63 +1103,7 @@ void MOEA::initialize()
 	error_min_members = 4;
 	
 
-	if (pest_scenario.get_control_info().noptmax == 0)
-	{
-		message(0, "'noptmax'=0, running control file parameter values and quitting");
-
-		Parameters pars = pest_scenario.get_ctl_parameters();
-		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
-
-		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
-		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
-		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
-		_pe.append("BASE", pars);
-		string par_csv = file_manager.get_base_filename() + ".par.csv";
-		//message(1, "saving parameter values to ", par_csv);
-		//_pe.to_csv(par_csv);
-		ParameterEnsemble pe_base = _pe;
-		pe_base.reorder(vector<string>(), act_par_names);
-		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
-		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
-		_oe.append("BASE", pest_scenario.get_ctl_observations());
-		ObservationEnsemble oe_base = _oe;
-		oe_base.reorder(vector<string>(), act_obs_names);
-		//initialize the phi handler
-		Covariance parcov;
-		parcov.from_parameter_bounds(pest_scenario, file_manager.rec_ofstream());
-		L2PhiHandler ph(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
-		if (ph.get_lt_obs_names().size() > 0)
-		{
-			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
-		}
-		if (ph.get_gt_obs_names().size())
-		{
-			message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
-		}
-		message(1, "running control file parameter values");
-
-		vector<int> failed_idxs = run_population(_pe, _oe);
-		if (failed_idxs.size() != 0)
-		{
-			message(0, "control file parameter value run failed...bummer");
-			throw_moea_error(string("control file parameter value run failed"));
-		}
-		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
-		message(1, "saving results from control file parameter value run to ", obs_csv);
-		_oe.to_csv(obs_csv);
-
-		ph.update(_oe, _pe);
-		message(0, "control file parameter phi report:");
-		ph.report(true);
-		ph.write(0, 1);
-		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);
-		
-		message(0, "control file parameter objective function summary: ");
-		obj_func_report(_pe, _oe);
-
-		return;
-	}
-
+	
 	//set some defaults
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
@@ -1413,6 +1361,64 @@ void MOEA::initialize()
 	
 	if (obs_obj_names.size() + pi_obj_names.size() > 5)
 		message(1, "WARNING: more than 5 objectives, this is pushing the limits!");
+
+
+	if (pest_scenario.get_control_info().noptmax == 0)
+	{
+		message(0, "'noptmax'=0, running control file parameter values and quitting");
+
+		Parameters pars = pest_scenario.get_ctl_parameters();
+		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+
+		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
+		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
+		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
+		_pe.append("BASE", pars);
+		string par_csv = file_manager.get_base_filename() + ".par.csv";
+		//message(1, "saving parameter values to ", par_csv);
+		//_pe.to_csv(par_csv);
+		ParameterEnsemble pe_base = _pe;
+		pe_base.reorder(vector<string>(), act_par_names);
+		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
+		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
+		_oe.append("BASE", pest_scenario.get_ctl_observations());
+		ObservationEnsemble oe_base = _oe;
+		oe_base.reorder(vector<string>(), act_obs_names);
+		//initialize the phi handler
+		Covariance parcov;
+		parcov.from_parameter_bounds(pest_scenario, file_manager.rec_ofstream());
+		L2PhiHandler ph(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
+		if (ph.get_lt_obs_names().size() > 0)
+		{
+			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
+		}
+		if (ph.get_gt_obs_names().size())
+		{
+			message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
+		}
+		message(1, "running control file parameter values");
+
+		vector<int> failed_idxs = run_population(_pe, _oe);
+		if (failed_idxs.size() != 0)
+		{
+			message(0, "control file parameter value run failed...bummer");
+			throw_moea_error(string("control file parameter value run failed"));
+		}
+		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
+		message(1, "saving results from control file parameter value run to ", obs_csv);
+		_oe.to_csv(obs_csv);
+
+		ph.update(_oe, _pe);
+		message(0, "control file parameter phi report:");
+		ph.report(true);
+		ph.write(0, 1);
+		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);
+
+		message(0, "control file parameter objective function summary: ");
+		obj_func_report(_pe, _oe);
+
+		return;
+	}
 
 
 	//TODO: report constraints being applied
@@ -2075,22 +2081,8 @@ ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnse
     // selection
 	// 
 	while (i_member < num_members)
-	// if we select two at a time and generate two offspring
-	// for (int i_member = 0; i < (num_members / 2); i_member++) {
+	
 	{
-
-		// if member1 dominates member2, use member1
-		// else if member2 dominates member1, use member2
-		// else if member1 has greater crowding distance, use member1
-		// else if member2 has greater crowding distance, use member2
-		// else use one at random:
-		//  rnds = uniform_draws(2, 0.0, 1.0, rand_gen);
-		//    else
-		//    if (rnds[0] < 0.5)
-		//  	  return member1;
-		//    else
-		//  	  return member2;
-
 
 		//randomly select two parents - this is just a temp routine, something better needed...
 		working_count = member_count;//copy member count index to working count
