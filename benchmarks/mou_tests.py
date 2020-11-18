@@ -229,7 +229,7 @@ def test_zdt1():
     test_d = setup_zdt_problem(test_case,30,additive_chance=False)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
     pst.control_data.noptmax = 3
-    pst.pestpp_options["mou_population_size"] = 200
+    pst.pestpp_options["mou_population_size"] = 50
     pst.pestpp_options["panther_echo"] = False
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
@@ -260,7 +260,7 @@ def test_zdt1():
     shutil.copy2(os.path.join(master_d,obs_pop_file),os.path.join(test_d,"restart_obs.csv"))
     pst.pestpp_options["mou_dv_population_file"] = "restart_dv.csv"
     pst.pestpp_options["mou_obs_population_restart_file"] = "restart_obs.csv"
-    pst.control_data.noptmax = 1000
+    pst.control_data.noptmax = 3
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
                                       num_workers=25, master_dir=master_d,worker_root=test_root,
@@ -400,7 +400,7 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt6",10)
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
     #setup_zdt_problem("zdt1",30, additive_chance=True)
-    #test_zdt1()
+    test_zdt1()
     plot_zdt1_results()
     #test_zdt1_chance()
     #setup_zdt_problem("zdt1",30, additive_chance=True)
