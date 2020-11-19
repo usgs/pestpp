@@ -1858,7 +1858,8 @@ bool MOEA::initialize_dv_population()
 			ss << "original_member:" << i;
 			real_names.push_back(ss.str());
 		}
-		dp.set_real_names(real_names);
+		dp.set_real_names(real_names, true);
+	
 		drawn = true;
 	}
 	else

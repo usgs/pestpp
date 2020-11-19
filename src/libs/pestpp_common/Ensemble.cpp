@@ -1043,7 +1043,7 @@ void Ensemble::throw_ensemble_error(string message)
 	throw runtime_error(full_message);
 }
 
-void Ensemble::set_real_names(vector<string>& _real_names)
+void Ensemble::set_real_names(vector<string>& _real_names, bool update_org_names)
 {
 	if (_real_names.size() != real_names.size())
 	{
@@ -1053,7 +1053,13 @@ void Ensemble::set_real_names(vector<string>& _real_names)
 
 	}
 	real_names = _real_names;
+	if (update_org_names)
+	{
+		org_real_names = real_names;
+	}
 }
+
+
 
 Ensemble::~Ensemble()
 {

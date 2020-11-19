@@ -279,11 +279,11 @@ def test_zdt1():
     assert dv_df.index.to_list() == obs_df.index.to_list()
 
 
-def test_zdt(test_case="zdt1"):
+def test_zdt(test_case="zdt1",pop_size=100,noptmax=3):
     test_d = setup_zdt_problem(test_case,30,additive_chance=False)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
-    pst.control_data.noptmax = 3
-    pst.pestpp_options["mou_population_size"] = 100
+    pst.control_data.noptmax = 2
+    pst.pestpp_options["mou_population_size"] = pop_size
     pst.pestpp_options["panther_echo"] = False
     pst.pestpp_options["mou_generator"] = "de"
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
@@ -315,7 +315,7 @@ def test_zdt(test_case="zdt1"):
     shutil.copy2(os.path.join(master_d,obs_pop_file),os.path.join(test_d,"restart_obs.csv"))
     pst.pestpp_options["mou_dv_population_file"] = "restart_dv.csv"
     pst.pestpp_options["mou_obs_population_restart_file"] = "restart_obs.csv"
-    pst.control_data.noptmax = 100
+    pst.control_data.noptmax = noptmax
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
                                       num_workers=35, master_dir=master_d,worker_root=test_root,
@@ -483,7 +483,7 @@ if __name__ == "__main__":
     #setup_zdt_problem("zdt1",30, additive_chance=True)
     
     
-    master_d = test_zdt("zdt2")
+    master_d = test_zdt("zdt2",noptmax=100)
     plot_zdt_results(master_d)
     #test_zdt1_chance()
     #setup_zdt_problem("zdt1",30, additive_chance=True)
