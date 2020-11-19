@@ -1419,12 +1419,33 @@ void MOEA::initialize()
 
 		return;
 	}
-
-
+	
+	string mou_generator = pest_utils::upper_cp(pest_scenario.get_pestpp_options().get_mou_generator());
+	vector<string> tokens;
+	int pop_size = pest_scenario.get_pestpp_options().get_mou_population_size();
+	pest_utils::tokenize(mou_generator, tokens, ",");
+	for (auto token : tokens)
+	{
+		if (token == "DE")
+		{
+			gen_types.push_back(MouGenType::DE);
+		}
+		else if (token == "RGA")
+		{
+			gen_types.push_back(MouGenType::RGA);
+		}
+		else
+		{
+			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','RGA'}");
+		}
+	}
 	//TODO: report constraints being applied
 
 	sanity_checks();
 
+	file_manager.open_ofile_ext(lineage_tag);
+	ofstream& lin = file_manager.get_ofstream(lineage_tag);
+	lin << "child,parent_1,parent_2,parent_3" << endl;
 
 	//initialize the constraints using ctl file pars and obs
 	//throughout the process, we can update these pars and obs
@@ -1692,25 +1713,32 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 
 ParameterEnsemble MOEA::generate_population()
 {
-	string mou_alg = pest_utils::upper_cp(pest_scenario.get_pestpp_options().get_mou_algorithm());
-	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
+	int total_new_members = pest_scenario.get_pestpp_options().get_mou_population_size();
 	//add new members for any missing
-	num_members += (num_members - dp.shape().first);
+	total_new_members += (total_new_members - dp.shape().first);
+	int new_members_per_gen = int(total_new_members / gen_types.size());
+	ParameterEnsemble new_pop(&pest_scenario, &rand_gen);
+	new_pop.set_trans_status(ParameterEnsemble::transStatus::NUM);
+	for (auto gen_type : gen_types)
+	{
+		ParameterEnsemble p;
+		if (gen_type == MouGenType::DE)
+		{
+			p = generate_diffevol_population(new_members_per_gen, dp);
+		}
 
-	//TODO: work out which generator to use
-
-	//TODO: add sanity check for supported algs so that we 
-	//trap issues before getting here
-
-	if (mou_alg == "DE")
-		return generate_diffevol_population(num_members, dp);
-	else if (mou_alg == "NSGA2")
-		// if using NSGA2
-		return generate_nsga2_population(num_members, dp);
-
-	else
-		throw_moea_error("unrecognized mou algorithm (looking for 'NSGA2', 'DE'): " + mou_alg);
-
+		else if (gen_type == MouGenType::RGA)
+		{
+			p = generate_rga_population(new_members_per_gen, dp);
+		}
+		else
+			throw_moea_error("unrecognized mou generator");
+		if (new_pop.shape().first == 0)
+			new_pop = p;
+		else
+			new_pop.append_other_rows(p);
+	}
+	return new_pop;
 }
 
 void MOEA::iterate_to_solution()
@@ -1822,6 +1850,15 @@ bool MOEA::initialize_dv_population()
 		Parameters draw_par = pest_scenario.get_ctl_parameters();
 		
 		dp.draw_uniform(num_members, dv_names, performance_log, 1, file_manager.rec_ofstream());
+		vector<string> real_names;
+		
+		for (int i = 0; i < num_members; i++)
+		{
+			ss.str("");
+			ss << "original_member:" << i;
+			real_names.push_back(ss.str());
+		}
+		dp.set_real_names(real_names);
 		drawn = true;
 	}
 	else
@@ -1988,7 +2025,9 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	//since _dp migth contain both dev vars and pars, we want to 
 	//make sure we are only fooling with dec vars
 	//the var_map lets us map between dv name and col index
-
+	ofstream& lin = file_manager.get_ofstream(lineage_tag);
+	vector<string> real_names = _dp.get_real_names();
+	string new_name;
 	_dp.update_var_map();
 	map<string, int> var_map = _dp.get_var_map();
 	string dv_name;
@@ -2040,7 +2079,12 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 				y[ii] = diff[ii];
 			}
 		}
-		new_member_names.push_back(get_new_member_name("diffevol"));
+		new_name = get_new_member_name("diffevol");
+		new_member_names.push_back(new_name);
+		lin << new_name;
+		for (auto idx : selected)
+			lin << "," << real_names[idx];
+		lin << endl;
 		new_reals.row(i) = y;
 	}
 
@@ -2052,7 +2096,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	return new_dp;
 }
 
-ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnsemble& _dp)
+ParameterEnsemble MOEA::generate_rga_population(int num_members, ParameterEnsemble& _dp)
 {
 	message(1, "generating NSGA2 population of size", num_members);
 
@@ -2077,9 +2121,9 @@ ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnse
 	new_reals.setZero();
 	pair<Eigen::VectorXd, Eigen::VectorXd> children;
 	vector<string> new_names;
-
-    // selection
-	// 
+	ofstream& lin = file_manager.get_ofstream(lineage_tag);
+	vector<string> real_names = _dp.get_real_names();
+	string new_name;
 	while (i_member < num_members)
 	
 	{
@@ -2097,13 +2141,17 @@ ParameterEnsemble MOEA::generate_nsga2_population(int num_members, ParameterEnse
 
 		//put the two children into the child population
 		new_reals.row(i_member) = children.first;
-		new_names.push_back(get_new_member_name("nsga-ii"));
+		new_name = get_new_member_name("rga");
+		lin << new_name << "," << real_names[p1_idx] << "," << real_names[p2_idx] << endl;
+		new_names.push_back(new_name);
 		//cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() - 1] << endl;
 		i_member++;
 		if (i_member >= num_members)
 			break;
 		new_reals.row(i_member) = children.second;
-		new_names.push_back(get_new_member_name("nsga-ii"));
+		new_name = get_new_member_name("rga");
+		lin << new_name << "," << real_names[p1_idx] << "," << real_names[p2_idx] << endl;
+		new_names.push_back(new_name);
 		//cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() -1] << endl;
 		i_member++;
 
@@ -2158,7 +2206,7 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 string MOEA::get_new_member_name(string tag)
 {
 	stringstream ss;
-	ss << "gen_" << iter << "_member_" << member_count;
+	ss << "gen:" << iter << "_member:" << member_count;
 	if (tag.size() > 0)
 	{
 		ss << "_" << tag;

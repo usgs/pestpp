@@ -1053,9 +1053,9 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 
 bool PestppOptions::assign_mou_value_by_key(const string& key, const string& value, const string& org_value)
 {
-	if (key == "MOU_ALGORITHM")
+	if (key == "MOU_GENERATOR")
 	{
-		mou_algorithm = org_value;
+		mou_generator = org_value;
 		return true;
 	}
 
@@ -1268,7 +1268,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_num_reals: " << sqp_num_reals << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
-	os << "mou_algorithm: " << mou_algorithm << endl;
+	os << "mou_generator: " << mou_generator << endl;
 	os << "mou_population_size: " << mou_population_size << endl;
 	os << "mou_dv_population_file: " << mou_dv_population_file << endl;
 	os << "mou_obs_population_restart_file: " << mou_obs_population_restart_file << endl;
@@ -1413,7 +1413,7 @@ void PestppOptions::set_defaults()
 	set_sqp_obs_restart_en("");
 	set_sqp_num_reals(50);
 
-	set_mou_algorithm("NSGA2");
+	set_mou_generator("RGA");
 
 	set_mou_population_size(100);
 	set_mou_dv_population_file("");

@@ -337,8 +337,8 @@ public:
 	int get_sqp_num_reals()const { return sqp_num_reals; }
 	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
 
-	string get_mou_algorithm() const { return mou_algorithm; }
-	void set_mou_algorithm(string name) { mou_algorithm = name; }
+	string get_mou_generator() const { return mou_generator; }
+	void set_mou_generator(string name) { mou_generator = name; }
 	int get_mou_population_size() const { return mou_population_size; }
 	void set_mou_population_size(int size) { mou_population_size = size; }
 	string get_mou_dv_population_file() const { return mou_dv_population_file; }
@@ -589,7 +589,7 @@ private:
 	int sqp_num_reals;
 
 	int mou_population_size;
-	string mou_algorithm; 
+	string mou_generator; 
 	string mou_dv_population_file;
 	string mou_obs_population_restart_file;
 	vector<string> mou_objectives;

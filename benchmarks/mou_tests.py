@@ -231,14 +231,14 @@ def test_zdt1():
     pst.control_data.noptmax = 3
     pst.pestpp_options["mou_population_size"] = 100
     pst.pestpp_options["panther_echo"] = False
-    pst.pestpp_options["mou_algorithm"] = "de"
+    pst.pestpp_options["mou_generator"] = "de"
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
     master_d = test_d.replace("template","master")
     pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
                                   num_workers=35, master_dir=master_d,worker_root=test_root,
                                   port=port)
-
+    
     #TODO: need some asserts here
     dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
     assert os.path.exists(os.path.join(master_d,dv_pop_file)),dv_pop_file
@@ -261,7 +261,7 @@ def test_zdt1():
     shutil.copy2(os.path.join(master_d,obs_pop_file),os.path.join(test_d,"restart_obs.csv"))
     pst.pestpp_options["mou_dv_population_file"] = "restart_dv.csv"
     pst.pestpp_options["mou_obs_population_restart_file"] = "restart_obs.csv"
-    pst.control_data.noptmax = 3
+    pst.control_data.noptmax = 100
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
                                       num_workers=35, master_dir=master_d,worker_root=test_root,
@@ -279,17 +279,72 @@ def test_zdt1():
     assert dv_df.index.to_list() == obs_df.index.to_list()
 
 
-def plot_zdt1_results():
-    master_d = os.path.join("mou_tests","zdt1_master")
+def test_zdt(test_case="zdt1"):
+    test_d = setup_zdt_problem(test_case,30,additive_chance=False)
+    pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
+    pst.control_data.noptmax = 3
+    pst.pestpp_options["mou_population_size"] = 100
+    pst.pestpp_options["panther_echo"] = False
+    pst.pestpp_options["mou_generator"] = "de"
+    pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
+    #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
+    master_d = test_d.replace("template","master")
+    pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
+                                  num_workers=35, master_dir=master_d,worker_root=test_root,
+                                  port=port)
+    
+    #TODO: need some asserts here
+    dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
+    assert os.path.exists(os.path.join(master_d,dv_pop_file)),dv_pop_file
+    obs_pop_file = "{0}.0.obs_pop.csv".format(test_case)
+    assert os.path.exists(os.path.join(master_d,obs_pop_file)),obs_pop_file
+    dv_df = pd.read_csv(os.path.join(master_d,dv_pop_file),index_col=0)
+    obs_df = pd.read_csv(os.path.join(master_d,obs_pop_file),index_col=0)
+    assert dv_df.shape[0] == pst.pestpp_options["mou_population_size"]
+    assert dv_df.shape[1] == pst.npar
+    assert obs_df.shape[0] == pst.pestpp_options["mou_population_size"]
+    assert obs_df.shape[1] == pst.nobs
+    assert dv_df.index.to_list() == obs_df.index.to_list()
+
+    dv_df = dv_df.iloc[1:,:]
+    obs_df = obs_df.iloc[:-1,:]
+    dv_df.to_csv(os.path.join(test_d,"restart_dv.csv"))
+    obs_df.to_csv(os.path.join(test_d,"restart_obs.csv"))
+
+    shutil.copy2(os.path.join(master_d,dv_pop_file),os.path.join(test_d,"restart_dv.csv"))
+    shutil.copy2(os.path.join(master_d,obs_pop_file),os.path.join(test_d,"restart_obs.csv"))
+    pst.pestpp_options["mou_dv_population_file"] = "restart_dv.csv"
+    pst.pestpp_options["mou_obs_population_restart_file"] = "restart_obs.csv"
+    pst.control_data.noptmax = 100
+    pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
+    pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
+                                      num_workers=35, master_dir=master_d,worker_root=test_root,
+                                      port=port)
+    dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
+    assert os.path.exists(os.path.join(master_d,dv_pop_file)),dv_pop_file
+    obs_pop_file = "{0}.0.obs_pop.csv".format(test_case)
+    assert os.path.exists(os.path.join(master_d,obs_pop_file)),obs_pop_file
+    dv_df = pd.read_csv(os.path.join(master_d,dv_pop_file),index_col=0)
+    obs_df = pd.read_csv(os.path.join(master_d,obs_pop_file),index_col=0)
+    assert dv_df.shape[0] == pst.pestpp_options["mou_population_size"]
+    assert dv_df.shape[1] == pst.npar
+    assert obs_df.shape[0] == pst.pestpp_options["mou_population_size"]
+    assert obs_df.shape[1] == pst.nobs
+    assert dv_df.index.to_list() == obs_df.index.to_list()
+    return master_d
+
+
+def plot_zdt_results(master_d):
+    #master_d = os.path.join("mou_tests","zdt1_master")
     assert os.path.exists(master_d)
 
     #odf_files = [f for f in os.listdir(master_d) if f.endswith("obs_pop.csv") and "archive" in f]
     #odf_files_all = [f for f in os.listdir(master_d) if f.endswith("obs_pop.csv") and "archive" not in f]
     #odfs = [pd.read_csv(os.path.join(master_d,f),index_col=0) for f in odf_files]
     #odfs_all = [pd.read_csv(os.path.join(master_d,f),index_col=0) for f in odf_files_all]
-    
-    df = pd.read_csv(os.path.join(master_d,"zdt1.pareto.summary.csv"))
-    df_arc = pd.read_csv(os.path.join(master_d,"zdt1.pareto.archive.summary.csv"))
+    case = os.path.split(master_d)[1].split('_')[0]
+    df = pd.read_csv(os.path.join(master_d,"{0}.pareto.summary.csv".format(case)))
+    df_arc = pd.read_csv(os.path.join(master_d,"{0}.pareto.archive.summary.csv".format(case)))
 
     import matplotlib.colors as colors
     import matplotlib.pyplot as plt
@@ -307,6 +362,7 @@ def plot_zdt1_results():
     #colors = ["0.5",'m','b','c','g','y','r']
     
     fig,ax = plt.subplots(1,1,figsize=(10,10))
+    df = df.loc[df.generation<80,:]
     gens = df.generation.unique()
     gens.sort()
     print(gens)
@@ -322,12 +378,16 @@ def plot_zdt1_results():
         df_arc.loc[df_arc.generation==gen,cols[1]],
         marker="+",c=cmap(i/len(gens)),s=100)
 
+    possibles = globals().copy()
+    possibles.update(locals())
+    method = possibles.get(case)
+
     x0 = np.linspace(0,1,1000)
     o1,o2 = [],[]
     for xx0 in x0:
         x = np.zeros(30)
         x[0] = xx0
-        oo1,oo2 = zdt1(x)
+        oo1,oo2 = method(x)
         o1.append(oo1)
         o2.append(oo2)
     ax.plot(o1,o2,"k")
@@ -421,8 +481,10 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt6",10)
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
     #setup_zdt_problem("zdt1",30, additive_chance=True)
-    test_zdt1()
-    plot_zdt1_results()
+    
+    
+    master_d = test_zdt("zdt2")
+    plot_zdt_results(master_d)
     #test_zdt1_chance()
     #setup_zdt_problem("zdt1",30, additive_chance=True)
     #test_sorting_fake_problem()

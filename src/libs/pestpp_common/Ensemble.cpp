@@ -1937,12 +1937,13 @@ void ParameterEnsemble::draw_uniform(int num_reals, vector<string> par_names, Pe
 
 	stringstream ss;
 	real_names.clear();
-	for (int i = 0; i < num_reals; i++)
+	/*for (int i = 0; i < num_reals; i++)
 	{
 		ss.str("");
-		ss << "member_" << i;
+		ss << "member:" << i;
 		real_names.push_back(ss.str());
-	}
+	}*/
+	real_names = get_generic_real_names(num_reals);
 	org_real_names = real_names;
 	tstat = ParameterEnsemble::transStatus::NUM;
 }

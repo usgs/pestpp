@@ -90,6 +90,7 @@ private:
 
 class MOEA
 {
+	enum MouGenType{DE,RGA};
 public:
 	static mt19937_64 rand_engine;
 	MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer,
@@ -101,6 +102,7 @@ public:
 private:
 	Pest& pest_scenario;
 	set<string> pp_args;
+	vector<MouGenType> gen_types;
 	vector<string> act_obs_names, act_par_names;
 	int iter, warn_min_members, error_min_members;
 	int member_count;
@@ -108,6 +110,7 @@ private:
 	string population_dv_file, population_obs_restart_file;
 	string dv_pop_file_tag = "dv_pop";
 	string obs_pop_file_tag = "obs_pop";
+	string lineage_tag = "lineage.csv";
 	chancePoints chancepoints;
 	FileManager &file_manager; 
 	std::mt19937 rand_gen;
@@ -158,7 +161,7 @@ private:
 	ParameterEnsemble generate_population();
 
 	ParameterEnsemble generate_diffevol_population(int num_members, ParameterEnsemble& _dp);
-	ParameterEnsemble generate_nsga2_population(int num_members, ParameterEnsemble& _dp);
+	ParameterEnsemble generate_rga_population(int num_members, ParameterEnsemble& _dp);
 
 	string get_new_member_name(string tag = string());
 
