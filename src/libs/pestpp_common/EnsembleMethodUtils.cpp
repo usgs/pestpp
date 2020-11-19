@@ -284,7 +284,7 @@ void L2PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
 
 }
 
-map<string, double>* L2PhiHandler::get_phi_map(L2PhiHandler::phiType &pt)
+map<string, double>* L2PhiHandler::get_phi_map_ptr(L2PhiHandler::phiType pt)
 {
 	switch (pt)
 	{
@@ -296,6 +296,22 @@ map<string, double>* L2PhiHandler::get_phi_map(L2PhiHandler::phiType &pt)
 		return &meas;
 	case L2PhiHandler::phiType::REGUL:
 		return &regul;
+	}
+	throw runtime_error("PhiHandler::get_phi_map() didn't find a phi map...");
+}
+
+map<string, double> L2PhiHandler::get_phi_map(L2PhiHandler::phiType pt)
+{
+	switch (pt)
+	{
+	case L2PhiHandler::phiType::ACTUAL:
+		return actual;
+	case L2PhiHandler::phiType::COMPOSITE:
+		return composite;
+	case L2PhiHandler::phiType::MEAS:
+		return meas;
+	case L2PhiHandler::phiType::REGUL:
+		return regul;
 	}
 	throw runtime_error("PhiHandler::get_phi_map() didn't find a phi map...");
 }
@@ -324,7 +340,7 @@ double L2PhiHandler::calc_std(map<string, double> *phi_map)
 double L2PhiHandler::get_mean(phiType pt)
 {
 	//double mean = 0.0;
-	map<string, double>* phi_map = get_phi_map(pt);
+	map<string, double>* phi_map = get_phi_map_ptr(pt);
 	/*map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
 	for (;pi != end; ++pi)
 		mean = mean + pi->second;
@@ -336,7 +352,7 @@ double L2PhiHandler::get_std(phiType pt)
 {
 	//double mean = get_mean(pt);
 	//double var = 0.0;
-	map<string, double>* phi_map = get_phi_map(pt);
+	map<string, double>* phi_map = get_phi_map_ptr(pt);
 	/*map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
 	for (; pi != end; ++pi)
 		var = var + (pow(pi->second - mean,2));
@@ -349,7 +365,7 @@ double L2PhiHandler::get_std(phiType pt)
 double L2PhiHandler::get_max(phiType pt)
 {
 	double mx = -1.0e+30;
-	map<string, double>* phi_map = get_phi_map(pt);
+	map<string, double>* phi_map = get_phi_map_ptr(pt);
 	map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
 	for (; pi != end; ++pi)
 		mx = (pi->second > mx) ? pi->second : mx;
@@ -359,7 +375,7 @@ double L2PhiHandler::get_max(phiType pt)
 double L2PhiHandler::get_min(phiType pt)
 {
 	double mn = 1.0e+30;
-	map<string, double>* phi_map = get_phi_map(pt);
+	map<string, double>* phi_map = get_phi_map_ptr(pt);
 	map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
 	for (; pi != end; ++pi)
 		mn = (pi->second < mn) ? pi->second : mn;
@@ -583,7 +599,7 @@ void L2PhiHandler::write_group(int iter_num, int total_runs, vector<double> extr
 
 void L2PhiHandler::write_csv(int iter_num, int total_runs, ofstream &csv, phiType pt, vector<string> &names)
 {
-	map<string, double>* phi_map = get_phi_map(pt);
+	map<string, double>* phi_map = get_phi_map_ptr(pt);
 	map<string, double>::iterator pmi = phi_map->end();
 	csv << iter_num << ',' << total_runs;
 	map<string, double> stats = get_summary_stats(pt);
@@ -665,9 +681,17 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
 	double std = calc_std(&_meas);
 	vector<int> idxs;
 	vector<string> names = oe.get_real_names();
-	for (int i=0;i<names.size();i++)
+	for (int i = 0; i < names.size(); i++)
+	{
+		
 		if ((_meas[names[i]] > bad_phi) || (_meas[names[i]] > mean + (std * bad_phi_sigma)))
-			idxs.push_back(i);
+		{
+			if (names[i] == BASE_REAL_NAME)
+				cout << "...not dropping 'base' real even though phi is 'bad'" << endl;
+			else
+				idxs.push_back(i);
+		}	
+	}
 	return idxs;
 }
 

@@ -246,7 +246,8 @@ int main(int argc, char* argv[])
 				file_manager.build_filename("rns"), pathname,
 				pest_scenario.get_pestpp_options().get_max_run_fail(),
 				pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
-				pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
+				pest_scenario.get_pestpp_options().get_additional_ins_delimiters(),
+				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
 		}
 		
 
@@ -260,55 +261,28 @@ int main(int argc, char* argv[])
 		map<int, map<string, double>> weight_cycle_info = process_da_weight_cycle_table(pest_scenario, fout_rec, weights_in_tbl);
 		
 		vector<int> assimilation_cycles;
-		if (false) // todo: I think we need to remove this 
-		{
-			pest_scenario.assign_da_cycles(fout_rec);
-		}
+
 		assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec);
 
 		//generate a parent ensemble which includes all parameters across all cycles
-		cout << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
-		fout_rec << "...preparing parent parameter ensemble for all parameters across all cycles" << endl;
 	
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
-		da.use_ies = pest_scenario.get_pestpp_options_ptr()->get_da_use_ies();
 		ParameterEnsemble curr_pe;
-		da.initialize_parcov();
-		da.initialize_pe(*da.get_parcov_ptr());
-		curr_pe = da.get_pe();
-		if (pest_scenario.get_control_info().noptmax == 0)
-		{
-			curr_pe.reserve(vector<string>{BASE_REAL_NAME}, pest_scenario.get_ctl_ordered_adj_par_names());
-			Parameters pars = pest_scenario.get_ctl_parameters();
-			ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
-			pts.ctl2numeric_ip(pars);
-			Eigen::VectorXd v = pars.get_data_eigen_vec(pest_scenario.get_ctl_ordered_adj_par_names());
-			curr_pe.update_real_ip(BASE_REAL_NAME,v);
-		}
+		ObservationEnsemble curr_oe;
+		generate_global_ensembles(da, fout_rec, curr_pe, curr_oe);
 		
-		cout << "...preparing parent observation ensemble for all observations across all cycles" << endl;
-		fout_rec << "...preparing parent observation ensemble for all observations across all cycles" << endl;
-		mt19937 rand_gen = da.get_rand_gen();
-		ObservationEnsemble curr_oe(&pest_scenario, &rand_gen);
-		curr_oe.reserve(curr_pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
+		//prepare a phi csv file for all cycles
+		string phi_file = file_manager.get_base_filename() + ".global.phi.actual.csv";
+		ofstream f_phi(phi_file);
+		if (f_phi.bad())
+			throw runtime_error("error opening " + phi_file + " for writing");
+		f_phi << "cycle,iteration,mean,standard_deviation,min,max";
+		vector<string> init_real_names = curr_oe.get_real_names();
+		for (auto real : init_real_names)
+			f_phi << "," << pest_utils::lower_cp(real);
+		f_phi << endl;
 
-		try
-		{
-			curr_pe.check_for_dups();
-		}
-		catch (const exception& e)
-		{
-			string message = e.what();
-			throw runtime_error("error in parameter ensemble: " + message);
-		}
-
-		//todo: add the base realization here so that it is present thru out the cycles below
-		cout << "...parent parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" <<  endl;
-		fout_rec << "...parent parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
-		curr_pe.to_csv(file_manager.get_base_filename() + ".parent.prior.pe.csv");
-		cout << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
-		fout_rec << "...parent observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
-
+		
 
 		// loop over assimilation cycles
 		stringstream ss;
@@ -337,6 +311,7 @@ int main(int argc, char* argv[])
 				output_file_writer.scenario_par_report(fout_rec);
 				output_file_writer.scenario_obs_report(fout_rec);
 			}
+
 			//------------------------------
 
 			if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_MASTER)
@@ -362,60 +337,90 @@ int main(int argc, char* argv[])
 					childPest.get_pestpp_options().get_additional_ins_delimiters());
 			}
 
-
-
 			ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq_4_mod();
 			
 			//check for entries in the par cycle table
 			if (par_cycle_info.find(*icycle) != par_cycle_info.end())
 			{
 				performance_log.log_event("updating pars using da par cycle table info");
-				Parameters pars = childPest.get_ctl_parameters_4_mod();
-				TranFixed* fixed_ptr = base_trans_seq.get_fixed_ptr_4_mod();
+				//Parameters pars = childPest.get_ctl_parameters_4_mod();
+				//TranFixed* fixed_ptr = base_trans_seq.get_fixed_ptr_4_mod();
 				map<string, double> cycle_map = par_cycle_info[*icycle];
 				for (auto item : cycle_map)
 				{
-					fixed_ptr->insert(item.first, item.second);
-					pars.update_rec(item.first, item.second);
+					base_trans_seq.get_fixed_ptr_4_mod()->insert(item.first, item.second);
+					childPest.get_ctl_parameters_4_mod().update_rec(item.first, item.second);
 				}
 			}
 			//check for entries in the obs cycle table
+			//cout << childPest.get_ctl_observations().get_rec("GAGE_1") << ", " << pest_scenario.get_observation_info_ptr()->get_weight("GAGE_1") << endl;
 			if (obs_cycle_info.find(*icycle) != obs_cycle_info.end())
 			{
 				performance_log.log_event("updating obs using da obs cycle table info");
-				Observations obs = childPest.get_ctl_observations();
-				ObservationInfo* oi_ptr = childPest.get_observation_info_ptr();
 				map<string, double> cycle_map = obs_cycle_info[*icycle];
 				map<string, double> weight_cycle_map;
 				if (weight_cycle_info.find(*icycle) != weight_cycle_info.end())
 					weight_cycle_map = weight_cycle_info[*icycle];
+				ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+				childPest.set_observation_info(oi);
 				for (auto tbl_obs_name : obs_in_tbl)
 				{
 					//if this obs is not in this cycle, give it a zero weight
 					if (cycle_map.find(tbl_obs_name) == cycle_map.end())
 					{
-						oi_ptr->set_weight(tbl_obs_name,0.0);
+						oi.set_weight(tbl_obs_name, 0.0);
 					}
 					else
 					{
-						obs.update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);
+						childPest.get_ctl_observations_4_mod().update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);
 						//check if this obs is in this cycle's weight info
 						if (weight_cycle_map.find(tbl_obs_name) != weight_cycle_map.end())
 						{
-							oi_ptr->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+							oi.set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+							//pest_scenario.get_observation_info_ptr()->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
 						}
 					}
 				}
-
-				
+				childPest.set_observation_info(oi);
 
 			}
-
-
+			//cout << childPest.get_ctl_observations().get_rec("GAGE_1") << ", " << childPest.get_ctl_observation_info().get_weight("GAGE_1") << endl;
+			output_file_writer.scenario_io_report(fout_rec);
+			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1) // todo: add da verbose
+			{
+				output_file_writer.scenario_pargroup_report(fout_rec);
+				output_file_writer.scenario_par_report(fout_rec);
+				output_file_writer.scenario_obs_report(fout_rec);
+			}
+			
+			
 
 			Parameters par1 = childPest.get_ctl_parameters();
 			base_trans_seq.ctl2numeric_ip(par1);
 			base_trans_seq.numeric2model_ip(par1);
+			ParameterInfo pi = childPest.get_ctl_parameter_info();
+
+			int nadj_par = 0;
+			for (auto par : par1)
+			{
+				if ((pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::FIXED) &&
+					(pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::TIED))
+					nadj_par++;
+
+			}
+
+			cout << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
+			fout_rec << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
+
+			ObservationInfo oi = childPest.get_ctl_observation_info();
+			int nnz_obs = 0;
+			for (auto o : childPest.get_ctl_observations())
+			{
+				if (oi.get_observation_rec_ptr(o.first)->weight != 0.0)
+					nnz_obs++;
+			}
+			cout << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
+			fout_rec << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
 
 			ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
 
@@ -433,7 +438,6 @@ int main(int argc, char* argv[])
 			performance_log.log_event("instantiating DA instance");
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 			// use ies or da?
-			da.use_ies = pest_scenario.get_pestpp_options_ptr()->get_da_use_ies();
 			da.da_type = pest_scenario.get_pestpp_options_ptr()->da_ctl_params.get_svalue("DA_TYPE");
 			std::mt19937 rand_gen = da.get_rand_gen();
 			vector<string> act_par_names = childPest.get_ctl_ordered_adj_par_names();
@@ -443,31 +447,19 @@ int main(int argc, char* argv[])
 
 			da.set_pe(cycle_curr_pe);	
 			
-			if (da.use_ies)
-			{
-				da.initialize(*icycle);
-			}
-			else
-			{
-				da.da_initialize(*icycle);
-			}
+			
+			da.initialize(*icycle);
+			
+			write_global_phi_info(*icycle, f_phi, da, init_real_names);
+
 			if (childPest.get_ctl_ordered_nz_obs_names().size() > 0)
 			{
-				if (da.use_ies) // use ies
+				
+				if (pest_scenario.get_control_info().noptmax > 0) // 
 				{
-					da.iterate_2_solution();
-					/*curr_pe = da.get_pe();
-					curr_pe.to_csv("cncnc.csv");*/
+					da.da_upate();
 				}
-				else // use da
-				{
-					if (pest_scenario.get_control_info().noptmax > 0) // 
-					{
-						da.da_upate();
-					}
-					/*curr_pe = da.get_pe();
-					curr_pe.to_csv("cncnc.csv");*/
-				}
+				write_global_phi_info(*icycle, f_phi, da, init_real_names);
 			}
 			else
 			{
@@ -477,7 +469,7 @@ int main(int argc, char* argv[])
 				
 			}
 			//replace all the pars used in this cycle in the parent parameter ensemble
-			performance_log.log_event("updating parent ensemble with cycle ensemble columns");
+			performance_log.log_event("updating global ensemble with cycle ensemble columns");
 			
 			//if we lost some realizations...
 			if (curr_pe.shape().first > cycle_curr_pe.shape().first)
@@ -488,8 +480,8 @@ int main(int argc, char* argv[])
 				for (auto r : curr_pe.get_real_names())
 					if (ccp_reals.find(r) == ccp_reals.end())
 						missing.push_back(r);
-				fout_rec << "...dropping the following " << missing.size() << " realizations from parent parameter ensemble:" << endl;
-				cout << "...dropping " << missing.size() << " realizations from parent parameter ensemble, see rec file for listing" << endl;
+				fout_rec << "...dropping the following " << missing.size() << " realizations from global parameter ensemble:" << endl;
+				cout << "...dropping " << missing.size() << " realizations from global parameter ensemble, see rec file for listing" << endl;
 				int i = 0;
 				for (auto m : missing)
 				{
@@ -518,8 +510,8 @@ int main(int argc, char* argv[])
 				for (auto r : curr_oe.get_real_names())
 					if (ccp_reals.find(r) == ccp_reals.end())
 						missing.push_back(r);
-				fout_rec << "...dropping the following " << missing.size() << " realizations from parent observation ensemble:" << endl;
-				cout << "...dropping " << missing.size() << " realizations from parent observation ensemble, see rec file for listing" << endl;
+				fout_rec << "...dropping the following " << missing.size() << " realizations from global observation ensemble:" << endl;
+				cout << "...dropping " << missing.size() << " realizations from global observation ensemble, see rec file for listing" << endl;
 				int i = 0;
 				for (auto m : missing)
 				{
@@ -536,9 +528,10 @@ int main(int argc, char* argv[])
 
 			curr_oe.replace_col_vals(cycle_curr_oe.get_var_names(), *cycle_curr_oe.get_eigen_ptr());
 			ss.str("");
-			ss << "." << *icycle << ".parent.oe.csv";
+			ss << ".global." << *icycle << ".oe.csv";
 			curr_oe.to_csv(file_manager.get_base_filename()+ss.str());
 
+			
 
 		} // end cycle loop
 		fout_rec.close();

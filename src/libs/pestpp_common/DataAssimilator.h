@@ -21,7 +21,6 @@
 
 
 
-
 class LocalUpgradeThread_da
 {
 public:
@@ -75,14 +74,12 @@ public:
 		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 		RunManagerAbstract* _run_mgr_ptr);
 	void initialize(int _icycle);
-	void da_initialize(int _icycle);
 	void da_save_ensemble_pe(string fprefix, string dtyp);
 	void da_save_ensemble_oe(string fprefix, string dtyp);
 	//void add_dynamic_state_to_pe();
 	void add_dynamic_state_to_pe();
 	vector<string> get_dynamic_states();
-	void iterate_2_solution();
-
+	
 	void da_upate();
 
 	void kf_upate();
@@ -91,15 +88,19 @@ public:
 	bool should_terminate();
 	ParameterEnsemble get_pe() { return pe;}
 	void set_pe(ParameterEnsemble new_pe) { pe = new_pe;}
-	bool use_ies; 
+	//bool use_ies; 
 	string da_type;
 
 	bool initialize_pe(Covariance& cov);
 	void initialize_parcov();
 	Covariance* get_parcov_ptr() { return &parcov; }
-	std::mt19937 get_rand_gen() { return rand_gen; }
+	std::mt19937& get_rand_gen() { return rand_gen; }
 	vector<string> get_act_par_names() { return act_par_names; }
-	ObservationEnsemble get_oe() { return oe; }
+	ObservationEnsemble& get_oe() { return oe; }
+	L2PhiHandler& get_phi_handler() { return ph; }
+	int get_iter() { return iter; }
+	FileManager& get_file_manager() { return file_manager; }
+	Pest& get_pest_scenario() { return pest_scenario; }
 
 private:
 	int icycle;
@@ -109,7 +110,6 @@ private:
 	std::mt19937 rand_gen;
 	std::mt19937 subset_rand_gen;
 	FileManager& file_manager;
-	
 	
 	OutputFileWriter& output_file_writer;
 	PerformanceLog* performance_log;
@@ -157,15 +157,11 @@ private:
 
 	bool oe_drawn, pe_drawn;
 	
-
-	//bool solve_old();
-	bool solve_new();
 	bool solve_new_da();
 	void update_starting_state();
 	void return_post_dyn_state(vector<ParameterEnsemble>& pe_lams, vector<ParameterEnsemble> poterior_dyn_states);
 	vector<ParameterEnsemble> temp_remove_dyn_state(vector<ParameterEnsemble>& pe_lams);
-	void adjust_pareto_weight(string& obsgroup, double wfac);
-
+	
 	//ParameterEnsemble calc_upgrade(vector<string> &obs_names, vector<string> &par_names,double lamb, int num_reals);
 
 	//ParameterEnsemble calc_localized_upgrade(double cur_lam);
@@ -240,4 +236,11 @@ private:
 map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ofstream& fout_rec);
 map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl);
 map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl);
+
+void write_global_phi_info(int cycle, ofstream& f_phi, DataAssimilator& da, vector<string>& init_real_names);
+
+void generate_global_ensembles(DataAssimilator& da, ofstream& fout_rec, ParameterEnsemble& curr_pe, ObservationEnsemble& curr_oe);
+
+
+
 #endif

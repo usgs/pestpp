@@ -2558,14 +2558,14 @@ void IterEnsembleSmoother::update_reals_by_phi(ParameterEnsemble &_pe, Observati
 	//store map of current phi values
 	ph.update(oe, pe);
 	L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
-	map<string, double> *phi_map = ph.get_phi_map(pt);
+	map<string, double> *phi_map = ph.get_phi_map_ptr(pt);
 	map<string, double> cur_phi_map;
 	for (auto p : *phi_map)
 		cur_phi_map[p.first] = p.second;
 
 	//now get a phi map of the new phi values
 	ph.update(_oe, _pe);
-	phi_map = ph.get_phi_map(pt);
+	phi_map = ph.get_phi_map_ptr(pt);
 	
 	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
 	double cur_phi, new_phi;
@@ -2959,6 +2959,8 @@ bool IterEnsembleSmoother::solve_new()
 		//re-check phi
 		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+		//replace the last entry in the best mean phi tracker
+		best_mean_phis[best_mean_phis.size() - 1] = best_mean;
 		message(1, "current best mean phi (after updating reduced-phi reals): ", best_mean);
 		if (best_mean < last_best_mean * acc_fac)
 		{
@@ -3111,7 +3113,7 @@ void IterEnsembleSmoother::set_subset_idx(int size)
 		int step;
 		int idx;
 		L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
-		map<string, double>* phi_map = ph.get_phi_map(pt);
+		map<string, double>* phi_map = ph.get_phi_map_ptr(pt);
 		map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
 
 		int i = 0;
