@@ -1671,9 +1671,9 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 	{
 		//calculate the optimal tradeoff point from the current op
 		//dont worry about pi-based obj since they are chance-based
-		message(2, "seeking optimal trade-off point for aingle 'optimal' chance point runs");
+		message(2, "seeking optimal trade-off point for single 'optimal' chance point runs");
 		vector<double> obj_extrema;
-		Eigen::VectorXd obj_vec;
+		Eigen::VectorXd obj_vec; 
 
 		for (auto obj_name : obs_obj_names)
 		{
@@ -1760,19 +1760,18 @@ void MOEA::iterate_to_solution()
 		new_op.reserve(new_dp.get_real_names(), op.get_var_names());
 		run_population(new_dp, new_op);
 		
-		// evalute metrics
-		  // Setting initial values
-			//fitness_ = 0.0;
-			//kDistance_ = 0.0;
-			//crowdingDistance_ = 0.0;
-			//distanceToSolutionSet_ = std::numeric_limits<double>::max();
-			//variable_ = type_->createVariables();
-			//rank_ = 0;
+		
 
 		//and risk-shift
-		ObservationEnsemble new_op_shifted = get_chance_shifted_op(new_op);
 			
 		//TODO: save new_dp, new_op and new_op_shifted?
+		save_populations(dp, op);
+		if (constraints.get_use_chance())
+		{
+			ObservationEnsemble new_op_shifted = get_chance_shifted_op(new_op);
+			save_populations(dp, new_op_shifted,"chance");
+			new_op = new_op_shifted;
+		}
 
 		//append offspring dp and (risk-shifted) op to make new dp and op containers
 		new_dp.append_other_rows(dp);
@@ -1820,7 +1819,7 @@ void MOEA::iterate_to_solution()
 		dp = new_dp;
 		op = new_op;
 
-		save_populations(dp, op);
+		
 		ss.str("");
 		ss << "iteration " << iter << " objective function summary:";
 		message(0, ss.str());
@@ -2099,7 +2098,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 
 ParameterEnsemble MOEA::generate_rga_population(int num_members, ParameterEnsemble& _dp)
 {
-	message(1, "generating NSGA2 population of size", num_members);
+	message(1, "generating RGA population of size", num_members);
 
 	_dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 
@@ -2163,8 +2162,8 @@ ParameterEnsemble MOEA::generate_rga_population(int num_members, ParameterEnsemb
 	//tmp_dp.to_csv("temp_cross.csv");
 	//mutation
 	double mutation_probability = 1.0 / pest_scenario.get_n_adj_par();
-	double mutation_distribution_index = 10.0;
-	mutate(mutation_probability, mutation_distribution_index, tmp_dp);
+	double mutation_distribution_index = 20.0;
+	mutate_ip(mutation_probability, mutation_distribution_index, tmp_dp);
 
 	//tmp_dp.to_csv("temp_mut.csv");
 
@@ -2207,7 +2206,7 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 string MOEA::get_new_member_name(string tag)
 {
 	stringstream ss;
-	ss << "gen:" << iter << "_member:" << member_count;
+	ss << "gen=" << iter << "_member=" << member_count;
 	if (tag.size() > 0)
 	{
 		ss << "_" << tag;
@@ -2346,7 +2345,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::crossover(double probability, doubl
 	return vec_pair;
 }
 
-void MOEA::mutate(double probability, double eta_m, ParameterEnsemble& temp_dp)
+void MOEA::mutate_ip(double probability, double eta_m, ParameterEnsemble& temp_dp)
 {
 	vector<double> rnds;
 	double delta1, delta2, mut_pow, deltaq;

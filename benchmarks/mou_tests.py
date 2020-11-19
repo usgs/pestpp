@@ -199,11 +199,14 @@ def setup_zdt_problem(name,num_dv,additive_chance=False):
         
         par = pst.parameter_data
         par.loc[adf.parnme,"partrans"] = "none"
-        par.loc[adf.parnme,"parubnd"] = 1.0
+        par.loc[adf.parnme,"parubnd"] = 0.5
         par.loc[adf.parnme,"parval1"] = 0.0
-        par.loc[adf.parnme,"parlbnd"] = -1.0
+        par.loc[adf.parnme,"parlbnd"] = -0.5
         par.loc[adf.parnme,"parchglim"] = "relative"
         par.loc[adf.parnme,"pargp"] = "obj_add"
+        #much less uncertainty in the second obj
+        par.loc[adf.parnme[1],"parubnd"] = 0.05
+        par.loc[adf.parnme[1],"parlbnd"] = -0.05
         pst.rectify_pgroups()
         pst.parameter_groups.loc["obj_add","inctyp"] = "absolute"
 
@@ -335,6 +338,9 @@ def test_zdt(test_case="zdt1",pop_size=100,noptmax=3):
 
 
 def plot_zdt_results(master_d):
+    plt_dir = os.path.join("mou_tests","zdt_results")
+    if not os.path.exists(plt_dir):
+        os.mkdir(plt_dir)
     #master_d = os.path.join("mou_tests","zdt1_master")
     assert os.path.exists(master_d)
 
@@ -361,8 +367,8 @@ def plot_zdt_results(master_d):
 
     #colors = ["0.5",'m','b','c','g','y','r']
     
-    fig,ax = plt.subplots(1,1,figsize=(10,10))
-    df = df.loc[df.generation<80,:]
+    fig,ax = plt.subplots(1,1,figsize=(6,6))
+    #df = df.loc[df.generation<80,:]
     gens = df.generation.unique()
     gens.sort()
     print(gens)
@@ -376,7 +382,7 @@ def plot_zdt_results(master_d):
 
     ax.scatter(df_arc.loc[df_arc.generation==gen,cols[0]],
         df_arc.loc[df_arc.generation==gen,cols[1]],
-        marker="+",c=cmap(i/len(gens)),s=100)
+        marker="+",c=cmap(i/len(gens)),s=100,label="final non dom solutions")
 
     possibles = globals().copy()
     possibles.update(locals())
@@ -390,26 +396,33 @@ def plot_zdt_results(master_d):
         oo1,oo2 = method(x)
         o1.append(oo1)
         o2.append(oo2)
-    ax.plot(o1,o2,"k")
+    ax.plot(o1,o2,"k",label="truth")
+    ax.set_title("{0}, {1} generations shown, {2} members in archive, {3} total members".\
+        format(case,len(gens),df_arc.shape[0],df.shape[0]))
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(plt_dir,case+".pdf"))
+    plt.close("all")
 
-    plt.show()
 
-
-def test_zdt1_chance():
-    test_case = "zdt1"
+def test_zdt_chance(test_case="zdt1",pop_size=100,noptmax=3):
+    
     test_d = setup_zdt_problem(test_case,30,additive_chance=True)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
-    pst.control_data.noptmax = 1
-    pst.pestpp_options["mou_population_size"] = 5    
+    pst.control_data.noptmax = noptmax
+    pst.pestpp_options["mou_population_size"] = pop_size   
     pst.pestpp_options["opt_risk"] = 0.95
-    pst.pestpp_options["opt_stack_size"] = 3
-    pst.pestpp_options["opt_chance_points"] = "all"
+    pst.pestpp_options["opt_stack_size"] = 50
+    pst.pestpp_options["opt_chance_points"] = "single"
+    pst.pestpp_options["panther_echo"] = False
+    pst.pestpp_options["mou_generator"] = "de"
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
     master_d = test_d.replace("template","master_chance")
     pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
-                                  num_workers=15, master_dir=master_d,worker_root=test_root,
+                                  num_workers=35, master_dir=master_d,worker_root=test_root,
                                   port=port)
+    return master_d
 
 
 def test_sorting_fake_problem():
@@ -482,10 +495,15 @@ if __name__ == "__main__":
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
     #setup_zdt_problem("zdt1",30, additive_chance=True)
     
-    
-    master_d = test_zdt("zdt2",noptmax=100)
-    plot_zdt_results(master_d)
-    #test_zdt1_chance()
+    #for case in ["zdt1","zdt2","zdt3","zdt4","zdt6"]:
+    #    master_d = test_zdt(case,noptmax=100)
+    #    plot_zdt_results(master_d)
+
+    #master_d = test_zdt("zdt2",noptmax=3)
+    #master_d = os.path.join("mou_tests","zdt2_master")
+    #plot_zdt_results(master_d)
+    master_d = test_zdt_chance("zdt1",noptmax=100)
+    plot_zdt_results(os.path.join("mou_tests","zdt1_master_chance"))
     #setup_zdt_problem("zdt1",30, additive_chance=True)
     #test_sorting_fake_problem()
     #start_workers()

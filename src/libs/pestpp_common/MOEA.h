@@ -166,7 +166,7 @@ private:
 	string get_new_member_name(string tag = string());
 
 	void save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag = string());
-	void mutate(double probability, double eta_m, ParameterEnsemble& temp_dp);
+	void mutate_ip(double probability, double eta_m, ParameterEnsemble& temp_dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> crossover(double probability, double eta_m, int idx1, int idx2);
 
 	pair<Parameters, Observations> get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe, bool use_mean=false);
