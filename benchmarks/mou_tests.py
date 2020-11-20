@@ -62,7 +62,7 @@ def constr(x):
 
 def srn(x):
     const1 = np.power(x[0], 2) + np.power(x[1], 2)  # lest than or equal to 225
-    const2 =  3 * x[1] - x[0]  # greater than or equal to 10
+    const2 =  x[0] - (3 * x[1])  # less than or equal to -10
     f1 = np.power(x[0] - 2, 2) + np.power(x[1] - 1, 2) + 2
     f2 = 9 * x[0] - np.power(x[1] - 1, 2)
     return f1, f2, const1, const2
@@ -82,7 +82,7 @@ def zdt_helper(func):
         f.write("obj_1 {0}\n".format(float(obj1)))
         f.write("obj_2 {0}\n".format(float(obj2)))
         for i,v in enumerate(ret_val[2:]):
-            f.write("constr_{0} {1}\n".format(i+1,float(obj1)))
+            f.write("constr_{0} {1}\n".format(i+1,float(v)))
 
 def setup_problem(name,additive_chance=False):
     test_d = os.path.join(test_root,"{0}_template".format(name))
@@ -195,7 +195,7 @@ def setup_problem(name,additive_chance=False):
         par.loc[:,"parubnd"] = 20.0
         par.loc[:,"parlbnd"] = -20.0
         par.loc[:,"partrans"] = "none"
-        par.loc[:,"parval1"] = 0.0
+        par.loc[:,"parval1"] = 5.0
 
     if additive_chance_tpl_file is not None:
         adf = pst.add_parameters(os.path.join(test_d,additive_chance_tpl_file),pst_path=".")
@@ -471,5 +471,5 @@ if __name__ == "__main__":
     #test_sorting_fake_problem()
     #start_workers()
     #setup_problem("srn")
-    run_problem("srn")
+    run_problem("srn",noptmax=100)
 

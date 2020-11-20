@@ -1432,8 +1432,13 @@ void MOEA::initialize()
 
 		message(0, "control file parameter objective function summary: ");
 		obj_func_report(_pe, _oe);
-		
 
+		vector<string> names = _oe.get_var_names();
+		Observations obs(names, _oe.get_real_vector(BASE_REAL_NAME));
+		names = _pe.get_var_names();
+		pars.update(names, eigenvec_2_stlvec(_pe.get_real_vector(BASE_REAL_NAME)));
+		
+		constraints.mou_report(0, pars, obs, obs_obj_names, pi_obj_names);
 		return;
 	}
 	

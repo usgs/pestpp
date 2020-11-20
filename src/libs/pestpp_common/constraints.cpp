@@ -1233,6 +1233,87 @@ double Constraints::get_probit()
 	return output;
 }
 
+void Constraints::mou_report(int iter, Parameters& current_pars, Observations& current_obs, vector<string>& obs_obj_names,
+	vector<string>& pi_obj_names, bool echo)
+{
+
+	set<string> skip_names(obs_obj_names.begin(), obs_obj_names.end());
+
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+	vector<double> residuals;
+	map<string, double> infeas_dist;
+	stringstream ss;
+	ss.str("");
+	if (skip_names.size() < ctl_ord_obs_constraint_names.size())
+	{
+		ss << endl << "  observation constraint/objective information " << iter << endl;
+		ss << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
+		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
+
+
+
+		residuals = get_constraint_residual_vec(current_obs);
+		infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
+		for (int i = 0; i < num_obs_constraints(); ++i)
+		{
+			string name = ctl_ord_obs_constraint_names[i];
+			if (skip_names.find(name) != skip_names.end())
+				continue;
+			ss << setw(20) << left << name;
+			ss << setw(15) << right << constraint_sense_name[name];
+			ss << setw(15) << constraints_obs.get_rec(name);
+			ss << setw(15) << current_obs.get_rec(name);
+			if (infeas_dist.find(name) != infeas_dist.end())
+			{
+				ss << setw(15) << "false" << setw(15) << infeas_dist[name];
+			}
+			else
+			{
+				ss << setw(15) << "true" << setw(15) << 0.0;
+			}
+			ss << endl;
+
+		}
+	}
+	skip_names.clear();
+	skip_names.insert(pi_obj_names.begin(), pi_obj_names.end());
+	if (num_pi_constraints() > skip_names.size())
+	{
+
+		//report prior information constraints
+		infeas_dist = get_unsatified_pi_constraints(current_pars);
+		ss << endl << "  prior information constraint information " << iter << endl;
+		ss << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
+		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
+		for (int i = 0; i < num_pi_constraints(); ++i)
+		{
+			string name = ctl_ord_pi_constraint_names[i];
+			if (skip_names.find(name) != skip_names.end())
+				continue;
+			PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
+			ss << setw(20) << left << name;
+			ss << setw(15) << right << constraint_sense_name[name];
+			ss << setw(15) << pi_rec.get_obs_value();
+			ss << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
+			if (infeas_dist.find(name) != infeas_dist.end())
+			{
+				ss << setw(15) << "false" << setw(15) << infeas_dist[name];
+			}
+			else
+			{
+				ss << setw(15) << "true" << setw(15) << 0.0;
+			}
+			ss << endl;
+		}
+	}
+	f_rec << ss.str();
+	if (echo)
+		cout << ss.str();
+
+	return;
+}
+
+
 void Constraints::presolve_report(int iter, Parameters& current_pars, Observations& current_obs)
 {
 	/* this is a report to the rec file for the status of the constraints before solving the current iteration*/

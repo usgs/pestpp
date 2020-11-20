@@ -69,6 +69,9 @@ public:
 		map<string, string> status_map = map<string, string>(), map<string, double> price_map = map<string, double>());
 	void initial_report();
 	
+	void mou_report(int iter, Parameters& current_pars, Observations& current_obs, vector<string>& obs_obj_names,
+		vector<string>& pi_obj_names, bool echo=true);
+
 	//queue up chance related runs
 	void add_runs(int iter, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
 
