@@ -1247,7 +1247,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 	ss.str("");
 	if (skip_names.size() < ctl_ord_obs_constraint_names.size())
 	{
-		ss << endl << "  observation constraint information " << iter << endl;
+		ss << endl << "  observation constraint information at iteration " << iter << endl;
 		ss << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
 		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
 
@@ -1282,7 +1282,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 
 		//report prior information constraints
 		infeas_dist = get_unsatified_pi_constraints(current_pars);
-		ss << endl << "  prior information constraint information " << iter << endl;
+		ss << endl << "  prior information constraint information at iteration " << iter << endl;
 		ss << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
 		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
 		for (int i = 0; i < num_pi_constraints(); ++i)
@@ -1364,11 +1364,11 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 
 		}
 	}
-	
+	skip_names.clear();
+	skip_names.insert(pi_obj_names.begin(), pi_obj_names.end());
 	if (num_pi_constraints() > skip_names.size())
 	{
-		skip_names.clear();
-		skip_names.insert(pi_obj_names.begin(), pi_obj_names.end());
+		
 		Parameters current_pars;
 		names = pe.get_var_names();
 		map<string, double> tots;
@@ -1390,7 +1390,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			}
 		}
 		//report prior information constraints
-		ss << endl << "  prior information constraint information at iteration" << iter << endl;
+		ss << endl << "  prior information constraint information at iteration " << iter << endl;
 		ss << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "mean sim value";
 		ss << setw(15) << "% unsatisfied" << endl;
 		int num_reals = pe.shape().first;
@@ -1399,7 +1399,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			string name = ctl_ord_pi_constraint_names[i];
 			if (skip_names.find(name) != skip_names.end())
 				continue;
-			
+			pi_rec = constraints_pi.get_pi_rec_ptr(name);
 			ss << setw(20) << left << name;
 			ss << setw(15) << right << constraint_sense_name[name];
 			ss << setw(15) << pi_rec.get_obs_value();

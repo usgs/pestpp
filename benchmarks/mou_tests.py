@@ -197,6 +197,28 @@ def setup_problem(name,additive_chance=False):
         par.loc[:,"partrans"] = "none"
         par.loc[:,"parval1"] = 5.0
 
+    if name.lower() == "constr":
+        par.loc["dv_0","parlbnd"] = 0.1
+        par.loc["dv_0","parubnd"] = 1.0
+        par.loc["dv_0","parval1"] = 0.5
+        par.loc["dv_1","parlbnd"] = 0.0
+        par.loc["dv_1","parubnd"] = 5.0
+        par.loc["dv_1","parval1"] = 2.5
+        pst.prior_information = pst.null_prior
+        pi = pst.prior_information
+        pi.loc["const_1","pilbl"] = "const_1"
+        pi.loc["const_1","equation"] = "9.0 * dv_0 + 1.0 * dv_1 = 6.0"
+        pi.loc["const_1","weight"] = 1.0
+        
+        pi.loc["const_1","obgnme"] = "greater_than"
+        pi.loc["const_2","pilbl"] = "const_2"
+        pi.loc["const_2","equation"] = "9.0 * dv_0 - 1.0 * dv_1 = 1.0"
+        pi.loc["const_2","weight"] = 1.0
+        pi.loc["const_2","obgnme"] = "greater_than"
+        
+        
+
+
     if additive_chance_tpl_file is not None:
         adf = pst.add_parameters(os.path.join(test_d,additive_chance_tpl_file),pst_path=".")
         print(adf)
@@ -223,7 +245,7 @@ def setup_problem(name,additive_chance=False):
     if name.lower() == "srn":
         obs.loc["const_1","obsval"] = 225
         obs.loc["const_2","obsval"] = -10
-
+    
     pst.pestpp_options["opt_dec_var_groups"] = "decvars"
     pst.pestpp_options["mou_objectives"] = "obj_1,obj_2"
     pst.model_command = "python forward_run.py"
@@ -345,15 +367,17 @@ def plot_zdt_results(master_d):
     possibles.update(locals())
     method = possibles.get(case)
 
-    x0 = np.linspace(0,1,1000)
-    o1,o2 = [],[]
-    for xx0 in x0:
-        x = np.zeros(30)
-        x[0] = xx0
-        oo1,oo2 = method(x)
-        o1.append(oo1)
-        o2.append(oo2)
-    ax.plot(o1,o2,"k",label="truth")
+    
+    if "srn" not in master_d.lower():
+        x0 = np.linspace(0,1,1000)
+        o1,o2 = [],[]
+        for xx0 in x0:
+            x = np.zeros(30)
+            x[0] = xx0
+            ret_vals = method(x)
+            o1.append(ret_vals[0])
+            o2.append(ret_vals[1])
+        ax.plot(o1,o2,"k",label="truth")
     ax.set_title("{0}, {1} generations shown, {2} members in archive, {3} total members".\
         format(case,len(gens),df_arc.shape[0],df.shape[0]))
     ax.legend()
@@ -471,5 +495,8 @@ if __name__ == "__main__":
     #test_sorting_fake_problem()
     #start_workers()
     #setup_problem("srn")
-    run_problem("srn",noptmax=100)
+    #run_problem("srn",noptmax=100)
+    #plot_zdt_results(os.path.join("mou_tests","srn_master"))
+    #setup_problem("constr")
+    run_problem("constr",noptmax=100)
 
