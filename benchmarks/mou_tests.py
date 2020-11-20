@@ -439,7 +439,7 @@ def test_sorting_fake_problem():
 
 
 def start_workers():
-    pyemu.os_utils.start_workers(os.path.join("mou_tests","zdt1_template"), exe_path, "zdt1.pst", 
+    pyemu.os_utils.start_workers(os.path.join("mou_tests","srn_template"), exe_path, "srn.pst", 
                                   num_workers=15, worker_root="mou_tests",
                                   port=4004)
 

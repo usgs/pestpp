@@ -19,6 +19,7 @@
 #include "FileManager.h"
 #include "constraints.h"
 #include "linear_analysis.h"
+#include "eigen_tools.h"
 
 using namespace std;
 
@@ -1233,8 +1234,8 @@ double Constraints::get_probit()
 	return output;
 }
 
-void Constraints::mou_report(int iter, Parameters& current_pars, Observations& current_obs, vector<string>& obs_obj_names,
-	vector<string>& pi_obj_names, bool echo)
+void Constraints::mou_report(int iter, Parameters& current_pars, Observations& current_obs, const vector<string>& obs_obj_names,
+	const vector<string>& pi_obj_names, bool echo)
 {
 
 	set<string> skip_names(obs_obj_names.begin(), obs_obj_names.end());
@@ -1246,13 +1247,12 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 	ss.str("");
 	if (skip_names.size() < ctl_ord_obs_constraint_names.size())
 	{
-		ss << endl << "  observation constraint/objective information " << iter << endl;
+		ss << endl << "  observation constraint information " << iter << endl;
 		ss << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
 		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
 
 
 
-		residuals = get_constraint_residual_vec(current_obs);
 		infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
 		for (int i = 0; i < num_obs_constraints(); ++i)
 		{
@@ -1303,6 +1303,108 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 			{
 				ss << setw(15) << "true" << setw(15) << 0.0;
 			}
+			ss << endl;
+		}
+	}
+	f_rec << ss.str();
+	if (echo)
+		cout << ss.str();
+
+	return;
+}
+
+
+void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsemble& oe, const vector<string>& obs_obj_names,
+	const vector<string>& pi_obj_names, bool echo)
+{
+
+	set<string> skip_names(obs_obj_names.begin(), obs_obj_names.end());
+
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+	vector<double> residuals;
+	map<string, double> infeas_dist;
+	stringstream ss;
+	ss.str("");
+	vector<string> names = oe.get_var_names();
+	Observations current_obs;
+	map<string, int> infeas_count;
+	if (skip_names.size() < ctl_ord_obs_constraint_names.size())
+	{
+		
+		for (auto o : ctl_ord_obs_constraint_names)
+			infeas_count[o] = 0;
+		for (auto real : oe.get_real_names())
+		{
+			current_obs.update(names, eigenvec_2_stlvec(oe.get_real_vector(real)));
+			infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
+			for (auto in : infeas_dist)
+				infeas_count[in.first]++;
+		}
+
+		pair<map<string,double>,map<string,double>> mm = oe.get_moment_maps();
+
+
+		ss << endl << "  population observation constraint summary at iteration " << iter << endl;
+		ss << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "mean sim value";
+		ss << setw(15) << "% unsatisfied" << setw(15) << endl;
+
+		infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
+		int num_reals = oe.shape().first;
+		for (int i = 0; i < num_obs_constraints(); ++i)
+		{
+			string name = ctl_ord_obs_constraint_names[i];
+			if (skip_names.find(name) != skip_names.end())
+				continue;
+			ss << setw(20) << left << name;
+			ss << setw(15) << right << constraint_sense_name[name];
+			ss << setw(15) << constraints_obs.get_rec(name);
+			ss << setw(15) << mm.first[name];
+			ss << setw(15) << 100.0 * double(infeas_count[name]) / double(num_reals);
+			ss << endl;
+
+		}
+	}
+	
+	if (num_pi_constraints() > skip_names.size())
+	{
+		skip_names.clear();
+		skip_names.insert(pi_obj_names.begin(), pi_obj_names.end());
+		Parameters current_pars;
+		names = pe.get_var_names();
+		map<string, double> tots;
+		PriorInformationRec pi_rec;
+		for (auto p : ctl_ord_pi_constraint_names)
+		{
+			tots[p] = 0.0;
+			infeas_count[p] = 0;
+		}
+		for (auto real : pe.get_real_names())
+		{
+			current_pars.update(names, eigenvec_2_stlvec(pe.get_real_vector(real)));
+			infeas_dist = get_unsatified_pi_constraints(current_pars);
+			for (int i = 0; i < num_pi_constraints(); ++i)
+			{
+				string name = ctl_ord_pi_constraint_names[i];
+				pi_rec = constraints_pi.get_pi_rec_ptr(name);
+				tots[name] = tots[name] + pi_rec.calc_sim_and_resid(current_pars).first;
+			}
+		}
+		//report prior information constraints
+		ss << endl << "  prior information constraint information at iteration" << iter << endl;
+		ss << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "mean sim value";
+		ss << setw(15) << "% unsatisfied" << endl;
+		int num_reals = pe.shape().first;
+		for (int i = 0; i < num_pi_constraints(); ++i)
+		{
+			string name = ctl_ord_pi_constraint_names[i];
+			if (skip_names.find(name) != skip_names.end())
+				continue;
+			
+			ss << setw(20) << left << name;
+			ss << setw(15) << right << constraint_sense_name[name];
+			ss << setw(15) << pi_rec.get_obs_value();
+			ss << setw(15) << double(tots[name] / num_reals);
+			ss << setw(15) << 100.0 * double(infeas_count[name]) / double(num_reals);
 			ss << endl;
 		}
 	}

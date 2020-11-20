@@ -1654,6 +1654,9 @@ void MOEA::initialize()
 		pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op, false);
 		constraints.presolve_chance_report(iter, po_pair.second);
 	}
+
+	constraints.mou_report(0,dp, op, obs_obj_names,pi_obj_names);
+
 	message(0, "initialization complete");
 }
 
@@ -1795,6 +1798,8 @@ void MOEA::iterate_to_solution()
 			new_op = new_op_shifted;
 		}
 
+		
+
 		//append offspring dp and (risk-shifted) op to make new dp and op containers
 		new_dp.append_other_rows(dp);
 		new_op.append_other_rows(op);
@@ -1851,6 +1856,8 @@ void MOEA::iterate_to_solution()
 		message(0, ss.str());
 		obj_func_change_report(summary);
 		previous_obj_summary = summary;
+		constraints.mou_report(iter, new_dp, new_op, obs_obj_names, pi_obj_names, true);
+
 
 		iter++;
 	}
