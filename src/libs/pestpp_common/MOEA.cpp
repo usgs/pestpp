@@ -18,9 +18,9 @@ using namespace std;
 
 
 ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager,
-	PerformanceLog* _performance_log, Constraints* _constraints_ptr):
+	PerformanceLog* _performance_log):
 	pest_scenario(_pest_scenario),file_manager(_file_manager),
-	performance_log(_performance_log),constraints_ptr(_constraints_ptr)
+	performance_log(_performance_log)
 
 {
 
@@ -136,7 +136,7 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 }
 
 pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int generation, ObservationEnsemble& op, 
-	ParameterEnsemble& dp, bool report, string sum_tag)
+	ParameterEnsemble& dp, Constraints* constraints_ptr, bool report, string sum_tag)
 {
 	stringstream ss;
 	ss << "ParetoObjectives::pareto_dominance_sort() for " << op.shape().first << " population members";
@@ -150,7 +150,8 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int
 	//update the member struct container
 	update_member_struct(op, dp);
 
-
+	if (member_struct.size() == 0)
+		throw runtime_error("ParetoObjectives error: member_struct is empty");
 
 	//check for and drop duplictes
 	drop_duplicates(op, dp);
@@ -159,8 +160,10 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int
 	vector<string> real_names = op.get_real_names();
 	vector<string> infeas_ordered;
 	map<string, double> infeas;
+	bool all_infeas = false;
 	if (constraints_ptr)
 	{
+		performance_log->log_event("feasible sorting");
 		//sort into feasible and infeasible 
 		map<string, double> violations;
 		double vsum;
@@ -203,8 +206,17 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int
 			ss << "WARNING: all members are infeasible" << endl;
 			frec << ss.str();
 			cout << ss.str();
+			all_infeas = true;
 		}
-		member_struct = feas_member_struct;
+		else 
+		{
+			ss.str("");
+			ss << feas_member_struct.size() << " feasible solution" << endl;
+			frec << ss.str();
+			cout << ss.str();
+			member_struct = feas_member_struct;
+		}
+		
 		
 		//sort the infeasible members by violation
 		vector <pair<string, double>> infeas_vec;
@@ -220,8 +232,8 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int
 		
 	}
 
+	performance_log->log_event("pareto sorting");
 	map<int, vector<string>> front_map = sort_members_by_dominance_into_fronts(member_struct);
-	performance_log->log_event("sorting done");
 	
 	frec << "...pareto dominance sort yielded " << front_map.size() << " domination fronts" << endl;
 	for (auto front : front_map)
@@ -269,13 +281,15 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int
 
 	//now add the infeasible members
 	//if there is atleast one feasible nondom solution, then add the infeasible ones to dom solutions
-	if (nondom_crowd_ordered.size() > 0)
-		for (auto inf : infeas_ordered)
-			dom_crowd_ordered.push_back(inf);
-	else
-		for (auto inf : infeas_ordered)
-			nondom_crowd_ordered.push_back(inf);
-
+	if (!all_infeas)
+	{
+		if (nondom_crowd_ordered.size() > 0)
+			for (auto inf : infeas_ordered)
+				dom_crowd_ordered.push_back(inf);
+		else
+			for (auto inf : infeas_ordered)
+				nondom_crowd_ordered.push_back(inf);
+	}
 
 	if (op.shape().first != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
 	{
@@ -905,7 +919,7 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	dp_archive.append_other_rows(keep, other);
 	other.resize(0, 0);
 	message(2, "pareto dominance sorting archive of size", op_archive.shape().first);
-	DomPair dompair = objectives.pareto_dominance_sort(iter,op_archive, dp_archive,true,ARC_SUM_TAG);
+	DomPair dompair = objectives.pareto_dominance_sort(iter,op_archive, dp_archive,&constraints,true,ARC_SUM_TAG);
 	
 	ss.str("");
 	ss << "resizing archive from " << op_archive.shape().first << " to " << dompair.first.size() << " current non-dominated solutions";
@@ -1262,7 +1276,7 @@ void MOEA::initialize()
 		set<string> pinames(onames.begin(), onames.end());
 		onames.clear();
 		vector<string> missing,keep_obs, keep_pi,err_sense;
-		for (auto obj_name : obs_obj_names)
+		for (auto obj_name : passed_obj_names)
 		{
 			if ((oset.find(obj_name) == oset.end()) && (pinames.find(obj_name) == pinames.end()))
 				missing.push_back(obj_name);
@@ -1285,7 +1299,7 @@ void MOEA::initialize()
 						obj_sense_map[obj_name] = "minimize";
 						obj_dir_mult[obj_name] = 1.0;
 					}
-					
+					obs_obj_names.push_back(obj_name);
 				}
 			}
 			else
@@ -1307,7 +1321,7 @@ void MOEA::initialize()
 						obj_sense_map[obj_name] = "minimize";
 						obj_dir_mult[obj_name] = 1.0;
 					}
-
+					pi_obj_names.push_back(obj_name);
 				}
 			}
 		}
@@ -1321,13 +1335,13 @@ void MOEA::initialize()
 		}
 		if (keep_obs.size() == 0)
 		{
-			throw_moea_error("none of the supplied observation-based 'mou_objectives' were found in the zero-weighted observations");
+			throw_moea_error("none of the supplied observation-based 'mou_objectives' were found in the non-zero-weighted observations");
 		}
 		
 		else if (missing.size() > 0)
 		{
 			ss.str("");
-			ss << "WARNING: the following mou_objectives were not found in the zero-weighted observations or prior info eqs: ";
+			ss << "WARNING: the following mou_objectives were not found in the non-zero-weighted observations or prior info eqs: ";
 			for (auto m : missing)
 				ss << m << ",";
 			message(1, ss.str());
@@ -1362,6 +1376,8 @@ void MOEA::initialize()
 	if (obs_obj_names.size() + pi_obj_names.size() > 5)
 		message(1, "WARNING: more than 5 objectives, this is pushing the limits!");
 
+	constraints.initialize(dv_names, numeric_limits<double>::max());
+	constraints.initial_report();
 
 	if (pest_scenario.get_control_info().noptmax == 0)
 	{
@@ -1416,6 +1432,7 @@ void MOEA::initialize()
 
 		message(0, "control file parameter objective function summary: ");
 		obj_func_report(_pe, _oe);
+		
 
 		return;
 	}
@@ -1430,13 +1447,13 @@ void MOEA::initialize()
 		{
 			gen_types.push_back(MouGenType::DE);
 		}
-		else if (token == "RGA")
+		else if (token == "SBX")
 		{
-			gen_types.push_back(MouGenType::RGA);
+			gen_types.push_back(MouGenType::SBX);
 		}
 		else
 		{
-			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','RGA'}");
+			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX'}");
 		}
 	}
 	//TODO: report constraints being applied
@@ -1453,7 +1470,7 @@ void MOEA::initialize()
 	//calculated
 	//effective_constraint_pars = pest_scenario.get_ctl_parameters();
 	//effective_constraint_obs = pest_scenario.get_ctl_observations();
-	constraints.initialize(dv_names, numeric_limits<double>::max());
+	
 
 	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
 	population_dv_file = ppo->get_mou_dv_population_file();
@@ -1604,7 +1621,7 @@ void MOEA::initialize()
 	//do an initial pareto dominance sort
 	message(1, "performing initial pareto dominance sort");
 	objectives.set_pointers(obs_obj_names, pi_obj_names, obj_dir_mult);
-	DomPair dompair = objectives.pareto_dominance_sort(iter, op, dp,true,POP_SUM_TAG);
+	DomPair dompair = objectives.pareto_dominance_sort(iter, op, dp,&constraints,true,POP_SUM_TAG);
 	
 	//initialize op and dp archives
 	op_archive = ObservationEnsemble(&pest_scenario, &rand_gen, 
@@ -1727,9 +1744,9 @@ ParameterEnsemble MOEA::generate_population()
 			p = generate_diffevol_population(new_members_per_gen, dp);
 		}
 
-		else if (gen_type == MouGenType::RGA)
+		else if (gen_type == MouGenType::SBX)
 		{
-			p = generate_rga_population(new_members_per_gen, dp);
+			p = generate_sbx_population(new_members_per_gen, dp);
 		}
 		else
 			throw_moea_error("unrecognized mou generator");
@@ -1781,7 +1798,7 @@ void MOEA::iterate_to_solution()
 
 		message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
 
-		DomPair dompair = objectives.pareto_dominance_sort(iter, new_op, new_dp,true,POP_SUM_TAG);
+		DomPair dompair = objectives.pareto_dominance_sort(iter, new_op, new_dp,&constraints,true,POP_SUM_TAG);
 
 		//drop shitty members
 		//TODO: this is just a cheap hack, prob something more meaningful to be done...
@@ -2096,9 +2113,9 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	return new_dp;
 }
 
-ParameterEnsemble MOEA::generate_rga_population(int num_members, ParameterEnsemble& _dp)
+ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemble& _dp)
 {
-	message(1, "generating RGA population of size", num_members);
+	message(1, "generating SBX population of size", num_members);
 
 	_dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 
@@ -2137,11 +2154,11 @@ ParameterEnsemble MOEA::generate_rga_population(int num_members, ParameterEnsemb
 		p2_idx = working_count[1];
 
 		//generate two children thru cross over
-		children = crossover(crossover_probability, crossover_distribution_index, p1_idx, p2_idx);
+		children = sbx(crossover_probability, crossover_distribution_index, p1_idx, p2_idx);
 
 		//put the two children into the child population
 		new_reals.row(i_member) = children.first;
-		new_name = get_new_member_name("rga");
+		new_name = get_new_member_name("sbx");
 		lin << new_name << "," << real_names[p1_idx] << "," << real_names[p2_idx] << endl;
 		new_names.push_back(new_name);
 		//cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() - 1] << endl;
@@ -2149,7 +2166,7 @@ ParameterEnsemble MOEA::generate_rga_population(int num_members, ParameterEnsemb
 		if (i_member >= num_members)
 			break;
 		new_reals.row(i_member) = children.second;
-		new_name = get_new_member_name("rga");
+		new_name = get_new_member_name("sbx");
 		lin << new_name << "," << real_names[p1_idx] << "," << real_names[p2_idx] << endl;
 		new_names.push_back(new_name);
 		//cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() -1] << endl;
@@ -2215,7 +2232,7 @@ string MOEA::get_new_member_name(string tag)
 	return ss.str();
 }
 
-pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::crossover(double probability, double di, int idx1, int idx2)
+pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx(double probability, double di, int idx1, int idx2)
 {
 	int i;
 	//double rnd1, rnd2, rnd3, rnd4;

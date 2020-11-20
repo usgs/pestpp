@@ -1086,6 +1086,7 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		{
 			mou_objectives.push_back(upper_cp(obj));
 		}
+		return true;
 	}
 	
 	else if (key == "MOU_MAX_ARCHIVE_SIZE")
@@ -1413,7 +1414,7 @@ void PestppOptions::set_defaults()
 	set_sqp_obs_restart_en("");
 	set_sqp_num_reals(50);
 
-	set_mou_generator("RGA");
+	set_mou_generator("SBX");
 
 	set_mou_population_size(100);
 	set_mou_dv_population_file("");

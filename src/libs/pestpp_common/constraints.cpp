@@ -211,7 +211,9 @@ void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv
 Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, OutputFileWriter& _of_wr, PerformanceLog& _pfm)
 	:pest_scenario(_pest_scenario), file_mgr_ptr(_file_mgr_ptr), of_wr(_of_wr), pfm(_pfm), jco(*_file_mgr_ptr, _of_wr)
 {
-	;
+	use_fosm = false;
+	std_weights = false;
+	probit_val = 0.0;
 }
 
 
@@ -738,6 +740,7 @@ void Constraints::initial_report()
 		f_rec << setw(20) << constraint_sense_name[name];
 		f_rec << setw(20) << constraints_obs.get_rec(name) << endl;
 	}
+	cout << "..." << ctl_ord_obs_constraint_names.size() << " obs-based constraints, see rec file for listing" << endl;
 
 	if (num_pi_constraints() > 0)
 	{
@@ -749,7 +752,11 @@ void Constraints::initial_report()
 			f_rec << setw(20) << constraint_sense_name[name];
 			f_rec << setw(20) << constraints_pi.get_pi_rec_ptr(name).get_obs_value() << endl;
 		}
+		cout << "..." << ctl_ord_pi_constraint_names.size() << " pi-based constraints, see rec file for listing" << endl;
 	}
+
+	
+
 
 	if (use_chance)
 	{
@@ -805,7 +812,10 @@ void Constraints::initial_report()
 			cout << ", using FOSM-based chance constraints with " << adj_par_names.size() << " adjustable parameters" << endl;
 		else
 			cout << ", using stack-based chance constraints with " << stack_pe.shape().first << " realizations" << endl;
-
+	}
+	else
+	{
+		cout << "...not using chance constraints" << endl;
 	}
 }
 

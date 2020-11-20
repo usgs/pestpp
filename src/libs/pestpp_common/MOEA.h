@@ -23,9 +23,10 @@ class ParetoObjectives
 {
 public:
 	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
-		PerformanceLog* _performance_log,Constraints* _constraints_ptr = nullptr);
+		PerformanceLog* _performance_log);
 
-	pair<vector<string>, vector<string>> pareto_dominance_sort(int generation, ObservationEnsemble& op, ParameterEnsemble& dp, bool report=true, string sum_tag=string());
+	pair<vector<string>, vector<string>> pareto_dominance_sort(int generation, ObservationEnsemble& op, 
+		ParameterEnsemble& dp, Constraints* constraints_ptr=nullptr, bool report=true, string sum_tag=string());
 	
 	//this must be called at least once before the diversity metrixs can be called...
 	void set_pointers(vector<string>& _obs_obj_names, vector<string>& _pi_obj_names, map<string, double>& _obj_dir_mult)
@@ -48,7 +49,6 @@ private:
 	FileManager& file_manager;
 	PerformanceLog* performance_log;
 	//vector<string> obj_names;
-	Constraints* constraints_ptr;
 	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, double>& crowd_map);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
 
@@ -90,7 +90,7 @@ private:
 
 class MOEA
 {
-	enum MouGenType{DE,RGA};
+	enum MouGenType{DE,SBX};
 public:
 	static mt19937_64 rand_engine;
 	MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer,
@@ -135,7 +135,6 @@ private:
 	RunManagerAbstract* run_mgr_ptr;
 	const ObservationInfo *obs_info_ptr;
 
-
 	ParameterEnsemble dp, dp_archive;
 	ObservationEnsemble op, op_archive;
 
@@ -161,13 +160,13 @@ private:
 	ParameterEnsemble generate_population();
 
 	ParameterEnsemble generate_diffevol_population(int num_members, ParameterEnsemble& _dp);
-	ParameterEnsemble generate_rga_population(int num_members, ParameterEnsemble& _dp);
+	ParameterEnsemble generate_sbx_population(int num_members, ParameterEnsemble& _dp);
 
 	string get_new_member_name(string tag = string());
 
 	void save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag = string());
 	void mutate_ip(double probability, double eta_m, ParameterEnsemble& temp_dp);
-	pair<Eigen::VectorXd, Eigen::VectorXd> crossover(double probability, double eta_m, int idx1, int idx2);
+	pair<Eigen::VectorXd, Eigen::VectorXd> sbx(double probability, double eta_m, int idx1, int idx2);
 
 	pair<Parameters, Observations> get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe, bool use_mean=false);
 
