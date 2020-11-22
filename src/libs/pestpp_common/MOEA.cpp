@@ -501,24 +501,26 @@ map<string, double> ParetoObjectives::get_crowding_distance(vector<string>& memb
 	for (auto obj_map : obj_member_map)
 	{
 		omap = obj_map.second;
+		//note: for members with identical distances, only the first one gets into the 
+		//sorted set but this is ok since we initialized the distance map with zeros
+		//for all members, so it works out...
 		crowdset crowd_sorted(omap.begin(), omap.end(), compFunctor);
 
 		crowdset::iterator start = crowd_sorted.begin(), last = prev(crowd_sorted.end(), 1);
-
 
 		obj_range = last->second - start->second;
 
 		//the obj extrema - makes sure they are retained 
 		crowd_distance_map[start->first] = 1.0e+30;
 		crowd_distance_map[last->first] = 1.0e+30;
-		if (members.size() == 3)
+		if (crowd_sorted.size() == 3)
 		{
 			crowdset::iterator it = start;
 			next(it, 1);
 			crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((last->second - start->second) / obj_range);
 
 		}
-		else if (members.size() > 3)
+		else if (crowd_sorted.size() > 3)
 		{
 			//need iterators to start and stop one off from the edges
 			start = next(crowd_sorted.begin(), 1);
@@ -534,7 +536,6 @@ map<string, double> ParetoObjectives::get_crowding_distance(vector<string>& memb
 				crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((inext->second - iprev->second) / obj_range);
 			}
 		}
-
 	}
 	return crowd_distance_map;
 }
