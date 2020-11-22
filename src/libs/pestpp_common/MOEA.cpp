@@ -128,12 +128,65 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 				i = 0;
 			}
 		}
+		/*vector<string> d(duplicates.begin(), duplicates.end());
+		op.drop_rows(d);
+		dp.drop_rows(d);
+		performance_log->log_event("updating member struct after dropping duplicates");
+		update_member_struct(op, dp);*/
+	}
+
+	duplicates.clear(); 
+	vector<string> names;
+	map<string, double> solution_p,solution_q;
+	string name_p,name_q;
+	for (auto m : member_struct)
+		names.push_back(m.first);
+
+	//for (auto solution_p : member_struct)
+	for (int i=0;i<names.size();i++)
+	{
+		name_p = names[i];
+		solution_p = member_struct[names[i]];
+		//for (auto solution_q : member_struct)
+		for (int j=i+1;j<names.size();j++)
+		{
+			name_q = names[j];
+			solution_q = member_struct[name_q];
+			//if (solution_p.first == solution_q.first)
+			//	continue;
+			if ((first_equals_second(solution_p, solution_q)) && (duplicates.find(name_q) == duplicates.end()))
+			{
+				duplicates.emplace(name_p);
+			}
+		}
+	}
+	if (duplicates.size() > 0)
+	{
+		stringstream ss;
+		ss << "WARNING: " << duplicates.size() << " duplicate solutions found, dropping (see rec file for listing)";
+		performance_log->log_event(ss.str());
+		cout << ss.str() << endl;
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << "WARNING: " << duplicates.size() << " duplicate solutions found:" << endl;
+		int i = 0;
+		for (auto d : duplicates)
+		{
+			frec << d << " ";
+			i++;
+			if (i > 5)
+			{
+				frec << endl;
+				i = 0;
+			}
+		}
 		vector<string> d(duplicates.begin(), duplicates.end());
 		op.drop_rows(d);
 		dp.drop_rows(d);
 		performance_log->log_event("updating member struct after dropping duplicates");
 		update_member_struct(op, dp);
 	}
+
+
 }
 
 pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int generation, ObservationEnsemble& op,

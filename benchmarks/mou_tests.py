@@ -487,7 +487,7 @@ def test_sorting_fake_problem():
 
 def start_workers():
     pyemu.os_utils.start_workers(os.path.join("mou_tests","water_template"), exe_path, "water.pst", 
-                                  num_workers=15, worker_root="mou_tests",
+                                  num_workers=35, worker_root="mou_tests",
                                   port=4004)
 
 if __name__ == "__main__":
@@ -498,7 +498,7 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt3",30)
     # setup_zdt_problem("zdt4",10)
     # setup_zdt_problem("zdt6",10)
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
+    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
     #setup_zdt_problem("zdt1",30, additive_chance=True)
     
     #for case in ["zdt6","srn","constr"]:
@@ -506,7 +506,7 @@ if __name__ == "__main__":
     #   plot_results(master_d)
 
     #setup_problem("water")
-    #master_d = run_problem("water",noptmax=10)
+    #master_d = run_problem("water",noptmax=200)
     #plot_results(os.path.join("mou_tests","sch_master"))
 
     #master_d = test_zdt("zdt2",noptmax=3)
