@@ -32,7 +32,22 @@ port = 4021
 test_root = "mou_tests"
 
 
+def water(x):
+    f1 = (107680.37 * (x[1] + x[2])) + 61704.67
+    f2 = 3000.0 * x[0]
+    f3 = (305700. * (2289 * x[1])) / (0.06 * np.power(2289,0.65))
+    f4 = 250. * 2289 * np.exp((-39.75 * x[1]) + (9.9 * x[2]) + 2.74) 
+    f5 = 25.0 * ((1.39/(x[0] * x[1])) + (4940 * x[2]) - 80)
+    g1 = (0.00139 / (x[0] * x[1])) + (4.94 * x[2]) - 0.08
+    g2 = 0.000306 / (x[0] * x[1]) + (1.082 * x[2]) - 0.0986
+    g3 = 12.307 / (x[0] * x[1]) + (49408.24 * x[2]) + 4051.02
+    g4 = 2.098 / (x[0] * x[1]) + (8046.33 * x[2]) + 696.71
+    g5 = 2.138 / (x[0] * x[1]) + (7883.39 * x[2]) - 705.04
+    g6 = 0.417 / (x[0] * x[1]) + (1721.26 * x[2]) - 136.54
+    g7 = 0.164 / (x[0] * x[1]) + (631.13 * x[2]) - 54.48
 
+def sch(x):
+    return np.power(x,2),np.power(x-2,2)
 
 
 def zdt1(x):
@@ -97,6 +112,11 @@ def setup_problem(name,additive_chance=False):
         num_dv = 2
     elif name.lower() == "srn":
         num_dv = 2
+    elif name.lower() == "sch":
+        num_dv = 1
+
+    elif name.lower() == "water":
+        num_dv = 3
 
     # write a generic template file for the dec vars
     tpl_file = "dv.dat.tpl".format(name)
@@ -130,6 +150,9 @@ def setup_problem(name,additive_chance=False):
         if name.lower() == "srn":
             f.write("l1 w !const_1!\n")
             f.write("l1 w !const_2!\n")
+        if name.lower() == "water":
+            for i in range(1,8):
+                f.write("l1 w !const_{0}!\n"format(i))
 
     # now scape this python file to get the function lines and
     # the helper lines
@@ -188,8 +211,10 @@ def setup_problem(name,additive_chance=False):
     par.loc[:,"parchglim"] = "relative"
 
     if name.lower() == "zdt4":
-        par.loc[pst.par_names[0],"parubnd"] = 5.0
-        par.loc[pst.par_names[0],"parlbnd"] = -5.0
+        par.loc[pst.par_names[0],"parubnd"] = 1.0
+        par.loc[pst.par_names[0],"parlbnd"] = 0.0
+        par.loc[pst.par_names[1:],"parubnd"] = 5.0
+        par.loc[pst.par_names[1:],"parlbnd"] = -5.0
 
     if name.lower() == "srn":
         par.loc[:,"parubnd"] = 20.0
@@ -216,7 +241,24 @@ def setup_problem(name,additive_chance=False):
         pi.loc["const_2","weight"] = 1.0
         pi.loc["const_2","obgnme"] = "greater_than"
         
-        
+      
+    if name.lower() == "sch":
+        par.loc[:,"parubnd"] = 1000.0
+        par.loc[:,"parlbnd"] = -1000.0
+        par.loc[:,"partrans"] = "none"
+        par.loc[:,"parval1"] = 0.0
+
+    if name.lower() == "water":
+        par.loc["dv_0","parlbnd"] = 0.01
+        par.loc["dv_0","parubnd"] = 0.45
+        par.loc["dv_0","parval1"] = 0.2
+        par.loc["dv_1","parlbnd"] = 0.01
+        par.loc["dv_1","parubnd"] = 0.1
+        par.loc["dv_1","parval1"] = 0.05
+        par.loc["dv_2","parlbnd"] = 0.01
+        par.loc["dv_2","parubnd"] = 0.1
+        par.loc["dv_2","parval1"] = 0.05
+
 
 
     if additive_chance_tpl_file is not None:
@@ -261,13 +303,14 @@ def setup_problem(name,additive_chance=False):
     return test_d
 
 
-def run_problem(test_case="zdt1",pop_size=100,noptmax=10):
+def run_problem(test_case="zdt1",pop_size=100,noptmax=100):
     test_d = setup_problem(test_case,additive_chance=False)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
-    pst.control_data.noptmax = 1
+    pst.control_data.noptmax = noptmax
     pst.pestpp_options["mou_population_size"] = pop_size
     pst.pestpp_options["panther_echo"] = False
     pst.pestpp_options["mou_generator"] = "de"
+    pst.pestpp_options["panther_agent_freeze_on_fail"] = True
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
     master_d = test_d.replace("template","master")
@@ -276,47 +319,10 @@ def run_problem(test_case="zdt1",pop_size=100,noptmax=10):
                                   port=port)
     
     #TODO: need some asserts here
-    dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
-    assert os.path.exists(os.path.join(master_d,dv_pop_file)),dv_pop_file
-    obs_pop_file = "{0}.0.obs_pop.csv".format(test_case)
-    assert os.path.exists(os.path.join(master_d,obs_pop_file)),obs_pop_file
-    dv_df = pd.read_csv(os.path.join(master_d,dv_pop_file),index_col=0)
-    obs_df = pd.read_csv(os.path.join(master_d,obs_pop_file),index_col=0)
-    assert dv_df.shape[0] == pst.pestpp_options["mou_population_size"]
-    assert dv_df.shape[1] == pst.npar
-    assert obs_df.shape[0] == pst.pestpp_options["mou_population_size"]
-    assert obs_df.shape[1] == pst.nobs
-    assert dv_df.index.to_list() == obs_df.index.to_list()
-
-    dv_df = dv_df.iloc[1:,:]
-    obs_df = obs_df.iloc[:-1,:]
-    dv_df.to_csv(os.path.join(test_d,"restart_dv.csv"))
-    obs_df.to_csv(os.path.join(test_d,"restart_obs.csv"))
-
-    shutil.copy2(os.path.join(master_d,dv_pop_file),os.path.join(test_d,"restart_dv.csv"))
-    shutil.copy2(os.path.join(master_d,obs_pop_file),os.path.join(test_d,"restart_obs.csv"))
-    pst.pestpp_options["mou_dv_population_file"] = "restart_dv.csv"
-    pst.pestpp_options["mou_obs_population_restart_file"] = "restart_obs.csv"
-    pst.control_data.noptmax = noptmax
-    pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
-    pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case), 
-                                      num_workers=35, master_dir=master_d,worker_root=test_root,
-                                      port=port)
-    dv_pop_file = "{0}.0.dv_pop.csv".format(test_case)
-    assert os.path.exists(os.path.join(master_d,dv_pop_file)),dv_pop_file
-    obs_pop_file = "{0}.0.obs_pop.csv".format(test_case)
-    assert os.path.exists(os.path.join(master_d,obs_pop_file)),obs_pop_file
-    dv_df = pd.read_csv(os.path.join(master_d,dv_pop_file),index_col=0)
-    obs_df = pd.read_csv(os.path.join(master_d,obs_pop_file),index_col=0)
-    assert dv_df.shape[0] == pst.pestpp_options["mou_population_size"]
-    assert dv_df.shape[1] == pst.npar
-    assert obs_df.shape[0] == pst.pestpp_options["mou_population_size"]
-    assert obs_df.shape[1] == pst.nobs
-    assert dv_df.index.to_list() == obs_df.index.to_list()
     return master_d
 
 
-def plot_zdt_results(master_d):
+def plot_results(master_d):
     plt_dir = os.path.join("mou_tests","zdt_results")
     if not os.path.exists(plt_dir):
         os.mkdir(plt_dir)
@@ -368,7 +374,7 @@ def plot_zdt_results(master_d):
     method = possibles.get(case)
 
     
-    if "srn" not in master_d.lower():
+    if "zdt" in master_d.lower():
         x0 = np.linspace(0,1,1000)
         o1,o2 = [],[]
         for xx0 in x0:
@@ -388,9 +394,9 @@ def plot_zdt_results(master_d):
     plt.close("all")
 
 
-def test_zdt_chance(test_case="zdt1",pop_size=100,noptmax=3):
+def run_problem_chance(test_case="zdt1",pop_size=100,noptmax=100):
     
-    test_d = setup_zdt_problem(test_case,30,additive_chance=True)
+    test_d = setup_problem(test_case,additive_chance=True)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
     pst.control_data.noptmax = noptmax
     pst.pestpp_options["mou_population_size"] = pop_size   
@@ -475,19 +481,22 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt3",30)
     # setup_zdt_problem("zdt4",10)
     # setup_zdt_problem("zdt6",10)
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
+    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
     #setup_zdt_problem("zdt1",30, additive_chance=True)
     
-    # for case in ["zdt1","zdt2","zdt3","zdt4","zdt6"]:
-    #    master_d = test_zdt(case,noptmax=100)
-    #    plot_zdt_results(master_d)
+    #for case in ["zdt6","srn","constr"]:
+    #   master_d = run_problem(case,noptmax=250)
+    #   plot_results(master_d)
+
+    #master_d = run_problem("sch")
+    #plot_results(master_d)
 
     #master_d = test_zdt("zdt2",noptmax=3)
-    #master_d = os.path.join("mou_tests","zdt4_master")
-    #plot_zdt_results(master_d)
-    # for case in ["zdt1","zdt2","zdt3","zdt4","zdt6"]:
-    #    master_d = test_zdt_chance(case,noptmax=100)
-    #    plot_zdt_results(master_d)
+    #master_d = os.path.join("mou_tests","zdt6_master")
+    #plot_results(master_d)
+    #for case in ["zdt1","zdt2","zdt3","zdt4","zdt6"]:
+    #  master_d = run_problem_chance(case,noptmax=250)
+    #  plot_results(master_d)
 
     #master_d = test_zdt_chance("zdt1",noptmax=100)
     #plot_zdt_results(os.path.join("mou_tests","zdt3_master"))
@@ -496,7 +505,7 @@ if __name__ == "__main__":
     #start_workers()
     #setup_problem("srn")
     #run_problem("srn",noptmax=100)
-    #plot_zdt_results(os.path.join("mou_tests","srn_master"))
+    #plot_results(os.path.join("mou_tests","srn_master"))
     #setup_problem("constr")
-    run_problem("constr",noptmax=100)
+    #run_problem("constr",noptmax=100)
 

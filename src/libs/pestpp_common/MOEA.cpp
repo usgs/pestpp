@@ -135,7 +135,7 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 	}
 }
 
-pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int generation, ObservationEnsemble& op, 
+pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int generation, ObservationEnsemble& op,
 	ParameterEnsemble& dp, Constraints* constraints_ptr, bool report, string sum_tag)
 {
 	stringstream ss;
@@ -145,9 +145,9 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int
 
 
 	ofstream& frec = file_manager.rec_ofstream();
-    	//TODO: check for a single objective and deal appropriately
+	//TODO: check for a single objective and deal appropriately
 
-	//update the member struct container
+//update the member struct container
 	update_member_struct(op, dp);
 
 	if (member_struct.size() == 0)
@@ -156,80 +156,108 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int
 	//check for and drop duplictes
 	drop_duplicates(op, dp);
 
-	
+
 	vector<string> real_names = op.get_real_names();
 	vector<string> infeas_ordered;
 	map<string, double> infeas;
 	bool all_infeas = false;
+	//TODO: work out if there are actually any constraints (instead of all objectives)
+	
+
 	if (constraints_ptr)
 	{
-		performance_log->log_event("feasible sorting");
-		//sort into feasible and infeasible 
-		map<string, double> violations;
-		double vsum;
-		Observations obs = pest_scenario.get_ctl_observations();
-		Parameters pars = pest_scenario.get_ctl_parameters();
-		vector<string> onames = op.get_var_names(), pnames=dp.get_var_names();
-		set<string> obs_obj_set(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
-		set<string> pi_obj_set(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());	
-		map<string, map<string, double>> feas_member_struct;
-		for (auto real_name : real_names)
+		bool check_constraints = false;
+			set<string> obj_names(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
+			for (auto name : constraints_ptr->get_obs_constraint_names())
+			{
+				if (obj_names.find(name) == obj_names.end())
+				{
+					check_constraints = true;
+						break;
+				}
+			}
+
+		if (!check_constraints)
 		{
-			vsum = 0.0;
-			obs.update_without_clear(onames, op.get_real_vector(real_name));
-			//TODO: add a constraint tol ++ arg and use it here
-			// the 'false' arg is to not apply risk shifting to the satisfaction calcs since
-			// 'op' has already been shifted
-			violations = constraints_ptr->get_unsatified_obs_constraints(obs, 0.0, false);
-			for (auto v : violations)
+			obj_names.clear();
+			obj_names.insert(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());
+			for (auto name : constraints_ptr->get_pi_constraint_names())
 			{
-				if (obs_obj_set.find(v.first) == obs_obj_set.end())
-					vsum += v.second;
+				if (obj_names.find(name) == obj_names.end())
+				{
+					check_constraints = true;
+					break;
+				}
 			}
-			pars.update_without_clear(pnames, dp.get_real_vector(real_name));
-			violations = constraints_ptr->get_unsatified_pi_constraints(pars, 0.0);
-			for (auto v : violations)
+
+		}
+		if (check_constraints)
+		{
+			performance_log->log_event("feasible sorting");
+			//sort into feasible and infeasible 
+			map<string, double> violations;
+			double vsum;
+			Observations obs = pest_scenario.get_ctl_observations();
+			Parameters pars = pest_scenario.get_ctl_parameters();
+			vector<string> onames = op.get_var_names(), pnames = dp.get_var_names();
+			set<string> obs_obj_set(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
+			set<string> pi_obj_set(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());
+			map<string, map<string, double>> feas_member_struct;
+			for (auto real_name : real_names)
 			{
-				if (pi_obj_set.find(v.first) == pi_obj_set.end())
-					vsum += v.second;
+				vsum = 0.0;
+				obs.update_without_clear(onames, op.get_real_vector(real_name));
+				//TODO: add a constraint tol ++ arg and use it here
+				// the 'false' arg is to not apply risk shifting to the satisfaction calcs since
+				// 'op' has already been shifted
+				violations = constraints_ptr->get_unsatified_obs_constraints(obs, 0.0, false);
+				for (auto v : violations)
+				{
+					if (obs_obj_set.find(v.first) == obs_obj_set.end())
+						vsum += v.second;
+				}
+				pars.update_without_clear(pnames, dp.get_real_vector(real_name));
+				violations = constraints_ptr->get_unsatified_pi_constraints(pars, 0.0);
+				for (auto v : violations)
+				{
+					if (pi_obj_set.find(v.first) == pi_obj_set.end())
+						vsum += v.second;
+				}
+				if (vsum > 0.0)
+				{
+					infeas[real_name] = vsum;
+				}
+				else
+					feas_member_struct[real_name] = member_struct[real_name];
 			}
-			if (vsum > 0.0)
+			if (feas_member_struct.size() == 0)
 			{
-				infeas[real_name] = vsum;
+				ss.str("");
+				ss << "WARNING: all members are infeasible" << endl;
+				frec << ss.str();
+				cout << ss.str();
+				all_infeas = true;
 			}
 			else
-				feas_member_struct[real_name] = member_struct[real_name];
-		}
-		if (feas_member_struct.size() == 0)
-		{
-			ss.str("");
-			ss << "WARNING: all members are infeasible" << endl;
-			frec << ss.str();
-			cout << ss.str();
-			all_infeas = true;
-		}
-		else 
-		{
-			ss.str("");
-			ss << feas_member_struct.size() << " feasible solution" << endl;
-			frec << ss.str();
-			cout << ss.str();
-			member_struct = feas_member_struct;
-		}
-		
-		
-		//sort the infeasible members by violation
-		vector <pair<string, double>> infeas_vec;
-		for (auto inf : infeas)
-			infeas_vec.push_back(inf);
+			{
+				ss.str("");
+				ss << feas_member_struct.size() << " feasible solutions" << endl;
+				frec << ss.str();
+				cout << ss.str();
+				member_struct = feas_member_struct;
+			}
 
-		std::sort(infeas_vec.begin(), infeas_vec.end(),
-			compFunctor);
+			//sort the infeasible members by violation
+			vector <pair<string, double>> infeas_vec;
+			for (auto inf : infeas)
+				infeas_vec.push_back(inf);
 
-		
-		for (auto inf : infeas_vec)
-			infeas_ordered.push_back(inf.first);
-		
+			std::sort(infeas_vec.begin(), infeas_vec.end(),
+				compFunctor);
+
+			for (auto inf : infeas_vec)
+				infeas_ordered.push_back(inf.first);
+		}
 	}
 
 	performance_log->log_event("pareto sorting");
