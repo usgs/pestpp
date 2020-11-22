@@ -136,6 +136,8 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 	}
 
 	duplicates.clear(); 
+
+	performance_log->log_event("checking for duplicate solutions");
 	vector<string> names;
 	map<string, double> solution_p,solution_q;
 	string name_p,name_q;
