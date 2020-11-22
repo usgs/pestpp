@@ -96,7 +96,7 @@ def zdt_helper(func):
 
     with open("obj.dat",'w') as f:
         for i,obj in enumerate(objs):
-            f.write("obj_{0} {1}\n".format(i+1,float(obj1)))
+            f.write("obj_{0} {1}\n".format(i+1,float(obj)))
         #f.write("obj_2 {0}\n".format(float(obj2)))
         for i,constr in enumerate(constrs):
             f.write("constr_{0} {1}\n".format(i+1,float(constr)))
@@ -486,7 +486,7 @@ def test_sorting_fake_problem():
 
 
 def start_workers():
-    pyemu.os_utils.start_workers(os.path.join("mou_tests","srn_template"), exe_path, "srn.pst", 
+    pyemu.os_utils.start_workers(os.path.join("mou_tests","water_template"), exe_path, "water.pst", 
                                   num_workers=15, worker_root="mou_tests",
                                   port=4004)
 
@@ -498,7 +498,7 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt3",30)
     # setup_zdt_problem("zdt4",10)
     # setup_zdt_problem("zdt6",10)
-    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
     #setup_zdt_problem("zdt1",30, additive_chance=True)
     
     #for case in ["zdt6","srn","constr"]:
@@ -506,7 +506,7 @@ if __name__ == "__main__":
     #   plot_results(master_d)
 
     #setup_problem("water")
-    master_d = run_problem("water",noptmax=10)
+    #master_d = run_problem("water",noptmax=10)
     #plot_results(os.path.join("mou_tests","sch_master"))
 
     #master_d = test_zdt("zdt2",noptmax=3)
@@ -520,7 +520,7 @@ if __name__ == "__main__":
     #plot_zdt_results(os.path.join("mou_tests","zdt3_master"))
     #setup_zdt_problem("zdt1",30, additive_chance=True)
     #test_sorting_fake_problem()
-    #start_workers()
+    start_workers()
     #setup_problem("srn")
     #run_problem("srn",noptmax=100)
     #plot_results(os.path.join("mou_tests","srn_master"))

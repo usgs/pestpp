@@ -168,20 +168,22 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int
 	if (constraints_ptr)
 	{
 		bool check_constraints = false;
-			set<string> obj_names(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
-			for (auto name : constraints_ptr->get_obs_constraint_names())
+		vector<string> t = *obs_obj_names_ptr;
+		set<string> obj_names(t.begin(), t.end());
+		for (auto name : constraints_ptr->get_obs_constraint_names())
+		{
+			if (obj_names.find(name) == obj_names.end())
 			{
-				if (obj_names.find(name) == obj_names.end())
-				{
-					check_constraints = true;
-						break;
-				}
+				check_constraints = true;
+					break;
 			}
+		}
 
 		if (!check_constraints)
 		{
 			obj_names.clear();
-			obj_names.insert(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());
+			t = *pi_obj_names_ptr;
+			obj_names.insert(t.begin(), t.end());
 			for (auto name : constraints_ptr->get_pi_constraint_names())
 			{
 				if (obj_names.find(name) == obj_names.end())
@@ -454,7 +456,14 @@ map<string, double> ParetoObjectives::get_crowding_distance(vector<string>& memb
 		//the obj extrema - makes sure they are retained 
 		crowd_distance_map[start->first] = 1.0e+30;
 		crowd_distance_map[last->first] = 1.0e+30;
-		if (members.size() > 2)
+		if (members.size() == 3)
+		{
+			crowdset::iterator it = start;
+			next(it, 1);
+			crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((last->second - start->second) / obj_range);
+
+		}
+		else if (members.size() > 3)
 		{
 			//need iterators to start and stop one off from the edges
 			start = next(crowd_sorted.begin(), 1);
