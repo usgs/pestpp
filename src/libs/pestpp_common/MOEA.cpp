@@ -95,6 +95,7 @@ void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEn
 
 void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
+	performance_log->log_event("checking for duplicate solutions");
 	set<string> duplicates;
 	for (auto solution_p : member_struct)
 	{

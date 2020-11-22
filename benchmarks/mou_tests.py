@@ -46,58 +46,60 @@ def water(x):
     g6 = 0.417 / (x[0] * x[1]) + (1721.26 * x[2]) - 136.54
     g7 = 0.164 / (x[0] * x[1]) + (631.13 * x[2]) - 54.48
 
+    return (f1,f2,f3,f4,f5),(g1,g2,g3,g4,g5,g6,g7)
 def sch(x):
-    return np.power(x,2),np.power(x-2,2)
+    return (np.power(x,2),np.power(x-2,2)),[]
 
 
 def zdt1(x):
     g = 1 + 9 * np.sum(x[1:]) / (len(x) - 1)
-    return x[0], g * (1 - np.sqrt(x[0] / g))
+    return (x[0], g * (1 - np.sqrt(x[0] / g))),[]
 
 def zdt2(x):
     g = 1 + 9 * np.sum(x[1:]) / (len(x) - 1)
-    return x[0], g * (1 - np.power(x[0] / g, 2))
+    return (x[0], g * (1 - np.power(x[0] / g, 2))),[]
 
 def zdt3(x):
     g = 1 + 9 * np.sum(x[1:]) / (len(x) - 1)
-    return x[0], g * (1 - np.sqrt(x[0] / g) - (x[0] / g) *\
-           np.sin(10 * np.pi * x[0]))
+    return (x[0], g * (1 - np.sqrt(x[0] / g) - (x[0] / g) *\
+           np.sin(10 * np.pi * x[0]))),[]
 
 def zdt4(x):
     g = 1 + 10 * (len(x) - 1) + np.sum(np.power(x[1:], 2) - 10 * np.cos(4 * np.pi * x[1:]))
-    return x[0], g * (1 - np.sqrt(x[0] / g))
+    return (x[0], g * (1 - np.sqrt(x[0] / g))),[]
 
 def zdt6(x):
     f1 = 1 - np.exp(-4 * x[0]) * np.power(np.sin(6 * np.pi * x[0]), 6)
     g = 1 + 9 * np.power(np.sum(x[1:]) / (len(x) - 1), 0.25)
-    return f1, g * (1 - np.power(f1 / g, 2))
+    return (f1, g * (1 - np.power(f1 / g, 2))),[]
 
 def constr(x):
-    return x[0],(1 + x[1]) / x[0]
+    return (x[0],(1 + x[1]) / x[0]),[]
 
 def srn(x):
     const1 = np.power(x[0], 2) + np.power(x[1], 2)  # lest than or equal to 225
     const2 =  x[0] - (3 * x[1])  # less than or equal to -10
     f1 = np.power(x[0] - 2, 2) + np.power(x[1] - 1, 2) + 2
     f2 = 9 * x[0] - np.power(x[1] - 1, 2)
-    return f1, f2, const1, const2
+    return (f1, f2), (const1, const2)
 
 
 def zdt_helper(func):
     pdf = pd.read_csv("dv.dat",delim_whitespace=True,index_col=0, header=None, names=["parnme","parval1"])
     #obj1,obj2 = func(pdf.values)
-    ret_val = func(pdf.values)
-    obj1,obj2 = ret_val[0],ret_val[1]
+    objs,constrs = func(pdf.values)
+    obj1,obj2 = objs[0],objs[1]
     if os.path.exists("additive_par.dat"):
         cdf = pd.read_csv("additive_par.dat", delim_whitespace=True, index_col=0,header=None, names=["parnme","parval1"])
         obj1[0] += cdf.parval1.values[0]
         obj2[0] += cdf.parval1.values[1]
 
     with open("obj.dat",'w') as f:
-        f.write("obj_1 {0}\n".format(float(obj1)))
-        f.write("obj_2 {0}\n".format(float(obj2)))
-        for i,v in enumerate(ret_val[2:]):
-            f.write("constr_{0} {1}\n".format(i+1,float(v)))
+        for i,obj in enumerate(objs):
+            f.write("obj_{0} {1}\n".format(i+1,float(obj1)))
+        #f.write("obj_2 {0}\n".format(float(obj2)))
+        for i,constr in enumerate(constrs):
+            f.write("constr_{0} {1}\n".format(i+1,float(constr)))
 
 def setup_problem(name,additive_chance=False):
     test_d = os.path.join(test_root,"{0}_template".format(name))
@@ -145,14 +147,18 @@ def setup_problem(name,additive_chance=False):
     ins_file = "obj.dat.ins".format(name)
     with open(os.path.join(test_d,ins_file),'w') as f:
         f.write("pif ~\n")
-        f.write("l1 w !obj_1!\n")
-        f.write("l1 w !obj_2!\n")
-        if name.lower() == "srn":
-            f.write("l1 w !const_1!\n")
-            f.write("l1 w !const_2!\n")
         if name.lower() == "water":
+            for i in range(1,6):
+                f.write("l1 w !obj_{0}!\n".format(i))
             for i in range(1,8):
-                f.write("l1 w !const_{0}!\n"format(i))
+                f.write("l1 w !const_{0}!\n".format(i))
+        else:
+            f.write("l1 w !obj_1!\n")
+            f.write("l1 w !obj_2!\n")
+            if name.lower() == "srn":
+                f.write("l1 w !const_1!\n")
+                f.write("l1 w !const_2!\n")
+        
 
     # now scape this python file to get the function lines and
     # the helper lines
@@ -287,9 +293,20 @@ def setup_problem(name,additive_chance=False):
     if name.lower() == "srn":
         obs.loc["const_1","obsval"] = 225
         obs.loc["const_2","obsval"] = -10
-    
+    if name.lower() == "water":
+        obs.loc["const_1","obsval"] = 1
+        obs.loc["const_2","obsval"] = 1
+        obs.loc["const_3","obsval"] = 50000
+        obs.loc["const_4","obsval"] = 16000
+        obs.loc["const_5","obsval"] = 10000
+        obs.loc["const_6","obsval"] = 2000
+        obs.loc["const_7","obsval"] = 550
+           
     pst.pestpp_options["opt_dec_var_groups"] = "decvars"
     pst.pestpp_options["mou_objectives"] = "obj_1,obj_2"
+    if name.lower() == "water":
+        pst.pestpp_options["mou_objectives"] = "obj_1,obj_2,obj_3,obj_4,obj_5"
+
     pst.model_command = "python forward_run.py"
     pst.control_data.noptmax = 0
     pst.write(os.path.join(test_d,name+".pst"))
@@ -488,8 +505,9 @@ if __name__ == "__main__":
     #   master_d = run_problem(case,noptmax=250)
     #   plot_results(master_d)
 
-    #master_d = run_problem("sch")
-    #plot_results(master_d)
+    #setup_problem("water")
+    master_d = run_problem("water",noptmax=10)
+    #plot_results(os.path.join("mou_tests","sch_master"))
 
     #master_d = test_zdt("zdt2",noptmax=3)
     #master_d = os.path.join("mou_tests","zdt6_master")
