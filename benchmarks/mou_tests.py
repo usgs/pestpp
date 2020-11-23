@@ -549,66 +549,45 @@ def plot_results_single(master_d):
     #master_d = os.path.join("mou_tests","zdt1_master")
     assert os.path.exists(master_d)
 
-    odf_files = [f for f in os.listdir(master_d) if f.endswith("obs_pop.csv") and "archive" in f]
     odf_files_all = [f for f in os.listdir(master_d) if f.endswith("obs_pop.csv") and "archive" not in f]
-    odfs = [pd.read_csv(os.path.join(master_d,f),index_col=0) for f in odf_files]
     odfs_all = [pd.read_csv(os.path.join(master_d,f),index_col=0) for f in odf_files_all]
+    
+    pdf_files_all = [f for f in os.listdir(master_d) if f.endswith("dv_pop.csv") and "archive" not in f]
+    pdfs_all = [pd.read_csv(os.path.join(master_d,f),index_col=0) for f in pdf_files_all]
     
     import matplotlib.colors as colors
     import matplotlib.pyplot as plt
-    cols = ["obj_1","obj_2"]
-    if "water" in master_d.lower():
-        cols = ["obj_4","obj_1"]
-    cols = odfs[0].columns
-    mins,maxs = {},{}
-    for oname in cols:
-        mins[oname] = 1.0e+30
-        maxs[oname] = -1.0e+30
-        for df in odfs_all:
-            mins[oname] = min(mins[oname],df.loc[:,oname].min())
-            maxs[oname] = max(maxs[oname], df.loc[:, oname].max())
-    print(mins,maxs)
-
-    #colors = ["0.5",'m','b','c','g','y','r']
     
-    fig,ax = plt.subplots(1,1,figsize=(6,6))
-    #df = df.loc[df.generation<80,:]
-    #print(gens)
-
-    cmap = plt.get_cmap("jet",lut=len(odfs_all))
-    for i,df in enumerate(odfs_all):
-    #for i,gen in enumerate(gens):
-       ax.scatter(df.loc[:,cols[0]],df.loc[:,cols[1]],marker=".",
-           c=cmap(i/len(odfs_all)),s=50,alpha=0.25)
-
-
     possibles = globals().copy()
     possibles.update(locals())
     case = os.path.split(master_d)[-1].split("_")[0]
     method = possibles.get(case)
 
-    
-    if "zdt" in master_d.lower():
-        x0 = np.linspace(0,1,1000)
-        o1,o2 = [],[]
-        for xx0 in x0:
-            x = np.zeros(30)
-            x[0] = xx0
-            ret_vals = method(x)
-            o1.append(ret_vals[0][0])
-            o2.append(ret_vals[0][1])
+    fig,ax = plt.subplots(1,1,figsize=(6,6))
+    cmap = plt.get_cmap("jet",lut=len(odfs_all))
+    for i,(df,pdf) in enumerate(zip(odfs_all,pdfs_all)):
+       #ax.scatter(pdf.loc[:,"dv_0"],pdf.loc[:,"dv_1"],
+       # c=cmap(i/len(odfs_all)), marker=".",s=50,alpha=0.25)
+       ax.scatter(pdf.loc[:,"dv_0"],pdf.loc[:,"dv_1"],
+        c="k", marker=".",s=20,alpha=i/len(odfs_all))
 
-        ax.plot(o1,o2,"k",label="truth")
-    ax.set_title("{0}, {1} generations shown".\
-        format(case,len(odfs_all)))
+    x = np.linspace(-2,2,1000)
+    y = np.linspace(-2,2,1000)
+    X,Y = np.meshgrid(x,y)
+    
+    z = []
+    #for xx,yy in zip(X.flatten(),Y.flatten()):
+    for xx in x:
+        for yy in y:
+            z.append(method((xx,yy))[0])
+    Z = np.array(z).reshape((x.shape[0],x.shape[0]))
+    ax.imshow(Z,alpha=0.5,extent=(-2,2,-2,2),interpolation="none")
     ax.legend()
-    ax.set_xlim(-0.1,7.0)
-    ax.set_ylim(-0.1,7.0)
+    ax.set_xlim(-2,2.0)
+    ax.set_ylim(-2,2.0)
     plt.tight_layout()
     plt.savefig(os.path.join(plt_dir,os.path.split(master_d)[-1]+".pdf"))
     plt.close("all")
-
-
 
 if __name__ == "__main__":
         
@@ -652,5 +631,7 @@ if __name__ == "__main__":
     #master_d = os.path.join("mou_tests","sch_master")
     #plot_results_single(master_d)
     #setup_problem("ackley")
-    run_problem("ackley")
+    #run_problem("ackley")
+    master_d = os.path.join("mou_tests","rosen_master")
+    plot_results_single(master_d)
 
