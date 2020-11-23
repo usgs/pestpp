@@ -97,47 +97,47 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 {
 	performance_log->log_event("checking for duplicate solutions");
 	set<string> duplicates;
-	for (auto solution_p : member_struct)
-	{
-		for (auto solution_q : member_struct)
-		{
-			if (solution_p.first == solution_q.first)
-				continue;
-			if ((first_equals_second(solution_p.second, solution_q.second)) && (duplicates.find(solution_q.first) == duplicates.end()))
-			{
-				duplicates.emplace(solution_p.first);
-			}
-		}
-	}
-	if (duplicates.size() > 0)
-	{
-		stringstream ss;
-		ss << "WARNING: " << duplicates.size() << " duplicate solutions found, dropping (see rec file for listing)";
-		performance_log->log_event(ss.str());
-		cout << ss.str() << endl;
-		ofstream& frec = file_manager.rec_ofstream();
-		frec << "WARNING: " << duplicates.size() << " duplicate solutions found:" << endl;
-		int i = 0;
-		for (auto d : duplicates)
-		{
-			frec << d << " ";
-			i++;
-			if (i > 5)
-			{
-				frec << endl;
-				i = 0;
-			}
-		}
-		/*vector<string> d(duplicates.begin(), duplicates.end());
-		op.drop_rows(d);
-		dp.drop_rows(d);
-		performance_log->log_event("updating member struct after dropping duplicates");
-		update_member_struct(op, dp);*/
-	}
+	//for (auto solution_p : member_struct)
+	//{
+	//	for (auto solution_q : member_struct)
+	//	{
+	//		if (solution_p.first == solution_q.first)
+	//			continue;
+	//		if ((first_equals_second(solution_p.second, solution_q.second)) && (duplicates.find(solution_q.first) == duplicates.end()))
+	//		{
+	//			duplicates.emplace(solution_p.first);
+	//		}
+	//	}
+	//}
+	//if (duplicates.size() > 0)
+	//{
+	//	stringstream ss;
+	//	ss << "WARNING: " << duplicates.size() << " duplicate solutions found, dropping (see rec file for listing)";
+	//	performance_log->log_event(ss.str());
+	//	cout << ss.str() << endl;
+	//	ofstream& frec = file_manager.rec_ofstream();
+	//	frec << "WARNING: " << duplicates.size() << " duplicate solutions found:" << endl;
+	//	int i = 0;
+	//	for (auto d : duplicates)
+	//	{
+	//		frec << d << " ";
+	//		i++;
+	//		if (i > 5)
+	//		{
+	//			frec << endl;
+	//			i = 0;
+	//		}
+	//	}
+	//	/*vector<string> d(duplicates.begin(), duplicates.end());
+	//	op.drop_rows(d);
+	//	dp.drop_rows(d);
+	//	performance_log->log_event("updating member struct after dropping duplicates");
+	//	update_member_struct(op, dp);*/
+	//}
 
-	duplicates.clear(); 
+	//duplicates.clear(); 
 
-	performance_log->log_event("checking for duplicate solutions");
+	//performance_log->log_event("checking for duplicate solutions");
 	vector<string> names;
 	map<string, double> solution_p,solution_q;
 	string name_p,name_q;
@@ -203,8 +203,10 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int
 	ofstream& frec = file_manager.rec_ofstream();
 	//TODO: check for a single objective and deal appropriately
 
-//update the member struct container
+	//update the member struct container
 	update_member_struct(op, dp);
+
+
 
 	if (member_struct.size() == 0)
 		throw runtime_error("ParetoObjectives error: member_struct is empty");
@@ -212,6 +214,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int
 	//check for and drop duplictes
 	drop_duplicates(op, dp);
 
+	
 
 	vector<string> real_names = op.get_real_names();
 	vector<string> infeas_ordered;
@@ -321,21 +324,23 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int
 	performance_log->log_event("pareto sorting");
 	map<int, vector<string>> front_map = sort_members_by_dominance_into_fronts(member_struct);
 	
-	frec << "...pareto dominance sort yielded " << front_map.size() << " domination fronts" << endl;
-	for (auto front : front_map)
+
+	if (obs_obj_names_ptr->size() + pi_obj_names_ptr->size() > 1)
 	{
-
-		if (front.second.size() == 0)
+		frec << "...pareto dominance sort yielded " << front_map.size() << " domination fronts" << endl;
+		for (auto front : front_map)
 		{
-			ss.str("");
-			ss << "ParetoObjectives::pareto_dominance_sort() error: front " << front.first << " has no members";
-			performance_log->log_event(ss.str());
-			throw runtime_error(ss.str());
+			if (front.second.size() == 0)
+			{
+				ss.str("");
+				ss << "ParetoObjectives::pareto_dominance_sort() error: front " << front.first << " has no members";
+				performance_log->log_event(ss.str());
+				throw runtime_error(ss.str());
+			}
+			frec << front.second.size() << " in the front " << front.first << endl;
 		}
-
-		frec << front.second.size() << " in the front " << front.first << endl;
 	}
-
+	
 	vector<string> nondom_crowd_ordered,dom_crowd_ordered;
 	vector<string> crowd_ordered_front;
 	map<string, double> crowd_map;

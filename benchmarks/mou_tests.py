@@ -46,7 +46,7 @@ def water(x):
     g6 = 0.417 / (x[0] * x[1]) + (1721.26 * x[2]) - 136.54
     g7 = 0.164 / (x[0] * x[1]) + (631.13 * x[2]) - 54.48
 
-    return (f1,f2,f3,f4,f5),(g1,g2,g3,g4,g5,g6,g7)
+    return (f1,f2,f3,f4,f5),[g1,g2,g3,g4,g5,g6,g7]
 def sch(x):
     return (np.power(x,2),np.power(x-2,2)),[]
 
@@ -81,18 +81,29 @@ def srn(x):
     const2 =  x[0] - (3 * x[1])  # less than or equal to -10
     f1 = np.power(x[0] - 2, 2) + np.power(x[1] - 1, 2) + 2
     f2 = 9 * x[0] - np.power(x[1] - 1, 2)
-    return (f1, f2), (const1, const2)
+    return (f1, f2), [const1, const2]
 
+def rosen(x):
+    f1 = np.power(1 - x[0],2) + (100 * np.power(x[1] - np.power(x[0],2),2))
+    return (f1),[]
 
-def zdt_helper(func):
+def ackley(x):
+    t1 = -20. * np.exp(-0.2 * np.sqrt(0.5 * np.power(x[0],2) + np.power(x[1],2)))
+    t2 = -1. * np.exp(0.5 * (np.cos(2. * np.pi * x[0]) + np.cos(2.0 * np.pi * x[1]))) + np.e + 20.0
+    return (t1 + t2),[]
+
+def helper(func):
     pdf = pd.read_csv("dv.dat",delim_whitespace=True,index_col=0, header=None, names=["parnme","parval1"])
     #obj1,obj2 = func(pdf.values)
     objs,constrs = func(pdf.values)
-    obj1,obj2 = objs[0],objs[1]
+    
     if os.path.exists("additive_par.dat"):
+        obj1,obj2 = objs[0],objs[1]
         cdf = pd.read_csv("additive_par.dat", delim_whitespace=True, index_col=0,header=None, names=["parnme","parval1"])
         obj1[0] += cdf.parval1.values[0]
         obj2[0] += cdf.parval1.values[1]
+        for i in range(2,cdf.shape[0]):
+            constrs[i-2] += cdf.parval1.values[i]
 
     with open("obj.dat",'w') as f:
         for i,obj in enumerate(objs):
@@ -119,6 +130,8 @@ def setup_problem(name,additive_chance=False):
 
     elif name.lower() == "water":
         num_dv = 3
+    elif name.lower() in ["rosen","ackley"]:
+        num_dv = 2
 
     # write a generic template file for the dec vars
     tpl_file = "dv.dat.tpl".format(name)
@@ -134,10 +147,16 @@ def setup_problem(name,additive_chance=False):
             f.write("ptf ~\n")
             f.write("obj1_add_par ~   obj1_add_par   ~\n")
             f.write("obj2_add_par ~   obj2_add_par   ~\n")
+            if name.lower() in ["srn","constr"]:
+                f.write("constr1_add_par ~   constr1_add_par   ~\n")
+                f.write("constr2_add_par ~   constr2_add_par   ~\n")
 
         with open(os.path.join(test_d,additive_chance_tpl_file.replace(".tpl","")),'w') as f:
             f.write("obj1_add_par 0.0\n")
             f.write("obj2_add_par 0.0\n")
+            if name.lower() in ["srn","constr"]:
+                f.write("constr1_add_par 0.0\n")
+                f.write("constr2_add_par 0.0\n")
             
     with open(os.path.join(test_d,tpl_file.replace(".tpl","")),'w') as f:
         for i in range(num_dv):
@@ -154,7 +173,8 @@ def setup_problem(name,additive_chance=False):
                 f.write("l1 w !const_{0}!\n".format(i))
         else:
             f.write("l1 w !obj_1!\n")
-            f.write("l1 w !obj_2!\n")
+            if name.lower() not in ["rosen","ackley"]:
+                f.write("l1 w !obj_2!\n")
             if name.lower() == "srn":
                 f.write("l1 w !const_1!\n")
                 f.write("l1 w !const_2!\n")
@@ -177,7 +197,7 @@ def setup_problem(name,additive_chance=False):
         raise Exception()
     helper_lines = []
     for i in range(len(lines)):
-        if lines[i].startswith("def zdt_helper(".format(name)):
+        if lines[i].startswith("def helper(".format(name)):
             helper_lines.append(lines[i])
             for ii in range(i+1,len(lines)):
                 if lines[ii][0] not in [" ","   ","\n"]:
@@ -197,7 +217,7 @@ def setup_problem(name,additive_chance=False):
         for helper_line in helper_lines:
             f.write(helper_line)
 
-        f.write("if __name__ == '__main__':\n    zdt_helper({0})\n".format(name))
+        f.write("if __name__ == '__main__':\n    helper({0})\n".format(name))
 
     # make sure it runs
     pyemu.os_utils.run("python forward_run.py",cwd=test_d)
@@ -265,6 +285,13 @@ def setup_problem(name,additive_chance=False):
         par.loc["dv_2","parubnd"] = 0.1
         par.loc["dv_2","parval1"] = 0.05
 
+    if name.lower() in ["rosen","ackley"]:
+        par.loc["dv_0","parlbnd"] = -4.
+        par.loc["dv_0","parubnd"] = 4
+        par.loc["dv_0","parval1"] = -1.
+        par.loc["dv_1","parlbnd"] = -4.
+        par.loc["dv_1","parubnd"] = 4
+        par.loc["dv_1","parval1"] = -1.
 
 
     if additive_chance_tpl_file is not None:
@@ -340,7 +367,7 @@ def run_problem(test_case="zdt1",pop_size=100,noptmax=100):
 
 
 def plot_results(master_d):
-    plt_dir = os.path.join("mou_tests","zdt_results")
+    plt_dir = os.path.join("mou_tests","test_result_plots")
     if not os.path.exists(plt_dir):
         os.mkdir(plt_dir)
     #master_d = os.path.join("mou_tests","zdt1_master")
@@ -357,6 +384,8 @@ def plot_results(master_d):
     import matplotlib.colors as colors
     import matplotlib.pyplot as plt
     cols = ["obj_1","obj_2"]
+    if "water" in master_d.lower():
+        cols = ["obj_4","obj_1"]
     # cols = odfs[0].columns
     # mins,maxs = {},{}
     # for oname in cols:
@@ -377,14 +406,13 @@ def plot_results(master_d):
 
     cmap = plt.get_cmap("jet",lut=len(gens))
     #for i,df in enumerate(odfs_all):
-    for i,gen in enumerate(gens):
+    #for i,gen in enumerate(gens):
+    #    ax.scatter(df_arc.loc[df_arc.generation==gen,cols[0]],df_arc.loc[df_arc.generation==gen,cols[1]],marker=".",
+    #        c=cmap(i/len(gens)),s=50,alpha=0.25)
 
-        ax.scatter(df_arc.loc[df_arc.generation==gen,cols[0]],df_arc.loc[df_arc.generation==gen,cols[1]],marker=".",
-            c=cmap(i/len(gens)),s=50,alpha=0.25)
-
-    ax.scatter(df_arc.loc[df_arc.generation==gen,cols[0]],
-        df_arc.loc[df_arc.generation==gen,cols[1]],
-        marker="+",c=cmap(i/len(gens)),s=100,label="final non dom solutions")
+    ax.scatter(df_arc.loc[df_arc.generation==gens[-1],cols[0]],
+        df_arc.loc[df_arc.generation==gens[-1],cols[1]],
+        marker="+",c='k',s=100,label="final non dom solutions")
 
     possibles = globals().copy()
     possibles.update(locals())
@@ -398,8 +426,9 @@ def plot_results(master_d):
             x = np.zeros(30)
             x[0] = xx0
             ret_vals = method(x)
-            o1.append(ret_vals[0])
-            o2.append(ret_vals[1])
+            o1.append(ret_vals[0][0])
+            o2.append(ret_vals[0][1])
+
         ax.plot(o1,o2,"k",label="truth")
     ax.set_title("{0}, {1} generations shown, {2} members in archive, {3} total members".\
         format(case,len(gens),df_arc.shape[0],df.shape[0]))
@@ -490,6 +519,97 @@ def start_workers():
                                   num_workers=35, worker_root="mou_tests",
                                   port=4004)
 
+def run_single_obj_sch_prob():
+    test_d = os.path.join("mou_tests","sch_template")
+    setup_problem("sch")
+    pst = pyemu.Pst(os.path.join(test_d,"sch.pst"))
+    pst.pestpp_options["mou_objectives"] = "obj_1"
+    pst.observation_data.loc["obj_2","obsval"] = 2.0
+    pst.write(os.path.join(test_d,"sch.pst"))
+    pst.control_data.noptmax = 100
+    pst.pestpp_options["mou_population_size"] = 100
+    pst.pestpp_options["panther_echo"] = False
+    pst.pestpp_options["mou_generator"] = "de"
+    pst.pestpp_options["panther_agent_freeze_on_fail"] = True
+    pst.write(os.path.join(test_d,"sch.pst"))
+    #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
+    master_d = test_d.replace("template","master")
+    pyemu.os_utils.start_workers(test_d, exe_path, "sch.pst", 
+                                  num_workers=35, master_dir=master_d,worker_root=test_root,
+                                  port=port)
+    
+    #TODO: need some asserts here
+    return master_d
+
+
+def plot_results_single(master_d):
+    plt_dir = os.path.join("mou_tests","test_result_plots")
+    if not os.path.exists(plt_dir):
+        os.mkdir(plt_dir)
+    #master_d = os.path.join("mou_tests","zdt1_master")
+    assert os.path.exists(master_d)
+
+    odf_files = [f for f in os.listdir(master_d) if f.endswith("obs_pop.csv") and "archive" in f]
+    odf_files_all = [f for f in os.listdir(master_d) if f.endswith("obs_pop.csv") and "archive" not in f]
+    odfs = [pd.read_csv(os.path.join(master_d,f),index_col=0) for f in odf_files]
+    odfs_all = [pd.read_csv(os.path.join(master_d,f),index_col=0) for f in odf_files_all]
+    
+    import matplotlib.colors as colors
+    import matplotlib.pyplot as plt
+    cols = ["obj_1","obj_2"]
+    if "water" in master_d.lower():
+        cols = ["obj_4","obj_1"]
+    cols = odfs[0].columns
+    mins,maxs = {},{}
+    for oname in cols:
+        mins[oname] = 1.0e+30
+        maxs[oname] = -1.0e+30
+        for df in odfs_all:
+            mins[oname] = min(mins[oname],df.loc[:,oname].min())
+            maxs[oname] = max(maxs[oname], df.loc[:, oname].max())
+    print(mins,maxs)
+
+    #colors = ["0.5",'m','b','c','g','y','r']
+    
+    fig,ax = plt.subplots(1,1,figsize=(6,6))
+    #df = df.loc[df.generation<80,:]
+    #print(gens)
+
+    cmap = plt.get_cmap("jet",lut=len(odfs_all))
+    for i,df in enumerate(odfs_all):
+    #for i,gen in enumerate(gens):
+       ax.scatter(df.loc[:,cols[0]],df.loc[:,cols[1]],marker=".",
+           c=cmap(i/len(odfs_all)),s=50,alpha=0.25)
+
+
+    possibles = globals().copy()
+    possibles.update(locals())
+    case = os.path.split(master_d)[-1].split("_")[0]
+    method = possibles.get(case)
+
+    
+    if "zdt" in master_d.lower():
+        x0 = np.linspace(0,1,1000)
+        o1,o2 = [],[]
+        for xx0 in x0:
+            x = np.zeros(30)
+            x[0] = xx0
+            ret_vals = method(x)
+            o1.append(ret_vals[0][0])
+            o2.append(ret_vals[0][1])
+
+        ax.plot(o1,o2,"k",label="truth")
+    ax.set_title("{0}, {1} generations shown".\
+        format(case,len(odfs_all)))
+    ax.legend()
+    ax.set_xlim(-0.1,7.0)
+    ax.set_ylim(-0.1,7.0)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plt_dir,os.path.split(master_d)[-1]+".pdf"))
+    plt.close("all")
+
+
+
 if __name__ == "__main__":
         
     #zdt1_test()
@@ -500,30 +620,37 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt6",10)
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
     #setup_zdt_problem("zdt1",30, additive_chance=True)
+    shutil.copy2(os.path.join("..","bin","win","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
     
-    #for case in ["zdt6","srn","constr"]:
-    #   master_d = run_problem(case,noptmax=250)
+    #for case in ["srn","constr","zdt4","zdt3","zdt2","zdt1"]:
+    #   master_d = run_problem(case,noptmax=100)
     #   plot_results(master_d)
 
     #setup_problem("water")
     #master_d = run_problem("water",noptmax=200)
-    #plot_results(os.path.join("mou_tests","sch_master"))
+    #plot_results(os.path.join("mou_tests","zdt6_master"))
 
     #master_d = test_zdt("zdt2",noptmax=3)
     #master_d = os.path.join("mou_tests","zdt6_master")
     #plot_results(master_d)
-    #for case in ["zdt1","zdt2","zdt3","zdt4","zdt6"]:
-    #  master_d = run_problem_chance(case,noptmax=250)
+    #for case in ["zdt1","zdt2","zdt3","zdt4","zdt6","sch","srn","constr"]:
+    #  master_d = run_problem_chance(case,noptmax=100)
     #  plot_results(master_d)
 
+    #setup_problem("srn",additive_chance=True)
     #master_d = test_zdt_chance("zdt1",noptmax=100)
     #plot_zdt_results(os.path.join("mou_tests","zdt3_master"))
     #setup_zdt_problem("zdt1",30, additive_chance=True)
     #test_sorting_fake_problem()
-    start_workers()
+    #start_workers()
     #setup_problem("srn")
     #run_problem("srn",noptmax=100)
     #plot_results(os.path.join("mou_tests","srn_master"))
     #setup_problem("constr")
     #run_problem("constr",noptmax=100)
+    #master_d = run_single_obj_sch_prob()
+    #master_d = os.path.join("mou_tests","sch_master")
+    #plot_results_single(master_d)
+    #setup_problem("ackley")
+    run_problem("ackley")
 
