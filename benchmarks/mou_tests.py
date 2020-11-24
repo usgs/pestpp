@@ -632,6 +632,6 @@ if __name__ == "__main__":
     #plot_results_single(master_d)
     #setup_problem("ackley")
     #run_problem("ackley")
-    master_d = os.path.join("mou_tests","rosen_master")
-    plot_results_single(master_d)
+    #master_d = os.path.join("mou_tests","rosen_master")
+    #plot_results_single(master_d)
 

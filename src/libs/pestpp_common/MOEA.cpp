@@ -1432,9 +1432,9 @@ void MOEA::initialize()
 				ss << e << ";";
 			throw_moea_error(ss.str());
 		}
-		if (keep_obs.size() == 0)
+		if ((keep_obs.size() == 0) && (keep_pi.size() == 0))
 		{
-			throw_moea_error("none of the supplied observation-based 'mou_objectives' were found in the non-zero-weighted observations");
+			throw_moea_error("none of the supplied observation and/or prior info 'mou_objectives' were found in the non-zero-weighted observations");
 		}
 		
 		else if (missing.size() > 0)

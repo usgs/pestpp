@@ -1248,7 +1248,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 	if (skip_names.size() < ctl_ord_obs_constraint_names.size())
 	{
 		ss << endl << "  observation constraint information at iteration " << iter << endl;
-		ss << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
+		ss << setw(30) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
 		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
 
 
@@ -1259,7 +1259,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 			string name = ctl_ord_obs_constraint_names[i];
 			if (skip_names.find(name) != skip_names.end())
 				continue;
-			ss << setw(20) << left << name;
+			ss << setw(30) << left << name;
 			ss << setw(15) << right << constraint_sense_name[name];
 			ss << setw(15) << constraints_obs.get_rec(name);
 			ss << setw(15) << current_obs.get_rec(name);
