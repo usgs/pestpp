@@ -3,6 +3,8 @@ import shutil
 import platform
 import numpy as np
 import pandas as pd
+from matplotlib.patches import Rectangle
+from matplotlib.colors import Normalize
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 import flopy
@@ -75,7 +77,7 @@ def add_artrch():
             raw = line.strip().split()
             args[raw[0]] = float(raw[1])
 
-    org_wel_list_file = "flow.wel_stress_period_data_historic.txt"
+    org_wel_list_file = "flow.wel_stress_period_data_scenario_base.txt"
     new_wel_list_file = "flow.wel_stress_period_data_scenario.txt"
     lines = []
     with open(org_wel_list_file,'r') as f:
@@ -107,7 +109,10 @@ def test_add_artrch(test_d,dist=80,width=10,rate=1,concen=0.0,write_tpl=False):
             f.write("width ~  ar_width    ~\n")
             f.write("rate   ~   ar_rate     ~\n")
             f.write("concen ~   ar_concen    ~\n")
-
+    base_file = os.path.join(test_d, "flow.wel_stress_period_data_scenario_base.txt")
+    if not os.path.exists(base_file):
+        shutil.copy2(os.path.join(test_d, "flow.wel_stress_period_data_historic.txt"),
+                     base_file)
     bd = os.getcwd()
     os.chdir(test_d)
     add_artrch()
@@ -118,7 +123,7 @@ def test_add_artrch(test_d,dist=80,width=10,rate=1,concen=0.0,write_tpl=False):
 
 def setup_pst():
     old_dir = os.path.join("mou_tests","henry_temp")
-    new_dir = os.path.join("mou_tests","henry_template")
+    new_dir = os.path.join("mou_tests","henry_template1")
     sim = flopy.mf6.MFSimulation.load(sim_ws=old_dir)
     m = sim.get_model("flow")
     # setup a fake model grid
@@ -145,12 +150,15 @@ def setup_pst():
                      par_name_base="p", pargp="p",
                      geostruct=gs_k,par_style="direct")
 
-    # setup pars for "recharge" wells in rows 1-40,
-    # pumping wells in both historic (uncertain) and scenario (dv)
-    pf.add_parameters("flow.wel_stress_period_data_historic.txt",par_type="grid",par_style="direct",
+
+    # copy the current historic well list file to a "base" file that will get modified...
+    shutil.copy2(os.path.join(new_dir,"flow.wel_stress_period_data_historic.txt"),
+                 os.path.join(new_dir,"flow.wel_stress_period_data_scenario_base.txt"))
+    pf.add_parameters("flow.wel_stress_period_data_scenario_base.txt",par_type="grid",par_style="multiplier",
                       index_cols=[0,1,2],use_cols=3,pargp="wel")
 
-    # add pars for ghb conditions to represent historic and scenario sea level
+    # todo: add pars for ghb conditions to represent historic and scenario sea level
+    # this may bring additional constraints to not add to flooding with recharge basin
 
     # setup obs for all concentrations at the end of the 3 periods
     pump_filename,conc_filenames = test_process_unc(new_dir)
@@ -205,7 +213,7 @@ def setup_pst():
     par.loc[wpar, "pargp"] = "dv_pars"
     par.loc[wpar, "parubnd"] = 0.0
     par.loc[wpar, "parlbnd"] = -2.0
-    pf.pst.add_pi_equation(wpar.to_list(),pilbl="pump_rate",obs_group="greater_than")
+    #pf.pst.add_pi_equation(wpar.to_list(),pilbl="pump_rate",obs_group="less_than")
 
     pf.pst.control_data.noptmax = 0
     pf.pst.add_pi_equation(["ar_width"],obs_group="less_than",pilbl="ar_width")
@@ -213,7 +221,7 @@ def setup_pst():
     pf.pst.add_pi_equation(["ar_concen"], obs_group="greater_than",pilbl="ar_concen")
     pf.pst.pestpp_options["mou_objectives"] = ["ar_width","ar_rate","ar_concen","pump_rate"]
     pf.pst.pestpp_options["opt_dec_var_groups"] = "dv_pars"
-    pf.pst.pestpp_options["panther_echo"] = False
+    pf.pst.pestpp_options["panther_echo"] = True
     pf.pst.pestpp_options["mou_generator"] = "de"
     pf.pst.pestpp_options["mou_population_size"] = 100
 
@@ -242,7 +250,7 @@ def process_unc():
     df = pd.read_csv(os.path.join("flow.wel_stress_period_data_historic.txt"),
                     delim_whitespace=True, header=None, names=["l", "r", "c", "flux", "concen"])
 
-    df = df.loc[df.flux < 0, :]
+    df = df.loc[df.flux<=0, :]
     d = ucn.get_alldata()
     # print(d.shape)
     wel_ucn = {}
@@ -307,16 +315,105 @@ def plot_pr_real():
     plt.imshow(k)
     plt.show()
 
+def start_workers_for_debug():
+    t_d = os.path.join("mou_tests", "henry_template")
+    m_d = os.path.join("mou_tests","henry_master")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(t_d,m_d)
+    pst = pyemu.Pst(os.path.join(m_d,"henry.pst"))
+    pst.control_data.noptmax = 100
+    pst.write(os.path.join(m_d,"henry.pst"))
+    pyemu.os_utils.start_workers(t_d, exe_path, "henry.pst",
+                                  num_workers=10, worker_root="mou_tests",
+                                  port=4004)
+
+def plot_results(m_d):
+    # plt_d = "henry_results"
+    # if os.path.exists(plt_d):
+    #     shutil.rmtree(plt_d)
+    # os.mkdir(plt_d)
+    df_arc = pd.read_csv(os.path.join(m_d,"henry.pareto.archive.summary.csv"))
+    pst = pyemu.Pst(os.path.join(m_d,"henry.pst"))
+    obj_names = pst.pestpp_options["mou_objectives"].split(',')
+
+    par = pst.parameter_data
+    par = par.loc[par.pargp=="dv_pars",:].copy()
+    rate_pars = par.loc[par.parnme.apply(lambda x: not x.startswith("ar")),"parnme"]
+    print(rate_pars)
+
+    dmn = 60
+    dmx = 140
+
+    gens = df_arc.generation.unique()
+    gens.sort()
+    print(gens)
+
+    cmap = plt.get_cmap("jet")
+    norm = Normalize(0.0,35.0)
+    with PdfPages(os.path.join(os.path.split(m_d)[-1]+".pdf")) as pdf:
+        for gen in [gens[-1]]:
+            #df_gen = df_arc.loc[df_arc.generation==gen,:].copy()
+            df_gen = pd.read_csv(os.path.join(m_d,"henry.{0}.archive.dv_pop.csv".format(gen)))
+
+            # flip the rate pars
+            df_gen.loc[:, rate_pars] *= -1.
+            tot = df_gen.loc[:, rate_pars].sum(axis=1)
+
+            # only show solutions with some min amount of pumping
+            df_gen = df_gen.loc[tot > 1.0]
+            # and only show solutions using concen > some % seawater
+            df_gen = df_gen.loc[df_gen.ar_concen >= 17.5]
+            df_gen = df_gen.loc[df_gen.ar_rate <= 2.0]
+
+            if df_gen.shape[0] == 0:
+                continue
+            fig,axes = plt.subplots(4,1,figsize=(15,6))
+            ax = axes[0]
+            for d,w,r,c,r1,r2,r3 in zip(df_gen.ar_dist,df_gen.ar_width,df_gen.ar_rate,
+                               df_gen.ar_concen,df_gen.loc[:,rate_pars[0]],
+                                        df_gen.loc[:,rate_pars[1]],
+                                        df_gen.loc[:,rate_pars[2]]):
+                r = Rectangle((d,0),w,r,facecolor=cmap(c/35.0),edgecolor="none",alpha=0.5)
+                ax.add_patch(r)
+                mpt = d + (w/2.)
+                axes[1].plot([mpt,mpt],[0,r1],color=cmap(c/35.0))
+                axes[2].plot([mpt, mpt], [0, r2], color=cmap(c / 35.0))
+                axes[3].plot([mpt, mpt], [0, r3], color=cmap(c / 35.0))
+
+            ax.set_xlim(dmn,dmx)
+            ax.set_ylim(0,3.5)
+            ax.set_xlabel("column")
+            ax.set_ylabel("recharge flux rate")
+            #cb = plt.colorbar(plt.cm.ScalarMappable(norm=norm,cmap=cmap))
+            #cb.set_label("recharge concentration")
+            ax.set_title("generation {0}, {1} feasible nondom solutions".format(gen,df_gen.shape[0]))
+            for i,ax in enumerate(axes[1:]):
+                ax.set_ylim(0,2.0)
+                ax.set_xlim(dmn,dmx)
+                ax.set_title("pumping well {0}".format(i+1))
+                ax.set_ylabel("pumping rate")
+
+
+            plt.tight_layout()
+            #plt.show()
+            pdf.savefig()
+            plt.close(fig)
+            #if gen > 10:
+            #    break
+
+
 
 if __name__ == "__main__":
     #shutil.copy2(os.path.join("..", "bin", "win", "pestpp-mou.exe"), os.path.join("..", "bin", "pestpp-mou.exe"))
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
+    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
     #prep_model()
     #run_and_plot_results(os.path.join("mou_tests", "henry_temp"))
     #test_add_artrch("henry_template",write_tpl=False)
     #test_process_unc("henry_temp")
-    setup_pst()
+    #setup_pst()
     #run_and_plot_results("henry_template")
-
+    #start_workers_for_debug()
     #plot_pr_real()
+    plot_results(os.path.join("mou_tests","henry_master"))
