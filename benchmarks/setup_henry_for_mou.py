@@ -123,7 +123,7 @@ def test_add_artrch(test_d,dist=80,width=10,rate=1,concen=0.0,write_tpl=False):
 
 def setup_pst():
     old_dir = os.path.join("mou_tests","henry_temp")
-    new_dir = os.path.join("mou_tests","henry_template1")
+    new_dir = os.path.join("mou_tests","henry_template")
     sim = flopy.mf6.MFSimulation.load(sim_ws=old_dir)
     m = sim.get_model("flow")
     # setup a fake model grid
@@ -141,12 +141,12 @@ def setup_pst():
                              remove_existing=True)
 
     # setup pars for k using aniso to represent vk
-    pf.add_parameters("flow.npf_k.txt",par_type="grid",upper_bound=8640.0,lower_bound=8.640,
+    pf.add_parameters("flow.npf_k.txt",par_type="grid",upper_bound=1200.0,lower_bound=100.0,
                       par_name_base="k",pargp="k",
                       geostruct=gs_k,par_style="direct")
 
     # setup pars for porosity
-    pf.add_parameters("trans.mst_porosity.txt", par_type="grid", upper_bound=0.45, lower_bound=0.1,
+    pf.add_parameters("trans.mst_porosity.txt", par_type="grid", upper_bound=0.4, lower_bound=0.2,
                      par_name_base="p", pargp="p",
                      geostruct=gs_k,par_style="direct")
 
@@ -154,7 +154,7 @@ def setup_pst():
     # copy the current historic well list file to a "base" file that will get modified...
     shutil.copy2(os.path.join(new_dir,"flow.wel_stress_period_data_historic.txt"),
                  os.path.join(new_dir,"flow.wel_stress_period_data_scenario_base.txt"))
-    pf.add_parameters("flow.wel_stress_period_data_scenario_base.txt",par_type="grid",par_style="multiplier",
+    pf.add_parameters("flow.wel_stress_period_data_scenario_base.txt",par_type="grid",par_style="direct",
                       index_cols=[0,1,2],use_cols=3,pargp="wel")
 
     # todo: add pars for ghb conditions to represent historic and scenario sea level
@@ -204,15 +204,17 @@ def setup_pst():
     par.loc["ar_width", "partrans"] = "none"
 
     wel_par = par.loc[par.pargp=="wel",:]
-    par.loc[wel_par.parnme,"partrans"] = "none"
     wpar = wel_par.loc[wel_par.parval1>0,"parnme"]
+    par.loc[wpar, "partrans"] = "none"
+
     par.loc[wpar,"pargp"] = "wel_rch"
-    par.loc[wpar, "parubnd"] = 0.25
-    par.loc[wpar, "parlbnd"] = 0.0
+    par.loc[wpar, "parubnd"] = 0.1
+    par.loc[wpar, "parlbnd"] = 0.05
     wpar = wel_par.loc[wel_par.parval1<0,"parnme"]
+    par.loc[wpar, "partrans"] = "none"
     par.loc[wpar, "pargp"] = "dv_pars"
     par.loc[wpar, "parubnd"] = 0.0
-    par.loc[wpar, "parlbnd"] = -2.0
+    par.loc[wpar, "parlbnd"] = -3.0
     #pf.pst.add_pi_equation(wpar.to_list(),pilbl="pump_rate",obs_group="less_than")
 
     pf.pst.control_data.noptmax = 0
@@ -317,12 +319,15 @@ def plot_pr_real():
 
 def start_workers_for_debug():
     t_d = os.path.join("mou_tests", "henry_template")
-    m_d = os.path.join("mou_tests","henry_master")
+    m_d = os.path.join("mou_tests","henry_chance_master")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
     shutil.copytree(t_d,m_d)
     pst = pyemu.Pst(os.path.join(m_d,"henry.pst"))
     pst.control_data.noptmax = 100
+    pst.pestpp_options["opt_par_stack"] = "prior.jcb"
+    pst.pestpp_options["opt_risk"] = 0.95
+
     pst.write(os.path.join(m_d,"henry.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path, "henry.pst",
                                   num_workers=10, worker_root="mou_tests",
@@ -406,14 +411,14 @@ def plot_results(m_d):
 
 if __name__ == "__main__":
     #shutil.copy2(os.path.join("..", "bin", "win", "pestpp-mou.exe"), os.path.join("..", "bin", "pestpp-mou.exe"))
-    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
-    #prep_model()
-    #run_and_plot_results(os.path.join("mou_tests", "henry_temp"))
+    prep_model()
+    run_and_plot_results(os.path.join("mou_tests", "henry_temp"))
     #test_add_artrch("henry_template",write_tpl=False)
     #test_process_unc("henry_temp")
-    #setup_pst()
-    #run_and_plot_results("henry_template")
+    setup_pst()
+    run_and_plot_results(os.path.join("mou_tests", "henry_template"))
     #start_workers_for_debug()
     #plot_pr_real()
-    plot_results(os.path.join("mou_tests","henry_master"))
+    #plot_results(os.path.join("mou_tests","henry_master"))
