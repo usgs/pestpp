@@ -1748,7 +1748,7 @@ void MOEA::initialize()
 		ofstream& f_rec = file_manager.rec_ofstream();
 		f_rec << "  initial chance constraint summary (calculated at optimal/mean decision variable point) " << endl;
 		pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op);
-		constraints.presolve_chance_report(iter, po_pair.second);
+		constraints.presolve_chance_report(iter, po_pair.second, true);
 	}
 
 	constraints.mou_report(0,dp, op, obs_obj_names,pi_obj_names);

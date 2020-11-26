@@ -141,7 +141,7 @@ def setup_pst():
                              remove_existing=True)
 
     # setup pars for k using aniso to represent vk
-    pf.add_parameters("flow.npf_k.txt",par_type="grid",upper_bound=1200.0,lower_bound=100.0,
+    pf.add_parameters("flow.npf_k.txt",par_type="grid",upper_bound=864*1.5,lower_bound=864*0.5,
                       par_name_base="k",pargp="k",
                       geostruct=gs_k,par_style="direct")
 
@@ -209,7 +209,7 @@ def setup_pst():
 
     par.loc[wpar,"pargp"] = "wel_rch"
     par.loc[wpar, "parubnd"] = 0.1
-    par.loc[wpar, "parlbnd"] = 0.05
+    par.loc[wpar, "parlbnd"] = 0.06
     wpar = wel_par.loc[wel_par.parval1<0,"parnme"]
     par.loc[wpar, "partrans"] = "none"
     par.loc[wpar, "pargp"] = "dv_pars"
