@@ -1247,11 +1247,18 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 	ss.str("");
 	if (skip_names.size() < ctl_ord_obs_constraint_names.size())
 	{
+		int nsize = 20;
+		for (auto name : ctl_ord_obs_constraint_names)
+		{
+			if (skip_names.find(name) != skip_names.end())
+				continue;
+			nsize = max(nsize, int(name.size()));
+		}
 		ss << endl << "  observation constraint information at iteration " << iter << endl;
-		ss << setw(30) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
-		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
+		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
+		ss << setw(11) << "satisfied" << setw(15) << "distance" << endl;
 
-
+		
 
 		infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
 		for (int i = 0; i < num_obs_constraints(); ++i)
@@ -1259,17 +1266,17 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 			string name = ctl_ord_obs_constraint_names[i];
 			if (skip_names.find(name) != skip_names.end())
 				continue;
-			ss << setw(30) << left << name;
-			ss << setw(15) << right << constraint_sense_name[name];
-			ss << setw(15) << constraints_obs.get_rec(name);
+			ss << setw(nsize) << left << name;
+			ss << setw(12) << right << constraint_sense_name[name];
+			ss << setw(12) << constraints_obs.get_rec(name);
 			ss << setw(15) << current_obs.get_rec(name);
 			if (infeas_dist.find(name) != infeas_dist.end())
 			{
-				ss << setw(15) << "false" << setw(15) << infeas_dist[name];
+				ss << setw(11) << "false" << setw(15) << infeas_dist[name];
 			}
 			else
 			{
-				ss << setw(15) << "true" << setw(15) << 0.0;
+				ss << setw(11) << "true" << setw(15) << 0.0;
 			}
 			ss << endl;
 
@@ -1280,10 +1287,18 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 	if (num_pi_constraints() > skip_names.size())
 	{
 
+		int nsize = 20;
+		for (auto name : ctl_ord_pi_constraint_names)
+		{
+			if (skip_names.find(name) != skip_names.end())
+				continue;
+			nsize = max(nsize, int(name.size()));
+		}
+
 		//report prior information constraints
 		infeas_dist = get_unsatified_pi_constraints(current_pars);
 		ss << endl << "  prior information constraint information at iteration " << iter << endl;
-		ss << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
+		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
 		for (int i = 0; i < num_pi_constraints(); ++i)
 		{
@@ -1291,17 +1306,17 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 			if (skip_names.find(name) != skip_names.end())
 				continue;
 			PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
-			ss << setw(20) << left << name;
-			ss << setw(15) << right << constraint_sense_name[name];
-			ss << setw(15) << pi_rec.get_obs_value();
+			ss << setw(nsize) << left << name;
+			ss << setw(12) << right << constraint_sense_name[name];
+			ss << setw(12) << pi_rec.get_obs_value();
 			ss << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
 			if (infeas_dist.find(name) != infeas_dist.end())
 			{
-				ss << setw(15) << "false" << setw(15) << infeas_dist[name];
+				ss << setw(11) << "false" << setw(15) << infeas_dist[name];
 			}
 			else
 			{
-				ss << setw(15) << "true" << setw(15) << 0.0;
+				ss << setw(11) << "true" << setw(15) << 0.0;
 			}
 			ss << endl;
 		}
