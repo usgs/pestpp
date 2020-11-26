@@ -1518,7 +1518,7 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs)
 	
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 	//vector<double> residuals = get_constraint_residual_vec();
-	f_rec << endl << "  FOSM-based chance constraint/objective information at start of iteration " << iter << endl;
+	f_rec << endl << "  Chance constraint/objective information at start of iteration " << iter << endl;
 	f_rec << setw(20) << left << "name" << right << setw(10) << "sense" << setw(15) << "required" << setw(15) << "sim value";
 	f_rec << setw(15) << "prior stdev" << setw(15) << "post stdev" << setw(15) << "offset";
 	f_rec << setw(15) << "new sim value" << endl;

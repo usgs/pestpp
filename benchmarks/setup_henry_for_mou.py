@@ -146,7 +146,7 @@ def setup_pst():
                       geostruct=gs_k,par_style="direct")
 
     # setup pars for porosity
-    pf.add_parameters("trans.mst_porosity.txt", par_type="grid", upper_bound=0.4, lower_bound=0.2,
+    pf.add_parameters("trans.mst_porosity.txt", par_type="grid", upper_bound=0.4, lower_bound=0.3,
                      par_name_base="p", pargp="p",
                      geostruct=gs_k,par_style="direct")
 
@@ -215,7 +215,7 @@ def setup_pst():
     par.loc[wpar, "pargp"] = "dv_pars"
     par.loc[wpar, "parubnd"] = 0.0
     par.loc[wpar, "parlbnd"] = -3.0
-    #pf.pst.add_pi_equation(wpar.to_list(),pilbl="pump_rate",obs_group="less_than")
+    pf.pst.add_pi_equation(wpar.to_list(),pilbl="pump_rate",obs_group="less_than")
 
     pf.pst.control_data.noptmax = 0
     pf.pst.add_pi_equation(["ar_width"],obs_group="less_than",pilbl="ar_width")
@@ -317,18 +317,19 @@ def plot_pr_real():
     plt.imshow(k)
     plt.show()
 
-def start_workers_for_debug():
+def start_workers_for_debug(with_master=True):
     t_d = os.path.join("mou_tests", "henry_template")
     m_d = os.path.join("mou_tests","henry_chance_master")
-    if os.path.exists(m_d):
-        shutil.rmtree(m_d)
-    shutil.copytree(t_d,m_d)
-    pst = pyemu.Pst(os.path.join(m_d,"henry.pst"))
-    pst.control_data.noptmax = 100
-    pst.pestpp_options["opt_par_stack"] = "prior.jcb"
-    pst.pestpp_options["opt_risk"] = 0.95
+    if with_master:
+        if os.path.exists(m_d):
+            shutil.rmtree(m_d)
+        shutil.copytree(t_d,m_d)
+        pst = pyemu.Pst(os.path.join(m_d,"henry.pst"))
+        pst.control_data.noptmax = 100
+        pst.pestpp_options["opt_par_stack"] = "prior.jcb"
+        pst.pestpp_options["opt_risk"] = 0.95
 
-    pst.write(os.path.join(m_d,"henry.pst"))
+        pst.write(os.path.join(m_d,"henry.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path, "henry.pst",
                                   num_workers=10, worker_root="mou_tests",
                                   port=4004)
@@ -413,12 +414,12 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..", "bin", "win", "pestpp-mou.exe"), os.path.join("..", "bin", "pestpp-mou.exe"))
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
-    prep_model()
-    run_and_plot_results(os.path.join("mou_tests", "henry_temp"))
+    #prep_model()
+    #run_and_plot_results(os.path.join("mou_tests", "henry_temp"))
     #test_add_artrch("henry_template",write_tpl=False)
     #test_process_unc("henry_temp")
     setup_pst()
-    run_and_plot_results(os.path.join("mou_tests", "henry_template"))
-    #start_workers_for_debug()
+    #run_and_plot_results(os.path.join("mou_tests", "henry_template"))
+    start_workers_for_debug(True)
     #plot_pr_real()
     #plot_results(os.path.join("mou_tests","henry_master"))

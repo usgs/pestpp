@@ -1057,10 +1057,7 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 		
 		if (chancepoints == chancePoints::SINGLE)
 		{
-			bool use_mean = false;
-			if ((iter == 0) && (population_obs_restart_file.size() == 0))
-				use_mean = true;
-			pair<Parameters, Observations> po_pair = get_optimal_solution(_dp, op, use_mean);
+			pair<Parameters, Observations> po_pair = get_optimal_solution(_dp, op);
 			pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
 			constraints.add_runs(iter, pars, obs, run_mgr_ptr);
 		}
@@ -1073,7 +1070,7 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 		{
 			throw_moea_error("internal error: trying to call unsupported chancePoints type");
 		}
-		
+
 	}
 }
 
@@ -1750,7 +1747,7 @@ void MOEA::initialize()
 	{
 		ofstream& f_rec = file_manager.rec_ofstream();
 		f_rec << "  initial chance constraint summary (calculated at optimal/mean decision variable point) " << endl;
-		pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op, false);
+		pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op);
 		constraints.presolve_chance_report(iter, po_pair.second);
 	}
 
@@ -1760,11 +1757,14 @@ void MOEA::initialize()
 }
 
 
-pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe, bool use_mean)
+pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe)
 {
 	Parameters pars;
 	Observations obs;
 	stringstream ss;
+	bool use_mean = false;
+	if (((iter == 0) && (population_obs_restart_file.size() == 0)) || (obs_obj_names.size() == 0))
+		use_mean = true;
 	if (use_mean)
 	{
 		//just use dp member nearest the mean dec var values
@@ -1789,6 +1789,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 		message(2, ss.str());
 
 		pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(min_member));
+		obs.update_without_clear(op.get_var_names(), op.get_real_vector(min_member));
 		pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
 	}
 	else
@@ -1892,12 +1893,12 @@ void MOEA::iterate_to_solution()
 		save_populations(dp, op);
 		if (constraints.get_use_chance())
 		{
+			pair<Parameters,Observations> po = get_optimal_solution(dp, op);
+			constraints.presolve_chance_report(iter, po.second);
 			ObservationEnsemble new_op_shifted = get_chance_shifted_op(new_op);
 			save_populations(dp, new_op_shifted,"chance");
 			new_op = new_op_shifted;
 		}
-
-		
 
 		//append offspring dp and (risk-shifted) op to make new dp and op containers
 		new_dp.append_other_rows(dp);
