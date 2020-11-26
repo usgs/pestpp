@@ -624,10 +624,15 @@ void OutputFileWriter::phi_report(std::ostream &os, int const iter, int const nr
 
 void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Observations &sim, ObservationInfo &oi)
 {
-
-	os << setw(21) << " Name" << setw(13) << " Group" << setw(21) << " Measured" << setw(21) << " Modelled" << setw(21) << " Residual" << setw(21) << " Weight" << endl;
-	//vector<string> obs_name_vec = obs.get_keys();
 	vector<string> obs_name_vec = pest_scenario.get_ctl_ordered_obs_names();
+	int nsize = 20;
+	for (auto o : obs_name_vec)
+	{
+		nsize = max(nsize, int(o.size()));
+	}
+	os << setw(nsize + 1) << " Name" << setw(13) << " Group" << setw(21) << " Measured" << setw(21) << " Modelled" << setw(21) << " Residual" << setw(21) << " Weight" << endl;
+	//vector<string> obs_name_vec = obs.get_keys();
+	
 	double obs_val, sim_val;
 	//ObservationInfo oi = pest_scenario.get_ctl_observation_info();
 	//for(vector<string>::const_iterator b = obs_name_vec.begin(),
@@ -638,7 +643,7 @@ void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Ob
 		{
 			obs_val = obs.get_rec(b);
 			sim_val = sim.get_rec(b);
-			os << " " << setw(20) << lower_cp(b)
+			os << " " << setw(nsize) << lower_cp(b)
 				<< " " << setw(12) << lower_cp(oi.get_observation_rec_ptr(b)->group)
 				<< " " << showpoint << setw(20) << obs_val
 				<< " " << showpoint << setw(20) << sim_val
@@ -683,6 +688,13 @@ void OutputFileWriter::write_opt_constraint_rei(std::ofstream &fout, int iter_no
 	//	e = prior_info_ptr->end(); b!=e; ++b)
 	vector<string> obs_name_vec = pest_scenario.get_ctl_ordered_pi_names();
 	double obs_val, residual, sim_val;
+
+	int nsize = 20;
+	for (auto& b : obs_name_vec)
+	{
+		nsize = max(nsize, int(b.size()));
+	}
+
 	for (auto &b : obs_name_vec)
 	{
 		ipi = prior_info_ptr->find(b);
@@ -690,7 +702,7 @@ void OutputFileWriter::write_opt_constraint_rei(std::ofstream &fout, int iter_no
 		obs_val = pi_rec_ptr->get_obs_value();
 		residual = pi_rec_ptr->calc_residual(pars);
 		sim_val = obs_val + residual;
-		fout << " " << setw(20) << lower_cp(b)
+		fout << " " << setw(nsize) << lower_cp(b)
 			<< " " << setw(12) << lower_cp(pi_rec_ptr->get_group())
 			<< " " << showpoint << setw(20) << obs_val
 			<< " " << showpoint << setw(20) << sim_val

@@ -1330,9 +1330,12 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 	map<string, int> infeas_count;
 	if (skip_names.size() < ctl_ord_obs_constraint_names.size())
 	{
-		
+		int nsize = 20;
 		for (auto o : ctl_ord_obs_constraint_names)
+		{
 			infeas_count[o] = 0;
+			nsize = max(nsize, int(o.size()));
+		}
 		for (auto real : oe.get_real_names())
 		{
 			current_obs.update(names, eigenvec_2_stlvec(oe.get_real_vector(real)));
@@ -1345,7 +1348,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 
 
 		ss << endl << "  population observation constraint summary at iteration " << iter << endl;
-		ss << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "mean sim value";
+		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "mean sim value";
 		ss << setw(15) << "% unsatisfied" << setw(15) << endl;
 
 		infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
@@ -1355,9 +1358,9 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			string name = ctl_ord_obs_constraint_names[i];
 			if (skip_names.find(name) != skip_names.end())
 				continue;
-			ss << setw(20) << left << name;
-			ss << setw(15) << right << constraint_sense_name[name];
-			ss << setw(15) << constraints_obs.get_rec(name);
+			ss << setw(nsize) << left << name;
+			ss << setw(12) << right << constraint_sense_name[name];
+			ss << setw(12) << constraints_obs.get_rec(name);
 			ss << setw(15) << mm.first[name];
 			ss << setw(15) << 100.0 * double(infeas_count[name]) / double(num_reals);
 			ss << endl;
@@ -1373,10 +1376,12 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 		names = pe.get_var_names();
 		map<string, double> tots;
 		PriorInformationRec pi_rec;
+		int nsize = 20;
 		for (auto p : ctl_ord_pi_constraint_names)
 		{
 			tots[p] = 0.0;
 			infeas_count[p] = 0;
+			nsize = max(nsize, int(p.size()));
 		}
 		for (auto real : pe.get_real_names())
 		{
@@ -1391,7 +1396,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 		}
 		//report prior information constraints
 		ss << endl << "  prior information constraint information at iteration " << iter << endl;
-		ss << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "mean sim value";
+		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "mean sim value";
 		ss << setw(15) << "% unsatisfied" << endl;
 		int num_reals = pe.shape().first;
 		for (int i = 0; i < num_pi_constraints(); ++i)
@@ -1400,9 +1405,9 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			if (skip_names.find(name) != skip_names.end())
 				continue;
 			pi_rec = constraints_pi.get_pi_rec_ptr(name);
-			ss << setw(20) << left << name;
-			ss << setw(15) << right << constraint_sense_name[name];
-			ss << setw(15) << pi_rec.get_obs_value();
+			ss << setw(nsize) << left << name;
+			ss << setw(12) << right << constraint_sense_name[name];
+			ss << setw(12) << pi_rec.get_obs_value();
 			ss << setw(15) << double(tots[name] / num_reals);
 			ss << setw(15) << 100.0 * double(infeas_count[name]) / double(num_reals);
 			ss << endl;
@@ -1419,11 +1424,14 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 void Constraints::presolve_report(int iter, Parameters& current_pars, Observations& current_obs)
 {
 	/* this is a report to the rec file for the status of the constraints before solving the current iteration*/
-	
+	int nsize = 20;
+	for (auto o : ctl_ord_obs_constraint_names)
+		nsize = max(nsize, int(o.size()));
+
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 	vector<double> residuals;
 	f_rec << endl << "  observation constraint/objective information at start of iteration " << iter << endl;
-	f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
+	f_rec << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 	f_rec << setw(15) << "residual" << setw(15) << "lower bound" << setw(15) << "upper bound" << endl;
 	
 	//if we are using chances, then we need to account for that here
@@ -1442,9 +1450,9 @@ void Constraints::presolve_report(int iter, Parameters& current_pars, Observatio
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
-		f_rec << setw(20) << left << name;
-		f_rec << setw(15) << right << constraint_sense_name[name];
-		f_rec << setw(15) << constraints_obs.get_rec(name);	
+		f_rec << setw(nsize) << left << name;
+		f_rec << setw(12) << right << constraint_sense_name[name];
+		f_rec << setw(12) << constraints_obs.get_rec(name);	
 		f_rec << setw(15) << current.get_rec(name);
 		f_rec << setw(15) << residuals[i];
 		f_rec << setw(15) << current_bounds.first[i];
@@ -1452,18 +1460,20 @@ void Constraints::presolve_report(int iter, Parameters& current_pars, Observatio
 	}
 	if (num_pi_constraints() > 0)
 	{
-
+		nsize = 20;
+		for (auto o : ctl_ord_pi_constraint_names)
+			nsize = max(nsize, int(o.size()));
 		//report prior information constraints
 		f_rec << endl << "  prior information constraint information at start of iteration " << iter << endl;
-		f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(15) << "sim value";
+		f_rec << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 		f_rec << setw(15) << "residual" << setw(15) << "lower bound" << setw(15) << "upper bound" << endl;
 		for (int i = 0; i < num_pi_constraints(); ++i)
 		{
 			string name = ctl_ord_pi_constraint_names[i];
 			PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
-			f_rec << setw(20) << left << name;
-			f_rec << setw(15) << right << constraint_sense_name[name];
-			f_rec << setw(15) << pi_rec.get_obs_value();
+			f_rec << setw(nsize) << left << name;
+			f_rec << setw(12) << right << constraint_sense_name[name];
+			f_rec << setw(12) << pi_rec.get_obs_value();
 			f_rec << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
 			f_rec << setw(15) << pi_rec.calc_residual(current_pars);
 			f_rec << setw(15) << current_bounds.first[num_obs_constraints() + i];

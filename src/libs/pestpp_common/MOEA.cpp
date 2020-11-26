@@ -872,7 +872,7 @@ map<string, map<string, double>> MOEA::obj_func_change_report(map<string, map<st
 			change_summary[pi_obj][tag] = change;
 			change_summary[pi_obj][tag + "_percent"] = percent_change;
 		}
-		ss << endl; ss << endl;
+		ss << endl;
 	}
 	file_manager.rec_ofstream() << ss.str() << endl;
 	cout << ss.str() << endl;
@@ -1785,7 +1785,8 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 		}
 		string min_member = dp.get_real_names()[idx_min];
 		ss.str("");
-		ss << "using member " << min_member << " as nearest-to-mean single point with distance of " << dist_min << " from mean of decision population";
+		ss << "using member " << min_member << " as nearest-to-mean single point" << endl;
+		ss << "    with distance of " << dist_min << " from mean of decision variable population";
 		message(2, ss.str());
 
 		pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(min_member));
@@ -1826,7 +1827,8 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 		}
 		string opt_member = op.get_real_names()[opt_idx];
 		ss.str("");
-		ss << "using member " << opt_member << " as single, 'optimal' point with distance of " << opt_dist << " from optimal trade-off";
+		ss << "using member " << opt_member << " as single, 'optimal' point" << endl;
+		ss << "   with distance of " << opt_dist << " from optimal trade - off";
 		message(2, ss.str());
 		pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(opt_member));
 		obs.update_without_clear(op.get_var_names(), op.get_real_vector(opt_member));
