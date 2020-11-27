@@ -1047,7 +1047,7 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 {
 	/* queue up chance-related runs using the class attributes dp and op*/
 	stringstream ss;
-	if (constraints.should_update_chance(iter))
+	if (constraints.should_update_chance(iter+1))
 	{
 		dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 		Parameters pars = pest_scenario.get_ctl_parameters();

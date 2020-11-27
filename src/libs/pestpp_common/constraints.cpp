@@ -210,11 +210,13 @@ void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv
 
 
 Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, OutputFileWriter& _of_wr, PerformanceLog& _pfm)
-	:pest_scenario(_pest_scenario), file_mgr_ptr(_file_mgr_ptr), of_wr(_of_wr), pfm(_pfm), jco(*_file_mgr_ptr, _of_wr)
+	:pest_scenario(_pest_scenario), file_mgr_ptr(_file_mgr_ptr), of_wr(_of_wr), pfm(_pfm), 
+	jco(*_file_mgr_ptr, _of_wr)
 {
 	use_fosm = false;
 	std_weights = false;
 	probit_val = 0.0;
+	stack_runs_processed = false;
 }
 
 
@@ -721,6 +723,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 					f_rec << "droppping " << drop_rows.size() << "realizations from obs stack b/c of ++opt_stack_size req" << endl;
 					stack_oe.drop_rows(drop_rows);
 				}
+				stack_runs_processed = true;
 			}
 		}
 	}
@@ -1012,6 +1015,8 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	}
 	else
 	{
+		if (!stack_runs_processed)
+			throw_constraints_error("no stack runs have been processed, something is wrong");
 		//work out which realization index corresponds to the risk value
 		if (stack_oe.shape().first < 3)
 			throw_constraints_error("too few (<3) stack members, cannot continue with stack-based chance constraints/objectives");
@@ -1050,7 +1055,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 			
 			if (prior_constraint_stdev[name] == 0.0)
 			{
-				throw_constraints_error("model-based constraint '" + name + "' has empirical (stack) standard deviation of 0.0, something is probably wrong...",false);
+				throw_constraints_error("model-based constraint '" + name + "' has empirical (stack) standard deviation of 0.0",false);
 			}
 
 			// if this is a "less than" constraint
@@ -1211,11 +1216,16 @@ void Constraints::throw_constraints_error(string message, bool should_throw)
 		error_message = "Constraints Warning: " + message;
 	file_mgr_ptr->rec_ofstream() << error_message << endl;
 	
-	cout << endl << endl << error_message << endl << endl;
+	
 	if (should_throw)
 	{
+		cout << endl << endl << error_message << endl << endl;
 		throw runtime_error(error_message);
 		//file_mgr_ptr->close_file("rec");
+	}
+	else
+	{
+		cout << error_message << endl;
 	}
 }
 
@@ -1717,6 +1727,10 @@ void Constraints::postsolve_pi_constraints_report(Parameters& old_pars, Paramete
 pair<vector<int>,ObservationEnsemble> Constraints::process_stack_runs(string real_name, int iter, map<int, int> _stack_pe_run_map, 
 	RunManagerAbstract* run_mgr_ptr, bool drop_fails)
 {
+	if (_stack_pe_run_map.size() == 0)
+		pfm.log_event("process_stack_runs() was passed an empty run map");
+	else
+		stack_runs_processed = true;
 	ObservationEnsemble _stack_oe(stack_oe);//copy
 	vector<int> failed_runs = _stack_oe.update_from_runs(_stack_pe_run_map, run_mgr_ptr);
 	stringstream ss;
@@ -1911,6 +1925,7 @@ void Constraints::add_runs(int iter, Parameters& current_pars, Observations& cur
 		cout << "...adding " << stack_pe.shape().first << " model runs for stack-based chance constraints" << endl;
 		stack_pe_run_map.clear();
 		stack_pe_run_map = stack_pe.add_runs(run_mgr_ptr);
+		stack_runs_processed = false;
 	}
 }
 

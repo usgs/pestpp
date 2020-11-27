@@ -159,9 +159,11 @@ private:
 	bool use_chance;
 	bool use_fosm;
 	bool std_weights;
+	bool stack_runs_processed;
 	double risk;
 	double probit_val;
 	double dbl_max;
+
 
 	Covariance obscov;
 	Covariance parcov;
