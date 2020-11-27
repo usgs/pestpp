@@ -1247,7 +1247,7 @@ void MOEA::initialize()
 		string group;
 		end = dec_var_groups.end();
 		start = dec_var_groups.begin();
-		for (auto& par_name : pest_scenario.get_ctl_ordered_par_names())
+		for (auto& par_name : pest_scenario.get_ctl_ordered_adj_par_names())
 		{
 			group = pinfo.get_group_name(par_name);
 			if (find(start, end, group) != end)
@@ -1260,7 +1260,7 @@ void MOEA::initialize()
 		if (dv_names.size() == 0)
 		{
 			ss.str("");
-			ss << "no decision variables found in supplied dec var groups : ";
+			ss << "no adjustable decision variables found in supplied dec var groups : ";
 			for (auto g : dec_var_groups)
 			{
 				ss << g << ",";
@@ -1896,7 +1896,7 @@ void MOEA::iterate_to_solution()
 		if (constraints.get_use_chance())
 		{
 			pair<Parameters,Observations> po = get_optimal_solution(dp, op);
-			constraints.presolve_chance_report(iter, po.second);
+			constraints.presolve_chance_report(iter, po.second,true);
 			ObservationEnsemble new_op_shifted = get_chance_shifted_op(new_op);
 			save_populations(dp, new_op_shifted,"chance");
 			new_op = new_op_shifted;

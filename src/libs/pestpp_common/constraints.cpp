@@ -1050,7 +1050,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 			
 			if (prior_constraint_stdev[name] == 0.0)
 			{
-				throw_constraints_error("model-based constraint '" + name + "' has empirical (stack) standard deviation of 0.0, something is wrong");
+				throw_constraints_error("model-based constraint '" + name + "' has empirical (stack) standard deviation of 0.0, something is probably wrong...",false);
 			}
 
 			// if this is a "less than" constraint
@@ -1186,29 +1186,37 @@ pair<Constraints::ConstraintSense, string> Constraints::get_sense_from_group_nam
 }
 
 
-void Constraints::throw_constraints_error(string message, const vector<string>& messages)
+void Constraints::throw_constraints_error(string message, const vector<string>& messages, bool should_throw)
 {
 	stringstream ss;
 	for (auto& mess : messages)
 		ss << mess + ',';
-	throw_constraints_error(message + ss.str());
+	throw_constraints_error(message + ss.str(), should_throw);
 }
 
-void Constraints::throw_constraints_error(string message, const set<string>& messages)
+void Constraints::throw_constraints_error(string message, const set<string>& messages, bool should_throw)
 {
 	stringstream ss;
 	for (auto& mess : messages)
 		ss << mess + ',';
-	throw_constraints_error(message + ss.str());
+	throw_constraints_error(message + ss.str(), should_throw);
 }
 
-void Constraints::throw_constraints_error(string message)
+void Constraints::throw_constraints_error(string message, bool should_throw)
 {
-	string error_message = "error in Constraints: " + message;
+	string error_message;
+	if (should_throw)
+		error_message = "error in Constraints: " + message;
+	else
+		error_message = "Constraints Warning: " + message;
 	file_mgr_ptr->rec_ofstream() << error_message << endl;
-	file_mgr_ptr->close_file("rec");
+	
 	cout << endl << endl << error_message << endl << endl;
-	throw runtime_error(error_message);
+	if (should_throw)
+	{
+		throw runtime_error(error_message);
+		//file_mgr_ptr->close_file("rec");
+	}
 }
 
 double  Constraints::ErfInv2(double x)

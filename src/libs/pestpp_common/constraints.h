@@ -204,9 +204,9 @@ private:
 	vector<double> get_constraint_residual_vec(Observations& sim);
 
 	//error handlers
-	void throw_constraints_error(string message);
-	void throw_constraints_error(string message, const vector<string>& messages);
-	void throw_constraints_error(string message, const set<string>& messages);
+	void throw_constraints_error(string message, bool should_throw = true);
+	void throw_constraints_error(string message, const vector<string>& messages, bool should_throw = true);
+	void throw_constraints_error(string message, const set<string>& messages, bool should_throw = true);
 
 	//get the risk-shift value
 	double get_probit();

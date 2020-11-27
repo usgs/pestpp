@@ -293,7 +293,6 @@ def setup_problem(name,additive_chance=False):
         par.loc["dv_1","parubnd"] = 4
         par.loc["dv_1","parval1"] = -1.
 
-
     if additive_chance_tpl_file is not None:
         adf = pst.add_parameters(os.path.join(test_d,additive_chance_tpl_file),pst_path=".")
         print(adf)
@@ -344,8 +343,33 @@ def setup_problem(name,additive_chance=False):
     print(pst.phi)
     if name.lower() in ["zdt1","zdt2","zdt3"]:
         assert pst.phi < 1.0e-10
+
+    cov = pyemu.Cov.from_parameter_data(pst)
+    pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst,cov,100)
+    pe.to_csv(os.path.join(test_d,"prior.csv"))
     return test_d
 
+
+def run_problem_chance_external_fixed(test_case="zdt1"):
+    assert "zdt" in test_case
+    test_d = setup_problem(test_case,additive_chance=True)
+    pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
+    par = pst.parameter_data
+    par.loc["dv_9","partrans"] = "fixed"
+    par.loc["obj1_add_par","partrans"] = "fixed"
+    pst.control_data.noptmax = 2
+    pst.pestpp_options["mou_population_size"] = 10
+    pst.pestpp_options["panther_echo"] = False
+    pst.pestpp_options["mou_generator"] = "de"
+    pst.pestpp_options["panther_agent_freeze_on_fail"] = True
+    pst.pestpp_options["opt_stack_size"] = 10
+    pst.pestpp_options["opt_risk"] = 0.95
+    pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
+    #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
+    master_d = test_d.replace("template","master_chance_external_fixed")
+    pyemu.os_utils.start_workers(test_d, exe_path, "{0}.pst".format(test_case),
+                                  num_workers=20, master_dir=master_d,worker_root=test_root,
+                                  port=port)
 
 def run_problem(test_case="zdt1",pop_size=100,noptmax=100):
     test_d = setup_problem(test_case,additive_chance=False)
@@ -521,16 +545,17 @@ def start_workers():
 
 def run_single_obj_sch_prob():
     test_d = os.path.join("mou_tests","sch_template")
-    setup_problem("sch")
+    setup_problem("sch",True)
     pst = pyemu.Pst(os.path.join(test_d,"sch.pst"))
     pst.pestpp_options["mou_objectives"] = "obj_1"
     pst.observation_data.loc["obj_2","obsval"] = 2.0
     pst.write(os.path.join(test_d,"sch.pst"))
     pst.control_data.noptmax = 100
-    pst.pestpp_options["mou_population_size"] = 100
+    pst.pestpp_options["mou_population_size"] = 50
     pst.pestpp_options["panther_echo"] = False
     pst.pestpp_options["mou_generator"] = "de"
     pst.pestpp_options["panther_agent_freeze_on_fail"] = True
+    pst.pestpp_options["opt_stack_size"] = 10
     pst.write(os.path.join(test_d,"sch.pst"))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
     master_d = test_d.replace("template","master")
@@ -597,9 +622,8 @@ if __name__ == "__main__":
     # setup_zdt_problem("zdt3",30)
     # setup_zdt_problem("zdt4",10)
     # setup_zdt_problem("zdt6",10)
-    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
-    #setup_zdt_problem("zdt1",30, additive_chance=True)
-    shutil.copy2(os.path.join("..","bin","win","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
+    #shutil.copy2(os.path.join("..","bin","win","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
     
     #for case in ["srn","constr","zdt4","zdt3","zdt2","zdt1"]:
     #   master_d = run_problem(case,noptmax=100)
@@ -619,10 +643,11 @@ if __name__ == "__main__":
     #setup_problem("srn",additive_chance=True)
     #master_d = test_zdt_chance("zdt1",noptmax=100)
     #plot_zdt_results(os.path.join("mou_tests","zdt3_master"))
-    #setup_zdt_problem("zdt1",30, additive_chance=True)
+    #setup_problem("zdt1",30, additive_chance=True)
     #test_sorting_fake_problem()
     #start_workers()
-    #setup_problem("srn")
+    #setup_problem("zdt1")
+    run_problem_chance_external_fixed("zdt1")
     #run_problem("srn",noptmax=100)
     #plot_results(os.path.join("mou_tests","srn_master"))
     #setup_problem("constr")
