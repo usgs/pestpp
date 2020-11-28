@@ -141,21 +141,25 @@ def setup_pst():
                              remove_existing=True)
 
     # setup pars for k using aniso to represent vk
-    pf.add_parameters("flow.npf_k.txt",par_type="grid",upper_bound=864*3,lower_bound=864*0.3,
+    pf.add_parameters("flow.npf_k.txt",par_type="grid",upper_bound=864*10.,lower_bound=864*0.1,
                       par_name_base="k",pargp="k",
                       geostruct=gs_k,par_style="direct")
 
     # setup pars for porosity
     pf.add_parameters("trans.mst_porosity.txt", par_type="grid", upper_bound=0.4, lower_bound=0.15,
-                     par_name_base="p", pargp="p",
+                     par_name_base="pr", pargp="pr",
                      geostruct=gs_k,par_style="direct")
 
+
+    pf.add_parameters("trans.dsp_diffc.txt", par_type="grid", upper_bound=1.0, lower_bound=0.01,
+                      par_name_base="diff", pargp="diff",
+                      geostruct=gs_k, par_style="direct")
 
     # copy the current historic well list file to a "base" file that will get modified...
     shutil.copy2(os.path.join(new_dir,"flow.wel_stress_period_data_historic.txt"),
                  os.path.join(new_dir,"flow.wel_stress_period_data_scenario_base.txt"))
     pf.add_parameters("flow.wel_stress_period_data_scenario_base.txt",par_type="grid",par_style="direct",
-                      index_cols=[0,1,2],use_cols=3,pargp="wel")
+                      index_cols=[0,1,2],use_cols=3,pargp="wel",par_name_base="wel")
 
     # todo: add pars for ghb conditions to represent historic and scenario sea level
     # this may bring additional constraints to not add to flooding with recharge basin
@@ -418,7 +422,7 @@ if __name__ == "__main__":
     #run_and_plot_results(os.path.join("mou_tests", "henry_temp"))
     #test_add_artrch("henry_template",write_tpl=False)
     #test_process_unc("henry_temp")
-    setup_pst()
+    #setup_pst()
     #run_and_plot_results(os.path.join("mou_tests", "henry_template"))
     start_workers_for_debug(True)
     #plot_pr_real()

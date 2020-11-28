@@ -604,60 +604,8 @@ void SeqQuadProgram::initialize()
 	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
 
 	stringstream ss;
-
-	if (pest_scenario.get_control_info().noptmax == 0)
-	{
-		message(0, "'noptmax'=0, running control file parameter values and quitting");
-		
-		Parameters pars = pest_scenario.get_ctl_parameters();
-		ParamTransformSeq pts = dv.get_par_transform();
-
-		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
-		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
-		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
-		_pe.append("BASE", pars);
-		string par_csv = file_manager.get_base_filename() + ".par.csv";
-		//message(1, "saving parameter values to ", par_csv);
-		//_pe.to_csv(par_csv);
-		dv_base = _pe;
-		dv_base.reorder(vector<string>(), act_par_names);
-		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
-		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
-		_oe.append("BASE", pest_scenario.get_ctl_observations());
-		oe_base = _oe;
-		oe_base.reorder(vector<string>(), act_obs_names);
-		//initialize the phi handler
-		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &dv_base, &parcov);
-		if (ph.get_lt_obs_names().size() > 0)
-		{
-			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
-		}
-		if (ph.get_gt_obs_names().size())
-		{
-			message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
-		}
-		message(1, "running control file parameter values");
-
-		vector<int> failed_idxs = run_ensemble(_pe, _oe);
-		if (failed_idxs.size() != 0)
-		{
-			message(0, "control file parameter value run failed...bummer");
-			throw_sqp_error("control file parameter value run failed");
-		}
-		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
-		message(1, "saving results from control file parameter value run to ", obs_csv);
-		_oe.to_csv(obs_csv);
-
-		ph.update(_oe, _pe);
-		message(0, "control file parameter phi report:");
-		ph.report(true);
-		ph.write(0, 1);
-		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);			
-		return;
-	}
-
 	//set some defaults
-	PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
+	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
 	//reset the par bound PI augmentation since that option is just for simplex
 	ppo->set_opt_include_bnd_pi(false);
@@ -758,8 +706,61 @@ void SeqQuadProgram::initialize()
 		ss << "unrecognized 'sqp_chance_points' value :" << chance_points << ", should be 'all' or 'single'";
 		throw_sqp_error(ss.str());
 	}
-	
+
 	iter = 0;
+
+	if (pest_scenario.get_control_info().noptmax == 0)
+	{
+		message(0, "'noptmax'=0, running control file parameter values and quitting");
+		
+		Parameters pars = pest_scenario.get_ctl_parameters();
+		ParamTransformSeq pts = dv.get_par_transform();
+
+		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
+		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
+		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
+		_pe.append("BASE", pars);
+		string par_csv = file_manager.get_base_filename() + ".par.csv";
+		//message(1, "saving parameter values to ", par_csv);
+		//_pe.to_csv(par_csv);
+		dv_base = _pe;
+		dv_base.reorder(vector<string>(), act_par_names);
+		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
+		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
+		_oe.append("BASE", pest_scenario.get_ctl_observations());
+		oe_base = _oe;
+		oe_base.reorder(vector<string>(), act_obs_names);
+		//initialize the phi handler
+		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &dv_base, &parcov);
+		if (ph.get_lt_obs_names().size() > 0)
+		{
+			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
+		}
+		if (ph.get_gt_obs_names().size())
+		{
+			message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
+		}
+		message(1, "running control file parameter values");
+
+		vector<int> failed_idxs = run_ensemble(_pe, _oe);
+		if (failed_idxs.size() != 0)
+		{
+			message(0, "control file parameter value run failed...bummer");
+			throw_sqp_error("control file parameter value run failed");
+		}
+		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
+		message(1, "saving results from control file parameter value run to ", obs_csv);
+		_oe.to_csv(obs_csv);
+
+		ph.update(_oe, _pe);
+		message(0, "control file parameter phi report:");
+		ph.report(true);
+		ph.write(0, 1);
+		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);			
+		return;
+	}
+
+	
 	//ofstream &frec = file_manager.rec_ofstream();
 	last_best_mean = 1.0E+30;
 	last_best_std = 1.0e+30;

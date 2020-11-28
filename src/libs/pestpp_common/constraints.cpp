@@ -952,7 +952,8 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ObservationEnsem
 		{
 			if (snames.find(real_info.first) == snames.end())
 			{
-				throw_constraints_error("dec var population realization name '" + real_info.first + "' not found in observation population realization names");
+				//TODO: just track the ones that are missing and maybe map to nearest or use mean or...
+				throw_constraints_error("population member name '" + real_info.first + "' not found in observation population names");
 			}
 			//overwrite the class stack_oe attribute with the realization stack
 			stack_oe = real_info.second;
@@ -1559,25 +1560,29 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 	if (!use_chance)
 		return;
 	
+	int nsize = 20;
+	for (auto o : ctl_ord_obs_constraint_names)
+		nsize = max(nsize, int(o.size()));
+
 	stringstream ss;// = file_mgr_ptr->rec_ofstream();
 	//vector<double> residuals = get_constraint_residual_vec();
 	ss << endl << "  Chance constraint/objective information at start of iteration " << iter << endl;
-	ss << setw(20) << left << "name" << right << setw(10) << "sense" << setw(15) << "required" << setw(15) << "sim value";
-	ss << setw(15) << "prior stdev" << setw(15) << "post stdev" << setw(15) << "offset";
-	ss << setw(15) << "new sim value" << endl;
+	ss << setw(nsize) << left << "name" << right << setw(10) << "sense" << setw(12) << "required" << setw(12) << "sim value";
+	ss << setw(12) << "prior stdev" << setw(12) << "post stdev" << setw(12) << "offset";
+	ss << setw(12) << "new sim value" << endl;
 	vector<string> out_of_bounds;
 	Observations current_constraints_chance = get_chance_shifted_constraints(current_obs);
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
-		ss << setw(20) << left << name;
+		ss << setw(nsize) << left << name;
 		ss << setw(10) << right << constraint_sense_name[name];
-		ss << setw(15) << constraints_obs[name];
-		ss << setw(15) << current_obs.get_rec(name);
-		ss << setw(15) << prior_constraint_stdev[name];
-		ss << setw(15) << post_constraint_stdev[name];
-		ss << setw(15) << post_constraint_offset[name];
-		ss << setw(15) << current_constraints_chance[name] << endl;
+		ss << setw(12) << constraints_obs[name];
+		ss << setw(12) << current_obs.get_rec(name);
+		ss << setw(12) << prior_constraint_stdev[name];
+		ss << setw(12) << post_constraint_stdev[name];
+		ss << setw(12) << post_constraint_offset[name];
+		ss << setw(12) << current_constraints_chance[name] << endl;
 	}
 	ss << "  note: 'offset' is the value added to the simulated constraint/objective value to account" << endl;
 	ss << "        for the uncertainty in the constraint/objective value arsing from uncertainty in the " << endl;

@@ -648,7 +648,7 @@ if __name__ == "__main__":
     #test_sorting_fake_problem()
     #start_workers()
     #setup_problem("zdt1")
-    run_problem_chance_external_fixed("zdt1")
+    #run_problem_chance_external_fixed("zdt1")
     #run_problem("srn",noptmax=100)
     #plot_results(os.path.join("mou_tests","srn_master"))
     #setup_problem("constr")
