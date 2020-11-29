@@ -979,7 +979,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 			{
 				real_vec = shifted_oe.get_real_vector(real_name);
 				sim.update_without_clear(onames, real_vec);
-				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[real_name]);
+				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[real_name],true);
 				shifted_oe.replace(real_map[real_name], sim_shifted);
 			}
 		}
@@ -1025,7 +1025,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 				real_vec = shifted_oe.get_real_vector(missing[i]);
 				sim.update_without_clear(onames, real_vec);
 				//this call uses the class stack_oe attribute;
-				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[min_real_name]);
+				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[min_real_name],true);
 				shifted_oe.replace(real_map[missing[i]], sim_shifted);
 			}
 		}
@@ -1084,7 +1084,32 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	{
 		if (!stack_runs_processed)
 			throw_constraints_error("no stack runs have been processed, something is wrong");
-		shifted_obs = get_chance_shifted_constraints(current_obs, stack_oe);
+		//if we are using nested stacks, then calculate the average stack
+		if (stack_oe_map.size() > 0)
+		{
+
+			Eigen::MatrixXd oe_stack_mean;
+			bool first = true;
+			vector<string> real_names;
+			for (auto& o : stack_oe_map)
+			{
+				if (first)
+				{
+					oe_stack_mean = o.second.get_eigen(vector<string>(), ctl_ord_obs_constraint_names);
+					real_names = o.second.get_real_names();
+					first = false;
+				}
+				else
+					oe_stack_mean = oe_stack_mean + o.second.get_eigen(vector<string>(), ctl_ord_obs_constraint_names);
+			}
+			oe_stack_mean = oe_stack_mean / double(stack_oe_map.size());
+			ObservationEnsemble _mean_stack(&pest_scenario, &rand_gen,oe_stack_mean, real_names,ctl_ord_obs_constraint_names);
+			shifted_obs = get_chance_shifted_constraints(current_obs, stack_oe);
+
+		}
+
+		else
+			shifted_obs = get_chance_shifted_constraints(current_obs, stack_oe);
 		
 	}
 	vector<string> names = shifted_obs.get_keys();
@@ -1095,10 +1120,13 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 }
 
 
-Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe)
+Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe, bool full_obs)
 {
 	double old_constraint_val, required_val, pt_offset, new_constraint_val;
+
 	Observations shifted_obs;
+	if (full_obs)
+		shifted_obs = Observations(current_obs);
 	//work out which realization index corresponds to the risk value
 	if (_stack_oe.shape().first < 3)
 		throw_constraints_error("too few (<3) stack members, cannot continue with stack-based chance constraints/objectives");
@@ -1992,6 +2020,7 @@ void Constraints::add_runs(int iter, Parameters& current_pars, Observations& cur
 	else
 	{
 		stack_pe_run_map = add_stack_runs(iter, stack_pe, current_pars, current_obs, run_mgr_ptr);
+		cout << "...adding " << stack_pe_run_map.size() << " model runs for stack-based chance constraints" << endl;
 		stack_runs_processed = false;
 		
 	}
@@ -2015,24 +2044,24 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(real_pars);
 	current_pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
-	f_rec << "queuing up nested-sets of chance runs ('opt_chance_points' == 'all') for decision-variable ensemble " << endl;
-	cout << "queuing up nested - sets of chance runs for decision-variable ensemble " << endl;
+	f_rec << "queuing up nested sets of chance runs ('opt_chance_points' == 'all') for decision-variable ensemble " << endl;
+	cout << "queuing up nested sets of chance runs for decision-variable ensemble " << endl;
 	map<int, int> _stack_pe_run_map;
-	ParameterEnsemble _stack_pe(stack_pe); //copy
+	int count = 0;
 	for (auto real_info : current_pe.get_real_map())
 	{
 
 		par_vec = current_pe.get_real_vector(real_info.first);
 		real_pars.update_without_clear(par_names, par_vec);
-		_stack_pe_run_map = add_stack_runs(iter, _stack_pe, real_pars, current_obs, run_mgr_ptr);
+		_stack_pe_run_map = add_stack_runs(iter, stack_pe, real_pars, current_obs, run_mgr_ptr);
 		population_stack_pe_run_map[real_info.first] = _stack_pe_run_map;
 		stack_pe_map[real_info.first] = real_pars;
-		//relying on class attribute being set in add_runs():
-		save_pe_stack(iter, real_info.first, _stack_pe);
+		//TODO: add a flag to decide if saving
+		//save_pe_stack(iter, real_info.first, stack_pe);
 		f_rec << "...added " << stack_pe.shape().first << " runs for decision variable solution '" << real_info.first << "'" << endl;
-
+		count = count + _stack_pe_run_map.size();
 	}
-	
+	cout << "...adding " << count << " runs nested stack-based chance constraints" << endl;
 }
 
 map<int, int> Constraints::add_stack_runs(int iter, ParameterEnsemble& _stack_pe, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
@@ -2047,7 +2076,7 @@ map<int, int> Constraints::add_stack_runs(int iter, ParameterEnsemble& _stack_pe
 		_stack_pe.replace_col(dname, dvec);
 	}
 	pfm.log_event("building stack-based parameter runs");
-	cout << "...adding " << stack_pe.shape().first << " model runs for stack-based chance constraints" << endl;
+	
 	
 	map<int,int> _stack_pe_run_map = _stack_pe.add_runs(run_mgr_ptr);
 	

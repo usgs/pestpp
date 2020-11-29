@@ -174,7 +174,7 @@ private:
 	map<string, ObservationEnsemble> stack_oe_map;
 	map<string, Parameters> stack_pe_map;
 
-	Observations get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe);
+	Observations get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe, bool full_obs = false);
 
 	PriorInformation* null_prior = new PriorInformation();
 	PriorInformation constraints_pi;

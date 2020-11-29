@@ -2527,7 +2527,7 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv)
 	csv << endl;
 
 	//get the pars and transform to be in sync with ensemble trans status
-	Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+	/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 	if (tstat == transStatus::NUM)
 	{
 		par_transform.active_ctl2numeric_ip(pars);
@@ -2535,7 +2535,7 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv)
 	else if (tstat == transStatus::MODEL)
 	{
 		par_transform.active_ctl2model_ip(pars);
-	}
+	}*/
 
 	//for (int ireal = 0; ireal < reals.rows(); ireal++)
 	map<string, Parameters> tpar_map;
@@ -2543,6 +2543,15 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv)
 	{
 		if (real_map.find(rname) == end)
 			continue;
+		Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+		if (tstat == transStatus::NUM)
+		{
+			par_transform.active_ctl2numeric_ip(pars);
+		}
+		else if (tstat == transStatus::MODEL)
+		{
+			par_transform.active_ctl2model_ip(pars);
+		}
 		ireal = real_map[rname];
 		pars.update_without_clear(var_names, reals.row(ireal));
 		if (tstat == transStatus::MODEL)
@@ -2575,7 +2584,7 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv)
 	csv << endl;
 
 	//get the pars and transform to be in sync with ensemble trans status
-	Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+	/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 	if (tstat == transStatus::NUM)
 	{
 		par_transform.active_ctl2numeric_ip(pars);
@@ -2583,7 +2592,7 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv)
 	else if (tstat == transStatus::MODEL)
 	{
 		par_transform.active_ctl2model_ip(pars);
-	}
+	}*/
 
 	//for (int ireal = 0; ireal < reals.rows(); ireal++)
 	int ireal = 0;
@@ -2598,6 +2607,16 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv)
 	{
 		if (real_map.find(rname) == end)
 			continue;
+		Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+		if (tstat == transStatus::NUM)
+		{
+			par_transform.active_ctl2numeric_ip(pars);
+		}
+		else if (tstat == transStatus::MODEL)
+		{
+			par_transform.active_ctl2model_ip(pars);
+		}
+
 		ireal = real_map[rname];
 		csv << pest_utils::lower_cp(real_names[ireal]);
 		//evec = reals.row(ireal);
