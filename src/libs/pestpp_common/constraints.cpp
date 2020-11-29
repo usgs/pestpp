@@ -979,7 +979,6 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 			{
 				real_vec = shifted_oe.get_real_vector(real_name);
 				sim.update_without_clear(onames, real_vec);
-				//this call uses the class stack_oe attribute;
 				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[real_name]);
 				shifted_oe.replace(real_map[real_name], sim_shifted);
 			}
@@ -1992,21 +1991,9 @@ void Constraints::add_runs(int iter, Parameters& current_pars, Observations& cur
 	//with the current dec var values.
 	else
 	{
-		
-		//update stack_pe parameter values for decision variables using current_pars_and_dec_vars_ptr
-		int num_reals = stack_pe.shape().first;
-		map<string, int> var_map = stack_pe.get_var_map();
-		for (auto dname : dec_var_names)
-		{
-			Eigen::VectorXd dvec(num_reals);
-			dvec.setConstant(current_pars.get_rec(dname));
-			stack_pe.replace_col(dname, dvec);
-		}
-		pfm.log_event("building stack-based parameter runs");
-		cout << "...adding " << stack_pe.shape().first << " model runs for stack-based chance constraints" << endl;
-		stack_pe_run_map.clear();
-		stack_pe_run_map = stack_pe.add_runs(run_mgr_ptr);
+		stack_pe_run_map = add_stack_runs(iter, stack_pe, current_pars, current_obs, run_mgr_ptr);
 		stack_runs_processed = false;
+		
 	}
 }
 
@@ -2030,21 +2017,41 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 	f_rec << "queuing up nested-sets of chance runs ('opt_chance_points' == 'all') for decision-variable ensemble " << endl;
 	cout << "queuing up nested - sets of chance runs for decision-variable ensemble " << endl;
+	map<int, int> _stack_pe_run_map;
+	ParameterEnsemble _stack_pe(stack_pe); //copy
 	for (auto real_info : current_pe.get_real_map())
 	{
 
 		par_vec = current_pe.get_real_vector(real_info.first);
 		real_pars.update_without_clear(par_names, par_vec);
-		add_runs(iter, real_pars, current_obs, run_mgr_ptr);
-		//relying on class attribute being set in add_runs():
-		population_stack_pe_run_map[real_info.first] = stack_pe_run_map;
+		_stack_pe_run_map = add_stack_runs(iter, _stack_pe, real_pars, current_obs, run_mgr_ptr);
+		population_stack_pe_run_map[real_info.first] = _stack_pe_run_map;
 		stack_pe_map[real_info.first] = real_pars;
 		//relying on class attribute being set in add_runs():
-		save_pe_stack(iter, real_info.first, stack_pe);
+		save_pe_stack(iter, real_info.first, _stack_pe);
 		f_rec << "...added " << stack_pe.shape().first << " runs for decision variable solution '" << real_info.first << "'" << endl;
 
 	}
 	
+}
+
+map<int, int> Constraints::add_stack_runs(int iter, ParameterEnsemble& _stack_pe, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)
+{
+	//update _stack_pe parameter values for decision variables using current_pars
+	int num_reals = _stack_pe.shape().first;
+	map<string, int> var_map = stack_pe.get_var_map();
+	for (auto dname : dec_var_names)
+	{
+		Eigen::VectorXd dvec(num_reals);
+		dvec.setConstant(current_pars.get_rec(dname));
+		_stack_pe.replace_col(dname, dvec);
+	}
+	pfm.log_event("building stack-based parameter runs");
+	cout << "...adding " << stack_pe.shape().first << " model runs for stack-based chance constraints" << endl;
+	
+	map<int,int> _stack_pe_run_map = _stack_pe.add_runs(run_mgr_ptr);
+	
+	return _stack_pe_run_map;
 }
 
 vector<string> Constraints::get_fosm_par_names()

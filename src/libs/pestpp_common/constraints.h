@@ -81,7 +81,6 @@ public:
 
 	void add_runs(int iter, ParameterEnsemble& current_pe, Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
 
-
 	//queue up chance related runs at several points in dev var space
 	//void add_runs_at_multiple_points(RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& pe, vector<string> only_reals = vector<string>());
 
@@ -207,6 +206,8 @@ private:
 
 	//get the (risk-shifted) residual (distance) vector between constraints RHS and sim arg
 	vector<double> get_constraint_residual_vec(Observations& sim);
+
+	map<int, int> add_stack_runs(int iter, ParameterEnsemble& current_pe, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
 
 	//error handlers
 	void throw_constraints_error(string message, bool should_throw = true);
