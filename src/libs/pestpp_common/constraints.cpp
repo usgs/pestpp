@@ -879,7 +879,29 @@ void Constraints::update_chance_offsets()
 	//we can still report this variance.
 	else
 	{
-		pair<map<string, double>, map<string, double>> stack_oe_mean_stdev = stack_oe.get_moment_maps();
+		pair<map<string, double>, map<string, double>> stack_oe_mean_stdev;
+		if (stack_oe_map.size() > 0)
+		{
+			Eigen::MatrixXd oe_stack_mean;
+			bool first = true;
+			vector<string> real_names;
+			for (auto& o : stack_oe_map)
+			{
+				if (first)
+				{
+					oe_stack_mean = o.second.get_eigen(vector<string>(), ctl_ord_obs_constraint_names);
+					real_names = o.second.get_real_names();
+					first = false;
+				}
+				else
+					oe_stack_mean = oe_stack_mean + o.second.get_eigen(vector<string>(), ctl_ord_obs_constraint_names);
+			}
+			oe_stack_mean = oe_stack_mean / double(stack_oe_map.size());
+			ObservationEnsemble _mean_stack(&pest_scenario, &rand_gen, oe_stack_mean, real_names, ctl_ord_obs_constraint_names);
+			stack_oe_mean_stdev = _mean_stack.get_moment_maps();
+		}
+		else
+			stack_oe_mean_stdev = stack_oe.get_moment_maps();
 		for (auto cname : ctl_ord_obs_constraint_names)
 		{
 			prior_const_var[cname] = stack_oe_mean_stdev.second[cname] * stack_oe_mean_stdev.second[cname];
@@ -1104,7 +1126,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 			}
 			oe_stack_mean = oe_stack_mean / double(stack_oe_map.size());
 			ObservationEnsemble _mean_stack(&pest_scenario, &rand_gen,oe_stack_mean, real_names,ctl_ord_obs_constraint_names);
-			shifted_obs = get_chance_shifted_constraints(current_obs, stack_oe);
+			shifted_obs = get_chance_shifted_constraints(current_obs, _mean_stack);
 
 		}
 
@@ -2057,7 +2079,7 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 		population_stack_pe_run_map[real_info.first] = _stack_pe_run_map;
 		stack_pe_map[real_info.first] = real_pars;
 		//TODO: add a flag to decide if saving
-		//save_pe_stack(iter, real_info.first, stack_pe);
+		save_pe_stack(iter, real_info.first, stack_pe);
 		f_rec << "...added " << stack_pe.shape().first << " runs for decision variable solution '" << real_info.first << "'" << endl;
 		count = count + _stack_pe_run_map.size();
 	}
