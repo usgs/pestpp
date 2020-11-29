@@ -152,7 +152,7 @@ private:
 	vector<int> run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
 	void queue_chance_runs(ParameterEnsemble& _dp);
-	ObservationEnsemble get_chance_shifted_op(ObservationEnsemble& _op);
+	ObservationEnsemble get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
 	bool initialize_dv_population();
 	void initialize_obs_restart_population();

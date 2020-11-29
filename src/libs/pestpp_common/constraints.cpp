@@ -913,7 +913,7 @@ double Constraints::get_max_constraint_change(Observations& current_obs, Observa
 //	return get_chance_shifted_constraints(*current_constraints_sim_ptr);
 //}
 
-ObservationEnsemble Constraints::get_chance_shifted_constraints(ObservationEnsemble& oe)
+ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe)
 {
 	ObservationEnsemble shifted_oe(oe);//copy
 	ofstream& frec = file_mgr_ptr->rec_ofstream();
@@ -922,8 +922,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ObservationEnsem
 		
 		pfm.log_event("risk-shifting observation population using a single, 'optimal' chance point");
 		frec << "risk - shifting observation population using a single, 'optimal' chance point" << endl;
-
-		
+	
 		//constraints.presolve_chance_report(iter,);
 		Observations sim, sim_shifted;
 		Eigen::VectorXd real_vec;
@@ -943,25 +942,93 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ObservationEnsem
 		frec << "risk-shifting observation population using 'ALL' decision variable solutions as chance points" << endl;
 		//vector<string> real_names = shifted_oe.get_real_names();
 		vector<string> real_names = oe.get_real_names();
-		set<string> snames(real_names.begin(), real_names.end());
+		//set<string> snames(real_names.begin(), real_names.end());
 		map<string, int> real_map = oe.get_real_map();
 		Observations sim, sim_shifted;
 		Eigen::VectorXd real_vec;
 		vector<string> onames = shifted_oe.get_var_names();
-		for (auto& real_info : stack_oe_map)
+		vector<string> missing;
+		//for (auto& real_info : stack_oe_map)
+		//{
+		//	if (snames.find(real_info.first) == snames.end())
+		//	{
+		//		//TODO: just track the ones that are missing and maybe map to nearest or use mean or...
+		//		//throw_constraints_error("population member name '" + real_info.first + "' not found in observation population names");
+		//		missing.push_back(real_info.first);
+		//	}
+		//	else
+		//	{
+		//		real_vec = shifted_oe.get_real_vector(real_info.first);
+		//		sim.update_without_clear(onames, real_vec);
+		//		//this call uses the class stack_oe attribute;
+		//		sim_shifted = get_chance_shifted_constraints(sim,real_info.second);
+		//		shifted_oe.replace(real_map[real_info.first], sim_shifted);
+		//	}
+		//}
+
+		for (auto& real_name : real_names)
 		{
-			if (snames.find(real_info.first) == snames.end())
+			//if (snames.find(real_info.first) == snames.end())
+			if (stack_oe_map.find(real_name) == stack_oe_map.end())
 			{
 				//TODO: just track the ones that are missing and maybe map to nearest or use mean or...
-				throw_constraints_error("population member name '" + real_info.first + "' not found in observation population names");
+				//throw_constraints_error("population member name '" + real_info.first + "' not found in observation population names");
+				missing.push_back(real_name);
 			}
-			//overwrite the class stack_oe attribute with the realization stack
-			stack_oe = real_info.second;
-			real_vec = shifted_oe.get_real_vector(real_info.first);
-			sim.update_without_clear(onames, real_vec);
-			//this call uses the class stack_oe attribute;
-			sim_shifted = get_chance_shifted_constraints(sim);
-			shifted_oe.replace(real_map[real_info.first], sim_shifted);
+			else
+			{
+				real_vec = shifted_oe.get_real_vector(real_name);
+				sim.update_without_clear(onames, real_vec);
+				//this call uses the class stack_oe attribute;
+				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[real_name]);
+				shifted_oe.replace(real_map[real_name], sim_shifted);
+			}
+		}
+
+		if (missing.size() > 0)
+		{
+			frec << missing.size() << " members not in current oe stack runs, mapping to nearest point in decision variable space" << endl;
+			cout << missing.size() << " members not in current oe stack runs, mapping to nearest point in decision variable space" << endl;
+			
+			//so the idea here is to figure out which pe in the pe stack map is closest to the missing solutions in dec var space. 
+			if (stack_pe_map.size() != stack_oe_map.size())
+				throw_constraints_error("stack_pe_map size != stack_oe_map size");
+			Eigen::MatrixXd missing_dv_mat = pe.get_eigen(missing, dec_var_names);
+			Eigen::VectorXd missing_dv_vec, stack_dv_vec;
+			//for (auto m : missing)
+			double dist, min_dist;
+			string min_real_name;
+			for (int i=0;i<missing.size();i++)
+			{
+
+				missing_dv_vec = missing_dv_mat.row(i);
+				min_dist = numeric_limits<double>::max();
+				min_real_name = "";
+				for (auto& p : stack_pe_map)
+				{
+					stack_dv_vec = p.second.get_data_eigen_vec(dec_var_names);
+					dist = (stack_dv_vec - missing_dv_vec).squaredNorm();
+					if (dist < min_dist)
+					{
+						min_dist = dist;
+						min_real_name = p.first;
+					}
+				}
+				if (min_real_name.size() == 0)
+					//do something here
+					throw_constraints_error("couldnt find a nearest dv real for stack mapping");
+				if (stack_oe_map.find(min_real_name) == stack_oe_map.end())
+					throw_constraints_error("nearest dv real '" + min_real_name +"' not in stack oe map");
+				//todo add some output here to report the mapping results
+				frec << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
+				cout << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
+				
+				real_vec = shifted_oe.get_real_vector(missing[i]);
+				sim.update_without_clear(onames, real_vec);
+				//this call uses the class stack_oe attribute;
+				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[min_real_name]);
+				shifted_oe.replace(real_map[missing[i]], sim_shifted);
+			}
 		}
 	}
 	return shifted_oe;
@@ -977,7 +1044,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	post_constraint_stdev.clear();
 	double new_constraint_val, old_constraint_val, required_val;
 	double pr_offset, pt_offset;
-	Observations iter_fosm;
+	Observations shifted_obs;
 
 	if (use_fosm)
 	{
@@ -1011,88 +1078,97 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 			//if its not an ineq constraint, then there is no direction to shift
 			else
 				new_constraint_val = current_obs.get_rec(name);
-			iter_fosm.insert(name, new_constraint_val);
+			shifted_obs.insert(name, new_constraint_val);
 		}
 	}
 	else
 	{
 		if (!stack_runs_processed)
 			throw_constraints_error("no stack runs have been processed, something is wrong");
-		//work out which realization index corresponds to the risk value
-		if (stack_oe.shape().first < 3)
-			throw_constraints_error("too few (<3) stack members, cannot continue with stack-based chance constraints/objectives");
-		int cur_num_reals = stack_oe.shape().first;
-		//get the inde (which realization number) represents the risk value according to constraint sense
-		//
-		//the "less than" realization index is just the risk value times the number of reals
-		int lt_idx = int(risk * cur_num_reals);
-		//the greater than index is the opposite direction
-		int gt_idx = int((1.0-risk) * cur_num_reals);
-		//the equality contraint risk index
-		int eq_idx = int(0.5 * cur_num_reals);
-		//get the mean-centered anomalies - we want to subtract off the mean 
-		//in case these stack values are being re-used from a previous iteration
-		Eigen::MatrixXd anom = stack_oe.get_eigen_anomalies();
-		//get the map of realization name to index location in the stack
-		stack_oe.update_var_map();
-		map<string, int> var_map = stack_oe.get_var_map();
-		//get the mean and stdev summary containters, summarized by observation (e.g. constraint) name
-		pair<map<string, double>, map<string, double>> mm = stack_oe.get_moment_maps();
-		for (auto& name : ctl_ord_obs_constraint_names)
-		{
-			old_constraint_val = current_obs.get_rec(name);
-			//the value that must be statified (from the control file)
-			required_val = constraints_obs[name];
-			// the realized values of this stack are the anomalies added to the
-			//current constraint value - this assumes the current value 
-			//is the mean of the stack distribution
-			Eigen::VectorXd cvec = anom.col(var_map[name]).array() + old_constraint_val;
-			//now sort the anomolies + current (mean) value vector
-			sort(cvec.data(), cvec.data() + cvec.size());
-			//set the stdev container info - this isnt used in 
-			//calculations but gets reported
-			prior_constraint_stdev[name] = mm.second[name];
-			post_constraint_stdev[name] = mm.second[name];
-			
-			if (prior_constraint_stdev[name] == 0.0)
-			{
-				throw_constraints_error("model-based constraint '" + name + "' has empirical (stack) standard deviation of 0.0",false);
-			}
-
-			// if this is a "less than" constraint
-			if (constraint_sense_map[name] == ConstraintSense::less_than)
-			{
-				//the posterior shifted constraint value is the stack value at the less than index location minus the 
-				//current constraint value
-				pt_offset = cvec[lt_idx] - old_constraint_val;
-				new_constraint_val = cvec[lt_idx];
-				post_constraint_offset[name] = pt_offset;
-				prior_constraint_offset[name] = pt_offset;
-				
-			}
-			
-			else if (constraint_sense_map[name] == ConstraintSense::greater_than)
-			{
-				//the posterior shifted constraint value is the stack value at the greater than index location minus the 
-				//current constraint value
-				pt_offset = cvec[gt_idx] - old_constraint_val;
-				new_constraint_val = cvec[gt_idx];
-				post_constraint_offset[name] = -pt_offset;
-				prior_constraint_offset[name] = -pt_offset;
-
-			}
-			else
-				new_constraint_val = old_constraint_val;
-			iter_fosm.insert(name, new_constraint_val);
-		}
+		shifted_obs = get_chance_shifted_constraints(current_obs, stack_oe);
+		
 	}
-	vector<string> names = iter_fosm.get_keys();
+	vector<string> names = shifted_obs.get_keys();
 	Observations constraints_chance(current_obs);
-	constraints_chance.update_without_clear(names, iter_fosm.get_data_vec(names));
+	constraints_chance.update_without_clear(names, shifted_obs.get_data_vec(names));
 	
 	return constraints_chance;
 }
 
+
+Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe)
+{
+	double old_constraint_val, required_val, pt_offset, new_constraint_val;
+	Observations shifted_obs;
+	//work out which realization index corresponds to the risk value
+	if (_stack_oe.shape().first < 3)
+		throw_constraints_error("too few (<3) stack members, cannot continue with stack-based chance constraints/objectives");
+	int cur_num_reals = _stack_oe.shape().first;
+	//get the inde (which realization number) represents the risk value according to constraint sense
+	//
+	//the "less than" realization index is just the risk value times the number of reals
+	int lt_idx = int(risk * cur_num_reals);
+	//the greater than index is the opposite direction
+	int gt_idx = int((1.0 - risk) * cur_num_reals);
+	//the equality contraint risk index
+	int eq_idx = int(0.5 * cur_num_reals);
+	//get the mean-centered anomalies - we want to subtract off the mean 
+	//in case these stack values are being re-used from a previous iteration
+	Eigen::MatrixXd anom = _stack_oe.get_eigen_anomalies();
+	//get the map of realization name to index location in the stack
+	_stack_oe.update_var_map();
+	map<string, int> var_map = _stack_oe.get_var_map();
+	//get the mean and stdev summary containters, summarized by observation (e.g. constraint) name
+	pair<map<string, double>, map<string, double>> mm = _stack_oe.get_moment_maps();
+	for (auto& name : ctl_ord_obs_constraint_names)
+	{
+		old_constraint_val = current_obs.get_rec(name);
+		//the value that must be statified (from the control file)
+		required_val = constraints_obs[name];
+		// the realized values of this stack are the anomalies added to the
+		//current constraint value - this assumes the current value 
+		//is the mean of the stack distribution
+		Eigen::VectorXd cvec = anom.col(var_map[name]).array() + old_constraint_val;
+		//now sort the anomolies + current (mean) value vector
+		sort(cvec.data(), cvec.data() + cvec.size());
+		//set the stdev container info - this isnt used in 
+		//calculations but gets reported
+		prior_constraint_stdev[name] = mm.second[name];
+		post_constraint_stdev[name] = mm.second[name];
+
+		if (prior_constraint_stdev[name] == 0.0)
+		{
+			throw_constraints_error("model-based constraint '" + name + "' has empirical (stack) standard deviation of 0.0", false);
+		}
+
+		// if this is a "less than" constraint
+		if (constraint_sense_map[name] == ConstraintSense::less_than)
+		{
+			//the posterior shifted constraint value is the stack value at the less than index location minus the 
+			//current constraint value
+			pt_offset = cvec[lt_idx] - old_constraint_val;
+			new_constraint_val = cvec[lt_idx];
+			post_constraint_offset[name] = pt_offset;
+			prior_constraint_offset[name] = pt_offset;
+
+		}
+
+		else if (constraint_sense_map[name] == ConstraintSense::greater_than)
+		{
+			//the posterior shifted constraint value is the stack value at the greater than index location minus the 
+			//current constraint value
+			pt_offset = cvec[gt_idx] - old_constraint_val;
+			new_constraint_val = cvec[gt_idx];
+			post_constraint_offset[name] = -pt_offset;
+			prior_constraint_offset[name] = -pt_offset;
+
+		}
+		else
+			new_constraint_val = old_constraint_val;
+		shifted_obs.insert(name, new_constraint_val);
+	}
+	return shifted_obs;
+}
 
 vector<double> Constraints::get_constraint_residual_vec(Observations& sim)
 {
@@ -1943,6 +2019,7 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 		throw_constraints_error("add_runs() error: FOSM-based chance constraints not supported for ensemble/population-based algorithms");
 	}
 	population_stack_pe_run_map.clear();
+	stack_pe_map.clear();
 	pfm.log_event("queuing up nested-sets of chance runs for decision-variable ensemble ");
 	
 	Eigen::VectorXd par_vec;
@@ -1961,10 +2038,13 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 		add_runs(iter, real_pars, current_obs, run_mgr_ptr);
 		//relying on class attribute being set in add_runs():
 		population_stack_pe_run_map[real_info.first] = stack_pe_run_map;
+		stack_pe_map[real_info.first] = real_pars;
 		//relying on class attribute being set in add_runs():
 		save_pe_stack(iter, real_info.first, stack_pe);
 		f_rec << "...added " << stack_pe.shape().first << " runs for decision variable solution '" << real_info.first << "'" << endl;
+
 	}
+	
 }
 
 vector<string> Constraints::get_fosm_par_names()

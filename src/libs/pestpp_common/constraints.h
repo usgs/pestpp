@@ -147,7 +147,7 @@ public:
 	//get risk-shifted simulated constraint values using _constraints_sim arg
 	Observations get_chance_shifted_constraints(Observations& _constraints_sim);
 
-	ObservationEnsemble get_chance_shifted_constraints(ObservationEnsemble& oe);
+	ObservationEnsemble get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe);
 
 private:
 	Pest& pest_scenario;
@@ -173,7 +173,9 @@ private:
 	ObservationEnsemble stack_oe;
 	
 	map<string, ObservationEnsemble> stack_oe_map;
+	map<string, Parameters> stack_pe_map;
 
+	Observations get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe);
 
 	PriorInformation* null_prior = new PriorInformation();
 	PriorInformation constraints_pi;
@@ -188,6 +190,7 @@ private:
 	map<string, double> post_constraint_stdev;
 
 	map<int, int> stack_pe_run_map;
+	
 	map<string, map<int, int>> population_stack_pe_run_map;
 
 	vector<string> dec_var_names;

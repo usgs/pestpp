@@ -56,7 +56,7 @@ def run_and_plot_results(cwd):
             ax.contour(d[:,0,:],levels,colors="k",)
 
             ax.set_title("{0}".format(time))
-            plt.savefig(os.path.join(plt_dir,"{0:03d}_henry.pdf".format(i)))
+            #plt.savefig(os.path.join(plt_dir,"{0:03d}_henry.pdf".format(i)))
             pdf.savefig()
             plt.close("all")
             print(time,d.min(),d.max())
@@ -323,7 +323,7 @@ def plot_pr_real():
 
 def start_workers_for_debug(with_master=True):
     t_d = os.path.join("mou_tests", "henry_template")
-    m_d = os.path.join("mou_tests","henry_chance_master")
+    m_d = os.path.join("mou_tests","henry_master_chance")
     if with_master:
         if os.path.exists(m_d):
             shutil.rmtree(m_d)
@@ -331,6 +331,7 @@ def start_workers_for_debug(with_master=True):
         pst = pyemu.Pst(os.path.join(m_d,"henry.pst"))
         pst.control_data.noptmax = 100
         pst.pestpp_options["opt_par_stack"] = "prior.jcb"
+        pst.pestpp_options["opt_stack_size"] = 50
         pst.pestpp_options["opt_risk"] = 0.95
 
         pst.write(os.path.join(m_d,"henry.pst"))

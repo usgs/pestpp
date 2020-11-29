@@ -1160,34 +1160,10 @@ vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _o
 	return failed_real_indices;
 }
 
-ObservationEnsemble MOEA::get_chance_shifted_op(ObservationEnsemble& _op)
+ObservationEnsemble MOEA::get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
-	//ObservationEnsemble shifted_op(_op);
-	//if (chancepoints == chancePoints::SINGLE)
-	//{
-	//	message(2, "risk-shifting observation population using a single, 'optimal' chance point");
-	//	//constraints.presolve_chance_report(iter,);
-	//	Observations sim, sim_shifted;
-	//	Eigen::VectorXd real_vec;
-	//	vector<string> onames = shifted_op.get_var_names();
-	//	for (int i = 0; i < shifted_op.shape().first; i++)
-	//	{
-	//		real_vec = shifted_op.get_real_vector(i);
-	//		sim.update_without_clear(onames, real_vec);
-	//		sim_shifted = constraints.get_chance_shifted_constraints(sim);
-	//		shifted_op.replace(i, sim_shifted);
-	//	}
-	//}
-	//else if (chancepoints == chancePoints::ALL)
-	//{
 
-	//}
-	//else
-	//{
-	//	throw_moea_error("only 'optimal' chancepoint currently supported");
-	//}
-
-	return constraints.get_chance_shifted_constraints(_op);
+	return constraints.get_chance_shifted_constraints(_dp, _op);
 }
 
 void MOEA::finalize()
@@ -1685,7 +1661,7 @@ void MOEA::initialize()
 
 	if (constraints.get_use_chance())
 	{
-		ObservationEnsemble shifted_op = get_chance_shifted_op(op);
+		ObservationEnsemble shifted_op = get_chance_shifted_op(dp, op);
 		ss.str("");
 		ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".chance.csv";
 		op.to_csv(ss.str());
@@ -1796,7 +1772,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 	else
 	{
 		//calculate the optimal tradeoff point from the current op
-		//dont worry about pi-based obj since they are chance-based
+		//dont worry about pi-based obj since they arent chance-based
 		message(2, "seeking optimal trade-off point for single 'optimal' chance point runs");
 		vector<double> obj_extrema;
 		Eigen::VectorXd obj_vec; 
@@ -1897,7 +1873,7 @@ void MOEA::iterate_to_solution()
 		{
 			pair<Parameters,Observations> po = get_optimal_solution(dp, op);
 			constraints.presolve_chance_report(iter, po.second,true);
-			ObservationEnsemble new_op_shifted = get_chance_shifted_op(new_op);
+			ObservationEnsemble new_op_shifted = get_chance_shifted_op(new_dp, new_op);
 			save_populations(dp, new_op_shifted,"chance");
 			new_op = new_op_shifted;
 		}
@@ -1985,7 +1961,7 @@ bool MOEA::initialize_dv_population()
 		for (int i = 0; i < num_members; i++)
 		{
 			ss.str("");
-			ss << "original_member:" << i;
+			ss << "original_member=" << i;
 			real_names.push_back(ss.str());
 		}
 		dp.set_real_names(real_names, true);
