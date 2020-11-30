@@ -5,7 +5,11 @@ END options
 
 BEGIN griddata
   diffc
-    OPEN/CLOSE  'trans.dsp_diffc.txt'  FACTOR  1.0
-    #constant 0.1
+    #OPEN/CLOSE  'trans.dsp_diffc.txt'  FACTOR  1.0
+    constant 0.1
+  alh 
+    constant 0.025
+  ath1
+    constant 0.0025 
 END griddata
 

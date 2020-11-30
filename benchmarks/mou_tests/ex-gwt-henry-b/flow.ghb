@@ -11,3 +11,7 @@ BEGIN period  1
     OPEN/CLOSE  'flow.ghb_stress_period_data_1.txt'
 END period  1
 
+BEGIN period  3
+    OPEN/CLOSE  'flow.ghb_stress_period_data_3.txt'
+END period  3
+

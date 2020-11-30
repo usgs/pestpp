@@ -134,11 +134,11 @@ def setup_pst():
     #print(dely.shape)
     mg = flopy.discretization.StructuredGrid(dely,delx)
 
-    v_k = pyemu.geostats.ExpVario(1.0,0.2,anisotropy=10,bearing=90.0)
+    v_k = pyemu.geostats.ExpVario(1.0,0.1)
     gs_k = pyemu.geostats.GeoStruct(variograms=v_k)
 
     pf = pyemu.utils.PstFrom(old_dir,new_dir,spatial_reference=mg,
-                             remove_existing=True)
+                             remove_existing=True,zero_based=False)
 
     # setup pars for k using aniso to represent vk
     pf.add_parameters("flow.npf_k.txt",par_type="grid",upper_bound=864*10.,lower_bound=864*0.1,
@@ -151,9 +151,6 @@ def setup_pst():
                      geostruct=gs_k,par_style="direct")
 
 
-    pf.add_parameters("trans.dsp_diffc.txt", par_type="grid", upper_bound=1.0, lower_bound=0.01,
-                      par_name_base="diff", pargp="diff",
-                      geostruct=gs_k, par_style="direct")
 
     # copy the current historic well list file to a "base" file that will get modified...
     shutil.copy2(os.path.join(new_dir,"flow.wel_stress_period_data_historic.txt"),
@@ -161,8 +158,8 @@ def setup_pst():
     pf.add_parameters("flow.wel_stress_period_data_scenario_base.txt",par_type="grid",par_style="direct",
                       index_cols=[0,1,2],use_cols=3,pargp="wel",par_name_base="wel")
 
-    # todo: add pars for ghb conditions to represent historic and scenario sea level
-    # this may bring additional constraints to not add to flooding with recharge basin
+    pf.add_parameters("flow.ghb_stress_period_data_3.txt", par_type="constant", par_style="direct",
+                      index_cols=[0, 1, 2], use_cols=3, pargp="stage", par_name_base="stage")
 
     # setup obs for all concentrations at the end of the 3 periods
     pump_filename,conc_filenames = test_process_unc(new_dir)
@@ -210,7 +207,6 @@ def setup_pst():
     wel_par = par.loc[par.pargp=="wel",:]
     wpar = wel_par.loc[wel_par.parval1>0,"parnme"]
     par.loc[wpar, "partrans"] = "none"
-
     par.loc[wpar,"pargp"] = "wel_rch"
     par.loc[wpar, "parubnd"] = 0.11
     par.loc[wpar, "parlbnd"] = 0.05
@@ -218,7 +214,7 @@ def setup_pst():
     par.loc[wpar, "partrans"] = "none"
     par.loc[wpar, "pargp"] = "dv_pars"
     par.loc[wpar, "parubnd"] = 0.0
-    par.loc[wpar, "parlbnd"] = -3.0
+    par.loc[wpar, "parlbnd"] = -5.0
     pf.pst.add_pi_equation(wpar.to_list(),pilbl="pump_rate",obs_group="less_than")
 
     pf.pst.control_data.noptmax = 0
@@ -422,12 +418,12 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..", "bin", "win", "pestpp-mou.exe"), os.path.join("..", "bin", "pestpp-mou.exe"))
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
-    #prep_model()
-    #run_and_plot_results(os.path.join("mou_tests", "henry_temp"))
+    prep_model()
+    run_and_plot_results(os.path.join("mou_tests", "henry_temp"))
     #test_add_artrch("henry_template",write_tpl=False)
     #test_process_unc("henry_temp")
-    #setup_pst()
-    #run_and_plot_results(os.path.join("mou_tests", "henry_template"))
-    start_workers_for_debug(True)
+    setup_pst()
+    run_and_plot_results(os.path.join("mou_tests", "henry_template"))
+    #start_workers_for_debug(True)
     #plot_pr_real()
     #plot_results(os.path.join("mou_tests","henry_master"))
