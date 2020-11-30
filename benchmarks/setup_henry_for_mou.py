@@ -146,7 +146,7 @@ def setup_pst():
                       geostruct=gs_k,par_style="direct")
 
     # setup pars for porosity
-    pf.add_parameters("trans.mst_porosity.txt", par_type="grid", upper_bound=0.4, lower_bound=0.15,
+    pf.add_parameters("trans.mst_porosity.txt", par_type="grid", upper_bound=0.4, lower_bound=0.3,
                      par_name_base="pr", pargp="pr",
                      geostruct=gs_k,par_style="direct")
 
@@ -216,6 +216,9 @@ def setup_pst():
     par.loc[wpar, "parubnd"] = 0.0
     par.loc[wpar, "parlbnd"] = -5.0
     pf.pst.add_pi_equation(wpar.to_list(),pilbl="pump_rate",obs_group="less_than")
+
+    stage_par = par.loc[par.pargp == "stage", "parnme"]
+    par.loc[stage_par, "partrans"] = "fixed"
 
     pf.pst.control_data.noptmax = 0
     pf.pst.add_pi_equation(["ar_width"],obs_group="less_than",pilbl="ar_width")
@@ -327,9 +330,9 @@ def start_workers_for_debug(with_master=True):
         pst = pyemu.Pst(os.path.join(m_d,"henry.pst"))
         pst.control_data.noptmax = 100
         pst.pestpp_options["opt_par_stack"] = "prior.jcb"
-        pst.pestpp_options["opt_stack_size"] = 20
+        pst.pestpp_options["opt_stack_size"] = 10
         pst.pestpp_options["opt_recalc_chance_every"] = 100
-        pst.pestpp_options["mou_population_size"] = 100
+        pst.pestpp_options["mou_population_size"] = 20
         pst.pestpp_options["opt_chance_points"] = "all"
         pst.pestpp_options["opt_risk"] = 0.95
 
@@ -418,8 +421,8 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..", "bin", "win", "pestpp-mou.exe"), os.path.join("..", "bin", "pestpp-mou.exe"))
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
 
-    prep_model()
-    run_and_plot_results(os.path.join("mou_tests", "henry_temp"))
+    #prep_model()
+    #run_and_plot_results(os.path.join("mou_tests", "henry_temp"))
     #test_add_artrch("henry_template",write_tpl=False)
     #test_process_unc("henry_temp")
     setup_pst()
