@@ -313,6 +313,9 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 
 	}
 	w_listen(listener, BACKLOG);
+	f_rmr << endl;
+	cout << "PANTHER master listening on socket: " << w_get_addrinfo_string(connect_addr) << endl;
+	f_rmr << "PANTHER master listening on socket:" << w_get_addrinfo_string(connect_addr) << endl;
 	//free servinfo
 	freeaddrinfo(servinfo);
 	fdmax = listener;
@@ -320,9 +323,7 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	FD_SET(listener, &master);
 	//cant do this here because the run manager doesnt yet know the par and obs names
 	//resume_idle();
-	f_rmr << endl;
-	cout << "PANTHER master listening on socket: " << w_get_addrinfo_string(connect_addr) << endl;
-	f_rmr << "PANTHER master listening on socket:" << w_get_addrinfo_string(connect_addr) << endl;
+	
 	
 	
 }
@@ -1131,13 +1132,13 @@ void RunManagerPanther::echo()
 	if (!should_echo)
 		return;
 	map<string, int> stats_map = get_agent_stats();
-	cout << get_time_string_short() << " runs("
-		<< "C=" << setw(5) << left << model_runs_done
-		<< "| F=" << setw(5) << left << model_runs_failed
-		<< "| T=" << setw(5) << left << model_runs_timed_out << "): agents("
-		<< "R=" << setw(4) << left << stats_map["run"]
-		<< "| W=" << setw(4) << left << stats_map["wait"]
-		<< "| U=" << setw(4) << left << stats_map["unavailable"] << ")\r" << flush;
+	cout << get_time_string_short() << " avg:" << setprecision(3) << setw(5) << get_global_runtime_minute()  << " runs("
+		<< "C" << setw(5) << left << model_runs_done
+		<< "|F" << setw(5) << left << model_runs_failed
+		<< "|T" << setw(5) << left << model_runs_timed_out << ") agents("
+		<< "R" << setw(4) << left << stats_map["run"]
+		<< "|W" << setw(4) << left << stats_map["wait"]
+		<< "|U" << setw(4) << left << stats_map["unavailable"] << ")\r" << flush;
 }
 
 void RunManagerPanther::report(std::string message,bool to_cout)

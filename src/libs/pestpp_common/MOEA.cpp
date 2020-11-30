@@ -1664,7 +1664,7 @@ void MOEA::initialize()
 		ObservationEnsemble shifted_op = get_chance_shifted_op(dp, op);
 		ss.str("");
 		ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".chance.csv";
-		op.to_csv(ss.str());
+		shifted_op.to_csv(ss.str());
 		message(1, "saved chance-shifted observation population to ", ss.str());
 
 		op = shifted_op;
@@ -1722,9 +1722,8 @@ void MOEA::initialize()
 	if (constraints.get_use_chance())
 	{
 		ofstream& f_rec = file_manager.rec_ofstream();
-		f_rec << "  initial chance constraint summary (calculated at optimal/mean decision variable point) " << endl;
 		pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op);
-		constraints.presolve_chance_report(iter, po_pair.second, true);
+		constraints.presolve_chance_report(iter, po_pair.second, true,"initial chance constraint summary (calculated at optimal/mean decision variable point)");
 	}
 
 	constraints.mou_report(0,dp, op, obs_obj_names,pi_obj_names);
@@ -1791,10 +1790,11 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 
 		//find the member nearest the optimal tradeoff
 		int opt_idx = -1;
+		Eigen::MatrixXd obj_op = op.get_eigen(vector<string>(), obs_obj_names);
 		double dist, opt_dist = numeric_limits<double>::max();
 		for (int i = 0; i < op.shape().first; i++)
 		{
-			dist = opt_vec.dot(op.get_eigen_ptr()->row(i));
+			dist = (opt_vec - obj_op.row(i).transpose()).squaredNorm();
 			if (dist < opt_dist)
 			{
 				opt_idx = i;
@@ -1868,13 +1868,13 @@ void MOEA::iterate_to_solution()
 		//and risk-shift
 			
 		//TODO: save new_dp, new_op and new_op_shifted?
-		save_populations(dp, op);
+		save_populations(new_dp, new_op);
 		if (constraints.get_use_chance())
 		{
 			pair<Parameters,Observations> po = get_optimal_solution(dp, op);
-			constraints.presolve_chance_report(iter, po.second,true);
+			constraints.presolve_chance_report(iter, po.second,true, "chance constraint summary (calculated at optimal/mean decision variable point)");
 			ObservationEnsemble new_op_shifted = get_chance_shifted_op(new_dp, new_op);
-			save_populations(dp, new_op_shifted,"chance");
+			save_populations(new_dp, new_op_shifted,"chance");
 			new_op = new_op_shifted;
 		}
 

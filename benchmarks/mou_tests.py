@@ -465,15 +465,15 @@ def plot_results(master_d):
     plt.close("all")
 
 
-def run_problem_chance(test_case="zdt1",pop_size=100,noptmax=100):
+def run_problem_chance(test_case="zdt1",pop_size=100,noptmax=100,stack_size=50,chance_points="single"):
     
     test_d = setup_problem(test_case,additive_chance=True)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
     pst.control_data.noptmax = noptmax
     pst.pestpp_options["mou_population_size"] = pop_size   
     pst.pestpp_options["opt_risk"] = 0.95
-    pst.pestpp_options["opt_stack_size"] = 50
-    pst.pestpp_options["opt_chance_points"] = "single"
+    pst.pestpp_options["opt_stack_size"] = stack_size
+    pst.pestpp_options["opt_chance_points"] = chance_points
     pst.pestpp_options["panther_echo"] = False
     pst.pestpp_options["mou_generator"] = "de"
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
@@ -539,8 +539,9 @@ def test_sorting_fake_problem():
     pyemu.os_utils.run("{0} test.pst".format(exe_path),cwd=test_d)
 
 
-def start_workers():
-    pyemu.os_utils.start_workers(os.path.join("mou_tests","water_template"), exe_path, "water.pst", 
+def start_workers(case="srn"):
+    pyemu.os_utils.start_workers(os.path.join("mou_tests","{0}_template".format(case)),
+                                 exe_path, "{0}.pst".format(case),
                                   num_workers=35, worker_root="mou_tests",
                                   port=4004)
 
@@ -630,8 +631,8 @@ if __name__ == "__main__":
     #   master_d = run_problem(case,noptmax=100)
     #   plot_results(master_d)
 
-    #setup_problem("water")
-    #master_d = run_problem("water",noptmax=200)
+    #setup_problem("srn",additive_chance=True)
+    #master_d = run_problem_chance("srn",noptmax=3,chance_points="all",pop_size=10,stack_size=10)
     #plot_results(os.path.join("mou_tests","zdt6_master"))
 
     #master_d = test_zdt("zdt2",noptmax=3)
@@ -646,7 +647,7 @@ if __name__ == "__main__":
     #plot_zdt_results(os.path.join("mou_tests","zdt3_master"))
     #setup_problem("zdt1",30, additive_chance=True)
     #test_sorting_fake_problem()
-    #start_workers()
+    start_workers()
     #setup_problem("zdt1")
     #run_problem_chance_external_fixed("zdt1")
     #run_problem("srn",noptmax=100)

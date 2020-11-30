@@ -332,13 +332,14 @@ def start_workers_for_debug(with_master=True):
         pst.control_data.noptmax = 100
         pst.pestpp_options["opt_par_stack"] = "prior.jcb"
         pst.pestpp_options["opt_stack_size"] = 20
-        pst.pestpp_options["opt_recalc_chance_every"] = 50
+        pst.pestpp_options["opt_recalc_chance_every"] = 100
+        pst.pestpp_options["mou_population_size"] = 100
         pst.pestpp_options["opt_chance_points"] = "all"
         pst.pestpp_options["opt_risk"] = 0.95
 
         pst.write(os.path.join(m_d,"henry.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path, "henry.pst",
-                                  num_workers=10, worker_root="mou_tests",
+                                  num_workers=15, worker_root="mou_tests",
                                   port=4004)
 
 def plot_results(m_d):
@@ -427,6 +428,6 @@ if __name__ == "__main__":
     #test_process_unc("henry_temp")
     #setup_pst()
     #run_and_plot_results(os.path.join("mou_tests", "henry_template"))
-    start_workers_for_debug(False)
+    start_workers_for_debug(True)
     #plot_pr_real()
     #plot_results(os.path.join("mou_tests","henry_master"))

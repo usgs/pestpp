@@ -1214,7 +1214,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 		}
 		else
 			new_constraint_val = old_constraint_val;
-		shifted_obs.insert(name, new_constraint_val);
+		shifted_obs[name] = new_constraint_val;
 	}
 	return shifted_obs;
 }
@@ -1679,7 +1679,9 @@ void Constraints::write_res_file(Observations& constraints, Parameters& pars_and
 
 }
 
-void Constraints::presolve_chance_report(int iter, Observations& current_obs, bool echo)
+
+
+void Constraints::presolve_chance_report(int iter, Observations& current_obs, bool echo, string header)
 {
 	/* write chance info to the rec file before undertaking the current iteration process*/
 	if (!use_chance)
@@ -1689,9 +1691,16 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 	for (auto o : ctl_ord_obs_constraint_names)
 		nsize = max(nsize, int(o.size()));
 
-	stringstream ss;// = file_mgr_ptr->rec_ofstream();
+	stringstream ss;
+	ss << endl << "   ";
+	if (header.size() == 0)
+		ss << "Chance constraint / objective information at start of iteration " << iter;
+	else
+		ss << header;
+	ss << endl;
+
 	//vector<double> residuals = get_constraint_residual_vec();
-	ss << endl << "  Chance constraint/objective information at start of iteration " << iter << endl;
+	
 	ss << setw(nsize) << left << "name" << right << setw(10) << "sense" << setw(12) << "required" << setw(12) << "sim value";
 	ss << setw(12) << "prior stdev" << setw(12) << "post stdev" << setw(12) << "offset";
 	ss << setw(12) << "new sim value" << endl;
@@ -1919,8 +1928,7 @@ void Constraints::save_pe_stack(int iter, string real_name, ParameterEnsemble& _
 	else
 	{
 		ss << ".csv";
-		//_stack_pe.to_csv(ss.str());
-		_stack_pe.to_csv("test_1.csv");
+		_stack_pe.to_csv(ss.str());
 	}
 	ss.str("");
 	if (real_name.size() > 0)

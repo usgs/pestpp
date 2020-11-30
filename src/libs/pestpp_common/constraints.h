@@ -62,7 +62,7 @@ public:
 	void initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_max);
 
 	void presolve_report(int iter, Parameters& current_pars, Observations& current_obs);
-	void presolve_chance_report(int iter, Observations& current_obs, bool echo=false);
+	void presolve_chance_report(int iter, Observations& current_obs, bool echo=false, string header = string());
 	void postsolve_obs_constraints_report(Observations& old_obs, Observations& new_obs, string tag, int iter,
 		map<string, string> status_map=map<string,string>(), map<string, double> price_map=map<string,double>());
 	void postsolve_pi_constraints_report(Parameters& old_pars, Parameters& new_pars, int iter,
