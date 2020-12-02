@@ -469,6 +469,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	if (should_echo)
 	{
 		cout << "PANTHER progress" << endl;
+		cout << "avg = average model run time in minutes" << endl;
 		cout << "   runs(C = completed | F = failed | T = timed out)" << endl;
 		cout << "   agents(R = running | W = waiting | U = unavailable)" << endl;
 		cout << "------------------------------------------------------------------------------" << endl;

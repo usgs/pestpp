@@ -141,7 +141,7 @@ def setup_pst():
                              remove_existing=True,zero_based=False)
 
     # setup pars for k using aniso to represent vk
-    pf.add_parameters("flow.npf_k.txt",par_type="grid",upper_bound=864*10.,lower_bound=864*0.1,
+    pf.add_parameters("flow.npf_k.txt",par_type="grid",upper_bound=864*10.0,lower_bound=864*0.1,
                       par_name_base="k",pargp="k",
                       geostruct=gs_k,par_style="direct")
 
@@ -214,7 +214,7 @@ def setup_pst():
     par.loc[wpar, "partrans"] = "none"
     par.loc[wpar, "pargp"] = "dv_pars"
     par.loc[wpar, "parubnd"] = 0.0
-    par.loc[wpar, "parlbnd"] = -5.0
+    par.loc[wpar, "parlbnd"] = -2.0
     pf.pst.add_pi_equation(wpar.to_list(),pilbl="pump_rate",obs_group="less_than")
 
     stage_par = par.loc[par.pargp == "stage", "parnme"]
@@ -322,7 +322,7 @@ def plot_pr_real():
 
 def start_workers_for_debug(with_master=True):
     t_d = os.path.join("mou_tests", "henry_template")
-    m_d = os.path.join("mou_tests","henry_master_chance")
+    m_d = os.path.join("mou_tests","henry_master_test")
     if with_master:
         if os.path.exists(m_d):
             shutil.rmtree(m_d)
@@ -330,9 +330,9 @@ def start_workers_for_debug(with_master=True):
         pst = pyemu.Pst(os.path.join(m_d,"henry.pst"))
         pst.control_data.noptmax = 100
         pst.pestpp_options["opt_par_stack"] = "prior.jcb"
-        pst.pestpp_options["opt_stack_size"] = 10
+        pst.pestpp_options["opt_stack_size"] = 20
         pst.pestpp_options["opt_recalc_chance_every"] = 100
-        pst.pestpp_options["mou_population_size"] = 20
+        pst.pestpp_options["mou_population_size"] = 100
         pst.pestpp_options["opt_chance_points"] = "all"
         pst.pestpp_options["opt_risk"] = 0.95
 
@@ -415,7 +415,15 @@ def plot_results(m_d):
             #if gen > 10:
             #    break
 
+def invest():
+    m_d = os.path.join("mou_tests","henry_master_chance")
+    pst = pyemu.Pst(os.path.join(m_d,"henry.pst"))
+    dv = pd.read_csv(os.path.join(m_d,"henry.0.dv_pop.csv"),index_col=0)
+    pst.parameter_data.loc[:,"parval1"] = dv.loc[dv.index[0],pst.par_names]
+    pst.write_input_files(m_d)
+    pyemu.os_utils.run("python forward_run.py",cwd=m_d)
 
+    run_and_plot_results(m_d)
 
 if __name__ == "__main__":
     #shutil.copy2(os.path.join("..", "bin", "win", "pestpp-mou.exe"), os.path.join("..", "bin", "pestpp-mou.exe"))
@@ -426,7 +434,8 @@ if __name__ == "__main__":
     #test_add_artrch("henry_template",write_tpl=False)
     #test_process_unc("henry_temp")
     setup_pst()
-    run_and_plot_results(os.path.join("mou_tests", "henry_template"))
-    #start_workers_for_debug(True)
+    #run_and_plot_results(os.path.join("mou_tests", "henry_template"))
+    start_workers_for_debug(True)
     #plot_pr_real()
     #plot_results(os.path.join("mou_tests","henry_master"))
+    #invest()

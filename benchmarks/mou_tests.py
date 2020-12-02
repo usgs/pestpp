@@ -359,7 +359,7 @@ def run_problem_chance_external_fixed(test_case="zdt1"):
     par.loc["obj1_add_par","partrans"] = "fixed"
     pst.control_data.noptmax = 2
     pst.pestpp_options["mou_population_size"] = 10
-    pst.pestpp_options["panther_echo"] = False
+    pst.pestpp_options["panther_echo"] = True
     pst.pestpp_options["mou_generator"] = "de"
     pst.pestpp_options["panther_agent_freeze_on_fail"] = True
     pst.pestpp_options["opt_stack_size"] = 10
@@ -377,7 +377,7 @@ def run_problem(test_case="zdt1",pop_size=100,noptmax=100):
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
     pst.control_data.noptmax = noptmax
     pst.pestpp_options["mou_population_size"] = pop_size
-    pst.pestpp_options["panther_echo"] = False
+    pst.pestpp_options["panther_echo"] = True
     pst.pestpp_options["mou_generator"] = "de"
     pst.pestpp_options["panther_agent_freeze_on_fail"] = True
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
@@ -465,7 +465,8 @@ def plot_results(master_d):
     plt.close("all")
 
 
-def run_problem_chance(test_case="zdt1",pop_size=100,noptmax=100,stack_size=50,chance_points="single"):
+def run_problem_chance(test_case="zdt1",pop_size=100,noptmax=100,stack_size=50,
+                       chance_points="single",recalc=100):
     
     test_d = setup_problem(test_case,additive_chance=True)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
@@ -474,8 +475,9 @@ def run_problem_chance(test_case="zdt1",pop_size=100,noptmax=100,stack_size=50,c
     pst.pestpp_options["opt_risk"] = 0.95
     pst.pestpp_options["opt_stack_size"] = stack_size
     pst.pestpp_options["opt_chance_points"] = chance_points
-    pst.pestpp_options["panther_echo"] = False
+    pst.pestpp_options["panther_echo"] = True
     pst.pestpp_options["mou_generator"] = "de"
+    pst.pestpp_options["opt_recalc_chance_every"] = recalc
     pst.write(os.path.join(test_d,"{0}.pst".format(test_case)))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
     master_d = test_d.replace("template","master_chance")
@@ -542,7 +544,7 @@ def test_sorting_fake_problem():
 def start_workers(case="srn"):
     pyemu.os_utils.start_workers(os.path.join("mou_tests","{0}_template".format(case)),
                                  exe_path, "{0}.pst".format(case),
-                                  num_workers=35, worker_root="mou_tests",
+                                  num_workers=25, worker_root="mou_tests",
                                   port=4004)
 
 def run_single_obj_sch_prob():
@@ -554,7 +556,7 @@ def run_single_obj_sch_prob():
     pst.write(os.path.join(test_d,"sch.pst"))
     pst.control_data.noptmax = 100
     pst.pestpp_options["mou_population_size"] = 50
-    pst.pestpp_options["panther_echo"] = False
+    pst.pestpp_options["panther_echo"] = True
     pst.pestpp_options["mou_generator"] = "de"
     pst.pestpp_options["panther_agent_freeze_on_fail"] = True
     pst.pestpp_options["opt_stack_size"] = 10
@@ -632,10 +634,9 @@ if __name__ == "__main__":
     #   plot_results(master_d)
 
     #setup_problem("srn",additive_chance=True)
-    #master_d = run_problem_chance("srn",noptmax=3,chance_points="all",pop_size=10,stack_size=10)
+    #master_d = run_problem_chance("srn",noptmax=5,chance_points="all",pop_size=10,stack_size=10,recalc=3)
     #plot_results(os.path.join("mou_tests","zdt6_master"))
 
-    #master_d = test_zdt("zdt2",noptmax=3)
     #master_d = os.path.join("mou_tests","zdt6_master")
     #plot_results(master_d)
     #for case in ["zdt1","zdt2","zdt3","zdt4","zdt6","sch","srn","constr"]:
@@ -643,8 +644,6 @@ if __name__ == "__main__":
     #  plot_results(master_d)
 
     #setup_problem("srn",additive_chance=True)
-    #master_d = test_zdt_chance("zdt1",noptmax=100)
-    #plot_zdt_results(os.path.join("mou_tests","zdt3_master"))
     #setup_problem("zdt1",30, additive_chance=True)
     #test_sorting_fake_problem()
     start_workers()

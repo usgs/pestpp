@@ -1742,7 +1742,7 @@ bool Constraints::should_update_chance(int iter)
 		return false;
 	if (std_weights)
 		return false;
-	if (iter == 1)
+	if (iter == 0)
 	{
 		if (use_fosm)
 			return true;
@@ -1751,7 +1751,7 @@ bool Constraints::should_update_chance(int iter)
 		else
 			return true;
 	}
-	else if ((iter + 1) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)
+	else if ((iter) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)
 		return true;
 	return false;
 }
@@ -2007,7 +2007,8 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 	//otherwise, process some stack runs
 	else
 	{
-
+		if (stack_runs_processed)
+			return;
 		process_stack_runs(run_mgr_ptr,iter);
 
 	}
@@ -2092,6 +2093,7 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 		count = count + _stack_pe_run_map.size();
 	}
 	cout << "...adding " << count << " runs nested stack-based chance constraints" << endl;
+	stack_runs_processed = false;
 }
 
 map<int, int> Constraints::add_stack_runs(int iter, ParameterEnsemble& _stack_pe, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)

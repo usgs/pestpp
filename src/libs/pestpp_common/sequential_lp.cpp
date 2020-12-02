@@ -1011,7 +1011,7 @@ void sequentialLP::iter_presolve()
 			pest_utils::read_res(res_filename, current_constraints_sim);
 			f_rec << "done" << endl;
 			cout << "done" << endl;
-			if ((constraints.should_update_chance(slp_iter)) && (!constraints.get_use_fosm()))
+			if ((constraints.should_update_chance(slp_iter-1)) && (!constraints.get_use_fosm()))
 				constraints.add_runs(slp_iter, current_pars,current_constraints_sim, run_mgr_ptr);
 			
 
@@ -1048,7 +1048,7 @@ void sequentialLP::iter_presolve()
 			if (find(ext_dv_names.begin(), ext_dv_names.end(), name) == ext_dv_names.end())
 				names_to_run.push_back(name);
 		}
-		if ((constraints.should_update_chance(slp_iter)) && (constraints.get_use_fosm()))
+		if ((constraints.should_update_chance(slp_iter-1)) && (constraints.get_use_fosm()))
 		{
 				//names_to_run.insert(names_to_run.end(), adj_par_names.begin(), adj_par_names.end());
 				vector<string> fosm_par_names = constraints.get_fosm_par_names();
@@ -1096,7 +1096,7 @@ void sequentialLP::iter_presolve()
 			throw_sequentialLP_error("failed to calc derviatives for the following decision vars: ", failed);
 		}
 
-		if ((constraints.should_update_chance(slp_iter)) && (!constraints.get_use_fosm()))
+		if ((constraints.should_update_chance(slp_iter-1)) && (!constraints.get_use_fosm()))
 		{
 			constraints.add_runs(slp_iter, current_pars, current_constraints_sim, run_mgr_ptr);
 		}
