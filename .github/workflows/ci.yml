@@ -77,23 +77,6 @@ jobs:
     - name: PESTPP exe install
       shell: bash -l {0}
       run: |
-        if [[ ! -d "$HOME/.local/bin" ]]; then
-            mkdir -p "$HOME/.local/bin";
-        fi
-        # copy modflow bins to local dir to add to PATH later
-        if [ "$RUNNER_OS" == "Windows" ]; then
-            d="win"
-        elif [ "$RUNNER_OS" == "macOS" ]; then
-            d="mac"
-        elif [ "$RUNNER_OS" == "Linux" ]; then
-            d="linux"
-        else
-            d="unexpectedos"
-            exit 1
-        fi
-        cp -r bin/$d/. "$HOME/.local/bin/"
-        git clone -b develop --depth 1 https://github.com/usgs/pestpp
-        cd pestpp
         mkdir build && cd build
         if [[ "$RUNNER_OS" == "Windows" ]]; then
             cmake -GNinja -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DCMAKE_BUILD_TYPE=Release ..
@@ -102,14 +85,8 @@ jobs:
             cmake -DCMAKE_BUILD_TYPE=Release ..
             make -j2
         fi
-        # cd pestpp/src
-        # bindir=../../../../bin/linux COMPILER=gcc CXX=g++ FC=gfortran STATIC=no make -j 20 install
         cd ..
-        # do we also need to cp to os specific within .local/bin/? probs...
-        find bin -maxdepth 1 -type f -exec cp {} $HOME/.local/bin/. \;
-        # cp -r bin ../bin
-        cd ..
-    
+  
     - name: Install Flopy & pyemu?
       shell: bash -l {0}
       run: |
