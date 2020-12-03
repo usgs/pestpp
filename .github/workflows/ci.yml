@@ -107,6 +107,7 @@ jobs:
     - name: catch empty
       if: ${{ matrix.test_script }} != ""
       ${{ matrix.test_script }} = "basic_test.py"
+      if: ${{ matrix.test_dir }} != ""
       ${{ matrix.test_dir }} = "benchmarks"
 
     - name: ${{ matrix.test_script }}
