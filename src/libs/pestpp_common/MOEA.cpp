@@ -1259,6 +1259,7 @@ void MOEA::initialize()
 				icol = 0;
 			}
 		}
+		frec << endl;
 	}
 	//otherwise, just use all adjustable parameters as dec vars
 	else

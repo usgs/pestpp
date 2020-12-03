@@ -1204,8 +1204,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "glm_debug_lamb_fail: " << glm_debug_lamb_fail << endl;
 	os << "glm_debug_real_fail: " << glm_debug_real_fail << endl;
 	os << "glm_accept_mc_phi: " << glm_accept_mc_phi << endl;
-	os << "glm_rebase_super: " << glm_rebase_super;
-	os << "glm_iter_mc: " << glm_iter_mc;
+	os << "glm_rebase_super: " << glm_rebase_super << endl;
+	os << "glm_iter_mc: " << glm_iter_mc << endl;
 
 
 	if (global_opt == OPT_DE)

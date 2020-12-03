@@ -322,7 +322,7 @@ def plot_pr_real():
 
 def start_workers_for_debug(with_master=True):
     t_d = os.path.join("mou_tests", "henry_template")
-    m_d = os.path.join("mou_tests","henry_master_test")
+    m_d = os.path.join("mou_tests","henry_master_chance_70")
     if with_master:
         if os.path.exists(m_d):
             shutil.rmtree(m_d)
@@ -334,7 +334,7 @@ def start_workers_for_debug(with_master=True):
         pst.pestpp_options["opt_recalc_chance_every"] = 100
         pst.pestpp_options["mou_population_size"] = 100
         pst.pestpp_options["opt_chance_points"] = "all"
-        pst.pestpp_options["opt_risk"] = 0.95
+        pst.pestpp_options["opt_risk"] = 0.70
 
         pst.write(os.path.join(m_d,"henry.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path, "henry.pst",
@@ -433,7 +433,7 @@ if __name__ == "__main__":
     #run_and_plot_results(os.path.join("mou_tests", "henry_temp"))
     #test_add_artrch("henry_template",write_tpl=False)
     #test_process_unc("henry_temp")
-    setup_pst()
+    #setup_pst()
     #run_and_plot_results(os.path.join("mou_tests", "henry_template"))
     start_workers_for_debug(True)
     #plot_pr_real()
