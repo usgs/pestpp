@@ -1433,6 +1433,8 @@ void MOEA::initialize()
 	file_manager.rec_ofstream() << ss.str();
 	cout << ss.str();
 
+	risk_obj = pest_scenario.get_pestpp_options().get_mou_risk_obj();
+	
 	if (pi_obj_names.size() > 0)
 	{
 		ss.str("");
@@ -1448,6 +1450,26 @@ void MOEA::initialize()
 	
 	if (obs_obj_names.size() + pi_obj_names.size() > 5)
 		message(1, "WARNING: more than 5 objectives, this is pushing the limits!");
+
+
+	if (risk_obj)
+	{
+		ss.str("");
+		ss << "'mou_risk_objective' is true, augmenting decision variables with '" << RISK_NAME << "' and adding prior info objective";
+		/*file_manager.rec_ofstream() << ss.str();
+		cout << ss.str();
+		dv_names.push_back(RISK_NAME);
+		pi_obj_names.push_back(RISK_NAME);
+		PIAtom pia(RISK_NAME, false, 1.0);
+		PriorInformationRec pir(0.0, 1.0, "greater_than", vector<PIAtom>{pia});
+		pest_scenario.get_prior_info_ptr()->AddRecord(RISK_NAME, &pir);*/
+		if (find(dv_names.begin(), dv_names.end(), RISK_NAME) == dv_names.end())
+			throw_moea_error(RISK_NAME + " not found in decision variable names");
+		if (find(pi_obj_names.begin(), pi_obj_names.end(), RISK_NAME) == pi_obj_names.end())
+			throw_moea_error(RISK_NAME + " not found in prior information objective names");
+		//TODO check the bounds of the risk parameter
+
+	}
 
 	constraints.initialize(dv_names, numeric_limits<double>::max());
 	constraints.initial_report();

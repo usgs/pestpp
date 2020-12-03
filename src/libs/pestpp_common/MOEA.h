@@ -18,7 +18,7 @@
 
 const string POP_SUM_TAG = "pareto.summary.csv";
 const string ARC_SUM_TAG = "pareto.archive.summary.csv";
-
+const string RISK_NAME = "_RISK_";
 class ParetoObjectives
 {
 public:
@@ -119,7 +119,7 @@ private:
 	map<string, double> obj_dir_mult;
 
 	map<string, map<string, double>> previous_obj_summary;
-
+	bool risk_obj;
 
 	//these two instances are passed as pointers to the constraints
 	//Parameters effective_constraint_pars;

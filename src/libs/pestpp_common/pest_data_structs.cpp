@@ -1081,10 +1081,10 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 	
 		mou_objectives.clear();
 		vector<string> tok;
-		tokenize(value, tok, ",");
+		tokenize(value, tok, ",		");
 		for (const auto& obj : tok)
 		{
-			mou_objectives.push_back(upper_cp(obj));
+			mou_objectives.push_back(upper_cp(strip_cp(obj)));
 		}
 		return true;
 	}
@@ -1101,6 +1101,11 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		return true;
 	}
 
+	else if (key == "MOU_RISK_OBJECTIVE")
+	{
+		mou_risk_obj = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
 	return false;
 }
 
@@ -1277,8 +1282,8 @@ void PestppOptions::summary(ostream& os) const
 	for (auto obj : mou_objectives)
 		os << obj << endl;
 	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
+	os << "mou_risk_objective: " << mou_risk_obj << endl;
 	
-
 	os << endl << "...pestpp-ies options:" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
 	os << "ies_observation_ensemble: " << ies_obs_csv << endl;
@@ -1421,6 +1426,7 @@ void PestppOptions::set_defaults()
 	set_mou_obs_population_restart_file("");
 	set_mou_objectives(vector<string>());
 	set_mou_max_archive_size(5000);
+	set_mou_risk_obj(false);
 	
 
 	set_ies_par_csv("");

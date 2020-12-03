@@ -935,8 +935,25 @@ double Constraints::get_max_constraint_change(Observations& current_obs, Observa
 //	return get_chance_shifted_constraints(*current_constraints_sim_ptr);
 //}
 
-ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe)
+ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe, string risk_obj)
 {
+	map<string, double> risk_map;
+	for (auto& rname : pe.get_real_names())
+	{
+		risk_map[rname] = risk;
+	}
+	map<string, int> vm = pe.get_var_map();
+	if (risk_obj.size() > 0)
+	{
+		if (vm.find(risk_obj) == vm.end())
+			throw_constraints_error("couldnt find 'risk_obj' " + risk_obj + " in pe var names");
+		Eigen::VectorXd risk_vec = pe.get_var_vector(risk_obj);
+		int i = 0;
+		for (auto& rname : pe.get_real_names())
+		{
+			risk_map[rname] = risk_vec[i];
+		}
+	}
 	ObservationEnsemble shifted_oe(oe);//copy
 	ofstream& frec = file_mgr_ptr->rec_ofstream();
 	if (stack_oe_map.size() == 0)
@@ -949,11 +966,12 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 		Observations sim, sim_shifted;
 		Eigen::VectorXd real_vec;
 		vector<string> onames = shifted_oe.get_var_names();
+		vector<string> rnames = shifted_oe.get_real_names();
 		for (int i = 0; i < shifted_oe.shape().first; i++)
 		{
 			real_vec = shifted_oe.get_real_vector(i);
 			sim.update_without_clear(onames, real_vec);
-			sim_shifted = get_chance_shifted_constraints(sim);
+			sim_shifted = get_chance_shifted_constraints(sim, risk_map[rnames[i]]);
 			shifted_oe.replace(i, sim_shifted);
 		}
 
@@ -1001,7 +1019,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 			{
 				real_vec = shifted_oe.get_real_vector(real_name);
 				sim.update_without_clear(onames, real_vec);
-				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[real_name],true);
+				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[real_name],risk_map[real_name], true);
 				shifted_oe.replace(real_map[real_name], sim_shifted);
 			}
 		}
@@ -1043,11 +1061,15 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 				//todo add some output here to report the mapping results
 				frec << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
 				cout << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
-				
+				double _risk = risk;
+				if (risk_obj.size() > 0)
+				{	
+					_risk = stack_pe_map[min_real_name][risk_obj];
+				}
 				real_vec = shifted_oe.get_real_vector(missing[i]);
 				sim.update_without_clear(onames, real_vec);
 				//this call uses the class stack_oe attribute;
-				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[min_real_name],true);
+				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[min_real_name],_risk,true);
 				shifted_oe.replace(real_map[missing[i]], sim_shifted);
 			}
 		}
@@ -1056,6 +1078,14 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 }
 
 Observations Constraints::get_chance_shifted_constraints(Observations& current_obs)
+{
+	return get_chance_shifted_constraints(current_obs, risk);
+
+}
+
+
+
+Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, double _risk)
 {
 	/* get the simulated constraint values with the chance shift applied*/
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
@@ -1066,7 +1096,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	double new_constraint_val, old_constraint_val, required_val;
 	double pr_offset, pt_offset;
 	Observations shifted_obs;
-
+	double _probit_val = get_probit(_risk);
 	if (use_fosm)
 	{
 		for (auto& name : ctl_ord_obs_constraint_names)
@@ -1074,8 +1104,8 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 			prior_constraint_stdev[name] = sqrt(prior_const_var[name]);
 			post_constraint_stdev[name] = sqrt(post_const_var[name]);
 			//the offset (shift) is just the stdev * the risk-based probit value
-			pr_offset = probit_val * prior_constraint_stdev[name];
-			pt_offset = probit_val * post_constraint_stdev[name];
+			pr_offset = _probit_val * prior_constraint_stdev[name];
+			pt_offset = _probit_val * post_constraint_stdev[name];
 			old_constraint_val = current_obs.get_rec(name);
 			required_val = constraints_obs[name];
 
@@ -1126,12 +1156,12 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 			}
 			oe_stack_mean = oe_stack_mean / double(stack_oe_map.size());
 			ObservationEnsemble _mean_stack(&pest_scenario, &rand_gen,oe_stack_mean, real_names,ctl_ord_obs_constraint_names);
-			shifted_obs = get_chance_shifted_constraints(current_obs, _mean_stack);
+			shifted_obs = get_chance_shifted_constraints(current_obs, _mean_stack, _risk);
 
 		}
 
 		else
-			shifted_obs = get_chance_shifted_constraints(current_obs, stack_oe);
+			shifted_obs = get_chance_shifted_constraints(current_obs, stack_oe, _risk);
 		
 	}
 	vector<string> names = shifted_obs.get_keys();
@@ -1142,7 +1172,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 }
 
 
-Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe, bool full_obs)
+Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe, double _risk, bool full_obs)
 {
 	double old_constraint_val, required_val, pt_offset, new_constraint_val;
 
@@ -1156,9 +1186,9 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	//get the inde (which realization number) represents the risk value according to constraint sense
 	//
 	//the "less than" realization index is just the risk value times the number of reals
-	int lt_idx = int(risk * cur_num_reals);
+	int lt_idx = int(_risk * cur_num_reals);
 	//the greater than index is the opposite direction
-	int gt_idx = int((1.0 - risk) * cur_num_reals);
+	int gt_idx = int((1.0 - _risk) * cur_num_reals);
 	//the equality contraint risk index
 	int eq_idx = int(0.5 * cur_num_reals);
 	//get the mean-centered anomalies - we want to subtract off the mean 
@@ -1370,11 +1400,15 @@ double  Constraints::ErfInv2(double x)
 	return(sgn * sqrtf(-tt1 + sqrtf(tt1 * tt1 - tt2)));
 }
 
-
 double Constraints::get_probit()
 {
+	return get_probit(risk);
+}
+
+double Constraints::get_probit(double _risk)
+{
 	/* the probit function estimate - needed for the fosm-basd chance constraints*/
-	double output = sqrt(2.0) * ErfInv2((2.0 * risk) - 1.0);
+	double output = sqrt(2.0) * ErfInv2((2.0 * _risk) - 1.0);
 	return output;
 }
 

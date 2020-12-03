@@ -145,8 +145,9 @@ public:
 	//Observations get_chance_shifted_constraints();
 	//get risk-shifted simulated constraint values using _constraints_sim arg
 	Observations get_chance_shifted_constraints(Observations& _constraints_sim);
+	Observations get_chance_shifted_constraints(Observations& _constraints_sim, double _risk);
 
-	ObservationEnsemble get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe);
+	ObservationEnsemble get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe, string risk_obj = string());
 
 private:
 	Pest& pest_scenario;
@@ -174,7 +175,7 @@ private:
 	map<string, ObservationEnsemble> stack_oe_map;
 	map<string, Parameters> stack_pe_map;
 
-	Observations get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe, bool full_obs = false);
+	Observations get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe, double _risk, bool full_obs = false);
 
 	PriorInformation* null_prior = new PriorInformation();
 	PriorInformation constraints_pi;
@@ -215,6 +216,7 @@ private:
 	void throw_constraints_error(string message, const set<string>& messages, bool should_throw = true);
 
 	//get the risk-shift value
+	double get_probit(double _risk);
 	double get_probit();
 	double ErfInv2(double x);
 
