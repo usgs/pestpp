@@ -30,12 +30,7 @@ jobs:
     # - name: Setup Ninja
       # if: ${{ runner.os == 'Windows' }} 
     - uses: seanmiddleditch/gha-setup-ninja@master
-
-    - name: catch empty
-      if ${{ matrix.test_script }} == ""
-      exit 0
-
-
+  
     - name: Cache Miniconda
       uses: actions/cache@v2.1.0
       env:
@@ -100,11 +95,19 @@ jobs:
         python setup.py install
         cd ..
 
+
+
     
     - name: clone test repo ${{ matrix.test_repo }}
+      if ${{ matrix.test_repo }} != ""
       shell: bash -l {0}
       run: |
         git clone -b develop --depth 1 ${{ matrix.test_repo }}
+
+    - name: catch empty
+      if ${{ matrix.test_script }} != ""
+      ${{ matrix.test_script }} = "basic_test.py"
+      ${{ matrix.test_dir }} = "benchmarks"
 
     - name: ${{ matrix.test_script }}
       shell: bash -l {0}
