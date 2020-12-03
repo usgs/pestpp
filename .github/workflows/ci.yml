@@ -23,7 +23,6 @@ jobs:
         #   - test_script: opt_test.py
         #   - test_repo: "https://github.com/pestpp/pestpp-opt_benchmarks"
         #   - test_dir: "pestpp-opt_benchmarks"
-        https://github.com/modflowpy/flopy.git
         
         env:
           - { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "basic_test.py"}
