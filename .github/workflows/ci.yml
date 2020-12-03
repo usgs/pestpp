@@ -32,8 +32,12 @@ jobs:
     - uses: seanmiddleditch/gha-setup-ninja@master
 
     - name: catch empty
-    if ${{ matrix.test_repo}} == "":
-      exit 0
+      shell: bash -l {0}
+      run: |
+        if [ "$TEST_SCRIPT" == "" ]; then
+          exit 0
+        fi
+
 
     - name: Cache Miniconda
       uses: actions/cache@v2.1.0
