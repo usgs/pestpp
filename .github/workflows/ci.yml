@@ -32,11 +32,8 @@ jobs:
     - uses: seanmiddleditch/gha-setup-ninja@master
 
     - name: catch empty
-      shell: bash -l {0}
-      run: |
-        if [ "$TEST_SCRIPT" == "" ]; then
-          exit 0
-        fi
+      if ${{ matrix.test_script }}
+      exit 0
 
 
     - name: Cache Miniconda
