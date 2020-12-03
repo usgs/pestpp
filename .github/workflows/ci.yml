@@ -59,7 +59,7 @@ jobs:
     #   if: ${{ runner.os == 'Windows' }} 
     #   uses: lukka/get-cmake@latest
 
-     - name: clone test repo ${{ env.test_repo }}
+    - name: clone test repo ${{ env.test_repo }}
       shell: bash -l {0}
       run: |
         git clone --depth 1 ${{ env.test_repo }}
