@@ -31,6 +31,9 @@ jobs:
       # if: ${{ runner.os == 'Windows' }} 
     - uses: seanmiddleditch/gha-setup-ninja@master
 
+    - name: catch empty
+    if ${{ matrix.test_repo}} == "":
+      exit 0
 
     - name: Cache Miniconda
       uses: actions/cache@v2.1.0
