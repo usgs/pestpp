@@ -65,10 +65,10 @@ jobs:
         fi
         cd ..
 
-    - name: clone test repo ${{ matrix.test_repo }}
+    - name: clone test repo ${{ env.test_repo }}
       shell: bash -l {0}
       run: |
-        git clone -b develop --depth 1 ${{ matrix.test_repo }}
+        git clone -b develop --depth 1 ${{ env.test_repo }}
 
     # Standard python fails on windows without GDAL installation
     # Using custom bash shell ("shell: bash -l {0}") with Miniconda
