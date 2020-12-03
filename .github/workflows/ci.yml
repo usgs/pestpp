@@ -1,4 +1,4 @@
-name: pyemu continuous integration
+name: pestpp continuous integration
 
 on: 
   schedule:
@@ -7,8 +7,8 @@ on:
   pull_request:
 
 jobs:
-  pyemuCI:
-    name: autotests
+  pestppCI:
+    name: benchmarks
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
