@@ -95,13 +95,11 @@ jobs:
         python setup.py install
         cd ..
         pip install https://github.com/modflowpy/pymake/zipball/master
+        git clone -b develop --depth 1 https://github.com/pypest/pyemu.git
+        cd pyemu
         python setup.py install
+        cd ..
 
-    - name: Add executables directory to path
-      shell: bash
-      run: |
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-        ls $GITHUB_PATH
     
     - name: clone test repo ${{ matrix.test_repo }}
       shell: bash -l {0}
