@@ -14,15 +14,19 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest] 
-        python-version: [3.8] # , 3.7, 3.6]
-        run-type: [std]
-        test_repo: [""]
-        test_dir: [""]
-        test_script: [""]
-        include:
-          - test_script: opt_test.py
-          - test_repo: "https://github.com/pestpp/pestpp-opt_benchmarks"
-          - test_dir: "pestpp-opt_benchmarks"
+        # python-version: [3.8] # , 3.7, 3.6]
+        # run-type: [std]
+        # test_repo: [""]
+        # test_dir: [""]
+        # test_script: [""]
+        # include:
+        #   - test_script: opt_test.py
+        #   - test_repo: "https://github.com/pestpp/pestpp-opt_benchmarks"
+        #   - test_dir: "pestpp-opt_benchmarks"
+        env:
+          - { TEST_DIR: "benchmarks", TEST_REPO: "https://github.com/usgs/pestpp", TEST_SCRIPT: "basic_test.py"}
+          - { TEST_DIR: "pestpp_opt-benchmarks", TEST_REPO: "https://github.com/pestpp/pestpp_opt-benchmarks", TEST_SCRIPT: "opt_test.py"}
+        env: ${{ matrix.env }}
 
     steps:
 
