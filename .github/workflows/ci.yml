@@ -105,12 +105,12 @@ jobs:
         git clone -b develop --depth 1 ${{ matrix.test_repo }}
 
     - name: catch empty script
-      if: ${{ matrix.test_script }} != ""
+      if: ${{ matrix.test_script }} == ""
       ${{ matrix.test_script }} = "basic_test.py"
 
 
     - name: catch empty dir
-      if: ${{ matrix.test_dir }} != ""
+      if: ${{ matrix.test_dir }} == ""
       ${{ matrix.test_dir }} = "benchmarks"
 
     - name: ${{ matrix.test_script }}
