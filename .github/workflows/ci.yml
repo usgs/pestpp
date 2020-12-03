@@ -52,18 +52,18 @@ jobs:
     #   if: ${{ runner.os == 'Windows' }} 
     #   uses: lukka/get-cmake@latest
 
-   - name: PESTPP exe install
-    shell: bash -l {0}
-    run: |
-      mkdir build && cd build
-      if [[ "$RUNNER_OS" == "Windows" ]]; then
-          cmake -GNinja -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DCMAKE_BUILD_TYPE=Release ..
-          ninja
-      else
-          cmake -DCMAKE_BUILD_TYPE=Release ..
-          make -j2
-      fi
-      cd ..
+    - name: PESTPP exe install
+      shell: bash -l {0}
+      run: |
+        mkdir build && cd build
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cmake -GNinja -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DCMAKE_BUILD_TYPE=Release ..
+            ninja
+        else
+            cmake -DCMAKE_BUILD_TYPE=Release ..
+            make -j2
+        fi
+        cd ..
 
     # Standard python fails on windows without GDAL installation
     # Using custom bash shell ("shell: bash -l {0}") with Miniconda
