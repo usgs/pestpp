@@ -26,7 +26,7 @@ jobs:
         env:
           - { TEST_DIR: "benchmarks", TEST_REPO: "https://github.com/usgs/pestpp", TEST_SCRIPT: "basic_test.py"}
           - { TEST_DIR: "pestpp_opt-benchmarks", TEST_REPO: "https://github.com/pestpp/pestpp_opt-benchmarks", TEST_SCRIPT: "opt_test.py"}
-        env: ${{ matrix.env }}
+        #env: ${{ matrix.env }}
 
     steps:
 
