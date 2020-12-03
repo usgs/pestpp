@@ -65,6 +65,11 @@ jobs:
         fi
         cd ..
 
+    - name: clone test repo ${{ matrix.test_repo }}
+      shell: bash -l {0}
+      run: |
+        git clone -b develop --depth 1 ${{ matrix.test_repo }}
+
     # Standard python fails on windows without GDAL installation
     # Using custom bash shell ("shell: bash -l {0}") with Miniconda
     - name: Setup Miniconda
@@ -101,10 +106,9 @@ jobs:
         python setup.py install
         cd ..
     
-    - name: clone test repo ${{ matrix.test_repo }}
+    - name: run test script ${{ matrix.test_script }} in ${{ matrix.test_dir }}
       shell: bash -l {0}
       run: |
-        git clone -b develop --depth 1 ${{ matrix.test_repo }}
         cd ${{ matrix.test_dir }}
         nosetests -v ${{ matrix.test_script }}
         cd
