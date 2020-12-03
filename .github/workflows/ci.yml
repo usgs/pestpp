@@ -14,8 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest] 
-        # python-version: [3.8] # , 3.7, 3.6]
-        # run-type: [std]
+        python-version: [3.8] # , 3.7, 3.6]
+        run-type: [std]
         # test_repo: [""]
         # test_dir: [""]
         # test_script: [""]
@@ -91,8 +91,6 @@ jobs:
           mamba env update --name pyemu --file etc/environment.yml
         fi
     
-   
-  
     - name: Install Flopy & pyemu?
       shell: bash -l {0}
       run: |
@@ -106,11 +104,11 @@ jobs:
         python setup.py install
         cd ..
     
-    - name: run test script ${{ matrix.test_script }} in ${{ matrix.test_dir }}
+    - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
       shell: bash -l {0}
       run: |
-        cd ${{ matrix.test_dir }}
-        nosetests -v ${{ matrix.test_script }}
+        cd ${{ env.test_dir }}
+        nosetests -v ${{ env.test_script }}
         cd
 
         
