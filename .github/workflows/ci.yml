@@ -112,6 +112,18 @@ jobs:
         python setup.py install
         cd ..
     
+    - name: aux bin path hackery
+      shell: bash -l {0}
+      run: |
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo "$HOME/test_bin/win" >> $GITHUB_PATH
+            ls $GITHUB_PATH
+        else
+            echo "$HOME/test_bin/linux" >> $GITHUB_PATH
+            ls $GITHUB_PATH
+        fi
+        cd ..
+
     - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
       shell: bash -l {0}
       run: |
