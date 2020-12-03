@@ -16,19 +16,22 @@ jobs:
         os: [windows-latest, ubuntu-latest] 
         python-version: [3.8] # , 3.7, 3.6]
         run-type: [std]
-        test-scipt: [
-              "base_test.py"
-            ]
-        test_repo: [
-              "https://github.com/usgs/pestpp"
-            ]
-        test_dir: [
-              "benchmarks"
-            ]
-        # include:
-        #   - test_script: opt_test.py
-        #   - test_repo: "https://github.com/pestpp/pestpp-opt_benchmarks"
-        #   - test_dir: "pestpp-opt_benchmarks"
+        # test-scipt: [
+        #       "base_test.py"
+        #     ]
+        # test_repo: [
+        #       "https://github.com/usgs/pestpp"
+        #     ]
+        # test_dir: [
+        #       "benchmarks"
+        #     ]
+        test-scipt: 
+        test_repo: 
+        test_dir: 
+        include:
+          - test_script: opt_test.py
+          - test_repo: "https://github.com/pestpp/pestpp-opt_benchmarks"
+          - test_dir: "pestpp-opt_benchmarks"
 
     steps:
     - uses:  actions/checkout@v2.3.4 
