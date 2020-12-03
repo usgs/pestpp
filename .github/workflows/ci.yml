@@ -26,13 +26,13 @@ jobs:
         
         env:
           - { test_dir: "benchmarks", test_repo: "https://github.com/usgs/pestpp", test_script: "basic_tests.py"}
-          - { test_dir: "pestpp_opt-benchmarks", test_repo: "https://github.com/pestpp/pestpp-opt_benchmarks", test_script: "opt_test.py"}
-          - { test_dir: "pestpp_ies-benchmarks", test_repo: "https://github.com/pestpp/pestpp_ies-benchmarks", test_script: "ies_test_base.py"}
-          - { test_dir: "pestpp_ies-benchmarks", test_repo: "https://github.com/pestpp/pestpp_ies-benchmarks", test_script: "ies_test_part1.py"}
-          - { test_dir: "pestpp_ies-benchmarks", test_repo: "https://github.com/pestpp/pestpp_ies-benchmarks", test_script: "ies_test_part2.py"}
-          - { test_dir: "pestpp_ies-benchmarks", test_repo: "https://github.com/pestpp/pestpp_ies-benchmarks", test_script: "ies_test_part3.py"}
-          - { test_dir: "pestpp_ies-benchmarks", test_repo: "https://github.com/pestpp/pestpp_ies-benchmarks", test_script: "ies_test_part4.py"}
-          - { test_dir: "pestpp_glm-benchmarks", test_repo: "https://github.com/pestpp/pestpp_glm-benchmarks", test_script: "glm_test_base.py"}
+          - { test_dir: "pestpp-opt_benchmarks", test_repo: "https://github.com/pestpp/pestpp-opt_benchmarks", test_script: "opt_test.py"}
+          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp_ies-benchmarks", test_script: "ies_test_base.py"}
+          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp_ies-benchmarks", test_script: "ies_test_part1.py"}
+          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp_ies-benchmarks", test_script: "ies_test_part2.py"}
+          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp_ies-benchmarks", test_script: "ies_test_part3.py"}
+          - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp_ies-benchmarks", test_script: "ies_test_part4.py"}
+          - { test_dir: "pestpp-glm_benchmarks", test_repo: "https://github.com/pestpp/pestpp_glm-benchmarks", test_script: "glm_test_base.py"}
     env: ${{ matrix.env }}
 
     steps:
