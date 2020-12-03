@@ -32,7 +32,7 @@ jobs:
     - uses: seanmiddleditch/gha-setup-ninja@master
 
     - name: catch empty
-      if ${{ matrix.test_script }}
+      if ${{ matrix.test_script }} == ""
       exit 0
 
 
