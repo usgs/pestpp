@@ -1021,10 +1021,12 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (tokens.empty())
 			{
 				//skip blank line
+				lnum--;
 			}
 			else if (line[0] == '#')
 			{
-
+				
+				lnum--;
 			}
 			else if (line_upper.substr(0, 2) == "++")
 			{
