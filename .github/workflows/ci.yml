@@ -96,17 +96,13 @@ jobs:
         cd ..
     
     - name: clone test repo ${{ matrix.test_repo }}
-      if: ${{ matrix.test_repo }} != ""
       shell: bash -l {0}
       run: |
         git clone -b develop --depth 1 ${{ matrix.test_repo }}
-
-    - name: catch empty script
-      if: ${{ matrix.test_script }} != ""
-      shell: bash -l {0}
-      run: |
         cd ${{ matrix.test_dir }}
         nosetests -v ${{ matrix.test_script }}
         cd
+
+        
 
 
