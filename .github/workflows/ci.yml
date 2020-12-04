@@ -116,11 +116,11 @@ jobs:
       shell: bash -l {0}
       run: |
         if [[ "$RUNNER_OS" == "Windows" ]]; then
-            export PATH="$HOME/benchmarks/test_bin/linux:$PATH"
-            echo $PATH
-        else
             set PATH=%PATH%;..\..\..\test_bin\win;..\..\test_bin\win;
             echo %PATH%
+        else
+            export PATH="$HOME/benchmarks/test_bin/linux:$PATH"
+            echo $PATH
         fi
         cd ..
 
