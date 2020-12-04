@@ -33,7 +33,7 @@ jobs:
           - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "ies_test_part3.py"}
           - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "ies_test_part4.py"}
           - { test_dir: "pestpp-glm_benchmarks", test_repo: "https://github.com/pestpp/pestpp-glm_benchmarks", test_script: "glm_test_base.py"}
-          - { test_dir: "pestpp-gmou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests.py"}
+          - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests.py"}
     env: ${{ matrix.env }}
 
     steps:
