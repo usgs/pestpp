@@ -125,9 +125,9 @@ jobs:
     #     cd ..
 
 
-   - name: aux bin path hackery
-     if: runner.os != 'Windows'
-     echo "$HOME/benchmarks/test_bin/linux" >> $GITHUB_PATH
+    - name: aux bin path hackery
+      if: runner.os != 'Windows'
+      echo "$HOME/benchmarks/test_bin/linux" >> $GITHUB_PATH
 
     - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
       shell: bash -l {0}
