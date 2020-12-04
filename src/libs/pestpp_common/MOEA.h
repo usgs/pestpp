@@ -149,7 +149,7 @@ private:
 	void message(int level, const string& _message, T extra);
 
 	void sanity_checks();
-	vector<int> run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op);
+	vector<int> run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance);
 
 	void queue_chance_runs(ParameterEnsemble& _dp);
 	ObservationEnsemble get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op);

@@ -569,11 +569,13 @@ def start_workers(case="srn"):
                                   num_workers=25, worker_root="mou_tests",
                                   port=4004)
 
-def run_single_obj_sch_prob():
+def run_single_obj_sch_prob(risk_obj):
     test_d = os.path.join("mou_tests","sch_template")
-    setup_problem("sch",True)
+    setup_problem("sch",True,risk_obj=risk_obj)
     pst = pyemu.Pst(os.path.join(test_d,"sch.pst"))
     pst.pestpp_options["mou_objectives"] = "obj_1"
+    if risk_obj:
+        pst.pestpp_options["mou_objectives"] += ",_risk_"
     pst.observation_data.loc["obj_2","obsval"] = 2.0
     pst.write(os.path.join(test_d,"sch.pst"))
     pst.control_data.noptmax = 100
@@ -581,7 +583,9 @@ def run_single_obj_sch_prob():
     pst.pestpp_options["panther_echo"] = True
     pst.pestpp_options["mou_generator"] = "de"
     pst.pestpp_options["panther_agent_freeze_on_fail"] = True
-    pst.pestpp_options["opt_stack_size"] = 10
+    pst.pestpp_options["opt_chance_points"] = "all"
+    pst.pestpp_options["opt_recalc_chance_every"] = 100
+    pst.pestpp_options["opt_stack_size"] = 50
     pst.write(os.path.join(test_d,"sch.pst"))
     #pyemu.os_utils.run("{0} {1}.pst".format(exe_path,test_case),cwd=test_d)
     master_d = test_d.replace("template","master")
@@ -665,17 +669,17 @@ if __name__ == "__main__":
     #  master_d = run_problem_chance(case,noptmax=100)
     #  plot_results(master_d)
 
-    #setup_problem("srn",additive_chance=True, risk_obj=True)
+    setup_problem("water",additive_chance=True, risk_obj=True)
     #setup_problem("zdt1",30, additive_chance=True)
     #test_sorting_fake_problem()
-    start_workers()
+    #start_workers()
     #setup_problem("zdt1")
     #run_problem_chance_external_fixed("zdt1")
     #run_problem_chance("srn",noptmax=100,risk_obj=True)
     #plot_results(os.path.join("mou_tests","srn_master"))
     #setup_problem("constr")
     #run_problem("constr",noptmax=100)
-    #master_d = run_single_obj_sch_prob()
+    #master_d = run_single_obj_sch_prob(risk_obj=True)
     #master_d = os.path.join("mou_tests","sch_master")
     #plot_results_single(master_d)
     #setup_problem("ackley")

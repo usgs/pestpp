@@ -1074,10 +1074,11 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 	}
 }
 
-vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op)
+vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance)
 {
 	//queue up any chance related runs
-	queue_chance_runs(_dp);
+	if (allow_chance)
+		queue_chance_runs(_dp);
 
 	message(1, "running population of size ", _dp.shape().first);
 	stringstream ss;
@@ -1155,8 +1156,11 @@ vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _o
 	}
 
 	//do this here in case something is wrong, we know sooner than later
-	constraints.process_runs(run_mgr_ptr, iter);
-	constraints.update_chance_offsets();
+	if (allow_chance)
+	{
+		constraints.process_runs(run_mgr_ptr, iter);
+		constraints.update_chance_offsets();
+	}
 	return failed_real_indices;
 }
 
@@ -1472,12 +1476,13 @@ void MOEA::initialize()
 		file_manager.rec_ofstream() << ss.str();
 		cout << ss.str();
 
-		//TODO check the bounds of the risk parameter
+		//reset bounds of the risk parameter
 		double b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(RISK_NAME)->lbnd;
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(RISK_NAME)->lbnd = max(b,0.01);
 		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(RISK_NAME)->ubnd;
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(RISK_NAME)->ubnd = min(b, 0.99);
-		
+		//set this just to make sure everuything gets initialized right
+		pest_scenario.get_pestpp_options_ptr()->set_opt_risk(0.95);
 
 
 	}
@@ -1520,7 +1525,7 @@ void MOEA::initialize()
 		}
 		message(1, "running control file parameter values");
 
-		vector<int> failed_idxs = run_population(_pe, _oe);
+		vector<int> failed_idxs = run_population(_pe, _oe, false);
 		if (failed_idxs.size() != 0)
 		{
 			message(0, "control file parameter value run failed...bummer");
@@ -1679,7 +1684,7 @@ void MOEA::initialize()
 		performance_log->log_event("running initial population");
 		message(1, "running initial population of size", dp.shape().first);
 	
-		vector<int> failed = run_population(dp, op);
+		vector<int> failed = run_population(dp, op, true);
 		if (dp.shape().first == 0)
 			throw_moea_error(string("all members failed during initial population evaluation"));
 		
@@ -1895,7 +1900,7 @@ void MOEA::iterate_to_solution()
 		//run offspring thru the model while also running risk runs, possibly at many points in dec var space	
 		ObservationEnsemble new_op(&pest_scenario, &rand_gen);
 		new_op.reserve(new_dp.get_real_names(), op.get_var_names());
-		run_population(new_dp, new_op);
+		run_population(new_dp, new_op, true);
 		
 		
 

@@ -182,7 +182,18 @@ def setup_pst():
     # add artificial recharge basin dvs
     tpl_file = test_add_artrch(new_dir, write_tpl=True)
     df = pf.pst.add_parameters(os.path.join(new_dir,tpl_file),pst_path=".")
+    with open(os.path.join(new_dir,"risk.dat.tpl"),'w') as f:
+        f.write("ptf ~\n")
+        f.write("_risk_ ~   _risk_    ~\n")
+    pf.pst.add_parameters(os.path.join(new_dir,"risk.dat.tpl"),pst_path=".")
+
     par = pf.pst.parameter_data
+    par.loc["_risk_","pargp"] = "dv_pars"
+    par.loc["_risk_","parlbnd"] = 0.001
+    par.loc["_risk_", "parubnd"] = 0.999
+    par.loc["_risk_", "parval1"] = 0.5
+    par.loc["_risk_", "partrans"] = "none"
+
     par.loc[df.parnme,"pargp"] = "dv_pars"
     par.loc["ar_concen","parval1"] = 0.0
     par.loc["ar_concen", "parubnd"] = 35.0
@@ -224,9 +235,12 @@ def setup_pst():
     pf.pst.add_pi_equation(["ar_width"],obs_group="less_than",pilbl="ar_width")
     pf.pst.add_pi_equation(["ar_rate"], obs_group="less_than",pilbl="ar_rate")
     pf.pst.add_pi_equation(["ar_concen"], obs_group="greater_than",pilbl="ar_concen")
-    pf.pst.pestpp_options["mou_objectives"] = ["ar_width","ar_rate","ar_concen","pump_rate"]
+    pf.pst.add_pi_equation(["_risk_"], obs_group="greater_than",pilbl="_risk_")
+    pf.pst.pestpp_options["mou_objectives"] = ["ar_width","ar_rate","ar_concen","pump_rate", "_risk_"]
+
     pf.pst.pestpp_options["opt_dec_var_groups"] = "dv_pars"
     pf.pst.pestpp_options["panther_echo"] = True
+    pf.pst.pestpp_options["mou_risk_objective"] = True
     pf.pst.pestpp_options["mou_generator"] = "de"
     pf.pst.pestpp_options["mou_population_size"] = 100
 
@@ -433,9 +447,9 @@ if __name__ == "__main__":
     #run_and_plot_results(os.path.join("mou_tests", "henry_temp"))
     #test_add_artrch("henry_template",write_tpl=False)
     #test_process_unc("henry_temp")
-    #setup_pst()
+    setup_pst()
     #run_and_plot_results(os.path.join("mou_tests", "henry_template"))
-    start_workers_for_debug(True)
+    #start_workers_for_debug(True)
     #plot_pr_real()
     #plot_results(os.path.join("mou_tests","henry_master"))
     #invest()
