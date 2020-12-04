@@ -120,7 +120,6 @@ jobs:
         else
             echo "$HOME/benchmarks/test_bin/linux" >> $GITHUB_PATH
         fi
-        cd ..
 
     - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
       shell: bash -l {0}
