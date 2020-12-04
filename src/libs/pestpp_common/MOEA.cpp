@@ -1162,8 +1162,10 @@ vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _o
 
 ObservationEnsemble MOEA::get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
-
-	return constraints.get_chance_shifted_constraints(_dp, _op);
+	if (risk_obj)
+		return constraints.get_chance_shifted_constraints(_dp, _op, RISK_NAME);
+	else
+		return constraints.get_chance_shifted_constraints(_dp, _op);
 }
 
 void MOEA::finalize()
@@ -1454,8 +1456,6 @@ void MOEA::initialize()
 
 	if (risk_obj)
 	{
-		ss.str("");
-		ss << "'mou_risk_objective' is true, augmenting decision variables with '" << RISK_NAME << "' and adding prior info objective";
 		/*file_manager.rec_ofstream() << ss.str();
 		cout << ss.str();
 		dv_names.push_back(RISK_NAME);
@@ -1467,7 +1467,18 @@ void MOEA::initialize()
 			throw_moea_error(RISK_NAME + " not found in decision variable names");
 		if (find(pi_obj_names.begin(), pi_obj_names.end(), RISK_NAME) == pi_obj_names.end())
 			throw_moea_error(RISK_NAME + " not found in prior information objective names");
+		ss.str("");
+		ss << "'mou_risk_objective' is true, using " << RISK_NAME << " decision variable as risk in chance calcs" << endl;
+		file_manager.rec_ofstream() << ss.str();
+		cout << ss.str();
+
 		//TODO check the bounds of the risk parameter
+		double b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(RISK_NAME)->lbnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(RISK_NAME)->lbnd = max(b,0.01);
+		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(RISK_NAME)->ubnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(RISK_NAME)->ubnd = min(b, 0.99);
+		
+
 
 	}
 

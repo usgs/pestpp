@@ -942,6 +942,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 	{
 		risk_map[rname] = risk;
 	}
+	pe.update_var_map();
 	map<string, int> vm = pe.get_var_map();
 	if (risk_obj.size() > 0)
 	{
@@ -952,6 +953,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 		for (auto& rname : pe.get_real_names())
 		{
 			risk_map[rname] = risk_vec[i];
+			i++;
 		}
 	}
 	ObservationEnsemble shifted_oe(oe);//copy

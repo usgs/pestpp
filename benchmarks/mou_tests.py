@@ -112,7 +112,7 @@ def helper(func):
         for i,constr in enumerate(constrs):
             f.write("constr_{0} {1}\n".format(i+1,float(constr)))
 
-def setup_problem(name,additive_chance=False):
+def setup_problem(name,additive_chance=False, risk_obj=True):
     test_d = os.path.join(test_root,"{0}_template".format(name))
     if os.path.exists(test_d):
         shutil.rmtree(test_d)
@@ -157,7 +157,13 @@ def setup_problem(name,additive_chance=False):
             if name.lower() in ["srn","constr"]:
                 f.write("constr1_add_par 0.0\n")
                 f.write("constr2_add_par 0.0\n")
-            
+
+    if risk_obj:
+        risk_tpl_file = os.path.join(test_d,"risk.dat.tpl")
+        with open(risk_tpl_file, 'w') as f:
+            f.write("ptf ~\n")
+            f.write("_risk_ ~   _risk_   ~\n")
+
     with open(os.path.join(test_d,tpl_file.replace(".tpl","")),'w') as f:
         for i in range(num_dv):
             f.write("dv_{0} 0.5\n".format(i))
@@ -310,6 +316,18 @@ def setup_problem(name,additive_chance=False):
         pst.rectify_pgroups()
         pst.parameter_groups.loc["obj_add","inctyp"] = "absolute"
 
+    if risk_obj:
+        rdf = pst.add_parameters(risk_tpl_file,pst_path=".")
+        par = pst.parameter_data
+        par.loc[rdf.parnme,"partrans"] = "none"
+        par.loc[rdf.parnme, "parubnd"] = 1.0
+        par.loc[rdf.parnme, "parval1"] = 0.5
+        par.loc[rdf.parnme, "parlbnd"] = 0.0
+        par.loc[rdf.parnme, "parchglim"] = "relative"
+        par.loc[rdf.parnme, "pargp"] = "decvars"
+        pst.add_pi_equation(["_risk_"],"_risk_",obs_group="greater_than")
+
+
 
     obs = pst.observation_data
     obs.loc[:,"weight"] = 1.0
@@ -332,6 +350,10 @@ def setup_problem(name,additive_chance=False):
     pst.pestpp_options["mou_objectives"] = "obj_1,obj_2"
     if name.lower() == "water":
         pst.pestpp_options["mou_objectives"] = "obj_1,obj_2,obj_3,obj_4,obj_5"
+
+    if risk_obj:
+        pst.pestpp_options["mou_objectives"] += ",_risk_"
+        pst.pestpp_options["mou_risk_objective"] = True
 
     pst.model_command = "python forward_run.py"
     pst.control_data.noptmax = 0
@@ -466,9 +488,9 @@ def plot_results(master_d):
 
 
 def run_problem_chance(test_case="zdt1",pop_size=100,noptmax=100,stack_size=50,
-                       chance_points="single",recalc=100):
+                       chance_points="single",recalc=100,risk_obj=False):
     
-    test_d = setup_problem(test_case,additive_chance=True)
+    test_d = setup_problem(test_case,additive_chance=True, risk_obj=risk_obj)
     pst = pyemu.Pst(os.path.join(test_d,"{0}.pst".format(test_case)))
     pst.control_data.noptmax = noptmax
     pst.pestpp_options["mou_population_size"] = pop_size   
@@ -643,13 +665,13 @@ if __name__ == "__main__":
     #  master_d = run_problem_chance(case,noptmax=100)
     #  plot_results(master_d)
 
-    #setup_problem("srn",additive_chance=True)
+    #setup_problem("srn",additive_chance=True, risk_obj=True)
     #setup_problem("zdt1",30, additive_chance=True)
     #test_sorting_fake_problem()
     start_workers()
     #setup_problem("zdt1")
     #run_problem_chance_external_fixed("zdt1")
-    #run_problem("srn",noptmax=100)
+    #run_problem_chance("srn",noptmax=100,risk_obj=True)
     #plot_results(os.path.join("mou_tests","srn_master"))
     #setup_problem("constr")
     #run_problem("constr",noptmax=100)
