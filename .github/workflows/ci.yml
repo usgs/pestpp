@@ -116,11 +116,11 @@ jobs:
       shell: bash -l {0}
       run: |
         if [[ "$RUNNER_OS" == "Windows" ]]; then
-            echo "$HOME/test_bin/win" >> $GITHUB_PATH
-            ls $GITHUB_PATH
+            export PATH="$HOME/benchmarks/test_bin/linux:$PATH"
+            echo $PATH
         else
-            echo "$HOME/test_bin/linux" >> $GITHUB_PATH
-            ls $GITHUB_PATH
+            set PATH=%PATH%;..\..\..\test_bin\win;..\..\test_bin\win;
+            echo %PATH%
         fi
         cd ..
 
