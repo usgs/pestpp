@@ -336,7 +336,7 @@ def plot_pr_real():
 
 def start_workers_for_debug(with_master=True):
     t_d = os.path.join("mou_tests", "henry_template")
-    m_d = os.path.join("mou_tests","henry_master_chance_70")
+    m_d = os.path.join("mou_tests","henry_master_chance_risk_obj")
     if with_master:
         if os.path.exists(m_d):
             shutil.rmtree(m_d)
@@ -447,9 +447,9 @@ if __name__ == "__main__":
     #run_and_plot_results(os.path.join("mou_tests", "henry_temp"))
     #test_add_artrch("henry_template",write_tpl=False)
     #test_process_unc("henry_temp")
-    setup_pst()
+    #setup_pst()
     #run_and_plot_results(os.path.join("mou_tests", "henry_template"))
-    #start_workers_for_debug(True)
+    start_workers_for_debug(True)
     #plot_pr_real()
     #plot_results(os.path.join("mou_tests","henry_master"))
     #invest()
