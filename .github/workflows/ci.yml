@@ -62,7 +62,7 @@ jobs:
     - name: clone test repo ${{ env.test_repo }}
       shell: bash -l {0}
       run: |
-        git clone --depth 1 ${{ env.test_repo }}
+        git clone ${{ env.test_repo }}
 
     - name: PESTPP exe install
       shell: bash -l {0}
