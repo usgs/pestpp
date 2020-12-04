@@ -116,9 +116,9 @@ jobs:
       shell: bash -l {0}
       run: |
         if [[ "$RUNNER_OS" == "Windows" ]]; then
-            echo "$HOME/benchmarks/test_bin/win" >> $GITHUB_PATH        
+            echo ..\..\..\test_bin\win" >> $GITHUB_PATH        
         else
-            echo "$HOME/benchmarks/test_bin/linux" >> $GITHUB_PATH
+            echo "../../../test_bin/linux" >> $GITHUB_PATH
         fi
 
     - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
