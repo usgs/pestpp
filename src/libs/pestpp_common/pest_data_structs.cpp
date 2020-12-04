@@ -312,16 +312,10 @@ map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const s
 {
 	map<string, ARG_STATUS> arg_map;
 	ARG_STATUS stat;
-	
-	vector<string> tokens;
-	pest_utils::tokenize(line, tokens, "	 ");
-	for (auto& token : tokens)
+
+	map<string, string> spairs = pest_utils::parse_plusplus_line(line);
+	for (auto& spair : spairs)
 	{
-		if (token == "++")
-			continue;
-		if (token == "#")
-			continue;
-		pair<string, string> spair = pest_utils::parse_plusplus_line(token);
 		if (spair.second.size() == 0)
 		{
 			arg_map[spair.first] = ARG_STATUS::ARG_INVALID;

@@ -630,42 +630,59 @@ void  thread_exceptions::rethrow()
 	throw runtime_error(ss.str());
 }
 
-pair<string, string> parse_plusplus_line(const string& line)
+map<string, string> parse_plusplus_line(const string& _line)
 {
 	string key;
 	string value, org_value;
+	map<string, string> arg_map;
+	string line_copy = _line;
+	while (true)
+	{
+		if (line_copy.size() < 1)
+			break;
+		string tmp_line = line_copy;
+		pest_utils::strip_ip(tmp_line, "both");
+		vector<string> tmp_tokens;
+		pest_utils::tokenize(tmp_line, tmp_tokens, " \t", false);
+		if (tmp_tokens.size() > 1)
+			if (tmp_tokens[0] == "++")
+				if (tmp_tokens[1].substr(0, 1) == "#")
+				{
+					//return pair<string, string>("", "");
+					continue;
+				}
+		if (tmp_line.substr(0, 3) == "++#")
+		{
+			//return pair<string, string>("", "");
+			continue;
+		}
 
-	string tmp_line = line;
-	pest_utils::strip_ip(tmp_line, "both");
-	vector<string> tmp_tokens;
-	pest_utils::tokenize(tmp_line, tmp_tokens, " \t", false);
-	if (tmp_tokens.size() > 1)
-		if (tmp_tokens[0] == "++")
-			if (tmp_tokens[1].substr(0, 1) == "#")
-				return pair<string,string>("","");
-	if (tmp_line.substr(0, 3) == "++#")
-		return pair<string, string>("", "");
+		size_t found = line_copy.find_first_of("#");
+		if (found == string::npos) {
+			found = line_copy.length();
+		}
+		tmp_line = line_copy.substr(0, found);
+		strip_ip(tmp_line, "both", "\t\n\r+ ");
+		tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\"'), tmp_line.end());
+		tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\''), tmp_line.end());
+		//upper_ip(tmp_line);
 
-	size_t found = line.find_first_of("#");
-	if (found == string::npos) {
-		found = line.length();
+		found = tmp_line.find_first_of("(");
+		if (found == string::npos)
+			throw runtime_error("incorrect format for '++' line (missing'('):" + _line);
+		key = tmp_line.substr(0, found);
+		tmp_line = tmp_line.substr(found);
+		found = tmp_line.find_first_of(")");
+		if (found == string::npos)
+			throw runtime_error("incorrect format for '++' line (missing')'):" + _line);
+		org_value = tmp_line.substr(1, found - 1);
+		found = line_copy.find_first_of(")");
+		if (found == string::npos)
+			throw runtime_error("error seeking ')' in line: " + line_copy);
+		line_copy = line_copy.substr(found+1);
+		arg_map[key] =  org_value;
 	}
-	tmp_line = line.substr(0, found);
-	strip_ip(tmp_line, "both", "\t\n\r+ ");
-	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\"'), tmp_line.end());
-	tmp_line.erase(remove(tmp_line.begin(), tmp_line.end(), '\''), tmp_line.end());
-	//upper_ip(tmp_line);
-
-	found = tmp_line.find_first_of("(");
-	if (found == string::npos)
-		throw runtime_error("incorrect format for '++' line (missing'('):" + line);
-	key = tmp_line.substr(0, found);
-	tmp_line = tmp_line.substr(found);
-	found = tmp_line.find_first_of(")");
-	if (found == string::npos)
-		throw runtime_error("incorrect format for '++' line (missing')'):" + line);
-	org_value = tmp_line.substr(1, found - 1);
-	return pair < string, string>(key, org_value);
+	return arg_map;
 }
 
 

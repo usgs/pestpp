@@ -2804,6 +2804,28 @@ bool IterEnsembleSmoother::solve_new()
 			message(1, "abandoning current lambda ensembles, increasing lambda to ", new_lam);
 			message(1, "updating realizations with reduced phi");
 			update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx]);
+			ph.update(oe, pe);
+			//re-check phi
+			best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+			best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+			//replace the last entry in the best mean phi tracker
+			best_mean_phis[best_mean_phis.size() - 1] = best_mean;
+			message(1, "current best mean phi (after updating reduced-phi reals): ", best_mean);
+			if (best_mean < last_best_mean * acc_fac)
+			{
+				if (best_std < last_best_std * acc_fac)
+				{
+					double new_lam = lam_vals[best_idx] * lam_dec;
+					new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
+					message(0, "updating lambda to ", new_lam);
+					last_best_lam = new_lam;
+				}
+				else
+				{
+					message(0, "not updating lambda (standard deviation reduction criteria not met)");
+				}
+				last_best_std = best_std;
+			}
 			message(1, "returing to lambda calculations...");
 			return false;
 		}
