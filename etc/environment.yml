@@ -1,0 +1,12 @@
+name: pyemu
+channels:
+  - defaults
+dependencies:  
+  - numpy 
+  - pandas 
+  - pyshp
+  - nose-timer
+  - nbsphinx
+  - matplotlib
+  - coverage
+  - scipy
