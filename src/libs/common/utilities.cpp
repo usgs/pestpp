@@ -638,7 +638,7 @@ map<string, string> parse_plusplus_line(const string& _line)
 	string line_copy = _line;
 	while (true)
 	{
-		if (line_copy.size() < 1)
+		if (line_copy.size() <= 2)
 			break;
 		string tmp_line = line_copy;
 		pest_utils::strip_ip(tmp_line, "both");
