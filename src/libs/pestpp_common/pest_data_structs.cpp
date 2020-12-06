@@ -312,18 +312,26 @@ map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const s
 {
 	map<string, ARG_STATUS> arg_map;
 	ARG_STATUS stat;
-	
-	pair<string, string> spair = pest_utils::parse_plusplus_line(line);
-	if (spair.second.size() == 0)
-		return arg_map;
-	try
+
+	map<string, string> spairs = pest_utils::parse_plusplus_line(line);
+	for (auto& spair : spairs)
 	{
-		stat = assign_value_by_key(spair.first, spair.second);
-		arg_map[spair.first] = stat;
-	}
-	catch (...)
-	{
-		arg_map[spair.first] = ARG_STATUS::ARG_INVALID;
+		if (spair.second.size() == 0)
+		{
+			arg_map[spair.first] = ARG_STATUS::ARG_INVALID;
+			continue;
+		}
+			
+		try
+		{
+			stat = assign_value_by_key(spair.first, spair.second);
+			arg_map[spair.first] = stat;
+		}
+		catch (...)
+		{
+			arg_map[spair.first] = ARG_STATUS::ARG_INVALID;
+		}
+
 	}
 	return arg_map;
 }

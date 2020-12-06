@@ -1248,20 +1248,7 @@ void IterEnsembleSmoother::initialize()
 	message(1, "saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
 
 
-	if (center_on.size() > 0)
-	{
-		ss.str("");
-		ss << "centering on realization: '" << center_on << "' ";
-		message(1, ss.str());
-		vector<string> names = pe.get_real_names();
-		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_ies_error("'ies_center_on' realization not found in par en: " + center_on);
-		names = oe.get_real_names();
-		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_ies_error("'ies_center_on' realization not found in obs en: " + center_on);
-	}
-	else
-		message(1, "centering on ensemble mean vector");
+	
 
 	if (pest_scenario.get_control_info().noptmax == -2)
 	{
@@ -1346,8 +1333,25 @@ void IterEnsembleSmoother::initialize()
 	if (obs_restart_csv.size() > 0)
 		initialize_restart();
 	
-	//no restart
+	//check for center on 
+	if (center_on.size() > 0)
+	{
+		ss.str("");
+		ss << "centering on realization: '" << center_on << "' ";
+		message(1, ss.str());
+		vector<string> names = pe.get_real_names();
+		if (find(names.begin(), names.end(), center_on) == names.end())
+			throw_ies_error("'ies_center_on' realization not found in par en: " + center_on);
+		names = oe.get_real_names();
+		if (find(names.begin(), names.end(), center_on) == names.end())
+			throw_ies_error("'ies_center_on' realization not found in obs en: " + center_on);
+	}
 	else
+		message(1, "centering on ensemble mean vector");
+
+	//ok, now run the prior ensemble - after checking for center_on
+	//in case something is wrong with center_on
+	if (obs_restart_csv.size() == 0)
 	{
 		performance_log->log_event("running initial ensemble");
 		message(1, "running initial ensemble of size", oe.shape().first);
@@ -2804,6 +2808,28 @@ bool IterEnsembleSmoother::solve_new()
 			message(1, "abandoning current lambda ensembles, increasing lambda to ", new_lam);
 			message(1, "updating realizations with reduced phi");
 			update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx]);
+			ph.update(oe, pe);
+			//re-check phi
+			best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+			best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+			//replace the last entry in the best mean phi tracker
+			best_mean_phis[best_mean_phis.size() - 1] = best_mean;
+			message(1, "current best mean phi (after updating reduced-phi reals): ", best_mean);
+			if (best_mean < last_best_mean * acc_fac)
+			{
+				if (best_std < last_best_std * acc_fac)
+				{
+					double new_lam = lam_vals[best_idx] * lam_dec;
+					new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
+					message(0, "updating lambda to ", new_lam);
+					last_best_lam = new_lam;
+				}
+				else
+				{
+					message(0, "not updating lambda (standard deviation reduction criteria not met)");
+				}
+				last_best_std = best_std;
+			}
 			message(1, "returing to lambda calculations...");
 			return false;
 		}

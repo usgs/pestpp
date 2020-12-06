@@ -158,12 +158,12 @@ int main(int argc, char* argv[])
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
 		pest_scenario.set_defaults();
-		try {
+		//try {
 			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
 			file_manager.close_file("pst");
 			performance_log.log_event("finished processing control file");
-		}
+		/*}
 		catch (PestError e)
 		{
 			cerr << "Error prococessing control file: " << cmdline.ctl_file_name << endl << endl;
@@ -172,7 +172,7 @@ int main(int argc, char* argv[])
 			fout_rec << e.what() << endl << endl;
 			fout_rec.close();
 			throw(e);
-		}
+		}*/
 		//pest_scenario.clear_ext_files();
 		pest_scenario.check_inputs(fout_rec);
 
