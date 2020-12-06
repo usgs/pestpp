@@ -636,6 +636,7 @@ map<string, string> parse_plusplus_line(const string& _line)
 	string value, org_value;
 	map<string, string> arg_map;
 	string line_copy = _line;
+	int i = 0;
 	while (true)
 	{
 		if (line_copy.size() <= 2)
@@ -681,6 +682,9 @@ map<string, string> parse_plusplus_line(const string& _line)
 			throw runtime_error("error seeking ')' in line: " + line_copy);
 		line_copy = line_copy.substr(found+1);
 		arg_map[key] =  org_value;
+		i++;
+		if (i > _line.size())
+			throw runtime_error("parse_plusplus_line() error: infinite loop detected processing line: " + _line);
 	}
 	return arg_map;
 }
