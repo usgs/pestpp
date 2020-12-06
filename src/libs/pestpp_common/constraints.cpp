@@ -1730,7 +1730,8 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 	stringstream ss;
 	ss << endl << "   ";
 	if (header.size() == 0)
-		ss << "Chance constraint / objective information at start of iteration " << iter;
+		//dont change this text - its used in one of the opt tests
+		ss << "Chance constraint/objective information at start of iteration " << iter;
 	else
 		ss << header;
 	ss << endl;
