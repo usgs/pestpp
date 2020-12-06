@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>pest_forgive.pst</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)../benchmarks/ies_10par_xsec/master_sweep_forgive</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>10par_xsec.pst</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>C:\Dev\pyemu\autotest\moouu\10par_xsec\template</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
