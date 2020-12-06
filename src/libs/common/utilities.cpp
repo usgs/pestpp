@@ -649,12 +649,12 @@ map<string, string> parse_plusplus_line(const string& _line)
 				if (tmp_tokens[1].substr(0, 1) == "#")
 				{
 					//return pair<string, string>("", "");
-					continue;
+					break;
 				}
 		if (tmp_line.substr(0, 3) == "++#")
 		{
 			//return pair<string, string>("", "");
-			continue;
+			break;
 		}
 
 		size_t found = line_copy.find_first_of("#");
