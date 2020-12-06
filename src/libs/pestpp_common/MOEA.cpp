@@ -75,12 +75,16 @@ void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEn
 	if (pi_obj_names_ptr->size() > 0)
 	{
 		PriorInformation* pi_ptr = pest_scenario.get_prior_info_ptr();
-		Parameters pars;
+		
 		pair<double, double> pi_res_sim;
+		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
 		vector<string> pnames = dp.get_var_names();
 		for (auto real_name : real_names)
 		{
+			Parameters pars = pest_scenario.get_ctl_parameters();
 			pars.update_without_clear(pnames, dp.get_real_vector(real_name));
+			if (dp.get_trans_status() == ParameterEnsemble::transStatus::NUM)
+				pts.numeric2ctl_ip(pars);
 			for (auto obj_name : *pi_obj_names_ptr)
 			{
 				pi_res_sim = pi_ptr->get_pi_rec_ptr(obj_name).calc_sim_and_resid(pars);
