@@ -81,7 +81,7 @@ void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEn
 		vector<string> pnames = dp.get_var_names();
 		for (auto real_name : real_names)
 		{
-			Parameters pars = pest_scenario.get_ctl_parameters();
+			Parameters pars = pest_scenario.get_ctl_parameters(); 
 			pars.update_without_clear(pnames, dp.get_real_vector(real_name));
 			if (dp.get_trans_status() == ParameterEnsemble::transStatus::NUM)
 				pts.numeric2ctl_ip(pars);
@@ -412,14 +412,15 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, vec
 	ofstream& sum = file_manager.get_ofstream(sum_tag);
 	for (auto& member : member_names)
 	{
+		
 		sum << generation << "," << member;
 		for (auto obj : *obs_obj_names_ptr)
 		{
-			sum << "," << member_struct[member][obj];
+			sum << "," << obj_dir_mult_ptr->at(obj) * member_struct[member][obj];
 		}
 		for (auto obj : *pi_obj_names_ptr)
 		{
-			sum << "," << member_struct[member][obj];
+			sum << "," << obj_dir_mult_ptr->at(obj) * member_struct[member][obj];
 		}
 		sum << "," << front_map[member];
 		sum << "," << crowd_map[member];
