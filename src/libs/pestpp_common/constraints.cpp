@@ -1740,7 +1740,7 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 	
 	ss << setw(nsize) << left << "name" << right << setw(10) << "sense" << setw(12) << "required" << setw(12) << "sim value";
 	ss << setw(12) << "prior stdev" << setw(12) << "post stdev" << setw(12) << "offset";
-	ss << setw(12) << "new sim value" << endl;
+	ss << setw(14) << "new sim value" << endl;
 	vector<string> out_of_bounds;
 	Observations current_constraints_chance = get_chance_shifted_constraints(current_obs);
 	for (int i = 0; i < num_obs_constraints(); ++i)
@@ -1753,7 +1753,7 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 		ss << setw(12) << prior_constraint_stdev[name];
 		ss << setw(12) << post_constraint_stdev[name];
 		ss << setw(12) << post_constraint_offset[name];
-		ss << setw(12) << current_constraints_chance[name] << endl;
+		ss << setw(14) << current_constraints_chance[name] << endl;
 	}
 	ss << "  note: 'offset' is the value added to the simulated constraint/objective value to account" << endl;
 	ss << "        for the uncertainty in the constraint/objective value arsing from uncertainty in the " << endl;

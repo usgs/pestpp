@@ -2315,7 +2315,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	double mutation_probability = 1.0 / pest_scenario.get_n_adj_par();
 	double mutation_distribution_index = 20.0;
 	mutate_ip(mutation_probability, mutation_distribution_index, tmp_dp);
-
+	tmp_dp.enforce_limits(performance_log,false);
 	//tmp_dp.to_csv("temp_mut.csv");
 
 
@@ -2398,7 +2398,9 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx(double probability, double di, 
 	//can't set all rnds outside of loop or all vars will be treated the same
 	rnds = uniform_draws(4, 0.0, 1.0, rand_gen);
 
-	if (rnds[0] <= probability) {
+	//if (rnds[0] <= probability) 
+	if (true)
+	{
 		for (i = 0; i < n_var; i++) {
 			valueX1 = x1[i];
 			valueX2 = x2[i];
