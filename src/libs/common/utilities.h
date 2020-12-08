@@ -231,7 +231,7 @@ bool check_exist_out(std::string filename);
 
 void try_clean_up_run_storage_files(const string& case_name);
 
-pair<string, string> parse_plusplus_line(const string& line);
+map<string, string> parse_plusplus_line(const string& line);
 
 //template <class dataType>
 //void read_twocol_ascii_to_map(std::map<std::string, dataType> &result,std::string filename, int header_lines=0, int data_col=1);
