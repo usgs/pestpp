@@ -555,7 +555,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 			if (passed.find("OPT_STACK_SIZE") == passed.end())
 				size_passed = false;
 			string par_csv = pest_scenario.get_pestpp_options().get_opt_par_stack();
-			
+			string obs_csv = pest_scenario.get_pestpp_options().get_opt_obs_stack();
 			//if a par stack wasnt passed, draw one
 			if (par_csv.size() == 0)
 			{
@@ -633,9 +633,51 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 					dmat.setZero();
 					stack_pe.extend_cols(dmat,missing);
 				}
-					
+				
+				//a restart with "all"
+				if ((obs_csv.size() > 0) && (pest_scenario.get_pestpp_options().get_opt_chance_points() == "ALL"))
+				{
 
-				if ((size_passed) && (stack_pe.shape().first > stack_size))
+					stack_pe.transform_ip(ParameterEnsemble::transStatus::CTL);
+					vector<string> tokens, var_names = stack_pe.get_var_names();
+					string member_name, last_member_name = "";
+					for (auto n : stack_pe.get_real_names())
+					{
+						if (n.find_first_of(NESTED_STACK_NAME_SEP) == string::npos)
+							throw_constraints_error("no nested stack name sep chars ('" +
+								NESTED_STACK_NAME_SEP + "') in par stack name: " + n);
+						else
+						{
+							tokens.clear();
+							pest_utils::tokenize(n,tokens, NESTED_STACK_NAME_SEP);
+							if (tokens.size() > 2)
+							{
+								throw_constraints_error("too many nested stack name sep chars ('" +
+									NESTED_STACK_NAME_SEP + "') in par stack name: " + n);
+							}
+							if (tokens.size() < 2)
+							{
+								throw_constraints_error("too few entries in split nested stack name: "+n+
+									", expecting <stack_name>"+NESTED_STACK_NAME_SEP+"<member_name>");
+							}
+							member_name = tokens[1];
+							if (member_name != last_member_name)
+							{
+								Parameters ctl_pars = pest_scenario.get_ctl_parameters();
+								Eigen::VectorXd real = stack_pe.get_real_vector(n);
+								ctl_pars.update_without_clear(var_names, real);
+								stack_pe_map[member_name] = ctl_pars;
+								last_member_name = member_name;
+							}
+
+
+
+
+						}
+					}
+				}
+
+				else if ((size_passed) && (stack_pe.shape().first > stack_size))
 				{
 					vector<int> drop_rows;
 					for (int i = stack_size - 1; i < stack_pe.shape().first; i++)
@@ -658,7 +700,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 			f_rec << "saved initial parameter stack to " << filename << endl;
 			
 			//maybe there was an obs stack passed?
-			string obs_csv = pest_scenario.get_pestpp_options().get_opt_obs_stack();
+			
 			if (obs_csv.size() == 0)
 			{
 				stack_oe.reserve(stack_pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
@@ -715,7 +757,80 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 				if (missing.size() > 0)
 					throw_constraints_error("obs stack missing the following constraints: ", missing);
 
-				if (((size_passed) || (stack_pe.shape().first > 0)) && (stack_oe.shape().first > stack_size))
+				//a restart with "all"
+				if ((stack_pe_map.size() > 0) && (pest_scenario.get_pestpp_options().get_opt_chance_points() == "ALL"))
+				{
+					if (par_csv.size() == 0)
+					{
+						throw_constraints_error("restarting with opt_chance_points=='all' requires both the par and obs nested stack files");
+
+					}
+					vector<string> tokens, missing, keep_org_names, keep_new_names, var_names = stack_pe.get_var_names();
+					string member_name, last_member_name = "";
+					for (auto n : stack_oe.get_real_names())
+					{
+						if (n.find_first_of(NESTED_STACK_NAME_SEP) == string::npos)
+							throw_constraints_error("no nested stack name sep chars ('" +
+								NESTED_STACK_NAME_SEP + "') in obs stack name: " + n);
+						else
+						{
+							tokens.clear();
+							pest_utils::tokenize(n, tokens, NESTED_STACK_NAME_SEP);
+							if (tokens.size() > 2)
+							{
+								throw_constraints_error("too many nested stack name sep chars ('" +
+									NESTED_STACK_NAME_SEP + "') in obs stack name: " + n);
+							}
+							if (tokens.size() < 2)
+							{
+								throw_constraints_error("too few entries in split nested stack name: " + n +
+									", expecting <stack_name>" + NESTED_STACK_NAME_SEP + "<member_name>");
+							}
+							member_name = tokens[1];
+							if (last_member_name == "")
+								last_member_name = member_name;
+							if (stack_pe_map.find(member_name) == stack_pe_map.end())
+								missing.push_back(member_name);
+							else if (member_name != last_member_name)
+							{
+								Eigen::MatrixXd stack_mat = stack_oe.get_eigen(keep_org_names,vector<string>());
+								ObservationEnsemble _oe_stack(&pest_scenario, &rand_gen, stack_mat, keep_new_names, stack_oe.get_var_names());
+								stack_oe_map[last_member_name] = _oe_stack;
+								last_member_name = member_name;
+								keep_org_names.clear();
+								keep_org_names.push_back(n);
+								keep_new_names.clear();
+								keep_new_names.push_back(tokens[0]);
+							}
+							else
+							{
+								keep_new_names.push_back(tokens[0]);
+								keep_org_names.push_back(n);
+							}
+
+						}
+					}
+					if (keep_org_names.size() > 0)
+					{
+						Eigen::MatrixXd stack_mat = stack_oe.get_eigen(keep_org_names, vector<string>());
+						ObservationEnsemble _oe_stack(&pest_scenario, &rand_gen, stack_mat, keep_new_names, stack_oe.get_var_names());
+						stack_oe_map[last_member_name] = _oe_stack;
+					}
+					
+					if (missing.size() > 0)
+					{
+						if (missing.size() == stack_pe_map.size())
+							throw_constraints_error("all nested par stack names are missing from nested obs stack");
+						for (auto m : missing)
+							stack_pe_map.erase(m);
+					}
+					if (stack_oe_map.size() == 0)
+						throw_constraints_error("no nested obs stack names could be matched to nested par stack names...");
+					
+
+				}
+
+				else if (((size_passed) || (stack_pe.shape().first > 0)) && (stack_oe.shape().first > stack_size))
 				{
 					vector<int> drop_rows;
 					for (int i = stack_size - 1; i < stack_oe.shape().first; i++)
@@ -2005,7 +2120,7 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 			names1 = stack_info.second.get_real_names();
 			names2.clear();
 			for (auto n : names1)
-				names2.push_back(n + "|" + real_info.first);
+				names2.push_back(n + NESTED_STACK_NAME_SEP + real_info.first);
 			stack_info.second.set_real_names(names2,true);
 			if (i == 0)
 				stack_info.second.to_csv_by_reals(fstack, true);
@@ -2154,10 +2269,10 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 		names1 = stack_pe.get_real_names();
 		names2.clear();
 		for (auto n : names1)
-			names2.push_back(n + "|" + real_info.first);
+			names2.push_back(n + NESTED_STACK_NAME_SEP + real_info.first);
 		stack_pe.set_real_names(names2,true);
 		//TODO: add a flag to decide if saving
-		if (int i = 0)
+		if (i == 0)
 			stack_pe.to_csv_by_reals(fstack, true);
 		else
 			stack_pe.to_csv_by_reals(fstack, false);

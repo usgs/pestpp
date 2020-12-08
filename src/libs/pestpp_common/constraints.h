@@ -19,6 +19,7 @@
 
 using namespace std;
 
+const string NESTED_STACK_NAME_SEP = "||";
 
 class OptObjFunc
 {
