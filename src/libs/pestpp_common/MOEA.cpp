@@ -1199,8 +1199,6 @@ void MOEA::initialize()
 	warn_min_members = 20;
 	error_min_members = 4;
 	
-
-	
 	//set some defaults
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
@@ -1755,14 +1753,9 @@ void MOEA::initialize()
 	message(2, ss.str());
 	archive_size = ppo->get_mou_max_archive_size();
 
-	//ad hoc archive update test
-	/*vector<string> temp = op.get_real_names();
-	for (auto& m : temp)
-		m = "XXX" + m;
-	op.set_real_names(temp);
-	op.set_eigen(*op.get_eigen_ptr() * 2.0);
-	dp.set_real_names(temp);
-	update_archive(op, dp);*/
+	//this causes the initial archive pareto summary file to be written
+	objectives.pareto_dominance_sort(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+	
 	if (constraints.get_use_chance())
 	{
 		ofstream& f_rec = file_manager.rec_ofstream();
