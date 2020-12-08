@@ -639,7 +639,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 				{
 
 					stack_pe.transform_ip(ParameterEnsemble::transStatus::CTL);
-					vector<string> tokens, var_names = stack_pe.get_var_names();
+					vector<string> tokens, keep_org_names, keep_new_names, var_names = stack_pe.get_var_names();
 					string member_name, last_member_name = "";
 					for (auto n : stack_pe.get_real_names())
 					{
@@ -668,16 +668,25 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 								ctl_pars.update_without_clear(var_names, real);
 								stack_pe_map[member_name] = ctl_pars;
 								last_member_name = member_name;
+								keep_org_names.clear();
+								keep_new_names.clear();
+								keep_org_names.push_back(n);
+								keep_new_names.push_back(tokens[0]);
 							}
-
-
-
+							else
+							{
+								keep_org_names.push_back(n);
+								keep_new_names.push_back(tokens[0]);
+							}
 
 						}
 					}
+					//set the stack pe attribute in case the chances need to be recalc'd
+					Eigen::MatrixXd real_mat = stack_pe.get_eigen(keep_org_names, vector<string>());
+					stack_pe = ParameterEnsemble(&pest_scenario, &rand_gen, real_mat, keep_new_names, var_names);
 				}
 
-				else if ((size_passed) && (stack_pe.shape().first > stack_size))
+				if ((size_passed) && (stack_pe.shape().first > stack_size))
 				{
 					vector<int> drop_rows;
 					for (int i = stack_size - 1; i < stack_pe.shape().first; i++)
