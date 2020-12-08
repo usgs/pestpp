@@ -1981,10 +1981,18 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 	if (population_stack_pe_run_map.size() > 0)
 	{
 		stack_oe_map.clear();
+		int i = 0;
+		stringstream ss;
+		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.obs_stack.csv";
+		ofstream fstack(ss.str());
+		if (fstack.bad())
+			throw_constraints_error("error opening " + ss.str() + " for writing");
+
 		//work out what var names for the stack_oe we dont need so we can drop them!
 		vector<string> drop_names;
 		pair<vector<int>, ObservationEnsemble> stack_info;
 		set<string> s_obs_constraint_names(ctl_ord_obs_constraint_names.begin(), ctl_ord_obs_constraint_names.end());
+		vector<string> names1, names2;
 		for (auto name : stack_oe.get_var_names())
 		{
 			if (s_obs_constraint_names.find(name) == s_obs_constraint_names.end())
@@ -1994,9 +2002,20 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 		{
 			pfm.log_event("processing stack runs for realization " + real_info.first);
 			stack_info = process_stack_runs(real_info.first, iter, real_info.second, run_mgr_ptr, false);
+			names1 = stack_info.second.get_real_names();
+			names2.clear();
+			for (auto n : names1)
+				names2.push_back(n + "|" + real_info.first);
+			stack_info.second.set_real_names(names2,true);
+			if (i == 0)
+				stack_info.second.to_csv_by_reals(fstack, true);
+			else
+				stack_info.second.to_csv_by_reals(fstack, false);
+			stack_info.second.set_real_names(names1,true);
 			save_oe_stack(iter, real_info.first, stack_info.second);
 			stack_info.second.drop_cols(drop_names);
 			stack_oe_map[real_info.first] = stack_info.second;
+			i++;
 			
 		}
 	}
@@ -2116,6 +2135,13 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 	cout << "queuing up nested sets of chance runs for decision-variable ensemble " << endl;
 	map<int, int> _stack_pe_run_map;
 	int count = 0;
+	int i = 0;
+	stringstream ss;
+	ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.csv";
+	ofstream fstack(ss.str());
+	if (fstack.bad())
+		throw_constraints_error("error opening " + ss.str() + " for writing");
+	vector<string> names1, names2;
 	for (auto real_info : current_pe.get_real_map())
 	{
 
@@ -2123,14 +2149,27 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 		real_pars.update_without_clear(par_names, par_vec);
 		_stack_pe_run_map = add_stack_runs(iter, stack_pe, real_pars, current_obs, run_mgr_ptr);
 		population_stack_pe_run_map[real_info.first] = _stack_pe_run_map;
+		
 		stack_pe_map[real_info.first] = real_pars;
+		names1 = stack_pe.get_real_names();
+		names2.clear();
+		for (auto n : names1)
+			names2.push_back(n + "|" + real_info.first);
+		stack_pe.set_real_names(names2,true);
 		//TODO: add a flag to decide if saving
+		if (int i = 0)
+			stack_pe.to_csv_by_reals(fstack, true);
+		else
+			stack_pe.to_csv_by_reals(fstack, false);
+		stack_pe.set_real_names(names1,true);
 		save_pe_stack(iter, real_info.first, stack_pe);
 		f_rec << "...added " << stack_pe.shape().first << " runs for decision variable solution '" << real_info.first << "'" << endl;
 		count = count + _stack_pe_run_map.size();
+		i++;
 	}
 	cout << "...adding " << count << " runs nested stack-based chance constraints" << endl;
 	stack_runs_processed = false;
+	fstack.close();
 }
 
 map<int, int> Constraints::add_stack_runs(int iter, ParameterEnsemble& _stack_pe, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)

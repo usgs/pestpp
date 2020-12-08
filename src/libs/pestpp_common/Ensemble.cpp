@@ -890,11 +890,13 @@ void Ensemble::to_csv(string file_name)
 	{
 		to_csv_by_vars(csv);
 	}
+	csv.close();
 }
 
-void Ensemble::to_csv_by_vars(ofstream &csv)
+void Ensemble::to_csv_by_vars(ofstream &csv, bool write_header)
 {
-	csv << "var_name";
+	if (write_header)
+		csv << "var_name";
 	
 	//for (int ireal = 0; ireal < reals.rows(); ireal++)
 	int ireal = 0;
@@ -911,9 +913,11 @@ void Ensemble::to_csv_by_vars(ofstream &csv)
 			continue;
 
 		ireal = real_map[rname];
-		csv << ',' << pest_utils::lower_cp(real_names[ireal]);
+		if (write_header)
+			csv << ',' << pest_utils::lower_cp(real_names[ireal]);
 	}
-	csv << endl;
+	if (write_header)
+		csv << endl;
 	for (int ivar = 0; ivar < reals.cols(); ivar++)
 	{
 		csv << pest_utils::lower_cp(var_names[ivar]);
@@ -928,12 +932,15 @@ void Ensemble::to_csv_by_vars(ofstream &csv)
 	}
 }
 
-void Ensemble::to_csv_by_reals(ofstream &csv)
+void Ensemble::to_csv_by_reals(ofstream &csv, bool write_header)
 {
-	csv << "real_name";
-	for (auto &vname : var_names)
-		csv << ',' << pest_utils::lower_cp(vname);
-	csv << endl;
+	if (write_header)
+	{
+		csv << "real_name";
+		for (auto& vname : var_names)
+			csv << ',' << pest_utils::lower_cp(vname);
+		csv << endl;
+	}
 	//for (int ireal = 0; ireal < reals.rows(); ireal++)
 	int ireal = 0;
 	map<string, int> real_map;
@@ -2505,13 +2512,15 @@ void ParameterEnsemble::to_csv(string file_name)
 		to_csv_by_reals(csv);
 	else
 		to_csv_by_vars(csv);
+	csv.close();
 }
 
 
-void ParameterEnsemble::to_csv_by_vars(ofstream &csv)
+void ParameterEnsemble::to_csv_by_vars(ofstream &csv, bool write_header)
 {
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_par_names();
-	csv << "var_name";
+	if (write_header)
+		csv << "var_name";
 	int ireal = 0;
 	map<string, int> real_map;
 	for (int i = 0; i < real_names.size(); i++)
@@ -2522,9 +2531,11 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv)
 		if (real_map.find(rname) == end)
 			continue;
 		ireal = real_map[rname];
-		csv << ',' << pest_utils::lower_cp(real_names[ireal]);
+		if (write_header)
+			csv << ',' << pest_utils::lower_cp(real_names[ireal]);
 	}
-	csv << endl;
+	if (write_header)
+		csv << endl;
 
 	//get the pars and transform to be in sync with ensemble trans status
 	/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
@@ -2575,13 +2586,16 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv)
 	}
 }
 
-void ParameterEnsemble::to_csv_by_reals(ofstream &csv)
+void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 {
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_par_names();
-	csv << "real_name";
-	for (auto &vname : names)
-		csv << ',' << pest_utils::lower_cp(vname);
-	csv << endl;
+	if (write_header)
+	{
+		csv << "real_name";
+		for (auto& vname : names)
+			csv << ',' << pest_utils::lower_cp(vname);
+		csv << endl;
+	}
 
 	//get the pars and transform to be in sync with ensemble trans status
 	/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();

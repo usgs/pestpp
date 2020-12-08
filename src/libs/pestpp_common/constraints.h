@@ -208,7 +208,8 @@ private:
 	//get the (risk-shifted) residual (distance) vector between constraints RHS and sim arg
 	vector<double> get_constraint_residual_vec(Observations& sim);
 
-	map<int, int> add_stack_runs(int iter, ParameterEnsemble& current_pe, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
+	map<int, int> add_stack_runs(int iter, ParameterEnsemble& current_pe, Parameters& current_pars, 
+		Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
 
 	//error handlers
 	void throw_constraints_error(string message, bool should_throw = true);

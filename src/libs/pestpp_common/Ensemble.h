@@ -29,6 +29,8 @@ public:
 	//Ensemble get(vector<string> &_real_names, vector<string> &_var_names);
 
 	void to_csv(string file_name);
+	void to_csv_by_reals(ofstream& csv, bool write_header = true);
+	void to_csv_by_vars(ofstream& csv, bool write_header = true);
 	void to_binary_old(string file_name, bool transposed=false);
 	void to_binary(string file_name, bool transposed=false);
 	void from_eigen_mat(Eigen::MatrixXd mat, const vector<string> &_real_names, const vector<string> &_var_names);
@@ -115,8 +117,7 @@ protected:
 	map<string,int> from_binary_old(string file_name, vector<string> &names,  bool transposed);
 	map<string, int> from_binary(string file_name, vector<string> &names, bool transposed);
 	pair<map<string, int>, map<string, int>> prepare_csv(const vector<string> &names, ifstream &csv, bool forgive);
-	void to_csv_by_reals(ofstream &csv);
-	void to_csv_by_vars(ofstream &csv);
+	
 };
 
 class ParameterEnsemble : public Ensemble
@@ -144,8 +145,8 @@ public:
 		transStatus _tstat = transStatus::NUM);
 	void enforce_limits(PerformanceLog* plog, bool enforce_chglim);
 	void to_csv(string file_name);
-	void to_csv_by_reals(ofstream &csv);
-	void to_csv_by_vars(ofstream &csv);
+	void to_csv_by_reals(ofstream &csv, bool write_header=true);
+	void to_csv_by_vars(ofstream &csv, bool write_header=true);
 	//Pest* get_pest_scenario_ptr() { return &pest_scenario; }
 	transStatus get_trans_status() const { return tstat; }
 	void set_trans_status(transStatus _tstat) { tstat = _tstat; }
