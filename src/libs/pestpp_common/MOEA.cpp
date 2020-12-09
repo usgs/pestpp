@@ -1769,7 +1769,7 @@ void MOEA::initialize()
 }
 
 
-pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe)
+pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
 	Parameters pars;
 	Observations obs;
@@ -1781,28 +1781,31 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 	{
 		//just use dp member nearest the mean dec var values
 
-		vector<double> t = dp.get_mean_stl_var_vector();
+		vector<double> t = _dp.get_mean_stl_var_vector();
 		Eigen::VectorXd dp_mean = stlvec_2_eigenvec(t);
 		t.resize(0);
-		int idx_min;
+		int idx_min = -1;
 		double dist, dist_min = numeric_limits<double>::max();
-		for (int i = 0; i < dp.shape().first; i++)
+		for (int i = 0; i < _dp.shape().first; i++)
 		{
-			dist = dp_mean.dot(dp.get_eigen_ptr()->row(i));
+			//dist = dp_mean.dot(_dp.get_eigen_ptr()->row(i));
+			dist = (dp_mean - _dp.get_eigen_ptr()->row(i).transpose()).squaredNorm();
 			if (dist < dist_min)
 			{
 				idx_min = i;
 				dist_min = dist;
 			}
 		}
-		string min_member = dp.get_real_names()[idx_min];
+		if (idx_min == -1)
+			throw_moea_error("couldnt find nearest mean point");
+		string min_member = _dp.get_real_names()[idx_min];
 		ss.str("");
 		ss << "using member " << min_member << " as nearest-to-mean single point" << endl;
 		ss << "    with distance of " << dist_min << " from mean of decision variable population";
 		message(2, ss.str());
 
-		pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(min_member));
-		obs.update_without_clear(op.get_var_names(), op.get_real_vector(min_member));
+		pars.update_without_clear(_dp.get_var_names(), _dp.get_real_vector(min_member));
+		obs.update_without_clear(_op.get_var_names(), _op.get_real_vector(min_member));
 		pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
 	}
 	else
@@ -1818,18 +1821,18 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 			//if this is a max obj
 			if ((obj_dir_mult.find(obj_name) != obj_dir_mult.end()) &&
 				(obj_dir_mult[obj_name] == -1.0))
-				obj_extrema.push_back(op.get_var_vector(obj_name).maxCoeff());
+				obj_extrema.push_back(_op.get_var_vector(obj_name).maxCoeff());
 			else
-				obj_extrema.push_back(op.get_var_vector(obj_name).minCoeff());
+				obj_extrema.push_back(_op.get_var_vector(obj_name).minCoeff());
 		}
 
 		Eigen::VectorXd opt_vec = stlvec_2_eigenvec(obj_extrema);
 
 		//find the member nearest the optimal tradeoff
 		int opt_idx = -1;
-		Eigen::MatrixXd obj_op = op.get_eigen(vector<string>(), obs_obj_names);
+		Eigen::MatrixXd obj_op = _op.get_eigen(vector<string>(), obs_obj_names);
 		double dist, opt_dist = numeric_limits<double>::max();
-		for (int i = 0; i < op.shape().first; i++)
+		for (int i = 0; i < _op.shape().first; i++)
 		{
 			dist = (opt_vec - obj_op.row(i).transpose()).squaredNorm();
 			if (dist < opt_dist)
@@ -1838,13 +1841,15 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 				opt_dist = dist;
 			}
 		}
-		string opt_member = op.get_real_names()[opt_idx];
+		if (opt_idx == -1)
+			throw_moea_error("couldnt find nearest optimal point");
+		string opt_member = _op.get_real_names()[opt_idx];
 		ss.str("");
 		ss << "using member " << opt_member << " as single, 'optimal' point" << endl;
 		ss << "   with distance of " << opt_dist << " from optimal trade - off";
 		message(2, ss.str());
-		pars.update_without_clear(dp.get_var_names(), dp.get_real_vector(opt_member));
-		obs.update_without_clear(op.get_var_names(), op.get_real_vector(opt_member));
+		pars.update_without_clear(_dp.get_var_names(), _dp.get_real_vector(opt_member));
+		obs.update_without_clear(_op.get_var_names(), _op.get_real_vector(opt_member));
 	}
 
 	return pair<Parameters, Observations>(pars, obs);
