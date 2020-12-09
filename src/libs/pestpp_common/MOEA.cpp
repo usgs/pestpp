@@ -1062,7 +1062,9 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 		
 		if (chancepoints == chancePoints::SINGLE)
 		{
-			pair<Parameters, Observations> po_pair = get_optimal_solution(_dp, op);
+			//dont use the _dp, use the class attr dp and op here
+			//because they are in sync. _dp hasnt been run yet...
+			pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op);
 			pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
 			constraints.add_runs(iter, pars, obs, run_mgr_ptr);
 		}
@@ -1070,7 +1072,7 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 		{
 			constraints.add_runs(iter, _dp, obs, run_mgr_ptr);
 		}
-
+		 
 		else
 		{
 			throw_moea_error("internal error: trying to call unsupported chancePoints type");
