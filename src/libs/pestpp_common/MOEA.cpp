@@ -1801,6 +1801,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 		if (idx_min == -1)
 			throw_moea_error("couldnt find nearest mean point");
 		string min_member = _dp.get_real_names()[idx_min];
+		if (dist_min > 0.0) dist_min = sqrt(dist_min);
 		ss.str("");
 		ss << "using member " << min_member << " as nearest-to-mean single point" << endl;
 		ss << "    with distance of " << dist_min << " from mean of decision variable population";
@@ -1846,6 +1847,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 		if (opt_idx == -1)
 			throw_moea_error("couldnt find nearest optimal point");
 		string opt_member = _op.get_real_names()[opt_idx];
+		if (opt_dist > 0.0) opt_dist = sqrt(opt_dist);
 		ss.str("");
 		ss << "using member " << opt_member << " as single, 'optimal' point" << endl;
 		ss << "   with distance of " << opt_dist << " from optimal trade - off";

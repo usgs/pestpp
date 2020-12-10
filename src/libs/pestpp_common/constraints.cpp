@@ -1185,6 +1185,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 				if (stack_oe_map.find(min_real_name) == stack_oe_map.end())
 					throw_constraints_error("nearest dv real '" + min_real_name +"' not in stack oe map");
 				//todo add some output here to report the mapping results
+				if (min_dist > 0.0) min_dist = sqrt(min_dist);
 				frec << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
 				cout << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
 				double _risk = risk;
