@@ -2039,7 +2039,14 @@ pair<vector<int>,ObservationEnsemble> Constraints::process_stack_runs(string rea
 	{
 		ss.str("");
 		ss << "WARNING: " << failed_runs.size() << " stack runs failed for realization " << real_name;
+		
+		if ((drop_fails) && (failed_runs.size() < _stack_oe.shape().first))
+		{
+			_stack_oe.drop_rows(failed_runs);
+			ss << ", dropped...";
+		}
 		pfm.log_event(ss.str());
+		file_mgr_ptr->rec_ofstream() << ss.str() << endl;
 		cout << ss.str() << endl;
 	}
 		
@@ -2123,10 +2130,29 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 			if (s_obs_constraint_names.find(name) == s_obs_constraint_names.end())
 				drop_names.push_back(name);
 		}
+		vector<string> drop_members;
 		for (auto& real_info : population_stack_pe_run_map)
 		{
 			pfm.log_event("processing stack runs for realization " + real_info.first);
-			stack_info = process_stack_runs(real_info.first, iter, real_info.second, run_mgr_ptr, false);
+			stack_info = process_stack_runs(real_info.first, iter, real_info.second, run_mgr_ptr, true);
+			if (stack_info.first.size() > 0)
+			{
+				if (stack_info.first.size() == stack_pe.shape().first)
+				{
+					ss.str("");
+					ss << "WARNING: all stack runs failed for population member '" << real_info.first << 
+						", removing this member from chance calcs" << endl;
+					file_mgr_ptr->rec_ofstream() << ss.str();
+					cout << ss.str();
+					drop_members.push_back(real_info.first);
+					continue;
+				}
+				else
+				{
+					//nothing to do here since we have only stored the dec var values, not the full stack of par values.
+				}
+			}
+
 			names1 = stack_info.second.get_real_names();
 			names2.clear();
 			for (auto n : names1)
@@ -2143,6 +2169,12 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 			i++;
 			
 		}
+		for (auto d : drop_members)
+		{
+			population_stack_pe_run_map.erase(d);
+			stack_pe_map.erase(d);
+		}
+
 	}
 	else
 	{
@@ -2150,6 +2182,10 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 		stack_info = process_stack_runs("", iter, stack_pe_run_map, run_mgr_ptr, true);
 		if (stack_info.first.size() > 0)
 		{
+			if (stack_info.first.size() == stack_pe.shape().first)
+			{
+				throw_constraints_error("all stack runs failed, cannot continue");
+			}
 			file_mgr_ptr->rec_ofstream() << "dropping " << stack_info.first.size() << " failed realizations for par stack";
 			pfm.log_event("dropping failed realizations from par stack");
 			stack_pe.drop_rows(stack_info.first);

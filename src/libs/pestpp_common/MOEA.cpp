@@ -210,8 +210,6 @@ pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int
 	//update the member struct container
 	update_member_struct(op, dp);
 
-
-
 	if (member_struct.size() == 0)
 		throw runtime_error("ParetoObjectives error: member_struct is empty");
 
