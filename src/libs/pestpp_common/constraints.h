@@ -227,11 +227,12 @@ private:
 
 	void process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter);
 	pair<vector<int>,ObservationEnsemble> process_stack_runs(string real_name, int iter, map<int, int> _stack_pe_run_map, 
-		RunManagerAbstract* run_mgr_ptr, bool drop_fails=true);
+		RunManagerAbstract* run_mgr_ptr, bool drop_fails=true, bool debug_fail=false);
 
 	void save_oe_stack(int iter, string real_name, ObservationEnsemble& _stack_oe);
 	void save_pe_stack(int iter, string real_name, ParameterEnsemble& _stack_pe);
 
+	ObservationEnsemble get_stack_mean(map<string, ObservationEnsemble>& _stack_oe_map);
 
 };
 #endif

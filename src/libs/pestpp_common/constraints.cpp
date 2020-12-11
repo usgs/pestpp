@@ -1008,37 +1008,8 @@ void Constraints::update_chance_offsets()
 		
 		if (stack_oe_map.size() > 0)
 		{
-			Eigen::MatrixXd oe_stack_mean;
-			bool first = true;
-			vector<string> real_names;
-			//blast thru once to get the max num rows
-			int max_nrow = 0;
-			for (auto& o : stack_oe_map)
-			{
-				max_nrow = max(max_nrow, o.second.shape().first);
-			}
-			int count = 0;
-			for (auto& o : stack_oe_map)
-			{
-				//only use stacks that are full size (no failed runs)
-				if (o.second.shape().first != max_nrow)
-					continue;
-
-				if (first)
-				{
-					oe_stack_mean = o.second.get_eigen(vector<string>(), ctl_ord_obs_constraint_names);
-					real_names = o.second.get_real_names();
-					first = false;
-				}
-				
-				else
-				{
-					oe_stack_mean = oe_stack_mean + o.second.get_eigen(vector<string>(), ctl_ord_obs_constraint_names);
-				}
-				count += 1;
-			}
-			oe_stack_mean = oe_stack_mean / double(count);
-			ObservationEnsemble _mean_stack(&pest_scenario, &rand_gen, oe_stack_mean, real_names, ctl_ord_obs_constraint_names);
+			
+			ObservationEnsemble _mean_stack = get_stack_mean(stack_oe_map);
 			stack_oe_mean_stdev = _mean_stack.get_moment_maps();
 		}
 		else
@@ -1283,25 +1254,8 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 		//if we are using nested stacks, then calculate the average stack
 		if (stack_oe_map.size() > 0)
 		{
-
-			Eigen::MatrixXd oe_stack_mean;
-			bool first = true;
-			vector<string> real_names;
-			for (auto& o : stack_oe_map)
-			{
-				if (first)
-				{
-					oe_stack_mean = o.second.get_eigen(vector<string>(), ctl_ord_obs_constraint_names);
-					real_names = o.second.get_real_names();
-					first = false;
-				}
-				else
-					oe_stack_mean = oe_stack_mean + o.second.get_eigen(vector<string>(), ctl_ord_obs_constraint_names);
-			}
-			oe_stack_mean = oe_stack_mean / double(stack_oe_map.size());
-			ObservationEnsemble _mean_stack(&pest_scenario, &rand_gen,oe_stack_mean, real_names,ctl_ord_obs_constraint_names);
+			ObservationEnsemble _mean_stack = get_stack_mean(stack_oe_map);
 			shifted_obs = get_chance_shifted_constraints(current_obs, _mean_stack, _risk);
-
 		}
 
 		else
@@ -1315,6 +1269,42 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	return constraints_chance;
 }
 
+ObservationEnsemble Constraints::get_stack_mean(map<string, ObservationEnsemble>& _stack_oe_map)
+{
+	int max_nrow = 0;
+	for (auto& o : _stack_oe_map)
+	{
+		max_nrow = max(max_nrow, o.second.shape().first);
+	}
+	int count = 0;
+	Eigen::MatrixXd oe_stack_mean;
+	bool first = true;
+	vector<string> real_names;
+	for (auto& o : _stack_oe_map)
+	{
+		//only use stacks that are full size (no failed runs)
+		if (o.second.shape().first != max_nrow)
+			continue;
+
+		if (first)
+		{
+			oe_stack_mean = o.second.get_eigen(vector<string>(), ctl_ord_obs_constraint_names);
+			real_names = o.second.get_real_names();
+			first = false;
+		}
+
+		else
+		{
+			oe_stack_mean = oe_stack_mean + o.second.get_eigen(vector<string>(), ctl_ord_obs_constraint_names);
+		}
+		count += 1;
+	}
+	if (first)
+		throw_constraints_error("unable to compute oe_stack_mean - all stacks are empty");
+	oe_stack_mean = oe_stack_mean / double(count);
+	ObservationEnsemble _mean_stack(&pest_scenario, &rand_gen, oe_stack_mean, real_names, ctl_ord_obs_constraint_names);
+	return _mean_stack;
+}
 
 Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe, double _risk, bool full_obs)
 {
@@ -2043,7 +2033,7 @@ void Constraints::postsolve_pi_constraints_report(Parameters& old_pars, Paramete
 }
 
 pair<vector<int>,ObservationEnsemble> Constraints::process_stack_runs(string real_name, int iter, map<int, int> _stack_pe_run_map, 
-	RunManagerAbstract* run_mgr_ptr, bool drop_fails)
+	RunManagerAbstract* run_mgr_ptr, bool drop_fails, bool debug_fail)
 {
 	if (_stack_pe_run_map.size() == 0)
 		pfm.log_event("process_stack_runs() was passed an empty run map");
@@ -2051,12 +2041,12 @@ pair<vector<int>,ObservationEnsemble> Constraints::process_stack_runs(string rea
 		stack_runs_processed = true;
 	ObservationEnsemble _stack_oe(stack_oe);//copy
 	vector<int> failed_runs = _stack_oe.update_from_runs(_stack_pe_run_map, run_mgr_ptr);
-	if (pest_scenario.get_pestpp_options().get_ies_debug_fail_subset())
+	if (debug_fail)
 	{
 
 		failed_runs.push_back(0);
 		cout << "ies_debug_fail_subset = true, failing first stack realization" << endl;
-		file_mgr_ptr->rec_ofstream() << "ies_debug_fail_subset = true, failing first stack realization" << endl;
+		file_mgr_ptr->rec_ofstream() << "debug = true, failing first stack realization for " << real_name <<  endl;
 	}
 	stringstream ss;
 	if (failed_runs.size() > 0)
@@ -2156,10 +2146,17 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 		}
 		vector<string> drop_members;
 		bool test_failed = false;
+		bool should_fail = false;
 		for (auto& real_info : population_stack_pe_run_map)
 		{
 			pfm.log_event("processing stack runs for realization " + real_info.first);
-			stack_info = process_stack_runs(real_info.first, iter, real_info.second, run_mgr_ptr, true);
+			should_fail = false;
+			if ((!test_failed) && (pest_scenario.get_pestpp_options().get_ies_debug_fail_subset()))
+			{
+				should_fail = true;
+				test_failed = true;
+			}
+			stack_info = process_stack_runs(real_info.first, iter, real_info.second, run_mgr_ptr, true, should_fail);
 
 			//test all but one stack runs failed
 			if ((!test_failed) && (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder()))
@@ -2168,7 +2165,7 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 					stack_info.first.push_back(i);
 				test_failed = true;
 				cout << "ies_debug_fail_remainder = true, failing full stack for member " << real_info.first << endl;
-				file_mgr_ptr->rec_ofstream() << "ies_debug_fail_remainder = true, failing full stack for member " << real_info.first << endl;
+				file_mgr_ptr->rec_ofstream() << "ies_debug_fail_remainder = true, failing most of stack for member " << real_info.first << endl;
 			}
 			if (stack_info.first.size() > 0)
 			{
