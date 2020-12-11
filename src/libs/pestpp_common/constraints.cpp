@@ -2161,10 +2161,10 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 			pfm.log_event("processing stack runs for realization " + real_info.first);
 			stack_info = process_stack_runs(real_info.first, iter, real_info.second, run_mgr_ptr, true);
 
-			//test a single stack run failed
+			//test all but one stack runs failed
 			if ((!test_failed) && (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder()))
 			{
-				for (int i = 0; i < real_info.second.size(); i++)
+				for (int i = 1; i < real_info.second.size(); i++)
 					stack_info.first.push_back(i);
 				test_failed = true;
 				cout << "ies_debug_fail_remainder = true, failing full stack for member " << real_info.first << endl;
