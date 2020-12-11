@@ -1000,27 +1000,44 @@ void Constraints::update_chance_offsets()
 	}
 	// or if we are using stacks, we just calculate a new token variance
 	//this isnt actually used in the shifting since we do a non-parametric shift along the PDF, but 
-	//we can still report this variance.
+	//we can still report this variance.  So we dont need to worry about accounting for 
+	//every stack if there are some failed runs, etc.
 	else
 	{
 		pair<map<string, double>, map<string, double>> stack_oe_mean_stdev;
+		
 		if (stack_oe_map.size() > 0)
 		{
 			Eigen::MatrixXd oe_stack_mean;
 			bool first = true;
 			vector<string> real_names;
+			//blast thru once to get the max num rows
+			int max_nrow = 0;
 			for (auto& o : stack_oe_map)
 			{
+				max_nrow = max(max_nrow, o.second.shape().first);
+			}
+			int count = 0;
+			for (auto& o : stack_oe_map)
+			{
+				//only use stacks that are full size (no failed runs)
+				if (o.second.shape().first != max_nrow)
+					continue;
+
 				if (first)
 				{
 					oe_stack_mean = o.second.get_eigen(vector<string>(), ctl_ord_obs_constraint_names);
 					real_names = o.second.get_real_names();
 					first = false;
 				}
+				
 				else
+				{
 					oe_stack_mean = oe_stack_mean + o.second.get_eigen(vector<string>(), ctl_ord_obs_constraint_names);
+				}
+				count += 1;
 			}
-			oe_stack_mean = oe_stack_mean / double(stack_oe_map.size());
+			oe_stack_mean = oe_stack_mean / double(count);
 			ObservationEnsemble _mean_stack(&pest_scenario, &rand_gen, oe_stack_mean, real_names, ctl_ord_obs_constraint_names);
 			stack_oe_mean_stdev = _mean_stack.get_moment_maps();
 		}
