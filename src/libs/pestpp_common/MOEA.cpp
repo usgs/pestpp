@@ -1139,7 +1139,8 @@ vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _o
 		throw_moea_error(string("error processing runs"));
 	}
 	//for testing
-	//failed_real_indices.push_back(0);
+	if (pest_scenario.get_pestpp_options().get_ies_debug_fail_subset())
+		failed_real_indices.push_back(0);
 
 	if (failed_real_indices.size() > 0)
 	{
