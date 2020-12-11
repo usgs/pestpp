@@ -2034,6 +2034,13 @@ pair<vector<int>,ObservationEnsemble> Constraints::process_stack_runs(string rea
 		stack_runs_processed = true;
 	ObservationEnsemble _stack_oe(stack_oe);//copy
 	vector<int> failed_runs = _stack_oe.update_from_runs(_stack_pe_run_map, run_mgr_ptr);
+	if (pest_scenario.get_pestpp_options().get_ies_debug_fail_subset())
+	{
+
+		failed_runs.push_back(0);
+		cout << "ies_debug_fail_subset = true, failing first stack realization" << endl;
+		file_mgr_ptr->rec_ofstream() << "ies_debug_fail_subset = true, failing first stack realization" << endl;
+	}
 	stringstream ss;
 	if (failed_runs.size() > 0)
 	{
@@ -2131,10 +2138,21 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 				drop_names.push_back(name);
 		}
 		vector<string> drop_members;
+		bool test_failed = false;
 		for (auto& real_info : population_stack_pe_run_map)
 		{
 			pfm.log_event("processing stack runs for realization " + real_info.first);
 			stack_info = process_stack_runs(real_info.first, iter, real_info.second, run_mgr_ptr, true);
+
+			//test a single stack run failed
+			if ((!test_failed) && (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder()))
+			{
+				for (int i = 0; i < real_info.second.size(); i++)
+					stack_info.first.push_back(i);
+				test_failed = true;
+				cout << "ies_debug_fail_remainder = true, failing full stack for member " << real_info.first << endl;
+				file_mgr_ptr->rec_ofstream() << "ies_debug_fail_remainder = true, failing full stack for member " << real_info.first << endl;
+			}
 			if (stack_info.first.size() > 0)
 			{
 				if (stack_info.first.size() == stack_pe.shape().first)
@@ -2180,6 +2198,7 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 	{
 		pfm.log_event("processing stack runs");
 		stack_info = process_stack_runs("", iter, stack_pe_run_map, run_mgr_ptr, true);
+		
 		if (stack_info.first.size() > 0)
 		{
 			if (stack_info.first.size() == stack_pe.shape().first)
