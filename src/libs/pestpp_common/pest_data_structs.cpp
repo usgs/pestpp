@@ -983,11 +983,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		// Read all DA parameters. 
 	}
-	else if (!assign_value_by_key_continued(key, value, org_value))
-	{
-		return ARG_STATUS::ARG_NOTFOUND;
-	}
-
+	
 	else if ((!assign_value_by_key_continued(key, value, org_value)) && 
 	(!assign_value_by_key_sqp(key, value, org_value)) &&
 	(!assign_mou_value_by_key(key, value, org_value)))
