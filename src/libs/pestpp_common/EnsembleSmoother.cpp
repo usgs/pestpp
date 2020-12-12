@@ -1288,7 +1288,7 @@ void IterEnsembleSmoother::initialize()
 		vector<int> failed_idxs = run_ensemble(_pe, _oe);
 		if (failed_idxs.size() != 0)
 		{
-			message(0, "mean parmeter value run failed...bummer");
+			message(0, "mean parameter value run failed...bummer");
 			return;
 		}
 		string obs_csv = file_manager.get_base_filename() + ".mean.obs.csv";
@@ -2562,14 +2562,14 @@ void IterEnsembleSmoother::update_reals_by_phi(ParameterEnsemble &_pe, Observati
 	//store map of current phi values
 	ph.update(oe, pe);
 	L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
-	map<string, double> *phi_map = ph.get_phi_map(pt);
+	map<string, double> *phi_map = ph.get_phi_map_ptr(pt);
 	map<string, double> cur_phi_map;
 	for (auto p : *phi_map)
 		cur_phi_map[p.first] = p.second;
 
 	//now get a phi map of the new phi values
 	ph.update(_oe, _pe);
-	phi_map = ph.get_phi_map(pt);
+	phi_map = ph.get_phi_map_ptr(pt);
 	
 	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
 	double cur_phi, new_phi;
@@ -3139,7 +3139,7 @@ void IterEnsembleSmoother::set_subset_idx(int size)
 		int step;
 		int idx;
 		L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
-		map<string, double>* phi_map = ph.get_phi_map(pt);
+		map<string, double>* phi_map = ph.get_phi_map_ptr(pt);
 		map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
 
 		int i = 0;
@@ -3343,63 +3343,18 @@ vector<ObservationEnsemble> IterEnsembleSmoother::run_lambda_ensembles(vector<Pa
 vector<int> IterEnsembleSmoother::run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs)
 {
 	stringstream ss;
-	ss << "queuing " << _pe.shape().first << " runs";
-	performance_log->log_event(ss.str());
-	run_mgr_ptr->reinitialize();
-	map<int, int> real_run_ids;
-	try
-	{
-		real_run_ids = _pe.add_runs(run_mgr_ptr,real_idxs);
-	}
-	catch (const exception &e)
-	{
-		stringstream ss;
-		ss << "run_ensemble() error queueing runs: " << e.what();
-		throw_ies_error(ss.str());
-	}
-	catch (...)
-	{
-		throw_ies_error(string("run_ensemble() error queueing runs"));
-	}
-	performance_log->log_event("making runs");
-	try
-	{
-		run_mgr_ptr->run();
-	}
-	catch (const exception &e)
-	{
-		stringstream ss;
-		ss << "error running ensemble: " << e.what();
-		throw_ies_error(ss.str());
-	}
-	catch (...)
-	{
-		throw_ies_error(string("error running ensemble"));
-	}
-
-	performance_log->log_event("processing runs");
-	if (real_idxs.size() > 0)
-	{
-		_oe.keep_rows(real_idxs);
-	}
 	vector<int> failed_real_indices;
 	try
 	{
-		failed_real_indices = _oe.update_from_runs(real_run_ids,run_mgr_ptr);
+		failed_real_indices = run_ensemble_util(performance_log, file_manager.rec_ofstream(), _pe, _oe, run_mgr_ptr, pest_scenario.get_pestpp_options().get_debug_check_par_en_consistency(), real_idxs);
 	}
-	catch (const exception &e)
+	catch (const exception& e)
 	{
-		stringstream ss;
-		ss << "error processing runs: " << e.what();
+		ss.str("");
+		ss << "run_ensemble() error: " << e.what();
 		throw_ies_error(ss.str());
 	}
-	catch (...)
-	{
-		throw_ies_error(string("error processing runs"));
-	}
-	//for testing
-	//failed_real_indices.push_back(0);
-
+	
 	if (failed_real_indices.size() > 0)
 	{
 		stringstream ss;

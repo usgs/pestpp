@@ -61,9 +61,12 @@ test_script:
   - #cd benchmarks
   - set PATH=%PATH%;..\..\..\test_bin\win;..\..\test_bin\win;
   - nosetests -v -w ./benchmarks basic_tests.py
+<<<<<<< HEAD
   - nosetests -v -w ./benchmarks mou_tests.py
   - #set USE_INTEL="YES";
   - #nosetests -v -w ./benchmarks basic_tests.py
+=======
+>>>>>>> upstream_ayman/develop
   - #nosetests -v -w ./pestpp-ies_benchmarks ies_test.py
   - #nosetests -v -w ./pestpp-opt_benchmarks opt_test.py
 

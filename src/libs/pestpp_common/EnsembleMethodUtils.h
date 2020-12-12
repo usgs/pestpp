@@ -28,7 +28,7 @@ public:
 	L2PhiHandler() { ; }
 	L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 		       ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
-		       Covariance *_parcov, bool should_prep_csv = true);
+		       Covariance *_parcov, bool should_prep_csv = true, string _tag=string());
 	void update(ObservationEnsemble &oe, ParameterEnsemble &pe);
 	double get_mean(phiType pt);
 	double get_std(phiType pt);
@@ -38,7 +38,8 @@ public:
 	double calc_mean(map<string, double> *phi_map);
 	double calc_std(map<string, double> *phi_map);
 
-	map<string, double>* get_phi_map(L2PhiHandler::phiType &pt);
+	map<string, double>* get_phi_map_ptr(L2PhiHandler::phiType pt);
+	map<string, double> get_phi_map(L2PhiHandler::phiType pt);
 	void report(bool echo=true);
 	void write(int iter_num, int total_runs, bool write_group = true);
 	void write_group(int iter_num, int total_runs, vector<double> extra);
@@ -60,6 +61,7 @@ public:
 
 
 private:
+	string tag;
 	map<string, double> get_summary_stats(phiType pt);
 	string get_summary_string(phiType pt);
 	string get_summary_header();
@@ -128,5 +130,10 @@ private:
 
 void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
 	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter);
+
+vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
+	ObservationEnsemble& _oe, RunManagerAbstract* run_mgr_ptr,
+	bool check_pe_consistency = false, const vector<int>& real_idxs = vector<int>(),int da_cycle=NetPackage::NULL_DA_CYCLE);
+
 
 #endif

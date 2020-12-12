@@ -82,6 +82,9 @@ public:
 	const ParameterGroupInfo& operator=(const ParameterGroupInfo &rhs);
 	bool have_switch_derivative() const;
 	vector<string> get_group_names() const;
+	void par_erase(const string& par_name) { parameter2group.erase(par_name); }
+	void grp_erase(const string& grp_name) { groups.erase(grp_name);
+	}
 	~ParameterGroupInfo();
 private:
 	unordered_map<string, ParameterGroupRec*> groups;
@@ -101,9 +104,10 @@ public:
 	double offset;
 	string group;
 	int dercom;
+	int cycle;
 	TRAN_TYPE tranform_type;
 	ParameterRec() : chglim(""), lbnd(0.0), ubnd(0.0), init_value(0.0), group(""),
-		dercom(1), tranform_type(TRAN_TYPE::NONE), scale(1.0), offset(0.0){}
+		dercom(1), tranform_type(TRAN_TYPE::NONE), scale(1.0), offset(0.0), cycle(0){}
 	bool is_active() const { return !(tranform_type == TRAN_TYPE::FIXED || tranform_type == TRAN_TYPE::TIED); }
 };
 ostream& operator<< (ostream &os, const ParameterRec& val);
@@ -117,6 +121,7 @@ public:
 	const ParameterRec* get_parameter_rec_ptr(const string &name) const;
 	ParameterRec* get_parameter_rec_ptr_4_mod(const string &name);
 	void insert(const string &name, const ParameterRec &rec) {parameter_info[name] = rec;}
+	void erase(const string& name) { parameter_info.erase(name);}
 	ParameterInfo() {}
 	~ParameterInfo() {}
 private:
@@ -139,7 +144,9 @@ class ObservationRec {
 public:
 	double weight;
 	string group;
-	ObservationRec(double _weight=0.0,const string &_group="") : weight(_weight), group(_group) {}
+	int cycle;
+	ObservationRec(double _weight=0.0,const string &_group="", int _cycle = 0)
+		: weight(_weight), group(_group),cycle(_cycle)  {}
 	bool is_regularization() const;
 };
 ostream& operator<< (ostream &os, const ObservationRec& val);
@@ -155,6 +162,7 @@ public:
 	void set_weight(const string &obs_name, double value);
 	string get_group(const string &obs_name) const;
 	const ObservationRec* get_observation_rec_ptr(const string &name) const;
+	ObservationRec* get_observation_rec_ptr_4_mod(const string& name);
 	const ObservationGroupRec* get_group_rec_ptr(const string &name) const;
 	Observations get_regulatization_obs(const Observations &obs_in);
 	int get_nnz_obs() const;
@@ -162,6 +170,8 @@ public:
 	vector<string> get_groups();
 	void reset_group_weights(string &group, double val);
 	void scale_group_weights(string &group, double scale_val);
+	void erase_ob(const string& name) { observations.erase(name);}
+	void erase_gp(const string& name) { groups.erase(name); }
 
 };
 
@@ -172,6 +182,8 @@ public:
 	std::vector<std::string> inpfile_vec;
 	std::vector<std::string> insfile_vec;
 	std::vector<std::string> outfile_vec;
+	std::vector<int> incycle_vec;
+	std::vector<int> outcycle_vec;
 };
 
 class ParetoInfo {
@@ -181,6 +193,87 @@ public:
 	int niter_start, niter_gen, niter_fin;
 	ParetoInfo() : wf_start(1.0), wf_fin(1.0), wf_inc(0.0),
 		obsgroup(""), niter_start(1), niter_gen(1), niter_fin(1) {};
+};
+
+
+class CtlPar_container
+{
+	/* A proposed class to simplify adding new control options*/
+public:
+	CtlPar_container() { ; };
+
+	// overload return data is impossible, so each function return different value. 
+	// Cons: user must know the type of the data before using it
+
+	
+	template<typename  T>
+	T get_value(string name);
+	
+	string get_svalue(string name);
+	int get_ivalue(string name);
+	double get_dvalue(string name);
+	bool get_bvalue(string name);
+	vector<double> get_vvalue(string name);
+
+	bool is_parameter(string name);
+	string get_type(string name);
+
+	void set_value(string name, bool val);
+	void set_value(string name, int val);
+	void set_value(string name, double val);
+	void set_value(string name, string val);
+	void set_value(string name, vector<double> val);
+
+private:
+	
+
+	std::unordered_map<string, int> int_parms = {
+		{ "DA_SUBSET_SIZE", 5 },
+		{ "DA_VERBOSE_LEVEL", 1 }
+		
+	};
+
+	std::unordered_map<string, double> double_parms = {
+		{ "DA_BAD_PHI",1.0E300 },
+		{ "DA_BAD_PHI_SIGMA", 1.0E300 },
+	    {"DA_INITIAL_INF_FAC", -1.0},
+	    {"DA_LAMBDA_DEC_FAC", 0.75},
+	    {"DA_LAMBDA_INC_FAC", 10.0},
+		{"DA_ACCEPT_PHI_FAC", 1.05}
+
+	};
+
+	std::unordered_map<string, string> string_parms = {
+		{ "DA_OBSERVATION_ENSEMBLE", "" },
+		{"DA_RESTART_OBSERVATION_ENSEMBLE", ""},
+		{"DA_RESTART_PARAMETER_ENSEMBLE", ""},
+	    {"DA_SUBSET_HOW", "random"},
+		{"DA_TYPE", "mda"}
+
+	};
+	std::unordered_map<string, bool> bool_parms = {
+		{ "DA_ADD_BASE", true },
+	    {"DA_ENFORCE_BOUNDS", true},
+		{"DA_USE_PRIOR_SCALING", true},
+		{"DA_SAVE_BINARY", false},
+		{"DA_EVALUATE_UPDATE", true},
+	    {"DA_ENFORCE_CHGLIM", false}
+
+
+	};
+	std::unordered_map<string, vector<double>> vector_parms
+	{
+		{"DA_INFLATION_FAC", {1.0}},
+		{"DA_INFLATION_MULT",{0.1, 1, 10}},
+		{"DA_SCALE_FAC", {0.75,1.0,1.1}},
+		{"DA_SVD_THRSH", {1e-3, 1e-4, 1e-6}}
+	    //LAMBDA_SCALE_FAC
+
+	};
+	
+
+	
+
 };
 
 class PestppOptions {
@@ -196,11 +289,11 @@ public:
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
 	vector<string> notfound_args;
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
-	bool assign_value_by_key_continued(const string& key, const string& value);
 
 	bool assign_value_by_key_sqp(const string& key, const string& value, const string& org_value);
 	bool assign_mou_value_by_key(const string& key, const string& value, const string& org_value);
-
+	bool assign_DA_value_by_key(const string& key, const string& value, const string& org_value);
+	bool assign_value_by_key_continued(const string& key, const string& value, const string& org_value);
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
 	int get_n_iter_base() const { return n_iter_base; }
@@ -448,6 +541,21 @@ public:
 	double get_ies_pdc_sigma_distance() const { return ies_pdc_sigma_distance; }
 	void set_ies_pdc_sigma_distance(double distance) { ies_pdc_sigma_distance = distance; }
 
+	// DA parameters
+	CtlPar_container da_ctl_params;
+	void set_da_use_ies(bool _use) { da_use_ies = _use; }
+	bool get_da_use_ies() const { return da_use_ies; }
+	void set_da_mode(string _mode) { da_mode = _mode; }
+	string get_da_mode() const { return da_mode; }	
+	string get_da_par_csv()const { return da_par_csv; }
+	void set_da_par_csv(string _da_par_csv) { da_par_csv = _da_par_csv; }
+	int get_da_num_reals() const { return da_num_reals; }
+	void set_da_num_reals(int _da_num_reals) { da_num_reals = _da_num_reals; }
+	string get_da_obs_csv()const { return da_obs_csv; }
+	void set_da_obs_csv(string _da_obs_csv) { da_obs_csv = _da_obs_csv; }
+
+	// End of Data parameters
+
 	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
 	bool get_gsa_morris_pooled_obs() const { return gsa_morris_pooled_obs; }
@@ -500,6 +608,16 @@ public:
 	void set_forgive_unknown_args(bool _flag) { forgive_unknown_args = _flag; }
 	bool get_forgive_unknown_args() const { return forgive_unknown_args; }
 
+
+	string get_da_par_cycle_table() const { return da_par_cycle_table; }
+	void set_da_par_cycle_table(string _filename) { da_par_cycle_table = _filename; }
+	string get_da_obs_cycle_table() const { return da_obs_cycle_table; }
+	void set_da_obs_cycle_table(string _filename) { da_obs_cycle_table = _filename; }
+	string get_da_weight_cycle_table() const { return da_weight_cycle_table; }
+	void set_da_weight_cycle_table(string _filename) { da_weight_cycle_table = _filename; }
+
+	bool get_debug_check_par_en_consistency() const { return debug_check_paren_consistency; }
+	void set_debug_check_par_en_consistency(bool _flag) { debug_check_paren_consistency = _flag; }
 	void set_num_tpl_ins_threads(int num) { num_tpl_ins_threads = num; }
 	int get_num_tpl_ins_threads()const { return num_tpl_ins_threads; }
 
@@ -612,7 +730,7 @@ private:
 	vector<double> ies_lam_mults;
 	int ies_verbose_level;
 	bool ies_use_prior_scaling;
-	int ies_num_reals;
+	int ies_num_reals;	
 	double ies_bad_phi;
 	double ies_bad_phi_sigma;
 	bool ies_include_base;
@@ -648,6 +766,20 @@ private:
 	bool ies_save_rescov;
 	double ies_pdc_sigma_distance;
 
+	// Data Assimilation parameters
+	string da_mode;
+	bool da_use_ies;
+	string da_par_csv;
+	int da_num_reals;
+	string da_obs_csv;
+	string da_par_cycle_table;
+	string da_obs_cycle_table;
+	string da_weight_cycle_table;
+
+	
+
+	// End of Data Assimilation Parameters
+
 	string gsa_method;
 	int gsa_morris_p;
 	int gsa_morris_r;
@@ -657,11 +789,14 @@ private:
 	double gsa_morris_delta;
 	string gsa_sobol_par_dist;
 
+
 	bool panther_agent_restart_on_error;
 	int panther_agent_no_ping_timeout_secs;
 	bool panther_debug_loop;
+	bool debug_check_paren_consistency;		
 	bool panther_debug_fail_freeze;
 	bool panther_echo;
+
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);
 ostream& operator<< (ostream &os, const ObservationInfo& val);
@@ -709,6 +844,9 @@ ostream& operator<< (ostream& os, const SVDInfo& val);
 
 double draw_standard_normal(std::mt19937& rand_gen);
 vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bound, std::mt19937& rand_gen);
+
+
+
 
 
 #endif  /* PEST_DATAS_STRUCTS_H_ */

@@ -1312,9 +1312,9 @@ void SeqQuadProgram::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnse
 	//store map of current phi values
 	ph.update(oe, dv);
 	L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
-	map<string, double> *phi_map = ph.get_phi_map(pt);
+	map<string, double> phi_map = ph.get_phi_map(pt);
 	map<string, double> cur_phi_map;
-	for (auto p : *phi_map)
+	for (auto p : phi_map)
 		cur_phi_map[p.first] = p.second;
 
 	//now get a phi map of the new phi values
@@ -1329,7 +1329,7 @@ void SeqQuadProgram::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnse
 	for (int i=0;i<_oe.shape().first;i++)
 	{
 		oname = oe_names[i];
-		new_phi = phi_map->at(oname);
+		new_phi = phi_map.at(oname);
 		cur_phi = cur_phi_map.at(oname);
 		if (new_phi < cur_phi * acc_fac)
 		{
@@ -1821,8 +1821,8 @@ void SeqQuadProgram::set_subset_idx(int size)
 		int step;
 		int idx;
 		L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
-		map<string, double>* phi_map = ph.get_phi_map(pt);
-		map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
+		map<string, double> phi_map = ph.get_phi_map(pt);
+		map<string, double>::iterator pi = phi_map.begin(), end = phi_map.end();
 
 		int i = 0;
 		for (; pi != end; ++pi)

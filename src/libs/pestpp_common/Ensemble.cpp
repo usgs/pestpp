@@ -71,6 +71,7 @@ void Ensemble::check_for_dups()
 void Ensemble::reserve(vector<string> _real_names, vector<string> _var_names)
 {
 	reals.resize(_real_names.size(), _var_names.size());
+	reals.setZero();
 	var_names = _var_names;
 	real_names = _real_names;
 	org_real_names = real_names;
@@ -83,6 +84,40 @@ Ensemble Ensemble::zero_like()
 	new_en.from_eigen_mat(new_reals, real_names, var_names);
 	return new_en;
 }
+
+void Ensemble::broadcast_vec2mat(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
+{
+	//todo
+
+}
+
+void Ensemble::replace_col_vals(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
+{
+
+	if (shape().first != mat.rows())
+		throw_ensemble_error("Ensemble::add_2_cols_ip(): first dimensions don't match");
+
+	map<string, int> this_varmap, other_varmap;
+	for (int i = 0; i < var_names.size(); i++)
+		this_varmap[var_names[i]] = i;
+
+	vector<string> missing;
+	set<string> svnames(var_names.begin(), var_names.end());
+	set<string>::iterator end = svnames.end();
+	for (int i = 0; i < other_var_names.size(); i++)
+	{
+		if (svnames.find(other_var_names[i]) == end)
+			missing.push_back(other_var_names[i]);
+		other_varmap[other_var_names[i]] = i;
+	}
+	if (missing.size() > 0)
+		throw_ensemble_error("Ensemble::add_2_cols_ip(): the following var names in other were not found", missing);
+	for (auto& ovm : other_varmap)
+	{
+		reals.col(this_varmap[ovm.first]) = mat.col(ovm.second);
+	}
+}
+
 
 
 void Ensemble::add_2_cols_ip(const vector<string> &other_var_names, const Eigen::MatrixXd &mat)
@@ -1011,7 +1046,7 @@ Eigen::VectorXd Ensemble::get_real_vector(const string &real_name)
 	return get_real_vector(idx);
 }
 
-void Ensemble::update_real_ip(string & rname, Eigen::VectorXd & real)
+void Ensemble::update_real_ip(const string & rname, Eigen::VectorXd & real)
 {
 	vector<string>::iterator idx = find(real_names.begin(), real_names.end(), rname);
 	if (idx == real_names.end())
@@ -2070,7 +2105,7 @@ ParameterEnsemble ParameterEnsemble::zeros_like()
 
 }
 
-map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs)
+map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs, int da_cycle)
 {
 	//add runs to the run manager using int indices
 	map<int,int> real_run_ids;
@@ -2102,6 +2137,14 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 	for (int i = 0; i < real_names.size(); i++)
 		rmap[real_names[i]] = i;
 	vector<string> nn;
+
+	string info_txt = "";
+	//if (da_cycle != NetPackage::NULL_DA_CYCLE)
+	{
+		stringstream ss;
+		ss << " da_cycle=" << da_cycle << " ";
+		info_txt = ss.str();
+	}
 	for (auto &rname : run_real_names)
 	{
 		//idx = find(real_names.begin(), real_names.end(), rname) - real_names.begin();
@@ -2124,7 +2167,7 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 				ss << n << ",";
 			throw_ensemble_error(ss.str());
 		}
-		run_id = run_mgr_ptr->add_run(pars_real,"realization: "+rname);
+		run_id = run_mgr_ptr->add_run(pars_real,info_txt+" realization: "+rname);
 		real_run_ids[idx]  = run_id;
 	}
 	return real_run_ids;
@@ -2222,8 +2265,10 @@ void ParameterEnsemble::from_csv(string file_name)
 	map<string, int>::iterator end = map_ptr->end();
 
 	for (auto p : pest_scenario_ptr->get_ctl_ordered_adj_par_names())
+	{
 		if (map_ptr->find(p) == end)
 			missing.push_back(p);
+	}
 	if (missing.size() > 0)
 		throw_ensemble_error("ParameterEnsemble.from_csv() error: the following adjustable pars not in csv:",missing);
 
@@ -2846,15 +2891,29 @@ void ObservationEnsemble::update_from_obs(string real_name, Observations &obs)
 	update_from_obs(real - start, obs);
 }
 
-vector<int> ObservationEnsemble::update_from_runs(map<int,int> &real_run_ids, RunManagerAbstract *run_mgr_ptr)
+vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr)
 {
+	ParameterEnsemble run_mgr_pe(pest_scenario_ptr, rand_gen_ptr);
+	return update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe);
+}
+
+vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe)
+{
+	//run_mgr_pe is reset here and filled with the parameter value from the run mgr - these can be used to check that the 
+	//par values from the run mgr are consistent with what par values were desired
+
 	//update the obs ensemble in place from the run manager
+	
 	set<int> failed_runs = run_mgr_ptr->get_failed_run_ids();
 	vector<int> failed_real_idxs;
 	Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 	Observations obs = pest_scenario_ptr->get_ctl_observations();
 	string real_name;
 	int ireal = 0;
+	run_mgr_pe = ParameterEnsemble(pest_scenario_ptr, rand_gen_ptr);
+	vector<string> var_names = pars.get_keys();
+	run_mgr_pe.reserve(real_names,var_names);
+	run_mgr_pe.set_zeros();
 	for (auto &real_run_id : real_run_ids)
 	{
 		if (failed_runs.find(real_run_id.second) != failed_runs.end())
@@ -2868,6 +2927,8 @@ vector<int> ObservationEnsemble::update_from_runs(map<int,int> &real_run_ids, Ru
 			run_mgr_ptr->get_run(real_run_id.second, pars, obs);
 			//real_name = real_names[real_run_id.first];
 			update_from_obs(real_run_id.first, obs);
+			Eigen::VectorXd real = pars.get_data_eigen_vec(var_names);
+			run_mgr_pe.update_real_ip(real_names[real_run_id.first], real);
 			//update_from_obs(ireal, obs);
 		}
 	}

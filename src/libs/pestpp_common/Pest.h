@@ -49,20 +49,26 @@ public:
 
 	int get_n_adj_par(){ return n_adj_par; }
 	const Parameters& get_ctl_parameters() const {return ctl_parameters;}
+	Parameters& get_ctl_parameters_4_mod() { return ctl_parameters; }
 	const Observations& get_ctl_observations() const {return observation_values;}
+	Observations& get_ctl_observations_4_mod() { return observation_values;  }
 	const ParameterInfo& get_ctl_parameter_info()const {return ctl_parameter_info;}
 	ParameterInfo* get_ctl_parameter_info_ptr_4_mod() { return &ctl_parameter_info; }
 	const ParameterGroupInfo& get_base_group_info() const {return  base_group_info;}
 	ParameterGroupInfo* get_base_group_info_ptr_4_mod() { return  &base_group_info; }
 	ParameterGroupInfo* get_base_group_info_ptr() { return  &base_group_info; }
 	const ObservationInfo &get_ctl_observation_info() const {return observation_info;}
+	ObservationInfo& get_ctl_observation_info_4_mod() { return observation_info; }
 	const ObservationInfo* get_ctl_observation_info_ptr() const { return &observation_info; }
+	void set_observation_info(ObservationInfo oi) { observation_info = oi; }
+
 	const std::map<std::string, std::string> get_observation_groups() const;
 	const PriorInformation &get_prior_info() {return prior_info;}
 	PriorInformation *get_prior_info_ptr() {return &prior_info;}
 	const SVDInfo& get_svd_info() const {return svd_info;}
 	const ControlInfo&  get_control_info() const {return control_info;}
 	const ParamTransformSeq& get_base_par_tran_seq() const {return base_par_transform;}
+	ParamTransformSeq& get_base_par_tran_seq_4_mod() { return base_par_transform; }
 	const vector<string> &get_ctl_ordered_par_names() const {return ctl_ordered_par_names;}
 	const vector<string> &get_ctl_ordered_obs_names() const {return ctl_ordered_obs_names;}
 	const vector<string> &get_ctl_ordered_par_group_names() { return ctl_ordered_par_group_names; }
@@ -89,13 +95,19 @@ public:
 	map<string,double> get_pars_at_near_bounds(const Parameters &pars, double tol=0.0);
 	pair<Parameters,Parameters> get_effective_ctl_lower_upper_bnd(Parameters &pars);
 	map<string, double> calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform);
+
+	Pest &get_child_pest(int icycle);
+	void child_pest_update(int icycle);
+	vector<int> get_assim_cycles(ofstream& f_rec);
+	void assign_da_cycles(ofstream& f_rec);
+	vector<pair<string, int>> extract_cycle_numbers2(ofstream& f_rec, string section_name, vector<string> possible_name_cols);
 	map<string, double> get_ext_file_double_map(const string& section_name, const string& col_name);
 
     void clear_ext_files() { efiles_map.clear(); }
 
 	virtual ~Pest();
 	
-private:
+protected:
 	//this is the list of external file cols that have meaning...
 	set<string> efile_keep_cols{ "standard_deviation", "obsnme","parnme","name", "upper_bound","lower_bound", "cycle" };
 	int n_adj_par = 0;
@@ -117,6 +129,7 @@ private:
 	vector<string> ctl_ordered_par_group_names;
 	vector<string> ctl_ordered_obs_group_names;
 	vector<string> ctl_ordered_pi_names;
+	vector<int> assimilation_cycles;
 	DynamicRegularization *regul_scheme_ptr;
 	map<int,string> other_lines;
 	string pst_filename;
@@ -134,7 +147,8 @@ private:
 	void tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens);
 	void tokens_to_pi_rec(ostream& f_rec, const string& line_upper);
 	void rectify_par_groups();
-
+	void extract_da_cycles();
+	map<string, int> extract_cycle_numbers(ofstream& f_rec, string section_name, vector<string> possible_name_cols);
 	map<string, vector<pest_utils::ExternalCtlFile>> efiles_map;
 };
 ostream& operator<< (ostream &os, const Pest& val);

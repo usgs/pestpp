@@ -25,6 +25,7 @@ public:
 	static int get_new_group_id();
 	NetPackage(PackType _type=PackType::UNKN, int _group=-1, int _run_id=-1, const std::string &desc_str="");
 	~NetPackage(){}
+
 	std::vector<std::string> pack_strings;
 	const static int DESC_LEN = 1001;
 	const static int NULL_DA_CYCLE = -9999;

@@ -29,6 +29,7 @@
   <ItemGroup>
     <ClInclude Include="constraints.h" />
     <ClInclude Include="covariance.h" />
+    <ClInclude Include="DataAssimilator.h" />
     <ClInclude Include="DifferentialEvolution.h" />
     <ClInclude Include="eigen_tools.h" />
     <ClInclude Include="Ensemble.h" />
@@ -42,6 +43,7 @@
     <ClInclude Include="logger.h" />
     <ClInclude Include="ModelRunPP.h" />
     <ClInclude Include="MOEA.h" />
+    <ClInclude Include="MultiPest.h" />
     <ClInclude Include="ObjectiveFunc.h" />
     <ClInclude Include="OutputFileWriter.h" />
     <ClInclude Include="ParamTransformSeq.h" />
@@ -65,6 +67,7 @@
   <ItemGroup>
     <ClCompile Include="constraints.cpp" />
     <ClCompile Include="covariance.cpp" />
+    <ClCompile Include="DataAssimilator.cpp" />
     <ClCompile Include="DifferentialEvolution.cpp" />
     <ClCompile Include="eigen_tools.cpp" />
     <ClCompile Include="Ensemble.cpp" />

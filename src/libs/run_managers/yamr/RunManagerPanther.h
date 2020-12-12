@@ -100,7 +100,9 @@ class RunManagerPanther : public RunManagerAbstract
 {
 public:
 	RunManagerPanther(const std::string &stor_filename, const std::string &port, std::ofstream &_f_rmr, int _max_n_failure,
-		double overdue_reched_fac, double overdue_giveup_fac, double overdue_giveup_minutes, bool _should_echo=true);
+		double overdue_reched_fac, double overdue_giveup_fac, double overdue_giveup_minutes, bool _should_echo = true, const vector<string>& par_names=vector<string>(),
+		const vector<string>& obs_names=vector<string>());
+
 	virtual void initialize(const Parameters &model_pars, const Observations &obs, const std::string &_filename = std::string(""));
 	virtual void initialize_restart(const std::string &_filename);
 	virtual void reinitialize(const std::string &_filename = std::string(""));
@@ -114,6 +116,7 @@ public:
 	~RunManagerPanther(void);
 	int get_n_waiting_runs() { return waiting_runs.size(); }
 	void close_agents();
+	
 
 private:
 	std::string port;
@@ -189,6 +192,9 @@ private:
 	virtual void update_run_failed(int run_id, int socket_fd);
 	virtual void update_run_failed(int run_id);
 	map<string, int> get_agent_stats();
+	vector<string> par_names_to_check_worker;
+	vector<string> obs_names_to_check_worker;
+
 };
 
 class RunManagerYAMRCondor : public RunManagerPanther

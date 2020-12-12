@@ -35,6 +35,7 @@ add_library(pestpp_com STATIC
   SQP.cpp
   MOEA.cpp
   sequential_lp.cpp
+  DataAssimilator.cpp
 )
 
 target_include_directories(pestpp_com INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}" /src/libs/opt)

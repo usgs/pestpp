@@ -1,0 +1,34 @@
+pcf version=2
+* control data keyword
+pestmode                                 estimation
+noptmax                                 10
+svdmode                                 1
+maxsing                          10000000
+eigthresh                           1e-5
+eigwrite                                1
+da_use_ies                      False
+da_add_base 					False
+da_parameter_ensemble      kh_ensemble0.csv
+da_type       mda
+DA_SUBSET_SIZE 10
+da_num_reals 10
+da_inflation_fac 100, 50, 10, 5, 1, 1
+da_inflation_mult 0.65
+DA_INITIAL_INF_FAC 100
+DA_EVALUATE_UPDATE   False
+DA_SUBSET_HOW  RANDOM
+da_scale_fac 1.0
+* parameter groups external
+test.pargrp_data.csv
+* parameter data external
+test.par_data.csv
+* observation groups external
+obsgrp.csv
+* observation data external
+test.obs_data.csv
+* model command line
+model_run.bat
+* model input external
+test.tplfile_data.csv
+* model output external
+test.insfile_data.csv

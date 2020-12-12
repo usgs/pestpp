@@ -47,6 +47,10 @@ public:
 	void add_2_cols_ip(const vector<string> &_var_names, const Eigen::MatrixXd &mat);
 	Ensemble zero_like();
 
+	void broadcast_vec2mat(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);
+
+	void replace_col_vals(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);
+
 	vector<string> get_generic_real_names(int num_reals);
 
 	void reserve(vector<string> _real_names, vector<string> _var_names);
@@ -54,11 +58,13 @@ public:
 	Eigen::VectorXd get_real_vector(int ireal);
 	Eigen::VectorXd get_real_vector(const string &real_name);
 	Eigen::VectorXd get_var_vector(const string& var_name);
-	void update_real_ip(string &rname, Eigen::VectorXd &real);
+	void update_real_ip(const string &rname, Eigen::VectorXd &real);
 	Eigen::MatrixXd get_eigen(vector<string> row_names, vector<string> col_names, bool update_vmap=true);
 	const Eigen::MatrixXd get_eigen() const { return reals; }
 	const Eigen::MatrixXd* get_eigen_ptr() const { return &reals; }
+
 	void set_eigen(Eigen::MatrixXd _reals);
+
 
 	Eigen::MatrixXd get_eigen_anomalies(string on_real="");
 	Eigen::MatrixXd get_eigen_anomalies(const vector<string> &_real_names, const vector<string> &_var_names, string on_real="");
@@ -153,12 +159,13 @@ public:
 	ParamTransformSeq get_par_transform() const { return par_transform; }
 	void transform_ip(transStatus to_tstat);
 	void set_pest_scenario(Pest *_pest_scenario);
-	map<int,int> add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs=vector<int>());
+	map<int,int> add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs=vector<int>(),int da_cycle=NetPackage::NULL_DA_CYCLE);
 
 	void draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
 	void draw_uniform(int num_reals, vector<string> par_names, PerformanceLog* plog, int level, ofstream& frec);
 	Covariance get_diagonal_cov_matrix();
 	void to_binary(string filename);
+
 
 private:
 	ParamTransformSeq par_transform;
@@ -188,6 +195,8 @@ public:
 	void from_eigen_mat(Eigen::MatrixXd mat, const vector<string> &_real_names, const vector<string> &_var_names);
 	void from_binary(string file_name);// { Ensemble::from_binary(file_name, true); }
 	vector<int> update_from_runs(map<int,int> &real_run_ids, RunManagerAbstract *run_mgr_ptr);
+	vector<int> update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe);
+
 	void draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
 	void initialize_without_noise(int num_reals);
 	//ObservationEnsemble get_mean_diff();

@@ -703,6 +703,18 @@ const TranFixed* ParamTransformSeq::get_fixed_ptr()const
 	return dynamic_cast<const TranFixed*>(ptr);
 }
 
+TranFixed* ParamTransformSeq::get_fixed_ptr_4_mod()
+{
+	Transformation* ptr = 0;
+	auto iter = find_in_ctl2active_ctl(string("PEST to model fixed transformation"));
+	if (iter != tranSeq_ctl2active_ctl.end())
+	{
+		ptr = (*iter);
+	}
+	return dynamic_cast<TranFixed*>(ptr);
+}
+
+
 TranTied* ParamTransformSeq::get_tied_ptr()const
 {
 	Transformation* ptr = 0;

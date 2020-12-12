@@ -315,6 +315,7 @@ void OutputFileWriter::scenario_report(std::ostream &os, bool report_mode)
 	os << endl;
 
 }
+void OutputFileWriter::set_pest_scenario(Pest& _pest_scenario) { pest_scenario = _pest_scenario; }
 
 void OutputFileWriter::scenario_io_report(std::ostream &os)
 {
@@ -745,6 +746,7 @@ void OutputFileWriter::write_rei(ofstream &fout, int iter_no, const Observations
 		<< " " << showpoint << setw(20)  << pi_rec_ptr->get_weight() << endl;
 	}
 }
+
 
 
 void OutputFileWriter::write_par(ofstream &fout, const Parameters &pars, const TranOffset &offset_tran, const TranScale &scale_tran)
