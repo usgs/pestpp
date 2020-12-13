@@ -1483,13 +1483,13 @@ if __name__ == "__main__":
     # ext_stdcol_test()
 
     #da_prep_4_freyberg_batch()
-    da_prep_4_mf6_freyberg_seq()
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-da.exe"),os.path.join("..","bin","pestpp-da.exe"))
-    da_mf6_freyberg_smoother_test()
-    da_mf6_freyberg_test_1()
+    # da_prep_4_mf6_freyberg_seq()
+    # shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-da.exe"),os.path.join("..","bin","pestpp-da.exe"))
+    # da_mf6_freyberg_smoother_test()
+    # da_mf6_freyberg_test_1()
 
     #da_prep_4_mf6_freyberg_seq_tbl()
-    da_mf6_freyberg_test_2()
+    #da_mf6_freyberg_test_2()
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
