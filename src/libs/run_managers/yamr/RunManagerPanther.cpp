@@ -323,11 +323,6 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	fdmax = listener;
 	FD_ZERO(&master);
 	FD_SET(listener, &master);
-	//cant do this here because the run manager doesnt yet know the par and obs names
-	//resume_idle();
-	f_rmr << endl;
-	cout << "PANTHER master listening on socket: " << w_get_addrinfo_string(connect_addr) << endl;
-	f_rmr << "PANTHER master listening on socket:" << w_get_addrinfo_string(connect_addr) << endl;
 	par_names_to_check_worker = par_names;
 	obs_names_to_check_worker = obs_names;
 
