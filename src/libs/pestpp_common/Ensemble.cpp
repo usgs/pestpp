@@ -1312,7 +1312,7 @@ void Ensemble::append_other_rows(const vector<string>& _real_names, Eigen::Matri
 	real_names = new_real_names;
 }
 
-void Ensemble::append_other_rows(Ensemble &other)
+void Ensemble::append_other_rows(Ensemble &other, bool reset_org_real_names)
 {
 	//append rows to the end of reals
 	if (other.shape().second != shape().second)
@@ -1352,6 +1352,8 @@ void Ensemble::append_other_rows(Ensemble &other)
 		iother++;
 	}
 	real_names = new_real_names;
+	if (reset_org_real_names)
+		org_real_names = real_names;
 }
 
 void Ensemble::append(string real_name, const Transformable &trans)

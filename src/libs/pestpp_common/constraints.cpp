@@ -2198,7 +2198,7 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 			else
 			{
 				//stack_info.second.to_csv_by_reals(fstack, false);
-				nested_oe.append_other_rows(stack_info.second);
+				nested_oe.append_other_rows(stack_info.second, true);
 			}
 			stack_info.second.set_real_names(names1,true);
 			//save_oe_stack(iter, real_info.first, stack_info.second);
@@ -2214,7 +2214,7 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 		}
 		//update nested pe for any failed runs
 		nested_pe.keep_rows(nested_oe.get_real_names());
-
+		
 		if (pest_scenario.get_pestpp_options().get_opt_save_binary())
 		{
 			ss.str("");
@@ -2389,7 +2389,7 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 		else
 		{
 			//stack_pe.to_csv_by_reals(fstack, false);
-			nested_pe.append_other_rows(stack_pe);
+			nested_pe.append_other_rows(stack_pe,true);
 		}
 		stack_pe.set_real_names(names1,true);
 		//save_pe_stack(iter, real_info.first, stack_pe);
