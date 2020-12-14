@@ -170,7 +170,7 @@ private:
 	Covariance parcov;
 	Jacobian_1to1 jco;
 	
-	ParameterEnsemble stack_pe;
+	ParameterEnsemble stack_pe, nested_pe;
 	ObservationEnsemble stack_oe;
 	
 	map<string, ObservationEnsemble> stack_oe_map;

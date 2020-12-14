@@ -1165,6 +1165,11 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		convert_ip(value, num_tpl_ins_threads);
 		return true;
 	}
+	else if (key == "OPT_SAVE_BINARY")
+	{
+		opt_save_binary = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
 
 	return false;
 }
@@ -1389,6 +1394,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "opt_iter_tol: " << opt_iter_tol << endl;
 	os << "opt_recalc_fosm_every: " << opt_recalc_fosm_every << endl;
 	os << "opt_chance_points: " << opt_chance_points << endl;
+	os << "opt_save_binary: " << opt_save_binary << endl;
 	
 
 	os << endl << "...pestpp-sqp options:" << endl;
@@ -1545,6 +1551,7 @@ void PestppOptions::set_defaults()
 	set_opt_par_stack("");
 	set_opt_obs_stack("");
 	set_opt_chance_points("SINGLE");
+	set_opt_save_binary(false);
 
 
 	set_sqp_dv_en("");

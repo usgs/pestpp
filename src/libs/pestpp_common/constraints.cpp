@@ -696,7 +696,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 				}
 			}
 			string filename = file_mgr_ptr->get_base_filename() + ".0.par_stack";
-			if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+			if (pest_scenario.get_pestpp_options().get_opt_save_binary())
 			{
 				filename = filename + ".jcb";
 				stack_pe.to_binary(filename);
@@ -2076,7 +2076,7 @@ void Constraints::save_oe_stack(int iter, string real_name, ObservationEnsemble&
 	else
 		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".obs_stack";
 
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_opt_save_binary())
 	{
 		ss << ".jcb";
 		_stack_oe.to_binary(ss.str());
@@ -2103,7 +2103,7 @@ void Constraints::save_pe_stack(int iter, string real_name, ParameterEnsemble& _
 	else
 		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".par_stack";
 
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_opt_save_binary())
 	{
 		ss << ".jcb";
 		_stack_pe.to_binary(ss.str());
@@ -2124,15 +2124,15 @@ void Constraints::save_pe_stack(int iter, string real_name, ParameterEnsemble& _
 void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 {
 	pair<vector<int>, ObservationEnsemble> stack_info;
+	
 	if (population_stack_pe_run_map.size() > 0)
 	{
+		ObservationEnsemble nested_oe;
+		vector<string> keep_nested_names;
 		stack_oe_map.clear();
 		int i = 0;
 		stringstream ss;
-		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.obs_stack.csv";
-		ofstream fstack(ss.str());
-		if (fstack.bad())
-			throw_constraints_error("error opening " + ss.str() + " for writing");
+		
 
 		//work out what var names for the stack_oe we dont need so we can drop them!
 		vector<string> drop_names;
@@ -2191,11 +2191,17 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 				names2.push_back(n + NESTED_STACK_NAME_SEP + real_info.first);
 			stack_info.second.set_real_names(names2,true);
 			if (i == 0)
-				stack_info.second.to_csv_by_reals(fstack, true);
+			{
+				//stack_info.second.to_csv_by_reals(fstack, true);
+				nested_oe = stack_info.second;
+			}
 			else
-				stack_info.second.to_csv_by_reals(fstack, false);
+			{
+				//stack_info.second.to_csv_by_reals(fstack, false);
+				nested_oe.append_other_rows(stack_info.second);
+			}
 			stack_info.second.set_real_names(names1,true);
-			save_oe_stack(iter, real_info.first, stack_info.second);
+			//save_oe_stack(iter, real_info.first, stack_info.second);
 			stack_info.second.drop_cols(drop_names);
 			stack_oe_map[real_info.first] = stack_info.second;
 			i++;
@@ -2206,6 +2212,33 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 			population_stack_pe_run_map.erase(d);
 			stack_pe_map.erase(d);
 		}
+		//update nested pe for any failed runs
+		nested_pe.keep_rows(nested_oe.get_real_names());
+
+		if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+		{
+			ss.str("");
+			ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.obs_stack.jcb";
+			nested_oe.to_binary(ss.str());
+			ss.str("");
+			ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.jcb";
+			nested_pe.to_binary(ss.str());
+			
+		}
+		else
+		{
+			ss.str("");
+			ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.obs_stack.csv";
+			nested_oe.to_csv(ss.str());
+			ss.str("");
+			ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.csv";
+			nested_pe.to_csv(ss.str());
+
+		}
+		//clear these two out
+		nested_oe = ObservationEnsemble();
+		nested_pe = ParameterEnsemble();
+		
 
 	}
 	else
@@ -2331,10 +2364,7 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 	int count = 0;
 	int i = 0;
 	stringstream ss;
-	ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.csv";
-	ofstream fstack(ss.str());
-	if (fstack.bad())
-		throw_constraints_error("error opening " + ss.str() + " for writing");
+	
 	vector<string> names1, names2;
 	for (auto real_info : current_pe.get_real_map())
 	{
@@ -2352,18 +2382,30 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 		stack_pe.set_real_names(names2,true);
 		//TODO: add a flag to decide if saving
 		if (i == 0)
-			stack_pe.to_csv_by_reals(fstack, true);
+		{
+			//stack_pe.to_csv_by_reals(fstack, true);
+			nested_pe = stack_pe;
+		}
 		else
-			stack_pe.to_csv_by_reals(fstack, false);
+		{
+			//stack_pe.to_csv_by_reals(fstack, false);
+			nested_pe.append_other_rows(stack_pe);
+		}
 		stack_pe.set_real_names(names1,true);
-		save_pe_stack(iter, real_info.first, stack_pe);
+		//save_pe_stack(iter, real_info.first, stack_pe);
 		f_rec << "...added " << stack_pe.shape().first << " runs for decision variable solution '" << real_info.first << "'" << endl;
 		count = count + _stack_pe_run_map.size();
+		cout << real_info.first << "\r" << flush;
 		i++;
 	}
+	//save this as bin here - it will be resaved after runs are processed...
+	ss.str("");
+	ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.jcb";
+	nested_pe.to_binary(ss.str());
 	cout << "...adding " << count << " runs nested stack-based chance constraints" << endl;
 	stack_runs_processed = false;
-	fstack.close();
+	
+	
 }
 
 map<int, int> Constraints::add_stack_runs(int iter, ParameterEnsemble& _stack_pe, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr)

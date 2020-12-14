@@ -392,6 +392,9 @@ public:
 	void set_opt_coin_log(bool _log) { opt_coin_log = _log; }
 	bool get_opt_skip_final()const { return opt_skip_final; }
 	void set_opt_skip_final(bool _skip_final) { opt_skip_final = _skip_final; }
+	bool get_opt_save_binary()const { return opt_save_binary; }
+	void set_opt_save_binary(bool _flag) { opt_save_binary = _flag; }
+
 
 	vector<string> get_opt_dec_var_groups()const { return opt_dec_var_groups; }
 	void set_opt_dec_var_groups(vector<string> _grps) { opt_dec_var_groups = _grps; }
@@ -705,6 +708,7 @@ private:
 	string opt_par_stack;
 	string opt_obs_stack;
 	string opt_chance_points;
+	bool opt_save_binary;
 
 	string sqp_dv_en;
 	string sqp_obs_restart_en;

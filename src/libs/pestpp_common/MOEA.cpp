@@ -1682,8 +1682,18 @@ void MOEA::initialize()
 		dp.check_for_normal("initial transformed dv population");
 		//save the initial population once here
 		ss.str("");
-		ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag << ".csv";
-		dp.to_csv(ss.str());
+		ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag;
+		if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+		{
+			ss << ".jcb";
+			dp.to_binary(ss.str());
+		}
+		else
+		{
+			ss << ".csv";
+			dp.to_csv(ss.str());
+		}
+		
 		message(1, "saved initial dv population to ", ss.str());
 		performance_log->log_event("running initial population");
 		message(1, "running initial population of size", dp.shape().first);
@@ -1695,8 +1705,17 @@ void MOEA::initialize()
 		dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
 	ss.str("");
-	ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".csv";
-	op.to_csv(ss.str());
+	ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag;
+	if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+	{
+		ss << ".jcb";
+		op.to_binary(ss.str());
+	}
+	else
+	{
+		ss << ".csv";
+		op.to_csv(ss.str());
+	}
 	message(1, "saved observation population to ", ss.str());
 
 	message(0, "initial population objective function summary:");
@@ -1706,8 +1725,17 @@ void MOEA::initialize()
 	{
 		ObservationEnsemble shifted_op = get_chance_shifted_op(dp, op);
 		ss.str("");
-		ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".chance.csv";
-		shifted_op.to_csv(ss.str());
+		ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".chance";
+		if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+		{
+			ss << ".jcb";
+			shifted_op.to_binary(ss.str());
+		}
+		else
+		{
+			ss << ".csv";
+			shifted_op.to_csv(ss.str());
+		}
 		message(1, "saved chance-shifted observation population to ", ss.str());
 
 		op = shifted_op;
@@ -1717,8 +1745,17 @@ void MOEA::initialize()
 
 	//save the initial dv population again in case runs failed or members were dropped as part of restart
 	ss.str("");
-	ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag << ".csv";
-	dp.to_csv(ss.str());
+	ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag;
+	if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+	{
+		ss << ".jcb";
+		dp.to_binary(ss.str());
+	}
+	else
+	{
+		ss << ".csv";
+		dp.to_csv(ss.str());
+	}
 	message(1, "saved initial dv population to ", ss.str());
 
 	//TODO: think about a bad phi (or phis) for MOEA
@@ -2333,11 +2370,18 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 	{
 		ss << "." << tag;
 	}
-	ss << "." << dv_pop_file_tag << ".csv";
-	fname = ss.str();
-	dp.to_csv(fname);
-	ss.str("");
-	ss << "saved decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << fname << "'";
+	ss << "." << dv_pop_file_tag;
+	if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+	{
+		ss << ".jcb";
+		dp.to_binary(ss.str());
+	}
+	else
+	{
+		ss << ".csv";
+		dp.to_csv(ss.str());
+	}
+	ss << "saved decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << ss.str() << "'";
 	message(1, ss.str());
 	
 	ss.str("");
@@ -2346,11 +2390,18 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 	{
 		ss << "." << tag;
 	}
-	ss << "." << obs_pop_file_tag << ".csv";
-	fname = ss.str();
-	op.to_csv(fname);
-	ss.str("");
-	ss << "saved observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << fname << "'";
+	ss << "." << obs_pop_file_tag;
+	if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+	{
+		ss << ".jcb";
+		op.to_binary(ss.str());
+	}
+	else
+	{
+		ss << ".csv";
+		op.to_csv(ss.str());
+	}
+	ss << "saved observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << ss.str() << "'";
 	message(1, ss.str());
 
 }
