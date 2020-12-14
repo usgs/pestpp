@@ -2404,6 +2404,9 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 	nested_pe.to_binary(ss.str());
 	cout << "...adding " << count << " runs nested stack-based chance constraints" << endl;
 	stack_runs_processed = false;
+	//reset stack_oe to use the same real names as stack_pe
+	stack_oe.reserve(names1, stack_oe.get_var_names());
+	stack_oe.set_real_names(names1, true);
 	
 	
 }
