@@ -1847,6 +1847,49 @@ void Constraints::write_res_file(Observations& constraints, Parameters& pars_and
 
 }
 
+void Constraints::stack_summary(int iter, Observations& shifted_obs, bool echo, string header)
+{
+	/* write chance info to the rec file before undertaking the current iteration process*/
+	if (!use_chance)
+		return;
+
+	int nsize = 20;
+	for (auto o : ctl_ord_obs_constraint_names)
+		nsize = max(nsize, int(o.size()));
+
+	stringstream ss;
+	ss << endl << "   ";
+	if (header.size() == 0)
+		//dont change this text - its used in one of the opt tests
+		ss << "Chance constraint/objective information at start of iteration " << iter;
+	else
+		ss << header;
+	ss << endl;
+
+	//vector<double> residuals = get_constraint_residual_vec();
+
+	ss << setw(nsize) << left << "name" << right << setw(10) << "sense" << setw(12) << "required";
+	ss << setw(12) << "prior stdev" << setw(12) << "post stdev" << setw(12) << "offset" << setw(12) << "shifted val" << endl;
+	vector<string> out_of_bounds;
+	for (int i = 0; i < num_obs_constraints(); ++i)
+	{
+		string name = ctl_ord_obs_constraint_names[i];
+		ss << setw(nsize) << left << name;
+		ss << setw(10) << right << constraint_sense_name[name];
+		ss << setw(12) << constraints_obs[name];
+		ss << setw(12) << prior_constraint_stdev[name];
+		ss << setw(12) << post_constraint_stdev[name];
+		ss << setw(12) << post_constraint_offset[name];
+		ss << setw(12) << shifted_obs[name] << endl;
+	}
+	ss << "  note: the above standard deviations and offset are empirical estimates from the stack" << endl;
+	
+	file_mgr_ptr->rec_ofstream() << ss.str();
+	if (echo)
+		cout << ss.str();
+	return;
+
+}
 
 
 void Constraints::presolve_chance_report(int iter, Observations& current_obs, bool echo, string header)
@@ -1855,6 +1898,12 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 	if (!use_chance)
 		return;
 	
+	if (!use_fosm)
+	{
+		stack_summary(iter, current_obs, echo, header);
+		return;
+	}
+
 	int nsize = 20;
 	for (auto o : ctl_ord_obs_constraint_names)
 		nsize = max(nsize, int(o.size()));
@@ -2127,6 +2176,7 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 	
 	if (population_stack_pe_run_map.size() > 0)
 	{
+		cout << "...processing nested stack runs" << endl;
 		ObservationEnsemble nested_oe;
 		vector<string> keep_nested_names;
 		stack_oe_map.clear();
@@ -2147,6 +2197,7 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 		vector<string> drop_members;
 		bool test_failed = false;
 		bool should_fail = false;
+	
 		for (auto& real_info : population_stack_pe_run_map)
 		{
 			pfm.log_event("processing stack runs for realization " + real_info.first);
@@ -2204,6 +2255,7 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 			//save_oe_stack(iter, real_info.first, stack_info.second);
 			stack_info.second.drop_cols(drop_names);
 			stack_oe_map[real_info.first] = stack_info.second;
+			cout << real_info.first << "\r" << flush;
 			i++;
 			
 		}
