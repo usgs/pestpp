@@ -25,7 +25,7 @@ public:
 	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
 		PerformanceLog* _performance_log);
 
-	pair<vector<string>, vector<string>> pareto_dominance_sort(int generation, ObservationEnsemble& op, 
+	pair<vector<string>, vector<string>> nsga_ii_pareto_dominance_sort(int generation, ObservationEnsemble& op, 
 		ParameterEnsemble& dp, Constraints* constraints_ptr=nullptr, bool report=true, string sum_tag=string());
 	
 	//this must be called at least once before the diversity metrixs can be called...
@@ -39,9 +39,8 @@ public:
 	}
 	void update_member_struct(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	
-	map<string,double> get_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
+	map<string,double> get_cuboid_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	
-	map<string, double> get_hypervolume(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	 
 private:
 	
@@ -58,16 +57,9 @@ private:
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& member_struct);
 
 	//sort specific members
-	map<string, double> get_crowding_distance(vector<string>& members);
+	map<string, double> get_cuboid_crowding_distance(vector<string>& members);
 	//sort all members in member struct
-	map<string, double> get_crowding_distance();
-
-	//constraint dominance principal Fan (2017) Tian (2020)
-	//void apply_constraints_cdp();
-	//self-adaptive constraint penalty Fan (2017), Woldesenbet (2009)
-	//void apply_constraints_sp();
-	//in-feasibility driven evolution-ary algorithms Fan (2017)
-	//void apply_constraints_idea();
+	map<string, double> get_cuboid_crowding_distance();
 
 	map<string, map<string, double>> member_struct;
 	vector<string>* obs_obj_names_ptr;
@@ -100,6 +92,7 @@ public:
 	void finalize();
 	typedef pair<vector<string>, vector<string>> DomPair;
 private:
+	double epsilon = 1.0e-15;
 	Pest& pest_scenario;
 	set<string> pp_args;
 	vector<MouGenType> gen_types;
@@ -167,6 +160,8 @@ private:
 	void save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag = string());
 	void mutate_ip(double probability, double eta_m, ParameterEnsemble& temp_dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx(double probability, double eta_m, int idx1, int idx2);
+	pair<Eigen::VectorXd, Eigen::VectorXd> sbx_new(double probability, double eta_m, int idx1, int idx2);
+	pair<double, double> get_betas(double v1, double v2, double distribution_index);
 
 	pair<Parameters, Observations> get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe);
 

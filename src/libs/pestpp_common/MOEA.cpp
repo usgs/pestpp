@@ -101,45 +101,7 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 {
 	performance_log->log_event("checking for duplicate solutions");
 	set<string> duplicates;
-	//for (auto solution_p : member_struct)
-	//{
-	//	for (auto solution_q : member_struct)
-	//	{
-	//		if (solution_p.first == solution_q.first)
-	//			continue;
-	//		if ((first_equals_second(solution_p.second, solution_q.second)) && (duplicates.find(solution_q.first) == duplicates.end()))
-	//		{
-	//			duplicates.emplace(solution_p.first);
-	//		}
-	//	}
-	//}
-	//if (duplicates.size() > 0)
-	//{
-	//	stringstream ss;
-	//	ss << "WARNING: " << duplicates.size() << " duplicate solutions found, dropping (see rec file for listing)";
-	//	performance_log->log_event(ss.str());
-	//	cout << ss.str() << endl;
-	//	ofstream& frec = file_manager.rec_ofstream();
-	//	frec << "WARNING: " << duplicates.size() << " duplicate solutions found:" << endl;
-	//	int i = 0;
-	//	for (auto d : duplicates)
-	//	{
-	//		frec << d << " ";
-	//		i++;
-	//		if (i > 5)
-	//		{
-	//			frec << endl;
-	//			i = 0;
-	//		}
-	//	}
-	//	/*vector<string> d(duplicates.begin(), duplicates.end());
-	//	op.drop_rows(d);
-	//	dp.drop_rows(d);
-	//	performance_log->log_event("updating member struct after dropping duplicates");
-	//	update_member_struct(op, dp);*/
-	//}
-
-	//duplicates.clear(); 
+	
 
 	//performance_log->log_event("checking for duplicate solutions");
 	vector<string> names;
@@ -195,7 +157,7 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 
 }
 
-pair<vector<string>, vector<string>> ParetoObjectives::pareto_dominance_sort(int generation, ObservationEnsemble& op,
+pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_sort(int generation, ObservationEnsemble& op,
 	ParameterEnsemble& dp, Constraints* constraints_ptr, bool report, string sum_tag)
 {
 	stringstream ss;
@@ -450,38 +412,23 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 
 }
 
-map<string, double> ParetoObjectives::get_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
+map<string, double> ParetoObjectives::get_cuboid_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	//this updates the complicated map-based structure that stores the member names: obj_names:value nested pairs
 	update_member_struct(op, dp);
 	//just reuse the same routine used for the pareto dominance sort...
-	return get_crowding_distance();
+	return get_cuboid_crowding_distance();
 }
 
-map<string, double> ParetoObjectives::get_hypervolume(ObservationEnsemble& op, ParameterEnsemble& dp)
-{
-	//this updates the complicated map-based structure that stores the member names: obj_names:value nested pairs
-	update_member_struct(op, dp);
-
-	map<string, double> hypervol_map;
-
-	//do something cool here...
-	
-
-
-	return hypervol_map;
-
-}
-
-map<string, double> ParetoObjectives::get_crowding_distance()
+map<string, double> ParetoObjectives::get_cuboid_crowding_distance()
 {
 	vector<string> members;
 	for (auto m : member_struct)
 		members.push_back(m.first);
-	return get_crowding_distance(members);
+	return get_cuboid_crowding_distance(members);
 }
 
-map<string, double> ParetoObjectives::get_crowding_distance(vector<string>& members)
+map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string>& members)
 {
 	
 	map<string, map<string, double>> obj_member_map;
@@ -552,7 +499,7 @@ map<string, double> ParetoObjectives::get_crowding_distance(vector<string>& memb
 vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members, map<string,double>& crowd_map)
 {
 
-	map<string, double> crowd_distance_map = get_crowding_distance(members);
+	map<string, double> crowd_distance_map = get_cuboid_crowding_distance(members);
 	
 
 	vector <pair<string, double>> cs_vec;
@@ -1021,7 +968,7 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	dp_archive.append_other_rows(keep, other);
 	other.resize(0, 0);
 	message(2, "pareto dominance sorting archive of size", op_archive.shape().first);
-	DomPair dompair = objectives.pareto_dominance_sort(iter,op_archive, dp_archive,&constraints,true,ARC_SUM_TAG);
+	DomPair dompair = objectives.nsga_ii_pareto_dominance_sort(iter,op_archive, dp_archive,&constraints,true,ARC_SUM_TAG);
 	
 	ss.str("");
 	ss << "resizing archive from " << op_archive.shape().first << " to " << dompair.first.size() << " current non-dominated solutions";
@@ -1778,7 +1725,7 @@ void MOEA::initialize()
 	//do an initial pareto dominance sort
 	message(1, "performing initial pareto dominance sort");
 	objectives.set_pointers(obs_obj_names, pi_obj_names, obj_dir_mult);
-	DomPair dompair = objectives.pareto_dominance_sort(iter, op, dp,&constraints,true,POP_SUM_TAG);
+	DomPair dompair = objectives.nsga_ii_pareto_dominance_sort(iter, op, dp,&constraints,true,POP_SUM_TAG);
 	
 	//initialize op and dp archives
 	op_archive = ObservationEnsemble(&pest_scenario, &rand_gen, 
@@ -1792,7 +1739,7 @@ void MOEA::initialize()
 	archive_size = ppo->get_mou_max_archive_size();
 
 	//this causes the initial archive pareto summary file to be written
-	objectives.pareto_dominance_sort(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+	objectives.nsga_ii_pareto_dominance_sort(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
 	
 	if (constraints.get_use_chance())
 	{
@@ -1968,7 +1915,7 @@ void MOEA::iterate_to_solution()
 
 		message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
 
-		DomPair dompair = objectives.pareto_dominance_sort(iter, new_op, new_dp,&constraints,true,POP_SUM_TAG);
+		DomPair dompair = objectives.nsga_ii_pareto_dominance_sort(iter, new_op, new_dp,&constraints,true,POP_SUM_TAG);
 
 		//drop shitty members
 		//TODO: this is just a cheap hack, prob something more meaningful to be done...
@@ -2326,7 +2273,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 		p2_idx = working_count[1];
 
 		//generate two children thru cross over
-		children = sbx(crossover_probability, crossover_distribution_index, p1_idx, p2_idx);
+		children = sbx_new(crossover_probability, crossover_distribution_index, p1_idx, p2_idx);
 
 		//put the two children into the child population
 		new_reals.row(i_member) = children.first;
@@ -2548,6 +2495,94 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx(double probability, double di, 
 	}
 	pair<Eigen::VectorXd, Eigen::VectorXd> vec_pair(offs1, offs2);
 	return vec_pair;
+}
+
+
+pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double probability, double di, int idx1, int idx2)
+{
+	int i;
+	//double rnd1, rnd2, rnd3, rnd4;
+	vector<double> rnds;
+	double lt, ut;
+	double valueX1, valueX2, valueX1initial, valueX2initial;
+	const double EPS = 1.0e-14;
+	// get parents from dp
+	Eigen::VectorXd x1 = dp.get_eigen_ptr()->row(idx1); // parent #1
+	Eigen::VectorXd x2 = dp.get_eigen_ptr()->row(idx2); // parent #2
+
+	vector<string> var_names = dp.get_var_names();
+	string vname;
+	Parameters lbnd = pest_scenario.get_ctl_parameter_info().get_low_bnd(var_names);
+	Parameters ubnd = pest_scenario.get_ctl_parameter_info().get_up_bnd(var_names);
+	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(lbnd);
+	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(ubnd);
+
+	//offs1.setZero();
+	//offs2.setZero();
+
+	pair<double, double> betas;
+
+
+	int n_var = dv_names.size();
+	//can't set all rnds outside of loop or all vars will be treated the same
+	rnds = uniform_draws(4, 0.0, 1.0, rand_gen);
+
+	//if (rnds[0] <= probability) 
+	if (true)
+	{
+		for (i = 0; i < n_var; i++)
+		{
+			valueX1 = x1[i];
+			valueX2 = x2[i];
+			vname = var_names[i];
+			if (rnds[1] <= 0.5)
+			{
+				lt = (valueX1 + (valueX2 + (2 * lbnd[vname])))/(abs(valueX1 - valueX2));
+				ut = ((2. * ubnd[vname]) - valueX1 - valueX2) / (abs(valueX1 - valueX2));
+				betas = get_betas(lt, ut, di);
+				x1[i] = 0.5 * ((valueX1 + valueX2) - betas.first * abs(valueX1 - valueX2));
+				x2[i] = 0.5 * ((valueX1 + valueX2) - betas.second * abs(valueX1 - valueX2));
+			}
+		}
+	}
+	return pair<Eigen::VectorXd, Eigen::VectorXd>(x1, x2);
+
+}
+
+pair<double,double> MOEA::get_betas(double v1, double v2, double distribution_index)
+{
+	bool are_close = false;
+	if (abs(v1 - v2) <= epsilon)
+		are_close = true;
+	double p1,p2,u1,u2,b1,b2;	
+	vector<double> rands = uniform_draws(2, 0.0, 1.0,rand_gen);
+	if (are_close)
+		p1 = 1., p2 = 1.;
+	else
+	{
+		p1 = 1. - 1. / (2. * pow(v1, distribution_index));
+		p2 = 1. - 1. / (2. * pow(v2, distribution_index));
+	}
+	u1 = p1 * rands[0];
+	u2 = p2 * rands[1];
+	if (u1 <= 0.5)
+	{
+		b1 = pow((2. * u1), (1. / distribution_index + 1));
+	}
+	else
+	{
+		b1 = pow((1. / (2. - (2. * u1))), (1.0 / (distribution_index + 1)));
+	}
+	if (u1 <= 0.5)
+	{
+		b2 = pow((2. * u2), (1. / distribution_index + 1));
+	}
+	else
+	{
+		b2 = pow((1. / (2. - (2. * u2))), (1.0 / (distribution_index + 1)));
+	}
+	return pair<double, double>(b1, b2);
+
 }
 
 void MOEA::mutate_ip(double probability, double eta_m, ParameterEnsemble& temp_dp)
