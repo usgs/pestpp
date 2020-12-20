@@ -53,8 +53,8 @@ int main(int argc, char* argv[])
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 
-		CmdLine cmdline(argc, argv);		
-		
+		CmdLine cmdline(argc, argv);
+
 		FileManager file_manager;
 		string filename = cmdline.ctl_file_name;
 		string pathname = ".";
@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
 		//rns file is really large. so let's remove it explicitly and wait a few seconds before continuing...
 		string rns_file = file_manager.build_filename("rns");
 		int flag = remove(rns_file.c_str());
-		
+
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
 		{
 			cerr << "External run manager ('/e') not supported by pestpp-da, please use panther instead" << endl;
@@ -74,25 +74,25 @@ int main(int argc, char* argv[])
 			cerr << "genie run manager ('/g') not supported by pestpp-da, please use panther instead" << endl;
 			exit(1);
 		}
-		
+
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_WORKER)
 		{
 			// This is a PANTHER worker, start PEST++ as a PANTHER worker
-			
+
 			try
 			{
-				
+
 				ofstream frec("panther_agent.rec");
 				if (frec.bad())
 					throw runtime_error("error opening 'panther_agent.rec'");
 				PANTHERAgent yam_agent(frec);
 				string ctl_file = "";
 				try {
-					
+
 					// process traditional PEST control file
 					ctl_file = file_manager.build_filename("pst");
 					yam_agent.process_ctl_file(ctl_file);
-					
+
 				}
 				catch (PestError e)
 				{
@@ -105,17 +105,17 @@ int main(int argc, char* argv[])
 					cerr << "Error processing control file" << endl;
 					throw runtime_error("error processing control file");
 				}
-				yam_agent.start(cmdline.panther_host_name,cmdline.panther_port);
+				yam_agent.start(cmdline.panther_host_name, cmdline.panther_port);
 			}
-			catch (PestError &perr)
+			catch (PestError & perr)
 			{
 				cerr << perr.what();
 				throw(perr);
 			}
-			
+
 			cout << endl << "Work Done..." << endl;
 			exit(0);
-		}		
+		}
 
 		RestartController restart_ctl;
 		//process restart and reuse jacobian directives
@@ -137,7 +137,7 @@ int main(int argc, char* argv[])
 			file_manager.open_default_files();
 		}
 
-		ofstream &fout_rec = file_manager.rec_ofstream();
+		ofstream& fout_rec = file_manager.rec_ofstream();
 		PerformanceLog performance_log(file_manager.open_ofile_ext("pfm"));
 
 		if (!restart_flag || save_restart_rec_header)
@@ -162,7 +162,7 @@ int main(int argc, char* argv[])
 		pest_scenario.set_defaults();
 		try {
 			performance_log.log_event("starting to process control file");
-			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
+			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"), fout_rec);
 			file_manager.close_file("pst");
 			pest_scenario.assign_da_cycles(fout_rec);
 			performance_log.log_event("finished processing control file");
@@ -176,7 +176,7 @@ int main(int argc, char* argv[])
 			fout_rec.close();
 			throw(e);
 		}
-		pest_scenario.check_inputs(fout_rec);	
+		pest_scenario.check_inputs(fout_rec);
 
 
 		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
@@ -193,8 +193,8 @@ int main(int argc, char* argv[])
 			output_file_writer.scenario_pargroup_report(fout_rec);
 			output_file_writer.scenario_par_report(fout_rec);
 			output_file_writer.scenario_obs_report(fout_rec);
-		}	
-		
+		}
+
 
 		//reset some default args for da here:		
 		set<string> pp_args = ppo->get_passed_args();
@@ -204,7 +204,7 @@ int main(int argc, char* argv[])
 			ppo->set_overdue_giveup_fac(2.0);
 		if (pp_args.find("OVERDUE_resched_FAC") == pp_args.end())
 			ppo->set_overdue_reched_fac(1.15);
-		
+
 		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
 		{
 			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
@@ -219,7 +219,7 @@ int main(int argc, char* argv[])
 			{
 				cout << endl << endl << "WARNING: 'noptmax' = 0 but using parallel run mgr.  This prob isn't what you want to happen..." << endl << endl;
 			}
-			
+
 			run_manager_ptr = new RunManagerPanther(
 				rns_file, cmdline.panther_port,
 				file_manager.open_ofile_ext("rmr"),
@@ -249,7 +249,7 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_additional_ins_delimiters(),
 				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
 		}
-		
+
 
 		//process da (recurrent??) par cycle table
 		map<int, map<string, double>> par_cycle_info = process_da_par_cycle_table(pest_scenario, fout_rec);
@@ -257,20 +257,20 @@ int main(int argc, char* argv[])
 		set<string> obs_in_tbl; //we need this so we can set weights to zero in childpest of a value isnt listed for a given cycle
 		map<int, map<string, double>> obs_cycle_info = process_da_obs_cycle_table(pest_scenario, fout_rec, obs_in_tbl);
 		//process weights table
-		set<string> weights_in_tbl; 
+		set<string> weights_in_tbl;
 		map<int, map<string, double>> weight_cycle_info = process_da_weight_cycle_table(pest_scenario, fout_rec, weights_in_tbl);
-		
+
 		vector<int> assimilation_cycles;
 
 		assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec);
 
 		//generate a parent ensemble which includes all parameters across all cycles
-	
+
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 		ParameterEnsemble curr_pe;
 		ObservationEnsemble curr_oe;
 		generate_global_ensembles(da, fout_rec, curr_pe, curr_oe);
-		
+
 		//prepare a phi csv file for all cycles
 		string phi_file = file_manager.get_base_filename() + ".global.phi.actual.csv";
 		ofstream f_phi(phi_file);
@@ -282,7 +282,7 @@ int main(int argc, char* argv[])
 			f_phi << "," << pest_utils::lower_cp(real);
 		f_phi << endl;
 
-		
+
 
 		// loop over assimilation cycles
 		stringstream ss;
@@ -299,13 +299,13 @@ int main(int argc, char* argv[])
 			fout_rec << " =======================================" << endl;
 
 			performance_log.log_event("instantiating child pest object");
-			
+
 			Pest childPest;
 			childPest = pest_scenario.get_child_pest(*icycle);
-			
-			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);			
+
+			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);
 			output_file_writer.scenario_io_report(fout_rec);
-			if (verbose_level> 1) // 
+			if (verbose_level > 1) // 
 			{
 				output_file_writer.scenario_pargroup_report(fout_rec);
 				output_file_writer.scenario_par_report(fout_rec);
@@ -338,7 +338,7 @@ int main(int argc, char* argv[])
 			}
 
 			ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq_4_mod();
-			
+
 			//check for entries in the par cycle table
 			if (par_cycle_info.find(*icycle) != par_cycle_info.end())
 			{
@@ -392,20 +392,28 @@ int main(int argc, char* argv[])
 				output_file_writer.scenario_par_report(fout_rec);
 				output_file_writer.scenario_obs_report(fout_rec);
 			}
-			
-			
+
+
 
 			Parameters par1 = childPest.get_ctl_parameters();
 			base_trans_seq.ctl2numeric_ip(par1);
 			base_trans_seq.numeric2model_ip(par1);
-			ParameterInfo pi = childPest.get_ctl_parameter_info();
+			ParameterInfo pi = pest_scenario.get_ctl_parameter_info();//I change this as well. TODO use pest_scenrio instead of child
 
 			int nadj_par = 0;
 			for (auto par : par1)
+
 			{
-				if ((pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::FIXED) &&
-					(pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::TIED))
-					nadj_par++;
+				// ayman:  base_trans_seq above was copied from parentpest without any changes; the following statement temporarly fix
+				// the issue; permenat solution should occur during the creation of childpest
+				if ((pi.get_parameter_rec_ptr(par.first)->cycle != *icycle) &&
+					(pi.get_parameter_rec_ptr(par.first)->cycle >= 0))
+				{
+
+					if ((pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::FIXED) &&
+						(pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::TIED))
+						nadj_par++;
+				}
 
 			}
 
@@ -434,7 +442,7 @@ int main(int argc, char* argv[])
 			sort(par_names.begin(), par_names.end());
 			vector<string> obs_names = childPest.get_ctl_observations().get_keys();
 			sort(obs_names.begin(), obs_names.end());
-			run_manager_ptr->initialize(par_names,obs_names);
+			run_manager_ptr->initialize(par_names, obs_names);
 			performance_log.log_event("instantiating DA instance");
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 			// use ies or da?
@@ -442,19 +450,19 @@ int main(int argc, char* argv[])
 			std::mt19937 rand_gen = da.get_rand_gen();
 			vector<string> act_par_names = childPest.get_ctl_ordered_adj_par_names();
 			performance_log.log_event("instantiating cycle parameter ensemble instance");
-			ParameterEnsemble cycle_curr_pe(&childPest, &rand_gen, curr_pe.get_eigen(vector<string>(),act_par_names), curr_pe.get_real_names(), act_par_names);
+			ParameterEnsemble cycle_curr_pe(&childPest, &rand_gen, curr_pe.get_eigen(vector<string>(), act_par_names), curr_pe.get_real_names(), act_par_names);
 			cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
 
-			da.set_pe(cycle_curr_pe);	
-			
-			
+			da.set_pe(cycle_curr_pe);
+
+
 			da.initialize(*icycle);
-			
+
 			write_global_phi_info(*icycle, f_phi, da, init_real_names);
 
 			if (childPest.get_ctl_ordered_nz_obs_names().size() > 0)
 			{
-				
+
 				if (pest_scenario.get_control_info().noptmax > 0) // 
 				{
 					da.da_upate();
@@ -466,11 +474,11 @@ int main(int argc, char* argv[])
 				cout << "...Note: no non-zero-weighted observations in cycle " << *icycle << ", continuing..." << endl;
 				fout_rec << "...Note: no non-zero-weighted observations in cycle " << *icycle << ", continuing..." << endl;
 				performance_log.log_event("no non-zero-weighted observations in current cycle");
-				
+
 			}
 			//replace all the pars used in this cycle in the parent parameter ensemble
 			performance_log.log_event("updating global ensemble with cycle ensemble columns");
-			
+
 			//if we lost some realizations...
 			if (curr_pe.shape().first > cycle_curr_pe.shape().first)
 			{
@@ -529,9 +537,9 @@ int main(int argc, char* argv[])
 			curr_oe.replace_col_vals(cycle_curr_oe.get_var_names(), *cycle_curr_oe.get_eigen_ptr());
 			ss.str("");
 			ss << ".global." << *icycle << ".oe.csv";
-			curr_oe.to_csv(file_manager.get_base_filename()+ss.str());
+			curr_oe.to_csv(file_manager.get_base_filename() + ss.str());
 
-			
+
 
 		} // end cycle loop
 		fout_rec.close();
@@ -540,7 +548,7 @@ int main(int argc, char* argv[])
 		return 0;
 #ifndef _DEBUG
 	}
-	catch (exception &e)
+	catch (exception & e)
 	{
 		cout << "Error condition prevents further execution: " << endl << e.what() << endl;
 		//cout << "press enter to continue" << endl;

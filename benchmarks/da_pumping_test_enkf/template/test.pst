@@ -6,7 +6,6 @@ svdmode                                 1
 maxsing                          10000000
 eigthresh                           1e-5
 eigwrite                                1
-da_use_ies                      False
 da_add_base 					False
 da_parameter_ensemble      kh_ensemble0.csv
 da_type       mda
