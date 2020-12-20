@@ -3960,6 +3960,7 @@ void DataAssimilator::update_starting_state()
 void DataAssimilator::return_post_dyn_state(vector<ParameterEnsemble>& pe_lams, vector<ParameterEnsemble> posterior_dyn_states)
 {
 	vector<string> real_names_; // it is not used!
+
 	int ireal = 0;
 	real_names_ = pe_base.get_real_names();	
 
