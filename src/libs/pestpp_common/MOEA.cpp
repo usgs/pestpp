@@ -2504,7 +2504,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double probability, double 
 	//double rnd1, rnd2, rnd3, rnd4;
 	vector<double> rnds;
 	double lt, ut;
-	double valueX1, valueX2, valueX1initial, valueX2initial;
+	double valueX1, valueX2, new1, new2;
 	const double EPS = 1.0e-14;
 	// get parents from dp
 	Eigen::VectorXd x1 = dp.get_eigen_ptr()->row(idx1); // parent #1
@@ -2539,10 +2539,18 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double probability, double 
 			{
 				lt = (valueX1 + (valueX2 + (2 * lbnd[vname])))/(abs(valueX1 - valueX2));
 				ut = ((2. * ubnd[vname]) - valueX1 - valueX2) / (abs(valueX1 - valueX2));
+				if (lt < 0)
+					throw_moea_error("sbx error: lower transform bound less than zero");
+				if (ut < 0)
+					throw_moea_error("sbx error: upper transform bound less than zero");
 				betas = get_betas(lt, ut, di);
-				x1[i] = 0.5 * ((valueX1 + valueX2) - betas.first * abs(valueX1 - valueX2));
-				x2[i] = 0.5 * ((valueX1 + valueX2) - betas.second * abs(valueX1 - valueX2));
-			}
+				new1 = 0.5 * ((valueX1 + valueX2) - betas.first * abs(valueX1 - valueX2));
+				new2 = 0.5 * ((valueX1 + valueX2) - betas.second * abs(valueX1 - valueX2));
+				if (isnan(new1))
+					cout << new1 << endl;
+				if (isnan(new2))
+					cout << new2 << endl;
+ 			}
 		}
 	}
 	return pair<Eigen::VectorXd, Eigen::VectorXd>(x1, x2);
