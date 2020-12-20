@@ -96,6 +96,10 @@ void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEn
 
 }
 
+bool ParetoObjectives::compare_two(string& first, string& second)
+{
+	return false;
+}
 
 void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
@@ -2139,10 +2143,7 @@ void MOEA::initialize_obs_restart_population()
 ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterEnsemble& _dp)
 {
 	message(1, "generating diffevol population of size", num_members);
-	vector<int> member_count,working_count, selected, r_int_vec;
-	for (int i = 0; i < _dp.shape().first; i++)
-		member_count.push_back(i);
-
+	vector<int> r_int_vec;
 	for (int i = 0; i < dv_names.size(); i++)
 		r_int_vec.push_back(i);
 
@@ -2169,24 +2170,11 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	string dv_name;
 	int ii;
 	int i_last;
+	vector<int> selected;
 	for (int i = 0; i < num_members; i++)
 	{
-		working_count = member_count;
-		shuffle(working_count.begin(), working_count.end(), rand_gen);
-		selected.clear();
-
-		i_last = 0;
-		while (true)
-		{
-			i_last += 1;
-			if (i_last > working_count.size())
-				throw_moea_error("MOEA::generate_diffevol_population(): internal error seeking random population members for differntial");
-			if (i_last == i)
-				continue;
-			selected.push_back(working_count[i_last]);
-			if (selected.size() == 3)
-				break;
-		}
+		
+		selected = selection(4, _dp, false);
 
 		//differential vector
 		diff = _dp.get_eigen_ptr()->row(selected[0]) + (F * (_dp.get_eigen_ptr()->row(selected[1]) - _dp.get_eigen_ptr()->row(selected[2])));
@@ -2196,7 +2184,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 			x = _dp.get_eigen_ptr()->row(i);
 		else
 			//this risks "inbreeding" but maybe thats good?!
-			x = _dp.get_eigen_ptr()->row(working_count[i_last]);
+			x = _dp.get_eigen_ptr()->row(selected[3]);
 		//copy to perserve non-dec var values;
 		y = x; 
 		//random cross over probs - one per decision variable
@@ -2232,23 +2220,75 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	return new_dp;
 }
 
+ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsemble& _dp)
+{
+	message(1, "generating PM population of size", num_members);
+	_dp.transform_ip(ParameterEnsemble::transStatus::NUM);
+	return ParameterEnsemble();
+}
+
+vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, bool use_binary_tourament)
+{
+	int i_member = 0, p1_idx,p2_idx;
+	vector<int> member_count, working_count, selected, r_int_vec;
+	vector<double> rnds;
+	for (int i = 0; i < _dp.shape().first; i++)
+		member_count.push_back(i);
+	vector<string> real_names = _dp.get_real_names();
+	for (int i = 0; i < _dp.shape().first; i++)
+		r_int_vec.push_back(i);
+	set<int> selected_members;
+	string s1, s2;
+	int tries = 0;
+	while (selected_members.size() < num_to_select)
+	{
+		working_count = member_count;//copy member count index to working count
+		// sampled with replacement
+		shuffle(working_count.begin(), working_count.end(), rand_gen); //randomly shuffle working count
+		//just take the first two since this should change each time thru
+		p1_idx = working_count[0];
+		if (selected_members.find(p1_idx) != selected_members.end())
+			continue;
+		p2_idx = working_count[1];
+		if (selected_members.find(p2_idx) != selected_members.end())
+			continue;
+		s1 = real_names[p1_idx];
+		s2 = real_names[p2_idx];
+		if (use_binary_tourament)
+		{
+			if (objectives.compare_two(s1, s2))
+				selected_members.emplace(p1_idx);
+			else
+				selected_members.emplace(p2_idx);
+		}
+		else
+		{
+			selected_members.emplace(p1_idx);
+			if (selected_members.size() == num_to_select)
+				break;
+			selected_members.emplace(p2_idx);
+		}
+		tries++;
+		if (tries > 1000000000)
+			throw_moea_error("selection process appears to be stuck in an infinite loop...");
+	}
+	vector<int> members(selected_members.begin(), selected_members.end());
+	return members;
+}
+
 ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemble& _dp)
 {
 	message(1, "generating SBX population of size", num_members);
 
 	_dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 
-	vector<int> member_count, working_count, selected, r_int_vec;
+	vector<int> r_int_vec;
 	vector<double> rnds;
-	for (int i = 0; i < _dp.shape().first; i++)
-		member_count.push_back(i);
-
+	
 	for (int i = 0; i < dv_names.size(); i++)
 		r_int_vec.push_back(i);
 
-	//TODO: move the operators to classes
-	//TODO: add algorithm parameters to pp args
-	// crossover
+	
 	double crossover_probability = 0.9;
 	double crossover_distribution_index = 10.0;
 	int i_member = 0;
@@ -2257,6 +2297,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	new_reals.setZero();
 	pair<Eigen::VectorXd, Eigen::VectorXd> children;
 	vector<string> new_names;
+	vector<int> selected;
 	ofstream& lin = file_manager.get_ofstream(lineage_tag);
 	vector<string> real_names = _dp.get_real_names();
 	string new_name;
@@ -2264,13 +2305,9 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	
 	{
 
-		//randomly select two parents - this is just a temp routine, something better needed...
-		working_count = member_count;//copy member count index to working count
-		// sampled with or without replacement? TODO: need to figure this out
-		shuffle(working_count.begin(), working_count.end(), rand_gen); //randomly shuffle working count
-		//just take the first two since this should change each time thru
-		p1_idx = working_count[0];
-		p2_idx = working_count[1];
+		selected = selection(2, _dp, true);
+		p1_idx = selected[0];
+		p2_idx = selected[1];
 
 		//generate two children thru cross over
 		children = sbx_new(crossover_probability, crossover_distribution_index, p1_idx, p2_idx);
@@ -2299,7 +2336,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	//mutation
 	double mutation_probability = 1.0 / pest_scenario.get_n_adj_par();
 	double mutation_distribution_index = 20.0;
-	mutate_ip(mutation_probability, mutation_distribution_index, tmp_dp);
+	linear_mutation_ip(mutation_probability, mutation_distribution_index, tmp_dp);
 	tmp_dp.enforce_limits(performance_log,false);
 	//tmp_dp.to_csv("temp_mut.csv");
 
@@ -2593,7 +2630,7 @@ pair<double,double> MOEA::get_betas(double v1, double v2, double distribution_in
 
 }
 
-void MOEA::mutate_ip(double probability, double eta_m, ParameterEnsemble& temp_dp)
+void MOEA::linear_mutation_ip(double probability, double eta_m, ParameterEnsemble& temp_dp)
 {
 	vector<double> rnds;
 	double delta1, delta2, mut_pow, deltaq;

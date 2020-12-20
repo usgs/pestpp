@@ -41,6 +41,9 @@ public:
 	
 	map<string,double> get_cuboid_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	
+	map<string,double> get_kth_nn_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
+
+	bool compare_two(string& first, string& second);
 	 
 private:
 	
@@ -154,11 +157,14 @@ private:
 
 	ParameterEnsemble generate_diffevol_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble generate_sbx_population(int num_members, ParameterEnsemble& _dp);
+	ParameterEnsemble generate_pm_population(int num_members, ParameterEnsemble& _dp);
+
+	vector<int> selection(int num_to_select, ParameterEnsemble& _dp, bool use_binary_tourament);
 
 	string get_new_member_name(string tag = string());
 
 	void save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag = string());
-	void mutate_ip(double probability, double eta_m, ParameterEnsemble& temp_dp);
+	void linear_mutation_ip(double probability, double eta_m, ParameterEnsemble& temp_dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx(double probability, double eta_m, int idx1, int idx2);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx_new(double probability, double eta_m, int idx1, int idx2);
 	pair<double, double> get_betas(double v1, double v2, double distribution_index);
