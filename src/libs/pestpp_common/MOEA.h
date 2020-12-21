@@ -59,6 +59,8 @@ private:
 
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& member_struct);
 
+	bool ParetoObjectives::compare_two_nsga(string& first, string& second);
+
 	//sort specific members
 	map<string, double> get_cuboid_crowding_distance(vector<string>& members);
 	//sort all members in member struct
@@ -68,6 +70,12 @@ private:
 	vector<string>* obs_obj_names_ptr;
 	vector<string>* pi_obj_names_ptr;
 	map<string, double>* obj_dir_mult_ptr;
+
+	map<string, map<string, double>> feas_member_struct;
+	map<int, vector<string>> front_map;
+	map<string, double> crowd_map;
+	map<string, int> member_front_map;
+	map<string, double> infeas;
 
 	typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
 	// Defining a lambda function to compare two pairs. It will compare two pairs using second field
@@ -86,6 +94,7 @@ private:
 class MOEA
 {
 	enum MouGenType{DE,SBX};
+	enum MouEnvType { NSGA, SPEA };
 public:
 	static mt19937_64 rand_engine;
 	MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer,
@@ -95,6 +104,7 @@ public:
 	void finalize();
 	typedef pair<vector<string>, vector<string>> DomPair;
 private:
+	MouEnvType envtype;
 	double epsilon = 1.0e-15;
 	Pest& pest_scenario;
 	set<string> pp_args;

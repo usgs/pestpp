@@ -98,6 +98,34 @@ void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEn
 
 bool ParetoObjectives::compare_two(string& first, string& second)
 {
+	if (infeas.find(first) != infeas.end())
+		//if both are infeas, select the solution that is less infeasible
+		if (infeas.find(second) != infeas.end())
+		{
+			if (infeas[first] > infeas[second])
+				return false;
+			else
+				return true;
+		}
+		return false;
+	if (infeas.find(second) != infeas.end())
+		return true;
+
+	return compare_two_nsga(first, second);
+	
+}
+
+bool ParetoObjectives::compare_two_nsga(string& first, string& second)
+{
+	if (member_front_map[first] > member_front_map[second])
+		return true;
+	if (member_front_map[first] == member_front_map[second])
+	{
+		if (crowd_map[first] > crowd_map[second])
+			return true;
+		else
+			return false;
+	}
 	return false;
 }
 
@@ -182,15 +210,12 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 	//check for and drop duplictes
 	drop_duplicates(op, dp);
 
-	
-
 	vector<string> real_names = op.get_real_names();
 	vector<string> infeas_ordered;
-	map<string, double> infeas;
+	infeas.clear();
 	bool all_infeas = false;
 	//TODO: work out if there are actually any constraints (instead of all objectives)
 	
-
 	if (constraints_ptr)
 	{
 		bool check_constraints = false;
@@ -231,7 +256,8 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 			vector<string> onames = op.get_var_names(), pnames = dp.get_var_names();
 			set<string> obs_obj_set(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
 			set<string> pi_obj_set(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());
-			map<string, map<string, double>> feas_member_struct;
+			feas_member_struct.clear();
+			infeas;
 			for (auto real_name : real_names)
 			{
 				vsum = 0.0;
@@ -290,9 +316,8 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 	}
 
 	performance_log->log_event("pareto sorting");
-	map<int, vector<string>> front_map = sort_members_by_dominance_into_fronts(member_struct);
+	front_map = sort_members_by_dominance_into_fronts(member_struct);
 	
-
 	if (obs_obj_names_ptr->size() + pi_obj_names_ptr->size() > 1)
 	{
 		frec << "...pareto dominance sort yielded " << front_map.size() << " domination fronts" << endl;
@@ -311,8 +336,8 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 	
 	vector<string> nondom_crowd_ordered,dom_crowd_ordered;
 	vector<string> crowd_ordered_front;
-	map<string, double> crowd_map;
-	map<string, int> member_front_map;
+	crowd_map.clear();
+	member_front_map.clear();
 	for (auto front : front_map)
 	{	
 		for (auto m : front.second)
@@ -1153,6 +1178,14 @@ void MOEA::initialize()
 	
 	//set some defaults
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
+
+	string env = ppo->get_mou_env();
+	if (env == "NSGA")
+		envtype = MouEnvType::NSGA;
+	else if (env == "SPEA")
+		envtype = MouEnvType::SPEA;
+	else
+		throw_moea_error("'mou_env' type not recognized: " + env + ", should be 'NSGA' or 'SPEA'");
 
 	//reset the par bound PI augmentation since that option is just for simplex
 	ppo->set_opt_include_bnd_pi(false);
