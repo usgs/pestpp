@@ -1572,7 +1572,7 @@ void PestppOptions::set_defaults()
 	set_mou_max_archive_size(5000);
 	set_mou_risk_obj(false);
 	set_mou_verbose_level(4);
-	set_mou_env("nsga");
+	set_mou_env("NSGA");
 	
 
 	set_ies_par_csv("");
