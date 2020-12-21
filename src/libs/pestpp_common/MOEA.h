@@ -51,10 +51,10 @@ private:
 	FileManager& file_manager;
 	PerformanceLog* performance_log;
 	//vector<string> obj_names;
-	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, double>& crowd_map);
+	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, double>& crowd_map, map<string, map<string, double>>& _member_struct);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
 	void update_member_struct(ObservationEnsemble& oe, ParameterEnsemble& dp);
-	void drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp);
+	void drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp, map<string, map<string, double>>& _member_struct);
 	bool first_equals_second(map<string, double>& first, map<string, double>& second);
 
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& _member_struct);
@@ -92,6 +92,7 @@ private:
 	map<string, int> member_front_map;
 	map<string, double> infeas;
 	vector<string> infeas_ordered;
+	map<string, double> fitness_map;
 
 	typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
 	// Defining a lambda function to compare two pairs. It will compare two pairs using second field
@@ -102,7 +103,8 @@ private:
 	
 	void prep_pareto_summary_file(string summary_tag);
 	void write_pareto_summary(string& sum_tag, int generation, vector<string>& member_names,
-		map<string, int>& front_map, map<string, double>& crowd_map, map<string, double>& infeas_map);
+		map<string, int>& front_map, map<string, double>& crowd_map, map<string, double>& infeas_map,
+		map<string, map<string, double>>& _member_struct);
 	
 };
 

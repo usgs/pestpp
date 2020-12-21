@@ -129,7 +129,7 @@ bool ParetoObjectives::compare_two_nsga(string& first, string& second)
 	return false;
 }
 
-void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp)
+void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp, map<string, map<string, double>>& _member_struct)
 {
 	performance_log->log_event("checking for duplicate solutions");
 	set<string> duplicates;
@@ -139,19 +139,19 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 	vector<string> names;
 	map<string, double> solution_p,solution_q;
 	string name_p,name_q;
-	for (auto m : member_struct)
+	for (auto m : _member_struct)
 		names.push_back(m.first);
 
 	//for (auto solution_p : member_struct)
 	for (int i=0;i<names.size();i++)
 	{
 		name_p = names[i];
-		solution_p = member_struct[names[i]];
+		solution_p = _member_struct[names[i]];
 		//for (auto solution_q : member_struct)
 		for (int j=i+1;j<names.size();j++)
 		{
 			name_q = names[j];
-			solution_q = member_struct[name_q];
+			solution_q = _member_struct[name_q];
 			//if (solution_p.first == solution_q.first)
 			//	continue;
 			if ((first_equals_second(solution_p, solution_q)) && (duplicates.find(name_q) == duplicates.end()))
@@ -207,7 +207,7 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 		throw runtime_error("ParetoObjectives error: member_struct is empty");
 
 	//check for and drop duplictes
-	drop_duplicates(op, dp);
+	drop_duplicates(op, dp, member_struct);
 
 	vector<string> real_names = op.get_real_names();
 	infeas_ordered.clear();
@@ -316,6 +316,21 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 
 	performance_log->log_event("pareto sorting");
 	front_map = sort_members_by_dominance_into_fronts(member_struct);
+	fitness_map = get_spea_fitness(member_struct);
+	
+	return;
+}
+
+pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_sort(int generation, ObservationEnsemble& op,
+	ParameterEnsemble& dp, Constraints* constraints_ptr, bool report, string sum_tag)
+{
+	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
+	ss << "ParetoObjectives::nsga_ii_pareto_dominance_sort() for " << op.shape().first << " population members";
+	update(op, dp, constraints_ptr);
+
+	if (member_struct.size() == 0)
+		throw runtime_error("ParetoObjectives error: member_struct is empty");
 
 	if (obs_obj_names_ptr->size() + pi_obj_names_ptr->size() > 1)
 	{
@@ -332,72 +347,6 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 			frec << front.second.size() << " in the front " << front.first << endl;
 		}
 	}
-
-	vector<string> nondom_crowd_ordered, dom_crowd_ordered;
-	vector<string> crowd_ordered_front;
-	crowd_map.clear();
-	member_front_map.clear();
-	for (auto front : front_map)
-	{
-		for (auto m : front.second)
-			member_front_map[m] = front.first;
-		//TODO: Deb says we only need to worry about crowding sort if not all
-		//members of the front are going to be retained.  For now, just sorting all fronts...
-		if (front.second.size() == 1)
-		{
-			crowd_ordered_front = front.second;
-			crowd_map[front.second[0]] = -999.0;
-		}
-
-		else
-		{
-			crowd_ordered_front = sort_members_by_crowding_distance(front.second, crowd_map);
-		}
-
-		if (front.first == 1)
-			for (auto front_member : crowd_ordered_front)
-				nondom_crowd_ordered.push_back(front_member);
-		else
-			for (auto front_member : crowd_ordered_front)
-				dom_crowd_ordered.push_back(front_member);
-	}
-
-	//now add the infeasible members
-	//if there is atleast one feasible nondom solution, then add the infeasible ones to dom solutions
-	if (!all_infeas)
-	{
-		if (nondom_crowd_ordered.size() > 0)
-			for (auto inf : infeas_ordered)
-				dom_crowd_ordered.push_back(inf);
-		else
-			for (auto inf : infeas_ordered)
-				nondom_crowd_ordered.push_back(inf);
-	}
-
-	if (op.shape().first != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
-	{
-		ss.str("");
-		ss << "ParetoObjectives::pareto_dominance_sort() internal error: final sorted population size: " <<
-			nondom_crowd_ordered.size() + dom_crowd_ordered.size() << " != initial population size: " << op.shape().first;
-		cout << ss.str();
-		throw runtime_error(ss.str());
-	}
-
-	
-
-	return;
-}
-
-pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_sort(int generation, ObservationEnsemble& op,
-	ParameterEnsemble& dp, Constraints* constraints_ptr, bool report, string sum_tag)
-{
-	stringstream ss;
-	ss << "ParetoObjectives::nsga_ii_pareto_dominance_sort() for " << op.shape().first << " population members";
-	update(op, dp, constraints_ptr);
-
-	if (member_struct.size() == 0)
-		throw runtime_error("ParetoObjectives error: member_struct is empty");
-
 
 	vector<string> nondom_crowd_ordered,dom_crowd_ordered;
 	vector<string> crowd_ordered_front;
@@ -417,7 +366,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 
 		else
 		{
-			crowd_ordered_front = sort_members_by_crowding_distance(front.second, crowd_map);
+			crowd_ordered_front = sort_members_by_crowding_distance(front.second, crowd_map, member_struct);
 		}
 
 		if (front.first == 1)
@@ -449,17 +398,17 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 		throw runtime_error(ss.str());
 	}
 
-	//TODO: some kind of reporting here.  Probably to the rec and maybe a csv file too...
 	if (sum_tag.size() > 0)
 	{
 		vector<string> real_names = op.get_real_names();
-		write_pareto_summary(sum_tag, generation, real_names, member_front_map, crowd_map, infeas);
+		write_pareto_summary(sum_tag, generation, real_names, member_front_map, crowd_map, infeas, member_struct);
 	}	
 	return pair<vector<string>, vector<string>>(nondom_crowd_ordered, dom_crowd_ordered);
 }
 
 void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, vector<string>& member_names, 
-	map<string,int>& front_map, map<string,double>& crowd_map, map<string,double>& infeas_map)
+	map<string,int>& front_map, map<string,double>& crowd_map, map<string,double>& infeas_map,
+	map<string, map<string, double>>& _member_struct)
 {
 	ofstream& sum = file_manager.get_ofstream(sum_tag);
 	for (auto& member : member_names)
@@ -468,11 +417,11 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, vec
 		sum << generation << "," << member;
 		for (auto obj : *obs_obj_names_ptr)
 		{
-			sum << "," << obj_dir_mult_ptr->at(obj) * member_struct[member][obj];
+			sum << "," << obj_dir_mult_ptr->at(obj) * _member_struct[member][obj];
 		}
 		for (auto obj : *pi_obj_names_ptr)
 		{
-			sum << "," << obj_dir_mult_ptr->at(obj) * member_struct[member][obj];
+			sum << "," << obj_dir_mult_ptr->at(obj) * _member_struct[member][obj];
 		}
 		sum << "," << front_map[member];
 		sum << "," << crowd_map[member];
@@ -649,10 +598,11 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 }
 
 
-vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members, map<string,double>& crowd_map)
+vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members, map<string,double>& crowd_map, 
+	map<string, map<string, double>>& _member_struct)
 {
 
-	map<string, double> crowd_distance_map = get_cuboid_crowding_distance(members, member_struct);
+	map<string, double> crowd_distance_map = get_cuboid_crowding_distance(members, _member_struct);
 	
 
 	vector <pair<string, double>> cs_vec;
@@ -686,16 +636,16 @@ map<string, double> ParetoObjectives::get_spea_fitness(map<string, map<string, d
 	map<string, vector<string>> solutions_dominated_map;
 	map<string, int> num_dominating_map;
 	int dom;
-	fill_domination_containers(member_struct, solutions_dominated_map, num_dominating_map);
-	map<string, double> fitness;
+	fill_domination_containers(_member_struct, solutions_dominated_map, num_dominating_map);
+	map<string, double> _fitness_map;
 	for (auto& sol_map : solutions_dominated_map)
 	{
 		dom = 0;
 		for (auto& sol : sol_map.second)
 			dom = dom + num_dominating_map[sol];
-		fitness[sol_map.first] = (double)dom + kdist[sol_map.first];
+		_fitness_map[sol_map.first] = (double)dom + kdist[sol_map.first];
 	}
-	return fitness;
+	return _fitness_map;
 
 }
 
@@ -742,7 +692,7 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 	//map<string,map<string,double>> Sp, F1;
 	map<string, vector<string>> solutions_dominated_map;
 	map<string, int> num_dominating_map;
-	fill_domination_containers(member_struct, solutions_dominated_map, num_dominating_map);
+	fill_domination_containers(_member_struct, solutions_dominated_map, num_dominating_map);
 	vector<string> solutions_dominated, first_front;
 	performance_log->log_event("finding first front");
 	for (auto  num_dom : num_dominating_map)
