@@ -217,7 +217,7 @@ void ParetoObjectives::get_spea_names_to_keep(int num_members, vector<string>& k
 }
 
 
-void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, bool drop_dups_4_nsga, Constraints* constraints_ptr)
+void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Constraints* constraints_ptr)
 {
 	stringstream ss;
 	ss << "ParetoObjectives::update() for  " << op.shape().first << " population members";
@@ -226,10 +226,11 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, bo
 
 
 	ofstream& frec = file_manager.rec_ofstream();
-	//TODO: check for a single objective and deal appropriately
 
 	//update the member struct container
 	member_struct = get_member_struct(op, dp);
+
+	drop_duplicates(op, dp, member_struct);
 
 	if (member_struct.size() == 0)
 		throw runtime_error("ParetoObjectives error: member_struct is empty");
@@ -345,36 +346,29 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, bo
 	performance_log->log_event("calculating fitness");
 	fitness_map = get_spea_fitness(member_struct);
 
-	//check for and drop duplictes - after spea fitness calcs...
-	int org_size = member_struct.size();
-	if (drop_dups_4_nsga)
+	
+	//remove infeasible solutions - after spea fitness calcs
+	if (check_constraints)
 	{
-		drop_duplicates(op, dp, member_struct);
-		//remove infeasible solutions - after spea fitness calcs
-		if (check_constraints)
+		if (infeas.size() == member_struct.size())
 		{
-			if (infeas.size() == org_size)
-			{
-				ss.str("");
-				ss << "WARNING: all members are infeasible" << endl;
-				frec << ss.str();
-				cout << ss.str();
-				all_infeas = true;
-			}
-			else
-			{
-				ss.str("");
-				ss << feas_member_struct.size() << " feasible solutions" << endl;
-				frec << ss.str();
-				cout << ss.str();
-				member_struct = feas_member_struct;
-			}
+			ss.str("");
+			ss << "WARNING: all members are infeasible" << endl;
+			frec << ss.str();
+			cout << ss.str();
+			all_infeas = true;
 		}
-		performance_log->log_event("pareto front sorting");
-		front_map = sort_members_by_dominance_into_fronts(member_struct);
+		else
+		{
+			ss.str("");
+			ss << feas_member_struct.size() << " feasible solutions" << endl;
+			frec << ss.str();
+			cout << ss.str();
+			member_struct = feas_member_struct;
+		}
 	}
-	
-	
+	performance_log->log_event("pareto front sorting");
+	front_map = sort_members_by_dominance_into_fronts(member_struct);	
 	return;
 }
 
@@ -386,7 +380,7 @@ map<string, double> ParetoObjectives::get_spea2_fitness(int generation, Observat
 	ofstream& frec = file_manager.rec_ofstream();
 	ss << "ParetoObjectives::get_spea2_fitness() for " << op.shape().first << " population members";
 	performance_log->log_event(ss.str());
-	update(op, dp, false, constraints_ptr);
+	update(op, dp, constraints_ptr);
 
 	if (member_struct.size() == 0)
 		throw runtime_error("ParetoObjectives error: member_struct is empty");
@@ -406,7 +400,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 	ofstream& frec = file_manager.rec_ofstream();
 	ss << "ParetoObjectives::nsga_ii_pareto_dominance_sort() for " << op.shape().first << " population members";
 	performance_log->log_event(ss.str());
-	update(op, dp, true, constraints_ptr);
+	update(op, dp, constraints_ptr);
 
 	if (member_struct.size() == 0)
 		throw runtime_error("ParetoObjectives error: member_struct is empty");
@@ -2896,11 +2890,13 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double probability, double 
 	//double rnd1, rnd2, rnd3, rnd4;
 	vector<double> rnds;
 	double lt, ut;
-	double valueX1, valueX2, new1, new2;
+	double p1, p2, c1, c2;
 	const double EPS = 1.0e-14;
 	// get parents from dp
-	Eigen::VectorXd x1 = dp.get_eigen_ptr()->row(idx1); // parent #1
-	Eigen::VectorXd x2 = dp.get_eigen_ptr()->row(idx2); // parent #2
+	Eigen::VectorXd parent1 = dp.get_eigen_ptr()->row(idx1); // parent #1
+	Eigen::VectorXd parent2 = dp.get_eigen_ptr()->row(idx2); // parent #2
+	Eigen::VectorXd child1 = parent1; // parent #1
+	Eigen::VectorXd child2 = parent2; // parent #2
 
 	vector<string> var_names = dp.get_var_names();
 	string vname;
@@ -2909,51 +2905,66 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double probability, double 
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(lbnd);
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(ubnd);
 
-	//offs1.setZero();
-	//offs2.setZero();
-
 	pair<double, double> betas;
-
 
 	int n_var = dv_names.size();
 	//can't set all rnds outside of loop or all vars will be treated the same
 	rnds = uniform_draws(4, 0.0, 1.0, rand_gen);
 
-	//if (rnds[0] <= probability) 
-	if (true)
+	int tries = 0;
+	while (true)
 	{
+		
+		child1 = parent1; 
+		child2 = parent2; 
 		for (i = 0; i < n_var; i++)
 		{
-			valueX1 = x1[i];
-			valueX2 = x2[i];
+			rnds = uniform_draws(1, 0.0, 1.0, rand_gen);
+			p1 = parent1[i];
+			p2 = parent2[i];
 			vname = var_names[i];
-			if (rnds[1] <= 0.5)
+			if (rnds[0] <= probability)
 			{
-				lt = (valueX1 + valueX2 + (2 * lbnd[vname]))/(abs(valueX1 - valueX2));
-				ut = ((2. * ubnd[vname]) - valueX1 - valueX2) / (abs(valueX1 - valueX2));
+				lt = (p1 + p2 + (2 * lbnd[vname]))/(abs(p1 - p2));
+				ut = ((2. * ubnd[vname]) - p1 - p2) / (abs(p1 - p2));
 				/*if (lt < 0)
 					throw_moea_error("sbx error: lower transform bound less than zero");
 				if (ut < 0)
 				*/	//throw_moea_error("sbx error: upper transform bound less than zero");
 				betas = get_betas(lt, ut, di);
-				new1 = 0.5 * ((valueX1 + valueX2) - betas.first * abs(valueX1 - valueX2));
-				new2 = 0.5 * ((valueX1 + valueX2) - betas.second * abs(valueX1 - valueX2));
-				if (isnan(new1))
+				c1 = 0.5 * ((p1 + p2) - betas.first * abs(p1 - p2));
+				c2 = 0.5 * ((p1 + p2) - betas.second * abs(p1 - p2));
+				if (isnan(c1))
 				{
 					ss.str("");
-					ss << "sbx error: denormal value generated for " << vname << ", beta: " << betas.first << ", lt:" << lt << ", ut: " << ut << ", v1:" << valueX1 << ", v2: " << valueX2;
+					ss << "sbx error: denormal value generated for " << vname << ", beta: " << betas.first << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
 					throw_moea_error(ss.str());
 				}
-				if (isnan(new2))
+				if (isnan(c2))
 				{
 					ss.str("");
-					ss << "sbx error: denormal value generated for " << vname << ", beta: " << betas.second << ", lt:" << lt << ", ut: " << ut << ", v1:" << valueX1 << ", v2: " << valueX2;
+					ss << "sbx error: denormal value generated for " << vname << ", beta: " << betas.second << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
 					throw_moea_error(ss.str());
 				}
+				child1[i] = c1;
+				child2[i] = c2;
  			}
 		}
+		tries++;
+		if (tries > 10000000)
+			throw_moea_error("sbx generation process appears to be stuck in an infinite loop...");
+		//hack alert - we dont wanna waste time with identical solutions, so we will keep trying 
+		//until both child1 and child2 are different from parents - evolution!
+		if ((parent1 - child1).squaredNorm() < epsilon)
+			continue;
+		else if ((parent2 - child2).squaredNorm() < epsilon)
+			continue;
+		else
+			break;
+			
 	}
-	return pair<Eigen::VectorXd, Eigen::VectorXd>(x1, x2);
+	
+	return pair<Eigen::VectorXd, Eigen::VectorXd>(child1, child2);
 
 }
 

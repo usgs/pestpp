@@ -40,9 +40,7 @@ public:
 	}
 	
 
-	void update(ObservationEnsemble& oe, ParameterEnsemble& dp, bool drop_dups, Constraints* constraints_ptr = nullptr);
-	
-	
+	void update(ObservationEnsemble& oe, ParameterEnsemble& dp, Constraints* constraints_ptr = nullptr);
 
 	bool compare_two(string& first, string& second);
 
