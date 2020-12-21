@@ -14,6 +14,14 @@
 using namespace std;
 
 //util functions
+typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
+// Defining a lambda function to compare two pairs. It will compare two pairs using second field
+Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
+{
+	return elem1.second < elem2.second;
+};
+
+typedef std::set<std::pair<std::string, double>, Comparator> sortedset;
 
 
 
@@ -26,9 +34,9 @@ ParetoObjectives::ParetoObjectives(Pest& _pest_scenario, FileManager& _file_mana
 
 }
 
-void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEnsemble& dp)
+map<string, map<string, double>> ParetoObjectives::get_member_struct(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
-	member_struct.clear();
+	map<string, map<string, double>> _member_struct;
 
 	//map<string, map<double, string>> obj_struct;
 	vector<string> real_names = op.get_real_names();
@@ -67,7 +75,7 @@ void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEn
 			obj_map[t.first] = t.second[real_name];
 		}
 
-		member_struct[real_name] = obj_map;
+		_member_struct[real_name] = obj_map;
 	}
 	temp.clear();
 
@@ -89,10 +97,11 @@ void ParetoObjectives::update_member_struct(ObservationEnsemble& op, ParameterEn
 			{
 				pi_res_sim = pi_ptr->get_pi_rec_ptr(obj_name).calc_sim_and_resid(pars);
 				//account for dir mult here
-				member_struct[real_name][obj_name] = pi_res_sim.first * obj_dir_mult_ptr->at(obj_name);
+				_member_struct[real_name][obj_name] = pi_res_sim.first * obj_dir_mult_ptr->at(obj_name);
 			}
 		}
 	}
+	return _member_struct;
 
 }
 
@@ -183,13 +192,13 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 		op.drop_rows(d);
 		dp.drop_rows(d);
 		performance_log->log_event("updating member struct after dropping duplicates");
-		update_member_struct(op, dp);
+		member_struct = get_member_struct(op, dp);
 	}
 
 
 }
 
-void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Constraints* constraints_ptr)
+void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, bool drop_dups_4_nsga, Constraints* constraints_ptr)
 {
 	stringstream ss;
 	ss << "ParetoObjectives::update() for  " << op.shape().first << " population members";
@@ -201,23 +210,20 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 	//TODO: check for a single objective and deal appropriately
 
 	//update the member struct container
-	update_member_struct(op, dp);
+	member_struct = get_member_struct(op, dp);
 
 	if (member_struct.size() == 0)
 		throw runtime_error("ParetoObjectives error: member_struct is empty");
-
-	//check for and drop duplictes
-	drop_duplicates(op, dp, member_struct);
 
 	vector<string> real_names = op.get_real_names();
 	infeas_ordered.clear();
 	infeas.clear();
 	bool all_infeas = false;
 	//TODO: work out if there are actually any constraints (instead of all objectives)
-
+	bool check_constraints = false;
 	if (constraints_ptr)
 	{
-		bool check_constraints = false;
+		
 		vector<string> t = *obs_obj_names_ptr;
 		set<string> obj_names(t.begin(), t.end());
 		for (auto name : constraints_ptr->get_obs_constraint_names())
@@ -255,6 +261,8 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 			vector<string> onames = op.get_var_names(), pnames = dp.get_var_names();
 			set<string> obs_obj_set(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
 			set<string> pi_obj_set(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());
+			ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+			PriorInformation* pi = pest_scenario.get_prior_info_ptr();
 			feas_member_struct.clear();
 			infeas;
 			for (auto real_name : real_names)
@@ -268,14 +276,14 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 				for (auto v : violations)
 				{
 					if (obs_obj_set.find(v.first) == obs_obj_set.end())
-						vsum += v.second;
+						vsum += pow(v.second * oi->get_weight(v.first),2);
 				}
 				pars.update_without_clear(pnames, dp.get_real_vector(real_name));
 				violations = constraints_ptr->get_unsatified_pi_constraints(pars, 0.0);
 				for (auto v : violations)
 				{
 					if (pi_obj_set.find(v.first) == pi_obj_set.end())
-						vsum += v.second;
+						vsum += pow(v.second * pi->get_pi_rec_ptr(v.first).get_weight(),2);
 				}
 				if (vsum > 0.0)
 				{
@@ -284,7 +292,49 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 				else
 					feas_member_struct[real_name] = member_struct[real_name];
 			}
-			if (feas_member_struct.size() == 0)
+			/*if (feas_member_struct.size() == 0)
+			{
+				ss.str("");
+				ss << "WARNING: all members are infeasible" << endl;
+				frec << ss.str();
+				cout << ss.str();
+				all_infeas = true;
+			}
+			else
+			{
+				ss.str("");
+				ss << feas_member_struct.size() << " feasible solutions" << endl;
+				frec << ss.str();
+				cout << ss.str();
+				member_struct = feas_member_struct;
+			}*/
+
+			//sort the infeasible members by violation
+			vector <pair<string, double>> infeas_vec;
+			for (auto inf : infeas)
+				infeas_vec.push_back(inf);
+
+			std::sort(infeas_vec.begin(), infeas_vec.end(),
+				compFunctor);
+
+			for (auto inf : infeas_vec)
+				infeas_ordered.push_back(inf.first);
+		}
+	}
+
+
+	performance_log->log_event("calculating fitness");
+	fitness_map = get_spea_fitness(member_struct);
+
+	//check for and drop duplictes - after spea fitness calcs...
+	int org_size = member_struct.size();
+	if (drop_dups_4_nsga)
+	{
+		drop_duplicates(op, dp, member_struct);
+		//remove infeasible solutions - after spea fitness calcs
+		if (check_constraints)
+		{
+			if (infeas.size() == org_size)
 			{
 				ss.str("");
 				ss << "WARNING: all members are infeasible" << endl;
@@ -300,25 +350,34 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 				cout << ss.str();
 				member_struct = feas_member_struct;
 			}
-
-			//sort the infeasible members by violation
-			vector <pair<string, double>> infeas_vec;
-			for (auto inf : infeas)
-				infeas_vec.push_back(inf);
-
-			std::sort(infeas_vec.begin(), infeas_vec.end(),
-				compFunctor);
-
-			for (auto inf : infeas_vec)
-				infeas_ordered.push_back(inf.first);
 		}
+		performance_log->log_event("pareto front sorting");
+		front_map = sort_members_by_dominance_into_fronts(member_struct);
 	}
-
-	performance_log->log_event("pareto sorting");
-	front_map = sort_members_by_dominance_into_fronts(member_struct);
-	fitness_map = get_spea_fitness(member_struct);
+	
 	
 	return;
+}
+
+
+
+map<string, double> ParetoObjectives::get_spea2_fitness(int generation, ObservationEnsemble& op, ParameterEnsemble& dp, Constraints* constraints_ptr, bool report, string sum_tag)
+{
+	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
+	ss << "ParetoObjectives::get_spea2_fitness() for " << op.shape().first << " population members";
+	performance_log->log_event(ss.str());
+	update(op, dp, false, constraints_ptr);
+
+	if (member_struct.size() == 0)
+		throw runtime_error("ParetoObjectives error: member_struct is empty");
+
+	if (sum_tag.size() > 0)
+	{
+		vector<string> real_names = op.get_real_names();
+		write_pareto_summary(sum_tag, generation, real_names, member_front_map, crowd_map, infeas, member_struct);
+	}
+	return fitness_map;
 }
 
 pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_sort(int generation, ObservationEnsemble& op,
@@ -327,7 +386,8 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
 	ss << "ParetoObjectives::nsga_ii_pareto_dominance_sort() for " << op.shape().first << " population members";
-	update(op, dp, constraints_ptr);
+	performance_log->log_event(ss.str());
+	update(op, dp, true, constraints_ptr);
 
 	if (member_struct.size() == 0)
 		throw runtime_error("ParetoObjectives error: member_struct is empty");
@@ -456,9 +516,9 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	//this updates the complicated map-based structure that stores the member names: obj_names:value nested pairs
-	update_member_struct(op, dp);
+	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
 	//just reuse the same routine used for the pareto dominance sort...
-	return get_cuboid_crowding_distance(member_struct);
+	return get_kth_nn_crowding_distance(_member_struct);
 }
 
 
@@ -510,7 +570,7 @@ map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(vector<string
 			distances.push_back(distance);
 		}
 		sort(distances.begin(), distances.end());
-		crowd_distance_map[members[i]] = 1./(sqrt(distances[k]) + 2.);	
+		crowd_distance_map[members[i]] = sqrt(distances[k]);	
 	}
 	return crowd_distance_map;
 }
@@ -519,9 +579,9 @@ map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(vector<string
 map<string, double> ParetoObjectives::get_cuboid_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	//this updates the complicated map-based structure that stores the member names: obj_names:value nested pairs
-	update_member_struct(op, dp);
+	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
 	//just reuse the same routine used for the pareto dominance sort...
-	return get_cuboid_crowding_distance(member_struct);
+	return get_cuboid_crowding_distance(_member_struct);
 }
 
 map<string, double> ParetoObjectives::get_cuboid_crowding_distance(map<string, map<string, double>>& _member_struct)
@@ -556,16 +616,16 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 	//map<double,string>::iterator start, end;
 	map<string, double> omap;
 	double obj_range;
-	typedef std::set<std::pair<std::string, double>, Comparator> crowdset;
+	
 	for (auto obj_map : obj_member_map)
 	{
 		omap = obj_map.second;
 		//note: for members with identical distances, only the first one gets into the 
 		//sorted set but this is ok since we initialized the distance map with zeros
 		//for all members, so it works out...
-		crowdset crowd_sorted(omap.begin(), omap.end(), compFunctor);
+		sortedset crowd_sorted(omap.begin(), omap.end(), compFunctor);
 
-		crowdset::iterator start = crowd_sorted.begin(), last = prev(crowd_sorted.end(), 1);
+		sortedset::iterator start = crowd_sorted.begin(), last = prev(crowd_sorted.end(), 1);
 
 		obj_range = last->second - start->second;
 
@@ -574,7 +634,7 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 		crowd_distance_map[last->first] = 1.0e+30;
 		if (crowd_sorted.size() == 3)
 		{
-			crowdset::iterator it = start;
+			sortedset::iterator it = start;
 			next(it, 1);
 			crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((last->second - start->second) / obj_range);
 
@@ -585,9 +645,9 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 			start = next(crowd_sorted.begin(), 1);
 			last = prev(crowd_sorted.end(), 2);
 
-			crowdset::iterator it = start;
+			sortedset::iterator it = start;
 
-			crowdset::iterator inext, iprev;
+			sortedset::iterator inext, iprev;
 			for (; it != last; ++it)
 			{
 				iprev = prev(it, 1);
@@ -638,21 +698,24 @@ map<string, double> ParetoObjectives::get_spea_fitness(map<string, map<string, d
 	map<string, vector<string>> solutions_dominated_map;
 	map<string, int> num_dominating_map;
 	int dom;
-	fill_domination_containers(_member_struct, solutions_dominated_map, num_dominating_map);
+	fill_domination_containers(_member_struct, solutions_dominated_map, num_dominating_map,true);
 	map<string, double> _fitness_map;
 	for (auto& sol_map : solutions_dominated_map)
 	{
 		dom = 0;
 		for (auto& sol : sol_map.second)
 			dom = dom + num_dominating_map[sol];
-		_fitness_map[sol_map.first] = (double)dom + kdist[sol_map.first];
+		_fitness_map[sol_map.first] = (double)dom + (1.0/(kdist[sol_map.first] + 2.0)); //convert the distace to density
+		//include infeasibility sum in fitness...
+		if (infeas.find(sol_map.first) != infeas.end())
+			_fitness_map[sol_map.first] += infeas[sol_map.first];
 	}
 	return _fitness_map;
 
 }
 
 void ParetoObjectives::fill_domination_containers(map<string, map<string, double>>& _member_struct, map<string,
-	vector<string>>& solutions_dominated_map, map<string, int>& num_dominating_map)
+	vector<string>>& solutions_dominated_map, map<string, int>& num_dominating_map, bool dup_as_dom)
 {
 	solutions_dominated_map.clear();
 	num_dominating_map.clear();
@@ -671,7 +734,10 @@ void ParetoObjectives::fill_domination_containers(map<string, map<string, double
 			//if the solutions are identical...
 			if (first_equals_second(solution_p.second, solution_q.second))
 			{
-				throw runtime_error("ParetoObjectives::fill_domination_containers(): solution '" + solution_p.first + "' and '" + solution_q.first + "' are identical");
+				if (dup_as_dom)
+					domination_counter++;
+				else
+					throw runtime_error("ParetoObjectives::fill_domination_containers(): solution '" + solution_p.first + "' and '" + solution_q.first + "' are identical");
 			}
 			else if (first_dominates_second(solution_p.second, solution_q.second))
 			{
@@ -1869,21 +1935,46 @@ void MOEA::initialize()
 	//do an initial pareto dominance sort
 	message(1, "performing initial pareto dominance sort");
 	objectives.set_pointers(obs_obj_names, pi_obj_names, obj_dir_mult);
-	DomPair dompair = objectives.nsga_ii_pareto_dominance_sort(iter, op, dp,&constraints,true,POP_SUM_TAG);
-	
-	//initialize op and dp archives
-	op_archive = ObservationEnsemble(&pest_scenario, &rand_gen, 
-		op.get_eigen(dompair.first, vector<string>()),dompair.first,op.get_var_names());
-	
-	dp_archive = ParameterEnsemble(&pest_scenario, &rand_gen,
-		dp.get_eigen(dompair.first, vector<string>()), dompair.first, dp.get_var_names());
-	ss.str("");
-	ss << "initialized archives with " << dompair.first.size() << " nondominated members";
-	message(2, ss.str());
-	archive_size = ppo->get_mou_max_archive_size();
+	if (envtype == MouEnvType::NSGA)
+	{
+		DomPair dompair = objectives.nsga_ii_pareto_dominance_sort(iter, op, dp, &constraints, true, POP_SUM_TAG);
 
-	//this causes the initial archive pareto summary file to be written
-	objectives.nsga_ii_pareto_dominance_sort(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+		//initialize op and dp archives
+		op_archive = ObservationEnsemble(&pest_scenario, &rand_gen,
+			op.get_eigen(dompair.first, vector<string>()), dompair.first, op.get_var_names());
+
+		dp_archive = ParameterEnsemble(&pest_scenario, &rand_gen,
+			dp.get_eigen(dompair.first, vector<string>()), dompair.first, dp.get_var_names());
+		ss.str("");
+		ss << "initialized archives with " << dompair.first.size() << " nondominated members";
+		message(2, ss.str());
+		archive_size = ppo->get_mou_max_archive_size();
+
+		//this causes the initial archive pareto summary file to be written
+		objectives.nsga_ii_pareto_dominance_sort(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+	}
+	else if (envtype == MouEnvType::SPEA)
+	{
+		map<string, double> fit = objectives.get_spea2_fitness(iter, op, dp, &constraints, true, POP_SUM_TAG);
+		op_archive = op; //copy
+		dp_archive = dp; //copy
+		vector<string> keep;
+		for (auto& f : fit)
+			if (f.second < 1.0)
+				keep.push_back(f.first);
+		op_archive.keep_rows(keep);
+		dp_archive.keep_rows(keep);
+
+		ss.str("");
+		ss << "initialized archives with " << keep.size() << " nondominated members";
+		message(2, ss.str());
+		archive_size = num_members * 2;
+
+		//this causes the initial archive pareto summary file to be written
+		objectives.get_spea2_fitness(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+
+	}
+
 	
 	if (constraints.get_use_chance())
 	{
@@ -2057,46 +2148,111 @@ void MOEA::iterate_to_solution()
 
 		//sort according to pareto dominance, crowding distance, and, optionally, feasibility
 
-		message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
-
-		DomPair dompair = objectives.nsga_ii_pareto_dominance_sort(iter, new_op, new_dp,&constraints,true,POP_SUM_TAG);
-
-		//drop shitty members
-		//TODO: this is just a cheap hack, prob something more meaningful to be done...
-		keep.clear();
-		for (auto nondom : dompair.first)
-		{
-			if (keep.size() >= num_members)
-				break;
-			keep.push_back(nondom);
-			
-		}
-
-		if (keep.size() > 0)
-		{
-			//update the archive of nondom members
-			ParameterEnsemble new_dp_nondom = new_dp;
-			new_dp_nondom.keep_rows(keep);
-			ObservationEnsemble new_op_nondom = new_op;
-			new_op_nondom.keep_rows(keep);
-			update_archive(new_op_nondom, new_dp_nondom);
-		}
-
-		//now fill out the rest of keep with dom solutions
-		for (auto dom : dompair.second)
-		{
-			if (keep.size() >= num_members)
-				break;
-			keep.push_back(dom);
-
-		}
 		
-		message(1, "resizing current populations to ", keep.size());
-		new_dp.keep_rows(keep);
-		new_op.keep_rows(keep);
-		dp = new_dp;
-		op = new_op;
 
+		
+
+		if (envtype == MouEnvType::NSGA)
+		{
+			message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
+			DomPair dompair = objectives.nsga_ii_pareto_dominance_sort(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
+
+			//drop shitty members
+			//TODO: this is just a cheap hack, prob something more meaningful to be done...
+			keep.clear();
+			for (auto nondom : dompair.first)
+			{
+				if (keep.size() >= num_members)
+					break;
+				keep.push_back(nondom);
+
+			}
+
+			if (keep.size() > 0)
+			{
+				//update the archive of nondom members
+				ParameterEnsemble new_dp_nondom = new_dp;
+				new_dp_nondom.keep_rows(keep);
+				ObservationEnsemble new_op_nondom = new_op;
+				new_op_nondom.keep_rows(keep);
+				update_archive(new_op_nondom, new_dp_nondom);
+			}
+
+			//now fill out the rest of keep with dom solutions
+			for (auto dom : dompair.second)
+			{
+				if (keep.size() >= num_members)
+					break;
+				keep.push_back(dom);
+
+			}
+
+			message(1, "resizing current populations to ", keep.size());
+			new_dp.keep_rows(keep);
+			new_op.keep_rows(keep);
+			dp = new_dp;
+			op = new_op;
+
+		}
+
+		else if (envtype == MouEnvType::SPEA)
+		{
+			map<string, double> fit = objectives.get_spea2_fitness(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
+			//first find all members with fitness less than 1 (nondom)
+			keep.clear();
+			for (auto member : new_dp.get_real_names())
+			{
+				if (fit[member] < 1.0)
+					keep.push_back(member);
+			}
+			ss.str("");
+			ss << keep.size() << " non-dominated members (spea2 fitness less than 1.0)";
+			cout << ss.str() << endl;
+			file_manager.rec_ofstream() << ss.str() << endl;
+			if (keep.size() < num_members * 2)
+			{
+				//fill with members of increasing fitness value
+				sortedset fit_sorted(fit.begin(), fit.end(), compFunctor);
+				sortedset::iterator it = next(fit_sorted.begin(), keep.size());		
+				for (it; it != fit_sorted.end(); ++it)
+				{
+					keep.push_back(it->first);
+					if (keep.size() == num_members * 2)
+						break;
+				}
+				cout << keep.size() << endl;;
+			}
+
+			if (keep.size() > num_members * 2)
+			{
+				ParameterEnsemble temp_dp = new_dp;
+				ObservationEnsemble temp_op = new_op;
+				string rm;
+				map<string, double> kdist = objectives.get_kth_nn_crowding_distance(temp_op, temp_dp);
+				while (keep.size() > num_members * 2)
+				{
+					temp_dp.keep_rows(keep);
+					temp_op.keep_rows(keep);
+					kdist = objectives.get_kth_nn_crowding_distance(temp_op, temp_dp);
+					sortedset fit_sorted(kdist.begin(), kdist.end(), compFunctor);
+					rm = fit_sorted.begin()->first;
+					keep.erase(remove(keep.begin(),keep.end(),rm),keep.end());
+					cout << keep.size() << endl;
+				}
+			}
+			message(1, "resizing current populations to ", keep.size());
+			new_dp.keep_rows(keep);
+			new_op.keep_rows(keep);
+			dp = new_dp;
+			op = new_op;
+				
+
+		}
+
+		else
+		{
+			throw_moea_error("unrecognized 'mou_env'");
+		}
 		
 		ss.str("");
 		ss << "iteration " << iter << " objective function summary:";
@@ -2677,6 +2833,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx(double probability, double di, 
 
 pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double probability, double di, int idx1, int idx2)
 {
+	stringstream ss;
 	int i;
 	//double rnd1, rnd2, rnd3, rnd4;
 	vector<double> rnds;
@@ -2714,19 +2871,27 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double probability, double 
 			vname = var_names[i];
 			if (rnds[1] <= 0.5)
 			{
-				lt = (valueX1 + (valueX2 + (2 * lbnd[vname])))/(abs(valueX1 - valueX2));
+				lt = (valueX1 + valueX2 + (2 * lbnd[vname]))/(abs(valueX1 - valueX2));
 				ut = ((2. * ubnd[vname]) - valueX1 - valueX2) / (abs(valueX1 - valueX2));
-				if (lt < 0)
+				/*if (lt < 0)
 					throw_moea_error("sbx error: lower transform bound less than zero");
 				if (ut < 0)
-					throw_moea_error("sbx error: upper transform bound less than zero");
+				*/	//throw_moea_error("sbx error: upper transform bound less than zero");
 				betas = get_betas(lt, ut, di);
 				new1 = 0.5 * ((valueX1 + valueX2) - betas.first * abs(valueX1 - valueX2));
 				new2 = 0.5 * ((valueX1 + valueX2) - betas.second * abs(valueX1 - valueX2));
 				if (isnan(new1))
-					cout << new1 << endl;
+				{
+					ss.str("");
+					ss << "sbx error: denormal value generated for " << vname << ", beta: " << betas.first << ", lt:" << lt << ", ut: " << ut << ", v1:" << valueX1 << ", v2: " << valueX2;
+					throw_moea_error(ss.str());
+				}
 				if (isnan(new2))
-					cout << new2 << endl;
+				{
+					ss.str("");
+					ss << "sbx error: denormal value generated for " << vname << ", beta: " << betas.second << ", lt:" << lt << ", ut: " << ut << ", v1:" << valueX1 << ", v2: " << valueX2;
+					throw_moea_error(ss.str());
+				}
  			}
 		}
 	}
