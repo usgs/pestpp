@@ -64,7 +64,7 @@ private:
 		vector<string>>&solutions_dominated_map, map<string, int>& num_dominating_map);
 	
 
-	bool ParetoObjectives::compare_two_nsga(string& first, string& second);
+	bool compare_two_nsga(string& first, string& second);
 
 	//sort specific members
 	map<string, double> get_cuboid_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
