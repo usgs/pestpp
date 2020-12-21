@@ -189,11 +189,10 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 
 }
 
-pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_sort(int generation, ObservationEnsemble& op,
-	ParameterEnsemble& dp, Constraints* constraints_ptr, bool report, string sum_tag)
+void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Constraints* constraints_ptr)
 {
 	stringstream ss;
-	ss << "ParetoObjectives::pareto_dominance_sort() for " << op.shape().first << " population members";
+	ss << "ParetoObjectives::update() for  " << op.shape().first << " population members";
 	performance_log->log_event(ss.str());
 	performance_log->log_event("preparing fast-lookup containers");
 
@@ -211,11 +210,11 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 	drop_duplicates(op, dp);
 
 	vector<string> real_names = op.get_real_names();
-	vector<string> infeas_ordered;
+	infeas_ordered.clear();
 	infeas.clear();
 	bool all_infeas = false;
 	//TODO: work out if there are actually any constraints (instead of all objectives)
-	
+
 	if (constraints_ptr)
 	{
 		bool check_constraints = false;
@@ -226,7 +225,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 			if (obj_names.find(name) == obj_names.end())
 			{
 				check_constraints = true;
-					break;
+				break;
 			}
 		}
 
@@ -317,7 +316,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 
 	performance_log->log_event("pareto sorting");
 	front_map = sort_members_by_dominance_into_fronts(member_struct);
-	
+
 	if (obs_obj_names_ptr->size() + pi_obj_names_ptr->size() > 1)
 	{
 		frec << "...pareto dominance sort yielded " << front_map.size() << " domination fronts" << endl;
@@ -333,13 +332,13 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 			frec << front.second.size() << " in the front " << front.first << endl;
 		}
 	}
-	
-	vector<string> nondom_crowd_ordered,dom_crowd_ordered;
+
+	vector<string> nondom_crowd_ordered, dom_crowd_ordered;
 	vector<string> crowd_ordered_front;
 	crowd_map.clear();
 	member_front_map.clear();
 	for (auto front : front_map)
-	{	
+	{
 		for (auto m : front.second)
 			member_front_map[m] = front.first;
 		//TODO: Deb says we only need to worry about crowding sort if not all
@@ -378,6 +377,72 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 	if (op.shape().first != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
 	{
 		ss.str("");
+		ss << "ParetoObjectives::pareto_dominance_sort() internal error: final sorted population size: " <<
+			nondom_crowd_ordered.size() + dom_crowd_ordered.size() << " != initial population size: " << op.shape().first;
+		cout << ss.str();
+		throw runtime_error(ss.str());
+	}
+
+	
+
+	return;
+}
+
+pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_sort(int generation, ObservationEnsemble& op,
+	ParameterEnsemble& dp, Constraints* constraints_ptr, bool report, string sum_tag)
+{
+	stringstream ss;
+	ss << "ParetoObjectives::nsga_ii_pareto_dominance_sort() for " << op.shape().first << " population members";
+	update(op, dp, constraints_ptr);
+
+	if (member_struct.size() == 0)
+		throw runtime_error("ParetoObjectives error: member_struct is empty");
+
+
+	vector<string> nondom_crowd_ordered,dom_crowd_ordered;
+	vector<string> crowd_ordered_front;
+	crowd_map.clear();
+	member_front_map.clear();
+	for (auto front : front_map)
+	{	
+		for (auto m : front.second)
+			member_front_map[m] = front.first;
+		//TODO: Deb says we only need to worry about crowding sort if not all
+		//members of the front are going to be retained.  For now, just sorting all fronts...
+		if (front.second.size() == 1)
+		{
+			crowd_ordered_front = front.second;
+			crowd_map[front.second[0]] = -999.0;
+		}
+
+		else
+		{
+			crowd_ordered_front = sort_members_by_crowding_distance(front.second, crowd_map);
+		}
+
+		if (front.first == 1)
+			for (auto front_member : crowd_ordered_front)
+				nondom_crowd_ordered.push_back(front_member);
+		else
+			for (auto front_member : crowd_ordered_front)
+				dom_crowd_ordered.push_back(front_member);
+	}
+
+	//now add the infeasible members
+	//if there is atleast one feasible nondom solution, then add the infeasible ones to dom solutions
+	if (infeas.size() < op.shape().first)
+	{
+		if (nondom_crowd_ordered.size() > 0)
+			for (auto inf : infeas_ordered)
+				dom_crowd_ordered.push_back(inf);
+		else
+			for (auto inf : infeas_ordered)
+				nondom_crowd_ordered.push_back(inf);
+	}
+
+	if (op.shape().first != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
+	{
+		ss.str("");
 		ss << "ParetoObjectives::pareto_dominance_sort() internal error: final sorted population size: " << 
 			nondom_crowd_ordered.size() + dom_crowd_ordered.size() << " != initial population size: " << op.shape().first;
 		cout << ss.str();
@@ -387,12 +452,10 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 	//TODO: some kind of reporting here.  Probably to the rec and maybe a csv file too...
 	if (sum_tag.size() > 0)
 	{
-
+		vector<string> real_names = op.get_real_names();
 		write_pareto_summary(sum_tag, generation, real_names, member_front_map, crowd_map, infeas);
-	}
-		
+	}	
 	return pair<vector<string>, vector<string>>(nondom_crowd_ordered, dom_crowd_ordered);
-
 }
 
 void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, vector<string>& member_names, 
@@ -441,30 +504,91 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 
 }
 
+map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
+{
+	//this updates the complicated map-based structure that stores the member names: obj_names:value nested pairs
+	update_member_struct(op, dp);
+	//just reuse the same routine used for the pareto dominance sort...
+	return get_cuboid_crowding_distance(member_struct);
+}
+
+
+map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct)
+{
+	vector<string> members;
+	for (auto m : _member_struct)
+		members.push_back(m.first);
+	return get_kth_nn_crowding_distance(members, _member_struct);
+}
+
+map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
+{
+	if (members.size() < 3)
+		throw runtime_error("ParetoObjectives::get_kth_nn_crowding_distance(): less than 3 members");
+	int k = ceil(sqrt(members.size()));
+	if (k > members.size())
+		k = members.size() - 1;
+	map<string, Eigen::VectorXd> obj_member_map;
+	map<string, double> crowd_distance_map;
+	string m = members[0];
+	vector<string> obj_names;
+	for (auto obj_map : _member_struct[m])
+	{
+		obj_names.push_back(obj_map.first);
+	}
+	Eigen::VectorXd ovals(obj_names.size());
+	for (auto member : members)
+	{
+		crowd_distance_map[member] = 1.0;
+		for (int i = 0; i < obj_names.size(); i++)
+		{
+			ovals[i] = _member_struct[member][obj_names[i]];
+		}
+		obj_member_map[member] = ovals;
+	}
+
+	vector<double> distances;
+	double distance;
+	for (int i=0;i<members.size();i++)
+	{
+		distances.clear();
+		ovals = obj_member_map[members[i]];
+		for (int j = i + 1; j < members.size(); j++)
+		{
+			distance = (ovals - obj_member_map[members[i]]).squaredNorm();
+			distances.push_back(distance);
+		}
+		sort(distances.begin(), distances.end());
+		crowd_distance_map[members[i]] = 1./(sqrt(distances[k]) + 2.);	
+	}
+	return crowd_distance_map;
+}
+
+
 map<string, double> ParetoObjectives::get_cuboid_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	//this updates the complicated map-based structure that stores the member names: obj_names:value nested pairs
 	update_member_struct(op, dp);
 	//just reuse the same routine used for the pareto dominance sort...
-	return get_cuboid_crowding_distance();
+	return get_cuboid_crowding_distance(member_struct);
 }
 
-map<string, double> ParetoObjectives::get_cuboid_crowding_distance()
+map<string, double> ParetoObjectives::get_cuboid_crowding_distance(map<string, map<string, double>>& _member_struct)
 {
 	vector<string> members;
-	for (auto m : member_struct)
+	for (auto m : _member_struct)
 		members.push_back(m.first);
-	return get_cuboid_crowding_distance(members);
+	return get_cuboid_crowding_distance(members, _member_struct);
 }
 
-map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string>& members)
+map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
 	
 	map<string, map<string, double>> obj_member_map;
 	map<string, double> crowd_distance_map;
 	string m = members[0];
 	vector<string> obj_names;
-	for (auto obj_map : member_struct[m])
+	for (auto obj_map : _member_struct[m])
 	{
 		obj_member_map[obj_map.first] = map<string, double>();
 		obj_names.push_back(obj_map.first);
@@ -473,7 +597,7 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 	for (auto member : members)
 	{
 		crowd_distance_map[member] = 0.0;
-		for (auto obj_map : member_struct[member])
+		for (auto obj_map : _member_struct[member])
 			obj_member_map[obj_map.first][member] = obj_map.second;
 
 	}
@@ -528,7 +652,7 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members, map<string,double>& crowd_map)
 {
 
-	map<string, double> crowd_distance_map = get_cuboid_crowding_distance(members);
+	map<string, double> crowd_distance_map = get_cuboid_crowding_distance(members, member_struct);
 	
 
 	vector <pair<string, double>> cs_vec;
@@ -554,21 +678,40 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string
 	return crowd_ordered;
 }
 
-map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(map<string, map<string, double>>& member_struct)
+
+map<string, double> ParetoObjectives::get_spea_fitness(map<string, map<string, double>>& _member_struct)
 {
-	//following fast non-dom alg in Deb
-	performance_log->log_event("starting 'fast non-dom sort");
-	//map<string,map<string,double>> Sp, F1;
+	performance_log->log_event("get_spea_fitness");
+	map<string, double> kdist = get_kth_nn_crowding_distance(_member_struct);
 	map<string, vector<string>> solutions_dominated_map;
-	int domination_counter;
 	map<string, int> num_dominating_map;
+	int dom;
+	fill_domination_containers(member_struct, solutions_dominated_map, num_dominating_map);
+	map<string, double> fitness;
+	for (auto& sol_map : solutions_dominated_map)
+	{
+		dom = 0;
+		for (auto& sol : sol_map.second)
+			dom = dom + num_dominating_map[sol];
+		fitness[sol_map.first] = (double)dom + kdist[sol_map.first];
+	}
+	return fitness;
+
+}
+
+void ParetoObjectives::fill_domination_containers(map<string, map<string, double>>& _member_struct, map<string,
+	vector<string>>& solutions_dominated_map, map<string, int>& num_dominating_map)
+{
+	solutions_dominated_map.clear();
+	num_dominating_map.clear();
+	int domination_counter;
 	vector<string> solutions_dominated, first_front;
-	performance_log->log_event("finding first front");
-	for (auto solution_p : member_struct)
+	performance_log->log_event("fill domination containers");
+	for (auto solution_p : _member_struct)
 	{
 		domination_counter = 0;
 		solutions_dominated.clear();
-		for (auto solution_q : member_struct)
+		for (auto solution_q : _member_struct)
 		{
 			if (solution_p.first == solution_q.first) //string compare real name
 				continue;
@@ -576,10 +719,9 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 			//if the solutions are identical...
 			if (first_equals_second(solution_p.second, solution_q.second))
 			{
-				throw runtime_error("ParetoObjectives::sort_members_by_dominance_into_fronts(): solution '" + solution_p.first + "' and '" + solution_q.first + "' are identical");
+				throw runtime_error("ParetoObjectives::fill_domination_containers(): solution '" + solution_p.first + "' and '" + solution_q.first + "' are identical");
 			}
 			else if (first_dominates_second(solution_p.second, solution_q.second))
-
 			{
 				solutions_dominated.push_back(solution_q.first);
 			}
@@ -587,16 +729,29 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 			{
 				domination_counter++;
 			}
-
-		}
-		//solution_p is in the first front
-		if (domination_counter == 0)
-		{
-			first_front.push_back(solution_p.first);
 		}
 		num_dominating_map[solution_p.first] = domination_counter;
 		solutions_dominated_map[solution_p.first] = solutions_dominated;
+	}
+}
 
+map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(map<string, map<string, double>>& _member_struct)
+{
+	//following fast non-dom alg in Deb
+	performance_log->log_event("starting 'fast non-dom sort");
+	//map<string,map<string,double>> Sp, F1;
+	map<string, vector<string>> solutions_dominated_map;
+	map<string, int> num_dominating_map;
+	fill_domination_containers(member_struct, solutions_dominated_map, num_dominating_map);
+	vector<string> solutions_dominated, first_front;
+	performance_log->log_event("finding first front");
+	for (auto  num_dom : num_dominating_map)
+	{	
+		//solution_p is in the first front
+		if (num_dom.second == 0)
+		{
+			first_front.push_back( num_dom.first);
+		}
 	}
 	performance_log->log_event("sorting remaining fronts");
 	int i = 1;
@@ -632,11 +787,11 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 		num_front_solutions += front.size();
 	}
 	
-	if (num_front_solutions != member_struct.size())
+	if (num_front_solutions != _member_struct.size())
 	{
 		stringstream ss;
 		ss << "ERROR: ParetoObjectives::sort_members_by_dominance_into_fronts(): number of solutions in fronts (";
-		ss << num_front_solutions << ") != member_stuct.size() (" << member_struct.size() << endl;
+		ss << num_front_solutions << ") != member_stuct.size() (" << _member_struct.size() << endl;
 		file_manager.rec_ofstream() << ss.str();
 		cout << ss.str();
 		throw runtime_error(ss.str());

@@ -37,11 +37,11 @@ public:
 		prep_pareto_summary_file(POP_SUM_TAG);
 		prep_pareto_summary_file(ARC_SUM_TAG);
 	}
-	void update_member_struct(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	
-	map<string,double> get_cuboid_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
+
+	void update(ObservationEnsemble& oe, ParameterEnsemble& dp, Constraints* constraints_ptr = nullptr);
 	
-	map<string,double> get_kth_nn_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
+	
 
 	bool compare_two(string& first, string& second);
 	 
@@ -53,18 +53,33 @@ private:
 	//vector<string> obj_names;
 	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, double>& crowd_map);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
-
+	void update_member_struct(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	void drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp);
 	bool first_equals_second(map<string, double>& first, map<string, double>& second);
 
-	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& member_struct);
+	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& _member_struct);
+	map<string,double> get_spea_fitness(map<string, map<string, double>>& _member_struct);
+
+	void fill_domination_containers(map<string, map<string, double>>& _member_struct, map<string,
+		vector<string>>&solutions_dominated_map, map<string, int>& num_dominating_map);
+	
 
 	bool ParetoObjectives::compare_two_nsga(string& first, string& second);
 
 	//sort specific members
-	map<string, double> get_cuboid_crowding_distance(vector<string>& members);
+	map<string, double> get_cuboid_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
 	//sort all members in member struct
-	map<string, double> get_cuboid_crowding_distance();
+	//map<string, double> get_cuboid_crowding_distance();
+	map<string, double> get_cuboid_crowding_distance(map<string, map<string, double>>& _member_struct);
+
+
+	map<string, double> get_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct);
+	map<string, double> get_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
+
+	
+	map<string, double> get_cuboid_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
+
+	map<string, double> get_kth_nn_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
 
 	map<string, map<string, double>> member_struct;
 	vector<string>* obs_obj_names_ptr;
@@ -76,6 +91,7 @@ private:
 	map<string, double> crowd_map;
 	map<string, int> member_front_map;
 	map<string, double> infeas;
+	vector<string> infeas_ordered;
 
 	typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
 	// Defining a lambda function to compare two pairs. It will compare two pairs using second field
