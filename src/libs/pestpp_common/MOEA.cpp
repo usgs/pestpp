@@ -472,9 +472,9 @@ map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(map<string, m
 
 map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
-	if (members.size() < 3)
-		throw runtime_error("ParetoObjectives::get_kth_nn_crowding_distance(): less than 3 members");
-	int k = ceil(sqrt(members.size()));
+	if (members.size() < 2)
+		throw runtime_error("ParetoObjectives::get_kth_nn_crowding_distance(): less than 2 members");
+	int k = ceil(sqrt(members.size())) - 2; //minus one for zero-based indexing and minus one since the distances will be one less than the num of members
 	if (k > members.size())
 		k = members.size() - 1;
 	map<string, Eigen::VectorXd> obj_member_map;
@@ -502,9 +502,11 @@ map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(vector<string
 	{
 		distances.clear();
 		ovals = obj_member_map[members[i]];
-		for (int j = i + 1; j < members.size(); j++)
+		for (int j = 0; j < members.size(); j++)
 		{
-			distance = (ovals - obj_member_map[members[i]]).squaredNorm();
+			if (j == i)
+				continue;
+			distance = (ovals - obj_member_map[members[j]]).squaredNorm();
 			distances.push_back(distance);
 		}
 		sort(distances.begin(), distances.end());
