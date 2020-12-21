@@ -212,7 +212,7 @@ void ParetoObjectives::get_spea_names_to_keep(int num_members, vector<string>& k
 		sortedset fit_sorted(kdist.begin(), kdist.end(), compFunctor);
 		rm = fit_sorted.begin()->first;
 		keep.erase(remove(keep.begin(), keep.end(), rm), keep.end());
-		cout << keep.size() << endl;
+		//cout << keep.size() << endl;
 	}
 }
 
@@ -2284,7 +2284,7 @@ void MOEA::iterate_to_solution()
 					if (keep.size() == num_members)
 						break;
 				}
-				cout << keep.size() << endl;;
+				//cout << keep.size() << endl;;
 			}
 
 			if (keep.size() > num_members)
@@ -2296,9 +2296,7 @@ void MOEA::iterate_to_solution()
 			new_op.keep_rows(keep);
 			dp = new_dp;
 			op = new_op;
-			dp_archive;
-				
-
+			update_archive_spea(op, dp);
 		}
 
 		else
@@ -2637,7 +2635,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 		r_int_vec.push_back(i);
 
 	
-	double crossover_probability = 0.9;
+	double crossover_probability = 0.8;
 	double crossover_distribution_index = 10.0;
 	int i_member = 0;
 	int p1_idx, p2_idx;
@@ -2684,7 +2682,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	//mutation
 	double mutation_probability = 1.0 / pest_scenario.get_n_adj_par();
 	double mutation_distribution_index = 20.0;
-	linear_mutation_ip(mutation_probability, mutation_distribution_index, tmp_dp);
+	//linear_mutation_ip(mutation_probability, mutation_distribution_index, tmp_dp);
 	tmp_dp.enforce_limits(performance_log,false);
 	//tmp_dp.to_csv("temp_mut.csv");
 
@@ -2912,6 +2910,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double probability, double 
 	rnds = uniform_draws(4, 0.0, 1.0, rand_gen);
 
 	int tries = 0;
+	double abs_diff;
 	while (true)
 	{
 		
@@ -2925,15 +2924,18 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double probability, double 
 			vname = var_names[i];
 			if (rnds[0] <= probability)
 			{
-				lt = (p1 + p2 + (2 * lbnd[vname]))/(abs(p1 - p2));
-				ut = ((2. * ubnd[vname]) - p1 - p2) / (abs(p1 - p2));
+				abs_diff = abs(p1 - p2);
+				if (abs_diff < epsilon)
+					abs_diff = 1.0;
+				lt = (p1 + p2 + (2 * lbnd[vname]))/abs_diff;
+				ut = ((2. * ubnd[vname]) - p1 - p2) / abs_diff;
 				/*if (lt < 0)
 					throw_moea_error("sbx error: lower transform bound less than zero");
 				if (ut < 0)
 				*/	//throw_moea_error("sbx error: upper transform bound less than zero");
 				betas = get_betas(lt, ut, di);
-				c1 = 0.5 * ((p1 + p2) - betas.first * abs(p1 - p2));
-				c2 = 0.5 * ((p1 + p2) - betas.second * abs(p1 - p2));
+				c1 = 0.5 * ((p1 + p2) - betas.first * abs_diff);
+				c2 = 0.5 * ((p1 + p2) - betas.second * abs_diff);
 				if (isnan(c1))
 				{
 					ss.str("");
