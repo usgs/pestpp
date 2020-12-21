@@ -50,6 +50,8 @@ public:
 		Constraints* constraints_ptr = nullptr, bool report = true, string sum_tag = string());
 	map<string, double> get_kth_nn_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	 
+	void get_spea_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp);
+
 private:
 	
 	Pest& pest_scenario;
@@ -162,7 +164,8 @@ private:
 	ParameterEnsemble dp, dp_archive;
 	ObservationEnsemble op, op_archive;
 
-	void update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp);
+	void update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp);
+	void update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp);
 
 	void throw_moea_error(const string& message);
 

@@ -198,6 +198,25 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 
 }
 
+void ParetoObjectives::get_spea_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp)
+{
+	ParameterEnsemble temp_dp = dp;
+	ObservationEnsemble temp_op = op;
+	string rm;
+	map<string, double> kdist = get_kth_nn_crowding_distance(temp_op, temp_dp);
+	while (keep.size() > num_members)
+	{
+		temp_dp.keep_rows(keep);
+		temp_op.keep_rows(keep);
+		kdist = get_kth_nn_crowding_distance(temp_op, temp_dp);
+		sortedset fit_sorted(kdist.begin(), kdist.end(), compFunctor);
+		rm = fit_sorted.begin()->first;
+		keep.erase(remove(keep.begin(), keep.end(), rm), keep.end());
+		cout << keep.size() << endl;
+	}
+}
+
+
 void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, bool drop_dups_4_nsga, Constraints* constraints_ptr)
 {
 	stringstream ss;
@@ -1136,14 +1155,14 @@ void MOEA::sanity_checks()
 }
 
 
-void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
+void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 {
 	message(2, "updating archive");
 	stringstream ss;
 	if (op_archive.shape().first != dp_archive.shape().first)
 	{
 		ss.str("");
-		ss << "MOEA::update_archive(): op_archive members " << op_archive.shape().first << " != dp_archive members " << dp_archive.shape().first;
+		ss << "MOEA::update_archive_nsga(): op_archive members " << op_archive.shape().first << " != dp_archive members " << dp_archive.shape().first;
 		throw_moea_error(ss.str());
 	}
 
@@ -1187,6 +1206,63 @@ void MOEA::update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		keep.clear();
 		for (int i = 0; i < archive_size; i++)
 			keep.push_back(members[i]);
+		op_archive.keep_rows(keep);
+		dp_archive.keep_rows(keep);
+	}
+
+	save_populations(dp_archive, op_archive, "archive");
+}
+
+void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
+{
+	message(2, "updating archive");
+	stringstream ss;
+	if (op_archive.shape().first != dp_archive.shape().first)
+	{
+		ss.str("");
+		ss << "MOEA::update_archive_spea(): op_archive members " << op_archive.shape().first << " != dp_archive members " << dp_archive.shape().first;
+		throw_moea_error(ss.str());
+	}
+
+	//check that members of _op arent in the archive already
+	vector<string> keep, temp = op.get_real_names();
+	set<string> archive_members(temp.begin(), temp.end());
+	for (auto& member : _op.get_real_names())
+	{
+		if (archive_members.find(member) == archive_members.end())
+			keep.push_back(member);
+	}
+	if (keep.size() == 0)
+	{
+		message(2, "all nondominated members in already in archive");
+		return;
+	}
+
+	ss.str("");
+	ss << "adding " << keep.size() << " non-dominated members to archive";
+	message(2, ss.str());
+	Eigen::MatrixXd other = _op.get_eigen(keep, vector<string>());
+	op_archive.append_other_rows(keep, other);
+	other = _dp.get_eigen(keep, vector<string>());
+	dp_archive.append_other_rows(keep, other);
+	other.resize(0, 0);
+	message(2, "spea fitness calculation for archive of size ", op_archive.shape().first);
+	map<string,double> fit = objectives.get_spea2_fitness(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+
+	keep.clear();
+	for (auto& f : fit)
+		if (f.second < 1.0)
+			keep.push_back(f.first);
+
+	ss.str("");
+	ss << "resizing archive from " << op_archive.shape().first << " to " << keep.size() << " current non-dominated solutions";
+	message(2, ss.str());
+	op_archive.keep_rows(keep);
+	dp_archive.keep_rows(keep);
+
+	if (op_archive.shape().first > archive_size)
+	{
+		objectives.get_spea_names_to_keep(archive_size, keep, op_archive, dp_archive);
 		op_archive.keep_rows(keep);
 		dp_archive.keep_rows(keep);
 	}
@@ -2146,12 +2222,6 @@ void MOEA::iterate_to_solution()
 		new_dp.append_other_rows(dp);
 		new_op.append_other_rows(op);
 
-		//sort according to pareto dominance, crowding distance, and, optionally, feasibility
-
-		
-
-		
-
 		if (envtype == MouEnvType::NSGA)
 		{
 			message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
@@ -2175,7 +2245,7 @@ void MOEA::iterate_to_solution()
 				new_dp_nondom.keep_rows(keep);
 				ObservationEnsemble new_op_nondom = new_op;
 				new_op_nondom.keep_rows(keep);
-				update_archive(new_op_nondom, new_dp_nondom);
+				update_archive_nsga(new_op_nondom, new_dp_nondom);
 			}
 
 			//now fill out the rest of keep with dom solutions
@@ -2209,7 +2279,7 @@ void MOEA::iterate_to_solution()
 			ss << keep.size() << " non-dominated members (spea2 fitness less than 1.0)";
 			cout << ss.str() << endl;
 			file_manager.rec_ofstream() << ss.str() << endl;
-			if (keep.size() < num_members * 2)
+			if (keep.size() < num_members)
 			{
 				//fill with members of increasing fitness value
 				sortedset fit_sorted(fit.begin(), fit.end(), compFunctor);
@@ -2217,34 +2287,22 @@ void MOEA::iterate_to_solution()
 				for (it; it != fit_sorted.end(); ++it)
 				{
 					keep.push_back(it->first);
-					if (keep.size() == num_members * 2)
+					if (keep.size() == num_members)
 						break;
 				}
 				cout << keep.size() << endl;;
 			}
 
-			if (keep.size() > num_members * 2)
+			if (keep.size() > num_members)
 			{
-				ParameterEnsemble temp_dp = new_dp;
-				ObservationEnsemble temp_op = new_op;
-				string rm;
-				map<string, double> kdist = objectives.get_kth_nn_crowding_distance(temp_op, temp_dp);
-				while (keep.size() > num_members * 2)
-				{
-					temp_dp.keep_rows(keep);
-					temp_op.keep_rows(keep);
-					kdist = objectives.get_kth_nn_crowding_distance(temp_op, temp_dp);
-					sortedset fit_sorted(kdist.begin(), kdist.end(), compFunctor);
-					rm = fit_sorted.begin()->first;
-					keep.erase(remove(keep.begin(),keep.end(),rm),keep.end());
-					cout << keep.size() << endl;
-				}
+				objectives.get_spea_names_to_keep(num_members, keep, new_op, new_dp);
 			}
 			message(1, "resizing current populations to ", keep.size());
 			new_dp.keep_rows(keep);
 			new_op.keep_rows(keep);
 			dp = new_dp;
 			op = new_op;
+			dp_archive;
 				
 
 		}
