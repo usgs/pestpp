@@ -3724,7 +3724,8 @@ bool DataAssimilator::solve_new_da()
 		//save best posterior ...
 		if (posterior_dyn_states.size() > 0)
 			pe_post = posterior_dyn_states[0];
-		oe = oe_lams[0];
+		if (evaluate_update)
+			oe = oe_lams[0];
 		return true;
 	}
 	
