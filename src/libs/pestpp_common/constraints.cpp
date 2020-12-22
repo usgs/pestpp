@@ -1869,7 +1869,7 @@ void Constraints::stack_summary(int iter, Observations& shifted_obs, bool echo, 
 	//vector<double> residuals = get_constraint_residual_vec();
 
 	ss << setw(nsize) << left << "name" << right << setw(10) << "sense" << setw(12) << "required";
-	ss << setw(12) << "prior stdev" << setw(12) << "post stdev" << setw(12) << "offset" << setw(12) << "shifted val" << endl;
+	ss << setw(12) << "stdev" << setw(12) << "offset" << setw(12) << "shifted val" << endl;
 	vector<string> out_of_bounds;
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
@@ -1877,7 +1877,6 @@ void Constraints::stack_summary(int iter, Observations& shifted_obs, bool echo, 
 		ss << setw(nsize) << left << name;
 		ss << setw(10) << right << constraint_sense_name[name];
 		ss << setw(12) << constraints_obs[name];
-		ss << setw(12) << prior_constraint_stdev[name];
 		ss << setw(12) << post_constraint_stdev[name];
 		ss << setw(12) << post_constraint_offset[name];
 		ss << setw(12) << shifted_obs[name] << endl;

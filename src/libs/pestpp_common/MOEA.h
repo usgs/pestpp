@@ -19,13 +19,14 @@
 const string POP_SUM_TAG = "pareto.summary.csv";
 const string ARC_SUM_TAG = "pareto.archive.summary.csv";
 const string RISK_NAME = "_RISK_";
+
 class ParetoObjectives
 {
 public:
 	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
 		PerformanceLog* _performance_log);
 
-	pair<vector<string>, vector<string>> pareto_dominance_sort(int generation, ObservationEnsemble& op, 
+	pair<vector<string>, vector<string>> nsga_ii_pareto_dominance_sort(int generation, ObservationEnsemble& op, 
 		ParameterEnsemble& dp, Constraints* constraints_ptr=nullptr, bool report=true, string sum_tag=string());
 	
 	//this must be called at least once before the diversity metrixs can be called...
@@ -37,53 +38,73 @@ public:
 		prep_pareto_summary_file(POP_SUM_TAG);
 		prep_pareto_summary_file(ARC_SUM_TAG);
 	}
-	void update_member_struct(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	
-	map<string,double> get_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
-	
-	map<string, double> get_hypervolume(ObservationEnsemble& oe, ParameterEnsemble& dp);
+
+	void update(ObservationEnsemble& oe, ParameterEnsemble& dp, Constraints* constraints_ptr = nullptr);
+
+	bool compare_two(string& first, string& second);
+
+	map<string, double> get_spea2_fitness(int generation, ObservationEnsemble& op, ParameterEnsemble& dp, 
+		Constraints* constraints_ptr = nullptr, bool report = true, string sum_tag = string());
+	map<string, double> get_kth_nn_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	 
+	void get_spea_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp);
+
 private:
 	
 	Pest& pest_scenario;
 	FileManager& file_manager;
 	PerformanceLog* performance_log;
 	//vector<string> obj_names;
-	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, double>& crowd_map);
+	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, double>& crowd_map, map<string, map<string, double>>& _member_struct);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
-
-	void drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp);
+	map<string, map<string, double>> get_member_struct(ObservationEnsemble& oe, ParameterEnsemble& dp);
+	void drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp, map<string, map<string, double>>& _member_struct);
 	bool first_equals_second(map<string, double>& first, map<string, double>& second);
 
-	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& member_struct);
+	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& _member_struct);
+	map<string,double> get_spea_fitness(map<string, map<string, double>>& _member_struct);
+
+	void fill_domination_containers(map<string, map<string, double>>& _member_struct, map<string,
+		vector<string>>&solutions_dominated_map, map<string, int>& num_dominating_map, bool dup_as_dom=false);
+	
+
+	bool compare_two_nsga(string& first, string& second);
 
 	//sort specific members
-	map<string, double> get_crowding_distance(vector<string>& members);
+	map<string, double> get_cuboid_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
 	//sort all members in member struct
-	map<string, double> get_crowding_distance();
+	//map<string, double> get_cuboid_crowding_distance();
+	map<string, double> get_cuboid_crowding_distance(map<string, map<string, double>>& _member_struct);
 
-	//constraint dominance principal Fan (2017) Tian (2020)
-	//void apply_constraints_cdp();
-	//self-adaptive constraint penalty Fan (2017), Woldesenbet (2009)
-	//void apply_constraints_sp();
-	//in-feasibility driven evolution-ary algorithms Fan (2017)
-	//void apply_constraints_idea();
+
+	map<string, double> get_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct);
+	map<string, double> get_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
+
+	
+	map<string, double> get_cuboid_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
+
+	
 
 	map<string, map<string, double>> member_struct;
 	vector<string>* obs_obj_names_ptr;
 	vector<string>* pi_obj_names_ptr;
 	map<string, double>* obj_dir_mult_ptr;
 
-	typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
-	// Defining a lambda function to compare two pairs. It will compare two pairs using second field
-	Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
-	{
-		return elem1.second < elem2.second;
-	};
+	map<string, map<string, double>> feas_member_struct;
+	map<int, vector<string>> front_map;
+	map<string, double> crowd_map;
+	map<string, int> member_front_map;
+	map<string, double> infeas;
+	vector<string> infeas_ordered;
+	map<string, double> fitness_map;
+
+	
 	
 	void prep_pareto_summary_file(string summary_tag);
 	void write_pareto_summary(string& sum_tag, int generation, vector<string>& member_names,
-		map<string, int>& front_map, map<string, double>& crowd_map, map<string, double>& infeas_map);
+		map<string, int>& front_map, map<string, double>& crowd_map, map<string, double>& infeas_map,
+		map<string, map<string, double>>& _member_struct);
 	
 };
 
@@ -91,6 +112,7 @@ private:
 class MOEA
 {
 	enum MouGenType{DE,SBX};
+	enum MouEnvType { NSGA, SPEA };
 public:
 	static mt19937_64 rand_engine;
 	MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer,
@@ -100,6 +122,8 @@ public:
 	void finalize();
 	typedef pair<vector<string>, vector<string>> DomPair;
 private:
+	MouEnvType envtype;
+	double epsilon = 1.0e-15;
 	Pest& pest_scenario;
 	set<string> pp_args;
 	vector<MouGenType> gen_types;
@@ -138,7 +162,8 @@ private:
 	ParameterEnsemble dp, dp_archive;
 	ObservationEnsemble op, op_archive;
 
-	void update_archive(ObservationEnsemble& _op, ParameterEnsemble& _dp);
+	void update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp);
+	void update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp);
 
 	void throw_moea_error(const string& message);
 
@@ -161,12 +186,17 @@ private:
 
 	ParameterEnsemble generate_diffevol_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble generate_sbx_population(int num_members, ParameterEnsemble& _dp);
+	ParameterEnsemble generate_pm_population(int num_members, ParameterEnsemble& _dp);
+
+	vector<int> selection(int num_to_select, ParameterEnsemble& _dp, bool use_binary_tourament);
 
 	string get_new_member_name(string tag = string());
 
 	void save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag = string());
-	void mutate_ip(double probability, double eta_m, ParameterEnsemble& temp_dp);
+	void linear_mutation_ip(double probability, double eta_m, ParameterEnsemble& temp_dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx(double probability, double eta_m, int idx1, int idx2);
+	pair<Eigen::VectorXd, Eigen::VectorXd> sbx_new(double probability, double eta_m, int idx1, int idx2);
+	pair<double, double> get_betas(double v1, double v2, double distribution_index);
 
 	pair<Parameters, Observations> get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe);
 

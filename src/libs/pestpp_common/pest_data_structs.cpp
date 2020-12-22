@@ -1234,6 +1234,11 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_verbose_level);
 		return true;
 	}
+	else if (key == "MOU_ENV")
+	{
+		mou_env = upper_cp(strip_cp(value));
+		return true;
+	}
 	return false;
 }
 
@@ -1413,6 +1418,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
 	os << "mou_risk_objective: " << mou_risk_obj << endl;
 	os << "mou_verbose_level: " << mou_verbose_level << endl;
+	os << "mou_env: " << mou_env << endl;
 	
 	os << endl << "...pestpp-ies options:" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
@@ -1559,7 +1565,6 @@ void PestppOptions::set_defaults()
 	set_sqp_num_reals(50);
 
 	set_mou_generator("SBX");
-
 	set_mou_population_size(100);
 	set_mou_dv_population_file("");
 	set_mou_obs_population_restart_file("");
@@ -1567,6 +1572,7 @@ void PestppOptions::set_defaults()
 	set_mou_max_archive_size(5000);
 	set_mou_risk_obj(false);
 	set_mou_verbose_level(4);
+	set_mou_env("NSGA");
 	
 
 	set_ies_par_csv("");
