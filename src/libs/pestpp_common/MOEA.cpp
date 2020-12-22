@@ -2735,6 +2735,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	Parameters ubnd = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(lbnd);
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(ubnd);
+	Eigen::VectorXd parent1, parent2;
 
 	while (i_member < num_members)
 	{
@@ -2743,7 +2744,9 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 		p2_idx = selected[1];
 
 		//generate two children thru cross over
-		children = sbx_new(crossover_probability, crossover_distribution_index, _dp.get_real_vector(p1_idx), _dp.get_real_vector(p2_idx),_dv_names, lbnd,ubnd);
+		parent1 = _dp.get_real_vector(p1_idx);
+		parent2 = _dp.get_real_vector(p2_idx);
+		children = sbx_new(crossover_probability, crossover_distribution_index, parent1, parent2,_dv_names, lbnd,ubnd);
 
 		//put the two children into the child population
 		new_reals.row(i_member) = children.first;
