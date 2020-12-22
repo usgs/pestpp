@@ -1166,7 +1166,7 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	}
 
 	//check that members of _op arent in the archive already
-	vector<string> keep, temp = op.get_real_names();
+	vector<string> keep, temp = op_archive.get_real_names();
 	set<string> archive_members(temp.begin(), temp.end());
 	for (auto& member : _op.get_real_names())
 	{
@@ -1224,7 +1224,7 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	}
 
 	//check that members of _op arent in the archive already
-	vector<string> keep, temp = op.get_real_names();
+	vector<string> keep, temp = op_archive.get_real_names();
 	set<string> archive_members(temp.begin(), temp.end());
 	for (auto& member : _op.get_real_names())
 	{
