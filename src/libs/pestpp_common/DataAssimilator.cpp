@@ -2366,9 +2366,26 @@ void DataAssimilator::da_upate()
 
 	string da_method = da_ctl_params.get_svalue("DA_TYPE");
 	message(0, "Assimilation Method :", da_method);
-	int solution_iterations;
+	int user_noptmax = pest_scenario.get_control_info().noptmax;
+	//int solution_iterations;
 	if (da_type == "MDA")
+	{
+		if (user_noptmax > infl_facs.size())
+		{
+			int beta_diff = user_noptmax - infl_facs.size();
+			for (int ibeta = 0; ibeta < beta_diff; ibeta++)
+			{
+				infl_facs.push_back(infl_facs.back());
+			}
+		}
+		else if (user_noptmax < infl_facs.size())
+		{
+			int beta_diff = infl_facs.size() - user_noptmax;
+			vector<double> v2 = std::vector<double>(infl_facs.begin(), infl_facs.end() - beta_diff);
+			infl_facs = v2;
+		}
 		solution_iterations = infl_facs.size();
+	}
 	else if (da_type == "VANILLA")
 		solution_iterations = 1;
 	else
@@ -3411,19 +3428,18 @@ bool DataAssimilator::solve_new_da()
 		message(1, s);
 	}
 
-	if (true) // check subset size
+	 // check subset size	
+	if ((use_subset) && (subset_size > pe.shape().first))
 	{
-		if ((use_subset) && (subset_size > pe.shape().first))
-		{
-			ss.str("");
-			ss << "++ies_subset size (" << subset_size << ") greater than ensemble size (" << pe.shape().first << ")";
-			frec << "  ---  " << ss.str() << endl;
-			cout << "  ---  " << ss.str() << endl;
-			frec << "  ...reducing subset_size to " << pe.shape().first << endl;
-			cout << "  ...reducing subset_size to " << pe.shape().first << endl;
-			subset_size = pe.shape().first;
-		}
+		ss.str("");
+		ss << "++da_subset size (" << subset_size << ") greater than ensemble size (" << pe.shape().first << ")";
+		frec << "  ---  " << ss.str() << endl;
+		cout << "  ---  " << ss.str() << endl;
+		frec << "  ...reducing subset_size to " << pe.shape().first << endl;
+		cout << "  ...reducing subset_size to " << pe.shape().first << endl;
+		subset_size = pe.shape().first;
 	}
+	
 
 	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 
@@ -3437,7 +3453,6 @@ bool DataAssimilator::solve_new_da()
 	unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	if (use_localizer)
 	{
-
 		loc_map = localizer.get_localizer_map(iter, oe, pe, performance_log);
 		//localizer.report(file_manager.rec_ofstream());
 	}
@@ -3584,19 +3599,27 @@ bool DataAssimilator::solve_new_da()
 	vector<ParameterEnsemble> posterior_dyn_states;
 	bool evaluate_update = da_ctl_params.get_bvalue("DA_EVALUATE_UPDATE");
 
-	if ((da_type == "MDA") || (da_type == "ITERATIVE"))
+	if (da_type == "ITERATIVE")
 	{
 		evaluate_update = true;
 	}
-	message(0, "running inflation ensembles");		
-	if (dyn_states_names.size() > 0)
+
+	if (da_type == "MDA")
 	{
-		// before forward runing remove the dynamic states temporarly 
-		// and replace them with prior dynamic states
-		posterior_dyn_states = temp_remove_dyn_state(pe_lams);
-	}		
+		if (iter < solution_iterations) 
+			evaluate_update = true;					
+	}
+
+		
 	if (evaluate_update)
 	{
+		message(0, "running inflation ensembles");
+		if (dyn_states_names.size() > 0)
+		{
+			// before forward runing remove the dynamic states temporarly 
+			// and replace them with prior dynamic states
+			posterior_dyn_states = temp_remove_dyn_state(pe_lams);
+		}
 		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
 	}
 	/*
@@ -3688,8 +3711,9 @@ bool DataAssimilator::solve_new_da()
 	
 	if (da_type == "MDA") 
 	{			
-		if (iter == infl_facs.size()) // I thins is also not needed
+		if (iter == infl_facs.size()) // I thinks is also not needed
 		{
+			if (evaluate_update)
 			if (dyn_states_names.size() > 0)
 			{
 				message(1, "Last MDA cycle; update dynamic forecast ");

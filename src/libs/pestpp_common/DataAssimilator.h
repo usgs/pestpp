@@ -128,7 +128,7 @@ private:
 
 	set<string> pp_args;
 
-	int iter, subset_size;
+	int iter, subset_size, solution_iterations;
 	bool use_subset;
 
 	double last_best_lam, last_best_mean, last_best_std;
