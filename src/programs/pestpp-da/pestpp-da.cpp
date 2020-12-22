@@ -478,7 +478,7 @@ int main(int argc, char* argv[])
 			}
 			//replace all the pars used in this cycle in the parent parameter ensemble
 			performance_log.log_event("updating global ensemble with cycle ensemble columns");
-			curr_pe = da.get_pe();
+			cycle_curr_pe = da.get_pe();
 			//if we lost some realizations...
 			if (curr_pe.shape().first > cycle_curr_pe.shape().first)
 			{
