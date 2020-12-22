@@ -111,7 +111,7 @@ private:
 
 class MOEA
 {
-	enum MouGenType{DE,SBX};
+	enum MouGenType{DE,SBX,PM};
 	enum MouEnvType { NSGA, SPEA };
 public:
 	static mt19937_64 rand_engine;
@@ -193,9 +193,12 @@ private:
 	string get_new_member_name(string tag = string());
 
 	void save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag = string());
-	void linear_mutation_ip(double probability, double eta_m, ParameterEnsemble& temp_dp);
+	void gauss_mutation_ip(double mutation_probability, ParameterEnsemble& _dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx(double probability, double eta_m, int idx1, int idx2);
-	pair<Eigen::VectorXd, Eigen::VectorXd> sbx_new(double probability, double eta_m, int idx1, int idx2);
+	pair<Eigen::VectorXd, Eigen::VectorXd> sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1,
+		Eigen::VectorXd parent2, vector<string>& _dv_names, Parameters& lbnd, Parameters& ubnd);
+	Eigen::VectorXd hybrid_pm(Eigen::VectorXd& parent1, double mutation_probability, double disrupt_probabilty, 
+		vector<string>& _dv_names, Parameters& lbnd, Parameters& ubnd);
 	pair<double, double> get_betas(double v1, double v2, double distribution_index);
 
 	pair<Parameters, Observations> get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe);
