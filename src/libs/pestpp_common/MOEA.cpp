@@ -1410,6 +1410,7 @@ void MOEA::finalize()
 void MOEA::initialize()
 {
 	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
 	message(0, "initializing MOEA process");
 	
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
@@ -1427,13 +1428,33 @@ void MOEA::initialize()
 	//set some defaults
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
-	string env = ppo->get_mou_env();
+	string env = ppo->get_mou_env_selector();
 	if (env == "NSGA")
+	{
 		envtype = MouEnvType::NSGA;
+		message(1, "using 'nsga2' env selector");
+	}
 	else if (env == "SPEA")
+	{
 		envtype = MouEnvType::SPEA;
+		message(1, "using 'spea2' env selector");
+	}
 	else
-		throw_moea_error("'mou_env' type not recognized: " + env + ", should be 'NSGA' or 'SPEA'");
+		throw_moea_error("'mou_env_selector' type not recognized: " + env + ", should be 'NSGA' or 'SPEA'");
+
+	string mate = ppo->get_mou_mating_selector();
+	if (mate == "RANDOM")
+	{
+		mattype = MouMateType::RANDOM;
+		message(1, "using random mating pool selector");
+	}	
+	else if (mate == "TOURNAMENT")
+	{
+		mattype = MouMateType::TOURNAMENT;
+		message(1, "using binary tournament mating pool selector");
+	}
+	else
+		throw_moea_error("'mou_mating_selector' type not recognized: " + mate + ", should be 'RANDOM' or 'TOURNAMENT'");
 
 	//reset the par bound PI augmentation since that option is just for simplex
 	ppo->set_opt_include_bnd_pi(false);
@@ -2504,9 +2525,8 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 
 
 	Eigen::VectorXd y, x, diff;
-	double F = pest_scenario.get_pestpp_options().get_de_f();
-	double CR = pest_scenario.get_pestpp_options().get_de_cr();
-	double R;
+	double crossover = pest_scenario.get_pestpp_options().get_mou_crossover_probability();
+	double r;
 	
 	vector<double> cr_vals;
 	Eigen::MatrixXd new_reals(num_members, _dp.shape().second);
@@ -2526,13 +2546,17 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	int ii;
 	int i_last;
 	vector<int> selected;
+	double dithered_f;
 	for (int i = 0; i < num_members; i++)
 	{
 		
-		selected = selection(4, _dp, false);
+		selected = selection(4, _dp, mattype);
+
+		//use dithered F value
+		dithered_f = uniform_draws(1, 0.5, 1.0, rand_gen)[0];
 
 		//differential vector
-		diff = _dp.get_eigen_ptr()->row(selected[0]) + (F * (_dp.get_eigen_ptr()->row(selected[1]) - _dp.get_eigen_ptr()->row(selected[2])));
+		diff = _dp.get_eigen_ptr()->row(selected[0]) + (dithered_f * (_dp.get_eigen_ptr()->row(selected[1]) - _dp.get_eigen_ptr()->row(selected[2])));
 
 		//current member if in range, otherwise, select randomly
 		if (i < _dp.shape().first)
@@ -2547,13 +2571,13 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 		
 		//get the R values for this member;
 		shuffle(r_int_vec.begin(), r_int_vec.end(), rand_gen);
-		R = r_int_vec[0];
+		r = r_int_vec[0];
 
 		//only change dec vars
 		for(int idv=0;idv<dv_names.size();idv++)
 		{
 			ii = var_map[dv_names[idv]];
-			if ((cr_vals[ii] < CR) || (ii == R))
+			if ((cr_vals[ii] < crossover) || (ii == r))
 			{
 				y[ii] = diff[ii];
 			}
@@ -2585,7 +2609,10 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(ubnd);
 	vector<int> selected;
 	Eigen::VectorXd child, parent;
-	double mut_prob = 1.0 / (double)_dp.shape().second;
+	double mut_prob = pest_scenario.get_pestpp_options().get_mou_mutation_probability();
+	if (mut_prob < -0.0)
+		mut_prob = 1.0 / (double)_dp.shape().second;
+
 	double disrupt_prob = 0.2;
 	vector<string> _dv_names = _dp.get_var_names();
 	vector<string> real_names = _dp.get_real_names();
@@ -2598,7 +2625,7 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 	string new_name;
 	while (imember < num_members)
 	{
-		selected = selection(1, _dp, false);
+		selected = selection(1, _dp, mattype);
 		parent = _dp.get_real_vector(selected[0]);
 		child = hybrid_pm(parent, mut_prob, disrupt_prob, _dv_names, lbnd, ubnd);
 		if ((parent - child).squaredNorm() < epsilon)
@@ -2625,7 +2652,7 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 	return tmp_dp;
 }
 
-vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, bool use_binary_tourament)
+vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, MouMateType& _mattype)
 {
 	int i_member = 0, p1_idx,p2_idx;
 	vector<int> member_count, working_count, selected, r_int_vec;
@@ -2652,19 +2679,23 @@ vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, bool use_
 			continue;
 		s1 = real_names[p1_idx];
 		s2 = real_names[p2_idx];
-		if (use_binary_tourament)
+		if (_mattype==MouMateType::TOURNAMENT)
 		{
 			if (objectives.compare_two(s1, s2))
 				selected_members.emplace(p1_idx);
 			else
 				selected_members.emplace(p2_idx);
 		}
-		else
+		else if (_mattype == MouMateType::RANDOM)
 		{
 			selected_members.emplace(p1_idx);
 			if (selected_members.size() == num_to_select)
 				break;
 			selected_members.emplace(p2_idx);
+		}
+		else
+		{
+			throw_moea_error("selector error: unrecognized MouMatingType, should be 'random' or 'tournament'");
 		}
 		tries++;
 		if (tries > 1000000000)
@@ -2686,7 +2717,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	for (int i = 0; i < dv_names.size(); i++)
 		r_int_vec.push_back(i);
 
-	double crossover_probability = 0.8;
+	double crossover_probability = pest_scenario.get_pestpp_options().get_mou_crossover_probability();
 	double crossover_distribution_index = 10.0;
 	int i_member = 0;
 	int p1_idx, p2_idx;
@@ -2706,10 +2737,8 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(ubnd);
 
 	while (i_member < num_members)
-	
 	{
-
-		selected = selection(2, _dp, true);
+		selected = selection(2, _dp, mattype);
 		p1_idx = selected[0];
 		p2_idx = selected[1];
 
@@ -2731,12 +2760,14 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 		new_member_names.push_back(new_name);
 		//cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() -1] << endl;
 		i_member++;
-
 	}
 		
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
 	tmp_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
-	double mutation_probability = 1.0 / _dp.shape().second;
+
+	double mutation_probability = pest_scenario.get_pestpp_options().get_mou_mutation_probability();
+	if (mutation_probability < 0.0)
+		mutation_probability = 1.0 / _dp.shape().second;
 	gauss_mutation_ip(mutation_probability, tmp_dp);
 	tmp_dp.enforce_limits(performance_log,false);
 	return tmp_dp;

@@ -113,6 +113,7 @@ class MOEA
 {
 	enum MouGenType{DE,SBX,PM};
 	enum MouEnvType { NSGA, SPEA };
+	enum MouMateType {RANDOM,TOURNAMENT };
 public:
 	static mt19937_64 rand_engine;
 	MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer,
@@ -123,6 +124,7 @@ public:
 	typedef pair<vector<string>, vector<string>> DomPair;
 private:
 	MouEnvType envtype;
+	MouMateType mattype;
 	double epsilon = 1.0e-15;
 	Pest& pest_scenario;
 	set<string> pp_args;
@@ -188,7 +190,7 @@ private:
 	ParameterEnsemble generate_sbx_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble generate_pm_population(int num_members, ParameterEnsemble& _dp);
 
-	vector<int> selection(int num_to_select, ParameterEnsemble& _dp, bool use_binary_tourament);
+	vector<int> selection(int num_to_select, ParameterEnsemble& _dp, MouMateType& matetype);
 
 	string get_new_member_name(string tag = string());
 
