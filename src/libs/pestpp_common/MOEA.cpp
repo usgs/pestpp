@@ -2635,7 +2635,7 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 		if (tries > 10000000)
 			throw_moea_error("hybrid polynomial mutation appears to be stuck in an infinite loop...");
 		
-		new_reals.row(imember) == child;
+		new_reals.row(imember) == child.transpose();
 		imember++;
 		new_name = get_new_member_name("pm");
 		new_member_names.push_back(new_name);
