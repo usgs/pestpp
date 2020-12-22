@@ -2926,7 +2926,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double probability, double 
 			{
 				abs_diff = abs(p1 - p2);
 				if (abs_diff < epsilon)
-					abs_diff = 1.0;
+					abs_diff = 1e-10;
 				lt = (p1 + p2 + (2 * lbnd[vname]))/abs_diff;
 				ut = ((2. * ubnd[vname]) - p1 - p2) / abs_diff;
 				/*if (lt < 0)
@@ -2939,13 +2939,13 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double probability, double 
 				if (isnan(c1))
 				{
 					ss.str("");
-					ss << "sbx error: denormal value generated for " << vname << ", beta: " << betas.first << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
+					ss << "sbx error: denormal value generated for " << vname << ", beta1: " << betas.first << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
 					throw_moea_error(ss.str());
 				}
 				if (isnan(c2))
 				{
 					ss.str("");
-					ss << "sbx error: denormal value generated for " << vname << ", beta: " << betas.second << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
+					ss << "sbx error: denormal value generated for " << vname << ", beta2: " << betas.second << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
 					throw_moea_error(ss.str());
 				}
 				child1[i] = c1;
@@ -2972,6 +2972,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double probability, double 
 
 pair<double,double> MOEA::get_betas(double v1, double v2, double distribution_index)
 {
+	stringstream ss;
 	bool are_close = false;
 	if (abs(v1 - v2) <= epsilon)
 		are_close = true;
@@ -2981,8 +2982,8 @@ pair<double,double> MOEA::get_betas(double v1, double v2, double distribution_in
 		p1 = 1., p2 = 1.;
 	else
 	{
-		p1 = 1. - 1. / (2. * pow(v1, distribution_index));
-		p2 = 1. - 1. / (2. * pow(v2, distribution_index));
+		p1 = 1. - (1. / (2. * pow(v1, distribution_index)));
+		p2 = 1. - (1. / (2. * pow(v2, distribution_index)));
 	}
 	u1 = p1 * rands[0];
 	u2 = p2 * rands[1];
@@ -2994,7 +2995,7 @@ pair<double,double> MOEA::get_betas(double v1, double v2, double distribution_in
 	{
 		b1 = pow((1. / (2. - (2. * u1))), (1.0 / (distribution_index + 1)));
 	}
-	if (u1 <= 0.5)
+	if (u2 <= 0.5)
 	{
 		b2 = pow((2. * u2), (1. / distribution_index + 1));
 	}
@@ -3002,6 +3003,20 @@ pair<double,double> MOEA::get_betas(double v1, double v2, double distribution_in
 	{
 		b2 = pow((1. / (2. - (2. * u2))), (1.0 / (distribution_index + 1)));
 	}
+
+	if (isnan(b1))
+	{
+		ss.str("");
+		ss << "sbx error: denormal beta1 generated: v1:" << v1 << ", v2:" << v2 << ", rand: "<< rands[0] << ", p1:" << p1 << ", p2: " << p2 << ", u1:" << u1 << ", u2: " << u2;
+		throw_moea_error(ss.str());
+	}
+	if (isnan(b2))
+	{
+		ss.str("");
+		ss << "sbx error: denormal beta1 generated: v1:" << v1 << ", v2:" << v2 << ", rand: " << rands[1] << ", p1:" << p1 << ", p2: " << p2 << ", u1:" << u1 << ", u2: " << u2;
+		throw_moea_error(ss.str());
+	}
+
 	return pair<double, double>(b1, b2);
 
 }
