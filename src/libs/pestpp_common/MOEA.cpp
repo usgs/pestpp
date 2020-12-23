@@ -3058,6 +3058,8 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probabilit
 					abs_diff = 1e-10;
 				lt = (p1 + p2 + (2 * lbnd[vname]))/abs_diff;
 				ut = ((2. * ubnd[vname]) - p1 - p2) / abs_diff;
+				lt = max(lt, 1.0);
+				ut = max(ut, 1.0);
 				/*if (lt < 0)
 					throw_moea_error("sbx error: lower transform bound less than zero");
 				if (ut < 0)
