@@ -1233,12 +1233,12 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	}
 	if (keep.size() == 0)
 	{
-		message(2, "all nondominated members in already in archive");
+		message(2, "all members in already in archive");
 		return;
 	}
 
 	ss.str("");
-	ss << "adding " << keep.size() << " non-dominated members to archive";
+	ss << "adding " << keep.size() << " members to archive";
 	message(2, ss.str());
 	Eigen::MatrixXd other = _op.get_eigen(keep, vector<string>());
 	op_archive.append_other_rows(keep, other);
@@ -2635,7 +2635,7 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 		if (tries > 10000000)
 			throw_moea_error("hybrid polynomial mutation appears to be stuck in an infinite loop...");
 		
-		new_reals.row(imember) == child.transpose();
+		new_reals.row(imember) = child;
 		imember++;
 		new_name = get_new_member_name("pm");
 		new_member_names.push_back(new_name);
