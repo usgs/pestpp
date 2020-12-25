@@ -127,6 +127,13 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 		throw PestError("PANTHER agent unable to open pest control file: " + ctl_filename);
 	}
 	pest_scenario.process_ctl_file(fin,ctl_filename,frec);
+	if ((pest_scenario.get_ctl_ordered_par_names().size() > 250000) || (pest_scenario.get_ctl_ordered_obs_names().size() > 250000))
+	{
+		set<string> pargs = pest_scenario.get_pestpp_options().get_passed_args();
+		if (pargs.find("CHECK_TPLINS") == pargs.end())
+			pest_scenario.get_pestpp_options_ptr()->set_check_tplins(false);
+	}
+	report("checking interface files", true);
 	pest_scenario.check_io(frec);
 	poll_interval_seconds = pest_scenario.get_pestpp_options().get_worker_poll_interval();
 
@@ -135,9 +142,6 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 		pest_scenario.get_model_exec_info().insfile_vec,
 		pest_scenario.get_model_exec_info().outfile_vec,
 		pest_scenario.get_model_exec_info().comline_vec);
-	mi.check_io_access();
-	if (pest_scenario.get_pestpp_options().get_check_tplins())
-		mi.check_tplins(pest_scenario.get_ctl_ordered_par_names(), pest_scenario.get_ctl_ordered_obs_names());
 	mi.set_additional_ins_delimiters(pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
 	mi.set_fill_tpl_zeros(pest_scenario.get_pestpp_options().get_fill_tpl_zeros());
 	mi.set_num_threads(pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());

@@ -1234,9 +1234,24 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_verbose_level);
 		return true;
 	}
-	else if (key == "MOU_ENV")
+	else if (key == "MOU_ENV_SELECTOR")
 	{
-		mou_env = upper_cp(strip_cp(value));
+		mou_env_selector = upper_cp(strip_cp(value));
+		return true;
+	}
+	else if (key == "MOU_MATING_SELECTOR")
+	{
+		mou_mating_selector = upper_cp(strip_cp(value));
+		return true;
+	}
+	else if (key == "MOU_CROSSOVER_PROBABILITY")
+	{
+		convert_ip(value, mou_crossover_prob);
+		return true;
+	}
+	else if (key == "MOU_MUTATION_PROBABILITY")
+	{
+		convert_ip(value, mou_mutation_prob);
 		return true;
 	}
 	return false;
@@ -1418,7 +1433,10 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
 	os << "mou_risk_objective: " << mou_risk_obj << endl;
 	os << "mou_verbose_level: " << mou_verbose_level << endl;
-	os << "mou_env: " << mou_env << endl;
+	os << "mou_env_selector: " << mou_env_selector << endl;
+	os << "mou_mating_selector: " << mou_mating_selector << endl;
+	os << "mou_crossover_prob: " << mou_crossover_prob << endl;
+	os << "mou_mutation_prob: " << mou_mutation_prob << endl;
 	
 	os << endl << "...pestpp-ies options:" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
@@ -1572,7 +1590,10 @@ void PestppOptions::set_defaults()
 	set_mou_max_archive_size(5000);
 	set_mou_risk_obj(false);
 	set_mou_verbose_level(4);
-	set_mou_env("NSGA");
+	set_mou_env_selector("NSGA");
+	set_mou_mating_selector("TOURNAMENT");
+	set_mou_crossover_probability(0.75);
+	set_mou_mutation_probability(-999);
 	
 
 	set_ies_par_csv("");

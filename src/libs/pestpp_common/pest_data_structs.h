@@ -450,8 +450,14 @@ public:
 	void set_mou_risk_obj(bool _flag) { mou_risk_obj = _flag; }
 	int get_mou_verbose_level() const { return mou_verbose_level; }
 	void set_mou_verbose_level(int size) { mou_verbose_level = size; }
-	string get_mou_env() const { return mou_env; }
-	void set_mou_env(string _env) { mou_env = _env; }
+	string get_mou_env_selector() const { return mou_env_selector; }
+	void set_mou_env_selector(string _env) { mou_env_selector = _env; }
+	string get_mou_mating_selector() const { return mou_mating_selector; }
+	void set_mou_mating_selector(string _mating) { mou_mating_selector = _mating; }
+	double get_mou_crossover_probability() const { return mou_crossover_prob; }
+	void set_mou_crossover_probability(double _val) { mou_crossover_prob = _val; }
+	double get_mou_mutation_probability() const { return mou_mutation_prob; }
+	void set_mou_mutation_probability(double _val) { mou_mutation_prob = _val; }
 	
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
@@ -725,7 +731,10 @@ private:
 	int mou_max_archive_size;
 	bool mou_risk_obj;
 	int mou_verbose_level;
-	string mou_env;
+	string mou_env_selector;
+	double mou_crossover_prob;
+	double mou_mutation_prob;
+	string mou_mating_selector;
 
 	int ies_subset_size;
 	string ies_par_csv;

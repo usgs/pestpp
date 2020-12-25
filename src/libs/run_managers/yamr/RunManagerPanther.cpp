@@ -1296,7 +1296,7 @@ void RunManagerPanther::process_message(int i_sock)
 	{
 		stringstream ss;
 		ss << "Frozen agent: " << host_name << "$" << agent_info_iter->get_work_dir() << " is frozen because of panther_debug_freeze_on_fail = true...";
-		report(ss.str(), false);
+		report(ss.str(), true);
 
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::RUN_KILLED)

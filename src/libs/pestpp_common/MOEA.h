@@ -111,8 +111,9 @@ private:
 
 class MOEA
 {
-	enum MouGenType{DE,SBX};
+	enum MouGenType{DE,SBX,PM};
 	enum MouEnvType { NSGA, SPEA };
+	enum MouMateType {RANDOM,TOURNAMENT };
 public:
 	static mt19937_64 rand_engine;
 	MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer,
@@ -123,6 +124,7 @@ public:
 	typedef pair<vector<string>, vector<string>> DomPair;
 private:
 	MouEnvType envtype;
+	MouMateType mattype;
 	double epsilon = 1.0e-15;
 	Pest& pest_scenario;
 	set<string> pp_args;
@@ -188,14 +190,17 @@ private:
 	ParameterEnsemble generate_sbx_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble generate_pm_population(int num_members, ParameterEnsemble& _dp);
 
-	vector<int> selection(int num_to_select, ParameterEnsemble& _dp, bool use_binary_tourament);
+	vector<int> selection(int num_to_select, ParameterEnsemble& _dp, MouMateType& matetype);
 
 	string get_new_member_name(string tag = string());
 
 	void save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag = string());
-	void linear_mutation_ip(double probability, double eta_m, ParameterEnsemble& temp_dp);
+	void gauss_mutation_ip(double mutation_probability, ParameterEnsemble& _dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx(double probability, double eta_m, int idx1, int idx2);
-	pair<Eigen::VectorXd, Eigen::VectorXd> sbx_new(double probability, double eta_m, int idx1, int idx2);
+	pair<Eigen::VectorXd, Eigen::VectorXd> sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1,
+		Eigen::VectorXd parent2, vector<string>& _dv_names, Parameters& lbnd, Parameters& ubnd);
+	Eigen::VectorXd hybrid_pm(Eigen::VectorXd& parent1, double mutation_probability, double disrupt_probabilty, 
+		vector<string>& _dv_names, Parameters& lbnd, Parameters& ubnd);
 	pair<double, double> get_betas(double v1, double v2, double distribution_index);
 
 	pair<Parameters, Observations> get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe);
