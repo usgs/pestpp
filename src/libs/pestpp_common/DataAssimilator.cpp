@@ -1501,7 +1501,14 @@ void DataAssimilator::initialize(int _icycle)
 		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
 		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
 		_pe.append(BASE_REAL_NAME, pars);
-		pe = _pe;
+		if (icycle == 0)
+		{
+			pe = _pe;
+		}
+		else
+		{
+			_pe = pe;
+		}
 		string par_csv = file_manager.get_base_filename() + ".par.csv";
 		pe_base = _pe;
 		pe_base.reorder(vector<string>(), act_par_names);
@@ -1572,7 +1579,7 @@ void DataAssimilator::initialize(int _icycle)
 			pe.replace_col_vals(dyn_states_names, obs_i);
 
 		}
-		
+		oe = _oe;
 		return;
 	}
 	
@@ -2370,6 +2377,7 @@ void DataAssimilator::da_upate()
 	//int solution_iterations;
 	if (da_type == "MDA")
 	{
+		// make sure that noptmax and number of inflations are consistent. Allways noptmax will be hounred. 
 		if (user_noptmax > infl_facs.size())
 		{
 			int beta_diff = user_noptmax - infl_facs.size();

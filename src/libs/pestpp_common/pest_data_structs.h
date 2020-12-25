@@ -229,7 +229,8 @@ private:
 
 	std::unordered_map<string, int> int_parms = {
 		{ "DA_SUBSET_SIZE", 5 },
-		{ "DA_VERBOSE_LEVEL", 1 }
+		{ "DA_VERBOSE_LEVEL", 1 },
+	    { "DA_CYCLES_NUMBER", -1}
 		
 	};
 
