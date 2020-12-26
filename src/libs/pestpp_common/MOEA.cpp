@@ -1947,7 +1947,7 @@ void MOEA::initialize()
 			dp.to_csv(ss.str());
 		}
 		
-		message(1, "saved initial dv population to ", ss.str());
+		message(1, " saved initial dv population to ", ss.str());
 		performance_log->log_event("running initial population");
 		message(1, "running initial population of size", dp.shape().first);
 	
@@ -1969,7 +1969,7 @@ void MOEA::initialize()
 		ss << ".csv";
 		op.to_csv(ss.str());
 	}
-	message(1, "saved observation population to ", ss.str());
+	message(1, " saved observation population to ", ss.str());
 
 	message(0, "initial population objective function summary:");
 	previous_obj_summary = obj_func_report(dp, op);
@@ -1989,7 +1989,7 @@ void MOEA::initialize()
 			ss << ".csv";
 			shifted_op.to_csv(ss.str());
 		}
-		message(1, "saved chance-shifted observation population to ", ss.str());
+		message(1, " saved chance-shifted observation population to ", ss.str());
 
 		op = shifted_op;
 		message(0, "chance-shifted initial population objective function summary");
@@ -2009,7 +2009,7 @@ void MOEA::initialize()
 		ss << ".csv";
 		dp.to_csv(ss.str());
 	}
-	message(1, "saved initial dv population to ", ss.str());
+	message(1, " saved initial dv population to ", ss.str());
 
 	//TODO: think about a bad phi (or phis) for MOEA
 	
@@ -2743,6 +2743,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(lbnd);
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(ubnd);
 	Eigen::VectorXd parent1, parent2;
+	int tries = 0;
 
 	while (i_member < num_members)
 	{
@@ -2753,6 +2754,8 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 		//generate two children thru cross over
 		parent1 = _dp.get_real_vector(p1_idx);
 		parent2 = _dp.get_real_vector(p2_idx);
+		if ((parent1 - parent2).squaredNorm() < epsilon)
+			continue;
 		children = sbx_new(crossover_probability, crossover_distribution_index, parent1, parent2,_dv_names, lbnd,ubnd);
 
 		//put the two children into the child population
@@ -2770,6 +2773,9 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 		new_member_names.push_back(new_name);
 		//cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() -1] << endl;
 		i_member++;
+		tries++;
+		if (tries > 1000000)
+			throw_moea_error("sbx appears to be stuck in an infinite loop");
 	}
 		
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
@@ -2803,7 +2809,8 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 		ss << ".csv";
 		dp.to_csv(ss.str());
 	}
-	ss << "saved decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << ss.str() << "'";
+	ss.str("");
+	ss << " saved decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << ss.str() << "'";
 	message(1, ss.str());
 	
 	ss.str("");
@@ -2823,7 +2830,8 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 		ss << ".csv";
 		op.to_csv(ss.str());
 	}
-	ss << "saved observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << ss.str() << "'";
+	ss.str("");
+	ss << " saved observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << ss.str() << "'";
 	message(1, ss.str());
 
 }
@@ -3115,10 +3123,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probabilit
 	/* https://gist.github.com/Tiagoperes/1779d5f1c89bae0cfdb87b1960bba36d */
 
 	stringstream ss;
-	int i;
-	//double rnd1, rnd2, rnd3, rnd4;
 	vector<double> rnds;
-	double y1, y2;
 	double p1, p2, c1, c2;
 	// get parents from dp
 	Eigen::VectorXd child1 = parent1; // parent #1
@@ -3126,7 +3131,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probabilit
 	string vname;
 
 	int n_var = _dv_names.size();
-
+	
 	int tries = 0;
 	double alpha, beta, betaq;
 	while (true)
@@ -3134,7 +3139,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probabilit
 
 		child1 = parent1;
 		child2 = parent2;
-		for (i = 0; i < n_var; i++)
+		for (int i = 0; i < n_var; i++)
 		{
 			rnds = uniform_draws(4, 0.0, 1.0, rand_gen);
 			p1 = parent1[i];
@@ -3143,20 +3148,16 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probabilit
 			//this uses crossover like de instead of like standard sbx but we need to generate
 			//a full child population for testing...
 			if (rnds[0] <= crossover_probability)
-			{
-				y1 = min(p1, p2);
-				y2 = max(p1, p2);
+			{			
 				if (abs(p1 - p2) > epsilon)
 				{
-
-					c1 = get_sbx_child_value(y1, y2, lbnd[vname], ubnd[vname], di, rnds[1]);
-					c2 = get_sbx_child_value(y1, y2, lbnd[vname], ubnd[vname], di, rnds[1]);
+					get_sbx_child_values(p1, p2, lbnd[vname], ubnd[vname], di, rnds[1], c1, c2);
 					child1[i] = c1;
 					child2[i] = c2;
-
 				}
 			}
 		}
+		cout << tries << "\r" << flush;
 		tries++;
 		if (tries > 10000000)
 			throw_moea_error("sbx generation process appears to be stuck in an infinite loop...");
@@ -3171,15 +3172,20 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probabilit
 
 	}
 
+	cout << endl;
+
 	return pair<Eigen::VectorXd, Eigen::VectorXd>(child1, child2);
 
 }
 
-double MOEA::get_sbx_child_value(double y1, double y2, double lbnd, double ubnd, double eta, double rnd)
+void MOEA::get_sbx_child_values(const double& p1, const double& p2, const double& lbnd, const double& ubnd, const double& eta, double& rnd, double& c1, double& c2)
 {
+	double y1 = min(p1, p2);
+	double y2 = max(p1, p2);
 	double beta = 1.0 + (2.0 * (y1 - lbnd) / (y2 - y1));
 	double alpha = 2.0 - pow(beta, -1.0 * (eta + 1));
-	double betaq, cval;
+	double betaq;
+	
 	if (rnd <= (1.0 / alpha))
 	{
 		betaq = pow((rnd * alpha), (1.0 / (eta + 1.0)));
@@ -3188,10 +3194,24 @@ double MOEA::get_sbx_child_value(double y1, double y2, double lbnd, double ubnd,
 	{
 		betaq = pow((1.0 / (2.0 - rnd * alpha)), (1.0 / (eta + 1.0)));
 	}
-	cval = 0.5 * ((y1 + y2) - betaq * (y2 - y1));
-	cval = min(lbnd, cval);
-	cval = max(ubnd, cval);
-	return cval;
+	c1 = 0.5 * ((y1 + y2) - betaq * (y2 - y1));
+	c1 = max(lbnd, c1);
+	c1 = min(ubnd, c1);
+
+	beta = 1.0 + (2.0 * (ubnd - y2) / (y2 - y1));
+	alpha = 2.0 - pow(beta, -1.0 * (eta + 1.0));
+	if (rnd <= (1.0 / alpha))
+	{
+		betaq = pow((rnd * alpha), (1.0 / (eta + 1.0)));
+	}
+	else
+	{
+		betaq = pow((1.0 / (2.0 - (rnd * alpha))), (1.0 / (eta + 1.0)));
+	}
+	c2 = 0.5 * ((y1 + y2) - betaq * (y2 - y1));
+	c2 = max(lbnd, c2);
+	c2 = min(ubnd, c2);
+
 
 }
 pair<double,double> MOEA::get_betas(double v1, double v2, double distribution_index)

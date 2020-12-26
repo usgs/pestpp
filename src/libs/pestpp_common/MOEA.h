@@ -202,7 +202,9 @@ private:
 	Eigen::VectorXd hybrid_pm(Eigen::VectorXd& parent1, double mutation_probability, double disrupt_probabilty, 
 		vector<string>& _dv_names, Parameters& lbnd, Parameters& ubnd);
 	pair<double, double> get_betas(double v1, double v2, double distribution_index);
-	double get_sbx_child_value(double y1, double y2, double lbnd, double ubnd, double eta, double rnd);
+	void get_sbx_child_values(const double& p1, const double& p2, const double& lbnd, 
+		const double& ubnd, const double& eta, double& rnd, double& c1, double& c2);
+
 
 	pair<Parameters, Observations> get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe);
 
