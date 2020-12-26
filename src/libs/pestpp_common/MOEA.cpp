@@ -2061,13 +2061,20 @@ void MOEA::initialize()
 		op_archive.keep_rows(keep);
 		dp_archive.keep_rows(keep);
 
-		ss.str("");
-		ss << "initialized archives with " << keep.size() << " nondominated members";
-		message(2, ss.str());
-		archive_size = num_members * 2;
+		if (keep.size() == 0)
+		{
+			message(2, "initial archive empty - no feasible non-dominated solutions...");
+		}
+		else
+		{
+			ss.str("");
+			ss << "initialized archives with " << keep.size() << " nondominated members";
+			message(2, ss.str());
+			archive_size = num_members * 2;
 
-		//this causes the initial archive pareto summary file to be written
-		objectives.get_spea2_fitness(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+			//this causes the initial archive pareto summary file to be written
+			objectives.get_spea2_fitness(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+		}
 
 	}
 
@@ -3019,69 +3026,136 @@ Eigen::VectorXd MOEA::hybrid_pm(Eigen::VectorXd& parent, double mutation_probabi
 	return child;
 }
 
-pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1, 
+//pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1, 
+//	Eigen::VectorXd parent2, vector<string>& _dv_names, Parameters& lbnd, Parameters& ubnd)
+//{
+//
+//	stringstream ss;
+//	int i;
+//	//double rnd1, rnd2, rnd3, rnd4;
+//	vector<double> rnds;
+//	double lt, ut;
+//	double p1, p2, c1, c2;
+//	// get parents from dp
+//	Eigen::VectorXd child1 = parent1; // parent #1
+//	Eigen::VectorXd child2 = parent2; // parent #2
+//	string vname;
+//	pair<double, double> betas;
+//
+//	int n_var = _dv_names.size();
+//	//can't set all rnds outside of loop or all vars will be treated the same
+//	rnds = uniform_draws(4, 0.0, 1.0, rand_gen);
+//
+//	int tries = 0;
+//	double abs_diff;
+//	while (true)
+//	{
+//		
+//		child1 = parent1; 
+//		child2 = parent2; 
+//		for (i = 0; i < n_var; i++)
+//		{
+//			rnds = uniform_draws(1, 0.0, 1.0, rand_gen);
+//			p1 = parent1[i];
+//			p2 = parent2[i];
+//			vname = _dv_names[i];
+//			if (rnds[0] <= crossover_probability)
+//			{
+//				abs_diff = abs(p1 - p2);
+//				if (abs_diff < epsilon)
+//					abs_diff = 1e-10;
+//				lt = (p1 + p2 + (2 * lbnd[vname]))/abs_diff;
+//				ut = ((2. * ubnd[vname]) - p1 - p2) / abs_diff;
+//				lt = max(lt, 1.0);
+//				ut = max(ut, 1.0);
+//				/*if (lt < 0)
+//					throw_moea_error("sbx error: lower transform bound less than zero");
+//				if (ut < 0)
+//				*/	//throw_moea_error("sbx error: upper transform bound less than zero");
+//				betas = get_betas(lt, ut, di);
+//				c1 = 0.5 * ((p1 + p2) - betas.first * abs_diff);
+//				c2 = 0.5 * ((p1 + p2) - betas.second * abs_diff);
+//				if (isnan(c1))
+//				{
+//					ss.str("");
+//					ss << "sbx error: denormal value generated for " << vname << ", beta1: " << betas.first << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
+//					throw_moea_error(ss.str());
+//				}
+//				if (isnan(c2))
+//				{
+//					ss.str("");
+//					ss << "sbx error: denormal value generated for " << vname << ", beta2: " << betas.second << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
+//					throw_moea_error(ss.str());
+//				}
+//				child1[i] = c1;
+//				child2[i] = c2;
+// 			}
+//		}
+//		tries++;
+//		if (tries > 10000000)
+//			throw_moea_error("sbx generation process appears to be stuck in an infinite loop...");
+//		//hack alert - we dont wanna waste time with identical solutions, so we will keep trying 
+//		//until both child1 and child2 are different from parents - evolution!
+//		if ((parent1 - child1).squaredNorm() < epsilon)
+//			continue;
+//		else if ((parent2 - child2).squaredNorm() < epsilon)
+//			continue;
+//		else
+//			break;
+//			
+//	}
+//	
+//	return pair<Eigen::VectorXd, Eigen::VectorXd>(child1, child2);
+//
+//}
+
+pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1,
 	Eigen::VectorXd parent2, vector<string>& _dv_names, Parameters& lbnd, Parameters& ubnd)
 {
+	/* https://gist.github.com/Tiagoperes/1779d5f1c89bae0cfdb87b1960bba36d */
+
 	stringstream ss;
 	int i;
 	//double rnd1, rnd2, rnd3, rnd4;
 	vector<double> rnds;
-	double lt, ut;
+	double y1, y2;
 	double p1, p2, c1, c2;
 	// get parents from dp
 	Eigen::VectorXd child1 = parent1; // parent #1
 	Eigen::VectorXd child2 = parent2; // parent #2
 	string vname;
-	pair<double, double> betas;
 
 	int n_var = _dv_names.size();
-	//can't set all rnds outside of loop or all vars will be treated the same
-	rnds = uniform_draws(4, 0.0, 1.0, rand_gen);
 
 	int tries = 0;
-	double abs_diff;
+	double alpha, beta, betaq;
 	while (true)
 	{
-		
-		child1 = parent1; 
-		child2 = parent2; 
+
+		child1 = parent1;
+		child2 = parent2;
 		for (i = 0; i < n_var; i++)
 		{
-			rnds = uniform_draws(1, 0.0, 1.0, rand_gen);
+			rnds = uniform_draws(4, 0.0, 1.0, rand_gen);
 			p1 = parent1[i];
 			p2 = parent2[i];
 			vname = _dv_names[i];
+			//this uses crossover like de instead of like standard sbx but we need to generate
+			//a full child population for testing...
 			if (rnds[0] <= crossover_probability)
 			{
-				abs_diff = abs(p1 - p2);
-				if (abs_diff < epsilon)
-					abs_diff = 1e-10;
-				lt = (p1 + p2 + (2 * lbnd[vname]))/abs_diff;
-				ut = ((2. * ubnd[vname]) - p1 - p2) / abs_diff;
-				lt = max(lt, 1.0);
-				ut = max(ut, 1.0);
-				/*if (lt < 0)
-					throw_moea_error("sbx error: lower transform bound less than zero");
-				if (ut < 0)
-				*/	//throw_moea_error("sbx error: upper transform bound less than zero");
-				betas = get_betas(lt, ut, di);
-				c1 = 0.5 * ((p1 + p2) - betas.first * abs_diff);
-				c2 = 0.5 * ((p1 + p2) - betas.second * abs_diff);
-				if (isnan(c1))
+				y1 = min(p1, p2);
+				y2 = max(p1, p2);
+				if (abs(p1 - p2) > epsilon)
 				{
-					ss.str("");
-					ss << "sbx error: denormal value generated for " << vname << ", beta1: " << betas.first << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
-					throw_moea_error(ss.str());
+
+					c1 = get_sbx_child_value(y1, y2, lbnd[vname], ubnd[vname], di, rnds[1]);
+					c2 = get_sbx_child_value(y1, y2, lbnd[vname], ubnd[vname], di, rnds[1]);
+					child1[i] = c1;
+					child2[i] = c2;
+
 				}
-				if (isnan(c2))
-				{
-					ss.str("");
-					ss << "sbx error: denormal value generated for " << vname << ", beta2: " << betas.second << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
-					throw_moea_error(ss.str());
-				}
-				child1[i] = c1;
-				child2[i] = c2;
- 			}
+			}
 		}
 		tries++;
 		if (tries > 10000000)
@@ -3094,13 +3168,32 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probabilit
 			continue;
 		else
 			break;
-			
+
 	}
-	
+
 	return pair<Eigen::VectorXd, Eigen::VectorXd>(child1, child2);
 
 }
 
+double MOEA::get_sbx_child_value(double y1, double y2, double lbnd, double ubnd, double eta, double rnd)
+{
+	double beta = 1.0 + (2.0 * (y1 - lbnd) / (y2 - y1));
+	double alpha = 2.0 - pow(beta, -1.0 * (eta + 1));
+	double betaq, cval;
+	if (rnd <= (1.0 / alpha))
+	{
+		betaq = pow((rnd * alpha), (1.0 / (eta + 1.0)));
+	}
+	else
+	{
+		betaq = pow((1.0 / (2.0 - rnd * alpha)), (1.0 / (eta + 1.0)));
+	}
+	cval = 0.5 * ((y1 + y2) - betaq * (y2 - y1));
+	cval = min(lbnd, cval);
+	cval = max(ubnd, cval);
+	return cval;
+
+}
 pair<double,double> MOEA::get_betas(double v1, double v2, double distribution_index)
 {
 	stringstream ss;
