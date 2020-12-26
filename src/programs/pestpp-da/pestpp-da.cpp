@@ -261,8 +261,19 @@ int main(int argc, char* argv[])
 		map<int, map<string, double>> weight_cycle_info = process_da_weight_cycle_table(pest_scenario, fout_rec, weights_in_tbl);
 
 		vector<int> assimilation_cycles;
-
-		assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec);
+		//pest_scenario.get_pestpp_options
+		int n_da_cycles = ppo->da_ctl_params.get_ivalue("DA_CYCLES_NUMBER");
+		if (n_da_cycles > 0)
+		{
+			for (int i = 0; i < n_da_cycles; i++)
+			{
+				assimilation_cycles.push_back(i);
+			}
+		}
+		else
+		{
+			assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec);
+		}
 
 		//generate a parent ensemble which includes all parameters across all cycles
 
@@ -506,7 +517,7 @@ int main(int argc, char* argv[])
 
 			cycle_curr_pe.transform_ip(curr_pe.get_trans_status());
 			curr_pe.replace_col_vals(cycle_curr_pe.get_var_names(), *cycle_curr_pe.get_eigen_ptr());
-			curr_pe.to_csv("cncnc.csv");
+			curr_pe.to_csv("cncnc.csv");//to be removed 
 
 			ObservationEnsemble cycle_curr_oe = da.get_oe();
 			//if we lost some realizations...

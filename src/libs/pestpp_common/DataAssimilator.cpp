@@ -1469,6 +1469,102 @@ void DataAssimilator::initialize_obscov()
 //	message(0, "initialization complete");
 //}
 
+void DataAssimilator::forward_run_noptmax_0(int icycle)
+{
+	// Dry Run. No parameter update occurs. Run initial values and move to the next time cycle 
+	vector <string> dyn_states;
+	stringstream ss;
+
+	message(0, "'noptmax'=0, running control file parameter values and quitting");
+
+	Parameters pars = pest_scenario.get_ctl_parameters();
+	ParamTransformSeq pts = pe.get_par_transform();
+
+	ParameterEnsemble _pe(&pest_scenario, &rand_gen);
+	_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
+	_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
+	_pe.append(BASE_REAL_NAME, pars);
+	if (icycle == 0)
+	{
+		pe = _pe; // pe is initialized in the first cycle
+	}
+	else
+	{
+		_pe = pe;
+	}
+	string par_csv = file_manager.get_base_filename() + ".par.csv";
+	pe_base = _pe;
+	pe_base.reorder(vector<string>(), act_par_names);
+	ObservationEnsemble _oe(&pest_scenario, &rand_gen);
+	_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
+	_oe.append(BASE_REAL_NAME, pest_scenario.get_ctl_observations());
+	oe_base = _oe;
+	oe = _oe; // 
+			  // 
+	oe_base.reorder(vector<string>(), act_obs_names);
+
+	//initialize the phi handler
+	ss.str("");
+	ss << icycle << ".";
+	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, true, ss.str());
+	if (ph.get_lt_obs_names().size() > 0)
+	{
+		message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
+	}
+	if (ph.get_gt_obs_names().size())
+	{
+		message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
+	}
+	message(1, "running control file parameter values");
+
+	vector<int> failed_idxs = run_ensemble(_pe, _oe);
+	if (failed_idxs.size() != 0)
+	{
+		message(0, "control file parameter value run failed...bummer");
+		throw_da_error("control file parameter value run failed");
+	}
+	string obs_csv = file_manager.get_base_filename() + ".obs.csv";
+	message(1, "saving results from control file parameter value run to ", obs_csv);
+	_oe.to_csv(obs_csv);
+
+	ph.update(_oe, _pe);
+	message(0, "control file parameter phi report:");
+	ph.report(true);
+	ph.write(0, 1);
+	ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
+	Observations obs;
+	Eigen::VectorXd v = _oe.get_real_vector(BASE_REAL_NAME);
+	vector<double> vv;
+	vv.resize(v.size());
+	Eigen::VectorXd::Map(&vv[0], v.size()) = v;
+	obs.update(_oe.get_var_names(), vv);
+
+	// save parameters to .par file
+	output_file_writer.write_par(file_manager.open_ofile_ext("base.par"), pars, *(pts.get_offset_ptr()),
+		*(pts.get_scale_ptr()));
+	file_manager.close_file("par");
+
+	// save new residuals to .rei file
+	output_file_writer.write_rei(file_manager.open_ofile_ext("base.rei"), 0,
+		pest_scenario.get_ctl_observations(), obs, obj_func, pars);
+
+	// for models y(t+1) = g(x, y(t)), extract y(t+1) and use it as initial state for next time cycle
+	dyn_states = get_dynamic_states();
+	vector<string> real_names = _oe.get_real_names();
+	Eigen::MatrixXd obs_i;
+	if (dyn_states_names.size() > 0) {
+		message(1, "update initial dynamic states for next time cycle. Dynamic states  matrix size is", dyn_states.size());
+
+		Eigen::MatrixXd mat = _oe.get_eigen(real_names, dyn_states_names);
+		obs_i = mat.replicate(pe.shape().first, 1);
+		pe.replace_col_vals(dyn_states_names, obs_i);
+
+	}
+	oe = _oe;
+	return;
+}
+
+
 void DataAssimilator::initialize(int _icycle)
 {
 	icycle = _icycle;
@@ -1492,91 +1588,10 @@ void DataAssimilator::initialize(int _icycle)
 	// run the model one time using the initial parameters values. 
 	if (pest_scenario.get_control_info().noptmax == 0)
 	{
-		message(0, "'noptmax'=0, running control file parameter values and quitting");
-
-		Parameters pars = pest_scenario.get_ctl_parameters();
-		ParamTransformSeq pts = pe.get_par_transform();
-
-		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
-		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
-		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
-		_pe.append(BASE_REAL_NAME, pars);
-		pe = _pe;
-		string par_csv = file_manager.get_base_filename() + ".par.csv";
-		pe_base = _pe;
-		pe_base.reorder(vector<string>(), act_par_names);
-		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
-		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
-		_oe.append(BASE_REAL_NAME, pest_scenario.get_ctl_observations());
-		oe_base = _oe;
-		oe = _oe; // when optmax = 0, oe should be initialized to make it easier to extract dynamic states
-				  // 
-		oe_base.reorder(vector<string>(), act_obs_names);
-		//initialize the phi handler
-		ss.str("");
-		ss << icycle << ".";
-		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov,true, ss.str());
-		if (ph.get_lt_obs_names().size() > 0)
-		{
-			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
-		}
-		if (ph.get_gt_obs_names().size())
-		{
-			message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
-		}
-		message(1, "running control file parameter values");
-
-		vector<int> failed_idxs = run_ensemble(_pe, _oe);
-		if (failed_idxs.size() != 0)
-		{
-			message(0, "control file parameter value run failed...bummer");
-			throw_da_error("control file parameter value run failed");
-		}
-		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
-		message(1, "saving results from control file parameter value run to ", obs_csv);
-		_oe.to_csv(obs_csv);
-
-		ph.update(_oe, _pe);
-		message(0, "control file parameter phi report:");
-		ph.report(true);
-		ph.write(0, 1);
-		ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
-		Observations obs;
-		Eigen::VectorXd v = _oe.get_real_vector(BASE_REAL_NAME);
-		vector<double> vv;
-		vv.resize(v.size());
-		Eigen::VectorXd::Map(&vv[0], v.size()) = v;
-		obs.update(_oe.get_var_names(), vv);
-
-		// save parameters to .par file
-		output_file_writer.write_par(file_manager.open_ofile_ext("base.par"), pars, *(pts.get_offset_ptr()),
-			*(pts.get_scale_ptr()));
-		file_manager.close_file("par");
-
-		// save new residuals to .rei file
-		output_file_writer.write_rei(file_manager.open_ofile_ext("base.rei"), 0,
-			pest_scenario.get_ctl_observations(), obs, obj_func, pars);
-
-		// for models y(t+1) = g(x, y(t)), extract y(t+1) and use it as initial state for next time cycle
-		dyn_states = get_dynamic_states();
-		if (dyn_states.size() != 0)
-		{
-			message(1, "update initial dynamic states for next time cycle. Dynamic states  matrix size is", dyn_states.size());
-		}
-		//add_dynamic_state_to_pe();
-		vector<string> real_names = _oe.get_real_names();
-		Eigen::MatrixXd obs_i;
-		if (dyn_states_names.size() > 0) {
-			Eigen::MatrixXd mat = _oe.get_eigen(real_names, dyn_states_names);
-			obs_i = mat.replicate(pe.shape().first, 1);
-			pe.replace_col_vals(dyn_states_names, obs_i);
-
-		}
-		
+		forward_run_noptmax_0(_icycle);
 		return;
 	}
 	
-
 	//set some defaults
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
@@ -1774,20 +1789,6 @@ void DataAssimilator::initialize(int _icycle)
 	message(2, "checking for denormal values in pe");
 	if (icycle == 0)
 		pe.check_for_normal("initial transformed parameter ensemble");
-	/* Ayman commented this and moved it after we update dynamic states exist in pe
-	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
-	{
-		ss << file_manager.get_base_filename() << "_cycle_" << icycle << ".par.jcb";
-		pe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << "_cycle_" << icycle << ".par.csv";
-		pe.to_csv(ss.str());
-	}
-	*/
-
 
 	//message(1, "saved initial parameter ensemble to ", ss.str());
 	message(2, "checking for denormal values in base oe");
@@ -2370,6 +2371,7 @@ void DataAssimilator::da_upate()
 	//int solution_iterations;
 	if (da_type == "MDA")
 	{
+		// make sure that noptmax and number of inflations are consistent. Allways noptmax will be hounred. 
 		if (user_noptmax > infl_facs.size())
 		{
 			int beta_diff = user_noptmax - infl_facs.size();
