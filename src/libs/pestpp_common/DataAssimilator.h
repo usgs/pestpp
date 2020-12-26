@@ -73,6 +73,7 @@ public:
 	DataAssimilator(Pest& _pest_scenario, FileManager& _file_manager,
 		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 		RunManagerAbstract* _run_mgr_ptr);
+	void forward_run_noptmax_0(int icycle);
 	void initialize(int _icycle);
 	void da_save_ensemble_pe(string fprefix, string dtyp);
 	void da_save_ensemble_oe(string fprefix, string dtyp);
