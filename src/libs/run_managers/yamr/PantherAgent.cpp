@@ -127,13 +127,17 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 		throw PestError("PANTHER agent unable to open pest control file: " + ctl_filename);
 	}
 	pest_scenario.process_ctl_file(fin,ctl_filename,frec);
-	if ((pest_scenario.get_ctl_ordered_par_names().size() > 250000) || (pest_scenario.get_ctl_ordered_obs_names().size() > 250000))
+
+	if ((pest_scenario.get_ctl_parameters().size() > 250000) || (pest_scenario.get_ctl_observations().size() > 250000))
 	{
 		set<string> pargs = pest_scenario.get_pestpp_options().get_passed_args();
 		if (pargs.find("CHECK_TPLINS") == pargs.end())
+		{
 			pest_scenario.get_pestpp_options_ptr()->set_check_tplins(false);
+			cout << "large problem detected, resetting 'check_tplins' to false" << endl;
+ 		}
 	}
-	report("checking interface files", true);
+	report("checking model interface files", true);
 	pest_scenario.check_io(frec);
 	poll_interval_seconds = pest_scenario.get_pestpp_options().get_worker_poll_interval();
 

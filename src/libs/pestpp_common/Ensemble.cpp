@@ -258,7 +258,10 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 				group_keys.push_back(gi.first);
 			DrawThread worker(plog, cov, &draws, group_keys, grouper);
 			int num_threads = pest_scenario_ptr->get_pestpp_options().get_ies_num_threads();
-			if ((num_threads <= 0) || (group_keys.size() == 1))
+			//if ((num_threads <= 0) || (group_keys.size() == 1))
+			//jwhite 23 dec 2020 - something is up with the multithreaded draw (and its a really mem pig)
+			//so turning it off
+			if (true)
 			{
 				worker.work(0, num_reals, level, idx_map, std_map);
 			}
