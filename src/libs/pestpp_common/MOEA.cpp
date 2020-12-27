@@ -105,7 +105,7 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 
 }
 
-bool ParetoObjectives::compare_two(string& first, string& second)
+bool ParetoObjectives::compare_two(string& first, string& second, MouEnvType envtyp)
 {
 	if (infeas.find(first) != infeas.end())
 		//if both are infeas, select the solution that is less infeasible
@@ -119,9 +119,20 @@ bool ParetoObjectives::compare_two(string& first, string& second)
 		return false;
 	if (infeas.find(second) != infeas.end())
 		return true;
+	if (envtyp == MouEnvType::NSGA)
+		return compare_two_nsga(first, second);
+	else if (envtyp == MouEnvType::SPEA)
+		return compare_two_spea(first, second);
+	else
+		throw runtime_error("ParetoObjectives::compare_two(): unrecognized envtyp");
+}
 
-	return compare_two_nsga(first, second);
-	
+bool ParetoObjectives::compare_two_spea(string& first, string& second)
+{
+	if (spea2_constrained_fitness_map[first] < spea2_constrained_fitness_map[second])
+		return true;
+	else
+		return false;
 }
 
 bool ParetoObjectives::compare_two_nsga(string& first, string& second)
@@ -2755,7 +2766,7 @@ vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, MouMateTy
 		s2 = real_names[p2_idx];
 		if (_mattype==MouMateType::TOURNAMENT)
 		{
-			if (objectives.compare_two(s1, s2))
+			if (objectives.compare_two(s1, s2, envtype))
 				selected_members.emplace(p1_idx);
 			else
 				selected_members.emplace(p2_idx);

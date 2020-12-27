@@ -23,6 +23,10 @@ const string DE_F_NAME = "_DE_F_";
 const string CR_NAME = "_CR_";
 const string MR_NAME = "_MR_";
 
+enum MouGenType { DE, SBX, PM };
+enum MouEnvType { NSGA, SPEA };
+enum MouMateType { RANDOM, TOURNAMENT };
+
 class ParetoObjectives
 {
 public:
@@ -45,7 +49,7 @@ public:
 
 	void update(ObservationEnsemble& oe, ParameterEnsemble& dp, Constraints* constraints_ptr = nullptr);
 
-	bool compare_two(string& first, string& second);
+	bool compare_two(string& first, string& second, MouEnvType envtyp);
 
 	map<string, double> get_spea2_fitness(int generation, ObservationEnsemble& op, ParameterEnsemble& dp, 
 		Constraints* constraints_ptr = nullptr, bool report = true, string sum_tag = string());
@@ -76,6 +80,7 @@ private:
 	
 
 	bool compare_two_nsga(string& first, string& second);
+	bool compare_two_spea(string& first, string& second);
 
 	//sort specific members
 	map<string, double> get_cuboid_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
@@ -109,10 +114,9 @@ private:
 
 class MOEA
 {
-	enum MouGenType{DE,SBX,PM};
-	enum MouEnvType { NSGA, SPEA };
-	enum MouMateType {RANDOM,TOURNAMENT };
+	
 public:
+	
 	static mt19937_64 rand_engine;
 	MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer,
 		PerformanceLog *_performance_log, RunManagerAbstract* _run_mgr_ptr);
