@@ -1254,6 +1254,12 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_mutation_prob);
 		return true;
 	}
+	else if (key == "MOU_DE_F")
+	{
+		convert_ip(value, mou_de_f);
+		return true;
+	}
+
 	return false;
 }
 
@@ -1437,6 +1443,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_mating_selector: " << mou_mating_selector << endl;
 	os << "mou_crossover_prob: " << mou_crossover_prob << endl;
 	os << "mou_mutation_prob: " << mou_mutation_prob << endl;
+	os << "mou_de_f: " << mou_de_f << endl;
 	
 	os << endl << "...pestpp-ies options:" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
@@ -1594,6 +1601,7 @@ void PestppOptions::set_defaults()
 	set_mou_mating_selector("TOURNAMENT");
 	set_mou_crossover_probability(0.75);
 	set_mou_mutation_probability(-999);
+	set_mou_de_f(0.8);
 	
 
 	set_ies_par_csv("");

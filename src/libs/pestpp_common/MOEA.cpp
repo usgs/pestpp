@@ -198,17 +198,17 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 
 }
 
-void ParetoObjectives::get_spea_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp)
+void ParetoObjectives::get_spea2_archive_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp)
 {
 	ParameterEnsemble temp_dp = dp;
 	ObservationEnsemble temp_op = op;
 	string rm;
-	map<string, double> kdist = get_kth_nn_crowding_distance(temp_op, temp_dp);
+	map<string, double> kdist = get_spea2_kth_nn_crowding_distance(temp_op, temp_dp);
 	while (keep.size() > num_members)
 	{
 		temp_dp.keep_rows(keep);
 		temp_op.keep_rows(keep);
-		kdist = get_kth_nn_crowding_distance(temp_op, temp_dp);
+		kdist = get_spea2_kth_nn_crowding_distance(temp_op, temp_dp);
 		sortedset fit_sorted(kdist.begin(), kdist.end(), compFunctor);
 		rm = fit_sorted.begin()->first;
 		keep.erase(remove(keep.begin(), keep.end(), rm), keep.end());
@@ -344,9 +344,10 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 
 
 	performance_log->log_event("calculating fitness");
-	fitness_map = get_spea_fitness(member_struct);
+	pair<map<string, double>, map<string, double>> fitness_maps = get_spea2_fitness(member_struct);
+	spea2_constrained_fitness_map = fitness_maps.first;
+	spea2_unconstrained_fitness_map = fitness_maps.second;
 
-	
 	//remove infeasible solutions - after spea fitness calcs
 	if (check_constraints)
 	{
@@ -390,7 +391,7 @@ map<string, double> ParetoObjectives::get_spea2_fitness(int generation, Observat
 		vector<string> real_names = op.get_real_names();
 		write_pareto_summary(sum_tag, generation, real_names, member_front_map, crowd_map, infeas, member_struct);
 	}
-	return fitness_map;
+	return spea2_constrained_fitness_map;
 }
 
 pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_sort(int generation, ObservationEnsemble& op,
@@ -526,24 +527,24 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 
 }
 
-map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
+map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	//this updates the complicated map-based structure that stores the member names: obj_names:value nested pairs
 	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
 	//just reuse the same routine used for the pareto dominance sort...
-	return get_kth_nn_crowding_distance(_member_struct);
+	return get_spea2_kth_nn_crowding_distance(_member_struct);
 }
 
 
-map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct)
+map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct)
 {
 	vector<string> members;
 	for (auto m : _member_struct)
 		members.push_back(m.first);
-	return get_kth_nn_crowding_distance(members, _member_struct);
+	return get_spea2_kth_nn_crowding_distance(members, _member_struct);
 }
 
-map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
+map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
 	map<string, double> crowd_distance_map;
 	if (members.size() < 2)
@@ -709,26 +710,29 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string
 }
 
 
-map<string, double> ParetoObjectives::get_spea_fitness(map<string, map<string, double>>& _member_struct)
+pair<map<string, double>, map<string, double>> ParetoObjectives::get_spea2_fitness(map<string, map<string, double>>& _member_struct)
 {
 	performance_log->log_event("get_spea_fitness");
-	map<string, double> kdist = get_kth_nn_crowding_distance(_member_struct);
+	map<string, double> kdist = get_spea2_kth_nn_crowding_distance(_member_struct);
 	map<string, vector<string>> solutions_dominated_map;
 	map<string, int> num_dominating_map;
 	int dom;
 	fill_domination_containers(_member_struct, solutions_dominated_map, num_dominating_map,true);
+	map<string, double> _unconstrained_fitness_map;
 	map<string, double> _fitness_map;
 	for (auto& sol_map : solutions_dominated_map)
 	{
 		dom = 0;
 		for (auto& sol : sol_map.second)
 			dom = dom + num_dominating_map[sol];
-		_fitness_map[sol_map.first] = (double)dom + (1.0/(kdist[sol_map.first] + 2.0)); //convert the distace to density
+		_unconstrained_fitness_map[sol_map.first] = (double)dom + (1.0/(kdist[sol_map.first] + 2.0)); //convert the distace to density
+		_fitness_map[sol_map.first] = _unconstrained_fitness_map[sol_map.first];
+
 		//include infeasibility sum in fitness...
 		if (infeas.find(sol_map.first) != infeas.end())
 			_fitness_map[sol_map.first] += infeas[sol_map.first];
 	}
-	return _fitness_map;
+	return pair<map<string, double>, map<string, double>>(_fitness_map,_unconstrained_fitness_map);
 
 }
 
@@ -1261,7 +1265,7 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 
 	if (op_archive.shape().first > archive_size)
 	{
-		objectives.get_spea_names_to_keep(archive_size, keep, op_archive, dp_archive);
+		objectives.get_spea2_archive_names_to_keep(archive_size, keep, op_archive, dp_archive);
 		op_archive.keep_rows(keep);
 		dp_archive.keep_rows(keep);
 	}
@@ -1740,6 +1744,8 @@ void MOEA::initialize()
 
 	}
 
+
+
 	constraints.initialize(dv_names, numeric_limits<double>::max());
 	constraints.initial_report();
 
@@ -2088,6 +2094,14 @@ void MOEA::initialize()
 
 	constraints.mou_report(0,dp, op, obs_obj_names,pi_obj_names);
 
+	set<string> s_dv_names(dv_names.begin(),dv_names.end());
+	if (s_dv_names.find(DE_F_NAME) != s_dv_names.end())
+		message(1, "self-adaptive diffevol 'F' value found");
+	if (s_dv_names.find(CR_NAME) != s_dv_names.end())
+		message(1, "self-adaptive crossover rate value found");
+	if (s_dv_names.find(MR_NAME) != s_dv_names.end())
+		message(1, "self-adaptive mutation rate value found");
+
 	message(0, "initialization complete");
 }
 
@@ -2326,7 +2340,7 @@ void MOEA::iterate_to_solution()
 
 			if (keep.size() > num_members)
 			{
-				objectives.get_spea_names_to_keep(num_members, keep, new_op, new_dp);
+				objectives.get_spea2_archive_names_to_keep(num_members, keep, new_op, new_dp);
 			}
 			message(1, "resizing current populations to ", keep.size());
 			new_dp.keep_rows(keep);
@@ -2525,6 +2539,9 @@ void MOEA::initialize_obs_restart_population()
 
 ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterEnsemble& _dp)
 {
+	/* adaptive idea:  Front. Built Environ., 09 July 2020 | https://doi.org/10.3389/fbuil.2020.00102
+	A Comparative Study of Differential Evolution Variants in Constrained Structural Optimization
+	Manolis Georgioudakis1 and Vagelis Plevris2**/
 	message(1, "generating diffevol population of size", num_members);
 	vector<int> r_int_vec;
 	for (int i = 0; i < dv_names.size(); i++)
@@ -2532,7 +2549,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 
 
 	Eigen::VectorXd y, x, diff;
-	double crossover = pest_scenario.get_pestpp_options().get_mou_crossover_probability();
+	double org_crossover = pest_scenario.get_pestpp_options().get_mou_crossover_probability();
 	double r;
 	
 	vector<double> cr_vals;
@@ -2553,17 +2570,35 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	int ii;
 	int i_last;
 	vector<int> selected;
-	double dithered_f;
+	double org_f = pest_scenario.get_pestpp_options().get_mou_de_f();
+	double f = org_f, crossover = org_crossover;
+	bool adaptive_f = false;
+	bool adaptive_cr = false;
+	if (var_map.find(DE_F_NAME) != var_map.end())
+		adaptive_f = true;
+	if (var_map.find(CR_NAME) != var_map.end())
+		adaptive_cr = true;
 	for (int i = 0; i < num_members; i++)
 	{
 		
 		selected = selection(4, _dp, mattype);
-
-		//use dithered F value
-		dithered_f = uniform_draws(1, 0.5, 1.0, rand_gen)[0];
-
+		if (adaptive_f)
+		{
+			if (uniform_draws(1, 0.0, 1.0, rand_gen)[0] > 0.1)
+				f = _dp.get_eigen_ptr()->row(selected[0])[var_map[DE_F_NAME]];
+			else
+				f = org_f;
+		}
+		if (adaptive_cr)
+		{
+			if (uniform_draws(1, 0.0, 1.0, rand_gen)[0] > 0.1)
+				crossover = _dp.get_eigen_ptr()->row(selected[0])[var_map[CR_NAME]];
+			else
+				crossover = org_crossover;
+		}
+		
 		//differential vector
-		diff = _dp.get_eigen_ptr()->row(selected[0]) + (dithered_f * (_dp.get_eigen_ptr()->row(selected[1]) - _dp.get_eigen_ptr()->row(selected[2])));
+		diff = _dp.get_eigen_ptr()->row(selected[0]) + (f * (_dp.get_eigen_ptr()->row(selected[1]) - _dp.get_eigen_ptr()->row(selected[2])));
 
 		//current member if in range, otherwise, select randomly
 		if (i < _dp.shape().first)
@@ -2616,10 +2651,10 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(ubnd);
 	vector<int> selected;
 	Eigen::VectorXd child, parent;
-	double mut_prob = pest_scenario.get_pestpp_options().get_mou_mutation_probability();
-	if (mut_prob < -0.0)
-		mut_prob = 1.0 / (double)_dp.shape().second;
-
+	double org_mut_prob = pest_scenario.get_pestpp_options().get_mou_mutation_probability();
+	if (org_mut_prob < -0.0)
+		org_mut_prob = 1.0 / (double)_dp.shape().second;
+	
 	double disrupt_prob = 0.2;
 	vector<string> _dv_names = _dp.get_var_names();
 	vector<string> real_names = _dp.get_real_names();
@@ -2630,10 +2665,19 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 	ofstream& lin = file_manager.get_ofstream(lineage_tag);
 	vector<string> new_member_names;
 	string new_name;
+
+	_dp.update_var_map();
+	map<string, int> var_map = _dp.get_var_map();
+	bool adaptive_mr = false;
+	if (var_map.find(MR_NAME) != var_map.end())
+		adaptive_mr = true;
+	double mut_prob = org_mut_prob;
 	while (imember < num_members)
 	{
 		selected = selection(1, _dp, mattype);
 		parent = _dp.get_real_vector(selected[0]);
+		if (adaptive_mr)
+			mut_prob = parent[var_map[MR_NAME]];
 		child = hybrid_pm(parent, mut_prob, disrupt_prob, _dv_names, lbnd, ubnd);
 		if ((parent - child).squaredNorm() < epsilon)
 			continue;
@@ -2724,8 +2768,9 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	for (int i = 0; i < dv_names.size(); i++)
 		r_int_vec.push_back(i);
 
-	double crossover_probability = pest_scenario.get_pestpp_options().get_mou_crossover_probability();
+	double org_crossover_probability = pest_scenario.get_pestpp_options().get_mou_crossover_probability();
 	double crossover_distribution_index = 10.0;
+	double crossover = org_crossover_probability;
 	int i_member = 0;
 	int p1_idx, p2_idx;
 	Eigen::MatrixXd new_reals(num_members, _dp.shape().second);
@@ -2744,7 +2789,11 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(ubnd);
 	Eigen::VectorXd parent1, parent2;
 	int tries = 0;
-
+	_dp.update_var_map();
+	map<string, int> var_map = _dp.get_var_map();
+	bool adaptive_cr = false;
+	if (var_map.find(CR_NAME) != var_map.end())
+		adaptive_cr = true;
 	while (i_member < num_members)
 	{
 		selected = selection(2, _dp, mattype);
@@ -2756,7 +2805,19 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 		parent2 = _dp.get_real_vector(p2_idx);
 		if ((parent1 - parent2).squaredNorm() < epsilon)
 			continue;
-		children = sbx_new(crossover_probability, crossover_distribution_index, parent1, parent2,_dv_names, lbnd,ubnd);
+		if (adaptive_cr)
+		{
+			if (uniform_draws(1, 0.0, 1.0, rand_gen)[0] > 0.1)
+			{
+				if (uniform_draws(1, 0.0, 1.0, rand_gen)[0] > 0.5)
+					crossover = parent1[var_map[CR_NAME]];
+				else
+					crossover = parent2[var_map[CR_NAME]];
+			}
+			else
+				crossover = org_crossover_probability;
+		}
+		children = sbx_new(crossover, crossover_distribution_index, parent1, parent2,_dv_names, lbnd,ubnd);
 
 		//put the two children into the child population
 		new_reals.row(i_member) = children.first;
@@ -2781,10 +2842,8 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
 	tmp_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
 
-	double mutation_probability = pest_scenario.get_pestpp_options().get_mou_mutation_probability();
-	if (mutation_probability < 0.0)
-		mutation_probability = 1.0 / _dp.shape().second;
-	gauss_mutation_ip(mutation_probability, tmp_dp);
+	
+	gauss_mutation_ip(tmp_dp);
 	tmp_dp.enforce_limits(performance_log,false);
 	return tmp_dp;
 }
@@ -3265,7 +3324,7 @@ pair<double,double> MOEA::get_betas(double v1, double v2, double distribution_in
 
 }
 
-void MOEA::gauss_mutation_ip(double mutation_probability, ParameterEnsemble& _dp)
+void MOEA::gauss_mutation_ip(ParameterEnsemble& _dp)
 {
 	/* 
 	Information Sciences, Vol. 133/3-4, pp. 229-247 (2001.5)
@@ -3273,7 +3332,16 @@ void MOEA::gauss_mutation_ip(double mutation_probability, ParameterEnsemble& _dp
 	Shigeyoshi Tsutsui* and David E. Goldberg**
 	*/
 
+	double org_mutation_probability = pest_scenario.get_pestpp_options().get_mou_mutation_probability();
+	if (org_mutation_probability < 0.0)
+		org_mutation_probability = 1.0 / _dp.shape().second;
+
 	_dp.transform_ip(ParameterEnsemble::transStatus::NUM);
+	_dp.update_var_map();
+	map<string, int> var_map = _dp.get_var_map();
+	bool adaptive_mr = false;
+	if (var_map.find(MR_NAME) != var_map.end())
+		adaptive_mr = true;
 	vector<string> var_names =_dp.get_var_names();
 	string vname;
 	Parameters lbnd = pest_scenario.get_ctl_parameter_info().get_low_bnd(var_names);
@@ -3284,9 +3352,18 @@ void MOEA::gauss_mutation_ip(double mutation_probability, ParameterEnsemble& _dp
 	vector<double> rnds;
 	double mut_val;
 	Eigen::MatrixXd reals = _dp.get_eigen();
+	double mutation_probability = org_mutation_probability;
 	for (int i = 0; i < _dp.shape().first; i++)
 	{
 		indiv = reals.row(i);
+		if (adaptive_mr)
+		{
+			if (uniform_draws(1, 0.0, 1.0, rand_gen)[0] > 0.1)
+				mutation_probability = org_mutation_probability;
+			else
+				mutation_probability = org_mutation_probability;
+
+		}
 		for (int var = 0; var < var_names.size(); var++)
 		{
 			vname = var_names[var];

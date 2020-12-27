@@ -458,6 +458,8 @@ public:
 	void set_mou_crossover_probability(double _val) { mou_crossover_prob = _val; }
 	double get_mou_mutation_probability() const { return mou_mutation_prob; }
 	void set_mou_mutation_probability(double _val) { mou_mutation_prob = _val; }
+	double get_mou_de_f() const { return mou_de_f; }
+	void set_mou_de_f(double _val) { mou_de_f = _val; }
 	
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
@@ -735,6 +737,7 @@ private:
 	double mou_crossover_prob;
 	double mou_mutation_prob;
 	string mou_mating_selector;
+	double mou_de_f;
 
 	int ies_subset_size;
 	string ies_par_csv;

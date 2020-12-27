@@ -19,6 +19,9 @@
 const string POP_SUM_TAG = "pareto.summary.csv";
 const string ARC_SUM_TAG = "pareto.archive.summary.csv";
 const string RISK_NAME = "_RISK_";
+const string DE_F_NAME = "_DE_F_";
+const string CR_NAME = "_CR_";
+const string MR_NAME = "_MR_";
 
 class ParetoObjectives
 {
@@ -46,9 +49,9 @@ public:
 
 	map<string, double> get_spea2_fitness(int generation, ObservationEnsemble& op, ParameterEnsemble& dp, 
 		Constraints* constraints_ptr = nullptr, bool report = true, string sum_tag = string());
-	map<string, double> get_kth_nn_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
+	map<string, double> get_spea2_kth_nn_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	 
-	void get_spea_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp);
+	void get_spea2_archive_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp);
 
 private:
 	
@@ -63,7 +66,7 @@ private:
 	bool first_equals_second(map<string, double>& first, map<string, double>& second);
 
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& _member_struct);
-	map<string,double> get_spea_fitness(map<string, map<string, double>>& _member_struct);
+	pair<map<string, double>, map<string, double>> get_spea2_fitness(map<string, map<string, double>>& _member_struct);
 
 	void fill_domination_containers(map<string, map<string, double>>& _member_struct, map<string,
 		vector<string>>&solutions_dominated_map, map<string, int>& num_dominating_map, bool dup_as_dom=false);
@@ -78,13 +81,9 @@ private:
 	map<string, double> get_cuboid_crowding_distance(map<string, map<string, double>>& _member_struct);
 
 
-	map<string, double> get_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct);
-	map<string, double> get_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
-
-	
+	map<string, double> get_spea2_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct);
+	map<string, double> get_spea2_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);	
 	map<string, double> get_cuboid_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
-
-	
 
 	map<string, map<string, double>> member_struct;
 	vector<string>* obs_obj_names_ptr;
@@ -97,9 +96,8 @@ private:
 	map<string, int> member_front_map;
 	map<string, double> infeas;
 	vector<string> infeas_ordered;
-	map<string, double> fitness_map;
-
-	
+	map<string, double> spea2_constrained_fitness_map;
+	map<string, double> spea2_unconstrained_fitness_map;
 	
 	void prep_pareto_summary_file(string summary_tag);
 	void write_pareto_summary(string& sum_tag, int generation, vector<string>& member_names,
@@ -195,7 +193,7 @@ private:
 	string get_new_member_name(string tag = string());
 
 	void save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag = string());
-	void gauss_mutation_ip(double mutation_probability, ParameterEnsemble& _dp);
+	void gauss_mutation_ip(ParameterEnsemble& _dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx(double probability, double eta_m, int idx1, int idx2);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1,
 		Eigen::VectorXd parent2, vector<string>& _dv_names, Parameters& lbnd, Parameters& ubnd);
