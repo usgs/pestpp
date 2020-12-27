@@ -138,7 +138,7 @@ bool ParetoObjectives::compare_two_nsga(string& first, string& second)
 	return false;
 }
 
-void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp, map<string, map<string, double>>& _member_struct)
+void ParetoObjectives::drop_duplicates(map<string, map<string, double>>& _member_struct)
 {
 	performance_log->log_event("checking for duplicate solutions");
 	set<string> duplicates;
@@ -151,7 +151,6 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 	for (auto m : _member_struct)
 		names.push_back(m.first);
 
-	//for (auto solution_p : member_struct)
 	for (int i=0;i<names.size();i++)
 	{
 		name_p = names[i];
@@ -167,6 +166,7 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 			{
 				duplicates.emplace(name_p);
 			}
+			
 		}
 	}
 	if (duplicates.size() > 0)
@@ -188,14 +188,9 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 				i = 0;
 			}
 		}
-		vector<string> d(duplicates.begin(), duplicates.end());
-		op.drop_rows(d);
-		dp.drop_rows(d);
-		performance_log->log_event("updating member struct after dropping duplicates");
-		member_struct = get_member_struct(op, dp);
+		for (auto d : duplicates)
+			member_struct.erase(d);	
 	}
-
-
 }
 
 void ParetoObjectives::get_spea2_archive_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp)
@@ -230,12 +225,14 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 	//update the member struct container
 	member_struct = get_member_struct(op, dp);
 
-	drop_duplicates(op, dp, member_struct);
+	drop_duplicates(member_struct);
 
 	if (member_struct.size() == 0)
 		throw runtime_error("ParetoObjectives error: member_struct is empty");
 
-	vector<string> real_names = op.get_real_names();
+	vector<string> real_names;
+	for (auto& m : member_struct)
+		real_names.push_back(m.first);
 	infeas_ordered.clear();
 	infeas.clear();
 	bool all_infeas = false;
@@ -389,7 +386,7 @@ map<string, double> ParetoObjectives::get_spea2_fitness(int generation, Observat
 	if (sum_tag.size() > 0)
 	{
 		vector<string> real_names = op.get_real_names();
-		write_pareto_summary(sum_tag, generation, real_names, member_front_map, crowd_map, infeas, member_struct);
+		write_pareto_summary(sum_tag, generation, op, dp,constraints_ptr);
 	}
 	return spea2_constrained_fitness_map;
 }
@@ -475,33 +472,37 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 	if (sum_tag.size() > 0)
 	{
 		vector<string> real_names = op.get_real_names();
-		write_pareto_summary(sum_tag, generation, real_names, member_front_map, crowd_map, infeas, member_struct);
+		write_pareto_summary(sum_tag, generation, op, dp, constraints_ptr);
 	}	
 	return pair<vector<string>, vector<string>>(nondom_crowd_ordered, dom_crowd_ordered);
 }
 
-void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, vector<string>& member_names, 
-	map<string,int>& front_map, map<string,double>& crowd_map, map<string,double>& infeas_map,
-	map<string, map<string, double>>& _member_struct)
+void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, ObservationEnsemble& op, ParameterEnsemble& dp, Constraints* constr_ptr)
 {
+	update(op, dp, constr_ptr);
+	if (!file_manager.check_ofile_tag_exists(sum_tag))
+		file_manager.open_ofile_ext(sum_tag);
 	ofstream& sum = file_manager.get_ofstream(sum_tag);
-	for (auto& member : member_names)
+	for (auto member : op.get_real_names())
 	{
-		
+		if (member_struct.find(member) == member_struct.end())
+			continue;
 		sum << generation << "," << member;
 		for (auto obj : *obs_obj_names_ptr)
 		{
-			sum << "," << obj_dir_mult_ptr->at(obj) * _member_struct[member][obj];
+			sum << "," << obj_dir_mult_ptr->at(obj) * member_struct[member][obj];
 		}
 		for (auto obj : *pi_obj_names_ptr)
 		{
-			sum << "," << obj_dir_mult_ptr->at(obj) * _member_struct[member][obj];
+			sum << "," << obj_dir_mult_ptr->at(obj) * member_struct[member][obj];
 		}
-		sum << "," << front_map[member];
+		sum << "," << member_front_map[member];
 		sum << "," << crowd_map[member];
-		if (infeas_map.find(member) != infeas_map.end())
+		sum << "," << spea2_constrained_fitness_map[member];
+		sum << "," << spea2_unconstrained_fitness_map[member];
+		if (infeas.find(member) != infeas.end())
 		{
-			sum << "," << 0 << "," << infeas_map[member];
+			sum << "," << 0 << "," << infeas[member];
 		}
 		else
 		{
@@ -523,7 +524,7 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 		sum << "," << pest_utils::lower_cp(obj);
 	for (auto obj : *pi_obj_names_ptr)
 		sum << "," << pest_utils::lower_cp(obj);
-	sum << ",front,crowding_distance,is_feasible,feasible_distance" << endl;
+	sum << ",nsga2_front,nsga2_crowding_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
 
 }
 
@@ -2864,8 +2865,10 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
 	tmp_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
 
+	if (find(gen_types.begin(),gen_types.end(),MouGenType::PM) == gen_types.end())
+		gauss_mutation_ip(tmp_dp);
+	generate_pm_population(tmp_dp.shape().first, tmp_dp);
 	
-	gauss_mutation_ip(tmp_dp);
 	tmp_dp.enforce_limits(performance_log,false);
 	return tmp_dp;
 }

@@ -50,7 +50,11 @@ public:
 	std::ofstream &get_ofstream(const std::string &tag);
 	std::ifstream &get_ifstream(const std::string &tag);
 	std::fstream &get_fstream(const std::string &tag);
+	bool check_ofile_tag_exists(std::string& tag) { return ofile_map.find(tag) != ofile_map.end() ? true : false; }
+	bool check_ifile_tag_exists(std::string& tag) { return ifile_map.find(tag) != ifile_map.end() ? true : false; }
+	bool check_iofile_tag_exists(std::string& tag) { return iofile_map.find(tag) != iofile_map.end() ? true : false; }
 	~FileManager(void);
+
 private:
 	std::string directory;
 	std::string pest_base_filename;

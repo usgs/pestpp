@@ -53,6 +53,9 @@ public:
 	 
 	void get_spea2_archive_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp);
 
+	void prep_pareto_summary_file(string summary_tag);
+	void write_pareto_summary(string& sum_tag, int generation, ObservationEnsemble& op, ParameterEnsemble& dp, Constraints* constr_ptr=nullptr);
+
 private:
 	
 	Pest& pest_scenario;
@@ -62,7 +65,7 @@ private:
 	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, double>& crowd_map, map<string, map<string, double>>& _member_struct);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
 	map<string, map<string, double>> get_member_struct(ObservationEnsemble& oe, ParameterEnsemble& dp);
-	void drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp, map<string, map<string, double>>& _member_struct);
+	void drop_duplicates(map<string, map<string, double>>& _member_struct);
 	bool first_equals_second(map<string, double>& first, map<string, double>& second);
 
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& _member_struct);
@@ -99,10 +102,7 @@ private:
 	map<string, double> spea2_constrained_fitness_map;
 	map<string, double> spea2_unconstrained_fitness_map;
 	
-	void prep_pareto_summary_file(string summary_tag);
-	void write_pareto_summary(string& sum_tag, int generation, vector<string>& member_names,
-		map<string, int>& front_map, map<string, double>& crowd_map, map<string, double>& infeas_map,
-		map<string, map<string, double>>& _member_struct);
+	
 	
 };
 
