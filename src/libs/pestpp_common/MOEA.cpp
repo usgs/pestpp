@@ -1759,7 +1759,7 @@ void MOEA::initialize()
 	set<string> s_dv_names(dv_names.begin(), dv_names.end());
 	if (s_dv_names.find(DE_F_NAME) != s_dv_names.end())
 	{
-		message(1, "self-adaptive diffevol 'F' value found, resetting bounds to (min:0.5,max:1.0)");
+		message(1, "self-adaptive diffevol 'F' value found, resetting bounds to min:0.5 max:1.0");
 		double b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(DE_F_NAME)->lbnd;
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(DE_F_NAME)->lbnd = max(b, 0.5);
 		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(DE_F_NAME)->ubnd;
@@ -1768,7 +1768,7 @@ void MOEA::initialize()
 
 	if (s_dv_names.find(CR_NAME) != s_dv_names.end())
 	{
-		message(1, "self-adaptive crossover probability value found, resetting bounds to (min:0.8,max:1.0");
+		message(1, "self-adaptive crossover probability value found, resetting bounds to min:0.8, max:1.0");
 		double b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(CR_NAME)->lbnd;
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(CR_NAME)->lbnd = max(b, 0.8);
 		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(CR_NAME)->ubnd;
@@ -1777,7 +1777,7 @@ void MOEA::initialize()
 
 	if (s_dv_names.find(MR_NAME) != s_dv_names.end())
 	{
-		message(1, "self-adaptive mutation probability value found, resetting bounds to (min:0.01,max:0.3");
+		message(1, "self-adaptive mutation probability value found, resetting bounds to min:0.01, max:0.3");
 		double b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(MR_NAME)->lbnd;
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(MR_NAME)->lbnd = max(b, 0.8);
 		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(MR_NAME)->ubnd;
@@ -2904,8 +2904,9 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 		ss << ".csv";
 		dp.to_csv(ss.str());
 	}
+	string name = ss.str();
 	ss.str("");
-	ss << " saved decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << ss.str() << "'";
+	ss << " saved decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 	
 	ss.str("");
@@ -2925,8 +2926,9 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 		ss << ".csv";
 		op.to_csv(ss.str());
 	}
+	name = ss.str();
 	ss.str("");
-	ss << " saved observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << ss.str() << "'";
+	ss << " saved observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 
 }
@@ -3252,7 +3254,6 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probabilit
 				}
 			}
 		}
-		cout << tries << "\r" << flush;
 		tries++;
 		if (tries > 10000000)
 			throw_moea_error("sbx generation process appears to be stuck in an infinite loop...");
