@@ -442,7 +442,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 
 	// Pause idle pinging thread
 	pause_idle();
-
+	stringstream ss;
 	model_runs_done = 0;
 	model_runs_failed = 0;
 	model_runs_timed_out = 0;
@@ -454,7 +454,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	cout << "    starting at " << pest_utils::get_time_string() << endl;
 	if (agent_info_set.size() == 0) // first entry is the listener, slave apears after this
 	{
-		cout << endl << "      waiting for agents to appear..." << endl << endl;
+		cout << endl << "    waiting for agents to appear..." << endl << endl;
 		//f_rmr << endl << "    waiting for agents to appear..." << endl << endl;
 		report("waiting for agents to appear", false);
 	}
@@ -462,6 +462,11 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	{
 		for (auto &si : agent_info_set)
 			si.reset_runtime();
+		ss.str("");
+		ss << endl << "    " << agent_info_set.size() << " agents ready";
+		report(ss.str(), false);
+		cout << ss.str() << endl << endl;
+		
 	}
 	cout << endl;
 	f_rmr << endl;
