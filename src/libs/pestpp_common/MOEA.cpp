@@ -1744,6 +1744,34 @@ void MOEA::initialize()
 
 	}
 
+	set<string> s_dv_names(dv_names.begin(), dv_names.end());
+	if (s_dv_names.find(DE_F_NAME) != s_dv_names.end())
+	{
+		message(1, "self-adaptive diffevol 'F' value found, resetting bounds to (min:0.5,max:1.0)");
+		double b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(DE_F_NAME)->lbnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(DE_F_NAME)->lbnd = max(b, 0.5);
+		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(DE_F_NAME)->ubnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(DE_F_NAME)->ubnd = min(b, 1.0);
+	}
+
+	if (s_dv_names.find(CR_NAME) != s_dv_names.end())
+	{
+		message(1, "self-adaptive crossover probability value found, resetting bounds to (min:0.8,max:1.0");
+		double b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(CR_NAME)->lbnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(CR_NAME)->lbnd = max(b, 0.8);
+		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(CR_NAME)->ubnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(CR_NAME)->ubnd = min(b, 1.0);
+	}
+
+	if (s_dv_names.find(MR_NAME) != s_dv_names.end())
+	{
+		message(1, "self-adaptive mutation probability value found, resetting bounds to (min:0.01,max:0.3");
+		double b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(MR_NAME)->lbnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(MR_NAME)->lbnd = max(b, 0.8);
+		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(MR_NAME)->ubnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(MR_NAME)->ubnd = min(b, 1.0);
+	}
+
 
 
 	constraints.initialize(dv_names, numeric_limits<double>::max());
@@ -2094,13 +2122,7 @@ void MOEA::initialize()
 
 	constraints.mou_report(0,dp, op, obs_obj_names,pi_obj_names);
 
-	set<string> s_dv_names(dv_names.begin(),dv_names.end());
-	if (s_dv_names.find(DE_F_NAME) != s_dv_names.end())
-		message(1, "self-adaptive diffevol 'F' value found");
-	if (s_dv_names.find(CR_NAME) != s_dv_names.end())
-		message(1, "self-adaptive crossover rate value found");
-	if (s_dv_names.find(MR_NAME) != s_dv_names.end())
-		message(1, "self-adaptive mutation rate value found");
+	
 
 	message(0, "initialization complete");
 }
