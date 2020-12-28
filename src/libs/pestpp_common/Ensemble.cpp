@@ -1873,7 +1873,7 @@ ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _ra
 
 
 
-void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
+map<string,double> ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
 {
 	///draw a parameter ensemble
 	var_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names(); //only draw for adjustable pars
@@ -1951,10 +1951,12 @@ void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, Per
 
 		reorder(vector<string>(), pest_scenario_ptr->get_ctl_ordered_adj_par_names());
 	}
+	map<string, double> norm_map;
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_enforce_bounds())
-		//dont enforce parchglim-style here - if a pars initial value is near its bound, lots of realizations 
-		//will be near zero length.  
-		enforce_limits(plog, false);
+	{
+		norm_map = enforce_bounds(plog, pest_scenario_ptr->get_pestpp_options().get_ies_enforce_chglim());
+	}
+	return norm_map;
 
 
 }
@@ -2221,26 +2223,76 @@ void ParameterEnsemble::save_fixed()
 	}
 }
 
-void ParameterEnsemble::enforce_limits(PerformanceLog* plog, bool enforce_chglim)
+map<string,double> ParameterEnsemble::enforce_change_limits_and_bounds(PerformanceLog* plog, ParameterEnsemble& other)
+{
+	string rname;
+	vector<string> other_names = other.get_real_names();
+	set<string> s_other_real_names(other_names.begin(), other_names.end());
+	transform_ip(ParameterEnsemble::transStatus::NUM);
+	other.transform_ip(ParameterEnsemble::transStatus::NUM);
+	other_names = other.get_var_names();
+	Eigen::VectorXd other_real;
+	double init_norm, shrunk_norm;
+	map<string, double> norm_map;
+	ParamTransformSeq bts = pest_scenario_ptr->get_base_par_tran_seq();
+	
+	for (int i = 0; i < reals.rows(); i++)
+	{
+		rname = real_names[i];
+		if (s_other_real_names.find(rname) == s_other_real_names.end())
+			throw_ensemble_error("enforce_change_limits(): real name '" + rname + "' not in other ensemble");
+		other_real = other.get_real_vector(rname);
+		Parameters real_pars(var_names, reals.row(i));
+		Parameters other_pars(other_names, other_real);
+		bts.numeric2ctl_ip(real_pars);
+		bts.numeric2ctl_ip(other_pars);
+		init_norm = (other_real - reals.row(i).transpose()).squaredNorm();
+		pest_scenario_ptr->enforce_par_limits(plog, real_pars, other_pars, true, true);
+		bts.ctl2numeric_ip(real_pars);
+		//pest_scenario_ptr->enforce_par_limits(real, base, true, false);
+		reals.row(i) = real_pars.get_data_eigen_vec(var_names);
+		shrunk_norm = (other_real - reals.row(i).transpose()).squaredNorm();
+		if (init_norm > 0.0)
+		{
+			norm_map[rname] = sqrt(shrunk_norm) / sqrt(init_norm);
+		}
+		else
+			norm_map[rname] = 1.0;
+	}
+	return norm_map;
+}
+
+map<string,double> ParameterEnsemble::enforce_bounds(PerformanceLog* plog, bool shrink)
 {
 	
-	if (tstat != ParameterEnsemble::transStatus::NUM)
+	/*if (tstat != ParameterEnsemble::transStatus::NUM)
 	{
 		throw_ensemble_error("pe.enforce_bounds() tstat != NUM not implemented");
-
-	}
+	}*/
+	transform_ip(ParameterEnsemble::transStatus::NUM);
+	map<string, double> norm_map;
+	double init_norm, shrunk_norm;
+	Parameters base = pest_scenario_ptr->get_ctl_parameters();
+	Eigen::VectorXd base_vec = base.get_data_eigen_vec(var_names);
+	ParamTransformSeq bts = pest_scenario_ptr->get_base_par_tran_seq();
+	
 	//fancy vector shrinking style enforcement
-	if (enforce_chglim)
-	{
-		Parameters base = pest_scenario_ptr->get_ctl_parameters();
+	if (shrink)
+	{	
 		for (int i = 0; i < reals.rows(); i++)
 		{
-
 			Parameters real(var_names, reals.row(i));
-
-			pest_scenario_ptr->enforce_par_limits(plog, real, base, true, true);
+			bts.numeric2ctl_ip(real);
+			init_norm = (base_vec - reals.row(i).transpose()).squaredNorm();
+			pest_scenario_ptr->enforce_par_limits(plog, real, base, false, true);
 			//pest_scenario_ptr->enforce_par_limits(real, base, true, false);
+			bts.ctl2numeric_ip(real);
 			reals.row(i) = real.get_data_eigen_vec(var_names);
+			shrunk_norm = (base_vec - reals.row(i).transpose()).squaredNorm();
+			if (init_norm > 0.0)
+				norm_map[real_names[i]] = sqrt(shrunk_norm) / sqrt(init_norm);
+			else
+				norm_map[real_names[i]] = 1.0;
 		}
 	}
 	//reset parameters to be inbounds - very crude
@@ -2257,6 +2309,7 @@ void ParameterEnsemble::enforce_limits(PerformanceLog* plog, bool enforce_chglim
 			ppar = pest_scenario_ptr->get_effective_ctl_lower_upper_bnd(real);
 			for (int i = 0; i < reals.rows(); i++)
 			{
+				init_norm = (base_vec - reals.row(i).transpose()).squaredNorm();
 				real.update_without_clear(var_names, reals.row(i));
 				Parameters real_ctl = pest_scenario_ptr->get_base_par_tran_seq().numeric2ctl_cp(real);
 
@@ -2271,7 +2324,11 @@ void ParameterEnsemble::enforce_limits(PerformanceLog* plog, bool enforce_chglim
 					real_ctl.update_rec(n, v);
 				}
 				reals.row(i) = pest_scenario_ptr->get_base_par_tran_seq().ctl2numeric_cp(real_ctl).get_data_eigen_vec(var_names);
-
+				shrunk_norm = (base_vec - reals.row(i).transpose()).squaredNorm();
+				if (init_norm > 0.0)
+					norm_map[real_names[i]] = sqrt(shrunk_norm) / sqrt(init_norm);
+				else
+					norm_map[real_names[i]] = 1.0;
 			}
 		}
 		else
@@ -2301,6 +2358,7 @@ void ParameterEnsemble::enforce_limits(PerformanceLog* plog, bool enforce_chglim
 		
 
 	}
+	return norm_map;
 }
 
 void ParameterEnsemble::to_binary(string file_name)

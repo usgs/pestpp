@@ -140,7 +140,8 @@ public:
 
 	void from_eigen_mat(Eigen::MatrixXd mat, const vector<string> &_real_names, const vector<string> &_var_names,
 		transStatus _tstat = transStatus::NUM);
-	void enforce_limits(PerformanceLog* plog, bool enforce_chglim);
+	map<string,double>  enforce_bounds(PerformanceLog* plog, bool shrink);
+	map<string,double> enforce_change_limits_and_bounds(PerformanceLog* plog, ParameterEnsemble& other);
 	void to_csv(string file_name);
 	void to_csv_by_reals(ofstream &csv);
 	void to_csv_by_vars(ofstream &csv);
@@ -152,7 +153,7 @@ public:
 	void set_pest_scenario(Pest *_pest_scenario);
 	map<int,int> add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs=vector<int>());
 
-	void draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
+	map<string,double> draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
 	Covariance get_diagonal_cov_matrix();
 	void to_binary(string filename);
 
