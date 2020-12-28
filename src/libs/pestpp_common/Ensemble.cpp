@@ -1288,7 +1288,12 @@ void Ensemble::append_other_rows(const vector<string>& _real_names, Eigen::Matri
 
 	//append rows to the end of reals
 	if (_reals.cols() != shape().second)
-		throw_ensemble_error("append_other_rows(): different number of columns in _reals");
+	{
+		if ((reals.cols() == 0) && (var_names.size() == _reals.cols()))
+			;
+		else
+			throw_ensemble_error("append_other_rows(): different number of columns in _reals");
+	}
 	vector<string> probs;
 	set<string> rnames(real_names.begin(), real_names.end());
 	set<string>::iterator end = rnames.end();
