@@ -1274,15 +1274,17 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	message(2, ss.str());
 	op_archive.keep_rows(keep);
 	dp_archive.keep_rows(keep);
-
-	if (op_archive.shape().first > archive_size)
+	if (keep.size() > 0)
 	{
-		objectives.get_spea2_archive_names_to_keep(archive_size, keep, op_archive, dp_archive);
-		op_archive.keep_rows(keep);
-		dp_archive.keep_rows(keep);
-	}
+		if (op_archive.shape().first > archive_size)
+		{
+			objectives.get_spea2_archive_names_to_keep(archive_size, keep, op_archive, dp_archive);
+			op_archive.keep_rows(keep);
+			dp_archive.keep_rows(keep);
+		}
 
-	save_populations(dp_archive, op_archive, "archive");
+		save_populations(dp_archive, op_archive, "archive");
+	}
 }
 
 

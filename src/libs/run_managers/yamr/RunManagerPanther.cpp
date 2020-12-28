@@ -466,7 +466,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		for (auto &si : agent_info_set)
 			si.reset_runtime();
 		ss.str("");
-		ss << endl << "    " << agent_info_set.size() << " agents ready";
+		ss << "    " << agent_info_set.size() << " agents ready";
 		report(ss.str(), false);
 		cout << ss.str() << endl << endl;
 		
