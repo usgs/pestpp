@@ -33,7 +33,7 @@ public:
 	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
 		PerformanceLog* _performance_log);
 
-	pair<vector<string>, vector<string>> nsga_ii_pareto_dominance_sort(int generation, ObservationEnsemble& op, 
+	pair<vector<string>, vector<string>> get_nsga2_pareto_dominance(int generation, ObservationEnsemble& op, 
 		ParameterEnsemble& dp, Constraints* constraints_ptr=nullptr, bool report=true, string sum_tag=string());
 	
 	//this must be called at least once before the diversity metrixs can be called...

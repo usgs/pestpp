@@ -402,7 +402,7 @@ map<string, double> ParetoObjectives::get_spea2_fitness(int generation, Observat
 	return spea2_constrained_fitness_map;
 }
 
-pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_sort(int generation, ObservationEnsemble& op,
+pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominance(int generation, ObservationEnsemble& op,
 	ParameterEnsemble& dp, Constraints* constraints_ptr, bool report, string sum_tag)
 {
 	stringstream ss;
@@ -471,7 +471,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 				nondom_crowd_ordered.push_back(inf);
 	}
 
-	if (op.shape().first != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
+	if (member_struct.size() != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
 	{
 		ss.str("");
 		ss << "ParetoObjectives::pareto_dominance_sort() internal error: final sorted population size: " << 
@@ -1204,7 +1204,7 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	dp_archive.append_other_rows(keep, other);
 	other.resize(0, 0);
 	message(2, "pareto dominance sorting archive of size", op_archive.shape().first);
-	DomPair dompair = objectives.nsga_ii_pareto_dominance_sort(iter,op_archive, dp_archive,&constraints,true,ARC_SUM_TAG);
+	DomPair dompair = objectives.get_nsga2_pareto_dominance(iter,op_archive, dp_archive,&constraints,true,ARC_SUM_TAG);
 	
 	ss.str("");
 	ss << "resizing archive from " << op_archive.shape().first << " to " << dompair.first.size() << " current non-dominated solutions";
@@ -2079,7 +2079,7 @@ void MOEA::initialize()
 	objectives.set_pointers(obs_obj_names, pi_obj_names, obj_dir_mult);
 	if (envtype == MouEnvType::NSGA)
 	{
-		DomPair dompair = objectives.nsga_ii_pareto_dominance_sort(iter, op, dp, &constraints, true, POP_SUM_TAG);
+		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, true, POP_SUM_TAG);
 
 		//initialize op and dp archives
 		op_archive = ObservationEnsemble(&pest_scenario, &rand_gen,
@@ -2093,7 +2093,7 @@ void MOEA::initialize()
 		archive_size = ppo->get_mou_max_archive_size();
 
 		//this causes the initial archive pareto summary file to be written
-		objectives.nsga_ii_pareto_dominance_sort(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+		objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
 	}
 	else if (envtype == MouEnvType::SPEA)
 	{
@@ -2304,7 +2304,7 @@ void MOEA::iterate_to_solution()
 		if (envtype == MouEnvType::NSGA)
 		{
 			message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
-			DomPair dompair = objectives.nsga_ii_pareto_dominance_sort(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
+			DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
 
 			//drop shitty members
 			//TODO: this is just a cheap hack, prob something more meaningful to be done...
