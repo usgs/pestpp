@@ -407,12 +407,12 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
-	ss << "ParetoObjectives::nsga_ii_pareto_dominance_sort() for " << op.shape().first << " population members";
+	ss << "ParetoObjectives::get_nsga2_pareto_dominance() for " << op.shape().first << " population members";
 	performance_log->log_event(ss.str());
 	update(op, dp, constraints_ptr);
 
 	if (member_struct.size() == 0)
-		throw runtime_error("ParetoObjectives error: member_struct is empty");
+		throw runtime_error("ParetoObjectives::get_nsga2_pareto_dominance() error: member_struct is empty");
 
 	if (obs_obj_names_ptr->size() + pi_obj_names_ptr->size() > 1)
 	{
@@ -422,7 +422,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 			if (front.second.size() == 0)
 			{
 				ss.str("");
-				ss << "ParetoObjectives::pareto_dominance_sort() error: front " << front.first << " has no members";
+				ss << "ParetoObjectives::get_nsga2_pareto_dominance() error: front " << front.first << " has no members";
 				performance_log->log_event(ss.str());
 				throw runtime_error(ss.str());
 			}
@@ -459,6 +459,8 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 				dom_crowd_ordered.push_back(front_member);
 	}
 
+	
+
 	//now add the infeasible members
 	//if there is atleast one feasible nondom solution, then add the infeasible ones to dom solutions
 	if (infeas.size() < op.shape().first)
@@ -471,14 +473,15 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 				nondom_crowd_ordered.push_back(inf);
 	}
 
-	if (member_struct.size() != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
+	if (infeas.size() + member_struct.size() != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
 	{
 		ss.str("");
-		ss << "ParetoObjectives::pareto_dominance_sort() internal error: final sorted population size: " << 
-			nondom_crowd_ordered.size() + dom_crowd_ordered.size() << " != initial population size: " << op.shape().first;
+		ss << "ParetoObjectives::get_nsga2_pareto_dominance() internal error: final sorted population size: " <<
+			nondom_crowd_ordered.size() + dom_crowd_ordered.size() << " != member_struct size: " << member_struct.size();
 		cout << ss.str();
 		throw runtime_error(ss.str());
 	}
+	
 
 	if (sum_tag.size() > 0)
 	{
