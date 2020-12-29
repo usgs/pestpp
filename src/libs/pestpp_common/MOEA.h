@@ -145,7 +145,7 @@ private:
 	vector<string> obs_obj_names, pi_obj_names;
 	vector<string> dv_names;
 	map<string, double> obj_dir_mult;
-
+	int n_adaptive_dvs;
 	map<string, map<string, double>> previous_obj_summary;
 	bool risk_obj;
 

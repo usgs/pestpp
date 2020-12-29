@@ -199,6 +199,7 @@ void ParetoObjectives::drop_duplicates(map<string, map<string, double>>& _member
 				i = 0;
 			}
 		}
+		frec << endl;
 		for (auto d : duplicates)
 			member_struct.erase(d);	
 	}
@@ -1760,7 +1761,7 @@ void MOEA::initialize()
 
 
 	}
-
+	n_adaptive_dvs = 0;
 	set<string> s_dv_names(dv_names.begin(), dv_names.end());
 	if (s_dv_names.find(DE_F_NAME) != s_dv_names.end())
 	{
@@ -1769,6 +1770,7 @@ void MOEA::initialize()
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(DE_F_NAME)->lbnd = max(b, 0.5);
 		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(DE_F_NAME)->ubnd;
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(DE_F_NAME)->ubnd = min(b, 1.0);
+		n_adaptive_dvs++;
 	}
 
 	if (s_dv_names.find(CR_NAME) != s_dv_names.end())
@@ -1778,6 +1780,7 @@ void MOEA::initialize()
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(CR_NAME)->lbnd = max(b, 0.8);
 		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(CR_NAME)->ubnd;
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(CR_NAME)->ubnd = min(b, 1.0);
+		n_adaptive_dvs++;
 	}
 
 	if (s_dv_names.find(MR_NAME) != s_dv_names.end())
@@ -1787,10 +1790,8 @@ void MOEA::initialize()
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(MR_NAME)->lbnd = max(b, 0.8);
 		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(MR_NAME)->ubnd;
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(MR_NAME)->ubnd = min(b, 1.0);
+		n_adaptive_dvs++;
 	}
-
-
-
 	constraints.initialize(dv_names, numeric_limits<double>::max());
 	constraints.initial_report();
 
@@ -2583,7 +2584,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	Manolis Georgioudakis1 and Vagelis Plevris2**/
 	message(1, "generating diffevol population of size", num_members);
 	vector<int> r_int_vec;
-	for (int i = 0; i < dv_names.size(); i++)
+	for (int i = 0; i < dv_names.size() - n_adaptive_dvs; i++)
 		r_int_vec.push_back(i);
 
 
@@ -2617,7 +2618,14 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 		adaptive_f = true;
 	if (var_map.find(CR_NAME) != var_map.end())
 		adaptive_cr = true;
-	for (int i = 0; i < num_members; i++)
+	Parameters lbnd = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
+	Parameters ubnd = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
+	ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
+	bts.ctl2numeric_ip(lbnd);
+	bts.ctl2numeric_ip(ubnd);
+	int tries = 0;
+	int i = 0;
+	while (i < num_members)
 	{
 		
 		selected = selection(4, _dp, mattype);
@@ -2655,14 +2663,29 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 		r = r_int_vec[0];
 
 		//only change dec vars
+		double dsum = 0.0;
+		if (i == 72)
+			cout << endl;
 		for(int idv=0;idv<dv_names.size();idv++)
 		{
 			ii = var_map[dv_names[idv]];
 			if ((cr_vals[ii] < crossover) || (ii == r))
 			{
 				y[ii] = diff[ii];
+				y[ii] = min(y[ii], ubnd[dv_names[idv]]);
+				y[ii] = max(y[ii], lbnd[dv_names[idv]]);
+
+				
 			}
 		}
+
+		tries++;
+		if (tries > 1000000)
+			throw_moea_error("diffevol generator appears to be stuck in an infinite loop...");
+
+		double n = (x - y).squaredNorm();
+		if (n < epsilon)
+			continue;
 		new_name = get_new_member_name("de");
 		new_member_names.push_back(new_name);
 		lin << new_name;
@@ -2670,13 +2693,13 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 			lin << "," << real_names[idx];
 		lin << endl;
 		new_reals.row(i) = y;
+		i++;
 	}
 
 	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
 	
 	new_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
 	new_dp.enforce_limits(performance_log, false);
-
 	return new_dp;
 }
 
