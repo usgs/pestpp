@@ -1954,7 +1954,8 @@ map<string,double> ParameterEnsemble::draw(int num_reals, Parameters par, Covari
 	map<string, double> norm_map;
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_enforce_bounds())
 	{
-		norm_map = enforce_bounds(plog, pest_scenario_ptr->get_pestpp_options().get_ies_enforce_chglim());
+		//dont use the shrinking bounds enforcement - too many chances for zero-length realizations
+		norm_map = enforce_bounds(plog, false);
 	}
 	return norm_map;
 
@@ -2247,7 +2248,7 @@ map<string,double> ParameterEnsemble::enforce_change_limits_and_bounds(Performan
 		bts.numeric2ctl_ip(real_pars);
 		bts.numeric2ctl_ip(other_pars);
 		init_norm = (other_real - reals.row(i).transpose()).squaredNorm();
-		pest_scenario_ptr->enforce_par_limits(plog, real_pars, other_pars, true, true);
+		pest_scenario_ptr->enforce_par_limits(plog, real_pars, other_pars, true, false);
 		bts.ctl2numeric_ip(real_pars);
 		//pest_scenario_ptr->enforce_par_limits(real, base, true, false);
 		reals.row(i) = real_pars.get_data_eigen_vec(var_names);
@@ -2259,6 +2260,9 @@ map<string,double> ParameterEnsemble::enforce_change_limits_and_bounds(Performan
 		else
 			norm_map[rname] = 1.0;
 	}
+	map<string, double> bounds_norm_map = enforce_bounds(plog, false);
+	for (auto& n : norm_map)
+		n.second = min(n.second, bounds_norm_map[n.first]);
 	return norm_map;
 }
 

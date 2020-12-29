@@ -200,7 +200,7 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 				message(1, "Warning: even though ies_enforce_bounds is true, a restart obs en was passed, so bounds will not be enforced on the initial par en");
 			else
 			{
-				if (pest_scenario.get_pestpp_options().get_ies_enforce_chglim())
+				/*if (pest_scenario.get_pestpp_options().get_ies_enforce_chglim())
 				{
 					ss.str("");
 					ss << "WARNING: 'ies_enforce_chglim' is true, so bounds are being enforced on the " << endl;
@@ -210,9 +210,9 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 					ss << "          identical to the parameter values in the control file" << endl;
 					message(1, ss.str());
 
-				}
-					
-				map<string,double> norm_map = pe.enforce_bounds(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+				}*/
+				//dont use the shrinking bounds - too many chances for zero length
+				map<string,double> norm_map = pe.enforce_bounds(performance_log, false);
 				norm_map_report(norm_map, "initial parameter");
 
 
@@ -2729,7 +2729,7 @@ bool IterEnsembleSmoother::solve_new()
 				if (pest_scenario.get_pestpp_options().get_ies_enforce_chglim())
 					norm_map = pe_lam_scale.enforce_change_limits_and_bounds(performance_log, pe);
 				else
-					norm_map = pe_lam_scale.enforce_bounds(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+					norm_map = pe_lam_scale.enforce_bounds(performance_log, false);
 
 				ss.str("");
 				ss << " lambda " << cur_lam << ", scale factor " << sf;
