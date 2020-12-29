@@ -581,6 +581,14 @@ void IterEnsembleSmoother::sanity_checks()
 	}
 */
 
+	if ((ppo->get_ies_save_rescov()) && (pest_scenario.get_ctl_ordered_nz_obs_names().size() > 60000))
+	{
+		errors.push_back("'ies_save_rescov' requires too much memory for greater than 60,000 observations");
+	}
+	else if ((ppo->get_ies_save_rescov()) && (pest_scenario.get_ctl_ordered_nz_obs_names().size() > 30000))
+	{
+		warnings.push_back("'ies_save_rescov' with more than 30,000 observations will likely produce allocation errors, be prepared!");
+	}
 
 	if (warnings.size() > 0)
 	{
