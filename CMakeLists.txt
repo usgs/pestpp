@@ -69,6 +69,7 @@ if(ENABLE_Fortran)
   message(STATUS "BLA_VENDOR=${BLA_VENDOR}")
   message(STATUS "BLAS_LIBRARIES=${BLAS_LIBRARIES}")
   message(STATUS "LAPACK_LIBRARIES=${LAPACK_LIBRARIES}")
+  set(local_install_pso pestpp-pso)
   set(Fortran_ENABLED TRUE)
 else()
   set(Fortran_ENABLED FALSE)
@@ -164,6 +165,7 @@ add_custom_target(local_install
     pestpp-opt
     pestpp-sen
     pestpp-swp
+    ${local_install_pso}
   COMMENT "Installing local executables to ${PESTPP_SOURCE_DIR}/bin"
 )
 
