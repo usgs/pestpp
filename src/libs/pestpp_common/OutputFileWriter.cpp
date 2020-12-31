@@ -933,7 +933,16 @@ void OutputFileWriter::write_jco(bool isBaseIter, string ext, Jacobian &jco)
 {
 
 	//ofstream &jout = file_manager.open_ofile_ext(ext, ios::out | ios::binary);
+	if (jco.get_matrix_ptr()->nonZeros() == 0)
+	{
+		stringstream ss;
+		ss << "WARNING: jacobian matrix has no non-zeros - the parameter pertubations " << endl;
+		ss << "         have no effect on the control file observations.";
+		ss << "         This usually means something is not setup correctly." << endl;
+		cout << ss.str();
+		file_manager.rec_ofstream() << ss.str();
 
+	}
 	vector<string> obs_names;
 	vector<string> par_names;
 

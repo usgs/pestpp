@@ -891,6 +891,10 @@ bool read_binary(const string &filename, vector<string> &row_names, vector<strin
 
 void save_binary(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix)
 {
+	if (matrix.nonZeros() == 0)
+	{
+		cout << "save_binary() WARNING: matrix has no non-zeros..." << endl;
+	}
 	//check row name and col name lengths
 	int mx_rlen = 0, mx_clen = 0, v;
 	for (auto& n : row_names)
