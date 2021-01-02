@@ -1399,14 +1399,23 @@ void IterEnsembleSmoother::initialize()
 	if (center_on.size() > 0)
 	{
 		ss.str("");
-		ss << "centering on realization: '" << center_on << "' ";
-		message(1, ss.str());
-		vector<string> names = pe.get_real_names();
-		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_ies_error("'ies_center_on' realization not found in par en: " + center_on);
-		names = oe.get_real_names();
-		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_ies_error("'ies_center_on' realization not found in obs en: " + center_on);
+		if (center_on == "_MEDIAN_")
+		{
+			ss << "centering on ensemble median value";
+			message(1, ss.str());
+			pe.get_eigen_anomalies(center_on);
+		}
+		else
+		{
+			ss << "centering on realization: '" << center_on << "' ";
+			message(1, ss.str());
+			vector<string> names = pe.get_real_names();
+			if (find(names.begin(), names.end(), center_on) == names.end())
+				throw_ies_error("'ies_center_on' realization not found in par en: " + center_on);
+			names = oe.get_real_names();
+			if (find(names.begin(), names.end(), center_on) == names.end())
+				throw_ies_error("'ies_center_on' realization not found in obs en: " + center_on);
+		}
 	}
 	else
 		message(1, "centering on ensemble mean vector");

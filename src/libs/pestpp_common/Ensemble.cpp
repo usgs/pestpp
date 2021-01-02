@@ -14,6 +14,7 @@
 #include "PerformanceLog.h"
 #include "system_variables.h"
 #include "pest_data_structs.h"
+#include "eigen_tools.h"
 
 Ensemble::Ensemble(Pest *_pest_scenario_ptr, std::mt19937* _rand_gen_ptr): pest_scenario_ptr(_pest_scenario_ptr),
 rand_gen_ptr(_rand_gen_ptr)
@@ -578,12 +579,47 @@ Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names,
 	map<int, double> center_on_map;
 	if (on_real.size() > 0)
 	{
-		vector<string>::iterator it = find(real_names.begin(), real_names.end(), on_real);
-		if (it == real_names.end())
-			throw runtime_error("Ensemble::get_eigen_mean_diff() error: 'on_real' not found: " + on_real);
-		int idx = distance(real_names.begin(), it);
-		for (int i = 0; i <_reals.cols(); i++)
-			center_on_map[i] = _reals(idx, i);
+		//cheap median approx - doesnt deal with mean of the two middle elements if even 
+		if (pest_utils::upper_cp(on_real) == "_MEDIAN_")
+		{
+			int half_size = _reals.rows() / 2;
+			vector<double> d(_reals.rows());
+			vector<double>::iterator begin;
+			vector<double>::iterator end;
+			vector<double>::iterator half;
+			vector<double>::iterator half_minus_one;
+			double half_val;
+			bool even = _reals.rows() % 2 == 0;
+
+			for (int i = 0; i < _reals.cols(); i++)
+			{
+				d = eigenvec_2_stlvec(_reals.col(i));
+				begin = d.begin();
+				end = d.end();
+				half = d.begin() + half_size;
+				half_minus_one = half - 1;
+				nth_element(begin,half,end);
+				half_val = *half;
+				if (even)
+				{
+					nth_element(begin, half_minus_one, end);
+					center_on_map[i] = (half_val + *half_minus_one) / 2.0;
+				}
+				else
+					center_on_map[i] = half_val;
+			}
+				
+
+		}
+		else
+		{
+			vector<string>::iterator it = find(real_names.begin(), real_names.end(), on_real);
+			if (it == real_names.end())
+				throw runtime_error("Ensemble::get_eigen_mean_diff() error: 'on_real' not found: " + on_real);
+			int idx = distance(real_names.begin(), it);
+			for (int i = 0; i < _reals.cols(); i++)
+				center_on_map[i] = _reals(idx, i);
+		}
 	}
 	else
 	{
