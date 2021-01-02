@@ -2849,7 +2849,7 @@ void ObservationEnsemble::from_binary(string file_name)
 	Ensemble::from_binary(file_name, names, true);
 	unordered_set<string>svar_names(var_names.begin(), var_names.end());
 	vector<string> missing;
-	for (auto& name : pest_scenario_ptr->get_ctl_ordered_obs_names();)
+	for (auto& name : pest_scenario_ptr->get_ctl_ordered_obs_names())
 		if (svar_names.find(name) == svar_names.end())
 			missing.push_back(name);
 	if (missing.size() > 0)
