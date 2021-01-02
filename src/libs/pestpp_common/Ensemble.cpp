@@ -2077,20 +2077,29 @@ void ParameterEnsemble::from_binary(string file_name)
 	//overload for ensemble::from_binary - just need to set tstat
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
 	map<string,int> header_info = Ensemble::from_binary(file_name, names, false);
-	unordered_set<string>snames_adj(names.begin(), names.end());
-	names = pest_scenario_ptr->get_ctl_ordered_par_names();
-	unordered_set<string>snames(names.begin(), names.end());
-	names.clear();
+	unordered_set<string>svar_names(var_names.begin(), var_names.end());
 	vector<string> missing;
-	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
-	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
-	for (auto &name : var_names)
+	for (auto& name : pest_scenario_ptr->get_ctl_ordered_adj_par_names())
 	{
-		if (snames_adj.find(name) == snames_adj.end())
+		if (svar_names.find(name) == svar_names.end())
 		{
 			missing.push_back(name);
 		}
-		else if (snames.find(name) == snames.end())
+
+	}
+	if (missing.size() > 0)
+		throw_ensemble_error("from_binary() error: the following adjustable parameter names in the control file are not in the binary parameter ensemble file:", missing);
+
+	names = pest_scenario_ptr->get_ctl_ordered_par_names();
+	unordered_set<string>snames(names.begin(), names.end());
+	names.clear();
+	
+	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
+	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
+
+	for (auto &name : var_names)
+	{	
+		if (snames.find(name) == snames.end())
 		{
 			continue;
 		}
@@ -2099,9 +2108,7 @@ void ParameterEnsemble::from_binary(string file_name)
 			fixed_names.push_back(name);
 		}
 	}
-	if (missing.size() > 0)
-		throw_ensemble_error("from_binary() error: the following adjustable parameter names in the control file are not in the binary parameter ensemble file:", missing);
-
+	
 	fill_fixed(header_info);
 	save_fixed();
 	tstat = transStatus::CTL;
@@ -2840,12 +2847,11 @@ void ObservationEnsemble::from_binary(string file_name)
 	//load obs en from binary jco-type file
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_obs_names();
 	Ensemble::from_binary(file_name, names, true);
-	names = pest_scenario_ptr->get_ctl_ordered_nz_obs_names();
-	unordered_set<string>snames(names.begin(), names.end());
+	unordered_set<string>svar_names(var_names.begin(), var_names.end());
 	vector<string> missing;
-	for (auto& var_name : var_names)
-		if (snames.find(var_name) == snames.end())
-			missing.push_back(var_name);
+	for (auto& name : pest_scenario_ptr->get_ctl_ordered_obs_names();)
+		if (svar_names.find(name) == svar_names.end())
+			missing.push_back(name);
 	if (missing.size() > 0)
 		throw_ensemble_error("from_binary() error: the following non-zero-weighted obs names in the control file are not in the binary obs ensemble file:", missing);
 }
