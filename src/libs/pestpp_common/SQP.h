@@ -132,6 +132,13 @@ private:
 
 	bool oe_drawn, dv_drawn;
 
+	bool use_ensemble_grad;
+
+	void prep_4_ensemble_grad();
+	void prep_4_fd_grad();
+
+	Jacobian_1to1 jco;
+
 	//bool solve_old();
 	bool solve_new();
 

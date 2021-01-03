@@ -1561,7 +1561,6 @@ void MOEA::initialize()
 	if (chance_points == "ALL")
 	{
 		//evaluate the chance constraints at every individual, very costly, but most robust
-		//throw_moea_error("'mou_chance_points' == 'all' not implemented");
 		chancepoints = chancePoints::ALL;
 	}
 	
@@ -1574,7 +1573,7 @@ void MOEA::initialize()
 	else
 	{
 		ss.str("");
-		ss << "unrecognized 'mou_chance_points' value :" << chance_points << ", should be 'all' or 'single'";
+		ss << "unrecognized 'opt_chance_points' value :" << chance_points << ", should be 'all' or 'single'";
 		throw_moea_error(ss.str());
 	}
 

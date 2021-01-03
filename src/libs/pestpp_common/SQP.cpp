@@ -22,7 +22,9 @@ SeqQuadProgram::SeqQuadProgram(Pest &_pest_scenario, FileManager &_file_manager,
 	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log,
 	RunManagerAbstract* _run_mgr_ptr) : pest_scenario(_pest_scenario), file_manager(_file_manager),
 	output_file_writer(_output_file_writer), performance_log(_performance_log),
-	run_mgr_ptr(_run_mgr_ptr), constraints(_pest_scenario, &_file_manager, _output_file_writer, *_performance_log)
+	run_mgr_ptr(_run_mgr_ptr), 
+	constraints(_pest_scenario, &_file_manager, _output_file_writer, *_performance_log),
+	jco(_file_manager,_output_file_writer)
 {
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	subset_rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
@@ -650,7 +652,7 @@ void SeqQuadProgram::initialize()
 		if (dv_names.size() == 0)
 		{
 			ss.str("");
-			ss << "no decision variables found in supplied dec var groups : ";
+			ss << "no adjustable decision variables found in supplied dec var groups : ";
 			for (auto g : dec_var_groups)
 			{
 				ss << g << ",";
@@ -703,7 +705,7 @@ void SeqQuadProgram::initialize()
 	else
 	{
 		ss.str("");
-		ss << "unrecognized 'sqp_chance_points' value :" << chance_points << ", should be 'all' or 'single'";
+		ss << "unrecognized 'opt_chance_points' value :" << chance_points << ", should be 'all' or 'single'";
 		throw_sqp_error(ss.str());
 	}
 
@@ -774,6 +776,7 @@ void SeqQuadProgram::initialize()
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
 	//TODO: update sanity checks for SQP context
+	//check that if using fd, chance points == single
 	sanity_checks();
 
 	bool echo = false;
@@ -784,24 +787,91 @@ void SeqQuadProgram::initialize()
 	//I dont think SQP needs an obscov? 
 	//initialize_obscov();
 
-	subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
+
 	
+
+	//todo: add the FD approach and initialize it here
+	use_ensemble_grad = ppo->get_sqp_use_ensemble_grad();
+	if (use_ensemble_grad)
+	{
+		prep_4_ensemble_grad();
+	}
+	else
+	{
+		prep_4_fd_grad();
+	}
+		
+	
+
+	message(0, "initialization complete");
+}
+
+void SeqQuadProgram::prep_4_fd_grad()
+{
+	stringstream ss;
+	message(1, "using finite-difference approximation to gradient (Jacobian)");
+	string base_jco = pest_scenario.get_pestpp_options().get_basejac_filename();
+	if (base_jco.size() > 0)
+	{
+	
+	}
+	else
+	{
+		Parameters current_pars = pest_scenario.get_ctl_parameters();
+		Observations current_sim = pest_scenario.get_ctl_observations();
+		ParamTransformSeq par_trans = pest_scenario.get_base_par_tran_seq();
+		
+		//todo: handle hotstart_resfile here...
+		bool init_obs = true;
+
+		set<string> out_of_bounds;
+		ss.str("");
+		ss << "queuing " << dv_names.size() << " finite difference runs";
+		message(2, ss.str());
+		bool success = jco.build_runs(current_pars, current_sim, dv_names, par_trans,
+			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
+			*run_mgr_ptr, out_of_bounds, false, init_obs);
+		if (!success)
+			throw_sqp_error("error building jacobian runs for FD grad");
+		if (out_of_bounds.size() > 0)
+		{
+			ss.str("");
+			ss << "the following decision variable are out of bounds: " << endl;
+			for (auto& o : out_of_bounds)
+				ss << o << ",";
+		}
+		throw_sqp_error(ss.str());
+		message(2, "starting finite difference gradient pertubation runs");
+		jco.make_runs(*run_mgr_ptr);
+
+
+	}
+}
+
+void SeqQuadProgram::prep_4_ensemble_grad()
+{
+	stringstream ss;
+	message(1, "using ensemble approximation to gradient (EnOpt)");
+	//todo: we probably need to increase the default subset size 
+	//bc of nonlinear constraints...
+	subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
+
 	//I think a bad phi option has use in SQP?
-	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
+	/*double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
 	if (bad_phi < 1.0e+30)
-		message(1, "using bad_phi: ", bad_phi);
+		message(1, "using bad_phi: ", bad_phi);*/
 
 	int num_reals = pest_scenario.get_pestpp_options().get_sqp_num_reals();
 
 	dv_drawn = initialize_dv(parcov);
 
 	oe_drawn = initialize_restart();
-	
+
 	try
 	{
 		dv.check_for_dups();
 	}
-	catch (const exception &e)
+	catch (const exception& e)
 	{
 		string message = e.what();
 		throw_sqp_error("error in dv ensemble: " + message);
@@ -811,7 +881,7 @@ void SeqQuadProgram::initialize()
 	{
 		oe.check_for_dups();
 	}
-	catch (const exception &e)
+	catch (const exception& e)
 	{
 		string message = e.what();
 		throw_sqp_error("error in observation ensemble: " + message);
@@ -836,7 +906,7 @@ void SeqQuadProgram::initialize()
 				ss.str("");
 				ss << "dv en has " << dv.shape().first << " realizations, compared to " << oe.shape().first << " obs realizations";
 				message(1, ss.str());
-				message(1," the realization names are compatible");
+				message(1, " the realization names are compatible");
 				message(1, "re-indexing obs en to align with dv en...");
 
 				oe.reorder(dv.get_real_names(), vector<string>());
@@ -876,8 +946,8 @@ void SeqQuadProgram::initialize()
 			add_bases();*/
 
 
-	//now we check to see if we need to try to align the par and obs en
-	//this would only be needed if either of these were not drawn
+			//now we check to see if we need to try to align the par and obs en
+			//this would only be needed if either of these were not drawn
 	if (!dv_drawn || !oe_drawn)
 	{
 		bool aligned = dv.try_align_other_rows(performance_log, oe);
@@ -901,7 +971,7 @@ void SeqQuadProgram::initialize()
 	{
 		message(1, "WARNING: common realization names shared between the dv and observation ensembles but they are not in the same row locations, see .rec file for listing");
 		ofstream& frec = file_manager.rec_ofstream();
-		frec << endl <<  "WARNING: the following " << misaligned.size() << " realization names are shared between the dv and observation ensembles but they are not in the same row locations:" << endl;
+		frec << endl << "WARNING: the following " << misaligned.size() << " realization names are shared between the dv and observation ensembles but they are not in the same row locations:" << endl;
 		for (auto ma : misaligned)
 			frec << ma << endl;
 	}
@@ -1014,9 +1084,11 @@ void SeqQuadProgram::initialize()
 	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
 
 	//TODO: I think the base_oe should just be a "no noise" obs ensemble?
+	//or do we even need it?  Or can we use this to do a chen-oliver style 
+	//robust opt?
 	oe_base = oe; //copy
-	
-    //reorder this for later...
+
+	//reorder this for later...
 	oe_base.reorder(vector<string>(), act_obs_names);
 
 	dv_base = dv; //copy
@@ -1034,7 +1106,7 @@ void SeqQuadProgram::initialize()
 
 		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
-	
+
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
@@ -1054,8 +1126,16 @@ void SeqQuadProgram::initialize()
 
 
 	performance_log->log_event("calc pre-drop phi");
+	//todo: I think we probably want to use the opt_objective_function arg
+	//to define the objective function.  Support and obs or a pi.  
+	//what about an external file like pestpp-opt with just coefficients?
+
+
 	//initialize the phi handler
-	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &dv_base, &parcov);
+	//todo: can we also use the l2 norm of residuals to ident 
+	//"bad" realizations?
+
+	/*ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &dv_base, &parcov);
 
 	if (ph.get_lt_obs_names().size() > 0)
 	{
@@ -1086,14 +1166,11 @@ void SeqQuadProgram::initialize()
 		ss << "WARNING: less than " << warn_min_reals << " active realizations...might not be enough";
 		string s = ss.str();
 		message(0, s);
-	}
+	}*/
 
-	pcs = ParChangeSummarizer(&dv_base, &file_manager,&output_file_writer);
-	
+	pcs = ParChangeSummarizer(&dv_base, &file_manager, &output_file_writer);
 
-	message(0, "initialization complete");
 }
-
 
 void SeqQuadProgram::drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe, bool is_subset)
 {
