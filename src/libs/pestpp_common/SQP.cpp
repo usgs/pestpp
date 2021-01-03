@@ -833,6 +833,7 @@ void SeqQuadProgram::prep_4_fd_grad()
 			*run_mgr_ptr, out_of_bounds, false, init_obs);
 		if (!success)
 			throw_sqp_error("error building jacobian runs for FD grad");
+		//todo: think about freezind dec vars that go out of bounds? - yuck!
 		if (out_of_bounds.size() > 0)
 		{
 			ss.str("");

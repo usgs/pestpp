@@ -736,6 +736,10 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_spea2_fitne
 	fill_domination_containers(_member_struct, solutions_dominated_map, num_dominating_map,true);
 	map<string, double> _unconstrained_fitness_map;
 	map<string, double> _fitness_map;
+	double max_infeas = -1.0e+30;
+	for (auto& in : infeas)
+		max_infeas = max(max_infeas, in.second);
+
 	for (auto& sol_map : solutions_dominated_map)
 	{
 		dom = 0;
@@ -744,9 +748,9 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_spea2_fitne
 		_unconstrained_fitness_map[sol_map.first] = (double)dom + (1.0/(kdist[sol_map.first] + 2.0)); //convert the distace to density
 		_fitness_map[sol_map.first] = _unconstrained_fitness_map[sol_map.first];
 
-		//include infeasibility sum in fitness...
+		//include scaled infeasibility sum in fitness...
 		if (infeas.find(sol_map.first) != infeas.end())
-			_fitness_map[sol_map.first] += infeas[sol_map.first];
+			_fitness_map[sol_map.first] += (infeas[sol_map.first] / (max_infeas + 2.0)); // +2.0 to make sure it is less than 0.5, similar to distance penalty
 	}
 	return pair<map<string, double>, map<string, double>>(_fitness_map,_unconstrained_fitness_map);
 
