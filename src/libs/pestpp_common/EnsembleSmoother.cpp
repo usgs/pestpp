@@ -1399,7 +1399,7 @@ void IterEnsembleSmoother::initialize()
 	if (center_on.size() > 0)
 	{
 		ss.str("");
-		if (center_on == "_MEDIAN_")
+		if (center_on == MEDIAN_CENTER_ON_NAME)
 		{
 			ss << "centering on ensemble median value";
 			message(1, ss.str());
