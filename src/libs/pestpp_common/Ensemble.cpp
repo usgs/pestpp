@@ -580,7 +580,7 @@ Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names,
 	if (on_real.size() > 0)
 	{
 		//cheap median approx - doesnt deal with mean of the two middle elements if even 
-		if (pest_utils::upper_cp(on_real) == "_MEDIAN_")
+		if (pest_utils::upper_cp(on_real) == MEDIAN_CENTER_ON_NAME)
 		{
 			int half_size = _reals.rows() / 2;
 			vector<double> d(_reals.rows());
