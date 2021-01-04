@@ -1573,8 +1573,8 @@ bool SeqQuadProgram::solve_new()
 		message(2, "see .log file for more details");
 		
 		dv_candidate = fancy_solve_routine(scale_val, _current_num_dv_values);
-
-		dv_candidates.update_real_ip(real_names[i], dv_candidate.get_data_eigen_vec(dv_names));
+		Eigen::VectorXd vec = dv_candidate.get_data_eigen_vec(dv_names);
+		dv_candidates.update_real_ip(real_names[i], vec);
 		//TODO: add sqp option to save candidates
 
 		ss.str("");
