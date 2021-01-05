@@ -1660,6 +1660,41 @@ bool SeqQuadProgram::solve_new()
 	//	throw_sqp_error("TODO");
 	//}
 
+	Parameters dv_candidate;
+	ParameterEnsemble dv_candidates(&pest_scenario,&rand_gen);
+	dv_candidates.set_trans_status(ParameterEnsemble::transStatus::NUM);
+	
+	
+	//backtracking/line search factors
+	//TODO: make this a ++ arg or tunable or something clever
+	vector<double> scale_vals{ 0.1,0.5,1.0 };
+	vector<string> real_names;
+	
+	for (auto sv : scale_vals)
+	{
+		ss.str("");
+		ss << "dv_cand_sv:" << setw(8) << setprecision(3) << sv;
+		real_names.push_back(ss.str());
+	}
+	dv_candidates.reserve(real_names, dv_names);
+
+	for (int i=0;i<scale_vals.size();i++)
+	{
+		double scale_val = scale_vals[i];
+		ss.str("");
+		ss << "starting calcs for scaling factor" << scale_val;
+		message(1, "starting lambda calcs for scaling factor", scale_val);
+		message(2, "see .log file for more details");
+		
+		dv_candidate = fancy_solve_routine(scale_val, _current_num_dv_values);
+		Eigen::VectorXd vec = dv_candidate.get_data_eigen_vec(dv_names);
+		dv_candidates.update_real_ip(real_names[i], vec);
+		//TODO: add sqp option to save candidates
+
+		ss.str("");
+		message(1, "finished calcs for scaling factor:", scale_val);
+
+	}
 	//// alpha trialing
 	//if (search_dir != 0 or next_it == False);  // or break out of iteration here if True
 	//{
@@ -1768,6 +1803,22 @@ bool SeqQuadProgram::solve_new()
 	//		}
 	//	}
 	//}
+	
+	if (pest_scenario.get_pestpp_options().get_ies_debug_upgrade_only())
+	{
+		message(0, "ies_debug_upgrade_only is true, exiting");
+		throw_sqp_error("ies_debug_upgrade_only is true, exiting");
+	}
+
+	vector<map<int, int>> real_run_ids_lams;
+	int best_idx = -1;
+	double best_mean = 1.0e+30, best_std = 1.0e+30;
+	double mean, std;
+
+	message(0, "running candidate decision variable ensembles");
+	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates, scale_vals);
+
+	//todo: decide which if any dv candidate to accept...
 
 	//// deal with unsuccessful iteration
 
@@ -1788,60 +1839,7 @@ bool SeqQuadProgram::solve_new()
 	//	string s = ss.str();
 	//	message(1, s);
 	//}
-
-
-	Parameters dv_candidate;
-	ParameterEnsemble dv_candidates(&pest_scenario,&rand_gen);
-	dv_candidates.set_trans_status(ParameterEnsemble::transStatus::NUM);
 	
-	
-	//backtracking/line search factors
-	//TODO: make this a ++ arg or tunable or something clever
-	vector<double> scale_vals{ 0.1,0.5,1.0 };
-	vector<string> real_names;
-	
-	for (auto sv : scale_vals)
-	{
-		ss.str("");
-		ss << "dv_cand_sv:" << setw(8) << setprecision(3) << sv;
-		real_names.push_back(ss.str());
-	}
-	dv_candidates.reserve(real_names, dv_names);
-
-	for (int i=0;i<scale_vals.size();i++)
-	{
-		double scale_val = scale_vals[i];
-		ss.str("");
-		ss << "starting calcs for scaling factor" << scale_val;
-		message(1, "starting lambda calcs for scaling factor", scale_val);
-		message(2, "see .log file for more details");
-		
-		dv_candidate = fancy_solve_routine(scale_val, _current_num_dv_values);
-		Eigen::VectorXd vec = dv_candidate.get_data_eigen_vec(dv_names);
-		dv_candidates.update_real_ip(real_names[i], vec);
-		//TODO: add sqp option to save candidates
-
-		ss.str("");
-		message(1, "finished calcs for scaling factor:", scale_val);
-
-	}
-	
-	if (pest_scenario.get_pestpp_options().get_ies_debug_upgrade_only())
-	{
-		message(0, "ies_debug_upgrade_only is true, exiting");
-		throw_sqp_error("ies_debug_upgrade_only is true, exiting");
-	}
-
-	vector<map<int, int>> real_run_ids_lams;
-	int best_idx = -1;
-	double best_mean = 1.0e+30, best_std = 1.0e+30;
-	double mean, std;
-
-	message(0, "running candidate decision variable ensembles");
-	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates, scale_vals);
-
-	//todo: decide which if any dv candidate to accept...
-
 	//report and save, etc...
 	
 	return true;
