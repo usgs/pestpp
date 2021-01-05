@@ -1601,8 +1601,53 @@ bool SeqQuadProgram::solve_new()
 	//	}
 	//}
 
-	// compute search direction
+	//// compute search direction
+	//if (constraints is True) &(len(working_set) > 0);
+	//{
+	//	ss.str("");
+	//	ss << "solve (E)QP sub-problem via active set method for search direction";
+	//	string s = ss.str();
+	//	message(1, s);
+	//	//self.search_d, self.lagrang_mults = self._solve_eqp(qp_solve_method=self.qp_solve_method)
+	//	//search direction tests contained therein
+	//	throw_sqp_error("TODO");
+	//}
+	//else if ((constraints is False) | ((constraints is True) & (len(self.working_set) == 0)));
+	//{
+	//	if (LBFGS);
+	//	{
+	//		ss.str("");
+	//		ss << "use limited-memory BFGS algorithm to solve for search direction in unconstrained case";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		//self.search_d = self._LBFGS_hess_update(memory = memory, self_scale = hess_self_scaling)
+	//		throw_sqp_error("TODO");
+	//	}
+	//	else  //BFGS
+	//	{
+	//		ss.str("");
+	//		ss << "use standard BFGS algorithm to solve for search direction in unconstrained case";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		//self.search_d = self._LBFGS_hess_update(memory = memory, self_scale = hess_self_scaling)
+	//		throw_sqp_error("TODO");
+	//	}
+
+	//	// now first attempt at updating active set
+	//	if (constraints is True);  //irrespective of shape of working set
+	//	{
+	//		ss.str("");
+	//		ss << "updating active set of constraints; first attempt";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		//alpha, next_it = self._active_set_method(first_pass = True)
+	//		throw_sqp_error("TODO");
+	//	}
 	//
+	//// undertake some search direction-related tests here, e.g., point down-hill
+	//// and rectify if bad!
+	//
+	//}
 
 	Parameters dv_candidate;
 	ParameterEnsemble dv_candidates(&pest_scenario,&rand_gen);
