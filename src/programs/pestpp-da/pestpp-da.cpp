@@ -293,12 +293,29 @@ int main(int argc, char* argv[])
 			f_phi << "," << pest_utils::lower_cp(real);
 		f_phi << endl;
 
+		// check_io
+		
+		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
+		{
+			cout << endl;
+			
+			cout << " >>>> Checking data in cycle " << *icycle << endl;		
+			fout_rec << endl;
+			fout_rec << " >>>> Checking data in cycle " << *icycle << endl;
+			
 
+			performance_log.log_event("instantiating child pest object");
+
+			Pest childPest;
+			childPest = pest_scenario.get_child_pest(*icycle);
+			childPest.check_io(fout_rec);
+		}
 
 		// loop over assimilation cycles
 		stringstream ss;
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 		{
+			// da_start_cycle, da_end_cycle
 			cout << endl;
 			cout << " =======================================" << endl;
 			cout << " >>>> Assimilating data in cycle " << *icycle << endl;
@@ -415,7 +432,7 @@ int main(int argc, char* argv[])
 			for (auto par : par1)
 
 			{
-				// ayman:  base_trans_seq above was copied from parentpest without any changes; the following statement temporarly fix
+				// ayman:  base_trans_seq above was copied from parent pest without any changes; the following statement temporarly fix
 				// the issue; permenat solution should occur during the creation of childpest
 				if ((pi.get_parameter_rec_ptr(par.first)->cycle != *icycle) &&
 					(pi.get_parameter_rec_ptr(par.first)->cycle >= 0))
