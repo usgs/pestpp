@@ -45,6 +45,14 @@ void SeqQuadProgram::throw_sqp_error(string message)
 	throw runtime_error("SeqQuadProgram error: " + message);
 }
 
+X SeqQuadProgram::apply_draw_mult()  // right place?
+{
+	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
+	float dm = ppo->get_sqp_dv_draw_mult(); // TODO add as ppo arg
+	cov * dm
+	return cov 
+}
+
 bool SeqQuadProgram::initialize_dv(Covariance &cov)
 {
 	stringstream ss;
@@ -55,7 +63,9 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 	{
 		//only draw for dv names
 		Covariance dv_cov = cov.get(dv_names);
-		message(1, "dv_cov:", dv_cov);// * 2.0);
+		message(1, "dv_cov:", dv_cov);  // tmp
+		// apply draw_mult (++ arg?)
+		// dv_cov = apply_draw_mult();
 		ofstream& frec = file_manager.rec_ofstream();
 		message(1, "drawing decision variable realizations: ", num_reals);
 		map<string, double> par_means = pest_scenario.get_ext_file_double_map("parameter data external", "mean");
@@ -1450,10 +1460,19 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			Eigen::MatrixXd obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str}, center_on);
 			//this is a matrix of dv anoms around the center_on point
 			Eigen::MatrixXd dv_anoms = oe.get_eigen_anomalies(vector<string>(), dv_names, center_on);
+			
+			// calc the dec var ensemble (approx) covariance vector (e.g., eq (8) of Dehdari and Oliver 2012 SPE)
+
+			// calc the dec var-phi ensemble (approx) cross-covariance vector (e.g., eq (9) of Dehdari and Oliver 2012 SPE)
+
+			// calc pseudo inv of ensemble dec var covariance vector
+
+			// calc gradient: (outer) product of pseudo inv of dec var cov vector and dec var-phi cross-cov vector
+			
 			//todo: actually calc the grad!
 			throw_sqp_error("obs-based obj for ensembles not implemented");
 
-			//todo: localize the gradient?
+			//todo: localize the gradient
 
 		}
 		//pi base obj, need representative dv values using the "center_on" arg
