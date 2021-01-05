@@ -106,8 +106,7 @@ private:
 
 	set<string> pp_args;
 
-	int iter,subset_size;
-	bool use_subset;
+	int iter;
 
 	double last_best_mean,last_best_std;
 	vector<double> best_mean_phis;
@@ -121,6 +120,7 @@ private:
 	//vector<int> subset_idxs;
 	
 	Parameters current_ctl_dv_values;
+	Observations current_obs;
 
 	ParameterEnsemble dv, dv_base;
 	ObservationEnsemble oe, oe_base;
@@ -149,6 +149,9 @@ private:
 
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
 	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates, vector<double> &scale_vals);
+
+	void run_jacobian(Parameters& _current_dv_vals,Observations& _current_obs, bool init_obs);
+
 	
 	void report_and_save();
 	void save_mat(string prefix, Eigen::MatrixXd &mat);
