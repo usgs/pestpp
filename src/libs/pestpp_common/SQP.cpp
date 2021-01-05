@@ -55,6 +55,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 	{
 		//only draw for dv names
 		Covariance dv_cov = cov.get(dv_names);
+		message(1, "dv_cov:", dv_cov);// * 2.0);
 		ofstream& frec = file_manager.rec_ofstream();
 		message(1, "drawing decision variable realizations: ", num_reals);
 		map<string, double> par_means = pest_scenario.get_ext_file_double_map("parameter data external", "mean");
@@ -89,7 +90,7 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 
 			}
 		}
-		dv.draw(num_reals, draw_par,dv_cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
+		dv.draw(num_reals, draw_par, dv_cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
 		drawn = true;
 	}
 	else
@@ -1546,6 +1547,63 @@ bool SeqQuadProgram::solve_new()
 		_current_num_dv_values.update(dv_names, mean_vec);
 	}
 	
+	// compute gradient
+	//if (use_ensemble_grad)
+	//{
+	//	if (LBFGS) &(num_it > 2)& (constraints False); // constraint False as need phi_grad for Lagrangian
+	//	{
+	//		ss.str("");
+	//		ss << "(re)use grad from Wolfe testing during upgrade evaluations last iteration";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		throw_sqp_error("TODO");
+	//	}
+	//	else
+	//	{
+	//		ss.str("");
+	//		ss << "compute dec var en cov vector and dec var en-phi en cross-covariance vector";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		throw_sqp_error("TODO");
+
+	//		// CMA implementation to go here
+
+	//		ss.str("");
+	//		ss << "compute gradient vector through product of pseudo inv of dec var and cross-cov";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		throw_sqp_error("TODO");
+
+	//		ss.str("");
+	//		ss << "compute ensemble approx to (active) constraint jacobian";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		throw_sqp_error("TODO");
+	//	}
+	//}
+	//else // finite differences for gradient
+	//{
+	//	if (LBFGS) &(num_it > 2);
+	//	{
+	//		ss.str("");
+	//		ss << "(re)use grad from Wolfe testing during upgrade evaluations last iteration";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		throw_sqp_error("TODO");
+	//	}
+	//	else // standard BFGS
+	//	{
+	//		ss.str("");
+	//		ss << "populate jco and partition into phi grad vector and (active) constraint jco";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		throw_sqp_error("TODO");
+	//	}
+	//}
+
+	// compute search direction
+	//
+
 	Parameters dv_candidate;
 	ParameterEnsemble dv_candidates(&pest_scenario,&rand_gen);
 	dv_candidates.set_trans_status(ParameterEnsemble::transStatus::NUM);
