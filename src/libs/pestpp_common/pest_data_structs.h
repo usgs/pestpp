@@ -433,6 +433,8 @@ public:
 	void set_sqp_obs_restart_en(string _file) { sqp_obs_restart_en = _file; }
 	int get_sqp_num_reals()const { return sqp_num_reals; }
 	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
+	bool get_sqp_use_ensemble_grad() const { return sqp_use_ensemble_grad; }
+	void set_sqp_use_ensemble_grad(bool _flag) { sqp_use_ensemble_grad = _flag; }
 
 	string get_mou_generator() const { return mou_generator; }
 	void set_mou_generator(string name) { mou_generator = name; }
@@ -458,6 +460,8 @@ public:
 	void set_mou_crossover_probability(double _val) { mou_crossover_prob = _val; }
 	double get_mou_mutation_probability() const { return mou_mutation_prob; }
 	void set_mou_mutation_probability(double _val) { mou_mutation_prob = _val; }
+	double get_mou_de_f() const { return mou_de_f; }
+	void set_mou_de_f(double _val) { mou_de_f = _val; }
 	
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
@@ -722,6 +726,7 @@ private:
 	string sqp_dv_en;
 	string sqp_obs_restart_en;
 	int sqp_num_reals;
+	bool sqp_use_ensemble_grad;
 
 	int mou_population_size;
 	string mou_generator; 
@@ -735,6 +740,7 @@ private:
 	double mou_crossover_prob;
 	double mou_mutation_prob;
 	string mou_mating_selector;
+	double mou_de_f;
 
 	int ies_subset_size;
 	string ies_par_csv;

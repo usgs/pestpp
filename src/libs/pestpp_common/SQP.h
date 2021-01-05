@@ -118,8 +118,9 @@ private:
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
 	vector<string> dv_names;
-	vector<int> subset_idxs;
+	//vector<int> subset_idxs;
 	
+	Parameters current_ctl_dv_values;
 
 	ParameterEnsemble dv, dv_base;
 	ObservationEnsemble oe, oe_base;
@@ -132,13 +133,22 @@ private:
 
 	bool oe_drawn, dv_drawn;
 
+	bool use_ensemble_grad;
+
+	void prep_4_ensemble_grad();
+	void prep_4_fd_grad();
+
+	Jacobian_1to1 jco;
+
 	//bool solve_old();
 	bool solve_new();
 
-	ParameterEnsemble fancy_solve_routine(double scale_val);
+	Eigen::VectorXd calc_gradient_vector(const Parameters& _current_dv_);
+
+	Parameters fancy_solve_routine(double scale_val, const Parameters& _current_dv_);
 
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
-	vector<ObservationEnsemble> run_candidate_ensembles(vector<ParameterEnsemble> &dv_candidates, vector<double> &scale_vals);
+	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates, vector<double> &scale_vals);
 	
 	void report_and_save();
 	void save_mat(string prefix, Eigen::MatrixXd &mat);

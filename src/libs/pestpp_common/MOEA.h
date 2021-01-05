@@ -19,6 +19,13 @@
 const string POP_SUM_TAG = "pareto.summary.csv";
 const string ARC_SUM_TAG = "pareto.archive.summary.csv";
 const string RISK_NAME = "_RISK_";
+const string DE_F_NAME = "_DE_F_";
+const string CR_NAME = "_CR_";
+const string MR_NAME = "_MR_";
+
+enum MouGenType { DE, SBX, PM };
+enum MouEnvType { NSGA, SPEA };
+enum MouMateType { RANDOM, TOURNAMENT };
 
 class ParetoObjectives
 {
@@ -26,7 +33,7 @@ public:
 	ParetoObjectives(Pest& _pest_scenario, FileManager& _file_manager, 
 		PerformanceLog* _performance_log);
 
-	pair<vector<string>, vector<string>> nsga_ii_pareto_dominance_sort(int generation, ObservationEnsemble& op, 
+	pair<vector<string>, vector<string>> get_nsga2_pareto_dominance(int generation, ObservationEnsemble& op, 
 		ParameterEnsemble& dp, Constraints* constraints_ptr=nullptr, bool report=true, string sum_tag=string());
 	
 	//this must be called at least once before the diversity metrixs can be called...
@@ -42,13 +49,16 @@ public:
 
 	void update(ObservationEnsemble& oe, ParameterEnsemble& dp, Constraints* constraints_ptr = nullptr);
 
-	bool compare_two(string& first, string& second);
+	bool compare_two(string& first, string& second, MouEnvType envtyp);
 
 	map<string, double> get_spea2_fitness(int generation, ObservationEnsemble& op, ParameterEnsemble& dp, 
 		Constraints* constraints_ptr = nullptr, bool report = true, string sum_tag = string());
-	map<string, double> get_kth_nn_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
+	map<string, double> get_spea2_kth_nn_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	 
-	void get_spea_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp);
+	void get_spea2_archive_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp);
+
+	void prep_pareto_summary_file(string summary_tag);
+	void write_pareto_summary(string& sum_tag, int generation, ObservationEnsemble& op, ParameterEnsemble& dp, Constraints* constr_ptr=nullptr);
 
 private:
 	
@@ -59,17 +69,18 @@ private:
 	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, double>& crowd_map, map<string, map<string, double>>& _member_struct);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
 	map<string, map<string, double>> get_member_struct(ObservationEnsemble& oe, ParameterEnsemble& dp);
-	void drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp, map<string, map<string, double>>& _member_struct);
+	void drop_duplicates(map<string, map<string, double>>& _member_struct);
 	bool first_equals_second(map<string, double>& first, map<string, double>& second);
 
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& _member_struct);
-	map<string,double> get_spea_fitness(map<string, map<string, double>>& _member_struct);
+	pair<map<string, double>, map<string, double>> get_spea2_fitness(map<string, map<string, double>>& _member_struct);
 
 	void fill_domination_containers(map<string, map<string, double>>& _member_struct, map<string,
 		vector<string>>&solutions_dominated_map, map<string, int>& num_dominating_map, bool dup_as_dom=false);
 	
 
 	bool compare_two_nsga(string& first, string& second);
+	bool compare_two_spea(string& first, string& second);
 
 	//sort specific members
 	map<string, double> get_cuboid_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
@@ -78,13 +89,9 @@ private:
 	map<string, double> get_cuboid_crowding_distance(map<string, map<string, double>>& _member_struct);
 
 
-	map<string, double> get_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct);
-	map<string, double> get_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
-
-	
+	map<string, double> get_spea2_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct);
+	map<string, double> get_spea2_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);	
 	map<string, double> get_cuboid_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
-
-	
 
 	map<string, map<string, double>> member_struct;
 	vector<string>* obs_obj_names_ptr;
@@ -97,24 +104,19 @@ private:
 	map<string, int> member_front_map;
 	map<string, double> infeas;
 	vector<string> infeas_ordered;
-	map<string, double> fitness_map;
-
+	map<string, double> spea2_constrained_fitness_map;
+	map<string, double> spea2_unconstrained_fitness_map;
 	
 	
-	void prep_pareto_summary_file(string summary_tag);
-	void write_pareto_summary(string& sum_tag, int generation, vector<string>& member_names,
-		map<string, int>& front_map, map<string, double>& crowd_map, map<string, double>& infeas_map,
-		map<string, map<string, double>>& _member_struct);
 	
 };
 
 
 class MOEA
 {
-	enum MouGenType{DE,SBX,PM};
-	enum MouEnvType { NSGA, SPEA };
-	enum MouMateType {RANDOM,TOURNAMENT };
+	
 public:
+	
 	static mt19937_64 rand_engine;
 	MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer,
 		PerformanceLog *_performance_log, RunManagerAbstract* _run_mgr_ptr);
@@ -143,7 +145,7 @@ private:
 	vector<string> obs_obj_names, pi_obj_names;
 	vector<string> dv_names;
 	map<string, double> obj_dir_mult;
-
+	int n_adaptive_dvs;
 	map<string, map<string, double>> previous_obj_summary;
 	bool risk_obj;
 
@@ -195,13 +197,16 @@ private:
 	string get_new_member_name(string tag = string());
 
 	void save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag = string());
-	void gauss_mutation_ip(double mutation_probability, ParameterEnsemble& _dp);
+	void gauss_mutation_ip(ParameterEnsemble& _dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx(double probability, double eta_m, int idx1, int idx2);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1,
 		Eigen::VectorXd parent2, vector<string>& _dv_names, Parameters& lbnd, Parameters& ubnd);
 	Eigen::VectorXd hybrid_pm(Eigen::VectorXd& parent1, double mutation_probability, double disrupt_probabilty, 
 		vector<string>& _dv_names, Parameters& lbnd, Parameters& ubnd);
 	pair<double, double> get_betas(double v1, double v2, double distribution_index);
+	void get_sbx_child_values(const double& p1, const double& p2, const double& lbnd, 
+		const double& ubnd, const double& eta, double& rnd, double& c1, double& c2);
+
 
 	pair<Parameters, Observations> get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe);
 

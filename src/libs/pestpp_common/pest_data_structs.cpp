@@ -1254,6 +1254,12 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_mutation_prob);
 		return true;
 	}
+	else if (key == "MOU_DE_F")
+	{
+		convert_ip(value, mou_de_f);
+		return true;
+	}
+
 	return false;
 }
 
@@ -1274,6 +1280,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 	else if (key == "SQP_NUM_REALS")
 	{
 		convert_ip(value, sqp_num_reals);
+		return true;
+	}
+	else if (key == "SQP_USE_ENSEMBLE_GRAD")
+	{
+		sqp_use_ensemble_grad = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
 	
@@ -1421,6 +1432,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_dv_en: " << sqp_dv_en << endl;
 	os << "sqp_obs_restart_en: " << sqp_obs_restart_en << endl;
 	os << "sqp_num_reals: " << sqp_num_reals << endl;
+	os << "sqp_use_ensemble_grad: " << sqp_use_ensemble_grad << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -1437,6 +1449,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_mating_selector: " << mou_mating_selector << endl;
 	os << "mou_crossover_prob: " << mou_crossover_prob << endl;
 	os << "mou_mutation_prob: " << mou_mutation_prob << endl;
+	os << "mou_de_f: " << mou_de_f << endl;
 	
 	os << endl << "...pestpp-ies options:" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
@@ -1581,6 +1594,7 @@ void PestppOptions::set_defaults()
 	set_sqp_dv_en("");
 	set_sqp_obs_restart_en("");
 	set_sqp_num_reals(50);
+	set_sqp_use_ensemble_grad(true);
 
 	set_mou_generator("SBX");
 	set_mou_population_size(100);
@@ -1594,6 +1608,7 @@ void PestppOptions::set_defaults()
 	set_mou_mating_selector("TOURNAMENT");
 	set_mou_crossover_probability(0.75);
 	set_mou_mutation_probability(-999);
+	set_mou_de_f(0.8);
 	
 
 	set_ies_par_csv("");

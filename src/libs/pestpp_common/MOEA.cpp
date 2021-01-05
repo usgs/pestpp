@@ -105,7 +105,7 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 
 }
 
-bool ParetoObjectives::compare_two(string& first, string& second)
+bool ParetoObjectives::compare_two(string& first, string& second, MouEnvType envtyp)
 {
 	if (infeas.find(first) != infeas.end())
 		//if both are infeas, select the solution that is less infeasible
@@ -119,9 +119,20 @@ bool ParetoObjectives::compare_two(string& first, string& second)
 		return false;
 	if (infeas.find(second) != infeas.end())
 		return true;
+	if (envtyp == MouEnvType::NSGA)
+		return compare_two_nsga(first, second);
+	else if (envtyp == MouEnvType::SPEA)
+		return compare_two_spea(first, second);
+	else
+		throw runtime_error("ParetoObjectives::compare_two(): unrecognized envtyp");
+}
 
-	return compare_two_nsga(first, second);
-	
+bool ParetoObjectives::compare_two_spea(string& first, string& second)
+{
+	if (spea2_constrained_fitness_map[first] < spea2_constrained_fitness_map[second])
+		return true;
+	else
+		return false;
 }
 
 bool ParetoObjectives::compare_two_nsga(string& first, string& second)
@@ -138,7 +149,7 @@ bool ParetoObjectives::compare_two_nsga(string& first, string& second)
 	return false;
 }
 
-void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsemble& dp, map<string, map<string, double>>& _member_struct)
+void ParetoObjectives::drop_duplicates(map<string, map<string, double>>& _member_struct)
 {
 	performance_log->log_event("checking for duplicate solutions");
 	set<string> duplicates;
@@ -151,7 +162,6 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 	for (auto m : _member_struct)
 		names.push_back(m.first);
 
-	//for (auto solution_p : member_struct)
 	for (int i=0;i<names.size();i++)
 	{
 		name_p = names[i];
@@ -167,6 +177,7 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 			{
 				duplicates.emplace(name_p);
 			}
+			
 		}
 	}
 	if (duplicates.size() > 0)
@@ -188,27 +199,23 @@ void ParetoObjectives::drop_duplicates(ObservationEnsemble& op, ParameterEnsembl
 				i = 0;
 			}
 		}
-		vector<string> d(duplicates.begin(), duplicates.end());
-		op.drop_rows(d);
-		dp.drop_rows(d);
-		performance_log->log_event("updating member struct after dropping duplicates");
-		member_struct = get_member_struct(op, dp);
+		frec << endl;
+		for (auto d : duplicates)
+			member_struct.erase(d);	
 	}
-
-
 }
 
-void ParetoObjectives::get_spea_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp)
+void ParetoObjectives::get_spea2_archive_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp)
 {
 	ParameterEnsemble temp_dp = dp;
 	ObservationEnsemble temp_op = op;
 	string rm;
-	map<string, double> kdist = get_kth_nn_crowding_distance(temp_op, temp_dp);
+	map<string, double> kdist = get_spea2_kth_nn_crowding_distance(temp_op, temp_dp);
 	while (keep.size() > num_members)
 	{
 		temp_dp.keep_rows(keep);
 		temp_op.keep_rows(keep);
-		kdist = get_kth_nn_crowding_distance(temp_op, temp_dp);
+		kdist = get_spea2_kth_nn_crowding_distance(temp_op, temp_dp);
 		sortedset fit_sorted(kdist.begin(), kdist.end(), compFunctor);
 		rm = fit_sorted.begin()->first;
 		keep.erase(remove(keep.begin(), keep.end(), rm), keep.end());
@@ -230,12 +237,14 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 	//update the member struct container
 	member_struct = get_member_struct(op, dp);
 
-	drop_duplicates(op, dp, member_struct);
+	drop_duplicates(member_struct);
 
 	if (member_struct.size() == 0)
 		throw runtime_error("ParetoObjectives error: member_struct is empty");
 
-	vector<string> real_names = op.get_real_names();
+	vector<string> real_names;
+	for (auto& m : member_struct)
+		real_names.push_back(m.first);
 	infeas_ordered.clear();
 	infeas.clear();
 	bool all_infeas = false;
@@ -344,9 +353,10 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 
 
 	performance_log->log_event("calculating fitness");
-	fitness_map = get_spea_fitness(member_struct);
+	pair<map<string, double>, map<string, double>> fitness_maps = get_spea2_fitness(member_struct);
+	spea2_constrained_fitness_map = fitness_maps.first;
+	spea2_unconstrained_fitness_map = fitness_maps.second;
 
-	
 	//remove infeasible solutions - after spea fitness calcs
 	if (check_constraints)
 	{
@@ -388,22 +398,22 @@ map<string, double> ParetoObjectives::get_spea2_fitness(int generation, Observat
 	if (sum_tag.size() > 0)
 	{
 		vector<string> real_names = op.get_real_names();
-		write_pareto_summary(sum_tag, generation, real_names, member_front_map, crowd_map, infeas, member_struct);
+		write_pareto_summary(sum_tag, generation, op, dp,constraints_ptr);
 	}
-	return fitness_map;
+	return spea2_constrained_fitness_map;
 }
 
-pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_sort(int generation, ObservationEnsemble& op,
+pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominance(int generation, ObservationEnsemble& op,
 	ParameterEnsemble& dp, Constraints* constraints_ptr, bool report, string sum_tag)
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
-	ss << "ParetoObjectives::nsga_ii_pareto_dominance_sort() for " << op.shape().first << " population members";
+	ss << "ParetoObjectives::get_nsga2_pareto_dominance() for " << op.shape().first << " population members";
 	performance_log->log_event(ss.str());
 	update(op, dp, constraints_ptr);
 
 	if (member_struct.size() == 0)
-		throw runtime_error("ParetoObjectives error: member_struct is empty");
+		throw runtime_error("ParetoObjectives::get_nsga2_pareto_dominance() error: member_struct is empty");
 
 	if (obs_obj_names_ptr->size() + pi_obj_names_ptr->size() > 1)
 	{
@@ -413,7 +423,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 			if (front.second.size() == 0)
 			{
 				ss.str("");
-				ss << "ParetoObjectives::pareto_dominance_sort() error: front " << front.first << " has no members";
+				ss << "ParetoObjectives::get_nsga2_pareto_dominance() error: front " << front.first << " has no members";
 				performance_log->log_event(ss.str());
 				throw runtime_error(ss.str());
 			}
@@ -450,6 +460,8 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 				dom_crowd_ordered.push_back(front_member);
 	}
 
+	
+
 	//now add the infeasible members
 	//if there is atleast one feasible nondom solution, then add the infeasible ones to dom solutions
 	if (infeas.size() < op.shape().first)
@@ -462,45 +474,50 @@ pair<vector<string>, vector<string>> ParetoObjectives::nsga_ii_pareto_dominance_
 				nondom_crowd_ordered.push_back(inf);
 	}
 
-	if (op.shape().first != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
+	if (infeas.size() + member_struct.size() != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
 	{
 		ss.str("");
-		ss << "ParetoObjectives::pareto_dominance_sort() internal error: final sorted population size: " << 
-			nondom_crowd_ordered.size() + dom_crowd_ordered.size() << " != initial population size: " << op.shape().first;
+		ss << "ParetoObjectives::get_nsga2_pareto_dominance() internal error: final sorted population size: " <<
+			nondom_crowd_ordered.size() + dom_crowd_ordered.size() << " != member_struct size: " << member_struct.size();
 		cout << ss.str();
 		throw runtime_error(ss.str());
 	}
+	
 
 	if (sum_tag.size() > 0)
 	{
 		vector<string> real_names = op.get_real_names();
-		write_pareto_summary(sum_tag, generation, real_names, member_front_map, crowd_map, infeas, member_struct);
+		write_pareto_summary(sum_tag, generation, op, dp, constraints_ptr);
 	}	
 	return pair<vector<string>, vector<string>>(nondom_crowd_ordered, dom_crowd_ordered);
 }
 
-void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, vector<string>& member_names, 
-	map<string,int>& front_map, map<string,double>& crowd_map, map<string,double>& infeas_map,
-	map<string, map<string, double>>& _member_struct)
+void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, ObservationEnsemble& op, ParameterEnsemble& dp, Constraints* constr_ptr)
 {
+	update(op, dp, constr_ptr);
+	if (!file_manager.check_ofile_tag_exists(sum_tag))
+		file_manager.open_ofile_ext(sum_tag);
 	ofstream& sum = file_manager.get_ofstream(sum_tag);
-	for (auto& member : member_names)
+	for (auto member : op.get_real_names())
 	{
-		
+		if (member_struct.find(member) == member_struct.end())
+			continue;
 		sum << generation << "," << member;
 		for (auto obj : *obs_obj_names_ptr)
 		{
-			sum << "," << obj_dir_mult_ptr->at(obj) * _member_struct[member][obj];
+			sum << "," << obj_dir_mult_ptr->at(obj) * member_struct[member][obj];
 		}
 		for (auto obj : *pi_obj_names_ptr)
 		{
-			sum << "," << obj_dir_mult_ptr->at(obj) * _member_struct[member][obj];
+			sum << "," << obj_dir_mult_ptr->at(obj) * member_struct[member][obj];
 		}
-		sum << "," << front_map[member];
+		sum << "," << member_front_map[member];
 		sum << "," << crowd_map[member];
-		if (infeas_map.find(member) != infeas_map.end())
+		sum << "," << spea2_constrained_fitness_map[member];
+		sum << "," << spea2_unconstrained_fitness_map[member];
+		if (infeas.find(member) != infeas.end())
 		{
-			sum << "," << 0 << "," << infeas_map[member];
+			sum << "," << 0 << "," << infeas[member];
 		}
 		else
 		{
@@ -522,28 +539,28 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 		sum << "," << pest_utils::lower_cp(obj);
 	for (auto obj : *pi_obj_names_ptr)
 		sum << "," << pest_utils::lower_cp(obj);
-	sum << ",front,crowding_distance,is_feasible,feasible_distance" << endl;
+	sum << ",nsga2_front,nsga2_crowding_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
 
 }
 
-map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
+map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	//this updates the complicated map-based structure that stores the member names: obj_names:value nested pairs
 	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
 	//just reuse the same routine used for the pareto dominance sort...
-	return get_kth_nn_crowding_distance(_member_struct);
+	return get_spea2_kth_nn_crowding_distance(_member_struct);
 }
 
 
-map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct)
+map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct)
 {
 	vector<string> members;
 	for (auto m : _member_struct)
 		members.push_back(m.first);
-	return get_kth_nn_crowding_distance(members, _member_struct);
+	return get_spea2_kth_nn_crowding_distance(members, _member_struct);
 }
 
-map<string, double> ParetoObjectives::get_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
+map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
 	map<string, double> crowd_distance_map;
 	if (members.size() < 2)
@@ -709,26 +726,33 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string
 }
 
 
-map<string, double> ParetoObjectives::get_spea_fitness(map<string, map<string, double>>& _member_struct)
+pair<map<string, double>, map<string, double>> ParetoObjectives::get_spea2_fitness(map<string, map<string, double>>& _member_struct)
 {
 	performance_log->log_event("get_spea_fitness");
-	map<string, double> kdist = get_kth_nn_crowding_distance(_member_struct);
+	map<string, double> kdist = get_spea2_kth_nn_crowding_distance(_member_struct);
 	map<string, vector<string>> solutions_dominated_map;
 	map<string, int> num_dominating_map;
 	int dom;
 	fill_domination_containers(_member_struct, solutions_dominated_map, num_dominating_map,true);
+	map<string, double> _unconstrained_fitness_map;
 	map<string, double> _fitness_map;
+	double max_infeas = -1.0e+30;
+	for (auto& in : infeas)
+		max_infeas = max(max_infeas, in.second);
+
 	for (auto& sol_map : solutions_dominated_map)
 	{
 		dom = 0;
 		for (auto& sol : sol_map.second)
 			dom = dom + num_dominating_map[sol];
-		_fitness_map[sol_map.first] = (double)dom + (1.0/(kdist[sol_map.first] + 2.0)); //convert the distace to density
-		//include infeasibility sum in fitness...
+		_unconstrained_fitness_map[sol_map.first] = (double)dom + (1.0/(kdist[sol_map.first] + 2.0)); //convert the distace to density
+		_fitness_map[sol_map.first] = _unconstrained_fitness_map[sol_map.first];
+
+		//include scaled infeasibility sum in fitness...
 		if (infeas.find(sol_map.first) != infeas.end())
-			_fitness_map[sol_map.first] += infeas[sol_map.first];
+			_fitness_map[sol_map.first] += (infeas[sol_map.first] / (max_infeas + 2.0)); // +2.0 to make sure it is less than 0.5, similar to distance penalty
 	}
-	return _fitness_map;
+	return pair<map<string, double>, map<string, double>>(_fitness_map,_unconstrained_fitness_map);
 
 }
 
@@ -1188,7 +1212,7 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	dp_archive.append_other_rows(keep, other);
 	other.resize(0, 0);
 	message(2, "pareto dominance sorting archive of size", op_archive.shape().first);
-	DomPair dompair = objectives.nsga_ii_pareto_dominance_sort(iter,op_archive, dp_archive,&constraints,true,ARC_SUM_TAG);
+	DomPair dompair = objectives.get_nsga2_pareto_dominance(iter,op_archive, dp_archive,&constraints,true,ARC_SUM_TAG);
 	
 	ss.str("");
 	ss << "resizing archive from " << op_archive.shape().first << " to " << dompair.first.size() << " current non-dominated solutions";
@@ -1258,15 +1282,17 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	message(2, ss.str());
 	op_archive.keep_rows(keep);
 	dp_archive.keep_rows(keep);
-
-	if (op_archive.shape().first > archive_size)
+	if (keep.size() > 0)
 	{
-		objectives.get_spea_names_to_keep(archive_size, keep, op_archive, dp_archive);
-		op_archive.keep_rows(keep);
-		dp_archive.keep_rows(keep);
-	}
+		if (op_archive.shape().first > archive_size)
+		{
+			objectives.get_spea2_archive_names_to_keep(archive_size, keep, op_archive, dp_archive);
+			op_archive.keep_rows(keep);
+			dp_archive.keep_rows(keep);
+		}
 
-	save_populations(dp_archive, op_archive, "archive");
+		save_populations(dp_archive, op_archive, "archive");
+	}
 }
 
 
@@ -1539,7 +1565,6 @@ void MOEA::initialize()
 	if (chance_points == "ALL")
 	{
 		//evaluate the chance constraints at every individual, very costly, but most robust
-		//throw_moea_error("'mou_chance_points' == 'all' not implemented");
 		chancepoints = chancePoints::ALL;
 	}
 	
@@ -1552,7 +1577,7 @@ void MOEA::initialize()
 	else
 	{
 		ss.str("");
-		ss << "unrecognized 'mou_chance_points' value :" << chance_points << ", should be 'all' or 'single'";
+		ss << "unrecognized 'opt_chance_points' value :" << chance_points << ", should be 'all' or 'single'";
 		throw_moea_error(ss.str());
 	}
 
@@ -1739,7 +1764,37 @@ void MOEA::initialize()
 
 
 	}
+	n_adaptive_dvs = 0;
+	set<string> s_dv_names(dv_names.begin(), dv_names.end());
+	if (s_dv_names.find(DE_F_NAME) != s_dv_names.end())
+	{
+		message(1, "self-adaptive diffevol 'F' value found, resetting bounds to min:0.5 max:1.0");
+		double b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(DE_F_NAME)->lbnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(DE_F_NAME)->lbnd = max(b, 0.5);
+		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(DE_F_NAME)->ubnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(DE_F_NAME)->ubnd = min(b, 1.0);
+		n_adaptive_dvs++;
+	}
 
+	if (s_dv_names.find(CR_NAME) != s_dv_names.end())
+	{
+		message(1, "self-adaptive crossover probability value found, resetting bounds to min:0.8, max:1.0");
+		double b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(CR_NAME)->lbnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(CR_NAME)->lbnd = max(b, 0.8);
+		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(CR_NAME)->ubnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(CR_NAME)->ubnd = min(b, 1.0);
+		n_adaptive_dvs++;
+	}
+
+	if (s_dv_names.find(MR_NAME) != s_dv_names.end())
+	{
+		message(1, "self-adaptive mutation probability value found, resetting bounds to min:0.01, max:0.3");
+		double b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(MR_NAME)->lbnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(MR_NAME)->lbnd = max(b, 0.8);
+		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(MR_NAME)->ubnd;
+		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(MR_NAME)->ubnd = min(b, 1.0);
+		n_adaptive_dvs++;
+	}
 	constraints.initialize(dv_names, numeric_limits<double>::max());
 	constraints.initial_report();
 
@@ -1947,7 +2002,7 @@ void MOEA::initialize()
 			dp.to_csv(ss.str());
 		}
 		
-		message(1, "saved initial dv population to ", ss.str());
+		message(1, " saved initial dv population to ", ss.str());
 		performance_log->log_event("running initial population");
 		message(1, "running initial population of size", dp.shape().first);
 	
@@ -1969,7 +2024,7 @@ void MOEA::initialize()
 		ss << ".csv";
 		op.to_csv(ss.str());
 	}
-	message(1, "saved observation population to ", ss.str());
+	message(1, " saved observation population to ", ss.str());
 
 	message(0, "initial population objective function summary:");
 	previous_obj_summary = obj_func_report(dp, op);
@@ -1989,7 +2044,7 @@ void MOEA::initialize()
 			ss << ".csv";
 			shifted_op.to_csv(ss.str());
 		}
-		message(1, "saved chance-shifted observation population to ", ss.str());
+		message(1, " saved chance-shifted observation population to ", ss.str());
 
 		op = shifted_op;
 		message(0, "chance-shifted initial population objective function summary");
@@ -2009,7 +2064,7 @@ void MOEA::initialize()
 		ss << ".csv";
 		dp.to_csv(ss.str());
 	}
-	message(1, "saved initial dv population to ", ss.str());
+	message(1, " saved initial dv population to ", ss.str());
 
 	//TODO: think about a bad phi (or phis) for MOEA
 	
@@ -2033,7 +2088,7 @@ void MOEA::initialize()
 	objectives.set_pointers(obs_obj_names, pi_obj_names, obj_dir_mult);
 	if (envtype == MouEnvType::NSGA)
 	{
-		DomPair dompair = objectives.nsga_ii_pareto_dominance_sort(iter, op, dp, &constraints, true, POP_SUM_TAG);
+		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, true, POP_SUM_TAG);
 
 		//initialize op and dp archives
 		op_archive = ObservationEnsemble(&pest_scenario, &rand_gen,
@@ -2047,7 +2102,7 @@ void MOEA::initialize()
 		archive_size = ppo->get_mou_max_archive_size();
 
 		//this causes the initial archive pareto summary file to be written
-		objectives.nsga_ii_pareto_dominance_sort(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+		objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
 	}
 	else if (envtype == MouEnvType::SPEA)
 	{
@@ -2061,13 +2116,20 @@ void MOEA::initialize()
 		op_archive.keep_rows(keep);
 		dp_archive.keep_rows(keep);
 
-		ss.str("");
-		ss << "initialized archives with " << keep.size() << " nondominated members";
-		message(2, ss.str());
-		archive_size = num_members * 2;
+		if (keep.size() == 0)
+		{
+			message(2, "initial archive empty - no feasible non-dominated solutions...");
+		}
+		else
+		{
+			ss.str("");
+			ss << "initialized archives with " << keep.size() << " nondominated members";
+			message(2, ss.str());
+			archive_size = num_members * 2;
 
-		//this causes the initial archive pareto summary file to be written
-		objectives.get_spea2_fitness(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+			//this causes the initial archive pareto summary file to be written
+			objectives.get_spea2_fitness(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+		}
 
 	}
 
@@ -2080,6 +2142,8 @@ void MOEA::initialize()
 	}
 
 	constraints.mou_report(0,dp, op, obs_obj_names,pi_obj_names);
+
+	
 
 	message(0, "initialization complete");
 }
@@ -2249,7 +2313,7 @@ void MOEA::iterate_to_solution()
 		if (envtype == MouEnvType::NSGA)
 		{
 			message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
-			DomPair dompair = objectives.nsga_ii_pareto_dominance_sort(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
+			DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
 
 			//drop shitty members
 			//TODO: this is just a cheap hack, prob something more meaningful to be done...
@@ -2319,7 +2383,7 @@ void MOEA::iterate_to_solution()
 
 			if (keep.size() > num_members)
 			{
-				objectives.get_spea_names_to_keep(num_members, keep, new_op, new_dp);
+				objectives.get_spea2_archive_names_to_keep(num_members, keep, new_op, new_dp);
 			}
 			message(1, "resizing current populations to ", keep.size());
 			new_dp.keep_rows(keep);
@@ -2518,14 +2582,17 @@ void MOEA::initialize_obs_restart_population()
 
 ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterEnsemble& _dp)
 {
+	/* adaptive idea:  Front. Built Environ., 09 July 2020 | https://doi.org/10.3389/fbuil.2020.00102
+	A Comparative Study of Differential Evolution Variants in Constrained Structural Optimization
+	Manolis Georgioudakis1 and Vagelis Plevris2**/
 	message(1, "generating diffevol population of size", num_members);
 	vector<int> r_int_vec;
-	for (int i = 0; i < dv_names.size(); i++)
+	for (int i = 0; i < dv_names.size() - n_adaptive_dvs; i++)
 		r_int_vec.push_back(i);
 
 
 	Eigen::VectorXd y, x, diff;
-	double crossover = pest_scenario.get_pestpp_options().get_mou_crossover_probability();
+	double org_crossover = pest_scenario.get_pestpp_options().get_mou_crossover_probability();
 	double r;
 	
 	vector<double> cr_vals;
@@ -2546,17 +2613,42 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	int ii;
 	int i_last;
 	vector<int> selected;
-	double dithered_f;
-	for (int i = 0; i < num_members; i++)
+	double org_f = pest_scenario.get_pestpp_options().get_mou_de_f();
+	double f = org_f, crossover = org_crossover;
+	bool adaptive_f = false;
+	bool adaptive_cr = false;
+	if (var_map.find(DE_F_NAME) != var_map.end())
+		adaptive_f = true;
+	if (var_map.find(CR_NAME) != var_map.end())
+		adaptive_cr = true;
+	Parameters lbnd = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
+	Parameters ubnd = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
+	ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
+	bts.ctl2numeric_ip(lbnd);
+	bts.ctl2numeric_ip(ubnd);
+	int tries = 0;
+	int i = 0;
+	while (i < num_members)
 	{
 		
 		selected = selection(4, _dp, mattype);
-
-		//use dithered F value
-		dithered_f = uniform_draws(1, 0.5, 1.0, rand_gen)[0];
-
+		if (adaptive_f)
+		{
+			if (uniform_draws(1, 0.0, 1.0, rand_gen)[0] > 0.1)
+				f = _dp.get_eigen_ptr()->row(selected[0])[var_map[DE_F_NAME]];
+			else
+				f = org_f;
+		}
+		if (adaptive_cr)
+		{
+			if (uniform_draws(1, 0.0, 1.0, rand_gen)[0] > 0.1)
+				crossover = _dp.get_eigen_ptr()->row(selected[0])[var_map[CR_NAME]];
+			else
+				crossover = org_crossover;
+		}
+		
 		//differential vector
-		diff = _dp.get_eigen_ptr()->row(selected[0]) + (dithered_f * (_dp.get_eigen_ptr()->row(selected[1]) - _dp.get_eigen_ptr()->row(selected[2])));
+		diff = _dp.get_eigen_ptr()->row(selected[0]) + (f * (_dp.get_eigen_ptr()->row(selected[1]) - _dp.get_eigen_ptr()->row(selected[2])));
 
 		//current member if in range, otherwise, select randomly
 		if (i < _dp.shape().first)
@@ -2574,14 +2666,29 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 		r = r_int_vec[0];
 
 		//only change dec vars
+		double dsum = 0.0;
+		if (i == 72)
+			cout << endl;
 		for(int idv=0;idv<dv_names.size();idv++)
 		{
 			ii = var_map[dv_names[idv]];
 			if ((cr_vals[ii] < crossover) || (ii == r))
 			{
 				y[ii] = diff[ii];
+				y[ii] = min(y[ii], ubnd[dv_names[idv]]);
+				y[ii] = max(y[ii], lbnd[dv_names[idv]]);
+
+				
 			}
 		}
+
+		tries++;
+		if (tries > 1000000)
+			throw_moea_error("diffevol generator appears to be stuck in an infinite loop...");
+
+		double n = (x - y).squaredNorm();
+		if (n < epsilon)
+			continue;
 		new_name = get_new_member_name("de");
 		new_member_names.push_back(new_name);
 		lin << new_name;
@@ -2589,13 +2696,13 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 			lin << "," << real_names[idx];
 		lin << endl;
 		new_reals.row(i) = y;
+		i++;
 	}
 
 	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
 	
 	new_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
 	new_dp.enforce_limits(performance_log, false);
-
 	return new_dp;
 }
 
@@ -2609,10 +2716,10 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(ubnd);
 	vector<int> selected;
 	Eigen::VectorXd child, parent;
-	double mut_prob = pest_scenario.get_pestpp_options().get_mou_mutation_probability();
-	if (mut_prob < -0.0)
-		mut_prob = 1.0 / (double)_dp.shape().second;
-
+	double org_mut_prob = pest_scenario.get_pestpp_options().get_mou_mutation_probability();
+	if (org_mut_prob < -0.0)
+		org_mut_prob = 1.0 / (double)_dp.shape().second;
+	
 	double disrupt_prob = 0.2;
 	vector<string> _dv_names = _dp.get_var_names();
 	vector<string> real_names = _dp.get_real_names();
@@ -2623,10 +2730,19 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 	ofstream& lin = file_manager.get_ofstream(lineage_tag);
 	vector<string> new_member_names;
 	string new_name;
+
+	_dp.update_var_map();
+	map<string, int> var_map = _dp.get_var_map();
+	bool adaptive_mr = false;
+	if (var_map.find(MR_NAME) != var_map.end())
+		adaptive_mr = true;
+	double mut_prob = org_mut_prob;
 	while (imember < num_members)
 	{
 		selected = selection(1, _dp, mattype);
 		parent = _dp.get_real_vector(selected[0]);
+		if (adaptive_mr)
+			mut_prob = parent[var_map[MR_NAME]];
 		child = hybrid_pm(parent, mut_prob, disrupt_prob, _dv_names, lbnd, ubnd);
 		if ((parent - child).squaredNorm() < epsilon)
 			continue;
@@ -2681,7 +2797,7 @@ vector<int> MOEA::selection(int num_to_select, ParameterEnsemble& _dp, MouMateTy
 		s2 = real_names[p2_idx];
 		if (_mattype==MouMateType::TOURNAMENT)
 		{
-			if (objectives.compare_two(s1, s2))
+			if (objectives.compare_two(s1, s2, envtype))
 				selected_members.emplace(p1_idx);
 			else
 				selected_members.emplace(p2_idx);
@@ -2717,8 +2833,9 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	for (int i = 0; i < dv_names.size(); i++)
 		r_int_vec.push_back(i);
 
-	double crossover_probability = pest_scenario.get_pestpp_options().get_mou_crossover_probability();
+	double org_crossover_probability = pest_scenario.get_pestpp_options().get_mou_crossover_probability();
 	double crossover_distribution_index = 10.0;
+	double crossover = org_crossover_probability;
 	int i_member = 0;
 	int p1_idx, p2_idx;
 	Eigen::MatrixXd new_reals(num_members, _dp.shape().second);
@@ -2736,7 +2853,12 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(lbnd);
 	pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(ubnd);
 	Eigen::VectorXd parent1, parent2;
-
+	int tries = 0;
+	_dp.update_var_map();
+	map<string, int> var_map = _dp.get_var_map();
+	bool adaptive_cr = false;
+	if (var_map.find(CR_NAME) != var_map.end())
+		adaptive_cr = true;
 	while (i_member < num_members)
 	{
 		selected = selection(2, _dp, mattype);
@@ -2746,7 +2868,21 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 		//generate two children thru cross over
 		parent1 = _dp.get_real_vector(p1_idx);
 		parent2 = _dp.get_real_vector(p2_idx);
-		children = sbx_new(crossover_probability, crossover_distribution_index, parent1, parent2,_dv_names, lbnd,ubnd);
+		if ((parent1 - parent2).squaredNorm() < epsilon)
+			continue;
+		if (adaptive_cr)
+		{
+			if (uniform_draws(1, 0.0, 1.0, rand_gen)[0] > 0.1)
+			{
+				if (uniform_draws(1, 0.0, 1.0, rand_gen)[0] > 0.5)
+					crossover = parent1[var_map[CR_NAME]];
+				else
+					crossover = parent2[var_map[CR_NAME]];
+			}
+			else
+				crossover = org_crossover_probability;
+		}
+		children = sbx_new(crossover, crossover_distribution_index, parent1, parent2,_dv_names, lbnd,ubnd);
 
 		//put the two children into the child population
 		new_reals.row(i_member) = children.first;
@@ -2763,15 +2899,18 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 		new_member_names.push_back(new_name);
 		//cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() -1] << endl;
 		i_member++;
+		tries++;
+		if (tries > 1000000)
+			throw_moea_error("sbx appears to be stuck in an infinite loop");
 	}
 		
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
 	tmp_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
 
-	double mutation_probability = pest_scenario.get_pestpp_options().get_mou_mutation_probability();
-	if (mutation_probability < 0.0)
-		mutation_probability = 1.0 / _dp.shape().second;
-	gauss_mutation_ip(mutation_probability, tmp_dp);
+	if (find(gen_types.begin(),gen_types.end(),MouGenType::PM) == gen_types.end())
+		gauss_mutation_ip(tmp_dp);
+	generate_pm_population(tmp_dp.shape().first, tmp_dp);
+	
 	tmp_dp.enforce_limits(performance_log,false);
 	return tmp_dp;
 }
@@ -2796,7 +2935,9 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 		ss << ".csv";
 		dp.to_csv(ss.str());
 	}
-	ss << "saved decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << ss.str() << "'";
+	string name = ss.str();
+	ss.str("");
+	ss << " saved decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 	
 	ss.str("");
@@ -2816,7 +2957,9 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 		ss << ".csv";
 		op.to_csv(ss.str());
 	}
-	ss << "saved observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << ss.str() << "'";
+	name = ss.str();
+	ss.str("");
+	ss << " saved observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 
 }
@@ -3019,67 +3162,128 @@ Eigen::VectorXd MOEA::hybrid_pm(Eigen::VectorXd& parent, double mutation_probabi
 	return child;
 }
 
-pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1, 
+//pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1, 
+//	Eigen::VectorXd parent2, vector<string>& _dv_names, Parameters& lbnd, Parameters& ubnd)
+//{
+//
+//	stringstream ss;
+//	int i;
+//	//double rnd1, rnd2, rnd3, rnd4;
+//	vector<double> rnds;
+//	double lt, ut;
+//	double p1, p2, c1, c2;
+//	// get parents from dp
+//	Eigen::VectorXd child1 = parent1; // parent #1
+//	Eigen::VectorXd child2 = parent2; // parent #2
+//	string vname;
+//	pair<double, double> betas;
+//
+//	int n_var = _dv_names.size();
+//	//can't set all rnds outside of loop or all vars will be treated the same
+//	rnds = uniform_draws(4, 0.0, 1.0, rand_gen);
+//
+//	int tries = 0;
+//	double abs_diff;
+//	while (true)
+//	{
+//		
+//		child1 = parent1; 
+//		child2 = parent2; 
+//		for (i = 0; i < n_var; i++)
+//		{
+//			rnds = uniform_draws(1, 0.0, 1.0, rand_gen);
+//			p1 = parent1[i];
+//			p2 = parent2[i];
+//			vname = _dv_names[i];
+//			if (rnds[0] <= crossover_probability)
+//			{
+//				abs_diff = abs(p1 - p2);
+//				if (abs_diff < epsilon)
+//					abs_diff = 1e-10;
+//				lt = (p1 + p2 + (2 * lbnd[vname]))/abs_diff;
+//				ut = ((2. * ubnd[vname]) - p1 - p2) / abs_diff;
+//				lt = max(lt, 1.0);
+//				ut = max(ut, 1.0);
+//				/*if (lt < 0)
+//					throw_moea_error("sbx error: lower transform bound less than zero");
+//				if (ut < 0)
+//				*/	//throw_moea_error("sbx error: upper transform bound less than zero");
+//				betas = get_betas(lt, ut, di);
+//				c1 = 0.5 * ((p1 + p2) - betas.first * abs_diff);
+//				c2 = 0.5 * ((p1 + p2) - betas.second * abs_diff);
+//				if (isnan(c1))
+//				{
+//					ss.str("");
+//					ss << "sbx error: denormal value generated for " << vname << ", beta1: " << betas.first << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
+//					throw_moea_error(ss.str());
+//				}
+//				if (isnan(c2))
+//				{
+//					ss.str("");
+//					ss << "sbx error: denormal value generated for " << vname << ", beta2: " << betas.second << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
+//					throw_moea_error(ss.str());
+//				}
+//				child1[i] = c1;
+//				child2[i] = c2;
+// 			}
+//		}
+//		tries++;
+//		if (tries > 10000000)
+//			throw_moea_error("sbx generation process appears to be stuck in an infinite loop...");
+//		//hack alert - we dont wanna waste time with identical solutions, so we will keep trying 
+//		//until both child1 and child2 are different from parents - evolution!
+//		if ((parent1 - child1).squaredNorm() < epsilon)
+//			continue;
+//		else if ((parent2 - child2).squaredNorm() < epsilon)
+//			continue;
+//		else
+//			break;
+//			
+//	}
+//	
+//	return pair<Eigen::VectorXd, Eigen::VectorXd>(child1, child2);
+//
+//}
+
+pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1,
 	Eigen::VectorXd parent2, vector<string>& _dv_names, Parameters& lbnd, Parameters& ubnd)
 {
+	/* https://gist.github.com/Tiagoperes/1779d5f1c89bae0cfdb87b1960bba36d */
+
 	stringstream ss;
-	int i;
-	//double rnd1, rnd2, rnd3, rnd4;
 	vector<double> rnds;
-	double lt, ut;
 	double p1, p2, c1, c2;
 	// get parents from dp
 	Eigen::VectorXd child1 = parent1; // parent #1
 	Eigen::VectorXd child2 = parent2; // parent #2
 	string vname;
-	pair<double, double> betas;
 
 	int n_var = _dv_names.size();
-	//can't set all rnds outside of loop or all vars will be treated the same
-	rnds = uniform_draws(4, 0.0, 1.0, rand_gen);
-
+	
 	int tries = 0;
-	double abs_diff;
+	double alpha, beta, betaq;
 	while (true)
 	{
-		
-		child1 = parent1; 
-		child2 = parent2; 
-		for (i = 0; i < n_var; i++)
+
+		child1 = parent1;
+		child2 = parent2;
+		for (int i = 0; i < n_var; i++)
 		{
-			rnds = uniform_draws(1, 0.0, 1.0, rand_gen);
+			rnds = uniform_draws(4, 0.0, 1.0, rand_gen);
 			p1 = parent1[i];
 			p2 = parent2[i];
 			vname = _dv_names[i];
+			//this uses crossover like de instead of like standard sbx but we need to generate
+			//a full child population for testing...
 			if (rnds[0] <= crossover_probability)
-			{
-				abs_diff = abs(p1 - p2);
-				if (abs_diff < epsilon)
-					abs_diff = 1e-10;
-				lt = (p1 + p2 + (2 * lbnd[vname]))/abs_diff;
-				ut = ((2. * ubnd[vname]) - p1 - p2) / abs_diff;
-				/*if (lt < 0)
-					throw_moea_error("sbx error: lower transform bound less than zero");
-				if (ut < 0)
-				*/	//throw_moea_error("sbx error: upper transform bound less than zero");
-				betas = get_betas(lt, ut, di);
-				c1 = 0.5 * ((p1 + p2) - betas.first * abs_diff);
-				c2 = 0.5 * ((p1 + p2) - betas.second * abs_diff);
-				if (isnan(c1))
+			{			
+				if (abs(p1 - p2) > epsilon)
 				{
-					ss.str("");
-					ss << "sbx error: denormal value generated for " << vname << ", beta1: " << betas.first << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
-					throw_moea_error(ss.str());
+					get_sbx_child_values(p1, p2, lbnd[vname], ubnd[vname], di, rnds[1], c1, c2);
+					child1[i] = c1;
+					child2[i] = c2;
 				}
-				if (isnan(c2))
-				{
-					ss.str("");
-					ss << "sbx error: denormal value generated for " << vname << ", beta2: " << betas.second << ", lt:" << lt << ", ut: " << ut << ", v1:" << p1 << ", v2: " << p2;
-					throw_moea_error(ss.str());
-				}
-				child1[i] = c1;
-				child2[i] = c2;
- 			}
+			}
 		}
 		tries++;
 		if (tries > 10000000)
@@ -3092,13 +3296,51 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probabilit
 			continue;
 		else
 			break;
-			
+
 	}
-	
+
+	cout << endl;
+
 	return pair<Eigen::VectorXd, Eigen::VectorXd>(child1, child2);
 
 }
 
+void MOEA::get_sbx_child_values(const double& p1, const double& p2, const double& lbnd, const double& ubnd, const double& eta, double& rnd, double& c1, double& c2)
+{
+	double y1 = min(p1, p2);
+	double y2 = max(p1, p2);
+	double beta = 1.0 + (2.0 * (y1 - lbnd) / (y2 - y1));
+	double alpha = 2.0 - pow(beta, -1.0 * (eta + 1));
+	double betaq;
+	
+	if (rnd <= (1.0 / alpha))
+	{
+		betaq = pow((rnd * alpha), (1.0 / (eta + 1.0)));
+	}
+	else
+	{
+		betaq = pow((1.0 / (2.0 - rnd * alpha)), (1.0 / (eta + 1.0)));
+	}
+	c1 = 0.5 * ((y1 + y2) - betaq * (y2 - y1));
+	c1 = max(lbnd, c1);
+	c1 = min(ubnd, c1);
+
+	beta = 1.0 + (2.0 * (ubnd - y2) / (y2 - y1));
+	alpha = 2.0 - pow(beta, -1.0 * (eta + 1.0));
+	if (rnd <= (1.0 / alpha))
+	{
+		betaq = pow((rnd * alpha), (1.0 / (eta + 1.0)));
+	}
+	else
+	{
+		betaq = pow((1.0 / (2.0 - (rnd * alpha))), (1.0 / (eta + 1.0)));
+	}
+	c2 = 0.5 * ((y1 + y2) - betaq * (y2 - y1));
+	c2 = max(lbnd, c2);
+	c2 = min(ubnd, c2);
+
+
+}
 pair<double,double> MOEA::get_betas(double v1, double v2, double distribution_index)
 {
 	stringstream ss;
@@ -3150,7 +3392,7 @@ pair<double,double> MOEA::get_betas(double v1, double v2, double distribution_in
 
 }
 
-void MOEA::gauss_mutation_ip(double mutation_probability, ParameterEnsemble& _dp)
+void MOEA::gauss_mutation_ip(ParameterEnsemble& _dp)
 {
 	/* 
 	Information Sciences, Vol. 133/3-4, pp. 229-247 (2001.5)
@@ -3158,7 +3400,16 @@ void MOEA::gauss_mutation_ip(double mutation_probability, ParameterEnsemble& _dp
 	Shigeyoshi Tsutsui* and David E. Goldberg**
 	*/
 
+	double org_mutation_probability = pest_scenario.get_pestpp_options().get_mou_mutation_probability();
+	if (org_mutation_probability < 0.0)
+		org_mutation_probability = 1.0 / _dp.shape().second;
+
 	_dp.transform_ip(ParameterEnsemble::transStatus::NUM);
+	_dp.update_var_map();
+	map<string, int> var_map = _dp.get_var_map();
+	bool adaptive_mr = false;
+	if (var_map.find(MR_NAME) != var_map.end())
+		adaptive_mr = true;
 	vector<string> var_names =_dp.get_var_names();
 	string vname;
 	Parameters lbnd = pest_scenario.get_ctl_parameter_info().get_low_bnd(var_names);
@@ -3169,9 +3420,18 @@ void MOEA::gauss_mutation_ip(double mutation_probability, ParameterEnsemble& _dp
 	vector<double> rnds;
 	double mut_val;
 	Eigen::MatrixXd reals = _dp.get_eigen();
+	double mutation_probability = org_mutation_probability;
 	for (int i = 0; i < _dp.shape().first; i++)
 	{
 		indiv = reals.row(i);
+		if (adaptive_mr)
+		{
+			if (uniform_draws(1, 0.0, 1.0, rand_gen)[0] > 0.1)
+				mutation_probability = org_mutation_probability;
+			else
+				mutation_probability = org_mutation_probability;
+
+		}
 		for (int var = 0; var < var_names.size(); var++)
 		{
 			vname = var_names[var];

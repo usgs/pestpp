@@ -22,7 +22,9 @@ SeqQuadProgram::SeqQuadProgram(Pest &_pest_scenario, FileManager &_file_manager,
 	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log,
 	RunManagerAbstract* _run_mgr_ptr) : pest_scenario(_pest_scenario), file_manager(_file_manager),
 	output_file_writer(_output_file_writer), performance_log(_performance_log),
-	run_mgr_ptr(_run_mgr_ptr), constraints(_pest_scenario, &_file_manager, _output_file_writer, *_performance_log)
+	run_mgr_ptr(_run_mgr_ptr), 
+	constraints(_pest_scenario, &_file_manager, _output_file_writer, *_performance_log),
+	jco(_file_manager,_output_file_writer)
 {
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	subset_rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
@@ -650,7 +652,7 @@ void SeqQuadProgram::initialize()
 		if (dv_names.size() == 0)
 		{
 			ss.str("");
-			ss << "no decision variables found in supplied dec var groups : ";
+			ss << "no adjustable decision variables found in supplied dec var groups : ";
 			for (auto g : dec_var_groups)
 			{
 				ss << g << ",";
@@ -703,7 +705,7 @@ void SeqQuadProgram::initialize()
 	else
 	{
 		ss.str("");
-		ss << "unrecognized 'sqp_chance_points' value :" << chance_points << ", should be 'all' or 'single'";
+		ss << "unrecognized 'opt_chance_points' value :" << chance_points << ", should be 'all' or 'single'";
 		throw_sqp_error(ss.str());
 	}
 
@@ -774,6 +776,7 @@ void SeqQuadProgram::initialize()
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
 	//TODO: update sanity checks for SQP context
+	//check that if using fd, chance points == single
 	sanity_checks();
 
 	bool echo = false;
@@ -784,24 +787,96 @@ void SeqQuadProgram::initialize()
 	//I dont think SQP needs an obscov? 
 	//initialize_obscov();
 
-	subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
+
 	
+
+	//todo: add the FD approach and initialize it here
+	use_ensemble_grad = ppo->get_sqp_use_ensemble_grad();
+	if (use_ensemble_grad)
+	{
+		prep_4_ensemble_grad();
+	}
+	else
+	{
+		prep_4_fd_grad();
+	}
+		
+	//these will be the ones we track...
+	current_ctl_dv_values = pest_scenario.get_ctl_parameters();
+	
+
+	message(0, "initialization complete");
+}
+
+
+
+void SeqQuadProgram::prep_4_fd_grad()
+{
+	stringstream ss;
+	message(1, "using finite-difference approximation to gradient (Jacobian)");
+	string base_jco = pest_scenario.get_pestpp_options().get_basejac_filename();
+	if (base_jco.size() > 0)
+	{
+	
+	}
+	else
+	{
+		Parameters current_pars = pest_scenario.get_ctl_parameters();
+		Observations current_sim = pest_scenario.get_ctl_observations();
+		ParamTransformSeq par_trans = pest_scenario.get_base_par_tran_seq();
+		
+		//todo: handle hotstart_resfile here...
+		bool init_obs = true;
+
+		set<string> out_of_bounds;
+		ss.str("");
+		ss << "queuing " << dv_names.size() << " finite difference runs";
+		message(2, ss.str());
+		bool success = jco.build_runs(current_pars, current_sim, dv_names, par_trans,
+			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
+			*run_mgr_ptr, out_of_bounds, false, init_obs);
+		if (!success)
+			throw_sqp_error("error building jacobian runs for FD grad");
+		//todo: think about freezind dec vars that go out of bounds? - yuck!
+		if (out_of_bounds.size() > 0)
+		{
+			ss.str("");
+			ss << "the following decision variable are out of bounds: " << endl;
+			for (auto& o : out_of_bounds)
+				ss << o << ",";
+		}
+		throw_sqp_error(ss.str());
+		message(2, "starting finite difference gradient pertubation runs");
+		jco.make_runs(*run_mgr_ptr);
+
+
+	}
+}
+
+void SeqQuadProgram::prep_4_ensemble_grad()
+{
+	stringstream ss;
+	message(1, "using ensemble approximation to gradient (EnOpt)");
+	//todo: we probably need to increase the default subset size 
+	//bc of nonlinear constraints...
+	subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
+
 	//I think a bad phi option has use in SQP?
-	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
+	/*double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
 	if (bad_phi < 1.0e+30)
-		message(1, "using bad_phi: ", bad_phi);
+		message(1, "using bad_phi: ", bad_phi);*/
 
 	int num_reals = pest_scenario.get_pestpp_options().get_sqp_num_reals();
 
 	dv_drawn = initialize_dv(parcov);
 
 	oe_drawn = initialize_restart();
-	
+
 	try
 	{
 		dv.check_for_dups();
 	}
-	catch (const exception &e)
+	catch (const exception& e)
 	{
 		string message = e.what();
 		throw_sqp_error("error in dv ensemble: " + message);
@@ -811,7 +886,7 @@ void SeqQuadProgram::initialize()
 	{
 		oe.check_for_dups();
 	}
-	catch (const exception &e)
+	catch (const exception& e)
 	{
 		string message = e.what();
 		throw_sqp_error("error in observation ensemble: " + message);
@@ -836,7 +911,7 @@ void SeqQuadProgram::initialize()
 				ss.str("");
 				ss << "dv en has " << dv.shape().first << " realizations, compared to " << oe.shape().first << " obs realizations";
 				message(1, ss.str());
-				message(1," the realization names are compatible");
+				message(1, " the realization names are compatible");
 				message(1, "re-indexing obs en to align with dv en...");
 
 				oe.reorder(dv.get_real_names(), vector<string>());
@@ -876,8 +951,8 @@ void SeqQuadProgram::initialize()
 			add_bases();*/
 
 
-	//now we check to see if we need to try to align the par and obs en
-	//this would only be needed if either of these were not drawn
+			//now we check to see if we need to try to align the par and obs en
+			//this would only be needed if either of these were not drawn
 	if (!dv_drawn || !oe_drawn)
 	{
 		bool aligned = dv.try_align_other_rows(performance_log, oe);
@@ -901,7 +976,7 @@ void SeqQuadProgram::initialize()
 	{
 		message(1, "WARNING: common realization names shared between the dv and observation ensembles but they are not in the same row locations, see .rec file for listing");
 		ofstream& frec = file_manager.rec_ofstream();
-		frec << endl <<  "WARNING: the following " << misaligned.size() << " realization names are shared between the dv and observation ensembles but they are not in the same row locations:" << endl;
+		frec << endl << "WARNING: the following " << misaligned.size() << " realization names are shared between the dv and observation ensembles but they are not in the same row locations:" << endl;
 		for (auto ma : misaligned)
 			frec << ma << endl;
 	}
@@ -1014,9 +1089,11 @@ void SeqQuadProgram::initialize()
 	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
 
 	//TODO: I think the base_oe should just be a "no noise" obs ensemble?
+	//or do we even need it?  Or can we use this to do a chen-oliver style 
+	//robust opt?
 	oe_base = oe; //copy
-	
-    //reorder this for later...
+
+	//reorder this for later...
 	oe_base.reorder(vector<string>(), act_obs_names);
 
 	dv_base = dv; //copy
@@ -1034,7 +1111,7 @@ void SeqQuadProgram::initialize()
 
 		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
-	
+
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
@@ -1054,8 +1131,16 @@ void SeqQuadProgram::initialize()
 
 
 	performance_log->log_event("calc pre-drop phi");
+	//todo: I think we probably want to use the opt_objective_function arg
+	//to define the objective function.  Support and obs or a pi.  
+	//what about an external file like pestpp-opt with just coefficients?
+
+
 	//initialize the phi handler
-	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &dv_base, &parcov);
+	//todo: can we also use the l2 norm of residuals to ident 
+	//"bad" realizations?
+
+	/*ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &dv_base, &parcov);
 
 	if (ph.get_lt_obs_names().size() > 0)
 	{
@@ -1086,14 +1171,11 @@ void SeqQuadProgram::initialize()
 		ss << "WARNING: less than " << warn_min_reals << " active realizations...might not be enough";
 		string s = ss.str();
 		message(0, s);
-	}
+	}*/
 
-	pcs = ParChangeSummarizer(&dv_base, &file_manager,&output_file_writer);
-	
+	pcs = ParChangeSummarizer(&dv_base, &file_manager, &output_file_writer);
 
-	message(0, "initialization complete");
 }
-
 
 void SeqQuadProgram::drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe, bool is_subset)
 {
@@ -1137,7 +1219,7 @@ void SeqQuadProgram::drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_
 		{
 			oname = obs_real_names[i];
 			
-			if (is_subset)
+			/*if (is_subset)
 			{
 				pidx = find(full_onames.begin(), full_onames.end(), oname) - full_onames.begin();
 				if (find(subset_idxs.begin(), subset_idxs.end(), pidx) == subset_idxs.end())
@@ -1147,8 +1229,8 @@ void SeqQuadProgram::drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_
 					throw_sqp_error(ss.str());
 				}
 				pname = full_pnames[pidx];
-			}
-			else
+			}*/
+			//else
 			{
 				pidx = i;
 				pname = par_real_names[pidx];
@@ -1352,11 +1434,75 @@ void SeqQuadProgram::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnse
 
 }
 
-ParameterEnsemble SeqQuadProgram::fancy_solve_routine(double scale_val)
+Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_values)
 {
-	ParameterEnsemble dv_candidate = dv; //copy
-	//lots of fancy maths here...
-	return dv_candidate;
+	Eigen::VectorXd grad(dv_names.size());
+	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
+	if (use_ensemble_grad)
+	{
+		//ensemble stuff here
+		if (use_obj_obs)
+		{
+			
+			//todo: need to make sqp specific or refactor ies arg names
+			//this is really just a vector of obj function anoms around the center_on point
+			Eigen::MatrixXd obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str}, center_on);
+			//this is a matrix of dv anoms around the center_on point
+			Eigen::MatrixXd dv_anoms = oe.get_eigen_anomalies(vector<string>(), dv_names, center_on);
+			//todo: actually calc the grad!
+			throw_sqp_error("obs-based obj for ensembles not implemented");
+
+			//todo: localize the gradient?
+
+		}
+		//pi base obj, need representative dv values using the "center_on" arg
+		//represent the mean/median/base - that is, derived from the "center_on" arg
+		//todo: for now, just using mean dv values
+		else
+		{
+			//if not center_on arg, use the mean dv values
+			if (center_on.size() == 0)
+			{
+				pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
+				for (int i = 0; i < dv_names.size(); i++)
+				{
+					grad[i] = obj_func_coef_map[dv_names[i]] * mm.first[dv_names[i]];
+				}
+			}
+			else
+			{
+				
+					grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
+			}
+		}
+	}
+	else
+	{
+		//obs-based obj
+		if (use_obj_obs)
+		{
+			//just a jco row
+			vector<string> obj_name_vec{obj_func_str};
+			grad = jco.get_matrix(obj_name_vec, dv_names);
+		}
+		//pi based obj
+		else
+		{
+			for (int i=0;i<dv_names.size();i++)
+			{
+				grad[i] = obj_func_coef_map[dv_names[i]] * _current_dv_values.get_rec(dv_names[i]);
+			}
+		}
+	}
+	return grad;
+}
+
+
+Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameters& _current_dv_values)
+{
+	Parameters candidate;
+	Eigen::VectorXd grad = calc_gradient_vector(_current_dv_values);
+	return candidate;
 }
 
 bool SeqQuadProgram::solve_new()
@@ -1387,48 +1533,49 @@ bool SeqQuadProgram::solve_new()
 		cout << "  ...reducing ++ies_subset_size to " << dv.shape().first << endl;
 		subset_size = dv.shape().first;
 	}
-
-	dv.transform_ip(ParameterEnsemble::transStatus::NUM);
-
-	//vector to store candidate upgrade ensembles
-	vector<ParameterEnsemble> dv_candidates;
-	//the current candidate
-	ParameterEnsemble dv_candidate;
+	
+	
+	Parameters _current_num_dv_values = current_ctl_dv_values;
+	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+	pts.ctl2numeric_ip(_current_num_dv_values);
+	_current_num_dv_values = _current_num_dv_values.get_subset(dv_names.begin(),dv_names.end());
+	if (use_ensemble_grad)
+	{
+		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
+		vector<double> mean_vec = dv.get_mean_stl_var_vector();
+		_current_num_dv_values.update(dv_names, mean_vec);
+	}
+	
+	Parameters dv_candidate;
+	ParameterEnsemble dv_candidates(&pest_scenario,&rand_gen);
+	dv_candidates.set_trans_status(ParameterEnsemble::transStatus::NUM);
+	
 	
 	//backtracking/line search factors
 	//TODO: make this a ++ arg or tunable or something clever
 	vector<double> scale_vals{ 0.1,0.5,1.0 };
+	vector<string> real_names;
 	
-	for (auto &scale_val : scale_vals)
+	for (auto sv : scale_vals)
 	{
+		ss.str("");
+		ss << "dv_cand_sv:" << setw(8) << setprecision(3) << sv;
+		real_names.push_back(ss.str());
+	}
+	dv_candidates.reserve(real_names, dv_names);
+
+	for (int i=0;i<scale_vals.size();i++)
+	{
+		double scale_val = scale_vals[i];
 		ss.str("");
 		ss << "starting calcs for scaling factor" << scale_val;
 		message(1, "starting lambda calcs for scaling factor", scale_val);
 		message(2, "see .log file for more details");
 		
-		dv_candidate = fancy_solve_routine(scale_val);
-
-		dv_candidates.push_back(dv_candidate);
-		//TODO: add sqp option to save candidates, but for now, just piggy back on 
-		//ies option
-		if (!pest_scenario.get_pestpp_options().get_ies_save_lambda_en())
-			continue;
-		ss.str("");
-		ss << file_manager.get_base_filename() << "." << iter << "." << scale_val << ".scale.par";
-
-		if (pest_scenario.get_pestpp_options().get_ies_save_binary())
-		{
-			ss << ".jcb";
-			dv_candidate.to_binary(ss.str());
-		}
-		else
-		{
-			ss << ".csv";
-			dv_candidate.to_csv(ss.str());
-		}
-		frec << "scale value " << scale_val << " dv ensemble saved to " << ss.str() << endl;
-
-		
+		dv_candidate = fancy_solve_routine(scale_val, _current_num_dv_values);
+		Eigen::VectorXd vec = dv_candidate.get_data_eigen_vec(dv_names);
+		dv_candidates.update_real_ip(real_names[i], vec);
+		//TODO: add sqp option to save candidates
 
 		ss.str("");
 		message(1, "finished calcs for scaling factor:", scale_val);
@@ -1447,253 +1594,12 @@ bool SeqQuadProgram::solve_new()
 	double mean, std;
 
 	message(0, "running candidate decision variable ensembles");
-	vector<ObservationEnsemble> oe_lams = run_candidate_ensembles(dv_candidates, scale_vals);
+	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates, scale_vals);
 
-	message(0, "evaluting lambda ensembles");
-	message(1, "last mean: ", last_best_mean);
-	message(1, "last stdev: ", last_best_std);
+	//todo: decide which if any dv candidate to accept...
 
-	ObservationEnsemble oe_scale_best;
-	bool echo = false;
-	if (verbose_level > 1)
-		echo = true;
-	for (int i = 0; i<dv_candidates.size(); i++)
-	{
-		if (oe_lams[i].shape().first == 0)
-			continue;
-		if (pest_scenario.get_pestpp_options().get_ies_save_lambda_en())
-			
-		{
-			ss.str("");
-			ss << file_manager.get_base_filename() << "." << iter << "." << scale_vals[i] << ".scale.obs";
-
-			if (pest_scenario.get_pestpp_options().get_ies_save_binary())
-			{
-				ss << ".jcb";
-				oe_lams[i].to_binary(ss.str());
-			}
-			else
-			{
-				ss << ".csv";
-				oe_lams[i].to_csv(ss.str());
-			}
-			frec << "scale value " << scale_vals[i] << " observation scale value ensemble saved to " << ss.str() << endl;
-
-		}
-		drop_bad_phi(dv_candidates[i], oe_lams[i], true);
-		if (oe_lams[i].shape().first == 0)
-		{
-			message(1, "all realizations dropped as 'bad' for scale value: ", scale_vals[i]);
-			continue;
-		}
-		
-		ph.update(oe_lams[i], dv_candidates[i]);
-		
-		message(0, "phi summary for scale value: ", scale_vals[i]);
-		ph.report(echo);
-		
-		mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
-		std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-		if (mean < best_mean)
-		{
-			oe_scale_best = oe_lams[i];
-			best_mean = mean;
-			best_std = std;
-			best_idx = i;
-		}
-	}
-	if (best_idx == -1)
-	{
-		//TODO: how to handle bad testing...
-		message(0, "WARNING:  unsuccessful testing");
-		return false;
-
-	}
-	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
-
-
-	//subset stuff here
-	if ((best_idx != -1) && (use_subset) && (subset_size < dv.shape().first))
-	{
-
-		double acc_phi = last_best_mean * acc_fac;
-		
-		if (pest_scenario.get_pestpp_options().get_ies_debug_high_subset_phi())
-		{
-			cout << "ies_debug_high_subset_phi active" << endl;
-			best_mean = acc_phi + 1.0;
-		}
-
-		if (best_mean > acc_phi)
-		{
-			//ph.update(oe_lams[best_idx],pe_lams[best_idx]);
-			
-			//TODO: think about what bad sqp cycles look like and how to handle...
-			/*ss.str("");
-			ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
-			string m = ss.str();
-			message(0, m);
-			message(1, "abandoning current lambda ensembles, increasing lambda to ", new_lam);
-			message(1, "updating realizations with reduced phi");
-			update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx]);
-			message(1, "returing to lambda calculations...");
-			return false;*/
-		}
-
-		//release the memory of the unneeded pe_lams
-		for (int i = 0; i < dv_candidates.size(); i++)
-		{
-			if (i == best_idx)
-				continue;
-			dv_candidates[i] = ParameterEnsemble();
-		}
-		//need to work out which par and obs en real names to run - some may have failed during subset testing...
-		ObservationEnsemble remaining_oe_lam = oe;//copy
-		ParameterEnsemble remaining_pe_lam = dv_candidates[best_idx];
-		vector<string> pe_keep_names, oe_keep_names;
-		vector<string> pe_names = dv.get_real_names(), oe_names = oe.get_real_names();
-
-		vector<string> org_pe_idxs,org_oe_idxs;
-		set<string> ssub;
-		for (auto &i : subset_idxs)
-			ssub.emplace(pe_names[i]);
-		for (int i=0;i<pe_names.size();i++)
-			if (ssub.find(pe_names[i]) == ssub.end())
-			{
-				pe_keep_names.push_back(pe_names[i]);
-				//oe_keep_names.push_back(oe_names[i]);
-			}
-		ssub.clear();
-		for (auto &i : subset_idxs)
-			ssub.emplace(oe_names[i]);
-		for (int i = 0; i<oe_names.size(); i++)
-			if (ssub.find(oe_names[i]) == ssub.end())
-			{
-				oe_keep_names.push_back(oe_names[i]);
-			}
-		message(0, "phi summary for best scale value: ", scale_vals[best_idx]);
-		ph.update(oe_lams[best_idx], dv_candidates[best_idx]);
-		ph.report(true);
-		message(0, "running remaining realizations for best scale value:", scale_vals[best_idx]);
-
-		//pe_keep_names and oe_keep_names are names of the remaining reals to eval
-		performance_log->log_event("dropping subset idxs from remaining_pe_lam");
-		remaining_pe_lam.keep_rows(pe_keep_names);
-		performance_log->log_event("dropping subset idxs from remaining_oe_lam");
-		remaining_oe_lam.keep_rows(oe_keep_names);
-		//save these names for later
-		org_pe_idxs = remaining_pe_lam.get_real_names();
-		org_oe_idxs = remaining_oe_lam.get_real_names();
-		///run
-		vector<int> fails = run_ensemble(remaining_pe_lam, remaining_oe_lam);
-
-		//for testing
-		if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder())
-			fails.push_back(0);
-
-		//if any of the remaining runs failed
-		if (fails.size() == org_pe_idxs.size())
-			throw_sqp_error(string("all remaining realizations failed...something is prob wrong"));
-		if (fails.size() > 0)
-		{
-
-			vector<string> new_pe_idxs, new_oe_idxs;
-			vector<int>::iterator start = fails.begin(), end = fails.end();
-			stringstream ss;
-			ss << "the following par:obs realizations failed during evaluation of the remaining ensemble: ";
-			for (int i = 0; i < org_pe_idxs.size(); i++)
-				if (find(start, end, i) == end)
-				{
-					new_pe_idxs.push_back(org_pe_idxs[i]);
-					new_oe_idxs.push_back(org_oe_idxs[i]);
-				}
-				else
-				{
-					ss << org_pe_idxs[i] << ":" << org_oe_idxs[i] << " , ";
-				}
-			string s = ss.str();
-			message(1, s);
-			remaining_oe_lam.keep_rows(new_oe_idxs);
-			remaining_pe_lam.keep_rows(new_pe_idxs);
-
-		}
-		//drop the remaining runs from the par en then append the remaining par runs (in case some failed)
-		performance_log->log_event("assembling ensembles");
-		dv_candidates[best_idx].drop_rows(pe_keep_names);
-		dv_candidates[best_idx].append_other_rows(remaining_pe_lam);
-		//append the remaining obs en
-		oe_scale_best.append_other_rows(remaining_oe_lam);
-		assert(dv_candidates[best_idx].shape().first == oe_scale_best.shape().first);
-		drop_bad_phi(dv_candidates[best_idx], oe_scale_best);
-		if (oe_scale_best.shape().first == 0)
-		{
-			throw_sqp_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
-		}
-		performance_log->log_event("updating phi");
-		ph.update(oe_scale_best, dv_candidates[best_idx]);
-		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
-		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-		message(1, "phi summary for entire ensemble using scale value",scale_vals[best_idx]);
-		ph.report(true);
-	}
-	else
-	{
-		ph.update(oe_scale_best, dv_candidates[best_idx]);
-		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
-		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-		
-	}
-
-	ph.update(oe_scale_best, dv_candidates[best_idx]);
-	best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
-	best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-	message(1, "last best mean phi * acceptable phi factor: ", last_best_mean * acc_fac);
-	message(1, "current best mean phi: ", best_mean);
-
-	if (pest_scenario.get_pestpp_options().get_ies_debug_high_upgrade_phi())
-	{
-		cout << "ies_debug_high_upgrade_phi active" << endl;
-		best_mean = (last_best_mean * acc_fac) + 1.0;
-	}
-
-	//track this here for phi-based termination check
-	best_mean_phis.push_back(best_mean);
-
-
-	if (best_mean < last_best_mean * acc_fac)
-	{
-		message(0, "updating parameter ensemble");
-		performance_log->log_event("updating parameter ensemble");
-		last_best_mean = best_mean;
-
-		dv = dv_candidates[best_idx];
-		oe = oe_scale_best;
-		/*if (best_std < last_best_std * acc_fac)
-		{
-			double new_lam = lam_vals[best_idx] * lam_dec;
-			new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
-			message(0, "updating lambda to ", new_lam);
-			last_best_lam = new_lam;
-		}
-		else
-		{
-			message(0, "not updating lambda");
-		}*/
-		last_best_std = best_std;
-	}
-
-	else 
-	{
-		//message(0, "not updating parameter ensemble");
-		message(0, "only updating realizations with reduced phi");
-		update_reals_by_phi(dv_candidates[best_idx], oe_scale_best);
-		ph.update(oe, dv);
-		/*double new_lam = last_best_lam * lam_inc;
-		new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
-		message(0, "incresing lambda to: ", new_lam);
-		last_best_lam = new_lam;*/
-	}
-	//report_and_save();
+	//report and save, etc...
+	
 	return true;
 }
 
@@ -1745,177 +1651,175 @@ void SeqQuadProgram::report_and_save()
 }
 
 
-void SeqQuadProgram::set_subset_idx(int size)
-{
-	//map<int,int> subset_idx_map;
-	subset_idxs.clear();
-	int nreal_subset = pest_scenario.get_pestpp_options().get_ies_subset_size();
-	if ((!use_subset) || (nreal_subset >= size))
-	{
-		for (int i = 0; i < size; i++)
-			subset_idxs.push_back(i);
-		return;
-	}
-	vector<string> pe_names = dv.get_real_names();
+//void SeqQuadProgram::set_subset_idx(int size)
+//{
+//	//map<int,int> subset_idx_map;
+//	subset_idxs.clear();
+//	int nreal_subset = pest_scenario.get_pestpp_options().get_ies_subset_size();
+//	if ((!use_subset) || (nreal_subset >= size))
+//	{
+//		for (int i = 0; i < size; i++)
+//			subset_idxs.push_back(i);
+//		return;
+//	}
+//	vector<string> pe_names = dv.get_real_names();
+//
+//	vector<string>::iterator bidx = find(pe_names.begin(), pe_names.end(), base_name);
+//	if (bidx != pe_names.end())
+//	{
+//
+//		subset_idxs.push_back(bidx - pe_names.begin());
+//	}
+//	//int size = dv.shape().first;
+//	string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
+//	if (how == "FIRST")
+//	{
+//		for (int i = 0; i < size; i++)
+//		{
+//			if (subset_idxs.size() >= nreal_subset)
+//				break;
+//			if (find(subset_idxs.begin(), subset_idxs.end(), i) != subset_idxs.end())
+//				continue;
+//
+//			subset_idxs.push_back(i);
+//
+//		}
+//
+//	}
+//	else if (how == "LAST")
+//	{
+//
+//		for (int i = size-1; i >= 0; i--)
+//		{
+//			if (subset_idxs.size() >= nreal_subset)
+//				break;
+//			if (find(subset_idxs.begin(), subset_idxs.end(), i) != subset_idxs.end())
+//				continue;
+//
+//			subset_idxs.push_back(i);
+//
+//		}
+//
+//	}
+//
+//	else if (how == "RANDOM")
+//	{
+//		std::uniform_int_distribution<int> uni(0, size-1);
+//		int idx;
+//		for (int i = 0; i < 10000000; i++)
+//		{
+//			if (subset_idxs.size() >= nreal_subset)
+//				break;
+//			idx = uni(subset_rand_gen);
+//			if (find(subset_idxs.begin(), subset_idxs.end(), idx) != subset_idxs.end())
+//				continue;
+//			subset_idxs.push_back(idx);
+//		}
+//		if (subset_idxs.size() != nreal_subset)
+//			throw_sqp_error("max iterations exceeded when trying to find random subset idxs");
+//
+//	}
+//	else if (how == "PHI_BASED")
+//	{
+//		//sidx needs to be index of realization, not realization number
+//		vector<pair<double, int>> phis;
+//		//vector<int> sidx;
+//		int step;
+//		int idx;
+//		L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
+//		map<string, double> phi_map = ph.get_phi_map(pt);
+//		map<string, double>::iterator pi = phi_map.begin(), end = phi_map.end();
+//
+//		int i = 0;
+//		for (; pi != end; ++pi)
+//		{
+//			phis.push_back(make_pair(pi->second, i)); //phival,idx?
+//			++i;
+//		}
+//		sort(phis.begin(), phis.end());
+//
+//		//include idx for lowest and highest phi reals
+//		if (subset_idxs.size() < nreal_subset)
+//		{
+//			for (auto phi : phis)
+//			{
+//				if (find(subset_idxs.begin(), subset_idxs.end(), phi.second) == subset_idxs.end())
+//				{
+//					subset_idxs.push_back(phi.second);
+//					break;
+//				}
+//			}
+//		}
+//		if (subset_idxs.size() < nreal_subset)
+//		{
+//			for (int i = phis.size() - 1; i >= 0; i--)
+//			{
+//				if (find(subset_idxs.begin(), subset_idxs.end(), phis[i].second) == subset_idxs.end())
+//				{
+//					subset_idxs.push_back(phis[i].second);
+//					break;
+//				}
+//			}
+//		}
+//
+//
+//		step = (phis.size()-1) / nreal_subset;
+//		//cout << step << endl;
+//		//cout << (phis.size() - 1) << endl;
+//		for (i = 1; i < nreal_subset; ++i)
+//		{
+//			//add higher phis first
+//			idx = phis.size() - (i * step);
+//			if ((subset_idxs.size() < nreal_subset) && (find(subset_idxs.begin(), subset_idxs.end(), phis[idx].second) == subset_idxs.end()))
+//			{
+//				subset_idxs.push_back(phis[idx].second);
+//				//cout << i << endl;
+//				//cout << idx << endl;
+//				//cout << phis[idx].first << endl;
+//				//cout << phis[idx].second << endl;
+//			}
+//		}
+//	}
+//	else
+//	{
+//		//throw runtime_error("unkonwn 'subset_how'");
+//		throw_sqp_error("unknown 'subset_how'");
+//	}
+//	stringstream ss;
+//	for (auto i : subset_idxs)
+//		ss << i << ":" << pe_names[i] << ", ";
+//	message(1,"subset idx:dv real name: ",ss.str());
+//	return;
+//	//return subset_idx_map;
+//}
 
-	vector<string>::iterator bidx = find(pe_names.begin(), pe_names.end(), base_name);
-	if (bidx != pe_names.end())
-	{
-
-		subset_idxs.push_back(bidx - pe_names.begin());
-	}
-	//int size = dv.shape().first;
-	string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
-	if (how == "FIRST")
-	{
-		for (int i = 0; i < size; i++)
-		{
-			if (subset_idxs.size() >= nreal_subset)
-				break;
-			if (find(subset_idxs.begin(), subset_idxs.end(), i) != subset_idxs.end())
-				continue;
-
-			subset_idxs.push_back(i);
-
-		}
-
-	}
-	else if (how == "LAST")
-	{
-
-		for (int i = size-1; i >= 0; i--)
-		{
-			if (subset_idxs.size() >= nreal_subset)
-				break;
-			if (find(subset_idxs.begin(), subset_idxs.end(), i) != subset_idxs.end())
-				continue;
-
-			subset_idxs.push_back(i);
-
-		}
-
-	}
-
-	else if (how == "RANDOM")
-	{
-		std::uniform_int_distribution<int> uni(0, size-1);
-		int idx;
-		for (int i = 0; i < 10000000; i++)
-		{
-			if (subset_idxs.size() >= nreal_subset)
-				break;
-			idx = uni(subset_rand_gen);
-			if (find(subset_idxs.begin(), subset_idxs.end(), idx) != subset_idxs.end())
-				continue;
-			subset_idxs.push_back(idx);
-		}
-		if (subset_idxs.size() != nreal_subset)
-			throw_sqp_error("max iterations exceeded when trying to find random subset idxs");
-
-	}
-	else if (how == "PHI_BASED")
-	{
-		//sidx needs to be index of realization, not realization number
-		vector<pair<double, int>> phis;
-		//vector<int> sidx;
-		int step;
-		int idx;
-		L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
-		map<string, double> phi_map = ph.get_phi_map(pt);
-		map<string, double>::iterator pi = phi_map.begin(), end = phi_map.end();
-
-		int i = 0;
-		for (; pi != end; ++pi)
-		{
-			phis.push_back(make_pair(pi->second, i)); //phival,idx?
-			++i;
-		}
-		sort(phis.begin(), phis.end());
-
-		//include idx for lowest and highest phi reals
-		if (subset_idxs.size() < nreal_subset)
-		{
-			for (auto phi : phis)
-			{
-				if (find(subset_idxs.begin(), subset_idxs.end(), phi.second) == subset_idxs.end())
-				{
-					subset_idxs.push_back(phi.second);
-					break;
-				}
-			}
-		}
-		if (subset_idxs.size() < nreal_subset)
-		{
-			for (int i = phis.size() - 1; i >= 0; i--)
-			{
-				if (find(subset_idxs.begin(), subset_idxs.end(), phis[i].second) == subset_idxs.end())
-				{
-					subset_idxs.push_back(phis[i].second);
-					break;
-				}
-			}
-		}
-
-
-		step = (phis.size()-1) / nreal_subset;
-		//cout << step << endl;
-		//cout << (phis.size() - 1) << endl;
-		for (i = 1; i < nreal_subset; ++i)
-		{
-			//add higher phis first
-			idx = phis.size() - (i * step);
-			if ((subset_idxs.size() < nreal_subset) && (find(subset_idxs.begin(), subset_idxs.end(), phis[idx].second) == subset_idxs.end()))
-			{
-				subset_idxs.push_back(phis[idx].second);
-				//cout << i << endl;
-				//cout << idx << endl;
-				//cout << phis[idx].first << endl;
-				//cout << phis[idx].second << endl;
-			}
-		}
-	}
-	else
-	{
-		//throw runtime_error("unkonwn 'subset_how'");
-		throw_sqp_error("unknown 'subset_how'");
-	}
-	stringstream ss;
-	for (auto i : subset_idxs)
-		ss << i << ":" << pe_names[i] << ", ";
-	message(1,"subset idx:dv real name: ",ss.str());
-	return;
-	//return subset_idx_map;
-}
-
-vector<ObservationEnsemble> SeqQuadProgram::run_candidate_ensembles(vector<ParameterEnsemble>& dv_candidates, vector<double> &scale_vals)
+ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv_candidates, vector<double> &scale_vals)
 {
 	ofstream &frec = file_manager.rec_ofstream();
 	stringstream ss;
-	ss << "queuing " << dv_candidates.size() << " ensembles";
+	ss << "queuing " << dv_candidates.shape().first << " candidate solutions";
 	performance_log->log_event(ss.str());
 	run_mgr_ptr->reinitialize();
 	
-	set_subset_idx(dv_candidates[0].shape().first);
-	vector<map<int, int>> real_run_ids_vec;
+	//set_subset_idx(dv_candidates[0].shape().first);
+	map<int, int> real_run_ids;
 	//ParameterEnsemble pe_lam;
 	//for (int i=0;i<pe_lams.size();i++)
-	for (auto &dv_candidate : dv_candidates)
+	try
 	{
-		try
-		{
-			real_run_ids_vec.push_back(dv_candidate.add_runs(run_mgr_ptr,subset_idxs));
-		}
-		catch (const exception &e)
-		{
-			stringstream ss;
-			ss << "run_ensemble() error queueing runs: " << e.what();
-			throw_sqp_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_sqp_error(string("run_ensembles() error queueing runs"));
-		}
+		real_run_ids = dv_candidates.add_runs(run_mgr_ptr);
 	}
+	catch (const exception &e)
+	{
+		stringstream ss;
+		ss << "run_ensemble() error queueing runs: " << e.what();
+		throw_sqp_error(ss.str());
+	}
+	catch (...)
+	{
+		throw_sqp_error(string("run_ensembles() error queueing runs"));
+	}
+	
 	performance_log->log_event("making runs");
 	try
 	{
@@ -1935,90 +1839,64 @@ vector<ObservationEnsemble> SeqQuadProgram::run_candidate_ensembles(vector<Param
 
 	performance_log->log_event("processing runs");
 	vector<int> failed_real_indices;
-	vector<ObservationEnsemble> obs_lams;
-	//ObservationEnsemble _oe = oe;//copy
-	//if (subset_size < pe_lams[0].shape().first)
-	//	_oe.keep_rows(subset_idxs);
-	map<int, int> real_run_ids;
-	//for (auto &real_run_ids : real_run_ids_vec)
-	for (int i=0;i<dv_candidates.size();i++)
+	
+	ObservationEnsemble _oe = oe;//copy
+	try
 	{
-		ObservationEnsemble _oe = oe;//copy
-		//vector<double> rep_vals{ lam_vals[i],scale_vals[i] };
-		real_run_ids = real_run_ids_vec[i];
-		//if using subset, reset the real_idx in real_run_ids to be just simple counter
-		//if (subset_size < pe_lams[0].shape().first)
-		if ((use_subset) && (subset_size < dv_candidates[i].shape().first))
-		{
-			_oe.keep_rows(subset_idxs);
-			int ireal = 0;
-			map<int, int> temp;
-			for (auto &rri : real_run_ids)
-			{
-				temp[ireal] = rri.second;
-				ireal++;
-			}
-
-			real_run_ids = temp;
-		}
-
-		try
-		{
-			failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr);
-		}
-		catch (const exception &e)
-		{
-			stringstream ss;
-			ss << "error processing runs for scale value: " << scale_vals[i] << ':' << e.what();
-			throw_sqp_error(ss.str());
-		}
-		catch (...)
-		{
-			stringstream ss;
-			ss << "error processing runs for scale value: " << scale_vals[i];
-			throw_sqp_error(ss.str());
-		}
-
-		if (pest_scenario.get_pestpp_options().get_ies_debug_fail_subset())
-			failed_real_indices.push_back(real_run_ids.size()-1);
-
-		if (failed_real_indices.size() > 0)
-		{
-			stringstream ss;
-			vector<string> par_real_names = dv.get_real_names();
-			vector<string> obs_real_names = oe.get_real_names();
-			vector<string> failed_par_names, failed_obs_names;
-			string oname, pname;
-			ss << "the following dv:obs realization runs failed for scale value " << scale_vals[i] << "-->";
-			for (auto &i : failed_real_indices)
-			{
-				pname = par_real_names[subset_idxs[i]];
-				oname = obs_real_names[subset_idxs[i]];
-				failed_par_names.push_back(pname);
-				failed_obs_names.push_back(oname);
-				ss << pname << ":" << oname << ',';
-			}
-			string s = ss.str();
-			message(1,s);
-			if (failed_real_indices.size() == _oe.shape().first)
-			{
-				message(0, "WARNING: all realizations failed for scale value :", scale_vals[i]);
-				_oe = ObservationEnsemble();
-
-			}
-			else
-			{
-				performance_log->log_event("dropping failed realizations");
-				//_oe.drop_rows(failed_real_indices);
-				//pe_lams[i].drop_rows(failed_real_indices);
-				_oe.drop_rows(failed_obs_names);
-				dv_candidates[i].drop_rows(failed_par_names);
-			}
-
-		}
-		obs_lams.push_back(_oe);
+		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr);
 	}
-	return obs_lams;
+	catch (const exception &e)
+	{
+		stringstream ss;
+		ss << "error processing dv candidate runs: " << e.what();
+		throw_sqp_error(ss.str());
+	}
+	catch (...)
+	{
+		stringstream ss;
+		ss << "error processing dv candidate runs";
+		throw_sqp_error(ss.str());
+	}
+
+	if (pest_scenario.get_pestpp_options().get_ies_debug_fail_subset())
+		failed_real_indices.push_back(real_run_ids.size()-1);
+
+	if (failed_real_indices.size() > 0)
+	{
+		stringstream ss;
+		vector<string> par_real_names = dv.get_real_names();
+		vector<string> obs_real_names = oe.get_real_names();
+		vector<string> failed_par_names, failed_obs_names;
+		string oname, pname;
+		ss << "the following dv candidate runs failed -->";
+		for (auto& i : failed_real_indices)
+		{
+			pname = par_real_names[i];
+			oname = obs_real_names[i];
+			failed_par_names.push_back(pname);
+			failed_obs_names.push_back(oname);
+			ss << pname << ":" << oname << ',';
+		}
+		string s = ss.str();
+		message(1, s);
+		if (failed_real_indices.size() == _oe.shape().first)
+		{
+			message(0, "WARNING: all dv candidate runs failed");
+			_oe = ObservationEnsemble();
+
+		}
+		else
+		{
+			performance_log->log_event("dropping failed realizations");
+			//_oe.drop_rows(failed_real_indices);
+			//pe_lams[i].drop_rows(failed_real_indices);
+			_oe.drop_rows(failed_obs_names);
+			dv_candidates.drop_rows(failed_par_names);
+		}
+	}
+
+	
+	return _oe;
 }
 
 void SeqQuadProgram::queue_chance_runs()
