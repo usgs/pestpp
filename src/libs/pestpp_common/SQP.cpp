@@ -817,7 +817,39 @@ void SeqQuadProgram::prep_4_fd_grad()
 	string base_jco = pest_scenario.get_pestpp_options().get_basejac_filename();
 	if (base_jco.size() > 0)
 	{
-	
+		message(1, "loading existing base jacobian " + base_jco);
+		jco.read(base_jco);
+		//todo: error trapping to make sure all the needed rows and cols are found
+		vector<string> vnames = jco.get_base_numeric_par_names();
+		set<string> snames(vnames.begin(), vnames.end());
+		vnames.clear();
+		for (auto& dv_name : dv_names)
+			if (snames.find(dv_name) == snames.end())
+				vnames.push_back(dv_name);
+		if (vnames.size() > 0)
+		{
+			ss.str("");
+			ss << "existing jacobian missing the following decision variables:" << endl;
+			for (auto m : vnames)
+				ss << vnames << endl;
+			throw_sqp_error(ss.str());
+		}
+		snames.clear();
+		vnames = constraints.get_obs_constraint_names();
+		snames.insert(vnames.begin(), vnames.end());
+		vnames.clear();
+		for (auto name : jco.get_sim_obs_names())
+			if (snames.find(name) == snames.end())
+				vnames.push_back(name);
+
+		if (vnames.size() > 0)
+		{
+			ss.str("");
+			ss << "existing jacobian missing the following obs constraints:" << endl;
+			for (auto m : vnames)
+				ss << vnames << endl;
+			throw_sqp_error(ss.str());
+		}
 	}
 	else
 	{
@@ -1450,6 +1482,7 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			//this is a matrix of dv anoms around the center_on point
 			Eigen::MatrixXd dv_anoms = oe.get_eigen_anomalies(vector<string>(), dv_names, center_on);
 			//todo: actually calc the grad!
+
 			throw_sqp_error("obs-based obj for ensembles not implemented");
 
 			//todo: localize the gradient?
