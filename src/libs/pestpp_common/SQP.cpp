@@ -1509,7 +1509,7 @@ Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameter
 bool SeqQuadProgram::solve_new()
 {
 	stringstream ss;
-	ofstream &frec = file_manager.rec_ofstream();
+	ofstream& frec = file_manager.rec_ofstream();
 	if (dv.shape().first <= error_min_reals)
 	{
 		message(0, "too few active realizations:", oe.shape().first);
@@ -1534,19 +1534,19 @@ bool SeqQuadProgram::solve_new()
 		cout << "  ...reducing ++ies_subset_size to " << dv.shape().first << endl;
 		subset_size = dv.shape().first;
 	}
-	
-	
+
+
 	Parameters _current_num_dv_values = current_ctl_dv_values;
 	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
 	pts.ctl2numeric_ip(_current_num_dv_values);
-	_current_num_dv_values = _current_num_dv_values.get_subset(dv_names.begin(),dv_names.end());
+	_current_num_dv_values = _current_num_dv_values.get_subset(dv_names.begin(), dv_names.end());
 	if (use_ensemble_grad)
 	{
 		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 		vector<double> mean_vec = dv.get_mean_stl_var_vector();
 		_current_num_dv_values.update(dv_names, mean_vec);
 	}
-	
+
 	// compute gradient
 	//if (use_ensemble_grad)
 	//{
@@ -1648,6 +1648,147 @@ bool SeqQuadProgram::solve_new()
 	//// and rectify if bad!
 	//
 	//}
+
+	// attempt update of active set again, now where constraints are active 
+	//if ((constraints is True) & (len(working_set) > 0));
+	//{
+	//	ss.str("");
+	//	ss << "updating active set of constraints; first attempt";
+	//	string s = ss.str();
+	//	message(1, s);
+	//	//alpha, next_it = self._active_set_method(first_pass = True)
+	//	throw_sqp_error("TODO");
+	//}
+
+	//// alpha trialing
+	//if (search_dir != 0 or next_it == False);  // or break out of iteration here if True
+	//{
+	//	if (constraints);
+	//	{
+	//		ss.str("");
+	//		ss << "specifying 'base' step length based on active set solve";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		//step = alpha
+	//		throw_sqp_error("TODO");
+	//	}
+	//	else
+	//	{
+	//		ss.str("");
+	//		ss << "specifying 'base' step length based on bound-related heuristics";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		//step = alpha
+	//		throw_sqp_error("TODO");
+	//	}
+
+	//	// compute step length and evaluate
+	//	ss.str("");
+	//	ss << "compute trial step lengths and associated mean dec var vectors";
+	//	string s = ss.str();
+	//	message(1, s);
+	//	throw_sqp_error("TODO");
+
+	//	// some bound handling here
+	//	// and drop subsequent (larger) alphas
+
+	//	if (use_ensemble_grad)
+	//	{
+	//		ss.str("");
+	//		ss << "draw dec var en at candidate mean vector";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		throw_sqp_error("TODO");
+
+	//		ss.str("");
+	//		ss << "evaluate ensembles at trial alphas - efficiently";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		throw_sqp_error("TODO");
+	//	}
+	//	else  // finite differences
+	//	{
+	//		ss.str("");
+	//		ss << "evaluate model at trial alphas - efficiently";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		throw_sqp_error("TODO");
+	//	}
+
+	//	if (constraints); // and if active set size is > 1?
+	//	{
+	//		ss.str("");
+	//		ss << "adopt filtering method to handle constraints and select best step size";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		//self._filter, accept, c_viol = self._filter_constraint_eval(self.obsensemble_1, self._filter, step_size,
+	//			//	biobj_weight = biobj_weight, biobj_transf = biobj_transf,
+	//				//opt_direction = self.opt_direction)
+	//		throw_sqp_error("TODO");
+
+	//		if (accept);
+	//		{
+	//			// tracking
+
+	//			ss.str("");
+	//			ss << "check for blocking constraints; break if so";
+	//			string s = ss.str();
+	//			message(1, s);
+	//			throw_sqp_error("TODO");
+	//		}
+	//	}
+	//	else  // unconstrained
+	//	{
+	//		if ((LBFGS) & (iter_num > 1));  // BFGS comes later
+	//		{
+	//			ss.str("");
+	//			ss << "check first (sufficiency) Wolfe condition for each alpha; next alpha if not";
+	//			string s = ss.str();
+	//			message(1, s);
+	//			throw_sqp_error("TODO");
+
+	//			ss.str("");
+	//			ss << "evaluate grad at candidate step size";
+	//			string s = ss.str();
+	//			message(1, s);
+	//			// can also do some re-use here
+	//			throw_sqp_error("TODO");
+
+	//			ss.str("");
+	//			ss << "check second (curvature) Wolfe condition for each alpha; next alpha if not";
+	//			string s = ss.str();
+	//			message(1, s);
+	//			throw_sqp_error("TODO");
+	//		}
+	//		// can compute curvature (y^Ts) here for reference and phi-curvature trade off
+
+	//		if; //current alpha is best
+	//		{
+	//			// tracking
+	//		}
+	//	}
+	//}
+
+	//// deal with unsuccessful iteration
+
+	//// quasi-Newton Hessian updating via BFGS
+	//// only if combination of conditions satisfies (some of which are user-specified)
+	//if (Hessian update or self scale) & (BFGS);
+	//{
+	//	ss.str("");
+	//	ss << "update Hessian via standard quasi-Newton BFGS";
+	//	string s = ss.str();
+	//	message(1, s);
+	//	throw_sqp_error("TODO");
+	//}
+	//else
+	//{
+	//	ss.str("");
+	//	ss << "skipping Hessian scaling and updating";
+	//	string s = ss.str();
+	//	message(1, s);
+	//}
+
 
 	Parameters dv_candidate;
 	ParameterEnsemble dv_candidates(&pest_scenario,&rand_gen);
