@@ -147,8 +147,6 @@ private:
 
 	Parameters fancy_solve_routine(double scale_val, const Parameters& _current_dv_);
 
-	//Covariance apply_draw_mult();
-
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
 	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates, vector<double> &scale_vals);
 

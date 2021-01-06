@@ -1282,6 +1282,11 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_num_reals);
 		return true;
 	}
+	else if (key == "SQP_USE_ENSEMBLE_GRAD")
+	{
+		sqp_use_ensemble_grad = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
 	else if (key == "SQP_UPDATE_HESSIAN")
 	{
 		sqp_update_hessian = pest_utils::parse_string_arg_to_bool(value);
