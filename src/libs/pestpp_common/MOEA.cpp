@@ -1482,6 +1482,8 @@ void MOEA::initialize()
 	else
 		throw_moea_error("'mou_mating_selector' type not recognized: " + mate + ", should be 'RANDOM' or 'TOURNAMENT'");
 
+
+
 	//reset the par bound PI augmentation since that option is just for simplex
 	ppo->set_opt_include_bnd_pi(false);
 
@@ -1557,6 +1559,8 @@ void MOEA::initialize()
 		dv_names = act_par_names;
 	}
 
+
+	message(1, "number of decision variables (see rec file for listing):", dv_names.size());
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
 
@@ -1566,6 +1570,7 @@ void MOEA::initialize()
 	{
 		//evaluate the chance constraints at every individual, very costly, but most robust
 		chancepoints = chancePoints::ALL;
+		message(1, "'opt_chance_points' = ALL, evaluting chance at all population members");
 	}
 	
 	else if (chance_points == "SINGLE")
@@ -1573,6 +1578,7 @@ void MOEA::initialize()
 		//evaluate the chance constraints only at the population member nearest the optimal tradeoff.
 		//much cheaper, but assumes linear coupling
 		chancepoints = chancePoints::SINGLE;
+		message(1, "'opt_chance_points' = SINGLE, evaluting chance at representative point");
 	}
 	else
 	{
@@ -1870,14 +1876,17 @@ void MOEA::initialize()
 		if (token == "DE")
 		{
 			gen_types.push_back(MouGenType::DE);
+			message(1, "using differential evolution generator");
 		}
 		else if (token == "SBX")
 		{
 			gen_types.push_back(MouGenType::SBX);
+			message(1, "using simulated binary cross over generator");
 		}
 		else if (token == "PM")
 		{
 			gen_types.push_back(MouGenType::PM);
+			message(1, "using polynomial mutation generator");
 		}
 		else
 		{
