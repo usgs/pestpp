@@ -1555,10 +1555,10 @@ bool SeqQuadProgram::solve_new()
 	}
 
 
-	Parameters _current_num_dv_values = current_ctl_dv_values;
+	Parameters _current_num_dv_values = current_ctl_dv_values;  // make copy
 	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
-	pts.ctl2numeric_ip(_current_num_dv_values);
-	_current_num_dv_values = _current_num_dv_values.get_subset(dv_names.begin(), dv_names.end());
+	pts.ctl2numeric_ip(_current_num_dv_values);  // covert to numeric format
+	_current_num_dv_values = _current_num_dv_values.get_subset(dv_names.begin(), dv_names.end());  // just dec var operation
 	if (use_ensemble_grad)
 	{
 		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
