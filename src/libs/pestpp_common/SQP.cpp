@@ -45,13 +45,13 @@ void SeqQuadProgram::throw_sqp_error(string message)
 	throw runtime_error("SeqQuadProgram error: " + message);
 }
 
-X SeqQuadProgram::apply_draw_mult()  // right place?
-{
-	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
-	float dm = ppo->get_sqp_dv_draw_mult(); // TODO add as ppo arg
-	cov * dm
-	return cov 
-}
+//SeqQuadProgram::apply_draw_mult()  // right place?
+//{
+//	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
+//	float dm = ppo->get_sqp_dv_draw_mult(); // TODO add as ppo arg
+//	cov * dm
+//	return cov 
+//}
 
 bool SeqQuadProgram::initialize_dv(Covariance &cov)
 {
@@ -620,6 +620,13 @@ void SeqQuadProgram::initialize()
 	//set some defaults
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
+	if (pp_args.find("PAR_SIGMA_RANGE") == pp_args.end())
+	{
+		message(1, "resetting par_sigma_range to 20.0");
+		ppo->set_par_sigma_range(20.0);
+	}
+
+
 	//reset the par bound PI augmentation since that option is just for simplex
 	ppo->set_opt_include_bnd_pi(false);
 
@@ -802,7 +809,9 @@ void SeqQuadProgram::initialize()
 	
 
 	//todo: add the FD approach and initialize it here
-	use_ensemble_grad = ppo->get_sqp_use_ensemble_grad();
+	use_ensemble_grad = false;
+	if (ppo->get_sqp_num_reals() > 0)
+		use_ensemble_grad = true;
 	if (use_ensemble_grad)
 	{
 		prep_4_ensemble_grad();
@@ -814,6 +823,7 @@ void SeqQuadProgram::initialize()
 		
 	//these will be the ones we track...
 	current_ctl_dv_values = pest_scenario.get_ctl_parameters();
+	current_obs = pest_scenario.get_ctl_observations();
 	
 
 	message(0, "initialization complete");
@@ -828,50 +838,102 @@ void SeqQuadProgram::prep_4_fd_grad()
 	string base_jco = pest_scenario.get_pestpp_options().get_basejac_filename();
 	if (base_jco.size() > 0)
 	{
-	
+		message(1, "loading existing base jacobian " + base_jco);
+		jco.read(base_jco);
+		//todo: error trapping to make sure all the needed rows and cols are found
+		vector<string> vnames = jco.get_base_numeric_par_names();
+		set<string> snames(vnames.begin(), vnames.end());
+		vnames.clear();
+		for (auto& dv_name : dv_names)
+			if (snames.find(dv_name) == snames.end())
+				vnames.push_back(dv_name);
+		if (vnames.size() > 0)
+		{
+			ss.str("");
+			ss << "existing jacobian missing the following decision variables:" << endl;
+			for (auto m : vnames)
+				ss << vnames << endl;
+			throw_sqp_error(ss.str());
+		}
+		snames.clear();
+		vnames = constraints.get_obs_constraint_names();
+		snames.insert(vnames.begin(), vnames.end());
+		vnames.clear();
+		for (auto name : jco.get_sim_obs_names())
+			if (snames.find(name) == snames.end())
+				vnames.push_back(name);
+
+		if (vnames.size() > 0)
+		{
+			ss.str("");
+			ss << "existing jacobian missing the following obs constraints:" << endl;
+			for (auto m : vnames)
+				ss << vnames << endl;
+			throw_sqp_error(ss.str());
+		}
 	}
 	else
 	{
-		Parameters current_pars = pest_scenario.get_ctl_parameters();
-		Observations current_sim = pest_scenario.get_ctl_observations();
-		ParamTransformSeq par_trans = pest_scenario.get_base_par_tran_seq();
 		
 		//todo: handle hotstart_resfile here...
 		bool init_obs = true;
 
-		set<string> out_of_bounds;
-		ss.str("");
-		ss << "queuing " << dv_names.size() << " finite difference runs";
-		message(2, ss.str());
-		bool success = jco.build_runs(current_pars, current_sim, dv_names, par_trans,
-			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
-			*run_mgr_ptr, out_of_bounds, false, init_obs);
-		if (!success)
-			throw_sqp_error("error building jacobian runs for FD grad");
-		//todo: think about freezind dec vars that go out of bounds? - yuck!
-		if (out_of_bounds.size() > 0)
-		{
-			ss.str("");
-			ss << "the following decision variable are out of bounds: " << endl;
-			for (auto& o : out_of_bounds)
-				ss << o << ",";
-		}
-		throw_sqp_error(ss.str());
-		message(2, "starting finite difference gradient pertubation runs");
-		jco.make_runs(*run_mgr_ptr);
-
+		run_jacobian(current_ctl_dv_values, current_obs, init_obs);
+		
 
 	}
+}
+
+void SeqQuadProgram::run_jacobian(Parameters& _current_ctl_dv_vals, Observations& _current_obs, bool init_obs)
+{
+	stringstream ss;
+	ParamTransformSeq par_trans = pest_scenario.get_base_par_tran_seq();
+	ParameterGroupInfo pgi = pest_scenario.get_base_group_info();
+	Parameters current_pars = pest_scenario.get_ctl_parameters();
+	PriorInformation pi = pest_scenario.get_prior_info();
+	current_pars.update_without_clear(dv_names,_current_ctl_dv_vals.get_data_eigen_vec(dv_names));
+
+	set<string> out_of_bounds;
+	ss.str("");
+	ss << "queuing " << dv_names.size() << " finite difference runs";
+	message(2, ss.str());
+	bool success = jco.build_runs(current_pars, _current_obs, dv_names, par_trans,
+		pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
+		*run_mgr_ptr, out_of_bounds, false, init_obs);
+	if (!success)
+		throw_sqp_error("error building jacobian runs for FD grad");
+	//todo: think about freezind dec vars that go out of bounds? - yuck!
+	if (out_of_bounds.size() > 0)
+	{
+		ss.str("");
+		ss << "the following decision variable are out of bounds: " << endl;
+		for (auto& o : out_of_bounds)
+			ss << o << ",";
+		throw_sqp_error(ss.str());
+	}
+	queue_chance_runs();
+	message(2, "starting finite difference gradient pertubation runs");
+	jco.make_runs(*run_mgr_ptr);
+	
+	success = jco.process_runs(par_trans,pgi,*run_mgr_ptr,pi,false,false);
+	if (!success)
+	{
+		throw_sqp_error("error processing finite difference gradient pertubation runs");
+	}
+	constraints.process_runs(run_mgr_ptr, iter);
+	if (init_obs)
+	{
+		run_mgr_ptr->get_run(0, current_pars, _current_obs, false);
+
+	}
+
 }
 
 void SeqQuadProgram::prep_4_ensemble_grad()
 {
 	stringstream ss;
 	message(1, "using ensemble approximation to gradient (EnOpt)");
-	//todo: we probably need to increase the default subset size 
-	//bc of nonlinear constraints...
-	subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
-
+	
 	//I think a bad phi option has use in SQP?
 	/*double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
 	if (bad_phi < 1.0e+30)
@@ -1080,18 +1142,6 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 		ph.write(0, 1);
 
 		return;
-	}
-
-	if (subset_size > dv.shape().first)
-	{
-		use_subset = false;
-	}
-	else
-	{
-		message(1, "using subset in scale factor testing, number of realizations used in subset testing: ", subset_size);
-		string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
-		message(1, "subset how: ", how);
-		use_subset = true;
 	}
 
 	oe_org_real_names = oe.get_real_names();
@@ -1462,7 +1512,17 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			Eigen::MatrixXd dv_anoms = oe.get_eigen_anomalies(vector<string>(), dv_names, center_on);
 			
 			// calc the dec var ensemble (approx) covariance vector (e.g., eq (8) of Dehdari and Oliver 2012 SPE)
+			for (int i = 0; i < dv_anoms.rows(); i++)
+			{
+				//assuming obj_anoms is being treated as a matrix - could swap it to a vector above
+				dv_anoms.row(i).array() *= obj_anoms.row(i)[0];
+			}
+			Eigen::VectorXd dv_cross_cov = dv_anoms.rowwise().sum();
+			//assumes that parcov has been pseudo inv ip'd before now...probably best to pass in a ref to an already inv'd parcov since we 
+			//will be using adaptive cov matrix
+			dv_cross_cov = *parcov.e_ptr() * dv_cross_cov;
 
+			//parcov.pseudo_inv_ip()
 			// calc the dec var-phi ensemble (approx) cross-covariance vector (e.g., eq (9) of Dehdari and Oliver 2012 SPE)
 
 			// calc pseudo inv of ensemble dec var covariance vector
@@ -1470,6 +1530,7 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			// calc gradient: (outer) product of pseudo inv of dec var cov vector and dec var-phi cross-cov vector
 			
 			//todo: actually calc the grad!
+
 			throw_sqp_error("obs-based obj for ensembles not implemented");
 
 			//todo: localize the gradient
@@ -1542,18 +1603,6 @@ bool SeqQuadProgram::solve_new()
 		string s = ss.str();
 		message(1, s);
 	}
-
-	if ((use_subset) && (subset_size > dv.shape().first))
-	{
-		ss.str("");
-		ss << "++ies_subset size (" << subset_size << ") greater than ensemble size (" << dv.shape().first << ")";
-		frec << "  ---  " << ss.str() << endl;
-		cout << "  ---  " << ss.str() << endl;
-		frec << "  ...reducing ++ies_subset_size to " << dv.shape().first << endl;
-		cout << "  ...reducing ++ies_subset_size to " << dv.shape().first << endl;
-		subset_size = dv.shape().first;
-	}
-
 
 	Parameters _current_num_dv_values = current_ctl_dv_values;  // make copy
 	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
