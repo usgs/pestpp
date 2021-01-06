@@ -104,6 +104,8 @@ private:
 
 	int num_threads;
 
+	double eigthresh;
+
 	set<string> pp_args;
 
 	int iter;
@@ -144,6 +146,8 @@ private:
 	bool solve_new();
 
 	Eigen::VectorXd calc_gradient_vector(const Parameters& _current_dv_);
+
+	//Eigen::VectorXd calc_search_direction_vector(const Parameters& _current_dv_)
 
 	Parameters fancy_solve_routine(double scale_val, const Parameters& _current_dv_);
 

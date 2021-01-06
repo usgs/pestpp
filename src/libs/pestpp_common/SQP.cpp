@@ -63,9 +63,6 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 	{
 		//only draw for dv names
 		Covariance dv_cov = cov.get(dv_names);
-		message(1, "dv_cov:", dv_cov);  // tmp
-		// apply draw_mult (++ arg?)
-		// dv_cov = apply_draw_mult();
 		ofstream& frec = file_manager.rec_ofstream();
 		message(1, "drawing decision variable realizations: ", num_reals);
 		map<string, double> par_means = pest_scenario.get_ext_file_double_map("parameter data external", "mean");
@@ -442,7 +439,7 @@ void SeqQuadProgram::initialize_objfunc()
 		}
 
 
-		//check that all obj_coefs are decsision vars
+		//check that all obj_coefs are decision vars
 		vector<string> missing_vars;
 		set<string> s_dv_names(dv_names.begin(), dv_names.end());
 		for (auto& coef : obj_func_coef_map)
@@ -1353,9 +1350,10 @@ void SeqQuadProgram::iterate_2_solution()
 		ss.str("");
 		ss << "starting solve for iteration: " << iter;
 		performance_log->log_event(ss.str());
-		accept = solve_new();
+ 		accept = solve_new();
 		report_and_save();
 		ph.update(oe,dv);
+		//hessian_operations();  // somewhere here
 		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		ph.report(true);
@@ -1498,6 +1496,7 @@ void SeqQuadProgram::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnse
 
 Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_values)
 {
+	stringstream ss;
 	Eigen::VectorXd grad(dv_names.size());
 	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
 	if (use_ensemble_grad)
@@ -1507,34 +1506,118 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 		{
 			
 			//todo: need to make sqp specific or refactor ies arg names
-			//this is really just a vector of obj function anoms around the center_on point
+
+			// compute diag dec var cov matrix empirically
+			// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
+			// start by computing mean-shifted dec var ensemble
+			Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, center_on);
+			Eigen::MatrixXd dv_cov_matrix;
+			dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
+			message(1, "dv_cov:", dv_cov_matrix);
+			// a theoretical alternative... check for consistency
+			//parcov = dv.get_diagonal_cov_matrix();  // check ok to instantiate empricially here  // pass helpful center_on here too
+			//message(1, "empirical parcov get method:", parcov);
+
+			// compute pseudo inv of diag dec var cov matrix
+			//Eigen::VectorXd parcov_inv;
+			//Covariance parcov_diag;
+			//parcov_diag.from_diagonal(parcov);
+			//parcov_inv = parcov_diag.get_matrix().diagonal();
+			//parcov_inv = parcov_inv.cwiseSqrt().cwiseInverse();  // equivalent to pseudo inv?
+			Eigen::MatrixXd parcov_inv;
+			parcov_inv = dv_cov_matrix.cwiseInverse();  // equivalent to pseudo inv?
+			message(1, "empirical parcov inv:", parcov_inv);  // tmp
+			//parcov_inv = parcov_diag.get_matrix().diagonal();
+			//Covariance parcov_pinv;
+			//parcov_pinv = parcov.pseudo_inv_ip(pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+			//parcov_pinv = dv_cov_matrix.pseudo_inv_ip(pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+			//message(1, "pseudo inv:", parcov_inv);  // tmp
+
+			// compute dec var-phi cross-cov vector
+			// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
+			// start by computing mean-shifted obj function ensemble
+			initialize_objfunc();
 			Eigen::MatrixXd obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str}, center_on);
-			//this is a matrix of dv anoms around the center_on point
-			Eigen::MatrixXd dv_anoms = oe.get_eigen_anomalies(vector<string>(), dv_names, center_on);
+			Eigen::MatrixXd cross_cov_vector;  // or Eigen::VectorXd?
+			cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
+			message(1, "dv-obj_cross_cov:", cross_cov_vector);
+
 			
 			// calc the dec var ensemble (approx) covariance vector (e.g., eq (8) of Dehdari and Oliver 2012 SPE)
-			for (int i = 0; i < dv_anoms.rows(); i++)
-			{
+			//for (int i = 0; i < dv_anoms.rows(); i++)
+			//{
 				//assuming obj_anoms is being treated as a matrix - could swap it to a vector above
-				dv_anoms.row(i).array() *= obj_anoms.row(i)[0];
-			}
-			Eigen::VectorXd dv_cross_cov = dv_anoms.rowwise().sum();
+				//dv_anoms.row(i).array() *= obj_anoms.row(i)[0];
+			//}
+			//Eigen::VectorXd dv_cross_cov = dv_anoms.rowwise().sum();
+			//message(1, "cross cov:", dv_cross_cov);  // tmp
 			//assumes that parcov has been pseudo inv ip'd before now...probably best to pass in a ref to an already inv'd parcov since we 
 			//will be using adaptive cov matrix
-			dv_cross_cov = *parcov.e_ptr() * dv_cross_cov;
-
-			//parcov.pseudo_inv_ip()
-			// calc the dec var-phi ensemble (approx) cross-covariance vector (e.g., eq (9) of Dehdari and Oliver 2012 SPE)
-
-			// calc pseudo inv of ensemble dec var covariance vector
-
-			// calc gradient: (outer) product of pseudo inv of dec var cov vector and dec var-phi cross-cov vector
 			
-			//todo: actually calc the grad!
+			// now compute grad vector
+			// this is a matrix-vector product; the matrix being the pseudo inv of diag empirical dec var cov matrix and the vector being the dec var-phi cross-cov vector\
+			// see, e.g., Chen et al. (2009) and Fonseca et al. (2015)
+			Eigen::VectorXd grad_vector; 
+			grad_vector = parcov_inv * cross_cov_vector;//*parcov.e_ptr() * cross_cov_vector;
+			message(1, "grad vector:", grad_vector);
 
-			throw_sqp_error("obs-based obj for ensembles not implemented");
+			// compute gradient
+			//if (use_ensemble_grad)
+//{
+//	if (LBFGS) &(num_it > 2)& (constraints False); // constraint False as need phi_grad for Lagrangian
+//	{
+//		ss.str("");
+//		ss << "(re)use grad from Wolfe testing during upgrade evaluations last iteration";
+//		string s = ss.str();
+//		message(1, s);
+//		throw_sqp_error("TODO");
+//	}
+//	else
+//	{
+//		ss.str("");
+//		ss << "compute dec var en cov vector and dec var en-phi en cross-covariance vector";
+//		string s = ss.str();
+//		message(1, s);
+//		throw_sqp_error("TODO");
 
-			//todo: localize the gradient
+//		// CMA implementation to go here
+
+//		ss.str("");
+//		ss << "compute gradient vector through product of pseudo inv of dec var and cross-cov";
+//		string s = ss.str();
+//		message(1, s);
+//		throw_sqp_error("TODO");
+
+//		ss.str("");
+//		ss << "compute ensemble approx to (active) constraint jacobian";
+//		string s = ss.str();
+//		message(1, s);
+//		throw_sqp_error("TODO");
+//	}
+//}
+//else // finite differences for gradient
+//{
+//	if (LBFGS) &(num_it > 2);
+//	{
+//		ss.str("");
+//		ss << "(re)use grad from Wolfe testing during upgrade evaluations last iteration";
+//		string s = ss.str();
+//		message(1, s);
+//		throw_sqp_error("TODO");
+//	}
+//	else // standard BFGS
+//	{
+//		ss.str("");
+//		ss << "populate jco and partition into phi grad vector and (active) constraint jco";
+//		string s = ss.str();
+//		message(1, s);
+//		throw_sqp_error("TODO");
+//	}
+//}
+
+             throw_sqp_error("obs-based obj for ensembles not implemented");
+
+             //todo: localize the gradient
 
 		}
 		//pi base obj, need representative dv values using the "center_on" arg
@@ -1542,135 +1625,68 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 		//todo: for now, just using mean dv values
 		else
 		{
-			//if not center_on arg, use the mean dv values
-			if (center_on.size() == 0)
+		//if not center_on arg, use the mean dv values
+		if (center_on.size() == 0)
+		{
+			pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
+			for (int i = 0; i < dv_names.size(); i++)
 			{
-				pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
-				for (int i = 0; i < dv_names.size(); i++)
-				{
-					grad[i] = obj_func_coef_map[dv_names[i]] * mm.first[dv_names[i]];
-				}
+				grad[i] = obj_func_coef_map[dv_names[i]] * mm.first[dv_names[i]];
 			}
-			else
-			{
-				
-					grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
-			}
+		}
+		else
+		{
+
+			grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
+		}
 		}
 	}
 	else
 	{
-		//obs-based obj
-		if (use_obj_obs)
+	//obs-based obj
+	if (use_obj_obs)
+	{
+		//just a jco row
+		vector<string> obj_name_vec{ obj_func_str };
+		grad = jco.get_matrix(obj_name_vec, dv_names);
+	}
+	//pi based obj
+	else
+	{
+		for (int i = 0; i < dv_names.size(); i++)
 		{
-			//just a jco row
-			vector<string> obj_name_vec{obj_func_str};
-			grad = jco.get_matrix(obj_name_vec, dv_names);
+			grad[i] = obj_func_coef_map[dv_names[i]] * _current_dv_values.get_rec(dv_names[i]);
 		}
-		//pi based obj
-		else
-		{
-			for (int i=0;i<dv_names.size();i++)
-			{
-				grad[i] = obj_func_coef_map[dv_names[i]] * _current_dv_values.get_rec(dv_names[i]);
-			}
-		}
+	}
 	}
 	return grad;
 }
 
+//Eigen::MatrixXd SeqQuadProgram::update_hessian()
+//{
+//// quasi-Newton Hessian updating via BFGS
+//// only if combination of conditions satisfies (some of which are user-specified)
+//if (Hessian update or self scale) & (BFGS);
+//{
+//	ss.str("");
+//	ss << "update Hessian via standard quasi-Newton BFGS";
+//	string s = ss.str();
+//	message(1, s);
+//	throw_sqp_error("TODO");
+//}
+//else
+//{
+//	ss.str("");
+//	ss << "skipping Hessian scaling and updating";
+//	string s = ss.str();
+//	message(1, s);
+//}
+//}
 
-Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameters& _current_dv_values)
-{
-	Parameters candidate;
-	Eigen::VectorXd grad = calc_gradient_vector(_current_dv_values);
-	return candidate;
-}
+//Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _current_dv_values)
+//{
+//	throw_sqp_error("TODO");
 
-bool SeqQuadProgram::solve_new()
-{
-	stringstream ss;
-	ofstream& frec = file_manager.rec_ofstream();
-	if (dv.shape().first <= error_min_reals)
-	{
-		message(0, "too few active realizations:", oe.shape().first);
-		message(1, "need at least ", error_min_reals);
-		throw_sqp_error(string("too few active realizations, cannot continue"));
-	}
-	if (dv.shape().first < warn_min_reals)
-	{
-		ss.str("");
-		ss << "WARNING: less than " << warn_min_reals << " active realizations...might not be enough";
-		string s = ss.str();
-		message(1, s);
-	}
-
-	Parameters _current_num_dv_values = current_ctl_dv_values;  // make copy
-	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
-	pts.ctl2numeric_ip(_current_num_dv_values);  // covert to numeric format
-	_current_num_dv_values = _current_num_dv_values.get_subset(dv_names.begin(), dv_names.end());  // just dec var operation
-	if (use_ensemble_grad)
-	{
-		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
-		vector<double> mean_vec = dv.get_mean_stl_var_vector();
-		_current_num_dv_values.update(dv_names, mean_vec);
-	}
-
-	// compute gradient
-	//if (use_ensemble_grad)
-	//{
-	//	if (LBFGS) &(num_it > 2)& (constraints False); // constraint False as need phi_grad for Lagrangian
-	//	{
-	//		ss.str("");
-	//		ss << "(re)use grad from Wolfe testing during upgrade evaluations last iteration";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		throw_sqp_error("TODO");
-	//	}
-	//	else
-	//	{
-	//		ss.str("");
-	//		ss << "compute dec var en cov vector and dec var en-phi en cross-covariance vector";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		throw_sqp_error("TODO");
-
-	//		// CMA implementation to go here
-
-	//		ss.str("");
-	//		ss << "compute gradient vector through product of pseudo inv of dec var and cross-cov";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		throw_sqp_error("TODO");
-
-	//		ss.str("");
-	//		ss << "compute ensemble approx to (active) constraint jacobian";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		throw_sqp_error("TODO");
-	//	}
-	//}
-	//else // finite differences for gradient
-	//{
-	//	if (LBFGS) &(num_it > 2);
-	//	{
-	//		ss.str("");
-	//		ss << "(re)use grad from Wolfe testing during upgrade evaluations last iteration";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		throw_sqp_error("TODO");
-	//	}
-	//	else // standard BFGS
-	//	{
-	//		ss.str("");
-	//		ss << "populate jco and partition into phi grad vector and (active) constraint jco";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		throw_sqp_error("TODO");
-	//	}
-	//}
-
-	//// compute search direction
 	//if (constraints is True) &(len(working_set) > 0);
 	//{
 	//	ss.str("");
@@ -1701,33 +1717,127 @@ bool SeqQuadProgram::solve_new()
 	//		//self.search_d = self._LBFGS_hess_update(memory = memory, self_scale = hess_self_scaling)
 	//		throw_sqp_error("TODO");
 	//	}
+//}
 
-	//	// now first attempt at updating active set
-	//	if (constraints is True);  //irrespective of shape of working set
+Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameters& _current_dv_values)
+{
+	Parameters candidate;
+
+	// part 1: done only once (at first alpha test)
+
+	// grad vector computation
+	Eigen::VectorXd grad = calc_gradient_vector(_current_dv_values);
+	
+	// search direction computation
+	//Eigen::VectorXd search_d = calc_search_direction_vector()
+
+	// undertake search direction-related tests, e.g., point down-hill
+	// and check if constraints in working set cause zero search_d (and go to next iteration if so)
+	//	if (constraints is True);  // irrespective of shape of working set
 	//	{
 	//		ss.str("");
-	//		ss << "updating active set of constraints; first attempt";
+	//		ss << "check if constraints in working set cause zero search_d";
 	//		string s = ss.str();
 	//		message(1, s);
 	//		//alpha, next_it = self._active_set_method(first_pass = True)
 	//		throw_sqp_error("TODO");
 	//	}
-	//
-	//// undertake some search direction-related tests here, e.g., point down-hill
-	//// and rectify if bad!
-	//
-	//}
 
-	// attempt update of active set again, now where constraints are active 
-	//if ((constraints is True) & (len(working_set) > 0));
-	//{
+	// part 2
+
+	// // alpha testing
+	//if (search_dir != 0 or next_it == False);  // or break out of iteration here if True  // this should be accounted for in checks above
+	//if (constraints);
+	//	{
+	//		ss.str("");
+	//		ss << "specifying 'base' step length based on active set solve";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		//step = alpha
+	//		throw_sqp_error("TODO");
+	//	}
+	//	else
+	//	{
+	//		ss.str("");
+	//		ss << "specifying 'base' step length based on bound-related heuristics";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		//step = alpha
+	//		throw_sqp_error("TODO");
+	//	}
+
+	//	// compute candidate dec var vector
 	//	ss.str("");
-	//	ss << "updating active set of constraints; first attempt";
+	//	ss << "compute candidate step lengths and associated mean dec var vectors";
 	//	string s = ss.str();
 	//	message(1, s);
-	//	//alpha, next_it = self._active_set_method(first_pass = True)
 	//	throw_sqp_error("TODO");
-	//}
+
+	//	// some bound handling here
+	//	// and drop subsequent (larger) alphas
+
+	//	// evaluate
+	//	ss.str("");
+	//	ss << "evaluating model for alpha" << alpha;
+	//	string s = ss.str();
+	//	message(1, s);
+	//	throw_sqp_error("TODO");
+
+	//	// check that we need to have gradient at candidate at this stage
+	// if (use_ensemble_grad)
+	//	{
+	//		ss.str("");
+	//		ss << "draw dec var en at candidate mean vector";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		throw_sqp_error("TODO");
+
+	//		ss.str("");
+	//		ss << "evaluate ensembles at trial alphas";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		throw_sqp_error("TODO");
+	//	}
+	//	else  // finite differences
+	//	{
+	//		ss.str("");
+	//		ss << "evaluate model at trial alphas";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		throw_sqp_error("TODO");
+
+	return candidate;
+}
+
+bool SeqQuadProgram::solve_new()
+{
+	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
+	if (dv.shape().first <= error_min_reals)
+	{
+		message(0, "too few active realizations:", oe.shape().first);
+		message(1, "need more than ", error_min_reals);
+		throw_sqp_error(string("too few active realizations, cannot continue"));
+	}
+	if (dv.shape().first < warn_min_reals)
+	{
+		ss.str("");
+		ss << "WARNING: less than " << warn_min_reals << " active realizations...might not be enough";
+		string s = ss.str();
+		message(1, s);
+	}
+
+	Parameters _current_num_dv_values = current_ctl_dv_values;  // make copy
+	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+	pts.ctl2numeric_ip(_current_num_dv_values);  // covert to numeric format
+	_current_num_dv_values = _current_num_dv_values.get_subset(dv_names.begin(), dv_names.end());  // just dec var operation
+	
+	if (use_ensemble_grad)
+	{
+		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
+		vector<double> mean_vec = dv.get_mean_stl_var_vector();
+		_current_num_dv_values.update(dv_names, mean_vec);
+	}
 
 	Parameters dv_candidate;
 	ParameterEnsemble dv_candidates(&pest_scenario,&rand_gen);
@@ -1736,7 +1846,7 @@ bool SeqQuadProgram::solve_new()
 	
 	//backtracking/line search factors
 	//TODO: make this a ++ arg or tunable or something clever
-	vector<double> scale_vals{ 0.1,0.5,1.0 };
+	vector<double> scale_vals{ 0.01,0.1,0.5,1.0 };
 	vector<string> real_names;
 	
 	for (auto sv : scale_vals)
@@ -1764,60 +1874,6 @@ bool SeqQuadProgram::solve_new()
 		message(1, "finished calcs for scaling factor:", scale_val);
 
 	}
-	//// alpha trialing
-	//if (search_dir != 0 or next_it == False);  // or break out of iteration here if True
-	//{
-	//	if (constraints);
-	//	{
-	//		ss.str("");
-	//		ss << "specifying 'base' step length based on active set solve";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		//step = alpha
-	//		throw_sqp_error("TODO");
-	//	}
-	//	else
-	//	{
-	//		ss.str("");
-	//		ss << "specifying 'base' step length based on bound-related heuristics";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		//step = alpha
-	//		throw_sqp_error("TODO");
-	//	}
-
-	//	// compute step length and evaluate
-	//	ss.str("");
-	//	ss << "compute trial step lengths and associated mean dec var vectors";
-	//	string s = ss.str();
-	//	message(1, s);
-	//	throw_sqp_error("TODO");
-
-	//	// some bound handling here
-	//	// and drop subsequent (larger) alphas
-
-	//	if (use_ensemble_grad)
-	//	{
-	//		ss.str("");
-	//		ss << "draw dec var en at candidate mean vector";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		throw_sqp_error("TODO");
-
-	//		ss.str("");
-	//		ss << "evaluate ensembles at trial alphas - efficiently";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		throw_sqp_error("TODO");
-	//	}
-	//	else  // finite differences
-	//	{
-	//		ss.str("");
-	//		ss << "evaluate model at trial alphas - efficiently";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		throw_sqp_error("TODO");
-	//	}
 
 	//	if (constraints); // and if active set size is > 1?
 	//	{
@@ -1890,28 +1946,8 @@ bool SeqQuadProgram::solve_new()
 	//todo: decide which if any dv candidate to accept...
 
 	//// deal with unsuccessful iteration
-
-	//// quasi-Newton Hessian updating via BFGS
-	//// only if combination of conditions satisfies (some of which are user-specified)
-	//if (Hessian update or self scale) & (BFGS);
-	//{
-	//	ss.str("");
-	//	ss << "update Hessian via standard quasi-Newton BFGS";
-	//	string s = ss.str();
-	//	message(1, s);
-	//	throw_sqp_error("TODO");
-	//}
-	//else
-	//{
-	//	ss.str("");
-	//	ss << "skipping Hessian scaling and updating";
-	//	string s = ss.str();
-	//	message(1, s);
-	//}
 	
-	//report and save, etc...
-	
-	return true;
+	return true;  // reporting and saving done next
 }
 
 
