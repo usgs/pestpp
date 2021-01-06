@@ -1282,11 +1282,6 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		convert_ip(value, sqp_num_reals);
 		return true;
 	}
-	else if (key == "SQP_USE_ENSEMBLE_GRAD")
-	{
-		sqp_use_ensemble_grad = pest_utils::parse_string_arg_to_bool(value);
-		return true;
-	}
 	else if (key == "SQP_UPDATE_HESSIAN")
 	{
 		sqp_update_hessian = pest_utils::parse_string_arg_to_bool(value);
@@ -1438,7 +1433,6 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_obs_restart_en: " << sqp_obs_restart_en << endl;
 	os << "sqp_num_reals: " << sqp_num_reals << endl;
 	os << "sqp_update_hessian: " << sqp_update_hessian << endl;
-	//os << "sqp_use_ensemble_grad: " << sqp_use_ensemble_grad << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
