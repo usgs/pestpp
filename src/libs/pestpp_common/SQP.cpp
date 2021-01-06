@@ -806,7 +806,9 @@ void SeqQuadProgram::initialize()
 	//initialize_obscov();
 
 
-	
+	//these will be the ones we track...
+	current_ctl_dv_values = pest_scenario.get_ctl_parameters();
+	current_obs = pest_scenario.get_ctl_observations();
 
 	//todo: add the FD approach and initialize it here
 	use_ensemble_grad = false;
@@ -821,9 +823,7 @@ void SeqQuadProgram::initialize()
 		prep_4_fd_grad();
 	}
 		
-	//these will be the ones we track...
-	current_ctl_dv_values = pest_scenario.get_ctl_parameters();
-	current_obs = pest_scenario.get_ctl_observations();
+	
 	
 
 	message(0, "initialization complete");
@@ -911,7 +911,8 @@ void SeqQuadProgram::run_jacobian(Parameters& _current_ctl_dv_vals, Observations
 			ss << o << ",";
 		throw_sqp_error(ss.str());
 	}
-	queue_chance_runs();
+	//todo: mod queue chance runs for FD grad
+	//queue_chance_runs();
 	message(2, "starting finite difference gradient pertubation runs");
 	jco.make_runs(*run_mgr_ptr);
 	
@@ -920,7 +921,7 @@ void SeqQuadProgram::run_jacobian(Parameters& _current_ctl_dv_vals, Observations
 	{
 		throw_sqp_error("error processing finite difference gradient pertubation runs");
 	}
-	constraints.process_runs(run_mgr_ptr, iter);
+	//constraints.process_runs(run_mgr_ptr, iter);
 	if (init_obs)
 	{
 		run_mgr_ptr->get_run(0, current_pars, _current_obs, false);
