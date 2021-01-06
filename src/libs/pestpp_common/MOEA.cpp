@@ -2711,7 +2711,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
 	
 	new_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
-	new_dp.enforce_limits(performance_log, false);
+	new_dp.enforce_bounds(performance_log, false);
 	return new_dp;
 }
 
@@ -2772,7 +2772,7 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
 	tmp_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
-	tmp_dp.enforce_limits(performance_log,false);
+	tmp_dp.enforce_bounds(performance_log,false);
 
 	return tmp_dp;
 }
@@ -2920,7 +2920,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 		gauss_mutation_ip(tmp_dp);
 	generate_pm_population(tmp_dp.shape().first, tmp_dp);
 	
-	tmp_dp.enforce_limits(performance_log,false);
+	tmp_dp.enforce_bounds(performance_log,false);
 	return tmp_dp;
 }
 

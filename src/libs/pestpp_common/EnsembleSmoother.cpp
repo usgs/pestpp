@@ -85,7 +85,21 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 
 			}
 		}
-		pe.draw(num_reals, draw_par,cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
+
+		if ((pest_scenario.get_pestpp_options().get_ies_enforce_bounds()) && (pest_scenario.get_pestpp_options().get_ies_enforce_chglim()))
+		{
+			ss.str("");
+			ss << "WARNING: 'ies_enforce_chglim' is true, so bounds are being enforced on the " << endl;
+			ss << "          initial parameter ensemble by shrinking each realization towards the " << endl;
+			ss << "          parameter values in the pest control file. If any parameters are at / near " << endl;
+			ss << "          bounds in the control file this will cause many realizations to be nearly " << endl;
+			ss << "          identical to the parameter values in the control file" << endl;
+			message(1, ss.str());
+
+		}
+
+		map<string,double> norm_map = pe.draw(num_reals, draw_par,cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
+		norm_map_report(norm_map, "initial parameter realizations");
 		// stringstream ss;
 		// ss << file_manager.get_base_filename() << ".0.par.csv";
 		// message(1, "saving initial parameter ensemble to ", ss.str());
@@ -185,11 +199,51 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 			if (pest_scenario.get_pestpp_options().get_ies_obs_restart_csv().size() > 0)
 				message(1, "Warning: even though ies_enforce_bounds is true, a restart obs en was passed, so bounds will not be enforced on the initial par en");
 			else
-				pe.enforce_limits(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+			{
+				/*if (pest_scenario.get_pestpp_options().get_ies_enforce_chglim())
+				{
+					ss.str("");
+					ss << "WARNING: 'ies_enforce_chglim' is true, so bounds are being enforced on the " << endl;
+					ss << "          initial parameter ensemble by shrinking each realization towards the " << endl;
+					ss << "          parameter values in the pest control file. If any parameters are at / near " << endl;
+					ss << "          bounds in the control file this will cause many realizations to be nearly " << endl;
+					ss << "          identical to the parameter values in the control file" << endl;
+					message(1, ss.str());
+
+				}*/
+				//dont use the shrinking bounds - too many chances for zero length
+				map<string,double> norm_map = pe.enforce_bounds(performance_log, false);
+				norm_map_report(norm_map, "initial parameter");
+
+
+			}
+				
 		}
 
 	}
 	return drawn;
+
+}
+
+void IterEnsembleSmoother::norm_map_report(map<string, double>& norm_map, string tag, double thres)
+{
+	stringstream ss;
+	ss.str("");
+	ss << "WARNING: the following " << tag << " realizations have been shrunk to less than 10% of their original length: " << endl;
+	int count = 0;
+	for (auto& n : norm_map)
+		if (n.second < thres)
+		{
+			ss << n.first << ": " << n.second * 100.0 << " % original length" << endl;
+			count++;
+		}
+	if (count > 0)
+	{
+		file_manager.rec_ofstream() << ss.str() << endl;
+		ss.str("");
+		ss << "WARNING: " << count << " " << tag << " have been shrunk to less than 10% of their original length, see .rec file for listing" << endl;
+		message(1, ss.str());
+	}
 
 }
 
@@ -527,6 +581,14 @@ void IterEnsembleSmoother::sanity_checks()
 	}
 */
 
+	if ((ppo->get_ies_save_rescov()) && (pest_scenario.get_ctl_ordered_nz_obs_names().size() > 60000))
+	{
+		errors.push_back("'ies_save_rescov' requires too much memory for greater than 60,000 observations");
+	}
+	else if ((ppo->get_ies_save_rescov()) && (pest_scenario.get_ctl_ordered_nz_obs_names().size() > 30000))
+	{
+		warnings.push_back("'ies_save_rescov' with more than 30,000 observations will likely produce allocation errors, be prepared!");
+	}
 
 	if (warnings.size() > 0)
 	{
@@ -1337,14 +1399,23 @@ void IterEnsembleSmoother::initialize()
 	if (center_on.size() > 0)
 	{
 		ss.str("");
-		ss << "centering on realization: '" << center_on << "' ";
-		message(1, ss.str());
-		vector<string> names = pe.get_real_names();
-		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_ies_error("'ies_center_on' realization not found in par en: " + center_on);
-		names = oe.get_real_names();
-		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_ies_error("'ies_center_on' realization not found in obs en: " + center_on);
+		if (center_on == MEDIAN_CENTER_ON_NAME)
+		{
+			ss << "centering on ensemble median value";
+			message(1, ss.str());
+			pe.get_eigen_anomalies(center_on);
+		}
+		else
+		{
+			ss << "centering on realization: '" << center_on << "' ";
+			message(1, ss.str());
+			vector<string> names = pe.get_real_names();
+			if (find(names.begin(), names.end(), center_on) == names.end())
+				throw_ies_error("'ies_center_on' realization not found in par en: " + center_on);
+			names = oe.get_real_names();
+			if (find(names.begin(), names.end(), center_on) == names.end())
+				throw_ies_error("'ies_center_on' realization not found in obs en: " + center_on);
+		}
 	}
 	else
 		message(1, "centering on ensemble mean vector");
@@ -2664,7 +2735,7 @@ bool IterEnsembleSmoother::solve_new()
 		ParameterEnsemble pe_upgrade;
 		
 		pe_upgrade = calc_localized_upgrade_threaded(cur_lam, loc_map);
-
+		map<string, double> norm_map;
 		for (auto sf : pest_scenario.get_pestpp_options().get_lambda_scale_vec())
 		{
 
@@ -2672,7 +2743,14 @@ bool IterEnsembleSmoother::solve_new()
 			pe_lam_scale.set_eigen(*pe_lam_scale.get_eigen_ptr() + (*pe_upgrade.get_eigen_ptr() * sf));
 			if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
 			{
-				pe_lam_scale.enforce_limits(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+				if (pest_scenario.get_pestpp_options().get_ies_enforce_chglim())
+					norm_map = pe_lam_scale.enforce_change_limits_and_bounds(performance_log, pe);
+				else
+					norm_map = pe_lam_scale.enforce_bounds(performance_log, false);
+
+				ss.str("");
+				ss << " lambda " << cur_lam << ", scale factor " << sf;
+				norm_map_report(norm_map, ss.str());
 			}
 
 			pe_lams.push_back(pe_lam_scale);

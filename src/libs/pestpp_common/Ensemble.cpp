@@ -614,12 +614,47 @@ Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names,
 	map<int, double> center_on_map;
 	if (on_real.size() > 0)
 	{
-		vector<string>::iterator it = find(real_names.begin(), real_names.end(), on_real);
-		if (it == real_names.end())
-			throw runtime_error("Ensemble::get_eigen_mean_diff() error: 'on_real' not found: " + on_real);
-		int idx = distance(real_names.begin(), it);
-		for (int i = 0; i <_reals.cols(); i++)
-			center_on_map[i] = _reals(idx, i);
+		//cheap median approx - doesnt deal with mean of the two middle elements if even 
+		if (pest_utils::upper_cp(on_real) == MEDIAN_CENTER_ON_NAME)
+		{
+			int half_size = _reals.rows() / 2;
+			vector<double> d(_reals.rows());
+			vector<double>::iterator begin;
+			vector<double>::iterator end;
+			vector<double>::iterator half;
+			vector<double>::iterator half_minus_one;
+			double half_val;
+			bool even = _reals.rows() % 2 == 0;
+
+			for (int i = 0; i < _reals.cols(); i++)
+			{
+				d = eigenvec_2_stlvec(_reals.col(i));
+				begin = d.begin();
+				end = d.end();
+				half = d.begin() + half_size;
+				half_minus_one = half - 1;
+				nth_element(begin,half,end);
+				half_val = *half;
+				if (even)
+				{
+					nth_element(begin, half_minus_one, end);
+					center_on_map[i] = (half_val + *half_minus_one) / 2.0;
+				}
+				else
+					center_on_map[i] = half_val;
+			}
+				
+
+		}
+		else
+		{
+			vector<string>::iterator it = find(real_names.begin(), real_names.end(), on_real);
+			if (it == real_names.end())
+				throw runtime_error("Ensemble::get_eigen_mean_diff() error: 'on_real' not found: " + on_real);
+			int idx = distance(real_names.begin(), it);
+			for (int i = 0; i < _reals.cols(); i++)
+				center_on_map[i] = _reals(idx, i);
+		}
 	}
 	else
 	{
@@ -1075,8 +1110,8 @@ void Ensemble::throw_ensemble_error(string message, vector<string> vec)
 {
 	stringstream ss;
 	ss << ' ';
-	for (auto &v : vec)
-		ss << v << ',';
+	for (auto& v : vec)
+		ss << v << endl;
 	throw_ensemble_error(message + ss.str());
 }
 
@@ -1643,6 +1678,7 @@ map<string, int> Ensemble::from_binary(string file_name, vector<string> &names, 
 		reals.transposeInPlace();
 	}
 
+	
 	map<string, int> header_info;
 	for (int i = 0; i < var_names.size(); i++)
 		header_info[var_names.at(i)] = i;
@@ -2006,7 +2042,7 @@ void ParameterEnsemble::draw_uniform(int num_reals, vector<string> par_names, Pe
 	tstat = ParameterEnsemble::transStatus::NUM;
 }
 
-void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
+map<string,double> ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
 {
 	///draw a parameter ensemble
 	var_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names(); //only draw for adjustable pars
@@ -2084,10 +2120,13 @@ void ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, Per
 
 		reorder(vector<string>(), pest_scenario_ptr->get_ctl_ordered_adj_par_names());
 	}
+	map<string, double> norm_map;
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_enforce_bounds())
-		//dont enforce parchglim-style here - if a pars initial value is near its bound, lots of realizations 
-		//will be near zero length.  
-		enforce_limits(plog, false);
+	{
+		//dont use the shrinking bounds enforcement - too many chances for zero-length realizations
+		norm_map = enforce_bounds(plog, false);
+	}
+	return norm_map;
 
 
 }
@@ -2213,17 +2252,40 @@ void ParameterEnsemble::from_eigen_mat(Eigen::MatrixXd mat, const vector<string>
 void ParameterEnsemble::from_binary(string file_name)
 {
 	//overload for ensemble::from_binary - just need to set tstat
-	vector<string> names = pest_scenario_ptr->get_ctl_ordered_par_names();
+	vector<string> names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
 	map<string,int> header_info = Ensemble::from_binary(file_name, names, false);
+	unordered_set<string>svar_names(var_names.begin(), var_names.end());
+	vector<string> missing;
+	for (auto& name : pest_scenario_ptr->get_ctl_ordered_adj_par_names())
+	{
+		if (svar_names.find(name) == svar_names.end())
+		{
+			missing.push_back(name);
+		}
+
+	}
+	if (missing.size() > 0)
+		throw_ensemble_error("from_binary() error: the following adjustable parameter names in the control file are not in the binary parameter ensemble file:", missing);
+
+	names = pest_scenario_ptr->get_ctl_ordered_par_names();
+	unordered_set<string>snames(names.begin(), names.end());
+	names.clear();
+	
 	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
 	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
+
 	for (auto &name : var_names)
-	{
-		if (pi.get_parameter_rec_ptr(name)->tranform_type == ft)
+	{	
+		if (snames.find(name) == snames.end())
+		{
+			continue;
+		}
+		else if (pi.get_parameter_rec_ptr(name)->tranform_type == ft)
 		{
 			fixed_names.push_back(name);
 		}
 	}
+	
 	fill_fixed(header_info);
 	save_fixed();
 	tstat = transStatus::CTL;
@@ -2365,26 +2427,79 @@ void ParameterEnsemble::save_fixed()
 	}
 }
 
-void ParameterEnsemble::enforce_limits(PerformanceLog* plog, bool enforce_chglim)
+map<string,double> ParameterEnsemble::enforce_change_limits_and_bounds(PerformanceLog* plog, ParameterEnsemble& other)
+{
+	string rname;
+	vector<string> other_names = other.get_real_names();
+	set<string> s_other_real_names(other_names.begin(), other_names.end());
+	transform_ip(ParameterEnsemble::transStatus::NUM);
+	other.transform_ip(ParameterEnsemble::transStatus::NUM);
+	other_names = other.get_var_names();
+	Eigen::VectorXd other_real;
+	double init_norm, shrunk_norm;
+	map<string, double> norm_map;
+	ParamTransformSeq bts = pest_scenario_ptr->get_base_par_tran_seq();
+	
+	for (int i = 0; i < reals.rows(); i++)
+	{
+		rname = real_names[i];
+		if (s_other_real_names.find(rname) == s_other_real_names.end())
+			throw_ensemble_error("enforce_change_limits(): real name '" + rname + "' not in other ensemble");
+		other_real = other.get_real_vector(rname);
+		Parameters real_pars(var_names, reals.row(i));
+		Parameters other_pars(other_names, other_real);
+		bts.numeric2ctl_ip(real_pars);
+		bts.numeric2ctl_ip(other_pars);
+		init_norm = (other_real - reals.row(i).transpose()).squaredNorm();
+		pest_scenario_ptr->enforce_par_limits(plog, real_pars, other_pars, true, false);
+		bts.ctl2numeric_ip(real_pars);
+		//pest_scenario_ptr->enforce_par_limits(real, base, true, false);
+		reals.row(i) = real_pars.get_data_eigen_vec(var_names);
+		shrunk_norm = (other_real - reals.row(i).transpose()).squaredNorm();
+		if (init_norm > 0.0)
+		{
+			norm_map[rname] = sqrt(shrunk_norm) / sqrt(init_norm);
+		}
+		else
+			norm_map[rname] = 1.0;
+	}
+	map<string, double> bounds_norm_map = enforce_bounds(plog, false);
+	for (auto& n : norm_map)
+		n.second = min(n.second, bounds_norm_map[n.first]);
+	return norm_map;
+}
+
+map<string,double> ParameterEnsemble::enforce_bounds(PerformanceLog* plog, bool shrink)
 {
 	
-	if (tstat != ParameterEnsemble::transStatus::NUM)
+	/*if (tstat != ParameterEnsemble::transStatus::NUM)
 	{
 		throw_ensemble_error("pe.enforce_bounds() tstat != NUM not implemented");
-
-	}
+	}*/
+	transform_ip(ParameterEnsemble::transStatus::NUM);
+	map<string, double> norm_map;
+	double init_norm, shrunk_norm;
+	Parameters base = pest_scenario_ptr->get_ctl_parameters();
+	Eigen::VectorXd base_vec = base.get_data_eigen_vec(var_names);
+	ParamTransformSeq bts = pest_scenario_ptr->get_base_par_tran_seq();
+	
 	//fancy vector shrinking style enforcement
-	if (enforce_chglim)
-	{
-		Parameters base = pest_scenario_ptr->get_ctl_parameters();
+	if (shrink)
+	{	
 		for (int i = 0; i < reals.rows(); i++)
 		{
-
 			Parameters real(var_names, reals.row(i));
-
-			pest_scenario_ptr->enforce_par_limits(plog, real, base, true, true);
+			bts.numeric2ctl_ip(real);
+			init_norm = (base_vec - reals.row(i).transpose()).squaredNorm();
+			pest_scenario_ptr->enforce_par_limits(plog, real, base, false, true);
 			//pest_scenario_ptr->enforce_par_limits(real, base, true, false);
+			bts.ctl2numeric_ip(real);
 			reals.row(i) = real.get_data_eigen_vec(var_names);
+			shrunk_norm = (base_vec - reals.row(i).transpose()).squaredNorm();
+			if (init_norm > 0.0)
+				norm_map[real_names[i]] = sqrt(shrunk_norm) / sqrt(init_norm);
+			else
+				norm_map[real_names[i]] = 1.0;
 		}
 	}
 	//reset parameters to be inbounds - very crude
@@ -2401,6 +2516,7 @@ void ParameterEnsemble::enforce_limits(PerformanceLog* plog, bool enforce_chglim
 			ppar = pest_scenario_ptr->get_effective_ctl_lower_upper_bnd(real);
 			for (int i = 0; i < reals.rows(); i++)
 			{
+				init_norm = (base_vec - reals.row(i).transpose()).squaredNorm();
 				real.update_without_clear(var_names, reals.row(i));
 				Parameters real_ctl = pest_scenario_ptr->get_base_par_tran_seq().numeric2ctl_cp(real);
 
@@ -2415,7 +2531,11 @@ void ParameterEnsemble::enforce_limits(PerformanceLog* plog, bool enforce_chglim
 					real_ctl.update_rec(n, v);
 				}
 				reals.row(i) = pest_scenario_ptr->get_base_par_tran_seq().ctl2numeric_cp(real_ctl).get_data_eigen_vec(var_names);
-
+				shrunk_norm = (base_vec - reals.row(i).transpose()).squaredNorm();
+				if (init_norm > 0.0)
+					norm_map[real_names[i]] = sqrt(shrunk_norm) / sqrt(init_norm);
+				else
+					norm_map[real_names[i]] = 1.0;
 			}
 		}
 		else
@@ -2445,6 +2565,7 @@ void ParameterEnsemble::enforce_limits(PerformanceLog* plog, bool enforce_chglim
 		
 
 	}
+	return norm_map;
 }
 
 void ParameterEnsemble::to_binary(string file_name)
@@ -2950,6 +3071,13 @@ void ObservationEnsemble::from_binary(string file_name)
 	//load obs en from binary jco-type file
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_obs_names();
 	Ensemble::from_binary(file_name, names, true);
+	unordered_set<string>svar_names(var_names.begin(), var_names.end());
+	vector<string> missing;
+	for (auto& name : pest_scenario_ptr->get_ctl_ordered_obs_names())
+		if (svar_names.find(name) == svar_names.end())
+			missing.push_back(name);
+	if (missing.size() > 0)
+		throw_ensemble_error("from_binary() error: the following non-zero-weighted obs names in the control file are not in the binary obs ensemble file:", missing);
 }
 
 void ObservationEnsemble::from_csv(string file_name)
