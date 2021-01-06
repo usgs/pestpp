@@ -98,9 +98,8 @@ private:
 	string obj_obs;
 	string obj_sense;
 	bool use_obj_obs;
+	bool use_pi_obs;
 	map<string, double> obj_func_coef_map;
-
-	string base_name = "BASE"; //this is also defined in Ensemble
 
 	int num_threads;
 
@@ -124,6 +123,8 @@ private:
 	Parameters current_ctl_dv_values;
 	Observations current_obs;
 
+	Parameters current_grad_vector;
+
 	ParameterEnsemble dv, dv_base;
 	ObservationEnsemble oe, oe_base;
 
@@ -140,12 +141,19 @@ private:
 	void prep_4_ensemble_grad();
 	void prep_4_fd_grad();
 
+	bool update_hessian_and_grad_vector();
+
 	Jacobian_1to1 jco;
 
 	//bool solve_old();
 	bool solve_new();
 
+	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe);
+
 	Eigen::VectorXd calc_gradient_vector(const Parameters& _current_dv_);
+
+	Eigen::VectorXd get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
+	
 
 	//Eigen::VectorXd calc_search_direction_vector(const Parameters& _current_dv_)
 
@@ -156,8 +164,11 @@ private:
 
 	void run_jacobian(Parameters& _current_dv_vals,Observations& _current_obs, bool init_obs);
 
-	
-	void report_and_save();
+	void make_gradient_runs(Parameters& _current_dv_vals, Observations& _current_obs);
+
+	void report_and_save_ensemble();
+	void report_and_save_ensemble(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
+	void save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool save_base=true);
 	void save_mat(string prefix, Eigen::MatrixXd &mat);
 	bool initialize_dv(Covariance &cov);
 	//bool initialize_oe(Covariance &cov);

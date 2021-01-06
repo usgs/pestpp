@@ -208,7 +208,7 @@ void SeqQuadProgram::add_bases()
 	//check that 'base' isn't already in ensemble
 	vector<string> rnames = dv.get_real_names();
 	bool inpar = false;
-	if (find(rnames.begin(), rnames.end(), base_name) != rnames.end())
+	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
 		message(1, "'base' realization already in parameter ensemble, ignoring '++ies_include_base'");
 		inpar = true;
@@ -220,12 +220,12 @@ void SeqQuadProgram::add_bases()
 		dv.get_par_transform().active_ctl2numeric_ip(pars);
 		vector<int> drop{ dv.shape().first - 1 };
 		dv.drop_rows(drop);
-		dv.append(base_name, pars);
+		dv.append(BASE_REAL_NAME, pars);
 	}
 
 	//check that 'base' isn't already in ensemble
 	rnames = oe.get_real_names();
-	if (find(rnames.begin(), rnames.end(), base_name) != rnames.end())
+	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
 		message(1, "'base' realization already in observation ensemble, ignoring '++ies_include_base'");
 	}
@@ -236,7 +236,7 @@ void SeqQuadProgram::add_bases()
 		{
 			vector<string> prnames = dv.get_real_names();
 
-			int idx = find(prnames.begin(), prnames.end(), base_name) - prnames.begin();
+			int idx = find(prnames.begin(), prnames.end(), BASE_REAL_NAME) - prnames.begin();
 			//cout << idx << "," << rnames.size() << endl;
 			string oreal = rnames[idx];
 			stringstream ss;
@@ -247,9 +247,9 @@ void SeqQuadProgram::add_bases()
 			vector<string> drop;
 			drop.push_back(oreal);
 			oe.drop_rows(drop);
-			oe.append(base_name, obs);
+			oe.append(BASE_REAL_NAME, obs);
 			//rnames.insert(rnames.begin() + idx, string(base_name));
-			rnames[idx] = base_name;
+			rnames[idx] = BASE_REAL_NAME;
 			oe.reorder(rnames, vector<string>());
 		}
 		else
@@ -257,7 +257,7 @@ void SeqQuadProgram::add_bases()
 			message(1, "adding 'base' observation values to ensemble");
 			vector<int> drop{ oe.shape().first - 1 };
 			oe.drop_rows(drop);
-			oe.append(base_name, obs);
+			oe.append(BASE_REAL_NAME, obs);
 		}
 	}
 }
@@ -344,12 +344,7 @@ void SeqQuadProgram::sanity_checks()
 	{
 		warnings.push_back("unrecognized 'pestmode', using 'estimation'");
 	}
-
-	
-	
-	
-	
-	if ((ppo->get_sqp_num_reals() < warn_min_reals) && (par_csv.size() == 0))
+	if ((use_ensemble_grad) && (ppo->get_sqp_num_reals() < warn_min_reals) && (par_csv.size() == 0))
 	{
 		ss.str("");
 		ss << "ies_num_reals < " << warn_min_reals << ", this is prob too few";
@@ -412,24 +407,36 @@ void SeqQuadProgram::initialize_objfunc()
 		{
 			throw_sqp_error("objective function obs has non-zero weight and chance constraints are active");
 		}
+		message(1, "using observation '" + obj_func_str + "' as the objective function");
 	}
 
 	else
 	{
 		if (obj_func_str.size() == 0)
 		{
+			
 			f_rec << " warning: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
+			//ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
 			for (auto& name : dv_names)
+			{
+				/*if (pi.get_parameter_rec_ptr(name)->tranform_type != ParameterRec::TRAN_TYPE::NONE)
+				{
+					throw_sqp_error("only 'none' type decision variable transform supported for generic obj function");
+				}*/
 				obj_func_coef_map[name] = 1.0;
+			}
+				
 		}
 
 		//or if it is a prior info equation
 		else if (pest_scenario.get_prior_info().find(obj_func_str) != pest_scenario.get_prior_info().end())
 		{
+			message(1, "using prior information equation '" + obj_func_str + "' as the objective function");
 			obj_func_coef_map = pest_scenario.get_prior_info().get_pi_rec_ptr(obj_func_str).get_atom_factors();
 		}
 		else
 		{
+			
 			//check if this obj_str is a filename
 			ifstream if_obj(obj_func_str);
 			if (!if_obj.good())
@@ -452,7 +459,6 @@ void SeqQuadProgram::initialize_objfunc()
 			for (auto m : missing_vars)
 			{
 				ss << m << ",";
-				
 			}
 			throw_sqp_error(ss.str());
 		}
@@ -623,6 +629,7 @@ void SeqQuadProgram::initialize()
 		ppo->set_par_sigma_range(20.0);
 	}
 
+	initialize_objfunc();
 
 	//reset the par bound PI augmentation since that option is just for simplex
 	ppo->set_opt_include_bnd_pi(false);
@@ -792,6 +799,9 @@ void SeqQuadProgram::initialize()
 
 	//TODO: update sanity checks for SQP context
 	//check that if using fd, chance points == single
+	use_ensemble_grad = false;
+	if (ppo->get_sqp_num_reals() > 0)
+		use_ensemble_grad = true;
 	sanity_checks();
 
 	bool echo = false;
@@ -807,10 +817,7 @@ void SeqQuadProgram::initialize()
 	current_ctl_dv_values = pest_scenario.get_ctl_parameters();
 	current_obs = pest_scenario.get_ctl_observations();
 
-	//todo: add the FD approach and initialize it here
-	use_ensemble_grad = false;
-	if (ppo->get_sqp_num_reals() > 0)
-		use_ensemble_grad = true;
+	
 	if (use_ensemble_grad)
 	{
 		prep_4_ensemble_grad();
@@ -819,13 +826,14 @@ void SeqQuadProgram::initialize()
 	{
 		prep_4_fd_grad();
 	}
-		
-	
-	
 
+	//set the initial grad vector
+	Eigen::VectorXd g = calc_gradient_vector(current_ctl_dv_values);
+	current_grad_vector.update_without_clear(dv_names, g);
+	//todo: save and report on initial gradient - make some checks would be useful?
+	
 	message(0, "initialization complete");
 }
-
 
 
 void SeqQuadProgram::prep_4_fd_grad()
@@ -853,10 +861,10 @@ void SeqQuadProgram::prep_4_fd_grad()
 			throw_sqp_error(ss.str());
 		}
 		snames.clear();
-		vnames = constraints.get_obs_constraint_names();
+		vnames = jco.get_sim_obs_names(); 
 		snames.insert(vnames.begin(), vnames.end());
 		vnames.clear();
-		for (auto name : jco.get_sim_obs_names())
+		for (auto name : constraints.get_obs_constraint_names())
 			if (snames.find(name) == snames.end())
 				vnames.push_back(name);
 
@@ -871,14 +879,12 @@ void SeqQuadProgram::prep_4_fd_grad()
 	}
 	else
 	{
-		
 		//todo: handle hotstart_resfile here...
 		bool init_obs = true;
-
 		run_jacobian(current_ctl_dv_values, current_obs, init_obs);
-		
-
 	}
+	jco.save("0.jcb");
+	message(1, "saved initial jacobian to " + file_manager.get_base_filename() + ".0.jcb");
 }
 
 void SeqQuadProgram::run_jacobian(Parameters& _current_ctl_dv_vals, Observations& _current_obs, bool init_obs)
@@ -922,6 +928,35 @@ void SeqQuadProgram::run_jacobian(Parameters& _current_ctl_dv_vals, Observations
 	if (init_obs)
 	{
 		run_mgr_ptr->get_run(0, current_pars, _current_obs, false);
+	}
+}
+
+void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observations& _current_obs)
+{
+	stringstream ss;
+	if (use_ensemble_grad)
+	{
+		message(1, "generating new dv ensemble at current best location");
+		//draw new dv ensemble using - assuming parcov has been updated by now...
+		ParameterEnsemble _dv(&pest_scenario, &rand_gen);
+		Parameters dv = _current_dv_vals.get_subset(dv_names.begin(),dv_names.end());
+		ofstream& frec = file_manager.rec_ofstream();
+		_dv.draw(pest_scenario.get_pestpp_options().get_sqp_num_reals(), dv, parcov, performance_log, 0, frec);
+		//todo: save _dv here in case something bad happens...
+		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
+		_oe.reserve(_dv.get_real_names(), constraints.get_obs_constraint_names());
+		message(1, "running new dv ensemble");
+		run_ensemble(_dv, _oe);
+		save(_dv, _oe);
+	}
+	else
+	{
+		ss.str("");
+		ss << iter << ".jcb";
+		message(1, "running jacobian for gradient");
+		run_jacobian(_current_dv_vals, _current_obs, false);
+		jco.save(ss.str());
+		message(1, "saved jacobian to " + file_manager.get_base_filename() + "." + ss.str());
 
 	}
 
@@ -1006,8 +1041,6 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 		}
 	}
 
-
-	//need this here for Am calcs...
 	//message(1, "transforming parameter ensemble to numeric");
 	dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 
@@ -1336,6 +1369,26 @@ void SeqQuadProgram::save_mat(string prefix, Eigen::MatrixXd &mat)
 	}
 }
 
+bool SeqQuadProgram::update_hessian_and_grad_vector()
+{
+	Eigen::VectorXd new_grad = calc_gradient_vector(current_ctl_dv_values);
+	if (!pest_scenario.get_pestpp_options().get_sqp_update_hessian())
+	{
+		message(2, "hessian_update is false...");
+		current_grad_vector.update_without_clear(dv_names, new_grad);
+		return false;
+	}
+	//fancy shit here...
+	message(1, "starting hessian update for iteration ", iter);
+	
+	Eigen::VectorXd old_grad = current_grad_vector.get_data_eigen_vec(dv_names);
+
+
+	//update
+	current_grad_vector.update_without_clear(dv_names, new_grad);
+	//if accepted, return true
+	return true;
+}
 
 void SeqQuadProgram::iterate_2_solution()
 {
@@ -1350,22 +1403,40 @@ void SeqQuadProgram::iterate_2_solution()
 		ss.str("");
 		ss << "starting solve for iteration: " << iter;
 		performance_log->log_event(ss.str());
- 		accept = solve_new();
-		report_and_save();
-		ph.update(oe,dv);
-		//hessian_operations();  // somewhere here
-		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
-		last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-		ph.report(true);
-		ph.write(iter, run_mgr_ptr->get_total_runs());
-		if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
-			ph.save_residual_cov(oe,iter);
-		ss.str("");
-		ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
-		pcs.summarize(dv,iter,ss.str());
+ 		
+		//solve for and test candidates
+		accept = solve_new();
+
+		//todo: save and write out the current phi grad vector (maybe save all of them???)
+		
+		//update the underlying runs
+		make_gradient_runs(current_ctl_dv_values,current_obs);
+		
+		//save some stuff...
+		if (use_ensemble_grad)
+			report_and_save_ensemble();
+
+		//update the hessian
+		update_hessian_and_grad_vector();
+	
+		//todo: report some obj function stats
+
+		//todo: report constraint stats
+		//a la constraints.mou_report();
+
+		//report dec var change stats - only for ensemble form
+		if (use_ensemble_grad)
+		{
+			ss.str("");
+			ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
+			pcs.summarize(dv, iter, ss.str());
+		}
 			
 		if (should_terminate())
 			break;
+		
+		iter++;
+
 	}
 }
 
@@ -1536,7 +1607,7 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			// compute dec var-phi cross-cov vector
 			// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
 			// start by computing mean-shifted obj function ensemble
-			initialize_objfunc();
+			
 			Eigen::MatrixXd obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str}, center_on);
 			Eigen::MatrixXd cross_cov_vector;  // or Eigen::VectorXd?
 			cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
@@ -1628,10 +1699,10 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 		//if not center_on arg, use the mean dv values
 		if (center_on.size() == 0)
 		{
-			pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
+			//pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
 			for (int i = 0; i < dv_names.size(); i++)
 			{
-				grad[i] = obj_func_coef_map[dv_names[i]] * mm.first[dv_names[i]];
+				grad[i] = obj_func_coef_map[dv_names[i]];// * mm.first[dv_names[i]];
 			}
 		}
 		else
@@ -1653,9 +1724,10 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 	//pi based obj
 	else
 	{
+		
 		for (int i = 0; i < dv_names.size(); i++)
 		{
-			grad[i] = obj_func_coef_map[dv_names[i]] * _current_dv_values.get_rec(dv_names[i]);
+			grad[i] = obj_func_coef_map[dv_names[i]];// *_current_dv_values.get_rec(dv_names[i]);
 		}
 	}
 	}
@@ -1721,7 +1793,7 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 
 Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameters& _current_dv_values)
 {
-	Parameters candidate;
+	Parameters candidate = _current_dv_values; //copy
 
 	// part 1: done only once (at first alpha test)
 
@@ -1813,13 +1885,13 @@ bool SeqQuadProgram::solve_new()
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
-	if (dv.shape().first <= error_min_reals)
+	if ((use_ensemble_grad) && (dv.shape().first <= error_min_reals))
 	{
 		message(0, "too few active realizations:", oe.shape().first);
 		message(1, "need more than ", error_min_reals);
 		throw_sqp_error(string("too few active realizations, cannot continue"));
 	}
-	if (dv.shape().first < warn_min_reals)
+	else if ((use_ensemble_grad) && (dv.shape().first < warn_min_reals))
 	{
 		ss.str("");
 		ss << "WARNING: less than " << warn_min_reals << " active realizations...might not be enough";
@@ -1868,7 +1940,7 @@ bool SeqQuadProgram::solve_new()
 		dv_candidate = fancy_solve_routine(scale_val, _current_num_dv_values);
 		Eigen::VectorXd vec = dv_candidate.get_data_eigen_vec(dv_names);
 		dv_candidates.update_real_ip(real_names[i], vec);
-		//TODO: add sqp option to save candidates
+		
 
 		ss.str("");
 		message(1, "finished calcs for scaling factor:", scale_val);
@@ -1935,63 +2007,135 @@ bool SeqQuadProgram::solve_new()
 		throw_sqp_error("ies_debug_upgrade_only is true, exiting");
 	}
 
-	vector<map<int, int>> real_run_ids_lams;
-	int best_idx = -1;
-	double best_mean = 1.0e+30, best_std = 1.0e+30;
-	double mean, std;
+	//TODO: add sqp option to save candidates
 
 	message(0, "running candidate decision variable ensembles");
 	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates, scale_vals);
 
 	//todo: decide which if any dv candidate to accept...
-
-	//// deal with unsuccessful iteration
+	bool success = pick_candidate_and_update_current(dv_candidates, oe_candidates);
+	if (!success)
+	{
+		//// deal with unsuccessful iteration
+		return false;
+		
+	}
 	
 	return true;  // reporting and saving done next
 }
 
-
-void SeqQuadProgram::report_and_save()
+Eigen::VectorXd SeqQuadProgram::get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe)
 {
-	ofstream &frec = file_manager.rec_ofstream();
+	Eigen::VectorXd obj_vec(_dv.shape().first);
+	if (use_obj_obs)
+	{
+		obj_vec = _oe.get_var_vector(obj_func_str);
+	}
+	else
+	{
+		_dv.transform_ip(ParameterEnsemble::transStatus::NUM);
+		Parameters pars = pest_scenario.get_ctl_parameters();
+		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+		//PriorInformationRec pi = pest_scenario.get_prior_info().get_pi_rec_ptr(obj_func_str);
+		Eigen::VectorXd real;
+		vector<string> vnames = _dv.get_var_names();
+		//pair<double, double> sr;
+		for (int i = 0; i < _dv.shape().first; i++)
+		{
+			pts.ctl2numeric_ip(pars);
+			real = _dv.get_real_vector(i);
+			pars.update_without_clear(vnames, real);
+			pts.numeric2ctl_ip(pars);
+			//sr = pi.calc_sim_and_resid(pars);
+			//obj_vec[i] = sr.first;
+			double v = 0;
+			for (int j = 0; j < dv_names.size(); j++)
+			{
+				v += obj_func_coef_map[dv_names[j]] * pars[dv_names[j]];
+			}
+			obj_vec[i] = v;
+		}
+	}
+	return obj_vec;
+}
+
+bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe)
+{
+	//decide!
+	Eigen::VectorXd obj_vec = get_obj_vector(dv_candidates, _oe);
+	double omin = numeric_limits<double>::max();
+	int imin = -1;
+	for (int i = 0; i < obj_vec.size(); i++)
+	{
+		if (obj_vec[i] < omin)
+		{
+			imin = i;
+			omin = obj_vec[i];
+		}
+	}
+	if (imin == -1)
+		throw_sqp_error("shits busted");
+	//todo:update current_dv and current_obs
+	
+	
+	return true;
+}
+
+void SeqQuadProgram::report_and_save_ensemble()
+{
+	if (use_ensemble_grad)
+		report_and_save_ensemble(dv, oe);
+
+}
+void SeqQuadProgram::report_and_save_ensemble(ParameterEnsemble& _dv, ObservationEnsemble& _oe)
+{
+	ofstream& frec = file_manager.rec_ofstream();
 	frec << endl << "  ---  SeqQuadProgram iteration " << iter << " report  ---  " << endl;
-	frec << "   number of active realizations:  " << dv.shape().first << endl;
+	frec << "   number of active realizations:  " << _dv.shape().first << endl;
 	frec << "   number of model runs:           " << run_mgr_ptr->get_total_runs() << endl;
 
 	cout << endl << "  ---  SeqQuadProgram iteration " << iter << " report  ---  " << endl;
-	cout << "   number of active realizations:   " << dv.shape().first << endl;
+	cout << "   number of active realizations:   " << _dv.shape().first << endl;
 	cout << "   number of model runs:            " << run_mgr_ptr->get_total_runs() << endl;
+	save(_dv, _oe);
+}
 
+void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool save_base)
+{
+	ofstream& frec = file_manager.rec_ofstream();
 	stringstream ss;
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".obs.jcb";
-		oe.to_binary(ss.str());
+		_oe.to_binary(ss.str());
 	}
 	else
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".obs.csv";
-		oe.to_csv(ss.str());
+		_oe.to_csv(ss.str());
 	}
-	frec << "      current obs ensemble saved to " << ss.str() << endl;
-	cout << "      current obs ensemble saved to " << ss.str() << endl;
+	frec << "      obs ensemble saved to " << ss.str() << endl;
+	cout << "      obs ensemble saved to " << ss.str() << endl;
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".par.jcb";
-		dv.to_binary(ss.str());
+		_dv.to_binary(ss.str());
 	}
 	else
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
-		dv.to_csv(ss.str());
+		_dv.to_csv(ss.str());
 	}
-	save_base_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, iter);
-	save_base_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, -1);
+	if (save_base)
+	{
+		save_base_real_par_rei(pest_scenario, _dv, _oe, output_file_writer, file_manager, iter);
+		save_base_real_par_rei(pest_scenario, _dv, _oe, output_file_writer, file_manager, -1);
+	}
 	//ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
 	//dv.to_csv(ss.str());
-	frec << "      current par ensemble saved to " << ss.str() << endl;
-	cout << "      current par ensemble saved to " << ss.str() << endl;
+	frec << "      par ensemble saved to " << ss.str() << endl;
+	cout << "      par ensemble saved to " << ss.str() << endl;
 
 	
 
@@ -2187,7 +2331,9 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 	performance_log->log_event("processing runs");
 	vector<int> failed_real_indices;
 	
-	ObservationEnsemble _oe = oe;//copy
+	ObservationEnsemble _oe(&pest_scenario, &rand_gen);
+	_oe.reserve(dv_candidates.get_real_names(), constraints.get_obs_constraint_names());
+
 	try
 	{
 		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr);
