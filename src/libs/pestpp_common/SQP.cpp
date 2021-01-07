@@ -1571,6 +1571,17 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 	stringstream ss;
 	Eigen::VectorXd grad(dv_names.size());
 	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
+	
+	//if don't already have or if already have and exit
+	//	if (LBFGS) &(num_it > 2)& (constraints False); // constraint False as need phi_grad for Lagrangian
+	//	{
+	//		ss.str("");
+	//		ss << "(re)use grad from Wolfe testing during upgrade evaluations last iteration";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		throw_sqp_error("TODO");
+	//	}
+	
 	if (use_ensemble_grad)
 	{
 		//ensemble stuff here
@@ -1603,9 +1614,11 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			message(1, "empirical parcov inv:", parcov_inv);  // tmp
 			// try pseudo_inv_ip()
 			//Covariance x;
-			//x = Covariance(dv.get_var_names(), dv_cov_matrix.sparseView(), Covariance::MatType::SPARSE);
+			//x = Covariance(dv_names, dv_cov_matrix.sparseView(), Covariance::MatType::SPARSE);
 			//x.pseudo_inv_ip(pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
 			//message(1, "pseudo inv:", x);  // tmp
+
+			// CMA implementation to go here
 
 			// compute dec var-phi cross-cov vector
 			// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
@@ -1618,67 +1631,23 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			// now compute grad vector
 			// this is a matrix-vector product; the matrix being the pseudo inv of diag empirical dec var cov matrix and the vector being the dec var-phi cross-cov vector\
 			// see, e.g., Chen et al. (2009) and Fonseca et al. (2015)
-			Eigen::VectorXd grad_vector; 
-			grad_vector = parcov_inv * cross_cov_vector;//*parcov.e_ptr() * cross_cov_vector;
-			message(1, "grad vector:", grad_vector);
+			Eigen::VectorXd grad; 
+			grad = parcov_inv * cross_cov_vector;//*parcov.e_ptr() * cross_cov_vector;
+			message(1, "grad vector:", grad);
 
-			// compute gradient
-			//if (use_ensemble_grad)
-//{
-//	if (LBFGS) &(num_it > 2)& (constraints False); // constraint False as need phi_grad for Lagrangian
-//	{
-//		ss.str("");
-//		ss << "(re)use grad from Wolfe testing during upgrade evaluations last iteration";
-//		string s = ss.str();
-//		message(1, s);
-//		throw_sqp_error("TODO");
-//	}
-//	else
-//	{
-//		ss.str("");
-//		ss << "compute dec var en cov vector and dec var en-phi en cross-covariance vector";
-//		string s = ss.str();
-//		message(1, s);
-//		throw_sqp_error("TODO");
 
-//		// CMA implementation to go here
-
-//		ss.str("");
-//		ss << "compute gradient vector through product of pseudo inv of dec var and cross-cov";
-//		string s = ss.str();
-//		message(1, s);
-//		throw_sqp_error("TODO");
-
-//		ss.str("");
-//		ss << "compute ensemble approx to (active) constraint jacobian";
-//		string s = ss.str();
-//		message(1, s);
-//		throw_sqp_error("TODO");
-//	}
-//}
-//else // finite differences for gradient
-//{
-//	if (LBFGS) &(num_it > 2);
-//	{
-//		ss.str("");
-//		ss << "(re)use grad from Wolfe testing during upgrade evaluations last iteration";
-//		string s = ss.str();
-//		message(1, s);
-//		throw_sqp_error("TODO");
-//	}
-//	else // standard BFGS
-//	{
-//		ss.str("");
-//		ss << "populate jco and partition into phi grad vector and (active) constraint jco";
-//		string s = ss.str();
-//		message(1, s);
-//		throw_sqp_error("TODO");
-//	}
-//}
+			// if (constraints)
+			//{
+			//	ss.str("");
+			//	ss << "compute ensemble approx to (active) constraint jacobian";
+			//	string s = ss.str();
+			//	message(1, s);
+			//	throw_sqp_error("TODO");
+			//}
 
              throw_sqp_error("obs-based obj for ensembles not implemented");
 
-             //todo: localize the gradient
+             //todo: localize the gradient here - fun times
 
 		}
 		//pi base obj, need representative dv values using the "center_on" arg
