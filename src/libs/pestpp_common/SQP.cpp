@@ -1714,9 +1714,11 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 //}
 //}
 
-//Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _current_dv_values)
-//{
-//	throw_sqp_error("TODO");
+Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _current_dv_values, Eigen::VectorXd& grad_vector)
+{
+	//
+	//throw_sqp_error("TODO");
+	return grad_vector;
 
 	//if (constraints is True) &(len(working_set) > 0);
 	//{
@@ -1748,7 +1750,7 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 	//		//self.search_d = self._LBFGS_hess_update(memory = memory, self_scale = hess_self_scaling)
 	//		throw_sqp_error("TODO");
 	//	}
-//}
+}
 
 Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameters& _current_dv_values)
 {
@@ -1757,10 +1759,10 @@ Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameter
 	// part 1: done only once (at first alpha test)
 
 	// grad vector computation
-	Eigen::VectorXd grad = calc_gradient_vector(_current_dv_values);
+	Eigen::VectorXd grad = calc_gradient_vector(_current_dv_values);  // need _current_dv_values here?
 	
 	// search direction computation
-	//Eigen::VectorXd search_d = calc_search_direction_vector()
+	Eigen::VectorXd search_d = calc_search_direction_vector(_current_dv_values, grad);  // need _current_dv_values here?
 
 	// undertake search direction-related tests, e.g., point down-hill
 	// and check if constraints in working set cause zero search_d (and go to next iteration if so)

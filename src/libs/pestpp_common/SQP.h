@@ -155,7 +155,7 @@ private:
 	Eigen::VectorXd get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
 	
 
-	//Eigen::VectorXd calc_search_direction_vector(const Parameters& _current_dv_)
+	Eigen::VectorXd calc_search_direction_vector(const Parameters& _current_dv_, Eigen::VectorXd &grad_vector);  // to check
 
 	Parameters fancy_solve_routine(double scale_val, const Parameters& _current_dv_);
 
