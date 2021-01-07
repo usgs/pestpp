@@ -946,15 +946,17 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 		message(1, "generating new dv ensemble at current best location");
 		//draw new dv ensemble using - assuming parcov has been updated by now...
 		ParameterEnsemble _dv(&pest_scenario, &rand_gen);
-		Parameters dv = _current_dv_vals.get_subset(dv_names.begin(),dv_names.end());
+		Parameters dv_par = _current_dv_vals.get_subset(dv_names.begin(),dv_names.end());
 		ofstream& frec = file_manager.rec_ofstream();
-		_dv.draw(pest_scenario.get_pestpp_options().get_sqp_num_reals(), dv, parcov, performance_log, 0, frec);
+		_dv.draw(pest_scenario.get_pestpp_options().get_sqp_num_reals(), dv_par, parcov, performance_log, 0, frec);
 		//todo: save _dv here in case something bad happens...
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(_dv.get_real_names(), constraints.get_obs_constraint_names());
 		message(1, "running new dv ensemble");
 		run_ensemble(_dv, _oe);
 		save(_dv, _oe);
+		dv = _dv;
+		oe = _oe;
 	}
 	else
 	{
@@ -1708,7 +1710,6 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 		//pi based obj
 		else
 		{
-
 			for (int i = 0; i < dv_names.size(); i++)
 			{
 				grad[i] = obj_func_coef_map[dv_names[i]];// *_current_dv_values.get_rec(dv_names[i]);
