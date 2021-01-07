@@ -785,10 +785,12 @@ void SeqQuadProgram::initialize()
 		return;
 	}
 
+
+	scale_vals = ppo->get_sqp_scale_facs();
+	message(0, "using the following upgrade vector scale values (e.g. 'line search'):", scale_vals);
 	
 	//ofstream &frec = file_manager.rec_ofstream();
-	last_best_mean = 1.0E+30;
-	last_best_std = 1.0e+30;
+	last_best = 1.0E+30;
 	
 	warn_min_reals = 10;
 	error_min_reals = 2;
@@ -833,6 +835,10 @@ void SeqQuadProgram::initialize()
 	current_grad_vector.update_without_clear(dv_names, g);
 	//todo: save and report on initial gradient - make some checks would be useful?
 	
+	last_best = get_obj_value(current_ctl_dv_values, current_obs);
+	message(0, "Initial phi value:", last_best);
+	best_phis.push_back(last_best);
+
 	message(0, "initialization complete");
 }
 
@@ -940,15 +946,17 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 		message(1, "generating new dv ensemble at current best location");
 		//draw new dv ensemble using - assuming parcov has been updated by now...
 		ParameterEnsemble _dv(&pest_scenario, &rand_gen);
-		Parameters dv = _current_dv_vals.get_subset(dv_names.begin(),dv_names.end());
+		Parameters dv_par = _current_dv_vals.get_subset(dv_names.begin(),dv_names.end());
 		ofstream& frec = file_manager.rec_ofstream();
-		_dv.draw(pest_scenario.get_pestpp_options().get_sqp_num_reals(), dv, parcov, performance_log, 0, frec);
+		_dv.draw(pest_scenario.get_pestpp_options().get_sqp_num_reals(), dv_par, parcov, performance_log, 0, frec);
 		//todo: save _dv here in case something bad happens...
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(_dv.get_real_names(), constraints.get_obs_constraint_names());
 		message(1, "running new dv ensemble");
 		run_ensemble(_dv, _oe);
 		save(_dv, _oe);
+		dv = _dv;
+		oe = _oe;
 	}
 	else
 	{
@@ -1268,6 +1276,17 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 
 	pcs = ParChangeSummarizer(&dv_base, &file_manager, &output_file_writer);
 
+	dv.transform_ip(ParameterEnsemble::transStatus::NUM);
+	vector<double> vals = dv.get_mean_stl_var_vector();
+	vector<string> names = dv.get_var_names();
+	current_ctl_dv_values.update(names, vals);
+	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+	pts.numeric2ctl_ip(current_ctl_dv_values);
+	vals = oe.get_mean_stl_var_vector();
+	names = oe.get_var_names();
+	current_obs.update(names, vals);
+
+
 }
 
 void SeqQuadProgram::drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe, bool is_subset)
@@ -1409,7 +1428,16 @@ void SeqQuadProgram::iterate_2_solution()
 		accept = solve_new();
 
 		//todo: save and write out the current phi grad vector (maybe save all of them???)
-		
+		ss.str("");
+		ss << "best phi sequence:";
+		for (auto phi : best_phis)
+			ss << phi << " ";
+		message(0, ss.str());
+
+		//check to break here before making more runs
+		if (should_terminate())
+			break;
+
 		//update the underlying runs
 		make_gradient_runs(current_ctl_dv_values,current_obs);
 		
@@ -1433,8 +1461,7 @@ void SeqQuadProgram::iterate_2_solution()
 			pcs.summarize(dv, iter, ss.str());
 		}
 			
-		if (should_terminate())
-			break;
+		
 		
 		iter++;
 
@@ -1443,6 +1470,9 @@ void SeqQuadProgram::iterate_2_solution()
 
 bool SeqQuadProgram::should_terminate()
 {
+	if (iter >= pest_scenario.get_control_info().noptmax)
+		return true;
+
 	//todo: work out some SQP-based criteria here...
 	//double phiredstp = pest_scenario.get_control_info().phiredstp;
 	//int nphistp = pest_scenario.get_control_info().nphistp;
@@ -1608,10 +1638,16 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 				//parcov_inv = parcov_diag.get_matrix().diagonal();
 				//parcov_inv = parcov_inv.cwiseInverse();  // equivalent to pseudo inv?
 			}
-			dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
-			message(1, "dv_cov:", dv_cov_matrix);
-			parcov_inv = dv_cov_matrix.cwiseInverse();  // check equivalence to pseudo inv
+			//dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
+			//message(1, "dv_cov:", dv_cov_matrix);
+			//parcov_inv = dv_cov_matrix.cwiseInverse();  // check equivalence to pseudo inv
+			
+			//the second return matrix should be shrunk optimally to be nonsingular...but who knows!
+			Covariance shrunk_cov = dv.get_empirical_cov_matrices(&file_manager).second;
+			shrunk_cov.inv_ip();
+			parcov_inv = shrunk_cov.e_ptr()->toDense();
 			message(1, "empirical parcov inv:", parcov_inv);  // tmp
+			
 			// try pseudo_inv_ip()
 			//Covariance x;
 			//x = Covariance(dv_names, dv_cov_matrix.sparseView(), Covariance::MatType::SPARSE);
@@ -1626,16 +1662,12 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			Eigen::MatrixXd obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str}, center_on);
 			Eigen::MatrixXd cross_cov_vector;  // or Eigen::VectorXd?
 			cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
-			message(1, "dv-obj_cross_cov:", cross_cov_vector);
+			cout << "dv-obj_cross_cov:" << cross_cov_vector << endl;
 			
 			// now compute grad vector
 			// this is a matrix-vector product; the matrix being the pseudo inv of diag empirical dec var cov matrix and the vector being the dec var-phi cross-cov vector\
-			// see, e.g., Chen et al. (2009) and Fonseca et al. (2015)
-			Eigen::VectorXd grad; 
+			// see, e.g., Chen et al. (2009) and Fonseca et al. (2015) 
 			grad = parcov_inv * cross_cov_vector;//*parcov.e_ptr() * cross_cov_vector;
-			message(1, "grad vector:", grad);
-
-
 			// if (constraints)
 			//{
 			//	ss.str("");
@@ -1645,7 +1677,7 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			//	throw_sqp_error("TODO");
 			//}
 
-             throw_sqp_error("obs-based obj for ensembles not implemented");
+             //throw_sqp_error("obs-based obj for ensembles not implemented");
 
              //todo: localize the gradient here - fun times
 
@@ -1655,40 +1687,40 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 		//todo: for now, just using mean dv values
 		else
 		{
-		//if not center_on arg, use the mean dv values
-		if (center_on.size() == 0)
-		{
-			//pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
-			for (int i = 0; i < dv_names.size(); i++)
+			//if not center_on arg, use the mean dv values
+			if (center_on.size() == 0)
 			{
-				grad[i] = obj_func_coef_map[dv_names[i]];// * mm.first[dv_names[i]];
+				//pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
+				for (int i = 0; i < dv_names.size(); i++)
+				{
+					grad[i] = obj_func_coef_map[dv_names[i]];// * mm.first[dv_names[i]];
+				}
+			}
+			else
+			{
+
+				grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
 			}
 		}
+	}
+	else
+	{
+		//obs-based obj
+		if (use_obj_obs)
+		{
+			//just a jco row
+			vector<string> obj_name_vec{ obj_func_str };
+			Eigen::MatrixXd t = jco.get_matrix(obj_name_vec, dv_names);
+			grad = t.row(0);
+		}
+		//pi based obj
 		else
 		{
-
-			grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
+			for (int i = 0; i < dv_names.size(); i++)
+			{
+				grad[i] = obj_func_coef_map[dv_names[i]];// *_current_dv_values.get_rec(dv_names[i]);
+			}
 		}
-		}
-	}
-	else
-	{
-	//obs-based obj
-	if (use_obj_obs)
-	{
-		//just a jco row
-		vector<string> obj_name_vec{ obj_func_str };
-		grad = jco.get_matrix(obj_name_vec, dv_names);
-	}
-	//pi based obj
-	else
-	{
-		
-		for (int i = 0; i < dv_names.size(); i++)
-		{
-			grad[i] = obj_func_coef_map[dv_names[i]];// *_current_dv_values.get_rec(dv_names[i]);
-		}
-	}
 	}
 	return grad;
 }
@@ -1752,14 +1784,24 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 	//	}
 }
 
-Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameters& _current_dv_values)
+Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameters& _current_dv_num_values)
 {
-	Parameters candidate = _current_dv_values; //copy
-
+	Parameters num_candidate = _current_dv_num_values; //copy
 	// part 1: done only once (at first alpha test)
 
 	// grad vector computation
-	Eigen::VectorXd grad = calc_gradient_vector(_current_dv_values);  // need _current_dv_values here?
+	Eigen::VectorXd grad = current_grad_vector.get_data_eigen_vec(dv_names);
+	if (obj_sense == "minimize")
+		grad *= -1.;
+	
+	grad *= scale_val;
+	if (grad.squaredNorm() < 1.0 - 10)
+		message(1, "very short upgrade for scale value", scale_val);
+
+	Eigen::VectorXd cvals = num_candidate.get_data_eigen_vec(dv_names);
+	
+	cvals.array() += grad.array();
+	num_candidate.update_without_clear(dv_names, cvals);
 	
 	// search direction computation
 	Eigen::VectorXd search_d = calc_search_direction_vector(_current_dv_values, grad);  // need _current_dv_values here?
@@ -1839,7 +1881,7 @@ Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameter
 	//		message(1, s);
 	//		throw_sqp_error("TODO");
 
-	return candidate;
+	return num_candidate;
 }
 
 bool SeqQuadProgram::solve_new()
@@ -1872,20 +1914,20 @@ bool SeqQuadProgram::solve_new()
 		_current_num_dv_values.update(dv_names, mean_vec);
 	}
 
-	Parameters dv_candidate;
+	Parameters dv_num_candidate;
 	ParameterEnsemble dv_candidates(&pest_scenario,&rand_gen);
 	dv_candidates.set_trans_status(ParameterEnsemble::transStatus::NUM);
 	
 	
 	//backtracking/line search factors
 	//TODO: make this a ++ arg or tunable or something clever
-	vector<double> scale_vals{ 0.01,0.1,0.5,1.0 };
+	
 	vector<string> real_names;
 	
 	for (auto sv : scale_vals)
 	{
 		ss.str("");
-		ss << "dv_cand_sv:" << setw(8) << setprecision(3) << sv;
+		ss << "dv_cand_sv:" << left << setw(8) << setprecision(3) << sv;
 		real_names.push_back(ss.str());
 	}
 	dv_candidates.reserve(real_names, dv_names);
@@ -1898,8 +1940,8 @@ bool SeqQuadProgram::solve_new()
 		message(1, "starting lambda calcs for scaling factor", scale_val);
 		message(2, "see .log file for more details");
 		
-		dv_candidate = fancy_solve_routine(scale_val, _current_num_dv_values);
-		Eigen::VectorXd vec = dv_candidate.get_data_eigen_vec(dv_names);
+		dv_num_candidate = fancy_solve_routine(scale_val, _current_num_dv_values);
+		Eigen::VectorXd vec = dv_num_candidate.get_data_eigen_vec(dv_names);
 		dv_candidates.update_real_ip(real_names[i], vec);
 		
 
@@ -1985,6 +2027,38 @@ bool SeqQuadProgram::solve_new()
 	return true;  // reporting and saving done next
 }
 
+
+double SeqQuadProgram::get_obj_value(Parameters& _current_ctl_dv_vals, Observations& _current_obs)
+{
+	double v = 0;
+	if (use_obj_obs)
+	{
+		v =  _current_obs.get_rec(obj_func_str);
+	}
+	else
+	{
+		Parameters pars = _current_ctl_dv_vals;
+		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+		pts.ctl2numeric_ip(pars);
+		for (auto& dv_name : dv_names)
+			v += obj_func_coef_map[dv_name] * pars.get_rec(dv_name);
+	}
+	return v;
+}
+
+map<string, double> SeqQuadProgram::get_obj_map(ParameterEnsemble& _dv, ObservationEnsemble& _oe)
+{
+	Eigen::VectorXd obj_vec = get_obj_vector(_dv, _oe);
+	vector<string> real_names = _dv.get_real_names();
+	map<string, double> obj_map;
+	for (int i = 0; i < real_names.size(); i++)
+		obj_map[real_names[i]] = obj_vec[i];
+
+	return obj_map;
+
+
+}
+
 Eigen::VectorXd SeqQuadProgram::get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe)
 {
 	Eigen::VectorXd obj_vec(_dv.shape().first);
@@ -1997,16 +2071,17 @@ Eigen::VectorXd SeqQuadProgram::get_obj_vector(ParameterEnsemble& _dv, Observati
 		_dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 		Parameters pars = pest_scenario.get_ctl_parameters();
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+		pts.ctl2numeric_ip(pars);
 		//PriorInformationRec pi = pest_scenario.get_prior_info().get_pi_rec_ptr(obj_func_str);
 		Eigen::VectorXd real;
 		vector<string> vnames = _dv.get_var_names();
 		//pair<double, double> sr;
 		for (int i = 0; i < _dv.shape().first; i++)
 		{
-			pts.ctl2numeric_ip(pars);
+			//pts.ctl2numeric_ip(pars);
 			real = _dv.get_real_vector(i);
 			pars.update_without_clear(vnames, real);
-			pts.numeric2ctl_ip(pars);
+			//pts.numeric2ctl_ip(pars);
 			//sr = pi.calc_sim_and_resid(pars);
 			//obj_vec[i] = sr.first;
 			double v = 0;
@@ -2023,20 +2098,71 @@ Eigen::VectorXd SeqQuadProgram::get_obj_vector(ParameterEnsemble& _dv, Observati
 bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe)
 {
 	//decide!
+	message(0, " current best phi:", last_best);
+	stringstream ss;
 	Eigen::VectorXd obj_vec = get_obj_vector(dv_candidates, _oe);
-	double omin = numeric_limits<double>::max();
-	int imin = -1;
+	double oext;
+	if (obj_sense == "minimize")
+		oext = numeric_limits<double>::max();
+	else
+		oext = numeric_limits<double>::min();
+	int idx = -1;
+	vector<string> real_names = dv_candidates.get_real_names();
+	map<string, double> obj_map = get_obj_map(dv_candidates, _oe);
+	//todo make sure chances have been applied before now...
+	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates,_oe);
 	for (int i = 0; i < obj_vec.size(); i++)
 	{
-		if (obj_vec[i] < omin)
+		ss.str("");
+		ss << "candidate: " << real_names[i] << " phi: " << obj_vec[i];
+		double infeas_sum = 0.0;
+		for (auto& v : violations[real_names[i]])
 		{
-			imin = i;
-			omin = obj_vec[i];
+			infeas_sum += v.second;
+		}
+		ss << " infeasibilty total: " << infeas_sum << endl;
+		message(1, ss.str());
+		if ((obj_sense=="minimize") && (obj_vec[i] < oext))
+		{
+			idx = i;
+			oext = obj_vec[i];
+		}
+		else if ((obj_sense == "maximize") && (obj_vec[i] > oext))
+		{
+			idx = i;
+			oext = obj_vec[i];
 		}
 	}
-	if (imin == -1)
+	message(0, "best phi this iteration: ", oext);
+	if (idx == -1)
 		throw_sqp_error("shits busted");
-	//todo:update current_dv and current_obs
+	best_phis.push_back(oext);
+	if (((obj_sense == "minimize") && (oext < last_best)) || ((obj_sense == "maximize") && (oext > last_best)))
+	{
+		//todo:update current_dv and current_obs
+		message(0, "accepting upgrade", real_names[idx]);
+		Eigen::VectorXd v = dv_candidates.get_real_vector(idx);
+		vector<string> vnames = dv_candidates.get_var_names();
+		Parameters p;
+		p.update_without_clear(vnames, v);
+		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+		pts.numeric2ctl_ip(p);
+		for (auto& d : dv_names)
+			current_ctl_dv_values[d] = p[d];
+		v = _oe.get_real_vector(idx);
+		vnames = _oe.get_var_names();
+		current_obs.update_without_clear(vnames, v);
+		last_best = oext;
+		message(0, "new best phi:", last_best);
+		return true;
+		
+	}
+	else
+	{
+		message(0, "not accepting upgrade #sad");
+		return false;
+	}
+	
 	
 	
 	return true;
@@ -2293,7 +2419,7 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 	vector<int> failed_real_indices;
 	
 	ObservationEnsemble _oe(&pest_scenario, &rand_gen);
-	_oe.reserve(dv_candidates.get_real_names(), constraints.get_obs_constraint_names());
+	_oe.reserve(dv_candidates.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
 
 	try
 	{
@@ -2361,20 +2487,35 @@ void SeqQuadProgram::queue_chance_runs()
 	stringstream ss;
 	if (constraints.should_update_chance(iter))
 	{
-		//just use dp member nearest the mean dec var values
-		dv.transform_ip(ParameterEnsemble::transStatus::NUM);
-		vector<double> t = dv.get_mean_stl_var_vector();
-		Eigen::VectorXd dv_mean = stlvec_2_eigenvec(t);
-		t.resize(0);
-			
-		ss << "using mean decision variables for chance calculations";
-		
-		Parameters pars = pest_scenario.get_ctl_parameters();
-		pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(pars);
-		pars.update_without_clear(dv.get_var_names(), dv_mean);
-		Observations obs = pest_scenario.get_ctl_observations();
-		pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
-		constraints.add_runs(iter, pars, obs, run_mgr_ptr);
+		if (use_ensemble_grad)
+		{
+			if (chancepoints == chancePoints::ALL)
+			{
+				message(1, "queueing up chance runs using nested chance points");
+				constraints.add_runs(iter, dv, current_obs, run_mgr_ptr);
+			}
+			else
+			{
+				//just use dp member nearest the mean dec var values
+				dv.transform_ip(ParameterEnsemble::transStatus::NUM);
+				vector<double> t = dv.get_mean_stl_var_vector();
+				Eigen::VectorXd dv_mean = stlvec_2_eigenvec(t);
+				t.resize(0);
+				ss << "queueing up chance runs using mean decision variables";
+				message(1, ss.str());
+				Parameters pars = pest_scenario.get_ctl_parameters();
+				pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(pars);
+				pars.update_without_clear(dv.get_var_names(), dv_mean);
+				Observations obs = pest_scenario.get_ctl_observations();
+				pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
+				constraints.add_runs(iter, pars, obs, run_mgr_ptr);
+			}
+		}
+		else
+		{
+			message(1, "queuing chance runs");
+			constraints.add_runs(iter, current_ctl_dv_values, current_obs, run_mgr_ptr);
+		}
 	}
 }
 
@@ -2421,6 +2562,7 @@ vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnse
 	}
 
 	performance_log->log_event("processing runs");
+	_oe.reserve(_pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
 	if (real_idxs.size() > 0)
 	{
 		_oe.keep_rows(real_idxs);

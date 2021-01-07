@@ -1287,6 +1287,18 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 		sqp_update_hessian = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	else if (key == "SQP_SCALE_FACS")
+	{
+		sqp_scale_facs.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			sqp_scale_facs.push_back(v);
+		}
+	}
 	
 	return false;
 }
@@ -1433,6 +1445,9 @@ void PestppOptions::summary(ostream& os) const
 	os << "sqp_obs_restart_en: " << sqp_obs_restart_en << endl;
 	os << "sqp_num_reals: " << sqp_num_reals << endl;
 	os << "sqp_update_hessian: " << sqp_update_hessian << endl;
+	os << "sqp_scale_facs:" << endl;
+	for (auto m : sqp_scale_facs)
+		os << "  " << m << endl;
 
 	os << endl << "...pestpp-mou options:" << endl;
 	os << "mou_generator: " << mou_generator << endl;
@@ -1441,7 +1456,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_obs_population_restart_file: " << mou_obs_population_restart_file << endl;
 	os << "mou_objectives: " << endl;
 	for (auto obj : mou_objectives)
-		os << obj << endl;
+		os << "  " << obj << endl;
 	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
 	os << "mou_risk_objective: " << mou_risk_obj << endl;
 	os << "mou_verbose_level: " << mou_verbose_level << endl;
@@ -1595,6 +1610,7 @@ void PestppOptions::set_defaults()
 	set_sqp_obs_restart_en("");
 	set_sqp_num_reals(-1);
 	set_sqp_update_hessian(false);
+	set_sqp_scale_facs(vector<double>{0.00001, 0.0001, 0.01, 0.1, 1.0});
 
 	set_mou_generator("SBX");
 	set_mou_population_size(100);
