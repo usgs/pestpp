@@ -104,13 +104,13 @@ private:
 	int num_threads;
 
 	double eigthresh;
-
+	vector<double> scale_vals;
 	set<string> pp_args;
 
 	int iter;
 
-	double last_best_mean,last_best_std;
-	vector<double> best_mean_phis;
+	double last_best;
+	vector<double> best_phis;
 	double best_phi_yet;
 
 	int warn_min_reals, error_min_reals;
@@ -154,6 +154,8 @@ private:
 
 	Eigen::VectorXd get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
 	
+	double get_obj_value(Parameters& _current_ctl_dv_vals, Observations& _current_obs);
+	map<string, double> get_obj_map(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
 
 	//Eigen::VectorXd calc_search_direction_vector(const Parameters& _current_dv_)
 

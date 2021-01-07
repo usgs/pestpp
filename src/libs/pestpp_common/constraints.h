@@ -110,6 +110,8 @@ public:
 	map<string, double> get_unsatified_pi_constraints(Parameters& par_and_dec_vars, double tol=0.0);
 	map<string, double> get_unsatified_obs_constraints(Observations& constraints_sim, double tol=0.0, bool do_shift = true);
 	
+	map<string, map<string, double>> get_ensemble_violations_map(ParameterEnsemble& pe, ObservationEnsemble& oe);
+
 	//get the number of non-zero Prior info constraint elements
 	int get_num_nz_pi_constraint_elements();
 	

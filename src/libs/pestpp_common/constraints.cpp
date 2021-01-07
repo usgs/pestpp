@@ -2518,6 +2518,45 @@ map<string, double> Constraints::get_unsatified_pi_constraints(Parameters& par_a
 	return unsatisfied;
 }
 
+map<string, map<string, double>> Constraints::get_ensemble_violations_map(ParameterEnsemble& pe, ObservationEnsemble& oe)
+{
+	//make sure pe and oe share realizations
+	vector<string> pe_names = pe.get_real_names();
+	vector<string> oe_names = oe.get_real_names();
+	if (pe_names.size() != oe_names.size())
+		throw_constraints_error("get_ensemble_violations_map(): pe reals != oe reals");
+	for (int i=0;i<pe_names.size();i++)
+		if (pe_names[i] != oe_names[i])
+			throw_constraints_error("get_ensemble_violations_map(): pe reals != oe reals");
+	
+	Observations obs = pest_scenario.get_ctl_observations();
+	Eigen::VectorXd v;
+	vector<string> vnames = oe.get_var_names();
+	map<string, double> vmap;
+	map<string, map<string, double>> violations;
+	for (auto& name : oe_names)
+	{
+		v = oe.get_real_vector(name);
+		obs.update_without_clear(vnames, v);
+		vmap = get_unsatified_obs_constraints(obs);
+		violations[name] = vmap;
+	}
+
+	Parameters pars = pest_scenario.get_ctl_parameters();
+	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+	pts.ctl2numeric_ip(pars);
+	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+	vnames = pe.get_var_names();
+	for (auto& name : pe_names)
+	{
+		v = pe.get_real_vector(name);
+		pars.update_without_clear(vnames, v);
+		vmap = get_unsatified_pi_constraints(pars);
+		violations[name].insert(vmap.begin(), vmap.end());
+	}
+	return violations;
+}
+
 map<string, double> Constraints::get_unsatified_obs_constraints(Observations& constraints_sim, double tol, bool do_shift)
 {
 	/* get a map of name, distance for each of the obs-based (e.g. model-based) constraints that are not satisfied in the constraint_obs container.

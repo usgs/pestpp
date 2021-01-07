@@ -2448,17 +2448,20 @@ ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double c
 	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
 	if (center_on.size() > 0)
 	{
-		vector<string> real_names = oe_upgrade.get_real_names();
-		if (find(real_names.begin(), real_names.end(), center_on) == real_names.end())
+		if (center_on != MEDIAN_CENTER_ON_NAME)
 		{
-			message(0, "Warning: 'ies_center_on' real not found in obs en, reverting to mean...");
-			center_on = "";
-		}
-		real_names = pe_upgrade.get_real_names();
-		if ((center_on.size() > 0) && find(real_names.begin(), real_names.end(), center_on) == real_names.end())
-		{
-			message(0, "Warning: 'ies_center_on' real not found in par en, reverting to mean...");
-			center_on = "";
+			vector<string> real_names = oe_upgrade.get_real_names();
+			if (find(real_names.begin(), real_names.end(), center_on) == real_names.end())
+			{
+				message(0, "Warning: 'ies_center_on' real not found in obs en, reverting to mean...");
+				center_on = "";
+			}
+			real_names = pe_upgrade.get_real_names();
+			if ((center_on.size() > 0) && find(real_names.begin(), real_names.end(), center_on) == real_names.end())
+			{
+				message(0, "Warning: 'ies_center_on' real not found in par en, reverting to mean...");
+				center_on = "";
+			}
 		}
 	}
 
