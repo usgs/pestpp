@@ -1654,16 +1654,12 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			Eigen::MatrixXd obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str}, center_on);
 			Eigen::MatrixXd cross_cov_vector;  // or Eigen::VectorXd?
 			cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
-			message(1, "dv-obj_cross_cov:", cross_cov_vector);
+			cout << "dv-obj_cross_cov:" << cross_cov_vector << endl;
 			
 			// now compute grad vector
 			// this is a matrix-vector product; the matrix being the pseudo inv of diag empirical dec var cov matrix and the vector being the dec var-phi cross-cov vector\
-			// see, e.g., Chen et al. (2009) and Fonseca et al. (2015)
-			Eigen::VectorXd grad; 
+			// see, e.g., Chen et al. (2009) and Fonseca et al. (2015) 
 			grad = parcov_inv * cross_cov_vector;//*parcov.e_ptr() * cross_cov_vector;
-			message(1, "grad vector:", grad);
-
-
 			// if (constraints)
 			//{
 			//	ss.str("");
@@ -1673,7 +1669,7 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			//	throw_sqp_error("TODO");
 			//}
 
-             throw_sqp_error("obs-based obj for ensembles not implemented");
+             //throw_sqp_error("obs-based obj for ensembles not implemented");
 
              //todo: localize the gradient here - fun times
 
@@ -1683,41 +1679,41 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 		//todo: for now, just using mean dv values
 		else
 		{
-		//if not center_on arg, use the mean dv values
-		if (center_on.size() == 0)
-		{
-			//pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
-			for (int i = 0; i < dv_names.size(); i++)
+			//if not center_on arg, use the mean dv values
+			if (center_on.size() == 0)
 			{
-				grad[i] = obj_func_coef_map[dv_names[i]];// * mm.first[dv_names[i]];
+				//pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
+				for (int i = 0; i < dv_names.size(); i++)
+				{
+					grad[i] = obj_func_coef_map[dv_names[i]];// * mm.first[dv_names[i]];
+				}
+			}
+			else
+			{
+
+				grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
 			}
 		}
+	}
+	else
+	{
+		//obs-based obj
+		if (use_obj_obs)
+		{
+			//just a jco row
+			vector<string> obj_name_vec{ obj_func_str };
+			Eigen::MatrixXd t = jco.get_matrix(obj_name_vec, dv_names);
+			grad = t.row(0);
+		}
+		//pi based obj
 		else
 		{
 
-			grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
+			for (int i = 0; i < dv_names.size(); i++)
+			{
+				grad[i] = obj_func_coef_map[dv_names[i]];// *_current_dv_values.get_rec(dv_names[i]);
+			}
 		}
-		}
-	}
-	else
-	{
-	//obs-based obj
-	if (use_obj_obs)
-	{
-		//just a jco row
-		vector<string> obj_name_vec{ obj_func_str };
-		Eigen::MatrixXd t = jco.get_matrix(obj_name_vec, dv_names);
-		grad = t.row(0);
-	}
-	//pi based obj
-	else
-	{
-		
-		for (int i = 0; i < dv_names.size(); i++)
-		{
-			grad[i] = obj_func_coef_map[dv_names[i]];// *_current_dv_values.get_rec(dv_names[i]);
-		}
-	}
 	}
 	return grad;
 }
@@ -2105,11 +2101,17 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	vector<string> real_names = dv_candidates.get_real_names();
 	map<string, double> obj_map = get_obj_map(dv_candidates, _oe);
 	//todo make sure chances have been applied before now...
-	map<string, map<string, double>> infeas = constraints.get_ensemble_violations_map(dv_candidates,_oe);
+	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates,_oe);
 	for (int i = 0; i < obj_vec.size(); i++)
 	{
 		ss.str("");
-		ss << "candidate: " << real_names[i] << " phi: " << obj_vec[i] << endl;
+		ss << "candidate: " << real_names[i] << " phi: " << obj_vec[i];
+		double infeas_sum = 0.0;
+		for (auto& v : violations[real_names[i]])
+		{
+			infeas_sum += v.second;
+		}
+		ss << " infeasibilty total: " << infeas_sum << endl;
 		message(1, ss.str());
 		if ((obj_sense=="minimize") && (obj_vec[i] < oext))
 		{

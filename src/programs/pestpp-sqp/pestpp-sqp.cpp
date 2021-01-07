@@ -263,7 +263,7 @@ int main(int argc, char* argv[])
 		pest_utils::try_clean_up_run_storage_files(case_name);
 		
 		cout << endl << endl << "pestpp-sqp analysis complete..." << endl;
-		cout << flush;
+		cout << flush; 
 		return 0;
 #ifndef _DEBUG
 	}
