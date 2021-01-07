@@ -173,7 +173,8 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 			if (pest_scenario.get_pestpp_options().get_ies_obs_restart_csv().size() > 0)
 				message(1, "Warning: even though ies_enforce_bounds is true, a restart obs en was passed, so bounds will not be enforced on the initial par en");
 			else
-				dv.enforce_bounds(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+				//dv.enforce_bounds(performance_log, pest_scenario.get_pestpp_options().get_ies_enforce_chglim());
+			    message(1, "TODO");
 		}
 
 	}
@@ -1578,52 +1579,41 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			
 			//todo: need to make sqp specific or refactor ies arg names
 
-			// compute diag dec var cov matrix empirically
+			// compute sample dec var cov matrix and its pseudo inverse
 			// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
-			// start by computing mean-shifted dec var ensemble
-			Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, center_on);
+			// TODO: so can pseudo inverse: Covariance dv_cov_matrix; 
 			Eigen::MatrixXd dv_cov_matrix;
+			Eigen::MatrixXd parcov_inv;
+			// start by computing mean-shifted dec var ensemble
+			Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, center_on);  // need this for both cov and cross-cov
+			if (dv.shape().first > 1000)  // until we encounter
+			{
+				// lower rank - diag elements only
+				throw_sqp_error("TODO: use dv.get_diagonal_cov matrix()? need to check for consistency if so"); 
+				//parcov = dv.get_diagonal_cov_matrix();  // check ok to instantiate empricially here  // pass helpful center_on here too
+				//Eigen::VectorXd parcov_inv;
+				//Covariance parcov_diag;
+				//parcov_diag.from_diagonal(parcov);
+				//parcov_inv = parcov_diag.get_matrix().diagonal();
+				//parcov_inv = parcov_inv.cwiseInverse();  // equivalent to pseudo inv?
+			}
 			dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
 			message(1, "dv_cov:", dv_cov_matrix);
-			// a theoretical alternative... check for consistency
-			//parcov = dv.get_diagonal_cov_matrix();  // check ok to instantiate empricially here  // pass helpful center_on here too
-			//message(1, "empirical parcov get method:", parcov);
-
-			// compute pseudo inv of diag dec var cov matrix
-			//Eigen::VectorXd parcov_inv;
-			//Covariance parcov_diag;
-			//parcov_diag.from_diagonal(parcov);
-			//parcov_inv = parcov_diag.get_matrix().diagonal();
-			//parcov_inv = parcov_inv.cwiseSqrt().cwiseInverse();  // equivalent to pseudo inv?
-			Eigen::MatrixXd parcov_inv;
-			parcov_inv = dv_cov_matrix.cwiseInverse();  // equivalent to pseudo inv?
+			parcov_inv = dv_cov_matrix.cwiseInverse();  // check equivalence to pseudo inv
 			message(1, "empirical parcov inv:", parcov_inv);  // tmp
-			//parcov_inv = parcov_diag.get_matrix().diagonal();
-			//Covariance parcov_pinv;
-			//parcov_pinv = parcov.pseudo_inv_ip(pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-			//parcov_pinv = dv_cov_matrix.pseudo_inv_ip(pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-			//message(1, "pseudo inv:", parcov_inv);  // tmp
+			// try pseudo_inv_ip()
+			//Covariance x;
+			//x = Covariance(dv.get_var_names(), dv_cov_matrix.sparseView(), Covariance::MatType::SPARSE);
+			//x.pseudo_inv_ip(pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+			//message(1, "pseudo inv:", x);  // tmp
 
 			// compute dec var-phi cross-cov vector
 			// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
 			// start by computing mean-shifted obj function ensemble
-			
 			Eigen::MatrixXd obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str}, center_on);
 			Eigen::MatrixXd cross_cov_vector;  // or Eigen::VectorXd?
 			cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
 			message(1, "dv-obj_cross_cov:", cross_cov_vector);
-
-			
-			// calc the dec var ensemble (approx) covariance vector (e.g., eq (8) of Dehdari and Oliver 2012 SPE)
-			//for (int i = 0; i < dv_anoms.rows(); i++)
-			//{
-				//assuming obj_anoms is being treated as a matrix - could swap it to a vector above
-				//dv_anoms.row(i).array() *= obj_anoms.row(i)[0];
-			//}
-			//Eigen::VectorXd dv_cross_cov = dv_anoms.rowwise().sum();
-			//message(1, "cross cov:", dv_cross_cov);  // tmp
-			//assumes that parcov has been pseudo inv ip'd before now...probably best to pass in a ref to an already inv'd parcov since we 
-			//will be using adaptive cov matrix
 			
 			// now compute grad vector
 			// this is a matrix-vector product; the matrix being the pseudo inv of diag empirical dec var cov matrix and the vector being the dec var-phi cross-cov vector\
