@@ -1638,10 +1638,16 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 				//parcov_inv = parcov_diag.get_matrix().diagonal();
 				//parcov_inv = parcov_inv.cwiseInverse();  // equivalent to pseudo inv?
 			}
-			dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
-			message(1, "dv_cov:", dv_cov_matrix);
-			parcov_inv = dv_cov_matrix.cwiseInverse();  // check equivalence to pseudo inv
+			//dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
+			//message(1, "dv_cov:", dv_cov_matrix);
+			//parcov_inv = dv_cov_matrix.cwiseInverse();  // check equivalence to pseudo inv
+			
+			//the second return matrix should be shrunk optimally to be nonsingular...but who knows!
+			Covariance shrunk_cov = dv.get_empirical_cov_matrices(&file_manager).second;
+			shrunk_cov.inv_ip();
+			parcov_inv = shrunk_cov.e_ptr()->toDense();
 			message(1, "empirical parcov inv:", parcov_inv);  // tmp
+			
 			// try pseudo_inv_ip()
 			//Covariance x;
 			//x = Covariance(dv_names, dv_cov_matrix.sparseView(), Covariance::MatType::SPARSE);
