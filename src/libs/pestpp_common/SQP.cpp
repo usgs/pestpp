@@ -1804,7 +1804,7 @@ Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameter
 	num_candidate.update_without_clear(dv_names, cvals);
 	
 	// search direction computation
-	Eigen::VectorXd search_d = calc_search_direction_vector(_current_dv_values, grad);  // need _current_dv_values here?
+	//Eigen::VectorXd search_d = calc_search_direction_vector(_current_dv_values, grad);  // need _current_dv_values here?
 
 	// undertake search direction-related tests, e.g., point down-hill
 	// and check if constraints in working set cause zero search_d (and go to next iteration if so)
