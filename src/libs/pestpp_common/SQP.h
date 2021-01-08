@@ -124,6 +124,7 @@ private:
 	Observations current_obs;
 
 	Parameters current_grad_vector;
+	map<int, Parameters> grad_vector_map;
 
 	ParameterEnsemble dv, dv_base;
 	ObservationEnsemble oe, oe_base;
@@ -138,19 +139,21 @@ private:
 
 	bool use_ensemble_grad;
 
+	Jacobian_1to1 jco;
+
+	//store the hessian as a cov since it is symmetric...
+	Covariance hessian;
+
 	void prep_4_ensemble_grad();
 	void prep_4_fd_grad();
 
 	bool update_hessian_and_grad_vector();
 
-	Jacobian_1to1 jco;
-
-	//bool solve_old();
 	bool solve_new();
 
 	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe);
 
-	Eigen::VectorXd calc_gradient_vector(const Parameters& _current_dv_);
+	Parameters calc_gradient_vector(const Parameters& _current_dv_);
 
 	Eigen::VectorXd get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
 	

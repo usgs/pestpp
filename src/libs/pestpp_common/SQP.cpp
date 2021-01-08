@@ -831,14 +831,19 @@ void SeqQuadProgram::initialize()
 	}
 
 	//set the initial grad vector
-	Eigen::VectorXd g = calc_gradient_vector(current_ctl_dv_values);
-	current_grad_vector.update_without_clear(dv_names, g);
+	message(2, "calculating initial objective function gradient");
+	current_grad_vector = calc_gradient_vector(current_ctl_dv_values);
+	grad_vector_map[0] = current_grad_vector;
 	//todo: save and report on initial gradient - make some checks would be useful?
 	
 	last_best = get_obj_value(current_ctl_dv_values, current_obs);
 	message(0, "Initial phi value:", last_best);
 	best_phis.push_back(last_best);
 
+	message(2, "initializing hessian matrix with identity");
+	Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
+	h.setIdentity();
+	hessian = Covariance(dv_names, h);
 	message(0, "initialization complete");
 }
 
@@ -1391,11 +1396,12 @@ void SeqQuadProgram::save_mat(string prefix, Eigen::MatrixXd &mat)
 
 bool SeqQuadProgram::update_hessian_and_grad_vector()
 {
-	Eigen::VectorXd new_grad = calc_gradient_vector(current_ctl_dv_values);
+	Parameters new_grad = calc_gradient_vector(current_ctl_dv_values);
 	if (!pest_scenario.get_pestpp_options().get_sqp_update_hessian())
 	{
 		message(2, "hessian_update is false...");
-		current_grad_vector.update_without_clear(dv_names, new_grad);
+
+		current_grad_vector = new_grad;
 		return false;
 	}
 	//fancy shit here...
@@ -1405,7 +1411,7 @@ bool SeqQuadProgram::update_hessian_and_grad_vector()
 
 
 	//update
-	current_grad_vector.update_without_clear(dv_names, new_grad);
+	current_grad_vector = new_grad;
 	//if accepted, return true
 	return true;
 }
@@ -1460,10 +1466,11 @@ void SeqQuadProgram::iterate_2_solution()
 			ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
 			pcs.summarize(dv, iter, ss.str());
 		}
-			
 		
-		
-		iter++;
+
+		//store the grad vector used for this iteration
+		grad_vector_map[iter] = current_grad_vector;
+
 
 	}
 }
@@ -1596,7 +1603,7 @@ void SeqQuadProgram::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnse
 
 }
 
-Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_values)
+Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_values)
 {
 	stringstream ss;
 	Eigen::VectorXd grad(dv_names.size());
@@ -1723,7 +1730,9 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			}
 		}
 	}
-	return grad;
+	Parameters pgrad = _current_dv_values;
+	pgrad.update_without_clear(dv_names, grad);
+	return pgrad;
 }
 
 //Eigen::MatrixXd SeqQuadProgram::update_hessian()
@@ -1763,10 +1772,7 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 
 	Eigen::VectorXd search_d;
 
-	// hessian  // todo - this needs to be global - defined in header - initialize as identity by default (support hessian user supply) and only updated if sqp_hessian_update is True
-	Eigen::MatrixXd hessian(size(dv_names), size(dv_names)); 
-	// or //Eigen::SparseMatrix<double> hessian(size(dv_names), size(dv_names));
-	hessian.setIdentity();
+	
 	message(1, "hessian:", hessian);  // tmp
 
 	if (constraints.num_obs_constraints() + constraints.num_pi_constraints() > 0)  // tmp - enter here if we are solving a problem with constraints AND working set is nonempty
@@ -1806,7 +1812,9 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 
 		// some transforms for solve
 		Eigen::MatrixXd G; // or //Eigen::SparseMatrix<double> G;?
-		G = hessian.inverse() * 2.;  // TODO: double check and give ref
+		//will hessian ever be singular?  If not, then just use inv method...
+
+		G = *hessian.inv().e_ptr() * 2.;  // TODO: double check and give ref
 
 		Eigen::VectorXd c;
 		c = grad_vector + G * _current_dv_values.get_data_eigen_vec(dv_names);  // TODO: check not just grad (see both) and check sign too...
@@ -1874,7 +1882,7 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 	}
 	else  // if ((constraints is False) | ((constraints is True) & (len(self.working_set) == 0)));
 	{
-		search_d = hessian * grad_vector;
+		search_d = *hessian.e_ptr() * grad_vector;
 
 
 //		if (LBFGS)
