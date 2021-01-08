@@ -1759,8 +1759,8 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 	Eigen::VectorXd search_d;
 
 	// hessian  // todo - this needs to be global - defined in header - initialize as identity by default (support hessian user supply) and only updated if sqp_hessian_update is True
-	Eigen::MatrixXd hessian(size(dv_names), size(dv_names));
-	//Eigen::SparseMatrix<double> hessian(size(dv_names), size(dv_names));
+	Eigen::MatrixXd hessian(size(dv_names), size(dv_names)); 
+	// or //Eigen::SparseMatrix<double> hessian(size(dv_names), size(dv_names));
 	hessian.setIdentity();
 	message(1, "hessian:", hessian);  // tmp
 
@@ -1777,46 +1777,33 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 		// collate the pieces
 
 		// constraint jco
-		// only for constraints in WS only
+		// todo only for constraints in WS only
 		Eigen::MatrixXd constraint_jco;  // or would you pref to slice and dice each time - this won't get too big but want to avoid replicates  // and/or make Jacobian obj?
 		vector<string> cnames = constraints.get_obs_constraint_names();  // not already stored?
-		message(1, "cnames:", cnames);  // tmp
 		constraint_jco = jco.get_matrix(cnames, dv_names);
 		message(1, "A:", constraint_jco);  // tmp
 		// add check here that A is full rank; warn that linearly dependent will be removed via factorization
 
 		// constraint diff (h = Ax - b)
-		// only for constraints in WS only
+		// todo only for constraints in WS only
 		Eigen::VectorXd Ax;
 		Eigen::VectorXd constraint_diff;
-		constraint_diff = constraint_diff.setZero(size(cnames));  // shouldn't need shape call here
-		//Ax = constraint_jco * _current_dv_values.get_data_eigen_vec(dv_names);  // check: -A or A
+		//Ax = constraint_jco * _current_dv_values.get_data_eigen_vec(dv_names);  // check sign here
 		//message(1, "Ax product", Ax);  // tmp
 		//message(1, "b", constraints.get_constraint_residual_vec());  // tmp
+		constraint_diff = constraint_diff.setZero(size(cnames));  // shouldn't need shape call here
 		// throw error here if not all (approx) zero, i.e., not on constraint
-		message(1, "constraint diff", constraint_diff);  // tmp
 		if ((constraint_diff.array() != 0.0).any())  // make some level of forgiveness with a tolerance parameter here
 		{
-			throw_sqp_error("not on constraint");  // better to pick this up elsewhere anyway
+			throw_sqp_error("not on constraint");  // better to pick this up elsewhere (before) anyway
 		}
 
-		// some transforms
-		Eigen::MatrixXd G;
-		//Eigen::SparseMatrix<double> G;
-		G = hessian.cwiseInverse() * 2.;  // TODO: double check and give ref
-		message(1, "G", G);  // tmp
+		// some transforms for solve
+		Eigen::MatrixXd G; // or //Eigen::SparseMatrix<double> G;?
+		G = hessian.inverse() * 2.;  // TODO: double check and give ref
 
 		Eigen::VectorXd c;
-		message(1, "Gx", G * _current_dv_values.get_data_eigen_vec(dv_names));  // tmp
-		c = grad_vector + G * _current_dv_values.get_data_eigen_vec(dv_names);  // TODO: check not just grad (see both) and check sign too...
-		message(1, "c", c);  // tmp
-
-		// forming system to be solved
-		Eigen::MatrixXd coeff;
-		Eigen::VectorXd rhs;
-		//VectorXd vec_joined(vec1.size() + vec2.size());
-		rhs = grad_vector, grad_vector;  // << vec1, vec2;
-		message(1, "rhs", rhs);  // tmp
+		c = -1. * grad_vector + G * _current_dv_values.get_data_eigen_vec(dv_names);  // TODO: check not just grad (see both) and check sign too...
 
 
 		string eqp_solve_method; // probably too heavy to be a ++arg
@@ -1836,6 +1823,22 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 		else if (eqp_solve_method == "direct")
 		{
 			// check: A full rank
+
+			// forming system to be solved
+			Eigen::MatrixXd coeff_u(dv_names.size(), dv_names.size() + cnames.size());  // todo only in WS
+			coeff_u << G, constraint_jco.transpose();
+			Eigen::MatrixXd coeff_l(cnames.size(), dv_names.size() + cnames.size());  // todo only in WS
+			Eigen::MatrixXd lm = Eigen::MatrixXd::Zero(cnames.size(), cnames.size());
+			coeff_l << constraint_jco, lm;
+			Eigen::MatrixXd coeff(dv_names.size() + cnames.size(), dv_names.size() + cnames.size());  // todo only in WS
+			coeff << coeff_u, coeff_l;
+			message(1, "coeff", coeff);  // tmp
+			// this is filth but it works..
+
+			Eigen::VectorXd rhs(c.size() + constraint_diff.size());
+			rhs << c, constraint_diff;  // << vec1, vec2;
+			message(1, "rhs", rhs);  // tmp
+
 			Eigen::VectorXd x;
 			//x = SVDPackage::solve_ip(); // include eigthresh
 		}
