@@ -66,23 +66,44 @@ private:
 	
 };
 
+
+struct FilterRec
+{
+	double obj_val;
+	double viol_val;
+	int iter;
+	double alpha;
+};
+
+template<>
+struct std::less<FilterRec>
+{
+	bool operator()(const FilterRec& k1, const FilterRec& k2) const
+	{
+		if ((k1.obj_val < k2.obj_val) && (k1.viol_val < k2.viol_val))
+			return true;
+		return false;
+
+	}
+};
+
 class SqpFilter
 {
 public:
 	SqpFilter(bool _minimize=true,double _obj_tol = 0.01, double _viol_tol = 0.01) {
 		minimize = _minimize; obj_tol = _obj_tol; viol_tol = _viol_tol;
 	}
-	bool accept(double obj_val, double violation_val);
-	bool update(double obj_val, double violation_val);
+	bool accept(double obj_val, double violation_val,int iter=0,double alpha=-1.0);
+	bool update(double obj_val, double violation_val, int iter=0,double alpha=-1.0);
 
 private:
 	bool minimize;
 	double obj_tol;
 	double viol_tol;
 
-	set<pair<double, double>> obj_viol_pairs;
+	set<FilterRec> obj_viol_pairs;
 
-	bool first_dominates_second(const pair<double, double>& first, const pair<double, double>& second);
+	bool first_dominates_second(const FilterRec& first, const FilterRec& second);
 	
 };
 
@@ -172,7 +193,7 @@ private:
 
 	bool solve_new();
 
-	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe);
+	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, vector<double>& alpha_vals);
 
 	Parameters calc_gradient_vector(const Parameters& _current_dv_);
 

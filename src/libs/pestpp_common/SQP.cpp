@@ -17,9 +17,9 @@
 #include "constraints.h"
 
 
-bool SqpFilter::accept(double obj_val, double violation_val)
+bool SqpFilter::accept(double obj_val, double violation_val, int iter, double alpha)
 {
-	pair<double, double> candidate(obj_val, violation_val);
+	FilterRec candidate{ obj_val, violation_val,iter,alpha };
 	if (obj_viol_pairs.size() == 0)
 	{
 		obj_viol_pairs.insert(candidate);
@@ -28,12 +28,11 @@ bool SqpFilter::accept(double obj_val, double violation_val)
 	//I think its cheaper to combine the tols with the candidate, rather adding them to every 
 	//existing pair...
 	if (minimize)
-		candidate.first *= (1 + obj_tol);
+		candidate.obj_val *= (1 + obj_tol);
 	else
-		candidate.first *= (1 - obj_tol);
-	candidate.second *= (1 + viol_tol);
+		candidate.obj_val *= (1 - obj_tol);
+	candidate.viol_val *= (1 + viol_tol);
 	
-
 	bool accept = false;
 	for (auto& p : obj_viol_pairs)
 		if (first_dominates_second(candidate, p))
@@ -45,30 +44,34 @@ bool SqpFilter::accept(double obj_val, double violation_val)
 }
 
 
-bool SqpFilter::first_dominates_second(const pair<double, double>& first, const pair<double, double>& second)
+bool SqpFilter::first_dominates_second(const FilterRec& first, const FilterRec& second)
 {
 	if (minimize)
 	{
-		if ((first.first < second.first) || (first.second < second.second))
+		if ((first.obj_val < second.obj_val) || (first.viol_val < second.viol_val))
 			return true;
 		else
 			return false;
 	}
 	else
 	{
-		if ((first.first > second.first) || (first.second < second.second))
+		if ((first.obj_val > second.obj_val) || (first.viol_val < second.viol_val))
 			return true;
 		else
 			return false;
 	}
 }
-bool SqpFilter::update(double obj_val, double violation_val)
+bool SqpFilter::update(double obj_val, double violation_val, int iter, double alpha)
 {
-	bool acc = accept(obj_val, violation_val);
+	bool acc = accept(obj_val, violation_val,iter, alpha);
 	if (!acc)
 		return false;
-	pair<double, double> candidate(obj_val, violation_val);
-	set<pair<double, double>> updated{ candidate };
+	FilterRec candidate;
+	candidate.obj_val = obj_val;
+	candidate.viol_val = violation_val;
+	candidate.iter = iter;
+	candidate.alpha = alpha;
+	set<FilterRec> updated{ candidate };
 	for (auto& p : obj_viol_pairs)
 	{
 		if (first_dominates_second(p, candidate))
@@ -917,7 +920,7 @@ void SeqQuadProgram::initialize()
 	best_phis.push_back(last_best);
 
 	double v = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
-	filter.update(last_best, v);
+	filter.update(last_best, v, 0, -1.0);
 	
 	message(2, "initializing hessian matrix with identity");
 	Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
@@ -2207,10 +2210,11 @@ bool SeqQuadProgram::solve_new()
 	//TODO: add sqp option to save candidates
 
 	message(0, "running candidate decision variable ensembles");
-	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates, scale_vals);
+	vector<double> passed_scale_vals = scale_vals;
+	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates, passed_scale_vals);
 
 	//todo: decide which if any dv candidate to accept...
-	bool success = pick_candidate_and_update_current(dv_candidates, oe_candidates);
+	bool success = pick_candidate_and_update_current(dv_candidates, oe_candidates, passed_scale_vals);
 	if (!success)
 	{
 		//// deal with unsuccessful iteration
@@ -2292,7 +2296,7 @@ Eigen::VectorXd SeqQuadProgram::get_obj_vector(ParameterEnsemble& _dv, Observati
 	return obj_vec;
 }
 
-bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe)
+bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, vector<double>& alpha_vals)
 {
 	//decide!
 	message(0, " current best phi:", last_best);
@@ -2324,7 +2328,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		//but maybe we want to just add all of these candidates to the filter?
 		//there is also a test method with the filter that doesnt add 
 		//to the records...
-		filter_accept = filter.update(obj_vec[i], infeas_sum);
+		filter_accept = filter.update(obj_vec[i], infeas_sum,iter,alpha_vals[i]);
 		if (filter_accept)
 			ss << " filter accepted ";
 		else
@@ -2680,6 +2684,11 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 			//pe_lams[i].drop_rows(failed_real_indices);
 			_oe.drop_rows(failed_obs_names);
 			dv_candidates.drop_rows(failed_par_names);
+			//update scale_vals 
+			vector<double> new_scale_vals;
+			for (int i = 0; i < scale_vals.size(); i++)
+				if (find(failed_real_indices.begin(), failed_real_indices.end(), i) == failed_real_indices.end())
+					new_scale_vals.push_back(scale_vals[i]);
 		}
 	}
 
