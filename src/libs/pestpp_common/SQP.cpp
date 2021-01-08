@@ -1756,36 +1756,42 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _current_dv_values, Eigen::VectorXd& grad_vector)
 {
 
-	// working set before this point
-	if (constraints.num_obs_constraints() + constraints.num_pi_constraints() > 0)
+	if (constraints.num_obs_constraints() + constraints.num_pi_constraints() > 0)  // tmp - enter here if we are solving a problem with constraints AND working set is nonempty
 	{
-		// tmp - enter here if we are solving a problem with constraints AND working set is nonempty
-		//solve (E)QP sub-problem via active set method for search direction
+		// solve (E)QP sub-problem via active set method for search direction
 
 		// put in _solve_eqp() func - self.search_d, self.lagrang_mults = self._solve_eqp(qp_solve_method=self.qp_solve_method)
+		
+		// Direct QP (KKT system) solve method herein; assumes convexity (pos-def-ness) and that A has full row rank.
+		// Direct method here is just for demon purposes - will require the other methods offered here given that the KKT system will be indefinite.
+		// Refer to (16.5, 18.9) of Nocedal and Wright (2006)
 	
-		// H = I
+		// collate the pieces
+		// hessian
 		//Eigen::MatrixXd hessian;
 		//hessian = Eigen::MatrixXd::Identity(dv.shape().second, dv.shape().second);  // better way of getting shape?
-		Eigen::SparseMatrix<double> I(dv.shape().second, dv.shape().second);  // better way of getting shape?
-		I.setIdentity();
-		message(1, "hessian:", I);  // tmp
+		Eigen::SparseMatrix<double> hessian(dv.shape().second, dv.shape().second);  // better way of getting shape?
+		hessian.setIdentity();
+		message(1, "hessian:", hessian);  // tmp
 
 		// grad
 		message(1, "grad vector:", grad_vector);  // tmp
 
-		// A = J[]
+		// constraint jco
+		// only for constraints in WS only
 		Eigen::MatrixXd constraint_jco;  // or would you pref to slice and dice each time - this won't get too big but want to avoid replicates  // and/or make Jacobian obj?
 		vector<string> cnames = constraints.get_obs_constraint_names();  // not already stored?
 		message(1, "cnames:", cnames);  // tmp
 		constraint_jco = jco.get_matrix(cnames, dv_names);
 		message(1, "A:", constraint_jco);  // tmp
+		// add check here that A is full rank; warn that linearly dependent will be removed via factorization
 
 		// constraint diff (h = Ax - b)
+		// only for constraints in WS only
 		Eigen::VectorXd Ax;
 		Eigen::VectorXd constraint_diff;
 		constraint_diff = constraint_diff.setZero(size(cnames));  // shouldn't need shape call here
-		//Ax = constraint_jco * _current_dv_values.get_data_eigen_vec(dv_names);
+		//Ax = constraint_jco * _current_dv_values.get_data_eigen_vec(dv_names);  // check: -A or A
 		//message(1, "Ax product", Ax);  // tmp
 		//message(1, "b", constraints.get_constraint_residual_vec());  // tmp
 		// throw error here if not all (approx) zero, i.e., not on constraint
@@ -1795,22 +1801,48 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 			throw_sqp_error("not on constraint");  // better to pick this up elsewhere anyway
 		}
 
-		//if eqp_solve_method is null_space
-		//call _kkt_null_space()
-		// assert if A not full rank
-		// assert if ZTGZ is non pos def
-
 		// some transforms
+		Eigen::SparseMatrix<double> G;
+		G = hessian.cwiseInverse() * 2.;  // TODO: double check and give ref
+		message(1, "G", G);  // tmp
 
-		// solve q_range_space
+		Eigen::VectorXd c;
+		message(1, "Gx", G * _current_dv_values.get_data_eigen_vec(dv_names));  // tmp
+		c = grad_vector + G * _current_dv_values.get_data_eigen_vec(dv_names);  // TODO: check not just grad (see both) and check sign too...
+		message(1, "c", c);  // tmp
 
-		// solve q_null_space
+		// formign system to be solved
+		Eigen::MatrixXd coeff;
+		Eigen::VectorXd rhs;
+		//VectorXd vec_joined(vec1.size() + vec2.size());
+		rhs = grad_vector, grad_vector;  // << vec1, vec2;
+		message(1, "rhs", rhs);  // tmp
 
-		// combine to make total direction
 
-		//else if schur, direct, krylov, ...
+		string eqp_solve_method; // probably too heavy to be a ++arg
+		eqp_solve_method = "direct";
+		if (eqp_solve_method == "null_space")
+		{
+			//move to _kkt_null_space() func with description
+			// check: A full rank
+			// check: ZTGZ is non pos def
 
-		// search direction tests contained in functions above
+			// solve q_range_space
+
+			// solve q_null_space
+
+			// combine to make total direction
+		}
+		else if (eqp_solve_method == "direct")
+		{
+			// check: A full rank
+			Eigen::VectorXd x;
+			x = SVDPackage::solve_ip(); // include eigthresh
+		}
+		else // if "schur", "cg", ...
+		{
+			throw_sqp_error("eqp_solve_method not implemented");
+		}
 
 	}
 	//else if ((constraints is False) | ((constraints is True) & (len(self.working_set) == 0)));
@@ -1846,7 +1878,7 @@ Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameter
 	Eigen::VectorXd grad = current_grad_vector.get_data_eigen_vec(dv_names);
 
 	// search direction computation
-	Eigen::VectorXd search_d = calc_search_direction_vector(_current_dv_num_values, grad);  // need _current_dv_values here?
+	Eigen::VectorXd search_d = calc_search_direction_vector(_current_dv_num_values, grad);  // need _current_dv_values as arg here?
 
 	if (obj_sense == "minimize")
 		grad *= -1.;
