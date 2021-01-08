@@ -1756,6 +1756,14 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _current_dv_values, Eigen::VectorXd& grad_vector)
 {
 
+	Eigen::VectorXd search_d;
+
+	// hessian  // todo - this needs to be global - defined in header - initialize as identity by default (support hessian user supply) and only updated if sqp_hessian_update is True
+	Eigen::MatrixXd hessian(size(dv_names), size(dv_names));
+	//Eigen::SparseMatrix<double> hessian(size(dv_names), size(dv_names));
+	hessian.setIdentity();
+	message(1, "hessian:", hessian);  // tmp
+
 	if (constraints.num_obs_constraints() + constraints.num_pi_constraints() > 0)  // tmp - enter here if we are solving a problem with constraints AND working set is nonempty
 	{
 		// solve (E)QP sub-problem via active set method for search direction
@@ -1767,15 +1775,6 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 		// Refer to (16.5, 18.9) of Nocedal and Wright (2006)
 	
 		// collate the pieces
-		// hessian
-		//Eigen::MatrixXd hessian;
-		//hessian = Eigen::MatrixXd::Identity(dv.shape().second, dv.shape().second);  // better way of getting shape?
-		Eigen::SparseMatrix<double> hessian(dv.shape().second, dv.shape().second);  // better way of getting shape?
-		hessian.setIdentity();
-		message(1, "hessian:", hessian);  // tmp
-
-		// grad
-		message(1, "grad vector:", grad_vector);  // tmp
 
 		// constraint jco
 		// only for constraints in WS only
@@ -1802,7 +1801,8 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 		}
 
 		// some transforms
-		Eigen::SparseMatrix<double> G;
+		Eigen::MatrixXd G;
+		//Eigen::SparseMatrix<double> G;
 		G = hessian.cwiseInverse() * 2.;  // TODO: double check and give ref
 		message(1, "G", G);  // tmp
 
@@ -1811,7 +1811,7 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 		c = grad_vector + G * _current_dv_values.get_data_eigen_vec(dv_names);  // TODO: check not just grad (see both) and check sign too...
 		message(1, "c", c);  // tmp
 
-		// formign system to be solved
+		// forming system to be solved
 		Eigen::MatrixXd coeff;
 		Eigen::VectorXd rhs;
 		//VectorXd vec_joined(vec1.size() + vec2.size());
@@ -1837,7 +1837,7 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 		{
 			// check: A full rank
 			Eigen::VectorXd x;
-			x = SVDPackage::solve_ip(); // include eigthresh
+			//x = SVDPackage::solve_ip(); // include eigthresh
 		}
 		else // if "schur", "cg", ...
 		{
@@ -1845,28 +1845,24 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 		}
 
 	}
-	//else if ((constraints is False) | ((constraints is True) & (len(self.working_set) == 0)));
-	//{
-	//	if (LBFGS);
-	//	{
-	//		ss.str("");
-	//		ss << "use limited-memory BFGS algorithm to solve for search direction in unconstrained case";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		//self.search_d = self._LBFGS_hess_update(memory = memory, self_scale = hess_self_scaling)
-	//		throw_sqp_error("TODO");
-	//	}
-	//	else  //BFGS
-	//	{
-	//		ss.str("");
-	//		ss << "use standard BFGS algorithm to solve for search direction in unconstrained case";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		//self.search_d = self._LBFGS_hess_update(memory = memory, self_scale = hess_self_scaling)
-	//		throw_sqp_error("TODO");
-	//	}
+	else  // if ((constraints is False) | ((constraints is True) & (len(self.working_set) == 0)));
+	{
+		search_d = hessian * grad_vector;
 
-	return grad_vector;
+
+//		ss.str("");
+//		ss << "use L/BFGS algorithm to solve for search direction in unconstrained case";
+//		string s = ss.str();
+//		message(1, s);
+//		//self.search_d = self._LBFGS_hess_update(memory = memory, self_scale = hess_self_scaling)
+//		throw_sqp_error("TODO");
+	}
+
+	// sign of direction
+	if (obj_sense == "minimize")
+		search_d *= -1.;
+
+	return search_d;
 }
 
 Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameters& _current_dv_num_values)
@@ -1878,8 +1874,8 @@ Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameter
 	Eigen::VectorXd grad = current_grad_vector.get_data_eigen_vec(dv_names);
 
 	// search direction computation
-	Eigen::VectorXd search_d = calc_search_direction_vector(_current_dv_num_values, grad);  // need _current_dv_values as arg here?
-
+	Eigen::VectorXd search_d = calc_search_direction_vector(_current_dv_num_values, grad);  
+	
 	if (obj_sense == "minimize")
 		grad *= -1.;
 	
