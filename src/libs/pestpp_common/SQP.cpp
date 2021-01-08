@@ -1752,6 +1752,11 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 //	//return pair<>
 //}
 
+//pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_direct()
+//{
+//	//return pair<>
+//}
+
 
 Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _current_dv_values, Eigen::VectorXd& grad_vector)
 {
@@ -1768,7 +1773,7 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 	{
 		// solve (E)QP sub-problem via active set method for search direction
 
-		// put in _solve_eqp() func - self.search_d, self.lagrang_mults = self._solve_eqp(qp_solve_method=self.qp_solve_method)
+		// todo put in _solve_eqp() func - self.search_d, self.lagrang_mults = self._solve_eqp(qp_solve_method=self.qp_solve_method)
 		
 		// Direct QP (KKT system) solve method herein; assumes convexity (pos-def-ness) and that A has full row rank.
 		// Direct method here is just for demon purposes - will require the other methods offered here given that the KKT system will be indefinite.
@@ -1786,11 +1791,12 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 
 		// constraint diff (h = Ax - b)
 		// todo only for constraints in WS only
-		Eigen::VectorXd Ax;
+		Eigen::VectorXd Ax, b;
 		Eigen::VectorXd constraint_diff;
-		//Ax = constraint_jco * _current_dv_values.get_data_eigen_vec(dv_names);  // check sign here
+		//Ax = constraint_jco * _current_dv_values.get_data_eigen_vec(dv_names);
+		//b = constraints.get_obs_constraint_values(); //todo
 		//message(1, "Ax product", Ax);  // tmp
-		//message(1, "b", constraints.get_constraint_residual_vec());  // tmp
+		//constraint_diff = constraints.get_constraint_residual_vec();
 		constraint_diff = constraint_diff.setZero(size(cnames));  // shouldn't need shape call here
 		// throw error here if not all (approx) zero, i.e., not on constraint
 		if ((constraint_diff.array() != 0.0).any())  // make some level of forgiveness with a tolerance parameter here
@@ -1803,14 +1809,14 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 		G = hessian.inverse() * 2.;  // TODO: double check and give ref
 
 		Eigen::VectorXd c;
-		c = -1. * grad_vector + G * _current_dv_values.get_data_eigen_vec(dv_names);  // TODO: check not just grad (see both) and check sign too...
+		c = grad_vector + G * _current_dv_values.get_data_eigen_vec(dv_names);  // TODO: check not just grad (see both) and check sign too...
 
 
 		string eqp_solve_method; // probably too heavy to be a ++arg
 		eqp_solve_method = "direct";
 		if (eqp_solve_method == "null_space")
 		{
-			//move to _kkt_null_space() func with description
+			// todo move to _kkt_null_space() func with description
 			// check: A full rank
 			// check: ZTGZ is non pos def
 
@@ -1822,14 +1828,14 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 		}
 		else if (eqp_solve_method == "direct")
 		{
-			// check: A full rank
+			// todo move to _kkt_direct() func with description 
+		    //check: A full rank
 
 			// forming system to be solved
 			Eigen::MatrixXd coeff_u(dv_names.size(), dv_names.size() + cnames.size());  // todo only in WS
 			coeff_u << G, constraint_jco.transpose();
 			Eigen::MatrixXd coeff_l(cnames.size(), dv_names.size() + cnames.size());  // todo only in WS
-			Eigen::MatrixXd lm = Eigen::MatrixXd::Zero(cnames.size(), cnames.size());
-			coeff_l << constraint_jco, lm;
+			coeff_l << constraint_jco, Eigen::MatrixXd::Zero(cnames.size(), cnames.size());
 			Eigen::MatrixXd coeff(dv_names.size() + cnames.size(), dv_names.size() + cnames.size());  // todo only in WS
 			coeff << coeff_u, coeff_l;
 			message(1, "coeff", coeff);  // tmp
@@ -1840,12 +1846,30 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 			message(1, "rhs", rhs);  // tmp
 
 			Eigen::VectorXd x;
-			//x = SVDPackage::solve_ip(); // include eigthresh
+			Eigen::MatrixXd V, U, S_, s;
+			SVD_REDSVD rsvd;
+			//SVD_EIGEN rsvd;
+			rsvd.set_performance_log(performance_log);
+
+			rsvd.solve_ip(coeff, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+			S_ = s.asDiagonal();
+			message(1, "singular values of KKT matrix", S_);  // tmp
+			
+			// an old friend
+			x = V * S_.inverse() * U.transpose() * rhs;
+			message(1, "solution vector of steps and lagrange mults", x);  // tmp
+
+			search_d = x.head(dv_names.size()); // add rigor here or at least asserts
+
+			// todo return lagrange multipliers and use in _active_set()
+
 		}
 		else // if "schur", "cg", ...
 		{
 			throw_sqp_error("eqp_solve_method not implemented");
 		}
+
+		//todo check sign of search_d; think the way the system is formulated, it solves for -dx
 
 	}
 	else  // if ((constraints is False) | ((constraints is True) & (len(self.working_set) == 0)));
@@ -1853,8 +1877,9 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 		search_d = hessian * grad_vector;
 
 
+//		if (LBFGS)
 //		ss.str("");
-//		ss << "use L/BFGS algorithm to solve for search direction in unconstrained case";
+//		ss << "use LBFGS algorithm to solve for search direction in unconstrained case";
 //		string s = ss.str();
 //		message(1, s);
 //		//self.search_d = self._LBFGS_hess_update(memory = memory, self_scale = hess_self_scaling)
@@ -1879,16 +1904,13 @@ Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameter
 	// search direction computation
 	Eigen::VectorXd search_d = calc_search_direction_vector(_current_dv_num_values, grad);  
 	
-	if (obj_sense == "minimize")
-		grad *= -1.;
-	
-	grad *= scale_val;
-	if (grad.squaredNorm() < 1.0 - 10)
+	search_d *= scale_val;
+	if (search_d.squaredNorm() < 1.0 - 10)
 		message(1, "very short upgrade for scale value", scale_val);
 
 	Eigen::VectorXd cvals = num_candidate.get_data_eigen_vec(dv_names);
 	
-	cvals.array() += grad.array();
+	cvals.array() += search_d.array();
 	num_candidate.update_without_clear(dv_names, cvals);
 
 	// undertake search direction-related tests, e.g., point down-hill
