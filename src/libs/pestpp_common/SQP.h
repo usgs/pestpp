@@ -66,6 +66,25 @@ private:
 	
 };
 
+class SqpFilter
+{
+public:
+	SqpFilter(bool _minimize=true,double _obj_tol = 0.01, double _viol_tol = 0.01) {
+		minimize = _minimize; obj_tol = _obj_tol; viol_tol = _viol_tol;
+	}
+	bool accept(double obj_val, double violation_val);
+	bool update(double obj_val, double violation_val);
+
+private:
+	bool minimize;
+	double obj_tol;
+	double viol_tol;
+
+	set<pair<double, double>> obj_viol_pairs;
+
+	bool first_dominates_second(const pair<double, double>& first, const pair<double, double>& second);
+	
+};
 
 class SeqQuadProgram
 {
@@ -98,7 +117,7 @@ private:
 	string obj_obs;
 	string obj_sense;
 	bool use_obj_obs;
-	bool use_pi_obs;
+	bool use_obj_pi;
 	map<string, double> obj_func_coef_map;
 
 	int num_threads;
@@ -143,6 +162,8 @@ private:
 
 	//store the hessian as a cov since it is symmetric...
 	Covariance hessian;
+
+	SqpFilter filter;
 
 	void prep_4_ensemble_grad();
 	void prep_4_fd_grad();

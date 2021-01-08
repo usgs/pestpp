@@ -95,7 +95,7 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 				pts.numeric2ctl_ip(pars);
 			for (auto obj_name : *pi_obj_names_ptr)
 			{
-				pi_res_sim = pi_ptr->get_pi_rec_ptr(obj_name).calc_sim_and_resid(pars);
+				pi_res_sim = pi_ptr->get_pi_rec(obj_name).calc_sim_and_resid(pars);
 				//account for dir mult here
 				_member_struct[real_name][obj_name] = pi_res_sim.first * obj_dir_mult_ptr->at(obj_name);
 			}
@@ -312,7 +312,7 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 				for (auto v : violations)
 				{
 					if (pi_obj_set.find(v.first) == pi_obj_set.end())
-						vsum += pow(v.second * pi->get_pi_rec_ptr(v.first).get_weight(),2);
+						vsum += pow(v.second * pi->get_pi_rec(v.first).get_weight(),2);
 				}
 				if (vsum > 0.0)
 				{
@@ -1114,7 +1114,7 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 		
 		for (auto pi_obj : pi_obj_names)
 		{
-			sim_res = prior_info_ptr->get_pi_rec_ptr(pi_obj).calc_sim_and_resid(pars);
+			sim_res = prior_info_ptr->get_pi_rec(pi_obj).calc_sim_and_resid(pars);
 			pi_vals[pi_obj].push_back(sim_res.first);
 		}
 	}
@@ -1616,9 +1616,9 @@ void MOEA::initialize()
 		onames = pest_scenario.get_ctl_ordered_pi_names();
 		for (auto oname : onames)
 		{
-			if (pest_scenario.get_prior_info().get_pi_rec_ptr(oname).get_weight() == 0.0)
+			if (pest_scenario.get_prior_info().get_pi_rec(oname).get_weight() == 0.0)
 				continue;
-			sense = Constraints::get_sense_from_group_name(pest_scenario.get_prior_info().get_pi_rec_ptr(oname).get_group());
+			sense = Constraints::get_sense_from_group_name(pest_scenario.get_prior_info().get_pi_rec(oname).get_group());
 			if (sense.first == gt)
 			{
 				pi_obj_names.push_back(oname);
@@ -1671,7 +1671,7 @@ void MOEA::initialize()
 			}
 			else
 			{
-				sense = Constraints::get_sense_from_group_name(pest_scenario.get_prior_info().get_pi_rec_ptr(obj_name).get_group());
+				sense = Constraints::get_sense_from_group_name(pest_scenario.get_prior_info().get_pi_rec(obj_name).get_group());
 				if ((sense.first != gt) && (sense.first != lt))
 					err_sense.push_back(obj_name);
 				else

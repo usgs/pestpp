@@ -175,7 +175,7 @@ void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv
 		//or if it is a prior info equation
 		else if (pest_scenario.get_prior_info().find(obj_func_str) != pest_scenario.get_prior_info().end())
 		{
-			obj_func_coef_map = pest_scenario.get_prior_info().get_pi_rec_ptr(obj_func_str).get_atom_factors();
+			obj_func_coef_map = pest_scenario.get_prior_info().get_pi_rec(obj_func_str).get_atom_factors();
 			//throw_sequentialLP_error("prior-information-based objective function not implemented");
 		}
 		else
@@ -361,11 +361,11 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 		PriorInformationRec pi_rec;
 		for (auto& pi_name : pest_scenario.get_ctl_ordered_pi_names())
 		{
-			group = pinfo->get_pi_rec_ptr(pi_name).get_group();
+			group = pinfo->get_pi_rec(pi_name).get_group();
 			if (find(start, end, group) != end)
 			{
 				ctl_ord_pi_constraint_names.push_back(pi_name);
-				pi_rec = pinfo->get_pi_rec_ptr(pi_name);
+				pi_rec = pinfo->get_pi_rec(pi_name);
 				//pi_constraint_factors[pi_name] = pi_rec.get_atom_factors();
 				//pi_constraint_rhs[pi_name] = pi_rec.get_obs_value();
 				constraints_pi.AddRecord(pi_name, &pi_rec);
@@ -380,7 +380,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 		{
 			for (auto& pi_name : ctl_ord_pi_constraint_names)
 			{
-				pi_rec = constraints_pi.get_pi_rec_ptr(pi_name);
+				pi_rec = constraints_pi.get_pi_rec(pi_name);
 				missing.clear();
 				for (auto& pi_factor : pi_rec.get_atom_factors())
 					if (find(start, end, pi_factor.first) == end)
@@ -434,7 +434,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	problem_constraints.clear();
 	for (auto& name : ctl_ord_pi_constraint_names)
 	{
-		string group = pest_scenario.get_prior_info_ptr()->get_pi_rec_ptr(name).get_group();
+		string group = pest_scenario.get_prior_info_ptr()->get_pi_rec(name).get_group();
 		pair<ConstraintSense, string> sense = get_sense_from_group_name(group);
 		if (sense.first == ConstraintSense::undefined)
 		{
@@ -878,7 +878,7 @@ void Constraints::initial_report()
 		{
 			f_rec << setw(20) << left << name;
 			f_rec << setw(20) << constraint_sense_name[name];
-			f_rec << setw(20) << constraints_pi.get_pi_rec_ptr(name).get_obs_value() << endl;
+			f_rec << setw(20) << constraints_pi.get_pi_rec(name).get_obs_value() << endl;
 		}
 		cout << "..." << ctl_ord_pi_constraint_names.size() << " pi-based constraints, see rec file for listing" << endl;
 	}
@@ -1046,6 +1046,29 @@ double Constraints::get_max_constraint_change(Observations& current_obs, Observa
 //	current sim constraint values*/
 //	return get_chance_shifted_constraints(*current_constraints_sim_ptr);
 //}
+
+double Constraints::get_sum_of_violations(Parameters& pars, Observations& obs)
+{
+	double sum = 0.0;
+	for (auto& c : get_unsatified_obs_constraints(obs))
+		sum += c.second;
+	for (auto& c : get_unsatified_pi_constraints(pars))
+		sum += c.second;
+	return sum;
+}
+
+
+vector<double> Constraints::get_sum_of_violations(ParameterEnsemble& pe, ObservationEnsemble& oe)
+{
+	if (pe.shape().first != oe.shape().first)
+		throw_constraints_error("get_sum_of_violations(): pe rows != oe rows");
+	vector<double> sums;
+	for (int i = 0; i < pe.shape().first; i++)
+	{
+
+	}
+	return sums;
+}
 
 ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe, string risk_obj)
 {
@@ -1446,7 +1469,7 @@ pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Pa
 	for (int i = 0; i < num_pi_constraints(); ++i)
 	{
 		string name = ctl_ord_pi_constraint_names[i];
-		double residual = -constraints_pi.get_pi_rec_ptr(name).calc_residual(current_pars);
+		double residual = -constraints_pi.get_pi_rec(name).calc_residual(current_pars);
 		if (constraint_sense_map[name] == ConstraintSense::less_than)
 			constraint_ub.push_back(residual);
 		else
@@ -1617,7 +1640,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 			string name = ctl_ord_pi_constraint_names[i];
 			if (skip_names.find(name) != skip_names.end())
 				continue;
-			PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
+			PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
 			ss << setw(nsize) << left << name;
 			ss << setw(12) << right << constraint_sense_name[name];
 			ss << setw(12) << pi_rec.get_obs_value();
@@ -1717,7 +1740,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			for (int i = 0; i < num_pi_constraints(); ++i)
 			{
 				string name = ctl_ord_pi_constraint_names[i];
-				pi_rec = constraints_pi.get_pi_rec_ptr(name);
+				pi_rec = constraints_pi.get_pi_rec(name);
 				tots[name] = tots[name] + pi_rec.calc_sim_and_resid(current_pars).first;
 			}
 		}
@@ -1731,7 +1754,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			string name = ctl_ord_pi_constraint_names[i];
 			if (skip_names.find(name) != skip_names.end())
 				continue;
-			pi_rec = constraints_pi.get_pi_rec_ptr(name);
+			pi_rec = constraints_pi.get_pi_rec(name);
 			ss << setw(nsize) << left << name;
 			ss << setw(12) << right << constraint_sense_name[name];
 			ss << setw(12) << pi_rec.get_obs_value();
@@ -1797,7 +1820,7 @@ void Constraints::presolve_report(int iter, Parameters& current_pars, Observatio
 		for (int i = 0; i < num_pi_constraints(); ++i)
 		{
 			string name = ctl_ord_pi_constraint_names[i];
-			PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
+			PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
 			f_rec << setw(nsize) << left << name;
 			f_rec << setw(12) << right << constraint_sense_name[name];
 			f_rec << setw(12) << pi_rec.get_obs_value();
@@ -2059,7 +2082,7 @@ void Constraints::postsolve_pi_constraints_report(Parameters& old_pars, Paramete
 		int i = 0;
 		for (auto &name : ctl_ord_pi_constraint_names)
 		{
-			PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
+			PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
 			pair<double,double> cur_sim_resid = pi_rec.calc_sim_and_resid(old_pars);
 			pair<double,double> new_sim_resid = pi_rec.calc_sim_and_resid(new_pars);
 			f_rec << setw(20) << left << name;
@@ -2501,7 +2524,7 @@ map<string, double> Constraints::get_unsatified_pi_constraints(Parameters& par_a
 	
 	for (auto& name : ctl_ord_pi_constraint_names)
 	{
-		PriorInformationRec pi_rec = constraints_pi.get_pi_rec_ptr(name);
+		PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
 		//pair<double, double> cur_sim_resid = pi_rec.calc_residual_and_sim_val(*current_pars_and_dec_vars_ptr);
 		pair<double, double> new_sim_resid = pi_rec.calc_sim_and_resid(par_and_dec_vars);
 		//check for invalid pi constraints
@@ -2600,7 +2623,7 @@ int Constraints::get_num_nz_pi_constraint_elements()
 
 	for (auto &pi_name : ctl_ord_pi_constraint_names)
 	{
-		num += constraints_pi.get_pi_rec_ptr(pi_name).get_atom_factors().size();
+		num += constraints_pi.get_pi_rec(pi_name).get_atom_factors().size();
 	}
 	return num;
 }

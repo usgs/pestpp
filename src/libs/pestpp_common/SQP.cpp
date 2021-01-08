@@ -17,6 +17,66 @@
 #include "constraints.h"
 
 
+bool SqpFilter::accept(double obj_val, double violation_val)
+{
+	pair<double, double> candidate(obj_val, violation_val);
+	if (obj_viol_pairs.size() == 0)
+	{
+		obj_viol_pairs.insert(candidate);
+		return true;
+	}
+	//I think its cheaper to combine the tols with the candidate, rather adding them to every 
+	//existing pair...
+	if (minimize)
+		candidate.first *= (1 + obj_tol);
+	else
+		candidate.first *= (1 - obj_tol);
+	candidate.second *= (1 + viol_tol);
+	
+
+	bool accept = false;
+	for (auto& p : obj_viol_pairs)
+		if (first_dominates_second(candidate, p))
+		{
+			accept = true;
+			break;
+		}
+	return accept;
+}
+
+
+bool SqpFilter::first_dominates_second(const pair<double, double>& first, const pair<double, double>& second)
+{
+	if (minimize)
+	{
+		if ((first.first < second.first) || (first.second < second.second))
+			return true;
+		else
+			return false;
+	}
+	else
+	{
+		if ((first.first > second.first) || (first.second < second.second))
+			return true;
+		else
+			return false;
+	}
+}
+bool SqpFilter::update(double obj_val, double violation_val)
+{
+	bool acc = accept(obj_val, violation_val);
+	if (!acc)
+		return false;
+	pair<double, double> candidate(obj_val, violation_val);
+	set<pair<double, double>> updated{ candidate };
+	for (auto& p : obj_viol_pairs)
+	{
+		if (first_dominates_second(p, candidate))
+			updated.insert(p);
+	}
+	obj_viol_pairs = updated;
+	return true;
+ }
 
 SeqQuadProgram::SeqQuadProgram(Pest &_pest_scenario, FileManager &_file_manager,
 	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log,
@@ -390,6 +450,7 @@ void SeqQuadProgram::initialize_objfunc()
 
 	//check if the obj_str is an observation
 	use_obj_obs = false;
+	use_obj_pi = false;
 	if (pest_scenario.get_ctl_observations().find(obj_func_str) != pest_scenario.get_ctl_observations().end())
 	{
 		use_obj_obs = true;
@@ -416,14 +477,16 @@ void SeqQuadProgram::initialize_objfunc()
 		if (obj_func_str.size() == 0)
 		{
 			
-			f_rec << " warning: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
-			//ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
+			message(0, " warning: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)");
+			
+			ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
+			
 			for (auto& name : dv_names)
 			{
-				/*if (pi.get_parameter_rec_ptr(name)->tranform_type != ParameterRec::TRAN_TYPE::NONE)
+				if (pi.get_parameter_rec_ptr(name)->tranform_type != ParameterRec::TRAN_TYPE::NONE)
 				{
 					throw_sqp_error("only 'none' type decision variable transform supported for generic obj function");
-				}*/
+				}
 				obj_func_coef_map[name] = 1.0;
 			}
 				
@@ -433,8 +496,10 @@ void SeqQuadProgram::initialize_objfunc()
 		else if (pest_scenario.get_prior_info().find(obj_func_str) != pest_scenario.get_prior_info().end())
 		{
 			message(1, "using prior information equation '" + obj_func_str + "' as the objective function");
-			obj_func_coef_map = pest_scenario.get_prior_info().get_pi_rec_ptr(obj_func_str).get_atom_factors();
+			obj_func_coef_map = pest_scenario.get_prior_info().get_pi_rec(obj_func_str).get_atom_factors();
+			use_obj_pi = true;
 		}
+
 		else
 		{
 			
@@ -443,7 +508,18 @@ void SeqQuadProgram::initialize_objfunc()
 			if (!if_obj.good())
 				throw_sqp_error("unrecognized ++opt_objective_function arg (tried file name, obs name, prior info name): " + obj_func_str);
 			else
+			{
+				message(1, "loading objective function coefficents from ascii file ", obj_func_str);
 				obj_func_coef_map = pest_utils::read_twocol_ascii_to_map(obj_func_str);
+				ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
+				for (auto& name : dv_names)
+				{
+					if (pi.get_parameter_rec_ptr(name)->tranform_type != ParameterRec::TRAN_TYPE::NONE)
+					{
+						throw_sqp_error("only 'none' type decision variable transform supported for external file obj function");
+					}
+				}
+			}
 		}
 
 
@@ -840,6 +916,9 @@ void SeqQuadProgram::initialize()
 	message(0, "Initial phi value:", last_best);
 	best_phis.push_back(last_best);
 
+	double v = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
+	filter.update(last_best, v);
+	
 	message(2, "initializing hessian matrix with identity");
 	Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
 	h.setIdentity();
@@ -1798,12 +1877,12 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 		// constraint diff (h = Ax - b)
 		// todo only for constraints in WS only
 		Eigen::VectorXd Ax, b;
-		Eigen::VectorXd constraint_diff;
+		Eigen::VectorXd constraint_diff(cnames.size());
 		//Ax = constraint_jco * _current_dv_values.get_data_eigen_vec(dv_names);
 		//b = constraints.get_obs_constraint_values(); //todo
 		//message(1, "Ax product", Ax);  // tmp
 		//constraint_diff = constraints.get_constraint_residual_vec();
-		constraint_diff = constraint_diff.setZero(size(cnames));  // shouldn't need shape call here
+		constraint_diff = constraint_diff.setZero();  // shouldn't need shape call here
 		// throw error here if not all (approx) zero, i.e., not on constraint
 		if ((constraint_diff.array() != 0.0).any())  // make some level of forgiveness with a tolerance parameter here
 		{
@@ -2152,11 +2231,20 @@ double SeqQuadProgram::get_obj_value(Parameters& _current_ctl_dv_vals, Observati
 	}
 	else
 	{
-		Parameters pars = _current_ctl_dv_vals;
-		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
-		pts.ctl2numeric_ip(pars);
-		for (auto& dv_name : dv_names)
-			v += obj_func_coef_map[dv_name] * pars.get_rec(dv_name);
+		if (use_obj_pi)
+		{
+			PriorInformationRec pi = pest_scenario.get_prior_info_ptr()->get_pi_rec(obj_func_str);
+			v = pi.calc_sim_and_resid(_current_ctl_dv_vals).first;
+
+		}
+		else
+		{
+			Parameters pars = _current_ctl_dv_vals;
+			ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+			pts.ctl2numeric_ip(pars);
+			for (auto& dv_name : dv_names)
+				v += obj_func_coef_map[dv_name] * pars.get_rec(dv_name);
+		}
 	}
 	return v;
 }
@@ -2187,24 +2275,18 @@ Eigen::VectorXd SeqQuadProgram::get_obj_vector(ParameterEnsemble& _dv, Observati
 		Parameters pars = pest_scenario.get_ctl_parameters();
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
 		pts.ctl2numeric_ip(pars);
-		//PriorInformationRec pi = pest_scenario.get_prior_info().get_pi_rec_ptr(obj_func_str);
 		Eigen::VectorXd real;
 		vector<string> vnames = _dv.get_var_names();
-		//pair<double, double> sr;
+		double v;
 		for (int i = 0; i < _dv.shape().first; i++)
 		{
 			//pts.ctl2numeric_ip(pars);
 			real = _dv.get_real_vector(i);
 			pars.update_without_clear(vnames, real);
-			//pts.numeric2ctl_ip(pars);
-			//sr = pi.calc_sim_and_resid(pars);
-			//obj_vec[i] = sr.first;
-			double v = 0;
-			for (int j = 0; j < dv_names.size(); j++)
-			{
-				v += obj_func_coef_map[dv_names[j]] * pars[dv_names[j]];
-			}
+			pts.numeric2ctl_ip(pars);
+			v = get_obj_value(pars, current_obs); //shouldnt be using current obs since this is dv-based obj
 			obj_vec[i] = v;
+			pts.ctl2numeric_ip(pars);
 		}
 	}
 	return obj_vec;
@@ -2226,8 +2308,10 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	map<string, double> obj_map = get_obj_map(dv_candidates, _oe);
 	//todo make sure chances have been applied before now...
 	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates,_oe);
+	bool filter_accept;
 	for (int i = 0; i < obj_vec.size(); i++)
 	{
+		
 		ss.str("");
 		ss << "candidate: " << real_names[i] << " phi: " << obj_vec[i];
 		double infeas_sum = 0.0;
@@ -2236,6 +2320,15 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 			infeas_sum += v.second;
 		}
 		ss << " infeasibilty total: " << infeas_sum << endl;
+		//not sure how to deal with filter here - liu and reynolds have a scheme about it...
+		//but maybe we want to just add all of these candidates to the filter?
+		//there is also a test method with the filter that doesnt add 
+		//to the records...
+		filter_accept = filter.update(obj_vec[i], infeas_sum);
+		if (filter_accept)
+			ss << " filter accepted ";
+		else
+			ss << " fitler rejected ";
 		message(1, ss.str());
 		if ((obj_sense=="minimize") && (obj_vec[i] < oext))
 		{
