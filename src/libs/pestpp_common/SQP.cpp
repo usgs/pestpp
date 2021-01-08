@@ -1646,6 +1646,7 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 			Covariance shrunk_cov = dv.get_empirical_cov_matrices(&file_manager).second;
 			shrunk_cov.inv_ip();
 			parcov_inv = shrunk_cov.e_ptr()->toDense();
+			//TODO: Matt to check consistency being sample cov forms
 			message(1, "empirical parcov inv:", parcov_inv);  // tmp
 			
 			// try pseudo_inv_ip()
@@ -1746,22 +1747,72 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector(const Parameters& _current_
 //}
 //}
 
+//pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_solve_eqp()
+//{
+//	//return pair<>
+//}
+
+
 Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _current_dv_values, Eigen::VectorXd& grad_vector)
 {
-	//
-	//throw_sqp_error("TODO");
-	return grad_vector;
 
-	//if (constraints is True) &(len(working_set) > 0);
-	//{
-	//	ss.str("");
-	//	ss << "solve (E)QP sub-problem via active set method for search direction";
-	//	string s = ss.str();
-	//	message(1, s);
-	//	//self.search_d, self.lagrang_mults = self._solve_eqp(qp_solve_method=self.qp_solve_method)
-	//	//search direction tests contained therein
-	//	throw_sqp_error("TODO");
-	//}
+	// working set before this point
+	if (constraints.num_obs_constraints() + constraints.num_pi_constraints() > 0)
+	{
+		// tmp - enter here if we are solving a problem with constraints AND working set is nonempty
+		//solve (E)QP sub-problem via active set method for search direction
+
+		// put in _solve_eqp() func - self.search_d, self.lagrang_mults = self._solve_eqp(qp_solve_method=self.qp_solve_method)
+	
+		// H = I
+		//Eigen::MatrixXd hessian;
+		//hessian = Eigen::MatrixXd::Identity(dv.shape().second, dv.shape().second);  // better way of getting shape?
+		Eigen::SparseMatrix<double> I(dv.shape().second, dv.shape().second);  // better way of getting shape?
+		I.setIdentity();
+		message(1, "hessian:", I);  // tmp
+
+		// grad
+		message(1, "grad vector:", grad_vector);  // tmp
+
+		// A = J[]
+		Eigen::MatrixXd constraint_jco;  // or would you pref to slice and dice each time - this won't get too big but want to avoid replicates  // and/or make Jacobian obj?
+		vector<string> cnames = constraints.get_obs_constraint_names();  // not already stored?
+		message(1, "cnames:", cnames);  // tmp
+		constraint_jco = jco.get_matrix(cnames, dv_names);
+		message(1, "A:", constraint_jco);  // tmp
+
+		// constraint diff (h = Ax - b)
+		Eigen::VectorXd Ax;
+		Eigen::VectorXd constraint_diff;
+		constraint_diff = constraint_diff.setZero(size(cnames));  // shouldn't need shape call here
+		//Ax = constraint_jco * _current_dv_values.get_data_eigen_vec(dv_names);
+		//message(1, "Ax product", Ax);  // tmp
+		//message(1, "b", constraints.get_constraint_residual_vec());  // tmp
+		// throw error here if not all (approx) zero, i.e., not on constraint
+		message(1, "constraint diff", constraint_diff);  // tmp
+		if ((constraint_diff.array() != 0.0).any())  // make some level of forgiveness with a tolerance parameter here
+		{
+			throw_sqp_error("not on constraint");  // better to pick this up elsewhere anyway
+		}
+
+		//if eqp_solve_method is null_space
+		//call _kkt_null_space()
+		// assert if A not full rank
+		// assert if ZTGZ is non pos def
+
+		// some transforms
+
+		// solve q_range_space
+
+		// solve q_null_space
+
+		// combine to make total direction
+
+		//else if schur, direct, krylov, ...
+
+		// search direction tests contained in functions above
+
+	}
 	//else if ((constraints is False) | ((constraints is True) & (len(self.working_set) == 0)));
 	//{
 	//	if (LBFGS);
@@ -1782,6 +1833,8 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 	//		//self.search_d = self._LBFGS_hess_update(memory = memory, self_scale = hess_self_scaling)
 	//		throw_sqp_error("TODO");
 	//	}
+
+	return grad_vector;
 }
 
 Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameters& _current_dv_num_values)
@@ -1791,6 +1844,10 @@ Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameter
 
 	// grad vector computation
 	Eigen::VectorXd grad = current_grad_vector.get_data_eigen_vec(dv_names);
+
+	// search direction computation
+	Eigen::VectorXd search_d = calc_search_direction_vector(_current_dv_num_values, grad);  // need _current_dv_values here?
+
 	if (obj_sense == "minimize")
 		grad *= -1.;
 	
@@ -1802,9 +1859,6 @@ Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameter
 	
 	cvals.array() += grad.array();
 	num_candidate.update_without_clear(dv_names, cvals);
-	
-	// search direction computation
-	//Eigen::VectorXd search_d = calc_search_direction_vector(_current_dv_values, grad);  // need _current_dv_values here?
 
 	// undertake search direction-related tests, e.g., point down-hill
 	// and check if constraints in working set cause zero search_d (and go to next iteration if so)

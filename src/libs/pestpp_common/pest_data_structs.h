@@ -435,7 +435,7 @@ public:
 	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
 	bool get_sqp_update_hessian()const { return sqp_update_hessian; }
 	void set_sqp_update_hessian(bool _flag) { sqp_update_hessian = _flag; }
-	vector<double> get_sqp_scale_facs() const { return sqp_scale_facs; }
+	vector<double> get_sqp_scale_facs() const { return sqp_scale_facs; }  // perhaps change arg name to sqp_alpha_mults
 	void set_sqp_scale_facs(vector<double> _mults) { sqp_scale_facs = _mults; }
 
 
