@@ -581,7 +581,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 					pfm.log_event("loading par stack from csv file: " + par_csv);
 					try
 					{
-						stack_pe.from_csv(par_csv);
+						stack_pe.from_csv(par_csv, true);
 					}
 					catch (const exception& e)
 					{
@@ -595,10 +595,10 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 				}
 				else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
 				{
-					pfm.log_event("loading par stack from binary file+ " + par_csv);
+					pfm.log_event("loading par stack from binary file " + par_csv);
 					try
 					{
-						stack_pe.from_binary(par_csv);
+						stack_pe.from_binary(par_csv, true);
 					}
 					catch (const exception& e)
 					{

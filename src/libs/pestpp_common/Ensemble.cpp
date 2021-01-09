@@ -1297,25 +1297,28 @@ pair<map<string,int>, map<string, int>> Ensemble::prepare_csv(const vector<strin
 void Ensemble::extend_cols(Eigen::MatrixXd &_reals, const vector<string> &_var_names)
 {
 	//add new columns to reals
-	vector<string>::iterator start = var_names.begin(), end = var_names.end();
-	vector<string> missing;
+	set<string> svar_names(var_names.begin(),var_names.end());
+	vector<string> dups;
 	for (auto &vname : _var_names)
-		if (find(start, end, vname) == end)
-			missing.push_back(vname);
-	if (missing.size() > 0)
-		throw_ensemble_error("add_to_cols(): the following var_names not found: ", missing);
-	if (_var_names.size() != _reals.cols())
-		throw_ensemble_error("add_to_cols(): _reals.cols() != _var_names.size()");
+		if (svar_names.find(vname) != svar_names.end())
+			dups.push_back(vname);
+	if (dups.size() > 0)
+		throw_ensemble_error("extend_cols(): the following var_names are already in the ensemble found: ", dups);
 	if (_reals.rows() != reals.rows())
-		throw_ensemble_error("add_to_cols(): _reals.rows() != reals.rows()");
+		throw_ensemble_error("extend_cols(): _reals.rows() != reals.rows()");
 	int i_this;
 	string vname;
+	vector<string> new_var_names = var_names;
+	new_var_names.insert(new_var_names.end(), _var_names.begin(), _var_names.end());
+	reals.conservativeResize(real_names.size(), new_var_names.size());
 	for (int i = 0; i < _var_names.size(); i++)
 	{
 		vname = _var_names[i];
-		i_this = find(start, end, vname) - start;
-		reals.col(i_this) += _reals.col(i);
+		i_this = var_names.size() + i;
+		reals.col(i_this) = _reals.col(i);
 	}
+	var_names = new_var_names;
+	update_var_map();
 }
 
 void Ensemble::append_other_rows(const vector<string>& _real_names, Eigen::MatrixXd& _reals)
@@ -2248,10 +2251,8 @@ void ParameterEnsemble::from_eigen_mat(Eigen::MatrixXd mat, const vector<string>
 	tstat = _tstat;
 }
 
-
-void ParameterEnsemble::from_binary(string file_name)
+void ParameterEnsemble::from_binary(string file_name, bool forgive)
 {
-	//overload for ensemble::from_binary - just need to set tstat
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
 	map<string,int> header_info = Ensemble::from_binary(file_name, names, false);
 	unordered_set<string>svar_names(var_names.begin(), var_names.end());
@@ -2265,7 +2266,21 @@ void ParameterEnsemble::from_binary(string file_name)
 
 	}
 	if (missing.size() > 0)
-		throw_ensemble_error("from_binary() error: the following adjustable parameter names in the control file are not in the binary parameter ensemble file:", missing);
+	{
+		if (forgive)
+		{
+			cout << "from_binary() warning: the following adjustable parameter names in the control file are not in the binary parameter ensemble file: " << endl;
+			for (auto& m : missing)
+				cout << m << endl;
+			cout << "forgive is true, so continuing..." << endl;
+
+		}
+
+		else
+		{
+			throw_ensemble_error("from_binary() error: the following adjustable parameter names in the control file are not in the binary parameter ensemble file:", missing);
+		}
+	}
 
 	names = pest_scenario_ptr->get_ctl_ordered_par_names();
 	unordered_set<string>snames(names.begin(), names.end());
@@ -2303,7 +2318,7 @@ void ParameterEnsemble::from_binary(string file_name)
 //	//return ParameterEnsmeble(get_eigen(_real_names,_var_names),)
 //}
 
-void ParameterEnsemble::from_csv(string file_name)
+void ParameterEnsemble::from_csv(string file_name, bool forgive)
 {
 	ifstream csv(file_name);
 	if (!csv.good())
@@ -2342,7 +2357,19 @@ void ParameterEnsemble::from_csv(string file_name)
 			missing.push_back(p);
 	}
 	if (missing.size() > 0)
-		throw_ensemble_error("ParameterEnsemble.from_csv() error: the following adjustable pars not in csv:",missing);
+	{
+		if (forgive)
+		{
+			cout << "ParameterEnsemble.from_csv() error: the following adjustable pars not in csv: " << endl;
+			for (auto& m : missing)
+				cout << m << endl;
+			cout << "forgive is true, so continuing..." << endl;
+		}
+		else
+		{
+			throw_ensemble_error("ParameterEnsemble.from_csv() error: the following adjustable pars not in csv:", missing);
+		}
+	}
 
 	csv.close();
 	csv.open(file_name);
