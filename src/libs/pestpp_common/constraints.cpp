@@ -622,6 +622,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 						missing.push_back(name);
 				if (missing.size() > 0)
 					throw_constraints_error("par stack missing the following adjustable parameters: ", missing);
+				stack_pe.clear_fixed_map();
 
 				missing.clear();
 				for (auto name : dec_var_names)

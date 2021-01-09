@@ -166,6 +166,7 @@ public:
 	map<string,double> draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
 	Covariance get_diagonal_cov_matrix();
 	void to_binary(string filename);
+	void clear_fixed_map() { fixed_map.clear(); fixed_names.clear(); }
 
 
 private:
