@@ -1908,10 +1908,10 @@ const vector<string> &Pest::get_outfile_vec()
 	return model_exec_info.outfile_vec;
 }
 
-void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgrade_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim, bool enforce_bounds)
+pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgrade_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim, bool enforce_bounds)
 {
 	if ((!enforce_chglim) && (!enforce_bounds))
-		return;
+		pair<string, double> control_info("no enforcement", 1.0);
 	stringstream ss;
 	double fpm = control_info.facparmax;
 	double facorig = control_info.facorig;
