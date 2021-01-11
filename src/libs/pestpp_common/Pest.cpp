@@ -2129,6 +2129,10 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 			p.second = p_rec->ubnd;
 
 	}
+	ss.str("");
+	ss << control_type << "," << controlling_par;
+	pair<string, double> control_info(ss.str(), scaling_factor);
+	return control_info;
 
 }
 
