@@ -996,7 +996,7 @@ void SeqQuadProgram::run_jacobian(Parameters& _current_ctl_dv_vals, Observations
 	message(2, ss.str());
 	bool success = jco.build_runs(current_pars, _current_obs, dv_names, par_trans,
 		pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
-		*run_mgr_ptr, out_of_bounds, false, init_obs);
+		*run_mgr_ptr, out_of_bounds, false, init_obs,true);
 	if (!success)
 		throw_sqp_error("error building jacobian runs for FD grad");
 	//todo: think about freezind dec vars that go out of bounds? - yuck!
@@ -1009,7 +1009,7 @@ void SeqQuadProgram::run_jacobian(Parameters& _current_ctl_dv_vals, Observations
 		throw_sqp_error(ss.str());
 	}
 	//todo: mod queue chance runs for FD grad
-	//queue_chance_runs();
+	queue_chance_runs();
 	message(2, "starting finite difference gradient pertubation runs");
 	jco.make_runs(*run_mgr_ptr);
 	
@@ -2585,6 +2585,7 @@ void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool
 
 ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv_candidates, vector<double> &scale_vals)
 {
+	run_mgr_ptr->reinitialize();
 	ofstream &frec = file_manager.rec_ofstream();
 	stringstream ss;
 	ss << "queuing " << dv_candidates.shape().first << " candidate solutions";
@@ -2740,6 +2741,7 @@ void SeqQuadProgram::queue_chance_runs()
 
 vector<int> SeqQuadProgram::run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs)
 {
+	run_mgr_ptr->reinitialize();
 	stringstream ss;
 	ss << "queuing " << _pe.shape().first << " runs";
 	performance_log->log_event(ss.str());

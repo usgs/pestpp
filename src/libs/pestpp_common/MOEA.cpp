@@ -1331,6 +1331,7 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 
 vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance)
 {
+	run_mgr_ptr->reinitialize();
 	//queue up any chance related runs
 	if (allow_chance)
 		queue_chance_runs(_dp);
@@ -2676,8 +2677,6 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 
 		//only change dec vars
 		double dsum = 0.0;
-		if (i == 72)
-			cout << endl;
 		for(int idv=0;idv<dv_names.size();idv++)
 		{
 			ii = var_map[dv_names[idv]];
