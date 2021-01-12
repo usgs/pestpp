@@ -2734,6 +2734,18 @@ map<string, double> Constraints::get_constraint_map(Parameters& par_and_dec_vars
 	return constraint_map;
 }
 
+Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, double working_set_tol)
+{
+	Covariance cov = dv.get_empirical_cov_matrices(file_mgr_ptr).second;
+	Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies();
+
+	cov = oe.get_empirical_cov_matrices(file_mgr_ptr).second;
+	Eigen::MatrixXd delta_oe = *cov.inv().e_ptr() * oe.get_eigen_anomalies();
+	Eigen::MatrixXd approx_jco = delta_oe * delta_dv.inverse();
+
+	return Mat();
+}
+
 Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& jco, bool do_shift, double working_set_tol)
 {
 	map<string, double> constraint_map = get_constraint_map(par_and_dec_vars, constraints_sim, do_shift);
