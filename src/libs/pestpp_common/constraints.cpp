@@ -1071,6 +1071,7 @@ vector<double> Constraints::get_sum_of_violations(ParameterEnsemble& pe, Observa
 	return sums;
 }
 
+
 ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe, string risk_obj)
 {
 	map<string, double> risk_map;
@@ -1568,6 +1569,81 @@ double Constraints::get_probit(double _risk)
 	/* the probit function estimate - needed for the fosm-basd chance constraints*/
 	double output = sqrt(2.0) * ErfInv2((2.0 * _risk) - 1.0);
 	return output;
+}
+
+void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& current_obs, bool echo)
+{
+	
+	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
+	vector<double> residuals;
+	map<string, double> infeas_dist;
+	stringstream ss;
+	ss.str("");
+	
+	int nsize = 20;
+	for (auto name : ctl_ord_obs_constraint_names)
+	{
+		nsize = max(nsize, int(name.size()));
+	}
+	ss << endl << "  observation constraint information at iteration " << iter << endl;
+	ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
+	ss << setw(11) << "satisfied" << setw(15) << "distance" << endl;
+
+	infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
+	for (int i = 0; i < num_obs_constraints(); ++i)
+	{
+		string name = ctl_ord_obs_constraint_names[i];
+		ss << setw(nsize) << left << name;
+		ss << setw(12) << right << constraint_sense_name[name];
+		ss << setw(12) << constraints_obs.get_rec(name);
+		ss << setw(15) << current_obs.get_rec(name);
+		if (infeas_dist.find(name) != infeas_dist.end())
+		{
+			ss << setw(11) << "false" << setw(15) << infeas_dist[name];
+		}
+		else
+		{
+			ss << setw(11) << "true" << setw(15) << 0.0;
+		}
+		ss << endl;
+
+	}
+	
+	nsize = 20;
+	for (auto name : ctl_ord_pi_constraint_names)
+	{
+		nsize = max(nsize, int(name.size()));
+	}
+
+	//report prior information constraints
+	infeas_dist = get_unsatified_pi_constraints(current_pars);
+	ss << endl << "  prior information constraint information at iteration " << iter << endl;
+	ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
+	ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
+	for (int i = 0; i < num_pi_constraints(); ++i)
+	{
+		string name = ctl_ord_pi_constraint_names[i];
+		PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
+		ss << setw(nsize) << left << name;
+		ss << setw(12) << right << constraint_sense_name[name];
+		ss << setw(12) << pi_rec.get_obs_value();
+		ss << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
+		if (infeas_dist.find(name) != infeas_dist.end())
+		{
+			ss << setw(11) << "false" << setw(15) << infeas_dist[name];
+		}
+		else
+		{
+			ss << setw(11) << "true" << setw(15) << 0.0;
+		}
+		ss << endl;
+	}
+	
+	f_rec << ss.str();
+	if (echo)
+		cout << ss.str();
+
+	return;
 }
 
 void Constraints::mou_report(int iter, Parameters& current_pars, Observations& current_obs, const vector<string>& obs_obj_names,
@@ -2531,7 +2607,10 @@ map<string, double> Constraints::get_unsatified_pi_constraints(Parameters& par_a
 		//check for invalid pi constraints
 		sim_val = new_sim_resid.first;
 		obs_val = pi_rec.get_obs_value();
-		scaled_diff = abs((obs_val - sim_val) / obs_val);
+		if (obs_val != 0)
+			scaled_diff = abs((obs_val - sim_val) / obs_val);
+		else
+			scaled_diff = abs(obs_val - sim_val);
 		if ((constraint_sense_map[name] == ConstraintSense::less_than) && (sim_val > obs_val) && (scaled_diff > tol))
 			unsatisfied[name] = sim_val - obs_val;
 		else if ((constraint_sense_map[name] == ConstraintSense::greater_than) && (sim_val < obs_val) && (scaled_diff > tol))
@@ -2581,6 +2660,7 @@ map<string, map<string, double>> Constraints::get_ensemble_violations_map(Parame
 	return violations;
 }
 
+
 map<string, double> Constraints::get_unsatified_obs_constraints(Observations& constraints_sim, double tol, bool do_shift)
 {
 	/* get a map of name, distance for each of the obs-based (e.g. model-based) constraints that are not satisfied in the constraint_obs container.
@@ -2602,7 +2682,11 @@ map<string, double> Constraints::get_unsatified_obs_constraints(Observations& co
 			sim_val += offset;
 		}
 		obs_val = constraints_obs[name];
-		scaled_diff = abs((obs_val - sim_val) / obs_val);
+		if (obs_val != 0)
+			scaled_diff = abs((obs_val - sim_val) / obs_val);
+		else
+			scaled_diff = abs(obs_val - sim_val);
+
 		//check for invalid obs constraints (e.g. satified)
 		if ((constraint_sense_map[name] == ConstraintSense::less_than) && (sim_val > obs_val) && (scaled_diff > tol))
 			unsatisfied[name] = sim_val - obs_val;
@@ -2615,6 +2699,68 @@ map<string, double> Constraints::get_unsatified_obs_constraints(Observations& co
 
 }
 
+map<string, double> Constraints::get_constraint_map(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift)
+{
+	double sim_val, obs_val;
+	map<string, double> constraint_map;
+	Observations _constraints_sim(constraints_sim);
+	if ((do_shift) && (use_chance))
+		_constraints_sim = get_chance_shifted_constraints(constraints_sim);
+	//for (int i = 0; i < num_obs_constraints(); ++i)
+	for (auto& name : ctl_ord_obs_constraint_names)
+	{
+		//string name = ctl_ord_obs_constraint_names[i];
+		sim_val = constraints_sim[name];
+		if ((do_shift) && (use_chance))
+		{
+			double offset = post_constraint_offset[name];
+			sim_val += offset;
+		}
+		obs_val = constraints_obs[name];
+		constraint_map[name] = sim_val - obs_val;
+	}
+
+	for (auto& name : ctl_ord_pi_constraint_names)
+	{
+		PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
+		//pair<double, double> cur_sim_resid = pi_rec.calc_residual_and_sim_val(*current_pars_and_dec_vars_ptr);
+		pair<double, double> new_sim_resid = pi_rec.calc_sim_and_resid(par_and_dec_vars);
+		//check for invalid pi constraints
+		sim_val = new_sim_resid.first;
+		obs_val = pi_rec.get_obs_value();
+		constraint_map[name] = sim_val - obs_val;
+		
+	}
+	return constraint_map;
+}
+
+Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& jco, bool do_shift, double working_set_tol)
+{
+	map<string, double> constraint_map = get_constraint_map(par_and_dec_vars, constraints_sim, do_shift);
+	vector<string> working_set;
+	for (auto& name : ctl_ord_obs_constraint_names)
+	{
+		if (constraint_sense_map[name] == ConstraintSense::equal_to)
+			working_set.push_back(name);
+
+		else if (abs(constraint_map[name]) < working_set_tol)
+		{
+			working_set.push_back(name);
+		}
+	}
+	for (auto& name : ctl_ord_pi_constraint_names)
+	{
+		if (constraint_sense_map[name] == ConstraintSense::equal_to)
+			working_set.push_back(name);
+
+		else if (abs(constraint_map[name]) < working_set_tol)
+		{
+			working_set.push_back(name);
+		}
+	}
+	Eigen::SparseMatrix<double> t = jco.get_matrix(working_set, dec_var_names);
+	return Mat(working_set, dec_var_names,t);
+}
 
 int Constraints::get_num_nz_pi_constraint_elements()
 {

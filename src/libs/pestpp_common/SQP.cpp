@@ -709,7 +709,7 @@ void SeqQuadProgram::initialize()
 		ppo->set_par_sigma_range(20.0);
 	}
 
-	initialize_objfunc();
+	
 
 	//reset the par bound PI augmentation since that option is just for simplex
 	ppo->set_opt_include_bnd_pi(false);
@@ -785,7 +785,7 @@ void SeqQuadProgram::initialize()
 		message(2, "using all adjustable parameters as decision variables: ", act_par_names.size());
 		dv_names = act_par_names;
 	}
-
+	initialize_objfunc();
 	constraints.initialize(dv_names, numeric_limits<double>::max());
 	constraints.initial_report();
 	//some risk-based stuff here
@@ -817,13 +817,13 @@ void SeqQuadProgram::initialize()
 	{
 		message(0, "'noptmax'=0, running control file parameter values and quitting");
 		
-		Parameters pars = pest_scenario.get_ctl_parameters();
+		current_ctl_dv_values = pest_scenario.get_ctl_parameters();
 		ParamTransformSeq pts = dv.get_par_transform();
 
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
 		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
-		_pe.append("BASE", pars);
+		_pe.append("BASE", current_ctl_dv_values);
 		string par_csv = file_manager.get_base_filename() + ".par.csv";
 		//message(1, "saving parameter values to ", par_csv);
 		//_pe.to_csv(par_csv);
@@ -834,16 +834,6 @@ void SeqQuadProgram::initialize()
 		_oe.append("BASE", pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
-		//initialize the phi handler
-		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &dv_base, &parcov);
-		if (ph.get_lt_obs_names().size() > 0)
-		{
-			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
-		}
-		if (ph.get_gt_obs_names().size())
-		{
-			message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
-		}
 		message(1, "running control file parameter values");
 
 		vector<int> failed_idxs = run_ensemble(_pe, _oe);
@@ -855,12 +845,11 @@ void SeqQuadProgram::initialize()
 		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
 		message(1, "saving results from control file parameter value run to ", obs_csv);
 		_oe.to_csv(obs_csv);
-
-		ph.update(_oe, _pe);
-		message(0, "control file parameter phi report:");
-		ph.report(true);
-		ph.write(0, 1);
-		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);			
+		Eigen::VectorXd o = _oe.get_real_vector(BASE_REAL_NAME);
+		current_obs = pest_scenario.get_ctl_observations();
+		current_obs.update_without_clear(_oe.get_var_names(), o);
+		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);	
+		constraints.sqp_report(0,current_ctl_dv_values, current_obs);
 		return;
 	}
 
@@ -907,6 +896,14 @@ void SeqQuadProgram::initialize()
 	else
 	{
 		prep_4_fd_grad();
+	}
+
+	
+
+	constraints.sqp_report(iter, current_ctl_dv_values, current_obs);
+	if (constraints.get_use_chance())
+	{
+		constraints.presolve_chance_report(iter, current_obs, true, "initial chance constraint report");
 	}
 
 	//set the initial grad vector
@@ -970,6 +967,40 @@ void SeqQuadProgram::prep_4_fd_grad()
 				ss << vnames << endl;
 			throw_sqp_error(ss.str());
 		}
+		string res_filename = pest_scenario.get_pestpp_options().get_hotstart_resfile();
+		if (res_filename.size() == 0)
+		{
+			//make the intial base run
+			cout << "  ---  running the model once with initial decision variables  ---  " << endl;
+			ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+			int run_id = run_mgr_ptr->add_run(pts.ctl2model_cp(current_ctl_dv_values));
+			queue_chance_runs();
+
+			run_mgr_ptr->run();
+			bool success = run_mgr_ptr->get_run(run_id, current_ctl_dv_values, current_obs);
+			if (!success)
+				throw_sqp_error("initial (base) run with initial decision vars failed...cannot continue");
+			constraints.process_runs(run_mgr_ptr,iter);
+		}
+		else
+		{
+			stringstream message;
+			message << "  reading  residual file " << res_filename << " for hot-start...";
+			cout << message.str();
+			file_manager.rec_ofstream() << message.str();
+			for (auto& oname : pest_scenario.get_ctl_ordered_obs_names())
+				current_obs[oname] = -1.0e+30;
+			pest_utils::read_res(res_filename, current_obs);
+			file_manager.rec_ofstream() << "done" << endl;
+			cout << "done" << endl;
+			if (constraints.get_use_chance())
+			{
+				queue_chance_runs();
+				run_mgr_ptr->run();
+				constraints.process_runs(run_mgr_ptr, iter);
+			}
+		}
+			
 	}
 	else
 	{
@@ -1910,9 +1941,15 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 
 		// constraint jco
 		// todo only for constraints in WS only
-		Eigen::MatrixXd constraint_jco;  // or would you pref to slice and dice each time - this won't get too big but want to avoid replicates  // and/or make Jacobian obj?
-		vector<string> cnames = constraints.get_obs_constraint_names();  // not already stored?
-		constraint_jco = jco.get_matrix(cnames, dv_names);
+		Mat constraint_mat = constraints.get_working_set_constraint_matrix(current_ctl_dv_values, current_obs, jco, true);
+		//todo:probably need to check if constraint_mat has any nonzeros?
+
+		Eigen::MatrixXd constraint_jco = constraint_mat.e_ptr()->toDense();  // or would you pref to slice and dice each time - this won't get too big but want to avoid replicates  // and/or make Jacobian obj?
+		
+		//vector<string> cnames = constraints.get_constraint_names();  // not already stored?
+		vector<string> cnames = constraint_mat.get_row_names(); // just the working set constraints?
+		
+		//constraint_jco = jco.get_matrix(cnames, dv_names);
 		message(1, "A:", constraint_jco);  // tmp
 		// add check here that A is full rank; warn that linearly dependent will be removed via factorization
 

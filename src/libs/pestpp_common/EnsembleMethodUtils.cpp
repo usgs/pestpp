@@ -1029,11 +1029,13 @@ void ParChangeSummarizer::update(ParameterEnsemble& pe)
 }
 
 
-void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
+pair<Parameters, Observations> save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
 	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter)
 {
 	stringstream ss;
 	map<string, int> vmap = pe.get_real_map();
+	Parameters pars;
+	Observations obs;
 	if (vmap.find(BASE_REAL_NAME) != vmap.end())
 	{
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
@@ -1068,6 +1070,7 @@ void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, Observat
 				pest_scenario.get_ctl_observations(), obs, obj_func, pars);
 		}
 	}
+	return pair<Parameters, Observations>(pars, obs);
 
 }
 

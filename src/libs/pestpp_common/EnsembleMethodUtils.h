@@ -128,7 +128,7 @@ private:
 
 };
 
-void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
+pair<Parameters,Observations> save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
 	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter);
 
 vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
