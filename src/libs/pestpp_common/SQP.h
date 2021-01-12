@@ -204,7 +204,8 @@ private:
 
 	Eigen::VectorXd calc_search_direction_vector(const Parameters& _current_dv_, Eigen::VectorXd &grad_vector);  // to check
 
-	Parameters fancy_solve_routine(double scale_val, const Parameters& _current_dv_);
+	//Parameters fancy_solve_routine(double scale_val, const Parameters& _current_dv_);
+	Eigen::VectorXd fancy_solve_routine(const Parameters& _current_dv_);
 
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
 	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates, vector<double> &scale_vals);

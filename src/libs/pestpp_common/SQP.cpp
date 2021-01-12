@@ -1908,7 +1908,7 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 		{
 			// todo move to _kkt_null_space() func with description
 			// check: A full rank
-			// check: ZTGZ is non pos def
+			// check: reduced hessian ZTGZ is non pos def
 
 			// solve q_range_space
 
@@ -1983,27 +1983,16 @@ Eigen::VectorXd SeqQuadProgram::calc_search_direction_vector(const Parameters& _
 	return search_d;
 }
 
-Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameters& _current_dv_num_values)
+Eigen::VectorXd SeqQuadProgram::fancy_solve_routine(const Parameters& _current_dv_num_values)
 {
-	Parameters num_candidate = _current_dv_num_values; //copy
-	// part 1: done only once (at first alpha test)
 
 	// grad vector computation
 	Eigen::VectorXd grad = current_grad_vector.get_data_eigen_vec(dv_names);
 
 	// search direction computation
 	Eigen::VectorXd search_d = calc_search_direction_vector(_current_dv_num_values, grad);  
-	
-	search_d *= scale_val;
-	if (search_d.squaredNorm() < 1.0 - 10)
-		message(1, "very short upgrade for scale value", scale_val);
 
-	Eigen::VectorXd cvals = num_candidate.get_data_eigen_vec(dv_names);
-	
-	cvals.array() += search_d.array();
-	num_candidate.update_without_clear(dv_names, cvals);
-
-	// undertake search direction-related tests, e.g., point down-hill
+	// todo undertake search direction-related tests, e.g., point down-hill
 	// and check if constraints in working set cause zero search_d (and go to next iteration if so)
 	//	if (constraints is True);  // irrespective of shape of working set
 	//	{
@@ -2015,70 +2004,8 @@ Parameters SeqQuadProgram::fancy_solve_routine(double scale_val, const Parameter
 	//		throw_sqp_error("TODO");
 	//	}
 
-	// part 2
-
-	// // alpha testing
-	//if (search_dir != 0 or next_it == False);  // or break out of iteration here if True  // this should be accounted for in checks above
-	//if (constraints);
-	//	{
-	//		ss.str("");
-	//		ss << "specifying 'base' step length based on active set solve";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		//step = alpha
-	//		throw_sqp_error("TODO");
-	//	}
-	//	else
-	//	{
-	//		ss.str("");
-	//		ss << "specifying 'base' step length based on bound-related heuristics";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		//step = alpha
-	//		throw_sqp_error("TODO");
-	//	}
-
-	//	// compute candidate dec var vector
-	//	ss.str("");
-	//	ss << "compute candidate step lengths and associated mean dec var vectors";
-	//	string s = ss.str();
-	//	message(1, s);
-	//	throw_sqp_error("TODO");
-
-	//	// some bound handling here
-	//	// and drop subsequent (larger) alphas
-
-	//	// evaluate
-	//	ss.str("");
-	//	ss << "evaluating model for alpha" << alpha;
-	//	string s = ss.str();
-	//	message(1, s);
-	//	throw_sqp_error("TODO");
-
-	//	// check that we need to have gradient at candidate at this stage
-	// if (use_ensemble_grad)
-	//	{
-	//		ss.str("");
-	//		ss << "draw dec var en at candidate mean vector";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		throw_sqp_error("TODO");
-
-	//		ss.str("");
-	//		ss << "evaluate ensembles at trial alphas";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		throw_sqp_error("TODO");
-	//	}
-	//	else  // finite differences
-	//	{
-	//		ss.str("");
-	//		ss << "evaluate model at trial alphas";
-	//		string s = ss.str();
-	//		message(1, s);
-	//		throw_sqp_error("TODO");
-
-	return num_candidate;
+	message(1, "SEARCH_D", search_d);
+	return search_d;
 }
 
 bool SeqQuadProgram::solve_new()
@@ -2111,13 +2038,36 @@ bool SeqQuadProgram::solve_new()
 		_current_num_dv_values.update(dv_names, mean_vec);
 	}
 
-	Parameters dv_num_candidate;
+	//Parameters dv_num_candidate;
 	ParameterEnsemble dv_candidates(&pest_scenario,&rand_gen);
 	dv_candidates.set_trans_status(ParameterEnsemble::transStatus::NUM);
 	
 	
+	// search direction computation
+	Eigen::VectorXd search_d;
+	search_d = fancy_solve_routine(_current_num_dv_values);
+
+	
 	//backtracking/line search factors
 	//TODO: make this a ++ arg or tunable or something clever
+		//if (constraints);
+	//	{
+	//		ss.str("");
+	//		ss << "specifying 'base' step length based on active set solve";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		//step = alpha
+	//		throw_sqp_error("TODO");
+	//	}
+	//	else
+	//	{
+	//		ss.str("");
+	//		ss << "specifying 'base' step length based on bound-related heuristics";
+	//		string s = ss.str();
+	//		message(1, s);
+	//		//step = alpha
+	//		throw_sqp_error("TODO");
+	//	}
 	
 	vector<string> real_names;
 	
@@ -2137,8 +2087,20 @@ bool SeqQuadProgram::solve_new()
 		message(1, "starting lambda calcs for scaling factor", scale_val);
 		message(2, "see .log file for more details");
 		
-		dv_num_candidate = fancy_solve_routine(scale_val, _current_num_dv_values);
-		Eigen::VectorXd vec = dv_num_candidate.get_data_eigen_vec(dv_names);
+		//dv_num_candidate = fancy_solve_routine(scale_val, _current_num_dv_values);
+		Parameters num_candidate = _current_num_dv_values;
+
+		search_d *= scale_val;
+		if (search_d.squaredNorm() < 1.0 - 10)
+			message(1, "very short upgrade for scale value", scale_val); 
+		
+		Eigen::VectorXd cvals = num_candidate.get_data_eigen_vec(dv_names);
+
+		cvals.array() += search_d.array();
+		num_candidate.update_without_clear(dv_names, cvals); 
+
+		//Eigen::VectorXd vec = dv_num_candidate.get_data_eigen_vec(dv_names); 
+		Eigen::VectorXd vec = num_candidate.get_data_eigen_vec(dv_names);
 		dv_candidates.update_real_ip(real_names[i], vec);
 		
 
@@ -2146,6 +2108,49 @@ bool SeqQuadProgram::solve_new()
 		message(1, "finished calcs for scaling factor:", scale_val);
 
 	}
+
+	// // alpha testing
+//if (search_dir != 0 or next_it == False);  // or break out of iteration here if True  // this should be accounted for in checks above
+
+//	// compute candidate dec var vector
+//	ss.str("");
+//	ss << "compute candidate step lengths and associated mean dec var vectors";
+//	string s = ss.str();
+//	message(1, s);
+//	throw_sqp_error("TODO");
+
+//	// some bound handling here
+//	// and drop subsequent (larger) alphas
+
+//	// evaluate
+//	ss.str("");
+//	ss << "evaluating model for alpha" << alpha;
+//	string s = ss.str();
+//	message(1, s);
+//	throw_sqp_error("TODO");
+
+//	// check that we need to have gradient at candidate at this stage
+// if (use_ensemble_grad)
+//	{
+//		ss.str("");
+//		ss << "draw dec var en at candidate mean vector";
+//		string s = ss.str();
+//		message(1, s);
+//		throw_sqp_error("TODO");
+
+//		ss.str("");
+//		ss << "evaluate ensembles at trial alphas";
+//		string s = ss.str();
+//		message(1, s);
+//		throw_sqp_error("TODO");
+//	}
+//	else  // finite differences
+//	{
+//		ss.str("");
+//		ss << "evaluate model at trial alphas";
+//		string s = ss.str();
+//		message(1, s);
+//		throw_sqp_error("TODO");
 
 	//	if (constraints); // and if active set size is > 1?
 	//	{
@@ -2332,7 +2337,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		if (filter_accept)
 			ss << " filter accepted ";
 		else
-			ss << " fitler rejected ";
+			ss << " filter rejected ";
 		message(1, ss.str());
 		if ((obj_sense=="minimize") && (obj_vec[i] < oext))
 		{
