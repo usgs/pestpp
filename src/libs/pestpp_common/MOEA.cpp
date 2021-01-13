@@ -1815,7 +1815,7 @@ void MOEA::initialize()
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_adj_par_names());
 		_pe.set_trans_status(ParameterEnsemble::transStatus::NUM);
-		_pe.append("BASE", pars);
+		_pe.append(BASE_REAL_NAME, pars);
 		string par_csv = file_manager.get_base_filename() + ".par.csv";
 		//message(1, "saving parameter values to ", par_csv);
 		//_pe.to_csv(par_csv);
@@ -1823,7 +1823,7 @@ void MOEA::initialize()
 		pe_base.reorder(vector<string>(), act_par_names);
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
-		_oe.append("BASE", pest_scenario.get_ctl_observations());
+		_oe.append(BASE_REAL_NAME, pest_scenario.get_ctl_observations());
 		ObservationEnsemble oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
@@ -1854,7 +1854,7 @@ void MOEA::initialize()
 		message(0, "control file parameter phi report:");
 		ph.report(true);
 		ph.write(0, 1);
-		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);
+		save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, BASE_REAL_NAME);
 
 		message(0, "control file parameter objective function summary: ");
 		obj_func_report(_pe, _oe);

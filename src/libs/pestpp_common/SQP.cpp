@@ -848,7 +848,7 @@ void SeqQuadProgram::initialize()
 		Eigen::VectorXd o = _oe.get_real_vector(BASE_REAL_NAME);
 		current_obs = pest_scenario.get_ctl_observations();
 		current_obs.update_without_clear(_oe.get_var_names(), o);
-		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);	
+		save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, BASE_REAL_NAME);	
 		constraints.sqp_report(0,current_ctl_dv_values, current_obs);
 		return;
 	}
@@ -1345,8 +1345,8 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	message(1, "saved initial obs ensemble to", ss.str());
 
 	//save the 0th iter par and rei and well as the untagged par and rei
-	save_base_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, iter);
-	save_base_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, -1);
+	save_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, iter);
+	save_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, -1);
 
 
 	performance_log->log_event("calc pre-drop phi");
@@ -2679,8 +2679,8 @@ void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool
 	}
 	if (save_base)
 	{
-		save_base_real_par_rei(pest_scenario, _dv, _oe, output_file_writer, file_manager, iter);
-		save_base_real_par_rei(pest_scenario, _dv, _oe, output_file_writer, file_manager, -1);
+		save_real_par_rei(pest_scenario, _dv, _oe, output_file_writer, file_manager, iter);
+		save_real_par_rei(pest_scenario, _dv, _oe, output_file_writer, file_manager, -1);
 	}
 	//ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
 	//dv.to_csv(ss.str());
