@@ -176,7 +176,7 @@ void DataAssimilator::add_bases()
 	//check that 'base' isn't already in ensemble
 	vector<string> rnames = pe.get_real_names();
 	bool inpar = false;
-	if (find(rnames.begin(), rnames.end(), base_name) != rnames.end())
+	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
 		message(1, "'base' realization already in parameter ensemble, ignoring '++ies_include_base'");
 		inpar = true;
@@ -188,12 +188,12 @@ void DataAssimilator::add_bases()
 		pe.get_par_transform().active_ctl2numeric_ip(pars);
 		vector<int> drop{ pe.shape().first - 1 };
 		pe.drop_rows(drop);
-		pe.append(base_name, pars);
+		pe.append(BASE_REAL_NAME, pars);
 	}
 
 	//check that 'base' isn't already in ensemble
 	rnames = oe.get_real_names();
-	if (find(rnames.begin(), rnames.end(), base_name) != rnames.end())
+	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
 		message(1, "'base' realization already in observation ensemble, ignoring '++ies_include_base'");
 	}
@@ -204,7 +204,7 @@ void DataAssimilator::add_bases()
 		{
 			vector<string> prnames = pe.get_real_names();
 
-			int idx = find(prnames.begin(), prnames.end(), base_name) - prnames.begin();
+			int idx = find(prnames.begin(), prnames.end(), BASE_REAL_NAME) - prnames.begin();
 			//cout << idx << "," << rnames.size() << endl;
 			string oreal = rnames[idx];
 			stringstream ss;
@@ -215,9 +215,9 @@ void DataAssimilator::add_bases()
 			vector<string> drop;
 			drop.push_back(oreal);
 			oe.drop_rows(drop);
-			oe.append(base_name, obs);
+			oe.append(BASE_REAL_NAME, obs);
 			//rnames.insert(rnames.begin() + idx, string(base_name));
-			rnames[idx] = base_name;
+			rnames[idx] = BASE_REAL_NAME;
 			oe.reorder(rnames, vector<string>());
 		}
 		else
@@ -225,7 +225,7 @@ void DataAssimilator::add_bases()
 			message(1, "adding 'base' observation values to ensemble");
 			vector<int> drop{ oe.shape().first - 1 };
 			oe.drop_rows(drop);
-			oe.append(base_name, obs);
+			oe.append(BASE_REAL_NAME, obs);
 		}
 	}
 
@@ -233,7 +233,7 @@ void DataAssimilator::add_bases()
 	rnames = weights.get_real_names();
 	if (rnames.size() == 0)
 		return;
-	if (find(rnames.begin(), rnames.end(), base_name) != rnames.end())
+	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
 		message(1, "'base' realization already in weights ensemble, ignoring '++ies_include_base'");
 	}
@@ -256,7 +256,7 @@ void DataAssimilator::add_bases()
 		{
 			vector<string> prnames = pe.get_real_names();
 
-			int idx = find(prnames.begin(), prnames.end(), base_name) - prnames.begin();
+			int idx = find(prnames.begin(), prnames.end(), BASE_REAL_NAME) - prnames.begin();
 			//cout << idx << "," << rnames.size() << endl;
 			string oreal = rnames[idx];
 			stringstream ss;
@@ -267,9 +267,9 @@ void DataAssimilator::add_bases()
 			vector<string> drop;
 			drop.push_back(oreal);
 			weights.drop_rows(drop);
-			weights.append(base_name, wobs);
+			weights.append(BASE_REAL_NAME, wobs);
 			//rnames.insert(rnames.begin() + idx, string(base_name));
-			rnames[idx] = base_name;
+			rnames[idx] = BASE_REAL_NAME;
 			weights.reorder(rnames, vector<string>());
 		}
 		else
@@ -277,7 +277,7 @@ void DataAssimilator::add_bases()
 			message(1, "adding 'base' weight values to weights");
 
 
-			weights.append(base_name, wobs);
+			weights.append(BASE_REAL_NAME, wobs);
 		}
 	}
 }
@@ -4489,7 +4489,7 @@ void DataAssimilator::set_subset_idx(int size)
 	}
 	vector<string> pe_names = pe.get_real_names();
 
-	vector<string>::iterator bidx = find(pe_names.begin(), pe_names.end(), base_name);
+	vector<string>::iterator bidx = find(pe_names.begin(), pe_names.end(), BASE_REAL_NAME);
 	if (bidx != pe_names.end())
 	{
 
