@@ -2015,6 +2015,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 
 
 		// put the following in constraints.reduce_working_set(bool& unsuccessful) func
+		// call here constraints.reduce_working_set(false);
 		//----------
 		// see alg (16.3) of Nocedal and Wright (2006)
 
@@ -2055,8 +2056,6 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		// return alpha, go_to
 		//----------
 
-	// add blocking constraint to ws (during alpha trialing stage) --> constraints.expand_working_set() 
-	// violating_constraint (or largest violating one if multiple)
 
 	}
 	else  // if ((constraints is False) | ((constraints is True) & (len(self.working_set) == 0)));
@@ -2105,8 +2104,6 @@ Eigen::VectorXd SeqQuadProgram::fancy_solve_routine(const Parameters& _current_d
 	//	}
 
 
-	message(1, "SD", x.first);
-	message(1, "LM", x.second);
 	return x.first;  // search_d;
 }
 
@@ -2211,27 +2208,8 @@ bool SeqQuadProgram::solve_new()
 
 	}
 
-	// // alpha testing
-//if (search_dir != 0 or next_it == False);  // or break out of iteration here if True  // this should be accounted for in checks above
 
-//	// compute candidate dec var vector
-//	ss.str("");
-//	ss << "compute candidate step lengths and associated mean dec var vectors";
-//	string s = ss.str();
-//	message(1, s);
-//	throw_sqp_error("TODO");
-
-//	// some bound handling here
-//	// and drop subsequent (larger) alphas
-
-//	// evaluate
-//	ss.str("");
-//	ss << "evaluating model for alpha" << alpha;
-//	string s = ss.str();
-//	message(1, s);
-//	throw_sqp_error("TODO");
-
-//	// check that we need to have gradient at candidate at this stage
+//// check that we need to have the gradient at candidate, e.g., for Hessian purposes
 // if (use_ensemble_grad)
 //	{
 //		ss.str("");
@@ -2246,13 +2224,6 @@ bool SeqQuadProgram::solve_new()
 //		message(1, s);
 //		throw_sqp_error("TODO");
 //	}
-//	else  // finite differences
-//	{
-//		ss.str("");
-//		ss << "evaluate model at trial alphas";
-//		string s = ss.str();
-//		message(1, s);
-//		throw_sqp_error("TODO");
 
 	//	if (constraints); // and if active set size is > 1?
 	//	{
@@ -2316,7 +2287,7 @@ bool SeqQuadProgram::solve_new()
 
 	//TODO: add sqp option to save candidates
 
-	message(0, "running candidate decision variable ensembles");
+	message(0, "running candidate decision variable batch");
 	vector<double> passed_scale_vals = scale_vals;
 	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates, passed_scale_vals);
 
@@ -2325,6 +2296,9 @@ bool SeqQuadProgram::solve_new()
 	if (!success)
 	{
 		//// deal with unsuccessful iteration
+
+		// call constraints.reduce_working_set(true) here
+		
 		return false;
 		
 	}
@@ -2473,6 +2447,14 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		current_obs.update_without_clear(vnames, v);
 		last_best = oext;
 		message(0, "new best phi:", last_best);
+
+
+		// todo add constraint (largest violating constraint not already in working set) to working set
+		// is this the right place to do this? after accepting a particular candidate? 
+		// also can we adapt alpha_mult based on subset? using concept of blocking constraint here?
+		// take diff between vector of strings of constraints in working set and constraints with non-zero violation (return constraint idx from filter?)
+
+
 		return true;
 		
 	}
@@ -2484,7 +2466,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	
 	
 	
-	return true;
+	//return true;
 }
 
 void SeqQuadProgram::report_and_save_ensemble()
