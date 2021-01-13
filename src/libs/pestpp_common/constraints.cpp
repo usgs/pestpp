@@ -1294,6 +1294,43 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	return constraints_chance;
 }
 
+pair<Eigen::VectorXd, Eigen::VectorXd> Constraints::get_obs_resid_constraint_vectors(Parameters& _current_ctl_dv_vals, Observations& _constraints_sim, vector<string>& cnames)
+{
+	Eigen::VectorXd rhs(cnames.size()), resid(cnames.size());
+	Observations sim = _constraints_sim;
+	if (use_chance)
+		sim = get_chance_shifted_constraints(_constraints_sim);
+	string cname;
+	Observations obs = pest_scenario.get_ctl_observations();
+	for (int i=0;i<cnames.size();i++)
+	{
+		cname = cnames[i];
+		if (sim.find(cname) != sim.end())
+		{
+			rhs[i] = obs[cname];
+			resid[i] = obs[cname] - sim[cname];
+		}
+		else if (constraints_pi.find(cname) != constraints_pi.end())
+		{
+			resid[i] = constraints_pi.get_pi_rec(cname).calc_sim_and_resid(_current_ctl_dv_vals).second;
+			rhs[i] = constraints_pi.get_pi_rec(cname).get_obs_value();
+		}
+		throw_constraints_error("get_obs_resid_cosntraint_vectors(): constraint '" + cname + "' not found");
+	}
+	
+	return pair<Eigen::VectorXd, Eigen::VectorXd>(rhs,resid);
+}
+
+
+vector<string> Constraints::get_working_set_ineq_names(vector<string>& cnames)
+{
+	vector<string> names;
+	for (auto& name : cnames)
+		if (constraint_sense_map[name] != ConstraintSense::equal_to)
+			names.push_back(name);
+	return names;
+}
+
 ObservationEnsemble Constraints::get_stack_mean(map<string, ObservationEnsemble>& _stack_oe_map)
 {
 	int max_nrow = 0;

@@ -162,6 +162,10 @@ public:
 	double get_sum_of_violations(Parameters& pars, Observations& obs);
 	vector<double> get_sum_of_violations(ParameterEnsemble& pe, ObservationEnsemble& oe);
 
+	pair<Eigen::VectorXd, Eigen::VectorXd> get_obs_resid_constraint_vectors(Parameters& _current_ctl_dv_vals, Observations& _constraints_sim, vector<string>& cnames);
+
+	vector<string> get_working_set_ineq_names(vector<string>& cnames);
+
 private:
 	Pest& pest_scenario;
 	PerformanceLog& pfm;

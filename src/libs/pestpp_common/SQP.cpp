@@ -1937,6 +1937,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 	red_hess = Z.transpose() * red_hess * Z;
 	message(1, "red hess", red_hess);
 	bool cholesky = false;
+	Eigen::VectorXd p_z;
 	//try following, else ZTGZ is not pos-def
 	//if LBFGS
 	if (Z.size() > 0)
@@ -1968,14 +1969,20 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 			rhs = (-1. * X1 * p_y) - (Z.transpose() * curved_grad);
 			if (cholesky)
 			{
-				throw_sqp_error("cholesky decomp for null space KKT solve not implemented");  // todo JDub I noticed there is an built in cholesky decomposition?
-			    //l = cholesky(red_hess);
-			    //rhs2 = solve: l, rhs;
-			    //p_z = solve: l.transpose(), rhs2;
+				
+				throw_sqp_error("cholesky decomp for null space KKT solve not implemented");  // todo JDub I noticed there is an built in cholesky decomposition? 
+				//l = cholesky(red_hess);
+				//rhs2 = solve: l, rhs;
+				//p_z = solve: l.transpose(), rhs2;
+			    //jwhite: I was tinkering with adding cholesky as a cov matrix method but it old as!
+				//jwhite: I just hacked this in - not tested!
+				Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver;
+				Eigen::VectorXd rhs2 = solver.compute(red_hess.sparseView()).solve(rhs);
+				p_z = solver.solve(rhs2);
+				
 			}
 			else
 			{
-				Eigen::VectorXd p_z;
 				// try straight inverse here; will req rSVD
 				p_z = coeff.inverse() * rhs;
 				message(1, "p_z", p_z);  // tmp
@@ -2101,10 +2108,11 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		Eigen::VectorXd Ax, b;
 		Eigen::VectorXd constraint_diff(cnames.size());
 		//Ax = constraint_jco * _current_dv_values.get_data_eigen_vec(dv_names);
-		//b = constraints.get_obs_constraint_values(); // todo JDub
-		//message(1, "Ax - b", Ax - b);  // tmp
-		//constraint_diff = constraints.get_constraint_residual_vec();  // todo JDub or do we have something like this?
-		constraint_diff = constraint_diff.setZero();  // just tmp
+		
+		pair<Eigen::VectorXd, Eigen::VectorXd> p = constraints.get_obs_resid_constraint_vectors(current_ctl_dv_values,current_obs,cnames);
+		b = p.first;
+		constraint_diff = p.second;
+		
 		// throw error here if not all (approx) zero, i.e., not on constraint
 		if ((constraint_diff.array() != 0.0).any())  // make some level of forgiveness with a tolerance parameter here
 		{
@@ -2161,14 +2169,23 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		bool converged = false;  // todo approx step convergence test here? e.g. current search_d is within 5% of last itn and WS is same as last itn
 		bool unsuccessful = false;  // todo JDub pass unsuccessful arg to constraints.reduce_working_set() if accept is false 
 		// can also check convergence with orthogonality of p_y / p_z > 1.0 if using null_space KKT solve method.. later
+		//jwhite: what is the logic to reduce?  like pass names to get working set for constraints to skip?
 
 		bool search_d_approx_zero = false;
-		search_d_approx_zero = (search_d == Eigen::VectorXd::Zero(search_d.size()));  // todo JDub add small tolerance here?
+		//search_d_approx_zero = (search_d == Eigen::VectorXd::Zero(search_d.size()));  // todo JDub add small tolerance here?
+		double tol = 0.01; //todo: move this to a ++arg
+		for (int i=0;i<search_d.size();i++)
+			if (abs(search_d[i]) < tol)
+			{
+				search_d_approx_zero = true;
+				break;
+			}
+		
 
 		message(1, "cnames[0]:", cnames[0]);  // tmp
 		if (search_d_approx_zero | converged | unsuccessful)
 		{
-			vector<string> lm_ineq = constraint_mat.get_row_names();  // todo Jdub maybe add constraints.get_working_set_ineq() function? // lm sign only iterpret-able for ineq constraints in working set
+			vector<string> lm_ineq = constraints.get_working_set_ineq_names(cnames);  // todo Jdub maybe add constraints.get_working_set_ineq() function? // lm sign only iterpret-able for ineq constraints in working set
 			message(1, "lm_ineq:", lm_ineq);  // tmp
 			//if np.all(lm.loc[lm_ineq, ].value > 0.):  // todo JDub 
 			//{
@@ -2176,9 +2193,20 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 			//}
 			//else
 			//{
-			string to_drop = cnames[0];  // todo JDub get index of constraint with most negative lagrangian multiplier
-			// todo JDub update ws vector?
+			double lm_min = 0.0;
+			int idx;
+			for (int i = 0; i < cnames.size(); i++)
+			{
+				if ((lm[i] < 0.0) && (lm[i] < lm_min))
+				{
+					idx = i;
+					lm_min = lm[i];
+				}
+			}
+			string to_drop = cnames[idx];  // todo JDub get index of constraint with most negative lagrangian multiplier
+			cnames.erase(cnames.begin() + idx); // todo JDub update ws vector?
 			// todo JDub now we need to skip alpha testing for this iter and recalc search_d without this constraint... i moved to next iter in proto because it was cheap, probably want to go back to start of search_d computation?
+			// jwhite: will this process happen multiple times?  If so, we probably need to wrap this process in a "while true" loop
 			//}
 		}
 		else  // progress with this iter
