@@ -11,7 +11,7 @@ jobs:
     name: benchmarks
     runs-on: ubuntu-latest #${{ matrix.os }}
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest] 
         python-version: [3.8] # , 3.7, 3.6]

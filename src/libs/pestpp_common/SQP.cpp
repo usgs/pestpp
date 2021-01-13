@@ -1955,11 +1955,11 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 			}
 			else
 			{
-				throw_sqp_error("todo");
+				//throw_sqp_error("todo");
 				//p_z = solve: red_hess, rhs
 			}
 		}
-		else  // full hessian
+		else  // full hessian jwhite: below I see red_hess....
 		{
 			message(1, "using full hessian in KKT null space solve...");
 			Eigen::MatrixXd X1, coeff;
@@ -1970,7 +1970,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 			if (cholesky)
 			{
 				
-				throw_sqp_error("cholesky decomp for null space KKT solve not implemented");  // todo JDub I noticed there is an built in cholesky decomposition? 
+				//throw_sqp_error("cholesky decomp for null space KKT solve not implemented");  // todo JDub I noticed there is an built in cholesky decomposition? 
 				//l = cholesky(red_hess);
 				//rhs2 = solve: l, rhs;
 				//p_z = solve: l.transpose(), rhs2;
