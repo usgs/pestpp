@@ -2197,6 +2197,9 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 			for (int i = 0; i < cnames.size(); i++)
 			{
 				// todo JDub - need another if here such that we get the idx and lm_min for ineq constraints only
+				//jwhite: this is slow if heaps (1000+) in working_set_ineq_names - can swap to set<string> to be faster
+				if (find(working_set_ineq_names.begin(), working_set_ineq_names.end(), cnames[i]) == working_set_ineq_names.end())
+					continue;
 				if ((lm[i] < 0.0) && (lm[i] < lm_min))
 				{
 					idx = i;
