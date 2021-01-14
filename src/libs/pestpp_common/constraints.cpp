@@ -1315,7 +1315,10 @@ pair<Eigen::VectorXd, Eigen::VectorXd> Constraints::get_obs_resid_constraint_vec
 			resid[i] = constraints_pi.get_pi_rec(cname).calc_sim_and_resid(_current_ctl_dv_vals).second;
 			rhs[i] = constraints_pi.get_pi_rec(cname).get_obs_value();
 		}
-		throw_constraints_error("get_obs_resid_cosntraint_vectors(): constraint '" + cname + "' not found");
+		else // todo Jdub else needed here right?
+		{
+			throw_constraints_error("get_obs_resid_cosntraint_vectors(): constraint '" + cname + "' not found");
+		}
 	}
 	
 	return pair<Eigen::VectorXd, Eigen::VectorXd>(rhs,resid);

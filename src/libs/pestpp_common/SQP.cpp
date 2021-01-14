@@ -1878,6 +1878,8 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::MatrixXd& G, Eigen::MatrixXd& constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>& cnames)
 {
 
+	Eigen::VectorXd search_d, lm;
+	
 	// check: A full rank
 	// check: reduced hessian ZTGZ is non pos def
 
@@ -1925,15 +1927,12 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 	//try straight inverse here; else another rSVD
 	p_y = coeff.inverse() * rhs;
 	message(1, "p_y", p_y);  // tmp
-	// should assert here for p_y == 0 if sum_viol == 0
+	// todo assert here for p_y == 0 if sum_viol == 0
 
 	// solve p_null_space
-	bool reduced_hessian = false; // for now
+	bool simplified_null_space_approach = false; // see Nocedal and Wright (2006) pg 538-9
 	message(1, "hess", G);
-	//Covariance red_hess = G;
 	Eigen::MatrixXd red_hess = G;
-	message(1, "red hess", red_hess);
-	message(1, "ZT", Z.transpose());
 	red_hess = Z.transpose() * red_hess * Z;
 	message(1, "red hess", red_hess);
 	bool cholesky = false;
@@ -1943,15 +1942,14 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 	if (Z.size() > 0)
 	{
 		// check use of grads or curved grads below (want second order)?
-		if (reduced_hessian)
+		if (simplified_null_space_approach)
 		{
-			message(1, "using reduced hessian in KKT null space solve...");
-			throw_sqp_error("reduced hessian in KKT null space solve not implemented");
+			message(1, "using simplified approach in KKT null space solve...");
 			//rhs = -1. * Z.transpose() * curved_grad;
 			// simplify by removing cross term (or ``partial hessian'') matrix (zTgy), which is approp when approximating hessian (zTgz) (as p_y goes to zero faster than p_z)
 			if (cholesky)
 			{
-				throw_sqp_error("cholesky decomp for null space KKT solve not implemented");
+				// todo throw_sqp_error("cholesky decomp for null space KKT solve not implemented");
 			}
 			else
 			{
@@ -1959,13 +1957,14 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 				//p_z = solve: red_hess, rhs
 			}
 		}
-		else  // full hessian jwhite: below I see red_hess....
+		else
 		{
-			message(1, "using full hessian in KKT null space solve...");
+			message(1, "carrying out KKT null space solve...");
 			Eigen::MatrixXd X1, coeff;
 			Eigen::VectorXd rhs;
 			coeff = red_hess;
 			X1 = Z.transpose() * G * Y;
+			message(1, "larger cross-term matrix", X1);
 			rhs = (-1. * X1 * p_y) - (Z.transpose() * curved_grad);
 			if (cholesky)
 			{
@@ -1983,43 +1982,50 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 			}
 			else
 			{
-				// try straight inverse here; will req rSVD
+				// try straight inverse here
+				// todo rSVD here instead?
 				p_z = coeff.inverse() * rhs;
 				message(1, "p_z", p_z);  // tmp
+
 			}
 		}
 	}
 	else
 	{
-		message(1, "here");  // tmp
+		throw_sqp_error("zero null space dimensionality wrt active constraints");  // tmp
 	}
-	//else zero null space dimensionality wrt active constraints
 	//else not sure can be done
 
 	// combine to make total direction
-	// p = Y * p_y + Z * p_z
+	message(1, "combining range and null space components of search direction");  // tmp
+	search_d = Y * p_y + Z * p_z;
+	message(1, "SD", search_d);  // tmp
+	if (search_d.size() != curved_grad.size())
+	{
+		throw_sqp_error("search direction vector computation error (in null space KKT solve method)!");
+	}
 
+	
 	// compute lagrangian multipliers
 	//if LBFGS
-	if (reduced_hessian)
+	message(1, "computing lagrangian multipliers...");  // tmp
+	if (simplified_null_space_approach)
 	{
-		// Nocedal and Wright pg. 539
-		throw_sqp_error("reduced hessian in KKT null space solve not implemented");
-		// simplify by dropping dependency of lm on hess (considered appropr given p converges to zero whereas grad does not..
+		// simplify by dropping dependency of lm on hess (considered appropr given p converges to zero whereas grad does not..; Nocedal and Wright pg. 539)
+		// throw_sqp_error("reduced hessian in KKT null space solve not implemented");
+		// todo
+		// lm = solve: constraint_jco * constraint_jco.transpose(), constraint_jco * curved_grad
 	}
-	else  // full hessian
+	else
 	{
 		// Nocedal and Wright pg. 457 and 538
-		throw_sqp_error("todo");
-		//rhs = Y.transpose() * curved_grad
-		//lm = solve: (AY).transpose(), rhs
+		rhs = Y.transpose() * curved_grad;
+		coeff = (constraint_jco * Y).transpose();
+		lm = coeff.inverse() * rhs;
+		message(1, "lm", lm);  // tmp
+
 	}
 	//else not sure can be done
-
-
-	Eigen::VectorXd search_d, lm;
-	//search_d = x.head(dv_names.size());  // add rigor here or at least asserts to ensure operating on correct elements
-	//lm = x.tail(x.size() - dv_names.size());  // add rigor here or at least asserts to ensure operating on correct elements
 
 
 	return pair<Eigen::VectorXd, Eigen::VectorXd>(search_d, lm);
@@ -2107,14 +2113,14 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		// todo only for constraints in WS only
 		Eigen::VectorXd Ax, b;
 		Eigen::VectorXd constraint_diff(cnames.size());
-		//Ax = constraint_jco * _current_dv_values.get_data_eigen_vec(dv_names);
 		
-		pair<Eigen::VectorXd, Eigen::VectorXd> p = constraints.get_obs_resid_constraint_vectors(current_ctl_dv_values,current_obs,cnames);
+		pair<Eigen::VectorXd, Eigen::VectorXd> p = constraints.get_obs_resid_constraint_vectors(current_ctl_dv_values, current_obs, cnames);
 		b = p.first;
 		constraint_diff = p.second;
+		message(1, "constraint diff:", constraint_diff);  // tmp
 		
-		// throw error here if not all (approx) zero, i.e., not on constraint
-		if ((constraint_diff.array() != 0.0).any())  // make some level of forgiveness with a tolerance parameter here
+		// throw error here if not all on/near constraint
+		if ((constraint_diff.array() != 0.0).any())  // todo make some level of forgiveness with a tolerance parameter here
 		{
 			throw_sqp_error("not on constraint");  // better to pick this up elsewhere (before) anyway
 		}
@@ -2169,10 +2175,8 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		bool converged = false;  // todo approx step convergence test here? e.g. current search_d is within 5% of last itn and WS is same as last itn
 		bool unsuccessful = false;  // todo JDub pass unsuccessful arg to constraints.reduce_working_set() if accept is false 
 		// can also check convergence with orthogonality of p_y / p_z > 1.0 if using null_space KKT solve method.. later
-		//jwhite: what is the logic to reduce?  like pass names to get working set for constraints to skip?
 
 		bool search_d_approx_zero = false;
-		//search_d_approx_zero = (search_d == Eigen::VectorXd::Zero(search_d.size()));  // todo JDub add small tolerance here?
 		double tol = 0.01; //todo: move this to a ++arg
 		for (int i=0;i<search_d.size();i++)
 			if (abs(search_d[i]) < tol)
@@ -2181,32 +2185,39 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 				break;
 			}
 		
+		//search_d_approx_zero = true;  // tmp
 
-		message(1, "cnames[0]:", cnames[0]);  // tmp
 		if (search_d_approx_zero | converged | unsuccessful)
 		{
-			vector<string> lm_ineq = constraints.get_working_set_ineq_names(cnames);  // todo Jdub maybe add constraints.get_working_set_ineq() function? // lm sign only iterpret-able for ineq constraints in working set
-			message(1, "lm_ineq:", lm_ineq);  // tmp
-			//if np.all(lm.loc[lm_ineq, ].value > 0.):  // todo JDub 
-			//{
-			//	throw_sqp_error("optimal soln detected at solve EQP step!...");
-			//}
-			//else
-			//{
+			vector<string> working_set_ineq_names = constraints.get_working_set_ineq_names(cnames);  // lm sign only iterpret-able for ineq constraints in working set
+			message(1, "ineq constraints in working set:", working_set_ineq_names);  // tmp
+
 			double lm_min = 0.0;
 			int idx;
 			for (int i = 0; i < cnames.size(); i++)
 			{
+				// todo JDub - need another if here such that we get the idx and lm_min for ineq constraints only
 				if ((lm[i] < 0.0) && (lm[i] < lm_min))
 				{
 					idx = i;
 					lm_min = lm[i];
 				}
 			}
-			string to_drop = cnames[idx];  // todo JDub get index of constraint with most negative lagrangian multiplier
-			cnames.erase(cnames.begin() + idx); // todo JDub update ws vector?
+
+			if (lm_min == 0.0)
+			{
+				throw_sqp_error("optimal soln detected at solve EQP step (lagrangian multiplier for all ineq constraints in working set is non-neg)...");
+			}
+			message(1, "lm_min:", lm_min);  // tmp
+			message(1, "lm_min_idx:", cnames[idx]);  // tmp
+
+			string to_drop = cnames[idx];
+			cnames.erase(cnames.begin() + idx);
+			message(1, "cnames after dropping atttempting:", cnames);  // tmp
+
 			// todo JDub now we need to skip alpha testing for this iter and recalc search_d without this constraint... i moved to next iter in proto because it was cheap, probably want to go back to start of search_d computation?
 			// jwhite: will this process happen multiple times?  If so, we probably need to wrap this process in a "while true" loop
+			// mjk: as we discussed, the while true would be awesome!
 			//}
 		}
 		else  // progress with this iter
