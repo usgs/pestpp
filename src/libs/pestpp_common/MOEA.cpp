@@ -2782,8 +2782,6 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 			lin << "," << real_names[idx];
 		lin << endl;
 		new_reals.row(i) = y;
-		cout << x << endl;
-		cout << y << endl;
 		i++;
 	}
 
