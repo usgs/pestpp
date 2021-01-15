@@ -1740,7 +1740,7 @@ Eigen::MatrixXd IterEnsembleSmoother::get_Am(const vector<string> &real_names, c
 
 	rsvd.solve_ip(par_diff, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
 	par_diff.resize(0, 0);
-	Eigen::MatrixXd temp = s.inverse().asDiagonal();
+	Eigen::MatrixXd temp = s.asDiagonal().inverse();
 	Eigen::MatrixXd Am = U * temp;
 	return Am;
 }
