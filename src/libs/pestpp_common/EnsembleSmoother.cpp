@@ -1234,6 +1234,15 @@ void IterEnsembleSmoother::initialize()
 		}
 	}
 
+	string obs_restart_csv = pest_scenario.get_pestpp_options().get_ies_obs_restart_csv();
+	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
+	// if no restart and a pe was passed and no oe was passed, reset here before adding base
+	if ((obs_restart_csv.size() == 0) && (!pe_drawn) && (oe_drawn))
+	{
+		vector<string> rnames = pe.get_real_names();
+		oe.set_real_names(rnames);
+		message(2, "reset observation ensemble real names to parameter ensemble real names");
+	}
 
 	//need this here for Am calcs...
 	//message(1, "transforming parameter ensemble to numeric");
@@ -1310,8 +1319,6 @@ void IterEnsembleSmoother::initialize()
 	message(1, "saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
 
 
-	
-
 	if (pest_scenario.get_control_info().noptmax == -2)
 	{
 		message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
@@ -1379,8 +1386,7 @@ void IterEnsembleSmoother::initialize()
 
 	oe_org_real_names = oe.get_real_names();
 	pe_org_real_names = pe.get_real_names();
-	string obs_restart_csv = pest_scenario.get_pestpp_options().get_ies_obs_restart_csv();
-	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
+	
 
 	oe_base = oe; //copy
 	//reorder this for later...
