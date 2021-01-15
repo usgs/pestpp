@@ -1863,7 +1863,7 @@ void MOEA::initialize()
 		names = _pe.get_var_names();
 		pars.update(names, eigenvec_2_stlvec(_pe.get_real_vector(BASE_REAL_NAME)));
 		
-		constraints.mou_report(0, pars, obs, obs_obj_names, pi_obj_names);
+		constraints.mou_report(0, pars, obs, obs_obj_names, pi_obj_names, false);
 		return;
 	}
 	
@@ -1999,7 +1999,7 @@ void MOEA::initialize()
 		names = _pe.get_var_names();
 		pars.update(names, eigenvec_2_stlvec(_pe.get_real_vector("mean")));
 
-		constraints.mou_report(0, pars, obs, obs_obj_names, pi_obj_names);
+		constraints.mou_report(0, pars, obs, obs_obj_names, pi_obj_names, false);
 		return;
 	}
 

@@ -1697,6 +1697,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 	map<string, double> infeas_dist;
 	stringstream ss;
 	ss.str("");
+	int obs_infeas = 0, pi_infeas = 0;
 	if (skip_names.size() < ctl_ord_obs_constraint_names.size())
 	{
 		int nsize = 20;
@@ -1713,6 +1714,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 		
 
 		infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
+		obs_infeas = infeas_dist.size();
 		for (int i = 0; i < num_obs_constraints(); ++i)
 		{
 			string name = ctl_ord_obs_constraint_names[i];
@@ -1749,6 +1751,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 
 		//report prior information constraints
 		infeas_dist = get_unsatified_pi_constraints(current_pars);
+		pi_infeas = infeas_dist.size();
 		ss << endl << "  prior information constraint information at iteration " << iter << endl;
 		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
@@ -1776,7 +1779,8 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 	f_rec << ss.str();
 	if (echo)
 		cout << ss.str();
-
+	else
+		cout << "iteration " << iter << ": " << obs_infeas << " obs constraints and " << pi_infeas << " prior info constraints not satisfied, see rec file for listing" << endl;
 	return;
 }
 
