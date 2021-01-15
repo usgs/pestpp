@@ -2368,10 +2368,10 @@ void DataAssimilator::da_upate()
 	string da_method = da_ctl_params.get_svalue("DA_TYPE");
 	message(0, "Assimilation Method :", da_method);
 	int user_noptmax = pest_scenario.get_control_info().noptmax;
-	//int solution_iterations;
+	
 	if (da_type == "MDA")
 	{
-		// make sure that noptmax and number of inflations are consistent. Allways noptmax will be hounred. 
+		// make sure that noptmax and number of inflations are consistent. always noptmax will be respected. 
 		if (user_noptmax > infl_facs.size())
 		{
 			int beta_diff = user_noptmax - infl_facs.size();
@@ -3104,7 +3104,7 @@ ParameterEnsemble DataAssimilator::calc_localized_upgrade_threaded(double cur_la
 
 		for (int i = 0; i < num_threads; i++)
 		{
-			//threads.push_back(thread(&LocalUpgradeThread_da::work, &worker, i, iter, cur_lam));
+			//threads.push_back(thread(&LocalUpgradeThread::work, &worker, i, iter, cur_lam));
 
 			threads.push_back(thread(upgrade_thread_function, i, iter, cur_lam, std::ref(worker), std::ref(exception_ptrs[i])));
 
@@ -3112,22 +3112,58 @@ ParameterEnsemble DataAssimilator::calc_localized_upgrade_threaded(double cur_la
 		message(2, "waiting to join threads");
 		//for (auto &t : threads)
 		//	t.join();
+		ss.str("");
+		int num_exp = 0;
+
 		for (int i = 0; i < num_threads; ++i)
 		{
+			bool found = false;
 			if (exception_ptrs[i])
 			{
+				found = true;
+				num_exp++;
 				try
 				{
 					rethrow_exception(exception_ptrs[i]);
 				}
 				catch (const std::exception & e)
 				{
-					ss.str("");
-					ss << "thread " << i << "raised an exception: " << e.what();
-					throw runtime_error(ss.str());
+					//ss.str("");
+					ss << " thread " << i << "raised an exception: " << e.what();
+					//throw runtime_error(ss.str());
+				}
+				catch (...)
+				{
+					//ss.str("");
+					ss << " thread " << i << "raised an exception";
+					//throw runtime_error(ss.str());
 				}
 			}
 			threads[i].join();
+			if ((exception_ptrs[i]) && (!found))
+			{
+				num_exp++;
+				try
+				{
+					rethrow_exception(exception_ptrs[i]);
+				}
+				catch (const std::exception & e)
+				{
+					//ss.str("");
+					ss << " thread " << i << "raised an exception: " << e.what();
+					//throw runtime_error(ss.str());
+				}
+				catch (...)
+				{
+					//ss.str("");
+					ss << " thread " << i << "raised an exception: ";
+					//throw runtime_error(ss.str());
+				}
+			}
+		}
+		if (num_exp > 0)
+		{
+			throw runtime_error(ss.str());
 		}
 		message(2, "threaded localized upgrade calculation done");
 	}
@@ -3534,7 +3570,14 @@ bool DataAssimilator::solve_new_da()
 		message(2, "see .log file for more details");
 
 		// Here is the update .....
-		pe_upgrade = calc_kf_upgrade(cur_lam, loc_map);
+		if (0)
+		{
+			pe_upgrade = calc_kf_upgrade(cur_lam, loc_map);
+		}
+		else
+		{
+			pe_upgrade = calc_localized_upgrade_threaded(cur_lam, loc_map);
+		}
 		
 
 		vector<double> scale_facs;

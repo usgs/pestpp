@@ -298,6 +298,7 @@ int main(int argc, char* argv[])
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 		{
 			cout << endl;
+
 			
 			cout << " >>>> Checking data in cycle " << *icycle << endl;		
 			fout_rec << endl;
