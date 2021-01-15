@@ -97,6 +97,7 @@ private:
 	vector<string>* obs_obj_names_ptr;
 	vector<string>* pi_obj_names_ptr;
 	map<string, double>* obj_dir_mult_ptr;
+	set<string> duplicates;
 
 	map<string, map<string, double>> feas_member_struct;
 	map<int, vector<string>> front_map;

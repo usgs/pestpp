@@ -152,7 +152,7 @@ bool ParetoObjectives::compare_two_nsga(string& first, string& second)
 void ParetoObjectives::drop_duplicates(map<string, map<string, double>>& _member_struct)
 {
 	performance_log->log_event("checking for duplicate solutions");
-	set<string> duplicates;
+	duplicates.clear();
 	
 
 	//performance_log->log_event("checking for duplicate solutions");
@@ -464,8 +464,9 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 
 	//now add the infeasible members
 	//if there is atleast one feasible nondom solution, then add the infeasible ones to dom solutions
-	if (infeas.size() < op.shape().first)
+	if (infeas.size() < op.shape().first - duplicates.size())
 	{
+
 		if (nondom_crowd_ordered.size() > 0)
 			for (auto inf : infeas_ordered)
 				dom_crowd_ordered.push_back(inf);
@@ -473,8 +474,20 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 			for (auto inf : infeas_ordered)
 				nondom_crowd_ordered.push_back(inf);
 	}
+	if (infeas.size() == member_struct.size())
+	{
+		if (infeas.size() != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
+		{
+			ss.str("");
+			ss << "ParetoObjectives::get_nsga2_pareto_dominance() internal error: final sorted population size: " <<
+				nondom_crowd_ordered.size() + dom_crowd_ordered.size() << " != member_struct size: " << member_struct.size();
+			cout << ss.str();
+			throw runtime_error(ss.str());
+		}
 
-	if (infeas.size() + member_struct.size() != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
+
+	}
+	else if (infeas.size() + member_struct.size() != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
 	{
 		ss.str("");
 		ss << "ParetoObjectives::get_nsga2_pareto_dominance() internal error: final sorted population size: " <<
@@ -2769,6 +2782,8 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 			lin << "," << real_names[idx];
 		lin << endl;
 		new_reals.row(i) = y;
+		cout << x << endl;
+		cout << y << endl;
 		i++;
 	}
 
