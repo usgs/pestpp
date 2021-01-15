@@ -67,6 +67,46 @@ private:
 };
 
 
+struct FilterRec
+{
+	double obj_val;
+	double viol_val;
+	int iter;
+	double alpha;
+};
+
+template<>
+struct std::less<FilterRec>
+{
+	bool operator()(const FilterRec& k1, const FilterRec& k2) const
+	{
+		if ((k1.obj_val < k2.obj_val) && (k1.viol_val < k2.viol_val))
+			return true;
+		return false;
+
+	}
+};
+
+class SqpFilter
+{
+public:
+	SqpFilter(bool _minimize=true,double _obj_tol = 0.01, double _viol_tol = 0.01) {
+		minimize = _minimize; obj_tol = _obj_tol; viol_tol = _viol_tol;
+	}
+	bool accept(double obj_val, double violation_val,int iter=0,double alpha=-1.0);
+	bool update(double obj_val, double violation_val, int iter=0,double alpha=-1.0);
+
+private:
+	bool minimize;
+	double obj_tol;
+	double viol_tol;
+
+	set<FilterRec> obj_viol_pairs;
+
+	bool first_dominates_second(const FilterRec& first, const FilterRec& second);
+	
+};
+
 class SeqQuadProgram
 {
 public:
@@ -98,19 +138,19 @@ private:
 	string obj_obs;
 	string obj_sense;
 	bool use_obj_obs;
+	bool use_obj_pi;
 	map<string, double> obj_func_coef_map;
-
-	string base_name = "BASE"; //this is also defined in Ensemble
 
 	int num_threads;
 
+	double eigthresh;
+	vector<double> scale_vals;
 	set<string> pp_args;
 
-	int iter,subset_size;
-	bool use_subset;
+	int iter;
 
-	double last_best_mean,last_best_std;
-	vector<double> best_mean_phis;
+	double last_best;
+	vector<double> best_phis;
 	double best_phi_yet;
 
 	int warn_min_reals, error_min_reals;
@@ -121,6 +161,10 @@ private:
 	//vector<int> subset_idxs;
 	
 	Parameters current_ctl_dv_values;
+	Observations current_obs;
+
+	Parameters current_grad_vector;
+	map<int, Parameters> grad_vector_map;
 
 	ParameterEnsemble dv, dv_base;
 	ObservationEnsemble oe, oe_base;
@@ -135,22 +179,48 @@ private:
 
 	bool use_ensemble_grad;
 
+	Jacobian_1to1 jco;
+
+	//store the hessian as a cov since it is symmetric...
+	Covariance hessian;
+
+	SqpFilter filter;
+
 	void prep_4_ensemble_grad();
 	void prep_4_fd_grad();
 
-	Jacobian_1to1 jco;
+	bool update_hessian_and_grad_vector();
 
-	//bool solve_old();
 	bool solve_new();
 
-	Eigen::VectorXd calc_gradient_vector(const Parameters& _current_dv_);
+	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, vector<double>& alpha_vals);
 
-	Parameters fancy_solve_routine(double scale_val, const Parameters& _current_dv_);
+	Parameters calc_gradient_vector(const Parameters& _current_dv_);
+
+	Eigen::VectorXd get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
+	
+	double get_obj_value(Parameters& _current_ctl_dv_vals, Observations& _current_obs);
+	map<string, double> get_obj_map(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
+
+	//Eigen::VectorXd calc_search_direction_vector(const Parameters& _current_dv_, Eigen::VectorXd &grad_vector);
+	pair<Eigen::VectorXd, Eigen::VectorXd> calc_search_direction_vector(const Parameters& _current_dv_, Eigen::VectorXd& grad_vector);
+
+	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_direct(Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>& cnames);
+	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_null_space(Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>& cnames);
+
+	//Parameters fancy_solve_routine(double scale_val, const Parameters& _current_dv_);
+	Eigen::VectorXd fancy_solve_routine(const Parameters& _current_dv_);
 
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
 	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates, vector<double> &scale_vals);
-	
-	void report_and_save();
+
+	void run_jacobian(Parameters& _current_dv_vals,Observations& _current_obs, bool init_obs);
+
+	void make_gradient_runs(Parameters& _current_dv_vals, Observations& _current_obs);
+
+	void report_and_save_ensemble();
+	void report_and_save_ensemble(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
+	void save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool save_base=true);
 	void save_mat(string prefix, Eigen::MatrixXd &mat);
 	bool initialize_dv(Covariance &cov);
 	//bool initialize_oe(Covariance &cov);

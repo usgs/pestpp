@@ -954,7 +954,7 @@ void ParChangeSummarizer::write_to_csv(string& filename)
 	f << "group,mean_change,std_change,num_at_near_bounds,percent_at_near_bounds" << endl;
 	for (auto grp_name : base_pe_ptr->get_pest_scenario_ptr()->get_ctl_ordered_par_group_names())
 	{
-		f << pest_utils::lower_cp(grp_name) << "," << mean_change[grp_name] << "," << std_change[grp_name] << ",";
+		f << pest_utils::lower_cp(grp_name) << "," << mean_change[grp_name]*100.0 << "," << std_change[grp_name]*100.0 << ",";
 		f << num_at_bounds[grp_name] << "," << percent_at_bounds[grp_name] << endl;
 	}
 	f.close();
@@ -1029,45 +1029,50 @@ void ParChangeSummarizer::update(ParameterEnsemble& pe)
 }
 
 
-void save_base_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
-	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter)
+pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
+	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter,string tag)
 {
 	stringstream ss;
 	map<string, int> vmap = pe.get_real_map();
-	if (vmap.find(BASE_REAL_NAME) != vmap.end())
+	Parameters pars;
+	Observations obs;
+	if (vmap.find(tag) != vmap.end())
 	{
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
 		Parameters pars;
-		pars.update(pe.get_var_names(), eigenvec_2_stlvec(pe.get_real_vector(BASE_REAL_NAME)));
+		pars.update(pe.get_var_names(), eigenvec_2_stlvec(pe.get_real_vector(tag)));
 		if (pe.get_trans_status() == ParameterEnsemble::transStatus::NUM)
 			pts.numeric2ctl_ip(pars);
 		// save parameters to .par file
 		if (iter >= 0)
 			ss << iter << ".";
-		ss << "base.par";
+		ss << pest_utils::lower_cp(tag) << ".par";
 		output_file_writer.write_par(file_manager.open_ofile_ext(ss.str()), pars, *(pts.get_offset_ptr()),
 			*(pts.get_scale_ptr()));
 		file_manager.close_file("par");
 
 		vmap = oe.get_real_map();
-		if (vmap.find(BASE_REAL_NAME) == vmap.end())
+		if (vmap.find(tag) == vmap.end())
 		{
 			//message(2, "unable to find 'BASE' realization in obs ensemble for saving .base.rei file, continuing...");
 		}
 		else
 		{
 			Observations obs;
-			obs.update(oe.get_var_names(), eigenvec_2_stlvec(oe.get_real_vector(BASE_REAL_NAME)));
+			obs.update(oe.get_var_names(), eigenvec_2_stlvec(oe.get_real_vector(tag)));
 			ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
 			// save new residuals to .rei file
 			ss.str("");
 			if (iter >= 0)
 				ss << iter << ".";
-			ss << "base.rei";
+			ss << pest_utils::lower_cp(tag) <<  ".rei";
 			output_file_writer.write_rei(file_manager.open_ofile_ext(ss.str()), iter,
 				pest_scenario.get_ctl_observations(), obs, obj_func, pars);
 		}
+		cout << "saved par and rei files for realization " << tag << " for iteration " << iter << endl;
 	}
+	
+	return pair<Parameters, Observations>(pars, obs);
 
 }
 

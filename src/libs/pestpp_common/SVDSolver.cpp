@@ -585,6 +585,7 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 	const Parameters &base_run_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
 	Pest::LimitType &limit_type)
 {
+	stringstream ss;
 	Parameters upgrade_ctl_del_pars;
 	Parameters grad_ctl_del_pars;
 	int num_upgrade_out_grad_in;
@@ -616,7 +617,17 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 	performance_log->log_event("limiting out of bounds pars");
 	Parameters notfrozen_upgrade_active_ctl_pars = upgrade_active_ctl_pars;
 	notfrozen_upgrade_active_ctl_pars.erase(prev_frozen_active_ctl_pars.get_keys());
-	pest_scenario.enforce_par_limits(performance_log, notfrozen_upgrade_active_ctl_pars, base_run_active_ctl_pars, true, true);
+	pair<string,double> ctl_info = pest_scenario.enforce_par_limits(performance_log, notfrozen_upgrade_active_ctl_pars, base_run_active_ctl_pars, true, true);
+	
+	ss.str("");
+	ss << "change limit/bound enforement for lambda " << i_lambda << ": " << ctl_info.first << ", scaling factor: " << ctl_info.second;
+	performance_log->log_event(ss.str());
+	if (ctl_info.second < 0.01)
+	{
+		file_manager.rec_ofstream() << "WARNING: change limit/bound enforcement for lambda " << i_lambda << "resulted in less than 1% original upgrade vector length" << endl;
+		cout << "WARNING: change limit/bound enforcement for lambda " << i_lambda << "resulted in less than 1% original upgrade vector length, see rec file for details" << endl;
+		file_manager.rec_ofstream() << ss.str() << endl;
+	}
 	upgrade_active_ctl_pars = notfrozen_upgrade_active_ctl_pars;
 	for (auto p : prev_frozen_active_ctl_pars)
 		upgrade_active_ctl_pars[p.first] = p.second;

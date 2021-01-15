@@ -120,8 +120,6 @@ private:
 	Covariance parcov, obscov;
 	double reg_factor;
 
-	string base_name = "BASE"; //this is also defined in Ensemble
-
 	bool use_localizer;
 	Localizer localizer;
 

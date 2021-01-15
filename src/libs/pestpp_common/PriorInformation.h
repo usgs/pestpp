@@ -78,7 +78,7 @@ public:
 	PriorInformation::const_iterator end() const {return prior_info_map.end();}
 	PriorInformation::const_iterator find(const std::string &key) const {return  prior_info_map.find(key);}
 	PriorInformation::iterator find(const std::string &key) {return  prior_info_map.find(key);}
-	PriorInformationRec get_pi_rec_ptr(std::string name)const { return prior_info_map.at(name); }
+	PriorInformationRec get_pi_rec(std::string name)const { return prior_info_map.at(name); }
 	size_t size() const {return prior_info_map.size();}
 	int get_nnz_pi() const;
 	std::vector<std::string> get_keys() const;

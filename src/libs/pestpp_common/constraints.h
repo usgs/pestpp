@@ -77,6 +77,7 @@ public:
 	void mou_report(int iter, ParameterEnsemble& pe, ObservationEnsemble& oe, const vector<string>& obs_obj_names,
 		const vector<string>& pi_obj_names, bool echo = true);
 
+	void sqp_report(int iter, Parameters& current_pars, Observations& current_obs, bool echo = true);
 
 	//queue up chance related runs
 	void add_runs(int iter, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr);
@@ -109,7 +110,13 @@ public:
 	//get maps of obs and pi constraints that are not satified - the value is the distance to cosntraint RHS
 	map<string, double> get_unsatified_pi_constraints(Parameters& par_and_dec_vars, double tol=0.0);
 	map<string, double> get_unsatified_obs_constraints(Observations& constraints_sim, double tol=0.0, bool do_shift = true);
-	
+	map<string, double> get_constraint_map(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift);
+
+	Mat get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& jco, bool do_shift, double working_set_tol = 0.1);
+	Mat get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, double working_set_tol = 0.1);
+
+	map<string, map<string, double>> get_ensemble_violations_map(ParameterEnsemble& pe, ObservationEnsemble& oe);
+
 	//get the number of non-zero Prior info constraint elements
 	int get_num_nz_pi_constraint_elements();
 	
@@ -136,6 +143,7 @@ public:
 	vector<string> get_nz_obs_names() { return nz_obs_names; }
 	vector<string> get_pi_constraint_names() { return ctl_ord_pi_constraint_names; }
 	vector<string> get_adj_par_names() { return adj_par_names; }
+	vector<string> get_constraint_names() { vector<string> names = ctl_ord_obs_constraint_names; names.insert(names.end(), ctl_ord_pi_constraint_names.begin(), ctl_ord_pi_constraint_names.end()); return names; }
 
 	//decide whether it is time to update the chance constraints
 	bool should_update_chance(int iter);
@@ -150,6 +158,13 @@ public:
 	Observations get_chance_shifted_constraints(Observations& _constraints_sim, double _risk);
 
 	ObservationEnsemble get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe, string risk_obj = string());
+
+	double get_sum_of_violations(Parameters& pars, Observations& obs);
+	vector<double> get_sum_of_violations(ParameterEnsemble& pe, ObservationEnsemble& oe);
+
+	pair<Eigen::VectorXd, Eigen::VectorXd> get_obs_resid_constraint_vectors(Parameters& _current_ctl_dv_vals, Observations& _constraints_sim, vector<string>& cnames);
+
+	vector<string> get_working_set_ineq_names(vector<string>& cnames);
 
 private:
 	Pest& pest_scenario;

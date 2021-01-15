@@ -165,6 +165,8 @@ private:
 
 	void zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov=true,bool update_oe_base=true);
 
+	void norm_map_report(map<string, double>& norm_map, string tag, double thres = 0.1);
+
 };
 
 #endif

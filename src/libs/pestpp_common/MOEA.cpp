@@ -95,7 +95,7 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 				pts.numeric2ctl_ip(pars);
 			for (auto obj_name : *pi_obj_names_ptr)
 			{
-				pi_res_sim = pi_ptr->get_pi_rec_ptr(obj_name).calc_sim_and_resid(pars);
+				pi_res_sim = pi_ptr->get_pi_rec(obj_name).calc_sim_and_resid(pars);
 				//account for dir mult here
 				_member_struct[real_name][obj_name] = pi_res_sim.first * obj_dir_mult_ptr->at(obj_name);
 			}
@@ -312,7 +312,7 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 				for (auto v : violations)
 				{
 					if (pi_obj_set.find(v.first) == pi_obj_set.end())
-						vsum += pow(v.second * pi->get_pi_rec_ptr(v.first).get_weight(),2);
+						vsum += pow(v.second * pi->get_pi_rec(v.first).get_weight(),2);
 				}
 				if (vsum > 0.0)
 				{
@@ -1114,7 +1114,7 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 		
 		for (auto pi_obj : pi_obj_names)
 		{
-			sim_res = prior_info_ptr->get_pi_rec_ptr(pi_obj).calc_sim_and_resid(pars);
+			sim_res = prior_info_ptr->get_pi_rec(pi_obj).calc_sim_and_resid(pars);
 			pi_vals[pi_obj].push_back(sim_res.first);
 		}
 	}
@@ -1331,6 +1331,7 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 
 vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance)
 {
+	run_mgr_ptr->reinitialize();
 	//queue up any chance related runs
 	if (allow_chance)
 		queue_chance_runs(_dp);
@@ -1482,6 +1483,8 @@ void MOEA::initialize()
 	else
 		throw_moea_error("'mou_mating_selector' type not recognized: " + mate + ", should be 'RANDOM' or 'TOURNAMENT'");
 
+
+
 	//reset the par bound PI augmentation since that option is just for simplex
 	ppo->set_opt_include_bnd_pi(false);
 
@@ -1557,6 +1560,8 @@ void MOEA::initialize()
 		dv_names = act_par_names;
 	}
 
+
+	message(1, "number of decision variables (see rec file for listing):", dv_names.size());
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
 
@@ -1566,6 +1571,7 @@ void MOEA::initialize()
 	{
 		//evaluate the chance constraints at every individual, very costly, but most robust
 		chancepoints = chancePoints::ALL;
+		message(1, "'opt_chance_points' = ALL, evaluting chance at all population members");
 	}
 	
 	else if (chance_points == "SINGLE")
@@ -1573,6 +1579,7 @@ void MOEA::initialize()
 		//evaluate the chance constraints only at the population member nearest the optimal tradeoff.
 		//much cheaper, but assumes linear coupling
 		chancepoints = chancePoints::SINGLE;
+		message(1, "'opt_chance_points' = SINGLE, evaluting chance at representative point");
 	}
 	else
 	{
@@ -1610,9 +1617,9 @@ void MOEA::initialize()
 		onames = pest_scenario.get_ctl_ordered_pi_names();
 		for (auto oname : onames)
 		{
-			if (pest_scenario.get_prior_info().get_pi_rec_ptr(oname).get_weight() == 0.0)
+			if (pest_scenario.get_prior_info().get_pi_rec(oname).get_weight() == 0.0)
 				continue;
-			sense = Constraints::get_sense_from_group_name(pest_scenario.get_prior_info().get_pi_rec_ptr(oname).get_group());
+			sense = Constraints::get_sense_from_group_name(pest_scenario.get_prior_info().get_pi_rec(oname).get_group());
 			if (sense.first == gt)
 			{
 				pi_obj_names.push_back(oname);
@@ -1665,7 +1672,7 @@ void MOEA::initialize()
 			}
 			else
 			{
-				sense = Constraints::get_sense_from_group_name(pest_scenario.get_prior_info().get_pi_rec_ptr(obj_name).get_group());
+				sense = Constraints::get_sense_from_group_name(pest_scenario.get_prior_info().get_pi_rec(obj_name).get_group());
 				if ((sense.first != gt) && (sense.first != lt))
 					err_sense.push_back(obj_name);
 				else
@@ -1808,7 +1815,7 @@ void MOEA::initialize()
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_adj_par_names());
 		_pe.set_trans_status(ParameterEnsemble::transStatus::NUM);
-		_pe.append("BASE", pars);
+		_pe.append(BASE_REAL_NAME, pars);
 		string par_csv = file_manager.get_base_filename() + ".par.csv";
 		//message(1, "saving parameter values to ", par_csv);
 		//_pe.to_csv(par_csv);
@@ -1816,7 +1823,7 @@ void MOEA::initialize()
 		pe_base.reorder(vector<string>(), act_par_names);
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
-		_oe.append("BASE", pest_scenario.get_ctl_observations());
+		_oe.append(BASE_REAL_NAME, pest_scenario.get_ctl_observations());
 		ObservationEnsemble oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
 		//initialize the phi handler
@@ -1847,7 +1854,7 @@ void MOEA::initialize()
 		message(0, "control file parameter phi report:");
 		ph.report(true);
 		ph.write(0, 1);
-		save_base_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1);
+		save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, BASE_REAL_NAME);
 
 		message(0, "control file parameter objective function summary: ");
 		obj_func_report(_pe, _oe);
@@ -1870,14 +1877,17 @@ void MOEA::initialize()
 		if (token == "DE")
 		{
 			gen_types.push_back(MouGenType::DE);
+			message(1, "using differential evolution generator");
 		}
 		else if (token == "SBX")
 		{
 			gen_types.push_back(MouGenType::SBX);
+			message(1, "using simulated binary cross over generator");
 		}
 		else if (token == "PM")
 		{
 			gen_types.push_back(MouGenType::PM);
+			message(1, "using polynomial mutation generator");
 		}
 		else
 		{
@@ -2667,8 +2677,6 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 
 		//only change dec vars
 		double dsum = 0.0;
-		if (i == 72)
-			cout << endl;
 		for(int idv=0;idv<dv_names.size();idv++)
 		{
 			ii = var_map[dv_names[idv]];
@@ -2702,7 +2710,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
 	
 	new_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
-	new_dp.enforce_limits(performance_log, false);
+	new_dp.enforce_bounds(performance_log, false);
 	return new_dp;
 }
 
@@ -2763,7 +2771,7 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
 	tmp_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
-	tmp_dp.enforce_limits(performance_log,false);
+	tmp_dp.enforce_bounds(performance_log,false);
 
 	return tmp_dp;
 }
@@ -2911,7 +2919,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 		gauss_mutation_ip(tmp_dp);
 	generate_pm_population(tmp_dp.shape().first, tmp_dp);
 	
-	tmp_dp.enforce_limits(performance_log,false);
+	tmp_dp.enforce_bounds(performance_log,false);
 	return tmp_dp;
 }
 

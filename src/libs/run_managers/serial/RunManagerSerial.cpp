@@ -60,9 +60,14 @@ void RunManagerSerial::run()
 	const vector<string> &obs_name_vec = file_stor.get_obs_name_vec();
 
 	stringstream message;
+	int nruns = get_outstanding_run_ids().size();
+	message.str("");
+	message << endl << endl << endl << "    ---  starting serial run manager for " << nruns << " runs ---    " << endl << endl << endl;
+	std::cout << message.str();
+
 	std::vector<double> obs_vec;
 	vector<int> run_id_vec;
-	int nruns = get_outstanding_run_ids().size();
+	
 	std::chrono::system_clock::time_point start_time_all = std::chrono::system_clock::now();
 	while (!(run_id_vec = get_outstanding_run_ids()).empty())
 	{

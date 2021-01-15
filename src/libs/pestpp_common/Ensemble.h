@@ -17,6 +17,7 @@
 
 
 const string BASE_REAL_NAME = "BASE";
+const string MEDIAN_CENTER_ON_NAME = "_MEDIAN_";
 
 class Ensemble
 {
@@ -143,13 +144,13 @@ public:
 	void set_zeros();
 	//ParameterEnsemble get_new(const vector<string> &_real_names, const vector<string> &_var_names);
 
-	//void from_csv(string file_name,const vector<string> &ordered_names);
-	void from_csv(string file_name);
-	void from_binary(string file_name);
+	void from_csv(string file_name, bool forgive = false);	
+	void from_binary(string file_name, bool forgive = false);
 
 	void from_eigen_mat(Eigen::MatrixXd mat, const vector<string> &_real_names, const vector<string> &_var_names,
 		transStatus _tstat = transStatus::NUM);
-	void enforce_limits(PerformanceLog* plog, bool enforce_chglim);
+	map<string,double>  enforce_bounds(PerformanceLog* plog, bool shrink);
+	map<string,double> enforce_change_limits_and_bounds(PerformanceLog* plog, ParameterEnsemble& other);
 	void to_csv(string file_name);
 	void to_csv_by_reals(ofstream &csv, bool write_header=true);
 	void to_csv_by_vars(ofstream &csv, bool write_header=true);
@@ -161,10 +162,11 @@ public:
 	void set_pest_scenario(Pest *_pest_scenario);
 	map<int,int> add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs=vector<int>(),int da_cycle=NetPackage::NULL_DA_CYCLE);
 
-	void draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
 	void draw_uniform(int num_reals, vector<string> par_names, PerformanceLog* plog, int level, ofstream& frec);
+	map<string,double> draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
 	Covariance get_diagonal_cov_matrix();
 	void to_binary(string filename);
+	void clear_fixed_map() { fixed_map.clear(); fixed_names.clear(); }
 
 
 private:

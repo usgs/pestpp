@@ -626,7 +626,7 @@ CoinPackedMatrix sequentialLP::jacobian_to_coinpackedmatrix()
 	PriorInformation constraints_pi = constraints.get_pi_constraints();
 	for (auto &pi_name : constraints.get_pi_constraint_names())
 	{
-		for (auto &pi_factor : constraints_pi.get_pi_rec_ptr(pi_name).get_atom_factors())
+		for (auto &pi_factor : constraints_pi.get_pi_rec(pi_name).get_atom_factors())
 		{
 			jcol = find(start, end, pi_factor.first) - start;
 			row_idx[elem_count] = irow;
