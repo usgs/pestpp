@@ -41,7 +41,7 @@ int main(int argc, char* argv[])
 #endif
 		string version = PESTPP_VERSION;
 		cout << endl << endl;
-		cout << "             pestpp-mou: multi-objective optimization with uncertainty for PEST++ datasets" << endl << endl;
+		cout << "             pestpp-mou: multi-objective optimization under uncertainty" << endl << endl;
 		//cout << "                     for PEST(++) datasets " << endl << endl;
 		cout << "                   by the PEST++ development team" << endl;
 		cout << endl << endl << "version: " << version << endl;
@@ -144,7 +144,7 @@ int main(int argc, char* argv[])
 
 		if (!restart_flag || save_restart_rec_header)
 		{
-			fout_rec << "              pestpp-mou: multi-objective optimization with uncertainty" << endl;
+			fout_rec << "              pestpp-mou: multi-objective optimization under uncertainty" << endl;
 			fout_rec << "                         by the PEST++ developement team" << endl << endl << endl;
 			fout_rec << endl;
 			fout_rec << endl << endl << "version: " << version << endl;

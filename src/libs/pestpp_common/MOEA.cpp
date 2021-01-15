@@ -1484,7 +1484,6 @@ void MOEA::initialize()
 		throw_moea_error("'mou_mating_selector' type not recognized: " + mate + ", should be 'RANDOM' or 'TOURNAMENT'");
 
 
-
 	//reset the par bound PI augmentation since that option is just for simplex
 	ppo->set_opt_include_bnd_pi(false);
 
@@ -1561,7 +1560,7 @@ void MOEA::initialize()
 	}
 
 
-	message(1, "number of decision variables (see rec file for listing):", dv_names.size());
+	message(1, "number of decision variables: ", dv_names.size());
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
 
@@ -1936,6 +1935,72 @@ void MOEA::initialize()
 	{
 		string message = e.what();
 		throw_moea_error("error in obs population: " + message);
+	}
+
+	if (pest_scenario.get_control_info().noptmax == -2)
+	{
+		message(0, "'noptmax'=-2, running mean parameter/decision variable ensemble values and quitting");
+		message(1, "calculating mean parameter values");
+		
+		Parameters pars;
+		vector<double> mv = dp.get_mean_stl_var_vector();
+		pars.update(dp.get_var_names(), dp.get_mean_stl_var_vector());
+		ParamTransformSeq pts = dp.get_par_transform();
+
+		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
+		_pe.reserve(vector<string>(), dp.get_var_names());
+		_pe.set_trans_status(dp.get_trans_status());
+		_pe.append("mean", pars);
+		string par_csv = file_manager.get_base_filename() + ".mean.par.csv";
+		message(1, "saving mean parameter/decision variable values to ", par_csv);
+		_pe.to_csv(par_csv);
+		ParameterEnsemble pe_base = _pe;
+		pe_base.reorder(vector<string>(), act_par_names);
+		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
+		_oe.reserve(vector<string>(), op.get_var_names());
+		_oe.append("mean", pest_scenario.get_ctl_observations());
+		ObservationEnsemble oe_base = _oe;
+		oe_base.reorder(vector<string>(), act_obs_names);
+		//initialize the phi handler
+		Covariance parcov;
+		parcov.from_parameter_bounds(pest_scenario, file_manager.rec_ofstream());
+
+		L2PhiHandler ph(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
+		if (ph.get_lt_obs_names().size() > 0)
+		{
+			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
+		}
+		if (ph.get_gt_obs_names().size())
+		{
+			message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
+		}
+		message(1, "running mean values");
+
+		vector<int> failed_idxs = run_population(_pe, _oe,false);
+		if (failed_idxs.size() != 0)
+		{
+			message(0, "mean value run failed...bummer");
+			return;
+		}
+		string obs_csv = file_manager.get_base_filename() + ".mean.obs.csv";
+		message(1, "saving results from mean value run to ", obs_csv);
+		_oe.to_csv(obs_csv);
+
+		ph.update(_oe, _pe);
+		message(0, "mean phi report:");
+		ph.report(true);
+		ph.write(0, 1);
+		save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, "mean");
+		message(0, "mean objective function summary: ");
+		obj_func_report(_pe, _oe);
+
+		vector<string> names = _oe.get_var_names();
+		Observations obs(names, _oe.get_real_vector("mean"));
+		names = _pe.get_var_names();
+		pars.update(names, eigenvec_2_stlvec(_pe.get_real_vector("mean")));
+
+		constraints.mou_report(0, pars, obs, obs_obj_names, pi_obj_names);
+		return;
 	}
 
 
