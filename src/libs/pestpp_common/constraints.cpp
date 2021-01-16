@@ -697,7 +697,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 				}
 			}
 			string filename = file_mgr_ptr->get_base_filename() + ".0.par_stack";
-			if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+			if (pest_scenario.get_pestpp_options().get_save_binary())
 			{
 				filename = filename + ".jcb";
 				stack_pe.to_binary(filename);
@@ -2268,7 +2268,7 @@ void Constraints::save_oe_stack(int iter, string real_name, ObservationEnsemble&
 	else
 		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".obs_stack";
 
-	if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
 		_stack_oe.to_binary(ss.str());
@@ -2295,7 +2295,7 @@ void Constraints::save_pe_stack(int iter, string real_name, ParameterEnsemble& _
 	else
 		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".par_stack";
 
-	if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
 		_stack_pe.to_binary(ss.str());
@@ -2410,7 +2410,7 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 		//update nested pe for any failed runs
 		nested_pe.keep_rows(nested_oe.get_real_names());
 		
-		if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
 			ss.str("");
 			ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.obs_stack.jcb";
@@ -2433,6 +2433,7 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 		//clear these two out
 		nested_oe = ObservationEnsemble();
 		nested_pe = ParameterEnsemble();
+		nested_stack_stdev_summary(stack_oe_map);
 		
 
 	}
@@ -2456,6 +2457,62 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 		stack_oe = stack_info.second;
 	}
 }
+
+void Constraints::nested_stack_stdev_summary(map<string, ObservationEnsemble>& _stack_oe_map)
+{
+	Eigen::VectorXd cvals(ctl_ord_obs_constraint_names.size());
+	pair < map<string, double>, map<string, double>> mm;
+	map <string, vector<double>> nested_std_map;
+	int mxlen = 11;
+	for (auto& cname : ctl_ord_obs_constraint_names)
+	{
+		nested_std_map[cname] = vector<double>();
+		mxlen = max(mxlen, (int)cname.size());
+	}
+
+	string cname;
+	
+	for (auto& m : _stack_oe_map)
+	{
+		mm = m.second.get_moment_maps();
+		for (auto& cname : ctl_ord_obs_constraint_names)
+		{
+			nested_std_map[cname].push_back(mm.second[cname]);
+		}
+	}
+	
+	stringstream ss;
+	ss.str("");
+	ss << "   Change point = 'all' constraint standard deviation summary" << endl;
+	ss << left << setw(mxlen+1) << "constraint" << setw(9) << "count" << setw(13) << "mean" << setw(13) << "stdev" << setw(13) << "min" << setw(13) << "max" << endl;
+	double mean, st,mn,mx;
+	for (auto& cname : ctl_ord_obs_constraint_names)
+	{
+		cvals = stlvec_2_eigenvec(nested_std_map[cname]);
+		mean = cvals.mean();
+		mn = cvals.minCoeff();
+		mx = cvals.maxCoeff();
+		cvals = cvals.array() - mn;
+		st = cvals.array().pow(2).sum();
+		if (st > 0)
+			st = sqrt(st);
+		ss << setw(mxlen) << cname << " ";
+		ss << setw(8) << cvals.size() << " ";
+		ss << setw(12) << mn << " ";
+		ss << setw(12) << st << " ";
+		ss << setw(12) << mn << " ";
+		ss << setw(12) << mx << " ";
+		ss << endl;
+	}
+	ss << "   note: the above summary is an indication of how the chance estimates interact with" << endl;
+	ss << "         the decision variables. A large variation in the standard deviation across" << endl;
+	ss << "         the chance point locations indicates that there is non-trivial interaction" << endl;
+	ss << "         between the chance estimates and the decision variables." << endl;
+	cout << ss.str() << endl;
+	file_mgr_ptr->rec_ofstream() << ss.str() << endl;
+ 	
+}
+
 
 void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 {

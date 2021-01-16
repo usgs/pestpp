@@ -2079,7 +2079,7 @@ void MOEA::initialize()
 		//save the initial population once here
 		ss.str("");
 		ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag;
-		if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
 			ss << ".jcb";
 			dp.to_binary(ss.str());
@@ -2102,7 +2102,7 @@ void MOEA::initialize()
 	}
 	ss.str("");
 	ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag;
-	if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
 		op.to_binary(ss.str());
@@ -2122,7 +2122,7 @@ void MOEA::initialize()
 		ObservationEnsemble shifted_op = get_chance_shifted_op(dp, op);
 		ss.str("");
 		ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".chance";
-		if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
 			ss << ".jcb";
 			shifted_op.to_binary(ss.str());
@@ -2142,7 +2142,7 @@ void MOEA::initialize()
 	//save the initial dv population again in case runs failed or members were dropped as part of restart
 	ss.str("");
 	ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag;
-	if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
 		dp.to_binary(ss.str());
@@ -3011,7 +3011,7 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 		ss << "." << tag;
 	}
 	ss << "." << dv_pop_file_tag;
-	if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
 		dp.to_binary(ss.str());
@@ -3033,7 +3033,7 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 		ss << "." << tag;
 	}
 	ss << "." << obs_pop_file_tag;
-	if (pest_scenario.get_pestpp_options().get_opt_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
 		op.to_binary(ss.str());

@@ -257,7 +257,7 @@ void L2PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
 	pair<Covariance,Covariance> rcovs = res.get_empirical_cov_matrices(file_manager);
 	stringstream ss;
 	ss << file_manager->get_base_filename() << "." << iter << ".res.";
-	if (pest_scenario->get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario->get_pestpp_options().get_save_binary())
 	{
 		ss << "jcb";
 		rcovs.first.to_binary_new(ss.str());
@@ -271,7 +271,7 @@ void L2PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
 	
 	ss.str("");
 	ss << file_manager->get_base_filename() << "." << iter << ".shrunk_res.";
-	if (pest_scenario->get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario->get_pestpp_options().get_save_binary())
 	{
 		ss << "jcb";
 		rcovs.second.to_binary_new(ss.str());

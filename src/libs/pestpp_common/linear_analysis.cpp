@@ -411,7 +411,7 @@ pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerA
 	if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
 	{
 		pfm.log_event("drawing, saving and queuing FOSM parameter realizations");
-		bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
+		bool binary = pest_scenario.get_pestpp_options().get_save_binary();
 		int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
 		
 		
@@ -464,7 +464,7 @@ pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(
 														double last_best_phi)
 {
 	int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
-	bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
+	bool binary = pest_scenario.get_pestpp_options().get_save_binary();
 	pfm.log_event("processing FOSM realization runs");
 	ObservationEnsemble oe(&pest_scenario, rand_gen_ptr);
 	if (num_reals <= 0)

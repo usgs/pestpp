@@ -1218,7 +1218,7 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	dv.check_for_normal("initial transformed dv ensemble");
 	ss.str("");
 	//TODO: setup an sqp save bin flag?  or piggy back?
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << ".0.par.jcb";
 		dv.to_binary(ss.str());
@@ -1332,7 +1332,7 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	}
 
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << ".0.obs.jcb";
 		oe.to_binary(ss.str());
@@ -2676,7 +2676,7 @@ void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool
 {
 	ofstream& frec = file_manager.rec_ofstream();
 	stringstream ss;
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".obs.jcb";
 		_oe.to_binary(ss.str());
@@ -2689,7 +2689,7 @@ void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool
 	frec << "      obs ensemble saved to " << ss.str() << endl;
 	cout << "      obs ensemble saved to " << ss.str() << endl;
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".par.jcb";
 		_dv.to_binary(ss.str());

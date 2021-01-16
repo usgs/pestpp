@@ -180,7 +180,7 @@ bool IterEnsembleSmoother::initialize_pe(Covariance &cov)
 			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1)
 			{
 
-				if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+				if (pest_scenario.get_pestpp_options().get_save_binary())
 				{
 					string filename = file_manager.get_base_filename() + ".prior.jcb";
 					message(1, "saving emprirical parameter covariance matrix to binary file: ", filename);
@@ -777,7 +777,7 @@ void IterEnsembleSmoother::initialize_restart()
 				Observations obs = pest_scenario.get_ctl_observations();
 				oe_base.replace(base_par_idx, obs, BASE_REAL_NAME);
 				ss.str("");
-				if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+				if (pest_scenario.get_pestpp_options().get_save_binary())
 				{
 					ss << file_manager.get_base_filename() << ".obs+noise.jcb";
 					oe_base.to_binary(ss.str());
@@ -1292,7 +1292,7 @@ void IterEnsembleSmoother::initialize()
 	message(2, "checking for denormal values in pe");
 	pe.check_for_normal("initial transformed parameter ensemble");
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << ".0.par.jcb";
 		pe.to_binary(ss.str());
@@ -1306,7 +1306,7 @@ void IterEnsembleSmoother::initialize()
 	message(2, "checking for denormal values in base oe");
 	oe.check_for_normal("obs+noise observation ensemble");
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << ".obs+noise.jcb";
 		oe.to_binary(ss.str());
@@ -1440,7 +1440,7 @@ void IterEnsembleSmoother::initialize()
 	}
 	
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << ".0.obs.jcb";
 		oe.to_binary(ss.str());
@@ -2770,7 +2770,7 @@ bool IterEnsembleSmoother::solve_new()
 			ss.str("");
 			ss << file_manager.get_base_filename() << "." << iter << "." << cur_lam << ".lambda." << sf << ".scale.par";
 
-			if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+			if (pest_scenario.get_pestpp_options().get_save_binary())
 			{
 				ss << ".jcb";
 				pe_lam_scale.to_binary(ss.str());
@@ -2822,7 +2822,7 @@ bool IterEnsembleSmoother::solve_new()
 			ss.str("");
 			ss << file_manager.get_base_filename() << "." << iter << "." << lam_vals[i] << ".lambda." << scale_vals[i] << ".scale.obs";
 
-			if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+			if (pest_scenario.get_pestpp_options().get_save_binary())
 			{
 				ss << ".jcb";
 				oe_lams[i].to_binary(ss.str());
@@ -3115,7 +3115,7 @@ void IterEnsembleSmoother::report_and_save()
 	cout << "   number of model runs:            " << run_mgr_ptr->get_total_runs() << endl;
 
 	stringstream ss;
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".obs.jcb";
 		oe.to_binary(ss.str());
@@ -3128,7 +3128,7 @@ void IterEnsembleSmoother::report_and_save()
 	frec << "      current obs ensemble saved to " << ss.str() << endl;
 	cout << "      current obs ensemble saved to " << ss.str() << endl;
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".par.jcb";
 		pe.to_binary(ss.str());

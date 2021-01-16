@@ -142,7 +142,7 @@ bool DataAssimilator::initialize_pe(Covariance& cov)
 			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1)
 			{
 
-				if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+				if (pest_scenario.get_pestpp_options().get_save_binary())
 				{
 					string filename = file_manager.get_base_filename() + ".prior.jcb";
 					message(1, "saving emprirical parameter covariance matrix to binary file: ", filename);
@@ -1794,7 +1794,7 @@ void DataAssimilator::initialize(int _icycle)
 	message(2, "checking for denormal values in base oe");
 	oe.check_for_normal("base observation ensemble");
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << ".base.obs.jcb";
 		oe.to_binary(ss.str());
@@ -3566,7 +3566,7 @@ bool DataAssimilator::solve_new_da()
 			ss.str("");
 			ss << file_manager.get_base_filename() << "." << iter << "." << cur_lam << ".lambda." << sf << ".scale.par";
 			
-			if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+			if (pest_scenario.get_pestpp_options().get_save_binary())
 			{
 				ss << ".jcb";
 				pe_lam_scale.to_binary(ss.str());
@@ -3661,7 +3661,7 @@ bool DataAssimilator::solve_new_da()
 				ss.str("");
 				ss << file_manager.get_base_filename() << "." << iter << "." << lam_vals[i] << ".lambda." << scale_vals[i] << ".scale.obs";
 
-				if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+				if (pest_scenario.get_pestpp_options().get_save_binary())
 				{
 					ss << ".jcb";
 					oe_lams[i].to_binary(ss.str());
@@ -4424,7 +4424,7 @@ void DataAssimilator::report_and_save()
 	cout << "   number of model runs:            " << run_mgr_ptr->get_total_runs() << endl;
 
 	stringstream ss;
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".obs.jcb";
 		oe.to_binary(ss.str());
@@ -4437,7 +4437,7 @@ void DataAssimilator::report_and_save()
 	frec << "      current obs ensemble saved to " << ss.str() << endl;
 	cout << "      current obs ensemble saved to " << ss.str() << endl;
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".par.jcb";
 		pe.to_binary(ss.str());
