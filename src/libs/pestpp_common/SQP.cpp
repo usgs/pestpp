@@ -1925,13 +1925,12 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 	message(1, "coeff matrix for p_range_space component", coeff);  // tmp
 	rhs = (-1. * constraint_diff);
 	message(1, "rhs", rhs);
-	//try straight inverse here; else another rSVD
 	rsvd.solve_ip(coeff, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
 	coeff = V * s.inverse() * U.transpose();
 	message(1, "coeff inv", coeff);
 	p_y = coeff * rhs;
 	message(1, "p_y", p_y);  // tmp
-	// todo assert here for p_y == 0 if sum_viol == 0
+	// todo assert here for p_y != 0 if sum_viol == 0 (this is the component that rectifies constraint viol)
 
 	// solve p_null_space
 	bool simplified_null_space_approach = false; // see Nocedal and Wright (2006) pg 538-9
@@ -2088,19 +2087,10 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 
 	Mat constraint_mat = constraints.get_working_set_constraint_matrix(current_ctl_dv_values, current_obs, jco, true);
 	//todo:probably need to check if constraint_mat has any nonzeros?
-	//vector<string> cnames = constraints.get_constraint_names();  // not already stored?
 	vector<string> cnames = constraint_mat.get_row_names();
-	//if (cnames.size() == 0)
-	//{
-	//	message(1, "constraint working set is empty, problem is currently unconstrained...");
-	//	//todo: wtf shoud we do here? does this mean we are entirely in the constraint null space?
-	//	return pair<Eigen::VectorXd, Eigen::VectorXd>(grad_vector, grad_vector);
-	//}
 
-	if (cnames.size() > 0)  // tmp - enter here if we are solving a problem with constraints AND working set is nonempty
+	if (cnames.size() > 0)  // solve constrained QP subproblem
 	{
-		Eigen::VectorXd sd;
-
 		// solve (E)QP sub-problem via active set method for search direction
 
 		// todo put in _solve_eqp() func - self.search_d, self.lagrang_mults = self._solve_eqp(qp_solve_method=self.qp_solve_method)
@@ -2112,7 +2102,6 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		// collate the pieces
 
 		// constraint jco
-		// todo only for constraints in WS only
 		
 		//todo: something better than just echoing working set to screen and rec...
 		message(0, "current working set:", cnames);
@@ -2249,7 +2238,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 
 
 	}
-	else  // if ((constraints is False) | ((constraints is True) & (len(self.working_set) == 0)));
+	else  // solve unconstrained QP subproblem
 	{
 		message(1, "constraint working set is empty, problem is currently unconstrained...");
 		search_d = *hessian.e_ptr() * grad_vector;
