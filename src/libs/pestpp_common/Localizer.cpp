@@ -540,7 +540,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 		ss.str("");
 		ss << pst_filename.substr(0, pst_filename.size() - 4) << "." << iter << ".autoadaloc.tCC";
 		string filename = ss.str();
-		if (pe.get_pest_scenario_ptr()->get_pestpp_options().get_ies_save_binary())
+		if (pe.get_pest_scenario_ptr()->get_pestpp_options().get_save_binary())
 		{
 			filename = filename + ".jcb";
 			performance_log->log_event("saving thresholded CC matrix in binary format to " + filename);

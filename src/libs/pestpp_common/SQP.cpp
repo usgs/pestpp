@@ -1218,7 +1218,7 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	dv.check_for_normal("initial transformed dv ensemble");
 	ss.str("");
 	//TODO: setup an sqp save bin flag?  or piggy back?
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << ".0.par.jcb";
 		dv.to_binary(ss.str());
@@ -1332,7 +1332,7 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	}
 
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << ".0.obs.jcb";
 		oe.to_binary(ss.str());
@@ -1924,10 +1924,13 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 	coeff = constraint_jco * Y;
 	message(1, "coeff matrix for p_range_space component", coeff);  // tmp
 	rhs = (-1. * constraint_diff);
-	//try straight inverse here; else another rSVD
-	p_y = coeff.inverse() * rhs;
+	message(1, "rhs", rhs);
+	rsvd.solve_ip(coeff, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+	coeff = V * s.inverse() * U.transpose();
+	message(1, "coeff inv", coeff);
+	p_y = coeff * rhs;
 	message(1, "p_y", p_y);  // tmp
-	// todo assert here for p_y == 0 if sum_viol == 0
+	// todo assert here for p_y != 0 if sum_viol == 0 (this is the component that rectifies constraint viol)
 
 	// solve p_null_space
 	bool simplified_null_space_approach = false; // see Nocedal and Wright (2006) pg 538-9
@@ -2079,12 +2082,15 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 	Eigen::VectorXd search_d, lm;
 	pair<Eigen::VectorXd, Eigen::VectorXd> x;
 	
+
 	message(1, "hessian:", hessian);  // tmp
 
-	if (constraints.num_obs_constraints() + constraints.num_pi_constraints() > 0)  // tmp - enter here if we are solving a problem with constraints AND working set is nonempty
-	{
-		Eigen::VectorXd sd;
+	Mat constraint_mat = constraints.get_working_set_constraint_matrix(current_ctl_dv_values, current_obs, jco, true);
+	//todo:probably need to check if constraint_mat has any nonzeros?
+	vector<string> cnames = constraint_mat.get_row_names();
 
+	if (cnames.size() > 0)  // solve constrained QP subproblem
+	{
 		// solve (E)QP sub-problem via active set method for search direction
 
 		// todo put in _solve_eqp() func - self.search_d, self.lagrang_mults = self._solve_eqp(qp_solve_method=self.qp_solve_method)
@@ -2096,14 +2102,12 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		// collate the pieces
 
 		// constraint jco
-		// todo only for constraints in WS only
-		Mat constraint_mat = constraints.get_working_set_constraint_matrix(current_ctl_dv_values, current_obs, jco, true);
-		//todo:probably need to check if constraint_mat has any nonzeros?
-
+		
+		//todo: something better than just echoing working set to screen and rec...
+		message(0, "current working set:", cnames);
 		Eigen::MatrixXd constraint_jco = constraint_mat.e_ptr()->toDense();  // or would you pref to slice and dice each time - this won't get too big but want to avoid replicates  // and/or make Jacobian obj?
 
-		//vector<string> cnames = constraints.get_constraint_names();  // not already stored?
-		vector<string> cnames = constraint_mat.get_row_names();
+		
 
 		//constraint_jco = jco.get_matrix(cnames, dv_names);
 		message(1, "A:", constraint_jco);  // tmp
@@ -2234,8 +2238,9 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 
 
 	}
-	else  // if ((constraints is False) | ((constraints is True) & (len(self.working_set) == 0)));
+	else  // solve unconstrained QP subproblem
 	{
+		message(1, "constraint working set is empty, problem is currently unconstrained...");
 		search_d = *hessian.e_ptr() * grad_vector;
 
 
@@ -2463,6 +2468,9 @@ bool SeqQuadProgram::solve_new()
 
 	//TODO: add sqp option to save candidates
 
+
+	//enforce bounds on candidates
+	dv_candidates.enforce_bounds(performance_log,false);
 	message(0, "running candidate decision variable batch");
 	vector<double> passed_scale_vals = scale_vals;
 	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates, passed_scale_vals);
@@ -2668,7 +2676,7 @@ void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool
 {
 	ofstream& frec = file_manager.rec_ofstream();
 	stringstream ss;
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".obs.jcb";
 		_oe.to_binary(ss.str());
@@ -2681,7 +2689,7 @@ void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool
 	frec << "      obs ensemble saved to " << ss.str() << endl;
 	cout << "      obs ensemble saved to " << ss.str() << endl;
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_ies_save_binary())
+	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << "." << iter << ".par.jcb";
 		_dv.to_binary(ss.str());

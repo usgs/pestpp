@@ -245,6 +245,8 @@ private:
 	pair<vector<int>,ObservationEnsemble> process_stack_runs(string real_name, int iter, map<int, int> _stack_pe_run_map, 
 		RunManagerAbstract* run_mgr_ptr, bool drop_fails=true, bool debug_fail=false);
 
+	void nested_stack_stdev_summary(map<string, ObservationEnsemble>& _stack_oe_map);
+
 	void save_oe_stack(int iter, string real_name, ObservationEnsemble& _stack_oe);
 	void save_pe_stack(int iter, string real_name, ParameterEnsemble& _stack_pe);
 

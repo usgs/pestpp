@@ -352,7 +352,7 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 	const vector<string> &run_mngr_obs_name_vec = run_manager.get_obs_name_vec();
 	obs_sen_file.initialize(adj_par_name_vec, run_mngr_obs_name_vec, Observations::no_data, this);
 
-	fout_raw << "parameter_name, phi_0, phi_1, par_0, par_1, elem_effect" << endl;
+	fout_raw << "parameter_name,phi_0,phi_1,par_0,par_1,elem_effect" << endl;
 	int n_runs = run_manager.get_nruns();
 	bool run0_ok = false;
 	bool run1_ok = false;
@@ -396,7 +396,7 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 			double p1 = pars1[par_name_1];
 			// compute standard Morris Sensitivity on the global objective function
 			double sen = (phi1 - phi0) / delta;
-			fout_raw << pest_utils::lower_cp(par_name_1) << ",  " << phi1 << ",  " << phi0 << ",  " << p1 << ",  " << p0 << ", " << sen << endl;
+			fout_raw << pest_utils::lower_cp(par_name_1) << "," << phi1 << "," << phi0 << "," << p1 << "," << p0 << "," << sen << endl;
 
 			const auto &it_senmap = sen_map.find(par_name_1);
 			if (it_senmap != sen_map.end())
@@ -423,13 +423,13 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 	cout << endl;
 	cout << "writing output files" << endl;
 	// write standard Morris Sensitivity for the global objective function
-	fout_morris << "parameter_name, n_samples, sen_mean, sen_mean_abs, sen_std_dev" << endl;
+	fout_morris << "parameter_name,n_samples,sen_mean,sen_mean_abs,sen_std_dev" << endl;
 	for (const auto &it_par : adj_par_name_vec)
 	{
 		const auto &it_senmap = sen_map.find(it_par);
 		if (it_senmap != sen_map.end())
 		{
-			fout_morris << pest_utils::lower_cp(it_par) << ", " << it_senmap->second.comp_nsamples() << ", " << it_senmap->second.comp_mean() << ", " << it_senmap->second.comp_abs_mean() << ", " << sqrt(it_senmap->second.comp_var()) << endl;
+			fout_morris << pest_utils::lower_cp(it_par) << "," << it_senmap->second.comp_nsamples() << "," << it_senmap->second.comp_mean() << "," << it_senmap->second.comp_abs_mean() << "," << sqrt(it_senmap->second.comp_var()) << endl;
 		}
 	}
 	if (calc_morris_obs_sen)

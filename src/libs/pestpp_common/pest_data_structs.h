@@ -397,8 +397,6 @@ public:
 	void set_opt_coin_log(bool _log) { opt_coin_log = _log; }
 	bool get_opt_skip_final()const { return opt_skip_final; }
 	void set_opt_skip_final(bool _skip_final) { opt_skip_final = _skip_final; }
-	bool get_opt_save_binary()const { return opt_save_binary; }
-	void set_opt_save_binary(bool _flag) { opt_save_binary = _flag; }
 
 
 	vector<string> get_opt_dec_var_groups()const { return opt_dec_var_groups; }
@@ -509,8 +507,8 @@ public:
 
 	double get_par_sigma_range() const { return par_sigma_range; }
 	void set_par_sigma_range(double _par_sigma_range) { par_sigma_range = _par_sigma_range; }
-	bool get_ies_save_binary() const { return ies_save_binary; }
-	void set_ies_save_binary(bool _ies_save_binary) { ies_save_binary = _ies_save_binary; }
+	bool get_save_binary() const { return save_binary; }
+	void set_save_binary(bool _ies_save_binary) { save_binary = _ies_save_binary; }
 	string get_ies_localizer() const { return ies_localizer; }
 	void set_ies_localizer(string _ies_localizer) { ies_localizer = _ies_localizer; }
 	double get_ies_accept_phi_fac() const { return ies_accept_phi_fac; }
@@ -732,7 +730,6 @@ private:
 	string opt_par_stack;
 	string opt_obs_stack;
 	string opt_chance_points;
-	bool opt_save_binary;
 
 	string sqp_dv_en;
 	string sqp_obs_restart_en;
@@ -774,7 +771,7 @@ private:
 	//bool ies_num_reals_passed;
 	bool ies_enforce_bounds;
 	double par_sigma_range;
-	bool ies_save_binary;
+	bool save_binary;
 	string ies_localizer;
 	double ies_accept_phi_fac;
 	double ies_lambda_inc_fac;
