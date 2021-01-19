@@ -230,7 +230,8 @@ private:
 	std::unordered_map<string, int> int_parms = {
 		{ "DA_SUBSET_SIZE", 5 },
 		{ "DA_VERBOSE_LEVEL", 1 },
-	    { "DA_CYCLES_NUMBER", -1}
+	    { "DA_CYCLES_NUMBER", -1},
+	    {"DA_NUM_THREADS", 0}
 		
 	};
 
@@ -240,7 +241,8 @@ private:
 	    {"DA_INITIAL_INF_FAC", -1.0},
 	    {"DA_LAMBDA_DEC_FAC", 0.75},
 	    {"DA_LAMBDA_INC_FAC", 10.0},
-		{"DA_ACCEPT_PHI_FAC", 1.05}
+		{"DA_ACCEPT_PHI_FAC", 1.05},
+		{"DA_AUTOADALOC_SIGMA_DIST", 1.0}
 
 	};
 
@@ -249,7 +251,8 @@ private:
 		{"DA_RESTART_OBSERVATION_ENSEMBLE", ""},
 		{"DA_RESTART_PARAMETER_ENSEMBLE", ""},
 	    {"DA_SUBSET_HOW", "random"},
-		{"DA_TYPE", "mda"}
+		{"DA_TYPE", "mda"},
+		{"DA_LOCALIZE_HOW", "PARAMETERS"}
 
 	};
 	std::unordered_map<string, bool> bool_parms = {
@@ -258,7 +261,8 @@ private:
 		{"DA_USE_PRIOR_SCALING", true},
 		{"DA_SAVE_BINARY", false},
 		{"DA_EVALUATE_UPDATE", true},
-	    {"DA_ENFORCE_CHGLIM", false}
+	    {"DA_ENFORCE_CHGLIM", false},
+		{"DA_AUTOADALOC", false}
 
 
 	};
@@ -564,6 +568,10 @@ public:
 	CtlPar_container da_ctl_params;
 	void set_da_use_ies(bool _use) { da_use_ies = _use; }
 	bool get_da_use_ies() const { return da_use_ies; }
+
+	void set_use_da(bool _use) { use_da = _use;}
+	bool get_use_da() const { return use_da; }
+
 	void set_da_mode(string _mode) { da_mode = _mode; }
 	string get_da_mode() const { return da_mode; }	
 	string get_da_par_csv()const { return da_par_csv; }
@@ -796,6 +804,7 @@ private:
 	// Data Assimilation parameters
 	string da_mode;
 	bool da_use_ies;
+	bool use_da = false;
 	string da_par_csv;
 	int da_num_reals;
 	string da_obs_csv;

@@ -182,6 +182,7 @@ int main(int argc, char* argv[])
 		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
 		pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
+		pest_scenario.get_pestpp_options_ptr()->set_use_da(true);
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
 		//output_file_writer.scenario_report(fout_rec);
 		output_file_writer.scenario_io_report(fout_rec);
@@ -474,7 +475,7 @@ int main(int argc, char* argv[])
 			run_manager_ptr->initialize(par_names, obs_names);
 			performance_log.log_event("instantiating DA instance");
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
-			// use ies or da?
+
 			da.da_type = pest_scenario.get_pestpp_options_ptr()->da_ctl_params.get_svalue("DA_TYPE");
 			std::mt19937 rand_gen = da.get_rand_gen();
 			vector<string> act_par_names = childPest.get_ctl_ordered_adj_par_names();

@@ -10,7 +10,7 @@ da_add_base 					False
 da_parameter_ensemble      kh_ensemble0.csv
 da_type       mda
 DA_SUBSET_SIZE 10
-da_num_reals 10
+da_num_reals 20
 da_inflation_fac 100, 50, 10, 5, 1, 1
 da_inflation_mult 0.65
 DA_INITIAL_INF_FAC 100

@@ -30,13 +30,16 @@ public:
 		Localizer& _localizer, unordered_map<string, double>& _parcov_inv_map,
 		unordered_map<string, double>& _weight_map, ParameterEnsemble& _pe_upgrade,
 		unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
-		unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how);
+		unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how,
+		unordered_map<string, Eigen::VectorXd>& _obs_err_map);
 
 	//Eigen::DiagonalMatrix<double, Eigen::Dynamic> get_matrix_from_map(vector<string> &names, map<string, double> &dmap);	
 	//Eigen::MatrixXd get_matrix_from_map(int num_reals, vector<string> &names, map<string, Eigen::VectorXd> &emap);
 
 
 	void work(int thread_id, int iter, double cur_lam);
+
+	void work2da(int thread_id, int iter, double cur_lam);
 
 
 private:
@@ -57,10 +60,10 @@ private:
 	unordered_map<string, double>& weight_map;
 
 	unordered_map<string, Eigen::VectorXd>& par_resid_map, & par_diff_map, & Am_map;
-	unordered_map<string, Eigen::VectorXd>& obs_resid_map, & obs_diff_map;
+	unordered_map<string, Eigen::VectorXd>& obs_resid_map, & obs_diff_map, & obs_err_map;
 
 	mutex ctrl_lock, weight_lock, loc_lock, parcov_lock;
-	mutex obs_resid_lock, obs_diff_lock, par_resid_lock;
+	mutex obs_resid_lock, obs_diff_lock, par_resid_lock, obs_err_lock;
 	mutex par_diff_lock, am_lock, put_lock;
 	mutex next_lock;
 

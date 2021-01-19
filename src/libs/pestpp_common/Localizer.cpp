@@ -17,7 +17,17 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 {
 	stringstream ss;
 	how = How::OBSERVATIONS; //set this for the case with no localization
-	string how_str = pest_scenario_ptr->get_pestpp_options().get_ies_localize_how();
+	bool use_da;
+	string how_str;
+	use_da = pest_scenario_ptr->get_pestpp_options().get_use_da();	
+	
+	if (use_da)
+	{		
+		how_str = pest_scenario_ptr->get_pestpp_options_ptr()->da_ctl_params.get_svalue("DA_LOCALIZE_HOW");
+	}
+	{		
+		how_str = pest_scenario_ptr->get_pestpp_options().get_ies_localize_how();
+	}
 	if (how_str[0] == 'P')
 	{
 		how = How::PARAMETERS;
@@ -28,11 +38,21 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 	}
 	else
 	{
-		throw runtime_error("Localizer error: 'ies_localize_how' must start with 'P' (pars) or 'O' (obs) not " + how_str[0]);
+		throw runtime_error("Localizer error: 'ies_localize_how' or 'da_localize_how' must start with 'P' (pars) or 'O' (obs) not " + how_str[0]);
 	}
 	string filename = pest_scenario_ptr->get_pestpp_options().get_ies_localizer();
-	autoadaloc = pest_scenario_ptr->get_pestpp_options().get_ies_autoadaloc();
-	sigma_dist = pest_scenario_ptr->get_pestpp_options().get_ies_autoadaloc_sigma_dist();
+	if (use_da)
+	{
+
+		autoadaloc = pest_scenario_ptr->get_pestpp_options_ptr()->da_ctl_params.get_bvalue("DA_AUTOADALOC");
+		sigma_dist = pest_scenario_ptr->get_pestpp_options_ptr()->da_ctl_params.get_dvalue("DA_AUTOADALOC_SIGMA_DIST");
+	}
+	else
+	{
+		autoadaloc = pest_scenario_ptr->get_pestpp_options().get_ies_autoadaloc();
+		sigma_dist = pest_scenario_ptr->get_pestpp_options().get_ies_autoadaloc_sigma_dist();
+		
+	}
 	use = true;
 	if ((filename.size() == 0) && (!autoadaloc))
 	{
@@ -52,7 +72,7 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 	{
 		//string how = pest_scenario_ptr->get_pestpp_options().get_ies_localize_how();
 		if (how != How::PARAMETERS)
-			throw runtime_error("using a localizer matrix and autoadaloc requires ies_localize_how == 'PARAMETERS'");
+			throw runtime_error("using a localizer matrix and autoadaloc requires ies_ or da_ localize_how == 'PARAMETERS'");
 		for (auto i : localizer_map)
 		{
 			set<string> oset(i.second.first.begin(), i.second.first.end());
