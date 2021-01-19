@@ -1460,6 +1460,7 @@ void MOEA::initialize()
 
 	//define these here to make sure the iter loop later behaves
 	iter = 0;
+	restart_iter_offset = 0;
 	member_count = 0;
 
 	warn_min_members = 20;
@@ -2522,8 +2523,9 @@ bool MOEA::initialize_dv_population()
 		for (int i = 0; i < num_members; i++)
 		{
 			ss.str("");
-			ss << "original_member=" << i;
+			ss << "GEN=0_MEMBER=" << i;
 			real_names.push_back(ss.str());
+			member_count++;
 		}
 		dp.set_real_names(real_names, true);
 	
@@ -2598,7 +2600,39 @@ bool MOEA::initialize_dv_population()
 				dp.keep_rows(keep_names);
 			}
 		}
-		
+		//this is just to make sure we dont accidentally generate duplicate real nanmes later...
+		int gen,max_gen = 0;
+		vector<string> tokens;
+		string t;
+		for (auto name : dp.get_real_names())
+		{
+			tokens.clear();
+			if (name.find("GEN=") != string::npos)
+			{
+				pest_utils::tokenize(name, tokens, "=");
+				t = tokens[1];
+				tokens.clear();
+				pest_utils::tokenize(t, tokens, "_");
+				if (tokens.size() > 0)
+				{
+					t = tokens[0];
+					try
+					{
+						gen = stoi(t);
+					}
+					catch (...)
+					{
+						continue;
+					}
+					max_gen = max(max_gen, gen);
+				}
+			}
+		}
+		if (max_gen > 0)
+		{
+			message(1, "previous generation numbers detected in dv population, fast forwarding generation counter to", max_gen);
+			restart_iter_offset = max_gen;
+		}
 	}
 	return drawn;
 
@@ -3053,7 +3087,7 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 string MOEA::get_new_member_name(string tag)
 {
 	stringstream ss;
-	ss << "gen=" << iter << "_member=" << member_count;
+	ss << "gen=" << iter+restart_iter_offset << "_member=" << member_count;
 	if (tag.size() > 0)
 	{
 		ss << "_" << tag;
