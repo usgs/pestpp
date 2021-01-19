@@ -1967,16 +1967,14 @@ void DataAssimilator::initialize(int _icycle)
 
 		if (pe.shape().first == 0)
 			throw_da_error("all realizations failed during initial evaluation");
+
 		if (failed.size() > 0)
 			oe_base.drop_rows(failed);
 
-		//string obs_csv = file_manager.get_base_filename() + ".0.obs.csv";
-		//message(1, "saving results of initial ensemble run to", obs_csv);
-		//oe.to_csv(obs_csv);
-		if (icycle == 0)
-		{
+		//if (icycle == 0)
+		//{
 			pe.transform_ip(ParameterEnsemble::transStatus::NUM);
-		}
+		//}
 	}
 
 	// ======================================================================
@@ -1997,39 +1995,6 @@ void DataAssimilator::initialize(int _icycle)
 	ss.str("");
 	da_save_ensemble_pe("_forecast_cycle_", ".par");
 	da_save_ensemble_oe("_forecast_cycle_", ".obs");
-	if (false)
-	{
-	
-		// todo: update for da
-		bool save_binary;
-		save_binary = da_ctl_params.get_bvalue("DA_SAVE_BINARY");
-		
-		if (save_binary)
-		{
-			ss << file_manager.get_base_filename() << "_forecast_cycle_" << icycle << ".0.par.jcb";
-			pe.to_binary(ss.str());
-		}
-		else
-		{
-			ss << file_manager.get_base_filename() << "_forecast_cycle." << icycle << ".par.csv";
-			pe.to_csv(ss.str());
-		}
-		message(1, "saved forecast (parameter and state) ensemble to ", ss.str());
-
-		ss.str("");
-		if (save_binary)
-		{
-			ss << file_manager.get_base_filename() << "_forecast_cycle." << icycle << ".obs.jcb";
-			oe.to_binary(ss.str());
-		}
-		else
-		{
-			ss << file_manager.get_base_filename() << "_forecast_cycle." << icycle << ".obs.csv";
-			oe.to_csv(ss.str()); // todo: check is this matrix is already saved in pe as dynamic states
-		}
-		message(1, "saved obs ensemble to", ss.str());
-}
-
 
 	performance_log->log_event("calc pre-drop phi");
 	//initialize the phi handler
@@ -2142,15 +2107,37 @@ void DataAssimilator::initialize(int _icycle)
 
 	}
 
+	if (ph.get_mean(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
+	{
+		throw_da_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");
+	}
+	if (ph.get_std(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
+	{
+		throw_da_error("initial actual phi stdev too low, something is wrong...");
+	}
+
 	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	last_best_lam = da_ctl_params.get_dvalue("DA_INITIAL_INF_FAC");
-	
+
+	if (last_best_mean < 1.0e-10)
+	{
+		throw_da_error("initial composite phi mean too low, something is wrong...");
+	}
+	if (last_best_std < 1.0e-10)
+	{
+		throw_da_error("initial composite phi stdev too low, something is wrong...");
+	}
 	if (last_best_lam <= 0.0)
 	{
 		//double x = last_best_mean / (2.0 * double(oe.shape().second));
 		double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
 		last_best_lam = pow(10.0, (floor(log10(x))));
+		if (last_best_lam < 1.0e-10)
+		{
+			message(1, "initial lambda estimation from phi failed, using 10,000");
+			last_best_lam = 10000;
+		}
 	}
 	message(1, "current lambda:", last_best_lam);
 	message(0, "initialization complete");
