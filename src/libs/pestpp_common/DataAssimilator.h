@@ -235,9 +235,9 @@ private:
 };
 
 
-map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ofstream& fout_rec);
-map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl);
-map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl);
+map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, vector <int>& ncycles_in_tables, ofstream& fout_rec);
+map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, vector <int>& ncycles_in_tables, ofstream& fout_rec, set<string>& obs_in_tbl);
+map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario, vector <int>& ncycles_in_tables, ofstream& fout_rec, set<string>& obs_in_tbl);
 
 void write_global_phi_info(int cycle, ofstream& f_phi, DataAssimilator& da, vector<string>& init_real_names);
 

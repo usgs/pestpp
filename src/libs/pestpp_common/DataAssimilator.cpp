@@ -5376,7 +5376,7 @@ void DataAssimilator::finalize()
 
 }
 
-map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl)
+map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, vector <int>& ncycles_in_tables, ofstream& fout_rec, set<string>& obs_in_tbl)
 {
 	//process da par cycle table
 	string filename = pest_scenario.get_pestpp_options().get_da_obs_cycle_table();
@@ -5482,6 +5482,14 @@ map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, of
 					continue;
 				}
 				cycle_map[tbl_obs_names[i]] = val;
+				ncycles_in_tables.push_back(cycle);
+				ncycles_in_tables.push_back(cycle);
+
+				// make sure cycle numbers are sorted and unique
+				sort(ncycles_in_tables.begin(), ncycles_in_tables.end());
+				ncycles_in_tables.erase(unique(ncycles_in_tables.begin(),
+					ncycles_in_tables.end()),
+					ncycles_in_tables.end());
 			}
 			obs_cycle_info[cycle] = cycle_map;
 		}
@@ -5498,7 +5506,7 @@ map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, of
 
 }
 
-map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario, ofstream& fout_rec, set<string>& obs_in_tbl)
+map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario, vector <int>& ncycles_in_tables, ofstream& fout_rec, set<string>& obs_in_tbl)
 {
 	//process da par cycle table
 	string filename = pest_scenario.get_pestpp_options().get_da_weight_cycle_table();
@@ -5593,6 +5601,13 @@ map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario,
 				cycle_map[tbl_obs_names[i]] = val;
 			}
 			weight_cycle_info[cycle] = cycle_map;
+			ncycles_in_tables.push_back(cycle);
+
+			// make sure cycle numbers are sorted and unique
+			sort(ncycles_in_tables.begin(), ncycles_in_tables.end());
+			ncycles_in_tables.erase(unique(ncycles_in_tables.begin(),
+								ncycles_in_tables.end()),
+								ncycles_in_tables.end());
 		}
 		if (parse_fail)
 		{
@@ -5607,7 +5622,7 @@ map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario,
 
 }
 
-map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ofstream& fout_rec)
+map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, vector <int>& ncycles_in_tables, ofstream& fout_rec)
 {
 	//process da par cycle table
 	string filename = pest_scenario.get_pestpp_options().get_da_par_cycle_table();
@@ -5715,6 +5730,15 @@ map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, of
 				cycle_map[tbl_par_names[i]] = val;
 			}
 			par_cycle_info[cycle] = cycle_map;
+			ncycles_in_tables.push_back(cycle);
+
+			// make sure cycle numbers are sorted and unique
+			sort(ncycles_in_tables.begin(), ncycles_in_tables.end());
+			ncycles_in_tables.erase(unique(ncycles_in_tables.begin(), 
+											ncycles_in_tables.end()),
+											ncycles_in_tables.end());
+
+
 		}
 		if (parse_fail)
 		{

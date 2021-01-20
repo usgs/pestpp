@@ -2630,10 +2630,11 @@ void Pest::child_pest_update(int icycle)
 	//this.check_inputs();
 }
 
-vector<int> Pest::get_assim_cycles(ofstream& f_rec)
+vector<int> Pest::get_assim_cycles(ofstream& f_rec, vector<int> unique_cycles)
 {
 	int curr_cycle;
-	vector<int> cycles_ordered_list, unique_cycles;
+	vector<int> cycles_ordered_list;
+	
 	for (auto pname : ctl_ordered_par_names)
 	{
 		curr_cycle = ctl_parameter_info.get_parameter_rec_ptr(pname)->cycle;
