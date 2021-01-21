@@ -3442,7 +3442,7 @@ vector<int> IterEnsembleSmoother::run_ensemble(ParameterEnsemble &_pe, Observati
 		throw_ies_error(ss.str());
 	}
 	
-	if (failed_real_indices.size() > 0)
+	/*if (failed_real_indices.size() > 0)
 	{
 		stringstream ss;
 		vector<string> par_real_names = _pe.get_real_names();
@@ -3459,7 +3459,7 @@ vector<int> IterEnsembleSmoother::run_ensemble(ParameterEnsemble &_pe, Observati
 		performance_log->log_event("dropping failed realizations");
 		_pe.drop_rows(failed_real_indices);
 		_oe.drop_rows(failed_real_indices);
-	}
+	}*/
 	return failed_real_indices;
 }
 

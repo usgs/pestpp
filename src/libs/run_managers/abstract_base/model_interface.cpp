@@ -11,6 +11,7 @@
 #include <thread>
 #include <unordered_set>
 #include "model_interface.h"
+#include <limits>
 
 using namespace std;
 
@@ -1423,7 +1424,7 @@ pair<string, pair<int, int>> InstructionFile::parse_obs_instruction(const string
 pair<string, double> InstructionFile::execute_fixed(const string& token, string& line, ifstream& f_out)
 {
 	string temp;
-	double value;
+	double value = 1.0e+30;
 	pair<string, pair<int, int>> info = parse_obs_instruction(token, "]");
 	//use the raw last_out_line since "line" has been getting progressively truncated
 	if (last_out_line.size() < info.second.second)
@@ -1440,6 +1441,7 @@ pair<string, double> InstructionFile::execute_fixed(const string& token, string&
 	}
 	catch (...)
 	{
+		if (info.first != "DUM")
 		throw_ins_error("error casting fixed observation instruction '" + token + "' from output string '" + temp + "' on line '" + line + "'",ins_line_num, out_line_num);
 	}
 	int pos = line.find(temp);
@@ -1458,7 +1460,7 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 {
 	string temp;
 	vector<string> tokens;
-	double value;
+	double value = 1.0e+30;
 	pair<string, pair<int, int>> info = parse_obs_instruction(token, ")");
 	//use the raw last_out_line since "line" has been getting progressively truncated
 	if (last_out_line.size() < info.second.second)
@@ -1482,7 +1484,8 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 	}
 	catch (...)
 	{
-		throw_ins_error("error casting string '" + temp + "' to double for semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num, out_line_num);
+		if (info.first != "DUM")
+			throw_ins_error("error casting string '" + temp + "' to double for semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num, out_line_num);
 	}
 	pos = line.find(temp);
 	if (pos == string::npos)
@@ -1502,12 +1505,13 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	int tsize = line.size() / 20;
 	if (tsize > 50)
 		tsize = 50;
+	string name = token.substr(1, token.size() - 2);
 	vector<string> tokens;
 	tokens.reserve(tsize);
 	tokenize(line, tokens,", \t\n\r" + additional_delimiters) ; //include the comma in the delimiters here
 	if (tokens.size() == 0)
 		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for free instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);
-	double value;
+	double value = 1.0e+30;
 	try
 	{
 		//pest_utils::convert_ip(tokens[0], value);
@@ -1515,9 +1519,10 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	}
 	catch (...)
 	{
-		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruciton: '"+token+"'", ins_line_num, out_line_num);
+		if (name != "DUM")
+			throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruciton: '"+token+"'", ins_line_num, out_line_num);
 	}
-	string name = token.substr(1, token.size() - 2);
+	
 	int pos = line.find(tokens[0]);
 	if (pos == string::npos)
 	{
