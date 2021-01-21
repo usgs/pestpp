@@ -253,13 +253,15 @@ int main(int argc, char* argv[])
 
 
 		//process da (recurrent??) par cycle table
-		map<int, map<string, double>> par_cycle_info = process_da_par_cycle_table(pest_scenario, fout_rec);
+		vector <int> cycles_in_tables;
+		
+		map<int, map<string, double>> par_cycle_info = process_da_par_cycle_table(pest_scenario, cycles_in_tables, fout_rec);
 		// process da obs cycle table
 		set<string> obs_in_tbl; //we need this so we can set weights to zero in childpest of a value isnt listed for a given cycle
-		map<int, map<string, double>> obs_cycle_info = process_da_obs_cycle_table(pest_scenario, fout_rec, obs_in_tbl);
+		map<int, map<string, double>> obs_cycle_info = process_da_obs_cycle_table(pest_scenario, cycles_in_tables, fout_rec, obs_in_tbl);
 		//process weights table
 		set<string> weights_in_tbl;
-		map<int, map<string, double>> weight_cycle_info = process_da_weight_cycle_table(pest_scenario, fout_rec, weights_in_tbl);
+		map<int, map<string, double>> weight_cycle_info = process_da_weight_cycle_table(pest_scenario, cycles_in_tables, fout_rec, weights_in_tbl);
 
 		vector<int> assimilation_cycles;
 		//pest_scenario.get_pestpp_options
@@ -273,7 +275,7 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec);
+			assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec, cycles_in_tables);
 		}
 
 		//generate a parent ensemble which includes all parameters across all cycles
