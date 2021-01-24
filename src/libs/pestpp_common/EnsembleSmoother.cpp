@@ -1590,12 +1590,21 @@ void IterEnsembleSmoother::initialize()
 	if (last_best_lam <= 0.0)
 	{
 		//double x = last_best_mean / (2.0 * double(oe.shape().second));
+		double org_val = last_best_lam;
 		double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
 		last_best_lam = pow(10.0, (floor(log10(x))));
 		if (last_best_lam < 1.0e-10)
 		{
 			message(1, "initial lambda estimation from phi failed, using 10,000");
 			last_best_lam = 10000;
+		}
+		if (org_val < 0.0)
+		{
+			org_val *= -1.0;
+			ss.str("");
+			ss << "scaling phi-based initial lambda " << last_best_lam << " by user-supplied (negative) initial lambda " << org_val;
+			message(1, ss.str());
+			last_best_lam *= org_val;
 		}
 	}
 	message(1, "current lambda:", last_best_lam);

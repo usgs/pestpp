@@ -1626,7 +1626,7 @@ void PestppOptions::set_defaults()
 	set_ies_obs_restart_csv("");
 	set_ies_par_restart_csv("");
 	set_ies_lam_mults(vector<double>());
-	set_ies_init_lam(-999);
+	set_ies_init_lam(0.0);
 	set_ies_use_approx(true);
 	set_ies_subset_size(4);
 	set_ies_reg_factor(0.0);
