@@ -1602,7 +1602,7 @@ void IterEnsembleSmoother::initialize()
 		{
 			org_val *= -1.0;
 			ss.str("");
-			ss << "scaling phi-based initial lambda " << last_best_lam << " by user-supplied (negative) initial lambda " << org_val;
+			ss << "scaling phi-based initial lambda: " << last_best_lam << ", by user-supplied (negative) initial lambda: " << org_val;
 			message(1, ss.str());
 			last_best_lam *= org_val;
 		}
