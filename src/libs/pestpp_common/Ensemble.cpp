@@ -772,7 +772,7 @@ void Ensemble::reorder(const vector<string> &_real_names, const vector<string> &
 	}
 }
 
-void Ensemble::drop_rows(const vector<int> &row_idxs)
+void Ensemble::drop_rows(const vector<int> &row_idxs, bool update_org_real_names)
 {
 	vector<int>::const_iterator start = row_idxs.begin(), end = row_idxs.end();
 	vector<string> keep_names;
@@ -784,9 +784,11 @@ void Ensemble::drop_rows(const vector<int> &row_idxs)
 	else
 		reals = get_eigen(keep_names, vector<string>());
 	real_names = keep_names;
+	if (update_org_real_names)
+		org_real_names = keep_names;
 }
 
-void Ensemble::drop_rows(const vector<string> &drop_names)
+void Ensemble::drop_rows(const vector<string> &drop_names, bool update_org_real_names)
 {
 	vector<string> keep_names;
 	vector<string>::const_iterator start = drop_names.begin(), end = drop_names.end();
@@ -798,7 +800,8 @@ void Ensemble::drop_rows(const vector<string> &drop_names)
 	else
 		reals = get_eigen(keep_names, vector<string>());
 	real_names = keep_names;
-	org_real_names = keep_names;
+	if (update_org_real_names)
+		org_real_names = keep_names;
 
 }
 

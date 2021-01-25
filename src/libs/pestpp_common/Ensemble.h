@@ -82,8 +82,8 @@ public:
 	Covariance get_diagonal_cov_matrix();
 	pair<Covariance,Covariance> get_empirical_cov_matrices(FileManager* file_manager_ptr);
 	void reorder(const vector<string> &_real_names, const vector<string> &_var_names, bool update_org_real_names=false);
-	void drop_rows(const vector<int> &row_idxs);
-	void drop_rows(const vector<string> &drop_names);
+	void drop_rows(const vector<int> &row_idxs, bool update_org_real_names=false);
+	void drop_rows(const vector<string> &drop_names, bool update_org_real_names=false);
 	void drop_cols(const vector<string>& drop_names);
 	void keep_rows(const vector<int> &row_idxs);
 	void keep_rows(const vector<string> &keep_names);
