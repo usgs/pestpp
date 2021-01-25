@@ -3011,9 +3011,9 @@ bool IterEnsembleSmoother::solve_new()
 		//drop the remaining runs from the par en then append the remaining par runs (in case some failed)
 		performance_log->log_event("assembling ensembles");
 		pe_lams[best_idx].drop_rows(pe_keep_names);
-		pe_lams[best_idx].append_other_rows(remaining_pe_lam);
+		pe_lams[best_idx].append_other_rows(remaining_pe_lam,true);
 		//append the remaining obs en
-		oe_lam_best.append_other_rows(remaining_oe_lam);
+		oe_lam_best.append_other_rows(remaining_oe_lam,true);
 		assert(pe_lams[best_idx].shape().first == oe_lam_best.shape().first);
 		drop_bad_phi(pe_lams[best_idx], oe_lam_best);
 		if (oe_lam_best.shape().first == 0)
