@@ -1237,6 +1237,16 @@ void IterEnsembleSmoother::initialize()
 	string obs_restart_csv = pest_scenario.get_pestpp_options().get_ies_obs_restart_csv();
 	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
 	// if no restart and a pe was passed and no oe was passed, reset here before adding base
+	
+
+	if (pest_scenario.get_pestpp_options().get_ies_include_base())
+		if (pp_args.find("IES_RESTART_OBS_EN") != pp_args.end())
+		{
+			message(1, "Warning: even though `ies_include_base` is true, you passed a restart obs en, not adding 'base' realization...");
+		}
+		else
+			add_bases();
+
 	if ((obs_restart_csv.size() == 0) && (!pe_drawn) && (oe_drawn))
 	{
 		vector<string> rnames = pe.get_real_names();
@@ -1247,15 +1257,6 @@ void IterEnsembleSmoother::initialize()
 	//need this here for Am calcs...
 	//message(1, "transforming parameter ensemble to numeric");
 	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
-
-	if (pest_scenario.get_pestpp_options().get_ies_include_base())
-		if (pp_args.find("IES_RESTART_OBS_EN") != pp_args.end())
-		{
-			message(1, "Warning: even though `ies_include_base` is true, you passed a restart obs en, not adding 'base' realization...");
-		}
-		else
-			add_bases();
-
 
 	//now we check to see if we need to try to align the par and obs en
 	//this would only be needed if either of these were not drawn

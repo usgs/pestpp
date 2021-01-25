@@ -798,6 +798,7 @@ void Ensemble::drop_rows(const vector<string> &drop_names)
 	else
 		reals = get_eigen(keep_names, vector<string>());
 	real_names = keep_names;
+	org_real_names = keep_names;
 
 }
 
