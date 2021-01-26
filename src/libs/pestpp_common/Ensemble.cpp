@@ -1622,6 +1622,15 @@ void Ensemble::to_binary(string file_name, bool transposed)
 	char obs_name[200];
 
 	// write header
+	vector<string> too_long;
+	for (auto& name : real_names)
+		if (name.size() > 200)
+			too_long.push_back(name);
+	for (auto& name : var_names)
+		if (name.size() > 200)
+			too_long.push_back(name);
+	if (too_long.size() > 0)
+		throw_ensemble_error("ParameterEnsemble.to_binary(): the following real and/or par names are too long", too_long);
 	
 	tmp = n_var;
 	fout.write((char*)&tmp, sizeof(tmp));
@@ -2626,7 +2635,15 @@ void ParameterEnsemble::to_binary(string file_name)
 		}
 	}
 	//vnames.insert(vnames.end(),f_names.begin(),f_names.end());
-	
+	vector<string> too_long;
+	for (auto& name : real_names)
+		if (name.size() > 200)
+			too_long.push_back(name);
+	for (auto& name : var_names)
+		if (name.size() > 200)
+			too_long.push_back(name);
+	if (too_long.size() > 0)
+		throw_ensemble_error("ParameterEnsemble.to_binary(): the following real and/or par names are too long", too_long);
 
 	int n_var = vnames.size();
 	int n_real = real_names.size();
