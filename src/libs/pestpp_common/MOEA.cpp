@@ -3072,7 +3072,7 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 	ss << " saved decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 	ss.str("");
-	if (iter % save_every == 0)
+	if ((save_every > 0) && (iter % save_every == 0))
 	{
 		ss << file_manager.get_base_filename() << "." << iter;
 		if (tag.size() > 0)
@@ -3119,7 +3119,7 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 	ss << " saved observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 
-	if (iter % save_every == 0)
+	if ((save_every > 0) && (iter % save_every == 0))
 	{
 		ss.str("");
 		ss << file_manager.get_base_filename() << "." << iter;
