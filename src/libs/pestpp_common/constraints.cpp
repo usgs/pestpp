@@ -2409,7 +2409,7 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 		}
 		//update nested pe for any failed runs
 		nested_pe.keep_rows(nested_oe.get_real_names());
-		
+		nested_pe.reset_org_real_names();
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
 			ss.str("");

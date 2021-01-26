@@ -65,7 +65,7 @@ public:
 	const Eigen::MatrixXd* get_eigen_ptr() const { return &reals; }
 
 	void set_eigen(Eigen::MatrixXd _reals);
-
+	void reset_org_real_names() { org_real_names = real_names; }
 
 	Eigen::MatrixXd get_eigen_anomalies(string on_real="");
 	Eigen::MatrixXd get_eigen_anomalies(const vector<string> &_real_names, const vector<string> &_var_names, string on_real="");
