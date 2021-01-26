@@ -467,6 +467,8 @@ public:
 	void set_mou_mutation_probability(double _val) { mou_mutation_prob = _val; }
 	double get_mou_de_f() const { return mou_de_f; }
 	void set_mou_de_f(double _val) { mou_de_f = _val; }
+	int get_mou_save_population_every() const { return mou_save_population_every; }
+	void set_mou_save_population_every(int every) { mou_save_population_every = every; }
 	
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
@@ -750,6 +752,7 @@ private:
 	double mou_mutation_prob;
 	string mou_mating_selector;
 	double mou_de_f;
+	int mou_save_population_every;
 
 	int ies_subset_size;
 	string ies_par_csv;

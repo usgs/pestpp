@@ -885,17 +885,6 @@ ParChangeSummarizer::ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileMa
 
 void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter, string filename)
 {
-
-	stringstream ss;
-	ofstream &frec = file_manager_ptr->rec_ofstream();
-	ss << endl << "   ---  Parameter Group Change Summmary  ---    " << endl;
-	ss << "   (compared to the initial ensemble using active realizations)" << endl;
-	cout << ss.str();
-	frec << ss.str();
-	ss.str("");
-	ss << setw(15) << "group" << setw(12) << "mean change" << setw(12) << "std change" << setw(18) << "num at/near bnds" << setw(16) << "% at/near bnds" << endl;
-	cout << ss.str();
-	frec << ss.str();	
 	update(pe);
 	vector<string> grp_names;// = base_pe_ptr->get_pest_scenario().get_ctl_ordered_par_group_names();
 	vector<pair<double, string>> mean_pairs;
@@ -909,7 +898,22 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter, string fil
 	{
 		grp_names.push_back(mean_pairs[i].second);
 	}
+	int mxlen = 0;
+	for (auto& g : grp_names)
+		mxlen = max(mxlen, (int)g.size());
 
+	stringstream ss;
+	ofstream &frec = file_manager_ptr->rec_ofstream();
+	ss << endl << "   ---  Parameter Group Change Summmary  ---    " << endl;
+	ss << "   (compared to the initial ensemble using active realizations)" << endl;
+	cout << ss.str();
+	frec << ss.str();
+	ss.str("");
+	ss << setw(mxlen) << "group" << setw(12) << "mean change" << setw(12) << "std change" << setw(18) << "num at/near bnds" << setw(16) << "% at/near bnds" << endl;
+	cout << ss.str();
+	frec << ss.str();	
+	
+	
 	int i = 0;
 	for (auto &grp_name : grp_names)
 	{
@@ -918,7 +922,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter, string fil
 		int num_out = num_at_bounds[grp_name];
 		int percent_out = percent_at_bounds[grp_name];
 		ss.str("");
-		ss << setw(15) << pest_utils::lower_cp(grp_name) << setw(12) << mean_diff * 100.0 << setw(12) << std_diff * 100.0 << setw(18);
+		ss << setw(mxlen) << pest_utils::lower_cp(grp_name) << setw(12) << mean_diff * 100.0 << setw(12) << std_diff * 100.0 << setw(18);
 		ss << num_out << setw(16) << setprecision(2) << percent_out << endl;
 		if (i < 15)
 			cout << ss.str();

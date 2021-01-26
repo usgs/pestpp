@@ -1497,6 +1497,16 @@ void MOEA::initialize()
 	else
 		throw_moea_error("'mou_mating_selector' type not recognized: " + mate + ", should be 'RANDOM' or 'TOURNAMENT'");
 
+	save_every = ppo->get_mou_save_population_every();
+	if (save_every <= 0)
+	{
+		message(1, "'mou_save_population_every' less than/equal to zero, not saving generation-specific populations (and archives)");
+	}
+	else
+	{
+		message(1, "saving generation specific populations and archives every nth generation", save_every);
+	}
+
 
 	//reset the par bound PI augmentation since that option is just for simplex
 	ppo->set_opt_include_bnd_pi(false);
@@ -3037,9 +3047,11 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 
 void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag)
 {
+	
 	stringstream ss;
 	string fname;
-	ss << file_manager.get_base_filename() << "." << iter ;
+
+	ss << file_manager.get_base_filename();
 	if (tag.size() > 0)
 	{
 		ss << "." << tag;
@@ -3059,9 +3071,34 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 	ss.str("");
 	ss << " saved decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << name << "'";
 	message(1, ss.str());
-	
 	ss.str("");
-	ss << file_manager.get_base_filename() << "." << iter;
+	if (iter % save_every == 0)
+	{
+		ss << file_manager.get_base_filename() << "." << iter;
+		if (tag.size() > 0)
+		{
+			ss << "." << tag;
+		}
+		ss << "." << dv_pop_file_tag;
+		if (pest_scenario.get_pestpp_options().get_save_binary())
+		{
+			ss << ".jcb";
+			dp.to_binary(ss.str());
+		}
+		else
+		{
+			ss << ".csv";
+			dp.to_csv(ss.str());
+		}
+		string name = ss.str();
+		ss.str("");
+		ss << " saved generation-specific decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << name << "'";
+		message(1, ss.str());
+	}
+	
+
+	ss.str("");
+	ss << file_manager.get_base_filename();
 	if (tag.size() > 0)
 	{
 		ss << "." << tag;
@@ -3081,6 +3118,31 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 	ss.str("");
 	ss << " saved observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << name << "'";
 	message(1, ss.str());
+
+	if (iter % save_every == 0)
+	{
+		ss.str("");
+		ss << file_manager.get_base_filename() << "." << iter;
+		if (tag.size() > 0)
+		{
+			ss << "." << tag;
+		}
+		ss << "." << obs_pop_file_tag;
+		if (pest_scenario.get_pestpp_options().get_save_binary())
+		{
+			ss << ".jcb";
+			op.to_binary(ss.str());
+		}
+		else
+		{
+			ss << ".csv";
+			op.to_csv(ss.str());
+		}
+		name = ss.str();
+		ss.str("");
+		ss << " saved generation-specific observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << name << "'";
+		message(1, ss.str());
+	}
 
 }
 

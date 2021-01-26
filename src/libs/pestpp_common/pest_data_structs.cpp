@@ -1254,6 +1254,11 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_de_f);
 		return true;
 	}
+	else if (key == "MOU_SAVE_POPULATION_EVERY")
+	{
+		convert_ip(value, mou_save_population_every);
+		return true;
+	}
 
 	return false;
 }
@@ -1461,6 +1466,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_crossover_prob: " << mou_crossover_prob << endl;
 	os << "mou_mutation_prob: " << mou_mutation_prob << endl;
 	os << "mou_de_f: " << mou_de_f << endl;
+	os << "mou_save_population_every: " << mou_save_population_every << endl;
 	
 	os << endl << "...pestpp-ies options:" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
@@ -1619,6 +1625,7 @@ void PestppOptions::set_defaults()
 	set_mou_crossover_probability(0.75);
 	set_mou_mutation_probability(-999);
 	set_mou_de_f(0.8);
+	set_mou_save_population_every(-1);
 	
 
 	set_ies_par_csv("");

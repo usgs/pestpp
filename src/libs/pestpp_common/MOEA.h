@@ -150,6 +150,7 @@ private:
 	map<string, map<string, double>> previous_obj_summary;
 	bool risk_obj;
 	int restart_iter_offset;
+	int save_every;
 
 	//these two instances are passed as pointers to the constraints
 	//Parameters effective_constraint_pars;
