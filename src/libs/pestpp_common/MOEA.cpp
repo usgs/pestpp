@@ -1768,21 +1768,29 @@ void MOEA::initialize()
 	
 	if (risk_obj)
 	{
-		/*file_manager.rec_ofstream() << ss.str();
-		cout << ss.str();
-		dv_names.push_back(RISK_NAME);
-		pi_obj_names.push_back(RISK_NAME);
-		PIAtom pia(RISK_NAME, false, 1.0);
-		PriorInformationRec pir(0.0, 1.0, "greater_than", vector<PIAtom>{pia});
-		pest_scenario.get_prior_info_ptr()->AddRecord(RISK_NAME, &pir);*/
+		set<string> snames(act_par_names.begin(), act_par_names.end());
+		if (snames.find(RISK_NAME) == snames.end())
+			throw_moea_error("couldnt find '" + RISK_NAME + "' in adj par names for risk objective");
 		if (find(dv_names.begin(), dv_names.end(), RISK_NAME) == dv_names.end())
-			throw_moea_error(RISK_NAME + " not found in decision variable names");
+		{
+			//throw_moea_error(RISK_NAME + " not found in decision variable names");
+			message(1, "adding '" + RISK_NAME + "' to decision variable names");
+			dv_names.push_back(RISK_NAME);
+		}
 		if (find(pi_obj_names.begin(), pi_obj_names.end(), RISK_NAME) == pi_obj_names.end())
-			throw_moea_error(RISK_NAME + " not found in prior information objective names");
+		{
+			//throw_moea_error(RISK_NAME + " not found in prior information objective names");
+			PriorInformation* pi_ptr = pest_scenario.get_prior_info_ptr();
+			ParameterInfo par_info = pest_scenario.get_ctl_parameter_info();
+			ss.str("");
+			ss << RISK_NAME << " 1.0 * " << RISK_NAME << " = 0.5 1.0 greater_than";
+			pi_ptr->AddRecord(pest_utils::upper_cp(ss.str()));
+			message(1, "added prior information objective for '" + RISK_NAME + "': ", ss.str());
+			pi_obj_names.push_back(RISK_NAME);
+		}
 		ss.str("");
 		ss << "'mou_risk_objective' is true, using " << RISK_NAME << " decision variable as risk in chance calcs" << endl;
-		file_manager.rec_ofstream() << ss.str();
-		cout << ss.str();
+		message(1, ss.str());
 
 		//reset bounds of the risk parameter
 		double b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(RISK_NAME)->lbnd;

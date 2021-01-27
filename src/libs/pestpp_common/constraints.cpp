@@ -2501,7 +2501,7 @@ void Constraints::nested_stack_stdev_summary(map<string, ObservationEnsemble>& _
 			st = sqrt(st);
 		ss << setw(mxlen) << cname << " ";
 		ss << setw(8) << cvals.size() << " ";
-		ss << setw(12) << mn << " ";
+		ss << setw(12) << mean << " ";
 		ss << setw(12) << st << " ";
 		ss << setw(12) << mn << " ";
 		ss << setw(12) << mx << " ";
