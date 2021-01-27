@@ -2657,7 +2657,6 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 	ss.str("");
 	ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.jcb";
 	nested_pe.to_binary(ss.str());
-	nested_pe.to_csv("tests.csv");
 	cout << "...adding " << count << " runs nested stack-based chance constraints" << endl;
 	stack_runs_processed = false;
 	//reset stack_oe to use the same real names as stack_pe
