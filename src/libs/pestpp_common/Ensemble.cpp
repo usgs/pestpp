@@ -713,9 +713,10 @@ pair<map<string, double>, map<string, double>>  Ensemble::get_moment_maps(const 
 	return pair<map<string, double>, map<string, double>>(mean_map,std_map);
 }
 
-void Ensemble::replace_col(string var_name, Eigen::VectorXd& vec)
+void Ensemble::replace_col(string var_name, Eigen::VectorXd& vec, bool update_map)
 {
-	update_var_map();
+	if (update_map)
+		update_var_map();
 	if (var_map.find(var_name) == var_map.end())
 		throw_ensemble_error("replace_col(): var_name not found: " + var_name);
 	if (vec.size() != reals.rows())
@@ -774,10 +775,12 @@ void Ensemble::reorder(const vector<string> &_real_names, const vector<string> &
 
 void Ensemble::drop_rows(const vector<int> &row_idxs, bool update_org_real_names)
 {
-	vector<int>::const_iterator start = row_idxs.begin(), end = row_idxs.end();
+	//vector<int>::const_iterator start = row_idxs.begin(), end = row_idxs.end();
+	set<int> sdrop_rows(row_idxs.begin(), row_idxs.end());
+	set<int>::iterator end = sdrop_rows.end();
 	vector<string> keep_names;
 	for (int ireal = 0; ireal < reals.rows(); ireal++)
-		if (find(start, end, ireal) == end)
+		if (sdrop_rows.find(ireal) == end)
 			keep_names.push_back(real_names[ireal]);
 	if (keep_names.size() == 0)
 		reals = Eigen::MatrixXd();
@@ -791,9 +794,11 @@ void Ensemble::drop_rows(const vector<int> &row_idxs, bool update_org_real_names
 void Ensemble::drop_rows(const vector<string> &drop_names, bool update_org_real_names)
 {
 	vector<string> keep_names;
-	vector<string>::const_iterator start = drop_names.begin(), end = drop_names.end();
+	//vector<string>::const_iterator start = drop_names.begin(), end = drop_names.end();
+	set<string> sdrop_names(drop_names.begin(), drop_names.end());
+	set<string>::iterator end = sdrop_names.end();
 	for (auto &n : real_names)
-		if (find(start, end, n) == end)
+		if (sdrop_names.find(n) == end)
 			keep_names.push_back(n);
 	if (keep_names.size() == 0)
 		reals = Eigen::MatrixXd();
@@ -808,9 +813,12 @@ void Ensemble::drop_rows(const vector<string> &drop_names, bool update_org_real_
 void Ensemble::drop_cols(const vector<string>& drop_names)
 {
 	vector<string> keep_names;
-	vector<string>::const_iterator start = drop_names.begin(), end = drop_names.end();
+	set<string> sdrop_names(drop_names.begin(), drop_names.end());
+	set<string>::iterator end = sdrop_names.end();
+	//vector<string>::const_iterator start = drop_names.begin(), end = drop_names.end();
 	for (auto& n : var_names)
-		if (find(start, end, n) == end)
+		//if (find(start, end, n) == end)
+		if (sdrop_names.find(n) == end)
 			keep_names.push_back(n);
 	if (keep_names.size() == 0)
 		reals = Eigen::MatrixXd();
@@ -1630,7 +1638,7 @@ void Ensemble::to_binary(string file_name, bool transposed)
 		if (name.size() > 200)
 			too_long.push_back(name);
 	if (too_long.size() > 0)
-		throw_ensemble_error("ParameterEnsemble.to_binary(): the following real and/or par names are too long", too_long);
+		throw_ensemble_error("Ensemble.to_binary(): the following real and/or par names are too long", too_long);
 	
 	tmp = n_var;
 	fout.write((char*)&tmp, sizeof(tmp));
@@ -2185,7 +2193,6 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 	{
 		par_transform.active_ctl2model_ip(pars);
 	}
-	
 	Parameters pars_real = pars;
 	Eigen::VectorXd evec;
 	vector<double> svec;
@@ -2626,8 +2633,12 @@ void ParameterEnsemble::to_binary(string file_name)
 	ParameterRec::TRAN_TYPE tt = ParameterRec::TRAN_TYPE::TIED;
 
 	vector<string> f_names;
+	set<string> snames(var_names.begin(), var_names.end());
+	set<string>::iterator end = snames.end();
 	for (auto &name : pest_scenario_ptr->get_ctl_ordered_par_names())
 	{
+		if (snames.find(name) != end)
+			continue;
 		if ((pi.get_parameter_rec_ptr(name)->tranform_type == ft) || 
 			(pi.get_parameter_rec_ptr(name)->tranform_type == tt))
 		{
@@ -2669,10 +2680,10 @@ void ParameterEnsemble::to_binary(string file_name)
 	//map<string, double>::const_iterator found_pi_par;
 	//map<string, double>::const_iterator not_found_pi_par;
 	//icount = row_idxs + 1 + col_idxs * self.shape[0]
-	Parameters pars;
+	//Parameters pars;
 	for (int irow = 0; irow<n_real; ++irow)
 	{
-		pars.update_without_clear(var_names, reals.row(irow));
+		Parameters pars(var_names, reals.row(irow));
 		if (tstat == transStatus::MODEL)
 			par_transform.model2ctl_ip(pars);
 		else if (tstat == transStatus::NUM)

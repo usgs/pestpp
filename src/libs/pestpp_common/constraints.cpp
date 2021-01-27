@@ -1199,8 +1199,11 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 					throw_constraints_error("nearest dv real '" + min_real_name +"' not in stack oe map");
 				//todo add some output here to report the mapping results
 				if (min_dist > 0.0) min_dist = sqrt(min_dist);
-				frec << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
-				cout << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
+				if (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 3)
+				{
+					frec << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
+					cout << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
+				}
 				double _risk = risk;
 				if (risk_obj.size() > 0)
 				{	
@@ -1414,7 +1417,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 		prior_constraint_stdev[name] = mm.second[name];
 		post_constraint_stdev[name] = mm.second[name];
 
-		if (prior_constraint_stdev[name] == 0.0)
+		if ((prior_constraint_stdev[name] == 0.0) && (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 3))
 		{
 			throw_constraints_error("model-based constraint '" + name + "' has empirical (stack) standard deviation of 0.0", false);
 		}
@@ -2654,6 +2657,7 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 	ss.str("");
 	ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.jcb";
 	nested_pe.to_binary(ss.str());
+	nested_pe.to_csv("tests.csv");
 	cout << "...adding " << count << " runs nested stack-based chance constraints" << endl;
 	stack_runs_processed = false;
 	//reset stack_oe to use the same real names as stack_pe
@@ -2667,18 +2671,15 @@ map<int, int> Constraints::add_stack_runs(int iter, ParameterEnsemble& _stack_pe
 {
 	//update _stack_pe parameter values for decision variables using current_pars
 	int num_reals = _stack_pe.shape().first;
-	map<string, int> var_map = stack_pe.get_var_map();
+	_stack_pe.update_var_map();
 	for (auto dname : dec_var_names)
 	{
 		Eigen::VectorXd dvec(num_reals);
 		dvec.setConstant(current_pars.get_rec(dname));
-		_stack_pe.replace_col(dname, dvec);
+		_stack_pe.replace_col(dname, dvec,false);
 	}
 	pfm.log_event("building stack-based parameter runs");
-	
-	
 	map<int,int> _stack_pe_run_map = _stack_pe.add_runs(run_mgr_ptr);
-	
 	return _stack_pe_run_map;
 }
 
