@@ -694,13 +694,15 @@ pair<map<string, double>, map<string, double>>  Ensemble::get_moment_maps(const 
 	{
 		mean = reals.colwise().mean();
 		Eigen::MatrixXd mean_diff = get_eigen_anomalies();
-		std = mean_diff.array().pow(2).colwise().sum().sqrt();
+		//std = mean_diff.array().pow(2).colwise().sum().sqrt();
+		std = (mean_diff.array() * mean_diff.array()).colwise().sum().sqrt();
 	}
 	else
 	{
 		mean = get_eigen(_real_names,vector<string>()).colwise().mean();
 		Eigen::MatrixXd mean_diff = get_eigen_anomalies(_real_names,vector<string>());
-		std = mean_diff.array().pow(2).colwise().sum().sqrt();
+		//std = mean_diff.array().pow(2).colwise().sum().sqrt();
+		std = (mean_diff.array() * mean_diff.array()).colwise().sum().sqrt();
 	}
 	map<string, double> mean_map, std_map;
 	string name;
@@ -1453,11 +1455,12 @@ void Ensemble::replace(int idx, const Transformable &trans, string real_name)
 	stringstream ss;
 	
 	//make sure all var_names are found
-	vector<string> keys = trans.get_keys();
-	set<string> tset(keys.begin(), keys.end());
+	//vector<string> keys = trans.get_keys();
+	//set<string> tset(keys.begin(), keys.end());
+	Transformable::const_iterator end = trans.end();
 	vector<string> missing;
 	for (auto &n : var_names)
-		if (tset.find(n) == tset.end())
+		if (trans.find(n) == end)
 			missing.push_back(n);
 	if (missing.size() > 0)
 	{

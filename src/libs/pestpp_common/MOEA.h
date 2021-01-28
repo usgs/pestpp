@@ -58,7 +58,8 @@ public:
 	void get_spea2_archive_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp);
 
 	void prep_pareto_summary_file(string summary_tag);
-	void write_pareto_summary(string& sum_tag, int generation, ObservationEnsemble& op, ParameterEnsemble& dp, Constraints* constr_ptr=nullptr);
+	void write_pareto_summary(string& sum_tag, int generation, ObservationEnsemble& op, ParameterEnsemble& dp, 
+		Constraints* constr_ptr=nullptr);
 
 private:
 	

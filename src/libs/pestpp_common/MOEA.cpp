@@ -507,7 +507,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 
 void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, ObservationEnsemble& op, ParameterEnsemble& dp, Constraints* constr_ptr)
 {
-	update(op, dp, constr_ptr);
+	//update(op, dp, constr_ptr);
 	if (!file_manager.check_ofile_tag_exists(sum_tag))
 		file_manager.open_ofile_ext(sum_tag);
 	ofstream& sum = file_manager.get_ofstream(sum_tag);
@@ -1789,7 +1789,7 @@ void MOEA::initialize()
 			pi_obj_names.push_back(RISK_NAME);
 		}
 		ss.str("");
-		ss << "'mou_risk_objective' is true, using " << RISK_NAME << " decision variable as risk in chance calcs" << endl;
+		ss << "'mou_risk_objective' is true, using " << RISK_NAME << " decision variable as risk in chance calcs";
 		message(1, ss.str());
 
 		//reset bounds of the risk parameter
