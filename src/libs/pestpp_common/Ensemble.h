@@ -72,8 +72,8 @@ public:
 
 
 	vector<double> get_mean_stl_var_vector();
-	pair<map<string, double>, map<string, double>>  get_moment_maps(const vector<string> &_real_names=vector<string>());
-
+	//pair<map<string, double>, map<string, double>>  get_moment_maps(const vector<string> &_real_names=vector<string>());
+	void fill_moment_maps(map<string, double>& mean_map, map<string, double>& std_map);
 	void append_other_rows(Ensemble &other,bool reset_org_real_names=false);
 	void append_other_rows(const vector<string>& _real_names, Eigen::MatrixXd& _reals);
 	void append(string real_name, const Transformable &trans);

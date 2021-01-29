@@ -1005,19 +1005,19 @@ void Constraints::update_chance_offsets()
 	//every stack if there are some failed runs, etc.
 	else
 	{
-		pair<map<string, double>, map<string, double>> stack_oe_mean_stdev;
-		
+		//pair<map<string, double>, map<string, double>> stack_oe_mean_stdev;
+		map<string, double> mean_map, std_map;
 		if (stack_oe_map.size() > 0)
 		{
 			
 			ObservationEnsemble _mean_stack = get_stack_mean(stack_oe_map);
-			stack_oe_mean_stdev = _mean_stack.get_moment_maps();
+			_mean_stack.fill_moment_maps(mean_map, std_map);
 		}
 		else
-			stack_oe_mean_stdev = stack_oe.get_moment_maps();
+			stack_oe.fill_moment_maps(mean_map, std_map);
 		for (auto cname : ctl_ord_obs_constraint_names)
 		{
-			prior_const_var[cname] = stack_oe_mean_stdev.second[cname] * stack_oe_mean_stdev.second[cname];
+			prior_const_var[cname] = std_map[cname] * std_map[cname];
 			post_const_var[cname] = prior_const_var[cname];
 		}
 	}
@@ -1400,7 +1400,9 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	_stack_oe.update_var_map();
 	map<string, int> var_map = _stack_oe.get_var_map();
 	//get the mean and stdev summary containters, summarized by observation (e.g. constraint) name
-	pair<map<string, double>, map<string, double>> mm = _stack_oe.get_moment_maps();
+	//pair<map<string, double>, map<string, double>> mm = _stack_oe.get_moment_maps();
+	map<string, double> mean_map, std_map;
+	_stack_oe.fill_moment_maps(mean_map, std_map);
 	for (auto& name : ctl_ord_obs_constraint_names)
 	{
 		old_constraint_val = current_obs.get_rec(name);
@@ -1414,8 +1416,8 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 		sort(cvec.data(), cvec.data() + cvec.size());
 		//set the stdev container info - this isnt used in 
 		//calculations but gets reported
-		prior_constraint_stdev[name] = mm.second[name];
-		post_constraint_stdev[name] = mm.second[name];
+		prior_constraint_stdev[name] = std_map[name];
+		post_constraint_stdev[name] = std_map[name];
 
 		if ((prior_constraint_stdev[name] == 0.0) && (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 3))
 		{
@@ -1818,8 +1820,9 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 				infeas_count[in.first]++;
 		}
 
-		pair<map<string,double>,map<string,double>> mm = oe.get_moment_maps();
-
+		//pair<map<string,double>,map<string,double>> mm = oe.get_moment_maps();
+		map<string, double> mean_map, std_map;
+		oe.fill_moment_maps(mean_map, std_map);
 
 		ss << endl << "  population observation constraint summary at iteration " << iter << endl;
 		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "mean sim value";
@@ -1835,7 +1838,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			ss << setw(nsize) << left << name;
 			ss << setw(12) << right << constraint_sense_name[name];
 			ss << setw(12) << constraints_obs.get_rec(name);
-			ss << setw(15) << mm.first[name];
+			ss << setw(15) << mean_map[name];
 			ss << setw(15) << 100.0 * double(infeas_count[name]) / double(num_reals);
 			ss << endl;
 
@@ -2474,13 +2477,15 @@ void Constraints::nested_stack_stdev_summary(map<string, ObservationEnsemble>& _
 	}
 
 	string cname;
-	
+	map<string, double> mean_map, std_map;
 	for (auto& m : _stack_oe_map)
 	{
-		mm = m.second.get_moment_maps();
+		mean_map.clear();
+		std_map.clear();
+		m.second.fill_moment_maps(mean_map, std_map);
 		for (auto& cname : ctl_ord_obs_constraint_names)
 		{
-			nested_std_map[cname].push_back(mm.second[cname]);
+			nested_std_map[cname].push_back(std_map[cname]);
 		}
 	}
 	

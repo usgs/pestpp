@@ -1089,7 +1089,9 @@ map<string, map<string, double>> MOEA::obj_func_change_report(map<string, map<st
 map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
 
-	pair<map<string, double>, map<string, double>> mm = _op.get_moment_maps();
+	//pair<map<string, double>, map<string, double>> mm = _op.get_moment_maps();
+	map<string, double> mean_map, std_map;
+	_op.fill_moment_maps(mean_map, std_map);
 	_op.update_var_map();
 	map<string, int> var_map = _op.get_var_map();
 	map<string, double> sum;
@@ -1097,14 +1099,17 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 	for (auto obs_obj : obs_obj_names)
 	{
 		sum.clear();
-		sum["mean"] = mm.first[obs_obj];
-		sum["std"] = mm.second[obs_obj];
+		sum["mean"] = mean_map[obs_obj];
+		sum["std"] = std_map[obs_obj];
 		sum["min"] = _op.get_eigen_ptr()->col(var_map[obs_obj]).minCoeff();
 		sum["max"] = _op.get_eigen_ptr()->col(var_map[obs_obj]).maxCoeff();
 		summary_stats[obs_obj] = sum;
 	}
 
-	mm = _dp.get_moment_maps();
+	//mm = _dp.get_moment_maps();
+	//mean_map.clear();
+	//std_map.clear();
+	//_dp.fill_moment_maps(mean_map, std_map);
 	_dp.update_var_map();
 	var_map = _dp.get_var_map();
 	vector<string> dp_names = _dp.get_var_names();

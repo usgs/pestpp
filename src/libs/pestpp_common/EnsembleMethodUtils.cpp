@@ -870,7 +870,9 @@ ParChangeSummarizer::ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileMa
 	base_pe_ptr = _base_pe_ptr;
 	file_manager_ptr = _file_manager_ptr;
 	output_file_writer_ptr = _output_file_writer_ptr;
-	init_moments = base_pe_ptr->get_moment_maps();
+	map<string, double> mean_map, std_map;
+	base_pe_ptr->fill_moment_maps(mean_map, std_map);
+	init_moments = pair<map<string, double>, map<string, double>>(mean_map, std_map);
 	ParameterGroupInfo gi = base_pe_ptr->get_pest_scenario().get_base_group_info();
 	string group;
 	for (auto &n : base_pe_ptr->get_var_names())
@@ -974,9 +976,14 @@ void ParChangeSummarizer::update(ParameterEnsemble& pe)
 	std_change.clear();
 	num_at_bounds.clear();
 	percent_at_bounds.clear();
-	pair<map<string, double>, map<string, double>> moments = pe.get_moment_maps();
-	init_moments = base_pe_ptr->get_moment_maps(pe.get_real_names());
-	
+	//pair<map<string, double>, map<string, double>> moments = pe.get_moment_maps();
+	//init_moments = base_pe_ptr->get_moment_maps(pe.get_real_names());
+	map<string, double> mean_map, std_map;
+	base_pe_ptr->fill_moment_maps(mean_map, std_map);
+	init_moments = pair<map<string, double>, map<string, double>>(mean_map, std_map);
+	mean_map.clear();
+	std_map.clear();
+	pe.fill_moment_maps(mean_map, std_map);
 	double mean_diff = 0.0, std_diff = 0.0;
 	double dsize, value1, value2, v;
 	vector<string> pnames = pe.get_var_names();
@@ -1006,11 +1013,11 @@ void ParChangeSummarizer::update(ParameterEnsemble& pe)
 					num_out++;
 			}
 			value1 = init_moments.first[par_name];
-			value2 = value1 - moments.first[par_name];
+			value2 = value1 - mean_map[par_name];
 			if ((value1 != 0.0) && (value2 != 0.0))
 				mean_diff += value2 / value1;
 			value1 = init_moments.second[par_name];
-			value2 = value1 - moments.second[par_name];
+			value2 = value1 - std_map[par_name];
 			if ((value1 != 0.0) && (value2 != 0.0))
 				std_diff += value2 / value1;
 		}

@@ -687,33 +687,48 @@ vector<double> Ensemble::get_mean_stl_var_vector()
 	return mean_vec;
 }
 
-pair<map<string, double>, map<string, double>>  Ensemble::get_moment_maps(const vector<string> &_real_names)
+void Ensemble::fill_moment_maps(map<string, double>& mean_map, map<string, double>& std_map)
 {
-	Eigen::VectorXd mean, std;
-	if (_real_names.size() == 0)
+	Eigen::VectorXd mean = reals.colwise().mean();
+	Eigen::MatrixXd mean_diff = get_eigen_anomalies();
+	//std = mean_diff.array().pow(2).colwise().sum().sqrt();
+	Eigen::VectorXd std = (mean_diff.array() * mean_diff.array()).colwise().sum().sqrt();
+	int i = 0;
+	for (auto& name : var_names)
 	{
-		mean = reals.colwise().mean();
-		Eigen::MatrixXd mean_diff = get_eigen_anomalies();
-		//std = mean_diff.array().pow(2).colwise().sum().sqrt();
-		std = (mean_diff.array() * mean_diff.array()).colwise().sum().sqrt();
+		mean_map.insert(make_pair(name,mean[i]));
+		std_map.insert(make_pair(name,std[i]));
+		i++;
 	}
-	else
-	{
-		mean = get_eigen(_real_names,vector<string>()).colwise().mean();
-		Eigen::MatrixXd mean_diff = get_eigen_anomalies(_real_names,vector<string>());
-		//std = mean_diff.array().pow(2).colwise().sum().sqrt();
-		std = (mean_diff.array() * mean_diff.array()).colwise().sum().sqrt();
-	}
-	map<string, double> mean_map, std_map;
-	string name;
-	for (int i = 0; i < reals.cols(); i++)
-	{
-		name = var_names[i];
-		mean_map[name] = mean[i];
-		std_map[name] = std[i];
-	}
-	return pair<map<string, double>, map<string, double>>(mean_map,std_map);
 }
+
+//pair<map<string, double>, map<string, double>>  Ensemble::get_moment_maps(const vector<string> &_real_names)
+//{
+//	Eigen::VectorXd mean, std;
+//	if (_real_names.size() == 0)
+//	{
+//		mean = reals.colwise().mean();
+//		Eigen::MatrixXd mean_diff = get_eigen_anomalies();
+//		//std = mean_diff.array().pow(2).colwise().sum().sqrt();
+//		std = (mean_diff.array() * mean_diff.array()).colwise().sum().sqrt();
+//	}
+//	else
+//	{
+//		mean = get_eigen(_real_names,vector<string>()).colwise().mean();
+//		Eigen::MatrixXd mean_diff = get_eigen_anomalies(_real_names,vector<string>());
+//		//std = mean_diff.array().pow(2).colwise().sum().sqrt();
+//		std = (mean_diff.array() * mean_diff.array()).colwise().sum().sqrt();
+//	}
+//	map<string, double> mean_map, std_map;
+//	string name;
+//	for (int i = 0; i < reals.cols(); i++)
+//	{
+//		name = var_names[i];
+//		mean_map[name] = mean[i];
+//		std_map[name] = std[i];
+//	}
+//	return pair<map<string, double>, map<string, double>>(mean_map,std_map);
+//}
 
 void Ensemble::replace_col(string var_name, Eigen::VectorXd& vec, bool update_map)
 {
@@ -1116,8 +1131,15 @@ void Ensemble::update_real_ip(const string & rname, Eigen::VectorXd & real)
 void Ensemble::update_var_map()
 {
 	var_map.clear();
-	for (int i = 0; i < var_names.size(); i++)
-		var_map[var_names[i]] = i;
+	
+	//for (int i = 0; i < var_names.size(); i++)
+	int i = 0;
+	for (auto& name : var_names)
+	{
+		//var_map[var_names[i]] = i;
+		var_map.insert(make_pair(name, i));
+		i++;
+	}
 }
 
 void Ensemble::throw_ensemble_error(string message, vector<string> vec)

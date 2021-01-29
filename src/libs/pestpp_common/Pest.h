@@ -105,12 +105,12 @@ public:
 	map<string, double> get_ext_file_double_map(const string& section_name, const string& col_name);
 
     void clear_ext_files() { efiles_map.clear(); }
-
+	map<string, vector<pest_utils::ExternalCtlFile>>& get_efiles_map() { return efiles_map; }
 	virtual ~Pest();
 	
 protected:
 	//this is the list of external file cols that have meaning...
-	set<string> efile_keep_cols{ "standard_deviation", "obsnme","parnme","name", "upper_bound","lower_bound", "cycle" };
+	set<string> efile_keep_cols{ "standard_deviation", "obsnme","parnme","name", "upper_bound","lower_bound", "cycle", "da_state_par_name" };
 	int n_adj_par = 0;
 	string prior_info_string;
 	ControlInfo control_info;
