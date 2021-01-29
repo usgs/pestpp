@@ -110,7 +110,7 @@ public:
 	
 protected:
 	//this is the list of external file cols that have meaning...
-	set<string> efile_keep_cols{ "standard_deviation", "obsnme","parnme","name", "upper_bound","lower_bound", "cycle", "da_state_par_name" };
+	set<string> efile_keep_cols{ "standard_deviation", "obsnme","parnme","name", "upper_bound","lower_bound", "cycle", "state_par_link" };
 	int n_adj_par = 0;
 	string prior_info_string;
 	ControlInfo control_info;

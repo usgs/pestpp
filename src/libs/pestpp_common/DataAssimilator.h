@@ -82,7 +82,7 @@ public:
 	void da_save_ensemble_oe(string fprefix, string dtyp);
 	//void add_dynamic_state_to_pe();
 	void add_dynamic_state_to_pe();
-	vector<string> get_dynamic_states();
+	
 	
 	void da_upate();
 
@@ -136,7 +136,9 @@ private:
 	double last_best_lam, last_best_mean, last_best_std;
 	vector<double> best_mean_phis;
 	double best_phi_yet;
-	vector<string> dyn_states_names;
+	vector<string> obs_dyn_state_names;
+	vector<string> par_dyn_state_names;
+
 
 	int consec_bad_lambda_cycles;
 
@@ -158,7 +160,7 @@ private:
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 
 	bool oe_drawn, pe_drawn;
-	
+	void initialize_dynamic_states();
 	bool solve_new_da();
 	void update_starting_state();
 	void return_post_dyn_state(vector<ParameterEnsemble>& pe_lams, vector<ParameterEnsemble> poterior_dyn_states);

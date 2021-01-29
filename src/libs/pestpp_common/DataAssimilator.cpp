@@ -1549,15 +1549,15 @@ void DataAssimilator::forward_run_noptmax_0(int icycle)
 		pest_scenario.get_ctl_observations(), obs, obj_func, pars);
 
 	// for models y(t+1) = g(x, y(t)), extract y(t+1) and use it as initial state for next time cycle
-	dyn_states = get_dynamic_states();
-	vector<string> real_names = _oe.get_real_names();
+	//dyn_states = get_dynamic_states();
+	//vector<string> real_names = _oe.get_real_names();
 	Eigen::MatrixXd obs_i;
-	if (dyn_states_names.size() > 0) {
+	if (obs_dyn_state_names.size() > 0) {
 		message(1, "update initial dynamic states for next time cycle. Dynamic states  matrix size is", dyn_states.size());
 
-		Eigen::MatrixXd mat = _oe.get_eigen(real_names, dyn_states_names);
+		Eigen::MatrixXd mat = _oe.get_eigen(vector<string>(), obs_dyn_state_names);
 		obs_i = mat.replicate(pe.shape().first, 1);
-		pe.replace_col_vals(dyn_states_names, obs_i);
+		pe.replace_col_vals(par_dyn_state_names, obs_i);
 
 	}
 	oe = _oe;
@@ -1581,6 +1581,8 @@ void DataAssimilator::initialize(int _icycle)
 	// da type that is lower case is ok, I should move this somewhere else
 	transform(da_type.begin(), da_type.end(), da_type.begin(), ::toupper);
 	
+	initialize_dynamic_states();
+
 	// run the model one time using the initial parameters values. 
 	if (pest_scenario.get_control_info().noptmax == 0)
 	{
@@ -1904,19 +1906,19 @@ void DataAssimilator::initialize(int _icycle)
 		ph.report();
 
 		// for models y(t+1) = g(x, y(t)), extract y(t+1) and as initial state for next time cycle
-		dyn_states = get_dynamic_states();
-		if (dyn_states.size() != 0)
+		//dyn_states = get_dynamic_states();
+		if (obs_dyn_state_names.size() != 0)
 		{
 			message(1, "update initial dynamic states for next time cycle. Dynamic states  matrix size is", dyn_states.size());
 		}
 		//add_dynamic_state_to_pe();
-		vector<string> real_names = _oe.get_real_names();
+		//vector<string> real_names = _oe.get_real_names();
 		Eigen::MatrixXd obs_i;
 
-		if (dyn_states_names.size() > 0) {
-			Eigen::MatrixXd mat = _oe.get_eigen(real_names, dyn_states_names);
+		if (obs_dyn_state_names.size() > 0) {
+			Eigen::MatrixXd mat = _oe.get_eigen(vector<string>(), obs_dyn_state_names);
 			obs_i = mat.replicate(pe.shape().first, 1);
-			pe.replace_col_vals(dyn_states_names, obs_i);
+			pe.replace_col_vals(par_dyn_state_names, obs_i);
 
 		}
 
@@ -1984,8 +1986,9 @@ void DataAssimilator::initialize(int _icycle)
 
 	//States are flaged as ones that have zero weights and exist in both oe and pe
 
-	dyn_states = get_dynamic_states();
-	if (dyn_states.size() != 0)
+	//dyn_states = get_dynamic_states();
+	
+	if (obs_dyn_state_names.size() != 0)
 	{
 		message(1, "add dynamic states to forecast ensemble. Dynamic states  matrix size is ", dyn_states.size());
 	}
@@ -2185,40 +2188,38 @@ void DataAssimilator::da_save_ensemble_oe(string fprefix, string dtyp)
 void DataAssimilator::add_dynamic_state_to_pe()
 {
 	
-	vector<string> real_names = oe.get_real_names();
-	
-	if (dyn_states_names.size() > 0)	{	
+	//vector<string> real_names = oe.get_real_names();
+	if (obs_dyn_state_names.size() > 0)	{	
 			
-		Eigen::MatrixXd mat = oe.get_eigen(real_names, dyn_states_names);
-		pe.replace_col_vals(dyn_states_names, mat);
+		Eigen::MatrixXd mat = oe.get_eigen(vector<string>(), obs_dyn_state_names);
+		pe.replace_col_vals(par_dyn_state_names, mat);
 		
 	}
 }
-vector<string> DataAssimilator::get_dynamic_states()
+void DataAssimilator::initialize_dynamic_states()
 {
 	// find a list of dynamic states
 	//vector <string> dyn_states_names;	
-	if (dyn_states_names.size() > 0)
-	{
-		return dyn_states_names;
-	}
-
+	obs_dyn_state_names.clear();
+	par_dyn_state_names.clear();
 	vector<string> obs_names = oe.get_var_names();
-	vector<string> par_names = pe.get_var_names();	
-	double w;
-	string name;
-	for (int i = 0; i < obs_names.size(); i++)	{
-		name = obs_names[i];
+	vector<string> par_names = pe.get_var_names();
+	set<string> spar_names(par_names.begin(), par_names.end());
+	set<string>::iterator end = spar_names.end();
+	par_names.clear();
+	//for (int i = 0; i < obs_names.size(); i++)	
+	for (auto& name : obs_names)
+	{
 		
-		w = pest_scenario.get_observation_info_ptr()->get_weight(obs_names[i]);		
-		if ((w == 0) & (std::count(par_names.begin(), par_names.end(), name)))
+		//w = pest_scenario.get_observation_info_ptr()->get_weight(obs_names[i]);		
+		//if ((w == 0) & (std::count(par_names.begin(), par_names.end(), name)))
+		if (spar_names.find(name) != end)
 		{
-			dyn_states_names.push_back(name);
+			obs_dyn_state_names.push_back(name);
+			par_dyn_state_names.push_back(name);
 		}
 
 	}
-	return dyn_states_names;
-
 }
 vector<string> DataAssimilator::detect_prior_data_conflict()
 {
@@ -2442,7 +2443,7 @@ void DataAssimilator::da_upate()
 	//todo return posterior here
 	da_save_ensemble_pe("_analysis_cycle_", ".par");
 	da_save_ensemble_oe("_analysis_cycle_", ".obs");
-	if (dyn_states_names.size() > 0)
+	if (obs_dyn_state_names.size() > 0)
 		update_starting_state();
 
 
@@ -4151,7 +4152,7 @@ bool DataAssimilator::solve_new_da()
 	if (evaluate_update)
 	{
 		message(0, "running inflation ensembles");
-		if (dyn_states_names.size() > 0)
+		if (par_dyn_state_names.size() > 0)
 		{
 			// before forward runing remove the dynamic states temporarly 
 			// and replace them with prior dynamic states
@@ -4251,7 +4252,7 @@ bool DataAssimilator::solve_new_da()
 		if (iter == infl_facs.size()) // I thinks is also not needed
 		{
 			if (evaluate_update)
-			if (dyn_states_names.size() > 0)
+			if (par_dyn_state_names.size() > 0)
 			{
 				message(1, "Last MDA cycle; update dynamic forecast ");
 				return_post_dyn_state(pe_lams, posterior_dyn_states);
@@ -4379,7 +4380,7 @@ bool DataAssimilator::solve_new_da()
 			pe_lams_remain.push_back(remaining_pe_lam);
 			// TODO: we do not need this here becuase we have already posteriors from all the ensembles 
 			if (true)
-				if (dyn_states_names.size() > 0)
+				if (par_dyn_state_names.size() > 0)
 				{
 					// before forward runing remove the dynamic states temporarly 
 					// and replace them with prior dynamic states
@@ -4389,7 +4390,7 @@ bool DataAssimilator::solve_new_da()
 			//oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
 			vector<int> fails = run_ensemble(pe_lams_remain[0], remaining_oe_lam);
 			if (false) // only no need for this here
-				if (dyn_states_names.size() > 0)
+				if (par_dyn_state_names.size() > 0)
 				{
 					// after forward running put the dynamic states back into pe
 					return_post_dyn_state(pe_lams_remain, posterior_dyn_states);
@@ -4524,7 +4525,7 @@ void DataAssimilator::return_post_dyn_state(vector<ParameterEnsemble>& pe_lams, 
 	vector<string> real_names_; // it is not used!
 
 	int ireal = 0;
-	real_names_ = pe_base.get_real_names();	
+	//real_names_ = pe_base.get_real_names();	
 
 	for (auto _pe : pe_lams)
 
@@ -4535,7 +4536,7 @@ void DataAssimilator::return_post_dyn_state(vector<ParameterEnsemble>& pe_lams, 
 		var_names = Ens.get_var_names();
 		Ens.keep_rows(real_names);
 
-		real_names_ = _pe.get_real_names();		
+		//real_names_ = _pe.get_real_names();		
 		pe_lams[ireal].replace_col_vals(var_names, Ens.get_eigen());
 		ireal = ireal + 1;
 	}
@@ -4549,17 +4550,17 @@ vector<ParameterEnsemble> DataAssimilator::temp_remove_dyn_state(vector<Paramete
 		int ireal = 0;
 		real_names_ = pe_base.get_real_names();
 		Eigen::MatrixXd matPrior;
-		vector<string> static_parms_names, dyn_nam;
+		vector<string> static_parms_names;
 		ParameterEnsemble local_base_pe;
 		ParameterEnsemble current_pe;
 
 		static_parms_names = pe_base.get_var_names();
-		dyn_nam = dyn_states_names;		
+		set<string> dyn_nam(par_dyn_state_names.begin(),par_dyn_state_names.end());		
 
 		// get a vector of non-dynamic parameters
 		auto pred = [&dyn_nam](const std::string& key) ->bool
 		{
-			return std::find(dyn_nam.begin(), dyn_nam.end(), key) != dyn_nam.end();
+			return dyn_nam.find(key) != dyn_nam.end();
 		};
 		static_parms_names.erase(remove_if(static_parms_names.begin(), static_parms_names.end(), pred), static_parms_names.end());
 		
@@ -4572,8 +4573,8 @@ vector<ParameterEnsemble> DataAssimilator::temp_remove_dyn_state(vector<Paramete
 			poterior_dyn_states.push_back(current_pe);			
 			local_base_pe = pe_base;
 			local_base_pe.keep_rows(real_names_);
-			matPrior = local_base_pe.get_eigen(real_names_, dyn_states_names);
-			pe_lams[ireal].replace_col_vals(dyn_states_names, matPrior);
+			matPrior = local_base_pe.get_eigen(real_names_, par_dyn_state_names);
+			pe_lams[ireal].replace_col_vals(par_dyn_state_names, matPrior);
 			ireal = ireal + 1;
 		}		
 		return poterior_dyn_states;
