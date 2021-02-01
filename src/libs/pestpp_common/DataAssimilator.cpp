@@ -2220,7 +2220,51 @@ void DataAssimilator::initialize_dynamic_states()
 		}
 
 	}
-
+	map<string, string> state_map = pest_scenario.get_ext_file_string_map("observation data external", "state_par_link");
+	if (state_map.size() > 0)
+	{
+		set<string> pstates(par_dyn_state_names.begin(), par_dyn_state_names.end());
+		set<string>::iterator send = pstates.end();
+		vector<string> t = pest_scenario.get_ctl_ordered_par_names();
+		set<string> pnames(t.begin(), t.end());
+		t.clear();
+		set<string>::iterator pend = pnames.end();
+		vector<string> dups,missing;
+		for (auto& sm : state_map)
+		{
+			if (pstates.find(sm.second) != send)
+			{
+				dups.push_back(sm.second);
+			}
+			else if (pnames.find(sm.second) == pend)
+			{
+				missing.push_back(sm.second);
+			}
+			else
+			{
+				obs_dyn_state_names.push_back(sm.first);
+				par_dyn_state_names.push_back(sm.second);
+			}
+		}
+		if (dups.size() > 0)
+		{
+			stringstream ss;
+			ss << "the following state parameters nominated thru obs data linking " << endl;
+			ss << "    were already tagged as 'states' by identically named observations:" << endl;
+			for (auto& d : dups)
+				ss << d << ",";		
+			throw_da_error(ss.str());
+		}
+		if (missing.size() > 0)
+		{
+			stringstream ss;
+			ss << "the following parameters nominated thru obs data linking " << endl;
+			ss << "    were not found in par data section:" << endl;
+			for (auto& m : missing)
+				ss << m << ",";
+			throw_da_error(ss.str());
+		}
+	}
 }
 vector<string> DataAssimilator::detect_prior_data_conflict()
 {

@@ -3007,10 +3007,10 @@ void Pest::extract_da_cycles()
 {
 	int xxx;
 }
-map<string,double> Pest::get_ext_file_double_map(const string& section_name, const string& col_name)
+map<string,string> Pest::get_ext_file_string_map(const string& section_name, const string& col_name)
 {
 	string sname_upper = pest_utils::upper_cp(section_name);
-	map<string, double> val_map;
+	map<string, string> val_map;
 	if (efiles_map.find(sname_upper) == efiles_map.end())
 		return val_map;
 	set<string> col_names;
@@ -3030,16 +3030,30 @@ map<string,double> Pest::get_ext_file_double_map(const string& section_name, con
 			sidx = efile.get_col_string_vector(idx_col);
 			for (int i = 0; i < svals.size(); i++)
 			{
-				try
-				{
-					val = stod(svals[i]);
-					val_map[sidx[i]] = val;
-				}
-				catch (...)
-				{
-					continue;
-				}
+				val_map.emplace(make_pair(sidx[i],svals[i]));
 			}
+		}
+	}
+	return val_map;
+}
+
+
+map<string, double> Pest::get_ext_file_double_map(const string& section_name, const string& col_name)
+{
+	string sname_upper = pest_utils::upper_cp(section_name);
+	map<string, string> str_map = get_ext_file_string_map(section_name, col_name);
+	map<string, double> val_map;
+	double val;
+	for (auto sval : str_map)
+	{
+		try
+		{
+			val = stod(sval.second);
+			val_map[sval.first] = val;
+		}
+		catch (...)
+		{
+			continue;
 		}
 	}
 	return val_map;

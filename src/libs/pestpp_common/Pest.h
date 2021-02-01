@@ -103,6 +103,7 @@ public:
 	void assign_da_cycles(ofstream& f_rec);
 	vector<pair<string, int>> extract_cycle_numbers2(ofstream& f_rec, string section_name, vector<string> possible_name_cols);
 	map<string, double> get_ext_file_double_map(const string& section_name, const string& col_name);
+	map<string, string> get_ext_file_string_map(const string& section_name, const string& col_name);
 
     void clear_ext_files() { efiles_map.clear(); }
 	map<string, vector<pest_utils::ExternalCtlFile>>& get_efiles_map() { return efiles_map; }
