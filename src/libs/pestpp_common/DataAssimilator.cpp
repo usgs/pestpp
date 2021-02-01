@@ -2220,6 +2220,7 @@ void DataAssimilator::initialize_dynamic_states()
 		}
 
 	}
+
 }
 vector<string> DataAssimilator::detect_prior_data_conflict()
 {

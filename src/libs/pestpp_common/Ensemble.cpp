@@ -2669,6 +2669,10 @@ void ParameterEnsemble::to_binary(string file_name)
 		{
 			f_names.push_back(name);
 		}
+		else
+		{
+			f_names.push_back(name);
+		}
 	}
 	//vnames.insert(vnames.end(),f_names.begin(),f_names.end());
 	vector<string> too_long;
@@ -2705,10 +2709,16 @@ void ParameterEnsemble::to_binary(string file_name)
 	//map<string, double>::const_iterator found_pi_par;
 	//map<string, double>::const_iterator not_found_pi_par;
 	//icount = row_idxs + 1 + col_idxs * self.shape[0]
-	//Parameters pars;
+	Parameters org_pars = pest_scenario_ptr->get_ctl_parameters();
+	if (tstat == transStatus::MODEL)
+		par_transform.ctl2model_ip(org_pars);
+	else if (tstat == transStatus::NUM)
+		par_transform.ctl2numeric_ip(org_pars);
 	for (int irow = 0; irow<n_real; ++irow)
 	{
-		Parameters pars(var_names, reals.row(irow));
+		//Parameters pars(var_names, reals.row(irow));
+		Parameters pars = org_pars;
+		pars.update_without_clear(var_names, reals.row(irow));
 		if (tstat == transStatus::MODEL)
 			par_transform.model2ctl_ip(pars);
 		else if (tstat == transStatus::NUM)
@@ -2724,6 +2734,7 @@ void ParameterEnsemble::to_binary(string file_name)
 			data = pars[vnames[jcol]];
 			fout.write((char*) &(data), sizeof(data));
 		}
+
 		/*int jcol = n_var;
 		for (auto &fname : fixed_names)
 		{
