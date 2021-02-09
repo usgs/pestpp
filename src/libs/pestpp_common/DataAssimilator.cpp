@@ -2198,6 +2198,7 @@ void DataAssimilator::add_dynamic_state_to_pe()
 }
 void DataAssimilator::initialize_dynamic_states()
 {
+	stringstream ss;
 	// find a list of dynamic states
 	//vector <string> dyn_states_names;	
 	obs_dyn_state_names.clear();
@@ -2208,21 +2209,29 @@ void DataAssimilator::initialize_dynamic_states()
 	set<string>::iterator end = spar_names.end();
 	par_names.clear();
 	//for (int i = 0; i < obs_names.size(); i++)	
+	double w;
 	for (auto& name : obs_names)
 	{
 		
-		//w = pest_scenario.get_observation_info_ptr()->get_weight(obs_names[i]);		
+		w = pest_scenario.get_observation_info_ptr()->get_weight(name);		
 		//if ((w == 0) & (std::count(par_names.begin(), par_names.end(), name)))
-		if (spar_names.find(name) != end)
+		if ((w == 0) && (spar_names.find(name) != end))
 		{
 			obs_dyn_state_names.push_back(name);
 			par_dyn_state_names.push_back(name);
 		}
 
 	}
+	if (obs_dyn_state_names.size() > 0)
+	{
+		ss.str("");
+		ss << obs_dyn_state_names.size() << " non-zero weighted dynamic states identified through shared-names";
+		message(1, ss.str());
+	}
 	map<string, string> state_map = pest_scenario.get_ext_file_string_map("observation data external", "state_par_link");
 	if (state_map.size() > 0)
 	{
+		
 		set<string> pstates(par_dyn_state_names.begin(), par_dyn_state_names.end());
 		set<string>::iterator send = pstates.end();
 		vector<string> t = pest_scenario.get_ctl_ordered_par_names();
@@ -2230,6 +2239,7 @@ void DataAssimilator::initialize_dynamic_states()
 		t.clear();
 		set<string>::iterator pend = pnames.end();
 		vector<string> dups,missing;
+		int c = 0;
 		for (auto& sm : state_map)
 		{
 			if (pstates.find(sm.second) != send)
@@ -2242,8 +2252,13 @@ void DataAssimilator::initialize_dynamic_states()
 			}
 			else
 			{
-				obs_dyn_state_names.push_back(sm.first);
-				par_dyn_state_names.push_back(sm.second);
+				w = pest_scenario.get_observation_info_ptr()->get_weight(sm.first);
+				if (w == 0)
+				{
+					obs_dyn_state_names.push_back(sm.first);
+					par_dyn_state_names.push_back(sm.second);
+					c++;
+				}
 			}
 		}
 		if (dups.size() > 0)
@@ -2264,8 +2279,15 @@ void DataAssimilator::initialize_dynamic_states()
 				ss << m << ",";
 			throw_da_error(ss.str());
 		}
+		if (c > 0)
+		{
+			ss.str("");
+			ss << c << " non-zero weighted dynamic states identified through 'state_par_link'";
+			message(1, ss.str());
+		}
 	}
 }
+
 vector<string> DataAssimilator::detect_prior_data_conflict()
 {
 	message(1, "checking for prior-data conflict...");

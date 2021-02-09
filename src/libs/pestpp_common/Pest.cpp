@@ -3030,7 +3030,8 @@ map<string,string> Pest::get_ext_file_string_map(const string& section_name, con
 			sidx = efile.get_col_string_vector(idx_col);
 			for (int i = 0; i < svals.size(); i++)
 			{
-				val_map.emplace(make_pair(sidx[i],svals[i]));
+				if (svals[i].size() > 0)
+					val_map.emplace(make_pair(sidx[i],svals[i]));
 			}
 		}
 	}
