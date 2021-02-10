@@ -950,10 +950,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				continue;
 
 			}
-
-
 			ss.str("");
-			ss << "received parameters (group id = " << group_id << ", run id = " << run_id << "), ";
+			ss << "received parameters ( group_id=" << group_id << ", run_id=" << run_id << ", info_txt=" << info_txt << " ), ";
 			ss << "starting model run..." << endl;
 			report(ss.str(), true);
 
@@ -964,6 +962,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				{
 					fout << "run_id, " << run_id << endl;
 					fout << "group_id, " << group_id << endl;
+					fout << "info_txt," << info_txt << endl;
 				}
 				fout.close();
 			}
@@ -981,7 +980,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				//send model results back
 				ss.str("");
 				ss << "run complete, ";
-				ss << "sending results to master (group id = " << group_id << ", run id = " << run_id << ")...";
+				ss << "sending results to master (group_id=" << group_id << " , run_id=" << run_id << " , info_txt=" << info_txt <<" )...";
 				ss << "run took: " << run_time << " seconds";
 				report(ss.str(), true);
 				ss.str("");
@@ -1004,9 +1003,11 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			else if (final_run_status.first == NetPackage::PackType::RUN_FAILED)
 			{
 				ss.str("");
-				ss << "run failed for run_id" << run_id << ": " << final_run_status.second;
+				ss << "run failed for run_id" << run_id << ", info_txt=" << info_txt << " , : " << final_run_status.second;
 				report(ss.str(), true);
-				net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id,final_run_status.second);
+				ss.str("");
+				ss << "group_id=" << group_id << ", run_id=" << run_id << " , info_txt=" << info_txt << " , " << final_run_status.second;
+				net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id,ss.str());
 				char data;
 				err = send_message(net_pack, &data, 0);
 				if (err.first != 1)
@@ -1042,7 +1043,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			else if (final_run_status.first == NetPackage::PackType::RUN_KILLED)
 			{
 				ss.str("");
-				ss << "run_id " << run_id << " killed";
+				ss << "run_id " << run_id << " , info_txt=" << info_txt << " , killed";
 				report(ss.str(), true);
 				net_pack.reset(NetPackage::PackType::RUN_KILLED, group_id, run_id, final_run_status.second);
 				char data;
