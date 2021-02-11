@@ -264,6 +264,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	//this is to make sure we dont end up with an unbounded problem
 	if (pest_scenario.get_pestpp_options().get_opt_include_bnd_pi())
 	{
+		f_rec << "...augmenting prior information constraints with decision variable bounds" << endl;
 		PriorInformation* pi_ptr = pest_scenario.get_prior_info_ptr();
 		ParameterInfo par_info = pest_scenario.get_ctl_parameter_info();
 		stringstream ss;
@@ -392,14 +393,14 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 		if (missing_map.size() > 0)
 		{
 			stringstream ss;
-			ss << " the following prior information constraints reference parameters that are not treated as decision variables:" << endl;
+			ss << " the following prior information constraints/objectives reference parameters that are not treated as decision variables:" << endl;
 			for (auto& missing_pi : missing_map)
 			{
 				ss << missing_pi.first << ": ";
 				for (auto& par_name : missing_pi.second)
 					ss << par_name << ",";
 			}
-			throw_constraints_error("errors in prior information constraints:" + ss.str());
+			throw_constraints_error("errors in prior information constraints/objectives:" + ss.str());
 		}
 
 		//TODO: investigate a pi constraint only formulation
@@ -445,7 +446,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	}
 	if (problem_constraints.size() > 0)
 	{
-		throw_constraints_error("the following prior info constraints do not have a correct group name prefix {'l_','less','g_','greater','e_','equal'}: ", problem_constraints);
+		throw_constraints_error("the following prior info constraints/objectives do not have a correct group name prefix {'l_','less','g_','greater','e_','equal'}: ", problem_constraints);
 	}
 
 	set<string> dec_set(ctl_ord_dec_var_names.begin(), ctl_ord_dec_var_names.end());
@@ -563,7 +564,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 					throw_constraints_error("++opt_stack_size is zero");
 				else if (stack_size > 0)
 				{
-					f_rec << "drawing " << stack_size << "stack realizations" << endl;
+					f_rec << "drawing " << stack_size << " stack realizations" << endl;
 					pfm.log_event("loading parcov");
 					parcov.try_from(pest_scenario, *file_mgr_ptr);
 					pfm.log_event("drawing stack realizations");
