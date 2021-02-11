@@ -601,8 +601,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			vector<string> vnames = pest_scenario.get_ctl_ordered_par_names();
 			set<string> snames(vnames.begin(), vnames.end());
 			vnames.clear();
-			for (auto pname : par_name_vec)
+			for (auto& pname : par_name_vec)
 			{
+				pest_utils::upper_ip(pname);
 				if (snames.find(pname) == snames.end())
 					vnames.push_back(pname);
 			}
@@ -669,8 +670,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			vector<string> vnames = pest_scenario.get_ctl_ordered_obs_names();
 			set<string> snames(vnames.begin(), vnames.end());
 			vnames.clear();
-			for (auto oname : obs_name_vec)
+			for (auto& oname : obs_name_vec)
 			{
+				pest_utils::upper_ip(oname);
 				if (snames.find(oname) == snames.end())
 					vnames.push_back(oname);
 			}

@@ -242,7 +242,7 @@ bool Jacobian::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vector<st
 	debug_msg("Jacobian::build_runs method: begin");
 	// add base run
 	Parameters model_pars = par_transform.ctl2model_cp(ctl_pars);
-	int run_id = run_manager.add_run(model_pars, "", 0);
+	int run_id = run_manager.add_run(model_pars, "__base__", 0);
 
 	if (!calc_init_obs) {
 		const Observations &observations = ctl_obs;
