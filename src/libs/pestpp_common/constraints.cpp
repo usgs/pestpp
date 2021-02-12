@@ -863,7 +863,7 @@ void Constraints::initial_report()
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 
 	f_rec << endl << "  ---  observation constraints and/or objectives ---  " << endl;
-	f_rec << setw(20) << "name" << setw(20) << "sense" << setw(20) << "value" << endl;
+	f_rec << left << setw(20) << "name" << setw(20) << "sense" << setw(20) << "value" << endl;
 	for (auto& name : ctl_ord_obs_constraint_names)
 	{
 		f_rec << setw(20) << left << name;
@@ -918,8 +918,8 @@ void Constraints::initial_report()
 			f_rec << endl;
 			if ((num_nz_obs() == 0) && (use_fosm))
 			{
-				f_rec << endl << endl << "  ---  Note: No nonzero weight observations found." << endl;
-				f_rec << "           Prior constraint/objective uncertainty will be used in FOSM-based calculations" << endl;
+				f_rec << endl << endl << "...Note: No nonzero weight observations found." << endl;
+				f_rec << "...Prior constraint/objective uncertainty will be used in FOSM-based calculations" << endl;
 			}
 			else
 			{
