@@ -1826,8 +1826,8 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 		oe.fill_moment_maps(mean_map, std_map);
 
 		ss << endl << "  population observation constraint summary at iteration " << iter << endl;
-		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "mean sim value";
-		ss << setw(15) << "% unsatisfied" << setw(15) << endl;
+		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim min";
+		ss << setw(15) << "sim mean" << setw(15) << "sim max" << setw(15) << "% unsatisfied" << setw(15) << endl;
 
 		infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
 		int num_reals = oe.shape().first;
@@ -1839,7 +1839,10 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			ss << setw(nsize) << left << name;
 			ss << setw(12) << right << constraint_sense_name[name];
 			ss << setw(12) << constraints_obs.get_rec(name);
+			
+			ss << setw(15) << oe.get_var_vector(name).minCoeff();
 			ss << setw(15) << mean_map[name];
+			ss << setw(15) << oe.get_var_vector(name).maxCoeff();
 			ss << setw(15) << 100.0 * double(infeas_count[name]) / double(num_reals);
 			ss << endl;
 
@@ -1853,11 +1856,15 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 		Parameters current_pars;
 		names = pe.get_var_names();
 		map<string, double> tots;
+		map<string, double> mins,maxs;
 		PriorInformationRec pi_rec;
 		int nsize = 20;
+		double v;
 		for (auto p : ctl_ord_pi_constraint_names)
 		{
 			tots[p] = 0.0;
+			mins[p] = 1.0e+300;
+			maxs[p] = -1.0e+300;
 			infeas_count[p] = 0;
 			nsize = max(nsize, int(p.size()));
 		}
@@ -1869,13 +1876,18 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			{
 				string name = ctl_ord_pi_constraint_names[i];
 				pi_rec = constraints_pi.get_pi_rec(name);
-				tots[name] = tots[name] + pi_rec.calc_sim_and_resid(current_pars).first;
+				v = pi_rec.calc_sim_and_resid(current_pars).first;
+				tots[name] = tots[name] + v;
+				mins[name] = min(mins[name], v);
+				maxs[name] = max(maxs[name], v);
+
+
 			}
 		}
 		//report prior information constraints
 		ss << endl << "  prior information constraint information at iteration " << iter << endl;
-		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "mean sim value";
-		ss << setw(15) << "% unsatisfied" << endl;
+		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim min";
+		ss << setw(15) << "sim mean" << setw(15) << "sim max" << setw(15) << "% unsatisfied" << endl;
 		int num_reals = pe.shape().first;
 		for (int i = 0; i < num_pi_constraints(); ++i)
 		{
@@ -1886,7 +1898,9 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			ss << setw(nsize) << left << name;
 			ss << setw(12) << right << constraint_sense_name[name];
 			ss << setw(12) << pi_rec.get_obs_value();
+			ss << setw(15) << mins[name];
 			ss << setw(15) << double(tots[name] / num_reals);
+			ss << setw(15) << maxs[name];
 			ss << setw(15) << 100.0 * double(infeas_count[name]) / double(num_reals);
 			ss << endl;
 		}
