@@ -308,7 +308,7 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 class ExternalCtlFile
 {
 public:
-	ExternalCtlFile(ofstream& _f_rec, const string& _line, bool _cast=true);
+	ExternalCtlFile(const string& _line, bool _cast=true);
 	string get_filename() { return filename;  }
 	vector<string> get_col_names() { return col_names; }
 	vector<int> get_row_order() { return row_order; }
@@ -324,13 +324,13 @@ public:
 	string get_index_col_name() { return index_col_name; }
 	template<typename t>
 	inline void fill_col_vector(string col_name, vector<t> &col_vector);
-	void read_file();
+	void read_file(ofstream& f_rec);
 	void keep_cols(set<string>& keep_cols);
 	void clear() { data.clear(); }
 	
 private:
 	bool cast;
-	ofstream& f_rec;
+	//ofstream& f_rec;
 	string line, filename, index_col_name;
 	string delim,missing_val;
 	vector<string> col_names;

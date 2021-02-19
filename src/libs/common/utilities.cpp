@@ -1041,8 +1041,8 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 }
 
 
-ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line, bool _cast) :
-	f_rec(_f_rec), cast(_cast), line(_line), delim(","), missing_val(""), filename(""),
+ExternalCtlFile::ExternalCtlFile(const string& _line, bool _cast) :
+	cast(_cast), line(_line), delim(","), missing_val(""), filename(""),
 	index_col_name("")
 {
 }
@@ -1155,7 +1155,7 @@ map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<str
 }
 
 
-void ExternalCtlFile::read_file()
+void ExternalCtlFile::read_file(ofstream& f_rec)
 {	
 	parse_control_record();
 	string delim_upper = upper_cp(delim);

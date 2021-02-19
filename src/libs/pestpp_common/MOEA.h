@@ -195,6 +195,7 @@ private:
 	ParameterEnsemble generate_diffevol_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble generate_sbx_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble generate_pm_population(int num_members, ParameterEnsemble& _dp);
+	ParameterEnsemble generate_pso_population(int num_members, ParameterEnsemble& _dp);
 
 	vector<int> selection(int num_to_select, ParameterEnsemble& _dp, MouMateType& matetype);
 
