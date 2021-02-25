@@ -239,7 +239,8 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	//by default, we want to use fosm for chances, but it any
 	//of those stack options were passed, then use stacks instead
 	use_fosm = true;
-	if ((stack_size > 0) || (par_stack_name.size() > 0) || (obs_stack_name.size() > 0))
+	std_weights = pest_scenario.get_pestpp_options().get_opt_std_weights();
+	if ((!std_weights) && ((stack_size > 0) || (par_stack_name.size() > 0) || (obs_stack_name.size() > 0)))
 		use_fosm = false;
 	//initialize the stack constainers (ensemble class instances)
 	stack_pe.set_pest_scenario(&pest_scenario);
@@ -471,7 +472,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	{
 		pfm.log_event("initializing chance constraints/objectives");
 		use_chance = true;
-		std_weights = pest_scenario.get_pestpp_options().get_opt_std_weights();
+		
 
 		//make sure risk value is valid
 		if ((risk > 1.0) || (risk < 0.0))
