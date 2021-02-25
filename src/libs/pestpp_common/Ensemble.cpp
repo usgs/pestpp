@@ -1316,6 +1316,7 @@ pair<map<string,int>, map<string, int>> Ensemble::prepare_csv(const vector<strin
 			}
 		}
 		//skip the index label
+		real_names.clear();
 		for (int i = 1; i < header_tokens.size(); i++)
 		{
 			header_info[header_tokens[i]] = i;
