@@ -2203,7 +2203,7 @@ void DataAssimilator::initialize_dynamic_states()
 	//vector <string> dyn_states_names;	
 	obs_dyn_state_names.clear();
 	par_dyn_state_names.clear();
-	vector<string> obs_names = oe.get_var_names();
+	vector<string> obs_names = oe.get_var_names(); // todo: get obs names from a different source. 
 	vector<string> par_names = pe.get_var_names();
 	set<string> spar_names(par_names.begin(), par_names.end());
 	set<string>::iterator end = spar_names.end();
@@ -4130,7 +4130,7 @@ bool DataAssimilator::solve_new_da()
 		message(2, "see .log file for more details");
 
 		// Here is the update .....
-		if (1)
+		if (0)
 		{
 			pe_upgrade = calc_kf_upgrade(cur_lam, loc_map);
 		}
