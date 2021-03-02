@@ -178,7 +178,7 @@ void EnsembleSolver::message(int level, const string& _message, vector<T, A> _ex
 
 }
 
-void glm_upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form,
+void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form,
                                  LocalAnalysisUpgradeThread& worker, exception_ptr& eptr)
 {
 	try
@@ -223,7 +223,7 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 		{
 			//threads.push_back(thread(&LocalUpgradeThread::work, &worker, i, iter, cur_lam));
 
-			threads.push_back(thread(glm_upgrade_thread_function, i, iter, cur_lam, std::ref(worker), std::ref(exception_ptrs[i])));
+			threads.push_back(thread(upgrade_thread_function, i, iter, cur_lam, use_glm_form, std::ref(worker), std::ref(exception_ptrs[i])));
 
 		}
 		message(2, "waiting to join threads");
