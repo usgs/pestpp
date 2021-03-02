@@ -1201,8 +1201,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			}
 			else if (section == "PARAMETER GROUPS EXTERNAL")
 			{
-				pest_utils::ExternalCtlFile efile(f_rec, line);
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line);
+				efile.read_file(f_rec);
 				
 				set<string> cnames = efile.get_col_set();
 				for (auto n : par_group_formal_names)
@@ -1276,8 +1276,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (section == "PARAMETER DATA EXTERNAL")
 			{
 				
-				pest_utils::ExternalCtlFile efile(f_rec, line);	
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line);	
+				efile.read_file(f_rec);
 				set<string> cnames = efile.get_col_set();
 				vector<string> get_names;
 				//for (auto n : par_formal_names)
@@ -1350,8 +1350,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 
 			else if (section == "OBSERVATION GROUPS EXTERNAL")
 			{
-				pest_utils::ExternalCtlFile efile(f_rec, line);		
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line);		
+				efile.read_file(f_rec);
 					
 				set<string> cnames = efile.get_col_set();
 				for (auto n : obs_group_formal_names)
@@ -1386,8 +1386,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (section == "OBSERVATION DATA EXTERNAL")
 			{
 				
-				pest_utils::ExternalCtlFile efile(f_rec, line);		
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line);		
+				efile.read_file(f_rec);
 					
 				vector<string> get_names;
 				set<string> cnames = efile.get_col_set();
@@ -1442,8 +1442,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 
 			{
 				
-				pest_utils::ExternalCtlFile efile(f_rec, line);
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line);
+				efile.read_file(f_rec);
 				set<string> cnames = efile.get_col_set();
 				for (auto n : pi_formal_names)
 				{
@@ -1485,8 +1485,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (section == "MODEL INPUT EXTERNAL")
 			{
 				
-				pest_utils::ExternalCtlFile efile(f_rec, line, false);	
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line, false);	
+				efile.read_file(f_rec);
 					
 				set<string> cnames = efile.get_col_set();
 				for (auto n : model_input_formal_names)
@@ -1526,8 +1526,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 
 			else if (section == "MODEL OUTPUT EXTERNAL")
 			{
-				pest_utils::ExternalCtlFile efile(f_rec, line, false);	
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line, false);	
+				efile.read_file(f_rec);
 				set<string> cnames = efile.get_col_set();
 				for (auto n : model_output_formal_names)
 				{

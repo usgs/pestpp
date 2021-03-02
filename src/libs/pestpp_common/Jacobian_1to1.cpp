@@ -63,7 +63,7 @@ bool Jacobian_1to1::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vect
 	failed_ctl_parameters.clear();
 	par_run_map.clear();
 	// add base run
-	int run_id = run_manager.add_run(model_parameters, "", 0);
+	int run_id = run_manager.add_run(model_parameters, "__base__", 0);
 	par_run_map["__base__"] = vector<int>{ run_id };
 	//if base run is has already been complete, update it and mark it as complete
 	// compute runs for to jacobain calculation as it is influenced by derivative type( forward or central)

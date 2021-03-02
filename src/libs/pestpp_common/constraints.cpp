@@ -239,7 +239,8 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	//by default, we want to use fosm for chances, but it any
 	//of those stack options were passed, then use stacks instead
 	use_fosm = true;
-	if ((stack_size > 0) || (par_stack_name.size() > 0) || (obs_stack_name.size() > 0))
+	std_weights = pest_scenario.get_pestpp_options().get_opt_std_weights();
+	if ((!std_weights) && ((stack_size > 0) || (par_stack_name.size() > 0) || (obs_stack_name.size() > 0)))
 		use_fosm = false;
 	//initialize the stack constainers (ensemble class instances)
 	stack_pe.set_pest_scenario(&pest_scenario);
@@ -264,6 +265,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	//this is to make sure we dont end up with an unbounded problem
 	if (pest_scenario.get_pestpp_options().get_opt_include_bnd_pi())
 	{
+		f_rec << "...augmenting prior information constraints with decision variable bounds" << endl;
 		PriorInformation* pi_ptr = pest_scenario.get_prior_info_ptr();
 		ParameterInfo par_info = pest_scenario.get_ctl_parameter_info();
 		stringstream ss;
@@ -392,14 +394,14 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 		if (missing_map.size() > 0)
 		{
 			stringstream ss;
-			ss << " the following prior information constraints reference parameters that are not treated as decision variables:" << endl;
+			ss << " the following prior information constraints/objectives reference parameters that are not treated as decision variables:" << endl;
 			for (auto& missing_pi : missing_map)
 			{
 				ss << missing_pi.first << ": ";
 				for (auto& par_name : missing_pi.second)
 					ss << par_name << ",";
 			}
-			throw_constraints_error("errors in prior information constraints:" + ss.str());
+			throw_constraints_error("errors in prior information constraints/objectives:" + ss.str());
 		}
 
 		//TODO: investigate a pi constraint only formulation
@@ -445,7 +447,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	}
 	if (problem_constraints.size() > 0)
 	{
-		throw_constraints_error("the following prior info constraints do not have a correct group name prefix {'l_','less','g_','greater','e_','equal'}: ", problem_constraints);
+		throw_constraints_error("the following prior info constraints/objectives do not have a correct group name prefix {'l_','less','g_','greater','e_','equal'}: ", problem_constraints);
 	}
 
 	set<string> dec_set(ctl_ord_dec_var_names.begin(), ctl_ord_dec_var_names.end());
@@ -470,7 +472,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	{
 		pfm.log_event("initializing chance constraints/objectives");
 		use_chance = true;
-		std_weights = pest_scenario.get_pestpp_options().get_opt_std_weights();
+		
 
 		//make sure risk value is valid
 		if ((risk > 1.0) || (risk < 0.0))
@@ -563,7 +565,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 					throw_constraints_error("++opt_stack_size is zero");
 				else if (stack_size > 0)
 				{
-					f_rec << "drawing " << stack_size << "stack realizations" << endl;
+					f_rec << "drawing " << stack_size << " stack realizations" << endl;
 					pfm.log_event("loading parcov");
 					parcov.try_from(pest_scenario, *file_mgr_ptr);
 					pfm.log_event("drawing stack realizations");
@@ -862,7 +864,7 @@ void Constraints::initial_report()
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 
 	f_rec << endl << "  ---  observation constraints and/or objectives ---  " << endl;
-	f_rec << setw(20) << "name" << setw(20) << "sense" << setw(20) << "value" << endl;
+	f_rec << left << setw(20) << "name" << setw(20) << "sense" << setw(20) << "value" << endl;
 	for (auto& name : ctl_ord_obs_constraint_names)
 	{
 		f_rec << setw(20) << left << name;
@@ -917,8 +919,8 @@ void Constraints::initial_report()
 			f_rec << endl;
 			if ((num_nz_obs() == 0) && (use_fosm))
 			{
-				f_rec << endl << endl << "  ---  Note: No nonzero weight observations found." << endl;
-				f_rec << "           Prior constraint/objective uncertainty will be used in FOSM-based calculations" << endl;
+				f_rec << endl << endl << "...Note: No nonzero weight observations found." << endl;
+				f_rec << "...Prior constraint/objective uncertainty will be used in FOSM-based calculations" << endl;
 			}
 			else
 			{
@@ -1825,8 +1827,8 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 		oe.fill_moment_maps(mean_map, std_map);
 
 		ss << endl << "  population observation constraint summary at iteration " << iter << endl;
-		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "mean sim value";
-		ss << setw(15) << "% unsatisfied" << setw(15) << endl;
+		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim min";
+		ss << setw(15) << "sim mean" << setw(15) << "sim max" << setw(15) << "% unsatisfied" << setw(15) << endl;
 
 		infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
 		int num_reals = oe.shape().first;
@@ -1838,7 +1840,10 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			ss << setw(nsize) << left << name;
 			ss << setw(12) << right << constraint_sense_name[name];
 			ss << setw(12) << constraints_obs.get_rec(name);
+			
+			ss << setw(15) << oe.get_var_vector(name).minCoeff();
 			ss << setw(15) << mean_map[name];
+			ss << setw(15) << oe.get_var_vector(name).maxCoeff();
 			ss << setw(15) << 100.0 * double(infeas_count[name]) / double(num_reals);
 			ss << endl;
 
@@ -1852,11 +1857,15 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 		Parameters current_pars;
 		names = pe.get_var_names();
 		map<string, double> tots;
+		map<string, double> mins,maxs;
 		PriorInformationRec pi_rec;
 		int nsize = 20;
+		double v;
 		for (auto p : ctl_ord_pi_constraint_names)
 		{
 			tots[p] = 0.0;
+			mins[p] = 1.0e+300;
+			maxs[p] = -1.0e+300;
 			infeas_count[p] = 0;
 			nsize = max(nsize, int(p.size()));
 		}
@@ -1868,13 +1877,18 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			{
 				string name = ctl_ord_pi_constraint_names[i];
 				pi_rec = constraints_pi.get_pi_rec(name);
-				tots[name] = tots[name] + pi_rec.calc_sim_and_resid(current_pars).first;
+				v = pi_rec.calc_sim_and_resid(current_pars).first;
+				tots[name] = tots[name] + v;
+				mins[name] = min(mins[name], v);
+				maxs[name] = max(maxs[name], v);
+
+
 			}
 		}
 		//report prior information constraints
 		ss << endl << "  prior information constraint information at iteration " << iter << endl;
-		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "mean sim value";
-		ss << setw(15) << "% unsatisfied" << endl;
+		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim min";
+		ss << setw(15) << "sim mean" << setw(15) << "sim max" << setw(15) << "% unsatisfied" << endl;
 		int num_reals = pe.shape().first;
 		for (int i = 0; i < num_pi_constraints(); ++i)
 		{
@@ -1885,7 +1899,9 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			ss << setw(nsize) << left << name;
 			ss << setw(12) << right << constraint_sense_name[name];
 			ss << setw(12) << pi_rec.get_obs_value();
+			ss << setw(15) << mins[name];
 			ss << setw(15) << double(tots[name] / num_reals);
+			ss << setw(15) << maxs[name];
 			ss << setw(15) << 100.0 * double(infeas_count[name]) / double(num_reals);
 			ss << endl;
 		}

@@ -1340,14 +1340,16 @@ void PestppOptions::summary(ostream& os) const
 	os << "num_tpl_ins_threads: " << num_tpl_ins_threads << endl;
 	os << "save_binary: " << save_binary << endl;
 	
+	os << "panther_echo: " << panther_echo << endl;
 	os << "panther_agent_restart_on_error: " << panther_agent_restart_on_error << endl;
 	os << "panther_agent_no_ping_timeout_secs: " << panther_agent_no_ping_timeout_secs << endl;
 	os << "panther_debug_loop: " << panther_debug_loop << endl;
-	os << "panther_echo: " << panther_echo << endl;
+	os << "debug_check_par_en_consistency: " << debug_check_paren_consistency << endl;
+	os << "panther_agent_freeze_on_fail: " << panther_debug_fail_freeze << endl;
 
 	os << endl;
 
-	os << endl << "...pestpp-glm specific options:" << endl;
+	os << "...pestpp-glm specific options:" << endl;
 	os << "max_n_super: " << max_n_super << endl;
 	os << "super_eigthresh: " << super_eigthres << endl;
 	os << "n_iter_base: " << n_iter_base << endl;
@@ -1529,12 +1531,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "da_parameter_cycle_table: " << da_par_cycle_table << endl;
 	os << "da_observation_cycle_table: " << da_obs_cycle_table << endl;
 
-	os << endl;
-	os << "panther_agent_restart_on_error: " << panther_agent_restart_on_error << endl;
-	os << "panther_agent_no_ping_timeout_secs: " << panther_agent_no_ping_timeout_secs << endl;
-	os << "panther_debug_loop: " << panther_debug_loop << endl;
-	os << "debug_check_par_en_consistency: " << debug_check_paren_consistency << endl;
-	os << "panther_agent_freeze_on_fail: " << panther_debug_fail_freeze << endl;
+	
 	os << endl << endl << endl;
 }
 

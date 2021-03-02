@@ -5452,8 +5452,8 @@ map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ve
 	if (filename.size() > 0)
 	{
 		fout_rec << "processing 'DA_OBSEERVATION_CYCLE_TABLE' file " << filename;
-		pest_utils::ExternalCtlFile cycle_table(fout_rec, filename);
-		cycle_table.read_file();
+		pest_utils::ExternalCtlFile cycle_table(filename);
+		cycle_table.read_file(fout_rec);
 		vector<string> col_names = cycle_table.get_col_names();
 		fout_rec << "...using the first column ('" << col_names[0] << "') as observation names" << endl;
 		vector<string> onames = pest_scenario.get_ctl_ordered_obs_names();
@@ -5582,8 +5582,8 @@ map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario,
 	if (filename.size() > 0)
 	{
 		fout_rec << "processing 'DA_WEIGHT_CYCLE_TABLE' file " << filename;
-		pest_utils::ExternalCtlFile cycle_table(fout_rec, filename);
-		cycle_table.read_file();
+		pest_utils::ExternalCtlFile cycle_table(filename);
+		cycle_table.read_file(fout_rec);
 		vector<string> col_names = cycle_table.get_col_names();
 		fout_rec << "...using the first column ('" << col_names[0] << "') as observation names" << endl;
 		vector<string> onames = pest_scenario.get_ctl_ordered_obs_names();
@@ -5698,8 +5698,8 @@ map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ve
 	if (filename.size() > 0)
 	{
 		fout_rec << "processing 'DA_PARAMETER_CYCLE_TABLE' file " << filename;
-		pest_utils::ExternalCtlFile cycle_table(fout_rec, filename);
-		cycle_table.read_file();
+		pest_utils::ExternalCtlFile cycle_table(filename);
+		cycle_table.read_file(fout_rec);
 		vector<string> col_names = cycle_table.get_col_names();
 		fout_rec << "...using the first column ('" << col_names[0] << "') as parameter names" << endl;
 		vector<string> pnames = pest_scenario.get_ctl_ordered_par_names();
