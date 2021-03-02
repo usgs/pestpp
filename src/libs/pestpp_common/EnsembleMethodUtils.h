@@ -138,14 +138,15 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec, P
 	ObservationEnsemble& _oe, RunManagerAbstract* run_mgr_ptr,
 	bool check_pe_consistency = false, const vector<int>& real_idxs = vector<int>(),int da_cycle=NetPackage::NULL_DA_CYCLE);
 
-class GlmEnsembleSolver
+class EnsembleSolver
 {
 public:
-	GlmEnsembleSolver(PerformanceLog* _performance_log, FileManager& _file_manager, Pest& _pest_scenario, ParameterEnsemble& _pe, ObservationEnsemble& _oe,
-		Localizer& _localizer, Covariance& _parcov,Eigen::MatrixXd& _Am, L2PhiHandler& _ph, 
+	EnsembleSolver(PerformanceLog* _performance_log, FileManager& _file_manager, Pest& _pest_scenario, ParameterEnsemble& _pe,
+		ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, Localizer& _localizer, Covariance& _parcov,Eigen::MatrixXd& _Am, L2PhiHandler& _ph, 
 		bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string> &_act_obs_names);
 
-	void solve(int num_threads, double cur_lam, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
+	void glm_solve(int num_threads, double cur_lam, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
+	void mda_solve(int num_threads, double cur_beta, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
 
 private:
 	PerformanceLog* performance_log;
@@ -154,13 +155,13 @@ private:
 	bool use_localizer;
 	Pest& pest_scenario;
 	ParameterEnsemble& pe;
-	ObservationEnsemble& oe;
+	ObservationEnsemble& oe, base_oe;
 	Localizer& localizer;
 	Covariance& parcov;
 	Eigen::MatrixXd& Am;
 	L2PhiHandler& ph;
 	unordered_map<string, Eigen::VectorXd> par_resid_map, obs_resid_map, Am_map;
-	unordered_map<string, Eigen::VectorXd> par_diff_map, obs_diff_map;
+	unordered_map<string, Eigen::VectorXd> par_diff_map, obs_diff_map, obs_err_map;
 	unordered_map<string, double> weight_map;
 	unordered_map<string, double> parcov_inv_map;
 	//unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
@@ -175,21 +176,17 @@ private:
 	
 };
 
+
 class GlmLocalAnalysisUpgradeThread
 {
 public:
 
 	GlmLocalAnalysisUpgradeThread(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map,
-		unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map,
+		unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map, unordered_map<string, Eigen::VectorXd>& _obs_err_map,
 		Localizer& _localizer, unordered_map<string, double>& _parcov_inv_map,
 		unordered_map<string, double>& _weight_map, ParameterEnsemble& _pe_upgrade,
 		unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
 		unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how);
-
-
-	//Eigen::DiagonalMatrix<double, Eigen::Dynamic> get_matrix_from_map(vector<string> &names, map<string, double> &dmap);	
-	//Eigen::MatrixXd get_matrix_from_map(int num_reals, vector<string> &names, map<string, Eigen::VectorXd> &emap);
-
 
 	void work(int thread_id, int iter, double cur_lam);
 
@@ -199,24 +196,20 @@ private:
 	Localizer::How how;
 	vector<string> keys;
 	int count, total;
-	//double eigthresh, cur_lam;
-	//int maxsing, num_reals,iter, thread_id;
-	//bool use_approx, use_prior_scaling;
 
 	unordered_map<string, pair<vector<string>, vector<string>>>& cases;
 
 	ParameterEnsemble& pe_upgrade;
-	//PhiHandler &ph;
 	Localizer& localizer;
 	unordered_map<string, double>& parcov_inv_map;
 	unordered_map<string, double>& weight_map;
 
 	unordered_map<string, Eigen::VectorXd>& par_resid_map, & par_diff_map, & Am_map;
-	unordered_map<string, Eigen::VectorXd>& obs_resid_map, & obs_diff_map;
+	unordered_map<string, Eigen::VectorXd>& obs_resid_map, & obs_diff_map, obs_err_map;
 
 	mutex ctrl_lock, weight_lock, loc_lock, parcov_lock;
 	mutex obs_resid_lock, obs_diff_lock, par_resid_lock;
-	mutex par_diff_lock, am_lock, put_lock;
+	mutex par_diff_lock, am_lock, put_lock, obs_err_lock;
 	mutex next_lock;
 
 };

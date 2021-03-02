@@ -2303,9 +2303,9 @@ bool IterEnsembleSmoother::solve_new()
 		pe_upgrade.set_trans_status(pe.get_trans_status());
 		ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
 		
-		GlmEnsembleSolver ges(performance_log, file_manager, pest_scenario, pe_upgrade, oe_upgrade, localizer, parcov, Am, ph,
+		EnsembleSolver ges(performance_log, file_manager, pest_scenario, pe_upgrade, oe_upgrade, oe_base, localizer, parcov, Am, ph,
 			use_localizer, iter, act_par_names, act_obs_names);
-		ges.solve(num_threads, cur_lam, pe_upgrade, loc_map);
+		ges.glm_solve(num_threads, cur_lam, pe_upgrade, loc_map);
 
 		map<string, double> norm_map;
 		for (auto sf : pest_scenario.get_pestpp_options().get_lambda_scale_vec())

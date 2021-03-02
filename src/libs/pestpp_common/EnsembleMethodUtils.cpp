@@ -25,10 +25,10 @@
 
 
 
-GlmEnsembleSolver::GlmEnsembleSolver(PerformanceLog* _performance_log, FileManager& _file_manager, Pest& _pest_scenario, ParameterEnsemble& _pe,
-	ObservationEnsemble& _oe, Localizer& _localizer, Covariance& _parcov, Eigen::MatrixXd& _Am, L2PhiHandler& _ph,
+EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _file_manager, Pest& _pest_scenario, ParameterEnsemble& _pe,
+	ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, Localizer& _localizer, Covariance& _parcov, Eigen::MatrixXd& _Am, L2PhiHandler& _ph,
 	bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string>& _act_obs_names) :
-	file_manager(_file_manager), pest_scenario(_pest_scenario), pe(_pe), oe(_oe), localizer(_localizer), parcov(_parcov), Am(_Am), ph(_ph)
+	file_manager(_file_manager), pest_scenario(_pest_scenario), pe(_pe), oe(_oe), base_oe(_base_oe), localizer(_localizer), parcov(_parcov), Am(_Am), ph(_ph)
 
 {
 	performance_log = _performance_log;
@@ -56,7 +56,6 @@ GlmEnsembleSolver::GlmEnsembleSolver(PerformanceLog* _performance_log, FileManag
 	for (int i = 0; i < parcov_inv.size(); i++)
 		parcov_inv_map[par_names[i]] = parcov_inv[i];
 
-
 	//prep the fast lookup weights info
 	weight_map.clear();
 	weight_map.reserve(oe.shape().second);
@@ -82,6 +81,8 @@ GlmEnsembleSolver::GlmEnsembleSolver(PerformanceLog* _performance_log, FileManag
 	obs_resid_map.reserve(obs_names.size());
 	obs_diff_map.clear();
 	obs_diff_map.reserve(obs_names.size());
+	obs_err_map.clear();
+	obs_err_map.reserve(obs_names.size());
 
 	//check for the 'center_on' real - it may have been dropped...
 	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
@@ -113,6 +114,12 @@ GlmEnsembleSolver::GlmEnsembleSolver(PerformanceLog* _performance_log, FileManag
 	for (int i = 0; i < obs_names.size(); i++)
 	{
 		obs_diff_map[obs_names[i]] = mat.col(i);
+	}
+	mat = base_oe.get_eigen(vector<string>(), obs_names);
+	Observations ctl_obs = pest_scenario.get_ctl_observations();
+	for (int i = 0; i < obs_names.size(); i++)
+	{
+		obs_err_map[obs_names[i]] = mat.col(i).array() - ctl_obs.get_rec(obs_names[i]);
 	}
 	mat = ph.get_par_resid_subset(pe);
 	for (int i = 0; i < par_names.size(); i++)
@@ -147,7 +154,7 @@ GlmEnsembleSolver::GlmEnsembleSolver(PerformanceLog* _performance_log, FileManag
 }
 
 template<typename T, typename A>
-void GlmEnsembleSolver::message(int level, const string& _message, vector<T, A> _extras, bool echo)
+void EnsembleSolver::message(int level, const string& _message, vector<T, A> _extras, bool echo)
 {
 	stringstream ss;
 	if (level == 0)
@@ -187,12 +194,12 @@ GlmLocalAnalysisUpgradeThread& worker, exception_ptr& eptr)
 }
 
 
-void GlmEnsembleSolver::solve(int num_threads, double cur_lam, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map)
+void EnsembleSolver::glm_solve(int num_threads, double cur_lam, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map)
 {
 	pe_upgrade.set_zeros();
 	stringstream ss;
 	Localizer::How _how = localizer.get_how();
-	GlmLocalAnalysisUpgradeThread worker(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map,
+	GlmLocalAnalysisUpgradeThread worker(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map,obs_err_map,
 		localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
 
 	if ((num_threads < 1) || (loc_map.size() == 1))
@@ -280,13 +287,13 @@ void GlmEnsembleSolver::solve(int num_threads, double cur_lam, ParameterEnsemble
 }
 
 
-void GlmEnsembleSolver::message(int level, const string& _message)
+void EnsembleSolver::message(int level, const string& _message)
 {
 	message(level, _message, vector<string>());
 }
 
 template<typename T>
-void GlmEnsembleSolver::message(int level, const string& _message, T extra)
+void EnsembleSolver::message(int level, const string& _message, T extra)
 {
 	stringstream ss;
 	ss << _message << " " << extra;
@@ -297,11 +304,11 @@ void GlmEnsembleSolver::message(int level, const string& _message, T extra)
 
 
 GlmLocalAnalysisUpgradeThread::GlmLocalAnalysisUpgradeThread(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map,
-	unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map,
+	unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map, unordered_map<string, Eigen::VectorXd>& _obs_err_map,
 	Localizer& _localizer, unordered_map<string, double>& _parcov_inv_map, unordered_map<string, double>& _weight_map,
 	ParameterEnsemble& _pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
 	unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how) : par_resid_map(_par_resid_map),
-	par_diff_map(_par_diff_map), obs_resid_map(_obs_resid_map), obs_diff_map(_obs_diff_map), localizer(_localizer),
+	par_diff_map(_par_diff_map), obs_resid_map(_obs_resid_map), obs_diff_map(_obs_diff_map), obs_err_map(_obs_err_map),localizer(_localizer),
 	pe_upgrade(_pe_upgrade), cases(_cases), parcov_inv_map(_parcov_inv_map), weight_map(_weight_map), Am_map(_Am_map)
 {
 	performance_log = _performance_log;
@@ -416,7 +423,7 @@ void GlmLocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam
 		ss.str("");
 	}
 	Eigen::MatrixXd par_resid, par_diff, Am;
-	Eigen::MatrixXd obs_resid, obs_diff, loc;
+	Eigen::MatrixXd obs_resid, obs_diff, obs_err, loc;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> weights, parcov_inv;
 	vector<string> par_names, obs_names;
 	while (true)
@@ -471,7 +478,6 @@ void GlmLocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam
 			}
 		}
 
-
 		if (verbose_level > 2)
 		{
 			f_thread << t_count << "," << iter;
@@ -486,6 +492,7 @@ void GlmLocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam
 		par_diff.resize(0, 0);
 		obs_resid.resize(0, 0);
 		obs_diff.resize(0, 0);
+		obs_err.resize(0, 0);
 		loc.resize(0, 0);
 		Am.resize(0, 0);
 		weights.resize(0);
@@ -494,6 +501,7 @@ void GlmLocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam
 
 		unique_lock<mutex> obs_diff_guard(obs_diff_lock, defer_lock);
 		unique_lock<mutex> obs_resid_guard(obs_resid_lock, defer_lock);
+		unique_lock<mutex> obs_err_guard(obs_err_lock, defer_lock);
 		unique_lock<mutex> par_diff_guard(par_diff_lock, defer_lock);
 		unique_lock<mutex> par_resid_guard(par_resid_lock, defer_lock);
 		unique_lock<mutex> loc_guard(loc_lock, defer_lock);
@@ -508,6 +516,7 @@ void GlmLocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam
 				(parcov_inv.size() > 0) &&
 				(par_diff.rows() > 0) &&
 				(obs_resid.rows() > 0) &&
+				(obs_err.rows() > 0) &&
 				(obs_diff.rows() > 0) &&
 				((!use_localizer) || (loc.rows() > 0)) &&
 				((use_approx) || (Am.rows() > 0)))
@@ -532,6 +541,11 @@ void GlmLocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam
 			{
 				obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
 				obs_resid_guard.unlock();
+			}
+			if ((obs_err.rows() == 0) && (obs_err_guard.try_lock()))
+			{
+				obs_err = local_utils::get_matrix_from_map(num_reals, obs_names, obs_err_map);
+				obs_err_guard.unlock();
 			}
 			if ((par_diff.rows() == 0) && (par_diff_guard.try_lock()))
 			{
