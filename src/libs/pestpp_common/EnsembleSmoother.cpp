@@ -1941,19 +1941,19 @@ bool IterEnsembleSmoother::should_terminate()
 
 
 
-void upgrade_thread_function(int id, int iter,double cur_lam, GlmLocalAnalysisUpgradeThread &worker, exception_ptr &eptr)
-{
-	try
-	{
-		worker.work(id, iter, cur_lam);
-	}
-	catch (...)
-	{
-		eptr = current_exception();
-	}
-	
-	return;
-}
+//void upgrade_thread_function(int id, int iter,double cur_lam, LocalAnalysisUpgradeThread &worker, exception_ptr &eptr)
+//{
+//	try
+//	{
+//		worker.work(id, iter, cur_lam);
+//	}
+//	catch (...)
+//	{
+//		eptr = current_exception();
+//	}
+//	
+//	return;
+//}
 
 
 //ParameterEnsemble IterEnsembleSmoother::calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>> &loc_map)
@@ -2303,9 +2303,9 @@ bool IterEnsembleSmoother::solve_new()
 		pe_upgrade.set_trans_status(pe.get_trans_status());
 		ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
 		
-		EnsembleSolver ges(performance_log, file_manager, pest_scenario, pe_upgrade, oe_upgrade, oe_base, localizer, parcov, Am, ph,
+		EnsembleSolver es(performance_log, file_manager, pest_scenario, pe_upgrade, oe_upgrade, oe_base, localizer, parcov, Am, ph,
 			use_localizer, iter, act_par_names, act_obs_names);
-		ges.glm_solve(num_threads, cur_lam, pe_upgrade, loc_map);
+		es.solve(num_threads, cur_lam, true, pe_upgrade, loc_map);
 
 		map<string, double> norm_map;
 		for (auto sf : pest_scenario.get_pestpp_options().get_lambda_scale_vec())

@@ -145,9 +145,8 @@ public:
 		ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, Localizer& _localizer, Covariance& _parcov,Eigen::MatrixXd& _Am, L2PhiHandler& _ph, 
 		bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string> &_act_obs_names);
 
-	void glm_solve(int num_threads, double cur_lam, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
-	void mda_solve(int num_threads, double cur_beta, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
-
+	void solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
+	
 private:
 	PerformanceLog* performance_log;
 	FileManager& file_manager;
@@ -177,18 +176,18 @@ private:
 };
 
 
-class GlmLocalAnalysisUpgradeThread
+class LocalAnalysisUpgradeThread
 {
 public:
 
-	GlmLocalAnalysisUpgradeThread(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map,
+	LocalAnalysisUpgradeThread(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map,
 		unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map, unordered_map<string, Eigen::VectorXd>& _obs_err_map,
 		Localizer& _localizer, unordered_map<string, double>& _parcov_inv_map,
 		unordered_map<string, double>& _weight_map, ParameterEnsemble& _pe_upgrade,
 		unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
 		unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how);
 
-	void work(int thread_id, int iter, double cur_lam);
+	void work(int thread_id, int iter, double cur_lam,bool use_glm_form);
 
 
 private:
