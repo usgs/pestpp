@@ -563,6 +563,8 @@ public:
 	void set_ies_save_rescov(bool _flag) { ies_save_rescov = _flag; }
 	double get_ies_pdc_sigma_distance() const { return ies_pdc_sigma_distance; }
 	void set_ies_pdc_sigma_distance(double distance) { ies_pdc_sigma_distance = distance; }
+	bool get_ensemble_use_glm_solver() const { return ensemble_use_glm_solver; }
+	void set_ensemble_use_glm_solver(bool _flag) { ensemble_use_glm_solver = _flag; }
 
 	// DA parameters
 	CtlPar_container da_ctl_params;
@@ -800,6 +802,7 @@ private:
 	bool ies_drop_conflicts;
 	bool ies_save_rescov;
 	double ies_pdc_sigma_distance;
+	bool ensemble_use_glm_solver;
 
 	// Data Assimilation parameters
 	string da_mode;
