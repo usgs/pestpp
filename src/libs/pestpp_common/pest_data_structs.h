@@ -563,6 +563,12 @@ public:
 	void set_ies_save_rescov(bool _flag) { ies_save_rescov = _flag; }
 	double get_ies_pdc_sigma_distance() const { return ies_pdc_sigma_distance; }
 	void set_ies_pdc_sigma_distance(double distance) { ies_pdc_sigma_distance = distance; }
+	bool get_ies_use_mda() const { return ies_use_mda; }
+	void set_ies_use_mda(bool _flag) { ies_use_mda = _flag; }
+	double get_ies_mda_init_fac() const { return ies_mda_init_fac; }
+	void set_ies_mda_init_fac(double fac) { ies_mda_init_fac = fac; }
+	double get_ies_mda_dec_fac() const { return ies_mda_dec_fac; }
+	void set_ies_mda_dec_fac(double fac) { ies_mda_dec_fac = fac; }
 
 	// DA parameters
 	CtlPar_container da_ctl_params;
@@ -800,6 +806,9 @@ private:
 	bool ies_drop_conflicts;
 	bool ies_save_rescov;
 	double ies_pdc_sigma_distance;
+	bool ies_use_mda;
+	double ies_mda_init_fac;
+	double ies_mda_dec_fac;
 
 	// Data Assimilation parameters
 	string da_mode;

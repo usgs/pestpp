@@ -20,51 +20,6 @@
 
 
 
-class LocalUpgradeThread
-{
-public:
-
-	LocalUpgradeThread(PerformanceLog *_performance_log, unordered_map<string, Eigen::VectorXd> &_par_resid_map, unordered_map<string, Eigen::VectorXd> &_par_diff_map,
-		unordered_map<string, Eigen::VectorXd> &_obs_resid_map, unordered_map<string, Eigen::VectorXd> &_obs_diff_map,
-		Localizer &_localizer, unordered_map<string, double> &_parcov_inv_map,
-		unordered_map<string, double> &_weight_map, ParameterEnsemble &_pe_upgrade,
-		unordered_map<string, pair<vector<string>, vector<string>>> &_cases,
-		unordered_map<string, Eigen::VectorXd> &_Am_map, Localizer::How &_how);
-
-	//Eigen::DiagonalMatrix<double, Eigen::Dynamic> get_matrix_from_map(vector<string> &names, map<string, double> &dmap);	
-	//Eigen::MatrixXd get_matrix_from_map(int num_reals, vector<string> &names, map<string, Eigen::VectorXd> &emap);
-
-
-	void work(int thread_id, int iter, double cur_lam);
-
-
-private:
-	PerformanceLog * performance_log;
-	Localizer::How how;
-	vector<string> keys;
-	int count, total;
-	//double eigthresh, cur_lam;
-	//int maxsing, num_reals,iter, thread_id;
-	//bool use_approx, use_prior_scaling;
-
-	unordered_map<string, pair<vector<string>, vector<string>>> &cases;
-
-	ParameterEnsemble &pe_upgrade;
-	//PhiHandler &ph;
-	Localizer &localizer;
-	unordered_map<string, double> &parcov_inv_map;
-	unordered_map<string, double> &weight_map;
-
-	unordered_map<string, Eigen::VectorXd> &par_resid_map, &par_diff_map, &Am_map;
-	unordered_map<string, Eigen::VectorXd> &obs_resid_map, &obs_diff_map;
-
-	mutex ctrl_lock, weight_lock, loc_lock, parcov_lock;
-	mutex obs_resid_lock, obs_diff_lock, par_resid_lock;
-	mutex par_diff_lock, am_lock, put_lock;
-	mutex next_lock;
-	
-};
-
 
 class IterEnsembleSmoother
 {
@@ -106,6 +61,8 @@ private:
 
 	int iter,subset_size;
 	bool use_subset;
+	bool use_mda;
+	vector<double> mda_facs;
 
 	double last_best_lam, last_best_mean,last_best_std;
 	vector<double> best_mean_phis;
@@ -132,7 +89,7 @@ private:
 	//bool solve_old();
 	bool solve_new();
 
-	ParameterEnsemble calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>> &loc_map);
+	//ParameterEnsemble calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>> &loc_map);
 
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
 	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble> &pe_lams, vector<double> &lam_vals, vector<double> &scale_vals);

@@ -1165,9 +1165,24 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		convert_ip(value, num_tpl_ins_threads);
 		return true;
 	}
-
+	else if (key == "IES_USE_MDA")
+	{
+		ies_use_mda = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if (key == "IES_MDA_INIT_FAC")
+	{
+		convert_ip(value, ies_mda_init_fac);
+		return true;
+	}
+	else if (key == "IES_MDA_DEC_FAC")
+	{
+		convert_ip(value, ies_mda_dec_fac);
+		return true;
+	}
 	return false;
 }
+
 
 bool PestppOptions::assign_mou_value_by_key(const string& key, const string& value, const string& org_value)
 {
@@ -1516,6 +1531,9 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_drop_conflicts: " << ies_drop_conflicts << endl;
 	os << "ies_save_rescov:" << ies_save_rescov << endl;
 	os << "ies_pdc_sigma_distance: " << ies_pdc_sigma_distance << endl;
+	os << "ies_use_mda: " << ies_use_mda << endl;
+	os << "ies_mda_init_fac: " << ies_mda_init_fac << endl;
+	os << "ies_mda_dec_fac: " << ies_mda_dec_fac << endl;
 
 	os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -1669,6 +1687,9 @@ void PestppOptions::set_defaults()
 	set_ies_drop_conflicts(false);
 	set_ies_save_rescov(false);
 	set_ies_pdc_sigma_distance(-1.0);
+	set_ies_use_mda(false);
+	set_ies_mda_init_fac(0.25);
+	set_ies_mda_dec_fac(0.5);
 
 	// DA parameters
 	set_da_use_ies(false);

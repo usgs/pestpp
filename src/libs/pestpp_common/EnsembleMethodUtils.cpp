@@ -3,16 +3,905 @@
 #include <iomanip>
 #include <mutex>
 #include <thread>
+#include <Eigen/Dense>
+#include <Eigen/Sparse>
+#include "FileManager.h"
 #include "Ensemble.h"
 #include "RestartController.h"
 #include "utilities.h"
 #include "Ensemble.h"
-#include "EnsembleSmoother.h"
 #include "ObjectiveFunc.h"
 #include "covariance.h"
 #include "RedSVD-h.h"
 #include "SVDPackage.h"
 #include "eigen_tools.h"
+#include "EnsembleMethodUtils.h"
+#include "Localizer.h"
+#include "Pest.h"
+#include "PerformanceLog.h"
+#include "RunStorage.h"
+#include "RunManagerAbstract.h"
+
+
+
+
+EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _file_manager, Pest& _pest_scenario, ParameterEnsemble& _pe,
+	ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, Localizer& _localizer, Covariance& _parcov, Eigen::MatrixXd& _Am, L2PhiHandler& _ph,
+	bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string>& _act_obs_names) :
+	file_manager(_file_manager), pest_scenario(_pest_scenario), pe(_pe), oe(_oe), base_oe(_base_oe), localizer(_localizer), parcov(_parcov), Am(_Am), ph(_ph)
+
+{
+	performance_log = _performance_log;
+	use_localizer = _use_localizer;
+	iter = _iter;
+	verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
+	//prep the fast look par cov info
+	message(0,"preparing fast-look containers for threaded localization solve");
+	parcov_inv_map.clear();
+	parcov_inv_map.reserve(pe.shape().second);
+	Eigen::VectorXd parcov_inv;// = parcov.get(par_names).inv().e_ptr()->toDense().cwiseSqrt().asDiagonal();
+	if (!parcov.isdiagonal())
+	{
+		parcov_inv = parcov.get_matrix().diagonal();
+	}
+	else
+	{
+		message(2,"extracting diagonal from prior parameter covariance matrix");
+		Covariance parcov_diag;
+		parcov_diag.from_diagonal(parcov);
+		parcov_inv = parcov_diag.get_matrix().diagonal();
+	}
+	parcov_inv = parcov_inv.cwiseSqrt().cwiseInverse();
+	vector<string> par_names = pe.get_var_names();
+	for (int i = 0; i < parcov_inv.size(); i++)
+		parcov_inv_map[par_names[i]] = parcov_inv[i];
+
+	//prep the fast lookup weights info
+	weight_map.clear();
+	weight_map.reserve(oe.shape().second);
+	vector<string> obs_names = oe.get_var_names();
+	double w;
+	for (int i = 0; i < obs_names.size(); i++)
+	{
+		w = pest_scenario.get_observation_info_ptr()->get_weight(obs_names[i]);
+		//don't want to filter on weight here - might be changing weights, etc...
+		//if (w == 0.0)
+		//	continue;
+		weight_map[obs_names[i]] = w;
+	}
+
+	//prep a fast look for obs, par and resid matrices - stored as column vectors in a map
+	par_resid_map.clear();
+	par_resid_map.reserve(par_names.size());
+	par_diff_map.clear();
+	par_diff_map.reserve(par_names.size());
+	Am_map.clear();
+	Am_map.reserve(par_names.size());
+	obs_resid_map.clear();
+	obs_resid_map.reserve(obs_names.size());
+	obs_diff_map.clear();
+	obs_diff_map.reserve(obs_names.size());
+	obs_err_map.clear();
+	obs_err_map.reserve(obs_names.size());
+
+	//check for the 'center_on' real - it may have been dropped...
+	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
+	if (center_on.size() > 0)
+	{
+		if (center_on != MEDIAN_CENTER_ON_NAME)
+		{
+			vector<string> real_names = oe.get_real_names();
+			if (find(real_names.begin(), real_names.end(), center_on) == real_names.end())
+			{
+				message(1,"Warning: 'ies_center_on' real not found in obs en, reverting to mean...");
+				center_on = "";
+			}
+			real_names = pe.get_real_names();
+			if ((center_on.size() > 0) && find(real_names.begin(), real_names.end(), center_on) == real_names.end())
+			{
+				message(1,"Warning: 'ies_center_on' real not found in par en, reverting to mean...");
+				center_on = "";
+			}
+		}
+	}
+
+	Eigen::MatrixXd mat = ph.get_obs_resid_subset(oe);
+	for (int i = 0; i < obs_names.size(); i++)
+	{
+		obs_resid_map[obs_names[i]] = mat.col(i);
+	}
+	mat = oe.get_eigen_anomalies(center_on);
+	for (int i = 0; i < obs_names.size(); i++)
+	{
+		obs_diff_map[obs_names[i]] = mat.col(i);
+	}
+	mat = base_oe.get_eigen(vector<string>(), obs_names);
+	Observations ctl_obs = pest_scenario.get_ctl_observations();
+	for (int i = 0; i < obs_names.size(); i++)
+	{
+		obs_err_map[obs_names[i]] = mat.col(i).array() - ctl_obs.get_rec(obs_names[i]);
+	}
+	mat = ph.get_par_resid_subset(pe);
+	for (int i = 0; i < par_names.size(); i++)
+	{
+		par_resid_map[par_names[i]] = mat.col(i);
+	}
+	mat = pe.get_eigen_anomalies(center_on);
+	for (int i = 0; i < par_names.size(); i++)
+	{
+		par_diff_map[par_names[i]] = mat.col(i);
+	}
+	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
+	{
+		for (int i = 0; i < par_names.size(); i++)
+		{
+			Am_map[par_names[i]] = Am.row(i);
+		}
+	}
+	mat.resize(0, 0);
+
+	//passing loc_map to solve so it can be reused...
+	/*loc_map.clear();
+	if (use_localizer)
+	{
+		loc_map = localizer.get_localizer_map(iter, oe, pe, performance_log);
+	}
+	else
+	{
+		pair<vector<string>, vector<string>> p(_act_obs_names, _act_par_names);
+		loc_map["all"] = p;
+	}*/
+}
+
+template<typename T, typename A>
+void EnsembleSolver::message(int level, const string& _message, vector<T, A> _extras, bool echo)
+{
+	stringstream ss;
+	if (level == 0)
+		ss << endl << "  ---  ";
+	else if (level == 1)
+		ss << "...";
+	ss << _message;
+	if (_extras.size() > 0)
+	{
+
+		for (auto& e : _extras)
+			ss << e << " , ";
+
+	}
+	if (level == 0)
+		ss << "  ---  ";
+	if ((echo) && ((verbose_level >= 2) || (level < 2)))
+		cout << ss.str() << endl;
+	file_manager.rec_ofstream() << ss.str() << endl;
+	performance_log->log_event(_message);
+
+}
+
+void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form,
+                                 LocalAnalysisUpgradeThread& worker, exception_ptr& eptr)
+{
+	try
+	{
+		worker.work(id, iter, cur_lam, use_glm_form);
+	}
+	catch (...)
+	{
+		eptr = current_exception();
+	}
+
+	return;
+}
+
+
+void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map)
+{
+	pe_upgrade.set_zeros();
+	stringstream ss;
+	Localizer::How _how = localizer.get_how();
+	LocalAnalysisUpgradeThread worker(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map,obs_err_map,
+		localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
+
+	if ((num_threads < 1) || (loc_map.size() == 1))
+		//if (num_threads < 1)
+	{
+		worker.work(0, iter, cur_lam, use_glm_form);
+	}
+	else
+	{
+		Eigen::setNbThreads(1);
+		vector<thread> threads;
+		vector<exception_ptr> exception_ptrs;
+		message(2, "launching threads");
+
+		for (int i = 0; i < num_threads; i++)
+		{
+			exception_ptrs.push_back(exception_ptr());
+		}
+
+		for (int i = 0; i < num_threads; i++)
+		{
+			//threads.push_back(thread(&LocalUpgradeThread::work, &worker, i, iter, cur_lam));
+
+			threads.push_back(thread(upgrade_thread_function, i, iter, cur_lam, use_glm_form, std::ref(worker), std::ref(exception_ptrs[i])));
+
+		}
+		message(2, "waiting to join threads");
+		//for (auto &t : threads)
+		//	t.join();
+		ss.str("");
+		int num_exp = 0;
+
+		for (int i = 0; i < num_threads; ++i)
+		{
+			bool found = false;
+			if (exception_ptrs[i])
+			{
+				found = true;
+				num_exp++;
+				try
+				{
+					rethrow_exception(exception_ptrs[i]);
+				}
+				catch (const std::exception& e)
+				{
+					//ss.str("");
+					ss << " thread " << i << "raised an exception: " << e.what();
+					//throw runtime_error(ss.str());
+				}
+				catch (...)
+				{
+					//ss.str("");
+					ss << " thread " << i << "raised an exception";
+					//throw runtime_error(ss.str());
+				}
+			}
+			threads[i].join();
+			if ((exception_ptrs[i]) && (!found))
+			{
+				num_exp++;
+				try
+				{
+					rethrow_exception(exception_ptrs[i]);
+				}
+				catch (const std::exception& e)
+				{
+					//ss.str("");
+					ss << " thread " << i << "raised an exception: " << e.what();
+					//throw runtime_error(ss.str());
+				}
+				catch (...)
+				{
+					//ss.str("");
+					ss << " thread " << i << "raised an exception: ";
+					//throw runtime_error(ss.str());
+				}
+			}
+		}
+		if (num_exp > 0)
+		{
+			throw runtime_error(ss.str());
+		}
+		message(2, "threaded localized upgrade calculation done");
+	}
+}
+
+
+void EnsembleSolver::message(int level, const string& _message)
+{
+	message(level, _message, vector<string>());
+}
+
+template<typename T>
+void EnsembleSolver::message(int level, const string& _message, T extra)
+{
+	stringstream ss;
+	ss << _message << " " << extra;
+	string s = ss.str();
+	message(level, s);
+}
+
+
+
+LocalAnalysisUpgradeThread::LocalAnalysisUpgradeThread(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map,
+	unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map, unordered_map<string, Eigen::VectorXd>& _obs_err_map,
+	Localizer& _localizer, unordered_map<string, double>& _parcov_inv_map, unordered_map<string, double>& _weight_map,
+	ParameterEnsemble& _pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
+	unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how) : par_resid_map(_par_resid_map),
+	par_diff_map(_par_diff_map), obs_resid_map(_obs_resid_map), obs_diff_map(_obs_diff_map), obs_err_map(_obs_err_map),localizer(_localizer),
+	pe_upgrade(_pe_upgrade), cases(_cases), parcov_inv_map(_parcov_inv_map), weight_map(_weight_map), Am_map(_Am_map)
+{
+	performance_log = _performance_log;
+	how = _how;
+	count = 0;
+
+	for (auto& c : cases)
+	{
+		keys.push_back(c.first);
+	}
+	//sort(keys.begin(), keys.end());
+	total = keys.size();
+	//random_shuffle(keys.begin(), keys.end());
+
+}
+
+
+void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm_form)
+{
+	class local_utils
+	{
+	public:
+		static Eigen::DiagonalMatrix<double, Eigen::Dynamic> get_matrix_from_map(vector<string>& names, unordered_map<string, double>& dmap)
+		{
+			Eigen::VectorXd vec(names.size());
+			int i = 0;
+			for (auto name : names)
+			{
+				vec[i] = dmap.at(name);
+				++i;
+			}
+			Eigen::DiagonalMatrix<double, Eigen::Dynamic> m = vec.asDiagonal();
+			return m;
+		}
+		static Eigen::MatrixXd get_matrix_from_map(int num_reals, vector<string>& names, unordered_map<string, Eigen::VectorXd>& emap)
+		{
+			Eigen::MatrixXd mat(num_reals, names.size());
+			mat.setZero();
+
+			for (int j = 0; j < names.size(); j++)
+			{
+				mat.col(j) = emap[names[j]];
+			}
+
+			return mat;
+		}
+		static void save_mat(int verbose_level, int tid, int iter, int t_count, string prefix, Eigen::MatrixXd& mat)
+		{
+			if (verbose_level < 2)
+				return;
+
+			if (verbose_level < 3)
+				return;
+			//cout << "thread: " << tid << ", " << t_count << ", " << prefix << " rows:cols" << mat.rows() << ":" << mat.cols() << endl;
+			stringstream ss;
+
+			ss << "thread_" << tid << ".count_ " << t_count << ".iter_" << iter << "." << prefix << ".dat";
+			string fname = ss.str();
+			ofstream f(fname);
+			if (!f.good())
+				cout << "error getting ofstream " << fname << endl;
+			else
+			{
+
+				try
+				{
+					f << mat << endl;
+					f.close();
+				}
+				catch (...)
+				{
+					cout << "error saving matrix " << fname << endl;
+				}
+			}
+		}
+	};
+
+	stringstream ss;
+
+	unique_lock<mutex> ctrl_guard(ctrl_lock, defer_lock);
+	int maxsing, num_reals, verbose_level, pcount = 0, t_count;
+	double eigthresh;
+	bool use_approx;
+	bool use_prior_scaling;
+	bool use_localizer = false;
+	bool loc_by_obs = true;
+
+	while (true)
+	{
+		if (ctrl_guard.try_lock())
+		{
+			maxsing = pe_upgrade.get_pest_scenario_ptr()->get_svd_info().maxsing;
+			eigthresh = pe_upgrade.get_pest_scenario_ptr()->get_svd_info().eigthresh;
+			use_approx = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_use_approx();
+			use_prior_scaling = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_use_prior_scaling();
+			num_reals = pe_upgrade.shape().first;
+			verbose_level = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_verbose_level();
+			ctrl_guard.unlock();
+			//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_localize_how()[0] == 'P')
+			if (how == Localizer::How::PARAMETERS)
+				loc_by_obs = false;
+			break;
+		}
+	}
+	ofstream f_thread;
+	if (verbose_level > 2)
+	{
+		ss.str("");
+		ss << "thread_" << thread_id << "part_map.csv";
+		f_thread.open(ss.str());
+		ss.str("");
+	}
+	Eigen::MatrixXd par_resid, par_diff, Am;
+	Eigen::MatrixXd obs_resid, obs_diff, obs_err, loc;
+	Eigen::DiagonalMatrix<double, Eigen::Dynamic> weights, parcov_inv;
+	vector<string> par_names, obs_names;
+	while (true)
+	{
+		unique_lock<mutex> next_guard(next_lock, defer_lock);
+		par_names.clear();
+		obs_names.clear();
+		use_localizer = false;
+		//the end condition
+		//the end condition
+		while (true)
+		{
+			if (next_guard.try_lock())
+			{
+				if (count == keys.size())
+				{
+					if (verbose_level > 1)
+					{
+						cout << "upgrade thread: " << thread_id << " processed " << pcount << " upgrade parts" << endl;
+					}
+					if (f_thread.good())
+						f_thread.close();
+					return;
+				}
+				string k = keys[count];
+				pair<vector<string>, vector<string>> p = cases.at(k);
+				par_names = p.second;
+				obs_names = p.first;
+				if (localizer.get_use())
+				{
+					if ((loc_by_obs) && (par_names.size() == 1) && (k == par_names[0]))
+						use_localizer = true;
+					else if ((!loc_by_obs) && (obs_names.size() == 1) && (k == obs_names[0]))
+					{
+						use_localizer = true;
+						//loc_by_obs = false;
+					}
+				}
+				if (count % 1000 == 0)
+				{
+					ss.str("");
+					ss << "upgrade thread progress: " << count << " of " << total << " parts done";
+					if (verbose_level > 1)
+						cout << ss.str() << endl;
+					performance_log->log_event(ss.str());
+				}
+				count++;
+				t_count = count;
+				pcount++;
+				next_guard.unlock();
+				break;
+			}
+		}
+
+		if (verbose_level > 2)
+		{
+			f_thread << t_count << "," << iter;
+			for (auto name : par_names)
+				f_thread << "," << name;
+			for (auto name : obs_names)
+				f_thread << "," << name;
+			f_thread << endl;
+		}
+
+		par_resid.resize(0, 0);
+		par_diff.resize(0, 0);
+		obs_resid.resize(0, 0);
+		obs_diff.resize(0, 0);
+		obs_err.resize(0, 0);
+		loc.resize(0, 0);
+		Am.resize(0, 0);
+		weights.resize(0);
+		parcov_inv.resize(0);
+		Am.resize(0, 0);
+
+		unique_lock<mutex> obs_diff_guard(obs_diff_lock, defer_lock);
+		unique_lock<mutex> obs_resid_guard(obs_resid_lock, defer_lock);
+		unique_lock<mutex> obs_err_guard(obs_err_lock, defer_lock);
+		unique_lock<mutex> par_diff_guard(par_diff_lock, defer_lock);
+		unique_lock<mutex> par_resid_guard(par_resid_lock, defer_lock);
+		unique_lock<mutex> loc_guard(loc_lock, defer_lock);
+		unique_lock<mutex> weight_guard(weight_lock, defer_lock);
+		unique_lock<mutex> parcov_guard(parcov_lock, defer_lock);
+		unique_lock<mutex> am_guard(am_lock, defer_lock);
+
+		while (true)
+		{
+			if (((use_approx) || (par_resid.rows() > 0)) &&
+				(weights.size() > 0) &&
+				(parcov_inv.size() > 0) &&
+				(par_diff.rows() > 0) &&
+				(obs_resid.rows() > 0) &&
+				(obs_err.rows() > 0) &&
+				(obs_diff.rows() > 0) &&
+				((!use_localizer) || (loc.rows() > 0)) &&
+				((use_approx) || (Am.rows() > 0)))
+				break;
+			if ((use_localizer) && (loc.rows() == 0) && (loc_guard.try_lock()))
+			{
+				if (loc_by_obs)
+					loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
+				else
+					loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
+				loc_guard.unlock();
+			}
+			if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
+			{
+				//piggy back here for thread safety
+				//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
+				//	use_propack = true;
+				obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
+				obs_diff_guard.unlock();
+			}
+			if ((obs_resid.rows() == 0) && (obs_resid_guard.try_lock()))
+			{
+				obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
+				obs_resid_guard.unlock();
+			}
+			if ((obs_err.rows() == 0) && (obs_err_guard.try_lock()))
+			{
+				obs_err = local_utils::get_matrix_from_map(num_reals, obs_names, obs_err_map);
+				obs_err_guard.unlock();
+			}
+			if ((par_diff.rows() == 0) && (par_diff_guard.try_lock()))
+			{
+				par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
+				par_diff_guard.unlock();
+			}
+			if ((par_resid.rows() == 0) && (par_resid_guard.try_lock()))
+			{
+				par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
+				par_resid_guard.unlock();
+			}
+			if ((weights.rows() == 0) && (weight_guard.try_lock()))
+			{
+				weights = local_utils::get_matrix_from_map(obs_names, weight_map);
+				weight_guard.unlock();
+			}
+			if ((parcov_inv.rows() == 0) && (parcov_guard.try_lock()))
+			{
+				parcov_inv = local_utils::get_matrix_from_map(par_names, parcov_inv_map);
+				parcov_guard.unlock();
+			}
+			if ((!use_approx) && (Am.rows() == 0) && (am_guard.try_lock()))
+			{
+				//Am = local_utils::get_matrix_from_map(num_reals, par_names, Am_map).transpose();
+				int am_cols = Am_map[par_names[0]].size();
+				Am.resize(par_names.size(), am_cols);
+				Am.setZero();
+
+				for (int j = 0; j < par_names.size(); j++)
+				{
+					Am.row(j) = Am_map[par_names[j]];
+				}
+				am_guard.unlock();
+			}
+		}
+
+		par_diff.transposeInPlace();
+		obs_diff.transposeInPlace();
+		obs_resid.transposeInPlace();
+		par_resid.transposeInPlace();
+		obs_err.transposeInPlace();
+
+		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
+		Eigen::MatrixXd scaled_residual = weights * obs_resid;
+
+		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_resid", par_resid);
+		Eigen::MatrixXd scaled_par_resid;
+		if ((!use_approx) && (iter > 1))
+		{
+			if (use_prior_scaling)
+			{
+				scaled_par_resid = parcov_inv * par_resid;
+			}
+			else
+			{
+				scaled_par_resid = par_resid;
+			}
+		}
+
+		stringstream ss;
+
+		double scale = (1.0 / (sqrt(double(num_reals - 1))));
+		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
+
+		if (use_localizer)
+			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "loc", loc);
+		if (use_localizer)
+		{
+			if (loc_by_obs)
+				par_diff = par_diff.cwiseProduct(loc);
+			else
+				obs_diff = obs_diff.cwiseProduct(loc);
+
+		}
+
+		Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
+
+		if (!use_glm_form)
+		{
+			obs_diff = scale * obs_diff;// (H-Hm)/sqrt(N-1)		
+			par_diff = scale * par_diff;// (K-Km)/sqrt(N-1)		
+			obs_err = scale * obs_err; //  (E-Em)/sqrt(N-1)	
+			obs_resid = (-1.0) * obs_resid; // D-H  , the negative one is becuase obs_resid is calculated as H-D ???
+
+			Eigen::MatrixXd s2_, s, V, U, cum_sum;
+			SVD_REDSVD rsvd;
+			Eigen::MatrixXd C;
+			C = obs_diff + (cur_lam * obs_err); // curr_lam is the inflation factor 		
+			Eigen::VectorXd s2;
+
+			if (false) // check this 
+			{
+				rsvd.solve_ip(C, s, U, V, eigthresh, maxsing);
+			}
+			else
+			{
+
+				Eigen::JacobiSVD<Eigen::MatrixXd> svd(C, Eigen::ComputeThinU | Eigen::ComputeThinV);
+				U = svd.matrixU();
+				s = svd.singularValues();
+
+				int ssize = s.size();
+				double threshold_frac;
+				s2 = s.cwiseProduct(s);
+				double s_sum = s.sum();
+				cum_sum = s;
+				for (int i = 0; i < ssize; i++)
+				{
+
+					threshold_frac = s(i) / s_sum;
+					if (threshold_frac < eigthresh)
+						s2(i) = 0;
+				}
+
+			}
+			s2_ = s2.asDiagonal().inverse();
+			for (int i = 0; i < s2.size(); i++)
+			{
+				if (s2(i) < 1e-50)
+				{
+					s2_(i, i) = 0;
+				}
+			}
+			Eigen::MatrixXd X1 = s2_ * U.transpose();
+
+			X1 = X1 * obs_resid;
+
+			X1 = U * X1;
+
+			X1 = obs_diff.transpose() * X1;
+
+			upgrade_1 = par_diff * X1;
+			upgrade_1.transposeInPlace();
+
+
+			////******************************************
+			if (0)
+			{
+				if (true) //Evensen's solution
+				{
+					obs_diff = obs_diff + cur_lam * obs_err;
+				}
+				else
+				{
+					// do nothing
+				}
+
+				obs_diff = scale * (weights * obs_diff);
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
+				if (use_prior_scaling)
+					par_diff = scale * parcov_inv * par_diff;
+				else
+					par_diff = scale * par_diff;
+
+
+				
+				
+
+
+				SVD_REDSVD rsvd;
+				rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
+
+				Ut.transposeInPlace();
+				obs_diff.resize(0, 0);// this is becuase obs_diff = USVt
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Ut", Ut);
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "s", s);
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "V", V);
+
+				Eigen::MatrixXd s2 = s.cwiseProduct(s);
+
+				if (true) // Evensen's solution
+				{
+					ivec = s2.asDiagonal().inverse();
+				}
+				else
+				{
+					ivec = ((Eigen::VectorXd::Ones(s2.size()) * cur_lam) + s2).asDiagonal().inverse();
+				}
+
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "ivec", ivec);
+				Eigen::MatrixXd X1 = Ut * scaled_residual;
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
+				Eigen::MatrixXd X2 = ivec * X1;
+				X1.resize(0, 0);
+
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X2", X2);
+				Eigen::MatrixXd X3 = V * s.asDiagonal() * X2;
+				X2.resize(0, 0);
+
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X3", X3);
+				if (use_prior_scaling)
+				{
+					upgrade_1 = -1.0 * parcov_inv * par_diff * X3;
+				}
+				else
+				{
+					upgrade_1 = -1.0 * par_diff * X3;
+				}
+				upgrade_1.transposeInPlace();
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
+				X3.resize(0, 0);
+
+
+				Eigen::MatrixXd upgrade_2;
+				if ((!use_approx) && (iter > 1))
+				{
+					local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Am", Am);
+					Eigen::MatrixXd x4 = Am.transpose() * scaled_par_resid;
+					local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X4", x4);
+
+					par_resid.resize(0, 0);
+
+					Eigen::MatrixXd x5 = Am * x4;
+					x4.resize(0, 0);
+					Am.resize(0, 0);
+
+					local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X5", x5);
+					Eigen::MatrixXd x6 = par_diff.transpose() * x5;
+					x5.resize(0, 0);
+
+					local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X6", x6);
+					Eigen::MatrixXd x7 = V * ivec * V.transpose() * x6;
+					x6.resize(0, 0);
+
+					if (use_prior_scaling)
+					{
+						upgrade_2 = -1.0 * parcov_inv * par_diff * x7;
+					}
+					else
+					{
+						upgrade_2 = -1.0 * (par_diff * x7);
+					}
+					x7.resize(0, 0);
+
+					upgrade_1 = upgrade_1 + upgrade_2.transpose();
+					local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_2", upgrade_2);
+					upgrade_2.resize(0, 0);
+
+				}
+			}
+
+			unique_lock<mutex> put_guard(put_lock, defer_lock);
+			while (true)
+			{
+				if (put_guard.try_lock())
+				{
+					pe_upgrade.add_2_cols_ip(par_names, upgrade_1);
+					put_guard.unlock();
+					break;
+				}
+			}
+			
+		}
+		else
+		{
+			obs_diff = scale * (weights * obs_diff);
+			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
+			if (use_prior_scaling)
+				par_diff = scale * parcov_inv * par_diff;
+			else
+				par_diff = scale * par_diff;
+
+
+			//performance_log->log_event("SVD of obs diff");
+			Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
+
+
+			SVD_REDSVD rsvd;
+			rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
+
+			Ut.transposeInPlace();
+			obs_diff.resize(0, 0);
+			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Ut", Ut);
+			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "s", s);
+			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "V", V);
+
+			Eigen::MatrixXd s2 = s.cwiseProduct(s);
+
+			ivec = ((Eigen::VectorXd::Ones(s2.size()) * (cur_lam + 1.0)) + s2).asDiagonal().inverse();
+			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "ivec", ivec);
+			Eigen::MatrixXd X1 = Ut * scaled_residual;
+			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
+			Eigen::MatrixXd X2 = ivec * X1;
+			X1.resize(0, 0);
+
+			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X2", X2);
+			Eigen::MatrixXd X3 = V * s.asDiagonal() * X2;
+			X2.resize(0, 0);
+
+			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X3", X3);
+			if (use_prior_scaling)
+			{
+				upgrade_1 = -1.0 * parcov_inv * par_diff * X3;
+			}
+			else
+			{
+				upgrade_1 = -1.0 * par_diff * X3;
+			}
+			upgrade_1.transposeInPlace();
+			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
+			X3.resize(0, 0);
+
+
+			Eigen::MatrixXd upgrade_2;
+			if ((!use_approx) && (iter > 1))
+			{
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Am", Am);
+				Eigen::MatrixXd x4 = Am.transpose() * scaled_par_resid;
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X4", x4);
+
+				par_resid.resize(0, 0);
+
+				Eigen::MatrixXd x5 = Am * x4;
+				x4.resize(0, 0);
+				Am.resize(0, 0);
+
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X5", x5);
+				Eigen::MatrixXd x6 = par_diff.transpose() * x5;
+				x5.resize(0, 0);
+
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X6", x6);
+				Eigen::MatrixXd x7 = V * ivec * V.transpose() * x6;
+				x6.resize(0, 0);
+
+				if (use_prior_scaling)
+				{
+					upgrade_2 = -1.0 * parcov_inv * par_diff * x7;
+				}
+				else
+				{
+					upgrade_2 = -1.0 * (par_diff * x7);
+				}
+				x7.resize(0, 0);
+
+				upgrade_1 = upgrade_1 + upgrade_2.transpose();
+				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_2", upgrade_2);
+				upgrade_2.resize(0, 0);
+
+			}
+
+			unique_lock<mutex> put_guard(put_lock, defer_lock);
+			while (true)
+			{
+				if (put_guard.try_lock())
+				{
+					pe_upgrade.add_2_cols_ip(par_names, upgrade_1);
+					put_guard.unlock();
+					break;
+				}
+			}
+		}
+	}
+
+}
+
+
+
 
 
 L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
