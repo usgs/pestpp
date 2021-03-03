@@ -622,7 +622,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 		Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
 
-		if (false)
+		if (!use_glm_form)
 		{
 			obs_diff = scale * obs_diff;// (H-Hm)/sqrt(N-1)		
 			par_diff = scale * par_diff;// (K-Km)/sqrt(N-1)		

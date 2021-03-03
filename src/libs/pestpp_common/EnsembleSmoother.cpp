@@ -1043,7 +1043,35 @@ void IterEnsembleSmoother::initialize()
 	use_mda = false;
 	if (ppo->get_ies_use_mda())
 	{
-		message(0, "using multiple-data-assimilation algorithm");
+		int noptmax = pest_scenario.get_control_info().noptmax;
+		if (noptmax > 0)
+		{
+			message(0, "using multiple-data-assimilation algorithm");
+			set<string> pargs = ppo->get_passed_args();
+			if ((pargs.find("IES_SUBSET_SIZE") == pargs.end()) && (pargs.find("LAMBDA_SCALE_FAC") == pargs.end()))
+			{
+				message(0, "disabling subset testing...");
+				ppo->set_ies_subset_size(1000000000);
+				message(0, "disabling lambda scale factor testing...");
+				ppo->set_lambda_scale_vec(vector<double>{1.0});
+			}
+			mda_facs.clear();
+			mda_facs.push_back(ppo->get_ies_mda_init_fac());
+			double tot = ppo->get_ies_mda_init_fac();
+			for (int i = 1; i < noptmax; i++)
+			{
+				mda_facs.push_back(mda_facs[i - 1] * ppo->get_ies_mda_dec_fac());
+				tot += mda_facs[i];
+			}
+			double ttot = 0.0;
+			for (auto& mda_fac : mda_facs)
+			{
+				mda_fac = mda_fac / tot;
+				ttot += mda_fac;
+			}
+			message(0, "using mda inflation factors: ", mda_facs);
+		}
+
 		use_mda = true;
 	}
 	else
@@ -2311,12 +2339,25 @@ bool IterEnsembleSmoother::solve_new()
 		Am = get_Am(pe.get_real_names(), pe.get_var_names());
 	}
 
-	for (auto &lam_mult : lam_mults)
+	vector<double> mults = lam_mults;
+	if (use_mda)
+		mults = vector<double>{ mda_facs[iter-1] };
+
+	for (auto &lam_mult : mults)
 	{
 		ss.str("");
 		double cur_lam = last_best_lam * lam_mult;
-		ss << "starting calcs for lambda" << cur_lam;
-		message(1, "starting lambda calcs for lambda", cur_lam);
+		if (use_mda)
+		{
+			cur_lam = lam_mult;
+			message(1, "starting calcs for mda factor ", cur_lam);
+		}
+		else
+		{
+			ss << "starting calcs for lambda" << cur_lam;
+			message(1, "starting lambda calcs for lambda", cur_lam);
+			
+		}
 		message(2, "see .log file for more details");
 		//ParameterEnsemble pe_upgrade;
 		//pe_upgrade = calc_localized_upgrade_threaded(cur_lam, loc_map);
@@ -2332,7 +2373,6 @@ bool IterEnsembleSmoother::solve_new()
 		map<string, double> norm_map;
 		for (auto sf : pest_scenario.get_pestpp_options().get_lambda_scale_vec())
 		{
-
 			ParameterEnsemble pe_lam_scale = pe;
 			pe_lam_scale.set_eigen(*pe_lam_scale.get_eigen_ptr() + (*pe_upgrade.get_eigen_ptr() * sf));
 			if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
@@ -2370,7 +2410,7 @@ bool IterEnsembleSmoother::solve_new()
 		}
 
 		ss.str("");
-		message(1, "finished calcs for lambda:", cur_lam);
+		message(1, "finished calcs for:", cur_lam);
 
 	}
 	
@@ -2385,10 +2425,10 @@ bool IterEnsembleSmoother::solve_new()
 	double best_mean = 1.0e+30, best_std = 1.0e+30;
 	double mean, std;
 
-	message(0, "running lambda ensembles");
+	message(0, "running upgrade ensembles");
 	vector<ObservationEnsemble> oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
 
-	message(0, "evaluting lambda ensembles");
+	message(0, "evaluting upgrade ensembles");
 	message(1, "last mean: ", last_best_mean);
 	message(1, "last stdev: ", last_best_std);
 
@@ -2444,7 +2484,7 @@ bool IterEnsembleSmoother::solve_new()
 	}
 	if (best_idx == -1)
 	{
-		message(0, "WARNING:  unsuccessful lambda testing, resetting lambda to 10000.0");
+		message(0, "WARNING:  unsuccessful upgrade testing, resetting lambda to 10000.0");
 		last_best_lam = 10000.0;
 		return false;
 
@@ -2466,7 +2506,7 @@ bool IterEnsembleSmoother::solve_new()
 			best_mean = acc_phi + 1.0;
 		}
 
-		if (best_mean > acc_phi)
+		if ((best_mean > acc_phi) && (!use_mda))
 		{
 			//ph.update(oe_lams[best_idx],pe_lams[best_idx]);
 			
@@ -2477,7 +2517,7 @@ bool IterEnsembleSmoother::solve_new()
 			ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
 			string m = ss.str();
 			message(0, m);
-			message(1, "abandoning current lambda ensembles, increasing lambda to ", new_lam);
+			message(1, "abandoning current upgrade ensembles, increasing lambda to ", new_lam);
 			message(1, "updating realizations with reduced phi");
 			update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx]);
 			ph.update(oe, pe);
@@ -2506,7 +2546,7 @@ bool IterEnsembleSmoother::solve_new()
 					last_best_std = best_std;
 				}
 			}
-			message(1, "returing to lambda calculations...");
+			message(1, "returing to upgrade calculations...");
 			return false;
 		}
 
@@ -2630,7 +2670,7 @@ bool IterEnsembleSmoother::solve_new()
 	best_mean_phis.push_back(best_mean);
 
 
-	if (best_mean < last_best_mean * acc_fac)
+	if ((best_mean < last_best_mean * acc_fac) || (use_mda))
 	{
 		message(0, "updating parameter ensemble");
 		performance_log->log_event("updating parameter ensemble");
