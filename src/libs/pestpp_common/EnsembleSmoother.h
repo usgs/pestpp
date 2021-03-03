@@ -61,6 +61,7 @@ private:
 
 	int iter,subset_size;
 	bool use_subset;
+	bool use_mda;
 
 	double last_best_lam, last_best_mean,last_best_std;
 	vector<double> best_mean_phis;

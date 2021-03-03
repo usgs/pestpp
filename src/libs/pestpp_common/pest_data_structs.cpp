@@ -1165,9 +1165,9 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		convert_ip(value, num_tpl_ins_threads);
 		return true;
 	}
-	else if (key == "USE_ENSEMBLE_GLM_SOLVER")
+	else if (key == "IES_USE_MDA")
 	{
-		ensemble_use_glm_solver = pest_utils::parse_string_arg_to_bool(value);
+		ies_use_mda = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
 
@@ -1521,7 +1521,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_drop_conflicts: " << ies_drop_conflicts << endl;
 	os << "ies_save_rescov:" << ies_save_rescov << endl;
 	os << "ies_pdc_sigma_distance: " << ies_pdc_sigma_distance << endl;
-	os << "ensemble_use_glm_solver: " << ensemble_use_glm_solver << endl;
+	os << "ies_use_mda: " << ies_use_mda << endl;
 
 	os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -1675,7 +1675,7 @@ void PestppOptions::set_defaults()
 	set_ies_drop_conflicts(false);
 	set_ies_save_rescov(false);
 	set_ies_pdc_sigma_distance(-1.0);
-	set_ensemble_use_glm_solver(true);
+	set_ies_use_mda(false);
 
 	// DA parameters
 	set_da_use_ies(false);

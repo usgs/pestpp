@@ -1040,10 +1040,32 @@ void IterEnsembleSmoother::initialize()
 	//set some defaults
 	PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
 
+	use_mda = false;
+	if (ppo->get_ies_use_mda())
+	{
+		message(0, "using multiple-data-assimilation algorithm");
+		use_mda = true;
+	}
+	else
+	{
+		message(0, "using glm algorithm");
+	}
+
 	verbose_level = pest_scenario.get_pestpp_options_ptr()->get_ies_verbose_level();
 	if (pest_scenario.get_n_adj_par() >= 1e6)
 	{
 		message(0, "You are a god among mere mortals!");
+	}
+
+	use_mda = false;
+	if (ppo->get_ies_use_mda())
+	{
+		message(0, "using mutiple-data-assimilation algorithm");
+		use_mda = true;
+	}
+	else
+	{
+		message(0, "using glm algorithm");
 	}
 
 	message(1, "using REDSVD for truncated svd solve");
@@ -2305,7 +2327,7 @@ bool IterEnsembleSmoother::solve_new()
 		
 		EnsembleSolver es(performance_log, file_manager, pest_scenario, pe_upgrade, oe_upgrade, oe_base, localizer, parcov, Am, ph,
 			use_localizer, iter, act_par_names, act_obs_names);
-		es.solve(num_threads, cur_lam, true, pe_upgrade, loc_map);
+		es.solve(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map);
 
 		map<string, double> norm_map;
 		for (auto sf : pest_scenario.get_pestpp_options().get_lambda_scale_vec())
