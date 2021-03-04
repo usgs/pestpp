@@ -211,6 +211,8 @@ private:
 	mutex par_diff_lock, am_lock, put_lock, obs_err_lock;
 	mutex next_lock;
 
+	void fill_maps();
+
 };
 
 #endif

@@ -425,6 +425,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 	Eigen::MatrixXd obs_resid, obs_diff, obs_err, loc;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> weights, parcov_inv;
 	vector<string> par_names, obs_names;
+	string key;
 	while (true)
 	{
 		unique_lock<mutex> next_guard(next_lock, defer_lock);
@@ -447,19 +448,20 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 						f_thread.close();
 					return;
 				}
-				string k = keys[count];
-				pair<vector<string>, vector<string>> p = cases.at(k);
+				key = keys[count];
+				pair<vector<string>, vector<string>> p = cases.at(key);
 				par_names = p.second;
 				obs_names = p.first;
 				if (localizer.get_use())
 				{
-					if ((loc_by_obs) && (par_names.size() == 1) && (k == par_names[0]))
+					/*if ((loc_by_obs) && (par_names.size() == 1) && (k == par_names[0]))
 						use_localizer = true;
 					else if ((!loc_by_obs) && (obs_names.size() == 1) && (k == obs_names[0]))
-					{
+						use_localizer = true;*/
+					//if ((loc_by_obs) && (obs_names.size() == 1) && (k == obs_names[0]))
 						use_localizer = true;
-						//loc_by_obs = false;
-					}
+					//else if ((!loc_by_obs) && (par_names.size() == 1) && (k == par_names[0]))
+					//	use_localizer = true;
 				}
 				if (count % 1000 == 0)
 				{
@@ -523,9 +525,16 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			if ((use_localizer) && (loc.rows() == 0) && (loc_guard.try_lock()))
 			{
 				if (loc_by_obs)
-					loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
+				{
+					//loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
+					loc = localizer.get_localizing_par_hadamard_matrix(num_reals, key, par_names);
+				}
+
 				else
-					loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
+				{
+					//loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
+					loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, key, obs_names);
+				}
 				loc_guard.unlock();
 			}
 			if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
@@ -617,7 +626,6 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				par_diff = par_diff.cwiseProduct(loc);
 			else
 				obs_diff = obs_diff.cwiseProduct(loc);
-
 		}
 
 		Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
@@ -698,10 +706,6 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 					par_diff = scale * parcov_inv * par_diff;
 				else
 					par_diff = scale * par_diff;
-
-
-				
-				
 
 
 				SVD_REDSVD rsvd;
