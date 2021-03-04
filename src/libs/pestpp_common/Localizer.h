@@ -59,8 +59,11 @@ public:
 	bool initialize(PerformanceLog *performance_log, bool forgive_missing=false);
 	unordered_map<string, pair<vector<string>, vector<string>>> get_localizer_map(int iter, ObservationEnsemble &oe, ParameterEnsemble &pe, PerformanceLog *performance_log);// { return localizer_map; }
 	void set_pest_scenario(Pest *_pest_scenario_ptr) { pest_scenario_ptr = _pest_scenario_ptr; }
-	Eigen::MatrixXd get_localizing_obs_hadamard_matrix(int num_reals,string col_name,vector<string> &obs_names);
-	Eigen::MatrixXd get_localizing_par_hadamard_matrix(int num_reals, string row_name, vector<string> &par_names);
+	Eigen::MatrixXd get_obsdiff_hadamard_matrix(int num_reals,string col_name,vector<string> &obs_names);
+	Eigen::MatrixXd get_pardiff_hadamard_matrix(int num_reals, string row_name, vector<string> &par_names);
+	Eigen::MatrixXd get_kalmangain_hadamard_matrix(vector<string>& obs_names, vector<string>& par_names);
+	Eigen::VectorXd get_obs_hadamard_vector(string par_name, vector<string>& obs_names);
+
 	How get_how() { return how; }
 	bool get_use() { return use; }
 	bool get_autoadaloc() { return autoadaloc; }

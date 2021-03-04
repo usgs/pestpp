@@ -868,14 +868,54 @@ void AutoAdaLocThread::work(int thread_id)
 }
 
 
-Eigen::MatrixXd Localizer::get_localizing_obs_hadamard_matrix(int num_reals, string col_name, vector<string> &obs_names)
+Eigen::MatrixXd Localizer::get_kalmangain_hadamard_matrix(vector<string>& obs_names, vector<string>& par_names)
 {
+	Eigen::MatrixXd loc(obs_names.size(), par_names.size());
+	loc.setZero();
+	int row_idx, col_idx;
+	Eigen::VectorXd row_vec, val_vec(par_names.size());
+	for (int i = 0; i < obs_names.size(); i++)
+	{
+		row_idx = obs2row_map[obs_names[i]];
+		row_vec = mat.e_ptr()->row(row_idx);
+		val_vec.setZero();
+		for (int j = 0; j < par_names.size(); j++)
+		{
+			col_idx = obs2row_map[obs_names[i]];
+			val_vec[j] = row_vec[col_idx];
+		}
+		loc.row(i) = val_vec;
+	}
+	return loc;
 
-	vector<double> values;
+}
+
+
+Eigen::VectorXd Localizer::get_obs_hadamard_vector(string par_name, vector<string>& obs_names)
+{
+	int idx;
+	vector<string> mat_cols = mat.get_col_names();
+	vector<string>::iterator it = find(mat_cols.begin(), mat_cols.end(), par_name);
+	if (it == mat_cols.end())
+	{
+		if (par2col_map.find(par_name) == par2col_map.end())
+			throw runtime_error("Localizer::get_obs_hadamard_vector(): error: par name '" + par_name + "' not found");
+		idx = par2col_map[par_name];
+	}
+	else
+	{
+		idx = it - mat_cols.begin();
+	}
+	Eigen::VectorXd loc = mat.e_ptr()->col(idx);
+	return loc;
+}
+
+Eigen::MatrixXd Localizer::get_obsdiff_hadamard_matrix(int num_reals, string col_name, vector<string> &obs_names)
+{
 	vector<string> mat_cols = mat.get_col_names();
 	vector<string>::iterator it = find(mat_cols.begin(), mat_cols.end(), col_name);
 	if (it == mat_cols.end())
-		throw runtime_error("Localizer::get_localizing_obs_hadamard_matrix() error: col_name not found in localizer matrix: " + col_name);
+		throw runtime_error("Localizer::get_obsdiff_hadamard_matrix error: col_name not found in localizer matrix: " + col_name);
 	int idx = it - mat_cols.begin();
 	Eigen::VectorXd mat_vec = mat.e_ptr()->col(idx);
 	int col_idx;
@@ -890,14 +930,14 @@ Eigen::MatrixXd Localizer::get_localizing_obs_hadamard_matrix(int num_reals, str
 }
 
 
-Eigen::MatrixXd Localizer::get_localizing_par_hadamard_matrix(int num_reals, string row_name, vector<string> &par_names)
+Eigen::MatrixXd Localizer::get_pardiff_hadamard_matrix(int num_reals, string row_name, vector<string> &par_names)
 {
 
 	vector<double> values;
 	vector<string> mat_rows = mat.get_row_names();
 	vector<string>::iterator it = find(mat_rows.begin(), mat_rows.end(), row_name);
 	if (it == mat_rows.end())
-		throw runtime_error("Localizer::get_localizing_par_hadamard_matrix() error: row_name not found in localizer matrix: " + row_name);
+		throw runtime_error("Localizer::get_pardiff_hadamard_matrix error: row_name not found in localizer matrix: " + row_name);
 	int idx = it - mat_rows.begin();
 	Eigen::VectorXd mat_vec = mat.e_ptr()->row(idx);
 	int col_idx;

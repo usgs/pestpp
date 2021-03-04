@@ -302,32 +302,68 @@ void EnsembleSolver::message(int level, const string& _message, T extra)
 }
 
 
-
-LocalAnalysisUpgradeThread::LocalAnalysisUpgradeThread(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map,
-	unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map, unordered_map<string, Eigen::VectorXd>& _obs_err_map,
-	Localizer& _localizer, unordered_map<string, double>& _parcov_inv_map, unordered_map<string, double>& _weight_map,
-	ParameterEnsemble& _pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
-	unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how) : par_resid_map(_par_resid_map),
-	par_diff_map(_par_diff_map), obs_resid_map(_obs_resid_map), obs_diff_map(_obs_diff_map), obs_err_map(_obs_err_map),localizer(_localizer),
-	pe_upgrade(_pe_upgrade), cases(_cases), parcov_inv_map(_parcov_inv_map), weight_map(_weight_map), Am_map(_Am_map)
-{
-	performance_log = _performance_log;
-	how = _how;
-	count = 0;
-
-	for (auto& c : cases)
+UpgradeThread::UpgradeThread(PerformanceLog* _performance_log, unordered_map<string, 
+	Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map, 
+	unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, 
+	Eigen::VectorXd>& _obs_diff_map, unordered_map<string, Eigen::VectorXd>& _obs_err_map, 
+	Localizer& _localizer, unordered_map<string, double>& _parcov_inv_map, 
+	unordered_map<string, double>& _weight_map, ParameterEnsemble& _pe_upgrade, 
+	unordered_map<string, pair<vector<string>, vector<string>>>& _cases, 
+	unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how):
+	par_resid_map(_par_resid_map),par_diff_map(_par_diff_map), obs_resid_map(_obs_resid_map), 
+	obs_diff_map(_obs_diff_map), obs_err_map(_obs_err_map), localizer(_localizer),
+    pe_upgrade(_pe_upgrade), cases(_cases), parcov_inv_map(_parcov_inv_map), 
+	weight_map(_weight_map), Am_map(_Am_map)
 	{
-		keys.push_back(c.first);
-	}
-	//sort(keys.begin(), keys.end());
-	total = keys.size();
-	//random_shuffle(keys.begin(), keys.end());
+		performance_log = _performance_log;
+		how = _how;
+		count = 0;
 
+		for (auto& c : cases)
+		{
+			keys.push_back(c.first);
+		}
+		//sort(keys.begin(), keys.end());
+		total = keys.size();
+		//random_shuffle(keys.begin(), keys.end());
+
+	
+}
+
+
+//LocalAnalysisUpgradeThread::LocalAnalysisUpgradeThread(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map,
+//	unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map, unordered_map<string, Eigen::VectorXd>& _obs_err_map,
+//	Localizer& _localizer, unordered_map<string, double>& _parcov_inv_map, unordered_map<string, double>& _weight_map,
+//	ParameterEnsemble& _pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
+//	unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how) : par_resid_map(_par_resid_map),
+//	par_diff_map(_par_diff_map), obs_resid_map(_obs_resid_map), obs_diff_map(_obs_diff_map), obs_err_map(_obs_err_map),localizer(_localizer),
+//	pe_upgrade(_pe_upgrade), cases(_cases), parcov_inv_map(_parcov_inv_map), weight_map(_weight_map), Am_map(_Am_map)
+//{
+//	performance_log = _performance_log;
+//	how = _how;
+//	count = 0;
+//
+//	for (auto& c : cases)
+//	{
+//		keys.push_back(c.first);
+//	}
+//	//sort(keys.begin(), keys.end());
+//	total = keys.size();
+//	//random_shuffle(keys.begin(), keys.end());
+//
+//}
+//
+
+
+void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm_form)
+{
 }
 
 
 void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm_form)
 {
+
+	//declare these helpers in here so they are thread safe...
 	class local_utils
 	{
 	public:
@@ -426,18 +462,33 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> weights, parcov_inv;
 	vector<string> par_names, obs_names;
 	string key;
+
+
+	//these locks are used to control (thread-safe) access to the fast look up containers
+	unique_lock<mutex> next_guard(next_lock, defer_lock);
+	unique_lock<mutex> obs_diff_guard(obs_diff_lock, defer_lock);
+	unique_lock<mutex> obs_resid_guard(obs_resid_lock, defer_lock);
+	unique_lock<mutex> obs_err_guard(obs_err_lock, defer_lock);
+	unique_lock<mutex> par_diff_guard(par_diff_lock, defer_lock);
+	unique_lock<mutex> par_resid_guard(par_resid_lock, defer_lock);
+	unique_lock<mutex> loc_guard(loc_lock, defer_lock);
+	unique_lock<mutex> weight_guard(weight_lock, defer_lock);
+	unique_lock<mutex> parcov_guard(parcov_lock, defer_lock);
+	unique_lock<mutex> am_guard(am_lock, defer_lock);
+
+	//This is the main thread loop - it continues until all upgrade pieces have been completed
 	while (true)
 	{
-		unique_lock<mutex> next_guard(next_lock, defer_lock);
+		//First get a new case of par and obs names to solve with
 		par_names.clear();
 		obs_names.clear();
 		use_localizer = false;
-		//the end condition
-		//the end condition
+		
 		while (true)
 		{
 			if (next_guard.try_lock())
 			{
+				//if all the pieces have been completed, return
 				if (count == keys.size())
 				{
 					if (verbose_level > 1)
@@ -458,10 +509,10 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 						use_localizer = true;
 					else if ((!loc_by_obs) && (obs_names.size() == 1) && (k == obs_names[0]))
 						use_localizer = true;*/
-					//if ((loc_by_obs) && (obs_names.size() == 1) && (k == obs_names[0]))
-						use_localizer = true;
+					//if ((loc_by_obs) && (obs_names.size() == 1) && (k == obs_names[0]))	
 					//else if ((!loc_by_obs) && (par_names.size() == 1) && (k == par_names[0]))
 					//	use_localizer = true;
+					use_localizer = true;
 				}
 				if (count % 1000 == 0)
 				{
@@ -489,6 +540,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			f_thread << endl;
 		}
 
+		//reset all the solution parts
 		par_resid.resize(0, 0);
 		par_diff.resize(0, 0);
 		obs_resid.resize(0, 0);
@@ -500,18 +552,11 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 		parcov_inv.resize(0);
 		Am.resize(0, 0);
 
-		unique_lock<mutex> obs_diff_guard(obs_diff_lock, defer_lock);
-		unique_lock<mutex> obs_resid_guard(obs_resid_lock, defer_lock);
-		unique_lock<mutex> obs_err_guard(obs_err_lock, defer_lock);
-		unique_lock<mutex> par_diff_guard(par_diff_lock, defer_lock);
-		unique_lock<mutex> par_resid_guard(par_resid_lock, defer_lock);
-		unique_lock<mutex> loc_guard(loc_lock, defer_lock);
-		unique_lock<mutex> weight_guard(weight_lock, defer_lock);
-		unique_lock<mutex> parcov_guard(parcov_lock, defer_lock);
-		unique_lock<mutex> am_guard(am_lock, defer_lock);
-
+		
+		//now loop until this thread gets access to all the containers it needs to solve with
 		while (true)
 		{
+			//if all the solution pieces are filled, break out and solve!
 			if (((use_approx) || (par_resid.rows() > 0)) &&
 				(weights.size() > 0) &&
 				(parcov_inv.size() > 0) &&
@@ -522,21 +567,26 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				((!use_localizer) || (loc.rows() > 0)) &&
 				((use_approx) || (Am.rows() > 0)))
 				break;
+			
+			//get access to the localizer
 			if ((use_localizer) && (loc.rows() == 0) && (loc_guard.try_lock()))
 			{
+				//get a matrix that is either the shape of par diff or obs diff
 				if (loc_by_obs)
 				{
 					//loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
-					loc = localizer.get_localizing_par_hadamard_matrix(num_reals, key, par_names);
+					loc = localizer.get_pardiff_hadamard_matrix(num_reals, key, par_names);
 				}
 
 				else
 				{
 					//loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
-					loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, key, obs_names);
+					loc = localizer.get_obsdiff_hadamard_matrix(num_reals, key, obs_names);
 				}
 				loc_guard.unlock();
 			}
+
+			//get access to the obs_diff container
 			if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
 			{
 				//piggy back here for thread safety
@@ -545,36 +595,50 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
 				obs_diff_guard.unlock();
 			}
+
+			//get access to the residual container
 			if ((obs_resid.rows() == 0) && (obs_resid_guard.try_lock()))
 			{
 				obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
 				obs_resid_guard.unlock();
 			}
+
+			//get access to the obs noise container
 			if ((obs_err.rows() == 0) && (obs_err_guard.try_lock()))
 			{
 				obs_err = local_utils::get_matrix_from_map(num_reals, obs_names, obs_err_map);
 				obs_err_guard.unlock();
 			}
+
+			//get access to the par diff container
 			if ((par_diff.rows() == 0) && (par_diff_guard.try_lock()))
 			{
 				par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
 				par_diff_guard.unlock();
 			}
+
+			//get access to the par residual container
 			if ((par_resid.rows() == 0) && (par_resid_guard.try_lock()))
 			{
 				par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
 				par_resid_guard.unlock();
 			}
+
+			//get access to the obs weights container
 			if ((weights.rows() == 0) && (weight_guard.try_lock()))
 			{
 				weights = local_utils::get_matrix_from_map(obs_names, weight_map);
 				weight_guard.unlock();
 			}
+
+			//get access to the inverse prior parcov
 			if ((parcov_inv.rows() == 0) && (parcov_guard.try_lock()))
 			{
 				parcov_inv = local_utils::get_matrix_from_map(par_names, parcov_inv_map);
 				parcov_guard.unlock();
 			}
+
+			//if needed, get access to the Am container - needed in the full glm solution
 			if ((!use_approx) && (Am.rows() == 0) && (am_guard.try_lock()))
 			{
 				//Am = local_utils::get_matrix_from_map(num_reals, par_names, Am_map).transpose();
@@ -589,6 +653,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				am_guard.unlock();
 			}
 		}
+		
 
 		par_diff.transposeInPlace();
 		obs_diff.transposeInPlace();
@@ -596,9 +661,11 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 		par_resid.transposeInPlace();
 		obs_err.transposeInPlace();
 
+		//form the scaled obs resid matrix
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
 		Eigen::MatrixXd scaled_residual = weights * obs_resid;
 
+		//form the (optionally) scaled par resid matrix
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_resid", par_resid);
 		Eigen::MatrixXd scaled_par_resid;
 		if ((!use_approx) && (iter > 1))
@@ -616,8 +683,10 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 		stringstream ss;
 
 		double scale = (1.0 / (sqrt(double(num_reals - 1))));
+
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
 
+		//apply the localizer here...
 		if (use_localizer)
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "loc", loc);
 		if (use_localizer)
@@ -630,6 +699,12 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 		Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
 
+
+
+
+		//----------------------------------
+		//es-mda solution
+		//----------------------------------
 		if (!use_glm_form)
 		{
 			obs_diff = scale * obs_diff;// (H-Hm)/sqrt(N-1)		
@@ -641,37 +716,12 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			SVD_REDSVD rsvd;
 			Eigen::MatrixXd C;
 			C = obs_diff + (cur_lam * obs_err); // curr_lam is the inflation factor 		
-			Eigen::VectorXd s2;
-
-			if (false) // check this 
+			rsvd.solve_ip(C, s, U, V, eigthresh, maxsing);
+			
+			s2_ = s.asDiagonal().inverse();
+			for (int i = 0; i < s.size(); i++)
 			{
-				rsvd.solve_ip(C, s, U, V, eigthresh, maxsing);
-			}
-			else
-			{
-
-				Eigen::JacobiSVD<Eigen::MatrixXd> svd(C, Eigen::ComputeThinU | Eigen::ComputeThinV);
-				U = svd.matrixU();
-				s = svd.singularValues();
-
-				int ssize = s.size();
-				double threshold_frac;
-				s2 = s.cwiseProduct(s);
-				double s_sum = s.sum();
-				cum_sum = s;
-				for (int i = 0; i < ssize; i++)
-				{
-
-					threshold_frac = s(i) / s_sum;
-					if (threshold_frac < eigthresh)
-						s2(i) = 0;
-				}
-
-			}
-			s2_ = s2.asDiagonal().inverse();
-			for (int i = 0; i < s2.size(); i++)
-			{
-				if (s2(i) < 1e-50)
+				if (s(i) < 1e-50)
 				{
 					s2_(i, i) = 0;
 				}
@@ -686,122 +736,13 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 			upgrade_1 = par_diff * X1;
 			upgrade_1.transposeInPlace();
-
-
-			////******************************************
-			if (0)
-			{
-				if (true) //Evensen's solution
-				{
-					obs_diff = obs_diff + cur_lam * obs_err;
-				}
-				else
-				{
-					// do nothing
-				}
-
-				obs_diff = scale * (weights * obs_diff);
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
-				if (use_prior_scaling)
-					par_diff = scale * parcov_inv * par_diff;
-				else
-					par_diff = scale * par_diff;
-
-
-				SVD_REDSVD rsvd;
-				rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
-
-				Ut.transposeInPlace();
-				obs_diff.resize(0, 0);// this is becuase obs_diff = USVt
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Ut", Ut);
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "s", s);
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "V", V);
-
-				Eigen::MatrixXd s2 = s.cwiseProduct(s);
-
-				if (true) // Evensen's solution
-				{
-					ivec = s2.asDiagonal().inverse();
-				}
-				else
-				{
-					ivec = ((Eigen::VectorXd::Ones(s2.size()) * cur_lam) + s2).asDiagonal().inverse();
-				}
-
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "ivec", ivec);
-				Eigen::MatrixXd X1 = Ut * scaled_residual;
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
-				Eigen::MatrixXd X2 = ivec * X1;
-				X1.resize(0, 0);
-
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X2", X2);
-				Eigen::MatrixXd X3 = V * s.asDiagonal() * X2;
-				X2.resize(0, 0);
-
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X3", X3);
-				if (use_prior_scaling)
-				{
-					upgrade_1 = -1.0 * parcov_inv * par_diff * X3;
-				}
-				else
-				{
-					upgrade_1 = -1.0 * par_diff * X3;
-				}
-				upgrade_1.transposeInPlace();
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
-				X3.resize(0, 0);
-
-
-				Eigen::MatrixXd upgrade_2;
-				if ((!use_approx) && (iter > 1))
-				{
-					local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Am", Am);
-					Eigen::MatrixXd x4 = Am.transpose() * scaled_par_resid;
-					local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X4", x4);
-
-					par_resid.resize(0, 0);
-
-					Eigen::MatrixXd x5 = Am * x4;
-					x4.resize(0, 0);
-					Am.resize(0, 0);
-
-					local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X5", x5);
-					Eigen::MatrixXd x6 = par_diff.transpose() * x5;
-					x5.resize(0, 0);
-
-					local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X6", x6);
-					Eigen::MatrixXd x7 = V * ivec * V.transpose() * x6;
-					x6.resize(0, 0);
-
-					if (use_prior_scaling)
-					{
-						upgrade_2 = -1.0 * parcov_inv * par_diff * x7;
-					}
-					else
-					{
-						upgrade_2 = -1.0 * (par_diff * x7);
-					}
-					x7.resize(0, 0);
-
-					upgrade_1 = upgrade_1 + upgrade_2.transpose();
-					local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_2", upgrade_2);
-					upgrade_2.resize(0, 0);
-
-				}
-			}
-
-			unique_lock<mutex> put_guard(put_lock, defer_lock);
-			while (true)
-			{
-				if (put_guard.try_lock())
-				{
-					pe_upgrade.add_2_cols_ip(par_names, upgrade_1);
-					put_guard.unlock();
-					break;
-				}
-			}
 			
 		}
+
+
+		//----------------------------------
+		//glm solution
+		//----------------------------------
 		else
 		{
 			obs_diff = scale * (weights * obs_diff);
@@ -812,10 +753,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				par_diff = scale * par_diff;
 
 
-			//performance_log->log_event("SVD of obs diff");
 			Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
-
-
 			SVD_REDSVD rsvd;
 			rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
 
@@ -829,16 +767,35 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 			ivec = ((Eigen::VectorXd::Ones(s2.size()) * (cur_lam + 1.0)) + s2).asDiagonal().inverse();
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "ivec", ivec);
+			
+
+			Eigen::MatrixXd t = V * s.asDiagonal() * ivec * Ut;
+			Eigen::VectorXd loc_vec;
+			Eigen::VectorXd pt = parcov_inv.diagonal();
+			for (int i = 0; i < par_names.size(); i++)
+			{
+				loc_vec = localizer.get_obs_hadamard_vector(par_names[i], obs_names);
+				Eigen::VectorXd par_vec = par_diff.row(i) * t;
+				par_vec = par_vec.cwiseProduct(loc_vec);
+				par_vec = -1.0 * par_vec.transpose() * scaled_residual;
+				if (use_prior_scaling)
+					par_vec *= pt[i];
+				cout << par_names[i] << " " << par_vec << endl;
+				
+			}
+
 			Eigen::MatrixXd X1 = Ut * scaled_residual;
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
+			
 			Eigen::MatrixXd X2 = ivec * X1;
 			X1.resize(0, 0);
-
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X2", X2);
+			
 			Eigen::MatrixXd X3 = V * s.asDiagonal() * X2;
 			X2.resize(0, 0);
-
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X3", X3);
+			
+			
 			if (use_prior_scaling)
 			{
 				upgrade_1 = -1.0 * parcov_inv * par_diff * X3;
@@ -848,6 +805,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				upgrade_1 = -1.0 * par_diff * X3;
 			}
 			upgrade_1.transposeInPlace();
+			cout << upgrade_1 << endl;
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
 			X3.resize(0, 0);
 
@@ -888,16 +846,15 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				upgrade_2.resize(0, 0);
 
 			}
-
-			unique_lock<mutex> put_guard(put_lock, defer_lock);
-			while (true)
+		}
+		unique_lock<mutex> put_guard(put_lock, defer_lock);
+		while (true)
+		{
+			if (put_guard.try_lock())
 			{
-				if (put_guard.try_lock())
-				{
-					pe_upgrade.add_2_cols_ip(par_names, upgrade_1);
-					put_guard.unlock();
-					break;
-				}
+				pe_upgrade.add_2_cols_ip(par_names, upgrade_1);
+				put_guard.unlock();
+				break;
 			}
 		}
 	}
