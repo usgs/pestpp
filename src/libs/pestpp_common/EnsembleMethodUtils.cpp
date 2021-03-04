@@ -780,7 +780,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				par_vec = -1.0 * par_vec.transpose() * scaled_residual;
 				if (use_prior_scaling)
 					par_vec *= pt[i];
-				cout << par_names[i] << " " << par_vec << endl;
+				//cout << par_names[i] << " " << par_vec << endl;
 				
 			}
 
@@ -805,7 +805,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				upgrade_1 = -1.0 * par_diff * X3;
 			}
 			upgrade_1.transposeInPlace();
-			cout << upgrade_1 << endl;
+			//cout << upgrade_1 << endl;
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
 			X3.resize(0, 0);
 
