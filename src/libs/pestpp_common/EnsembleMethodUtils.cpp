@@ -422,7 +422,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 	Eigen::MatrixXd par_resid, par_diff, Am;
 	Eigen::MatrixXd obs_resid, obs_diff, obs_err, loc;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> weights, parcov_inv;
-	vector<string> par_names, obs_names;
+	vector<string> case_par_names, case_obs_names;
 	string key;
 
 
@@ -438,12 +438,177 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 	unique_lock<mutex> parcov_guard(parcov_lock, defer_lock);
 	unique_lock<mutex> am_guard(am_lock, defer_lock);
 
-	//This is the main thread loop - it continues until all upgrade pieces have been completed
+	//reset all the solution parts
+	par_resid.resize(0, 0);
+	par_diff.resize(0, 0);
+	obs_resid.resize(0, 0);
+	obs_diff.resize(0, 0);
+	obs_err.resize(0, 0);
+	loc.resize(0, 0);
+	Am.resize(0, 0);
+	weights.resize(0);
+	parcov_inv.resize(0);
+	Am.resize(0, 0);
+
+
+	//loop until this thread gets access to all the containers it needs to solve with 
+	//which in this solution, is all active pars and obs...
+	use_localizer = true;
 	while (true)
 	{
-		//First get a new case of par and obs names to solve with
-		par_names.clear();
-		obs_names.clear();
+		//if all the solution pieces are filled, break out and solve!
+		if (((use_approx) || (par_resid.rows() > 0)) &&
+			(weights.size() > 0) &&
+			(parcov_inv.size() > 0) &&
+			(par_diff.rows() > 0) &&
+			(obs_resid.rows() > 0) &&
+			(obs_err.rows() > 0) &&
+			(obs_diff.rows() > 0) &&
+			((!use_localizer) || (loc.rows() > 0)) &&
+			((use_approx) || (Am.rows() > 0)))
+			break;
+
+		//get access to the localizer
+		if ((use_localizer) && (loc.rows() == 0) && (loc_guard.try_lock()))
+		{
+			if (!localizer.get_use())
+			{
+				use_localizer = false;
+			}
+			else
+			{
+				//get a matrix that is either the shape of par diff or obs diff
+				if (loc_by_obs)
+				{
+					//loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
+					loc = localizer.get_pardiff_hadamard_matrix(num_reals, key, par_names);
+				}
+
+				else
+				{
+					//loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
+					loc = localizer.get_obsdiff_hadamard_matrix(num_reals, key, obs_names);
+				}
+			}
+			loc_guard.unlock();
+		}
+
+		//get access to the obs_diff container
+		if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
+		{
+			//piggy back here for thread safety
+			//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
+			//	use_propack = true;
+			obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
+			obs_diff_guard.unlock();
+		}
+
+		//get access to the residual container
+		if ((obs_resid.rows() == 0) && (obs_resid_guard.try_lock()))
+		{
+			obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
+			obs_resid_guard.unlock();
+		}
+
+		//get access to the obs noise container
+		if ((obs_err.rows() == 0) && (obs_err_guard.try_lock()))
+		{
+			obs_err = local_utils::get_matrix_from_map(num_reals, obs_names, obs_err_map);
+			obs_err_guard.unlock();
+		}
+
+		//get access to the par diff container
+		if ((par_diff.rows() == 0) && (par_diff_guard.try_lock()))
+		{
+			par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
+			par_diff_guard.unlock();
+		}
+
+		//get access to the par residual container
+		if ((par_resid.rows() == 0) && (par_resid_guard.try_lock()))
+		{
+			par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
+			par_resid_guard.unlock();
+		}
+
+		//get access to the obs weights container
+		if ((weights.rows() == 0) && (weight_guard.try_lock()))
+		{
+			weights = local_utils::get_matrix_from_map(obs_names, weight_map);
+			weight_guard.unlock();
+		}
+
+		//get access to the inverse prior parcov
+		if ((parcov_inv.rows() == 0) && (parcov_guard.try_lock()))
+		{
+			parcov_inv = local_utils::get_matrix_from_map(par_names, parcov_inv_map);
+			parcov_guard.unlock();
+		}
+
+		//if needed, get access to the Am container - needed in the full glm solution
+		if ((!use_approx) && (Am.rows() == 0) && (am_guard.try_lock()))
+		{
+			//Am = local_utils::get_matrix_from_map(num_reals, par_names, Am_map).transpose();
+			int am_cols = Am_map[par_names[0]].size();
+			Am.resize(par_names.size(), am_cols);
+			Am.setZero();
+
+			for (int j = 0; j < par_names.size(); j++)
+			{
+				Am.row(j) = Am_map[par_names[j]];
+			}
+			am_guard.unlock();
+		}
+	}
+
+
+	par_diff.transposeInPlace();
+	obs_diff.transposeInPlace();
+	obs_resid.transposeInPlace();
+	par_resid.transposeInPlace();
+	obs_err.transposeInPlace();
+
+
+	//form the scaled obs resid matrix
+	local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
+	Eigen::MatrixXd scaled_residual = weights * obs_resid;
+
+	//form the (optionally) scaled par resid matrix
+	local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_resid", par_resid);
+	Eigen::MatrixXd scaled_par_resid;
+	if ((!use_approx) && (iter > 1))
+	{
+		if (use_prior_scaling)
+		{
+			scaled_par_resid = parcov_inv * par_resid;
+		}
+		else
+		{
+			scaled_par_resid = par_resid;
+		}
+	}
+
+	ss.str("");
+	double scale = (1.0 / (sqrt(double(num_reals - 1))));
+
+	local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
+
+	//apply the localizer here...
+	if (use_localizer)
+		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "loc", loc);
+	if (use_localizer)
+	{
+		if (loc_by_obs)
+			par_diff = par_diff.cwiseProduct(loc);
+		else
+			obs_diff = obs_diff.cwiseProduct(loc);
+	}
+
+	Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
+
+	//This is the main thread loop - it continues until all upgrade pieces have been completed
+	while (true)
+	{	
 		use_localizer = false;
 
 		while (true)
@@ -463,19 +628,9 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 				}
 				key = keys[count];
 				pair<vector<string>, vector<string>> p = cases.at(key);
-				par_names = p.second;
-				obs_names = p.first;
-				if (localizer.get_use())
-				{
-					/*if ((loc_by_obs) && (par_names.size() == 1) && (k == par_names[0]))
-						use_localizer = true;
-					else if ((!loc_by_obs) && (obs_names.size() == 1) && (k == obs_names[0]))
-						use_localizer = true;*/
-						//if ((loc_by_obs) && (obs_names.size() == 1) && (k == obs_names[0]))	
-						//else if ((!loc_by_obs) && (par_names.size() == 1) && (k == par_names[0]))
-						//	use_localizer = true;
-					use_localizer = true;
-				}
+				case_par_names = p.second;
+				case_obs_names = p.first;
+				
 				if (count % 1000 == 0)
 				{
 					ss.str("");
@@ -495,174 +650,12 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 		if (verbose_level > 2)
 		{
 			f_thread << t_count << "," << iter;
-			for (auto name : par_names)
+			for (auto name : case_par_names)
 				f_thread << "," << name;
-			for (auto name : obs_names)
+			for (auto name : case_obs_names)
 				f_thread << "," << name;
 			f_thread << endl;
 		}
-
-		//reset all the solution parts
-		par_resid.resize(0, 0);
-		par_diff.resize(0, 0);
-		obs_resid.resize(0, 0);
-		obs_diff.resize(0, 0);
-		obs_err.resize(0, 0);
-		loc.resize(0, 0);
-		Am.resize(0, 0);
-		weights.resize(0);
-		parcov_inv.resize(0);
-		Am.resize(0, 0);
-
-
-		//now loop until this thread gets access to all the containers it needs to solve with
-		while (true)
-		{
-			//if all the solution pieces are filled, break out and solve!
-			if (((use_approx) || (par_resid.rows() > 0)) &&
-				(weights.size() > 0) &&
-				(parcov_inv.size() > 0) &&
-				(par_diff.rows() > 0) &&
-				(obs_resid.rows() > 0) &&
-				(obs_err.rows() > 0) &&
-				(obs_diff.rows() > 0) &&
-				((!use_localizer) || (loc.rows() > 0)) &&
-				((use_approx) || (Am.rows() > 0)))
-				break;
-
-			//get access to the localizer
-			if ((use_localizer) && (loc.rows() == 0) && (loc_guard.try_lock()))
-			{
-				//get a matrix that is either the shape of par diff or obs diff
-				if (loc_by_obs)
-				{
-					//loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
-					loc = localizer.get_pardiff_hadamard_matrix(num_reals, key, par_names);
-				}
-
-				else
-				{
-					//loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
-					loc = localizer.get_obsdiff_hadamard_matrix(num_reals, key, obs_names);
-				}
-				loc_guard.unlock();
-			}
-
-			//get access to the obs_diff container
-			if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
-			{
-				//piggy back here for thread safety
-				//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
-				//	use_propack = true;
-				obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
-				obs_diff_guard.unlock();
-			}
-
-			//get access to the residual container
-			if ((obs_resid.rows() == 0) && (obs_resid_guard.try_lock()))
-			{
-				obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
-				obs_resid_guard.unlock();
-			}
-
-			//get access to the obs noise container
-			if ((obs_err.rows() == 0) && (obs_err_guard.try_lock()))
-			{
-				obs_err = local_utils::get_matrix_from_map(num_reals, obs_names, obs_err_map);
-				obs_err_guard.unlock();
-			}
-
-			//get access to the par diff container
-			if ((par_diff.rows() == 0) && (par_diff_guard.try_lock()))
-			{
-				par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
-				par_diff_guard.unlock();
-			}
-
-			//get access to the par residual container
-			if ((par_resid.rows() == 0) && (par_resid_guard.try_lock()))
-			{
-				par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
-				par_resid_guard.unlock();
-			}
-
-			//get access to the obs weights container
-			if ((weights.rows() == 0) && (weight_guard.try_lock()))
-			{
-				weights = local_utils::get_matrix_from_map(obs_names, weight_map);
-				weight_guard.unlock();
-			}
-
-			//get access to the inverse prior parcov
-			if ((parcov_inv.rows() == 0) && (parcov_guard.try_lock()))
-			{
-				parcov_inv = local_utils::get_matrix_from_map(par_names, parcov_inv_map);
-				parcov_guard.unlock();
-			}
-
-			//if needed, get access to the Am container - needed in the full glm solution
-			if ((!use_approx) && (Am.rows() == 0) && (am_guard.try_lock()))
-			{
-				//Am = local_utils::get_matrix_from_map(num_reals, par_names, Am_map).transpose();
-				int am_cols = Am_map[par_names[0]].size();
-				Am.resize(par_names.size(), am_cols);
-				Am.setZero();
-
-				for (int j = 0; j < par_names.size(); j++)
-				{
-					Am.row(j) = Am_map[par_names[j]];
-				}
-				am_guard.unlock();
-			}
-		}
-
-
-		par_diff.transposeInPlace();
-		obs_diff.transposeInPlace();
-		obs_resid.transposeInPlace();
-		par_resid.transposeInPlace();
-		obs_err.transposeInPlace();
-
-		//form the scaled obs resid matrix
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
-		Eigen::MatrixXd scaled_residual = weights * obs_resid;
-
-		//form the (optionally) scaled par resid matrix
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_resid", par_resid);
-		Eigen::MatrixXd scaled_par_resid;
-		if ((!use_approx) && (iter > 1))
-		{
-			if (use_prior_scaling)
-			{
-				scaled_par_resid = parcov_inv * par_resid;
-			}
-			else
-			{
-				scaled_par_resid = par_resid;
-			}
-		}
-
-		stringstream ss;
-
-		double scale = (1.0 / (sqrt(double(num_reals - 1))));
-
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
-
-		//apply the localizer here...
-		if (use_localizer)
-			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "loc", loc);
-		if (use_localizer)
-		{
-			if (loc_by_obs)
-				par_diff = par_diff.cwiseProduct(loc);
-			else
-				obs_diff = obs_diff.cwiseProduct(loc);
-		}
-
-		Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
-
-
-
 
 		//----------------------------------
 		//es-mda solution
@@ -734,16 +727,15 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 			Eigen::MatrixXd t = V * s.asDiagonal() * ivec * Ut;
 			Eigen::VectorXd loc_vec;
 			Eigen::VectorXd pt = parcov_inv.diagonal();
-			for (int i = 0; i < par_names.size(); i++)
+			for (int i = 0; i < case_par_names.size(); i++)
 			{
-				loc_vec = localizer.get_obs_hadamard_vector(par_names[i], obs_names);
+				loc_vec = localizer.get_obs_hadamard_vector(case_par_names[i], case_obs_names);
 				Eigen::VectorXd par_vec = par_diff.row(i) * t;
 				par_vec = par_vec.cwiseProduct(loc_vec);
 				par_vec = -1.0 * par_vec.transpose() * scaled_residual;
 				if (use_prior_scaling)
 					par_vec *= pt[i];
 				//cout << par_names[i] << " " << par_vec << endl;
-
 			}
 
 			Eigen::MatrixXd X1 = Ut * scaled_residual;
@@ -813,7 +805,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 		{
 			if (put_guard.try_lock())
 			{
-				pe_upgrade.add_2_cols_ip(par_names, upgrade_1);
+				pe_upgrade.add_2_cols_ip(case_par_names, upgrade_1);
 				put_guard.unlock();
 				break;
 			}
@@ -1231,22 +1223,6 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 			ivec = ((Eigen::VectorXd::Ones(s2.size()) * (cur_lam + 1.0)) + s2).asDiagonal().inverse();
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "ivec", ivec);
-			
-
-			Eigen::MatrixXd t = V * s.asDiagonal() * ivec * Ut;
-			Eigen::VectorXd loc_vec;
-			Eigen::VectorXd pt = parcov_inv.diagonal();
-			for (int i = 0; i < par_names.size(); i++)
-			{
-				loc_vec = localizer.get_obs_hadamard_vector(par_names[i], obs_names);
-				Eigen::VectorXd par_vec = par_diff.row(i) * t;
-				par_vec = par_vec.cwiseProduct(loc_vec);
-				par_vec = -1.0 * par_vec.transpose() * scaled_residual;
-				if (use_prior_scaling)
-					par_vec *= pt[i];
-				//cout << par_names[i] << " " << par_vec << endl;
-				
-			}
 
 			Eigen::MatrixXd X1 = Ut * scaled_residual;
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);

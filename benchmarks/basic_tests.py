@@ -1034,5 +1034,6 @@ if __name__ == "__main__":
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
     #cmdline_test()
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sqp.exe"),os.path.join("..","bin","pestpp-sqp.exe"))
-    basic_sqp_test()
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","pestpp-ies.exe"))
+    #basic_sqp_test()
+    mf6_v5_ies_test()
