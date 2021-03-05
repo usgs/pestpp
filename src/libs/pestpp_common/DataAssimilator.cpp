@@ -4051,7 +4051,7 @@ bool DataAssimilator::solve_new_da()
 	unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	if (use_localizer)
 	{
-		loc_map = localizer.get_localizer_map(iter, oe, pe, performance_log);
+		loc_map = localizer.get_localanalysis_case_map(iter, oe, pe, performance_log);
 		//localizer.report(file_manager.rec_ofstream());
 	}
 	else

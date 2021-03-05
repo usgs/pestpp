@@ -1180,6 +1180,13 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		convert_ip(value, ies_mda_dec_fac);
 		return true;
 	}
+	else if ((key == "IES_LOC_TYPE") || (key == "IES_LOCALIZATION_TYPE"))
+	{
+		passed_args.insert("IES_LOC_TYPE");
+		passed_args.insert("IES_LOCALIZATION_TYPE");
+		convert_ip(value, ies_loc_type);
+		return true;
+	}
 	return false;
 }
 
@@ -1534,6 +1541,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_use_mda: " << ies_use_mda << endl;
 	os << "ies_mda_init_fac: " << ies_mda_init_fac << endl;
 	os << "ies_mda_dec_fac: " << ies_mda_dec_fac << endl;
+	os << "ies_localization_type: " << ies_loc_type << endl;
 
 	os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -1690,6 +1698,7 @@ void PestppOptions::set_defaults()
 	set_ies_use_mda(false);
 	set_ies_mda_init_fac(0.25);
 	set_ies_mda_dec_fac(0.5);
+	set_ies_loc_type("LOCAL");
 
 	// DA parameters
 	set_da_use_ies(false);
