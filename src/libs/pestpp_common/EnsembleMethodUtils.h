@@ -164,7 +164,7 @@ private:
 	unordered_map<string, double> weight_map;
 	unordered_map<string, double> parcov_inv_map;
 	//unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
-
+	vector<string>& act_par_names, act_obs_names;
 	template<typename T, typename A>
 	void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
 	void message(int level, const string& _message);
@@ -223,7 +223,7 @@ public:
 		unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how);*/
 	using UpgradeThread::UpgradeThread;
 
-	void work(int thread_id, int iter, double cur_lam, bool use_glm_form);
+	void work(int thread_id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names, vector<string> obs_names);
 };
 
 class LocalAnalysisUpgradeThread: UpgradeThread
@@ -238,7 +238,7 @@ public:
 		unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how);*/
 	using UpgradeThread::UpgradeThread;
 
-	void work(int thread_id, int iter, double cur_lam,bool use_glm_form);
+	void work(int thread_id, int iter, double cur_lam,bool use_glm_form, vector<string> par_names, vector<string> obs_names);
 
 
 //private:
