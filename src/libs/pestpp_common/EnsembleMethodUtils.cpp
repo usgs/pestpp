@@ -735,7 +735,6 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 				par_vec = -1.0 * par_vec.transpose() * scaled_residual;
 				if (use_prior_scaling)
 					par_vec *= pt[i];
-				//cout << par_names[i] << " " << par_vec << endl;
 			}
 
 			Eigen::MatrixXd X1 = Ut * scaled_residual;
@@ -931,6 +930,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 	unique_lock<mutex> weight_guard(weight_lock, defer_lock);
 	unique_lock<mutex> parcov_guard(parcov_lock, defer_lock);
 	unique_lock<mutex> am_guard(am_lock, defer_lock);
+	unique_lock<mutex> put_guard(put_lock, defer_lock);
 
 	//This is the main thread loop - it continues until all upgrade pieces have been completed
 	while (true)
@@ -1208,8 +1208,6 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			else
 				par_diff = scale * par_diff;
 
-
-			Eigen::MatrixXd ivec, upgrade_1, s, V, Ut;
 			SVD_REDSVD rsvd;
 			rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
 
@@ -1286,7 +1284,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 			}
 		}
-		unique_lock<mutex> put_guard(put_lock, defer_lock);
+		
 		while (true)
 		{
 			if (put_guard.try_lock())
