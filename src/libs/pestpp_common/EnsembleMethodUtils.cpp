@@ -167,8 +167,8 @@ void EnsembleSolver::message(int level, const string& _message, vector<T, A> _ex
 
 }
 
-void localanalysis_upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names,
-								vector<string> obs_names,LocalAnalysisUpgradeThread& worker, exception_ptr& eptr)
+void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names,
+								vector<string> obs_names, UpgradeThread& worker, exception_ptr& eptr)
 {
 	try
 	{
@@ -188,13 +188,24 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 	pe_upgrade.set_zeros();
 	stringstream ss;
 	Localizer::How _how = localizer.get_how();
+	Localizer::LocTyp loctyp = localizer.get_loctyp();
+	bool use_cov_loc = true;
+	if (loctyp == Localizer::LocTyp::LOCALANALYSIS)
+		use_cov_loc = false;
 	LocalAnalysisUpgradeThread worker(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map,obs_err_map,
 		localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
-
+	UpgradeThread* ut_ptr;
+	if (!use_cov_loc)
+		ut_ptr = new LocalAnalysisUpgradeThread(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map, obs_err_map,
+			localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
+	else
+		ut_ptr = new CovLocalizationUpgradeThread(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map, obs_err_map,
+			localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
 	if ((num_threads < 1) || (loc_map.size() == 1))
 		//if (num_threads < 1)
 	{
 		worker.work(0, iter, cur_lam, use_glm_form, act_par_names, act_obs_names);
+		ut_ptr->work(0, iter, cur_lam, use_glm_form, act_par_names, act_obs_names);
 	}
 	else
 	{
@@ -212,7 +223,11 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 		{
 			//threads.push_back(thread(&LocalUpgradeThread::work, &worker, i, iter, cur_lam));
 
-			threads.push_back(thread(localanalysis_upgrade_thread_function, i, iter, cur_lam, use_glm_form, act_par_names, act_obs_names, std::ref(worker), std::ref(exception_ptrs[i])));
+			//threads.push_back(thread(localanalysis_upgrade_thread_function, i, iter, cur_lam, use_glm_form, act_par_names, act_obs_names, std::ref(worker), std::ref(exception_ptrs[i])));
+			threads.push_back(thread(upgrade_thread_function, i, iter, cur_lam, use_glm_form, act_par_names, 
+				act_obs_names, std::ref(*ut_ptr), std::ref(exception_ptrs[i])));
+
+
 
 		}
 		message(2, "waiting to join threads");
@@ -271,6 +286,7 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 		{
 			throw runtime_error(ss.str());
 		}
+		delete ut_ptr;
 		message(2, "threaded localized upgrade calculation done");
 	}
 }
@@ -387,7 +403,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 	stringstream ss;
 
 	unique_lock<mutex> ctrl_guard(ctrl_lock, defer_lock);
-	int maxsing, num_reals, verbose_level, pcount = 0, t_count;
+	int maxsing, num_reals, verbose_level, pcount = 0, t_count=0;
 	double eigthresh;
 	bool use_approx;
 	bool use_prior_scaling;
@@ -589,7 +605,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 	Eigen::MatrixXd ivec, upgrade_1, s, s2, V, Ut, t;
 	Eigen::MatrixXd upgrade_2;
 	Eigen::VectorXd loc_vec;
-	upgrade_1.resize(par_diff.rows(), par_diff.cols());
+	upgrade_1.resize(par_diff.cols(), par_diff.rows());
 	upgrade_1.setZero();
 
 	if (!use_glm_form)

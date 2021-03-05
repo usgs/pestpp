@@ -71,6 +71,7 @@ public:
 	bool get_autoadaloc() { return autoadaloc; }
 	string get_filename() { return filename;  }
 	int get_num_upgrade_steps() { return localizer_map.size(); }
+	LocTyp get_loctyp() { return loctyp; }
 	void report(ofstream &f_rec);
 private:
 	bool use;

@@ -186,7 +186,7 @@ public:
 		unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
 		unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how);
 
-	//virtual void work(int thread_id, int iter, double cur_lam, bool use_glm_form);
+	virtual void work(int thread_id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names, vector<string> obs_names) { ; }
 
 protected:
 	PerformanceLog* performance_log;
@@ -211,7 +211,7 @@ protected:
 
 };
 
-class CovLocalizationUpgradeThread : UpgradeThread
+class CovLocalizationUpgradeThread : public UpgradeThread
 {
 public:
 
@@ -226,7 +226,7 @@ public:
 	void work(int thread_id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names, vector<string> obs_names);
 };
 
-class LocalAnalysisUpgradeThread: UpgradeThread
+class LocalAnalysisUpgradeThread: public UpgradeThread
 {
 public:
 
