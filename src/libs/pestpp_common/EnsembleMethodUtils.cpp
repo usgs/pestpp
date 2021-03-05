@@ -192,8 +192,8 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 	bool use_cov_loc = true;
 	if (loctyp == Localizer::LocTyp::LOCALANALYSIS)
 		use_cov_loc = false;
-	LocalAnalysisUpgradeThread worker(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map,obs_err_map,
-		localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
+	//LocalAnalysisUpgradeThread worker(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map,obs_err_map,
+	//	localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
 	UpgradeThread* ut_ptr;
 	if (!use_cov_loc)
 		ut_ptr = new LocalAnalysisUpgradeThread(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map, obs_err_map,
@@ -204,7 +204,7 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 	if ((num_threads < 1) || (loc_map.size() == 1))
 		//if (num_threads < 1)
 	{
-		worker.work(0, iter, cur_lam, use_glm_form, act_par_names, act_obs_names);
+		//worker.work(0, iter, cur_lam, use_glm_form, act_par_names, act_obs_names);
 		ut_ptr->work(0, iter, cur_lam, use_glm_form, act_par_names, act_obs_names);
 	}
 	else
@@ -627,7 +627,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 		s2 = s.asDiagonal().inverse();
 		for (int i = 0; i < s.size(); i++)
 		{
-			if (s(i,i) < 1e-50)
+			if (s(i) < 1e-50)
 			{
 				s2(i, i) = 0;
 			}

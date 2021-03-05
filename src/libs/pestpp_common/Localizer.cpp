@@ -924,7 +924,15 @@ Eigen::VectorXd Localizer::get_obs_hadamard_vector(string par_name, vector<strin
 	{
 		idx = colname2col_map[par_name];
 	}
-	Eigen::VectorXd loc = mat.e_ptr()->col(idx);
+	Eigen::VectorXd loc(obs_names.size());
+	loc.setZero();
+	Eigen::VectorXd col = mat.e_ptr()->col(idx);
+	map<string, int>::iterator end = obs2row_map.end();
+	for (int i = 0; i < obs_names.size(); i++)
+	{
+		if (obs2row_map.find(obs_names[i]) != end)
+			loc[i] = col[obs2row_map[obs_names[i]]];
+	}
 	return loc;
 }
 
