@@ -578,7 +578,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 
 	//form the scaled obs resid matrix
 	local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
-	Eigen::MatrixXd scaled_residual = weights * obs_resid;
+	//Eigen::MatrixXd scaled_residual = weights * obs_resid;
 
 	//form the (optionally) scaled par resid matrix
 	local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_resid", par_resid);
@@ -644,6 +644,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 	//----------------------------------
 	else
 	{
+		
 		obs_diff = scale * (weights * obs_diff);
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
 		if (use_prior_scaling)
@@ -665,7 +666,8 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 		ivec = ((Eigen::VectorXd::Ones(s2.size()) * (cur_lam + 1.0)) + s2).asDiagonal().inverse();
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "ivec", ivec);
 
-		Eigen::MatrixXd X1 = Ut * scaled_residual;
+		obs_resid = weights * obs_resid;
+		Eigen::MatrixXd X1 = Ut * obs_resid;
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
 
 		Eigen::MatrixXd X2 = ivec * X1;
@@ -800,7 +802,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 				par_vec = -1.0 * par_vec.transpose() * obs_resid;
 			else
 			{
-				par_vec = -1.0 * par_vec.transpose() * scaled_residual;
+				par_vec = -1.0 * par_vec.transpose() * obs_resid;
 				if (use_prior_scaling)
 					par_vec *= pt[i];
 			}
