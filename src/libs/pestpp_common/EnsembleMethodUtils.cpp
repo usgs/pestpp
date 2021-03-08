@@ -655,7 +655,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 
 		obs_resid = weights * obs_resid;
 		t = V * s.asDiagonal() * ivec * Ut;
-		
+		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "t", t);
 
 		if ((!use_approx) && (iter > 1))
 		{
@@ -726,6 +726,8 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 				}
 				key = keys[count];
 				pair<vector<string>, vector<string>> p = cases.at(key);
+				//we can potentially optimize the speed of this loc type by changing how many pars are
+				//passed in each "case" so herein, we support a generic number of pars per case...
 				case_par_names = p.second;
 				//In this solution, we ignore case obs names since we are using the full set of obs for the solution...
 				case_obs_names = p.first;
@@ -747,6 +749,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 			//get access to the localizer
 			if ((key != "") && (loc_map.size() == 0) && (loc_guard.try_lock()))
 			{
+				//get the nobs-length localizing vector for each case par name
 				for (auto& par_name : case_par_names)
 				{
 					loc_map[par_name] = localizer.get_obs_hadamard_vector(par_name, obs_names);
@@ -772,7 +775,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 		{
 			name = case_par_names[i];
 			loc_vec = loc_map[name];
-			Eigen::VectorXd par_vec = par_diff.row(i) * t;
+			Eigen::VectorXd par_vec = par_diff.row(par2col_map[name]) * t;
 			par_vec = par_vec.cwiseProduct(loc_vec);
 			if (!use_glm_form)
 				par_vec = -1.0 * par_vec.transpose() * obs_resid;
@@ -785,6 +788,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 			upgrade_1.col(par2col_map[name]) += par_vec;
 
 		}
+		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
 
 		//put this piece of the upgrade vector in
 		unique_lock<mutex> put_guard(put_lock, defer_lock);
@@ -1169,6 +1173,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1_obs_diff", X1);
 			obs_diff.resize(0, 0);
 			upgrade_1 = -1.0 * par_diff * X1;
+			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
 			upgrade_1.transposeInPlace();
 			
 		}

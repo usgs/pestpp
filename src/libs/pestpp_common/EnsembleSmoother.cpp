@@ -1048,7 +1048,7 @@ void IterEnsembleSmoother::initialize()
 		{
 			message(0, "using multiple-data-assimilation algorithm");
 			set<string> pargs = ppo->get_passed_args();
-			if ((pargs.find("IES_SUBSET_SIZE") == pargs.end()) && (pargs.find("LAMBDA_SCALE_FAC") == pargs.end()))
+			if ((pargs.find("IES_SUBSET_SIZE") == pargs.end()) && ((pargs.find("LAMBDA_SCALE_FAC") == pargs.end()) || (ppo->get_lambda_scale_vec().size()==1)))
 			{
 				message(0, "disabling subset testing...");
 				ppo->set_ies_subset_size(1000000000);
