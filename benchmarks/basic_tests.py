@@ -868,14 +868,7 @@ def mf6_v5_ies_test():
     pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_loc.pst", num_workers=15,
                                 master_dir=m_d,worker_root=model_d,port=port)
 
-    m_d = os.path.join(model_d, "master_ies_glm_obsloc")
-    if os.path.exists(m_d):
-        shutil.rmtree(m_d)
-    pst.pestpp_options["ies_localize_how"] = "obs"
-    pst.pestpp_options.pop("ies_localizer",None)
-    pst.write(os.path.join(t_d, "freyberg6_run_ies_glm_locobs.pst"))
-    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_locobs.pst", num_workers=15,
-                                 master_dir=m_d, worker_root=model_d, port=port)
+
 
     oe_file = os.path.join(m_d, "freyberg6_run_ies_glm_loc.{0}.obs.csv".format(pst.control_data.noptmax))
     assert os.path.exists(oe_file)
@@ -890,6 +883,14 @@ def mf6_v5_ies_test():
     print(d)
     assert len(d) == 0, d
 
+    m_d = os.path.join(model_d, "master_ies_glm_obsloc")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst.pestpp_options["ies_localize_how"] = "obs"
+    pst.pestpp_options.pop("ies_localizer",None)
+    pst.write(os.path.join(t_d, "freyberg6_run_ies_glm_locobs.pst"))
+    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_locobs.pst", num_workers=15,
+                                 master_dir=m_d, worker_root=model_d, port=port)
 
     m_d = os.path.join(model_d, "master_ies_glm_noloc")
     if os.path.exists(m_d):
