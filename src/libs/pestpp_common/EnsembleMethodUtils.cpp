@@ -37,7 +37,7 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 	iter = _iter;
 	verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
 	//prep the fast look par cov info
-	message(0,"preparing fast-look containers for threaded localization solve");
+	message(1,"preparing fast-look containers for threaded localization solve");
 	parcov_inv_map.clear();
 	parcov_inv_map.reserve(pe.shape().second);
 	Eigen::VectorXd parcov_inv;// = parcov.get(par_names).inv().e_ptr()->toDense().cwiseSqrt().asDiagonal();
@@ -185,6 +185,7 @@ void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form
 
 void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map)
 {
+	message(1, "starting solve for lambda", cur_lam);
 	pe_upgrade.set_zeros();
 	stringstream ss;
 	Localizer::How _how = localizer.get_how();
@@ -1124,7 +1125,6 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 		//form the (optionally) scaled par resid matrix
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_resid", par_resid);
 		
-
 		stringstream ss;
 
 		double scale = (1.0 / (sqrt(double(num_reals - 1))));

@@ -2370,9 +2370,7 @@ bool IterEnsembleSmoother::solve_new()
 
 		pe_upgrade = ParameterEnsemble(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
 		pe_upgrade.set_trans_status(pe.get_trans_status());
-		
-		EnsembleSolver es(performance_log, file_manager, pest_scenario, pe_upgrade, oe_upgrade, oe_base, localizer, parcov, Am, ph,
-			use_localizer, iter, act_par_names, act_obs_names);
+			
 		es.solve(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map);
 
 		map<string, double> norm_map;
