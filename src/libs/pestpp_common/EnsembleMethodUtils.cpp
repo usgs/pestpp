@@ -593,8 +593,9 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 	Eigen::MatrixXd ivec, upgrade_1, s, s2, V, Ut, t;
 	Eigen::MatrixXd upgrade_2;
 	Eigen::VectorXd loc_vec;
-	upgrade_1.resize(par_diff.cols(), par_diff.rows());
-	upgrade_1.setZero();
+	
+	upgrade_2.resize(num_reals, pe_upgrade.shape().second);
+	upgrade_2.setZero();
 
 	if (!use_glm_form)
 	{
@@ -692,14 +693,18 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 			x7.resize(0, 0);
 
 			//add upgrade_2 piece 
-			upgrade_1 = upgrade_1 + upgrade_2.transpose();
+			//upgrade_1 = upgrade_1 + upgrade_2.transpose();
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_2", upgrade_2);
-			upgrade_2.resize(0, 0);
+			//upgrade_2.resize(0, 0);
 		}
 	}
 
 	//This is the main thread loop - it continues until all upgrade pieces have been completed
 	map<string, Eigen::VectorXd> loc_map;
+	//solve for each case par_name
+	local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", parcov_inv.toDenseMatrix());
+	Eigen::VectorXd pt = parcov_inv.diagonal();
+	string name;
 	while (true)
 	{	
 		//clear the pieces used last time...
@@ -767,15 +772,15 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 				f_thread << "," << name;
 			f_thread << endl;
 		}
+		upgrade_1.resize(num_reals,case_par_names.size());
+		upgrade_1.setZero();
 
-		//solve for each case par_name
-		Eigen::VectorXd pt = parcov_inv.diagonal();
-		string name;
 		for (int i = 0; i < case_par_names.size(); i++)
 		{
 			name = case_par_names[i];
 			loc_vec = loc_map[name];
 			Eigen::VectorXd par_vec = par_diff.row(par2col_map[name]) * t;
+			//apply the localizer
 			par_vec = par_vec.cwiseProduct(loc_vec);
 			if (!use_glm_form)
 				par_vec = -1.0 * par_vec.transpose() * obs_resid;
@@ -785,7 +790,13 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 				if (use_prior_scaling)
 					par_vec *= pt[i];
 			}
-			upgrade_1.col(par2col_map[name]) += par_vec;
+			upgrade_1.col(i) += par_vec.transpose();
+			//add the par change part for the full glm solution
+			if ((!use_approx) && (iter > 1))
+			{
+				//update_2 is transposed relative to upgrade_1
+				upgrade_1.col(i) += upgrade_2.row(par2col_map[name]);
+			}
 
 		}
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
@@ -1109,6 +1120,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 		//form the scaled obs resid matrix
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
+		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", parcov_inv.toDenseMatrix());
 		//Eigen::MatrixXd scaled_residual = weights * obs_resid;
 
 		//form the (optionally) scaled par resid matrix
@@ -1216,16 +1228,13 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			Eigen::MatrixXd X3 = V * s.asDiagonal() * X2;
 			X2.resize(0, 0);
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X3", X3);
-			
+			upgrade_1 = -1.0 * par_diff * X3;
 			
 			if (use_prior_scaling)
 			{
-				upgrade_1 = -1.0 * parcov_inv * par_diff * X3;
+				upgrade_1 = parcov_inv * upgrade_1;
 			}
-			else
-			{
-				upgrade_1 = -1.0 * par_diff * X3;
-			}
+			
 			upgrade_1.transposeInPlace();
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
 			X3.resize(0, 0);

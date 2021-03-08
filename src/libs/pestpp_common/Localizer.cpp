@@ -578,8 +578,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 	}
 
 
-	//convert triplet values to abs values
-	//and check for pars and obs with zero entries
+	
 	map<int, int> par_count, obs_count;
 	for (int i = 0; i < par_names.size(); i++)
 		par_count[i] = 0;
@@ -588,7 +587,10 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 	vector<Eigen::Triplet<double>> ones;
 	for (auto &t : triplets)
 	{
-		ones.push_back(Eigen::Triplet<double>(t.row(), t.col(), abs(t.value())));
+		//Im not sure using the emp CC value is the right thing to do here...
+		//so just gonna use 1.0 for now...
+		//ones.push_back(Eigen::Triplet<double>(t.row(), t.col(), abs(t.value())));
+		ones.push_back(Eigen::Triplet<double>(t.row(), t.col(), 1.0));
 		par_count[t.col()]++;
 		obs_count[t.row()]++;
 	}

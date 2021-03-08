@@ -2343,6 +2343,14 @@ bool IterEnsembleSmoother::solve_new()
 	if (use_mda)
 		mults = vector<double>{ mda_facs[iter-1] };
 
+	performance_log->log_event("preparing EnsembleSolver");
+	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
+	pe_upgrade.set_trans_status(pe.get_trans_status());
+	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
+
+	EnsembleSolver es(performance_log, file_manager, pest_scenario, pe_upgrade, oe_upgrade, oe_base, localizer, parcov, Am, ph,
+		use_localizer, iter, act_par_names, act_obs_names);
+
 	for (auto &lam_mult : mults)
 	{
 		ss.str("");
@@ -2359,12 +2367,9 @@ bool IterEnsembleSmoother::solve_new()
 			
 		}
 		message(2, "see .log file for more details");
-		//ParameterEnsemble pe_upgrade;
-		//pe_upgrade = calc_localized_upgrade_threaded(cur_lam, loc_map);
 
-		ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
+		pe_upgrade = ParameterEnsemble(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
 		pe_upgrade.set_trans_status(pe.get_trans_status());
-		ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
 		
 		EnsembleSolver es(performance_log, file_manager, pest_scenario, pe_upgrade, oe_upgrade, oe_base, localizer, parcov, Am, ph,
 			use_localizer, iter, act_par_names, act_obs_names);
