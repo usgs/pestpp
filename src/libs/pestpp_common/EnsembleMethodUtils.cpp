@@ -639,7 +639,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 			par_diff = scale * parcov_inv * par_diff;
 		else
 			par_diff = scale * par_diff;
-
+		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_par_diff", par_diff);
 		SVD_REDSVD rsvd;
 		rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
 
@@ -787,8 +787,8 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 			else
 			{
 				par_vec = -1.0 * par_vec.transpose() * obs_resid;
-				if (use_prior_scaling)
-					par_vec *= pt[i];
+				//if (use_prior_scaling)
+				//	par_vec *= pt[i];
 			}
 			upgrade_1.col(i) += par_vec.transpose();
 			//add the par change part for the full glm solution
@@ -1203,7 +1203,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				par_diff = scale * parcov_inv * par_diff;
 			else
 				par_diff = scale * par_diff;
-
+			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_par_diff", par_diff);
 			SVD_REDSVD rsvd;
 			rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
 
@@ -1232,7 +1232,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			
 			if (use_prior_scaling)
 			{
-				upgrade_1 = parcov_inv * upgrade_1;
+				//upgrade_1 = parcov_inv * upgrade_1;
 			}
 			
 			upgrade_1.transposeInPlace();
