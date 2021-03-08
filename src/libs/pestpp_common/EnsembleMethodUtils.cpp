@@ -702,7 +702,6 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 	//This is the main thread loop - it continues until all upgrade pieces have been completed
 	map<string, Eigen::VectorXd> loc_map;
 	//solve for each case par_name
-	local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", parcov_inv.toDenseMatrix());
 	Eigen::VectorXd pt = parcov_inv.diagonal();
 	string name;
 	while (true)
@@ -1120,7 +1119,6 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 		//form the scaled obs resid matrix
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", parcov_inv.toDenseMatrix());
 		//Eigen::MatrixXd scaled_residual = weights * obs_resid;
 
 		//form the (optionally) scaled par resid matrix
