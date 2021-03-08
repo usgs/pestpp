@@ -214,13 +214,6 @@ protected:
 class CovLocalizationUpgradeThread : public UpgradeThread
 {
 public:
-
-	/*LocalAnalysisUpgradeThread(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map,
-		unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map, unordered_map<string, Eigen::VectorXd>& _obs_err_map,
-		Localizer& _localizer, unordered_map<string, double>& _parcov_inv_map,
-		unordered_map<string, double>& _weight_map, ParameterEnsemble& _pe_upgrade,
-		unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
-		unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how);*/
 	using UpgradeThread::UpgradeThread;
 
 	void work(int thread_id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names, vector<string> obs_names);
@@ -229,13 +222,6 @@ public:
 class LocalAnalysisUpgradeThread: public UpgradeThread
 {
 public:
-
-	/*LocalAnalysisUpgradeThread(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map,
-		unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map, unordered_map<string, Eigen::VectorXd>& _obs_err_map,
-		Localizer& _localizer, unordered_map<string, double>& _parcov_inv_map,
-		unordered_map<string, double>& _weight_map, ParameterEnsemble& _pe_upgrade,
-		unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
-		unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how);*/
 	using UpgradeThread::UpgradeThread;
 
 	void work(int thread_id, int iter, double cur_lam,bool use_glm_form, vector<string> par_names, vector<string> obs_names);
