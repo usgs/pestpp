@@ -601,7 +601,6 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 		obs_diff = scale * obs_diff;// (H-Hm)/sqrt(N-1)		
 		par_diff = scale * par_diff;// (K-Km)/sqrt(N-1)		
 		obs_err = scale * obs_err; //  (E-Em)/sqrt(N-1)	
-		obs_resid = (-1.0) * obs_resid; // D-H  , the negative one is becuase obs_resid is calculated as H-D ???
 
 		SVD_REDSVD rsvd;
 		Eigen::MatrixXd C = obs_diff + (cur_lam * obs_err); // curr_lam is the inflation factor 		
@@ -1139,8 +1138,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			obs_diff = scale * obs_diff;// (H-Hm)/sqrt(N-1)		
 			par_diff = scale * par_diff;// (K-Km)/sqrt(N-1)		
 			obs_err = scale * obs_err; //  (E-Em)/sqrt(N-1)	
-			obs_resid = (-1.0) * obs_resid; // D-H  , the negative one is becuase obs_resid is calculated as H-D ???
-
+			
 			SVD_REDSVD rsvd;
 			Eigen::MatrixXd C = obs_diff + (cur_lam * obs_err); // curr_lam is the inflation factor 		
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "C", C);
@@ -1170,7 +1168,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			X1 = obs_diff.transpose() * X1;
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1_obs_diff", X1);
 			obs_diff.resize(0, 0);
-			upgrade_1 = par_diff * X1;
+			upgrade_1 = -1.0 * par_diff * X1;
 			upgrade_1.transposeInPlace();
 			
 		}
