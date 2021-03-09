@@ -1050,9 +1050,9 @@ void IterEnsembleSmoother::initialize()
 			set<string> pargs = ppo->get_passed_args();
 			if ((pargs.find("IES_SUBSET_SIZE") == pargs.end()) && ((pargs.find("LAMBDA_SCALE_FAC") == pargs.end()) || (ppo->get_lambda_scale_vec().size()==1)))
 			{
-				message(0, "disabling subset testing...");
+				message(1, "disabling subset testing...");
 				ppo->set_ies_subset_size(1000000000);
-				message(0, "disabling lambda scale factor testing...");
+				message(1, "disabling lambda scale factor testing...");
 				ppo->set_lambda_scale_vec(vector<double>{1.0});
 			}
 			mda_facs.clear();
@@ -1069,7 +1069,7 @@ void IterEnsembleSmoother::initialize()
 				mda_fac = mda_fac / tot;
 				ttot += mda_fac;
 			}
-			message(0, "using mda inflation factors: ", mda_facs);
+			message(1, "using mda inflation factors: ", mda_facs);
 		}
 
 		use_mda = true;
@@ -2362,8 +2362,8 @@ bool IterEnsembleSmoother::solve_new()
 		}
 		else
 		{
-			ss << "starting calcs for lambda" << cur_lam;
-			message(1, "starting lambda calcs for lambda", cur_lam);
+			//ss << "starting calcs for lambda" << cur_lam;
+			message(1, "starting calcs for lambda", cur_lam);
 			
 		}
 		message(2, "see .log file for more details");

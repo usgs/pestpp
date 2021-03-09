@@ -883,13 +883,13 @@ def mf6_v5_ies_test():
     print(d)
     assert len(d) == 0, d
 
-    m_d = os.path.join(model_d, "master_ies_glm_obsloc")
+    m_d = os.path.join(model_d, "master_ies_glm_covloc")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
-    pst.pestpp_options["ies_localize_how"] = "obs"
-    pst.pestpp_options.pop("ies_localizer",None)
-    pst.write(os.path.join(t_d, "freyberg6_run_ies_glm_locobs.pst"))
-    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_locobs.pst", num_workers=15,
+    pst.pestpp_options["ies_loc_type"] = "cov"
+    #pst.pestpp_options.pop("ies_localizer",None)
+    pst.write(os.path.join(t_d, "freyberg6_run_ies_glm_covloc.pst"))
+    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_covloc.pst", num_workers=15,
                                  master_dir=m_d, worker_root=model_d, port=port)
 
     m_d = os.path.join(model_d, "master_ies_glm_noloc")
@@ -911,6 +911,17 @@ def mf6_v5_ies_test():
     pst.pestpp_options["ies_use_mda"] = True
     pst.write(os.path.join(t_d, "freyberg6_run_ies_mda_loc.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_mda_loc.pst", num_workers=15,
+                                 master_dir=m_d, worker_root=model_d, port=port)
+
+    m_d = os.path.join(model_d, "master_ies_mda_covloc")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d, "freyberg6_run_ies.pst"))
+    pst.control_data.noptmax = 3
+    pst.pestpp_options["ies_use_mda"] = True
+    pst.pestpp_options["ies_loc_type"] = "cov"
+    pst.write(os.path.join(t_d, "freyberg6_run_ies_mda_covloc.pst"))
+    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_mda_covloc.pst", num_workers=15,
                                  master_dir=m_d, worker_root=model_d, port=port)
 
     m_d = os.path.join(model_d, "master_ies_mda_noloc")
@@ -1077,6 +1088,6 @@ if __name__ == "__main__":
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
     #cmdline_test()
-    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","pestpp-ies.exe"))
+    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #basic_sqp_test()
     mf6_v5_ies_test()
