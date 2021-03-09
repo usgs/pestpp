@@ -21,7 +21,7 @@
 
 
 
-class IterEnsembleSmoother: protected EnsembleMethod
+class IterEnsembleSmoother: public EnsembleMethod
 {
 	
 public:

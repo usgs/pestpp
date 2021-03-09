@@ -276,6 +276,20 @@ public:
 	void message(int level, const string& _message, double extra);
 	void message(int level, const string& _message, size_t extra);
 
+	ParameterEnsemble get_pe() { return pe; }
+	void set_pe(ParameterEnsemble new_pe) { pe = new_pe; }
+
+	bool initialize_pe(Covariance& cov);
+	void initialize_parcov();
+	Covariance* get_parcov_ptr() { return &parcov; }
+	std::mt19937& get_rand_gen() { return rand_gen; }
+	vector<string> get_act_par_names() { return act_par_names; }
+	ObservationEnsemble& get_oe() { return oe; }
+	L2PhiHandler& get_phi_handler() { return ph; }
+	int get_iter() { return iter; }
+	FileManager& get_file_manager() { return file_manager; }
+	Pest& get_pest_scenario() { return pest_scenario; }
+
 protected:
 	string alg_tag;
 	int  verbose_level;
@@ -331,10 +345,10 @@ protected:
 
 	void report_and_save();
 	void save_mat(string prefix, Eigen::MatrixXd& mat);
-	bool initialize_pe(Covariance& cov);
+	//bool initialize_pe(Covariance& cov);
 	bool initialize_oe(Covariance& cov);
 	void initialize_restart();
-	void initialize_parcov();
+	//void initialize_parcov();
 	void initialize_obscov();
 	void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, bool is_subset = false);
 	

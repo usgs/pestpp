@@ -70,7 +70,7 @@ private:
 };
 
 
-class DataAssimilator: protected EnsembleMethod
+class DataAssimilator: public EnsembleMethod
 {
 public:
 	/*DataAssimilator(Pest& _pest_scenario, FileManager& _file_manager,
@@ -95,11 +95,11 @@ public:
 	//bool should_terminate();
 	ParameterEnsemble get_pe() { return pe;}
 	void set_pe(ParameterEnsemble new_pe) { pe = new_pe;}
-	//bool use_ies; 
-	string da_type;
+	////bool use_ies; 
+	//string da_type;
 
-	bool initialize_pe(Covariance& cov);
-	void initialize_parcov();
+	//bool initialize_pe(Covariance& cov);
+	//void initialize_parcov();
 	Covariance* get_parcov_ptr() { return &parcov; }
 	std::mt19937& get_rand_gen() { return rand_gen; }
 	vector<string> get_act_par_names() { return act_par_names; }
@@ -108,9 +108,10 @@ public:
 	int get_iter() { return iter; }
 	FileManager& get_file_manager() { return file_manager; }
 	Pest& get_pest_scenario() { return pest_scenario; }
-
+	string da_type;
 private:
 	int icycle;
+	
 	CtlPar_container da_ctl_params;
 
 	vector<string> obs_dyn_state_names;

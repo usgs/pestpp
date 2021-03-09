@@ -55,121 +55,121 @@
 //	throw runtime_error("DataAssimilator error: " + message);
 //}
 
-bool DataAssimilator::initialize_pe(Covariance& cov)
-{
-	stringstream ss;
-	int num_reals;
-	
-	string par_csv;
-	
-	par_csv = pest_scenario.get_pestpp_options().get_da_par_csv();
-	num_reals = pest_scenario.get_pestpp_options().get_da_num_reals();
-
-	bool drawn = false;
-	if (par_csv.size() == 0)
-	{
-		message(1, "drawing parameter realizations: ", num_reals);
-		pe.draw(num_reals, pest_scenario.get_ctl_parameters(), cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(),file_manager.rec_ofstream());
-		drawn = true;
-	}
-	else
-	{
-		string par_ext = pest_utils::lower_cp(par_csv).substr(par_csv.size() - 3, par_csv.size());
-		performance_log->log_event("processing par csv " + par_csv);
-		if (par_ext.compare("csv") == 0)
-		{
-			message(1, "loading par ensemble from csv file", par_csv);
-			try
-			{
-				pe.from_csv(par_csv);
-			}
-			catch (const exception & e)
-			{
-				ss << "error processing par csv: " << e.what();
-				throw_em_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_em_error(string("error processing par csv"));
-			}
-		}
-		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
-		{
-			message(1, "loading par ensemble from binary file", par_csv);
-			try
-			{
-				pe.from_binary(par_csv);
-			}
-			catch (const exception & e)
-			{
-				ss << "error processing par jcb: " << e.what();
-				throw_em_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_em_error(string("error processing par jcb"));
-			}
-		}
-		else
-		{
-			ss << "unrecognized par csv extension " << par_ext << ", looking for csv, jcb, or jco";
-			throw_em_error(ss.str());
-		}
-
-		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
-		
-		if (pp_args.find("DA_NUM_REALS") != pp_args.end())
-		{
-			int num_reals = pest_scenario.get_pestpp_options().get_da_num_reals();			
-	
-			if (num_reals < pe.shape().first)
-			{
-				message(1, "da_num_reals arg passed, truncated parameter ensemble to ", num_reals);
-				vector<string> keep_names, real_names = pe.get_real_names();
-				for (int i = 0; i < num_reals; i++)
-				{
-					keep_names.push_back(real_names[i]);
-				}
-				pe.keep_rows(keep_names);
-			}
-		}
-		
-		// todo: Ayman ?? what empirical prior means
-		if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior())
-		{
-			message(1, "initializing prior parameter covariance matrix from ensemble (using diagonal matrix)");
-			parcov = pe.get_diagonal_cov_matrix();
-			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1)
-			{
-
-				if (pest_scenario.get_pestpp_options().get_save_binary())
-				{
-					string filename = file_manager.get_base_filename() + ".prior.jcb";
-					message(1, "saving emprirical parameter covariance matrix to binary file: ", filename);
-					parcov.to_binary(filename);
-				}
-				else
-				{
-					string filename = file_manager.get_base_filename() + ".prior.cov";
-					message(1, "saving emprirical parameter covariance matrix to ASCII file: ", filename);
-					parcov.to_ascii(filename);
-				}
-			}
-		}
-
-		//todo: apply this for da
-		if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
-		{
-			if (pest_scenario.get_pestpp_options().get_ies_obs_restart_csv().size() > 0)
-				message(1, "Warning: even though ies_enforce_bounds is true, a restart obs en was passed, so bounds will not be enforced on the initial par en");
-			else
-				pe.enforce_bounds(performance_log, false);
-		}
-
-	}
-	return drawn;
-
-}
+//bool DataAssimilator::initialize_pe(Covariance& cov)
+//{
+//	stringstream ss;
+//	int num_reals;
+//	
+//	string par_csv;
+//	
+//	par_csv = pest_scenario.get_pestpp_options().get_da_par_csv();
+//	num_reals = pest_scenario.get_pestpp_options().get_da_num_reals();
+//
+//	bool drawn = false;
+//	if (par_csv.size() == 0)
+//	{
+//		message(1, "drawing parameter realizations: ", num_reals);
+//		pe.draw(num_reals, pest_scenario.get_ctl_parameters(), cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(),file_manager.rec_ofstream());
+//		drawn = true;
+//	}
+//	else
+//	{
+//		string par_ext = pest_utils::lower_cp(par_csv).substr(par_csv.size() - 3, par_csv.size());
+//		performance_log->log_event("processing par csv " + par_csv);
+//		if (par_ext.compare("csv") == 0)
+//		{
+//			message(1, "loading par ensemble from csv file", par_csv);
+//			try
+//			{
+//				pe.from_csv(par_csv);
+//			}
+//			catch (const exception & e)
+//			{
+//				ss << "error processing par csv: " << e.what();
+//				throw_em_error(ss.str());
+//			}
+//			catch (...)
+//			{
+//				throw_em_error(string("error processing par csv"));
+//			}
+//		}
+//		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+//		{
+//			message(1, "loading par ensemble from binary file", par_csv);
+//			try
+//			{
+//				pe.from_binary(par_csv);
+//			}
+//			catch (const exception & e)
+//			{
+//				ss << "error processing par jcb: " << e.what();
+//				throw_em_error(ss.str());
+//			}
+//			catch (...)
+//			{
+//				throw_em_error(string("error processing par jcb"));
+//			}
+//		}
+//		else
+//		{
+//			ss << "unrecognized par csv extension " << par_ext << ", looking for csv, jcb, or jco";
+//			throw_em_error(ss.str());
+//		}
+//
+//		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+//		
+//		if (pp_args.find("DA_NUM_REALS") != pp_args.end())
+//		{
+//			int num_reals = pest_scenario.get_pestpp_options().get_da_num_reals();			
+//	
+//			if (num_reals < pe.shape().first)
+//			{
+//				message(1, "da_num_reals arg passed, truncated parameter ensemble to ", num_reals);
+//				vector<string> keep_names, real_names = pe.get_real_names();
+//				for (int i = 0; i < num_reals; i++)
+//				{
+//					keep_names.push_back(real_names[i]);
+//				}
+//				pe.keep_rows(keep_names);
+//			}
+//		}
+//		
+//		// todo: Ayman ?? what empirical prior means
+//		if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior())
+//		{
+//			message(1, "initializing prior parameter covariance matrix from ensemble (using diagonal matrix)");
+//			parcov = pe.get_diagonal_cov_matrix();
+//			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1)
+//			{
+//
+//				if (pest_scenario.get_pestpp_options().get_save_binary())
+//				{
+//					string filename = file_manager.get_base_filename() + ".prior.jcb";
+//					message(1, "saving emprirical parameter covariance matrix to binary file: ", filename);
+//					parcov.to_binary(filename);
+//				}
+//				else
+//				{
+//					string filename = file_manager.get_base_filename() + ".prior.cov";
+//					message(1, "saving emprirical parameter covariance matrix to ASCII file: ", filename);
+//					parcov.to_ascii(filename);
+//				}
+//			}
+//		}
+//
+//		//todo: apply this for da
+//		if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds())
+//		{
+//			if (pest_scenario.get_pestpp_options().get_ies_obs_restart_csv().size() > 0)
+//				message(1, "Warning: even though ies_enforce_bounds is true, a restart obs en was passed, so bounds will not be enforced on the initial par en");
+//			else
+//				pe.enforce_bounds(performance_log, false);
+//		}
+//
+//	}
+//	return drawn;
+//
+//}
 
 //void DataAssimilator::add_bases()
 //{
@@ -794,22 +794,22 @@ void DataAssimilator::initialize_restart()
 
 
 
-void DataAssimilator::initialize_parcov()
-{
-	stringstream ss;
-	performance_log->log_event("initializing parcov");
-
-	if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior())
-		return;
-	string how = parcov.try_from(pest_scenario, file_manager);
-	message(1, "parcov loaded ", how);
-	//if (parcov.e_ptr()->rows() > 0)
-	if (act_par_names.size() > 0)
-	{
-		parcov = parcov.get(act_par_names);
-	}
-
-}
+//void DataAssimilator::initialize_parcov()
+//{
+//	stringstream ss;
+//	performance_log->log_event("initializing parcov");
+//
+//	if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior())
+//		return;
+//	string how = parcov.try_from(pest_scenario, file_manager);
+//	message(1, "parcov loaded ", how);
+//	//if (parcov.e_ptr()->rows() > 0)
+//	if (act_par_names.size() > 0)
+//	{
+//		parcov = parcov.get(act_par_names);
+//	}
+//
+//}
 
 
 void DataAssimilator::initialize_obscov()
