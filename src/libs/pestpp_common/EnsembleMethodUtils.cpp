@@ -4318,7 +4318,7 @@ void EnsembleMethod::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _
 	//don't use this assert because _pe maybe full size, but _oe might be subset size
 	if (!is_subset)
 		if (_pe.shape().first != _oe.shape().first)
-			throw_em_error("IterEnsembleSmoother::drop_bad_phi() error: _pe != _oe and not subset");
+			throw_em_error("EnsembleMethod::drop_bad_phi() error: _pe != _oe and not subset");
 
 	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
 	double bad_phi_sigma = pest_scenario.get_pestpp_options().get_ies_bad_phi_sigma();
@@ -4442,7 +4442,7 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 			//pname = pe_names[oe_name_to_idx[oname]];
 			pname = pe_idx_to_name[oe_name_to_idx[oname]];
 			if (find(pe_names.begin(), pe_names.end(), pname) == pe_names.end())
-				throw runtime_error("IterEnsembleSmoother::update_reals_by_phi() error: pname not in pe_names: " + pname);
+				throw runtime_error("EnsembeMethod::update_reals_by_phi() error: pname not in pe_names: " + pname);
 			ss.str("");
 			ss << "updating pe:oe real =" << pname << ":" << oname << ", current phi: new phi  =" << cur_phi << ":" << new_phi;
 			message(3, ss.str());
