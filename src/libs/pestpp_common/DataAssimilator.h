@@ -87,9 +87,9 @@ public:
 	void add_dynamic_state_to_pe();
 	
 	
-	void da_upate();
+	void da_update();
 
-	void kf_upate();
+	//void kf_upate();
 	void finalize();
 	//void throw_da_error(string message);
 	//bool should_terminate();
@@ -134,17 +134,17 @@ private:
 	//ParameterEnsemble calc_localized_upgrade(double cur_lam);
 	//ParameterEnsemble calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
 
-	ParameterEnsemble calc_kf_upgrade(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
+	//ParameterEnsemble calc_kf_upgrade(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
 
 	void eig2csv(string name, Eigen::MatrixXd matrix);
 
-	ParameterEnsemble kf_work(PerformanceLog* performance_log, unordered_map<string, 
+	/*ParameterEnsemble kf_work(PerformanceLog* performance_log, unordered_map<string, 
 		Eigen::VectorXd>& par_resid_map, unordered_map<string, Eigen::VectorXd>& par_diff_map,
 		unordered_map<string, Eigen::VectorXd>& obs_resid_map, unordered_map<string, Eigen::VectorXd>& obs_diff_map,
 		unordered_map<string, Eigen::VectorXd>& obs_err_map, Localizer& localizer,
 		unordered_map<string, double>& parcov_inv_map, unordered_map<string, double>& weight_map,
 		ParameterEnsemble& pe_upgrade, double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map,
-		unordered_map<string, Eigen::VectorXd>& Am_map, Localizer::How& how);
+		unordered_map<string, Eigen::VectorXd>& Am_map, Localizer::How& how);*/
 	/*
 	ParameterEnsemble kf_work(PerformanceLog* _performance_log, unordered_map<string,
 		Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map, 

@@ -2461,7 +2461,7 @@ vector<string> DataAssimilator::detect_prior_data_conflict()
 //	}
 //}
 
-void DataAssimilator::da_upate()
+void DataAssimilator::da_update()
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
@@ -2530,41 +2530,41 @@ void DataAssimilator::da_upate()
 
 }
 
-void DataAssimilator::kf_upate()
-{
-	stringstream ss;
-	ofstream& frec = file_manager.rec_ofstream();
-
-	bool accept;
-	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
-	{
-		iter++;
-		message(0, "starting solve for iteration:", iter);
-		ss << "starting solve for iteration: " << iter;
-		performance_log->log_event(ss.str());
-		accept = solve_new_da();
-		report_and_save();
-		ph.update(oe, pe);
-		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
-		last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-		ph.report(true);
-		ph.write(iter, run_mgr_ptr->get_total_runs());
-		if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
-			ph.save_residual_cov(oe, iter);
-		pcs.summarize(pe, iter);
-
-
-		if (accept)
-			consec_bad_lambda_cycles = 0;
-		else
-			consec_bad_lambda_cycles++;
-
-		if (should_terminate())
-			break;
-	}
-	
-}
-
+//void DataAssimilator::kf_upate()
+//{
+//	stringstream ss;
+//	ofstream& frec = file_manager.rec_ofstream();
+//
+//	bool accept;
+//	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
+//	{
+//		iter++;
+//		message(0, "starting solve for iteration:", iter);
+//		ss << "starting solve for iteration: " << iter;
+//		performance_log->log_event(ss.str());
+//		accept = solve_new_da();
+//		report_and_save();
+//		ph.update(oe, pe);
+//		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+//		last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+//		ph.report(true);
+//		ph.write(iter, run_mgr_ptr->get_total_runs());
+//		if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
+//			ph.save_residual_cov(oe, iter);
+//		pcs.summarize(pe, iter);
+//
+//
+//		if (accept)
+//			consec_bad_lambda_cycles = 0;
+//		else
+//			consec_bad_lambda_cycles++;
+//
+//		if (should_terminate())
+//			break;
+//	}
+//	
+//}
+//
 //bool DataAssimilator::should_terminate()
 //{
 //	//todo: use ies accept fac here?
@@ -3881,145 +3881,145 @@ LocalUpgradeThread_da::LocalUpgradeThread_da(PerformanceLog* _performance_log, u
 //
 //}
 
-ParameterEnsemble DataAssimilator::calc_kf_upgrade(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map)
-{
-	stringstream ss;
-
-	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
-	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
-
-	//this copy of the localizer map will be consumed by the worker threads
-	//unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
-	if (use_localizer)
-	{
-
-		//loc_map = localizer.get_localizer_map(iter, oe, pe, performance_log);
-		//localizer.report(file_manager.rec_ofstream());
-	}
-	else
-	{
-		// Ayman noticed that p is empty when no localizer is used
-		//pair<vector<string>, vector<string>> p(act_obs_names, act_par_names);
-		//loc_map["all"] = p;
-	}
-
-	//prep the fast look par cov info
-	message(2, "preparing fast-look containers for threaded localization solve");
-	unordered_map<string, double> parcov_inv_map;
-	parcov_inv_map.reserve(pe_upgrade.shape().second);
-	Eigen::VectorXd parcov_inv;// = parcov.get(par_names).inv().e_ptr()->toDense().cwiseSqrt().asDiagonal();
-	if (!parcov.isdiagonal())
-	{
-		//parcov_inv = parcov.inv().get_matrix().diagonal().cwiseSqrt();
-		parcov_inv = parcov.get_matrix().diagonal();
-
-	}
-	else
-	{
-		message(2, "extracting diagonal from prior parameter covariance matrix");
-		Covariance parcov_diag;
-		parcov_diag.from_diagonal(parcov);
-		//parcov_inv = parcov_diag.inv().get_matrix().diagonal().cwiseSqrt();
-		parcov_inv = parcov_diag.get_matrix().diagonal();
-
-	}
-	parcov_inv = parcov_inv.cwiseSqrt().cwiseInverse();
-
-	vector<string> par_names = pe_upgrade.get_var_names();
-	for (int i = 0; i < parcov_inv.size(); i++)
-		parcov_inv_map[par_names[i]] = parcov_inv[i];
-
-
-	//prep the fast lookup weights info
-	unordered_map<string, double> weight_map;
-	weight_map.reserve(oe_upgrade.shape().second);
-	vector<string> obs_names = oe_upgrade.get_var_names();
-	Observations obs_value = pest_scenario.get_ctl_observations();
-	vector<string> names = oe.get_var_names();	
-	Eigen::MatrixXd meas_errors = oe_base.get_eigen(oe_base.get_real_names(), obs_names);// -obs_value.get_rec(obs_names);
-	unordered_map<string, Eigen::VectorXd> obs_err_map;
-	obs_err_map.reserve(obs_names.size());
-	
-	double w;
-	for (int i = 0; i < obs_names.size(); i++)
-	{
-		w = pest_scenario.get_observation_info_ptr()->get_weight(obs_names[i]);
-		meas_errors.col(i).array() = meas_errors.col(i).array() - obs_value.get_rec(obs_names[i]);// ;
-		obs_err_map[obs_names[i]] = meas_errors.col(i);		
-		weight_map[obs_names[i]] = w;
-	}
-
-	//prep a fast look for obs, par and resid matrices - stored as column vectors in a map
-	unordered_map<string, Eigen::VectorXd> par_resid_map, obs_resid_map, Am_map;
-	unordered_map<string, Eigen::VectorXd> par_diff_map, obs_diff_map;
-	par_resid_map.reserve(par_names.size());
-	par_diff_map.reserve(par_names.size());
-	Am_map.reserve(par_names.size());
-	obs_resid_map.reserve(obs_names.size());
-	obs_diff_map.reserve(obs_names.size());
-	
-	//check for the 'center_on' real - it may have been dropped...
-	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
-	if (center_on.size() > 0)
-	{
-		vector<string> real_names = oe_upgrade.get_real_names();
-		if (find(real_names.begin(), real_names.end(), center_on) == real_names.end())
-		{
-			message(0, "Warning: 'ies_center_on' real not found in obs en, reverting to mean...");
-			center_on = "";
-		}
-		real_names = pe_upgrade.get_real_names();
-		if ((center_on.size() > 0) && find(real_names.begin(), real_names.end(), center_on) == real_names.end())
-		{
-			message(0, "Warning: 'ies_center_on' real not found in par en, reverting to mean...");
-			center_on = "";
-		}
-	}
-
-	Eigen::MatrixXd mat = ph.get_obs_resid_subset(oe_upgrade); // oe - oe_base --->(H-D)
-	for (int i = 0; i < obs_names.size(); i++)
-	{
-		obs_resid_map[obs_names[i]] = mat.col(i);
-	}
-	mat = oe_upgrade.get_eigen_anomalies(center_on);
-	for (int i = 0; i < obs_names.size(); i++)
-	{
-		obs_diff_map[obs_names[i]] = mat.col(i);
-	}
-	mat = ph.get_par_resid_subset(pe_upgrade);
-	for (int i = 0; i < par_names.size(); i++)
-	{
-		par_resid_map[par_names[i]] = mat.col(i);
-	}
-	mat = pe_upgrade.get_eigen_anomalies(center_on);
-	for (int i = 0; i < par_names.size(); i++)
-	{
-		par_diff_map[par_names[i]] = mat.col(i);
-	}
-	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
-	{
-		mat = get_Am(pe_upgrade.get_real_names(), pe_upgrade.get_var_names());
-		for (int i = 0; i < par_names.size(); i++)
-		{
-			Am_map[par_names[i]] = mat.row(i);
-		}
-	}
-	mat.resize(0, 0);
-	// clear the upgrade ensemble
-	pe_upgrade.set_zeros();
-	Localizer::How _how = localizer.get_how();
-
-
-
-	kf_work(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map, obs_err_map,
-		localizer, parcov_inv_map, weight_map, pe_upgrade, cur_lam, loc_map, Am_map, _how);
-	/*
-	
-	*/
-
-	return pe_upgrade;
-}
-
+//ParameterEnsemble DataAssimilator::calc_kf_upgrade(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map)
+//{
+//	stringstream ss;
+//
+//	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
+//	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
+//
+//	//this copy of the localizer map will be consumed by the worker threads
+//	//unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
+//	if (use_localizer)
+//	{
+//
+//		//loc_map = localizer.get_localizer_map(iter, oe, pe, performance_log);
+//		//localizer.report(file_manager.rec_ofstream());
+//	}
+//	else
+//	{
+//		// Ayman noticed that p is empty when no localizer is used
+//		//pair<vector<string>, vector<string>> p(act_obs_names, act_par_names);
+//		//loc_map["all"] = p;
+//	}
+//
+//	//prep the fast look par cov info
+//	message(2, "preparing fast-look containers for threaded localization solve");
+//	unordered_map<string, double> parcov_inv_map;
+//	parcov_inv_map.reserve(pe_upgrade.shape().second);
+//	Eigen::VectorXd parcov_inv;// = parcov.get(par_names).inv().e_ptr()->toDense().cwiseSqrt().asDiagonal();
+//	if (!parcov.isdiagonal())
+//	{
+//		//parcov_inv = parcov.inv().get_matrix().diagonal().cwiseSqrt();
+//		parcov_inv = parcov.get_matrix().diagonal();
+//
+//	}
+//	else
+//	{
+//		message(2, "extracting diagonal from prior parameter covariance matrix");
+//		Covariance parcov_diag;
+//		parcov_diag.from_diagonal(parcov);
+//		//parcov_inv = parcov_diag.inv().get_matrix().diagonal().cwiseSqrt();
+//		parcov_inv = parcov_diag.get_matrix().diagonal();
+//
+//	}
+//	parcov_inv = parcov_inv.cwiseSqrt().cwiseInverse();
+//
+//	vector<string> par_names = pe_upgrade.get_var_names();
+//	for (int i = 0; i < parcov_inv.size(); i++)
+//		parcov_inv_map[par_names[i]] = parcov_inv[i];
+//
+//
+//	//prep the fast lookup weights info
+//	unordered_map<string, double> weight_map;
+//	weight_map.reserve(oe_upgrade.shape().second);
+//	vector<string> obs_names = oe_upgrade.get_var_names();
+//	Observations obs_value = pest_scenario.get_ctl_observations();
+//	vector<string> names = oe.get_var_names();	
+//	Eigen::MatrixXd meas_errors = oe_base.get_eigen(oe_base.get_real_names(), obs_names);// -obs_value.get_rec(obs_names);
+//	unordered_map<string, Eigen::VectorXd> obs_err_map;
+//	obs_err_map.reserve(obs_names.size());
+//	
+//	double w;
+//	for (int i = 0; i < obs_names.size(); i++)
+//	{
+//		w = pest_scenario.get_observation_info_ptr()->get_weight(obs_names[i]);
+//		meas_errors.col(i).array() = meas_errors.col(i).array() - obs_value.get_rec(obs_names[i]);// ;
+//		obs_err_map[obs_names[i]] = meas_errors.col(i);		
+//		weight_map[obs_names[i]] = w;
+//	}
+//
+//	//prep a fast look for obs, par and resid matrices - stored as column vectors in a map
+//	unordered_map<string, Eigen::VectorXd> par_resid_map, obs_resid_map, Am_map;
+//	unordered_map<string, Eigen::VectorXd> par_diff_map, obs_diff_map;
+//	par_resid_map.reserve(par_names.size());
+//	par_diff_map.reserve(par_names.size());
+//	Am_map.reserve(par_names.size());
+//	obs_resid_map.reserve(obs_names.size());
+//	obs_diff_map.reserve(obs_names.size());
+//	
+//	//check for the 'center_on' real - it may have been dropped...
+//	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
+//	if (center_on.size() > 0)
+//	{
+//		vector<string> real_names = oe_upgrade.get_real_names();
+//		if (find(real_names.begin(), real_names.end(), center_on) == real_names.end())
+//		{
+//			message(0, "Warning: 'ies_center_on' real not found in obs en, reverting to mean...");
+//			center_on = "";
+//		}
+//		real_names = pe_upgrade.get_real_names();
+//		if ((center_on.size() > 0) && find(real_names.begin(), real_names.end(), center_on) == real_names.end())
+//		{
+//			message(0, "Warning: 'ies_center_on' real not found in par en, reverting to mean...");
+//			center_on = "";
+//		}
+//	}
+//
+//	Eigen::MatrixXd mat = ph.get_obs_resid_subset(oe_upgrade); // oe - oe_base --->(H-D)
+//	for (int i = 0; i < obs_names.size(); i++)
+//	{
+//		obs_resid_map[obs_names[i]] = mat.col(i);
+//	}
+//	mat = oe_upgrade.get_eigen_anomalies(center_on);
+//	for (int i = 0; i < obs_names.size(); i++)
+//	{
+//		obs_diff_map[obs_names[i]] = mat.col(i);
+//	}
+//	mat = ph.get_par_resid_subset(pe_upgrade);
+//	for (int i = 0; i < par_names.size(); i++)
+//	{
+//		par_resid_map[par_names[i]] = mat.col(i);
+//	}
+//	mat = pe_upgrade.get_eigen_anomalies(center_on);
+//	for (int i = 0; i < par_names.size(); i++)
+//	{
+//		par_diff_map[par_names[i]] = mat.col(i);
+//	}
+//	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
+//	{
+//		mat = get_Am(pe_upgrade.get_real_names(), pe_upgrade.get_var_names());
+//		for (int i = 0; i < par_names.size(); i++)
+//		{
+//			Am_map[par_names[i]] = mat.row(i);
+//		}
+//	}
+//	mat.resize(0, 0);
+//	// clear the upgrade ensemble
+//	pe_upgrade.set_zeros();
+//	Localizer::How _how = localizer.get_how();
+//
+//
+//
+//	kf_work(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map, obs_err_map,
+//		localizer, parcov_inv_map, weight_map, pe_upgrade, cur_lam, loc_map, Am_map, _how);
+//	/*
+//	
+//	*/
+//
+//	return pe_upgrade;
+//}
+//
 
 
 bool DataAssimilator::solve_new_da()

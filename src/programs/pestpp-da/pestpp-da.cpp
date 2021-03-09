@@ -508,7 +508,7 @@ int main(int argc, char* argv[])
 
 				if (pest_scenario.get_control_info().noptmax > 0) // 
 				{
-					da.da_upate();
+					da.da_update();
 				}
 				write_global_phi_info(*icycle, f_phi, da, init_real_names);
 			}
