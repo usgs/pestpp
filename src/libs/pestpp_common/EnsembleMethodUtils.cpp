@@ -2513,6 +2513,9 @@ EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
 	pe.set_rand_gen(&rand_gen);
 	oe.set_rand_gen(&rand_gen);
 	localizer.set_pest_scenario(&pest_scenario);
+	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
+	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
 
 }
 
@@ -2527,8 +2530,72 @@ void EnsembleMethod::throw_em_error(string message)
 	
 }
 
+bool EnsembleMethod::should_terminate()
+{
+	//todo: use ies accept fac here?
+	double phiredstp = pest_scenario.get_control_info().phiredstp;
+	int nphistp = pest_scenario.get_control_info().nphistp;
+	int nphinored = pest_scenario.get_control_info().nphinored;
+	bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
+	double phi, ratio;
+	int count = 0;
+	int nphired = 0;
+	//best_mean_phis = vector<double>{ 1.0,0.8,0.81,0.755,1.1,0.75,0.75,1.2 };
 
-vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals)
+
+
+	/*if ((!consec_sat )&& (best_mean_phis.size() == 0))
+		return false;*/
+	message(0, "phi-based termination criteria check");
+	message(1, "phiredstp: ", phiredstp);
+	message(1, "nphistp: ", nphistp);
+	message(1, "nphinored (also used for consecutive bad lambda cycles): ", nphinored);
+	if (best_mean_phis.size() > 0)
+	{
+		vector<double>::iterator idx = min_element(best_mean_phis.begin(), best_mean_phis.end());
+		nphired = (best_mean_phis.end() - idx) - 1;
+		best_phi_yet = best_mean_phis[idx - best_mean_phis.begin()];// *pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
+		message(1, "best mean phi sequence: ", best_mean_phis);
+		message(1, "best phi yet: ", best_phi_yet);
+	}
+	message(1, "number of consecutive bad lambda testing cycles: ", consec_bad_lambda_cycles);
+	if (consec_bad_lambda_cycles >= nphinored)
+	{
+		message(1, "number of consecutive bad lambda testing cycles > nphinored");
+		consec_sat = true;
+	}
+
+	for (auto& phi : best_mean_phis)
+	{
+		ratio = (phi - best_phi_yet) / phi;
+		if (ratio <= phiredstp)
+			count++;
+	}
+	message(1, "number of iterations satisfying phiredstp criteria: ", count);
+	if (count >= nphistp)
+	{
+		message(1, "number iterations satisfying phiredstp criteria > nphistp");
+		phiredstp_sat = true;
+	}
+
+	message(1, "number of iterations since best yet mean phi: ", nphired);
+	if (nphired >= nphinored)
+	{
+		message(1, "number of iterations since best yet mean phi > nphinored");
+		nphinored_sat = true;
+	}
+
+	if ((nphinored_sat) || (phiredstp_sat) || (consec_sat))
+	{
+		message(1, "phi-based termination criteria satisfied, all done");
+		return true;
+	}
+	return false;
+}
+
+
+vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, 
+	vector<double>& scale_vals, int cycle)
 {
 	ofstream& frec = file_manager.rec_ofstream();
 	stringstream ss;
@@ -2544,7 +2611,7 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 	{
 		try
 		{
-			real_run_ids_vec.push_back(pe_lam.add_runs(run_mgr_ptr, subset_idxs));
+			real_run_ids_vec.push_back(pe_lam.add_runs(run_mgr_ptr, subset_idxs,cycle));
 		}
 		catch (const exception& e)
 		{
@@ -2726,13 +2793,17 @@ void EnsembleMethod::save_mat(string prefix, Eigen::MatrixXd& mat)
 	}
 }
 
-vector<int> EnsembleMethod::run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs)
+vector<int> EnsembleMethod::run_ensemble(ParameterEnsemble& _pe,
+	ObservationEnsemble& _oe, const vector<int>& real_idxs, int cycle)
 {
 	stringstream ss;
 	vector<int> failed_real_indices;
 	try
 	{
-		failed_real_indices = run_ensemble_util(performance_log, file_manager.rec_ofstream(), _pe, _oe, run_mgr_ptr, pest_scenario.get_pestpp_options().get_debug_check_par_en_consistency(), real_idxs);
+		failed_real_indices = run_ensemble_util(performance_log, file_manager.rec_ofstream(), 
+			_pe, _oe, run_mgr_ptr, 
+			pest_scenario.get_pestpp_options().get_debug_check_par_en_consistency(), 
+			real_idxs, cycle);
 	}
 	catch (const exception& e)
 	{

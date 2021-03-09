@@ -16,7 +16,7 @@
 #include "RunManagerAbstract.h"
 #include "ObjectiveFunc.h"
 #include "Localizer.h"
-
+#include "network_package.h"
 
 enum chancePoints { ALL, SINGLE };
 
@@ -262,7 +262,7 @@ public:
 	//virtual void iterate_2_solution() { ; }
 	//virtual void finalize() { ; }
 	virtual void throw_em_error(string message);
-	//virtual bool should_terminate() { return false; }
+	bool should_terminate();
 	template<typename T, typename A>
 	void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
 	void message(int level, const string& _message);
@@ -320,8 +320,8 @@ protected:
 
 	//ParameterEnsemble calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>> &loc_map);
 
-	vector<int> run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>());
-	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals);
+	vector<int> run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>(), int cycle=NetPackage::NULL_DA_CYCLE);
+	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle= NetPackage::NULL_DA_CYCLE);
 
 	void report_and_save();
 	void save_mat(string prefix, Eigen::MatrixXd& mat);

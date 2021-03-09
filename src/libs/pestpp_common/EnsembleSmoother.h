@@ -33,7 +33,7 @@ public:
 	void iterate_2_solution();
 	void finalize();
 	void throw_ies_error(string message);
-	bool should_terminate();
+	//bool should_terminate();
 	
 
 private:

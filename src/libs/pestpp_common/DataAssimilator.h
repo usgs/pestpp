@@ -70,12 +70,15 @@ private:
 };
 
 
-class DataAssimilator
+class DataAssimilator: protected EnsembleMethod
 {
 public:
-	DataAssimilator(Pest& _pest_scenario, FileManager& _file_manager,
+	/*DataAssimilator(Pest& _pest_scenario, FileManager& _file_manager,
 		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
-		RunManagerAbstract* _run_mgr_ptr);
+		RunManagerAbstract* _run_mgr_ptr);*/
+
+	using EnsembleMethod::EnsembleMethod;
+
 	void forward_run_noptmax_0(int icycle);
 	void initialize(int _icycle);
 	void da_save_ensemble_pe(string fprefix, string dtyp);
@@ -88,8 +91,8 @@ public:
 
 	void kf_upate();
 	void finalize();
-	void throw_da_error(string message);
-	bool should_terminate();
+	//void throw_da_error(string message);
+	//bool should_terminate();
 	ParameterEnsemble get_pe() { return pe;}
 	void set_pe(ParameterEnsemble new_pe) { pe = new_pe;}
 	//bool use_ies; 
@@ -108,55 +111,14 @@ public:
 
 private:
 	int icycle;
-	int  verbose_level;
-	Pest& pest_scenario;
 	CtlPar_container da_ctl_params;
-	std::mt19937 rand_gen;
-	std::mt19937 subset_rand_gen;
-	FileManager& file_manager;
-	
-	OutputFileWriter& output_file_writer;
-	PerformanceLog* performance_log;
-	RunManagerAbstract* run_mgr_ptr;
-	L2PhiHandler ph;
-	ParChangeSummarizer pcs;
-	Covariance parcov, obscov;
-	double reg_factor;
 
-	bool use_localizer;
-	Localizer localizer;
-
-	int num_threads;
-
-	set<string> pp_args;
-
-	int iter, subset_size, solution_iterations;
-	bool use_subset;
-
-	double last_best_lam, last_best_mean, last_best_std;
-	vector<double> best_mean_phis;
-	double best_phi_yet;
 	vector<string> obs_dyn_state_names;
 	vector<string> par_dyn_state_names;
 
-
-	int consec_bad_lambda_cycles;
-
-	double lambda_max, lambda_min;
-	int warn_min_reals, error_min_reals;
-	vector<double> lam_mults, infl_facs;
-	map<string, double> pareto_obs;
-	map<string, double> pareto_weights;
-	//string fphi_name;
-	//ofstream fphi;
-	vector<string> oe_org_real_names, pe_org_real_names;
-	vector<string> act_obs_names, act_par_names;
-	vector<int> subset_idxs;
-
-	ParameterEnsemble pe, pe_base, pe_post;
-	ObservationEnsemble oe, oe_base, weights;
-	//Eigen::MatrixXd prior_pe_diff;
-	//Eigen::MatrixXd Am;
+	vector<double> infl_facs;
+	int solution_iterations;
+	ParameterEnsemble pe_post;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 
 	bool oe_drawn, pe_drawn;
@@ -169,7 +131,7 @@ private:
 	//ParameterEnsemble calc_upgrade(vector<string> &obs_names, vector<string> &par_names,double lamb, int num_reals);
 
 	//ParameterEnsemble calc_localized_upgrade(double cur_lam);
-	ParameterEnsemble calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
+	//ParameterEnsemble calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
 
 	ParameterEnsemble calc_kf_upgrade(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
 
@@ -193,18 +155,18 @@ private:
 
 	
 	//EnsemblePair run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe);
-	vector<int> run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>());
-	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals);
+	//vector<int> run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>());
+	//vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals);
 	//map<string, double> get_phi_vec_stats(map<string,PhiComponets> &phi_info);
 	//map<string,PhiComponets> get_phi_info(ObservationEnsemble &_oe);
-	void report_and_save();
-	void save_mat(string prefix, Eigen::MatrixXd& mat);
+	//void report_and_save();
+	//void save_mat(string prefix, Eigen::MatrixXd& mat);
 	
 	bool initialize_oe(Covariance& cov);
 	void initialize_restart();
 	
 	void initialize_obscov();
-	void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, bool is_subset = false);
+	//void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, bool is_subset = false);
 	//void check_ensembles(ObservationEnsemble &oe, ParameterEnsemble &pe);
 	template<typename T, typename A>
 	void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
@@ -222,9 +184,9 @@ private:
 
 	void sanity_checks();
 
-	void add_bases();
+	//void add_bases();
 
-	void update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
+	//void update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
 
 	//void initialize();
 
@@ -232,7 +194,7 @@ private:
 
 	//map<int,int> get_subset_idx_map();
 	void set_subset_idx(int size);
-	Eigen::MatrixXd get_Am(const vector<string>& real_names, const vector<string>& par_names);
+	//Eigen::MatrixXd get_Am(const vector<string>& real_names, const vector<string>& par_names);
 
 };
 

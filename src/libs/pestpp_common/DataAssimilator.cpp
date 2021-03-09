@@ -21,39 +21,39 @@
 
 
 
-DataAssimilator::DataAssimilator(Pest& _pest_scenario, FileManager& _file_manager,
-	OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
-	RunManagerAbstract* _run_mgr_ptr) : pest_scenario(_pest_scenario), file_manager(_file_manager),
-	output_file_writer(_output_file_writer), performance_log(_performance_log),
-	run_mgr_ptr(_run_mgr_ptr)
-{
-	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
+//DataAssimilator::DataAssimilator(Pest& _pest_scenario, FileManager& _file_manager,
+//	OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
+//	RunManagerAbstract* _run_mgr_ptr) : pest_scenario(_pest_scenario), file_manager(_file_manager),
+//	output_file_writer(_output_file_writer), performance_log(_performance_log),
+//	run_mgr_ptr(_run_mgr_ptr)
+//{
+//	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
+//
+//	subset_rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
+//
+//	pe.set_pest_scenario(&pest_scenario);
+//	pe.set_rand_gen(&rand_gen);
+//	oe.set_pest_scenario(&pest_scenario);
+//	oe.set_rand_gen(&rand_gen);
+//	weights.set_pest_scenario(&pest_scenario);
+//	localizer.set_pest_scenario(&pest_scenario);
+//	icycle = 0;
+//	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
+//	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+//	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
+//
+//	
+//}
 
-	subset_rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
-
-	pe.set_pest_scenario(&pest_scenario);
-	pe.set_rand_gen(&rand_gen);
-	oe.set_pest_scenario(&pest_scenario);
-	oe.set_rand_gen(&rand_gen);
-	weights.set_pest_scenario(&pest_scenario);
-	localizer.set_pest_scenario(&pest_scenario);
-	icycle = 0;
-	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
-	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
-	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
-
-	
-}
-
-void DataAssimilator::throw_da_error(string message)
-{
-	performance_log->log_event("DataAssimilator error: " + message);
-	cout << endl << "   ************   " << endl << "    DataAssimilator error: " << message << endl << endl;
-	file_manager.rec_ofstream() << endl << "   ************   " << endl << "    DataAssimilator error: " << message << endl << endl;
-	file_manager.close_file("rec");
-	performance_log->~PerformanceLog();
-	throw runtime_error("DataAssimilator error: " + message);
-}
+//void DataAssimilator::throw_da_error(string message)
+//{
+//	performance_log->log_event("DataAssimilator error: " + message);
+//	cout << endl << "   ************   " << endl << "    DataAssimilator error: " << message << endl << endl;
+//	file_manager.rec_ofstream() << endl << "   ************   " << endl << "    DataAssimilator error: " << message << endl << endl;
+//	file_manager.close_file("rec");
+//	performance_log->~PerformanceLog();
+//	throw runtime_error("DataAssimilator error: " + message);
+//}
 
 bool DataAssimilator::initialize_pe(Covariance& cov)
 {
@@ -86,11 +86,11 @@ bool DataAssimilator::initialize_pe(Covariance& cov)
 			catch (const exception & e)
 			{
 				ss << "error processing par csv: " << e.what();
-				throw_da_error(ss.str());
+				throw_em_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_da_error(string("error processing par csv"));
+				throw_em_error(string("error processing par csv"));
 			}
 		}
 		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
@@ -103,17 +103,17 @@ bool DataAssimilator::initialize_pe(Covariance& cov)
 			catch (const exception & e)
 			{
 				ss << "error processing par jcb: " << e.what();
-				throw_da_error(ss.str());
+				throw_em_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_da_error(string("error processing par jcb"));
+				throw_em_error(string("error processing par jcb"));
 			}
 		}
 		else
 		{
 			ss << "unrecognized par csv extension " << par_ext << ", looking for csv, jcb, or jco";
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 
 		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
@@ -171,116 +171,116 @@ bool DataAssimilator::initialize_pe(Covariance& cov)
 
 }
 
-void DataAssimilator::add_bases()
-{
-	//check that 'base' isn't already in ensemble
-	vector<string> rnames = pe.get_real_names();
-	bool inpar = false;
-	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
-	{
-		message(1, "'base' realization already in parameter ensemble, ignoring '++ies_include_base'");
-		inpar = true;
-	}
-	else
-	{
-		message(1, "adding 'base' parameter values to ensemble");
-		Parameters pars = pest_scenario.get_ctl_parameters();
-		pe.get_par_transform().active_ctl2numeric_ip(pars);
-		vector<int> drop{ pe.shape().first - 1 };
-		pe.drop_rows(drop);
-		pe.append(BASE_REAL_NAME, pars);
-	}
-
-	//check that 'base' isn't already in ensemble
-	rnames = oe.get_real_names();
-	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
-	{
-		message(1, "'base' realization already in observation ensemble, ignoring '++ies_include_base'");
-	}
-	else
-	{
-		Observations obs = pest_scenario.get_ctl_observations();
-		if (inpar)
-		{
-			vector<string> prnames = pe.get_real_names();
-
-			int idx = find(prnames.begin(), prnames.end(), BASE_REAL_NAME) - prnames.begin();
-			//cout << idx << "," << rnames.size() << endl;
-			string oreal = rnames[idx];
-			stringstream ss;
-			ss << "warning: 'base' realization in par ensenmble but not in obs ensemble," << endl;
-			ss << "         replacing obs realization '" << oreal << "' with 'base'";
-			string mess = ss.str();
-			message(1, mess);
-			vector<string> drop;
-			drop.push_back(oreal);
-			oe.drop_rows(drop);
-			oe.append(BASE_REAL_NAME, obs);
-			//rnames.insert(rnames.begin() + idx, string(base_name));
-			rnames[idx] = BASE_REAL_NAME;
-			oe.reorder(rnames, vector<string>());
-		}
-		else
-		{
-			message(1, "adding 'base' observation values to ensemble");
-			vector<int> drop{ oe.shape().first - 1 };
-			oe.drop_rows(drop);
-			oe.append(BASE_REAL_NAME, obs);
-		}
-	}
-
-	//check that 'base' isn't already in ensemble
-	rnames = weights.get_real_names();
-	if (rnames.size() == 0)
-		return;
-	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
-	{
-		message(1, "'base' realization already in weights ensemble, ignoring '++ies_include_base'");
-	}
-	else
-	{
-		//Observations obs = pest_scenario.get_ctl_observations();
-		ObservationInfo oinfo = pest_scenario.get_ctl_observation_info();
-		Eigen::VectorXd q;
-		//vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
-		vector<string> vnames = weights.get_var_names();
-		q.resize(vnames.size());
-		double w;
-		for (int i = 0; i < vnames.size(); i++)
-		{
-			q(i) = oinfo.get_weight(vnames[i]);
-		}
-
-		Observations wobs(vnames, q);
-		if (inpar)
-		{
-			vector<string> prnames = pe.get_real_names();
-
-			int idx = find(prnames.begin(), prnames.end(), BASE_REAL_NAME) - prnames.begin();
-			//cout << idx << "," << rnames.size() << endl;
-			string oreal = rnames[idx];
-			stringstream ss;
-			ss << "warning: 'base' realization in par ensenmble but not in weights ensemble," << endl;
-			ss << "         replacing weights realization '" << oreal << "' with 'base'";
-			string mess = ss.str();
-			message(1, mess);
-			vector<string> drop;
-			drop.push_back(oreal);
-			weights.drop_rows(drop);
-			weights.append(BASE_REAL_NAME, wobs);
-			//rnames.insert(rnames.begin() + idx, string(base_name));
-			rnames[idx] = BASE_REAL_NAME;
-			weights.reorder(rnames, vector<string>());
-		}
-		else
-		{
-			message(1, "adding 'base' weight values to weights");
-
-
-			weights.append(BASE_REAL_NAME, wobs);
-		}
-	}
-}
+//void DataAssimilator::add_bases()
+//{
+//	//check that 'base' isn't already in ensemble
+//	vector<string> rnames = pe.get_real_names();
+//	bool inpar = false;
+//	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
+//	{
+//		message(1, "'base' realization already in parameter ensemble, ignoring '++ies_include_base'");
+//		inpar = true;
+//	}
+//	else
+//	{
+//		message(1, "adding 'base' parameter values to ensemble");
+//		Parameters pars = pest_scenario.get_ctl_parameters();
+//		pe.get_par_transform().active_ctl2numeric_ip(pars);
+//		vector<int> drop{ pe.shape().first - 1 };
+//		pe.drop_rows(drop);
+//		pe.append(BASE_REAL_NAME, pars);
+//	}
+//
+//	//check that 'base' isn't already in ensemble
+//	rnames = oe.get_real_names();
+//	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
+//	{
+//		message(1, "'base' realization already in observation ensemble, ignoring '++ies_include_base'");
+//	}
+//	else
+//	{
+//		Observations obs = pest_scenario.get_ctl_observations();
+//		if (inpar)
+//		{
+//			vector<string> prnames = pe.get_real_names();
+//
+//			int idx = find(prnames.begin(), prnames.end(), BASE_REAL_NAME) - prnames.begin();
+//			//cout << idx << "," << rnames.size() << endl;
+//			string oreal = rnames[idx];
+//			stringstream ss;
+//			ss << "warning: 'base' realization in par ensenmble but not in obs ensemble," << endl;
+//			ss << "         replacing obs realization '" << oreal << "' with 'base'";
+//			string mess = ss.str();
+//			message(1, mess);
+//			vector<string> drop;
+//			drop.push_back(oreal);
+//			oe.drop_rows(drop);
+//			oe.append(BASE_REAL_NAME, obs);
+//			//rnames.insert(rnames.begin() + idx, string(base_name));
+//			rnames[idx] = BASE_REAL_NAME;
+//			oe.reorder(rnames, vector<string>());
+//		}
+//		else
+//		{
+//			message(1, "adding 'base' observation values to ensemble");
+//			vector<int> drop{ oe.shape().first - 1 };
+//			oe.drop_rows(drop);
+//			oe.append(BASE_REAL_NAME, obs);
+//		}
+//	}
+//
+//	//check that 'base' isn't already in ensemble
+//	rnames = weights.get_real_names();
+//	if (rnames.size() == 0)
+//		return;
+//	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
+//	{
+//		message(1, "'base' realization already in weights ensemble, ignoring '++ies_include_base'");
+//	}
+//	else
+//	{
+//		//Observations obs = pest_scenario.get_ctl_observations();
+//		ObservationInfo oinfo = pest_scenario.get_ctl_observation_info();
+//		Eigen::VectorXd q;
+//		//vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
+//		vector<string> vnames = weights.get_var_names();
+//		q.resize(vnames.size());
+//		double w;
+//		for (int i = 0; i < vnames.size(); i++)
+//		{
+//			q(i) = oinfo.get_weight(vnames[i]);
+//		}
+//
+//		Observations wobs(vnames, q);
+//		if (inpar)
+//		{
+//			vector<string> prnames = pe.get_real_names();
+//
+//			int idx = find(prnames.begin(), prnames.end(), BASE_REAL_NAME) - prnames.begin();
+//			//cout << idx << "," << rnames.size() << endl;
+//			string oreal = rnames[idx];
+//			stringstream ss;
+//			ss << "warning: 'base' realization in par ensenmble but not in weights ensemble," << endl;
+//			ss << "         replacing weights realization '" << oreal << "' with 'base'";
+//			string mess = ss.str();
+//			message(1, mess);
+//			vector<string> drop;
+//			drop.push_back(oreal);
+//			weights.drop_rows(drop);
+//			weights.append(BASE_REAL_NAME, wobs);
+//			//rnames.insert(rnames.begin() + idx, string(base_name));
+//			rnames[idx] = BASE_REAL_NAME;
+//			weights.reorder(rnames, vector<string>());
+//		}
+//		else
+//		{
+//			message(1, "adding 'base' weight values to weights");
+//
+//
+//			weights.append(BASE_REAL_NAME, wobs);
+//		}
+//	}
+//}
 
 bool DataAssimilator::initialize_oe(Covariance& cov)
 {
@@ -329,11 +329,11 @@ bool DataAssimilator::initialize_oe(Covariance& cov)
 			catch (const exception & e)
 			{
 				ss << "error processing obs csv: " << e.what();
-				throw_da_error(ss.str());
+				throw_em_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_da_error(string("error processing obs csv"));
+				throw_em_error(string("error processing obs csv"));
 			}
 		}
 		else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
@@ -347,17 +347,17 @@ bool DataAssimilator::initialize_oe(Covariance& cov)
 			{
 				stringstream ss;
 				ss << "error processing obs binary file: " << e.what();
-				throw_da_error(ss.str());
+				throw_em_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_da_error(string("error processing obs binary file"));
+				throw_em_error(string("error processing obs binary file"));
 			}
 		}
 		else
 		{
 			ss << "unrecognized obs ensemble extension " << obs_ext << ", looing for csv, jcb, or jco";
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
 		{
@@ -481,7 +481,7 @@ void DataAssimilator::sanity_checks()
 		message(0, "sanity_check errors - uh oh");
 		for (auto& e : errors)
 			message(1, e);
-		throw_da_error(string("sanity_check() found some problems - please review rec file"));
+		throw_em_error(string("sanity_check() found some problems - please review rec file"));
 	}
 	//cout << endl << endl;
 }
@@ -505,11 +505,11 @@ void DataAssimilator::initialize_restart()
 		catch (const exception & e)
 		{
 			ss << "error processing restart obs csv: " << e.what();
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_da_error(string("error processing restart obs csv"));
+			throw_em_error(string("error processing restart obs csv"));
 		}
 	}
 	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
@@ -522,17 +522,17 @@ void DataAssimilator::initialize_restart()
 		catch (const exception & e)
 		{
 			ss << "error processing restart obs binary file: " << e.what();
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_da_error(string("error processing restart obs binary file"));
+			throw_em_error(string("error processing restart obs binary file"));
 		}
 	}
 	else
 	{
 		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
-		throw_da_error(ss.str());
+		throw_em_error(ss.str());
 	}
 	if (par_restart_csv.size() > 0)
 	{
@@ -547,11 +547,11 @@ void DataAssimilator::initialize_restart()
 			catch (const exception & e)
 			{
 				ss << "error processing restart par csv: " << e.what();
-				throw_da_error(ss.str());
+				throw_em_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_da_error(string("error processing restart par csv"));
+				throw_em_error(string("error processing restart par csv"));
 			}
 		}
 		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
@@ -564,23 +564,23 @@ void DataAssimilator::initialize_restart()
 			catch (const exception & e)
 			{
 				ss << "error processing restart par binary file: " << e.what();
-				throw_da_error(ss.str());
+				throw_em_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_da_error(string("error processing restart par binary file"));
+				throw_em_error(string("error processing restart par binary file"));
 			}
 		}
 		else
 		{
 			ss << "unrecognized restart par ensemble extension " << par_ext << ", looking for csv, jcb, or jco";
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 		if (pe.shape().first != oe.shape().first)
 		{
 			ss.str("");
 			ss << "restart par en has " << pe.shape().first << " realizations but restart obs en has " << oe.shape().first;
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 
 		//check that restart pe is in sync with pe_base
@@ -597,7 +597,7 @@ void DataAssimilator::initialize_restart()
 			ss << "the following realization names were found in the restart par en but not in the 'base' par en:";
 			for (auto& m : missing)
 				ss << m << ",";
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 	}
 
@@ -657,7 +657,7 @@ void DataAssimilator::initialize_restart()
 			else
 			{
 				ss << "the 'base' realization was not found in the restart obs en and also not found in the par en";
-				throw_da_error(ss.str());
+				throw_em_error(ss.str());
 			}
 
 		}
@@ -666,7 +666,7 @@ void DataAssimilator::initialize_restart()
 			ss << "the following realization names were found in the restart obs en but not in the 'base' obs en:";
 			for (auto& m : missing)
 				ss << m << ",";
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 
 	}
@@ -688,7 +688,7 @@ void DataAssimilator::initialize_restart()
 			ss << " and realization names could not be aligned:";
 			for (auto& m : missing)
 				ss << m << ",";
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 
 		message(2, "reordering pe to align with restart obs en, num reals: ", oe_real_names.size());
@@ -699,11 +699,11 @@ void DataAssimilator::initialize_restart()
 		catch (exception & e)
 		{
 			ss << "error reordering pe with restart oe:" << e.what();
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_da_error(string("error reordering pe with restart oe"));
+			throw_em_error(string("error reordering pe with restart oe"));
 		}
 
 	}
@@ -743,11 +743,11 @@ void DataAssimilator::initialize_restart()
 			catch (exception & e)
 			{
 				ss << "error reordering oe_base with restart oe:" << e.what();
-				throw_da_error(ss.str());
+				throw_em_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_da_error(string("error reordering oe_base with restart oe"));
+				throw_em_error(string("error reordering oe_base with restart oe"));
 			}
 		}
 		//if (par_restart_csv.size() > 0)
@@ -762,11 +762,11 @@ void DataAssimilator::initialize_restart()
 			catch (exception & e)
 			{
 				ss << "error reordering pe_base with restart pe:" << e.what();
-				throw_da_error(ss.str());
+				throw_em_error(ss.str());
 			}
 			catch (...)
 			{
-				throw_da_error(string("error reordering pe_base with restart pe"));
+				throw_em_error(string("error reordering pe_base with restart pe"));
 			}
 		}
 
@@ -778,17 +778,17 @@ void DataAssimilator::initialize_restart()
 		catch (exception &e)
 		{
 			ss << "error reordering pe with restart oe:" << e.what();
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_da_error(string("error reordering pe with restart oe"));
+			throw_em_error(string("error reordering pe with restart oe"));
 		}*/
 	}
 	else if (oe.shape().first > oe_base.shape().first) //something is wrong
 	{
 		ss << "restart oe has too many rows: " << oe.shape().first << " compared to oe_base: " << oe_base.shape().first;
-		throw_da_error(ss.str());
+		throw_em_error(ss.str());
 	}
 }
 
@@ -878,7 +878,7 @@ void DataAssimilator::initialize_obscov()
 //		if (failed_idxs.size() != 0)
 //		{
 //			message(0, "control file parameter value run failed...bummer");
-//			throw_da_error("control file parameter value run failed");
+//			throw_em_error("control file parameter value run failed");
 //		}
 //		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
 //		message(1, "saving results from control file parameter value run to ", obs_csv);
@@ -934,7 +934,7 @@ void DataAssimilator::initialize_obscov()
 //
 //	//if ((ppo->get_ies_localizer().size() > 0) & (ppo->get_ies_autoadaloc()))
 //	//{
-//	//	throw_da_error("use of localization matrix and autoadaloc not supported...yet!");
+//	//	throw_em_error("use of localization matrix and autoadaloc not supported...yet!");
 //	//}
 //	message(1, "initializing localizer--");
 //	use_localizer = localizer.initialize(performance_log);
@@ -1072,7 +1072,7 @@ void DataAssimilator::initialize_obscov()
 //		catch (const exception & e)
 //		{
 //			string message = e.what();
-//			throw_da_error("error in parameter ensemble: " + message);
+//			throw_em_error("error in parameter ensemble: " + message);
 //		}
 //
 //	}
@@ -1084,7 +1084,7 @@ void DataAssimilator::initialize_obscov()
 //	catch (const exception & e)
 //	{
 //		string message = e.what();
-//		throw_da_error("error in observation ensemble: " + message);
+//		throw_em_error("error in observation ensemble: " + message);
 //	}
 //
 //	if (pe.shape().first != oe.shape().first)
@@ -1119,7 +1119,7 @@ void DataAssimilator::initialize_obscov()
 //				{
 //					ss << m << ",";
 //				}
-//				throw_da_error(ss.str());
+//				throw_em_error(ss.str());
 //
 //			}
 //		}
@@ -1127,7 +1127,7 @@ void DataAssimilator::initialize_obscov()
 //		{
 //			ss.str("");
 //			ss << "parameter ensemble rows (" << pe.shape().first << ") not equal to observation ensemble rows (" << oe.shape().first << ")";
-//			throw_da_error(ss.str());
+//			throw_em_error(ss.str());
 //		}
 //	}
 //
@@ -1204,10 +1204,10 @@ void DataAssimilator::initialize_obscov()
 //		message(1, ss.str());
 //		vector<string> names = pe.get_real_names();
 //		if (find(names.begin(), names.end(), center_on) == names.end())
-//			throw_da_error("'ies_center_on' realization not found in par en: " + center_on);
+//			throw_em_error("'ies_center_on' realization not found in par en: " + center_on);
 //		names = oe.get_real_names();
 //		if (find(names.begin(), names.end(), center_on) == names.end())
-//			throw_da_error("'ies_center_on' realization not found in obs en: " + center_on);
+//			throw_em_error("'ies_center_on' realization not found in obs en: " + center_on);
 //	}
 //	else
 //		message(1, "centering on ensemble mean vector");
@@ -1302,7 +1302,7 @@ void DataAssimilator::initialize_obscov()
 //		vector<int> failed = run_ensemble(pe, oe);
 //
 //		if (pe.shape().first == 0)
-//			throw_da_error("all realizations failed during initial evaluation");
+//			throw_em_error("all realizations failed during initial evaluation");
 //		if (failed.size() > 0)
 //			oe_base.drop_rows(failed);
 //		
@@ -1366,13 +1366,13 @@ void DataAssimilator::initialize_obscov()
 //	drop_bad_phi(pe, oe);
 //	if (oe.shape().first == 0)
 //	{
-//		throw_da_error(string("all realizations dropped as 'bad'"));
+//		throw_em_error(string("all realizations dropped as 'bad'"));
 //	}
 //	if (oe.shape().first <= error_min_reals)
 //	{
 //		message(0, "too few active realizations:", oe.shape().first);
 //		message(1, "need at least ", error_min_reals);
-//		throw_da_error(string("too few active realizations, cannot continue"));
+//		throw_em_error(string("too few active realizations, cannot continue"));
 //	}
 //	if (oe.shape().first < warn_min_reals)
 //	{
@@ -1414,7 +1414,7 @@ void DataAssimilator::initialize_obscov()
 //		message(1, "dropping conflicted observations");
 //		if (in_conflict.size() == oe.shape().second)
 //		{
-//			throw_da_error("all non-zero weighted observations in conflict state, cannot continue");
+//			throw_em_error("all non-zero weighted observations in conflict state, cannot continue");
 //		}
 //		//drop from act_obs_names
 //		vector<string> t;
@@ -1521,7 +1521,7 @@ void DataAssimilator::forward_run_noptmax_0(int icycle)
 	if (failed_idxs.size() != 0)
 	{
 		message(0, "control file parameter value run failed...bummer");
-		throw_da_error("control file parameter value run failed");
+		throw_em_error("control file parameter value run failed");
 	}
 	string obs_csv = file_manager.get_base_filename() + ".obs.csv";
 	message(1, "saving results from control file parameter value run to ", obs_csv);
@@ -1714,7 +1714,7 @@ void DataAssimilator::initialize(int _icycle)
 		catch (const exception & e)
 		{
 			string message = e.what();
-			throw_da_error("error in parameter ensemble: " + message);
+			throw_em_error("error in parameter ensemble: " + message);
 		}
 
 	}*/
@@ -1726,7 +1726,7 @@ void DataAssimilator::initialize(int _icycle)
 	catch (const exception & e)
 	{
 		string message = e.what();
-		throw_da_error("error in observation ensemble: " + message);
+		throw_em_error("error in observation ensemble: " + message);
 	}
 
 	if ((act_obs_names.size() > 0) && (pe.shape().first != oe.shape().first))
@@ -1761,7 +1761,7 @@ void DataAssimilator::initialize(int _icycle)
 				{
 					ss << m << ",";
 				}
-				throw_da_error(ss.str());
+				throw_em_error(ss.str());
 
 			}
 		}
@@ -1769,7 +1769,7 @@ void DataAssimilator::initialize(int _icycle)
 		{
 			ss.str("");
 			ss << "parameter ensemble rows (" << pe.shape().first << ") not equal to observation ensemble rows (" << oe.shape().first << ")";
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 	}
 
@@ -1847,10 +1847,10 @@ void DataAssimilator::initialize(int _icycle)
 		message(1, ss.str());
 		vector<string> names = pe.get_real_names();
 		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_da_error("'ies_center_on' realization not found in par en: " + center_on);
+			throw_em_error("'ies_center_on' realization not found in par en: " + center_on);
 		names = oe.get_real_names();
 		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_da_error("'ies_center_on' realization not found in obs en: " + center_on);
+			throw_em_error("'ies_center_on' realization not found in obs en: " + center_on);
 	}
 	else
 		message(1, "centering on ensemble mean vector");
@@ -1968,7 +1968,7 @@ void DataAssimilator::initialize(int _icycle)
 		vector<int> failed = run_ensemble(pe, oe);
 
 		if (pe.shape().first == 0)
-			throw_da_error("all realizations failed during initial evaluation");
+			throw_em_error("all realizations failed during initial evaluation");
 
 		if (failed.size() > 0)
 			oe_base.drop_rows(failed);
@@ -2020,13 +2020,13 @@ void DataAssimilator::initialize(int _icycle)
 	drop_bad_phi(pe, oe);
 	if (oe.shape().first == 0)
 	{
-		throw_da_error(string("all realizations dropped as 'bad'"));
+		throw_em_error(string("all realizations dropped as 'bad'"));
 	}
 	if (oe.shape().first <= error_min_reals)
 	{
 		message(0, "too few active realizations:", oe.shape().first);
 		message(1, "need at least ", error_min_reals);
-		throw_da_error(string("too few active realizations, cannot continue"));
+		throw_em_error(string("too few active realizations, cannot continue"));
 	}
 	if (oe.shape().first < warn_min_reals)
 	{
@@ -2068,7 +2068,7 @@ void DataAssimilator::initialize(int _icycle)
 		message(1, "dropping conflicted observations");
 		if (in_conflict.size() == oe.shape().second)
 		{
-			throw_da_error("all non-zero weighted observations in conflict state, cannot continue");
+			throw_em_error("all non-zero weighted observations in conflict state, cannot continue");
 		}
 		//drop from act_obs_names
 		vector<string> t;
@@ -2112,11 +2112,11 @@ void DataAssimilator::initialize(int _icycle)
 
 	if (ph.get_mean(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
 	{
-		throw_da_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");
+		throw_em_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");
 	}
 	if (ph.get_std(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
 	{
-		throw_da_error("initial actual phi stdev too low, something is wrong...");
+		throw_em_error("initial actual phi stdev too low, something is wrong...");
 	}
 
 	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
@@ -2125,11 +2125,11 @@ void DataAssimilator::initialize(int _icycle)
 
 	if (last_best_mean < 1.0e-10)
 	{
-		throw_da_error("initial composite phi mean too low, something is wrong...");
+		throw_em_error("initial composite phi mean too low, something is wrong...");
 	}
 	if (last_best_std < 1.0e-10)
 	{
-		throw_da_error("initial composite phi stdev too low, something is wrong...");
+		throw_em_error("initial composite phi stdev too low, something is wrong...");
 	}
 	if (last_best_lam <= 0.0)
 	{
@@ -2282,7 +2282,7 @@ void DataAssimilator::initialize_dynamic_states()
 			ss << "    were already tagged as 'states' by identically named observations:" << endl;
 			for (auto& d : dups)
 				ss << d << ",";		
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 		if (missing.size() > 0)
 		{
@@ -2291,7 +2291,7 @@ void DataAssimilator::initialize_dynamic_states()
 			ss << "    were not found in par data section:" << endl;
 			for (auto& m : missing)
 				ss << m << ",";
-			throw_da_error(ss.str());
+			throw_em_error(ss.str());
 		}
 		if (c > 0)
 		{
@@ -2336,130 +2336,130 @@ vector<string> DataAssimilator::detect_prior_data_conflict()
 	return in_conflict;
 }
 
-Eigen::MatrixXd DataAssimilator::get_Am(const vector<string>& real_names, const vector<string>& par_names)
-{
+//Eigen::MatrixXd DataAssimilator::get_Am(const vector<string>& real_names, const vector<string>& par_names)
+//{
+//
+//	double scale = (1.0 / (sqrt(double(real_names.size() - 1))));
+//	Eigen::MatrixXd par_diff = scale * pe_base.get_eigen_anomalies(real_names, par_names, pest_scenario.get_pestpp_options().get_ies_center_on());
+//	par_diff.transposeInPlace();
+//	if (verbose_level > 1)
+//	{
+//		cout << "prior_par_diff: " << par_diff.rows() << ',' << par_diff.cols() << endl;
+//		if (verbose_level > 2)
+//			save_mat("prior_par_diff.dat", par_diff);
+//	}
+//
+//	Eigen::MatrixXd ivec, upgrade_1, s, V, U, st;
+//	SVD_REDSVD rsvd;
+//	//SVD_EIGEN rsvd;
+//	rsvd.set_performance_log(performance_log);
+//
+//	rsvd.solve_ip(par_diff, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+//	par_diff.resize(0, 0);
+//	Eigen::MatrixXd temp = s.asDiagonal();
+//	Eigen::MatrixXd Am = U * temp;
+//	return Am;
+//}
 
-	double scale = (1.0 / (sqrt(double(real_names.size() - 1))));
-	Eigen::MatrixXd par_diff = scale * pe_base.get_eigen_anomalies(real_names, par_names, pest_scenario.get_pestpp_options().get_ies_center_on());
-	par_diff.transposeInPlace();
-	if (verbose_level > 1)
-	{
-		cout << "prior_par_diff: " << par_diff.rows() << ',' << par_diff.cols() << endl;
-		if (verbose_level > 2)
-			save_mat("prior_par_diff.dat", par_diff);
-	}
+//void DataAssimilator::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, bool is_subset)
+//{
+//	//don't use this assert because _pe maybe full size, but _oe might be subset size
+//	if (!is_subset)
+//		if (_pe.shape().first != _oe.shape().first)
+//			throw_em_error("DataAssimilator::drop_bad_phi() error: _pe != _oe and not subset");
+//
+//	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
+//	double bad_phi_sigma = pest_scenario.get_pestpp_options().get_ies_bad_phi_sigma();
+//	vector<int> idxs = ph.get_idxs_greater_than(bad_phi, bad_phi_sigma, _oe);
+//
+//	if (pest_scenario.get_pestpp_options().get_ies_debug_bad_phi())
+//		idxs.push_back(0);
+//
+//	if (idxs.size() > 0)
+//	{
+//
+//		message(0, "dropping realizations as bad: ", idxs.size());
+//
+//		vector<string> par_real_names = _pe.get_real_names(), obs_real_names = _oe.get_real_names();
+//		stringstream ss;
+//		string pname;
+//		string oname;
+//
+//		int pidx;
+//		vector<string> full_onames, full_pnames;
+//		// if a subset drop, then use the full oe index, otherwise, just use _oe index
+//		/*if (_oe.shape().first != _pe.shape().first)
+//		{
+//			full_onames = oe.get_real_names();
+//		}
+//		else
+//		{
+//			full_onames = _oe.get_real_names();
+//		}*/
+//		full_onames = oe.get_real_names();
+//		full_pnames = pe.get_real_names();
+//		vector<string> pdrop, odrop;
+//		for (auto i : idxs)
+//		{
+//			oname = obs_real_names[i];
+//
+//			if (is_subset)
+//			{
+//				pidx = find(full_onames.begin(), full_onames.end(), oname) - full_onames.begin();
+//				if (find(subset_idxs.begin(), subset_idxs.end(), pidx) == subset_idxs.end())
+//				{
+//					ss.str("");
+//					ss << "drop_bad_phi() error: idx " << pidx << " not found in subset_idxs";
+//					throw_em_error(ss.str());
+//				}
+//				pname = full_pnames[pidx];
+//			}
+//			else
+//			{
+//				pidx = i;
+//				pname = par_real_names[pidx];
+//			}
+//			ss << pname << " : " << obs_real_names[i] << " , ";
+//			pdrop.push_back(pname);
+//			odrop.push_back(obs_real_names[i]);
+//		}
+//
+//		string s = "dropping par:obs realizations: " + ss.str();
+//		message(1, s);
+//		try
+//		{
+//			_pe.drop_rows(pdrop);
+//			_oe.drop_rows(odrop);
+//		}
+//		catch (const exception & e)
+//		{
+//			stringstream ss;
+//			ss << "drop_bad_phi() error : " << e.what();
+//			throw_em_error(ss.str());
+//		}
+//		catch (...)
+//		{
+//			throw_em_error(string("drop_bad_phi() error"));
+//		}
+//	}
+//}
 
-	Eigen::MatrixXd ivec, upgrade_1, s, V, U, st;
-	SVD_REDSVD rsvd;
-	//SVD_EIGEN rsvd;
-	rsvd.set_performance_log(performance_log);
-
-	rsvd.solve_ip(par_diff, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-	par_diff.resize(0, 0);
-	Eigen::MatrixXd temp = s.asDiagonal();
-	Eigen::MatrixXd Am = U * temp;
-	return Am;
-}
-
-void DataAssimilator::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, bool is_subset)
-{
-	//don't use this assert because _pe maybe full size, but _oe might be subset size
-	if (!is_subset)
-		if (_pe.shape().first != _oe.shape().first)
-			throw_da_error("DataAssimilator::drop_bad_phi() error: _pe != _oe and not subset");
-
-	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
-	double bad_phi_sigma = pest_scenario.get_pestpp_options().get_ies_bad_phi_sigma();
-	vector<int> idxs = ph.get_idxs_greater_than(bad_phi, bad_phi_sigma, _oe);
-
-	if (pest_scenario.get_pestpp_options().get_ies_debug_bad_phi())
-		idxs.push_back(0);
-
-	if (idxs.size() > 0)
-	{
-
-		message(0, "dropping realizations as bad: ", idxs.size());
-
-		vector<string> par_real_names = _pe.get_real_names(), obs_real_names = _oe.get_real_names();
-		stringstream ss;
-		string pname;
-		string oname;
-
-		int pidx;
-		vector<string> full_onames, full_pnames;
-		// if a subset drop, then use the full oe index, otherwise, just use _oe index
-		/*if (_oe.shape().first != _pe.shape().first)
-		{
-			full_onames = oe.get_real_names();
-		}
-		else
-		{
-			full_onames = _oe.get_real_names();
-		}*/
-		full_onames = oe.get_real_names();
-		full_pnames = pe.get_real_names();
-		vector<string> pdrop, odrop;
-		for (auto i : idxs)
-		{
-			oname = obs_real_names[i];
-
-			if (is_subset)
-			{
-				pidx = find(full_onames.begin(), full_onames.end(), oname) - full_onames.begin();
-				if (find(subset_idxs.begin(), subset_idxs.end(), pidx) == subset_idxs.end())
-				{
-					ss.str("");
-					ss << "drop_bad_phi() error: idx " << pidx << " not found in subset_idxs";
-					throw_da_error(ss.str());
-				}
-				pname = full_pnames[pidx];
-			}
-			else
-			{
-				pidx = i;
-				pname = par_real_names[pidx];
-			}
-			ss << pname << " : " << obs_real_names[i] << " , ";
-			pdrop.push_back(pname);
-			odrop.push_back(obs_real_names[i]);
-		}
-
-		string s = "dropping par:obs realizations: " + ss.str();
-		message(1, s);
-		try
-		{
-			_pe.drop_rows(pdrop);
-			_oe.drop_rows(odrop);
-		}
-		catch (const exception & e)
-		{
-			stringstream ss;
-			ss << "drop_bad_phi() error : " << e.what();
-			throw_da_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_da_error(string("drop_bad_phi() error"));
-		}
-	}
-}
-
-void DataAssimilator::save_mat(string prefix, Eigen::MatrixXd& mat)
-{
-	stringstream ss;
-	ss << iter << '.' << prefix;
-	try
-	{
-		ofstream& f = file_manager.open_ofile_ext(ss.str());
-		f << mat << endl;
-		f.close();
-		file_manager.close_file(ss.str());
-	}
-	catch (...)
-	{
-		message(1, "error saving matrix", ss.str());
-	}
-}
+//void DataAssimilator::save_mat(string prefix, Eigen::MatrixXd& mat)
+//{
+//	stringstream ss;
+//	ss << iter << '.' << prefix;
+//	try
+//	{
+//		ofstream& f = file_manager.open_ofile_ext(ss.str());
+//		f << mat << endl;
+//		f.close();
+//		file_manager.close_file(ss.str());
+//	}
+//	catch (...)
+//	{
+//		message(1, "error saving matrix", ss.str());
+//	}
+//}
 
 void DataAssimilator::da_upate()
 {
@@ -2565,69 +2565,69 @@ void DataAssimilator::kf_upate()
 	
 }
 
-bool DataAssimilator::should_terminate()
-{
-	//todo: use ies accept fac here?
-	double phiredstp = pest_scenario.get_control_info().phiredstp;
-	int nphistp = pest_scenario.get_control_info().nphistp;
-	int nphinored = pest_scenario.get_control_info().nphinored;
-	bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
-	double phi, ratio;
-	int count = 0;
-	int nphired = 0;
-	//best_mean_phis = vector<double>{ 1.0,0.8,0.81,0.755,1.1,0.75,0.75,1.2 };
-
-
-
-	/*if ((!consec_sat )&& (best_mean_phis.size() == 0))
-		return false;*/
-	message(0, "phi-based termination criteria check");
-	message(1, "phiredstp: ", phiredstp);
-	message(1, "nphistp: ", nphistp);
-	message(1, "nphinored (also used for consecutive bad lambda cycles): ", nphinored);
-	if (best_mean_phis.size() > 0)
-	{
-		vector<double>::iterator idx = min_element(best_mean_phis.begin(), best_mean_phis.end());
-		nphired = (best_mean_phis.end() - idx) - 1;
-		best_phi_yet = best_mean_phis[idx - best_mean_phis.begin()];// *pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
-		message(1, "best mean phi sequence: ", best_mean_phis);
-		message(1, "best phi yet: ", best_phi_yet);
-	}
-	message(1, "number of consecutive bad lambda testing cycles: ", consec_bad_lambda_cycles);
-	if (consec_bad_lambda_cycles >= nphinored)
-	{
-		message(1, "number of consecutive bad lambda testing cycles > nphinored");
-		consec_sat = true;
-	}
-
-	for (auto& phi : best_mean_phis)
-	{
-		ratio = (phi - best_phi_yet) / phi;
-		if (ratio <= phiredstp)
-			count++;
-	}
-	message(1, "number of iterations satisfying phiredstp criteria: ", count);
-	if (count >= nphistp)
-	{
-		message(1, "number iterations satisfying phiredstp criteria > nphistp");
-		phiredstp_sat = true;
-	}
-
-	message(1, "number of iterations since best yet mean phi: ", nphired);
-	if (nphired >= nphinored)
-	{
-		message(1, "number of iterations since best yet mean phi > nphinored");
-		nphinored_sat = true;
-	}
-
-	if ((nphinored_sat) || (phiredstp_sat) || (consec_sat))
-	{
-		message(1, "phi-based termination criteria satisfied, all done");
-		return true;
-	}
-	return false;
-}
-
+//bool DataAssimilator::should_terminate()
+//{
+//	//todo: use ies accept fac here?
+//	double phiredstp = pest_scenario.get_control_info().phiredstp;
+//	int nphistp = pest_scenario.get_control_info().nphistp;
+//	int nphinored = pest_scenario.get_control_info().nphinored;
+//	bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
+//	double phi, ratio;
+//	int count = 0;
+//	int nphired = 0;
+//	//best_mean_phis = vector<double>{ 1.0,0.8,0.81,0.755,1.1,0.75,0.75,1.2 };
+//
+//
+//
+//	/*if ((!consec_sat )&& (best_mean_phis.size() == 0))
+//		return false;*/
+//	message(0, "phi-based termination criteria check");
+//	message(1, "phiredstp: ", phiredstp);
+//	message(1, "nphistp: ", nphistp);
+//	message(1, "nphinored (also used for consecutive bad lambda cycles): ", nphinored);
+//	if (best_mean_phis.size() > 0)
+//	{
+//		vector<double>::iterator idx = min_element(best_mean_phis.begin(), best_mean_phis.end());
+//		nphired = (best_mean_phis.end() - idx) - 1;
+//		best_phi_yet = best_mean_phis[idx - best_mean_phis.begin()];// *pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
+//		message(1, "best mean phi sequence: ", best_mean_phis);
+//		message(1, "best phi yet: ", best_phi_yet);
+//	}
+//	message(1, "number of consecutive bad lambda testing cycles: ", consec_bad_lambda_cycles);
+//	if (consec_bad_lambda_cycles >= nphinored)
+//	{
+//		message(1, "number of consecutive bad lambda testing cycles > nphinored");
+//		consec_sat = true;
+//	}
+//
+//	for (auto& phi : best_mean_phis)
+//	{
+//		ratio = (phi - best_phi_yet) / phi;
+//		if (ratio <= phiredstp)
+//			count++;
+//	}
+//	message(1, "number of iterations satisfying phiredstp criteria: ", count);
+//	if (count >= nphistp)
+//	{
+//		message(1, "number iterations satisfying phiredstp criteria > nphistp");
+//		phiredstp_sat = true;
+//	}
+//
+//	message(1, "number of iterations since best yet mean phi: ", nphired);
+//	if (nphired >= nphinored)
+//	{
+//		message(1, "number of iterations since best yet mean phi > nphinored");
+//		nphinored_sat = true;
+//	}
+//
+//	if ((nphinored_sat) || (phiredstp_sat) || (consec_sat))
+//	{
+//		message(1, "phi-based termination criteria satisfied, all done");
+//		return true;
+//	}
+//	return false;
+//}
+//
 
 
 
@@ -3820,66 +3820,66 @@ LocalUpgradeThread_da::LocalUpgradeThread_da(PerformanceLog* _performance_log, u
 //
 //}
 
-void DataAssimilator::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
-{
-
-	vector<string> oe_names = _oe.get_real_names();
-	vector<string> pe_names = _pe.get_real_names();
-	vector<string> oe_base_names = oe.get_real_names();
-	vector<string> pe_base_names = pe.get_real_names();
-
-	//if (pe_names.size() != oe_base_names.size())
-	//	throw runtime_error("DataAssimilator::update_reals_by_phi() error: pe_names != oe_base_names");
-	map<string, int> oe_name_to_idx;
-	map<int, string> pe_idx_to_name;
-
-	for (int i = 0; i < oe_base_names.size(); i++)
-		oe_name_to_idx[oe_base_names[i]] = i;
-
-	for (int i = 0; i < pe_base_names.size(); i++)
-		pe_idx_to_name[i] = pe_base_names[i];
-	//store map of current phi values
-	ph.update(oe, pe);
-	L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
-	map<string, double>* phi_map = ph.get_phi_map_ptr(pt);
-	map<string, double> cur_phi_map;
-	for (auto p : *phi_map)
-		cur_phi_map[p.first] = p.second;
-
-	//now get a phi map of the new phi values
-	ph.update(_oe, _pe);
-	phi_map = ph.get_phi_map_ptr(pt);
-
-	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
-	double cur_phi, new_phi;
-	string oname, pname;
-	Eigen::VectorXd real;
-	stringstream ss;
-	for (int i = 0; i < _oe.shape().first; i++)
-	{
-		oname = oe_names[i];
-		new_phi = phi_map->at(oname);
-		cur_phi = cur_phi_map.at(oname);
-		if (new_phi < cur_phi * acc_fac)
-		{
-			//pname = pe_names[i];
-			//pname = pe_names[oe_name_to_idx[oname]];
-			pname = pe_idx_to_name[oe_name_to_idx[oname]];
-			if (find(pe_names.begin(), pe_names.end(), pname) == pe_names.end())
-				throw runtime_error("DataAssimilator::update_reals_by_phi() error: pname not in pe_names: " + pname);
-			ss.str("");
-			ss << "updating pe:oe real =" << pname << ":" << oname << ", current phi: new phi  =" << cur_phi << ":" << new_phi;
-			message(3, ss.str());
-
-			real = _pe.get_real_vector(pname);
-			pe.update_real_ip(pname, real);
-			real = _oe.get_real_vector(oname);
-			oe.update_real_ip(oname, real);
-		}
-	}
-	ph.update(oe, pe);
-
-}
+//void DataAssimilator::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
+//{
+//
+//	vector<string> oe_names = _oe.get_real_names();
+//	vector<string> pe_names = _pe.get_real_names();
+//	vector<string> oe_base_names = oe.get_real_names();
+//	vector<string> pe_base_names = pe.get_real_names();
+//
+//	//if (pe_names.size() != oe_base_names.size())
+//	//	throw runtime_error("DataAssimilator::update_reals_by_phi() error: pe_names != oe_base_names");
+//	map<string, int> oe_name_to_idx;
+//	map<int, string> pe_idx_to_name;
+//
+//	for (int i = 0; i < oe_base_names.size(); i++)
+//		oe_name_to_idx[oe_base_names[i]] = i;
+//
+//	for (int i = 0; i < pe_base_names.size(); i++)
+//		pe_idx_to_name[i] = pe_base_names[i];
+//	//store map of current phi values
+//	ph.update(oe, pe);
+//	L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
+//	map<string, double>* phi_map = ph.get_phi_map_ptr(pt);
+//	map<string, double> cur_phi_map;
+//	for (auto p : *phi_map)
+//		cur_phi_map[p.first] = p.second;
+//
+//	//now get a phi map of the new phi values
+//	ph.update(_oe, _pe);
+//	phi_map = ph.get_phi_map_ptr(pt);
+//
+//	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
+//	double cur_phi, new_phi;
+//	string oname, pname;
+//	Eigen::VectorXd real;
+//	stringstream ss;
+//	for (int i = 0; i < _oe.shape().first; i++)
+//	{
+//		oname = oe_names[i];
+//		new_phi = phi_map->at(oname);
+//		cur_phi = cur_phi_map.at(oname);
+//		if (new_phi < cur_phi * acc_fac)
+//		{
+//			//pname = pe_names[i];
+//			//pname = pe_names[oe_name_to_idx[oname]];
+//			pname = pe_idx_to_name[oe_name_to_idx[oname]];
+//			if (find(pe_names.begin(), pe_names.end(), pname) == pe_names.end())
+//				throw runtime_error("DataAssimilator::update_reals_by_phi() error: pname not in pe_names: " + pname);
+//			ss.str("");
+//			ss << "updating pe:oe real =" << pname << ":" << oname << ", current phi: new phi  =" << cur_phi << ":" << new_phi;
+//			message(3, ss.str());
+//
+//			real = _pe.get_real_vector(pname);
+//			pe.update_real_ip(pname, real);
+//			real = _oe.get_real_vector(oname);
+//			oe.update_real_ip(oname, real);
+//		}
+//	}
+//	ph.update(oe, pe);
+//
+//}
 
 ParameterEnsemble DataAssimilator::calc_kf_upgrade(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map)
 {
@@ -4030,7 +4030,7 @@ bool DataAssimilator::solve_new_da()
 	{
 		message(0, "too few active realizations:", oe.shape().first);
 		message(1, "need at least ", error_min_reals);
-		throw_da_error(string("too few active realizations, cannot continue"));
+		throw_em_error(string("too few active realizations, cannot continue"));
 	}
 	if (pe.shape().first < warn_min_reals)
 	{
@@ -4219,7 +4219,7 @@ bool DataAssimilator::solve_new_da()
 	if (pest_scenario.get_pestpp_options().get_ies_debug_upgrade_only())
 	{
 		message(0, "ies_debug_upgrade_only is true, exiting");
-		throw_da_error("ies_debug_upgrade_only is true, exiting");
+		throw_em_error("ies_debug_upgrade_only is true, exiting");
 	}
 
 	//  =============== forward runs to test lams and scales ==================
@@ -4503,7 +4503,7 @@ bool DataAssimilator::solve_new_da()
 
 			//if any of the remaining runs failed
 			if (fails.size() == org_pe_idxs.size())
-				throw_da_error(string("all remaining realizations failed...something is prob wrong"));
+				throw_em_error(string("all remaining realizations failed...something is prob wrong"));
 			if (fails.size() > 0)
 			{
 
@@ -4537,7 +4537,7 @@ bool DataAssimilator::solve_new_da()
 			drop_bad_phi(pe_lams[best_idx], oe_lam_best);
 			if (oe_lam_best.shape().first == 0)
 			{
-				throw_da_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
+				throw_em_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
 			}
 			performance_log->log_event("updating phi");
 			ph.update(oe_lam_best, pe_lams[best_idx]);
@@ -5043,50 +5043,50 @@ ParameterEnsemble DataAssimilator::kf_work(PerformanceLog* performance_log, unor
 
 
 
-void DataAssimilator::report_and_save()
-{
-	ofstream& frec = file_manager.rec_ofstream();
-	frec << endl << "  ---  DataAssimilator iteration " << iter << " report  ---  " << endl;
-	frec << "   number of active realizations:  " << pe.shape().first << endl;
-	frec << "   number of model runs:           " << run_mgr_ptr->get_total_runs() << endl;
-
-	cout << endl << "  ---  DataAssimilator iteration " << iter << " report  ---  " << endl;
-	cout << "   number of active realizations:   " << pe.shape().first << endl;
-	cout << "   number of model runs:            " << run_mgr_ptr->get_total_runs() << endl;
-
-	stringstream ss;
-	if (pest_scenario.get_pestpp_options().get_save_binary())
-	{
-		ss << file_manager.get_base_filename() << "." << iter << ".obs.jcb";
-		oe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << "." << iter << ".obs.csv";
-		oe.to_csv(ss.str());
-	}
-	frec << "      current obs ensemble saved to " << ss.str() << endl;
-	cout << "      current obs ensemble saved to " << ss.str() << endl;
-	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_save_binary())
-	{
-		ss << file_manager.get_base_filename() << "." << iter << ".par.jcb";
-		pe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
-		pe.to_csv(ss.str());
-	}
-	//ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
-	//pe.to_csv(ss.str());
-	frec << "      current par ensemble saved to " << ss.str() << endl;
-	cout << "      current par ensemble saved to " << ss.str() << endl;
-
-
-
-}
-
+//void DataAssimilator::report_and_save()
+//{
+//	ofstream& frec = file_manager.rec_ofstream();
+//	frec << endl << "  ---  DataAssimilator iteration " << iter << " report  ---  " << endl;
+//	frec << "   number of active realizations:  " << pe.shape().first << endl;
+//	frec << "   number of model runs:           " << run_mgr_ptr->get_total_runs() << endl;
+//
+//	cout << endl << "  ---  DataAssimilator iteration " << iter << " report  ---  " << endl;
+//	cout << "   number of active realizations:   " << pe.shape().first << endl;
+//	cout << "   number of model runs:            " << run_mgr_ptr->get_total_runs() << endl;
+//
+//	stringstream ss;
+//	if (pest_scenario.get_pestpp_options().get_save_binary())
+//	{
+//		ss << file_manager.get_base_filename() << "." << iter << ".obs.jcb";
+//		oe.to_binary(ss.str());
+//	}
+//	else
+//	{
+//		ss << file_manager.get_base_filename() << "." << iter << ".obs.csv";
+//		oe.to_csv(ss.str());
+//	}
+//	frec << "      current obs ensemble saved to " << ss.str() << endl;
+//	cout << "      current obs ensemble saved to " << ss.str() << endl;
+//	ss.str("");
+//	if (pest_scenario.get_pestpp_options().get_save_binary())
+//	{
+//		ss << file_manager.get_base_filename() << "." << iter << ".par.jcb";
+//		pe.to_binary(ss.str());
+//	}
+//	else
+//	{
+//		ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
+//		pe.to_csv(ss.str());
+//	}
+//	//ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
+//	//pe.to_csv(ss.str());
+//	frec << "      current par ensemble saved to " << ss.str() << endl;
+//	cout << "      current par ensemble saved to " << ss.str() << endl;
+//
+//
+//
+//}
+//
 
 void DataAssimilator::set_subset_idx(int size)
 {
@@ -5174,7 +5174,7 @@ void DataAssimilator::set_subset_idx(int size)
 			subset_idxs.push_back(idx);
 		}
 		if (subset_idxs.size() != nreal_subset)
-			throw_da_error("max iterations exceeded when trying to find random subset idxs");
+			throw_em_error("max iterations exceeded when trying to find random subset idxs");
 
 	}
 	else if (how == "PHI_BASED")
@@ -5241,7 +5241,7 @@ void DataAssimilator::set_subset_idx(int size)
 	else
 	{
 		//throw runtime_error("unkonwn 'subset_how'");
-		throw_da_error("unknown 'subset_how'");
+		throw_em_error("unknown 'subset_how'");
 	}
 	stringstream ss;
 	for (auto i : subset_idxs)
@@ -5251,221 +5251,221 @@ void DataAssimilator::set_subset_idx(int size)
 	//return subset_idx_map;
 }
 
-vector<ObservationEnsemble> DataAssimilator::run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals)
-{
-	ofstream& frec = file_manager.rec_ofstream();
-	stringstream ss;
-	ss << "queuing " << pe_lams.size() << " ensembles";
-	performance_log->log_event(ss.str());
-	run_mgr_ptr->reinitialize();
-
-	set_subset_idx(pe_lams[0].shape().first); // get realization index to test tuning parameters
-	vector<map<int, int>> real_run_ids_vec;
-	//ParameterEnsemble pe_lam;
-	//for (int i=0;i<pe_lams.size();i++)
-	for (auto& pe_lam : pe_lams)
-	{
-		try
-		{
-			real_run_ids_vec.push_back(pe_lam.add_runs(run_mgr_ptr, subset_idxs,icycle));
-		}
-		catch (const exception & e)
-		{
-			stringstream ss;
-			ss << "run_ensemble() error queueing runs: " << e.what();
-			throw_da_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_da_error(string("run_ensembles() error queueing runs"));
-		}
-	}
-	performance_log->log_event("making runs");
-	try
-	{
-
-		run_mgr_ptr->run();
-	}
-	catch (const exception & e)
-	{
-		stringstream ss;
-		ss << "error running ensembles: " << e.what();
-		throw_da_error(ss.str());
-	}
-	catch (...)
-	{
-		throw_da_error(string("error running ensembles"));
-	}
-
-	performance_log->log_event("processing runs");
-	vector<int> failed_real_indices;
-	vector<ObservationEnsemble> obs_lams;
-	//ObservationEnsemble _oe = oe;//copy
-	//if (subset_size < pe_lams[0].shape().first)
-	//	_oe.keep_rows(subset_idxs);
-	map<int, int> real_run_ids;
-	//for (auto &real_run_ids : real_run_ids_vec)
-	for (int i = 0; i < pe_lams.size(); i++)
-	{
-		ObservationEnsemble _oe = oe;//copy
-		vector<double> rep_vals{ lam_vals[i],scale_vals[i] };
-		real_run_ids = real_run_ids_vec[i];
-		//if using subset, reset the real_idx in real_run_ids to be just simple counter
-		if (subset_size < pe_lams[0].shape().first)
-		{
-			_oe.keep_rows(subset_idxs);
-			int ireal = 0;
-			map<int, int> temp;
-			for (auto& rri : real_run_ids)
-			{
-				temp[ireal] = rri.second;
-				ireal++;
-			}
-
-			real_run_ids = temp;
-		}
-
-		try
-		{
-			failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr);
-		}
-		catch (const exception & e)
-		{
-			stringstream ss;
-			ss << "error processing runs for lambda,scale: " << lam_vals[i] << ',' << scale_vals[i] << ':' << e.what();
-			throw_da_error(ss.str());
-		}
-		catch (...)
-		{
-			stringstream ss;
-			ss << "error processing runs for lambda,scale: " << lam_vals[i] << ',' << scale_vals[i];
-			throw_da_error(ss.str());
-		}
-
-		if (pest_scenario.get_pestpp_options().get_ies_debug_fail_subset())
-			failed_real_indices.push_back(real_run_ids.size() - 1);
-
-		if (failed_real_indices.size() > 0)
-		{
-			stringstream ss;
-			vector<string> par_real_names = pe.get_real_names();
-			vector<string> obs_real_names = oe.get_real_names();
-			vector<string> failed_par_names, failed_obs_names;
-			string oname, pname;
-			ss << "the following par:obs realization runs failed for lambda,scale " << lam_vals[i] << ',' << scale_vals[i] << "-->";
-			for (auto& i : failed_real_indices)
-			{
-				pname = par_real_names[subset_idxs[i]];
-				oname = obs_real_names[subset_idxs[i]];
-				failed_par_names.push_back(pname);
-				failed_obs_names.push_back(oname);
-				ss << pname << ":" << oname << ',';
-			}
-			string s = ss.str();
-			message(1, s);
-			if (failed_real_indices.size() == _oe.shape().first)
-			{
-				message(0, "WARNING: all realizations failed for lambda, scale :", rep_vals);
-				_oe = ObservationEnsemble();
-
-			}
-			else
-			{
-				performance_log->log_event("dropping failed realizations");
-				//_oe.drop_rows(failed_real_indices);
-				//pe_lams[i].drop_rows(failed_real_indices);
-				_oe.drop_rows(failed_obs_names);
-				pe_lams[i].drop_rows(failed_par_names);
-			}
-
-		}
-		obs_lams.push_back(_oe);
-	}
-	return obs_lams;
-}
-
-
-vector<int> DataAssimilator::run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs)
-{
-	stringstream ss;
-	ss << "queuing " << _pe.shape().first << " runs";
-	performance_log->log_event(ss.str());
-	run_mgr_ptr->reinitialize();
-	map<int, int> real_run_ids;
-	try
-	{
-		real_run_ids = _pe.add_runs(run_mgr_ptr, real_idxs,icycle);
-	}
-	catch (const exception & e)
-	{
-		stringstream ss;
-		ss << "run_ensemble() error queueing runs: " << e.what();
-		throw_da_error(ss.str());
-	}
-	catch (...)
-	{
-		throw_da_error(string("run_ensemble() error queueing runs"));
-	}
-	performance_log->log_event("making runs");
-	try
-	{
-		run_mgr_ptr->run();
-	}
-	catch (const exception & e)
-	{
-		stringstream ss;
-		ss << "error running ensemble: " << e.what();
-		throw_da_error(ss.str());
-	}
-	catch (...)
-	{
-		throw_da_error(string("error running ensemble"));
-	}
-
-	performance_log->log_event("processing runs");
-	if (real_idxs.size() > 0)
-	{
-		_oe.keep_rows(real_idxs);
-	}
-	vector<int> failed_real_indices;
-	try
-	{
-		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr);
-	}
-	catch (const exception & e)
-	{
-		stringstream ss;
-		ss << "error processing runs: " << e.what();
-		throw_da_error(ss.str());
-	}
-	catch (...)
-	{
-		throw_da_error(string("error processing runs"));
-	}
-	//for testing
-	//failed_real_indices.push_back(0);
-
-	if (failed_real_indices.size() > 0)
-	{
-		stringstream ss;
-		vector<string> par_real_names = _pe.get_real_names();
-		vector<string> obs_real_names = _oe.get_real_names();
-		ss << "the following par:obs realization runs failed: ";
-		for (auto& i : failed_real_indices)
-		{
-			ss << par_real_names[i] << ":" << obs_real_names[i] << ',';
-		}
-		performance_log->log_event(ss.str());
-		message(1, "failed realizations: ", failed_real_indices.size());
-		string s = ss.str();
-		message(1, s);
-		performance_log->log_event("dropping failed realizations");
-		_pe.drop_rows(failed_real_indices);
-		_oe.drop_rows(failed_real_indices);
-	}
-	return failed_real_indices;
-}
-
+//vector<ObservationEnsemble> DataAssimilator::run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals)
+//{
+//	ofstream& frec = file_manager.rec_ofstream();
+//	stringstream ss;
+//	ss << "queuing " << pe_lams.size() << " ensembles";
+//	performance_log->log_event(ss.str());
+//	run_mgr_ptr->reinitialize();
+//
+//	set_subset_idx(pe_lams[0].shape().first); // get realization index to test tuning parameters
+//	vector<map<int, int>> real_run_ids_vec;
+//	//ParameterEnsemble pe_lam;
+//	//for (int i=0;i<pe_lams.size();i++)
+//	for (auto& pe_lam : pe_lams)
+//	{
+//		try
+//		{
+//			real_run_ids_vec.push_back(pe_lam.add_runs(run_mgr_ptr, subset_idxs,icycle));
+//		}
+//		catch (const exception & e)
+//		{
+//			stringstream ss;
+//			ss << "run_ensemble() error queueing runs: " << e.what();
+//			throw_em_error(ss.str());
+//		}
+//		catch (...)
+//		{
+//			throw_em_error(string("run_ensembles() error queueing runs"));
+//		}
+//	}
+//	performance_log->log_event("making runs");
+//	try
+//	{
+//
+//		run_mgr_ptr->run();
+//	}
+//	catch (const exception & e)
+//	{
+//		stringstream ss;
+//		ss << "error running ensembles: " << e.what();
+//		throw_em_error(ss.str());
+//	}
+//	catch (...)
+//	{
+//		throw_em_error(string("error running ensembles"));
+//	}
+//
+//	performance_log->log_event("processing runs");
+//	vector<int> failed_real_indices;
+//	vector<ObservationEnsemble> obs_lams;
+//	//ObservationEnsemble _oe = oe;//copy
+//	//if (subset_size < pe_lams[0].shape().first)
+//	//	_oe.keep_rows(subset_idxs);
+//	map<int, int> real_run_ids;
+//	//for (auto &real_run_ids : real_run_ids_vec)
+//	for (int i = 0; i < pe_lams.size(); i++)
+//	{
+//		ObservationEnsemble _oe = oe;//copy
+//		vector<double> rep_vals{ lam_vals[i],scale_vals[i] };
+//		real_run_ids = real_run_ids_vec[i];
+//		//if using subset, reset the real_idx in real_run_ids to be just simple counter
+//		if (subset_size < pe_lams[0].shape().first)
+//		{
+//			_oe.keep_rows(subset_idxs);
+//			int ireal = 0;
+//			map<int, int> temp;
+//			for (auto& rri : real_run_ids)
+//			{
+//				temp[ireal] = rri.second;
+//				ireal++;
+//			}
+//
+//			real_run_ids = temp;
+//		}
+//
+//		try
+//		{
+//			failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr);
+//		}
+//		catch (const exception & e)
+//		{
+//			stringstream ss;
+//			ss << "error processing runs for lambda,scale: " << lam_vals[i] << ',' << scale_vals[i] << ':' << e.what();
+//			throw_em_error(ss.str());
+//		}
+//		catch (...)
+//		{
+//			stringstream ss;
+//			ss << "error processing runs for lambda,scale: " << lam_vals[i] << ',' << scale_vals[i];
+//			throw_em_error(ss.str());
+//		}
+//
+//		if (pest_scenario.get_pestpp_options().get_ies_debug_fail_subset())
+//			failed_real_indices.push_back(real_run_ids.size() - 1);
+//
+//		if (failed_real_indices.size() > 0)
+//		{
+//			stringstream ss;
+//			vector<string> par_real_names = pe.get_real_names();
+//			vector<string> obs_real_names = oe.get_real_names();
+//			vector<string> failed_par_names, failed_obs_names;
+//			string oname, pname;
+//			ss << "the following par:obs realization runs failed for lambda,scale " << lam_vals[i] << ',' << scale_vals[i] << "-->";
+//			for (auto& i : failed_real_indices)
+//			{
+//				pname = par_real_names[subset_idxs[i]];
+//				oname = obs_real_names[subset_idxs[i]];
+//				failed_par_names.push_back(pname);
+//				failed_obs_names.push_back(oname);
+//				ss << pname << ":" << oname << ',';
+//			}
+//			string s = ss.str();
+//			message(1, s);
+//			if (failed_real_indices.size() == _oe.shape().first)
+//			{
+//				message(0, "WARNING: all realizations failed for lambda, scale :", rep_vals);
+//				_oe = ObservationEnsemble();
+//
+//			}
+//			else
+//			{
+//				performance_log->log_event("dropping failed realizations");
+//				//_oe.drop_rows(failed_real_indices);
+//				//pe_lams[i].drop_rows(failed_real_indices);
+//				_oe.drop_rows(failed_obs_names);
+//				pe_lams[i].drop_rows(failed_par_names);
+//			}
+//
+//		}
+//		obs_lams.push_back(_oe);
+//	}
+//	return obs_lams;
+//}
+//
+//
+//vector<int> DataAssimilator::run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs)
+//{
+//	stringstream ss;
+//	ss << "queuing " << _pe.shape().first << " runs";
+//	performance_log->log_event(ss.str());
+//	run_mgr_ptr->reinitialize();
+//	map<int, int> real_run_ids;
+//	try
+//	{
+//		real_run_ids = _pe.add_runs(run_mgr_ptr, real_idxs,icycle);
+//	}
+//	catch (const exception & e)
+//	{
+//		stringstream ss;
+//		ss << "run_ensemble() error queueing runs: " << e.what();
+//		throw_em_error(ss.str());
+//	}
+//	catch (...)
+//	{
+//		throw_em_error(string("run_ensemble() error queueing runs"));
+//	}
+//	performance_log->log_event("making runs");
+//	try
+//	{
+//		run_mgr_ptr->run();
+//	}
+//	catch (const exception & e)
+//	{
+//		stringstream ss;
+//		ss << "error running ensemble: " << e.what();
+//		throw_em_error(ss.str());
+//	}
+//	catch (...)
+//	{
+//		throw_em_error(string("error running ensemble"));
+//	}
+//
+//	performance_log->log_event("processing runs");
+//	if (real_idxs.size() > 0)
+//	{
+//		_oe.keep_rows(real_idxs);
+//	}
+//	vector<int> failed_real_indices;
+//	try
+//	{
+//		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr);
+//	}
+//	catch (const exception & e)
+//	{
+//		stringstream ss;
+//		ss << "error processing runs: " << e.what();
+//		throw_em_error(ss.str());
+//	}
+//	catch (...)
+//	{
+//		throw_em_error(string("error processing runs"));
+//	}
+//	//for testing
+//	//failed_real_indices.push_back(0);
+//
+//	if (failed_real_indices.size() > 0)
+//	{
+//		stringstream ss;
+//		vector<string> par_real_names = _pe.get_real_names();
+//		vector<string> obs_real_names = _oe.get_real_names();
+//		ss << "the following par:obs realization runs failed: ";
+//		for (auto& i : failed_real_indices)
+//		{
+//			ss << par_real_names[i] << ":" << obs_real_names[i] << ',';
+//		}
+//		performance_log->log_event(ss.str());
+//		message(1, "failed realizations: ", failed_real_indices.size());
+//		string s = ss.str();
+//		message(1, s);
+//		performance_log->log_event("dropping failed realizations");
+//		_pe.drop_rows(failed_real_indices);
+//		_oe.drop_rows(failed_real_indices);
+//	}
+//	return failed_real_indices;
+//}
+//
 
 void DataAssimilator::finalize()
 {
