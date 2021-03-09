@@ -2626,7 +2626,7 @@ void Pest::child_pest_update(int icycle)
 		}
 	}
 	n_adj_par = new_n_adj_par;
-	this->get_pestpp_options_ptr()->set_check_tplins(false);
+	//this->get_pestpp_options_ptr()->set_check_tplins(false);
 	//get_pestpp_options_ptr->set_check_tplins(false);
 	//this.check_inputs();
 }
@@ -2754,8 +2754,7 @@ void Pest::throw_control_file_error(ofstream& f_rec,const string &message, bool 
 		cerr << ss.str();
 		f_rec.close();
 		throw runtime_error(ss.str());
-	}
-	
+	}	
 }
 
 void Pest::check_report_assignment(ofstream &f_rec, PestppOptions::ARG_STATUS stat, const string &key, const string &org_value)
