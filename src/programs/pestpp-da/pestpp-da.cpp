@@ -206,6 +206,61 @@ int main(int argc, char* argv[])
 		if (pp_args.find("OVERDUE_resched_FAC") == pp_args.end())
 			ppo->set_overdue_reched_fac(1.15);
 
+
+		//do all this up here so we can use the parse only option
+		//to check the interface and then quit
+		//process da (recurrent??) par cycle table
+		vector <int> cycles_in_tables;
+		map<int, map<string, double>> par_cycle_info = process_da_par_cycle_table(pest_scenario, cycles_in_tables, fout_rec);
+		// process da obs cycle table
+		set<string> obs_in_tbl; //we need this so we can set weights to zero in childpest of a value isnt listed for a given cycle
+		map<int, map<string, double>> obs_cycle_info = process_da_obs_cycle_table(pest_scenario, cycles_in_tables, fout_rec, obs_in_tbl);
+		//process weights table
+		set<string> weights_in_tbl;
+		map<int, map<string, double>> weight_cycle_info = process_da_weight_cycle_table(pest_scenario, 
+			cycles_in_tables, fout_rec, weights_in_tbl);
+		vector<int> assimilation_cycles;
+		//pest_scenario.get_pestpp_options
+		int n_da_cycles = ppo->da_ctl_params.get_ivalue("DA_CYCLES_NUMBER");
+		if (n_da_cycles > 0)
+		{
+			for (int i = 0; i < n_da_cycles; i++)
+			{
+				assimilation_cycles.push_back(i);
+			}
+		}
+		else
+		{
+			assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec, cycles_in_tables);
+		}
+
+
+		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
+		{
+			cout << endl;
+
+
+			cout << " >>>> Checking data in cycle " << *icycle << endl;
+			fout_rec << endl;
+			fout_rec << " >>>> Checking data in cycle " << *icycle << endl;
+
+
+			performance_log.log_event("instantiating child pest object");
+
+			Pest childPest;
+			childPest = pest_scenario.get_child_pest(*icycle);
+			childPest.check_io(fout_rec);
+			stringstream ss;
+
+			ss << "num adj par: " << childPest.get_ctl_ordered_adj_par_names().size() << ", ";
+			ss << "num nz obs: " << childPest.get_ctl_ordered_nz_obs_names().size() << ", ";
+			ss << "num tpl files: " << childPest.get_tplfile_vec().size() << ", ";
+			ss << "num ins files: " << childPest.get_insfile_vec().size() << endl;
+			cout << ss.str();
+			fout_rec << ss.str();
+
+		}
+
 		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
 		{
 			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
@@ -252,32 +307,7 @@ int main(int argc, char* argv[])
 		}
 
 
-		//process da (recurrent??) par cycle table
-		vector <int> cycles_in_tables;
 		
-		map<int, map<string, double>> par_cycle_info = process_da_par_cycle_table(pest_scenario, cycles_in_tables, fout_rec);
-		// process da obs cycle table
-		set<string> obs_in_tbl; //we need this so we can set weights to zero in childpest of a value isnt listed for a given cycle
-		map<int, map<string, double>> obs_cycle_info = process_da_obs_cycle_table(pest_scenario, cycles_in_tables, fout_rec, obs_in_tbl);
-		//process weights table
-		set<string> weights_in_tbl;
-		map<int, map<string, double>> weight_cycle_info = process_da_weight_cycle_table(pest_scenario, cycles_in_tables, fout_rec, weights_in_tbl);
-
-		vector<int> assimilation_cycles;
-		//pest_scenario.get_pestpp_options
-		int n_da_cycles = ppo->da_ctl_params.get_ivalue("DA_CYCLES_NUMBER");
-		if (n_da_cycles > 0)
-		{
-			for (int i = 0; i < n_da_cycles; i++)
-			{
-				assimilation_cycles.push_back(i);
-			}
-		}
-		else
-		{
-			assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec, cycles_in_tables);
-		}
-
 		//generate a parent ensemble which includes all parameters across all cycles
 
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
@@ -298,22 +328,7 @@ int main(int argc, char* argv[])
 
 		// check_io
 		
-		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
-		{
-			cout << endl;
-
-			
-			cout << " >>>> Checking data in cycle " << *icycle << endl;		
-			fout_rec << endl;
-			fout_rec << " >>>> Checking data in cycle " << *icycle << endl;
-			
-
-			performance_log.log_event("instantiating child pest object");
-
-			Pest childPest;
-			childPest = pest_scenario.get_child_pest(*icycle);
-			childPest.check_io(fout_rec);
-		}
+		
 
 		// loop over assimilation cycles
 		stringstream ss;

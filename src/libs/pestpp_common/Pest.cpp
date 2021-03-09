@@ -45,6 +45,7 @@ using namespace::pest_utils;
 
 Pest::Pest() : base_par_transform("PEST base_par_transform"), regul_scheme_ptr(0)
 {
+	set_defaults();
 }
 
 void Pest::set_defaults()
