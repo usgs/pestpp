@@ -1965,7 +1965,7 @@ void DataAssimilator::initialize(int _icycle)
 		performance_log->log_event("running ensemble for data assimilation cycle No." + icycle);
 		message(1, "runing ensemble of size", pe.shape().first);
 
-		vector<int> failed = run_ensemble(pe, oe);
+		vector<int> failed = run_ensemble(pe, oe, vector<int>(), icycle);
 
 		if (pe.shape().first == 0)
 			throw_em_error("all realizations failed during initial evaluation");
@@ -4253,7 +4253,7 @@ bool DataAssimilator::solve_new_da()
 			// and replace them with prior dynamic states
 			posterior_dyn_states = temp_remove_dyn_state(pe_lams);
 		}
-		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
+		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, icycle);
 	}
 	/*
 	if (dyn_states_names.size() > 0)
@@ -4483,7 +4483,7 @@ bool DataAssimilator::solve_new_da()
 				}
 
 			//oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
-			vector<int> fails = run_ensemble(pe_lams_remain[0], remaining_oe_lam);
+			vector<int> fails = run_ensemble(pe_lams_remain[0], remaining_oe_lam, vector<int>(), icycle);
 			if (false) // only no need for this here
 				if (par_dyn_state_names.size() > 0)
 				{
