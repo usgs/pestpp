@@ -2109,15 +2109,14 @@ void DataAssimilator::initialize(int _icycle)
 		message(1, "using full (MAP) update solution");
 
 	}
-
+	
+	if ((pest_scenario.get_ctl_ordered_nz_obs_names().size() == 0) || (pest_scenario.get_control_info().noptmax < 0))
+			return;
 	if (ph.get_mean(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
 	{
 		throw_em_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");
 	}
-	if (ph.get_std(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
-	{
-		throw_em_error("initial actual phi stdev too low, something is wrong...");
-	}
+	
 
 	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
