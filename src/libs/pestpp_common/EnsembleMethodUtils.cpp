@@ -3291,8 +3291,82 @@ bool EnsembleMethod::solve_new()
 	return true;
 }
 
-template<typename T, typename A>
-void EnsembleMethod::message(int level, const string& _message, vector<T, A> _extras, bool echo)
+//template<typename T, typename A>
+//void EnsembleMethod::message(int level, const string& _message, vector<T, A> _extras, bool echo)
+//{
+//	stringstream ss;
+//	if (level == 0)
+//		ss << endl << "  ---  ";
+//	else if (level == 1)
+//		ss << "...";
+//	ss << _message;
+//	if (_extras.size() > 0)
+//	{
+//
+//		for (auto& e : _extras)
+//			ss << e << " , ";
+//
+//	}
+//	if (level == 0)
+//		ss << "  ---  ";
+//	if ((echo) && ((verbose_level >= 2) || (level < 2)))
+//		cout << ss.str() << endl;
+//	file_manager.rec_ofstream() << ss.str() << endl;
+//	performance_log->log_event(_message);
+//
+//}
+
+
+void EnsembleMethod::message(int level, const string& _message, vector<string> _extras, bool echo)
+{
+	stringstream ss;
+	if (level == 0)
+		ss << endl << "  ---  ";
+	else if (level == 1)
+		ss << "...";
+	ss << _message;
+	if (_extras.size() > 0)
+	{
+
+		for (auto& e : _extras)
+			ss << e << " , ";
+
+	}
+	if (level == 0)
+		ss << "  ---  ";
+	if ((echo) && ((verbose_level >= 2) || (level < 2)))
+		cout << ss.str() << endl;
+	file_manager.rec_ofstream() << ss.str() << endl;
+	performance_log->log_event(_message);
+
+}
+
+
+void EnsembleMethod::message(int level, const string& _message, vector<int> _extras, bool echo)
+{
+	stringstream ss;
+	if (level == 0)
+		ss << endl << "  ---  ";
+	else if (level == 1)
+		ss << "...";
+	ss << _message;
+	if (_extras.size() > 0)
+	{
+
+		for (auto& e : _extras)
+			ss << e << " , ";
+
+	}
+	if (level == 0)
+		ss << "  ---  ";
+	if ((echo) && ((verbose_level >= 2) || (level < 2)))
+		cout << ss.str() << endl;
+	file_manager.rec_ofstream() << ss.str() << endl;
+	performance_log->log_event(_message);
+
+}
+
+void EnsembleMethod::message(int level, const string& _message, vector<double> _extras, bool echo)
 {
 	stringstream ss;
 	if (level == 0)
@@ -3321,14 +3395,40 @@ void EnsembleMethod::message(int level, const string& _message)
 	message(level, _message, vector<string>());
 }
 
-template<typename T>
-void EnsembleMethod::message(int level, const string& _message, T extra)
+//template<typename T>
+
+void EnsembleMethod::message(int level, const string& _message, string extra)
 {
 	stringstream ss;
 	ss << _message << " " << extra;
 	string s = ss.str();
 	message(level, s);
 }
+
+void EnsembleMethod::message(int level, const string& _message, int extra)
+{
+	stringstream ss;
+	ss << _message << " " << extra;
+	string s = ss.str();
+	message(level, s);
+}
+
+void EnsembleMethod::message(int level, const string& _message, double extra)
+{
+	stringstream ss;
+	ss << _message << " " << extra;
+	string s = ss.str();
+	message(level, s);
+}
+
+void EnsembleMethod::message(int level, const string& _message, size_t extra)
+{
+	stringstream ss;
+	ss << _message << " " << extra;
+	string s = ss.str();
+	message(level, s);
+}
+
 
 bool EnsembleMethod::initialize_pe(Covariance& cov)
 {

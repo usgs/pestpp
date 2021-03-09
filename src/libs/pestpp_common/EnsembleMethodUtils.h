@@ -263,12 +263,18 @@ public:
 	//virtual void finalize() { ; }
 	virtual void throw_em_error(string message);
 	bool should_terminate();
-	template<typename T, typename A>
-	void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
+	//template<typename T, typename A>
+	//void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
+	void message(int level, const string& _message, vector<string> _extras, bool echo = true);
+	void message(int level, const string& _message, vector<int> _extras, bool echo = true);
+	void message(int level, const string& _message, vector<double> _extras, bool echo = true);
 	void message(int level, const string& _message);
-	template<typename T>
-	void message(int level, const string& _message, T extra);
-
+	//template<typename T>
+	//void message(int level, const string& _message, T extra);
+	void message(int level, const string& _message, string extra);
+	void message(int level, const string& _message, int extra);
+	void message(int level, const string& _message, double extra);
+	void message(int level, const string& _message, size_t extra);
 
 protected:
 	string alg_tag;
