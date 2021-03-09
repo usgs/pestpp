@@ -258,11 +258,11 @@ public:
 		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 		RunManagerAbstract* _run_mgr_ptr, string _alg_tag="EnsembleMethod");
 
-	virtual void initialize() { ; }
-	virtual void iterate_2_solution() { ; }
-	virtual void finalize() { ; }
+	//virtual void initialize() { ; }
+	//virtual void iterate_2_solution() { ; }
+	//virtual void finalize() { ; }
 	virtual void throw_em_error(string message);
-	virtual bool should_terminate() { return false; }
+	//virtual bool should_terminate() { return false; }
 
 
 protected:
@@ -333,7 +333,7 @@ protected:
 	template<typename T>
 	void message(int level, const string& _message, T extra);
 
-	void sanity_checks();
+	//void sanity_checks();
 
 	void add_bases();
 

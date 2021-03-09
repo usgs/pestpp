@@ -2361,6 +2361,7 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 			ss << pest_utils::lower_cp(tag) <<  ".rei";
 			output_file_writer.write_rei(file_manager.open_ofile_ext(ss.str()), iter,
 				pest_scenario.get_ctl_observations(), obs, obj_func, pars);
+			file_manager.close_file("rei");
 		}
 		cout << "saved par and rei files for realization " << tag << " for iteration " << iter << endl;
 	}

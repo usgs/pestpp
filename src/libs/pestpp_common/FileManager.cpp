@@ -201,6 +201,22 @@ fstream &FileManager::open_iofile_local(const string &tag, const string &filenam
 	return f_new;
 }
 
+
+void FileManager::close_all_files(const std::string& partial_name)
+{
+	string lower = lower_cp(partial_name);
+	vector<string> to_close;
+	for (auto& fm : filename_map)
+	{
+		if (lower_cp(fm.second).find(lower) != string::npos)
+		{
+			to_close.push_back(fm.first);
+		}
+	}
+	for (auto tc : to_close)
+		close_file(tc);
+}
+
 void FileManager::close_file(const string &tag)
 {
 	{

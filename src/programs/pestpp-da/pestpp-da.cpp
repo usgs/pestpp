@@ -582,7 +582,7 @@ int main(int argc, char* argv[])
 			ss << ".global." << *icycle << ".oe.csv";
 			curr_oe.to_csv(file_manager.get_base_filename() + ss.str());
 
-
+			file_manager.close_all_files("phi");
 
 		} // end cycle loop
 		fout_rec.close();
