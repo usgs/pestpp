@@ -2648,6 +2648,8 @@ vector<int> Pest::get_assim_cycles(ofstream& f_rec, vector<int> unique_cycles)
 		if (curr_cycle >= 0)
 			cycles_ordered_list.push_back(curr_cycle);
 	}
+
+	
 	// get unique groups
 	for (auto curr = cycles_ordered_list.begin(); curr != cycles_ordered_list.end(); curr++) {
 		if (find(unique_cycles.begin(), unique_cycles.end(), *curr) == unique_cycles.end())
@@ -2655,6 +2657,9 @@ vector<int> Pest::get_assim_cycles(ofstream& f_rec, vector<int> unique_cycles)
 			unique_cycles.push_back(*curr);
 		}
 	}
+	if (unique_cycles.size() == 0)
+		throw_control_file_error(f_rec, "no valid cycle info found in par and obs data (possibly all '-1' cycles?)");
+
 	sort(unique_cycles.begin(), unique_cycles.end());
 	stringstream ss;
 	//to catch common non-zero-indexing

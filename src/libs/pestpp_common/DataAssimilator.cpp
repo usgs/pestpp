@@ -2189,12 +2189,26 @@ void DataAssimilator::add_dynamic_state_to_pe()
 {
 	
 	//vector<string> real_names = oe.get_real_names();
+	ParameterEnsemble::transStatus org_status = pe.get_trans_status();
+	ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
 	if (obs_dyn_state_names.size() > 0)	{	
 			
 		Eigen::MatrixXd mat = oe.get_eigen(vector<string>(), obs_dyn_state_names);
+		if (org_status == ParameterEnsemble::transStatus::NUM)
+		{
+			for (int i = 0; i < mat.rows(); i++)
+			{
+				Parameters pars = pest_scenario.get_ctl_parameters();
+				
+				pars.update(par_dyn_state_names, mat.row(i));
+				bts.ctl2numeric_ip(pars);
+				mat.row(i) = pars.get_data_eigen_vec(par_dyn_state_names);
+			}
+		}
 		pe.replace_col_vals(par_dyn_state_names, mat);
 		
 	}
+	
 }
 void DataAssimilator::initialize_dynamic_states()
 {
@@ -2214,8 +2228,8 @@ void DataAssimilator::initialize_dynamic_states()
 	{
 		
 		w = pest_scenario.get_observation_info_ptr()->get_weight(name);		
-		//if ((w == 0) & (std::count(par_names.begin(), par_names.end(), name)))
-		if ((w == 0) && (spar_names.find(name) != end))
+		//if ((w == 0) && (spar_names.find(name) != end))
+		if (spar_names.find(name) != end)
 		{
 			obs_dyn_state_names.push_back(name);
 			par_dyn_state_names.push_back(name);
@@ -2253,7 +2267,7 @@ void DataAssimilator::initialize_dynamic_states()
 			else
 			{
 				w = pest_scenario.get_observation_info_ptr()->get_weight(sm.first);
-				if (w == 0)
+				//if (w == 0)
 				{
 					obs_dyn_state_names.push_back(sm.first);
 					par_dyn_state_names.push_back(sm.second);

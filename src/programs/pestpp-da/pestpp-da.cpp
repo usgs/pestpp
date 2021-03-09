@@ -246,8 +246,8 @@ int main(int argc, char* argv[])
 
 			performance_log.log_event("instantiating child pest object");
 
-			Pest childPest;
-			childPest = pest_scenario.get_child_pest(*icycle);
+			//Pest childPest;
+			Pest childPest = pest_scenario.get_child_pest(*icycle);
 			childPest.check_io(fout_rec);
 			stringstream ss;
 
@@ -304,8 +304,6 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_additional_ins_delimiters(),
 				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
 		}
-
-
 		
 		//generate a parent ensemble which includes all parameters across all cycles
 
@@ -346,8 +344,7 @@ int main(int argc, char* argv[])
 
 			performance_log.log_event("instantiating child pest object");
 
-			Pest childPest;
-			childPest = pest_scenario.get_child_pest(*icycle);
+			Pest childPest = pest_scenario.get_child_pest(*icycle);
 
 			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);
 			output_file_writer.scenario_io_report(fout_rec);
@@ -476,7 +473,7 @@ int main(int argc, char* argv[])
 			cout << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
 			fout_rec << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
 
-			ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
+			//ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
 
 			Parameters cur_ctl_parameters = childPest.get_ctl_parameters();
 			//Allocates Space for Run Manager.  This initializes the model parameter names and observations names.
