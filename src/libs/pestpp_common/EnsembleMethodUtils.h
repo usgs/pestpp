@@ -263,6 +263,11 @@ public:
 	//virtual void finalize() { ; }
 	virtual void throw_em_error(string message);
 	//virtual bool should_terminate() { return false; }
+	template<typename T, typename A>
+	void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
+	void message(int level, const string& _message);
+	template<typename T>
+	void message(int level, const string& _message, T extra);
 
 
 protected:
@@ -326,12 +331,7 @@ protected:
 	void initialize_parcov();
 	void initialize_obscov();
 	void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, bool is_subset = false);
-	template<typename T, typename A>
-	void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
-	void message(int level, const string& _message);
-
-	template<typename T>
-	void message(int level, const string& _message, T extra);
+	
 
 	//void sanity_checks();
 
