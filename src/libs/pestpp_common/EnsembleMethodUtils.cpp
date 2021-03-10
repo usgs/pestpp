@@ -2520,6 +2520,7 @@ EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
+	iter = 0;
 
 }
 
@@ -3659,7 +3660,7 @@ void EnsembleMethod::add_bases()
 	rnames = oe.get_real_names();
 	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
-		message(1, "'base' realization already in observation ensemble, ignoring '++ies_include_base'");
+		message(1, "'base' realization already in observation ensemble, ignoring 'include_base'");
 	}
 	else
 	{

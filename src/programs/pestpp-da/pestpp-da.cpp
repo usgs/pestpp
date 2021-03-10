@@ -616,7 +616,7 @@ int main(int argc, char* argv[])
 
 			cycle_curr_pe.transform_ip(curr_pe.get_trans_status());
 			curr_pe.replace_col_vals(cycle_curr_pe.get_var_names(), *cycle_curr_pe.get_eigen_ptr());
-			curr_pe.to_csv("cncnc.csv");//to be removed 
+			
 
 			ObservationEnsemble cycle_curr_oe = da.get_oe();
 			//if we lost some realizations...
@@ -648,6 +648,9 @@ int main(int argc, char* argv[])
 			ss.str("");
 			ss << ".global." << *icycle << ".oe.csv";
 			curr_oe.to_csv(file_manager.get_base_filename() + ss.str());
+			ss.str("");
+			ss << ".global." << *icycle << ".pe.csv";
+			curr_pe.to_csv(file_manager.get_base_filename() + ss.str());
 
 			file_manager.close_all_files("phi");
 
