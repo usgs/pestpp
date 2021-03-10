@@ -3803,6 +3803,13 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		throw_em_error("ies_debug_upgrade_only is true, exiting");
 	}
 
+	//the case for all state estimation and non-iterative
+	//only one upgrade lambda and all pars are states
+	if ((pe_lams.size() == 1) && (par_dyn_state_names.size() == pe_lams[0].shape().second))
+	{
+		pe = pe_lams[0];
+	}
+
 	vector<map<int, int>> real_run_ids_lams;
 	int best_idx = -1;
 	double best_mean = 1.0e+30, best_std = 1.0e+30;
@@ -4951,6 +4958,8 @@ void EnsembleMethod::initialize_parcov()
 
 void EnsembleMethod::initialize_obscov()
 {
+	if (act_obs_names.size() == 0)
+		return;
 	message(1, "initializing observation noise covariance matrix");
 	string obscov_filename = pest_scenario.get_pestpp_options().get_obscov_filename();
 
@@ -4994,10 +5003,8 @@ void EnsembleMethod::initialize_obscov()
 			oi->set_weight(cov_names[i], min(1.0 / sqrt(diag[i]), oi->get_weight(cov_names[i])));
 		}
 	}
-	else
-	{
+	else 
 		obscov = obscov.get(act_obs_names);
-	}
 
 }
 void EnsembleMethod::zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov, bool update_oe_base)

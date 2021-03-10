@@ -23,7 +23,6 @@
 
 class IterEnsembleSmoother: public EnsembleMethod
 {
-	
 public:
 
 	using EnsembleMethod::EnsembleMethod;
