@@ -79,10 +79,10 @@ public:
 
 	using EnsembleMethod::EnsembleMethod;
 
-	void forward_run_noptmax_0(int icycle);
-	void initialize(int _icycle);
-	void da_save_ensemble_pe(string fprefix, string dtyp);
-	void da_save_ensemble_oe(string fprefix, string dtyp);
+	//void forward_run_noptmax_0(int icycle);
+	//void initialize(int _icycle);
+	//void da_save_ensemble_pe(string fprefix, string dtyp);
+	//void da_save_ensemble_oe(string fprefix, string dtyp);
 	//void add_dynamic_state_to_pe();
 	//void add_dynamic_state_to_pe();
 	

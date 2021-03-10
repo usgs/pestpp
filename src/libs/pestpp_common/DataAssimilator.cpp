@@ -1469,710 +1469,710 @@ void DataAssimilator::sanity_checks()
 //	message(0, "initialization complete");
 //}
 
-void DataAssimilator::forward_run_noptmax_0(int icycle)
-{
-	// Dry Run. No parameter update occurs. Run initial values and move to the next time cycle 
-	vector <string> dyn_states;
-	stringstream ss;
-
-	message(0, "'noptmax'=0, running control file parameter values and quitting");
-
-	Parameters pars = pest_scenario.get_ctl_parameters();
-	ParamTransformSeq pts = pe.get_par_transform();
-
-	ParameterEnsemble _pe(&pest_scenario, &rand_gen);
-	_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
-	_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
-	_pe.append(BASE_REAL_NAME, pars);
-	if (icycle == 0)
-	{
-		pe = _pe; // pe is initialized in the first cycle
-	}
-	else
-	{
-		_pe = pe;
-	}
-	string par_csv = file_manager.get_base_filename() + ".par.csv";
-	pe_base = _pe;
-	pe_base.reorder(vector<string>(), act_par_names);
-	ObservationEnsemble _oe(&pest_scenario, &rand_gen);
-	_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
-	_oe.append(BASE_REAL_NAME, pest_scenario.get_ctl_observations());
-	oe_base = _oe;
-	oe = _oe; // 
-			  // 
-	oe_base.reorder(vector<string>(), act_obs_names);
-
-	//initialize the phi handler
-	ss.str("");
-	ss << icycle << ".";
-	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, true, ss.str());
-	if (ph.get_lt_obs_names().size() > 0)
-	{
-		message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
-	}
-	if (ph.get_gt_obs_names().size())
-	{
-		message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
-	}
-	message(1, "running control file parameter values");
-
-	vector<int> failed_idxs = run_ensemble(_pe, _oe);
-	if (failed_idxs.size() != 0)
-	{
-		message(0, "control file parameter value run failed...bummer");
-		throw_em_error("control file parameter value run failed");
-	}
-	string obs_csv = file_manager.get_base_filename() + ".obs.csv";
-	message(1, "saving results from control file parameter value run to ", obs_csv);
-	_oe.to_csv(obs_csv);
-
-	ph.update(_oe, _pe);
-	message(0, "control file parameter phi report:");
-	ph.report(true);
-	ph.write(0, 1);
-	ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
-	Observations obs;
-	Eigen::VectorXd v = _oe.get_real_vector(BASE_REAL_NAME);
-	vector<double> vv;
-	vv.resize(v.size());
-	Eigen::VectorXd::Map(&vv[0], v.size()) = v;
-	obs.update(_oe.get_var_names(), vv);
-
-	// save parameters to .par file
-	output_file_writer.write_par(file_manager.open_ofile_ext("base.par"), pars, *(pts.get_offset_ptr()),
-		*(pts.get_scale_ptr()));
-	file_manager.close_file("par");
-
-	// save new residuals to .rei file
-	output_file_writer.write_rei(file_manager.open_ofile_ext("base.rei"), 0,
-		pest_scenario.get_ctl_observations(), obs, obj_func, pars);
-
-	// for models y(t+1) = g(x, y(t)), extract y(t+1) and use it as initial state for next time cycle
-	//dyn_states = get_dynamic_states();
-	//vector<string> real_names = _oe.get_real_names();
-	Eigen::MatrixXd obs_i;
-	if (obs_dyn_state_names.size() > 0) {
-		message(1, "update initial dynamic states for next time cycle. Dynamic states  matrix size is", dyn_states.size());
-
-		/*Eigen::MatrixXd mat = _oe.get_eigen(vector<string>(), obs_dyn_state_names);
-		obs_i = mat.replicate(pe.shape().first, 1);
-		cout << obs_i << endl;
-		pe.replace_col_vals(par_dyn_state_names, obs_i);*/
-		//transfer_dynamic_state_from_oe_to_pe(pe, _oe);
-	}
-	transfer_dynamic_state_from_oe_to_pe(pe, _oe);
-	oe = _oe;
-	return;
-}
-
-
-void DataAssimilator::initialize(int _icycle)
-{
-	icycle = _icycle;
-	message(0, "initializing cycle", icycle);
-	stringstream ss;
-	ofstream& f_rec = file_manager.rec_ofstream();
-	vector <string> dyn_states;
-
-	da_ctl_params = pest_scenario.get_pestpp_options().da_ctl_params;
-	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
-	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
-	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
-
-	// da type that is lower case is ok, I should move this somewhere else
-	transform(da_type.begin(), da_type.end(), da_type.begin(), ::toupper);
-	
-	//initialize_dynamic_states();
-
-	// run the model one time using the initial parameters values. 
-	if (pest_scenario.get_control_info().noptmax == 0)
-	{
-		forward_run_noptmax_0(_icycle);
-		return;
-	}
-	
-	//set some defaults
-	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
-
-	// TODO: (Ayman) We need to develop a da verbose level, for now ies is being used
-	//verbose_level = pest_scenario.get_pestpp_options_ptr()->get_ies_verbose_level();
-	verbose_level = da_ctl_params.get_ivalue("DA_VERBOSE_LEVEL");
-	if (pest_scenario.get_n_adj_par() >= 1e6)
-	{
-		message(0, "Too many parameters ... !");
-	}
-	message(1, "using REDSVD for truncated svd solve");
-	message(1, "maxsing:", pest_scenario.get_svd_info().maxsing);
-	message(1, "eigthresh: ", pest_scenario.get_svd_info().eigthresh);
-
-	message(1, "initializing localizer--");
-	use_localizer = localizer.initialize(performance_log);	
-
-	num_threads = da_ctl_params.get_ivalue("DA_NUM_THREADS");
-	if (!use_localizer)
-		message(1, "not using localization");
-	else
-	{
-		if (localizer.get_autoadaloc())
-		{
-			message(1, "using automatic adaptive localization");
-			message(2, "with autoadaloc_sigma_dist ", da_ctl_params.get_dvalue("DA_AUTOADALOC_SIGMA_DIST"));
-		}
-		if (localizer.get_filename().size() > 0)
-		{
-			message(1, "using localization matrix " + localizer.get_filename());
-			localizer.report(file_manager.rec_ofstream());
-		}
-	}
-	if ((use_localizer) && (!localizer.get_autoadaloc()))
-	{
-
-		ss.str("");
-		ss << "using localized solution with " << localizer.get_num_upgrade_steps() << " sequential upgrade steps";
-		message(1, ss.str());
-		ss.str("");
-		if (num_threads > 0)
-		{
-			ss.str("");
-			ss << "using multithreaded localization calculation with " << num_threads << " threads";
-			message(1, ss.str());
-
-		}
-		if (localizer.get_how() == Localizer::How::OBSERVATIONS)
-			message(1, "localizing by obseravtions");
-		else
-			message(1, "localizing by parameters");
-	}
-
-
-	iter = 0;
-	last_best_mean = 1.0E+30;
-	last_best_std = 1.0e+30;
-	lambda_max = 1.0E+30;
-	lambda_min = 1.0E-30;
-	warn_min_reals = 10;
-	error_min_reals = 2;
-	consec_bad_lambda_cycles = 0;
-
-	
-	// report DA paramters use
-	lam_mults = da_ctl_params.get_vvalue("DA_INFLATION_MULT");
-	infl_facs = da_ctl_params.get_vvalue("DA_INFLATION_FAC");
-	
-
-	sanity_checks();
-
-	bool echo = false;
-	if (verbose_level > 1)
-		echo = true;
-
-	// ies_use_empirical --- TODO (Ayman: check if we need to add if-statement for use only in ies
-	initialize_parcov();
-	initialize_obscov();
-
-	
-	int subset_size = da_ctl_params.get_ivalue("DA_SUBSET_SIZE");
-	reg_factor = pest_scenario.get_pestpp_options().get_ies_reg_factor(); //Todo: how this fit in da
-	message(1, "using reg_factor: ", reg_factor);
-	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
-	if (bad_phi < 1.0e+30)
-		message(1, "using bad_phi: ", bad_phi);
-	
-
-
-	int num_reals = pest_scenario.get_pestpp_options().get_da_num_reals();
-
-	
-	pe_drawn = true;
-	if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
-	{
-		message(1, "forming inverse sqrt of prior parameter covariance matrix");
-
-		if (parcov.isdiagonal())
-			parcov_inv_sqrt = parcov.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
-		else
-		{
-			message(1, "first extracting diagonal from prior parameter covariance matrix");
-			Covariance parcov_diag;
-			parcov_diag.from_diagonal(parcov);
-			parcov_inv_sqrt = parcov_diag.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
-		}
-	}
-	else {
-		message(1, "not using prior parameter covariance matrix scaling");
-	}
-
-	oe_drawn = initialize_oe(obscov);
-	string center_on = ppo->get_ies_center_on();
-	try
-	{
-		oe.check_for_dups();
-	}
-	catch (const exception & e)
-	{
-		string message = e.what();
-		throw_em_error("error in observation ensemble: " + message);
-	}
-
-	if ((act_obs_names.size() > 0) && (pe.shape().first != oe.shape().first))
-	{
-		//the special case where par en < obs en and all par reals are found in obs en...
-
-		if (pe.shape().first < oe.shape().first)
-		{
-			vector<string> oe_names = oe.get_real_names();
-			set<string> oset(oe_names.begin(), oe_names.end());
-			vector<string> missing;
-			for (auto n : pe.get_real_names())
-				if (oset.find(n) == oset.end())
-				{
-					missing.push_back(n);
-				}
-			if (missing.size() == 0)
-			{
-				ss.str("");
-				ss << "par en has " << pe.shape().first << " realizations, compared to " << oe.shape().first << " obs realizations";
-				message(1, ss.str());
-				message(1, " the realization names are compatible");
-				message(1, "re-indexing obs en to align with par en...");
-
-				oe.reorder(pe.get_real_names(), vector<string>());
-			}
-			else
-			{
-				ss.str("");
-				ss << "the following par en real names were not found in the obs en: ";
-				for (auto m : missing)
-				{
-					ss << m << ",";
-				}
-				throw_em_error(ss.str());
-
-			}
-		}
-		else
-		{
-			ss.str("");
-			ss << "parameter ensemble rows (" << pe.shape().first << ") not equal to observation ensemble rows (" << oe.shape().first << ")";
-			throw_em_error(ss.str());
-		}
-	}
-
-
-	//need this here for Am calcs...
-	//message(1, "transforming parameter ensemble to numeric");
-	//if (icycle == 0)
-		// parameters need to be transformed once ?
-	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
-
-	if (da_ctl_params.get_bvalue("DA_ADD_BASE"))
-	{
-		if (pp_args.find("DA_RESTART_OBS_EN") != pp_args.end())  // todo: think about how this restart works in da?
-		{
-			message(1, "Warning: even though `da_include_base` is true, you passed a restart obs en, not adding 'base' realization...");
-		}
-		else
-			add_bases();
-	}
-
-	//now we check to see if we need to try to align the par and obs en
-	//this would only be needed if either of these were not drawn
-	if (!pe_drawn || !oe_drawn)
-	{
-		bool aligned = pe.try_align_other_rows(performance_log, oe);
-		if (aligned)
-		{
-			message(2, "observation ensemble reordered to align rows with parameter ensemble");
-		}
-	}
-	
-	//just check to see if common real names are found but are not in the same location
-	map<string, int> pe_map = pe.get_real_map(), oe_map = oe.get_real_map();
-	vector<string> misaligned;
-	for (auto item : pe_map)
-	{
-		if (oe_map.find(item.first) == oe_map.end())
-			continue;
-		if (item.second != oe_map[item.first])
-			misaligned.push_back(item.first);
-	}
-	if (misaligned.size() > 0)
-	{
-		message(1, "WARNING: common realization names shared between the parameter and observation ensembles but they are not in the same row locations, see .rec file for listing");
-		ofstream& frec = file_manager.rec_ofstream();
-		frec << endl << "WARNING: the following " << misaligned.size() << " realization names are shared between the parameter and observation ensembles but they are not in the same row locations:" << endl;
-		for (auto ma : misaligned)
-			frec << ma << endl;
-	}
-
-	message(2, "checking for denormal values in pe");
-	//if (icycle == 0)
-	pe.check_for_normal("initial transformed parameter ensemble");
-
-	//message(1, "saved initial parameter ensemble to ", ss.str());
-	message(2, "checking for denormal values in base oe");
-	oe.check_for_normal("base observation ensemble");
-	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_save_binary())
-	{
-		ss << file_manager.get_base_filename() << ".base.obs.jcb";
-		oe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << ".base.obs.csv";
-		oe.to_csv(ss.str());
-	}
-	message(1, "saved base observation ensemble (obsval+noise) to ", ss.str());
-
-	if (center_on.size() > 0)
-	{
-		ss.str("");
-		ss << "centering on realization: '" << center_on << "' ";
-		message(1, ss.str());
-		vector<string> names = pe.get_real_names();
-		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_em_error("'ies_center_on' realization not found in par en: " + center_on);
-		names = oe.get_real_names();
-		if (find(names.begin(), names.end(), center_on) == names.end())
-			throw_em_error("'ies_center_on' realization not found in obs en: " + center_on);
-	}
-	else
-		message(1, "centering on ensemble mean vector");
-
-	// Run the ensemble mean and move to the next cycle
-	if (pest_scenario.get_control_info().noptmax == -2)
-	{
-		message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
-		message(1, "calculating mean parameter values");
-		Parameters pars;
-		vector<double> mv = pe.get_mean_stl_var_vector();
-		pars.update(pe.get_var_names(), pe.get_mean_stl_var_vector());
-		ParamTransformSeq pts = pe.get_par_transform();
-
-		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
-		_pe.reserve(vector<string>(), pe.get_var_names());
-		_pe.set_trans_status(pe.get_trans_status());
-		_pe.append("mean", pars);
-		string par_csv = file_manager.get_base_filename() + ".mean.par.csv";
-		message(1, "saving mean parameter values to ", par_csv);
-		_pe.to_csv(par_csv);
-		pe_base = _pe;
-		pe_base.reorder(vector<string>(), act_par_names);
-		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
-		_oe.reserve(vector<string>(), oe.get_var_names());
-		_oe.append("mean", pest_scenario.get_ctl_observations());
-		oe_base = _oe;
-		oe_base.reorder(vector<string>(), act_obs_names);
-		//initialize the phi handler
-		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
-		if (ph.get_lt_obs_names().size() > 0)
-		{
-			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
-		}
-		if (ph.get_gt_obs_names().size())
-		{
-			message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
-		}
-		message(1, "running mean parameter values");
-
-		vector<int> failed_idxs = run_ensemble(_pe, _oe);
-		if (failed_idxs.size() != 0)
-		{
-			message(0, "mean parameter value run failed...bummer");
-			return;
-		}
-		string obs_csv = file_manager.get_base_filename() + ".mean.obs.csv";
-		message(1, "saving results from mean parameter value run to ", obs_csv);
-		_oe.to_csv(obs_csv);
-
-		ph.update(_oe, _pe);
-		message(0, "mean parameter phi report:");
-		ph.report();
-
-		// for models y(t+1) = g(x, y(t)), extract y(t+1) and as initial state for next time cycle
-		//dyn_states = get_dynamic_states();
-		if (obs_dyn_state_names.size() != 0)
-		{
-			message(1, "update initial dynamic states for next time cycle. Dynamic states  matrix size is", dyn_states.size());
-		}
-		//add_dynamic_state_to_pe();
-		//vector<string> real_names = _oe.get_real_names();
-		
-		//Eigen::MatrixXd obs_i;
-
-		/*if (obs_dyn_state_names.size() > 0) {
-			Eigen::MatrixXd mat = _oe.get_eigen(vector<string>(), obs_dyn_state_names);
-			obs_i = mat.replicate(pe.shape().first, 1);
-			pe.replace_col_vals(par_dyn_state_names, obs_i);
-
-		}*/
-		transfer_dynamic_state_from_pe_to_oe(pe, _oe);
-		return;
-	}
-
-	if (subset_size > pe.shape().first)
-	{
-		use_subset = false;
-	}
-	else
-	{
-		message(1, "using subset in lambda testing, number of realizations used in subset testing: ", subset_size);
-		string how = da_ctl_params.get_svalue("DA_SUBSET_HOW");
-		message(1, "subset how: ", how);
-		use_subset = true;
-	}
-
-	oe_org_real_names = oe.get_real_names();
-	pe_org_real_names = pe.get_real_names();
-	string obs_restart_csv = pest_scenario.get_pestpp_options().get_ies_obs_restart_csv();
-	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
-
-	oe_base = oe; //copy
-	//reorder this for later...
-	oe_base.reorder(vector<string>(), act_obs_names);
-
-
-	pe_base = pe; //copy
-	//reorder this for later
-	pe_base.reorder(vector<string>(), act_par_names);
-
-	// ==================================================
-	// ==================== forward run =================
-	// ==================================================
-
-	if (obs_restart_csv.size() > 0)
-		//the hard way to restart
-		initialize_restart();
-
-	//no restart
-	else
-	{
-		performance_log->log_event("running ensemble for data assimilation cycle No." + icycle);
-		message(1, "runing ensemble of size", pe.shape().first);
-
-		vector<int> failed = run_ensemble(pe, oe, vector<int>(), icycle);
-
-		if (pe.shape().first == 0)
-			throw_em_error("all realizations failed during initial evaluation");
-
-		if (failed.size() > 0)
-			oe_base.drop_rows(failed);
-
-		//if (icycle == 0)
-		//{
-			pe.transform_ip(ParameterEnsemble::transStatus::NUM);
-		//}
-	}
-
-	// ======================================================================
-	// extract dynamic states forecast from oe and add them to pe.
-	// for a model y(t+1) = g(x,y(t)), this code use simulated y(t+1) as input for the next time
-	// cycle
-
-	//States are flaged as ones that have zero weights and exist in both oe and pe
-
-	//dyn_states = get_dynamic_states();
-	
-	if (obs_dyn_state_names.size() != 0)
-	{
-		message(1, "add dynamic states to forecast ensemble. Dynamic states  matrix size is ", dyn_states.size());
-	}
-	//add_dynamic_state_to_pe();
-	transfer_dynamic_state_from_oe_to_pe(pe, oe);
-	// ==
-
-	ss.str("");
-	da_save_ensemble_pe("_forecast_cycle_", ".par");
-	da_save_ensemble_oe("_forecast_cycle_", ".obs");
-
-	performance_log->log_event("calc pre-drop phi");
-	//initialize the phi handler
-	ss.str("");
-	ss << icycle << ".";
-	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, true, ss.str());
-
-	if (ph.get_lt_obs_names().size() > 0) // todo: (Ayman) how to handle those obs in DA? 
-	{
-		message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
-	}
-	if (ph.get_gt_obs_names().size())
-	{
-		message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
-	}
-
-	ph.update(oe, pe);
-	message(0, "pre-drop initial phi summary");
-	ph.report();
-	drop_bad_phi(pe, oe);
-	if (oe.shape().first == 0)
-	{
-		throw_em_error(string("all realizations dropped as 'bad'"));
-	}
-	if (oe.shape().first <= error_min_reals)
-	{
-		message(0, "too few active realizations:", oe.shape().first);
-		message(1, "need at least ", error_min_reals);
-		throw_em_error(string("too few active realizations, cannot continue"));
-	}
-	if (oe.shape().first < warn_min_reals)
-	{
-		ss.str("");
-		ss << "WARNING: less than " << warn_min_reals << " active realizations...might not be enough";
-		string s = ss.str();
-		message(0, s);
-	}
-
-
-	pcs = ParChangeSummarizer(&pe_base, &file_manager, &output_file_writer);
-	vector<string> in_conflict = detect_prior_data_conflict();
-	if (in_conflict.size() > 0)
-	{
-		ss.str("");
-		ss << "WARNING: " << in_conflict.size() << " non-zero weighted observations are in conflict";
-		ss << " with the prior simulated ensemble." << endl;
-		message(0, ss.str());
-
-
-		cout << "...see rec file for listing of conflicted observations" << endl << endl;
-		ofstream& frec = file_manager.rec_ofstream();
-		frec << endl << "...conflicted observations: " << endl;
-		for (auto oname : in_conflict)
-		{
-			frec << oname << endl;
-		}
-		if (!ppo->get_ies_drop_conflicts())
-		{
-			ss.str("");
-			ss << "  Continuing with data assimilation will likely result ";
-			ss << " in parameter bias and, ultimately, forecast bias";
-			message(1, ss.str());
-		}
-		else
-		{
-
-			//check that all obs are in conflict
-			message(1, "dropping conflicted observations");
-			if (in_conflict.size() == oe.shape().second)
-			{
-				throw_em_error("all non-zero weighted observations in conflict state, cannot continue");
-			}
-			//drop from act_obs_names
-			vector<string> t;
-			set<string> sconflict(in_conflict.begin(), in_conflict.end());
-			for (auto oname : act_obs_names)
-				if (sconflict.find(oname) == sconflict.end())
-					t.push_back(oname);
-			act_obs_names = t;
-
-			//update obscov
-			obscov.drop(in_conflict);
-
-			//drop from oe_base
-			oe_base.drop_cols(in_conflict);
-			//shouldnt need to update localizer since we dropping not adding
-			//updating weights in control file
-
-			ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
-			int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
-			for (auto n : in_conflict)
-			{
-				oi->set_weight(n, 0.0);
-			}
-
-			stringstream ss;
-			ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
-			ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
-			message(1, ss.str());
-		}
-	}
-	performance_log->log_event("calc initial phi");
-	ph.update(oe, pe);
-	message(0, "initial phi summary");
-	ph.report();
-	ph.write(0, run_mgr_ptr->get_total_runs());
-	best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
-	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
-	{
-		message(1, "using full (MAP) update solution");
-
-	}
-	
-	if ((pest_scenario.get_ctl_ordered_nz_obs_names().size() == 0) || (pest_scenario.get_control_info().noptmax < 0))
-			return;
-	if (ph.get_mean(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
-	{
-		throw_em_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");
-	}
-	
-
-	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
-	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-	last_best_lam = da_ctl_params.get_dvalue("DA_INITIAL_INF_FAC");
-
-	if (last_best_mean < 1.0e-10)
-	{
-		throw_em_error("initial composite phi mean too low, something is wrong...");
-	}
-	if (last_best_std < 1.0e-10)
-	{
-		throw_em_error("initial composite phi stdev too low, something is wrong...");
-	}
-	if (last_best_lam <= 0.0)
-	{
-		//double x = last_best_mean / (2.0 * double(oe.shape().second));
-		double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
-		last_best_lam = pow(10.0, (floor(log10(x))));
-		if (last_best_lam < 1.0e-10)
-		{
-			message(1, "initial lambda estimation from phi failed, using 10,000");
-			last_best_lam = 10000;
-		}
-	}
-	message(1, "current lambda:", last_best_lam);
-	message(0, "initialization complete");
-}
-
-void DataAssimilator:: da_save_ensemble_pe(string fprefix, string dtyp)
-{
-	// todo: update for da
-	stringstream ss;
-	ss.str("");
-	bool save_binary;
-	save_binary = da_ctl_params.get_bvalue("DA_SAVE_BINARY");
-	
-	if (save_binary)
-	{
-		ss << file_manager.get_base_filename() << fprefix << icycle << dtyp <<".jcb";
-		pe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << fprefix << icycle << dtyp <<".csv";
-		pe.to_csv(ss.str());
-	}
-	//message(1, "saved forecast (parameter and state) ensemble to ", ss.str());
-}
-void DataAssimilator::da_save_ensemble_oe(string fprefix, string dtyp)
-{
-	// todo: update for da
-	stringstream ss;
-	ss.str("");
-	bool save_binary;
-	save_binary = da_ctl_params.get_bvalue("DA_SAVE_BINARY");
-	if (save_binary)
-	{
-		ss << file_manager.get_base_filename() << fprefix << icycle << dtyp << ".jcb";
-		oe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << fprefix << icycle << dtyp << ".csv";
-		oe.to_csv(ss.str());
-	}
-	//message(1, "saved forecast (parameter and state) ensemble to ", ss.str());
-}
+//void DataAssimilator::forward_run_noptmax_0(int icycle)
+//{
+//	// Dry Run. No parameter update occurs. Run initial values and move to the next time cycle 
+//	vector <string> dyn_states;
+//	stringstream ss;
+//
+//	message(0, "'noptmax'=0, running control file parameter values and quitting");
+//
+//	Parameters pars = pest_scenario.get_ctl_parameters();
+//	ParamTransformSeq pts = pe.get_par_transform();
+//
+//	ParameterEnsemble _pe(&pest_scenario, &rand_gen);
+//	_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
+//	_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
+//	_pe.append(BASE_REAL_NAME, pars);
+//	if (icycle == 0)
+//	{
+//		pe = _pe; // pe is initialized in the first cycle
+//	}
+//	else
+//	{
+//		_pe = pe;
+//	}
+//	string par_csv = file_manager.get_base_filename() + ".par.csv";
+//	pe_base = _pe;
+//	pe_base.reorder(vector<string>(), act_par_names);
+//	ObservationEnsemble _oe(&pest_scenario, &rand_gen);
+//	_oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
+//	_oe.append(BASE_REAL_NAME, pest_scenario.get_ctl_observations());
+//	oe_base = _oe;
+//	oe = _oe; // 
+//			  // 
+//	oe_base.reorder(vector<string>(), act_obs_names);
+//
+//	//initialize the phi handler
+//	ss.str("");
+//	ss << icycle << ".";
+//	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, true, ss.str());
+//	if (ph.get_lt_obs_names().size() > 0)
+//	{
+//		message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
+//	}
+//	if (ph.get_gt_obs_names().size())
+//	{
+//		message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
+//	}
+//	message(1, "running control file parameter values");
+//
+//	vector<int> failed_idxs = run_ensemble(_pe, _oe);
+//	if (failed_idxs.size() != 0)
+//	{
+//		message(0, "control file parameter value run failed...bummer");
+//		throw_em_error("control file parameter value run failed");
+//	}
+//	string obs_csv = file_manager.get_base_filename() + ".obs.csv";
+//	message(1, "saving results from control file parameter value run to ", obs_csv);
+//	_oe.to_csv(obs_csv);
+//
+//	ph.update(_oe, _pe);
+//	message(0, "control file parameter phi report:");
+//	ph.report(true);
+//	ph.write(0, 1);
+//	ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
+//	Observations obs;
+//	Eigen::VectorXd v = _oe.get_real_vector(BASE_REAL_NAME);
+//	vector<double> vv;
+//	vv.resize(v.size());
+//	Eigen::VectorXd::Map(&vv[0], v.size()) = v;
+//	obs.update(_oe.get_var_names(), vv);
+//
+//	// save parameters to .par file
+//	output_file_writer.write_par(file_manager.open_ofile_ext("base.par"), pars, *(pts.get_offset_ptr()),
+//		*(pts.get_scale_ptr()));
+//	file_manager.close_file("par");
+//
+//	// save new residuals to .rei file
+//	output_file_writer.write_rei(file_manager.open_ofile_ext("base.rei"), 0,
+//		pest_scenario.get_ctl_observations(), obs, obj_func, pars);
+//
+//	// for models y(t+1) = g(x, y(t)), extract y(t+1) and use it as initial state for next time cycle
+//	//dyn_states = get_dynamic_states();
+//	//vector<string> real_names = _oe.get_real_names();
+//	Eigen::MatrixXd obs_i;
+//	if (obs_dyn_state_names.size() > 0) {
+//		message(1, "update initial dynamic states for next time cycle. Dynamic states  matrix size is", dyn_states.size());
+//
+//		/*Eigen::MatrixXd mat = _oe.get_eigen(vector<string>(), obs_dyn_state_names);
+//		obs_i = mat.replicate(pe.shape().first, 1);
+//		cout << obs_i << endl;
+//		pe.replace_col_vals(par_dyn_state_names, obs_i);*/
+//		//transfer_dynamic_state_from_oe_to_pe(pe, _oe);
+//	}
+//	transfer_dynamic_state_from_oe_to_pe(pe, _oe);
+//	oe = _oe;
+//	return;
+//}
+
+
+//void DataAssimilator::initialize(int _icycle)
+//{
+//	icycle = _icycle;
+//	message(0, "initializing cycle", icycle);
+//	stringstream ss;
+//	ofstream& f_rec = file_manager.rec_ofstream();
+//	vector <string> dyn_states;
+//
+//	da_ctl_params = pest_scenario.get_pestpp_options().da_ctl_params;
+//	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
+//	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
+//	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
+//
+//	// da type that is lower case is ok, I should move this somewhere else
+//	transform(da_type.begin(), da_type.end(), da_type.begin(), ::toupper);
+//	
+//	//initialize_dynamic_states();
+//
+//	// run the model one time using the initial parameters values. 
+//	if (pest_scenario.get_control_info().noptmax == 0)
+//	{
+//		forward_run_noptmax_0(_icycle);
+//		return;
+//	}
+//	
+//	//set some defaults
+//	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
+//
+//	// TODO: (Ayman) We need to develop a da verbose level, for now ies is being used
+//	//verbose_level = pest_scenario.get_pestpp_options_ptr()->get_ies_verbose_level();
+//	verbose_level = da_ctl_params.get_ivalue("DA_VERBOSE_LEVEL");
+//	if (pest_scenario.get_n_adj_par() >= 1e6)
+//	{
+//		message(0, "Too many parameters ... !");
+//	}
+//	message(1, "using REDSVD for truncated svd solve");
+//	message(1, "maxsing:", pest_scenario.get_svd_info().maxsing);
+//	message(1, "eigthresh: ", pest_scenario.get_svd_info().eigthresh);
+//
+//	message(1, "initializing localizer--");
+//	use_localizer = localizer.initialize(performance_log);	
+//
+//	num_threads = da_ctl_params.get_ivalue("DA_NUM_THREADS");
+//	if (!use_localizer)
+//		message(1, "not using localization");
+//	else
+//	{
+//		if (localizer.get_autoadaloc())
+//		{
+//			message(1, "using automatic adaptive localization");
+//			message(2, "with autoadaloc_sigma_dist ", da_ctl_params.get_dvalue("DA_AUTOADALOC_SIGMA_DIST"));
+//		}
+//		if (localizer.get_filename().size() > 0)
+//		{
+//			message(1, "using localization matrix " + localizer.get_filename());
+//			localizer.report(file_manager.rec_ofstream());
+//		}
+//	}
+//	if ((use_localizer) && (!localizer.get_autoadaloc()))
+//	{
+//
+//		ss.str("");
+//		ss << "using localized solution with " << localizer.get_num_upgrade_steps() << " sequential upgrade steps";
+//		message(1, ss.str());
+//		ss.str("");
+//		if (num_threads > 0)
+//		{
+//			ss.str("");
+//			ss << "using multithreaded localization calculation with " << num_threads << " threads";
+//			message(1, ss.str());
+//
+//		}
+//		if (localizer.get_how() == Localizer::How::OBSERVATIONS)
+//			message(1, "localizing by obseravtions");
+//		else
+//			message(1, "localizing by parameters");
+//	}
+//
+//
+//	iter = 0;
+//	last_best_mean = 1.0E+30;
+//	last_best_std = 1.0e+30;
+//	lambda_max = 1.0E+30;
+//	lambda_min = 1.0E-30;
+//	warn_min_reals = 10;
+//	error_min_reals = 2;
+//	consec_bad_lambda_cycles = 0;
+//
+//	
+//	// report DA paramters use
+//	lam_mults = da_ctl_params.get_vvalue("DA_INFLATION_MULT");
+//	infl_facs = da_ctl_params.get_vvalue("DA_INFLATION_FAC");
+//	
+//
+//	sanity_checks();
+//
+//	bool echo = false;
+//	if (verbose_level > 1)
+//		echo = true;
+//
+//	// ies_use_empirical --- TODO (Ayman: check if we need to add if-statement for use only in ies
+//	initialize_parcov();
+//	initialize_obscov();
+//
+//	
+//	int subset_size = da_ctl_params.get_ivalue("DA_SUBSET_SIZE");
+//	reg_factor = pest_scenario.get_pestpp_options().get_ies_reg_factor(); //Todo: how this fit in da
+//	message(1, "using reg_factor: ", reg_factor);
+//	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
+//	if (bad_phi < 1.0e+30)
+//		message(1, "using bad_phi: ", bad_phi);
+//	
+//
+//
+//	int num_reals = pest_scenario.get_pestpp_options().get_da_num_reals();
+//
+//	
+//	pe_drawn = true;
+//	if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
+//	{
+//		message(1, "forming inverse sqrt of prior parameter covariance matrix");
+//
+//		if (parcov.isdiagonal())
+//			parcov_inv_sqrt = parcov.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
+//		else
+//		{
+//			message(1, "first extracting diagonal from prior parameter covariance matrix");
+//			Covariance parcov_diag;
+//			parcov_diag.from_diagonal(parcov);
+//			parcov_inv_sqrt = parcov_diag.inv(echo).get_matrix().diagonal().cwiseSqrt().asDiagonal();
+//		}
+//	}
+//	else {
+//		message(1, "not using prior parameter covariance matrix scaling");
+//	}
+//
+//	oe_drawn = initialize_oe(obscov);
+//	string center_on = ppo->get_ies_center_on();
+//	try
+//	{
+//		oe.check_for_dups();
+//	}
+//	catch (const exception & e)
+//	{
+//		string message = e.what();
+//		throw_em_error("error in observation ensemble: " + message);
+//	}
+//
+//	if ((act_obs_names.size() > 0) && (pe.shape().first != oe.shape().first))
+//	{
+//		//the special case where par en < obs en and all par reals are found in obs en...
+//
+//		if (pe.shape().first < oe.shape().first)
+//		{
+//			vector<string> oe_names = oe.get_real_names();
+//			set<string> oset(oe_names.begin(), oe_names.end());
+//			vector<string> missing;
+//			for (auto n : pe.get_real_names())
+//				if (oset.find(n) == oset.end())
+//				{
+//					missing.push_back(n);
+//				}
+//			if (missing.size() == 0)
+//			{
+//				ss.str("");
+//				ss << "par en has " << pe.shape().first << " realizations, compared to " << oe.shape().first << " obs realizations";
+//				message(1, ss.str());
+//				message(1, " the realization names are compatible");
+//				message(1, "re-indexing obs en to align with par en...");
+//
+//				oe.reorder(pe.get_real_names(), vector<string>());
+//			}
+//			else
+//			{
+//				ss.str("");
+//				ss << "the following par en real names were not found in the obs en: ";
+//				for (auto m : missing)
+//				{
+//					ss << m << ",";
+//				}
+//				throw_em_error(ss.str());
+//
+//			}
+//		}
+//		else
+//		{
+//			ss.str("");
+//			ss << "parameter ensemble rows (" << pe.shape().first << ") not equal to observation ensemble rows (" << oe.shape().first << ")";
+//			throw_em_error(ss.str());
+//		}
+//	}
+//
+//
+//	//need this here for Am calcs...
+//	//message(1, "transforming parameter ensemble to numeric");
+//	//if (icycle == 0)
+//		// parameters need to be transformed once ?
+//	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+//
+//	if (da_ctl_params.get_bvalue("DA_ADD_BASE"))
+//	{
+//		if (pp_args.find("DA_RESTART_OBS_EN") != pp_args.end())  // todo: think about how this restart works in da?
+//		{
+//			message(1, "Warning: even though `da_include_base` is true, you passed a restart obs en, not adding 'base' realization...");
+//		}
+//		else
+//			add_bases();
+//	}
+//
+//	//now we check to see if we need to try to align the par and obs en
+//	//this would only be needed if either of these were not drawn
+//	if (!pe_drawn || !oe_drawn)
+//	{
+//		bool aligned = pe.try_align_other_rows(performance_log, oe);
+//		if (aligned)
+//		{
+//			message(2, "observation ensemble reordered to align rows with parameter ensemble");
+//		}
+//	}
+//	
+//	//just check to see if common real names are found but are not in the same location
+//	map<string, int> pe_map = pe.get_real_map(), oe_map = oe.get_real_map();
+//	vector<string> misaligned;
+//	for (auto item : pe_map)
+//	{
+//		if (oe_map.find(item.first) == oe_map.end())
+//			continue;
+//		if (item.second != oe_map[item.first])
+//			misaligned.push_back(item.first);
+//	}
+//	if (misaligned.size() > 0)
+//	{
+//		message(1, "WARNING: common realization names shared between the parameter and observation ensembles but they are not in the same row locations, see .rec file for listing");
+//		ofstream& frec = file_manager.rec_ofstream();
+//		frec << endl << "WARNING: the following " << misaligned.size() << " realization names are shared between the parameter and observation ensembles but they are not in the same row locations:" << endl;
+//		for (auto ma : misaligned)
+//			frec << ma << endl;
+//	}
+//
+//	message(2, "checking for denormal values in pe");
+//	//if (icycle == 0)
+//	pe.check_for_normal("initial transformed parameter ensemble");
+//
+//	//message(1, "saved initial parameter ensemble to ", ss.str());
+//	message(2, "checking for denormal values in base oe");
+//	oe.check_for_normal("base observation ensemble");
+//	ss.str("");
+//	if (pest_scenario.get_pestpp_options().get_save_binary())
+//	{
+//		ss << file_manager.get_base_filename() << ".base.obs.jcb";
+//		oe.to_binary(ss.str());
+//	}
+//	else
+//	{
+//		ss << file_manager.get_base_filename() << ".base.obs.csv";
+//		oe.to_csv(ss.str());
+//	}
+//	message(1, "saved base observation ensemble (obsval+noise) to ", ss.str());
+//
+//	if (center_on.size() > 0)
+//	{
+//		ss.str("");
+//		ss << "centering on realization: '" << center_on << "' ";
+//		message(1, ss.str());
+//		vector<string> names = pe.get_real_names();
+//		if (find(names.begin(), names.end(), center_on) == names.end())
+//			throw_em_error("'ies_center_on' realization not found in par en: " + center_on);
+//		names = oe.get_real_names();
+//		if (find(names.begin(), names.end(), center_on) == names.end())
+//			throw_em_error("'ies_center_on' realization not found in obs en: " + center_on);
+//	}
+//	else
+//		message(1, "centering on ensemble mean vector");
+//
+//	// Run the ensemble mean and move to the next cycle
+//	if (pest_scenario.get_control_info().noptmax == -2)
+//	{
+//		message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
+//		message(1, "calculating mean parameter values");
+//		Parameters pars;
+//		vector<double> mv = pe.get_mean_stl_var_vector();
+//		pars.update(pe.get_var_names(), pe.get_mean_stl_var_vector());
+//		ParamTransformSeq pts = pe.get_par_transform();
+//
+//		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
+//		_pe.reserve(vector<string>(), pe.get_var_names());
+//		_pe.set_trans_status(pe.get_trans_status());
+//		_pe.append("mean", pars);
+//		string par_csv = file_manager.get_base_filename() + ".mean.par.csv";
+//		message(1, "saving mean parameter values to ", par_csv);
+//		_pe.to_csv(par_csv);
+//		pe_base = _pe;
+//		pe_base.reorder(vector<string>(), act_par_names);
+//		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
+//		_oe.reserve(vector<string>(), oe.get_var_names());
+//		_oe.append("mean", pest_scenario.get_ctl_observations());
+//		oe_base = _oe;
+//		oe_base.reorder(vector<string>(), act_obs_names);
+//		//initialize the phi handler
+//		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
+//		if (ph.get_lt_obs_names().size() > 0)
+//		{
+//			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
+//		}
+//		if (ph.get_gt_obs_names().size())
+//		{
+//			message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
+//		}
+//		message(1, "running mean parameter values");
+//
+//		vector<int> failed_idxs = run_ensemble(_pe, _oe);
+//		if (failed_idxs.size() != 0)
+//		{
+//			message(0, "mean parameter value run failed...bummer");
+//			return;
+//		}
+//		string obs_csv = file_manager.get_base_filename() + ".mean.obs.csv";
+//		message(1, "saving results from mean parameter value run to ", obs_csv);
+//		_oe.to_csv(obs_csv);
+//
+//		ph.update(_oe, _pe);
+//		message(0, "mean parameter phi report:");
+//		ph.report();
+//
+//		// for models y(t+1) = g(x, y(t)), extract y(t+1) and as initial state for next time cycle
+//		//dyn_states = get_dynamic_states();
+//		if (obs_dyn_state_names.size() != 0)
+//		{
+//			message(1, "update initial dynamic states for next time cycle. Dynamic states  matrix size is", dyn_states.size());
+//		}
+//		//add_dynamic_state_to_pe();
+//		//vector<string> real_names = _oe.get_real_names();
+//		
+//		//Eigen::MatrixXd obs_i;
+//
+//		/*if (obs_dyn_state_names.size() > 0) {
+//			Eigen::MatrixXd mat = _oe.get_eigen(vector<string>(), obs_dyn_state_names);
+//			obs_i = mat.replicate(pe.shape().first, 1);
+//			pe.replace_col_vals(par_dyn_state_names, obs_i);
+//
+//		}*/
+//		transfer_dynamic_state_from_pe_to_oe(pe, _oe);
+//		return;
+//	}
+//
+//	if (subset_size > pe.shape().first)
+//	{
+//		use_subset = false;
+//	}
+//	else
+//	{
+//		message(1, "using subset in lambda testing, number of realizations used in subset testing: ", subset_size);
+//		string how = da_ctl_params.get_svalue("DA_SUBSET_HOW");
+//		message(1, "subset how: ", how);
+//		use_subset = true;
+//	}
+//
+//	oe_org_real_names = oe.get_real_names();
+//	pe_org_real_names = pe.get_real_names();
+//	string obs_restart_csv = pest_scenario.get_pestpp_options().get_ies_obs_restart_csv();
+//	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
+//
+//	oe_base = oe; //copy
+//	//reorder this for later...
+//	oe_base.reorder(vector<string>(), act_obs_names);
+//
+//
+//	pe_base = pe; //copy
+//	//reorder this for later
+//	pe_base.reorder(vector<string>(), act_par_names);
+//
+//	// ==================================================
+//	// ==================== forward run =================
+//	// ==================================================
+//
+//	if (obs_restart_csv.size() > 0)
+//		//the hard way to restart
+//		initialize_restart();
+//
+//	//no restart
+//	else
+//	{
+//		performance_log->log_event("running ensemble for data assimilation cycle No." + icycle);
+//		message(1, "runing ensemble of size", pe.shape().first);
+//
+//		vector<int> failed = run_ensemble(pe, oe, vector<int>(), icycle);
+//
+//		if (pe.shape().first == 0)
+//			throw_em_error("all realizations failed during initial evaluation");
+//
+//		if (failed.size() > 0)
+//			oe_base.drop_rows(failed);
+//
+//		//if (icycle == 0)
+//		//{
+//			pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+//		//}
+//	}
+//
+//	// ======================================================================
+//	// extract dynamic states forecast from oe and add them to pe.
+//	// for a model y(t+1) = g(x,y(t)), this code use simulated y(t+1) as input for the next time
+//	// cycle
+//
+//	//States are flaged as ones that have zero weights and exist in both oe and pe
+//
+//	//dyn_states = get_dynamic_states();
+//	
+//	if (obs_dyn_state_names.size() != 0)
+//	{
+//		message(1, "add dynamic states to forecast ensemble. Dynamic states  matrix size is ", dyn_states.size());
+//	}
+//	//add_dynamic_state_to_pe();
+//	transfer_dynamic_state_from_oe_to_pe(pe, oe);
+//	// ==
+//
+//	ss.str("");
+//	da_save_ensemble_pe("_forecast_cycle_", ".par");
+//	da_save_ensemble_oe("_forecast_cycle_", ".obs");
+//
+//	performance_log->log_event("calc pre-drop phi");
+//	//initialize the phi handler
+//	ss.str("");
+//	ss << icycle << ".";
+//	ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov, true, ss.str());
+//
+//	if (ph.get_lt_obs_names().size() > 0) // todo: (Ayman) how to handle those obs in DA? 
+//	{
+//		message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
+//	}
+//	if (ph.get_gt_obs_names().size())
+//	{
+//		message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
+//	}
+//
+//	ph.update(oe, pe);
+//	message(0, "pre-drop initial phi summary");
+//	ph.report();
+//	drop_bad_phi(pe, oe);
+//	if (oe.shape().first == 0)
+//	{
+//		throw_em_error(string("all realizations dropped as 'bad'"));
+//	}
+//	if (oe.shape().first <= error_min_reals)
+//	{
+//		message(0, "too few active realizations:", oe.shape().first);
+//		message(1, "need at least ", error_min_reals);
+//		throw_em_error(string("too few active realizations, cannot continue"));
+//	}
+//	if (oe.shape().first < warn_min_reals)
+//	{
+//		ss.str("");
+//		ss << "WARNING: less than " << warn_min_reals << " active realizations...might not be enough";
+//		string s = ss.str();
+//		message(0, s);
+//	}
+//
+//
+//	pcs = ParChangeSummarizer(&pe_base, &file_manager, &output_file_writer);
+//	vector<string> in_conflict = detect_prior_data_conflict();
+//	if (in_conflict.size() > 0)
+//	{
+//		ss.str("");
+//		ss << "WARNING: " << in_conflict.size() << " non-zero weighted observations are in conflict";
+//		ss << " with the prior simulated ensemble." << endl;
+//		message(0, ss.str());
+//
+//
+//		cout << "...see rec file for listing of conflicted observations" << endl << endl;
+//		ofstream& frec = file_manager.rec_ofstream();
+//		frec << endl << "...conflicted observations: " << endl;
+//		for (auto oname : in_conflict)
+//		{
+//			frec << oname << endl;
+//		}
+//		if (!ppo->get_ies_drop_conflicts())
+//		{
+//			ss.str("");
+//			ss << "  Continuing with data assimilation will likely result ";
+//			ss << " in parameter bias and, ultimately, forecast bias";
+//			message(1, ss.str());
+//		}
+//		else
+//		{
+//
+//			//check that all obs are in conflict
+//			message(1, "dropping conflicted observations");
+//			if (in_conflict.size() == oe.shape().second)
+//			{
+//				throw_em_error("all non-zero weighted observations in conflict state, cannot continue");
+//			}
+//			//drop from act_obs_names
+//			vector<string> t;
+//			set<string> sconflict(in_conflict.begin(), in_conflict.end());
+//			for (auto oname : act_obs_names)
+//				if (sconflict.find(oname) == sconflict.end())
+//					t.push_back(oname);
+//			act_obs_names = t;
+//
+//			//update obscov
+//			obscov.drop(in_conflict);
+//
+//			//drop from oe_base
+//			oe_base.drop_cols(in_conflict);
+//			//shouldnt need to update localizer since we dropping not adding
+//			//updating weights in control file
+//
+//			ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+//			int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
+//			for (auto n : in_conflict)
+//			{
+//				oi->set_weight(n, 0.0);
+//			}
+//
+//			stringstream ss;
+//			ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
+//			ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
+//			message(1, ss.str());
+//		}
+//	}
+//	performance_log->log_event("calc initial phi");
+//	ph.update(oe, pe);
+//	message(0, "initial phi summary");
+//	ph.report();
+//	ph.write(0, run_mgr_ptr->get_total_runs());
+//	best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
+//	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
+//	{
+//		message(1, "using full (MAP) update solution");
+//
+//	}
+//	
+//	if ((pest_scenario.get_ctl_ordered_nz_obs_names().size() == 0) || (pest_scenario.get_control_info().noptmax < 0))
+//			return;
+//	if (ph.get_mean(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
+//	{
+//		throw_em_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");
+//	}
+//	
+//
+//	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+//	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+//	last_best_lam = da_ctl_params.get_dvalue("DA_INITIAL_INF_FAC");
+//
+//	if (last_best_mean < 1.0e-10)
+//	{
+//		throw_em_error("initial composite phi mean too low, something is wrong...");
+//	}
+//	if (last_best_std < 1.0e-10)
+//	{
+//		throw_em_error("initial composite phi stdev too low, something is wrong...");
+//	}
+//	if (last_best_lam <= 0.0)
+//	{
+//		//double x = last_best_mean / (2.0 * double(oe.shape().second));
+//		double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
+//		last_best_lam = pow(10.0, (floor(log10(x))));
+//		if (last_best_lam < 1.0e-10)
+//		{
+//			message(1, "initial lambda estimation from phi failed, using 10,000");
+//			last_best_lam = 10000;
+//		}
+//	}
+//	message(1, "current lambda:", last_best_lam);
+//	message(0, "initialization complete");
+//}
+
+//void DataAssimilator:: da_save_ensemble_pe(string fprefix, string dtyp)
+//{
+//	// todo: update for da
+//	stringstream ss;
+//	ss.str("");
+//	bool save_binary;
+//	save_binary = da_ctl_params.get_bvalue("DA_SAVE_BINARY");
+//	
+//	if (save_binary)
+//	{
+//		ss << file_manager.get_base_filename() << fprefix << icycle << dtyp <<".jcb";
+//		pe.to_binary(ss.str());
+//	}
+//	else
+//	{
+//		ss << file_manager.get_base_filename() << fprefix << icycle << dtyp <<".csv";
+//		pe.to_csv(ss.str());
+//	}
+//	//message(1, "saved forecast (parameter and state) ensemble to ", ss.str());
+//}
+//void DataAssimilator::da_save_ensemble_oe(string fprefix, string dtyp)
+//{
+//	// todo: update for da
+//	stringstream ss;
+//	ss.str("");
+//	bool save_binary;
+//	save_binary = da_ctl_params.get_bvalue("DA_SAVE_BINARY");
+//	if (save_binary)
+//	{
+//		ss << file_manager.get_base_filename() << fprefix << icycle << dtyp << ".jcb";
+//		oe.to_binary(ss.str());
+//	}
+//	else
+//	{
+//		ss << file_manager.get_base_filename() << fprefix << icycle << dtyp << ".csv";
+//		oe.to_csv(ss.str());
+//	}
+//	//message(1, "saved forecast (parameter and state) ensemble to ", ss.str());
+//}
 //void DataAssimilator::add_dynamic_state_to_pe()
 //{
 //	
@@ -2458,37 +2458,43 @@ void DataAssimilator::da_update()
 	message(0, "Assimilation Method :", da_method);
 	int user_noptmax = pest_scenario.get_control_info().noptmax;
 	
-	if (da_type == "MDA")
-	{
-		// make sure that noptmax and number of inflations are consistent. always noptmax will be respected. 
-		if (user_noptmax > infl_facs.size())
-		{
-			int beta_diff = user_noptmax - infl_facs.size();
-			for (int ibeta = 0; ibeta < beta_diff; ibeta++)
-			{
-				infl_facs.push_back(infl_facs.back());
-			}
-		}
-		else if (user_noptmax < infl_facs.size())
-		{
-			int beta_diff = infl_facs.size() - user_noptmax;
-			vector<double> v2 = std::vector<double>(infl_facs.begin(), infl_facs.end() - beta_diff);
-			infl_facs = v2;
-		}
-		solution_iterations = infl_facs.size();
-	}
-	else if (da_type == "VANILLA")
-		solution_iterations = 1;
-	else
-		solution_iterations = pest_scenario.get_control_info().noptmax;
+	//if (da_type == "MDA")
+	//{
+	//	// make sure that noptmax and number of inflations are consistent. always noptmax will be respected. 
+	//	if (user_noptmax > infl_facs.size())
+	//	{
+	//		int beta_diff = user_noptmax - infl_facs.size();
+	//		for (int ibeta = 0; ibeta < beta_diff; ibeta++)
+	//		{
+	//			infl_facs.push_back(infl_facs.back());
+	//		}
+	//	}
+	//	else if (user_noptmax < infl_facs.size())
+	//	{
+	//		int beta_diff = infl_facs.size() - user_noptmax;
+	//		vector<double> v2 = std::vector<double>(infl_facs.begin(), infl_facs.end() - beta_diff);
+	//		infl_facs = v2;
+	//	}
+	//	solution_iterations = infl_facs.size();
+	//}
+	//else if (da_type == "VANILLA")
+	//	solution_iterations = 1;
+	//else
+	//	solution_iterations = pest_scenario.get_control_info().noptmax;
 	bool accept;
-	for (int i = 0; i < solution_iterations; i++)
+	
+	//for (int i = 0; i < solution_iterations; i++)
+	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
 		iter++;
 		message(0, "starting solve for iteration:", iter);
 		ss << "starting solve for iteration: " << iter;
 		performance_log->log_event(ss.str());
-		accept = solve_new_da();
+		//accept = solve_new_da();
+		if (da_type == "MDA")
+			accept = solve_mda();
+		else
+			accept = solve_glm();
 		report_and_save();
 		ph.update(oe, pe);
 		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
@@ -2510,10 +2516,10 @@ void DataAssimilator::da_update()
 
 	}
 	//todo return posterior here
-	da_save_ensemble_pe("_analysis_cycle_", ".par");
-	da_save_ensemble_oe("_analysis_cycle_", ".obs");
-	if (obs_dyn_state_names.size() > 0)
-		update_starting_state();
+	//da_save_ensemble_pe("_analysis_cycle_", ".par");
+	//da_save_ensemble_oe("_analysis_cycle_", ".obs");
+	//if (obs_dyn_state_names.size() > 0)
+	//	update_starting_state();
 
 
 }

@@ -3430,8 +3430,10 @@ void EnsembleMethod::initialize(int cycle)
 		message(1, "using full (MAP) update solution");
 
 	}
-
-	if ((pest_scenario.get_control_info().noptmax > 0) || (act_obs_names.size() > 0))
+	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+	last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
+	if ((pest_scenario.get_control_info().noptmax > 0) && (act_obs_names.size() > 0))
 	{
 		if (ph.get_mean(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
 		{
@@ -3441,13 +3443,6 @@ void EnsembleMethod::initialize(int cycle)
 		{
 			throw_em_error("initial actual phi stdev too low, something is wrong...");
 		}
-	}
-
-	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
-	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-	last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
-	if ((pest_scenario.get_control_info().noptmax > 0) || (act_obs_names.size() > 0))
-	{
 		if (last_best_mean < 1.0e-10)
 		{
 			throw_em_error("initial composite phi mean too low, something is wrong...");
@@ -3457,6 +3452,7 @@ void EnsembleMethod::initialize(int cycle)
 			throw_em_error("initial composite phi stdev too low, something is wrong...");
 		}
 	}
+
 	if (last_best_lam <= 0.0)
 	{
 		//double x = last_best_mean / (2.0 * double(oe.shape().second));
@@ -3658,7 +3654,7 @@ bool EnsembleMethod::solve_mda()
 		mda_fac = mda_fac / tot;
 		ttot += mda_fac;
 	}
-	tot = mda_facs[iter];
+	tot = mda_facs[iter-1];
 	mda_facs = vector<double>{ tot };
 	vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
 	return solve(true, mda_facs, scale_facs);
@@ -3805,9 +3801,10 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	//the case for all state estimation and non-iterative
 	//only one upgrade lambda and all pars are states
-	if ((pe_lams.size() == 1) && (par_dyn_state_names.size() == pe_lams[0].shape().second))
+	if (((pe_lams.size() == 1) && (par_dyn_state_names.size() == pe_lams[0].shape().second) && pest_scenario.get_control_info().noptmax == 1))
 	{
 		pe = pe_lams[0];
+		return true;
 	}
 
 	vector<map<int, int>> real_run_ids_lams;
@@ -4538,7 +4535,7 @@ bool EnsembleMethod::initialize_oe(Covariance& cov)
 	bool drawn = false;
 	if (obs_csv.size() == 0)
 	{
-		if (pest_scenario.get_pestpp_options().get_ies_no_noise())
+		if ((pest_scenario.get_pestpp_options().get_ies_no_noise()) || (act_obs_names.size() == 0))
 		{
 			message(1, "initializing no-noise observation ensemble of : ", num_reals);
 			oe.initialize_without_noise(num_reals);
