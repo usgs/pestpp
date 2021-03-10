@@ -2045,58 +2045,59 @@ void DataAssimilator::initialize(int _icycle)
 		ss << "WARNING: " << in_conflict.size() << " non-zero weighted observations are in conflict";
 		ss << " with the prior simulated ensemble." << endl;
 		message(0, ss.str());
-	}
 
-	cout << "...see rec file for listing of conflicted observations" << endl << endl;
-	ofstream& frec = file_manager.rec_ofstream();
-	frec << endl << "...conflicted observations: " << endl;
-	for (auto oname : in_conflict)
-	{
-		frec << oname << endl;
-	}
-	if (!ppo->get_ies_drop_conflicts())
-	{
-		ss.str("");
-		ss << "  Continuing with data assimilation will likely result ";
-		ss << " in parameter bias and, ultimately, forecast bias";
-		message(1, ss.str());
-	}
-	else
-	{
 
-		//check that all obs are in conflict
-		message(1, "dropping conflicted observations");
-		if (in_conflict.size() == oe.shape().second)
+		cout << "...see rec file for listing of conflicted observations" << endl << endl;
+		ofstream& frec = file_manager.rec_ofstream();
+		frec << endl << "...conflicted observations: " << endl;
+		for (auto oname : in_conflict)
 		{
-			throw_em_error("all non-zero weighted observations in conflict state, cannot continue");
+			frec << oname << endl;
 		}
-		//drop from act_obs_names
-		vector<string> t;
-		set<string> sconflict(in_conflict.begin(), in_conflict.end());
-		for (auto oname : act_obs_names)
-			if (sconflict.find(oname) == sconflict.end())
-				t.push_back(oname);
-		act_obs_names = t;
-
-		//update obscov
-		obscov.drop(in_conflict);
-
-		//drop from oe_base
-		oe_base.drop_cols(in_conflict);
-		//shouldnt need to update localizer since we dropping not adding
-		//updating weights in control file
-
-		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
-		int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
-		for (auto n : in_conflict)
+		if (!ppo->get_ies_drop_conflicts())
 		{
-			oi->set_weight(n, 0.0);
+			ss.str("");
+			ss << "  Continuing with data assimilation will likely result ";
+			ss << " in parameter bias and, ultimately, forecast bias";
+			message(1, ss.str());
 		}
+		else
+		{
 
-		stringstream ss;
-		ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
-		ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
-		message(1, ss.str());
+			//check that all obs are in conflict
+			message(1, "dropping conflicted observations");
+			if (in_conflict.size() == oe.shape().second)
+			{
+				throw_em_error("all non-zero weighted observations in conflict state, cannot continue");
+			}
+			//drop from act_obs_names
+			vector<string> t;
+			set<string> sconflict(in_conflict.begin(), in_conflict.end());
+			for (auto oname : act_obs_names)
+				if (sconflict.find(oname) == sconflict.end())
+					t.push_back(oname);
+			act_obs_names = t;
+
+			//update obscov
+			obscov.drop(in_conflict);
+
+			//drop from oe_base
+			oe_base.drop_cols(in_conflict);
+			//shouldnt need to update localizer since we dropping not adding
+			//updating weights in control file
+
+			ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+			int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
+			for (auto n : in_conflict)
+			{
+				oi->set_weight(n, 0.0);
+			}
+
+			stringstream ss;
+			ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
+			ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
+			message(1, ss.str());
+		}
 	}
 	performance_log->log_event("calc initial phi");
 	ph.update(oe, pe);

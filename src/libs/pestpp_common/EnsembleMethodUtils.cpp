@@ -186,6 +186,10 @@ void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form
 void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map)
 {
 	message(1, "starting solve for lambda", cur_lam);
+	if (use_glm_form)
+		message(1, "using glm form");
+	else
+		message(1, "using mda form");
 	pe_upgrade.set_zeros();
 	stringstream ss;
 	Localizer::How _how = localizer.get_how();
