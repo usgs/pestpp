@@ -282,106 +282,106 @@
 //	}
 //}
 
-bool DataAssimilator::initialize_oe(Covariance& cov)
-{
-	//if there are no active obs, then just reserve a generic oe and return
-	if (act_obs_names.size() == 0)
-	{
-		oe.reserve(pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
-		return true;
-	}
-
-
-	stringstream ss;
-	int num_reals = pe.shape().first;
-
-	string obs_csv;
-	obs_csv = da_ctl_params.get_svalue("DA_OBSERVATION_ENSEMBLE");
-	
-	bool drawn = false;
-	if (obs_csv.size() == 0)
-	{
-		if (pest_scenario.get_pestpp_options().get_ies_no_noise())
-		{
-			message(1, "initializing no-noise observation ensemble of : ", num_reals);
-			oe.initialize_without_noise(num_reals);
-
-		}
-		else
-		{
-			message(1, "drawing observation noise realizations: ", num_reals);
-			oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(),file_manager.rec_ofstream());
-
-		}
-		drawn = true;
-	}
-	else
-	{
-		string obs_ext = pest_utils::lower_cp(obs_csv).substr(obs_csv.size() - 3, obs_csv.size());
-		performance_log->log_event("processing obs csv " + obs_csv);
-		if (obs_ext.compare("csv") == 0)
-		{
-			message(1, "loading obs ensemble from csv file", obs_csv);
-			try
-			{
-				oe.from_csv(obs_csv);
-			}
-			catch (const exception & e)
-			{
-				ss << "error processing obs csv: " << e.what();
-				throw_em_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_em_error(string("error processing obs csv"));
-			}
-		}
-		else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
-		{
-			message(1, "loading obs ensemble from binary file", obs_csv);
-			try
-			{
-				oe.from_binary(obs_csv);
-			}
-			catch (const exception & e)
-			{
-				stringstream ss;
-				ss << "error processing obs binary file: " << e.what();
-				throw_em_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_em_error(string("error processing obs binary file"));
-			}
-		}
-		else
-		{
-			ss << "unrecognized obs ensemble extension " << obs_ext << ", looing for csv, jcb, or jco";
-			throw_em_error(ss.str());
-		}
-		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
-		{
-			int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
-			/*if (pest_scenario.get_pestpp_options().get_ies_include_base())
-			{
-				message(1, "Note: increasing num_reals by 1 to account for 'base' realization in existing obs ensemble");
-				num_reals++;
-			}*/
-			if (num_reals < oe.shape().first)
-			{
-				message(1, "ies_num_reals arg passed, truncated observation ensemble to ", num_reals);
-				vector<string> keep_names, real_names = oe.get_real_names();
-				for (int i = 0; i < num_reals; i++)
-				{
-					keep_names.push_back(real_names[i]);
-				}
-				oe.keep_rows(keep_names);
-			}
-		}
-	}
-	return drawn;
-
-}
+//bool DataAssimilator::initialize_oe(Covariance& cov)
+//{
+//	//if there are no active obs, then just reserve a generic oe and return
+//	if (act_obs_names.size() == 0)
+//	{
+//		oe.reserve(pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
+//		return true;
+//	}
+//
+//
+//	stringstream ss;
+//	int num_reals = pe.shape().first;
+//
+//	string obs_csv;
+//	obs_csv = da_ctl_params.get_svalue("DA_OBSERVATION_ENSEMBLE");
+//	
+//	bool drawn = false;
+//	if (obs_csv.size() == 0)
+//	{
+//		if (pest_scenario.get_pestpp_options().get_ies_no_noise())
+//		{
+//			message(1, "initializing no-noise observation ensemble of : ", num_reals);
+//			oe.initialize_without_noise(num_reals);
+//
+//		}
+//		else
+//		{
+//			message(1, "drawing observation noise realizations: ", num_reals);
+//			oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(),file_manager.rec_ofstream());
+//
+//		}
+//		drawn = true;
+//	}
+//	else
+//	{
+//		string obs_ext = pest_utils::lower_cp(obs_csv).substr(obs_csv.size() - 3, obs_csv.size());
+//		performance_log->log_event("processing obs csv " + obs_csv);
+//		if (obs_ext.compare("csv") == 0)
+//		{
+//			message(1, "loading obs ensemble from csv file", obs_csv);
+//			try
+//			{
+//				oe.from_csv(obs_csv);
+//			}
+//			catch (const exception & e)
+//			{
+//				ss << "error processing obs csv: " << e.what();
+//				throw_em_error(ss.str());
+//			}
+//			catch (...)
+//			{
+//				throw_em_error(string("error processing obs csv"));
+//			}
+//		}
+//		else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
+//		{
+//			message(1, "loading obs ensemble from binary file", obs_csv);
+//			try
+//			{
+//				oe.from_binary(obs_csv);
+//			}
+//			catch (const exception & e)
+//			{
+//				stringstream ss;
+//				ss << "error processing obs binary file: " << e.what();
+//				throw_em_error(ss.str());
+//			}
+//			catch (...)
+//			{
+//				throw_em_error(string("error processing obs binary file"));
+//			}
+//		}
+//		else
+//		{
+//			ss << "unrecognized obs ensemble extension " << obs_ext << ", looing for csv, jcb, or jco";
+//			throw_em_error(ss.str());
+//		}
+//		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
+//		{
+//			int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
+//			/*if (pest_scenario.get_pestpp_options().get_ies_include_base())
+//			{
+//				message(1, "Note: increasing num_reals by 1 to account for 'base' realization in existing obs ensemble");
+//				num_reals++;
+//			}*/
+//			if (num_reals < oe.shape().first)
+//			{
+//				message(1, "ies_num_reals arg passed, truncated observation ensemble to ", num_reals);
+//				vector<string> keep_names, real_names = oe.get_real_names();
+//				for (int i = 0; i < num_reals; i++)
+//				{
+//					keep_names.push_back(real_names[i]);
+//				}
+//				oe.keep_rows(keep_names);
+//			}
+//		}
+//	}
+//	return drawn;
+//
+//}
 
 //template<typename T, typename A>
 //void DataAssimilator::message(int level, char* _message, vector<T, A> _extras)
@@ -404,44 +404,44 @@ bool DataAssimilator::initialize_oe(Covariance& cov)
 //
 //}
 
-template<typename T, typename A>
-void DataAssimilator::message(int level, const string& _message, vector<T, A> _extras, bool echo)
-{
-	stringstream ss;
-	if (level == 0)
-		ss << endl << "  ---  ";
-	else if (level == 1)
-		ss << "...";
-	ss << _message;
-	if (_extras.size() > 0)
-	{
-
-		for (auto& e : _extras)
-			ss << e << " , ";
-
-	}
-	if (level == 0)
-		ss << "  ---  ";
-	if ((echo) && ((verbose_level >= 2) || (level < 2)))
-		cout << ss.str() << endl;
-	file_manager.rec_ofstream() << ss.str() << endl;
-	performance_log->log_event(ss.str());
-
-}
-
-void DataAssimilator::message(int level, const string& _message)
-{
-	message(level, _message, vector<string>());
-}
-
-template<typename T>
-void DataAssimilator::message(int level, const string& _message, T extra)
-{
-	stringstream ss;
-	ss << _message << " " << extra;
-	string s = ss.str();
-	message(level, s);
-}
+//template<typename T, typename A>
+//void DataAssimilator::message(int level, const string& _message, vector<T, A> _extras, bool echo)
+//{
+//	stringstream ss;
+//	if (level == 0)
+//		ss << endl << "  ---  ";
+//	else if (level == 1)
+//		ss << "...";
+//	ss << _message;
+//	if (_extras.size() > 0)
+//	{
+//
+//		for (auto& e : _extras)
+//			ss << e << " , ";
+//
+//	}
+//	if (level == 0)
+//		ss << "  ---  ";
+//	if ((echo) && ((verbose_level >= 2) || (level < 2)))
+//		cout << ss.str() << endl;
+//	file_manager.rec_ofstream() << ss.str() << endl;
+//	performance_log->log_event(ss.str());
+//
+//}
+//
+//void DataAssimilator::message(int level, const string& _message)
+//{
+//	message(level, _message, vector<string>());
+//}
+//
+//template<typename T>
+//void DataAssimilator::message(int level, const string& _message, T extra)
+//{
+//	stringstream ss;
+//	ss << _message << " " << extra;
+//	string s = ss.str();
+//	message(level, s);
+//}
 
 void DataAssimilator::sanity_checks()
 {
@@ -486,311 +486,311 @@ void DataAssimilator::sanity_checks()
 	//cout << endl << endl;
 }
 
-void DataAssimilator::initialize_restart()
-{
-	stringstream ss;
-	string obs_restart_csv = pest_scenario.get_pestpp_options().get_ies_obs_restart_csv();
-	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
-
-	//performance_log->log_event("restart with existing obs ensemble: " + obs_restart_csv);
-	message(1, "restarting with existing obs ensemble", obs_restart_csv);
-	string obs_ext = pest_utils::lower_cp(obs_restart_csv).substr(obs_restart_csv.size() - 3, obs_restart_csv.size());
-	if (obs_ext.compare("csv") == 0)
-	{
-		message(1, "loading restart obs ensemble from csv file", obs_restart_csv);
-		try
-		{
-			oe.from_csv(obs_restart_csv);
-		}
-		catch (const exception & e)
-		{
-			ss << "error processing restart obs csv: " << e.what();
-			throw_em_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_em_error(string("error processing restart obs csv"));
-		}
-	}
-	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
-	{
-		message(1, "loading restart obs ensemble from binary file", obs_restart_csv);
-		try
-		{
-			oe.from_binary(obs_restart_csv);
-		}
-		catch (const exception & e)
-		{
-			ss << "error processing restart obs binary file: " << e.what();
-			throw_em_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_em_error(string("error processing restart obs binary file"));
-		}
-	}
-	else
-	{
-		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
-		throw_em_error(ss.str());
-	}
-	if (par_restart_csv.size() > 0)
-	{
-		string par_ext = pest_utils::lower_cp(par_restart_csv).substr(par_restart_csv.size() - 3, par_restart_csv.size());
-		if (par_ext.compare("csv") == 0)
-		{
-			message(1, "loading restart par ensemble from csv file", par_restart_csv);
-			try
-			{
-				pe.from_csv(par_restart_csv);
-			}
-			catch (const exception & e)
-			{
-				ss << "error processing restart par csv: " << e.what();
-				throw_em_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_em_error(string("error processing restart par csv"));
-			}
-		}
-		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
-		{
-			message(1, "loading restart par ensemble from binary file", par_restart_csv);
-			try
-			{
-				pe.from_binary(par_restart_csv);
-			}
-			catch (const exception & e)
-			{
-				ss << "error processing restart par binary file: " << e.what();
-				throw_em_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_em_error(string("error processing restart par binary file"));
-			}
-		}
-		else
-		{
-			ss << "unrecognized restart par ensemble extension " << par_ext << ", looking for csv, jcb, or jco";
-			throw_em_error(ss.str());
-		}
-		if (pe.shape().first != oe.shape().first)
-		{
-			ss.str("");
-			ss << "restart par en has " << pe.shape().first << " realizations but restart obs en has " << oe.shape().first;
-			throw_em_error(ss.str());
-		}
-
-		//check that restart pe is in sync with pe_base
-		vector<string> pe_real_names = pe.get_real_names(), pe_base_real_names = pe_base.get_real_names();
-		vector<string>::const_iterator start, end;
-		vector<string> missing;
-		start = pe_base_real_names.begin();
-		end = pe_base_real_names.end();
-		for (auto& rname : pe_real_names)
-			if (find(start, end, rname) == end)
-				missing.push_back(rname);
-		if (missing.size() > 0)
-		{
-			ss << "the following realization names were found in the restart par en but not in the 'base' par en:";
-			for (auto& m : missing)
-				ss << m << ",";
-			throw_em_error(ss.str());
-		}
-	}
-
-	if (pp_args.find("IES_NUM_REALS") != pp_args.end())
-	{
-		int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
-		/*if (pest_scenario.get_pestpp_options().get_ies_include_base())
-		{
-			message(1, "Note: increasing num_reals by 1 to account for 'base' realization in existing obs restart ensemble");
-			num_reals++;
-		}*/
-		if (num_reals < oe.shape().first)
-		{
-			message(1, "ies_num_reals arg passed, truncated restart obs ensemble to ", num_reals);
-			vector<string> keep_names, real_names = oe.get_real_names();
-			for (int i = 0; i < num_reals; i++)
-			{
-				keep_names.push_back(real_names[i]);
-			}
-			oe.keep_rows(keep_names);
-		}
-	}
-
-	//check that restart oe is in sync with oe_base
-	vector<string> oe_real_names = oe.get_real_names(), oe_base_real_names = oe_base.get_real_names();
-	vector<string>::const_iterator start, end;
-	vector<string> missing;
-	start = oe_base_real_names.begin();
-	end = oe_base_real_names.end();
-	for (auto& rname : oe_real_names)
-		if (find(start, end, rname) == end)
-			missing.push_back(rname);
-	if (missing.size() > 0)
-	{
-		//the special case where the base real is what is missing...
-		if ((missing.size() == 1) && (missing[0] == "BASE"))
-		{
-			//check that the base real is in the par en - restart_par_en should be accounted for by now
-			int base_par_idx = -1;
-			vector<string> pe_real_names = pe.get_real_names(), pe_base_real_names = pe_base.get_real_names();
-			for (int i = 0; i < pe_base.shape().first; i++)
-			{
-				if (pe_base_real_names[i] == "BASE")
-				{
-					base_par_idx = i;
-					break;
-				}
-			}
-			if (base_par_idx != -1)
-			{
-				ss.str("");
-				ss << "WARNING: replacing base obs en realization '" << oe_base_real_names[base_par_idx] << "' with 'base' (noise free) values to match par en 'base' location";
-				message(2, ss.str());
-				Observations obs = pest_scenario.get_ctl_observations();
-				oe_base.replace(base_par_idx, obs, "BASE");
-			}
-			else
-			{
-				ss << "the 'base' realization was not found in the restart obs en and also not found in the par en";
-				throw_em_error(ss.str());
-			}
-
-		}
-		else
-		{
-			ss << "the following realization names were found in the restart obs en but not in the 'base' obs en:";
-			for (auto& m : missing)
-				ss << m << ",";
-			throw_em_error(ss.str());
-		}
-
-	}
-
-	if (oe.shape().first != pe.shape().first)
-	{
-		//check if all oe names are found in par en, if so, we can reorder and proceed.  otherwise, die
-		missing.clear();
-		vector<string> pe_real_names = pe.get_real_names();
-		for (auto& oname : oe_real_names)
-		{
-			if (find(pe_real_names.begin(), pe_real_names.end(), oname) == pe_real_names.end())
-				missing.push_back(oname);
-		}
-
-		if (missing.size() > 0)
-		{
-			ss << "number of reals differ between restart obs en (" << oe.shape().first << ") and par en (" << pe.shape().first << ")";
-			ss << " and realization names could not be aligned:";
-			for (auto& m : missing)
-				ss << m << ",";
-			throw_em_error(ss.str());
-		}
-
-		message(2, "reordering pe to align with restart obs en, num reals: ", oe_real_names.size());
-		try
-		{
-			pe.reorder(oe_real_names, vector<string>());
-		}
-		catch (exception & e)
-		{
-			ss << "error reordering pe with restart oe:" << e.what();
-			throw_em_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_em_error(string("error reordering pe with restart oe"));
-		}
-
-	}
-
-	//if (oe.shape().first < oe_base.shape().first) //maybe some runs failed...
-	if (oe.shape().first <= oe_base.shape().first)
-	{
-		//find which realizations are missing and reorder oe_base, pe and pe_base
-
-		//message(1, "shape mismatch detected with restart obs ensemble...checking for compatibility");
-
-		/*vector<string> pe_real_names;
-		start = oe_base_real_names.begin();
-		end = oe_base_real_names.end();
-		vector<string>::const_iterator it;
-		int iit;
-		for (int i = 0; i < oe.shape().first; i++)
-		{
-			it = find(start, end, oe_real_names[i]);
-			if (it != end)
-			{
-				iit = it - start;
-				pe_real_names.push_back(pe_org_real_names[iit]);
-			}
-		}*/
-		message(2, "reordering oe_base to align with restart obs en,num reals:", oe_real_names.size());
-		if ((oe_drawn) && (oe_base.shape().first == oe_real_names.size()))
-		{
-			oe_base.set_real_names(oe_real_names);
-		}
-		else
-		{
-			try
-			{
-				oe_base.reorder(oe_real_names, vector<string>());
-			}
-			catch (exception & e)
-			{
-				ss << "error reordering oe_base with restart oe:" << e.what();
-				throw_em_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_em_error(string("error reordering oe_base with restart oe"));
-			}
-		}
-		//if (par_restart_csv.size() > 0)
-		if (true)
-		{
-			vector<string> pe_real_names = pe.get_real_names();
-			message(2, "reordering pe_base to align with restart par en,num reals:", pe_real_names.size());
-			try
-			{
-				pe_base.reorder(pe_real_names, vector<string>());
-			}
-			catch (exception & e)
-			{
-				ss << "error reordering pe_base with restart pe:" << e.what();
-				throw_em_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_em_error(string("error reordering pe_base with restart pe"));
-			}
-		}
-
-
-		/*try
-		{
-			pe.reorder(pe_real_names, vector<string>());
-		}
-		catch (exception &e)
-		{
-			ss << "error reordering pe with restart oe:" << e.what();
-			throw_em_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_em_error(string("error reordering pe with restart oe"));
-		}*/
-	}
-	else if (oe.shape().first > oe_base.shape().first) //something is wrong
-	{
-		ss << "restart oe has too many rows: " << oe.shape().first << " compared to oe_base: " << oe_base.shape().first;
-		throw_em_error(ss.str());
-	}
-}
+//void DataAssimilator::initialize_restart()
+//{
+//	stringstream ss;
+//	string obs_restart_csv = pest_scenario.get_pestpp_options().get_ies_obs_restart_csv();
+//	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
+//
+//	//performance_log->log_event("restart with existing obs ensemble: " + obs_restart_csv);
+//	message(1, "restarting with existing obs ensemble", obs_restart_csv);
+//	string obs_ext = pest_utils::lower_cp(obs_restart_csv).substr(obs_restart_csv.size() - 3, obs_restart_csv.size());
+//	if (obs_ext.compare("csv") == 0)
+//	{
+//		message(1, "loading restart obs ensemble from csv file", obs_restart_csv);
+//		try
+//		{
+//			oe.from_csv(obs_restart_csv);
+//		}
+//		catch (const exception & e)
+//		{
+//			ss << "error processing restart obs csv: " << e.what();
+//			throw_em_error(ss.str());
+//		}
+//		catch (...)
+//		{
+//			throw_em_error(string("error processing restart obs csv"));
+//		}
+//	}
+//	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
+//	{
+//		message(1, "loading restart obs ensemble from binary file", obs_restart_csv);
+//		try
+//		{
+//			oe.from_binary(obs_restart_csv);
+//		}
+//		catch (const exception & e)
+//		{
+//			ss << "error processing restart obs binary file: " << e.what();
+//			throw_em_error(ss.str());
+//		}
+//		catch (...)
+//		{
+//			throw_em_error(string("error processing restart obs binary file"));
+//		}
+//	}
+//	else
+//	{
+//		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
+//		throw_em_error(ss.str());
+//	}
+//	if (par_restart_csv.size() > 0)
+//	{
+//		string par_ext = pest_utils::lower_cp(par_restart_csv).substr(par_restart_csv.size() - 3, par_restart_csv.size());
+//		if (par_ext.compare("csv") == 0)
+//		{
+//			message(1, "loading restart par ensemble from csv file", par_restart_csv);
+//			try
+//			{
+//				pe.from_csv(par_restart_csv);
+//			}
+//			catch (const exception & e)
+//			{
+//				ss << "error processing restart par csv: " << e.what();
+//				throw_em_error(ss.str());
+//			}
+//			catch (...)
+//			{
+//				throw_em_error(string("error processing restart par csv"));
+//			}
+//		}
+//		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+//		{
+//			message(1, "loading restart par ensemble from binary file", par_restart_csv);
+//			try
+//			{
+//				pe.from_binary(par_restart_csv);
+//			}
+//			catch (const exception & e)
+//			{
+//				ss << "error processing restart par binary file: " << e.what();
+//				throw_em_error(ss.str());
+//			}
+//			catch (...)
+//			{
+//				throw_em_error(string("error processing restart par binary file"));
+//			}
+//		}
+//		else
+//		{
+//			ss << "unrecognized restart par ensemble extension " << par_ext << ", looking for csv, jcb, or jco";
+//			throw_em_error(ss.str());
+//		}
+//		if (pe.shape().first != oe.shape().first)
+//		{
+//			ss.str("");
+//			ss << "restart par en has " << pe.shape().first << " realizations but restart obs en has " << oe.shape().first;
+//			throw_em_error(ss.str());
+//		}
+//
+//		//check that restart pe is in sync with pe_base
+//		vector<string> pe_real_names = pe.get_real_names(), pe_base_real_names = pe_base.get_real_names();
+//		vector<string>::const_iterator start, end;
+//		vector<string> missing;
+//		start = pe_base_real_names.begin();
+//		end = pe_base_real_names.end();
+//		for (auto& rname : pe_real_names)
+//			if (find(start, end, rname) == end)
+//				missing.push_back(rname);
+//		if (missing.size() > 0)
+//		{
+//			ss << "the following realization names were found in the restart par en but not in the 'base' par en:";
+//			for (auto& m : missing)
+//				ss << m << ",";
+//			throw_em_error(ss.str());
+//		}
+//	}
+//
+//	if (pp_args.find("IES_NUM_REALS") != pp_args.end())
+//	{
+//		int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
+//		/*if (pest_scenario.get_pestpp_options().get_ies_include_base())
+//		{
+//			message(1, "Note: increasing num_reals by 1 to account for 'base' realization in existing obs restart ensemble");
+//			num_reals++;
+//		}*/
+//		if (num_reals < oe.shape().first)
+//		{
+//			message(1, "ies_num_reals arg passed, truncated restart obs ensemble to ", num_reals);
+//			vector<string> keep_names, real_names = oe.get_real_names();
+//			for (int i = 0; i < num_reals; i++)
+//			{
+//				keep_names.push_back(real_names[i]);
+//			}
+//			oe.keep_rows(keep_names);
+//		}
+//	}
+//
+//	//check that restart oe is in sync with oe_base
+//	vector<string> oe_real_names = oe.get_real_names(), oe_base_real_names = oe_base.get_real_names();
+//	vector<string>::const_iterator start, end;
+//	vector<string> missing;
+//	start = oe_base_real_names.begin();
+//	end = oe_base_real_names.end();
+//	for (auto& rname : oe_real_names)
+//		if (find(start, end, rname) == end)
+//			missing.push_back(rname);
+//	if (missing.size() > 0)
+//	{
+//		//the special case where the base real is what is missing...
+//		if ((missing.size() == 1) && (missing[0] == "BASE"))
+//		{
+//			//check that the base real is in the par en - restart_par_en should be accounted for by now
+//			int base_par_idx = -1;
+//			vector<string> pe_real_names = pe.get_real_names(), pe_base_real_names = pe_base.get_real_names();
+//			for (int i = 0; i < pe_base.shape().first; i++)
+//			{
+//				if (pe_base_real_names[i] == "BASE")
+//				{
+//					base_par_idx = i;
+//					break;
+//				}
+//			}
+//			if (base_par_idx != -1)
+//			{
+//				ss.str("");
+//				ss << "WARNING: replacing base obs en realization '" << oe_base_real_names[base_par_idx] << "' with 'base' (noise free) values to match par en 'base' location";
+//				message(2, ss.str());
+//				Observations obs = pest_scenario.get_ctl_observations();
+//				oe_base.replace(base_par_idx, obs, "BASE");
+//			}
+//			else
+//			{
+//				ss << "the 'base' realization was not found in the restart obs en and also not found in the par en";
+//				throw_em_error(ss.str());
+//			}
+//
+//		}
+//		else
+//		{
+//			ss << "the following realization names were found in the restart obs en but not in the 'base' obs en:";
+//			for (auto& m : missing)
+//				ss << m << ",";
+//			throw_em_error(ss.str());
+//		}
+//
+//	}
+//
+//	if (oe.shape().first != pe.shape().first)
+//	{
+//		//check if all oe names are found in par en, if so, we can reorder and proceed.  otherwise, die
+//		missing.clear();
+//		vector<string> pe_real_names = pe.get_real_names();
+//		for (auto& oname : oe_real_names)
+//		{
+//			if (find(pe_real_names.begin(), pe_real_names.end(), oname) == pe_real_names.end())
+//				missing.push_back(oname);
+//		}
+//
+//		if (missing.size() > 0)
+//		{
+//			ss << "number of reals differ between restart obs en (" << oe.shape().first << ") and par en (" << pe.shape().first << ")";
+//			ss << " and realization names could not be aligned:";
+//			for (auto& m : missing)
+//				ss << m << ",";
+//			throw_em_error(ss.str());
+//		}
+//
+//		message(2, "reordering pe to align with restart obs en, num reals: ", oe_real_names.size());
+//		try
+//		{
+//			pe.reorder(oe_real_names, vector<string>());
+//		}
+//		catch (exception & e)
+//		{
+//			ss << "error reordering pe with restart oe:" << e.what();
+//			throw_em_error(ss.str());
+//		}
+//		catch (...)
+//		{
+//			throw_em_error(string("error reordering pe with restart oe"));
+//		}
+//
+//	}
+//
+//	//if (oe.shape().first < oe_base.shape().first) //maybe some runs failed...
+//	if (oe.shape().first <= oe_base.shape().first)
+//	{
+//		//find which realizations are missing and reorder oe_base, pe and pe_base
+//
+//		//message(1, "shape mismatch detected with restart obs ensemble...checking for compatibility");
+//
+//		/*vector<string> pe_real_names;
+//		start = oe_base_real_names.begin();
+//		end = oe_base_real_names.end();
+//		vector<string>::const_iterator it;
+//		int iit;
+//		for (int i = 0; i < oe.shape().first; i++)
+//		{
+//			it = find(start, end, oe_real_names[i]);
+//			if (it != end)
+//			{
+//				iit = it - start;
+//				pe_real_names.push_back(pe_org_real_names[iit]);
+//			}
+//		}*/
+//		message(2, "reordering oe_base to align with restart obs en,num reals:", oe_real_names.size());
+//		if ((oe_drawn) && (oe_base.shape().first == oe_real_names.size()))
+//		{
+//			oe_base.set_real_names(oe_real_names);
+//		}
+//		else
+//		{
+//			try
+//			{
+//				oe_base.reorder(oe_real_names, vector<string>());
+//			}
+//			catch (exception & e)
+//			{
+//				ss << "error reordering oe_base with restart oe:" << e.what();
+//				throw_em_error(ss.str());
+//			}
+//			catch (...)
+//			{
+//				throw_em_error(string("error reordering oe_base with restart oe"));
+//			}
+//		}
+//		//if (par_restart_csv.size() > 0)
+//		if (true)
+//		{
+//			vector<string> pe_real_names = pe.get_real_names();
+//			message(2, "reordering pe_base to align with restart par en,num reals:", pe_real_names.size());
+//			try
+//			{
+//				pe_base.reorder(pe_real_names, vector<string>());
+//			}
+//			catch (exception & e)
+//			{
+//				ss << "error reordering pe_base with restart pe:" << e.what();
+//				throw_em_error(ss.str());
+//			}
+//			catch (...)
+//			{
+//				throw_em_error(string("error reordering pe_base with restart pe"));
+//			}
+//		}
+//
+//
+//		/*try
+//		{
+//			pe.reorder(pe_real_names, vector<string>());
+//		}
+//		catch (exception &e)
+//		{
+//			ss << "error reordering pe with restart oe:" << e.what();
+//			throw_em_error(ss.str());
+//		}
+//		catch (...)
+//		{
+//			throw_em_error(string("error reordering pe with restart oe"));
+//		}*/
+//	}
+//	else if (oe.shape().first > oe_base.shape().first) //something is wrong
+//	{
+//		ss << "restart oe has too many rows: " << oe.shape().first << " compared to oe_base: " << oe_base.shape().first;
+//		throw_em_error(ss.str());
+//	}
+//}
 
 
 
@@ -812,21 +812,21 @@ void DataAssimilator::initialize_restart()
 //}
 
 
-void DataAssimilator::initialize_obscov()
-{
-	if (act_obs_names.size() == 0)
-		message(1, "no non-zero weighted observations for cycle ", icycle);
-	else
-	{
-		message(1, "initializing observation noise covariance matrix");
-		string obscov_filename = pest_scenario.get_pestpp_options().get_obscov_filename();
-
-		string how = obscov.try_from(pest_scenario, file_manager, false);
-		message(1, "obscov loaded ", how);
-		obscov = obscov.get(act_obs_names);
-	}
-}
-
+//void DataAssimilator::initialize_obscov()
+//{
+//	if (act_obs_names.size() == 0)
+//		message(1, "no non-zero weighted observations for cycle ", icycle);
+//	else
+//	{
+//		message(1, "initializing observation noise covariance matrix");
+//		string obscov_filename = pest_scenario.get_pestpp_options().get_obscov_filename();
+//
+//		string how = obscov.try_from(pest_scenario, file_manager, false);
+//		message(1, "obscov loaded ", how);
+//		obscov = obscov.get(act_obs_names);
+//	}
+//}
+//
 
 //void DataAssimilator::initialize(int _icycle)
 //{
@@ -1555,11 +1555,13 @@ void DataAssimilator::forward_run_noptmax_0(int icycle)
 	if (obs_dyn_state_names.size() > 0) {
 		message(1, "update initial dynamic states for next time cycle. Dynamic states  matrix size is", dyn_states.size());
 
-		Eigen::MatrixXd mat = _oe.get_eigen(vector<string>(), obs_dyn_state_names);
+		/*Eigen::MatrixXd mat = _oe.get_eigen(vector<string>(), obs_dyn_state_names);
 		obs_i = mat.replicate(pe.shape().first, 1);
-		pe.replace_col_vals(par_dyn_state_names, obs_i);
-
+		cout << obs_i << endl;
+		pe.replace_col_vals(par_dyn_state_names, obs_i);*/
+		//transfer_dynamic_state_from_oe_to_pe(pe, _oe);
 	}
+	transfer_dynamic_state_from_oe_to_pe(pe, _oe);
 	oe = _oe;
 	return;
 }
@@ -1581,7 +1583,7 @@ void DataAssimilator::initialize(int _icycle)
 	// da type that is lower case is ok, I should move this somewhere else
 	transform(da_type.begin(), da_type.end(), da_type.begin(), ::toupper);
 	
-	initialize_dynamic_states();
+	//initialize_dynamic_states();
 
 	// run the model one time using the initial parameters values. 
 	if (pest_scenario.get_control_info().noptmax == 0)
@@ -1703,22 +1705,6 @@ void DataAssimilator::initialize(int _icycle)
 
 	oe_drawn = initialize_oe(obscov);
 	string center_on = ppo->get_ies_center_on();
-
-	//this is being done globally now
-	/*if (icycle == 0)
-	{
-		try
-		{
-			pe.check_for_dups();
-		}
-		catch (const exception & e)
-		{
-			string message = e.what();
-			throw_em_error("error in parameter ensemble: " + message);
-		}
-
-	}*/
-
 	try
 	{
 		oe.check_for_dups();
@@ -1913,15 +1899,16 @@ void DataAssimilator::initialize(int _icycle)
 		}
 		//add_dynamic_state_to_pe();
 		//vector<string> real_names = _oe.get_real_names();
-		Eigen::MatrixXd obs_i;
+		
+		//Eigen::MatrixXd obs_i;
 
-		if (obs_dyn_state_names.size() > 0) {
+		/*if (obs_dyn_state_names.size() > 0) {
 			Eigen::MatrixXd mat = _oe.get_eigen(vector<string>(), obs_dyn_state_names);
 			obs_i = mat.replicate(pe.shape().first, 1);
 			pe.replace_col_vals(par_dyn_state_names, obs_i);
 
-		}
-
+		}*/
+		transfer_dynamic_state_from_pe_to_oe(pe, _oe);
 		return;
 	}
 
@@ -1992,7 +1979,8 @@ void DataAssimilator::initialize(int _icycle)
 	{
 		message(1, "add dynamic states to forecast ensemble. Dynamic states  matrix size is ", dyn_states.size());
 	}
-	add_dynamic_state_to_pe();
+	//add_dynamic_state_to_pe();
+	transfer_dynamic_state_from_oe_to_pe(pe, oe);
 	// ==
 
 	ss.str("");
@@ -2185,156 +2173,156 @@ void DataAssimilator::da_save_ensemble_oe(string fprefix, string dtyp)
 	}
 	//message(1, "saved forecast (parameter and state) ensemble to ", ss.str());
 }
-void DataAssimilator::add_dynamic_state_to_pe()
-{
-	
-	//vector<string> real_names = oe.get_real_names();
-	ParameterEnsemble::transStatus org_status = pe.get_trans_status();
-	ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
-	if (obs_dyn_state_names.size() > 0)	{	
-			
-		Eigen::MatrixXd mat = oe.get_eigen(vector<string>(), obs_dyn_state_names);
-		if (org_status == ParameterEnsemble::transStatus::NUM)
-		{
-			for (int i = 0; i < mat.rows(); i++)
-			{
-				Parameters pars = pest_scenario.get_ctl_parameters();
-				
-				pars.update(par_dyn_state_names, mat.row(i));
-				bts.ctl2numeric_ip(pars);
-				mat.row(i) = pars.get_data_eigen_vec(par_dyn_state_names);
-			}
-		}
-		pe.replace_col_vals(par_dyn_state_names, mat);
-		
-	}
-	
-}
-void DataAssimilator::initialize_dynamic_states()
-{
-	stringstream ss;
-	// find a list of dynamic states
-	//vector <string> dyn_states_names;	
-	obs_dyn_state_names.clear();
-	par_dyn_state_names.clear();
-	vector<string> obs_names = oe.get_var_names(); // todo: get obs names from a different source. 
-	vector<string> par_names = pe.get_var_names();
-	set<string> spar_names(par_names.begin(), par_names.end());
-	set<string>::iterator end = spar_names.end();
-	par_names.clear();
-	//for (int i = 0; i < obs_names.size(); i++)	
-	double w;
-	for (auto& name : obs_names)
-	{
-		
-		w = pest_scenario.get_observation_info_ptr()->get_weight(name);		
-		//if ((w == 0) && (spar_names.find(name) != end))
-		if (spar_names.find(name) != end)
-		{
-			obs_dyn_state_names.push_back(name);
-			par_dyn_state_names.push_back(name);
-		}
+//void DataAssimilator::add_dynamic_state_to_pe()
+//{
+//	
+//	//vector<string> real_names = oe.get_real_names();
+//	ParameterEnsemble::transStatus org_status = pe.get_trans_status();
+//	ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
+//	if (obs_dyn_state_names.size() > 0)	{	
+//			
+//		Eigen::MatrixXd mat = oe.get_eigen(vector<string>(), obs_dyn_state_names);
+//		if (org_status == ParameterEnsemble::transStatus::NUM)
+//		{
+//			for (int i = 0; i < mat.rows(); i++)
+//			{
+//				Parameters pars = pest_scenario.get_ctl_parameters();
+//				
+//				pars.update(par_dyn_state_names, mat.row(i));
+//				bts.ctl2numeric_ip(pars);
+//				mat.row(i) = pars.get_data_eigen_vec(par_dyn_state_names);
+//			}
+//		}
+//		pe.replace_col_vals(par_dyn_state_names, mat);
+//		
+//	}
+//	
+//}
+////void DataAssimilator::initialize_dynamic_states()
+//{
+//	stringstream ss;
+//	// find a list of dynamic states
+//	//vector <string> dyn_states_names;	
+//	obs_dyn_state_names.clear();
+//	par_dyn_state_names.clear();
+//	vector<string> obs_names = oe.get_var_names(); // todo: get obs names from a different source. 
+//	vector<string> par_names = pe.get_var_names();
+//	set<string> spar_names(par_names.begin(), par_names.end());
+//	set<string>::iterator end = spar_names.end();
+//	par_names.clear();
+//	//for (int i = 0; i < obs_names.size(); i++)	
+//	double w;
+//	for (auto& name : obs_names)
+//	{
+//		
+//		w = pest_scenario.get_observation_info_ptr()->get_weight(name);		
+//		//if ((w == 0) && (spar_names.find(name) != end))
+//		if (spar_names.find(name) != end)
+//		{
+//			obs_dyn_state_names.push_back(name);
+//			par_dyn_state_names.push_back(name);
+//		}
+//
+//	}
+//	if (obs_dyn_state_names.size() > 0)
+//	{
+//		ss.str("");
+//		ss << obs_dyn_state_names.size() << " non-zero weighted dynamic states identified through shared-names";
+//		message(1, ss.str());
+//	}
+//	map<string, string> state_map = pest_scenario.get_ext_file_string_map("observation data external", "state_par_link");
+//	if (state_map.size() > 0)
+//	{
+//		
+//		set<string> pstates(par_dyn_state_names.begin(), par_dyn_state_names.end());
+//		set<string>::iterator send = pstates.end();
+//		vector<string> t = pest_scenario.get_ctl_ordered_par_names();
+//		set<string> pnames(t.begin(), t.end());
+//		t.clear();
+//		set<string>::iterator pend = pnames.end();
+//		vector<string> dups,missing;
+//		int c = 0;
+//		for (auto& sm : state_map)
+//		{
+//			if (pstates.find(sm.second) != send)
+//			{
+//				dups.push_back(sm.second);
+//			}
+//			else if (pnames.find(sm.second) == pend)
+//			{
+//				missing.push_back(sm.second);
+//			}
+//			else
+//			{
+//				w = pest_scenario.get_observation_info_ptr()->get_weight(sm.first);
+//				//if (w == 0)
+//				{
+//					obs_dyn_state_names.push_back(sm.first);
+//					par_dyn_state_names.push_back(sm.second);
+//					c++;
+//				}
+//			}
+//		}
+//		if (dups.size() > 0)
+//		{
+//			stringstream ss;
+//			ss << "the following state parameters nominated thru obs data linking " << endl;
+//			ss << "    were already tagged as 'states' by identically named observations:" << endl;
+//			for (auto& d : dups)
+//				ss << d << ",";		
+//			throw_em_error(ss.str());
+//		}
+//		if (missing.size() > 0)
+//		{
+//			stringstream ss;
+//			ss << "the following parameters nominated thru obs data linking " << endl;
+//			ss << "    were not found in par data section:" << endl;
+//			for (auto& m : missing)
+//				ss << m << ",";
+//			throw_em_error(ss.str());
+//		}
+//		if (c > 0)
+//		{
+//			ss.str("");
+//			ss << c << " non-zero weighted dynamic states identified through 'state_par_link'";
+//			message(1, ss.str());
+//		}
+//	}
+//}
 
-	}
-	if (obs_dyn_state_names.size() > 0)
-	{
-		ss.str("");
-		ss << obs_dyn_state_names.size() << " non-zero weighted dynamic states identified through shared-names";
-		message(1, ss.str());
-	}
-	map<string, string> state_map = pest_scenario.get_ext_file_string_map("observation data external", "state_par_link");
-	if (state_map.size() > 0)
-	{
-		
-		set<string> pstates(par_dyn_state_names.begin(), par_dyn_state_names.end());
-		set<string>::iterator send = pstates.end();
-		vector<string> t = pest_scenario.get_ctl_ordered_par_names();
-		set<string> pnames(t.begin(), t.end());
-		t.clear();
-		set<string>::iterator pend = pnames.end();
-		vector<string> dups,missing;
-		int c = 0;
-		for (auto& sm : state_map)
-		{
-			if (pstates.find(sm.second) != send)
-			{
-				dups.push_back(sm.second);
-			}
-			else if (pnames.find(sm.second) == pend)
-			{
-				missing.push_back(sm.second);
-			}
-			else
-			{
-				w = pest_scenario.get_observation_info_ptr()->get_weight(sm.first);
-				//if (w == 0)
-				{
-					obs_dyn_state_names.push_back(sm.first);
-					par_dyn_state_names.push_back(sm.second);
-					c++;
-				}
-			}
-		}
-		if (dups.size() > 0)
-		{
-			stringstream ss;
-			ss << "the following state parameters nominated thru obs data linking " << endl;
-			ss << "    were already tagged as 'states' by identically named observations:" << endl;
-			for (auto& d : dups)
-				ss << d << ",";		
-			throw_em_error(ss.str());
-		}
-		if (missing.size() > 0)
-		{
-			stringstream ss;
-			ss << "the following parameters nominated thru obs data linking " << endl;
-			ss << "    were not found in par data section:" << endl;
-			for (auto& m : missing)
-				ss << m << ",";
-			throw_em_error(ss.str());
-		}
-		if (c > 0)
-		{
-			ss.str("");
-			ss << c << " non-zero weighted dynamic states identified through 'state_par_link'";
-			message(1, ss.str());
-		}
-	}
-}
-
-vector<string> DataAssimilator::detect_prior_data_conflict()
-{
-	message(1, "checking for prior-data conflict...");
-	//for now, just really simple metric - checking for overlap
-	vector<string> in_conflict;
-	double smin, smax, omin, omax;
-	map<string, int> smap, omap;
-	vector<string> snames = oe.get_var_names();
-	vector<string> onames = oe_base.get_var_names();
-
-	for (int i = 0; i < snames.size(); i++)
-	{
-		smap[snames[i]] = i;
-	}
-	for (int i = 0; i < onames.size(); i++)
-	{
-		omap[onames[i]] = i;
-	}
-	int sidx, oidx; // Ayman: this is to check if the model predictions does not envelop obs values. 
-				    // If yes, we still can run KF, but it means that our prior is not wide enough or the model is biased!
-	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
-	{
-		sidx = smap[oname];
-		oidx = omap[oname];
-		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
-		omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
-		smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
-		omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
-		if ((smin > omax) || (smax < omin))
-			in_conflict.push_back(oname);
-	}
-	return in_conflict;
-}
+//vector<string> DataAssimilator::detect_prior_data_conflict()
+//{
+//	message(1, "checking for prior-data conflict...");
+//	//for now, just really simple metric - checking for overlap
+//	vector<string> in_conflict;
+//	double smin, smax, omin, omax;
+//	map<string, int> smap, omap;
+//	vector<string> snames = oe.get_var_names();
+//	vector<string> onames = oe_base.get_var_names();
+//
+//	for (int i = 0; i < snames.size(); i++)
+//	{
+//		smap[snames[i]] = i;
+//	}
+//	for (int i = 0; i < onames.size(); i++)
+//	{
+//		omap[onames[i]] = i;
+//	}
+//	int sidx, oidx; // Ayman: this is to check if the model predictions does not envelop obs values. 
+//				    // If yes, we still can run KF, but it means that our prior is not wide enough or the model is biased!
+//	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
+//	{
+//		sidx = smap[oname];
+//		oidx = omap[oname];
+//		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
+//		omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
+//		smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
+//		omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
+//		if ((smin > omax) || (smax < omin))
+//			in_conflict.push_back(oname);
+//	}
+//	return in_conflict;
+//}
 
 //Eigen::MatrixXd DataAssimilator::get_Am(const vector<string>& real_names, const vector<string>& par_names)
 //{
@@ -4268,8 +4256,6 @@ bool DataAssimilator::solve_new_da()
 		}
 	}
 	*/
-		
-	
 	
 	// ============= end of forward runs =================
 	message(0, "evaluting inflation factor ensembles");

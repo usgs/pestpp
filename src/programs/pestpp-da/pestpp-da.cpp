@@ -555,7 +555,7 @@ int main(int argc, char* argv[])
 			run_manager_ptr->initialize(par_names, obs_names);
 			performance_log.log_event("instantiating DA instance");
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
-
+			da.initialize_dynamic_states();
 			da.da_type = pest_scenario.get_pestpp_options_ptr()->da_ctl_params.get_svalue("DA_TYPE");
 			std::mt19937 rand_gen = da.get_rand_gen();
 			vector<string> act_par_names = childPest.get_ctl_ordered_adj_par_names();
@@ -564,7 +564,6 @@ int main(int argc, char* argv[])
 			cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
 
 			da.set_pe(cycle_curr_pe);
-
 
 			da.initialize(*icycle);
 
@@ -607,7 +606,7 @@ int main(int argc, char* argv[])
 					if (i > 10)
 					{
 						fout_rec << endl;
-						i == 0;
+						i = 0;
 					}
 				}
 				curr_pe.drop_rows(missing);
@@ -637,7 +636,7 @@ int main(int argc, char* argv[])
 					if (i > 10)
 					{
 						fout_rec << endl;
-						i == 0;
+						i = 0;
 					}
 				}
 				curr_oe.drop_rows(missing);

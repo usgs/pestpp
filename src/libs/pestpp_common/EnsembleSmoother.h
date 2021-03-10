@@ -29,7 +29,7 @@ public:
 	using EnsembleMethod::EnsembleMethod;
 	
 	
-	void initialize();
+	//void initialize();
 	void iterate_2_solution();
 	void finalize();
 	void throw_ies_error(string message);

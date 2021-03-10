@@ -263,6 +263,7 @@ public:
 	//virtual void finalize() { ; }
 	virtual void throw_em_error(string message);
 	bool should_terminate();
+	virtual void sanity_checks() { ; }
 	//template<typename T, typename A>
 	//void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
 	void message(int level, const string& _message, vector<string> _extras, bool echo = true);
@@ -278,7 +279,6 @@ public:
 
 	ParameterEnsemble get_pe() { return pe; }
 	void set_pe(ParameterEnsemble new_pe) { pe = new_pe; }
-
 	bool initialize_pe(Covariance& cov);
 	void initialize_parcov();
 	Covariance* get_parcov_ptr() { return &parcov; }
@@ -289,6 +289,11 @@ public:
 	int get_iter() { return iter; }
 	FileManager& get_file_manager() { return file_manager; }
 	Pest& get_pest_scenario() { return pest_scenario; }
+	
+	void initialize(int cycle = NetPackage::NULL_DA_CYCLE);
+
+	//this is not called in the initialization - must be called before initialize() to trigger dynamic state handling...
+	void initialize_dynamic_states();
 
 protected:
 	string alg_tag;
@@ -315,6 +320,8 @@ protected:
 	vector<double> best_mean_phis;
 	double best_phi_yet;
 
+	vector<string> obs_dyn_state_names, par_dyn_state_names;
+
 	int consec_bad_lambda_cycles;
 
 	double lambda_max, lambda_min;
@@ -333,6 +340,12 @@ protected:
 
 	bool oe_drawn, pe_drawn;
 
+
+	void transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
+	void transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
+
+	
+
 	bool solve_glm();
 	bool solve_mda();
 
@@ -344,6 +357,7 @@ protected:
 	//ParameterEnsemble calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>> &loc_map);
 
 	vector<int> run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>(), int cycle=NetPackage::NULL_DA_CYCLE);
+	
 	//vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle= NetPackage::NULL_DA_CYCLE);
 
 	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int> subset_idxs);

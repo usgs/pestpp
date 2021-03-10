@@ -84,7 +84,7 @@ public:
 	void da_save_ensemble_pe(string fprefix, string dtyp);
 	void da_save_ensemble_oe(string fprefix, string dtyp);
 	//void add_dynamic_state_to_pe();
-	void add_dynamic_state_to_pe();
+	//void add_dynamic_state_to_pe();
 	
 	
 	void da_update();
@@ -114,8 +114,8 @@ private:
 	
 	CtlPar_container da_ctl_params;
 
-	vector<string> obs_dyn_state_names;
-	vector<string> par_dyn_state_names;
+	//vector<string> obs_dyn_state_names;
+	//vector<string> par_dyn_state_names;
 
 	vector<double> infl_facs;
 	int solution_iterations;
@@ -123,7 +123,7 @@ private:
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 
 	bool oe_drawn, pe_drawn;
-	void initialize_dynamic_states();
+	//void initialize_dynamic_states();
 	bool solve_new_da();
 	void update_starting_state();
 	void return_post_dyn_state(vector<ParameterEnsemble>& pe_lams, vector<ParameterEnsemble> poterior_dyn_states);
@@ -163,22 +163,22 @@ private:
 	//void report_and_save();
 	//void save_mat(string prefix, Eigen::MatrixXd& mat);
 	
-	bool initialize_oe(Covariance& cov);
-	void initialize_restart();
+	//bool initialize_oe(Covariance& cov);
+	//void initialize_restart();
 	
-	void initialize_obscov();
+	//void initialize_obscov();
 	//void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, bool is_subset = false);
 	//void check_ensembles(ObservationEnsemble &oe, ParameterEnsemble &pe);
-	template<typename T, typename A>
+	/*template<typename T, typename A>
 	void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
-	void message(int level, const string& _message);
+	void message(int level, const string& _message);*/
 
 	//template<typename T, typename A>
 	//void message(int level, char* _message, vector<T, A> _extras);// { message(level, string(_message), _extras); }
 	//void message(int level, char* _message);// { message(level, string(_message)); }
 
-	template<typename T>
-	void message(int level, const string& _message, T extra);
+	//template<typename T>
+	//void message(int level, const string& _message, T extra);
 
 	//template<typename T>
 	//void message(int level, char* _message, T extra);
@@ -191,7 +191,7 @@ private:
 
 	//void initialize();
 
-	vector<string> detect_prior_data_conflict();
+	//vector<string> detect_prior_data_conflict();
 
 	//map<int,int> get_subset_idx_map();
 	//void set_subset_idx(int size);
