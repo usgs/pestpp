@@ -308,7 +308,7 @@ protected:
 	Localizer localizer;
 	int num_threads;
 	set<string> pp_args;
-	int iter, subset_size;
+	int iter;
 	bool use_subset;
 	
 	double last_best_lam, last_best_mean, last_best_std;
@@ -323,7 +323,7 @@ protected:
 
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
-	vector<int> subset_idxs;
+	//vector<int> subset_idxs;
 
 	ParameterEnsemble pe, pe_base;
 	ObservationEnsemble oe, oe_base;
@@ -333,13 +333,20 @@ protected:
 
 	bool oe_drawn, pe_drawn;
 
+	bool solve_glm();
+	bool solve_mda();
+
+	bool solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle=NetPackage::NULL_DA_CYCLE);
+
 	//bool solve_old();
-	bool solve_new();
+	//bool solve();
 
 	//ParameterEnsemble calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>> &loc_map);
 
 	vector<int> run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>(), int cycle=NetPackage::NULL_DA_CYCLE);
-	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle= NetPackage::NULL_DA_CYCLE);
+	//vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle= NetPackage::NULL_DA_CYCLE);
+
+	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int> subset_idxs);
 
 	void report_and_save();
 	void save_mat(string prefix, Eigen::MatrixXd& mat);
@@ -348,7 +355,7 @@ protected:
 	void initialize_restart();
 	//void initialize_parcov();
 	void initialize_obscov();
-	void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, bool is_subset = false);
+	void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, vector<int> subset_idxs = vector<int>());
 	
 
 	//void sanity_checks();
@@ -357,9 +364,11 @@ protected:
 
 	void update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
 
+	vector<int> get_subset_idxs(int size, int _subset_size);
+
 	vector<string> detect_prior_data_conflict();
 
-	void set_subset_idx(int size);
+	//void set_subset_idx(int size);
 	Eigen::MatrixXd get_Am(const vector<string>& real_names, const vector<string>& par_names);
 
 	void zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov = true, bool update_oe_base = true);

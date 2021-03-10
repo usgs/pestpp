@@ -194,7 +194,7 @@ private:
 	vector<string> detect_prior_data_conflict();
 
 	//map<int,int> get_subset_idx_map();
-	void set_subset_idx(int size);
+	//void set_subset_idx(int size);
 	//Eigen::MatrixXd get_Am(const vector<string>& real_names, const vector<string>& par_names);
 
 };

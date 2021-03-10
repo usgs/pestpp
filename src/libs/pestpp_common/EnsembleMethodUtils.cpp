@@ -2600,7 +2600,7 @@ bool EnsembleMethod::should_terminate()
 
 
 vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, 
-	vector<double>& scale_vals, int cycle)
+	vector<double>& scale_vals, int cycle, vector<int> subset_idxs)
 {
 	ofstream& frec = file_manager.rec_ofstream();
 	stringstream ss;
@@ -2608,7 +2608,7 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 	performance_log->log_event(ss.str());
 	run_mgr_ptr->reinitialize();
 
-	set_subset_idx(pe_lams[0].shape().first);
+	//set_subset_idx(pe_lams[0].shape().first);
 	vector<map<int, int>> real_run_ids_vec;
 	//ParameterEnsemble pe_lam;
 	//for (int i=0;i<pe_lams.size();i++)
@@ -2661,7 +2661,7 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 		real_run_ids = real_run_ids_vec[i];
 		//if using subset, reset the real_idx in real_run_ids to be just simple counter
 		//if (subset_size < pe_lams[0].shape().first)
-		if ((use_subset) && (subset_size < pe_lams[i].shape().first))
+		if ((use_subset) && (subset_idxs.size() < pe_lams[i].shape().first))
 		{
 			_oe.keep_rows(subset_idxs);
 			int ireal = 0;
@@ -2839,7 +2839,43 @@ vector<int> EnsembleMethod::run_ensemble(ParameterEnsemble& _pe,
 }
 
 
-bool EnsembleMethod::solve_new()
+bool EnsembleMethod::solve_glm()
+{
+	vector<double> lambdas = lam_mults;
+	for (auto& m : lambdas)
+		m *= last_best_lam;
+
+	vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
+	return solve(false, lambdas, scale_facs);
+
+}
+
+bool EnsembleMethod::solve_mda()
+{
+
+	//this function should cover the case where noptmax = 1 (vanilla) also...
+	vector<double> mda_facs;
+	mda_facs.push_back(pest_scenario.get_pestpp_options().get_ies_mda_init_fac());
+	double tot = mda_facs[0];
+	double dec_fac = pest_scenario.get_pestpp_options().get_ies_mda_dec_fac();
+	for (int i = 1; i < pest_scenario.get_control_info().noptmax; i++)
+	{
+		mda_facs.push_back(mda_facs[i - 1] * dec_fac);
+		tot += mda_facs[i];
+	}
+	double ttot = 0.0;
+	for (auto& mda_fac : mda_facs)
+	{
+		mda_fac = mda_fac / tot;
+		ttot += mda_fac;
+	}
+	tot = mda_facs[iter];
+	mda_facs = vector<double>{ tot };
+	vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
+	return solve(true, mda_facs, scale_facs);
+}
+
+bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle)
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
@@ -2857,15 +2893,25 @@ bool EnsembleMethod::solve_new()
 		message(1, s);
 	}
 
-	if ((use_subset) && (subset_size > pe.shape().first))
+	int local_subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
+	if ((use_subset) && (local_subset_size > pe.shape().first))
 	{
 		ss.str("");
-		ss << "++ies_subset size (" << subset_size << ") greater than ensemble size (" << pe.shape().first << ")";
+		ss << "subset size (" << local_subset_size << ") greater than ensemble size (" << pe.shape().first << ")";
 		frec << "  ---  " << ss.str() << endl;
 		cout << "  ---  " << ss.str() << endl;
-		frec << "  ...reducing ++ies_subset_size to " << pe.shape().first << endl;
-		cout << "  ...reducing ++ies_subset_size to " << pe.shape().first << endl;
-		subset_size = pe.shape().first;
+		frec << "  ...reducing subset size to " << pe.shape().first << endl;
+		cout << "  ...reducing subset size to " << pe.shape().first << endl;
+		local_subset_size = pe.shape().first;
+	}
+
+	else if ((inflation_factors.size() == 1) && (backtrack_factors.size() == 1))
+	{
+		ss.str("");
+		ss << "only testing one inflation/lambda factor and one scale/backtrack factor, not using subset";
+		frec << "  ---  " << ss.str() << endl;
+		cout << "  ---  " << ss.str() << endl;
+		local_subset_size = pe.shape().first;
 	}
 
 	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
@@ -2891,16 +2937,10 @@ bool EnsembleMethod::solve_new()
 	}
 	//get this once and reuse it for each lambda
 	Eigen::MatrixXd Am;
-	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
+	if ((!use_mda) && (!pest_scenario.get_pestpp_options().get_ies_use_approx()))
 	{
 		Am = get_Am(pe.get_real_names(), pe.get_var_names());
 	}
-
-	//todo: make a get_current_values function to encapulate
-	//these values so that this one function can support both mda and glm
-	vector<double> lambdas = lam_mults;
-	for (auto& m : lambdas)
-		m *= last_best_lam;
 
 	performance_log->log_event("preparing EnsembleSolver");
 	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
@@ -2910,25 +2950,22 @@ bool EnsembleMethod::solve_new()
 	EnsembleSolver es(performance_log, file_manager, pest_scenario, pe_upgrade, oe_upgrade, oe_base, localizer, parcov, Am, ph,
 		use_localizer, iter, act_par_names, act_obs_names);
 
-	for (auto& cur_lam : lambdas)
+	for (auto& cur_lam : inflation_factors)
 	{
 		ss.str("");
-		//double cur_lam = last_best_lam * lam_mult;
-		/*else
-		{*/
-			//ss << "starting calcs for lambda" << cur_lam;
-		message(1, "starting calcs for lambda", cur_lam);
-
-		//}
+		if (!use_mda)
+			message(1, "starting calcs for glm factor", cur_lam);
+		else
+			message(1, "starting calcs for mda factor", cur_lam);
 		message(2, "see .log file for more details");
 
 		pe_upgrade = ParameterEnsemble(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
 		pe_upgrade.set_trans_status(pe.get_trans_status());
 
-		es.solve(num_threads, cur_lam, true , pe_upgrade, loc_map);
+		es.solve(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map);
 
 		map<string, double> norm_map;
-		for (auto sf : pest_scenario.get_pestpp_options().get_lambda_scale_vec())
+		for (auto sf : backtrack_factors)
 		{
 			ParameterEnsemble pe_lam_scale = pe;
 			pe_lam_scale.set_eigen(*pe_lam_scale.get_eigen_ptr() + (*pe_upgrade.get_eigen_ptr() * sf));
@@ -2982,8 +3019,10 @@ bool EnsembleMethod::solve_new()
 	double best_mean = 1.0e+30, best_std = 1.0e+30;
 	double mean, std;
 
+	vector<int> subset_idxs = get_subset_idxs(pe_lams[0].shape().first, local_subset_size);
+
 	message(0, "running upgrade ensembles");
-	vector<ObservationEnsemble> oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals);
+	vector<ObservationEnsemble> oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, subset_idxs);
 
 	message(0, "evaluting upgrade ensembles");
 	message(1, "last mean: ", last_best_mean);
@@ -3017,7 +3056,7 @@ bool EnsembleMethod::solve_new()
 			frec << "lambda, scale value " << lam_vals[i] << ',' << scale_vals[i] << " pars saved to " << ss.str() << endl;
 
 		}
-		drop_bad_phi(pe_lams[i], oe_lams[i], true);
+		drop_bad_phi(pe_lams[i], oe_lams[i], subset_idxs);
 		if (oe_lams[i].shape().first == 0)
 		{
 			message(1, "all realizations dropped as 'bad' for lambda, scale fac ", vals);
@@ -3052,7 +3091,7 @@ bool EnsembleMethod::solve_new()
 
 
 	//subset stuff here
-	if ((best_idx != -1) && (use_subset) && (subset_size < pe.shape().first))
+	if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
 	{
 
 		double acc_phi = last_best_mean * acc_fac;
@@ -3152,7 +3191,7 @@ bool EnsembleMethod::solve_new()
 		org_pe_idxs = remaining_pe_lam.get_real_names();
 		org_oe_idxs = remaining_oe_lam.get_real_names();
 		///run
-		vector<int> fails = run_ensemble(remaining_pe_lam, remaining_oe_lam);
+		vector<int> fails = run_ensemble(remaining_pe_lam, remaining_oe_lam,vector<int>(),cycle);
 
 		//for testing
 		if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder())
@@ -4315,9 +4354,12 @@ Eigen::MatrixXd EnsembleMethod::get_Am(const vector<string>& real_names, const v
 	return Am;
 }
 
-void EnsembleMethod::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, bool is_subset)
+void EnsembleMethod::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, vector<int> subset_idxs)
 {
 	//don't use this assert because _pe maybe full size, but _oe might be subset size
+	bool is_subset = false;
+	if (subset_idxs.size() > 0)
+		is_subset = true;
 	if (!is_subset)
 		if (_pe.shape().first != _oe.shape().first)
 			throw_em_error("EnsembleMethod::drop_bad_phi() error: _pe != _oe and not subset");
@@ -4460,16 +4502,16 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 }
 
 
-void EnsembleMethod::set_subset_idx(int size)
+vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 {
 	//map<int,int> subset_idx_map;
-	subset_idxs.clear();
-	int nreal_subset = pest_scenario.get_pestpp_options().get_ies_subset_size();
+	vector<int> subset_idxs;
+	//int nreal_subset = pest_scenario.get_pestpp_options().get_ies_subset_size();
 	if ((!use_subset) || (nreal_subset >= size))
 	{
 		for (int i = 0; i < size; i++)
 			subset_idxs.push_back(i);
-		return;
+		return subset_idxs;
 	}
 	vector<string> pe_names = pe.get_real_names();
 
@@ -4598,6 +4640,6 @@ void EnsembleMethod::set_subset_idx(int size)
 	for (auto i : subset_idxs)
 		ss << i << ":" << pe_names[i] << ", ";
 	message(1, "subset idx:pe real name: ", ss.str());
-	return;
+	return subset_idxs;
 	//return subset_idx_map;
 }

@@ -1670,7 +1670,7 @@ void DataAssimilator::initialize(int _icycle)
 	initialize_obscov();
 
 	
-	subset_size = da_ctl_params.get_ivalue("DA_SUBSET_SIZE");
+	int subset_size = da_ctl_params.get_ivalue("DA_SUBSET_SIZE");
 	reg_factor = pest_scenario.get_pestpp_options().get_ies_reg_factor(); //Todo: how this fit in da
 	message(1, "using reg_factor: ", reg_factor);
 	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
@@ -2631,30 +2631,30 @@ void DataAssimilator::da_update()
 
 
 
-LocalUpgradeThread_da::LocalUpgradeThread_da(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map,
-	unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map,
-	Localizer& _localizer, unordered_map<string, double>& _parcov_inv_map, unordered_map<string, double>& _weight_map,
-	ParameterEnsemble& _pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
-	unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how, unordered_map<string, Eigen::VectorXd>& _obs_err_map) : par_resid_map(_par_resid_map),
-	par_diff_map(_par_diff_map), obs_resid_map(_obs_resid_map), obs_diff_map(_obs_diff_map), localizer(_localizer),
-	pe_upgrade(_pe_upgrade), cases(_cases), parcov_inv_map(_parcov_inv_map), weight_map(_weight_map), Am_map(_Am_map), obs_err_map(_obs_err_map)
-{
-	performance_log = _performance_log;
-	how = _how;
-	parcov_inv_map = _parcov_inv_map;
-	weight_map = _weight_map;
-	//obs_err_map = _obs_err_map;
-	count = 0;
-
-	for (auto& c : cases)
-	{
-		keys.push_back(c.first);
-	}
-	//sort(keys.begin(), keys.end());
-	total = keys.size();
-	//random_shuffle(keys.begin(), keys.end());
-
-}
+//LocalUpgradeThread_da::LocalUpgradeThread_da(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map, unordered_map<string, Eigen::VectorXd>& _par_diff_map,
+//	unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map,
+//	Localizer& _localizer, unordered_map<string, double>& _parcov_inv_map, unordered_map<string, double>& _weight_map,
+//	ParameterEnsemble& _pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& _cases,
+//	unordered_map<string, Eigen::VectorXd>& _Am_map, Localizer::How& _how, unordered_map<string, Eigen::VectorXd>& _obs_err_map) : par_resid_map(_par_resid_map),
+//	par_diff_map(_par_diff_map), obs_resid_map(_obs_resid_map), obs_diff_map(_obs_diff_map), localizer(_localizer),
+//	pe_upgrade(_pe_upgrade), cases(_cases), parcov_inv_map(_parcov_inv_map), weight_map(_weight_map), Am_map(_Am_map), obs_err_map(_obs_err_map)
+//{
+//	performance_log = _performance_log;
+//	how = _how;
+//	parcov_inv_map = _parcov_inv_map;
+//	weight_map = _weight_map;
+//	//obs_err_map = _obs_err_map;
+//	count = 0;
+//
+//	for (auto& c : cases)
+//	{
+//		keys.push_back(c.first);
+//	}
+//	//sort(keys.begin(), keys.end());
+//	total = keys.size();
+//	//random_shuffle(keys.begin(), keys.end());
+//
+//}
 
 
 //void LocalUpgradeThread_da::work(int thread_id, int iter, double cur_lam)
@@ -4040,7 +4040,8 @@ bool DataAssimilator::solve_new_da()
 		message(1, s);
 	}
 
-	 // check subset size	
+	 // check subset size
+	int subset_size = da_ctl_params.get_ivalue("DA_SUBSET_SIZE");
 	if ((use_subset) && (subset_size > pe.shape().first))
 	{
 		ss.str("");
@@ -4246,7 +4247,7 @@ bool DataAssimilator::solve_new_da()
 			evaluate_update = true;					
 	}
 
-		
+	vector<int> subset_idxs = get_subset_idxs(pe_lams[0].shape().first, subset_size);
 	if (evaluate_update)
 	{
 		message(0, "running inflation ensembles");
@@ -4256,7 +4257,7 @@ bool DataAssimilator::solve_new_da()
 			// and replace them with prior dynamic states
 			posterior_dyn_states = temp_remove_dyn_state(pe_lams);
 		}
-		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, icycle);
+		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, icycle, subset_idxs);
 	}
 	/*
 	if (dyn_states_names.size() > 0)
@@ -4308,7 +4309,7 @@ bool DataAssimilator::solve_new_da()
 				frec << "lambda, scale value " << lam_vals[i] << ',' << scale_vals[i] << " pars saved to " << ss.str() << endl;
 
 			}
-			drop_bad_phi(pe_lams[i], oe_lams[i], true);
+			drop_bad_phi(pe_lams[i], oe_lams[i], subset_idxs);
 			if (oe_lams[i].shape().first == 0)
 			{
 				message(1, "all realizations dropped as 'bad' for lambda, scale fac ", vals);
@@ -5091,168 +5092,168 @@ void DataAssimilator::eig2csv(string name, Eigen::MatrixXd matrix)
 //}
 //
 
-void DataAssimilator::set_subset_idx(int size)
-{
-	//map<int,int> subset_idx_map;
-	subset_idxs.clear();
-	int nreal_subset;
-	
-	//CtlPar_container da_ctl_params = pest_scenario.get_pestpp_options().da_ctl_params;
-	if ((da_type == "MDA")|| (da_type == "VANILLA"))
-	{
-		int nnreal = pe.get_real_names().size();
-		nreal_subset = nnreal;
-		use_subset = true;
-	}
-	else if (da_type == "ITERATIVE")
-	{
-		nreal_subset = da_ctl_params.get_ivalue("DA_SUBSET_SIZE");
-		if (nreal_subset <= 0)
-		{
-			int nnreal = pe.get_real_names().size();
-			nreal_subset = nnreal;
-		}
-		use_subset = true;
-	}
-	
-	if ((!use_subset) || (nreal_subset >= size))
-	{
-		for (int i = 0; i < size; i++)
-			subset_idxs.push_back(i);
-		return;
-	}
-	vector<string> pe_names = pe.get_real_names();
-
-	vector<string>::iterator bidx = find(pe_names.begin(), pe_names.end(), BASE_REAL_NAME);
-	if (bidx != pe_names.end())
-	{
-
-		subset_idxs.push_back(bidx - pe_names.begin());
-	}
-	//int size = pe.shape().first;
-	string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
-	how = da_ctl_params.get_svalue("DA_SUBSET_HOW");
-
-	if (how == "FIRST")
-	{
-		for (int i = 0; i < size; i++)
-		{
-			if (subset_idxs.size() >= nreal_subset)
-				break;
-			if (find(subset_idxs.begin(), subset_idxs.end(), i) != subset_idxs.end())
-				continue;
-
-			subset_idxs.push_back(i);
-
-		}
-
-	}
-	else if (how == "LAST")
-	{
-
-		for (int i = size - 1; i >= 0; i--)
-		{
-			if (subset_idxs.size() >= nreal_subset)
-				break;
-			if (find(subset_idxs.begin(), subset_idxs.end(), i) != subset_idxs.end())
-				continue;
-
-			subset_idxs.push_back(i);
-
-		}
-
-	}
-
-	else if (how == "RANDOM")
-	{
-		std::uniform_int_distribution<int> uni(0, size - 1);
-		int idx;
-		for (int i = 0; i < 10000000; i++)
-		{
-			if (subset_idxs.size() >= nreal_subset)
-				break;
-			idx = uni(subset_rand_gen);
-			if (find(subset_idxs.begin(), subset_idxs.end(), idx) != subset_idxs.end())
-				continue;
-			subset_idxs.push_back(idx);
-		}
-		if (subset_idxs.size() != nreal_subset)
-			throw_em_error("max iterations exceeded when trying to find random subset idxs");
-
-	}
-	else if (how == "PHI_BASED")
-	{
-		//sidx needs to be index of realization, not realization number
-		vector<pair<double, int>> phis;
-		//vector<int> sidx;
-		int step;
-		int idx;
-		L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
-		map<string, double>* phi_map = ph.get_phi_map_ptr(pt);
-		map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-
-		int i = 0;
-		for (pi; pi != end; ++pi)
-		{
-			phis.push_back(make_pair(pi->second, i)); //phival,idx?
-			++i;
-		}
-		sort(phis.begin(), phis.end());
-
-		//include idx for lowest and highest phi reals
-		if (subset_idxs.size() < nreal_subset)
-		{
-			for (auto phi : phis)
-			{
-				if (find(subset_idxs.begin(), subset_idxs.end(), phi.second) == subset_idxs.end())
-				{
-					subset_idxs.push_back(phi.second);
-					break;
-				}
-			}
-		}
-		if (subset_idxs.size() < nreal_subset)
-		{
-			for (int i = phis.size() - 1; i >= 0; i--)
-			{
-				if (find(subset_idxs.begin(), subset_idxs.end(), phis[i].second) == subset_idxs.end())
-				{
-					subset_idxs.push_back(phis[i].second);
-					break;
-				}
-			}
-		}
-
-
-		step = (phis.size() - 1) / nreal_subset;
-		//cout << step << endl;
-		//cout << (phis.size() - 1) << endl;
-		for (i = 1; i < nreal_subset; ++i)
-		{
-			//add higher phis first
-			idx = phis.size() - (i * step);
-			if ((subset_idxs.size() < nreal_subset) && (find(subset_idxs.begin(), subset_idxs.end(), phis[idx].second) == subset_idxs.end()))
-			{
-				subset_idxs.push_back(phis[idx].second);
-				//cout << i << endl;
-				//cout << idx << endl;
-				//cout << phis[idx].first << endl;
-				//cout << phis[idx].second << endl;
-			}
-		}
-	}
-	else
-	{
-		//throw runtime_error("unkonwn 'subset_how'");
-		throw_em_error("unknown 'subset_how'");
-	}
-	stringstream ss;
-	for (auto i : subset_idxs)
-		ss << i << ":" << pe_names[i] << ", ";
-	message(1, "subset idx:pe real name: ", ss.str());
-	return;
-	//return subset_idx_map;
-}
+//void DataAssimilator::set_subset_idx(int size)
+//{
+//	//map<int,int> subset_idx_map;
+//	subset_idxs.clear();
+//	int nreal_subset;
+//	
+//	//CtlPar_container da_ctl_params = pest_scenario.get_pestpp_options().da_ctl_params;
+//	if ((da_type == "MDA")|| (da_type == "VANILLA"))
+//	{
+//		int nnreal = pe.get_real_names().size();
+//		nreal_subset = nnreal;
+//		use_subset = true;
+//	}
+//	else if (da_type == "ITERATIVE")
+//	{
+//		nreal_subset = da_ctl_params.get_ivalue("DA_SUBSET_SIZE");
+//		if (nreal_subset <= 0)
+//		{
+//			int nnreal = pe.get_real_names().size();
+//			nreal_subset = nnreal;
+//		}
+//		use_subset = true;
+//	}
+//	
+//	if ((!use_subset) || (nreal_subset >= size))
+//	{
+//		for (int i = 0; i < size; i++)
+//			subset_idxs.push_back(i);
+//		return;
+//	}
+//	vector<string> pe_names = pe.get_real_names();
+//
+//	vector<string>::iterator bidx = find(pe_names.begin(), pe_names.end(), BASE_REAL_NAME);
+//	if (bidx != pe_names.end())
+//	{
+//
+//		subset_idxs.push_back(bidx - pe_names.begin());
+//	}
+//	//int size = pe.shape().first;
+//	string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
+//	how = da_ctl_params.get_svalue("DA_SUBSET_HOW");
+//
+//	if (how == "FIRST")
+//	{
+//		for (int i = 0; i < size; i++)
+//		{
+//			if (subset_idxs.size() >= nreal_subset)
+//				break;
+//			if (find(subset_idxs.begin(), subset_idxs.end(), i) != subset_idxs.end())
+//				continue;
+//
+//			subset_idxs.push_back(i);
+//
+//		}
+//
+//	}
+//	else if (how == "LAST")
+//	{
+//
+//		for (int i = size - 1; i >= 0; i--)
+//		{
+//			if (subset_idxs.size() >= nreal_subset)
+//				break;
+//			if (find(subset_idxs.begin(), subset_idxs.end(), i) != subset_idxs.end())
+//				continue;
+//
+//			subset_idxs.push_back(i);
+//
+//		}
+//
+//	}
+//
+//	else if (how == "RANDOM")
+//	{
+//		std::uniform_int_distribution<int> uni(0, size - 1);
+//		int idx;
+//		for (int i = 0; i < 10000000; i++)
+//		{
+//			if (subset_idxs.size() >= nreal_subset)
+//				break;
+//			idx = uni(subset_rand_gen);
+//			if (find(subset_idxs.begin(), subset_idxs.end(), idx) != subset_idxs.end())
+//				continue;
+//			subset_idxs.push_back(idx);
+//		}
+//		if (subset_idxs.size() != nreal_subset)
+//			throw_em_error("max iterations exceeded when trying to find random subset idxs");
+//
+//	}
+//	else if (how == "PHI_BASED")
+//	{
+//		//sidx needs to be index of realization, not realization number
+//		vector<pair<double, int>> phis;
+//		//vector<int> sidx;
+//		int step;
+//		int idx;
+//		L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
+//		map<string, double>* phi_map = ph.get_phi_map_ptr(pt);
+//		map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
+//
+//		int i = 0;
+//		for (pi; pi != end; ++pi)
+//		{
+//			phis.push_back(make_pair(pi->second, i)); //phival,idx?
+//			++i;
+//		}
+//		sort(phis.begin(), phis.end());
+//
+//		//include idx for lowest and highest phi reals
+//		if (subset_idxs.size() < nreal_subset)
+//		{
+//			for (auto phi : phis)
+//			{
+//				if (find(subset_idxs.begin(), subset_idxs.end(), phi.second) == subset_idxs.end())
+//				{
+//					subset_idxs.push_back(phi.second);
+//					break;
+//				}
+//			}
+//		}
+//		if (subset_idxs.size() < nreal_subset)
+//		{
+//			for (int i = phis.size() - 1; i >= 0; i--)
+//			{
+//				if (find(subset_idxs.begin(), subset_idxs.end(), phis[i].second) == subset_idxs.end())
+//				{
+//					subset_idxs.push_back(phis[i].second);
+//					break;
+//				}
+//			}
+//		}
+//
+//
+//		step = (phis.size() - 1) / nreal_subset;
+//		//cout << step << endl;
+//		//cout << (phis.size() - 1) << endl;
+//		for (i = 1; i < nreal_subset; ++i)
+//		{
+//			//add higher phis first
+//			idx = phis.size() - (i * step);
+//			if ((subset_idxs.size() < nreal_subset) && (find(subset_idxs.begin(), subset_idxs.end(), phis[idx].second) == subset_idxs.end()))
+//			{
+//				subset_idxs.push_back(phis[idx].second);
+//				//cout << i << endl;
+//				//cout << idx << endl;
+//				//cout << phis[idx].first << endl;
+//				//cout << phis[idx].second << endl;
+//			}
+//		}
+//	}
+//	else
+//	{
+//		//throw runtime_error("unkonwn 'subset_how'");
+//		throw_em_error("unknown 'subset_how'");
+//	}
+//	stringstream ss;
+//	for (auto i : subset_idxs)
+//		ss << i << ":" << pe_names[i] << ", ";
+//	message(1, "subset idx:pe real name: ", ss.str());
+//	return;
+//	//return subset_idx_map;
+//}
 
 //vector<ObservationEnsemble> DataAssimilator::run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals)
 //{

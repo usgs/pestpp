@@ -1170,7 +1170,7 @@ void IterEnsembleSmoother::initialize()
 	initialize_parcov();
 	initialize_obscov();
 
-	subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
+	int subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
 	reg_factor = pest_scenario.get_pestpp_options().get_ies_reg_factor();
 	message(1,"using reg_factor: ", reg_factor);
 	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
@@ -1900,7 +1900,7 @@ void IterEnsembleSmoother::iterate_2_solution()
 		ss.str("");
 		ss << "starting solve for iteration: " << iter;
 		performance_log->log_event(ss.str());
-		accept = solve_new();
+		accept = solve_glm();
 		report_and_save();
 		ph.update(oe,pe);
 		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
