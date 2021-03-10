@@ -310,9 +310,7 @@ protected:
 	set<string> pp_args;
 	int iter, subset_size;
 	bool use_subset;
-	bool use_mda;
-	vector<double> mda_facs;
-
+	
 	double last_best_lam, last_best_mean, last_best_std;
 	vector<double> best_mean_phis;
 	double best_phi_yet;

@@ -2891,9 +2891,11 @@ bool EnsembleMethod::solve_new()
 		Am = get_Am(pe.get_real_names(), pe.get_var_names());
 	}
 
-	vector<double> mults = lam_mults;
-	if (use_mda)
-		mults = vector<double>{ mda_facs[iter - 1] };
+	//todo: make a get_current_values function to encapulate
+	//these values so that this one function can support both mda and glm
+	vector<double> lambdas = lam_mults;
+	for (auto& m : lambdas)
+		m *= last_best_lam;
 
 	performance_log->log_event("preparing EnsembleSolver");
 	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
@@ -2903,27 +2905,22 @@ bool EnsembleMethod::solve_new()
 	EnsembleSolver es(performance_log, file_manager, pest_scenario, pe_upgrade, oe_upgrade, oe_base, localizer, parcov, Am, ph,
 		use_localizer, iter, act_par_names, act_obs_names);
 
-	for (auto& lam_mult : mults)
+	for (auto& cur_lam : lambdas)
 	{
 		ss.str("");
-		double cur_lam = last_best_lam * lam_mult;
-		if (use_mda)
-		{
-			cur_lam = lam_mult;
-			message(1, "starting calcs for mda factor ", cur_lam);
-		}
-		else
-		{
+		//double cur_lam = last_best_lam * lam_mult;
+		/*else
+		{*/
 			//ss << "starting calcs for lambda" << cur_lam;
-			message(1, "starting calcs for lambda", cur_lam);
+		message(1, "starting calcs for lambda", cur_lam);
 
-		}
+		//}
 		message(2, "see .log file for more details");
 
 		pe_upgrade = ParameterEnsemble(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
 		pe_upgrade.set_trans_status(pe.get_trans_status());
 
-		es.solve(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map);
+		es.solve(num_threads, cur_lam, true , pe_upgrade, loc_map);
 
 		map<string, double> norm_map;
 		for (auto sf : pest_scenario.get_pestpp_options().get_lambda_scale_vec())
@@ -3061,7 +3058,7 @@ bool EnsembleMethod::solve_new()
 			best_mean = acc_phi + 1.0;
 		}
 
-		if ((best_mean > acc_phi) && (!use_mda))
+		if ((best_mean > acc_phi))
 		{
 			//ph.update(oe_lams[best_idx],pe_lams[best_idx]);
 
@@ -3225,7 +3222,7 @@ bool EnsembleMethod::solve_new()
 	best_mean_phis.push_back(best_mean);
 
 
-	if ((best_mean < last_best_mean * acc_fac) || (use_mda))
+	if ((best_mean < last_best_mean * acc_fac))
 	{
 		message(0, "updating parameter ensemble");
 		performance_log->log_event("updating parameter ensemble");
