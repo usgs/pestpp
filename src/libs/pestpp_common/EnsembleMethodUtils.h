@@ -301,6 +301,7 @@ public:
 	pair<string, string> save_ensembles(string tag, int cycle, ParameterEnsemble& _pe, ObservationEnsemble& _oe);
 	vector<string>& get_par_dyn_state_names() { return par_dyn_state_names; }
 
+
 protected:
 	string alg_tag;
 	int  verbose_level;

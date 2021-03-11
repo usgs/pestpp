@@ -2742,7 +2742,12 @@ pair<string,string> EnsembleMethod::save_ensembles(string tag, int cycle, Parame
 		ss << "." << cycle;
 	if (tag.size() > 0)
 		ss << "." << tag;
-	ss << "." << iter << ".obs";
+	if (iter == -1)
+		ss << "." << "prior" << ".obs";
+	else if (iter == -2)
+		ss << "." << "mean" << ".obs";
+	else
+		ss << "." << iter << ".obs";
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
@@ -2760,7 +2765,12 @@ pair<string,string> EnsembleMethod::save_ensembles(string tag, int cycle, Parame
 		ss << "." << cycle;
 	if (tag.size() > 0)
 		ss << "." << tag;
-	ss << "." << iter << ".par";
+	if (iter == -1)
+		ss << "." << "prior" << ".par";
+	else if (iter == -2)
+		ss << "." << "mean" << ".par";
+	else
+		ss << "." << iter << ".par";
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
@@ -2852,6 +2862,7 @@ vector<int> EnsembleMethod::run_ensemble(ParameterEnsemble& _pe,
 	}*/
 	return failed_real_indices;
 }
+
 
 void EnsembleMethod::initialize(int cycle)
 {
@@ -3495,7 +3506,7 @@ void EnsembleMethod::initialize(int cycle)
 
 	if (cycle != NetPackage::NULL_DA_CYCLE)
 	{
-		pair<string, string> names = save_ensembles("prior",cycle, pe, oe);
+		pair<string, string> names = save_ensembles(string(),cycle, pe, oe);
 		message(1, "saved cycle prior obs ensemble to", names.second);
 		message(1, "saved cycle prior par ensemble to", names.first);
 	}
@@ -3826,11 +3837,14 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	//the case for all state estimation and non-iterative
 	//only one upgrade lambda and all pars are states
-	/*if (((pe_lams.size() == 1) && (par_dyn_state_names.size() == pe_lams[0].shape().second) && pest_scenario.get_control_info().noptmax == 1))
+	if (((pe_lams.size() == 1) && (par_dyn_state_names.size() == pe_lams[0].shape().second) && pest_scenario.get_control_info().noptmax == 1))
 	{
+		message(1, "non-iterative state-estimation detected, not evaluating state estimates for current cycle");
 		pe = pe_lams[0];
+		//move the estimated states to the oe, which will then later be transferred back to the pe
+		transfer_dynamic_state_from_pe_to_oe(pe, oe);
 		return true;
-	}*/
+	}
 
 	vector<map<int, int>> real_run_ids_lams;
 	int best_idx = -1;
