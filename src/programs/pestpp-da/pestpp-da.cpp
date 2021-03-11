@@ -380,7 +380,7 @@ int main(int argc, char* argv[])
 		ParameterEnsemble curr_pe;
 		ObservationEnsemble curr_oe;
 		generate_global_ensembles(da, fout_rec, curr_pe, curr_oe);
-
+		
 		//prepare a phi csv file for all cycles
 		string phi_file = file_manager.get_base_filename() + ".global.phi.actual.csv";
 		ofstream f_phi(phi_file);
@@ -391,10 +391,11 @@ int main(int argc, char* argv[])
 		for (auto real : init_real_names)
 			f_phi << "," << pest_utils::lower_cp(real);
 		f_phi << endl;
-
-		// check_io
-		
-		
+	
+		cout << "initializing 'global' localizer" << endl;
+		fout_rec << "initializing 'global' localizer" << endl;
+		Localizer global_loc(&pest_scenario);
+		global_loc.initialize(&performance_log);
 
 		// loop over assimilation cycles
 		stringstream ss;
@@ -566,6 +567,7 @@ int main(int argc, char* argv[])
 			cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
 
 			da.set_pe(cycle_curr_pe);
+			da.set_localizer(global_loc);
 			da.initialize(*icycle);
 			
 			

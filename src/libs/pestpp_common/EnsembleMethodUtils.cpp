@@ -937,6 +937,10 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 	unique_lock<mutex> am_guard(am_lock, defer_lock);
 	unique_lock<mutex> put_guard(put_lock, defer_lock);
 
+	set<string> sorg_par_names(par_names.begin(),par_names.end());
+	set<string> sorg_obs_names(obs_names.begin(),obs_names.end());
+
+
 	//This is the main thread loop - it continues until all upgrade pieces have been completed
 	while (true)
 	{
@@ -990,6 +994,45 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				break;
 			}
 		}
+
+		//check here that the names in the case match the names passed - this is needed for seq da
+		/*vector<string> t;
+		set<string>::iterator end = sorg_par_names.end();
+		for (auto& par_name : par_names)
+			if (sorg_par_names.find(par_name) != end)
+				t.push_back(par_name);
+		if (t.size() == 0)
+		{
+			ss.str("");
+			ss << "thread " << thread_id << " processing case " << key << " - no par_names in case found in act_par_names";
+			throw runtime_error(ss.str());
+		}
+		if (t.size() != par_names.size())
+		{
+			f_thread << "par_names for case " << key << "reduced from " << par_names.size() << " to " << t.size() << endl;
+		}
+		par_names = t;
+
+		t.clear();
+		end = sorg_obs_names.end();
+		for (auto& obs_name : obs_names)
+			if (sorg_obs_names.find(obs_name) != end)
+				t.push_back(obs_name);
+		if (t.size() == 0)
+		{
+			ss.str("");
+			ss << "thread " << thread_id << " processing case " << key << " - no obs_names in case found in act_obs_names";
+			throw runtime_error(ss.str());
+		}
+		if (t.size() != obs_names.size())
+		{
+			f_thread << "obs_names for case " << key << "reduced from " << obs_names.size() << " to " << t.size() << endl;
+		}
+		obs_names = t;
+		t.clear();*/
+
+
+
 
 		if (verbose_level > 2)
 		{
@@ -2956,9 +2999,15 @@ void EnsembleMethod::initialize(int cycle)
 	message(1, "using REDSVD for truncated svd solve");
 	message(1, "maxsing:", pest_scenario.get_svd_info().maxsing);
 	message(1, "eigthresh: ", pest_scenario.get_svd_info().eigthresh);
-
-	message(1, "initializing localizer");
-	use_localizer = localizer.initialize(performance_log);
+	if (localizer.is_initialized())
+	{
+		message(1, "using previously initialized localizer");
+	}
+	else
+	{
+		message(1, "initializing localizer");
+		use_localizer = localizer.initialize(performance_log);
+	}
 	num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
 	if (!use_localizer)
 		message(1, "not using localization");
@@ -3749,7 +3798,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	if (use_localizer)
 	{
-		loc_map = localizer.get_localanalysis_case_map(iter, oe, pe, performance_log);
+		loc_map = localizer.get_localanalysis_case_map(iter, act_obs_names, act_par_names, oe, pe, performance_log);
 	}
 	else
 	{
@@ -3843,6 +3892,11 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		pe = pe_lams[0];
 		//move the estimated states to the oe, which will then later be transferred back to the pe
 		transfer_dynamic_state_from_pe_to_oe(pe, oe);
+		ph.update(oe, pe);
+		double best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+		double best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+		best_mean_phis.push_back(best_mean);
+
 		return true;
 	}
 

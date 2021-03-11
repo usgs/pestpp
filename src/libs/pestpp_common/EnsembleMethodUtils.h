@@ -278,7 +278,9 @@ public:
 	void message(int level, const string& _message, size_t extra);
 
 	ParameterEnsemble get_pe() { return pe; }
-	void set_pe(ParameterEnsemble new_pe) { pe = new_pe; }
+	void set_pe(ParameterEnsemble& new_pe) { pe = new_pe; }
+	void set_localizer(Localizer& new_loc) { localizer = new_loc; }
+	Localizer get_localizer() { return localizer;  }
 	bool initialize_pe(Covariance& cov);
 	void initialize_parcov();
 	Covariance* get_parcov_ptr() { return &parcov; }
