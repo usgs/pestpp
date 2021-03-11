@@ -233,100 +233,102 @@ int main(int argc, char* argv[])
 			assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec, cycles_in_tables);
 		}
 
-
-		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
+		if (pest_scenario.get_control_info().noptmax != 0)
 		{
-			cout << endl;
 
-
-			cout << " >>>> Checking data in cycle " << *icycle << endl;
-			fout_rec << endl;
-			fout_rec << " >>>> Checking data in cycle " << *icycle << endl;
-
-
-			performance_log.log_event("instantiating child pest object");
-
-			//Pest childPest;
-			Pest childPest = pest_scenario.get_child_pest(*icycle);
-			childPest.check_io(fout_rec);
-			
-			if (obs_cycle_info.find(*icycle) != obs_cycle_info.end())
+			for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 			{
-				performance_log.log_event("updating obs using da obs cycle table info");
-				map<string, double> cycle_map = obs_cycle_info[*icycle];
-				map<string, double> weight_cycle_map;
-				if (weight_cycle_info.find(*icycle) != weight_cycle_info.end())
-					weight_cycle_map = weight_cycle_info[*icycle];
-				ObservationInfo oi = pest_scenario.get_ctl_observation_info();
-				childPest.set_observation_info(oi);
-				for (auto tbl_obs_name : obs_in_tbl)
+				cout << endl;
+
+
+				cout << " >>>> Checking data in cycle " << *icycle << endl;
+				fout_rec << endl;
+				fout_rec << " >>>> Checking data in cycle " << *icycle << endl;
+
+
+				performance_log.log_event("instantiating child pest object");
+
+				//Pest childPest;
+				Pest childPest = pest_scenario.get_child_pest(*icycle);
+				childPest.check_io(fout_rec);
+
+				if (obs_cycle_info.find(*icycle) != obs_cycle_info.end())
 				{
-					//if this obs is not in this cycle, give it a zero weight
-					if (cycle_map.find(tbl_obs_name) == cycle_map.end())
+					performance_log.log_event("updating obs using da obs cycle table info");
+					map<string, double> cycle_map = obs_cycle_info[*icycle];
+					map<string, double> weight_cycle_map;
+					if (weight_cycle_info.find(*icycle) != weight_cycle_info.end())
+						weight_cycle_map = weight_cycle_info[*icycle];
+					ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+					childPest.set_observation_info(oi);
+					for (auto tbl_obs_name : obs_in_tbl)
 					{
-						oi.set_weight(tbl_obs_name, 0.0);
-					}
-					else
-					{
-						childPest.get_ctl_observations_4_mod().update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);
-						//check if this obs is in this cycle's weight info
-						if (weight_cycle_map.find(tbl_obs_name) != weight_cycle_map.end())
+						//if this obs is not in this cycle, give it a zero weight
+						if (cycle_map.find(tbl_obs_name) == cycle_map.end())
 						{
-							oi.set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
-							//pest_scenario.get_observation_info_ptr()->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+							oi.set_weight(tbl_obs_name, 0.0);
+						}
+						else
+						{
+							childPest.get_ctl_observations_4_mod().update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);
+							//check if this obs is in this cycle's weight info
+							if (weight_cycle_map.find(tbl_obs_name) != weight_cycle_map.end())
+							{
+								oi.set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+								//pest_scenario.get_observation_info_ptr()->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+							}
 						}
 					}
+					childPest.set_observation_info(oi);
+
 				}
-				childPest.set_observation_info(oi);
 
-			}
-			
-			Parameters par1 = childPest.get_ctl_parameters();
-			ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq_4_mod();
-			base_trans_seq.ctl2numeric_ip(par1);
-			base_trans_seq.numeric2model_ip(par1);
-			ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
-			int nadj_par = 0;
-			for (auto par : par1)
+				Parameters par1 = childPest.get_ctl_parameters();
+				ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq_4_mod();
+				base_trans_seq.ctl2numeric_ip(par1);
+				base_trans_seq.numeric2model_ip(par1);
+				ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
+				int nadj_par = 0;
+				for (auto par : par1)
 
-			{
-				if ((pi.get_parameter_rec_ptr(par.first)->cycle == *icycle) ||
-					(pi.get_parameter_rec_ptr(par.first)->cycle < 0))
 				{
+					if ((pi.get_parameter_rec_ptr(par.first)->cycle == *icycle) ||
+						(pi.get_parameter_rec_ptr(par.first)->cycle < 0))
+					{
 
-					if ((pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::FIXED) &&
-						(pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::TIED))
-						nadj_par++;
+						if ((pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::FIXED) &&
+							(pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::TIED))
+							nadj_par++;
+					}
+
 				}
 
+				cout << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
+				fout_rec << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
+
+				ObservationInfo oi = childPest.get_ctl_observation_info();
+				int nnz_obs = 0;
+				for (auto o : childPest.get_ctl_observations())
+				{
+					if (oi.get_observation_rec_ptr(o.first)->weight != 0.0)
+						nnz_obs++;
+				}
+				cout << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
+				fout_rec << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
+
+
+
+				stringstream ss;
+
+				/*ss << "num adj par: " << nadj_par << ", ";
+				ss << "num nz obs: " << nnz_obs << ", ";*/
+				ss << "num tpl files: " << childPest.get_tplfile_vec().size() << ", ";
+				ss << "num ins files: " << childPest.get_insfile_vec().size() << endl;
+				cout << ss.str();
+				fout_rec << ss.str();
+
 			}
-
-			cout << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
-			fout_rec << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
-
-			ObservationInfo oi = childPest.get_ctl_observation_info();
-			int nnz_obs = 0;
-			for (auto o : childPest.get_ctl_observations())
-			{
-				if (oi.get_observation_rec_ptr(o.first)->weight != 0.0)
-					nnz_obs++;
-			}
-			cout << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
-			fout_rec << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
-
-
-			
-			stringstream ss;
-
-			ss << "num adj par: " << nadj_par << ", ";
-			ss << "num nz obs: " << nnz_obs << ", ";
-			ss << "num tpl files: " << childPest.get_tplfile_vec().size() << ", ";
-			ss << "num ins files: " << childPest.get_insfile_vec().size() << endl;
-			cout << ss.str();
-			fout_rec << ss.str();
-
 		}
-
 		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
 		{
 			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
