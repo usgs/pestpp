@@ -295,6 +295,12 @@ public:
 	//this is not called in the initialization - must be called before initialize() to trigger dynamic state handling...
 	void initialize_dynamic_states();
 
+	void transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
+	void transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
+
+	pair<string, string> save_ensembles(string tag, int cycle, ParameterEnsemble& _pe, ObservationEnsemble& _oe);
+
+
 protected:
 	string alg_tag;
 	int  verbose_level;
@@ -340,12 +346,6 @@ protected:
 
 	bool oe_drawn, pe_drawn;
 
-
-	void transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
-	void transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
-
-	
-
 	bool solve_glm();
 	bool solve_mda();
 
@@ -362,7 +362,9 @@ protected:
 
 	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int> subset_idxs);
 
-	void report_and_save();
+	
+
+	void report_and_save(int cycle);
 	void save_mat(string prefix, Eigen::MatrixXd& mat);
 	//bool initialize_pe(Covariance& cov);
 	bool initialize_oe(Covariance& cov);

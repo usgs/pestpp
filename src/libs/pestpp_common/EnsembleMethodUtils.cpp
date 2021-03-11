@@ -2734,7 +2734,48 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 	return obs_lams;
 }
 
-void EnsembleMethod::report_and_save()
+pair<string,string> EnsembleMethod::save_ensembles(string tag, int cycle, ParameterEnsemble& _pe, ObservationEnsemble& _oe)
+{
+	stringstream ss;
+	ss << file_manager.get_base_filename();
+	if (cycle != NetPackage::NULL_DA_CYCLE)
+		ss << "." << cycle;
+	if (tag.size() > 0)
+		ss << "." << tag;
+	ss << "." << iter << ".obs";
+	if (pest_scenario.get_pestpp_options().get_save_binary())
+	{
+		ss << ".jcb";
+		_oe.to_binary(ss.str());
+	}
+	else
+	{
+		ss << ".csv";
+		_oe.to_csv(ss.str());
+	}
+	string oname = ss.str();
+	ss.str("");
+	ss << file_manager.get_base_filename();
+	if (cycle != NetPackage::NULL_DA_CYCLE)
+		ss << "." << cycle;
+	if (tag.size() > 0)
+		ss << "." << tag;
+	ss << "." << iter << ".par";
+	if (pest_scenario.get_pestpp_options().get_save_binary())
+	{
+		ss << ".jcb";
+		_pe.to_binary(ss.str());
+	}
+	else
+	{
+		ss << ".csv";
+		_pe.to_csv(ss.str());
+	}
+	string pname = ss.str();
+	return pair<string, string>(pname, oname);
+}
+
+void EnsembleMethod::report_and_save(int cycle)
 {
 	ofstream& frec = file_manager.rec_ofstream();
 	frec << endl << "  ---  " << alg_tag << " iteration " << iter << " report  ---  " << endl;
@@ -2745,39 +2786,13 @@ void EnsembleMethod::report_and_save()
 	cout << "   number of active realizations:   " << pe.shape().first << endl;
 	cout << "   number of model runs:            " << run_mgr_ptr->get_total_runs() << endl;
 
-	stringstream ss;
-	if (pest_scenario.get_pestpp_options().get_save_binary())
-	{
-		ss << file_manager.get_base_filename() << "." << iter << ".obs.jcb";
-		oe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << "." << iter << ".obs.csv";
-		oe.to_csv(ss.str());
-	}
-	frec << "      current obs ensemble saved to " << ss.str() << endl;
-	cout << "      current obs ensemble saved to " << ss.str() << endl;
-	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_save_binary())
-	{
-		ss << file_manager.get_base_filename() << "." << iter << ".par.jcb";
-		pe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
-		pe.to_csv(ss.str());
-	}
+	pair<string, string> names = save_ensembles(string(), cycle, pe, oe);
+	frec << "      current obs ensemble saved to " << names.second << endl;
+	cout << "      current obs ensemble saved to " << names.second << endl;
+	frec << "      current par ensemble saved to " << names.first << endl;
+	cout << "      current par ensemble saved to " << names.first << endl;
 	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter);
 	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1);
-	//ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
-	//pe.to_csv(ss.str());
-	frec << "      current par ensemble saved to " << ss.str() << endl;
-	cout << "      current par ensemble saved to " << ss.str() << endl;
-
-
-
 }
 
 
@@ -3009,7 +3024,13 @@ void EnsembleMethod::initialize(int cycle)
 
 	int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
 
-	pe_drawn = initialize_pe(parcov);
+	if ((pe.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
+	{
+		message(2, "using pre-set parameter ensemble");
+		pe_drawn = false;
+	}
+	else
+		pe_drawn = initialize_pe(parcov);
 
 	if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
 	{
@@ -3314,8 +3335,6 @@ void EnsembleMethod::initialize(int cycle)
 		oe.to_csv(ss.str());
 	}
 	message(1, "saved initial obs ensemble to", ss.str());
-
-	transfer_dynamic_state_from_oe_to_pe(pe, oe);
 	
 	//save the 0th iter par and rei and well as the untagged par and rei
 	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter);
@@ -3473,11 +3492,17 @@ void EnsembleMethod::initialize(int cycle)
 			last_best_lam *= org_val;
 		}
 	}
+
+	if (cycle != NetPackage::NULL_DA_CYCLE)
+	{
+		pair<string, string> names = save_ensembles("prior",cycle, pe, oe);
+		message(1, "saved cycle prior obs ensemble to", names.second);
+		message(1, "saved cycle prior par ensemble to", names.first);
+	}
+
 	message(1, "current lambda:", last_best_lam);
 	message(0, "initialization complete");
 }
-
-
 
 void EnsembleMethod::transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
 {
@@ -3801,11 +3826,11 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	//the case for all state estimation and non-iterative
 	//only one upgrade lambda and all pars are states
-	if (((pe_lams.size() == 1) && (par_dyn_state_names.size() == pe_lams[0].shape().second) && pest_scenario.get_control_info().noptmax == 1))
-	{
-		pe = pe_lams[0];
-		return true;
-	}
+	//if (((pe_lams.size() == 1) && (par_dyn_state_names.size() == pe_lams[0].shape().second) && pest_scenario.get_control_info().noptmax == 1))
+	//{
+	//	pe = pe_lams[0];
+	//	return true;
+	//}
 
 	vector<map<int, int>> real_run_ids_lams;
 	int best_idx = -1;

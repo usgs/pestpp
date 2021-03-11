@@ -1901,7 +1901,7 @@ void IterEnsembleSmoother::iterate_2_solution()
 		ss << "starting solve for iteration: " << iter;
 		performance_log->log_event(ss.str());
 		accept = solve_glm();
-		report_and_save();
+		report_and_save(NetPackage::NULL_DA_CYCLE);
 		ph.update(oe,pe);
 		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);

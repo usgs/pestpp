@@ -87,7 +87,7 @@ public:
 	//void add_dynamic_state_to_pe();
 	
 	
-	void da_update();
+	void da_update(int cycle);
 
 	//void kf_upate();
 	void finalize();

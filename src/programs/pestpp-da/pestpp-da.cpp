@@ -564,8 +564,9 @@ int main(int argc, char* argv[])
 			cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
 
 			da.set_pe(cycle_curr_pe);
-
 			da.initialize(*icycle);
+			
+			
 
 			write_global_phi_info(*icycle, f_phi, da, init_real_names);
 
@@ -574,7 +575,7 @@ int main(int argc, char* argv[])
 
 				if (pest_scenario.get_control_info().noptmax > 0) // 
 				{
-					da.da_update();
+					da.da_update(*icycle);
 				}
 				write_global_phi_info(*icycle, f_phi, da, init_real_names);
 			}
@@ -585,6 +586,9 @@ int main(int argc, char* argv[])
 				performance_log.log_event("no non-zero-weighted observations in current cycle");
 
 			}
+
+			
+
 			//replace all the pars used in this cycle in the parent parameter ensemble
 			performance_log.log_event("updating global ensemble with cycle ensemble columns");
 			cycle_curr_pe = da.get_pe();
@@ -616,7 +620,6 @@ int main(int argc, char* argv[])
 			cycle_curr_pe.transform_ip(curr_pe.get_trans_status());
 			curr_pe.replace_col_vals(cycle_curr_pe.get_var_names(), *cycle_curr_pe.get_eigen_ptr());
 			
-
 			ObservationEnsemble cycle_curr_oe = da.get_oe();
 			//if we lost some realizations...
 			if (curr_oe.shape().first > cycle_curr_oe.shape().first)
@@ -652,6 +655,10 @@ int main(int argc, char* argv[])
 			curr_pe.to_csv(file_manager.get_base_filename() + ss.str());
 
 			file_manager.close_all_files("phi");
+
+			//transfer the best (current) simulated final states to the inital states pars in the pe for the cycle
+			//is the place to do this?  
+			da.transfer_dynamic_state_from_oe_to_pe(curr_pe, curr_oe);
 
 		} // end cycle loop
 		fout_rec.close();

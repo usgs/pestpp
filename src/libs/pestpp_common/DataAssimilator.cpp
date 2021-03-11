@@ -2449,7 +2449,7 @@ void DataAssimilator::sanity_checks()
 //	}
 //}
 
-void DataAssimilator::da_update()
+void DataAssimilator::da_update(int cycle)
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
@@ -2495,7 +2495,7 @@ void DataAssimilator::da_update()
 			accept = solve_mda();
 		else
 			accept = solve_glm();
-		report_and_save();
+		report_and_save(cycle);
 		ph.update(oe, pe);
 		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
@@ -2505,7 +2505,6 @@ void DataAssimilator::da_update()
 			ph.save_residual_cov(oe, iter);
 		pcs.summarize(pe, iter);
 
-
 		if (accept)
 			consec_bad_lambda_cycles = 0;
 		else
@@ -2513,6 +2512,8 @@ void DataAssimilator::da_update()
 
 		if (should_terminate())		
 			break;
+		
+		//transfer_dynamic_state_from_oe_to_pe(pe, oe);
 
 	}
 	//todo return posterior here
