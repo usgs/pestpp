@@ -431,19 +431,14 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 	{
 		ptemp.clear();
 		otemp.clear();
-		if (((how == How::PARAMETERS) && (sact_par_names.find(i.first) != pend)) ||
-			((how == How::OBSERVATIONS) && (sact_obs_names.find(i.first) != oend)))
-		{
-			for (auto& o : i.second.first)
-				if (sact_obs_names.find(o) != oend)
-					otemp.push_back(o);
-
-			for (auto& p : i.second.second)
-				if (sact_par_names.find(p) != pend)
-					ptemp.push_back(p);
-			if ((otemp.size() > 0) && (ptemp.size() > 0))
-				lmap[i.first] = pair<vector<string>, vector<string>>(otemp, ptemp);
-		}
+		for (auto& o : i.second.first)
+			if (sact_obs_names.find(o) != oend)
+				otemp.push_back(o);
+		for (auto& p : i.second.second)
+			if (sact_par_names.find(p) != pend)
+				ptemp.push_back(p);
+		if ((otemp.size() > 0) && (ptemp.size() > 0))
+			lmap[i.first] = pair<vector<string>, vector<string>>(otemp, ptemp);
 
 	}
 	if (!autoadaloc)
