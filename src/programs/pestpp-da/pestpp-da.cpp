@@ -657,7 +657,7 @@ int main(int argc, char* argv[])
 			file_manager.close_all_files("phi");
 
 			//transfer the best (current) simulated final states to the inital states pars in the pe for the cycle
-			//is the place to do this?  
+			//is the place to do this?
 			da.transfer_dynamic_state_from_oe_to_pe(curr_pe, curr_oe);
 
 		} // end cycle loop

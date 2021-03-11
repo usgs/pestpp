@@ -299,7 +299,7 @@ public:
 	void transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
 
 	pair<string, string> save_ensembles(string tag, int cycle, ParameterEnsemble& _pe, ObservationEnsemble& _oe);
-
+	vector<string>& get_par_dyn_state_names() { return par_dyn_state_names; }
 
 protected:
 	string alg_tag;

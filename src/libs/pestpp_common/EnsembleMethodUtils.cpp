@@ -3460,7 +3460,7 @@ void EnsembleMethod::initialize(int cycle)
 		}
 		if (ph.get_std(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
 		{
-			throw_em_error("initial actual phi stdev too low, something is wrong...");
+			message(0,"WARNING: initial actual phi stdev is very low, something is probably wrong...");
 		}
 		if (last_best_mean < 1.0e-10)
 		{
@@ -3468,7 +3468,7 @@ void EnsembleMethod::initialize(int cycle)
 		}
 		if (last_best_std < 1.0e-10)
 		{
-			throw_em_error("initial composite phi stdev too low, something is wrong...");
+			message(0, "WARNING: initial composite phi stdev is very low, something is probably wrong...");
 		}
 	}
 
@@ -3826,11 +3826,11 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	//the case for all state estimation and non-iterative
 	//only one upgrade lambda and all pars are states
-	//if (((pe_lams.size() == 1) && (par_dyn_state_names.size() == pe_lams[0].shape().second) && pest_scenario.get_control_info().noptmax == 1))
-	//{
-	//	pe = pe_lams[0];
-	//	return true;
-	//}
+	/*if (((pe_lams.size() == 1) && (par_dyn_state_names.size() == pe_lams[0].shape().second) && pest_scenario.get_control_info().noptmax == 1))
+	{
+		pe = pe_lams[0];
+		return true;
+	}*/
 
 	vector<map<int, int>> real_run_ids_lams;
 	int best_idx = -1;
