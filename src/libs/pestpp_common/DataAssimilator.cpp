@@ -36,13 +36,7 @@ void DataAssimilator::sanity_checks()
 	{
 		warnings.push_back("prior information equations not supported in pestpp-da, ignoring...");
 	}
-	
-	if ((da_type != "VANILLA") && (da_type != "ITERATIVE") && (da_type != "MDA"))
-	{
-		ss.str("");
-		ss << " DA_TYPE is '" << da_type << "' but must be 'VANILLA','ITERATIVE', or'MDA'";
-		errors.push_back(ss.str());
-	}
+
 
 	if (warnings.size() > 0)
 	{
@@ -67,8 +61,8 @@ void DataAssimilator::da_update(int cycle)
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
 
-	string da_method = da_ctl_params.get_svalue("DA_TYPE");
-	message(0, "Assimilation Method :", da_method);
+	//string da_method = da_ctl_params.get_svalue("DA_TYPE");
+	//message(0, "Assimilation Method :", da_method);
 	int user_noptmax = pest_scenario.get_control_info().noptmax;
 
 	bool accept;
@@ -79,7 +73,7 @@ void DataAssimilator::da_update(int cycle)
 		ss << "starting solve for iteration: " << iter;
 		performance_log->log_event(ss.str());
 		//accept = solve_new_da();
-		if (da_type == "MDA")
+		if (pest_scenario.get_pestpp_options().get_ies_use_mda())
 			accept = solve_mda();
 		else
 			accept = solve_glm();

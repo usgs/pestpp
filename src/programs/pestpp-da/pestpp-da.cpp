@@ -181,13 +181,13 @@ int main(int argc, char* argv[])
 		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
 		pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
-		pest_scenario.get_pestpp_options_ptr()->set_use_da(true);
+		//pest_scenario.get_pestpp_options_ptr()->set_use_da(true);
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
 		//output_file_writer.scenario_report(fout_rec);
 		output_file_writer.scenario_io_report(fout_rec);
 		int verbose_level;
 		PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
-		verbose_level = ppo->da_ctl_params.get_ivalue("DA_VERBOSE_LEVEL");
+		verbose_level = ppo->get_ies_verbose_level();
 		if (verbose_level > 1)
 		{
 			output_file_writer.scenario_pargroup_report(fout_rec);
@@ -220,7 +220,7 @@ int main(int argc, char* argv[])
 			cycles_in_tables, fout_rec, weights_in_tbl);
 		vector<int> assimilation_cycles;
 		//pest_scenario.get_pestpp_options
-		int n_da_cycles = ppo->da_ctl_params.get_ivalue("DA_CYCLES_NUMBER");
+		int n_da_cycles = -1;// ppo->da_ctl_params.get_ivalue("DA_CYCLES_NUMBER");
 		if (n_da_cycles > 0)
 		{
 			for (int i = 0; i < n_da_cycles; i++)
@@ -562,7 +562,7 @@ int main(int argc, char* argv[])
 			performance_log.log_event("instantiating DA instance");
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 			da.initialize_dynamic_states();
-			da.da_type = pest_scenario.get_pestpp_options_ptr()->da_ctl_params.get_svalue("DA_TYPE");
+			//da.da_type = pest_scenario.get_pestpp_options_ptr()->da_ctl_params.get_svalue("DA_TYPE");
 			std::mt19937 rand_gen = da.get_rand_gen();
 			vector<string> act_par_names = childPest.get_ctl_ordered_adj_par_names();
 			performance_log.log_event("instantiating cycle parameter ensemble instance");

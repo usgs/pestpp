@@ -88,9 +88,9 @@ public:
 	int get_iter() { return iter; }
 	FileManager& get_file_manager() { return file_manager; }
 	Pest& get_pest_scenario() { return pest_scenario; }
-	string da_type;
+	//string da_type;
 private:
-	CtlPar_container da_ctl_params;
+	//CtlPar_container da_ctl_params;
 	void eig2csv(string name, Eigen::MatrixXd matrix);	
 	void sanity_checks();
 
