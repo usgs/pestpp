@@ -91,8 +91,10 @@ void DataAssimilator::da_update(int cycle)
 		ph.write(iter, run_mgr_ptr->get_total_runs());
 		if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
 			ph.save_residual_cov(oe, iter);
-		pcs.summarize(pe, iter);
-
+		ss.str("");
+		ss << file_manager.get_base_filename() << "." << cycle << "." << iter << ".pcs.csv";
+		pcs.summarize(pe, ss.str());
+		
 		if (accept)
 			consec_bad_lambda_cycles = 0;
 		else

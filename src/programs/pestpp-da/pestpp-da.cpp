@@ -397,6 +397,9 @@ int main(int argc, char* argv[])
 		Localizer global_loc(&pest_scenario);
 		global_loc.initialize(&performance_log);
 
+		//ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr
+		ParChangeSummarizer pcs(&curr_pe, &file_manager, &output_file_writer);
+
 		// loop over assimilation cycles
 		stringstream ss;
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
@@ -580,6 +583,9 @@ int main(int argc, char* argv[])
 				if (pest_scenario.get_control_info().noptmax > 0) // 
 				{
 					da.da_update(*icycle);
+					ss.str("");
+					ss << file_manager.get_base_filename() << ".global." << *icycle << "." << da.get_iter() << ".pcsaB.csv";
+					pcs.summarize(cycle_curr_pe, ss.str());
 				}
 				write_global_phi_info(*icycle, f_phi, da, init_real_names);
 			}

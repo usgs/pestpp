@@ -1577,14 +1577,11 @@ void SeqQuadProgram::iterate_2_solution()
 		{
 			ss.str("");
 			ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
-			pcs.summarize(dv, iter, ss.str());
+			pcs.summarize(dv, ss.str());
 		}
 		
-
 		//store the grad vector used for this iteration
 		grad_vector_map[iter] = current_grad_vector;
-
-
 	}
 }
 

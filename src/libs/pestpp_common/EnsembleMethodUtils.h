@@ -112,7 +112,7 @@ class ParChangeSummarizer
 public:
 	ParChangeSummarizer() { ; }
 	ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr);
-	void summarize(ParameterEnsemble &pe, int iiter, string filename = string());
+	void summarize(ParameterEnsemble &pe, string filename = string());
 	
 
 private:

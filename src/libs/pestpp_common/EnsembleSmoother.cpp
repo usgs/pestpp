@@ -186,7 +186,7 @@ void IterEnsembleSmoother::iterate_2_solution()
 			ph.save_residual_cov(oe,iter);
 		ss.str("");
 		ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
-		pcs.summarize(pe,iter,ss.str());
+		pcs.summarize(pe,ss.str());
 			
 			
 		if (accept)

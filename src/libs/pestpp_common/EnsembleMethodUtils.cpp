@@ -2214,7 +2214,7 @@ ParChangeSummarizer::ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileMa
 }
 
 
-void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter, string filename)
+void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 {
 	update(pe);
 	vector<string> grp_names;// = base_pe_ptr->get_pest_scenario().get_ctl_ordered_par_group_names();
@@ -2331,7 +2331,8 @@ void ParChangeSummarizer::update(ParameterEnsemble& pe)
 	pe.get_pest_scenario_ptr()->get_base_par_tran_seq().active_ctl2numeric_ip(lb);
 	Parameters ub = pe.get_pest_scenario_ptr()->get_ctl_parameter_info().get_up_bnd(pnames);
 	pe.get_pest_scenario_ptr()->get_base_par_tran_seq().active_ctl2numeric_ip(ub);
-	vector<string> grp_names = base_pe_ptr->get_pest_scenario().get_ctl_ordered_par_group_names();
+	//vector<string> grp_names = base_pe_ptr->get_pest_scenario().get_ctl_ordered_par_group_names();
+	vector<string> grp_names = pe.get_pest_scenario_ptr()->get_ctl_ordered_par_group_names();
 	map<string, int> idx_map;
 	for (int i = 0; i < pnames.size(); i++)
 		idx_map[pnames[i]] = i;
