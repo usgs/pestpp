@@ -2229,7 +2229,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter, string fil
 	{
 		grp_names.push_back(mean_pairs[i].second);
 	}
-	int mxlen = 0;
+	int mxlen = 15;
 	for (auto& g : grp_names)
 		mxlen = max(mxlen, (int)g.size());
 
@@ -2240,7 +2240,9 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter, string fil
 	cout << ss.str();
 	frec << ss.str();
 	ss.str("");
-	ss << setw(mxlen) << "group" << setw(12) << "mean change" << setw(12) << "std change" << setw(18) << "num at/near bnds" << setw(16) << "% at/near bnds" << endl;
+	ss << setw(mxlen) << left << "group" << setw(12) << right << "mean change" << setw(12) << "std change" << setw(16);
+	ss << "n at/near bnds" << setw(16) << "% at/near bnds";
+	ss << setw(10) << "init CV" << setw(10) << "curr CV" << setw(10) << "n CV decr" << endl;
 	cout << ss.str();
 	frec << ss.str();	
 	
@@ -2253,8 +2255,9 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter, string fil
 		int num_out = num_at_bounds[grp_name];
 		int percent_out = percent_at_bounds[grp_name];
 		ss.str("");
-		ss << setw(mxlen) << pest_utils::lower_cp(grp_name) << setw(12) << mean_diff * 100.0 << setw(12) << std_diff * 100.0 << setw(18);
-		ss << num_out << setw(16) << setprecision(2) << percent_out << endl;
+		ss << setw(mxlen) << left << pest_utils::lower_cp(grp_name) << setw(12) << right << mean_diff * 100.0 << setw(12) << std_diff * 100.0 << setw(16);
+		ss << num_out << setw(16) << setprecision(2) << percent_out;
+		ss << setw(10) << setprecision(2) << init_cv[grp_name] << setw(10) << curr_cv[grp_name] << setw(10) << setprecision(2) << num_dec_cv[grp_name] << endl;
 		if (i < 15)
 			cout << ss.str();
 		frec << ss.str();
@@ -2263,6 +2266,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, int iiter, string fil
 
 	ss.str("");
 	ss << "    Note: parameter change summary sorted according to abs 'mean change'." << endl;
+	ss << "          'n CV decr' is the number of parameters with current CV less " << cv_dec_threshold*100.0 << "% of the initial CV" << endl;
 	cout << ss.str();
 	frec << ss.str();
 	if (grp_names.size() > 15)
@@ -2286,11 +2290,11 @@ void ParChangeSummarizer::write_to_csv(string& filename)
 	if (f.bad())
 		throw runtime_error("ParChangeSummarizer::write_to_csv() error opening file " + filename);
 
-	f << "group,mean_change,std_change,num_at_near_bounds,percent_at_near_bounds" << endl;
+	f << "group,mean_change,std_change,num_at_near_bounds,percent_at_near_bounds,initial_cv,current_cv,num_cv_dec" << endl;
 	for (auto grp_name : base_pe_ptr->get_pest_scenario_ptr()->get_ctl_ordered_par_group_names())
 	{
 		f << pest_utils::lower_cp(grp_name) << "," << mean_change[grp_name]*100.0 << "," << std_change[grp_name]*100.0 << ",";
-		f << num_at_bounds[grp_name] << "," << percent_at_bounds[grp_name] << endl;
+		f << num_at_bounds[grp_name] << "," << percent_at_bounds[grp_name] <<","<< init_cv[grp_name] << "," << curr_cv[grp_name] << "," << num_dec_cv[grp_name] <<  endl;
 	}
 	f.close();
 	file_manager_ptr->rec_ofstream() << "...saved parameter change summary to " << filename << endl;
@@ -2305,6 +2309,9 @@ void ParChangeSummarizer::update(ParameterEnsemble& pe)
 	std_change.clear();
 	num_at_bounds.clear();
 	percent_at_bounds.clear();
+	init_cv.clear();
+	curr_cv.clear();
+	num_dec_cv.clear();
 	//pair<map<string, double>, map<string, double>> moments = pe.get_moment_maps();
 	//init_moments = base_pe_ptr->get_moment_maps(pe.get_real_names());
 	map<string, double> mean_map, std_map;
@@ -2314,7 +2321,11 @@ void ParChangeSummarizer::update(ParameterEnsemble& pe)
 	std_map.clear();
 	pe.fill_moment_maps(mean_map, std_map);
 	double mean_diff = 0.0, std_diff = 0.0;
-	double dsize, value1, value2, v;
+	double icv = 0.0, ccv = 0.0;
+	double iicv = 0.0, cccv = 0.0;
+
+	int ndec_cv = 0, dsize=0;
+	double  value1, value2, v;
 	vector<string> pnames = pe.get_var_names();
 	Parameters lb = pe.get_pest_scenario_ptr()->get_ctl_parameter_info().get_low_bnd(pnames);
 	pe.get_pest_scenario_ptr()->get_base_par_tran_seq().active_ctl2numeric_ip(lb);
@@ -2327,11 +2338,17 @@ void ParChangeSummarizer::update(ParameterEnsemble& pe)
 	int num_out, num_pars;
 	int num_reals = pe.get_real_names().size();
 	Eigen::ArrayXd arr;
+	int mean_size, std_size,icv_size,ccv_size;
 	for (auto& grp_name : grp_names)
 	{
 		mean_diff = 0.0, std_diff = 0.0;
+		icv = 0.0; ccv = 0.0;
+		icv_size = 0; ccv_size = 0;
+		ndec_cv = 0;
 		num_pars = pargp2par_map[grp_name].size();
 		num_out = 0;
+		mean_size = 0;
+		std_size = 0;
 		for (auto& par_name : pargp2par_map[grp_name])
 		{
 			arr = pe.get_eigen_ptr()->col(idx_map[par_name]).array();
@@ -2343,18 +2360,63 @@ void ParChangeSummarizer::update(ParameterEnsemble& pe)
 			}
 			value1 = init_moments.first[par_name];
 			value2 = value1 - mean_map[par_name];
-			if ((value1 != 0.0) && (value2 != 0.0))
-				mean_diff += value2 / value1;
+			//if ((value1 != 0.0) && (value2 != 0.0))
+			if (value1 != 0.0)
+			{
+				mean_diff += abs(value2) / abs(value1);
+				mean_size++;
+			}
 			value1 = init_moments.second[par_name];
 			value2 = value1 - std_map[par_name];
-			if ((value1 != 0.0) && (value2 != 0.0))
-				std_diff += value2 / value1;
+			if (value1 != 0.0)
+			{
+				std_diff += abs(value2) / value1;
+				std_size++;
+			}
+			//cv calcs
+			value1 = init_moments.first[par_name];
+			value2 = init_moments.second[par_name];
+			iicv = 0.0;
+			if (value1 != 0.0)
+			{
+				iicv = value2 / abs(value1);
+				icv += iicv;
+				icv_size++;
+			}
+			value1 = mean_map[par_name];
+			value2 = std_map[par_name];
+			cccv = 0.0;
+			if (value1 != 0.0)
+			{
+				cccv = value2 / abs(value1);
+				ccv += cccv;
+				ccv_size++;
+			}
+			if ((cccv != 0.0) && (iicv != 0.0))
+			{
+				value1 = cccv / iicv;
+				if (value1 < cv_dec_threshold)
+					ndec_cv++;
+			}
 		}
-		dsize = double(init_moments.first.size());
+		
 		if (mean_diff != 0.0)
-			mean_diff = mean_diff / dsize;
+		{	
+			mean_diff = mean_diff / double(mean_size);
+		}
 		if (std_diff != 0.0)
-			std_diff = std_diff / dsize;
+		{
+			std_diff = std_diff / double(std_size);
+		}
+		if (icv != 0.0)
+		{
+			icv = icv / double(icv_size);
+		}
+		if (ccv != 0.0)
+		{
+			ccv = ccv / double(ccv_size);
+		}
+			
 
 		double percent_out = 0;
 		if (num_pars > 0)
@@ -2364,6 +2426,9 @@ void ParChangeSummarizer::update(ParameterEnsemble& pe)
 		std_change[grp_name] = std_diff;
 		num_at_bounds[grp_name] = num_out;
 		percent_at_bounds[grp_name] = percent_out;
+		curr_cv[grp_name] = ccv;
+		init_cv[grp_name] = icv;
+		num_dec_cv[grp_name] = ndec_cv;
 
 	}
 }
@@ -4901,12 +4966,11 @@ void EnsembleMethod::initialize_restart()
 		}
 		else
 		{
-			ss << "the following realization names were found in the restart obs en but not in the 'base' obs en:";
+			ss << "the following realization names were found in the restart obs en but not in the 'obs+noise' obs en:";
 			for (auto& m : missing)
 				ss << m << ",";
 			throw_em_error(ss.str());
 		}
-
 	}
 
 	if (oe.shape().first != pe.shape().first)

@@ -116,6 +116,7 @@ public:
 	
 
 private:
+	double cv_dec_threshold = 0.3;
 	ParameterEnsemble * base_pe_ptr;
 	FileManager *file_manager_ptr;
 	OutputFileWriter* output_file_writer_ptr;
@@ -123,6 +124,9 @@ private:
 	pair<map<string,double>, map<string, double>> init_moments;
 	map<string, double> mean_change;
 	map<string, double> std_change;
+	map<string, double> init_cv;
+	map<string, double> curr_cv;
+	map<string, int> num_dec_cv;
 	map<string, int> num_at_bounds;
 	map<string, int> percent_at_bounds;
 
