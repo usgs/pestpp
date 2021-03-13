@@ -1041,6 +1041,28 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
 	convert_ip(value, ies_pdc_sigma_distance);
 	return true;
 	}
+	else if (key == "IES_USE_MDA")
+	{
+	ies_use_mda = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_MDA_INIT_FAC")
+	{
+	convert_ip(value, ies_mda_init_fac);
+	return true;
+	}
+	else if (key == "IES_MDA_DEC_FAC")
+	{
+	convert_ip(value, ies_mda_dec_fac);
+	return true;
+	}
+	else if ((key == "IES_LOC_TYPE") || (key == "IES_LOCALIZATION_TYPE"))
+	{
+	passed_args.insert("IES_LOC_TYPE");
+	passed_args.insert("IES_LOCALIZATION_TYPE");
+	convert_ip(value, ies_loc_type);
+	return true;
+	}
 	return false;
 }
 
@@ -1071,7 +1093,6 @@ bool PestppOptions::assign_da_value_by_key(const string& key, const string& valu
 		if (key.substr(0,2) == "DA")
 		{
 			string ies_key = "IES" + key.substr(2, key.size());
-			cout << ies_key << endl;
 			//temp remove the ies arg if it has been found..
 			bool already_found = false;
 			if (passed_args.find(ies_key) != passed_args.end())
@@ -1174,28 +1195,7 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		convert_ip(value, num_tpl_ins_threads);
 		return true;
 	}
-	else if (key == "IES_USE_MDA")
-	{
-		ies_use_mda = pest_utils::parse_string_arg_to_bool(value);
-		return true;
-	}
-	else if (key == "IES_MDA_INIT_FAC")
-	{
-		convert_ip(value, ies_mda_init_fac);
-		return true;
-	}
-	else if (key == "IES_MDA_DEC_FAC")
-	{
-		convert_ip(value, ies_mda_dec_fac);
-		return true;
-	}
-	else if ((key == "IES_LOC_TYPE") || (key == "IES_LOCALIZATION_TYPE"))
-	{
-		passed_args.insert("IES_LOC_TYPE");
-		passed_args.insert("IES_LOCALIZATION_TYPE");
-		convert_ip(value, ies_loc_type);
-		return true;
-	}
+	
 	return false;
 }
 
