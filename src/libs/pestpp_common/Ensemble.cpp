@@ -95,7 +95,7 @@ void Ensemble::replace_col_vals(const vector<string>& other_var_names, const Eig
 {
 
 	if (shape().first != mat.rows())
-		throw_ensemble_error("Ensemble::add_2_cols_ip(): first dimensions don't match");
+		throw_ensemble_error("Ensemble::replace_col_vals(): first dimensions don't match");
 
 	map<string, int> this_varmap, other_varmap;
 	for (int i = 0; i < var_names.size(); i++)
@@ -111,12 +111,13 @@ void Ensemble::replace_col_vals(const vector<string>& other_var_names, const Eig
 		other_varmap[other_var_names[i]] = i;
 	}
 	if (missing.size() > 0)
-		throw_ensemble_error("Ensemble::add_2_cols_ip(): the following var names in other were not found", missing);
+		throw_ensemble_error("Ensemble::replace_col_vals(): the following var names in other were not found", missing);
 	for (auto& ovm : other_varmap)
 	{
 		reals.col(this_varmap[ovm.first]) = mat.col(ovm.second);
 	}
 }
+
 
 
 
@@ -2640,6 +2641,66 @@ map<string,double> ParameterEnsemble::enforce_bounds(PerformanceLog* plog, bool 
 	}
 	return norm_map;
 }
+
+void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
+{
+	//this is only used by pestpp-da in seq mode for moving fixed state pars forward thru cycles
+	if (shape().first != mat.rows())
+		throw_ensemble_error("ParameterEnsemble::replace_col_vals_and_fixed(): first dimensions don't match");
+
+	map<string, int> this_varmap, other_varmap;
+	for (int i = 0; i < var_names.size(); i++)
+		this_varmap[var_names[i]] = i;
+
+	vector<string> missing;
+	set<string> svnames(var_names.begin(), var_names.end());
+
+	set<string>::iterator end = svnames.end();
+	for (int i = 0; i < other_var_names.size(); i++)
+	{
+		if (svnames.find(other_var_names[i]) == end)
+			missing.push_back(other_var_names[i]);
+		other_varmap[other_var_names[i]] = i;
+	}
+	if (missing.size() > 0)
+	{
+		//check for any fixed par names
+		vector<string> still_missing;
+		set<string>found;
+		ParameterInfo* pi = pest_scenario_ptr->get_ctl_parameter_info_ptr_4_mod();
+		for (auto& m : missing)
+		{
+			if (pi->get_parameter_rec_ptr(m)->tranform_type == ParameterRec::TRAN_TYPE::FIXED)
+			{
+				//map<string, double> fm;
+				Eigen::VectorXd vec = mat.col(other_varmap[m]);
+				for (int i = 0; i < real_names.size(); i++)
+					fixed_map[pair<string, string>(real_names[i], m)] = vec[i];
+
+				found.emplace(m);
+			}
+			else
+				still_missing.push_back(m);
+		}
+		if (still_missing.size() > 0)
+			throw_ensemble_error("ParameterEnsemble::replace_col_vals_and_fixed(): the following par names in other were not found in adj or fixed pars", still_missing);
+		//update the other_varmap and the other mat
+		for (auto& ovm : other_varmap)
+		{
+			if (found.find(ovm.first) == found.end())
+				reals.col(this_varmap[ovm.first]) = mat.col(ovm.second);
+		}
+	}
+	else
+	{
+		for (auto& ovm : other_varmap)
+		{
+			reals.col(this_varmap[ovm.first]) = mat.col(ovm.second);
+		}
+	}
+}
+
+
 
 void ParameterEnsemble::to_binary(string file_name)
 {

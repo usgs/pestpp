@@ -510,7 +510,6 @@ int main(int argc, char* argv[])
 			}
 
 
-
 			Parameters par1 = childPest.get_ctl_parameters();
 			base_trans_seq.ctl2numeric_ip(par1);
 			base_trans_seq.numeric2model_ip(par1);

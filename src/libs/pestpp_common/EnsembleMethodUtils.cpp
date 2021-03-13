@@ -3636,6 +3636,10 @@ void EnsembleMethod::transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe
 	
 	if (obs_dyn_state_names.size() > 0) 
 	{
+		map<string, int> par2col_map;
+		for (int i = 0; i < par_dyn_state_names.size(); i++)
+			par2col_map[par_dyn_state_names[i]] = i;
+
 		ParameterEnsemble::transStatus org_status = _pe.get_trans_status();
 		ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
 		Eigen::MatrixXd mat = _oe.get_eigen(vector<string>(), obs_dyn_state_names);
@@ -3644,15 +3648,24 @@ void EnsembleMethod::transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe
 		message(1, ss.str());
 		if (org_status == ParameterEnsemble::transStatus::NUM)
 		{
+			//get a vec of adj states
+			vector<string> adj_par_dyn_state_names = pest_scenario.get_ctl_ordered_adj_par_names();
+			set<string> sadj_pars(adj_par_dyn_state_names.begin(), adj_par_dyn_state_names.end());
+			adj_par_dyn_state_names.clear();
+			set<string>::iterator end = sadj_pars.end();
+			for (auto& p : par_dyn_state_names)
+				if (sadj_pars.find(p) != end)
+					adj_par_dyn_state_names.push_back(p);
 			for (int i = 0; i < mat.rows(); i++)
 			{
 				Parameters pars = pest_scenario.get_ctl_parameters();
 				pars.update(par_dyn_state_names, mat.row(i));
 				bts.ctl2numeric_ip(pars);
-				mat.row(i) = pars.get_data_eigen_vec(par_dyn_state_names);
+				for (auto& p : adj_par_dyn_state_names)
+					mat(i, par2col_map[p]) = pars.get_rec(p);
 			}
 		}
-		_pe.replace_col_vals(par_dyn_state_names, mat);
+		_pe.replace_col_vals_and_fixed(par_dyn_state_names, mat);
 	}
 }
 

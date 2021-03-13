@@ -167,7 +167,7 @@ public:
 	Covariance get_diagonal_cov_matrix();
 	void to_binary(string filename);
 	void clear_fixed_map() { fixed_map.clear(); fixed_names.clear(); }
-
+	void replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);
 
 private:
 	ParamTransformSeq par_transform;
