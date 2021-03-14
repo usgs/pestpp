@@ -136,7 +136,7 @@ private:
 };
 
 pair<Parameters,Observations> save_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
-	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter, string tag = BASE_REAL_NAME);
+	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter, string tag = BASE_REAL_NAME, int cycle = NetPackage::NULL_DA_CYCLE);
 
 vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
 	ObservationEnsemble& _oe, RunManagerAbstract* run_mgr_ptr,

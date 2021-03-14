@@ -2642,6 +2642,20 @@ map<string,double> ParameterEnsemble::enforce_bounds(PerformanceLog* plog, bool 
 	return norm_map;
 }
 
+void ParameterEnsemble::set_fixed_info(map<pair<string, string>, double> _fixed_map)
+{
+	fixed_names.clear();
+	fixed_map.clear();
+	set<string> found;
+	for (auto& fi : _fixed_map)
+	{
+		found.emplace(fi.first.second);
+	}
+	fixed_map = _fixed_map;
+	fixed_names = vector<string>(found.begin(), found.end());
+	cout << "";
+}
+
 void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
 {
 	//this is only used by pestpp-da in seq mode for moving fixed state pars forward thru cycles
@@ -2682,8 +2696,16 @@ void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_v
 			else
 				still_missing.push_back(m);
 		}
+		
 		if (still_missing.size() > 0)
 			throw_ensemble_error("ParameterEnsemble::replace_col_vals_and_fixed(): the following par names in other were not found in adj or fixed pars", still_missing);
+		//update fixed_names
+		set<string> fnames(fixed_names.begin(), fixed_names.end());
+		for (auto& f : found)
+			if (fnames.find(f) == fnames.end())
+				fixed_names.push_back(f);
+
+
 		//update the other_varmap and the other mat
 		for (auto& ovm : other_varmap)
 		{

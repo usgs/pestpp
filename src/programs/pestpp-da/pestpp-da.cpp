@@ -568,7 +568,7 @@ int main(int argc, char* argv[])
 			performance_log.log_event("instantiating cycle parameter ensemble instance");
 			ParameterEnsemble cycle_curr_pe(&childPest, &rand_gen, curr_pe.get_eigen(vector<string>(), act_par_names), curr_pe.get_real_names(), act_par_names);
 			cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
-
+			cycle_curr_pe.set_fixed_info(curr_pe.get_fixed_map());
 			da.set_pe(cycle_curr_pe);
 			da.set_localizer(global_loc);
 			da.initialize(*icycle);
@@ -669,6 +669,11 @@ int main(int argc, char* argv[])
 			//transfer the best (current) simulated final states to the inital states pars in the pe for the cycle
 			//is the place to do this?
 			da.transfer_dynamic_state_from_oe_to_pe(curr_pe, curr_oe);
+			ss.str("");
+			ss << "test_" << *icycle << ".csv";
+			curr_pe.to_csv(ss.str());
+			cout << curr_oe.get_eigen() << endl;
+			cout << endl;
 
 		} // end cycle loop
 		fout_rec.close();

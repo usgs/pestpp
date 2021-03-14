@@ -2436,7 +2436,7 @@ void ParChangeSummarizer::update(ParameterEnsemble& pe)
 
 
 pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
-	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter,string tag)
+	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter, string tag, int cycle)
 {
 	stringstream ss;
 	map<string, int> vmap = pe.get_real_map();
@@ -2450,8 +2450,11 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 		if (pe.get_trans_status() == ParameterEnsemble::transStatus::NUM)
 			pts.numeric2ctl_ip(pars);
 		// save parameters to .par file
+		if (cycle != NetPackage::NULL_DA_CYCLE)
+			ss << cycle << ".";
 		if (iter >= 0)
 			ss << iter << ".";
+		
 		ss << pest_utils::lower_cp(tag) << ".par";
 		output_file_writer.write_par(file_manager.open_ofile_ext(ss.str()), pars, *(pts.get_offset_ptr()),
 			*(pts.get_scale_ptr()));
@@ -2469,6 +2472,8 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 			ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
 			// save new residuals to .rei file
 			ss.str("");
+			if (cycle != NetPackage::NULL_DA_CYCLE)
+				ss << cycle << ".";
 			if (iter >= 0)
 				ss << iter << ".";
 			ss << pest_utils::lower_cp(tag) <<  ".rei";
@@ -2910,8 +2915,8 @@ void EnsembleMethod::report_and_save(int cycle)
 	cout << "      current obs ensemble saved to " << names.second << endl;
 	frec << "      current par ensemble saved to " << names.first << endl;
 	cout << "      current par ensemble saved to " << names.first << endl;
-	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter);
-	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1);
+	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter, BASE_REAL_NAME, cycle);
+	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1, BASE_REAL_NAME, cycle);
 }
 
 
@@ -3030,7 +3035,7 @@ void EnsembleMethod::initialize(int cycle)
 		message(0, "control file parameter phi report:");
 		ph.report(true);
 		ph.write(0, 1);
-		save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, BASE_REAL_NAME);
+		save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, BASE_REAL_NAME, cycle);
 		//transfer_dynamic_state_from_oe_to_pe(_pe, _oe);
 		pe = _pe;
 		oe = _oe;
@@ -3375,7 +3380,7 @@ void EnsembleMethod::initialize(int cycle)
 		message(0, "mean parameter phi report:");
 		ph.report(true);
 		ph.write(0, 1);
-		save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, "mean");
+		save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, "mean", cycle);
 		//transfer_dynamic_state_from_oe_to_pe(_pe, _oe);
 		pe = _pe;
 		oe = _oe;
@@ -3463,8 +3468,8 @@ void EnsembleMethod::initialize(int cycle)
 	message(1, "saved initial obs ensemble to", ss.str());
 	
 	//save the 0th iter par and rei and well as the untagged par and rei
-	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter);
-	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1);
+	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter, BASE_REAL_NAME, cycle);
+	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1, BASE_REAL_NAME, cycle);
 
 
 	performance_log->log_event("calc pre-drop phi");
