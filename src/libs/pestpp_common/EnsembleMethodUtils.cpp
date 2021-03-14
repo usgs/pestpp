@@ -3031,7 +3031,7 @@ void EnsembleMethod::initialize(int cycle)
 		ph.report(true);
 		ph.write(0, 1);
 		save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, BASE_REAL_NAME);
-		transfer_dynamic_state_from_oe_to_pe(_pe, _oe);
+		//transfer_dynamic_state_from_oe_to_pe(_pe, _oe);
 		pe = _pe;
 		oe = _oe;
 		return;
@@ -3376,7 +3376,7 @@ void EnsembleMethod::initialize(int cycle)
 		ph.report(true);
 		ph.write(0, 1);
 		save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, "mean");
-		transfer_dynamic_state_from_oe_to_pe(_pe, _oe);
+		//transfer_dynamic_state_from_oe_to_pe(_pe, _oe);
 		pe = _pe;
 		oe = _oe;
 		return;

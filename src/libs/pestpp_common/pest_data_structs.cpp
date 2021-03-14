@@ -1085,6 +1085,8 @@ bool PestppOptions::assign_da_value_by_key(const string& key, const string& valu
 		da_weight_cycle_table = org_value;
 		return true;
 	}
+
+	//any additional da specific args must be before here!
 	//some hackery!
 	else
 	{

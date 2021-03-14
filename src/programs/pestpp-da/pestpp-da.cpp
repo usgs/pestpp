@@ -583,7 +583,7 @@ int main(int argc, char* argv[])
 				{
 					da.da_update(*icycle);
 					ss.str("");
-					ss << file_manager.get_base_filename() << ".global." << *icycle << "." << da.get_iter() << ".pcsaB.csv";
+					ss << file_manager.get_base_filename() << ".global." << *icycle << "." << da.get_iter() << ".pcs.csv";
 					pcs.summarize(cycle_curr_pe, ss.str());
 				}
 				write_global_phi_info(*icycle, f_phi, da, init_real_names);
