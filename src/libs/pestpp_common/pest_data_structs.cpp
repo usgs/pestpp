@@ -343,15 +343,16 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 
 	string value = upper_cp(org_value);
 		
-	if (value.size() > 0)
-		if (passed_args.find(key) != passed_args.end())
-		{
-			//throw PestParsingError(line, "Duplicate key word \"" + key + "\", possibly through an alias");
-			//cout << "parse_plusplus_line() Error: Duplicate key word " << key << ", possibly through an alias" << endl;
-			return ARG_STATUS::ARG_DUPLICATE;
-		}
-		passed_args.insert(key);
-		arg_map[key] = value;
+	if (value.size() == 0)
+		return ARG_STATUS::ARG_INVALID;
+
+	if (passed_args.find(key) != passed_args.end())
+	{
+		//throw PestParsingError(line, "Duplicate key word \"" + key + "\", possibly through an alias");
+		//cout << "parse_plusplus_line() Error: Duplicate key word " << key << ", possibly through an alias" << endl;
+		return ARG_STATUS::ARG_DUPLICATE;
+	}
+	arg_map[key] = value;
 		
 
 	if (key=="MAX_N_SUPER"){
@@ -783,15 +784,30 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		//special treatment of the da args...
 		if (!assign_da_value_by_key(key, value, org_value))
+		{
+			passed_args.insert(key);
 			return ARG_STATUS::ARG_NOTFOUND;
+
+		}
+			
 	}
-	
+	passed_args.insert(key);
+
 	return ARG_STATUS::ARG_ACCEPTED;
 }
 
 
 bool PestppOptions::assign_ies_value_by_key(const string& key, const string& value, const string& org_value)
 {
+	if ((use_da_args) && (key.find("IES") != string::npos))
+	{
+		string da_key = "DA" + key.substr(3, key.size());
+		// if the same da arg has been passed already, then we have already set 
+		//the value in the ies arg for the da arg and the current arg, 
+		//while valid, should not be used.
+		if (passed_args.find(da_key) != passed_args.end())
+			return true;
+	}
 	if ((key == "IES_PAR_EN") || (key == "IES_PARAMETER_ENSEMBLE"))
 	{
 	passed_args.insert("IES_PARAMETER_ENSEMBLE");
@@ -1106,8 +1122,8 @@ bool PestppOptions::assign_da_value_by_key(const string& key, const string& valu
 			bool ies_accepted = assign_ies_value_by_key(ies_key, value, org_value);
 			if (ies_accepted)
 			{
-				passed_args.erase(ies_key);
-				passed_args.emplace(key);
+				//passed_args.erase(ies_key);
+				//passed_args.emplace(key);
 			}
 			if (already_found)
 			{

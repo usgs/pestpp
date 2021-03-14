@@ -288,7 +288,9 @@ public:
 	enum GLOBAL_OPT { NONE, OPT_DE, OPT_MOEA};
 	enum GLMNormalForm { IDENT,DIAG, PRIOR };
 	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
-	PestppOptions() { ; }
+	PestppOptions() { use_da_args=false; }
+
+	
 
 	//void parce_line(const string &line);
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
@@ -657,11 +659,15 @@ public:
 	void set_num_tpl_ins_threads(int num) { num_tpl_ins_threads = num; }
 	int get_num_tpl_ins_threads()const { return num_tpl_ins_threads; }
 
+	bool get_use_da_args() const { return use_da_args; }
+	void set_use_dat_args(bool _flag) { use_da_args = _flag; }
+
 	void set_defaults();
 	void summary(ostream& os) const;
 
 private:
 
+	bool use_da_args;
 	bool forgive_unknown_args;
 	int n_iter_base;
 	int n_iter_super;
