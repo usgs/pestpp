@@ -206,6 +206,7 @@ int main(int argc, char* argv[])
 		if (pp_args.find("OVERDUE_resched_FAC") == pp_args.end())
 			ppo->set_overdue_reched_fac(1.15);
 
+		pest_scenario.get_pestpp_options().summary(fout_rec);
 
 		//do all this up here so we can use the parse only option
 		//to check the interface and then quit
@@ -509,7 +510,7 @@ int main(int argc, char* argv[])
 				output_file_writer.scenario_par_report(fout_rec);
 				output_file_writer.scenario_obs_report(fout_rec);
 			}
-
+			
 
 			Parameters par1 = childPest.get_ctl_parameters();
 			base_trans_seq.ctl2numeric_ip(par1);
