@@ -3073,6 +3073,7 @@ void EnsembleMethod::initialize(int cycle)
 	if (localizer.is_initialized())
 	{
 		message(1, "using previously initialized localizer");
+		use_localizer = true;
 	}
 	else
 	{
