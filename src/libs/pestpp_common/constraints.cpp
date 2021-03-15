@@ -245,7 +245,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	//initialize the stack constainers (ensemble class instances)
 	stack_pe.set_pest_scenario(&pest_scenario);
 	stack_pe.set_rand_gen(&rand_gen);
-	stack_oe.set_pest_scenario(&pest_scenario);
+	stack_oe.set_pest_scenario_ptr(&pest_scenario);
 	stack_oe.set_rand_gen(&rand_gen);
 	//initialize some more things
 	dbl_max = _dbl_max;

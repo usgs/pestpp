@@ -294,7 +294,7 @@ public:
 	L2PhiHandler& get_phi_handler() { return ph; }
 	int get_iter() { return iter; }
 	FileManager& get_file_manager() { return file_manager; }
-	Pest& get_pest_scenario() { return pest_scenario; }
+	Pest* get_pest_scenario_ptr() { return &pest_scenario; }
 	
 	void initialize(int cycle = NetPackage::NULL_DA_CYCLE);
 

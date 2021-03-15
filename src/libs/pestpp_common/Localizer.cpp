@@ -57,13 +57,17 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 	use = true;
 	if ((filename.size() == 0) && (!autoadaloc))
 	{
+		initialized = true;
 		use = false;
 		return use;
 	}
 	//use = true;
 
 	if (filename.size() == 0)
+	{
+		initialized = true;
 		return use;
+	}
 	performance_log->log_event("loading localizer matrix from file " + filename);
 	org_mat.from_file(filename);
 	

@@ -526,22 +526,22 @@ void generate_global_ensembles(DataAssimilator& da, ofstream& fout_rec, Paramete
 	//generate a parent ensemble which includes all parameters across all cycles
 	cout << "...preparing global parameter ensemble for all parameters across all cycles" << endl;
 	fout_rec << "...preparing global parameter ensemble for all parameters across all cycles" << endl;
-	Pest pest_scenario = da.get_pest_scenario();
+	Pest* pest_scenario_ptr = da.get_pest_scenario_ptr();
 	da.initialize_parcov();
 	da.initialize_pe(*da.get_parcov_ptr());
 	curr_pe = da.get_pe();
-	Parameters pars = pest_scenario.get_ctl_parameters();
-	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+	Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+	ParamTransformSeq pts = pest_scenario_ptr->get_base_par_tran_seq();
 	if (curr_pe.get_trans_status() != ParameterEnsemble::transStatus::NUM)
 		throw runtime_error("parameter ensemble not in numeric transform status");
 	pts.ctl2numeric_ip(pars);
-	Eigen::VectorXd v = pars.get_data_eigen_vec(pest_scenario.get_ctl_ordered_adj_par_names());
-	if (pest_scenario.get_control_info().noptmax == 0)
+	Eigen::VectorXd v = pars.get_data_eigen_vec(pest_scenario_ptr->get_ctl_ordered_adj_par_names());
+	if (pest_scenario_ptr->get_control_info().noptmax == 0)
 	{
-		curr_pe.reserve(vector<string>{BASE_REAL_NAME}, pest_scenario.get_ctl_ordered_adj_par_names());
+		curr_pe.reserve(vector<string>{BASE_REAL_NAME}, pest_scenario_ptr->get_ctl_ordered_adj_par_names());
 		curr_pe.update_real_ip(BASE_REAL_NAME, v);
 	}
-	else if (pest_scenario.get_pestpp_options().get_ies_include_base())
+	else if (pest_scenario_ptr->get_pestpp_options().get_ies_include_base())
 	{
 		cout << "...replacing last realization with 'base' realization in global parameter ensemble" << endl;
 		fout_rec << "...replacing last realization with 'base' realization in global parameter ensemble" << endl;
@@ -551,9 +551,9 @@ void generate_global_ensembles(DataAssimilator& da, ofstream& fout_rec, Paramete
 	cout << "...preparing global observation ensemble for all observations across all cycles" << endl;
 	fout_rec << "...preparing global observation ensemble for all observations across all cycles" << endl;
 	mt19937 rand_gen = da.get_rand_gen();
-	curr_oe.set_pest_scenario(&pest_scenario);
+	curr_oe.set_pest_scenario_ptr(pest_scenario_ptr);
 	curr_oe.set_rand_gen(&rand_gen);
-	curr_oe.reserve(curr_pe.get_real_names(), pest_scenario.get_ctl_ordered_obs_names());
+	curr_oe.reserve(curr_pe.get_real_names(), pest_scenario_ptr->get_ctl_ordered_obs_names());
 
 	try
 	{

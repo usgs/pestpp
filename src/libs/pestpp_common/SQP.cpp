@@ -92,7 +92,7 @@ SeqQuadProgram::SeqQuadProgram(Pest &_pest_scenario, FileManager &_file_manager,
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	subset_rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	dv.set_pest_scenario(&pest_scenario);
-	oe.set_pest_scenario(&pest_scenario);
+	oe.set_pest_scenario_ptr(&pest_scenario);
 	dv.set_rand_gen(&rand_gen);
 	oe.set_rand_gen(&rand_gen);
 	
