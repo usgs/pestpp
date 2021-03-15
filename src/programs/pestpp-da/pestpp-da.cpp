@@ -669,11 +669,11 @@ int main(int argc, char* argv[])
 			//transfer the best (current) simulated final states to the inital states pars in the pe for the cycle
 			//is the place to do this?
 			da.transfer_dynamic_state_from_oe_to_pe(curr_pe, curr_oe);
-			ss.str("");
+			/*ss.str("");
 			ss << "test_" << *icycle << ".csv";
 			curr_pe.to_csv(ss.str());
 			cout << curr_oe.get_eigen() << endl;
-			cout << endl;
+			cout << endl;*/
 
 		} // end cycle loop
 		fout_rec.close();
