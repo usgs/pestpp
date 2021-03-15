@@ -343,15 +343,16 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 
 	string value = upper_cp(org_value);
 		
-	if (value.size() > 0)
-		if (passed_args.find(key) != passed_args.end())
-		{
-			//throw PestParsingError(line, "Duplicate key word \"" + key + "\", possibly through an alias");
-			//cout << "parse_plusplus_line() Error: Duplicate key word " << key << ", possibly through an alias" << endl;
-			return ARG_STATUS::ARG_DUPLICATE;
-		}
-		passed_args.insert(key);
-		arg_map[key] = value;
+	if (value.size() == 0)
+		return ARG_STATUS::ARG_INVALID;
+
+	if (passed_args.find(key) != passed_args.end())
+	{
+		//throw PestParsingError(line, "Duplicate key word \"" + key + "\", possibly through an alias");
+		//cout << "parse_plusplus_line() Error: Duplicate key word " << key << ", possibly through an alias" << endl;
+		return ARG_STATUS::ARG_DUPLICATE;
+	}
+	arg_map[key] = value;
 		
 
 	if (key=="MAX_N_SUPER"){
@@ -502,6 +503,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	else if (key == "OVERDUE_GIVEUP_MINUTES")
 	{
 		convert_ip(value, overdue_giveup_minutes);
+	}
+	else if (key == "YAMR_POLL_INTERVAL")
+	{
+	convert_ip(value, worker_poll_interval);
 	}
 	else if (key == "CONDOR_SUBMIT_FILE")
 	{
@@ -721,219 +726,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		opt_include_bnd_pi = pest_utils::parse_string_arg_to_bool(value);
 	}
 
-	else if ((key == "IES_PAR_EN") || (key == "IES_PARAMETER_ENSEMBLE"))
-	{
-		passed_args.insert("IES_PARAMETER_ENSEMBLE");
-		passed_args.insert("IES_PAR_EN");
-		//convert_ip(value, ies_par_csv);
-		ies_par_csv = org_value;
-	}
-	else if ((key == "IES_OBS_EN") || (key == "IES_OBSERVATION_ENSEMBLE"))
-	{
-		passed_args.insert("IES_OBSERVATION_ENSEMBLE");
-		passed_args.insert("IES_OBS_EN");
-		//convert_ip(value, ies_obs_csv);
-		ies_obs_csv = org_value;
-	}
-	else if ((key == "IES_RESTART_PARAMETER_ENSEMBLE") || (key == "IES_RESTART_PAR_EN"))
-	{
-		passed_args.insert("IES_RESTART_PARAMETER_ENSEMBLE");
-		passed_args.insert("IES_RESTART_PAR_EN");
-		//convert_ip(value, ies_obs_restart_csv);
-		ies_par_restart_csv = org_value;
-	}
-	else if ((key == "IES_RESTART_OBSERVATION_ENSEMBLE") || (key == "IES_RESTART_OBS_EN"))
-	{
-		passed_args.insert("IES_RESTART_OBSERVATION_ENSEMBLE");
-		passed_args.insert("IES_RESTART_OBS_EN");
-		//convert_ip(value, ies_obs_restart_csv);
-		ies_obs_restart_csv = org_value;
-	}
-
-	else if ((key == "IES_USE_APPROXIMATE_SOLUTION") || (key == "IES_USE_APPROX"))
-	{
-		passed_args.insert("IES_USE_APPROXIMATE_SOLUTION");
-		passed_args.insert("IES_USE_APPROX");
-		ies_use_approx = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_LAMBDA_MULTS")
-	{
-		ies_lam_mults.clear();
-		vector<string> tok;
-		tokenize(value, tok, ",");
-		for (const auto &iscale : tok)
-		{
-			ies_lam_mults.push_back(convert_cp<double>(iscale));
-		}
-	}
-	else if ((key == "IES_INIT_LAM") || (key == "IES_INITIAL_LAMBDA"))
-	{
-		passed_args.insert("IES_INIT_LAM");
-		passed_args.insert("IES_INITIAL_LAMBDA");
-		convert_ip(value, ies_init_lam);
-	}
-	else if (key == "IES_USE_APPROX")
-	{
-		convert_ip(value, ies_use_approx);
-	}
-	else if (key == "IES_SUBSET_SIZE")
-	{
-		convert_ip(value, ies_subset_size);
-	}
-	else if  ((key == "IES_REG_FACTOR") || (key == "IES_REG_FAC"))
-	{
-		passed_args.insert("IES_REG_FACTOR");
-		passed_args.insert("IES_REG_FAC");
-		convert_ip(value, ies_reg_factor);
-	}
-	else if (key == "IES_VERBOSE_LEVEL")
-	{
-		convert_ip(value, ies_verbose_level);
-	}
-	else if (key == "IES_USE_PRIOR_SCALING")
-	{
-		ies_use_prior_scaling = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_NUM_REALS")
-	{
-		convert_ip(value, ies_num_reals);
-	}
-	else if (key == "IES_BAD_PHI")
-	{
-		convert_ip(value, ies_bad_phi);
-	}
-	else if (key == "IES_BAD_PHI_SIGMA")
-	{
-		convert_ip(value, ies_bad_phi_sigma);
-	}
-	else if ((key == "IES_INCLUDE_BASE") || (key == "IES_ADD_BASE"))
-	{
-		passed_args.insert("IES_INCLUDE_BASE");
-		passed_args.insert("IES_ADD_BASE");
-		ies_include_base = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_USE_EMPIRICAL_PRIOR")
-	{
-		ies_use_empirical_prior = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_GROUP_DRAWS")
-	{
-		ies_group_draws = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_ENFORCE_BOUNDS")
-	{
-		ies_enforce_bounds = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if ((key == "IES_SAVE_BINARY") || (key == "SAVE_BINARY"))
-	{
-		passed_args.insert("IES_SAVE_BINARY");
-		passed_args.insert("SAVE_BINARY");
-		save_binary = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "PAR_SIGMA_RANGE")
-	{
-		convert_ip(value, par_sigma_range);
-	}
-	else if (key == "YAMR_POLL_INTERVAL") 
-	{
-		convert_ip(value, worker_poll_interval);
-	}
-	else if (key == "IES_LOCALIZER")
-	{
-		//convert_ip(value, ies_localizer);
-		ies_localizer = org_value;
-	}
-	else if (key == "IES_ACCEPT_PHI_FAC")
-	{
-		convert_ip(value, ies_accept_phi_fac);
-	}
-	else if (key == "IES_LAMBDA_INC_FAC")
-	{
-		convert_ip(value, ies_lambda_inc_fac);
-	}
-	else if (key == "IES_LAMBDA_DEC_FAC")
-	{
-		convert_ip(value, ies_lambda_dec_fac);
-	}
-	else if ((key == "IES_SAVE_LAMBDA_EN") || (key == "IES_SAVE_LAMBDA_ENSEMBLES"))
-	{
-		passed_args.insert("IES_SAVE_LAMBDA_EN");
-		passed_args.insert("IES_SAVE_LAMBDA_ENSEMBLES");
-		ies_save_lambda_en = pest_utils::parse_string_arg_to_bool(value);
-	}
 	
-	else if (key == "IES_SUBSET_HOW")
-	{
-		convert_ip(value,ies_subset_how);
-	}
-	else if (key == "IES_LOCALIZE_HOW")
-	{
-		convert_ip(value, ies_localize_how);
-	}
-	else if (key == "IES_NUM_THREADS")
-	{
-		convert_ip(value, ies_num_threads);
-	}
-	else if (key == "IES_DEBUG_FAIL_SUBSET")
-	{
-		ies_debug_fail_subset = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_DEBUG_FAIL_REMAINDER")
-	{
-		ies_debug_fail_remainder = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_DEBUG_BAD_PHI")
-	{
-		ies_debug_bad_phi = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_DEBUG_UPGRADE_ONLY")
-	{
-		ies_debug_upgrade_only = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_DEBUG_HIGH_SUBSET_PHI")
-	{
-		ies_debug_high_subset_phi = pest_utils::parse_string_arg_to_bool(value);;
-	}
-	else if (key == "IES_DEBUG_HIGH_UPGRADE_PHI")
-	{
-		ies_debug_high_upgrade_phi = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_CSV_BY_REALS")
-	{
-		ies_csv_by_reals = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_AUTOADALOC")
-	{
-		ies_autoadaloc = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_AUTOADALOC_SIGMA_DIST")
-	{
-		convert_ip(value, ies_autoadaloc_sigma_dist);
-	}
-	else if (key == "IES_ENFORCE_CHGLIM")
-	{
-		ies_enforce_chglim = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_CENTER_ON")
-	{
-		convert_ip(value, ies_center_on);
-	}
-	else if (key == "IES_NO_NOISE")
-	{
-		ies_no_noise = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_DROP_CONFLICTS")
-	{
-		ies_drop_conflicts = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_SAVE_RESCOV")
-	{
-		ies_save_rescov = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_PDC_SIGMA_DISTANCE")
-	{
-		convert_ip(value, ies_pdc_sigma_distance);
-	}
 	
 	else if (key == "GSA_METHOD")
 	{
@@ -979,38 +772,321 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		debug_parse_only = pest_utils::parse_string_arg_to_bool(value);
 	
 	}
-	else if (assign_DA_value_by_key(key, value, org_value))
+	else if (key == "PAR_SIGMA_RANGE")
 	{
-		// Read all DA parameters. 
+	convert_ip(value, par_sigma_range);
 	}
 	
 	else if ((!assign_value_by_key_continued(key, value, org_value)) && 
 	(!assign_value_by_key_sqp(key, value, org_value)) &&
-	(!assign_mou_value_by_key(key, value, org_value)))
+	(!assign_mou_value_by_key(key, value, org_value)) && 
+	(!assign_ies_value_by_key(key, value, org_value)))
 	{
-		return ARG_STATUS::ARG_NOTFOUND;
+		//special treatment of the da args...
+		if (!assign_da_value_by_key(key, value, org_value))
+		{
+			passed_args.insert(key);
+			return ARG_STATUS::ARG_NOTFOUND;
+
+		}
+			
 	}
-	
+	passed_args.insert(key);
+
 	return ARG_STATUS::ARG_ACCEPTED;
 }
 
-bool PestppOptions::assign_DA_value_by_key(const string& key, const string& value, const string& org_value)
+
+bool PestppOptions::assign_ies_value_by_key(const string& key, const string& value, const string& org_value)
+{
+	if ((use_da_args) && (key.find("IES") != string::npos))
+	{
+		string da_key = "DA" + key.substr(3, key.size());
+		// if the same da arg has been passed already, then we have already set 
+		//the value in the ies arg for the da arg and the current arg, 
+		//while valid, should not be used.
+		if (passed_args.find(da_key) != passed_args.end())
+			return true;
+	}
+	if ((key == "IES_PAR_EN") || (key == "IES_PARAMETER_ENSEMBLE"))
+	{
+	passed_args.insert("IES_PARAMETER_ENSEMBLE");
+	passed_args.insert("IES_PAR_EN");
+	//convert_ip(value, ies_par_csv);
+	ies_par_csv = org_value;
+	return true;
+	}
+	else if ((key == "IES_OBS_EN") || (key == "IES_OBSERVATION_ENSEMBLE"))
+	{
+	passed_args.insert("IES_OBSERVATION_ENSEMBLE");
+	passed_args.insert("IES_OBS_EN");
+	//convert_ip(value, ies_obs_csv);
+	ies_obs_csv = org_value;
+	return true;
+	}
+	else if ((key == "IES_RESTART_PARAMETER_ENSEMBLE") || (key == "IES_RESTART_PAR_EN"))
+	{
+	passed_args.insert("IES_RESTART_PARAMETER_ENSEMBLE");
+	passed_args.insert("IES_RESTART_PAR_EN");
+	//convert_ip(value, ies_obs_restart_csv);
+	ies_par_restart_csv = org_value;
+	return true;
+	}
+	else if ((key == "IES_RESTART_OBSERVATION_ENSEMBLE") || (key == "IES_RESTART_OBS_EN"))
+	{
+	passed_args.insert("IES_RESTART_OBSERVATION_ENSEMBLE");
+	passed_args.insert("IES_RESTART_OBS_EN");
+	//convert_ip(value, ies_obs_restart_csv);
+	ies_obs_restart_csv = org_value;
+	return true;
+	}
+
+	else if ((key == "IES_USE_APPROXIMATE_SOLUTION") || (key == "IES_USE_APPROX"))
+	{
+	passed_args.insert("IES_USE_APPROXIMATE_SOLUTION");
+	passed_args.insert("IES_USE_APPROX");
+	ies_use_approx = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_LAMBDA_MULTS")
+	{
+	ies_lam_mults.clear();
+	vector<string> tok;
+	tokenize(value, tok, ",");
+	for (const auto& iscale : tok)
+	{
+		ies_lam_mults.push_back(convert_cp<double>(iscale));
+	}
+	return true;
+	}
+
+	else if ((key == "IES_INIT_LAM") || (key == "IES_INITIAL_LAMBDA"))
+	{
+	passed_args.insert("IES_INIT_LAM");
+	passed_args.insert("IES_INITIAL_LAMBDA");
+	convert_ip(value, ies_init_lam);
+	return true;
+	}
+	else if (key == "IES_USE_APPROX")
+	{
+	convert_ip(value, ies_use_approx);
+	return true;
+	}
+	else if (key == "IES_SUBSET_SIZE")
+	{
+	convert_ip(value, ies_subset_size);
+	return true;
+	}
+	else if ((key == "IES_REG_FACTOR") || (key == "IES_REG_FAC"))
+	{
+	passed_args.insert("IES_REG_FACTOR");
+	passed_args.insert("IES_REG_FAC");
+	convert_ip(value, ies_reg_factor);
+	return true;
+	}
+	else if (key == "IES_VERBOSE_LEVEL")
+	{
+	convert_ip(value, ies_verbose_level);
+	return true;
+	}
+	else if (key == "IES_USE_PRIOR_SCALING")
+	{
+	ies_use_prior_scaling = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+
+	else if (key == "IES_NUM_REALS")
+	{
+	convert_ip(value, ies_num_reals);
+	return true;
+	}
+	else if (key == "IES_BAD_PHI")
+	{
+	convert_ip(value, ies_bad_phi);
+	return true;
+	}
+	else if (key == "IES_BAD_PHI_SIGMA")
+	{
+	convert_ip(value, ies_bad_phi_sigma);
+	return true;
+	}
+	else if ((key == "IES_INCLUDE_BASE") || (key == "IES_ADD_BASE"))
+	{
+	passed_args.insert("IES_INCLUDE_BASE");
+	passed_args.insert("IES_ADD_BASE");
+	ies_include_base = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_USE_EMPIRICAL_PRIOR")
+	{
+	ies_use_empirical_prior = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_GROUP_DRAWS")
+	{
+	ies_group_draws = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_ENFORCE_BOUNDS")
+	{
+	ies_enforce_bounds = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if ((key == "IES_SAVE_BINARY") || (key == "SAVE_BINARY"))
+	{
+	passed_args.insert("IES_SAVE_BINARY");
+	passed_args.insert("SAVE_BINARY");
+	save_binary = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}	
+	else if (key == "IES_LOCALIZER")
+	{
+	//convert_ip(value, ies_localizer);
+	ies_localizer = org_value;
+	return true;
+	}
+	else if (key == "IES_ACCEPT_PHI_FAC")
+	{
+	convert_ip(value, ies_accept_phi_fac);
+	return true;
+	}
+	else if (key == "IES_LAMBDA_INC_FAC")
+	{
+	convert_ip(value, ies_lambda_inc_fac);
+	return true;
+	}
+	else if (key == "IES_LAMBDA_DEC_FAC")
+	{
+	convert_ip(value, ies_lambda_dec_fac);
+	return true;
+	}
+	else if ((key == "IES_SAVE_LAMBDA_EN") || (key == "IES_SAVE_LAMBDA_ENSEMBLES"))
+	{
+	passed_args.insert("IES_SAVE_LAMBDA_EN");
+	passed_args.insert("IES_SAVE_LAMBDA_ENSEMBLES");
+	ies_save_lambda_en = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_SUBSET_HOW")
+	{
+	convert_ip(value, ies_subset_how);
+	return true;
+	}
+	else if (key == "IES_LOCALIZE_HOW")
+	{
+	convert_ip(value, ies_localize_how);
+	return true;
+	}
+	else if (key == "IES_NUM_THREADS")
+	{
+	convert_ip(value, ies_num_threads);
+	return true;
+	}
+	else if (key == "IES_DEBUG_FAIL_SUBSET")
+	{
+	ies_debug_fail_subset = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_DEBUG_FAIL_REMAINDER")
+	{
+	ies_debug_fail_remainder = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_DEBUG_BAD_PHI")
+	{
+	ies_debug_bad_phi = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_DEBUG_UPGRADE_ONLY")
+	{
+	ies_debug_upgrade_only = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_DEBUG_HIGH_SUBSET_PHI")
+	{
+	ies_debug_high_subset_phi = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_DEBUG_HIGH_UPGRADE_PHI")
+	{
+	ies_debug_high_upgrade_phi = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_CSV_BY_REALS")
+	{
+	ies_csv_by_reals = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_AUTOADALOC")
+	{
+	ies_autoadaloc = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_AUTOADALOC_SIGMA_DIST")
+	{
+	convert_ip(value, ies_autoadaloc_sigma_dist);
+	return true;
+	}
+	else if (key == "IES_ENFORCE_CHGLIM")
+	{
+	ies_enforce_chglim = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_CENTER_ON")
+	{
+	convert_ip(value, ies_center_on);
+	return true;
+	}
+	else if (key == "IES_NO_NOISE")
+	{
+	ies_no_noise = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_DROP_CONFLICTS")
+	{
+	ies_drop_conflicts = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_SAVE_RESCOV")
+	{
+	ies_save_rescov = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_PDC_SIGMA_DISTANCE")
+	{
+	convert_ip(value, ies_pdc_sigma_distance);
+	return true;
+	}
+	else if (key == "IES_USE_MDA")
+	{
+	ies_use_mda = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_MDA_INIT_FAC")
+	{
+	convert_ip(value, ies_mda_init_fac);
+	return true;
+	}
+	else if (key == "IES_MDA_DEC_FAC")
+	{
+	convert_ip(value, ies_mda_dec_fac);
+	return true;
+	}
+	else if ((key == "IES_LOC_TYPE") || (key == "IES_LOCALIZATION_TYPE"))
+	{
+	passed_args.insert("IES_LOC_TYPE");
+	passed_args.insert("IES_LOCALIZATION_TYPE");
+	convert_ip(value, ies_loc_type);
+	return true;
+	}
+	return false;
+}
+
+bool PestppOptions::assign_da_value_by_key(const string& key, const string& value, const string& org_value)
 {
 	//DA parameters
-	if (key == "DA_USE_IES")
-	{
-		throw PestParsingError("'da_ues_ies' is not implemented yet");
-		//da_use_ies = pest_utils::parse_string_arg_to_bool(value);
-		//return true;
-	}
-	else if ((key == "DA_PAR_EN") || (key == "DA_PARAMETER_ENSEMBLE"))
-	{
-		passed_args.insert("DA_PARAMETER_ENSEMBLE");
-		passed_args.insert("DA_PAR_EN");		
-		da_par_csv = org_value;
-		return true;
-	}
-	else if (key == "DA_PARAMETER_CYCLE_TABLE")
+	
+	if (key == "DA_PARAMETER_CYCLE_TABLE")
 	{
 		da_par_cycle_table = org_value;
 		return true;
@@ -1025,73 +1101,45 @@ bool PestppOptions::assign_DA_value_by_key(const string& key, const string& valu
 		da_weight_cycle_table = org_value;
 		return true;
 	}
-	else if (key == "DA_NUM_REALS")
-	{
-		convert_ip(value, da_num_reals);
-		return true;
-	}
-	else if ((key == "DA_OBS_EN") || (key == "DA_OBSERVATION_ENSEMBLE"))
-	{
-		convert_ip(value, da_num_reals);
-		return true;
-	}
 
-	else if (da_ctl_params.is_parameter(key))
-		// this is a generic code to assign da data
+	//any additional da specific args must be before here!
+	//some hackery!
+	else
 	{
-		string typ = da_ctl_params.get_type(key);
-		if (typ.compare("int") == 0)
+		//
+		//if (index != string::npos)
+		if (key.substr(0,2) == "DA")
 		{
-			int ival;
-			convert_ip(value, ival);
-			da_ctl_params.set_value(key, ival);
-			return true;
-		}
-		else if (typ.compare("string") == 0)
-		{
-			string ival;
-			convert_ip(value, ival);
-			da_ctl_params.set_value(key, ival);
-			return true;
-		}
-		else if (typ.compare("double") == 0)
-		{
-			double ival;
-			convert_ip(value, ival);
-			da_ctl_params.set_value(key, ival);
-			return true;
-		}
-		else if (typ.compare("bool") == 0)
-		{
-			bool ival;
-			ival = pest_utils::parse_string_arg_to_bool(value);			
-			da_ctl_params.set_value(key, ival);
-			return true;
-		}
-		else if (typ.compare("vector")==0)
-		{
-			vector <double> vval;
-			vval.clear();
-			vector<string> tok;
-			tokenize(value, tok, ",");
-			for (const auto& iscale : tok)
+			string ies_key = "IES" + key.substr(2, key.size());
+			//temp remove the ies arg if it has been found..
+			bool already_found = false;
+			if (passed_args.find(ies_key) != passed_args.end())
 			{
-				vval.push_back(convert_cp<double>(iscale));
+				passed_args.erase(ies_key);
+				already_found = true;
 			}
-			da_ctl_params.set_value(key, vval);
-			return true;
+
+			bool ies_accepted = assign_ies_value_by_key(ies_key, value, org_value);
+			if (ies_accepted)
+			{
+				//passed_args.erase(ies_key);
+				//passed_args.emplace(key);
+			}
+			if (already_found)
+			{
+				passed_args.emplace(ies_key);
+			}
+			return ies_accepted;
 
 		}
-		else
-			return false;
-		
 
+		return false;
 	}
 
 	
 	
 	
-	return false;
+	
 }
 
 
@@ -1165,21 +1213,7 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		convert_ip(value, num_tpl_ins_threads);
 		return true;
 	}
-	else if (key == "IES_USE_MDA")
-	{
-		ies_use_mda = pest_utils::parse_string_arg_to_bool(value);
-		return true;
-	}
-	else if (key == "IES_MDA_INIT_FAC")
-	{
-		convert_ip(value, ies_mda_init_fac);
-		return true;
-	}
-	else if (key == "IES_MDA_DEC_FAC")
-	{
-		convert_ip(value, ies_mda_dec_fac);
-		return true;
-	}
+	
 	return false;
 }
 
@@ -1485,7 +1519,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_de_f: " << mou_de_f << endl;
 	os << "mou_save_population_every: " << mou_save_population_every << endl;
 	
-	os << endl << "...pestpp-ies options:" << endl;
+	os << endl << "...shared pestpp-ies/pestpp-da options:" << endl;
+	os << "(note: 'da' args override 'ies' args when using pestpp-da)" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
 	os << "ies_observation_ensemble: " << ies_obs_csv << endl;
 	os << "ies_restart_parameter_ensemble: " << ies_par_restart_csv << endl;
@@ -1534,6 +1569,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_use_mda: " << ies_use_mda << endl;
 	os << "ies_mda_init_fac: " << ies_mda_init_fac << endl;
 	os << "ies_mda_dec_fac: " << ies_mda_dec_fac << endl;
+	os << "ies_localization_type: " << ies_loc_type << endl;
 
 	os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -1690,13 +1726,14 @@ void PestppOptions::set_defaults()
 	set_ies_use_mda(false);
 	set_ies_mda_init_fac(0.25);
 	set_ies_mda_dec_fac(0.5);
+	set_ies_loc_type("LOCAL");
 
 	// DA parameters
-	set_da_use_ies(false);
+	//set_da_use_ies(false);
 	set_da_par_cycle_table("");
 	set_da_obs_cycle_table("");
-	set_da_par_csv("");
-	set_da_num_reals(50);
+	//set_da_par_csv("");
+	//set_da_num_reals(50);
 
 	// End of DA parameters
 	set_gsa_method("MORRIS");
@@ -2072,128 +2109,128 @@ vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bou
 
 
 
-template <typename  T>
-T CtlPar_container::get_value(string name) {
-	
-	if (!(int_parms.find(name) == int_parms.end()))
-	{
-		int ival;
-		ival = int_parms[name];
-		return ival;
-	}
-	/*
-	else if (!(string_parms.find(name) == string_parms.end()))
-	{
-		value = string_parms[name];
-		return value;
-	}
-
-	else if (!(double_parms.find(name) == double_parms.end()))
-	{
-		value = double_parms[name];
-		return value;
-	}*/
-
-	else if (!(bool_parms.find(name) == bool_parms.end()))
-	{
-		bool bvalue = bool_parms[name];
-		//value = bvalue;
-		return bvalue;
-	}
-	/*else
-	{
-		cout << "....... Unknow name ..........";
-		value = False;
-		return value;
-	}*/
-
-	
-}
-
-
+//template <typename  T>
+//T CtlPar_container::get_value(string name) {
+//	
+//	if (!(int_parms.find(name) == int_parms.end()))
+//	{
+//		int ival;
+//		ival = int_parms[name];
+//		return ival;
+//	}
+//	/*
+//	else if (!(string_parms.find(name) == string_parms.end()))
+//	{
+//		value = string_parms[name];
+//		return value;
+//	}
+//
+//	else if (!(double_parms.find(name) == double_parms.end()))
+//	{
+//		value = double_parms[name];
+//		return value;
+//	}*/
+//
+//	else if (!(bool_parms.find(name) == bool_parms.end()))
+//	{
+//		bool bvalue = bool_parms[name];
+//		//value = bvalue;
+//		return bvalue;
+//	}
+//	/*else
+//	{
+//		cout << "....... Unknow name ..........";
+//		value = False;
+//		return value;
+//	}*/
+//
+//	
+//}
 
 
-string CtlPar_container::get_svalue(string name)
-{
-	return string_parms[name];
-}
-
-int CtlPar_container::get_ivalue(string name)
-{
-	return int_parms[name];
-}
-
-double CtlPar_container::get_dvalue(string name)
-{
-	return double_parms[name];
-}
-
-bool CtlPar_container::get_bvalue(string name)
-{
-	return bool_parms[name];
-}
-
-vector<double> CtlPar_container::get_vvalue(string name)
-{
-	
-
-	return vector_parms[name];
-}
 
 
-void CtlPar_container::set_value(string name, string val)
-{
-	string_parms[name] = val;
-}
-
-void CtlPar_container::set_value(string name, vector<double> val)
-{
-	vector_parms[name] = val;
-}
-
-void CtlPar_container::set_value(string name, int val)
-{
-	int_parms[name] = val;
-}
-
-void CtlPar_container::set_value(string name, double val)
-{
-	double_parms[name] = val;
-}
-void CtlPar_container::set_value(string name, bool val)
-{
-	bool_parms[name] = val;
-}
-
-bool CtlPar_container::is_parameter(string name)
-{
-	if (!(int_parms.find(name) == int_parms.end()))
-		return true;
-	else if (!(string_parms.find(name) == string_parms.end()))
-		return true;
-	else if (!(double_parms.find(name) == double_parms.end()))
-		return true;
-	else if (!(bool_parms.find(name) == bool_parms.end()))
-		return true;
-	else if (!(vector_parms.find(name) == vector_parms.end()))
-		return true;
-	else
-		return false;
-}
-string CtlPar_container::get_type(string name)
-{
-	if (!(int_parms.find(name) == int_parms.end()))
-		return "int";
-	else if (!(string_parms.find(name) == string_parms.end()))
-		return "string";
-	else if (!(double_parms.find(name) == double_parms.end()))
-		return "double";
-	else if (!(bool_parms.find(name) == bool_parms.end()))
-		return "bool";
-	else if (!(vector_parms.find(name) == vector_parms.end()))
-		return "vector";
-	else
-		return "UNKNOWN";
-}
-;
+//string CtlPar_container::get_svalue(string name)
+//{
+//	return string_parms[name];
+//}
+//
+//int CtlPar_container::get_ivalue(string name)
+//{
+//	return int_parms[name];
+//}
+//
+//double CtlPar_container::get_dvalue(string name)
+//{
+//	return double_parms[name];
+//}
+//
+//bool CtlPar_container::get_bvalue(string name)
+//{
+//	return bool_parms[name];
+//}
+//
+//vector<double> CtlPar_container::get_vvalue(string name)
+//{
+//	
+//
+//	return vector_parms[name];
+//}
+//
+//
+//void CtlPar_container::set_value(string name, string val)
+//{
+//	string_parms[name] = val;
+//}
+//
+//void CtlPar_container::set_value(string name, vector<double> val)
+//{
+//	vector_parms[name] = val;
+//}
+//
+//void CtlPar_container::set_value(string name, int val)
+//{
+//	int_parms[name] = val;
+//}
+//
+//void CtlPar_container::set_value(string name, double val)
+//{
+//	double_parms[name] = val;
+//}
+//void CtlPar_container::set_value(string name, bool val)
+//{
+//	bool_parms[name] = val;
+//}
+//
+//bool CtlPar_container::is_parameter(string name)
+//{
+//	if (!(int_parms.find(name) == int_parms.end()))
+//		return true;
+//	else if (!(string_parms.find(name) == string_parms.end()))
+//		return true;
+//	else if (!(double_parms.find(name) == double_parms.end()))
+//		return true;
+//	else if (!(bool_parms.find(name) == bool_parms.end()))
+//		return true;
+//	else if (!(vector_parms.find(name) == vector_parms.end()))
+//		return true;
+//	else
+//		return false;
+//}
+//string CtlPar_container::get_type(string name)
+//{
+//	if (!(int_parms.find(name) == int_parms.end()))
+//		return "int";
+//	else if (!(string_parms.find(name) == string_parms.end()))
+//		return "string";
+//	else if (!(double_parms.find(name) == double_parms.end()))
+//		return "double";
+//	else if (!(bool_parms.find(name) == bool_parms.end()))
+//		return "bool";
+//	else if (!(vector_parms.find(name) == vector_parms.end()))
+//		return "vector";
+//	else
+//		return "UNKNOWN";
+//}
+//;
 

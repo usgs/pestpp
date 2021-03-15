@@ -92,7 +92,7 @@ SeqQuadProgram::SeqQuadProgram(Pest &_pest_scenario, FileManager &_file_manager,
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	subset_rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	dv.set_pest_scenario(&pest_scenario);
-	oe.set_pest_scenario(&pest_scenario);
+	oe.set_pest_scenario_ptr(&pest_scenario);
 	dv.set_rand_gen(&rand_gen);
 	oe.set_rand_gen(&rand_gen);
 	
@@ -1577,14 +1577,11 @@ void SeqQuadProgram::iterate_2_solution()
 		{
 			ss.str("");
 			ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
-			pcs.summarize(dv, iter, ss.str());
+			pcs.summarize(dv, ss.str());
 		}
 		
-
 		//store the grad vector used for this iteration
 		grad_vector_map[iter] = current_grad_vector;
-
-
 	}
 }
 

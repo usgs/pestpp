@@ -54,32 +54,42 @@ class Localizer
 {
 public:
 	enum How { PARAMETERS, OBSERVATIONS};
-	Localizer() { ; }
-	Localizer(Pest *_pest_scenario_ptr) { pest_scenario_ptr = _pest_scenario_ptr; }
+	enum LocTyp {COVARIANCE, LOCALANALYSIS };
+	Localizer() { initialized=false; }
+	Localizer(Pest* _pest_scenario_ptr) { pest_scenario_ptr = _pest_scenario_ptr; initialized = false; }
 	bool initialize(PerformanceLog *performance_log, bool forgive_missing=false);
-	unordered_map<string, pair<vector<string>, vector<string>>> get_localizer_map(int iter, ObservationEnsemble &oe, ParameterEnsemble &pe, PerformanceLog *performance_log);// { return localizer_map; }
+	unordered_map<string, pair<vector<string>, vector<string>>> get_localanalysis_case_map(int iter, vector<string>& act_obs_names, vector<string>& act_par_names, 
+		ObservationEnsemble &oe, ParameterEnsemble &pe, PerformanceLog *performance_log);// { return localizer_map; }
+	
 	void set_pest_scenario(Pest *_pest_scenario_ptr) { pest_scenario_ptr = _pest_scenario_ptr; }
-	Eigen::MatrixXd get_localizing_obs_hadamard_matrix(int num_reals,string col_name,vector<string> &obs_names);
-	Eigen::MatrixXd get_localizing_par_hadamard_matrix(int num_reals, string row_name, vector<string> &par_names);
+	Eigen::MatrixXd get_obsdiff_hadamard_matrix(int num_reals,string col_name,vector<string> &obs_names);
+	Eigen::MatrixXd get_pardiff_hadamard_matrix(int num_reals, string row_name, vector<string> &par_names);
+	Eigen::MatrixXd get_kalmangain_hadamard_matrix(vector<string>& obs_names, vector<string>& par_names);
+	Eigen::VectorXd get_obs_hadamard_vector(string par_name, vector<string>& obs_names);
+
 	How get_how() { return how; }
 	bool get_use() { return use; }
 	bool get_autoadaloc() { return autoadaloc; }
 	string get_filename() { return filename;  }
-	int get_num_upgrade_steps() { return localizer_map.size(); }
+	int get_num_upgrade_steps() { return _localizer_map.size(); }
+	LocTyp get_loctyp() { return loctyp; }
 	void report(ofstream &f_rec);
+	bool is_initialized() { return initialized; }
 private:
 	bool use;
 	bool autoadaloc;
 	double sigma_dist;
+	bool initialized;
 	How how;
+	LocTyp loctyp;
 	Pest * pest_scenario_ptr;
-	Mat mat;
+	Mat org_mat, cur_mat;
 	string filename;
-	unordered_map<string,pair<vector<string>, vector<string>>> localizer_map;
-	map<string, set<string>> listed_obs;
-	map<string, int> obs2row_map, par2col_map;
+	unordered_map<string,pair<vector<string>, vector<string>>> _localizer_map;
+	//map<string, set<string>> listed_obs;
+	map<string, int> obs2row_map, par2col_map,colname2col_map, rowname2row_map;
 
-	void process_mat(PerformanceLog *performance_log, bool forgive_missing=false);	
+	unordered_map<string, pair<vector<string>, vector<string>>> process_mat(PerformanceLog *performance_log, Mat& mat, bool forgive_missing=false);
 };
 
 void aal_upgrade_thread_function(int id, AutoAdaLocThread &worker, exception_ptr &eptr);

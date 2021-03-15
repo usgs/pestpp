@@ -91,7 +91,7 @@ public:
 
 	Pest* get_pest_scenario_ptr() { return pest_scenario_ptr; }
 	Pest get_pest_scenario() { return *pest_scenario_ptr; }
-	void set_pest_scenario(Pest *_pest_scenario) { pest_scenario_ptr = _pest_scenario; }
+	void set_pest_scenario_ptr(Pest *_pest_scenario) { pest_scenario_ptr = _pest_scenario; }
 	void set_real_names(vector<string> &_real_names, bool update_org_names=false);
 	void check_for_dups();
 	void check_for_normal(string context="");
@@ -167,7 +167,9 @@ public:
 	Covariance get_diagonal_cov_matrix();
 	void to_binary(string filename);
 	void clear_fixed_map() { fixed_map.clear(); fixed_names.clear(); }
-
+	void replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);
+	map<pair<string, string>, double> get_fixed_map() { return fixed_map; }
+	void set_fixed_info(map<pair<string, string>, double> _fixed_map);
 
 private:
 	ParamTransformSeq par_transform;

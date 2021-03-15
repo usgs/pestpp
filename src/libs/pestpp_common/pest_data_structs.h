@@ -196,90 +196,90 @@ public:
 };
 
 
-class CtlPar_container
-{
-	/* A proposed class to simplify adding new control options*/
-public:
-	CtlPar_container() { ; };
-
-	// overload return data is impossible, so each function return different value. 
-	// Cons: user must know the type of the data before using it
-
-	
-	template<typename  T>
-	T get_value(string name);
-	
-	string get_svalue(string name);
-	int get_ivalue(string name);
-	double get_dvalue(string name);
-	bool get_bvalue(string name);
-	vector<double> get_vvalue(string name);
-
-	bool is_parameter(string name);
-	string get_type(string name);
-
-	void set_value(string name, bool val);
-	void set_value(string name, int val);
-	void set_value(string name, double val);
-	void set_value(string name, string val);
-	void set_value(string name, vector<double> val);
-
-private:
-	
-
-	std::unordered_map<string, int> int_parms = {
-		{ "DA_SUBSET_SIZE", 5 },
-		{ "DA_VERBOSE_LEVEL", 1 },
-	    { "DA_CYCLES_NUMBER", -1},
-	    {"DA_NUM_THREADS", 0}
-		
-	};
-
-	std::unordered_map<string, double> double_parms = {
-		{ "DA_BAD_PHI",1.0E300 },
-		{ "DA_BAD_PHI_SIGMA", 1.0E300 },
-	    {"DA_INITIAL_INF_FAC", -1.0},
-	    {"DA_LAMBDA_DEC_FAC", 0.75},
-	    {"DA_LAMBDA_INC_FAC", 10.0},
-		{"DA_ACCEPT_PHI_FAC", 1.05},
-		{"DA_AUTOADALOC_SIGMA_DIST", 1.0}
-
-	};
-
-	std::unordered_map<string, string> string_parms = {
-		{ "DA_OBSERVATION_ENSEMBLE", "" },
-		{"DA_RESTART_OBSERVATION_ENSEMBLE", ""},
-		{"DA_RESTART_PARAMETER_ENSEMBLE", ""},
-	    {"DA_SUBSET_HOW", "random"},
-		{"DA_TYPE", "mda"},
-		{"DA_LOCALIZE_HOW", "PARAMETERS"}
-
-	};
-	std::unordered_map<string, bool> bool_parms = {
-		{ "DA_ADD_BASE", true },
-	    {"DA_ENFORCE_BOUNDS", true},
-		{"DA_USE_PRIOR_SCALING", true},
-		{"DA_SAVE_BINARY", false},
-		{"DA_EVALUATE_UPDATE", true},
-	    {"DA_ENFORCE_CHGLIM", false},
-		{"DA_AUTOADALOC", false}
-
-
-	};
-	std::unordered_map<string, vector<double>> vector_parms
-	{
-		{"DA_INFLATION_FAC", {1.0}},
-		{"DA_INFLATION_MULT",{0.1, 1, 10}},
-		{"DA_SCALE_FAC", {0.75,1.0,1.1}},
-		{"DA_SVD_THRSH", {1e-3, 1e-4, 1e-6}}
-	    //LAMBDA_SCALE_FAC
-
-	};
-	
-
-	
-
-};
+//class CtlPar_container
+//{
+//	/* A proposed class to simplify adding new control options*/
+//public:
+//	CtlPar_container() { ; };
+//
+//	// overload return data is impossible, so each function return different value. 
+//	// Cons: user must know the type of the data before using it
+//
+//	
+//	template<typename  T>
+//	T get_value(string name);
+//	
+//	string get_svalue(string name);
+//	int get_ivalue(string name);
+//	double get_dvalue(string name);
+//	bool get_bvalue(string name);
+//	vector<double> get_vvalue(string name);
+//
+//	bool is_parameter(string name);
+//	string get_type(string name);
+//
+//	void set_value(string name, bool val);
+//	void set_value(string name, int val);
+//	void set_value(string name, double val);
+//	void set_value(string name, string val);
+//	void set_value(string name, vector<double> val);
+//
+//private:
+//	
+//
+//	std::unordered_map<string, int> int_parms = {
+//		{ "DA_SUBSET_SIZE", 5 },
+//		{ "DA_VERBOSE_LEVEL", 1 },
+//	    { "DA_CYCLES_NUMBER", -1},
+//	    {"DA_NUM_THREADS", 0}
+//		
+//	};
+//
+//	std::unordered_map<string, double> double_parms = {
+//		{ "DA_BAD_PHI",1.0E300 },
+//		{ "DA_BAD_PHI_SIGMA", 1.0E300 },
+//	    {"DA_INITIAL_INF_FAC", -1.0},
+//	    {"DA_LAMBDA_DEC_FAC", 0.75},
+//	    {"DA_LAMBDA_INC_FAC", 10.0},
+//		{"DA_ACCEPT_PHI_FAC", 1.05},
+//		{"DA_AUTOADALOC_SIGMA_DIST", 1.0}
+//
+//	};
+//
+//	std::unordered_map<string, string> string_parms = {
+//		{ "DA_OBSERVATION_ENSEMBLE", "" },
+//		{"DA_RESTART_OBSERVATION_ENSEMBLE", ""},
+//		{"DA_RESTART_PARAMETER_ENSEMBLE", ""},
+//	    {"DA_SUBSET_HOW", "random"},
+//		{"DA_TYPE", "mda"},
+//		{"DA_LOCALIZE_HOW", "PARAMETERS"}
+//
+//	};
+//	std::unordered_map<string, bool> bool_parms = {
+//		{ "DA_ADD_BASE", true },
+//	    {"DA_ENFORCE_BOUNDS", true},
+//		{"DA_USE_PRIOR_SCALING", true},
+//		{"DA_SAVE_BINARY", false},
+//		{"DA_EVALUATE_UPDATE", true},
+//	    {"DA_ENFORCE_CHGLIM", false},
+//		{"DA_AUTOADALOC", false}
+//
+//
+//	};
+//	std::unordered_map<string, vector<double>> vector_parms
+//	{
+//		{"DA_INFLATION_FAC", {1.0}},
+//		{"DA_INFLATION_MULT",{0.1, 1, 10}},
+//		{"DA_SCALE_FAC", {0.75,1.0,1.1}},
+//		{"DA_SVD_THRSH", {1e-3, 1e-4, 1e-6}}
+//	    //LAMBDA_SCALE_FAC
+//
+//	};
+//	
+//
+//	
+//
+//};
 
 class PestppOptions {
 public:
@@ -288,7 +288,9 @@ public:
 	enum GLOBAL_OPT { NONE, OPT_DE, OPT_MOEA};
 	enum GLMNormalForm { IDENT,DIAG, PRIOR };
 	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
-	PestppOptions() { ; }
+	PestppOptions() { use_da_args=false; }
+
+	
 
 	//void parce_line(const string &line);
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
@@ -297,7 +299,8 @@ public:
 
 	bool assign_value_by_key_sqp(const string& key, const string& value, const string& org_value);
 	bool assign_mou_value_by_key(const string& key, const string& value, const string& org_value);
-	bool assign_DA_value_by_key(const string& key, const string& value, const string& org_value);
+	bool assign_da_value_by_key(const string& key, const string& value, const string& org_value);
+	bool assign_ies_value_by_key(const string& key, const string& value, const string& org_value);
 	bool assign_value_by_key_continued(const string& key, const string& value, const string& org_value);
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
@@ -569,23 +572,25 @@ public:
 	void set_ies_mda_init_fac(double fac) { ies_mda_init_fac = fac; }
 	double get_ies_mda_dec_fac() const { return ies_mda_dec_fac; }
 	void set_ies_mda_dec_fac(double fac) { ies_mda_dec_fac = fac; }
+	string get_ies_loc_type() const { return ies_loc_type; }
+	void set_ies_loc_type(string typ) { ies_loc_type = typ; }
 
 	// DA parameters
-	CtlPar_container da_ctl_params;
-	void set_da_use_ies(bool _use) { da_use_ies = _use; }
-	bool get_da_use_ies() const { return da_use_ies; }
+	//CtlPar_container da_ctl_params;
+	//void set_da_use_ies(bool _use) { da_use_ies = _use; }
+	//bool get_da_use_ies() const { return da_use_ies; }
 
-	void set_use_da(bool _use) { use_da = _use;}
-	bool get_use_da() const { return use_da; }
+	//void set_use_da(bool _use) { use_da = _use;}
+	//bool get_use_da() const { return use_da; }
 
-	void set_da_mode(string _mode) { da_mode = _mode; }
+	/*void set_da_mode(string _mode) { da_mode = _mode; }
 	string get_da_mode() const { return da_mode; }	
 	string get_da_par_csv()const { return da_par_csv; }
 	void set_da_par_csv(string _da_par_csv) { da_par_csv = _da_par_csv; }
 	int get_da_num_reals() const { return da_num_reals; }
 	void set_da_num_reals(int _da_num_reals) { da_num_reals = _da_num_reals; }
 	string get_da_obs_csv()const { return da_obs_csv; }
-	void set_da_obs_csv(string _da_obs_csv) { da_obs_csv = _da_obs_csv; }
+	void set_da_obs_csv(string _da_obs_csv) { da_obs_csv = _da_obs_csv; }*/
 
 	// End of Data parameters
 
@@ -654,11 +659,15 @@ public:
 	void set_num_tpl_ins_threads(int num) { num_tpl_ins_threads = num; }
 	int get_num_tpl_ins_threads()const { return num_tpl_ins_threads; }
 
+	bool get_use_da_args() const { return use_da_args; }
+	void set_use_dat_args(bool _flag) { use_da_args = _flag; }
+
 	void set_defaults();
 	void summary(ostream& os) const;
 
 private:
 
+	bool use_da_args;
 	bool forgive_unknown_args;
 	int n_iter_base;
 	int n_iter_super;
@@ -809,14 +818,15 @@ private:
 	bool ies_use_mda;
 	double ies_mda_init_fac;
 	double ies_mda_dec_fac;
+	string ies_loc_type;
 
 	// Data Assimilation parameters
-	string da_mode;
+	/*string da_mode;
 	bool da_use_ies;
 	bool use_da = false;
 	string da_par_csv;
 	int da_num_reals;
-	string da_obs_csv;
+	string da_obs_csv;*/
 	string da_par_cycle_table;
 	string da_obs_cycle_table;
 	string da_weight_cycle_table;

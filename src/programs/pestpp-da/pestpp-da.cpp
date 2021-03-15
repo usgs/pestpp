@@ -159,7 +159,7 @@ int main(int argc, char* argv[])
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
-		pest_scenario.set_defaults();
+		pest_scenario.get_pestpp_options_ptr()->set_use_dat_args(true);
 		try {
 			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"), fout_rec);
@@ -182,13 +182,13 @@ int main(int argc, char* argv[])
 		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
 		pest_scenario.get_pestpp_options_ptr()->set_iter_summary_flag(false);
-		pest_scenario.get_pestpp_options_ptr()->set_use_da(true);
+		//pest_scenario.get_pestpp_options_ptr()->set_use_da(true);
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
 		//output_file_writer.scenario_report(fout_rec);
 		output_file_writer.scenario_io_report(fout_rec);
 		int verbose_level;
 		PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
-		verbose_level = ppo->da_ctl_params.get_ivalue("DA_VERBOSE_LEVEL");
+		verbose_level = ppo->get_ies_verbose_level();
 		if (verbose_level > 1)
 		{
 			output_file_writer.scenario_pargroup_report(fout_rec);
@@ -206,6 +206,131 @@ int main(int argc, char* argv[])
 		if (pp_args.find("OVERDUE_resched_FAC") == pp_args.end())
 			ppo->set_overdue_reched_fac(1.15);
 
+		pest_scenario.get_pestpp_options().summary(fout_rec);
+
+		//do all this up here so we can use the parse only option
+		//to check the interface and then quit
+		//process da (recurrent??) par cycle table
+		vector <int> cycles_in_tables;
+		map<int, map<string, double>> par_cycle_info = process_da_par_cycle_table(pest_scenario, cycles_in_tables, fout_rec);
+		// process da obs cycle table
+		set<string> obs_in_tbl; //we need this so we can set weights to zero in childpest of a value isnt listed for a given cycle
+		map<int, map<string, double>> obs_cycle_info = process_da_obs_cycle_table(pest_scenario, cycles_in_tables, fout_rec, obs_in_tbl);
+		//process weights table
+		set<string> weights_in_tbl;
+		map<int, map<string, double>> weight_cycle_info = process_da_weight_cycle_table(pest_scenario, 
+			cycles_in_tables, fout_rec, weights_in_tbl);
+		vector<int> assimilation_cycles;
+		//pest_scenario.get_pestpp_options
+		int n_da_cycles = -1;// ppo->da_ctl_params.get_ivalue("DA_CYCLES_NUMBER");
+		if (n_da_cycles > 0)
+		{
+			for (int i = 0; i < n_da_cycles; i++)
+			{
+				assimilation_cycles.push_back(i);
+			}
+		}
+		else
+		{
+			assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec, cycles_in_tables);
+		}
+
+		if (pest_scenario.get_control_info().noptmax != 0)
+		{
+
+			for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
+			{
+				cout << endl;
+
+
+				cout << " >>>> Checking data in cycle " << *icycle << endl;
+				fout_rec << endl;
+				fout_rec << " >>>> Checking data in cycle " << *icycle << endl;
+
+
+				performance_log.log_event("instantiating child pest object");
+
+				//Pest childPest;
+				Pest childPest = pest_scenario.get_child_pest(*icycle);
+				childPest.check_io(fout_rec);
+
+				if (obs_cycle_info.find(*icycle) != obs_cycle_info.end())
+				{
+					performance_log.log_event("updating obs using da obs cycle table info");
+					map<string, double> cycle_map = obs_cycle_info[*icycle];
+					map<string, double> weight_cycle_map;
+					if (weight_cycle_info.find(*icycle) != weight_cycle_info.end())
+						weight_cycle_map = weight_cycle_info[*icycle];
+					ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+					childPest.set_observation_info(oi);
+					for (auto tbl_obs_name : obs_in_tbl)
+					{
+						//if this obs is not in this cycle, give it a zero weight
+						if (cycle_map.find(tbl_obs_name) == cycle_map.end())
+						{
+							oi.set_weight(tbl_obs_name, 0.0);
+						}
+						else
+						{
+							childPest.get_ctl_observations_4_mod().update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);
+							//check if this obs is in this cycle's weight info
+							if (weight_cycle_map.find(tbl_obs_name) != weight_cycle_map.end())
+							{
+								oi.set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+								//pest_scenario.get_observation_info_ptr()->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+							}
+						}
+					}
+					childPest.set_observation_info(oi);
+
+				}
+
+				Parameters par1 = childPest.get_ctl_parameters();
+				ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq_4_mod();
+				base_trans_seq.ctl2numeric_ip(par1);
+				base_trans_seq.numeric2model_ip(par1);
+				ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
+				int nadj_par = 0;
+				for (auto par : par1)
+
+				{
+					if ((pi.get_parameter_rec_ptr(par.first)->cycle == *icycle) ||
+						(pi.get_parameter_rec_ptr(par.first)->cycle < 0))
+					{
+
+						if ((pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::FIXED) &&
+							(pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::TIED))
+							nadj_par++;
+					}
+
+				}
+
+				cout << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
+				fout_rec << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
+
+				ObservationInfo oi = childPest.get_ctl_observation_info();
+				int nnz_obs = 0;
+				for (auto o : childPest.get_ctl_observations())
+				{
+					if (oi.get_observation_rec_ptr(o.first)->weight != 0.0)
+						nnz_obs++;
+				}
+				cout << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
+				fout_rec << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
+
+
+
+				stringstream ss;
+
+				/*ss << "num adj par: " << nadj_par << ", ";
+				ss << "num nz obs: " << nnz_obs << ", ";*/
+				ss << "num tpl files: " << childPest.get_tplfile_vec().size() << ", ";
+				ss << "num ins files: " << childPest.get_insfile_vec().size() << endl;
+				cout << ss.str();
+				fout_rec << ss.str();
+
+			}
+		}
 		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
 		{
 			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
@@ -250,41 +375,14 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_additional_ins_delimiters(),
 				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
 		}
-
-
-		//process da (recurrent??) par cycle table
-		vector <int> cycles_in_tables;
 		
-		map<int, map<string, double>> par_cycle_info = process_da_par_cycle_table(pest_scenario, cycles_in_tables, fout_rec);
-		// process da obs cycle table
-		set<string> obs_in_tbl; //we need this so we can set weights to zero in childpest of a value isnt listed for a given cycle
-		map<int, map<string, double>> obs_cycle_info = process_da_obs_cycle_table(pest_scenario, cycles_in_tables, fout_rec, obs_in_tbl);
-		//process weights table
-		set<string> weights_in_tbl;
-		map<int, map<string, double>> weight_cycle_info = process_da_weight_cycle_table(pest_scenario, cycles_in_tables, fout_rec, weights_in_tbl);
-
-		vector<int> assimilation_cycles;
-		//pest_scenario.get_pestpp_options
-		int n_da_cycles = ppo->da_ctl_params.get_ivalue("DA_CYCLES_NUMBER");
-		if (n_da_cycles > 0)
-		{
-			for (int i = 0; i < n_da_cycles; i++)
-			{
-				assimilation_cycles.push_back(i);
-			}
-		}
-		else
-		{
-			assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec, cycles_in_tables);
-		}
-
 		//generate a parent ensemble which includes all parameters across all cycles
 
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 		ParameterEnsemble curr_pe;
 		ObservationEnsemble curr_oe;
 		generate_global_ensembles(da, fout_rec, curr_pe, curr_oe);
-
+		
 		//prepare a phi csv file for all cycles
 		string phi_file = file_manager.get_base_filename() + ".global.phi.actual.csv";
 		ofstream f_phi(phi_file);
@@ -295,25 +393,14 @@ int main(int argc, char* argv[])
 		for (auto real : init_real_names)
 			f_phi << "," << pest_utils::lower_cp(real);
 		f_phi << endl;
+	
+		cout << "initializing 'global' localizer" << endl;
+		fout_rec << "initializing 'global' localizer" << endl;
+		Localizer global_loc(&pest_scenario);
+		global_loc.initialize(&performance_log);
 
-		// check_io
-		
-		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
-		{
-			cout << endl;
-
-			
-			cout << " >>>> Checking data in cycle " << *icycle << endl;		
-			fout_rec << endl;
-			fout_rec << " >>>> Checking data in cycle " << *icycle << endl;
-			
-
-			performance_log.log_event("instantiating child pest object");
-
-			Pest childPest;
-			childPest = pest_scenario.get_child_pest(*icycle);
-			childPest.check_io(fout_rec);
-		}
+		//ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr
+		ParChangeSummarizer pcs(&curr_pe, &file_manager, &output_file_writer);
 
 		// loop over assimilation cycles
 		stringstream ss;
@@ -332,8 +419,7 @@ int main(int argc, char* argv[])
 
 			performance_log.log_event("instantiating child pest object");
 
-			Pest childPest;
-			childPest = pest_scenario.get_child_pest(*icycle);
+			Pest childPest = pest_scenario.get_child_pest(*icycle);
 
 			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);
 			output_file_writer.scenario_io_report(fout_rec);
@@ -424,8 +510,7 @@ int main(int argc, char* argv[])
 				output_file_writer.scenario_par_report(fout_rec);
 				output_file_writer.scenario_obs_report(fout_rec);
 			}
-
-
+			
 
 			Parameters par1 = childPest.get_ctl_parameters();
 			base_trans_seq.ctl2numeric_ip(par1);
@@ -438,8 +523,8 @@ int main(int argc, char* argv[])
 			{
 				// ayman:  base_trans_seq above was copied from parent pest without any changes; the following statement temporarly fix
 				// the issue; permenat solution should occur during the creation of childpest
-				if ((pi.get_parameter_rec_ptr(par.first)->cycle != *icycle) &&
-					(pi.get_parameter_rec_ptr(par.first)->cycle >= 0))
+				if ((pi.get_parameter_rec_ptr(par.first)->cycle == *icycle) ||
+					(pi.get_parameter_rec_ptr(par.first)->cycle < 0))
 				{
 
 					if ((pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::FIXED) &&
@@ -462,7 +547,7 @@ int main(int argc, char* argv[])
 			cout << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
 			fout_rec << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
 
-			ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
+			//ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
 
 			Parameters cur_ctl_parameters = childPest.get_ctl_parameters();
 			//Allocates Space for Run Manager.  This initializes the model parameter names and observations names.
@@ -477,18 +562,19 @@ int main(int argc, char* argv[])
 			run_manager_ptr->initialize(par_names, obs_names);
 			performance_log.log_event("instantiating DA instance");
 			DataAssimilator da(childPest, file_manager, output_file_writer, &performance_log, run_manager_ptr);
-
-			da.da_type = pest_scenario.get_pestpp_options_ptr()->da_ctl_params.get_svalue("DA_TYPE");
+			da.initialize_dynamic_states();
+			//da.da_type = pest_scenario.get_pestpp_options_ptr()->da_ctl_params.get_svalue("DA_TYPE");
 			std::mt19937 rand_gen = da.get_rand_gen();
 			vector<string> act_par_names = childPest.get_ctl_ordered_adj_par_names();
 			performance_log.log_event("instantiating cycle parameter ensemble instance");
 			ParameterEnsemble cycle_curr_pe(&childPest, &rand_gen, curr_pe.get_eigen(vector<string>(), act_par_names), curr_pe.get_real_names(), act_par_names);
 			cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
-
+			cycle_curr_pe.set_fixed_info(curr_pe.get_fixed_map());
 			da.set_pe(cycle_curr_pe);
-
-
+			da.set_localizer(global_loc);
 			da.initialize(*icycle);
+			
+			
 
 			write_global_phi_info(*icycle, f_phi, da, init_real_names);
 
@@ -497,7 +583,10 @@ int main(int argc, char* argv[])
 
 				if (pest_scenario.get_control_info().noptmax > 0) // 
 				{
-					da.da_upate();
+					da.da_update(*icycle);
+					ss.str("");
+					ss << file_manager.get_base_filename() << ".global." << *icycle << "." << da.get_iter() << ".pcs.csv";
+					pcs.summarize(cycle_curr_pe, ss.str());
 				}
 				write_global_phi_info(*icycle, f_phi, da, init_real_names);
 			}
@@ -508,6 +597,9 @@ int main(int argc, char* argv[])
 				performance_log.log_event("no non-zero-weighted observations in current cycle");
 
 			}
+
+			
+
 			//replace all the pars used in this cycle in the parent parameter ensemble
 			performance_log.log_event("updating global ensemble with cycle ensemble columns");
 			cycle_curr_pe = da.get_pe();
@@ -529,7 +621,7 @@ int main(int argc, char* argv[])
 					if (i > 10)
 					{
 						fout_rec << endl;
-						i == 0;
+						i = 0;
 					}
 				}
 				curr_pe.drop_rows(missing);
@@ -538,8 +630,7 @@ int main(int argc, char* argv[])
 
 			cycle_curr_pe.transform_ip(curr_pe.get_trans_status());
 			curr_pe.replace_col_vals(cycle_curr_pe.get_var_names(), *cycle_curr_pe.get_eigen_ptr());
-			curr_pe.to_csv("cncnc.csv");//to be removed 
-
+			
 			ObservationEnsemble cycle_curr_oe = da.get_oe();
 			//if we lost some realizations...
 			if (curr_oe.shape().first > cycle_curr_oe.shape().first)
@@ -559,7 +650,7 @@ int main(int argc, char* argv[])
 					if (i > 10)
 					{
 						fout_rec << endl;
-						i == 0;
+						i = 0;
 					}
 				}
 				curr_oe.drop_rows(missing);
@@ -570,8 +661,20 @@ int main(int argc, char* argv[])
 			ss.str("");
 			ss << ".global." << *icycle << ".oe.csv";
 			curr_oe.to_csv(file_manager.get_base_filename() + ss.str());
+			ss.str("");
+			ss << ".global." << *icycle << ".pe.csv";
+			curr_pe.to_csv(file_manager.get_base_filename() + ss.str());
 
+			file_manager.close_all_files_ending_with("phi");
 
+			//transfer the best (current) simulated final states to the inital states pars in the pe for the cycle
+			//is the place to do this?
+			da.transfer_dynamic_state_from_oe_to_pe(curr_pe, curr_oe);
+			/*ss.str("");
+			ss << "test_" << *icycle << ".csv";
+			curr_pe.to_csv(ss.str());
+			cout << curr_oe.get_eigen() << endl;
+			cout << endl;*/
 
 		} // end cycle loop
 		fout_rec.close();

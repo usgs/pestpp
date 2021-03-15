@@ -45,6 +45,7 @@ using namespace::pest_utils;
 
 Pest::Pest() : base_par_transform("PEST base_par_transform"), regul_scheme_ptr(0)
 {
+	set_defaults();
 }
 
 void Pest::set_defaults()
@@ -2625,7 +2626,7 @@ void Pest::child_pest_update(int icycle)
 		}
 	}
 	n_adj_par = new_n_adj_par;
-	this->get_pestpp_options_ptr()->set_check_tplins(false);
+	//this->get_pestpp_options_ptr()->set_check_tplins(false);
 	//get_pestpp_options_ptr->set_check_tplins(false);
 	//this.check_inputs();
 }
@@ -2647,6 +2648,8 @@ vector<int> Pest::get_assim_cycles(ofstream& f_rec, vector<int> unique_cycles)
 		if (curr_cycle >= 0)
 			cycles_ordered_list.push_back(curr_cycle);
 	}
+
+	
 	// get unique groups
 	for (auto curr = cycles_ordered_list.begin(); curr != cycles_ordered_list.end(); curr++) {
 		if (find(unique_cycles.begin(), unique_cycles.end(), *curr) == unique_cycles.end())
@@ -2654,6 +2657,9 @@ vector<int> Pest::get_assim_cycles(ofstream& f_rec, vector<int> unique_cycles)
 			unique_cycles.push_back(*curr);
 		}
 	}
+	if (unique_cycles.size() == 0)
+		throw_control_file_error(f_rec, "no valid cycle info found in par and obs data (possibly all '-1' cycles?)");
+
 	sort(unique_cycles.begin(), unique_cycles.end());
 	stringstream ss;
 	//to catch common non-zero-indexing
@@ -2753,8 +2759,7 @@ void Pest::throw_control_file_error(ofstream& f_rec,const string &message, bool 
 		cerr << ss.str();
 		f_rec.close();
 		throw runtime_error(ss.str());
-	}
-	
+	}	
 }
 
 void Pest::check_report_assignment(ofstream &f_rec, PestppOptions::ARG_STATUS stat, const string &key, const string &org_value)

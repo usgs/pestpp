@@ -47,6 +47,7 @@ public:
 	std::fstream &open_iofile_local(const std::string &tag, const std::string &filename, std::fstream::openmode mode = std::fstream::in | std::fstream::out);
 	std::fstream &open_iofile_absolute(const std::string &tag, const std::string &filename, std::fstream::openmode mode = std::fstream::in | std::fstream::out);
 	void close_file(const std::string &extension);
+	void close_all_files_ending_with(const std::string& partial_name);
 	std::ofstream &get_ofstream(const std::string &tag);
 	std::ifstream &get_ifstream(const std::string &tag);
 	std::fstream &get_fstream(const std::string &tag);

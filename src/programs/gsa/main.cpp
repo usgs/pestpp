@@ -131,7 +131,6 @@ int main(int argc, char* argv[])
 
 	// create pest run and process control file to initialize it
 	Pest pest_scenario;
-	pest_scenario.set_defaults();
 	try 
 	{
 		pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);

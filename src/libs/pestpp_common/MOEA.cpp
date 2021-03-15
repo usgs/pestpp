@@ -905,11 +905,11 @@ MOEA::MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_
 	dp.set_rand_gen(&rand_gen);
 	dp.set_pest_scenario(&pest_scenario);
 	op.set_rand_gen(&rand_gen);
-	op.set_pest_scenario(&pest_scenario);
+	op.set_pest_scenario_ptr(&pest_scenario);
 	dp_archive.set_rand_gen(&rand_gen);
 	dp_archive.set_pest_scenario(&pest_scenario);
 	op_archive.set_rand_gen(&rand_gen);
-	op_archive.set_pest_scenario(&pest_scenario);
+	op_archive.set_pest_scenario_ptr(&pest_scenario);
 }
 
 
