@@ -1519,7 +1519,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_de_f: " << mou_de_f << endl;
 	os << "mou_save_population_every: " << mou_save_population_every << endl;
 	
-	os << endl << "...pestpp-ies options:" << endl;
+	os << endl << "...shared pestpp-ies/pestpp-da options:" << endl;
+	os << "(note: 'da' args override 'ies' args when using pestpp-da)" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
 	os << "ies_observation_ensemble: " << ies_obs_csv << endl;
 	os << "ies_restart_parameter_ensemble: " << ies_par_restart_csv << endl;

@@ -664,7 +664,7 @@ int main(int argc, char* argv[])
 			ss << ".global." << *icycle << ".pe.csv";
 			curr_pe.to_csv(file_manager.get_base_filename() + ss.str());
 
-			file_manager.close_all_files("phi");
+			file_manager.close_all_files_ending_with("phi");
 
 			//transfer the best (current) simulated final states to the inital states pars in the pe for the cycle
 			//is the place to do this?

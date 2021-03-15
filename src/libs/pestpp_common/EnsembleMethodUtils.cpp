@@ -2458,8 +2458,8 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 		ss << pest_utils::lower_cp(tag) << ".par";
 		output_file_writer.write_par(file_manager.open_ofile_ext(ss.str()), pars, *(pts.get_offset_ptr()),
 			*(pts.get_scale_ptr()));
-		file_manager.close_file("par");
-
+		//file_manager.close_file("par");
+		file_manager.close_all_files_ending_with("par");
 		vmap = oe.get_real_map();
 		if (vmap.find(tag) == vmap.end())
 		{
@@ -2479,7 +2479,7 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 			ss << pest_utils::lower_cp(tag) <<  ".rei";
 			output_file_writer.write_rei(file_manager.open_ofile_ext(ss.str()), iter,
 				pest_scenario.get_ctl_observations(), obs, obj_func, pars);
-			file_manager.close_file("rei");
+			file_manager.close_all_files_ending_with("rei");
 		}
 		cout << "saved par and rei files for realization " << tag << " for iteration " << iter << endl;
 	}
