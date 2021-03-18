@@ -1174,9 +1174,15 @@ void MOEA::sanity_checks()
 		ss << "mou_population_size < " << warn_min_members << ", this is prob too few";
 		warnings.push_back(ss.str());
 	}
-	if (ppo->get_ies_reg_factor() < 0.0)
-		errors.push_back("ies_reg_factor < 0.0 - WRONG!");
 	
+	bool use_pso = false;
+	for (auto gt : gen_types)
+		if (gt == MouGenType::PSO)
+			use_pso = true;
+	if (use_pso)
+		if (gen_types.size() > 1)
+			errors.push_back("'PSO' generator cannot be used with other generators...");
+
 	
 	if (warnings.size() > 0)
 	{
@@ -1192,6 +1198,9 @@ void MOEA::sanity_checks()
 			message(1, e);
 		throw_moea_error(string("sanity_check() found some problems - please review rec file"));
 	}
+
+	
+
 	//cout << endl << endl;
 }
 
@@ -1925,6 +1934,11 @@ void MOEA::initialize()
 			gen_types.push_back(MouGenType::PM);
 			message(1, "using polynomial mutation generator");
 		}
+		else if (token == "PSO")
+		{
+			gen_types.push_back(MouGenType::PSO);
+			message(1, "using particle swarm generator");
+		}
 		else
 		{
 			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX','PM'}");
@@ -2040,6 +2054,8 @@ void MOEA::initialize()
 		return;
 	}
 
+
+	
 
 	//we are restarting
 	if (population_obs_restart_file.size() > 0)
@@ -2255,7 +2271,24 @@ void MOEA::initialize()
 
 	constraints.mou_report(0,dp, op, obs_obj_names,pi_obj_names);
 
-	
+
+	//initialize PSO bits
+	pso_velocity = dp.zeros_like();
+	int num_reals = dp.shape().first;
+	Parameters lb = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
+	Parameters ub = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
+	pso_velocity.get_par_transform().ctl2numeric_ip(lb);
+	pso_velocity.get_par_transform().ctl2numeric_ip(ub);
+	Parameters dist = ub - lb;
+	for (auto& dv_name : dv_names)
+	{
+		vector<double> vals = uniform_draws(num_reals, -dist[dv_name], dist[dv_name], rand_gen);
+		Eigen::VectorXd real = stlvec_2_eigenvec(vals);
+		pso_velocity.replace_col(dv_name, real);
+	}
+	pso_pbest_dp = ParameterEnsemble(&pest_scenario, &rand_gen, dp.get_eigen(), dp.get_real_names(), dp.get_var_names());
+	pso_pbest_dp.set_trans_status(dp.get_trans_status());
+	pso_pbest_op = ObservationEnsemble(&pest_scenario, &rand_gen, op.get_eigen(), op.get_real_names(), op.get_var_names());
 
 	message(0, "initialization complete");
 }
@@ -2373,6 +2406,10 @@ ParameterEnsemble MOEA::generate_population()
 		else if (gen_type == MouGenType::PM)
 		{
 			p = generate_pm_population(new_members_per_gen, dp);
+		}
+		else if (gen_type == MouGenType::PSO)
+		{
+			p = generate_pso_population(new_members_per_gen, dp);
 		}
 		else
 			throw_moea_error("unrecognized mou generator");
@@ -2659,6 +2696,7 @@ bool MOEA::initialize_dv_population()
 	}
 	return drawn;
 
+
 }
 
 
@@ -2723,6 +2761,67 @@ void MOEA::initialize_obs_restart_population()
 	}
 
 
+}
+
+
+void MOEA::update_pso_velocty(ParameterEnsemble& _dp, ObservationEnsemble& _op)
+{
+	double omega = 0.7;
+	double cog_const = 2.0, social_const = 2.0;
+	
+	vector<int> member_count,working_count;
+	for (int i = 0; i < dp_archive.shape().first; i++)
+		member_count.push_back(i);
+	int g_best_idx;
+	int num_dv = _dp.shape().second;
+	vector<double> r;
+	Eigen::VectorXd rand1, rand2, cur_real, p_best, g_best, new_real, cur_vel;
+	if (pso_velocity.shape().first > _dp.shape().first)
+	{
+		vector<string> names = pso_velocity.get_real_names();
+		set<string> snames(names.begin(), names.end());
+		names.clear();
+		for (auto& name : _dp.get_real_names())
+			if (snames.find(name) == snames.end())
+				names.push_back(name);
+		pso_velocity.drop_rows(names);
+	}
+	pso_pbest_dp.transform_ip(_dp.get_trans_status());
+	dp_archive.set_trans_status(_dp.get_trans_status());
+	Eigen::MatrixXd new_vel(_dp.shape().first, _dp.shape().second);
+	int ireal = 0;
+	for (auto real_name : _dp.get_real_names())
+	{
+		working_count = member_count;//copy member count index to working count
+		shuffle(working_count.begin(), working_count.end(), rand_gen);
+		g_best_idx = working_count[0];
+		r = uniform_draws(num_dv, 0.0, 1.0, rand_gen);
+		rand1 = stlvec_2_eigenvec(r);
+		r = uniform_draws(num_dv, 0.0, 1.0, rand_gen);
+		rand2 = stlvec_2_eigenvec(r);
+		cur_real = _dp.get_real_vector(real_name);
+		p_best = pso_pbest_dp.get_real_vector(real_name);
+		g_best = dp_archive.get_real_vector(g_best_idx);
+		cur_vel = pso_velocity.get_real_vector(real_name);
+		 
+		new_real = (omega * cur_vel.array()) + (cog_const * rand1.array() * (cur_real.array() - p_best.array()));
+		new_real = new_real.array() + (social_const * rand2.array() * (cur_real.array() - g_best.array()));
+		new_vel.row(ireal) = new_real;
+		ireal++;
+	}
+	pso_velocity = ParameterEnsemble(&pest_scenario, &rand_gen, new_vel, _dp.get_real_names(), _dp.get_var_names());
+
+}
+
+ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemble& _dp)
+{
+
+	update_pso_velocty(_dp, op);
+	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, _dp.get_eigen().array() + pso_velocity.get_eigen().array(), _dp.get_real_names(), _dp.get_var_names());
+	new_dp.set_trans_status(_dp.get_trans_status());
+	new_dp.enforce_bounds(performance_log,false);
+	new_dp.check_for_normal("new pso population");
+	return new_dp;
 }
 
 ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterEnsemble& _dp)

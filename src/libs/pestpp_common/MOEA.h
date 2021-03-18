@@ -23,7 +23,7 @@ const string DE_F_NAME = "_DE_F_";
 const string CR_NAME = "_CR_";
 const string MR_NAME = "_MR_";
 
-enum MouGenType { DE, SBX, PM };
+enum MouGenType { DE, SBX, PM, PSO };
 enum MouEnvType { NSGA, SPEA };
 enum MouMateType { RANDOM, TOURNAMENT };
 
@@ -170,6 +170,10 @@ private:
 	ParameterEnsemble dp, dp_archive;
 	ObservationEnsemble op, op_archive;
 
+	ParameterEnsemble pso_velocity, pso_pbest_dp;
+	ObservationEnsemble pso_pbest_op;
+
+
 	void update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp);
 	void update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp);
 
@@ -196,6 +200,8 @@ private:
 	ParameterEnsemble generate_sbx_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble generate_pm_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble generate_pso_population(int num_members, ParameterEnsemble& _dp);
+
+	void update_pso_velocty(ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
 	vector<int> selection(int num_to_select, ParameterEnsemble& _dp, MouMateType& matetype);
 
