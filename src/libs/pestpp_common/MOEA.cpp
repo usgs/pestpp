@@ -130,7 +130,7 @@ bool ParetoObjectives::compare_two(string& first, string& second, MouEnvType env
 
 bool ParetoObjectives::compare_two_spea(string& first, string& second)
 {
-	if (spea2_constrained_fitness_map[first] < spea2_constrained_fitness_map[second])
+	if (spea2_constrained_fitness_map.at(first) < spea2_constrained_fitness_map.at(second))
 		return true;
 	else
 		return false;
@@ -138,11 +138,11 @@ bool ParetoObjectives::compare_two_spea(string& first, string& second)
 
 bool ParetoObjectives::compare_two_nsga(string& first, string& second)
 {
-	if (member_front_map[first] < member_front_map[second])
+	if (member_front_map.at(first) < member_front_map.at(second))
 		return true;
-	if (member_front_map[first] == member_front_map[second])
+	if (member_front_map.at(first) == member_front_map.at(second))
 	{
-		if (crowd_map[first] > crowd_map[second])
+		if (crowd_map.at(first) > crowd_map.at(second))
 			return true;
 		else
 			return false;
@@ -2473,11 +2473,13 @@ void MOEA::iterate_to_solution()
 		}
 
 
-		update_pso_pbest(new_dp, new_op);
+		
 		//append offspring dp and (risk-shifted) op to make new dp and op containers
 
 		new_dp.append_other_rows(dp);
 		new_op.append_other_rows(op);
+
+		update_pso_pbest(new_dp, new_op);
 
 		if (envtype == MouEnvType::NSGA)
 		{
@@ -2577,7 +2579,6 @@ void MOEA::iterate_to_solution()
 		obj_func_change_report(summary);
 		previous_obj_summary = summary;
 		constraints.mou_report(iter, new_dp, new_op, obs_obj_names, pi_obj_names, true);
-
 
 		iter++;
 	}
@@ -2786,17 +2787,22 @@ void MOEA::initialize_obs_restart_population()
 
 void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
-	ParameterEnsemble tdp = _dp;
+	/*ParameterEnsemble tdp = _dp;
 	tdp.append_other_rows(pso_pbest_dp);
 	ObservationEnsemble top = _op;
-	top.append_other_rows(pso_pbest_op);
-	objectives.update(top, tdp, &constraints);
+	top.append_other_rows(pso_pbest_op);*/
+	//objectives.update(top, tdp, &constraints);
+	objectives.update(_op, _dp, &constraints);
+	objectives.get_nsga2_pareto_dominance(-999, _op, _dp, &constraints, false);
 	Eigen::VectorXd real;
 	string f, s;
 	vector<string> names = _dp.get_real_names();
 	set<string> snames(names.begin(), names.end());
 	names.clear();
 	bool new_dom_old;
+	vector<string> new_pbest_names;
+	//pso_pbest_dp = _dp;
+	//pso_pbest_op = _op;
 	for (auto lm : current_pso_lineage_map)
 	{
 		
@@ -2817,6 +2823,7 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 				pso_pbest_op.update_real_ip(lm.second, real);
 
 			}
+			new_pbest_names.push_back(lm.first);
 		}
 	}
 	//drop any fails...
@@ -2825,10 +2832,11 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 		pso_pbest_dp.drop_rows(names);
 		pso_pbest_op.drop_rows(names);
 	}
-	names = _dp.get_real_names();
-	pso_pbest_dp.set_real_names(names);
-	names = _op.get_real_names();
-	pso_pbest_op.set_real_names(names);
+	//names = _dp.get_real_names();
+	pso_pbest_dp.set_real_names(new_pbest_names);
+	//names = _op.get_real_names();
+	pso_pbest_op.set_real_names(new_pbest_names);
+	//pso_pbest
 }
 
 ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
@@ -3417,7 +3425,7 @@ string MOEA::get_new_member_name(string tag)
 		ss << "_" << tag;
 	}
 	member_count++;
-	return ss.str();
+	return pest_utils::upper_cp(ss.str());
 }
 
 pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx(double probability, double di, int idx1, int idx2)
