@@ -640,6 +640,12 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(map<string, m
 	return get_cuboid_crowding_distance(members, _member_struct);
 }
 
+map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string>& members)
+{
+	return get_cuboid_crowding_distance(members, member_struct);
+}
+
+
 map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
 	
@@ -678,8 +684,8 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 		obj_range = last->second - start->second;
 
 		//the obj extrema - makes sure they are retained 
-		crowd_distance_map[start->first] = 1.0e+30;
-		crowd_distance_map[last->first] = 1.0e+30;
+		crowd_distance_map[start->first] = CROWDING_EXTREME;
+			crowd_distance_map[last->first] = CROWDING_EXTREME;
 		if (crowd_sorted.size() == 3)
 		{
 			sortedset::iterator it = start;
@@ -2418,6 +2424,9 @@ ParameterEnsemble MOEA::generate_population()
 		else
 			new_pop.append_other_rows(p);
 	}
+
+	
+
 	return new_pop;
 }
 
@@ -2721,8 +2730,8 @@ void MOEA::initialize_obs_restart_population()
 		}
 		catch (const exception& e)
 		{
-			ss << "error processing obs population file: " << e.what();
-			throw_moea_error(ss.str());
+		ss << "error processing obs population file: " << e.what();
+		throw_moea_error(ss.str());
 		}
 		catch (...)
 		{
@@ -2731,25 +2740,25 @@ void MOEA::initialize_obs_restart_population()
 	}
 	else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
 	{
-		message(1, "loading obs population from binary file", obs_filename);
-		try
-		{
-			op.from_binary(obs_filename);
-		}
-		catch (const exception& e)
-		{
-			ss << "error processing obs population binary file: " << e.what();
-			throw_moea_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_moea_error(string("error processing obs population binary file"));
-		}
+	message(1, "loading obs population from binary file", obs_filename);
+	try
+	{
+		op.from_binary(obs_filename);
+	}
+	catch (const exception& e)
+	{
+		ss << "error processing obs population binary file: " << e.what();
+		throw_moea_error(ss.str());
+	}
+	catch (...)
+	{
+		throw_moea_error(string("error processing obs population binary file"));
+	}
 	}
 	else
 	{
-		ss << "unrecognized obs population restart file extension " << par_ext << ", looking for csv, jcb, or jco";
-		throw_moea_error(ss.str());
+	ss << "unrecognized obs population restart file extension " << par_ext << ", looking for csv, jcb, or jco";
+	throw_moea_error(ss.str());
 	}
 
 	ss.str("");
@@ -2760,19 +2769,14 @@ void MOEA::initialize_obs_restart_population()
 		throw_moea_error("zero members found in obs population restart file");
 	}
 
-
 }
 
 
-void MOEA::update_pso_velocty(ParameterEnsemble& _dp, ObservationEnsemble& _op)
+ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
 {
 	double omega = 0.7;
 	double cog_const = 2.0, social_const = 2.0;
-	
-	vector<int> member_count,working_count;
-	for (int i = 0; i < dp_archive.shape().first; i++)
-		member_count.push_back(i);
-	int g_best_idx;
+
 	int num_dv = _dp.shape().second;
 	vector<double> r;
 	Eigen::VectorXd rand1, rand2, cur_real, p_best, g_best, new_real, cur_vel;
@@ -2789,40 +2793,124 @@ void MOEA::update_pso_velocty(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 	pso_pbest_dp.transform_ip(_dp.get_trans_status());
 	dp_archive.set_trans_status(_dp.get_trans_status());
 	Eigen::MatrixXd new_vel(_dp.shape().first, _dp.shape().second);
-	int ireal = 0;
-	for (auto real_name : _dp.get_real_names())
+	string real_name;
+	vector<string> real_names = _dp.get_real_names();
+	for (int i=0;i<_dp.shape().first;i++)
 	{
-		working_count = member_count;//copy member count index to working count
-		shuffle(working_count.begin(), working_count.end(), rand_gen);
-		g_best_idx = working_count[0];
+		real_name = real_names[i];
 		r = uniform_draws(num_dv, 0.0, 1.0, rand_gen);
 		rand1 = stlvec_2_eigenvec(r);
 		r = uniform_draws(num_dv, 0.0, 1.0, rand_gen);
 		rand2 = stlvec_2_eigenvec(r);
 		cur_real = _dp.get_real_vector(real_name);
 		p_best = pso_pbest_dp.get_real_vector(real_name);
-		g_best = dp_archive.get_real_vector(g_best_idx);
+		g_best = dp_archive.get_real_vector(gbest_solutions[i]);
 		cur_vel = pso_velocity.get_real_vector(real_name);
-		 
-		new_real = (omega * cur_vel.array()) + (cog_const * rand1.array() * (cur_real.array() - p_best.array()));
-		new_real = new_real.array() + (social_const * rand2.array() * (cur_real.array() - g_best.array()));
-		new_vel.row(ireal) = new_real;
-		ireal++;
-	}
-	pso_velocity = ParameterEnsemble(&pest_scenario, &rand_gen, new_vel, _dp.get_real_names(), _dp.get_var_names());
 
+		new_real = (omega * cur_vel.array()) + (cog_const * rand1.array() * (p_best.array() - cur_real.array()));
+		new_real = new_real.array() + (social_const * rand2.array() * (g_best.array() - cur_real.array()));
+		new_vel.row(i) = new_real;
+	}
+	return ParameterEnsemble(&pest_scenario, &rand_gen, new_vel, _dp.get_real_names(), _dp.get_var_names());
+}
+
+vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _dp, ObservationEnsemble& _op)
+{
+	DomPair dompair = objectives.get_nsga2_pareto_dominance(-999, _op, _dp, &constraints, false);
+	vector<string> nondom_solutions = dompair.first;
+	vector<string> gbest_solutions;
+	//if no non dom solutions, then use the dominated ones...
+	if (nondom_solutions.size() == 0)
+	{
+		nondom_solutions = dompair.second;
+	}
+	if (nondom_solutions.size() == 1)
+	{
+		for (int i = 0; i < _dp.shape().first; i++)
+			gbest_solutions.push_back(nondom_solutions[0]);
+		return gbest_solutions;
+	}
+	
+	map<string, double> crowd_dist = objectives.get_cuboid_crowding_distance(nondom_solutions);
+	//normalize cd
+	double mx = -1.0e+30;
+	for (auto& cd : crowd_dist)
+		if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
+			mx = cd.second;
+	
+	for (auto& cd : crowd_dist)
+		if (cd.second == CROWDING_EXTREME)
+			cd.second = 1.0;
+		else if (mx != 0.0)
+			cd.second = cd.second / mx;
+		else
+	cd.second = 0.5;
+
+	vector<string> working;
+	string candidate;
+	int count = 0;
+	vector < double> r;
+	bool found;
+	for (int i = 0; i < num_reals; i++)
+	{
+		count = 0;
+		found = false;
+		while (true)
+		{
+			working = nondom_solutions;
+			shuffle(working.begin(), working.end(), rand_gen);
+			r = uniform_draws(nondom_solutions.size(), 0.0, 1.0, rand_gen);
+			for (int i = 0; i < r.size(); i++)
+				if (crowd_dist[working[i]] >= r[i])
+				{
+					candidate = working[i];
+					found = true;
+					break;
+				}
+
+			if (found)
+				break;
+			count++;
+			if (count > 1000000)
+				throw_moea_error("MOEA::get_pso_gbest_solutions() seems to be stuck in a infinite loop....");
+		}
+		gbest_solutions.push_back(candidate);
+	}
+	return gbest_solutions;
 }
 
 ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemble& _dp)
 {
+	vector<string> gbest_solutions = get_pso_gbest_solutions(_dp.shape().first, dp_archive, op_archive);
+	ParameterEnsemble cur_velocity = get_updated_pso_velocty(_dp, gbest_solutions);
+	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, _dp.get_eigen().array() + cur_velocity.get_eigen().array(), _dp.get_real_names(), _dp.get_var_names());
+	
+	//augment with DE if needed...
+	if (num_members > _dp.shape().first)
+	{
+		int num_reals = num_members - _dp.shape().first;
+		ParameterEnsemble temp = generate_diffevol_population(num_reals, _dp);
+		new_dp.append_other_rows(temp);
+	}
 
-	update_pso_velocty(_dp, op);
-	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, _dp.get_eigen().array() + pso_velocity.get_eigen().array(), _dp.get_real_names(), _dp.get_var_names());
+	current_pso_lineage_map.clear();
+	string new_name;
+	vector<string> new_names;
+	for (auto real_name : new_dp.get_real_names())
+	{
+		new_name = get_new_member_name("pso");
+		current_pso_lineage_map[new_name] = real_name;
+		new_names.push_back(new_name);
+	}
+	cur_velocity.set_real_names(new_names);
+	pso_velocity = cur_velocity;
+	new_dp.set_real_names(new_names);
 	new_dp.set_trans_status(_dp.get_trans_status());
 	new_dp.enforce_bounds(performance_log,false);
 	new_dp.check_for_normal("new pso population");
 	return new_dp;
 }
+
 
 ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterEnsemble& _dp)
 {

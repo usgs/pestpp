@@ -22,6 +22,7 @@ const string RISK_NAME = "_RISK_";
 const string DE_F_NAME = "_DE_F_";
 const string CR_NAME = "_CR_";
 const string MR_NAME = "_MR_";
+const double CROWDING_EXTREME = 1.0e+30;
 
 enum MouGenType { DE, SBX, PM, PSO };
 enum MouEnvType { NSGA, SPEA };
@@ -61,6 +62,10 @@ public:
 	void write_pareto_summary(string& sum_tag, int generation, ObservationEnsemble& op, ParameterEnsemble& dp, 
 		Constraints* constr_ptr=nullptr);
 
+	//sort specific members
+	map<string, double> get_cuboid_crowding_distance(vector<string>& members);
+	
+
 private:
 	
 	Pest& pest_scenario;
@@ -83,12 +88,11 @@ private:
 	bool compare_two_nsga(string& first, string& second);
 	bool compare_two_spea(string& first, string& second);
 
-	//sort specific members
-	map<string, double> get_cuboid_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
+	
 	//sort all members in member struct
 	//map<string, double> get_cuboid_crowding_distance();
 	map<string, double> get_cuboid_crowding_distance(map<string, map<string, double>>& _member_struct);
-
+	map<string, double> get_cuboid_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
 
 	map<string, double> get_spea2_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct);
 	map<string, double> get_spea2_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);	
@@ -201,7 +205,11 @@ private:
 	ParameterEnsemble generate_pm_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble generate_pso_population(int num_members, ParameterEnsemble& _dp);
 
-	void update_pso_velocty(ParameterEnsemble& _dp, ObservationEnsemble& _op);
+	ParameterEnsemble get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions);
+
+	vector<string> get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _dp, ObservationEnsemble& _op);
+
+	map<string, string> current_pso_lineage_map;
 
 	vector<int> selection(int num_to_select, ParameterEnsemble& _dp, MouMateType& matetype);
 
