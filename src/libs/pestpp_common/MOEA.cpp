@@ -108,7 +108,7 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 bool ParetoObjectives::compare_two(string& first, string& second, MouEnvType envtyp)
 {
 	if (infeas.find(first) != infeas.end())
-		//if both are infeas, select the solution that is less infeasible
+	{	//if both are infeas, select the solution that is less infeasible
 		if (infeas.find(second) != infeas.end())
 		{
 			if (infeas[first] > infeas[second])
@@ -117,6 +117,7 @@ bool ParetoObjectives::compare_two(string& first, string& second, MouEnvType env
 				return true;
 		}
 		return false;
+	}
 	if (infeas.find(second) != infeas.end())
 		return true;
 	if (envtyp == MouEnvType::NSGA)
@@ -137,7 +138,7 @@ bool ParetoObjectives::compare_two_spea(string& first, string& second)
 
 bool ParetoObjectives::compare_two_nsga(string& first, string& second)
 {
-	if (member_front_map[first] > member_front_map[second])
+	if (member_front_map[first] < member_front_map[second])
 		return true;
 	if (member_front_map[first] == member_front_map[second])
 	{
@@ -2277,8 +2278,17 @@ void MOEA::initialize()
 
 	constraints.mou_report(0,dp, op, obs_obj_names,pi_obj_names);
 
+	initial_pso_bits();
+	
 
+	message(0, "initialization complete");
+}
+
+
+void MOEA::initial_pso_bits()
+{
 	//initialize PSO bits
+	double init_vel_scale_fac = 0.5;
 	pso_velocity = dp.zeros_like();
 	int num_reals = dp.shape().first;
 	Parameters lb = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
@@ -2288,7 +2298,7 @@ void MOEA::initialize()
 	Parameters dist = ub - lb;
 	for (auto& dv_name : dv_names)
 	{
-		vector<double> vals = uniform_draws(num_reals, -dist[dv_name], dist[dv_name], rand_gen);
+		vector<double> vals = uniform_draws(num_reals, -dist[dv_name]* init_vel_scale_fac, dist[dv_name]* init_vel_scale_fac, rand_gen);
 		Eigen::VectorXd real = stlvec_2_eigenvec(vals);
 		pso_velocity.replace_col(dv_name, real);
 	}
@@ -2296,9 +2306,7 @@ void MOEA::initialize()
 	pso_pbest_dp.set_trans_status(dp.get_trans_status());
 	pso_pbest_op = ObservationEnsemble(&pest_scenario, &rand_gen, op.get_eigen(), op.get_real_names(), op.get_var_names());
 
-	message(0, "initialization complete");
 }
-
 
 pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
@@ -2464,7 +2472,10 @@ void MOEA::iterate_to_solution()
 			new_op = new_op_shifted;
 		}
 
+
+		update_pso_pbest(new_dp, new_op);
 		//append offspring dp and (risk-shifted) op to make new dp and op containers
+
 		new_dp.append_other_rows(dp);
 		new_op.append_other_rows(op);
 
@@ -2772,6 +2783,54 @@ void MOEA::initialize_obs_restart_population()
 }
 
 
+
+void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
+{
+	ParameterEnsemble tdp = _dp;
+	tdp.append_other_rows(pso_pbest_dp);
+	ObservationEnsemble top = _op;
+	top.append_other_rows(pso_pbest_op);
+	objectives.update(top, tdp, &constraints);
+	Eigen::VectorXd real;
+	string f, s;
+	vector<string> names = _dp.get_real_names();
+	set<string> snames(names.begin(), names.end());
+	names.clear();
+	bool new_dom_old;
+	for (auto lm : current_pso_lineage_map)
+	{
+		
+		f = lm.first; s = lm.second;
+		//check if run failed...
+		if (snames.find(f) == snames.end())
+		{
+			names.push_back(f);
+		}
+		else
+		{
+			new_dom_old = objectives.compare_two(f, s, envtype);
+			if (new_dom_old)
+			{
+				real = _dp.get_real_vector(lm.first);
+				pso_pbest_dp.update_real_ip(lm.second, real);
+				real = _op.get_real_vector(lm.first);
+				pso_pbest_op.update_real_ip(lm.second, real);
+
+			}
+		}
+	}
+	//drop any fails...
+	if (names.size() > 0)
+	{
+		pso_pbest_dp.drop_rows(names);
+		pso_pbest_op.drop_rows(names);
+	}
+	names = _dp.get_real_names();
+	pso_pbest_dp.set_real_names(names);
+	names = _op.get_real_names();
+	pso_pbest_op.set_real_names(names);
+}
+
 ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
 {
 	double omega = 0.7;
@@ -2886,12 +2945,15 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
 	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, _dp.get_eigen().array() + cur_velocity.get_eigen().array(), _dp.get_real_names(), _dp.get_var_names());
 	
 	//augment with DE if needed...
-	if (num_members > _dp.shape().first)
+	//need to think more about this bc of tracking pbest...
+	/*if (num_members > _dp.shape().first)
 	{
 		int num_reals = num_members - _dp.shape().first;
 		ParameterEnsemble temp = generate_diffevol_population(num_reals, _dp);
 		new_dp.append_other_rows(temp);
-	}
+		pso_pbest_dp.append_other_rows(temp);
+		pso_pbest_op;
+	}*/
 
 	current_pso_lineage_map.clear();
 	string new_name;

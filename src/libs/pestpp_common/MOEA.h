@@ -47,10 +47,9 @@ public:
 		prep_pareto_summary_file(ARC_SUM_TAG);
 	}
 	
-
 	void update(ObservationEnsemble& oe, ParameterEnsemble& dp, Constraints* constraints_ptr = nullptr);
 
-	bool compare_two(string& first, string& second, MouEnvType envtyp);
+	bool compare_two(string& first,string& second, MouEnvType envtyp);
 
 	map<string, double> get_spea2_fitness(int generation, ObservationEnsemble& op, ParameterEnsemble& dp, 
 		Constraints* constraints_ptr = nullptr, bool report = true, string sum_tag = string());
@@ -195,6 +194,8 @@ private:
 	void queue_chance_runs(ParameterEnsemble& _dp);
 	ObservationEnsemble get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
+	void initial_pso_bits();
+
 	bool initialize_dv_population();
 	void initialize_obs_restart_population();
 
@@ -208,6 +209,7 @@ private:
 	ParameterEnsemble get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions);
 
 	vector<string> get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _dp, ObservationEnsemble& _op);
+	void update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
 	map<string, string> current_pso_lineage_map;
 
