@@ -2787,12 +2787,9 @@ void MOEA::initialize_obs_restart_population()
 
 void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
-	/*ParameterEnsemble tdp = _dp;
-	tdp.append_other_rows(pso_pbest_dp);
+	ParameterEnsemble tdp = _dp;
 	ObservationEnsemble top = _op;
-	top.append_other_rows(pso_pbest_op);*/
-	//objectives.update(top, tdp, &constraints);
-	objectives.update(_op, _dp, &constraints);
+	objectives.update(top, tdp, &constraints);
 	objectives.get_nsga2_pareto_dominance(-999, _op, _dp, &constraints, false);
 	Eigen::VectorXd real;
 	string f, s;
@@ -2800,43 +2797,44 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 	set<string> snames(names.begin(), names.end());
 	names.clear();
 	bool new_dom_old;
-	vector<string> new_pbest_names;
+	//vector<string> new_pbest_names;
 	//pso_pbest_dp = _dp;
 	//pso_pbest_op = _op;
 	for (auto lm : current_pso_lineage_map)
 	{
 		
-		f = lm.first; s = lm.second;
-		//check if run failed...
-		if (snames.find(f) == snames.end())
+		f = lm.second; s = lm.first;
+		if ((snames.find(f) == snames.end()) || (snames.find(f) == snames.end()))
 		{
 			names.push_back(f);
 		}
 		else
 		{
 			new_dom_old = objectives.compare_two(f, s, envtype);
-			if (new_dom_old)
+			if (!new_dom_old)
 			{
-				real = _dp.get_real_vector(lm.first);
-				pso_pbest_dp.update_real_ip(lm.second, real);
-				real = _op.get_real_vector(lm.first);
-				pso_pbest_op.update_real_ip(lm.second, real);
+				real = pso_pbest_dp.get_real_vector(s);
+				tdp.update_real_ip(f, real);
+				real = pso_pbest_op.get_real_vector(s);
+				top.update_real_ip(f, real);
 
 			}
-			new_pbest_names.push_back(lm.first);
+			//new_pbest_names.push_back(lm.first);
 		}
 	}
 	//drop any fails...
-	if (names.size() > 0)
+	/*if (names.size() > 0)
 	{
 		pso_pbest_dp.drop_rows(names);
 		pso_pbest_op.drop_rows(names);
-	}
+	}*/
 	//names = _dp.get_real_names();
-	pso_pbest_dp.set_real_names(new_pbest_names);
+	//pso_pbest_dp.set_real_names(new_pbest_names);
 	//names = _op.get_real_names();
-	pso_pbest_op.set_real_names(new_pbest_names);
+	//pso_pbest_op.set_real_names(new_pbest_names);
 	//pso_pbest
+	pso_pbest_dp = tdp;
+	pso_pbest_op = top;
 }
 
 ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
@@ -2847,7 +2845,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 	int num_dv = _dp.shape().second;
 	vector<double> r;
 	Eigen::VectorXd rand1, rand2, cur_real, p_best, g_best, new_real, cur_vel;
-	if (pso_velocity.shape().first > _dp.shape().first)
+	/*if (pso_velocity.shape().first > _dp.shape().first)
 	{
 		vector<string> names = pso_velocity.get_real_names();
 		set<string> snames(names.begin(), names.end());
@@ -2856,12 +2854,17 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 			if (snames.find(name) == snames.end())
 				names.push_back(name);
 		pso_velocity.drop_rows(names);
-	}
+	}*/
+	
 	pso_pbest_dp.transform_ip(_dp.get_trans_status());
 	dp_archive.set_trans_status(_dp.get_trans_status());
 	Eigen::MatrixXd new_vel(_dp.shape().first, _dp.shape().second);
 	string real_name;
-	vector<string> real_names = _dp.get_real_names();
+	vector<string> real_names = pso_velocity.get_real_names();
+	set<string> snames(real_names.begin(), real_names.end());
+		
+		
+	real_names = _dp.get_real_names();
 	for (int i=0;i<_dp.shape().first;i++)
 	{
 		real_name = real_names[i];
@@ -2872,7 +2875,10 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 		cur_real = _dp.get_real_vector(real_name);
 		p_best = pso_pbest_dp.get_real_vector(real_name);
 		g_best = dp_archive.get_real_vector(gbest_solutions[i]);
-		cur_vel = pso_velocity.get_real_vector(real_name);
+		if (snames.find(real_name) != snames.end())
+			cur_vel = pso_velocity.get_real_vector(real_name);
+		else
+			cur_vel = pso_velocity.get_real_vector(current_pso_lineage_map.at(real_name));
 
 		new_real = (omega * cur_vel.array()) + (cog_const * rand1.array() * (p_best.array() - cur_real.array()));
 		new_real = new_real.array() + (social_const * rand2.array() * (g_best.array() - cur_real.array()));
@@ -2969,7 +2975,7 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
 	for (auto real_name : new_dp.get_real_names())
 	{
 		new_name = get_new_member_name("pso");
-		current_pso_lineage_map[new_name] = real_name;
+		current_pso_lineage_map[real_name] = new_name;
 		new_names.push_back(new_name);
 	}
 	cur_velocity.set_real_names(new_names);
