@@ -2800,11 +2800,17 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 	//vector<string> new_pbest_names;
 	//pso_pbest_dp = _dp;
 	//pso_pbest_op = _op;
+	set<string> duplicates = objectives.get_duplicates();
+
 	for (auto lm : current_pso_lineage_map)
 	{
 		
 		f = lm.second; s = lm.first;
-		if ((snames.find(f) == snames.end()) || (snames.find(f) == snames.end()))
+		if ((snames.find(f) == snames.end()) || (snames.find(s) == snames.end()))
+		{
+			names.push_back(f);
+		}
+		else if ((duplicates.find(f) == duplicates.end()) || (duplicates.find(s) == duplicates.end()))
 		{
 			names.push_back(f);
 		}
@@ -2817,7 +2823,6 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 				tdp.update_real_ip(f, real);
 				real = pso_pbest_op.get_real_vector(s);
 				top.update_real_ip(f, real);
-
 			}
 			//new_pbest_names.push_back(lm.first);
 		}

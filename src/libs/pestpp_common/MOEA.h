@@ -64,6 +64,7 @@ public:
 	//sort specific members
 	map<string, double> get_cuboid_crowding_distance(vector<string>& members);
 	
+	set<string> get_duplicates() { return duplicates;  }
 
 private:
 	
@@ -116,7 +117,7 @@ private:
 	
 };
 
-
+//todo: add pso args: init_vel_scale_fac, c1, c2, omega, 
 class MOEA
 {
 	
