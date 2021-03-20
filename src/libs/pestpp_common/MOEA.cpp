@@ -2905,7 +2905,7 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	}
 	if (nondom_solutions.size() == 1)
 	{
-		for (int i = 0; i < _dp.shape().first; i++)
+		for (int i = 0; i < num_reals; i++)
 			gbest_solutions.push_back(nondom_solutions[0]);
 		return gbest_solutions;
 	}
