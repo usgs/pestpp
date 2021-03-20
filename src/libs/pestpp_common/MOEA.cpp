@@ -2806,7 +2806,7 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 	{
 		
 		f = lm.second; s = lm.first;
-		if ((snames.find(f) != snames.end()) || (snames.find(s) != snames.end()))
+		if ((snames.find(f) == snames.end()) || (snames.find(s) == snames.end()))
 		{
 			names.push_back(f);
 		}
