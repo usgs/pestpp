@@ -3318,9 +3318,9 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
 	tmp_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
 
-	if (find(gen_types.begin(),gen_types.end(),MouGenType::PM) == gen_types.end())
-		gauss_mutation_ip(tmp_dp);
-	generate_pm_population(tmp_dp.shape().first, tmp_dp);
+	//if (find(gen_types.begin(),gen_types.end(),MouGenType::PM) == gen_types.end())
+	gauss_mutation_ip(tmp_dp);
+	//generate_pm_population(tmp_dp.shape().first, tmp_dp);
 	
 	tmp_dp.enforce_bounds(performance_log,false);
 	return tmp_dp;
