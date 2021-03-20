@@ -2405,6 +2405,7 @@ ParameterEnsemble MOEA::generate_population()
 	int new_members_per_gen = int(total_new_members / gen_types.size());
 	ParameterEnsemble new_pop(&pest_scenario, &rand_gen);
 	new_pop.set_trans_status(ParameterEnsemble::transStatus::NUM);
+	objectives.update(op, dp, &constraints);
 	for (auto gen_type : gen_types)
 	{
 		ParameterEnsemble p;
