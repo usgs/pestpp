@@ -472,6 +472,12 @@ public:
 	void set_mou_de_f(double _val) { mou_de_f = _val; }
 	int get_mou_save_population_every() const { return mou_save_population_every; }
 	void set_mou_save_population_every(int every) { mou_save_population_every = every; }
+	double get_mou_pso_omega() const { return mou_pso_omega; }
+	void set_mou_pso_omega(double val) { mou_pso_omega = val; }
+	double get_mou_pso_social_const() const { return mou_pso_social_const; }
+	void set_mou_pso_social_const(double val) { mou_pso_social_const = val; }
+	double get_mou_pso_cognitive_const() const { return mou_pso_cognitive_const; }
+	void set_mou_pso_cognitive_const(double val) { mou_pso_cognitive_const = val; }
 	
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
@@ -768,6 +774,9 @@ private:
 	string mou_mating_selector;
 	double mou_de_f;
 	int mou_save_population_every;
+	double mou_pso_omega;
+	double mou_pso_social_const;
+	double mou_pso_cognitive_const;
 
 	int ies_subset_size;
 	string ies_par_csv;

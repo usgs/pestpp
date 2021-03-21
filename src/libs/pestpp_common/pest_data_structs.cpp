@@ -1308,6 +1308,21 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_save_population_every);
 		return true;
 	}
+	else if (key == "MOU_PSO_OMEGA")
+	{
+		convert_ip(value, mou_pso_omega);
+		return true;
+	}
+	else if (key == "MOU_PSO_SOCIAL_CONST")
+	{
+		convert_ip(value, mou_pso_social_const);
+		return true;
+	}
+	else if (key == "MOU_PSO_COGNITIVE_CONST")
+	{
+		convert_ip(value, mou_pso_cognitive_const);
+		return true;
+	}
 
 	return false;
 }
@@ -1518,7 +1533,10 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_mutation_prob: " << mou_mutation_prob << endl;
 	os << "mou_de_f: " << mou_de_f << endl;
 	os << "mou_save_population_every: " << mou_save_population_every << endl;
-	
+	os << "mou_pso_omega: " << mou_pso_omega << endl;
+	os << "mou_pso_social_const: " << mou_pso_social_const << endl;
+	os << "mou_pso_cognitive: " << mou_pso_cognitive_const << endl;
+
 	os << endl << "...shared pestpp-ies/pestpp-da options:" << endl;
 	os << "(note: 'da' args override 'ies' args when using pestpp-da)" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
@@ -1677,8 +1695,10 @@ void PestppOptions::set_defaults()
 	set_mou_mutation_probability(-999);
 	set_mou_de_f(0.8);
 	set_mou_save_population_every(-1);
+	set_mou_pso_omega(0.7);
+	set_mou_pso_cognitive_const(2.0);
+	set_mou_pso_social_const(2.0);
 	
-
 	set_ies_par_csv("");
 	set_ies_obs_csv("");
 	set_ies_obs_restart_csv("");

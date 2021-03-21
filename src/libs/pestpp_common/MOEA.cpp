@@ -2845,8 +2845,9 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 
 ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
 {
-	double omega = 0.7;
-	double cog_const = 2.0, social_const = 2.0;
+	double omega = pest_scenario.get_pestpp_options().get_mou_pso_omega();
+	double cog_const = pest_scenario.get_pestpp_options().get_mou_pso_cognitive_const();
+	double social_const = pest_scenario.get_pestpp_options().get_mou_pso_social_const();
 
 	int num_dv = _dp.shape().second;
 	vector<double> r;
