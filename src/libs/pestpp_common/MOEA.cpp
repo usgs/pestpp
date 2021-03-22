@@ -475,7 +475,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 			for (auto inf : infeas_ordered)
 				nondom_crowd_ordered.push_back(inf);
 	}
-	if (infeas.size() == member_struct.size())
+	/*if (infeas.size() == member_struct.size())
 	{
 		if (infeas.size() != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
 		{
@@ -487,8 +487,8 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 		}
 
 
-	}
-	else if (infeas.size() + member_struct.size() != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
+	}*/
+	if (infeas.size() + member_struct.size() != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
 	{
 		ss.str("");
 		ss << "ParetoObjectives::get_nsga2_pareto_dominance() internal error: final sorted population size: " <<
