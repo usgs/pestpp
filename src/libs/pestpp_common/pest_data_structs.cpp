@@ -308,6 +308,11 @@ Parameters ParameterInfo::get_init_value(const vector<string> &keys) const
 	return init_value;
 }
 
+void PestppOptions::rectify_ies_da_args()
+{
+	for (auto& a : passed_da_ies_args)
+		passed_args.emplace(a);
+}
 
 map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const string& line)
 {
@@ -1108,6 +1113,7 @@ bool PestppOptions::assign_da_value_by_key(const string& key, const string& valu
 	{
 		//
 		//if (index != string::npos)
+		set<string> ies_da_args;
 		if (key.substr(0,2) == "DA")
 		{
 			string ies_key = "IES" + key.substr(2, key.size());
@@ -1124,6 +1130,7 @@ bool PestppOptions::assign_da_value_by_key(const string& key, const string& valu
 			{
 				//passed_args.erase(ies_key);
 				//passed_args.emplace(key);
+				passed_da_ies_args.emplace(ies_key);
 			}
 			if (already_found)
 			{

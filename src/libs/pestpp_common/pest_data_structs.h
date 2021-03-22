@@ -296,6 +296,7 @@ public:
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
 	vector<string> notfound_args;
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
+	void rectify_ies_da_args();
 
 	bool assign_value_by_key_sqp(const string& key, const string& value, const string& org_value);
 	bool assign_mou_value_by_key(const string& key, const string& value, const string& org_value);
@@ -673,6 +674,8 @@ public:
 
 private:
 
+	set<string> passed_args;
+	set<string> passed_da_ies_args;
 	bool use_da_args;
 	bool forgive_unknown_args;
 	int n_iter_base;
@@ -804,7 +807,8 @@ private:
 	double ies_lambda_inc_fac;
 	double ies_lambda_dec_fac;
 	bool ies_save_lambda_en;
-	set<string> passed_args;
+	
+
 	map<string, string> arg_map;
 	string ies_subset_how;
 	string ies_localize_how;

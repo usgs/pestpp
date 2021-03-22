@@ -1721,6 +1721,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		}
 		arg_map.insert(line_arg_map.begin(), line_arg_map.end());
 	}
+	pestpp_options.rectify_ies_da_args();
 
 	if (dup.size() > 0)
 	{
