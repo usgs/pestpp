@@ -465,6 +465,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 
 	//now add the infeasible members
 	//if there is atleast one feasible nondom solution, then add the infeasible ones to dom solutions
+	bool all_infeas = true;
 	if (infeas.size() < op.shape().first - duplicates.size())
 	{
 
@@ -474,8 +475,10 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 		else
 			for (auto inf : infeas_ordered)
 				nondom_crowd_ordered.push_back(inf);
+		all_infeas = false;
 	}
-	/*if (infeas.size() == member_struct.size())
+
+	if (all_infeas)
 	{
 		if (infeas.size() != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
 		{
@@ -485,10 +488,9 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 			cout << ss.str();
 			throw runtime_error(ss.str());
 		}
-
-
-	}*/
-	if (infeas.size() + member_struct.size() != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
+	}
+	
+	else if (infeas.size() + member_struct.size() != nondom_crowd_ordered.size() + dom_crowd_ordered.size())
 	{
 		ss.str("");
 		ss << "ParetoObjectives::get_nsga2_pareto_dominance() internal error: final sorted population size: " <<
