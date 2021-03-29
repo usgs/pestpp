@@ -976,7 +976,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	base_par_transform.push_back_active_ctl2numeric(t_log);
 
 	pestpp_options.set_defaults();
-
+	vector<string> notfound_args;
 	set<string> tied_names;
 	pst_filename = _pst_filename;
 	set<string> sections_found;
@@ -1000,7 +1000,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	try {
 #endif
 		prior_info_string = "";
-		vector<string> notfound_args;
+		
 		for (lnum = 1, sec_begin_lnum = 1; getline(fin, line); ++lnum)
 		{
 			strip_ip(line);
