@@ -7,7 +7,8 @@ rem fast but without fortran
 rmdir /Q /S bin
 rmdir /Q /S build
 mkdir build
-call "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\bin\compilervars.bat" intel64
+rem call "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\bin\compilervars.bat" intel64
+call "C:\Program Files (x86)\Intel\oneAPI\setvars.bat" intel64
 cd build
 cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icl ..
 ninja

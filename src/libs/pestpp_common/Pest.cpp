@@ -1775,7 +1775,23 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			throw_control_file_error(f_rec, ss.str(), true);
 		}
 	}
-	
+	if (notfound_args.size() > 0)
+	{
+		ss.str("");
+		ss << " the following control data keyword lines were not accepted:" << endl;
+		for (auto n : notfound_args)
+			ss << n << ",";
+		if (pestpp_options.get_forgive_unknown_args())
+		{
+			ss << endl << "forgive_unknown_args is 'true', continuing" << endl;
+			throw_control_file_error(f_rec, ss.str(), false);
+		}
+		else
+		{
+			ss << endl << "forgive_unknown_args is 'false' so this is treated as an error" << endl;
+			throw_control_file_error(f_rec, ss.str(), true);
+		}
+	}
 	if (control_info.pestmode == ControlInfo::PestMode::REGUL)
 	{
 		if (regul_scheme_ptr)

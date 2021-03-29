@@ -3073,7 +3073,7 @@ void EnsembleMethod::initialize(int cycle)
 	if (localizer.is_initialized())
 	{
 		message(1, "using previously initialized localizer");
-		use_localizer = true;
+		use_localizer = localizer.get_use();
 	}
 	else
 	{
@@ -3889,6 +3889,10 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	{
 		pair<vector<string>, vector<string>> p(act_obs_names, act_par_names);
 		loc_map["all"] = p;
+	}
+	if (loc_map.size() == 0)
+	{
+		throw_em_error("EnsembleMethod::solve() interal error: loc_map is empty");
 	}
 	//get this once and reuse it for each lambda
 	Eigen::MatrixXd Am;
