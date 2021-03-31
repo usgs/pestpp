@@ -327,11 +327,12 @@ protected:
 	int num_threads;
 	set<string> pp_args;
 	int iter;
-	bool use_subset;
+	bool use_subset;	
 	
 	double last_best_lam, last_best_mean, last_best_std;
 	vector<double> best_mean_phis;
 	double best_phi_yet;
+	vector<double> mda_lambdas;
 
 	vector<string> obs_dyn_state_names, par_dyn_state_names;
 
@@ -354,7 +355,7 @@ protected:
 	bool oe_drawn, pe_drawn;
 
 	bool solve_glm();
-	bool solve_mda();
+	bool solve_mda(bool last_iter);
 
 	bool solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle=NetPackage::NULL_DA_CYCLE);
 

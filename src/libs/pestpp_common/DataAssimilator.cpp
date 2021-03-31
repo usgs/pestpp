@@ -64,17 +64,18 @@ void DataAssimilator::da_update(int cycle)
 	//string da_method = da_ctl_params.get_svalue("DA_TYPE");
 	//message(0, "Assimilation Method :", da_method);
 	int user_noptmax = pest_scenario.get_control_info().noptmax;
-
+	iter = 0;
 	bool accept;
-	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
-	{
-		iter++;
+	bool islast_iter = false;
+	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)	
+	{		
+		iter++;			
 		message(0, "starting solve for iteration:", iter);
 		ss << "starting solve for iteration: " << iter;
 		performance_log->log_event(ss.str());
 		//accept = solve_new_da();
 		if (pest_scenario.get_pestpp_options().get_ies_use_mda())
-			accept = solve_mda();
+			accept = solve_mda(islast_iter);
 		else
 			accept = solve_glm();
 		report_and_save(cycle);
@@ -94,8 +95,21 @@ void DataAssimilator::da_update(int cycle)
 		else
 			consec_bad_lambda_cycles++;
 
-		if (should_terminate())		
+		if (islast_iter)
 			break;
+
+		if (should_terminate())
+		{			
+			if ((pest_scenario.get_pestpp_options().get_ies_use_mda()) && 
+				(iter < pest_scenario.get_control_info().noptmax))
+			{
+				islast_iter = true;
+				continue;
+			}			
+			break;			
+		}
+
+		
 	}
 }
 
