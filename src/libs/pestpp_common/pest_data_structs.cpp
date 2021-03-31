@@ -1751,7 +1751,7 @@ void PestppOptions::set_defaults()
 	set_ies_save_rescov(false);
 	set_ies_pdc_sigma_distance(-1.0);
 	set_ies_use_mda(false);
-	set_ies_mda_init_fac(0.25);
+	set_ies_mda_init_fac(10);
 	set_ies_mda_dec_fac(0.5);
 	set_ies_loc_type("LOCAL");
 

@@ -116,7 +116,7 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 	{
 		obs_diff_map[obs_names[i]] = mat.col(i);
 	}
-	mat = base_oe.get_eigen(vector<string>(), obs_names);
+	mat = base_oe.get_eigen(oe.get_real_names(), obs_names);
 	Observations ctl_obs = pest_scenario.get_ctl_observations();
 	for (int i = 0; i < obs_names.size(); i++)
 	{
@@ -3805,29 +3805,80 @@ bool EnsembleMethod::solve_glm()
 
 }
 
-bool EnsembleMethod::solve_mda()
+bool EnsembleMethod::solve_mda(bool last_iter)
 {
 
 	//this function should cover the case where noptmax = 1 (vanilla) also...
-	vector<double> mda_facs;
-	mda_facs.push_back(pest_scenario.get_pestpp_options().get_ies_mda_init_fac());
-	double tot = mda_facs[0];
-	double dec_fac = pest_scenario.get_pestpp_options().get_ies_mda_dec_fac();
-	for (int i = 1; i < pest_scenario.get_control_info().noptmax; i++)
+	vector<double> mda_facs, scaled_mda_facs;
+	//mda_facs.push_back(pest_scenario.get_pestpp_options().get_ies_mda_init_fac());
+	double tot, ttot;
+	if (iter == 1)
 	{
-		mda_facs.push_back(mda_facs[i - 1] * dec_fac);
-		tot += mda_facs[i];
-	}
-	double ttot = 0.0;
-	for (auto& mda_fac : mda_facs)
+		mda_facs.push_back(last_best_lam);
+		tot = 1.0 / mda_facs[0];
+		double dec_fac = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();// get_ies_mda_dec_fac();
+		ttot = 0.0;
+		for (int i = 1; i < pest_scenario.get_control_info().noptmax; i++)
+		{
+			mda_facs.push_back(mda_facs[i - 1] * dec_fac);
+			tot += (1.0 / mda_facs[i]);
+		}		
+		scaled_mda_facs.clear();
+		for (auto& mda_fac : mda_facs)
+		{
+			mda_fac = (1.0 / mda_fac) / tot;
+			scaled_mda_facs.push_back(1.0 / mda_fac);
+			ttot += mda_fac;
+		}
+		mda_lambdas = scaled_mda_facs;
+	}	
+	else 
 	{
-		mda_fac = mda_fac / tot;
-		ttot += mda_fac;
+		if (last_iter) // trim unused lambdas after the last iteration
+		{
+			mda_lambdas.erase(mda_lambdas.begin()+iter, mda_lambdas.end());
+		}
+		int ii = 1;
+		double tot_fac1, tot_fac2, resid_fac;
+		tot_fac1 = 0;
+		tot_fac2 = 0;
+		scaled_mda_facs.clear();		
+		mda_lambdas[iter - 1] = last_best_lam;
+		tot = 0;
+		ttot = 0;
+		for (auto& mda_fac : mda_lambdas)
+		{		
+			tot += (1.0 / mda_fac);
+			if (ii<iter)
+				tot_fac1 += (1.0 / mda_fac);
+			else
+				tot_fac2 += (1.0 / mda_fac);
+			ii += 1;			
+		}
+		
+		ii = 1;
+		for (auto& mda_fac : mda_lambdas)
+		{
+			if (ii < iter)
+			{
+				ii += 1;
+				ttot += 1.0/mda_fac;
+				scaled_mda_facs.push_back(mda_fac);
+				continue;
+			}
+			mda_fac = (1.0-tot_fac1)*(1.0 / mda_fac) / tot_fac2;
+			scaled_mda_facs.push_back(1.0 / mda_fac);
+			ttot += mda_fac;
+			ii += 1;
+		}
+		mda_lambdas = scaled_mda_facs;
+
 	}
-	tot = mda_facs[iter-1];
-	mda_facs = vector<double>{ tot };
+	
+	mda_facs = vector<double>{ mda_lambdas[iter-1] };
 	vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
 	return solve(true, mda_facs, scale_facs);
+	
 }
 
 bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle)
@@ -3991,7 +4042,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	vector<map<int, int>> real_run_ids_lams;
 	int best_idx = -1;
-	double best_mean = 1.0e+30, best_std = 1.0e+30;
+	double best_mean = 1.0e+30, best_std = 1.0e+30; // todo (Ayman): read those from input
 	double mean, std;
 
 	vector<int> subset_idxs = get_subset_idxs(pe_lams[0].shape().first, local_subset_size);
@@ -4090,7 +4141,10 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			message(0, m);
 			message(1, "abandoning current upgrade ensembles, increasing lambda to ", new_lam);
 			message(1, "updating realizations with reduced phi");
-			update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx]);
+			if (!use_mda)
+			{
+				update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx]);
+			}
 			ph.update(oe, pe);
 			//re-check phi
 			double new_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
