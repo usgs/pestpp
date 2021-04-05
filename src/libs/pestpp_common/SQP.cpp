@@ -1713,6 +1713,38 @@ void SeqQuadProgram::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnse
 
 }
 
+Eigen::VectorXd SeqQuadProgram::calc_gradient_vector_from_coeffs(const Parameters& _current_dv_values)
+{
+	Eigen::VectorXd grad(dv_names.size());
+	//first calc the current obj function value
+	double current_obj_val = 0.0;
+	for (auto& dv_val : _current_dv_values)
+	{
+		current_obj_val += obj_func_coef_map[dv_val.first] * dv_val.second;
+	}
+	//now perturb each dec var and re calc
+	//just use a plain ole perturb here since we dont
+	//case
+	double pert = 1.1;
+	double pert_obj_val, derv, dv_val;
+	int i;
+	for (auto& dv : dv_names)
+	{
+		dv_val = _current_dv_values.get_rec(dv);
+		Parameters pert_dv_values = _current_dv_values;
+		pert_dv_values.update_rec(dv, dv_val * 1.1);
+		pert_obj_val = 0.0;
+		for (auto& ddv_val : _current_dv_values)
+		{
+			pert_obj_val += obj_func_coef_map[ddv_val.first] * ddv_val.second;
+		}
+		derv = (current_obj_val - pert_obj_val) / (dv_val - (dv_val * pert));
+		grad[i] = derv;
+		i++;
+	}
+}
+
+
 Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_values)
 {
 	stringstream ss;
@@ -1806,20 +1838,24 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 		else
 		{
 			//if not center_on arg, use the mean dv values
-			if (center_on.size() == 0)
-			{
-				//pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
-				for (int i = 0; i < dv_names.size(); i++)
-				{
-					grad[i] = obj_func_coef_map[dv_names[i]];// * mm.first[dv_names[i]];
-				}
-			}
-			else
-			{
+			//if (center_on.size() == 0)
+			//{
+			//	//pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
+			//	for (int i = 0; i < dv_names.size(); i++)
+			//	{
+			//		grad[i] = obj_func_coef_map[dv_names[i]];// * mm.first[dv_names[i]];
+			//	}
+			//}
+			//else
+			//{
 
-				grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
-			}
+			//	grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
+			//}
+			// 
+			//I think we should just eval the gradient around the current dv values
+			grad = calc_gradient_vector_from_coeffs(_current_dv_values);
 		}
+			
 	}
 	else
 	{
@@ -1834,10 +1870,7 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 		//pi based obj
 		else
 		{
-			for (int i = 0; i < dv_names.size(); i++)
-			{
-				grad[i] = obj_func_coef_map[dv_names[i]];// *_current_dv_values.get_rec(dv_names[i]);
-			}
+			grad = calc_gradient_vector_from_coeffs(_current_dv_values);
 		}
 	}
 	Parameters pgrad = _current_dv_values;

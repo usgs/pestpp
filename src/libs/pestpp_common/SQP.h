@@ -149,7 +149,9 @@ private:
 
 	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, vector<double>& alpha_vals);
 
-	Parameters calc_gradient_vector(const Parameters& _current_dv_);
+	Parameters calc_gradient_vector(const Parameters& _current_dv_values);
+
+	Eigen::VectorXd calc_gradient_vector_from_coeffs(const Parameters & _current_dv_values);
 
 	Eigen::VectorXd get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
 	
