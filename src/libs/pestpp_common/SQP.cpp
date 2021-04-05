@@ -481,9 +481,7 @@ void SeqQuadProgram::initialize_objfunc()
 		{
 			
 			message(0, " warning: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)");
-			
 			ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
-			
 			for (auto& name : dv_names)
 			{
 				if (pi.get_parameter_rec_ptr(name)->tranform_type != ParameterRec::TRAN_TYPE::NONE)
@@ -980,6 +978,7 @@ void SeqQuadProgram::prep_4_fd_grad()
 			bool success = run_mgr_ptr->get_run(run_id, current_ctl_dv_values, current_obs);
 			if (!success)
 				throw_sqp_error("initial (base) run with initial decision vars failed...cannot continue");
+			pts.model2ctl_ip(current_ctl_dv_values);
 			constraints.process_runs(run_mgr_ptr,iter);
 		}
 		else
@@ -1718,30 +1717,36 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector_from_coeffs(const Parameter
 	Eigen::VectorXd grad(dv_names.size());
 	//first calc the current obj function value
 	double current_obj_val = 0.0;
-	for (auto& dv_val : _current_dv_values)
+	for (auto& dv : dv_names)
 	{
-		current_obj_val += obj_func_coef_map[dv_val.first] * dv_val.second;
+		current_obj_val += obj_func_coef_map.at(dv) * _current_dv_values.get_rec(dv);
 	}
 	//now perturb each dec var and re calc
 	//just use a plain ole perturb here since we dont
 	//case
 	double pert = 1.1;
+	double pert_val;
 	double pert_obj_val, derv, dv_val;
-	int i;
+	int i = 0;
 	for (auto& dv : dv_names)
 	{
 		dv_val = _current_dv_values.get_rec(dv);
 		Parameters pert_dv_values = _current_dv_values;
-		pert_dv_values.update_rec(dv, dv_val * 1.1);
+		if (dv_val != 0.0)
+			pert_val = dv_val * pert;
+		else
+			pert_val = dv_val + pert;
+		pert_dv_values.update_rec(dv,pert_val);
 		pert_obj_val = 0.0;
-		for (auto& ddv_val : _current_dv_values)
+		for (auto& ddv_val : pert_dv_values)
 		{
 			pert_obj_val += obj_func_coef_map[ddv_val.first] * ddv_val.second;
 		}
-		derv = (current_obj_val - pert_obj_val) / (dv_val - (dv_val * pert));
+		derv = (current_obj_val - pert_obj_val) / (dv_val - pert_val);
 		grad[i] = derv;
 		i++;
 	}
+	return grad;
 }
 
 
@@ -2400,13 +2405,13 @@ bool SeqQuadProgram::solve_new()
 		//dv_num_candidate = fancy_solve_routine(scale_val, _current_num_dv_values);
 		Parameters num_candidate = _current_num_dv_values;
 
-		search_d *= scale_val;
-		if (search_d.squaredNorm() < 1.0 - 10)
+		Eigen::VectorXd scale_search_d = search_d * scale_val;
+		if (scale_search_d.squaredNorm() < 1.0 - 10)
 			message(1, "very short upgrade for scale value", scale_val); 
 		
 		Eigen::VectorXd cvals = num_candidate.get_data_eigen_vec(dv_names);
 
-		cvals.array() += search_d.array();
+		cvals.array() += scale_search_d.array();
 		num_candidate.update_without_clear(dv_names, cvals); 
 
 		//Eigen::VectorXd vec = dv_num_candidate.get_data_eigen_vec(dv_names); 
@@ -2497,10 +2502,14 @@ bool SeqQuadProgram::solve_new()
 	}
 
 	//TODO: add sqp option to save candidates
+	
 
-
-	//enforce bounds on candidates
+	//enforce bounds on candidates - TODO: report the shrinkage summary that enforce_bounds returns
 	dv_candidates.enforce_bounds(performance_log,false);
+	ss.str("");
+	ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
+	dv_candidates.to_csv(ss.str());
+
 	message(0, "running candidate decision variable batch");
 	vector<double> passed_scale_vals = scale_vals;
 	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates, passed_scale_vals);
