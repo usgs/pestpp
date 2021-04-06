@@ -77,7 +77,7 @@ public:
 	void mou_report(int iter, ParameterEnsemble& pe, ObservationEnsemble& oe, const vector<string>& obs_obj_names,
 		const vector<string>& pi_obj_names, bool echo = true);
 
-	void sqp_report(int iter, Parameters& current_pars, Observations& current_obs, bool echo = true);
+	void sqp_report(int iter, Parameters& current_pars, Observations& current_obs, bool echo = true, string tag = "");
 
 	//queue up chance related runs
 	void add_runs(int iter, Parameters& current_pars, Observations& current_obs, RunManagerAbstract* run_mgr_ptr);

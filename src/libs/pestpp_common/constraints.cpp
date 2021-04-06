@@ -1618,7 +1618,7 @@ double Constraints::get_probit(double _risk)
 	return output;
 }
 
-void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& current_obs, bool echo)
+void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& current_obs, bool echo, string tag)
 {
 	
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
@@ -1632,7 +1632,10 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 	{
 		nsize = max(nsize, int(name.size()));
 	}
-	ss << endl << "  observation constraint information at iteration " << iter << endl;
+	ss << endl << "  observation constraint information at iteration " << iter;
+	if (tag.size() > 0)
+		ss << " for " << tag;
+	ss << endl;
 	ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 	ss << setw(11) << "satisfied" << setw(15) << "distance" << endl;
 
@@ -1664,7 +1667,10 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 
 	//report prior information constraints
 	infeas_dist = get_unsatified_pi_constraints(current_pars);
-	ss << endl << "  prior information constraint information at iteration " << iter << endl;
+	ss << endl << "  prior information constraint information at iteration " << iter;
+	if (tag.size() > 0)
+		ss << " for " << tag;
+	ss << endl;
 	ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 	ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
 	for (int i = 0; i < num_pi_constraints(); ++i)
@@ -1685,7 +1691,7 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 		}
 		ss << endl;
 	}
-	
+	ss << endl;
 	f_rec << ss.str();
 	if (echo)
 		cout << ss.str();

@@ -1548,8 +1548,14 @@ void SeqQuadProgram::iterate_2_solution()
 		//todo: save and write out the current phi grad vector (maybe save all of them???)
 		ss.str("");
 		ss << "best phi sequence:";
+		int ii = 0;
 		for (auto phi : best_phis)
+		{
 			ss << phi << " ";
+			ii++;
+			if (ii % 7 == 0)
+				ss << endl;
+		}
 		message(0, ss.str());
 
 		//check to break here before making more runs
@@ -1570,6 +1576,7 @@ void SeqQuadProgram::iterate_2_solution()
 
 		//todo: report constraint stats
 		//a la constraints.mou_report();
+		constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true);
 
 		//report dec var change stats - only for ensemble form
 		if (use_ensemble_grad)
@@ -2511,7 +2518,8 @@ bool SeqQuadProgram::solve_new()
 	dv_candidates.to_csv(ss.str());
 
 	message(0, "running candidate decision variable batch");
-	vector<double> passed_scale_vals = scale_vals;
+	vector<double> passed_scale_vals = scale_vals;	
+	//passed_scale_vals will get amended in this function based on run fails...
 	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates, passed_scale_vals);
 
 	//todo: decide which if any dv candidate to accept...
@@ -2616,10 +2624,14 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	map<string, double> obj_map = get_obj_map(dv_candidates, _oe);
 	//todo make sure chances have been applied before now...
 	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates,_oe);
+	Parameters cand_dv_values = current_ctl_dv_values;
+	Observations cand_obs_values = current_obs;
+	Eigen::VectorXd t;
+	vector<string> onames = _oe.get_var_names();
+	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
 	bool filter_accept;
 	for (int i = 0; i < obj_vec.size(); i++)
 	{
-		
 		ss.str("");
 		ss << "candidate: " << real_names[i] << " phi: " << obj_vec[i];
 		double infeas_sum = 0.0;
@@ -2628,6 +2640,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 			infeas_sum += v.second;
 		}
 		ss << " infeasibilty total: " << infeas_sum << endl;
+		
 		//not sure how to deal with filter here - liu and reynolds have a scheme about it...
 		//but maybe we want to just add all of these candidates to the filter?
 		//there is also a test method with the filter that doesnt add 
@@ -2648,6 +2661,18 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 			idx = i;
 			oext = obj_vec[i];
 		}
+		
+		//report the constraint info for this candidate
+		t = dv_candidates.get_real_vector(real_names[i]);
+		cand_dv_values = current_ctl_dv_values;
+		cand_dv_values.update_without_clear(dv_names, t);
+		pts.numeric2ctl_ip(cand_dv_values);
+		t = _oe.get_real_vector(real_names[i]);
+		cand_obs_values.update_without_clear(onames, t);
+		ss.str("");
+		ss << "scale factor " << setprecision(4) << scale_vals[i];
+		constraints.sqp_report(iter, cand_dv_values, cand_obs_values, true, real_names[i]);
+
 	}
 	message(0, "best phi this iteration: ", oext);
 	if (idx == -1)
@@ -2657,17 +2682,16 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	{
 		//todo:update current_dv and current_obs
 		message(0, "accepting upgrade", real_names[idx]);
-		Eigen::VectorXd v = dv_candidates.get_real_vector(idx);
+		t = dv_candidates.get_real_vector(idx);
 		vector<string> vnames = dv_candidates.get_var_names();
 		Parameters p;
-		p.update_without_clear(vnames, v);
-		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
+		p.update_without_clear(vnames, t);
+		
 		pts.numeric2ctl_ip(p);
 		for (auto& d : dv_names)
 			current_ctl_dv_values[d] = p[d];
-		v = _oe.get_real_vector(idx);
-		vnames = _oe.get_var_names();
-		current_obs.update_without_clear(vnames, v);
+		t = _oe.get_real_vector(idx);
+		current_obs.update_without_clear(onames, t);
 		last_best = oext;
 		message(0, "new best phi:", last_best);
 
@@ -3002,9 +3026,10 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 			for (int i = 0; i < scale_vals.size(); i++)
 				if (find(failed_real_indices.begin(), failed_real_indices.end(), i) == failed_real_indices.end())
 					new_scale_vals.push_back(scale_vals[i]);
+			scale_vals = new_scale_vals;
 		}
 	}
-
+	
 	
 	return _oe;
 }
