@@ -1659,37 +1659,42 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 
 	}
 	
-	nsize = 20;
-	for (auto name : ctl_ord_pi_constraint_names)
+	if (ctl_ord_pi_constraint_names.size() > 0)
 	{
-		nsize = max(nsize, int(name.size()));
-	}
 
-	//report prior information constraints
-	infeas_dist = get_unsatified_pi_constraints(current_pars);
-	ss << endl << "  prior information constraint information at iteration " << iter;
-	if (tag.size() > 0)
-		ss << " for " << tag;
-	ss << endl;
-	ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
-	ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
-	for (int i = 0; i < num_pi_constraints(); ++i)
-	{
-		string name = ctl_ord_pi_constraint_names[i];
-		PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
-		ss << setw(nsize) << left << name;
-		ss << setw(12) << right << constraint_sense_name[name];
-		ss << setw(12) << pi_rec.get_obs_value();
-		ss << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
-		if (infeas_dist.find(name) != infeas_dist.end())
+
+		nsize = 20;
+		for (auto name : ctl_ord_pi_constraint_names)
 		{
-			ss << setw(11) << "false" << setw(15) << infeas_dist[name];
+			nsize = max(nsize, int(name.size()));
 		}
-		else
-		{
-			ss << setw(11) << "true" << setw(15) << 0.0;
-		}
+
+		//report prior information constraints
+		infeas_dist = get_unsatified_pi_constraints(current_pars);
+		ss << endl << "  prior information constraint information at iteration " << iter;
+		if (tag.size() > 0)
+			ss << " for " << tag;
 		ss << endl;
+		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
+		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
+		for (int i = 0; i < num_pi_constraints(); ++i)
+		{
+			string name = ctl_ord_pi_constraint_names[i];
+			PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
+			ss << setw(nsize) << left << name;
+			ss << setw(12) << right << constraint_sense_name[name];
+			ss << setw(12) << pi_rec.get_obs_value();
+			ss << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
+			if (infeas_dist.find(name) != infeas_dist.end())
+			{
+				ss << setw(11) << "false" << setw(15) << infeas_dist[name];
+			}
+			else
+			{
+				ss << setw(11) << "true" << setw(15) << 0.0;
+			}
+			ss << endl;
+		}
 	}
 	ss << endl;
 	f_rec << ss.str();

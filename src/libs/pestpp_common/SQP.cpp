@@ -2630,16 +2630,20 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	vector<string> onames = _oe.get_var_names();
 	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
 	bool filter_accept;
+	string tag;
 	for (int i = 0; i < obj_vec.size(); i++)
 	{
 		ss.str("");
-		ss << "candidate: " << real_names[i] << " phi: " << obj_vec[i];
+		ss << "scale factor " << setprecision(4) << scale_vals[i];
+		tag = ss.str();
+		ss.str("");
+		ss << "candidate: " << tag << " phi: " << obj_vec[i];
 		double infeas_sum = 0.0;
 		for (auto& v : violations[real_names[i]])
 		{
 			infeas_sum += v.second;
 		}
-		ss << " infeasibilty total: " << infeas_sum << endl;
+		ss << " infeasibilty total: " << infeas_sum << ", ";
 		
 		//not sure how to deal with filter here - liu and reynolds have a scheme about it...
 		//but maybe we want to just add all of these candidates to the filter?
@@ -2669,9 +2673,8 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		pts.numeric2ctl_ip(cand_dv_values);
 		t = _oe.get_real_vector(real_names[i]);
 		cand_obs_values.update_without_clear(onames, t);
-		ss.str("");
-		ss << "scale factor " << setprecision(4) << scale_vals[i];
-		constraints.sqp_report(iter, cand_dv_values, cand_obs_values, true, real_names[i]);
+		
+		constraints.sqp_report(iter, cand_dv_values, cand_obs_values, true,tag);
 
 	}
 	message(0, "best phi this iteration: ", oext);
