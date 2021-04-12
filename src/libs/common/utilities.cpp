@@ -740,8 +740,35 @@ bool read_binary(const string &filename, vector<string> &row_names, vector<strin
 	// read header
 	in.read((char*)&n_par, sizeof(n_par));
 	in.read((char*)&n_obs_and_pi, sizeof(n_obs_and_pi));
+	in.read((char*)&n_nonzero, sizeof(n_nonzero));
 	
 	bool is_new_format = false;
+
+	if ((n_par == 0) && (n_obs_and_pi < 0) && (n_nonzero < 0) && (n_obs_and_pi == n_nonzero))
+	{
+		char* col_name;
+		char* row_name;
+		n_obs_and_pi *= -1;
+		cout << "reading 'dense' format matrix with " << n_obs_and_pi << " columns" << endl;
+		//first read the names of the columns
+		vector<int> col_name_sizes;
+		int col_name_size = 0;
+		for (int i = 0; i < n_obs_and_pi; i++)
+		{
+			in.read((char*)&(col_name_size), sizeof(col_name_size));
+			col_name_sizes.push_back(col_name_size);
+		}
+		for (auto col_name_size : col_name_sizes)
+		{
+			in.read(col_name, col_name_size);
+			string temp_col = string(col_name, col_name_size);
+			col_names.push_back(temp_col);
+		}
+
+
+
+	}
+
 	if (n_par > 0)
 	{
 		is_new_format = true;
@@ -752,9 +779,7 @@ bool read_binary(const string &filename, vector<string> &row_names, vector<strin
 		if (n_par > 100000000)
 			throw runtime_error("pest_utils::read_binary() failed sanity check: npar > 100 mil");
 
-		////read number nonzero elements in jacobian (observations + prior information)
-		in.read((char*)&n_nonzero, sizeof(n_nonzero));
-
+		
 		if ((n_par == 0) || (n_obs_and_pi == 0) || (n_nonzero == 0))
 		{
 			throw runtime_error("pest_utils::read_binary() npar, nobs and/or nnz is zero");
@@ -820,8 +845,7 @@ bool read_binary(const string &filename, vector<string> &row_names, vector<strin
 		if (n_par > 100000000)
 			throw runtime_error("pest_utils::read_binary() failed sanity check: npar > 100 mil");
 
-		////read number nonzero elements in jacobian (observations + prior information)
-		in.read((char*)&n_nonzero, sizeof(n_nonzero));
+		
 
 		if ((n_par == 0) || (n_obs_and_pi == 0) || (n_nonzero == 0))
 		{

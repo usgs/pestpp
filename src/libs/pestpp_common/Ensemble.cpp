@@ -2854,6 +2854,114 @@ void ParameterEnsemble::to_binary(string file_name)
 }
 
 
+void ParameterEnsemble::to_dense(string file_name)
+{
+
+	ofstream fout(file_name, ios::binary);
+	if (!fout.good())
+	{
+		throw runtime_error("error opening file for binary parameter ensemble:" + file_name);
+	}
+
+	//vector<string> vnames = var_names;
+	vector<string> vnames = pest_scenario_ptr->get_ctl_ordered_par_names();
+	//vnames.insert(vnames.end(), fixed_names.begin(), fixed_names.end());
+	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
+	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
+	ParameterRec::TRAN_TYPE tt = ParameterRec::TRAN_TYPE::TIED;
+
+	vector<string> f_names;
+	set<string> snames(var_names.begin(), var_names.end());
+	set<string>::iterator end = snames.end();
+	for (auto& name : pest_scenario_ptr->get_ctl_ordered_par_names())
+	{
+		if (snames.find(name) != end)
+			continue;
+		if ((pi.get_parameter_rec_ptr(name)->tranform_type == ft) ||
+			(pi.get_parameter_rec_ptr(name)->tranform_type == tt))
+		{
+			f_names.push_back(name);
+		}
+		else
+		{
+			f_names.push_back(name);
+		}
+	}
+	
+	int n_var = vnames.size();
+	int n_real = real_names.size();
+	int n;
+	int tmp;
+	double data;
+	//char par_name[200];
+	//char obs_name[200];
+
+	// write header
+	tmp = 0;
+	fout.write((char*)&tmp, sizeof(tmp));
+
+	n = -1 * (reals.size() + (f_names.size() * shape().first));
+	fout.write((char*)&n, sizeof(n));
+	fout.write((char*)&n, sizeof(n));
+
+	//save parameter names
+	int mx = 0;
+	for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
+		b != e; ++b)
+	{
+		string name = pest_utils::lower_cp(*b);
+		tmp = name.size();
+		fout.write((char*)&tmp, sizeof(tmp));
+		mx = max(tmp, mx);
+	}
+	for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
+		b != e; ++b)
+	{
+		string name = pest_utils::lower_cp(*b);
+		char* par_name;
+		pest_utils::string_to_fortran_char(name, par_name, tmp);
+		fout.write(par_name, tmp);
+	}
+
+	//write matrix
+	n = 0;
+	//map<string, double>::const_iterator found_pi_par;
+	//map<string, double>::const_iterator not_found_pi_par;
+	//icount = row_idxs + 1 + col_idxs * self.shape[0]
+	Parameters org_pars = pest_scenario_ptr->get_ctl_parameters();
+	if (tstat == transStatus::MODEL)
+		par_transform.ctl2model_ip(org_pars);
+	else if (tstat == transStatus::NUM)
+		par_transform.ctl2numeric_ip(org_pars);
+	for (int irow = 0; irow < n_real; ++irow)
+	{
+		//Parameters pars(var_names, reals.row(irow));
+		Parameters pars = org_pars;
+		pars.update_without_clear(var_names, reals.row(irow));
+		if (tstat == transStatus::MODEL)
+			par_transform.model2ctl_ip(pars);
+		else if (tstat == transStatus::NUM)
+			par_transform.numeric2ctl_ip(pars);
+		replace_fixed(real_names[irow], pars);
+		string name = real_names[irow];
+		tmp = name.size();
+		char* real_name;
+		fout.write((char*)&tmp, sizeof(tmp));
+		pest_utils::string_to_fortran_char(name, real_name, tmp);
+		fout.write(real_name, tmp);
+		for (int jcol = 0; jcol < n_var; ++jcol)
+		{
+			data = pars[vnames[jcol]];
+			fout.write((char*)&(data), sizeof(data));
+		}
+	}
+	
+	fout.close();
+}
+
+
+
+
 void ParameterEnsemble::to_csv(string file_name)
 {
 	//write the par ensemble to csv file - transformed back to CTL status
