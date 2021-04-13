@@ -296,6 +296,8 @@ private:
 };
 
 
+void read_binary_matrix_header(const string& filename, int& tmp1, int& tmp2, int& tmp3);
+void read_dense_binary(const string& filename, vector<string>& row_names, vector<string>& col_names, Eigen::MatrixXd& matrix);
 bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::SparseMatrix<double> &matrix);
 
 bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::MatrixXd &matrix);

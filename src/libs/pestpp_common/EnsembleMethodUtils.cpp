@@ -2611,8 +2611,6 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 			frec << endl;
 			throw runtime_error("parameter ensemble consistency check failed, see .rec file");
 			
-			
-
 		}
 	}
 	return failed_real_indices;
@@ -3164,6 +3162,11 @@ void EnsembleMethod::initialize(int cycle)
 	else
 		pe_drawn = initialize_pe(parcov);
 
+	pe.to_dense("test.bin");
+	ParameterEnsemble pe1 = pe;
+	pe1.from_binary("test.bin");
+	cout << *pe1.get_eigen_ptr() << endl;
+	cout << *pe.get_eigen_ptr() << endl;
 	if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
 	{
 		message(1, "forming inverse sqrt of prior parameter covariance matrix");

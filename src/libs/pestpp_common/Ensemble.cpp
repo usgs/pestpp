@@ -2900,7 +2900,7 @@ void ParameterEnsemble::to_dense(string file_name)
 	tmp = 0;
 	fout.write((char*)&tmp, sizeof(tmp));
 
-	n = -1 * (reals.size() + (f_names.size() * shape().first));
+	n = -1 * n_var;
 	fout.write((char*)&n, sizeof(n));
 	fout.write((char*)&n, sizeof(n));
 
@@ -2918,9 +2918,9 @@ void ParameterEnsemble::to_dense(string file_name)
 		b != e; ++b)
 	{
 		string name = pest_utils::lower_cp(*b);
-		char* par_name;
-		pest_utils::string_to_fortran_char(name, par_name, tmp);
-		fout.write(par_name, tmp);
+		char* par_name = new char[name.size()];
+		pest_utils::string_to_fortran_char(name, par_name, name.size());
+		fout.write(par_name, name.size());
 	}
 
 	//write matrix
@@ -2945,7 +2945,7 @@ void ParameterEnsemble::to_dense(string file_name)
 		replace_fixed(real_names[irow], pars);
 		string name = real_names[irow];
 		tmp = name.size();
-		char* real_name;
+		char* real_name = new char[tmp];
 		fout.write((char*)&tmp, sizeof(tmp));
 		pest_utils::string_to_fortran_char(name, real_name, tmp);
 		fout.write(real_name, tmp);
