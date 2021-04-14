@@ -581,7 +581,7 @@ public:
 	void set_ies_mda_dec_fac(double fac) { ies_mda_dec_fac = fac; }
 	string get_ies_loc_type() const { return ies_loc_type; }
 	void set_ies_loc_type(string typ) { ies_loc_type = typ; }
-	bool get_ies_upgrades_in_memory() { return ies_upgrades_in_memory; }
+	bool get_ies_upgrades_in_memory() const { return ies_upgrades_in_memory; }
 	void set_ies_upgrades_in_memory(bool _flag) { ies_upgrades_in_memory = _flag; }
 
 	// DA parameters

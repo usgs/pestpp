@@ -2773,7 +2773,8 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 		real_run_ids = real_run_ids_vec[i];
 		//if using subset, reset the real_idx in real_run_ids to be just simple counter
 		//if (subset_size < pe_lams[0].shape().first)
-		if ((use_subset) && (subset_idxs.size() < pe_lams[i].shape().first))
+		//if ((use_subset) && (subset_idxs.size() < pe_lams[i].shape().first))
+		if ((use_subset) && ((_oe.shape().first > pe_lams[i].shape().first) || (subset_idxs.size() < pe_lams[i].shape().first)))
 		{
 			_oe.keep_rows(subset_idxs);
 			int ireal = 0;
@@ -3951,7 +3952,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	}
 
 	vector<int> subset_idxs = get_subset_idxs(pe.shape().first, local_subset_size);
-
+	vector<string> pe_filenames;
 
 
 	performance_log->log_event("preparing EnsembleSolver");
@@ -3992,26 +3993,37 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 				ss << " lambda " << cur_lam << ", scale factor " << sf;
 				norm_map_report(norm_map, ss.str());
 			}
+			ss.str("");
+			ss << file_manager.get_base_filename() << "." << iter << "." << cur_lam << ".lambda." << sf << ".scale.par";
+
+			if ((!pest_scenario.get_pestpp_options().get_ies_upgrades_in_memory()) && (subset_idxs.size() < pe.shape().first) && ((scale_vals.size() > 1) || (backtrack_factors.size() > 1)))
+			{
+				pe_lam_scale.to_dense(ss.str() + ".bin");
+				pe_filenames.push_back(ss.str() + ".bin");
+				pe_lam_scale.keep_rows(subset_idxs);
+				message(1, "'ies_upgrades_in_memory' is 'false', upgrade ensemble saved to " + ss.str() + ".bin");
+
+			}
+			else if (!pest_scenario.get_pestpp_options().get_ies_upgrades_in_memory())
+			{
+				message(1, "even though 'ies_upgrades_in_memory' is 'false', there is no benefit to using this option because either you arent testing multiple upgrades or you arent using a subset");
+			}
 
 			pe_lams.push_back(pe_lam_scale);
 			lam_vals.push_back(cur_lam);
 			scale_vals.push_back(sf);
 			if (!pest_scenario.get_pestpp_options().get_ies_save_lambda_en())
 				continue;
-			ss.str("");
-			ss << file_manager.get_base_filename() << "." << iter << "." << cur_lam << ".lambda." << sf << ".scale.par";
 
 			if (pest_scenario.get_pestpp_options().get_save_binary())
 			{
-				ss << ".jcb";
-				pe_lam_scale.to_binary(ss.str());
+				pe_lam_scale.to_binary(ss.str()+".jcb");
 			}
 			else
 			{
-				ss << ".csv";
-				pe_lam_scale.to_csv(ss.str());
+				pe_lam_scale.to_csv(ss.str()+".csv");
 			}
-			frec << "lambda, scale value " << cur_lam << ',' << sf << " pars saved to " << ss.str() << endl;
+			frec << "lambda, scale value " << cur_lam << ',' << sf << " par ensemble saved to " << ss.str() << endl;
 
 		}
 
@@ -4048,7 +4060,28 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	double mean, std;
 
 	message(0, "running upgrade ensembles");
-	vector<ObservationEnsemble> oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, subset_idxs);
+	vector<ObservationEnsemble> oe_lams;
+	
+	//if we are saving upgrades to disk
+	if (pe_filenames.size() > 0)
+	{
+		vector<int> temp;
+		for (int i = 0; i < pe_lams[0].shape().first; i++)
+			temp.push_back(i);
+		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, temp);
+		vector<string> actual_oe_subset_real_names;
+		vector<string> real_names = oe.get_real_names();
+		for (auto idx : subset_idxs)
+		{
+			actual_oe_subset_real_names.push_back(real_names[idx]);
+		}
+		for (auto& oe : oe_lams)
+		{
+			oe.set_real_names(actual_oe_subset_real_names);
+		}
+	}
+	else
+		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, subset_idxs);
 
 	message(0, "evaluting upgrade ensembles");
 	message(1, "last mean: ", last_best_mean);
@@ -4079,7 +4112,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 				ss << ".csv";
 				oe_lams[i].to_csv(ss.str());
 			}
-			frec << "lambda, scale value " << lam_vals[i] << ',' << scale_vals[i] << " pars saved to " << ss.str() << endl;
+			frec << "lambda, scale value " << lam_vals[i] << ',' << scale_vals[i] << " obs ensemble saved to " << ss.str() << endl;
 
 		}
 		drop_bad_phi(pe_lams[i], oe_lams[i], subset_idxs);
@@ -4106,7 +4139,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	}
 	if (best_idx == -1)
 	{
-		message(0, "WARNING:  unsuccessful upgrade testing, resetting lambda to 10000.0");
+		message(0, "WARNING:  unsuccessful upgrade testing, resetting lambda to 10000.0 and returning to upgrade calculations");
 		last_best_lam = 10000.0;
 		return false;
 
@@ -4139,7 +4172,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
 			string m = ss.str();
 			message(0, m);
-			message(1, "abandoning current upgrade ensembles, increasing lambda to ", new_lam);
+			message(1, "abandoning current upgrade ensembles, returning to upgrade calculations and increasing lambda to ", new_lam);
 			message(1, "updating realizations with reduced phi");
 			if (!use_mda)
 			{
@@ -4184,7 +4217,18 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		}
 		//need to work out which par and obs en real names to run - some may have failed during subset testing...
 		ObservationEnsemble remaining_oe_lam = oe;//copy
-		ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
+
+		ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];;
+		
+		if (pe_filenames.size() > 0)
+		{
+			message(1, "'ies_upgrades_in_memory' is 'false', loading 'best' parameter ensemble from file '" + pe_filenames[best_idx] + "'");
+			remaining_pe_lam.from_binary(pe_filenames[best_idx]);
+			remaining_pe_lam.transform_ip(ParameterEnsemble::transStatus::NUM);
+
+		}
+		
+		
 		vector<string> pe_keep_names, oe_keep_names;
 		vector<string> pe_names = pe.get_real_names(), oe_names = oe.get_real_names();
 
