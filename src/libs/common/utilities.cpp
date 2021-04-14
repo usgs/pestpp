@@ -865,7 +865,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 	}
 }
 
-void pest_utils::read_binary_matrix_header(const string& filename, int& tmp1, int& tmp2, int& tmp3)
+void read_binary_matrix_header(const string& filename, int& tmp1, int& tmp2, int& tmp3)
 {
 	stringstream ss;
 	ifstream in;
