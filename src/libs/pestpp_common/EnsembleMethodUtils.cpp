@@ -3162,11 +3162,6 @@ void EnsembleMethod::initialize(int cycle)
 	else
 		pe_drawn = initialize_pe(parcov);
 
-	pe.to_dense("test.bin");
-	ParameterEnsemble pe1 = pe;
-	pe1.from_binary("test.bin");
-	cout << *pe1.get_eigen_ptr() << endl;
-	cout << *pe.get_eigen_ptr() << endl;
 	if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
 	{
 		message(1, "forming inverse sqrt of prior parameter covariance matrix");
@@ -3955,6 +3950,10 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		Am = get_Am(pe.get_real_names(), pe.get_var_names());
 	}
 
+	vector<int> subset_idxs = get_subset_idxs(pe.shape().first, local_subset_size);
+
+
+
 	performance_log->log_event("preparing EnsembleSolver");
 	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
 	pe_upgrade.set_trans_status(pe.get_trans_status());
@@ -4047,8 +4046,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	int best_idx = -1;
 	double best_mean = 1.0e+30, best_std = 1.0e+30; // todo (Ayman): read those from input
 	double mean, std;
-
-	vector<int> subset_idxs = get_subset_idxs(pe_lams[0].shape().first, local_subset_size);
 
 	message(0, "running upgrade ensembles");
 	vector<ObservationEnsemble> oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, subset_idxs);

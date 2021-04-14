@@ -1084,6 +1084,13 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
 	convert_ip(value, ies_loc_type);
 	return true;
 	}
+	else if (key == "IES_UPGRADES_IN_MEMORY")
+	{
+	ies_upgrades_in_memory = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+
+
 	return false;
 }
 
@@ -1595,6 +1602,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_mda_init_fac: " << ies_mda_init_fac << endl;
 	os << "ies_mda_dec_fac: " << ies_mda_dec_fac << endl;
 	os << "ies_localization_type: " << ies_loc_type << endl;
+	os << "ies_upgrades_in_memory: " << ies_upgrades_in_memory << endl;
 
 	os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -1754,6 +1762,7 @@ void PestppOptions::set_defaults()
 	set_ies_mda_init_fac(10);
 	set_ies_mda_dec_fac(0.5);
 	set_ies_loc_type("LOCAL");
+	set_ies_upgrades_in_memory(true);
 
 	// DA parameters
 	//set_da_use_ies(false);

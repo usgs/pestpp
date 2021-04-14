@@ -581,6 +581,8 @@ public:
 	void set_ies_mda_dec_fac(double fac) { ies_mda_dec_fac = fac; }
 	string get_ies_loc_type() const { return ies_loc_type; }
 	void set_ies_loc_type(string typ) { ies_loc_type = typ; }
+	bool get_ies_upgrades_in_memory() { return ies_upgrades_in_memory; }
+	void set_ies_upgrades_in_memory(bool _flag) { ies_upgrades_in_memory = _flag; }
 
 	// DA parameters
 	//CtlPar_container da_ctl_params;
@@ -832,6 +834,7 @@ private:
 	double ies_mda_init_fac;
 	double ies_mda_dec_fac;
 	string ies_loc_type;
+	bool ies_upgrades_in_memory;
 
 	// Data Assimilation parameters
 	/*string da_mode;
