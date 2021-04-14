@@ -4001,7 +4001,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 				pe_lam_scale.to_dense(ss.str() + ".bin");
 				pe_filenames.push_back(ss.str() + ".bin");
 				pe_lam_scale.keep_rows(subset_idxs);
-				message(1, "'ies_upgrades_in_memory' is 'false', upgrade ensemble saved to " + ss.str() + ".bin");
+				performance_log->log_event("'ies_upgrades_in_memory' is 'false', upgrade ensemble saved to " + ss.str() + ".bin");
 
 			}
 			else if (!pest_scenario.get_pestpp_options().get_ies_upgrades_in_memory())
@@ -4071,13 +4071,15 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, temp);
 		vector<string> actual_oe_subset_real_names;
 		vector<string> real_names = oe.get_real_names();
-		for (auto idx : subset_idxs)
+		vector<int> sorted_subset_idxs = subset_idxs;
+		sort(sorted_subset_idxs.begin(), sorted_subset_idxs.end());
+		for (auto idx : sorted_subset_idxs)
 		{
 			actual_oe_subset_real_names.push_back(real_names[idx]);
 		}
-		for (auto& oe : oe_lams)
+		for (auto& oe_lam : oe_lams)
 		{
-			oe.set_real_names(actual_oe_subset_real_names);
+			oe_lam.set_real_names(actual_oe_subset_real_names);
 		}
 	}
 	else
@@ -4222,10 +4224,27 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		
 		if (pe_filenames.size() > 0)
 		{
-			message(1, "'ies_upgrades_in_memory' is 'false', loading 'best' parameter ensemble from file '" + pe_filenames[best_idx] + "'");
+			performance_log->log_event("'ies_upgrades_in_memory' is 'false', loading 'best' parameter ensemble from file '" + pe_filenames[best_idx] + "'");
 			remaining_pe_lam.from_binary(pe_filenames[best_idx]);
 			remaining_pe_lam.transform_ip(ParameterEnsemble::transStatus::NUM);
-
+			for (auto& pe_filename : pe_filenames)
+			{ 
+				performance_log->log_event("removing upgrade ensemble '" + pe_filename + "'");
+				try
+				{
+					remove(pe_filename.c_str());
+				}
+				catch (exception& e)
+				{
+					message(2, "error removing upgrade ensemble: '" + pe_filename + "' :" + e.what());
+				}
+				catch (...)
+				{
+					message(2, "error removing upgrade ensemble: '" + pe_filename);
+				}
+				
+			}
+			
 		}
 		
 		
