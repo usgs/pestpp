@@ -172,6 +172,7 @@ public:
 	map<string,double> draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
 	Covariance get_diagonal_cov_matrix();
 	void to_binary(string filename);
+	void to_binary_unordered(string filename);
 	void to_dense(string filename);
 	void clear_fixed_map() { fixed_map.clear(); fixed_names.clear(); }
 	void replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);
@@ -186,6 +187,7 @@ private:
 	vector<string> fixed_names;
 	map<pair<string, string>, double> fixed_map;
 	void replace_fixed(string real_name,Parameters &pars);
+	void prep_par_ensemble_after_read(map<string,int>& header_info);
 };
 
 class ObservationEnsemble : public Ensemble

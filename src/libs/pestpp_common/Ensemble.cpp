@@ -15,6 +15,7 @@
 #include "system_variables.h"
 #include "pest_data_structs.h"
 #include "eigen_tools.h"
+#include "Transformable.h"
 
 Ensemble::Ensemble(Pest *_pest_scenario_ptr, std::mt19937* _rand_gen_ptr): pest_scenario_ptr(_pest_scenario_ptr),
 rand_gen_ptr(_rand_gen_ptr)
@@ -2355,28 +2356,7 @@ void ParameterEnsemble::from_binary(string file_name, bool forgive)
 		}
 	}
 
-	names = pest_scenario_ptr->get_ctl_ordered_par_names();
-	unordered_set<string>snames(names.begin(), names.end());
-	names.clear();
-	
-	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
-	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
-
-	for (auto &name : var_names)
-	{	
-		if (snames.find(name) == snames.end())
-		{
-			continue;
-		}
-		else if (pi.get_parameter_rec_ptr(name)->tranform_type == ft)
-		{
-			fixed_names.push_back(name);
-		}
-	}
-	
-	fill_fixed(header_info);
-	save_fixed();
-	tstat = transStatus::CTL;
+	prep_par_ensemble_after_read(header_info);
 
 }
 
@@ -2454,21 +2434,45 @@ void ParameterEnsemble::from_csv(string file_name, bool forgive)
 		Ensemble::read_csv_by_reals(num_reals, csv, header_info, index_info);
 	else
 		Ensemble::read_csv_by_vars(num_reals, csv, header_info, index_info);
+	
+	prep_par_ensemble_after_read(header_info);
+
+}
+
+void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_info)
+{
 	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
 	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
-	for (auto &name : var_names)
+	ParameterRec::TRAN_TYPE tt = ParameterRec::TRAN_TYPE::TIED;
+	vector<string> tied_names;
+	vector<string> names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
+	unordered_set<string>snames(names.begin(), names.end());
+	names.clear();
+	for (auto& name : var_names)
 	{
+		if (snames.find(name) != snames.end())
+		{
+			continue;
+		}
 		if (pi.get_parameter_rec_ptr(name)->tranform_type == ft)
 		{
 			fixed_names.push_back(name);
+		}
+		else if (pi.get_parameter_rec_ptr(name)->tranform_type == tt)
+		{
+			tied_names.push_back(name);
 		}
 	}
 	fill_fixed(header_info);
 	save_fixed();
 
+	if (tied_names.size() > 0)
+	{
+		drop_cols(tied_names);
+	}
+
 	tstat = transStatus::CTL;
 	org_real_names = real_names;
-
 }
 
 void ParameterEnsemble::fill_fixed(const map<string, int> &header_info)
@@ -2525,6 +2529,10 @@ void ParameterEnsemble::save_fixed()
 			fixed_map[key] = pars[fname];
 		}
 	}
+	
+	drop_cols(fixed_names);
+
+
 }
 
 map<string,double> ParameterEnsemble::enforce_change_limits_and_bounds(PerformanceLog* plog, ParameterEnsemble& other)
@@ -2748,7 +2756,142 @@ void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_v
 	}
 }
 
+void ParameterEnsemble::to_binary_unordered(string file_name)
+{
+	ofstream fout(file_name, ios::binary);
+	if (!fout.good())
+	{
+		throw runtime_error("error opening file for binary parameter ensemble:" + file_name);
+	}
 
+	vector<string> vnames = var_names;
+	//vector<string> vnames = pest_scenario_ptr->get_ctl_ordered_par_names();
+	//vnames.insert(vnames.end(), fixed_names.begin(), fixed_names.end());
+	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
+	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
+	ParameterRec::TRAN_TYPE tt = ParameterRec::TRAN_TYPE::TIED;
+
+	vector<string> f_names,t_names;
+	set<string> snames(var_names.begin(), var_names.end());
+	set<string>::iterator end = snames.end();
+	for (auto& name : pest_scenario_ptr->get_ctl_ordered_par_names())
+	{
+		if (snames.find(name) != end)
+			continue;
+		if (pi.get_parameter_rec_ptr(name)->tranform_type == ft)
+			f_names.push_back(name);
+		else if (pi.get_parameter_rec_ptr(name)->tranform_type == tt)
+			t_names.push_back(name);
+		else
+		{
+			throw_ensemble_error("ParameterEnsemble::to_binary_unordered()::unsupported transform for parameter '" + name + "'");
+		}
+	}
+	//this order matters!
+	vnames.insert(vnames.end(),f_names.begin(),f_names.end());
+	vnames.insert(vnames.end(), t_names.begin(), t_names.end());
+	
+	vector<string> too_long;
+	for (auto& name : real_names)
+		if (name.size() > 200)
+			too_long.push_back(name);
+	for (auto& name : var_names)
+		if (name.size() > 200)
+			too_long.push_back(name);
+	if (too_long.size() > 0)
+		throw_ensemble_error("ParameterEnsemble.to_binary(): the following real and/or par names are too long", too_long);
+
+	int n_var = vnames.size();
+	int n_real = real_names.size();
+	int n;
+	int tmp;
+	double data;
+	char par_name[200];
+	char obs_name[200];
+
+	// write header
+	tmp = n_var;
+	fout.write((char*)&tmp, sizeof(tmp));
+	tmp = n_real;
+	fout.write((char*)&tmp, sizeof(tmp));
+
+	//write number nonzero elements in jacobian (includes prior information)
+
+	n = reals.size() + (f_names.size() * shape().first) + (t_names.size() * shape().first);
+	fout.write((char*)&n, sizeof(n));
+	pair<string, string> p;
+	map<pair<string, string>, double>::iterator fixed_end = fixed_map.end();
+	Parameters ctl_pars = pest_scenario_ptr->get_ctl_parameters();
+	map<string, TranTied::pair_string_double> tied_items = par_transform.get_tied_ptr()->get_items();
+	//write matrix
+	n = 0;
+	transform_ip(transStatus::CTL);
+	Eigen::VectorXd t;
+	for (int irow = 0; irow < n_real; ++irow)
+	{
+		t = reals.row(irow);
+		for (int jcol = 0; jcol < var_names.size(); ++jcol)
+		{
+			n = irow;
+			fout.write((char*)&(n), sizeof(n));
+			n = jcol;
+			fout.write((char*)&(n), sizeof(n));
+			data = t[jcol];
+			fout.write((char*)&(data), sizeof(data));
+		}
+
+		int jcol = var_names.size();
+
+		for (auto &fname : f_names)
+		{
+		
+			n = irow + 1 + (jcol * n_real);
+			p = pair<string, string>(real_names[irow], fname);
+			if (fixed_map.find(p) == fixed_end)
+			{
+				data = ctl_pars[fname];
+			}
+			else
+			{
+				data = fixed_map.at(p);
+			}
+			fout.write((char*) &(n), sizeof(n));
+			fout.write((char*) &(data), sizeof(data));
+			jcol++;
+		}
+
+		for (auto& tname : t_names)
+		{
+			n = irow + 1 + (jcol * n_real);
+			data = t[var_map[tied_items.at(tname).first]] * tied_items.at(tname).second;
+			fout.write((char*)&(n), sizeof(n));
+			fout.write((char*)&(data), sizeof(data));
+			jcol++;
+		}
+	}
+	//save parameter names
+	for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
+		b != e; ++b) {
+		string l = pest_utils::lower_cp(*b);
+		pest_utils::string_to_fortran_char(l, par_name, 200);
+		fout.write(par_name, 200);
+	}
+	/*for (auto fname : fixed_names)
+	{
+		pest_utils::string_to_fortran_char(pest_utils::lower_cp(fname), par_name, 12);
+		fout.write(par_name, 12);
+	}*/
+
+	//save observation and Prior information names
+	for (vector<string>::const_iterator b = real_names.begin(), e = real_names.end();
+		b != e; ++b) {
+		string l = pest_utils::lower_cp(*b);
+		pest_utils::string_to_fortran_char(l, obs_name, 200);
+		fout.write(obs_name, 200);
+	}
+	//save observation names (part 2 prior information)
+	fout.close();
+}
 
 void ParameterEnsemble::to_binary(string file_name)
 {
