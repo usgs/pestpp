@@ -2473,6 +2473,7 @@ void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_in
 
 	tstat = transStatus::CTL;
 	org_real_names = real_names;
+	update_var_map();
 }
 
 void ParameterEnsemble::fill_fixed(const map<string, int> &header_info)
@@ -2756,7 +2757,7 @@ void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_v
 	}
 }
 
-void ParameterEnsemble::to_binary_unordered(string file_name)
+void ParameterEnsemble::to_binary(string file_name)
 {
 	ofstream fout(file_name, ios::binary);
 	if (!fout.good())
@@ -2893,7 +2894,7 @@ void ParameterEnsemble::to_binary_unordered(string file_name)
 	fout.close();
 }
 
-void ParameterEnsemble::to_binary(string file_name)
+void ParameterEnsemble::to_binary_ordered(string file_name)
 {
 	ofstream fout(file_name, ios::binary);
 	if (!fout.good())
@@ -3126,6 +3127,123 @@ void ParameterEnsemble::to_dense(string file_name)
 	fout.close();
 }
 
+void ParameterEnsemble::to_dense_unordered(string file_name)
+{
+	ofstream fout(file_name, ios::binary);
+	if (!fout.good())
+	{
+		throw runtime_error("error opening file for binary parameter ensemble:" + file_name);
+	}
+
+	vector<string> vnames = var_names;
+	//vector<string> vnames = pest_scenario_ptr->get_ctl_ordered_par_names();
+	//vnames.insert(vnames.end(), fixed_names.begin(), fixed_names.end());
+	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
+	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
+	ParameterRec::TRAN_TYPE tt = ParameterRec::TRAN_TYPE::TIED;
+
+	vector<string> f_names, t_names;
+	set<string> snames(var_names.begin(), var_names.end());
+	set<string>::iterator end = snames.end();
+	for (auto& name : pest_scenario_ptr->get_ctl_ordered_par_names())
+	{
+		if (snames.find(name) != end)
+			continue;
+		if (pi.get_parameter_rec_ptr(name)->tranform_type == ft)
+			f_names.push_back(name);
+		else if (pi.get_parameter_rec_ptr(name)->tranform_type == tt)
+			t_names.push_back(name);
+		else
+		{
+			throw_ensemble_error("ParameterEnsemble::to_binary_unordered()::unsupported transform for parameter '" + name + "'");
+		}
+	}
+	//this order matters!
+	vnames.insert(vnames.end(), f_names.begin(), f_names.end());
+	vnames.insert(vnames.end(), t_names.begin(), t_names.end());
+
+	// write header
+	int tmp = 0;
+	fout.write((char*)&tmp, sizeof(tmp));
+
+	pair<string, string> p;
+	map<pair<string, string>, double>::iterator fixed_end = fixed_map.end();
+	Parameters ctl_pars = pest_scenario_ptr->get_ctl_parameters();
+	map<string, TranTied::pair_string_double> tied_items = par_transform.get_tied_ptr()->get_items();
+	int n_real = reals.rows();
+	int n_var = var_names.size();
+	int n = -1 * n_var;
+	fout.write((char*)&n, sizeof(n));
+	fout.write((char*)&n, sizeof(n));
+
+	//save parameter names
+	int mx = 0;
+	for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
+		b != e; ++b)
+	{
+		string name = pest_utils::lower_cp(*b);
+		tmp = name.size();
+		fout.write((char*)&tmp, sizeof(tmp));
+		mx = max(tmp, mx);
+	}
+	for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
+		b != e; ++b)
+	{
+		string name = pest_utils::lower_cp(*b);
+		char* par_name = new char[name.size()];
+		pest_utils::string_to_fortran_char(name, par_name, name.size());
+		fout.write(par_name, name.size());
+	}
+
+	//write matrix
+	n = 0;
+	double data;
+	transform_ip(transStatus::CTL);
+	Eigen::VectorXd t;
+	
+	for (int irow = 0; irow < n_real; ++irow)
+	{
+		t = reals.row(irow);
+		string name = real_names[irow];
+		tmp = name.size();
+		char* real_name = new char[tmp];
+		fout.write((char*)&tmp, sizeof(tmp));
+		pest_utils::string_to_fortran_char(name, real_name, tmp);
+		fout.write(real_name, tmp);
+		for (int jcol = 0; jcol < n_var; ++jcol)
+		{
+			data = t[jcol];
+			fout.write((char*)&(data), sizeof(data));
+		}
+	
+		int jcol = var_names.size();
+
+		for (auto& fname : f_names)
+		{
+
+			p = pair<string, string>(real_names[irow], fname);
+			if (fixed_map.find(p) == fixed_end)
+			{
+				data = ctl_pars[fname];
+			}
+			else
+			{
+				data = fixed_map.at(p);
+			}
+			fout.write((char*)&(data), sizeof(data));
+			jcol++;
+		}
+
+		for (auto& tname : t_names)
+		{
+			data = t[var_map[tied_items.at(tname).first]] * tied_items.at(tname).second;
+			fout.write((char*)&(data), sizeof(data));
+			jcol++;
+		}
+	}
+	fout.close();
+
+}
 
 
 
