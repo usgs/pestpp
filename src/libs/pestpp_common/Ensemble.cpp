@@ -2752,8 +2752,6 @@ void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_v
 
 void ParameterEnsemble::to_binary(string file_name)
 {
-
-
 	ofstream fout(file_name, ios::binary);
 	if (!fout.good())
 	{
@@ -3156,44 +3154,69 @@ void ParameterEnsemble::transform_ip(transStatus to_tstat)
 	//transform the ensemble in place
 	if (to_tstat == tstat)
 		return;
+	
+	set<string> log_pars = par_transform.get_log10_ptr()->get_items();
+	set<string>::iterator log_end = log_pars.end();
+	int j = 0;
 	if ((to_tstat == transStatus::NUM) && (tstat == transStatus::CTL))
-	{
-		set<string> log_pars = par_transform.get_log10_ptr()->get_items();
-
-		vector<string> adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
-		Eigen::MatrixXd new_reals = Eigen::MatrixXd(shape().first, adj_par_names.size());
-		set<string> sadj_pars(adj_par_names.begin(), adj_par_names.end());
-		set<string>::iterator log_end = log_pars.end();
-		int new_j = 0;
-		Eigen::VectorXd t;
-		update_var_map();
-		for (auto& apar_name : adj_par_names)
+	{	
+		for (auto& var_name : var_names)
 		{
-			t = reals.col(var_map[apar_name]);
-			cout << t << endl << endl;
-			new_reals.col(new_j) = t;
-			if (log_pars.find(apar_name) != log_end)
+			if (log_pars.find(var_name) != log_end)
 			{
-				new_reals.col(new_j) = new_reals.col(new_j).array().log10();
+				reals.col(j) = reals.col(j).array().log10();
 			}
-			new_j++;
+			j++;
 		}
-		cout << reals << endl << endl;
-		cout << new_reals << endl << endl;
-		/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
-		vector<string> adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
-		Eigen::MatrixXd new_reals = Eigen::MatrixXd(shape().first, adj_par_names.size());
-		for (int ireal = 0; ireal < reals.rows(); ireal++)
+		
+		//set<string> log_pars = par_transform.get_log10_ptr()->get_items();
+		//set<string>::iterator log_end = log_pars.end();
+
+		//vector<string> adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
+		//Eigen::MatrixXd new_reals = Eigen::MatrixXd(shape().first, adj_par_names.size());
+		//set<string> sadj_pars(adj_par_names.begin(), adj_par_names.end());
+		//
+		//int new_j = 0;
+		//Eigen::VectorXd t;
+		//update_var_map();
+		//for (auto& apar_name : adj_par_names)
+		//{
+		//	new_reals.col(new_j) = reals.col(var_map[apar_name]);
+		//	if (log_pars.find(apar_name) != log_end)
+		//	{
+		//		new_reals.col(new_j) = new_reals.col(new_j).array().log10();
+		//	}
+		//	new_j++;
+		//}
+		////cout << reals << endl << endl;
+		////cout << new_reals << endl << endl;
+		///*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+		//vector<string> adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
+		//Eigen::MatrixXd new_reals = Eigen::MatrixXd(shape().first, adj_par_names.size());
+		//for (int ireal = 0; ireal < reals.rows(); ireal++)
+		//{
+		//	pars.update_without_clear(var_names, reals.row(ireal));
+		//	par_transform.ctl2numeric_ip(pars);
+		//	assert(pars.size() == adj_par_names.size());
+		//	new_reals.row(ireal) = pars.get_data_eigen_vec(adj_par_names);
+		//}
+		//cout << new_reals << endl;*/
+		//reals = new_reals;
+		//var_names = adj_par_names;
+		//update_var_map();
+		tstat = to_tstat;
+
+	}
+	else if ((to_tstat == transStatus::CTL) && (tstat == transStatus::NUM))
+	{
+		for (auto& var_name : var_names)
 		{
-			pars.update_without_clear(var_names, reals.row(ireal));
-			par_transform.ctl2numeric_ip(pars);
-			assert(pars.size() == adj_par_names.size());
-			new_reals.row(ireal) = pars.get_data_eigen_vec(adj_par_names);
+			if (log_pars.find(var_name) != log_end)
+			{
+				reals.col(j) = reals.col(j).array().pow(10);
+			}
+			j++;
 		}
-		cout << new_reals << endl;*/
-		reals = new_reals;
-		var_names = adj_par_names;
-		update_var_map();
 		tstat = to_tstat;
 
 	}
