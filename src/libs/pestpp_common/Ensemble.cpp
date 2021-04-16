@@ -3135,24 +3135,23 @@ void ParameterEnsemble::transform_ip(transStatus to_tstat)
 		set<string> log_pars = par_transform.get_log10_ptr()->get_items();
 
 		vector<string> adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
-		Eigen::MatrixXd new_reals1 = Eigen::MatrixXd(shape().first, adj_par_names.size());
+		Eigen::MatrixXd new_reals = Eigen::MatrixXd(shape().first, adj_par_names.size());
 		set<string> sadj_pars(adj_par_names.begin(), adj_par_names.end());
 		set<string>::iterator log_end = log_pars.end();
 		int new_j = 0;
 		for (auto& apar_name : adj_par_names)
 		{
-			Eigen::VectorXd t = reals.col(var_map[apar_name]);
-			new_reals1.col(new_j) = t;
+			new_reals.col(new_j) = reals.col(var_map[apar_name]);
 			if (log_pars.find(apar_name) != log_end)
 			{
-				new_reals1.col(new_j) = new_reals1.col(new_j).array().log10();
+				new_reals.col(new_j) = new_reals.col(new_j).array().log10();
 			}
 			new_j++;
 		}
-		cout << reals << endl << endl;
-		cout << new_reals1 << endl << endl;
-		Parameters pars = pest_scenario_ptr->get_ctl_parameters();
-		//vector<string> adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
+		//cout << reals << endl << endl;
+		//cout << new_reals1 << endl << endl;
+		/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+		vector<string> adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
 		Eigen::MatrixXd new_reals = Eigen::MatrixXd(shape().first, adj_par_names.size());
 		for (int ireal = 0; ireal < reals.rows(); ireal++)
 		{
@@ -3161,7 +3160,7 @@ void ParameterEnsemble::transform_ip(transStatus to_tstat)
 			assert(pars.size() == adj_par_names.size());
 			new_reals.row(ireal) = pars.get_data_eigen_vec(adj_par_names);
 		}
-		cout << new_reals << endl;
+		cout << new_reals << endl;*/
 		reals = new_reals;
 		var_names = adj_par_names;
 		tstat = to_tstat;
