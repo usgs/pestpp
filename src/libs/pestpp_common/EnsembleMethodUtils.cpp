@@ -4083,7 +4083,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		}
 	}
 	else
-		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, subset_idxs);
+ 		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, subset_idxs);
 
 	message(0, "evaluting upgrade ensembles");
 	message(1, "last mean: ", last_best_mean);
