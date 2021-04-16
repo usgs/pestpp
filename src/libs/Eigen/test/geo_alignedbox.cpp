@@ -15,8 +15,9 @@
 #include<iostream>
 using namespace std;
 
+// TODO not sure if this is actually still necessary anywhere ...
 template<typename T> EIGEN_DONT_INLINE
-void kill_extra_precision(T& x) { eigen_assert(&x != 0); }
+void kill_extra_precision(T& ) {  }
 
 
 template<typename BoxType> void alignedbox(const BoxType& _box)
@@ -24,7 +25,6 @@ template<typename BoxType> void alignedbox(const BoxType& _box)
   /* this test covers the following files:
      AlignedBox.h
   */
-  typedef typename BoxType::Index Index;  
   typedef typename BoxType::Scalar Scalar;
   typedef typename NumTraits<Scalar>::Real RealScalar;
   typedef Matrix<Scalar, BoxType::AmbientDimAtCompileTime, 1> VectorType;
@@ -48,12 +48,21 @@ template<typename BoxType> void alignedbox(const BoxType& _box)
   b0.extend(p0);
   b0.extend(p1);
   VERIFY(b0.contains(p0*s1+(Scalar(1)-s1)*p1));
+  VERIFY(b0.contains(b0.center()));
+  VERIFY_IS_APPROX(b0.center(),(p0+p1)/Scalar(2));
 
   (b2 = b0).extend(b1);
   VERIFY(b2.contains(b0));
   VERIFY(b2.contains(b1));
   VERIFY_IS_APPROX(b2.clamp(b0), b0);
 
+  // intersection
+  BoxType box1(VectorType::Random(dim));
+  box1.extend(VectorType::Random(dim));
+  BoxType box2(VectorType::Random(dim));
+  box2.extend(VectorType::Random(dim));
+
+  VERIFY(box1.intersects(box2) == !box1.intersection(box2).isEmpty()); 
 
   // alignment -- make sure there is no memory alignment assertion
   BoxType *bp0 = new BoxType(dim);
@@ -77,7 +86,6 @@ template<typename BoxType>
 void alignedboxCastTests(const BoxType& _box)
 {
   // casting  
-  typedef typename BoxType::Index Index;
   typedef typename BoxType::Scalar Scalar;
   typedef Matrix<Scalar, BoxType::AmbientDimAtCompileTime, 1> VectorType;
 

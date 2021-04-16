@@ -1599,8 +1599,8 @@ double  Constraints::ErfInv2(double x)
 
 	x = (1 - x) * (1 + x);        // x = 1 - x*x;
 	lnx = logf(x);
-	//double PI = 3.14159265358979323846;
-	tt1 = 2 / (M_PI * 0.147) + 0.5f * lnx;
+	double PI = 3.14159265358979323846;
+	tt1 = 2 / (PI * 0.147) + 0.5f * lnx;
 	tt2 = 1 / (0.147) * lnx;
 
 	return(sgn * sqrtf(-tt1 + sqrtf(tt1 * tt1 - tt2)));

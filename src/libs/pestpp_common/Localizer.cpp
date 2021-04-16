@@ -103,8 +103,13 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 	
 	map<string, vector<string>> pargp_map;
 	ParameterGroupInfo *pi = pest_scenario_ptr->get_base_group_info_ptr();
-
-	for (auto &pg : pest_scenario_ptr->get_ctl_ordered_par_group_names())
+	string gname;
+	for (auto& p : par_names)
+	{
+		gname = pi->get_group_name(p);
+		pargp_map[gname].push_back(p);
+	}
+	/*for (auto &pg : pest_scenario_ptr->get_ctl_ordered_par_group_names())
 	{
 
 		names.clear();
@@ -112,7 +117,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 			if (pi->get_group_name(p) == pg)
 				names.push_back(p);
 		pargp_map[pg] = names;
-	}
+	}*/
 
 	map<string, vector<string>> obgnme_map;
 	for (auto &og : pest_scenario_ptr->get_ctl_ordered_obs_group_names())
@@ -297,7 +302,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 			for (Eigen::SparseMatrix<double>::InnerIterator it(*mat.e_ptr(), k); it; ++it)
 			{
 				if (idx_map.find(it.col()) == idx_map.end())
-					idx_map[it.col()] = vector<int>{ it.row() };
+					idx_map[it.col()] = vector<int>{ (int)it.row() };
 				else
 					idx_map[it.col()].push_back(it.row());
 				//std::cout << "(" << it.row() << ","; // row index
@@ -328,7 +333,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 			for (Eigen::SparseMatrix<double>::InnerIterator it(*mat.e_ptr(), k); it; ++it)
 			{
 				if (idx_map.find(it.row()) == idx_map.end())
-					idx_map[it.row()] = vector<int>{ it.col() };
+					idx_map[it.row()] = vector<int>{ (int)it.col() };
 				else
 					idx_map[it.row()].push_back(it.col());
 				//std::cout << "(" << it.row() << ","; // row index
