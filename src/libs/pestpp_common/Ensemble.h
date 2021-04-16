@@ -25,6 +25,8 @@ public:
 	//Ensemble(Pest &_pest_scenario, FileManager &_file_manager,
 	//	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log, unsigned int = 1);
 	Ensemble(Pest* _pest_scenario, std::mt19937* _rand_gen_ptr);
+	Ensemble(Pest* _pest_scenario);
+
 	Ensemble(){ ; }
 
 	//Ensemble get(vector<string> &_real_names, vector<string> &_var_names);
@@ -46,7 +48,7 @@ public:
 	void extend_cols(Eigen::MatrixXd &_reals, const vector<string> &_var_names);
 	void add_2_cols_ip(Ensemble &other);
 	void add_2_cols_ip(const vector<string> &_var_names, const Eigen::MatrixXd &mat);
-	Ensemble zero_like();
+	Ensemble zeros_like(int nrow=-1);
 
 	void broadcast_vec2mat(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);
 
@@ -92,7 +94,7 @@ public:
 
 	Pest* get_pest_scenario_ptr() { return pest_scenario_ptr; }
 	Pest get_pest_scenario() { return *pest_scenario_ptr; }
-	void set_pest_scenario_ptr(Pest *_pest_scenario) { pest_scenario_ptr = _pest_scenario; }
+	void set_pest_scenario_ptr(Pest *_pest_scenario) { pest_scenario_ptr = _pest_scenario;}
 	void set_real_names(vector<string> &_real_names, bool update_org_names=false);
 	void check_for_dups();
 	void check_for_normal(string context="");
@@ -139,9 +141,11 @@ public:
 	*/
 	ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr);
 	ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
-
+	ParameterEnsemble(Pest* _pest_scenario);
 	ParameterEnsemble() { ; }
-	ParameterEnsemble zeros_like();
+	ParameterEnsemble zeros_like(int nrows = -1);
+
+
 	void set_zeros();
 	//ParameterEnsemble get_new(const vector<string> &_real_names, const vector<string> &_var_names);
 
@@ -158,6 +162,7 @@ public:
 	//Pest* get_pest_scenario_ptr() { return &pest_scenario; }
 	transStatus get_trans_status() const { return tstat; }
 	void set_trans_status(transStatus _tstat) { tstat = _tstat; }
+	void set_pest_scenario_ptr(Pest* _pest_scenario) { pest_scenario_ptr = _pest_scenario; par_transform = _pest_scenario->get_base_par_tran_seq(); }
 	ParamTransformSeq get_par_transform() const { return par_transform; }
 	void transform_ip(transStatus to_tstat);
 	void set_pest_scenario(Pest *_pest_scenario);
@@ -191,7 +196,7 @@ public:
 	*/
 	ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr);
 	ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
-
+	ObservationEnsemble(Pest* _pest_scenario);
 	ObservationEnsemble() { ; }
 	void to_binary(string filename) { Ensemble::to_binary(filename, true); }
 	void update_from_obs(int row_idx, Observations &obs);

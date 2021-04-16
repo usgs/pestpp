@@ -213,10 +213,14 @@ Constraints::Constraints(Pest& _pest_scenario, FileManager* _file_mgr_ptr, Outpu
 	:pest_scenario(_pest_scenario), file_mgr_ptr(_file_mgr_ptr), of_wr(_of_wr), pfm(_pfm), 
 	jco(*_file_mgr_ptr, _of_wr)
 {
+
 	use_fosm = false;
 	std_weights = false;
 	probit_val = 0.0;
 	stack_runs_processed = false;
+	stack_pe.set_pest_scenario_ptr(&_pest_scenario);
+	nested_pe.set_pest_scenario_ptr(&_pest_scenario);
+
 }
 
 
@@ -2464,8 +2468,8 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 
 		}
 		//clear these two out
-		nested_oe = ObservationEnsemble();
-		nested_pe = ParameterEnsemble();
+		nested_oe = ObservationEnsemble(&pest_scenario);
+		nested_pe = ParameterEnsemble(&pest_scenario);
 		nested_stack_stdev_summary(stack_oe_map);
 		
 

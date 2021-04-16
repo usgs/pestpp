@@ -2410,7 +2410,7 @@ ParameterEnsemble MOEA::generate_population()
 	objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, false);
 	for (auto gen_type : gen_types)
 	{
-		ParameterEnsemble p;
+		ParameterEnsemble p(&pest_scenario);
 		if (gen_type == MouGenType::DE)
 		{
 			p = generate_diffevol_population(new_members_per_gen, dp);

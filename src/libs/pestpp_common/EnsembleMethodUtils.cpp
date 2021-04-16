@@ -2533,7 +2533,7 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 		_oe.keep_rows(real_idxs);
 	}
 	vector<int> failed_real_indices;
-	ParameterEnsemble run_mgr_pe;
+	ParameterEnsemble run_mgr_pe = _pe.zeros_like(0);
 	try
 	{
 		failed_real_indices = _oe.update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe);
@@ -2620,7 +2620,7 @@ EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
 	OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 	RunManagerAbstract* _run_mgr_ptr, string _alg_tag) : alg_tag(_alg_tag), pest_scenario(_pest_scenario), file_manager(_file_manager),
 	output_file_writer(_output_file_writer), performance_log(_performance_log),
-	run_mgr_ptr(_run_mgr_ptr)
+	run_mgr_ptr(_run_mgr_ptr), pe(&_pest_scenario)
 {
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	subset_rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
@@ -2829,7 +2829,7 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 			if (failed_real_indices.size() == _oe.shape().first)
 			{
 				message(0, "WARNING: all realizations failed for lambda, scale :", rep_vals);
-				_oe = ObservationEnsemble();
+				_oe = ObservationEnsemble(&pest_scenario);
 
 			}
 			else
@@ -4089,7 +4089,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	message(1, "last mean: ", last_best_mean);
 	message(1, "last stdev: ", last_best_std);
 
-	ObservationEnsemble oe_lam_best;
+	ObservationEnsemble oe_lam_best(&pest_scenario);
 	bool echo = false;
 	if (verbose_level > 1)
 		echo = true;
@@ -4215,7 +4215,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		{
 			if (i == best_idx)
 				continue;
-			pe_lams[i] = ParameterEnsemble();
+			pe_lams[i] =pe.zeros_like(0);
 		}
 		//need to work out which par and obs en real names to run - some may have failed during subset testing...
 		ObservationEnsemble remaining_oe_lam = oe;//copy

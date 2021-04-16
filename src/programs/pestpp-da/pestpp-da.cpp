@@ -379,8 +379,8 @@ int main(int argc, char* argv[])
 		//generate a parent ensemble which includes all parameters across all cycles
 
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
-		ParameterEnsemble curr_pe;
-		ObservationEnsemble curr_oe;
+		ParameterEnsemble curr_pe(&pest_scenario);
+		ObservationEnsemble curr_oe(&pest_scenario);
 		generate_global_ensembles(da, fout_rec, curr_pe, curr_oe);
 		
 		//prepare a phi csv file for all cycles

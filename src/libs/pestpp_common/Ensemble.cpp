@@ -21,6 +21,10 @@ rand_gen_ptr(_rand_gen_ptr)
 {
 }
 
+Ensemble::Ensemble(Pest* _pest_scenario_ptr): pest_scenario_ptr(_pest_scenario_ptr)
+{
+}
+
 bool Ensemble::try_align_other_rows(PerformanceLog* performance_log, Ensemble& other)
 {
 	map<string, int> other_real_map = other.get_real_map(), this_real_map = get_real_map();
@@ -77,12 +81,20 @@ void Ensemble::reserve(vector<string> _real_names, vector<string> _var_names)
 	org_real_names = real_names;
 }
 
-Ensemble Ensemble::zero_like()
+Ensemble Ensemble::zeros_like(int nrows)
 {
-	Eigen::MatrixXd new_reals = Eigen::MatrixXd::Zero(real_names.size(), var_names.size());
-	Ensemble new_en(pest_scenario_ptr, rand_gen_ptr);
-	new_en.from_eigen_mat(new_reals, real_names, var_names);
+	if (nrows < 0)
+		nrows = real_names.size();
+	Eigen::MatrixXd new_reals = Eigen::MatrixXd::Zero(nrows, var_names.size());
+
+	vector<string> new_real_names;
+	for (int i = 0; i < nrows; i++)
+		new_real_names.push_back(real_names[i]);
+
+	ParameterEnsemble new_en(pest_scenario_ptr, rand_gen_ptr);
+	new_en.from_eigen_mat(new_reals, new_real_names, var_names);
 	return new_en;
+
 }
 
 void Ensemble::broadcast_vec2mat(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
@@ -2061,6 +2073,14 @@ ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _ra
 	tstat = transStatus::CTL;
 }
 
+ParameterEnsemble::ParameterEnsemble(Pest* _pest_scenario_ptr): 
+	Ensemble(_pest_scenario_ptr)
+{
+	par_transform = pest_scenario_ptr->get_base_par_tran_seq();
+	tstat = transStatus::CTL;
+}
+
+
 void ParameterEnsemble::draw_uniform(int num_reals, vector<string> par_names, PerformanceLog* plog, int level, ofstream& frec)
 {
 	var_names = par_names;
@@ -2193,13 +2213,19 @@ void ParameterEnsemble::set_zeros()
 	reals.setZero();
 }
 
-ParameterEnsemble ParameterEnsemble::zeros_like()
+ParameterEnsemble ParameterEnsemble::zeros_like(int nrows)
 {
-
-	Eigen::MatrixXd new_reals = Eigen::MatrixXd::Zero(real_names.size(), var_names.size());
+	if (nrows < 0)
+		nrows = real_names.size();
+	Eigen::MatrixXd new_reals = Eigen::MatrixXd::Zero(nrows, var_names.size());
 	
+	vector<string> new_real_names;
+	for (int i = 0; i < nrows; i++)
+		new_real_names.push_back(real_names[i]);
+
 	ParameterEnsemble new_en(pest_scenario_ptr, rand_gen_ptr);
-	new_en.from_eigen_mat(new_reals, real_names, var_names);
+	new_en.from_eigen_mat(new_reals, new_real_names, var_names);
+	new_en.set_trans_status(get_trans_status());
 	return new_en;
 
 
@@ -3139,17 +3165,21 @@ void ParameterEnsemble::transform_ip(transStatus to_tstat)
 		set<string> sadj_pars(adj_par_names.begin(), adj_par_names.end());
 		set<string>::iterator log_end = log_pars.end();
 		int new_j = 0;
+		Eigen::VectorXd t;
+		update_var_map();
 		for (auto& apar_name : adj_par_names)
 		{
-			new_reals.col(new_j) = reals.col(var_map[apar_name]);
+			t = reals.col(var_map[apar_name]);
+			cout << t << endl << endl;
+			new_reals.col(new_j) = t;
 			if (log_pars.find(apar_name) != log_end)
 			{
 				new_reals.col(new_j) = new_reals.col(new_j).array().log10();
 			}
 			new_j++;
 		}
-		//cout << reals << endl << endl;
-		//cout << new_reals1 << endl << endl;
+		cout << reals << endl << endl;
+		cout << new_reals << endl << endl;
 		/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 		vector<string> adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
 		Eigen::MatrixXd new_reals = Eigen::MatrixXd(shape().first, adj_par_names.size());
@@ -3163,6 +3193,7 @@ void ParameterEnsemble::transform_ip(transStatus to_tstat)
 		cout << new_reals << endl;*/
 		reals = new_reals;
 		var_names = adj_par_names;
+		update_var_map();
 		tstat = to_tstat;
 
 	}
@@ -3192,6 +3223,10 @@ ObservationEnsemble::ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937*
 	real_names = _real_names;
 }
 
+ObservationEnsemble::ObservationEnsemble(Pest* _pest_scenario): Ensemble(_pest_scenario)
+{
+
+}
 
 void ObservationEnsemble::initialize_without_noise(int num_reals)
 {

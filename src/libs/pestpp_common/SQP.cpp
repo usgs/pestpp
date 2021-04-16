@@ -3014,7 +3014,7 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 		if (failed_real_indices.size() == _oe.shape().first)
 		{
 			message(0, "WARNING: all dv candidate runs failed");
-			_oe = ObservationEnsemble();
+			_oe = ObservationEnsemble(&pest_scenario);
 
 		}
 		else
