@@ -3022,7 +3022,7 @@ void ParameterEnsemble::to_binary_ordered(string file_name)
 }
 
 
-void ParameterEnsemble::to_dense(string file_name)
+void ParameterEnsemble::to_dense_ordered(string file_name)
 {
 
 	ofstream fout(file_name, ios::binary);
@@ -3127,7 +3127,7 @@ void ParameterEnsemble::to_dense(string file_name)
 	fout.close();
 }
 
-void ParameterEnsemble::to_dense_unordered(string file_name)
+void ParameterEnsemble::to_dense(string file_name)
 {
 	ofstream fout(file_name, ios::binary);
 	if (!fout.good())

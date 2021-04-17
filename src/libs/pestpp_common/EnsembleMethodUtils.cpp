@@ -292,7 +292,7 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 			throw runtime_error(ss.str());
 		}
 		delete ut_ptr;
-		message(2, "threaded localized upgrade calculation done");
+		message(1, "upgrade calculation done");
 	}
 }
 
