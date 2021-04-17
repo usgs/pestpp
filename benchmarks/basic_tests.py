@@ -109,9 +109,9 @@ def basic_test(model_d="ies_10par_xsec"):
     m_d = os.path.join(model_d,"master_pestpp_sen")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
-    #pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-sen"), "pest.pst", 5, master_dir=m_d,
-    #                       worker_root=model_d,port=port)
-    pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-sen")),cwd=new_d)
+    pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-sen"), "pest.pst", 5, master_dir=m_d,
+                           worker_root=model_d,port=port,verbose=True)
+    #pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-sen")),cwd=new_d)
     df = pd.read_csv(os.path.join(new_d, "pest.mio"),index_col=0)
 
     # run sweep
@@ -119,22 +119,22 @@ def basic_test(model_d="ies_10par_xsec"):
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
     pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-swp"), "pest.pst", 5, master_dir=m_d,
-                           worker_root=model_d,port=port)
+                           worker_root=model_d,port=port,verbose=True)
     df = pd.read_csv(os.path.join(m_d, "sweep_out.csv"),index_col=0)
     
     m_d = os.path.join(model_d,"master_pestpp-glm")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
-    #pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-glm"), "pest.pst", 10, master_dir=m_d,
-    #                       worker_root=model_d,port=port)
-    pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-glm")),cwd=new_d)
+    pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-glm"), "pest.pst", 10, master_dir=m_d,
+                           worker_root=model_d,port=port,verbose=True)
+    #pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-glm")),cwd=new_d)
     df = pd.read_csv(os.path.join(new_d, "pest.mio"),index_col=0)
 
     m_d = os.path.join(model_d,"master_pestpp-ies")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
     pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 10, master_dir=m_d,
-                           worker_root=model_d,port=port)
+                           worker_root=model_d,port=port,verbose=True)
 
 
 
