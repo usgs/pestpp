@@ -38,11 +38,6 @@ def basic_test(model_d="ies_10par_xsec"):
         shutil.rmtree(new_d)
     shutil.copytree(base_d, new_d)
     print(platform.platform().lower())
-    local=True
-    #if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-    #    local=False
     pst = pyemu.Pst(os.path.join(new_d, "pest.pst"))
     print(pst.model_command)
     
@@ -98,32 +93,32 @@ def basic_test(model_d="ies_10par_xsec"):
     
 
     
-    # m_d = os.path.join(model_d,"master_pestpp_sen")
-    # if os.path.exists(m_d):
-    #     shutil.rmtree(m_d)
-    # pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-sen"), "pest.pst", 5, master_dir=m_d,
-    #                        worker_root=model_d,local=local,port=port)
-    # df = pd.read_csv(os.path.join(m_d, "pest.mio"),index_col=0)
+    m_d = os.path.join(model_d,"master_pestpp_sen")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-sen"), "pest.pst", 5, master_dir=m_d,
+                           worker_root=model_d,port=port)
+    df = pd.read_csv(os.path.join(m_d, "pest.mio"),index_col=0)
 
     # run sweep
     m_d = os.path.join(model_d,"master_sweep1")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
     pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-swp"), "pest.pst", 5, master_dir=m_d,
-                           worker_root=model_d,local=local,port=port)
+                           worker_root=model_d,port=port)
     df = pd.read_csv(os.path.join(m_d, "sweep_out.csv"),index_col=0)
     
     m_d = os.path.join(model_d,"master_pestpp-glm")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
     pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-glm"), "pest.pst", 10, master_dir=m_d,
-                           worker_root=model_d,local=local,port=port)
+                           worker_root=model_d,port=port)
 
     m_d = os.path.join(model_d,"master_pestpp-ies")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
     pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 10, master_dir=m_d,
-                           worker_root=model_d,local=local,port=port)
+                           worker_root=model_d,port=port)
 
 
 
