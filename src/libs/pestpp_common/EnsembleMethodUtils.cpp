@@ -3447,7 +3447,6 @@ void EnsembleMethod::initialize(int cycle)
 	{
 		performance_log->log_event("running initial ensemble");
 		message(1, "running initial ensemble of size", oe.shape().first);
-		cout << pe.get_eigen() << endl;
 		vector<int> failed = run_ensemble(pe, oe, vector<int>(),cycle);
 		if (pe.shape().first == 0)
 			throw_em_error("all realizations failed during initial evaluation");
