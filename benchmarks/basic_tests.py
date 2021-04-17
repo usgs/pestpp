@@ -28,7 +28,7 @@ exe_path = os.path.join(bin_path, "pestpp-ies" + exe)
 
 noptmax = 4
 num_reals = 20
-port = 4021
+port = 4016
 
 def basic_test(model_d="ies_10par_xsec"):
     pyemu.Ensemble.reseed()
@@ -1061,7 +1061,7 @@ if __name__ == "__main__":
     #parchglim_test()
     #unc_file_test()
     #secondary_marker_test()
-    #basic_test("ies_10par_xsec")
+    basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
@@ -1090,4 +1090,4 @@ if __name__ == "__main__":
     #cmdline_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #basic_sqp_test()
-    mf6_v5_ies_test()
+    #mf6_v5_ies_test()
