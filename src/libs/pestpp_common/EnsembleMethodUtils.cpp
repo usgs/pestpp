@@ -2993,10 +2993,10 @@ void EnsembleMethod::initialize(int cycle)
 
 		Parameters pars = pest_scenario.get_ctl_parameters();
 		ParamTransformSeq pts = pe.get_par_transform();
-
+		pts.ctl2numeric_ip(pars);
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
-		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_par_names());
-		_pe.set_trans_status(ParameterEnsemble::transStatus::CTL);
+		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_adj_par_names());
+		_pe.set_trans_status(ParameterEnsemble::transStatus::NUM);
 		_pe.append(BASE_REAL_NAME, pars);
 		string par_csv = file_manager.get_base_filename() + ".par.csv";
 		//message(1, "saving parameter values to ", par_csv);

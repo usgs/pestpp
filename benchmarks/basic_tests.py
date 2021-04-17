@@ -39,10 +39,10 @@ def basic_test(model_d="ies_10par_xsec"):
     shutil.copytree(base_d, new_d)
     print(platform.platform().lower())
     local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
+    #if "linux" in platform.platform().lower() and "10par" in model_d:
         #print("travis_prep")
         #prep_for_travis(model_d)
-        local=False
+    #    local=False
     pst = pyemu.Pst(os.path.join(new_d, "pest.pst"))
     print(pst.model_command)
     
@@ -1061,7 +1061,7 @@ if __name__ == "__main__":
     #parchglim_test()
     #unc_file_test()
     #secondary_marker_test()
-    basic_test("ies_10par_xsec")
+    #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
@@ -1076,7 +1076,7 @@ if __name__ == "__main__":
 
     #da_prep_4_freyberg_batch()
     # da_prep_4_mf6_freyberg_seq()
-    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sen.exe"),os.path.join("..","bin","pestpp-sen.exe"))
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sen.exe"),os.path.join("..","bin","pestpp-sen.exe"))
     basic_test()
     # da_mf6_freyberg_smoother_test()
     # da_mf6_freyberg_test_1()
