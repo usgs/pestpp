@@ -19,12 +19,25 @@ bin_path = os.path.abspath("test_bin")
 os.environ["PATH"] += os.pathsep + bin_path
 
 
-bin_path = os.path.join("..","..","..","bin")
-exe = ""
-if "windows" in platform.platform().lower():
-    exe = ".exe"
-exe_path = os.path.join(bin_path, "pestpp-ies" + exe)
+# bin_path = os.path.join("..","..","..","bin")
+# exe = ""
+# if "windows" in platform.platform().lower():
+#     exe = ".exe"
+# exe_path = os.path.join(bin_path, "pestpp-ies" + exe)
 
+# case of either appveyor, travis or local
+if os.path.exists(os.path.join("pestpp","bin")):
+    bin_path = os.path.join("..","..","pestpp","bin")
+else:
+    bin_path = os.path.join("..","..","..","..","pestpp","bin")
+
+        
+if "windows" in platform.platform().lower():
+    exe_path = os.path.join(bin_path, "win", "pestpp-ies.exe")
+elif "darwin" in platform.platform().lower():
+    exe_path = os.path.join(bin_path,  "mac", "pestpp-ies")
+else:
+    exe_path = os.path.join(bin_path, "linux", "pestpp-ies")
 
 noptmax = 4
 num_reals = 20
