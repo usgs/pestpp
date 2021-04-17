@@ -1076,7 +1076,8 @@ if __name__ == "__main__":
 
     #da_prep_4_freyberg_batch()
     # da_prep_4_mf6_freyberg_seq()
-    # shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-da.exe"),os.path.join("..","bin","pestpp-da.exe"))
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sen.exe"),os.path.join("..","bin","pestpp-sen.exe"))
+    basic_test()
     # da_mf6_freyberg_smoother_test()
     # da_mf6_freyberg_test_1()
 
@@ -1090,4 +1091,4 @@ if __name__ == "__main__":
     #cmdline_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #basic_sqp_test()
-    mf6_v5_ies_test()
+    #mf6_v5_ies_test()

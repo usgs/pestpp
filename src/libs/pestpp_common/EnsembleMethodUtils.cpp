@@ -4001,7 +4001,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 				pe_lam_scale.to_dense(ss.str() + ".bin");
 				pe_filenames.push_back(ss.str() + ".bin");
 				pe_lam_scale.keep_rows(subset_idxs);
-				performance_log->log_event("'ies_upgrades_in_memory' is 'false', upgrade ensemble saved to " + ss.str() + ".bin");
+				message(1,"upgrade ensemble saved to " + ss.str() + ".bin");
 
 			}
 			else if (!pest_scenario.get_pestpp_options().get_ies_upgrades_in_memory())
