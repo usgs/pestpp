@@ -3162,7 +3162,7 @@ void EnsembleMethod::initialize(int cycle)
 	}
 	else
 		pe_drawn = initialize_pe(parcov);
-
+	
 	if (pest_scenario.get_pestpp_options().get_ies_use_prior_scaling())
 	{
 		message(1, "forming inverse sqrt of prior parameter covariance matrix");
@@ -3447,6 +3447,7 @@ void EnsembleMethod::initialize(int cycle)
 	{
 		performance_log->log_event("running initial ensemble");
 		message(1, "running initial ensemble of size", oe.shape().first);
+		cout << pe.get_eigen() << endl;
 		vector<int> failed = run_ensemble(pe, oe, vector<int>(),cycle);
 		if (pe.shape().first == 0)
 			throw_em_error("all realizations failed during initial evaluation");

@@ -2892,6 +2892,7 @@ void ParameterEnsemble::to_binary(string file_name)
 	}
 	//save observation names (part 2 prior information)
 	fout.close();
+	transform_ip(transStatus::NUM);
 }
 
 void ParameterEnsemble::to_binary_ordered(string file_name)
@@ -3242,6 +3243,7 @@ void ParameterEnsemble::to_dense(string file_name)
 		}
 	}
 	fout.close();
+	transform_ip(transStatus::NUM);
 
 }
 
@@ -3474,7 +3476,7 @@ void ParameterEnsemble::transform_ip(transStatus to_tstat)
 		{
 			if (log_pars.find(var_name) != log_end)
 			{
-				reals.col(j) = reals.col(j).array().pow(10);
+				reals.col(j) = Eigen::pow(10,reals.col(j).array());
 			}
 			j++;
 		}

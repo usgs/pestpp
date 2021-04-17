@@ -28,7 +28,7 @@ exe_path = os.path.join(bin_path, "pestpp-ies" + exe)
 
 noptmax = 4
 num_reals = 20
-port = 4016
+port = 4021
 
 def basic_test(model_d="ies_10par_xsec"):
     pyemu.Ensemble.reseed()
@@ -98,12 +98,12 @@ def basic_test(model_d="ies_10par_xsec"):
     
 
     
-    m_d = os.path.join(model_d,"master_pestpp_sen")
-    if os.path.exists(m_d):
-        shutil.rmtree(m_d)
-    pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-sen"), "pest.pst", 5, master_dir=m_d,
-                           worker_root=model_d,local=local,port=port)
-    df = pd.read_csv(os.path.join(m_d, "pest.mio"),index_col=0)
+    # m_d = os.path.join(model_d,"master_pestpp_sen")
+    # if os.path.exists(m_d):
+    #     shutil.rmtree(m_d)
+    # pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-sen"), "pest.pst", 5, master_dir=m_d,
+    #                        worker_root=model_d,local=local,port=port)
+    # df = pd.read_csv(os.path.join(m_d, "pest.mio"),index_col=0)
 
     # run sweep
     m_d = os.path.join(model_d,"master_sweep1")
@@ -1076,7 +1076,7 @@ if __name__ == "__main__":
 
     #da_prep_4_freyberg_batch()
     # da_prep_4_mf6_freyberg_seq()
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sen.exe"),os.path.join("..","bin","pestpp-sen.exe"))
+    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sen.exe"),os.path.join("..","bin","pestpp-sen.exe"))
     basic_test()
     # da_mf6_freyberg_smoother_test()
     # da_mf6_freyberg_test_1()
