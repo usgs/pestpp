@@ -2785,7 +2785,7 @@ void ParameterEnsemble::to_binary(string file_name)
 			t_names.push_back(name);
 		else
 		{
-			throw_ensemble_error("ParameterEnsemble::to_binary_unordered()::unsupported transform for parameter '" + name + "'");
+			//throw_ensemble_error("ParameterEnsemble::to_binary_unordered()::unsupported transform for parameter '" + name + "'");
 		}
 	}
 	//this order matters!
