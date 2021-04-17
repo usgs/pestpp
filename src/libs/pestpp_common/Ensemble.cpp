@@ -3178,7 +3178,7 @@ void ParameterEnsemble::to_dense(string file_name)
 	Parameters ctl_pars = pest_scenario_ptr->get_ctl_parameters();
 	map<string, TranTied::pair_string_double> tied_items = par_transform.get_tied_ptr()->get_items();
 	int n_real = reals.rows();
-	int n_var = var_names.size();
+	int n_var = vnames.size();
 	int n = -1 * n_var;
 	fout.write((char*)&n, sizeof(n));
 	fout.write((char*)&n, sizeof(n));
@@ -3217,7 +3217,7 @@ void ParameterEnsemble::to_dense(string file_name)
 		fout.write((char*)&tmp, sizeof(tmp));
 		pest_utils::string_to_fortran_char(name, real_name, tmp);
 		fout.write(real_name, tmp);
-		for (int jcol = 0; jcol < n_var; ++jcol)
+		for (int jcol = 0; jcol < var_names.size(); ++jcol)
 		{
 			data = t[jcol];
 			fout.write((char*)&(data), sizeof(data));
