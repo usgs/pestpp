@@ -2856,7 +2856,10 @@ void ParameterEnsemble::to_binary(string file_name)
 			{
 				data = fixed_map.at(p);
 			}
-			fout.write((char*) &(n), sizeof(n));
+			n = irow;
+			fout.write((char*)&(n), sizeof(n));
+			n = jcol;
+			fout.write((char*)&(n), sizeof(n));
 			fout.write((char*) &(data), sizeof(data));
 			jcol++;
 		}
@@ -2865,6 +2868,9 @@ void ParameterEnsemble::to_binary(string file_name)
 		{
 			n = irow + 1 + (jcol * n_real);
 			data = t[var_map[tied_items.at(tname).first]] * tied_items.at(tname).second;
+			n = irow;
+			fout.write((char*)&(n), sizeof(n));
+			n = jcol;
 			fout.write((char*)&(n), sizeof(n));
 			fout.write((char*)&(data), sizeof(data));
 			jcol++;
