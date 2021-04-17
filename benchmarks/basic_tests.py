@@ -140,11 +140,6 @@ def basic_test(model_d="ies_10par_xsec"):
 
 def glm_save_binary_test():
     model_d = "ies_10par_xsec"
-    local = True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        # print("travis_prep")
-        # prep_for_travis(model_d)
-        local = False
 
     t_d = os.path.join(model_d, "template")
     m_d = os.path.join(model_d, "master_save_binary")
@@ -155,19 +150,13 @@ def glm_save_binary_test():
     pst.control_data.noptmax = 1
     pst.write(os.path.join(t_d, "pest_save_binary.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-glm"), "pest_save_binary.pst", 10, master_dir=m_d,
-                                worker_root=model_d, local=local, port=port)
+                                worker_root=model_d, port=port)
 
     pe = pyemu.ParameterEnsemble.from_binary(pst=pst,filename=os.path.join(m_d,"pest_save_binary.post.paren.jcb"))
     pe = pyemu.ObservationEnsemble.from_binary(pst=pst,filename=os.path.join(m_d, "pest_save_binary.post.obsen.jcb"))
 
 def sweep_forgive_test():
     model_d = "ies_10par_xsec"
-    local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-        local=False
-    
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_sweep_forgive")
     if os.path.exists(m_d):
@@ -179,7 +168,7 @@ def sweep_forgive_test():
     pst.pestpp_options["sweep_forgive"] = True
     pst.write(os.path.join(t_d,"pest_forgive.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_forgive.pst", 10, master_dir=m_d,
-                           worker_root=model_d,local=local,port=port)
+                           worker_root=model_d,port=port)
     df1 = pd.read_csv(os.path.join(m_d, "sweep_out.csv"),index_col=0)
 
     pe = pe.loc[:,pst.par_names[:2]]
@@ -187,7 +176,7 @@ def sweep_forgive_test():
     pst.pestpp_options["sweep_forgive"] = True
     pst.write(os.path.join(t_d,"pest_forgive.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_forgive.pst", 10, master_dir=m_d,
-                           worker_root=model_d,local=local,port=port)
+                           worker_root=model_d,port=port)
     df2 = pd.read_csv(os.path.join(m_d, "sweep_out.csv"),index_col=0)
     diff = df1 - df2
     print(diff.max())
@@ -196,11 +185,6 @@ def sweep_forgive_test():
 
 def inv_regul_test():
     model_d = "ies_10par_xsec"
-    local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-        local=False
     
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_inv_regul")
@@ -214,16 +198,11 @@ def inv_regul_test():
     pst.control_data.noptmax = 10
     pst.write(os.path.join(t_d,"pest_regul.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-glm"), "pest_regul.pst", 10, master_dir=m_d,
-                           worker_root=model_d,local=local,port=port)
+                           worker_root=model_d,port=port)
     
 
 def tie_by_group_test():
     model_d = "ies_10par_xsec"
-    local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-        local=False
     
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_tie_by_group")
@@ -249,7 +228,7 @@ def tie_by_group_test():
 
     pst.write(os.path.join(t_d,"pest_tied.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sen"), "pest_tied.pst", 5, master_dir=m_d,
-                           worker_root=model_d,local=local,port=port)
+                           worker_root=model_d,port=port)
     df = pd.read_csv(os.path.join(m_d,"pest_tied.sen.par.csv"),index_col=0)
     df.columns = df.columns.str.lower()
     print(df.loc[:,tied_names[1:3]])
@@ -264,7 +243,7 @@ def tie_by_group_test():
     
     #pst.write(os.path.join(t_d,"pest_tied.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-glm"), "pest_tied.pst", 5, master_dir=m_d,
-                           worker_root=model_d,local=local,port=port)
+                           worker_root=model_d,port=port)
     jco = pyemu.Jco.from_binary(os.path.join(m_d,"pest_tied.jcb"))
     assert jco.shape[1] == 2,jco.shape
     par_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_tied.par"))
@@ -279,7 +258,7 @@ def tie_by_group_test():
     pst.write(os.path.join(t_d, "pest_tied.pst"))
 
     pyemu.os_utils.start_workers(t_d, exe_path, "pest_tied.pst", 10, master_dir=m_d,
-                           worker_root=model_d,local=local,port=port)
+                           worker_root=model_d,port=port)
     
     for nopt in range(pst.control_data.noptmax+1):
         df = pd.read_csv(os.path.join(m_d,"pest_tied.{0}.par.csv".format(nopt)),index_col=0)
@@ -309,7 +288,7 @@ def tie_by_group_test():
     pst.write(os.path.join(t_d, "pest_tied.pst"))
 
     pyemu.os_utils.start_workers(t_d, exe_path, "pest_tied.pst", 10, master_dir=m_d,
-                                worker_root=model_d, local=local, port=port)
+                                worker_root=model_d, port=port)
     df = pd.read_csv(os.path.join(m_d, "pest_tied.{0}.par.csv".format(pst.control_data.noptmax)), index_col=0)
     df.columns = df.columns.str.lower()
     print(df.loc[:, tied_names].std(axis=1).apply(np.abs).max())
@@ -322,12 +301,12 @@ def tie_by_group_test():
     
     df.to_csv(os.path.join(t_d,"sweep_in.csv"))
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_tied.pst", 5, master_dir=m_d,
-                           worker_root=model_d,local=local,port=port)
+                           worker_root=model_d,port=port)
     pst.control_data.noptmax = 3
     pst.pestpp_options["enforce_tied_bounds"] = False
     pst.write(os.path.join(t_d, "pest_tied.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-glm"), "pest_tied.pst", 5, master_dir=m_d,
-                           worker_root=model_d,local=local,port=port)
+                           worker_root=model_d,port=port)
     jco = pyemu.Jco.from_binary(os.path.join(m_d,"pest_tied.jcb"))
     assert jco.shape[1] == 2,jco.shape
 
@@ -335,11 +314,6 @@ def tie_by_group_test():
 
 def unc_file_test():
     model_d = "ies_10par_xsec"
-    local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-        local=False
     
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_uncfile")
@@ -378,11 +352,6 @@ def unc_file_test():
 
 def parchglim_test():
     model_d = "ies_10par_xsec"
-    local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-        local=False
     
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_parchglim")
@@ -496,11 +465,7 @@ def parchglim_test():
     
 def sen_plusplus_test():
     model_d = "ies_10par_xsec"
-    local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-        local=False
+
     
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_sen_plusplus")
@@ -516,7 +481,7 @@ def sen_plusplus_test():
     pst.pestpp_options["gsa_morris_delta"] = 2
     pst.write(os.path.join(t_d,"pest_sen.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sen"), "pest_sen.pst", 5, master_dir=m_d,
-                           worker_root=model_d,local=local,port=port)
+                           worker_root=model_d,port=port)
 
 def secondary_marker_test():
     t_d = os.path.join("secondary_marker_test","template")
@@ -560,16 +525,11 @@ def secondary_marker_test():
     os.chdir(b_d)
 
 def sen_basic_test():
-    local = True
     model_d = "sen_invest"
     t_d = os.path.join(model_d, "template")
     if os.path.exists(t_d):
         shutil.rmtree(t_d)
     os.makedirs(t_d)
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        # print("travis_prep")
-        # prep_for_travis(model_d)
-        local = False
     par_names = ["p1","p2"]
     obs_names = ["p1","p2","p1+p2","p1*p2","p1^p2","const"]
 
@@ -639,7 +599,7 @@ def sen_basic_test():
     #pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies", "-sen")), cwd=t_d)
     m_d = os.path.join(model_d,"master_sobol")
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-sen"), "pest.pst", 5, master_dir=m_d,
-                                 worker_root=model_d, local=local, port=port)
+                                 worker_root=model_d, port=port)
     si_vals = pd.read_csv(os.path.join(m_d,"pest.sobol.si.csv"),index_col=0)
     sti_vals = pd.read_csv(os.path.join(m_d,"pest.sobol.sti.csv"),index_col=0)
     v_d = os.path.join("sen_invest","verf")
@@ -786,11 +746,6 @@ def tplins1_test():
 
 def ext_stdcol_test():
     model_d = "ies_10par_xsec"
-    local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-        local=False
     
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_ext_stdcol")
@@ -859,12 +814,7 @@ def ext_stdcol_test():
 
 def mf6_v5_ies_test():
     model_d = "mf6_freyberg"
-    local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-        local=False
-    
+
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_ies_glm_loc")
     if os.path.exists(m_d):
@@ -950,12 +900,7 @@ def mf6_v5_ies_test():
 
 def mf6_v5_sen_test():
     model_d = "mf6_freyberg"
-    local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-        local=False
-    
+
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_sen")
     if os.path.exists(m_d):
@@ -976,11 +921,6 @@ def mf6_v5_sen_test():
 
 def mf6_v5_opt_stack_test():
     model_d = "mf6_freyberg"
-    local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-        local=False
     
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_opt_stack")
@@ -998,11 +938,7 @@ def mf6_v5_opt_stack_test():
 
 def mf6_v5_glm_test():
     model_d = "mf6_freyberg"
-    local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-        local=False
+    
     
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_glm")
@@ -1023,11 +959,7 @@ def mf6_v5_glm_test():
 
 def cmdline_test():
     model_d = "mf6_freyberg"
-    local=True
-    if "linux" in platform.platform().lower() and "10par" in model_d:
-        #print("travis_prep")
-        #prep_for_travis(model_d)
-        local=False
+
     
     t_d = os.path.join(model_d,"template")
     pst_name = "freyberg6_run_glm.pst"
