@@ -1153,7 +1153,7 @@ void LinearAnalysis::write_par_credible_range(ofstream &fout, string sum_filenam
 
 			fout << setw(20) << pest_utils::lower_cp(pname) << setw(20) << value << setw(20) << stdev << setw(20) <<
 				value - (2.0*stdev) << setw(20) << value + (2.0*stdev);
-			sout << pname << "," << value << "," << stdev << "," <<
+			sout << pest_utils::lower_cp(pname) << "," << value << "," << stdev << "," <<
 				value - (2.0*stdev) << "," << value + (2.0*stdev);
 
 			//posterior
@@ -1222,7 +1222,7 @@ void LinearAnalysis::write_pred_credible_range(ofstream &fout, string sum_filena
 		upper = val + (2.0 * stdev);
 		fout << setw(20) << pest_utils::lower_cp(pred.first) << setw(20) << val << setw(20) << stdev;
 		fout << setw(20) << lower << setw(20) << upper;
-		sout << pred.first << "," << val << "," << stdev;
+		sout << pest_utils::lower_cp(pred.first) << "," << val << "," << stdev;
 		sout << "," << lower << "," << upper;
 
 		val = init_final_pred_values[pred.first].second;
