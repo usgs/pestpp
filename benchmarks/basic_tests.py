@@ -128,7 +128,7 @@ def basic_test(model_d="ies_10par_xsec"):
     pyemu.os_utils.start_workers(new_d, exe_path.replace("-ies","-glm"), "pest.pst", 10, master_dir=m_d,
                            worker_root=model_d,port=port,verbose=True)
     #pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-glm")),cwd=new_d)
-    df = pd.read_csv(os.path.join(m_d, "pest.par.usum"),index_col=0)
+    df = pd.read_csv(os.path.join(m_d, "pest.par.usum.csv"),index_col=0)
 
     m_d = os.path.join(model_d,"master_pestpp-ies")
     if os.path.exists(m_d):
