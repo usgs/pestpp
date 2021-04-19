@@ -4035,6 +4035,14 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	if (pest_scenario.get_pestpp_options().get_ies_debug_upgrade_only())
 	{
 		message(0, "ies_debug_upgrade_only is true, exiting");
+		if (pe_filenames.size() > 0)
+		{
+			message(1, "firstattempting to load upgrade ensemble " + pe_filenames[0]);
+			performance_log->log_event("loading dense pe upgrade ensemble");
+			ParameterEnsemble remaining_pe_lam(&pest_scenario);
+			remaining_pe_lam.from_binary(pe_filenames[0]);
+			remaining_pe_lam.transform_ip(ParameterEnsemble::transStatus::NUM);
+		}
 		throw_em_error("ies_debug_upgrade_only is true, exiting");
 	}
 
