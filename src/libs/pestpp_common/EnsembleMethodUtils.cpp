@@ -185,7 +185,7 @@ void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form
 
 void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map)
 {
-	message(1, "starting solve for lambda", cur_lam);
+	//message(1, "starting solve for lambda", cur_lam);
 	if (use_glm_form)
 		message(1, "using glm form");
 	else
@@ -3309,6 +3309,16 @@ void EnsembleMethod::initialize(int cycle)
 			pest_scenario.get_pestpp_options_ptr()->set_ies_ordered_binary(false);
 		}
 	}
+
+	if ((pp_args.find("IES_UPGRADES_IN_MEMORY") == pp_args.end()) && (pp_args.find("DA_UPGRADES_IN_MEMORY") == pp_args.end()))
+	{
+		if (pe.shape().second > 100000)
+		{
+			message(1, "'ies_upgrades_in_memory' was not passed, but num adj pars > 100,000, changing ies_upgrades_in_memory to false...");
+			pest_scenario.get_pestpp_options_ptr()->set_ies_upgrades_in_memory(false);
+		}
+	}
+
 
 	message(2, "checking for denormal values in pe");
 	pe.check_for_normal("initial transformed parameter ensemble");

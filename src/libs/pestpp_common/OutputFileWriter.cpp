@@ -354,14 +354,17 @@ void OutputFileWriter::scenario_io_report(std::ostream &os)
 void OutputFileWriter::scenario_pargroup_report(std::ostream &os)
 {
 	const ParameterGroupRec *grp_rec;
-
+	int grp_len = 12;
+	for (auto& par_name : pest_scenario.get_ctl_ordered_par_group_names())
+		grp_len = max((int)par_name.size(), grp_len);
+	grp_len++;
 	os << "Parameter group information" << endl;
-	os << left << setw(15) << "NAME" << right << setw(15) << "INCREMENT TYPE" << setw(25) << "DERIVATIVE INCREMENT";
+	os << left << setw(grp_len) << "NAME" << right << setw(15) << "INCREMENT TYPE" << setw(25) << "DERIVATIVE INCREMENT";
 	os << setw(25) << "INCREMENT LOWER BOUND" << setw(15) << "FORCE CENTRAL" << setw(25) << "INCREMENT MULTIPLIER" << endl;
 	for (auto &grp_name : pest_scenario.get_ctl_ordered_par_group_names())
 	{
 		grp_rec = pest_scenario.get_base_group_info().get_group_by_groupname(grp_name);
-		os << left << setw(15) << lower_cp(grp_rec->name) << right << setw(15) << grp_rec->inctyp << setw(25) << grp_rec->derinc;
+		os << left << setw(grp_len) << lower_cp(grp_rec->name) << right << setw(15) << grp_rec->inctyp << setw(25) << grp_rec->derinc;
 		os << setw(25) << grp_rec->derinclb << setw(15) << grp_rec->forcen << setw(25) << grp_rec->derincmul << endl;
 	}
 	os << endl << endl;
@@ -379,6 +382,10 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 	trans_type[1] = "fixed";
 	trans_type[2] = "tied";
 	trans_type[3] = "log";
+	int grp_len = 12;
+	for (auto& par_name : pest_scenario.get_ctl_ordered_par_group_names())
+		grp_len = max((int)par_name.size(), grp_len);
+	grp_len++;
 	int par_len = 12;
 	for (auto& par_name : pest_scenario.get_ctl_ordered_par_names())
 		par_len = max((int)par_name.size(), par_len);
@@ -386,7 +393,7 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 	os << endl << "Parameter information" << endl;
 	os << left << setw(par_len) << "NAME" << setw(10) << "TRANSFORMATION" << right << setw(20) << "CHANGE LIMIT" << setw(15) << "INITIAL VALUE";
 	os << setw(15) << "LOWER BOUND";
-	os << setw(15) << "UPPER BOUND" << setw(15) << "GROUP";
+	os << setw(15) << "UPPER BOUND" << setw(grp_len) << "GROUP";
 
 	os << setw(15) << "SCALE" << setw(15) << "OFFSET" << setw(20) << "DERIVATIVE COMMAND" << endl;
 	const ParameterRec* par_rec;
@@ -399,7 +406,7 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 		os << setw(15) << par_rec->init_value;
 		os << setw(15) << par_rec->lbnd;
 		os << setw(15) << par_rec->ubnd;
-		os << setw(15) << lower_cp(par_rec->group);
+		os << setw(grp_len) << lower_cp(par_rec->group);
 		os << setw(15) << par_rec->scale;
 		os << setw(15) << par_rec->offset;
 		os << setw(20) << par_rec->dercom << endl;
@@ -432,8 +439,12 @@ void OutputFileWriter::scenario_obs_report(std::ostream &os)
 	for (auto& obs_name : pest_scenario.get_ctl_ordered_obs_names())
 		obs_len = max((int)obs_name.size(), obs_len);
 	obs_len++;
+	int grp_len = 20;
+	for (auto& obs_name : pest_scenario.get_ctl_ordered_obs_group_names())
+		grp_len = max((int)obs_name.size(), grp_len);
+	grp_len++;
 	os << endl << "Observation information" << endl;
-	os << left << setw(obs_len) << "NAME" << right << setw(20) << "VALUE" << setw(20) << "GROUP" << setw(20) << "WEIGHT" << endl;
+	os << left << setw(obs_len) << "NAME" << right << setw(20) << "VALUE" << setw(grp_len) << "GROUP" << setw(20) << "WEIGHT" << endl;
 	const ObservationRec* obs_rec;
 	const Observations &obs = pest_scenario.get_ctl_observations();
 	for (auto &obs_name : pest_scenario.get_ctl_ordered_obs_names())
@@ -441,7 +452,7 @@ void OutputFileWriter::scenario_obs_report(std::ostream &os)
 		obs_rec = pest_scenario.get_ctl_observation_info().get_observation_rec_ptr(obs_name);
 		os << left << setw(obs_len) << lower_cp(obs_name);
 		os << right << setw(20) << obs.get_rec(obs_name);
-		os << setw(20) << lower_cp(obs_rec->group);
+		os << setw(grp_len) << lower_cp(obs_rec->group);
 		os << setw(20) << obs_rec->weight << endl;
 	}
 	os << endl << endl;
