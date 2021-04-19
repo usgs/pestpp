@@ -3796,6 +3796,7 @@ void EnsembleMethod::initialize_dynamic_states()
 bool EnsembleMethod::solve_glm()
 {
 	vector<double> lambdas = lam_mults;
+	message(1, "current lambda: ", last_best_lam);
 	for (auto& m : lambdas)
 		m *= last_best_lam;
 
@@ -4175,14 +4176,11 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		{
 			//ph.update(oe_lams[best_idx],pe_lams[best_idx]);
 
-			double new_lam = last_best_lam * lam_inc;
-			new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
-			last_best_lam = new_lam;
+			
 			ss.str("");
 			ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
 			string m = ss.str();
 			message(0, m);
-			message(1, "abandoning current upgrade ensembles, returning to upgrade calculations and increasing lambda to ", new_lam);
 			message(1, "updating realizations with reduced phi");
 			if (!use_mda)
 			{
@@ -4204,7 +4202,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 					{
 						double new_lam = lam_vals[best_idx] * lam_dec;
 						new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
-						message(0, "updating lambda to ", new_lam);
+						message(0, "partial update improved phi stats, updating lambda to ", new_lam);
 						last_best_lam = new_lam;
 					}
 					else
@@ -4213,6 +4211,14 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 					}
 					last_best_std = best_std;
 				}
+			}
+			else
+			{
+				double new_lam = last_best_lam * lam_inc;
+				new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
+				last_best_lam = new_lam;
+				message(1, "abandoning current upgrade ensembles, returning to upgrade calculations and increasing lambda to ", new_lam);
+
 			}
 			message(1, "returing to upgrade calculations...");
 			return false;
