@@ -3301,6 +3301,15 @@ void EnsembleMethod::initialize(int cycle)
 			frec << ma << endl;
 	}
 
+	if ((pp_args.find("IES_ORDERED_BINARY") == pp_args.end()) && (pp_args.find("DA_ORDERED_BINARY") == pp_args.end()))
+	{
+		if ((pe.shape().second > 100000) && (pest_scenario.get_pestpp_options().get_save_binary()))
+		{
+			message(1, "'ies_ordered_binary' was not passed, but 'ies_save_binary' is true and num adj pars > 100,000, changing to unordered binary...");
+			pest_scenario.get_pestpp_options_ptr()->set_ies_ordered_binary(false);
+		}
+	}
+
 	message(2, "checking for denormal values in pe");
 	pe.check_for_normal("initial transformed parameter ensemble");
 	ss.str("");

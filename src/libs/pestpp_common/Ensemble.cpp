@@ -2759,6 +2759,14 @@ void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_v
 
 void ParameterEnsemble::to_binary(string file_name)
 {
+	if (pest_scenario_ptr->get_pestpp_options().get_ies_ordered_binary())
+		return to_binary_ordered(file_name);
+	else
+		return to_binary_unordered(file_name);
+}
+
+void ParameterEnsemble::to_binary_unordered(string file_name)
+{
 	ofstream fout(file_name, ios::binary);
 	if (!fout.good())
 	{
@@ -3135,6 +3143,14 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 }
 
 void ParameterEnsemble::to_dense(string file_name)
+{
+	if (pest_scenario_ptr->get_pestpp_options().get_ies_ordered_binary())
+		return to_dense_ordered(file_name);
+	else
+		return to_dense_unordered(file_name);
+}
+
+void ParameterEnsemble::to_dense_unordered(string file_name)
 {
 	ofstream fout(file_name, ios::binary);
 	if (!fout.good())

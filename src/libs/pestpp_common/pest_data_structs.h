@@ -583,6 +583,10 @@ public:
 	void set_ies_loc_type(string typ) { ies_loc_type = typ; }
 	bool get_ies_upgrades_in_memory() const { return ies_upgrades_in_memory; }
 	void set_ies_upgrades_in_memory(bool _flag) { ies_upgrades_in_memory = _flag; }
+	bool get_ies_ordered_binary() const { return ies_ordered_binary; }
+	void set_ies_ordered_binary(bool _flag) { ies_ordered_binary = _flag; }
+
+
 
 	// DA parameters
 	//CtlPar_container da_ctl_params;
@@ -835,6 +839,7 @@ private:
 	double ies_mda_dec_fac;
 	string ies_loc_type;
 	bool ies_upgrades_in_memory;
+	bool ies_ordered_binary;
 
 	// Data Assimilation parameters
 	/*string da_mode;
