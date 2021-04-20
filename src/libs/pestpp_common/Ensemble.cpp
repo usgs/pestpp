@@ -36,7 +36,7 @@ bool Ensemble::try_align_other_rows(PerformanceLog* performance_log, Ensemble& o
 		if (other_real_map.find(item.first) == other_real_map.end())
 			return false;
 		//if this realization name is not at the same location then we do need to reorder
-		if (item.second != other_real_map[item.first])
+		if (item.second != other_real_map.at(item.first))
 			need_to_align = true;
 	}
 	//if we made it to here and need_to_align is false, then two ensembles are already row aligned
@@ -157,7 +157,7 @@ void Ensemble::add_2_cols_ip(const vector<string> &other_var_names, const Eigen:
 		throw_ensemble_error("Ensemble::add_2_cols_ip(): the following var names in other were not found", missing);
 	for (auto &ovm : other_varmap)
 	{
-		reals.col(this_varmap[ovm.first]) += mat.col(ovm.second);
+		reals.col(this_varmap.at(ovm.first)) += mat.col(ovm.second);
 	}
 }
 
