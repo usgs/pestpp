@@ -64,7 +64,7 @@ public:
 	void set_pest_scenario(Pest *_pest_scenario_ptr) { pest_scenario_ptr = _pest_scenario_ptr; }
 	Eigen::MatrixXd get_obsdiff_hadamard_matrix(int num_reals,string col_name,vector<string> &obs_names);
 	Eigen::MatrixXd get_pardiff_hadamard_matrix(int num_reals, string row_name, vector<string> &par_names);
-	Eigen::MatrixXd get_kalmangain_hadamard_matrix(vector<string>& obs_names, vector<string>& par_names);
+	//Eigen::MatrixXd get_kalmangain_hadamard_matrix(vector<string>& obs_names, vector<string>& par_names);
 	Eigen::VectorXd get_obs_hadamard_vector(string par_name, vector<string>& obs_names);
 
 	How get_how() { return how; }
@@ -90,6 +90,11 @@ private:
 	map<string, int> obs2row_map, par2col_map,colname2col_map, rowname2row_map;
 
 	unordered_map<string, pair<vector<string>, vector<string>>> process_mat(PerformanceLog *performance_log, Mat& mat, bool forgive_missing=false);
+	void update_obs_info_from_mat(Mat& mat, vector<vector<string>>& obs_map, vector<string>& missing, vector<string>& dups, 
+		set<string>& obs_names, map<string, vector<string>>& obgnme_map, vector<string>& not_allowed);
+	void update_par_info_from_mat(Mat& mat, vector<vector<string>>& par_map, vector<string>& missing, vector<string>& dups,
+		set<string>& par_names, map<string, vector<string>>& pargp_map, vector<string>& not_allowed);
+
 };
 
 void aal_upgrade_thread_function(int id, AutoAdaLocThread &worker, exception_ptr &eptr);

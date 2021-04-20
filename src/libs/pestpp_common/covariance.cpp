@@ -405,6 +405,7 @@ void Mat::from_file(const string &filename)
 		ss << "Mat::from_file() error: unrecognized extension'" << ext << "', should be JCB, JCO, MAT or CSV";
 		throw runtime_error(ss.str());
 	}
+	mattype = MatType::SPARSE;
 
 }
 
