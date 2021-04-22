@@ -2712,7 +2712,7 @@ bool EnsembleMethod::should_terminate()
 
 
 vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, 
-	vector<double>& scale_vals, int cycle, vector<int> subset_idxs)
+	vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs)
 {
 	ofstream& frec = file_manager.rec_ofstream();
 	stringstream ss;
@@ -2728,7 +2728,7 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 	{
 		try
 		{
-			real_run_ids_vec.push_back(pe_lam.add_runs(run_mgr_ptr, subset_idxs,cycle));
+			real_run_ids_vec.push_back(pe_lam.add_runs(run_mgr_ptr, pe_subset_idxs,cycle));
 		}
 		catch (const exception& e)
 		{
@@ -2774,9 +2774,9 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 		//if using subset, reset the real_idx in real_run_ids to be just simple counter
 		//if (subset_size < pe_lams[0].shape().first)
 		//if ((use_subset) && (subset_idxs.size() < pe_lams[i].shape().first))
-		if ((use_subset) && ((_oe.shape().first > pe_lams[i].shape().first) || (subset_idxs.size() < pe_lams[i].shape().first)))
+		if ((use_subset) && ((_oe.shape().first > pe_lams[i].shape().first) || (pe_subset_idxs.size() < pe_lams[i].shape().first)))
 		{
-			_oe.keep_rows(subset_idxs);
+			_oe.keep_rows(oe_subset_idxs);
 			int ireal = 0;
 			map<int, int> temp;
 			for (auto& rri : real_run_ids)
@@ -2835,8 +2835,8 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 			ss << "the following par:obs realization runs failed for lambda,scale " << lam_vals[i] << ',' << scale_vals[i] << "-->";
 			for (auto& i : failed_real_indices)
 			{
-				pname = par_real_names[subset_idxs[i]];
-				oname = obs_real_names[subset_idxs[i]];
+				pname = par_real_names[pe_subset_idxs[i]];
+				oname = obs_real_names[oe_subset_idxs[i]];
 				failed_par_names.push_back(pname);
 				failed_obs_names.push_back(oname);
 				ss << pname << ":" << oname << ',';
@@ -4110,36 +4110,12 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	if (pe_filenames.size() > 0)
 	{
 		vector<int> temp;
-		map<string, string> oe_subset_real_name_map;
-		vector<int> sorted_subset_idxs = subset_idxs;
-		sort(sorted_subset_idxs.begin(), sorted_subset_idxs.end());
-		vector<string> real_names = oe.get_real_names();
-
-		for (int i = 0; i < pe_lams[0].shape().first; i++)
-		{
+		for (int i = 0; i < subset_idxs.size(); i++)
 			temp.push_back(i);
-			ss.str("");
-			ss << i;
-
-			oe_subset_real_name_map[ss.str()] = real_names[sorted_subset_idxs[i]];
-		}
-		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, temp);
-		
-		/*for (auto idx : sorted_subset_idxs)
-		{
-			actual_oe_subset_real_names.push_back(real_names[idx]);
-		}*/
-		vector<string> temp_real_names;
-		for (auto& oe_lam : oe_lams)
-		{
-			temp_real_names.clear();
-			for (auto& real_name : oe_lam.get_real_names())
-				temp_real_names.push_back(oe_subset_real_name_map[real_name]);
-			oe_lam.set_real_names(temp_real_names);
-		}
+		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, temp, subset_idxs);
 	}
 	else
- 		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, subset_idxs);
+ 		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, subset_idxs,subset_idxs);
 
 	message(0, "evaluting upgrade ensembles");
 	message(1, "last mean: ", last_best_mean);
