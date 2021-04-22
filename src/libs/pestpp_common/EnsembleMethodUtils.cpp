@@ -2806,7 +2806,24 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 		}
 
 		if (pest_scenario.get_pestpp_options().get_ies_debug_fail_subset())
-			failed_real_indices.push_back(real_run_ids.size() - 1);
+		{
+			stringstream ss;
+			if ((pe_lams.size() > 1) && (i == pe_lams.size() - 1))
+			{
+				ss << "'ies_debug_fail_subset' is true, failing all realizations for inflation factor " << lam_vals[i] << ", backtrack factor " << scale_vals[i];
+				message(0, ss.str());
+				for (int j=0;j<real_run_ids.size();j++)
+					failed_real_indices.push_back(j);
+			}
+			else
+			{
+				ss << "'ies_debug_fail_subset' is true, failing last realization for inflation factor " << lam_vals[i] << ", backtrack factor " << scale_vals[i];
+				message(0, ss.str());
+				failed_real_indices.push_back(real_run_ids.size() - 1);
+			}
+		}
+				
+			
 
 		if (failed_real_indices.size() > 0)
 		{
@@ -3996,7 +4013,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		pe_upgrade.set_trans_status(pe.get_trans_status());
 
 		es.solve(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map);
-
 		map<string, double> norm_map;
 		for (auto sf : backtrack_factors)
 		{
@@ -4016,7 +4032,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			ss.str("");
 			ss << file_manager.get_base_filename() << "." << iter << "." << cur_lam << ".lambda." << sf << ".scale.par";
 
-			if ((!pest_scenario.get_pestpp_options().get_ies_upgrades_in_memory()) && (subset_idxs.size() < pe.shape().first) && ((scale_vals.size() > 1) || (backtrack_factors.size() > 1)))
+			if ((!pest_scenario.get_pestpp_options().get_ies_upgrades_in_memory()) && (subset_idxs.size() < pe.shape().first) && ((inflation_factors.size() > 1) || (backtrack_factors.size() > 1)))
 			{
 				pe_lam_scale.to_dense(ss.str() + ".bin");
 				pe_filenames.push_back(ss.str() + ".bin");
@@ -4094,20 +4110,32 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	if (pe_filenames.size() > 0)
 	{
 		vector<int> temp;
-		for (int i = 0; i < pe_lams[0].shape().first; i++)
-			temp.push_back(i);
-		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, temp);
-		vector<string> actual_oe_subset_real_names;
-		vector<string> real_names = oe.get_real_names();
+		map<string, string> oe_subset_real_name_map;
 		vector<int> sorted_subset_idxs = subset_idxs;
 		sort(sorted_subset_idxs.begin(), sorted_subset_idxs.end());
-		for (auto idx : sorted_subset_idxs)
+		vector<string> real_names = oe.get_real_names();
+
+		for (int i = 0; i < pe_lams[0].shape().first; i++)
+		{
+			temp.push_back(i);
+			ss.str("");
+			ss << i;
+
+			oe_subset_real_name_map[ss.str()] = real_names[sorted_subset_idxs[i]];
+		}
+		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, temp);
+		
+		/*for (auto idx : sorted_subset_idxs)
 		{
 			actual_oe_subset_real_names.push_back(real_names[idx]);
-		}
+		}*/
+		vector<string> temp_real_names;
 		for (auto& oe_lam : oe_lams)
 		{
-			oe_lam.set_real_names(actual_oe_subset_real_names);
+			temp_real_names.clear();
+			for (auto& real_name : oe_lam.get_real_names())
+				temp_real_names.push_back(oe_subset_real_name_map[real_name]);
+			oe_lam.set_real_names(temp_real_names);
 		}
 	}
 	else
@@ -4253,13 +4281,33 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		//need to work out which par and obs en real names to run - some may have failed during subset testing...
 		ObservationEnsemble remaining_oe_lam = oe;//copy
 
-		ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];;
 		
+		ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
+
 		if (pe_filenames.size() > 0)
 		{
 			performance_log->log_event("'ies_upgrades_in_memory' is 'false', loading 'best' parameter ensemble from file '" + pe_filenames[best_idx] + "'");
+			vector<string> missing;
+			if (oe_lams[best_idx].shape().first != remaining_pe_lam.shape().first)
+			{
+				set<string> ssub_names;
+				for (auto real_name : oe_lams[best_idx].get_real_names())
+					ssub_names.emplace(real_name);
+				vector<string> oreal_names = oe.get_real_names();
+				vector<string> preal_names = pe.get_real_names();
+
+				for (auto idx : subset_idxs)
+					if (ssub_names.find(oreal_names[idx]) == ssub_names.end())
+						missing.push_back(preal_names[idx]);
+				if (missing.size() > 0)
+					pe_lams[best_idx].drop_rows(missing);
+			}
+			
 			remaining_pe_lam.from_binary(pe_filenames[best_idx]);
 			remaining_pe_lam.transform_ip(ParameterEnsemble::transStatus::NUM);
+			//remove any failed runs from subset testing
+			if (missing.size() > 0)
+				remaining_pe_lam.drop_rows(missing);
 			for (auto& pe_filename : pe_filenames)
 			{ 
 				performance_log->log_event("removing upgrade ensemble '" + pe_filename + "'");
