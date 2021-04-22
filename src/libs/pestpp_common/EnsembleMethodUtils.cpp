@@ -3524,25 +3524,7 @@ void EnsembleMethod::initialize(int cycle)
 	ph.update(oe, pe);
 	message(0, "pre-drop initial phi summary");
 	ph.report(true);
-	drop_bad_phi(pe, oe);
-	if (oe.shape().first == 0)
-	{
-		throw_em_error(string("all realizations dropped as 'bad'"));
-	}
-	if (oe.shape().first <= error_min_reals)
-	{
-		message(0, "too few active realizations:", oe.shape().first);
-		message(1, "need at least ", error_min_reals);
-		throw_em_error(string("too few active realizations, cannot continue"));
-	}
-	if (oe.shape().first < warn_min_reals)
-	{
-		ss.str("");
-		ss << "WARNING: less than " << warn_min_reals << " active realizations...might not be enough";
-		string s = ss.str();
-		message(0, s);
-	}
-
+	
 	pcs = ParChangeSummarizer(&pe_base, &file_manager, &output_file_writer);
 	vector<string> in_conflict = detect_prior_data_conflict();
 	if (in_conflict.size() > 0)
@@ -3603,6 +3585,27 @@ void EnsembleMethod::initialize(int cycle)
 		f_obs.close();
 		message(1, "updated observation data information written to file ", filename);
 	}
+
+	drop_bad_phi(pe, oe);
+	if (oe.shape().first == 0)
+	{
+		throw_em_error(string("all realizations dropped as 'bad'"));
+	}
+	if (oe.shape().first <= error_min_reals)
+	{
+		message(0, "too few active realizations:", oe.shape().first);
+		message(1, "need at least ", error_min_reals);
+		throw_em_error(string("too few active realizations, cannot continue"));
+	}
+	if (oe.shape().first < warn_min_reals)
+	{
+		ss.str("");
+		ss << "WARNING: less than " << warn_min_reals << " active realizations...might not be enough";
+		string s = ss.str();
+		message(0, s);
+	}
+
+
 	performance_log->log_event("calc initial phi");
 	ph.update(oe, pe);
 	message(0, "initial phi summary");
