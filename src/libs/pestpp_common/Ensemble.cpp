@@ -2688,7 +2688,7 @@ void ParameterEnsemble::set_fixed_info(map<pair<string, string>, double> _fixed_
 	}
 	fixed_map = _fixed_map;
 	fixed_names = vector<string>(found.begin(), found.end());
-	cout << "";
+	//cout << "";
 }
 
 void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)

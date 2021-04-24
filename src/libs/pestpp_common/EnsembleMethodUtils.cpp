@@ -2060,7 +2060,7 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_meas(ObservationEnsemble & oe, E
 		if (find(start, end, rname) == end)
 			continue;
 		diff = resid.row(i);
-		
+		//cout << diff << endl;
 		diff = diff.cwiseProduct(w_vec);
 		
 		phi = (diff.cwiseProduct(diff)).sum();
@@ -2719,6 +2719,16 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 	ss << "queuing " << pe_lams.size() << " ensembles";
 	performance_log->log_event(ss.str());
 	run_mgr_ptr->reinitialize();
+	vector<string> names = pe_lams[0].get_real_names();
+	ss.str("");
+	for (auto i : pe_subset_idxs)
+		ss << i << ":" << names[i] << ", ";
+	message(1, "subset idx:pe real name: ", ss.str());
+	ss.str("");
+	names = oe.get_real_names();
+	for (auto i : oe_subset_idxs)
+		ss << i << ":" << names[i] << ", ";
+	message(1, "subset idx:oe real name: ", ss.str());
 
 	//set_subset_idx(pe_lams[0].shape().first);
 	vector<map<int, int>> real_run_ids_vec;
@@ -5604,11 +5614,11 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 	map<string, int> oe_name_to_idx;
 	map<int, string> pe_idx_to_name;
 
-	for (int i = 0; i < oe_base_names.size(); i++)
-		oe_name_to_idx[oe_base_names[i]] = i;
+	for (int i = 0; i < oe_names.size(); i++)
+		oe_name_to_idx[oe_names[i]] = i;
 
-	for (int i = 0; i < pe_base_names.size(); i++)
-		pe_idx_to_name[i] = pe_base_names[i];
+	for (int i = 0; i < pe_names.size(); i++)
+		pe_idx_to_name[i] = pe_names[i];
 	//store map of current phi values
 	ph.update(oe, pe);
 	L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
@@ -5635,7 +5645,7 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 		{
 			//pname = pe_names[i];
 			//pname = pe_names[oe_name_to_idx[oname]];
-			pname = pe_idx_to_name[oe_name_to_idx[oname]];
+			pname = pe_idx_to_name.at(oe_name_to_idx.at(oname));
 			if (find(pe_names.begin(), pe_names.end(), pname) == pe_names.end())
 				throw runtime_error("EnsembeMethod::update_reals_by_phi() error: pname not in pe_names: " + pname);
 			ss.str("");
@@ -5787,10 +5797,10 @@ vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 		//throw runtime_error("unkonwn 'subset_how'");
 		throw_em_error("unknown 'subset_how'");
 	}
-	stringstream ss;
+	/*stringstream ss;
 	for (auto i : subset_idxs)
 		ss << i << ":" << pe_names[i] << ", ";
-	message(1, "subset idx:pe real name: ", ss.str());
+	message(1, "subset idx:pe real name: ", ss.str());*/
 	return subset_idxs;
 	//return subset_idx_map;
 }
