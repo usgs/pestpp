@@ -5139,9 +5139,13 @@ void EnsembleMethod::initialize_restart()
 	vector<string> missing;
 	start = oe_base_real_names.begin();
 	end = oe_base_real_names.end();
+	cout << "restart oe real names: " << endl;
 	for (auto& rname : oe_real_names)
+	{
+		cout << rname << endl;
 		if (find(start, end, rname) == end)
 			missing.push_back(rname);
+	}
 	if (missing.size() > 0)
 	{
 		//the special case where the base real is what is missing...
