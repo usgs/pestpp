@@ -3252,8 +3252,19 @@ void EnsembleMethod::initialize(int cycle)
 				message(1, ss.str());
 				message(1, " the realization names are compatible");
 				message(1, "re-indexing obs en to align with par en...");
-
+				cout << "oe names: " << endl;
+				for (auto& name : oe_names)
+					cout << name << endl;
+				oe_names = pe.get_real_names();
+				cout << endl << "pe names: " << endl;
+				for (auto& name : oe_names)
+					cout << name << endl;
 				oe.reorder(pe.get_real_names(), vector<string>());
+				oe_names = oe.get_real_names();
+				cout << "new oe names: " << endl;
+				for (auto& name : oe_names)
+					cout << name << endl;
+				cout << endl;
 			}
 			else
 			{
