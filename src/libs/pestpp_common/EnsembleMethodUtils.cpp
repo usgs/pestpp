@@ -5650,7 +5650,7 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 				throw runtime_error("EnsembeMethod::update_reals_by_phi() error: pname not in pe_names: " + pname);
 			ss.str("");
 			ss << "updating pe:oe real =" << pname << ":" << oname << ", current phi: new phi  =" << cur_phi << ":" << new_phi;
-			message(3, ss.str());
+			message(2, ss.str());
 
 			real = _pe.get_real_vector(pname);
 			pe.update_real_ip(pname, real);
