@@ -2838,7 +2838,7 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 		if (failed_real_indices.size() > 0)
 		{
 			stringstream ss;
-			vector<string> par_real_names = pe.get_real_names();
+			vector<string> par_real_names = pe_lams[i].get_real_names();
 			vector<string> obs_real_names = oe.get_real_names();
 			vector<string> failed_par_names, failed_obs_names;
 			string oname, pname;
@@ -3252,8 +3252,19 @@ void EnsembleMethod::initialize(int cycle)
 				message(1, ss.str());
 				message(1, " the realization names are compatible");
 				message(1, "re-indexing obs en to align with par en...");
-
+				cout << "oe names: " << endl;
+				for (auto& name : oe_names)
+					cout << name << endl;
+				oe_names = pe.get_real_names();
+				cout << endl << "pe names: " << endl;
+				for (auto& name : oe_names)
+					cout << name << endl;
 				oe.reorder(pe.get_real_names(), vector<string>());
+				oe_names = oe.get_real_names();
+				cout << "new oe names: " << endl;
+				for (auto& name : oe_names)
+					cout << name << endl;
+				cout << endl;
 			}
 			else
 			{
@@ -5128,9 +5139,13 @@ void EnsembleMethod::initialize_restart()
 	vector<string> missing;
 	start = oe_base_real_names.begin();
 	end = oe_base_real_names.end();
+	cout << "restart oe real names: " << endl;
 	for (auto& rname : oe_real_names)
+	{
+		cout << rname << endl;
 		if (find(start, end, rname) == end)
 			missing.push_back(rname);
+	}
 	if (missing.size() > 0)
 	{
 		//the special case where the base real is what is missing...
@@ -5802,6 +5817,7 @@ vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 	for (auto i : subset_idxs)
 		ss << i << ":" << pe_names[i] << ", ";
 	message(1, "subset idx:pe real name: ", ss.str());*/
+	sort(subset_idxs.begin(), subset_idxs.end());
 	return subset_idxs;
 	//return subset_idx_map;
 }
