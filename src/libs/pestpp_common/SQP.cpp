@@ -2598,7 +2598,7 @@ bool SeqQuadProgram::seek_feasible()
 		else
 		{
 			ctl_obs.update_rec(name, shifted.get_rec(name));
-			oi->get_observation_rec_ptr_4_mod(name)->group = "__nz_temp__";
+			//oi->get_observation_rec_ptr_4_mod(name)->group = "__nz_temp__";
 		}
 	}
 
@@ -2609,7 +2609,7 @@ bool SeqQuadProgram::seek_feasible()
 	ies.initialize();
 	ies.iterate_2_solution();
 
-	//what to do here?
+	//what to do here? maybe we need to eval the kkt conditions to pick a new point that maintains the hessian?
 	ParameterEnsemble* ies_pe_ptr = ies.get_pe_ptr();
 	ies_pe_ptr->transform_ip(ParameterEnsemble::transStatus::CTL);
 	names = ies_pe_ptr->get_var_names();
@@ -2634,6 +2634,9 @@ bool SeqQuadProgram::seek_feasible()
 	names = ies.get_oe().get_var_names();
 	current_obs.update(names, cdv);
 	constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true, "post feasible seek");
+	//todo: probably more algorithmic things here...
+	last_best = get_obj_value(current_ctl_dv_values, current_obs);
+	message(1, "reset best phi value to ", last_best);
 	return false;
 }
 
