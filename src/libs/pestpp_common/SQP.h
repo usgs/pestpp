@@ -146,6 +146,8 @@ private:
 	bool update_hessian_and_grad_vector();
 
 	bool solve_new();
+	
+	bool seek_feasible();
 
 	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, vector<double>& alpha_vals);
 

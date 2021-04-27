@@ -53,11 +53,16 @@ public:
 	const Observations& get_ctl_observations() const {return observation_values;}
 	Observations& get_ctl_observations_4_mod() { return observation_values;  }
 	const ParameterInfo& get_ctl_parameter_info()const {return ctl_parameter_info;}
+	void set_ctl_parameter_info(ParameterInfo pi) { ctl_parameter_info = pi; }
+	void set_ctl_observation_info(ObservationInfo oi) { observation_info = oi; }
+
+	ParameterInfo get_ctl_parameter_info_copy() { return ctl_parameter_info; }
 	ParameterInfo* get_ctl_parameter_info_ptr_4_mod() { return &ctl_parameter_info; }
 	const ParameterGroupInfo& get_base_group_info() const {return  base_group_info;}
 	ParameterGroupInfo* get_base_group_info_ptr_4_mod() { return  &base_group_info; }
 	ParameterGroupInfo* get_base_group_info_ptr() { return  &base_group_info; }
 	const ObservationInfo &get_ctl_observation_info() const {return observation_info;}
+	ObservationInfo get_ctl_observation_info_copy() { return observation_info; }
 	ObservationInfo& get_ctl_observation_info_4_mod() { return observation_info; }
 	const ObservationInfo* get_ctl_observation_info_ptr() const { return &observation_info; }
 	void set_observation_info(ObservationInfo oi) { observation_info = oi; }

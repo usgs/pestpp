@@ -291,7 +291,7 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
     "   `  :' .... ..  .:::::.     . ..:::::::....:::.  `: .'\n"
     "    :..    ____:::::::::.  . . ....:::::::::____  ... :\n"
     "   :... `:~    ^~-:::::..  .........:::::-~^    ~::.::::\n"
-    "   `.::. `\   (8)  \b:::..::.:.:::::::d/  (8)   /'.::::'\n"
+    "   `.::. `\   (8)  \\b:::..::.:.:::::::d/  (8)   /'.::::'\n"
     "    ::::.  ~-._v    |b.::::::::::::::d|    v_.-~..:::::\n"
     "    `.:::::... ~~^?888b..:::::::::::d888P^~...::::::::'\n"
     "     `.::::::::::....~~~ .:::::::::~~~:::::::::::::::'\n"
@@ -354,6 +354,7 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	FD_SET(listener, &master);
 	par_names_to_check_worker = par_names;
 	obs_names_to_check_worker = obs_names;
+	mgr_type = RUN_MGR_TYPE::PANTHER;
 
 	
 }

@@ -42,6 +42,7 @@ RunManagerAbstract::RunManagerAbstract(const vector<string> _comline_vec,
 
 	cout << endl << endl;*/
 	cur_group_id = -1;
+	mgr_type = RUN_MGR_TYPE::NOTDEFINED;
 }
 
 void RunManagerAbstract::initialize(const Parameters &model_pars, const Observations &obs, const string &_filename)

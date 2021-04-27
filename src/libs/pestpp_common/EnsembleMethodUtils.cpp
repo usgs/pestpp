@@ -2701,6 +2701,11 @@ bool EnsembleMethod::should_terminate()
 		message(1, "number of iterations since best yet mean phi > nphinored");
 		nphinored_sat = true;
 	}
+	if (best_mean_phis[best_mean_phis.size() - 1] == 0.0)
+	{
+		message(1, "mean phi is zero, all done");
+		return true;
+	}
 
 	if ((nphinored_sat) || (phiredstp_sat) || (consec_sat))
 	{

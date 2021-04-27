@@ -15,6 +15,8 @@
 #include "eigen_tools.h"
 #include "EnsembleMethodUtils.h"
 #include "constraints.h"
+#include "RunManagerSerial.h"
+#include "EnsembleSmoother.h"
 
 
 bool SqpFilter::accept(double obj_val, double violation_val, int iter, double alpha)
@@ -916,6 +918,11 @@ void SeqQuadProgram::initialize()
 
 	double v = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
 	filter.update(last_best, v, 0, -1.0);
+
+	if (v > 0.0)
+	{
+		seek_feasible();
+	}
 	
 	message(2, "initializing hessian matrix with identity");
 	Eigen::SparseMatrix<double> h(dv_names.size(), dv_names.size());
@@ -2535,6 +2542,99 @@ bool SeqQuadProgram::solve_new()
 	}
 	
 	return true;  // reporting and saving done next
+}
+
+bool SeqQuadProgram::seek_feasible()
+{
+	stringstream ss;
+	message(1, "seeking feasibility with iterative ensemble smoother solution");
+	
+
+	Pest ies_pest_scenario;
+	string pst_filename = pest_scenario.get_pst_filename();
+	ifstream fin(pest_scenario.get_pst_filename());
+	ies_pest_scenario.process_ctl_file(fin, pst_filename);
+	set<string>snames(dv_names.begin(), dv_names.end());
+	set<string>::iterator send = snames.end();
+	ParameterInfo* pi = ies_pest_scenario.get_ctl_parameter_info_ptr_4_mod();
+	ParamTransformSeq pts = ies_pest_scenario.get_base_par_tran_seq_4_mod();
+	TranFixed* tf_ptr = pts.get_fixed_ptr_4_mod();
+
+	Parameters ctl_pars = ies_pest_scenario.get_ctl_parameters_4_mod();
+
+	for (auto& name : ies_pest_scenario.get_ctl_ordered_par_names())
+	{
+		if (snames.find(name) == send)
+		{
+			if (pi->get_parameter_rec_ptr_4_mod(name)->tranform_type != ParameterRec::TRAN_TYPE::FIXED)
+			{
+				pi->get_parameter_rec_ptr_4_mod(name)->tranform_type = ParameterRec::TRAN_TYPE::FIXED;
+				tf_ptr->insert(name, ctl_pars.get_rec(name));
+			}
+		}
+		else
+			ctl_pars.update_rec(name,current_ctl_dv_values.get_rec(name));
+
+	}
+	snames.clear();
+	vector<string> names = constraints.get_obs_constraint_names();
+	if (names.size() == 0)
+		throw_sqp_error("SQP::seek_feasible() error: no obs-based constraints found");
+	snames.insert(names.begin(), names.end());
+	send = snames.end();
+	if (snames.find(obj_obs) != send)
+	{
+		snames.erase(obj_obs);
+	}
+	ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+	Observations shifted = constraints.get_chance_shifted_constraints(current_obs);
+	Observations ctl_obs = ies_pest_scenario.get_ctl_observations_4_mod();
+	for (auto& name : ies_pest_scenario.get_ctl_ordered_obs_names())
+	{
+		if (snames.find(name) == send)
+		{
+			oi->get_observation_rec_ptr_4_mod(name)->weight = 0.0;
+		}
+		else
+		{
+			ctl_obs.update_rec(name, shifted.get_rec(name));
+			oi->get_observation_rec_ptr_4_mod(name)->group = "__nz_temp__";
+		}
+	}
+
+	snames = ies_pest_scenario.get_pestpp_options().get_passed_args();
+	if (snames.find("IES_NUM_REALS") == snames.end())
+		ies_pest_scenario.get_pestpp_options_ptr()->set_ies_num_reals(10);
+	IterEnsembleSmoother ies(ies_pest_scenario, file_manager, output_file_writer, performance_log, run_mgr_ptr);
+	ies.initialize();
+	ies.iterate_2_solution();
+
+	//what to do here?
+	ParameterEnsemble* ies_pe_ptr = ies.get_pe_ptr();
+	ies_pe_ptr->transform_ip(ParameterEnsemble::transStatus::CTL);
+	names = ies_pe_ptr->get_var_names();
+	Eigen::VectorXd cdv = current_ctl_dv_values.get_data_eigen_vec(dv_names);
+	double mndiff = 1.0e+300;
+	int mndiff_idx = -1;
+	for (int i = 0; i < ies_pe_ptr->shape().first; i++)
+	{
+		Eigen::VectorXd real = ies_pe_ptr->get_eigen_ptr()->row(i);
+		Eigen::VectorXd d = real - cdv;
+		double diff = (d.array() * d.array()).sum();
+		if (diff < mndiff)
+		{
+			mndiff = diff;
+			mndiff_idx = i;
+		}
+	}
+	cdv = ies_pe_ptr->get_real_vector(mndiff_idx);
+	current_ctl_dv_values.update_without_clear(names, cdv);
+	//update current obs
+	cdv = ies.get_oe().get_real_vector(mndiff_idx);
+	names = ies.get_oe().get_var_names();
+	current_obs.update(names, cdv);
+	constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true, "post feasible seek");
+	return false;
 }
 
 

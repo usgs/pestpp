@@ -49,6 +49,7 @@ RunManagerSerial::RunManagerSerial(const vector<string> _comline_vec,
 	mi.set_num_threads(_num_threads);
 
 	cout << "              starting serial run manager ..." << endl << endl;
+	mgr_type = RUN_MGR_TYPE::SERIAL;
 }
 
 void RunManagerSerial::run()
