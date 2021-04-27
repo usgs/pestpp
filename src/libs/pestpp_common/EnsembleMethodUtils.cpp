@@ -5309,6 +5309,7 @@ void EnsembleMethod::initialize_restart()
 void EnsembleMethod::initialize_parcov()
 {
 	stringstream ss;
+	message(1, "initializing prior parameter covariance matrix");
 	performance_log->log_event("initializing parcov");
 
 	if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior())

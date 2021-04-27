@@ -280,7 +280,36 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	terminate_idle_thread(false), currently_idle(true), idling(false), idle_thread_finished(false),
 	idle_thread(nullptr), idle_thread_raii(nullptr), should_echo(_should_echo)
 {
-	cout << "          starting PANTHER master..." << endl << endl;
+
+	char * t = 
+    "\n\n:~-._                                                 _.-~:\n"
+    ": :.~^o._        ________---------________        _.o^~.:.:\n"
+    " : ::.`?88booo~~~.::::::::...::::::::::::..~~oood88P'.::.:\n"
+    " :  ::: `?88P .:::....         ........:::::. ?88P' :::. :\n"
+    "  :  :::. `? .::.            . ...........:::. P' .:::. :\n"
+    "   :  :::   ... ..  ...       .. .::::......::.   :::. :\n"
+    "   `  :' .... ..  .:::::.     . ..:::::::....:::.  `: .'\n"
+    "    :..    ____:::::::::.  . . ....:::::::::____  ... :\n"
+    "   :... `:~    ^~-:::::..  .........:::::-~^    ~::.::::\n"
+    "   `.::. `\   (8)  \b:::..::.:.:::::::d/  (8)   /'.::::'\n"
+    "    ::::.  ~-._v    |b.::::::::::::::d|    v_.-~..:::::\n"
+    "    `.:::::... ~~^?888b..:::::::::::d888P^~...::::::::'\n"
+    "     `.::::::::::....~~~ .:::::::::~~~:::::::::::::::'\n"
+    "      `..:::::::::::   .   ....::::    ::::::::::::,'\n"
+    "        `. .:::::::    .      .::::.    ::::::::'.'\n"
+    "          `._ .:::    .        :::::.    :::::_.'\n"
+    "             `-. :    .        :::::      :,-'\n"
+    "                :.   :___     .:::___   .::\n"
+    "      ..--~~~~--:+::. ~~^?b..:::dP^~~.::++:--~~~~--..\n"
+    "        ___....--`+:::.    `~8~'    .:::+'--....___\n"
+    "      ~~   __..---`_=:: ___gd8bg___ :==_'---..__   ~~\n"
+    "       -~~~  _.--~~`-.~~~~~~~~~~~~~~~,-' ~~--._ ~~~-\n\n";
+             
+
+
+
+	cout << t << endl;
+	cout << "               starting PANTHER master..." << endl << endl;
 	max_concurrent_runs = max(MAX_CONCURRENT_RUNS_LOWER_LIMIT, _max_n_failure);
 	w_init();
 	std::pair<int, string> status;

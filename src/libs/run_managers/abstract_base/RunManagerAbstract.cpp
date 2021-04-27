@@ -35,12 +35,12 @@ RunManagerAbstract::RunManagerAbstract(const vector<string> _comline_vec,
     comline_vec(_comline_vec), tplfile_vec(_tplfile_vec),
     inpfile_vec(_inpfile_vec), insfile_vec(_insfile_vec), outfile_vec(_outfile_vec)
 {
-	cout << endl;
+	/*cout << endl;
 	cout << "             Generalized Run Manager Interface" << endl;
 	cout << "                             by:" << endl << endl;
 	cout << "               The PEST++ Development Team" << endl;
 
-	cout << endl << endl;
+	cout << endl << endl;*/
 	cur_group_id = -1;
 }
 

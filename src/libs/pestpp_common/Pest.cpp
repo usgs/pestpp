@@ -943,6 +943,7 @@ int Pest::process_ctl_file(ifstream& fin, string pst_filename)
 
 int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 {
+	cout << "processing control file " << _pst_filename << endl;
 	string line;
 	string line_upper;
 	string section("");
