@@ -3300,8 +3300,11 @@ void EnsembleMethod::initialize(int cycle)
 		{
 			message(1, "Warning: even though `ies_include_base` is true, you passed a restart obs en, not adding 'base' realization...");
 		}
+
 		else
+		{
 			add_bases();
+		}
 
 	if ((obs_restart_csv.size() == 0) && (!pe_drawn) && (oe_drawn))
 	{

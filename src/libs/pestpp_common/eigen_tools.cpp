@@ -219,7 +219,7 @@ void print(const VectorXd &vec, ostream & fout, int n_per_line)
 
 bool save_triplets_bin(const SparseMatrix<double> &mat, ostream &fout)
 {
-	int32_t xyn[3] = { mat.rows(), mat.cols(), mat.nonZeros() };
+	int32_t xyn[3] = { static_cast<int32_t>(mat.rows()), static_cast<int32_t>(mat.cols()), static_cast<int32_t>(mat.nonZeros()) };
 	fout.write((char*)xyn, sizeof(xyn));
 
 	for (int k = 0; k < mat.outerSize(); ++k)
@@ -227,7 +227,7 @@ bool save_triplets_bin(const SparseMatrix<double> &mat, ostream &fout)
 		SparseMatrix<double>::InnerIterator it(mat, k);
 		for (; it; ++it)
 		{
-			int32_t rc[2] = { it.row(), it.col() };
+			int32_t rc[2] = { static_cast<int32_t>(it.row()), static_cast<int32_t>(it.col() )};
 			fout.write((char*)rc, sizeof(rc));
 			double v = it.value();
 			fout.write((char*)&v, sizeof(v));

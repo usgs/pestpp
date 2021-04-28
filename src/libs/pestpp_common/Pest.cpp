@@ -97,13 +97,17 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 	}
 
 	if (control_info.facparmax <= 1.0)
+	{
 		if (forgive)
 		{
 			cout << "WARNING: 'facparmax` should be greater than 1.0" << endl;
 			f_rec << "WARNING: 'facparmax` should be greater than 1.0" << endl;
 		}
 		else
+		{
 			throw PestError("'facparmax' must be greater than 1.0");
+		}
+	}
 
 	if (control_info.pestmode == ControlInfo::PestMode::PARETO)
 	{
@@ -154,24 +158,40 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		if ((prec->tranform_type == ParameterRec::TRAN_TYPE::FIXED) || (prec->tranform_type == ParameterRec::TRAN_TYPE::TIED))
 			adj_par = false;
 		if (prec->lbnd >= prec->ubnd)
+		{
 			if ((forgive) || (!adj_par))
+			{
 				par_warnings.push_back(pname + ": bounds are busted");
+			}
 			else
+			{
 				par_problems.push_back(pname + ": bounds are busted");
+			}
+		}
 		if (prec->init_value < prec->lbnd)
+		{
 			if ((forgive) || (!adj_par))
+			{
 				par_warnings.push_back(pname + " initial value is less than lower bound");
+			}
 			else
+			{
 				par_problems.push_back(pname + " initial value is less than lower bound");
+			}
+		}
 		else if (prec->init_value == prec->lbnd)
 		{
 			par_lb++;
 		}
 		if (prec->init_value > prec->ubnd)
 			if ((forgive) || (!adj_par))
+			{
 				par_warnings.push_back(pname + " initial value is greater than upper bound");
+			}
 			else
+			{
 				par_problems.push_back(pname + " initial value is greater than upper bound");
+			}
 		else if (prec->init_value == prec->ubnd)
 		{
 			par_ub++;
@@ -186,15 +206,28 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		if ((prec->ubnd > 0.0) && (prec->lbnd < 0.0))
 		{
 			if (prec->chglim == "FACTOR")
+			{
 				if ((forgive) || (!adj_par))
+				{
 					par_warnings.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
+				}
 				else
+				{
 					par_problems.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
+			
+				}
+			}
 			else if ((prec->chglim == "RELATIVE") && (control_info.relparmax < 1.0))
+			{
 				if ((forgive) || (!adj_par))
+				{
 					par_warnings.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
+				}
 				else
+				{
 					par_problems.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
+				}
+			}
 		}
 	}
 
