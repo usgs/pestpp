@@ -15,7 +15,6 @@
 #include "eigen_tools.h"
 #include "EnsembleMethodUtils.h"
 #include "constraints.h"
-#include "RunManagerSerial.h"
 #include "EnsembleSmoother.h"
 
 
