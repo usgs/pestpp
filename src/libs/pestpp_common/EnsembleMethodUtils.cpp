@@ -229,7 +229,7 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 			//threads.push_back(thread(&LocalUpgradeThread::work, &worker, i, iter, cur_lam));
 
 			//threads.push_back(thread(localanalysis_upgrade_thread_function, i, iter, cur_lam, use_glm_form, act_par_names, act_obs_names, std::ref(worker), std::ref(exception_ptrs[i])));
-			threads.push_back(thread(upgrade_thread_function, i, iter, cur_lam, use_glm_form, act_par_names, 
+			threads.push_back(thread(upgrade_thread_function, i, iter, cur_lam, use_glm_form, act_par_names,
 				act_obs_names, std::ref(*ut_ptr), std::ref(exception_ptrs[i])));
 
 
@@ -3993,6 +3993,8 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	vector<ParameterEnsemble> pe_lams;
 	vector<double> lam_vals, scale_vals;
 	//update all the fast-lookup structures
+	performance_log->log_event("reordering variables in pe");
+	pe.reorder(vector<string>(), act_par_names);
 	oe.update_var_map();
 	pe.update_var_map();
 	parcov.update_sets();
@@ -4022,7 +4024,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	vector<int> subset_idxs = get_subset_idxs(pe.shape().first, local_subset_size);
 	vector<string> pe_filenames;
-
 
 	performance_log->log_event("preparing EnsembleSolver");
 	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
@@ -4830,6 +4831,7 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 		}
 
 	}
+	
 	return drawn;
 
 }

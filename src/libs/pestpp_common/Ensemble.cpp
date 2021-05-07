@@ -2357,7 +2357,6 @@ void ParameterEnsemble::from_binary(string file_name, bool forgive)
 	}
 
 	prep_par_ensemble_after_read(header_info);
-
 }
 
 //ParameterEnsemble ParameterEnsemble::get_new(const vector<string> &_real_names, const vector<string> &_var_names)
