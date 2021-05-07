@@ -1508,7 +1508,7 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	string name = token.substr(1, token.size() - 2);
 	vector<string> tokens;
 	tokens.reserve(tsize);
-	tokenize(line, tokens,", \t\n\r" + additional_delimiters) ; //include the comma in the delimiters here
+	tokenize(line, tokens,", \t\n\r" + additional_delimiters,true,1) ; //include the comma in the delimiters here
 	if (tokens.size() == 0)
 		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for free instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);
 	double value = 1.0e+30;
@@ -1537,7 +1537,7 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	return pair<string, double>(name,value);
 }
 
-void InstructionFile::tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty)
+void InstructionFile::tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty, int mx_tokens)
 {
 	std::string::size_type pos, lastPos = 0;
 	while (true)
@@ -1557,6 +1557,8 @@ void InstructionFile::tokenize(const std::string& str, vector<string>& tokens, c
 			if (pos != lastPos || !trimEmpty)
 				tokens.push_back(string(str.data() + lastPos, string::size_type(pos - lastPos)));
 		}
+		if ((mx_tokens > 0) && (tokens.size() > mx_tokens))
+			break;
 
 		lastPos = pos + 1;
 	}

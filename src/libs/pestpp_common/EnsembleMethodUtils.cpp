@@ -2623,6 +2623,7 @@ EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
 	run_mgr_ptr(_run_mgr_ptr), pe(&_pest_scenario)
 {
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
+
 	subset_rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 	pe.set_pest_scenario(&pest_scenario);
 	oe.set_pest_scenario_ptr(&pest_scenario);

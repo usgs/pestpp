@@ -86,7 +86,7 @@ private:
 	pair<string, pair<int, int>> parse_obs_instruction(const string& token, const string& close_tag);
 	string additional_delimiters;
 	
-	void tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty=true);
+	void tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty=true, int mx_tokens=-1);
 	
 
 };
