@@ -352,8 +352,8 @@ protected:
 
 	bool oe_drawn, pe_drawn;
 
-	bool solve_glm();
-	bool solve_mda(bool last_iter);
+	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
+	bool solve_mda(bool last_iter, int cycle = NetPackage::NULL_DA_CYCLE);
 
 	bool solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle=NetPackage::NULL_DA_CYCLE);
 

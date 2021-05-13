@@ -75,9 +75,9 @@ void DataAssimilator::da_update(int cycle)
 		performance_log->log_event(ss.str());
 		//accept = solve_new_da();
 		if (pest_scenario.get_pestpp_options().get_ies_use_mda())
-			accept = solve_mda(islast_iter);
+			accept = solve_mda(islast_iter,cycle);
 		else
-			accept = solve_glm();
+			accept = solve_glm(cycle);
 		report_and_save(cycle);
 		ph.update(oe, pe);
 		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);

@@ -3862,7 +3862,7 @@ void EnsembleMethod::initialize_dynamic_states()
 	}
 }
 
-bool EnsembleMethod::solve_glm()
+bool EnsembleMethod::solve_glm(int cycle)
 {
 	vector<double> lambdas = lam_mults;
 	message(1, "current lambda: ", last_best_lam);
@@ -3870,11 +3870,11 @@ bool EnsembleMethod::solve_glm()
 		m *= last_best_lam;
 
 	vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
-	return solve(false, lambdas, scale_facs);
+	return solve(false, lambdas, scale_facs,cycle);
 
 }
 
-bool EnsembleMethod::solve_mda(bool last_iter)
+bool EnsembleMethod::solve_mda(bool last_iter,int cycle)
 {
 
 	//this function should cover the case where noptmax = 1 (vanilla) also...
@@ -3946,7 +3946,7 @@ bool EnsembleMethod::solve_mda(bool last_iter)
 	
 	mda_facs = vector<double>{ mda_lambdas[iter-1] };
 	vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
-	return solve(true, mda_facs, scale_facs);
+	return solve(true, mda_facs, scale_facs,cycle);
 	
 }
 
