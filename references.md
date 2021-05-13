@@ -12,7 +12,14 @@
  * Knowling, M.J., White, J.T. and Moore, C.R., 2019. Role of model parameterization in risk-based decision support: An empirical exploration. Advances in Water Resources, 128, pp.59-73. [https://doi.org/10.1016/j.advwatres.2019.04.010](https://doi.org/10.1016/j.advwatres.2019.04.010)
   * Knowling, M.J., White, J.T., Moore, C.R., Rakowski, P. and Hayley, K., 2020. On the assimilation of environmental tracer observations for model-based decision support. Hydrology and Earth System Sciences, 24(4), pp.1677-1689.[https://hess.copernicus.org/articles/24/1677/2020/](https://hess.copernicus.org/articles/24/1677/2020/)
    * White, J.T., Knowling, M.J., Fienen, M.N., Feinstein, D.T., McDonald, G.W. and Moore, C.R., 2020. A non-intrusive approach for efficient stochastic emulation and optimization of model-based nitrate-loading management decision support. Environmental Modelling & Software, 126, p.104657. [https://www.sciencedirect.com/science/article/pii/S1364815219309934](https://www.sciencedirect.com/science/article/pii/S1364815219309934)  
-    
+   * Hemmings, B., Knowling, M.J., and Moore, C.R. 2020. Early Uncertainty Quantification for an Improved Decision Support Modeling Workflow: A Streamflow Reliability and Water Quality Example.  Frontiers in Earth Science. [https://www.frontiersin.org/article/10.3389/feart.2020.565613](https://www.frontiersin.org/article/10.3389/feart.2020.565613)  
+   * Knowling, M.J., White, J.T., McDonald, G.W., Kim, J.H., Moore, C.R., and Hemmings, B. (2020). Disentangling environmental and economic contributions to hydro-economic model output uncertainty: An example in the context of land-use change impact assessment. Environmental Modelling and Software.
+   * Hunt, R.J., Fienen, M.N. and White, J.T. (2020), Revisiting “An Exercise in Groundwater Model Calibration and Prediction” After 30 Years: Insights and New Directions. Groundwater, 58: 168-182. https://doi.org/10.1111/gwat.12907
+   * Foster, L.K., White, J.T., Leaf, A., Houston, N. and Teague, A. (2021), Risk‐based decision‐support groundwater modeling for the lower San Antonio River Basin, Texas, USA. Groundwater. Accepted Author Manuscript. https://doi.org/10.1111/gwat.13107
+   * Hunt, R.J., White, J.T., Duncan, L.L., Haugh, C.J. and Doherty, J. (2021), Evaluating lower computational burden approaches for calibration of large environmental models. Groundwater. Accepted Author Manuscript. https://doi.org/10.1111/gwat.13106
+   * White, J.T., Foster, L.K. and Fienen, M.N. (2021), Extending the Capture Map Concept to Estimate Discrete and Risk‐Based Streamflow Depletion Potential. Groundwater. https://doi.org/10.1111/gwat.13080
+   * White, J.T., Knowling, M.J. and Moore, C.R. (2020), Consequences of Groundwater‐Model Vertical Discretization in Risk‐Based Decision‐Making. Groundwater, 58: 695-709. https://doi.org/10.1111/gwat.12957
+   * White, J., Stengel, V., Rendon, S., and Banta, J.: The importance of parameterization when simulating the hydrologic response of vegetative land-cover change, Hydrol. Earth Syst. Sci., 21, 3975–3989, https://doi.org/10.5194/hess-21-3975-2017, 2017. 
 
 
 ## Conference Proceedings
