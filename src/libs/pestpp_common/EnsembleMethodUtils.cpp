@@ -3022,15 +3022,44 @@ void EnsembleMethod::initialize(int cycle)
 
 	if (pest_scenario.get_control_info().noptmax == 0)
 	{
-		message(0, "'noptmax'=0, running control file parameter values and quitting");
-
-		Parameters pars = pest_scenario.get_ctl_parameters();
+		
 		ParamTransformSeq pts = pe.get_par_transform();
-		pts.ctl2numeric_ip(pars);
+		
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
-		_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_adj_par_names());
-		_pe.set_trans_status(ParameterEnsemble::transStatus::NUM);
-		_pe.append(BASE_REAL_NAME, pars);
+		if (cycle == NetPackage::NULL_DA_CYCLE)
+		{
+			message(0, "'noptmax'=0, running control file parameter values and quitting");
+			_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_adj_par_names());
+			_pe.set_trans_status(ParameterEnsemble::transStatus::NUM);
+			Parameters pars = pest_scenario.get_ctl_parameters();
+			pts.ctl2numeric_ip(pars);
+			_pe.append(BASE_REAL_NAME, pars);
+		}
+		else
+		{
+			map<string, int> rmap = pe.get_real_map();
+			if (rmap.find(BASE_REAL_NAME) == rmap.end())
+			{
+				message(0, "'noptmax'=0, running current cycle mean parameter values");
+				message(1, "calculating mean parameter values");
+				Parameters pars = pest_scenario.get_ctl_parameters();
+				pars.update(pe.get_var_names(), pe.get_mean_stl_var_vector());
+				_pe.reserve(vector<string>(), pe.get_var_names());
+				_pe.set_trans_status(pe.get_trans_status());
+				_pe.append("mean", pars);
+			}
+			else
+			{
+				message(0, "'noptmax'=0, running current cycle base parameter values");
+				_pe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_adj_par_names());
+				_pe.set_trans_status(ParameterEnsemble::transStatus::NUM);
+				Parameters pars = pest_scenario.get_ctl_parameters();
+				pars.update(pe.get_var_names(), pe.get_real_vector(BASE_REAL_NAME));
+				_pe.set_trans_status(pe.get_trans_status());
+				_pe.append(BASE_REAL_NAME, pars);
+			}
+		}
+
 		string par_csv = file_manager.get_base_filename() + ".par.csv";
 		//message(1, "saving parameter values to ", par_csv);
 		//_pe.to_csv(par_csv);
@@ -3810,12 +3839,20 @@ void EnsembleMethod::initialize_dynamic_states()
 		set<string>::iterator send = pstates.end();
 		vector<string> t = pest_scenario.get_ctl_ordered_par_names();
 		set<string> pnames(t.begin(), t.end());
+		t = pest_scenario.get_ctl_ordered_obs_names();
+		set<string> onames(t.begin(), t.end());
 		t.clear();
 		set<string>::iterator pend = pnames.end();
+		set<string>::iterator oend = onames.end();
+
 		vector<string> dups, missing;
 		int c = 0;
 		for (auto& sm : state_map)
 		{
+			if (onames.find(sm.first) == oend)
+			{
+				continue;
+			}
 			if (pstates.find(sm.second) != send)
 			{
 				dups.push_back(sm.second);

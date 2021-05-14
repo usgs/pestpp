@@ -573,8 +573,7 @@ int main(int argc, char* argv[])
 			da.set_pe(cycle_curr_pe);
 			da.set_localizer(global_loc);
 			da.initialize(*icycle);
-			
-			
+			da.get_pe().to_csv("da_pe.csv");
 
 			write_global_phi_info(*icycle, f_phi, da, init_real_names);
 

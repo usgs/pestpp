@@ -306,7 +306,7 @@ int main(int argc, char* argv[])
 	{
 		GsaAbstractBase::PARAM_DIST par_dist = GsaAbstractBase::PARAM_DIST::uniform;
 		string par_dist_str = "UNIFORM";
-		int n_sample = 100;
+		int n_sample = pest_scenario.get_pestpp_options().get_gsa_sobol_samples();
 		auto sob_n_sam_it = gsa_opt_map.find("GSA_SOBOL_SAMPLES");
 		if (sob_n_sam_it != gsa_opt_map.end())
 		{
@@ -322,7 +322,7 @@ int main(int argc, char* argv[])
 			else
 			{
 				ostringstream str;
-				str << "SOBOL_PAR_DIST(" << par_dist_str << "):  \"" << par_dist_str << "\" is an invalid distribuation type";
+				str << "SOBOL_PAR_DIST(" << par_dist_str << "):  \"" << par_dist_str << "\" is an invalid distribution type";
 				throw PestError(str.str());
 			}
 		}
