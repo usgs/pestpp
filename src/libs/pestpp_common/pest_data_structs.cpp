@@ -1702,7 +1702,7 @@ void PestppOptions::set_defaults()
 	set_sqp_update_hessian(false);
 	set_sqp_scale_facs(vector<double>{0.00001, 0.0001, 0.01, 0.1, 1.0});
 
-	set_mou_generator("SBX");
+	set_mou_generator("DE");
 	set_mou_population_size(100);
 	set_mou_dv_population_file("");
 	set_mou_obs_population_restart_file("");
@@ -1800,9 +1800,7 @@ void PestppOptions::set_defaults()
 	set_check_tplins(true);
 	set_fill_tpl_zeros(false);
 	set_additional_ins_delimiters("");
-	set_num_tpl_ins_threads(1);
-
-	
+	set_num_tpl_ins_threads(1);	
 
 	set_panther_agent_restart_on_error(false);
 	set_panther_agent_no_ping_timeout_secs(-1);
