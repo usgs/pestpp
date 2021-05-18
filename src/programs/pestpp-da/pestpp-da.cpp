@@ -235,6 +235,17 @@ int main(int argc, char* argv[])
 			assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec, cycles_in_tables);
 		}
 
+		std::sort(assimilation_cycles.begin(), assimilation_cycles.end());
+
+		int start_cycle = pest_scenario.get_pestpp_options().get_da_hotstart_cycle();
+		int max_cycle = assimilation_cycles[assimilation_cycles.size() - 1];
+		if (start_cycle > max_cycle)
+		{
+			stringstream ss;
+			ss << "'da_hotstart_cycle' (" << start_cycle << ") greater than max cycle (" << max_cycle << ")";
+			throw runtime_error(ss.str());
+		}
+
 		if (pest_scenario.get_control_info().noptmax != 0)
 		{
 
@@ -402,10 +413,15 @@ int main(int argc, char* argv[])
 		//ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr
 		ParChangeSummarizer pcs(&curr_pe, &file_manager, &output_file_writer);
 
-		// loop over assimilation cycles
+		
 		stringstream ss;
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 		{
+			if (*icycle < start_cycle)
+			{
+				cout << "fast-forwarding past cycle " << *icycle << endl;
+				continue;
+			}
 			// da_start_cycle, da_end_cycle
 			cout << endl;
 			cout << " =======================================" << endl;
@@ -573,8 +589,7 @@ int main(int argc, char* argv[])
 			da.set_pe(cycle_curr_pe);
 			da.set_localizer(global_loc);
 			da.initialize(*icycle);
-			da.get_pe().to_csv("da_pe.csv");
-
+			
 			write_global_phi_info(*icycle, f_phi, da, init_real_names);
 
 			if (childPest.get_ctl_ordered_nz_obs_names().size() > 0)

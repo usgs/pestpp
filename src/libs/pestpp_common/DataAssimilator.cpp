@@ -557,9 +557,21 @@ void generate_global_ensembles(DataAssimilator& da, ofstream& fout_rec, Paramete
 	}
 	else if (pest_scenario_ptr->get_pestpp_options().get_ies_include_base())
 	{
-		cout << "...replacing last realization with 'base' realization in global parameter ensemble" << endl;
-		fout_rec << "...replacing last realization with 'base' realization in global parameter ensemble" << endl;
-		curr_pe.replace(curr_pe.shape().first - 1, pars, BASE_REAL_NAME);
+		vector<string> t = curr_pe.get_real_names();
+		set<string> snames(t.begin(), t.end());
+		t.clear();
+		if (snames.find(BASE_REAL_NAME) != snames.end())
+		{
+			cout << "'" << BASE_REAL_NAME << "' already in global parameter ensemble, continuing..." << endl;
+			fout_rec << "'" << BASE_REAL_NAME << "' already in global parameter ensemble, continuing..." << endl;
+
+		}
+		else
+		{
+			cout << "...replacing last realization with 'base' realization in global parameter ensemble" << endl;
+			fout_rec << "...replacing last realization with 'base' realization in global parameter ensemble" << endl;
+			curr_pe.replace(curr_pe.shape().first - 1, pars, BASE_REAL_NAME);
+		}
 	}
 
 	cout << "...preparing global observation ensemble for all observations across all cycles" << endl;

@@ -3059,9 +3059,13 @@ void EnsembleMethod::initialize(int cycle)
 				_pe.append(BASE_REAL_NAME, pars);
 			}
 		}
-
-		string par_csv = file_manager.get_base_filename() + ".par.csv";
-		//message(1, "saving parameter values to ", par_csv);
+		ss.str("");
+		ss << file_manager.get_base_filename();
+		if (cycle != NetPackage::NULL_DA_CYCLE)
+			ss << "." << cycle;
+		ss << "." << BASE_REAL_NAME << "." << ".par.csv";
+		string par_csv = ss.str();
+		message(1, "saving control file parameter ensemble to ", par_csv);
 		//_pe.to_csv(par_csv);
 		pe_base = _pe;
 		pe_base.reorder(vector<string>(), act_par_names);
@@ -3088,7 +3092,13 @@ void EnsembleMethod::initialize(int cycle)
 			message(0, "control file parameter value run failed...bummer");
 			throw_em_error("control file parameter value run failed");
 		}
-		string obs_csv = file_manager.get_base_filename() + ".obs.csv";
+
+		ss.str("");
+		ss << file_manager.get_base_filename();
+		if (cycle != NetPackage::NULL_DA_CYCLE)
+			ss << "." << cycle;
+		ss << "." << BASE_REAL_NAME << "." << ".obs.csv";
+		string obs_csv = ss.str();
 		message(1, "saving results from control file parameter value run to ", obs_csv);
 		_oe.to_csv(obs_csv);
 
@@ -3401,12 +3411,18 @@ void EnsembleMethod::initialize(int cycle)
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << file_manager.get_base_filename() << ".0.par.jcb";
+		ss << file_manager.get_base_filename();
+		if (cycle != NetPackage::NULL_DA_CYCLE)
+			ss << "." << cycle;
+		ss << ".0.par.jcb";
 		pe.to_binary(ss.str());
 	}
 	else
 	{
-		ss << file_manager.get_base_filename() << ".0.par.csv";
+		ss << file_manager.get_base_filename();
+		if (cycle != NetPackage::NULL_DA_CYCLE)
+			ss << "." << cycle;
+		ss << ".0.par.csv";
 		pe.to_csv(ss.str());
 	}
 	message(1, "saved initial parameter ensemble to ", ss.str());
@@ -3415,12 +3431,18 @@ void EnsembleMethod::initialize(int cycle)
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << file_manager.get_base_filename() << ".obs+noise.jcb";
+		ss << file_manager.get_base_filename();
+		if (cycle != NetPackage::NULL_DA_CYCLE)
+			ss << "." << cycle;
+		ss << ".obs+noise.jcb";
 		oe.to_binary(ss.str());
 	}
 	else
 	{
-		ss << file_manager.get_base_filename() << ".obs+noise.csv";
+		ss << file_manager.get_base_filename();
+		if (cycle != NetPackage::NULL_DA_CYCLE)
+			ss << "." << cycle;
+		ss << ".obs+noise.csv";
 		oe.to_csv(ss.str());
 	}
 	message(1, "saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
@@ -3439,7 +3461,12 @@ void EnsembleMethod::initialize(int cycle)
 		_pe.reserve(vector<string>(), pe.get_var_names());
 		_pe.set_trans_status(pe.get_trans_status());
 		_pe.append("mean", pars);
-		string par_csv = file_manager.get_base_filename() + ".mean.par.csv";
+		ss.str("");
+		ss << file_manager.get_base_filename();
+		if (cycle != NetPackage::NULL_DA_CYCLE)
+			ss << "." << cycle;
+		ss << ".mean.par.csv";
+		string par_csv = ss.str();
 		message(1, "saving mean parameter values to ", par_csv);
 		_pe.to_csv(par_csv);
 		pe_base = _pe;
@@ -3467,7 +3494,12 @@ void EnsembleMethod::initialize(int cycle)
 			message(0, "mean parameter value run failed...bummer");
 			return;
 		}
-		string obs_csv = file_manager.get_base_filename() + ".mean.obs.csv";
+		ss.str("");
+		ss << file_manager.get_base_filename();
+		if (cycle != NetPackage::NULL_DA_CYCLE)
+			ss << "." << cycle;
+		ss << ".mean.obs.csv";
+		string obs_csv = ss.str();
 		message(1, "saving results from mean parameter value run to ", obs_csv);
 		_oe.to_csv(obs_csv);
 
@@ -3500,7 +3532,8 @@ void EnsembleMethod::initialize(int cycle)
 
 	oe_base = oe; //copy
 	//reorder this for later...
-	oe_base.reorder(vector<string>(), act_obs_names);
+	if (act_obs_names.size() > 0)
+		oe_base.reorder(vector<string>(), act_obs_names);
 
 	pe_base = pe; //copy
 	//reorder this for later
@@ -3552,12 +3585,18 @@ void EnsembleMethod::initialize(int cycle)
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << file_manager.get_base_filename() << ".0.obs.jcb";
+		ss << file_manager.get_base_filename();
+		if (cycle != NetPackage::NULL_DA_CYCLE)
+			ss << "." << cycle;
+		ss << ".0.obs.jcb";
 		oe.to_binary(ss.str());
 	}
 	else
 	{
-		ss << file_manager.get_base_filename() << ".0.obs.csv";
+		ss << file_manager.get_base_filename();
+		if (cycle != NetPackage::NULL_DA_CYCLE)
+			ss << "." << cycle;
+		ss << ".0.obs.csv";
 		oe.to_csv(ss.str());
 	}
 	message(1, "saved initial obs ensemble to", ss.str());
