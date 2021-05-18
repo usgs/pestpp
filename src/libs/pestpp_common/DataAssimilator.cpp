@@ -559,6 +559,7 @@ void generate_global_ensembles(DataAssimilator& da, ofstream& fout_rec, Paramete
 		curr_oe.set_pest_scenario_ptr(pest_scenario_ptr);
 		curr_oe.set_rand_gen(&rand_gen);
 		curr_oe.reserve(curr_pe.get_real_names(), pest_scenario_ptr->get_ctl_ordered_obs_names());
+		curr_noise = curr_oe;
 	}
 	else
 	{
