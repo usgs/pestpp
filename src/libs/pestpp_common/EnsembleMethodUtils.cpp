@@ -3010,7 +3010,7 @@ vector<int> EnsembleMethod::run_ensemble(ParameterEnsemble& _pe,
 }
 
 
-void EnsembleMethod::initialize(int cycle)
+void EnsembleMethod::initialize(int cycle, bool run)
 {
 	message(0, "initializing");
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
@@ -3253,7 +3253,13 @@ void EnsembleMethod::initialize(int cycle)
 		message(1, "not using prior parameter covariance matrix scaling");
 	}
 
-	oe_drawn = initialize_oe(obscov);
+	if ((oe.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
+	{
+		message(2, "using pre-set observation ensemble");
+		oe_drawn = false;
+	}
+	else
+		oe_drawn = initialize_oe(obscov);
 	string center_on = ppo->get_ies_center_on();
 
 	try
@@ -3529,8 +3535,13 @@ void EnsembleMethod::initialize(int cycle)
 	oe_org_real_names = oe.get_real_names();
 	pe_org_real_names = pe.get_real_names();
 
-
-	oe_base = oe; //copy
+	if ((oe_base.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
+	{
+		message(2, "using pre-set observation ensemble");
+	}
+	else
+		oe_base = oe; //copy
+	
 	//reorder this for later...
 	if (act_obs_names.size() > 0)
 		oe_base.reorder(vector<string>(), act_obs_names);
@@ -3543,6 +3554,9 @@ void EnsembleMethod::initialize(int cycle)
 	//the hard way to restart
 	if (obs_restart_csv.size() > 0)
 		initialize_restart();
+
+	if (!run)
+		return;
 
 	//check for center on 
 	if (center_on.size() > 0)

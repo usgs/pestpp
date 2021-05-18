@@ -281,20 +281,26 @@ public:
 	ParameterEnsemble get_pe() { return pe; }
 	ParameterEnsemble* get_pe_ptr() { return &pe; }
 	void set_pe(ParameterEnsemble& new_pe) { pe = new_pe; }
+	void set_oe(ObservationEnsemble& new_oe) { oe = new_oe; }
+	void set_noise_oe(ObservationEnsemble& new_noise) { oe_base = new_noise; }
 	void set_localizer(Localizer& new_loc) { localizer = new_loc; }
 	Localizer get_localizer() { return localizer;  }
 	bool initialize_pe(Covariance& cov);
 	void initialize_parcov();
+	bool initialize_oe(Covariance& cov);
+	void initialize_obscov();
 	Covariance* get_parcov_ptr() { return &parcov; }
+	Covariance* get_obscov_ptr() { return &obscov; }
 	std::mt19937& get_rand_gen() { return rand_gen; }
 	vector<string> get_act_par_names() { return act_par_names; }
-	ObservationEnsemble& get_oe() { return oe; }
+	ObservationEnsemble get_oe() { return oe; }
+	ObservationEnsemble get_noise_oe() { return oe_base; }
 	L2PhiHandler& get_phi_handler() { return ph; }
 	int get_iter() { return iter; }
 	FileManager& get_file_manager() { return file_manager; }
 	Pest* get_pest_scenario_ptr() { return &pest_scenario; }
 	
-	void initialize(int cycle = NetPackage::NULL_DA_CYCLE);
+	void initialize(int cycle = NetPackage::NULL_DA_CYCLE, bool run = true);
 
 	//this is not called in the initialization - must be called before initialize() to trigger dynamic state handling...
 	void initialize_dynamic_states();
@@ -373,10 +379,10 @@ protected:
 	void report_and_save(int cycle);
 	void save_mat(string prefix, Eigen::MatrixXd& mat);
 	//bool initialize_pe(Covariance& cov);
-	bool initialize_oe(Covariance& cov);
+	
 	void initialize_restart();
 	//void initialize_parcov();
-	void initialize_obscov();
+	
 	void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, vector<int> subset_idxs = vector<int>());
 	
 

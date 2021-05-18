@@ -392,7 +392,8 @@ int main(int argc, char* argv[])
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
 		ParameterEnsemble curr_pe(&pest_scenario);
 		ObservationEnsemble curr_oe(&pest_scenario);
-		generate_global_ensembles(da, fout_rec, curr_pe, curr_oe);
+		ObservationEnsemble curr_noise(&pest_scenario);
+		generate_global_ensembles(da, fout_rec, curr_pe, curr_oe, curr_noise);
 		
 		//prepare a phi csv file for all cycles
 		string phi_file = file_manager.get_base_filename() + ".global.phi.actual.csv";
@@ -587,6 +588,15 @@ int main(int argc, char* argv[])
 			cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
 			cycle_curr_pe.set_fixed_info(curr_pe.get_fixed_map());
 			da.set_pe(cycle_curr_pe);
+			obs_names = childPest.get_ctl_ordered_obs_names();
+			ObservationEnsemble cycle_curr_oe(&childPest, &rand_gen, curr_oe.get_eigen(vector<string>(),obs_names), curr_oe.get_real_names(), obs_names);
+			da.set_oe(cycle_curr_oe);
+			if (nnz_obs > 0)
+			{
+				obs_names = childPest.get_ctl_ordered_nz_obs_names();
+				ObservationEnsemble cycle_curr_noise(&childPest, &rand_gen, curr_noise.get_eigen(cycle_curr_oe.get_real_names(), obs_names), cycle_curr_oe.get_real_names(), obs_names);
+				da.set_noise_oe(cycle_curr_noise);
+			}
 			da.set_localizer(global_loc);
 			da.initialize(*icycle);
 			
@@ -645,7 +655,7 @@ int main(int argc, char* argv[])
 			cycle_curr_pe.transform_ip(curr_pe.get_trans_status());
 			curr_pe.replace_col_vals(cycle_curr_pe.get_var_names(), *cycle_curr_pe.get_eigen_ptr());
 			
-			ObservationEnsemble cycle_curr_oe = da.get_oe();
+			cycle_curr_oe = da.get_oe();
 			//if we lost some realizations...
 			if (curr_oe.shape().first > cycle_curr_oe.shape().first)
 			{
