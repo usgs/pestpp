@@ -2467,8 +2467,8 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 		}
 		else
 		{
-			Observations obs;
-			obs.update(oe.get_var_names(), eigenvec_2_stlvec(oe.get_real_vector(tag)));
+			Observations obs = pest_scenario.get_ctl_observations();
+			obs.update_without_clear(oe.get_var_names(), eigenvec_2_stlvec(oe.get_real_vector(tag)));
 			ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
 			// save new residuals to .rei file
 			ss.str("");
