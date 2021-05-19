@@ -19,7 +19,13 @@
    * Hunt, R.J., White, J.T., Duncan, L.L., Haugh, C.J. and Doherty, J. (2021), Evaluating lower computational burden approaches for calibration of large environmental models. Groundwater. Accepted Author Manuscript. https://doi.org/10.1111/gwat.13106
    * White, J.T., Foster, L.K. and Fienen, M.N. (2021), Extending the Capture Map Concept to Estimate Discrete and Risk‐Based Streamflow Depletion Potential. Groundwater. https://doi.org/10.1111/gwat.13080
    * White, J.T., Knowling, M.J. and Moore, C.R. (2020), Consequences of Groundwater‐Model Vertical Discretization in Risk‐Based Decision‐Making. Groundwater, 58: 695-709. https://doi.org/10.1111/gwat.12957
-   * White, J., Stengel, V., Rendon, S., and Banta, J.: The importance of parameterization when simulating the hydrologic response of vegetative land-cover change, Hydrol. Earth Syst. Sci., 21, 3975–3989, https://doi.org/10.5194/hess-21-3975-2017, 2017. 
+   * White, J., Stengel, V., Rendon, S., and Banta, J.: The importance of parameterization when simulating the hydrologic response of vegetative land-cover change, Hydrol. Earth Syst. Sci., 21, 3975–3989, https://doi.org/10.5194/hess-21-3975-2017, 2017.
+   * Hayley, K., Valenza, A., White, E., Hutchison, B., & Schumacher, J. (2019). Application of the iterative ensemble smoother method and cloud computing: A groundwater modeling case study. Water, 11(8), 1649.
+   * Doble, R., Pickett, T., Janardhanan, S., Crosbie, R., & Gonzalez, D. (2020). Potential impacts on groundwater resources from conventional gas in the South East of SA. 
+   * Moridnejad, Maryam (2015) Sensitivity analysis of a one dimensional heat transport model in the Ngongotaha Stream, New Zealand. New Zealand hydrological society conference 2015, University of Waikato
+   * Heywood, C. E., Kahle, S. C., Olsen, T. D., Patterson, J. D., & Burns, E. (2016). Simulation of groundwater storage changes in the eastern Pasco Basin, Washington (No. 2016-5026). US Geological Survey.
+   * Heywood, C. E., Lindaman, M., & Lovelace, J. K. (2019). Simulation of groundwater flow and chloride transport in the “1,500-foot” sand,“2,400-foot” sand, and “2,800-foot” sand of the Baton Rouge area, Louisiana (No. 2019-5102). US Geological Survey.
+   * Zhuang, C., Zhou, Z., Illman, W. A., Guo, Q., & Wang, J. (2017). Estimating hydraulic parameters of a heterogeneous aquitard using long-term multi-extensometer and groundwater level data. Hydrogeology Journal, 25(6), 1721-1732.
 
 
 ## Conference Proceedings
