@@ -26,6 +26,8 @@
    * Heywood, C. E., Kahle, S. C., Olsen, T. D., Patterson, J. D., & Burns, E. (2016). Simulation of groundwater storage changes in the eastern Pasco Basin, Washington (No. 2016-5026). US Geological Survey.
    * Heywood, C. E., Lindaman, M., & Lovelace, J. K. (2019). Simulation of groundwater flow and chloride transport in the “1,500-foot” sand,“2,400-foot” sand, and “2,800-foot” sand of the Baton Rouge area, Louisiana (No. 2019-5102). US Geological Survey.
    * Zhuang, C., Zhou, Z., Illman, W. A., Guo, Q., & Wang, J. (2017). Estimating hydraulic parameters of a heterogeneous aquitard using long-term multi-extensometer and groundwater level data. Hydrogeology Journal, 25(6), 1721-1732.
+   * White, J. T., Connor, C. B., Connor, L., & Hasenaka, T. (2017). Efficient inversion and uncertainty quantification of a tephra fallout model. Journal of Geophysical Research: Solid Earth, 122(1), 281-294.
+   * Wallis, I., Prommer, H., Berg, M., Siade, A. J., Sun, J., & Kipfer, R. (2020). The river–groundwater interface as a hotspot for arsenic release. Nature Geoscience, 13(4), 288-295.
 
 
 ## Conference Proceedings
