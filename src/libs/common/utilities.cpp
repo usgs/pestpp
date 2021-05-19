@@ -1386,6 +1386,22 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 	header_line = upper_cp(org_header_line);
 	f_rec << "...header line: " << header_line << endl;
 	tokenize(header_line, col_names, delim,false);
+	for (auto& t : col_names)
+	{
+		bool cleaned = false;
+		for (auto& c : t)
+		{
+			if ((c < 32) || (c > 127))
+			{
+				c = ' ';
+				cleaned = true;
+			}
+		}
+		if (cleaned)
+		{
+			strip_ip(t);
+		}
+	}
 	int hsize = col_names.size();
 	set<string> tset;
 	tset.insert(col_names.begin(), col_names.end());
