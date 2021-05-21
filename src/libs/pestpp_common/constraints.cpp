@@ -2873,42 +2873,77 @@ map<string, double> Constraints::get_constraint_map(Parameters& par_and_dec_vars
 
 Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, double working_set_tol)
 {
-	Covariance cov = dv.get_empirical_cov_matrices(file_mgr_ptr).second;
-	Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies();
+    vector<string> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol);
+    if (working_set.size() > 0) {
+        Covariance cov = dv.get_empirical_cov_matrices(file_mgr_ptr).second;
+        Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies().transpose();
 
-	cov = oe.get_empirical_cov_matrices(file_mgr_ptr).second;
-	Eigen::MatrixXd delta_oe = *cov.inv().e_ptr() * oe.get_eigen_anomalies();
-	Eigen::MatrixXd approx_jco = delta_oe * delta_dv.inverse();
-
-	return Mat();
+        cov = oe.get_empirical_cov_matrices(file_mgr_ptr).second;
+        Eigen::MatrixXd delta_oe = *cov.inv().e_ptr() * oe.get_eigen_anomalies().transpose();
+        //todo: pseudo inv for delta_dv - will almost certainly be singular for large problems...
+        Eigen::MatrixXd s, V, U;
+        Eigen::BDCSVD<Eigen::MatrixXd> svd_fac(delta_dv, Eigen::DecompositionOptions::ComputeFullU |
+                                                         Eigen::DecompositionOptions::ComputeFullV);
+        s = svd_fac.singularValues();
+        U = svd_fac.matrixU();
+        V = svd_fac.matrixV();
+        s.col(0).asDiagonal().inverse();
+        Eigen::MatrixXd full_s_inv(V.rows(), U.cols());
+        full_s_inv.setZero();
+        for (int i = 0; i < s.size(); i++)
+            full_s_inv(i, i) = s(i);
+        delta_dv = V.transpose() * full_s_inv * U;
+        //delta_oe.transposeInPlace();
+        //delta_dv.transposeInPlace();
+        Eigen::MatrixXd approx_jco = delta_oe * delta_dv;
+        delta_dv.resize(0, 0);
+        delta_oe.resize(0, 0);
+        V.resize(0, 0);
+        U.resize(0, 0);
+        full_s_inv.resize(0, 0);
+        Eigen::MatrixXd working_mat(working_set.size(), dv.shape().second);
+        oe.update_var_map();
+        map<string, int> vmap = oe.get_var_map();
+        int i = 0;
+        for (auto &n : working_set) {
+            working_mat.row(i) = approx_jco.row(vmap[n]);
+            i++;
+        }
+        return Mat(working_set, dv.get_var_names(), working_mat.sparseView());
+    }
+    else
+    {
+        return Mat();
+    }
 }
 
 Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& jco, bool do_shift, double working_set_tol)
 {
-	map<string, double> constraint_map = get_constraint_map(par_and_dec_vars, constraints_sim, do_shift);
-	vector<string> working_set;
-	for (auto& name : ctl_ord_obs_constraint_names)
-	{
-		if (constraint_sense_map[name] == ConstraintSense::equal_to)
-			working_set.push_back(name);
-
-		else if (abs(constraint_map[name]) < working_set_tol)
-		{
-			working_set.push_back(name);
-		}
-	}
-	for (auto& name : ctl_ord_pi_constraint_names)
-	{
-		if (constraint_sense_map[name] == ConstraintSense::equal_to)
-			working_set.push_back(name);
-
-		else if (abs(constraint_map[name]) < working_set_tol)
-		{
-			working_set.push_back(name);
-		}
-	}
+	vector<string> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol);
 	Eigen::SparseMatrix<double> t = jco.get_matrix(working_set, dec_var_names);
 	return Mat(working_set, dec_var_names,t);
+}
+
+vector<string> Constraints::get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol) {
+    map<string, double> constraint_map = get_constraint_map(par_and_dec_vars, constraints_sim, do_shift);
+    vector<string> working_set;
+    for (auto &name : ctl_ord_obs_constraint_names) {
+        if (constraint_sense_map[name] == ConstraintSense::equal_to)
+            working_set.push_back(name);
+
+        else if (abs(constraint_map[name]) < working_set_tol) {
+            working_set.push_back(name);
+        }
+    }
+    for (auto &name : ctl_ord_pi_constraint_names) {
+        if (constraint_sense_map[name] == ConstraintSense::equal_to)
+            working_set.push_back(name);
+
+        else if (abs(constraint_map[name]) < working_set_tol) {
+            working_set.push_back(name);
+        }
+    }
+    return working_set;
 }
 
 int Constraints::get_num_nz_pi_constraint_elements()

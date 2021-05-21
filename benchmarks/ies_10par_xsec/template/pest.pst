@@ -55,3 +55,5 @@ mfnwt 10par_xsec.nam
 hk_Layer_1.ref.tpl hk_Layer_1.ref
 strt_Layer_1.ref.tpl strt_Layer_1.ref
 10par_xsec.hds.ins 10par_xsec.hds
+++ies_num_reals(5)
+++ies_bad_phi_sigma(2.0)
