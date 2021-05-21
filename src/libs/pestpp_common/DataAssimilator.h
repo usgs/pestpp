@@ -103,7 +103,8 @@ map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario,
 
 void write_global_phi_info(int cycle, ofstream& f_phi, DataAssimilator& da, vector<string>& init_real_names);
 
-void generate_global_ensembles(DataAssimilator& da, ofstream& fout_rec, ParameterEnsemble& curr_pe, ObservationEnsemble& curr_oe);
+void generate_global_ensembles(DataAssimilator& da, ofstream& fout_rec, ParameterEnsemble& curr_pe, 
+	ObservationEnsemble& curr_oe, ObservationEnsemble& curr_noise);
 
 
 

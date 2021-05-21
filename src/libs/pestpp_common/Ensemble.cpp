@@ -1641,6 +1641,7 @@ void Ensemble::check_for_normal(string context)
 		for (int j = 0; j < reals.cols(); j++)
 			if (!isnormal(reals(i, j)) && (reals(i, j) != 0.0))
 			{
+				double v = reals(i, j);
 				ss << real_names[i] << "," << var_names[j] << "," << reals(i,j) << endl;
 				nn_found = true;
 			}
@@ -1648,6 +1649,7 @@ void Ensemble::check_for_normal(string context)
 	{
 		ofstream of("ensemble_not_normal.csv");
 		of << ss.str();
+		of.close();
 		ss.str("");
 		ss << "Ensemble::check_for_normal() - " << context << " - not normal values found, see file 'ensemble_not_normal.csv'";
 		throw_ensemble_error(ss.str());
@@ -1926,6 +1928,10 @@ map<string,int> Ensemble::from_binary_old(string file_name, vector<string> &name
 
 void Ensemble::read_csv_by_reals(int num_reals,ifstream &csv, map<string,int> &header_info, map<string,int> &index_info)
 {
+	if (header_info.size() == 0)
+	{
+		throw_ensemble_error("Ensemble::read_csv_by_reals() error: header_info is empty");
+	}
 	//read a csv file to an Ensmeble
 	int lcount = 1;
 	//vector<vector<double>> vectors;
@@ -3717,15 +3723,37 @@ vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, R
 void ObservationEnsemble::from_binary(string file_name)
 {
 	//load obs en from binary jco-type file
-	vector<string> names = pest_scenario_ptr->get_ctl_ordered_obs_names();
-	Ensemble::from_binary(file_name, names, true);
+	vector<string> names = pest_scenario_ptr->get_ctl_ordered_nz_obs_names();
+	if (names.size() == 0)
+	{
+		names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+	}
+	Ensemble::from_binary(file_name, names, false);
 	unordered_set<string>svar_names(var_names.begin(), var_names.end());
 	vector<string> missing;
-	for (auto& name : pest_scenario_ptr->get_ctl_ordered_obs_names())
+	for (auto& name : pest_scenario_ptr->get_ctl_ordered_nz_obs_names())
 		if (svar_names.find(name) == svar_names.end())
 			missing.push_back(name);
 	if (missing.size() > 0)
 		throw_ensemble_error("from_binary() error: the following non-zero-weighted obs names in the control file are not in the binary obs ensemble file:", missing);
+	names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+	if (var_names.size() < names.size())
+	{
+		update_var_map();
+		map<string, int>::iterator end = var_map.end();
+		Eigen::MatrixXd full(reals.rows(), names.size());
+		full.setZero();
+		string name;
+		for (int j = 0; j < names.size(); j++)
+		{
+			name = names[j];
+			if (var_map.find(name) != end)
+				full.col(j) = reals.col(var_map.at(name));
+		}
+		var_names = names;
+		reals = full;
+		update_var_map();
+	}
 }
 
 void ObservationEnsemble::from_csv(string file_name)
@@ -3736,7 +3764,15 @@ void ObservationEnsemble::from_csv(string file_name)
 	ifstream csv(file_name);
 	if (!csv.good())
 		throw runtime_error("error opening observation csv " + file_name + " for reading");
-	pair<map<string,int>, map<string, int>> p = prepare_csv(pest_scenario_ptr->get_ctl_ordered_nz_obs_names(), csv, false);
+	vector<string> names = pest_scenario_ptr->get_ctl_ordered_nz_obs_names();
+	bool forgive = false;
+	if (names.size() == 0)
+	{
+		names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+		forgive = true;
+	}
+
+	pair<map<string,int>, map<string, int>> p = prepare_csv(names, csv, forgive);
 
 	map<string, int> header_info = p.first, index_info = p.second;
 	//blast through the file to get number of reals

@@ -666,6 +666,8 @@ public:
 	void set_da_obs_cycle_table(string _filename) { da_obs_cycle_table = _filename; }
 	string get_da_weight_cycle_table() const { return da_weight_cycle_table; }
 	void set_da_weight_cycle_table(string _filename) { da_weight_cycle_table = _filename; }
+	int get_da_hotstart_cycle() const { return da_hotstart_cycle; }
+	void set_da_hotstart_cycle(int val) { da_hotstart_cycle = val; }
 
 	bool get_debug_check_par_en_consistency() const { return debug_check_paren_consistency; }
 	void set_debug_check_par_en_consistency(bool _flag) { debug_check_paren_consistency = _flag; }
@@ -851,6 +853,7 @@ private:
 	string da_par_cycle_table;
 	string da_obs_cycle_table;
 	string da_weight_cycle_table;
+	int da_hotstart_cycle;
 
 	
 
