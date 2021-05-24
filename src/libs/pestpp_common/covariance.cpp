@@ -2,14 +2,12 @@
 #include <string>
 #include <sstream>
 #include <iostream>
-#include <fstream>
 #include <iomanip>
 #include <vector>
 #include <random>
 #include <iterator>
 #include <Eigen/Dense>
-#include <Eigen/Sparse>
-#include <Eigen/IterativeLinearSolvers>
+
 #include <Eigen/SparseCholesky>
 
 #include "SVDPackage.h"
@@ -940,8 +938,9 @@ void Mat::drop_cols(const vector<string> &drop_col_names)
 		new_col_names = col_names;
 	else
 	{
+
 		const set<string> snames(drop_col_names.begin(), drop_col_names.end());
-		set<string>::const_iterator send = snames.end();
+		send = snames.end();
 		for (auto &name : col_names)
 		{
 			//if (find(drop_col_names.begin(), drop_col_names.end(), name) == drop_col_names.end())
@@ -984,7 +983,7 @@ void Mat::drop_rows(const vector<string> &drop_row_names)
 	else
 	{
 		const set<string> snames(drop_row_names.begin(), drop_row_names.end());
-		set<string>::const_iterator send = snames.end();
+		send = snames.end();
 		for (auto &name : row_names)
 		{
 			//if (find(drop_row_names.begin(), drop_row_names.end(), name) == drop_row_names.end())
@@ -1253,7 +1252,7 @@ string Covariance::try_from(Pest &pest_scenario, FileManager &file_manager, bool
 	}
 	if (extra.size() > 0)
 	{
-		stringstream ss;
+		ss.str("");
 		ss << "WARNING: Cov::try_from(): " << extra.size() << " extra elements in covariance matrix being drop - these are probably for fixed parameters and/or zero-weight observations";
 		//for (auto name : extra)
 		//	ss << " " << name;
@@ -1434,18 +1433,18 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 
 				//check that the names in the covariance matrix are not already listed
 				vector<string> dup_names;
-				for (auto &name : cov.get_row_names())
+				for (auto &_name : cov.get_row_names())
 				{
-					if (find(names.begin(), names.end(), name) != names.end())
-						dup_names.push_back(name);
+					if (find(names.begin(), names.end(), _name) != names.end())
+						dup_names.push_back(_name);
 					else
-						names.push_back(name);
+						names.push_back(_name);
 				}
 				if (dup_names.size() != 0)
 				{
 					cout << "the following names from covariance matrix file " << cov_filename << " have already be found in uncertainty file " << filename << endl;
-					for (auto &name : dup_names)
-						cout << name << ',';
+					for (auto &_name : dup_names)
+						cout << _name << ',';
 					cout << endl;
 					throw runtime_error("Cov::from_uncertainty_file() error:atleast one name in covariance matrix " + cov_filename + " is already listed in uncertainty file: " + filename);
 				}

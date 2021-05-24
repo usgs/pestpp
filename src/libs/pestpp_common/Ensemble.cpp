@@ -3,7 +3,6 @@
 #include <unordered_set>
 #include <iterator>
 #include <limits>
-#include <cstddef>
 #include "Ensemble.h"
 #include "RestartController.h"
 #include "utilities.h"
@@ -275,148 +274,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 			//if ((num_threads <= 0) || (group_keys.size() == 1))
 			//jwhite 23 dec 2020 - something is up with the multithreaded draw (and its a really mem pig)
 			//so turning it off
-			if (true)
-			{
-				worker.work(0, num_reals, level, idx_map, std_map);
-			}
-			else
-			{
-				Eigen::setNbThreads(1);
-				vector<thread> threads;
-				vector<exception_ptr> exception_ptrs;
-				plog->log_event("launching draw threads");
-
-				for (int i = 0; i < num_threads; i++)
-				{
-					exception_ptrs.push_back(exception_ptr());
-				}
-
-				for (int i = 0; i < num_threads; i++)
-				{
-					//threads.push_back(thread(&LocalUpgradeThread::work, &worker, i, iter, cur_lam));
-
-					threads.push_back(thread(draw_thread_function, i, std::ref(worker), num_reals, level, idx_map, std_map,std::ref(exception_ptrs[i])));
-
-				}
-				plog->log_event("waiting to join threads");
-				//for (auto &t : threads)
-				//	t.join();
-				for (int i = 0; i < num_threads; ++i)
-				{
-					if (exception_ptrs[i])
-					{
-						try
-						{
-							rethrow_exception(exception_ptrs[i]);
-						}
-						catch (const std::exception& e)
-						{
-							ss.str("");
-							ss << "thread " << i << "raised an exception: " << e.what();
-							throw runtime_error(ss.str());
-						}
-					}
-					threads[i].join();
-					if (exception_ptrs[i])
-					{
-						try
-						{
-							rethrow_exception(exception_ptrs[i]);
-						}
-						catch (const std::exception& e)
-						{
-							ss.str("");
-							ss << "thread " << i << "raised an exception: " << e.what();
-							throw runtime_error(ss.str());
-						}
-					}
-				}
-				plog->log_event("threaded draws done");
-
-			}
-			
-
-			//Covariance gcov;
-			//
-			//RedSVD::RedSymEigen<Eigen::SparseMatrix<double>> eig;
-
-			//Eigen::MatrixXd proj;
-			////map<string, int> idx_map;
-			//vector<int> idx;
-			//for (int i = 0; i < var_names.size(); i++)
-			//	idx_map[var_names[i]] = i;
-			//for (auto &gi : grouper)
-			//{
-			//	ss.str("");
-			//	ss << "...processing " << gi.first << " with " << gi.second.size() << " elements" << endl;
-			//	cout << ss.str();
-			//	plog->log_event(ss.str());
-			//	if (gi.second.size() == 0)
-			//		throw_ensemble_error("Ensemble::draw(): no elements found for group", gi.second);
-			//	if (gi.second.size() == 1)
-			//	{
-			//		ss.str("");
-			//		ss << "only one element in group " << gi.first << ", scaling by std";
-			//		plog->log_event(ss.str());
-			//		int j = idx_map[gi.second[0]];
-			//		draws.col(j) *= std(j);
-			//		continue;
-			//	}
-
-			//	gcov = cov.get(gi.second);
-			//	if (level > 2)
-			//	{
-			//		gcov.to_ascii(gi.first + "_cov.dat");
-			//	}
-
-			//	idx.clear();
-			//	for (auto n : gi.second)
-			//		idx.push_back(idx_map[n]);
-			//	if (idx.size() != idx[idx.size() - 1] - idx[0] + 1)
-			//		throw_ensemble_error("Ensemble:: draw() error in full cov group draw: idx out of order");
-
-			//	//cout << var_names[idx[0]] << "," << var_names[idx.size() - idx[0]] << endl;
-			//	//cout << idx[0] << ',' << idx[idx.size()-1] << ',' <<  idx.size() << " , " << idx[idx.size()-1] - idx[0] <<  endl;
-
-			//	double fac = gcov.e_ptr()->diagonal().minCoeff();
-			//	ss.str("");
-			//	ss << "min variance for group " << gi.first << ": " << fac;
-			//	plog->log_event(ss.str());
-			//	Eigen::MatrixXd block = draws.block(0, idx[0], num_reals, idx.size());
-			//	ss.str("");
-			//	ss << "Randomized Eigen decomposition of full cov for " << gi.second.size() << " element matrix" << endl;
-			//	plog->log_event(ss.str());
-			//	eig.compute(*gcov.e_ptr() * (1.0/fac), gi.second.size());
-			//	//RedSVD::RedSVD<Eigen::SparseMatrix<double>> svd;
-			//	//svd.compute(*gcov.e_ptr(),gcov.get_col_names().size());// , gi.second.size());
-			//	//cout << svd.singularValues() << endl;
-			//	//Eigen::JacobiSVD<Eigen::MatrixXd> svd(gcov.e_ptr()->toDense(), Eigen::ComputeFullU);
-			//	//svd.computeU();
-
-			//	proj = (eig.eigenvectors() * (fac *eig.eigenvalues()).cwiseSqrt().asDiagonal());
-			//	//proj = (svd.matrixU() * svd.singularValues().asDiagonal());
-
-			//	if (level > 2)
-			//	{
-			//		ofstream f(gi.first + "_evec.dat");
-			//		f << eig.eigenvectors() << endl;
-			//		//f << svd.matrixU() << endl;
-			//		f.close();
-			//		ofstream ff(gi.first + "_sqrt_evals.dat");
-			//		ff << (fac * eig.eigenvalues()).cwiseSqrt() << endl;
-			//		//ff << svd.singularValues() << endl;
-			//		ff.close();
-			//		ofstream fff(gi.first+"_proj.dat");
-			//		fff << proj << endl;
-			//		fff.close();
-			//	}
-			//	//cout << "block " << block.rows() << " , " << block.cols() << endl;
-			//	//cout << " proj " << proj.rows() << " , " << proj.cols() << endl;
-			//	plog->log_event("projecting group block");
-			//	draws.block(0, idx[0], num_reals, idx.size()) = (proj * block.transpose()).transpose();
-
-			//}
-			
+			worker.work(0, num_reals, level, idx_map, std_map);
 		}
 		else
 		{
@@ -1271,9 +1129,9 @@ pair<map<string,int>, map<string, int>> Ensemble::prepare_csv(const vector<strin
 	vector<string> missing_names;
 	unordered_set<string>::iterator end = hset.end();
 	string name;
-	for (auto &name : names)
-		if (hset.find(name) == end)
-			missing_names.push_back(name);
+	for (auto &_name : names)
+		if (hset.find(_name) == end)
+			missing_names.push_back(_name);
 	/*if (pest_scenario_ptr->get_pestpp_options().get_ies_csv_by_reals())
 	{
 		if (missing_names.size() > 0)
@@ -2409,10 +2267,10 @@ void ParameterEnsemble::from_csv(string file_name, bool forgive)
 		map_ptr = &index_info;
 	map<string, int>::iterator end = map_ptr->end();
 
-	for (auto p : pest_scenario_ptr->get_ctl_ordered_adj_par_names())
+	for (auto& _p : pest_scenario_ptr->get_ctl_ordered_adj_par_names())
 	{
-		if (map_ptr->find(p) == end)
-			missing.push_back(p);
+		if (map_ptr->find(_p) == end)
+			missing.push_back(_p);
 	}
 	if (missing.size() > 0)
 	{

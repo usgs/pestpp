@@ -2,14 +2,11 @@
 #include <string>
 #include <sstream>
 #include <iostream>
-#include <fstream>
 #include <iomanip>
 #include <vector>
 #include <random>
 #include <iterator>
 #include <Eigen/Dense>
-#include <Eigen/Sparse>
-#include <Eigen/IterativeLinearSolvers>
 #include <Eigen/SparseCholesky>
 
 #include "SVDPackage.h"
@@ -89,9 +86,6 @@ void OptObjFunc::report()
 	else
 	{
 		f_rec << "  ---  objective function coefficients  ---  " << endl;
-		vector<string> missing;
-		ofstream& f_rec = file_mgr_ptr->rec_ofstream();
-		map<string, double>::iterator end = obj_func_coef_map.end();
 		f_rec << setw(20) << left << "name" << setw(25) << "obj func coefficient" << endl;
 		for (auto& name : dv_names)
 		{
@@ -781,7 +775,8 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 						throw_constraints_error("restarting with opt_chance_points=='all' requires both the par and obs nested stack files");
 
 					}
-					vector<string> tokens, missing, keep_org_names, keep_new_names, var_names = stack_pe.get_var_names();
+					vector<string> tokens, keep_org_names, keep_new_names, var_names = stack_pe.get_var_names();
+					missing.clear();
 					string member_name, last_member_name = "";
 					for (auto n : stack_oe.get_real_names())
 					{
@@ -929,7 +924,7 @@ void Constraints::initial_report()
 			else
 			{
 				f_rec << "  non-zero weight observations used for conditioning in FOSM-based chance constraint/objective calculations: " << endl;
-				int i = 0;
+				i = 0;
 				for (auto& name : nz_obs_names)
 				{
 					f_rec << setw(15) << name;
@@ -2366,7 +2361,6 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 
 		//work out what var names for the stack_oe we dont need so we can drop them!
 		vector<string> drop_names;
-		pair<vector<int>, ObservationEnsemble> stack_info;
 		set<string> s_obs_constraint_names(ctl_ord_obs_constraint_names.begin(), ctl_ord_obs_constraint_names.end());
 		vector<string> names1, names2;
 		for (auto name : stack_oe.get_var_names())
@@ -2392,8 +2386,8 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 			//test all but one stack runs failed
 			if ((!test_failed) && (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder()))
 			{
-				for (int i = 1; i < real_info.second.size(); i++)
-					stack_info.first.push_back(i);
+				for (int ii = 1; ii < real_info.second.size(); ii++)
+					stack_info.first.push_back(ii);
 				test_failed = true;
 				cout << "ies_debug_fail_remainder = true, failing full stack for member " << real_info.first << endl;
 				file_mgr_ptr->rec_ofstream() << "ies_debug_fail_remainder = true, failing most of stack for member " << real_info.first << endl;
@@ -2507,7 +2501,7 @@ void Constraints::nested_stack_stdev_summary(map<string, ObservationEnsemble>& _
 		mxlen = max(mxlen, (int)cname.size());
 	}
 
-	string cname;
+	//string cname;
 	map<string, double> mean_map, std_map;
 	for (auto& m : _stack_oe_map)
 	{
@@ -2917,10 +2911,10 @@ Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars,
     }
 }
 
-Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& jco, bool do_shift, double working_set_tol)
+Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& _jco, bool do_shift, double working_set_tol)
 {
 	vector<string> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol);
-	Eigen::SparseMatrix<double> t = jco.get_matrix(working_set, dec_var_names);
+	Eigen::SparseMatrix<double> t = _jco.get_matrix(working_set, dec_var_names);
 	return Mat(working_set, dec_var_names,t);
 }
 

@@ -451,10 +451,10 @@ vector<string> Pest::get_nonregul_obs() const
 //	return process_ctl_file_old(fin, pst_filename, f_out);
 //}
 
-int Pest::process_ctl_file(ifstream& fin, string pst_filename)
+int Pest::process_ctl_file(ifstream& fin, string _pst_filename)
 {
 	ofstream f_out("ctl_process.out");
-	return process_ctl_file(fin, pst_filename, f_out);
+	return process_ctl_file(fin, _pst_filename, f_out);
 }
 
 
@@ -1707,7 +1707,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	double numer, demon, ratio;
 	for (auto p: temp_tied_map)
 	{
-		string name = p.first;
+		name = p.first;
 		string name_tied = p.second;
 		numer = ctl_parameters[name];
 		demon = ctl_parameters[name_tied];
@@ -1836,9 +1836,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	{
 		set<string> found;
 		string gname;
-		for (auto name : ctl_ordered_obs_names)
+		for (auto& _name : ctl_ordered_obs_names)
 		{
-			gname = observation_info.get_group(name);
+			gname = observation_info.get_group(_name);
 			if (found.find(gname) == found.end())
 			{
 				found.insert(gname);
@@ -1913,7 +1913,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			to_tie_names = vector<string>(first, last);
 			for (auto pname : to_tie_names)
 			{
-				double ratio = ctl_parameters[pname] / ctl_parameters[tie_to_name];
+				ratio = ctl_parameters[pname] / ctl_parameters[tie_to_name];
 				t_tied->insert(pname, pair<string, double>(tie_to_name, ratio));
 				ctl_parameter_info.get_parameter_rec_ptr_4_mod(pname)->tranform_type = ttied;
 			}
@@ -1962,8 +1962,10 @@ const vector<string> &Pest::get_outfile_vec()
 
 pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgrade_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim, bool enforce_bounds)
 {
-	if ((!enforce_chglim) && (!enforce_bounds))
-		pair<string, double> control_info("no enforcement", 1.0);
+	if ((!enforce_chglim) && (!enforce_bounds)) {
+        pair<string, double> _control_info("no enforcement", 1.0);
+        return _control_info;
+    }
 	stringstream ss;
 	double fpm = control_info.facparmax;
 	double facorig = control_info.facorig;
@@ -2136,7 +2138,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 				temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
 				if ((temp > 1.0) || (temp < 0.0))
 				{
-					stringstream ss;
+					ss.str("");
 					ss << "Pest::enforce_par_limts() error: invalid lower bound scaling factor " << temp << " for par " << p.first << endl;
 					ss << " lbnd:" << p_rec->lbnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
 					throw runtime_error(ss.str());
@@ -2183,8 +2185,8 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	}
 	ss.str("");
 	ss << control_type << "," << controlling_par;
-	pair<string, double> control_info(ss.str(), scaling_factor);
-	return control_info;
+	pair<string, double> _control_info(ss.str(), scaling_factor);
+	return _control_info;
 
 }
 
@@ -2577,7 +2579,6 @@ void Pest::child_pest_update(int icycle)
 	// update observations
 	vector<string> cycle_grps_o, unique_cycle_grps_o, grps_o;
 	ObservationInfo obs_info = get_ctl_observation_info();
-	observation_values;
 	for (auto& ob : get_ctl_ordered_obs_names())
 		if (obs_info.get_observation_rec_ptr(ob)->cycle != icycle &&
 			obs_info.get_observation_rec_ptr(ob)->cycle >= 0)
@@ -2658,11 +2659,6 @@ void Pest::child_pest_update(int icycle)
 	//ctl_ordered_par_group_names ----> TODO: Check if the groups order is preserved..
 	ctl_ordered_par_group_names = unique_cycle_grps;
 	ctl_ordered_obs_group_names = unique_cycle_grps_o;
-
-	//ctl_ordered_pi_names
-	//regul_scheme_ptr
-	//other_lines
-	//pst_filename  ----> TODO: do I need to change the file name
 	
 	// get number of adj par for current cycle
 	ParameterRec::TRAN_TYPE tfixed = ParameterRec::TRAN_TYPE::FIXED;
@@ -2718,7 +2714,7 @@ vector<int> Pest::get_assim_cycles(ofstream& f_rec, vector<int> unique_cycles)
 	{
 		ss.str("");
 		ss << "a cycle with index of zero does not exist; cycling needs to start at zero for initialization...";
-		throw_control_file_error(f_rec, ss.str());;
+		throw_control_file_error(f_rec, ss.str());
 	}
 	return unique_cycles;
 	
@@ -3011,7 +3007,6 @@ void Pest::tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens)
 void Pest::rectify_par_groups()
 {
 	const ParameterRec *pr;
-	ParameterGroupRec pgi;
 	vector<string> temp = base_group_info.get_group_names();
 	set<string> group_names(temp.begin(), temp.end());
 	for (auto p : ctl_ordered_par_names)
@@ -3059,10 +3054,6 @@ map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& p
 	return par_sens;
 }
 
-void Pest::extract_da_cycles()
-{
-	int xxx;
-}
 map<string,string> Pest::get_ext_file_string_map(const string& section_name, const string& col_name)
 {
 	string sname_upper = pest_utils::upper_cp(section_name);

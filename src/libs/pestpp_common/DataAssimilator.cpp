@@ -2,18 +2,13 @@
 #include <map>
 #include <iomanip>
 #include <mutex>
-#include <thread>
-#include <math.h>
 #include <algorithm>
 #include "Ensemble.h"
 #include "RestartController.h"
 #include "utilities.h"
-#include "Ensemble.h"
 #include "DataAssimilator.h"
 #include "ObjectiveFunc.h"
-#include "covariance.h"
 #include "RedSVD-h.h"
-#include "SVDPackage.h"
 #include "DataAssimilator.h"
 #include "EnsembleMethodUtils.h"
 
@@ -61,9 +56,6 @@ void DataAssimilator::da_update(int cycle)
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
 
-	//string da_method = da_ctl_params.get_svalue("DA_TYPE");
-	//message(0, "Assimilation Method :", da_method);
-	int user_noptmax = pest_scenario.get_control_info().noptmax;
 	iter = 0;
 	bool accept;
 	bool islast_iter = false;
@@ -234,15 +226,15 @@ map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ve
 			}
 			cycle_vals = cycle_table.get_col_string_vector(col_name);
 			map<string, double> cycle_map;
-			for (int i = 0; i < cycle_vals.size(); i++)
+			for (int ii = 0; ii < cycle_vals.size(); ii++)
 			{
 				try
 				{
-					val = stod(cycle_vals[i]);
+					val = stod(cycle_vals[ii]);
 				}
 				catch (...)
 				{
-					fout_rec << "WARNING: error parsing '" << cycle_vals[i] << "' for observation " << tbl_obs_names[i] << " in cycle " << cycle << ", continuing..." << endl;
+					fout_rec << "WARNING: error parsing '" << cycle_vals[ii] << "' for observation " << tbl_obs_names[ii] << " in cycle " << cycle << ", continuing..." << endl;
 					parse_fail = true;
 					continue;
 				}
@@ -351,15 +343,15 @@ map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario,
 			}
 			cycle_vals = cycle_table.get_col_string_vector(col_name);
 			map<string, double> cycle_map;
-			for (int i = 0; i < cycle_vals.size(); i++)
+			for (int ii = 0; ii < cycle_vals.size(); ii++)
 			{
 				try
 				{
-					val = stod(cycle_vals[i]);
+					val = stod(cycle_vals[ii]);
 				}
 				catch (...)
 				{
-					fout_rec << "WARNING: error parsing weight '" << cycle_vals[i] << "' for observation " << tbl_obs_names[i] << " in cycle " << cycle << ", continuing..." << endl;
+					fout_rec << "WARNING: error parsing weight '" << cycle_vals[ii] << "' for observation " << tbl_obs_names[ii] << " in cycle " << cycle << ", continuing..." << endl;
 					parse_fail = true;
 					continue;
 				}
@@ -480,15 +472,15 @@ map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ve
 			}
 			cycle_vals = cycle_table.get_col_string_vector(col_name);
 			map<string, double> cycle_map;
-			for (int i = 0; i < cycle_vals.size(); i++)
+			for (int ii = 0; ii < cycle_vals.size(); ii++)
 			{
 				try
 				{
-					val = stod(cycle_vals[i]);
+					val = stod(cycle_vals[ii]);
 				}
 				catch (...)
 				{
-					fout_rec << "WARNING: error parsing '" << cycle_vals[i] << "' for parameter " << tbl_par_names[i] << " in cycle " << cycle << ", continuing..." << endl;
+					fout_rec << "WARNING: error parsing '" << cycle_vals[ii] << "' for parameter " << tbl_par_names[ii] << " in cycle " << cycle << ", continuing..." << endl;
 					parse_fail = true;
 					continue;
 				}

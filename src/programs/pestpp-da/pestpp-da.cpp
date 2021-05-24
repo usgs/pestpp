@@ -622,8 +622,6 @@ int main(int argc, char* argv[])
 
 			}
 
-			
-
 			//replace all the pars used in this cycle in the parent parameter ensemble
 			performance_log.log_event("updating global ensemble with cycle ensemble columns");
 			cycle_curr_pe = da.get_pe();

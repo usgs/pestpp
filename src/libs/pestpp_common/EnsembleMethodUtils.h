@@ -374,8 +374,6 @@ protected:
 
 	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
 
-	
-
 	void report_and_save(int cycle);
 	void save_mat(string prefix, Eigen::MatrixXd& mat);
 	//bool initialize_pe(Covariance& cov);
