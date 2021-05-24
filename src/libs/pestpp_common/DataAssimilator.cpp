@@ -238,7 +238,7 @@ map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ve
 					parse_fail = true;
 					continue;
 				}
-				cycle_map[tbl_obs_names[i]] = val;
+				cycle_map[tbl_obs_names[ii]] = val;
 				ncycles_in_tables.push_back(cycle);
 				ncycles_in_tables.push_back(cycle);
 
@@ -355,7 +355,7 @@ map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario,
 					parse_fail = true;
 					continue;
 				}
-				cycle_map[tbl_obs_names[i]] = val;
+				cycle_map[tbl_obs_names[ii]] = val;
 			}
 			weight_cycle_info[cycle] = cycle_map;
 			ncycles_in_tables.push_back(cycle);
@@ -484,7 +484,7 @@ map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ve
 					parse_fail = true;
 					continue;
 				}
-				cycle_map[tbl_par_names[i]] = val;
+				cycle_map[tbl_par_names[ii]] = val;
 			}
 			par_cycle_info[cycle] = cycle_map;
 			ncycles_in_tables.push_back(cycle);

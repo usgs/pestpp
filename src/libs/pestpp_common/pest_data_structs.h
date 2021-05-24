@@ -674,8 +674,8 @@ public:
 	void set_num_tpl_ins_threads(int num) { num_tpl_ins_threads = num; }
 	int get_num_tpl_ins_threads()const { return num_tpl_ins_threads; }
 
-	bool get_use_da_args() const { return use_da_args; }
-	void set_use_dat_args(bool _flag) { use_da_args = _flag; }
+	//bool get_use_da_args() const { return use_da_args; }
+	//void set_use_dat_args(bool _flag) { use_da_args = _flag; }
 
 	void set_defaults();
 	void summary(ostream& os) const;
