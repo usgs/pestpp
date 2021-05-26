@@ -2240,38 +2240,16 @@ pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &
 	return pair<Parameters,Parameters>(lbnd,ubnd);
 }
 
-Pest& Pest::get_child_pest(int icycle)
+Pest Pest::get_child_pest(int icycle)
 {
 	// TODO: insert return statement here
-	
-	
-	Pest* child_pest = new Pest(*this);
-	child_pest->child_pest_update(icycle);
-	
-	//child_pest->ctl_parameters;
-	//ctl_parameter_info.insert(name, pi);
-	//ctl_parameters.insert(name, pi.init_value);
-	//base_group_info.insert_parameter_link(name, pi.group);
 
-	// todo: change number of parameters and obs to match current parm/obs number
-	//ParameterRec curr_param_inf;
-	//unordered_map<string, ParameterRec>::iterator p_iter;
-	/*
-	ParameterInfo curr_params;
-	curr_params = child_pest->get_ctl_parameter_info();
-	ParameterInfo pi = get_ctl_parameter_info();
-	for (auto& p : get_ctl_ordered_par_names())
-		if (pi.get_parameter_rec_ptr(p)->cycle != icycle)
-		{
-			curr_params.erase(p);
-		}
-		*/
-
-	//for (auto it = curr_params.begin(); it != curr_params.end(); ++it)
-	//	std::cout << " " << it->first << ":" << it->second;
-
-	
-	return *child_pest;
+	Pest child_pest = Pest(*this);
+	child_pest.child_pest_update(icycle);
+	return child_pest;
+//	Pest* child_pest = new Pest(*this);
+//	child_pest->child_pest_update(icycle);
+//	return *child_pest;
 	
 }
 

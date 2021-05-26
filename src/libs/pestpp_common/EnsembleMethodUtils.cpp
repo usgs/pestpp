@@ -2616,9 +2616,9 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 
 EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
 	OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
-	RunManagerAbstract* _run_mgr_ptr, string _alg_tag) : alg_tag(_alg_tag), pest_scenario(_pest_scenario), file_manager(_file_manager),
-	output_file_writer(_output_file_writer), performance_log(_performance_log),
-	run_mgr_ptr(_run_mgr_ptr), pe(&_pest_scenario)
+	RunManagerAbstract* _run_mgr_ptr, string _alg_tag) : alg_tag(_alg_tag), pest_scenario(_pest_scenario),
+	file_manager(_file_manager),output_file_writer(_output_file_writer), performance_log(_performance_log),
+	run_mgr_ptr(_run_mgr_ptr), pe(&_pest_scenario), verbose_level(1)
 {
 	rand_gen = std::mt19937(pest_scenario.get_pestpp_options().get_random_seed());
 
