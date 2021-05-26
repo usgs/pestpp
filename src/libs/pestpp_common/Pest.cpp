@@ -2294,6 +2294,7 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 
 	else
 	{
+        vector<pair<string, DaCycleInfo>> par_cycle_map1 = extract_cycle_info(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
 		vector<pair<string, int>> par_cycle_map = extract_cycle_numbers2(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
 		if (par_cycle_map.size() == 0)
 		{
@@ -2417,6 +2418,220 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 	}
 	//TODO: prior info...with pi, need to check that parameters in each eqs are in the same cycle!
 }
+
+DaCycleInfo Pest::parse_cycle_str(string& raw_cycle_val, string& efilename, int row, ofstream& f_rec)
+{
+    stringstream ss;
+    DaCycleInfo dci;
+    dci.start = 0;
+    dci.stop = -999;
+    dci.stride = 1;
+    string sub_str;
+    int cycle;
+    int idx;
+    if (raw_cycle_val.find(':') != string::npos)
+    {
+        //no start
+        if (raw_cycle_val[0] == ':')
+        {
+            //no stop, so just stride
+            if (raw_cycle_val[1] == ':')
+            {
+                idx = raw_cycle_val.find_last_of(':');
+                sub_str = raw_cycle_val.substr(idx+1,raw_cycle_val.size());
+                try {
+                    dci.stride = stoi(sub_str);
+                }
+                catch (...) {
+                    ss.str("");
+                    ss << "error casting cycle stride '" << sub_str << "' to int for cycle info string '" << raw_cycle_val << "' on row " << row << "of external file "
+                       << efilename << " , Stopped...";
+                    throw_control_file_error(f_rec, ss.str());
+                }
+            }
+
+            else
+            {
+                //parse stop
+                sub_str = raw_cycle_val.substr(1,raw_cycle_val.size());
+                idx = sub_str.find_first_of(':');
+                try {
+                    dci.stop = stoi(sub_str.substr(0,idx));
+
+                }
+                catch (...) {
+                    ss.str("");
+                    ss << "error casting cycle stop '" << sub_str.substr(0,idx) << "' to int for cycle info string '" << raw_cycle_val << "' on row " << row << "of external file "
+                       << efilename << " , Stopped...";
+                    throw_control_file_error(f_rec, ss.str());
+                }
+
+                sub_str = sub_str.substr(idx,sub_str.size());
+                idx = sub_str.find_first_of(':');
+                //a stride too
+                if (idx != string::npos)
+                {
+                    sub_str = sub_str.substr(idx+1,sub_str.size());
+                    try {
+                        dci.stride = stoi(sub_str);
+
+                    }
+                    catch (...) {
+                        ss.str("");
+                        ss << "error casting cycle stride '" << sub_str << "' to int for cycle info string '" << raw_cycle_val << "' on row " << row << "of external file "
+                           << efilename << " , Stopped...";
+                        throw_control_file_error(f_rec, ss.str());
+                    }
+                }
+            }
+        }
+        else
+        {
+            //parse the start
+            idx = raw_cycle_val.find_first_of(':');
+            sub_str = raw_cycle_val.substr(0,idx);
+
+            try {
+                dci.start = stoi(sub_str);
+
+            }
+            catch (...) {
+                ss.str("");
+                ss << "error casting cycle start '" << sub_str << "' to int for cycle info string '" << raw_cycle_val << "' on row " << row << "of external file "
+                   << efilename << " , Stopped...";
+                throw_control_file_error(f_rec, ss.str());
+            }
+
+            sub_str = raw_cycle_val.substr(idx+1,raw_cycle_val.size());
+
+            //no stop but a stride
+            if (sub_str[0] == ':')
+            {
+                try {
+                    dci.stride = stoi(sub_str.substr(1,sub_str.size()));
+
+                }
+                catch (...) {
+                    ss.str("");
+                    ss << "error casting cycle stride '" << sub_str.substr(1,sub_str.size()) << "' to int for cycle info string '" << raw_cycle_val << "' on row " << row << "of external file "
+                       << efilename << " , Stopped...";
+                    throw_control_file_error(f_rec, ss.str());
+                }
+            }
+            else {
+                cout << sub_str;
+                idx = sub_str.find_first_of(':');
+
+                if (idx != string::npos) {
+
+                    try {
+                        dci.stop = stoi(sub_str.substr(0, idx));
+
+                    }
+                    catch (...) {
+                        ss.str("");
+                        ss << "error casting cycle stop '" << sub_str.substr(0, idx)
+                           << "' to int for cycle info string '" << raw_cycle_val << "' on row " << row
+                           << "of external file "
+                           << efilename << " , Stopped...";
+                        throw_control_file_error(f_rec, ss.str());
+                    }
+                    sub_str = sub_str.substr(idx + 1, sub_str.size());
+                    try {
+                        dci.stride = stoi(sub_str);
+
+                    }
+                    catch (...) {
+                        ss.str("");
+                        ss << "error casting cycle stride '" << sub_str << "' to int for cycle info string '"
+                           << raw_cycle_val << "' on row " << row << "of external file "
+                           << efilename << " , Stopped...";
+                        throw_control_file_error(f_rec, ss.str());
+                    }
+
+                } else {
+                    try {
+                        dci.stop = stoi(sub_str);
+
+                    }
+                    catch (...) {
+                        ss.str("");
+                        ss << "error casting cycle stop '" << sub_str << "' to int for cycle info string '"
+                           << raw_cycle_val << "' on row " << row << "of external file "
+                           << efilename << " , Stopped...";
+                        throw_control_file_error(f_rec, ss.str());
+                    }
+                }
+            }
+
+        }
+    }
+    else {
+        try {
+            cycle = stoi(raw_cycle_val);
+
+        }
+        catch (...) {
+            ss.str("");
+            ss << "error casting cycle '" << raw_cycle_val << "' to int on row " << row << "of external file "
+               << efilename << " , Stopped...";
+            throw_control_file_error(f_rec, ss.str());
+        }
+        if (cycle != -1) {
+            dci.start = cycle;
+            dci.stop = cycle;
+            dci.stride = 1;
+        }
+    }
+    return dci;
+}
+
+vector<pair<string, DaCycleInfo>> Pest::extract_cycle_info(ofstream& f_rec, string section_name, vector<string> possible_name_cols)
+{
+    vector<string> str_values, str_names;
+    stringstream ss;
+    set<string> col_names;
+    string name_col = "";
+    vector<pair<string, DaCycleInfo>> cycle_map;
+    DaCycleInfo dci;
+    string efilename;
+    if (this->efiles_map.find(section_name) == this->efiles_map.end())
+        return cycle_map;
+    for (auto efile : this->efiles_map[section_name])
+    {
+        col_names = efile.get_col_set();
+        for (auto possible_name : possible_name_cols)
+        {
+            if (col_names.find(possible_name) != col_names.end())
+            {
+                name_col = possible_name;
+                break;
+            }
+        }
+        if (name_col.size() == 0)
+        {
+            ss.str("");
+            ss << "could not find any possible name cols: ";
+            for (auto name : possible_name_cols)
+                ss << name << ",";
+            ss << " in efile '" << efile.get_filename() << "' columns";
+
+            throw_control_file_error(f_rec, ss.str());
+        }
+        if (col_names.find("CYCLE") == col_names.end())
+            continue;
+        str_values = efile.get_col_string_vector("CYCLE");
+        str_names = efile.get_col_string_vector(name_col);
+        efilename = efile.get_filename();
+        for (int i = 0; i < str_values.size(); i++)
+        {
+            dci = parse_cycle_str(str_values[i],efilename,i,f_rec);
+            cycle_map.push_back(make_pair(str_names[i],dci));
+        }
+    }
+    return cycle_map;
+}
+
 vector<pair<string, int>> Pest::extract_cycle_numbers2(ofstream& f_rec, string section_name, vector<string> possible_name_cols)
 {
 	vector<string> str_values, str_names;

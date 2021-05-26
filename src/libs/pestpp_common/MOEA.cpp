@@ -294,7 +294,6 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 			ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
 			PriorInformation* pi = pest_scenario.get_prior_info_ptr();
 			feas_member_struct.clear();
-			infeas;
 			for (auto real_name : real_names)
 			{
 				vsum = 0.0;

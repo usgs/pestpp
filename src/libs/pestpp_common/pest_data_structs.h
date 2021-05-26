@@ -33,7 +33,11 @@ class LaTridiagMatDouble;
 
 
 
-
+struct DaCycleInfo{
+    int start=0;
+    int stop = -999;
+    int stride = 1;
+};
 
 class ParameterGroupRec {
 public:
@@ -105,6 +109,7 @@ public:
 	string group;
 	int dercom;
 	int cycle;
+	DaCycleInfo dci;
 	TRAN_TYPE tranform_type;
 	ParameterRec() : chglim(""), lbnd(0.0), ubnd(0.0), init_value(0.0), group(""),
 		dercom(1), tranform_type(TRAN_TYPE::NONE), scale(1.0), offset(0.0), cycle(0){}
@@ -145,6 +150,7 @@ public:
 	double weight;
 	string group;
 	int cycle;
+	DaCycleInfo dci;
 	ObservationRec(double _weight=0.0,const string &_group="", int _cycle = 0)
 		: weight(_weight), group(_group),cycle(_cycle)  {}
 	bool is_regularization() const;
@@ -184,6 +190,9 @@ public:
 	std::vector<std::string> outfile_vec;
 	std::vector<int> incycle_vec;
 	std::vector<int> outcycle_vec;
+	std::vector<DaCycleInfo> incycle_dci_vec;
+    std::vector<DaCycleInfo> outcycle_dci_vec;
+
 };
 
 class ParetoInfo {
@@ -195,91 +204,6 @@ public:
 		obsgroup(""), niter_start(1), niter_gen(1), niter_fin(1) {};
 };
 
-
-//class CtlPar_container
-//{
-//	/* A proposed class to simplify adding new control options*/
-//public:
-//	CtlPar_container() { ; };
-//
-//	// overload return data is impossible, so each function return different value. 
-//	// Cons: user must know the type of the data before using it
-//
-//	
-//	template<typename  T>
-//	T get_value(string name);
-//	
-//	string get_svalue(string name);
-//	int get_ivalue(string name);
-//	double get_dvalue(string name);
-//	bool get_bvalue(string name);
-//	vector<double> get_vvalue(string name);
-//
-//	bool is_parameter(string name);
-//	string get_type(string name);
-//
-//	void set_value(string name, bool val);
-//	void set_value(string name, int val);
-//	void set_value(string name, double val);
-//	void set_value(string name, string val);
-//	void set_value(string name, vector<double> val);
-//
-//private:
-//	
-//
-//	std::unordered_map<string, int> int_parms = {
-//		{ "DA_SUBSET_SIZE", 5 },
-//		{ "DA_VERBOSE_LEVEL", 1 },
-//	    { "DA_CYCLES_NUMBER", -1},
-//	    {"DA_NUM_THREADS", 0}
-//		
-//	};
-//
-//	std::unordered_map<string, double> double_parms = {
-//		{ "DA_BAD_PHI",1.0E300 },
-//		{ "DA_BAD_PHI_SIGMA", 1.0E300 },
-//	    {"DA_INITIAL_INF_FAC", -1.0},
-//	    {"DA_LAMBDA_DEC_FAC", 0.75},
-//	    {"DA_LAMBDA_INC_FAC", 10.0},
-//		{"DA_ACCEPT_PHI_FAC", 1.05},
-//		{"DA_AUTOADALOC_SIGMA_DIST", 1.0}
-//
-//	};
-//
-//	std::unordered_map<string, string> string_parms = {
-//		{ "DA_OBSERVATION_ENSEMBLE", "" },
-//		{"DA_RESTART_OBSERVATION_ENSEMBLE", ""},
-//		{"DA_RESTART_PARAMETER_ENSEMBLE", ""},
-//	    {"DA_SUBSET_HOW", "random"},
-//		{"DA_TYPE", "mda"},
-//		{"DA_LOCALIZE_HOW", "PARAMETERS"}
-//
-//	};
-//	std::unordered_map<string, bool> bool_parms = {
-//		{ "DA_ADD_BASE", true },
-//	    {"DA_ENFORCE_BOUNDS", true},
-//		{"DA_USE_PRIOR_SCALING", true},
-//		{"DA_SAVE_BINARY", false},
-//		{"DA_EVALUATE_UPDATE", true},
-//	    {"DA_ENFORCE_CHGLIM", false},
-//		{"DA_AUTOADALOC", false}
-//
-//
-//	};
-//	std::unordered_map<string, vector<double>> vector_parms
-//	{
-//		{"DA_INFLATION_FAC", {1.0}},
-//		{"DA_INFLATION_MULT",{0.1, 1, 10}},
-//		{"DA_SCALE_FAC", {0.75,1.0,1.1}},
-//		{"DA_SVD_THRSH", {1e-3, 1e-4, 1e-6}}
-//	    //LAMBDA_SCALE_FAC
-//
-//	};
-//	
-//
-//	
-//
-//};
 
 class PestppOptions {
 public:
