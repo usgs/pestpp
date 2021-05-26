@@ -2265,31 +2265,31 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 	if (efiles_map.find("PARAMETER DATA EXTERNAL") == efiles_map.end())
 	{
 		throw_control_file_error(f_rec, "could not find 'parameter data external' section for cycle info, all parameter quantities being assigned 'cycle'=-1", false);
-		for (auto pname : get_ctl_ordered_adj_par_names())
-		{
-			ctl_parameter_info.get_parameter_rec_ptr_4_mod(pname)->cycle = -1;
-		}
+//		for (auto pname : get_ctl_ordered_adj_par_names())
+//		{
+//			ctl_parameter_info.get_parameter_rec_ptr_4_mod(pname)->cycle = -1;
+//		}
 	}
 
 	else
 	{
         vector<pair<string, DaCycleInfo>> par_cycle_dci_map = extract_cycle_info(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
-		vector<pair<string, int>> par_cycle_map = extract_cycle_numbers2(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
-		if (par_cycle_map.size() == 0)
+//		vector<pair<string, int>> par_cycle_map = extract_cycle_numbers2(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
+//		if (par_cycle_map.size() == 0)
+//		{
+//			throw_control_file_error(f_rec, "could not find cycle info in external file(s), all parameter quantities being assigned 'cycle'=-1", false);
+//			for (auto pname : get_ctl_ordered_adj_par_names())
+//			{
+//				ctl_parameter_info.get_parameter_rec_ptr_4_mod(pname)->cycle = -1;
+//			}
+//
+//		}
+//		else
 		{
-			throw_control_file_error(f_rec, "could not find cycle info in external file(s), all parameter quantities being assigned 'cycle'=-1", false);
-			for (auto pname : get_ctl_ordered_adj_par_names())
-			{
-				ctl_parameter_info.get_parameter_rec_ptr_4_mod(pname)->cycle = -1;
-			}
-
-		}
-		else
-		{
-			for (auto pc : par_cycle_map)
-			{
-				ctl_parameter_info.get_parameter_rec_ptr_4_mod(pc.first)->cycle = pc.second;
-			}
+//			for (auto pc : par_cycle_map)
+//			{
+//				ctl_parameter_info.get_parameter_rec_ptr_4_mod(pc.first)->cycle = pc.second;
+//			}
 			for (auto& pc : par_cycle_dci_map) {
                 ctl_parameter_info.get_parameter_rec_ptr_4_mod(pc.first)->dci = pc.second;
             }
@@ -2303,24 +2303,24 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 	if (efiles_map.find("OBSERVATION DATA EXTERNAL") == efiles_map.end())
 	{
 		throw_control_file_error(f_rec, "could not find 'observation data external' section, assigning all observations to cycle '0', effectively forming an 'ensemble smoother' run", false);
-		for (auto name : get_ctl_ordered_nz_obs_names())
-		{
-			observation_info.get_observation_rec_ptr_4_mod(name)->cycle = 0;
-		}
+//		for (auto name : get_ctl_ordered_nz_obs_names())
+//		{
+//			observation_info.get_observation_rec_ptr_4_mod(name)->cycle = 0;
+//		}
 	}
 
 	else
 	{
         vector<pair<string, DaCycleInfo>> obs_cycle_dci_map = extract_cycle_info(f_rec, "OBSERVATION DATA EXTERNAL", vector<string>{"OBSNME", "NAME"});
 
-        vector<pair<string, int>> obs_cycle_map = extract_cycle_numbers2(f_rec, "OBSERVATION DATA EXTERNAL", vector<string>{"OBSNME", "NAME"});
-		if (obs_cycle_map.size() == 0)
+        //vector<pair<string, int>> obs_cycle_map = extract_cycle_numbers2(f_rec, "OBSERVATION DATA EXTERNAL", vector<string>{"OBSNME", "NAME"});
+		if (obs_cycle_dci_map.size() == 0)
 		{
 			throw_control_file_error(f_rec, "no observation cycle information was found in external file(s), assigning all observations to cycle '0', effectively forming an 'ensemble smoother' run", false);
 
 		}
 		vector<string> missing, obs_vec;
-		for (auto pp: obs_cycle_map)
+		for (auto pp: obs_cycle_dci_map)
 		{
 			obs_vec.push_back(pp.first);
 		}
@@ -2337,35 +2337,35 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 				ss << m << ",";
 			throw_control_file_error(f_rec, ss.str());
 		}
-		for (auto oc : obs_cycle_map) {
-            observation_info.get_observation_rec_ptr_4_mod(oc.first)->cycle = oc.second;
-        }
+//		for (auto oc : obs_cycle_map) {
+//            observation_info.get_observation_rec_ptr_4_mod(oc.first)->cycle = oc.second;
+//        }
 		for (auto& oc : obs_cycle_dci_map)
         {
             observation_info.get_observation_rec_ptr_4_mod(oc.first)->dci = oc.second;
         }
 	}
 
-	model_exec_info.incycle_vec.clear();
+	model_exec_info.incycle_dci_vec.clear();
 	if (efiles_map.find("MODEL INPUT EXTERNAL") == efiles_map.end())
 	{
 		throw_control_file_error(f_rec, "could not find 'model input external' section, all template/model input files will be used every cycle", false);
 		for (auto tpl : model_exec_info.tplfile_vec)
 		{
-			model_exec_info.incycle_vec.push_back(-1);
+			//model_exec_info.incycle_vec.push_back(-1);
 			model_exec_info.incycle_dci_vec.push_back(DaCycleInfo());
 		}
 	}
 	else
 	{
-		vector<pair<string, int>> mi_cycle_map = extract_cycle_numbers2(f_rec, "MODEL INPUT EXTERNAL", vector<string>{"PEST_FILE"});
+		//vector<pair<string, int>> mi_cycle_map = extract_cycle_numbers2(f_rec, "MODEL INPUT EXTERNAL", vector<string>{"PEST_FILE"});
         vector<pair<string, DaCycleInfo>> mi_cycle_dci_map = extract_cycle_info(f_rec, "MODEL INPUT EXTERNAL", vector<string>{"PEST_FILE"});
-		if (mi_cycle_map.size() == 0)
+		if (mi_cycle_dci_map.size() == 0)
 		{
 			throw_control_file_error(f_rec, "could not find cycle info in external file(s), all template/model input files will be used every cycle", false);
 			for (auto tpl : model_exec_info.tplfile_vec)
 			{
-				model_exec_info.incycle_vec.push_back(-1);
+				//model_exec_info.incycle_vec.push_back(-1);
 				model_exec_info.incycle_dci_vec.push_back(DaCycleInfo());
 
 			}
@@ -2373,11 +2373,11 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 		else
 		{
 			
-			for (auto tpl : mi_cycle_map)
-			{
-				model_exec_info.incycle_vec.push_back(tpl.second); // we can do that becuase row order does not change.
-
-			}
+//			for (auto tpl : mi_cycle_map)
+//			{
+//				model_exec_info.incycle_vec.push_back(tpl.second); // we can do that becuase row order does not change.
+//
+//			}
 			for (auto& tpl : mi_cycle_dci_map)
             {
                 model_exec_info.incycle_dci_vec.push_back(tpl.second);
@@ -2386,39 +2386,38 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 	}
 
 
-	model_exec_info.outcycle_vec.clear();
+	model_exec_info.outcycle_dci_vec.clear();
 	if (efiles_map.find("MODEL OUTPUT EXTERNAL") == efiles_map.end())
 	{
 		throw_control_file_error(f_rec, "could not find 'model output external' section, assigning all instruction/out files to cycle '0', effectively forming an 'ensemble smoother' run", false);
 		for (auto ins : model_exec_info.insfile_vec)
 		{
-			model_exec_info.outcycle_vec.push_back(0);
+			//model_exec_info.outcycle_vec.push_back(0);
 			model_exec_info.outcycle_dci_vec.push_back(DaCycleInfo());
 		}
 	}
 	else
 	{
-		vector<pair<string, int>> mi_cycle_map = extract_cycle_numbers2(f_rec, "MODEL OUTPUT EXTERNAL", vector<string>{"PEST_FILE"});
+		//vector<pair<string, int>> mi_cycle_map = extract_cycle_numbers2(f_rec, "MODEL OUTPUT EXTERNAL", vector<string>{"PEST_FILE"});
         vector<pair<string, DaCycleInfo>> mi_cycle_dci_map = extract_cycle_info(f_rec, "MODEL OUTPUT EXTERNAL", vector<string>{"PEST_FILE"});
-		if (mi_cycle_map.size() == 0)
+		if (mi_cycle_dci_map.size() == 0)
 		{
 			throw_control_file_error(f_rec, "no model output cycle information was found in external file(s), assigning all instruction/out files to cycle '0', effectively forming an 'ensemble smoother' run",false);
 			for (auto ins : model_exec_info.insfile_vec)
 			{
-				model_exec_info.outcycle_vec.push_back(0);
+				//model_exec_info.outcycle_vec.push_back(0);
                 model_exec_info.outcycle_dci_vec.push_back(DaCycleInfo());
 			}
 		}
 		else
 		{		
-			for (auto ins : mi_cycle_map)
-			{
-				model_exec_info.outcycle_vec.push_back(ins.second); // we can do that becuase row order does not change. 
-			}
+//			for (auto ins : mi_cycle_map)
+//			{
+//				model_exec_info.outcycle_vec.push_back(ins.second); // we can do that becuase row order does not change.
+//			}
 			for (auto& ins : mi_cycle_dci_map)
             {
 			    model_exec_info.outcycle_dci_vec.push_back(ins.second);
-
             }
 		}
 	}
@@ -2781,7 +2780,7 @@ void Pest::child_pest_update(int icycle)
 	//model_exec_info
 	ModelExecInfo curr_mod_exe = model_exec_info;
 	std::vector<std::string> _tpl_vec, _infile_vec, _ins_vec, _out_vec;
-	std::vector<int> incy, outcy;
+	std::vector<DaCycleInfo> incy, outcy;
 	int index = 0;
 //	for (auto ic : model_exec_info.incycle_vec)
 //	{
@@ -2801,7 +2800,7 @@ void Pest::child_pest_update(int icycle)
         {
             _tpl_vec.push_back(model_exec_info.tplfile_vec[index]);
             _infile_vec.push_back(model_exec_info.inpfile_vec[index]);
-            incy.push_back(model_exec_info.incycle_vec[index]);
+            incy.push_back(model_exec_info.incycle_dci_vec[index]);
         }
 
         index = index + 1;
@@ -2826,17 +2825,17 @@ void Pest::child_pest_update(int icycle)
         {
             _ins_vec.push_back(model_exec_info.insfile_vec[index]);
             _out_vec.push_back(model_exec_info.outfile_vec[index]);
-            outcy.push_back(model_exec_info.outcycle_vec[index]);
+            outcy.push_back(model_exec_info.outcycle_dci_vec[index]);
         }
 
         index = index + 1;
     }
 	model_exec_info.tplfile_vec = _tpl_vec;
 	model_exec_info.inpfile_vec = _infile_vec;
-	model_exec_info.incycle_vec = incy;
+	model_exec_info.incycle_dci_vec = incy;
 	model_exec_info.insfile_vec = _ins_vec;
 	model_exec_info.outfile_vec = _out_vec;
-	model_exec_info.outcycle_vec = outcy;
+	model_exec_info.outcycle_dci_vec = outcy;
 
 
 	//pestpp_options
@@ -2951,49 +2950,49 @@ bool every_cycle(const DaCycleInfo& dci)
 
 
 
-vector<int> Pest::get_assim_cycles(ofstream& f_rec, vector<int> unique_cycles)
-{
-
-	int curr_cycle;
-	vector<int> cycles_ordered_list;
-	
-	for (auto pname : ctl_ordered_par_names)
-	{
-		curr_cycle = ctl_parameter_info.get_parameter_rec_ptr(pname)->cycle;
-		if (curr_cycle>= 0)
-			cycles_ordered_list.push_back(curr_cycle);
-	}
-	for (auto oname : ctl_ordered_obs_names)
-	{
-		curr_cycle = observation_info.get_observation_rec_ptr(oname)->cycle;
-		if (curr_cycle >= 0)
-			cycles_ordered_list.push_back(curr_cycle);
-	}
-
-	
-	// get unique groups
-	for (auto curr = cycles_ordered_list.begin(); curr != cycles_ordered_list.end(); curr++) {
-		if (find(unique_cycles.begin(), unique_cycles.end(), *curr) == unique_cycles.end())
-		{
-			unique_cycles.push_back(*curr);
-		}
-	}
-	if (unique_cycles.size() == 0)
-		throw_control_file_error(f_rec, "no valid cycle info found in par and obs data (possibly all '-1' cycles?)");
-
-	sort(unique_cycles.begin(), unique_cycles.end());
-	stringstream ss;
-	//to catch common non-zero-indexing
-	if (unique_cycles.front() != 0)  //recall a cycle of -1 is just a flag
-	{
-		ss.str("");
-		ss << "a cycle with index of zero does not exist; cycling needs to start at zero for initialization...";
-		throw_control_file_error(f_rec, ss.str());
-	}
-	return unique_cycles;
-	
-
-}
+//vector<int> Pest::get_assim_cycles(ofstream& f_rec, vector<int> unique_cycles)
+//{
+//
+//	int curr_cycle;
+//	vector<int> cycles_ordered_list;
+//
+//	for (auto pname : ctl_ordered_par_names)
+//	{
+//		curr_cycle = ctl_parameter_info.get_parameter_rec_ptr(pname)->cycle;
+//		if (curr_cycle>= 0)
+//			cycles_ordered_list.push_back(curr_cycle);
+//	}
+//	for (auto oname : ctl_ordered_obs_names)
+//	{
+//		curr_cycle = observation_info.get_observation_rec_ptr(oname)->cycle;
+//		if (curr_cycle >= 0)
+//			cycles_ordered_list.push_back(curr_cycle);
+//	}
+//
+//
+//	// get unique groups
+//	for (auto curr = cycles_ordered_list.begin(); curr != cycles_ordered_list.end(); curr++) {
+//		if (find(unique_cycles.begin(), unique_cycles.end(), *curr) == unique_cycles.end())
+//		{
+//			unique_cycles.push_back(*curr);
+//		}
+//	}
+//	if (unique_cycles.size() == 0)
+//		throw_control_file_error(f_rec, "no valid cycle info found in par and obs data (possibly all '-1' cycles?)");
+//
+//	sort(unique_cycles.begin(), unique_cycles.end());
+//	stringstream ss;
+//	//to catch common non-zero-indexing
+//	if (unique_cycles.front() != 0)  //recall a cycle of -1 is just a flag
+//	{
+//		ss.str("");
+//		ss << "a cycle with index of zero does not exist; cycling needs to start at zero for initialization...";
+//		throw_control_file_error(f_rec, ss.str());
+//	}
+//	return unique_cycles;
+//
+//
+//}
 
 
 

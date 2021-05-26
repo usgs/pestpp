@@ -108,11 +108,11 @@ public:
 	double offset;
 	string group;
 	int dercom;
-	int cycle;
+	//int cycle;
 	DaCycleInfo dci;
 	TRAN_TYPE tranform_type;
 	ParameterRec() : chglim(""), lbnd(0.0), ubnd(0.0), init_value(0.0), group(""),
-		dercom(1), tranform_type(TRAN_TYPE::NONE), scale(1.0), offset(0.0), cycle(0),
+		dercom(1), tranform_type(TRAN_TYPE::NONE), scale(1.0), offset(0.0),
 		dci(DaCycleInfo()){}
 	bool is_active() const { return !(tranform_type == TRAN_TYPE::FIXED || tranform_type == TRAN_TYPE::TIED); }
 };
@@ -150,10 +150,10 @@ class ObservationRec {
 public:
 	double weight;
 	string group;
-	int cycle;
+	//int cycle;
 	DaCycleInfo dci;
 	ObservationRec(double _weight=0.0,const string &_group="", int _cycle = 0)
-		: weight(_weight), group(_group),cycle(_cycle), dci(DaCycleInfo())  {}
+		: weight(_weight), group(_group), dci(DaCycleInfo())  {}
 	bool is_regularization() const;
 };
 ostream& operator<< (ostream &os, const ObservationRec& val);
@@ -189,8 +189,8 @@ public:
 	std::vector<std::string> inpfile_vec;
 	std::vector<std::string> insfile_vec;
 	std::vector<std::string> outfile_vec;
-	std::vector<int> incycle_vec;
-	std::vector<int> outcycle_vec;
+	//std::vector<int> incycle_vec;
+	//std::vector<int> outcycle_vec;
 	std::vector<DaCycleInfo> incycle_dci_vec;
     std::vector<DaCycleInfo> outcycle_dci_vec;
 

@@ -421,7 +421,7 @@ map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ve
 				notfixed.push_back(pname);
 				continue;
 			}
-			else if (pi.get_parameter_rec_ptr(pname)->cycle != -1)
+			else if (!every_cycle(pi.get_parameter_rec_ptr(pname)->dci))
 			{
 				notneg.push_back(pname);
 				continue;

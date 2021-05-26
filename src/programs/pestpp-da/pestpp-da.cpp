@@ -236,12 +236,18 @@ int main(int argc, char* argv[])
 		}
 
 		std::sort(assimilation_cycles.begin(), assimilation_cycles.end());
+        stringstream ss;
+
+		ss.str("");
+		ss << "...assimilating over " << assimilation_cycles.size() << " cycles from " << assimilation_cycles[0] << " to " << assimilation_cycles[assimilation_cycles.size()-1] << endl;
+		cout << ss.str();
+		fout_rec << ss.str();
 
 		int start_cycle = pest_scenario.get_pestpp_options().get_da_hotstart_cycle();
 		int max_cycle = assimilation_cycles[assimilation_cycles.size() - 1];
 		if (start_cycle > max_cycle)
 		{
-			stringstream ss;
+			ss.str("");
 			ss << "'da_hotstart_cycle' (" << start_cycle << ") greater than max cycle (" << max_cycle << ")";
 			throw runtime_error(ss.str());
 		}
@@ -305,15 +311,15 @@ int main(int argc, char* argv[])
 				for (auto par : par1)
 
 				{
-					if ((pi.get_parameter_rec_ptr(par.first)->cycle == *icycle) ||
-						(pi.get_parameter_rec_ptr(par.first)->cycle < 0))
+//					if ((pi.get_parameter_rec_ptr(par.first)->cycle == *icycle) ||
+//						(pi.get_parameter_rec_ptr(par.first)->cycle < 0))
+					if (cycle_in_range(*icycle,pi.get_parameter_rec_ptr(par.first)->dci))
 					{
 
 						if ((pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::FIXED) &&
 							(pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::TIED))
 							nadj_par++;
 					}
-
 				}
 
 				cout << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
@@ -414,8 +420,6 @@ int main(int argc, char* argv[])
 		//ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr
 		ParChangeSummarizer pcs(&curr_pe, &file_manager, &output_file_writer);
 
-		
-		stringstream ss;
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 		{
 			if (*icycle < start_cycle)
@@ -540,15 +544,14 @@ int main(int argc, char* argv[])
 			{
 				// ayman:  base_trans_seq above was copied from parent pest without any changes; the following statement temporarly fix
 				// the issue; permenat solution should occur during the creation of childpest
-				if ((pi.get_parameter_rec_ptr(par.first)->cycle == *icycle) ||
-					(pi.get_parameter_rec_ptr(par.first)->cycle < 0))
+//				if ((pi.get_parameter_rec_ptr(par.first)->cycle == *icycle) ||
+//					(pi.get_parameter_rec_ptr(par.first)->cycle < 0))
+				if (cycle_in_range(*icycle,pi.get_parameter_rec_ptr(par.first)->dci))
 				{
-
 					if ((pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::FIXED) &&
 						(pi.get_parameter_rec_ptr(par.first)->tranform_type != ParameterRec::TRAN_TYPE::TIED))
 						nadj_par++;
 				}
-
 			}
 
 			cout << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;

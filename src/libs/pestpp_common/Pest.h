@@ -104,7 +104,7 @@ public:
 
 	Pest get_child_pest(int icycle);
 	void child_pest_update(int icycle);
-	vector<int> get_assim_cycles(ofstream& f_rec, vector<int> unique_cycles);
+	//vector<int> get_assim_cycles(ofstream& f_rec, vector<int> unique_cycles);
 	vector<int> get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycles);
 	//vector<int> get_assim_cycles(ofstream& f_rec);
 	void assign_da_cycles(ofstream& f_rec);
