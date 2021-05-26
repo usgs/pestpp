@@ -2525,7 +2525,6 @@ DaCycleInfo Pest::parse_cycle_str(string& raw_cycle_val, string& efilename, int 
                 }
             }
             else {
-                cout << sub_str;
                 idx = sub_str.find_first_of(':');
 
                 if (idx != string::npos) {
@@ -2695,62 +2694,6 @@ vector<pair<string, int>> Pest::extract_cycle_numbers2(ofstream& f_rec, string s
 
 }
 
-map<string, int> Pest::extract_cycle_numbers(ofstream& f_rec, string section_name, vector<string> possible_name_cols)
-{
-	vector<string> str_values, str_names;
-	stringstream ss;
-	set<string> col_names;
-	string name_col = "";
-	int cycle;
-	map<string, int> cycle_map;
-	if (this->efiles_map.find(section_name) == this->efiles_map.end())
-		return cycle_map;
-	for (auto efile : this->efiles_map[section_name])
-	{
-		col_names = efile.get_col_set();
-		for (auto possible_name : possible_name_cols)
-		{
-			if (col_names.find(possible_name) != col_names.end())
-			{
-				name_col = possible_name;
-				break;
-			}
-				
-		}
-		
-		if (name_col.size() == 0)
-		{
-			ss.str("");
-			ss << "could not find any possible name cols: ";
-			for (auto name : possible_name_cols)
-				ss << name << ",";
-			ss << " in efile '" << efile.get_filename() << "' columns";
-
-			throw_control_file_error(f_rec, ss.str());
-		}
-		if (col_names.find("CYCLE") == col_names.end())
-			continue;
-		str_values = efile.get_col_string_vector("CYCLE");
-		str_names = efile.get_col_string_vector(name_col);
-		for (int i = 0; i < str_values.size(); i++)
-		{
-			try
-			{
-				cycle = stoi(str_values[i]);
-				cycle_map[str_names[i]] = cycle;
-			}
-			catch (...)
-			{
-				ss.str("");
-				ss << "error casting cycle '" << str_values[i] << "' to int on row " << i << "of external file " << efile.get_filename() << " , continuing...";
-				throw_control_file_error(f_rec, ss.str(), false);
-			}
-
-		}
-	}
-	return cycle_map;
-}
-
 void Pest::child_pest_update(int icycle)
 {
 	/*
@@ -2767,22 +2710,24 @@ void Pest::child_pest_update(int icycle)
 	parnames = get_ctl_ordered_par_names();
 	obsnames = get_ctl_ordered_obs_names();
 	ParameterInfo pi = get_ctl_parameter_info();
-	for (auto& p : get_ctl_ordered_par_names())
-		if (pi.get_parameter_rec_ptr(p)->cycle != icycle && 
-			pi.get_parameter_rec_ptr(p)->cycle >= 0)
-		{
-			ctl_parameter_info.erase(p);
-			ctl_parameters.erase(p);
-			base_group_info.par_erase(p);// .parameter2group.erase(p);
-			parnames.erase(remove(parnames.begin(),
-				parnames.end(), p), parnames.end());
+	for (auto& p : get_ctl_ordered_par_names()) {
+        if (!cycle_in_range(icycle, pi.get_parameter_rec_ptr(p)->dci)) {
+            cout << p;
+        }
+//        if (pi.get_parameter_rec_ptr(p)->cycle != icycle &&
+//            pi.get_parameter_rec_ptr(p)->cycle >= 0) {
+//            ctl_parameter_info.erase(p);
+//            ctl_parameters.erase(p);
+//            base_group_info.par_erase(p);// .parameter2group.erase(p);
+//            parnames.erase(remove(parnames.begin(),
+//                                  parnames.end(), p), parnames.end());
+//
+//        }
+        else {
+            cycle_grps.push_back(base_group_info.get_group_name(p));
 
-		}
-		else
-		{
-			cycle_grps.push_back(base_group_info.get_group_name(p));
-			
-		}
+        }
+    }
     // get unique groups
 	for (auto curr = cycle_grps.begin(); curr != cycle_grps.end(); curr++) {
 		if (find(unique_cycle_grps.begin(), unique_cycle_grps.end(), *curr) == unique_cycle_grps.end())
@@ -2801,8 +2746,9 @@ void Pest::child_pest_update(int icycle)
 	vector<string> cycle_grps_o, unique_cycle_grps_o, grps_o;
 	ObservationInfo obs_info = get_ctl_observation_info();
 	for (auto& ob : get_ctl_ordered_obs_names())
-		if (obs_info.get_observation_rec_ptr(ob)->cycle != icycle &&
-			obs_info.get_observation_rec_ptr(ob)->cycle >= 0)
+	    if (!cycle_in_range(icycle,obs_info.get_observation_rec_ptr(ob)->dci))
+//		if (obs_info.get_observation_rec_ptr(ob)->cycle != icycle &&
+//			obs_info.get_observation_rec_ptr(ob)->cycle >= 0)
 		{
 			observation_info.erase_ob(ob);
 			observation_values.erase(ob);
@@ -2837,30 +2783,54 @@ void Pest::child_pest_update(int icycle)
 	std::vector<std::string> _tpl_vec, _infile_vec, _ins_vec, _out_vec;
 	std::vector<int> incy, outcy;
 	int index = 0;
-	for (auto ic : model_exec_info.incycle_vec)
-	{
-		if ((ic == icycle) || (ic < 0))
-		{
-			_tpl_vec.push_back(model_exec_info.tplfile_vec[index]);
-			_infile_vec.push_back(model_exec_info.inpfile_vec[index]);
-			incy.push_back(model_exec_info.incycle_vec[index]);
-		}
+//	for (auto ic : model_exec_info.incycle_vec)
+//	{
+//		if ((ic == icycle) || (ic < 0))
+//		{
+//			_tpl_vec.push_back(model_exec_info.tplfile_vec[index]);
+//			_infile_vec.push_back(model_exec_info.inpfile_vec[index]);
+//			incy.push_back(model_exec_info.incycle_vec[index]);
+//		}
+//
+//		index = index + 1;
+//	}
 
-		index = index + 1;
-	}
+    for (auto ic : model_exec_info.incycle_dci_vec)
+    {
+        if (cycle_in_range(icycle,ic))
+        {
+            _tpl_vec.push_back(model_exec_info.tplfile_vec[index]);
+            _infile_vec.push_back(model_exec_info.inpfile_vec[index]);
+            incy.push_back(model_exec_info.incycle_vec[index]);
+        }
+
+        index = index + 1;
+    }
+
 	//output files
 	index = 0;
-	for (auto ic : model_exec_info.outcycle_vec)
-	{
-		if ((ic == icycle) || (ic < 0))
-		{
-			_ins_vec.push_back(model_exec_info.insfile_vec[index]);
-			_out_vec.push_back(model_exec_info.outfile_vec[index]);
-			outcy.push_back(model_exec_info.outcycle_vec[index]);
-		}
+//	for (auto ic : model_exec_info.outcycle_vec)
+//	{
+//		if ((ic == icycle) || (ic < 0))
+//		{
+//			_ins_vec.push_back(model_exec_info.insfile_vec[index]);
+//			_out_vec.push_back(model_exec_info.outfile_vec[index]);
+//			outcy.push_back(model_exec_info.outcycle_vec[index]);
+//		}
+//
+//		index = index + 1;
+//	}
+    for (auto ic : model_exec_info.outcycle_dci_vec)
+    {
+        if (cycle_in_range(icycle,ic))
+        {
+            _ins_vec.push_back(model_exec_info.insfile_vec[index]);
+            _out_vec.push_back(model_exec_info.outfile_vec[index]);
+            outcy.push_back(model_exec_info.outcycle_vec[index]);
+        }
 
-		index = index + 1;
-	}
+        index = index + 1;
+    }
 	model_exec_info.tplfile_vec = _tpl_vec;
 	model_exec_info.inpfile_vec = _infile_vec;
 	model_exec_info.incycle_vec = incy;
@@ -2901,8 +2871,9 @@ void Pest::child_pest_update(int icycle)
 
 vector<int> Pest::get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycles)
 {
-    int start_cycle = std::numeric_limits<int>::min();
-    int stop_cycle = std::numeric_limits<int>::max();
+    stringstream ss;
+    int start_cycle = std::numeric_limits<int>::max();
+    int stop_cycle = std::numeric_limits<int>::min();
     DaCycleInfo dci;
     for (auto pname : ctl_ordered_par_names)
     {
@@ -2920,26 +2891,62 @@ vector<int> Pest::get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycle
         if (dci.stop > stop_cycle)
             stop_cycle = dci.stop;
     }
-    for (int i=start_cycle;i<stop_cycle;i++)
-    {
 
+    if (start_cycle < 0)
+    {
+        ss.str("");
+        ss << "minimum start '" << start_cycle << "' cycle less than zero";
+        throw_control_file_error(f_rec,ss.str());
     }
 
-
-
-
-
+    if (stop_cycle < 0) {
+        throw_control_file_error(f_rec, "didnt find any explicit 'stop' cycle values");
+    }
+    if (start_cycle > stop_cycle) {
+        ss.str("");
+        ss << "minimum start cycle '" << start_cycle << "' greater than maximum stop cycle '" << stop_cycle << "'";
+        throw_control_file_error(f_rec, ss.str());
+    }
+    set<int> scycles{start_cycle,stop_cycle};
+    scycles.insert(unique_cycles.begin(),unique_cycles.end());
+    for (int i=start_cycle;i<stop_cycle;i++)
+    {
+        for (auto pname : ctl_ordered_par_names)
+        {
+            if (cycle_in_range(i,ctl_parameter_info.get_parameter_rec_ptr(pname)->dci))
+                scycles.emplace(i);
+        }
+        for (auto oname : ctl_ordered_obs_names)
+        {
+            if (cycle_in_range(i,observation_info.get_observation_rec_ptr(oname)->dci))
+                scycles.emplace(i);
+        }
+    }
+    return vector<int>(scycles.begin(),scycles.end());
 }
 
-bool cycle_in_range(int cycle,DaCycleInfo& dci) {
+bool cycle_in_range(int cycle,const DaCycleInfo& dci) {
     if (dci.start > cycle)
         return false;
-    if (dci.stop < cycle)
+    if ((dci.stop > 0) && (dci.stop < cycle))
         return false;
     if (dci.stride == 1)
         return true;
-    
+    if (abs(cycle - dci.start) % dci.stride == 0)
+        return true;
+    return false;
 
+}
+
+bool every_cycle(const DaCycleInfo& dci)
+{
+    if (dci.stop != -999)
+        return false;
+    if (dci.start != 0)
+        return false;
+    if (dci.stride != 1)
+        return false;
+    return true;
 }
 
 

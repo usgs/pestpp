@@ -231,7 +231,8 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec, cycles_in_tables);
+			//assimilation_cycles = pest_scenario.get_assim_cycles(fout_rec, cycles_in_tables);
+			assimilation_cycles = pest_scenario.get_assim_dci_cycles(fout_rec,cycles_in_tables);
 		}
 
 		std::sort(assimilation_cycles.begin(), assimilation_cycles.end());

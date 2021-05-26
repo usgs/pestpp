@@ -157,13 +157,11 @@ protected:
 	void tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens);
 	void tokens_to_pi_rec(ostream& f_rec, const string& line_upper);
 	void rectify_par_groups();
-	void extract_da_cycles();
-	map<string, int> extract_cycle_numbers(ofstream& f_rec, string section_name, vector<string> possible_name_cols);
 	map<string, vector<pest_utils::ExternalCtlFile>> efiles_map;
 	DaCycleInfo parse_cycle_str(string& raw_cycle_val, string& efilename, int row, ofstream& f_rec);
 };
 ostream& operator<< (ostream &os, const Pest& val);
-
-bool cycle_in_range(int cycle,DaCycleInfo& dci);
+bool every_cycle(const DaCycleInfo& dci);
+bool cycle_in_range(int cycle,const DaCycleInfo& dci);
 
 #endif /* PEST_H_ */

@@ -163,11 +163,17 @@ map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ve
 				zeroweight.push_back(oname);
 				continue;
 			}
-			else if (oi->get_observation_rec_ptr(oname)->cycle != -1)
-			{
-				notneg.push_back(oname);
-				continue;
-			}
+//			else if (oi->get_observation_rec_ptr(oname)->cycle != -1)
+//			{
+//				notneg.push_back(oname);
+//				continue;
+//			}
+			else if (!every_cycle(oi->get_observation_rec_ptr(oname)->dci))
+            {
+			    notneg.push_back(oname);
+			    continue;
+            }
+
 			else
 			{
 				tbl_obs_names.push_back(oname);
@@ -184,7 +190,7 @@ map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ve
 		}
 		if (zeroweight.size() > 0)
 		{
-			fout_rec << "ERROR: The following observations in DA_OBSERVATION_CYCLE_TABLE have zero weight:" << endl;
+			fout_rec << "ERROR: The following observations in DA_OBSERVATION_CYCLE_TABLE have zero weight in the control file:" << endl;
 			for (auto p : zeroweight)
 			{
 				fout_rec << p << endl;
@@ -288,11 +294,16 @@ map<int, map<string, double>> process_da_weight_cycle_table(Pest& pest_scenario,
 				missing.push_back(oname);
 				continue;
 			}
-			else if (oi->get_observation_rec_ptr(oname)->cycle != -1)
-			{
-				notneg.push_back(oname);
-				continue;
-			}
+//			else if (oi->get_observation_rec_ptr(oname)->cycle != -1)
+//			{
+//				notneg.push_back(oname);
+//				continue;
+//			}
+			else if (!every_cycle(oi->get_observation_rec_ptr(oname)->dci))
+            {
+                notneg.push_back(oname);
+                continue;
+            }
 			else
 			{
 				tbl_obs_names.push_back(oname);
