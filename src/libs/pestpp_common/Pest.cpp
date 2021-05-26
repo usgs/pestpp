@@ -2711,7 +2711,11 @@ void Pest::child_pest_update(int icycle)
 	ParameterInfo pi = get_ctl_parameter_info();
 	for (auto& p : get_ctl_ordered_par_names()) {
         if (!cycle_in_range(icycle, pi.get_parameter_rec_ptr(p)->dci)) {
-            cout << p;
+            ctl_parameter_info.erase(p);
+            ctl_parameters.erase(p);
+            base_group_info.par_erase(p);// .parameter2group.erase(p);
+            parnames.erase(remove(parnames.begin(),
+                                  parnames.end(), p), parnames.end());
         }
 //        if (pi.get_parameter_rec_ptr(p)->cycle != icycle &&
 //            pi.get_parameter_rec_ptr(p)->cycle >= 0) {
