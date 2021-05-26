@@ -36,6 +36,7 @@
 #include "model_interface.h"
 #include "Jacobian.h"
 #include "QSqrtMatrix.h"
+#include <limits>
 
 
 using namespace::std;
@@ -2272,7 +2273,7 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 
 	else
 	{
-        vector<pair<string, DaCycleInfo>> par_cycle_map1 = extract_cycle_info(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
+        vector<pair<string, DaCycleInfo>> par_cycle_dci_map = extract_cycle_info(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
 		vector<pair<string, int>> par_cycle_map = extract_cycle_numbers2(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
 		if (par_cycle_map.size() == 0)
 		{
@@ -2289,7 +2290,12 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 			{
 				ctl_parameter_info.get_parameter_rec_ptr_4_mod(pc.first)->cycle = pc.second;
 			}
+			for (auto& pc : par_cycle_dci_map) {
+                ctl_parameter_info.get_parameter_rec_ptr_4_mod(pc.first)->dci = pc.second;
+            }
+
 		}
+
 	}
 		
 	
@@ -2305,7 +2311,9 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 
 	else
 	{
-		vector<pair<string, int>> obs_cycle_map = extract_cycle_numbers2(f_rec, "OBSERVATION DATA EXTERNAL", vector<string>{"OBSNME", "NAME"});
+        vector<pair<string, DaCycleInfo>> obs_cycle_dci_map = extract_cycle_info(f_rec, "OBSERVATION DATA EXTERNAL", vector<string>{"OBSNME", "NAME"});
+
+        vector<pair<string, int>> obs_cycle_map = extract_cycle_numbers2(f_rec, "OBSERVATION DATA EXTERNAL", vector<string>{"OBSNME", "NAME"});
 		if (obs_cycle_map.size() == 0)
 		{
 			throw_control_file_error(f_rec, "no observation cycle information was found in external file(s), assigning all observations to cycle '0', effectively forming an 'ensemble smoother' run", false);
@@ -2329,10 +2337,13 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 				ss << m << ",";
 			throw_control_file_error(f_rec, ss.str());
 		}
-		for (auto oc : obs_cycle_map)
-		{
-			observation_info.get_observation_rec_ptr_4_mod(oc.first)->cycle = oc.second;
-		}
+		for (auto oc : obs_cycle_map) {
+            observation_info.get_observation_rec_ptr_4_mod(oc.first)->cycle = oc.second;
+        }
+		for (auto& oc : obs_cycle_dci_map)
+        {
+            observation_info.get_observation_rec_ptr_4_mod(oc.first)->dci = oc.second;
+        }
 	}
 
 	model_exec_info.incycle_vec.clear();
@@ -2342,17 +2353,21 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 		for (auto tpl : model_exec_info.tplfile_vec)
 		{
 			model_exec_info.incycle_vec.push_back(-1);
+			model_exec_info.incycle_dci_vec.push_back(DaCycleInfo());
 		}
 	}
 	else
 	{
 		vector<pair<string, int>> mi_cycle_map = extract_cycle_numbers2(f_rec, "MODEL INPUT EXTERNAL", vector<string>{"PEST_FILE"});
+        vector<pair<string, DaCycleInfo>> mi_cycle_dci_map = extract_cycle_info(f_rec, "MODEL INPUT EXTERNAL", vector<string>{"PEST_FILE"});
 		if (mi_cycle_map.size() == 0)
 		{
 			throw_control_file_error(f_rec, "could not find cycle info in external file(s), all template/model input files will be used every cycle", false);
 			for (auto tpl : model_exec_info.tplfile_vec)
 			{
 				model_exec_info.incycle_vec.push_back(-1);
+				model_exec_info.incycle_dci_vec.push_back(DaCycleInfo());
+
 			}
 		}	
 		else
@@ -2360,8 +2375,13 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 			
 			for (auto tpl : mi_cycle_map)
 			{
-				model_exec_info.incycle_vec.push_back(tpl.second); // we can do that becuase row order does not change. 
+				model_exec_info.incycle_vec.push_back(tpl.second); // we can do that becuase row order does not change.
+
 			}
+			for (auto& tpl : mi_cycle_dci_map)
+            {
+                model_exec_info.incycle_dci_vec.push_back(tpl.second);
+            }
 		}
 	}
 
@@ -2373,17 +2393,20 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 		for (auto ins : model_exec_info.insfile_vec)
 		{
 			model_exec_info.outcycle_vec.push_back(0);
+			model_exec_info.outcycle_dci_vec.push_back(DaCycleInfo());
 		}
 	}
 	else
 	{
 		vector<pair<string, int>> mi_cycle_map = extract_cycle_numbers2(f_rec, "MODEL OUTPUT EXTERNAL", vector<string>{"PEST_FILE"});
+        vector<pair<string, DaCycleInfo>> mi_cycle_dci_map = extract_cycle_info(f_rec, "MODEL OUTPUT EXTERNAL", vector<string>{"PEST_FILE"});
 		if (mi_cycle_map.size() == 0)
 		{
 			throw_control_file_error(f_rec, "no model output cycle information was found in external file(s), assigning all instruction/out files to cycle '0', effectively forming an 'ensemble smoother' run",false);
 			for (auto ins : model_exec_info.insfile_vec)
 			{
 				model_exec_info.outcycle_vec.push_back(0);
+                model_exec_info.outcycle_dci_vec.push_back(DaCycleInfo());
 			}
 		}
 		else
@@ -2392,6 +2415,11 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 			{
 				model_exec_info.outcycle_vec.push_back(ins.second); // we can do that becuase row order does not change. 
 			}
+			for (auto& ins : mi_cycle_dci_map)
+            {
+			    model_exec_info.outcycle_dci_vec.push_back(ins.second);
+
+            }
 		}
 	}
 	//TODO: prior info...with pi, need to check that parameters in each eqs are in the same cycle!
@@ -2871,8 +2899,54 @@ void Pest::child_pest_update(int icycle)
 	//this.check_inputs();
 }
 
+vector<int> Pest::get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycles)
+{
+    int start_cycle = std::numeric_limits<int>::min();
+    int stop_cycle = std::numeric_limits<int>::max();
+    DaCycleInfo dci;
+    for (auto pname : ctl_ordered_par_names)
+    {
+        dci = ctl_parameter_info.get_parameter_rec_ptr(pname)->dci;
+        if (dci.start < start_cycle)
+            start_cycle = dci.start;
+        if (dci.stop > stop_cycle)
+            stop_cycle = dci.stop;
+    }
+    for (auto oname : ctl_ordered_obs_names)
+    {
+        dci = observation_info.get_observation_rec_ptr(oname)->dci;
+        if (dci.start < start_cycle)
+            start_cycle = dci.start;
+        if (dci.stop > stop_cycle)
+            stop_cycle = dci.stop;
+    }
+    for (int i=start_cycle;i<stop_cycle;i++)
+    {
+
+    }
+
+
+
+
+
+}
+
+bool cycle_in_range(int cycle,DaCycleInfo& dci) {
+    if (dci.start > cycle)
+        return false;
+    if (dci.stop < cycle)
+        return false;
+    if (dci.stride == 1)
+        return true;
+    
+
+}
+
+
+
 vector<int> Pest::get_assim_cycles(ofstream& f_rec, vector<int> unique_cycles)
 {
+
 	int curr_cycle;
 	vector<int> cycles_ordered_list;
 	
