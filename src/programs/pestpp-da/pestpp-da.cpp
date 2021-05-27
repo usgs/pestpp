@@ -604,8 +604,23 @@ int main(int argc, char* argv[])
 				obs_names = childPest.get_ctl_ordered_nz_obs_names();
 				ObservationEnsemble cycle_curr_noise(&childPest, &rand_gen, curr_noise.get_eigen(cycle_curr_oe.get_real_names(), obs_names), cycle_curr_oe.get_real_names(), obs_names);
 				//correct for obs cycle table
-				if (pest_scenario.get_pestpp_options().get_da_obs_cycle_table().size() > 0)
+				if ((pest_scenario.get_pestpp_options().get_da_weight_cycle_table().size() > 0) && (
+				        !pest_scenario.get_pestpp_options().get_ies_no_noise())
+				        )
                 {
+				    cout << "...'da_weight_cycle_table' passed, redrawing noise realizations" << endl;
+				    fout_rec << "...'da_weight_cycle_table' passed, redrawing noise realizations" << endl;
+				    da.initialize_obscov();
+				    cycle_curr_noise.draw(cycle_curr_oe.shape().first,*da.get_obscov_ptr(),&performance_log,
+                              pest_scenario.get_pestpp_options().get_ies_verbose_level(),fout_rec);
+				    vector<string> names = cycle_curr_oe.get_real_names();
+				    cycle_curr_noise.set_real_names(names);
+                }
+
+				else if (pest_scenario.get_pestpp_options().get_da_obs_cycle_table().size() > 0)
+                {
+                    cout << "...'da_obs_cycle_table' passed, translating noise realizations" << endl;
+                    fout_rec << "...'da_obs_cycle_table' passed, translating noise realizations" << endl;
 				    cycle_curr_noise.update_var_map();
 				    Observations org_obs = pest_scenario.get_ctl_observations();
 				    map<string,int> vmap = cycle_curr_noise.get_var_map();
@@ -617,7 +632,6 @@ int main(int argc, char* argv[])
                         }
                     }
                 }
-
 				da.set_noise_oe(cycle_curr_noise);
 			}
 			da.set_localizer(global_loc);
