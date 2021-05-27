@@ -71,7 +71,10 @@ int main(int argc, char* argv[])
 		cout << "                                   by The PEST++ Development Team" << endl;
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-		
+        auto start = chrono::steady_clock::now();
+
+        string start_string = get_time_string();
+        cout << "started at " << start_string << endl;
 		CmdLine cmdline(argc, argv);
 
 		
@@ -838,7 +841,11 @@ int main(int argc, char* argv[])
 		pest_utils::try_clean_up_run_storage_files(case_name);
 
 		cout << endl << endl << "PESTPP-GLM Analysis Complete..." << endl;
-		cout << flush;
+        auto end = chrono::steady_clock::now();
+        cout << "started at " << start_string << endl;
+        cout << "finished at " << get_time_string() << endl;
+        cout << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
+        cout << flush;
 		return 0;
 #ifndef _DEBUG
 	}

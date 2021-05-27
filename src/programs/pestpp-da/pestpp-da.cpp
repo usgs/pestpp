@@ -42,6 +42,7 @@ int main(int argc, char* argv[])
 	try
 	{
 #endif
+
 		string version = PESTPP_VERSION;
 		cout << endl << endl;
 		cout << "             ==============================================" << endl;
@@ -52,7 +53,9 @@ int main(int argc, char* argv[])
 		cout << "               Developed by the PEST++ development team" << endl;
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-
+        auto start = chrono::steady_clock::now();
+        string start_string = get_time_string();
+        cout << "started at " << start_string << endl;
 		CmdLine cmdline(argc, argv);
 
 		FileManager file_manager;
@@ -704,7 +707,12 @@ int main(int argc, char* argv[])
 		} // end cycle loop
 		fout_rec.close();
 		cout << endl << endl << "pestpp-da analysis complete..." << endl;
-		cout << flush;
+
+        auto end = chrono::steady_clock::now();
+        cout << "started at " << start_string << endl;
+        cout << "finished at " << get_time_string() << endl;
+        cout << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
+        cout << flush;
 		return 0;
 #ifndef _DEBUG
 	}
