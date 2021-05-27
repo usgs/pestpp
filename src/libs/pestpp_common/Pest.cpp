@@ -2875,8 +2875,17 @@ void Pest::child_pest_update(int icycle)
 vector<int> Pest::get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycles)
 {
     stringstream ss;
+    set<int> scycles(unique_cycles.begin(),unique_cycles.end());
+
     int start_cycle = std::numeric_limits<int>::max();
     int stop_cycle = std::numeric_limits<int>::min();
+    for (auto &s : scycles)
+    {
+        if (s < start_cycle)
+            start_cycle = s;
+        if (s > stop_cycle)
+            stop_cycle = s;
+    }
     DaCycleInfo dci;
     for (auto pname : ctl_ordered_par_names)
     {
@@ -2910,8 +2919,7 @@ vector<int> Pest::get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycle
         ss << "minimum start cycle '" << start_cycle << "' greater than maximum stop cycle '" << stop_cycle << "'";
         throw_control_file_error(f_rec, ss.str());
     }
-    set<int> scycles{start_cycle,stop_cycle};
-    scycles.insert(unique_cycles.begin(),unique_cycles.end());
+
     for (int i=start_cycle;i<stop_cycle;i++)
     {
         for (auto pname : ctl_ordered_par_names)
