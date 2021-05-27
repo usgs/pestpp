@@ -2912,7 +2912,14 @@ vector<int> Pest::get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycle
     }
 
     if (stop_cycle < 0) {
-        throw_control_file_error(f_rec, "didnt find any explicit 'stop' cycle values");
+        ss.str("");
+        ss << "WARNING: didnt find any explicit 'stop' cycle values in control file info, assuming smoother formulation" << endl;
+        ss << "         assinging a generic 'stop' value of " << start_cycle + 1 << " which is 'start' cycle plus 1" << endl;
+        cout << ss.str();
+        f_rec << ss.str();
+        stop_cycle = start_cycle + 1;
+        return vector<int>{start_cycle};
+
     }
     if (start_cycle > stop_cycle) {
         ss.str("");
@@ -2920,7 +2927,9 @@ vector<int> Pest::get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycle
         throw_control_file_error(f_rec, ss.str());
     }
 
-    for (int i=start_cycle;i<stop_cycle;i++)
+
+
+    for (int i=start_cycle;i<stop_cycle+1;i++)
     {
         for (auto pname : ctl_ordered_par_names)
         {
@@ -2937,6 +2946,8 @@ vector<int> Pest::get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycle
 }
 
 bool cycle_in_range(int cycle,const DaCycleInfo& dci) {
+    if ((dci.start == dci.stop) && (dci.start == cycle))
+        return true;
     if (dci.start > cycle)
         return false;
     if ((dci.stop > 0) && (dci.stop < cycle))
