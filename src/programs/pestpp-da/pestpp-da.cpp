@@ -152,7 +152,8 @@ int main(int argc, char* argv[])
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
 			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
+			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl;
+            fout_rec << "started at " << start_string << endl << endl;
 		}
 
 		cout << endl;
@@ -446,9 +447,10 @@ int main(int argc, char* argv[])
 			Pest childPest = pest_scenario.get_child_pest(*icycle);
 
 			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);
-			output_file_writer.scenario_io_report(fout_rec);
+
 			if (verbose_level > 1) // 
 			{
+                output_file_writer.scenario_io_report(fout_rec);
 				output_file_writer.scenario_pargroup_report(fout_rec);
 				output_file_writer.scenario_par_report(fout_rec);
 				output_file_writer.scenario_obs_report(fout_rec);
@@ -601,6 +603,21 @@ int main(int argc, char* argv[])
 			{
 				obs_names = childPest.get_ctl_ordered_nz_obs_names();
 				ObservationEnsemble cycle_curr_noise(&childPest, &rand_gen, curr_noise.get_eigen(cycle_curr_oe.get_real_names(), obs_names), cycle_curr_oe.get_real_names(), obs_names);
+				//correct for obs cycle table
+				if (pest_scenario.get_pestpp_options().get_da_obs_cycle_table().size() > 0)
+                {
+				    cycle_curr_noise.update_var_map();
+				    Observations org_obs = pest_scenario.get_ctl_observations();
+				    map<string,int> vmap = cycle_curr_noise.get_var_map();
+                    for (auto o : childPest.get_ctl_observations())
+                    {
+                        if (oi.get_observation_rec_ptr(o.first)->weight != 0.0)
+                        {
+                            cycle_curr_noise.get_eigen_ptr_4_mod()->col(vmap[o.first]).array() +=o.second -  org_obs[o.first];
+                        }
+                    }
+                }
+
 				da.set_noise_oe(cycle_curr_noise);
 			}
 			da.set_localizer(global_loc);
@@ -713,7 +730,11 @@ int main(int argc, char* argv[])
         cout << "finished at " << get_time_string() << endl;
         cout << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
         cout << flush;
-		return 0;
+        fout_rec << "started at " << start_string << endl;
+        fout_rec << "finished at " << get_time_string() << endl;
+        fout_rec << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
+
+        return 0;
 #ifndef _DEBUG
 	}
 	catch (exception & e)

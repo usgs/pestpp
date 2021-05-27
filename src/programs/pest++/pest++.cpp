@@ -172,7 +172,8 @@ int main(int argc, char* argv[])
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl << endl;
 			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
+			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl;
+            fout_rec << "started at " << start_string << endl << endl;
 
 		}
 
@@ -845,6 +846,10 @@ int main(int argc, char* argv[])
         cout << "started at " << start_string << endl;
         cout << "finished at " << get_time_string() << endl;
         cout << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
+        fout_rec << "started at " << start_string << endl;
+        fout_rec << "finished at " << get_time_string() << endl;
+        fout_rec << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
+
         cout << flush;
 		return 0;
 #ifndef _DEBUG

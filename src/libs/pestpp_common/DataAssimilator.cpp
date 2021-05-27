@@ -614,7 +614,17 @@ void generate_global_ensembles(DataAssimilator& da, ofstream& fout_rec, Paramete
 
 	cout << "...global parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
 	fout_rec << "...global parameter ensemble has " << curr_pe.shape().first << " rows and " << curr_pe.shape().second << " columns" << endl;
-	curr_pe.to_csv(da.get_file_manager().get_base_filename() + ".global.prior.pe.csv");
+	if (pest_scenario_ptr->get_pestpp_options().get_save_binary())
+    {
+        curr_pe.to_binary(da.get_file_manager().get_base_filename() + ".global.prior.pe.jcb");
+        curr_noise.to_binary(da.get_file_manager().get_base_filename() + ".global.obs+noise.jcb");
+    }
+	else {
+        curr_pe.to_csv(da.get_file_manager().get_base_filename() + ".global.prior.pe.csv");
+        curr_noise.to_csv(da.get_file_manager().get_base_filename() + ".global.obs+noise.csv");
+    }
+
+
 	cout << "...global observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
 	fout_rec << "...global observation ensemble has " << curr_oe.shape().first << " rows and " << curr_oe.shape().second << " columns" << endl;
 

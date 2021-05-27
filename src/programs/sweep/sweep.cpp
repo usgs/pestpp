@@ -376,15 +376,14 @@ int main(int argc, char* argv[])
 		{
 			throw runtime_error("/r option not supported by sweep");
 		}
-		
-		
+
 		restart_ctl.get_restart_option() = RestartController::RestartOption::NONE;
 		file_manager.open_default_files();
-		
 
 		ofstream &fout_rec = file_manager.rec_ofstream();
 		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
-
+        auto start = chrono::steady_clock::now();
+        string start_string = get_time_string();
 		if (!restart_flag || save_restart_rec_header)
 		{
 			fout_rec << "             pestpp-swp.exe - a parameteric sweep utility" << endl << "for PEST(++) datasets " << endl << endl;
@@ -394,14 +393,14 @@ int main(int argc, char* argv[])
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl << endl;
 			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
+			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl;
+            fout_rec << "started at " << start_string << endl << endl;
 		}
 
 		cout << endl;
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-        auto start = chrono::steady_clock::now();
-        string start_string = get_time_string();
+
         cout << "started at " << start_string << endl;
 		cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl << endl;
 		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
@@ -660,7 +659,11 @@ int main(int argc, char* argv[])
         cout << "finished at " << get_time_string() << endl;
         cout << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
         cout << flush;
-		return 0;
+        fout_rec << "started at " << start_string << endl;
+        fout_rec << "finished at " << get_time_string() << endl;
+        fout_rec << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
+
+        return 0;
 #ifndef _DEBUG
 	}
 	catch (exception &e)

@@ -125,7 +125,7 @@ int main(int argc, char* argv[])
 	fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
 	fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
 	fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
-
+    fout_rec << "started at " << start_string << endl;
 	cout << endl;
 	cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
 	cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
@@ -390,7 +390,11 @@ int main(int argc, char* argv[])
     cout << "finished at " << get_time_string() << endl;
     cout << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
     cout << flush;
-	return 0;
+    fout_rec << "started at " << start_string << endl;
+    fout_rec << "finished at " << get_time_string() << endl;
+    fout_rec << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
+
+    return 0;
 	//cout << endl << "Simulation Complete - Press RETURN to close window" << endl;
 	//char buf[256];
 	//OperSys::gets_s(buf, sizeof(buf));
