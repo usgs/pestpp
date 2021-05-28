@@ -188,17 +188,14 @@ int main(int argc, char* argv[])
 		//pest_scenario.get_pestpp_options_ptr()->set_use_da(true);
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
 		//output_file_writer.scenario_report(fout_rec);
+		fout_rec << endl << endl << "...Global Interface Summary:" << endl;
 		output_file_writer.scenario_io_report(fout_rec);
 		int verbose_level;
 		PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 		verbose_level = ppo->get_ies_verbose_level();
-		if (verbose_level > 1)
-		{
-			output_file_writer.scenario_pargroup_report(fout_rec);
-			output_file_writer.scenario_par_report(fout_rec);
-			output_file_writer.scenario_obs_report(fout_rec);
-		}
-
+		output_file_writer.scenario_pargroup_report(fout_rec);
+        output_file_writer.scenario_par_report(fout_rec);
+        output_file_writer.scenario_obs_report(fout_rec);
 
 		//reset some default args for da here:		
 		set<string> pp_args = ppo->get_passed_args();
@@ -529,9 +526,11 @@ int main(int argc, char* argv[])
 
 			}
 			//cout << childPest.get_ctl_observations().get_rec("GAGE_1") << ", " << childPest.get_ctl_observation_info().get_weight("GAGE_1") << endl;
-			output_file_writer.scenario_io_report(fout_rec);
+
 			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1) // todo: add da verbose
 			{
+			    fout_rec << "...verbose level > 1, cycle " << *icycle << " Pest Interface Summary:" << endl;
+                output_file_writer.scenario_io_report(fout_rec);
 				output_file_writer.scenario_pargroup_report(fout_rec);
 				output_file_writer.scenario_par_report(fout_rec);
 				output_file_writer.scenario_obs_report(fout_rec);
@@ -595,6 +594,23 @@ int main(int argc, char* argv[])
 			ParameterEnsemble cycle_curr_pe(&childPest, &rand_gen, curr_pe.get_eigen(vector<string>(), act_par_names), curr_pe.get_real_names(), act_par_names);
 			cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
 			cycle_curr_pe.set_fixed_info(curr_pe.get_fixed_map());
+			if (par_cycle_info.find(*icycle) != par_cycle_info.end())
+            {
+                map<pair<string, string>, double> fm = cycle_curr_pe.get_fixed_map();
+
+			    for (auto& info : par_cycle_info.at(*icycle))
+                {
+			        for (auto& fi: fm)
+                    {
+			            if (fi.first.second == info.first)
+                        {
+			                fi.second = info.second;
+                        }
+                    }
+
+                }
+			    cycle_curr_pe.set_fixed_info(fm);
+            }
 			da.set_pe(cycle_curr_pe);
 			obs_names = childPest.get_ctl_ordered_obs_names();
 			ObservationEnsemble cycle_curr_oe(&childPest, &rand_gen, curr_oe.get_eigen(vector<string>(),obs_names), curr_oe.get_real_names(), obs_names);

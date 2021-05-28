@@ -180,7 +180,9 @@ public:
 	void clear_fixed_map() { fixed_map.clear(); fixed_names.clear(); }
 	void replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);
 	map<pair<string, string>, double> get_fixed_map() { return fixed_map; }
-	void set_fixed_info(map<pair<string, string>, double> _fixed_map);
+    map<pair<string, string>, double>* get_fixed_map_ptr() { return &fixed_map; }
+
+    void set_fixed_info(map<pair<string, string>, double> _fixed_map);
 
 private:
 	ParamTransformSeq par_transform;
