@@ -1209,7 +1209,9 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			C.resize(0, 0);
 			obs_err.resize(0, 0);
 
-			s2 = s.asDiagonal().inverse();
+
+			s2 = s.cwiseProduct(s).asDiagonal().inverse();
+
 			for (int i = 0; i < s.size(); i++)
 			{
 				if (s(i) < 1e-50)
@@ -1218,17 +1220,22 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				}
 			}
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "s2", s2);
+
 			Eigen::MatrixXd X1 = s2 * Ut;
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
+
 			X1 = X1 * obs_resid;
 			obs_resid.resize(0, 0);
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1_obs_resid", X1);
+
 			X1 = Ut.transpose() * X1;
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1_Ut", X1);
 			Ut.resize(0, 0);
+
 			X1 = obs_diff.transpose() * X1;
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1_obs_diff", X1);
 			obs_diff.resize(0, 0);
+
 			upgrade_1 = -1.0 * par_diff * X1;
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
 			upgrade_1.transposeInPlace();
@@ -3114,7 +3121,6 @@ void EnsembleMethod::initialize(int cycle, bool run)
 	//set some defaults
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
-	//use_mda = false;
 	if (ppo->get_ies_use_mda())
 	{
 		int noptmax = pest_scenario.get_control_info().noptmax;
@@ -3123,7 +3129,6 @@ void EnsembleMethod::initialize(int cycle, bool run)
 			message(0, "using multiple-data-assimilation algorithm");
 
 		}
-		//use_mda = true;
 	}
 	else
 	{
@@ -4192,7 +4197,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		message(0, "ies_debug_upgrade_only is true, exiting");
 		if (pe_filenames.size() > 0)
 		{
-			message(1, "firstattempting to load upgrade ensemble " + pe_filenames[0]);
+			message(1, "first attempting to load upgrade ensemble " + pe_filenames[0]);
 			performance_log->log_event("loading dense pe upgrade ensemble");
 			ParameterEnsemble remaining_pe_lam(&pest_scenario);
 			remaining_pe_lam.from_binary(pe_filenames[0]);

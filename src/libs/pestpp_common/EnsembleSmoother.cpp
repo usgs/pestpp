@@ -175,7 +175,13 @@ void IterEnsembleSmoother::iterate_2_solution()
 		ss.str("");
 		ss << "starting solve for iteration: " << iter;
 		performance_log->log_event(ss.str());
-		accept = solve_glm();
+		if (pest_scenario.get_pestpp_options().get_ies_use_mda())
+        {
+		    accept = solve_mda(false);
+        }
+		else {
+            accept = solve_glm();
+        }
 		report_and_save(NetPackage::NULL_DA_CYCLE);
 		ph.update(oe,pe);
 		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);

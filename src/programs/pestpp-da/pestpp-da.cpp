@@ -750,6 +750,13 @@ int main(int argc, char* argv[])
 			curr_pe.to_csv(ss.str());
 			cout << curr_oe.get_eigen() << endl;
 			cout << endl;*/
+			if (*icycle >= pest_scenario.get_pestpp_options().get_da_stop_cycle())
+            {
+			    cout << "'da_stop_cycle' criteria met" << endl;
+                fout_rec << "'da_stop_cycle' criteria met" << endl;
+                break;
+            }
+
 
 		} // end cycle loop
 		fout_rec.close();

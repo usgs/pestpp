@@ -593,8 +593,11 @@ public:
 	void set_da_weight_cycle_table(string _filename) { da_weight_cycle_table = _filename; }
 	int get_da_hotstart_cycle() const { return da_hotstart_cycle; }
 	void set_da_hotstart_cycle(int val) { da_hotstart_cycle = val; }
+    int get_da_stop_cycle() const { return da_stop_cycle; }
+    void set_da_stop_cycle(int val) { da_stop_cycle = val; }
 
-	bool get_debug_check_par_en_consistency() const { return debug_check_paren_consistency; }
+
+    bool get_debug_check_par_en_consistency() const { return debug_check_paren_consistency; }
 	void set_debug_check_par_en_consistency(bool _flag) { debug_check_paren_consistency = _flag; }
 	void set_num_tpl_ins_threads(int num) { num_tpl_ins_threads = num; }
 	int get_num_tpl_ins_threads()const { return num_tpl_ins_threads; }
@@ -779,6 +782,7 @@ private:
 	string da_obs_cycle_table;
 	string da_weight_cycle_table;
 	int da_hotstart_cycle;
+	int da_stop_cycle;
 
 	
 

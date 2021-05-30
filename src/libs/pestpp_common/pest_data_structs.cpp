@@ -1123,6 +1123,11 @@ bool PestppOptions::assign_da_value_by_key(const string& key, const string& valu
 		convert_ip(value, da_hotstart_cycle);
 		return true;
 	}
+	else if (key == "DA_STOP_CYCLE")
+    {
+        convert_ip(value, da_stop_cycle);
+        return true;
+    }
 	//any additional da specific args must be before here!
 	//some hackery!
 	else
@@ -1628,6 +1633,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "da_parameter_cycle_table: " << da_par_cycle_table << endl;
 	os << "da_observation_cycle_table: " << da_obs_cycle_table << endl;
 	os << "da_hotstart_cycle: " << da_hotstart_cycle << endl;
+	os << "da_stop_cycle: " << da_stop_cycle << endl;
 
 	
 	os << endl << endl << endl;
@@ -1783,6 +1789,7 @@ void PestppOptions::set_defaults()
 	//set_da_par_csv("");
 	//set_da_num_reals(50);
 	set_da_hotstart_cycle(0);
+    set_da_stop_cycle(1000000000);
 
 	// End of DA parameters
 	set_gsa_method("MORRIS");
