@@ -649,6 +649,7 @@ int main(int argc, char* argv[])
                     }
                 }
 				da.set_noise_oe(cycle_curr_noise);
+				cycle_curr_noise.to_csv("cycle_curr_noise.csv");
 			}
 			da.set_localizer(global_loc);
 			da.initialize(*icycle);
@@ -740,7 +741,7 @@ int main(int argc, char* argv[])
 			ss << ".global." << *icycle << ".pe.csv";
 			curr_pe.to_csv(file_manager.get_base_filename() + ss.str());
 
-			file_manager.close_all_files_ending_with("phi");
+			file_manager.close_all_files_containing(".phi.");
 
 			//transfer the best (current) simulated final states to the inital states pars in the pe for the cycle
 			//is the place to do this?

@@ -1372,11 +1372,15 @@ L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 		weight = oi->get_weight(oname);
 		if (weight == 0)
 			continue;
-		if ((og.compare(0, 2, "L_") == 0) || (og.compare(0, 4, "LESS")==0))
+		if ((og.compare(0, 2, "L_") == 0) ||
+		    (og.compare(0, 4, "LESS")==0) ||
+                (og.compare(0,2,">@") == 0))
 		{
 			lt_obs_names.push_back(oname);
 		}
-		else if ((og.compare(0, 2, "G_")==0) || (og.compare(0, 7, "GREATER")==0))
+		else if ((og.compare(0, 2, "G_")==0) ||
+		        (og.compare(0, 7, "GREATER")==0) ||
+                (og.compare(0,2,"<@") == 0))
 		{
 			gt_obs_names.push_back(oname);
 		}
@@ -3127,7 +3131,10 @@ void EnsembleMethod::initialize(int cycle, bool run)
 		if (noptmax > 0)
 		{
 			message(0, "using multiple-data-assimilation algorithm");
-
+            if (ppo->get_ies_no_noise())
+            {
+                throw_em_error("'no noise'is not compatible with 'use_mda' as this solution relies on noise draws");
+            }
 		}
 	}
 	else
@@ -3667,10 +3674,16 @@ void EnsembleMethod::initialize(int cycle, bool run)
 
 			//check that all obs are in conflict
 			message(1, "dropping conflicted observations");
-			if (in_conflict.size() == oe.shape().second)
+			if (in_conflict.size() == act_obs_names.size())
 			{
-				throw_em_error("all non-zero weighted observations in conflict state, cannot continue");
-			}
+			    if (cycle == NetPackage::NULL_DA_CYCLE) {
+                    throw_em_error("all non-zero weighted observations in conflict state, cannot continue");
+                }
+			    else
+                {
+                    message(0,"all non-zero weighted observations in conflict state, continuing to next cycle");
+                }
+            }
 			zero_weight_obs(in_conflict);
 			if (ppo->get_ies_localizer().size() > 0)
 			{
@@ -3781,9 +3794,10 @@ void EnsembleMethod::initialize(int cycle, bool run)
 		message(1, "saved cycle prior obs ensemble to", names.second);
 		message(1, "saved cycle prior par ensemble to", names.first);
 	}
-
-	message(1, "current lambda:", last_best_lam);
-	message(0, "initialization complete");
+    if (act_obs_names.size() > 0) {
+        message(1, "current lambda:", last_best_lam);
+    }
+    message(0, "initialization complete");
 }
 
 void EnsembleMethod::transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
@@ -5516,10 +5530,10 @@ void EnsembleMethod::zero_weight_obs(vector<string>& obs_to_zero_weight, bool up
 	{
 		oi->set_weight(n, 0.0);
 	}
-
+    act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	stringstream ss;
 	ss << "number of non-zero weighted observations reduced from " << org_nnz_obs;
-	ss << " to " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
+	ss << " to " << act_obs_names.size() << endl;
 	message(1, ss.str());
 }
 
