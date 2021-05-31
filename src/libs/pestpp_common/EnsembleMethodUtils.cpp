@@ -3674,6 +3674,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 
 			//check that all obs are in conflict
 			message(1, "dropping conflicted observations");
+
 			if (in_conflict.size() == act_obs_names.size())
 			{
 			    if (cycle == NetPackage::NULL_DA_CYCLE) {
@@ -3682,9 +3683,11 @@ void EnsembleMethod::initialize(int cycle, bool run)
 			    else
                 {
                     message(0,"all non-zero weighted observations in conflict state, continuing to next cycle");
+                    zero_weight_obs(in_conflict,false,false);
+                    return;
                 }
             }
-			zero_weight_obs(in_conflict);
+            zero_weight_obs(in_conflict);
 			if (ppo->get_ies_localizer().size() > 0)
 			{
 				message(1, "updating localizer");
