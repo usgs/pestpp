@@ -2491,7 +2491,11 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 				pest_scenario.get_ctl_observations(), obs, obj_func, pars);
 			file_manager.close_all_files_ending_with("rei");
 		}
-		cout << "saved par and rei files for realization " << tag << " for iteration " << iter << endl;
+		cout << "saved par and rei files for realization " << tag;
+		if (iter >= 0)
+		    cout << " for iteration " << iter;
+		cout << endl;
+
 	}
 	
 	return pair<Parameters, Observations>(pars, obs);
@@ -3073,7 +3077,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 		ss << file_manager.get_base_filename();
 		if (cycle != NetPackage::NULL_DA_CYCLE)
 			ss << "." << cycle;
-		ss << "." << BASE_REAL_NAME << "." << ".par.csv";
+		ss << "." << pest_utils::lower_cp(BASE_REAL_NAME) << ".par.csv";
 		string par_csv = ss.str();
 		message(1, "saving control file parameter ensemble to ", par_csv);
 		//_pe.to_csv(par_csv);
@@ -3107,7 +3111,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 		ss << file_manager.get_base_filename();
 		if (cycle != NetPackage::NULL_DA_CYCLE)
 			ss << "." << cycle;
-		ss << "." << BASE_REAL_NAME << "." << ".obs.csv";
+		ss << "." << pest_utils::lower_cp(BASE_REAL_NAME) << ".obs.csv";
 		string obs_csv = ss.str();
 		message(1, "saving results from control file parameter value run to ", obs_csv);
 		_oe.to_csv(obs_csv);

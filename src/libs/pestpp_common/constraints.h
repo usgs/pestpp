@@ -30,10 +30,9 @@ public:
 	void report();
 	void update_coef_map_from_jacobian(Jacobian& jco);
 
-	const string get_obj_sense() { return obj_sense;  }
-	const bool get_use_obs_obj() { return use_obj_obs; }
-
-	const map<string, double> get_obj_func_coef_map() { return obj_func_coef_map;  }
+	string get_obj_sense() { return obj_sense;  }
+	bool get_use_obs_obj() { return use_obj_obs; }
+	map<string, double> get_obj_func_coef_map() { return obj_func_coef_map;  }
 
 
 private:
