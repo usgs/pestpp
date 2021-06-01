@@ -8,6 +8,7 @@
 #include "CoinOslFactorization.hpp"
 #include "CoinOslC.h"
 #include "CoinFinite.hpp"
+#include <climits>
 #define GO_DENSE 70
 #define GO_DENSE_RATIO 1.8
 int c_ekkclco(const EKKfactinfo *fact,int *hcoli,
