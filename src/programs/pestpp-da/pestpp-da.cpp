@@ -254,7 +254,7 @@ int main(int argc, char* argv[])
 		}
 
 		vector<string> errors;
-		if ((!pest_scenario.get_pestpp_options().get_check_tplins()) &&
+		if ((pest_scenario.get_pestpp_options().get_check_tplins()) &&
 		((pest_scenario.get_control_info().noptmax != 0) ||
 		(pest_scenario.get_pestpp_options().get_debug_parse_only())))
 		{
