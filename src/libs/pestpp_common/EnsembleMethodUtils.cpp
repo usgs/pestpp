@@ -617,7 +617,8 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 		C.resize(0, 0);
 		obs_err.resize(0, 0);
 
-		s2 = s.asDiagonal().inverse();
+		// s2 = s.asDiagonal().inverse();
+		s2 = s.cwiseProduct(s).asDiagonal().inverse();
 		for (int i = 0; i < s.size(); i++)
 		{
 			if (s(i) < 1e-50)
