@@ -2950,7 +2950,7 @@ bool cycle_in_range(int cycle,const DaCycleInfo& dci) {
         return true;
     if (dci.start > cycle)
         return false;
-    if ((dci.stop > 0) && (dci.stop < cycle))
+    if ((dci.stop >= 0) && (dci.stop < cycle))
         return false;
     if (dci.stride == 1)
         return true;

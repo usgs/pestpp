@@ -253,7 +253,10 @@ int main(int argc, char* argv[])
 			throw runtime_error(ss.str());
 		}
 
-		if (pest_scenario.get_control_info().noptmax != 0)
+		vector<string> errors;
+		if ((!pest_scenario.get_pestpp_options().get_check_tplins()) &&
+		((pest_scenario.get_control_info().noptmax != 0) ||
+		(pest_scenario.get_pestpp_options().get_debug_parse_only())))
 		{
 
 			for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
@@ -270,7 +273,47 @@ int main(int argc, char* argv[])
 
 				//Pest childPest;
 				Pest childPest = pest_scenario.get_child_pest(*icycle);
-				childPest.check_io(fout_rec);
+
+
+				if (childPest.get_ctl_observations().size() == 0)
+                {
+				    ss.str("");
+				    ss << "Error: no observations found for cycle " << *icycle << endl;
+                    errors.push_back(ss.str());
+                    continue;
+                }
+                if (childPest.get_ctl_parameters().size() == 0)
+                {
+                    ss.str("");
+                    ss << "Error: no parameters found for cycle " << *icycle << endl;
+                    errors.push_back(ss.str());
+                    continue;
+                }
+                if (childPest.get_model_exec_info().tplfile_vec.size() == 0)
+                {
+                    ss.str("");
+                    ss << "Error: no template files found for cycle " << *icycle << endl;
+                    errors.push_back(ss.str());
+                    continue;
+                }
+                if (childPest.get_model_exec_info().insfile_vec.size() == 0)
+                {
+                    ss.str("");
+                    ss << "Error: no instruction files found for cycle " << *icycle << endl;
+                    errors.push_back(ss.str());
+                    continue;
+                }
+                try {
+                    childPest.check_io(fout_rec);
+                }
+                catch (exception& e)
+                {
+                    ss.str("");
+                    ss << "interface error for cycle " << *icycle << ": " << e.what() << endl;
+                    errors.push_back(ss.str());
+                    continue;
+                }
+
 
 				if (obs_cycle_info.find(*icycle) != obs_cycle_info.end())
 				{
@@ -338,17 +381,28 @@ int main(int argc, char* argv[])
 
 
 
-				stringstream ss;
+				ss.str("");
 
-				/*ss << "num adj par: " << nadj_par << ", ";
-				ss << "num nz obs: " << nnz_obs << ", ";*/
-				ss << "num tpl files: " << childPest.get_tplfile_vec().size() << ", ";
-				ss << "num ins files: " << childPest.get_insfile_vec().size() << endl;
+				ss << "...number of  template files in cycle " << *icycle << ": " << childPest.get_tplfile_vec().size() << endl;
+				ss << "...number of instruction files in cycle " << *icycle << ": " << childPest.get_insfile_vec().size() << endl;
 				cout << ss.str();
 				fout_rec << ss.str();
 
 			}
 		}
+		if (errors.size() > 0)
+        {
+		    ss.str("");
+		    ss << errors.size() << " errors detected in cycle interface checking:" << endl;
+		    cout << ss.str();
+		    fout_rec << ss.str();
+		    for (auto& e: errors)
+            {
+                cout << e;
+                fout_rec << e;
+            }
+		    throw runtime_error("Errors detected in cycle interface checking");
+        }
 		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
 		{
 			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
@@ -558,7 +612,10 @@ int main(int argc, char* argv[])
 				}
 			}
 
-			cout << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
+
+            cout << "...number of parameters in cycle " << *icycle << ": " << childPest.get_ctl_parameters().size() << endl;
+            fout_rec << "...number of parameters in cycle " << *icycle << ": " << childPest.get_ctl_parameters().size() << endl;
+            cout << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
 			fout_rec << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
 
 			ObservationInfo oi = childPest.get_ctl_observation_info();
@@ -568,7 +625,10 @@ int main(int argc, char* argv[])
 				if (oi.get_observation_rec_ptr(o.first)->weight != 0.0)
 					nnz_obs++;
 			}
-			cout << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
+
+            cout << "...number of observations in cycle " << *icycle << ": " << childPest.get_ctl_observations().size() << endl;
+            fout_rec << "...number of observations in cycle " << *icycle << ": " << childPest.get_ctl_observations().size() << endl;
+            cout << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
 			fout_rec << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
 
 			//ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
