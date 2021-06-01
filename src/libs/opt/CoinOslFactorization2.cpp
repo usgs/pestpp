@@ -20,9 +20,9 @@
 extern int ets_count;
 extern int ets_check;
 #endif
-#define COIN_REGISTER register
+#define COIN_REGISTER
 #define COIN_REGISTER2
-#define COIN_REGISTER3 register
+#define COIN_REGISTER3
 #ifdef COIN_USE_RESTRICT
 # define COIN_RESTRICT2 __restrict
 #else

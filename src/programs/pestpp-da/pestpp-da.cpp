@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
 		cout << "               Developed by the PEST++ development team" << endl;
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-        auto start = chrono::steady_clock::now();
+        auto start = chrono::system_clock::now();
         string start_string = get_time_string();
         cout << "started at " << start_string << endl;
 		CmdLine cmdline(argc, argv);
@@ -258,12 +258,9 @@ int main(int argc, char* argv[])
 		((pest_scenario.get_control_info().noptmax != 0) ||
 		(pest_scenario.get_pestpp_options().get_debug_parse_only())))
 		{
-
 			for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 			{
 				cout << endl;
-
-
 				cout << " >>>> Checking data in cycle " << *icycle << endl;
 				fout_rec << endl;
 				fout_rec << " >>>> Checking data in cycle " << *icycle << endl;
@@ -304,7 +301,7 @@ int main(int argc, char* argv[])
                     continue;
                 }
                 try {
-                    childPest.check_io(fout_rec);
+                    childPest.check_io(fout_rec, false);
                 }
                 catch (exception& e)
                 {
@@ -826,11 +823,14 @@ int main(int argc, char* argv[])
         auto end = chrono::steady_clock::now();
         cout << "started at " << start_string << endl;
         cout << "finished at " << get_time_string() << endl;
-        cout << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
-        cout << flush;
+
+
         fout_rec << "started at " << start_string << endl;
         fout_rec << "finished at " << get_time_string() << endl;
-        fout_rec << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
+        fout_rec << "took " << setprecision(3) << get_duration_sec(start)/60.0 << " minutes" << endl;
+        fout_rec << flush;
+        cout << "took " << setprecision(3) << get_duration_sec(start)/60.0 << " minutes" << endl;
+        cout << flush;
 
         return 0;
 #ifndef _DEBUG
