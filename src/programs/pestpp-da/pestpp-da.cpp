@@ -472,6 +472,9 @@ int main(int argc, char* argv[])
 		//ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr
 		ParChangeSummarizer pcs(&curr_pe, &file_manager, &output_file_writer);
 
+		Parameters prev_cycle_ctl_pars;
+		Observations prev_cycle_obs;
+
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 		{
 			if (*icycle < start_cycle)
@@ -480,10 +483,10 @@ int main(int argc, char* argv[])
 				continue;
 			}
 			// da_start_cycle, da_end_cycle
-			cout << endl;
+			cout << endl << endl ;
 			cout << " =======================================" << endl;
 			cout << " >>>> Assimilating data in cycle " << *icycle << endl;
-			cout << " =======================================" << endl;
+			cout << " =======================================" << endl << endl;
 
 			fout_rec << endl;
 			fout_rec << " =======================================" << endl;
@@ -709,7 +712,62 @@ int main(int argc, char* argv[])
 				cycle_curr_noise.to_csv("cycle_curr_noise.csv");
 			}
 			da.set_localizer(global_loc);
-			da.initialize(*icycle);
+
+			//check if we can use the previous outputs
+			bool use_existing = false;
+			if (prev_cycle_ctl_pars.size() == cur_ctl_parameters.size())
+            {
+			    if (prev_cycle_obs.size() == childPest.get_ctl_observations().size())
+                {
+			        Parameters::iterator pend = cur_ctl_parameters.end();
+			        bool pars_same = true;
+			        for (auto &p : prev_cycle_ctl_pars)
+                    {
+			            if (cur_ctl_parameters.find(p.first) == pend) {
+                            pars_same = false;
+                            break;
+                        }
+			            if (cur_ctl_parameters.get_rec(p.first) != p.second)
+                        {
+			                pars_same = false;
+			                break;
+                        }
+                    }
+			        if (pars_same)
+                    {
+			            Observations cur_cycle_obs = childPest.get_ctl_observations();
+			            bool obs_same = true;
+			            Observations::iterator oend = cur_cycle_obs.end();
+			            for (auto &o : prev_cycle_obs)
+                        {
+			                if (cur_cycle_obs.find(o.first) == oend)
+                            {
+			                    obs_same = false;
+			                    break;
+                            }
+			                if (cur_cycle_obs.get_rec(o.first) != o.second)
+                            {
+			                    obs_same = false;
+			                    break;
+                            }
+                        }
+			            if (obs_same)
+                        {
+			                use_existing = true;
+                        }
+                    }
+                }
+            }
+
+			if (use_existing)
+            {
+			    ss.str("");
+			    ss << "...parameters and observations are consistent with previous cycle, reusing exsisting simulated outputs" << endl;
+			    cout << ss.str();
+			    fout_rec << ss.str();
+            }
+
+			da.initialize(*icycle,true,use_existing);
 			
 			write_global_phi_info(*icycle, f_phi, da, init_real_names);
 
@@ -814,6 +872,9 @@ int main(int argc, char* argv[])
                 fout_rec << "'da_stop_cycle' criteria met" << endl;
                 break;
             }
+			prev_cycle_ctl_pars = Parameters(childPest.get_ctl_parameters());
+			prev_cycle_obs = Observations(childPest.get_ctl_observations());
+
 
 
 		} // end cycle loop

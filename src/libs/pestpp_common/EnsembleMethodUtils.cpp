@@ -3024,7 +3024,7 @@ vector<int> EnsembleMethod::run_ensemble(ParameterEnsemble& _pe,
 }
 
 
-void EnsembleMethod::initialize(int cycle, bool run)
+void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 {
 	message(0, "initializing");
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
@@ -3270,7 +3270,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 
 	if ((oe.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
 	{
-		message(2, "using pre-set observation ensemble");
+		message(2, "using pre-set observation (simulated output) ensemble");
 		oe_drawn = false;
 	}
 	else
@@ -3549,7 +3549,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 
 	if ((oe_base.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
 	{
-		message(2, "using pre-set observation ensemble");
+		message(2, "using pre-set observation + noise ensemble");
 	}
 	else
 		oe_base = oe; //copy
@@ -3597,7 +3597,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 
 	//ok, now run the prior ensemble - after checking for center_on
 	//in case something is wrong with center_on
-	if (obs_restart_csv.size() == 0)
+	if ((obs_restart_csv.size() == 0) && (!use_existing))
 	{
 		performance_log->log_event("running initial ensemble");
 		message(1, "running initial ensemble of size", oe.shape().first);
