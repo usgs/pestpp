@@ -3495,7 +3495,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		pe_base = _pe;
 		pe_base.reorder(vector<string>(), act_par_names);
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
-		_oe.reserve(vector<string>(), oe.get_var_names());
+		_oe.reserve(vector<string>(), oe_base.get_var_names());
 		_oe.append("mean", pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
