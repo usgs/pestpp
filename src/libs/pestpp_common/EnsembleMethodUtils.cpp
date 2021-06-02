@@ -3244,7 +3244,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	if ((pe.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
 	{
-		message(2, "using pre-set parameter ensemble");
+		message(1, "using pre-set parameter ensemble");
 		pe_drawn = false;
 	}
 	else
@@ -3270,11 +3270,16 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	if ((oe.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
 	{
-		message(2, "using pre-set observation (simulated output) ensemble");
+		message(1, "using pre-set observation (simulated output) ensemble");
 		oe_drawn = false;
+        if (oe_base.shape().first > 0)
+        {
+            oe = oe_base;
+        }
 	}
 	else
 		oe_drawn = initialize_oe(obscov);
+
 	string center_on = ppo->get_ies_center_on();
 
 	try
@@ -3368,7 +3373,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	{
 		vector<string> rnames = pe.get_real_names();
 		oe.set_real_names(rnames);
-		message(2, "reset observation ensemble real names to parameter ensemble real names");
+		message(2, "resetting observation ensemble real names to parameter ensemble real names");
 	}
 
 	//need this here for Am calcs...
@@ -3463,7 +3468,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		ss << ".obs+noise.csv";
 		oe.to_csv(ss.str());
 	}
-	message(1, "saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
+	message(1, "saved obs+noise observation ensemble (obsval + noise realizations) to ", ss.str());
 
 
 	if (pest_scenario.get_control_info().noptmax == -2)

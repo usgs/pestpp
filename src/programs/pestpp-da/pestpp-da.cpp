@@ -499,13 +499,6 @@ int main(int argc, char* argv[])
 
 			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);
 
-			if (verbose_level > 1) // 
-			{
-                output_file_writer.scenario_io_report(fout_rec);
-				output_file_writer.scenario_pargroup_report(fout_rec);
-				output_file_writer.scenario_par_report(fout_rec);
-				output_file_writer.scenario_obs_report(fout_rec);
-			}
 
 			//------------------------------
 
@@ -558,24 +551,19 @@ int main(int argc, char* argv[])
 					weight_cycle_map = weight_cycle_info[*icycle];
 				ObservationInfo oi = pest_scenario.get_ctl_observation_info();
 				childPest.set_observation_info(oi);
-				for (auto tbl_obs_name : obs_in_tbl)
-				{
-					//if this obs is not in this cycle, give it a zero weight
-					if (cycle_map.find(tbl_obs_name) == cycle_map.end())
-					{
-						oi.set_weight(tbl_obs_name, 0.0);
-					}
-					else
-					{
-						childPest.get_ctl_observations_4_mod().update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);
-						//check if this obs is in this cycle's weight info
-						if (weight_cycle_map.find(tbl_obs_name) != weight_cycle_map.end())
-						{
-							oi.set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
-							//pest_scenario.get_observation_info_ptr()->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
-						}
-					}
-				}
+				for (auto tbl_obs_name : obs_in_tbl) {
+                    //if this obs is not in this cycle, give it a zero weight
+                    if (cycle_map.find(tbl_obs_name) == cycle_map.end()) {
+                        oi.set_weight(tbl_obs_name, 0.0);
+                    } else {
+                        childPest.get_ctl_observations_4_mod().update_rec(tbl_obs_name, cycle_map.at(tbl_obs_name));
+                        //check if this obs is in this cycle's weight info
+                        if (weight_cycle_map.find(tbl_obs_name) != weight_cycle_map.end()) {
+                            oi.set_weight(tbl_obs_name, weight_cycle_map.at(tbl_obs_name));
+                            //pest_scenario.get_observation_info_ptr()->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+                        }
+                    }
+                }
 				childPest.set_observation_info(oi);
 
 			}
@@ -715,45 +703,46 @@ int main(int argc, char* argv[])
 
 			//check if we can use the previous outputs
 			bool use_existing = false;
-			if (prev_cycle_ctl_pars.size() == cur_ctl_parameters.size())
+			//if there are no dynamic states,then we can possibly reuse sim outputs
+			if (da.get_par_dyn_state_names().size() == 0)
             {
-			    if (prev_cycle_obs.size() == childPest.get_ctl_observations().size())
-                {
-			        Parameters::iterator pend = cur_ctl_parameters.end();
-			        bool pars_same = true;
-			        for (auto &p : prev_cycle_ctl_pars)
-                    {
-			            if (cur_ctl_parameters.find(p.first) == pend) {
-                            pars_same = false;
-                            break;
-                        }
-			            if (cur_ctl_parameters.get_rec(p.first) != p.second)
-                        {
-			                pars_same = false;
-			                break;
-                        }
-                    }
-			        if (pars_same)
-                    {
-			            Observations cur_cycle_obs = childPest.get_ctl_observations();
-			            bool obs_same = true;
-			            Observations::iterator oend = cur_cycle_obs.end();
-			            for (auto &o : prev_cycle_obs)
-                        {
-			                if (cur_cycle_obs.find(o.first) == oend)
-                            {
-			                    obs_same = false;
-			                    break;
+			    // if npar is the same...
+                if (prev_cycle_ctl_pars.size() == cur_ctl_parameters.size()) {
+                    //if nobs is the same
+                    if (prev_cycle_obs.size() == childPest.get_ctl_observations().size()) {
+                        //check that all pars have the same values
+                        Parameters::iterator pend = cur_ctl_parameters.end();
+                        bool pars_same = true;
+                        for (auto &p : prev_cycle_ctl_pars) {
+                            if (cur_ctl_parameters.find(p.first) == pend) {
+                                pars_same = false;
+                                break;
                             }
-			                if (cur_cycle_obs.get_rec(o.first) != o.second)
-                            {
-			                    obs_same = false;
-			                    break;
+                            if (cur_ctl_parameters.get_rec(p.first) != p.second) {
+                                pars_same = false;
+                                break;
                             }
                         }
-			            if (obs_same)
-                        {
-			                use_existing = true;
+                        if (pars_same) {
+                            //check that all obs have the same values
+                            Observations cur_cycle_obs = childPest.get_ctl_observations();
+                            bool obs_same = true;
+                            Observations::iterator oend = cur_cycle_obs.end();
+                            for (auto &o : prev_cycle_obs) {
+                                if (cur_cycle_obs.find(o.first) == oend) {
+                                    obs_same = false;
+                                    break;
+                                }
+                                if (cur_cycle_obs.get_rec(o.first) != o.second) {
+                                    obs_same = false;
+                                    break;
+                                }
+                            }
+                            //if we get to here, it should be safe to reuse the sim outputs from the
+                            //previous cycle...
+                            if (obs_same) {
+                                use_existing = true;
+                            }
                         }
                     }
                 }
@@ -767,7 +756,16 @@ int main(int argc, char* argv[])
 			    fout_rec << ss.str();
             }
 
-			da.initialize(*icycle,true,use_existing);
+            if (verbose_level > 1) //
+            {
+                output_file_writer.scenario_io_report(fout_rec);
+                output_file_writer.scenario_pargroup_report(fout_rec);
+                output_file_writer.scenario_par_report(fout_rec);
+                output_file_writer.scenario_obs_report(fout_rec);
+            }
+
+
+            da.initialize(*icycle,true,use_existing);
 			
 			write_global_phi_info(*icycle, f_phi, da, init_real_names);
 
@@ -878,7 +876,7 @@ int main(int argc, char* argv[])
 
 
 		} // end cycle loop
-		fout_rec.close();
+
 		cout << endl << endl << "pestpp-da analysis complete..." << endl;
 
         auto end = chrono::steady_clock::now();
@@ -892,7 +890,7 @@ int main(int argc, char* argv[])
         fout_rec << flush;
         cout << "took " << setprecision(3) << get_duration_sec(start)/60.0 << " minutes" << endl;
         cout << flush;
-
+        fout_rec.close();
         return 0;
 #ifndef _DEBUG
 	}
