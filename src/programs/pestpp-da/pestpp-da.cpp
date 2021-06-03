@@ -777,7 +777,7 @@ int main(int argc, char* argv[])
 					da.da_update(*icycle);
 					ss.str("");
 					ss << file_manager.get_base_filename() << ".global." << *icycle << "." << da.get_iter() << ".pcs.csv";
-					pcs.summarize(cycle_curr_pe, ss.str());
+					pcs.summarize(*da.get_pe_ptr(), ss.str());
 				}
 				write_global_phi_info(*icycle, f_phi, da, init_real_names);
 			}
@@ -786,7 +786,6 @@ int main(int argc, char* argv[])
 				cout << "...Note: no non-zero-weighted observations in cycle " << *icycle << ", continuing..." << endl;
 				fout_rec << "...Note: no non-zero-weighted observations in cycle " << *icycle << ", continuing..." << endl;
 				performance_log.log_event("no non-zero-weighted observations in current cycle");
-
 			}
 
 			//replace all the pars used in this cycle in the parent parameter ensemble
