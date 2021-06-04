@@ -1152,7 +1152,7 @@ unordered_set<string> InstructionFile::parse_and_check()
 					names.emplace(name);
 				}
 			}
-			else if ((first == marker) || (first == 'L'))
+			else if ((first == marker) || (first == 'L') || (first == 'W'))
             {
 
             }
