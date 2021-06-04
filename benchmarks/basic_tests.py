@@ -10,7 +10,7 @@ import pyemu
 bin_path = os.path.join("test_bin")
 if "linux" in platform.platform().lower():
     bin_path = os.path.join(bin_path,"linux")
-elif "darwin" in platform.platform().lower():
+elif "darwin" in platform.platform().lower() or "macos" in platform.platform().lower() :
     bin_path = os.path.join(bin_path,"mac")
 else:
     bin_path = os.path.join(bin_path,"win")
@@ -34,7 +34,7 @@ else:
         
 if "windows" in platform.platform().lower():
     exe_path = os.path.join(bin_path, "win", "pestpp-ies.exe")
-elif "darwin" in platform.platform().lower():
+elif "darwin" in platform.platform().lower() or "macos" in platform.platform().lower() :
     exe_path = os.path.join(bin_path,  "mac", "pestpp-ies")
 else:
     exe_path = os.path.join(bin_path, "linux", "pestpp-ies")
@@ -672,7 +672,9 @@ def tplins1_test():
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
     ins_file = os.path.join(t_d,"AOC_obs.txt.ins")
     pst.add_observations(ins_file,ins_file.replace(".ins",""),pst_path=".")
-    
+
+    pst.write(os.path.join(t_d,"pest.pst"))
+
     pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-glm")),cwd=t_d)
     obf_df = pd.read_csv(os.path.join(t_d,"out1.dat.obf"),delim_whitespace=True,header=None,names=["obsnme","obsval"])
     obf_df.index = obf_df.obsnme
@@ -721,7 +723,8 @@ def tplins1_test():
     assert len(lines_tpl) - 1 == len(lines_in)
 
     pst = pyemu.Pst(os.path.join(t_d, "pest.pst"))
-    dum_obs = ['h01_03', 'h01_07']
+    pst.drop_observations(os.path.join(t_d,"AOC_obs.txt.ins"),pst_path=".")
+    dum_obs = ['h01_03', 'h01_07', 'dummy_obs']
     pst.observation_data.drop(index=dum_obs, inplace=True)
     pst.model_output_data = pd.DataFrame({"pest_file":"out1dum.dat.ins",
                                           "model_file":'out1.dat'},index=["out1dum.dat.ins"])
@@ -1013,7 +1016,7 @@ if __name__ == "__main__":
     #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-    #tplins1_test()
+    tplins1_test()
     #ext_stdcol_test()
 
     # parallel_consist_test()
@@ -1021,8 +1024,8 @@ if __name__ == "__main__":
 
     #da_prep_4_freyberg_batch()
     # da_prep_4_mf6_freyberg_seq()
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sen.exe"),os.path.join("..","bin","pestpp-sen.exe"))
-    basic_test()
+    # shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sen.exe"),os.path.join("..","bin","pestpp-sen.exe"))
+    # basic_test()
     # da_mf6_freyberg_smoother_test()
     # da_mf6_freyberg_test_1()
 
