@@ -722,8 +722,8 @@ def tplins1_test():
     lines_in = open(os.path.join(t_d,"hk_Layer_1.ref"),'r').readlines()
     assert len(lines_tpl) - 1 == len(lines_in)
 
-    pst = pyemu.Pst(os.path.join(t_d, "pest.pst"))
-    pst.drop_observations(os.path.join(t_d,"AOC_obs.txt.ins"),pst_path=".")
+    pst = pyemu.Pst(os.path.join(os.path.join(model_d,"template"), "pest.pst"))
+    #pst.drop_observations(os.path.join(t_d,"AOC_obs.txt.ins"),pst_path=".")
     dum_obs = ['h01_03', 'h01_07', 'dummy_obs']
     pst.observation_data.drop(index=dum_obs, inplace=True)
     pst.model_output_data = pd.DataFrame({"pest_file":"out1dum.dat.ins",
@@ -1017,6 +1017,7 @@ if __name__ == "__main__":
     #sen_basic_test()
     #salib_verf()
     tplins1_test()
+    #secondary_marker_test()
     #ext_stdcol_test()
 
     # parallel_consist_test()
