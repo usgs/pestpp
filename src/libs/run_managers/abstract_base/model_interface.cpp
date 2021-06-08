@@ -692,7 +692,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 				//sleep
 				std::this_thread::sleep_for(std::chrono::milliseconds(OperSys::thread_sleep_milli_secs));
 				//check if process is still active
-				int status;
+				int status = 0;
 				pid_t exit_code = waitpid(command_pid, &status, WNOHANG);
 				//if the process ended, break
 				if ((exit_code == -1) || (status != 0))
