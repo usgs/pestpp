@@ -52,6 +52,47 @@ RunManagerSerial::RunManagerSerial(const vector<string> _comline_vec,
 	mgr_type = RUN_MGR_TYPE::SERIAL;
 }
 
+void RunManagerSerial::run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
+                             Parameters* pars, Observations* obs)
+{
+    mi.run(terminate,finished,shared_execptions, pars, obs);
+}
+
+void RunManagerSerial::run(Parameters* pars, Observations* obs)
+{
+    thread_flag f_terminate(false);
+    thread_flag f_finished(false);
+    thread_exceptions shared_execptions;
+    stringstream ss;
+    thread run_thread(&RunManagerSerial::run_async, this, &f_terminate, &f_finished, &shared_execptions,
+                      pars, obs);
+    pest_utils::thread_RAII raii(run_thread);
+
+    while (true)
+    {
+
+        if (shared_execptions.size() > 0)
+        {
+            ss.str("");
+            ss << "exception raised by run thread: " << std::endl;
+            ss << shared_execptions.what() << std::endl;
+            cout << ss.str();
+        }
+        //check if the runner thread has finished
+        if (f_finished.get())
+        {
+            break;
+        }
+        if (pest_utils::quit_file_found())
+        {
+            f_terminate.set(true);
+            break;
+        }
+
+    }
+    shared_execptions.rethrow();
+}
+
 void RunManagerSerial::run()
 {
 	int success_runs = 0;
@@ -91,9 +132,10 @@ void RunManagerSerial::run()
 				obs_vec.resize(obs_name_vec.size(), RunStorage::no_data);
 				obs.clear();
 				obs.insert(obs_name_vec, obs_vec);
-				mi.run(&pars, &obs);
+				//mi.run(&pars, &obs);
+				run(&pars, &obs);
 				
-				OperSys::chdir(run_dir.c_str());
+				//OperSys::chdir(run_dir.c_str());
 				success_runs += 1;
 				//std::cout << string(message.str().size(), '\b');
 				//message.str("");
