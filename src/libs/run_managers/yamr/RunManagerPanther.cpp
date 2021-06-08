@@ -520,6 +520,12 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	double run_time_sec = 0.0;
 	while (!all_runs_complete() && terminate_reason == RUN_UNTIL_COND::NORMAL)
 	{
+        if (quit_file_found())
+        {
+            cout << "'pest.stp' found" << endl;
+            kill_all_active_runs();
+
+        }
 		echo();
 		init_agents();
 		//schedule runs on available nodes
@@ -1564,6 +1570,8 @@ void RunManagerPanther::kill_all_active_runs()
 	 vector<int> sock_id_vec;
 	 auto range_pair = active_runid_to_iterset_map.equal_range(run_id);
 
+	 bool just_quit = quit_file_found();
+
 	 double duration;
 	 for (auto &i = range_pair.first; i != range_pair.second; ++i)
 	 {
@@ -1573,7 +1581,7 @@ void RunManagerPanther::kill_all_active_runs()
 			 if (avg_runtime <= 0) avg_runtime = get_global_runtime_minute();;
 			 if (avg_runtime <= 0) avg_runtime = 1.0E+10;
 			 duration = i->second->get_duration_minute();
-			 if ((duration > overdue_giveup_minutes) || (duration >= avg_runtime*overdue_giveup_fac))
+			 if ((just_quit) || (duration > overdue_giveup_minutes) || (duration >= avg_runtime*overdue_giveup_fac))
 			 {
 				 sock_id_vec.push_back(i->second->get_socket_fd());
 			 }
@@ -1584,6 +1592,18 @@ void RunManagerPanther::kill_all_active_runs()
 
  bool RunManagerPanther::all_runs_complete()
  {
+    if (quit_file_found())
+    {
+
+        kill_all_active_runs();
+        for (auto run_id : waiting_runs)
+        {
+            file_stor.update_run_failed(run_id);
+        }
+        waiting_runs.clear();
+        cout << endl << "'pest.stp' found, all remaining runs marked as fails. " << endl << endl;
+        return true;
+    }
 	 // check for run in the waitng queue
 	 if (!waiting_runs.empty())
 	 {
@@ -1740,7 +1760,7 @@ void RunManagerPanther::kill_all_active_runs()
  void RunManagerPanther::update_run_failed(int run_id)
  {
 	 // must call void RunManagerPANTHER::update_run_failed(int run_id, int socket_fd) instead
-	 throw(PestError("Error: Unsuppoerted function call  RunManagerPANTHER::update_run_failed(int run_id)"  ));
+	 throw(PestError("Error: Unsupported function call  RunManagerPANTHER::update_run_failed(int run_id)"  ));
  }
 
 RunManagerPanther::~RunManagerPanther(void)

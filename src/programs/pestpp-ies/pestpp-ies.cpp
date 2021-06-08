@@ -255,11 +255,17 @@ int main(int argc, char* argv[])
 		run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), pest_scenario.get_ctl_observations());
 		
 		IterEnsembleSmoother ies(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
-		
-
 		ies.initialize();
+        if (pest_utils::quit_file_found())
+        {
+            cout << "'pest.stp' found, quitting" << endl;
+            fout_rec << "'pest.stp' found, quitting" << endl;
+        }
+        else
+        {
+            ies.iterate_2_solution();
+        }
 
-		ies.iterate_2_solution();
 		ies.finalize();
 
 

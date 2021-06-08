@@ -24,7 +24,7 @@
 #include <Eigen/Sparse>
 
 
-
+const string QUIT_FILENAME = "pest.stp";
 
 //printing functions
 std::ostream& operator<< (std::ostream &os, const std::set<std::string> val);
@@ -376,6 +376,8 @@ inline void ExternalCtlFile::fill_col_vector(string col_name, vector<t>& col_vec
 
 string get_time_string();
 string get_time_string_short();
+
+bool quit_file_found();
 
 
 class CmdLine {

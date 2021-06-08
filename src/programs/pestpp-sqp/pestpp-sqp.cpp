@@ -255,8 +255,15 @@ int main(int argc, char* argv[])
 		
 
 		sqp.initialize();
-
-		sqp.iterate_2_solution();
+        if (pest_utils::quit_file_found())
+        {
+            cout << "'pest.stp' found, quitting" << endl;
+            fout_rec << "'pest.stp' found, quitting" << endl;
+        }
+        else
+        {
+            sqp.iterate_2_solution();
+        }
 		sqp.finalize();
 
 		// clean up

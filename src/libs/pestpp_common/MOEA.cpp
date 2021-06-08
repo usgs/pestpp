@@ -2583,6 +2583,11 @@ void MOEA::iterate_to_solution()
 		constraints.mou_report(iter, new_dp, new_op, obs_obj_names, pi_obj_names, true);
 
 		iter++;
+		if (pest_utils::quit_file_found())
+        {
+		    message(0,"'pest.stp' found, quitting");
+		    break;
+        }
 	}
 
 }

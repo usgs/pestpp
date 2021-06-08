@@ -1672,6 +1672,24 @@ string get_time_string_short()
 	return t_str;
 }
 
+bool quit_file_found()
+{
+    ifstream i(QUIT_FILENAME);
+    if (i.good())
+    {
+        string line;
+        getline(i,line);
+        vector<string> tokens;
+        tokenize(line,tokens);
+        if ((tokens.size() > 0) && (tokens[0] == "1")) {
+            i.close();
+            return true;
+        }
+    }
+    i.close();
+    return false;
+}
+
 
 CmdLine::CmdLine(int argc, char* argv[]) :
 	ctl_file_name(""), panther_host_name(""), panther_port(""), 

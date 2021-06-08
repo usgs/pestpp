@@ -461,6 +461,11 @@ int main(int argc, char* argv[])
 		}
 		while (!termination_ctl.terminate())
 		{
+		    if (quit_file_found())
+            {
+		        termination_ctl.set_terminate(true);
+		        termination_ctl.set_reason("'pest.stp' found");
+            }
 			//base parameter iterations
 			try
 			{

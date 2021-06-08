@@ -271,7 +271,16 @@ int main(int argc, char* argv[])
 		
 		//ZAK: Initialize random generator here
 		moea.initialize();
-		moea.iterate_to_solution();
+		if (pest_utils::quit_file_found())
+        {
+		    cout << "'pest.pst' found, quitting" << endl;
+		    fout_rec << "'pest.pst' found, quitting" << endl;
+        }
+		else
+        {
+            moea.iterate_to_solution();
+        }
+
 		moea.finalize();
 
 

@@ -74,6 +74,13 @@ void RunManagerSerial::run()
 	{
 		for (int i_run : run_id_vec)
 		{
+		    if (quit_file_found())
+            {
+		        cout << "'pest.stp' found, treating run " << i_run << " as a fail" << endl;
+                update_run_failed(i_run);
+                failed_runs++;
+                continue;
+            }
 			std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
 			try
 			{	

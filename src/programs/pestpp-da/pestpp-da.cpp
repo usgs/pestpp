@@ -872,6 +872,12 @@ int main(int argc, char* argv[])
 			prev_cycle_ctl_pars = Parameters(childPest.get_ctl_parameters());
 			prev_cycle_obs = Observations(childPest.get_ctl_observations());
 
+			if (pest_utils::quit_file_found())
+            {
+			    cout << "'pest.stp' found, quitting" << endl;
+                fout_rec << "'pest.stp' found, quitting" << endl;
+                break;
+            }
 
 
 		} // end cycle loop

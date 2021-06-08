@@ -21,6 +21,7 @@
 #include "PerformanceLog.h"
 #include "RunStorage.h"
 #include "RunManagerAbstract.h"
+#include "utilities.h"
 
 
 
@@ -2729,6 +2730,10 @@ bool EnsembleMethod::should_terminate()
 		message(1, "phi-based termination criteria satisfied, all done");
 		return true;
 	}
+	if (pest_utils::quit_file_found())
+    {
+	    message(1,"'pest.pst' found, quitting");
+    }
 	return false;
 }
 
