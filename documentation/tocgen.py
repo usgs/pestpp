@@ -1,3 +1,5 @@
+import os
+
 def processFile(inFile, outFile):
     mdFile = open(inFile, 'r')
     toc = []
@@ -78,27 +80,72 @@ def removeAnchors(text):
         text = text[0:leftTag] + text[rightTag + 1:]
     return text
 
-def clean_4_toc(inFile,outFile):
+def clean_4_toc(inFile,outFile,run_pandoc=True):
+    if run_pandoc:
+        os.system("pandoc -t gfm --wrap=none --extract-media . -o file.md pestpp_users_guide_v5.1.0.beta.docx --mathjax")
     num_str = [str(i) for i in range(1,11)]
     lines = open(inFile,'r').readlines()
-    for i,line in enumerate(lines):
-        if "version" in line.lower():
+
+    notoc_lines = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if "table of contents" in line.lower():
+            while True:
+                i += 1
+                line = lines[i]
+                if line.lower().strip().startswith("1. introduction"):
+                    break
+        notoc_lines.append(line)
+        i += 1
+    lines = notoc_lines
+    notoc_lines = []
+    i = 0
+    while i < len(lines):
+        if "version" in lines[i].lower():
             lines[i] = lines[i].replace("#","")
 
-        if line.strip().startswith("====="):
+        if lines[i].strip().startswith("====="):
             lines[i-1] = "# " + lines[i-1]
             lines[i] = "\n"
-        elif line.strip().startswith("----"):
+        elif lines[i].strip().startswith("----"):
             lines[i-1] = "## " + lines[i-1]
             lines[i] = "\n"
-        elif "<img" in line:
-            lines[i] = line.replace("#","")
-        elif line.strip().startswith("** ") and i < 200: #trying to catch the stuff at the top
-            lines[i] = "# " + line.replace("*","")
-        elif "**" in line:
-            lines[i] = line.replace("**","")
-        elif line.strip().startswith("#") and len(line.split()) > 1 and line.lower().split()[1][0] not in num_str:
-            lines[i] = "**"+line.split()[1] + "**"
+        elif "<img" in lines[i]:
+            lines[i] = lines[i].replace("#","")
+        elif lines[i].strip().startswith("**") and i < 100: #trying to catch the stuff at the top
+            lines[i] = "# " + lines[i].replace("*","")
+        elif "**" in lines[i]:
+            lines[i] = lines[i].replace("**","")
+        elif lines[i].strip().startswith("#") and len(lines[i].split()) > 1 and lines[i].lower().split()[1][0] not in num_str:
+            lines[i] = "**"+lines[i].split()[1] + "**"
+        if "<p>" in lines[i]:
+            lines[i] = lines[i].replace("<p>","").replace("</p>","<br>").replace("#","~")
+        if "blockquote" in lines[i]:
+            lines[i] = lines[i].replace("<blockquote>","").replace("</blockquote>","")
+        if lines[i].strip().startswith("$") and not "bmatrix" in lines[i].lower():
+            label = lines[i].split()[-1]
+            eq_str = lines[i].replace("$$","$").split('$')[1]
+            eq_str = r"{0}".format(eq_str).replace("\\\\","\\").replace(" \\ "," ").replace("\\_","_")
+            math_str_pre = "<img src=\"https://latex.codecogs.com/svg.latex?\Large&space;{0}".format(eq_str)
+            math_str_post = "\" title=\"\Large {0}\" />  {1}  <br>".format(eq_str,label)
+            lines[i] = math_str_pre + " " + math_str_post
+        # elif "bmatrix" in lines[i].lower():
+        #     eq_str = lines[i]
+        #     lines.pop(i)
+        #     while True:
+        #         i += 1
+        #         eq_str += lines[i]
+        #         lines.pop(i)
+        #         if "bmatrix" in lines[i].lower():
+        #             break
+        #     eq_str = r"{0}".format(eq_str).replace("\\\\", "\\").replace(" \\ ", " ").replace("\\_", "_")
+        #     math_str_pre = "<img src=\"https://latex.codecogs.com/svg.latex?\Large&space;{0}".format(eq_str)
+        #     math_str_post = "\" title=\"\Large {0}\" />".format(eq_str)
+        #     lines[i] = math_str_pre + " " + math_str_post
+
+        i += 1
+
     with open(outFile,'w') as f:
 
         for line in lines:
@@ -111,9 +158,9 @@ def clean_4_toc(inFile,outFile):
 
 
 if __name__ == "__main__":
-    import sys
-    clean_4_toc("file.md","temp.md")
-    processFile("temp.md","filetoc.md")
+
+    clean_4_toc("file.md","temp.md",False)
+    processFile("temp.md","pestpp_users_manual.md")
 
 
 
