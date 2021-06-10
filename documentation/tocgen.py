@@ -150,16 +150,13 @@ def clean_4_toc(inFile,outFile,run_pandoc=True):
 
         for line in lines:
             if "1. introduction" in line.lower():
-                f.write("\n**Table of Contents**\n\n")
+                f.write("\n# Table of Contents\n\n")
             f.write(line)
-
-
-
 
 
 if __name__ == "__main__":
 
-    clean_4_toc("file.md","temp.md",False)
+    clean_4_toc("file.md","temp.md",True)
     processFile("temp.md","pestpp_users_manual.md")
 
 

@@ -62,7 +62,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-**Table of Contents**
+# Table of Contents
 
 - [Version 5.1.0](#s1)
 - [Acknowledgements](#s2)
@@ -259,9 +259,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
     - [10.3 Summary of Control Variables](#s14-3)
 - [PESTPP-PSO](#s15)
     - [11.1 Introduction](#s15-1)
-    - [1.  Using PESTPP-PSO](#s15-2)
-        - [11.2.3. Pareto mode](#s15-2-1)
-    - [PESTPP-PSO Output Files](#s15-3)
+        - [11.1.2 Multi-Objective Particle Swarm optimization](#s15-1-1)
+        - [11.1.2 Decision Variable Transformations](#s15-1-2)
+    - [11.1 Using PESTPP-PSO](#s15-2)
+        - [11.1.1 General](#s15-2-1)
+        - [11.1.2 Estimation Mode](#s15-2-2)
+        - [11.2.3. Pareto mode](#s15-2-3)
+    - [11.2 PESTPP-PSO Output Files](#s15-3)
 - [12. PESTPP-DA](#s16)
     - [12.1 Introduction](#s16-1)
     - [12.2 Theory](#s16-2)
@@ -325,6 +329,8 @@ One of the original design specifications of PESTPP-GLM was that its parallel ru
 | PESTPP-OPT       | Decision optimization under uncertainty using sequential linear programming and linearized chance constraints |
 | PESTPP-IES       | Iterative ensemble smoother for production of a suite of calibration-constrained parameter fields             |
 | PESTPP-SWP       | Undertakes a suite of parallelized model runs for any reason                                                  |
+| PESTPP-DA        | Iterative ensemble filter and smoother data assimilation                                                      |
+| PESTPP-MOU       | Single and multiple constrained optimization under uncertainty using evolutionary heuristics                  |
 
 Table 1.1 Programs comprising version 4 of the PEST++ suite.
 
@@ -381,7 +387,7 @@ If, on commencement of execution, a model prompts the user for keyboard input, t
 
 model &lt; model.inp
 
-the model will look to file *model.inp*, rather than to the keyboard, for its input. A PEST++ program can therefore run the model without the need for any user involvement.
+the model will look to file *model.inp*, rather than to the keyboard, for its input. A PEST++ program can therefore run the model without the need for any user involvement. On UNIX-based platforms, the forward run command is a binary or script located in the directory where PEST++ is running, it may be nessecary to add a preceeding “./” (dot forward slash).
 
 ### <a id='s5-4-2' />1.4.2 Model Input and Output Files
 
@@ -854,7 +860,7 @@ if *b*<sub>0</sub> is negative. Note that if a parameter is subject to factor-li
 
 Let *r* represent the user-defined maximum allowed relative parameter change for all relative-limited parameters (i.e. RELPARMAX); *r* can be any positive number. Then if *b*<sub>0</sub> is the value of a particular relative-limited parameter at the beginning of a PESTPP-GLM iteration, its value *b* at the beginning of the next iteration will be such that
 
-(3.2)
+\|b – b<sub>0</sub>\| / \|b<sub>0</sub>\| (3.2)
 
 In this case, unless *r* is less than or equal to unity, a parameter can, indeed, change sign. However there may be a danger in using a relative limit for some types of parameters. If *r* is one or greater, *b* may fall to a minute fraction of *b*<sub>0</sub> (or even to zero), without transgressing the parameter change limit. For some types of parameters in some models this will be fine; in other cases a parameter factor change of this magnitude may significantly transgress model linearity limits.
 
@@ -1065,6 +1071,8 @@ PESTCHEK ignores lines in a PEST control file that begin with the “++” strin
 -   Control variables such as those which govern PEST’s calculation of the Marquardt lambda (RLAMBDA1, RLAMFAC, PHIRATSUF, PHIREDLAM and NUMLAM) should be coherent. Suitable values are suggested below for these and other variables, though little will be said about their usage by PEST.
 
 Variables appearing in a PEST control file which are used by members of the PEST++ suite are now described. At the same time, sensible, PESTCHEK-safe placeholder values are provided for all variables whose presence is required in a PEST control file, but which are not actually used by members of the PEST++ suite. The interested reader is referred to part I of the PEST manual for further details.
+
+Note that all of the PEST++ tools will check that the parameters and observations between the control file and template/instruction files are aligned. This checking can be disabled by setting *CHECK\_TPLINS* to false.
 
 ## <a id='s8-6' />4.6 Control Data Section
 
@@ -1781,22 +1789,22 @@ In certain Wide Area Network (WAN) environments, manager-worker communications c
 **panther\_agent\_no\_ping\_timeout\_secs()**
 Related to the above worker restart option, workers can be instructed to terminate (if *panther\_agent\_restart\_on\_error()* is set to *false*) or restart (if *panther\_agent\_restart\_on\_error()* is set to *true*), if no ping message has been received from the run manager in more than a specified time interval. This interval is configurable in seconds via the *panther\_agent\_no\_ping\_timeout\_secs()* control variable, with a default value of 300 (i.e., 5 minutes).
 
-*panther\_agent\_freeze\_on\_fail()*
-
+**panther\_agent\_freeze\_on\_fail()**
 In some settings, when starting to use PEST++, it can be difficult to debug why runs may be failing in a parallel run environment. This is especially true when workers are on separate physical hosts, which can make monitoring worker progress difficult and when a run fails, the panther run manager will immediate try to schedule another run on that same worker, which will cause the template files to be rewritten (nearly immediately) and any temporary files to be erased, making it nearly impossible to investigate the cause of the run failure. If users want to “slow down the process” so they debug run failures, adding *panther\_agent\_freeze\_on\_fail* as *true* to a (worker) control file will cause a worker to “freeze” on the occurrence of a run failure. This freeze can only be undone by forcing the worker to exit and restarting it, but, nevertheless, freezing a worker when a run failure occurs can be very useful to diagnosing issues related to parallelization of the PEST++ process because it allows direct inspection of all (temporary) files related to the failed run.
 
-*panther\_echo()*
+**panther\_echo()**
+If users are piping the master instance stdout and stderr to a file (through a redirect), then the panther master run summary, which echos to the file with a line return to overwrite the output (in place using a carriage return), can fill up these file because the carriage return character is ignored or converted to a line return. In this case, suppling *panther\_echo(false)* will turn off this stdout updating during the run sequence. Users can still inspect the run management process through the run management record.
 
-If users are piping the master instance stdout and stderr to a file (through a redirect), then the panther master run summary, which echos to the file with a line return to overwrite the output in place), can fill up these file because the line return character is ignored. In this case, suppling *panther\_echo(false)* will turn off this stdout updating during the run sequence.
-
-*num\_tpl\_ins\_threads*
-
+**num\_tpl\_ins\_threads**
 When using the PEST++ tools for very high-dimensional problems, the time required to process template and/or instruction files can be considerable. To speed things up, the PANTHER workers can multithread these input and output processing operations. By default, only one thread is used and the number of threads to use is controlled by the *num\_tpl\_ins\_threads* arg. Note that the number of threads used to process template and/or instruction files is set to the minimum of the number files and the value of *num\_tpl\_ins\_threads*. Also note that using multithreading to process template and/or instruction files can consume significantly more memory and clock cycles.
+
+**pest.stp**
+Sometimes, users may want to stop a pest++ tool at a certain stage of the algorthim. Of course you can use the ctrl+c, but this option will quit (nearly) immediately without recording any results regarding the current stage of the algorithm. For example, during an ensemble evaluation for pestpp-ies or pestpp-da, users may not want to wait for one or more (really) slow model runs to finish, but still want the results of the completed runs to be written to files. In this case, users can place a file named “pest.stp” (case sensitive – use lower case!) in the directory where PESTPP-XXX master is running and the first line of “pest.stp” should have a “1” as the first whitespace-delimited token on the first line. If this file is found and meets the first-token requirement, then the PESTPP-XXX master instance will exit gracefully. If the file’s presence is detected during run management, all remaining runs (queued or being run) are marked as fails (supported by both parallel and serial run manager). Then the algorithm records any relavent results are recorded and the pestpp-xxx exits gracefully.
 
 ## <a id='s9-4' />5.4 Run Book-Keeping Files
 
 
-After running a program of the PEST++ suite, you may notice a number of (possibly large) files in the folder from which it was run. These are *case.rns*, *case.rnu* and *case.rnj*, where *case* is the filename base of the PEST control file. These are binary files that are used for temporary storage of “raw” run results. They contain information that assists in parallel run management, and that facilitates restart of an interrupted PEST++ run. These run storage files can be read and processed using pyEMU.
+After running a program of the PEST++ suite, you may notice a number of (possibly large) files in the folder from which it was run. These are *case.rns*, *case.rnu* and *case.rnj*, where *case* is the filename base of the PEST control file. These are binary files that are used for temporary storage of “raw” run results. They contain information that assists in parallel run management, and that facilitates restart of an interrupted PEST++ run – if PESTPP-XXX exits gracefully, these files are removed. These run storage files can be read and processed using pyEMU.
 
 # <a id='s10' />6. PESTPP-GLM
 
@@ -1806,7 +1814,7 @@ After running a program of the PEST++ suite, you may notice a number of (possibl
 
 PESTPP-GLM was the original member of the PEST++ suite; its original name was “PESTPP”. The intention behind its creation was to reproduce much of the functionality of PEST in code that is modular, object oriented and supportive of collaborative programming. At the same time, it was hoped that certain aspects of PEST’s performance could be improved by taking advantage of the “new slate” that was offered by PESTPP-GLM.
 
-Like all versions of the PEST++ suite, PESTPP-GLM is written in C++. Version 4 of PESTPP-GLM uses the modular, general purpose, PANTHER parallel run manager.
+Like all versions of the PEST++ suite, PESTPP-GLM is written in C++. Version 4 of PESTPP-GLM uses a version of the modular, general purpose, PANTHER parallel run manager.
 
 Like PEST, PESTPP-GLM undertakes highly parameterized inversion. However, if requested, it can also undertake global optimization using the differential evolution (DE) method. The task that it implements on any given run is determined by the values that are supplied for pertinent control variables.
 
@@ -1896,7 +1904,7 @@ The IREGADJ variable supplied in the “regularization” section of a PEST cont
 
 For a particular observation or prior information equation (let us specify its index as *j*), the “composite observation sensitivity” is defined as
 
-(6.9)
+cso<sub>j</sub> = ((Q<sup>0.5</sup>JJ<sup>T</sup>Q<sup>0.5</sup>)<sup>0.5</sup>)<sub>j</sub>/m. (6.9)
 
 where *m* is the number of adjustable parameters featured in the PEST control file. Equation 6.9 specifies that the composite sensitivity of observation *j* is the magnitude of the *j*<sup>th</sup> row of the Jacobian matrix multiplied by the weight associated with that observation; this magnitude is then divided by the number of adjustable parameters. It is thus a measure of the sensitivity of the model output corresponding to that observation to all parameters involved in the inversion process. The total composite observation sensitivity of a particular regularization group can be calculated by summing the composite sensitivities of all observations or prior information equations that comprise the group.
 
@@ -2070,7 +2078,8 @@ The *der\_forgive()* control variable can be used to govern PESTPP’s behavior 
 
 PESTPP-GLM records composite parameter sensitivities in a file named *case.sen* where *case* is the filename base of the PEST control file. These are recorded during each iteration of the inversion process. Two composite parameter sensitivities are recorded. The first is the *csp* statistic of Doherty (2015), calculated using the equation
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;\text{csp}_{i} = \frac{\left\lbrack \mathbf{J}^{t}\mathbf{\text{QJ}} \right\rbrack_{\text{ii}}^{½}}{n}\text{\ } " title="\Large \text{csp}_{i} = \frac{\left\lbrack \mathbf{J}^{t}\mathbf{\text{QJ}} \right\rbrack_{\text{ii}}^{½}}{n}\text{\ }" />  (6.18)  <br>
+csp<sub>j</sub>= ((J<sup>T</sup>QJ)<sup>0.5</sup>)<sub>j</sub>/n (6.18)
+
 where J is the Jacobian matrix, Q is the weight matrix and *n* is the number of non-zero-weighted observations. PESTPP-GLM also records the composite scaled sensitivity of Hill and Tiedeman (2007) in this same file; see that text for details of its computation. Where regularization is employed in the inversion process, two sets of these two composite sensitivities are calculated. Regularization observations and prior information equations are included in one of them, while these are excluded from the other. Where they are included, the weights applied to regularization are multiplied by the current regularization weight factor.
 
 ### <a id='s10-2-11' />6.2.11 Other Controls
@@ -2380,7 +2389,8 @@ The Method of Sobol is based on the decomposition of variance. It employs theory
 
 The total variance *VT*(*y*) of the output *y* of a model with *m* parameters can be decomposed as follows:
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;V_{T} = V_{T}\left( y \right) = \sum_{i}^{}{V_{i} + \sum_{i}^{}{\sum_{j &gt; i}^{}{V_{\text{ij}} + \sum_{i}^{}{\sum_{j &gt; i}^{}{\sum_{k &gt; j}^{}V_{\text{ijk}}}}\ldots + V_{1,2\ldots m}}}} " title="\Large V_{T} = V_{T}\left( y \right) = \sum_{i}^{}{V_{i} + \sum_{i}^{}{\sum_{j &gt; i}^{}{V_{\text{ij}} + \sum_{i}^{}{\sum_{j &gt; i}^{}{\sum_{k &gt; j}^{}V_{\text{ijk}}}}\ldots + V_{1,2\ldots m}}}}" />  (7.3)  <br>
+V<sub>T</sub> = V<sub>T</sub>(y) = sum<sub>i</sub>(V<sub>i</sub>) + sum<sub>i</sub>(sum<sub>j&gt;i</sub>V<sub>ij</sub>) + sum<sub>i</sub>(sum<sub>j&gt;1</sub>(sum<sub>k&gt;j</sub>V<sub>ijk</sub>)) ….. + V<sub>i,2…m</sub> (7.3)
+
 where
 
 *V*<sub>*i*</sub>= *V*(*E*(*y*\|*x*<sub>*i*</sub>)) (7.4)
@@ -2395,10 +2405,12 @@ In the above equations, the expression *V*(*E*(*y*\|*x*<sub>*i*</sub>)) should b
 
 Application of the Method of Sobol culminates in the calculation of so-called “sensitiv­ity indices”. The first order sensitivity index for parameter *i*, (i.e. *S<sub>i</sub>*), is defined as the ratio of the its first order variance to the total variance of *y*. That is
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;S_{i} = \frac{V_{i}}{V_{T}} " title="\Large S_{i} = \frac{V_{i}}{V_{T}}" />  (7.7)  <br>
+S<sub>i</sub> = V<sub>i</sub>/V<sub>T</sub> (7.7)
+
 Meanwhile the second order sensitivity index that describes the effects of parameters *i* and *j* collectively on *y* is defined as
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;S_{\text{ij}} = \frac{V_{\text{ij}}}{V_{T}} " title="\Large S_{\text{ij}} = \frac{V_{\text{ij}}}{V_{T}}" />  (7.8)  <br>
+S<sub>ij</sub> = V<sub>ij</sub> /V<sub>T</sub> (7.8)
+
 The variances featured in the above equations are not easy to calculate. They must be computed empirically by running the model many times and taking averages of pertinent model outputs and of pertinent squared model outputs. Sometimes the model output of interest must be computed many times using many different set of parameters before the averaged quantity stabilizes. This is especially the case for quantities such as *V<sub>ij</sub>* which measure the effect of more than one parameter on the model output *y*.
 
 For this reason, Sobol-based sensitivity analysis is normally restricted to calculation of the first order sensitivity index *S<sub>i</sub>* for each parameter *i*, as well as the total sensitivity index *S<sub>Ti</sub>* for each parameter *i*. The first order index measures the individual importance of the parameter. The total sensitivity index includes terms that describe how the parameter effects the model output of interest in nonlinear ways, and through its interaction with other parameters. This is because
@@ -2407,7 +2419,8 @@ For this reason, Sobol-based sensitivity analysis is normally restricted to calc
 
 Fortunately S*<sub>Ti</sub>* can be calculated without the need to compute the expensive cross terms appearing in equation 7.9 using the relationships
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;S_{\text{Ti}} = 1 - \frac{V\left( E\left( y\|\mathbf{x}_{\sim i} \right) \right)}{V\left( y \right)} = \frac{E\left( V\left( y\|\mathbf{x}_{\sim i} \right) \right)}{V\left( y \right)} " title="\Large S_{\text{Ti}} = 1 - \frac{V\left( E\left( y\|\mathbf{x}_{\sim i} \right) \right)}{V\left( y \right)} = \frac{E\left( V\left( y\|\mathbf{x}_{\sim i} \right) \right)}{V\left( y \right)}" />  (7.10)  <br>
+S<sub>Ti</sub> = 1 – (V(E(y\|x<sub>\~1</sub>))/V(y) = (E(V(y\|x<sub>\~i</sub>))/V(y) (7.10)
+
 where the symbol x<sub>\~i</sub> signifies all parameters but *x<sub>i</sub>* being allowed to vary. Calculation of *S<sub>Ti</sub>* using equation 7.10 requires, once again, many model runs and appropriate averaging of model outputs and squared model outputs. However the numerical burden is far smaller than that required for calculation of second and higher order effects directly.
 
 Notwithstanding its ability to provide a comprehensive characterization of the relationship between a model output and all parameters employed by a model, use of Sobol’s method is compromised by its high model run requirements. Hence the Method of Morris is normally a more practical alternative unless model run times are minimal.
@@ -2483,19 +2496,19 @@ The variance (square of standard deviation) of the post-calibration uncertainty 
 
 σ<sup>2</sup>*<sub>s</sub>* = y<sup>t</sup>\[J<sup>t</sup>C<sup>-1</sup>(ε)J + C<sup>-1</sup>(k)\]<sup>-1</sup>y (8.1b)
 
-In the above equations
+In the above equations:
 
-k is the vector of adjustable parameters;
+-   k is the vector of adjustable parameters;
 
-C(k) is the prior parameter covariance matrix;
+-   C(k) is the prior parameter covariance matrix;
 
-ε is the vector of measurement noise;
+-   ε is the vector of measurement noise;
 
-C(ε) is the covariance matrix of measurement noise (normally diagonal);
+-   C(ε) is the covariance matrix of measurement noise (normally diagonal);
 
-J is the Jacobian matrix pertaining to the model calibration process; and
+-   J is the Jacobian matrix pertaining to the model calibration process; and
 
-> y is a vector whose elements are the sensitivities of the prediction *s* to model parameters; in the present context this is the prediction to which a constraint is applied.
+-   y is a vector whose elements are the sensitivities of the prediction *s* to model parameters; in the present context this is the prediction to which a constraint is applied.
 
 Both of the above equations are mathematically equivalent. The choice of which one to use in any numerical circumstance is an outcome of the size of the matrix that must be inverted. For equation 8.1a it is *n × n*, where *n* is the number of observations comprising the calibration dataset. For equation 8.1b it is *m × m*, where *m* is the number of parameters that are estimated through the calibration process.
 
@@ -2531,7 +2544,8 @@ In equation 8.4 both c and x are vectors. The vector x contains the current valu
 
 The vector c contains constants which must be supplied by the user. These are often factors by which decision variables must be multiplied to obtain monetary units, which are then used to express costs. Hence the *i*<sup>th</sup> element of c is the cost associated with the *i*<sup>th</sup> element of x. This is clear if equation 8.4a is re-written as
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;\varphi = \sum_{i = 1}^{d}{c_{i}x_{i}} " title="\Large \varphi = \sum_{i = 1}^{d}{c_{i}x_{i}}" />  (8.4b)  <br>
+φ= sum<sub>d</sub>c<sub>i</sub>x<sub>i</sub> (8.4b)
+
 where *d* is the number of decision variables.
 
 While undergoing adjustment to minimize φ, the elements of x are subject to one or more linear constraints. Because they are linear they can be expressed through a matrix equation such as
@@ -3200,7 +3214,9 @@ Environmental models can be highly nonlinear due to the necessity for some of th
 
 PSO, in its most basic form, i.e., as a single-objective optimization algorithm, is extremely simple and was first presented by *Eberhart and Kennedy* (1995). However, even though basic PSO is simple, it is also relatively flexible and can handle general nonlinear/nonconvex objective functions and inequality constraints (the reader is referred to *Siade et al*, (2019) for more details on how inequality constraints are handled). PSO is therefore not restricted to linear objective functions or constraints, and can potentially solve any general nonlinear programming problem,
 
-<table><tbody><tr class="odd"><td><span class="math display">\[\text{minimize\ \ \ }f_{0}\left( \mathbf{x} \right)\]</span><br><span class="math display">\[\text{subject\ to\ \ \ }f_{i}\left( \mathbf{x} \right) \leq b_{i},\ \ \ i = 1,\cdots,m\]</span><br></td><td>(11.1)</td></tr></tbody></table>
+|                                                                                                          |        |
+|----------------------------------------------------------------------------------------------------------|--------|
+| minimize *f<sub>0</sub>(x),* subject to *fi(x)* less than or equal to *b<sub>i,</sub> i* = 1,…,m | (11.1) |
 
 where, x is a vector of decision variables (which could be model parameters as part of a calibration exercise, or the groundwater extraction rates for management optimization, or etc.), *f*<sub>0</sub> is a scalar objective function, and *f*<sub>*i*</sub> is a scalar constraint function.
 
@@ -3208,7 +3224,9 @@ While PSO is effective for solving single-objective nonlinear programming proble
 
 The multi-objective optimization version of PSO (MOPSO) is included in PESTPP-PSO and is fundamentally based upon the basic form of PSO; however, the conceptualization and logical aspects of its operation are relatively complex, and the reader is referred to *Siade et al*, (2019) for these technical details. Generally, multi-objective optimization is formulated similarly to the optimization problem in Equation (11.1); however, there are now more than one objective function,
 
-<table><tbody><tr class="odd"><td><span class="math display">\[\text{minimize\ \ \ }\left\{ f_{1}\left( \mathbf{x} \right),\cdots,f_{n}(\mathbf{x}) \right\}\]</span><br><span class="math display">\[\text{subject\ to\ \ \ }f_{i}\left( x \right),\ \ \ i = n + 1,\cdots,m\]</span><br></td><td>(11.2)</td></tr></tbody></table>
+|                                                                                     |        |
+|-------------------------------------------------------------------------------------|--------|
+| minimize {*f*i(x),…,*f<sub>n</sub>*(x)}, subject to *fi(x) i* = n+1,…,m | (11.2) |
 
 where, *n* is the number of objective functions for which a Pareto front is evaluated (currently PESTPP-PSO is limited to two objective functions, but future developments are under way to increase this number), *m* is the total number of objectives (that is, there are *m* − *n* constraints).
 
@@ -3230,7 +3248,8 @@ The basic single-objective PSO algorithm proceeds by updating each particle’s 
 
 While basic PSO can approach such a problem, like all other optimization methods, if the problem is nonconvex it cannot guarantee a globally optimal solution. However, its global search approach to optimization makes it very effective at avoiding local minima. It is also important to point out that, like other evolutionary algorithms, the number of iterations required for convergence can be relatively high. This can be mitigated somewhat through the choice of values for inertia and the social and cognitive constants. It is recommended that one begin with a relatively high value for inertia (e.g., 0.7) and gradually lower the inertia over successive iterations, perhaps as low as 0.4. Another factor affecting convergence is the swarm size; the larger the swarm the faster the convergence. However, there comes a point where the speed-up in this trade-off diminishes; from the author’s experience this occurs somewhere around a swarm size of 50, but may still be problem-specific. See the sections regarding the use of this software for more details on how to manage these control variables.
 
-**Multi-Objective**
+### <a id='s15-1-1' />11.1.2 Multi-Objective Particle Swarm optimization
+
 Multi-objective optimization studies often have numerous factors to consider, and some of these factors may be considered objectives (a Pareto front is desired for their trade-offs), or they may be considered as constraints (they are given a limit for which they cannot exceed). Generally, one could consider constraints as objectives in this context, as they can be mixed and matched depending on the perspective of the optimization problem (Equation 11.2). Additionally, the upper limit of the constraints may be perturbed slightly to examine its effects on the Pareto front; such constraints are often referred to as epsilon (*ε*) constraints.
 
 Most multi-objective optimization problems in practice generally do not consider more than three objective functions when mapping a Pareto front. This is because higher-dimensional problems suffer from the “curse of dimensionality”, which often requires an infeasible number of model simulations in order to adequately span the front. Additionally, Pareto fronts with a dimension higher than three are difficult to visualize and hence, difficult to use for decision-support. Arguably, most studies can get by with just a two-dimensional Pareto front, with the remaining factors, or objectives, being handled as *ε*-constraints (see *Siade et al*, (2019) for a real-world example of this process).
@@ -3239,13 +3258,14 @@ MOPSO, like most multi-objective optimization algorithms in use today, approxima
 
 The MOPSO algorithm employed in this software determines the Pareto optimal set iteratively, beginning with an initial swarm population. The initial swarm is executed through the simulation model and the set of non-dominated decision vectors amongst the initial swarm is stored in a *repository*. Then, MOPSO will update the swarm, according to a modified PSO method, and check the dominance relationships between the swarm and the repository (*Siade et al*, 2019). If new decision vectors are obtained that are non-dominated (thus far), they will be added to the repository, and conversely, if decision vectors in the repository become dominated by those in the swarm, they will be discarded. This repeats for a desired number of iterations. At each iteration, the repository objectives and decision vectors are stored to their associated output files (see Section 11.3).
 
-**Decision**
+### <a id='s15-1-2' />11.1.2 Decision Variable Transformations
+
 Currently, the decision variables (which could consist of parameter values, for example) have a pre-defined transformation status. This status is referred to as *eqlog*, which allows for logarithmic transformation, but with different logarithmic bases for each of the decision variables. The decision variable with the greatest difference between upper and lower bounds (in terms of magnitude) is assigned a logarithm base of 10 during transformation. This is equivalent to the *log* option employed in much of the PEST and PEST++ suite for the variable PARTRANS. The logarithm base for the remaining decision variables are set such that the transformed range for those variables is equivalent to that of the widest one, whose aforementioned base is 10. This ensures that the variability of all transformed decision variables appears exactly the same to the PSO procedure, which enhances overall performance. This could result in some decision variables essentially having no transformation (equivalent to *none* for PARTRANS) or even some variables experiencing an expansion effect, where their transformed range is wider than the original one. Please see *Siade et al*, (2019) for more details.
 
-## <a id='s15-2' />1.  Using PESTPP-PSO
+## <a id='s15-2' />11.1 Using PESTPP-PSO
 
 
-    1.  ### General
+### <a id='s15-2-1' />11.1.1 General
 
 PESTPP-PSO was developed using the FORTRAN interface provided within the PEST++ source code. Currently, PESTPP-PSO is only designed to operate in parallel, and the command to execute the “manager” is as follows (which differs slightly from the other PEST++ calling programs),
 
@@ -3265,7 +3285,8 @@ In addition to the information contained in the main control file, PESTPP-PSO wi
 
 Figure 11.1. Variables comprising a minimalist PEST control file (see Figure 4.1), where the control variables used by PESTPP-PSO are shaded in grey. Note that the very last line designates the PSO control file.
 
-**Estimation**
+### <a id='s15-2-2' />11.1.2 Estimation Mode
+
 The algorithm employed in *estimation* mode is equivalent to the very basic form of PSO originally introduced by *Eberhart and Kennedy* (1995). Much of the basic mechanics of the algorithm can be summarized by Equation (11.3). The PSO control file for estimation mode will have a format as follows (“\*” sections can be in any order),
 
 <table><tbody><tr class="odd"><td>* control data<br>RSTPSO NOBJGP NCON NFORG VERBOSE<br>NPOP C1 C2 ISEED<br>INITP VMAX IINERT FINERT INITER<br>NEIBR NNEIBR<br>* objective data<br>OBJNME OBJMETH<br>* constraint data<br>CONNME CONMETH UPLIM<br>(<em>one such line for each constraint function</em>)<br></td></tr></tbody></table>
@@ -3321,7 +3342,7 @@ The first two real variables are the initial (IINERT, *ω*<sup>(0)</sup>) and fi
 |                                                                                                  |       |
 |--------------------------------------------------------------------------------------------------|-------|
 |                                                                                                  
- *ω*<sup>(*t*)</sup> = *ω*<sup>(0)</sup> + (*ω*<sup>(INITER)</sup>−*ω*<sup>(0)</sup>)(*t*/INITER)  | (X.3) |
+ *ω*<sup>(*t*)</sup> = *ω*<sup>(0)</sup> + (*ω*<sup>(INITER)</sup>−*ω*<sup>(0)</sup>)(*t*/INITER)  | (X.4) |
 
 The inertia value for all subsequent iterations, after INITER, is held constant at FINERT. The value for IINERT should be greater than FINERT; a good example would be 0.7 and 0.4, respectively. These values should range between greater than zero and one.
 
@@ -3337,7 +3358,7 @@ OBJNME is a character string and the name of the objective function being minimi
 
 CONNME is a character variable that defines the names of the constraints that are to be maintained during optimization (*f*<sub>*i*</sub> in Equation 11.1). Each CONNME must correspond with an observation group in the PEST control file. CONMETH is similar to OBJMETH and determines if a constraint is comprised of a sum of squared residuals (enter a 1), or a general constraint that is treated as is (enter a 2). UPLIM is simply the upper limit applied to that constraint (*b*<sub>*i*</sub> in Equation 11.1). Constraints with a lower limit can be converted to ones with an upper limit by simply multiplying the constraint value and its associated lower limit value by a -1.
 
-### <a id='s15-2-1' />11.2.3. Pareto mode
+### <a id='s15-2-3' />11.2.3. Pareto mode
 
 The algorithm employed in *pareto* mode (i.e., multi-objective optimization) is fundamentally based upon the basic form of PSO (Equation 11.3); however, the conceptualization and logical aspects of its operation are relatively complex, and the reader is referred to *Siade et al*, (2019) for these technical details. The PESTPP-PSO specs file for MOPSO is the same as that for standard PSO, with some minor modifications,
 
@@ -3386,12 +3407,8 @@ This character variable defines the names of the composite objective functions f
 
 *PTOGPNME* and *PTOW*
 
-PTGPNME is a character variable that tells PESTPP-PSO which Pareto group the corresponding objective function belongs to. This allows for composite objective functions, i.e., the scalarization of multiple objectives into a single composite objective function. Each objective function must correspond to a Pareto group whose name is defined as PTONME, i.e., each instance of PTOGPNME must match with a PTONME. Accordingly, there must be at least one objective function assigned to each Pareto group; and, as with *estimation* mode, there must be at least one observation (in the PEST control file) assigned to each objective function (see description of OBJNME and OBJMETH in the previous section). PTOW is a real variable representing the weight assigned to each objective group when calculating the value of the composite objective function, i.e.,
+PTGPNME is a character variable that tells PESTPP-PSO which Pareto group the corresponding objective function belongs to. This allows for composite objective functions, i.e., the scalarization of multiple objectives into a single composite objective function. Each objective function must correspond to a Pareto group whose name is defined as PTONME, i.e., each instance of PTOGPNME must match with a PTONME. Accordingly, there must be at least one objective function assigned to each Pareto group; and, as with *estimation* mode, there must be at least one observation (in the PEST control file) assigned to each objective function (see description of OBJNME and OBJMETH in the previous section). PTOW is a real variable representing the weight assigned to each objective group when calculating the value of the composite objective function<span id="_Toc73610597" class="anchor"></span>.
 
-|                                                                                                        |        |
-|--------------------------------------------------------------------------------------------------------|--------|
-|                                                                                                        
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;\text{PTONME} = \sum_{\text{PTOGPNME\ =\ PTONME}}^{}{\text{PTOW}_{i}\*\text{OBJNME}_{i}} " title="\Large \text{PTONME} = \sum_{\text{PTOGPNME\ =\ PTONME}}^{}{\text{PTOW}_{i}\*\text{OBJNME}_{i}}" />  |  <br>
 **PESTPP-PSO**
 When using PESTPP-PSO, in either *estimation* or *pareto* mode, the initial swarm must be determined before commencement of the algorithm. The user can either chose to have the swarm developed randomly (i.e., uniformly distributed between transformed upper and lower bounds), or alternatively, the user can provide a pre-determined list of decision variables (or parameters) for which the user has already developed in any manner they wish, e.g., via a Latin Hypercube sampling (LHS) algorithm; this is termed as an external initial-swarm file. This is actually encouraged, as basic uniform random sampling is inefficient, and using LHS, for example, to define the initial swarm positions may significantly reduce the number of iterations required for convergence.
 
@@ -3407,9 +3424,9 @@ The number of parameter values listed in the external initial-swarm file must be
 
 Figure 11.5. Format of the (optional) initial-swarm external file that the user can use to define the initial swarm of the PSO algorithm, either in estimation or in Pareto modes.
 
-The external initial-swarm file can also be used in other ways. For example, if the user simply wishes to execute a large number of model-runs, e.g., from the output of a Monte Carlo algorithm, the user could develop an external initial-swarm file with these realizations listed. Then the user would set NPOP accordingly, along with NOPTMAX set to 0. Another example could be the case where the user wishes to restart the PSO algorithm from some iteration of a previous PSO run. In this case, the user could use the *case.pbs* (*estimation* mode) or the *case.par* (*pareto* mode) output file from a previous PSO run as the external initial-swarm file, as these output files use the same format as described in Figure 11.5.
+The external initial-swarm file can also be used in other ways. For example, if the user simply wishes to execute a large number of model-runs, e.g., from the output of a Monte Carlo algorithm, the user could develop an external initial-swarm file with these realizations listed. Then the user would set NPOP accordingly, along with NOPTMAX set to 0. Another example could be the case where the user wishes to restart the PSO algorithm from some iteration of a previous PSO run. In this case, the user could use the *case.pbs* (*estimation* mode) or the *case.par* (*pareto* mode) output file from a previous PSO run as the external initial-swarm file, as these output files use the same format as described in Figure 11.5.<span id="_Toc73610598" class="anchor"></span>
 
-## <a id='s15-3' />PESTPP-PSO Output Files
+## <a id='s15-3' />11.2 PESTPP-PSO Output Files
 
 
 Output files produced by PESTPP-PSO are listed in the following table. The contents of this table assume that the PEST control file for which PESTPP-PSO is executed is named *case.pst*.
@@ -3467,7 +3484,7 @@ As with PESTPP-IES, PESTPP-DA uses the *NOPTMAX* control variable to define the 
 
 ### <a id='s16-2-2' />12.2.2 Schemes for Assimilating Temporal Data
 
-The frequency of assimilating observations depends on the problem at hand and on the need of the practioner. For example, atmospheric observations are typically assimilated at high frequency (ref) (in the order of minutes), while groundwater systems, which evolve slowly, might need assimilation frequency in the order of months or years. Sometimes, practitioner might be interested in assimilating observations for every model simulated time period, or, in other settings, all available historic observations may be assimilated simultaneously.
+<span id="_Toc73610604" class="anchor"></span>The frequency of assimilating observations depends on the problem at hand and on the need of the practioner. For example, atmospheric observations are typically assimilated at high frequency (ref) (in the order of minutes), while groundwater systems, which evolve slowly, might need assimilation frequency in the order of months or years. Sometimes, practitioner might be interested in assimilating observations for every model simulated time period, or, in other settings, all available historic observations may be assimilated simultaneously.
 
 To allow users to have a high level of flexibility in choosing the frequency of data assimilation, PESTPP-DA requires user to divide the simulation period into time cycles: interval of times that define when observations will be assimilated (See Figure\*\*\*). Every observation and parameter must be associated to a time cycle number. Template and instruction files also require time cycle assignment. This implies that the parameters and/or observations may change depending on the time cycle.
 
@@ -3572,7 +3589,7 @@ In this way, the string-based cycle values allow users to apply sophisticated ru
 
 Alhtough PESTPP-DA is a tool designed for flexible sequential and batch data assimilation, the generalized nature of the cycle concept, in concert with the observation and weight cycle tables, also exposes a range of other functionality. In this way, the cycle concept can be thought of as an outer iteration process. For example, users can undertake the advanced “direct predictive hypothesis testing” analysis of REF and REF with PESTPP-DA by constructing a generic weight cycle table where each cycle includes increasing weight on a control file observation quantity that represents a simulated outcome of interest. For example, assume a model has been constructed to simulate surface-water/groundwater exchange (SGE) along an important river reach. Further assume that the simulated SGE along this reach is included in the control file as an observation. To test the hypothesis that the SGE for this reach could be zero, users should set the observation value quantity in the control file to 0.0 and set the weight to 1.0 (this weight will not be used but simply activates this quantity in the PESTPP-DA cycle process). Now users can construct a weight cycle table. Let’s use 10 cycles. For the historic observations that are being assimilated, the entries for all cycles in the weight cycle table for these observations should be identical to the weights in the control file. The entries for the SGE “observation” in the weight cycle table should slow increase from 0.0 in the first cycle to a value large enough to dominate the objective function in the last cycle. Conceptually, during each PESTPP-DA “cycle”, a (iterative) ensemble smoother formulation will be used to minimize the objective function, but as cycles progress, the desire to force the SGE towards zero increasingly features in the objective function. In this way, the compatibility between the fitting the historic observations and the ability to make SGE be zero is directly tested. If the ability to fit the past observations is maintained while also making the simulated SGE zero, then one cannot reject the hypothesis that the SGE could be zero on the basis of compatibility with historic observations. This technique is very similar to “pareto mode” in PEST(\_HP), except here, we can take advantage of the computational efficiency of the iterative ensemble solver in PESTPP-DA. Figure 12.XXX depicts the results of such an analysis
 
-<img src="./media/image6.png" style="width:6.26806in;height:6.14722in" alt="Chart, scatter chart Description automatically generated" />
+<img src="./media/image4.png" style="width:6.26806in;height:6.29514in" alt="Chart, scatter chart Description automatically generated" />
 
 Figure 12.XXX. Results of a direct predictive hypothesis testing analysis where the relation between fitting historic observations and a desire to make surface-water/groundwater exchange (SGE) zero is evaluated. The ensemble-based pareto trade-off between these two quantities shows that simulating an SGE of zero is not compatible with the historic observations.
 
