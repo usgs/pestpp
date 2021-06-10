@@ -2545,7 +2545,7 @@ void MOEA::iterate_to_solution()
 				//fill with members of increasing fitness value
 				sortedset fit_sorted(fit.begin(), fit.end(), compFunctor);
 				sortedset::iterator it = next(fit_sorted.begin(), keep.size());		
-				for (it; it != fit_sorted.end(); ++it)
+				for (; it != fit_sorted.end(); ++it)
 				{
 					keep.push_back(it->first);
 					if (keep.size() == num_members)

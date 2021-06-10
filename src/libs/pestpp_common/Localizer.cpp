@@ -37,7 +37,7 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 	}
 	else
 	{
-		throw runtime_error("Localizer error: 'ies_localization_type' must start with 'C' (covariance) or 'L' (local analysis) not " + loc_typ[0]);
+		throw runtime_error("Localizer error: 'ies_localization_type' must start with 'C' (covariance) or 'L' (local analysis) not " + loc_typ);
 	}
 
 	if (how_str[0] == 'P')
@@ -50,7 +50,7 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 	}
 	else
 	{
-		throw runtime_error("Localizer error: 'ies_localize_how' or 'da_localize_how' must start with 'P' (pars) or 'O' (obs) not " + how_str[0]);
+		throw runtime_error("Localizer error: 'ies_localize_how' or 'da_localize_how' must start with 'P' (pars) or 'O' (obs) not " + how_str);
 	}
 
 	if ((loctyp == LocTyp::COVARIANCE) && (how == How::OBSERVATIONS))

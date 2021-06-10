@@ -140,7 +140,7 @@ map<int, map<string, double>> process_da_obs_cycle_table(Pest& pest_scenario, ve
 	map<int, map<string, double>> obs_cycle_info;
 	if (filename.size() > 0)
 	{
-		fout_rec << "processing 'DA_OBSEERVATION_CYCLE_TABLE' file " << filename;
+		fout_rec << "processing 'DA_OBSERVATION_CYCLE_TABLE' file " << filename;
 		pest_utils::ExternalCtlFile cycle_table(filename);
 		cycle_table.read_file(fout_rec);
 		vector<string> col_names = cycle_table.get_col_names();

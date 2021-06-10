@@ -2491,7 +2491,11 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 				pest_scenario.get_ctl_observations(), obs, obj_func, pars);
 			file_manager.close_all_files_ending_with("rei");
 		}
-		cout << "saved par and rei files for realization " << tag << " for iteration " << iter << endl;
+		cout << "saved par and rei files for realization " << tag;
+		if (iter >= 0)
+		    cout << " for iteration " << iter;
+		cout << endl;
+
 	}
 	
 	return pair<Parameters, Observations>(pars, obs);
@@ -2639,6 +2643,8 @@ EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
 	oe.set_pest_scenario_ptr(&pest_scenario);
 	pe.set_rand_gen(&rand_gen);
 	oe.set_rand_gen(&rand_gen);
+	oe_base.set_pest_scenario_ptr(&pest_scenario);
+	oe_base.set_rand_gen(&rand_gen);
 	localizer.set_pest_scenario(&pest_scenario);
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
@@ -3020,7 +3026,7 @@ vector<int> EnsembleMethod::run_ensemble(ParameterEnsemble& _pe,
 }
 
 
-void EnsembleMethod::initialize(int cycle, bool run)
+void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 {
 	message(0, "initializing");
 	pp_args = pest_scenario.get_pestpp_options().get_passed_args();
@@ -3073,7 +3079,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 		ss << file_manager.get_base_filename();
 		if (cycle != NetPackage::NULL_DA_CYCLE)
 			ss << "." << cycle;
-		ss << "." << BASE_REAL_NAME << "." << ".par.csv";
+		ss << "." << pest_utils::lower_cp(BASE_REAL_NAME) << ".par.csv";
 		string par_csv = ss.str();
 		message(1, "saving control file parameter ensemble to ", par_csv);
 		//_pe.to_csv(par_csv);
@@ -3107,7 +3113,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 		ss << file_manager.get_base_filename();
 		if (cycle != NetPackage::NULL_DA_CYCLE)
 			ss << "." << cycle;
-		ss << "." << BASE_REAL_NAME << "." << ".obs.csv";
+		ss << "." << pest_utils::lower_cp(BASE_REAL_NAME) << ".obs.csv";
 		string obs_csv = ss.str();
 		message(1, "saving results from control file parameter value run to ", obs_csv);
 		_oe.to_csv(obs_csv);
@@ -3240,7 +3246,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 
 	if ((pe.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
 	{
-		message(2, "using pre-set parameter ensemble");
+		message(1, "using pre-set parameter ensemble");
 		pe_drawn = false;
 	}
 	else
@@ -3264,13 +3270,14 @@ void EnsembleMethod::initialize(int cycle, bool run)
 		message(1, "not using prior parameter covariance matrix scaling");
 	}
 
-	if ((oe.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
+	if ((oe_base.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
 	{
-		message(2, "using pre-set observation ensemble");
+		message(1, "using pre-set observation (simulated output) ensemble");
 		oe_drawn = false;
 	}
 	else
 		oe_drawn = initialize_oe(obscov);
+
 	string center_on = ppo->get_ies_center_on();
 
 	try
@@ -3285,7 +3292,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 
 	try
 	{
-		oe.check_for_dups();
+		oe_base.check_for_dups();
 	}
 	catch (const exception& e)
 	{
@@ -3293,13 +3300,13 @@ void EnsembleMethod::initialize(int cycle, bool run)
 		throw_em_error("error in observation ensemble: " + message);
 	}
 
-	if (pe.shape().first != oe.shape().first)
+	if (pe.shape().first != oe_base.shape().first)
 	{
 		//the special case where par en < obs en and all par reals are found in obs en...
 
-		if (pe.shape().first < oe.shape().first)
+		if (pe.shape().first < oe_base.shape().first)
 		{
-			vector<string> oe_names = oe.get_real_names();
+			vector<string> oe_names = oe_base.get_real_names();
 			set<string> oset(oe_names.begin(), oe_names.end());
 			vector<string> missing;
 			for (auto n : pe.get_real_names())
@@ -3310,10 +3317,10 @@ void EnsembleMethod::initialize(int cycle, bool run)
 			if (missing.size() == 0)
 			{
 				ss.str("");
-				ss << "par en has " << pe.shape().first << " realizations, compared to " << oe.shape().first << " obs realizations";
+				ss << "par en has " << pe.shape().first << " realizations, compared to " << oe.shape().first << " obs+noise realizations";
 				message(1, ss.str());
 				message(1, " the realization names are compatible");
-				message(1, "re-indexing obs en to align with par en...");
+				message(1, "re-indexing obs+noise en to align with par en...");
 				cout << "oe names: " << endl;
 				for (auto& name : oe_names)
 					cout << name << endl;
@@ -3321,8 +3328,8 @@ void EnsembleMethod::initialize(int cycle, bool run)
 				cout << endl << "pe names: " << endl;
 				for (auto& name : oe_names)
 					cout << name << endl;
-				oe.reorder(pe.get_real_names(), vector<string>());
-				oe_names = oe.get_real_names();
+				oe_base.reorder(pe.get_real_names(), vector<string>());
+				oe_names = oe_base.get_real_names();
 				cout << "new oe names: " << endl;
 				for (auto& name : oe_names)
 					cout << name << endl;
@@ -3342,7 +3349,8 @@ void EnsembleMethod::initialize(int cycle, bool run)
 		else
 		{
 			ss.str("");
-			ss << "parameter ensemble rows (" << pe.shape().first << ") not equal to observation ensemble rows (" << oe.shape().first << ")";
+			ss << "parameter ensemble rows (" << pe.shape().first << ") not equal to observation ensemble rows (";
+			ss << oe_base.shape().first << ")";
 			throw_em_error(ss.str());
 		}
 	}
@@ -3363,8 +3371,8 @@ void EnsembleMethod::initialize(int cycle, bool run)
 	if ((obs_restart_csv.size() == 0) && (!pe_drawn) && (oe_drawn))
 	{
 		vector<string> rnames = pe.get_real_names();
-		oe.set_real_names(rnames);
-		message(2, "reset observation ensemble real names to parameter ensemble real names");
+		oe_base.set_real_names(rnames);
+		message(2, "resetting obs + noise ensemble real names to parameter ensemble real names");
 	}
 
 	//need this here for Am calcs...
@@ -3375,7 +3383,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 	//this would only be needed if either of these were not drawn
 	if (!pe_drawn || !oe_drawn)
 	{
-		bool aligned = pe.try_align_other_rows(performance_log, oe);
+		bool aligned = pe.try_align_other_rows(performance_log, oe_base);
 		if (aligned)
 		{
 			message(2, "observation ensemble reordered to align rows with parameter ensemble");
@@ -3383,7 +3391,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 	}
 
 	//just check to see if common real names are found but are not in the same location
-	map<string, int> pe_map = pe.get_real_map(), oe_map = oe.get_real_map();
+	map<string, int> pe_map = pe.get_real_map(), oe_map = oe_base.get_real_map();
 	vector<string> misaligned;
 	for (auto item : pe_map)
 	{
@@ -3394,9 +3402,10 @@ void EnsembleMethod::initialize(int cycle, bool run)
 	}
 	if (misaligned.size() > 0)
 	{
-		message(1, "WARNING: common realization names shared between the parameter and observation ensembles but they are not in the same row locations, see .rec file for listing");
+		message(1, "WARNING: common realization names shared between the parameter and observation + noise ensembles but they are not in the same row locations, see .rec file for listing");
 		ofstream& frec = file_manager.rec_ofstream();
-		frec << endl << "WARNING: the following " << misaligned.size() << " realization names are shared between the parameter and observation ensembles but they are not in the same row locations:" << endl;
+		frec << endl << "WARNING: the following " << misaligned.size() << " realization names are shared between the ";
+		frec << "parameter and observation ensembles but they are not in the same row locations:" << endl;
 		for (auto ma : misaligned)
 			frec << ma << endl;
 	}
@@ -3440,8 +3449,8 @@ void EnsembleMethod::initialize(int cycle, bool run)
 		pe.to_csv(ss.str());
 	}
 	message(1, "saved initial parameter ensemble to ", ss.str());
-	message(2, "checking for denormal values in base oe");
-	oe.check_for_normal("obs+noise observation ensemble");
+	message(2, "checking for denormal values in obs + noise ensemble");
+	oe_base.check_for_normal("obs+noise observation ensemble");
 	ss.str("");
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
@@ -3449,7 +3458,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 		if (cycle != NetPackage::NULL_DA_CYCLE)
 			ss << "." << cycle;
 		ss << ".obs+noise.jcb";
-		oe.to_binary(ss.str());
+		oe_base.to_binary(ss.str());
 	}
 	else
 	{
@@ -3457,9 +3466,9 @@ void EnsembleMethod::initialize(int cycle, bool run)
 		if (cycle != NetPackage::NULL_DA_CYCLE)
 			ss << "." << cycle;
 		ss << ".obs+noise.csv";
-		oe.to_csv(ss.str());
+		oe_base.to_csv(ss.str());
 	}
-	message(1, "saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
+	message(1, "saved obs+noise observation ensemble (obsval + noise realizations) to ", ss.str());
 
 
 	if (pest_scenario.get_control_info().noptmax == -2)
@@ -3486,7 +3495,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 		pe_base = _pe;
 		pe_base.reorder(vector<string>(), act_par_names);
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
-		_oe.reserve(vector<string>(), oe.get_var_names());
+		_oe.reserve(vector<string>(), oe_base.get_var_names());
 		_oe.append("mean", pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
@@ -3543,12 +3552,12 @@ void EnsembleMethod::initialize(int cycle, bool run)
 	oe_org_real_names = oe.get_real_names();
 	pe_org_real_names = pe.get_real_names();
 
-	if ((oe_base.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
+	if ((oe.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
 	{
-		message(2, "using pre-set observation ensemble");
+		message(2, "using pre-set observation + noise ensemble");
 	}
 	else
-		oe_base = oe; //copy
+		oe = oe_base; //copy
 	
 	//reorder this for later...
 	if (act_obs_names.size() > 0)
@@ -3593,7 +3602,7 @@ void EnsembleMethod::initialize(int cycle, bool run)
 
 	//ok, now run the prior ensemble - after checking for center_on
 	//in case something is wrong with center_on
-	if (obs_restart_csv.size() == 0)
+	if ((obs_restart_csv.size() == 0) && (!use_existing))
 	{
 		performance_log->log_event("running initial ensemble");
 		message(1, "running initial ensemble of size", oe.shape().first);
@@ -4988,7 +4997,7 @@ void EnsembleMethod::add_bases()
 	}
 
 	//check that 'base' isn't already in ensemble
-	rnames = oe.get_real_names();
+	rnames = oe_base.get_real_names();
 	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
 		message(1, "'base' realization already in observation ensemble, ignoring 'include_base'");
@@ -5010,18 +5019,18 @@ void EnsembleMethod::add_bases()
 			message(1, mess);
 			vector<string> drop;
 			drop.push_back(oreal);
-			oe.drop_rows(drop);
-			oe.append(BASE_REAL_NAME, obs);
+			oe_base.drop_rows(drop);
+			oe_base.append(BASE_REAL_NAME, obs);
 			//rnames.insert(rnames.begin() + idx, string(base_name));
 			rnames[idx] = BASE_REAL_NAME;
-			oe.reorder(rnames, vector<string>());
+			oe_base.reorder(rnames, vector<string>());
 		}
 		else
 		{
 			message(1, "adding 'base' observation values to ensemble");
-			vector<int> drop{ oe.shape().first - 1 };
-			oe.drop_rows(drop);
-			oe.append(BASE_REAL_NAME, obs);
+			vector<int> drop{ oe_base.shape().first - 1 };
+			oe_base.drop_rows(drop);
+			oe_base.append(BASE_REAL_NAME, obs);
 		}
 	}
 }
@@ -5037,13 +5046,13 @@ bool EnsembleMethod::initialize_oe(Covariance& cov)
 		if ((pest_scenario.get_pestpp_options().get_ies_no_noise()) || (act_obs_names.size() == 0))
 		{
 			message(1, "initializing no-noise observation ensemble of : ", num_reals);
-			oe.initialize_without_noise(num_reals);
+			oe_base.initialize_without_noise(num_reals);
 
 		}
 		else
 		{
 			message(1, "drawing observation noise realizations: ", num_reals);
-			oe.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
+			oe_base.draw(num_reals, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
 
 		}
 		drawn = true;
@@ -5057,7 +5066,7 @@ bool EnsembleMethod::initialize_oe(Covariance& cov)
 			message(1, "loading obs ensemble from csv file", obs_csv);
 			try
 			{
-				oe.from_csv(obs_csv);
+				oe_base.from_csv(obs_csv);
 			}
 			catch (const exception& e)
 			{
@@ -5074,7 +5083,7 @@ bool EnsembleMethod::initialize_oe(Covariance& cov)
 			message(1, "loading obs ensemble from binary file", obs_csv);
 			try
 			{
-				oe.from_binary(obs_csv);
+				oe_base.from_binary(obs_csv);
 			}
 			catch (const exception& e)
 			{
@@ -5100,15 +5109,15 @@ bool EnsembleMethod::initialize_oe(Covariance& cov)
 				message(1, "Note: increasing num_reals by 1 to account for 'base' realization in existing obs ensemble");
 				num_reals++;
 			}*/
-			if (num_reals < oe.shape().first)
+			if (num_reals < oe_base.shape().first)
 			{
 				message(1, "ies_num_reals arg passed, truncated observation ensemble to ", num_reals);
-				vector<string> keep_names, real_names = oe.get_real_names();
+				vector<string> keep_names, real_names = oe_base.get_real_names();
 				for (int i = 0; i < num_reals; i++)
 				{
 					keep_names.push_back(real_names[i]);
 				}
-				oe.keep_rows(keep_names);
+				oe_base.keep_rows(keep_names);
 			}
 		}
 	}

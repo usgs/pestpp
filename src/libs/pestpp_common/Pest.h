@@ -42,7 +42,7 @@ public:
 	Pest();
 	void set_defaults();
 	void check_inputs(ostream &f_rec, bool forgive_bound=false);
-	void check_io(ofstream& f_rec);
+	void check_io(ofstream& f_rec, bool echo_errors=true);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename, ofstream &f_rec);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename);
 	int process_ctl_file(ifstream& fin, string pst_filename, ofstream& f_rec);
@@ -147,7 +147,7 @@ protected:
 	set<string> s_pargp, s_obgnme; 
 
 	pair<string, string> parse_keyword_line(ofstream &f_rec, const string &line);
-	void throw_control_file_error(ofstream& f_rec, const string &message, bool should_throw=true);
+	void throw_control_file_error(ofstream& f_rec, const string &message, bool should_throw=true, bool echo=true);
 	void check_report_assignment(ofstream& f_rec, PestppOptions::ARG_STATUS stat, const string &key, const string &org_value);
 
 	void tokens_to_par_group_rec(ofstream &f_rec, const vector<string>& tokens);

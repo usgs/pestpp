@@ -300,7 +300,7 @@ public:
 	FileManager& get_file_manager() { return file_manager; }
 	Pest* get_pest_scenario_ptr() { return &pest_scenario; }
 	
-	void initialize(int cycle = NetPackage::NULL_DA_CYCLE, bool run = true);
+	void initialize(int cycle = NetPackage::NULL_DA_CYCLE, bool run = true, bool use_existing=false);
 
 	//this is not called in the initialization - must be called before initialize() to trigger dynamic state handling...
 	void initialize_dynamic_states();

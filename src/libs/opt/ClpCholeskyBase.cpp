@@ -2923,7 +2923,7 @@ ClpCholeskyBase::factorize(const CoinWorkDouble * diagonal, int * rowsDropped)
                     }
                }
                numberRowsDropped_ += newDropped;
-               if (numberRowsDropped_ && 0) {
+               if (numberRowsDropped_) {
                     std::cout << "Rank " << numberRows_ - numberRowsDropped_ << " ( " <<
                               numberRowsDropped_ << " dropped)";
                     if (newDropped) {

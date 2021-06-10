@@ -363,7 +363,7 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		}
 }
 
-void Pest::check_io(ofstream& f_rec)
+void Pest::check_io(ofstream& f_rec, bool echo_errors)
 {
 	ModelInterface mi(model_exec_info.tplfile_vec,model_exec_info.inpfile_vec,
 		model_exec_info.insfile_vec,model_exec_info.outfile_vec,model_exec_info.comline_vec);
@@ -376,11 +376,11 @@ void Pest::check_io(ofstream& f_rec)
 	catch (exception& e)
 	{
 		string mess = e.what();
-		throw_control_file_error(f_rec, "error in model interface file access:" + mess);
+		throw_control_file_error(f_rec, "error in model interface file access:" + mess, true,echo_errors);
 	}
 	catch (...)
 	{
-		throw_control_file_error(f_rec, "unspecified error in model interface file access checking");
+		throw_control_file_error(f_rec, "unspecified error in model interface file access checking", true, echo_errors);
 	}
 	if (pestpp_options.get_check_tplins())
 	{
@@ -392,11 +392,11 @@ void Pest::check_io(ofstream& f_rec)
 		catch (exception& e)
 		{
 			string mess = e.what();
-			throw_control_file_error(f_rec, "error in model interface file checking:" + mess);
+			throw_control_file_error(f_rec, "error in model interface file checking:" + mess, true, echo_errors);
 		}
 		catch (...)
 		{
-			throw_control_file_error(f_rec, "unspecified error in model interface file checking");
+			throw_control_file_error(f_rec, "unspecified error in model interface file checking", true, echo_errors);
 		}
 	}
 }
@@ -2950,7 +2950,7 @@ bool cycle_in_range(int cycle,const DaCycleInfo& dci) {
         return true;
     if (dci.start > cycle)
         return false;
-    if ((dci.stop > 0) && (dci.stop < cycle))
+    if ((dci.stop >= 0) && (dci.stop < cycle))
         return false;
     if (dci.stride == 1)
         return true;
@@ -3086,21 +3086,27 @@ pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string &lin
 	return pair<string, string>(key,value);
 }
 
-void Pest::throw_control_file_error(ofstream& f_rec,const string &message, bool should_throw)
+void Pest::throw_control_file_error(ofstream& f_rec,const string &message, bool should_throw, bool echo)
 {
 	stringstream ss;
 	if (should_throw)
 		ss << "control file parsing error: " << message << endl;
 	else
 		ss << "control file parsing warning: " << message << endl;
-	
-	cout << ss.str();
+
+	if (echo)
+    {
+	    cout << ss.str();
+    }
 	f_rec << ss.str();
 	
 	if (should_throw)
 	{
-		cerr << ss.str();
-		f_rec.close();
+	    if (echo){
+            cerr << ss.str();
+	    }
+
+		//f_rec.close();
 		throw runtime_error(ss.str());
 	}	
 }

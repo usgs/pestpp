@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
 		cout << "               Developed by the PEST++ development team" << endl;
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-        auto start = chrono::steady_clock::now();
+        auto start = chrono::system_clock::now();
         string start_string = get_time_string();
         cout << "started at " << start_string << endl;
 		CmdLine cmdline(argc, argv);
@@ -253,14 +253,14 @@ int main(int argc, char* argv[])
 			throw runtime_error(ss.str());
 		}
 
-		if (pest_scenario.get_control_info().noptmax != 0)
+		vector<string> errors;
+		if ((pest_scenario.get_pestpp_options().get_check_tplins()) &&
+		((pest_scenario.get_control_info().noptmax != 0) ||
+		(pest_scenario.get_pestpp_options().get_debug_parse_only())))
 		{
-
 			for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 			{
 				cout << endl;
-
-
 				cout << " >>>> Checking data in cycle " << *icycle << endl;
 				fout_rec << endl;
 				fout_rec << " >>>> Checking data in cycle " << *icycle << endl;
@@ -270,7 +270,47 @@ int main(int argc, char* argv[])
 
 				//Pest childPest;
 				Pest childPest = pest_scenario.get_child_pest(*icycle);
-				childPest.check_io(fout_rec);
+
+
+				if (childPest.get_ctl_observations().size() == 0)
+                {
+				    ss.str("");
+				    ss << "Error: no observations found for cycle " << *icycle << endl;
+                    errors.push_back(ss.str());
+                    continue;
+                }
+                if (childPest.get_ctl_parameters().size() == 0)
+                {
+                    ss.str("");
+                    ss << "Error: no parameters found for cycle " << *icycle << endl;
+                    errors.push_back(ss.str());
+                    continue;
+                }
+                if (childPest.get_model_exec_info().tplfile_vec.size() == 0)
+                {
+                    ss.str("");
+                    ss << "Error: no template files found for cycle " << *icycle << endl;
+                    errors.push_back(ss.str());
+                    continue;
+                }
+                if (childPest.get_model_exec_info().insfile_vec.size() == 0)
+                {
+                    ss.str("");
+                    ss << "Error: no instruction files found for cycle " << *icycle << endl;
+                    errors.push_back(ss.str());
+                    continue;
+                }
+                try {
+                    childPest.check_io(fout_rec, false);
+                }
+                catch (exception& e)
+                {
+                    ss.str("");
+                    ss << "interface error for cycle " << *icycle << ": " << e.what() << endl;
+                    errors.push_back(ss.str());
+                    continue;
+                }
+
 
 				if (obs_cycle_info.find(*icycle) != obs_cycle_info.end())
 				{
@@ -338,17 +378,28 @@ int main(int argc, char* argv[])
 
 
 
-				stringstream ss;
+				ss.str("");
 
-				/*ss << "num adj par: " << nadj_par << ", ";
-				ss << "num nz obs: " << nnz_obs << ", ";*/
-				ss << "num tpl files: " << childPest.get_tplfile_vec().size() << ", ";
-				ss << "num ins files: " << childPest.get_insfile_vec().size() << endl;
+				ss << "...number of  template files in cycle " << *icycle << ": " << childPest.get_tplfile_vec().size() << endl;
+				ss << "...number of instruction files in cycle " << *icycle << ": " << childPest.get_insfile_vec().size() << endl;
 				cout << ss.str();
 				fout_rec << ss.str();
 
 			}
 		}
+		if (errors.size() > 0)
+        {
+		    ss.str("");
+		    ss << errors.size() << " errors detected in cycle interface checking:" << endl;
+		    cout << ss.str();
+		    fout_rec << ss.str();
+		    for (auto& e: errors)
+            {
+                cout << e;
+                fout_rec << e;
+            }
+		    throw runtime_error("Errors detected in cycle interface checking");
+        }
 		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
 		{
 			cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
@@ -421,6 +472,9 @@ int main(int argc, char* argv[])
 		//ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr
 		ParChangeSummarizer pcs(&curr_pe, &file_manager, &output_file_writer);
 
+		Parameters prev_cycle_ctl_pars;
+		Observations prev_cycle_obs;
+
 		for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 		{
 			if (*icycle < start_cycle)
@@ -429,10 +483,10 @@ int main(int argc, char* argv[])
 				continue;
 			}
 			// da_start_cycle, da_end_cycle
-			cout << endl;
+			cout << endl << endl ;
 			cout << " =======================================" << endl;
 			cout << " >>>> Assimilating data in cycle " << *icycle << endl;
-			cout << " =======================================" << endl;
+			cout << " =======================================" << endl << endl;
 
 			fout_rec << endl;
 			fout_rec << " =======================================" << endl;
@@ -445,13 +499,6 @@ int main(int argc, char* argv[])
 
 			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);
 
-			if (verbose_level > 1) // 
-			{
-                output_file_writer.scenario_io_report(fout_rec);
-				output_file_writer.scenario_pargroup_report(fout_rec);
-				output_file_writer.scenario_par_report(fout_rec);
-				output_file_writer.scenario_obs_report(fout_rec);
-			}
 
 			//------------------------------
 
@@ -504,24 +551,19 @@ int main(int argc, char* argv[])
 					weight_cycle_map = weight_cycle_info[*icycle];
 				ObservationInfo oi = pest_scenario.get_ctl_observation_info();
 				childPest.set_observation_info(oi);
-				for (auto tbl_obs_name : obs_in_tbl)
-				{
-					//if this obs is not in this cycle, give it a zero weight
-					if (cycle_map.find(tbl_obs_name) == cycle_map.end())
-					{
-						oi.set_weight(tbl_obs_name, 0.0);
-					}
-					else
-					{
-						childPest.get_ctl_observations_4_mod().update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);
-						//check if this obs is in this cycle's weight info
-						if (weight_cycle_map.find(tbl_obs_name) != weight_cycle_map.end())
-						{
-							oi.set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
-							//pest_scenario.get_observation_info_ptr()->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
-						}
-					}
-				}
+				for (auto tbl_obs_name : obs_in_tbl) {
+                    //if this obs is not in this cycle, give it a zero weight
+                    if (cycle_map.find(tbl_obs_name) == cycle_map.end()) {
+                        oi.set_weight(tbl_obs_name, 0.0);
+                    } else {
+                        childPest.get_ctl_observations_4_mod().update_rec(tbl_obs_name, cycle_map.at(tbl_obs_name));
+                        //check if this obs is in this cycle's weight info
+                        if (weight_cycle_map.find(tbl_obs_name) != weight_cycle_map.end()) {
+                            oi.set_weight(tbl_obs_name, weight_cycle_map.at(tbl_obs_name));
+                            //pest_scenario.get_observation_info_ptr()->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+                        }
+                    }
+                }
 				childPest.set_observation_info(oi);
 
 			}
@@ -558,7 +600,10 @@ int main(int argc, char* argv[])
 				}
 			}
 
-			cout << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
+
+            cout << "...number of parameters in cycle " << *icycle << ": " << childPest.get_ctl_parameters().size() << endl;
+            fout_rec << "...number of parameters in cycle " << *icycle << ": " << childPest.get_ctl_parameters().size() << endl;
+            cout << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
 			fout_rec << "...number of adjustable parameters in cycle " << *icycle << ": " << nadj_par << endl;
 
 			ObservationInfo oi = childPest.get_ctl_observation_info();
@@ -568,7 +613,10 @@ int main(int argc, char* argv[])
 				if (oi.get_observation_rec_ptr(o.first)->weight != 0.0)
 					nnz_obs++;
 			}
-			cout << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
+
+            cout << "...number of observations in cycle " << *icycle << ": " << childPest.get_ctl_observations().size() << endl;
+            fout_rec << "...number of observations in cycle " << *icycle << ": " << childPest.get_ctl_observations().size() << endl;
+            cout << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
 			fout_rec << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
 
 			//ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
@@ -652,7 +700,72 @@ int main(int argc, char* argv[])
 				cycle_curr_noise.to_csv("cycle_curr_noise.csv");
 			}
 			da.set_localizer(global_loc);
-			da.initialize(*icycle);
+
+			//check if we can use the previous outputs
+			bool use_existing = false;
+			//if there are no dynamic states,then we can possibly reuse sim outputs
+			if (da.get_par_dyn_state_names().size() == 0)
+            {
+			    // if npar is the same...
+                if (prev_cycle_ctl_pars.size() == cur_ctl_parameters.size()) {
+                    //if nobs is the same
+                    if (prev_cycle_obs.size() == childPest.get_ctl_observations().size()) {
+                        //check that all pars have the same values
+                        Parameters::iterator pend = cur_ctl_parameters.end();
+                        bool pars_same = true;
+                        for (auto &p : prev_cycle_ctl_pars) {
+                            if (cur_ctl_parameters.find(p.first) == pend) {
+                                pars_same = false;
+                                break;
+                            }
+                            if (cur_ctl_parameters.get_rec(p.first) != p.second) {
+                                pars_same = false;
+                                break;
+                            }
+                        }
+                        if (pars_same) {
+                            //check that all obs have the same values
+                            Observations cur_cycle_obs = childPest.get_ctl_observations();
+                            bool obs_same = true;
+                            Observations::iterator oend = cur_cycle_obs.end();
+                            for (auto &o : prev_cycle_obs) {
+                                if (cur_cycle_obs.find(o.first) == oend) {
+                                    obs_same = false;
+                                    break;
+                                }
+                                if (cur_cycle_obs.get_rec(o.first) != o.second) {
+                                    obs_same = false;
+                                    break;
+                                }
+                            }
+                            //if we get to here, it should be safe to reuse the sim outputs from the
+                            //previous cycle...
+                            if (obs_same) {
+                                use_existing = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+			if (use_existing)
+            {
+			    ss.str("");
+			    ss << "...parameters and observations are consistent with previous cycle, reusing exsisting simulated outputs" << endl;
+			    cout << ss.str();
+			    fout_rec << ss.str();
+            }
+
+            if (verbose_level > 1) //
+            {
+                output_file_writer.scenario_io_report(fout_rec);
+                output_file_writer.scenario_pargroup_report(fout_rec);
+                output_file_writer.scenario_par_report(fout_rec);
+                output_file_writer.scenario_obs_report(fout_rec);
+            }
+
+
+            da.initialize(*icycle,true,use_existing);
 			
 			write_global_phi_info(*icycle, f_phi, da, init_real_names);
 
@@ -664,7 +777,7 @@ int main(int argc, char* argv[])
 					da.da_update(*icycle);
 					ss.str("");
 					ss << file_manager.get_base_filename() << ".global." << *icycle << "." << da.get_iter() << ".pcs.csv";
-					pcs.summarize(cycle_curr_pe, ss.str());
+					pcs.summarize(*da.get_pe_ptr(), ss.str());
 				}
 				write_global_phi_info(*icycle, f_phi, da, init_real_names);
 			}
@@ -673,7 +786,6 @@ int main(int argc, char* argv[])
 				cout << "...Note: no non-zero-weighted observations in cycle " << *icycle << ", continuing..." << endl;
 				fout_rec << "...Note: no non-zero-weighted observations in cycle " << *icycle << ", continuing..." << endl;
 				performance_log.log_event("no non-zero-weighted observations in current cycle");
-
 			}
 
 			//replace all the pars used in this cycle in the parent parameter ensemble
@@ -757,21 +869,27 @@ int main(int argc, char* argv[])
                 fout_rec << "'da_stop_cycle' criteria met" << endl;
                 break;
             }
+			prev_cycle_ctl_pars = Parameters(childPest.get_ctl_parameters());
+			prev_cycle_obs = Observations(childPest.get_ctl_observations());
+
 
 
 		} // end cycle loop
-		fout_rec.close();
+
 		cout << endl << endl << "pestpp-da analysis complete..." << endl;
 
         auto end = chrono::steady_clock::now();
         cout << "started at " << start_string << endl;
         cout << "finished at " << get_time_string() << endl;
-        cout << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
-        cout << flush;
+
+
         fout_rec << "started at " << start_string << endl;
         fout_rec << "finished at " << get_time_string() << endl;
-        fout_rec << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
-
+        fout_rec << "took " << setprecision(3) << get_duration_sec(start)/60.0 << " minutes" << endl;
+        fout_rec << flush;
+        cout << "took " << setprecision(3) << get_duration_sec(start)/60.0 << " minutes" << endl;
+        cout << flush;
+        fout_rec.close();
         return 0;
 #ifndef _DEBUG
 	}
