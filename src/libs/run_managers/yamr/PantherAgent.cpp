@@ -450,6 +450,20 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 		final_run_status = NetPackage::PackType::RUN_FAILED;
 	}
 
+    if (run_exception)
+    {
+        try {
+            rethrow_exception(run_exception);
+        }
+        catch (exception& e) {
+            ss.str("");
+            ss << "exception raised by run thread: " << std::endl;
+            ss << e.what() << std::endl;
+            report(ss.str(), true);
+            final_run_status = NetPackage::PackType::RUN_FAILED;
+        }
+    }
+
 	//sleep here just to give the os a chance to cleanup any remaining file handles
 	w_sleep(poll_interval_seconds * 1000);
 	return pair<NetPackage::PackType,std::string> (final_run_status,smessage.str());
@@ -459,12 +473,7 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 void PANTHERAgent::run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, exception_ptr& run_exception,
 	Parameters* pars, Observations* obs)
 {
-
 	mi.run(terminate,finished,run_exception, pars, obs);
-	if (run_exception)
-    {
-	    cout << endl;
-    }
 }
 
 
