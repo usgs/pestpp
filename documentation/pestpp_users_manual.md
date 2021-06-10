@@ -17,25 +17,29 @@ The writing of this manual, and improvements to the PEST++ parallel run manager,
 
 On a personal note, thanks are also due to the following people who have contributed in the distant or more recent past to the development of the PEST++ suite, and to modelling education based on the PEST++ suite:
 
-Chas Egan (Queensland Department of Environment and Science)
+-   Chas Egan (Queensland Department of Environment and Science)
 
-Mike Toews (GNS Science)
+-   Mike Toews (GNS Science)
 
-Mike Fienen (USGS)
+-   Mike Fienen (USGS)
 
-Randy Hunt (USGS)
+-   Randy Hunt (USGS)
 
-Wes Kitlasten (USGS)
+-   Wes Kitlasten (USGS)
 
-Matt Knowling (GNS Science)
+-   Matt Knowling (GNS Science)
 
-Brioch Hemmings (GNS Science)
+-   Brioch Hemmings (GNS Science)
 
-Chris Muffels (SS Papadopoulos and Associates)
+-   Chris Muffels (SS Papadopoulos and Associates)
 
-Damian Merrick (HydroAlgorithmics)
+-   Damian Merrick (HydroAlgorithmics)
 
-Chis Nicol (Groundwater Logic)
+-   Chis Nicol (Groundwater Logic)
+
+-   Ayman Alzraiee (USGS)
+
+-   Zak Stanko (USGS)
 
 # <a id='s3' />Preface
 
@@ -45,7 +49,7 @@ The present document serves as manual the current version of PEST++.
 
 The term “PEST++” describes a suite of programs which have certain things in common. Chief among these is their ability to conduct many model runs in parallel on a single computer, over an office network, on a high performance cluster and on the computing cloud. Members of the PEST++ suite employ the same protocol for communicating with a model as PEST does. They all employ a modular, parallel run manager named PANTHER, an upgrade from the YAMR run manager used by previous versions of PEST++. PANTHER is freely available to other programmers. Its sophisticated run management functionality is accessible through functions calls that can be issued from a number of programming languages. See the PANTHER manual (Welter et al; 2019) for details.
 
-A theme that runs through all members of the PEST++ suite is that of adding value to environmental modelling as it is conducted in the decision-making context. Programs which comprise the PEST++ suite apply state-of-the-art methods to model calibration and exploration of post-calibration parameter and predictive uncertainty. Their algorithms are capable of handling large numbers of parameters, of deploying advanced regularisation devices, and of exploring parameter and predictive uncertainty. One member of the suite optimizes environmental system management in a modelling context that respects the (sometimes high) levels of uncertainty that accompany all model predictions.
+A theme that runs through all members of the PEST++ suite is that of adding value to environmental modelling as it is conducted in the decision-making context. Programs which comprise the PEST++ suite apply state-of-the-art methods to model calibration and exploration of post-calibration parameter and predictive uncertainty, and advanced management optimization under uncertainty techniques. Their algorithms are capable of handling large numbers of parameters, of deploying advanced regularisation devices, and of exploring parameter and predictive uncertainty. One member of the suite optimizes environmental system management in a modelling context that respects the (sometimes high) levels of uncertainty that accompany all model predictions.
 
 The PEST++ suite is still under active development. The theme of enhancing model-based decision-support is being maintained. The free availability of the PANTHER run manager constitutes an invitation for others to join us in this important work.
 
