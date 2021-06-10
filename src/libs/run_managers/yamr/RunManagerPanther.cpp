@@ -278,7 +278,7 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	overdue_reched_fac(_overdue_reched_fac), overdue_giveup_fac(_overdue_giveup_fac),
 	port(_port), f_rmr(_f_rmr), n_no_ops(0), overdue_giveup_minutes(_overdue_giveup_minutes),
 	terminate_idle_thread(false), currently_idle(true), idling(false), idle_thread_finished(false),
-	idle_thread(nullptr), idle_thread_raii(nullptr), should_echo(_should_echo)
+	idle_thread(nullptr), should_echo(_should_echo)
 {
 
 	char * t = 
@@ -699,7 +699,7 @@ void RunManagerPanther::start_run_idle_async()
 
 	// Start thread
 	idle_thread = new thread(&RunManagerPanther::run_idle_async, this);
-	idle_thread_raii = new pest_utils::thread_RAII(*idle_thread);
+	//idle_thread_raii = new pest_utils::thread_RAII(*idle_thread);
 
 	report("Started idle ping thread.", false);
 }
@@ -738,9 +738,9 @@ void RunManagerPanther::end_run_idle_async()
 	}
 
 	// Clean up
-	delete idle_thread_raii;
+	//delete idle_thread_raii;
 	delete idle_thread;
-	idle_thread_raii = nullptr;
+	//idle_thread_raii = nullptr;
 	idle_thread = nullptr;
 }
 

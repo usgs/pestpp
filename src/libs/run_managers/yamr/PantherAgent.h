@@ -76,7 +76,7 @@ private:
 
 	ModelInterface mi;
 	void run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
-		pest_utils::thread_exceptions *shared_execptions,
+		exception_ptr& run_exception,
 		Parameters* pars, Observations* obs);
 
 	void terminate_or_restart(int error_code) const;

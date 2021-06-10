@@ -38,7 +38,7 @@ private:
 	std::string run_dir;
 
     void run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
-                   pest_utils::thread_exceptions *shared_execptions,
+                   exception_ptr& run_exception,
                    Parameters* pars, Observations* obs);
     void run(Parameters* pars, Observations* obs);
 };

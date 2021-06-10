@@ -584,51 +584,51 @@ bool thread_flag::get()
 	else return false;
 }
 
-void thread_exceptions::add(std::exception_ptr ex_ptr)
-{
-	std::lock_guard<std::mutex> lock(m);
-	shared_exception_vec.push_back(ex_ptr);
-}
+//void thread_exceptions::add(std::exception_ptr ex_ptr)
+//{
+//	std::lock_guard<std::mutex> lock(m);
+//	shared_exception_vec.push_back(ex_ptr);
+//}
 
-string thread_exceptions::what()
-{
-	stringstream ss;
-	std::lock_guard<std::mutex> lock(m);
-	for (auto eptr : shared_exception_vec)
-	{
-		try
-		{
-			std::rethrow_exception(eptr);
-		}
-		catch (const std::exception& e)
-		{
-			ss << e.what() << ", ";
-		}
-	}
-	return ss.str();
-}
-
-void  thread_exceptions::rethrow()
-{
-	std::lock_guard<std::mutex> lock(m);
-	if (shared_exception_vec.size() == 0)
-	{
-		return;
-	}
-	stringstream ss;
-	for (auto eptr : shared_exception_vec)
-	{
-		try
-		{
-			std::rethrow_exception(eptr);
-		}
-		catch (const std::exception& e)
-		{
-			ss << e.what() << " ";
-		}
-	}
-	throw runtime_error(ss.str());
-}
+//string thread_exceptions::what()
+//{
+//	stringstream ss;
+//	std::lock_guard<std::mutex> lock(m);
+//	for (auto eptr : shared_exception_vec)
+//	{
+//		try
+//		{
+//			std::rethrow_exception(eptr);
+//		}
+//		catch (const std::exception& e)
+//		{
+//			ss << e.what() << ", ";
+//		}
+//	}
+//	return ss.str();
+//}
+//
+//void  thread_exceptions::rethrow()
+//{
+//	std::lock_guard<std::mutex> lock(m);
+//	if (shared_exception_vec.size() == 0)
+//	{
+//		return;
+//	}
+//	stringstream ss;
+//	for (auto eptr : shared_exception_vec)
+//	{
+//		try
+//		{
+//			std::rethrow_exception(eptr);
+//		}
+//		catch (const std::exception& e)
+//		{
+//			ss << e.what() << " ";
+//		}
+//	}
+//	throw runtime_error(ss.str());
+//}
 
 map<string, string> parse_plusplus_line(const string& _line)
 {

@@ -4091,6 +4091,21 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	}
 
 	int local_subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
+	if (local_subset_size < 0)
+    {
+	    ss.str("");
+
+	    local_subset_size = (int)((double)pe.shape().first) * ((-1. * (double)local_subset_size) / 100.);
+
+        ss << "subset defined as a percentage of ensemble size, using " << local_subset_size;
+        ss << " realizations for subset" << endl;
+        if (local_subset_size < 4)
+        {
+            ss << "percentage-based subset size too small, increasing to 4" << endl;
+            local_subset_size = 4;
+        }
+    }
+
 	if ((use_subset) && (local_subset_size > pe.shape().first))
 	{
 		ss.str("");

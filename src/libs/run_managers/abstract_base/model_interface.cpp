@@ -157,16 +157,15 @@ void ModelInterface::check_tplins(const vector<string> &par_names, const vector<
 
 void ModelInterface::run(Parameters* pars, Observations* obs)
 {
-
+    exception_ptr run_exception = nullptr;
 	pest_utils::thread_flag terminate(false);
 	pest_utils::thread_flag finished(false);
-	pest_utils::thread_exceptions shared_exceptions;
 
-	run(&terminate, &finished, &shared_exceptions, pars, obs);
-	if (shared_exceptions.size() > 0)
+
+	run(&terminate, &finished, run_exception, pars, obs);
+	if (run_exception)
 	{
-		//finalize();
-		shared_exceptions.rethrow();
+        rethrow_exception(run_exception);
 	}
 
 }
@@ -601,7 +600,7 @@ void ModelInterface::remove_existing()
 }
 
 
-void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
+void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, exception_ptr& eptr,
 						Parameters* pars_ptr, Observations* obs_ptr)
 {
 			
@@ -738,12 +737,12 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 	catch (const std::exception& e)
 	{
 		cout << "exception raised by run thread: " << e.what() << endl;
-		shared_execptions->add(current_exception());
+		eptr = current_exception();
 	}
 	catch (...)
 	{
 		cout << "exception raised by run thread" << endl;
-		shared_execptions->add(current_exception());
+		eptr = current_exception();
 	}
 	return;
 
