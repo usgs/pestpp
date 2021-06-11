@@ -30,14 +30,49 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 	ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, Localizer& _localizer, Covariance& _parcov, Eigen::MatrixXd& _Am, L2PhiHandler& _ph,
 	bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string>& _act_obs_names) :
 	file_manager(_file_manager), pest_scenario(_pest_scenario), pe(_pe), oe(_oe), base_oe(_base_oe), localizer(_localizer), 
-	parcov(_parcov), Am(_Am), ph(_ph), act_par_names(_act_par_names),act_obs_names(_act_obs_names)
+	parcov(_parcov), Am(_Am), ph(_ph), act_par_names(_act_par_names),act_obs_names(_act_obs_names) {
+    performance_log = _performance_log;
+    use_localizer = _use_localizer;
+    iter = _iter;
+    verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
+    //prep the fast look par cov info
+    initialize();
+}
 
+
+void EnsembleSolver::initialize(string center_on, vector<int> real_idxs)
 {
-	performance_log = _performance_log;
-	use_localizer = _use_localizer;
-	iter = _iter;
-	verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
-	//prep the fast look par cov info
+    vector<string> pe_real_names = pe.get_real_names();
+    vector<string> oe_real_names = oe.get_real_names();
+    vector<string> t;
+    if (center_on.size() == 0)
+    {
+        center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
+    }
+    if (real_idxs.size() == 0)
+    {
+        for (int i=0;i<pe.shape().first;i++)
+            real_idxs.push_back(i);
+    }
+    else
+    {
+
+        for (auto ri : real_idxs)
+        {
+            t.push_back(pe_real_names[ri]);
+        }
+        pe_real_names = t;
+        t.clear();
+        for (auto ri: real_idxs)
+        {
+            t.push_back(oe_real_names[ri]);
+        }
+        oe_real_names = t;
+        t.clear();
+
+    }
+
+
 	message(1,"preparing fast-look containers for threaded localization solve");
 	parcov_inv_map.clear();
 	parcov_inv_map.reserve(pe.shape().second);
@@ -87,7 +122,7 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 	obs_err_map.reserve(obs_names.size());
 
 	//check for the 'center_on' real - it may have been dropped...
-	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
+
 	if (center_on.size() > 0)
 	{
 		if (center_on != MEDIAN_CENTER_ON_NAME)
@@ -107,28 +142,28 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 		}
 	}
 
-	Eigen::MatrixXd mat = ph.get_obs_resid_subset(oe);
+	Eigen::MatrixXd mat = ph.get_obs_resid_subset(oe,true,oe_real_names);
 	for (int i = 0; i < obs_names.size(); i++)
 	{
 		obs_resid_map[obs_names[i]] = mat.col(i);
 	}
-	mat = oe.get_eigen_anomalies(center_on);
+	mat = oe.get_eigen_anomalies(oe_real_names, t, center_on);
 	for (int i = 0; i < obs_names.size(); i++)
 	{
 		obs_diff_map[obs_names[i]] = mat.col(i);
 	}
-	mat = base_oe.get_eigen(oe.get_real_names(), obs_names);
+	mat = base_oe.get_eigen(oe_real_names, obs_names);
 	Observations ctl_obs = pest_scenario.get_ctl_observations();
 	for (int i = 0; i < obs_names.size(); i++)
 	{
 		obs_err_map[obs_names[i]] = mat.col(i).array() - ctl_obs.get_rec(obs_names[i]);
 	}
-	mat = ph.get_par_resid_subset(pe);
+	mat = ph.get_par_resid_subset(pe,pe_real_names);
 	for (int i = 0; i < par_names.size(); i++)
 	{
 		par_resid_map[par_names[i]] = mat.col(i);
 	}
-	mat = pe.get_eigen_anomalies(center_on);
+	mat = pe.get_eigen_anomalies(pe_real_names,t,center_on);
 	for (int i = 0; i < par_names.size(); i++)
 	{
 		par_diff_map[par_names[i]] = mat.col(i);
@@ -1423,10 +1458,14 @@ Eigen::MatrixXd L2PhiHandler::get_obs_resid(ObservationEnsemble &oe, bool apply_
 }
 
 
-Eigen::MatrixXd L2PhiHandler::get_obs_resid_subset(ObservationEnsemble &oe, bool apply_ineq)
+Eigen::MatrixXd L2PhiHandler::get_obs_resid_subset(ObservationEnsemble &oe, bool apply_ineq, vector<string> real_names)
 {
+    if (real_names.size() == 0)
+    {
+        real_names = oe.get_real_names();
+    }
 	vector<string> names = oe.get_var_names();
-	Eigen::MatrixXd resid = oe.get_eigen() - oe_base->get_eigen(oe.get_real_names(), names);
+	Eigen::MatrixXd resid = oe.get_eigen(real_names,vector<string>()) - oe_base->get_eigen(real_names, names);
 	if (apply_ineq)
 		apply_ineq_constraints(resid, names);
 	return resid;
@@ -1439,9 +1478,13 @@ Eigen::MatrixXd L2PhiHandler::get_par_resid(ParameterEnsemble &pe)
 	return resid;
 }
 
-Eigen::MatrixXd L2PhiHandler::get_par_resid_subset(ParameterEnsemble &pe)
+Eigen::MatrixXd L2PhiHandler::get_par_resid_subset(ParameterEnsemble &pe, vector<string> real_names)
 {
-	Eigen::MatrixXd resid = pe.get_eigen() - pe_base->get_eigen(pe.get_real_names(),pe.get_var_names());
+    if (real_names.size() == 0)
+    {
+        real_names = pe.get_real_names();
+    }
+	Eigen::MatrixXd resid = pe.get_eigen(real_names,vector<string>()) - pe_base->get_eigen(real_names,pe.get_var_names());
 	return resid;
 }
 

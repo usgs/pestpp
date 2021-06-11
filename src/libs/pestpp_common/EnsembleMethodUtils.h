@@ -46,10 +46,10 @@ public:
 	vector<int> get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe);
 
 	Eigen::MatrixXd get_obs_resid(ObservationEnsemble &oe, bool apply_ineq=true);
-	Eigen::MatrixXd get_obs_resid_subset(ObservationEnsemble &oe, bool apply_ineq=true);
+	Eigen::MatrixXd get_obs_resid_subset(ObservationEnsemble &oe, bool apply_ineq=true,vector<string> real_names=vector<string>());
 
 	Eigen::MatrixXd get_par_resid(ParameterEnsemble &pe);
-	Eigen::MatrixXd get_par_resid_subset(ParameterEnsemble &pe);
+	Eigen::MatrixXd get_par_resid_subset(ParameterEnsemble &pe,vector<string> real_names=vector<string>());
 	Eigen::MatrixXd get_actual_obs_resid(ObservationEnsemble &oe);
 	Eigen::VectorXd get_q_vector();
 	vector<string> get_lt_obs_names() { return lt_obs_names; }
@@ -147,7 +147,9 @@ public:
 		bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string> &_act_obs_names);
 
 	void solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
-	
+
+
+
 private:
 	PerformanceLog* performance_log;
 	FileManager& file_manager;
@@ -172,6 +174,8 @@ private:
 
 	template<typename T>
 	void message(int level, const string& _message, T extra);
+
+	void initialize(string center_on = string(), vector<int> real_idxs=vector<int>());
 
 	
 };
@@ -362,7 +366,6 @@ protected:
 	bool solve_mda(bool last_iter, int cycle = NetPackage::NULL_DA_CYCLE);
 
 	bool solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle=NetPackage::NULL_DA_CYCLE);
-
 	//bool solve_old();
 	//bool solve();
 
