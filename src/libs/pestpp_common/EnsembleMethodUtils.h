@@ -147,7 +147,8 @@ public:
 		bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string> &_act_obs_names);
 
 	void solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
-
+    void solve_by_reals(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,
+                        pair<vector<string>, vector<string>>>& loc_map, int subset_size, map<string,double>& phi_map);
 
 
 private:
@@ -177,7 +178,7 @@ private:
 
 	void initialize(string center_on = string(), vector<int> real_idxs=vector<int>());
 
-	
+
 };
 
 
@@ -368,7 +369,6 @@ protected:
 	bool solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle=NetPackage::NULL_DA_CYCLE);
 	//bool solve_old();
 	//bool solve();
-
 	//ParameterEnsemble calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>> &loc_map);
 
 	vector<int> run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>(), int cycle=NetPackage::NULL_DA_CYCLE);

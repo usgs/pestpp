@@ -219,8 +219,27 @@ void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form
 }
 
 
+void EnsembleSolver::solve_by_reals(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map,
+                                    int subset_size, map<string,double>& phi_map) {
+
+    //get normalized phi map
+    //for each par realization in pe
+    //  get normalized par real scaled par diff l2 norm map
+    //  calculate composite normalized score and sort
+    //  select subset_size best reals
+    //  (re-)initialize this using current real as "center on" real
+    //  create a subset-sized pe instance and set zero
+    //  solve for subset_sized pe instance
+    //  randomly select a real subset-sized pe or use current real and set row in pe_upgrade
+
+
+
+
+}
+
 void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map)
 {
+
 	//message(1, "starting solve for lambda", cur_lam);
 	if (use_glm_form)
 		message(1, "using glm form");
