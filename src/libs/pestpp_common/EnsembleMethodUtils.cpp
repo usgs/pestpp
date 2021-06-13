@@ -219,11 +219,96 @@ void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form
 }
 
 
-void EnsembleSolver::solve_by_reals(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map,
-                                    int subset_size, map<string,double>& phi_map) {
+void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map,
+                                      int subset_size, L2PhiHandler& ph) {
 
-    //get normalized phi map
+
+    /*map<string, Eigen::VectorXd> phi_map;
+	vector<string> real_names = pe.get_real_names();
+	pe_base->transform_ip(ParameterEnsemble::transStatus::NUM);
+	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+	Eigen::MatrixXd diff_mat = get_par_resid(pe);
+
+
+	Eigen::VectorXd diff;
+	for (int i = 0; i < real_names.size(); i++)
+	{
+		diff = diff_mat.row(i);
+		diff = diff.cwiseProduct(diff);
+		//cout << diff << endl;
+		diff = diff.cwiseProduct(parcov_inv_diag);
+		//cout << diff << endl;
+		//cout << parcov_inv_diag << endl;
+		//phi_map[real_names[i]] = _reg_fac * diff;
+		phi_map[real_names[i]] = diff;
+
+	}
+     */
+
     //for each par realization in pe
+    //get the normed phi map
+    map<string,double> phi_map = ph.get_phi_map(L2PhiHandler::phiType::MEAS);
+    double mx = -1.0e+300;
+    for (auto& p : phi_map)
+    {
+        if (p.second > mx)
+            mx = p.second;
+    }
+    for (auto& p : phi_map)
+    {
+        p.second /= mx;
+    }
+    //flip to map to par realization names
+    map<string,double> par_phi_map;
+    vector<string> oreal_names = oe.get_real_names(),preal_names=pe.get_real_names();
+    for (int i=0;i<oreal_names.size();i++)
+    {
+        par_phi_map[preal_names[i]] = phi_map.at(oreal_names[i]);
+    }
+    phi_map.clear();
+
+    vector<string> real_names = pe.get_real_names();
+    string real_name;
+    map<string,double> euclid_par_dist;
+    Eigen::VectorXd real,diff;
+    Eigen::SparseMatrix<double> parcov_inv = parcov.inv().get_matrix();
+    double edist;
+    for (int i=0;i<pe.shape().first;i++)
+    {
+        real_name = real_names[i];
+        euclid_par_dist.clear();
+        real = pe.get_real_vector(real_name);
+        for (auto& rname : real_names)
+        {
+            if (rname == real_name)
+                continue;
+            diff = real - pe.get_real_vector(rname);
+            edist = diff.transpose() * parcov_inv * diff;
+            euclid_par_dist[rname] = edist;
+        }
+    }
+    
+    mx = -1e300;
+    for (auto& e : euclid_par_dist)
+    {
+        if (e.second > mx)
+            mx = e.second;
+    }
+    for (auto& e : euclid_par_dist)
+    {
+        e.second /= mx;
+    }
+
+    map<string,double> composite_score;
+    for (auto& rname : real_names)
+    {
+        if (rname == real_name)
+            continue;
+        composite_score[rname] = euclid_par_dist.at(rname) + par_phi_map.at(rname);
+    }
+
+
+
     //  get normalized par real scaled par diff l2 norm map
     //  calculate composite normalized score and sort
     //  select subset_size best reals
@@ -4233,7 +4318,9 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	EnsembleSolver es(performance_log, file_manager, pest_scenario, pe_upgrade, oe_upgrade, oe_base, localizer, parcov, Am, ph,
 		use_localizer, iter, act_par_names, act_obs_names);
 
-	for (auto& cur_lam : inflation_factors)
+
+    //solve for each factor
+    for (auto& cur_lam : inflation_factors)
 	{
 		ss.str("");
 		if (!use_mda)
@@ -4245,7 +4332,15 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		pe_upgrade = ParameterEnsemble(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
 		pe_upgrade.set_trans_status(pe.get_trans_status());
 
-		es.solve(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map);
+		if (pest_scenario.get_pestpp_options().get_ies_multimodal())
+        {
+            message(1,"multimodal solve for inflation factor ",cur_lam);
+            es.solve_multimodal(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map, local_subset_size, ph);
+        }
+		else{
+            es.solve(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map);
+		}
+
 		map<string, double> norm_map;
 		for (auto sf : backtrack_factors)
 		{

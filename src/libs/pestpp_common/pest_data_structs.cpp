@@ -1094,7 +1094,11 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
 	ies_ordered_binary = pest_utils::parse_string_arg_to_bool(value);
 	return true;
 	}
-
+    else if (key == "IES_MULTIMODAL")
+    {
+        ies_multimodal = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
 
 	return false;
 }
@@ -1618,6 +1622,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_localization_type: " << ies_loc_type << endl;
 	os << "ies_upgrades_in_memory: " << ies_upgrades_in_memory << endl;
 	os << "ies_ordered_binary: " << ies_ordered_binary << endl;
+	os << "ies_multimodal: " << ies_multimodal << endl;
 
 	os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -1781,6 +1786,7 @@ void PestppOptions::set_defaults()
 	set_ies_loc_type("LOCAL");
 	set_ies_upgrades_in_memory(true);
 	set_ies_ordered_binary(true);
+    set_ies_multimodal(false);
 
 	// DA parameters
 	//set_da_use_ies(false);

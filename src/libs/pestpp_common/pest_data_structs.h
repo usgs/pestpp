@@ -510,6 +510,8 @@ public:
 	void set_ies_upgrades_in_memory(bool _flag) { ies_upgrades_in_memory = _flag; }
 	bool get_ies_ordered_binary() const { return ies_ordered_binary; }
 	void set_ies_ordered_binary(bool _flag) { ies_ordered_binary = _flag; }
+    bool get_ies_multimodal() const { return ies_multimodal; }
+    void set_ies_multimodal(bool _flag) { ies_multimodal = _flag; }
 
 
 
@@ -770,6 +772,7 @@ private:
 	string ies_loc_type;
 	bool ies_upgrades_in_memory;
 	bool ies_ordered_binary;
+	bool ies_multimodal;
 
 	// Data Assimilation parameters
 	/*string da_mode;
