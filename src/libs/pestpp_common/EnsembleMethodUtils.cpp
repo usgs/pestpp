@@ -223,27 +223,15 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
                                       int subset_size, L2PhiHandler& ph) {
 
 
-    /*map<string, Eigen::VectorXd> phi_map;
-	vector<string> real_names = pe.get_real_names();
-	pe_base->transform_ip(ParameterEnsemble::transStatus::NUM);
-	pe.transform_ip(ParameterEnsemble::transStatus::NUM);
-	Eigen::MatrixXd diff_mat = get_par_resid(pe);
-
-
-	Eigen::VectorXd diff;
-	for (int i = 0; i < real_names.size(); i++)
-	{
-		diff = diff_mat.row(i);
-		diff = diff.cwiseProduct(diff);
-		//cout << diff << endl;
-		diff = diff.cwiseProduct(parcov_inv_diag);
-		//cout << diff << endl;
-		//cout << parcov_inv_diag << endl;
-		//phi_map[real_names[i]] = _reg_fac * diff;
-		phi_map[real_names[i]] = diff;
-
-	}
-     */
+    //util functions
+    typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
+    // Defining a lambda function to compare two pairs. It will compare two pairs using second field
+    Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
+    {
+        return elem1.second < elem2.second;
+    };
+    typedef std::set<std::pair<std::string, double>, Comparator> sortedset;
+    typedef std::set<std::pair<std::string, double>, Comparator>::iterator sortedset_iter;
 
     //for each par realization in pe
     //get the normed phi map
@@ -273,41 +261,51 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
     Eigen::VectorXd real,diff;
     Eigen::SparseMatrix<double> parcov_inv = parcov.inv().get_matrix();
     double edist;
-    for (int i=0;i<pe.shape().first;i++)
-    {
+    map<string,int> real_map = pe.get_real_map();
+    vector<int> real_idxs;
+    for (int i=0;i<pe.shape().first;i++) {
         real_name = real_names[i];
         euclid_par_dist.clear();
         real = pe.get_real_vector(real_name);
-        for (auto& rname : real_names)
-        {
+        for (auto &rname : real_names) {
             if (rname == real_name)
                 continue;
             diff = real - pe.get_real_vector(rname);
             edist = diff.transpose() * parcov_inv * diff;
             euclid_par_dist[rname] = edist;
         }
-    }
-    
-    mx = -1e300;
-    for (auto& e : euclid_par_dist)
-    {
-        if (e.second > mx)
-            mx = e.second;
-    }
-    for (auto& e : euclid_par_dist)
-    {
-        e.second /= mx;
-    }
-
-    map<string,double> composite_score;
-    for (auto& rname : real_names)
-    {
-        if (rname == real_name)
-            continue;
-        composite_score[rname] = euclid_par_dist.at(rname) + par_phi_map.at(rname);
-    }
 
 
+        mx = -1e300;
+        for (auto &e : euclid_par_dist) {
+            if (e.second > mx)
+                mx = e.second;
+        }
+        for (auto &e : euclid_par_dist) {
+            e.second /= mx;
+        }
+
+        map<string, double> composite_score;
+        for (auto &rname : real_names) {
+            if (rname == real_name)
+                continue;
+            composite_score[rname] = euclid_par_dist.at(rname) + par_phi_map.at(rname);
+        }
+        sortedset fitness_sorted(composite_score.begin(), composite_score.end(), compFunctor);
+        real_idxs.clear();
+        int iii = 0;
+        for (sortedset_iter ii=fitness_sorted.begin();ii!=fitness_sorted.end();++ii)
+        {
+            int idx = real_map[ii->first];
+            real_idxs.push_back(idx);
+            iii++;
+            if (iii >= subset_size)
+                break;
+        }
+
+        initialize(real_name,real_idxs);
+
+    }
 
     //  get normalized par real scaled par diff l2 norm map
     //  calculate composite normalized score and sort
