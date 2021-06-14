@@ -739,7 +739,7 @@ void RunManagerPanther::end_run_idle_async()
 
 	// Clean up
 	//delete idle_thread_raii;
-	delete idle_thread;
+	//delete idle_thread;
 	//idle_thread_raii = nullptr;
 	idle_thread = nullptr;
 }

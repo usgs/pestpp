@@ -151,7 +151,7 @@ public:
 
 	void solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
     void solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,
-                        pair<vector<string>, vector<string>>>& loc_map, int subset_size, L2PhiHandler& ph);
+                        pair<vector<string>, vector<string>>>& loc_map, double mm_alpha, L2PhiHandler& ph);
 
 
 private:

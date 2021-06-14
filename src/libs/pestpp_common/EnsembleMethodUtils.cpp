@@ -36,6 +36,7 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
     iter = _iter;
     verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
     //prep the fast look par cov info
+    message(1,"preparing fast-look containers for threaded localization solve");
     initialize();
 }
 
@@ -73,7 +74,7 @@ void EnsembleSolver::initialize(string center_on, vector<int> real_idxs)
     }
 
 
-	message(1,"preparing fast-look containers for threaded localization solve");
+
 	parcov_inv_map.clear();
 	parcov_inv_map.reserve(pe.shape().second);
 	Eigen::VectorXd parcov_inv;// = parcov.get(par_names).inv().e_ptr()->toDense().cwiseSqrt().asDiagonal();
@@ -83,7 +84,7 @@ void EnsembleSolver::initialize(string center_on, vector<int> real_idxs)
 	}
 	else
 	{
-		message(2,"extracting diagonal from prior parameter covariance matrix");
+		//message(2,"extracting diagonal from prior parameter covariance matrix");
 		Covariance parcov_diag;
 		parcov_diag.from_diagonal(parcov);
 		parcov_inv = parcov_diag.get_matrix().diagonal();
@@ -220,9 +221,9 @@ void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form
 
 
 void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map,
-                                      int subset_size, L2PhiHandler& ph) {
+                                      double mm_alpha, L2PhiHandler& ph) {
 
-
+    stringstream ss;
     //util functions
     typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
     // Defining a lambda function to compare two pairs. It will compare two pairs using second field
@@ -232,6 +233,11 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
     };
     typedef std::set<std::pair<std::string, double>, Comparator> sortedset;
     typedef std::set<std::pair<std::string, double>, Comparator>::iterator sortedset_iter;
+
+    int subset_size = (int)(((double)pe.shape().first) * mm_alpha);
+    ss.str("");
+    ss << "multimodal upgrade using " << subset_size;
+    performance_log->log_event(ss.str());
 
     //for each par realization in pe
     //get the normed phi map
@@ -267,6 +273,7 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
     Eigen::MatrixXd* real_ptr = pe_upgrade.get_eigen_ptr_4_mod();
     for (int i=0;i<pe.shape().first;i++) {
         real_name = real_names[i];
+        performance_log->log_event("calculating multimodal upgrade for " + real_name);
         euclid_par_dist.clear();
         real = pe.get_real_vector(real_name);
         for (auto &rname : real_names) {
@@ -276,7 +283,6 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
             edist = diff.transpose() * parcov_inv * diff;
             euclid_par_dist[rname] = edist;
         }
-
 
         mx = -1e300;
         for (auto &e : euclid_par_dist) {
@@ -4344,11 +4350,11 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 		pe_upgrade = ParameterEnsemble(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
 		pe_upgrade.set_trans_status(pe.get_trans_status());
-
-		if (pest_scenario.get_pestpp_options().get_ies_multimodal())
+        double mm_alpha = pest_scenario.get_pestpp_options().get_ies_multimodal_alpha();
+		if (mm_alpha != 1.0)
         {
             message(1,"multimodal solve for inflation factor ",cur_lam);
-            es.solve_multimodal(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map, local_subset_size, ph);
+            es.solve_multimodal(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map, mm_alpha, ph);
         }
 		else{
             es.solve(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map);
