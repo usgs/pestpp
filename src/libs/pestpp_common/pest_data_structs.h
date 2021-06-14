@@ -772,7 +772,7 @@ private:
 	string ies_loc_type;
 	bool ies_upgrades_in_memory;
 	bool ies_ordered_binary;
-	bool ies_multimodal_alpha;
+	double ies_multimodal_alpha;
 
 	// Data Assimilation parameters
 	/*string da_mode;
