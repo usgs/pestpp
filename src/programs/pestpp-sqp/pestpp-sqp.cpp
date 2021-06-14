@@ -51,6 +51,11 @@ int main(int argc, char* argv[])
         cout << "started at " << start_string << endl;
 		CmdLine cmdline(argc, argv);
 
+        if (quit_file_found())
+        {
+            cerr << "'pest.stp' found, please remove this file " << endl;
+            return 1;
+        }
 		
 		FileManager file_manager;
 		string pathname = ".";
@@ -255,8 +260,15 @@ int main(int argc, char* argv[])
 		
 
 		sqp.initialize();
-
-		sqp.iterate_2_solution();
+        if (pest_utils::quit_file_found())
+        {
+            cout << "'pest.stp' found, quitting" << endl;
+            fout_rec << "'pest.stp' found, quitting" << endl;
+        }
+        else
+        {
+            sqp.iterate_2_solution();
+        }
 		sqp.finalize();
 
 		// clean up

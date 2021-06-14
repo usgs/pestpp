@@ -668,6 +668,13 @@ void sequentialLP::solve()
 		slp_iter++;
 		if (slp_iter > pest_scenario.get_control_info().noptmax)
 			break;
+		if (pest_utils::quit_file_found())
+        {
+		    cout << "'pest.stp' found, quitting" << endl;
+            f_rec << "'pest.stp' found, quitting" << endl;
+            break;
+
+        }
 	}
 	f_rec << endl << "  ---  objective function sequence  ---   " << endl << setw(10) << "iteration" << setw(15) << "obj func" << endl;
 	int i = 0;

@@ -297,8 +297,12 @@ int main(int argc, char* argv[])
 
 
 		CmdLine cmdline(argc, argv);
-		
-		
+
+        if (quit_file_found())
+        {
+            cerr << "'pest.stp' found, please remove this file " << endl;
+            return 1;
+        }
 
 		FileManager file_manager;
 		string filename = cmdline.ctl_file_name;
@@ -642,6 +646,12 @@ int main(int argc, char* argv[])
 
 			cout << "done" << endl;
 			total_runs_done += run_ids.size();
+			if (pest_utils::quit_file_found())
+            {
+			    cout << "'pest.stp' found, quitting" << endl;
+			    fout_rec << "'pest.stp' found, quitting" << endl;
+			    break;
+            }
 		}
 
 		// clean up

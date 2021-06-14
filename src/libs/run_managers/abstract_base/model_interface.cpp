@@ -692,10 +692,10 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 				//sleep
 				std::this_thread::sleep_for(std::chrono::milliseconds(OperSys::thread_sleep_milli_secs));
 				//check if process is still active
-				int status;
+				int status = 0;
 				pid_t exit_code = waitpid(command_pid, &status, WNOHANG);
 				//if the process ended, break
-				if (exit_code == -1)
+				if ((exit_code == -1) || (status != 0))
 				{
 					finished->set(true);
 					throw std::runtime_error("waitpid() returned error status for command: " + cmd_string);
@@ -1134,15 +1134,15 @@ unordered_set<string> InstructionFile::parse_and_check()
 		line = read_ins_line(f_ins);
 		pest_utils::upper_ip(line);
 		tokens.clear();
-		pest_utils::tokenize(line, tokens);
-		
+		//pest_utils::tokenize(line, tokens);
+        tokens = tokenize_ins_line(line);
 		for (int i = 0; i < tokens.size(); i++)
 		{
 			first = tokens[i].at(0);
 			if ((first == '!') || (first == '(') || (first == '['))
 			{
 				name = parse_obs_name_from_token(tokens[i]);
-				if (!(name.find("DUM") != std::string::npos))
+				if (name != "DUM")
 				{
 					if (names.find(name) != names.end())
 					{
@@ -1152,6 +1152,17 @@ unordered_set<string> InstructionFile::parse_and_check()
 					names.emplace(name);
 				}
 			}
+			else if ((first == marker) || (first == 'L') || (first == 'W'))
+            {
+
+            }
+			else
+            {
+			    stringstream ss;
+			    ss << "unrecognized instruction: '" << tokens[i];
+                throw_ins_error(ss.str(),ins_line_num);
+            }
+
 		}
 	}
 	f_ins.close();

@@ -36,6 +36,11 @@ public:
 private:
 	ModelInterface mi;
 	std::string run_dir;
+
+    void run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
+                   pest_utils::thread_exceptions *shared_execptions,
+                   Parameters* pars, Observations* obs);
+    void run(Parameters* pars, Observations* obs);
 };
 
 #endif /* RUNMANAGERSERIAL_H */

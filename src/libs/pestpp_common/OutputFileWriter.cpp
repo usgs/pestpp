@@ -962,7 +962,7 @@ void OutputFileWriter::write_jco(bool isBaseIter, string ext, Jacobian &jco)
 	{
 		stringstream ss;
 		ss << "WARNING: jacobian matrix has no non-zeros - the parameter pertubations " << endl;
-		ss << "         have no effect on the control file observations.";
+		ss << "         have no effect on the control file observations." << endl;
 		ss << "         This usually means something is not setup correctly." << endl;
 		cout << ss.str();
 		file_manager.rec_ofstream() << ss.str();

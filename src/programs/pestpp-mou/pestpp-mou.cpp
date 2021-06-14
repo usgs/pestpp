@@ -51,6 +51,12 @@ int main(int argc, char* argv[])
         cout << "started at " << start_string << endl;
 		CmdLine cmdline(argc, argv);
 
+        if (quit_file_found())
+        {
+            cerr << "'pest.stp' found, please remove this file " << endl;
+            return 1;
+        }
+
 		FileManager file_manager;
 		string filename = cmdline.ctl_file_name;
 
@@ -271,7 +277,16 @@ int main(int argc, char* argv[])
 		
 		//ZAK: Initialize random generator here
 		moea.initialize();
-		moea.iterate_to_solution();
+		if (pest_utils::quit_file_found())
+        {
+		    cout << "'pest.pst' found, quitting" << endl;
+		    fout_rec << "'pest.pst' found, quitting" << endl;
+        }
+		else
+        {
+            moea.iterate_to_solution();
+        }
+
 		moea.finalize();
 
 

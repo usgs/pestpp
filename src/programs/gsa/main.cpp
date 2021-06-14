@@ -65,6 +65,13 @@ int main(int argc, char* argv[])
     string start_string = get_time_string();
     cout << "started at " << start_string << endl;
 	CmdLine cmdline(argc, argv);
+
+    if (quit_file_found())
+    {
+        cerr << "'pest.stp' found, please remove this file " << endl;
+        return 1;
+    }
+
 	FileManager file_manager;
 	string pathname = ".";
 	file_manager.initialize_path(get_filename_without_ext(cmdline.ctl_file_name), pathname);

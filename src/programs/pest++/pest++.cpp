@@ -77,6 +77,11 @@ int main(int argc, char* argv[])
         cout << "started at " << start_string << endl;
 		CmdLine cmdline(argc, argv);
 
+        if (quit_file_found())
+        {
+            cerr << "'pest.stp' found, please remove this file " << endl;
+            return 1;
+        }
 		
 		FileManager file_manager;
 		string filename = cmdline.ctl_file_name;
@@ -461,6 +466,11 @@ int main(int argc, char* argv[])
 		}
 		while (!termination_ctl.terminate())
 		{
+		    if (quit_file_found())
+            {
+		        termination_ctl.set_terminate(true);
+		        termination_ctl.set_reason("'pest.stp' found");
+            }
 			//base parameter iterations
 			try
 			{

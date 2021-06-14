@@ -1599,6 +1599,12 @@ void SeqQuadProgram::iterate_2_solution()
 
 bool SeqQuadProgram::should_terminate()
 {
+    if (pest_utils::quit_file_found())
+    {
+        cout << "pest.stp' found, quitting" << endl;
+        file_manager.rec_ofstream() << "pest.stp' found, quitting" << endl;
+        return true;
+    }
 	if (iter >= pest_scenario.get_control_info().noptmax)
 		return true;
 
