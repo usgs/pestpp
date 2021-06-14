@@ -737,6 +737,7 @@ void RunManagerPanther::end_run_idle_async()
 		report("Warning: timed out waiting for acknowledgement of signal from idle thread.", false);
 	}
 
+    idle_thread->join();
 	// Clean up
 	//delete idle_thread_raii;
 	//delete idle_thread;

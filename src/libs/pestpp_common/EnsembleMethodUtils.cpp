@@ -315,7 +315,7 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
                 break;
         }
 
-        initialize(real_name,real_idxs);
+        initialize(string(),real_idxs);
         ParameterEnsemble pe_real(&pest_scenario,pe.get_rand_gen_ptr());
         pe_real.reserve(upgrade_real_names,pe.get_var_names());
         solve(num_threads,cur_lam,use_glm_form,pe_real,loc_map);
