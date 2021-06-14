@@ -1,0 +1,21 @@
+[workspace]
+basename = flow1d
+template_folder = flow1d_tmp
+worker_folder =  flow1d_worker
+
+[model_info]
+input_files = input_dis.csv, hk_1.dat, iheads_1.dat
+output_files = output_sim.csv
+
+[da_settings]
+pestpp_da_exe = D:\Workspace\projects\mississippi\pure_c_pestpp\pestpp\exe\windows\x64\Debug\pestpp-da.exe
+num_realizations = 50
+ensemble_filename = heads_out.csv
+
+[da_ensemble]
+seed_number = 42
+correlation_length = 50
+number_of_realizations = 50
+
+
+

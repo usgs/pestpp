@@ -1,0 +1,12 @@
+[template_folder]
+basename = od_flow
+orig_name = orig_od_flow
+new_name = new_od_flow
+
+[model_info]
+input_files = inputx.dat, index.csv
+output_files = heads_out.csv
+
+[da_parameters]
+num_realizations = 50
+ensemble_filename = heads_out.csv
