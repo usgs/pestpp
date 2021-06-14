@@ -1069,4 +1069,4 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #basic_sqp_test()
     #mf6_v5_ies_test()
-    fr_fail_test()
+    #fr_fail_test()

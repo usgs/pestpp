@@ -236,7 +236,7 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
 
     int subset_size = (int)(((double)pe.shape().first) * mm_alpha);
     ss.str("");
-    ss << "multimodal upgrade using " << subset_size;
+    ss << "multimodal upgrade using " << subset_size << " realizations";
     performance_log->log_event(ss.str());
 
     //for each par realization in pe
@@ -271,6 +271,20 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
     map<string,int> real_map = pe.get_real_map();
     vector<int> real_idxs;
     Eigen::MatrixXd* real_ptr = pe_upgrade.get_eigen_ptr_4_mod();
+
+    ofstream csv;
+    if (pest_scenario.get_pestpp_options().get_ies_verbose_level()>1)
+    {
+        csv.open(file_manager.get_base_filename()+".mm.info.csv");
+        csv << "real_name";
+        for (int j=0;j<subset_size;j++)
+        {
+            csv << ",neighbor_" << j << ",phi,pdiff";
+        }
+        csv << endl;
+
+    }
+
     for (int i=0;i<pe.shape().first;i++) {
         real_name = real_names[i];
         performance_log->log_event("calculating multimodal upgrade for " + real_name);
@@ -314,8 +328,14 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
             if (iii >= subset_size+1)//plus one to count 'real_name'
                 break;
         }
-
-        initialize(string(),real_idxs);
+        if (pest_scenario.get_pestpp_options().get_ies_verbose_level()>1)
+        {
+            csv << real_name;
+            for (auto& rname : upgrade_real_names)
+                csv << "," << rname << "," << par_phi_map.at(rname) << "," << euclid_par_dist.at(rname);
+            csv << endl;
+        }
+        initialize(real_name,real_idxs);
         ParameterEnsemble pe_real(&pest_scenario,pe.get_rand_gen_ptr());
         pe_real.reserve(upgrade_real_names,pe.get_var_names());
         solve(num_threads,cur_lam,use_glm_form,pe_real,loc_map);
@@ -327,7 +347,7 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
 
 
     }
-
+    csv.close();
     //  get normalized par real scaled par diff l2 norm map
     //  calculate composite normalized score and sort
     //  select subset_size best reals
@@ -345,10 +365,10 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 {
 
 	//message(1, "starting solve for lambda", cur_lam);
-	if (use_glm_form)
-		message(1, "using glm form");
-	else
-		message(1, "using mda form");
+//	if (use_glm_form)
+//		message(1, "using glm form");
+//	else
+//		message(1, "using mda form");
 	pe_upgrade.set_zeros();
 	stringstream ss;
 	Localizer::How _how = localizer.get_how();
