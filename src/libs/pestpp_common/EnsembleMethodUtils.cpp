@@ -255,14 +255,16 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
     }
     phi_map.clear();
 
-    vector<string> real_names = pe.get_real_names();
+    vector<string> real_names = pe.get_real_names(),upgrade_real_names;
     string real_name;
+
     map<string,double> euclid_par_dist;
     Eigen::VectorXd real,diff;
     Eigen::SparseMatrix<double> parcov_inv = parcov.inv().get_matrix();
     double edist;
     map<string,int> real_map = pe.get_real_map();
     vector<int> real_idxs;
+    Eigen::MatrixXd* real_ptr = pe_upgrade.get_eigen_ptr_4_mod();
     for (int i=0;i<pe.shape().first;i++) {
         real_name = real_names[i];
         euclid_par_dist.clear();
@@ -293,17 +295,30 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
         }
         sortedset fitness_sorted(composite_score.begin(), composite_score.end(), compFunctor);
         real_idxs.clear();
+        upgrade_real_names.clear();
+        real_idxs.push_back(real_map.at(real_name));
+        upgrade_real_names.push_back(real_name);
         int iii = 0;
         for (sortedset_iter ii=fitness_sorted.begin();ii!=fitness_sorted.end();++ii)
         {
-            int idx = real_map[ii->first];
+            int idx = real_map.at(ii->first);
             real_idxs.push_back(idx);
+            upgrade_real_names.push_back(ii->first);
             iii++;
-            if (iii >= subset_size)
+            if (iii >= subset_size+1)//plus one to count 'real_name'
                 break;
         }
 
         initialize(real_name,real_idxs);
+        ParameterEnsemble pe_real(&pest_scenario,pe.get_rand_gen_ptr());
+        pe_real.reserve(upgrade_real_names,pe.get_var_names());
+        solve(num_threads,cur_lam,use_glm_form,pe_real,loc_map);
+        iii = 0;
+        for (auto ridx : real_idxs) {
+            real_ptr->row(ridx) = pe_real.get_eigen_ptr()->row(iii);
+            iii++;
+        }
+
 
     }
 
