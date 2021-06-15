@@ -1061,6 +1061,12 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 						ss << "frozen";
 						report(ss.str(), true);
 						w_sleep(30 * 1000);
+						if (quit_file_found()) {
+                            report("pest.stp file found, resetting panther_agent_freeze_on_fail and continuing...",
+                                   true);
+                            pest_scenario.get_pestpp_options_ptr()->set_panther_debug_fail_freeze(false);
+                            break;
+                        }
 					}
 				}
 			}
