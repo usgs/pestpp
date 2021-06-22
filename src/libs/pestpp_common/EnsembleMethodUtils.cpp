@@ -275,7 +275,9 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
     ofstream csv;
     if (pest_scenario.get_pestpp_options().get_ies_verbose_level()>1)
     {
-        csv.open(file_manager.get_base_filename()+".mm.info.csv");
+        ss.str("");
+        ss << file_manager.get_base_filename() << "." << iter << "." << cur_lam << ".mm.info.csv";
+        csv.open(ss.str());
         csv << "real_name";
         for (int j=0;j<subset_size;j++)
         {
@@ -332,7 +334,12 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
         {
             csv << real_name;
             for (auto& rname : upgrade_real_names)
+            {
+                if (rname == real_name)
+                    continue;
                 csv << "," << rname << "," << par_phi_map.at(rname) << "," << euclid_par_dist.at(rname);
+            }
+
             csv << endl;
         }
         initialize(real_name,real_idxs);
@@ -905,7 +912,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 				//if all the pieces have been completed, return
 				if (count == keys.size())
 				{
-					if (verbose_level > 1)
+					if (verbose_level > 3)
 					{
 						cout << "upgrade thread: " << thread_id << " processed " << pcount << " upgrade parts" << endl;
 					}
@@ -925,7 +932,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 				{
 					ss.str("");
 					ss << "upgrade thread progress: " << count << " of " << total << " parts done";
-					if (verbose_level > 1)
+					if (verbose_level > 3)
 						cout << ss.str() << endl;
 					performance_log->log_event(ss.str());
 				}
@@ -1136,7 +1143,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				//if all the pieces have been completed, return
 				if (count == keys.size())
 				{
-					if (verbose_level > 1)
+					if (verbose_level > 3)
 					{
 						cout << "upgrade thread: " << thread_id << " processed " << pcount << " upgrade parts" << endl;
 					}
@@ -1163,7 +1170,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				{
 					ss.str("");
 					ss << "upgrade thread progress: " << count << " of " << total << " parts done";
-					if (verbose_level > 1)
+					if (verbose_level > 3)
 						cout << ss.str() << endl;
 					performance_log->log_event(ss.str());
 				}
@@ -5483,10 +5490,12 @@ void EnsembleMethod::initialize_restart()
 	vector<string> missing;
 	start = oe_base_real_names.begin();
 	end = oe_base_real_names.end();
-	cout << "restart oe real names: " << endl;
+	if (verbose_level > 3)
+	    cout << "restart oe real names: " << endl;
 	for (auto& rname : oe_real_names)
 	{
-		cout << rname << endl;
+	    if (verbose_level > 3)
+		    cout << rname << endl;
 		if (find(start, end, rname) == end)
 			missing.push_back(rname);
 	}
