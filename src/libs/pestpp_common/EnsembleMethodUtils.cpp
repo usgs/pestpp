@@ -312,8 +312,16 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
             if (e.second > mx)
                 mx = e.second;
         }
-        for (auto &e : euclid_par_dist) {
-            e.second /= mx;
+        if (mx <= 0.0)
+        {
+            ss.str("");
+            ss << "multimodal solve error: maximum par diff for realization '" << real_name <<"' not valid";
+            message(0,ss.str());
+        }
+        else {
+            for (auto &e : euclid_par_dist) {
+                e.second /= mx;
+            }
         }
 
         map<string, double> composite_score;
@@ -4370,10 +4378,11 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	performance_log->log_event("preparing EnsembleSolver");
 	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
+	pe_upgrade.set_zeros();
 	pe_upgrade.set_trans_status(pe.get_trans_status());
 	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
-
-	EnsembleSolver es(performance_log, file_manager, pest_scenario, pe_upgrade, oe_upgrade, oe_base, localizer, parcov, Am, ph,
+    oe_upgrade.get_eigen_ptr_4_mod()->setZero();
+	EnsembleSolver es(performance_log, file_manager, pest_scenario, pe, oe, oe_base, localizer, parcov, Am, ph,
 		use_localizer, iter, act_par_names, act_obs_names);
 
 
@@ -4388,6 +4397,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		message(2, "see .log file for more details");
 
 		pe_upgrade = ParameterEnsemble(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
+        pe_upgrade.set_zeros();
 		pe_upgrade.set_trans_status(pe.get_trans_status());
         double mm_alpha = pest_scenario.get_pestpp_options().get_ies_multimodal_alpha();
 		if (mm_alpha != 1.0)
