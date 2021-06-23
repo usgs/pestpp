@@ -4381,8 +4381,9 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	pe_upgrade.set_zeros();
 	pe_upgrade.set_trans_status(pe.get_trans_status());
 	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
-    oe_upgrade.get_eigen_ptr_4_mod()->setZero();
-	EnsembleSolver es(performance_log, file_manager, pest_scenario, pe, oe, oe_base, localizer, parcov, Am, ph,
+    //oe_upgrade.get_eigen_ptr_4_mod()->setZero();
+	//pass pe so that we can use the current par values but pass oe_upgrade since it only includes nz weight obs
+    EnsembleSolver es(performance_log, file_manager, pest_scenario, pe, oe_upgrade, oe_base, localizer, parcov, Am, ph,
 		use_localizer, iter, act_par_names, act_obs_names);
 
 
