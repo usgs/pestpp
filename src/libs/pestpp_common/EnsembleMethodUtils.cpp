@@ -169,7 +169,7 @@ void EnsembleSolver::initialize(string center_on, vector<int> real_idxs)
 	{
 		par_diff_map[par_names[i]] = mat.col(i);
 	}
-	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
+	if ((!pest_scenario.get_pestpp_options().get_ies_use_approx() && (Am.rows() > 0)))
 	{
 		for (int i = 0; i < par_names.size(); i++)
 		{
@@ -270,7 +270,7 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
     double edist;
     map<string,int> real_map = pe.get_real_map();
     vector<int> real_idxs;
-    Eigen::MatrixXd* real_ptr = pe_upgrade.get_eigen_ptr_4_mod();
+    //Eigen::MatrixXd* real_ptr = pe_upgrade.get_eigen_ptr_4_mod();
 
     ofstream csv;
     if (pest_scenario.get_pestpp_options().get_ies_verbose_level()>1)
@@ -292,12 +292,19 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
         performance_log->log_event("calculating multimodal upgrade for " + real_name);
         euclid_par_dist.clear();
         real = pe.get_real_vector(real_name);
+        //cout << real << endl;
+
         for (auto &rname : real_names) {
             if (rname == real_name)
                 continue;
             diff = real - pe.get_real_vector(rname);
             edist = diff.transpose() * parcov_inv * diff;
             euclid_par_dist[rname] = edist;
+//            cout << real << endl;
+//            cout << pe.get_real_vector(rname) << endl;
+//            cout << diff << endl;
+//            cout << real_name << "," << rname << "," << edist << endl << endl;
+
         }
 
         mx = -1e300;
@@ -327,8 +334,10 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
             real_idxs.push_back(idx);
             upgrade_real_names.push_back(ii->first);
             iii++;
-            if (iii >= subset_size+1)//plus one to count 'real_name'
+            if (iii >= subset_size)//plus one to count 'real_name'
                 break;
+            //cout << real_name << "," << ii->first << "," << ii->second << endl;
+
         }
         if (pest_scenario.get_pestpp_options().get_ies_verbose_level()>1)
         {
@@ -342,15 +351,18 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
 
             csv << endl;
         }
-        initialize(real_name,real_idxs);
+        initialize(string(),real_idxs);
         ParameterEnsemble pe_real(&pest_scenario,pe.get_rand_gen_ptr());
         pe_real.reserve(upgrade_real_names,pe.get_var_names());
         solve(num_threads,cur_lam,use_glm_form,pe_real,loc_map);
-        iii = 0;
-        for (auto ridx : real_idxs) {
-            real_ptr->row(ridx) = pe_real.get_eigen_ptr()->row(iii);
-            iii++;
-        }
+        real = pe_real.get_real_vector(real_name);
+        //cout << real << endl;
+        pe_upgrade.update_real_ip(real_name,real);
+//        iii = 0;
+//        for (auto ridx : real_idxs) {
+//            real_ptr->row(ridx) = pe_real.get_eigen_ptr()->row(iii);
+//            iii++;
+//        }
 
 
     }
