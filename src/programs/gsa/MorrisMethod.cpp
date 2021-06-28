@@ -92,42 +92,50 @@ void MorrisObsSenFile::calc_pooled_obs_sen(ofstream &fout_obs_sen, map<string, d
 
 void MorrisMethod::process_pooled_var_file()
 {
-	if (calc_obs_sen == true)
-	{
-		ifstream &fin = file_manager_ptr->open_ifile_ext("pgp");
-		std::set<string> obs_group_names;
-		for (const auto &imap : obs_info_ptr->groups)
-			obs_group_names.insert(imap.first);
+    group_2_pool_group_map.clear();
+	if (calc_obs_sen) {
+        std::set<string> obs_group_names;
+        for (const auto &imap : obs_info_ptr->groups)
+            obs_group_names.insert(imap.first);
+        string fname = file_manager_ptr->get_base_filename() + ".pgp";
+        if (check_exist_in(fname)) {
+            ifstream &fin = file_manager_ptr->open_ifile_ext("pgp");
 
-		string line;
-		string cur_pool_grp;
-		regex reg_reg("regex\\s*\\(\"(.+)\"\\)", regex_constants::icase);
-		regex reg_grp("pool_group\\s*\\((.+)\\)", regex_constants::icase);
-		cmatch mr;
-		while (getline(fin, line))
-		{
-			if (regex_match(line.c_str(), mr, reg_reg))
-			{
-				regex inp_reg = regex(mr[1].str(), regex_constants::icase);
 
-				for (auto itr = obs_group_names.begin(); itr != obs_group_names.end();)
-				{
-					auto  here = itr++;
-					if (regex_match(*here, inp_reg))
-					{
-						group_2_pool_group_map[*here] = cur_pool_grp;
-						obs_group_names.erase(here);
-					}
-				}
+            string line;
+            string cur_pool_grp;
+            regex reg_reg("regex\\s*\\(\"(.+)\"\\)", regex_constants::icase);
+            regex reg_grp("pool_group\\s*\\((.+)\\)", regex_constants::icase);
+            cmatch mr;
+            while (getline(fin, line)) {
+                if (regex_match(line.c_str(), mr, reg_reg)) {
+                    regex inp_reg = regex(mr[1].str(), regex_constants::icase);
 
-			}
-			if (regex_match(line.c_str(), mr, reg_grp))
-			{
-				cur_pool_grp = mr[1];
-			}
-		}
-	}
-	file_manager_ptr->close_file("pgp");
+                    for (auto itr = obs_group_names.begin(); itr != obs_group_names.end();) {
+                        auto here = itr++;
+                        if (regex_match(*here, inp_reg)) {
+                            group_2_pool_group_map[*here] = cur_pool_grp;
+                            obs_group_names.erase(here);
+                        }
+                    }
+
+                }
+                if (regex_match(line.c_str(), mr, reg_grp)) {
+                    cur_pool_grp = mr[1];
+                }
+            }
+            file_manager_ptr->close_file("pgp");
+        }
+        else
+        {
+            for (auto& g : obs_group_names)
+            {
+                group_2_pool_group_map[g] = g;
+            }
+
+
+        }
+    }
 }
 
 MatrixXd MorrisMethod::create_P_star_mat(int k)
@@ -150,6 +158,7 @@ MorrisMethod::MorrisMethod(Pest &_pest_scenario,
 		_par_dist, _seed),
 	calc_obs_sen(_calc_pooled_obs), calc_morris_obs_sen(_calc_morris_obs_sen)
 {
+    obs_info_ptr = pest_scenario_ptr->get_observation_info_ptr();
 	rand_gen = mt19937(_pest_scenario.get_pestpp_options().get_random_seed());
 	initialize(_p, _r, _delta);
 }

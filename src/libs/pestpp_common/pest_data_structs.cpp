@@ -1923,7 +1923,7 @@ const ObservationGroupRec* ObservationInfo::get_group_rec_ptr(const string &name
 	return ret_val;
 }
 
-vector<string> ObservationInfo::get_groups()
+vector<string> ObservationInfo::get_groups() const
 {
 	vector<string> ogroups;
 	for (auto &g : groups)

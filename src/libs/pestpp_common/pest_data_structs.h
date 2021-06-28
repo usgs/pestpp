@@ -174,7 +174,7 @@ public:
 	Observations get_regulatization_obs(const Observations &obs_in);
 	int get_nnz_obs() const;
 	int get_nnz_obs_and_reg() const;
-	vector<string> get_groups();
+	vector<string> get_groups() const;
 	void reset_group_weights(string &group, double val);
 	void scale_group_weights(string &group, double scale_val);
 	void erase_ob(const string& name) { observations.erase(name);}

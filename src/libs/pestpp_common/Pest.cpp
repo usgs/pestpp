@@ -3258,6 +3258,7 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
 
+
 	observation_values.insert(name, value);
 	name = obs_i.group;
 	//vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);
@@ -3266,6 +3267,8 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	{
 		ctl_ordered_obs_group_names.push_back(name);
 		s_obgnme.emplace(name);
+        ObservationGroupRec ogr;
+        observation_info.groups[obs_i.group] = ogr;
 	}
 }
 
