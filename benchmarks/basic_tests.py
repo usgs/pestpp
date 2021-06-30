@@ -829,7 +829,6 @@ def mf6_v5_ies_test():
 
     pst.control_data.noptmax = 3
     pst.write(os.path.join(t_d,"freyberg6_run_ies_glm_loc.pst"))
-    /
 
     m_d = os.path.join(model_d, "master_ies_glm_covloc")
     if os.path.exists(m_d):
@@ -837,8 +836,8 @@ def mf6_v5_ies_test():
     pst.pestpp_options["ies_loc_type"] = "cov"
     #pst.pestpp_options.pop("ies_localizer",None)
     pst.write(os.path.join(t_d, "freyberg6_run_ies_glm_covloc.pst"))
-    #pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_covloc.pst", num_workers=15,
-    #                             master_dir=m_d, worker_root=model_d, port=port)
+    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_covloc.pst", num_workers=15,
+                                 master_dir=m_d, worker_root=model_d, port=port)
 
     m_d = os.path.join(model_d, "master_ies_glm_noloc")
     if os.path.exists(m_d):
