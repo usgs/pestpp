@@ -100,8 +100,14 @@ void DataAssimilator::da_update(int cycle)
 			}			
 			break;			
 		}
+		int q = pest_utils::quit_file_found();
+        if (q == 4) {
+            message(0, "pest.stp found with '4'.  run mgr has returned control, removing file.");
+            if (!pest_utils::try_remove_quit_file()) {
+                message(0, "error removing pest.stp file, bad times ahead...");
 
-		
+            }
+        }
 	}
 }
 

@@ -259,7 +259,7 @@ int main(int argc, char* argv[])
 
 		double morris_delta = .666;
 		bool default_delta = true;
-		bool calc_pooled_obs = false;
+		bool calc_pooled_obs = true;
 		bool calc_morris_obs_sen = true;
 		auto morris_r_it = gsa_opt_map.find("GSA_MORRIS_R");
 		if (morris_r_it != gsa_opt_map.end())

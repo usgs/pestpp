@@ -466,7 +466,8 @@ int main(int argc, char* argv[])
 		}
 		while (!termination_ctl.terminate())
 		{
-		    if (quit_file_found())
+            int q = pest_utils::quit_file_found();
+            if ((q == 1) || (q == 2))
             {
 		        termination_ctl.set_terminate(true);
 		        termination_ctl.set_reason("'pest.stp' found");

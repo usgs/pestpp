@@ -2943,9 +2943,19 @@ bool EnsembleMethod::should_terminate()
 		message(1, "phi-based termination criteria satisfied, all done");
 		return true;
 	}
-	if (pest_utils::quit_file_found())
+	int q = pest_utils::quit_file_found();
+	if ((q == 1) || (q == 2))
     {
-	    message(1,"'pest.pst' found, quitting");
+	    message(1,"'pest.stp' found, quitting");
+	    return true;
+    }
+	else if (q == 4)
+    {
+	    message(0,"pest.stp found with '4'.  run mgr has returned control, removing file.");
+	    if (!pest_utils::try_remove_quit_file())
+        {
+	        message(0,"error removing pest.stp file, bad times ahead...");
+        }
     }
 	return false;
 }
@@ -4517,6 +4527,20 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	message(0, "evaluting upgrade ensembles");
 	message(1, "last mean: ", last_best_mean);
 	message(1, "last stdev: ", last_best_std);
+
+    int q = pest_utils::quit_file_found();
+    if ((q == 1) || (q == 2))
+    {
+        message(1,"'pest.stp' found, quitting");
+    }
+    else if (q == 4)
+    {
+        message(0,"pest.stp found with '4'.  run mgr has returned control, removing file.");
+        if (!pest_utils::try_remove_quit_file())
+        {
+            message(0,"error removing pest.stp file, bad times ahead...");
+        }
+    }
 
 	ObservationEnsemble oe_lam_best(&pest_scenario);
 	bool echo = false;

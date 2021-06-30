@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string>
 #include <cctype>
 #include <fstream>
@@ -1672,22 +1673,48 @@ string get_time_string_short()
 	return t_str;
 }
 
-bool quit_file_found()
+int quit_file_found()
 {
     ifstream i(QUIT_FILENAME);
-    if (i.good())
-    {
+    int itoken = 0;
+    if (i.good()) {
         string line;
-        getline(i,line);
+        getline(i, line);
         vector<string> tokens;
-        tokenize(line,tokens);
-        if ((tokens.size() > 0) && (tokens[0] == "1")) {
+        tokenize(line, tokens);
+        if (tokens.size() > 0) {
+
+            try {
+
+                convert_ip(tokens[0], itoken);
+            }
+            catch (...) {
+                itoken = 0;
+            }
+            if (itoken == 3)
+            {
+                cout << "pest.stp file with '3' found, pausing not supported...continuing" << endl;
+                return 0;
+            }
+
             i.close();
-            return true;
+            return itoken;
         }
     }
     i.close();
-    return false;
+    return itoken;
+}
+
+bool try_remove_quit_file()
+{
+    try {
+        remove(QUIT_FILENAME.c_str());
+    }
+    catch(...)
+    {
+        return false;
+    }
+    return true;
 }
 
 

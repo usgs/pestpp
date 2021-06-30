@@ -646,11 +646,22 @@ int main(int argc, char* argv[])
 
 			cout << "done" << endl;
 			total_runs_done += run_ids.size();
-			if (pest_utils::quit_file_found())
+            int q = pest_utils::quit_file_found();
+            if ((q == 1) || (q == 2))
             {
 			    cout << "'pest.stp' found, quitting" << endl;
 			    fout_rec << "'pest.stp' found, quitting" << endl;
 			    break;
+            }
+            else if (q == 4) {
+                cout << "...pest.stp found with '4'.  run mgr has returned control, removing file." << endl;
+                fout_rec << "...pest.stp found with '4'.  run mgr has returned control, removing file." << endl;
+
+                if (!pest_utils::try_remove_quit_file()) {
+                    cout << "...error removing pest.stp file, bad times ahead..." << endl;
+                    fout_rec << "...error removing pest.stp file, bad times ahead..." << endl;
+
+                }
             }
 		}
 

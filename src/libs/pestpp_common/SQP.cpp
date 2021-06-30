@@ -1599,7 +1599,8 @@ void SeqQuadProgram::iterate_2_solution()
 
 bool SeqQuadProgram::should_terminate()
 {
-    if (pest_utils::quit_file_found())
+    int q = pest_utils::quit_file_found();
+    if ((q == 1) || (q == 2))
     {
         cout << "pest.stp' found, quitting" << endl;
         file_manager.rec_ofstream() << "pest.stp' found, quitting" << endl;

@@ -520,7 +520,8 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	double run_time_sec = 0.0;
 	while (!all_runs_complete() && terminate_reason == RUN_UNTIL_COND::NORMAL)
 	{
-        if (quit_file_found())
+        int q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2) || (q == 4))
         {
             cout << "'pest.stp' found" << endl;
             kill_all_active_runs();
@@ -1571,7 +1572,11 @@ void RunManagerPanther::kill_all_active_runs()
 	 vector<int> sock_id_vec;
 	 auto range_pair = active_runid_to_iterset_map.equal_range(run_id);
 
-	 bool just_quit = quit_file_found();
+
+	 bool just_quit = false;
+     int q = pest_utils::quit_file_found();
+     if ((q == 1) || (q == 2) || (q == 4))
+         just_quit = true;
 
 	 double duration;
 	 for (auto &i = range_pair.first; i != range_pair.second; ++i)
@@ -1593,7 +1598,8 @@ void RunManagerPanther::kill_all_active_runs()
 
  bool RunManagerPanther::all_runs_complete()
  {
-    if (quit_file_found())
+     int q = pest_utils::quit_file_found();
+     if ((q == 1) || (q == 2) || (q == 4))
     {
 
         kill_all_active_runs();

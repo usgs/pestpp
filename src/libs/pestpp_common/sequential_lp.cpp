@@ -668,7 +668,8 @@ void sequentialLP::solve()
 		slp_iter++;
 		if (slp_iter > pest_scenario.get_control_info().noptmax)
 			break;
-		if (pest_utils::quit_file_found())
+        int q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2))
         {
 		    cout << "'pest.stp' found, quitting" << endl;
             f_rec << "'pest.stp' found, quitting" << endl;

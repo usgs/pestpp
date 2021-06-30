@@ -260,7 +260,8 @@ int main(int argc, char* argv[])
 		
 
 		sqp.initialize();
-        if (pest_utils::quit_file_found())
+        int q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2))
         {
             cout << "'pest.stp' found, quitting" << endl;
             fout_rec << "'pest.stp' found, quitting" << endl;

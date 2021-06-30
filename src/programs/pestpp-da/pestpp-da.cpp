@@ -878,11 +878,21 @@ int main(int argc, char* argv[])
 			prev_cycle_ctl_pars = Parameters(childPest.get_ctl_parameters());
 			prev_cycle_obs = Observations(childPest.get_ctl_observations());
 
-			if (pest_utils::quit_file_found())
+            int q = pest_utils::quit_file_found();
+            if ((q == 1) || (q == 2))
             {
 			    cout << "'pest.stp' found, quitting" << endl;
                 fout_rec << "'pest.stp' found, quitting" << endl;
                 break;
+            }
+            else if (q == 4) {
+                cout << "...pest.stp found with '4'.  run mgr has returned control, removing file." << endl;
+                fout_rec << "...pest.stp found with '4'.  run mgr has returned control, removing file." << endl;
+                if (!pest_utils::try_remove_quit_file()) {
+                    cout << "...error removing pest.stp file, bad times ahead..." << endl;
+                    fout_rec << "...error removing pest.stp file, bad times ahead..." << endl;
+
+                }
             }
 
 

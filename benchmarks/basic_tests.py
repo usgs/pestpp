@@ -829,23 +829,7 @@ def mf6_v5_ies_test():
 
     pst.control_data.noptmax = 3
     pst.write(os.path.join(t_d,"freyberg6_run_ies_glm_loc.pst"))
-    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_loc.pst", num_workers=15,
-                                master_dir=m_d,worker_root=model_d,port=port)
-
-
-
-    oe_file = os.path.join(m_d, "freyberg6_run_ies_glm_loc.{0}.obs.csv".format(pst.control_data.noptmax))
-    assert os.path.exists(oe_file)
-    pe_file = oe_file.replace(".obs.", ".par.")
-    assert os.path.exists(pe_file)
-    pcs_file = oe_file.replace(".obs.", ".pcs.")
-    assert os.path.exists(pcs_file)
-    df = pd.read_csv(pcs_file, index_col=0)
-    pst_pargp = set(list(pst.parameter_data.pargp.unique()))
-    df_pargp = set(df.index.to_list())
-    d = pst_pargp.symmetric_difference(df_pargp)
-    print(d)
-    assert len(d) == 0, d
+    /
 
     m_d = os.path.join(model_d, "master_ies_glm_covloc")
     if os.path.exists(m_d):
@@ -853,8 +837,8 @@ def mf6_v5_ies_test():
     pst.pestpp_options["ies_loc_type"] = "cov"
     #pst.pestpp_options.pop("ies_localizer",None)
     pst.write(os.path.join(t_d, "freyberg6_run_ies_glm_covloc.pst"))
-    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_covloc.pst", num_workers=15,
-                                 master_dir=m_d, worker_root=model_d, port=port)
+    #pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_covloc.pst", num_workers=15,
+    #                             master_dir=m_d, worker_root=model_d, port=port)
 
     m_d = os.path.join(model_d, "master_ies_glm_noloc")
     if os.path.exists(m_d):
@@ -876,7 +860,7 @@ def mf6_v5_ies_test():
     pst.write(os.path.join(t_d, "freyberg6_run_ies_mda_loc.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_mda_loc.pst", num_workers=15,
                                  master_dir=m_d, worker_root=model_d, port=port)
-
+    
     m_d = os.path.join(model_d, "master_ies_mda_covloc")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -887,7 +871,7 @@ def mf6_v5_ies_test():
     pst.write(os.path.join(t_d, "freyberg6_run_ies_mda_covloc.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_mda_covloc.pst", num_workers=15,
                                  master_dir=m_d, worker_root=model_d, port=port)
-
+    
     m_d = os.path.join(model_d, "master_ies_mda_noloc")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -900,19 +884,48 @@ def mf6_v5_ies_test():
     pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_mda_noloc.pst", num_workers=15,
                                  master_dir=m_d, worker_root=model_d, port=port)
 
+    m_d = os.path.join(model_d, "master_ies_glm_loc_mm")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d, "freyberg6_run_ies.pst"))
+    pst.control_data.noptmax = 3
+    pst.pestpp_options["ies_num_threads"] = 1
+    pst.pestpp_options["ies_use_mda"] = False
+    # pst.pestpp_options.pop("ies_localizer", None)
+    # pst.pestpp_options.pop("ies_autoadaloc", None)
+    pst.pestpp_options["ies_multimodal_alpha"] = 0.1
+    pst.write(os.path.join(t_d, "freyberg6_run_ies_glm_loc_mm.pst"))
+    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_loc_mm.pst", num_workers=15,
+                                 master_dir=m_d, worker_root=model_d, port=port)
+
+    m_d = os.path.join(model_d, "master_ies_glm_noloc_mm")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d, "freyberg6_run_ies.pst"))
+    pst.control_data.noptmax = 3
+    pst.pestpp_options["ies_use_mda"] = False
+    pst.pestpp_options.pop("ies_localizer", None)
+    pst.pestpp_options.pop("ies_autoadaloc", None)
+    pst.pestpp_options["ies_multimodal_alpha"] = 0.25
+    pst.write(os.path.join(t_d, "freyberg6_run_ies_glm_noloc_mm.pst"))
+    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_noloc_mm.pst", num_workers=15,
+                                 master_dir=m_d, worker_root=model_d, port=port)
+
+
+
 
 def mf6_v5_sen_test():
     model_d = "mf6_freyberg"
 
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_sen")
-    if os.path.exists(m_d):
-        shutil.rmtree(m_d)
+    #if os.path.exists(m_d):
+    #    shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_sen.pst"))
     m_d = os.path.join(model_d,"master_sen")
     pyemu.os_utils.start_workers(t_d, "pestpp-sen", "freyberg6_run_sen.pst",
-                                 num_workers=15, master_dir=m_d, worker_root=model_d,
-                                 port=port)
+                                 num_workers=15, worker_root=model_d,
+                                 port=4004)
 
     pst = pyemu.Pst(os.path.join(m_d,"freyberg6_run_sen.pst"))
     mio_file = os.path.join(m_d,"freyberg6_run_sen.mio")
@@ -1032,7 +1045,7 @@ def fr_fail_test():
 
 if __name__ == "__main__":
     
-    glm_long_name_test()
+    #glm_long_name_test()
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
@@ -1060,7 +1073,7 @@ if __name__ == "__main__":
 
     #da_prep_4_mf6_freyberg_seq_tbl()
     #da_mf6_freyberg_test_2()
-    #mf6_v5_ies_test()
+    mf6_v5_ies_test()
     #mf6_v5_sen_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     #mf6_v5_opt_stack_test()
