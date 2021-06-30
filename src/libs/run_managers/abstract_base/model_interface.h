@@ -105,7 +105,7 @@ public:
 	void throw_mio_error(string base_message);
 	void run(Parameters* pars, Observations* obs);
 	void run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
-		pest_utils::thread_exceptions *shared_execptions,
+		exception_ptr& eptr,
 		Parameters* par, Observations* obs);
 	void check_io_access();
 	void check_tplins(const vector<string> &par_names, const vector<string> &obs_names);

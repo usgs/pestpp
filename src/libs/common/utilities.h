@@ -256,45 +256,45 @@ private:
 
 };
 
-class thread_exceptions
-{
-public:
+//class thread_exceptions
+//{
+//public:
+//
+//	thread_exceptions() {}
+//	void add(std::exception_ptr ex_ptr);
+//	void rethrow();
+//	int size(){ return shared_exception_vec.size(); }
+//	string what();
+//private:
+//	std::vector<std::exception_ptr> shared_exception_vec;
+//	std::mutex m;
+//
+//};
 
-	thread_exceptions() {}
-	void add(std::exception_ptr ex_ptr);
-	void rethrow();
-	int size(){ return shared_exception_vec.size(); }
-	string what();
-private:
-	std::vector<std::exception_ptr> shared_exception_vec;
-	std::mutex m;
-
-};
-
-class thread_RAII
-{
-	thread& t;
-public:
-	thread_RAII(thread& th) :t(th)
-	{
-	}
-
-	~thread_RAII()
-	{
-		if (t.joinable())
-		{
-			t.join();
-		}
-	}
-
-private:
-	// copy constructor
-	thread_RAII(const thread_RAII& thr);
-
-	// copy-assignment operator
-	thread_RAII& operator=(const thread_RAII& thr);
-};
-
+//class thread_RAII
+//{
+//	thread& t;
+//public:
+//	thread_RAII(thread& th) :t(th)
+//	{
+//	}
+//
+//	~thread_RAII()
+//	{
+//		if (t.joinable())
+//		{
+//			t.join();
+//		}
+//	}
+//
+//private:
+//	// copy constructor
+//	thread_RAII(const thread_RAII& thr);
+//
+//	// copy-assignment operator
+//	thread_RAII& operator=(const thread_RAII& thr);
+//};
+//
 
 void read_binary_matrix_header(const string& filename, int& tmp1, int& tmp2, int& tmp3);
 void read_dense_binary(const string& filename, vector<string>& row_names, vector<string>& col_names, Eigen::MatrixXd& matrix);

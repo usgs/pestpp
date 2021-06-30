@@ -479,8 +479,9 @@ Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names,
 	Eigen::MatrixXd _reals;
 	if ((_real_names.size() == 0) && (_var_names.size() == 0))
 		_reals = reals;
-	else
-		_reals = get_eigen(_real_names, _var_names);
+	else {
+        _reals = get_eigen(_real_names, _var_names);
+    }
 
 
 	map<int, double> center_on_map;
@@ -520,10 +521,21 @@ Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names,
 		}
 		else
 		{
-			vector<string>::iterator it = find(real_names.begin(), real_names.end(), on_real);
-			if (it == real_names.end())
-				throw runtime_error("Ensemble::get_eigen_mean_diff() error: 'on_real' not found: " + on_real);
-			int idx = distance(real_names.begin(), it);
+			int idx;
+			if (_real_names.size() > 0) {
+
+                vector<string>::const_iterator it = find(_real_names.begin(), _real_names.end(), on_real);
+                if (it == _real_names.end())
+                    throw runtime_error("Ensemble::get_eigen_mean_diff() error: 'on_real' not found: " + on_real);
+                idx = distance(_real_names.begin(), it);
+            }
+			else
+            {
+                vector<string>::iterator it = find(real_names.begin(), real_names.end(), on_real);
+                if (it == real_names.end())
+                    throw runtime_error("Ensemble::get_eigen_mean_diff() error: 'on_real' not found: " + on_real);
+                idx = distance(real_names.begin(), it);
+            }
 			for (int i = 0; i < _reals.cols(); i++)
 				center_on_map[i] = _reals(idx, i);
 		}

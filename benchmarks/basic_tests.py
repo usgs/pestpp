@@ -999,12 +999,40 @@ def cmdline_test():
     else:
         raise Exception("should have failed")
     
+def fr_fail_test():
+    model_d = "ies_10par_xsec"
+    base_d = os.path.join(model_d, "template")
+    new_d = os.path.join(model_d, "test_template")
+    if os.path.exists(new_d):
+        shutil.rmtree(new_d)
+    shutil.copytree(base_d, new_d)
+    print(platform.platform().lower())
+    pst = pyemu.Pst(os.path.join(new_d, "pest.pst"))
+    with open(os.path.join(new_d,"run.py"),'w') as f:
+        f.write("import pyemu\npyemu.os_utils.run('mfnwt 10par_xsec.nam')\nprint(junk)\n")
+    pst.model_command = "python run.py"
+    oe_file = os.path.join(new_d, "pest.0.obs.csv")
+    if os.path.exists(oe_file):
+        os.remove(oe_file)
+    pst.control_data.noptmax = 1
+    pst.write(os.path.join(new_d, "pest.pst"))
+    try:
+        pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
+    except:
+        pass
+    else:
+        raise Exception("should have failed")
 
+    assert not os.path.exists(oe_file)
+    m_d = os.path.join(model_d,"fr_fail_master")
+    pyemu.os_utils.start_workers(new_d,exe_path,"pest.pst",num_workers=1,worker_root=model_d,master_dir=m_d)
+    oe_file = os.path.join(m_d, "pest.0.obs.csv")
+    assert not os.path.exists(oe_file)
 
 
 if __name__ == "__main__":
     
-    #glm_long_name_test()
+    glm_long_name_test()
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
@@ -1016,7 +1044,7 @@ if __name__ == "__main__":
     #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-    tplins1_test()
+    #tplins1_test()
     #secondary_marker_test()
     #ext_stdcol_test()
 
@@ -1041,3 +1069,4 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #basic_sqp_test()
     #mf6_v5_ies_test()
+    #fr_fail_test()

@@ -150,7 +150,7 @@ private:
 	pest_utils::thread_flag idling;
 	pest_utils::thread_flag idle_thread_finished;
 	thread* idle_thread;
-	pest_utils::thread_RAII* idle_thread_raii;
+	//pest_utils::thread_RAII* idle_thread_raii;
 
 	int schedule_run(int run_id, std::list<list<AgentInfoRec>::iterator> &free_agent_list, int n_responsive_agents);
 	void unschedule_run(list<AgentInfoRec>::iterator agent_info_iter);

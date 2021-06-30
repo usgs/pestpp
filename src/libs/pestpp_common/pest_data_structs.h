@@ -174,7 +174,7 @@ public:
 	Observations get_regulatization_obs(const Observations &obs_in);
 	int get_nnz_obs() const;
 	int get_nnz_obs_and_reg() const;
-	vector<string> get_groups();
+	vector<string> get_groups() const;
 	void reset_group_weights(string &group, double val);
 	void scale_group_weights(string &group, double scale_val);
 	void erase_ob(const string& name) { observations.erase(name);}
@@ -510,6 +510,8 @@ public:
 	void set_ies_upgrades_in_memory(bool _flag) { ies_upgrades_in_memory = _flag; }
 	bool get_ies_ordered_binary() const { return ies_ordered_binary; }
 	void set_ies_ordered_binary(bool _flag) { ies_ordered_binary = _flag; }
+    double get_ies_multimodal_alpha() const { return ies_multimodal_alpha; }
+    void set_ies_multimodal_alpha(double _flag) { ies_multimodal_alpha = _flag; }
 
 
 
@@ -770,6 +772,7 @@ private:
 	string ies_loc_type;
 	bool ies_upgrades_in_memory;
 	bool ies_ordered_binary;
+	double ies_multimodal_alpha;
 
 	// Data Assimilation parameters
 	/*string da_mode;

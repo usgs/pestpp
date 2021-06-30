@@ -52,31 +52,39 @@ RunManagerSerial::RunManagerSerial(const vector<string> _comline_vec,
 	mgr_type = RUN_MGR_TYPE::SERIAL;
 }
 
-void RunManagerSerial::run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
+void RunManagerSerial::run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, exception_ptr& run_exception,
                              Parameters* pars, Observations* obs)
 {
-    mi.run(terminate,finished,shared_execptions, pars, obs);
+    mi.run(terminate,finished,run_exception, pars, obs);
 }
 
 void RunManagerSerial::run(Parameters* pars, Observations* obs)
 {
     thread_flag f_terminate(false);
     thread_flag f_finished(false);
-    thread_exceptions shared_execptions;
+    exception_ptr run_exception = nullptr;
     stringstream ss;
-    thread run_thread(&RunManagerSerial::run_async, this, &f_terminate, &f_finished, &shared_execptions,
+    thread run_thread(&RunManagerSerial::run_async, this, &f_terminate, &f_finished, std::ref(run_exception),
                       pars, obs);
-    pest_utils::thread_RAII raii(run_thread);
+
 
     while (true)
     {
 
-        if (shared_execptions.size() > 0)
-        {
-            ss.str("");
-            ss << "exception raised by run thread: " << std::endl;
-            ss << shared_execptions.what() << std::endl;
-            cout << ss.str();
+        if (run_exception) {
+            try {
+                rethrow_exception(run_exception);
+            }
+            catch (exception &e)
+            {
+                ss.str("");
+                ss << "exception raised by run thread: " << std::endl;
+                ss << e.what() << std::endl;
+                cout << ss.str();
+            }
+            f_terminate.set(true);
+            run_thread.join();
+            break;
         }
         //check if the runner thread has finished
         if (f_finished.get())
@@ -86,11 +94,14 @@ void RunManagerSerial::run(Parameters* pars, Observations* obs)
         if (pest_utils::quit_file_found())
         {
             f_terminate.set(true);
+            run_thread.join();
             break;
         }
 
     }
-    shared_execptions.rethrow();
+    run_thread.join();
+    if (run_exception)
+        rethrow_exception(run_exception);
 }
 
 void RunManagerSerial::run()
@@ -133,6 +144,7 @@ void RunManagerSerial::run()
 				obs.clear();
 				obs.insert(obs_name_vec, obs_vec);
 				//mi.run(&pars, &obs);
+
 				run(&pars, &obs);
 				
 				//OperSys::chdir(run_dir.c_str());

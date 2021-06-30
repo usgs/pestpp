@@ -69,7 +69,8 @@ GsaAbstractBase::GsaAbstractBase(Pest &_pest_scenario,
 		{
 			adj_par_name_vec.push_back(i);
 		}
-	}	
+	}
+	obs_name_vec = pest_scenario_ptr->get_ctl_ordered_obs_names();
 }
 
 

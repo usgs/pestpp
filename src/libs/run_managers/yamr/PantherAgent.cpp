@@ -301,34 +301,39 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 
 	thread_flag f_terminate(false);
 	thread_flag f_finished(false);
-	thread_exceptions shared_execptions;
+	exception_ptr run_exception = nullptr;
 	stringstream ss;
-	try
-	{
-		vector<string> par_name_vec;
-		vector<double> par_values;
-		for (auto &i : pars)
-		{
-			par_name_vec.push_back(i.first);
-			par_values.push_back(i.second);
-		}
+    vector<string> par_name_vec;
+    vector<double> par_values;
+    for (auto &i : pars)
+    {
+        par_name_vec.push_back(i.first);
+        par_values.push_back(i.second);
+    }
 
-		vector<double> obs_vec;
-		thread run_thread(&PANTHERAgent::run_async, this, &f_terminate, &f_finished, &shared_execptions,
-		   &pars, &obs);
-		pest_utils::thread_RAII raii(run_thread);
-		
+    vector<double> obs_vec;
+    thread run_thread(&PANTHERAgent::run_async, this, &f_terminate, &f_finished, std::ref(run_exception),
+                      &pars, &obs);
+
+    try
+	{
+
 		while (true)
 		{
 
-			if (shared_execptions.size() > 0)
+			if (run_exception)
 			{
-				ss.str("");
-				ss << "exception raised by run thread: " << std::endl;
-				ss << shared_execptions.what() << std::endl;
-				report(ss.str(), true);
-				//don't break here, need to check one last time for incoming messages
-				done = true;
+                try {
+                    rethrow_exception(run_exception);
+                }
+                catch (exception& e) {
+                    ss.str("");
+                    ss << "exception raised by run thread: " << std::endl;
+                    ss << e.what() << std::endl;
+                    report(ss.str(), true);
+                    //don't break here, need to check one last time for incoming messages
+                    done = true;
+                }
 			}
 			//check if the runner thread has finished
 			if (f_finished.get())
@@ -412,12 +417,14 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 				break;
 			}
 		}
-		shared_execptions.rethrow();
+
 		if (!f_terminate.get())
 		{
 			final_run_status = NetPackage::PackType::RUN_FINISHED;
 		}
+        run_thread.join();
 	}
+
 	catch(const PANTHERAgentRestartError&)
 	{
 		// Rethrow for start() method to handle
@@ -432,6 +439,7 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 		report(ss.str(), true);
 		smessage << ex.what();
 		final_run_status = NetPackage::PackType::RUN_FAILED;
+
 		
 	}
 	catch(...)
@@ -442,16 +450,30 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 		final_run_status = NetPackage::PackType::RUN_FAILED;
 	}
 
+    if (run_exception)
+    {
+        try {
+            rethrow_exception(run_exception);
+        }
+        catch (exception& e) {
+            ss.str("");
+            ss << "exception raised by run thread: " << std::endl;
+            ss << e.what() << std::endl;
+            report(ss.str(), true);
+            final_run_status = NetPackage::PackType::RUN_FAILED;
+        }
+    }
+
 	//sleep here just to give the os a chance to cleanup any remaining file handles
 	w_sleep(poll_interval_seconds * 1000);
 	return pair<NetPackage::PackType,std::string> (final_run_status,smessage.str());
 }
 
 
-void PANTHERAgent::run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
+void PANTHERAgent::run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, exception_ptr& run_exception,
 	Parameters* pars, Observations* obs)
 {
-	mi.run(terminate,finished,shared_execptions, pars, obs);
+	mi.run(terminate,finished,run_exception, pars, obs);
 }
 
 
@@ -1039,6 +1061,12 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 						ss << "frozen";
 						report(ss.str(), true);
 						w_sleep(30 * 1000);
+						if (quit_file_found()) {
+                            report("pest.stp file found, resetting panther_agent_freeze_on_fail and continuing...",
+                                   true);
+                            pest_scenario.get_pestpp_options_ptr()->set_panther_debug_fail_freeze(false);
+                            break;
+                        }
 					}
 				}
 			}

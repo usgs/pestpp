@@ -30,15 +30,51 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 	ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, Localizer& _localizer, Covariance& _parcov, Eigen::MatrixXd& _Am, L2PhiHandler& _ph,
 	bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string>& _act_obs_names) :
 	file_manager(_file_manager), pest_scenario(_pest_scenario), pe(_pe), oe(_oe), base_oe(_base_oe), localizer(_localizer), 
-	parcov(_parcov), Am(_Am), ph(_ph), act_par_names(_act_par_names),act_obs_names(_act_obs_names)
+	parcov(_parcov), Am(_Am), ph(_ph), act_par_names(_act_par_names),act_obs_names(_act_obs_names) {
+    performance_log = _performance_log;
+    use_localizer = _use_localizer;
+    iter = _iter;
+    verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
+    //prep the fast look par cov info
+    message(1,"preparing fast-look containers for threaded localization solve");
+    initialize();
+}
 
+
+void EnsembleSolver::initialize(string center_on, vector<int> real_idxs)
 {
-	performance_log = _performance_log;
-	use_localizer = _use_localizer;
-	iter = _iter;
-	verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
-	//prep the fast look par cov info
-	message(1,"preparing fast-look containers for threaded localization solve");
+    vector<string> pe_real_names = pe.get_real_names();
+    vector<string> oe_real_names = oe.get_real_names();
+    vector<string> t;
+    if (center_on.size() == 0)
+    {
+        center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
+    }
+    if (real_idxs.size() == 0)
+    {
+        for (int i=0;i<pe.shape().first;i++)
+            real_idxs.push_back(i);
+    }
+    else
+    {
+
+        for (auto ri : real_idxs)
+        {
+            t.push_back(pe_real_names[ri]);
+        }
+        pe_real_names = t;
+        t.clear();
+        for (auto ri: real_idxs)
+        {
+            t.push_back(oe_real_names[ri]);
+        }
+        oe_real_names = t;
+        t.clear();
+
+    }
+
+
+
 	parcov_inv_map.clear();
 	parcov_inv_map.reserve(pe.shape().second);
 	Eigen::VectorXd parcov_inv;// = parcov.get(par_names).inv().e_ptr()->toDense().cwiseSqrt().asDiagonal();
@@ -48,7 +84,7 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 	}
 	else
 	{
-		message(2,"extracting diagonal from prior parameter covariance matrix");
+		//message(2,"extracting diagonal from prior parameter covariance matrix");
 		Covariance parcov_diag;
 		parcov_diag.from_diagonal(parcov);
 		parcov_inv = parcov_diag.get_matrix().diagonal();
@@ -87,7 +123,7 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 	obs_err_map.reserve(obs_names.size());
 
 	//check for the 'center_on' real - it may have been dropped...
-	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
+
 	if (center_on.size() > 0)
 	{
 		if (center_on != MEDIAN_CENTER_ON_NAME)
@@ -107,33 +143,33 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 		}
 	}
 
-	Eigen::MatrixXd mat = ph.get_obs_resid_subset(oe);
+	Eigen::MatrixXd mat = ph.get_obs_resid_subset(oe,true,oe_real_names);
 	for (int i = 0; i < obs_names.size(); i++)
 	{
 		obs_resid_map[obs_names[i]] = mat.col(i);
 	}
-	mat = oe.get_eigen_anomalies(center_on);
+	mat = oe.get_eigen_anomalies(oe_real_names, t, center_on);
 	for (int i = 0; i < obs_names.size(); i++)
 	{
 		obs_diff_map[obs_names[i]] = mat.col(i);
 	}
-	mat = base_oe.get_eigen(oe.get_real_names(), obs_names);
+	mat = base_oe.get_eigen(oe_real_names, obs_names);
 	Observations ctl_obs = pest_scenario.get_ctl_observations();
 	for (int i = 0; i < obs_names.size(); i++)
 	{
 		obs_err_map[obs_names[i]] = mat.col(i).array() - ctl_obs.get_rec(obs_names[i]);
 	}
-	mat = ph.get_par_resid_subset(pe);
+	mat = ph.get_par_resid_subset(pe,pe_real_names);
 	for (int i = 0; i < par_names.size(); i++)
 	{
 		par_resid_map[par_names[i]] = mat.col(i);
 	}
-	mat = pe.get_eigen_anomalies(center_on);
+	mat = pe.get_eigen_anomalies(pe_real_names,t,center_on);
 	for (int i = 0; i < par_names.size(); i++)
 	{
 		par_diff_map[par_names[i]] = mat.col(i);
 	}
-	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
+	if ((!pest_scenario.get_pestpp_options().get_ies_use_approx() && (Am.rows() > 0)))
 	{
 		for (int i = 0; i < par_names.size(); i++)
 		{
@@ -184,13 +220,182 @@ void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form
 }
 
 
+void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map,
+                                      double mm_alpha, L2PhiHandler& ph) {
+
+    stringstream ss;
+    //util functions
+    typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
+    // Defining a lambda function to compare two pairs. It will compare two pairs using second field
+    Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
+    {
+        return elem1.second < elem2.second;
+    };
+    typedef std::set<std::pair<std::string, double>, Comparator> sortedset;
+    typedef std::set<std::pair<std::string, double>, Comparator>::iterator sortedset_iter;
+
+    int subset_size = (int)(((double)pe.shape().first) * mm_alpha);
+    ss.str("");
+    ss << "multimodal upgrade using " << subset_size << " realizations";
+    performance_log->log_event(ss.str());
+
+    //for each par realization in pe
+    //get the normed phi map
+    map<string,double> phi_map = ph.get_phi_map(L2PhiHandler::phiType::MEAS);
+    double mx = -1.0e+300;
+    for (auto& p : phi_map)
+    {
+        if (p.second > mx)
+            mx = p.second;
+    }
+    for (auto& p : phi_map)
+    {
+        p.second /= mx;
+    }
+    //flip to map to par realization names
+    map<string,double> par_phi_map;
+    vector<string> oreal_names = oe.get_real_names(),preal_names=pe.get_real_names();
+    for (int i=0;i<oreal_names.size();i++)
+    {
+        par_phi_map[preal_names[i]] = phi_map.at(oreal_names[i]);
+    }
+    phi_map.clear();
+
+    vector<string> real_names = pe.get_real_names(),upgrade_real_names;
+    string real_name;
+
+    map<string,double> euclid_par_dist;
+    Eigen::VectorXd real,diff;
+    Eigen::SparseMatrix<double> parcov_inv = parcov.inv().get_matrix();
+    double edist;
+    map<string,int> real_map = pe.get_real_map();
+    vector<int> real_idxs;
+    //Eigen::MatrixXd* real_ptr = pe_upgrade.get_eigen_ptr_4_mod();
+
+    ofstream csv;
+    if (pest_scenario.get_pestpp_options().get_ies_verbose_level()>1)
+    {
+        ss.str("");
+        ss << file_manager.get_base_filename() << "." << iter << "." << cur_lam << ".mm.info.csv";
+        csv.open(ss.str());
+        csv << "real_name";
+        for (int j=0;j<subset_size;j++)
+        {
+            csv << ",neighbor_" << j << ",phi,pdiff";
+        }
+        csv << endl;
+
+    }
+
+    for (int i=0;i<pe.shape().first;i++) {
+        real_name = real_names[i];
+        performance_log->log_event("calculating multimodal upgrade for " + real_name);
+        euclid_par_dist.clear();
+        real = pe.get_real_vector(real_name);
+        //cout << real << endl;
+
+        for (auto &rname : real_names) {
+            if (rname == real_name)
+                continue;
+            diff = real - pe.get_real_vector(rname);
+            edist = diff.transpose() * parcov_inv * diff;
+            euclid_par_dist[rname] = edist;
+//            cout << real << endl;
+//            cout << pe.get_real_vector(rname) << endl;
+//            cout << diff << endl;
+//            cout << real_name << "," << rname << "," << edist << endl << endl;
+
+        }
+
+        mx = -1e300;
+        for (auto &e : euclid_par_dist) {
+            if (e.second > mx)
+                mx = e.second;
+        }
+        if (mx <= 0.0)
+        {
+            ss.str("");
+            ss << "multimodal solve error: maximum par diff for realization '" << real_name <<"' not valid";
+            message(0,ss.str());
+        }
+        else {
+            for (auto &e : euclid_par_dist) {
+                e.second /= mx;
+            }
+        }
+
+        map<string, double> composite_score;
+        for (auto &rname : real_names) {
+            if (rname == real_name)
+                continue;
+            composite_score[rname] = euclid_par_dist.at(rname) + par_phi_map.at(rname);
+        }
+        sortedset fitness_sorted(composite_score.begin(), composite_score.end(), compFunctor);
+        real_idxs.clear();
+        upgrade_real_names.clear();
+        real_idxs.push_back(real_map.at(real_name));
+        upgrade_real_names.push_back(real_name);
+        int iii = 0;
+        for (sortedset_iter ii=fitness_sorted.begin();ii!=fitness_sorted.end();++ii)
+        {
+            int idx = real_map.at(ii->first);
+            real_idxs.push_back(idx);
+            upgrade_real_names.push_back(ii->first);
+            iii++;
+            if (iii >= subset_size)//plus one to count 'real_name'
+                break;
+            //cout << real_name << "," << ii->first << "," << ii->second << endl;
+
+        }
+        if (pest_scenario.get_pestpp_options().get_ies_verbose_level()>1)
+        {
+            csv << real_name;
+            for (auto& rname : upgrade_real_names)
+            {
+                if (rname == real_name)
+                    continue;
+                csv << "," << rname << "," << par_phi_map.at(rname) << "," << euclid_par_dist.at(rname);
+            }
+
+            csv << endl;
+        }
+        initialize(string(),real_idxs);
+        ParameterEnsemble pe_real(&pest_scenario,pe.get_rand_gen_ptr());
+        pe_real.reserve(upgrade_real_names,pe.get_var_names());
+        solve(num_threads,cur_lam,use_glm_form,pe_real,loc_map);
+        real = pe_real.get_real_vector(real_name);
+        //cout << real << endl;
+        pe_upgrade.update_real_ip(real_name,real);
+//        iii = 0;
+//        for (auto ridx : real_idxs) {
+//            real_ptr->row(ridx) = pe_real.get_eigen_ptr()->row(iii);
+//            iii++;
+//        }
+
+
+    }
+    csv.close();
+    //  get normalized par real scaled par diff l2 norm map
+    //  calculate composite normalized score and sort
+    //  select subset_size best reals
+    //  (re-)initialize this using current real as "center on" real
+    //  create a subset-sized pe instance and set zero
+    //  solve for subset_sized pe instance
+    //  randomly select a real subset-sized pe or use current real and set row in pe_upgrade
+
+
+
+
+}
+
 void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map)
 {
+
 	//message(1, "starting solve for lambda", cur_lam);
-	if (use_glm_form)
-		message(1, "using glm form");
-	else
-		message(1, "using mda form");
+//	if (use_glm_form)
+//		message(1, "using glm form");
+//	else
+//		message(1, "using mda form");
 	pe_upgrade.set_zeros();
 	stringstream ss;
 	Localizer::How _how = localizer.get_how();
@@ -727,7 +932,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 				//if all the pieces have been completed, return
 				if (count == keys.size())
 				{
-					if (verbose_level > 1)
+					if (verbose_level > 3)
 					{
 						cout << "upgrade thread: " << thread_id << " processed " << pcount << " upgrade parts" << endl;
 					}
@@ -747,7 +952,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 				{
 					ss.str("");
 					ss << "upgrade thread progress: " << count << " of " << total << " parts done";
-					if (verbose_level > 1)
+					if (verbose_level > 3)
 						cout << ss.str() << endl;
 					performance_log->log_event(ss.str());
 				}
@@ -958,7 +1163,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				//if all the pieces have been completed, return
 				if (count == keys.size())
 				{
-					if (verbose_level > 1)
+					if (verbose_level > 3)
 					{
 						cout << "upgrade thread: " << thread_id << " processed " << pcount << " upgrade parts" << endl;
 					}
@@ -985,7 +1190,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				{
 					ss.str("");
 					ss << "upgrade thread progress: " << count << " of " << total << " parts done";
-					if (verbose_level > 1)
+					if (verbose_level > 3)
 						cout << ss.str() << endl;
 					performance_log->log_event(ss.str());
 				}
@@ -1423,10 +1628,14 @@ Eigen::MatrixXd L2PhiHandler::get_obs_resid(ObservationEnsemble &oe, bool apply_
 }
 
 
-Eigen::MatrixXd L2PhiHandler::get_obs_resid_subset(ObservationEnsemble &oe, bool apply_ineq)
+Eigen::MatrixXd L2PhiHandler::get_obs_resid_subset(ObservationEnsemble &oe, bool apply_ineq, vector<string> real_names)
 {
+    if (real_names.size() == 0)
+    {
+        real_names = oe.get_real_names();
+    }
 	vector<string> names = oe.get_var_names();
-	Eigen::MatrixXd resid = oe.get_eigen() - oe_base->get_eigen(oe.get_real_names(), names);
+	Eigen::MatrixXd resid = oe.get_eigen(real_names,vector<string>()) - oe_base->get_eigen(real_names, names);
 	if (apply_ineq)
 		apply_ineq_constraints(resid, names);
 	return resid;
@@ -1439,9 +1648,13 @@ Eigen::MatrixXd L2PhiHandler::get_par_resid(ParameterEnsemble &pe)
 	return resid;
 }
 
-Eigen::MatrixXd L2PhiHandler::get_par_resid_subset(ParameterEnsemble &pe)
+Eigen::MatrixXd L2PhiHandler::get_par_resid_subset(ParameterEnsemble &pe, vector<string> real_names)
 {
-	Eigen::MatrixXd resid = pe.get_eigen() - pe_base->get_eigen(pe.get_real_names(),pe.get_var_names());
+    if (real_names.size() == 0)
+    {
+        real_names = pe.get_real_names();
+    }
+	Eigen::MatrixXd resid = pe.get_eigen(real_names,vector<string>()) - pe_base->get_eigen(real_names,pe.get_var_names());
 	return resid;
 }
 
@@ -4091,6 +4304,21 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	}
 
 	int local_subset_size = pest_scenario.get_pestpp_options().get_ies_subset_size();
+	if (local_subset_size < 0)
+    {
+	    ss.str("");
+
+	    local_subset_size = (int)((double)pe.shape().first) * ((-1. * (double)local_subset_size) / 100.);
+
+        ss << "subset defined as a percentage of ensemble size, using " << local_subset_size;
+        ss << " realizations for subset" << endl;
+        if (local_subset_size < 4)
+        {
+            ss << "percentage-based subset size too small, increasing to 4" << endl;
+            local_subset_size = 4;
+        }
+    }
+
 	if ((use_subset) && (local_subset_size > pe.shape().first))
 	{
 		ss.str("");
@@ -4150,13 +4378,17 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	performance_log->log_event("preparing EnsembleSolver");
 	ParameterEnsemble pe_upgrade(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
+	pe_upgrade.set_zeros();
 	pe_upgrade.set_trans_status(pe.get_trans_status());
 	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
-
-	EnsembleSolver es(performance_log, file_manager, pest_scenario, pe_upgrade, oe_upgrade, oe_base, localizer, parcov, Am, ph,
+    //oe_upgrade.get_eigen_ptr_4_mod()->setZero();
+	//pass pe so that we can use the current par values but pass oe_upgrade since it only includes nz weight obs
+    EnsembleSolver es(performance_log, file_manager, pest_scenario, pe, oe_upgrade, oe_base, localizer, parcov, Am, ph,
 		use_localizer, iter, act_par_names, act_obs_names);
 
-	for (auto& cur_lam : inflation_factors)
+
+    //solve for each factor
+    for (auto& cur_lam : inflation_factors)
 	{
 		ss.str("");
 		if (!use_mda)
@@ -4166,9 +4398,18 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		message(2, "see .log file for more details");
 
 		pe_upgrade = ParameterEnsemble(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
+        pe_upgrade.set_zeros();
 		pe_upgrade.set_trans_status(pe.get_trans_status());
+        double mm_alpha = pest_scenario.get_pestpp_options().get_ies_multimodal_alpha();
+		if (mm_alpha != 1.0)
+        {
+            message(1,"multimodal solve for inflation factor ",cur_lam);
+            es.solve_multimodal(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map, mm_alpha, ph);
+        }
+		else{
+            es.solve(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map);
+		}
 
-		es.solve(num_threads, cur_lam, !use_mda, pe_upgrade, loc_map);
 		map<string, double> norm_map;
 		for (auto sf : backtrack_factors)
 		{
@@ -5272,10 +5513,12 @@ void EnsembleMethod::initialize_restart()
 	vector<string> missing;
 	start = oe_base_real_names.begin();
 	end = oe_base_real_names.end();
-	cout << "restart oe real names: " << endl;
+	if (verbose_level > 3)
+	    cout << "restart oe real names: " << endl;
 	for (auto& rname : oe_real_names)
 	{
-		cout << rname << endl;
+	    if (verbose_level > 3)
+		    cout << rname << endl;
 		if (find(start, end, rname) == end)
 			missing.push_back(rname);
 	}
