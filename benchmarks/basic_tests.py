@@ -890,8 +890,8 @@ def mf6_v5_ies_test():
     pst.control_data.noptmax = 3
     pst.pestpp_options["ies_num_threads"] = 1
     pst.pestpp_options["ies_use_mda"] = False
-    # pst.pestpp_options.pop("ies_localizer", None)
-    # pst.pestpp_options.pop("ies_autoadaloc", None)
+    pst.pestpp_options.pop("ies_localizer", None)
+    pst.pestpp_options.pop("ies_autoadaloc", None)
     pst.pestpp_options["ies_multimodal_alpha"] = 0.1
     pst.write(os.path.join(t_d, "freyberg6_run_ies_glm_loc_mm.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_loc_mm.pst", num_workers=15,
