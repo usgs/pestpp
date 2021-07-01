@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
 		cout << "               Developed by the PEST++ development team" << endl;
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-        auto start = chrono::system_clock::now();
+        auto start = chrono::steady_clock::now();
         string start_string = get_time_string();
         cout << "started at " << start_string << endl;
 		CmdLine cmdline(argc, argv);
@@ -907,9 +907,9 @@ int main(int argc, char* argv[])
 
         fout_rec << "started at " << start_string << endl;
         fout_rec << "finished at " << get_time_string() << endl;
-        fout_rec << "took " << setprecision(3) << get_duration_sec(start)/60.0 << " minutes" << endl;
+        fout_rec << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
         fout_rec << flush;
-        cout << "took " << setprecision(3) << get_duration_sec(start)/60.0 << " minutes" << endl;
+        cout << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
         cout << flush;
         fout_rec.close();
         return 0;

@@ -395,11 +395,11 @@ int main(int argc, char* argv[])
 
     cout << "started at " << start_string << endl;
     cout << "finished at " << get_time_string() << endl;
-    cout << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
+    cout << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
     cout << flush;
     fout_rec << "started at " << start_string << endl;
     fout_rec << "finished at " << get_time_string() << endl;
-    fout_rec << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
+    fout_rec << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
 
     return 0;
 	//cout << endl << "Simulation Complete - Press RETURN to close window" << endl;
