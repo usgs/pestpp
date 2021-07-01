@@ -2,6 +2,7 @@
 #include "RunManagerPanther.h" //needs to be first because it includes winsock2.h
 //#include <vld.h> // Memory Leak Detection using "Visual Leak Detector"
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <algorithm>
 #include "config_os.h"
