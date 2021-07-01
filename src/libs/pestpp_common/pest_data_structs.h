@@ -411,6 +411,8 @@ public:
 	void set_ies_obs_csv(string _ies_obs_csv) { ies_obs_csv = _ies_obs_csv; }
 	string get_ies_obs_restart_csv() const { return ies_obs_restart_csv; }
 	void set_ies_obs_restart_csv(string _ies_obs_restart_csv) { ies_obs_restart_csv = _ies_obs_restart_csv; }
+	string get_ies_weights_csv() const {return ies_weights_csv;}
+	void set_ies_weights_csv(string _ies_weights_csv) {ies_weights_csv = _ies_weights_csv;}
 	string get_ies_par_restart_csv() const { return ies_par_restart_csv; }
 	void set_ies_par_restart_csv(string _ies_par_restart_csv) { ies_par_restart_csv = _ies_par_restart_csv; }
 	vector<double> get_ies_lam_mults() const { return ies_lam_mults; }
@@ -724,6 +726,7 @@ private:
 	string ies_obs_csv;
 	string ies_obs_restart_csv;
 	string ies_par_restart_csv;
+	string ies_weights_csv;
 	double ies_init_lam;
 	bool ies_use_approx;
 	double ies_reg_factor;
