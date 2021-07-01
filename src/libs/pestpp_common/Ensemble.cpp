@@ -1357,6 +1357,29 @@ void Ensemble::append(string real_name, const Transformable &trans)
 		org_real_names.push_back(real_name);
 }
 
+void Ensemble::append(string real_name, const Eigen::VectorXd& vec)
+{
+    stringstream ss;
+    //make sure this real_name isn't ready used
+    if (find(real_names.begin(), real_names.end(), real_name) != real_names.end())
+    {
+        ss << "Ensemble::append() error: real_name '" << real_name << "' already in real_names";
+        throw_ensemble_error(ss.str());
+    }
+    if (vec.size() != reals.cols())
+    {
+        ss.str("");
+        ss << "Ensemble::append() vector size (" << vec.size() << ") != number of columns (" << reals.cols() << ")";
+        throw_ensemble_error(ss.str());
+    }
+
+    reals.conservativeResize(real_names.size() + 1, var_names.size());
+    reals.row(real_names.size()) = vec;
+    real_names.push_back(real_name);
+    if (find(org_real_names.begin(),org_real_names.end(),real_name) == org_real_names.end())
+        org_real_names.push_back(real_name);
+}
+
 void Ensemble::replace(int idx, const Transformable &trans, string real_name)
 {
 	stringstream ss;

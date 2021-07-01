@@ -251,6 +251,7 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
     Eigen::SparseMatrix<double> parcov_inv = parcov.inv().get_matrix();
     double edist;
     map<string,int> real_map = pe.get_real_map();
+    oe.update_var_map();
     map<string,int> ovar_map = oe.get_var_map();
 
     vector<int> real_idxs;
@@ -280,9 +281,10 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
         //get the phi map for this realization using the weights vector for this realization
         oreal_name = oreal_names[i];
         Eigen::VectorXd q_vec(act_obs_names.size());
-        for (auto& aon : act_obs_names)
-        {
-            q_vec[i] = oe.get_eigen_ptr()->coeff(i,ovar_map.at(aon));
+        int ii =0;
+        for (auto& aon : act_obs_names) {
+            q_vec[ii] = weights.get_eigen_ptr()->coeff(i, ovar_map.at(aon));
+            ii++;
         }
         map<string,double> phi_map = ph.get_meas_phi(oe,q_vec);
         double mx = -1.0e+300;
@@ -372,6 +374,17 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
             csv << endl;
         }
         initialize(string(),real_idxs);
+        //reset the weight map
+        weight_map.clear();
+        weight_map.reserve(q_vec.size());
+        iii = 0;
+        for (auto& name : act_obs_names)
+        {
+            weight_map[name] = q_vec[iii];
+            iii++;
+        }
+
+
         ParameterEnsemble pe_real(&pest_scenario,pe.get_rand_gen_ptr());
         pe_real.reserve(upgrade_real_names,pe.get_var_names());
         solve(num_threads,cur_lam,use_glm_form,pe_real,loc_map);
@@ -1803,7 +1816,13 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 			regul[name] = reg_map[name].sum();
 			par_group_phi_map[name] = get_par_group_contrib(reg_map[name]);
 		}
+        composite.clear();
+        composite = calc_composite(meas, regul);
 	}
+	else
+    {
+	    composite = meas;
+    }
 	
 	actual.clear();
 	for (auto &pv : calc_actual(oe, q))
@@ -1811,8 +1830,7 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 		actual[pv.first] = pv.second.sum();
 		obs_group_phi_map[pv.first] = get_obs_group_contrib(pv.second);
 	}
- 	composite.clear();
-	composite = calc_composite(meas, regul);
+
 }
 
 void L2PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
@@ -3483,6 +3501,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	message(1, "lambda decrease factor: ", dec_fac);
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
+	//todo: add sanity checks for weights en
+	//like conflict with da weight cycle table
 	sanity_checks();
 
 	bool echo = false;
@@ -3535,7 +3555,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	else
 		oe_drawn = initialize_oe(obscov);
 
-	initialize_weights();
+
 
 	string center_on = ppo->get_ies_center_on();
 
@@ -3728,6 +3748,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		oe_base.to_csv(ss.str());
 	}
 	message(1, "saved obs+noise observation ensemble (obsval + noise realizations) to ", ss.str());
+
+    initialize_weights();
 
 
 	if (pest_scenario.get_control_info().noptmax == -2)
@@ -5339,23 +5361,29 @@ void EnsembleMethod::add_bases()
 bool EnsembleMethod::initialize_weights()
 {
 	stringstream ss;
+    if (act_obs_names.size() == 0)
+        return true;
 
 	string weight_csv = pest_scenario.get_pestpp_options().get_ies_weights_csv();
 	bool drawn = false;
-	if (weight_csv.size() == 0)
-	{
-        int num_reals = oe.shape().first;
-		message(1, "setting weights ensemble from control file weights");
-		weights.reserve(oe.get_real_names(),act_obs_names);
-		Eigen::VectorXd w(act_obs_names.size());
-        for (int i=0;i<weights.shape().first;i++)
-        {
-            w = ph.get_q_vector();
-            weights.get_eigen_ptr_4_mod()->row(i) = w;
-        }
+    Eigen::VectorXd wvec(act_obs_names.size());
+    int i = 0;
+    for (auto& n : act_obs_names)
+    {
+        wvec[i] = pest_scenario.get_observation_info_ptr()->get_weight(n);
+        i++;
+    }
 
-		drawn = true;
-	}
+
+	if (weight_csv.size() == 0) {
+        int num_reals = oe.shape().first;
+        message(1, "setting weights ensemble from control file weights");
+        weights.reserve(oe_base.get_real_names(), act_obs_names);
+        for (int i = 0; i < weights.shape().first; i++) {
+            weights.get_eigen_ptr_4_mod()->row(i) = wvec;
+        }
+        drawn = true;
+    }
 	else
 	{
 		string obs_ext = pest_utils::lower_cp(weight_csv).substr(weight_csv.size() - 3, weight_csv.size());
@@ -5401,7 +5429,7 @@ bool EnsembleMethod::initialize_weights()
 			throw_em_error(ss.str());
 		}
 		//make sure all oe realizations are in weights
-		vector<string> missing, keep, real_names = oe.get_real_names();
+		vector<string> missing, keep, real_names = oe_base.get_real_names();
 		map<string,int> rmap = weights.get_real_map();
 		map<string,int>::iterator end = rmap.end();
 		for (auto& rname : real_names)
@@ -5411,16 +5439,23 @@ bool EnsembleMethod::initialize_weights()
         }
 		if (missing.size() >0)
         {
-		    ss.str("");
-		    ss << "weights ensemble missing obs ensemble realizations: " << endl << "   ";
-		    for (auto& m : missing)
+		    if ((missing.size() == 1) && (missing[0] == BASE_REAL_NAME) && (pest_scenario.get_pestpp_options().get_ies_include_base()))
             {
-		        ss << m << ",";
+                vector<int> drop{ weights.shape().first - 1 };
+                weights.drop_rows(drop);
+                weights.append(BASE_REAL_NAME, wvec);
             }
-            throw_em_error(ss.str());
+		    else {
+                ss.str("");
+                ss << "weights ensemble missing obs ensemble realizations: " << endl << "   ";
+                for (auto &m : missing) {
+                    ss << m << ",";
+                }
+                throw_em_error(ss.str());
+            }
         }
 		real_names = weights.get_real_names();
-		rmap = oe.get_real_map();
+		rmap = oe_base.get_real_map();
 		end = rmap.end();
 		for (auto& rname : real_names)
         {
