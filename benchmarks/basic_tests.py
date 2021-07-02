@@ -1046,6 +1046,30 @@ def fr_fail_test():
     assert not os.path.exists(oe_file)
 
 
+def sen_grp_test():
+    
+    model_d = "ies_10par_xsec"
+
+    t_d = os.path.join(model_d, "template")
+    m_d = os.path.join(model_d, "master_sen_group")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-sen"), "pest.pst", 10, master_dir=m_d,
+                                worker_root=model_d, port=port)
+
+    msn_file = os.path.join(m_d,"pest.msn")
+    msndf = pd.read_csv(msn_file)
+
+    grp_file = msn_file.replace(".msn",".group.msn")
+    grpdf = pd.read_csv(grp_file)
+    assert msndf.shape[0] == grpdf.shape[0]
+    for col in ["sen_mean","sen_mean_abs","sen_std_dev"]:
+        diff = np.abs(msndf.loc[:,col].sum() - grpdf.loc[:,col].sum())
+        print(col,diff)
+        assert diff < 1.0e-6
+
+
 if __name__ == "__main__":
     
     #glm_long_name_test()
@@ -1066,7 +1090,7 @@ if __name__ == "__main__":
 
     # parallel_consist_test()
     # ext_stdcol_test()
-
+    sen_grp_test()
     #da_prep_4_freyberg_batch()
     # da_prep_4_mf6_freyberg_seq()
     # shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sen.exe"),os.path.join("..","bin","pestpp-sen.exe"))
@@ -1077,7 +1101,7 @@ if __name__ == "__main__":
     #da_prep_4_mf6_freyberg_seq_tbl()
     #da_mf6_freyberg_test_2()
     #mf6_v5_ies_test()
-    mf6_v5_sen_test()
+    #mf6_v5_sen_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
