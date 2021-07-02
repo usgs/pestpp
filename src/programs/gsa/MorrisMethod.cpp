@@ -337,8 +337,10 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 {
 	ofstream &fout_morris = file_manager_ptr->open_ofile_ext("msn");
 	ofstream &fout_raw = file_manager_ptr->open_ofile_ext("raw.csv");
+    ofstream &fout_grp = file_manager_ptr->open_ofile_ext("group.raw.csv");
+    ofstream &fout_grpmorris = file_manager_ptr->open_ofile_ext("group.msn");
 
-	ModelRun run0 = model_run;
+    ModelRun run0 = model_run;
 	ModelRun run1 = model_run;
 	Parameters pars0;
 	Observations obs0;
@@ -347,10 +349,15 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 
 	map<string, RunningStats > sen_map;
 	map<string, RunningStats> obs_stats_map;
+    map<pair<string,string>, RunningStats> ogroup_sens_map;
 
 	for (auto &it_p : adj_par_name_vec)
 	{
 		sen_map[it_p] = RunningStats();
+        for (auto& gname : pest_scenario_ptr->get_ctl_ordered_obs_group_names())
+        {
+            ogroup_sens_map[make_pair(it_p,gname)] = RunningStats();
+        }
 	}
 
 	for (auto &it_obs : obs_name_vec)
@@ -362,7 +369,9 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 	obs_sen_file.initialize(adj_par_name_vec, run_mngr_obs_name_vec, Observations::no_data, this);
 
 	fout_raw << "parameter_name,phi_0,phi_1,par_0,par_1,elem_effect" << endl;
-	int n_runs = run_manager.get_nruns();
+    fout_grp << "parameter_name,obs_group,phi_0,phi_1,par_0,par_1,elem_effect" << endl;
+
+    int n_runs = run_manager.get_nruns();
 	bool run0_ok = false;
 	bool run1_ok = false;
 	string par_name_1;
@@ -398,10 +407,13 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 			Parameters tmp_ctl_par = base_partran_seq_ptr->numeric2ctl_cp(pars0);
 			run0.update_ctl(tmp_ctl_par, obs0);
 			double phi0 = run0.get_phi(DynamicRegularization::get_zero_reg_instance());
+			map<string,double> pg0 = run0.get_obj_func_ptr()->get_group_phi(obs0,tmp_ctl_par,DynamicRegularization::get_zero_reg_instance());
 			tmp_ctl_par = base_partran_seq_ptr->numeric2ctl_cp(pars1);
 			run1.update_ctl(tmp_ctl_par, obs1);
 			double phi1 = run1.get_phi(DynamicRegularization::get_zero_reg_instance());
-			double p0 = pars0[par_name_1];
+            map<string,double> pg1 = run1.get_obj_func_ptr()->get_group_phi(obs1,tmp_ctl_par,DynamicRegularization::get_zero_reg_instance());
+
+            double p0 = pars0[par_name_1];
 			double p1 = pars1[par_name_1];
 			// compute standard Morris Sensitivity on the global objective function
 			double sen = (phi1 - phi0) / delta;
@@ -415,7 +427,16 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 
 			//Compute sensitvities of indiviual observations
 			obs_sen_file.add_sen_run_pair(par_name_1, p0, obs0, p1, obs1);
-		}
+            for (auto& gphi : pg0)
+
+            {
+                phi0 = gphi.second;
+                phi1 = pg1.at(gphi.first);
+                sen = (phi1 - phi0) / delta;
+                fout_grp << pest_utils::lower_cp(par_name_1) << "," << gphi.first << "," << phi1 << "," << phi0 << "," << p1 << "," << p0 << "," << sen << endl;
+                ogroup_sens_map[make_pair(par_name_1,gphi.first)].add(sen);
+            }
+        }
 	}
 	// Add final run to obs_stats
 	if (run1_ok)
@@ -433,7 +454,9 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 	cout << "writing output files" << endl;
 	// write standard Morris Sensitivity for the global objective function
 	fout_morris << "parameter_name,n_samples,sen_mean,sen_mean_abs,sen_std_dev" << endl;
-	for (const auto &it_par : adj_par_name_vec)
+    fout_grpmorris << "parameter_name,obs_group_name,n_samples,sen_mean,sen_mean_abs,sen_std_dev" << endl;
+
+    for (const auto &it_par : adj_par_name_vec)
 	{
 		const auto &it_senmap = sen_map.find(it_par);
 		if (it_senmap != sen_map.end())
@@ -441,6 +464,26 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 			fout_morris << pest_utils::lower_cp(it_par) << "," << it_senmap->second.comp_nsamples() << "," << it_senmap->second.comp_mean() << "," << it_senmap->second.comp_abs_mean() << "," << sqrt(it_senmap->second.comp_var()) << endl;
 		}
 	}
+
+    for (auto& pname : adj_par_name_vec)
+    {
+        for (auto& ogname : pest_scenario_ptr->get_ctl_ordered_obs_group_names()) {
+
+            auto p = make_pair(pname,ogname);
+            if (ogroup_sens_map.find(p) == ogroup_sens_map.end())
+            {
+                cout << "missing " << pname << "," << ogname << endl;
+                continue;
+            }
+            //fout_morris << pest_utils::lower_cp(it_par) << "," << it_senmap->second.comp_nsamples() << ","
+            // << it_senmap->second.comp_mean() << "," << it_senmap->second.comp_abs_mean() << ","
+            // << sqrt(it_senmap->second.comp_var()) << endl;
+            fout_grpmorris << pest_utils::lower_cp(pname) << "," << pest_utils::lower_cp(ogname);
+            fout_grpmorris << "," << ogroup_sens_map.at(p).comp_nsamples() << "," << ogroup_sens_map.at(p).comp_mean();
+            fout_grpmorris << "," << ogroup_sens_map.at(p).comp_abs_mean() << "," << sqrt(ogroup_sens_map.at(p).comp_var()) << endl;
+         }
+    }
+
 	if (calc_morris_obs_sen)
 	{
 		// write standard Morris Sensitivity for individual observations
@@ -513,7 +556,10 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 		file_manager_ptr->close_file("mos");
 	}
 	file_manager_ptr->close_file("msn");
-	file_manager_ptr->close_file("raw");
+    file_manager_ptr->close_file("group.msn");
+
+    file_manager_ptr->close_file("group.raw.csv");
+    file_manager_ptr->close_file("raw.csv");
 }
 
 void MorrisMethod::calc_morris_obs(ostream &fout, MorrisObsSenFile &morris_sen_file)

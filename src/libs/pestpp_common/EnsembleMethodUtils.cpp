@@ -1079,7 +1079,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 			for (int j = 0; j < names.size(); j++)
 			{
-				mat.col(j) = emap[names[j]];
+				mat.col(j) = emap.at(names[j]);
 			}
 
 			return mat;

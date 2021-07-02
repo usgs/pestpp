@@ -914,6 +914,7 @@ def mf6_v5_ies_test():
 
 
 def mf6_v5_sen_test():
+
     model_d = "mf6_freyberg"
 
     t_d = os.path.join(model_d,"template")
@@ -922,17 +923,20 @@ def mf6_v5_sen_test():
     #    shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_sen.pst"))
     m_d = os.path.join(model_d,"master_sen")
-    pyemu.os_utils.start_workers(t_d, "pestpp-sen", "freyberg6_run_sen.pst",
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sen"), "freyberg6_run_sen.pst",
                                  num_workers=15, worker_root=model_d,
-                                 port=4004)
+                                 port=4004,verbose=True,master_dir=m_d)
 
     pst = pyemu.Pst(os.path.join(m_d,"freyberg6_run_sen.pst"))
     mio_file = os.path.join(m_d,"freyberg6_run_sen.mio")
-    assert os.path.exists(mio_file)
+    assert os.path.exists(mio_file),mio_file
     df = pd.read_csv(mio_file)
     assert df.shape[0] > 1
     msn_file = mio_file.replace(".mio",".msn")
-    assert os.path.exists(msn_file)
+    assert os.path.exists(msn_file),msn_file
+    msngrp_file = msn_file.replace(".msn",".group.msn")
+    assert os.path.exists(msngrp_file),msngrp_file
+
 
 def mf6_v5_opt_stack_test():
     model_d = "mf6_freyberg"
@@ -1072,8 +1076,8 @@ if __name__ == "__main__":
 
     #da_prep_4_mf6_freyberg_seq_tbl()
     #da_mf6_freyberg_test_2()
-    mf6_v5_ies_test()
-    #mf6_v5_sen_test()
+    #mf6_v5_ies_test()
+    mf6_v5_sen_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
