@@ -80,6 +80,7 @@ public:
 	void append_other_rows(Ensemble &other,bool reset_org_real_names=false);
 	void append_other_rows(const vector<string>& _real_names, Eigen::MatrixXd& _reals);
 	void append(string real_name, const Transformable &trans);
+    void append(string real_name, const Eigen::VectorXd& vec);
 	void replace(int idx, const Transformable &trans, string real_name="");
 
 	Covariance get_diagonal_cov_matrix();

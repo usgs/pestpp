@@ -697,6 +697,8 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 				if ((exit_code == -1) || (status != 0))
 				{
 					finished->set(true);
+					cout << "exit_code: " << exit_code << endl;
+					cout << "status: " << status << endl;
 					throw std::runtime_error("waitpid() returned error status for command: " + cmd_string);
 				}
 				else if (exit_code != 0)

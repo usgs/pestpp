@@ -846,6 +846,15 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
 	return true;
 	}
 
+    else if ((key == "IES_WEIGHTS_ENSEMBLE") || (key == "IES_WEIGHTS_EN"))
+    {
+        passed_args.insert("IES_WEIGHTS_ENSEMBLE");
+        passed_args.insert("IES_WEIGHTS_EN");
+        //convert_ip(value, ies_obs_restart_csv);
+        ies_weights_csv = org_value;
+        return true;
+    }
+
 	else if ((key == "IES_USE_APPROXIMATE_SOLUTION") || (key == "IES_USE_APPROX"))
 	{
 	passed_args.insert("IES_USE_APPROXIMATE_SOLUTION");
@@ -1099,6 +1108,7 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         convert_ip(value,ies_multimodal_alpha);
         return true;
     }
+
 
 	return false;
 }
@@ -1573,6 +1583,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "(note: 'da' args override 'ies' args when using pestpp-da)" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
 	os << "ies_observation_ensemble: " << ies_obs_csv << endl;
+	os << "ies_weights_ensemble: " << ies_weights_csv << endl;
 	os << "ies_restart_parameter_ensemble: " << ies_par_restart_csv << endl;
 	os << "ies_restart_observation_ensemble: " << ies_obs_restart_csv << endl;
 	os << "ies_use_approximate_solution: " << ies_use_approx << endl;
@@ -1740,6 +1751,7 @@ void PestppOptions::set_defaults()
 	set_ies_obs_csv("");
 	set_ies_obs_restart_csv("");
 	set_ies_par_restart_csv("");
+    set_ies_weights_csv("");
 	set_ies_lam_mults(vector<double>());
 	set_ies_init_lam(0.0);
 	set_ies_use_approx(true);

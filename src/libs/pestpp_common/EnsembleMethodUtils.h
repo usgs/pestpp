@@ -62,6 +62,7 @@ public:
 
 	void save_residual_cov(ObservationEnsemble& oe, int iter);
 
+	map<string,double> get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec);
 
 private:
 	string tag;
@@ -71,9 +72,9 @@ private:
 	void prepare_csv(ofstream &csv,vector<string> &names);
 	void prepare_group_csv(ofstream &csv, vector<string> extra = vector<string>());
 
-	map<string, Eigen::VectorXd> calc_meas(ObservationEnsemble &oe, Eigen::VectorXd &_q_vec);
+	map<string, Eigen::VectorXd> calc_meas(ObservationEnsemble &oe, Eigen::VectorXd& q_vec);
 	map<string, Eigen::VectorXd> calc_regul(ParameterEnsemble &pe);// , double _reg_fac);
-	map<string, Eigen::VectorXd> calc_actual(ObservationEnsemble &oe, Eigen::VectorXd &_q_vec);
+	map<string, Eigen::VectorXd> calc_actual(ObservationEnsemble &oe, Eigen::VectorXd& q_vec);
 	map<string, double> calc_composite(map<string,double> &_meas, map<string,double> &_regul);
 	//map<string, double>* get_phi_map(PhiHandler::phiType &pt);
 	void write_csv(int iter_num, int total_runs,ofstream &csv, phiType pt,
@@ -146,12 +147,13 @@ class EnsembleSolver
 {
 public:
 	EnsembleSolver(PerformanceLog* _performance_log, FileManager& _file_manager, Pest& _pest_scenario, ParameterEnsemble& _pe,
-		ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, Localizer& _localizer, Covariance& _parcov,Eigen::MatrixXd& _Am, L2PhiHandler& _ph, 
+		ObservationEnsemble& _oe, ObservationEnsemble& _base_oe, ObservationEnsemble& _weights, Localizer& _localizer,
+		Covariance& _parcov,Eigen::MatrixXd& _Am, L2PhiHandler& _ph,
 		bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string> &_act_obs_names);
 
 	void solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
     void solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,
-                        pair<vector<string>, vector<string>>>& loc_map, double mm_alpha, L2PhiHandler& ph);
+                        pair<vector<string>, vector<string>>>& loc_map, double mm_alpha);
 
 
 private:
@@ -161,7 +163,7 @@ private:
 	bool use_localizer;
 	Pest& pest_scenario;
 	ParameterEnsemble& pe;
-	ObservationEnsemble& oe, base_oe;
+	ObservationEnsemble& oe, base_oe, weights;
 	Localizer& localizer;
 	Covariance& parcov;
 	Eigen::MatrixXd& Am;
@@ -272,7 +274,7 @@ public:
 	//virtual void finalize() { ; }
 	virtual void throw_em_error(string message);
 	bool should_terminate();
-	virtual void sanity_checks() { ; }
+	void sanity_checks();
 	//template<typename T, typename A>
 	//void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
 	void message(int level, const string& _message, vector<string> _extras, bool echo = true);
@@ -297,6 +299,7 @@ public:
 	void initialize_parcov();
 	bool initialize_oe(Covariance& cov);
 	void initialize_obscov();
+	bool initialize_weights();
 	Covariance* get_parcov_ptr() { return &parcov; }
 	Covariance* get_obscov_ptr() { return &obscov; }
 	std::mt19937& get_rand_gen() { return rand_gen; }
@@ -359,7 +362,7 @@ protected:
 	//vector<int> subset_idxs;
 
 	ParameterEnsemble pe, pe_base;
-	ObservationEnsemble oe, oe_base;
+	ObservationEnsemble oe, oe_base, weights;
 	//Eigen::MatrixXd prior_pe_diff;
 	//Eigen::MatrixXd Am;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
