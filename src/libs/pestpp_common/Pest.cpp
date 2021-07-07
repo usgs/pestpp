@@ -3164,7 +3164,16 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 	convert_ip(tokens[8], offset);
 	
 	if (control_info.numcom > 1)
-		convert_ip(tokens[9], pi.dercom);
+        try {
+
+            convert_ip(tokens[9], pi.dercom);
+        }
+	    catch (...)
+        {
+	        float f;
+	        convert_ip(tokens[9],f);
+	        pi.dercom = std::round(f);
+        }
 	else
 		pi.dercom = 1;
 	
