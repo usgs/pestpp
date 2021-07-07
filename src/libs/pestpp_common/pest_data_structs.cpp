@@ -2099,6 +2099,7 @@ void ControlInfo::set_defaults()
 	/*ControlInfo() : relparmax(0.0), facparmax(0.0), facorig(0.0), phiredswh(0.0), noptmax(0),
 		phiredstp(0.0), nphistp(0), nphinored(0), relparstp(0.0), nrelpar(0), noptswitch(0),
 		splitswh(0.0), pestmode(PestMode::ESTIMATION) {}*/
+
 	facparmax = 1.1;
 	relparmax = 1.0;
 	facorig = 0.001;
@@ -2112,6 +2113,8 @@ void ControlInfo::set_defaults()
 	noptswitch = 1;
 	splitswh = 1.1;
 	pestmode = PestMode::ESTIMATION;
+	numcom = 1;
+	jacfile = 0;
 
 }
 
