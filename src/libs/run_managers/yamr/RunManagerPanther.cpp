@@ -1365,14 +1365,124 @@ void RunManagerPanther::process_message(int i_sock)
 		report("error in model IO files on agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + net_pack.get_info_txt() + "-terminating agent. ", true);
 		close_agent(i_sock);
 	}
+	else if (net_pack.get_type() == NetPackage::PackType::START_FILE_WRKR2MSTR) {
+        stringstream ss;
+        ss.str("");
+        pair<string, string> fnames = get_recv_filenames(net_pack);
+        if ((fnames.first.size() == 0) || (fnames.second.size() == 0)) {
+            //do something here
+        } else {
+            if (open_file_trans_streams.find(fnames.second) != open_file_trans_streams.end()) {
+                ss << "agent file '" << fnames.first << "', master file '" << fnames.second
+                   << "' already open, can't reopen, something is wrong";
+                report(ss.str(), true);
+            } else {
+                pair<map<string, ofstream *>::iterator, bool> ret = open_file_trans_streams.insert(
+                        pair<string, ofstream *>(fnames.second, new ofstream));
+                ofstream &out = *ret.first->second;
+                out.open(fnames.second.c_str(), ios::binary);
 
-	else
+            }
+        }
+    }
+
+    else if (net_pack.get_type() == NetPackage::PackType::CONT_FILE_WRKR2MSTR)
+    {
+        stringstream ss;
+        ss.str("");
+        pair<string,string> fnames = get_recv_filenames(net_pack);
+        if ((fnames.first.size() == 0) || (fnames.second.size() == 0))
+        {
+            //do something here
+        }
+        else
+        {
+            if (open_file_trans_streams.find(fnames.second) != open_file_trans_streams.end())
+            {
+                ss << "agent file '" << fnames.first << "', master file '" << fnames.second << "' not open yet, can't continue transfer, something is wrong";
+                report(ss.str(),true);
+            }
+            else
+            {
+                pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
+                ofstream& out = *ret.first->second;
+                int s = net_pack.get_data().size();
+                //buf = reinterpret_cast<const char*>(ibuf.data());
+                out.write(reinterpret_cast<const char*>(net_pack.get_data().data()),s);
+            }
+        }
+    }
+
+    else if (net_pack.get_type() == NetPackage::PackType::FINISH_FILE_WRKR2MSTR)
+    {
+        stringstream ss;
+        ss.str("");
+        pair<string,string> fnames = get_recv_filenames(net_pack);
+        if ((fnames.first.size() == 0) || (fnames.second.size() == 0))
+        {
+            //do something here
+        }
+        else
+        {
+            if (open_file_trans_streams.find(fnames.second) == open_file_trans_streams.end())
+            {
+                ss << "agent file '" << fnames.first << "', master file '" << fnames.second << "' not open yet, can't close, something is wrong";
+                report(ss.str(),true);
+            }
+            else
+            {
+                pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
+                ofstream& out = *ret.first->second;
+                out.close();
+                open_file_trans_streams.erase(ret.first);
+            }
+        }
+    }
+
+
+    else
 	{
 		report("received unsupported message from agent: ", false);
 		net_pack.print_header(f_rmr);
 		//save results from model run
 	}
 }
+
+pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack)
+{
+    string info_txt = net_pack.get_info_txt();
+    vector<string> tokens;
+    tokenize(info_txt,tokens);
+    stringstream ss;
+    ss.str("");
+    ss << "runid=" << net_pack.get_run_id() << "_groupid=" << net_pack.get_group_id();
+    string agent_filename_token = "";
+    string agent_filename = "";
+    string master_filename = "";
+    for (auto& token : tokens) {
+        if (token.find("AGENT_FILENAME=") != string::npos)
+            agent_filename_token = token;
+        else
+            ss << "_" << token;
+    }
+    if (agent_filename_token.size() == 0)
+    {
+        //do something here
+    }
+    else {
+        ss << "_" << agent_filename_token;
+        tokens.clear();
+        tokenize(agent_filename_token, tokens, "=");
+        if (tokens.size() != 2) {
+            //do something here
+        } else {
+            agent_filename = tokens[1];
+            master_filename = ss.str();
+        }
+    }
+    return make_pair(agent_filename,master_filename);
+}
+
 
 bool RunManagerPanther::process_model_run(int sock_id, NetPackage &net_pack)
 {

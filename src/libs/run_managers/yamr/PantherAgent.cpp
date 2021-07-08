@@ -261,9 +261,9 @@ pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, long  timeout_
 void PANTHERAgent::transfer_files(const vector<string>& tfiles, int group, int run_id, string& desc)
 {
     int bytes_read;
-    char buf[100]={' '};
+    char buf[256]={' '};
     stringstream ss;
-    NetPackage pack(NetPackage::PackType::FILE_WRKR2MSTR,group,run_id,desc);
+    NetPackage pack;
     for (auto& filename :tfiles) {
         ifstream in;
         in.open(filename.c_str(), ifstream::binary);
@@ -273,12 +273,23 @@ void PANTHERAgent::transfer_files(const vector<string>& tfiles, int group, int r
             report(ss.str(), true);
             continue;
         }
-        string filename_desc = desc + ", filename="+filename;
-        pack = NetPackage(NetPackage::PackType::FILE_WRKR2MSTR,group,run_id,filename_desc);
+        string filename_desc = desc + " AGENT_FILENAME="+filename;
+        pack = NetPackage(NetPackage::PackType::START_FILE_WRKR2MSTR,group,run_id,filename_desc);
+        send_message(pack);
+        report("starting file transfer of '" + filename + "'",true);
+        int total_size = 0;
+        pack = NetPackage(NetPackage::PackType::CONT_FILE_WRKR2MSTR,group,run_id,filename_desc);
         while (in.read(buf, sizeof(buf)))
         {
             send_message(pack,buf,sizeof(buf));
+            total_size = total_size + sizeof(buf);
         }
+        pack = NetPackage(NetPackage::PackType::FINISH_FILE_WRKR2MSTR,group,run_id,filename_desc);
+        send_message(pack);
+        ss.str("");
+        ss << "send " << total_size << " bytes for file '" << filename << "'";
+        report(ss.str(),true);
+        in.close();
     }
 }
 

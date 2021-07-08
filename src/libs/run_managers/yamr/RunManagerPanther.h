@@ -150,6 +150,7 @@ private:
 	pest_utils::thread_flag idling;
 	pest_utils::thread_flag idle_thread_finished;
 	thread* idle_thread;
+	map<string,ofstream*> open_file_trans_streams;
 	//pest_utils::thread_RAII* idle_thread_raii;
 
 	int schedule_run(int run_id, std::list<list<AgentInfoRec>::iterator> &free_agent_list, int n_responsive_agents);
@@ -194,7 +195,7 @@ private:
 	map<string, int> get_agent_stats();
 	vector<string> par_names_to_check_worker;
 	vector<string> obs_names_to_check_worker;
-
+    pair<string,string> get_recv_filenames(NetPackage& net_pack);
 };
 
 class RunManagerYAMRCondor : public RunManagerPanther
