@@ -481,6 +481,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	model_runs_timed_out = 0;
 	failure_map.clear();
 	active_runid_to_iterset_map.clear();
+	open_file_trans_streams.clear();
 	int num_runs = waiting_runs.size();
 	cout << "    running model " << num_runs << " times" << endl;
 	f_rmr << "running model " << num_runs << " times" << endl;
@@ -533,7 +534,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		schedule_runs();
 		echo();
 		// get and process incomming messages
-		if (listen() == false)
+		if (!listen())
 		{
 			++n_no_ops;
 		}
@@ -557,7 +558,18 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		}
 
 	}
-	if (terminate_reason == RUN_UNTIL_COND::NORMAL)
+    w_sleep(2000);
+    while (true)
+    {
+        listen();
+        if (open_file_trans_streams.size() == 0)
+            break;
+        cout << get_time_string_short() << "remaining file transfers: " << open_file_trans_streams.size() << "\r" << flush;
+
+
+    }
+
+    if (terminate_reason == RUN_UNTIL_COND::NORMAL)
 	{
 		echo();
 		total_runs += model_runs_done;
@@ -598,8 +610,12 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		}
 	}
 
-	// Resume idle pinging thread
-	resume_idle();
+
+
+
+
+    // Resume idle pinging thread
+    resume_idle();
 
 	return terminate_reason;
 }
@@ -1185,7 +1201,7 @@ void RunManagerPanther::echo()
 		<< "|T" << setw(5) << left << model_runs_timed_out << ") agents("
 		<< "R" << setw(4) << left << stats_map["run"]
 		<< "|W" << setw(4) << left << stats_map["wait"]
-		<< "|U" << setw(4) << left << stats_map["unavailable"] << ")\r" << flush;
+		<< "|U" << setw(4) << left << stats_map["unavailable"] << ") " << open_file_trans_streams.size() << "\r" << flush;
 }
 
 void RunManagerPanther::report(std::string message,bool to_cout)
@@ -1381,7 +1397,10 @@ void RunManagerPanther::process_message(int i_sock)
                         pair<string, ofstream *>(fnames.second, new ofstream));
                 ofstream &out = *ret.first->second;
                 out.open(fnames.second.c_str(), ios::binary);
-
+                if (out.bad())
+                {
+                    cout << " error opening file '" << fnames.second << "for writing" << endl;
+                }
             }
         }
     }
@@ -1397,7 +1416,7 @@ void RunManagerPanther::process_message(int i_sock)
         }
         else
         {
-            if (open_file_trans_streams.find(fnames.second) != open_file_trans_streams.end())
+            if (open_file_trans_streams.find(fnames.second) == open_file_trans_streams.end())
             {
                 ss << "agent file '" << fnames.first << "', master file '" << fnames.second << "' not open yet, can't continue transfer, something is wrong";
                 report(ss.str(),true);
@@ -1406,9 +1425,10 @@ void RunManagerPanther::process_message(int i_sock)
             {
                 pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
                 ofstream& out = *ret.first->second;
-                int s = net_pack.get_data().size();
-                //buf = reinterpret_cast<const char*>(ibuf.data());
-                out.write(reinterpret_cast<const char*>(net_pack.get_data().data()),s);
+                vector<int8_t> ibuf = net_pack.get_data();
+                //cout << reinterpret_cast<char*>(ibuf.data()) << endl;
+                out.write(reinterpret_cast<char*>(ibuf.data()),ibuf.size());
+                out.flush();
             }
         }
     }
@@ -1433,6 +1453,7 @@ void RunManagerPanther::process_message(int i_sock)
             {
                 pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
                 ofstream& out = *ret.first->second;
+                out.flush();
                 out.close();
                 open_file_trans_streams.erase(ret.first);
             }
