@@ -258,6 +258,30 @@ pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, long  timeout_
 	return err;
 }
 
+void PANTHERAgent::transfer_files(const vector<string>& tfiles, int group, int run_id, string& desc)
+{
+    int bytes_read;
+    char buf[100]={' '};
+    stringstream ss;
+    NetPackage pack(NetPackage::PackType::FILE_WRKR2MSTR,group,run_id,desc);
+    for (auto& filename :tfiles) {
+        ifstream in;
+        in.open(filename.c_str(), ifstream::binary);
+        if (in.bad()) {
+            ss.str("");
+            ss << "error opening file " << filename << " for reading";
+            report(ss.str(), true);
+            continue;
+        }
+        string filename_desc = desc + ", filename="+filename;
+        pack = NetPackage(NetPackage::PackType::FILE_WRKR2MSTR,group,run_id,filename_desc);
+        while (in.read(buf, sizeof(buf)))
+        {
+            send_message(pack,buf,sizeof(buf));
+        }
+    }
+}
+
 
 pair<int,string> PANTHERAgent::send_message(NetPackage &net_pack, const void *data, unsigned long data_len)
 {
@@ -1023,6 +1047,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss.str("");
 				ss << "results of run_id " << run_id << " sent successfully";
 				report(ss.str(), true);
+				transfer_files(pest_scenario.get_pestpp_options().get_panther_transfer_on_finish(), group_id, run_id,info_txt);
+
 			}
 			else if (final_run_status.first == NetPackage::PackType::RUN_FAILED)
 			{

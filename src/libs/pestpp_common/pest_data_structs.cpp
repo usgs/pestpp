@@ -1255,6 +1255,29 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		convert_ip(value, num_tpl_ins_threads);
 		return true;
 	}
+	else if (key == "PANTHER_TRANSFER_ON_FINISH")
+    {
+        panther_transfer_on_finish.clear();
+        vector<string> tokes;
+        tokenize(org_value, tokes, ",");
+        for (const auto& toke: tokes)
+        {
+            panther_transfer_on_finish.push_back(strip_cp(toke));
+        }
+        return true;
+    }
+    else if (key == "PANTHER_TRANSFER_ON_FAIL")
+    {
+        panther_transfer_on_finish.clear();
+        vector<string> tokes;
+        tokenize(org_value, tokes, ",");
+        for (const auto& toke: tokes)
+        {
+            panther_transfer_on_fail.push_back(strip_cp(toke));
+        }
+        return true;
+    }
+
 	
 	return false;
 }
@@ -1452,8 +1475,14 @@ void PestppOptions::summary(ostream& os) const
 	os << "panther_debug_loop: " << panther_debug_loop << endl;
 	os << "debug_check_par_en_consistency: " << debug_check_paren_consistency << endl;
 	os << "panther_agent_freeze_on_fail: " << panther_debug_fail_freeze << endl;
+	os << "panther_transfer_on_finish: " << endl;
+	for (auto& file : panther_transfer_on_finish)
+	    os << file << endl;
+    os << "panther_transfer_on_fail: " << endl;
+    for (auto& file : panther_transfer_on_fail)
+        os << file << endl;
 
-	os << endl;
+    os << endl;
 
 	os << "...pestpp-glm specific options:" << endl;
 	os << "max_n_super: " << max_n_super << endl;
@@ -1839,6 +1868,9 @@ void PestppOptions::set_defaults()
 	set_debug_check_par_en_consistency(false);
 	set_panther_debug_fail_freeze(false);
 	set_panther_echo(true);
+    set_panther_transfer_on_finish(vector<string>{});
+    set_panther_transfer_on_fail(vector<string>{});
+
 }
 
 ostream& operator<< (ostream &os, const ParameterInfo& val)
@@ -2183,129 +2215,4 @@ vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bou
 }
 
 
-
-//template <typename  T>
-//T CtlPar_container::get_value(string name) {
-//	
-//	if (!(int_parms.find(name) == int_parms.end()))
-//	{
-//		int ival;
-//		ival = int_parms[name];
-//		return ival;
-//	}
-//	/*
-//	else if (!(string_parms.find(name) == string_parms.end()))
-//	{
-//		value = string_parms[name];
-//		return value;
-//	}
-//
-//	else if (!(double_parms.find(name) == double_parms.end()))
-//	{
-//		value = double_parms[name];
-//		return value;
-//	}*/
-//
-//	else if (!(bool_parms.find(name) == bool_parms.end()))
-//	{
-//		bool bvalue = bool_parms[name];
-//		//value = bvalue;
-//		return bvalue;
-//	}
-//	/*else
-//	{
-//		cout << "....... Unknow name ..........";
-//		value = False;
-//		return value;
-//	}*/
-//
-//	
-//}
-
-
-
-
-//string CtlPar_container::get_svalue(string name)
-//{
-//	return string_parms[name];
-//}
-//
-//int CtlPar_container::get_ivalue(string name)
-//{
-//	return int_parms[name];
-//}
-//
-//double CtlPar_container::get_dvalue(string name)
-//{
-//	return double_parms[name];
-//}
-//
-//bool CtlPar_container::get_bvalue(string name)
-//{
-//	return bool_parms[name];
-//}
-//
-//vector<double> CtlPar_container::get_vvalue(string name)
-//{
-//	
-//
-//	return vector_parms[name];
-//}
-//
-//
-//void CtlPar_container::set_value(string name, string val)
-//{
-//	string_parms[name] = val;
-//}
-//
-//void CtlPar_container::set_value(string name, vector<double> val)
-//{
-//	vector_parms[name] = val;
-//}
-//
-//void CtlPar_container::set_value(string name, int val)
-//{
-//	int_parms[name] = val;
-//}
-//
-//void CtlPar_container::set_value(string name, double val)
-//{
-//	double_parms[name] = val;
-//}
-//void CtlPar_container::set_value(string name, bool val)
-//{
-//	bool_parms[name] = val;
-//}
-//
-//bool CtlPar_container::is_parameter(string name)
-//{
-//	if (!(int_parms.find(name) == int_parms.end()))
-//		return true;
-//	else if (!(string_parms.find(name) == string_parms.end()))
-//		return true;
-//	else if (!(double_parms.find(name) == double_parms.end()))
-//		return true;
-//	else if (!(bool_parms.find(name) == bool_parms.end()))
-//		return true;
-//	else if (!(vector_parms.find(name) == vector_parms.end()))
-//		return true;
-//	else
-//		return false;
-//}
-//string CtlPar_container::get_type(string name)
-//{
-//	if (!(int_parms.find(name) == int_parms.end()))
-//		return "int";
-//	else if (!(string_parms.find(name) == string_parms.end()))
-//		return "string";
-//	else if (!(double_parms.find(name) == double_parms.end()))
-//		return "double";
-//	else if (!(bool_parms.find(name) == bool_parms.end()))
-//		return "bool";
-//	else if (!(vector_parms.find(name) == vector_parms.end()))
-//		return "vector";
-//	else
-//		return "UNKNOWN";
-//}
-//;
 
