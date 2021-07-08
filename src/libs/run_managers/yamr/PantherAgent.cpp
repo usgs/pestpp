@@ -293,14 +293,15 @@ void PANTHERAgent::transfer_files(const vector<string>& tfiles, int group, int r
 
         int fsize = in.tellg();
         in.seekg(0,in.beg);
-        while ((total_size < fsize) && (in.read(buf, sizeof(buf))))
-        {
-            //cout << filename << ": " << buf << endl;
-            send_message(pack,buf,sizeof(buf));
-            total_size = total_size + sizeof(buf);
-            if ((fsize - total_size) < 256)
-                break;
-            //buf = new char[256]{'\0'};
+        if (fsize > 256) {
+            while ((total_size < fsize) && (in.read(buf, sizeof(buf)))) {
+                //cout << filename << ": " << buf << endl;
+                send_message(pack, buf, sizeof(buf));
+                total_size = total_size + sizeof(buf);
+                if ((fsize - total_size) < 256)
+                    break;
+                //buf = new char[256]{'\0'};
+            }
         }
         //cout << "final: " <<  in.eof() << "," << in.fail() << "," << in.bad() << endl;
         //trim the final buffer read

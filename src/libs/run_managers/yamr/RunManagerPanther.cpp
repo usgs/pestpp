@@ -1389,6 +1389,7 @@ void RunManagerPanther::process_message(int i_sock)
             //do something here
         } else {
             if (open_file_trans_streams.find(fnames.second) != open_file_trans_streams.end()) {
+                ss.str("");
                 ss << "agent file '" << fnames.first << "', master file '" << fnames.second
                    << "' already open, can't reopen, something is wrong";
                 report(ss.str(), true);
@@ -1399,8 +1400,14 @@ void RunManagerPanther::process_message(int i_sock)
                 out.open(fnames.second.c_str(), ios::binary);
                 if (out.bad())
                 {
-                    cout << " error opening file '" << fnames.second << "for writing" << endl;
+                    ss.str("");
+                    ss << " error opening file '" << fnames.second << "for writing" << endl;
+                    report(ss.str(),true);
                 }
+                ss.str("");
+                ss << "opened file '" << fnames.second << " for file transfer of file '" << fnames.first;
+                ss << "from " << host_name << "$" << agent_info_iter->get_work_dir();
+                report(ss.str(),false);
             }
         }
     }
@@ -1426,7 +1433,7 @@ void RunManagerPanther::process_message(int i_sock)
                 pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
                 ofstream& out = *ret.first->second;
                 vector<int8_t> ibuf = net_pack.get_data();
-                //cout << reinterpret_cast<char*>(ibuf.data()) << endl;
+                cout << reinterpret_cast<char*>(ibuf.data()) << endl;
                 out.write(reinterpret_cast<char*>(ibuf.data()),ibuf.size());
                 out.flush();
             }
@@ -1456,6 +1463,10 @@ void RunManagerPanther::process_message(int i_sock)
                 out.flush();
                 out.close();
                 open_file_trans_streams.erase(ret.first);
+                ss.str("");
+                ss << "closed file '" << fnames.second << " for file transfer of file '" << fnames.first;
+                ss << "from " << host_name << "$" << agent_info_iter->get_work_dir();
+                report(ss.str(),false);
             }
         }
     }
