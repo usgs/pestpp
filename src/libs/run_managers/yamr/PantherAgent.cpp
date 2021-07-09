@@ -258,7 +258,7 @@ pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, long  timeout_
 	return err;
 }
 
-void PANTHERAgent::transfer_files(const vector<string>& tfiles, int group, int run_id, string& desc)
+void PANTHERAgent::transfer_files(const vector<string>& tfiles, int group, int run_id, string& desc, string tag)
 {
     int bytes_read;
 
@@ -282,42 +282,40 @@ void PANTHERAgent::transfer_files(const vector<string>& tfiles, int group, int r
             in.close();
             continue;
         }
-        string filename_desc = desc + " AGENT_FILENAME="+filename;
+        string filename_desc = desc + " AGENT_FILENAME="+filename + " " + tag;
+
         pack = NetPackage(NetPackage::PackType::START_FILE_WRKR2MSTR,group,run_id,filename_desc);
         send_message(pack);
         report("starting file transfer of '" + filename + "'",true);
         int total_size = 0;
         pack = NetPackage(NetPackage::PackType::CONT_FILE_WRKR2MSTR,group,run_id,filename_desc);
-        char buf[256]={'\0'};
+        char buf[NetPackage::FILE_TRANS_BUF_SIZE]={'\0'};
         in.seekg(0,in.end);
 
-        int fsize = in.tellg();
+        int file_size = in.tellg();
         in.seekg(0,in.beg);
-        if (fsize > 256) {
-            while ((total_size < fsize) && (in.read(buf, sizeof(buf)))) {
+        if (file_size > NetPackage::FILE_TRANS_BUF_SIZE) {
+            while ((total_size < file_size) && (in.read(buf, sizeof(buf)))) {
                 //cout << filename << ": " << buf << endl;
                 send_message(pack, buf, sizeof(buf));
                 total_size = total_size + sizeof(buf);
-                if ((fsize - total_size) < 256)
+                if ((file_size - total_size) < NetPackage::FILE_TRANS_BUF_SIZE)
                     break;
-                //buf = new char[256]{'\0'};
+                
             }
         }
-        //cout << "final: " <<  in.eof() << "," << in.fail() << "," << in.bad() << endl;
-        //trim the final buffer read
-        if (total_size < fsize) {
-            char buf[256]={'\0'};
-            in.read(buf,fsize-total_size);
-            cout << filename << "fsize: " << fsize << ", total_size: " << total_size << ", final: " << string(buf,fsize-total_size) << endl;
-            send_message(pack, buf, fsize-total_size);
-            total_size = total_size + (fsize-total_size);
+        if (total_size < file_size) {
+            char buf[NetPackage::FILE_TRANS_BUF_SIZE]={'\0'};
+            in.read(buf,file_size-total_size);
+            //cout << filename << "fsize: " << file_size << ", total_size: " << total_size << ", final: " << string(buf,file_size-total_size) << endl;
+            send_message(pack, buf, file_size-total_size);
+            total_size = total_size + (file_size-total_size);
         }
-
-
+        
         pack = NetPackage(NetPackage::PackType::FINISH_FILE_WRKR2MSTR,group,run_id,filename_desc);
         send_message(pack);
         ss.str("");
-        ss << "send " << total_size << " bytes for file '" << filename << "'";
+        ss << "sent " << total_size << " bytes for file '" << filename << "', file size: " << file_size;
         report(ss.str(),true);
         in.close();
     }
@@ -1088,7 +1086,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss.str("");
 				ss << "results of run_id " << run_id << " sent successfully";
 				report(ss.str(), true);
-                transfer_files(pest_scenario.get_pestpp_options().get_panther_transfer_on_finish(), group_id, run_id,info_txt);
+                transfer_files(pest_scenario.get_pestpp_options().get_panther_transfer_on_finish(), group_id,
+                               run_id,info_txt, "RUN_STATUS=completed");
 
             }
 			else if (final_run_status.first == NetPackage::PackType::RUN_FAILED)
@@ -1108,6 +1107,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					report(ss.str(), true);
 					terminate_or_restart(-1);
 				}
+                transfer_files(pest_scenario.get_pestpp_options().get_panther_transfer_on_fail(), group_id,
+                               run_id,info_txt, "RUN_STATUS=failed");
 				if (pest_scenario.get_pestpp_options().get_panther_debug_fail_freeze())
 				{
 					ss.str("");
@@ -1152,6 +1153,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					report(ss.str(), true);
 					terminate_or_restart(-1);
 				}
+                transfer_files(pest_scenario.get_pestpp_options().get_panther_transfer_on_fail(), group_id,
+                               run_id,info_txt, "RUN_STATUS=failed");
 			}
 
 			else if (final_run_status.first == NetPackage::PackType::CORRUPT_MESG)

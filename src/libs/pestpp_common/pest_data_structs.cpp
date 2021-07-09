@@ -1268,7 +1268,7 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
     }
     else if (key == "PANTHER_TRANSFER_ON_FAIL")
     {
-        panther_transfer_on_finish.clear();
+        panther_transfer_on_fail.clear();
         vector<string> tokes;
         tokenize(org_value, tokes, ",");
         for (const auto& toke: tokes)

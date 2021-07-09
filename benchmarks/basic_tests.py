@@ -922,13 +922,15 @@ def mf6_v5_sen_test():
     #if os.path.exists(m_d):
     #    shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_sen.pst"))
+    pst.pestpp_options["panther_transfer_on_finish"] = ["freyberg6_freyberg.cbc","freyberg6.lst","ies_prior.jcb"]
+    pst.write(os.path.join(t_d,"freyberg6_run_sen_trn.pst"))
     m_d = os.path.join(model_d,"master_sen")
-    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sen"), "freyberg6_run_sen.pst",
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sen"), "freyberg6_run_sen_trn.pst",
                                  num_workers=15, worker_root=model_d,
                                  port=4004,verbose=True,master_dir=m_d)
 
-    pst = pyemu.Pst(os.path.join(m_d,"freyberg6_run_sen.pst"))
-    mio_file = os.path.join(m_d,"freyberg6_run_sen.mio")
+    pst = pyemu.Pst(os.path.join(m_d,"freyberg6_run_sen_trn.pst"))
+    mio_file = os.path.join(m_d,"freyberg6_run_sen_trn.mio")
     assert os.path.exists(mio_file),mio_file
     df = pd.read_csv(mio_file)
     assert df.shape[0] > 1
@@ -936,6 +938,22 @@ def mf6_v5_sen_test():
     assert os.path.exists(msn_file),msn_file
     msngrp_file = msn_file.replace(".msn",".group.msn")
     assert os.path.exists(msngrp_file),msngrp_file
+
+    jcb_files = [f for f in os.listdir(m_d) if f.lower().startswith("runid") and f.lower().endswith(".jcb")]
+    print(len(jcb_files))
+    assert len(jcb_files) == 52
+    for jcb_file in jcb_files:
+        j = pyemu.Jco.from_binary(os.path.join(m_d,jcb_file))
+
+    lst_files = [f for f in os.listdir(m_d) if f.lower().startswith("runid") and f.lower().endswith(".lst")]
+    print(len(lst_files))
+    assert len(lst_files) == 52
+    
+    cbc_files = [f for f in os.listdir(m_d) if f.lower().startswith("runid") and f.lower().endswith(".cbc")]
+    print(len(cbc_files))
+    assert len(cbc_files) == 52
+    
+
 
 
 def mf6_v5_opt_stack_test():
@@ -1090,7 +1108,7 @@ if __name__ == "__main__":
 
     # parallel_consist_test()
     # ext_stdcol_test()
-    sen_grp_test()
+    #sen_grp_test()
     #da_prep_4_freyberg_batch()
     # da_prep_4_mf6_freyberg_seq()
     # shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sen.exe"),os.path.join("..","bin","pestpp-sen.exe"))
@@ -1101,7 +1119,7 @@ if __name__ == "__main__":
     #da_prep_4_mf6_freyberg_seq_tbl()
     #da_mf6_freyberg_test_2()
     #mf6_v5_ies_test()
-    #mf6_v5_sen_test()
+    mf6_v5_sen_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
