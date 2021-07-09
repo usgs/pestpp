@@ -138,6 +138,8 @@ private:
 	int model_runs_done;
 	int model_runs_failed;
 	int model_runs_timed_out;
+	long long bytes_transferred;
+	int files_transferred;
 	bool should_echo;
 	fd_set master; // master file descriptor list
 	list<AgentInfoRec> agent_info_set;
