@@ -55,3 +55,4 @@ mfnwt 10par_xsec.nam
 hk_Layer_1.ref.tpl hk_Layer_1.ref
 strt_Layer_1.ref.tpl strt_Layer_1.ref
 10par_xsec.hds.ins 10par_xsec.hds
+++panther_transfer_on_finish(10par_xsec.hds,10par_xsec.list)
