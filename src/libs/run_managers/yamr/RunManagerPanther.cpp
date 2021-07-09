@@ -479,6 +479,8 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	model_runs_done = 0;
 	model_runs_failed = 0;
 	model_runs_timed_out = 0;
+	bytes_transferred = 0;
+	files_transferred = 0;
 	failure_map.clear();
 	active_runid_to_iterset_map.clear();
 	open_file_trans_streams.clear();
@@ -510,7 +512,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		cout << "   avg = average model run time in minutes" << endl;
 		cout << "   runs(C = completed | F = failed | T = timed out)" << endl;
 		cout << "   agents(R = running | W = waiting | U = unavailable)" << endl;
-		cout << "------------------------------------------------------------------------------" << endl;
+		cout << "---------------------------------------------------------------------------------" << endl;
 	}
 	else
 	{
@@ -564,7 +566,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
         listen();
         if (open_file_trans_streams.size() == 0)
             break;
-        cout << get_time_string_short() << "remaining file transfers: " << open_file_trans_streams.size() << "\r" << flush;
+        cout << get_time_string_short() << " remaining file transfers: " << open_file_trans_streams.size() << "                                       \r" << flush;
 
 
     }
@@ -583,6 +585,13 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		message << "   " << setprecision(3) << get_global_runtime_minute() << " avg run time (min) : ";
 		message << setprecision(3) << duration << " run mgr time (min)" << endl;
 		message << "   " << agent_info_set.size() << " agents connected" << endl;
+		if (bytes_transferred > 0)
+        {
+
+            message << "   " << files_transferred << " files transferred" << endl;
+            message << "   " << bytes_transferred << " bytes transferred" << endl;
+
+        }
 		
 		
 		
@@ -1195,13 +1204,13 @@ void RunManagerPanther::echo()
 	if (!should_echo)
 		return;
 	map<string, int> stats_map = get_agent_stats();
-	cout << get_time_string_short() << " avg:" << setw(5) << setprecision(2) << get_global_runtime_minute()  << " runs("
+	cout << get_time_string_short() << " avg:" << setw(5) << setprecision(2) << left << get_global_runtime_minute()  << " runs("
 	     << "C" << setw(5) << left << model_runs_done
 		<< "|F" << setw(5) << left << model_runs_failed
 		<< "|T" << setw(5) << left << model_runs_timed_out << ") agents("
 		<< "R" << setw(4) << left << stats_map["run"]
 		<< "|W" << setw(4) << left << stats_map["wait"]
-		<< "|U" << setw(4) << left << stats_map["unavailable"] << ") " << open_file_trans_streams.size() << "\r" << flush;
+		<< "|U" << setw(4) << left << stats_map["unavailable"] << ") " << setw(3) << left << open_file_trans_streams.size() << "\r" << flush;
 }
 
 void RunManagerPanther::report(std::string message,bool to_cout)
@@ -1436,6 +1445,7 @@ void RunManagerPanther::process_message(int i_sock)
                 //cout << reinterpret_cast<char*>(ibuf.data()) << endl;
                 out.write(reinterpret_cast<char*>(ibuf.data()),ibuf.size());
                 out.flush();
+                bytes_transferred += ibuf.size();
             }
         }
     }
@@ -1468,6 +1478,7 @@ void RunManagerPanther::process_message(int i_sock)
                 ss << "closed file '" << fnames.second << " for file transfer of file '" << fnames.first;
                 ss << "from " << host_name << "$" << agent_info_iter->get_work_dir() << ", transferred " << file_size << " bytes";
                 report(ss.str(),false);
+                files_transferred += 1;
             }
         }
     }
