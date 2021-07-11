@@ -1595,9 +1595,10 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
     }
     if (master_filename.size() > 255)
     {
-        cout << "WARNING: master_filename size > 255" << endl;
+        ss.str("");
+        ss << "WARNING: master_filename '" << master_filename << "' size > 255" << endl;
+        report(ss.str(),true);
     }
-
     return make_pair(agent_filename,master_filename);
 }
 
