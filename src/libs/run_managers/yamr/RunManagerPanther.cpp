@@ -1499,7 +1499,7 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack)
     tokenize(info_txt,tokens);
     stringstream ss;
     ss.str("");
-    ss << "runid=" << net_pack.get_run_id() << "|groupid=" << net_pack.get_group_id();
+    ss << "runid=" << net_pack.get_run_id() << ".groupid=" << net_pack.get_group_id();
     string agent_filename_token = "";
     string agent_filename = "";
     string master_filename = "";
@@ -1507,14 +1507,14 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack)
         if (token.find("AGENT_FILENAME=") != string::npos)
             agent_filename_token = token;
         else
-            ss << "|" << token;
+            ss << "." << token;
     }
     if (agent_filename_token.size() == 0)
     {
         //do something here
     }
     else {
-        ss << "|" << agent_filename_token;
+        ss << "." << agent_filename_token;
         tokens.clear();
         tokenize(agent_filename_token, tokens, "=");
         if (tokens.size() != 2) {
