@@ -562,6 +562,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 
 	}
     w_sleep(2000);
+	n_no_ops = 0;
     while (true)
     {
         if (!listen())
@@ -579,10 +580,10 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
         {
             n_no_ops = 0;
         }
-        if (n_no_ops >= max_no_ops)
+        if (agent_info_set.size() == 0)
         {
             ss.str("");
-            ss << "maximum 'no operations' count reached, closing all reminaing open file transfers";
+            ss << "lost comms with all agents, closing all reminaing open file transfers";
             for (auto& m : open_file_socket_map) {
                 string fname = m.second;
                 pair<map<string, ofstream *>::iterator, bool> ret = open_file_trans_streams.insert(
@@ -1451,7 +1452,7 @@ void RunManagerPanther::process_message(int i_sock)
         } else {
             if (open_file_trans_streams.find(fnames.second) != open_file_trans_streams.end()) {
                 ss.str("");
-                ss << "agent file '" << fnames.first << "', master file '" << fnames.second
+                ss << "file transfer error: agent " << host_name << "$" << agent_info_iter->get_work_dir() << " requesting file '" << fnames.first << "', master file '" << fnames.second
                    << "' already open, can't reopen, something is wrong";
                 report(ss.str(), true);
             } else {
@@ -1466,7 +1467,7 @@ void RunManagerPanther::process_message(int i_sock)
                     report(ss.str(),true);
                 }
                 ss.str("");
-                ss << "opened file '" << fnames.second << " for file transfer of file '" << fnames.first;
+                ss << "agent " << host_name << "$" << agent_info_iter->get_work_dir() << " request opened file '" << fnames.second << "' for file transfer of file '" << fnames.first << "'";
                 ss << "from " << host_name << "$" << agent_info_iter->get_work_dir();
                 report(ss.str(),false);
                 open_file_socket_map.insert(make_pair(i_sock,fnames.second));
@@ -1487,7 +1488,7 @@ void RunManagerPanther::process_message(int i_sock)
         {
             if (open_file_trans_streams.find(fnames.second) == open_file_trans_streams.end())
             {
-                ss << "agent file '" << fnames.first << "', master file '" << fnames.second << "' not open yet, can't continue transfer, something is wrong";
+                ss << "file transfer error: agent " << host_name << "$" << agent_info_iter->get_work_dir() << " requesting file '" << fnames.first << "', master file '" << fnames.second << "' not open yet, can't continue transfer, something is wrong";
                 report(ss.str(),true);
             }
             else
@@ -1499,6 +1500,9 @@ void RunManagerPanther::process_message(int i_sock)
                 out.write(reinterpret_cast<char*>(ibuf.data()),ibuf.size());
                 out.flush();
                 bytes_transferred += ibuf.size();
+                ss.str("");
+                ss << "agent " << host_name << "$" << agent_info_iter->get_work_dir() << " transferred " << ibuf.size() << " to file '" << fnames.second << "'";
+                report(ss.str(),false);
             }
         }
     }
@@ -1516,7 +1520,7 @@ void RunManagerPanther::process_message(int i_sock)
         {
             if (open_file_trans_streams.find(fnames.second) == open_file_trans_streams.end())
             {
-                ss << "agent file '" << fnames.first << "', master file '" << fnames.second << "' not open yet, can't close, something is wrong";
+                ss << "file transfer error: agent " << host_name << "$" << agent_info_iter->get_work_dir() << " requesting file '" << fnames.first << "', master file '" << fnames.second << "' not open yet, can't close, something is wrong";
                 report(ss.str(),true);
             }
             else
@@ -1528,8 +1532,8 @@ void RunManagerPanther::process_message(int i_sock)
                 out.close();
                 open_file_trans_streams.erase(ret.first);
                 ss.str("");
-                ss << "closed file '" << fnames.second << " for file transfer of file '" << fnames.first;
-                ss << "from " << host_name << "$" << agent_info_iter->get_work_dir() << ", transferred " << file_size << " bytes";
+                ss << "closed file '" << fnames.second << "' for file transfer of file '" << fnames.first;
+                ss << "' from " << host_name << "$" << agent_info_iter->get_work_dir() << ", transferred " << file_size << " bytes";
                 report(ss.str(),false);
                 files_transferred += 1;
                 open_file_socket_map.erase(i_sock);
@@ -1573,14 +1577,17 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
     string agent_filename = "";
     string master_filename = "";
     for (auto& token : tokens) {
-        if (token.find("AGENT_FILENAME=") != string::npos)
+        if (token.find("agent_filename=") != string::npos)
             agent_filename_token = token;
         else
             ss << "." << token;
     }
     if (agent_filename_token.size() == 0)
     {
-        //do something here
+        ss.str("");
+        ss << "WARNING: could not find 'agent_filename' tag in net_pack info txt: '" << info_txt;
+        ss << " from agent " << hostname << "$" << working_dir << ", unable form file transfer names";
+        report (ss.str(), true);
     }
     else {
         ss << "." << agent_filename_token;

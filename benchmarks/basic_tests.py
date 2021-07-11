@@ -166,7 +166,12 @@ def sweep_forgive_test():
     pe.loc[:,pst.par_names[2:]] = pst.parameter_data.loc[pst.par_names[2:],"parval1"].values
     pe.to_csv(os.path.join(t_d,"sweep_in.csv"))
     pst.pestpp_options["sweep_forgive"] = True
+    pst.control_data.noptmax = -1
+    pst.pestpp_options["ies_num_reals"] = 5
     pst.write(os.path.join(t_d,"pest_forgive.pst"))
+    pyemu.os_utils.start_workers(t_d, exe_path, "pest_forgive.pst", 1, master_dir=m_d+"0",
+                                 worker_root=model_d, port=port)
+
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_forgive.pst", 10, master_dir=m_d,
                            worker_root=model_d,port=port)
     df1 = pd.read_csv(os.path.join(m_d, "sweep_out.csv"),index_col=0)

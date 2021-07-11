@@ -282,11 +282,11 @@ void PANTHERAgent::transfer_files(const vector<string>& tfiles, int group, int r
             in.close();
             continue;
         }
-        string filename_desc = desc + " AGENT_FILENAME="+filename + " " + tag;
+        string filename_desc = desc + " agent_filename="+filename + " " + tag;
 
         pack = NetPackage(NetPackage::PackType::START_FILE_WRKR2MSTR,group,run_id,filename_desc);
         send_message(pack);
-        report("starting file transfer of '" + filename + "'",true);
+        report("starting file transfer of '" + filename + "' for info '" + filename_desc + "' ",true);
         int total_size = 0;
         pack = NetPackage(NetPackage::PackType::CONT_FILE_WRKR2MSTR,group,run_id,filename_desc);
         char buf[NetPackage::FILE_TRANS_BUF_SIZE]={'\0'};
@@ -1087,7 +1087,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss << "results of run_id " << run_id << " sent successfully";
 				report(ss.str(), true);
                 transfer_files(pest_scenario.get_pestpp_options().get_panther_transfer_on_finish(), group_id,
-                               run_id,info_txt, "RUN_STATUS=completed");
+                               run_id,info_txt, "run_status=completed");
 
             }
 			else if (final_run_status.first == NetPackage::PackType::RUN_FAILED)
@@ -1108,7 +1108,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					terminate_or_restart(-1);
 				}
                 transfer_files(pest_scenario.get_pestpp_options().get_panther_transfer_on_fail(), group_id,
-                               run_id,info_txt, "RUN_STATUS=failed");
+                               run_id,info_txt, "run_status=failed");
 				if (pest_scenario.get_pestpp_options().get_panther_debug_fail_freeze())
 				{
 					ss.str("");
@@ -1154,7 +1154,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					terminate_or_restart(-1);
 				}
                 transfer_files(pest_scenario.get_pestpp_options().get_panther_transfer_on_fail(), group_id,
-                               run_id,info_txt, "RUN_STATUS=failed");
+                               run_id,info_txt, "run_status=failed");
 			}
 
 			else if (final_run_status.first == NetPackage::PackType::CORRUPT_MESG)
