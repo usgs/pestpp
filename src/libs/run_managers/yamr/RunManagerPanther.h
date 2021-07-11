@@ -198,7 +198,7 @@ private:
 	map<string, int> get_agent_stats();
 	vector<string> par_names_to_check_worker;
 	vector<string> obs_names_to_check_worker;
-    pair<string,string> get_recv_filenames(NetPackage& net_pack);
+    pair<string,string> get_recv_filenames(NetPackage& net_pack, string host_name, string working_dir);
 };
 
 class RunManagerYAMRCondor : public RunManagerPanther

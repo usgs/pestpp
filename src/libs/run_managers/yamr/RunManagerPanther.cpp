@@ -1445,7 +1445,7 @@ void RunManagerPanther::process_message(int i_sock)
 	else if (net_pack.get_type() == NetPackage::PackType::START_FILE_WRKR2MSTR) {
         stringstream ss;
         ss.str("");
-        pair<string, string> fnames = get_recv_filenames(net_pack);
+        pair<string, string> fnames = get_recv_filenames(net_pack, host_name,agent_info_iter->get_work_dir());
         if ((fnames.first.size() == 0) || (fnames.second.size() == 0)) {
             //do something here
         } else {
@@ -1478,7 +1478,7 @@ void RunManagerPanther::process_message(int i_sock)
     {
         stringstream ss;
         ss.str("");
-        pair<string,string> fnames = get_recv_filenames(net_pack);
+        pair<string,string> fnames = get_recv_filenames(net_pack, host_name,agent_info_iter->get_work_dir());
         if ((fnames.first.size() == 0) || (fnames.second.size() == 0))
         {
             //do something here
@@ -1507,7 +1507,7 @@ void RunManagerPanther::process_message(int i_sock)
     {
         stringstream ss;
         ss.str("");
-        pair<string,string> fnames = get_recv_filenames(net_pack);
+        pair<string,string> fnames = get_recv_filenames(net_pack, host_name,agent_info_iter->get_work_dir());
         if ((fnames.first.size() == 0) || (fnames.second.size() == 0))
         {
             //do something here
@@ -1546,13 +1546,24 @@ void RunManagerPanther::process_message(int i_sock)
 	}
 }
 
-pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack)
+pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, string hostname, string working_dir)
 {
+    //sanitize hostname and working_dir
+    replace(hostname.begin(),hostname.end(),'/','-');
+    replace(hostname.begin(),hostname.end(),'\\','-');
+    replace(hostname.begin(),hostname.end(),'.','-');
+
+    replace(working_dir.begin(),working_dir.end(),'/','-');
+    replace(working_dir.begin(),working_dir.end(),'\\','-');
+    replace(working_dir.begin(),working_dir.end(),'.','-');
+    stringstream ss;
+    ss.str("");
+    ss << "hostname=" << hostname;
+    ss << ".agentdir=" << working_dir;
     string info_txt = net_pack.get_info_txt();
     vector<string> tokens;
     tokenize(info_txt,tokens);
-    stringstream ss;
-    ss.str("");
+
     ss << "runid=" << net_pack.get_run_id() << ".groupid=" << net_pack.get_group_id();
     string agent_filename_token = "";
     string agent_filename = "";
@@ -1578,6 +1589,11 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack)
             master_filename = ss.str();
         }
     }
+    if (master_filename.size() > 255)
+    {
+        cout << "WARNING: master_filename size > 255" << endl;
+    }
+
     return make_pair(agent_filename,master_filename);
 }
 
