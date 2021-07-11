@@ -1552,10 +1552,14 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
     replace(hostname.begin(),hostname.end(),'/','-');
     replace(hostname.begin(),hostname.end(),'\\','-');
     replace(hostname.begin(),hostname.end(),'.','-');
+    replace(hostname.begin(),hostname.end(),'(','-');
+    replace(hostname.begin(),hostname.end(),')','-');
 
     replace(working_dir.begin(),working_dir.end(),'/','-');
     replace(working_dir.begin(),working_dir.end(),'\\','-');
     replace(working_dir.begin(),working_dir.end(),'.','-');
+    replace(working_dir.begin(),working_dir.end(),'(','-');
+    replace(working_dir.begin(),working_dir.end(),')','-');
     stringstream ss;
     ss.str("");
     ss << "hostname=" << hostname;
@@ -1564,7 +1568,7 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
     vector<string> tokens;
     tokenize(info_txt,tokens);
 
-    ss << "runid=" << net_pack.get_run_id() << ".groupid=" << net_pack.get_group_id();
+    ss << ".runid=" << net_pack.get_run_id() << ".groupid=" << net_pack.get_group_id();
     string agent_filename_token = "";
     string agent_filename = "";
     string master_filename = "";
