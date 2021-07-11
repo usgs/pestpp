@@ -484,6 +484,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	failure_map.clear();
 	active_runid_to_iterset_map.clear();
 	open_file_trans_streams.clear();
+	open_file_socket_map.clear();
 	int num_runs = waiting_runs.size();
 	cout << "    running model " << num_runs << " times" << endl;
 	f_rmr << "running model " << num_runs << " times" << endl;
@@ -563,10 +564,43 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
     w_sleep(2000);
     while (true)
     {
-        listen();
+        if (!listen())
+        {
+            ++n_no_ops;
+        }
+        else
+        {
+            n_no_ops = 0;
+        }
         if (open_file_trans_streams.size() == 0)
             break;
         cout << get_time_string_short() << " remaining file transfers: " << open_file_trans_streams.size() << "                                       \r" << flush;
+        if (ping())
+        {
+            n_no_ops = 0;
+        }
+        if (n_no_ops >= max_no_ops)
+        {
+            ss.str("");
+            ss << "maximum 'no operations' count reached, closing all reminaing open file transfers";
+            for (auto& m : open_file_socket_map) {
+                string fname = m.second;
+                pair<map<string, ofstream *>::iterator, bool> ret = open_file_trans_streams.insert(
+                        pair<string, ofstream *>(fname, new ofstream));
+                ofstream &out = *ret.first->second;
+                int file_size = out.tellp();
+                out.flush();
+                out.close();
+                open_file_trans_streams.erase(ret.first);
+                ss.str("");
+                ss << "closed file '" << fname << " for file transfer, transferred " << file_size << " bytes";
+                report(ss.str(), false);
+                files_transferred += 1;
+
+            }
+            open_file_socket_map.clear();
+
+        }
 
 
     }
@@ -974,6 +1008,24 @@ void RunManagerPanther::close_agent(list<AgentInfoRec>::iterator agent_info_iter
 
 	agent_info_set.erase(agent_info_iter);
 	socket_to_iter_map.erase(i_sock);
+	if (open_file_socket_map.find(i_sock) != open_file_socket_map.end())
+    {
+	    string fname = open_file_socket_map.at(i_sock);
+        pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fname,new ofstream));
+        ofstream& out = *ret.first->second;
+        int file_size = out.tellp();
+        out.flush();
+        out.close();
+        open_file_trans_streams.erase(ret.first);
+        stringstream ss;
+        ss.str("");
+        ss << "lost comms with agent, closed file '" << fname << ", " << file_size << " bytes transferred";
+
+        report(ss.str(),false);
+        files_transferred += 1;
+        open_file_socket_map.erase(i_sock);
+    }
+
 
 	stringstream ss;
 	ss << "closed connection to agent: " << socket_name << ", number of agents: " << socket_to_iter_map.size();
@@ -1417,6 +1469,7 @@ void RunManagerPanther::process_message(int i_sock)
                 ss << "opened file '" << fnames.second << " for file transfer of file '" << fnames.first;
                 ss << "from " << host_name << "$" << agent_info_iter->get_work_dir();
                 report(ss.str(),false);
+                open_file_socket_map.insert(make_pair(i_sock,fnames.second));
             }
         }
     }
@@ -1479,6 +1532,7 @@ void RunManagerPanther::process_message(int i_sock)
                 ss << "from " << host_name << "$" << agent_info_iter->get_work_dir() << ", transferred " << file_size << " bytes";
                 report(ss.str(),false);
                 files_transferred += 1;
+                open_file_socket_map.erase(i_sock);
             }
         }
     }

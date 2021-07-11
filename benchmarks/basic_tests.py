@@ -1049,6 +1049,7 @@ def fr_fail_test():
     if os.path.exists(oe_file):
         os.remove(oe_file)
     pst.control_data.noptmax = 1
+    pst.pestpp_options["panther_transfer_on_fail"] = "10par_xsec.list"
     pst.write(os.path.join(new_d, "pest.pst"))
     try:
         pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
@@ -1119,7 +1120,7 @@ if __name__ == "__main__":
     #da_prep_4_mf6_freyberg_seq_tbl()
     #da_mf6_freyberg_test_2()
     #mf6_v5_ies_test()
-    mf6_v5_sen_test()
+    #mf6_v5_sen_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
@@ -1127,4 +1128,4 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #basic_sqp_test()
     #mf6_v5_ies_test()
-    #fr_fail_test()
+    fr_fail_test()

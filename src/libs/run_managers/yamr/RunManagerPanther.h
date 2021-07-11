@@ -153,6 +153,7 @@ private:
 	pest_utils::thread_flag idle_thread_finished;
 	thread* idle_thread;
 	map<string,ofstream*> open_file_trans_streams;
+	map<int,string> open_file_socket_map;
 	//pest_utils::thread_RAII* idle_thread_raii;
 
 	int schedule_run(int run_id, std::list<list<AgentInfoRec>::iterator> &free_agent_list, int n_responsive_agents);
