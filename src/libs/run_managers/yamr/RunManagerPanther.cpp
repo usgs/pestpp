@@ -573,8 +573,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
         {
             n_no_ops = 0;
         }
-        if (open_file_trans_streams.size() == 0)
-            break;
+
         cout << get_time_string_short() << " remaining file transfers: " << open_file_trans_streams.size() << "                                       \r" << flush;
         if (ping())
         {
@@ -601,6 +600,11 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
             }
             open_file_socket_map.clear();
 
+        }
+        if (open_file_trans_streams.size() == 0)
+        {
+            listen();
+            break;
         }
 
 
@@ -1558,12 +1562,14 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
     replace(hostname.begin(),hostname.end(),'.','-');
     replace(hostname.begin(),hostname.end(),'(','-');
     replace(hostname.begin(),hostname.end(),')','-');
+    replace(hostname.begin(),hostname.end(),':','-');
 
     replace(working_dir.begin(),working_dir.end(),'/','-');
     replace(working_dir.begin(),working_dir.end(),'\\','-');
     replace(working_dir.begin(),working_dir.end(),'.','-');
     replace(working_dir.begin(),working_dir.end(),'(','-');
     replace(working_dir.begin(),working_dir.end(),')','-');
+    replace(working_dir.begin(),working_dir.end(),':','-');
     stringstream ss;
     ss.str("");
     ss << "hostname=" << hostname;

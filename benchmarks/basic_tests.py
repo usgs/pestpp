@@ -169,8 +169,7 @@ def sweep_forgive_test():
     pst.control_data.noptmax = -1
     pst.pestpp_options["ies_num_reals"] = 5
     pst.write(os.path.join(t_d,"pest_forgive.pst"))
-    pyemu.os_utils.start_workers(t_d, exe_path, "pest_forgive.pst", 1, master_dir=m_d+"0",
-                                 worker_root=model_d, port=port)
+
 
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_forgive.pst", 10, master_dir=m_d,
                            worker_root=model_d,port=port)
