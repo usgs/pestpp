@@ -835,32 +835,71 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 
 	if (!use_glm_form)
 	{
-		obs_diff = scale * obs_diff;// (H-Hm)/sqrt(N-1)		
-		par_diff = scale * par_diff;// (K-Km)/sqrt(N-1)		
-		obs_err = scale * obs_err; //  (E-Em)/sqrt(N-1)	
+        if (true)
+        {
+            // Low rank Cee. Section 14.3.2 Evenson Book
+            obs_err = obs_err.colwise() - obs_err.rowwise().mean();
+            obs_err = sqrt(cur_lam) * obs_err;
+            Eigen::MatrixXd s0, V0, U0, s0_i;
+            SVD_REDSVD rsvd;
+            rsvd.solve_ip(obs_diff, s0, U0, V0, eigthresh, maxsing);
+            s0_i = s0.asDiagonal().inverse();
+            Eigen::MatrixXd X0 = U0.transpose() * obs_err;
+            X0 = s0_i * X0;
+            Eigen::MatrixXd s1, V1, U1, s1_2, s1_2i;
+            rsvd.solve_ip(X0, s1, U1, V1, 0, maxsing);
 
-		SVD_REDSVD rsvd;
-		Eigen::MatrixXd C = obs_diff + (cur_lam * obs_err); // curr_lam is the inflation factor 		
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "C", C);
-		rsvd.solve_ip(C, s, Ut, V, eigthresh, maxsing);
-		Ut.transposeInPlace();
-		V.resize(0, 0);
-		C.resize(0, 0);
-		obs_err.resize(0, 0);
+            s1_2 = s1.cwiseProduct(s1);
+            s1_2i = (Eigen::VectorXd::Ones(s1_2.size()) + s1_2).asDiagonal().inverse();
+            Eigen::MatrixXd X1 = s0_i * U1;
+            X1 = U0 * X1;
 
-		// s2 = s.asDiagonal().inverse();
-		s2 = s.cwiseProduct(s).asDiagonal().inverse();
-		for (int i = 0; i < s.size(); i++)
-		{
-			if (s(i) < 1e-50)
-			{
-				s2(i, i) = 0;
-			}
-		}
+            Eigen::MatrixXd X4 = s1_2i * X1.transpose();
+            Eigen::MatrixXd X2 = X4 * obs_resid;
+            Eigen::MatrixXd X3 = X1 * X2;
 
-		t = obs_diff.transpose() * Ut.transpose() * s2 * Ut;
-		Ut.resize(0, 0);
-		obs_diff.resize(0,0);
+            X3 = obs_diff.transpose() * X3;
+            //upgrade_1 = -1 * par_diff * X3;
+            //local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
+            //upgrade_1.transposeInPlace();
+            t = obs_diff.transpose() * X3;
+            Ut.resize(0, 0);
+            obs_diff.resize(0, 0);
+            X3.resize(0,0);
+            X2.resize(0,0);
+            X4.resize(0,0);
+            X1.resize(0,0);
+
+
+
+
+        }
+        else {
+            obs_diff = scale * obs_diff;// (H-Hm)/sqrt(N-1)
+            par_diff = scale * par_diff;// (K-Km)/sqrt(N-1)
+            obs_err = scale * obs_err; //  (E-Em)/sqrt(N-1)
+
+            SVD_REDSVD rsvd;
+            Eigen::MatrixXd C = obs_diff + (cur_lam * obs_err); // curr_lam is the inflation factor
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "C", C);
+            rsvd.solve_ip(C, s, Ut, V, eigthresh, maxsing);
+            Ut.transposeInPlace();
+            V.resize(0, 0);
+            C.resize(0, 0);
+            obs_err.resize(0, 0);
+
+            // s2 = s.asDiagonal().inverse();
+            s2 = s.cwiseProduct(s).asDiagonal().inverse();
+            for (int i = 0; i < s.size(); i++) {
+                if (s(i) < 1e-50) {
+                    s2(i, i) = 0;
+                }
+            }
+
+            t = obs_diff.transpose() * Ut.transpose() * s2 * Ut;
+            Ut.resize(0, 0);
+            obs_diff.resize(0, 0);
+        }
 	}
 
 
