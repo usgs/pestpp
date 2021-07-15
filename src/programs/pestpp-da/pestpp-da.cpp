@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
 		cout << "               Developed by the PEST++ development team" << endl;
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-        auto start = chrono::system_clock::now();
+        auto start = chrono::steady_clock::now();
         string start_string = get_time_string();
         cout << "started at " << start_string << endl;
 		CmdLine cmdline(argc, argv);
@@ -878,11 +878,21 @@ int main(int argc, char* argv[])
 			prev_cycle_ctl_pars = Parameters(childPest.get_ctl_parameters());
 			prev_cycle_obs = Observations(childPest.get_ctl_observations());
 
-			if (pest_utils::quit_file_found())
+            int q = pest_utils::quit_file_found();
+            if ((q == 1) || (q == 2))
             {
 			    cout << "'pest.stp' found, quitting" << endl;
                 fout_rec << "'pest.stp' found, quitting" << endl;
                 break;
+            }
+            else if (q == 4) {
+                cout << "...pest.stp found with '4'.  run mgr has returned control, removing file." << endl;
+                fout_rec << "...pest.stp found with '4'.  run mgr has returned control, removing file." << endl;
+                if (!pest_utils::try_remove_quit_file()) {
+                    cout << "...error removing pest.stp file, bad times ahead..." << endl;
+                    fout_rec << "...error removing pest.stp file, bad times ahead..." << endl;
+
+                }
             }
 
 
@@ -897,9 +907,9 @@ int main(int argc, char* argv[])
 
         fout_rec << "started at " << start_string << endl;
         fout_rec << "finished at " << get_time_string() << endl;
-        fout_rec << "took " << setprecision(3) << get_duration_sec(start)/60.0 << " minutes" << endl;
+        fout_rec << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
         fout_rec << flush;
-        cout << "took " << setprecision(3) << get_duration_sec(start)/60.0 << " minutes" << endl;
+        cout << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
         cout << flush;
         fout_rec.close();
         return 0;

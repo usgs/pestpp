@@ -829,23 +829,6 @@ def mf6_v5_ies_test():
 
     pst.control_data.noptmax = 3
     pst.write(os.path.join(t_d,"freyberg6_run_ies_glm_loc.pst"))
-    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_loc.pst", num_workers=15,
-                                master_dir=m_d,worker_root=model_d,port=port)
-
-
-
-    oe_file = os.path.join(m_d, "freyberg6_run_ies_glm_loc.{0}.obs.csv".format(pst.control_data.noptmax))
-    assert os.path.exists(oe_file)
-    pe_file = oe_file.replace(".obs.", ".par.")
-    assert os.path.exists(pe_file)
-    pcs_file = oe_file.replace(".obs.", ".pcs.")
-    assert os.path.exists(pcs_file)
-    df = pd.read_csv(pcs_file, index_col=0)
-    pst_pargp = set(list(pst.parameter_data.pargp.unique()))
-    df_pargp = set(df.index.to_list())
-    d = pst_pargp.symmetric_difference(df_pargp)
-    print(d)
-    assert len(d) == 0, d
 
     m_d = os.path.join(model_d, "master_ies_glm_covloc")
     if os.path.exists(m_d):
@@ -876,7 +859,7 @@ def mf6_v5_ies_test():
     pst.write(os.path.join(t_d, "freyberg6_run_ies_mda_loc.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_mda_loc.pst", num_workers=15,
                                  master_dir=m_d, worker_root=model_d, port=port)
-
+    
     m_d = os.path.join(model_d, "master_ies_mda_covloc")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -887,7 +870,7 @@ def mf6_v5_ies_test():
     pst.write(os.path.join(t_d, "freyberg6_run_ies_mda_covloc.pst"))
     pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_mda_covloc.pst", num_workers=15,
                                  master_dir=m_d, worker_root=model_d, port=port)
-
+    
     m_d = os.path.join(model_d, "master_ies_mda_noloc")
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
@@ -900,27 +883,60 @@ def mf6_v5_ies_test():
     pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_mda_noloc.pst", num_workers=15,
                                  master_dir=m_d, worker_root=model_d, port=port)
 
+    m_d = os.path.join(model_d, "master_ies_glm_loc_mm")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d, "freyberg6_run_ies.pst"))
+    pst.control_data.noptmax = 3
+    pst.pestpp_options["ies_num_threads"] = 1
+    pst.pestpp_options["ies_use_mda"] = False
+    pst.pestpp_options.pop("ies_localizer", None)
+    pst.pestpp_options.pop("ies_autoadaloc", None)
+    pst.pestpp_options["ies_multimodal_alpha"] = 0.1
+    pst.write(os.path.join(t_d, "freyberg6_run_ies_glm_loc_mm.pst"))
+    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_loc_mm.pst", num_workers=15,
+                                 master_dir=m_d, worker_root=model_d, port=port)
+
+    m_d = os.path.join(model_d, "master_ies_glm_noloc_mm")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d, "freyberg6_run_ies.pst"))
+    pst.control_data.noptmax = 3
+    pst.pestpp_options["ies_use_mda"] = False
+    pst.pestpp_options.pop("ies_localizer", None)
+    pst.pestpp_options.pop("ies_autoadaloc", None)
+    pst.pestpp_options["ies_multimodal_alpha"] = 0.25
+    pst.write(os.path.join(t_d, "freyberg6_run_ies_glm_noloc_mm.pst"))
+    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_noloc_mm.pst", num_workers=15,
+                                 master_dir=m_d, worker_root=model_d, port=port)
+
+
+
 
 def mf6_v5_sen_test():
+
     model_d = "mf6_freyberg"
 
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_sen")
-    if os.path.exists(m_d):
-        shutil.rmtree(m_d)
+    #if os.path.exists(m_d):
+    #    shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_sen.pst"))
     m_d = os.path.join(model_d,"master_sen")
-    pyemu.os_utils.start_workers(t_d, "pestpp-sen", "freyberg6_run_sen.pst",
-                                 num_workers=15, master_dir=m_d, worker_root=model_d,
-                                 port=port)
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sen"), "freyberg6_run_sen.pst",
+                                 num_workers=15, worker_root=model_d,
+                                 port=4004,verbose=True,master_dir=m_d)
 
     pst = pyemu.Pst(os.path.join(m_d,"freyberg6_run_sen.pst"))
     mio_file = os.path.join(m_d,"freyberg6_run_sen.mio")
-    assert os.path.exists(mio_file)
+    assert os.path.exists(mio_file),mio_file
     df = pd.read_csv(mio_file)
     assert df.shape[0] > 1
     msn_file = mio_file.replace(".mio",".msn")
-    assert os.path.exists(msn_file)
+    assert os.path.exists(msn_file),msn_file
+    msngrp_file = msn_file.replace(".msn",".group.msn")
+    assert os.path.exists(msngrp_file),msngrp_file
+
 
 def mf6_v5_opt_stack_test():
     model_d = "mf6_freyberg"
@@ -1030,9 +1046,33 @@ def fr_fail_test():
     assert not os.path.exists(oe_file)
 
 
+def sen_grp_test():
+    
+    model_d = "ies_10par_xsec"
+
+    t_d = os.path.join(model_d, "template")
+    m_d = os.path.join(model_d, "master_sen_group")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-sen"), "pest.pst", 10, master_dir=m_d,
+                                worker_root=model_d, port=port)
+
+    msn_file = os.path.join(m_d,"pest.msn")
+    msndf = pd.read_csv(msn_file)
+
+    grp_file = msn_file.replace(".msn",".group.msn")
+    grpdf = pd.read_csv(grp_file)
+    assert msndf.shape[0] == grpdf.shape[0]
+    for col in ["sen_mean","sen_mean_abs","sen_std_dev"]:
+        diff = np.abs(msndf.loc[:,col].sum() - grpdf.loc[:,col].sum())
+        print(col,diff)
+        assert diff < 1.0e-6
+
+
 if __name__ == "__main__":
     
-    glm_long_name_test()
+    #glm_long_name_test()
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
@@ -1050,7 +1090,7 @@ if __name__ == "__main__":
 
     # parallel_consist_test()
     # ext_stdcol_test()
-
+    sen_grp_test()
     #da_prep_4_freyberg_batch()
     # da_prep_4_mf6_freyberg_seq()
     # shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sen.exe"),os.path.join("..","bin","pestpp-sen.exe"))

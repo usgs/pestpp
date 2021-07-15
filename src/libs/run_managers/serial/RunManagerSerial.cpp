@@ -91,7 +91,8 @@ void RunManagerSerial::run(Parameters* pars, Observations* obs)
         {
             break;
         }
-        if (pest_utils::quit_file_found())
+        int q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2) || (q == 4))
         {
             f_terminate.set(true);
             run_thread.join();
@@ -126,7 +127,8 @@ void RunManagerSerial::run()
 	{
 		for (int i_run : run_id_vec)
 		{
-		    if (quit_file_found())
+            int q = pest_utils::quit_file_found();
+            if ((q == 1) || (q == 2) || (q == 4))
             {
 		        cout << "'pest.stp' found, treating run " << i_run << " as a fail" << endl;
                 update_run_failed(i_run);

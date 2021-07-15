@@ -277,13 +277,24 @@ int main(int argc, char* argv[])
 		
 		//ZAK: Initialize random generator here
 		moea.initialize();
-		if (pest_utils::quit_file_found())
+        int q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2))
         {
 		    cout << "'pest.pst' found, quitting" << endl;
 		    fout_rec << "'pest.pst' found, quitting" << endl;
         }
 		else
         {
+            if (q == 4) {
+                cout << "...pest.stp found with '4'.  run mgr has returned control, removing file." << endl;
+                fout_rec << "...pest.stp found with '4'.  run mgr has returned control, removing file." << endl;
+
+                if (!pest_utils::try_remove_quit_file()) {
+                    cout << "...error removing pest.stp file, bad times ahead..." << endl;
+                    fout_rec << "...error removing pest.stp file, bad times ahead..." << endl;
+
+                }
+            }
             moea.iterate_to_solution();
         }
 
@@ -297,11 +308,11 @@ int main(int argc, char* argv[])
         auto end = chrono::steady_clock::now();
         cout << "started at " << start_string << endl;
         cout << "finished at " << get_time_string() << endl;
-        cout << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
+        cout << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
         cout << flush;
         fout_rec << "started at " << start_string << endl;
         fout_rec << "finished at " << get_time_string() << endl;
-        fout_rec << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
+        fout_rec << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
 
         return 0;
 #ifndef _DEBUG

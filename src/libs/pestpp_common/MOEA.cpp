@@ -2583,10 +2583,18 @@ void MOEA::iterate_to_solution()
 		constraints.mou_report(iter, new_dp, new_op, obs_obj_names, pi_obj_names, true);
 
 		iter++;
-		if (pest_utils::quit_file_found())
+        int q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2))
         {
 		    message(0,"'pest.stp' found, quitting");
 		    break;
+        }
+        else if (q == 4) {
+            message(0,"pest.stp found with '4'.  run mgr has returned control, removing file.");
+
+            if (!pest_utils::try_remove_quit_file()) {
+                message(0,"error removing pest.stp file, bad times ahead...");
+            }
         }
 	}
 

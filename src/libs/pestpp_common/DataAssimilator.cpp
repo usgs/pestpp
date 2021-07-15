@@ -21,16 +21,13 @@ void DataAssimilator::sanity_checks()
 	stringstream ss;
 	
 
-	if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::UNKNOWN)
-	{
-		warnings.push_back("unrecognized 'pestmode', using 'estimation'");
-	}
+	EnsembleMethod::sanity_checks();
 
-
-	if (pest_scenario.get_ctl_ordered_pi_names().size() > 0)
-	{
-		warnings.push_back("prior information equations not supported in pestpp-da, ignoring...");
-	}
+	if ((pest_scenario.get_pestpp_options().get_da_weight_cycle_table().size() > 0) &&
+            (pest_scenario.get_pestpp_options().get_ies_weights_csv().size() > 0))
+    {
+	    errors.push_back("weight_cycle_table not compatible with ies_weight_ensemble");
+    }
 
 
 	if (warnings.size() > 0)
@@ -47,6 +44,7 @@ void DataAssimilator::sanity_checks()
 			message(1, e);
 		throw_em_error(string("sanity_check() found some problems - please review rec file"));
 	}
+
 	//cout << endl << endl;
 }
 
@@ -100,8 +98,14 @@ void DataAssimilator::da_update(int cycle)
 			}			
 			break;			
 		}
+		int q = pest_utils::quit_file_found();
+        if (q == 4) {
+            message(0, "pest.stp found with '4'.  run mgr has returned control, removing file.");
+            if (!pest_utils::try_remove_quit_file()) {
+                message(0, "error removing pest.stp file, bad times ahead...");
 
-		
+            }
+        }
 	}
 }
 
