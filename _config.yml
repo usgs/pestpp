@@ -5,6 +5,8 @@ relative_links:
   collections: true
   exclude:
     - src
+    - benchmarks
+    - bin
 include:
   - README.md
   - documentation/pestpp_users_manual.md
