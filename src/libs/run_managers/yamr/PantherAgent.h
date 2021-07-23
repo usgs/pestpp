@@ -87,6 +87,8 @@ private:
 
 	void report(const string& _message, bool to_cout);
 
+	void transfer_files(const vector<string>& tfiles, int group, int run_id, string& desc, string tag);
+
 };
 
 

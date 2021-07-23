@@ -15,15 +15,16 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>freiheit_gw.pst</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>ss_mf.pst</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug2_dll|x64'">
     <LocalDebuggerCommandArguments>pest.pst /H :4005</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerWorkingDirectory>C:\Dev\Freiheit_PESTPP_GLM\Manager</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>D:\Workspace\projects\RussianRiver\RR_GSFLOW_MODEL\RR_GSFLOW\modflow_calibration\ss_calibration\slave_dir</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerDebuggerType>Auto</LocalDebuggerDebuggerType>
+    <LocalDebuggerAttach>true</LocalDebuggerAttach>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug2_dll|x64'">
     <LocalDebuggerWorkingDirectory>$(SolutionDir)\benchmarks\henry\master</LocalDebuggerWorkingDirectory>

@@ -23,9 +23,11 @@ The latest official report documenting PEST++ is available from the USGS:
 
 White, J.T., Hunt, R.J., Fienen, M.N., and Doherty, J.E., 2020, Approaches to Highly Parameterized Inversion: PEST++ Version 5, a Software Suite for Parameter Estimation, Uncertainty Analysis, Management Optimization and Sensitivity Analysis: U.S. Geological Survey Techniques and Methods 7C26, 52 p., [https://doi.org/10.3133/tm7C26](https://doi.org/10.3133/tm7C26).
 
-##### User's Manual
+<br>
 
-The lastest PEST++ users manual is available [here](https://github.com/usgs/pestpp/tree/develop/documentation). Direct zip download [here](https://minhaskamal.github.io/DownGit/#/home?url=https://github.com/usgs/pestpp/tree/develop/documentation)
+## User's Manual
+
+The lastest PEST++ users manual is available [here](documentation/pestpp_users_manual.md) or as a [word document](https://github.com/usgs/pestpp/tree/develop/documentation).
 
 <br>
 

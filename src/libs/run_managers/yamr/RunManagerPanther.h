@@ -138,6 +138,8 @@ private:
 	int model_runs_done;
 	int model_runs_failed;
 	int model_runs_timed_out;
+	long long bytes_transferred;
+	int files_transferred;
 	bool should_echo;
 	fd_set master; // master file descriptor list
 	list<AgentInfoRec> agent_info_set;
@@ -150,6 +152,8 @@ private:
 	pest_utils::thread_flag idling;
 	pest_utils::thread_flag idle_thread_finished;
 	thread* idle_thread;
+	map<string,ofstream*> open_file_trans_streams;
+	map<int,string> open_file_socket_map;
 	//pest_utils::thread_RAII* idle_thread_raii;
 
 	int schedule_run(int run_id, std::list<list<AgentInfoRec>::iterator> &free_agent_list, int n_responsive_agents);
@@ -194,7 +198,7 @@ private:
 	map<string, int> get_agent_stats();
 	vector<string> par_names_to_check_worker;
 	vector<string> obs_names_to_check_worker;
-
+    pair<string,string> get_recv_filenames(NetPackage& net_pack, string host_name, string working_dir);
 };
 
 class RunManagerYAMRCondor : public RunManagerPanther

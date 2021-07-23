@@ -1,6 +1,7 @@
 @echo off
 
 set first_path=%cd%
+
 cd "%~dp0\.."
 
 rem fast but without fortran
@@ -16,7 +17,7 @@ cpack -G ZIP
 copy /y *.zip ..\
 
 cd ..
-call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
+rem call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
 rmdir /Q /S build
 mkdir build
 cd build

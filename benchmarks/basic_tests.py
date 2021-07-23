@@ -166,7 +166,11 @@ def sweep_forgive_test():
     pe.loc[:,pst.par_names[2:]] = pst.parameter_data.loc[pst.par_names[2:],"parval1"].values
     pe.to_csv(os.path.join(t_d,"sweep_in.csv"))
     pst.pestpp_options["sweep_forgive"] = True
+    pst.control_data.noptmax = -1
+    pst.pestpp_options["ies_num_reals"] = 5
     pst.write(os.path.join(t_d,"pest_forgive.pst"))
+
+
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_forgive.pst", 10, master_dir=m_d,
                            worker_root=model_d,port=port)
     df1 = pd.read_csv(os.path.join(m_d, "sweep_out.csv"),index_col=0)
@@ -922,13 +926,15 @@ def mf6_v5_sen_test():
     #if os.path.exists(m_d):
     #    shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_sen.pst"))
+    pst.pestpp_options["panther_transfer_on_finish"] = ["freyberg6_freyberg.cbc","freyberg6.lst","ies_prior.jcb"]
+    pst.write(os.path.join(t_d,"freyberg6_run_sen_trn.pst"))
     m_d = os.path.join(model_d,"master_sen")
-    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sen"), "freyberg6_run_sen.pst",
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sen"), "freyberg6_run_sen_trn.pst",
                                  num_workers=15, worker_root=model_d,
                                  port=4004,verbose=True,master_dir=m_d)
 
-    pst = pyemu.Pst(os.path.join(m_d,"freyberg6_run_sen.pst"))
-    mio_file = os.path.join(m_d,"freyberg6_run_sen.mio")
+    pst = pyemu.Pst(os.path.join(m_d,"freyberg6_run_sen_trn.pst"))
+    mio_file = os.path.join(m_d,"freyberg6_run_sen_trn.mio")
     assert os.path.exists(mio_file),mio_file
     df = pd.read_csv(mio_file)
     assert df.shape[0] > 1
@@ -936,6 +942,22 @@ def mf6_v5_sen_test():
     assert os.path.exists(msn_file),msn_file
     msngrp_file = msn_file.replace(".msn",".group.msn")
     assert os.path.exists(msngrp_file),msngrp_file
+
+    jcb_files = [f for f in os.listdir(m_d) if f.lower().startswith("hostname") and f.lower().endswith(".jcb")]
+    print(len(jcb_files))
+    assert len(jcb_files) == 52
+    for jcb_file in jcb_files:
+        j = pyemu.Jco.from_binary(os.path.join(m_d,jcb_file))
+
+    lst_files = [f for f in os.listdir(m_d) if f.lower().startswith("hostname") and f.lower().endswith(".lst")]
+    print(len(lst_files))
+    assert len(lst_files) == 52
+    
+    cbc_files = [f for f in os.listdir(m_d) if f.lower().startswith("hostname") and f.lower().endswith(".cbc")]
+    print(len(cbc_files))
+    assert len(cbc_files) == 52
+    
+
 
 
 def mf6_v5_opt_stack_test():
@@ -1031,6 +1053,7 @@ def fr_fail_test():
     if os.path.exists(oe_file):
         os.remove(oe_file)
     pst.control_data.noptmax = 1
+    pst.pestpp_options["panther_transfer_on_fail"] = "10par_xsec.list"
     pst.write(os.path.join(new_d, "pest.pst"))
     try:
         pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
@@ -1079,7 +1102,7 @@ if __name__ == "__main__":
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
-    #sweep_forgive_test()
+    sweep_forgive_test()
     #inv_regul_test()
     #tie_by_group_test()
     #sen_basic_test()
@@ -1090,7 +1113,7 @@ if __name__ == "__main__":
 
     # parallel_consist_test()
     # ext_stdcol_test()
-    sen_grp_test()
+    #sen_grp_test()
     #da_prep_4_freyberg_batch()
     # da_prep_4_mf6_freyberg_seq()
     # shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sen.exe"),os.path.join("..","bin","pestpp-sen.exe"))
@@ -1102,6 +1125,7 @@ if __name__ == "__main__":
     #da_mf6_freyberg_test_2()
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
+
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
