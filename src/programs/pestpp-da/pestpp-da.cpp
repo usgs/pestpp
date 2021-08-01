@@ -899,6 +899,7 @@ int main(int argc, char* argv[])
 		} // end cycle loop
 
 		cout << endl << endl << "pestpp-da analysis complete..." << endl;
+        fout_rec << endl << endl << "pestpp-da analysis complete..." << endl;
 
         auto end = chrono::steady_clock::now();
         cout << "started at " << start_string << endl;

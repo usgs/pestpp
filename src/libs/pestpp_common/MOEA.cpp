@@ -517,7 +517,7 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 	{
 		if (member_struct.find(member) == member_struct.end())
 			continue;
-		sum << generation << "," << member;
+		sum << generation << "," << pest_utils::lower_cp(member);
 		for (auto obj : *obs_obj_names_ptr)
 		{
 			sum << "," << obj_dir_mult_ptr->at(obj) * member_struct[member][obj];

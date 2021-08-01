@@ -390,7 +390,8 @@ int main(int argc, char* argv[])
 	file_manager.close_file("rst");
 	pest_utils::try_clean_up_run_storage_files(case_name);
 
-	cout << endl << endl << "PESTPP-SEN Analysis Complete..." << endl;
+	cout << endl << endl << "pestpp-sen analysis complete..." << endl;
+	fout_rec << endl << endl << "pestpp-sen analysis complete..." << endl;
     auto end = chrono::steady_clock::now();
 
     cout << "started at " << start_string << endl;
@@ -400,7 +401,7 @@ int main(int argc, char* argv[])
     fout_rec << "started at " << start_string << endl;
     fout_rec << "finished at " << get_time_string() << endl;
     fout_rec << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
-
+    fout_rec.close();
     return 0;
 	//cout << endl << "Simulation Complete - Press RETURN to close window" << endl;
 	//char buf[256];

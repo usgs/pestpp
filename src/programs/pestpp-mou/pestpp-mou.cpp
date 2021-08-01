@@ -302,9 +302,10 @@ int main(int argc, char* argv[])
 
 
 		// clean up
-		fout_rec.close();
+
 		delete run_manager_ptr;
 		cout << endl << endl << "pestpp-mou analysis complete..." << endl;
+        fout_rec << endl << endl << "pestpp-mou analysis complete..." << endl;
         auto end = chrono::steady_clock::now();
         cout << "started at " << start_string << endl;
         cout << "finished at " << get_time_string() << endl;
@@ -313,7 +314,7 @@ int main(int argc, char* argv[])
         fout_rec << "started at " << start_string << endl;
         fout_rec << "finished at " << get_time_string() << endl;
         fout_rec << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
-
+        fout_rec.close();
         return 0;
 #ifndef _DEBUG
 	}
