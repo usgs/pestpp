@@ -4344,6 +4344,19 @@ void EnsembleMethod::transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe
 	}
 }
 
+void EnsembleMethod::transfer_par_dynamic_state_final_to_initial_ip(ParameterEnsemble& _pe)
+{
+    _pe.update_var_map();
+    map<string,int> vmap = _pe.get_var_map();
+    Eigen::VectorXd vec;
+    for (auto& sm : final2init_par_state_names)
+    {
+        vec = _pe.get_var_vector(sm.first);
+        _pe.replace_col(sm.second,vec);
+    }
+}
+
+
 void EnsembleMethod::transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
 {
 	//vector<string> real_names = oe.get_real_names();
@@ -4376,6 +4389,7 @@ void EnsembleMethod::initialize_dynamic_states()
 	//vector <string> dyn_states_names;	
 	obs_dyn_state_names.clear();
 	par_dyn_state_names.clear();
+	final2init_par_state_names.clear();
 	//vector<string> obs_names = oe.get_var_names(); // todo: get obs names from a different source. 
 	//vector<string> par_names = pe.get_var_names();
 	vector<string> obs_names = pest_scenario.get_ctl_observations().get_keys();
@@ -4446,7 +4460,7 @@ void EnsembleMethod::initialize_dynamic_states()
 		}
 		if (dups.size() > 0)
 		{
-			stringstream ss;
+			ss.str("");
 			ss << "the following state parameters nominated thru obs data linking " << endl;
 			ss << "    were already tagged as 'states' by identically named observations:" << endl;
 			for (auto& d : dups)
@@ -4455,7 +4469,7 @@ void EnsembleMethod::initialize_dynamic_states()
 		}
 		if (missing.size() > 0)
 		{
-			stringstream ss;
+            ss.str("");
 			ss << "the following parameters nominated thru obs data linking " << endl;
 			ss << "    were not found in par data section:" << endl;
 			for (auto& m : missing)
@@ -4469,6 +4483,90 @@ void EnsembleMethod::initialize_dynamic_states()
 			message(1, ss.str());
 		}
 	}
+
+    map<string, string> par2par_state_map = pest_scenario.get_ext_file_string_map("parameter data external", "state_par_link");
+    if (par2par_state_map.size() > 0)
+    {
+
+        set<string> pstates(par_dyn_state_names.begin(), par_dyn_state_names.end());
+        set<string>::iterator send = pstates.end();
+        vector<string> t = pest_scenario.get_ctl_ordered_par_names();
+        set<string> pnames(t.begin(), t.end());
+        set<string>::iterator pend = pnames.end();
+        vector<string> dups, missing,already;
+        set<string> named;
+        int c = 0;
+        for (auto& sm : par2par_state_map)
+        {
+            //if the linking par isnt in current par state names, thats a problem
+            if (pstates.find(sm.first) == send)
+            {
+                missing.push_back(sm.first);
+            }
+            //if the par is in the currrent par state names, thats a problem
+            else if (pnames.find(sm.second) != send)
+            {
+                already.push_back(sm.second);
+            }
+            else if (named.find(sm.second) != named.end())
+            {
+                dups.push_back(sm.second);
+            }
+            else
+            {
+                final2init_par_state_names[sm.first] = sm.second;
+                named.emplace(sm.second);
+                c++;
+            }
+
+        }
+        if (dups.size() > 0)
+        {
+            ss.str("");
+            ss << "the following final state parameters identified with non-null parameter data par_state_link " << endl;
+            ss << "    were listed more than once:" << endl;
+            for (auto& d : dups)
+                ss << d << ",";
+            throw_em_error(ss.str());
+        }
+        if (missing.size() > 0)
+        {
+            ss.str("");
+            ss << "the following initial state parameters nominated thru parameter data par_state_link " << endl;
+            ss << "    were not found in obs-to-par dynamic state linkage:" << endl;
+            for (auto& m : missing)
+                ss << m << ",";
+            throw_em_error(ss.str());
+        }
+        if (already.size() > 0)
+        {
+            ss.str("");
+            ss << "the following initial state parameters nominated thru parameter data par_state_link " << endl;
+            ss << "    were listed more than once in parameter data 'par_state_link':" << endl;
+            for (auto& a : already)
+                ss << a << ",";
+            throw_em_error(ss.str());
+
+        }
+        ss.str("");
+        ss << c << " final-to-initial parameter states identified thru parameter data 'par_state_link' entries";
+        message(0,ss.str());
+        ofstream& frec = file_manager.rec_ofstream();
+
+        frec << "...observation-to-parameter state mapping: " << endl;
+        for (int i=0;i<obs_dyn_state_names.size();i++)
+        {
+            frec << "observation state '"<<obs_dyn_state_names[i] << "' maps to parameter initial state '" << par_dyn_state_names[i] << "'" << endl;
+        }
+
+        frec << endl << "...final-to-initial parameter state mapping: " << endl;
+        for (auto& sm : final2init_par_state_names)
+        {
+            frec << "final state '"<<sm.first << "' maps to initial state '" << sm.second << "'" << endl;
+        }
+
+
+    }
 }
 
 bool EnsembleMethod::solve_glm(int cycle)

@@ -1142,6 +1142,11 @@ bool PestppOptions::assign_da_value_by_key(const string& key, const string& valu
         convert_ip(value, da_stop_cycle);
         return true;
     }
+    else if (key == "DA_USE_SIMULATED_STATES")
+    {
+        da_use_simulated_states = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
 	//any additional da specific args must be before here!
 	//some hackery!
 	else
@@ -1679,6 +1684,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "da_observation_cycle_table: " << da_obs_cycle_table << endl;
 	os << "da_hotstart_cycle: " << da_hotstart_cycle << endl;
 	os << "da_stop_cycle: " << da_stop_cycle << endl;
+	os << "da_use_simulated_states: " << da_use_simulated_states << endl;
 
 	
 	os << endl << endl << endl;
@@ -1837,6 +1843,7 @@ void PestppOptions::set_defaults()
 	//set_da_num_reals(50);
 	set_da_hotstart_cycle(0);
     set_da_stop_cycle(1000000000);
+    set_da_use_simulated_states(true);
 
 	// End of DA parameters
 	set_gsa_method("MORRIS");

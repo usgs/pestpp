@@ -558,6 +558,8 @@ public:
 	void set_da_hotstart_cycle(int val) { da_hotstart_cycle = val; }
     int get_da_stop_cycle() const { return da_stop_cycle; }
     void set_da_stop_cycle(int val) { da_stop_cycle = val; }
+    bool get_da_use_simulated_states() const {return da_use_simulated_states; }
+    void set_da_use_simulated_states(bool _flag) {da_use_simulated_states = _flag;}
 
     void set_forgive_unknown_args(bool _flag) { forgive_unknown_args = _flag; }
     bool get_forgive_unknown_args() const { return forgive_unknown_args; }
@@ -777,6 +779,7 @@ private:
 	string da_weight_cycle_table;
 	int da_hotstart_cycle;
 	int da_stop_cycle;
+	bool da_use_simulated_states;
 
 	
 
