@@ -4884,10 +4884,10 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	//only one upgrade lambda and all pars are states
 	if (((pe_lams.size() == 1) && (par_dyn_state_names.size() == pe_lams[0].shape().second) && pest_scenario.get_control_info().noptmax == 1))
 	{
-		message(1, "non-iterative state-estimation detected, not evaluating state estimates for current cycle");
+		message(1, "non-iterative state-estimation detected, not evaluating update ensemble for current cycle");
 		pe = pe_lams[0];
 		//move the estimated states to the oe, which will then later be transferred back to the pe
-		transfer_dynamic_state_from_pe_to_oe(pe, oe);
+		//transfer_dynamic_state_from_pe_to_oe(pe, oe);
 		ph.update(oe, pe);
 		double best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		double best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
