@@ -4346,13 +4346,26 @@ void EnsembleMethod::transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe
 
 void EnsembleMethod::transfer_par_dynamic_state_final_to_initial_ip(ParameterEnsemble& _pe)
 {
-    _pe.update_var_map();
-    map<string,int> vmap = _pe.get_var_map();
-    Eigen::VectorXd vec;
-    for (auto& sm : final2init_par_state_names)
-    {
-        vec = _pe.get_var_vector(sm.first);
-        _pe.replace_col(sm.second,vec);
+    if (final2init_par_state_names.size() > 0) {
+        stringstream ss;
+        ss << "transferring " << final2init_par_state_names.size() << " final dynamic par states to initial dynamic par states for "
+           << _pe.shape().first << " realizations, see rec file for listing";
+        message(1, ss.str());
+
+        _pe.update_var_map();
+        //map<string, int> vmap = _pe.get_var_map();
+        //Eigen::VectorXd vec;
+        //for (auto &sm : final2init_par_state_names) {
+        //    vec = _pe.get_var_vector(sm.first);
+        //    _pe.replace_col(sm.second, vec);
+        vector<string> final_names,init_names;
+        for (auto &sm : final2init_par_state_names) {
+            final_names.push_back(sm.first);
+            init_names.push_back(sm.second);
+        }
+        Eigen::MatrixXd vals = _pe.get_eigen(vector<string>(),final_names);
+        _pe.replace_col_vals_and_fixed(init_names,vals);
+
     }
 }
 
@@ -4382,7 +4395,7 @@ void EnsembleMethod::transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe
 }
 
 
-void EnsembleMethod::initialize_dynamic_states()
+void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 {
 	stringstream ss;
 	// find a list of dynamic states
@@ -4479,7 +4492,7 @@ void EnsembleMethod::initialize_dynamic_states()
 		if (c > 0)
 		{
 			ss.str("");
-			ss << c << " non-zero weighted dynamic states identified through 'state_par_link'";
+			ss << c << " non-zero weighted initial dynamic states identified through 'state_par_link'";
 			message(1, ss.str());
 		}
 	}
@@ -4491,22 +4504,22 @@ void EnsembleMethod::initialize_dynamic_states()
         set<string> pstates(par_dyn_state_names.begin(), par_dyn_state_names.end());
         set<string>::iterator send = pstates.end();
         vector<string> t = pest_scenario.get_ctl_ordered_par_names();
-        set<string> pnames(t.begin(), t.end());
-        set<string>::iterator pend = pnames.end();
+        //set<string> pnames(t.begin(), t.end());
+        //set<string>::iterator pend = pnames.end();
         vector<string> dups, missing,already;
         set<string> named;
         int c = 0;
         for (auto& sm : par2par_state_map)
         {
             //if the linking par isnt in current par state names, thats a problem
-            if (pstates.find(sm.first) == send)
+            if (pstates.find(sm.second) == send)
             {
-                missing.push_back(sm.first);
+                missing.push_back(sm.second);
             }
             //if the par is in the currrent par state names, thats a problem
-            else if (pnames.find(sm.second) != send)
+            else if (pstates.find(sm.first) != send)
             {
-                already.push_back(sm.second);
+                already.push_back(sm.first);
             }
             else if (named.find(sm.second) != named.end())
             {
@@ -4523,7 +4536,7 @@ void EnsembleMethod::initialize_dynamic_states()
         if (dups.size() > 0)
         {
             ss.str("");
-            ss << "the following final state parameters identified with non-null parameter data par_state_link " << endl;
+            ss << "the following final state parameters identified with non-null parameter data 'state_par_link' " << endl;
             ss << "    were listed more than once:" << endl;
             for (auto& d : dups)
                 ss << d << ",";
@@ -4532,7 +4545,7 @@ void EnsembleMethod::initialize_dynamic_states()
         if (missing.size() > 0)
         {
             ss.str("");
-            ss << "the following initial state parameters nominated thru parameter data par_state_link " << endl;
+            ss << "the following initial state parameters nominated thru parameter data 'state_par_link' " << endl;
             ss << "    were not found in obs-to-par dynamic state linkage:" << endl;
             for (auto& m : missing)
                 ss << m << ",";
@@ -4541,28 +4554,29 @@ void EnsembleMethod::initialize_dynamic_states()
         if (already.size() > 0)
         {
             ss.str("");
-            ss << "the following initial state parameters nominated thru parameter data par_state_link " << endl;
-            ss << "    were listed more than once in parameter data 'par_state_link':" << endl;
+            ss << "the following initial state parameters nominated thru parameter data 'state_par_link' " << endl;
+            ss << "    were listed more than once in parameter data 'state_par_link':" << endl;
             for (auto& a : already)
                 ss << a << ",";
             throw_em_error(ss.str());
 
         }
         ss.str("");
-        ss << c << " final-to-initial parameter states identified thru parameter data 'par_state_link' entries";
-        message(0,ss.str());
+        ss << c << " final-to-initial parameter states identified thru parameter data 'state_par_link' entries";
+        message(1,ss.str());
         ofstream& frec = file_manager.rec_ofstream();
 
-        frec << "...observation-to-parameter state mapping: " << endl;
-        for (int i=0;i<obs_dyn_state_names.size();i++)
-        {
-            frec << "observation state '"<<obs_dyn_state_names[i] << "' maps to parameter initial state '" << par_dyn_state_names[i] << "'" << endl;
-        }
+        if (rec_report) {
+            frec << "...observation-to-parameter state mapping: " << endl;
+            for (int i = 0; i < obs_dyn_state_names.size(); i++) {
+                frec << "observation state '" << obs_dyn_state_names[i] << "' maps to parameter initial state '"
+                     << par_dyn_state_names[i] << "'" << endl;
+            }
 
-        frec << endl << "...final-to-initial parameter state mapping: " << endl;
-        for (auto& sm : final2init_par_state_names)
-        {
-            frec << "final state '"<<sm.first << "' maps to initial state '" << sm.second << "'" << endl;
+            frec << endl << "...final-to-initial parameter state mapping: " << endl;
+            for (auto &sm : final2init_par_state_names) {
+                frec << "final state '" << sm.first << "' maps to initial state '" << sm.second << "'" << endl;
+            }
         }
 
 
