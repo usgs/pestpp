@@ -1935,7 +1935,8 @@ void Ensemble::read_csv_by_vars(int num_reals, ifstream &csv, map<string, int> &
 		{
 			try
 			{
-				val = pest_utils::convert_cp<double>(tokens[hi.second]);
+				//val = pest_utils::convert_cp<double>(tokens[hi.second]);
+				val = stod(tokens[hi.second]);
 			}
 			catch (exception &e)
 			{
@@ -2330,12 +2331,14 @@ void ParameterEnsemble::from_csv(string file_name, bool forgive)
 		throw runtime_error("error re-opening parameter csv " + file_name + " for reading");
 	string line;
 	getline(csv, line);
-	if (csv_by_reals)
-		Ensemble::read_csv_by_reals(num_reals, csv, header_info, index_info);
+	if (csv_by_reals) {
+        Ensemble::read_csv_by_reals(num_reals, csv, header_info, index_info);
+        prep_par_ensemble_after_read(header_info);
+    }
 	else
+    {
 		Ensemble::read_csv_by_vars(num_reals, csv, header_info, index_info);
-	
-	prep_par_ensemble_after_read(header_info);
+        prep_par_ensemble_after_read(index_info);}
 
 }
 
