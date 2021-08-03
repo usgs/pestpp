@@ -4500,13 +4500,12 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
     map<string, string> par2par_state_map = pest_scenario.get_ext_file_string_map("parameter data external", "state_par_link");
     if (par2par_state_map.size() > 0)
     {
-
         set<string> pstates(par_dyn_state_names.begin(), par_dyn_state_names.end());
         set<string>::iterator send = pstates.end();
-        vector<string> t = pest_scenario.get_ctl_ordered_par_names();
-        //set<string> pnames(t.begin(), t.end());
-        //set<string>::iterator pend = pnames.end();
-        vector<string> dups, missing,already;
+        vector<string> t = pest_scenario.get_ctl_ordered_adj_par_names();
+        set<string> adj_pnames(t.begin(), t.end());
+        set<string>::iterator adj_end = adj_pnames.end();
+        vector<string> dups, missing,already,not_adj;
         set<string> named;
         int c = 0;
         for (auto& sm : par2par_state_map)
@@ -4530,6 +4529,10 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
                 final2init_par_state_names[sm.first] = sm.second;
                 named.emplace(sm.second);
                 c++;
+                if (adj_pnames.find(sm.first) == adj_end)
+                {
+                    not_adj.push_back(sm.first);
+                }
             }
 
         }
@@ -4561,6 +4564,15 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
             throw_em_error(ss.str());
 
         }
+        if ((!pest_scenario.get_pestpp_options().get_da_use_simulated_states()) && (not_adj.size() > 0))
+        {
+            ss.str("");
+            ss << "not using simulated states and the following final parameter states are not adjustable:" << endl;
+            for (auto& p : not_adj)
+                ss << p << ",";
+            throw_em_error(ss.str());
+        }
+
         ss.str("");
         ss << c << " final-to-initial parameter states identified thru parameter data 'state_par_link' entries";
         message(1,ss.str());
