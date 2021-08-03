@@ -868,6 +868,7 @@ void Ensemble::to_csv(string file_name)
 	{
 		throw_ensemble_error("Ensemble.to_csv() error opening csv file " + file_name + " for writing");
 	}
+	csv << setprecision(pest_scenario_ptr->get_pestpp_options().get_ensemble_output_precision());
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_csv_by_reals())
 	{
 		to_csv_by_reals(csv);
@@ -936,6 +937,7 @@ void Ensemble::to_csv_by_reals(ofstream &csv, bool write_header)
 	vector<string> names = org_real_names;
 	if (names.size() == 0)
 		names = real_names;
+
 	for (auto rname : names)
 	{
 		if (real_map.find(rname) == end)
@@ -3178,6 +3180,7 @@ void ParameterEnsemble::to_csv(string file_name)
 	{
 		throw_ensemble_error("ParameterEnsemble.to_csv() error opening csv file " + file_name + " for writing");
 	}
+	csv << setprecision(pest_scenario_ptr->get_pestpp_options().get_ensemble_output_precision());
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_csv_by_reals())
 		to_csv_by_reals(csv);
 	else
