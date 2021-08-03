@@ -4363,8 +4363,10 @@ void EnsembleMethod::transfer_par_dynamic_state_final_to_initial_ip(ParameterEns
             final_names.push_back(sm.first);
             init_names.push_back(sm.second);
         }
+        _pe.transform_ip(ParameterEnsemble::transStatus::CTL);
         Eigen::MatrixXd vals = _pe.get_eigen(vector<string>(),final_names);
         _pe.replace_col_vals_and_fixed(init_names,vals);
+        _pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 
     }
 }
