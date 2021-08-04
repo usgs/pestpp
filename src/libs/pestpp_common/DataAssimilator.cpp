@@ -28,6 +28,16 @@ void DataAssimilator::sanity_checks()
     {
 	    errors.push_back("weight_cycle_table not compatible with ies_weight_ensemble");
     }
+	if ((!pest_scenario.get_pestpp_options().get_da_use_simulated_states()) && (final2init_par_state_names.size()) == 0)
+    {
+	    errors.push_back("'da_use_simulated_states is false but no final-to-initial state par linkages are provided");
+    }
+    if ((!pest_scenario.get_pestpp_options().get_da_use_simulated_states()) && (final2init_par_state_names.size()) != obs_dyn_state_names.size())
+    {
+        ss.str("");
+        ss << "number of initial-state parameters (" << obs_dyn_state_names.size() << ") != number of final-state parameters (" << final2init_par_state_names.size() << ")";
+        errors.push_back((ss.str()));
+    }
 
 
 	if (warnings.size() > 0)

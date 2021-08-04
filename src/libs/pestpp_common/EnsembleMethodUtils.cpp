@@ -4578,22 +4578,26 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
         ss.str("");
         ss << c << " final-to-initial parameter states identified thru parameter data 'state_par_link' entries";
         message(1,ss.str());
+
+
+
+
+
+
+
+    }
+    if (rec_report) {
         ofstream& frec = file_manager.rec_ofstream();
-
-        if (rec_report) {
-            frec << "...observation-to-parameter state mapping: " << endl;
-            for (int i = 0; i < obs_dyn_state_names.size(); i++) {
-                frec << "observation state '" << obs_dyn_state_names[i] << "' maps to parameter initial state '"
-                     << par_dyn_state_names[i] << "'" << endl;
-            }
-
-            frec << endl << "...final-to-initial parameter state mapping: " << endl;
-            for (auto &sm : final2init_par_state_names) {
-                frec << "final state '" << sm.first << "' maps to initial state '" << sm.second << "'" << endl;
-            }
+        frec << "...observation-to-parameter state mapping: " << endl;
+        for (int i = 0; i < obs_dyn_state_names.size(); i++) {
+            frec << "observation state '" << obs_dyn_state_names[i] << "' maps to parameter initial state '"
+                 << par_dyn_state_names[i] << "'" << endl;
         }
-
-
+        
+        frec << endl << "...final-to-initial parameter state mapping: " << endl;
+        for (auto &sm : final2init_par_state_names) {
+            frec << "final state '" << sm.first << "' maps to initial state '" << sm.second << "'" << endl;
+        }
     }
 }
 
