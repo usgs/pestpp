@@ -868,6 +868,7 @@ void Ensemble::to_csv(string file_name)
 	{
 		throw_ensemble_error("Ensemble.to_csv() error opening csv file " + file_name + " for writing");
 	}
+	csv << setprecision(pest_scenario_ptr->get_pestpp_options().get_ensemble_output_precision());
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_csv_by_reals())
 	{
 		to_csv_by_reals(csv);
@@ -936,6 +937,7 @@ void Ensemble::to_csv_by_reals(ofstream &csv, bool write_header)
 	vector<string> names = org_real_names;
 	if (names.size() == 0)
 		names = real_names;
+
 	for (auto rname : names)
 	{
 		if (real_map.find(rname) == end)
@@ -1933,7 +1935,8 @@ void Ensemble::read_csv_by_vars(int num_reals, ifstream &csv, map<string, int> &
 		{
 			try
 			{
-				val = pest_utils::convert_cp<double>(tokens[hi.second]);
+				//val = pest_utils::convert_cp<double>(tokens[hi.second]);
+				val = stod(tokens[hi.second]);
 			}
 			catch (exception &e)
 			{
@@ -2328,12 +2331,14 @@ void ParameterEnsemble::from_csv(string file_name, bool forgive)
 		throw runtime_error("error re-opening parameter csv " + file_name + " for reading");
 	string line;
 	getline(csv, line);
-	if (csv_by_reals)
-		Ensemble::read_csv_by_reals(num_reals, csv, header_info, index_info);
+	if (csv_by_reals) {
+        Ensemble::read_csv_by_reals(num_reals, csv, header_info, index_info);
+        prep_par_ensemble_after_read(header_info);
+    }
 	else
+    {
 		Ensemble::read_csv_by_vars(num_reals, csv, header_info, index_info);
-	
-	prep_par_ensemble_after_read(header_info);
+        prep_par_ensemble_after_read(index_info);}
 
 }
 
@@ -3178,6 +3183,7 @@ void ParameterEnsemble::to_csv(string file_name)
 	{
 		throw_ensemble_error("ParameterEnsemble.to_csv() error opening csv file " + file_name + " for writing");
 	}
+	csv << setprecision(pest_scenario_ptr->get_pestpp_options().get_ensemble_output_precision());
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_csv_by_reals())
 		to_csv_by_reals(csv);
 	else

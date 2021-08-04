@@ -512,6 +512,8 @@ public:
 	void set_ies_ordered_binary(bool _flag) { ies_ordered_binary = _flag; }
     double get_ies_multimodal_alpha() const { return ies_multimodal_alpha; }
     void set_ies_multimodal_alpha(double _flag) { ies_multimodal_alpha = _flag; }
+    void set_ensemble_output_precision(int prec) { ensemble_output_precision = prec;}
+    int get_ensemble_output_precision() const {return ensemble_output_precision;}
 
 	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -558,6 +560,8 @@ public:
 	void set_da_hotstart_cycle(int val) { da_hotstart_cycle = val; }
     int get_da_stop_cycle() const { return da_stop_cycle; }
     void set_da_stop_cycle(int val) { da_stop_cycle = val; }
+    bool get_da_use_simulated_states() const {return da_use_simulated_states; }
+    void set_da_use_simulated_states(bool _flag) {da_use_simulated_states = _flag;}
 
     void set_forgive_unknown_args(bool _flag) { forgive_unknown_args = _flag; }
     bool get_forgive_unknown_args() const { return forgive_unknown_args; }
@@ -651,6 +655,7 @@ private:
 	double worker_poll_interval;
 	string condor_submit_file;
 	int num_tpl_ins_threads;
+    int ensemble_output_precision;
 	
 
 	string sweep_parameter_csv_file;
@@ -765,6 +770,7 @@ private:
 	bool ies_ordered_binary;
 	double ies_multimodal_alpha;
 
+
 	// Data Assimilation parameters
 	/*string da_mode;
 	bool da_use_ies;
@@ -777,6 +783,7 @@ private:
 	string da_weight_cycle_table;
 	int da_hotstart_cycle;
 	int da_stop_cycle;
+	bool da_use_simulated_states;
 
 	
 

@@ -781,6 +781,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 	convert_ip(value, par_sigma_range);
 	}
+    else if (key == "ENSEMBLE_OUTPUT_PRECISION")
+    {
+        convert_ip(value, ensemble_output_precision);
+    }
 	
 	else if ((!assign_value_by_key_continued(key, value, org_value)) && 
 	(!assign_value_by_key_sqp(key, value, org_value)) &&
@@ -1110,6 +1114,7 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
     }
 
 
+
 	return false;
 }
 
@@ -1140,6 +1145,11 @@ bool PestppOptions::assign_da_value_by_key(const string& key, const string& valu
 	else if (key == "DA_STOP_CYCLE")
     {
         convert_ip(value, da_stop_cycle);
+        return true;
+    }
+    else if (key == "DA_USE_SIMULATED_STATES")
+    {
+        da_use_simulated_states = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
 	//any additional da specific args must be before here!
@@ -1468,6 +1478,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "random_seed: " << random_seed << endl;
 	os << "num_tpl_ins_threads: " << num_tpl_ins_threads << endl;
 	os << "save_binary: " << save_binary << endl;
+    os << "ensemble_output_precision: " << ensemble_output_precision << endl;
 	
 	os << "panther_echo: " << panther_echo << endl;
 	os << "panther_agent_restart_on_error: " << panther_agent_restart_on_error << endl;
@@ -1664,6 +1675,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_ordered_binary: " << ies_ordered_binary << endl;
 	os << "ies_multimodal_alpha: " << ies_multimodal_alpha << endl;
 
+
 	os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
 	os << "gsa_morris_pooled_obs: " << gsa_morris_pooled_obs << endl;
@@ -1679,6 +1691,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "da_observation_cycle_table: " << da_obs_cycle_table << endl;
 	os << "da_hotstart_cycle: " << da_hotstart_cycle << endl;
 	os << "da_stop_cycle: " << da_stop_cycle << endl;
+	os << "da_use_simulated_states: " << da_use_simulated_states << endl;
 
 	
 	os << endl << endl << endl;
@@ -1828,6 +1841,7 @@ void PestppOptions::set_defaults()
 	set_ies_upgrades_in_memory(true);
 	set_ies_ordered_binary(true);
     set_ies_multimodal_alpha(1.0);
+    set_ensemble_output_precision(6);
 
 	// DA parameters
 	//set_da_use_ies(false);
@@ -1837,6 +1851,7 @@ void PestppOptions::set_defaults()
 	//set_da_num_reals(50);
 	set_da_hotstart_cycle(0);
     set_da_stop_cycle(1000000000);
+    set_da_use_simulated_states(true);
 
 	// End of DA parameters
 	set_gsa_method("MORRIS");

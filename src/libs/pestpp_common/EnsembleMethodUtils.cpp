@@ -4344,6 +4344,34 @@ void EnsembleMethod::transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe
 	}
 }
 
+void EnsembleMethod::transfer_par_dynamic_state_final_to_initial_ip(ParameterEnsemble& _pe)
+{
+    if (final2init_par_state_names.size() > 0) {
+        stringstream ss;
+        ss << "transferring " << final2init_par_state_names.size() << " final dynamic par states to initial dynamic par states for "
+           << _pe.shape().first << " realizations, see rec file for listing";
+        message(1, ss.str());
+
+        _pe.update_var_map();
+        //map<string, int> vmap = _pe.get_var_map();
+        //Eigen::VectorXd vec;
+        //for (auto &sm : final2init_par_state_names) {
+        //    vec = _pe.get_var_vector(sm.first);
+        //    _pe.replace_col(sm.second, vec);
+        vector<string> final_names,init_names;
+        for (auto &sm : final2init_par_state_names) {
+            final_names.push_back(sm.first);
+            init_names.push_back(sm.second);
+        }
+        _pe.transform_ip(ParameterEnsemble::transStatus::CTL);
+        Eigen::MatrixXd vals = _pe.get_eigen(vector<string>(),final_names);
+        _pe.replace_col_vals_and_fixed(init_names,vals);
+        _pe.transform_ip(ParameterEnsemble::transStatus::NUM);
+
+    }
+}
+
+
 void EnsembleMethod::transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
 {
 	//vector<string> real_names = oe.get_real_names();
@@ -4369,13 +4397,14 @@ void EnsembleMethod::transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe
 }
 
 
-void EnsembleMethod::initialize_dynamic_states()
+void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 {
 	stringstream ss;
 	// find a list of dynamic states
 	//vector <string> dyn_states_names;	
 	obs_dyn_state_names.clear();
 	par_dyn_state_names.clear();
+	final2init_par_state_names.clear();
 	//vector<string> obs_names = oe.get_var_names(); // todo: get obs names from a different source. 
 	//vector<string> par_names = pe.get_var_names();
 	vector<string> obs_names = pest_scenario.get_ctl_observations().get_keys();
@@ -4446,7 +4475,7 @@ void EnsembleMethod::initialize_dynamic_states()
 		}
 		if (dups.size() > 0)
 		{
-			stringstream ss;
+			ss.str("");
 			ss << "the following state parameters nominated thru obs data linking " << endl;
 			ss << "    were already tagged as 'states' by identically named observations:" << endl;
 			for (auto& d : dups)
@@ -4455,7 +4484,7 @@ void EnsembleMethod::initialize_dynamic_states()
 		}
 		if (missing.size() > 0)
 		{
-			stringstream ss;
+            ss.str("");
 			ss << "the following parameters nominated thru obs data linking " << endl;
 			ss << "    were not found in par data section:" << endl;
 			for (auto& m : missing)
@@ -4465,10 +4494,107 @@ void EnsembleMethod::initialize_dynamic_states()
 		if (c > 0)
 		{
 			ss.str("");
-			ss << c << " non-zero weighted dynamic states identified through 'state_par_link'";
+			ss << c << " non-zero weighted initial dynamic states identified through 'state_par_link'";
 			message(1, ss.str());
 		}
 	}
+
+    map<string, string> par2par_state_map = pest_scenario.get_ext_file_string_map("parameter data external", "state_par_link");
+    if (par2par_state_map.size() > 0)
+    {
+        set<string> pstates(par_dyn_state_names.begin(), par_dyn_state_names.end());
+        set<string>::iterator send = pstates.end();
+        vector<string> t = pest_scenario.get_ctl_ordered_adj_par_names();
+        set<string> adj_pnames(t.begin(), t.end());
+        set<string>::iterator adj_end = adj_pnames.end();
+        vector<string> dups, missing,already,not_adj;
+        set<string> named;
+        int c = 0;
+        for (auto& sm : par2par_state_map)
+        {
+            //if the linking par isnt in current par state names, thats a problem
+            if (pstates.find(sm.second) == send)
+            {
+                missing.push_back(sm.second);
+            }
+            //if the par is in the currrent par state names, thats a problem
+            else if (pstates.find(sm.first) != send)
+            {
+                already.push_back(sm.first);
+            }
+            else if (named.find(sm.second) != named.end())
+            {
+                dups.push_back(sm.second);
+            }
+            else
+            {
+                final2init_par_state_names[sm.first] = sm.second;
+                named.emplace(sm.second);
+                c++;
+                if (adj_pnames.find(sm.first) == adj_end)
+                {
+                    not_adj.push_back(sm.first);
+                }
+            }
+
+        }
+        if (dups.size() > 0)
+        {
+            ss.str("");
+            ss << "the following final state parameters identified with non-null parameter data 'state_par_link' " << endl;
+            ss << "    were listed more than once:" << endl;
+            for (auto& d : dups)
+                ss << d << ",";
+            throw_em_error(ss.str());
+        }
+        if (missing.size() > 0)
+        {
+            ss.str("");
+            ss << "the following initial state parameters nominated thru parameter data 'state_par_link' " << endl;
+            ss << "    were not found in obs-to-par dynamic state linkage:" << endl;
+            for (auto& m : missing)
+                ss << m << ",";
+            throw_em_error(ss.str());
+        }
+        if (already.size() > 0)
+        {
+            ss.str("");
+            ss << "the following initial state parameters nominated thru parameter data 'state_par_link' " << endl;
+            ss << "    were listed more than once in parameter data 'state_par_link':" << endl;
+            for (auto& a : already)
+                ss << a << ",";
+            throw_em_error(ss.str());
+
+        }
+        if ((!pest_scenario.get_pestpp_options().get_da_use_simulated_states()) && (not_adj.size() > 0))
+        {
+            ss.str("");
+            ss << "not using simulated states and the following final parameter states are not adjustable:" << endl;
+            for (auto& p : not_adj)
+                ss << p << ",";
+            throw_em_error(ss.str());
+        }
+
+        ss.str("");
+        ss << c << " final-to-initial parameter states identified thru parameter data 'state_par_link' entries";
+        message(1,ss.str());
+        ofstream& frec = file_manager.rec_ofstream();
+
+        if (rec_report) {
+            frec << "...observation-to-parameter state mapping: " << endl;
+            for (int i = 0; i < obs_dyn_state_names.size(); i++) {
+                frec << "observation state '" << obs_dyn_state_names[i] << "' maps to parameter initial state '"
+                     << par_dyn_state_names[i] << "'" << endl;
+            }
+
+            frec << endl << "...final-to-initial parameter state mapping: " << endl;
+            for (auto &sm : final2init_par_state_names) {
+                frec << "final state '" << sm.first << "' maps to initial state '" << sm.second << "'" << endl;
+            }
+        }
+
+
+    }
 }
 
 bool EnsembleMethod::solve_glm(int cycle)
@@ -4758,10 +4884,10 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	//only one upgrade lambda and all pars are states
 	if (((pe_lams.size() == 1) && (par_dyn_state_names.size() == pe_lams[0].shape().second) && pest_scenario.get_control_info().noptmax == 1))
 	{
-		message(1, "non-iterative state-estimation detected, not evaluating state estimates for current cycle");
+		message(1, "non-iterative state-estimation detected, not evaluating update ensemble for current cycle");
 		pe = pe_lams[0];
 		//move the estimated states to the oe, which will then later be transferred back to the pe
-		transfer_dynamic_state_from_pe_to_oe(pe, oe);
+		//transfer_dynamic_state_from_pe_to_oe(pe, oe);
 		ph.update(oe, pe);
 		double best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		double best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);

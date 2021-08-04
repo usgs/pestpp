@@ -264,6 +264,14 @@ int main(int argc, char* argv[])
 		((pest_scenario.get_control_info().noptmax != 0) ||
 		(pest_scenario.get_pestpp_options().get_debug_parse_only())))
 		{
+		    //create a DA instance here to check the dynamic state entries
+		    RunManagerAbstract* run_manager_ptr;
+            DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
+            da.initialize_dynamic_states();
+            run_manager_ptr = 0;
+            delete(run_manager_ptr);
+
+            //now check the cycles
 			for (auto icycle = assimilation_cycles.begin(); icycle != assimilation_cycles.end(); icycle++)
 			{
 				cout << endl;
@@ -414,7 +422,7 @@ int main(int argc, char* argv[])
 
 		RunManagerAbstract* run_manager_ptr;
 
-		if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_MASTER)
+        if (cmdline.runmanagertype == CmdLine::RunManagerType::PANTHER_MASTER)
 		{
 			if (pest_scenario.get_control_info().noptmax == 0)
 			{
@@ -454,6 +462,8 @@ int main(int argc, char* argv[])
 		//generate a parent ensemble which includes all parameters across all cycles
 
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
+        //initialize the dynamic states here only for error checking...
+		da.initialize_dynamic_states();
 		ParameterEnsemble curr_pe(&pest_scenario);
 		ObservationEnsemble curr_oe(&pest_scenario);
 		ObservationEnsemble curr_noise(&pest_scenario);
@@ -863,7 +873,13 @@ int main(int argc, char* argv[])
 
 			//transfer the best (current) simulated final states to the inital states pars in the pe for the cycle
 			//is the place to do this?
-			da.transfer_dynamic_state_from_oe_to_pe(curr_pe, curr_oe);
+			if (pest_scenario.get_pestpp_options().get_da_use_simulated_states()) {
+                da.transfer_dynamic_state_from_oe_to_pe(curr_pe, curr_oe);
+            }
+			else
+            {
+			    da.transfer_par_dynamic_state_final_to_initial_ip(curr_pe);
+            }
 			/*ss.str("");
 			ss << "test_" << *icycle << ".csv";
 			curr_pe.to_csv(ss.str());

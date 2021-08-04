@@ -314,10 +314,13 @@ public:
 	void initialize(int cycle = NetPackage::NULL_DA_CYCLE, bool run = true, bool use_existing=false);
 
 	//this is not called in the initialization - must be called before initialize() to trigger dynamic state handling...
-	void initialize_dynamic_states();
+	void initialize_dynamic_states(bool rec_report=true);
 
 	void transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
 	void transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
+    void transfer_par_dynamic_state_final_to_initial_ip(ParameterEnsemble& _pe);
+
+
 
 	pair<string, string> save_ensembles(string tag, int cycle, ParameterEnsemble& _pe, ObservationEnsemble& _oe);
 	vector<string>& get_par_dyn_state_names() { return par_dyn_state_names; }
@@ -350,6 +353,7 @@ protected:
 	vector<double> mda_lambdas;
 
 	vector<string> obs_dyn_state_names, par_dyn_state_names;
+	map<string,string> final2init_par_state_names;
 
 	int consec_bad_lambda_cycles;
 

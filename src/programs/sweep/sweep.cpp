@@ -213,7 +213,7 @@ void prep_sweep_output_file(Pest &pest_scenario, ofstream &csv)
 		throw runtime_error("could not open sweep_output_csv_file for writing: " +
 			pest_scenario.get_pestpp_options().get_sweep_output_csv_file());
 	}
-	csv.precision(numeric_limits<double>::digits10);
+	csv << setprecision(numeric_limits<double>::digits10);
 	csv << "run_id,input_run_id,failed_flag";
 	csv << ",phi,meas_phi,regul_phi";
 	for (auto &ogrp : pest_scenario.get_ctl_ordered_obs_group_names())
@@ -247,6 +247,7 @@ void process_sweep_runs(ofstream &csv, Pest &pest_scenario, RunManagerAbstract* 
 		if (run_manager_ptr->get_run(run_id, pars, obs))
 		{
 			PhiData phi_data = obj_func.phi_report(obs, pars, *(pest_scenario.get_regul_scheme_ptr()));
+
 			csv << ",0";
 
 			csv << ',' << phi_data.total();
