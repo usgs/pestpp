@@ -156,7 +156,7 @@ public:
 	Observations get_chance_shifted_constraints(Observations& _constraints_sim);
 	Observations get_chance_shifted_constraints(Observations& _constraints_sim, double _risk);
 
-	ObservationEnsemble get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe, string risk_obj = string());
+	ObservationEnsemble get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe, int gen, string risk_obj = string(), string opt_member=string());
 
 	double get_sum_of_violations(Parameters& pars, Observations& obs);
 	vector<double> get_sum_of_violations(ParameterEnsemble& pe, ObservationEnsemble& oe);

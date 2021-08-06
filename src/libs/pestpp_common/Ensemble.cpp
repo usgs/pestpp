@@ -573,6 +573,8 @@ vector<double> Ensemble::get_mean_stl_var_vector()
 
 void Ensemble::fill_moment_maps(map<string, double>& mean_map, map<string, double>& std_map)
 {
+    mean_map.clear();
+    std_map.clear();
 	Eigen::VectorXd mean = reals.colwise().mean();
 	Eigen::MatrixXd mean_diff = get_eigen_anomalies();
 	//std = mean_diff.array().pow(2).colwise().sum().sqrt();

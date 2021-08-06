@@ -1347,7 +1347,8 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 		{
 			//dont use the _dp, use the class attr dp and op here
 			//because they are in sync. _dp hasnt been run yet...
-			pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op);
+			string opt_member;
+			pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op, opt_member);
 			pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
 			constraints.add_runs(iter, pars, obs, run_mgr_ptr);
 		}
@@ -1456,12 +1457,12 @@ vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _o
 	return failed_real_indices;
 }
 
-ObservationEnsemble MOEA::get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op)
+ObservationEnsemble MOEA::get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op, string& opt_member)
 {
 	if (risk_obj)
-		return constraints.get_chance_shifted_constraints(_dp, _op, RISK_NAME);
+		return constraints.get_chance_shifted_constraints(_dp, _op, iter, RISK_NAME, opt_member);
 	else
-		return constraints.get_chance_shifted_constraints(_dp, _op);
+		return constraints.get_chance_shifted_constraints(_dp, _op, iter, string(), opt_member);
 }
 
 void MOEA::finalize()
@@ -2167,7 +2168,8 @@ void MOEA::initialize()
 
 	if (constraints.get_use_chance())
 	{
-		ObservationEnsemble shifted_op = get_chance_shifted_op(dp, op);
+	    string opt_member;
+		ObservationEnsemble shifted_op = get_chance_shifted_op(dp, op, opt_member);
 		ss.str("");
 		ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".chance";
 		if (pest_scenario.get_pestpp_options().get_save_binary())
@@ -2269,11 +2271,12 @@ void MOEA::initialize()
 
 	}
 
-	
+    string opt_member;
 	if (constraints.get_use_chance())
 	{
 		ofstream& f_rec = file_manager.rec_ofstream();
-		pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op);
+
+		pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op, opt_member);
 		constraints.presolve_chance_report(iter, po_pair.second, true,"initial chance constraint summary (calculated at optimal/mean decision variable point)");
 	}
 
@@ -2309,7 +2312,7 @@ void MOEA::initial_pso_bits()
 
 }
 
-pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _op)
+pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _op, string& opt_member_name)
 {
 	Parameters pars;
 	Observations obs;
@@ -2317,6 +2320,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 	bool use_mean = false;
 	if (((iter == 0) && (population_obs_restart_file.size() == 0)) || (obs_obj_names.size() == 0))
 		use_mean = true;
+
 	if (use_mean)
 	{
 		//just use dp member nearest the mean dec var values
@@ -2344,6 +2348,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 		ss << "using member " << min_member << " as nearest-to-mean single point" << endl;
 		ss << "    with distance of " << dist_min << " from mean of decision variable population";
 		message(2, ss.str());
+		opt_member_name = min_member;
 
 		pars.update_without_clear(_dp.get_var_names(), _dp.get_real_vector(min_member));
 		obs.update_without_clear(_op.get_var_names(), _op.get_real_vector(min_member));
@@ -2392,6 +2397,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 		message(2, ss.str());
 		pars.update_without_clear(_dp.get_var_names(), _dp.get_real_vector(opt_member));
 		obs.update_without_clear(_op.get_var_names(), _op.get_real_vector(opt_member));
+		opt_member_name=opt_member;
 	}
 
 	return pair<Parameters, Observations>(pars, obs);
@@ -2467,9 +2473,10 @@ void MOEA::iterate_to_solution()
 		save_populations(new_dp, new_op);
 		if (constraints.get_use_chance())
 		{
-			pair<Parameters,Observations> po = get_optimal_solution(dp, op);
+		    string opt_member;
+			pair<Parameters,Observations> po = get_optimal_solution(dp, op, opt_member);
 			constraints.presolve_chance_report(iter, po.second,true, "chance constraint summary (calculated at optimal/mean decision variable point)");
-			ObservationEnsemble new_op_shifted = get_chance_shifted_op(new_dp, new_op);
+			ObservationEnsemble new_op_shifted = get_chance_shifted_op(new_dp, new_op,opt_member);
 			save_populations(new_dp, new_op_shifted,"chance");
 			new_op = new_op_shifted;
 		}

@@ -1073,8 +1073,17 @@ vector<double> Constraints::get_sum_of_violations(ParameterEnsemble& pe, Observa
 }
 
 
-ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe, string risk_obj)
+ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe, int gen, string risk_obj, string opt_member)
 {
+    stringstream ss;
+    ss.str("");
+    ss << file_mgr_ptr->get_base_filename() << "." << gen << ".population_stack_summary.csv";
+    ofstream csv(ss.str());
+    if (csv.bad())
+    {
+        throw_constraints_error("error opening '" + ss.str() +"' for writing");
+    }
+    csv << "member,map_to_member,constraint,risk,stack_mean,stack_stdev,pre_shift,post_shift" << endl;
 	map<string, double> risk_map;
 	for (auto& rname : pe.get_real_names())
 	{
@@ -1096,12 +1105,13 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 	}
 	ObservationEnsemble shifted_oe(oe);//copy
 	ofstream& frec = file_mgr_ptr->rec_ofstream();
+	map<string,double> sim_mean,sim_std,stack_mean,stack_std;
 	if (stack_oe_map.size() == 0)
 	{
 		
 		pfm.log_event("risk-shifting observation population using a single, 'optimal' chance point");
 		frec << "risk - shifting observation population using a single, 'optimal' chance point" << endl;
-	
+	    stack_oe.fill_moment_maps(stack_mean,stack_std);
 		//constraints.presolve_chance_report(iter,);
 		Observations sim, sim_shifted;
 		Eigen::VectorXd real_vec;
@@ -1113,6 +1123,14 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 			sim.update_without_clear(onames, real_vec);
 			sim_shifted = get_chance_shifted_constraints(sim, risk_map[rnames[i]]);
 			shifted_oe.replace(i, sim_shifted);
+			//cout << *shifted_oe.get_eigen_ptr() << endl;
+			//cout << endl;
+			for (auto& constraint : ctl_ord_obs_constraint_names) {
+                csv << rnames[i] << "," << opt_member << "," << constraint << ",";
+                csv << risk_map[rnames[i]] << "," << stack_mean.at(constraint) << "," << stack_std.at(constraint)
+                    << ",";
+                csv << sim.get_rec(constraint) << "," << sim_shifted.get_rec(constraint) << endl;
+            }
 		}
 
 	}
@@ -1128,23 +1146,6 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 		Eigen::VectorXd real_vec;
 		vector<string> onames = shifted_oe.get_var_names();
 		vector<string> missing;
-		//for (auto& real_info : stack_oe_map)
-		//{
-		//	if (snames.find(real_info.first) == snames.end())
-		//	{
-		//		//TODO: just track the ones that are missing and maybe map to nearest or use mean or...
-		//		//throw_constraints_error("population member name '" + real_info.first + "' not found in observation population names");
-		//		missing.push_back(real_info.first);
-		//	}
-		//	else
-		//	{
-		//		real_vec = shifted_oe.get_real_vector(real_info.first);
-		//		sim.update_without_clear(onames, real_vec);
-		//		//this call uses the class stack_oe attribute;
-		//		sim_shifted = get_chance_shifted_constraints(sim,real_info.second);
-		//		shifted_oe.replace(real_map[real_info.first], sim_shifted);
-		//	}
-		//}
 
 		for (auto& real_name : real_names)
 		{
@@ -1160,7 +1161,14 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 				real_vec = shifted_oe.get_real_vector(real_name);
 				sim.update_without_clear(onames, real_vec);
 				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[real_name],risk_map[real_name], true);
+                stack_oe_map[real_name].fill_moment_maps(stack_mean,stack_std);
 				shifted_oe.replace(real_map[real_name], sim_shifted);
+                for (auto& constraint : ctl_ord_obs_constraint_names) {
+                    csv << real_name << "," << real_name << "," << constraint << ",";
+                    csv << risk_map[real_name] << "," << stack_mean.at(constraint) << "," << stack_std.at(constraint)
+                        << ",";
+                    csv << sim.get_rec(constraint) << "," << sim_shifted.get_rec(constraint) << endl;
+                }
 			}
 		}
 
@@ -1199,7 +1207,9 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 				if (stack_oe_map.find(min_real_name) == stack_oe_map.end())
 					throw_constraints_error("nearest dv real '" + min_real_name +"' not in stack oe map");
 				//todo add some output here to report the mapping results
+
 				if (min_dist > 0.0) min_dist = sqrt(min_dist);
+
 				if (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 3)
 				{
 					frec << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
@@ -1215,6 +1225,13 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 				//this call uses the class stack_oe attribute;
 				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[min_real_name],_risk,true);
 				shifted_oe.replace(real_map[missing[i]], sim_shifted);
+                stack_oe_map[min_real_name].fill_moment_maps(stack_mean,stack_std);
+                for (auto& constraint : ctl_ord_obs_constraint_names) {
+                    csv << missing[i] << "," << min_real_name << "," << constraint << ",";
+                    csv << _risk << "," << stack_mean.at(constraint) << "," << stack_std.at(constraint)
+                        << ",";
+                    csv << sim.get_rec(constraint) << "," << sim_shifted.get_rec(constraint) << endl;
+                }
 			}
 		}
 	}

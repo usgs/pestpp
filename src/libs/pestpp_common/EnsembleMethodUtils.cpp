@@ -4579,12 +4579,6 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
         ss << c << " final-to-initial parameter states identified thru parameter data 'state_par_link' entries";
         message(1,ss.str());
 
-
-
-
-
-
-
     }
     if (rec_report) {
         ofstream& frec = file_manager.rec_ofstream();

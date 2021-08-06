@@ -193,7 +193,7 @@ private:
 	vector<int> run_population(ParameterEnsemble& _dp, ObservationEnsemble& _op, bool allow_chance);
 
 	void queue_chance_runs(ParameterEnsemble& _dp);
-	ObservationEnsemble get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op);
+	ObservationEnsemble get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op, string& opt_member);
 
 	void initial_pso_bits();
 
@@ -230,7 +230,7 @@ private:
 		const double& ubnd, const double& eta, double& rnd, double& c1, double& c2);
 
 
-	pair<Parameters, Observations> get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe);
+	pair<Parameters, Observations> get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _oe, string& opt_member_name);
 
 	map<string, map<string, double>> obj_func_report(ParameterEnsemble& _dp, ObservationEnsemble& _oe);
 	map<string, map<string, double>> get_obj_func_summary_stats(ParameterEnsemble& _dp, ObservationEnsemble& _op);
