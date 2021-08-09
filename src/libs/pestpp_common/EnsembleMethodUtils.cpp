@@ -3609,7 +3609,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		ph.report(true);
 		ph.write(0, 1);
 		save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, BASE_REAL_NAME, cycle);
-		//transfer_dynamic_state_from_oe_to_pe(_pe, _oe);
+		//transfer_dynamic_state_from_oe_to_initial_pe(_pe, _oe);
 		pe = _pe;
 		oe = _oe;
 		return;
@@ -4023,7 +4023,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		ph.report(true);
 		ph.write(0, 1);
 		save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, "mean", cycle);
-		//transfer_dynamic_state_from_oe_to_pe(_pe, _oe);
+		//transfer_dynamic_state_from_oe_to_initial_pe(_pe, _oe);
 		pe = _pe;
 		oe = _oe;
 		return;
@@ -4305,10 +4305,10 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
     message(0, "initialization complete");
 }
 
-void EnsembleMethod::transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
+void EnsembleMethod::transfer_dynamic_state_from_oe_to_initial_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
 {
 	//vector<string> real_names = oe.get_real_names();
-	
+
 	if (obs_dyn_state_names.size() > 0) 
 	{
 		map<string, int> par2col_map;
@@ -4344,6 +4344,59 @@ void EnsembleMethod::transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe
 	}
 }
 
+void EnsembleMethod::transfer_dynamic_state_from_oe_to_final_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
+{
+    if (final2init_par_state_names.size() > 0) {
+        stringstream ss;
+        ss << "transferring " << final2init_par_state_names.size();
+        ss << " simulated states from obs ensemble to final dynamic state par ensemble for ";
+        ss << _pe.shape().first << " realizations, see rec file for listing";
+        message(1, ss.str());
+
+        //first get a flipped par-to-par map
+        map<string,string> init_to_final_par;
+        for (auto& m : final2init_par_state_names)
+        {
+            init_to_final_par[m.second] = m.first;
+        }
+        //now build a list of final par state names ordered against obs state names
+        //obs_dyn_state_names in sync'd with par_dyn_state_names
+        vector<string> final_par_dyn_state_names;
+        for (int i=0;i<obs_dyn_state_names.size();i++)
+            final_par_dyn_state_names.push_back(init_to_final_par.at(par_dyn_state_names[i]));
+
+        map<string,int> par2col_map;
+        for (int i=0;i<final_par_dyn_state_names.size();i++)
+            par2col_map[final_par_dyn_state_names[i]] = i;
+
+        ParameterEnsemble::transStatus org_status = _pe.get_trans_status();
+        ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
+        Eigen::MatrixXd mat = _oe.get_eigen(vector<string>(), obs_dyn_state_names);
+
+        if (org_status == ParameterEnsemble::transStatus::NUM)
+        {
+            //get a vec of adj states
+            vector<string> adj_par_dyn_state_names = pest_scenario.get_ctl_ordered_adj_par_names();
+            set<string> sadj_pars(adj_par_dyn_state_names.begin(), adj_par_dyn_state_names.end());
+            adj_par_dyn_state_names.clear();
+            set<string>::iterator end = sadj_pars.end();
+            for (auto& p : final_par_dyn_state_names)
+                if (sadj_pars.find(p) != end)
+                    adj_par_dyn_state_names.push_back(p);
+            for (int i = 0; i < mat.rows(); i++)
+            {
+                Parameters pars = pest_scenario.get_ctl_parameters();
+                pars.update(par_dyn_state_names, mat.row(i));
+                bts.ctl2numeric_ip(pars);
+                for (auto& p : adj_par_dyn_state_names)
+                    mat(i, par2col_map[p]) = pars.get_rec(p);
+            }
+        }
+        _pe.replace_col_vals_and_fixed(final_par_dyn_state_names, mat);
+
+    }
+}
+
 void EnsembleMethod::transfer_par_dynamic_state_final_to_initial_ip(ParameterEnsemble& _pe)
 {
     if (final2init_par_state_names.size() > 0) {
@@ -4353,11 +4406,6 @@ void EnsembleMethod::transfer_par_dynamic_state_final_to_initial_ip(ParameterEns
         message(1, ss.str());
 
         _pe.update_var_map();
-        //map<string, int> vmap = _pe.get_var_map();
-        //Eigen::VectorXd vec;
-        //for (auto &sm : final2init_par_state_names) {
-        //    vec = _pe.get_var_vector(sm.first);
-        //    _pe.replace_col(sm.second, vec);
         vector<string> final_names,init_names;
         for (auto &sm : final2init_par_state_names) {
             final_names.push_back(sm.first);
@@ -4372,29 +4420,27 @@ void EnsembleMethod::transfer_par_dynamic_state_final_to_initial_ip(ParameterEns
 }
 
 
-void EnsembleMethod::transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
-{
-	//vector<string> real_names = oe.get_real_names();
-	
-	if (obs_dyn_state_names.size() > 0) 
-	{
-		ParameterEnsemble::transStatus org_status = _pe.get_trans_status();
-		ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
-		Eigen::MatrixXd mat = _pe.get_eigen(vector<string>(), par_dyn_state_names);
-		if (org_status == ParameterEnsemble::transStatus::NUM)
-		{
-			for (int i = 0; i < mat.rows(); i++)
-			{
-				Parameters pars = pest_scenario.get_ctl_parameters();
-				bts.ctl2numeric_ip(pars);
-				pars.update(par_dyn_state_names, mat.row(i));
-				bts.numeric2ctl_ip(pars);
-				mat.row(i) = pars.get_data_eigen_vec(par_dyn_state_names);
-			}
-		}
-		_oe.replace_col_vals(obs_dyn_state_names, mat);
-	}
-}
+//void EnsembleMethod::transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
+//{
+//	if (obs_dyn_state_names.size() > 0)
+//	{
+//		ParameterEnsemble::transStatus org_status = _pe.get_trans_status();
+//		ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
+//		Eigen::MatrixXd mat = _pe.get_eigen(vector<string>(), par_dyn_state_names);
+//		if (org_status == ParameterEnsemble::transStatus::NUM)
+//		{
+//			for (int i = 0; i < mat.rows(); i++)
+//			{
+//				Parameters pars = pest_scenario.get_ctl_parameters();
+//				bts.ctl2numeric_ip(pars);
+//				pars.update(par_dyn_state_names, mat.row(i));
+//				bts.numeric2ctl_ip(pars);
+//				mat.row(i) = pars.get_data_eigen_vec(par_dyn_state_names);
+//			}
+//		}
+//		_oe.replace_col_vals(obs_dyn_state_names, mat);
+//	}
+//}
 
 
 void EnsembleMethod::initialize_dynamic_states(bool rec_report)

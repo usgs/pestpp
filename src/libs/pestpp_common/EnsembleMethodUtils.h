@@ -290,6 +290,7 @@ public:
 
 	ParameterEnsemble get_pe() { return pe; }
 	ParameterEnsemble* get_pe_ptr() { return &pe; }
+	ObservationEnsemble* get_oe_ptr() {return &oe; }
 	void set_pe(ParameterEnsemble& new_pe) { pe = new_pe; }
 	void set_oe(ObservationEnsemble& new_oe) { oe = new_oe; }
 	void set_noise_oe(ObservationEnsemble& new_noise) { oe_base = new_noise; }
@@ -316,11 +317,10 @@ public:
 	//this is not called in the initialization - must be called before initialize() to trigger dynamic state handling...
 	void initialize_dynamic_states(bool rec_report=true);
 
-	void transfer_dynamic_state_from_oe_to_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
-	void transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
+	void transfer_dynamic_state_from_oe_to_initial_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
+    void transfer_dynamic_state_from_oe_to_final_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
+	//void transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
     void transfer_par_dynamic_state_final_to_initial_ip(ParameterEnsemble& _pe);
-
-
 
 	pair<string, string> save_ensembles(string tag, int cycle, ParameterEnsemble& _pe, ObservationEnsemble& _oe);
 	vector<string>& get_par_dyn_state_names() { return par_dyn_state_names; }

@@ -265,7 +265,7 @@ int main(int argc, char* argv[])
 		(pest_scenario.get_pestpp_options().get_debug_parse_only())))
 		{
 		    //create a DA instance here to check the dynamic state entries
-		    RunManagerAbstract* run_manager_ptr;
+		    RunManagerAbstract* run_manager_ptr = 0;
             DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
             da.initialize_dynamic_states();
             run_manager_ptr = 0;
@@ -782,14 +782,17 @@ int main(int argc, char* argv[])
 
 
             da.initialize(*icycle,true,use_existing);
-			
+
 			write_global_phi_info(*icycle, f_phi, da, init_real_names);
+
+            da.transfer_dynamic_state_from_oe_to_final_pe(*da.get_pe_ptr(), *da.get_oe_ptr());
 
 			if (childPest.get_ctl_ordered_nz_obs_names().size() > 0)
 			{
 
 				if (pest_scenario.get_control_info().noptmax > 0) // 
 				{
+
 					da.da_update(*icycle);
 					ss.str("");
 					ss << file_manager.get_base_filename() << ".global." << *icycle << "." << da.get_iter() << ".pcs.csv";
@@ -874,7 +877,7 @@ int main(int argc, char* argv[])
 			//transfer the best (current) simulated final states to the inital states pars in the pe for the cycle
 			//is the place to do this?
 			if (pest_scenario.get_pestpp_options().get_da_use_simulated_states()) {
-                da.transfer_dynamic_state_from_oe_to_pe(curr_pe, curr_oe);
+                da.transfer_dynamic_state_from_oe_to_initial_pe(curr_pe, curr_oe);
             }
 			else
             {
