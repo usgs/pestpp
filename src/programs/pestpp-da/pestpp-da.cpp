@@ -787,6 +787,8 @@ int main(int argc, char* argv[])
 
             da.transfer_dynamic_state_from_oe_to_final_pe(*da.get_pe_ptr(), *da.get_oe_ptr());
 
+            cout << da.get_pe_ptr()->get_var_vector("")
+
 			if (childPest.get_ctl_ordered_nz_obs_names().size() > 0)
 			{
 

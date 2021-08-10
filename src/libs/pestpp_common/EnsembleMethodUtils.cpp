@@ -4386,7 +4386,7 @@ void EnsembleMethod::transfer_dynamic_state_from_oe_to_final_pe(ParameterEnsembl
             for (int i = 0; i < mat.rows(); i++)
             {
                 Parameters pars = pest_scenario.get_ctl_parameters();
-                pars.update(par_dyn_state_names, mat.row(i));
+                pars.update(final_par_dyn_state_names, mat.row(i));
                 bts.ctl2numeric_ip(pars);
                 for (auto& p : adj_par_dyn_state_names)
                     mat(i, par2col_map[p]) = pars.get_rec(p);
