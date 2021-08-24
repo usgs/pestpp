@@ -284,7 +284,7 @@ int main(int argc, char* argv[])
 
 				//Pest childPest;
 				Pest childPest = pest_scenario.get_child_pest(*icycle);
-
+                OutputFileWriter child_ofw(file_manager,childPest);
 
 				if (childPest.get_ctl_observations().size() == 0)
                 {
@@ -398,6 +398,8 @@ int main(int argc, char* argv[])
 				ss << "...number of instruction files in cycle " << *icycle << ": " << childPest.get_insfile_vec().size() << endl;
 				cout << ss.str();
 				fout_rec << ss.str();
+				child_ofw.scenario_io_report(fout_rec);
+
 
 			}
 		}
@@ -634,8 +636,13 @@ int main(int argc, char* argv[])
             fout_rec << "...number of observations in cycle " << *icycle << ": " << childPest.get_ctl_observations().size() << endl;
             cout << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
 			fout_rec << "...number of non-zero weighted observations in cycle " << *icycle << ": " << nnz_obs << endl;
+            cout << "...number of template files in cycle " << *icycle << ": " << childPest.get_model_exec_info().tplfile_vec.size() << endl;
+            fout_rec << "...number of template files in cycle " << *icycle << ": " << childPest.get_model_exec_info().tplfile_vec.size() << endl;
+            cout << "...number of instruction files in cycle " << *icycle << ": " << childPest.get_model_exec_info().insfile_vec.size() << endl;
+            fout_rec << "...number of instruction files in cycle " << *icycle << ": " << childPest.get_model_exec_info().insfile_vec.size() << endl;
 
-			//ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
+
+            //ObjectiveFunc obj_func(&(childPest.get_ctl_observations()), &(childPest.get_ctl_observation_info()), &(childPest.get_prior_info()));
 
 			Parameters cur_ctl_parameters = childPest.get_ctl_parameters();
 			//Allocates Space for Run Manager.  This initializes the model parameter names and observations names.
@@ -771,10 +778,10 @@ int main(int argc, char* argv[])
 			    cout << ss.str();
 			    fout_rec << ss.str();
             }
-
+            output_file_writer.scenario_io_report(fout_rec);
             if (verbose_level > 1) //
             {
-                output_file_writer.scenario_io_report(fout_rec);
+
                 output_file_writer.scenario_pargroup_report(fout_rec);
                 output_file_writer.scenario_par_report(fout_rec);
                 output_file_writer.scenario_obs_report(fout_rec);
