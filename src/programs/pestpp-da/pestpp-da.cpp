@@ -43,20 +43,38 @@ int main(int argc, char* argv[])
 	{
 #endif
 
-		string version = PESTPP_VERSION;
-		cout << endl << endl;
-		cout << "             ==============================================" << endl;
-		cout << "             pestpp-da: Model Independent Data Assimilation" << endl;
-		cout << "             ==============================================" << endl << endl;
+//		string version = PESTPP_VERSION;
+//		cout << endl << endl;
+//		cout << "             ==============================================" << endl;
+//		cout << "             pestpp-da: Model Independent Data Assimilation" << endl;
+//		cout << "             ==============================================" << endl << endl;
+//
+//		//cout << "                     for PEST(++) datasets " << endl << endl;
+//		cout << "               Developed by the PEST++ development team" << endl;
+//		cout << endl << endl << "version: " << version << endl;
+//		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+//        auto start = chrono::steady_clock::now();
+//        string start_string = get_time_string();
+//        cout << "started at " << start_string << endl;
+//		CmdLine cmdline(argc, argv);
+//
+//        if (quit_file_found())
+//        {
+//            cerr << "'pest.stp' found, please remove this file " << endl;
+//            return 1;
+//        }
 
-		//cout << "                     for PEST(++) datasets " << endl << endl;
-		cout << "               Developed by the PEST++ development team" << endl;
-		cout << endl << endl << "version: " << version << endl;
-		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+        string version = PESTPP_VERSION;
+        cout << endl << endl;
+        cout << "             pestpp-da: generalized iterative sequential/batch data assimilation" << endl << endl;
+        //cout << "                     for PEST(++) datasets " << endl << endl;
+        cout << "                            by the PEST++ development team" << endl;
+        cout << endl << endl << "version: " << version << endl;
+        cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
         auto start = chrono::steady_clock::now();
         string start_string = get_time_string();
         cout << "started at " << start_string << endl;
-		CmdLine cmdline(argc, argv);
+        CmdLine cmdline(argc, argv);
 
         if (quit_file_found())
         {
@@ -151,14 +169,15 @@ int main(int argc, char* argv[])
 
 		if (!restart_flag || save_restart_rec_header)
 		{
-			fout_rec << "             pestpp-da.exe - a Data Assimilation Tool" << endl << "for PEST(++) datasets " << endl << endl;
-			fout_rec << "                 by the PEST++ developement team" << endl << endl << endl;
-			fout_rec << endl;
-			fout_rec << endl << endl << "version: " << version << endl;
-			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
-			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl;
+            cout << "             pestpp-da: generalized iterative sequential/batch data assimilation" << endl << endl;
+            //cout << "                     for PEST(++) datasets " << endl << endl;
+            cout << "                            by the PEST++ development team" << endl;
+            fout_rec << endl;
+            fout_rec << endl << endl << "version: " << version << endl;
+            fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+            fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
+            fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
+            fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl;
             fout_rec << "started at " << start_string << endl << endl;
 		}
 
@@ -503,12 +522,12 @@ int main(int argc, char* argv[])
 			// da_start_cycle, da_end_cycle
 			cout << endl << endl ;
 			cout << " =======================================" << endl;
-			cout << " >>>> Assimilating data in cycle " << *icycle << endl;
+			cout << " >>>> processing cycle " << *icycle << endl;
 			cout << " =======================================" << endl << endl;
 
 			fout_rec << endl;
 			fout_rec << " =======================================" << endl;
-			fout_rec << " >>>> Assimilating data in cycle " << *icycle << endl;
+			fout_rec << " >>>> processing cycle " << *icycle << endl;
 			fout_rec << " =======================================" << endl;
 
 			performance_log.log_event("instantiating child pest object");
