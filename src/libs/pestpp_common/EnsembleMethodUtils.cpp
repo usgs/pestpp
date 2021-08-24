@@ -4362,8 +4362,17 @@ void EnsembleMethod::transfer_dynamic_state_from_oe_to_final_pe(ParameterEnsembl
         //now build a list of final par state names ordered against obs state names
         //obs_dyn_state_names in sync'd with par_dyn_state_names
         vector<string> final_par_dyn_state_names;
-        for (int i=0;i<obs_dyn_state_names.size();i++)
-            final_par_dyn_state_names.push_back(init_to_final_par.at(par_dyn_state_names[i]));
+		vector<string> final_obs_dyn_state_names;
+
+		for (int i = 0; i < obs_dyn_state_names.size(); i++)
+		{
+			if (init_to_final_par.find(par_dyn_state_names[i]) != init_to_final_par.end())
+			{
+				final_par_dyn_state_names.push_back(init_to_final_par.at(par_dyn_state_names[i]));
+				final_obs_dyn_state_names.push_back(obs_dyn_state_names[i]);
+
+			}
+		}
 
         map<string,int> par2col_map;
         for (int i=0;i<final_par_dyn_state_names.size();i++)
@@ -4371,7 +4380,7 @@ void EnsembleMethod::transfer_dynamic_state_from_oe_to_final_pe(ParameterEnsembl
 
         ParameterEnsemble::transStatus org_status = _pe.get_trans_status();
         ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
-        Eigen::MatrixXd mat = _oe.get_eigen(vector<string>(), obs_dyn_state_names);
+        Eigen::MatrixXd mat = _oe.get_eigen(vector<string>(), final_obs_dyn_state_names);
 
         if (org_status == ParameterEnsemble::transStatus::NUM)
         {
