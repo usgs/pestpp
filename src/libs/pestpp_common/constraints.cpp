@@ -17,6 +17,7 @@
 #include "constraints.h"
 #include "linear_analysis.h"
 #include "eigen_tools.h"
+#include "MOEA.h"
 
 using namespace std;
 
@@ -1078,12 +1079,15 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
     stringstream ss;
     ss.str("");
     ss << file_mgr_ptr->get_base_filename() << "." << gen << ".population_stack_summary.csv";
-    ofstream csv(ss.str());
-    if (csv.bad())
-    {
-        throw_constraints_error("error opening '" + ss.str() +"' for writing");
+    ofstream csv;
+    if (!use_fosm) {
+        (ss.str());
+
+        if (csv.bad()) {
+            throw_constraints_error("error opening '" + ss.str() + "' for writing");
+        }
+        csv << "member,map_to_member,constraint,risk,stack_mean,stack_stdev,pre_shift,post_shift" << endl;
     }
-    csv << "member,map_to_member,constraint,risk,stack_mean,stack_stdev,pre_shift,post_shift" << endl;
 	map<string, double> risk_map;
 	for (auto& rname : pe.get_real_names())
 	{
@@ -1125,11 +1129,13 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 			shifted_oe.replace(i, sim_shifted);
 			//cout << *shifted_oe.get_eigen_ptr() << endl;
 			//cout << endl;
-			for (auto& constraint : ctl_ord_obs_constraint_names) {
-                csv << rnames[i] << "," << opt_member << "," << constraint << ",";
-                csv << risk_map[rnames[i]] << "," << stack_mean.at(constraint) << "," << stack_std.at(constraint)
-                    << ",";
-                csv << sim.get_rec(constraint) << "," << sim_shifted.get_rec(constraint) << endl;
+			if (!use_fosm) {
+                for (auto &constraint : ctl_ord_obs_constraint_names) {
+                    csv << rnames[i] << "," << opt_member << "," << constraint << ",";
+                    csv << risk_map[rnames[i]] << "," << stack_mean.at(constraint) << "," << stack_std.at(constraint)
+                        << ",";
+                    csv << sim.get_rec(constraint) << "," << sim_shifted.get_rec(constraint) << endl;
+                }
             }
 		}
 
@@ -1152,8 +1158,6 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 			//if (snames.find(real_info.first) == snames.end())
 			if (stack_oe_map.find(real_name) == stack_oe_map.end())
 			{
-				//TODO: just track the ones that are missing and maybe map to nearest or use mean or...
-				//throw_constraints_error("population member name '" + real_info.first + "' not found in observation population names");
 				missing.push_back(real_name);
 			}
 			else
@@ -1180,20 +1184,27 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 			//so the idea here is to figure out which pe in the pe stack map is closest to the missing solutions in dec var space. 
 			if (stack_pe_map.size() != stack_oe_map.size())
 				throw_constraints_error("stack_pe_map size != stack_oe_map size");
-			Eigen::MatrixXd missing_dv_mat = pe.get_eigen(missing, dec_var_names);
+			//remove the risk dv name if found
+			vector<string> dvnames = dec_var_names;
+			vector<string>::iterator rit = find(dvnames.begin(),dvnames.end(),RISK_NAME);
+			if (rit != dvnames.end())
+            {
+                dvnames.erase(rit);
+            }
+			Eigen::MatrixXd missing_dv_mat = pe.get_eigen(missing, dvnames);
 			Eigen::VectorXd missing_dv_vec, stack_dv_vec;
 			//for (auto m : missing)
 			double dist, min_dist;
-			string min_real_name;
+			string min_real_name,missing_real_name;
 			for (int i=0;i<missing.size();i++)
 			{
-
+                missing_real_name = missing[i];
 				missing_dv_vec = missing_dv_mat.row(i);
 				min_dist = numeric_limits<double>::max();
 				min_real_name = "";
 				for (auto& p : stack_pe_map)
 				{
-					stack_dv_vec = p.second.get_data_eigen_vec(dec_var_names);
+					stack_dv_vec = p.second.get_data_eigen_vec(dvnames);
 					dist = (stack_dv_vec - missing_dv_vec).squaredNorm();
 					if (dist < min_dist)
 					{
@@ -1218,7 +1229,8 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 				double _risk = risk;
 				if (risk_obj.size() > 0)
 				{	
-					_risk = stack_pe_map[min_real_name][risk_obj];
+					//_risk = stack_pe_map[min_real_name][risk_obj];
+					_risk = risk_map[missing_real_name];
 				}
 				real_vec = shifted_oe.get_real_vector(missing[i]);
 				sim.update_without_clear(onames, real_vec);
@@ -1235,6 +1247,10 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 			}
 		}
 	}
+    if (!use_fosm)
+    {
+        csv.close();
+    }
 	return shifted_oe;
 }
 
@@ -2586,7 +2602,7 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 		if (!success)
 			throw_constraints_error("error processing FOSM JCO matrix runs ", jco.get_failed_parameter_names());
 		ss.str("");
-		ss << file_mgr_ptr->get_base_filename() << "." << iter << ".fosm.jcb";
+		ss << iter << ".fosm.jcb";
 		jco.save(ss.str());
 	}
 	//otherwise, process some stack runs
