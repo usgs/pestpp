@@ -3646,7 +3646,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	message(1, "eigthresh: ", pest_scenario.get_svd_info().eigthresh);
 	if (localizer.is_initialized())
 	{
-		message(1, "using previously initialized localizer");
+		message(2, "using previously initialized localizer");
 		use_localizer = localizer.get_use();
 	}
 	else
@@ -3734,7 +3734,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	if ((pe.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
 	{
-		message(1, "using pre-set parameter ensemble");
+		message(2, "using previously initialized parameter ensemble");
 		pe_drawn = false;
 	}
 	else
@@ -3760,7 +3760,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	if ((oe_base.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
 	{
-		message(1, "using pre-set observation (simulated output) ensemble");
+		message(2, "using previously initialized observation (simulated output) ensemble");
 		oe_drawn = false;
 	}
 	else
@@ -4046,7 +4046,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	if ((oe.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
 	{
-		message(2, "using pre-set observation + noise ensemble");
+		message(2, "using previously initialized observation + noise ensemble");
 	}
 	else
 		oe = oe_base; //copy
@@ -4094,13 +4094,26 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	//ok, now run the prior ensemble - after checking for center_on
 	//in case something is wrong with center_on
-	if ((obs_restart_csv.size() == 0) && (!use_existing))
-	{
-		performance_log->log_event("running initial ensemble");
-		message(1, "running initial ensemble of size", oe.shape().first);
-		vector<int> failed = run_ensemble(pe, oe, vector<int>(),cycle);
-		if (pe.shape().first == 0)
-			throw_em_error("all realizations failed during initial evaluation");
+	if ((obs_restart_csv.size() == 0) && (!use_existing)) {
+        performance_log->log_event("running initial ensemble");
+        message(1, "running initial ensemble of size", oe.shape().first);
+        vector<int> failed = run_ensemble(pe, oe, vector<int>(), cycle);
+        if (pe.shape().first == 0)
+            throw_em_error("all realizations failed during initial evaluation");
+        if (failed.size() > 0)
+        {
+            ss.str("");
+            ss << "the following " << failed.size() << " par:obs realization runs failed during evaluation of the initial parameter ensemble:" << endl;
+            vector<string> pnames = pe.get_real_names(),onames = oe.get_real_names();
+            for (auto ifail : failed)
+            {
+                ss << pnames[ifail] << ":" << onames[ifail];
+                if (ifail + 1 % 5 > 0)
+                    ss << endl;
+            }
+            message(0,ss.str());
+
+        }
 
 		pe.transform_ip(ParameterEnsemble::transStatus::NUM);
 	}
