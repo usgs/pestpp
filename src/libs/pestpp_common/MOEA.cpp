@@ -1273,6 +1273,7 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 
 void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 {
+    int current_archive_size = population_schedule[iter] * 2;
 	message(2, "updating archive");
 	stringstream ss;
 	if (op_archive.shape().first != dp_archive.shape().first)
@@ -1319,9 +1320,9 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	dp_archive.keep_rows(keep);
 	if (keep.size() > 0)
 	{
-		if (op_archive.shape().first > archive_size)
+		if (op_archive.shape().first > current_archive_size)
 		{
-			objectives.get_spea2_archive_names_to_keep(archive_size, keep, op_archive, dp_archive);
+			objectives.get_spea2_archive_names_to_keep(current_archive_size, keep, op_archive, dp_archive);
 			op_archive.keep_rows(keep);
 			dp_archive.keep_rows(keep);
 		}
@@ -1488,7 +1489,9 @@ void MOEA::initialize()
 
 	warn_min_members = 20;
 	error_min_members = 4;
-	
+
+	initialize_population_schedule();
+
 	//set some defaults
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
 
@@ -1950,7 +1953,7 @@ void MOEA::initialize()
 		}
 		else
 		{
-			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX','PM'}");
+			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX','PM','PSO'}");
 		}
 	}
 	//TODO: report constraints being applied
@@ -1969,7 +1972,7 @@ void MOEA::initialize()
 	//effective_constraint_obs = pest_scenario.get_ctl_observations();
 	
 
-	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
+	//int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
 	population_dv_file = ppo->get_mou_dv_population_file();
 	population_obs_restart_file = ppo->get_mou_obs_population_restart_file();
 	
@@ -2224,6 +2227,7 @@ void MOEA::initialize()
 	//do an initial pareto dominance sort
 	message(1, "performing initial pareto dominance sort");
 	objectives.set_pointers(obs_obj_names, pi_obj_names, obj_dir_mult);
+    archive_size = ppo->get_mou_max_archive_size();
 	if (envtype == MouEnvType::NSGA)
 	{
 		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, true, POP_SUM_TAG);
@@ -2237,7 +2241,7 @@ void MOEA::initialize()
 		ss.str("");
 		ss << "initialized archives with " << dompair.first.size() << " nondominated members";
 		message(2, ss.str());
-		archive_size = ppo->get_mou_max_archive_size();
+
 
 		//this causes the initial archive pareto summary file to be written
 		objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
@@ -2263,7 +2267,8 @@ void MOEA::initialize()
 			ss.str("");
 			ss << "initialized archives with " << keep.size() << " nondominated members";
 			message(2, ss.str());
-			archive_size = num_members * 2;
+			//dont set this here b/c it is set dynamically each gen using population schedule
+			//archive_size = num_members * 2;
 
 			//this causes the initial archive pareto summary file to be written
 			objectives.get_spea2_fitness(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
@@ -2282,14 +2287,14 @@ void MOEA::initialize()
 
 	constraints.mou_report(0,dp, op, obs_obj_names,pi_obj_names);
 
-	initial_pso_bits();
+    initialize_pso_bits();
 	
 
 	message(0, "initialization complete");
 }
 
 
-void MOEA::initial_pso_bits()
+void MOEA::initialize_pso_bits()
 {
 	//initialize PSO bits
 	double init_vel_scale_fac = 0.5;
@@ -2406,7 +2411,8 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 
 ParameterEnsemble MOEA::generate_population()
 {
-	int total_new_members = pest_scenario.get_pestpp_options().get_mou_population_size();
+	//int total_new_members = pest_scenario.get_pestpp_options().get_mou_population_size();
+    int total_new_members = population_schedule[iter];
 	//add new members for any missing
 	total_new_members += (total_new_members - dp.shape().first);
 	int new_members_per_gen = int(total_new_members / gen_types.size());
@@ -2607,11 +2613,79 @@ void MOEA::iterate_to_solution()
 
 }
 
+void MOEA::initialize_population_schedule()
+{
+    stringstream ss;
+    population_schedule.clear();
+    int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
+    string fname = pest_scenario.get_pestpp_options().get_mou_population_schedule();
+    string line;
+    vector<string> tokens;
+    int lcount = 0, gen,psize;
+    for (int i=0;i<pest_scenario.get_control_info().noptmax;i++)
+        population_schedule[i] = num_members;
+    if (fname.size() > 0)
+    {
+        message(2,"reading population schedule from file '"+fname+"'");
+        ifstream in(fname);
+        if (in.bad())
+        {
+            throw_moea_error("error opening mou_population_schedule file '"+fname+"'");
+        }
+        while (getline(in,line))
+        {
+            lcount++;
+            tokens.clear();
+            pest_utils::tokenize(line,tokens,"\t ,");
+            if (tokens.size() < 2)
+            {
+                ss.str("");
+                ss << "mou_population_schedule file '" << fname << "' line " << lcount << " needs at least two entries";
+                throw_moea_error(ss.str());
+            }
+            try
+            {
+                gen = stoi(tokens[0]);
+            }
+            catch (...)
+            {
+                ss.str("");
+                ss << "error casting '" << tokens[0] << "' to generation integer on line " << lcount << " in mou_schedule_file";
+                throw_moea_error(ss.str());
+            }
+            try
+            {
+                psize = stoi(tokens[1]);
+            }
+            catch (...)
+            {
+                ss.str("");
+                ss << "error casting '" << tokens[1] << "' to population size integer on line " << lcount << " in mou_schedule_file";
+                throw_moea_error(ss.str());
+            }
+            if (psize < error_min_members) {
+                ss.str("");
+                ss << "population size " << psize << " on line " << lcount << " in mou_schedule_file less than min "
+                   << error_min_members;
+                throw_moea_error(ss.str());
+            }
+            population_schedule[gen] = psize;
+        }
+        in.close();
+    }
+    ofstream& frec = file_manager.rec_ofstream();
+    frec << "...population schedule: generation,population size:" << endl;
+    for (int i=0;i<pest_scenario.get_control_info().noptmax;i++)
+    {
+        frec << "...   " << i << ", " << population_schedule.at(i) << endl;
+    }
+}
 
 bool MOEA::initialize_dv_population()
 {
 	stringstream ss;
-	int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
+	//int num_members = pest_scenario.get_pestpp_options().get_mou_population_size();
+	int num_members = population_schedule[0];
 	string dv_filename = pest_scenario.get_pestpp_options().get_mou_dv_population_file();
 	bool drawn = false;
 	if (dv_filename.size() == 0)

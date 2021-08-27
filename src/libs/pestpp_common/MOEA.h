@@ -156,6 +156,7 @@ private:
 	bool risk_obj;
 	int restart_iter_offset;
 	int save_every;
+	map<int,int> population_schedule;
 
 	//these two instances are passed as pointers to the constraints
 	//Parameters effective_constraint_pars;
@@ -195,8 +196,8 @@ private:
 	void queue_chance_runs(ParameterEnsemble& _dp);
 	ObservationEnsemble get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op, string& opt_member);
 
-	void initial_pso_bits();
-
+	void initialize_pso_bits();
+    void initialize_population_schedule();
 	bool initialize_dv_population();
 	void initialize_obs_restart_population();
 
