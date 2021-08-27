@@ -2622,7 +2622,7 @@ void MOEA::initialize_population_schedule()
     string line;
     vector<string> tokens;
     int lcount = 0, gen,psize;
-    for (int i=0;i<pest_scenario.get_control_info().noptmax+1;i++)
+    for (int i=0;i<max(1,pest_scenario.get_control_info().noptmax+1);i++)
         population_schedule[i] = num_members;
     if (fname.size() > 0)
     {
