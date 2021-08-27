@@ -704,7 +704,7 @@ private:
 	string mou_obs_population_restart_file;
 	vector<string> mou_objectives;
 	int mou_max_archive_size;
-	bool mou__risk_obj;
+	bool mou_risk_obj;
 	int mou_verbose_level;
 	string mou_env_selector;
 	double mou_crossover_prob;
