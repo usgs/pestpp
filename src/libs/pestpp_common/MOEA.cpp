@@ -2412,7 +2412,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 ParameterEnsemble MOEA::generate_population()
 {
 	//int total_new_members = pest_scenario.get_pestpp_options().get_mou_population_size();
-    int total_new_members = population_schedule[iter];
+    int total_new_members = population_schedule.at(iter);
 	//add new members for any missing
 	total_new_members += (total_new_members - dp.shape().first);
 	int new_members_per_gen = int(total_new_members / gen_types.size());
@@ -2622,7 +2622,7 @@ void MOEA::initialize_population_schedule()
     string line;
     vector<string> tokens;
     int lcount = 0, gen,psize;
-    for (int i=0;i<pest_scenario.get_control_info().noptmax;i++)
+    for (int i=0;i<pest_scenario.get_control_info().noptmax+1;i++)
         population_schedule[i] = num_members;
     if (fname.size() > 0)
     {
