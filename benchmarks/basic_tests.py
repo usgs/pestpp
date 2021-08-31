@@ -1069,6 +1069,8 @@ def fr_fail_test():
     assert not os.path.exists(oe_file)
 
 
+
+
 def sen_grp_test():
     
     model_d = "ies_10par_xsec"
@@ -1102,7 +1104,7 @@ if __name__ == "__main__":
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
-    sweep_forgive_test()
+    #sweep_forgive_test()
     #inv_regul_test()
     #tie_by_group_test()
     #sen_basic_test()
@@ -1133,4 +1135,4 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #basic_sqp_test()
     #mf6_v5_ies_test()
-    #fr_fail_test()
+    fr_fail_test()
