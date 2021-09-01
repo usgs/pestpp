@@ -4097,6 +4097,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	if ((obs_restart_csv.size() == 0) && (!use_existing)) {
         performance_log->log_event("running initial ensemble");
         message(1, "running initial ensemble of size", oe.shape().first);
+        //get these here so we can use them later for reporting since pe and oe have fails dropped...
+        vector<string> pnames = pe.get_real_names(),onames = oe.get_real_names();
         vector<int> failed = run_ensemble(pe, oe, vector<int>(), cycle);
         if (pe.shape().first == 0)
             throw_em_error("all realizations failed during initial evaluation");
@@ -4104,7 +4106,6 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         {
             ss.str("");
             ss << "the following " << failed.size() << " par:obs realization runs failed during evaluation of the initial parameter ensemble:" << endl;
-            vector<string> pnames = pe.get_real_names(),onames = oe.get_real_names();
             for (auto ifail : failed)
             {
                 ss << pnames[ifail] << ":" << onames[ifail];
