@@ -278,6 +278,8 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 
 	}
 
+
+
 	if (get_ctl_ordered_nz_obs_names().size() == 0)
 	{
 		if (forgive)
@@ -3204,6 +3206,8 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 		throw_control_file_error(f_rec, "unrecognized partrans for par " + name + ": " + trans_type);
 	}
 	ctl_parameter_info.insert(name, pi);
+	if (ctl_parameters.find(name) != ctl_parameters.end())
+        throw_control_file_error(f_rec,"duplicate parameter: '"+name+"'");
 	ctl_parameters.insert(name, pi.init_value);
 	
 	//if (find(ctl_ordered_par_group_names.begin(), ctl_ordered_par_group_names.end(), pi.group) == ctl_ordered_par_group_names.end())
@@ -3254,7 +3258,7 @@ void Pest::tokens_to_obs_group_rec(ofstream& f_rec, const vector<string>& tokens
 	}
 }
 
-void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
+void Pest::tokens_to_obs_rec(ofstream& f_rec, const vector<string> &tokens)
 {
 	ObservationRec obs_i;
 	string name = tokens[0];
@@ -3264,6 +3268,8 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	//convert_ip(tokens[2], obs_i.weight);
 	obs_i.weight = stod(tokens[2]);
 	obs_i.group = tokens[3];
+	if (observation_values.find(name) != observation_values.end())
+        throw_control_file_error(f_rec,"duplicate observation: '" + name + "'");
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
 
@@ -3281,7 +3287,7 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	}
 }
 
-void Pest::tokens_to_pi_rec(ostream& f_rec, const string& line_upper)
+void Pest::tokens_to_pi_rec(ofstream& f_rec, const string& line_upper)
 {
 	string first = line_upper.substr(0, 1);
 	if (!prior_info_string.empty() && first != "&") {
@@ -3303,10 +3309,11 @@ void Pest::tokens_to_pi_rec(ostream& f_rec, const string& line_upper)
 }
 
 
-void Pest::tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens)
+void Pest::tokens_to_pi_rec(ofstream& f_rec, const vector<string>& tokens)
 {
 	
-	
+	if (prior_info.find(tokens[0]) != prior_info.end())
+        throw_control_file_error(f_rec,"duplicate prior info names: '"+tokens[0]+"'");
 	pair<string,string> pi_name_group = prior_info.AddRecord(tokens);
 	ctl_ordered_pi_names.push_back(pi_name_group.first);
 	//vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);

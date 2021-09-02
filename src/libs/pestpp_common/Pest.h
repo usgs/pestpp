@@ -153,9 +153,9 @@ protected:
 	void tokens_to_par_group_rec(ofstream &f_rec, const vector<string>& tokens);
 	void tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens,TranFixed *t_fixed, TranLog10 *t_log, TranScale *t_scale, TranOffset *t_offset);
 	void tokens_to_obs_group_rec(ofstream& f_rec, const vector<string>& tokens);
-	void tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens);
-	void tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens);
-	void tokens_to_pi_rec(ostream& f_rec, const string& line_upper);
+	void tokens_to_obs_rec(ofstream& f_rec, const vector<string> &tokens);
+	void tokens_to_pi_rec(ofstream& f_rec, const vector<string>& tokens);
+	void tokens_to_pi_rec(ofstream& f_rec, const string& line_upper);
 	void rectify_par_groups();
 	map<string, vector<pest_utils::ExternalCtlFile>> efiles_map;
 	DaCycleInfo parse_cycle_str(string& raw_cycle_val, string& efilename, int row, ofstream& f_rec);
