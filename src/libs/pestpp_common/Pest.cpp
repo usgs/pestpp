@@ -3207,7 +3207,7 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 	}
 	ctl_parameter_info.insert(name, pi);
 	if (ctl_parameters.find(name) != ctl_parameters.end())
-        throw_control_file_error(f_rec,"duplicate parameter: '"+name+"'");
+        throw_control_file_error(f_rec,"duplicate parameter names in control file for: '"+name+"'");
 	ctl_parameters.insert(name, pi.init_value);
 	
 	//if (find(ctl_ordered_par_group_names.begin(), ctl_ordered_par_group_names.end(), pi.group) == ctl_ordered_par_group_names.end())
@@ -3269,7 +3269,7 @@ void Pest::tokens_to_obs_rec(ofstream& f_rec, const vector<string> &tokens)
 	obs_i.weight = stod(tokens[2]);
 	obs_i.group = tokens[3];
 	if (observation_values.find(name) != observation_values.end())
-        throw_control_file_error(f_rec,"duplicate observation: '" + name + "'");
+        throw_control_file_error(f_rec,"duplicate observation names in control file for: '" + name + "'");
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
 
@@ -3313,7 +3313,7 @@ void Pest::tokens_to_pi_rec(ofstream& f_rec, const vector<string>& tokens)
 {
 	
 	if (prior_info.find(tokens[0]) != prior_info.end())
-        throw_control_file_error(f_rec,"duplicate prior info names: '"+tokens[0]+"'");
+        throw_control_file_error(f_rec,"duplicate prior info names in control file for: '"+tokens[0]+"'");
 	pair<string,string> pi_name_group = prior_info.AddRecord(tokens);
 	ctl_ordered_pi_names.push_back(pi_name_group.first);
 	//vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
