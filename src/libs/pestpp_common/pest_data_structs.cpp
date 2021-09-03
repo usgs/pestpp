@@ -1538,27 +1538,26 @@ void PestppOptions::summary(ostream& os) const
 	os << "glm_rebase_super: " << glm_rebase_super << endl;
 	os << "glm_iter_mc: " << glm_iter_mc << endl;
 
+//	if (global_opt == OPT_DE)
+//	{
+//		os << "global_opt: de" << endl;
+//		os << "de_f: " << de_f << endl;
+//		os << "de_cr: " << de_cr << endl;
+//		os << "de_pop_size: " << de_npopulation << endl;
+//		os << "de_max_gen: " << de_max_gen << endl;
+//		os << "de_dither_f: " << de_dither_f << endl;
+//	}
+//
+//	if (global_opt == OPT_MOEA)
+//	{
+//		os << "global_opt: MOEA" << endl;
+//		os << "de_f: " << de_f << endl;
+//		os << "de_cr: " << de_cr << endl;
+//		os << "de_pop_size: " << de_npopulation << endl;
+//		os << "de_max_gen: " << de_max_gen << endl;
+//		os << "de_dither_f: " << de_dither_f << endl;
+//	}
 
-	if (global_opt == OPT_DE)
-	{
-		os << "global_opt: de" << endl;
-		os << "de_f: " << de_f << endl;
-		os << "de_cr: " << de_cr << endl;
-		os << "de_pop_size: " << de_npopulation << endl;
-		os << "de_max_gen: " << de_max_gen << endl;
-		os << "de_dither_f: " << de_dither_f << endl;
-	}
-
-	if (global_opt == OPT_MOEA)
-	{
-		os << "global_opt: MOEA" << endl;
-		os << "de_f: " << de_f << endl;
-		os << "de_cr: " << de_cr << endl;
-		os << "de_pop_size: " << de_npopulation << endl;
-		os << "de_max_gen: " << de_max_gen << endl;
-		os << "de_dither_f: " << de_dither_f << endl;
-	}
-	
 	os << endl << "...pestpp-swp options:" << endl;
 	os << "sweep_parameter_csv_file: " << sweep_parameter_csv_file << endl;
 	os << "sweep_output_csv_file: " << sweep_output_csv_file << endl;
@@ -1743,7 +1742,10 @@ void PestppOptions::set_defaults()
 	set_parcov_filename(string());
 	set_obscov_filename(string());
 	set_basejac_filename(string());
-	set_sweep_parameter_csv_file(string());
+    set_jac_scale(true);
+
+
+    set_sweep_parameter_csv_file(string());
 	set_sweep_output_csv_file("sweep_out.csv");
 	set_sweep_base_run(false);
 	set_sweep_forgive(false);
@@ -1751,7 +1753,7 @@ void PestppOptions::set_defaults()
 	set_tie_by_group(false);
 	set_enforce_tied_bounds(false);
 
-	set_jac_scale(true);
+
 	set_opt_obj_func("");
 	set_opt_coin_log(true);
 	set_opt_skip_final(false);

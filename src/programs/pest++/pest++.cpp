@@ -429,7 +429,8 @@ int main(int argc, char* argv[])
 		// Differential Evolution
 		if (pest_scenario.get_pestpp_options().get_global_opt() ==  PestppOptions::OPT_DE)
 		{
-			int rand_seed = 1;
+		    throw runtime_error("DE-based global optimization is deprecated in pestpp-glm. please use pestpp-mou");
+			/*int rand_seed = 1;
 			int np = pest_scenario.get_pestpp_options().get_de_npopulation();
 			int max_gen = pest_scenario.get_pestpp_options().get_de_max_gen();
 			double f = pest_scenario.get_pestpp_options().get_de_f();
@@ -443,7 +444,7 @@ int main(int argc, char* argv[])
 			de_solver.initialize_population(*run_manager_ptr, np);
 			de_solver.solve(*run_manager_ptr, restart_ctl, max_gen, f, cr, dither_f, init_run);
 			run_manager_ptr->free_memory();
-			exit(0);
+			exit(0);*/
 		}
 
 
