@@ -53,7 +53,7 @@ ModelInterface::ModelInterface(vector<string> _tplfile_vec, vector<string> _inpf
     {
         scrub_filename_ip(fname);
     }
-    for (auto& fname : outfile_vec)
+    for (auto& fname : inpfile_vec)
     {
         scrub_filename_ip(fname);
     }
