@@ -97,11 +97,7 @@ public:
 	ModelInterface() { ; }
 	//ModelInterface(Pest* _pest_scenario_ptr) { pest_scenario_ptr = _pest_scenario_ptr; }
 	ModelInterface(vector<string> _tplfile_vec, vector<string> _inpfile_vec, vector<string>
-		_insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec) :
-		insfile_vec(_insfile_vec), outfile_vec(_outfile_vec), tplfile_vec(_tplfile_vec),
-		inpfile_vec(_inpfile_vec), comline_vec(_comline_vec), fill_tpl_zeros(false), additional_ins_delimiters(""),
-		num_threads(1)
-		{;}
+		_insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec);
 	void throw_mio_error(string base_message);
 	void run(Parameters* pars, Observations* obs);
 	void run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
@@ -129,6 +125,7 @@ private:
 	void write_input_files(Parameters *pars_ptr);
 	void read_output_files(Observations *obs_ptr);
 	void remove_existing();
+	void scrub_filename_ip(string& fname);
 
 };
 
