@@ -2162,7 +2162,13 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	{
 		ss.str("");
 		ss << "Pest::enforce_par_change_limits error : zero length parameter vector" << endl;
-		ss << "parameter: " << controlling_par << ", control type: " << control_type;
+		ss << "parameter: " << controlling_par << ", control type: " << control_type << endl;
+		ss << "last value: " << last_ctl_pars.get_rec(controlling_par) << endl;
+		ss << "upgrade value: " << upgrade_ctl_pars.get_rec(controlling_par) << endl;
+		ss << "lower bound: " << p_info.get_parameter_rec_ptr(controlling_par)->lbnd << endl;
+		ss << "upper bound: " << p_info.get_parameter_rec_ptr(controlling_par)->ubnd << endl;
+
+
 		throw runtime_error(ss.str());
 	}
 

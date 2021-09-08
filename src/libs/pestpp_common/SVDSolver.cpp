@@ -1552,9 +1552,9 @@ bool SVDSolver::par_heading_out_bnd(double p_org, double p_new, double lower_bnd
 {
 	bool out_of_bnd = false;
 	double tolerance = 1.0e-5;
-	if (((1.0 + tolerance) * p_org > upper_bnd) && (((1.0 - tolerance) * p_new) > p_org))
+	if (((1.0 + tolerance) * p_org >= upper_bnd) && (((1.0 - tolerance) * p_new) >= p_org))
 		out_of_bnd = true;
-	else if (((1.0 - tolerance) * p_org) < lower_bnd && (((1.0 + tolerance) * p_new) < p_org))
+	else if (((1.0 - tolerance) * p_org) <= lower_bnd && (((1.0 + tolerance) * p_new) <= p_org))
 		out_of_bnd = true;
 	return out_of_bnd;
 }
@@ -1562,6 +1562,7 @@ bool SVDSolver::par_heading_out_bnd(double p_org, double p_new, double lower_bnd
 int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Parameters &current_active_ctl_pars,
 	const Parameters &upgrade_active_ctl_pars, const Parameters &del_grad_active_ctl_pars)
 {
+	double tolerance = 1.0e-5;
 	int num_upgrade_out_grad_in = 0;
 	double p_org;
 	double p_new;
@@ -1583,23 +1584,19 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 			lower_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->lbnd;
 			//these are active parameters so this is not really necessary - just being extra safe
 			bool par_active = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->is_active();
-			bool par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
-			//if gradient parameters are provided, also check these
-			/*if (par_active &&  par_going_out && del_grad_active_ctl_pars.size() > 0)
-			{
-				const auto it_grad = del_grad_active_ctl_pars.find(*name_ptr);
-				if (it_grad != del_grad_active_ctl_pars.end())
-				{
-					p_del = it_grad->second;
-					par_going_out = par_heading_out_bnd(p_org, p_del, lower_bnd, upper_bnd);
-				}
-				else
-				{
-					++num_upgrade_out_grad_in;
-				}
-			}*/
-			if (par_going_out)
+			if (!par_active)
+				continue;
+			if ((1.0 + tolerance) * p_new >= upper_bnd)
 				new_freeze_active_ctl_pars.insert(*name_ptr, p_org);
+			else if ((1.0 - tolerance) * p_new <= lower_bnd)
+				new_freeze_active_ctl_pars.insert(*name_ptr, p_org);
+			else
+			{
+
+				bool par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
+				if (par_going_out)
+					new_freeze_active_ctl_pars.insert(*name_ptr, p_org);
+			}
 		}
 	}
 	if (pest_scenario.get_pestpp_options().get_enforce_tied_bounds())
