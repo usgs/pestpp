@@ -377,6 +377,7 @@ def parchglim_test():
     pst.write(os.path.join(m_d,"pest_parchglim.pst"))
     pyemu.os_utils.run("{0} pest_parchglim.pst".format(exe_path.replace("-ies","-glm")),cwd=m_d)
     p_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_parchglim.par"))
+    print(p_df.loc["stage","parval1"],fpm)
     assert p_df.loc["stage","parval1"] == fpm
 
     rpm = 0.1
@@ -1095,8 +1096,31 @@ def sen_grp_test():
         assert diff < 1.0e-6
 
 
+def agnostic_path_test():
+    model_d = "ies_10par_xsec"
+
+    t_d = os.path.join(model_d, "template")
+    m_d = os.path.join(model_d, "test_path")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    shutil.copytree(t_d,m_d)
+
+    pst = pyemu.Pst(os.path.join(m_d, "pest.pst"))
+    pst.parameter_data.loc[pst.adj_par_names,"parval1"] = np.random.random(pst.npar_adj)
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(m_d,"pest.pst"))
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=m_d)
+
+    arr1 = np.loadtxt(os.path.join(m_d,"hk_Layer_1.ref"))
+    arr2 = np.loadtxt(os.path.join(m_d,"nested","really","deep","hk_Layer_1.ref"))
+    d = np.abs(arr1-arr2).sum()
+    print(d)
+    assert d == 0,d
+
+
+
 if __name__ == "__main__":
-    
+    agnostic_path_test()
     #glm_long_name_test()
     #sen_plusplus_test()
     #parchglim_test()
@@ -1135,4 +1159,4 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #basic_sqp_test()
     #mf6_v5_ies_test()
-    fr_fail_test()
+    #fr_fail_test()

@@ -33,6 +33,57 @@ using namespace std;
 //}
 
 
+ModelInterface::ModelInterface(vector<string> _tplfile_vec, vector<string> _inpfile_vec, vector<string>
+                               _insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec):
+                               insfile_vec(_insfile_vec), outfile_vec(_outfile_vec), tplfile_vec(_tplfile_vec),
+                               inpfile_vec(_inpfile_vec), comline_vec(_comline_vec), fill_tpl_zeros(false),
+                               additional_ins_delimiters(""),num_threads(1)
+{
+    //scrub any os seps from the file names
+
+    for (auto& fname : insfile_vec)
+    {
+        scrub_filename_ip(fname);
+    }
+    for (auto& fname : outfile_vec)
+    {
+        scrub_filename_ip(fname);
+    }
+    for (auto& fname : tplfile_vec)
+    {
+        scrub_filename_ip(fname);
+    }
+    for (auto& fname : inpfile_vec)
+    {
+        scrub_filename_ip(fname);
+    }
+    for (auto& fname : comline_vec)
+    {
+        scrub_filename_ip(fname);
+    }
+
+}
+
+void ModelInterface::scrub_filename_ip(string& fname)
+{
+    vector<string> tokens;
+    string tname;
+    pest_utils::tokenize(fname,tokens,"/\\");
+    if (tokens.size()> 1)
+    {
+        tname = tokens[0];
+
+        for (int i=1;i<tokens.size();i++)
+        {
+
+            tname = tname + OS_SEP + tokens[i];
+        }
+        //cout << fname << "," << tname << endl;
+        fname = tname;
+    }
+}
+
+
 void ModelInterface::throw_mio_error(string base_message)
 {
 	throw runtime_error("model input/output error:" + base_message);
