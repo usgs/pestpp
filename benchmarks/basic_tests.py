@@ -1120,10 +1120,12 @@ def agnostic_path_test():
 
 
 if __name__ == "__main__":
-    agnostic_path_test()
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
+
+    #agnostic_path_test()
     #glm_long_name_test()
     #sen_plusplus_test()
-    #parchglim_test()
+    parchglim_test()
     #unc_file_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
@@ -1142,7 +1144,6 @@ if __name__ == "__main__":
     #sen_grp_test()
     #da_prep_4_freyberg_batch()
     # da_prep_4_mf6_freyberg_seq()
-    # shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-sen.exe"),os.path.join("..","bin","pestpp-sen.exe"))
     # basic_test()
     # da_mf6_freyberg_smoother_test()
     # da_mf6_freyberg_test_1()

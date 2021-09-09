@@ -15,13 +15,13 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>pest_fail.pst</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>ss_mf.pst /h :4004</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug2_dll|x64'">
     <LocalDebuggerCommandArguments>pest.pst /H :4005</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerWorkingDirectory>C:\Dev\pestpp\pestpp-glm_benchmarks\glm_10par_xsec\master_3pt_fail</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>C:\Dev\pestpp\for_ayman\master</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerDebuggerType>Auto</LocalDebuggerDebuggerType>
     <LocalDebuggerAttach>false</LocalDebuggerAttach>
