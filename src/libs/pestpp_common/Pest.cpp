@@ -158,6 +158,44 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		adj_par = true;
 		if ((prec->tranform_type == ParameterRec::TRAN_TYPE::FIXED) || (prec->tranform_type == ParameterRec::TRAN_TYPE::TIED))
 			adj_par = false;
+
+		if (prec->tranform_type == ParameterRec::TRAN_TYPE::LOG)
+        {
+		    if (prec->lbnd <= 0)
+            {
+		        if ((forgive) || (!adj_par))
+                {
+		            par_warnings.push_back(pname + " parlbnd <= 0 and transform is 'log'");
+                }
+		        else
+                {
+                    par_problems.push_back(pname + " parlbnd <= 0 and transform is 'log'");
+                }
+            }
+            if (prec->init_value <= 0)
+            {
+                if ((forgive) || (!adj_par))
+                {
+                    par_warnings.push_back(pname + " parval1 <= 0 and transform is 'log'");
+                }
+                else
+                {
+                    par_problems.push_back(pname + " parval1 <= 0 and transform is 'log'");
+                }
+            }
+            if (prec->ubnd <= 0)
+            {
+                if ((forgive) || (!adj_par))
+                {
+                    par_warnings.push_back(pname + " parubnd <= 0 and transform is 'log'");
+                }
+                else
+                {
+                    par_problems.push_back(pname + " parubnd <= 0 and transform is 'log'");
+                }
+            }
+        }
+
 		if (prec->lbnd >= prec->ubnd)
 		{
 			if ((forgive) || (!adj_par))
