@@ -1550,21 +1550,21 @@ void SVDSolver::iteration_update_and_report(ostream &os, const ModelRun &base_ru
 
 bool SVDSolver::par_heading_out_bnd(double p_org, double p_new, double lower_bnd, double upper_bnd)
 {
-	bool out_of_bnd = false;
+	/*bool out_of_bnd = false;
 	double tolerance = 1.0e-5;
 	if (((1.0 + tolerance) * p_org >= upper_bnd) && (((1.0 + tolerance) * p_new) >= upper_bnd))
 		out_of_bnd = true;
 	else if (((1.0 - tolerance) * p_org) <= lower_bnd && (((1.0 - tolerance) * p_new) <= lower_bnd))
 		out_of_bnd = true;
-	return out_of_bnd;
-
-	/*bool out_of_bnd = false;
-	double tolerance = 1.0e-5;
-	if (((1.0 + tolerance) * p_org >= upper_bnd) && (((1.0 - tolerance) * p_new) >= p_org))
-		out_of_bnd = true;
-	else if (((1.0 - tolerance) * p_org) <= lower_bnd && (((1.0 + tolerance) * p_new) <= p_org))
-		out_of_bnd = true;
 	return out_of_bnd;*/
+
+	bool out_of_bnd = false;
+	double tolerance = 1.0e-5;
+	if (((1.0 + tolerance) * p_org >= upper_bnd) && (p_new >= p_org))
+		out_of_bnd = true;
+	else if (((1.0 - tolerance) * p_org) <= lower_bnd && (p_new <= p_org))
+		out_of_bnd = true;
+	return out_of_bnd;
 }
 
 int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Parameters &current_active_ctl_pars,
