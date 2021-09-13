@@ -401,7 +401,7 @@ protected:
 
 	void add_bases();
 
-	void update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
+	void update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, vector<int> subset_idxs=vector<int>());
 
 	vector<int> get_subset_idxs(int size, int _subset_size);
 
