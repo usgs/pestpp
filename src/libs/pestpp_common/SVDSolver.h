@@ -164,7 +164,7 @@ protected:
 	int check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Parameters &current_active_ctl_pars, 
 		const Parameters &new_upgrade_active_ctl_pars, 
 		const Parameters &new_grad_active_ctl_pars = Parameters(),
-		bool include_bound=true);
+		bool include_bound=false);
 };
 
 #endif /* SVDSOLVER_H_ */
