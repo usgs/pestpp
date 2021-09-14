@@ -2233,7 +2233,7 @@ void ParameterEnsemble::from_eigen_mat(Eigen::MatrixXd mat, const vector<string>
 void ParameterEnsemble::from_binary(string file_name, bool forgive)
 {
 	fixed_names.clear();
-	fixed_map.clear();
+	//fixed_map.clear();
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
 	map<string,int> header_info = Ensemble::from_binary(file_name, names, false);
 	unordered_set<string>svar_names(var_names.begin(), var_names.end());
@@ -2280,7 +2280,7 @@ void ParameterEnsemble::from_binary(string file_name, bool forgive)
 void ParameterEnsemble::from_csv(string file_name, bool forgive)
 {
 	fixed_names.clear();
-	fixed_map.clear();
+	//fixed_map.clear();
 	ifstream csv(file_name);
 	if (!csv.good())
 		throw runtime_error("error opening parameter csv " + file_name + " for reading");
@@ -2373,6 +2373,7 @@ void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_in
 			tied_names.push_back(name);
 		}
 	}
+	pfinfo.set_fixed_names(fixed_names);
 	fill_fixed(header_info);
 	save_fixed();
 
@@ -2415,30 +2416,33 @@ void ParameterEnsemble::fill_fixed(const map<string, int> &header_info)
 
 void ParameterEnsemble::save_fixed()
 {
-	
 	if (fixed_names.size() == 0)
 		return;
 	
 	Eigen::MatrixXd fixed_reals = get_eigen(vector<string>(), fixed_names);
-
+	Eigen::VectorXd v;
 	for (int i = 0; i < real_names.size(); i++)
 	{
-		for (int j = 0; j < fixed_names.size(); j++)
+		v = fixed_reals.row(i);
+		pfinfo.add_realization(real_names[i], v, fixed_names);
+		/*for (int j = 0; j < fixed_names.size(); j++)
 		{
 			pair<string, string> key(real_names[i], fixed_names[j]);
 			fixed_map[key] = fixed_reals(i, j);
 
-		}
+		}*/
 	}
 	// add the "base" if its not in the real names already
 	if (find(real_names.begin(), real_names.end(), BASE_REAL_NAME) == real_names.end())
 	{
 		Parameters pars = pest_scenario_ptr->get_ctl_parameters();
-		for (auto fname : fixed_names)
+		v = pars.get_data_eigen_vec(fixed_names);
+		pfinfo.add_realization(BASE_REAL_NAME, v, fixed_names);
+		/*for (auto fname : fixed_names)
 		{
 			pair<string, string> key(BASE_REAL_NAME, fname);
 			fixed_map[key] = pars[fname];
-		}
+		}*/
 	}
 	
 	drop_cols(fixed_names);
@@ -2587,19 +2591,19 @@ map<string,double> ParameterEnsemble::enforce_bounds(PerformanceLog* plog, bool 
 	return norm_map;
 }
 
-void ParameterEnsemble::set_fixed_info(map<pair<string, string>, double> _fixed_map)
-{
-	fixed_names.clear();
-	fixed_map.clear();
-	set<string> found;
-	for (auto& fi : _fixed_map)
-	{
-		found.emplace(fi.first.second);
-	}
-	fixed_map = _fixed_map;
-	fixed_names = vector<string>(found.begin(), found.end());
-	//cout << "";
-}
+//void ParameterEnsemble::set_fixed_info(map<pair<string, string>, double> _fixed_map)
+//{
+//	fixed_names.clear();
+//	fixed_map.clear();
+//	set<string> found;
+//	for (auto& fi : _fixed_map)
+//	{
+//		found.emplace(fi.first.second);
+//	}
+//	fixed_map = _fixed_map;
+//	fixed_names = vector<string>(found.begin(), found.end());
+//	//cout << "";
+//}
 
 void ParameterEnsemble::keep_rows(const vector<int>& keep, bool update_fixed_map)
 {
@@ -2623,7 +2627,7 @@ void ParameterEnsemble::keep_rows(const vector<string>& keep, bool update_fixed_
 {
 
 	
-	if ((update_fixed_map) && (fixed_map.size() > 0))
+	/*if ((update_fixed_map) && (fixed_map.size() > 0))
 	{
 		set<string> skeep(keep.begin(), keep.end());
 		set<string>::iterator end = skeep.end();
@@ -2644,7 +2648,13 @@ void ParameterEnsemble::keep_rows(const vector<string>& keep, bool update_fixed_
 			}
 		}
 
+	}*/
+	if ((update_fixed_map) && (fixed_names.size() > 0))
+	{
+		pfinfo.keep_realizations(keep);
+
 	}
+
 	Ensemble::keep_rows(keep);
 }
 
@@ -2682,9 +2692,10 @@ void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_v
 			if (pi->get_parameter_rec_ptr(m)->tranform_type == ParameterRec::TRAN_TYPE::FIXED)
 			{
 				//map<string, double> fm;
-				Eigen::VectorXd vec = mat.col(other_varmap[m]);
-				for (int i = 0; i < real_names.size(); i++)
-					fixed_map[pair<string, string>(real_names[i], m)] = vec[i];
+				//Eigen::VectorXd vec = mat.col(other_varmap[m]);
+				
+				//for (int i = 0; i < real_names.size(); i++)
+				//	fixed_map[pair<string, string>(real_names[i], m)] = vec[i];
 
 				found.emplace(m);
 			}
@@ -2789,13 +2800,14 @@ void ParameterEnsemble::to_binary_unordered(string file_name)
 	n = reals.size() + (f_names.size() * shape().first) + (t_names.size() * shape().first);
 	fout.write((char*)&n, sizeof(n));
 	pair<string, string> p;
-	map<pair<string, string>, double>::iterator fixed_end = fixed_map.end();
+	//map<pair<string, string>, double>::iterator fixed_end = fixed_map.end();
 	Parameters ctl_pars = pest_scenario_ptr->get_ctl_parameters();
 	map<string, TranTied::pair_string_double> tied_items = par_transform.get_tied_ptr()->get_items();
 	//write matrix
 	n = 0;
 	transform_ip(transStatus::CTL);
 	Eigen::VectorXd t;
+	double fvalue;
 	for (int irow = 0; irow < n_real; ++irow)
 	{
 		t = reals.row(irow);
@@ -2816,13 +2828,15 @@ void ParameterEnsemble::to_binary_unordered(string file_name)
 		
 			n = irow + 1 + (jcol * n_real);
 			p = pair<string, string>(real_names[irow], fname);
-			if (fixed_map.find(p) == fixed_end)
+			//if (fixed_map.find(p) == fixed_end)
+			if (pfinfo.get_fixed_value(fname,real_names[irow],fvalue))
 			{
-				data = ctl_pars[fname];
+				data = fvalue;
+				
 			}
 			else
 			{
-				data = fixed_map.at(p);
+				data = ctl_pars[fname];
 			}
 			n = irow;
 			fout.write((char*)&(n), sizeof(n));
@@ -3150,7 +3164,7 @@ void ParameterEnsemble::to_dense_unordered(string file_name)
 	fout.write((char*)&tmp, sizeof(tmp));
 
 	pair<string, string> p;
-	map<pair<string, string>, double>::iterator fixed_end = fixed_map.end();
+	//map<pair<string, string>, double>::iterator fixed_end = fixed_map.end();
 	Parameters ctl_pars = pest_scenario_ptr->get_ctl_parameters();
 	map<string, TranTied::pair_string_double> tied_items = par_transform.get_tied_ptr()->get_items();
 	int n_real = reals.rows();
@@ -3183,7 +3197,7 @@ void ParameterEnsemble::to_dense_unordered(string file_name)
 	double data;
 	transform_ip(transStatus::CTL);
 	Eigen::VectorXd t;
-	
+	double fvalue;
 	for (int irow = 0; irow < n_real; ++irow)
 	{
 		t = reals.row(irow);
@@ -3204,14 +3218,16 @@ void ParameterEnsemble::to_dense_unordered(string file_name)
 		for (auto& fname : f_names)
 		{
 
-			p = pair<string, string>(real_names[irow], fname);
-			if (fixed_map.find(p) == fixed_end)
+			//p = pair<string, string>(real_names[irow], fname);
+			//if (fixed_map.find(p) == fixed_end)
+			if (pfinfo.get_fixed_value(fname,real_names[irow],fvalue))
 			{
-				data = ctl_pars[fname];
+				data = fvalue;
+				
 			}
 			else
 			{
-				data = fixed_map.at(p);
+				data = ctl_pars[fname];
 			}
 			fout.write((char*)&(data), sizeof(data));
 			jcol++;
@@ -3382,12 +3398,14 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 
 void ParameterEnsemble::replace_fixed(string real_name,Parameters &pars)
 {
+	map<string, double> rmap = pfinfo.get_real_fixed_values(real_name);
 	if (fixed_names.size() > 0)
 	{
 		for (auto fname : fixed_names)
 		{
-			pair<string, string> key(real_name, fname);
-			double val = fixed_map.at(key);
+			//pair<string, string> key(real_name, fname);
+			//double val = fixed_map.at(key);
+			double val = rmap.at(fname);
 			pars.update_rec(fname, val);
 		}
 
@@ -4008,17 +4026,26 @@ FixedParInfo::FixedParInfo(vector<string> _fixed_names)
 	initialize();
 }
 
-double FixedParInfo::get_fixed_value(const string& pname, const string& rname)
+bool FixedParInfo::get_fixed_value(const string& pname, const string& rname, double& value)
 {
 	if (fixed_names.size() == 0)
 	{
-		throw runtime_error("FixedParInfo::get_fixed_value(): fixed_names is empty");
+		//throw runtime_error("FixedParInfo::get_fixed_value(): fixed_names is empty");
+		return false;
 	}
 	if (fixed_info.find(pname) == fixed_info.end())
-		throw runtime_error("FixedParInfo::get_real_fixed_value(): pname '" + pname + "' not in fixed_info");
+	{
+		//throw runtime_error("FixedParInfo::get_real_fixed_value(): pname '" + pname + "' not in fixed_info");
+		return false;
+	}
 	if (fixed_info.at(pname).find(rname) == fixed_info.at(pname).end())
-		throw runtime_error("FixedParInfo::get_real_fixed_value(): rname '" + rname + "' not in fixed_info");
-	return fixed_info.at(pname).at(rname);
+	{
+		//throw runtime_error("FixedParInfo::get_real_fixed_value(): rname '" + rname + "' not in fixed_info");
+		return false;
+	}
+
+	value = fixed_info.at(pname).at(rname);
+	return true;
 }
 
 map<string, double> FixedParInfo::get_par_fixed_values(const string& pname)
@@ -4055,7 +4082,25 @@ vector<double> FixedParInfo::get_real_fixed_values(const string& rname, vector<s
 	return real_vals;
 }
 
-void FixedParInfo::add_realization(string& rname, Eigen::VectorXd& rvals, vector<string>& pnames)
+map<string, double> FixedParInfo::get_real_fixed_values(const string& rname)
+{
+	if (fixed_names.size() == 0)
+	{
+		throw runtime_error("FixedParInfo::get_real_fixed_values(): fixed_names is empty");
+	}
+	map<string, double> rmap;
+	for (auto& fi : fixed_info)
+	{
+		if (fi.second.find(rname) == fi.second.end())
+		{
+			throw runtime_error("FixedParInfo::get_real_fixed_values(): rname '" + rname + "' not in fixed_info");
+		}
+		rmap[fi.first] = fi.second.at(rname);
+	}
+	return rmap;
+}
+
+void FixedParInfo::add_realization(string rname, Eigen::VectorXd& rvals, vector<string>& pnames)
 {
 	if (fixed_names.size() == 0)
 	{
@@ -4075,6 +4120,56 @@ void FixedParInfo::add_realization(string& rname, Eigen::VectorXd& rvals, vector
 		fixed_info.at(name)[rname] = v.at(name);
 	}
 }
+
+void FixedParInfo::keep_realizations(const vector<string>& keep)
+{
+	if (fixed_names.size() == 0)
+	{
+		throw runtime_error("FixedParInfo::keep_realizations(): fixed_names is empty");
+	}
+
+	set<string> skeep(keep.begin(), keep.end());
+	set<string>::iterator end = skeep.end();
+	set<string> sdrop;
+	map<string, double> rmap = fixed_info.at(fixed_names[0]);
+	for (auto& r : rmap)
+		if (skeep.find(r.first) == end)
+			sdrop.emplace(r.first);
+	end = sdrop.end();
+	for (auto& fi : fixed_info)
+	{
+		for (auto it = fi.second.begin(); it != fi.second.end();)
+		{
+			if (sdrop.find(it->first) != end)
+			{
+				fi.second.erase(it++);
+			}
+			else
+			{
+				++it;
+			}
+		}
+	}
+}
+
+void FixedParInfo::update_realizations(const vector<string>& other_var_names, const vector<string>& other_real_names, Eigen::MatrixXd& other_mat)
+{
+	if (fixed_names.size() == 0)
+	{
+		throw runtime_error("FixedParInfo::update_realizations: fixed_names is empty");
+	}
+	for (int j = 0; j < other_var_names.size(); j++)
+	{
+		if (fixed_info.find(other_var_names[j]) == fixed_info.end())
+			continue;
+		for (int i = 0; i < other_real_names.size(); i++)
+		{
+			fixed_info.at(other_var_names[j])[other_real_names[i]] = other_mat[i, j];
+		}
+	}
+}
+
+
 
 void FixedParInfo::initialize()
 {

@@ -131,6 +131,28 @@ protected:
 	
 };
 
+class FixedParInfo
+{
+public:
+	FixedParInfo(vector<string> _fixed_names);
+	FixedParInfo() { ; }
+	void set_fixed_names(vector<string>& _fixed_names) { fixed_names = _fixed_names; initialize(); }
+	bool get_fixed_value(const string& pname, const string& rname, double& value);
+	map<string, double> get_par_fixed_values(const string& pname);
+	vector<double> get_real_fixed_values(const string& rname, vector<string>& pnames);
+	map<string, double> get_real_fixed_values(const string& rname);
+	void add_realization(string rname, Eigen::VectorXd& rvals, vector<string>& pnames);
+	void keep_realizations(const vector<string>& keep);
+	void update_realizations(const vector<string>& other_var_names, const vector<string>& other_real_names, Eigen::MatrixXd& other_mat);
+
+private:
+	vector<string> fixed_names;
+	//map<string, int> par2idx;
+	map<string, map<string, double>> fixed_info;
+
+	void initialize();
+};
+
 class ParameterEnsemble : public Ensemble
 {
 
@@ -178,12 +200,12 @@ public:
 	void to_dense(string filename);
 	void to_dense_unordered(string filename);
 	void to_dense_ordered(string filename);
-	void clear_fixed_map() { fixed_map.clear(); fixed_names.clear(); }
+	//void clear_fixed_map() { fixed_map.clear(); fixed_names.clear(); }
 	void replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);
-	map<pair<string, string>, double> get_fixed_map() { return fixed_map; }
+	//map<pair<string, string>, double> get_fixed_map() { return fixed_map; }
     //map<pair<string, string>, double>* get_fixed_map_ptr() { return &fixed_map; }
 
-    void set_fixed_info(map<pair<string, string>, double> _fixed_map);
+    //void set_fixed_info(map<pair<string, string>, double> _fixed_map);
 	void keep_rows(const vector<int>& keep, bool update_fixed_map = false);
 	void keep_rows(const vector<string>& keep, bool update_fixed_map = false);
 
@@ -193,9 +215,10 @@ private:
 	void save_fixed();
 	void fill_fixed(const map<string, int> &header_info);
 	vector<string> fixed_names;
-	map<pair<string, string>, double> fixed_map;
+	//map<pair<string, string>, double> fixed_map;
 	void replace_fixed(string real_name,Parameters &pars);
 	void prep_par_ensemble_after_read(map<string,int>& header_info);
+	FixedParInfo pfinfo;
 };
 
 class ObservationEnsemble : public Ensemble
@@ -223,24 +246,7 @@ public:
 	//ObservationEnsemble get_mean_diff();
 };
 
-class FixedParInfo
-{
-public:
-	FixedParInfo(vector<string> _fixed_names);
-	FixedParInfo() { ; }
-	void set_fixed_names(vector<string>& _fixed_names) {fixed_names = _fixed_names; initialize();}
-	double get_fixed_value(const string& pname, const string& rname);
-	map<string, double> get_par_fixed_values(const string& pname);
-	vector<double> get_real_fixed_values(const string& rname, vector<string>& pnames);
-	void add_realization(string& rname, Eigen::VectorXd& rvals, vector<string>& pnames);
 
-private:
-	vector<string> fixed_names;
-	//map<string, int> par2idx;
-	map<string, map<string, double>> fixed_info;
-
-	void initialize();
-};
 
 class DrawThread
 {
