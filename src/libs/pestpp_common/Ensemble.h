@@ -184,6 +184,8 @@ public:
     map<pair<string, string>, double>* get_fixed_map_ptr() { return &fixed_map; }
 
     void set_fixed_info(map<pair<string, string>, double> _fixed_map);
+	void keep_rows(const vector<int>& keep, bool update_fixed_map = false);
+	void keep_rows(const vector<string>& keep, bool update_fixed_map = false);
 
 private:
 	ParamTransformSeq par_transform;

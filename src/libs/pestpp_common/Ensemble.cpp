@@ -740,8 +740,9 @@ void Ensemble::keep_rows(const vector<int> &row_idxs)
 	for (int ireal = 0; ireal < reals.rows(); ireal++)
 		if (find(start, end, ireal) != end)
 			keep_names.push_back(real_names[ireal]);
-	reals = get_eigen(keep_names, vector<string>());
-	real_names = keep_names;
+	/*reals = get_eigen(keep_names, vector<string>());
+	real_names = keep_names;*/
+	keep_rows(keep_names);
 }
 
 void Ensemble::keep_rows(const vector<string> &keep_names)
@@ -2595,6 +2596,55 @@ void ParameterEnsemble::set_fixed_info(map<pair<string, string>, double> _fixed_
 	fixed_names = vector<string>(found.begin(), found.end());
 	//cout << "";
 }
+
+void ParameterEnsemble::keep_rows(const vector<int>& keep, bool update_fixed_map)
+{
+	vector<string> str_keep;
+	for (auto& k : keep)
+	{
+		if ((k < 0) || (k > real_names.size() - 1))
+		{
+			stringstream ss;
+			ss << "ParameterEnsemble::drop_rows() : integer index not in range: " << k;
+			throw_ensemble_error(ss.str());
+		}
+	}
+	keep_rows(str_keep, update_fixed_map);
+
+
+}
+
+void ParameterEnsemble::keep_rows(const vector<string>& keep, bool update_fixed_map)
+{
+
+	
+	if ((update_fixed_map) && (fixed_map.size() > 0))
+	{
+		set<string> skeep(keep.begin(), keep.end());
+		set<string>::iterator end = skeep.end();
+		set<string> sdrop;
+		for (auto& rname : real_names)
+			if (skeep.find(rname) == end)
+				sdrop.emplace(rname);
+		end = sdrop.end();
+		for (auto it = fixed_map.begin(); it != fixed_map.end();)
+		{
+			if (sdrop.find(it->first.first) != end)
+			{
+				fixed_map.erase(it++);
+			}
+			else
+			{
+				++it;
+			}
+		}
+
+	}
+	Ensemble::keep_rows(keep);
+}
+
+
+
 
 void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
 {

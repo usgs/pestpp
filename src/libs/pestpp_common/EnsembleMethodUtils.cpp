@@ -4901,7 +4901,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			{
 				pe_lam_scale.to_dense(ss.str() + ".bin");
 				pe_filenames.push_back(ss.str() + ".bin");
-				pe_lam_scale.keep_rows(subset_idxs);
+				pe_lam_scale.keep_rows(subset_idxs,true);
 				message(1,"upgrade ensemble saved to " + ss.str() + ".bin");
 
 			}
