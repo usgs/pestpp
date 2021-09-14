@@ -223,6 +223,25 @@ public:
 	//ObservationEnsemble get_mean_diff();
 };
 
+class FixedParInfo
+{
+public:
+	FixedParInfo(vector<string> _fixed_names);
+	FixedParInfo() { ; }
+	void set_fixed_names(vector<string>& _fixed_names) {fixed_names = _fixed_names; initialize();}
+	double get_fixed_value(const string& pname, const string& rname);
+	map<string, double> get_par_fixed_values(const string& pname);
+	vector<double> get_real_fixed_values(const string& rname, vector<string>& pnames);
+	void add_realization(string& rname, Eigen::VectorXd& rvals, vector<string>& pnames);
+
+private:
+	vector<string> fixed_names;
+	//map<string, int> par2idx;
+	map<string, map<string, double>> fixed_info;
+
+	void initialize();
+};
+
 class DrawThread
 {
 public:

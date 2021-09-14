@@ -4001,3 +4001,91 @@ void DrawThread::work(int thread_id, int num_reals, int ies_verbose, map<string,
 	}
 
 }
+
+FixedParInfo::FixedParInfo(vector<string> _fixed_names)
+{
+	fixed_names = _fixed_names;
+	initialize();
+}
+
+double FixedParInfo::get_fixed_value(const string& pname, const string& rname)
+{
+	if (fixed_names.size() == 0)
+	{
+		throw runtime_error("FixedParInfo::get_fixed_value(): fixed_names is empty");
+	}
+	if (fixed_info.find(pname) == fixed_info.end())
+		throw runtime_error("FixedParInfo::get_real_fixed_value(): pname '" + pname + "' not in fixed_info");
+	if (fixed_info.at(pname).find(rname) == fixed_info.at(pname).end())
+		throw runtime_error("FixedParInfo::get_real_fixed_value(): rname '" + rname + "' not in fixed_info");
+	return fixed_info.at(pname).at(rname);
+}
+
+map<string, double> FixedParInfo::get_par_fixed_values(const string& pname)
+{
+	if (fixed_names.size() == 0)
+	{
+		throw runtime_error("FixedParInfo::get_par_fixed_values(): fixed_names is empty");
+	}
+	if (fixed_info.find(pname) == fixed_info.end())
+	{
+		throw runtime_error("FixedParInfo::get_par_fixed_values(): pname '"+pname+"' not in fixed_info");
+	}
+
+	return fixed_info.at(pname);
+}
+
+vector<double> FixedParInfo::get_real_fixed_values(const string& rname, vector<string>& pnames)
+{
+	if (fixed_names.size() == 0)
+	{
+		throw runtime_error("FixedParInfo::get_real_fixed_values(): fixed_names is empty");
+	}
+	vector<double> real_vals(pnames.size());
+	int c = 0;
+	for (auto& name : pnames)
+	{
+		if (fixed_info.find(name) == fixed_info.end())
+			throw runtime_error("FixedParInfo::get_real_fixed_values(): pname '" + name +"' not in fixed_info");
+		if (fixed_info.at(name).find(rname) == fixed_info.at(name).end())
+			throw runtime_error("FixedParInfo::get_real_fixed_values(): rname '" + rname + "' not in fixed_info");
+		real_vals[c] = fixed_info.at(name).at(rname);
+		c++;
+	}
+	return real_vals;
+}
+
+void FixedParInfo::add_realization(string& rname, Eigen::VectorXd& rvals, vector<string>& pnames)
+{
+	if (fixed_names.size() == 0)
+	{
+		throw runtime_error("FixedParInfo::add_realization(): fixed_names is empty");
+	}
+	if (rvals.size() != pnames.size())
+	{
+		throw runtime_error("FixedParInfo::add_realization(): rvals.size() != pnames.size()");
+	}
+	map<string, double> v;
+	for (int i = 0; i < rvals.size(); i++)
+		v[pnames[i]] = rvals[i];
+	for (auto& name : fixed_names)
+	{
+		if (v.find(name) == v.end())
+			throw runtime_error("FixedParInfo::add_realization(): fixed name '" + name + "' not in pnames");
+		fixed_info.at(name)[rname] = v.at(name);
+	}
+}
+
+void FixedParInfo::initialize()
+{
+	fixed_info.clear();
+	if (fixed_names.size() == 0)
+	{
+		throw runtime_error("FixedParInfo::reset_par2idx: fixed_names is empty");
+	}
+	for (auto& name : fixed_names)
+	{
+		fixed_info[name] = map<string, double>();
+	}
+	
+}
