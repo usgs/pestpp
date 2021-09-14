@@ -2608,6 +2608,7 @@ void ParameterEnsemble::keep_rows(const vector<int>& keep, bool update_fixed_map
 			ss << "ParameterEnsemble::drop_rows() : integer index not in range: " << k;
 			throw_ensemble_error(ss.str());
 		}
+		str_keep.push_back(real_names[k]);
 	}
 	keep_rows(str_keep, update_fixed_map);
 
