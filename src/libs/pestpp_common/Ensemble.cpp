@@ -2092,6 +2092,8 @@ map<string,double> ParameterEnsemble::draw(int num_reals, Parameters par, Covari
 	}*/
 	//fill_fixed(header_info);
 	//save_fixed();
+	vector<string> f;
+	pfinfo.set_fixed_names(f);
 	if (!same)
 	{
 

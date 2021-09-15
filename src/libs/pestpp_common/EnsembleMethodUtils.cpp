@@ -5568,6 +5568,7 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 		// message(1, "saving initial parameter ensemble to ", ss.str());
 		// pe.to_csv(ss.str());
 		drawn = true;
+		
 	}
 	else
 	{
