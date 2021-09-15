@@ -135,7 +135,7 @@ class FixedParInfo
 {
 public:
 	FixedParInfo(vector<string> _fixed_names);
-	FixedParInfo() { ; }
+	FixedParInfo() { initialized=false; }
 	void set_fixed_names(vector<string>& _fixed_names) { fixed_names = _fixed_names; initialize(); }
 	bool get_fixed_value(const string& pname, const string& rname, double& value);
 	map<string, double> get_par_fixed_values(const string& pname);
@@ -147,6 +147,7 @@ public:
 	void update_par_values(const map<string, double>& pval_map);
 	void clear() { fixed_info.clear(); fixed_names.clear(); }
 private:
+	bool initialized;
 	vector<string> fixed_names;
 	//map<string, int> par2idx;
 	map<string, map<string, double>> fixed_info;

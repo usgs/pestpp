@@ -3398,9 +3398,10 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 
 void ParameterEnsemble::replace_fixed(string real_name,Parameters &pars)
 {
-	map<string, double> rmap = pfinfo.get_real_fixed_values(real_name);
+	
 	if (fixed_names.size() > 0)
 	{
+		map<string, double> rmap = pfinfo.get_real_fixed_values(real_name);
 		for (auto fname : fixed_names)
 		{
 			//pair<string, string> key(real_name, fname);
@@ -4023,6 +4024,7 @@ void DrawThread::work(int thread_id, int num_reals, int ies_verbose, map<string,
 FixedParInfo::FixedParInfo(vector<string> _fixed_names)
 {
 	fixed_names = _fixed_names;
+	initialized = false;
 	initialize();
 }
 
@@ -4050,9 +4052,13 @@ bool FixedParInfo::get_fixed_value(const string& pname, const string& rname, dou
 
 map<string, double> FixedParInfo::get_par_fixed_values(const string& pname)
 {
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::get_par_fixed_values(): not initialized");
+	}
 	if (fixed_names.size() == 0)
 	{
-		throw runtime_error("FixedParInfo::get_par_fixed_values(): fixed_names is empty");
+		return map<string, double>();
 	}
 	if (fixed_info.find(pname) == fixed_info.end())
 	{
@@ -4064,9 +4070,13 @@ map<string, double> FixedParInfo::get_par_fixed_values(const string& pname)
 
 vector<double> FixedParInfo::get_real_fixed_values(const string& rname, vector<string>& pnames)
 {
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::get_real_fixed_values(): not initialized");
+	}
 	if (fixed_names.size() == 0)
 	{
-		throw runtime_error("FixedParInfo::get_real_fixed_values(): fixed_names is empty");
+		return vector<double>();
 	}
 	vector<double> real_vals(pnames.size());
 	int c = 0;
@@ -4084,9 +4094,13 @@ vector<double> FixedParInfo::get_real_fixed_values(const string& rname, vector<s
 
 map<string, double> FixedParInfo::get_real_fixed_values(const string& rname)
 {
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::get_real_fixed_values(): not initialized");
+	}
 	if (fixed_names.size() == 0)
 	{
-		throw runtime_error("FixedParInfo::get_real_fixed_values(): fixed_names is empty");
+		return map<string, double>();
 	}
 	map<string, double> rmap;
 	for (auto& fi : fixed_info)
@@ -4102,9 +4116,13 @@ map<string, double> FixedParInfo::get_real_fixed_values(const string& rname)
 
 void FixedParInfo::add_realization(string rname, Eigen::VectorXd& rvals, vector<string>& pnames)
 {
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::add_realization(): not initialized");
+	}
 	if (fixed_names.size() == 0)
 	{
-		throw runtime_error("FixedParInfo::add_realization(): fixed_names is empty");
+		return;
 	}
 	if (rvals.size() != pnames.size())
 	{
@@ -4123,9 +4141,13 @@ void FixedParInfo::add_realization(string rname, Eigen::VectorXd& rvals, vector<
 
 void FixedParInfo::keep_realizations(const vector<string>& keep)
 {
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::keep_realizations(): not initialized");
+	}
 	if (fixed_names.size() == 0)
 	{
-		throw runtime_error("FixedParInfo::keep_realizations(): fixed_names is empty");
+		return;
 	}
 
 	set<string> skeep(keep.begin(), keep.end());
@@ -4154,9 +4176,13 @@ void FixedParInfo::keep_realizations(const vector<string>& keep)
 
 void FixedParInfo::update_realizations(const vector<string>& other_var_names, const vector<string>& other_real_names, Eigen::MatrixXd& other_mat)
 {
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::update_realizations: not initialized");
+	}
 	if (fixed_names.size() == 0)
 	{
-		throw runtime_error("FixedParInfo::update_realizations: fixed_names is empty");
+		return;
 	}
 	for (int j = 0; j < other_var_names.size(); j++)
 	{
@@ -4197,5 +4223,6 @@ void FixedParInfo::initialize()
 	{
 		fixed_info[name] = map<string, double>();
 	}
+	initialized = true;
 	
 }
