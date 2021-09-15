@@ -4215,10 +4215,10 @@ void FixedParInfo::update_par_values(const map<string, double>& pval_map)
 void FixedParInfo::initialize()
 {
 	fixed_info.clear();
-	if (fixed_names.size() == 0)
+	/*if (fixed_names.size() == 0)
 	{
-		throw runtime_error("FixedParInfo::reset_par2idx: fixed_names is empty");
-	}
+		throw runtime_error("FixedParInfo::initialize: fixed_names is empty");
+	}*/
 	for (auto& name : fixed_names)
 	{
 		fixed_info[name] = map<string, double>();
