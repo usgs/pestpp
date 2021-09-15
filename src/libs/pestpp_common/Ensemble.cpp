@@ -3402,12 +3402,11 @@ void ParameterEnsemble::replace_fixed(string real_name,Parameters &pars)
 	if (fixed_names.size() > 0)
 	{
 		map<string, double> rmap = pfinfo.get_real_fixed_values(real_name);
-		for (auto fname : fixed_names)
+		for (auto& r : rmap)
 		{
 			//pair<string, string> key(real_name, fname);
 			//double val = fixed_map.at(key);
-			double val = rmap.at(fname);
-			pars.update_rec(fname, val);
+			pars.update_rec(r.first, r.second);
 		}
 
 	}
