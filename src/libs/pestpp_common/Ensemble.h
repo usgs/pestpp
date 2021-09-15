@@ -144,13 +144,15 @@ public:
 	void add_realization(string rname, Eigen::VectorXd& rvals, vector<string>& pnames);
 	void keep_realizations(const vector<string>& keep);
 	void update_realizations(const vector<string>& other_var_names, const vector<string>& other_real_names, Eigen::MatrixXd& other_mat);
-
+	void update_par_values(const map<string, double>& pval_map);
+	void clear() { fixed_info.clear(); fixed_names.clear(); }
 private:
 	vector<string> fixed_names;
 	//map<string, int> par2idx;
 	map<string, map<string, double>> fixed_info;
 
 	void initialize();
+
 };
 
 class ParameterEnsemble : public Ensemble
@@ -200,12 +202,12 @@ public:
 	void to_dense(string filename);
 	void to_dense_unordered(string filename);
 	void to_dense_ordered(string filename);
-	//void clear_fixed_map() { fixed_map.clear(); fixed_names.clear(); }
+	void clear_fixed_map() { pfinfo.clear(); }
 	void replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);
 	//map<pair<string, string>, double> get_fixed_map() { return fixed_map; }
     //map<pair<string, string>, double>* get_fixed_map_ptr() { return &fixed_map; }
-
-    //void set_fixed_info(map<pair<string, string>, double> _fixed_map);
+	FixedParInfo& get_fixed_info() { return pfinfo; }
+	void set_fixed_info(FixedParInfo _pfinfo) { pfinfo = _pfinfo; }
 	void keep_rows(const vector<int>& keep, bool update_fixed_map = false);
 	void keep_rows(const vector<string>& keep, bool update_fixed_map = false);
 

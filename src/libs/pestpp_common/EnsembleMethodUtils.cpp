@@ -5139,7 +5139,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 		
 		ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
-		remaining_pe_lam.set_fixed_info(pe.get_fixed_map());
+		remaining_pe_lam.set_fixed_info(pe.get_fixed_info());
 
 		if (pe_filenames.size() > 0)
 		{
@@ -5257,7 +5257,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		performance_log->log_event("assembling ensembles");
 		pe_lams[best_idx].drop_rows(pe_keep_names);
 		pe_lams[best_idx].append_other_rows(remaining_pe_lam);
-		pe_lams[best_idx].set_fixed_info(pe.get_fixed_map());
+		pe_lams[best_idx].set_fixed_info(pe.get_fixed_info());
 		//append the remaining obs en
 		oe_lam_best.append_other_rows(remaining_oe_lam);
 		assert(pe_lams[best_idx].shape().first == oe_lam_best.shape().first);

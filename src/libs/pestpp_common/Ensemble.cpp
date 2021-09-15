@@ -4164,7 +4164,22 @@ void FixedParInfo::update_realizations(const vector<string>& other_var_names, co
 			continue;
 		for (int i = 0; i < other_real_names.size(); i++)
 		{
-			fixed_info.at(other_var_names[j])[other_real_names[i]] = other_mat[i, j];
+			fixed_info.at(other_var_names[j])[other_real_names[i]] = other_mat(i, j);
+		}
+	}
+}
+
+void FixedParInfo::update_par_values(const map<string, double>& pval_map)
+{
+	for (auto& p : pval_map)
+	{
+		if (fixed_info.find(p.first) != fixed_info.end())
+		{
+			for (auto& pm : fixed_info.at(p.first))
+			{
+				pm.second = p.second;
+			}
+
 		}
 	}
 }
