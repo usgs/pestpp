@@ -2234,7 +2234,7 @@ void ParameterEnsemble::from_eigen_mat(Eigen::MatrixXd mat, const vector<string>
 
 void ParameterEnsemble::from_binary(string file_name, bool forgive)
 {
-	fixed_names.clear();
+	//fixed_names.clear();
 	//fixed_map.clear();
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
 	map<string,int> header_info = Ensemble::from_binary(file_name, names, false);
@@ -2281,7 +2281,7 @@ void ParameterEnsemble::from_binary(string file_name, bool forgive)
 
 void ParameterEnsemble::from_csv(string file_name, bool forgive)
 {
-	fixed_names.clear();
+	//fixed_names.clear();
 	//fixed_map.clear();
 	ifstream csv(file_name);
 	if (!csv.good())
@@ -2360,6 +2360,7 @@ void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_in
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
 	unordered_set<string>snames(names.begin(), names.end());
 	names.clear();
+	vector<string> fixed_names;
 	for (auto& name : var_names)
 	{
 		if (snames.find(name) != snames.end())
@@ -2376,8 +2377,8 @@ void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_in
 		}
 	}
 	pfinfo.set_fixed_names(fixed_names);
-	fill_fixed(header_info);
-	save_fixed();
+	fill_fixed(header_info, fixed_names);
+	save_fixed(fixed_names);
 
 	if (tied_names.size() > 0)
 	{
@@ -2389,8 +2390,9 @@ void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_in
 	update_var_map();
 }
 
-void ParameterEnsemble::fill_fixed(const map<string, int> &header_info)
+void ParameterEnsemble::fill_fixed(const map<string, int> &header_info, vector<string>& fixed_names)
 {
+	
 	if (fixed_names.size() == 0)
 		return;
 	map<string, int> var_map;
@@ -2416,7 +2418,7 @@ void ParameterEnsemble::fill_fixed(const map<string, int> &header_info)
 
 }
 
-void ParameterEnsemble::save_fixed()
+void ParameterEnsemble::save_fixed(vector<string>& fixed_names)
 {
 	if (fixed_names.size() == 0)
 		return;
@@ -2651,7 +2653,7 @@ void ParameterEnsemble::keep_rows(const vector<string>& keep, bool update_fixed_
 		}
 
 	}*/
-	if ((update_fixed_map) && (fixed_names.size() > 0))
+	if (update_fixed_map)
 	{
 		pfinfo.keep_realizations(keep);
 
@@ -2708,11 +2710,15 @@ void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_v
 		if (still_missing.size() > 0)
 			throw_ensemble_error("ParameterEnsemble::replace_col_vals_and_fixed(): the following par names in other were not found in adj or fixed pars", still_missing);
 		//update fixed_names
-		set<string> fnames(fixed_names.begin(), fixed_names.end());
-		for (auto& f : found)
-			if (fnames.find(f) == fnames.end())
-				fixed_names.push_back(f);
 
+		//set<string> fnames(fixed_names.begin(), fixed_names.end());
+		vector<string> fixed_names(found.begin(),found.end());
+
+		/*for (auto& f : found)
+			if (fnames.find(f) == fnames.end())
+				fixed_names.push_back(f);*/
+		pfinfo.set_fixed_names(fixed_names);
+		pfinfo.update_realizations(other_var_names, real_names, mat);
 
 		//update the other_varmap and the other mat
 		for (auto& ovm : other_varmap)
@@ -3401,17 +3407,15 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 void ParameterEnsemble::replace_fixed(string real_name,Parameters &pars)
 {
 	
-	if (fixed_names.size() > 0)
+	map<string, double> rmap = pfinfo.get_real_fixed_values(real_name);
+	for (auto& r : rmap)
 	{
-		map<string, double> rmap = pfinfo.get_real_fixed_values(real_name);
-		for (auto& r : rmap)
-		{
-			//pair<string, string> key(real_name, fname);
-			//double val = fixed_map.at(key);
-			pars.update_rec(r.first, r.second);
-		}
-
+		//pair<string, string> key(real_name, fname);
+		//double val = fixed_map.at(key);
+		pars.update_rec(r.first, r.second);
 	}
+
+	
 
 }
 
@@ -4175,7 +4179,7 @@ void FixedParInfo::keep_realizations(const vector<string>& keep)
 	}
 }
 
-void FixedParInfo::update_realizations(const vector<string>& other_var_names, const vector<string>& other_real_names, Eigen::MatrixXd& other_mat)
+void FixedParInfo::update_realizations(const vector<string>& other_var_names, const vector<string>& other_real_names, const Eigen::MatrixXd& other_mat)
 {
 	if (!initialized)
 	{
@@ -4209,6 +4213,25 @@ void FixedParInfo::update_par_values(const map<string, double>& pval_map)
 
 		}
 	}
+}
+
+void FixedParInfo::fill_fixed(map<string, double>& fixed_map, vector<string>& rnames)
+{
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::update_realizations: not initialized");
+	}
+	if (fixed_names.size() == 0)
+	{
+		return;
+	}
+	for (auto& pname : fixed_names)
+	{
+		double fval = fixed_map.at(pname);
+		for (auto& rname : rnames)
+			fixed_info.at(pname)[rname] = fval;
+	}
+
 }
 
 

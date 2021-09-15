@@ -143,9 +143,10 @@ public:
 	map<string, double> get_real_fixed_values(const string& rname);
 	void add_realization(string rname, Eigen::VectorXd& rvals, vector<string>& pnames);
 	void keep_realizations(const vector<string>& keep);
-	void update_realizations(const vector<string>& other_var_names, const vector<string>& other_real_names, Eigen::MatrixXd& other_mat);
+	void update_realizations(const vector<string>& other_var_names, const vector<string>& other_real_names, const Eigen::MatrixXd& other_mat);
 	void update_par_values(const map<string, double>& pval_map);
 	void clear() { fixed_info.clear(); fixed_names.clear(); }
+	void fill_fixed(map<string, double>& fixed_map, vector<string>& rnames);
 private:
 	bool initialized;
 	vector<string> fixed_names;
@@ -215,9 +216,9 @@ public:
 private:
 	ParamTransformSeq par_transform;
 	transStatus tstat;
-	void save_fixed();
-	void fill_fixed(const map<string, int> &header_info);
-	vector<string> fixed_names;
+	void save_fixed(vector<string>& fixed_names);
+	void fill_fixed(const map<string, int> &header_info, vector<string>& fixed_names);
+	//vector<string> fixed_names;
 	//map<pair<string, string>, double> fixed_map;
 	void replace_fixed(string real_name,Parameters &pars);
 	void prep_par_ensemble_after_read(map<string,int>& header_info);
