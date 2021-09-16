@@ -3098,6 +3098,157 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
 	return new_dp;
 }
 
+ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int nsteps, int optbounds)
+{
+	//C++ implementation of the cceua algorithm, Duan et al. (1992) with the addition of k worst points
+	// 	   and n steps along the reflection path
+	
+	//TODO get npt from s.
+	int nopt = 30; //number of variables in the model, in an ideal situaion s has nopt realizations, handle size of s in generate_simplex_population
+	int nps = nopt + 1; // number of members in a simplex
+
+	//TODO get parameters and fitness from s
+	Eigen::MatrixXd svals(nps, nopt); //PARAMETERS 
+	Eigen::VectorXd sfvals(nps);     //OBJECTIVE FUNCTION for members of the simplex
+
+	//TOERASE, FILL WTH RANDOM NUMBERS FOR NOW
+	for (int i = 0; i < nps; i++)
+	{
+		for (int j = 0; j < nopt; j++)
+			svals(i, j) = uniform_draws(1, 0.0, 1.0, rand_gen)[0];
+		sfvals(i) = uniform_draws(1, 0.0, 1.0, rand_gen)[0];
+	}
+
+	//TODO GET bl bu from s
+	Eigen::VectorXd bl(nopt); 
+	Eigen::VectorXd bu(nopt);
+	for (int i = 0; i < nopt; i++)
+	{
+		bu(i) = 0.0; //zdt1 example
+		bl(i) = 1.0; //zdt1 example
+
+	}
+	//Create vector with n steps from reflection [1-1/n, 1-2/n, ...1-(n-1)/n]
+	//Examples:                             n=1, [1]
+	//                                      n=4, [1, 1-1/n, 1-2/n, 1-3/n]
+	//TODO DECIDE TO INCLUDE one or more contraction points right the way or under some circustance
+	//A contraction point cound use -1+2/n or something similar.
+	Eigen::VectorXd alpha_d_vec(nsteps);
+	for (int ia = 0; ia < nsteps; ia++)
+	{
+		if (ia == 0)
+		{
+			alpha_d_vec(0) = 1;
+		}
+		else
+		{ 
+			alpha_d_vec(ia) =  1.0 - ( (double) ia + 1.0) / ((double) nsteps);
+		}
+	}
+	std::cout << alpha_d_vec;//DEBUG ME
+	//TODO consider adding iter 
+
+	//initialize structures for kth worst values
+	Eigen::MatrixXd skw(k, nopt);
+	Eigen::VectorXd sfkw(k);
+
+	//Separate the k worst points
+	for (int ik = 0; ik < k; ik++)
+	{
+		skw.row(ik) = svals.row(svals.rows() - ik -1);
+		sfkw(ik) = sfvals(svals.rows() - ik -1);
+	}
+
+	//Loop through the k worst points and n steps reflections
+	Eigen::MatrixXd snewkn(k * alpha_d_vec.size(), nopt);
+	for (int ik = 0; ik < k; ik++)
+	{
+		// Compute the centroid of the simplex excluding the seleted kth worst point
+		Eigen::MatrixXd svalsek(nps - 1, nopt);
+		int j = 0;
+		for (int ikk = 0; ikk < nps; ikk++)
+		{
+			if (ikk != ik)
+			{
+				svalsek.row(j) = svals.row(ikk);
+				j++;
+			}
+
+		}
+		Eigen::VectorXd ce = svalsek.rowwise().mean();
+
+		//Query reflection/contration points stored in vector of reflection/contraction  points
+		for (int ia = 0; ia < alpha_d_vec.size(); ia++)
+		{
+			Eigen::VectorXd valskrow = skw.row(ik);
+			Eigen::VectorXd delta = ce - valskrow;
+			Eigen::VectorXd delta_a = delta * alpha_d_vec(ia);
+			Eigen::VectorXd ce_delta_a = ce + delta;
+			snewkn.row(ik) = ce_delta_a;
+			//snewkn.row(ik) = (ce.array() + ( (ce.array() - skw.row(ik).array()) * alpha_d_vec(ia))).matrix();
+
+			//Check if is outside the bounds :
+			int ibound = 0;
+
+			Eigen::VectorXd sl = snewkn.row(ik) - bl;
+
+			if (bool bidx = (sl.array() < 0.0).any())
+				ibound = 1;
+
+			sl = bu - snewkn.row(ik);
+			if (bool bidx = (sl.array() < 0.0).any())
+				ibound = 2;
+
+			if (ibound >= 1)
+				//TODO BRING TO THE BOUND INSTEAD OF RANDOM.
+				switch (optbounds){
+					case 1:
+						//RANDOM, ORIGINAL SCE
+						snewkn.row(ik) = bl.array() + uniform_draws(1, 0.0, 1.0, rand_gen)[0] * (bu.array() - bl.array()); //TODO CHECK RECEPIE
+						break;
+					case 2:
+						//INFORCE BOUNDS CODE
+						for (int j = 0; j < snewkn.row(ik).size();j++ )
+						{
+							if (snewkn(ik,j) > bu(j))
+								snewkn(ik,j) = bu(j);
+							if (snewkn(ik,j) < bl(j))
+								snewkn(ik,j) = bl(j);
+						}						
+						break;
+					case 3:
+						//RANDOM, ONLY FOR THE PARAMETER BEYOND THE BOUND
+						break;
+				}
+
+
+			//RETURN PARAMETER FIT
+		}
+
+		//fnew = functn.functn(nopt, snew) 
+		// TODO IF FUNCTN FAILED
+		//icall = icall + 1
+
+		//Reflection failed; now attempt a contraction point :
+		//if fnew > fw:
+			//snew = sw + beta * (ce - sw)
+			//TODO fnew = functn.functn(nopt, snew)
+			//icall = icall + 1
+
+		//Both reflection and contraction have failed, attempt a random point;
+		//if fnew > fw:
+			//snew = bl + np.random.rand(1, nopt)[0] * (bu - bl)
+			// TODO fnew = functn.functn(nopt, snew)
+			//icall = icall + 1
+
+
+		//END OF CCE
+	}
+
+	//TOD0 assign snewk back in s
+
+	return s;//TODO fnew, icall
+} 
 
 ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEnsemble& _dp)
 {
@@ -3105,7 +3256,7 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
     vector<int> r_int_vec;
     for (int i = 0; i < dv_names.size() - n_adaptive_dvs; i++)
         r_int_vec.push_back(i);
-
+	int num_reflect = 2; //TODO READ mou_simplex_num_reflect, k
     Eigen::VectorXd x,y,diff;
     Eigen::MatrixXd new_reals(num_members, _dp.shape().second);
     new_reals.setZero();
@@ -3129,6 +3280,25 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
     bts.ctl2numeric_ip(ubnd);
     int tries = 0;
     int i = 0;
+	int mou_simplex_num_reflect = 5; //TODO INPUT FILE mou_simplex_num_reflect
+	int mou_simplex_num_steps_reflect = 4; //TODO INPUT FILE mou_simplex_num_steps_reflect
+	int mou_simplex_opt_bounds = 1; //TODO INPUT FILE mou_simplex_opt_bounds
+
+	//TODO compare size complex against number of parameters and size of the ensamble
+	int nopt = dv_names.size();// TODO check if this is he  number of parameters to optimize
+	int idealcomplex = max(2, nopt);
+	if (1 == 0) //(nensemble > nopt)
+	{
+		//TODO CREATE AS MANY COMPLEXES AS POSSIBLE GIVEN THE SIZE OF THE ENSEMBLE AND THE NUMBER OF PARAMETERS.
+		int ncomplexes = num_members/nopt; //create complexes with available popultation
+	}
+	else
+	{ 
+		//use the entire population
+		simplex_cceua_kn(_dp, mou_simplex_num_reflect, mou_simplex_num_steps_reflect, mou_simplex_opt_bounds);
+	}
+	//TODO check size s against a hypotheical complex. complex as a function. of decision.
+	
     while (i < num_members)
     {
         //nedler meade
