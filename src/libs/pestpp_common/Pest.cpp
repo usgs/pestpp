@@ -59,7 +59,7 @@ void Pest::set_defaults()
 
 }
 
-void Pest::check_inputs(ostream &f_rec, bool forgive)
+void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim)
 {
 	if (control_info.noptmax == 0)
 	{
@@ -70,6 +70,7 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		}
 
 		forgive = true;
+		forgive_parchglim = true;
 	}
 
 	if (other_lines.size() > 0)
@@ -110,46 +111,13 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		}
 	}
 
-	if (control_info.pestmode == ControlInfo::PestMode::PARETO)
-	{
-		//bool found_pareto = false, found_other = false;
-		//if (pareto_info.obsgroup.substr(0, 5) == "REGUL")
-		//	found_pareto = true;
-		//else if (find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pareto_info.obsgroup) == ctl_ordered_obs_group_names.end())
-		//	throw PestError("pareto obsgroup not found: " + pareto_info.obsgroup);
-		////make sure at least one other obs group has a nonzero weight obs in it
-
-
-		//for (auto &on : ctl_ordered_obs_names)
-		//{
-		//		if (observation_info.get_group(on) == pareto_info.obsgroup)
-		//			found_pareto = true;
-		//		else if (observation_info.get_weight(on) > 0.0)
-		//			found_other = true;
-		//}
-
-		//if (!found_pareto || !found_other)
-		//{
-		//	for (auto &pi : ctl_ordered_pi_names)
-		//	{
-		//		if (prior_info.get_pi_rec_ptr(pi).get_group() == pareto_info.obsgroup)
-		//			found_pareto = true;
-		//		else if (prior_info.get_pi_rec_ptr(pi).get_weight() > 0.0)
-		//			found_other = true;
-		//	}
-		//}
-		//if (!found_pareto)
-		//	throw PestError("no non-zero weighted obs found in pareto obsgroup: " + pareto_info.obsgroup);
-		//if (!found_other)
-		//	throw PestError("no non-zero weighted obs found outside of pareto obsgroup");
-	}
-
 	vector<string> par_warnings;
 	vector<string> par_problems;
 	bool adj_par;
 	int par_ub = 0;
 	int par_lb = 0;
-	
+	vector<string> adj_pnames = get_ctl_ordered_adj_par_names();
+	set<string> sadj(adj_pnames.begin(), adj_pnames.end());
 	for (auto &pname : ctl_ordered_par_names)
 	{
 		//double pval = ctl_parameters[pname];
@@ -158,44 +126,14 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		adj_par = true;
 		if ((prec->tranform_type == ParameterRec::TRAN_TYPE::FIXED) || (prec->tranform_type == ParameterRec::TRAN_TYPE::TIED))
 			adj_par = false;
-
-		if (prec->tranform_type == ParameterRec::TRAN_TYPE::LOG)
-        {
-		    if (prec->lbnd <= 0)
-            {
-		        if ((forgive) || (!adj_par))
-                {
-		            par_warnings.push_back(pname + " parlbnd <= 0 and transform is 'log'");
-                }
-		        else
-                {
-                    par_problems.push_back(pname + " parlbnd <= 0 and transform is 'log'");
-                }
-            }
-            if (prec->init_value <= 0)
-            {
-                if ((forgive) || (!adj_par))
-                {
-                    par_warnings.push_back(pname + " parval1 <= 0 and transform is 'log'");
-                }
-                else
-                {
-                    par_problems.push_back(pname + " parval1 <= 0 and transform is 'log'");
-                }
-            }
-            if (prec->ubnd <= 0)
-            {
-                if ((forgive) || (!adj_par))
-                {
-                    par_warnings.push_back(pname + " parubnd <= 0 and transform is 'log'");
-                }
-                else
-                {
-                    par_problems.push_back(pname + " parubnd <= 0 and transform is 'log'");
-                }
-            }
-        }
-
+		if (prec->tranform_type == ParameterRec::TRAN_TYPE::TIED)
+		{
+			string partied = base_par_transform.get_tied_ptr()->get_items().at(pname).first;
+			if (sadj.find(partied) == sadj.end())
+			{
+				par_problems.push_back("'tied' parameter '" + pname + "' is tied to '" + partied + "' which is not an adjustable parameter");
+			}
+		}
 		if (prec->lbnd >= prec->ubnd)
 		{
 			if ((forgive) || (!adj_par))
@@ -244,7 +182,7 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		
 		if ((prec->ubnd > 0.0) && (prec->lbnd < 0.0))
 		{
-			if (prec->chglim == "FACTOR")
+			if ((!forgive_parchglim) && (prec->chglim == "FACTOR"))
 			{
 				if ((forgive) || (!adj_par))
 				{
@@ -2200,13 +2138,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	{
 		ss.str("");
 		ss << "Pest::enforce_par_change_limits error : zero length parameter vector" << endl;
-		ss << "parameter: " << controlling_par << ", control type: " << control_type << endl;
-		ss << "last value: " << last_ctl_pars.get_rec(controlling_par) << endl;
-		ss << "upgrade value: " << upgrade_ctl_pars.get_rec(controlling_par) << endl;
-		ss << "lower bound: " << p_info.get_parameter_rec_ptr(controlling_par)->lbnd << endl;
-		ss << "upper bound: " << p_info.get_parameter_rec_ptr(controlling_par)->ubnd << endl;
-
-
+		ss << "parameter: " << controlling_par << ", control type: " << control_type;
 		throw runtime_error(ss.str());
 	}
 

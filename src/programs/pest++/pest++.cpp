@@ -205,7 +205,8 @@ int main(int argc, char* argv[])
 			throw(e);
 	 	}
 #endif
-		pest_scenario.check_inputs(fout_rec);
+
+		pest_scenario.check_inputs(fout_rec, false, false);
 		// reset this here because we want to draw from the FOSM posterior as a whole matrix
 		pest_scenario.get_pestpp_options_ptr()->set_ies_group_draws(false);
 		
