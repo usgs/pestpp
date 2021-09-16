@@ -1951,6 +1951,11 @@ void MOEA::initialize()
 			gen_types.push_back(MouGenType::PSO);
 			message(1, "using particle swarm generator");
 		}
+        else if (token == "SIMPLEX")
+        {
+            gen_types.push_back(MouGenType::SMP);
+            message(1, "using simplex generator");
+        }
 		else
 		{
 			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX','PM','PSO'}");
@@ -2439,6 +2444,10 @@ ParameterEnsemble MOEA::generate_population()
 		{
 			p = generate_pso_population(new_members_per_gen, dp);
 		}
+        else if (gen_type == MouGenType::SMP)
+        {
+            p = generate_simplex_population(new_members_per_gen, dp);
+        }
 		else
 			throw_moea_error("unrecognized mou generator");
 		if (new_pop.shape().first == 0)
@@ -3087,6 +3096,88 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
 	new_dp.enforce_bounds(performance_log,false);
 	new_dp.check_for_normal("new pso population");
 	return new_dp;
+}
+
+
+ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEnsemble& _dp)
+{
+    message(1, "generating simplex population of size", num_members);
+    vector<int> r_int_vec;
+    for (int i = 0; i < dv_names.size() - n_adaptive_dvs; i++)
+        r_int_vec.push_back(i);
+
+    Eigen::VectorXd x,y,diff;
+    Eigen::MatrixXd new_reals(num_members, _dp.shape().second);
+    new_reals.setZero();
+    _dp.transform_ip(ParameterEnsemble::transStatus::NUM);
+    vector<string> new_member_names;
+
+
+    ofstream& lin = file_manager.get_ofstream(lineage_tag);
+    vector<string> real_names = _dp.get_real_names();
+    string new_name;
+    _dp.update_var_map();
+    map<string, int> var_map = _dp.get_var_map();
+    string dv_name;
+    int ii;
+    int i_last;
+    vector<int> selected;
+    Parameters lbnd = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
+    Parameters ubnd = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
+    ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
+    bts.ctl2numeric_ip(lbnd);
+    bts.ctl2numeric_ip(ubnd);
+    int tries = 0;
+    int i = 0;
+    while (i < num_members)
+    {
+        //nedler meade
+
+        //selected = selection(4, _dp, mattype);
+
+
+        //differential vector
+        //diff = _dp.get_eigen_ptr()->row(selected[0]) + (f * (_dp.get_eigen_ptr()->row(selected[1]) - _dp.get_eigen_ptr()->row(selected[2])));
+
+        //current member if in range, otherwise, select randomly
+        if (i < _dp.shape().first)
+            x = _dp.get_eigen_ptr()->row(i);
+        else
+            //this risks "inbreeding" but maybe thats good?!
+            x = _dp.get_eigen_ptr()->row(selected[3]);
+        //copy to perserve non-dec var values;
+        y = x;
+
+        //only change dec vars
+        double dsum = 0.0;
+        for(int idv=0;idv<dv_names.size();idv++)
+        {
+            ii = var_map[dv_names[idv]];
+            y[ii] = diff[ii];
+            y[ii] = min(y[ii], ubnd[dv_names[idv]]);
+            y[ii] = max(y[ii], lbnd[dv_names[idv]]);
+        }
+
+        tries++;
+        if (tries > 1000000)
+            throw_moea_error("simplex generator appears to be stuck in an infinite loop...");
+
+        double n = (x - y).squaredNorm();
+        if (n < epsilon)
+            continue;
+        new_name = get_new_member_name("de");
+        new_member_names.push_back(new_name);
+        lin << new_name;
+        for (auto idx : selected)
+            lin << "," << real_names[idx];
+        lin << endl;
+        new_reals.row(i) = y;
+        i++;
+    }
+    ParameterEnsemble new_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
+    new_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
+    new_dp.enforce_bounds(performance_log, false);
+    return new_dp;
 }
 
 

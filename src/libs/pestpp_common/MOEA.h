@@ -24,7 +24,7 @@ const string CR_NAME = "_CR_";
 const string MR_NAME = "_MR_";
 const double CROWDING_EXTREME = 1.0e+30;
 
-enum MouGenType { DE, SBX, PM, PSO };
+enum MouGenType { DE, SBX, PM, PSO, SMP };
 enum MouEnvType { NSGA, SPEA };
 enum MouMateType { RANDOM, TOURNAMENT };
 
@@ -207,6 +207,7 @@ private:
 	ParameterEnsemble generate_sbx_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble generate_pm_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble generate_pso_population(int num_members, ParameterEnsemble& _dp);
+    ParameterEnsemble generate_simplex_population(int num_members, ParameterEnsemble& _dp);
 
 	ParameterEnsemble get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions);
 
