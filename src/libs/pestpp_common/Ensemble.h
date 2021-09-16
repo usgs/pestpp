@@ -131,6 +131,32 @@ protected:
 	
 };
 
+class FixedParInfo
+{
+public:
+	FixedParInfo(vector<string> _fixed_names);
+	FixedParInfo() { initialized=false; }
+	void set_fixed_names(vector<string>& _fixed_names) { fixed_names = _fixed_names; initialize(); }
+	bool get_fixed_value(const string& pname, const string& rname, double& value);
+	map<string, double> get_par_fixed_values(const string& pname);
+	vector<double> get_real_fixed_values(const string& rname, vector<string>& pnames);
+	map<string, double> get_real_fixed_values(const string& rname);
+	void add_realization(string rname, Eigen::VectorXd& rvals, vector<string>& pnames);
+	void keep_realizations(const vector<string>& keep);
+	void update_realizations(const vector<string>& other_var_names, const vector<string>& other_real_names, const Eigen::MatrixXd& other_mat);
+	void update_par_values(const map<string, double>& pval_map);
+	void clear() { fixed_info.clear(); fixed_names.clear(); }
+	void fill_fixed(map<string, double>& fixed_map, vector<string>& rnames);
+private:
+	bool initialized;
+	vector<string> fixed_names;
+	//map<string, int> par2idx;
+	map<string, map<string, double>> fixed_info;
+
+	void initialize();
+
+};
+
 class ParameterEnsemble : public Ensemble
 {
 
@@ -168,7 +194,7 @@ public:
 	void transform_ip(transStatus to_tstat);
 	void set_pest_scenario(Pest *_pest_scenario);
 	map<int,int> add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs=vector<int>(),int da_cycle=NetPackage::NULL_DA_CYCLE);
-
+	void set_fixed_names();
 	void draw_uniform(int num_reals, vector<string> par_names, PerformanceLog* plog, int level, ofstream& frec);
 	map<string,double> draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
 	Covariance get_diagonal_cov_matrix();
@@ -178,22 +204,25 @@ public:
 	void to_dense(string filename);
 	void to_dense_unordered(string filename);
 	void to_dense_ordered(string filename);
-	void clear_fixed_map() { fixed_map.clear(); fixed_names.clear(); }
+	void clear_fixed_map() { pfinfo.clear(); }
 	void replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);
-	map<pair<string, string>, double> get_fixed_map() { return fixed_map; }
-    map<pair<string, string>, double>* get_fixed_map_ptr() { return &fixed_map; }
-
-    void set_fixed_info(map<pair<string, string>, double> _fixed_map);
+	//map<pair<string, string>, double> get_fixed_map() { return fixed_map; }
+    //map<pair<string, string>, double>* get_fixed_map_ptr() { return &fixed_map; }
+	FixedParInfo& get_fixed_info() { return pfinfo; }
+	void set_fixed_info(FixedParInfo _pfinfo) { pfinfo = _pfinfo; }
+	void keep_rows(const vector<int>& keep, bool update_fixed_map = false);
+	void keep_rows(const vector<string>& keep, bool update_fixed_map = false);
 
 private:
 	ParamTransformSeq par_transform;
 	transStatus tstat;
-	void save_fixed();
-	void fill_fixed(const map<string, int> &header_info);
-	vector<string> fixed_names;
-	map<pair<string, string>, double> fixed_map;
+	void save_fixed(vector<string>& fixed_names);
+	void fill_fixed(const map<string, int> &header_info, vector<string>& fixed_names);
+	//vector<string> fixed_names;
+	//map<pair<string, string>, double> fixed_map;
 	void replace_fixed(string real_name,Parameters &pars);
 	void prep_par_ensemble_after_read(map<string,int>& header_info);
+	FixedParInfo pfinfo;
 };
 
 class ObservationEnsemble : public Ensemble
@@ -220,6 +249,8 @@ public:
 	void initialize_without_noise(int num_reals);
 	//ObservationEnsemble get_mean_diff();
 };
+
+
 
 class DrawThread
 {

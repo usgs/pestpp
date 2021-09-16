@@ -669,7 +669,8 @@ void SVDSolver::test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &pr
 	performance_log->log_event("commencing check of parameter bounds and gradients");
 
 	//get parameters who are at their bounds and heading out - these are the ones to freeze
-	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, grad_ctl_del_pars,false);
+	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, 
+		grad_ctl_del_pars,false);
 	prev_frozen_active_ctl_pars.insert(new_frozen_active_ctl_pars.begin(), new_frozen_active_ctl_pars.end());
 	if (new_frozen_active_ctl_pars.size() == upgrade_active_ctl_pars.size())
 		throw runtime_error("SVDSolver::test_upgrade_to_find_freeze_pars() error: all parameters at/near bounds and heading out - cannot continue");
@@ -1550,28 +1551,28 @@ void SVDSolver::iteration_update_and_report(ostream &os, const ModelRun &base_ru
 
 bool SVDSolver::par_heading_out_bnd(double p_org, double p_new, double lower_bnd, double upper_bnd)
 {
-	bool out_of_bnd = false;
+	/*bool out_of_bnd = false;
 	double tolerance = 1.0e-5;
 	if (((1.0 + tolerance) * p_org >= upper_bnd) && (((1.0 + tolerance) * p_new) >= upper_bnd))
 		out_of_bnd = true;
 	else if (((1.0 - tolerance) * p_org) <= lower_bnd && (((1.0 - tolerance) * p_new) <= lower_bnd))
 		out_of_bnd = true;
-	return out_of_bnd;
-
-	/*bool out_of_bnd = false;
-	double tolerance = 1.0e-5;
-	if (((1.0 + tolerance) * p_org >= upper_bnd) && (((1.0 - tolerance) * p_new) >= p_org))
-		out_of_bnd = true;
-	else if (((1.0 - tolerance) * p_org) <= lower_bnd && (((1.0 + tolerance) * p_new) <= p_org))
-		out_of_bnd = true;
 	return out_of_bnd;*/
+
+	bool out_of_bnd = false;
+	double tolerance = 1.0e-7;
+	if (((1.0 + tolerance) * p_org >= upper_bnd) && (p_new >= p_org))
+		out_of_bnd = true;
+	else if (((1.0 - tolerance) * p_org) <= lower_bnd && (p_new <= p_org))
+		out_of_bnd = true;
+	return out_of_bnd;
 }
 
 int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Parameters &current_active_ctl_pars,
 	const Parameters &upgrade_active_ctl_pars, const Parameters &del_grad_active_ctl_pars,
 	bool include_bound)
 {
-	double tolerance = 1.0e-5;
+	double tolerance = 1.0e-7;
 	int num_upgrade_out_grad_in = 0;
 	double p_org;
 	double p_new;

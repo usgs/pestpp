@@ -4901,7 +4901,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			{
 				pe_lam_scale.to_dense(ss.str() + ".bin");
 				pe_filenames.push_back(ss.str() + ".bin");
-				pe_lam_scale.keep_rows(subset_idxs);
+				pe_lam_scale.keep_rows(subset_idxs,true);
 				message(1,"upgrade ensemble saved to " + ss.str() + ".bin");
 
 			}
@@ -5083,10 +5083,11 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
 			string m = ss.str();
 			message(0, m);
-			message(1, "updating realizations with reduced phi");
+			
 			if (!use_mda)
 			{
-				update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx]);
+				message(1, "updating realizations with reduced phi");
+				update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx],subset_idxs);
 			}
 			ph.update(oe, pe);
 			//re-check phi
@@ -5138,6 +5139,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 		
 		ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
+		remaining_pe_lam.set_fixed_info(pe.get_fixed_info());
 
 		if (pe_filenames.size() > 0)
 		{
@@ -5255,6 +5257,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		performance_log->log_event("assembling ensembles");
 		pe_lams[best_idx].drop_rows(pe_keep_names);
 		pe_lams[best_idx].append_other_rows(remaining_pe_lam);
+		pe_lams[best_idx].set_fixed_info(pe.get_fixed_info());
 		//append the remaining obs en
 		oe_lam_best.append_other_rows(remaining_oe_lam);
 		assert(pe_lams[best_idx].shape().first == oe_lam_best.shape().first);
@@ -5319,8 +5322,12 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	else
 	{
 		//message(0, "not updating parameter ensemble");
-		message(0, "only updating realizations with reduced phi");
-		update_reals_by_phi(pe_lams[best_idx], oe_lam_best);
+		if (!use_mda)
+		{
+			message(0, "only updating realizations with reduced phi");
+			update_reals_by_phi(pe_lams[best_idx], oe_lam_best);
+			
+		}
 		ph.update(oe, pe);
 		//re-check phi
 		double new_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
@@ -5561,6 +5568,7 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 		// message(1, "saving initial parameter ensemble to ", ss.str());
 		// pe.to_csv(ss.str());
 		drawn = true;
+		
 	}
 	else
 	{
@@ -6587,7 +6595,7 @@ void EnsembleMethod::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _
 	}
 }
 
-void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
+void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, vector<int> subset_idxs)
 {
 
 	vector<string> oe_names = _oe.get_real_names();
@@ -6599,12 +6607,21 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 	//	throw runtime_error("IterEnsembleSmoother::update_reals_by_phi() error: pe_names != oe_base_names");
 	map<string, int> oe_name_to_idx;
 	map<int, string> pe_idx_to_name;
-
-	for (int i = 0; i < oe_names.size(); i++)
-		oe_name_to_idx[oe_names[i]] = i;
-
-	for (int i = 0; i < pe_names.size(); i++)
-		pe_idx_to_name[i] = pe_names[i];
+	if (subset_idxs.size() > 0)
+	{
+		for (int i = 0; i < subset_idxs.size(); i++)
+		{
+			oe_name_to_idx[oe_base_names[subset_idxs[i]]] = i;
+			pe_idx_to_name[i] = pe_base_names[subset_idxs[i]];
+		}
+	}
+	else
+	{
+		for (int i = 0; i < oe_names.size(); i++)
+			oe_name_to_idx[oe_names[i]] = i;
+		for (int i = 0; i < pe_names.size(); i++)
+			pe_idx_to_name[i] = pe_names[i];
+	}
 	//store map of current phi values
 	ph.update(oe, pe);
 	L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;

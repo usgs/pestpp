@@ -694,10 +694,13 @@ int main(int argc, char* argv[])
 			performance_log.log_event("instantiating cycle parameter ensemble instance");
 			ParameterEnsemble cycle_curr_pe(&childPest, &rand_gen, curr_pe.get_eigen(vector<string>(), act_par_names), curr_pe.get_real_names(), act_par_names);
 			cycle_curr_pe.set_trans_status(curr_pe.get_trans_status());
-			cycle_curr_pe.set_fixed_info(curr_pe.get_fixed_map());
+			cycle_curr_pe.set_fixed_info(curr_pe.get_fixed_info());
+			//cycle_curr_pe.set_fixed_names(curr_pe.get_fixed_names());
 			if (par_cycle_info.find(*icycle) != par_cycle_info.end())
             {
-                map<pair<string, string>, double> fm = cycle_curr_pe.get_fixed_map();
+				map<string, double> cycle_info = par_cycle_info.at(*icycle);
+				cycle_curr_pe.get_fixed_info().update_par_values(cycle_info);
+               /* map<pair<string, string>, double> fm = cycle_curr_pe.get_fixed_map();
 
 			    for (auto& info : par_cycle_info.at(*icycle))
                 {
@@ -710,7 +713,7 @@ int main(int argc, char* argv[])
                     }
 
                 }
-			    cycle_curr_pe.set_fixed_info(fm);
+			    cycle_curr_pe.set_fixed_info(fm);*/
             }
 			da.set_pe(cycle_curr_pe);
 			obs_names = childPest.get_ctl_ordered_obs_names();
@@ -824,6 +827,8 @@ int main(int argc, char* argv[])
 
             da.transfer_dynamic_state_from_oe_to_final_pe(*da.get_pe_ptr(), *da.get_oe_ptr());
 
+			//da.get_pe_ptr()->to_csv("prior_test.csv");
+
 			if (childPest.get_ctl_ordered_nz_obs_names().size() > 0)
 			{
 
@@ -920,6 +925,7 @@ int main(int argc, char* argv[])
             {
 			    da.transfer_par_dynamic_state_final_to_initial_ip(curr_pe);
             }
+			//curr_pe.to_csv("post_test.csv");
 			/*ss.str("");
 			ss << "test_" << *icycle << ".csv";
 			curr_pe.to_csv(ss.str());
