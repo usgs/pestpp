@@ -406,6 +406,8 @@ public:
 	void set_mou_pso_cognitive_const(double val) { mou_pso_cognitive_const = val; }
 	string get_mou_population_schedule() const {return mou_population_schedule;}
     void set_mou_population_schedule(string fname) {mou_population_schedule = fname;}
+	int get_mou_simplex_reflections() const { return mou_simplex_reflections; }
+	void set_mou_simplex_reflections(int val) { mou_simplex_reflections = val; }
 
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
@@ -716,6 +718,7 @@ private:
 	double mou_pso_social_const;
 	double mou_pso_cognitive_const;
 	string mou_population_schedule;
+	int mou_simplex_reflections;
 
 	int ies_subset_size;
 	string ies_par_csv;
