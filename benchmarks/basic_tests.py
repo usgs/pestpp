@@ -1121,7 +1121,9 @@ def agnostic_path_test():
 
 if __name__ == "__main__":
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
-
+    shutil.copy2(os.path.join("..", "exe", "windows", "x64", "Debug", "pestpp-ies.exe"),
+                 os.path.join("..", "bin", "win", "pestpp-ies.exe"))
+    basic_test()
     #agnostic_path_test()
     #glm_long_name_test()
     #sen_plusplus_test()

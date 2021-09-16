@@ -1963,6 +1963,7 @@ ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* ran
 {
 	par_transform = pest_scenario_ptr->get_base_par_tran_seq();
 	tstat = transStatus::CTL;
+	set_fixed_names();
 }
 
 ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _rand_gen_ptr, Eigen::MatrixXd _reals,
@@ -1977,6 +1978,7 @@ ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _ra
 	var_names = _var_names;
 	real_names = _real_names;
 	tstat = transStatus::CTL;
+	set_fixed_names();
 }
 
 ParameterEnsemble::ParameterEnsemble(Pest* _pest_scenario_ptr): 
@@ -1984,6 +1986,7 @@ ParameterEnsemble::ParameterEnsemble(Pest* _pest_scenario_ptr):
 {
 	par_transform = pest_scenario_ptr->get_base_par_tran_seq();
 	tstat = transStatus::CTL;
+	set_fixed_names();
 }
 
 
@@ -2114,6 +2117,21 @@ void ParameterEnsemble::set_pest_scenario(Pest *_pest_scenario)
 {
 	pest_scenario_ptr = _pest_scenario;
 	par_transform = pest_scenario_ptr->get_base_par_tran_seq();
+	set_fixed_names();
+}
+
+void ParameterEnsemble::set_fixed_names()
+{
+	vector<string> fixed_names;
+	/*ParameterInfo* pi = pest_scenario_ptr->get_ctl_parameter_info_ptr_4_mod();
+	for (auto& pname : pest_scenario_ptr->get_ctl_ordered_par_names())
+	{
+		if (pi->get_parameter_rec_ptr(pname)->tranform_type == ParameterRec::TRAN_TYPE::FIXED)
+		{
+			fixed_names.push_back(pname);
+		}
+	}*/
+	pfinfo.set_fixed_names(fixed_names);
 }
 
 void ParameterEnsemble::set_zeros()
