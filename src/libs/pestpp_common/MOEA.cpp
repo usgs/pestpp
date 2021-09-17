@@ -128,6 +128,7 @@ bool ParetoObjectives::compare_two(string& first, string& second, MouEnvType env
 		throw runtime_error("ParetoObjectives::compare_two(): unrecognized envtyp");
 }
 
+
 bool ParetoObjectives::compare_two_spea(string& first, string& second)
 {
 	if (spea2_constrained_fitness_map.at(first) < spea2_constrained_fitness_map.at(second))
@@ -2446,7 +2447,7 @@ ParameterEnsemble MOEA::generate_population()
 		}
         else if (gen_type == MouGenType::SMP)
         {
-            p = generate_simplex_population(new_members_per_gen, dp);
+            p = generate_simplex_population(new_members_per_gen, dp, op);
         }
 		else
 			throw_moea_error("unrecognized mou generator");
@@ -2537,7 +2538,6 @@ void MOEA::iterate_to_solution()
 				if (keep.size() >= num_members)
 					break;
 				keep.push_back(dom);
-
 			}
 
 			message(1, "resizing current populations to ", keep.size());
@@ -3102,7 +3102,8 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int optboun
 {
 	//C++ implementation of the cceua algorithm, Duan et al. (1992) with the addition of k worst points
 	// 	   and n steps along the reflection path
-	
+
+
 	//TODO get npt from s.
 	int nopt = 30; //number of variables in the model, in an ideal situaion s has nopt realizations, handle size of s in generate_simplex_population
 	int nps = nopt + 1; // number of members in a simplex
@@ -3221,69 +3222,65 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int optboun
 	return s;//TODO fnew, icall
 } 
 
-ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEnsemble& _dp)
+ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
     message(1, "generating simplex population of size", num_members);
-    vector<int> r_int_vec;
-    for (int i = 0; i < dv_names.size() - n_adaptive_dvs; i++)
-        r_int_vec.push_back(i);
-	int num_reflect = 2; //TODO READ mou_simplex_num_reflect, k
-    Eigen::VectorXd x,y,diff;
+    //for now just using nsga selector. TODO: work in spea2 selector if requested
+    pair<vector<string>, vector<string>> t = objectives.get_nsga2_pareto_dominance(-999,_op,_dp,&constraints,false);
+    vector<string> fitness;
+    for (auto& tt : t.first)
+        fitness.push_back(tt);
+    for (auto& tt : t.second)
+        fitness.push_back(tt);
+
+
+	int num_reflect = min(pest_scenario.get_pestpp_options().get_mou_simplex_reflections(),_dp.shape().first);
+	vector<double> step_factors = pest_scenario.get_pestpp_options().get_mou_simplex_factors();
+    num_members = num_reflect * step_factors.size();
+
     Eigen::MatrixXd new_reals(num_members, _dp.shape().second);
     new_reals.setZero();
     _dp.transform_ip(ParameterEnsemble::transStatus::NUM);
     vector<string> new_member_names;
 
-
     ofstream& lin = file_manager.get_ofstream(lineage_tag);
     vector<string> real_names = _dp.get_real_names();
-    string new_name;
+    string new_name,current_name;
     _dp.update_var_map();
     map<string, int> var_map = _dp.get_var_map();
     string dv_name;
     int ii;
     int i_last;
-    vector<int> selected;
     Parameters lbnd = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
     Parameters ubnd = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
     ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
     bts.ctl2numeric_ip(lbnd);
     bts.ctl2numeric_ip(ubnd);
-    int tries = 0;
-    int i = 0;
-	int mou_simplex_reflections = pest_scenario.get_pestpp_options().get_mou_simplex_reflections();
-	vector<double> mou_simplex_factors = pest_scenario.get_pestpp_options().get_mou_simplex_factors();
-	int mou_simplex_num_steps_reflect = 4; //TODO INPUT FILE mou_simplex_num_steps_reflect, our use factors above
-	int mou_simplex_opt_bounds = 2; //TODO INPUT FILE mou_simplex_opt_bounds, done for comparing bound correction.
 
-	//TODO compare size ideal complex against size of the ensamble, LETS DISCUSS HOW TO HANDLE CASES WITH A VERY LARGE POPULATION 
-	int nopt = dv_names.size();// TODO check if this is he  number of parameters to optimize
-	int idealcomplex = max(2, nopt); //Recomended complexes SCE
-	int idealpopulation = idealcomplex*(2*nopt+1); //ideal SCE-UA population
-	if (1 == 0) //(nensemble > nopt)
-	{
-		//TODO CREATE AS MANY COMPLEXES AS POSSIBLE GIVEN THE SIZE OF THE ENSEMBLE AND THE NUMBER OF PARAMETERS.
-		int ncomplexes = num_members/nopt; //create complexes with available popultation, HOW TO ROUND/INCLUDE LEFTOVERS
-		for (int icomp = 0; icomp < ncomplexes; icomp++)
-		{
-			//TODO, SELECT REALIZATIONS FOR ENSEMBLE
-			simplex_cceua_kn(_dp, mou_simplex_reflections, mou_simplex_opt_bounds);
-		}
-	}
-	else
-	{ 
-		//use the entire ensemble to create simplex
-		simplex_cceua_kn(_dp, mou_simplex_reflections, mou_simplex_opt_bounds);
+    vector<string> best;
+    for (int i=0;i<fitness.size()-num_reflect;i++)
+        best.push_back(fitness[i]);
 
-	}
-	//TODO check size s against a hypotheical complex. complex as a function. of decision.
-	
-    for (int inew=0; inew< num_members; inew++)
+    Eigen::VectorXd best_centroid = _dp.get_eigen(best,vector<string>()).colwise().mean();
+    Eigen::VectorXd current,reflected;
+    stringstream ss;
+    int i_newreal = 0;
+    for (int k=0;k<num_reflect;k++)
     {
-        //SET NEW REALIZATIONS IN new_dp
-
-        
-
+        //fitness is sorted from best to worst, so work from the end
+        current_name = fitness[fitness.size()-k-1];
+        current = _dp.get_real_vector(current_name);
+        reflected = best_centroid - current;
+        for (auto& f : step_factors)
+        {
+            new_reals.row(i_newreal) = reflected * f;
+            ss.str("");
+            ss << "simplex_k" << k << "_f" << setprecision(2) << f;
+            new_name = get_new_member_name(ss.str());
+            new_member_names.push_back(new_name);
+            i_newreal++;
+            lin << new_name << "," << current_name << endl;
+        }
     }
     ParameterEnsemble new_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
     new_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);

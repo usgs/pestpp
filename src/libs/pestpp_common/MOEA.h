@@ -83,7 +83,8 @@ private:
 
 	void fill_domination_containers(map<string, map<string, double>>& _member_struct, map<string,
 		vector<string>>&solutions_dominated_map, map<string, int>& num_dominating_map, bool dup_as_dom=false);
-	
+
+
 
 	bool compare_two_nsga(string& first, string& second);
 	bool compare_two_spea(string& first, string& second);
@@ -117,7 +118,7 @@ private:
 	
 };
 
-//todo: add pso args: init_vel_scale_fac, c1, c2, omega, 
+
 class MOEA
 {
 	
@@ -208,7 +209,7 @@ private:
 	ParameterEnsemble generate_pm_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble generate_pso_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble simplex_cceua_kn(ParameterEnsemble s, int k, int optbounds);																																		
-    ParameterEnsemble generate_simplex_population(int num_members, ParameterEnsemble& _dp);
+    ParameterEnsemble generate_simplex_population(int num_members, ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
 	ParameterEnsemble get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions);
 
