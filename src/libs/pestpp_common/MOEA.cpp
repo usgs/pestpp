@@ -3128,9 +3128,9 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int nsteps,
 		bl(i) = 1.0; //zdt1 example
 
 	}
-	//Create vector with n steps from reflection [1-1/n, 1-2/n, ...1-(n-1)/n]
+	//Create vector with n steps from reflection [1, 1-1/n, 1-2/n, ...1-(n-1)/n]
 	//Examples:                             n=1, [1]
-	//                                      n=4, [1, 1-1/n, 1-2/n, 1-3/n]
+	//                                      n=4, [1, 1-1/4, 1-2/4, 1-3/4]
 	//TODO DECIDE TO INCLUDE one or more contraction points right the way or under some circustance
 	//A contraction point cound use -1+2/n or something similar.
 	Eigen::VectorXd alpha_d_vec(nsteps);
@@ -3142,7 +3142,7 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int nsteps,
 		}
 		else
 		{ 
-			alpha_d_vec(ia) =  1.0 - ( (double) ia + 1.0) / ((double) nsteps);
+			alpha_d_vec(ia) =  1.0 - ( (double) ia) / ((double) nsteps);
 		}
 	}
 	std::cout << alpha_d_vec;//DEBUG ME
@@ -3161,6 +3161,7 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int nsteps,
 
 	//Loop through the k worst points and n steps reflections
 	Eigen::MatrixXd snewkn(k * alpha_d_vec.size(), nopt);
+	int inew = 0;
 	for (int ik = 0; ik < k; ik++)
 	{
 		// Compute the centroid of the simplex excluding the seleted kth worst point
@@ -3184,19 +3185,19 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int nsteps,
 			Eigen::VectorXd delta = ce - valskrow;
 			Eigen::VectorXd delta_a = delta * alpha_d_vec(ia);
 			Eigen::VectorXd ce_delta_a = ce + delta;
-			snewkn.row(ik) = ce_delta_a;
+			snewkn.row(inew) = ce_delta_a;
 			//snewkn.row(ik) = (ce.array() + ( (ce.array() - skw.row(ik).array()) * alpha_d_vec(ia))).matrix();
 
 			//Check if is outside the bounds :
 			int ibound = 0;
+			Eigen::VectorXd temp1 = snewkn.row(inew);
+			Eigen::VectorXd sl = temp1 - bl;
 
-			Eigen::VectorXd sl = snewkn.row(ik) - bl;
-
-			if (bool bidx = (sl.array() < 0.0).any())
+			if ((sl.array() < 0.0).count() > 0)
 				ibound = 1;
 
-			sl = bu - snewkn.row(ik);
-			if (bool bidx = (sl.array() < 0.0).any())
+			sl = bu - temp1;
+			if ((sl.array() < 0.0).count() > 0)
 				ibound = 2;
 
 			if (ibound >= 1)
@@ -3204,16 +3205,16 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int nsteps,
 				switch (optbounds){
 					case 1:
 						//RANDOM, ORIGINAL SCE
-						snewkn.row(ik) = bl.array() + uniform_draws(1, 0.0, 1.0, rand_gen)[0] * (bu.array() - bl.array()); //TODO CHECK RECEPIE
+						snewkn.row(inew) = bl.array() + uniform_draws(1, 0.0, 1.0, rand_gen)[0] * (bu.array() - bl.array()); //TODO CHECK RECEPIE
 						break;
 					case 2:
 						//INFORCE BOUNDS CODE
-						for (int j = 0; j < snewkn.row(ik).size();j++ )
+						for (int j = 0; j < snewkn.row(inew).size();j++ )
 						{
-							if (snewkn(ik,j) > bu(j))
-								snewkn(ik,j) = bu(j);
-							if (snewkn(ik,j) < bl(j))
-								snewkn(ik,j) = bl(j);
+							if (snewkn(inew,j) > bu(j))
+								snewkn(inew,j) = bu(j);
+							if (snewkn(inew,j) < bl(j))
+								snewkn(inew,j) = bl(j);
 						}						
 						break;
 					case 3:
@@ -3221,28 +3222,10 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int nsteps,
 						break;
 				}
 
+			inew++; //index used to fill k x n matrix
 
-			//RETURN PARAMETER FIT
 		}
 
-		//fnew = functn.functn(nopt, snew) 
-		// TODO IF FUNCTN FAILED
-		//icall = icall + 1
-
-		//Reflection failed; now attempt a contraction point :
-		//if fnew > fw:
-			//snew = sw + beta * (ce - sw)
-			//TODO fnew = functn.functn(nopt, snew)
-			//icall = icall + 1
-
-		//Both reflection and contraction have failed, attempt a random point;
-		//if fnew > fw:
-			//snew = bl + np.random.rand(1, nopt)[0] * (bu - bl)
-			// TODO fnew = functn.functn(nopt, snew)
-			//icall = icall + 1
-
-
-		//END OF CCE
 	}
 
 	//TOD0 assign snewk back in s
@@ -3280,22 +3263,29 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
     bts.ctl2numeric_ip(ubnd);
     int tries = 0;
     int i = 0;
-	int mou_simplex_num_reflect = 5; //TODO INPUT FILE mou_simplex_num_reflect
-	int mou_simplex_num_steps_reflect = 4; //TODO INPUT FILE mou_simplex_num_steps_reflect
-	int mou_simplex_opt_bounds = 1; //TODO INPUT FILE mou_simplex_opt_bounds
+	int mou_simplex_reflections = pest_scenario.get_pestpp_options().get_mou_simplex_reflections();
+	vector<double> mou_simplex_factors = pest_scenario.get_pestpp_options().get_mou_simplex_factors();
+	int mou_simplex_num_steps_reflect = 4; //TODO INPUT FILE mou_simplex_num_steps_reflect, our use factors above
+	int mou_simplex_opt_bounds = 2; //TODO INPUT FILE mou_simplex_opt_bounds, done for comparing bound correction.
 
-	//TODO compare size complex against number of parameters and size of the ensamble
+	//TODO compare size ideal complex against size of the ensamble, LETS DISCUSS HOW TO HANDLE CASES WITH A VERY LARGE POPULATION 
 	int nopt = dv_names.size();// TODO check if this is he  number of parameters to optimize
-	int idealcomplex = max(2, nopt);
+	int idealcomplex = max(2, nopt); //Recomended complexes SCE
+	int idealpopulation = idealcomplex*(2*nopt+1); //ideal SCE-UA population
 	if (1 == 0) //(nensemble > nopt)
 	{
 		//TODO CREATE AS MANY COMPLEXES AS POSSIBLE GIVEN THE SIZE OF THE ENSEMBLE AND THE NUMBER OF PARAMETERS.
-		int ncomplexes = num_members/nopt; //create complexes with available popultation
+		int ncomplexes = num_members/nopt; //create complexes with available popultation, HOW TO ROUND/INCLUDE LEFTOVERS
+		for (int icomp = 0; icomp < ncomplexes; icomp++)
+		{
+			//TODO, SELECT REALIZATIONS FOR ENSEMBLE
+			simplex_cceua_kn(_dp, mou_simplex_reflections, mou_simplex_num_steps_reflect, mou_simplex_opt_bounds);
+		}
 	}
 	else
 	{ 
-		//use the entire population
-		simplex_cceua_kn(_dp, mou_simplex_num_reflect, mou_simplex_num_steps_reflect, mou_simplex_opt_bounds);
+		//use the entire ensemble to create simplex
+		simplex_cceua_kn(_dp, mou_simplex_reflections, mou_simplex_num_steps_reflect, mou_simplex_opt_bounds);
 	}
 	//TODO check size s against a hypotheical complex. complex as a function. of decision.
 	
