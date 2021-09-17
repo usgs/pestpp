@@ -3261,24 +3261,36 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
     for (int i=0;i<fitness.size()-num_reflect;i++)
         best.push_back(fitness[i]);
 
+    //get the centroid in dec var space of the best individuals (excluding the ones that will be reflected)
     Eigen::VectorXd best_centroid = _dp.get_eigen(best,vector<string>()).colwise().mean();
+
+    //to hold the current and newly reflected individuals
     Eigen::VectorXd current,reflected;
+
     stringstream ss;
+
+
     int i_newreal = 0;
     for (int k=0;k<num_reflect;k++)
     {
         //fitness is sorted from best to worst, so work from the end
         current_name = fitness[fitness.size()-k-1];
+        //get the current worst individual
         current = _dp.get_real_vector(current_name);
+        //reflect
         reflected = best_centroid - current;
+
+        //now generate the step factor reflections
         for (auto& f : step_factors)
         {
             new_reals.row(i_newreal) = reflected * f;
+            //get a new name for this individual
             ss.str("");
             ss << "simplex_k" << k << "_f" << setprecision(2) << f;
             new_name = get_new_member_name(ss.str());
             new_member_names.push_back(new_name);
             i_newreal++;
+            //write the lineage info
             lin << new_name << "," << current_name << endl;
         }
     }
