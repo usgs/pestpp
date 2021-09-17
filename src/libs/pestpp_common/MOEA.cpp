@@ -3098,7 +3098,7 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
 	return new_dp;
 }
 
-ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int nsteps, int optbounds)
+ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int optbounds)
 {
 	//C++ implementation of the cceua algorithm, Duan et al. (1992) with the addition of k worst points
 	// 	   and n steps along the reflection path
@@ -3124,8 +3124,8 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int nsteps,
 	Eigen::VectorXd bu(nopt);
 	for (int i = 0; i < nopt; i++)
 	{
-		bu(i) = 0.0; //zdt1 example
-		bl(i) = 1.0; //zdt1 example
+		bu(i) = 1.0; //zdt1 example
+		bl(i) = 0.0; //zdt1 example
 
 	}
 	//Create vector with n steps from reflection [1, 1-1/n, 1-2/n, ...1-(n-1)/n]
@@ -3133,20 +3133,8 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int nsteps,
 	//                                      n=4, [1, 1-1/4, 1-2/4, 1-3/4]
 	//TODO DECIDE TO INCLUDE one or more contraction points right the way or under some circustance
 	//A contraction point cound use -1+2/n or something similar.
-	Eigen::VectorXd alpha_d_vec(nsteps);
-	for (int ia = 0; ia < nsteps; ia++)
-	{
-		if (ia == 0)
-		{
-			alpha_d_vec(0) = 1;
-		}
-		else
-		{ 
-			alpha_d_vec(ia) =  1.0 - ( (double) ia) / ((double) nsteps);
-		}
-	}
-	std::cout << alpha_d_vec;//DEBUG ME
-	//TODO consider adding iter 
+	vector<double> alpha_d_vec = pest_scenario.get_pestpp_options().get_mou_simplex_factors();
+	int nsteps = alpha_d_vec.size();
 
 	//initialize structures for kth worst values
 	Eigen::MatrixXd skw(k, nopt);
@@ -3183,20 +3171,20 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int nsteps,
 		{
 			Eigen::VectorXd valskrow = skw.row(ik);
 			Eigen::VectorXd delta = ce - valskrow;
-			Eigen::VectorXd delta_a = delta * alpha_d_vec(ia);
-			Eigen::VectorXd ce_delta_a = ce + delta;
-			snewkn.row(inew) = ce_delta_a;
-			//snewkn.row(ik) = (ce.array() + ( (ce.array() - skw.row(ik).array()) * alpha_d_vec(ia))).matrix();
-
+			double alpha;
+			alpha = alpha_d_vec[ia];
+			Eigen::VectorXd delta_a = delta * alpha;
+			Eigen::VectorXd ce_delta_a = ce + delta_a;
+						
 			//Check if is outside the bounds :
 			int ibound = 0;
-			Eigen::VectorXd temp1 = snewkn.row(inew);
-			Eigen::VectorXd sl = temp1 - bl;
+			
+			Eigen::VectorXd sl = ce_delta_a - bl;
 
 			if ((sl.array() < 0.0).count() > 0)
 				ibound = 1;
 
-			sl = bu - temp1;
+			sl = bu - ce_delta_a;
 			if ((sl.array() < 0.0).count() > 0)
 				ibound = 2;
 
@@ -3205,23 +3193,23 @@ ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int nsteps,
 				switch (optbounds){
 					case 1:
 						//RANDOM, ORIGINAL SCE
-						snewkn.row(inew) = bl.array() + uniform_draws(1, 0.0, 1.0, rand_gen)[0] * (bu.array() - bl.array()); //TODO CHECK RECEPIE
+						ce_delta_a = bl.array() + uniform_draws(1, 0.0, 1.0, rand_gen)[0] * (bu.array() - bl.array()); //TODO CHECK RECEPIE
 						break;
 					case 2:
 						//INFORCE BOUNDS CODE
-						for (int j = 0; j < snewkn.row(inew).size();j++ )
+						for (int j = 0; j < ce_delta_a.size();j++ )
 						{
-							if (snewkn(inew,j) > bu(j))
-								snewkn(inew,j) = bu(j);
-							if (snewkn(inew,j) < bl(j))
-								snewkn(inew,j) = bl(j);
+							if (ce_delta_a(j) > bu(j))
+								ce_delta_a(j) = bu(j);
+							if (ce_delta_a(j) < bl(j))
+								ce_delta_a(j) = bl(j);
 						}						
 						break;
 					case 3:
 						//RANDOM, ONLY FOR THE PARAMETER BEYOND THE BOUND
 						break;
 				}
-
+			snewkn.row(inew) = ce_delta_a;
 			inew++; //index used to fill k x n matrix
 
 		}
@@ -3279,60 +3267,23 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
 		for (int icomp = 0; icomp < ncomplexes; icomp++)
 		{
 			//TODO, SELECT REALIZATIONS FOR ENSEMBLE
-			simplex_cceua_kn(_dp, mou_simplex_reflections, mou_simplex_num_steps_reflect, mou_simplex_opt_bounds);
+			simplex_cceua_kn(_dp, mou_simplex_reflections, mou_simplex_opt_bounds);
 		}
 	}
 	else
 	{ 
 		//use the entire ensemble to create simplex
-		simplex_cceua_kn(_dp, mou_simplex_reflections, mou_simplex_num_steps_reflect, mou_simplex_opt_bounds);
+		simplex_cceua_kn(_dp, mou_simplex_reflections, mou_simplex_opt_bounds);
+
 	}
 	//TODO check size s against a hypotheical complex. complex as a function. of decision.
 	
-    while (i < num_members)
+    for (int inew=0; inew< num_members; inew++)
     {
-        //nedler meade
+        //SET NEW REALIZATIONS IN new_dp
 
-        //selected = selection(4, _dp, mattype);
+        
 
-
-        //differential vector
-        //diff = _dp.get_eigen_ptr()->row(selected[0]) + (f * (_dp.get_eigen_ptr()->row(selected[1]) - _dp.get_eigen_ptr()->row(selected[2])));
-
-        //current member if in range, otherwise, select randomly
-        if (i < _dp.shape().first)
-            x = _dp.get_eigen_ptr()->row(i);
-        else
-            //this risks "inbreeding" but maybe thats good?!
-            x = _dp.get_eigen_ptr()->row(selected[3]);
-        //copy to perserve non-dec var values;
-        y = x;
-
-        //only change dec vars
-        double dsum = 0.0;
-        for(int idv=0;idv<dv_names.size();idv++)
-        {
-            ii = var_map[dv_names[idv]];
-            y[ii] = diff[ii];
-            y[ii] = min(y[ii], ubnd[dv_names[idv]]);
-            y[ii] = max(y[ii], lbnd[dv_names[idv]]);
-        }
-
-        tries++;
-        if (tries > 1000000)
-            throw_moea_error("simplex generator appears to be stuck in an infinite loop...");
-
-        double n = (x - y).squaredNorm();
-        if (n < epsilon)
-            continue;
-        new_name = get_new_member_name("de");
-        new_member_names.push_back(new_name);
-        lin << new_name;
-        for (auto idx : selected)
-            lin << "," << real_names[idx];
-        lin << endl;
-        new_reals.row(i) = y;
-        i++;
     }
     ParameterEnsemble new_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
     new_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
