@@ -128,6 +128,7 @@ bool ParetoObjectives::compare_two(string& first, string& second, MouEnvType env
 		throw runtime_error("ParetoObjectives::compare_two(): unrecognized envtyp");
 }
 
+
 bool ParetoObjectives::compare_two_spea(string& first, string& second)
 {
 	if (spea2_constrained_fitness_map.at(first) < spea2_constrained_fitness_map.at(second))
@@ -1951,6 +1952,11 @@ void MOEA::initialize()
 			gen_types.push_back(MouGenType::PSO);
 			message(1, "using particle swarm generator");
 		}
+        else if (token == "SIMPLEX")
+        {
+            gen_types.push_back(MouGenType::SMP);
+            message(1, "using simplex generator");
+        }
 		else
 		{
 			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX','PM','PSO'}");
@@ -2439,6 +2445,10 @@ ParameterEnsemble MOEA::generate_population()
 		{
 			p = generate_pso_population(new_members_per_gen, dp);
 		}
+        else if (gen_type == MouGenType::SMP)
+        {
+            p = generate_simplex_population(new_members_per_gen, dp, op);
+        }
 		else
 			throw_moea_error("unrecognized mou generator");
 		if (new_pop.shape().first == 0)
@@ -2528,7 +2538,6 @@ void MOEA::iterate_to_solution()
 				if (keep.size() >= num_members)
 					break;
 				keep.push_back(dom);
-
 			}
 
 			message(1, "resizing current populations to ", keep.size());
@@ -3087,6 +3096,208 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
 	new_dp.enforce_bounds(performance_log,false);
 	new_dp.check_for_normal("new pso population");
 	return new_dp;
+}
+
+ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int optbounds)
+{
+	//C++ implementation of the cceua algorithm, Duan et al. (1992) with the addition of k worst points
+	// 	   and n steps along the reflection path
+
+
+	//TODO get npt from s.
+	int nopt = 30; //number of variables in the model, in an ideal situaion s has nopt realizations, handle size of s in generate_simplex_population
+	int nps = nopt + 1; // number of members in a simplex
+
+	//TODO get parameters and fitness from s
+	Eigen::MatrixXd svals(nps, nopt); //PARAMETERS 
+	Eigen::VectorXd sfvals(nps);     //OBJECTIVE FUNCTION for members of the simplex
+
+	//TOERASE, FILL WTH RANDOM NUMBERS FOR NOW
+	for (int i = 0; i < nps; i++)
+	{
+		for (int j = 0; j < nopt; j++)
+			svals(i, j) = uniform_draws(1, 0.0, 1.0, rand_gen)[0];
+		sfvals(i) = uniform_draws(1, 0.0, 1.0, rand_gen)[0];
+	}
+
+	//TODO GET bl bu from s
+	Eigen::VectorXd bl(nopt); 
+	Eigen::VectorXd bu(nopt);
+	for (int i = 0; i < nopt; i++)
+	{
+		bu(i) = 1.0; //zdt1 example
+		bl(i) = 0.0; //zdt1 example
+
+	}
+	//Create vector with n steps from reflection [1, 1-1/n, 1-2/n, ...1-(n-1)/n]
+	//Examples:                             n=1, [1]
+	//                                      n=4, [1, 1-1/4, 1-2/4, 1-3/4]
+	//TODO DECIDE TO INCLUDE one or more contraction points right the way or under some circustance
+	//A contraction point cound use -1+2/n or something similar.
+	vector<double> alpha_d_vec = pest_scenario.get_pestpp_options().get_mou_simplex_factors();
+	int nsteps = alpha_d_vec.size();
+
+	//initialize structures for kth worst values
+	Eigen::MatrixXd skw(k, nopt);
+	Eigen::VectorXd sfkw(k);
+
+	//Separate the k worst points
+	for (int ik = 0; ik < k; ik++)
+	{
+		skw.row(ik) = svals.row(svals.rows() - ik -1);
+		sfkw(ik) = sfvals(svals.rows() - ik -1);
+	}
+
+	//Loop through the k worst points and n steps reflections
+	Eigen::MatrixXd snewkn(k * alpha_d_vec.size(), nopt);
+	int inew = 0;
+	for (int ik = 0; ik < k; ik++)
+	{
+		// Compute the centroid of the simplex excluding the seleted kth worst point
+		Eigen::MatrixXd svalsek(nps - 1, nopt);
+		int j = 0;
+		for (int ikk = 0; ikk < nps; ikk++)
+		{
+			if (ikk != ik)
+			{
+				svalsek.row(j) = svals.row(ikk);
+				j++;
+			}
+
+		}
+		Eigen::VectorXd ce = svalsek.rowwise().mean();
+
+		//Query reflection/contration points stored in vector of reflection/contraction  points
+		for (int ia = 0; ia < alpha_d_vec.size(); ia++)
+		{
+			Eigen::VectorXd valskrow = skw.row(ik);
+			Eigen::VectorXd delta = ce - valskrow;
+			double alpha;
+			alpha = alpha_d_vec[ia];
+			Eigen::VectorXd delta_a = delta * alpha;
+			Eigen::VectorXd ce_delta_a = ce + delta_a;
+						
+			//Check if is outside the bounds :
+			int ibound = 0;
+			
+			Eigen::VectorXd sl = ce_delta_a - bl;
+
+			if ((sl.array() < 0.0).count() > 0)
+				ibound = 1;
+
+			sl = bu - ce_delta_a;
+			if ((sl.array() < 0.0).count() > 0)
+				ibound = 2;
+
+			if (ibound >= 1)
+				//TODO BRING TO THE BOUND INSTEAD OF RANDOM.
+				switch (optbounds){
+					case 1:
+						//RANDOM, ORIGINAL SCE
+						ce_delta_a = bl.array() + uniform_draws(1, 0.0, 1.0, rand_gen)[0] * (bu.array() - bl.array()); //TODO CHECK RECEPIE
+						break;
+					case 2:
+						//INFORCE BOUNDS CODE
+						for (int j = 0; j < ce_delta_a.size();j++ )
+						{
+							if (ce_delta_a(j) > bu(j))
+								ce_delta_a(j) = bu(j);
+							if (ce_delta_a(j) < bl(j))
+								ce_delta_a(j) = bl(j);
+						}						
+						break;
+					case 3:
+						//RANDOM, ONLY FOR THE PARAMETER BEYOND THE BOUND
+						break;
+				}
+			snewkn.row(inew) = ce_delta_a;
+			inew++; //index used to fill k x n matrix
+
+		}
+
+	}
+
+	//TOD0 assign snewk back in s
+
+	return s;//TODO fnew, icall
+} 
+
+ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEnsemble& _dp, ObservationEnsemble& _op)
+{
+    message(1, "generating simplex population of size", num_members);
+    //for now just using nsga selector. TODO: work in spea2 selector if requested
+    pair<vector<string>, vector<string>> t = objectives.get_nsga2_pareto_dominance(-999,_op,_dp,&constraints,false);
+    vector<string> fitness;
+    for (auto& tt : t.first)
+        fitness.push_back(tt);
+    for (auto& tt : t.second)
+        fitness.push_back(tt);
+
+
+	int num_reflect = min(pest_scenario.get_pestpp_options().get_mou_simplex_reflections(),_dp.shape().first);
+	vector<double> step_factors = pest_scenario.get_pestpp_options().get_mou_simplex_factors();
+    num_members = num_reflect * step_factors.size();
+
+    Eigen::MatrixXd new_reals(num_members, _dp.shape().second);
+    new_reals.setZero();
+    _dp.transform_ip(ParameterEnsemble::transStatus::NUM);
+    vector<string> new_member_names;
+
+    ofstream& lin = file_manager.get_ofstream(lineage_tag);
+    vector<string> real_names = _dp.get_real_names();
+    string new_name,current_name;
+    _dp.update_var_map();
+    map<string, int> var_map = _dp.get_var_map();
+    string dv_name;
+    int ii;
+    int i_last;
+    Parameters lbnd = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
+    Parameters ubnd = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
+    ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
+    bts.ctl2numeric_ip(lbnd);
+    bts.ctl2numeric_ip(ubnd);
+
+    vector<string> best;
+    for (int i=0;i<fitness.size()-num_reflect;i++)
+        best.push_back(fitness[i]);
+
+    //get the centroid in dec var space of the best individuals (excluding the ones that will be reflected)
+    Eigen::VectorXd best_centroid = _dp.get_eigen(best,vector<string>()).colwise().mean();
+
+    //to hold the current and newly reflected individuals
+    Eigen::VectorXd current,reflected;
+
+    stringstream ss;
+
+
+    int i_newreal = 0;
+    for (int k=0;k<num_reflect;k++)
+    {
+        //fitness is sorted from best to worst, so work from the end
+        current_name = fitness[fitness.size()-k-1];
+        //get the current worst individual
+        current = _dp.get_real_vector(current_name);
+        //reflect
+        reflected = best_centroid - current;
+
+        //now generate the step factor reflections
+        for (auto& f : step_factors)
+        {
+            new_reals.row(i_newreal) = reflected * f;
+            //get a new name for this individual
+            ss.str("");
+            ss << "simplex_k" << k << "_f" << setprecision(2) << f;
+            new_name = get_new_member_name(ss.str());
+            new_member_names.push_back(new_name);
+            i_newreal++;
+            //write the lineage info
+            lin << new_name << "," << current_name << endl;
+        }
+    }
+    ParameterEnsemble new_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
+    new_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
+    new_dp.enforce_bounds(performance_log, false);
+    return new_dp;
 }
 
 

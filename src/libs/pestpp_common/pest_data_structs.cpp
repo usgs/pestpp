@@ -1403,8 +1403,24 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 	    mou_population_schedule = org_value;
 	    return true;
     }
-
-
+	else if (key == "MOU_SIMPLEX_REFLECTIONS")
+	{
+		convert_ip(value, mou_simplex_reflections);
+		return true;
+	}
+	else if (key == "MOU_SIMPLEX_FACTORS")
+	{
+		mou_simplex_factors.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			mou_simplex_factors.push_back(v);
+		}
+		return true;
+	}
 	return false;
 }
 
@@ -1624,6 +1640,12 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_pso_social_const: " << mou_pso_social_const << endl;
 	os << "mou_pso_cognitive: " << mou_pso_cognitive_const << endl;
 	os << "mou_population_schedule: " << mou_population_schedule << endl;
+	os << "mou_simplex_reflections:" << mou_simplex_reflections << endl;
+	os << "mou_simplex_factors: " << endl;
+	for (auto& f : mou_simplex_factors)
+	{
+		os << " " << f << endl;
+	}
 
 	os << endl << "...shared pestpp-ies/pestpp-da options:" << endl;
 	os << "(note: 'da' args override 'ies' args when using pestpp-da)" << endl;
@@ -1798,6 +1820,8 @@ void PestppOptions::set_defaults()
 	set_mou_pso_cognitive_const(2.0);
 	set_mou_pso_social_const(2.0);
 	set_mou_population_schedule("");
+	set_mou_simplex_reflections(10);
+	set_mou_simplex_factors(vector<double>{0.5, 0.6, 0.7, 0.8});
 	
 	set_ies_par_csv("");
 	set_ies_obs_csv("");
