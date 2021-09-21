@@ -80,9 +80,9 @@ def removeAnchors(text):
         text = text[0:leftTag] + text[rightTag + 1:]
     return text
 
-def clean_4_toc(inFile,outFile,run_pandoc=True):
+def clean_4_toc(docx_file,inFile,outFile,run_pandoc=True):
     if run_pandoc:
-        os.system("pandoc -t gfm --wrap=none --extract-media . -o file.md pestpp_users_guide_v5.1.0.beta.docx --mathjax")
+        os.system("pandoc -t gfm --wrap=none --extract-media . -o file.md {0} --mathjax".format(docx_file))
     num_str = [str(i) for i in range(1,11)]
     lines = open(inFile,'r').readlines()
 
@@ -94,7 +94,7 @@ def clean_4_toc(inFile,outFile,run_pandoc=True):
             while True:
                 i += 1
                 line = lines[i]
-                if line.lower().strip().startswith("1. introduction"):
+                if line.lower().strip().startswith("1. introduction") or line.lower().strip().startswith("# 1. introduction") :
                     break
         notoc_lines.append(line)
         i += 1
@@ -156,7 +156,7 @@ def clean_4_toc(inFile,outFile,run_pandoc=True):
 
 if __name__ == "__main__":
 
-    clean_4_toc("file.md","temp.md",True)
+    clean_4_toc("pestpp_users_guide_v5.1.1.docx","file.md","temp.md",True)
     processFile("temp.md","pestpp_users_manual.md")
 
 
