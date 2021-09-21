@@ -65,7 +65,6 @@ public:
 	Mat inv(bool echo=false);
 	void inv_ip(PerformanceLog& pfm);
 	void inv_ip(bool echo=false);
-	void pseudo_inv_ip(double eigthresh, int maxsing);
 	void SVD();
 
 	Mat identity();
@@ -98,7 +97,6 @@ protected:
 	Eigen::SparseMatrix<double> U;
 	Eigen::SparseMatrix<double> V;
 	Eigen::VectorXd s;
-	Eigen::SparseMatrix<double> lower_chol;
 	vector<string> row_names;
 	vector<string> col_names;
 	set<string> row_set;

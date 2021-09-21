@@ -61,8 +61,17 @@ int main(int argc, char* argv[])
 	cout << "                       by The PEST++ Development Team" << endl;
 	cout << endl << endl << "version: " << version << endl;
 	cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-	
+    auto start = chrono::steady_clock::now();
+    string start_string = get_time_string();
+    cout << "started at " << start_string << endl;
 	CmdLine cmdline(argc, argv);
+
+    if (quit_file_found())
+    {
+        cerr << "'pest.stp' found, please remove this file " << endl;
+        return 1;
+    }
+
 	FileManager file_manager;
 	string pathname = ".";
 	file_manager.initialize_path(get_filename_without_ext(cmdline.ctl_file_name), pathname);
@@ -123,7 +132,7 @@ int main(int argc, char* argv[])
 	fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
 	fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
 	fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
-
+    fout_rec << "started at " << start_string << endl;
 	cout << endl;
 	cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
 	cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
@@ -131,7 +140,6 @@ int main(int argc, char* argv[])
 
 	// create pest run and process control file to initialize it
 	Pest pest_scenario;
-	pest_scenario.set_defaults();
 	try 
 	{
 		pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
@@ -251,7 +259,7 @@ int main(int argc, char* argv[])
 
 		double morris_delta = .666;
 		bool default_delta = true;
-		bool calc_pooled_obs = false;
+		bool calc_pooled_obs = true;
 		bool calc_morris_obs_sen = true;
 		auto morris_r_it = gsa_opt_map.find("GSA_MORRIS_R");
 		if (morris_r_it != gsa_opt_map.end())
@@ -307,7 +315,7 @@ int main(int argc, char* argv[])
 	{
 		GsaAbstractBase::PARAM_DIST par_dist = GsaAbstractBase::PARAM_DIST::uniform;
 		string par_dist_str = "UNIFORM";
-		int n_sample = 100;
+		int n_sample = pest_scenario.get_pestpp_options().get_gsa_sobol_samples();
 		auto sob_n_sam_it = gsa_opt_map.find("GSA_SOBOL_SAMPLES");
 		if (sob_n_sam_it != gsa_opt_map.end())
 		{
@@ -323,7 +331,7 @@ int main(int argc, char* argv[])
 			else
 			{
 				ostringstream str;
-				str << "SOBOL_PAR_DIST(" << par_dist_str << "):  \"" << par_dist_str << "\" is an invalid distribuation type";
+				str << "SOBOL_PAR_DIST(" << par_dist_str << "):  \"" << par_dist_str << "\" is an invalid distribution type";
 				throw PestError(str.str());
 			}
 		}
@@ -382,8 +390,19 @@ int main(int argc, char* argv[])
 	file_manager.close_file("rst");
 	pest_utils::try_clean_up_run_storage_files(case_name);
 
-	cout << endl << endl << "PESTPP-SEN Analysis Complete..." << endl;
-	return 0;
+	cout << endl << endl << "pestpp-sen analysis complete..." << endl;
+	fout_rec << endl << endl << "pestpp-sen analysis complete..." << endl;
+    auto end = chrono::steady_clock::now();
+
+    cout << "started at " << start_string << endl;
+    cout << "finished at " << get_time_string() << endl;
+    cout << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
+    cout << flush;
+    fout_rec << "started at " << start_string << endl;
+    fout_rec << "finished at " << get_time_string() << endl;
+    fout_rec << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
+    fout_rec.close();
+    return 0;
 	//cout << endl << "Simulation Complete - Press RETURN to close window" << endl;
 	//char buf[256];
 	//OperSys::gets_s(buf, sizeof(buf));

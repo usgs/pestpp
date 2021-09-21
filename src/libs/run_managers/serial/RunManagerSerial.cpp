@@ -49,6 +49,60 @@ RunManagerSerial::RunManagerSerial(const vector<string> _comline_vec,
 	mi.set_num_threads(_num_threads);
 
 	cout << "              starting serial run manager ..." << endl << endl;
+	mgr_type = RUN_MGR_TYPE::SERIAL;
+}
+
+void RunManagerSerial::run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, exception_ptr& run_exception,
+                             Parameters* pars, Observations* obs)
+{
+    mi.run(terminate,finished,run_exception, pars, obs);
+}
+
+void RunManagerSerial::run(Parameters* pars, Observations* obs)
+{
+    thread_flag f_terminate(false);
+    thread_flag f_finished(false);
+    exception_ptr run_exception = nullptr;
+    stringstream ss;
+    thread run_thread(&RunManagerSerial::run_async, this, &f_terminate, &f_finished, std::ref(run_exception),
+                      pars, obs);
+
+
+    while (true)
+    {
+
+        if (run_exception) {
+            try {
+                rethrow_exception(run_exception);
+            }
+            catch (exception &e)
+            {
+                ss.str("");
+                ss << "exception raised by run thread: " << std::endl;
+                ss << e.what() << std::endl;
+                cout << ss.str();
+            }
+            f_terminate.set(true);
+            run_thread.join();
+            break;
+        }
+        //check if the runner thread has finished
+        if (f_finished.get())
+        {
+            break;
+        }
+        int q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2) || (q == 4))
+        {
+            f_terminate.set(true);
+            run_thread.join();
+            break;
+        }
+
+    }
+    run_thread.join();
+    if (run_exception)
+        rethrow_exception(run_exception);
 }
 
 void RunManagerSerial::run()
@@ -60,14 +114,27 @@ void RunManagerSerial::run()
 	const vector<string> &obs_name_vec = file_stor.get_obs_name_vec();
 
 	stringstream message;
+	int nruns = get_outstanding_run_ids().size();
+	message.str("");
+	message << endl << endl << endl << "    ---  starting serial run manager for " << nruns << " runs ---    " << endl << endl << endl;
+	std::cout << message.str();
+
 	std::vector<double> obs_vec;
 	vector<int> run_id_vec;
-	int nruns = get_outstanding_run_ids().size();
+	
 	std::chrono::system_clock::time_point start_time_all = std::chrono::system_clock::now();
 	while (!(run_id_vec = get_outstanding_run_ids()).empty())
 	{
 		for (int i_run : run_id_vec)
 		{
+            int q = pest_utils::quit_file_found();
+            if ((q == 1) || (q == 2) || (q == 4))
+            {
+		        cout << "'pest.stp' found, treating run " << i_run << " as a fail" << endl;
+                update_run_failed(i_run);
+                failed_runs++;
+                continue;
+            }
 			std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
 			try
 			{	
@@ -78,9 +145,11 @@ void RunManagerSerial::run()
 				obs_vec.resize(obs_name_vec.size(), RunStorage::no_data);
 				obs.clear();
 				obs.insert(obs_name_vec, obs_vec);
-				mi.run(&pars, &obs);
+				//mi.run(&pars, &obs);
+
+				run(&pars, &obs);
 				
-				OperSys::chdir(run_dir.c_str());
+				//OperSys::chdir(run_dir.c_str());
 				success_runs += 1;
 				//std::cout << string(message.str().size(), '\b');
 				//message.str("");

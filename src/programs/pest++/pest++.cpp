@@ -71,9 +71,17 @@ int main(int argc, char* argv[])
 		cout << "                                   by The PEST++ Development Team" << endl;
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-		
+        auto start = chrono::steady_clock::now();
+
+        string start_string = get_time_string();
+        cout << "started at " << start_string << endl;
 		CmdLine cmdline(argc, argv);
 
+        if (quit_file_found())
+        {
+            cerr << "'pest.stp' found, please remove this file " << endl;
+            return 1;
+        }
 		
 		FileManager file_manager;
 		string filename = cmdline.ctl_file_name;
@@ -169,7 +177,8 @@ int main(int argc, char* argv[])
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl << endl;
 			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
+			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl;
+            fout_rec << "started at " << start_string << endl << endl;
 
 		}
 
@@ -180,7 +189,6 @@ int main(int argc, char* argv[])
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
-		pest_scenario.set_defaults();
 #ifndef _DEBUG
 		try {
 #endif
@@ -197,7 +205,8 @@ int main(int argc, char* argv[])
 			throw(e);
 	 	}
 #endif
-		pest_scenario.check_inputs(fout_rec);
+
+		pest_scenario.check_inputs(fout_rec, false, false);
 		// reset this here because we want to draw from the FOSM posterior as a whole matrix
 		pest_scenario.get_pestpp_options_ptr()->set_ies_group_draws(false);
 		
@@ -421,7 +430,8 @@ int main(int argc, char* argv[])
 		// Differential Evolution
 		if (pest_scenario.get_pestpp_options().get_global_opt() ==  PestppOptions::OPT_DE)
 		{
-			int rand_seed = 1;
+		    throw runtime_error("DE-based global optimization is deprecated in pestpp-glm. please use pestpp-mou");
+			/*int rand_seed = 1;
 			int np = pest_scenario.get_pestpp_options().get_de_npopulation();
 			int max_gen = pest_scenario.get_pestpp_options().get_de_max_gen();
 			double f = pest_scenario.get_pestpp_options().get_de_f();
@@ -435,7 +445,7 @@ int main(int argc, char* argv[])
 			de_solver.initialize_population(*run_manager_ptr, np);
 			de_solver.solve(*run_manager_ptr, restart_ctl, max_gen, f, cr, dither_f, init_run);
 			run_manager_ptr->free_memory();
-			exit(0);
+			exit(0);*/
 		}
 
 
@@ -458,6 +468,12 @@ int main(int argc, char* argv[])
 		}
 		while (!termination_ctl.terminate())
 		{
+            int q = pest_utils::quit_file_found();
+            if ((q == 1) || (q == 2))
+            {
+		        termination_ctl.set_terminate(true);
+		        termination_ctl.set_reason("'pest.stp' found");
+            }
 			//base parameter iterations
 			try
 			{
@@ -838,8 +854,17 @@ int main(int argc, char* argv[])
 		file_manager.close_file("rst");
 		pest_utils::try_clean_up_run_storage_files(case_name);
 
-		cout << endl << endl << "PESTPP-GLM Analysis Complete..." << endl;
-		cout << flush;
+		cout << endl << endl << "pestpp-glm analysis complete..." << endl;
+        fout_rec << endl << endl << "pestpp-glm analysis complete..." << endl;
+        auto end = chrono::steady_clock::now();
+        cout << "started at " << start_string << endl;
+        cout << "finished at " << get_time_string() << endl;
+        cout << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
+        fout_rec << "started at " << start_string << endl;
+        fout_rec << "finished at " << get_time_string() << endl;
+        fout_rec << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
+        fout_rec.close();
+        cout << flush;
 		return 0;
 #ifndef _DEBUG
 	}

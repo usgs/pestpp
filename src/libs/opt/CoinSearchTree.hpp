@@ -153,8 +153,8 @@ struct CoinSearchTreeComparePreferred {
   static inline const char* name() { return "CoinSearchTreeComparePreferred"; }
   inline bool operator()(const CoinTreeSiblings* x,
 			 const CoinTreeSiblings* y) const {
-    register const CoinTreeNode* xNode = x->currentNode();
-    register const CoinTreeNode* yNode = y->currentNode();
+    const CoinTreeNode* xNode = x->currentNode();
+    const CoinTreeNode* yNode = y->currentNode();
     const BitVector128 xPref = xNode->getPreferred();
     const BitVector128 yPref = yNode->getPreferred();
     bool retval = true;

@@ -474,7 +474,7 @@ const double * CoinLpIO::getRowRange() const
 }
 
 /*************************************************************************/
-const int CoinLpIO::getNumObjectives() const
+int CoinLpIO::getNumObjectives() const
 {
   return num_objectives_;
 }

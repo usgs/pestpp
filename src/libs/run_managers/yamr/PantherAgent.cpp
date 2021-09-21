@@ -9,8 +9,8 @@
 #include "system_variables.h"
 #include "utilities.h"
 #include <regex>
+#include "network_package.h"
 #include "OutputFileWriter.h"
-
 #include "Pest.h"
 #include "config_os.h"
 #include "pest_data_structs.h"
@@ -22,7 +22,8 @@ int  linpack_wrap(void);
 PANTHERAgent::PANTHERAgent(ofstream &_frec)
 	: frec(_frec),
 	  max_time_without_master_ping_seconds(300),
-	  restart_on_error(false)
+	  restart_on_error(false),
+	  current_da_cycle(NetPackage::NULL_DA_CYCLE)
 {
 }
 
@@ -126,6 +127,7 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 		throw PestError("PANTHER agent unable to open pest control file: " + ctl_filename);
 	}
 	pest_scenario.process_ctl_file(fin,ctl_filename,frec);
+
 	if ((pest_scenario.get_ctl_parameters().size() > 250000) || (pest_scenario.get_ctl_observations().size() > 250000))
 	{
 		set<string> pargs = pest_scenario.get_pestpp_options().get_passed_args();
@@ -153,7 +155,7 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 	FileManager fm("panther_agent");
 	OutputFileWriter of(fm, pest_scenario);
 	of.scenario_report(frec);
-	pest_scenario.clear_ext_files();
+	//pest_scenario.clear_ext_files();
 }
 
 pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, struct timeval *tv)
@@ -256,6 +258,69 @@ pair<int,string> PANTHERAgent::recv_message(NetPackage &net_pack, long  timeout_
 	return err;
 }
 
+void PANTHERAgent::transfer_files(const vector<string>& tfiles, int group, int run_id, string& desc, string tag)
+{
+    int bytes_read;
+
+    stringstream ss;
+    NetPackage pack;
+    for (auto& filename :tfiles) {
+        if (!check_exist_in(filename))
+        {
+            ss.str("");
+            ss << "file " << filename << " does not exists";
+            report(ss.str(), true);
+            continue;
+        }
+
+        ifstream in;
+        in.open(filename.c_str(), ifstream::binary);
+        if (in.bad()) {
+            ss.str("");
+            ss << "error opening file " << filename << " for reading";
+            report(ss.str(), true);
+            in.close();
+            continue;
+        }
+        string filename_desc = desc + " agent_filename="+filename + " " + tag;
+
+        pack = NetPackage(NetPackage::PackType::START_FILE_WRKR2MSTR,group,run_id,filename_desc);
+        send_message(pack);
+        report("starting file transfer of '" + filename + "' for info '" + filename_desc + "' ",true);
+        int total_size = 0;
+        pack = NetPackage(NetPackage::PackType::CONT_FILE_WRKR2MSTR,group,run_id,filename_desc);
+        char buf[NetPackage::FILE_TRANS_BUF_SIZE]={'\0'};
+        in.seekg(0,in.end);
+
+        int file_size = in.tellg();
+        in.seekg(0,in.beg);
+        if (file_size > NetPackage::FILE_TRANS_BUF_SIZE) {
+            while ((total_size < file_size) && (in.read(buf, sizeof(buf)))) {
+                //cout << filename << ": " << buf << endl;
+                send_message(pack, buf, sizeof(buf));
+                total_size = total_size + sizeof(buf);
+                if ((file_size - total_size) < NetPackage::FILE_TRANS_BUF_SIZE)
+                    break;
+                
+            }
+        }
+        if (total_size < file_size) {
+            char buf[NetPackage::FILE_TRANS_BUF_SIZE]={'\0'};
+            in.read(buf,file_size-total_size);
+            //cout << filename << "fsize: " << file_size << ", total_size: " << total_size << ", final: " << string(buf,file_size-total_size) << endl;
+            send_message(pack, buf, file_size-total_size);
+            total_size = total_size + (file_size-total_size);
+        }
+        
+        pack = NetPackage(NetPackage::PackType::FINISH_FILE_WRKR2MSTR,group,run_id,filename_desc);
+        send_message(pack);
+        ss.str("");
+        ss << "sent " << total_size << " bytes for file '" << filename << "', file size: " << file_size;
+        report(ss.str(),true);
+        in.close();
+    }
+}
+
 
 pair<int,string> PANTHERAgent::send_message(NetPackage &net_pack, const void *data, unsigned long data_len)
 {
@@ -299,34 +364,39 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 
 	thread_flag f_terminate(false);
 	thread_flag f_finished(false);
-	thread_exceptions shared_execptions;
+	exception_ptr run_exception = nullptr;
 	stringstream ss;
-	try
-	{
-		vector<string> par_name_vec;
-		vector<double> par_values;
-		for (auto &i : pars)
-		{
-			par_name_vec.push_back(i.first);
-			par_values.push_back(i.second);
-		}
+    vector<string> par_name_vec;
+    vector<double> par_values;
+    for (auto &i : pars)
+    {
+        par_name_vec.push_back(i.first);
+        par_values.push_back(i.second);
+    }
 
-		vector<double> obs_vec;
-		thread run_thread(&PANTHERAgent::run_async, this, &f_terminate, &f_finished, &shared_execptions,
-		   &pars, &obs);
-		pest_utils::thread_RAII raii(run_thread);
-		
+    vector<double> obs_vec;
+    thread run_thread(&PANTHERAgent::run_async, this, &f_terminate, &f_finished, std::ref(run_exception),
+                      &pars, &obs);
+
+    try
+	{
+
 		while (true)
 		{
 
-			if (shared_execptions.size() > 0)
+			if (run_exception)
 			{
-				ss.str("");
-				ss << "exception raised by run thread: " << std::endl;
-				ss << shared_execptions.what() << std::endl;
-				report(ss.str(), true);
-				//don't break here, need to check one last time for incoming messages
-				done = true;
+                try {
+                    rethrow_exception(run_exception);
+                }
+                catch (exception& e) {
+                    ss.str("");
+                    ss << "exception raised by run thread: " << std::endl;
+                    ss << e.what() << std::endl;
+                    report(ss.str(), true);
+                    //don't break here, need to check one last time for incoming messages
+                    done = true;
+                }
 			}
 			//check if the runner thread has finished
 			if (f_finished.get())
@@ -365,6 +435,7 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 					report(ss.str(), true);
 					f_terminate.set(true);
 					terminate_or_restart(-1);
+
 					smessage << "Error sending ping response to master...quitting";
 				}
 				//cout << "ping response sent" << endl;
@@ -409,12 +480,14 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 				break;
 			}
 		}
-		shared_execptions.rethrow();
+
 		if (!f_terminate.get())
 		{
 			final_run_status = NetPackage::PackType::RUN_FINISHED;
 		}
+        run_thread.join();
 	}
+
 	catch(const PANTHERAgentRestartError&)
 	{
 		// Rethrow for start() method to handle
@@ -429,6 +502,7 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 		report(ss.str(), true);
 		smessage << ex.what();
 		final_run_status = NetPackage::PackType::RUN_FAILED;
+
 		
 	}
 	catch(...)
@@ -439,16 +513,30 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 		final_run_status = NetPackage::PackType::RUN_FAILED;
 	}
 
+    if (run_exception)
+    {
+        try {
+            rethrow_exception(run_exception);
+        }
+        catch (exception& e) {
+            ss.str("");
+            ss << "exception raised by run thread: " << std::endl;
+            ss << e.what() << std::endl;
+            report(ss.str(), true);
+            final_run_status = NetPackage::PackType::RUN_FAILED;
+        }
+    }
+
 	//sleep here just to give the os a chance to cleanup any remaining file handles
 	w_sleep(poll_interval_seconds * 1000);
 	return pair<NetPackage::PackType,std::string> (final_run_status,smessage.str());
 }
 
 
-void PANTHERAgent::run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
+void PANTHERAgent::run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, exception_ptr& run_exception,
 	Parameters* pars, Observations* obs)
 {
-	mi.run(terminate,finished,shared_execptions, pars, obs);
+	mi.run(terminate,finished,run_exception, pars, obs);
 }
 
 
@@ -598,8 +686,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			vector<string> vnames = pest_scenario.get_ctl_ordered_par_names();
 			set<string> snames(vnames.begin(), vnames.end());
 			vnames.clear();
-			for (auto pname : par_name_vec)
+			for (auto& pname : par_name_vec)
 			{
+				pest_utils::upper_ip(pname);
 				if (snames.find(pname) == snames.end())
 					vnames.push_back(pname);
 			}
@@ -666,8 +755,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			vector<string> vnames = pest_scenario.get_ctl_ordered_obs_names();
 			set<string> snames(vnames.begin(), vnames.end());
 			vnames.clear();
-			for (auto oname : obs_name_vec)
+			for (auto& oname : obs_name_vec)
 			{
+				pest_utils::upper_ip(oname);
 				if (snames.find(oname) == snames.end())
 					vnames.push_back(oname);
 			}
@@ -733,11 +823,12 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			
 			int group_id = net_pack.get_group_id();
 			int run_id = net_pack.get_run_id();
+			string info_txt = net_pack.get_info_txt();
 			//jwhite 25 may 2020 - commented this out in develop merge from Ayman's develop
 			//so that I can pull in the run mgr message passing enhancements
 			//will uncommented later when merging in pestpp-da
-			/*string info_txt = net_pack.get_info_txt();
 			pest_utils::upper_ip(info_txt);
+			int da_cycle = NetPackage::NULL_DA_CYCLE;
 			if (info_txt.find("DA_CYCLE=") != string::npos)
 			{
 				frec << "Note: 'DA_CYCLE' information passed in START_RUN command" << endl;
@@ -746,7 +837,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				cout << "      info txt for group_id:run_id " << group_id << ":" << run_id << endl;
 				vector<string> tokens,ttokens;
 				pest_utils::tokenize(info_txt, tokens, " ");
-				int da_cycle = NetPackage::NULL_DA_CYCLE;
+				
 				for (auto token : tokens)
 				{
 					if (token.find("=") != string::npos)
@@ -756,7 +847,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 						{
 							if (ttokens[1].size() > 0)
 							{
-								string s_cycle;
+								string s_cycle = ttokens[1];
 								try
 								{
 									da_cycle = stoi(s_cycle);
@@ -773,105 +864,130 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				}
 				if (da_cycle != NetPackage::NULL_DA_CYCLE)
 				{
-					throw runtime_error("'DA_CYCLE' not implemented yet...");
-					try
+					if (da_cycle != current_da_cycle)
 					{
-						Pest childPest = pest_scenario.get_child_pest(da_cycle);
-						const ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq();
-						Parameters cur_ctl_parameters = childPest.get_ctl_parameters();
-						vector<string> par_names = base_trans_seq.ctl2model_cp(cur_ctl_parameters).get_keys();
-						sort(par_names.begin(), par_names.end());
-						vector<string> obs_names = childPest.get_ctl_observations().get_keys();
-						sort(obs_names.begin(), obs_names.end());
-						par_name_vec = par_names;
-						obs_name_vec = obs_names;
-						mi = ModelInterface(childPest.get_tplfile_vec(), childPest.get_inpfile_vec(),
-							childPest.get_insfile_vec(), childPest.get_outfile_vec(), childPest.get_comline_vec());
-						
-						stringstream ss;
-						ss << "Updated components for DA_CYCLE " << da_cycle << " as follows: " << endl;
-						int i = 0;
-						ss << "parameter names:" << endl;
-						for (int i = 0; i < par_name_vec.size(); i++)
+						try
 						{
-							ss << par_name_vec[i] << " ";
-							if (i % 10 == 0)
-								ss << endl;
-						}
-						frec << ss.str() << endl;
-						cout << ss.str() << endl;
-						ss.str("");
-						ss << endl << "observation names:" << endl;
-						for (int i = 0; i < obs_name_vec.size(); i++)
-						{
-							ss << obs_name_vec[i] << " ";
-							if (i % 10 == 0)
-								ss << endl;
-						}
-						frec << ss.str() << endl;
-						cout << ss.str() << endl;
-						ss.str("");
-						ss << endl << "tpl:in file names:" << endl;
-						vector<string> tpl_vec = childPest.get_tplfile_vec();
-						vector<string> in_vec = childPest.get_inpfile_vec();
-						for (int i = 0; i < tpl_vec.size(); i++)
-						{
-							ss << tpl_vec[i] << ":" << in_vec[i] << " ";
-							if (i % 5 == 0)
-								ss << endl;
-						}
-						frec << ss.str() << endl;
-						cout << ss.str() << endl;
-						ss.str("");
-						ss << endl << "ins:out file names:" << endl;
-						vector<string> ins_vec = childPest.get_insfile_vec();
-						vector<string> out_vec = childPest.get_outfile_vec();
-						for (int i = 0; i < ins_vec.size(); i++)
-						{
-							ss << ins_vec[i] << ":" << out_vec[i] << " ";
-							if (i % 5 == 0)
-								ss << endl;
-						}
-						frec << ss.str() << endl << endl;
-						cout << ss.str() << endl << endl;
+							pest_scenario.assign_da_cycles(frec);
+							Pest childPest = pest_scenario.get_child_pest(da_cycle);
+							const ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq();
+							Parameters cur_ctl_parameters = childPest.get_ctl_parameters();
+							vector<string> par_names = base_trans_seq.ctl2model_cp(cur_ctl_parameters).get_keys();
+							sort(par_names.begin(), par_names.end());
+							vector<string> obs_names = childPest.get_ctl_observations().get_keys();
+							sort(obs_names.begin(), obs_names.end());
+							par_name_vec = par_names;
+							obs_name_vec = obs_names;
+							mi = ModelInterface(childPest.get_tplfile_vec(), childPest.get_inpfile_vec(),
+								childPest.get_insfile_vec(), childPest.get_outfile_vec(), childPest.get_comline_vec());
+							obs = childPest.get_ctl_observations();
+							stringstream ss;
+							ss << "Updated interface components for DA_CYCLE " << da_cycle << " as follows: " << endl;
+							report(ss.str(), true);
+							int i = 0;
+							ss.str("");
+							ss << "parameter names:" << endl;
+							for (int i = 0; i < par_name_vec.size(); i++)
+							{
+								ss << par_name_vec[i] << " ";
+								if (i % 10 == 0)
+									ss << endl;
+							}
+							frec << ss.str() << endl;
+							//cout << ss.str() << endl;
+							
+							cout << par_name_vec.size() << " parameters in current cycle, see rec file for listing" << endl;
+							ss.str("");
+							ss << endl << "observation names:" << endl;
+							for (int i = 0; i < obs_name_vec.size(); i++)
+							{
+								ss << obs_name_vec[i] << " ";
+								if (i % 10 == 0)
+									ss << endl;
+							}
+							frec << ss.str() << endl;
+							//cout << ss.str() << endl;
+							cout << obs_name_vec.size() << " observations in current cycle, see rec file for listing" << endl;
 
+							ss.str("");
+							ss << endl << "tpl:in file names:" << endl;
+							vector<string> tpl_vec = childPest.get_tplfile_vec();
+							vector<string> in_vec = childPest.get_inpfile_vec();
+							for (int i = 0; i < tpl_vec.size(); i++)
+							{
+								ss << tpl_vec[i] << ":" << in_vec[i] << " ";
+								if (i % 5 == 0)
+									ss << endl;
+							}
+							frec << ss.str() << endl;
+							//cout << ss.str() << endl;
+							cout << tpl_vec.size() << " template files in current cycle, see rec file for listing" << endl;
 
+							ss.str("");
+							ss << endl << "ins:out file names:" << endl;
+							vector<string> ins_vec = childPest.get_insfile_vec();
+							vector<string> out_vec = childPest.get_outfile_vec();
+							for (int i = 0; i < ins_vec.size(); i++)
+							{
+								ss << ins_vec[i] << ":" << out_vec[i] << " ";
+								if (i % 5 == 0)
+									ss << endl;
+							}
+							frec << ss.str() << endl << endl;
+							//cout << ss.str() << endl << endl;
+							cout << ins_vec.size() << " instruction files in current cycle, see rec file for listing" << endl;
+
+							current_da_cycle = da_cycle;
+						}
+						catch (exception& e)
+						{
+							stringstream ss;
+							ss << "ERROR: could not process 'DA_CYCLE' " << da_cycle << ": " << e.what();
+							frec << ss.str() << endl;
+							cout << ss.str() << endl;
+							net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
+							char data;
+							err = send_message(net_pack, &data, 0);
+							terminate = true;
+							continue;
+						}
+						catch (...)
+						{
+							stringstream ss;
+							ss << "ERROR: could not process 'DA_CYCLE' " << da_cycle;
+							frec << ss.str() << endl;
+							cout << ss.str() << endl;
+							net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
+							char data;
+							err = send_message(net_pack, &data, 0);
+							terminate = true;
+							continue;
+						}
 					}
-					catch (exception& e)
+					else
 					{
 						stringstream ss;
-						ss << "ERROR: could not process 'DA_CYCLE' " << da_cycle << ": " << e.what();
+						ss << "reusing 'DA_CYCLE' " << da_cycle;
 						frec << ss.str() << endl;
 						cout << ss.str() << endl;
-						net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
-						char data;
-						err = send_message(net_pack, &data, 0);
-						terminate = true;
-						continue;
-					}
-					catch (...)
-					{
-						stringstream ss;
-						ss << "ERROR: could not process 'DA_CYCLE' " << da_cycle;
-						frec << ss.str() << endl;
-						cout << ss.str() << endl;
-						net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id, ss.str());
-						char data;
-						err = send_message(net_pack, &data, 0);
-						terminate = true;
-						continue;
+
 					}
 				}
-				else
-				{
-					frec << "Note: parsed 'DA_CYCLE' is null, continuing..." << endl;
-					cout << "Note: parsed 'DA_CYCLE' is null, continuing..." << endl;
-				}
-			}*/
+			}
 			
 			//do this after we handle a cycle change so that par_name_vec is updated
-
 			Serialization::unserialize(net_pack.get_data(), pars, par_name_vec);
+
+			/*frec << "parameters for run_id: " << run_id << ", group_id: " << group_id;
+			if (da_cycle != NetPackage::NULL_DA_CYCLE)
+				frec << ", da_cycle: " << da_cycle;
+			frec << endl << "name value " << endl;
+
+			for (auto name : par_name_vec)
+			{
+				frec << name << " " << pars.get_rec(name) << endl;
+			}*/
+
 			// run model
 			if (pest_scenario.get_pestpp_options().get_panther_debug_loop())
 			{
@@ -879,6 +995,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				ss << "PANTHER_DEBUG_LOOP = true, returning ctl obs values";
 				
 				report(ss.str(), true);
+				
 				serialized_data = Serialization::serialize(pars, par_name_vec, obs, obs_name_vec, run_time);
 				ss.str("");
 				double rd = ((double)rand() / (double)RAND_MAX);
@@ -896,11 +1013,11 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				if (err.first != 1)
 				{
 					ss.str("");
-					
 					ss << "error sending RUN_FINISHED message to master: " << err.second << ", terminating";
 					report(ss.str(), true);
 					terminate_or_restart(-1);
 				}
+				
 				ss.str("");
 				ss << "results of run_id " << run_id << " sent successfully";
 				report(ss.str(), true);
@@ -920,10 +1037,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				continue;
 
 			}
-
-
 			ss.str("");
-			ss << "received parameters (group id = " << group_id << ", run id = " << run_id << "), ";
+			ss << "received parameters ( group_id=" << group_id << ", run_id=" << run_id << ", info_txt=" << info_txt << " ), ";
 			ss << "starting model run..." << endl;
 			report(ss.str(), true);
 
@@ -934,6 +1049,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				{
 					fout << "run_id, " << run_id << endl;
 					fout << "group_id, " << group_id << endl;
+					fout << "info_txt," << info_txt << endl;
 				}
 				fout.close();
 			}
@@ -951,7 +1067,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				//send model results back
 				ss.str("");
 				ss << "run complete, ";
-				ss << "sending results to master (group id = " << group_id << ", run id = " << run_id << ")...";
+				ss << "sending results to master (group_id=" << group_id << " , run_id=" << run_id << " , info_txt=" << info_txt <<" )...";
 				ss << "run took: " << run_time << " seconds";
 				report(ss.str(), true);
 				ss.str("");
@@ -968,15 +1084,20 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					terminate_or_restart(-1);
 				}
 				ss.str("");
-				ss << "results of run_id " << run_id << "sent successfully";
+				ss << "results of run_id " << run_id << " sent successfully";
 				report(ss.str(), true);
-			}
+                transfer_files(pest_scenario.get_pestpp_options().get_panther_transfer_on_finish(), group_id,
+                               run_id,info_txt, "run_status=completed");
+
+            }
 			else if (final_run_status.first == NetPackage::PackType::RUN_FAILED)
 			{
 				ss.str("");
-				ss << "run failed for run_id" << run_id << ": " << final_run_status.second;
+				ss << "run failed for run_id" << run_id << ", info_txt=" << info_txt << " , : " << final_run_status.second;
 				report(ss.str(), true);
-				net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id,final_run_status.second);
+				ss.str("");
+				ss << "group_id=" << group_id << ", run_id=" << run_id << " , info_txt=" << info_txt << " , " << final_run_status.second;
+				net_pack.reset(NetPackage::PackType::RUN_FAILED, group_id, run_id,ss.str());
 				char data;
 				err = send_message(net_pack, &data, 0);
 				if (err.first != 1)
@@ -986,6 +1107,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					report(ss.str(), true);
 					terminate_or_restart(-1);
 				}
+                transfer_files(pest_scenario.get_pestpp_options().get_panther_transfer_on_fail(), group_id,
+                               run_id,info_txt, "run_status=failed");
 				if (pest_scenario.get_pestpp_options().get_panther_debug_fail_freeze())
 				{
 					ss.str("");
@@ -1006,13 +1129,19 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 						ss << "frozen";
 						report(ss.str(), true);
 						w_sleep(30 * 1000);
+						if (quit_file_found()) {
+                            report("pest.stp file found, resetting panther_agent_freeze_on_fail and continuing...",
+                                   true);
+                            pest_scenario.get_pestpp_options_ptr()->set_panther_debug_fail_freeze(false);
+                            break;
+                        }
 					}
 				}
 			}
 			else if (final_run_status.first == NetPackage::PackType::RUN_KILLED)
 			{
 				ss.str("");
-				ss << "run_id " << run_id << " killed";
+				ss << "run_id " << run_id << " , info_txt=" << info_txt << " , killed";
 				report(ss.str(), true);
 				net_pack.reset(NetPackage::PackType::RUN_KILLED, group_id, run_id, final_run_status.second);
 				char data;
@@ -1024,7 +1153,10 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 					report(ss.str(), true);
 					terminate_or_restart(-1);
 				}
+                transfer_files(pest_scenario.get_pestpp_options().get_panther_transfer_on_fail(), group_id,
+                               run_id,info_txt, "run_status=failed");
 			}
+
 			else if (final_run_status.first == NetPackage::PackType::CORRUPT_MESG)
 			{
 				ss << "corrupt/incorrect message recieved from master: " << final_run_status.second << ", quitting for safety";

@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string>
 #include <cctype>
 #include <fstream>
@@ -584,51 +585,51 @@ bool thread_flag::get()
 	else return false;
 }
 
-void thread_exceptions::add(std::exception_ptr ex_ptr)
-{
-	std::lock_guard<std::mutex> lock(m);
-	shared_exception_vec.push_back(ex_ptr);
-}
+//void thread_exceptions::add(std::exception_ptr ex_ptr)
+//{
+//	std::lock_guard<std::mutex> lock(m);
+//	shared_exception_vec.push_back(ex_ptr);
+//}
 
-string thread_exceptions::what()
-{
-	stringstream ss;
-	std::lock_guard<std::mutex> lock(m);
-	for (auto eptr : shared_exception_vec)
-	{
-		try
-		{
-			std::rethrow_exception(eptr);
-		}
-		catch (const std::exception& e)
-		{
-			ss << e.what() << ", ";
-		}
-	}
-	return ss.str();
-}
-
-void  thread_exceptions::rethrow()
-{
-	std::lock_guard<std::mutex> lock(m);
-	if (shared_exception_vec.size() == 0)
-	{
-		return;
-	}
-	stringstream ss;
-	for (auto eptr : shared_exception_vec)
-	{
-		try
-		{
-			std::rethrow_exception(eptr);
-		}
-		catch (const std::exception& e)
-		{
-			ss << e.what() << " ";
-		}
-	}
-	throw runtime_error(ss.str());
-}
+//string thread_exceptions::what()
+//{
+//	stringstream ss;
+//	std::lock_guard<std::mutex> lock(m);
+//	for (auto eptr : shared_exception_vec)
+//	{
+//		try
+//		{
+//			std::rethrow_exception(eptr);
+//		}
+//		catch (const std::exception& e)
+//		{
+//			ss << e.what() << ", ";
+//		}
+//	}
+//	return ss.str();
+//}
+//
+//void  thread_exceptions::rethrow()
+//{
+//	std::lock_guard<std::mutex> lock(m);
+//	if (shared_exception_vec.size() == 0)
+//	{
+//		return;
+//	}
+//	stringstream ss;
+//	for (auto eptr : shared_exception_vec)
+//	{
+//		try
+//		{
+//			std::rethrow_exception(eptr);
+//		}
+//		catch (const std::exception& e)
+//		{
+//			ss << e.what() << " ";
+//		}
+//	}
+//	throw runtime_error(ss.str());
+//}
 
 map<string, string> parse_plusplus_line(const string& _line)
 {
@@ -712,15 +713,226 @@ bool parse_string_arg_to_bool(string arg)
 	}
 }
 
-bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::SparseMatrix<double> &matrix)
-{
 
+
+void read_dense_binary(const string& filename, vector<string>& row_names, vector<string>& col_names, Eigen::MatrixXd& matrix)
+{
+	stringstream ss;
 	ifstream in;
 	in.open(filename.c_str(), ifstream::binary);
-	if (!in.good())
+	if (in.bad())
 	{
-		stringstream ss;
-		ss << "Mat::from_binary() error opening binary file " << filename << " for reading";
+		ss.str("");
+		ss << "read_dense_binary() error opening binary file " << filename << " for reading";
+		throw runtime_error(ss.str());
+	}
+
+	row_names.clear();
+	col_names.clear();
+	matrix.resize(0, 0);
+
+	int n_par;
+	int n_nonzero;
+	int n_obs_and_pi;
+	int i, j;
+	double data;
+	//char* col_name;
+	//char* row_name;
+
+	// read header
+	in.read((char*)&n_par, sizeof(n_par));
+	in.read((char*)&n_obs_and_pi, sizeof(n_obs_and_pi));
+	in.read((char*)&n_nonzero, sizeof(n_nonzero));
+
+	if ((n_par == 0) && (n_obs_and_pi < 0) && (n_nonzero < 0) && (n_obs_and_pi == n_nonzero))
+	{	
+		n_obs_and_pi *= -1;
+		cout << "reading 'dense' format matrix with " << n_obs_and_pi << " columns" << endl;
+		//first read the names of the columns
+		vector<int> col_name_sizes;
+		int name_size = 0;
+		for (int i = 0; i < n_obs_and_pi; i++)
+		{
+			in.read((char*)&(name_size), sizeof(name_size));
+			if (in.bad())
+			{
+				ss.str("");
+				ss << "read_dense_binary(), dense format error reading size column name size for column number " << i;
+				throw runtime_error(ss.str());
+			}
+
+			col_name_sizes.push_back(name_size);
+		}
+		int i = 0;
+		string name;
+		for (auto col_name_size : col_name_sizes)
+		{
+			char* col_name = new char[col_name_size];
+			in.read(col_name, col_name_size);
+			if (in.bad())
+			{
+				ss.str("");
+				ss << "read_dense_binary(), dense format error reading column name for column number " << i << ", size " << col_name_size;
+				throw runtime_error(ss.str());
+			}
+			name = string(col_name, col_name_size);
+			pest_utils::strip_ip(name);
+			pest_utils::upper_ip(name);
+			col_names.push_back(name);
+			i++;
+		}
+		i = 0;
+		double data = -1.;
+		// record current position in file
+		streampos begin_rows = in.tellg();
+		
+		//read the row names so we can dimension the matrix
+		while (true)
+		{
+			//finished
+			if ((in.bad()) || (in.eof()))
+			{
+				break;
+			}
+
+			in.read((char*)&(name_size), sizeof(name_size));
+			if (in.bad())
+			{
+				ss.str("");
+				ss << "read_dense_binary(), dense format incomplete record: error reading row name size for row number " << i << "...continuing";
+				cout << ss.str();
+				break;
+			}
+			char* row_name = new char[name_size];
+			in.read(row_name, name_size);
+			if (in.bad())
+			{
+				ss.str("");
+				ss << "read_dense_binary(), dense format incomplete record: error reading row name for row number " << i << "...continuing";
+				cout << ss.str();
+				break;
+			}
+			name = string(row_name, name_size);
+			pest_utils::strip_ip(name);
+			pest_utils::upper_ip(name);
+			if (in.bad())
+			{
+				ss.str("");
+				ss << "read_dense_binary(), dense format incomplete record: error skipping values for row  " << i << "...continuing ";
+				cout << ss.str();
+				break;
+			}
+			//skip the values
+			//in.seekg(col_names.size() * sizeof(double), ios_base::cur);
+			row_name = new char[sizeof(double) * col_names.size()];
+			in.read(row_name, sizeof(double)* col_names.size());
+			if (in.eof())
+				break;
+			if (in.bad())
+			{
+				ss.str("");
+				ss << "read_dense_binary(), dense format incomplete record: error skipping values for row  " << i << "...continuing ";
+				cout << ss.str();
+				break;
+			}
+			row_names.push_back(name);
+		}
+
+		in.close();
+		in.open(filename.c_str(), ifstream::binary);
+
+		//resize the matrix now that we know big it should be
+		matrix.resize(row_names.size(), col_names.size());
+		//seek back to the first row
+		in.seekg(begin_rows, ios_base::beg);
+
+		for (int i=0;i<row_names.size();i++)
+		{
+			//skip the name (and its size int)
+			in.seekg(sizeof(int) + row_names[i].size(), ios_base::cur);
+			for (int j = 0; j < col_names.size(); j++)
+			{
+				if (in.bad())
+				{
+					ss.str("");
+					ss << "read_dense_binary(), dense format incomplete record: error reading row,col value  " << i << "," << j << "...continuing ";
+					cout << ss.str();
+					break;
+				}
+				in.read((char*)&(data), sizeof(data));
+				matrix(i,j) = data;
+			}
+		}
+	}
+}
+
+void read_binary_matrix_header(const string& filename, int& tmp1, int& tmp2, int& tmp3)
+{
+	stringstream ss;
+	ifstream in;
+	in.open(filename.c_str(), ifstream::binary);
+	if (in.bad())
+	{
+		ss.str("");
+		ss << "pest_utils::read_binary_matrix_header() error opening binary file " << filename << " for reading";
+		throw runtime_error(ss.str());
+	}
+	in.read((char*)&tmp1, sizeof(tmp1));
+	in.read((char*)&tmp2, sizeof(tmp2));
+	in.read((char*)&tmp3, sizeof(tmp3));
+	if (in.bad())
+	{
+		ss.str("");
+		ss << "pest_utils::read_binary_matrix_header() error header from binary file " << filename << " for reading";
+		throw runtime_error(ss.str());
+	}
+
+	in.close();
+
+
+}
+
+bool read_binary(const string& filename, vector<string>& row_names, vector<string>& col_names, Eigen::MatrixXd& matrix)
+{
+	int tmp1 = 0, tmp2 = 0, tmp3 = 0;
+
+	try
+	{
+		read_binary_matrix_header(filename, tmp1, tmp2, tmp3);
+	}
+	catch (exception &e)
+	{
+		throw runtime_error("error reading binary matrix file header " + filename + e.what());
+	}
+	catch (...)
+	{
+		throw runtime_error("error reading binary matrix file header " + filename);
+	}
+
+	if ((tmp1 == 0) && (tmp2 < 0) && (tmp3 < 0) && (tmp2 == tmp3))
+	{
+		read_dense_binary(filename, row_names, col_names, matrix);
+		return true;
+	}
+	else
+	{
+		Eigen::SparseMatrix<double> smatrix;
+		bool is_new_format = read_binary(filename, row_names, col_names, smatrix);
+		matrix = Eigen::MatrixXd(smatrix);
+		return is_new_format;
+	}
+}
+
+
+bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::SparseMatrix<double> &matrix)
+{
+	stringstream ss;
+	ifstream in;
+	in.open(filename.c_str(), ifstream::binary);
+	if (in.bad())
+	{
+		ss.str("");
+		ss << "pest_utils::read_binary() error opening binary file " << filename << " for reading";
 		throw runtime_error(ss.str());
 	}
 
@@ -740,21 +952,20 @@ bool read_binary(const string &filename, vector<string> &row_names, vector<strin
 	// read header
 	in.read((char*)&n_par, sizeof(n_par));
 	in.read((char*)&n_obs_and_pi, sizeof(n_obs_and_pi));
+	in.read((char*)&n_nonzero, sizeof(n_nonzero));
 	
 	bool is_new_format = false;
+
+	
 	if (n_par > 0)
 	{
 		is_new_format = true;
 		char col_name[200];
 		char row_name[200];
 
-
 		if (n_par > 100000000)
 			throw runtime_error("pest_utils::read_binary() failed sanity check: npar > 100 mil");
-
-		////read number nonzero elements in jacobian (observations + prior information)
-		in.read((char*)&n_nonzero, sizeof(n_nonzero));
-
+	
 		if ((n_par == 0) || (n_obs_and_pi == 0) || (n_nonzero == 0))
 		{
 			throw runtime_error("pest_utils::read_binary() npar, nobs and/or nnz is zero");
@@ -820,8 +1031,7 @@ bool read_binary(const string &filename, vector<string> &row_names, vector<strin
 		if (n_par > 100000000)
 			throw runtime_error("pest_utils::read_binary() failed sanity check: npar > 100 mil");
 
-		////read number nonzero elements in jacobian (observations + prior information)
-		in.read((char*)&n_nonzero, sizeof(n_nonzero));
+		
 
 		if ((n_par == 0) || (n_obs_and_pi == 0) || (n_nonzero == 0))
 		{
@@ -881,13 +1091,8 @@ bool read_binary(const string &filename, vector<string> &row_names, vector<strin
 	return is_new_format;
 }
 
-bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::MatrixXd &matrix)
-{
-	Eigen::SparseMatrix<double> smatrix;
-	bool is_new_format = read_binary(filename, row_names, col_names, smatrix);
-	matrix = Eigen::MatrixXd(smatrix);
-	return is_new_format;
-}
+
+
 
 void save_binary(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix)
 {
@@ -1041,8 +1246,8 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 }
 
 
-ExternalCtlFile::ExternalCtlFile(ofstream& _f_rec, const string& _line, bool _cast) :
-	f_rec(_f_rec), cast(_cast), line(_line), delim(","), missing_val(""), filename(""),
+ExternalCtlFile::ExternalCtlFile(const string& _line, bool _cast) :
+	cast(_cast), line(_line), delim(","), missing_val(""), filename(""),
 	index_col_name("")
 {
 }
@@ -1155,7 +1360,7 @@ map<string, string> pest_utils::ExternalCtlFile::get_row_map(int idx, vector<str
 }
 
 
-void ExternalCtlFile::read_file()
+void ExternalCtlFile::read_file(ofstream& f_rec)
 {	
 	parse_control_record();
 	string delim_upper = upper_cp(delim);
@@ -1182,6 +1387,22 @@ void ExternalCtlFile::read_file()
 	header_line = upper_cp(org_header_line);
 	f_rec << "...header line: " << header_line << endl;
 	tokenize(header_line, col_names, delim,false);
+	for (auto& t : col_names)
+	{
+		bool cleaned = false;
+		for (auto& c : t)
+		{
+			if ((c < 32) || (c > 127))
+			{
+				c = ' ';
+				cleaned = true;
+			}
+		}
+		if (cleaned)
+		{
+			strip_ip(t);
+		}
+	}
 	int hsize = col_names.size();
 	set<string> tset;
 	tset.insert(col_names.begin(), col_names.end());
@@ -1450,6 +1671,50 @@ string get_time_string_short()
 	strftime(buffer, 80, "%m/%d %H:%M:%S", timeinfo);
 	string t_str(buffer);
 	return t_str;
+}
+
+int quit_file_found()
+{
+    ifstream i(QUIT_FILENAME);
+    int itoken = 0;
+    if (i.good()) {
+        string line;
+        getline(i, line);
+        vector<string> tokens;
+        tokenize(line, tokens);
+        if (tokens.size() > 0) {
+
+            try {
+
+                convert_ip(tokens[0], itoken);
+            }
+            catch (...) {
+                itoken = 0;
+            }
+            if (itoken == 3)
+            {
+                cout << "pest.stp file with '3' found, pausing not supported...continuing" << endl;
+                return 0;
+            }
+
+            i.close();
+            return itoken;
+        }
+    }
+    i.close();
+    return itoken;
+}
+
+bool try_remove_quit_file()
+{
+    try {
+        remove(QUIT_FILENAME.c_str());
+    }
+    catch(...)
+    {
+        return false;
+    }
+    return true;
 }
 
 

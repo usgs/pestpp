@@ -8,6 +8,7 @@
 #include "CoinOslFactorization.hpp"
 #include "CoinOslC.h"
 #include "CoinFinite.hpp"
+#include <climits>
 #define GO_DENSE 70
 #define GO_DENSE_RATIO 1.8
 int c_ekkclco(const EKKfactinfo *fact,int *hcoli,
@@ -1378,7 +1379,7 @@ static void c_ekkmltf(const EKKfactinfo *fact,double *dluval, int *hcoli,
     }
   }
 } /* c_ekkmltf */
-int c_ekklfct( register EKKfactinfo *fact)
+int c_ekklfct( EKKfactinfo *fact)
 {
   const int nrow	= fact->nrow;
   int ninbas = fact->xcsadr[nrow+1]-1;
@@ -1909,7 +1910,7 @@ static void c_ekk_sort2(int * key , double * array2,int number)
 #ifndef LONG_MAX
 #define LONG_MAX 0x7fffffff;
 #endif
-  int last=-LONG_MAX;
+  int last=-INT_MAX;
   for (j=0;j<number;j++) {
     if (key[j]>=last) {
       last=key[j];
@@ -2607,7 +2608,7 @@ inline void c_ekkclcp2(const int *hcol, const double *dels, const int * mrstrt,
     }
   }
 } /* c_ekkclcp */
-int c_ekkslcf( register const EKKfactinfo *fact)
+int c_ekkslcf(const EKKfactinfo *fact)
 {
   int * hrow = fact->xeradr;
   int * hcol = fact->xecadr;

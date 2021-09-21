@@ -165,7 +165,8 @@ const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo
 	end =  rhs.parameter2group.end();
 	for (; it != end; ++it) {
 		it_find = old2new.find((*it).second);
-		parameter2group[(*it).first] = (*it_find).second;
+		if (it_find != old2new.end())
+			parameter2group[(*it).first] = (*it_find).second;
 	}
 	return *this;
 }
@@ -307,6 +308,11 @@ Parameters ParameterInfo::get_init_value(const vector<string> &keys) const
 	return init_value;
 }
 
+void PestppOptions::rectify_ies_da_args()
+{
+	for (auto& a : passed_da_ies_args)
+		passed_args.emplace(a);
+}
 
 map<string,PestppOptions::ARG_STATUS> PestppOptions::parse_plusplus_line(const string& line)
 {
@@ -342,15 +348,16 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 
 	string value = upper_cp(org_value);
 		
-	if (value.size() > 0)
-		if (passed_args.find(key) != passed_args.end())
-		{
-			//throw PestParsingError(line, "Duplicate key word \"" + key + "\", possibly through an alias");
-			//cout << "parse_plusplus_line() Error: Duplicate key word " << key << ", possibly through an alias" << endl;
-			return ARG_STATUS::ARG_DUPLICATE;
-		}
-		passed_args.insert(key);
-		arg_map[key] = value;
+	if (value.size() == 0)
+		return ARG_STATUS::ARG_INVALID;
+
+	if (passed_args.find(key) != passed_args.end())
+	{
+		//throw PestParsingError(line, "Duplicate key word \"" + key + "\", possibly through an alias");
+		//cout << "parse_plusplus_line() Error: Duplicate key word " << key << ", possibly through an alias" << endl;
+		return ARG_STATUS::ARG_DUPLICATE;
+	}
+	arg_map[key] = value;
 		
 
 	if (key=="MAX_N_SUPER"){
@@ -502,6 +509,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		convert_ip(value, overdue_giveup_minutes);
 	}
+	else if (key == "YAMR_POLL_INTERVAL")
+	{
+	convert_ip(value, worker_poll_interval);
+	}
 	else if (key == "CONDOR_SUBMIT_FILE")
 	{
 		//convert_ip(value, condor_submit_file);
@@ -586,7 +597,14 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 
 	else if (key == "GLOBAL_OPT")
 	{
-		if (value == "DE") global_opt = OPT_DE;
+	if (value == "DE") global_opt = OPT_DE;
+	else if (value == "MOEA") global_opt = OPT_MOEA;
+	else
+		throw runtime_error(value + "is not a supported global optimization option");
+	}
+	else if (key == "MOEA_NAME")
+	{
+	convert_ip(value, moea_name);
 	}
 	else if (key == "DE_F")
 	{
@@ -713,219 +731,8 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		opt_include_bnd_pi = pest_utils::parse_string_arg_to_bool(value);
 	}
 
-	else if ((key == "IES_PAR_EN") || (key == "IES_PARAMETER_ENSEMBLE"))
-	{
-		passed_args.insert("IES_PARAMETER_ENSEMBLE");
-		passed_args.insert("IES_PAR_EN");
-		//convert_ip(value, ies_par_csv);
-		ies_par_csv = org_value;
-	}
-	else if ((key == "IES_OBS_EN") || (key == "IES_OBSERVATION_ENSEMBLE"))
-	{
-		passed_args.insert("IES_OBSERVATION_ENSEMBLE");
-		passed_args.insert("IES_OBS_EN");
-		//convert_ip(value, ies_obs_csv);
-		ies_obs_csv = org_value;
-	}
-	else if ((key == "IES_RESTART_PARAMETER_ENSEMBLE") || (key == "IES_RESTART_PAR_EN"))
-	{
-		passed_args.insert("IES_RESTART_PARAMETER_ENSEMBLE");
-		passed_args.insert("IES_RESTART_PAR_EN");
-		//convert_ip(value, ies_obs_restart_csv);
-		ies_par_restart_csv = org_value;
-	}
-	else if ((key == "IES_RESTART_OBSERVATION_ENSEMBLE") || (key == "IES_RESTART_OBS_EN"))
-	{
-		passed_args.insert("IES_RESTART_OBSERVATION_ENSEMBLE");
-		passed_args.insert("IES_RESTART_OBS_EN");
-		//convert_ip(value, ies_obs_restart_csv);
-		ies_obs_restart_csv = org_value;
-	}
-
-	else if ((key == "IES_USE_APPROXIMATE_SOLUTION") || (key == "IES_USE_APPROX"))
-	{
-		passed_args.insert("IES_USE_APPROXIMATE_SOLUTION");
-		passed_args.insert("IES_USE_APPROX");
-		ies_use_approx = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_LAMBDA_MULTS")
-	{
-		ies_lam_mults.clear();
-		vector<string> tok;
-		tokenize(value, tok, ",");
-		for (const auto &iscale : tok)
-		{
-			ies_lam_mults.push_back(convert_cp<double>(iscale));
-		}
-	}
-	else if ((key == "IES_INIT_LAM") || (key == "IES_INITIAL_LAMBDA"))
-	{
-		passed_args.insert("IES_INIT_LAM");
-		passed_args.insert("IES_INITIAL_LAMBDA");
-		convert_ip(value, ies_init_lam);
-	}
-	else if (key == "IES_USE_APPROX")
-	{
-		convert_ip(value, ies_use_approx);
-	}
-	else if (key == "IES_SUBSET_SIZE")
-	{
-		convert_ip(value, ies_subset_size);
-	}
-	else if  ((key == "IES_REG_FACTOR") || (key == "IES_REG_FAC"))
-	{
-		passed_args.insert("IES_REG_FACTOR");
-		passed_args.insert("IES_REG_FAC");
-		convert_ip(value, ies_reg_factor);
-	}
-	else if (key == "IES_VERBOSE_LEVEL")
-	{
-		convert_ip(value, ies_verbose_level);
-	}
-	else if (key == "IES_USE_PRIOR_SCALING")
-	{
-		ies_use_prior_scaling = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_NUM_REALS")
-	{
-		convert_ip(value, ies_num_reals);
-	}
-	else if (key == "IES_BAD_PHI")
-	{
-		convert_ip(value, ies_bad_phi);
-	}
-	else if (key == "IES_BAD_PHI_SIGMA")
-	{
-		convert_ip(value, ies_bad_phi_sigma);
-	}
-	else if ((key == "IES_INCLUDE_BASE") || (key == "IES_ADD_BASE"))
-	{
-		passed_args.insert("IES_INCLUDE_BASE");
-		passed_args.insert("IES_ADD_BASE");
-		ies_include_base = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_USE_EMPIRICAL_PRIOR")
-	{
-		ies_use_empirical_prior = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_GROUP_DRAWS")
-	{
-		ies_group_draws = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_ENFORCE_BOUNDS")
-	{
-		ies_enforce_bounds = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if ((key == "IES_SAVE_BINARY") || (key == "SAVE_BINARY"))
-	{
-		passed_args.insert("IES_SAVE_BINARY");
-		passed_args.insert("SAVE_BINARY");
-		ies_save_binary = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "PAR_SIGMA_RANGE")
-	{
-		convert_ip(value, par_sigma_range);
-	}
-	else if (key == "YAMR_POLL_INTERVAL") 
-	{
-		convert_ip(value, worker_poll_interval);
-	}
-	else if (key == "IES_LOCALIZER")
-	{
-		//convert_ip(value, ies_localizer);
-		ies_localizer = org_value;
-	}
-	else if (key == "IES_ACCEPT_PHI_FAC")
-	{
-		convert_ip(value, ies_accept_phi_fac);
-	}
-	else if (key == "IES_LAMBDA_INC_FAC")
-	{
-		convert_ip(value, ies_lambda_inc_fac);
-	}
-	else if (key == "IES_LAMBDA_DEC_FAC")
-	{
-		convert_ip(value, ies_lambda_dec_fac);
-	}
-	else if ((key == "IES_SAVE_LAMBDA_EN") || (key == "IES_SAVE_LAMBDA_ENSEMBLES"))
-	{
-		passed_args.insert("IES_SAVE_LAMBDA_EN");
-		passed_args.insert("IES_SAVE_LAMBDA_ENSEMBLES");
-		ies_save_lambda_en = pest_utils::parse_string_arg_to_bool(value);
-	}
 	
-	else if (key == "IES_SUBSET_HOW")
-	{
-		convert_ip(value,ies_subset_how);
-	}
-	else if (key == "IES_LOCALIZE_HOW")
-	{
-		convert_ip(value, ies_localize_how);
-	}
-	else if (key == "IES_NUM_THREADS")
-	{
-		convert_ip(value, ies_num_threads);
-	}
-	else if (key == "IES_DEBUG_FAIL_SUBSET")
-	{
-		ies_debug_fail_subset = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_DEBUG_FAIL_REMAINDER")
-	{
-		ies_debug_fail_remainder = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_DEBUG_BAD_PHI")
-	{
-		ies_debug_bad_phi = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_DEBUG_UPGRADE_ONLY")
-	{
-		ies_debug_upgrade_only = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_DEBUG_HIGH_SUBSET_PHI")
-	{
-		ies_debug_high_subset_phi = pest_utils::parse_string_arg_to_bool(value);;
-	}
-	else if (key == "IES_DEBUG_HIGH_UPGRADE_PHI")
-	{
-		ies_debug_high_upgrade_phi = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_CSV_BY_REALS")
-	{
-		ies_csv_by_reals = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_AUTOADALOC")
-	{
-		ies_autoadaloc = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_AUTOADALOC_SIGMA_DIST")
-	{
-		convert_ip(value, ies_autoadaloc_sigma_dist);
-	}
-	else if (key == "IES_ENFORCE_CHGLIM")
-	{
-		ies_enforce_chglim = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_CENTER_ON")
-	{
-		convert_ip(value, ies_center_on);
-	}
-	else if (key == "IES_NO_NOISE")
-	{
-		ies_no_noise = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_DROP_CONFLICTS")
-	{
-		ies_drop_conflicts = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_SAVE_RESCOV")
-	{
-		ies_save_rescov = pest_utils::parse_string_arg_to_bool(value);
-	}
-	else if (key == "IES_PDC_SIGMA_DISTANCE")
-	{
-		convert_ip(value, ies_pdc_sigma_distance);
-	}
+	
 	else if (key == "GSA_METHOD")
 	{
 		convert_ip(value, gsa_method);
@@ -970,19 +777,425 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		debug_parse_only = pest_utils::parse_string_arg_to_bool(value);
 	
 	}
-	
-	
-	else if (!assign_value_by_key_continued(key, value))
+	else if (key == "PAR_SIGMA_RANGE")
 	{
-
-		//throw PestParsingError(line, "Invalid key word \"" + key +"\"");
-		return ARG_STATUS::ARG_NOTFOUND;
+	convert_ip(value, par_sigma_range);
 	}
+    else if (key == "ENSEMBLE_OUTPUT_PRECISION")
+    {
+        convert_ip(value, ensemble_output_precision);
+    }
+	
+	else if ((!assign_value_by_key_continued(key, value, org_value)) && 
+	(!assign_value_by_key_sqp(key, value, org_value)) &&
+	(!assign_mou_value_by_key(key, value, org_value)) && 
+	(!assign_ies_value_by_key(key, value, org_value)))
+	{
+		//special treatment of the da args...
+		if (!assign_da_value_by_key(key, value, org_value))
+		{
+			passed_args.insert(key);
+			return ARG_STATUS::ARG_NOTFOUND;
+
+		}
+			
+	}
+	passed_args.insert(key);
+
 	return ARG_STATUS::ARG_ACCEPTED;
 }
 
 
-bool PestppOptions::assign_value_by_key_continued(const string& key, const string& value)
+bool PestppOptions::assign_ies_value_by_key(const string& key, const string& value, const string& org_value)
+{
+	if ((use_da_args) && (key.find("IES") != string::npos))
+	{
+		string da_key = "DA" + key.substr(3, key.size());
+		// if the same da arg has been passed already, then we have already set 
+		//the value in the ies arg for the da arg and the current arg, 
+		//while valid, should not be used.
+		if (passed_args.find(da_key) != passed_args.end())
+			return true;
+	}
+	if ((key == "IES_PAR_EN") || (key == "IES_PARAMETER_ENSEMBLE"))
+	{
+	passed_args.insert("IES_PARAMETER_ENSEMBLE");
+	passed_args.insert("IES_PAR_EN");
+	//convert_ip(value, ies_par_csv);
+	ies_par_csv = org_value;
+	return true;
+	}
+	else if ((key == "IES_OBS_EN") || (key == "IES_OBSERVATION_ENSEMBLE"))
+	{
+	passed_args.insert("IES_OBSERVATION_ENSEMBLE");
+	passed_args.insert("IES_OBS_EN");
+	//convert_ip(value, ies_obs_csv);
+	ies_obs_csv = org_value;
+	return true;
+	}
+	else if ((key == "IES_RESTART_PARAMETER_ENSEMBLE") || (key == "IES_RESTART_PAR_EN"))
+	{
+	passed_args.insert("IES_RESTART_PARAMETER_ENSEMBLE");
+	passed_args.insert("IES_RESTART_PAR_EN");
+	//convert_ip(value, ies_obs_restart_csv);
+	ies_par_restart_csv = org_value;
+	return true;
+	}
+	else if ((key == "IES_RESTART_OBSERVATION_ENSEMBLE") || (key == "IES_RESTART_OBS_EN"))
+	{
+	passed_args.insert("IES_RESTART_OBSERVATION_ENSEMBLE");
+	passed_args.insert("IES_RESTART_OBS_EN");
+	//convert_ip(value, ies_obs_restart_csv);
+	ies_obs_restart_csv = org_value;
+	return true;
+	}
+
+    else if ((key == "IES_WEIGHTS_ENSEMBLE") || (key == "IES_WEIGHTS_EN"))
+    {
+        passed_args.insert("IES_WEIGHTS_ENSEMBLE");
+        passed_args.insert("IES_WEIGHTS_EN");
+        //convert_ip(value, ies_obs_restart_csv);
+        ies_weights_csv = org_value;
+        return true;
+    }
+
+	else if ((key == "IES_USE_APPROXIMATE_SOLUTION") || (key == "IES_USE_APPROX"))
+	{
+	passed_args.insert("IES_USE_APPROXIMATE_SOLUTION");
+	passed_args.insert("IES_USE_APPROX");
+	ies_use_approx = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_LAMBDA_MULTS")
+	{
+	ies_lam_mults.clear();
+	vector<string> tok;
+	tokenize(value, tok, ",");
+	for (const auto& iscale : tok)
+	{
+		ies_lam_mults.push_back(convert_cp<double>(iscale));
+	}
+	return true;
+	}
+
+	else if ((key == "IES_INIT_LAM") || (key == "IES_INITIAL_LAMBDA"))
+	{
+	passed_args.insert("IES_INIT_LAM");
+	passed_args.insert("IES_INITIAL_LAMBDA");
+	convert_ip(value, ies_init_lam);
+	return true;
+	}
+	else if (key == "IES_USE_APPROX")
+	{
+	convert_ip(value, ies_use_approx);
+	return true;
+	}
+	else if (key == "IES_SUBSET_SIZE")
+	{
+	convert_ip(value, ies_subset_size);
+	return true;
+	}
+	else if ((key == "IES_REG_FACTOR") || (key == "IES_REG_FAC"))
+	{
+	passed_args.insert("IES_REG_FACTOR");
+	passed_args.insert("IES_REG_FAC");
+	convert_ip(value, ies_reg_factor);
+	return true;
+	}
+	else if (key == "IES_VERBOSE_LEVEL")
+	{
+	convert_ip(value, ies_verbose_level);
+	return true;
+	}
+	else if (key == "IES_USE_PRIOR_SCALING")
+	{
+	ies_use_prior_scaling = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+
+	else if (key == "IES_NUM_REALS")
+	{
+	convert_ip(value, ies_num_reals);
+	return true;
+	}
+	else if (key == "IES_BAD_PHI")
+	{
+	convert_ip(value, ies_bad_phi);
+	return true;
+	}
+	else if (key == "IES_BAD_PHI_SIGMA")
+	{
+	convert_ip(value, ies_bad_phi_sigma);
+	return true;
+	}
+	else if ((key == "IES_INCLUDE_BASE") || (key == "IES_ADD_BASE"))
+	{
+	passed_args.insert("IES_INCLUDE_BASE");
+	passed_args.insert("IES_ADD_BASE");
+	ies_include_base = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_USE_EMPIRICAL_PRIOR")
+	{
+	ies_use_empirical_prior = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_GROUP_DRAWS")
+	{
+	ies_group_draws = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_ENFORCE_BOUNDS")
+	{
+	ies_enforce_bounds = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if ((key == "IES_SAVE_BINARY") || (key == "SAVE_BINARY"))
+	{
+	passed_args.insert("IES_SAVE_BINARY");
+	passed_args.insert("SAVE_BINARY");
+	save_binary = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}	
+	else if (key == "IES_LOCALIZER")
+	{
+	//convert_ip(value, ies_localizer);
+	ies_localizer = org_value;
+	return true;
+	}
+	else if (key == "IES_ACCEPT_PHI_FAC")
+	{
+	convert_ip(value, ies_accept_phi_fac);
+	return true;
+	}
+	else if (key == "IES_LAMBDA_INC_FAC")
+	{
+	convert_ip(value, ies_lambda_inc_fac);
+	return true;
+	}
+	else if (key == "IES_LAMBDA_DEC_FAC")
+	{
+	convert_ip(value, ies_lambda_dec_fac);
+	return true;
+	}
+	else if ((key == "IES_SAVE_LAMBDA_EN") || (key == "IES_SAVE_LAMBDA_ENSEMBLES"))
+	{
+	passed_args.insert("IES_SAVE_LAMBDA_EN");
+	passed_args.insert("IES_SAVE_LAMBDA_ENSEMBLES");
+	ies_save_lambda_en = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_SUBSET_HOW")
+	{
+	convert_ip(value, ies_subset_how);
+	return true;
+	}
+	else if (key == "IES_LOCALIZE_HOW")
+	{
+	convert_ip(value, ies_localize_how);
+	return true;
+	}
+	else if (key == "IES_NUM_THREADS")
+	{
+	convert_ip(value, ies_num_threads);
+	return true;
+	}
+	else if (key == "IES_DEBUG_FAIL_SUBSET")
+	{
+	ies_debug_fail_subset = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_DEBUG_FAIL_REMAINDER")
+	{
+	ies_debug_fail_remainder = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_DEBUG_BAD_PHI")
+	{
+	ies_debug_bad_phi = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_DEBUG_UPGRADE_ONLY")
+	{
+	ies_debug_upgrade_only = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_DEBUG_HIGH_SUBSET_PHI")
+	{
+	ies_debug_high_subset_phi = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_DEBUG_HIGH_UPGRADE_PHI")
+	{
+	ies_debug_high_upgrade_phi = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_CSV_BY_REALS")
+	{
+	ies_csv_by_reals = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_AUTOADALOC")
+	{
+	ies_autoadaloc = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_AUTOADALOC_SIGMA_DIST")
+	{
+	convert_ip(value, ies_autoadaloc_sigma_dist);
+	return true;
+	}
+	else if (key == "IES_ENFORCE_CHGLIM")
+	{
+	ies_enforce_chglim = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_CENTER_ON")
+	{
+	convert_ip(value, ies_center_on);
+	return true;
+	}
+	else if (key == "IES_NO_NOISE")
+	{
+	ies_no_noise = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_DROP_CONFLICTS")
+	{
+	ies_drop_conflicts = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_SAVE_RESCOV")
+	{
+	ies_save_rescov = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_PDC_SIGMA_DISTANCE")
+	{
+	convert_ip(value, ies_pdc_sigma_distance);
+	return true;
+	}
+	else if (key == "IES_USE_MDA")
+	{
+	ies_use_mda = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_MDA_INIT_FAC")
+	{
+	convert_ip(value, ies_mda_init_fac);
+	return true;
+	}
+	else if (key == "IES_MDA_DEC_FAC")
+	{
+	convert_ip(value, ies_mda_dec_fac);
+	return true;
+	}
+	else if ((key == "IES_LOC_TYPE") || (key == "IES_LOCALIZATION_TYPE"))
+	{
+	passed_args.insert("IES_LOC_TYPE");
+	passed_args.insert("IES_LOCALIZATION_TYPE");
+	convert_ip(value, ies_loc_type);
+	return true;
+	}
+	else if (key == "IES_UPGRADES_IN_MEMORY")
+	{
+	ies_upgrades_in_memory = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+	else if (key == "IES_ORDERED_BINARY")
+	{
+	ies_ordered_binary = pest_utils::parse_string_arg_to_bool(value);
+	return true;
+	}
+    else if (key == "IES_MULTIMODAL_ALPHA")
+    {
+        convert_ip(value,ies_multimodal_alpha);
+        return true;
+    }
+
+
+
+	return false;
+}
+
+bool PestppOptions::assign_da_value_by_key(const string& key, const string& value, const string& org_value)
+{
+	//DA parameters
+	
+	if (key == "DA_PARAMETER_CYCLE_TABLE")
+	{
+		da_par_cycle_table = org_value;
+		return true;
+	}
+	else if (key == "DA_OBSERVATION_CYCLE_TABLE")
+	{
+		da_obs_cycle_table = org_value;
+		return true;
+	}
+	else if (key == "DA_WEIGHT_CYCLE_TABLE")
+	{
+		da_weight_cycle_table = org_value;
+		return true;
+	}
+	else if (key == "DA_HOTSTART_CYCLE")
+	{
+		convert_ip(value, da_hotstart_cycle);
+		return true;
+	}
+	else if (key == "DA_STOP_CYCLE")
+    {
+        convert_ip(value, da_stop_cycle);
+        return true;
+    }
+    else if (key == "DA_USE_SIMULATED_STATES")
+    {
+        da_use_simulated_states = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
+	//any additional da specific args must be before here!
+	//some hackery!
+	else
+	{
+		//
+		//if (index != string::npos)
+		set<string> ies_da_args;
+		if (key.substr(0,2) == "DA")
+		{
+			string ies_key = "IES" + key.substr(2, key.size());
+			//temp remove the ies arg if it has been found..
+			bool already_found = false;
+			if (passed_args.find(ies_key) != passed_args.end())
+			{
+				passed_args.erase(ies_key);
+				already_found = true;
+			}
+
+			bool ies_accepted = assign_ies_value_by_key(ies_key, value, org_value);
+			if (ies_accepted)
+			{
+				//passed_args.erase(ies_key);
+				//passed_args.emplace(key);
+				passed_da_ies_args.emplace(ies_key);
+			}
+			if (already_found)
+			{
+				passed_args.emplace(ies_key);
+			}
+			return ies_accepted;
+
+		}
+
+		return false;
+	}
+
+	
+	
+	
+	
+}
+
+
+bool PestppOptions::assign_value_by_key_continued(const string& key, const string& value, const string& org_value)
 {
 	// This method was added as a workaround for a compiler limit of at most 128 nesting levels (MSVC); no more else if blocks could be added to assign_value_by_key()
 	if (key == "PANTHER_AGENT_RESTART_ON_ERROR")
@@ -1011,11 +1224,17 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		glm_iter_mc = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	
 	else if (key == "PANTHER_DEBUG_LOOP")
 	{
 		panther_debug_loop = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+	else if (key == "DEBUG_CHECK_PAR_EN_CONSISTENCY")
+	{
+		debug_check_paren_consistency = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}	
 	else if (key == "PANTHER_AGENT_FREEZE_ON_FAIL")
 	{
 		panther_debug_fail_freeze = pest_utils::parse_string_arg_to_bool(value);
@@ -1046,10 +1265,209 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		convert_ip(value, num_tpl_ins_threads);
 		return true;
 	}
+	else if (key == "PANTHER_TRANSFER_ON_FINISH")
+    {
+        panther_transfer_on_finish.clear();
+        vector<string> tokes;
+        tokenize(org_value, tokes, ",");
+        for (const auto& toke: tokes)
+        {
+            panther_transfer_on_finish.push_back(strip_cp(toke));
+        }
+        return true;
+    }
+    else if (key == "PANTHER_TRANSFER_ON_FAIL")
+    {
+        panther_transfer_on_fail.clear();
+        vector<string> tokes;
+        tokenize(org_value, tokes, ",");
+        for (const auto& toke: tokes)
+        {
+            panther_transfer_on_fail.push_back(strip_cp(toke));
+        }
+        return true;
+    }
 
+	
 	return false;
 }
 
+
+bool PestppOptions::assign_mou_value_by_key(const string& key, const string& value, const string& org_value)
+{
+	if (key == "MOU_GENERATOR")
+	{
+		mou_generator = org_value;
+		return true;
+	}
+
+	else if (key == "MOU_POPULATION_SIZE")
+	{
+		convert_ip(value, mou_population_size);
+		return true;
+	}
+
+	else if (key == "MOU_DV_POPULATION_FILE")
+	{
+		mou_dv_population_file = org_value;
+		return true;
+	}
+	else if (key == "MOU_OBS_POPULATION_RESTART_FILE")
+	{
+		mou_obs_population_restart_file = org_value;
+		return true;
+	}
+
+	else if (key == "MOU_OBJECTIVES")
+	{
+	
+		mou_objectives.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		for (const auto& obj : tok)
+		{
+			mou_objectives.push_back(upper_cp(strip_cp(obj)));
+		}
+		return true;
+	}
+	
+	else if (key == "MOU_MAX_ARCHIVE_SIZE")
+	{
+		convert_ip(value, mou_max_archive_size);
+		return true;
+	}
+
+	else if (key == "OPT_CHANCE_POINTS")
+	{
+		opt_chance_points = value;
+		return true;
+	}
+
+	else if (key == "MOU_RISK_OBJECTIVE")
+	{
+		mou_risk_obj = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if (key == "MOU_VERBOSE_LEVEL")
+	{
+		convert_ip(value, mou_verbose_level);
+		return true;
+	}
+	else if (key == "MOU_ENV_SELECTOR")
+	{
+		mou_env_selector = upper_cp(strip_cp(value));
+		return true;
+	}
+	else if (key == "MOU_MATING_SELECTOR")
+	{
+		mou_mating_selector = upper_cp(strip_cp(value));
+		return true;
+	}
+	else if (key == "MOU_CROSSOVER_PROBABILITY")
+	{
+		convert_ip(value, mou_crossover_prob);
+		return true;
+	}
+	else if (key == "MOU_MUTATION_PROBABILITY")
+	{
+		convert_ip(value, mou_mutation_prob);
+		return true;
+	}
+	else if (key == "MOU_DE_F")
+	{
+		convert_ip(value, mou_de_f);
+		return true;
+	}
+	else if (key == "MOU_SAVE_POPULATION_EVERY")
+	{
+		convert_ip(value, mou_save_population_every);
+		return true;
+	}
+	else if (key == "MOU_PSO_OMEGA")
+	{
+		convert_ip(value, mou_pso_omega);
+		return true;
+	}
+	else if (key == "MOU_PSO_SOCIAL_CONST")
+	{
+		convert_ip(value, mou_pso_social_const);
+		return true;
+	}
+	else if (key == "MOU_PSO_COGNITIVE_CONST")
+	{
+		convert_ip(value, mou_pso_cognitive_const);
+		return true;
+	}
+	else if (key == "MOU_POPULATION_SCHEDULE")
+    {
+	    mou_population_schedule = org_value;
+	    return true;
+    }
+	else if (key == "MOU_SIMPLEX_REFLECTIONS")
+	{
+		convert_ip(value, mou_simplex_reflections);
+		return true;
+	}
+	else if (key == "MOU_SIMPLEX_FACTORS")
+	{
+		mou_simplex_factors.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			mou_simplex_factors.push_back(v);
+		}
+		return true;
+	}
+	else if (key == "MOU_SIMPLEX_MUTATION")
+    {
+        mou_simplex_mutation = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
+	return false;
+}
+
+
+bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& value, const string& org_value)
+{
+	if (key == "SQP_DV_EN")
+	{
+		sqp_dv_en = org_value;
+		return true;
+	}
+
+	else if (key == "SQP_RESTART_OBS_EN")
+	{
+		sqp_obs_restart_en = org_value;
+		return true;
+	}
+	else if (key == "SQP_NUM_REALS")
+	{
+		convert_ip(value, sqp_num_reals);
+		return true;
+	}
+	else if (key == "SQP_UPDATE_HESSIAN")
+	{
+		sqp_update_hessian = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
+	else if (key == "SQP_SCALE_FACS")
+	{
+		sqp_scale_facs.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			sqp_scale_facs.push_back(v);
+		}
+	}
+	
+	return false;
+}
 
 void PestppOptions::summary(ostream& os) const
 {
@@ -1086,15 +1504,25 @@ void PestppOptions::summary(ostream& os) const
 	os << "additional_ins_delimiters: " << additional_ins_delimiters << endl;
 	os << "random_seed: " << random_seed << endl;
 	os << "num_tpl_ins_threads: " << num_tpl_ins_threads << endl;
+	os << "save_binary: " << save_binary << endl;
+    os << "ensemble_output_precision: " << ensemble_output_precision << endl;
 	
+	os << "panther_echo: " << panther_echo << endl;
 	os << "panther_agent_restart_on_error: " << panther_agent_restart_on_error << endl;
 	os << "panther_agent_no_ping_timeout_secs: " << panther_agent_no_ping_timeout_secs << endl;
 	os << "panther_debug_loop: " << panther_debug_loop << endl;
-	os << "panther_echo: " << panther_echo << endl;
+	os << "debug_check_par_en_consistency: " << debug_check_paren_consistency << endl;
+	os << "panther_agent_freeze_on_fail: " << panther_debug_fail_freeze << endl;
+	os << "panther_transfer_on_finish: " << endl;
+	for (auto& file : panther_transfer_on_finish)
+	    os << file << endl;
+    os << "panther_transfer_on_fail: " << endl;
+    for (auto& file : panther_transfer_on_fail)
+        os << file << endl;
 
-	os << endl;
+    os << endl;
 
-	os << endl << "...pestpp-glm specific options:" << endl;
+	os << "...pestpp-glm specific options:" << endl;
 	os << "max_n_super: " << max_n_super << endl;
 	os << "super_eigthresh: " << super_eigthres << endl;
 	os << "n_iter_base: " << n_iter_base << endl;
@@ -1128,20 +1556,29 @@ void PestppOptions::summary(ostream& os) const
 	os << "glm_debug_lamb_fail: " << glm_debug_lamb_fail << endl;
 	os << "glm_debug_real_fail: " << glm_debug_real_fail << endl;
 	os << "glm_accept_mc_phi: " << glm_accept_mc_phi << endl;
-	os << "glm_rebase_super: " << glm_rebase_super;
-	os << "glm_iter_mc: " << glm_iter_mc;
+	os << "glm_rebase_super: " << glm_rebase_super << endl;
+	os << "glm_iter_mc: " << glm_iter_mc << endl;
 
+//	if (global_opt == OPT_DE)
+//	{
+//		os << "global_opt: de" << endl;
+//		os << "de_f: " << de_f << endl;
+//		os << "de_cr: " << de_cr << endl;
+//		os << "de_pop_size: " << de_npopulation << endl;
+//		os << "de_max_gen: " << de_max_gen << endl;
+//		os << "de_dither_f: " << de_dither_f << endl;
+//	}
+//
+//	if (global_opt == OPT_MOEA)
+//	{
+//		os << "global_opt: MOEA" << endl;
+//		os << "de_f: " << de_f << endl;
+//		os << "de_cr: " << de_cr << endl;
+//		os << "de_pop_size: " << de_npopulation << endl;
+//		os << "de_max_gen: " << de_max_gen << endl;
+//		os << "de_dither_f: " << de_dither_f << endl;
+//	}
 
-	if (global_opt == OPT_DE)
-	{
-		os << "global_opt: de" << endl;
-		os << "de_f: " << de_f << endl;
-		os << "de_cr: " << de_cr << endl;
-		os << "de_pop_size: " << de_npopulation << endl;
-		os << "de_max_gen: " << de_max_gen << endl;
-		os << "de_dither_f: " << de_dither_f << endl;
-	}
-	
 	os << endl << "...pestpp-swp options:" << endl;
 	os << "sweep_parameter_csv_file: " << sweep_parameter_csv_file << endl;
 	os << "sweep_output_csv_file: " << sweep_output_csv_file << endl;
@@ -1174,11 +1611,53 @@ void PestppOptions::summary(ostream& os) const
 	os << "opt_direction: " << opt_direction << endl;
 	os << "opt_iter_tol: " << opt_iter_tol << endl;
 	os << "opt_recalc_fosm_every: " << opt_recalc_fosm_every << endl;
-	os << "opt_include_bnd_pi: " << opt_include_bnd_pi << endl;
+	os << "opt_chance_points: " << opt_chance_points << endl;
+	
+	
 
-	os << endl << "...pestpp-ies options:" << endl;
+	os << endl << "...pestpp-sqp options:" << endl;
+	os << "sqp_dv_en: " << sqp_dv_en << endl;
+	os << "sqp_obs_restart_en: " << sqp_obs_restart_en << endl;
+	os << "sqp_num_reals: " << sqp_num_reals << endl;
+	os << "sqp_update_hessian: " << sqp_update_hessian << endl;
+	os << "sqp_scale_facs:" << endl;
+	for (auto m : sqp_scale_facs)
+		os << "  " << m << endl;
+
+	os << endl << "...pestpp-mou options:" << endl;
+	os << "mou_generator: " << mou_generator << endl;
+	os << "mou_population_size: " << mou_population_size << endl;
+	os << "mou_dv_population_file: " << mou_dv_population_file << endl;
+	os << "mou_obs_population_restart_file: " << mou_obs_population_restart_file << endl;
+	os << "mou_objectives: " << endl;
+	for (auto obj : mou_objectives)
+		os << "  " << obj << endl;
+	os << "mou_max_archive_size: " << mou_max_archive_size << endl;
+	os << "mou_risk_objective: " << mou_risk_obj << endl;
+	os << "mou_verbose_level: " << mou_verbose_level << endl;
+	os << "mou_env_selector: " << mou_env_selector << endl;
+	os << "mou_mating_selector: " << mou_mating_selector << endl;
+	os << "mou_crossover_prob: " << mou_crossover_prob << endl;
+	os << "mou_mutation_prob: " << mou_mutation_prob << endl;
+	os << "mou_de_f: " << mou_de_f << endl;
+	os << "mou_save_population_every: " << mou_save_population_every << endl;
+	os << "mou_pso_omega: " << mou_pso_omega << endl;
+	os << "mou_pso_social_const: " << mou_pso_social_const << endl;
+	os << "mou_pso_cognitive: " << mou_pso_cognitive_const << endl;
+	os << "mou_population_schedule: " << mou_population_schedule << endl;
+	os << "mou_simplex_reflections:" << mou_simplex_reflections << endl;
+	os << "mou_simplex_factors: " << endl;
+	for (auto& f : mou_simplex_factors)
+	{
+		os << " " << f << endl;
+	}
+	os << "mou_simplex_mutation: " << mou_simplex_mutation << endl;
+
+	os << endl << "...shared pestpp-ies/pestpp-da options:" << endl;
+	os << "(note: 'da' args override 'ies' args when using pestpp-da)" << endl;
 	os << "ies_parameter_ensemble: " << ies_par_csv << endl;
 	os << "ies_observation_ensemble: " << ies_obs_csv << endl;
+	os << "ies_weights_ensemble: " << ies_weights_csv << endl;
 	os << "ies_restart_parameter_ensemble: " << ies_par_restart_csv << endl;
 	os << "ies_restart_observation_ensemble: " << ies_obs_restart_csv << endl;
 	os << "ies_use_approximate_solution: " << ies_use_approx << endl;
@@ -1199,7 +1678,6 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_use_empirical_prior: " << ies_use_empirical_prior << endl;
 	os << "ies_group_draws: " << ies_group_draws << endl;
 	os << "ies_enforce_bounds: " << ies_enforce_bounds << endl;
-	os << "ies_save_binary: " << ies_save_binary << endl;
 	os << "ies_localizer: " << ies_localizer << endl;
 	os << "ies_accept_phi_fac: " << ies_accept_phi_fac << endl;
 	os << "ies_lambda_inc_fac: " << ies_lambda_inc_fac << endl;
@@ -1223,6 +1701,14 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_drop_conflicts: " << ies_drop_conflicts << endl;
 	os << "ies_save_rescov:" << ies_save_rescov << endl;
 	os << "ies_pdc_sigma_distance: " << ies_pdc_sigma_distance << endl;
+	os << "ies_use_mda: " << ies_use_mda << endl;
+	os << "ies_mda_init_fac: " << ies_mda_init_fac << endl;
+	os << "ies_mda_dec_fac: " << ies_mda_dec_fac << endl;
+	os << "ies_localization_type: " << ies_loc_type << endl;
+	os << "ies_upgrades_in_memory: " << ies_upgrades_in_memory << endl;
+	os << "ies_ordered_binary: " << ies_ordered_binary << endl;
+	os << "ies_multimodal_alpha: " << ies_multimodal_alpha << endl;
+
 
 	os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -1233,9 +1719,15 @@ void PestppOptions::summary(ostream& os) const
 	os << "gsa_morris_delta: " <<  gsa_morris_delta << endl;
 	os << "gsa_sobol_samples: " << gsa_sobol_samples << endl;
 	os << "gsa_sobol_par_dist: " << gsa_sobol_par_dist << endl;
+	
+	os << "pestpp-da options (those not shared with pestpp-ies):" << endl;
+	os << "da_parameter_cycle_table: " << da_par_cycle_table << endl;
+	os << "da_observation_cycle_table: " << da_obs_cycle_table << endl;
+	os << "da_hotstart_cycle: " << da_hotstart_cycle << endl;
+	os << "da_stop_cycle: " << da_stop_cycle << endl;
+	os << "da_use_simulated_states: " << da_use_simulated_states << endl;
 
 	
-	os << "panther_agent_freeze_on_fail: " << panther_debug_fail_freeze << endl;
 	os << endl << endl << endl;
 }
 
@@ -1254,8 +1746,8 @@ void PestppOptions::set_defaults()
 	set_base_lambda_vec(vector<double>{ 0.1, 1.0, 10.0, 100.0, 1000.0 });
 	set_lambda_scale_vec(vector<double>{0.75, 1.0, 1.1});
 	set_global_opt(PestppOptions::GLOBAL_OPT::NONE);
-	set_de_cr(0.9);
-	set_de_f(0.8);
+	set_de_cr(0.6);
+	set_de_f(0.7);
 	set_de_dither_f(true);
 	set_de_npopulation(40);
 	set_de_max_gen(100);
@@ -1278,7 +1770,10 @@ void PestppOptions::set_defaults()
 	set_parcov_filename(string());
 	set_obscov_filename(string());
 	set_basejac_filename(string());
-	set_sweep_parameter_csv_file(string());
+    set_jac_scale(true);
+
+
+    set_sweep_parameter_csv_file(string());
 	set_sweep_output_csv_file("sweep_out.csv");
 	set_sweep_base_run(false);
 	set_sweep_forgive(false);
@@ -1286,7 +1781,7 @@ void PestppOptions::set_defaults()
 	set_tie_by_group(false);
 	set_enforce_tied_bounds(false);
 
-	set_jac_scale(true);
+
 	set_opt_obj_func("");
 	set_opt_coin_log(true);
 	set_opt_skip_final(false);
@@ -1304,13 +1799,44 @@ void PestppOptions::set_defaults()
 	set_opt_stack_size(0);
 	set_opt_par_stack("");
 	set_opt_obs_stack("");
+	set_opt_chance_points("SINGLE");
+	
 
+	set_sqp_dv_en("");
+	set_sqp_obs_restart_en("");
+	set_sqp_num_reals(-1);
+	set_sqp_update_hessian(false);
+	set_sqp_scale_facs(vector<double>{0.00001, 0.0001, 0.01, 0.1, 1.0});
+
+	set_mou_generator("DE");
+	set_mou_population_size(100);
+	set_mou_dv_population_file("");
+	set_mou_obs_population_restart_file("");
+	set_mou_objectives(vector<string>());
+	set_mou_max_archive_size(500);
+	set_mou_risk_obj(false);
+	set_mou_verbose_level(1);
+	set_mou_env_selector("NSGA");
+	set_mou_mating_selector("TOURNAMENT");
+	set_mou_crossover_probability(0.75);
+	set_mou_mutation_probability(-999);
+	set_mou_de_f(0.8);
+	set_mou_save_population_every(-1);
+	set_mou_pso_omega(0.7);
+	set_mou_pso_cognitive_const(2.0);
+	set_mou_pso_social_const(2.0);
+	set_mou_population_schedule("");
+	set_mou_simplex_reflections(10);
+	set_mou_simplex_factors(vector<double>{0.5, 0.6, 0.7, 0.8});
+    set_mou_simplex_mutation(false);
+	
 	set_ies_par_csv("");
 	set_ies_obs_csv("");
 	set_ies_obs_restart_csv("");
 	set_ies_par_restart_csv("");
+    set_ies_weights_csv("");
 	set_ies_lam_mults(vector<double>());
-	set_ies_init_lam(-999);
+	set_ies_init_lam(0.0);
 	set_ies_use_approx(true);
 	set_ies_subset_size(4);
 	set_ies_reg_factor(0.0);
@@ -1324,7 +1850,7 @@ void PestppOptions::set_defaults()
 	set_ies_group_draws(true);
 	set_ies_enforce_bounds(true);
 	set_par_sigma_range(4.0);
-	set_ies_save_binary(false);
+	set_save_binary(false);
 	set_ies_localizer("");
 	set_ies_accept_phi_fac(1.05);
 	set_ies_lambda_inc_fac(10.0);
@@ -1349,7 +1875,26 @@ void PestppOptions::set_defaults()
 	set_ies_drop_conflicts(false);
 	set_ies_save_rescov(false);
 	set_ies_pdc_sigma_distance(-1.0);
+	set_ies_use_mda(false);
+	set_ies_mda_init_fac(10);
+	set_ies_mda_dec_fac(0.5);
+	set_ies_loc_type("LOCAL");
+	set_ies_upgrades_in_memory(true);
+	set_ies_ordered_binary(true);
+    set_ies_multimodal_alpha(1.0);
+    set_ensemble_output_precision(6);
 
+	// DA parameters
+	//set_da_use_ies(false);
+	set_da_par_cycle_table("");
+	set_da_obs_cycle_table("");
+	//set_da_par_csv("");
+	//set_da_num_reals(50);
+	set_da_hotstart_cycle(0);
+    set_da_stop_cycle(1000000000);
+    set_da_use_simulated_states(true);
+
+	// End of DA parameters
 	set_gsa_method("MORRIS");
 	//many of these defaults are also redefined in gsa main
 	set_gsa_morris_p(4);
@@ -1371,13 +1916,17 @@ void PestppOptions::set_defaults()
 	set_check_tplins(true);
 	set_fill_tpl_zeros(false);
 	set_additional_ins_delimiters("");
-	set_num_tpl_ins_threads(1);
+	set_num_tpl_ins_threads(1);	
 
 	set_panther_agent_restart_on_error(false);
 	set_panther_agent_no_ping_timeout_secs(-1);
 	set_panther_debug_loop(false);
+	set_debug_check_par_en_consistency(false);
 	set_panther_debug_fail_freeze(false);
 	set_panther_echo(true);
+    set_panther_transfer_on_finish(vector<string>{});
+    set_panther_transfer_on_fail(vector<string>{});
+
 }
 
 ostream& operator<< (ostream &os, const ParameterInfo& val)
@@ -1449,6 +1998,19 @@ const ObservationRec* ObservationInfo::get_observation_rec_ptr(const string &nam
 	return ret_val;
 }
 
+ObservationRec* ObservationInfo::get_observation_rec_ptr_4_mod(const string& name)
+{
+	ObservationRec* ret_val = 0;
+	unordered_map<string, ObservationRec>::iterator p_iter;
+
+	p_iter = observations.find(name);
+	if (p_iter != observations.end()) {
+		ret_val = &((*p_iter).second);
+	}
+	return ret_val;
+}
+
+
 const ObservationGroupRec* ObservationInfo::get_group_rec_ptr(const string &name) const
 {
 	const ObservationGroupRec *ret_val = 0;
@@ -1461,7 +2023,7 @@ const ObservationGroupRec* ObservationInfo::get_group_rec_ptr(const string &name
 	return ret_val;
 }
 
-vector<string> ObservationInfo::get_groups()
+vector<string> ObservationInfo::get_groups() const
 {
 	vector<string> ogroups;
 	for (auto &g : groups)
@@ -1583,7 +2145,8 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 	if (passed_args.find(key) != passed_args.end())
 		return PestppOptions::ARG_STATUS::ARG_DUPLICATE;
 	passed_args.insert(key);
-	if (key == "NOPTMAX")
+
+	if (key == "NOPTMAX") 
 		convert_ip(value, noptmax);
 	else if (key == "RELPARMAX")
 		convert_ip(value, relparmax);
@@ -1624,6 +2187,7 @@ void ControlInfo::set_defaults()
 	/*ControlInfo() : relparmax(0.0), facparmax(0.0), facorig(0.0), phiredswh(0.0), noptmax(0),
 		phiredstp(0.0), nphistp(0), nphinored(0), relparstp(0.0), nrelpar(0), noptswitch(0),
 		splitswh(0.0), pestmode(PestMode::ESTIMATION) {}*/
+
 	facparmax = 1.1;
 	relparmax = 1.0;
 	facorig = 0.001;
@@ -1637,6 +2201,8 @@ void ControlInfo::set_defaults()
 	noptswitch = 1;
 	splitswh = 1.1;
 	pestmode = PestMode::ESTIMATION;
+	numcom = 1;
+	jacfile = 0;
 
 }
 
@@ -1687,3 +2253,22 @@ double draw_standard_normal(std::mt19937& rand_gen)
 	double r = sqrt(-2.0 * log(v1));
 	return r * sin(2.0 * pi * v2);
 }
+
+vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bound, std::mt19937& rand_gen)
+{
+	double scale = 1.0 / (rand_gen.max() - rand_gen.min() + 1.0);
+	vector<double> vals;
+	double bscale = upper_bound - lower_bound;
+	double v1;
+	for (int i = 0; i < num_reals; i++)
+	{
+		v1 = (rand_gen() - rand_gen.min()) * scale;
+		v1 = lower_bound + (v1 * bscale);
+		vals.push_back(v1);
+	}
+	return vals;
+	
+}
+
+
+

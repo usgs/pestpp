@@ -411,7 +411,7 @@ pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerA
 	if (pest_scenario.get_pestpp_options().get_glm_num_reals() > 0)
 	{
 		pfm.log_event("drawing, saving and queuing FOSM parameter realizations");
-		bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
+		bool binary = pest_scenario.get_pestpp_options().get_save_binary();
 		int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
 		
 		
@@ -464,7 +464,7 @@ pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(
 														double last_best_phi)
 {
 	int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
-	bool binary = pest_scenario.get_pestpp_options().get_ies_save_binary();
+	bool binary = pest_scenario.get_pestpp_options().get_save_binary();
 	pfm.log_event("processing FOSM realization runs");
 	ObservationEnsemble oe(&pest_scenario, rand_gen_ptr);
 	if (num_reals <= 0)
@@ -507,7 +507,7 @@ pair<ObservationEnsemble,map<string,double>> LinearAnalysis::process_fosm_reals(
 		L2PhiHandler ph(&pest_scenario, &file_manager, &oe, &pe, get_parcov_ptr(),false);
 		ph.update(oe, pe);
 		L2PhiHandler::phiType pt = L2PhiHandler::phiType::ACTUAL;
-		map<string,double>* phi_map = ph.get_phi_map(pt);
+		map<string,double>* phi_map = ph.get_phi_map_ptr(pt);
 		t = *phi_map;
 		os << endl << "  FOSM-based Monte Carlo phi summary:" << endl;
 		os << setw(15) << "realization" << setw(20) << "phi" << endl;
@@ -1153,7 +1153,7 @@ void LinearAnalysis::write_par_credible_range(ofstream &fout, string sum_filenam
 
 			fout << setw(20) << pest_utils::lower_cp(pname) << setw(20) << value << setw(20) << stdev << setw(20) <<
 				value - (2.0*stdev) << setw(20) << value + (2.0*stdev);
-			sout << pname << "," << value << "," << stdev << "," <<
+			sout << pest_utils::lower_cp(pname) << "," << value << "," << stdev << "," <<
 				value - (2.0*stdev) << "," << value + (2.0*stdev);
 
 			//posterior
@@ -1222,7 +1222,7 @@ void LinearAnalysis::write_pred_credible_range(ofstream &fout, string sum_filena
 		upper = val + (2.0 * stdev);
 		fout << setw(20) << pest_utils::lower_cp(pred.first) << setw(20) << val << setw(20) << stdev;
 		fout << setw(20) << lower << setw(20) << upper;
-		sout << pred.first << "," << val << "," << stdev;
+		sout << pest_utils::lower_cp(pred.first) << "," << val << "," << stdev;
 		sout << "," << lower << "," << upper;
 
 		val = init_final_pred_values[pred.first].second;

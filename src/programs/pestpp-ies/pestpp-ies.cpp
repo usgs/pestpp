@@ -46,8 +46,16 @@ int main(int argc, char* argv[])
 		cout << "                   by the PEST++ development team" << endl;
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-
+        auto start = chrono::steady_clock::now();
+        string start_string = get_time_string();
+        cout << "started at " << start_string << endl;
 		CmdLine cmdline(argc, argv);
+
+		if (quit_file_found())
+        {
+		    cerr << "'pest.stp' found, please remove this file " << endl;
+		    return 1;
+        }
 
 		
 		FileManager file_manager;
@@ -139,14 +147,15 @@ int main(int argc, char* argv[])
 
 		if (!restart_flag || save_restart_rec_header)
 		{
-			fout_rec << "             pestpp-ies.exe - a GLM iterative Ensemble Smoother" << endl << "for PEST(++) datasets " << endl << endl;
+			fout_rec << "             pestpp-ies - a GLM iterative Ensemble Smoother" << endl << "for PEST(++) datasets " << endl << endl;
 			fout_rec << "                 by the PEST++ developement team" << endl << endl << endl;
 			fout_rec << endl;
 			fout_rec << endl << endl << "version: " << version << endl;
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
 			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
+			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl;
+            fout_rec << "started at " << start_string << endl << endl;
 
 		}
 
@@ -157,7 +166,6 @@ int main(int argc, char* argv[])
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
-		pest_scenario.set_defaults();
 		//try {
 			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
@@ -192,12 +200,20 @@ int main(int argc, char* argv[])
 		//reset some default args for ies here:
 		PestppOptions *ppo = pest_scenario.get_pestpp_options_ptr();
 		set<string> pp_args = ppo->get_passed_args();
-		if (pp_args.find("MAX_RUN_FAIL") == pp_args.end())
-			ppo->set_max_run_fail(1);
-		if (pp_args.find("OVERDUE_GIVEUP_FAC") == pp_args.end())
-			ppo->set_overdue_giveup_fac(2.0);
-		if (pp_args.find("OVERDUE_resched_FAC") == pp_args.end())
-			ppo->set_overdue_reched_fac(1.15);
+		if (pp_args.find("MAX_RUN_FAIL") == pp_args.end()) {
+            ppo->set_max_run_fail(1);
+            fout_rec << "...resetting max_run_fail to 1" << endl;
+        }
+
+		if (pp_args.find("OVERDUE_GIVEUP_FAC") == pp_args.end()) {
+            ppo->set_overdue_giveup_fac(2.0);
+            fout_rec << "...resetting overdue_giveup_fac to 2.0" << endl;
+        }
+
+		if (pp_args.find("OVERDUE_RESCHED_FAC") == pp_args.end()) {
+            ppo->set_overdue_reched_fac(1.15);
+            fout_rec << "...resetting overdue_resched_fac to 1.15" << endl;
+        }
 		
 		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
 		{
@@ -253,25 +269,53 @@ int main(int argc, char* argv[])
 		run_manager_ptr->initialize(base_trans_seq.ctl2model_cp(cur_ctl_parameters), pest_scenario.get_ctl_observations());
 		
 		IterEnsembleSmoother ies(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
-		
-
 		ies.initialize();
+        int q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2))
+        {
+           cout << "...'pest.stp' found, quitting" << endl;
+           fout_rec << "...'pest.stp' found, quitting" << endl;
 
-		ies.iterate_2_solution();
+        }
+        else
+        {
+            if (q == 4) {
+                cout << "...pest.stp found with '4'.  run mgr has returned control, removing file." << endl;
+                fout_rec << "...pest.stp found with '4'.  run mgr has returned control, removing file." << endl;
+
+                if (!pest_utils::try_remove_quit_file()) {
+                    cout << "...error removing pest.stp file, bad times ahead..." << endl;
+                    fout_rec << "...error removing pest.stp file, bad times ahead..." << endl;
+
+                }
+            }
+            ies.iterate_2_solution();
+        }
+
 		ies.finalize();
 
 
 
 		// clean up
-		fout_rec.close();
+
 		delete run_manager_ptr;
 		string case_name = file_manager.get_base_filename();
 		file_manager.close_file("rst");
 		pest_utils::try_clean_up_run_storage_files(case_name);
 		
 		cout << endl << endl << "pestpp-ies analysis complete..." << endl;
-		cout << flush;
-		return 0;
+        fout_rec << endl << endl << "pestpp-ies analysis complete..." << endl;
+        auto end = chrono::steady_clock::now();
+        cout << "started at " << start_string << endl;
+        cout << "finished at " << get_time_string() << endl;
+        //cout << "took " << chrono::duration_cast<chrono::seconds>(end - start).count() << " seconds" << endl;
+        cout << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
+        cout << flush;
+        fout_rec << "started at " << start_string << endl;
+        fout_rec << "finished at " << get_time_string() << endl;
+        fout_rec << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
+        fout_rec.close();
+        return 0;
 #ifndef _DEBUG
 	}
 	catch (exception &e)

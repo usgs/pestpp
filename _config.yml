@@ -1,0 +1,14 @@
+plugins:
+  - jekyll-relative-links
+relative_links:
+  enabled: true
+  collections: true
+  exclude:
+    - src
+    - benchmarks
+    - bin
+include:
+  - README.md
+  - documentation/pestpp_users_manual.md
+  - documentation/cmake.md
+theme: jekyll-theme-midnight

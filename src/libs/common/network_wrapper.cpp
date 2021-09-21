@@ -308,7 +308,7 @@ string w_get_addrinfo_string(struct addrinfo *p)
 {
 	stringstream sstr;
 	void *addr;
-	char ipstr[INET6_ADDRSTRLEN];
+	
 	string ipver;
 	unsigned short port = 0;
 	// get the pointer to the address itself,
@@ -318,6 +318,7 @@ string w_get_addrinfo_string(struct addrinfo *p)
 		addr = &(ipv4->sin_addr);
 		port = ntohs(ipv4->sin_port);
 		ipver = "IPv4";
+		char ipstr[INET_ADDRSTRLEN];
 		inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
 		sstr << ipstr <<":" << port<< " (" << ipver << ")";
 	}
@@ -326,6 +327,7 @@ string w_get_addrinfo_string(struct addrinfo *p)
 		addr = &(ipv6->sin6_addr);
 		port = ntohs(ipv6->sin6_port);
 		ipver = "IPv6";
+		char ipstr[INET6_ADDRSTRLEN];
 		inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
 		sstr << "[" << ipstr <<"]:" << port << " (" << ipver << ")";
 	}

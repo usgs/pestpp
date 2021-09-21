@@ -315,6 +315,7 @@ void OutputFileWriter::scenario_report(std::ostream &os, bool report_mode)
 	os << endl;
 
 }
+void OutputFileWriter::set_pest_scenario(Pest& _pest_scenario) { pest_scenario = _pest_scenario; }
 
 void OutputFileWriter::scenario_io_report(std::ostream &os)
 {
@@ -353,14 +354,17 @@ void OutputFileWriter::scenario_io_report(std::ostream &os)
 void OutputFileWriter::scenario_pargroup_report(std::ostream &os)
 {
 	const ParameterGroupRec *grp_rec;
-
+	int grp_len = 12;
+	for (auto& par_name : pest_scenario.get_ctl_ordered_par_group_names())
+		grp_len = max((int)par_name.size(), grp_len);
+	grp_len++;
 	os << "Parameter group information" << endl;
-	os << left << setw(15) << "NAME" << right << setw(15) << "INCREMENT TYPE" << setw(25) << "DERIVATIVE INCREMENT";
+	os << left << setw(grp_len) << "NAME" << right << setw(15) << "INCREMENT TYPE" << setw(25) << "DERIVATIVE INCREMENT";
 	os << setw(25) << "INCREMENT LOWER BOUND" << setw(15) << "FORCE CENTRAL" << setw(25) << "INCREMENT MULTIPLIER" << endl;
 	for (auto &grp_name : pest_scenario.get_ctl_ordered_par_group_names())
 	{
 		grp_rec = pest_scenario.get_base_group_info().get_group_by_groupname(grp_name);
-		os << left << setw(15) << lower_cp(grp_rec->name) << right << setw(15) << grp_rec->inctyp << setw(25) << grp_rec->derinc;
+		os << left << setw(grp_len) << lower_cp(grp_rec->name) << right << setw(15) << grp_rec->inctyp << setw(25) << grp_rec->derinc;
 		os << setw(25) << grp_rec->derinclb << setw(15) << grp_rec->forcen << setw(25) << grp_rec->derincmul << endl;
 	}
 	os << endl << endl;
@@ -378,6 +382,10 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 	trans_type[1] = "fixed";
 	trans_type[2] = "tied";
 	trans_type[3] = "log";
+	int grp_len = 12;
+	for (auto& par_name : pest_scenario.get_ctl_ordered_par_group_names())
+		grp_len = max((int)par_name.size(), grp_len);
+	grp_len++;
 	int par_len = 12;
 	for (auto& par_name : pest_scenario.get_ctl_ordered_par_names())
 		par_len = max((int)par_name.size(), par_len);
@@ -385,7 +393,7 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 	os << endl << "Parameter information" << endl;
 	os << left << setw(par_len) << "NAME" << setw(10) << "TRANSFORMATION" << right << setw(20) << "CHANGE LIMIT" << setw(15) << "INITIAL VALUE";
 	os << setw(15) << "LOWER BOUND";
-	os << setw(15) << "UPPER BOUND" << setw(15) << "GROUP";
+	os << setw(15) << "UPPER BOUND" << setw(grp_len) << "GROUP";
 
 	os << setw(15) << "SCALE" << setw(15) << "OFFSET" << setw(20) << "DERIVATIVE COMMAND" << endl;
 	const ParameterRec* par_rec;
@@ -398,7 +406,7 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 		os << setw(15) << par_rec->init_value;
 		os << setw(15) << par_rec->lbnd;
 		os << setw(15) << par_rec->ubnd;
-		os << setw(15) << lower_cp(par_rec->group);
+		os << setw(grp_len) << lower_cp(par_rec->group);
 		os << setw(15) << par_rec->scale;
 		os << setw(15) << par_rec->offset;
 		os << setw(20) << par_rec->dercom << endl;
@@ -431,8 +439,12 @@ void OutputFileWriter::scenario_obs_report(std::ostream &os)
 	for (auto& obs_name : pest_scenario.get_ctl_ordered_obs_names())
 		obs_len = max((int)obs_name.size(), obs_len);
 	obs_len++;
+	int grp_len = 20;
+	for (auto& obs_name : pest_scenario.get_ctl_ordered_obs_group_names())
+		grp_len = max((int)obs_name.size(), grp_len);
+	grp_len++;
 	os << endl << "Observation information" << endl;
-	os << left << setw(obs_len) << "NAME" << right << setw(20) << "VALUE" << setw(20) << "GROUP" << setw(20) << "WEIGHT" << endl;
+	os << left << setw(obs_len) << "NAME" << right << setw(20) << "VALUE" << setw(grp_len) << "GROUP" << setw(20) << "WEIGHT" << endl;
 	const ObservationRec* obs_rec;
 	const Observations &obs = pest_scenario.get_ctl_observations();
 	for (auto &obs_name : pest_scenario.get_ctl_ordered_obs_names())
@@ -440,7 +452,7 @@ void OutputFileWriter::scenario_obs_report(std::ostream &os)
 		obs_rec = pest_scenario.get_ctl_observation_info().get_observation_rec_ptr(obs_name);
 		os << left << setw(obs_len) << lower_cp(obs_name);
 		os << right << setw(20) << obs.get_rec(obs_name);
-		os << setw(20) << lower_cp(obs_rec->group);
+		os << setw(grp_len) << lower_cp(obs_rec->group);
 		os << setw(20) << obs_rec->weight << endl;
 	}
 	os << endl << endl;
@@ -624,10 +636,15 @@ void OutputFileWriter::phi_report(std::ostream &os, int const iter, int const nr
 
 void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Observations &sim, ObservationInfo &oi)
 {
-
-	os << setw(21) << " Name" << setw(13) << " Group" << setw(21) << " Measured" << setw(21) << " Modelled" << setw(21) << " Residual" << setw(21) << " Weight" << endl;
-	//vector<string> obs_name_vec = obs.get_keys();
 	vector<string> obs_name_vec = pest_scenario.get_ctl_ordered_obs_names();
+	int nsize = 20;
+	for (auto o : obs_name_vec)
+	{
+		nsize = max(nsize, int(o.size()));
+	}
+	os << setw(nsize + 1) << " Name" << setw(13) << " Group" << setw(21) << " Measured" << setw(21) << " Modelled" << setw(21) << " Residual" << setw(21) << " Weight" << endl;
+	//vector<string> obs_name_vec = obs.get_keys();
+	
 	double obs_val, sim_val;
 	//ObservationInfo oi = pest_scenario.get_ctl_observation_info();
 	//for(vector<string>::const_iterator b = obs_name_vec.begin(),
@@ -638,7 +655,7 @@ void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Ob
 		{
 			obs_val = obs.get_rec(b);
 			sim_val = sim.get_rec(b);
-			os << " " << setw(20) << lower_cp(b)
+			os << " " << setw(nsize) << lower_cp(b)
 				<< " " << setw(12) << lower_cp(oi.get_observation_rec_ptr(b)->group)
 				<< " " << showpoint << setw(20) << obs_val
 				<< " " << showpoint << setw(20) << sim_val
@@ -683,6 +700,13 @@ void OutputFileWriter::write_opt_constraint_rei(std::ofstream &fout, int iter_no
 	//	e = prior_info_ptr->end(); b!=e; ++b)
 	vector<string> obs_name_vec = pest_scenario.get_ctl_ordered_pi_names();
 	double obs_val, residual, sim_val;
+
+	int nsize = 20;
+	for (auto& b : obs_name_vec)
+	{
+		nsize = max(nsize, int(b.size()));
+	}
+
 	for (auto &b : obs_name_vec)
 	{
 		ipi = prior_info_ptr->find(b);
@@ -690,7 +714,7 @@ void OutputFileWriter::write_opt_constraint_rei(std::ofstream &fout, int iter_no
 		obs_val = pi_rec_ptr->get_obs_value();
 		residual = pi_rec_ptr->calc_residual(pars);
 		sim_val = obs_val + residual;
-		fout << " " << setw(20) << lower_cp(b)
+		fout << " " << setw(nsize) << lower_cp(b)
 			<< " " << setw(12) << lower_cp(pi_rec_ptr->get_group())
 			<< " " << showpoint << setw(20) << obs_val
 			<< " " << showpoint << setw(20) << sim_val
@@ -733,6 +757,7 @@ void OutputFileWriter::write_rei(ofstream &fout, int iter_no, const Observations
 		<< " " << showpoint << setw(20)  << pi_rec_ptr->get_weight() << endl;
 	}
 }
+
 
 
 void OutputFileWriter::write_par(ofstream &fout, const Parameters &pars, const TranOffset &offset_tran, const TranScale &scale_tran)
@@ -937,7 +962,7 @@ void OutputFileWriter::write_jco(bool isBaseIter, string ext, Jacobian &jco)
 	{
 		stringstream ss;
 		ss << "WARNING: jacobian matrix has no non-zeros - the parameter pertubations " << endl;
-		ss << "         have no effect on the control file observations.";
+		ss << "         have no effect on the control file observations." << endl;
 		ss << "         This usually means something is not setup correctly." << endl;
 		cout << ss.str();
 		file_manager.rec_ofstream() << ss.str();

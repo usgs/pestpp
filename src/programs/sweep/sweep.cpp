@@ -213,7 +213,7 @@ void prep_sweep_output_file(Pest &pest_scenario, ofstream &csv)
 		throw runtime_error("could not open sweep_output_csv_file for writing: " +
 			pest_scenario.get_pestpp_options().get_sweep_output_csv_file());
 	}
-	csv.precision(numeric_limits<double>::digits10);
+	csv << setprecision(numeric_limits<double>::digits10);
 	csv << "run_id,input_run_id,failed_flag";
 	csv << ",phi,meas_phi,regul_phi";
 	for (auto &ogrp : pest_scenario.get_ctl_ordered_obs_group_names())
@@ -247,6 +247,7 @@ void process_sweep_runs(ofstream &csv, Pest &pest_scenario, RunManagerAbstract* 
 		if (run_manager_ptr->get_run(run_id, pars, obs))
 		{
 			PhiData phi_data = obj_func.phi_report(obs, pars, *(pest_scenario.get_regul_scheme_ptr()));
+
 			csv << ",0";
 
 			csv << ',' << phi_data.total();
@@ -293,11 +294,16 @@ int main(int argc, char* argv[])
 		cout << "             pestpp-swp - a parameteric sweep utility, version " << version << endl;
 		cout << "                     for PEST(++) datasets " << endl << endl;
 		cout << "                 by the PEST++ development team" << endl << endl << endl;
-		
+
+
 
 		CmdLine cmdline(argc, argv);
-		
-		
+
+        if (quit_file_found())
+        {
+            cerr << "'pest.stp' found, please remove this file " << endl;
+            return 1;
+        }
 
 		FileManager file_manager;
 		string filename = cmdline.ctl_file_name;
@@ -375,15 +381,14 @@ int main(int argc, char* argv[])
 		{
 			throw runtime_error("/r option not supported by sweep");
 		}
-		
-		
+
 		restart_ctl.get_restart_option() = RestartController::RestartOption::NONE;
 		file_manager.open_default_files();
-		
 
 		ofstream &fout_rec = file_manager.rec_ofstream();
 		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
-
+        auto start = chrono::steady_clock::now();
+        string start_string = get_time_string();
 		if (!restart_flag || save_restart_rec_header)
 		{
 			fout_rec << "             pestpp-swp.exe - a parameteric sweep utility" << endl << "for PEST(++) datasets " << endl << endl;
@@ -393,20 +398,21 @@ int main(int argc, char* argv[])
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 			fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl << endl;
 			fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
+			fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl;
+            fout_rec << "started at " << start_string << endl << endl;
 		}
 
 		cout << endl;
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
+
+        cout << "started at " << start_string << endl;
 		cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl << endl;
 		cout << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
 		cout << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
-		pest_scenario.set_defaults();
-
 		try {
 			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
@@ -641,10 +647,27 @@ int main(int argc, char* argv[])
 
 			cout << "done" << endl;
 			total_runs_done += run_ids.size();
+            int q = pest_utils::quit_file_found();
+            if ((q == 1) || (q == 2))
+            {
+			    cout << "'pest.stp' found, quitting" << endl;
+			    fout_rec << "'pest.stp' found, quitting" << endl;
+			    break;
+            }
+            else if (q == 4) {
+                cout << "...pest.stp found with '4'.  run mgr has returned control, removing file." << endl;
+                fout_rec << "...pest.stp found with '4'.  run mgr has returned control, removing file." << endl;
+
+                if (!pest_utils::try_remove_quit_file()) {
+                    cout << "...error removing pest.stp file, bad times ahead..." << endl;
+                    fout_rec << "...error removing pest.stp file, bad times ahead..." << endl;
+
+                }
+            }
 		}
 
 		// clean up
-		fout_rec.close();
+
 		obs_stream.close();
 		delete run_manager_ptr;
 
@@ -652,9 +675,19 @@ int main(int argc, char* argv[])
 		file_manager.close_file("rst");
 		pest_utils::try_clean_up_run_storage_files(case_name);
 
-		cout << endl << endl << "PESTPP-SWP Analysis Complete..." << endl;
-		cout << flush;
-		return 0;
+		cout << endl << endl << "pestpp-swp analysis complete..." << endl;
+        fout_rec << endl << endl << "pestpp-swp analysis complete..." << endl;
+        auto end = chrono::steady_clock::now();
+        cout << "started at " << start_string << endl;
+        cout << "finished at " << get_time_string() << endl;
+        cout << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
+        cout << flush;
+        fout_rec << "started at " << start_string << endl;
+        fout_rec << "finished at " << get_time_string() << endl;
+        fout_rec << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
+        fout_rec.close();
+
+        return 0;
 #ifndef _DEBUG
 	}
 	catch (exception &e)

@@ -2,6 +2,7 @@
 #include "RunManagerPanther.h" //needs to be first because it includes winsock2.h
 //#include <vld.h> // Memory Leak Detection using "Visual Leak Detector"
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <algorithm>
 #include "config_os.h"
@@ -49,9 +50,17 @@ int main(int argc, char* argv[])
 		cout << "                             by the PEST++ development team" << endl;
 		cout << endl << endl << "version: " << version << endl;
 		cout << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
-		
+        auto start = chrono::steady_clock::now();
+        string start_string = get_time_string();
+        cout << "started at " << start_string << endl;
 		CmdLine cmdline(argc, argv);
-		
+
+        if (quit_file_found())
+        {
+            cerr << "'pest.stp' found, please remove this file " << endl;
+            return 1;
+        }
+
 		FileManager file_manager;
 		string filename = cmdline.ctl_file_name;
 		string pathname = ".";
@@ -140,7 +149,8 @@ int main(int argc, char* argv[])
 		fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
 		fout_rec << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
 		fout_rec << "in directory: \"" << OperSys::getcwd() << "\"" << endl;
-		fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl << endl;
+		fout_rec << "on host: \"" << w_get_hostname() << "\"" << endl;
+        fout_rec << "started at " << start_string << endl << endl;
 		
 		cout << endl;
 		cout << "using control file: \"" << cmdline.ctl_file_name << "\"" << endl;
@@ -149,7 +159,6 @@ int main(int argc, char* argv[])
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
-		pest_scenario.set_defaults();
 #ifndef _DEBUG
 		try {
 #endif
@@ -368,9 +377,18 @@ int main(int argc, char* argv[])
 		file_manager.close_file("rst");
 		pest_utils::try_clean_up_run_storage_files(case_name);
 
-		cout << endl << endl << "PESTPP-OPT Analysis Complete..." << endl;
-		cout << flush;
-		return 0;
+		cout << endl << endl << "pestpp-opt analysis complete..." << endl;
+        auto end = chrono::steady_clock::now();
+        cout << "started at " << start_string << endl;
+        cout << "finished at " << get_time_string() << endl;
+        cout << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
+        cout << flush;
+        fout_rec << "started at " << start_string << endl;
+        fout_rec << "finished at " << get_time_string() << endl;
+        fout_rec << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
+        fout_rec.close();
+        cout << flush;
+        return 0;
 #ifndef _DEBUG
 	}
 	catch (exception &e)

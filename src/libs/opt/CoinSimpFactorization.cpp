@@ -2440,7 +2440,7 @@ int CoinSimpFactorization::LUupdate(int newBasicCol)
 	const int row=secRowOfU_[i];
 	const int column=colOfU_[i];
 	if ( denseVector_[column]==0.0 ) continue;
-	register const double multiplier=denseVector_[column]*invOfPivots_[row];
+	const double multiplier=denseVector_[column]*invOfPivots_[row];
 	denseVector_[column]=0.0;
 	const int rowBeg=UrowStarts_[row];
 	const int rowEnd=rowBeg+UrowLengths_[row];
