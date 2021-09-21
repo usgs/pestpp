@@ -4235,7 +4235,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	{
 		throw_em_error(string("all realizations dropped as 'bad'"));
 	}
-	if (oe.shape().first <= error_min_reals)
+	if (oe.shape().first < error_min_reals)
 	{
 		message(0, "too few active realizations:", oe.shape().first);
 		message(1, "need at least ", error_min_reals);
@@ -4757,7 +4757,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
-	if (pe.shape().first <= error_min_reals)
+	if (pe.shape().first < error_min_reals)
 	{
 		message(0, "too few active realizations:", oe.shape().first);
 		message(1, "need at least ", error_min_reals);

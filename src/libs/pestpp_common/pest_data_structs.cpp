@@ -1421,6 +1421,11 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		}
 		return true;
 	}
+	else if (key == "MOU_SIMPLEX_MUTATION")
+    {
+        mou_simplex_mutation = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
 	return false;
 }
 
@@ -1646,6 +1651,7 @@ void PestppOptions::summary(ostream& os) const
 	{
 		os << " " << f << endl;
 	}
+	os << "mou_simplex_mutation: " << mou_simplex_mutation << endl;
 
 	os << endl << "...shared pestpp-ies/pestpp-da options:" << endl;
 	os << "(note: 'da' args override 'ies' args when using pestpp-da)" << endl;
@@ -1822,6 +1828,7 @@ void PestppOptions::set_defaults()
 	set_mou_population_schedule("");
 	set_mou_simplex_reflections(10);
 	set_mou_simplex_factors(vector<double>{0.5, 0.6, 0.7, 0.8});
+    set_mou_simplex_mutation(false);
 	
 	set_ies_par_csv("");
 	set_ies_obs_csv("");

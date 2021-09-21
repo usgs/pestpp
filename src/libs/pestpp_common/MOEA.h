@@ -153,7 +153,7 @@ private:
 	vector<string> dv_names;
 	map<string, double> obj_dir_mult;
 	int n_adaptive_dvs;
-	map<string, map<string, double>> previous_obj_summary;
+	map<string, map<string, double>> previous_obj_summary, previous_dv_summary;
 	bool risk_obj;
 	int restart_iter_offset;
 	int save_every;
@@ -239,6 +239,9 @@ private:
 	map<string, map<string, double>> obj_func_report(ParameterEnsemble& _dp, ObservationEnsemble& _oe);
 	map<string, map<string, double>> get_obj_func_summary_stats(ParameterEnsemble& _dp, ObservationEnsemble& _op);
 	map<string, map<string, double>> obj_func_change_report(map<string, map<string, double>>& current_obj_summary);
+    map<string, map<string, double>> decvar_report(ParameterEnsemble& _dp);
+    map<string, map<string, double>> decvar_change_report(map<string, map<string, double>>& current_dv_summary);
+
 
 	int get_max_len_obj_name();
 };

@@ -894,17 +894,17 @@ void Constraints::initial_report()
 		f_rec << endl << endl << "  ---  chance constraint/objective FOSM information  ---  " << endl;
 		if (use_fosm)
 		{
-			f_rec << "-->using FOSM-based chance constraints/objectives" << endl;
-			f_rec << "-->++opt_risk and corresponding probit function value: " << setw(10) << risk << setw(20) << probit_val << endl;
-			f_rec << "-->number of non-zero weight observations for FOSM calcs: " << num_nz_obs() << endl;
+			f_rec << "...using FOSM-based chance constraints/objectives" << endl;
+			f_rec << "...++opt_risk and corresponding probit function value: " << setw(10) << risk << setw(20) << probit_val << endl;
+			f_rec << "...number of non-zero weight observations for FOSM calcs: " << num_nz_obs() << endl;
 		}
 		else
 		{ 
-			f_rec << "-->using stack-based chance constraints/objectives" << endl;
+			f_rec << "...using stack-based chance constraints/objectives" << endl;
 		}
-		f_rec << "-->number of adjustable parameters for chance constraint/objective calcs: " << num_adj_pars() << endl;
+		f_rec << "...number of adjustable parameters for chance constraint/objective calcs: " << num_adj_pars() << endl;
 		
-		f_rec << "-->repeat chance constraint/objective calculations every: " << pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() << " iterations" << endl << endl;
+		f_rec << "...repeat chance constraint/objective calculations every: " << pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() << " iterations" << endl << endl;
 		if (use_fosm)
 		{
 			f_rec << "   adjustable parameters used in FOSM calculations:" << endl;
@@ -1703,10 +1703,10 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 
 		//report prior information constraints
 		infeas_dist = get_unsatified_pi_constraints(current_pars);
-		ss << endl << "  prior information constraint information at iteration " << iter;
+		ss << endl << " --- prior information constraint summary at iteration " << iter;
 		if (tag.size() > 0)
 			ss << " for " << tag;
-		ss << endl;
+		ss << " --- " <<  endl;
 		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
 		for (int i = 0; i < num_pi_constraints(); ++i)
@@ -1802,7 +1802,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 		//report prior information constraints
 		infeas_dist = get_unsatified_pi_constraints(current_pars);
 		pi_infeas = infeas_dist.size();
-		ss << endl << "  prior information constraint information at iteration " << iter << endl;
+		ss << endl << " --- prior information constraint information at iteration " << iter << " --- " << endl;
 		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
 		for (int i = 0; i < num_pi_constraints(); ++i)
@@ -1929,7 +1929,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			}
 		}
 		//report prior information constraints
-		ss << endl << "  prior information constraint information at iteration " << iter << endl;
+		ss << endl << " --- prior information constraint summary at iteration " << iter << " --- " << endl;
 		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim min";
 		ss << setw(15) << "sim mean" << setw(15) << "sim max" << setw(15) << "% unsatisfied" << endl;
 		int num_reals = pe.shape().first;
@@ -2000,7 +2000,7 @@ void Constraints::presolve_report(int iter, Parameters& current_pars, Observatio
 		for (auto o : ctl_ord_pi_constraint_names)
 			nsize = max(nsize, int(o.size()));
 		//report prior information constraints
-		f_rec << endl << "  prior information constraint information at start of iteration " << iter << endl;
+		f_rec << endl << " --- prior information constraint summary at start of iteration " << iter << " --- " << endl;
 		f_rec << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 		f_rec << setw(15) << "residual" << setw(15) << "lower bound" << setw(15) << "upper bound" << endl;
 		for (int i = 0; i < num_pi_constraints(); ++i)
@@ -2257,7 +2257,7 @@ void Constraints::postsolve_pi_constraints_report(Parameters& old_pars, Paramete
 	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
 	if (num_pi_constraints() > 0)
 	{
-		f_rec << endl << endl << "     prior information constraint information at end of iteration " << iter << endl << endl;
+		f_rec << endl << endl << " --- prior information constraint summary at end of iteration " << iter << " --- " << endl << endl;
 		f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(25);
 		if (status_map.size() > 0)
 			f_rec << "simplex status";

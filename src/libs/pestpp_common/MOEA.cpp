@@ -985,6 +985,94 @@ int MOEA::get_max_len_obj_name()
 	return max_len;
 }
 
+map<string, map<string, double>> MOEA::decvar_report(ParameterEnsemble& _dp)
+{
+
+    stringstream ss;
+    ss.str("");
+    int max_len = 19;
+    for (auto& dv : dv_names)
+    {
+        max_len = max(max_len,(int)dv.size());
+    }
+    ss << left << setw(max_len) << "decision variable" << right << setw(10) << "ubnd" << setw(10) << "lbnd" << setw(10) << "mean" << setw(20);
+    ss << "standard devation" << setw(12) << "min" << setw(12) << "max" << endl;
+    map<string,double> meanmap,stdmap;
+    _dp.fill_moment_maps(meanmap,stdmap);
+    Eigen::VectorXd vec;
+    const ParameterRec* prec;
+    map<string,map<string,double>> summary;
+    map<string,double> sum;
+    for (auto& dv : dv_names)
+    {
+        sum.clear();
+        prec = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(dv);
+        ss << left << setw(max_len) << dv;
+        ss << right << setw(10) << prec->ubnd;
+        ss << right << setw(10) << prec->lbnd;
+        ss << right << setw(10) << meanmap[dv];
+        ss << right << setw(20) << stdmap[dv];
+        vec = _dp.get_var_vector(dv);
+        ss << setw(12) << vec.maxCoeff();
+        ss << setw(12) << vec.minCoeff();
+        ss << endl;
+        sum["mean"] = meanmap[dv];
+        sum["std"] = stdmap[dv];
+        sum["min"] = vec.minCoeff();
+        sum["max"] = vec.maxCoeff();
+        summary[dv] = sum;
+    }
+    ss << endl;
+    file_manager.rec_ofstream() << ss.str();
+    cout << ss.str();
+    return summary;
+}
+
+map<string, map<string, double>> MOEA::decvar_change_report(map<string, map<string, double>>& current_dv_summary)
+{
+    map<string, map<string, double>> change_summary;
+    if (previous_dv_summary.size() == 0)
+        return change_summary;
+    double change, percent_change;
+
+    stringstream ss;
+    int max_len = get_max_len_obj_name();
+    ss << left << setw(max_len) << "decision variable" << right << setw(11) << "mean change";
+    ss << setw(11) << "% change";
+    ss << setw(11) << "max change" << setw(11) << "% change";
+    ss << setw(11) << "min change" << setw(11) << "% change" << endl;
+
+    vector<string> tags{ "mean","max","min" };
+    for (auto dv : dv_names)
+    {
+        change_summary[dv] = map<string, double>();
+        if (previous_dv_summary.find(dv) == previous_dv_summary.end())
+            throw_moea_error("decvar_change_report() error: dv '" + dv + "' not in previous summary");
+        if (current_dv_summary.find(dv) == current_dv_summary.end())
+            throw_moea_error("decvar_change_report() error: dv '" + dv + "' not in current summary");
+        ss << left << setw(max_len) << dv;
+        for (auto tag : tags)
+        {
+
+            change = previous_dv_summary[dv][tag] - current_dv_summary[dv][tag];
+            if ((previous_dv_summary[dv][tag] <= 0.0) || (change == 0.0))
+                percent_change = 0.0;
+            else
+                percent_change = 100.0 * (change / previous_dv_summary[dv][tag]);
+
+            ss << right << setw(11) << change;
+            ss << setw(11) << percent_change;
+            change_summary[dv][tag] = change;
+            change_summary[dv][tag+"_percent"] = percent_change;
+        }
+        ss << endl;
+    }
+
+    file_manager.rec_ofstream() << ss.str() << endl;
+    cout << ss.str() << endl;
+    return change_summary;
+}
+
 map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
 	map<string, map<string, double>> summary = get_obj_func_summary_stats(_dp, _op);
@@ -2172,6 +2260,9 @@ void MOEA::initialize()
 	}
 	message(1, " saved observation population to ", ss.str());
 
+    message(0, "initial population decision variable summary:");
+    previous_dv_summary = decvar_report(dp);
+
 	message(0, "initial population objective function summary:");
 	previous_obj_summary = obj_func_report(dp, op);
 
@@ -2215,7 +2306,7 @@ void MOEA::initialize()
 
 	//TODO: think about a bad phi (or phis) for MOEA
 	
-	if (op.shape().first <= error_min_members)
+	if (op.shape().first < error_min_members)
 	{
 		message(0, "too few population members:", op.shape().first);
 		message(1, "need at least ", error_min_members);
@@ -2288,7 +2379,7 @@ void MOEA::initialize()
 		ofstream& f_rec = file_manager.rec_ofstream();
 
 		pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op, opt_member);
-		constraints.presolve_chance_report(iter, po_pair.second, true,"initial chance constraint summary (calculated at optimal/mean decision variable point)");
+		constraints.presolve_chance_report(iter, po_pair.second, true," --- initial chance constraint summary (calculated at optimal/mean decision variable point) --- ");
 	}
 
 	constraints.mou_report(0,dp, op, obs_obj_names,pi_obj_names);
@@ -2480,8 +2571,6 @@ void MOEA::iterate_to_solution()
 		ObservationEnsemble new_op(&pest_scenario, &rand_gen);
 		new_op.reserve(new_dp.get_real_names(), op.get_var_names());
 		run_population(new_dp, new_op, true);
-		
-		
 
 		//and risk-shift
 			
@@ -2592,7 +2681,17 @@ void MOEA::iterate_to_solution()
 		{
 			throw_moea_error("unrecognized 'mou_env'");
 		}
-		
+        ss.str("");
+        ss << "iteration " << iter << " decision variable summary:";
+        message(0, ss.str());
+        summary = decvar_report(dp);
+
+        ss.str("");
+        ss << "iteration " << iter << " decision variable change summary:";
+        message(0, ss.str());
+        decvar_change_report(summary);
+        previous_dv_summary = summary;
+
 		ss.str("");
 		ss << "iteration " << iter << " objective function summary:";
 		message(0, ss.str());
@@ -3226,7 +3325,7 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
 {
     message(1, "generating simplex population of size", num_members);
     //for now just using nsga selector. TODO: work in spea2 selector if requested
-    pair<vector<string>, vector<string>> t = objectives.get_nsga2_pareto_dominance(-999,_op,_dp,&constraints,false);
+    DomPair t = objectives.get_nsga2_pareto_dominance(-999,_op,_dp,&constraints,false);
     vector<string> fitness;
     for (auto& tt : t.first)
         fitness.push_back(tt);
@@ -3234,7 +3333,7 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
         fitness.push_back(tt);
 
 
-	int num_reflect = min(pest_scenario.get_pestpp_options().get_mou_simplex_reflections(),_dp.shape().first);
+	int num_reflect = min(pest_scenario.get_pestpp_options().get_mou_simplex_reflections(),_dp.shape().first-1);
 	vector<double> step_factors = pest_scenario.get_pestpp_options().get_mou_simplex_factors();
     num_members = num_reflect * step_factors.size();
 
@@ -3296,6 +3395,10 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
     }
     ParameterEnsemble new_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
     new_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
+    if (pest_scenario.get_pestpp_options().get_mou_simplex_mutation())
+    {
+        gauss_mutation_ip(new_dp);
+    }
     new_dp.enforce_bounds(performance_log, false);
     return new_dp;
 }
