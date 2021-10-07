@@ -335,7 +335,7 @@ One of the original design specifications of PESTPP-GLM was that its parallel ru
 | PESTPP-DA        | Iterative ensemble filter and smoother data assimilation                                                      |
 | PESTPP-MOU       | Single and multiple constrained optimization under uncertainty using evolutionary heuristics                  |
 
-Table 1.1 Programs comprising version 4 of the PEST++ suite.
+Table 1.1 Programs comprising of the PEST++ suite.
 
 As well as containing a build-in parallel run manager (and hence of template and instruction files as a mechanism for non-intrusive communication with a model), the programs listed in table 1.1 have other commonalities. They all manipulate model parameters (which sometimes play the roles of decision variables). Most of them quantify mismatch between model outputs and field data. Information on parameters and field data is obtained from a PEST control file. So too is information that controls the way in which their algorithms operate.
 
@@ -344,8 +344,6 @@ Use of a PEST control file for storage of parameter, observation and control dat
 When reading a PEST control file, most programs of the PEST++ suite obtain the values of control variables that are unique to that program from lines within the PEST control file that begin with the “++” string. PEST, and most of its associated utility software, ignores these lines. Interoperability of the PEST and PEST++ suites is thereby maintained.
 
 If salient to the tasks which they implement, members of the PEST++ suite write two other file types that are compatible with PEST-suite files that hold the same information. These are parameter value files (i.e., PAR files) and Jacobian matrix files (i.e., JCO files). This, together with compatibility of the PEST control file, allows utilities which support the use of PEST to perform the same roles for members of the PEST++ suite. See Doherty et al (2018c) for an overview of PEST utility support software.
-
-The release of version 4 of PEST++ coincides with the release of version 15 of PEST. Enhancements introduced to version 15 of PEST include those required to promulgate inter-operability with the PEST++ suite. This inter-operability provides modelers with access to a broader range of model-value-adding functionality than that which is provided by either suite alone.
 
 ## <a id='s5-2' />1.2 Software Installation
 
@@ -1784,7 +1782,7 @@ After running a program of the PEST++ suite, you may notice a number of (possibl
 
 PESTPP-GLM was the original member of the PEST++ suite; its original name was “PESTPP”. The intention behind its creation was to reproduce much of the functionality of PEST in code that is modular, object oriented and supportive of collaborative programming. At the same time, it was hoped that certain aspects of PEST’s performance could be improved by taking advantage of the “new slate” that was offered by PESTPP-GLM.
 
-Like all versions of the PEST++ suite, PESTPP-GLM is written in C++. Version 4 of PESTPP-GLM uses a built-in parallel run manager.
+Like all versions of the PEST++ suite, PESTPP-GLM is written in C++. PESTPP-GLM uses a built-in parallel run manager.
 
 Like PEST, PESTPP-GLM undertakes highly parameterized inversion. However, if requested, it can also undertake global optimization using the differential evolution (DE) method. The task that it implements on any given run is determined by the values that are supplied for pertinent control variables.
 
