@@ -2056,11 +2056,13 @@ void Constraints::write_res_file(Observations& constraints, Parameters& pars_and
 
 }
 
-void Constraints::stack_summary(int iter, Observations& shifted_obs, bool echo, string header)
+void Constraints::stack_summary(int iter, Observations& current_obs, bool echo, string header)
 {
 	/* write chance info to the rec file before undertaking the current iteration process*/
 	if (!use_chance)
 		return;
+
+	Observations current_constraints_chance = get_chance_shifted_constraints(current_obs);
 
 	int nsize = 20;
 	for (auto o : ctl_ord_obs_constraint_names)
@@ -2077,19 +2079,22 @@ void Constraints::stack_summary(int iter, Observations& shifted_obs, bool echo, 
 
 	//vector<double> residuals = get_constraint_residual_vec();
 
-	ss << setw(nsize) << left << "name" << right << setw(10) << "sense" << setw(12) << "required";
-	ss << setw(12) << "stdev" << setw(12) << "offset" << setw(12) << "shifted val" << endl;
+	ss << setw(nsize) << left << "name" << right << setw(13) << "sense" << setw(12) << "required";
+	ss << setw(12) << "stdev" << setw(12) << "offset";
+	ss << setw(12) << "current val" << setw(12) << "shifted val" << endl;
 	vector<string> out_of_bounds;
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
 		ss << setw(nsize) << left << name;
-		ss << setw(10) << right << constraint_sense_name[name];
+		ss << setw(13) << right << constraint_sense_name[name];
 		ss << setw(12) << constraints_obs[name];
 		ss << setw(12) << post_constraint_stdev[name];
 		ss << setw(12) << post_constraint_offset[name];
-		ss << setw(12) << shifted_obs[name] << endl;
+		ss << setw(12) << current_obs[name];
+		ss << setw(12) << current_constraints_chance[name] << endl;
 	}
+
 	ss << "  note: the above standard deviations and offset are empirical estimates from the stack" << endl;
 	
 	file_mgr_ptr->rec_ofstream() << ss.str();
@@ -2127,7 +2132,7 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 
 	//vector<double> residuals = get_constraint_residual_vec();
 	
-	ss << setw(nsize) << left << "name" << right << setw(10) << "sense" << setw(12) << "required" << setw(12) << "sim value";
+	ss << setw(nsize) << left << "name" << right << setw(13) << "sense" << setw(12) << "required" << setw(12) << "sim value";
 	ss << setw(12) << "prior stdev" << setw(12) << "post stdev" << setw(12) << "offset";
 	ss << setw(14) << "new sim value" << endl;
 	vector<string> out_of_bounds;
@@ -2136,7 +2141,7 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 	{
 		string name = ctl_ord_obs_constraint_names[i];
 		ss << setw(nsize) << left << name;
-		ss << setw(10) << right << constraint_sense_name[name];
+		ss << setw(13) << right << constraint_sense_name[name];
 		ss << setw(12) << constraints_obs[name];
 		ss << setw(12) << current_obs.get_rec(name);
 		ss << setw(12) << prior_constraint_stdev[name];
