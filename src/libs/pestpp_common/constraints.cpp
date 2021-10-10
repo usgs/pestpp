@@ -1668,7 +1668,7 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 	if (tag.size() > 0)
 		ss << " for " << tag;
 	ss << endl;
-	ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
+	ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 	ss << setw(11) << "satisfied" << setw(15) << "distance" << endl;
 
 	infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
@@ -1676,7 +1676,7 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 	{
 		string name = ctl_ord_obs_constraint_names[i];
 		ss << setw(nsize) << left << name;
-		ss << setw(12) << right << constraint_sense_name[name];
+		ss << setw(14) << right << constraint_sense_name[name];
 		ss << setw(12) << constraints_obs.get_rec(name);
 		ss << setw(15) << current_obs.get_rec(name);
 		if (infeas_dist.find(name) != infeas_dist.end())
@@ -1707,14 +1707,14 @@ void Constraints::sqp_report(int iter, Parameters& current_pars, Observations& c
 		if (tag.size() > 0)
 			ss << " for " << tag;
 		ss << " --- " <<  endl;
-		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
+		ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
 		for (int i = 0; i < num_pi_constraints(); ++i)
 		{
 			string name = ctl_ord_pi_constraint_names[i];
 			PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
 			ss << setw(nsize) << left << name;
-			ss << setw(12) << right << constraint_sense_name[name];
+			ss << setw(14) << right << constraint_sense_name[name];
 			ss << setw(12) << pi_rec.get_obs_value();
 			ss << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
 			if (infeas_dist.find(name) != infeas_dist.end())
@@ -1758,7 +1758,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 			nsize = max(nsize, int(name.size()));
 		}
 		ss << endl << "  observation constraint information at iteration " << iter << endl;
-		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
+		ss << setw(nsize) << left << "name" << right << setw(42) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 		ss << setw(11) << "satisfied" << setw(15) << "distance" << endl;
 
 		
@@ -1771,7 +1771,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 			if (skip_names.find(name) != skip_names.end())
 				continue;
 			ss << setw(nsize) << left << name;
-			ss << setw(12) << right << constraint_sense_name[name];
+			ss << setw(14) << right << constraint_sense_name[name];
 			ss << setw(12) << constraints_obs.get_rec(name);
 			ss << setw(15) << current_obs.get_rec(name);
 			if (infeas_dist.find(name) != infeas_dist.end())
@@ -1803,7 +1803,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 		infeas_dist = get_unsatified_pi_constraints(current_pars);
 		pi_infeas = infeas_dist.size();
 		ss << endl << " --- prior information constraint information at iteration " << iter << " --- " << endl;
-		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
+		ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 		ss << setw(15) << "satisfied" << setw(15) << "distance" << endl;
 		for (int i = 0; i < num_pi_constraints(); ++i)
 		{
@@ -1812,7 +1812,7 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 				continue;
 			PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
 			ss << setw(nsize) << left << name;
-			ss << setw(12) << right << constraint_sense_name[name];
+			ss << setw(14) << right << constraint_sense_name[name];
 			ss << setw(12) << pi_rec.get_obs_value();
 			ss << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
 			if (infeas_dist.find(name) != infeas_dist.end())
@@ -1870,7 +1870,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 		oe.fill_moment_maps(mean_map, std_map);
 
 		ss << endl << "  population observation constraint summary at iteration " << iter << endl;
-		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim min";
+		ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim min";
 		ss << setw(15) << "sim mean" << setw(15) << "sim max" << setw(15) << "% unsatisfied" << setw(15) << endl;
 
 		infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
@@ -1881,7 +1881,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 			if (skip_names.find(name) != skip_names.end())
 				continue;
 			ss << setw(nsize) << left << name;
-			ss << setw(12) << right << constraint_sense_name[name];
+			ss << setw(14) << right << constraint_sense_name[name];
 			ss << setw(12) << constraints_obs.get_rec(name);
 			
 			ss << setw(15) << oe.get_var_vector(name).minCoeff();
@@ -1930,7 +1930,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 		}
 		//report prior information constraints
 		ss << endl << " --- prior information constraint summary at iteration " << iter << " --- " << endl;
-		ss << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim min";
+		ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim min";
 		ss << setw(15) << "sim mean" << setw(15) << "sim max" << setw(15) << "% unsatisfied" << endl;
 		int num_reals = pe.shape().first;
 		for (int i = 0; i < num_pi_constraints(); ++i)
@@ -1940,7 +1940,7 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 				continue;
 			pi_rec = constraints_pi.get_pi_rec(name);
 			ss << setw(nsize) << left << name;
-			ss << setw(12) << right << constraint_sense_name[name];
+			ss << setw(14) << right << constraint_sense_name[name];
 			ss << setw(12) << pi_rec.get_obs_value();
 			ss << setw(15) << mins[name];
 			ss << setw(15) << double(tots[name] / num_reals);
@@ -1967,7 +1967,7 @@ void Constraints::presolve_report(int iter, Parameters& current_pars, Observatio
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 	vector<double> residuals;
 	f_rec << endl << "  observation constraint/objective information at start of iteration " << iter << endl;
-	f_rec << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
+	f_rec << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 	f_rec << setw(15) << "residual" << setw(15) << "lower bound" << setw(15) << "upper bound" << endl;
 	
 	//if we are using chances, then we need to account for that here
@@ -1987,7 +1987,7 @@ void Constraints::presolve_report(int iter, Parameters& current_pars, Observatio
 	{
 		string name = ctl_ord_obs_constraint_names[i];
 		f_rec << setw(nsize) << left << name;
-		f_rec << setw(12) << right << constraint_sense_name[name];
+		f_rec << setw(14) << right << constraint_sense_name[name];
 		f_rec << setw(12) << constraints_obs.get_rec(name);	
 		f_rec << setw(15) << current.get_rec(name);
 		f_rec << setw(15) << residuals[i];
@@ -2001,14 +2001,14 @@ void Constraints::presolve_report(int iter, Parameters& current_pars, Observatio
 			nsize = max(nsize, int(o.size()));
 		//report prior information constraints
 		f_rec << endl << " --- prior information constraint summary at start of iteration " << iter << " --- " << endl;
-		f_rec << setw(nsize) << left << "name" << right << setw(12) << "sense" << setw(12) << "required" << setw(15) << "sim value";
+		f_rec << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim value";
 		f_rec << setw(15) << "residual" << setw(15) << "lower bound" << setw(15) << "upper bound" << endl;
 		for (int i = 0; i < num_pi_constraints(); ++i)
 		{
 			string name = ctl_ord_pi_constraint_names[i];
 			PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
 			f_rec << setw(nsize) << left << name;
-			f_rec << setw(12) << right << constraint_sense_name[name];
+			f_rec << setw(14) << right << constraint_sense_name[name];
 			f_rec << setw(12) << pi_rec.get_obs_value();
 			f_rec << setw(15) << pi_rec.calc_sim_and_resid(current_pars).first;
 			f_rec << setw(15) << pi_rec.calc_residual(current_pars);
@@ -2079,7 +2079,7 @@ void Constraints::stack_summary(int iter, Observations& current_obs, bool echo, 
 
 	//vector<double> residuals = get_constraint_residual_vec();
 
-	ss << setw(nsize) << left << "name" << right << setw(13) << "sense" << setw(12) << "required";
+	ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required";
 	ss << setw(12) << "stdev" << setw(12) << "offset";
 	ss << setw(12) << "current val" << setw(12) << "shifted val" << endl;
 	vector<string> out_of_bounds;
@@ -2087,7 +2087,7 @@ void Constraints::stack_summary(int iter, Observations& current_obs, bool echo, 
 	{
 		string name = ctl_ord_obs_constraint_names[i];
 		ss << setw(nsize) << left << name;
-		ss << setw(13) << right << constraint_sense_name[name];
+		ss << setw(14) << right << constraint_sense_name[name];
 		ss << setw(12) << constraints_obs[name];
 		ss << setw(12) << post_constraint_stdev[name];
 		ss << setw(12) << post_constraint_offset[name];
@@ -2132,7 +2132,7 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 
 	//vector<double> residuals = get_constraint_residual_vec();
 	
-	ss << setw(nsize) << left << "name" << right << setw(13) << "sense" << setw(12) << "required" << setw(12) << "sim value";
+	ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(12) << "sim value";
 	ss << setw(12) << "prior stdev" << setw(12) << "post stdev" << setw(12) << "offset";
 	ss << setw(14) << "new sim value" << endl;
 	vector<string> out_of_bounds;
@@ -2141,7 +2141,7 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 	{
 		string name = ctl_ord_obs_constraint_names[i];
 		ss << setw(nsize) << left << name;
-		ss << setw(13) << right << constraint_sense_name[name];
+		ss << setw(14) << right << constraint_sense_name[name];
 		ss << setw(12) << constraints_obs[name];
 		ss << setw(12) << current_obs.get_rec(name);
 		ss << setw(12) << prior_constraint_stdev[name];
