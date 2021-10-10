@@ -165,6 +165,8 @@ public:
 
 	vector<string> get_working_set_ineq_names(vector<string>& cnames);
 
+	string mou_population_observation_constraint_summary(int iter, ObservationEnsemble& oe, string tag, const vector<string>& obs_obj_names);
+
 private:
 	Pest& pest_scenario;
 	PerformanceLog& pfm;

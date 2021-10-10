@@ -863,31 +863,35 @@ void Constraints::initial_report()
 	/*make a rec file report before any iterations have happened*/
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 
+	int n = 21;
+    for (auto& name : ctl_ord_obs_constraint_names)
+        n = max(n,(int)name.size()+1);
+
 	f_rec << endl << "  ---  observation constraints and/or objectives ---  " << endl;
-	f_rec << left << setw(20) << "name" << setw(20) << "sense" << setw(20) << "value" << endl;
+	f_rec << left << setw(n) << "name" << setw(15) << "sense" << setw(15) << "value" << endl;
 	for (auto& name : ctl_ord_obs_constraint_names)
 	{
-		f_rec << setw(20) << left << name;
-		f_rec << setw(20) << constraint_sense_name[name];
-		f_rec << setw(20) << constraints_obs.get_rec(name) << endl;
+		f_rec << setw(n) << left << name;
+		f_rec << setw(15) << constraint_sense_name[name];
+		f_rec << setw(15) << constraints_obs.get_rec(name) << endl;
 	}
 	cout << "..." << ctl_ord_obs_constraint_names.size() << " obs-based constraints, see rec file for listing" << endl;
 
 	if (num_pi_constraints() > 0)
 	{
+        int n = 21;
+        for (auto& name : ctl_ord_pi_constraint_names)
+            n = max(n,(int)name.size()+1);
 		f_rec << endl << "  ---  prior information constraints   ---  " << endl;
-		f_rec << setw(20) << "name" << setw(20) << "sense" << setw(20) << "value" << endl;
+		f_rec << setw(n) << "name" << setw(15) << "sense" << setw(15) << "value" << endl;
 		for (auto& name : ctl_ord_pi_constraint_names)
 		{
-			f_rec << setw(20) << left << name;
-			f_rec << setw(20) << constraint_sense_name[name];
-			f_rec << setw(20) << constraints_pi.get_pi_rec(name).get_obs_value() << endl;
+			f_rec << setw(n) << left << name;
+			f_rec << setw(15) << constraint_sense_name[name];
+			f_rec << setw(15) << constraints_pi.get_pi_rec(name).get_obs_value() << endl;
 		}
 		cout << "..." << ctl_ord_pi_constraint_names.size() << " pi-based constraints, see rec file for listing" << endl;
 	}
-
-	
-
 
 	if (use_chance)
 	{
@@ -1834,78 +1838,88 @@ void Constraints::mou_report(int iter, Parameters& current_pars, Observations& c
 	return;
 }
 
+string Constraints::mou_population_observation_constraint_summary(int iter, ObservationEnsemble& oe, string tag, const vector<string>& obs_obj_names)
+{
+    set<string> skip_names(obs_obj_names.begin(), obs_obj_names.end());
+    vector<double> residuals;
+    map<string, double> infeas_dist;
+    stringstream ss;
+    ss.str("");
+    vector<string> names = oe.get_var_names();
+    Observations current_obs;
+    map<string, int> infeas_count;
+    if (skip_names.size() < ctl_ord_obs_constraint_names.size())
+    {
+        int nsize = 20;
+        for (auto o : ctl_ord_obs_constraint_names)
+        {
+            infeas_count[o] = 0;
+            nsize = max(nsize, int(o.size()));
+        }
+        for (auto real : oe.get_real_names())
+        {
+            current_obs.update(names, eigenvec_2_stlvec(oe.get_real_vector(real)));
+            infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
+            for (auto in : infeas_dist)
+                infeas_count[in.first]++;
+        }
+
+        //pair<map<string,double>,map<string,double>> mm = oe.get_moment_maps();
+        map<string, double> mean_map, std_map;
+        oe.fill_moment_maps(mean_map, std_map);
+
+        ss << endl << "  ---  " << tag << " population observation constraint summary at iteration " << iter << "  ---  " << endl;
+        ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim min";
+        ss << setw(15) << "sim mean" << setw(15) << "sim max" << setw(15) << "% unsatisfied" << setw(15) << endl;
+
+        infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
+        int num_reals = oe.shape().first;
+        for (int i = 0; i < num_obs_constraints(); ++i)
+        {
+            string name = ctl_ord_obs_constraint_names[i];
+            if (skip_names.find(name) != skip_names.end())
+                continue;
+            ss << setw(nsize) << left << name;
+            ss << setw(14) << right << constraint_sense_name[name];
+            ss << setw(12) << constraints_obs.get_rec(name);
+
+            ss << setw(15) << oe.get_var_vector(name).minCoeff();
+            ss << setw(15) << mean_map[name];
+            ss << setw(15) << oe.get_var_vector(name).maxCoeff();
+            ss << setw(15) << 100.0 * double(infeas_count[name]) / double(num_reals);
+            ss << endl;
+
+        }
+    }
+    return ss.str();
+
+}
+
 
 void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsemble& oe, const vector<string>& obs_obj_names,
 	const vector<string>& pi_obj_names, bool echo)
 {
 
-	set<string> skip_names(obs_obj_names.begin(), obs_obj_names.end());
+	set<string> skip_names;
 
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 	vector<double> residuals;
 	map<string, double> infeas_dist;
+	map<string,int> infeas_count;
 	stringstream ss;
 	ss.str("");
-	vector<string> names = oe.get_var_names();
-	Observations current_obs;
-	map<string, int> infeas_count;
-	if (skip_names.size() < ctl_ord_obs_constraint_names.size())
-	{
-		int nsize = 20;
-		for (auto o : ctl_ord_obs_constraint_names)
-		{
-			infeas_count[o] = 0;
-			nsize = max(nsize, int(o.size()));
-		}
-		for (auto real : oe.get_real_names())
-		{
-			current_obs.update(names, eigenvec_2_stlvec(oe.get_real_vector(real)));
-			infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
-			for (auto in : infeas_dist)
-				infeas_count[in.first]++;
-		}
-
-		//pair<map<string,double>,map<string,double>> mm = oe.get_moment_maps();
-		map<string, double> mean_map, std_map;
-		oe.fill_moment_maps(mean_map, std_map);
-
-		ss << endl << "  population observation constraint summary at iteration " << iter << endl;
-		ss << setw(nsize) << left << "name" << right << setw(14) << "sense" << setw(12) << "required" << setw(15) << "sim min";
-		ss << setw(15) << "sim mean" << setw(15) << "sim max" << setw(15) << "% unsatisfied" << setw(15) << endl;
-
-		infeas_dist = get_unsatified_obs_constraints(current_obs, 0.0, false);
-		int num_reals = oe.shape().first;
-		for (int i = 0; i < num_obs_constraints(); ++i)
-		{
-			string name = ctl_ord_obs_constraint_names[i];
-			if (skip_names.find(name) != skip_names.end())
-				continue;
-			ss << setw(nsize) << left << name;
-			ss << setw(14) << right << constraint_sense_name[name];
-			ss << setw(12) << constraints_obs.get_rec(name);
-			
-			ss << setw(15) << oe.get_var_vector(name).minCoeff();
-			ss << setw(15) << mean_map[name];
-			ss << setw(15) << oe.get_var_vector(name).maxCoeff();
-			ss << setw(15) << 100.0 * double(infeas_count[name]) / double(num_reals);
-			ss << endl;
-
-		}
-	}
+	string tag = "";
 	if (use_chance)
-    {
-	    ss << endl ;
-	    ss << "  note: The above observation constraint summary includes";
-	    ss << "        the effect of the chance shifting" << endl;
-    }
-
+	    tag = "chance-shifted";
+	string op_sum = mou_population_observation_constraint_summary(iter,oe,tag,obs_obj_names);
+	ss << op_sum;
 	skip_names.clear();
 	skip_names.insert(pi_obj_names.begin(), pi_obj_names.end());
 	if (num_pi_constraints() > skip_names.size())
 	{
 		
 		Parameters current_pars;
-		names = pe.get_var_names();
+		vector<string> names = pe.get_var_names();
 		map<string, double> tots;
 		map<string, double> mins,maxs;
 		PriorInformationRec pi_rec;
@@ -1933,7 +1947,10 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 				maxs[name] = max(maxs[name], v);
 
 
+
 			}
+            for (auto in : infeas_dist)
+                infeas_count[in.first]++;
 		}
 		//report prior information constraints
 		ss << endl << " --- prior information constraint summary at iteration " << iter << " --- " << endl;

@@ -2266,8 +2266,14 @@ void MOEA::initialize()
 	message(0, "initial population objective function summary:");
 	previous_obj_summary = obj_func_report(dp, op);
 
+
+
+
 	if (constraints.get_use_chance())
 	{
+        string sum = constraints.mou_population_observation_constraint_summary(0,op,"pre-shift",obs_obj_names);
+        frec << sum << endl;
+        cout << sum << endl;
 	    string opt_member;
 		ObservationEnsemble shifted_op = get_chance_shifted_op(dp, op, opt_member);
 		ss.str("");
@@ -2578,6 +2584,7 @@ void MOEA::iterate_to_solution()
 		save_populations(new_dp, new_op);
 		if (constraints.get_use_chance())
 		{
+		    constraints.mou_population_observation_constraint_summary(iter,new_op,"pre-shift",obs_obj_names);
 		    string opt_member;
 			pair<Parameters,Observations> po = get_optimal_solution(dp, op, opt_member);
 			constraints.presolve_chance_report(iter, po.second,true, "chance constraint summary (calculated at optimal/mean decision variable point)");
