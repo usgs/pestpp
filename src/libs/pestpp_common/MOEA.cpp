@@ -1081,7 +1081,8 @@ map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, O
 
 	int max_len = get_max_len_obj_name();
 	string dir;
-	frec << left << setw(max_len) << "objective function" << right << setw(10) << "direction" << setw(10) << "mean" << setw(20) << "standard devation" << setw(12) << "min" << setw(12) << "max" << endl;
+	frec << left << setw(max_len) << "objective function" << right << setw(12) << "direction" << setw(15) << "mean" << setw(15) << "std dev" << setw(15) << "min" << setw(15) << "max" << endl;
+    frec << setprecision(7);
 	for (auto obs_obj : obs_obj_names)
 	{
 
@@ -1089,11 +1090,12 @@ map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, O
 		dir = "minimize";
 		if (obj_dir_mult[obs_obj] == -1)
 			dir = "maximize";
-		frec << right << setw(10) << dir;
-		frec << right << setw(10) << summary[obs_obj]["mean"];
-		frec << setw(20) << summary[obs_obj]["std"];
-		frec << setw(12) << summary[obs_obj]["min"];
-		frec << setw(12) << summary[obs_obj]["max"] << endl;
+
+		frec << right << setw(12) << dir;
+		frec << right << setw(15) << summary[obs_obj]["mean"];
+		frec << setw(15) << summary[obs_obj]["std"];
+		frec << setw(15) << summary[obs_obj]["min"];
+		frec << setw(15) << summary[obs_obj]["max"] << endl;
 	}
 
 	
@@ -1103,11 +1105,11 @@ map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, O
 		dir = "minimize";
 		if (obj_dir_mult[pi_obj] == -1)
 			dir = "maximize";
-		frec << right << setw(10) << dir;
-		frec << right << setw(10) << summary[pi_obj]["mean"];
-		frec << setw(20) << summary[pi_obj]["std"];
-		frec << setw(12) << summary[pi_obj]["min"];
-		frec << setw(12) << summary[pi_obj]["max"] << endl;
+		frec << right << setw(12) << dir;
+		frec << right << setw(15) << summary[pi_obj]["mean"];
+		frec << setw(15) << summary[pi_obj]["std"];
+		frec << setw(15) << summary[pi_obj]["min"];
+		frec << setw(15) << summary[pi_obj]["max"] << endl;
 	}
 
 	frec << endl;
