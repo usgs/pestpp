@@ -1912,7 +1912,7 @@ void MOEA::initialize()
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(RISK_NAME)->lbnd = max(b,0.01);
 		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(RISK_NAME)->ubnd;
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(RISK_NAME)->ubnd = min(b, 0.99);
-		//set this just to make sure everuything gets initialized right
+		//set this just to make sure everything gets initialized right
 		pest_scenario.get_pestpp_options_ptr()->set_opt_risk(0.95);
 
 

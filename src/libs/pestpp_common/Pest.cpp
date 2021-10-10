@@ -1048,6 +1048,12 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					throw_control_file_error(f_rec, "'* control data keyword' cant be used with '++' args");
 				sections_found.insert("PLUSPLUS");
 				pestpp_input.push_back(line);
+				section = "PLUSPLUS";
+				if (!prior_info_string.empty())
+                {
+                    tokens_to_pi_rec(f_rec,prior_info_string);
+                    prior_info_string.clear();
+                }
 			}
 
 			else if (line_upper[0] == '*')

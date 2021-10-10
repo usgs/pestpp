@@ -1892,6 +1892,13 @@ void Constraints::mou_report(int iter, ParameterEnsemble& pe, ObservationEnsembl
 
 		}
 	}
+	if (use_chance)
+    {
+	    ss << endl ;
+	    ss << "  note: The above observation constraint summary includes";
+	    ss << "        the effect of the chance shifting" << endl;
+    }
+
 	skip_names.clear();
 	skip_names.insert(pi_obj_names.begin(), pi_obj_names.end());
 	if (num_pi_constraints() > skip_names.size())
@@ -2056,13 +2063,13 @@ void Constraints::write_res_file(Observations& constraints, Parameters& pars_and
 
 }
 
-void Constraints::stack_summary(int iter, Observations& current_obs, bool echo, string header)
+void Constraints::stack_summary(int iter, Observations& shifted_obs, bool echo, string header)
 {
 	/* write chance info to the rec file before undertaking the current iteration process*/
 	if (!use_chance)
 		return;
 
-	Observations current_constraints_chance = get_chance_shifted_constraints(current_obs);
+	//Observations current_constraints_chance = get_chance_shifted_constraints(current_obs);
 
 	int nsize = 20;
 	for (auto o : ctl_ord_obs_constraint_names)
@@ -2081,7 +2088,7 @@ void Constraints::stack_summary(int iter, Observations& current_obs, bool echo, 
 
 	ss << setw(nsize) << left << "name" << right << setw(13) << "sense" << setw(12) << "required";
 	ss << setw(12) << "stdev" << setw(12) << "offset";
-	ss << setw(12) << "current val" << setw(12) << "shifted val" << endl;
+	ss << setw(12) << "shifted val" << endl;
 	vector<string> out_of_bounds;
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
@@ -2091,11 +2098,11 @@ void Constraints::stack_summary(int iter, Observations& current_obs, bool echo, 
 		ss << setw(12) << constraints_obs[name];
 		ss << setw(12) << post_constraint_stdev[name];
 		ss << setw(12) << post_constraint_offset[name];
-		ss << setw(12) << current_obs[name];
-		ss << setw(12) << current_constraints_chance[name] << endl;
+		ss << setw(12) << shifted_obs[name] << endl;
 	}
 
-	ss << "  note: the above standard deviations and offset are empirical estimates from the stack" << endl;
+	ss << "  note: The above standard deviations and offset are empirical estimates from the stack." << endl;
+	ss <<"         The 'required' value only applies to constraint quantities." << endl;
 	
 	file_mgr_ptr->rec_ofstream() << ss.str();
 	if (echo)
@@ -2151,7 +2158,8 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 	}
 	ss << "  note: 'offset' is the value added to the simulated constraint/objective value to account" << endl;
 	ss << "        for the uncertainty in the constraint/objective value arsing from uncertainty in the " << endl;
-	ss << "        adjustable parameters identified in the control file." << endl << endl;
+	ss << "        adjustable parameters identified in the control file." << endl;
+    ss <<"         The 'required' value only applies to constraint quantities." << endl << endl;
 	if (!use_fosm)
 	{
 		ss << "  note: the above standard deviations are empirical estimates from the stack" << endl;
