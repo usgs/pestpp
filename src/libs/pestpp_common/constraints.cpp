@@ -977,7 +977,7 @@ void Constraints::update_chance_offsets()
 		//extract the part of the full jco we need for fosm
 		Eigen::SparseMatrix<double> fosm_mat = jco.get_matrix(fosm_row_names, adj_par_names);
 
-		if (fosm_mat.size() == 0)
+		if (fosm_mat.nonZeros() == 0)
 			throw_constraints_error("FOSM-based chance constraint/objective-to-parameter vectors are all zeros");
 
 		Mat fosm_jco(fosm_row_names, adj_par_names, fosm_mat);
@@ -1282,13 +1282,13 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	{
 		for (auto& name : ctl_ord_obs_constraint_names)
 		{
-			prior_constraint_stdev[name] = sqrt(prior_const_var[name]);
-			post_constraint_stdev[name] = sqrt(post_const_var[name]);
+			prior_constraint_stdev[name] = sqrt(prior_const_var.at(name));
+			post_constraint_stdev[name] = sqrt(post_const_var.at(name));
 			//the offset (shift) is just the stdev * the risk-based probit value
-			pr_offset = _probit_val * prior_constraint_stdev[name];
-			pt_offset = _probit_val * post_constraint_stdev[name];
+			pr_offset = _probit_val * prior_constraint_stdev.at(name);
+			pt_offset = _probit_val * post_constraint_stdev.at(name);
 			old_constraint_val = current_obs.get_rec(name);
-			required_val = constraints_obs[name];
+			required_val = constraints_obs.get_rec(name);
 
 			//if less_than constraint, then add to the sim value, to move positive
 			// WRT the required constraint value
