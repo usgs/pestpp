@@ -2586,7 +2586,9 @@ void MOEA::iterate_to_solution()
 		save_populations(new_dp, new_op);
 		if (constraints.get_use_chance())
 		{
-		    constraints.mou_population_observation_constraint_summary(iter,new_op,"pre-shift",obs_obj_names);
+		    string csum = constraints.mou_population_observation_constraint_summary(iter,new_op,"pre-shift",obs_obj_names);
+		    cout << csum;
+		    file_manager.rec_ofstream() << csum;
 		    string opt_member;
 			pair<Parameters,Observations> po = get_optimal_solution(dp, op, opt_member);
 			constraints.presolve_chance_report(iter, po.second,true, "chance constraint summary (calculated at optimal/mean decision variable point)");
