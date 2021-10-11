@@ -170,42 +170,49 @@ unordered_map<string, int> Jacobian::get_obs2row_map() const
 }
 
 
-Eigen::SparseMatrix<double> Jacobian::get_matrix(const vector<string> &obs_names, const vector<string> & par_names) const
+Eigen::SparseMatrix<double> Jacobian::get_matrix(const vector<string> &obs_names, const vector<string> & par_names, bool forgive_missing, int n_cols) const
 {
+    /* the n_cols arg is so you can reserve a sparse matrix with columns that are all zeros - this is for the LP solver in pestpp-opt when you have
+     * external dec vars - they wont be in the Jacobian instance but they need to be in the LP solution matrix.
+     */
     stringstream ss;
 	int n_rows = obs_names.size();
-	int n_cols = par_names.size();
+	if (n_cols == 0)
+	    n_cols = par_names.size();
 	int irow_new;
 	int icol_new;
-	set<string> sobs_names(base_sim_obs_names.begin(),base_sim_obs_names.end());
-	set<string> spar_names(base_numeric_par_names.begin(),base_numeric_par_names.end());
-	set<string>::iterator send = sobs_names.end();
-	vector<string> missing;
-	for (auto& obs_name : obs_names)
-	    if (sobs_names.find(obs_name) == send)
-	        missing.push_back(obs_name);
-	if (missing.size() > 0)
-    {
-	    ss.str("");
 
-        ss << "Jco::get_matrix(): the following obs names are not in the matrix:";
-        for (auto& m : missing)
-            ss << " " << m;
-        throw runtime_error(ss.str());
-    }
+	if (!forgive_missing) {
 
-	send = spar_names.end();
-    for (auto& par_name : par_names)
-        if (spar_names.find(par_name) == send)
-            missing.push_back(par_name);
-    if (missing.size() > 0)
-    {
-        ss.str("");
+        set<string> sobs_names(base_sim_obs_names.begin(), base_sim_obs_names.end());
+        set<string> spar_names(base_numeric_par_names.begin(), base_numeric_par_names.end());
 
-        ss << "Jco::get_matrix(): the following par names are not in the matrix:";
-        for (auto& m : missing)
-            ss << " " << m;
-        throw runtime_error(ss.str());
+        set<string>::iterator send = sobs_names.end();
+        vector<string> missing;
+        for (auto &obs_name : obs_names)
+            if (sobs_names.find(obs_name) == send)
+                missing.push_back(obs_name);
+        if (missing.size() > 0) {
+            ss.str("");
+
+            ss << "Jco::get_matrix(): the following obs names are not in the matrix:";
+            for (auto &m : missing)
+                ss << " " << m;
+            throw runtime_error(ss.str());
+        }
+
+        send = spar_names.end();
+        for (auto &par_name : par_names)
+            if (spar_names.find(par_name) == send)
+                missing.push_back(par_name);
+        if (missing.size() > 0){
+            ss.str("");
+
+            ss << "Jco::get_matrix(): the following par names are not in the matrix:";
+            for (auto &m : missing)
+                ss << " " << m;
+            throw runtime_error(ss.str());
+        }
     }
 
 	unordered_map<string, int> obs_name2newindex_map;
