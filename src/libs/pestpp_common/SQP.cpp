@@ -2601,7 +2601,12 @@ bool SeqQuadProgram::seek_feasible()
 		snames.erase(obj_obs);
 	}
 	ObservationInfo* oi = ies_pest_scenario.get_observation_info_ptr();
-	Observations shifted = constraints.get_chance_shifted_constraints(current_obs);
+
+	Observations shifted = pest_scenario.get_ctl_observations();
+	if (constraints.get_use_chance())
+    {
+	    shifted = constraints.get_chance_shifted_constraints(current_obs);
+    }
 	Observations ctl_obs = ies_pest_scenario.get_ctl_observations_4_mod();
 	for (auto& name : ies_pest_scenario.get_ctl_ordered_obs_names())
 	{

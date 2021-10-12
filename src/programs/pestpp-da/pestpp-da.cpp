@@ -316,6 +316,8 @@ int main(int argc, char* argv[])
 				Pest childPest = pest_scenario.get_child_pest(*icycle);
                 OutputFileWriter child_ofw(file_manager,childPest);
 
+				childPest.check_inputs(fout_rec,false,true);
+
 				if (childPest.get_ctl_observations().size() == 0)
                 {
 				    ss.str("");
@@ -547,6 +549,9 @@ int main(int argc, char* argv[])
 
 			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);
 
+			cout << "checking inputs...";
+			childPest.check_inputs(fout_rec, false, true);
+			cout << "done" << endl;
 
 			//------------------------------
 
@@ -559,6 +564,7 @@ int main(int argc, char* argv[])
 			{
 
 				performance_log.log_event("starting basic model IO error checking");
+				
 				cout << "checking model IO files...";
 				childPest.check_io(fout_rec);
 				//pest_scenario.check_par_obs();

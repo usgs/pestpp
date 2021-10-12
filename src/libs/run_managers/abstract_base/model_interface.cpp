@@ -677,6 +677,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		}
 		for (auto &cmd_string : comline_vec)
 		{
+		    cout << pest_utils::get_time_string() << " calling forward run command: '" << cmd_string << "' " << endl;
 			//start the command
 			PROCESS_INFORMATION pi;
 			try
@@ -735,6 +736,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		bool term_break = false;
 		for (auto &cmd_string : comline_vec)
 		{
+            cout << pest_utils::get_time_string() << " calling forward run command: '" << cmd_string << "' " << endl;
 			//start the command
 			int command_pid = start(cmd_string);
 			while (true)

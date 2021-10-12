@@ -1081,7 +1081,8 @@ map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, O
 
 	int max_len = get_max_len_obj_name();
 	string dir;
-	frec << left << setw(max_len) << "objective function" << right << setw(10) << "direction" << setw(10) << "mean" << setw(20) << "standard devation" << setw(12) << "min" << setw(12) << "max" << endl;
+	frec << left << setw(max_len) << "objective function" << right << setw(12) << "direction" << setw(15) << "mean" << setw(15) << "std dev" << setw(15) << "min" << setw(15) << "max" << endl;
+    frec << setprecision(7);
 	for (auto obs_obj : obs_obj_names)
 	{
 
@@ -1089,11 +1090,12 @@ map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, O
 		dir = "minimize";
 		if (obj_dir_mult[obs_obj] == -1)
 			dir = "maximize";
-		frec << right << setw(10) << dir;
-		frec << right << setw(10) << summary[obs_obj]["mean"];
-		frec << setw(20) << summary[obs_obj]["std"];
-		frec << setw(12) << summary[obs_obj]["min"];
-		frec << setw(12) << summary[obs_obj]["max"] << endl;
+
+		frec << right << setw(12) << dir;
+		frec << right << setw(15) << summary[obs_obj]["mean"];
+		frec << setw(15) << summary[obs_obj]["std"];
+		frec << setw(15) << summary[obs_obj]["min"];
+		frec << setw(15) << summary[obs_obj]["max"] << endl;
 	}
 
 	
@@ -1103,11 +1105,11 @@ map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, O
 		dir = "minimize";
 		if (obj_dir_mult[pi_obj] == -1)
 			dir = "maximize";
-		frec << right << setw(10) << dir;
-		frec << right << setw(10) << summary[pi_obj]["mean"];
-		frec << setw(20) << summary[pi_obj]["std"];
-		frec << setw(12) << summary[pi_obj]["min"];
-		frec << setw(12) << summary[pi_obj]["max"] << endl;
+		frec << right << setw(12) << dir;
+		frec << right << setw(15) << summary[pi_obj]["mean"];
+		frec << setw(15) << summary[pi_obj]["std"];
+		frec << setw(15) << summary[pi_obj]["min"];
+		frec << setw(15) << summary[pi_obj]["max"] << endl;
 	}
 
 	frec << endl;
@@ -1912,7 +1914,7 @@ void MOEA::initialize()
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(RISK_NAME)->lbnd = max(b,0.01);
 		b = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(RISK_NAME)->ubnd;
 		pest_scenario.get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr_4_mod(RISK_NAME)->ubnd = min(b, 0.99);
-		//set this just to make sure everuything gets initialized right
+		//set this just to make sure everything gets initialized right
 		pest_scenario.get_pestpp_options_ptr()->set_opt_risk(0.95);
 
 
@@ -2266,8 +2268,14 @@ void MOEA::initialize()
 	message(0, "initial population objective function summary:");
 	previous_obj_summary = obj_func_report(dp, op);
 
+
+
+
 	if (constraints.get_use_chance())
 	{
+        string sum = constraints.mou_population_observation_constraint_summary(0,op,"pre-shift",obs_obj_names);
+        frec << sum << endl;
+        cout << sum << endl;
 	    string opt_member;
 		ObservationEnsemble shifted_op = get_chance_shifted_op(dp, op, opt_member);
 		ss.str("");
@@ -2578,6 +2586,9 @@ void MOEA::iterate_to_solution()
 		save_populations(new_dp, new_op);
 		if (constraints.get_use_chance())
 		{
+		    string csum = constraints.mou_population_observation_constraint_summary(iter,new_op,"pre-shift",obs_obj_names);
+		    cout << csum;
+		    file_manager.rec_ofstream() << csum;
 		    string opt_member;
 			pair<Parameters,Observations> po = get_optimal_solution(dp, op, opt_member);
 			constraints.presolve_chance_report(iter, po.second,true, "chance constraint summary (calculated at optimal/mean decision variable point)");

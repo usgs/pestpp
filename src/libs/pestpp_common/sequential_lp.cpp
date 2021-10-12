@@ -569,8 +569,13 @@ void sequentialLP::iter_solve()
 
 CoinPackedMatrix sequentialLP::jacobian_to_coinpackedmatrix()
 {
-
-	Eigen::SparseMatrix<double> eig_ord_jco = jco.get_matrix(constraints.get_obs_constraint_names(), dv_names);
+    set<string> se_names(ext_dv_names.begin(),ext_dv_names.end());
+    set<string>::iterator send = se_names.end();
+    vector<string> use_names;
+    for (auto &name : dv_names)
+        if (se_names.find(name) == send)
+            use_names.push_back(name);
+	Eigen::SparseMatrix<double> eig_ord_jco = jco.get_matrix(constraints.get_obs_constraint_names(), use_names,false,dv_names.size());
 
 	file_mgr_ptr->rec_ofstream() << "number of nonzero elements in response matrix: " << eig_ord_jco.nonZeros() << " of " << eig_ord_jco.size() << endl;
 	cout << "number of nonzero elements in response matrix: " << eig_ord_jco.nonZeros() << " of " << eig_ord_jco.size() << endl;
@@ -800,9 +805,16 @@ void sequentialLP::iter_postsolve()
 	constraints.postsolve_pi_constraints_report(current_pars, upgrade_pars,slp_iter);
 
 	Observations upgrade_obs = current_constraints_sim;
-	
+
+    set<string> se_names(ext_dv_names.begin(),ext_dv_names.end());
+    set<string>::iterator send = se_names.end();
+    vector<string> use_names;
+    for (auto &name : dv_names)
+        if (se_names.find(name) == send)
+            use_names.push_back(name);
+
 	Eigen::VectorXd est_obs_vec = current_constraints_sim.get_data_eigen_vec(constraints.get_obs_constraint_names()) +  
-		jco.get_matrix(constraints.get_obs_constraint_names(), dv_names) *
+		jco.get_matrix(constraints.get_obs_constraint_names(), use_names,false,dv_names.size()) *
 		dv_changes.get_partial_data_eigen_vec(dv_names);
 	upgrade_obs.update_without_clear(constraints.get_obs_constraint_names(), est_obs_vec);
 	constraints.postsolve_obs_constraints_report(current_constraints_sim, upgrade_obs, "estimated",slp_iter);
@@ -1159,8 +1171,11 @@ void sequentialLP::iter_presolve()
 	build_obj_func_coef_array();
 
 	stringstream ss;
-	if ((constraints.get_use_chance()) && (constraints.get_use_fosm()))
-		constraints.set_jco(jco);
+	if ((constraints.get_use_chance()) && (constraints.get_use_fosm())) {
+	    if (constraints.should_update_chance(slp_iter-1)) {
+            constraints.set_jco(jco);
+        }
+    }
 	constraints.update_chance_offsets();
 	constraints.presolve_chance_report(slp_iter,current_constraints_sim);
 	constraints.write_res_files(current_constraints_sim, pars,"jcb",slp_iter);
