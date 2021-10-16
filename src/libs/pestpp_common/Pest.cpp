@@ -2286,7 +2286,7 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 
 	if (efiles_map.find("OBSERVATION DATA EXTERNAL") == efiles_map.end())
 	{
-		throw_control_file_error(f_rec, "could not find 'observation data external' section, assigning all observations to cycle '0', effectively forming an 'ensemble smoother' run", false);
+		throw_control_file_error(f_rec, "could not find 'observation data external' section, assigning all observations to cycle '0'", false);
 //		for (auto name : get_ctl_ordered_nz_obs_names())
 //		{
 //			observation_info.get_observation_rec_ptr_4_mod(name)->cycle = 0;
@@ -2300,7 +2300,7 @@ void Pest::assign_da_cycles(ofstream &f_rec)
         //vector<pair<string, int>> obs_cycle_map = extract_cycle_numbers2(f_rec, "OBSERVATION DATA EXTERNAL", vector<string>{"OBSNME", "NAME"});
 		if (obs_cycle_dci_map.size() == 0)
 		{
-			throw_control_file_error(f_rec, "no observation cycle information was found in external file(s), assigning all observations to cycle '0', effectively forming an 'ensemble smoother' run", false);
+			throw_control_file_error(f_rec, "no observation cycle information was found in external file(s), assigning all observations to cycle '0'", false);
 
 		}
 		vector<string> missing, obs_vec;
@@ -2373,7 +2373,7 @@ void Pest::assign_da_cycles(ofstream &f_rec)
 	model_exec_info.outcycle_dci_vec.clear();
 	if (efiles_map.find("MODEL OUTPUT EXTERNAL") == efiles_map.end())
 	{
-		throw_control_file_error(f_rec, "could not find 'model output external' section, assigning all instruction/out files to cycle '0', effectively forming an 'ensemble smoother' run", false);
+		throw_control_file_error(f_rec, "could not find 'model output external' section, assigning all instruction/out files to cycle '0'", false);
 		for (auto ins : model_exec_info.insfile_vec)
 		{
 			//model_exec_info.outcycle_vec.push_back(0);
@@ -2386,7 +2386,7 @@ void Pest::assign_da_cycles(ofstream &f_rec)
         vector<pair<string, DaCycleInfo>> mi_cycle_dci_map = extract_cycle_info(f_rec, "MODEL OUTPUT EXTERNAL", vector<string>{"PEST_FILE"});
 		if (mi_cycle_dci_map.size() == 0)
 		{
-			throw_control_file_error(f_rec, "no model output cycle information was found in external file(s), assigning all instruction/out files to cycle '0', effectively forming an 'ensemble smoother' run",false);
+			throw_control_file_error(f_rec, "no model output cycle information was found in external file(s), assigning all instruction/out files to cycle '0'",false);
 			for (auto ins : model_exec_info.insfile_vec)
 			{
 				//model_exec_info.outcycle_vec.push_back(0);
