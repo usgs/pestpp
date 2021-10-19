@@ -1118,12 +1118,39 @@ def agnostic_path_test():
     assert d == 0,d
 
 
+def ins_missing_e_test():
+    import os
+    import shutil
+    import pyemu
+    t_d = os.path.join("tplins_test_1","test_missing_e")
+    if os.path.exists(t_d):
+        shutil.rmtree(t_d)
+    os.makedirs(t_d)
+    bd = os.getcwd()
+    os.chdir(t_d)
+    with open("model.output.bak",'w') as f:
+        f.write("12345-123\n")
+    pst = pyemu.helpers.pst_from_parnames_obsnames(["p1"],["o1"])
+    pst.control_data.noptmax = 0
+    with open("forward_run.py",'w') as f:
+        f.write("import shutil\n")
+        f.write("shutil.copy2('model.output.bak','model.output')\n")
+    pst.model_command = "python forward_run.py"
+    pst.write("test.pst")
+    os.chdir(bd)
+    try:
+        pyemu.os_utils.run("{0} test.pst".format(exe_path),cwd=t_d)
+    except:
+        pass
+    else:
+        raise Exception("should have failed")
 
 if __name__ == "__main__":
     shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
     shutil.copy2(os.path.join("..", "exe", "windows", "x64", "Debug", "pestpp-ies.exe"),
                  os.path.join("..", "bin", "win", "pestpp-ies.exe"))
-    basic_test()
+    ins_missing_e_test()
+    #basic_test()
     #agnostic_path_test()
     #glm_long_name_test()
     #sen_plusplus_test()
@@ -1152,12 +1179,13 @@ if __name__ == "__main__":
 
     #da_prep_4_mf6_freyberg_seq_tbl()
     #da_mf6_freyberg_test_2()
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
-    mf6_v5_ies_test()
+    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
+    #tplins1_test()
+    #mf6_v5_ies_test()
     #mf6_v5_sen_test()
 
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
-    mf6_v5_opt_stack_test()
+    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
+    #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
     #cmdline_test()
     #basic_sqp_test()
