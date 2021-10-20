@@ -1217,10 +1217,7 @@ if __name__ == "__main__":
     #da_prep_4_mf6_freyberg_seq_tbl()
     #da_mf6_freyberg_test_2()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
-<<<<<<< HEAD
-=======
     #tplins1_test()
->>>>>>> 233d2f532250091c45b128c08bdf7fd74f9f8ab9
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
 
