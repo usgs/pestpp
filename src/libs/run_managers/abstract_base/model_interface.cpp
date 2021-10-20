@@ -1500,15 +1500,20 @@ pair<string, double> InstructionFile::execute_fixed(const string& token, string&
 	}
 	int len = (info.second.second - info.second.first) + 1;
 	temp = last_out_line.substr(info.second.first, len);
+	size_t idx = 0;
 	try
 	{
 		//pest_utils::convert_ip(temp, value);
-		value = stod(temp);
+		value = stod(temp,&idx);
 	}
 	catch (...)
 	{
 		if (info.first != "DUM")
 		throw_ins_error("error casting fixed observation instruction '" + token + "' from output string '" + temp + "' on line '" + line + "'",ins_line_num, out_line_num);
+	}
+	if (idx != temp.size())
+	{
+		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for fixed instruciton: '" + token + "', left-over chars: '" + temp.substr(idx, temp.size()) + "'", ins_line_num, out_line_num);
 	}
 	int pos = line.find(temp);
 	if (pos == string::npos)
@@ -1543,15 +1548,20 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 		throw_ins_error("no non-whitespace char found before end index in semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num,out_line_num);
 	pest_utils::tokenize(last_out_line.substr(pos), tokens);
 	temp = tokens[0];
+	size_t idx = 0;
 	try
 	{
 		//pest_utils::convert_ip(temp, value);
-		value = stod(temp);
+		value = stod(temp,&idx);
 	}
 	catch (...)
 	{
 		if (info.first != "DUM")
 			throw_ins_error("error casting string '" + temp + "' to double for semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num, out_line_num);
+	}
+	if (idx != tokens[0].size())
+	{
+		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for semi-fixed instruciton: '" + token + "', left-over chars: '" + temp.substr(idx, temp.size()) + "'", ins_line_num, out_line_num);
 	}
 	pos = line.find(temp);
 	if (pos == string::npos)
@@ -1578,17 +1588,21 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	if (tokens.size() == 0)
 		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for free instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);
 	double value = 1.0e+30;
+	std::size_t idx = 0;
 	try
 	{
 		//pest_utils::convert_ip(tokens[0], value);
-		value = stod(tokens[0]);
+		value = stod(tokens[0],&idx);
 	}
 	catch (...)
 	{
 		if (name != "DUM")
 			throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruciton: '"+token+"'", ins_line_num, out_line_num);
 	}
-	
+	if (idx != tokens[0].size())
+	{
+		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruciton: '" + token + "', left-over chars: '" + tokens[0].substr(idx,tokens[0].size())+"'", ins_line_num, out_line_num);
+	}
 	int pos = line.find(tokens[0]);
 	if (pos == string::npos)
 	{
