@@ -1055,6 +1055,7 @@ def fr_fail_test():
         os.remove(oe_file)
     pst.control_data.noptmax = 1
     pst.pestpp_options["panther_transfer_on_fail"] = "10par_xsec.list"
+    #pst.pestpp_options["panther_agent_freeze_on_fail"] = True
     pst.write(os.path.join(new_d, "pest.pst"))
     try:
         pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
@@ -1117,6 +1118,42 @@ def agnostic_path_test():
     print(d)
     assert d == 0,d
 
+def fr_timeout_test():
+    model_d = "ies_10par_xsec"
+    base_d = os.path.join(model_d, "template")
+    new_d = os.path.join(model_d, "test_template")
+    if os.path.exists(new_d):
+        shutil.rmtree(new_d)
+    shutil.copytree(base_d, new_d)
+    print(platform.platform().lower())
+    pst = pyemu.Pst(os.path.join(new_d, "pest.pst"))
+    with open(os.path.join(new_d,"run.py"),'w') as f:
+        f.write("import os\nimport time\nimport pyemu\npyemu.os_utils.run('mfnwt 10par_xsec.nam')\n")
+        f.write("if not os.path.exists('run.info'):\n    exit()\n")
+        f.write("lines = open('run.info','r').readlines()\nrnum = int(lines[-1].split()[-1].split('=')[-1])\n")
+        f.write("if rnum % 2 == 0:\n    time.sleep(100000)\n")
+    pst.model_command = "python run.py"
+    oe_file = os.path.join(new_d, "pest.0.obs.csv")
+    if os.path.exists(oe_file):
+        os.remove(oe_file)
+    pst.control_data.noptmax = -1
+    pst.pestpp_options["overdue_giveup_fac"] = 1.0e+10
+    pst.pestpp_options["overdue_giveup_minutes"] = 0.1
+    pst.pestpp_options["ies_num_reals"] = 10
+
+    #pst.pestpp_options["panther_transfer_on_fail"] = "10par_xsec.list"
+    pst.pestpp_options["panther_agent_freeze_on_fail"] = True
+    pst.write(os.path.join(new_d, "pest.pst"))
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
+
+    assert os.path.exists(oe_file)
+    m_d = os.path.join(model_d,"fr_timeout_master")
+    pyemu.os_utils.start_workers(new_d,exe_path,"pest.pst",num_workers=1,worker_root=model_d,master_dir=m_d)
+    oe_file = os.path.join(m_d, "pest.0.obs.csv")
+    assert os.path.exists(oe_file)
+    oe = pd.read_csv(oe_file,index_col=0)
+    print(oe.shape)
+    assert oe.shape[0] == 4
 
 def ins_missing_e_test():
     import os
@@ -1146,9 +1183,9 @@ def ins_missing_e_test():
         raise Exception("should have failed")
 
 if __name__ == "__main__":
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
-    shutil.copy2(os.path.join("..", "exe", "windows", "x64", "Debug", "pestpp-ies.exe"),
-                 os.path.join("..", "bin", "win", "pestpp-ies.exe"))
+    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
+    #shutil.copy2(os.path.join("..", "exe", "windows", "x64", "Debug", "pestpp-ies.exe"),
+    #             os.path.join("..", "bin", "win", "pestpp-ies.exe"))
     ins_missing_e_test()
     #basic_test()
     #agnostic_path_test()
@@ -1190,4 +1227,4 @@ if __name__ == "__main__":
     #cmdline_test()
     #basic_sqp_test()
     #mf6_v5_ies_test()
-    #fr_fail_test()
+    fr_timeout_test()

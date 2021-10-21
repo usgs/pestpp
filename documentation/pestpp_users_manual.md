@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.1.1
+# <a id='s1' />Version 5.1.2
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-September 2021
+October 2021
 
 # <a id='s2' />Acknowledgements
 
@@ -70,7 +70,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Table of Contents
 
-- [Version 5.1.1](#s1)
+- [Version 5.1.2](#s1)
 - [Acknowledgements](#s2)
 - [Preface](#s3)
 - [License](#s4)
@@ -251,7 +251,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         - [9.2.6 Restarting](#s13-2-6)
         - [9.2.7 Failed Model Runs](#s13-2-7)
         - [9.2.8 Reporting ](#s13-2-8)
-        - [9.2.9 Termination Criteria and Objective Functions ](#s13-2-9)
+        - [9.2.9 Termination Criteria, Objective Functions, and Upgrade Acceptance ](#s13-2-9)
     - [9.3 PESTPP-IES Output Files](#s13-3)
         - [9.3.1 CSV Output Files](#s13-3-1)
         - [9.3.2 Non-CSV Output Files](#s13-3-2)
@@ -1769,6 +1769,9 @@ Alternatively, users may want to the run manager to stop waiting on one or more 
 **panther\_transfer\_on\_finish/panther\_transfer\_on\_fail**
 In some cases, users may want to retrieve one or more model output files from the agent working directories and collect those files in the master directory. For example, users may want an entire model output binary file for further processing after a successful model run. Or, if a model run fails to complete, users may wish to see certain model input/output files to diagnose issues. In a parallel run setting, both of these tasks can be difficult to complete. To support these use cases, the PEST++ tools allow transferring files from the agent directories to the master directory through the *panther\_transfer\_on\_finish* and *panther\_transfer\_on\_fail* options. Both of these options can be supplied as comma-separated lists of files or single file names. After successful completion or run failure, respectively, the panther run manager will transfer the nominated files found in the agent control file to the master working directory. This is worth saying again – the values of *panther\_transfer\_on\_finish* and *panther\_transfer\_on\_fail* listed in the agent’s control file are transferred to the master. This approach allows users to potentially transfer different files from each agent. To avoid naming conflicts in the master directory, the name of the file saved in the master directory is prepended with additional metadata information including agent hostname, agent working directory, run manager run id value, run manager group id value and run manager information text (this information text usually includes information like realization name from pestpp-ies/pestpp-da and parameter name for Jacobian filling and global sensitivity analysis). Users are encouraged to study the .rmr file because it lists several valuable pieces of information regarding any file transfers.
 
+**panther\_poll\_interval**
+Once a panther agent is initialized, it will start to try to connect to the master instance. On some operating systems, this act of trying connect actually results in a OS-level “file handle” being opened, which, if substantial time passes, can accumulate to a large number of open file handles. To prevent this, the panther agents will “sleep” for a given number of seconds before trying to connect to the master again. The length of time the agent sleeps is controlled by the *panther\_poll\_interval*, which an interger value of seconds to sleep. By default, this value is 1 second.
+
 ## <a id='s9-4' />5.4 Run Book-Keeping Files
 
 
@@ -2968,17 +2971,17 @@ To forestall excessive PESTPP-IES run times incurred by occasional model failure
 
 ### <a id='s13-2-8' />9.2.8 Reporting 
 
-PESTPP-IES records its progress to the screen and to its run record file. In addition to this, it records a plethora of output files. These are discussed in the next section. These output files can be supplemented by additional files that record, in ASCII format, matrices that PESTPP-IES formulates in the course of upgrading parameter realizations. The extent of its output file production can be controlled using the *ies\_verbose\_level()* variable. This can be awarded values of 0,1 or 2. The default is 1.
+PESTPP-IES records its progress to the screen and to its run record file. In addition to this, it records a plethora of output files–this is intentional. In the ensemble setting the cost of evaluating new model outputs is high, a rerun of an ensemble. It is therefore easier for PESTPP-IES to write as much information as possible to avoid these additional costs. The output are discussed in the next section. These output files can be supplemented by additional files that record, in ASCII format, matrices that PESTPP-IES formulates in the course of upgrading parameter realizations. The extent of its output file production can be controlled using the *ies\_verbose\_level()* variable. This can be awarded values of 0,1 or 2. The default is 1.
 
 If a model is numerically unstable, a user may wish to be informed of parameter values that precipitate run failure. As is discussed below, PESTPP-IES records the values of all parameters in all realizations comprising an ensemble, together with model run results, in iteration-specific CSV or JCB files. Parameter sets used in lambda testing can also be recorded if the *save\_lambda\_ensembles()* control variable is set to *true*.
 
-### <a id='s13-2-9' />9.2.9 Termination Criteria and Objective Functions 
+### <a id='s13-2-9' />9.2.9 Termination Criteria, Objective Functions, and Upgrade Acceptance 
 
 Like PEST and PESTPP-GLM, PESTPP-IES reads termination criteria from the eighth line of the “control data” section of a PEST control file.
 
 PESTPP-IES ceases execution after NOPTMAX iterations have elapsed. However, during these NOPTMAX iterations it applies the PHIREDSTP, NPHISTP and NPHINORED termination criteria to the mean objective function calculated using all realizations of the ensemble over successive smoother iterations. If the relative reduction in the mean objective function is less than PHIREDSTP over NPHISTP iterations, or if NPHINORED iterations have elapsed since the last reduction in the mean objective function has occurred, PESTPP-IES ceases execution.
 
-Note that, as described above, PESTPP-IES also ceases execution if, during any particular iteration of the smoother process, it cannot find in successive NPHINORED iterations, a lambda and scale factor that allows it to calculate parameter upgrades for which the objective function is less than *ies\_accept\_phi\_fac()*.
+Note that, as described above, PESTPP-IES also ceases execution if, during any particular iteration of the smoother process, it cannot find in successive NPHINORED iterations, a lambda and scale factor that allows it to calculate parameter upgrades for which the objective function is less than *ies\_accept\_phi\_fac()*. If the results of a particular iteration’s solution process do not meet the acceptable phi criteria (the previous iteration’s mean composite phi time *ies\_accept\_phi\_fac*), then a “partial upgrade” is performed, where only realizations that have yield a phi meeting this criteria are updated. After this partial upgrade, the full ensemble phi statistics are recalculated to determine if the lambda value for the next iteration. If after a partial upgrade, the acceptable phi criteria is still not met, PESTPP-IES will return to upgrade calculations with an increased lambda. In this situation, PESTPP-IES will save “rejected” parameter and observation ensembles in case users want to inspect these quantities.
 
 Special values of NOPTMAX can instigate special PESTPP-IES behaviour. If NOPTMAX is set to -1, PESTPP-IES does not upgrade random parameter sets which comprise an ensemble. It simply runs the model once for each parameter set, records model output values, and then ceases execution, thereby effective undertaking unconstrained Monte Carlo analysis. If NOPTMAX is set to zero, execution of PESTPP-IES is even shorter. It evaluates only the parameter values listed in the control file­ – replicating the behaviour of PESTPP-GLM and PEST. If NOPTMAX is supplied as -2, then PESTPP-IES will calculate the mean value of the initial parameter ensemble, evaluate it (by running the model once) and record the results.
 
@@ -3003,8 +3006,8 @@ As always, it is assumed that the filename base of the PEST control file on whic
 
 | File                          | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| *case.N.par.csv/jcb*              | Values of all parameters in all realizations comprising an ensemble. For N=0, this is the initial ensemble, sampled from the prior parameter probability distribution.                                                                                                                                                                                                                                                                                         |
-| *case.N.obs.csv/jcb*              | Values of model outputs which correspond to observations listed in the “observation data” section of the PEST control file. These are calculated using all realizations comprising the parameter ensemble.                                                                                                                                                                                                                                                     |
+| *case.N.par.csv/jcb*              | Values of all parameters in all realizations comprising an ensemble. For N=0, this is the initial ensemble, sampled from the prior parameter probability distribution. Otherwise, it is the parameter realizations at the end of iteration N                                                                                                                                                                                                                   |
+| *case.N.obs.csv/jcb*              | The ensemble of model outputs values which correspond to observations listed in the “observation data” section of the PEST control file. These are calculated using all realizations comprising the parameter ensemble.                                                                                                                                                                                                                                        |
 | *case.obs+noise.csv/jcb*          | Base observation values. These are calculated by generating realizations of measurement noise and adding this noise to measured values listed in the “observation data” section of the PEST control file.                                                                                                                                                                                                                                                      |
 | *case.N.L.lambda.F.scale.csv/jcb* | These files are produced if the *save\_lambda\_ensembles()* control variable is set to *true*. They record parameter values used in testing the effects of different Marquardt lambdas and line search factors. *L* is the value of the Marquardt lambda; *F* is the value of the line search factor.                                                                                                                                                          |
 | *case.phi.actual.csv*             | Objective functions calculated during all iterations of the ensemble smoother process for all members of the ensemble. Objective functions are computed from differences between model outputs and measurements recorded in the “observation data” section of the PEST control file using weights that are also provided in this section.                                                                                                                      |
@@ -3015,6 +3018,8 @@ As always, it is assumed that the filename base of the PEST control file on whic
 | *case.N.autoadaloc.csv*           | The (optional) automatic adaptive localization summary for each iteration                                                                                                                                                                                                                                                                                                                                                                                      |
 | *case.pdc.csv*                    | A summary of prior-data conflict information                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | *case.N.pcs.csv*                  | A summary of parameter changes by group compared to the initial parameter ensemble.                                                                                                                                                                                                                                                                                                                                                                            |
+| *case.rejected.N.obs.csv/jcb*     | The ensemble of model output values which correspond to observations listed in the “observation data” section of the PEST control file from a “rejected”/failed upgrade solution iteration.                                                                                                                                                                                                                                                                    |
+| *case.rejected.N.par.csv/jcb*     | The ensemble of parameter values which correspond to parameters listed in the “parameterdata” section of the PEST control file from a “rejected”/failed upgrade solution iteration.                                                                                                                                                                                                                                                                            |
 
 Table 9.2 CSV and JCB files written by PESTPP-IES. It is assumed that the name of the PEST control file is *case.pst*.
 

@@ -509,9 +509,11 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		convert_ip(value, overdue_giveup_minutes);
 	}
-	else if (key == "YAMR_POLL_INTERVAL")
+	else if ((key == "YAMR_POLL_INTERVAL") || (key == "PANTHER_POLL_INTERVAL"))
 	{
-	convert_ip(value, worker_poll_interval);
+	    passed_args.insert("YAMR_POLL_INTERVAL");
+	    passed_args.insert("PANTHER_POLL_INTERVAL");
+	    convert_ip(value, worker_poll_interval);
 	}
 	else if (key == "CONDOR_SUBMIT_FILE")
 	{
@@ -1487,7 +1489,7 @@ void PestppOptions::summary(ostream& os) const
 	os << endl;
 	os << "forgive_unknown_args: " << forgive_unknown_args << endl;
 	os << "max_run_fail: " << max_run_fail << endl;
-	os << "yamr_poll_interval: " << worker_poll_interval << endl;
+	os << "panther_poll_interval: " << worker_poll_interval << endl;
 	os << "parameter_covariance: " << parcov_filename << endl;
 	os << "observation_covariance: " << obscov_filename << endl;
 	os << "hotstart_resfile: " << hotstart_resfile << endl;

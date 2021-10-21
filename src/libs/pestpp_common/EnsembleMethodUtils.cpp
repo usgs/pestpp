@@ -5362,6 +5362,15 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 				last_best_lam = new_lam;
 			}
 		}
+        else {
+            double new_lam = last_best_lam * lam_inc;
+            new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
+            message(0, "incresing lambda to: ", new_lam);
+            last_best_lam = new_lam;
+        }
+        save_ensembles("rejected",cycle,pe_lams[best_idx],oe_lam_best);
+
+
 	}
 	//report_and_save();
 	return true;

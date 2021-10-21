@@ -207,6 +207,7 @@ int main(int argc, char* argv[])
 			throw(e);
 		}
 		pest_scenario.check_inputs(fout_rec);
+        stringstream ss;
 
 
 		//Initialize OutputFileWriter to handle IO of suplementary files (.par, .par, .svd)
@@ -273,12 +274,22 @@ int main(int argc, char* argv[])
 		}
 
 		std::sort(assimilation_cycles.begin(), assimilation_cycles.end());
-        stringstream ss;
+
 
 		ss.str("");
 		ss << "...assimilating over " << assimilation_cycles.size() << " cycles from " << assimilation_cycles[0] << " to " << assimilation_cycles[assimilation_cycles.size()-1] << endl;
 		cout << ss.str();
 		fout_rec << ss.str();
+
+        if ((pest_scenario.get_num_ext_file_maps() == 0) && (n_da_cycles > 1))
+        {
+            ss.str("");
+            ss << endl;
+            ss << "WARNING: no external control file sections found and multiple cycles detected.  ";
+            ss << "         PESTPP-DA usually requires these external sections for sequential assimilation..." << endl;
+            cout << ss.str();
+            fout_rec << ss.str();
+        }
 
 		int start_cycle = pest_scenario.get_pestpp_options().get_da_hotstart_cycle();
 		int max_cycle = assimilation_cycles[assimilation_cycles.size() - 1];
