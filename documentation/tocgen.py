@@ -156,7 +156,7 @@ def clean_4_toc(docx_file,inFile,outFile,run_pandoc=True):
 
 if __name__ == "__main__":
 
-    clean_4_toc("pestpp_users_guide_v5.1.2.docx","file.md","temp.md",True)
+    clean_4_toc("pestpp_users_guide_v5.1.3.docx","file.md","temp.md",True)
     processFile("temp.md","pestpp_users_manual.md")
 
 

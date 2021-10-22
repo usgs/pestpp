@@ -1,7 +1,7 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.1.2
+# <a id='s1' />Version 5.1.3
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
@@ -70,7 +70,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Table of Contents
 
-- [Version 5.1.2](#s1)
+- [Version 5.1.3](#s1)
 - [Acknowledgements](#s2)
 - [Preface](#s3)
 - [License](#s4)
