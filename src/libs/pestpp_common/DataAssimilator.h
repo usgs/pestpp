@@ -27,9 +27,10 @@ public:
 
 	void da_update(int cycle);
 	void finalize();
+    void sanity_checks();
 private:
 	void eig2csv(string name, Eigen::MatrixXd matrix);	
-	void sanity_checks();
+
 
 };
 

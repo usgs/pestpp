@@ -309,6 +309,7 @@ int main(int argc, char* argv[])
 		    RunManagerAbstract* run_manager_ptr = 0;
             DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
             da.initialize_dynamic_states();
+            da.sanity_checks();
             run_manager_ptr = 0;
             delete(run_manager_ptr);
 
@@ -508,7 +509,9 @@ int main(int argc, char* argv[])
 
 		DataAssimilator da(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
         //initialize the dynamic states here only for error checking...
+
 		da.initialize_dynamic_states();
+		da.sanity_checks();
 		ParameterEnsemble curr_pe(&pest_scenario);
 		ObservationEnsemble curr_oe(&pest_scenario);
 		ObservationEnsemble curr_noise(&pest_scenario);

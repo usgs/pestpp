@@ -2979,6 +2979,8 @@ EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
 	act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	act_par_names = pest_scenario.get_ctl_ordered_adj_par_names();
 	iter = 0;
+    warn_min_reals = 10;
+    error_min_reals = 2;
 
 }
 
@@ -3694,8 +3696,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	last_best_std = 1.0e+30;
 	lambda_max = 1.0E+30;
 	lambda_min = 1.0E-30;
-	warn_min_reals = 10;
-	error_min_reals = 2;
+
 	consec_bad_lambda_cycles = 0;
 
 	lam_mults = pest_scenario.get_pestpp_options().get_ies_lam_mults();
