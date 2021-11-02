@@ -1511,7 +1511,7 @@ pair<string, double> InstructionFile::execute_fixed(const string& token, string&
 		if (info.first != "DUM")
 		throw_ins_error("error casting fixed observation instruction '" + token + "' from output string '" + temp + "' on line '" + line + "'",ins_line_num, out_line_num);
 	}
-	if (idx != temp.size())
+	if ((info.first != "DUM") && (idx != temp.size()))
 	{
 		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for fixed instruciton: '" + token + "', left-over chars: '" + temp.substr(idx, temp.size()) + "'", ins_line_num, out_line_num);
 	}
@@ -1559,7 +1559,7 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 		if (info.first != "DUM")
 			throw_ins_error("error casting string '" + temp + "' to double for semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num, out_line_num);
 	}
-	if (idx != tokens[0].size())
+	if ((info.first != "DUM") && (idx != tokens[0].size()))
 	{
 		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for semi-fixed instruciton: '" + token + "', left-over chars: '" + temp.substr(idx, temp.size()) + "'", ins_line_num, out_line_num);
 	}
@@ -1599,7 +1599,7 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 		if (name != "DUM")
 			throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruciton: '"+token+"'", ins_line_num, out_line_num);
 	}
-	if (idx != tokens[0].size())
+	if ((name != "DUM") && (idx != tokens[0].size()))
 	{
 		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruciton: '" + token + "', left-over chars: '" + tokens[0].substr(idx,tokens[0].size())+"'", ins_line_num, out_line_num);
 	}
