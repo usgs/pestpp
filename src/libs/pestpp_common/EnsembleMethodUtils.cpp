@@ -2639,7 +2639,7 @@ void ParChangeSummarizer::write_to_csv(string& filename)
 }
 
 
-void ParChangeSummarizer::update(ParameterEnsemble& pe)
+void ParChangeSummarizer:: update(ParameterEnsemble& pe)
 {
 	mean_change.clear();
 	std_change.clear();
