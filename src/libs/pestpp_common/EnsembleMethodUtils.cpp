@@ -2996,6 +2996,16 @@ void EnsembleMethod::sanity_checks()
     string restart_par = ppo->get_ies_par_restart_csv();
 
 
+	if (pest_scenario.get_control_info().noptmax > 10)
+	{
+		warnings.push_back("noptmax > 10, don't expect anything meaningful from the results!");
+	}
+
+	else if (pest_scenario.get_control_info().noptmax > 3)
+	{
+		warnings.push_back("noptmax > 3, this is a lot of iterations for an ensemble method, please consider using fewer iterations for better outcomes");
+	}
+
     if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
     {
         warnings.push_back("'pestmode' == 'regularization', in pestpp-ies, this is controlled with the ++ies_reg_factor argument, resetting to 'estimation'");
