@@ -1539,8 +1539,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens.size() != 2)
 					throw_control_file_error(f_rec, "wrong number of tokens on '* model output' line '" + line + "' expecting 2");
-				model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
-				model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
+				model_exec_info.insfile_vec.push_back(tokens_case_sen[0]);
+				model_exec_info.outfile_vec.push_back(tokens_case_sen[1]);
 			}
 
 
