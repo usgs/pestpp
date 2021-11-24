@@ -86,7 +86,7 @@ private:
 	pair<string, pair<int, int>> parse_obs_instruction(const string& token, const string& close_tag);
 	string additional_delimiters;
 	
-	void tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty=true);
+	void tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty=true, int mx_tokens=-1);
 	
 
 };
@@ -97,15 +97,11 @@ public:
 	ModelInterface() { ; }
 	//ModelInterface(Pest* _pest_scenario_ptr) { pest_scenario_ptr = _pest_scenario_ptr; }
 	ModelInterface(vector<string> _tplfile_vec, vector<string> _inpfile_vec, vector<string>
-		_insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec) :
-		insfile_vec(_insfile_vec), outfile_vec(_outfile_vec), tplfile_vec(_tplfile_vec),
-		inpfile_vec(_inpfile_vec), comline_vec(_comline_vec), fill_tpl_zeros(false), additional_ins_delimiters(""),
-		num_threads(1)
-		{;}
+		_insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec);
 	void throw_mio_error(string base_message);
 	void run(Parameters* pars, Observations* obs);
 	void run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
-		pest_utils::thread_exceptions *shared_execptions,
+		exception_ptr& eptr,
 		Parameters* par, Observations* obs);
 	void check_io_access();
 	void check_tplins(const vector<string> &par_names, const vector<string> &obs_names);
@@ -129,6 +125,7 @@ private:
 	void write_input_files(Parameters *pars_ptr);
 	void read_output_files(Observations *obs_ptr);
 	void remove_existing();
+	void scrub_filename_ip(string& fname);
 
 };
 

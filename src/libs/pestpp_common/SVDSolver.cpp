@@ -585,6 +585,7 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 	const Parameters &base_run_active_ctl_pars, Parameters &upgrade_active_ctl_pars,
 	Pest::LimitType &limit_type)
 {
+	stringstream ss;
 	Parameters upgrade_ctl_del_pars;
 	Parameters grad_ctl_del_pars;
 	int num_upgrade_out_grad_in;
@@ -609,14 +610,24 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 
 	}
 	performance_log->log_event("commencing check of parameter bounds");
-	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, grad_ctl_del_pars);
+	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, grad_ctl_del_pars,false);
 	prev_frozen_active_ctl_pars.insert(new_frozen_active_ctl_pars.begin(), new_frozen_active_ctl_pars.end());
 
 
 	performance_log->log_event("limiting out of bounds pars");
 	Parameters notfrozen_upgrade_active_ctl_pars = upgrade_active_ctl_pars;
 	notfrozen_upgrade_active_ctl_pars.erase(prev_frozen_active_ctl_pars.get_keys());
-	pest_scenario.enforce_par_limits(performance_log, notfrozen_upgrade_active_ctl_pars, base_run_active_ctl_pars, true, true);
+	pair<string,double> ctl_info = pest_scenario.enforce_par_limits(performance_log, notfrozen_upgrade_active_ctl_pars, base_run_active_ctl_pars, true, true);
+	
+	ss.str("");
+	ss << "change limit/bound enforement for lambda " << i_lambda << ": " << ctl_info.first << ", scaling factor: " << ctl_info.second;
+	performance_log->log_event(ss.str());
+	if (ctl_info.second < 0.01)
+	{
+		file_manager.rec_ofstream() << "WARNING: change limit/bound enforcement for lambda " << i_lambda << "resulted in less than 1% original upgrade vector length" << endl;
+		cout << "WARNING: change limit/bound enforcement for lambda " << i_lambda << "resulted in less than 1% original upgrade vector length, see rec file for details" << endl;
+		file_manager.rec_ofstream() << ss.str() << endl;
+	}
 	upgrade_active_ctl_pars = notfrozen_upgrade_active_ctl_pars;
 	for (auto p : prev_frozen_active_ctl_pars)
 		upgrade_active_ctl_pars[p.first] = p.second;
@@ -658,7 +669,8 @@ void SVDSolver::test_upgrade_to_find_freeze_pars(double i_lambda, Parameters &pr
 	performance_log->log_event("commencing check of parameter bounds and gradients");
 
 	//get parameters who are at their bounds and heading out - these are the ones to freeze
-	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, grad_ctl_del_pars);
+	num_upgrade_out_grad_in = check_bnd_par(new_frozen_active_ctl_pars, base_run_active_ctl_pars, upgrade_active_ctl_pars, 
+		grad_ctl_del_pars,false);
 	prev_frozen_active_ctl_pars.insert(new_frozen_active_ctl_pars.begin(), new_frozen_active_ctl_pars.end());
 	if (new_frozen_active_ctl_pars.size() == upgrade_active_ctl_pars.size())
 		throw runtime_error("SVDSolver::test_upgrade_to_find_freeze_pars() error: all parameters at/near bounds and heading out - cannot continue");
@@ -1539,18 +1551,28 @@ void SVDSolver::iteration_update_and_report(ostream &os, const ModelRun &base_ru
 
 bool SVDSolver::par_heading_out_bnd(double p_org, double p_new, double lower_bnd, double upper_bnd)
 {
-	bool out_of_bnd = false;
+	/*bool out_of_bnd = false;
 	double tolerance = 1.0e-5;
-	if (((1.0 + tolerance) * p_org > upper_bnd) && (((1.0 - tolerance) * p_new) > p_org))
+	if (((1.0 + tolerance) * p_org >= upper_bnd) && (((1.0 + tolerance) * p_new) >= upper_bnd))
 		out_of_bnd = true;
-	else if (((1.0 - tolerance) * p_org) < lower_bnd && (((1.0 + tolerance) * p_new) < p_org))
+	else if (((1.0 - tolerance) * p_org) <= lower_bnd && (((1.0 - tolerance) * p_new) <= lower_bnd))
+		out_of_bnd = true;
+	return out_of_bnd;*/
+
+	bool out_of_bnd = false;
+	double tolerance = 1.0e-7;
+	if (((1.0 + tolerance) * p_org >= upper_bnd) && (p_new >= p_org))
+		out_of_bnd = true;
+	else if (((1.0 - tolerance) * p_org) <= lower_bnd && (p_new <= p_org))
 		out_of_bnd = true;
 	return out_of_bnd;
 }
 
 int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Parameters &current_active_ctl_pars,
-	const Parameters &upgrade_active_ctl_pars, const Parameters &del_grad_active_ctl_pars)
+	const Parameters &upgrade_active_ctl_pars, const Parameters &del_grad_active_ctl_pars,
+	bool include_bound)
 {
+	double tolerance = 1.0e-7;
 	int num_upgrade_out_grad_in = 0;
 	double p_org;
 	double p_new;
@@ -1572,23 +1594,20 @@ int SVDSolver::check_bnd_par(Parameters &new_freeze_active_ctl_pars, const Param
 			lower_bnd = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->lbnd;
 			//these are active parameters so this is not really necessary - just being extra safe
 			bool par_active = ctl_par_info_ptr->get_parameter_rec_ptr(*name_ptr)->is_active();
-			bool par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
-			//if gradient parameters are provided, also check these
-			/*if (par_active &&  par_going_out && del_grad_active_ctl_pars.size() > 0)
-			{
-				const auto it_grad = del_grad_active_ctl_pars.find(*name_ptr);
-				if (it_grad != del_grad_active_ctl_pars.end())
-				{
-					p_del = it_grad->second;
-					par_going_out = par_heading_out_bnd(p_org, p_del, lower_bnd, upper_bnd);
-				}
-				else
-				{
-					++num_upgrade_out_grad_in;
-				}
-			}*/
-			if (par_going_out)
+			if (!par_active)
+				continue;
+			
+			if ((include_bound) && ((1.0 + tolerance) * p_new >= upper_bnd))
 				new_freeze_active_ctl_pars.insert(*name_ptr, p_org);
+			else if ((include_bound) && ((1.0 - tolerance) * p_new <= lower_bnd))
+				new_freeze_active_ctl_pars.insert(*name_ptr, p_org);
+			else
+			{
+
+				bool par_going_out = par_heading_out_bnd(p_org, p_new, lower_bnd, upper_bnd);
+				if (par_going_out)
+					new_freeze_active_ctl_pars.insert(*name_ptr, p_org);
+			}
 		}
 	}
 	if (pest_scenario.get_pestpp_options().get_enforce_tied_bounds())

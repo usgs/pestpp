@@ -12,25 +12,9 @@
 #undef EIGEN_DEFAULT_TO_ROW_MAJOR
 #endif
 
-static int nb_temporaries;
-
-inline void on_temporary_creation(int) {
-  // here's a great place to set a breakpoint when debugging failures in this test!
-  nb_temporaries++;
-}
-  
-
-#define EIGEN_DENSE_STORAGE_CTOR_PLUGIN { on_temporary_creation(size); }
-
+#define TEST_ENABLE_TEMPORARY_TRACKING
+#define TEST_CHECK_STATIC_ASSERTIONS
 #include "main.h"
-
-#define VERIFY_EVALUATION_COUNT(XPR,N) {\
-    nb_temporaries = 0; \
-    XPR; \
-    if(nb_temporaries!=N) std::cerr << "nb_temporaries == " << nb_temporaries << "\n"; \
-    VERIFY( (#XPR) && nb_temporaries==N ); \
-  }
-
 
 // test Ref.h
 
@@ -48,7 +32,6 @@ inline void on_temporary_creation(int) {
 
 template<typename MatrixType> void ref_matrix(const MatrixType& m)
 {
-  typedef typename MatrixType::Index Index;
   typedef typename MatrixType::Scalar Scalar;
   typedef typename MatrixType::RealScalar RealScalar;
   typedef Matrix<Scalar,Dynamic,Dynamic,MatrixType::Options> DynMatrixType;
@@ -96,7 +79,6 @@ template<typename MatrixType> void ref_matrix(const MatrixType& m)
 
 template<typename VectorType> void ref_vector(const VectorType& m)
 {
-  typedef typename VectorType::Index Index;
   typedef typename VectorType::Scalar Scalar;
   typedef typename VectorType::RealScalar RealScalar;
   typedef Matrix<Scalar,Dynamic,1,VectorType::Options> DynMatrixType;
@@ -120,10 +102,14 @@ template<typename VectorType> void ref_vector(const VectorType& m)
   Index i = internal::random<Index>(0,size-1);
   Index bsize = internal::random<Index>(1,size-i);
   
-  RefMat rm0 = v1;
-  VERIFY_IS_EQUAL(rm0, v1);
-  RefDynMat rv1 = v1;
-  VERIFY_IS_EQUAL(rv1, v1);
+  { RefMat    rm0 = v1;                   VERIFY_IS_EQUAL(rm0, v1); }
+  { RefMat    rm0 = v1.block(0,0,size,1); VERIFY_IS_EQUAL(rm0, v1); }
+  { RefDynMat rv1 = v1;                   VERIFY_IS_EQUAL(rv1, v1); }
+  { RefDynMat rv1 = v1.block(0,0,size,1); VERIFY_IS_EQUAL(rv1, v1); }
+  { VERIFY_RAISES_ASSERT( RefMat    rm0 = v1.block(0, 0, size, 0); EIGEN_UNUSED_VARIABLE(rm0); ); }
+  if(VectorType::SizeAtCompileTime!=1)
+  { VERIFY_RAISES_ASSERT( RefDynMat rv1 = v1.block(0, 0, size, 0); EIGEN_UNUSED_VARIABLE(rv1); ); }
+
   RefDynMat rv2 = v1.segment(i,bsize);
   VERIFY_IS_EQUAL(rv2, v1.segment(i,bsize));
   rv2.setOnes();
@@ -248,6 +234,12 @@ int test_ref_overload_fun1(Ref<MatrixXf> )       { return 3; }
 int test_ref_overload_fun2(Ref<const MatrixXd> ) { return 4; }
 int test_ref_overload_fun2(Ref<const MatrixXf> ) { return 5; }
 
+void test_ref_ambiguous(const Ref<const ArrayXd> &A, Ref<ArrayXd> B)
+{
+  B = A;
+  B = A - A;
+}
+
 // See also bug 969
 void test_ref_overloads()
 {
@@ -260,6 +252,20 @@ void test_ref_overloads()
   VERIFY( test_ref_overload_fun2(Ad)==4 );
   VERIFY( test_ref_overload_fun2(Ad+Bd)==4 );
   VERIFY( test_ref_overload_fun2(Af+Bf)==5 );
+  
+  ArrayXd A, B;
+  test_ref_ambiguous(A, B);
+}
+
+void test_ref_fixed_size_assert()
+{
+  Vector4f v4;
+  VectorXf vx(10);
+  VERIFY_RAISES_STATIC_ASSERT( Ref<Vector3f> y = v4; (void)y; );
+  VERIFY_RAISES_STATIC_ASSERT( Ref<Vector3f> y = vx.head<4>(); (void)y; );
+  VERIFY_RAISES_STATIC_ASSERT( Ref<const Vector3f> y = v4; (void)y; );
+  VERIFY_RAISES_STATIC_ASSERT( Ref<const Vector3f> y = vx.head<4>(); (void)y; );
+  VERIFY_RAISES_STATIC_ASSERT( Ref<const Vector3f> y = 2*v4; (void)y; );
 }
 
 void test_ref()
@@ -284,4 +290,5 @@ void test_ref()
   }
   
   CALL_SUBTEST_7( test_ref_overloads() );
+  CALL_SUBTEST_7( test_ref_fixed_size_assert() );
 }

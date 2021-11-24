@@ -37,6 +37,7 @@ class RunManagerAbstract
 {
 public:
 	enum class RUN_UNTIL_COND { NORMAL, NO_OPS, TIME, NO_OPS_OR_TIME };
+	enum class RUN_MGR_TYPE {NOTDEFINED, PANTHER, SERIAL};
 	RunManagerAbstract(const std::vector<std::string> _comline_vec,
 		const std::vector<std::string> _tplfile_vec, const std::vector<std::string> _inpfile_vec,
 		const std::vector<std::string> _insfile_vec, const std::vector<std::string> _outfile_vec,
@@ -80,12 +81,14 @@ public:
 	//virtual Observations get_init_run_obs() { return init_run_obs; }
 	virtual std::vector<double> get_init_sim() { return init_sim;  }
 	virtual void set_init_sim(std::vector<double> _init_sim) { init_sim = _init_sim; }
+	virtual RUN_MGR_TYPE get_mgr_type() { return mgr_type; }
 
 protected:
 	int total_runs;
 	int max_n_failure; // maximium number of times to retry a failed model run
 	int cur_group_id;  // used in some of the derived classes (ie PANTHER)
 	RunStorage file_stor;
+	RUN_MGR_TYPE mgr_type;
 	std::vector<std::string> comline_vec;
 	std::vector<std::string> tplfile_vec;
 	std::vector<std::string> inpfile_vec;

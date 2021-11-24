@@ -11,6 +11,7 @@
 #include <thread>
 #include <unordered_set>
 #include "model_interface.h"
+#include <limits>
 
 using namespace std;
 
@@ -30,6 +31,57 @@ using namespace std;
 //	void mio_get_message_string_w_(int *, int *, char *);
 //
 //}
+
+
+ModelInterface::ModelInterface(vector<string> _tplfile_vec, vector<string> _inpfile_vec, vector<string>
+                               _insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec):
+                               insfile_vec(_insfile_vec), outfile_vec(_outfile_vec), tplfile_vec(_tplfile_vec),
+                               inpfile_vec(_inpfile_vec), comline_vec(_comline_vec), fill_tpl_zeros(false),
+                               additional_ins_delimiters(""),num_threads(1)
+{
+    //scrub any os seps from the file names
+
+    for (auto& fname : insfile_vec)
+    {
+        scrub_filename_ip(fname);
+    }
+    for (auto& fname : outfile_vec)
+    {
+        scrub_filename_ip(fname);
+    }
+    for (auto& fname : tplfile_vec)
+    {
+        scrub_filename_ip(fname);
+    }
+    for (auto& fname : inpfile_vec)
+    {
+        scrub_filename_ip(fname);
+    }
+    for (auto& fname : comline_vec)
+    {
+        scrub_filename_ip(fname);
+    }
+
+}
+
+void ModelInterface::scrub_filename_ip(string& fname)
+{
+    vector<string> tokens;
+    string tname;
+    pest_utils::tokenize(fname,tokens,"/\\");
+    if (tokens.size()> 1)
+    {
+        tname = tokens[0];
+
+        for (int i=1;i<tokens.size();i++)
+        {
+
+            tname = tname + OS_SEP + tokens[i];
+        }
+        //cout << fname << "," << tname << endl;
+        fname = tname;
+    }
+}
 
 
 void ModelInterface::throw_mio_error(string base_message)
@@ -156,16 +208,15 @@ void ModelInterface::check_tplins(const vector<string> &par_names, const vector<
 
 void ModelInterface::run(Parameters* pars, Observations* obs)
 {
-
+    exception_ptr run_exception = nullptr;
 	pest_utils::thread_flag terminate(false);
 	pest_utils::thread_flag finished(false);
-	pest_utils::thread_exceptions shared_exceptions;
 
-	run(&terminate, &finished, &shared_exceptions, pars, obs);
-	if (shared_exceptions.size() > 0)
+
+	run(&terminate, &finished, run_exception, pars, obs);
+	if (run_exception)
 	{
-		//finalize();
-		shared_exceptions.rethrow();
+        rethrow_exception(run_exception);
 	}
 
 }
@@ -600,7 +651,7 @@ void ModelInterface::remove_existing()
 }
 
 
-void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, pest_utils::thread_exceptions *shared_execptions,
+void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, exception_ptr& eptr,
 						Parameters* pars_ptr, Observations* obs_ptr)
 {
 			
@@ -626,6 +677,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		}
 		for (auto &cmd_string : comline_vec)
 		{
+		    cout << pest_utils::get_time_string() << " calling forward run command: '" << cmd_string << "' " << endl;
 			//start the command
 			PROCESS_INFORMATION pi;
 			try
@@ -684,6 +736,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		bool term_break = false;
 		for (auto &cmd_string : comline_vec)
 		{
+            cout << pest_utils::get_time_string() << " calling forward run command: '" << cmd_string << "' " << endl;
 			//start the command
 			int command_pid = start(cmd_string);
 			while (true)
@@ -691,12 +744,14 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 				//sleep
 				std::this_thread::sleep_for(std::chrono::milliseconds(OperSys::thread_sleep_milli_secs));
 				//check if process is still active
-				int status;
+				int status = 0;
 				pid_t exit_code = waitpid(command_pid, &status, WNOHANG);
 				//if the process ended, break
-				if (exit_code == -1)
+				if ((exit_code == -1) || (status != 0))
 				{
 					finished->set(true);
+					cout << "exit_code: " << exit_code << endl;
+					cout << "status: " << status << endl;
 					throw std::runtime_error("waitpid() returned error status for command: " + cmd_string);
 				}
 				else if (exit_code != 0)
@@ -737,12 +792,12 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 	catch (const std::exception& e)
 	{
 		cout << "exception raised by run thread: " << e.what() << endl;
-		shared_execptions->add(current_exception());
+		eptr = current_exception();
 	}
 	catch (...)
 	{
 		cout << "exception raised by run thread" << endl;
-		shared_execptions->add(current_exception());
+		eptr = current_exception();
 	}
 	return;
 
@@ -1133,15 +1188,15 @@ unordered_set<string> InstructionFile::parse_and_check()
 		line = read_ins_line(f_ins);
 		pest_utils::upper_ip(line);
 		tokens.clear();
-		pest_utils::tokenize(line, tokens);
-		
+		//pest_utils::tokenize(line, tokens);
+        tokens = tokenize_ins_line(line);
 		for (int i = 0; i < tokens.size(); i++)
 		{
 			first = tokens[i].at(0);
 			if ((first == '!') || (first == '(') || (first == '['))
 			{
 				name = parse_obs_name_from_token(tokens[i]);
-				if (!(name.find("DUM") != std::string::npos))
+				if (name != "DUM")
 				{
 					if (names.find(name) != names.end())
 					{
@@ -1151,6 +1206,17 @@ unordered_set<string> InstructionFile::parse_and_check()
 					names.emplace(name);
 				}
 			}
+			else if ((first == marker) || (first == 'L') || (first == 'W'))
+            {
+
+            }
+			else
+            {
+			    stringstream ss;
+			    ss << "unrecognized instruction: '" << tokens[i];
+                throw_ins_error(ss.str(),ins_line_num);
+            }
+
 		}
 	}
 	f_ins.close();
@@ -1327,6 +1393,7 @@ string InstructionFile::parse_obs_name_from_token(const string& token)
 		}
 	}
 	throw_ins_error("instruction type not recognized for observation instruction '" + token + "'");
+	return "";
 }
 
 vector<string> InstructionFile::tokenize_ins_line(const string& ins_line)
@@ -1423,7 +1490,7 @@ pair<string, pair<int, int>> InstructionFile::parse_obs_instruction(const string
 pair<string, double> InstructionFile::execute_fixed(const string& token, string& line, ifstream& f_out)
 {
 	string temp;
-	double value;
+	double value = 1.0e+30;
 	pair<string, pair<int, int>> info = parse_obs_instruction(token, "]");
 	//use the raw last_out_line since "line" has been getting progressively truncated
 	if (last_out_line.size() < info.second.second)
@@ -1433,14 +1500,20 @@ pair<string, double> InstructionFile::execute_fixed(const string& token, string&
 	}
 	int len = (info.second.second - info.second.first) + 1;
 	temp = last_out_line.substr(info.second.first, len);
+	size_t idx = 0;
 	try
 	{
 		//pest_utils::convert_ip(temp, value);
-		value = stod(temp);
+		value = stod(temp,&idx);
 	}
 	catch (...)
 	{
+		if (info.first != "DUM")
 		throw_ins_error("error casting fixed observation instruction '" + token + "' from output string '" + temp + "' on line '" + line + "'",ins_line_num, out_line_num);
+	}
+	if ((info.first != "DUM") && (idx != temp.size()))
+	{
+		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for fixed instruciton: '" + token + "', left-over chars: '" + temp.substr(idx, temp.size()) + "'", ins_line_num, out_line_num);
 	}
 	int pos = line.find(temp);
 	if (pos == string::npos)
@@ -1458,7 +1531,7 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 {
 	string temp;
 	vector<string> tokens;
-	double value;
+	double value = 1.0e+30;
 	pair<string, pair<int, int>> info = parse_obs_instruction(token, ")");
 	//use the raw last_out_line since "line" has been getting progressively truncated
 	if (last_out_line.size() < info.second.second)
@@ -1475,14 +1548,20 @@ pair<string, double> InstructionFile::execute_semi(const string& token, string& 
 		throw_ins_error("no non-whitespace char found before end index in semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num,out_line_num);
 	pest_utils::tokenize(last_out_line.substr(pos), tokens);
 	temp = tokens[0];
+	size_t idx = 0;
 	try
 	{
 		//pest_utils::convert_ip(temp, value);
-		value = stod(temp);
+		value = stod(temp,&idx);
 	}
 	catch (...)
 	{
-		throw_ins_error("error casting string '" + temp + "' to double for semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num, out_line_num);
+		if (info.first != "DUM")
+			throw_ins_error("error casting string '" + temp + "' to double for semi-fixed instruction '" + token + "' on line: '" + line + "'", ins_line_num, out_line_num);
+	}
+	if ((info.first != "DUM") && (idx != tokens[0].size()))
+	{
+		throw_ins_error("error converting '" + temp + "' to double on output line '" + last_out_line + "' for semi-fixed instruciton: '" + token + "', left-over chars: '" + temp.substr(idx, temp.size()) + "'", ins_line_num, out_line_num);
 	}
 	pos = line.find(temp);
 	if (pos == string::npos)
@@ -1502,22 +1581,28 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	int tsize = line.size() / 20;
 	if (tsize > 50)
 		tsize = 50;
+	string name = token.substr(1, token.size() - 2);
 	vector<string> tokens;
 	tokens.reserve(tsize);
-	tokenize(line, tokens,", \t\n\r" + additional_delimiters) ; //include the comma in the delimiters here
+	tokenize(line, tokens,", \t\n\r" + additional_delimiters,true,1) ; //include the comma in the delimiters here
 	if (tokens.size() == 0)
 		throw_ins_error("error tokenizing output line ('"+last_out_line+"') for free instruction '"+token+"' on line: " +last_ins_line, ins_line_num, out_line_num);
-	double value;
+	double value = 1.0e+30;
+	std::size_t idx = 0;
 	try
 	{
 		//pest_utils::convert_ip(tokens[0], value);
-		value = stod(tokens[0]);
+		value = stod(tokens[0],&idx);
 	}
 	catch (...)
 	{
-		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruciton: '"+token+"'", ins_line_num, out_line_num);
+		if (name != "DUM")
+			throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruciton: '"+token+"'", ins_line_num, out_line_num);
 	}
-	string name = token.substr(1, token.size() - 2);
+	if ((name != "DUM") && (idx != tokens[0].size()))
+	{
+		throw_ins_error("error converting '" + tokens[0] + "' to double on output line '" + last_out_line + "' for free instruciton: '" + token + "', left-over chars: '" + tokens[0].substr(idx,tokens[0].size())+"'", ins_line_num, out_line_num);
+	}
 	int pos = line.find(tokens[0]);
 	if (pos == string::npos)
 	{
@@ -1532,7 +1617,7 @@ pair<string, double> InstructionFile::execute_free(const string& token, string& 
 	return pair<string, double>(name,value);
 }
 
-void InstructionFile::tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty)
+void InstructionFile::tokenize(const std::string& str, vector<string>& tokens, const std::string& delimiters, const bool trimEmpty, int mx_tokens)
 {
 	std::string::size_type pos, lastPos = 0;
 	while (true)
@@ -1552,6 +1637,8 @@ void InstructionFile::tokenize(const std::string& str, vector<string>& tokens, c
 			if (pos != lastPos || !trimEmpty)
 				tokens.push_back(string(str.data() + lastPos, string::size_type(pos - lastPos)));
 		}
+		if ((mx_tokens > 0) && (tokens.size() > mx_tokens))
+			break;
 
 		lastPos = pos + 1;
 	}

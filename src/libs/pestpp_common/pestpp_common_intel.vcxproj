@@ -52,6 +52,7 @@
     <ClInclude Include="RedSVD-h.h" />
     <ClInclude Include="Regularization.h" />
     <ClInclude Include="RestartController.h" />
+    <ClInclude Include="sequential_lp.h" />
     <ClInclude Include="SVDASolver.h" />
     <ClInclude Include="SVDPackage.h" />
     <ClInclude Include="SVDSolver.h" />
@@ -84,6 +85,7 @@
     <ClCompile Include="QSqrtMatrix.cpp" />
     <ClCompile Include="Regularization.cpp" />
     <ClCompile Include="RestartController.cpp" />
+    <ClCompile Include="sequential_lp.cpp" />
     <ClCompile Include="SVDASolver.cpp" />
     <ClCompile Include="SVDPackage.cpp" />
     <ClCompile Include="SVDSolver.cpp" />
@@ -95,44 +97,44 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{D25CC810-E9E9-4920-82A4-6F585214480E}</ProjectGuid>
     <RootNamespace>pestpp_common</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>Intel C++ Compiler 19.0</PlatformToolset>
+    <PlatformToolset>Intel C++ Compiler 19.1</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug2_dll|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>Intel C++ Compiler 19.0</PlatformToolset>
+    <PlatformToolset>Intel C++ Compiler 19.1</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>Intel C++ Compiler 19.0</PlatformToolset>
+    <PlatformToolset>Intel C++ Compiler 19.1</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug2_dll|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>Intel C++ Compiler 19.0</PlatformToolset>
+    <PlatformToolset>Intel C++ Compiler 19.1</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>Intel C++ Compiler 19.0</PlatformToolset>
+    <PlatformToolset>Intel C++ Compiler 19.1</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>Intel C++ Compiler 19.0</PlatformToolset>
+    <PlatformToolset>Intel C++ Compiler 19.1</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
     <UseIntelMKL>No</UseIntelMKL>
@@ -221,7 +223,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)libs\Eigen;$(SolutionDir)libs\linear_analysis</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)libs\Eigen;$(SolutionDir)\libs\opt;$(SolutionDir)libs\linear_analysis</AdditionalIncludeDirectories>
       <OpenMPSupport>false</OpenMPSupport>
       <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/D_WIN32_WINNT=0x0600 %(AdditionalOptions)</AdditionalOptions>

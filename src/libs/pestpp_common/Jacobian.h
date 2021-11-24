@@ -67,7 +67,7 @@ public:
 	virtual const vector<string>& observation_list() const {return  base_sim_obs_names;}
 	virtual const vector<string>& obs_and_reg_list() const;
 	virtual const Parameters &get_base_numeric_parameters() const{return base_numeric_parameters;};
-	Eigen::SparseMatrix<double> get_matrix(const vector<string> &obs_names, const vector<string> & par_name_vec) const;
+	Eigen::SparseMatrix<double> get_matrix(const vector<string> &obs_names, const vector<string> & par_name_vec, bool forgive_missing=false, int n_cols=0) const;
 
 	virtual bool build_runs(ModelRun &model_run, vector<string> numeric_par_names, ParamTransformSeq &par_transform,
 		const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info,

@@ -211,7 +211,7 @@ public:
   const double * getRowRange() const;
 
   /// Get pointer to array[getNumCols()] of objective function coefficients
-  const int getNumObjectives() const;
+  int getNumObjectives() const;
   
   /// Get pointer to array[getNumCols()] of objective function coefficients
   const double * getObjCoefficients() const;

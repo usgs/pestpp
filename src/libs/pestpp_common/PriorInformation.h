@@ -45,7 +45,7 @@ public:
 		const std::vector<PIAtom> _pi_atoms = std::vector<PIAtom>());
 	const PriorInformationRec& operator=(const PriorInformationRec &rhs);
 	double calc_residual(const Parameters &pars) const;
-	std::pair<double, double> calc_residual_and_sim_val(const Parameters &pars) const;
+	std::pair<double, double> calc_sim_and_resid(const Parameters &pars) const;
 	bool is_regularization() const;
 	double get_weight()const {return weight;}
 	double get_obs_value()const {return pival;}
@@ -78,7 +78,7 @@ public:
 	PriorInformation::const_iterator end() const {return prior_info_map.end();}
 	PriorInformation::const_iterator find(const std::string &key) const {return  prior_info_map.find(key);}
 	PriorInformation::iterator find(const std::string &key) {return  prior_info_map.find(key);}
-	PriorInformationRec get_pi_rec_ptr(std::string name)const { return prior_info_map.at(name); }
+	PriorInformationRec get_pi_rec(std::string name)const { return prior_info_map.at(name); }
 	size_t size() const {return prior_info_map.size();}
 	int get_nnz_pi() const;
 	std::vector<std::string> get_keys() const;

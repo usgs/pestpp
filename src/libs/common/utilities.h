@@ -24,7 +24,7 @@
 #include <Eigen/Sparse>
 
 
-
+const string QUIT_FILENAME = "pest.stp";
 
 //printing functions
 std::ostream& operator<< (std::ostream &os, const std::set<std::string> val);
@@ -256,46 +256,48 @@ private:
 
 };
 
-class thread_exceptions
-{
-public:
+//class thread_exceptions
+//{
+//public:
+//
+//	thread_exceptions() {}
+//	void add(std::exception_ptr ex_ptr);
+//	void rethrow();
+//	int size(){ return shared_exception_vec.size(); }
+//	string what();
+//private:
+//	std::vector<std::exception_ptr> shared_exception_vec;
+//	std::mutex m;
+//
+//};
 
-	thread_exceptions() {}
-	void add(std::exception_ptr ex_ptr);
-	void rethrow();
-	int size(){ return shared_exception_vec.size(); }
-	string what();
-private:
-	std::vector<std::exception_ptr> shared_exception_vec;
-	std::mutex m;
+//class thread_RAII
+//{
+//	thread& t;
+//public:
+//	thread_RAII(thread& th) :t(th)
+//	{
+//	}
+//
+//	~thread_RAII()
+//	{
+//		if (t.joinable())
+//		{
+//			t.join();
+//		}
+//	}
+//
+//private:
+//	// copy constructor
+//	thread_RAII(const thread_RAII& thr);
+//
+//	// copy-assignment operator
+//	thread_RAII& operator=(const thread_RAII& thr);
+//};
+//
 
-};
-
-class thread_RAII
-{
-	thread& t;
-public:
-	thread_RAII(thread& th) :t(th)
-	{
-	}
-
-	~thread_RAII()
-	{
-		if (t.joinable())
-		{
-			t.join();
-		}
-	}
-
-private:
-	// copy constructor
-	thread_RAII(const thread_RAII& thr);
-
-	// copy-assignment operator
-	thread_RAII& operator=(const thread_RAII& thr);
-};
-
-
+void read_binary_matrix_header(const string& filename, int& tmp1, int& tmp2, int& tmp3);
+void read_dense_binary(const string& filename, vector<string>& row_names, vector<string>& col_names, Eigen::MatrixXd& matrix);
 bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::SparseMatrix<double> &matrix);
 
 bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::MatrixXd &matrix);
@@ -308,7 +310,7 @@ void save_binary_orgfmt(const string &filename, const vector<string> &row_names,
 class ExternalCtlFile
 {
 public:
-	ExternalCtlFile(ofstream& _f_rec, const string& _line, bool _cast=true);
+	ExternalCtlFile(const string& _line, bool _cast=true);
 	string get_filename() { return filename;  }
 	vector<string> get_col_names() { return col_names; }
 	vector<int> get_row_order() { return row_order; }
@@ -324,13 +326,13 @@ public:
 	string get_index_col_name() { return index_col_name; }
 	template<typename t>
 	inline void fill_col_vector(string col_name, vector<t> &col_vector);
-	void read_file();
+	void read_file(ofstream& f_rec);
 	void keep_cols(set<string>& keep_cols);
 	void clear() { data.clear(); }
 	
 private:
 	bool cast;
-	ofstream& f_rec;
+	//ofstream& f_rec;
 	string line, filename, index_col_name;
 	string delim,missing_val;
 	vector<string> col_names;
@@ -375,6 +377,8 @@ inline void ExternalCtlFile::fill_col_vector(string col_name, vector<t>& col_vec
 string get_time_string();
 string get_time_string_short();
 
+int quit_file_found();
+bool try_remove_quit_file();
 
 class CmdLine {
 
@@ -392,6 +396,8 @@ private:
 	void throw_cmdline_error(string message);
 
 };
+
+
 
 }  // end namespace pest_utils
 #endif /* UTILITIES_H_ */

@@ -294,6 +294,18 @@ void Transformable::update_rec(const string &name, double value)
 	}
 }
 
+void Transformable::update(const vector<string>& names, const Eigen::VectorXd& values)
+{
+	items.clear();
+	assert(names.size() == values.size());
+	size_t n_rec = names.size();
+	items.reserve(n_rec);
+	for (size_t i = 0; i < n_rec; ++i)
+	{
+		items[names[i]] = values[i];
+	}
+}
+
 void Transformable::update(const vector<string> &names, const vector<double> &values)
 {
 	items.clear();

@@ -3,7 +3,6 @@
 #include <unordered_set>
 #include <iterator>
 #include <limits>
-#include <cstddef>
 #include "Ensemble.h"
 #include "RestartController.h"
 #include "utilities.h"
@@ -15,9 +14,14 @@
 #include "system_variables.h"
 #include "pest_data_structs.h"
 #include "eigen_tools.h"
+#include "Transformable.h"
 
 Ensemble::Ensemble(Pest *_pest_scenario_ptr, std::mt19937* _rand_gen_ptr): pest_scenario_ptr(_pest_scenario_ptr),
 rand_gen_ptr(_rand_gen_ptr)
+{
+}
+
+Ensemble::Ensemble(Pest* _pest_scenario_ptr): pest_scenario_ptr(_pest_scenario_ptr)
 {
 }
 
@@ -31,7 +35,7 @@ bool Ensemble::try_align_other_rows(PerformanceLog* performance_log, Ensemble& o
 		if (other_real_map.find(item.first) == other_real_map.end())
 			return false;
 		//if this realization name is not at the same location then we do need to reorder
-		if (item.second != other_real_map[item.first])
+		if (item.second != other_real_map.at(item.first))
 			need_to_align = true;
 	}
 	//if we made it to here and need_to_align is false, then two ensembles are already row aligned
@@ -71,18 +75,62 @@ void Ensemble::check_for_dups()
 void Ensemble::reserve(vector<string> _real_names, vector<string> _var_names)
 {
 	reals.resize(_real_names.size(), _var_names.size());
+	reals.setZero();
 	var_names = _var_names;
 	real_names = _real_names;
 	org_real_names = real_names;
 }
 
-Ensemble Ensemble::zero_like()
+Ensemble Ensemble::zeros_like(int nrows)
 {
-	Eigen::MatrixXd new_reals = Eigen::MatrixXd::Zero(real_names.size(), var_names.size());
-	Ensemble new_en(pest_scenario_ptr, rand_gen_ptr);
-	new_en.from_eigen_mat(new_reals, real_names, var_names);
+	if (nrows < 0)
+		nrows = real_names.size();
+	Eigen::MatrixXd new_reals = Eigen::MatrixXd::Zero(nrows, var_names.size());
+
+	vector<string> new_real_names;
+	for (int i = 0; i < nrows; i++)
+		new_real_names.push_back(real_names[i]);
+
+	ParameterEnsemble new_en(pest_scenario_ptr, rand_gen_ptr);
+	new_en.from_eigen_mat(new_reals, new_real_names, var_names);
 	return new_en;
+
 }
+
+void Ensemble::broadcast_vec2mat(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
+{
+	//todo
+
+}
+
+void Ensemble::replace_col_vals(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
+{
+
+	if (shape().first != mat.rows())
+		throw_ensemble_error("Ensemble::replace_col_vals(): first dimensions don't match");
+
+	map<string, int> this_varmap, other_varmap;
+	for (int i = 0; i < var_names.size(); i++)
+		this_varmap[var_names[i]] = i;
+
+	vector<string> missing;
+	set<string> svnames(var_names.begin(), var_names.end());
+	set<string>::iterator end = svnames.end();
+	for (int i = 0; i < other_var_names.size(); i++)
+	{
+		if (svnames.find(other_var_names[i]) == end)
+			missing.push_back(other_var_names[i]);
+		other_varmap[other_var_names[i]] = i;
+	}
+	if (missing.size() > 0)
+		throw_ensemble_error("Ensemble::replace_col_vals(): the following var names in other were not found", missing);
+	for (auto& ovm : other_varmap)
+	{
+		reals.col(this_varmap[ovm.first]) = mat.col(ovm.second);
+	}
+}
+
+
 
 
 void Ensemble::add_2_cols_ip(const vector<string> &other_var_names, const Eigen::MatrixXd &mat)
@@ -108,7 +156,7 @@ void Ensemble::add_2_cols_ip(const vector<string> &other_var_names, const Eigen:
 		throw_ensemble_error("Ensemble::add_2_cols_ip(): the following var names in other were not found", missing);
 	for (auto &ovm : other_varmap)
 	{
-		reals.col(this_varmap[ovm.first]) += mat.col(ovm.second);
+		reals.col(this_varmap.at(ovm.first)) += mat.col(ovm.second);
 	}
 }
 
@@ -226,148 +274,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 			//if ((num_threads <= 0) || (group_keys.size() == 1))
 			//jwhite 23 dec 2020 - something is up with the multithreaded draw (and its a really mem pig)
 			//so turning it off
-			if (true)
-			{
-				worker.work(0, num_reals, level, idx_map, std_map);
-			}
-			else
-			{
-				Eigen::setNbThreads(1);
-				vector<thread> threads;
-				vector<exception_ptr> exception_ptrs;
-				plog->log_event("launching draw threads");
-
-				for (int i = 0; i < num_threads; i++)
-				{
-					exception_ptrs.push_back(exception_ptr());
-				}
-
-				for (int i = 0; i < num_threads; i++)
-				{
-					//threads.push_back(thread(&LocalUpgradeThread::work, &worker, i, iter, cur_lam));
-
-					threads.push_back(thread(draw_thread_function, i, std::ref(worker), num_reals, level, idx_map, std_map,std::ref(exception_ptrs[i])));
-
-				}
-				plog->log_event("waiting to join threads");
-				//for (auto &t : threads)
-				//	t.join();
-				for (int i = 0; i < num_threads; ++i)
-				{
-					if (exception_ptrs[i])
-					{
-						try
-						{
-							rethrow_exception(exception_ptrs[i]);
-						}
-						catch (const std::exception& e)
-						{
-							ss.str("");
-							ss << "thread " << i << "raised an exception: " << e.what();
-							throw runtime_error(ss.str());
-						}
-					}
-					threads[i].join();
-					if (exception_ptrs[i])
-					{
-						try
-						{
-							rethrow_exception(exception_ptrs[i]);
-						}
-						catch (const std::exception& e)
-						{
-							ss.str("");
-							ss << "thread " << i << "raised an exception: " << e.what();
-							throw runtime_error(ss.str());
-						}
-					}
-				}
-				plog->log_event("threaded draws done");
-
-			}
-			
-
-			//Covariance gcov;
-			//
-			//RedSVD::RedSymEigen<Eigen::SparseMatrix<double>> eig;
-
-			//Eigen::MatrixXd proj;
-			////map<string, int> idx_map;
-			//vector<int> idx;
-			//for (int i = 0; i < var_names.size(); i++)
-			//	idx_map[var_names[i]] = i;
-			//for (auto &gi : grouper)
-			//{
-			//	ss.str("");
-			//	ss << "...processing " << gi.first << " with " << gi.second.size() << " elements" << endl;
-			//	cout << ss.str();
-			//	plog->log_event(ss.str());
-			//	if (gi.second.size() == 0)
-			//		throw_ensemble_error("Ensemble::draw(): no elements found for group", gi.second);
-			//	if (gi.second.size() == 1)
-			//	{
-			//		ss.str("");
-			//		ss << "only one element in group " << gi.first << ", scaling by std";
-			//		plog->log_event(ss.str());
-			//		int j = idx_map[gi.second[0]];
-			//		draws.col(j) *= std(j);
-			//		continue;
-			//	}
-
-			//	gcov = cov.get(gi.second);
-			//	if (level > 2)
-			//	{
-			//		gcov.to_ascii(gi.first + "_cov.dat");
-			//	}
-
-			//	idx.clear();
-			//	for (auto n : gi.second)
-			//		idx.push_back(idx_map[n]);
-			//	if (idx.size() != idx[idx.size() - 1] - idx[0] + 1)
-			//		throw_ensemble_error("Ensemble:: draw() error in full cov group draw: idx out of order");
-
-			//	//cout << var_names[idx[0]] << "," << var_names[idx.size() - idx[0]] << endl;
-			//	//cout << idx[0] << ',' << idx[idx.size()-1] << ',' <<  idx.size() << " , " << idx[idx.size()-1] - idx[0] <<  endl;
-
-			//	double fac = gcov.e_ptr()->diagonal().minCoeff();
-			//	ss.str("");
-			//	ss << "min variance for group " << gi.first << ": " << fac;
-			//	plog->log_event(ss.str());
-			//	Eigen::MatrixXd block = draws.block(0, idx[0], num_reals, idx.size());
-			//	ss.str("");
-			//	ss << "Randomized Eigen decomposition of full cov for " << gi.second.size() << " element matrix" << endl;
-			//	plog->log_event(ss.str());
-			//	eig.compute(*gcov.e_ptr() * (1.0/fac), gi.second.size());
-			//	//RedSVD::RedSVD<Eigen::SparseMatrix<double>> svd;
-			//	//svd.compute(*gcov.e_ptr(),gcov.get_col_names().size());// , gi.second.size());
-			//	//cout << svd.singularValues() << endl;
-			//	//Eigen::JacobiSVD<Eigen::MatrixXd> svd(gcov.e_ptr()->toDense(), Eigen::ComputeFullU);
-			//	//svd.computeU();
-
-			//	proj = (eig.eigenvectors() * (fac *eig.eigenvalues()).cwiseSqrt().asDiagonal());
-			//	//proj = (svd.matrixU() * svd.singularValues().asDiagonal());
-
-			//	if (level > 2)
-			//	{
-			//		ofstream f(gi.first + "_evec.dat");
-			//		f << eig.eigenvectors() << endl;
-			//		//f << svd.matrixU() << endl;
-			//		f.close();
-			//		ofstream ff(gi.first + "_sqrt_evals.dat");
-			//		ff << (fac * eig.eigenvalues()).cwiseSqrt() << endl;
-			//		//ff << svd.singularValues() << endl;
-			//		ff.close();
-			//		ofstream fff(gi.first+"_proj.dat");
-			//		fff << proj << endl;
-			//		fff.close();
-			//	}
-			//	//cout << "block " << block.rows() << " , " << block.cols() << endl;
-			//	//cout << " proj " << proj.rows() << " , " << proj.cols() << endl;
-			//	plog->log_event("projecting group block");
-			//	draws.block(0, idx[0], num_reals, idx.size()) = (proj * block.transpose()).transpose();
-
-			//}
-			
+			worker.work(0, num_reals, level, idx_map, std_map);
 		}
 		else
 		{
@@ -572,8 +479,9 @@ Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names,
 	Eigen::MatrixXd _reals;
 	if ((_real_names.size() == 0) && (_var_names.size() == 0))
 		_reals = reals;
-	else
-		_reals = get_eigen(_real_names, _var_names);
+	else {
+        _reals = get_eigen(_real_names, _var_names);
+    }
 
 
 	map<int, double> center_on_map;
@@ -613,10 +521,21 @@ Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names,
 		}
 		else
 		{
-			vector<string>::iterator it = find(real_names.begin(), real_names.end(), on_real);
-			if (it == real_names.end())
-				throw runtime_error("Ensemble::get_eigen_mean_diff() error: 'on_real' not found: " + on_real);
-			int idx = distance(real_names.begin(), it);
+			int idx;
+			if (_real_names.size() > 0) {
+
+                vector<string>::const_iterator it = find(_real_names.begin(), _real_names.end(), on_real);
+                if (it == _real_names.end())
+                    throw runtime_error("Ensemble::get_eigen_mean_diff() error: 'on_real' not found: " + on_real);
+                idx = distance(_real_names.begin(), it);
+            }
+			else
+            {
+                vector<string>::iterator it = find(real_names.begin(), real_names.end(), on_real);
+                if (it == real_names.end())
+                    throw runtime_error("Ensemble::get_eigen_mean_diff() error: 'on_real' not found: " + on_real);
+                idx = distance(real_names.begin(), it);
+            }
 			for (int i = 0; i < _reals.cols(); i++)
 				center_on_map[i] = _reals(idx, i);
 		}
@@ -641,7 +560,7 @@ Eigen::MatrixXd Ensemble::get_eigen_anomalies(const vector<string> &_real_names,
 	return _reals;
 }
 
-vector<double> Ensemble::get_mean_stl_vector()
+vector<double> Ensemble::get_mean_stl_var_vector()
 {
 	vector<double> mean_vec;
 	mean_vec.reserve(var_names.size());
@@ -652,35 +571,55 @@ vector<double> Ensemble::get_mean_stl_vector()
 	return mean_vec;
 }
 
-pair<map<string, double>, map<string, double>>  Ensemble::get_moment_maps(const vector<string> &_real_names)
+void Ensemble::fill_moment_maps(map<string, double>& mean_map, map<string, double>& std_map)
 {
-	Eigen::VectorXd mean, std;
-	if (_real_names.size() == 0)
+    mean_map.clear();
+    std_map.clear();
+	Eigen::VectorXd mean = reals.colwise().mean();
+	Eigen::MatrixXd mean_diff = get_eigen_anomalies();
+	//std = mean_diff.array().pow(2).colwise().sum().sqrt();
+	Eigen::VectorXd std = (mean_diff.array() * mean_diff.array()).colwise().sum().sqrt();
+	int i = 0;
+	for (auto& name : var_names)
 	{
-		mean = reals.colwise().mean();
-		Eigen::MatrixXd mean_diff = get_eigen_anomalies();
-		std = mean_diff.array().pow(2).colwise().sum().sqrt();
+		mean_map.insert(make_pair(name,mean[i]));
+		std_map.insert(make_pair(name,std[i]));
+		i++;
 	}
-	else
-	{
-		mean = get_eigen(_real_names,vector<string>()).colwise().mean();
-		Eigen::MatrixXd mean_diff = get_eigen_anomalies(_real_names,vector<string>());
-		std = mean_diff.array().pow(2).colwise().sum().sqrt();
-	}
-	map<string, double> mean_map, std_map;
-	string name;
-	for (int i = 0; i < reals.cols(); i++)
-	{
-		name = var_names[i];
-		mean_map[name] = mean[i];
-		std_map[name] = std[i];
-	}
-	return pair<map<string, double>, map<string, double>>(mean_map,std_map);
 }
 
-void Ensemble::replace_col(string var_name, Eigen::VectorXd& vec)
+//pair<map<string, double>, map<string, double>>  Ensemble::get_moment_maps(const vector<string> &_real_names)
+//{
+//	Eigen::VectorXd mean, std;
+//	if (_real_names.size() == 0)
+//	{
+//		mean = reals.colwise().mean();
+//		Eigen::MatrixXd mean_diff = get_eigen_anomalies();
+//		//std = mean_diff.array().pow(2).colwise().sum().sqrt();
+//		std = (mean_diff.array() * mean_diff.array()).colwise().sum().sqrt();
+//	}
+//	else
+//	{
+//		mean = get_eigen(_real_names,vector<string>()).colwise().mean();
+//		Eigen::MatrixXd mean_diff = get_eigen_anomalies(_real_names,vector<string>());
+//		//std = mean_diff.array().pow(2).colwise().sum().sqrt();
+//		std = (mean_diff.array() * mean_diff.array()).colwise().sum().sqrt();
+//	}
+//	map<string, double> mean_map, std_map;
+//	string name;
+//	for (int i = 0; i < reals.cols(); i++)
+//	{
+//		name = var_names[i];
+//		mean_map[name] = mean[i];
+//		std_map[name] = std[i];
+//	}
+//	return pair<map<string, double>, map<string, double>>(mean_map,std_map);
+//}
+
+void Ensemble::replace_col(string var_name, Eigen::VectorXd& vec, bool update_map)
 {
-	update_var_map();
+	if (update_map)
+		update_var_map();
 	if (var_map.find(var_name) == var_map.end())
 		throw_ensemble_error("replace_col(): var_name not found: " + var_name);
 	if (vec.size() != reals.rows())
@@ -737,41 +676,52 @@ void Ensemble::reorder(const vector<string> &_real_names, const vector<string> &
 	}
 }
 
-void Ensemble::drop_rows(const vector<int> &row_idxs)
+void Ensemble::drop_rows(const vector<int> &row_idxs, bool update_org_real_names)
 {
-	vector<int>::const_iterator start = row_idxs.begin(), end = row_idxs.end();
+	//vector<int>::const_iterator start = row_idxs.begin(), end = row_idxs.end();
+	set<int> sdrop_rows(row_idxs.begin(), row_idxs.end());
+	set<int>::iterator end = sdrop_rows.end();
 	vector<string> keep_names;
 	for (int ireal = 0; ireal < reals.rows(); ireal++)
-		if (find(start, end, ireal) == end)
+		if (sdrop_rows.find(ireal) == end)
 			keep_names.push_back(real_names[ireal]);
 	if (keep_names.size() == 0)
 		reals = Eigen::MatrixXd();
 	else
 		reals = get_eigen(keep_names, vector<string>());
 	real_names = keep_names;
+	if (update_org_real_names)
+		org_real_names = keep_names;
 }
 
-void Ensemble::drop_rows(const vector<string> &drop_names)
+void Ensemble::drop_rows(const vector<string> &drop_names, bool update_org_real_names)
 {
 	vector<string> keep_names;
-	vector<string>::const_iterator start = drop_names.begin(), end = drop_names.end();
+	//vector<string>::const_iterator start = drop_names.begin(), end = drop_names.end();
+	set<string> sdrop_names(drop_names.begin(), drop_names.end());
+	set<string>::iterator end = sdrop_names.end();
 	for (auto &n : real_names)
-		if (find(start, end, n) == end)
+		if (sdrop_names.find(n) == end)
 			keep_names.push_back(n);
 	if (keep_names.size() == 0)
 		reals = Eigen::MatrixXd();
 	else
 		reals = get_eigen(keep_names, vector<string>());
 	real_names = keep_names;
+	if (update_org_real_names)
+		org_real_names = keep_names;
 
 }
 
 void Ensemble::drop_cols(const vector<string>& drop_names)
 {
 	vector<string> keep_names;
-	vector<string>::const_iterator start = drop_names.begin(), end = drop_names.end();
+	set<string> sdrop_names(drop_names.begin(), drop_names.end());
+	set<string>::iterator end = sdrop_names.end();
+	//vector<string>::const_iterator start = drop_names.begin(), end = drop_names.end();
 	for (auto& n : var_names)
-		if (find(start, end, n) == end)
+		//if (find(start, end, n) == end)
+		if (sdrop_names.find(n) == end)
 			keep_names.push_back(n);
 	if (keep_names.size() == 0)
 		reals = Eigen::MatrixXd();
@@ -790,8 +740,9 @@ void Ensemble::keep_rows(const vector<int> &row_idxs)
 	for (int ireal = 0; ireal < reals.rows(); ireal++)
 		if (find(start, end, ireal) != end)
 			keep_names.push_back(real_names[ireal]);
-	reals = get_eigen(keep_names, vector<string>());
-	real_names = keep_names;
+	/*reals = get_eigen(keep_names, vector<string>());
+	real_names = keep_names;*/
+	keep_rows(keep_names);
 }
 
 void Ensemble::keep_rows(const vector<string> &keep_names)
@@ -920,6 +871,7 @@ void Ensemble::to_csv(string file_name)
 	{
 		throw_ensemble_error("Ensemble.to_csv() error opening csv file " + file_name + " for writing");
 	}
+	csv << setprecision(pest_scenario_ptr->get_pestpp_options().get_ensemble_output_precision());
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_csv_by_reals())
 	{
 		to_csv_by_reals(csv);
@@ -928,11 +880,13 @@ void Ensemble::to_csv(string file_name)
 	{
 		to_csv_by_vars(csv);
 	}
+	csv.close();
 }
 
-void Ensemble::to_csv_by_vars(ofstream &csv)
+void Ensemble::to_csv_by_vars(ofstream &csv, bool write_header)
 {
-	csv << "var_name";
+	if (write_header)
+		csv << "var_name";
 	
 	//for (int ireal = 0; ireal < reals.rows(); ireal++)
 	int ireal = 0;
@@ -940,19 +894,24 @@ void Ensemble::to_csv_by_vars(ofstream &csv)
 	for (int i = 0; i < real_names.size(); i++)
 		real_map[real_names[i]] = i;
 	map<string, int>::iterator end = real_map.end();
-	for (auto rname : org_real_names)
+	vector<string> names = org_real_names;
+	if (names.size() == 0)
+		names = real_names;
+	for (auto rname : names)
 	{
 		if (real_map.find(rname) == end)
 			continue;
 
 		ireal = real_map[rname];
-		csv << ',' << pest_utils::lower_cp(real_names[ireal]);
+		if (write_header)
+			csv << ',' << pest_utils::lower_cp(real_names[ireal]);
 	}
-	csv << endl;
+	if (write_header)
+		csv << endl;
 	for (int ivar = 0; ivar < reals.cols(); ivar++)
 	{
 		csv << pest_utils::lower_cp(var_names[ivar]);
-		for (auto rname : org_real_names)
+		for (auto rname : names)
 		{
 			if (real_map.find(rname) == end)
 				continue;
@@ -963,19 +922,26 @@ void Ensemble::to_csv_by_vars(ofstream &csv)
 	}
 }
 
-void Ensemble::to_csv_by_reals(ofstream &csv)
+void Ensemble::to_csv_by_reals(ofstream &csv, bool write_header)
 {
-	csv << "real_name";
-	for (auto &vname : var_names)
-		csv << ',' << pest_utils::lower_cp(vname);
-	csv << endl;
+	if (write_header)
+	{
+		csv << "real_name";
+		for (auto& vname : var_names)
+			csv << ',' << pest_utils::lower_cp(vname);
+		csv << endl;
+	}
 	//for (int ireal = 0; ireal < reals.rows(); ireal++)
 	int ireal = 0;
 	map<string, int> real_map;
 	for (int i = 0; i < real_names.size(); i++)
 		real_map[real_names[i]] = i;
-	map<string, int>::iterator end = real_map.end();	
-	for (auto rname : org_real_names)
+	map<string, int>::iterator end = real_map.end();
+	vector<string> names = org_real_names;
+	if (names.size() == 0)
+		names = real_names;
+
+	for (auto rname : names)
 	{
 		if (real_map.find(rname) == end)
 			continue;
@@ -1013,6 +979,16 @@ Eigen::VectorXd Ensemble::get_real_vector(int ireal)
 	return reals.row(ireal);
 }
 
+
+Eigen::VectorXd Ensemble::get_var_vector(const string& var_name)
+{
+	update_var_map();
+	if (var_map.find(var_name) == var_map.end())
+		throw_ensemble_error("Ensemble::get_var_vector(): var_name not found: " + var_name);
+	return reals.col(var_map[var_name]);
+
+}
+
 Eigen::VectorXd Ensemble::get_real_vector(const string &real_name)
 {
 	//get a row vector from reals by realization name
@@ -1026,7 +1002,7 @@ Eigen::VectorXd Ensemble::get_real_vector(const string &real_name)
 	return get_real_vector(idx);
 }
 
-void Ensemble::update_real_ip(string & rname, Eigen::VectorXd & real)
+void Ensemble::update_real_ip(const string & rname, Eigen::VectorXd & real)
 {
 	vector<string>::iterator idx = find(real_names.begin(), real_names.end(), rname);
 	if (idx == real_names.end())
@@ -1044,8 +1020,15 @@ void Ensemble::update_real_ip(string & rname, Eigen::VectorXd & real)
 void Ensemble::update_var_map()
 {
 	var_map.clear();
-	for (int i = 0; i < var_names.size(); i++)
-		var_map[var_names[i]] = i;
+	
+	//for (int i = 0; i < var_names.size(); i++)
+	int i = 0;
+	for (auto& name : var_names)
+	{
+		//var_map[var_names[i]] = i;
+		var_map.insert(make_pair(name, i));
+		i++;
+	}
 }
 
 void Ensemble::throw_ensemble_error(string message, vector<string> vec)
@@ -1065,7 +1048,7 @@ void Ensemble::throw_ensemble_error(string message)
 	throw runtime_error(full_message);
 }
 
-void Ensemble::set_real_names(vector<string>& _real_names)
+void Ensemble::set_real_names(vector<string>& _real_names, bool update_org_names)
 {
 	if (_real_names.size() != real_names.size())
 	{
@@ -1075,7 +1058,13 @@ void Ensemble::set_real_names(vector<string>& _real_names)
 
 	}
 	real_names = _real_names;
+	if (update_org_names)
+	{
+		org_real_names = real_names;
+	}
 }
+
+
 
 Ensemble::~Ensemble()
 {
@@ -1157,9 +1146,9 @@ pair<map<string,int>, map<string, int>> Ensemble::prepare_csv(const vector<strin
 	vector<string> missing_names;
 	unordered_set<string>::iterator end = hset.end();
 	string name;
-	for (auto &name : names)
-		if (hset.find(name) == end)
-			missing_names.push_back(name);
+	for (auto &_name : names)
+		if (hset.find(_name) == end)
+			missing_names.push_back(_name);
 	/*if (pest_scenario_ptr->get_pestpp_options().get_ies_csv_by_reals())
 	{
 		if (missing_names.size() > 0)
@@ -1234,29 +1223,68 @@ pair<map<string,int>, map<string, int>> Ensemble::prepare_csv(const vector<strin
 void Ensemble::extend_cols(Eigen::MatrixXd &_reals, const vector<string> &_var_names)
 {
 	//add new columns to reals
-	vector<string>::iterator start = var_names.begin(), end = var_names.end();
-	vector<string> missing;
+	set<string> svar_names(var_names.begin(),var_names.end());
+	vector<string> dups;
 	for (auto &vname : _var_names)
-		if (find(start, end, vname) == end)
-			missing.push_back(vname);
-	if (missing.size() > 0)
-		throw_ensemble_error("add_to_cols(): the following var_names not found: ", missing);
-	if (_var_names.size() != _reals.cols())
-		throw_ensemble_error("add_to_cols(): _reals.cols() != _var_names.size()");
+		if (svar_names.find(vname) != svar_names.end())
+			dups.push_back(vname);
+	if (dups.size() > 0)
+		throw_ensemble_error("extend_cols(): the following var_names are already in the ensemble found: ", dups);
 	if (_reals.rows() != reals.rows())
-		throw_ensemble_error("add_to_cols(): _reals.rows() != reals.rows()");
+		throw_ensemble_error("extend_cols(): _reals.rows() != reals.rows()");
 	int i_this;
 	string vname;
+	vector<string> new_var_names = var_names;
+	new_var_names.insert(new_var_names.end(), _var_names.begin(), _var_names.end());
+	reals.conservativeResize(real_names.size(), new_var_names.size());
 	for (int i = 0; i < _var_names.size(); i++)
 	{
 		vname = _var_names[i];
-		i_this = find(start, end, vname) - start;
-		reals.col(i_this) += _reals.col(i);
+		i_this = var_names.size() + i;
+		reals.col(i_this) = _reals.col(i);
 	}
+	var_names = new_var_names;
+	update_var_map();
 }
 
+void Ensemble::append_other_rows(const vector<string>& _real_names, Eigen::MatrixXd& _reals)
+{
 
-void Ensemble::append_other_rows(Ensemble &other)
+	//append rows to the end of reals
+	if (_reals.cols() != shape().second)
+	{
+		if ((reals.cols() == 0) && (var_names.size() == _reals.cols()))
+			;
+		else
+			throw_ensemble_error("append_other_rows(): different number of columns in _reals");
+	}
+	vector<string> probs;
+	set<string> rnames(real_names.begin(), real_names.end());
+	set<string>::iterator end = rnames.end();
+	for (auto& rname : _real_names)
+		//if (find(start, end, rname) != end)
+		if (rnames.find(rname) != end)
+			probs.push_back(rname);
+	if (probs.size() > 0)
+		throw_ensemble_error("append_other_rows(): the following _real_names are also in this::real_names: ", probs);
+	vector<string> new_real_names = real_names;
+	for (auto& rname : _real_names)
+	{
+		new_real_names.push_back(rname);
+		//org_real_names.push_back(rname);
+	}
+	reals.conservativeResize(new_real_names.size(), var_names.size());
+
+	int iother = 0;
+	for (int i = real_names.size(); i < new_real_names.size(); i++)
+	{
+		reals.row(i) = _reals.row(iother);
+		iother++;
+	}
+	real_names = new_real_names;
+}
+
+void Ensemble::append_other_rows(Ensemble &other, bool reset_org_real_names)
 {
 	//append rows to the end of reals
 	if (other.shape().second != shape().second)
@@ -1296,6 +1324,8 @@ void Ensemble::append_other_rows(Ensemble &other)
 		iother++;
 	}
 	real_names = new_real_names;
+	if (reset_org_real_names)
+		org_real_names = real_names;
 }
 
 void Ensemble::append(string real_name, const Transformable &trans)
@@ -1332,16 +1362,40 @@ void Ensemble::append(string real_name, const Transformable &trans)
 		org_real_names.push_back(real_name);
 }
 
+void Ensemble::append(string real_name, const Eigen::VectorXd& vec)
+{
+    stringstream ss;
+    //make sure this real_name isn't ready used
+    if (find(real_names.begin(), real_names.end(), real_name) != real_names.end())
+    {
+        ss << "Ensemble::append() error: real_name '" << real_name << "' already in real_names";
+        throw_ensemble_error(ss.str());
+    }
+    if (vec.size() != reals.cols())
+    {
+        ss.str("");
+        ss << "Ensemble::append() vector size (" << vec.size() << ") != number of columns (" << reals.cols() << ")";
+        throw_ensemble_error(ss.str());
+    }
+
+    reals.conservativeResize(real_names.size() + 1, var_names.size());
+    reals.row(real_names.size()) = vec;
+    real_names.push_back(real_name);
+    if (find(org_real_names.begin(),org_real_names.end(),real_name) == org_real_names.end())
+        org_real_names.push_back(real_name);
+}
+
 void Ensemble::replace(int idx, const Transformable &trans, string real_name)
 {
 	stringstream ss;
 	
 	//make sure all var_names are found
-	vector<string> keys = trans.get_keys();
-	set<string> tset(keys.begin(), keys.end());
+	//vector<string> keys = trans.get_keys();
+	//set<string> tset(keys.begin(), keys.end());
+	Transformable::const_iterator end = trans.end();
 	vector<string> missing;
 	for (auto &n : var_names)
-		if (tset.find(n) == tset.end())
+		if (trans.find(n) == end)
 			missing.push_back(n);
 	if (missing.size() > 0)
 	{
@@ -1485,6 +1539,7 @@ void Ensemble::check_for_normal(string context)
 		for (int j = 0; j < reals.cols(); j++)
 			if (!isnormal(reals(i, j)) && (reals(i, j) != 0.0))
 			{
+				double v = reals(i, j);
 				ss << real_names[i] << "," << var_names[j] << "," << reals(i,j) << endl;
 				nn_found = true;
 			}
@@ -1492,6 +1547,7 @@ void Ensemble::check_for_normal(string context)
 	{
 		ofstream of("ensemble_not_normal.csv");
 		of << ss.str();
+		of.close();
 		ss.str("");
 		ss << "Ensemble::check_for_normal() - " << context << " - not normal values found, see file 'ensemble_not_normal.csv'";
 		throw_ensemble_error(ss.str());
@@ -1514,6 +1570,15 @@ void Ensemble::to_binary(string file_name, bool transposed)
 	char obs_name[200];
 
 	// write header
+	vector<string> too_long;
+	for (auto& name : real_names)
+		if (name.size() > 200)
+			too_long.push_back(name);
+	for (auto& name : var_names)
+		if (name.size() > 200)
+			too_long.push_back(name);
+	if (too_long.size() > 0)
+		throw_ensemble_error("Ensemble.to_binary(): the following real and/or par names are too long", too_long);
 	
 	tmp = n_var;
 	fout.write((char*)&tmp, sizeof(tmp));
@@ -1761,6 +1826,10 @@ map<string,int> Ensemble::from_binary_old(string file_name, vector<string> &name
 
 void Ensemble::read_csv_by_reals(int num_reals,ifstream &csv, map<string,int> &header_info, map<string,int> &index_info)
 {
+	if (header_info.size() == 0)
+	{
+		throw_ensemble_error("Ensemble::read_csv_by_reals() error: header_info is empty");
+	}
 	//read a csv file to an Ensmeble
 	int lcount = 1;
 	//vector<vector<double>> vectors;
@@ -1869,7 +1938,8 @@ void Ensemble::read_csv_by_vars(int num_reals, ifstream &csv, map<string, int> &
 		{
 			try
 			{
-				val = pest_utils::convert_cp<double>(tokens[hi.second]);
+				//val = pest_utils::convert_cp<double>(tokens[hi.second]);
+				val = stod(tokens[hi.second]);
 			}
 			catch (exception &e)
 			{
@@ -1893,6 +1963,7 @@ ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* ran
 {
 	par_transform = pest_scenario_ptr->get_base_par_tran_seq();
 	tstat = transStatus::CTL;
+	set_fixed_names();
 }
 
 ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _rand_gen_ptr, Eigen::MatrixXd _reals,
@@ -1907,9 +1978,49 @@ ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _ra
 	var_names = _var_names;
 	real_names = _real_names;
 	tstat = transStatus::CTL;
+	set_fixed_names();
+}
+
+ParameterEnsemble::ParameterEnsemble(Pest* _pest_scenario_ptr): 
+	Ensemble(_pest_scenario_ptr)
+{
+	par_transform = pest_scenario_ptr->get_base_par_tran_seq();
+	tstat = transStatus::CTL;
+	set_fixed_names();
 }
 
 
+void ParameterEnsemble::draw_uniform(int num_reals, vector<string> par_names, PerformanceLog* plog, int level, ofstream& frec)
+{
+	var_names = par_names;
+	ParamTransformSeq ptrans = pest_scenario_ptr->get_base_par_tran_seq();
+	Parameters lb = pest_scenario_ptr->get_ctl_parameter_info().get_low_bnd(par_names);
+	Parameters ub = pest_scenario_ptr->get_ctl_parameter_info().get_up_bnd(par_names);
+	ptrans.ctl2numeric_ip(lb);
+	ptrans.ctl2numeric_ip(ub);
+	Parameters dist = ub - lb;
+	reals.resize(num_reals, var_names.size());
+	reals.setZero();
+
+	vector<double> vals;
+	for (int j=0;j<par_names.size();j++)
+	{
+		vals = uniform_draws(num_reals, lb[par_names[j]], ub[par_names[j]], *rand_gen_ptr);
+		reals.col(j) = stlvec_2_eigenvec(vals);
+	}
+
+	stringstream ss;
+	real_names.clear();
+	/*for (int i = 0; i < num_reals; i++)
+	{
+		ss.str("");
+		ss << "member:" << i;
+		real_names.push_back(ss.str());
+	}*/
+	real_names = get_generic_real_names(num_reals);
+	org_real_names = real_names;
+	tstat = ParameterEnsemble::transStatus::NUM;
+}
 
 map<string,double> ParameterEnsemble::draw(int num_reals, Parameters par, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec)
 {
@@ -1984,6 +2095,8 @@ map<string,double> ParameterEnsemble::draw(int num_reals, Parameters par, Covari
 	}*/
 	//fill_fixed(header_info);
 	//save_fixed();
+	vector<string> f;
+	pfinfo.set_fixed_names(f);
 	if (!same)
 	{
 
@@ -2004,6 +2117,21 @@ void ParameterEnsemble::set_pest_scenario(Pest *_pest_scenario)
 {
 	pest_scenario_ptr = _pest_scenario;
 	par_transform = pest_scenario_ptr->get_base_par_tran_seq();
+	set_fixed_names();
+}
+
+void ParameterEnsemble::set_fixed_names()
+{
+	vector<string> fixed_names;
+	/*ParameterInfo* pi = pest_scenario_ptr->get_ctl_parameter_info_ptr_4_mod();
+	for (auto& pname : pest_scenario_ptr->get_ctl_ordered_par_names())
+	{
+		if (pi->get_parameter_rec_ptr(pname)->tranform_type == ParameterRec::TRAN_TYPE::FIXED)
+		{
+			fixed_names.push_back(pname);
+		}
+	}*/
+	pfinfo.set_fixed_names(fixed_names);
 }
 
 void ParameterEnsemble::set_zeros()
@@ -2011,19 +2139,25 @@ void ParameterEnsemble::set_zeros()
 	reals.setZero();
 }
 
-ParameterEnsemble ParameterEnsemble::zeros_like()
+ParameterEnsemble ParameterEnsemble::zeros_like(int nrows)
 {
-
-	Eigen::MatrixXd new_reals = Eigen::MatrixXd::Zero(real_names.size(), var_names.size());
+	if (nrows < 0)
+		nrows = real_names.size();
+	Eigen::MatrixXd new_reals = Eigen::MatrixXd::Zero(nrows, var_names.size());
 	
+	vector<string> new_real_names;
+	for (int i = 0; i < nrows; i++)
+		new_real_names.push_back(real_names[i]);
+
 	ParameterEnsemble new_en(pest_scenario_ptr, rand_gen_ptr);
-	new_en.from_eigen_mat(new_reals, real_names, var_names);
+	new_en.from_eigen_mat(new_reals, new_real_names, var_names);
+	new_en.set_trans_status(get_trans_status());
 	return new_en;
 
 
 }
 
-map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs)
+map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs, int da_cycle)
 {
 	//add runs to the run manager using int indices
 	map<int,int> real_run_ids;
@@ -2054,6 +2188,14 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 	for (int i = 0; i < real_names.size(); i++)
 		rmap[real_names[i]] = i;
 	vector<string> nn;
+
+	string info_txt = "";
+	//if (da_cycle != NetPackage::NULL_DA_CYCLE)
+	{
+		stringstream ss;
+		ss << " da_cycle=" << da_cycle << " ";
+		info_txt = ss.str();
+	}
 	for (auto &rname : run_real_names)
 	{
 		//idx = find(real_names.begin(), real_names.end(), rname) - real_names.begin();
@@ -2076,7 +2218,7 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 				ss << n << ",";
 			throw_ensemble_error(ss.str());
 		}
-		run_id = run_mgr_ptr->add_run(pars_real);
+		run_id = run_mgr_ptr->add_run(pars_real,info_txt+" realization="+rname);
 		real_run_ids[idx]  = run_id;
 	}
 	return real_run_ids;
@@ -2108,10 +2250,10 @@ void ParameterEnsemble::from_eigen_mat(Eigen::MatrixXd mat, const vector<string>
 	tstat = _tstat;
 }
 
-
-void ParameterEnsemble::from_binary(string file_name)
+void ParameterEnsemble::from_binary(string file_name, bool forgive)
 {
-	//overload for ensemble::from_binary - just need to set tstat
+	//fixed_names.clear();
+	//fixed_map.clear();
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
 	map<string,int> header_info = Ensemble::from_binary(file_name, names, false);
 	unordered_set<string>svar_names(var_names.begin(), var_names.end());
@@ -2125,31 +2267,23 @@ void ParameterEnsemble::from_binary(string file_name)
 
 	}
 	if (missing.size() > 0)
-		throw_ensemble_error("from_binary() error: the following adjustable parameter names in the control file are not in the binary parameter ensemble file:", missing);
-
-	names = pest_scenario_ptr->get_ctl_ordered_par_names();
-	unordered_set<string>snames(names.begin(), names.end());
-	names.clear();
-	
-	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
-	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
-
-	for (auto &name : var_names)
-	{	
-		if (snames.find(name) == snames.end())
+	{
+		if (forgive)
 		{
-			continue;
+			cout << "from_binary() warning: the following adjustable parameter names in the control file are not in the binary parameter ensemble file: " << endl;
+			for (auto& m : missing)
+				cout << m << endl;
+			cout << "forgive is true, so continuing..." << endl;
+
 		}
-		else if (pi.get_parameter_rec_ptr(name)->tranform_type == ft)
+
+		else
 		{
-			fixed_names.push_back(name);
+			throw_ensemble_error("from_binary() error: the following adjustable parameter names in the control file are not in the binary parameter ensemble file:", missing);
 		}
 	}
-	
-	fill_fixed(header_info);
-	save_fixed();
-	tstat = transStatus::CTL;
 
+	prep_par_ensemble_after_read(header_info);
 }
 
 //ParameterEnsemble ParameterEnsemble::get_new(const vector<string> &_real_names, const vector<string> &_var_names)
@@ -2163,8 +2297,10 @@ void ParameterEnsemble::from_binary(string file_name)
 //	//return ParameterEnsmeble(get_eigen(_real_names,_var_names),)
 //}
 
-void ParameterEnsemble::from_csv(string file_name)
+void ParameterEnsemble::from_csv(string file_name, bool forgive)
 {
+	//fixed_names.clear();
+	//fixed_map.clear();
 	ifstream csv(file_name);
 	if (!csv.good())
 		throw runtime_error("error opening parameter csv " + file_name + " for reading");
@@ -2196,11 +2332,25 @@ void ParameterEnsemble::from_csv(string file_name)
 		map_ptr = &index_info;
 	map<string, int>::iterator end = map_ptr->end();
 
-	for (auto p : pest_scenario_ptr->get_ctl_ordered_adj_par_names())
-		if (map_ptr->find(p) == end)
-			missing.push_back(p);
+	for (auto& _p : pest_scenario_ptr->get_ctl_ordered_adj_par_names())
+	{
+		if (map_ptr->find(_p) == end)
+			missing.push_back(_p);
+	}
 	if (missing.size() > 0)
-		throw_ensemble_error("ParameterEnsemble.from_csv() error: the following adjustable pars not in csv:",missing);
+	{
+		if (forgive)
+		{
+			cout << "ParameterEnsemble.from_csv() error: the following adjustable pars not in csv: " << endl;
+			for (auto& m : missing)
+				cout << m << endl;
+			cout << "forgive is true, so continuing..." << endl;
+		}
+		else
+		{
+			throw_ensemble_error("ParameterEnsemble.from_csv() error: the following adjustable pars not in csv:", missing);
+		}
+	}
 
 	csv.close();
 	csv.open(file_name);
@@ -2208,29 +2358,59 @@ void ParameterEnsemble::from_csv(string file_name)
 		throw runtime_error("error re-opening parameter csv " + file_name + " for reading");
 	string line;
 	getline(csv, line);
-	if (csv_by_reals)
-		Ensemble::read_csv_by_reals(num_reals, csv, header_info, index_info);
+	if (csv_by_reals) {
+        Ensemble::read_csv_by_reals(num_reals, csv, header_info, index_info);
+        prep_par_ensemble_after_read(header_info);
+    }
 	else
+    {
 		Ensemble::read_csv_by_vars(num_reals, csv, header_info, index_info);
+        prep_par_ensemble_after_read(index_info);}
+
+}
+
+void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_info)
+{
 	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
 	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
-	for (auto &name : var_names)
+	ParameterRec::TRAN_TYPE tt = ParameterRec::TRAN_TYPE::TIED;
+	vector<string> tied_names;
+	vector<string> names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
+	unordered_set<string>snames(names.begin(), names.end());
+	names.clear();
+	vector<string> fixed_names;
+	for (auto& name : var_names)
 	{
+		if (snames.find(name) != snames.end())
+		{
+			continue;
+		}
 		if (pi.get_parameter_rec_ptr(name)->tranform_type == ft)
 		{
 			fixed_names.push_back(name);
 		}
+		else if (pi.get_parameter_rec_ptr(name)->tranform_type == tt)
+		{
+			tied_names.push_back(name);
+		}
 	}
-	fill_fixed(header_info);
-	save_fixed();
+	pfinfo.set_fixed_names(fixed_names);
+	fill_fixed(header_info, fixed_names);
+	save_fixed(fixed_names);
+
+	if (tied_names.size() > 0)
+	{
+		drop_cols(tied_names);
+	}
 
 	tstat = transStatus::CTL;
 	org_real_names = real_names;
-
+	update_var_map();
 }
 
-void ParameterEnsemble::fill_fixed(const map<string, int> &header_info)
+void ParameterEnsemble::fill_fixed(const map<string, int> &header_info, vector<string>& fixed_names)
 {
+	
 	if (fixed_names.size() == 0)
 		return;
 	map<string, int> var_map;
@@ -2256,33 +2436,40 @@ void ParameterEnsemble::fill_fixed(const map<string, int> &header_info)
 
 }
 
-void ParameterEnsemble::save_fixed()
+void ParameterEnsemble::save_fixed(vector<string>& fixed_names)
 {
-	
 	if (fixed_names.size() == 0)
 		return;
 	
 	Eigen::MatrixXd fixed_reals = get_eigen(vector<string>(), fixed_names);
-
+	Eigen::VectorXd v;
 	for (int i = 0; i < real_names.size(); i++)
 	{
-		for (int j = 0; j < fixed_names.size(); j++)
+		v = fixed_reals.row(i);
+		pfinfo.add_realization(real_names[i], v, fixed_names);
+		/*for (int j = 0; j < fixed_names.size(); j++)
 		{
 			pair<string, string> key(real_names[i], fixed_names[j]);
 			fixed_map[key] = fixed_reals(i, j);
 
-		}
+		}*/
 	}
 	// add the "base" if its not in the real names already
 	if (find(real_names.begin(), real_names.end(), BASE_REAL_NAME) == real_names.end())
 	{
 		Parameters pars = pest_scenario_ptr->get_ctl_parameters();
-		for (auto fname : fixed_names)
+		v = pars.get_data_eigen_vec(fixed_names);
+		pfinfo.add_realization(BASE_REAL_NAME, v, fixed_names);
+		/*for (auto fname : fixed_names)
 		{
 			pair<string, string> key(BASE_REAL_NAME, fname);
 			fixed_map[key] = pars[fname];
-		}
+		}*/
 	}
+	
+	drop_cols(fixed_names);
+
+
 }
 
 map<string,double> ParameterEnsemble::enforce_change_limits_and_bounds(PerformanceLog* plog, ParameterEnsemble& other)
@@ -2426,10 +2613,304 @@ map<string,double> ParameterEnsemble::enforce_bounds(PerformanceLog* plog, bool 
 	return norm_map;
 }
 
-void ParameterEnsemble::to_binary(string file_name)
+//void ParameterEnsemble::set_fixed_info(map<pair<string, string>, double> _fixed_map)
+//{
+//	fixed_names.clear();
+//	fixed_map.clear();
+//	set<string> found;
+//	for (auto& fi : _fixed_map)
+//	{
+//		found.emplace(fi.first.second);
+//	}
+//	fixed_map = _fixed_map;
+//	fixed_names = vector<string>(found.begin(), found.end());
+//	//cout << "";
+//}
+
+void ParameterEnsemble::keep_rows(const vector<int>& keep, bool update_fixed_map)
+{
+	vector<string> str_keep;
+	for (auto& k : keep)
+	{
+		if ((k < 0) || (k > real_names.size() - 1))
+		{
+			stringstream ss;
+			ss << "ParameterEnsemble::drop_rows() : integer index not in range: " << k;
+			throw_ensemble_error(ss.str());
+		}
+		str_keep.push_back(real_names[k]);
+	}
+	keep_rows(str_keep, update_fixed_map);
+
+
+}
+
+void ParameterEnsemble::keep_rows(const vector<string>& keep, bool update_fixed_map)
 {
 
+	
+	/*if ((update_fixed_map) && (fixed_map.size() > 0))
+	{
+		set<string> skeep(keep.begin(), keep.end());
+		set<string>::iterator end = skeep.end();
+		set<string> sdrop;
+		for (auto& rname : real_names)
+			if (skeep.find(rname) == end)
+				sdrop.emplace(rname);
+		end = sdrop.end();
+		for (auto it = fixed_map.begin(); it != fixed_map.end();)
+		{
+			if (sdrop.find(it->first.first) != end)
+			{
+				fixed_map.erase(it++);
+			}
+			else
+			{
+				++it;
+			}
+		}
 
+	}*/
+	if (update_fixed_map)
+	{
+		pfinfo.keep_realizations(keep);
+
+	}
+
+	Ensemble::keep_rows(keep);
+}
+
+
+
+
+void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat)
+{
+	//this is only used by pestpp-da in seq mode for moving fixed state pars forward thru cycles
+	if (shape().first != mat.rows())
+		throw_ensemble_error("ParameterEnsemble::replace_col_vals_and_fixed(): first dimensions don't match");
+
+	map<string, int> this_varmap, other_varmap;
+	for (int i = 0; i < var_names.size(); i++)
+		this_varmap[var_names[i]] = i;
+
+	vector<string> missing;
+	set<string> svnames(var_names.begin(), var_names.end());
+
+	set<string>::iterator end = svnames.end();
+	for (int i = 0; i < other_var_names.size(); i++)
+	{
+		if (svnames.find(other_var_names[i]) == end)
+			missing.push_back(other_var_names[i]);
+		other_varmap[other_var_names[i]] = i;
+	}
+	if (missing.size() > 0)
+	{
+		//check for any fixed par names
+		vector<string> still_missing;
+		set<string>found;
+		ParameterInfo* pi = pest_scenario_ptr->get_ctl_parameter_info_ptr_4_mod();
+		for (auto& m : missing)
+		{
+			if (pi->get_parameter_rec_ptr(m)->tranform_type == ParameterRec::TRAN_TYPE::FIXED)
+			{
+				//map<string, double> fm;
+				//Eigen::VectorXd vec = mat.col(other_varmap[m]);
+				
+				//for (int i = 0; i < real_names.size(); i++)
+				//	fixed_map[pair<string, string>(real_names[i], m)] = vec[i];
+
+				found.emplace(m);
+			}
+			else
+				still_missing.push_back(m);
+		}
+		
+		if (still_missing.size() > 0)
+			throw_ensemble_error("ParameterEnsemble::replace_col_vals_and_fixed(): the following par names in other were not found in adj or fixed pars", still_missing);
+		//update fixed_names
+
+		//set<string> fnames(fixed_names.begin(), fixed_names.end());
+		vector<string> fixed_names(found.begin(),found.end());
+
+		/*for (auto& f : found)
+			if (fnames.find(f) == fnames.end())
+				fixed_names.push_back(f);*/
+		pfinfo.set_fixed_names(fixed_names);
+		pfinfo.update_realizations(other_var_names, real_names, mat);
+
+		//update the other_varmap and the other mat
+		for (auto& ovm : other_varmap)
+		{
+			if (found.find(ovm.first) == found.end())
+				reals.col(this_varmap[ovm.first]) = mat.col(ovm.second);
+		}
+	}
+	else
+	{
+		for (auto& ovm : other_varmap)
+		{
+			reals.col(this_varmap[ovm.first]) = mat.col(ovm.second);
+		}
+	}
+}
+
+void ParameterEnsemble::to_binary(string file_name)
+{
+	if (pest_scenario_ptr->get_pestpp_options().get_ies_ordered_binary())
+		return to_binary_ordered(file_name);
+	else
+		return to_binary_unordered(file_name);
+}
+
+void ParameterEnsemble::to_binary_unordered(string file_name)
+{
+	ofstream fout(file_name, ios::binary);
+	if (!fout.good())
+	{
+		throw runtime_error("error opening file for binary parameter ensemble:" + file_name);
+	}
+
+	vector<string> vnames = var_names;
+	//vector<string> vnames = pest_scenario_ptr->get_ctl_ordered_par_names();
+	//vnames.insert(vnames.end(), fixed_names.begin(), fixed_names.end());
+	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
+	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
+	ParameterRec::TRAN_TYPE tt = ParameterRec::TRAN_TYPE::TIED;
+
+	vector<string> f_names,t_names;
+	set<string> snames(var_names.begin(), var_names.end());
+	set<string>::iterator end = snames.end();
+	for (auto& name : pest_scenario_ptr->get_ctl_ordered_par_names())
+	{
+		if (snames.find(name) != end)
+			continue;
+		if (pi.get_parameter_rec_ptr(name)->tranform_type == ft)
+			f_names.push_back(name);
+		else if (pi.get_parameter_rec_ptr(name)->tranform_type == tt)
+			t_names.push_back(name);
+		else
+		{
+			//throw_ensemble_error("ParameterEnsemble::to_binary_unordered()::unsupported transform for parameter '" + name + "'");
+		}
+	}
+	//this order matters!
+	vnames.insert(vnames.end(),f_names.begin(),f_names.end());
+	vnames.insert(vnames.end(), t_names.begin(), t_names.end());
+	
+	vector<string> too_long;
+	for (auto& name : real_names)
+		if (name.size() > 200)
+			too_long.push_back(name);
+	for (auto& name : var_names)
+		if (name.size() > 200)
+			too_long.push_back(name);
+	if (too_long.size() > 0)
+		throw_ensemble_error("ParameterEnsemble.to_binary(): the following real and/or par names are too long", too_long);
+
+	int n_var = vnames.size();
+	int n_real = real_names.size();
+	int n;
+	int tmp;
+	double data;
+	char par_name[200];
+	char obs_name[200];
+
+	// write header
+	tmp = n_var;
+	fout.write((char*)&tmp, sizeof(tmp));
+	tmp = n_real;
+	fout.write((char*)&tmp, sizeof(tmp));
+
+	//write number nonzero elements in jacobian (includes prior information)
+
+	n = reals.size() + (f_names.size() * shape().first) + (t_names.size() * shape().first);
+	fout.write((char*)&n, sizeof(n));
+	pair<string, string> p;
+	//map<pair<string, string>, double>::iterator fixed_end = fixed_map.end();
+	Parameters ctl_pars = pest_scenario_ptr->get_ctl_parameters();
+	map<string, TranTied::pair_string_double> tied_items = par_transform.get_tied_ptr()->get_items();
+	//write matrix
+	n = 0;
+	transform_ip(transStatus::CTL);
+	Eigen::VectorXd t;
+	double fvalue;
+	for (int irow = 0; irow < n_real; ++irow)
+	{
+		t = reals.row(irow);
+		for (int jcol = 0; jcol < var_names.size(); ++jcol)
+		{
+			n = irow;
+			fout.write((char*)&(n), sizeof(n));
+			n = jcol;
+			fout.write((char*)&(n), sizeof(n));
+			data = t[jcol];
+			fout.write((char*)&(data), sizeof(data));
+		}
+
+		int jcol = var_names.size();
+
+		for (auto &fname : f_names)
+		{
+		
+			n = irow + 1 + (jcol * n_real);
+			p = pair<string, string>(real_names[irow], fname);
+			//if (fixed_map.find(p) == fixed_end)
+			if (pfinfo.get_fixed_value(fname,real_names[irow],fvalue))
+			{
+				data = fvalue;
+				
+			}
+			else
+			{
+				data = ctl_pars[fname];
+			}
+			n = irow;
+			fout.write((char*)&(n), sizeof(n));
+			n = jcol;
+			fout.write((char*)&(n), sizeof(n));
+			fout.write((char*) &(data), sizeof(data));
+			jcol++;
+		}
+
+		for (auto& tname : t_names)
+		{
+			n = irow + 1 + (jcol * n_real);
+			data = t[var_map[tied_items.at(tname).first]] * tied_items.at(tname).second;
+			n = irow;
+			fout.write((char*)&(n), sizeof(n));
+			n = jcol;
+			fout.write((char*)&(n), sizeof(n));
+			fout.write((char*)&(data), sizeof(data));
+			jcol++;
+		}
+	}
+	//save parameter names
+	for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
+		b != e; ++b) {
+		string l = pest_utils::lower_cp(*b);
+		pest_utils::string_to_fortran_char(l, par_name, 200);
+		fout.write(par_name, 200);
+	}
+	/*for (auto fname : fixed_names)
+	{
+		pest_utils::string_to_fortran_char(pest_utils::lower_cp(fname), par_name, 12);
+		fout.write(par_name, 12);
+	}*/
+
+	//save observation and Prior information names
+	for (vector<string>::const_iterator b = real_names.begin(), e = real_names.end();
+		b != e; ++b) {
+		string l = pest_utils::lower_cp(*b);
+		pest_utils::string_to_fortran_char(l, obs_name, 200);
+		fout.write(obs_name, 200);
+	}
+	//save observation names (part 2 prior information)
+	fout.close();
+	transform_ip(transStatus::NUM);
+}
+
+void ParameterEnsemble::to_binary_ordered(string file_name)
+{
 	ofstream fout(file_name, ios::binary);
 	if (!fout.good())
 	{
@@ -2444,16 +2925,32 @@ void ParameterEnsemble::to_binary(string file_name)
 	ParameterRec::TRAN_TYPE tt = ParameterRec::TRAN_TYPE::TIED;
 
 	vector<string> f_names;
+	set<string> snames(var_names.begin(), var_names.end());
+	set<string>::iterator end = snames.end();
 	for (auto &name : pest_scenario_ptr->get_ctl_ordered_par_names())
 	{
+		if (snames.find(name) != end)
+			continue;
 		if ((pi.get_parameter_rec_ptr(name)->tranform_type == ft) || 
 			(pi.get_parameter_rec_ptr(name)->tranform_type == tt))
 		{
 			f_names.push_back(name);
 		}
+		else
+		{
+			f_names.push_back(name);
+		}
 	}
 	//vnames.insert(vnames.end(),f_names.begin(),f_names.end());
-	
+	vector<string> too_long;
+	for (auto& name : real_names)
+		if (name.size() > 200)
+			too_long.push_back(name);
+	for (auto& name : var_names)
+		if (name.size() > 200)
+			too_long.push_back(name);
+	if (too_long.size() > 0)
+		throw_ensemble_error("ParameterEnsemble.to_binary(): the following real and/or par names are too long", too_long);
 
 	int n_var = vnames.size();
 	int n_real = real_names.size();
@@ -2479,9 +2976,15 @@ void ParameterEnsemble::to_binary(string file_name)
 	//map<string, double>::const_iterator found_pi_par;
 	//map<string, double>::const_iterator not_found_pi_par;
 	//icount = row_idxs + 1 + col_idxs * self.shape[0]
-	Parameters pars;
+	Parameters org_pars = pest_scenario_ptr->get_ctl_parameters();
+	if (tstat == transStatus::MODEL)
+		par_transform.ctl2model_ip(org_pars);
+	else if (tstat == transStatus::NUM)
+		par_transform.ctl2numeric_ip(org_pars);
 	for (int irow = 0; irow<n_real; ++irow)
 	{
+		//Parameters pars(var_names, reals.row(irow));
+		Parameters pars = org_pars;
 		pars.update_without_clear(var_names, reals.row(irow));
 		if (tstat == transStatus::MODEL)
 			par_transform.model2ctl_ip(pars);
@@ -2498,6 +3001,7 @@ void ParameterEnsemble::to_binary(string file_name)
 			data = pars[vnames[jcol]];
 			fout.write((char*) &(data), sizeof(data));
 		}
+
 		/*int jcol = n_var;
 		for (auto &fname : fixed_names)
 		{
@@ -2533,6 +3037,242 @@ void ParameterEnsemble::to_binary(string file_name)
 }
 
 
+void ParameterEnsemble::to_dense_ordered(string file_name)
+{
+
+	ofstream fout(file_name, ios::binary);
+	if (!fout.good())
+	{
+		throw runtime_error("error opening file for binary parameter ensemble:" + file_name);
+	}
+
+	//vector<string> vnames = var_names;
+	vector<string> vnames = pest_scenario_ptr->get_ctl_ordered_par_names();
+	//vnames.insert(vnames.end(), fixed_names.begin(), fixed_names.end());
+	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
+	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
+	ParameterRec::TRAN_TYPE tt = ParameterRec::TRAN_TYPE::TIED;
+
+	vector<string> f_names;
+	set<string> snames(var_names.begin(), var_names.end());
+	set<string>::iterator end = snames.end();
+	for (auto& name : pest_scenario_ptr->get_ctl_ordered_par_names())
+	{
+		if (snames.find(name) != end)
+			continue;
+		if ((pi.get_parameter_rec_ptr(name)->tranform_type == ft) ||
+			(pi.get_parameter_rec_ptr(name)->tranform_type == tt))
+		{
+			f_names.push_back(name);
+		}
+		else
+		{
+			f_names.push_back(name);
+		}
+	}
+	
+	int n_var = vnames.size();
+	int n_real = real_names.size();
+	int n;
+	int tmp;
+	double data;
+	//char par_name[200];
+	//char obs_name[200];
+
+	// write header
+	tmp = 0;
+	fout.write((char*)&tmp, sizeof(tmp));
+
+	n = -1 * n_var;
+	fout.write((char*)&n, sizeof(n));
+	fout.write((char*)&n, sizeof(n));
+
+	//save parameter names
+	int mx = 0;
+	for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
+		b != e; ++b)
+	{
+		string name = pest_utils::lower_cp(*b);
+		tmp = name.size();
+		fout.write((char*)&tmp, sizeof(tmp));
+		mx = max(tmp, mx);
+	}
+	for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
+		b != e; ++b)
+	{
+		string name = pest_utils::lower_cp(*b);
+		char* par_name = new char[name.size()];
+		pest_utils::string_to_fortran_char(name, par_name, name.size());
+		fout.write(par_name, name.size());
+	}
+
+	//write matrix
+	n = 0;
+	//map<string, double>::const_iterator found_pi_par;
+	//map<string, double>::const_iterator not_found_pi_par;
+	//icount = row_idxs + 1 + col_idxs * self.shape[0]
+	Parameters org_pars = pest_scenario_ptr->get_ctl_parameters();
+	if (tstat == transStatus::MODEL)
+		par_transform.ctl2model_ip(org_pars);
+	else if (tstat == transStatus::NUM)
+		par_transform.ctl2numeric_ip(org_pars);
+	for (int irow = 0; irow < n_real; ++irow)
+	{
+		//Parameters pars(var_names, reals.row(irow));
+		Parameters pars = org_pars;
+		pars.update_without_clear(var_names, reals.row(irow));
+		if (tstat == transStatus::MODEL)
+			par_transform.model2ctl_ip(pars);
+		else if (tstat == transStatus::NUM)
+			par_transform.numeric2ctl_ip(pars);
+		replace_fixed(real_names[irow], pars);
+		string name = real_names[irow];
+		tmp = name.size();
+		char* real_name = new char[tmp];
+		fout.write((char*)&tmp, sizeof(tmp));
+		pest_utils::string_to_fortran_char(name, real_name, tmp);
+		fout.write(real_name, tmp);
+		for (int jcol = 0; jcol < n_var; ++jcol)
+		{
+			data = pars[vnames[jcol]];
+			fout.write((char*)&(data), sizeof(data));
+		}
+	}
+	
+	fout.close();
+}
+
+void ParameterEnsemble::to_dense(string file_name)
+{
+	if (pest_scenario_ptr->get_pestpp_options().get_ies_ordered_binary())
+		return to_dense_ordered(file_name);
+	else
+		return to_dense_unordered(file_name);
+}
+
+void ParameterEnsemble::to_dense_unordered(string file_name)
+{
+	ofstream fout(file_name, ios::binary);
+	if (!fout.good())
+	{
+		throw runtime_error("error opening file for binary parameter ensemble:" + file_name);
+	}
+
+	vector<string> vnames = var_names;
+	//vector<string> vnames = pest_scenario_ptr->get_ctl_ordered_par_names();
+	//vnames.insert(vnames.end(), fixed_names.begin(), fixed_names.end());
+	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
+	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
+	ParameterRec::TRAN_TYPE tt = ParameterRec::TRAN_TYPE::TIED;
+
+	vector<string> f_names, t_names;
+	set<string> snames(var_names.begin(), var_names.end());
+	set<string>::iterator end = snames.end();
+	for (auto& name : pest_scenario_ptr->get_ctl_ordered_par_names())
+	{
+		if (snames.find(name) != end)
+			continue;
+		if (pi.get_parameter_rec_ptr(name)->tranform_type == ft)
+			f_names.push_back(name);
+		else if (pi.get_parameter_rec_ptr(name)->tranform_type == tt)
+			t_names.push_back(name);
+		else
+		{
+			throw_ensemble_error("ParameterEnsemble::to_binary_unordered()::unsupported transform for parameter '" + name + "'");
+		}
+	}
+	//this order matters!
+	vnames.insert(vnames.end(), f_names.begin(), f_names.end());
+	vnames.insert(vnames.end(), t_names.begin(), t_names.end());
+
+	// write header
+	int tmp = 0;
+	fout.write((char*)&tmp, sizeof(tmp));
+
+	pair<string, string> p;
+	//map<pair<string, string>, double>::iterator fixed_end = fixed_map.end();
+	Parameters ctl_pars = pest_scenario_ptr->get_ctl_parameters();
+	map<string, TranTied::pair_string_double> tied_items = par_transform.get_tied_ptr()->get_items();
+	int n_real = reals.rows();
+	int n_var = vnames.size();
+	int n = -1 * n_var;
+	fout.write((char*)&n, sizeof(n));
+	fout.write((char*)&n, sizeof(n));
+
+	//save parameter names
+	int mx = 0;
+	for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
+		b != e; ++b)
+	{
+		string name = pest_utils::lower_cp(*b);
+		tmp = name.size();
+		fout.write((char*)&tmp, sizeof(tmp));
+		mx = max(tmp, mx);
+	}
+	for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
+		b != e; ++b)
+	{
+		string name = pest_utils::lower_cp(*b);
+		char* par_name = new char[name.size()];
+		pest_utils::string_to_fortran_char(name, par_name, name.size());
+		fout.write(par_name, name.size());
+	}
+
+	//write matrix
+	n = 0;
+	double data;
+	transform_ip(transStatus::CTL);
+	Eigen::VectorXd t;
+	double fvalue;
+	for (int irow = 0; irow < n_real; ++irow)
+	{
+		t = reals.row(irow);
+		string name = real_names[irow];
+		tmp = name.size();
+		char* real_name = new char[tmp];
+		fout.write((char*)&tmp, sizeof(tmp));
+		pest_utils::string_to_fortran_char(name, real_name, tmp);
+		fout.write(real_name, tmp);
+		for (int jcol = 0; jcol < var_names.size(); ++jcol)
+		{
+			data = t[jcol];
+			fout.write((char*)&(data), sizeof(data));
+		}
+	
+		int jcol = var_names.size();
+
+		for (auto& fname : f_names)
+		{
+
+			//p = pair<string, string>(real_names[irow], fname);
+			//if (fixed_map.find(p) == fixed_end)
+			if (pfinfo.get_fixed_value(fname,real_names[irow],fvalue))
+			{
+				data = fvalue;
+				
+			}
+			else
+			{
+				data = ctl_pars[fname];
+			}
+			fout.write((char*)&(data), sizeof(data));
+			jcol++;
+		}
+
+		for (auto& tname : t_names)
+		{
+			data = t[var_map[tied_items.at(tname).first]] * tied_items.at(tname).second;
+			fout.write((char*)&(data), sizeof(data));
+			jcol++;
+		}
+	}
+	fout.close();
+	transform_ip(transStatus::NUM);
+
+}
+
+
+
 void ParameterEnsemble::to_csv(string file_name)
 {
 	//write the par ensemble to csv file - transformed back to CTL status
@@ -2542,17 +3282,20 @@ void ParameterEnsemble::to_csv(string file_name)
 	{
 		throw_ensemble_error("ParameterEnsemble.to_csv() error opening csv file " + file_name + " for writing");
 	}
+	csv << setprecision(pest_scenario_ptr->get_pestpp_options().get_ensemble_output_precision());
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_csv_by_reals())
 		to_csv_by_reals(csv);
 	else
 		to_csv_by_vars(csv);
+	csv.close();
 }
 
 
-void ParameterEnsemble::to_csv_by_vars(ofstream &csv)
+void ParameterEnsemble::to_csv_by_vars(ofstream &csv, bool write_header)
 {
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_par_names();
-	csv << "var_name";
+	if (write_header)
+		csv << "var_name";
 	int ireal = 0;
 	map<string, int> real_map;
 	for (int i = 0; i < real_names.size(); i++)
@@ -2563,12 +3306,14 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv)
 		if (real_map.find(rname) == end)
 			continue;
 		ireal = real_map[rname];
-		csv << ',' << pest_utils::lower_cp(real_names[ireal]);
+		if (write_header)
+			csv << ',' << pest_utils::lower_cp(real_names[ireal]);
 	}
-	csv << endl;
+	if (write_header)
+		csv << endl;
 
 	//get the pars and transform to be in sync with ensemble trans status
-	Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+	/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 	if (tstat == transStatus::NUM)
 	{
 		par_transform.active_ctl2numeric_ip(pars);
@@ -2576,7 +3321,7 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv)
 	else if (tstat == transStatus::MODEL)
 	{
 		par_transform.active_ctl2model_ip(pars);
-	}
+	}*/
 
 	//for (int ireal = 0; ireal < reals.rows(); ireal++)
 	map<string, Parameters> tpar_map;
@@ -2584,6 +3329,15 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv)
 	{
 		if (real_map.find(rname) == end)
 			continue;
+		Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+		if (tstat == transStatus::NUM)
+		{
+			par_transform.active_ctl2numeric_ip(pars);
+		}
+		else if (tstat == transStatus::MODEL)
+		{
+			par_transform.active_ctl2model_ip(pars);
+		}
 		ireal = real_map[rname];
 		pars.update_without_clear(var_names, reals.row(ireal));
 		if (tstat == transStatus::MODEL)
@@ -2607,16 +3361,19 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv)
 	}
 }
 
-void ParameterEnsemble::to_csv_by_reals(ofstream &csv)
+void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 {
 	vector<string> names = pest_scenario_ptr->get_ctl_ordered_par_names();
-	csv << "real_name";
-	for (auto &vname : names)
-		csv << ',' << pest_utils::lower_cp(vname);
-	csv << endl;
+	if (write_header)
+	{
+		csv << "real_name";
+		for (auto& vname : names)
+			csv << ',' << pest_utils::lower_cp(vname);
+		csv << endl;
+	}
 
 	//get the pars and transform to be in sync with ensemble trans status
-	Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+	/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 	if (tstat == transStatus::NUM)
 	{
 		par_transform.active_ctl2numeric_ip(pars);
@@ -2624,7 +3381,7 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv)
 	else if (tstat == transStatus::MODEL)
 	{
 		par_transform.active_ctl2model_ip(pars);
-	}
+	}*/
 
 	//for (int ireal = 0; ireal < reals.rows(); ireal++)
 	int ireal = 0;
@@ -2632,10 +3389,23 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv)
 	for (int i = 0; i < real_names.size(); i++)
 		real_map[real_names[i]] = i;
 	map<string, int>::iterator end = real_map.end();
-	for (auto rname : org_real_names)
+	vector<string> rnames = org_real_names;
+	if (rnames.size() == 0)
+		rnames = real_names;
+	for (auto rname : rnames)
 	{
 		if (real_map.find(rname) == end)
 			continue;
+		Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+		if (tstat == transStatus::NUM)
+		{
+			par_transform.active_ctl2numeric_ip(pars);
+		}
+		else if (tstat == transStatus::MODEL)
+		{
+			par_transform.active_ctl2model_ip(pars);
+		}
+
 		ireal = real_map[rname];
 		csv << pest_utils::lower_cp(real_names[ireal]);
 		//evec = reals.row(ireal);
@@ -2654,16 +3424,16 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv)
 
 void ParameterEnsemble::replace_fixed(string real_name,Parameters &pars)
 {
-	if (fixed_names.size() > 0)
+	
+	map<string, double> rmap = pfinfo.get_real_fixed_values(real_name);
+	for (auto& r : rmap)
 	{
-		for (auto fname : fixed_names)
-		{
-			pair<string, string> key(real_name, fname);
-			double val = fixed_map.at(key);
-			pars.update_rec(fname, val);
-		}
-
+		//pair<string, string> key(real_name, fname);
+		//double val = fixed_map.at(key);
+		pars.update_rec(r.first, r.second);
 	}
+
+	
 
 }
 
@@ -2672,20 +3442,69 @@ void ParameterEnsemble::transform_ip(transStatus to_tstat)
 	//transform the ensemble in place
 	if (to_tstat == tstat)
 		return;
+	
+	set<string> log_pars = par_transform.get_log10_ptr()->get_items();
+	set<string>::iterator log_end = log_pars.end();
+	int j = 0;
 	if ((to_tstat == transStatus::NUM) && (tstat == transStatus::CTL))
-	{
-		Parameters pars = pest_scenario_ptr->get_ctl_parameters();
-		vector<string> adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
-		Eigen::MatrixXd new_reals = Eigen::MatrixXd(shape().first, adj_par_names.size());
-		for (int ireal = 0; ireal < reals.rows(); ireal++)
+	{	
+		for (auto& var_name : var_names)
 		{
-			pars.update_without_clear(var_names, reals.row(ireal));
-			par_transform.ctl2numeric_ip(pars);
-			assert(pars.size() == adj_par_names.size());
-			new_reals.row(ireal) = pars.get_data_eigen_vec(adj_par_names);
+			if (log_pars.find(var_name) != log_end)
+			{
+				reals.col(j) = reals.col(j).array().log10();
+			}
+			j++;
 		}
-		reals = new_reals;
-		var_names = adj_par_names;
+		
+		//set<string> log_pars = par_transform.get_log10_ptr()->get_items();
+		//set<string>::iterator log_end = log_pars.end();
+
+		//vector<string> adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
+		//Eigen::MatrixXd new_reals = Eigen::MatrixXd(shape().first, adj_par_names.size());
+		//set<string> sadj_pars(adj_par_names.begin(), adj_par_names.end());
+		//
+		//int new_j = 0;
+		//Eigen::VectorXd t;
+		//update_var_map();
+		//for (auto& apar_name : adj_par_names)
+		//{
+		//	new_reals.col(new_j) = reals.col(var_map[apar_name]);
+		//	if (log_pars.find(apar_name) != log_end)
+		//	{
+		//		new_reals.col(new_j) = new_reals.col(new_j).array().log10();
+		//	}
+		//	new_j++;
+		//}
+		////cout << reals << endl << endl;
+		////cout << new_reals << endl << endl;
+		///*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
+		//vector<string> adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
+		//Eigen::MatrixXd new_reals = Eigen::MatrixXd(shape().first, adj_par_names.size());
+		//for (int ireal = 0; ireal < reals.rows(); ireal++)
+		//{
+		//	pars.update_without_clear(var_names, reals.row(ireal));
+		//	par_transform.ctl2numeric_ip(pars);
+		//	assert(pars.size() == adj_par_names.size());
+		//	new_reals.row(ireal) = pars.get_data_eigen_vec(adj_par_names);
+		//}
+		//cout << new_reals << endl;*/
+		//reals = new_reals;
+		//var_names = adj_par_names;
+		//update_var_map();
+		tstat = to_tstat;
+
+	}
+	else if ((to_tstat == transStatus::CTL) && (tstat == transStatus::NUM))
+	{
+		for (auto& var_name : var_names)
+		{
+			if (log_pars.find(var_name) != log_end)
+			{
+				reals.col(j) = Eigen::pow(10,reals.col(j).array());
+			}
+			j++;
+		}
 		tstat = to_tstat;
 
 	}
@@ -2715,6 +3534,10 @@ ObservationEnsemble::ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937*
 	real_names = _real_names;
 }
 
+ObservationEnsemble::ObservationEnsemble(Pest* _pest_scenario): Ensemble(_pest_scenario)
+{
+
+}
 
 void ObservationEnsemble::initialize_without_noise(int num_reals)
 {
@@ -2851,15 +3674,29 @@ void ObservationEnsemble::update_from_obs(string real_name, Observations &obs)
 	update_from_obs(real - start, obs);
 }
 
-vector<int> ObservationEnsemble::update_from_runs(map<int,int> &real_run_ids, RunManagerAbstract *run_mgr_ptr)
+vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr)
 {
+	ParameterEnsemble run_mgr_pe(pest_scenario_ptr, rand_gen_ptr);
+	return update_from_runs(real_run_ids, run_mgr_ptr, run_mgr_pe);
+}
+
+vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe)
+{
+	//run_mgr_pe is reset here and filled with the parameter value from the run mgr - these can be used to check that the 
+	//par values from the run mgr are consistent with what par values were desired
+
 	//update the obs ensemble in place from the run manager
+	
 	set<int> failed_runs = run_mgr_ptr->get_failed_run_ids();
 	vector<int> failed_real_idxs;
 	Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 	Observations obs = pest_scenario_ptr->get_ctl_observations();
 	string real_name;
 	int ireal = 0;
+	run_mgr_pe = ParameterEnsemble(pest_scenario_ptr, rand_gen_ptr);
+	vector<string> var_names = pars.get_keys();
+	run_mgr_pe.reserve(real_names,var_names);
+	run_mgr_pe.set_zeros();
 	for (auto &real_run_id : real_run_ids)
 	{
 		if (failed_runs.find(real_run_id.second) != failed_runs.end())
@@ -2873,6 +3710,8 @@ vector<int> ObservationEnsemble::update_from_runs(map<int,int> &real_run_ids, Ru
 			run_mgr_ptr->get_run(real_run_id.second, pars, obs);
 			//real_name = real_names[real_run_id.first];
 			update_from_obs(real_run_id.first, obs);
+			Eigen::VectorXd real = pars.get_data_eigen_vec(var_names);
+			run_mgr_pe.update_real_ip(real_names[real_run_id.first], real);
 			//update_from_obs(ireal, obs);
 		}
 	}
@@ -2882,15 +3721,37 @@ vector<int> ObservationEnsemble::update_from_runs(map<int,int> &real_run_ids, Ru
 void ObservationEnsemble::from_binary(string file_name)
 {
 	//load obs en from binary jco-type file
-	vector<string> names = pest_scenario_ptr->get_ctl_ordered_obs_names();
-	Ensemble::from_binary(file_name, names, true);
+	vector<string> names = pest_scenario_ptr->get_ctl_ordered_nz_obs_names();
+	if (names.size() == 0)
+	{
+		names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+	}
+	Ensemble::from_binary(file_name, names, false);
 	unordered_set<string>svar_names(var_names.begin(), var_names.end());
 	vector<string> missing;
-	for (auto& name : pest_scenario_ptr->get_ctl_ordered_obs_names())
+	for (auto& name : pest_scenario_ptr->get_ctl_ordered_nz_obs_names())
 		if (svar_names.find(name) == svar_names.end())
 			missing.push_back(name);
 	if (missing.size() > 0)
 		throw_ensemble_error("from_binary() error: the following non-zero-weighted obs names in the control file are not in the binary obs ensemble file:", missing);
+	names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+	if (var_names.size() < names.size())
+	{
+		update_var_map();
+		map<string, int>::iterator end = var_map.end();
+		Eigen::MatrixXd full(reals.rows(), names.size());
+		full.setZero();
+		string name;
+		for (int j = 0; j < names.size(); j++)
+		{
+			name = names[j];
+			if (var_map.find(name) != end)
+				full.col(j) = reals.col(var_map.at(name));
+		}
+		var_names = names;
+		reals = full;
+		update_var_map();
+	}
 }
 
 void ObservationEnsemble::from_csv(string file_name)
@@ -2901,7 +3762,15 @@ void ObservationEnsemble::from_csv(string file_name)
 	ifstream csv(file_name);
 	if (!csv.good())
 		throw runtime_error("error opening observation csv " + file_name + " for reading");
-	pair<map<string,int>, map<string, int>> p = prepare_csv(pest_scenario_ptr->get_ctl_ordered_nz_obs_names(), csv, false);
+	vector<string> names = pest_scenario_ptr->get_ctl_ordered_nz_obs_names();
+	bool forgive = false;
+	if (names.size() == 0)
+	{
+		names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+		forgive = true;
+	}
+
+	pair<map<string,int>, map<string, int>> p = prepare_csv(names, csv, forgive);
 
 	map<string, int> header_info = p.first, index_info = p.second;
 	//blast through the file to get number of reals
@@ -3173,4 +4042,229 @@ void DrawThread::work(int thread_id, int num_reals, int ies_verbose, map<string,
 
 	}
 
+}
+
+FixedParInfo::FixedParInfo(vector<string> _fixed_names)
+{
+	fixed_names = _fixed_names;
+	initialized = false;
+	initialize();
+}
+
+bool FixedParInfo::get_fixed_value(const string& pname, const string& rname, double& value)
+{
+	if (fixed_names.size() == 0)
+	{
+		//throw runtime_error("FixedParInfo::get_fixed_value(): fixed_names is empty");
+		return false;
+	}
+	if (fixed_info.find(pname) == fixed_info.end())
+	{
+		//throw runtime_error("FixedParInfo::get_real_fixed_value(): pname '" + pname + "' not in fixed_info");
+		return false;
+	}
+	if (fixed_info.at(pname).find(rname) == fixed_info.at(pname).end())
+	{
+		//throw runtime_error("FixedParInfo::get_real_fixed_value(): rname '" + rname + "' not in fixed_info");
+		return false;
+	}
+
+	value = fixed_info.at(pname).at(rname);
+	return true;
+}
+
+map<string, double> FixedParInfo::get_par_fixed_values(const string& pname)
+{
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::get_par_fixed_values(): not initialized");
+	}
+	if (fixed_names.size() == 0)
+	{
+		return map<string, double>();
+	}
+	if (fixed_info.find(pname) == fixed_info.end())
+	{
+		throw runtime_error("FixedParInfo::get_par_fixed_values(): pname '"+pname+"' not in fixed_info");
+	}
+
+	return fixed_info.at(pname);
+}
+
+vector<double> FixedParInfo::get_real_fixed_values(const string& rname, vector<string>& pnames)
+{
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::get_real_fixed_values(): not initialized");
+	}
+	if (fixed_names.size() == 0)
+	{
+		return vector<double>();
+	}
+	vector<double> real_vals(pnames.size());
+	int c = 0;
+	for (auto& name : pnames)
+	{
+		if (fixed_info.find(name) == fixed_info.end())
+			throw runtime_error("FixedParInfo::get_real_fixed_values(): pname '" + name +"' not in fixed_info");
+		if (fixed_info.at(name).find(rname) == fixed_info.at(name).end())
+			throw runtime_error("FixedParInfo::get_real_fixed_values(): rname '" + rname + "' not in fixed_info");
+		real_vals[c] = fixed_info.at(name).at(rname);
+		c++;
+	}
+	return real_vals;
+}
+
+map<string, double> FixedParInfo::get_real_fixed_values(const string& rname)
+{
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::get_real_fixed_values(): not initialized");
+	}
+	if (fixed_names.size() == 0)
+	{
+		return map<string, double>();
+	}
+	map<string, double> rmap;
+	for (auto& fi : fixed_info)
+	{
+		if (fi.second.find(rname) == fi.second.end())
+		{
+			throw runtime_error("FixedParInfo::get_real_fixed_values(): rname '" + rname + "' not in fixed_info");
+		}
+		rmap[fi.first] = fi.second.at(rname);
+	}
+	return rmap;
+}
+
+void FixedParInfo::add_realization(string rname, Eigen::VectorXd& rvals, vector<string>& pnames)
+{
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::add_realization(): not initialized");
+	}
+	if (fixed_names.size() == 0)
+	{
+		return;
+	}
+	if (rvals.size() != pnames.size())
+	{
+		throw runtime_error("FixedParInfo::add_realization(): rvals.size() != pnames.size()");
+	}
+	map<string, double> v;
+	for (int i = 0; i < rvals.size(); i++)
+		v[pnames[i]] = rvals[i];
+	for (auto& name : fixed_names)
+	{
+		if (v.find(name) == v.end())
+			throw runtime_error("FixedParInfo::add_realization(): fixed name '" + name + "' not in pnames");
+		fixed_info.at(name)[rname] = v.at(name);
+	}
+}
+
+void FixedParInfo::keep_realizations(const vector<string>& keep)
+{
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::keep_realizations(): not initialized");
+	}
+	if (fixed_names.size() == 0)
+	{
+		return;
+	}
+
+	set<string> skeep(keep.begin(), keep.end());
+	set<string>::iterator end = skeep.end();
+	set<string> sdrop;
+	map<string, double> rmap = fixed_info.at(fixed_names[0]);
+	for (auto& r : rmap)
+		if (skeep.find(r.first) == end)
+			sdrop.emplace(r.first);
+	end = sdrop.end();
+	for (auto& fi : fixed_info)
+	{
+		for (auto it = fi.second.begin(); it != fi.second.end();)
+		{
+			if (sdrop.find(it->first) != end)
+			{
+				fi.second.erase(it++);
+			}
+			else
+			{
+				++it;
+			}
+		}
+	}
+}
+
+void FixedParInfo::update_realizations(const vector<string>& other_var_names, const vector<string>& other_real_names, const Eigen::MatrixXd& other_mat)
+{
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::update_realizations: not initialized");
+	}
+	if (fixed_names.size() == 0)
+	{
+		return;
+	}
+	for (int j = 0; j < other_var_names.size(); j++)
+	{
+		if (fixed_info.find(other_var_names[j]) == fixed_info.end())
+			continue;
+		for (int i = 0; i < other_real_names.size(); i++)
+		{
+			fixed_info.at(other_var_names[j])[other_real_names[i]] = other_mat(i, j);
+		}
+	}
+}
+
+void FixedParInfo::update_par_values(const map<string, double>& pval_map)
+{
+	for (auto& p : pval_map)
+	{
+		if (fixed_info.find(p.first) != fixed_info.end())
+		{
+			for (auto& pm : fixed_info.at(p.first))
+			{
+				pm.second = p.second;
+			}
+
+		}
+	}
+}
+
+void FixedParInfo::fill_fixed(map<string, double>& fixed_map, vector<string>& rnames)
+{
+	if (!initialized)
+	{
+		throw runtime_error("FixedParInfo::update_realizations: not initialized");
+	}
+	if (fixed_names.size() == 0)
+	{
+		return;
+	}
+	for (auto& pname : fixed_names)
+	{
+		double fval = fixed_map.at(pname);
+		for (auto& rname : rnames)
+			fixed_info.at(pname)[rname] = fval;
+	}
+
+}
+
+
+
+void FixedParInfo::initialize()
+{
+	fixed_info.clear();
+	/*if (fixed_names.size() == 0)
+	{
+		throw runtime_error("FixedParInfo::initialize: fixed_names is empty");
+	}*/
+	for (auto& name : fixed_names)
+	{
+		fixed_info[name] = map<string, double>();
+	}
+	initialized = true;
+	
 }

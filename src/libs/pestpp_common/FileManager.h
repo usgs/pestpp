@@ -47,10 +47,16 @@ public:
 	std::fstream &open_iofile_local(const std::string &tag, const std::string &filename, std::fstream::openmode mode = std::fstream::in | std::fstream::out);
 	std::fstream &open_iofile_absolute(const std::string &tag, const std::string &filename, std::fstream::openmode mode = std::fstream::in | std::fstream::out);
 	void close_file(const std::string &extension);
+	void close_all_files_ending_with(const std::string& partial_name);
+    void close_all_files_containing(const std::string& partial_name);
 	std::ofstream &get_ofstream(const std::string &tag);
 	std::ifstream &get_ifstream(const std::string &tag);
 	std::fstream &get_fstream(const std::string &tag);
+	bool check_ofile_tag_exists(std::string& tag) { return ofile_map.find(tag) != ofile_map.end() ? true : false; }
+	bool check_ifile_tag_exists(std::string& tag) { return ifile_map.find(tag) != ifile_map.end() ? true : false; }
+	bool check_iofile_tag_exists(std::string& tag) { return iofile_map.find(tag) != iofile_map.end() ? true : false; }
 	~FileManager(void);
+
 private:
 	std::string directory;
 	std::string pest_base_filename;

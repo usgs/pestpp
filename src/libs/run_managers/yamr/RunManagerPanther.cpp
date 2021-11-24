@@ -270,15 +270,46 @@ int AgentInfoRec::seconds_since_last_ping_time() const
 
 
 RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& _port, ofstream& _f_rmr, int _max_n_failure,
-	double _overdue_reched_fac, double _overdue_giveup_fac, double _overdue_giveup_minutes, bool _should_echo)
+	double _overdue_reched_fac, double _overdue_giveup_fac, double _overdue_giveup_minutes, bool _should_echo, const vector<string>& par_names,
+	const vector<string>& obs_names)
+
 	: RunManagerAbstract(vector<string>(), vector<string>(), vector<string>(),
 		vector<string>(), vector<string>(), stor_filename, _max_n_failure),
 	overdue_reched_fac(_overdue_reched_fac), overdue_giveup_fac(_overdue_giveup_fac),
 	port(_port), f_rmr(_f_rmr), n_no_ops(0), overdue_giveup_minutes(_overdue_giveup_minutes),
 	terminate_idle_thread(false), currently_idle(true), idling(false), idle_thread_finished(false),
-	idle_thread(nullptr), idle_thread_raii(nullptr), should_echo(_should_echo)
+	idle_thread(nullptr), should_echo(_should_echo)
 {
-	cout << "          starting PANTHER master..." << endl << endl;
+
+	char * t = 
+    "\n\n:~-._                                                 _.-~:\n"
+    ": :.~^o._        ________---------________        _.o^~.:.:\n"
+    " : ::.`?88booo~~~.::::::::...::::::::::::..~~oood88P'.::.:\n"
+    " :  ::: `?88P .:::....         ........:::::. ?88P' :::. :\n"
+    "  :  :::. `? .::.            . ...........:::. P' .:::. :\n"
+    "   :  :::   ... ..  ...       .. .::::......::.   :::. :\n"
+    "   `  :' .... ..  .:::::.     . ..:::::::....:::.  `: .'\n"
+    "    :..    ____:::::::::.  . . ....:::::::::____  ... :\n"
+    "   :... `:~    ^~-:::::..  .........:::::-~^    ~::.::::\n"
+    "   `.::. `\\   (8)  \\b:::..::.:.:::::::d/  (8)   /'.::::'\n"
+    "    ::::.  ~-._v    |b.::::::::::::::d|    v_.-~..:::::\n"
+    "    `.:::::... ~~^?888b..:::::::::::d888P^~...::::::::'\n"
+    "     `.::::::::::....~~~ .:::::::::~~~:::::::::::::::'\n"
+    "      `..:::::::::::   .   ....::::    ::::::::::::,'\n"
+    "        `. .:::::::    .      .::::.    ::::::::'.'\n"
+    "          `._ .:::    .        :::::.    :::::_.'\n"
+    "             `-. :    .        :::::      :,-'\n"
+    "                :.   :___     .:::___   .::\n"
+    "      ..--~~~~--:+::. ~~^?b..:::dP^~~.::++:--~~~~--..\n"
+    "        ___....--`+:::.    `~8~'    .:::+'--....___\n"
+    "      ~~   __..---`_=:: ___gd8bg___ :==_'---..__   ~~\n"
+    "       -~~~  _.--~~`-.~~~~~~~~~~~~~~~,-' ~~--._ ~~~-\n\n";
+             
+
+
+
+	cout << t << endl;
+	cout << "               starting PANTHER master..." << endl << endl;
 	max_concurrent_runs = max(MAX_CONCURRENT_RUNS_LOWER_LIMIT, _max_n_failure);
 	w_init();
 	std::pair<int, string> status;
@@ -313,17 +344,18 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 
 	}
 	w_listen(listener, BACKLOG);
+	f_rmr << endl;
+	cout << "PANTHER master listening on socket: " << w_get_addrinfo_string(connect_addr) << endl;
+	f_rmr << "PANTHER master listening on socket:" << w_get_addrinfo_string(connect_addr) << endl;
 	//free servinfo
 	freeaddrinfo(servinfo);
 	fdmax = listener;
 	FD_ZERO(&master);
 	FD_SET(listener, &master);
-	//cant do this here because the run manager doesnt yet know the par and obs names
-	//resume_idle();
-	f_rmr << endl;
-	cout << "PANTHER master listening on socket: " << w_get_addrinfo_string(connect_addr) << endl;
-	f_rmr << "PANTHER master listening on socket:" << w_get_addrinfo_string(connect_addr) << endl;
-	
+	par_names_to_check_worker = par_names;
+	obs_names_to_check_worker = obs_names;
+	mgr_type = RUN_MGR_TYPE::PANTHER;
+
 	
 }
 
@@ -360,6 +392,7 @@ void RunManagerPanther::initialize(const Parameters &model_pars, const Observati
 {
 	RunManagerAbstract::initialize(model_pars, obs, _filename);
 	cur_group_id = NetPackage::get_new_group_id();
+	
 }
 
 void RunManagerPanther::initialize_restart(const std::string &_filename)
@@ -446,8 +479,12 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	model_runs_done = 0;
 	model_runs_failed = 0;
 	model_runs_timed_out = 0;
+	bytes_transferred = 0;
+	files_transferred = 0;
 	failure_map.clear();
 	active_runid_to_iterset_map.clear();
+	open_file_trans_streams.clear();
+	open_file_socket_map.clear();
 	int num_runs = waiting_runs.size();
 	cout << "    running model " << num_runs << " times" << endl;
 	f_rmr << "running model " << num_runs << " times" << endl;
@@ -463,7 +500,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		for (auto &si : agent_info_set)
 			si.reset_runtime();
 		ss.str("");
-		ss << endl << "    " << agent_info_set.size() << " agents ready";
+		ss << "    " << agent_info_set.size() << " agents ready";
 		report(ss.str(), false);
 		cout << ss.str() << endl << endl;
 		
@@ -473,9 +510,10 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	if (should_echo)
 	{
 		cout << "PANTHER progress" << endl;
+		cout << "   avg = average model run time in minutes" << endl;
 		cout << "   runs(C = completed | F = failed | T = timed out)" << endl;
 		cout << "   agents(R = running | W = waiting | U = unavailable)" << endl;
-		cout << "------------------------------------------------------------------------------" << endl;
+		cout << "---------------------------------------------------------------------------------" << endl;
 	}
 	else
 	{
@@ -486,13 +524,20 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	double run_time_sec = 0.0;
 	while (!all_runs_complete() && terminate_reason == RUN_UNTIL_COND::NORMAL)
 	{
+        int q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2) || (q == 4))
+        {
+            cout << "'pest.stp' found" << endl;
+            kill_all_active_runs();
+
+        }
 		echo();
 		init_agents();
 		//schedule runs on available nodes
 		schedule_runs();
 		echo();
 		// get and process incomming messages
-		if (listen() == false)
+		if (!listen())
 		{
 			++n_no_ops;
 		}
@@ -516,7 +561,56 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		}
 
 	}
-	if (terminate_reason == RUN_UNTIL_COND::NORMAL)
+    w_sleep(2000);
+	n_no_ops = 0;
+    while (true)
+    {
+        if (!listen())
+        {
+            ++n_no_ops;
+        }
+        else
+        {
+            n_no_ops = 0;
+        }
+
+        cout << get_time_string_short() << " remaining file transfers: " << open_file_trans_streams.size() << "                                       \r" << flush;
+        if (ping())
+        {
+            n_no_ops = 0;
+        }
+        if (agent_info_set.size() == 0)
+        {
+            ss.str("");
+            ss << "lost comms with all agents, closing all reminaing open file transfers";
+            for (auto& m : open_file_socket_map) {
+                string fname = m.second;
+                pair<map<string, ofstream *>::iterator, bool> ret = open_file_trans_streams.insert(
+                        pair<string, ofstream *>(fname, new ofstream));
+                ofstream &out = *ret.first->second;
+                int file_size = out.tellp();
+                out.flush();
+                out.close();
+                open_file_trans_streams.erase(ret.first);
+                ss.str("");
+                ss << "closed file '" << fname << " for file transfer, transferred " << file_size << " bytes";
+                report(ss.str(), false);
+                files_transferred += 1;
+
+            }
+            open_file_socket_map.clear();
+
+        }
+        if (open_file_trans_streams.size() == 0)
+        {
+            listen();
+            break;
+        }
+
+
+    }
+
+    if (terminate_reason == RUN_UNTIL_COND::NORMAL)
 	{
 		echo();
 		total_runs += model_runs_done;
@@ -525,7 +619,21 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		echo();
 		cout << endl << endl;
 		message.str("");
-		message << "   " << model_runs_done << " runs complete :  " << get_num_failed_runs() << " runs failed";
+		message << "   " << model_runs_done << " runs complete :  " << get_num_failed_runs() << " runs failed" << endl;
+		double duration = pest_utils::get_duration_sec(start_time) / 60.0;
+		message << "   " << setprecision(3) << get_global_runtime_minute() << " avg run time (min) : ";
+		message << setprecision(3) << duration << " run mgr time (min)" << endl;
+		message << "   " << agent_info_set.size() << " agents connected" << endl;
+		if (bytes_transferred > 0)
+        {
+
+            message << "   " << files_transferred << " files transferred" << endl;
+            message << "   " << bytes_transferred << " bytes transferred" << endl;
+
+        }
+		
+		
+		
 		cout << message.str() << endl << endl;
 		f_rmr << endl << "---------------------" << endl << message.str() << endl;
 
@@ -550,8 +658,12 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		}
 	}
 
-	// Resume idle pinging thread
-	resume_idle();
+
+
+
+
+    // Resume idle pinging thread
+    resume_idle();
 
 	return terminate_reason;
 }
@@ -652,7 +764,7 @@ void RunManagerPanther::start_run_idle_async()
 
 	// Start thread
 	idle_thread = new thread(&RunManagerPanther::run_idle_async, this);
-	idle_thread_raii = new pest_utils::thread_RAII(*idle_thread);
+	//idle_thread_raii = new pest_utils::thread_RAII(*idle_thread);
 
 	report("Started idle ping thread.", false);
 }
@@ -690,10 +802,11 @@ void RunManagerPanther::end_run_idle_async()
 		report("Warning: timed out waiting for acknowledgement of signal from idle thread.", false);
 	}
 
+    idle_thread->join();
 	// Clean up
-	delete idle_thread_raii;
-	delete idle_thread;
-	idle_thread_raii = nullptr;
+	//delete idle_thread_raii;
+	//delete idle_thread;
+	//idle_thread_raii = nullptr;
 	idle_thread = nullptr;
 }
 
@@ -900,6 +1013,24 @@ void RunManagerPanther::close_agent(list<AgentInfoRec>::iterator agent_info_iter
 
 	agent_info_set.erase(agent_info_iter);
 	socket_to_iter_map.erase(i_sock);
+	if (open_file_socket_map.find(i_sock) != open_file_socket_map.end())
+    {
+	    string fname = open_file_socket_map.at(i_sock);
+        pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fname,new ofstream));
+        ofstream& out = *ret.first->second;
+        int file_size = out.tellp();
+        out.flush();
+        out.close();
+        open_file_trans_streams.erase(ret.first);
+        stringstream ss;
+        ss.str("");
+        ss << "lost comms with agent, closed file '" << fname << ", " << file_size << " bytes transferred";
+
+        report(ss.str(),false);
+        files_transferred += 1;
+        open_file_socket_map.erase(i_sock);
+    }
+
 
 	stringstream ss;
 	ss << "closed connection to agent: " << socket_name << ", number of agents: " << socket_to_iter_map.size();
@@ -1094,6 +1225,7 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::it
 		int rstat;
 		file_stor.get_info(run_id, rstat, info_txt, info_val);
 		string host_name = (*it_agent)->get_hostname();
+
 		//  info_txt = "sending run to " + host_name + ":" + (*it_agent)->get_work_dir() + " at " + pest_utils::get_time_string();
 		NetPackage net_pack(NetPackage::PackType::START_RUN, cur_group_id, run_id, info_txt);
 		pair<int,string> err = net_pack.send(socket_fd, &data[0], data.size());
@@ -1129,13 +1261,13 @@ void RunManagerPanther::echo()
 	if (!should_echo)
 		return;
 	map<string, int> stats_map = get_agent_stats();
-	cout << get_time_string_short() << " runs("
-		<< "C=" << setw(5) << left << model_runs_done
-		<< "| F=" << setw(5) << left << model_runs_failed
-		<< "| T=" << setw(5) << left << model_runs_timed_out << "): agents("
-		<< "R=" << setw(4) << left << stats_map["run"]
-		<< "| W=" << setw(4) << left << stats_map["wait"]
-		<< "| U=" << setw(4) << left << stats_map["unavailable"] << ")\r" << flush;
+	cout << get_time_string_short() << " avg:" << setw(5) << setprecision(2) << left << get_global_runtime_minute()  << " runs("
+	     << "C" << setw(5) << left << model_runs_done
+		<< "|F" << setw(5) << left << model_runs_failed
+		<< "|T" << setw(5) << left << model_runs_timed_out << ") agents("
+		<< "R" << setw(4) << left << stats_map["run"]
+		<< "|W" << setw(4) << left << stats_map["wait"]
+		<< "|U" << setw(4) << left << stats_map["unavailable"] << ") " << setw(3) << left << open_file_trans_streams.size() << "\r" << flush;
 }
 
 void RunManagerPanther::report(std::string message,bool to_cout)
@@ -1289,7 +1421,7 @@ void RunManagerPanther::process_message(int i_sock)
 	{
 		stringstream ss;
 		ss << "Frozen agent: " << host_name << "$" << agent_info_iter->get_work_dir() << " is frozen because of panther_debug_freeze_on_fail = true...";
-		report(ss.str(), false);
+		report(ss.str(), true);
 
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::RUN_KILLED)
@@ -1315,14 +1447,174 @@ void RunManagerPanther::process_message(int i_sock)
 		report("error in model IO files on agent: " + host_name + "$" + agent_info_iter->get_work_dir() + ": " + net_pack.get_info_txt() + "-terminating agent. ", true);
 		close_agent(i_sock);
 	}
+	else if (net_pack.get_type() == NetPackage::PackType::START_FILE_WRKR2MSTR) {
+        stringstream ss;
+        ss.str("");
+        pair<string, string> fnames = get_recv_filenames(net_pack, host_name,agent_info_iter->get_work_dir());
+        if ((fnames.first.size() == 0) || (fnames.second.size() == 0)) {
+            //do something here
+        } else {
+            if (open_file_trans_streams.find(fnames.second) != open_file_trans_streams.end()) {
+                ss.str("");
+                ss << "file transfer error: agent " << host_name << "$" << agent_info_iter->get_work_dir() << " requesting file '" << fnames.first << "', master file '" << fnames.second
+                   << "' already open, can't reopen, something is wrong";
+                report(ss.str(), true);
+            } else {
+                pair<map<string, ofstream *>::iterator, bool> ret = open_file_trans_streams.insert(
+                        pair<string, ofstream *>(fnames.second, new ofstream));
+                ofstream &out = *ret.first->second;
+                out.open(fnames.second.c_str(), ios::binary);
+                if (out.bad())
+                {
+                    ss.str("");
+                    ss << " error opening file '" << fnames.second << "for writing" << endl;
+                    report(ss.str(),true);
+                }
+                ss.str("");
+                ss << "agent " << host_name << "$" << agent_info_iter->get_work_dir() << " request opened file '" << fnames.second << "' for file transfer of file '" << fnames.first << "'";
+                ss << "from " << host_name << "$" << agent_info_iter->get_work_dir();
+                report(ss.str(),false);
+                open_file_socket_map.insert(make_pair(i_sock,fnames.second));
+            }
+        }
+    }
 
-	else
+    else if (net_pack.get_type() == NetPackage::PackType::CONT_FILE_WRKR2MSTR)
+    {
+        stringstream ss;
+        ss.str("");
+        pair<string,string> fnames = get_recv_filenames(net_pack, host_name,agent_info_iter->get_work_dir());
+        if ((fnames.first.size() == 0) || (fnames.second.size() == 0))
+        {
+            //do something here
+        }
+        else
+        {
+            if (open_file_trans_streams.find(fnames.second) == open_file_trans_streams.end())
+            {
+                ss << "file transfer error: agent " << host_name << "$" << agent_info_iter->get_work_dir() << " requesting file '" << fnames.first << "', master file '" << fnames.second << "' not open yet, can't continue transfer, something is wrong";
+                report(ss.str(),true);
+            }
+            else
+            {
+                pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
+                ofstream& out = *ret.first->second;
+                vector<int8_t> ibuf = net_pack.get_data();
+                //cout << reinterpret_cast<char*>(ibuf.data()) << endl;
+                out.write(reinterpret_cast<char*>(ibuf.data()),ibuf.size());
+                out.flush();
+                bytes_transferred += ibuf.size();
+                ss.str("");
+                ss << "agent " << host_name << "$" << agent_info_iter->get_work_dir() << " transferred " << ibuf.size() << " to file '" << fnames.second << "'";
+                report(ss.str(),false);
+            }
+        }
+    }
+
+    else if (net_pack.get_type() == NetPackage::PackType::FINISH_FILE_WRKR2MSTR)
+    {
+        stringstream ss;
+        ss.str("");
+        pair<string,string> fnames = get_recv_filenames(net_pack, host_name,agent_info_iter->get_work_dir());
+        if ((fnames.first.size() == 0) || (fnames.second.size() == 0))
+        {
+            //do something here
+        }
+        else
+        {
+            if (open_file_trans_streams.find(fnames.second) == open_file_trans_streams.end())
+            {
+                ss << "file transfer error: agent " << host_name << "$" << agent_info_iter->get_work_dir() << " requesting file '" << fnames.first << "', master file '" << fnames.second << "' not open yet, can't close, something is wrong";
+                report(ss.str(),true);
+            }
+            else
+            {
+                pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
+                ofstream& out = *ret.first->second;
+                int file_size = out.tellp();
+                out.flush();
+                out.close();
+                open_file_trans_streams.erase(ret.first);
+                ss.str("");
+                ss << "closed file '" << fnames.second << "' for file transfer of file '" << fnames.first;
+                ss << "' from " << host_name << "$" << agent_info_iter->get_work_dir() << ", transferred " << file_size << " bytes";
+                report(ss.str(),false);
+                files_transferred += 1;
+                open_file_socket_map.erase(i_sock);
+            }
+        }
+    }
+
+
+    else
 	{
 		report("received unsupported message from agent: ", false);
 		net_pack.print_header(f_rmr);
 		//save results from model run
 	}
 }
+
+pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, string hostname, string working_dir)
+{
+    //sanitize hostname and working_dir
+    replace(hostname.begin(),hostname.end(),'/','-');
+    replace(hostname.begin(),hostname.end(),'\\','-');
+    replace(hostname.begin(),hostname.end(),'.','-');
+    replace(hostname.begin(),hostname.end(),'(','-');
+    replace(hostname.begin(),hostname.end(),')','-');
+    replace(hostname.begin(),hostname.end(),':','-');
+
+    replace(working_dir.begin(),working_dir.end(),'/','-');
+    replace(working_dir.begin(),working_dir.end(),'\\','-');
+    replace(working_dir.begin(),working_dir.end(),'.','-');
+    replace(working_dir.begin(),working_dir.end(),'(','-');
+    replace(working_dir.begin(),working_dir.end(),')','-');
+    replace(working_dir.begin(),working_dir.end(),':','-');
+    stringstream ss;
+    ss.str("");
+    ss << "hostname=" << hostname;
+    ss << ".agentdir=" << working_dir;
+    string info_txt = net_pack.get_info_txt();
+    vector<string> tokens;
+    tokenize(info_txt,tokens);
+
+    ss << ".runid=" << net_pack.get_run_id() << ".groupid=" << net_pack.get_group_id();
+    string agent_filename_token = "";
+    string agent_filename = "";
+    string master_filename = "";
+    for (auto& token : tokens) {
+        if (token.find("agent_filename=") != string::npos)
+            agent_filename_token = token;
+        else
+            ss << "." << token;
+    }
+    if (agent_filename_token.size() == 0)
+    {
+        ss.str("");
+        ss << "WARNING: could not find 'agent_filename' tag in net_pack info txt: '" << info_txt;
+        ss << " from agent " << hostname << "$" << working_dir << ", unable form file transfer names";
+        report (ss.str(), true);
+    }
+    else {
+        ss << "." << agent_filename_token;
+        tokens.clear();
+        tokenize(agent_filename_token, tokens, "=");
+        if (tokens.size() != 2) {
+            //do something here
+        } else {
+            agent_filename = tokens[1];
+            master_filename = ss.str();
+        }
+    }
+    if (master_filename.size() > 255)
+    {
+        ss.str("");
+        ss << "WARNING: master_filename '" << master_filename << "' size > 255" << endl;
+        report(ss.str(),true);
+    }
+    return make_pair(agent_filename,master_filename);
+}
+
 
 bool RunManagerPanther::process_model_run(int sock_id, NetPackage &net_pack)
 {
@@ -1461,12 +1753,20 @@ void RunManagerPanther::kill_all_active_runs()
 			vector<int8_t> data;
 			vector<string> tmp_vec;
 			// send parameter names
-			tmp_vec = file_stor.get_par_name_vec();
+			if (par_names_to_check_worker.size() > 0)
+				tmp_vec = par_names_to_check_worker;
+			else
+				tmp_vec = file_stor.get_par_name_vec();
 			data = Serialization::serialize(tmp_vec);
 			pair<int,string> err_par = net_pack.send(i_sock, &data[0], data.size());
+			
 			//send observation names
 			net_pack = NetPackage(NetPackage::PackType::OBS_NAMES, 0, 0, "");
-			tmp_vec = file_stor.get_obs_name_vec();
+			// send parameter names
+			if (obs_names_to_check_worker.size() > 0)
+				tmp_vec = obs_names_to_check_worker;
+			else
+				tmp_vec = file_stor.get_obs_name_vec();
 			data = Serialization::serialize(tmp_vec);
 			pair<int,string> err_obs = net_pack.send(i_sock, &data[0], data.size());
 
@@ -1514,6 +1814,12 @@ void RunManagerPanther::kill_all_active_runs()
 	 vector<int> sock_id_vec;
 	 auto range_pair = active_runid_to_iterset_map.equal_range(run_id);
 
+
+	 bool just_quit = false;
+     int q = pest_utils::quit_file_found();
+     if ((q == 1) || (q == 2) || (q == 4))
+         just_quit = true;
+
 	 double duration;
 	 for (auto &i = range_pair.first; i != range_pair.second; ++i)
 	 {
@@ -1523,7 +1829,7 @@ void RunManagerPanther::kill_all_active_runs()
 			 if (avg_runtime <= 0) avg_runtime = get_global_runtime_minute();;
 			 if (avg_runtime <= 0) avg_runtime = 1.0E+10;
 			 duration = i->second->get_duration_minute();
-			 if ((duration > overdue_giveup_minutes) || (duration >= avg_runtime*overdue_giveup_fac))
+			 if ((just_quit) || (duration > overdue_giveup_minutes) || (duration >= avg_runtime*overdue_giveup_fac))
 			 {
 				 sock_id_vec.push_back(i->second->get_socket_fd());
 			 }
@@ -1534,6 +1840,19 @@ void RunManagerPanther::kill_all_active_runs()
 
  bool RunManagerPanther::all_runs_complete()
  {
+     int q = pest_utils::quit_file_found();
+     if ((q == 1) || (q == 2) || (q == 4))
+    {
+
+        kill_all_active_runs();
+        for (auto run_id : waiting_runs)
+        {
+            file_stor.update_run_failed(run_id);
+        }
+        waiting_runs.clear();
+        cout << endl << "'pest.stp' found, all remaining runs marked as fails. " << endl << endl;
+        return true;
+    }
 	 // check for run in the waitng queue
 	 if (!waiting_runs.empty())
 	 {
@@ -1690,7 +2009,7 @@ void RunManagerPanther::kill_all_active_runs()
  void RunManagerPanther::update_run_failed(int run_id)
  {
 	 // must call void RunManagerPANTHER::update_run_failed(int run_id, int socket_fd) instead
-	 throw(PestError("Error: Unsuppoerted function call  RunManagerPANTHER::update_run_failed(int run_id)"  ));
+	 throw(PestError("Error: Unsupported function call  RunManagerPANTHER::update_run_failed(int run_id)"  ));
  }
 
 RunManagerPanther::~RunManagerPanther(void)

@@ -29,6 +29,7 @@
   <ItemGroup>
     <ClInclude Include="constraints.h" />
     <ClInclude Include="covariance.h" />
+    <ClInclude Include="DataAssimilator.h" />
     <ClInclude Include="DifferentialEvolution.h" />
     <ClInclude Include="eigen_tools.h" />
     <ClInclude Include="Ensemble.h" />
@@ -41,6 +42,8 @@
     <ClInclude Include="Localizer.h" />
     <ClInclude Include="logger.h" />
     <ClInclude Include="ModelRunPP.h" />
+    <ClInclude Include="MOEA.h" />
+    <ClInclude Include="MultiPest.h" />
     <ClInclude Include="ObjectiveFunc.h" />
     <ClInclude Include="OutputFileWriter.h" />
     <ClInclude Include="ParamTransformSeq.h" />
@@ -52,6 +55,8 @@
     <ClInclude Include="RedSVD-h.h" />
     <ClInclude Include="Regularization.h" />
     <ClInclude Include="RestartController.h" />
+    <ClInclude Include="sequential_lp.h" />
+    <ClInclude Include="SQP.h" />
     <ClInclude Include="SVDASolver.h" />
     <ClInclude Include="SVDPackage.h" />
     <ClInclude Include="SVDSolver.h" />
@@ -62,6 +67,7 @@
   <ItemGroup>
     <ClCompile Include="constraints.cpp" />
     <ClCompile Include="covariance.cpp" />
+    <ClCompile Include="DataAssimilator.cpp" />
     <ClCompile Include="DifferentialEvolution.cpp" />
     <ClCompile Include="eigen_tools.cpp" />
     <ClCompile Include="Ensemble.cpp" />
@@ -74,6 +80,7 @@
     <ClCompile Include="Localizer.cpp" />
     <ClCompile Include="logger.cpp" />
     <ClCompile Include="ModelRunPP.cpp" />
+    <ClCompile Include="MOEA.cpp" />
     <ClCompile Include="ObjectiveFunc.cpp" />
     <ClCompile Include="OutputFileWriter.cpp" />
     <ClCompile Include="ParamTransformSeq.cpp" />
@@ -84,6 +91,8 @@
     <ClCompile Include="QSqrtMatrix.cpp" />
     <ClCompile Include="Regularization.cpp" />
     <ClCompile Include="RestartController.cpp" />
+    <ClCompile Include="sequential_lp.cpp" />
+    <ClCompile Include="SQP.cpp" />
     <ClCompile Include="SVDASolver.cpp" />
     <ClCompile Include="SVDPackage.cpp" />
     <ClCompile Include="SVDSolver.cpp" />
@@ -216,10 +225,10 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)libs\Eigen;$(SolutionDir)libs\linear_analysis</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\libs\opt;$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\run_managers\serial;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)libs\Eigen;$(SolutionDir)libs\linear_analysis</AdditionalIncludeDirectories>
       <OpenMPSupport>false</OpenMPSupport>
       <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalOptions>/D_WIN32_WINNT=0x0600 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D_WIN32_WINNT=0x0600 /bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -275,13 +284,13 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)libs\Eigen;$(SolutionDir)libs\linear_analysis</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\libs\common;$(SolutionDir)\libs\run_managers\abstract_base;$(SolutionDir)libs\Eigen;$(SolutionDir)\libs\opt;$(SolutionDir)libs\linear_analysis</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <OpenMPSupport>true</OpenMPSupport>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
-      <AdditionalOptions>/D_WIN32_WINNT=0x0600 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/D_WIN32_WINNT=0x0600 /bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

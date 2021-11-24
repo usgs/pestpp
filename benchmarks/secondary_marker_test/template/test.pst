@@ -1,13 +1,13 @@
 pcf
 * control data
              restart          estimation
-         1         2         1         0         1         0
-         1         1              single               point         1         0         0          noobsreref
-   2.000000E+01  -3.000000E+00   3.000000E-01   1.000000E-02        -7       999          lamforgive        noderforgive
-   1.000000E+01   1.000000E+01   1.000000E-03         0         0
-   1.000000E-01         1   1.100000E+00               noaui          nosenreuse        noboundscale
-         0   1.000000E-02         3         3   1.000000E-02         3   0.000000E+00         1  -1.000000E+00
-         0         0         0         0             jcosave          verboserec          jcosaveitn          reisaveitn          parsaveitn        noparsaverun
+         1         2         1         0         1
+         1         1              single               point
+   2.000000E+01  -3.000000E+00   3.000000E-01   1.000000E-02        -7
+   1.000000E+01   1.000000E+01   1.000000E-03
+   1.000000E-01
+         0   1.000000E-02         3         3   1.000000E-02         3
+         0         0         0
 * singular value decomposition
          1
   10000000    1.000000E-06

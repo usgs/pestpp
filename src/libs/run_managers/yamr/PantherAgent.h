@@ -38,6 +38,7 @@ public:
 	void init_network(const std::string &host, const std::string &port);
 	void start(const std::string &host, const std::string &port);
 	~PANTHERAgent();
+
 	pair<int,string> recv_message(NetPackage &net_pack, struct timeval *tv=NULL);
 	pair<int,string> recv_message(NetPackage &net_pack, long  timeout_seconds, long  timeout_microsecs = 0);
 	pair<int,string> send_message(NetPackage &net_pack, const void *data=NULL, unsigned long data_len=0);
@@ -51,6 +52,7 @@ private:
 	int poll_interval_seconds;
 	int max_time_without_master_ping_seconds;
 	bool restart_on_error;
+	int current_da_cycle;
 
 #ifdef _DEBUG
 	static const int max_recv_fails = 100;
@@ -74,7 +76,7 @@ private:
 
 	ModelInterface mi;
 	void run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished,
-		pest_utils::thread_exceptions *shared_execptions,
+		exception_ptr& run_exception,
 		Parameters* pars, Observations* obs);
 
 	void terminate_or_restart(int error_code) const;
@@ -84,6 +86,8 @@ private:
 	Pest pest_scenario;
 
 	void report(const string& _message, bool to_cout);
+
+	void transfer_files(const vector<string>& tfiles, int group, int run_id, string& desc, string tag);
 
 };
 

@@ -54,6 +54,12 @@ jobs:
         TEST_SCRIPT="basic_tests.py"
         TEST_DIR="benchmarks"
 
+    - name: "mou tests"
+      env:
+        TEST_REPO="https://github.com/usgs/pestpp"
+        TEST_SCRIPT="mou_tests.py"
+        TEST_DIR="benchmarks"
+
 before_script:
   - mkdir build && cd build
   - cmake -DCMAKE_BUILD_TYPE=Release ..

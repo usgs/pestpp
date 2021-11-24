@@ -116,8 +116,10 @@ PestppOptions::ARG_STATUS DynamicRegularization::assign_value_by_key(const std::
 		pest_utils::convert_ip(value, temp);
 		if (temp == 1)
 			adj_grp_weights = true;
+	}
 		else
-			return PestppOptions::ARG_STATUS::ARG_INVALID;
+	{
+		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;
 	}
 
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;

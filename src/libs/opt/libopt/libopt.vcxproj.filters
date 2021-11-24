@@ -342,9 +342,6 @@
     <ClCompile Include="..\IdiSolve.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\sequential_lp.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Clp_ampl.h">
@@ -699,9 +696,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\ClpCholeskyWssmpKKT.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\sequential_lp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -36,6 +36,7 @@
 #include "model_interface.h"
 #include "Jacobian.h"
 #include "QSqrtMatrix.h"
+#include <limits>
 
 
 using namespace::std;
@@ -45,6 +46,7 @@ using namespace::pest_utils;
 
 Pest::Pest() : base_par_transform("PEST base_par_transform"), regul_scheme_ptr(0)
 {
+	set_defaults();
 }
 
 void Pest::set_defaults()
@@ -57,7 +59,7 @@ void Pest::set_defaults()
 
 }
 
-void Pest::check_inputs(ostream &f_rec, bool forgive)
+void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim)
 {
 	if (control_info.noptmax == 0)
 	{
@@ -68,6 +70,7 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		}
 
 		forgive = true;
+		forgive_parchglim = true;
 	}
 
 	if (other_lines.size() > 0)
@@ -96,46 +99,16 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 	}
 
 	if (control_info.facparmax <= 1.0)
+	{
 		if (forgive)
 		{
 			cout << "WARNING: 'facparmax` should be greater than 1.0" << endl;
 			f_rec << "WARNING: 'facparmax` should be greater than 1.0" << endl;
 		}
 		else
+		{
 			throw PestError("'facparmax' must be greater than 1.0");
-
-	if (control_info.pestmode == ControlInfo::PestMode::PARETO)
-	{
-		//bool found_pareto = false, found_other = false;
-		//if (pareto_info.obsgroup.substr(0, 5) == "REGUL")
-		//	found_pareto = true;
-		//else if (find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pareto_info.obsgroup) == ctl_ordered_obs_group_names.end())
-		//	throw PestError("pareto obsgroup not found: " + pareto_info.obsgroup);
-		////make sure at least one other obs group has a nonzero weight obs in it
-
-
-		//for (auto &on : ctl_ordered_obs_names)
-		//{
-		//		if (observation_info.get_group(on) == pareto_info.obsgroup)
-		//			found_pareto = true;
-		//		else if (observation_info.get_weight(on) > 0.0)
-		//			found_other = true;
-		//}
-
-		//if (!found_pareto || !found_other)
-		//{
-		//	for (auto &pi : ctl_ordered_pi_names)
-		//	{
-		//		if (prior_info.get_pi_rec_ptr(pi).get_group() == pareto_info.obsgroup)
-		//			found_pareto = true;
-		//		else if (prior_info.get_pi_rec_ptr(pi).get_weight() > 0.0)
-		//			found_other = true;
-		//	}
-		//}
-		//if (!found_pareto)
-		//	throw PestError("no non-zero weighted obs found in pareto obsgroup: " + pareto_info.obsgroup);
-		//if (!found_other)
-		//	throw PestError("no non-zero weighted obs found outside of pareto obsgroup");
+		}
 	}
 
 	vector<string> par_warnings;
@@ -143,7 +116,8 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 	bool adj_par;
 	int par_ub = 0;
 	int par_lb = 0;
-	
+	vector<string> adj_pnames = get_ctl_ordered_adj_par_names();
+	set<string> sadj(adj_pnames.begin(), adj_pnames.end());
 	for (auto &pname : ctl_ordered_par_names)
 	{
 		//double pval = ctl_parameters[pname];
@@ -152,25 +126,49 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		adj_par = true;
 		if ((prec->tranform_type == ParameterRec::TRAN_TYPE::FIXED) || (prec->tranform_type == ParameterRec::TRAN_TYPE::TIED))
 			adj_par = false;
+		if (prec->tranform_type == ParameterRec::TRAN_TYPE::TIED)
+		{
+			string partied = base_par_transform.get_tied_ptr()->get_items().at(pname).first;
+			if (sadj.find(partied) == sadj.end())
+			{
+				par_problems.push_back("'tied' parameter '" + pname + "' is tied to '" + partied + "' which is not an adjustable parameter");
+			}
+		}
 		if (prec->lbnd >= prec->ubnd)
+		{
 			if ((forgive) || (!adj_par))
+			{
 				par_warnings.push_back(pname + ": bounds are busted");
+			}
 			else
+			{
 				par_problems.push_back(pname + ": bounds are busted");
+			}
+		}
 		if (prec->init_value < prec->lbnd)
+		{
 			if ((forgive) || (!adj_par))
+			{
 				par_warnings.push_back(pname + " initial value is less than lower bound");
+			}
 			else
+			{
 				par_problems.push_back(pname + " initial value is less than lower bound");
+			}
+		}
 		else if (prec->init_value == prec->lbnd)
 		{
 			par_lb++;
 		}
 		if (prec->init_value > prec->ubnd)
 			if ((forgive) || (!adj_par))
+			{
 				par_warnings.push_back(pname + " initial value is greater than upper bound");
+			}
 			else
+			{
 				par_problems.push_back(pname + " initial value is greater than upper bound");
+			}
 		else if (prec->init_value == prec->ubnd)
 		{
 			par_ub++;
@@ -184,16 +182,29 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		
 		if ((prec->ubnd > 0.0) && (prec->lbnd < 0.0))
 		{
-			if (prec->chglim == "FACTOR")
+			if ((!forgive_parchglim) && (prec->chglim == "FACTOR"))
+			{
 				if ((forgive) || (!adj_par))
+				{
 					par_warnings.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
+				}
 				else
+				{
 					par_problems.push_back(pname + " 'factor' parchglim not compatible with bounds that cross zero");
+			
+				}
+			}
 			else if ((prec->chglim == "RELATIVE") && (control_info.relparmax < 1.0))
+			{
 				if ((forgive) || (!adj_par))
+				{
 					par_warnings.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
+				}
 				else
+				{
 					par_problems.push_back(pname + "bounds cross zero, requires 'relparmax' > 1.0");
+				}
+			}
 		}
 	}
 
@@ -242,6 +253,8 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		}
 
 	}
+
+
 
 	if (get_ctl_ordered_nz_obs_names().size() == 0)
 	{
@@ -328,7 +341,7 @@ void Pest::check_inputs(ostream &f_rec, bool forgive)
 		}
 }
 
-void Pest::check_io(ofstream& f_rec)
+void Pest::check_io(ofstream& f_rec, bool echo_errors)
 {
 	ModelInterface mi(model_exec_info.tplfile_vec,model_exec_info.inpfile_vec,
 		model_exec_info.insfile_vec,model_exec_info.outfile_vec,model_exec_info.comline_vec);
@@ -341,11 +354,11 @@ void Pest::check_io(ofstream& f_rec)
 	catch (exception& e)
 	{
 		string mess = e.what();
-		throw_control_file_error(f_rec, "error in model interface file access:" + mess);
+		throw_control_file_error(f_rec, "error in model interface file access:" + mess, true,echo_errors);
 	}
 	catch (...)
 	{
-		throw_control_file_error(f_rec, "unspecified error in model interface file access checking");
+		throw_control_file_error(f_rec, "unspecified error in model interface file access checking", true, echo_errors);
 	}
 	if (pestpp_options.get_check_tplins())
 	{
@@ -357,11 +370,11 @@ void Pest::check_io(ofstream& f_rec)
 		catch (exception& e)
 		{
 			string mess = e.what();
-			throw_control_file_error(f_rec, "error in model interface file checking:" + mess);
+			throw_control_file_error(f_rec, "error in model interface file checking:" + mess, true, echo_errors);
 		}
 		catch (...)
 		{
-			throw_control_file_error(f_rec, "unspecified error in model interface file checking");
+			throw_control_file_error(f_rec, "unspecified error in model interface file checking", true, echo_errors);
 		}
 	}
 }
@@ -417,10 +430,10 @@ vector<string> Pest::get_nonregul_obs() const
 //	return process_ctl_file_old(fin, pst_filename, f_out);
 //}
 
-int Pest::process_ctl_file(ifstream& fin, string pst_filename)
+int Pest::process_ctl_file(ifstream& fin, string _pst_filename)
 {
 	ofstream f_out("ctl_process.out");
-	return process_ctl_file(fin, pst_filename, f_out);
+	return process_ctl_file(fin, _pst_filename, f_out);
 }
 
 
@@ -942,6 +955,7 @@ int Pest::process_ctl_file(ifstream& fin, string pst_filename)
 
 int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 {
+	cout << "processing control file " << _pst_filename << endl;
 	string line;
 	string line_upper;
 	string section("");
@@ -975,7 +989,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	base_par_transform.push_back_active_ctl2numeric(t_log);
 
 	pestpp_options.set_defaults();
-
+	vector<string> notfound_args;
 	set<string> tied_names;
 	pst_filename = _pst_filename;
 	set<string> sections_found;
@@ -999,7 +1013,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	try {
 #endif
 		prior_info_string = "";
-		vector<string> notfound_args;
+		
 		for (lnum = 1, sec_begin_lnum = 1; getline(fin, line); ++lnum)
 		{
 			strip_ip(line);
@@ -1034,6 +1048,12 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					throw_control_file_error(f_rec, "'* control data keyword' cant be used with '++' args");
 				sections_found.insert("PLUSPLUS");
 				pestpp_input.push_back(line);
+				section = "PLUSPLUS";
+				if (!prior_info_string.empty())
+                {
+                    tokens_to_pi_rec(f_rec,prior_info_string);
+                    prior_info_string.clear();
+                }
 			}
 
 			else if (line_upper[0] == '*')
@@ -1201,8 +1221,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			}
 			else if (section == "PARAMETER GROUPS EXTERNAL")
 			{
-				pest_utils::ExternalCtlFile efile(f_rec, line);
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line);
+				efile.read_file(f_rec);
 				
 				set<string> cnames = efile.get_col_set();
 				for (auto n : par_group_formal_names)
@@ -1276,8 +1296,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (section == "PARAMETER DATA EXTERNAL")
 			{
 				
-				pest_utils::ExternalCtlFile efile(f_rec, line);	
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line);	
+				efile.read_file(f_rec);
 				set<string> cnames = efile.get_col_set();
 				vector<string> get_names;
 				//for (auto n : par_formal_names)
@@ -1309,6 +1329,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					}
 						
 				}
+				
 				string tcol;
 				if (cnames.find("PARTRANS") != cnames.end())
 					tcol = "PARTRANS";
@@ -1349,8 +1370,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 
 			else if (section == "OBSERVATION GROUPS EXTERNAL")
 			{
-				pest_utils::ExternalCtlFile efile(f_rec, line);		
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line);		
+				efile.read_file(f_rec);
 					
 				set<string> cnames = efile.get_col_set();
 				for (auto n : obs_group_formal_names)
@@ -1385,8 +1406,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (section == "OBSERVATION DATA EXTERNAL")
 			{
 				
-				pest_utils::ExternalCtlFile efile(f_rec, line);		
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line);		
+				efile.read_file(f_rec);
 					
 				vector<string> get_names;
 				set<string> cnames = efile.get_col_set();
@@ -1441,8 +1462,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 
 			{
 				
-				pest_utils::ExternalCtlFile efile(f_rec, line);
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line);
+				efile.read_file(f_rec);
 				set<string> cnames = efile.get_col_set();
 				for (auto n : pi_formal_names)
 				{
@@ -1484,8 +1505,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			else if (section == "MODEL INPUT EXTERNAL")
 			{
 				
-				pest_utils::ExternalCtlFile efile(f_rec, line, false);	
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line, false);	
+				efile.read_file(f_rec);
 					
 				set<string> cnames = efile.get_col_set();
 				for (auto n : model_input_formal_names)
@@ -1504,6 +1525,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					mi_tokens = efile.get_row_vector(ro, model_input_formal_names);
 					model_exec_info.tplfile_vec.push_back(mi_tokens[0]);
 					model_exec_info.inpfile_vec.push_back(mi_tokens[1]);
+					//model_exec_info.incycle_vec.push_back(std::stoi(mi_tokens[2]));
 				}
 				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
@@ -1517,15 +1539,15 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			{
 				if (tokens.size() != 2)
 					throw_control_file_error(f_rec, "wrong number of tokens on '* model output' line '" + line + "' expecting 2");
-				model_exec_info.tplfile_vec.push_back(tokens_case_sen[0]);
-				model_exec_info.inpfile_vec.push_back(tokens_case_sen[1]);
+				model_exec_info.insfile_vec.push_back(tokens_case_sen[0]);
+				model_exec_info.outfile_vec.push_back(tokens_case_sen[1]);
 			}
 
 
 			else if (section == "MODEL OUTPUT EXTERNAL")
 			{
-				pest_utils::ExternalCtlFile efile(f_rec, line, false);	
-				efile.read_file();
+				pest_utils::ExternalCtlFile efile(line, false);	
+				efile.read_file(f_rec);
 				set<string> cnames = efile.get_col_set();
 				for (auto n : model_output_formal_names)
 				{
@@ -1543,6 +1565,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					mo_tokens = efile.get_row_vector(ro, model_output_formal_names);
 					model_exec_info.insfile_vec.push_back(mo_tokens[0]);
 					model_exec_info.outfile_vec.push_back(mo_tokens[1]);
+					//model_exec_info.outcycle_vec.push_back(std::stoi(mo_tokens[2]));
+					
 				}
 				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
@@ -1663,11 +1687,12 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	fin.close();
 
 	
+	
 	// handle any tied pars found in external files
 	double numer, demon, ratio;
 	for (auto p: temp_tied_map)
 	{
-		string name = p.first;
+		name = p.first;
 		string name_tied = p.second;
 		numer = ctl_parameters[name];
 		demon = ctl_parameters[name_tied];
@@ -1715,6 +1740,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		}
 		arg_map.insert(line_arg_map.begin(), line_arg_map.end());
 	}
+	pestpp_options.rectify_ies_da_args();
 
 	if (dup.size() > 0)
 	{
@@ -1768,7 +1794,23 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			throw_control_file_error(f_rec, ss.str(), true);
 		}
 	}
-	
+	if (notfound_args.size() > 0)
+	{
+		ss.str("");
+		ss << " the following control data keyword lines were not accepted:" << endl;
+		for (auto n : notfound_args)
+			ss << n << ",";
+		if (pestpp_options.get_forgive_unknown_args())
+		{
+			ss << endl << "forgive_unknown_args is 'true', continuing" << endl;
+			throw_control_file_error(f_rec, ss.str(), false);
+		}
+		else
+		{
+			ss << endl << "forgive_unknown_args is 'false' so this is treated as an error" << endl;
+			throw_control_file_error(f_rec, ss.str(), true);
+		}
+	}
 	if (control_info.pestmode == ControlInfo::PestMode::REGUL)
 	{
 		if (regul_scheme_ptr)
@@ -1779,9 +1821,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	{
 		set<string> found;
 		string gname;
-		for (auto name : ctl_ordered_obs_names)
+		for (auto& _name : ctl_ordered_obs_names)
 		{
-			gname = observation_info.get_group(name);
+			gname = observation_info.get_group(_name);
 			if (found.find(gname) == found.end())
 			{
 				found.insert(gname);
@@ -1856,7 +1898,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 			to_tie_names = vector<string>(first, last);
 			for (auto pname : to_tie_names)
 			{
-				double ratio = ctl_parameters[pname] / ctl_parameters[tie_to_name];
+				ratio = ctl_parameters[pname] / ctl_parameters[tie_to_name];
 				t_tied->insert(pname, pair<string, double>(tie_to_name, ratio));
 				ctl_parameter_info.get_parameter_rec_ptr_4_mod(pname)->tranform_type = ttied;
 			}
@@ -1903,10 +1945,12 @@ const vector<string> &Pest::get_outfile_vec()
 	return model_exec_info.outfile_vec;
 }
 
-void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgrade_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim, bool enforce_bounds)
+pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgrade_active_ctl_pars, const Parameters &last_active_ctl_pars, bool enforce_chglim, bool enforce_bounds)
 {
-	if ((!enforce_chglim) && (!enforce_bounds))
-		return;
+	if ((!enforce_chglim) && (!enforce_bounds)) {
+        pair<string, double> _control_info("no enforcement", 1.0);
+        return _control_info;
+    }
 	stringstream ss;
 	double fpm = control_info.facparmax;
 	double facorig = control_info.facorig;
@@ -2079,7 +2123,7 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 				temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
 				if ((temp > 1.0) || (temp < 0.0))
 				{
-					stringstream ss;
+					ss.str("");
 					ss << "Pest::enforce_par_limts() error: invalid lower bound scaling factor " << temp << " for par " << p.first << endl;
 					ss << " lbnd:" << p_rec->lbnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
 					throw runtime_error(ss.str());
@@ -2124,6 +2168,10 @@ void Pest::enforce_par_limits(PerformanceLog* performance_log, Parameters & upgr
 			p.second = p_rec->ubnd;
 
 	}
+	ss.str("");
+	ss << control_type << "," << controlling_par;
+	pair<string, double> _control_info(ss.str(), scaling_factor);
+	return _control_info;
 
 }
 
@@ -2176,6 +2224,784 @@ pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &
 	}
 	return pair<Parameters,Parameters>(lbnd,ubnd);
 }
+
+Pest Pest::get_child_pest(int icycle)
+{
+	// TODO: insert return statement here
+
+	Pest child_pest = Pest(*this);
+	child_pest.child_pest_update(icycle);
+	return child_pest;
+//	Pest* child_pest = new Pest(*this);
+//	child_pest->child_pest_update(icycle);
+//	return *child_pest;
+	
+}
+
+
+void Pest::assign_da_cycles(ofstream &f_rec)
+{
+	vector<string> str_values, str_names;
+	stringstream ss, ss_tpl;
+	set<string> col_names;
+	string name_col;
+	int cycle;
+	if (efiles_map.find("PARAMETER DATA EXTERNAL") == efiles_map.end())
+	{
+		throw_control_file_error(f_rec, "could not find 'parameter data external' section for cycle info, all parameter quantities being assigned 'cycle'=-1", false);
+//		for (auto pname : get_ctl_ordered_adj_par_names())
+//		{
+//			ctl_parameter_info.get_parameter_rec_ptr_4_mod(pname)->cycle = -1;
+//		}
+	}
+
+	else
+	{
+        vector<pair<string, DaCycleInfo>> par_cycle_dci_map = extract_cycle_info(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
+//		vector<pair<string, int>> par_cycle_map = extract_cycle_numbers2(f_rec, "PARAMETER DATA EXTERNAL", vector<string>{"PARNME", "NAME"});
+//		if (par_cycle_map.size() == 0)
+//		{
+//			throw_control_file_error(f_rec, "could not find cycle info in external file(s), all parameter quantities being assigned 'cycle'=-1", false);
+//			for (auto pname : get_ctl_ordered_adj_par_names())
+//			{
+//				ctl_parameter_info.get_parameter_rec_ptr_4_mod(pname)->cycle = -1;
+//			}
+//
+//		}
+//		else
+		{
+//			for (auto pc : par_cycle_map)
+//			{
+//				ctl_parameter_info.get_parameter_rec_ptr_4_mod(pc.first)->cycle = pc.second;
+//			}
+			for (auto& pc : par_cycle_dci_map) {
+                ctl_parameter_info.get_parameter_rec_ptr_4_mod(pc.first)->dci = pc.second;
+            }
+
+		}
+
+	}
+		
+	
+
+	if (efiles_map.find("OBSERVATION DATA EXTERNAL") == efiles_map.end())
+	{
+		throw_control_file_error(f_rec, "could not find 'observation data external' section, assigning all observations to cycle '0'", false);
+//		for (auto name : get_ctl_ordered_nz_obs_names())
+//		{
+//			observation_info.get_observation_rec_ptr_4_mod(name)->cycle = 0;
+//		}
+	}
+
+	else
+	{
+        vector<pair<string, DaCycleInfo>> obs_cycle_dci_map = extract_cycle_info(f_rec, "OBSERVATION DATA EXTERNAL", vector<string>{"OBSNME", "NAME"});
+
+        //vector<pair<string, int>> obs_cycle_map = extract_cycle_numbers2(f_rec, "OBSERVATION DATA EXTERNAL", vector<string>{"OBSNME", "NAME"});
+		if (obs_cycle_dci_map.size() == 0)
+		{
+			throw_control_file_error(f_rec, "no observation cycle information was found in external file(s), assigning all observations to cycle '0'", false);
+
+		}
+		vector<string> missing, obs_vec;
+		for (auto pp: obs_cycle_dci_map)
+		{
+			obs_vec.push_back(pp.first);
+		}
+		for (auto name : get_ctl_ordered_nz_obs_names())
+		{
+			if (std::find(obs_vec.begin(), obs_vec.end(), name) == obs_vec.end())			
+				missing.push_back(name);
+		}
+		if (missing.size() > 0)
+		{
+			ss.str("");
+			ss << "the following non-zero weighted observations do not have cycle information:";
+			for (auto m : missing)
+				ss << m << ",";
+			throw_control_file_error(f_rec, ss.str());
+		}
+//		for (auto oc : obs_cycle_map) {
+//            observation_info.get_observation_rec_ptr_4_mod(oc.first)->cycle = oc.second;
+//        }
+		for (auto& oc : obs_cycle_dci_map)
+        {
+            observation_info.get_observation_rec_ptr_4_mod(oc.first)->dci = oc.second;
+        }
+	}
+
+	model_exec_info.incycle_dci_vec.clear();
+	if (efiles_map.find("MODEL INPUT EXTERNAL") == efiles_map.end())
+	{
+		throw_control_file_error(f_rec, "could not find 'model input external' section, all template/model input files will be used every cycle", false);
+		for (auto tpl : model_exec_info.tplfile_vec)
+		{
+			//model_exec_info.incycle_vec.push_back(-1);
+			model_exec_info.incycle_dci_vec.push_back(DaCycleInfo());
+		}
+	}
+	else
+	{
+		//vector<pair<string, int>> mi_cycle_map = extract_cycle_numbers2(f_rec, "MODEL INPUT EXTERNAL", vector<string>{"PEST_FILE"});
+        vector<pair<string, DaCycleInfo>> mi_cycle_dci_map = extract_cycle_info(f_rec, "MODEL INPUT EXTERNAL", vector<string>{"PEST_FILE"});
+		if (mi_cycle_dci_map.size() == 0)
+		{
+			throw_control_file_error(f_rec, "could not find cycle info in external file(s), all template/model input files will be used every cycle", false);
+			for (auto tpl : model_exec_info.tplfile_vec)
+			{
+				//model_exec_info.incycle_vec.push_back(-1);
+				model_exec_info.incycle_dci_vec.push_back(DaCycleInfo());
+
+			}
+		}	
+		else
+		{
+			
+//			for (auto tpl : mi_cycle_map)
+//			{
+//				model_exec_info.incycle_vec.push_back(tpl.second); // we can do that becuase row order does not change.
+//
+//			}
+			for (auto& tpl : mi_cycle_dci_map)
+            {
+                model_exec_info.incycle_dci_vec.push_back(tpl.second);
+            }
+		}
+	}
+
+
+	model_exec_info.outcycle_dci_vec.clear();
+	if (efiles_map.find("MODEL OUTPUT EXTERNAL") == efiles_map.end())
+	{
+		throw_control_file_error(f_rec, "could not find 'model output external' section, assigning all instruction/out files to cycle '0'", false);
+		for (auto ins : model_exec_info.insfile_vec)
+		{
+			//model_exec_info.outcycle_vec.push_back(0);
+			model_exec_info.outcycle_dci_vec.push_back(DaCycleInfo());
+		}
+	}
+	else
+	{
+		//vector<pair<string, int>> mi_cycle_map = extract_cycle_numbers2(f_rec, "MODEL OUTPUT EXTERNAL", vector<string>{"PEST_FILE"});
+        vector<pair<string, DaCycleInfo>> mi_cycle_dci_map = extract_cycle_info(f_rec, "MODEL OUTPUT EXTERNAL", vector<string>{"PEST_FILE"});
+		if (mi_cycle_dci_map.size() == 0)
+		{
+			throw_control_file_error(f_rec, "no model output cycle information was found in external file(s), assigning all instruction/out files to cycle '0'",false);
+			for (auto ins : model_exec_info.insfile_vec)
+			{
+				//model_exec_info.outcycle_vec.push_back(0);
+                model_exec_info.outcycle_dci_vec.push_back(DaCycleInfo());
+			}
+		}
+		else
+		{		
+//			for (auto ins : mi_cycle_map)
+//			{
+//				model_exec_info.outcycle_vec.push_back(ins.second); // we can do that becuase row order does not change.
+//			}
+			for (auto& ins : mi_cycle_dci_map)
+            {
+			    model_exec_info.outcycle_dci_vec.push_back(ins.second);
+            }
+		}
+	}
+	//TODO: prior info...with pi, need to check that parameters in each eqs are in the same cycle!
+}
+
+DaCycleInfo Pest::parse_cycle_str(string& raw_cycle_val, string& efilename, int row, ofstream& f_rec)
+{
+    stringstream ss;
+    DaCycleInfo dci;
+    dci.start = 0;
+    dci.stop = -999;
+    dci.stride = 1;
+    string sub_str;
+    int cycle;
+    int idx;
+    if (raw_cycle_val.find(':') != string::npos)
+    {
+        //no start
+        if (raw_cycle_val[0] == ':')
+        {
+            //no stop, so just stride
+            if (raw_cycle_val[1] == ':')
+            {
+                idx = raw_cycle_val.find_last_of(':');
+                sub_str = raw_cycle_val.substr(idx+1,raw_cycle_val.size());
+                try {
+                    dci.stride = stoi(sub_str);
+                }
+                catch (...) {
+                    ss.str("");
+                    ss << "error casting cycle stride '" << sub_str << "' to int for cycle info string '" << raw_cycle_val << "' on row " << row << "of external file "
+                       << efilename << " , Stopped...";
+                    throw_control_file_error(f_rec, ss.str());
+                }
+            }
+
+            else
+            {
+                //parse stop
+                sub_str = raw_cycle_val.substr(1,raw_cycle_val.size());
+                idx = sub_str.find_first_of(':');
+                try {
+                    dci.stop = stoi(sub_str.substr(0,idx));
+
+                }
+                catch (...) {
+                    ss.str("");
+                    ss << "error casting cycle stop '" << sub_str.substr(0,idx) << "' to int for cycle info string '" << raw_cycle_val << "' on row " << row << "of external file "
+                       << efilename << " , Stopped...";
+                    throw_control_file_error(f_rec, ss.str());
+                }
+
+                sub_str = sub_str.substr(idx,sub_str.size());
+                idx = sub_str.find_first_of(':');
+                //a stride too
+                if (idx != string::npos)
+                {
+                    sub_str = sub_str.substr(idx+1,sub_str.size());
+                    try {
+                        dci.stride = stoi(sub_str);
+
+                    }
+                    catch (...) {
+                        ss.str("");
+                        ss << "error casting cycle stride '" << sub_str << "' to int for cycle info string '" << raw_cycle_val << "' on row " << row << "of external file "
+                           << efilename << " , Stopped...";
+                        throw_control_file_error(f_rec, ss.str());
+                    }
+                }
+            }
+        }
+        else
+        {
+            //parse the start
+            idx = raw_cycle_val.find_first_of(':');
+            sub_str = raw_cycle_val.substr(0,idx);
+
+            try {
+                dci.start = stoi(sub_str);
+
+            }
+            catch (...) {
+                ss.str("");
+                ss << "error casting cycle start '" << sub_str << "' to int for cycle info string '" << raw_cycle_val << "' on row " << row << "of external file "
+                   << efilename << " , Stopped...";
+                throw_control_file_error(f_rec, ss.str());
+            }
+
+            sub_str = raw_cycle_val.substr(idx+1,raw_cycle_val.size());
+
+            //no stop but a stride
+            if (sub_str[0] == ':')
+            {
+                try {
+                    dci.stride = stoi(sub_str.substr(1,sub_str.size()));
+
+                }
+                catch (...) {
+                    ss.str("");
+                    ss << "error casting cycle stride '" << sub_str.substr(1,sub_str.size()) << "' to int for cycle info string '" << raw_cycle_val << "' on row " << row << "of external file "
+                       << efilename << " , Stopped...";
+                    throw_control_file_error(f_rec, ss.str());
+                }
+            }
+            else {
+                idx = sub_str.find_first_of(':');
+
+                if (idx != string::npos) {
+
+                    try {
+                        dci.stop = stoi(sub_str.substr(0, idx));
+
+                    }
+                    catch (...) {
+                        ss.str("");
+                        ss << "error casting cycle stop '" << sub_str.substr(0, idx)
+                           << "' to int for cycle info string '" << raw_cycle_val << "' on row " << row
+                           << "of external file "
+                           << efilename << " , Stopped...";
+                        throw_control_file_error(f_rec, ss.str());
+                    }
+                    sub_str = sub_str.substr(idx + 1, sub_str.size());
+                    try {
+                        dci.stride = stoi(sub_str);
+
+                    }
+                    catch (...) {
+                        ss.str("");
+                        ss << "error casting cycle stride '" << sub_str << "' to int for cycle info string '"
+                           << raw_cycle_val << "' on row " << row << "of external file "
+                           << efilename << " , Stopped...";
+                        throw_control_file_error(f_rec, ss.str());
+                    }
+
+                } else {
+                    try {
+                        dci.stop = stoi(sub_str);
+
+                    }
+                    catch (...) {
+                        ss.str("");
+                        ss << "error casting cycle stop '" << sub_str << "' to int for cycle info string '"
+                           << raw_cycle_val << "' on row " << row << "of external file "
+                           << efilename << " , Stopped...";
+                        throw_control_file_error(f_rec, ss.str());
+                    }
+                }
+            }
+
+        }
+    }
+    else {
+        try {
+            cycle = stoi(raw_cycle_val);
+
+        }
+        catch (...) {
+            ss.str("");
+            ss << "error casting cycle '" << raw_cycle_val << "' to int on row " << row << "of external file "
+               << efilename << " , Stopped...";
+            throw_control_file_error(f_rec, ss.str());
+        }
+        if (cycle != -1) {
+            dci.start = cycle;
+            dci.stop = cycle;
+            dci.stride = 1;
+        }
+    }
+    return dci;
+}
+
+vector<pair<string, DaCycleInfo>> Pest::extract_cycle_info(ofstream& f_rec, string section_name, vector<string> possible_name_cols)
+{
+    vector<string> str_values, str_names;
+    stringstream ss;
+    set<string> col_names;
+    string name_col = "";
+    vector<pair<string, DaCycleInfo>> cycle_map;
+    DaCycleInfo dci;
+    string efilename;
+    if (this->efiles_map.find(section_name) == this->efiles_map.end())
+        return cycle_map;
+    for (auto efile : this->efiles_map[section_name])
+    {
+        col_names = efile.get_col_set();
+        for (auto possible_name : possible_name_cols)
+        {
+            if (col_names.find(possible_name) != col_names.end())
+            {
+                name_col = possible_name;
+                break;
+            }
+        }
+        if (name_col.size() == 0)
+        {
+            ss.str("");
+            ss << "could not find any possible name cols: ";
+            for (auto name : possible_name_cols)
+                ss << name << ",";
+            ss << " in efile '" << efile.get_filename() << "' columns";
+
+            throw_control_file_error(f_rec, ss.str());
+        }
+        if (col_names.find("CYCLE") == col_names.end())
+            continue;
+        str_values = efile.get_col_string_vector("CYCLE");
+        str_names = efile.get_col_string_vector(name_col);
+        efilename = efile.get_filename();
+        for (int i = 0; i < str_values.size(); i++)
+        {
+            dci = parse_cycle_str(str_values[i],efilename,i,f_rec);
+            cycle_map.push_back(make_pair(str_names[i],dci));
+        }
+    }
+    return cycle_map;
+}
+
+vector<pair<string, int>> Pest::extract_cycle_numbers2(ofstream& f_rec, string section_name, vector<string> possible_name_cols)
+{
+	vector<string> str_values, str_names;
+	stringstream ss;
+	set<string> col_names;
+	string name_col = "";
+	int cycle;
+	vector<pair<string, int>> cycle_map;
+	if (this->efiles_map.find(section_name) == this->efiles_map.end())
+		return cycle_map;
+	for (auto efile : this->efiles_map[section_name])
+	{
+		col_names = efile.get_col_set();
+		for (auto possible_name : possible_name_cols)
+		{
+			if (col_names.find(possible_name) != col_names.end())
+			{
+				name_col = possible_name;
+				break;
+			}
+
+		}
+
+		if (name_col.size() == 0)
+		{
+			ss.str("");
+			ss << "could not find any possible name cols: ";
+			for (auto name : possible_name_cols)
+				ss << name << ",";
+			ss << " in efile '" << efile.get_filename() << "' columns";
+
+			throw_control_file_error(f_rec, ss.str());
+		}
+		if (col_names.find("CYCLE") == col_names.end())
+			continue;
+		str_values = efile.get_col_string_vector("CYCLE");
+		str_names = efile.get_col_string_vector(name_col);
+		for (int i = 0; i < str_values.size(); i++)
+		{
+			try
+			{
+				cycle = stoi(str_values[i]);
+				cycle_map.push_back(make_pair(str_names[i], cycle));
+			}
+			catch (...)
+			{
+				ss.str("");
+				ss << "error casting cycle '" << str_values[i] << "' to int on row " << i << "of external file " << efile.get_filename() << " , Stopped...";
+				throw_control_file_error(f_rec, ss.str());
+			}
+
+		}
+	}
+	return cycle_map;
+
+}
+
+void Pest::child_pest_update(int icycle)
+{
+	/*
+	Update Pest members to reflect current cycle data only
+	*/
+	vector<string> cycle_grps, unique_cycle_grps, grps;	
+	vector<string> parnames, obsnames;
+	
+	//prior_info_string
+	//control_info
+	//pareto_info
+	//svd_info
+
+	parnames = get_ctl_ordered_par_names();
+	obsnames = get_ctl_ordered_obs_names();
+	ParameterInfo pi = get_ctl_parameter_info();
+	for (auto& p : get_ctl_ordered_par_names()) {
+        if (!cycle_in_range(icycle, pi.get_parameter_rec_ptr(p)->dci)) {
+            ctl_parameter_info.erase(p);
+            ctl_parameters.erase(p);
+            base_group_info.par_erase(p);// .parameter2group.erase(p);
+            parnames.erase(remove(parnames.begin(),
+                                  parnames.end(), p), parnames.end());
+        }
+//        if (pi.get_parameter_rec_ptr(p)->cycle != icycle &&
+//            pi.get_parameter_rec_ptr(p)->cycle >= 0) {
+//            ctl_parameter_info.erase(p);
+//            ctl_parameters.erase(p);
+//            base_group_info.par_erase(p);// .parameter2group.erase(p);
+//            parnames.erase(remove(parnames.begin(),
+//                                  parnames.end(), p), parnames.end());
+//
+//        }
+        else {
+            cycle_grps.push_back(base_group_info.get_group_name(p));
+
+        }
+    }
+    // get unique groups
+	for (auto curr = cycle_grps.begin(); curr != cycle_grps.end(); curr++) {
+		if (find(unique_cycle_grps.begin(), unique_cycle_grps.end(), *curr) == unique_cycle_grps.end())
+		{
+			unique_cycle_grps.push_back(*curr);
+		}
+	}
+	// remove groups not in current cycle
+	grps = base_group_info.get_group_names();
+	for (auto grp = grps.begin(); grp != grps.end(); grp++)
+	{
+		if (find(unique_cycle_grps.begin(), unique_cycle_grps.end(), *grp) == unique_cycle_grps.end())
+			base_group_info.grp_erase(*grp);
+	}
+	// update observations
+	vector<string> cycle_grps_o, unique_cycle_grps_o, grps_o;
+	ObservationInfo obs_info = get_ctl_observation_info();
+	for (auto& ob : get_ctl_ordered_obs_names())
+	    if (!cycle_in_range(icycle,obs_info.get_observation_rec_ptr(ob)->dci))
+//		if (obs_info.get_observation_rec_ptr(ob)->cycle != icycle &&
+//			obs_info.get_observation_rec_ptr(ob)->cycle >= 0)
+		{
+			observation_info.erase_ob(ob);
+			observation_values.erase(ob);
+			obsnames.erase(remove(obsnames.begin(),
+				obsnames.end(), ob), obsnames.end());
+		}
+		else
+		{
+			cycle_grps_o.push_back(obs_info.get_group(ob));
+		}
+
+	// get unique groups
+	for (auto curr = cycle_grps_o.begin(); curr != cycle_grps_o.end(); curr++) {
+		if (find(unique_cycle_grps_o.begin(), unique_cycle_grps_o.end(), *curr) == unique_cycle_grps_o.end())
+		{
+			unique_cycle_grps_o.push_back(*curr);
+		}
+	}
+	// remove groups not in current cycle
+	grps_o = observation_info.get_groups();
+	for (auto grp = grps_o.begin(); grp != grps_o.end(); grp++)
+	{
+		if (find(unique_cycle_grps_o.begin(), unique_cycle_grps_o.end(), *grp) == unique_cycle_grps_o.end())
+			observation_info.erase_gp(*grp);
+	}
+
+	// prior info
+
+	//ctl_parameters
+	//model_exec_info
+	ModelExecInfo curr_mod_exe = model_exec_info;
+	std::vector<std::string> _tpl_vec, _infile_vec, _ins_vec, _out_vec;
+	std::vector<DaCycleInfo> incy, outcy;
+	int index = 0;
+//	for (auto ic : model_exec_info.incycle_vec)
+//	{
+//		if ((ic == icycle) || (ic < 0))
+//		{
+//			_tpl_vec.push_back(model_exec_info.tplfile_vec[index]);
+//			_infile_vec.push_back(model_exec_info.inpfile_vec[index]);
+//			incy.push_back(model_exec_info.incycle_vec[index]);
+//		}
+//
+//		index = index + 1;
+//	}
+
+    for (auto ic : model_exec_info.incycle_dci_vec)
+    {
+        if (cycle_in_range(icycle,ic))
+        {
+            _tpl_vec.push_back(model_exec_info.tplfile_vec[index]);
+            _infile_vec.push_back(model_exec_info.inpfile_vec[index]);
+            incy.push_back(model_exec_info.incycle_dci_vec[index]);
+        }
+
+        index = index + 1;
+    }
+
+	//output files
+	index = 0;
+//	for (auto ic : model_exec_info.outcycle_vec)
+//	{
+//		if ((ic == icycle) || (ic < 0))
+//		{
+//			_ins_vec.push_back(model_exec_info.insfile_vec[index]);
+//			_out_vec.push_back(model_exec_info.outfile_vec[index]);
+//			outcy.push_back(model_exec_info.outcycle_vec[index]);
+//		}
+//
+//		index = index + 1;
+//	}
+    for (auto ic : model_exec_info.outcycle_dci_vec)
+    {
+        if (cycle_in_range(icycle,ic))
+        {
+            _ins_vec.push_back(model_exec_info.insfile_vec[index]);
+            _out_vec.push_back(model_exec_info.outfile_vec[index]);
+            outcy.push_back(model_exec_info.outcycle_dci_vec[index]);
+        }
+
+        index = index + 1;
+    }
+	model_exec_info.tplfile_vec = _tpl_vec;
+	model_exec_info.inpfile_vec = _infile_vec;
+	model_exec_info.incycle_dci_vec = incy;
+	model_exec_info.insfile_vec = _ins_vec;
+	model_exec_info.outfile_vec = _out_vec;
+	model_exec_info.outcycle_dci_vec = outcy;
+
+
+	//pestpp_options
+	//base_par_transform
+	//ctl_ordered_par_names
+	ctl_ordered_par_names = parnames;
+	
+	//ctl_ordered_obs_names
+	ctl_ordered_obs_names = obsnames;
+
+	//ctl_ordered_par_group_names ----> TODO: Check if the groups order is preserved..
+	ctl_ordered_par_group_names = unique_cycle_grps;
+	ctl_ordered_obs_group_names = unique_cycle_grps_o;
+	
+	// get number of adj par for current cycle
+	ParameterRec::TRAN_TYPE tfixed = ParameterRec::TRAN_TYPE::FIXED;
+	ParameterRec::TRAN_TYPE ttied = ParameterRec::TRAN_TYPE::TIED;
+	int new_n_adj_par = 0;
+	for (auto pname : ctl_ordered_par_names)
+	{
+		if ((ctl_parameter_info.get_parameter_rec_ptr(pname)->tranform_type != tfixed) &&
+			(ctl_parameter_info.get_parameter_rec_ptr(pname)->tranform_type != ttied))
+		{
+			new_n_adj_par++;
+		}
+	}
+	n_adj_par = new_n_adj_par;
+	//this->get_pestpp_options_ptr()->set_check_tplins(false);
+	//get_pestpp_options_ptr->set_check_tplins(false);
+	//this.check_inputs();
+}
+
+vector<int> Pest::get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycles)
+{
+    stringstream ss;
+    set<int> scycles(unique_cycles.begin(),unique_cycles.end());
+
+    int start_cycle = std::numeric_limits<int>::max();
+    int stop_cycle = std::numeric_limits<int>::min();
+    for (auto &s : scycles)
+    {
+        if (s < start_cycle)
+            start_cycle = s;
+        if (s > stop_cycle)
+            stop_cycle = s;
+    }
+    DaCycleInfo dci;
+    for (auto pname : ctl_ordered_par_names)
+    {
+        dci = ctl_parameter_info.get_parameter_rec_ptr(pname)->dci;
+        if (dci.start < start_cycle)
+            start_cycle = dci.start;
+        if (dci.stop > stop_cycle)
+            stop_cycle = dci.stop;
+    }
+    for (auto oname : ctl_ordered_obs_names)
+    {
+        dci = observation_info.get_observation_rec_ptr(oname)->dci;
+        if (dci.start < start_cycle)
+            start_cycle = dci.start;
+        if (dci.stop > stop_cycle)
+            stop_cycle = dci.stop;
+    }
+
+    if (start_cycle < 0)
+    {
+        ss.str("");
+        ss << "minimum start '" << start_cycle << "' cycle less than zero";
+        throw_control_file_error(f_rec,ss.str());
+    }
+
+    if (stop_cycle < 0) {
+        ss.str("");
+        ss << "WARNING: didnt find any explicit 'stop' cycle values in control file info, assuming smoother formulation" << endl;
+        ss << "         assinging a generic 'stop' value of " << start_cycle + 1 << " which is 'start' cycle plus 1" << endl;
+        cout << ss.str();
+        f_rec << ss.str();
+        stop_cycle = start_cycle + 1;
+        return vector<int>{start_cycle};
+
+    }
+    if (start_cycle > stop_cycle) {
+        ss.str("");
+        ss << "minimum start cycle '" << start_cycle << "' greater than maximum stop cycle '" << stop_cycle << "'";
+        throw_control_file_error(f_rec, ss.str());
+    }
+
+
+
+    for (int i=start_cycle;i<stop_cycle+1;i++)
+    {
+        for (auto pname : ctl_ordered_par_names)
+        {
+            if (cycle_in_range(i,ctl_parameter_info.get_parameter_rec_ptr(pname)->dci))
+                scycles.emplace(i);
+        }
+        for (auto oname : ctl_ordered_obs_names)
+        {
+            if (cycle_in_range(i,observation_info.get_observation_rec_ptr(oname)->dci))
+                scycles.emplace(i);
+        }
+    }
+    return vector<int>(scycles.begin(),scycles.end());
+}
+
+bool cycle_in_range(int cycle,const DaCycleInfo& dci) {
+    if ((dci.start == dci.stop) && (dci.start == cycle))
+        return true;
+    if (dci.start > cycle)
+        return false;
+    if ((dci.stop >= 0) && (dci.stop < cycle))
+        return false;
+    if (dci.stride == 1)
+        return true;
+    if (abs(cycle - dci.start) % dci.stride == 0)
+        return true;
+    return false;
+
+}
+
+bool every_cycle(const DaCycleInfo& dci)
+{
+    if (dci.stop != -999)
+        return false;
+    if (dci.start != 0)
+        return false;
+    if (dci.stride != 1)
+        return false;
+    return true;
+}
+
+
+
+//vector<int> Pest::get_assim_cycles(ofstream& f_rec, vector<int> unique_cycles)
+//{
+//
+//	int curr_cycle;
+//	vector<int> cycles_ordered_list;
+//
+//	for (auto pname : ctl_ordered_par_names)
+//	{
+//		curr_cycle = ctl_parameter_info.get_parameter_rec_ptr(pname)->cycle;
+//		if (curr_cycle>= 0)
+//			cycles_ordered_list.push_back(curr_cycle);
+//	}
+//	for (auto oname : ctl_ordered_obs_names)
+//	{
+//		curr_cycle = observation_info.get_observation_rec_ptr(oname)->cycle;
+//		if (curr_cycle >= 0)
+//			cycles_ordered_list.push_back(curr_cycle);
+//	}
+//
+//
+//	// get unique groups
+//	for (auto curr = cycles_ordered_list.begin(); curr != cycles_ordered_list.end(); curr++) {
+//		if (find(unique_cycles.begin(), unique_cycles.end(), *curr) == unique_cycles.end())
+//		{
+//			unique_cycles.push_back(*curr);
+//		}
+//	}
+//	if (unique_cycles.size() == 0)
+//		throw_control_file_error(f_rec, "no valid cycle info found in par and obs data (possibly all '-1' cycles?)");
+//
+//	sort(unique_cycles.begin(), unique_cycles.end());
+//	stringstream ss;
+//	//to catch common non-zero-indexing
+//	if (unique_cycles.front() != 0)  //recall a cycle of -1 is just a flag
+//	{
+//		ss.str("");
+//		ss << "a cycle with index of zero does not exist; cycling needs to start at zero for initialization...";
+//		throw_control_file_error(f_rec, ss.str());
+//	}
+//	return unique_cycles;
+//
+//
+//}
+
+
 
 map<string, double> Pest::get_pars_at_near_bounds(const Parameters & pars, double tol)
 {
@@ -2244,24 +3070,29 @@ pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string &lin
 	return pair<string, string>(key,value);
 }
 
-void Pest::throw_control_file_error(ofstream& f_rec,const string &message, bool should_throw)
+void Pest::throw_control_file_error(ofstream& f_rec,const string &message, bool should_throw, bool echo)
 {
 	stringstream ss;
 	if (should_throw)
 		ss << "control file parsing error: " << message << endl;
 	else
 		ss << "control file parsing warning: " << message << endl;
-	
-	cout << ss.str();
+
+	if (echo)
+    {
+	    cout << ss.str();
+    }
 	f_rec << ss.str();
 	
 	if (should_throw)
 	{
-		cerr << ss.str();
-		f_rec.close();
+	    if (echo){
+            cerr << ss.str();
+	    }
+
+		//f_rec.close();
 		throw runtime_error(ss.str());
-	}
-	
+	}	
 }
 
 void Pest::check_report_assignment(ofstream &f_rec, PestppOptions::ARG_STATUS stat, const string &key, const string &org_value)
@@ -2315,10 +3146,21 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 	convert_ip(tokens[6], pi.group);
 	convert_ip(tokens[7], scale);
 	convert_ip(tokens[8], offset);
+	
 	if (control_info.numcom > 1)
-		convert_ip(tokens[9], pi.dercom);
+        try {
+
+            convert_ip(tokens[9], pi.dercom);
+        }
+	    catch (...)
+        {
+	        float f;
+	        convert_ip(tokens[9],f);
+	        pi.dercom = std::round(f);
+        }
 	else
 		pi.dercom = 1;
+	
 	pi.scale = scale;
 	pi.offset = offset;
 	// add parameters to model parameter and paramter_info datasets
@@ -2346,6 +3188,8 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 		throw_control_file_error(f_rec, "unrecognized partrans for par " + name + ": " + trans_type);
 	}
 	ctl_parameter_info.insert(name, pi);
+	if (ctl_parameters.find(name) != ctl_parameters.end())
+        throw_control_file_error(f_rec,"duplicate parameter names in control file for: '"+name+"'");
 	ctl_parameters.insert(name, pi.init_value);
 	
 	//if (find(ctl_ordered_par_group_names.begin(), ctl_ordered_par_group_names.end(), pi.group) == ctl_ordered_par_group_names.end())
@@ -2396,7 +3240,7 @@ void Pest::tokens_to_obs_group_rec(ofstream& f_rec, const vector<string>& tokens
 	}
 }
 
-void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
+void Pest::tokens_to_obs_rec(ofstream& f_rec, const vector<string> &tokens)
 {
 	ObservationRec obs_i;
 	string name = tokens[0];
@@ -2406,8 +3250,11 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	//convert_ip(tokens[2], obs_i.weight);
 	obs_i.weight = stod(tokens[2]);
 	obs_i.group = tokens[3];
+	if (observation_values.find(name) != observation_values.end())
+        throw_control_file_error(f_rec,"duplicate observation names in control file for: '" + name + "'");
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
+
 
 	observation_values.insert(name, value);
 	name = obs_i.group;
@@ -2417,10 +3264,12 @@ void Pest::tokens_to_obs_rec(ostream& f_rec, const vector<string> &tokens)
 	{
 		ctl_ordered_obs_group_names.push_back(name);
 		s_obgnme.emplace(name);
+        ObservationGroupRec ogr;
+        observation_info.groups[obs_i.group] = ogr;
 	}
 }
 
-void Pest::tokens_to_pi_rec(ostream& f_rec, const string& line_upper)
+void Pest::tokens_to_pi_rec(ofstream& f_rec, const string& line_upper)
 {
 	string first = line_upper.substr(0, 1);
 	if (!prior_info_string.empty() && first != "&") {
@@ -2442,10 +3291,11 @@ void Pest::tokens_to_pi_rec(ostream& f_rec, const string& line_upper)
 }
 
 
-void Pest::tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens)
+void Pest::tokens_to_pi_rec(ofstream& f_rec, const vector<string>& tokens)
 {
 	
-	
+	if (prior_info.find(tokens[0]) != prior_info.end())
+        throw_control_file_error(f_rec,"duplicate prior info names in control file for: '"+tokens[0]+"'");
 	pair<string,string> pi_name_group = prior_info.AddRecord(tokens);
 	ctl_ordered_pi_names.push_back(pi_name_group.first);
 	//vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), pi_name_group.second);
@@ -2460,7 +3310,6 @@ void Pest::tokens_to_pi_rec(ostream& f_rec, const vector<string>& tokens)
 void Pest::rectify_par_groups()
 {
 	const ParameterRec *pr;
-	ParameterGroupRec pgi;
 	vector<string> temp = base_group_info.get_group_names();
 	set<string> group_names(temp.begin(), temp.end());
 	for (auto p : ctl_ordered_par_names)
@@ -2504,14 +3353,14 @@ map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& p
 	{
 		val = dss_mat_no_reg_pest.col(i).norm() / n_nonzero_weights_no_reg;
 		par_sens[par_list[i]] = val;
-		}
+	}
 	return par_sens;
 }
 
-map<string,double> Pest::get_ext_file_double_map(const string& section_name, const string& col_name)
+map<string,string> Pest::get_ext_file_string_map(const string& section_name, const string& col_name)
 {
 	string sname_upper = pest_utils::upper_cp(section_name);
-	map<string, double> val_map;
+	map<string, string> val_map;
 	if (efiles_map.find(sname_upper) == efiles_map.end())
 		return val_map;
 	set<string> col_names;
@@ -2531,20 +3380,34 @@ map<string,double> Pest::get_ext_file_double_map(const string& section_name, con
 			sidx = efile.get_col_string_vector(idx_col);
 			for (int i = 0; i < svals.size(); i++)
 			{
-				try
-				{
-					val = stod(svals[i]);
-					val_map[sidx[i]] = val;
-				}
-				catch (...)
-				{
-					continue;
-				}
+				if (svals[i].size() > 0)
+					val_map.emplace(make_pair(sidx[i],svals[i]));
 			}
 		}
 	}
 	return val_map;
-	
+}
+
+
+map<string, double> Pest::get_ext_file_double_map(const string& section_name, const string& col_name)
+{
+	string sname_upper = pest_utils::upper_cp(section_name);
+	map<string, string> str_map = get_ext_file_string_map(section_name, col_name);
+	map<string, double> val_map;
+	double val;
+	for (auto sval : str_map)
+	{
+		try
+		{
+			val = stod(sval.second);
+			val_map[sval.first] = val;
+		}
+		catch (...)
+		{
+			continue;
+		}
+	}
+	return val_map;
 }
 
 

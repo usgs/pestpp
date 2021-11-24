@@ -117,7 +117,6 @@ add_library(opt STATIC
   CoinWarmStartVector.cpp
   Idiot.cpp
   IdiSolve.cpp
-  sequential_lp.cpp
 )
 
 target_include_directories(opt INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")

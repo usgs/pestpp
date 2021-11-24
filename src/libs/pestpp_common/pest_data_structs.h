@@ -33,7 +33,11 @@ class LaTridiagMatDouble;
 
 
 
-
+struct DaCycleInfo{
+    int start=0;
+    int stop = -999;
+    int stride = 1;
+};
 
 class ParameterGroupRec {
 public:
@@ -82,6 +86,9 @@ public:
 	const ParameterGroupInfo& operator=(const ParameterGroupInfo &rhs);
 	bool have_switch_derivative() const;
 	vector<string> get_group_names() const;
+	void par_erase(const string& par_name) { parameter2group.erase(par_name); }
+	void grp_erase(const string& grp_name) { groups.erase(grp_name);
+	}
 	~ParameterGroupInfo();
 private:
 	unordered_map<string, ParameterGroupRec*> groups;
@@ -101,9 +108,12 @@ public:
 	double offset;
 	string group;
 	int dercom;
+	//int cycle;
+	DaCycleInfo dci;
 	TRAN_TYPE tranform_type;
 	ParameterRec() : chglim(""), lbnd(0.0), ubnd(0.0), init_value(0.0), group(""),
-		dercom(1), tranform_type(TRAN_TYPE::NONE), scale(1.0), offset(0.0){}
+		dercom(1), tranform_type(TRAN_TYPE::NONE), scale(1.0), offset(0.0),
+		dci(DaCycleInfo()){}
 	bool is_active() const { return !(tranform_type == TRAN_TYPE::FIXED || tranform_type == TRAN_TYPE::TIED); }
 };
 ostream& operator<< (ostream &os, const ParameterRec& val);
@@ -117,6 +127,7 @@ public:
 	const ParameterRec* get_parameter_rec_ptr(const string &name) const;
 	ParameterRec* get_parameter_rec_ptr_4_mod(const string &name);
 	void insert(const string &name, const ParameterRec &rec) {parameter_info[name] = rec;}
+	void erase(const string& name) { parameter_info.erase(name);}
 	ParameterInfo() {}
 	~ParameterInfo() {}
 private:
@@ -139,7 +150,10 @@ class ObservationRec {
 public:
 	double weight;
 	string group;
-	ObservationRec(double _weight=0.0,const string &_group="") : weight(_weight), group(_group) {}
+	//int cycle;
+	DaCycleInfo dci;
+	ObservationRec(double _weight=0.0,const string &_group="", int _cycle = 0)
+		: weight(_weight), group(_group), dci(DaCycleInfo())  {}
 	bool is_regularization() const;
 };
 ostream& operator<< (ostream &os, const ObservationRec& val);
@@ -155,13 +169,16 @@ public:
 	void set_weight(const string &obs_name, double value);
 	string get_group(const string &obs_name) const;
 	const ObservationRec* get_observation_rec_ptr(const string &name) const;
+	ObservationRec* get_observation_rec_ptr_4_mod(const string& name);
 	const ObservationGroupRec* get_group_rec_ptr(const string &name) const;
 	Observations get_regulatization_obs(const Observations &obs_in);
 	int get_nnz_obs() const;
 	int get_nnz_obs_and_reg() const;
-	vector<string> get_groups();
+	vector<string> get_groups() const;
 	void reset_group_weights(string &group, double val);
 	void scale_group_weights(string &group, double scale_val);
+	void erase_ob(const string& name) { observations.erase(name);}
+	void erase_gp(const string& name) { groups.erase(name); }
 
 };
 
@@ -172,6 +189,11 @@ public:
 	std::vector<std::string> inpfile_vec;
 	std::vector<std::string> insfile_vec;
 	std::vector<std::string> outfile_vec;
+	//std::vector<int> incycle_vec;
+	//std::vector<int> outcycle_vec;
+	std::vector<DaCycleInfo> incycle_dci_vec;
+    std::vector<DaCycleInfo> outcycle_dci_vec;
+
 };
 
 class ParetoInfo {
@@ -183,20 +205,30 @@ public:
 		obsgroup(""), niter_start(1), niter_gen(1), niter_fin(1) {};
 };
 
+
 class PestppOptions {
 public:
 	enum SVD_PACK { EIGEN, PROPACK, REDSVD };
 	enum MAT_INV { Q12J, JTQJ };
-	enum GLOBAL_OPT { NONE, OPT_DE };
+	enum GLOBAL_OPT { NONE, OPT_DE, OPT_MOEA};
 	enum GLMNormalForm { IDENT,DIAG, PRIOR };
 	enum ARG_STATUS {ARG_ACCEPTED, ARG_DUPLICATE, ARG_NOTFOUND, ARG_INVALID};
-	PestppOptions() { ; }
+	PestppOptions() { use_da_args=false; }
+
+
 
 	//void parce_line(const string &line);
 	map<string,ARG_STATUS> parse_plusplus_line(const string &line);
 	vector<string> notfound_args;
 	ARG_STATUS assign_value_by_key(string key, const string org_value);
-	bool assign_value_by_key_continued(const string& key, const string& value);
+	void rectify_ies_da_args();
+
+	bool assign_value_by_key_sqp(const string& key, const string& value, const string& org_value);
+	bool assign_mou_value_by_key(const string& key, const string& value, const string& org_value);
+	bool assign_da_value_by_key(const string& key, const string& value, const string& org_value);
+	bool assign_ies_value_by_key(const string& key, const string& value, const string& org_value);
+	bool assign_value_by_key_continued(const string& key, const string& value, const string& org_value);
+
 	int get_max_n_super() const { return max_n_super; }
 	double get_super_eigthres() const { return super_eigthres; }
 	int get_n_iter_base() const { return n_iter_base; }
@@ -204,8 +236,8 @@ public:
 	SVD_PACK get_svd_pack() const { return svd_pack; }
 	double get_super_relparmax() const { return super_relparmax; }
 	int get_max_run_fail() const { return max_run_fail; }
-	void set_worker_poll_interval(double _val) { worker_poll_interval = _val; }
-	double get_worker_poll_interval() const { return worker_poll_interval; }
+
+
 	int get_max_super_frz_iter()const { return max_super_frz_iter; }
 	int get_max_reg_iter()const { return max_reg_iter; }
 	const vector<double>& get_base_lambda_vec() const { return base_lambda_vec; }
@@ -261,15 +293,13 @@ public:
 	void set_glm_accept_mc_phi(bool _flag) { glm_accept_mc_phi = _flag; }
 	bool get_glm_rebase_super() const { return glm_rebase_super; }
 	void set_glm_rebase_super(bool _flag) { glm_rebase_super = _flag; }
+    bool get_glm_iter_mc() const { return glm_iter_mc; }
+    void set_glm_iter_mc(bool _flag) { glm_iter_mc = _flag; }
 
 
-	double get_overdue_reched_fac()const { return overdue_reched_fac; }
-	void set_overdue_reched_fac(double _val) { overdue_reched_fac = _val; }
-	double get_overdue_giveup_fac()const { return overdue_giveup_fac; }
-	void set_overdue_giveup_fac(double _val) { overdue_giveup_fac = _val; }
-	string get_condor_submit_file() const { return condor_submit_file; }
-	void set_condor_submit_file(string _condor_submit_file) { condor_submit_file = _condor_submit_file; }
-	string get_sweep_parameter_csv_file()const { return sweep_parameter_csv_file; }
+
+
+    string get_sweep_parameter_csv_file()const { return sweep_parameter_csv_file; }
 	void set_sweep_parameter_csv_file(string _file) { sweep_parameter_csv_file = _file; }
 	string get_sweep_output_csv_file()const { return sweep_output_csv_file; }
 	void set_sweep_output_csv_file(string _file) { sweep_output_csv_file = _file; }
@@ -286,7 +316,8 @@ public:
 	void set_hotstart_resfile(string _res_file) { hotstart_resfile = _res_file; }
 	string get_hotstart_resfile() const { return hotstart_resfile; }
 
-	bool get_tie_by_group() const { return tie_by_group; }
+
+    bool get_tie_by_group() const { return tie_by_group; }
 	void set_tie_by_group(bool _flag) { tie_by_group = _flag; }
 
 	string get_opt_obj_func()const { return opt_obj_func; }
@@ -295,6 +326,7 @@ public:
 	void set_opt_coin_log(bool _log) { opt_coin_log = _log; }
 	bool get_opt_skip_final()const { return opt_skip_final; }
 	void set_opt_skip_final(bool _skip_final) { opt_skip_final = _skip_final; }
+
 
 	vector<string> get_opt_dec_var_groups()const { return opt_dec_var_groups; }
 	void set_opt_dec_var_groups(vector<string> _grps) { opt_dec_var_groups = _grps; }
@@ -322,7 +354,64 @@ public:
 	void set_opt_par_stack(string _stack) { opt_par_stack = _stack; }
 	string get_opt_obs_stack()const { return opt_obs_stack; }
 	void set_opt_obs_stack(string _stack) { opt_obs_stack = _stack; }
+	string get_opt_chance_points() const { return opt_chance_points; }
+	void set_opt_chance_points(string chance_points) { opt_chance_points = chance_points; }
 
+
+	string get_sqp_dv_en()const { return sqp_dv_en; }
+	void set_sqp_dv_en(string _file) { sqp_dv_en = _file; }
+	string get_sqp_obs_restart_en()const { return sqp_obs_restart_en; }
+	void set_sqp_obs_restart_en(string _file) { sqp_obs_restart_en = _file; }
+	int get_sqp_num_reals()const { return sqp_num_reals; }
+	void set_sqp_num_reals(int _num_reals) { sqp_num_reals = _num_reals; }
+	bool get_sqp_update_hessian()const { return sqp_update_hessian; }
+	void set_sqp_update_hessian(bool _flag) { sqp_update_hessian = _flag; }
+	vector<double> get_sqp_scale_facs() const { return sqp_scale_facs; }  // perhaps change arg name to sqp_alpha_mults
+	void set_sqp_scale_facs(vector<double> _mults) { sqp_scale_facs = _mults; }
+
+
+	string get_mou_generator() const { return mou_generator; }
+	void set_mou_generator(string name) { mou_generator = name; }
+	int get_mou_population_size() const { return mou_population_size; }
+	void set_mou_population_size(int size) { mou_population_size = size; }
+	string get_mou_dv_population_file() const { return mou_dv_population_file; }
+	void set_mou_dv_population_file(string name) { mou_dv_population_file = name; }
+	string get_mou_obs_population_restart_file() const { return mou_obs_population_restart_file; }
+	void set_mou_obs_population_restart_file(string name) { mou_obs_population_restart_file = name; }
+	vector<string> get_mou_objectives() const { return mou_objectives; }
+	void set_mou_objectives(const vector<string>& objs) { mou_objectives = objs; }
+	int get_mou_max_archive_size() const { return mou_max_archive_size; }
+	void set_mou_max_archive_size(int size) { mou_max_archive_size = size; }
+	bool get_mou_risk_obj()const { return mou_risk_obj; }
+	void set_mou_risk_obj(bool _flag) { mou_risk_obj = _flag; }
+	int get_mou_verbose_level() const { return mou_verbose_level; }
+	void set_mou_verbose_level(int size) { mou_verbose_level = size; }
+	string get_mou_env_selector() const { return mou_env_selector; }
+	void set_mou_env_selector(string _env) { mou_env_selector = _env; }
+	string get_mou_mating_selector() const { return mou_mating_selector; }
+	void set_mou_mating_selector(string _mating) { mou_mating_selector = _mating; }
+	double get_mou_crossover_probability() const { return mou_crossover_prob; }
+	void set_mou_crossover_probability(double _val) { mou_crossover_prob = _val; }
+	double get_mou_mutation_probability() const { return mou_mutation_prob; }
+	void set_mou_mutation_probability(double _val) { mou_mutation_prob = _val; }
+	double get_mou_de_f() const { return mou_de_f; }
+	void set_mou_de_f(double _val) { mou_de_f = _val; }
+	int get_mou_save_population_every() const { return mou_save_population_every; }
+	void set_mou_save_population_every(int every) { mou_save_population_every = every; }
+	double get_mou_pso_omega() const { return mou_pso_omega; }
+	void set_mou_pso_omega(double val) { mou_pso_omega = val; }
+	double get_mou_pso_social_const() const { return mou_pso_social_const; }
+	void set_mou_pso_social_const(double val) { mou_pso_social_const = val; }
+	double get_mou_pso_cognitive_const() const { return mou_pso_cognitive_const; }
+	void set_mou_pso_cognitive_const(double val) { mou_pso_cognitive_const = val; }
+	string get_mou_population_schedule() const {return mou_population_schedule;}
+    void set_mou_population_schedule(string fname) {mou_population_schedule = fname;}
+	int get_mou_simplex_reflections() const { return mou_simplex_reflections; }
+	void set_mou_simplex_reflections(int val) { mou_simplex_reflections = val; }
+	vector<double> get_mou_simplex_factors() const { return mou_simplex_factors; }
+	void set_mou_simplex_factors(vector<double> _factors) { mou_simplex_factors = _factors; }
+    bool get_mou_simplex_mutation() const {return mou_simplex_mutation;}
+    void set_mou_simplex_mutation(bool _flag) {mou_simplex_mutation = _flag;}
 
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
@@ -330,6 +419,8 @@ public:
 	void set_ies_obs_csv(string _ies_obs_csv) { ies_obs_csv = _ies_obs_csv; }
 	string get_ies_obs_restart_csv() const { return ies_obs_restart_csv; }
 	void set_ies_obs_restart_csv(string _ies_obs_restart_csv) { ies_obs_restart_csv = _ies_obs_restart_csv; }
+	string get_ies_weights_csv() const {return ies_weights_csv;}
+	void set_ies_weights_csv(string _ies_weights_csv) {ies_weights_csv = _ies_weights_csv;}
 	string get_ies_par_restart_csv() const { return ies_par_restart_csv; }
 	void set_ies_par_restart_csv(string _ies_par_restart_csv) { ies_par_restart_csv = _ies_par_restart_csv; }
 	vector<double> get_ies_lam_mults() const { return ies_lam_mults; }
@@ -363,8 +454,8 @@ public:
 
 	double get_par_sigma_range() const { return par_sigma_range; }
 	void set_par_sigma_range(double _par_sigma_range) { par_sigma_range = _par_sigma_range; }
-	bool get_ies_save_binary() const { return ies_save_binary; }
-	void set_ies_save_binary(bool _ies_save_binary) { ies_save_binary = _ies_save_binary; }
+	bool get_save_binary() const { return save_binary; }
+	void set_save_binary(bool _ies_save_binary) { save_binary = _ies_save_binary; }
 	string get_ies_localizer() const { return ies_localizer; }
 	void set_ies_localizer(string _ies_localizer) { ies_localizer = _ies_localizer; }
 	double get_ies_accept_phi_fac() const { return ies_accept_phi_fac; }
@@ -380,8 +471,6 @@ public:
 	void set_ies_localize_how(string _how) { ies_localize_how = _how; }
 	string get_ies_localize_how() const { return ies_localize_how; }
 
-	double get_overdue_giveup_minutes() const { return overdue_giveup_minutes; }
-	void set_overdue_giveup_minutes(double overdue_minutes) { overdue_giveup_minutes = overdue_minutes; }
 
 	int get_ies_num_threads() const { return ies_num_threads; }
 	void set_ies_num_threads(int _threads) { ies_num_threads = _threads; }
@@ -417,6 +506,22 @@ public:
 	void set_ies_save_rescov(bool _flag) { ies_save_rescov = _flag; }
 	double get_ies_pdc_sigma_distance() const { return ies_pdc_sigma_distance; }
 	void set_ies_pdc_sigma_distance(double distance) { ies_pdc_sigma_distance = distance; }
+	bool get_ies_use_mda() const { return ies_use_mda; }
+	void set_ies_use_mda(bool _flag) { ies_use_mda = _flag; }
+	double get_ies_mda_init_fac() const { return ies_mda_init_fac; }
+	void set_ies_mda_init_fac(double fac) { ies_mda_init_fac = fac; }
+	double get_ies_mda_dec_fac() const { return ies_mda_dec_fac; }
+	void set_ies_mda_dec_fac(double fac) { ies_mda_dec_fac = fac; }
+	string get_ies_loc_type() const { return ies_loc_type; }
+	void set_ies_loc_type(string typ) { ies_loc_type = typ; }
+	bool get_ies_upgrades_in_memory() const { return ies_upgrades_in_memory; }
+	void set_ies_upgrades_in_memory(bool _flag) { ies_upgrades_in_memory = _flag; }
+	bool get_ies_ordered_binary() const { return ies_ordered_binary; }
+	void set_ies_ordered_binary(bool _flag) { ies_ordered_binary = _flag; }
+    double get_ies_multimodal_alpha() const { return ies_multimodal_alpha; }
+    void set_ies_multimodal_alpha(double _flag) { ies_multimodal_alpha = _flag; }
+    void set_ensemble_output_precision(int prec) { ensemble_output_precision = prec;}
+    int get_ensemble_output_precision() const {return ensemble_output_precision;}
 
 	string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -452,32 +557,66 @@ public:
 	string get_additional_ins_delimiters() const { return additional_ins_delimiters; }
 	void set_random_seed(int seed) { random_seed = seed; }
 	int get_random_seed()const { return random_seed; }
-	bool get_glm_iter_mc() const { return glm_iter_mc; }
-	void set_glm_iter_mc(bool _flag) { glm_iter_mc = _flag; }
 
-	void set_panther_agent_restart_on_error(bool _flag) { panther_agent_restart_on_error = _flag; }
-	bool get_panther_agent_restart_on_error() const { return panther_agent_restart_on_error; }
-	void set_panther_agent_no_ping_timeout_secs(int _timeout_secs) { panther_agent_no_ping_timeout_secs = _timeout_secs; }
-	int get_panther_agent_no_ping_timeout_secs() const { return panther_agent_no_ping_timeout_secs; }
-	void set_panther_debug_loop(bool _flag) { panther_debug_loop = _flag; }
-	bool get_panther_debug_loop() const { return panther_debug_loop; }
-	void set_panther_debug_fail_freeze(bool _flag) { panther_debug_fail_freeze = _flag; }
-	bool get_panther_debug_fail_freeze() const { return panther_debug_fail_freeze; }
-	
-	bool get_panther_echo() const { return panther_echo; }
-	void set_panther_echo(bool _flag) { panther_echo = _flag; }
+	string get_da_par_cycle_table() const { return da_par_cycle_table; }
+	void set_da_par_cycle_table(string _filename) { da_par_cycle_table = _filename; }
+	string get_da_obs_cycle_table() const { return da_obs_cycle_table; }
+	void set_da_obs_cycle_table(string _filename) { da_obs_cycle_table = _filename; }
+	string get_da_weight_cycle_table() const { return da_weight_cycle_table; }
+	void set_da_weight_cycle_table(string _filename) { da_weight_cycle_table = _filename; }
+	int get_da_hotstart_cycle() const { return da_hotstart_cycle; }
+	void set_da_hotstart_cycle(int val) { da_hotstart_cycle = val; }
+    int get_da_stop_cycle() const { return da_stop_cycle; }
+    void set_da_stop_cycle(int val) { da_stop_cycle = val; }
+    bool get_da_use_simulated_states() const {return da_use_simulated_states; }
+    void set_da_use_simulated_states(bool _flag) {da_use_simulated_states = _flag;}
 
-	void set_forgive_unknown_args(bool _flag) { forgive_unknown_args = _flag; }
-	bool get_forgive_unknown_args() const { return forgive_unknown_args; }
+    void set_forgive_unknown_args(bool _flag) { forgive_unknown_args = _flag; }
+    bool get_forgive_unknown_args() const { return forgive_unknown_args; }
 
+    bool get_debug_check_par_en_consistency() const { return debug_check_paren_consistency; }
+	void set_debug_check_par_en_consistency(bool _flag) { debug_check_paren_consistency = _flag; }
 	void set_num_tpl_ins_threads(int num) { num_tpl_ins_threads = num; }
 	int get_num_tpl_ins_threads()const { return num_tpl_ins_threads; }
+
+    void set_worker_poll_interval(double _val) { worker_poll_interval = _val; }
+    double get_worker_poll_interval() const { return worker_poll_interval; }
+    double get_overdue_reched_fac()const { return overdue_reched_fac; }
+    void set_overdue_reched_fac(double _val) { overdue_reched_fac = _val; }
+    double get_overdue_giveup_fac()const { return overdue_giveup_fac; }
+    void set_overdue_giveup_fac(double _val) { overdue_giveup_fac = _val; }
+    double get_overdue_giveup_minutes() const { return overdue_giveup_minutes; }
+    void set_overdue_giveup_minutes(double overdue_minutes) { overdue_giveup_minutes = overdue_minutes; }
+    string get_condor_submit_file() const { return condor_submit_file; }
+    void set_condor_submit_file(string _condor_submit_file) { condor_submit_file = _condor_submit_file; }
+    void set_panther_agent_restart_on_error(bool _flag) { panther_agent_restart_on_error = _flag; }
+    bool get_panther_agent_restart_on_error() const { return panther_agent_restart_on_error; }
+    void set_panther_agent_no_ping_timeout_secs(int _timeout_secs) { panther_agent_no_ping_timeout_secs = _timeout_secs; }
+    int get_panther_agent_no_ping_timeout_secs() const { return panther_agent_no_ping_timeout_secs; }
+    void set_panther_debug_loop(bool _flag) { panther_debug_loop = _flag; }
+    bool get_panther_debug_loop() const { return panther_debug_loop; }
+    void set_panther_debug_fail_freeze(bool _flag) { panther_debug_fail_freeze = _flag; }
+    bool get_panther_debug_fail_freeze() const { return panther_debug_fail_freeze; }
+    bool get_panther_echo() const { return panther_echo; }
+    void set_panther_echo(bool _flag) { panther_echo = _flag; }
+    const vector<string>& get_panther_transfer_on_finish() const {return panther_transfer_on_finish;}
+    const vector<string>& get_panther_transfer_on_fail() const {return panther_transfer_on_fail;}
+    void set_panther_transfer_on_finish(vector<string> _files) {panther_transfer_on_finish = _files;}
+    void set_panther_transfer_on_fail(vector<string> _files) {panther_transfer_on_fail = _files;}
+
+
+
+    //bool get_use_da_args() const { return use_da_args; }
+	//void set_use_dat_args(bool _flag) { use_da_args = _flag; }
 
 	void set_defaults();
 	void summary(ostream& os) const;
 
 private:
 
+	set<string> passed_args;
+	set<string> passed_da_ies_args;
+	bool use_da_args;
 	bool forgive_unknown_args;
 	int n_iter_base;
 	int n_iter_super;
@@ -524,6 +663,7 @@ private:
 	double worker_poll_interval;
 	string condor_submit_file;
 	int num_tpl_ins_threads;
+    int ensemble_output_precision;
 	
 
 	string sweep_parameter_csv_file;
@@ -533,6 +673,7 @@ private:
 	bool sweep_base_run;
 
 	GLOBAL_OPT global_opt;
+	string moea_name;
 	double de_f;
 	double de_cr;
 	int de_npopulation;
@@ -555,19 +696,49 @@ private:
 	int opt_stack_size;
 	string opt_par_stack;
 	string opt_obs_stack;
+	string opt_chance_points;
+
+	string sqp_dv_en;
+	string sqp_obs_restart_en;
+	int sqp_num_reals;
+	bool sqp_update_hessian;
+	vector<double> sqp_scale_facs;
+
+	int mou_population_size;
+	string mou_generator; 
+	string mou_dv_population_file;
+	string mou_obs_population_restart_file;
+	vector<string> mou_objectives;
+	int mou_max_archive_size;
+	bool mou_risk_obj;
+	int mou_verbose_level;
+	string mou_env_selector;
+	double mou_crossover_prob;
+	double mou_mutation_prob;
+	string mou_mating_selector;
+	double mou_de_f;
+	int mou_save_population_every;
+	double mou_pso_omega;
+	double mou_pso_social_const;
+	double mou_pso_cognitive_const;
+	string mou_population_schedule;
+	int mou_simplex_reflections;
+	vector<double> mou_simplex_factors;
+	bool mou_simplex_mutation;
 
 	int ies_subset_size;
 	string ies_par_csv;
 	string ies_obs_csv;
 	string ies_obs_restart_csv;
 	string ies_par_restart_csv;
+	string ies_weights_csv;
 	double ies_init_lam;
 	bool ies_use_approx;
 	double ies_reg_factor;
 	vector<double> ies_lam_mults;
 	int ies_verbose_level;
 	bool ies_use_prior_scaling;
-	int ies_num_reals;
+	int ies_num_reals;	
 	double ies_bad_phi;
 	double ies_bad_phi_sigma;
 	bool ies_include_base;
@@ -576,13 +747,14 @@ private:
 	//bool ies_num_reals_passed;
 	bool ies_enforce_bounds;
 	double par_sigma_range;
-	bool ies_save_binary;
+	bool save_binary;
 	string ies_localizer;
 	double ies_accept_phi_fac;
 	double ies_lambda_inc_fac;
 	double ies_lambda_dec_fac;
 	bool ies_save_lambda_en;
-	set<string> passed_args;
+	
+
 	map<string, string> arg_map;
 	string ies_subset_how;
 	string ies_localize_how;
@@ -602,6 +774,32 @@ private:
 	bool ies_drop_conflicts;
 	bool ies_save_rescov;
 	double ies_pdc_sigma_distance;
+	bool ies_use_mda;
+	double ies_mda_init_fac;
+	double ies_mda_dec_fac;
+	string ies_loc_type;
+	bool ies_upgrades_in_memory;
+	bool ies_ordered_binary;
+	double ies_multimodal_alpha;
+
+
+	// Data Assimilation parameters
+	/*string da_mode;
+	bool da_use_ies;
+	bool use_da = false;
+	string da_par_csv;
+	int da_num_reals;
+	string da_obs_csv;*/
+	string da_par_cycle_table;
+	string da_obs_cycle_table;
+	string da_weight_cycle_table;
+	int da_hotstart_cycle;
+	int da_stop_cycle;
+	bool da_use_simulated_states;
+
+	
+
+	// End of Data Assimilation Parameters
 
 	string gsa_method;
 	int gsa_morris_p;
@@ -612,11 +810,15 @@ private:
 	double gsa_morris_delta;
 	string gsa_sobol_par_dist;
 
+
 	bool panther_agent_restart_on_error;
 	int panther_agent_no_ping_timeout_secs;
 	bool panther_debug_loop;
+	bool debug_check_paren_consistency;		
 	bool panther_debug_fail_freeze;
 	bool panther_echo;
+	vector<string> panther_transfer_on_finish, panther_transfer_on_fail;
+
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);
 ostream& operator<< (ostream &os, const ObservationInfo& val);
@@ -663,6 +865,10 @@ private:
 ostream& operator<< (ostream& os, const SVDInfo& val);
 
 double draw_standard_normal(std::mt19937& rand_gen);
+vector<double> uniform_draws(int num_reals, double lower_bound, double upper_bound, std::mt19937& rand_gen);
+
+
+
 
 
 #endif  /* PEST_DATAS_STRUCTS_H_ */

@@ -92,6 +92,7 @@ public:
 	const TranOffset *get_offset_ptr() const;
 	const TranScale *get_scale_ptr() const;
 	const TranFixed *get_fixed_ptr()const;
+	TranFixed* get_fixed_ptr_4_mod();
 	const TranLog10 *get_log10_ptr() const;
 	TranSVD *get_svda_ptr()const;
 	TranFixed *get_svda_fixed_ptr()const;

@@ -23,6 +23,5 @@ cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
 ninja
 cpack -G ZIP
 copy /y *.zip ..\
-
 cd %first_path%
 pause
