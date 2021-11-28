@@ -1,14 +1,18 @@
 <p align="center">
   <img src="documentation/pestpplogo.png" alt="pestpplogo image">
 </p>
+
 # PEST++
 
 ## a Software Suite for Parameter Estimation, Uncertainty Analysis, Management Optimization and Sensitivity Analysis
 
 PEST++ is a software suite aimed at supporting complex numerical models in the decision-support context.  Much focus has been devoted to supporting environmental models (groundwater, surface water, etc) but these tools are readily applicable to any computer model.
 
-[![Travis Status](https://travis-ci.org/usgs/pestpp.svg?branch=master)](https://travis-ci.org/usgs/pestpp)
-[![Appveyor status](https://ci.appveyor.com/api/projects/status/rqadojcv8bkj5gr0/branch/master?svg=true)](https://ci.appveyor.com/project/jwhite-usgs/pestpp/branch/master)
+<br>
+
+Master branch:  [![master branch](https://github.com/usgs/pestpp/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/usgs/pestpp/actions/workflows/ci.yml/badge.svg?branch=master)
+
+Develop branch:  [![develop](https://github.com/usgs/pestpp/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/usgs/pestpp/actions/workflows/ci.yml/badge.svg?branch=develop)
 
 <br>
 
@@ -33,14 +37,14 @@ The lastest PEST++ users manual is available [here](documentation/pestpp_users_m
 
 ## Links to latest binaries
 
-As of version 4.3.11, PEST++ pre-compiled binaries for windows and mac are available as a github release:  
+As of version 4.3.11, PEST++ pre-compiled binaries for windows and linux are available as a github release:  
 
 [https://github.com/usgs/pestpp/releases](https://github.com/usgs/pestpp/releases)
 
 <br>
 
 ## Compiling
-The develop branch includes a Visual Studio solution, as well as CMake files for cross-compilation on all operating systems.
+The develop branch includes a Visual Studio solution, as well as CMake files for building on all operating systems using g++, MSVC, and/or intel C++.
 
 See details [here](documentation/cmake.md) to compile using CMake.
 
@@ -49,7 +53,7 @@ See details [here](documentation/cmake.md) to compile using CMake.
 ## Overview
 The PEST++ software suite includes several stand-alone tools for model-independent (non-intrusive) computer model parameter estimation and uncertainty analysis.  Codes include:
 
-* ``pestpp-glm``: deterministic GLM parameter estimation using "on-the-fly" subspace reparameterization, effectively reproducing the SVD-Assist methodology of PEST without any user intervention and FOSM-based parameter and (optional) forecast uncertainty estimation with support for generating posterior parameter realizations.
+* ``pestpp-glm``: deterministic GLM parameter estimation using "on-the-fly" subspace reparameterization, effectively reproducing the SVD-Assist methodology of PEST without any user intervention and FOSM-based parameter and (optional) forecast uncertainty estimation with support for generating Bayes-linear posterior parameter realizations.
 
 * ``pestpp-sen``: Global sensitivity analysis using either Morris or Sobol
 
