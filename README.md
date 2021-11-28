@@ -33,7 +33,9 @@ The lastest PEST++ users manual is available [here](documentation/pestpp_users_m
 
 ## Links to latest binaries
 
-As of version 4.3.11, PEST++ pre-compiled binaries for windows and mac are available as a github release.  For older version of PEST++, precompiled binaries are in the `bin` directory
+As of version 4.3.11, PEST++ pre-compiled binaries for windows and mac are available as a github release:  
+
+[https://github.com/usgs/pestpp/releases](https://github.com/usgs/pestpp/releases)
 
 <br>
 
@@ -53,29 +55,20 @@ The PEST++ software suite includes several stand-alone tools for model-independe
 
 * ``pestpp-swp``: a generic parallel run utility driven by a CSV file of parameter values
 
-* ``pestpp-opt``: chance-constrainted linear programming
+* ``pestpp-opt``: chance-constrained linear programming
 
 * ``pestpp-ies``: iterative ensemble smoother implementation of GLM (based on the work Chen and Oliver 2013) with support for generic localization (local analysis and/or covariance localization)
 
-* ``pestpp-pso``: particle-swarm based inversion.
+* ``pestpp-mou``: multi-objective optimization under uncertainty using evolutionary algorithms (single objective also!)
+* ``pestpp-da``: model-independent ensemble-based sequential and batch iterative data assimilation with options to use standard Kalman update, multiple data assimilation (MDA), or the GLM algorithm of Chen and Oliver (2013).
 
-All members of the software suite can be compiled for PC, MAC, or Linux and have several run managers to support parallelization.  precompiled binaries are available in the "bin" folder.  Windows users with older OS versions should use the ``iwin`` binaries (starting "i", compiled with intel C++) to avoid the dreaded MSVC missing runtime DLL issue.
+All members of the software suite can be compiled for PC, MAC, or Linux and have several run managers to support parallelization.  Windows users with older OS versions should use the ``iwin`` binaries (starting "i", compiled with intel C++) to avoid the dreaded MSVC missing runtime DLL issue.
 
 <br>
 
 ## Funding
 
 Funding for PEST++ has been provided by the U.S. Geologial Survey. The New Zealand Strategic Science Investment Fund as part of GNS Scienceâ€™s (https://www.gns.cri.nz/) Groundwater Research Programme has also funded contributions 2018-present.  Intera, Inc. also provides ongoing support for PEST++.
-
-<br>
-
-## Recent developements
-
-PEST++ version 5 has been released!  Please see the users manual for current input instructions and options for all PEST++ tools.  Also, several new tools are in development, include PESTPP-DA (generalized data assimilation including iterative ensemble Kalman filter), PESTPP-MOU (single and multiple objective constrained optimization under uncertainty) and PESTPP-SQP (ensemble-based constrainted sequential quadratic programming under uncertainty).  If you would like to be an early adopter/beta tester, please let us know!
-
-The PEST++ suite has been refactored to remove the fortran dependancy.  This includes the template and instruction file processing routines.
-
-An updated control file format has been implemented.  All the existing PEST++ tools are still backward compatible with the standard control file format.  However, new tools that are in developement to support sequential data assimilation need the external file format.  Additional, new functionality is being developed that will require the updated control file format.  The new control file format is described in documentation and pyEMU can operate on this new format interchangeably.
 
 <br>
 
@@ -103,11 +96,14 @@ Welter, D.E., Doherty, J.E., Hunt, R.J., Muffels, C.T., Tonkin, M.J., and SchreÃ
 
 ## Testing
 
-The ``benchmarks`` folder contains a simple worked example and basic testing routines that are used for basic CI testing.  Many full-worked test problems of varying problem sizes are now located in separate repos:
+The ``benchmarks`` folder contains a simple worked example and basic testing routines that are used for basic CI testing.  Many full-worked test problems of varying sizes are now located in separate repos:
 
 * [pestpp-glm benchmarks](https://github.com/usgs/pestpp-glm_benchmarks)
 * [pestpp-ies benchmarks](https://github.com/pestpp/pestpp-ies_benchmarks)
 * [pestpp-opt benchmarks](https://github.com/pestpp/pestpp-opt_benchmarks)
+* [pestpp-mou benchmarks](https://github.com/pestpp/pestpp-mou_benchmarks)
+* [pestpp-da benchmarks](https://github.com/pestpp/pestpp-da_benchmarks)
+* 
 
 <br>
 
