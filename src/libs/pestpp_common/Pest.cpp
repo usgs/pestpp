@@ -37,6 +37,7 @@
 #include "Jacobian.h"
 #include "QSqrtMatrix.h"
 #include <limits>
+#include "network_package.h"
 
 
 using namespace::std;
@@ -59,7 +60,7 @@ void Pest::set_defaults()
 
 }
 
-void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim)
+void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, int cycle)
 {
 	if (control_info.noptmax == 0)
 	{
@@ -240,7 +241,7 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim)
 
 	if (get_n_adj_par() == 0)
 	{
-		if (forgive)
+		if ((forgive) || (cycle != NetPackage::NULL_DA_CYCLE))
 		{
 			cout << "parameter warning: no adjustable parameters" << endl;
 			f_rec << "parameter warning: no adjustable parameters" << endl;
@@ -258,7 +259,7 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim)
 
 	if (get_ctl_ordered_nz_obs_names().size() == 0)
 	{
-		if (forgive)
+		if ((forgive) || (NetPackage::NULL_DA_CYCLE))
 		{
 			cout << "observation warning: no non-zero weighted observations" << endl;
 			f_rec << "observation warning: no non-zero weighted observations" << endl;
@@ -269,12 +270,10 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim)
 			f_rec << "observation error: no non-zero weighted observations" << endl;
 			err = true;
 		}
-
-
 	}
 
 	if (err)
-		throw runtime_error("error in parameter data");
+		throw runtime_error("error in inputs...");
 
 	int n_base = get_pestpp_options().get_n_iter_base();
 	if (n_base == -1 || n_base > 0)
@@ -3354,6 +3353,7 @@ map<string, double> Pest::calc_par_dss(const Jacobian& jac, ParamTransformSeq& p
 		val = dss_mat_no_reg_pest.col(i).norm() / n_nonzero_weights_no_reg;
 		par_sens[par_list[i]] = val;
 	}
+	return par_sens;
 	return par_sens;
 }
 
