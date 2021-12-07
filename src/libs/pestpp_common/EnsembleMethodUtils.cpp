@@ -4497,7 +4497,7 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 	for (auto& name : obs_names)
 	{
 
-		w = pest_scenario.get_observation_info_ptr()->get_weight(name);
+		//w = pest_scenario.get_observation_info_ptr()->get_weight(name);
 		//if ((w == 0) && (spar_names.find(name) != end))
 		if (spar_names.find(name) != end)
 		{
@@ -4509,7 +4509,7 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 	if (obs_dyn_state_names.size() > 0)
 	{
 		ss.str("");
-		ss << obs_dyn_state_names.size() << " non-zero weighted dynamic states identified through shared-names";
+		ss << obs_dyn_state_names.size() << " dynamic states identified through shared-names";
 		message(1, ss.str());
 	}
 	map<string, string> state_map = pest_scenario.get_ext_file_string_map("observation data external", "state_par_link");
@@ -4544,7 +4544,7 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 			}
 			else
 			{
-				w = pest_scenario.get_observation_info_ptr()->get_weight(sm.first);
+				//w = pest_scenario.get_observation_info_ptr()->get_weight(sm.first);
 				//if (w == 0)
 				{
 					obs_dyn_state_names.push_back(sm.first);
@@ -4574,7 +4574,7 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 		if (c > 0)
 		{
 			ss.str("");
-			ss << c << " non-zero weighted initial dynamic states identified through 'state_par_link'";
+			ss << c << " dynamic states identified through observation data 'state_par_link'";
 			message(1, ss.str());
 		}
 	}
@@ -4589,9 +4589,16 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
         set<string>::iterator adj_end = adj_pnames.end();
         vector<string> dups, missing,already,not_adj;
         set<string> named;
+        set<string>::iterator par_send = spar_names.end();
         int c = 0;
         for (auto& sm : par2par_state_map)
         {
+            //check if both names are not in the current Pest instance - if neither are
+            // in, continue - this means they are not in this cycle
+            if ((spar_names.find(sm.first) == par_send) && (spar_names.find(sm.second) == par_send))
+            {
+                continue;
+            }
             //if the linking par isnt in current par state names, thats a problem
             if (pstates.find(sm.second) == send)
             {
