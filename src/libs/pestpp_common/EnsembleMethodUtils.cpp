@@ -1873,17 +1873,25 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 		regul.clear();
 		map<string, Eigen::VectorXd> reg_map = calc_regul(pe);//, *reg_factor);
 		//for (auto &pv : calc_regul(pe))
-		string name;
+		//string name;
 		//big assumption - if oe is a diff shape, then this
 		//must be a subset, so just use the first X rows of pe
-		for (int i = 0; i < oe.shape().first; i++)
+		/*for (int i = 0; i < oe.shape().first; i++)
 		{
 			//name = preal_names[i];
 			name = pe.get_real_names()[i];
 			//cout << name << endl;
 			regul[name] = reg_map[name].sum();
 			par_group_phi_map[name] = get_par_group_contrib(reg_map[name]);
-		}
+		}*/
+        for (auto& r : reg_map)
+        {
+            //name = preal_names[i];
+            //name = pe.get_real_names()[i];
+            //cout << name << endl;
+            regul[r.first] = r.second.sum();
+            par_group_phi_map[r.first] = get_par_group_contrib(r.second);
+        }
         composite.clear();
         composite = calc_composite(meas, regul);
 	}
