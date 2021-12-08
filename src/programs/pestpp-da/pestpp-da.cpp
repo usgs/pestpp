@@ -1009,6 +1009,7 @@ int main(int argc, char* argv[])
 	catch (...)
 	{
 		cout << "Error condition prevents further execution: " << endl;
+		return 1;
 	}
 #endif
 }
