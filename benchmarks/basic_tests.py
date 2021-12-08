@@ -1066,7 +1066,12 @@ def fr_fail_test():
 
     assert not os.path.exists(oe_file)
     m_d = os.path.join(model_d,"fr_fail_master")
-    pyemu.os_utils.start_workers(new_d,exe_path,"pest.pst",num_workers=1,worker_root=model_d,master_dir=m_d)
+    try:
+        pyemu.os_utils.start_workers(new_d,exe_path,"pest.pst",num_workers=1,worker_root=model_d,master_dir=m_d)
+    except:
+        pass
+    else:
+        raise Exception("should have failed")
     oe_file = os.path.join(m_d, "pest.0.obs.csv")
     assert not os.path.exists(oe_file)
 
@@ -1227,4 +1232,5 @@ if __name__ == "__main__":
     #cmdline_test()
     #basic_sqp_test()
     #mf6_v5_ies_test()
-    fr_timeout_test()
+    #fr_timeout_test()
+    fr_fail_test()
