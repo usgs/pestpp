@@ -570,6 +570,9 @@ public:
     void set_da_stop_cycle(int val) { da_stop_cycle = val; }
     bool get_da_use_simulated_states() const {return da_use_simulated_states; }
     void set_da_use_simulated_states(bool _flag) {da_use_simulated_states = _flag;}
+    string get_da_noptmax_schedule() const {return da_noptmax_schedule;}
+	void set_da_noptmax_schedule(string _file) {da_noptmax_schedule = _file;}
+
 
     void set_forgive_unknown_args(bool _flag) { forgive_unknown_args = _flag; }
     bool get_forgive_unknown_args() const { return forgive_unknown_args; }
@@ -796,6 +799,7 @@ private:
 	int da_hotstart_cycle;
 	int da_stop_cycle;
 	bool da_use_simulated_states;
+	string da_noptmax_schedule;
 
 	
 

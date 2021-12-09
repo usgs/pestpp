@@ -516,7 +516,9 @@ int main(int argc, char* argv[])
 		ObservationEnsemble curr_oe(&pest_scenario);
 		ObservationEnsemble curr_noise(&pest_scenario);
 		generate_global_ensembles(da, fout_rec, curr_pe, curr_oe, curr_noise);
-		
+
+		map<int,int> noptmax_schedule = da.initialize_noptmax_schedule(assimilation_cycles);
+
 		//prepare a phi csv file for all cycles
 		string phi_file = file_manager.get_base_filename() + ".global.phi.actual.csv";
 		ofstream f_phi(phi_file);
@@ -560,7 +562,7 @@ int main(int argc, char* argv[])
 			performance_log.log_event("instantiating child pest object");
 
 			Pest childPest = pest_scenario.get_child_pest(*icycle);
-
+			childPest.get_control_info_4_mod().noptmax = noptmax_schedule[*icycle];
 			OutputFileWriter output_file_writer(file_manager, childPest, restart_flag);
 
 			cout << "checking inputs...";

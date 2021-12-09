@@ -13,6 +13,77 @@
 #include "EnsembleMethodUtils.h"
 
 
+map<int,int> DataAssimilator::initialize_noptmax_schedule(vector<int>& cycles)
+{
+    stringstream ss;
+    map<int,int> cycle_noptmax_map;
+    int noptmax = pest_scenario.get_control_info().noptmax;
+    string fname = pest_scenario.get_pestpp_options().get_da_noptmax_schedule();
+    string line;
+    vector<string> tokens;
+    int lcount = 0,c,n;
+    for (auto& cycle : cycles)
+        cycle_noptmax_map[cycle] = noptmax;
+    if (fname.size() > 0)
+    {
+        if (noptmax == 0)
+            throw_em_error("noptmax_schedule provided but noptmax is 0");
+        message(2,"reading noptmax_schedule from file '"+fname+"'");
+        ifstream in(fname);
+        if (in.bad())
+        {
+            throw_em_error("error opening noptmax_schedule file '"+fname+"'");
+        }
+        while (getline(in,line))
+        {
+            lcount++;
+            tokens.clear();
+            pest_utils::tokenize(line,tokens,"\t ,");
+            if (tokens.size() < 2)
+            {
+                ss.str("");
+                ss << "noptmax_schedule file '" << fname << "' line " << lcount << " needs at least two entries";
+                throw_em_error(ss.str());
+            }
+            try
+            {
+                c = stoi(tokens[0]);
+            }
+            catch (...)
+            {
+                ss.str("");
+                ss << "error casting '" << tokens[0] << "' to cycle on line " << lcount << " in noptmax_schedule file";
+                throw_em_error(ss.str());
+            }
+            try
+            {
+                n = stoi(tokens[1]);
+            }
+            catch (...)
+            {
+                ss.str("");
+                ss << "error casting '" << tokens[1] << "' to noptmax integer on line " << lcount << " in noptmax_schedule file";
+                throw_em_error(ss.str());
+            }
+            if ((n == 0) || (n < -1)) {
+                ss.str("");
+                ss << "invalid noptmax " << n << " on line " << lcount << " in noptmax_schedule";
+                throw_em_error(ss.str());
+            }
+            cycle_noptmax_map[c] = n;
+        }
+        in.close();
+    }
+    ofstream& frec = file_manager.rec_ofstream();
+    frec << "...noptmax_schedule: cycle,noptmax:" << endl;
+    for (int i=0;i<pest_scenario.get_control_info().noptmax;i++)
+    {
+        frec << "...   " << i << ", " << cycle_noptmax_map.at(i) << endl;
+    }
+    return cycle_noptmax_map;
+}
+
+
 void DataAssimilator::sanity_checks()
 {
 	PestppOptions* ppo = pest_scenario.get_pestpp_options_ptr();
