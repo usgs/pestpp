@@ -862,16 +862,13 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
             //upgrade_1 = -1 * par_diff * X3;
             //local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
             //upgrade_1.transposeInPlace();
-            t = obs_diff.transpose() * X3;
+            t = obs_diff * X3;
             Ut.resize(0, 0);
             obs_diff.resize(0, 0);
             X3.resize(0,0);
             X2.resize(0,0);
             X4.resize(0,0);
             X1.resize(0,0);
-
-
-
 
         }
         else {
@@ -1067,7 +1064,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 			}
 			upgrade_1.col(i) += par_vec.transpose();
 			//add the par change part for the full glm solution
-			if ((!use_approx) && (iter > 1))
+			if ((use_glm_form) && (!use_approx) && (iter > 1))
 			{
 				//update_2 is transposed relative to upgrade_1
 				upgrade_1.col(i) += upgrade_2.row(par2col_map[name]);
@@ -3003,8 +3000,13 @@ void EnsembleMethod::sanity_checks()
     string restart_obs = ppo->get_ies_obs_restart_csv();
     string restart_par = ppo->get_ies_par_restart_csv();
 
+    if (pest_scenario.get_pestpp_options().get_ies_use_mda() && (pest_scenario.get_pestpp_options().get_ies_loc_type()[0] == 'C'))
+    {
+        errors.push_back("Covariance-based localization not supported with MDA solver");
+    }
 
-	if (pest_scenario.get_control_info().noptmax > 10)
+
+    if (pest_scenario.get_control_info().noptmax > 10)
 	{
 		warnings.push_back("noptmax > 10, don't expect anything meaningful from the results!");
 	}
