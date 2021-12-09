@@ -76,9 +76,9 @@ map<int,int> DataAssimilator::initialize_noptmax_schedule(vector<int>& cycles)
     }
     ofstream& frec = file_manager.rec_ofstream();
     frec << "...noptmax_schedule: cycle,noptmax:" << endl;
-    for (int i=0;i<pest_scenario.get_control_info().noptmax;i++)
+    for (auto& cycle: cycles)
     {
-        frec << "...   " << i << ", " << cycle_noptmax_map.at(i) << endl;
+        frec << "...   " << cycle << ", " << cycle_noptmax_map.at(cycle) << endl;
     }
     return cycle_noptmax_map;
 }
