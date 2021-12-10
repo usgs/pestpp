@@ -354,6 +354,31 @@ def unc_file_test():
     print(diff.sum())
     assert diff.sum().max() < 1.0e-10
 
+    cov.to_uncfile(os.path.join(m_d, "pest.unc"), covmat_file=None)
+    pst.control_data.noptmax = -2
+    pst.pestpp_options["ies_num_reals"] = 100000
+    pst.pestpp_options["ies_enforce_bounds"] = False
+    pst.write(os.path.join(m_d, "pest_unc.pst"))
+    pyemu.os_utils.run("{0} {1}".format(exe_path, "pest_unc.pst"), cwd=m_d)
+    pe_3 = pd.read_csv(os.path.join(m_d, "pest_unc.0.par.csv"), index_col=0).apply(np.log10)
+    print(pe_3.std(ddof=0))
+    pe_std = pe_3.std(ddof=0)
+    for r,v  in zip(cov.row_names,cov.x):
+        d = np.abs(pe_std.loc[r] - np.sqrt(v))
+
+        print(r,v,np.sqrt(v),d)
+        assert d < 0.01
+    pst.control_data.noptmax = -1
+    pst.write(os.path.join(m_d, "pest_unc.pst"))
+    pyemu.os_utils.run("{0} {1}".format(exe_path.replace("-ies","-glm"), "pest_unc.pst"), cwd=m_d)
+    fosm_df = pd.read_csv(os.path.join(m_d,"pest_unc.par.usum.csv"),index_col=0)
+    cov_df = cov.to_dataframe()
+    for pname,prior_std in zip(fosm_df.index,fosm_df.prior_stdev):
+        d = np.abs(prior_std - np.sqrt(cov_df.loc[pname,pname]))
+        print(pname,d)
+        assert d < 1.0e-4
+
+
 def parchglim_test():
     model_d = "ies_10par_xsec"
     
@@ -1191,13 +1216,13 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
     #shutil.copy2(os.path.join("..", "exe", "windows", "x64", "Debug", "pestpp-ies.exe"),
     #             os.path.join("..", "bin", "win", "pestpp-ies.exe"))
-    ins_missing_e_test()
+    #ins_missing_e_test()
     #basic_test()
     #agnostic_path_test()
     #glm_long_name_test()
     #sen_plusplus_test()
     #parchglim_test()
-    #unc_file_test()
+    unc_file_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
@@ -1223,7 +1248,7 @@ if __name__ == "__main__":
     #da_mf6_freyberg_test_2()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
-    mf6_v5_ies_test()
+    #mf6_v5_ies_test()
     #mf6_v5_sen_test()
 
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
