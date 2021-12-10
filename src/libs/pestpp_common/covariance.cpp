@@ -1334,7 +1334,7 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 					if (find(names.begin(), names.end(), name) != names.end())
 						throw runtime_error(name + " listed more than once in uncertainty file:" + filename);
 					names.push_back(tokens[0]);
-					triplet_list.push_back(Eigen::Triplet<double>(irow, jcol, val * std_mlt));
+					triplet_list.push_back(Eigen::Triplet<double>(irow, jcol, (val * std_mlt)*(val * std_mlt)));
 					irow++, jcol++;
 				}
 
