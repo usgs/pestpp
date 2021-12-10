@@ -41,7 +41,7 @@ public:
 	friend ostream& operator<< (ostream &os, const Pest& val);
 	Pest();
 	void set_defaults();
-	void check_inputs(ostream &f_rec, bool forgive=false, bool forgive_parchglim=true);
+	void check_inputs(ostream &f_rec, bool forgive=false, bool forgive_parchglim=true,int cycle=NetPackage::NULL_DA_CYCLE);
 	void check_io(ofstream& f_rec, bool echo_errors=true);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename, ofstream &f_rec);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename);
@@ -73,6 +73,7 @@ public:
 	PriorInformation *get_prior_info_ptr() {return &prior_info;}
 	const SVDInfo& get_svd_info() const {return svd_info;}
 	const ControlInfo&  get_control_info() const {return control_info;}
+	ControlInfo& get_control_info_4_mod() {return control_info;}
 	const ParamTransformSeq& get_base_par_tran_seq() const {return base_par_transform;}
 	ParamTransformSeq& get_base_par_tran_seq_4_mod() { return base_par_transform; }
 	const vector<string> &get_ctl_ordered_par_names() const {return ctl_ordered_par_names;}
