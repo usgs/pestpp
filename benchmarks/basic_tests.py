@@ -865,16 +865,16 @@ def mf6_v5_ies_test():
     pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_mda_loc.pst", num_workers=15,
                                  master_dir=m_d, worker_root=model_d, port=port)
     
-    m_d = os.path.join(model_d, "master_ies_mda_covloc")
-    if os.path.exists(m_d):
-        shutil.rmtree(m_d)
-    pst = pyemu.Pst(os.path.join(t_d, "freyberg6_run_ies.pst"))
-    pst.control_data.noptmax = 3
-    pst.pestpp_options["ies_use_mda"] = True
-    pst.pestpp_options["ies_loc_type"] = "cov"
-    pst.write(os.path.join(t_d, "freyberg6_run_ies_mda_covloc.pst"))
-    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_mda_covloc.pst", num_workers=15,
-                                 master_dir=m_d, worker_root=model_d, port=port)
+    # m_d = os.path.join(model_d, "master_ies_mda_covloc")
+    # if os.path.exists(m_d):
+    #     shutil.rmtree(m_d)
+    # pst = pyemu.Pst(os.path.join(t_d, "freyberg6_run_ies.pst"))
+    # pst.control_data.noptmax = 3
+    # pst.pestpp_options["ies_use_mda"] = True
+    # pst.pestpp_options["ies_loc_type"] = "cov"
+    # pst.write(os.path.join(t_d, "freyberg6_run_ies_mda_covloc.pst"))
+    # pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_mda_covloc.pst", num_workers=15,
+    #                              master_dir=m_d, worker_root=model_d, port=port)
     
     m_d = os.path.join(model_d, "master_ies_mda_noloc")
     if os.path.exists(m_d):
@@ -1066,7 +1066,12 @@ def fr_fail_test():
 
     assert not os.path.exists(oe_file)
     m_d = os.path.join(model_d,"fr_fail_master")
-    pyemu.os_utils.start_workers(new_d,exe_path,"pest.pst",num_workers=1,worker_root=model_d,master_dir=m_d)
+    try:
+        pyemu.os_utils.start_workers(new_d,exe_path,"pest.pst",num_workers=1,worker_root=model_d,master_dir=m_d)
+    except:
+        pass
+    else:
+        raise Exception("should have failed")
     oe_file = os.path.join(m_d, "pest.0.obs.csv")
     assert not os.path.exists(oe_file)
 
@@ -1218,7 +1223,7 @@ if __name__ == "__main__":
     #da_mf6_freyberg_test_2()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
-    #mf6_v5_ies_test()
+    mf6_v5_ies_test()
     #mf6_v5_sen_test()
 
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
@@ -1227,4 +1232,5 @@ if __name__ == "__main__":
     #cmdline_test()
     #basic_sqp_test()
     #mf6_v5_ies_test()
-    fr_timeout_test()
+    #fr_timeout_test()
+    #fr_fail_test()

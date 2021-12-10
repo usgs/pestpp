@@ -862,16 +862,13 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
             //upgrade_1 = -1 * par_diff * X3;
             //local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
             //upgrade_1.transposeInPlace();
-            t = obs_diff.transpose() * X3;
+            t = obs_diff * X3;
             Ut.resize(0, 0);
             obs_diff.resize(0, 0);
             X3.resize(0,0);
             X2.resize(0,0);
             X4.resize(0,0);
             X1.resize(0,0);
-
-
-
 
         }
         else {
@@ -1067,7 +1064,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 			}
 			upgrade_1.col(i) += par_vec.transpose();
 			//add the par change part for the full glm solution
-			if ((!use_approx) && (iter > 1))
+			if ((use_glm_form) && (!use_approx) && (iter > 1))
 			{
 				//update_2 is transposed relative to upgrade_1
 				upgrade_1.col(i) += upgrade_2.row(par2col_map[name]);
@@ -1873,17 +1870,25 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 		regul.clear();
 		map<string, Eigen::VectorXd> reg_map = calc_regul(pe);//, *reg_factor);
 		//for (auto &pv : calc_regul(pe))
-		string name;
+		//string name;
 		//big assumption - if oe is a diff shape, then this
 		//must be a subset, so just use the first X rows of pe
-		for (int i = 0; i < oe.shape().first; i++)
+		/*for (int i = 0; i < oe.shape().first; i++)
 		{
 			//name = preal_names[i];
 			name = pe.get_real_names()[i];
 			//cout << name << endl;
 			regul[name] = reg_map[name].sum();
 			par_group_phi_map[name] = get_par_group_contrib(reg_map[name]);
-		}
+		}*/
+        for (auto& r : reg_map)
+        {
+            //name = preal_names[i];
+            //name = pe.get_real_names()[i];
+            //cout << name << endl;
+            regul[r.first] = r.second.sum();
+            par_group_phi_map[r.first] = get_par_group_contrib(r.second);
+        }
         composite.clear();
         composite = calc_composite(meas, regul);
 	}
@@ -2995,8 +3000,13 @@ void EnsembleMethod::sanity_checks()
     string restart_obs = ppo->get_ies_obs_restart_csv();
     string restart_par = ppo->get_ies_par_restart_csv();
 
+    if (pest_scenario.get_pestpp_options().get_ies_use_mda() && (pest_scenario.get_pestpp_options().get_ies_loc_type()[0] == 'C'))
+    {
+        errors.push_back("Covariance-based localization not supported with MDA solver");
+    }
 
-	if (pest_scenario.get_control_info().noptmax > 10)
+
+    if (pest_scenario.get_control_info().noptmax > 10)
 	{
 		warnings.push_back("noptmax > 10, don't expect anything meaningful from the results!");
 	}
@@ -4497,7 +4507,7 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 	for (auto& name : obs_names)
 	{
 
-		w = pest_scenario.get_observation_info_ptr()->get_weight(name);
+		//w = pest_scenario.get_observation_info_ptr()->get_weight(name);
 		//if ((w == 0) && (spar_names.find(name) != end))
 		if (spar_names.find(name) != end)
 		{
@@ -4509,7 +4519,7 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 	if (obs_dyn_state_names.size() > 0)
 	{
 		ss.str("");
-		ss << obs_dyn_state_names.size() << " non-zero weighted dynamic states identified through shared-names";
+		ss << obs_dyn_state_names.size() << " dynamic states identified through shared-names";
 		message(1, ss.str());
 	}
 	map<string, string> state_map = pest_scenario.get_ext_file_string_map("observation data external", "state_par_link");
@@ -4544,7 +4554,7 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 			}
 			else
 			{
-				w = pest_scenario.get_observation_info_ptr()->get_weight(sm.first);
+				//w = pest_scenario.get_observation_info_ptr()->get_weight(sm.first);
 				//if (w == 0)
 				{
 					obs_dyn_state_names.push_back(sm.first);
@@ -4574,7 +4584,7 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 		if (c > 0)
 		{
 			ss.str("");
-			ss << c << " non-zero weighted initial dynamic states identified through 'state_par_link'";
+			ss << c << " dynamic states identified through observation data 'state_par_link'";
 			message(1, ss.str());
 		}
 	}
@@ -4589,9 +4599,16 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
         set<string>::iterator adj_end = adj_pnames.end();
         vector<string> dups, missing,already,not_adj;
         set<string> named;
+        set<string>::iterator par_send = spar_names.end();
         int c = 0;
         for (auto& sm : par2par_state_map)
         {
+            //check if both names are not in the current Pest instance - if neither are
+            // in, continue - this means they are not in this cycle
+            if ((spar_names.find(sm.first) == par_send) && (spar_names.find(sm.second) == par_send))
+            {
+                continue;
+            }
             //if the linking par isnt in current par state names, thats a problem
             if (pstates.find(sm.second) == send)
             {

@@ -1154,6 +1154,11 @@ bool PestppOptions::assign_da_value_by_key(const string& key, const string& valu
         da_use_simulated_states = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
+    else if (key == "DA_NOPTMAX_SCHEDULE")
+    {
+        da_noptmax_schedule = org_value;
+        return true;
+    }
 	//any additional da specific args must be before here!
 	//some hackery!
 	else
@@ -1728,6 +1733,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "da_hotstart_cycle: " << da_hotstart_cycle << endl;
 	os << "da_stop_cycle: " << da_stop_cycle << endl;
 	os << "da_use_simulated_states: " << da_use_simulated_states << endl;
+	os << "da_noptmax_schedule: " << da_noptmax_schedule << endl;
 
 	
 	os << endl << endl << endl;
@@ -1895,6 +1901,7 @@ void PestppOptions::set_defaults()
 	set_da_hotstart_cycle(0);
     set_da_stop_cycle(1000000000);
     set_da_use_simulated_states(true);
+    set_da_noptmax_schedule("");
 
 	// End of DA parameters
 	set_gsa_method("MORRIS");

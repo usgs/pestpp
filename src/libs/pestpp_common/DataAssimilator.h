@@ -28,10 +28,9 @@ public:
 	void da_update(int cycle);
 	void finalize();
     void sanity_checks();
+    map<int,int> initialize_noptmax_schedule(vector<int>& cycles);
 private:
-	void eig2csv(string name, Eigen::MatrixXd matrix);	
-
-
+	void eig2csv(string name, Eigen::MatrixXd matrix);
 };
 
 
