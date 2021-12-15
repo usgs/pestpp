@@ -1329,11 +1329,16 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 						
 				}
 				
-				string tcol;
+				string tcol,pcol;
 				if (cnames.find("PARTRANS") != cnames.end())
 					tcol = "PARTRANS";
 				else
 					tcol = "TRANSFORM";
+                if (cnames.find("PARNME") != cnames.end())
+                    pcol = "PARNME";
+                else
+                    pcol = "NAME";
+
 				vector<string> partrans = efile.get_col_string_vector(tcol);
 				set<string> s_partrans(partrans.begin(), partrans.end());
 				if (s_partrans.find("TIED") != s_partrans.end())
@@ -1353,8 +1358,8 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 					//save any tied pars for processing later bc the par its tied to
 					//might not have been processed yet.
 					row_map = efile.get_row_map(ro);
-					if (row_map["PARTRANS"] == "TIED")
-						temp_tied_map[row_map["PARNME"]] = row_map["PARTIED"];
+					if (row_map.at(tcol) == "TIED")
+						temp_tied_map[row_map.at(pcol)] = row_map.at("PARTIED");
 				}
 				efile.keep_cols(efile_keep_cols);
 				if (efiles_map.find(section) == efiles_map.end())
@@ -1689,11 +1694,17 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	
 	// handle any tied pars found in external files
 	double numer, demon, ratio;
+	vector<string> missing;
 	for (auto p: temp_tied_map)
 	{
 		name = p.first;
 		string name_tied = p.second;
 		numer = ctl_parameters[name];
+//		if (ctl_parameters.find(name_tied) == ctl_parameters.end())
+//        {
+//		    missing.push_back(name_tied);
+//		    continue;
+//        }
 		demon = ctl_parameters[name_tied];
 		if (demon == 0.0)
 		{
@@ -1712,6 +1723,16 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		t_tied->insert(name, pair<string, double>(name_tied, ratio));
 		tied_names.insert(name_tied);
 	}
+
+	if (missing.size() > 0)
+    {
+	    ss.str("");
+	    ss << "Error: the following `partied` parameters were not found in the control file:";
+	    for (auto& m: missing)
+	        ss << m << ",";
+	    f_rec << ss.str() << endl;
+	    throw runtime_error(ss.str());
+    }
 
 	//process pestpp options
 	map<string, PestppOptions::ARG_STATUS> arg_map, line_arg_map;

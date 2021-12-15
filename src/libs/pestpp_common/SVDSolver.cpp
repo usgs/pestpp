@@ -1140,21 +1140,24 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		RestartController::write_upgrade_runs_built(fout_restart);
 	}
 	//instance of a Mat for the jco
+    Mat j;
+    LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, rand_gen_ptr);
+
 	pair<ParameterEnsemble, map<int, int>> fosm_real_info;
-	Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
-		jacobian.get_matrix_ptr());
-	if (pest_scenario.get_prior_info_ptr()->get_nnz_pi() > 0)
-	{
-		vector<string> pi_names = pest_scenario.get_ctl_ordered_pi_names();
-		j.drop_rows(pi_names);
-	}
-	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, rand_gen_ptr);
+
 	if (pest_scenario.get_pestpp_options().get_uncert_flag())
 	{
 		cout << "-->starting iteration FOSM process..." << endl;
 		
 		performance_log->log_event("LinearAnalysis::glm_iter_fosm");
-		
+        Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
+              jacobian.get_matrix_ptr());
+        if (pest_scenario.get_prior_info_ptr()->get_nnz_pi() > 0)
+        {
+            vector<string> pi_names = pest_scenario.get_ctl_ordered_pi_names();
+            j.drop_rows(pi_names);
+        }
+        LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, rand_gen_ptr);
 		try
 		{
 			la.glm_iter_fosm(base_run, output_file_writer, termination_ctl.get_iteration_number(), &run_manager);
