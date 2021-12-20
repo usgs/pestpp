@@ -38,6 +38,7 @@
 #include "QSqrtMatrix.h"
 #include <limits>
 #include "network_package.h"
+#include <cmath>
 
 
 using namespace::std;
@@ -3176,7 +3177,7 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
         {
 	        float f;
 	        convert_ip(tokens[9],f);
-	        pi.dercom = std::round(f);
+	        pi.dercom = (int)std::floor(f + 0.5);
         }
 	else
 		pi.dercom = 1;
