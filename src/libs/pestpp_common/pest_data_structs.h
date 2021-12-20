@@ -295,6 +295,9 @@ public:
 	void set_glm_rebase_super(bool _flag) { glm_rebase_super = _flag; }
     bool get_glm_iter_mc() const { return glm_iter_mc; }
     void set_glm_iter_mc(bool _flag) { glm_iter_mc = _flag; }
+    bool get_glm_debug_high_2nd_iter_phi() const {return glm_debug_high_2nd_iter_phi;}
+    void set_glm_debug_high_2nd_iter_phi(bool _flag) {glm_debug_high_2nd_iter_phi = _flag;}
+
 
 
 
@@ -638,6 +641,7 @@ private:
 	bool glm_accept_mc_phi;
 	bool glm_rebase_super;
 	bool glm_iter_mc;
+	bool glm_debug_high_2nd_iter_phi;
 
 	vector<double> base_lambda_vec;
 	vector<double> lambda_scale_vec;
