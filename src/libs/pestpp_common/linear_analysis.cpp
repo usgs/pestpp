@@ -1140,7 +1140,8 @@ void LinearAnalysis::write_par_credible_range(ofstream &fout, string sum_filenam
 	pair<double, double> range;
 	for (auto &pname : ordered_names)
 	{
-		if (find(jacobian.cn_ptr()->begin(), jacobian.cn_ptr()->end(), pname) == jacobian.cn_ptr()->end())
+		//if (find(jacobian.cn_ptr()->begin(), jacobian.cn_ptr()->end(), pname) == jacobian.cn_ptr()->end())
+		if (prior_vars.find(pname) == prior_vars.end())
 			missing.push_back(pname);
 		else
 		{
@@ -1149,7 +1150,7 @@ void LinearAnalysis::write_par_credible_range(ofstream &fout, string sum_filenam
 			//if (parinfo.get_parameter_rec_ptr(pname)->tranform_type == ParameterRec::TRAN_TYPE::LOG)
 			//	value = log10(value);
 			//range = get_range(value, prior_vars[pname], parinfo.get_parameter_rec_ptr(pname)->tranform_type);
-			stdev = sqrt(prior_vars[pname]);
+			stdev = sqrt(prior_vars.at(pname));
 
 			fout << setw(20) << pest_utils::lower_cp(pname) << setw(20) << value << setw(20) << stdev << setw(20) <<
 				value - (2.0*stdev) << setw(20) << value + (2.0*stdev);
@@ -1158,7 +1159,7 @@ void LinearAnalysis::write_par_credible_range(ofstream &fout, string sum_filenam
 
 			//posterior
 			value = opt_pars.get_rec(pname);
-			stdev = sqrt(post_vars[pname]);
+			stdev = sqrt(post_vars.at(pname));
 			//range = get_range(value, post_vars[pname], parinfo.get_parameter_rec_ptr(pname)->tranform_type);
 
 			fout << setw(20) << value << setw(20) << stdev << setw(20) <<

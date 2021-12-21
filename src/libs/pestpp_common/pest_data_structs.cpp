@@ -477,7 +477,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		passed_args.insert("BASE_JACOBIAN");
 		passed_args.insert("BASE_JACOBIAN_FILENAME");
 			
-		//convert_ip(org_value, basejac_filename);
+		//convert_ip(org_value, basejac_filename);f
 		basejac_filename = org_value;
 	}
 
@@ -579,6 +579,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		glm_debug_real_fail = pest_utils::parse_string_arg_to_bool(value);
 	}
+    else if (key == "GLM_DEBUG_HIGH_2ND_ITER_PHI")
+    {
+        glm_debug_high_2nd_iter_phi = pest_utils::parse_string_arg_to_bool(value);
+    }
 	else if (key == "UPGRADE_AUGMENT")
 	{
 		cout << "++UPGRADE_AUGMENT is deprecated and no longer supported...ignoring" << endl;
@@ -1565,6 +1569,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "glm_accept_mc_phi: " << glm_accept_mc_phi << endl;
 	os << "glm_rebase_super: " << glm_rebase_super << endl;
 	os << "glm_iter_mc: " << glm_iter_mc << endl;
+	os << "glm_high_2nd_iter_phi: " << glm_debug_high_2nd_iter_phi << endl;
 
 //	if (global_opt == OPT_DE)
 //	{
@@ -1774,6 +1779,7 @@ void PestppOptions::set_defaults()
 	set_glm_accept_mc_phi(false);
 	set_glm_rebase_super(false);
 	set_glm_iter_mc(false);
+    set_glm_debug_high_2nd_iter_phi(false);
 	set_prediction_names(vector<string>());
 	set_parcov_filename(string());
 	set_obscov_filename(string());

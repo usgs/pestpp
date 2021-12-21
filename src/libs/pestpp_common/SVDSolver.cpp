@@ -238,9 +238,19 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 		ModelRun prev_run(best_upgrade_run);
 		bool upgrade_start = (restart_controller.get_restart_option() == RestartController::RestartOption::RESUME_UPGRADE_RUNS);
 		best_upgrade_run = iteration_upgrd(run_manager, termination_ctl, prev_run, upgrade_start);
+        if ((global_iter_num == 2) && (pest_scenario.get_pestpp_options().get_glm_debug_high_2nd_iter_phi()))
+        {
+            Observations fake_obs(optimum_run.get_obs());
+            for (auto& oname : fake_obs.get_keys())
+            {
+                fake_obs.update_rec(oname,1.0e+10);
+            }
+            best_upgrade_run.set_observations(fake_obs);
+        }
 		// reload best parameters and set flag to switch to central derivatives next iteration
 		double prev_phi = prev_run.get_phi(*regul_scheme_ptr);
 		double best_new_phi = best_upgrade_run.get_phi(*regul_scheme_ptr);
+
 		double phi_ratio = best_new_phi / prev_phi;
 
 		cout << endl << "  ...Lambda testing complete for iteration " << termination_ctl.get_iteration_number() + 1 << endl;
@@ -288,11 +298,6 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 			best_upgrade_run.get_obs(), *(best_upgrade_run.get_obj_func_ptr()),
 			best_upgrade_run.get_ctl_pars());
 		file_manager.close_file(filename.str());
-		// par file for this iteration
-		output_file_writer.write_par(file_manager.open_ofile_ext("par"), best_upgrade_run.get_ctl_pars(), *(par_transform.get_offset_ptr()),
-			*(par_transform.get_scale_ptr()));
-		file_manager.close_file("par");
-
 		filename.str(""); // reset the stringstream
 		filename << global_iter_num << ".par";
 		output_file_writer.write_par(file_manager.open_ofile_ext(filename.str()), best_upgrade_run.get_ctl_pars(), *(par_transform.get_offset_ptr()),
@@ -328,6 +333,10 @@ ModelRun SVDSolver::solve(RunManagerAbstract &run_manager, TerminationController
 			// jacobian calculated next iteration will be at the current parameters and
 			// will be more accurate than the one caluculated at the begining of this iteration
 			save_nextjac = true;
+            // par file for this iteration
+            output_file_writer.write_par(file_manager.open_ofile_ext("par"), best_upgrade_run.get_ctl_pars(), *(par_transform.get_offset_ptr()),
+                                         *(par_transform.get_scale_ptr()));
+            file_manager.close_file("par");
 		}
 		os << endl;
 		iteration_update_and_report(os, prev_run, best_upgrade_run, termination_ctl, run_manager);
@@ -1140,21 +1149,24 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		RestartController::write_upgrade_runs_built(fout_restart);
 	}
 	//instance of a Mat for the jco
+    Mat j;
+    LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, rand_gen_ptr);
+
 	pair<ParameterEnsemble, map<int, int>> fosm_real_info;
-	Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
-		jacobian.get_matrix_ptr());
-	if (pest_scenario.get_prior_info_ptr()->get_nnz_pi() > 0)
-	{
-		vector<string> pi_names = pest_scenario.get_ctl_ordered_pi_names();
-		j.drop_rows(pi_names);
-	}
-	LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, rand_gen_ptr);
+
 	if (pest_scenario.get_pestpp_options().get_uncert_flag())
 	{
 		cout << "-->starting iteration FOSM process..." << endl;
 		
 		performance_log->log_event("LinearAnalysis::glm_iter_fosm");
-		
+        Mat j(jacobian.get_sim_obs_names(), jacobian.get_base_numeric_par_names(),
+              jacobian.get_matrix_ptr());
+        if (pest_scenario.get_prior_info_ptr()->get_nnz_pi() > 0)
+        {
+            vector<string> pi_names = pest_scenario.get_ctl_ordered_pi_names();
+            j.drop_rows(pi_names);
+        }
+        LinearAnalysis la(j, pest_scenario, file_manager, *performance_log, parcov, rand_gen_ptr);
 		try
 		{
 			la.glm_iter_fosm(base_run, output_file_writer, termination_ctl.get_iteration_number(), &run_manager);
