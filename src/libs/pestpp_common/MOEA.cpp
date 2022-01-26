@@ -2333,9 +2333,28 @@ void MOEA::initialize()
 	message(1, "performing initial pareto dominance sort");
 	objectives.set_pointers(obs_obj_names, pi_obj_names, obj_dir_mult);
     archive_size = ppo->get_mou_max_archive_size();
+    vector<string> keep;
 	if (envtype == MouEnvType::NSGA)
 	{
 		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, true, POP_SUM_TAG);
+
+        //drop any duplicates
+        keep.clear();
+        for (auto nondom : dompair.first)
+        {
+            keep.push_back(nondom);
+        }
+        for (auto nondom : dompair.second)
+        {
+            keep.push_back(nondom);
+        }
+        if (keep.size() == 0)
+        {
+            throw_moea_error("initial sorting yielded zero valid solutions");
+        }
+        dp.keep_rows(keep);
+        op.keep_rows(keep);
+
 
 		//initialize op and dp archives
 		op_archive = ObservationEnsemble(&pest_scenario, &rand_gen,
@@ -2354,6 +2373,14 @@ void MOEA::initialize()
 	else if (envtype == MouEnvType::SPEA)
 	{
 		map<string, double> fit = objectives.get_spea2_fitness(iter, op, dp, &constraints, true, POP_SUM_TAG);
+		keep.clear();
+		for (auto& rname : dp.get_real_names())
+        {
+		    if (fit.find(rname) != fit.end())
+		        keep.push_back(rname);
+        }
+		dp.keep_rows(keep);
+		op.keep_rows(keep);
 		op_archive = op; //copy
 		dp_archive = dp; //copy
 		vector<string> keep;
@@ -3464,8 +3491,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	int tries = 0;
 	int i = 0;
 	while (i < num_members)
-	{
-		
+    {
 		selected = selection(4, _dp, mattype);
 		if (adaptive_f)
 		{
