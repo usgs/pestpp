@@ -2407,7 +2407,9 @@ void MOEA::initialize()
 		}
 
 	}
+    save_populations(dp_archive, op_archive, "archive");
 
+	
     string opt_member;
 	if (constraints.get_use_chance())
 	{
