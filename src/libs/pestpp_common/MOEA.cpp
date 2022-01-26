@@ -2409,7 +2409,7 @@ void MOEA::initialize()
 	}
     save_populations(dp_archive, op_archive, "archive");
 
-	
+
     string opt_member;
 	if (constraints.get_use_chance())
 	{
@@ -2548,7 +2548,7 @@ ParameterEnsemble MOEA::generate_population()
 	//int total_new_members = pest_scenario.get_pestpp_options().get_mou_population_size();
     int total_new_members = population_schedule.at(iter);
 	//add new members for any missing
-	total_new_members += (total_new_members - dp.shape().first);
+	//total_new_members += (total_new_members - dp.shape().first);
 	int new_members_per_gen = int(total_new_members / gen_types.size());
 	ParameterEnsemble new_pop(&pest_scenario, &rand_gen);
 	new_pop.set_trans_status(ParameterEnsemble::transStatus::NUM);
