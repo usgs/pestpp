@@ -3302,11 +3302,10 @@ void Pest::tokens_to_obs_rec(ofstream& f_rec, const vector<string> &tokens)
     {
         throw_control_file_error(f_rec,"error parsing weight '"+tokens[2]+"' for observation "+tokens[0]);
     }
-    if (idx != tokens[1].size())
+    if (idx != tokens[2].size())
     {
         throw_control_file_error(f_rec,"error parsing weight '"+tokens[2]+"' for observation "+tokens[0]);
     }
-
 	if ((value != 0) && (!isnormal(value)))
         throw_control_file_error(f_rec,"denormal obsval '"+tokens[1]+"' for observation "+tokens[0]);
     if (((obs_i.weight!= 0) && !isnormal(obs_i.weight)))
