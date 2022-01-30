@@ -120,17 +120,23 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, in
 	int par_lb = 0;
 	vector<string> adj_pnames = get_ctl_ordered_adj_par_names();
 	set<string> sadj(adj_pnames.begin(), adj_pnames.end());
+    const ParameterRec *prec;
+    const map<string,pair<string,double>> tied_map = base_par_transform.get_tied_ptr()->get_items();
+    ParameterRec::TRAN_TYPE tranfixed = ParameterRec::TRAN_TYPE::FIXED;
+    ParameterRec::TRAN_TYPE trantied = ParameterRec::TRAN_TYPE::TIED;
+    ParameterRec::TRAN_TYPE tran;
 	for (auto &pname : ctl_ordered_par_names)
 	{
 		//double pval = ctl_parameters[pname];
 		//double lb = ctl_parameter_info.get_low_bnd(pname);
-		const ParameterRec *prec = ctl_parameter_info.get_parameter_rec_ptr(pname);
+		prec = ctl_parameter_info.get_parameter_rec_ptr(pname);
+		tran = prec->tranform_type;
 		adj_par = true;
-		if ((prec->tranform_type == ParameterRec::TRAN_TYPE::FIXED) || (prec->tranform_type == ParameterRec::TRAN_TYPE::TIED))
+		if ((tran == tranfixed) || (tran == tranfixed))
 			adj_par = false;
-		if (prec->tranform_type == ParameterRec::TRAN_TYPE::TIED)
+		if (tran == trantied)
 		{
-			string partied = base_par_transform.get_tied_ptr()->get_items().at(pname).first;
+			string partied = tied_map.at(pname).first;
 			if (sadj.find(partied) == sadj.end())
 			{
 				par_problems.push_back("'tied' parameter '" + pname + "' is tied to '" + partied + "' which is not an adjustable parameter");
