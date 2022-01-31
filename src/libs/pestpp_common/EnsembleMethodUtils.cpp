@@ -3982,7 +3982,9 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	message(1, "saved obs+noise observation ensemble (obsval + noise realizations) to ", ss.str());
 
     initialize_weights();
-
+    message(2, "checking for denormal values in weights ensemble");
+    weights.check_for_normal("weights ensemble");
+    ss.str("");
 
 	if (pest_scenario.get_control_info().noptmax == -2)
 	{

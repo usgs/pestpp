@@ -163,7 +163,13 @@ pair<string, string> PriorInformation::AddRecord(const string& pi_line)
 	convert_ip(tokens[n_tokens - 2], weight);
 	convert_ip(tokens[n_tokens - 3], pival);
 
-	string prior_info_name = tokens[0];
+    if ((weight != 0) && (!isnormal(weight)))
+        throw runtime_error("denormal weight '"+tokens[n_tokens - 2]+"' for PI equation "+tokens[0]);
+    if ((pival != 0) && (!isnormal(pival)))
+        throw runtime_error("denormal pival '"+tokens[n_tokens - 3]+"' for PI equation "+tokens[0]);
+
+
+    string prior_info_name = tokens[0];
 	// process prior information equation
 	plus_sign = true;
 	for (int i = 1; i < n_tokens - 4; i += 4)
