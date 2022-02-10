@@ -77,8 +77,9 @@ map<string,int> prepare_parameter_csv(Parameters pars, ifstream &csv, bool forgi
 	// check for parameter names that in the pest control file but that are missing from the csv file
 	vector<string> missing_names;
 	string name;
+	set<string> stokens(header_tokens.begin(),header_tokens.end());
 	for (auto &p : pars)
-	if (find(header_tokens.begin(), header_tokens.end(), p.first) == header_tokens.end())
+	if (stokens.find(p.first) == stokens.end())
 		missing_names.push_back(p.first);
 
 	if (missing_names.size() > 0)
