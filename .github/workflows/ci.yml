@@ -102,7 +102,7 @@ jobs:
         if [ "$RUNNER_OS" == "Windows" ]; then
           conda env update --name pyemu --file etc/environment.yml
         else
-          mamba env update --name pyemu --file etc/environment.yml
+          conda env update --name pyemu --file etc/environment.yml
         fi
     
     - name: Install Flopy & pyemu?
