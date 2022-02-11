@@ -4058,7 +4058,14 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	}
 	else
 	{
-		message(1, "using subset in lambda testing, number of realizations used in subset testing: ", subset_size);
+	    if (subset_size < 0)
+        {
+	        message(1, "using subset in lambda testing, percentage of realizations used in subset testing: ", -1. * subset_size);
+        }
+	    else
+        {
+            message(1, "using subset in lambda testing, number of realizations used in subset testing: ", subset_size);
+        }
 		string how = pest_scenario.get_pestpp_options().get_ies_subset_how();
 		message(1, "subset how: ", how);
 		use_subset = true;
@@ -4810,11 +4817,15 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
         ss << "subset defined as a percentage of ensemble size, using " << local_subset_size;
         ss << " realizations for subset" << endl;
+        message(2,ss.str());
         if (local_subset_size < 4)
         {
+            ss.str("");
             ss << "percentage-based subset size too small, increasing to 4" << endl;
             local_subset_size = 4;
+            message(2,ss.str());
         }
+
     }
 
 	if ((use_subset) && (local_subset_size > pe.shape().first))
@@ -6760,7 +6771,7 @@ vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 	{
 		std::uniform_int_distribution<int> uni(0, size - 1);
 		int idx;
-		for (int i = 0; i < 10000000; i++)
+		for (int i = 0; i < 1000000000; i++)
 		{
 			if (subset_idxs.size() >= nreal_subset)
 				break;

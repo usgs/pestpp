@@ -90,7 +90,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2.0.0
       with:
         python-version: ${{ matrix.python-version }}
-        mamba-version: "*"
+        mamba-version: "0.20.0"
         channels: conda-forge
         auto-update-conda: true
         activate-environment: pyemu
@@ -102,7 +102,7 @@ jobs:
         if [ "$RUNNER_OS" == "Windows" ]; then
           conda env update --name pyemu --file etc/environment.yml
         else
-          mamba env update --name pyemu --file etc/environment.yml
+          conda env update --name pyemu --file etc/environment.yml
         fi
     
     - name: Install Flopy & pyemu?
