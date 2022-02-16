@@ -578,7 +578,7 @@ void Ensemble::fill_moment_maps(map<string, double>& mean_map, map<string, doubl
 	Eigen::VectorXd mean = reals.colwise().mean();
 	Eigen::MatrixXd mean_diff = get_eigen_anomalies();
 	//std = mean_diff.array().pow(2).colwise().sum().sqrt();
-	Eigen::VectorXd std = (mean_diff.array() * mean_diff.array()).colwise().sum().sqrt();
+	Eigen::VectorXd std = (mean_diff.array() * mean_diff.array()).colwise().sum().sqrt() / sqrt((double)real_names.size());
 	int i = 0;
 	for (auto& name : var_names)
 	{

@@ -3598,6 +3598,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		_oe.append(BASE_REAL_NAME, pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
+		initialize_parcov();
 		//initialize the phi handler
 		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
 		if (ph.get_lt_obs_names().size() > 0)
