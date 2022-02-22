@@ -1223,7 +1223,7 @@ if __name__ == "__main__":
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    cmdline_test()
+    #cmdline_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
@@ -1232,7 +1232,7 @@ if __name__ == "__main__":
     #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-    #tplins1_test()
+    tplins1_test()
     #secondary_marker_test()
     #ext_stdcol_test()
 
