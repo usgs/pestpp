@@ -556,6 +556,8 @@ public:
 	bool get_check_tplins() const { return check_tplins; }
 	void set_fill_tpl_zeros(bool _flag) { fill_tpl_zeros = _flag; }
 	bool get_fill_tpl_zeros() const { return fill_tpl_zeros; }
+    void set_tpl_force_decimal(bool _flag) { tpl_force_decimal = _flag; }
+    bool get_tpl_force_decimal() const { return tpl_force_decimal; }
 	void set_additional_ins_delimiters(string _delims) { additional_ins_delimiters = _delims; }
 	string get_additional_ins_delimiters() const { return additional_ins_delimiters; }
 	void set_random_seed(int seed) { random_seed = seed; }
@@ -660,6 +662,7 @@ private:
 	bool debug_parse_only;
 	bool check_tplins;
 	bool fill_tpl_zeros;
+	bool tpl_force_decimal;
 	string additional_ins_delimiters;
 
 	int random_seed;
