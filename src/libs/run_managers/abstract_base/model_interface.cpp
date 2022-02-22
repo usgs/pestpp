@@ -1058,7 +1058,7 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 			//if there is an unnesscary zero(s) between the radix and the exponent
 			int r_idx = val_str.find_first_of(".")+1; // to skip past the radix
 			int e_idx = val_str.find_first_of("Ee");
-			if (r_idx != e_idx)
+			if ((e_idx != -1) && (r_idx != -1) && (r_idx != e_idx))
 			{
 				string t = val_str.substr(r_idx, e_idx - r_idx);
 				if (stod(t) == 0.0)
@@ -1069,6 +1069,14 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 						break;
 				}
 			}
+			//ok now just drop everything right of the radix and the radix
+			else if ((e_idx == -1) && (r_idx != -1))
+            {
+			    string t = val_str.substr(0,r_idx-1);
+			    if (t.size() <= size)
+			        val_str = t;
+			        break;
+            }
 			ss.str("");
 		 	ss << "TemplateFile casting error: cant represent value " << value;
 			ss << " for " << name << " in space that is only " << size << " chars wide";
