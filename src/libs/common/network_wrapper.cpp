@@ -74,7 +74,6 @@ int w_close(int sockfd)
   int n;
 	#ifdef OS_WIN
 	shutdown(sockfd, SD_BOTH);
-	close(sockfd);
 	if ((n = closesocket(sockfd)) != 0)
 	{
 		//cerr << "error closing socket: "  << w_get_error_msg() << endl;
