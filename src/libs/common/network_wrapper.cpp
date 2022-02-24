@@ -81,7 +81,8 @@ int w_close(int sockfd)
 	return n;
 	#endif
 	#ifdef OS_LINUX
-	n = shutdown(sockfd, 2);
+    //n = shutdown(sockfd, 2);
+	n = close(sockfd);
 	#endif
 	return n;
 }

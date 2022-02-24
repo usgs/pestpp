@@ -1246,7 +1246,7 @@ if __name__ == "__main__":
     #tie_by_group_test()
     #sen_basic_test()
     #salib_verf()
-    tplins1_test()
+    #tplins1_test()
     #secondary_marker_test()
     #ext_stdcol_test()
 
@@ -1269,6 +1269,7 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
+    mf6_v5_ies_test()
     #cmdline_test()
     #basic_sqp_test()
     #mf6_v5_ies_test()
