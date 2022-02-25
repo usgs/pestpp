@@ -1,13 +1,13 @@
 
  <img src="0d3cb7750c90b712af04ea3a51c8ecb968d784cc.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.1.10
+# <a id='s1' />Version 5.1.13
 
 <img src="0e14ec9848f78a9809081572ca785af9990c2d38.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-Janurary 2022
+February 2022
 
 # <a id='s2' />Acknowledgements
 
@@ -70,7 +70,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Table of Contents
 
-- [Version 5.1.10](#s1)
+- [Version 5.1.13](#s1)
 - [Acknowledgements](#s2)
 - [Preface](#s3)
 - [License](#s4)
@@ -504,6 +504,8 @@ Similarly, numbers read through field-specifying format statements may not occup
 Programs of the PEST++ suite write as many significant figures to a parameter space as they can. They do this so that even if a parameter space must be small in order to satisfy the input field requirements of a model, there is still every chance that a parameter value can be distinguished from its incrementally varied counterpart so as to allow proper derivatives calculation with respect to that parameter. Also, as has already been discussed, even though PEST++ programs adjust their internal representation of a parameter value to the precision with which the model can read it so that the PEST++ program and the model are using the same number, in general more precision is better.
 
 PEST provides two control variables, PRECIS and DPOINT, that affect the manner in which numbers fill a parameter space. These can optimize representation of numbers that are written to parameter spaces that are very broad or very narrow. Programs of the PEST++ suite do not use these control variables. Instead, the PEST++ suite declares PRECIS to be exclusively “double”. Furthermore, where parameter spaces are greater than about 23 characters in width (which can arise often because of PEST++ support for unlimited length parameter names), numbers are padded to the left with zeroes to fill the space (for example, “000001.2345678901234e+001”). Testing has indicated that most numerical models, as well as pre- and post-processing codes (written in languages such as Python) tolerate this padding. This padding is off by default and is controlled with the *fill_tpl_zeros* option.
+
+In some settings, the model (or its pre-processors) may not tolerate scientific notation representation of numbers. In this case, users can employ the *tpl_force_decimal* option to force template files to be filled with decimal format numbers. This option is off by default.
 
 ### <a id='s6-3-7' />2.3.7 Multiple Occurrences of the Same Parameter
 
@@ -2999,7 +3001,7 @@ Note the following.
 
 -   If, in the PEST control file read by PESTPP-SWP, a particular parameter is tied to another parameter (i.e., a parent parameter), PESTPP-SWP insists that the child/parent ratio is respected in the user-supplied CSV file. If it is not respected, it alters the value of the child parameter accordingly.
 
--   If a parameter is fixed in the PEST control file, and the value provided for that parameter in the CSV or JCO/JCB file differs from that in the PEST control file, the value in the PEST control file overrides that in the CSV or JCO/JCB file.
+-   If a parameter is fixed in the PEST control file, and the value provided for that parameter in the CSV or JCO/JCB file differs from that in the PEST control file, the value in the CSV or JCO/JCB file overrides the value in the PEST control file.
 
 -   If the value of the *ies_csv_by_reals()* control variable is supplied as *true*, then the roles of rows and columns can be reversed in a CSV input file. That is, columns pertain to realizations while rows pertain to parameter values.
 

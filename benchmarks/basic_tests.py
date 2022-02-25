@@ -702,8 +702,22 @@ def tplins1_test():
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
     ins_file = os.path.join(t_d,"AOC_obs.txt.ins")
     pst.add_observations(ins_file,ins_file.replace(".ins",""),pst_path=".")
-
+    pst.parameter_data.loc["k_10","parval1"] = 12345
+    pst.parameter_data.loc["k_10","parubnd"] = 200000
+    pst.pestpp_options["tpl_force_decimal"] = True
+    pst.control_data.noptmax = 0
     pst.write(os.path.join(t_d,"pest.pst"))
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=t_d)
+    with open(os.path.join(t_d,"hk_Layer_1.ref"),'r') as f:
+        for line in f:
+            if "e" in line.lower():
+                raise Exception(line)
+    pst.pestpp_options.pop("tpl_force_decimal")
+    pst.control_data.noptmax = -1
+    pst.parameter_data.loc["k_10","parval1"] = 120
+    pst.parameter_data.loc["k_10","parubnd"] = 200
+    pst.write(os.path.join(t_d,"pest.pst"))
+    
 
     pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-glm")),cwd=t_d)
     obf_df = pd.read_csv(os.path.join(t_d,"out1.dat.obf"),delim_whitespace=True,header=None,names=["obsnme","obsval"])
@@ -721,7 +735,7 @@ def tplins1_test():
 
     # check the input file - the last two number should be the same
     arr = np.loadtxt(os.path.join(t_d,"hk_Layer_1.ref"))
-    assert arr[-2] == arr[-1]
+    assert arr[-2] == arr[-1],arr[-2] - arr[-1]
 
     lines_tpl = open(os.path.join(t_d,"hk_Layer_1.ref.tpl"),'r').readlines()
     lines_in = open(os.path.join(t_d,"hk_Layer_1.ref"),'r').readlines()
@@ -1223,7 +1237,7 @@ if __name__ == "__main__":
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    cmdline_test()
+    #cmdline_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
@@ -1255,6 +1269,7 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
+    mf6_v5_ies_test()
     #cmdline_test()
     #basic_sqp_test()
     #mf6_v5_ies_test()

@@ -502,7 +502,8 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_max_run_fail(),
 				pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
 				pest_scenario.get_pestpp_options().get_additional_ins_delimiters(),
-				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
+				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads(),
+				pest_scenario.get_pestpp_options().get_tpl_force_decimal());
 		}
 		
 		//generate a parent ensemble which includes all parameters across all cycles
@@ -592,7 +593,9 @@ int main(int argc, char* argv[])
 					file_manager.build_filename("rns"), pathname,
 					childPest.get_pestpp_options().get_max_run_fail(),
 					childPest.get_pestpp_options().get_fill_tpl_zeros(),
-					childPest.get_pestpp_options().get_additional_ins_delimiters());
+					childPest.get_pestpp_options().get_additional_ins_delimiters(),
+					pest_scenario.get_pestpp_options().get_num_tpl_ins_threads(),
+					pest_scenario.get_pestpp_options().get_tpl_force_decimal());
 			}
 
 			ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq_4_mod();

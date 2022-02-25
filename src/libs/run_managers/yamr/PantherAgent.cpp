@@ -148,6 +148,7 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 		pest_scenario.get_model_exec_info().comline_vec);
 	mi.set_additional_ins_delimiters(pest_scenario.get_pestpp_options().get_additional_ins_delimiters());
 	mi.set_fill_tpl_zeros(pest_scenario.get_pestpp_options().get_fill_tpl_zeros());
+	mi.set_tpl_force_decimal(pest_scenario.get_pestpp_options().get_tpl_force_decimal());
 	mi.set_num_threads(pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
 
 	restart_on_error = pest_scenario.get_pestpp_options().get_panther_agent_restart_on_error();
