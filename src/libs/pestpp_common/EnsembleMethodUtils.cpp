@@ -4222,7 +4222,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 			//check that all obs are in conflict
 			message(1, "dropping conflicted observations");
 
-			if (in_conflict.size() == act_obs_names.size())
+			if ((pest_scenario.get_control_info().noptmax > 0) && (in_conflict.size() == act_obs_names.size()))
 			{
 			    if (cycle == NetPackage::NULL_DA_CYCLE) {
                     throw_em_error("all non-zero weighted observations in conflict state, cannot continue");
