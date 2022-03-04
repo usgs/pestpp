@@ -4208,7 +4208,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 			frec << oname << endl;
 		}
 
-		if (!ppo->get_ies_drop_conflicts())
+		if ((!ppo->get_ies_drop_conflicts()) && (pest_scenario.get_control_info().noptmax > 0))
 		{
 			ss.str("");
 			ss << "  WARNING: Prior-data conflict detected.  Continuing with IES parameter" << endl;
