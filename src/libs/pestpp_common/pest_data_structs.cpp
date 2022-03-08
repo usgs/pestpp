@@ -2163,6 +2163,13 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 	int noptswitch;
 	double splitswh;
 	PestMode pestmode;*/
+	set<string> valid_args{"RSTFLE","PESTMODE","NPAR","NOBS","NPARGP","NPRIOR","NOBSGP","MAXCOMPDIM","NTPLFLE","NINSFLE",
+                         "PRECIS","DPOINT","NUMCOM","JACFILE","MESSFILE","OBSREREF","RLAMBDA1","RLAMFAC","PHIREDLAM",
+                         "PHIRATSUF","NUMLAM","JACUPDATE","LAMFORGIVE","DERFORGIVE","RELPARMAX","FACPARMAX",
+                         "FACORIG","IBOUNDSTICK","UPVECBEND","PHIREDSWH","NOPTSWITCH","SPLITSWH","DOAUI","DOSENRESUSE",
+                         "BOUNDSCALE","NOPTMAX","PHIREDSTP","NPHINORED","RELPARSTP","NRELPAR","PHISTOPTHRESH",
+                         "LASTRUN","PHIABANDON","ICOV","ICOR","IEIG","IRES","JCOSAVE","VERBOSEREC","JCOSAVEITN",
+                         "REISAVEITN","PARSAVEITN","PARSAVERUN"};
 	string value = upper_cp(org_value);
 	if (passed_args.find(key) != passed_args.end())
 		return PestppOptions::ARG_STATUS::ARG_DUPLICATE;
@@ -2199,6 +2206,10 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 		else
 			return PestppOptions::ARG_STATUS::ARG_INVALID;
 	}
+	else if (valid_args.find(key) != valid_args.end())
+    {
+	    //a valid but unused ctl data arg
+    }
 	else
 		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;
