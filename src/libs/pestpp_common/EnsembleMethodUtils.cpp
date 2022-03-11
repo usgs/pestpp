@@ -4306,7 +4306,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		{
 		    if ((cycle != NetPackage::NULL_DA_CYCLE) && (num_ineq == nnz_obs))
             {
-		        message(0,"initial actual phi mean too low but only ineqaulity are being used, continuing...");
+		        message(0,"initial actual phi mean too low but only inequality obs are being used, continuing...");
                 continue_anyway = true;
             }
 		    else
@@ -4316,7 +4316,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		{
             if ((cycle != NetPackage::NULL_DA_CYCLE) && (num_ineq == nnz_obs))
             {
-                message(0,"initial actual phi stdev is very low but only ineqaulity are being used, continuing...");
+                message(0,"initial actual phi stdev is very low but only inequality obs are being used, continuing...");
                 continue_anyway = true;
             }
 			else
@@ -4326,7 +4326,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		{
             if ((cycle != NetPackage::NULL_DA_CYCLE) && (num_ineq == nnz_obs))
             {
-                message(0,"initial composite phi mean too low but only ineqaulity are being used, continuing...");
+                message(0,"initial composite phi mean too low but only inequality obs are being used, continuing...");
                 continue_anyway = true;
             }
 			else
@@ -4336,7 +4336,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		{
             if ((cycle != NetPackage::NULL_DA_CYCLE) && (num_ineq == nnz_obs))
             {
-                message(0,"initial composite phi stdev is ver low but only ineqaulity are being used, continuing...");
+                message(0,"initial composite phi stdev is ver low but only inequality obs are being used, continuing...");
                 continue_anyway = true;
             }
 			else
