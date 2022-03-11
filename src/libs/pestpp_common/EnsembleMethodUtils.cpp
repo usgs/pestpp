@@ -4297,45 +4297,77 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
+	bool continue_anyway = false;
 	if ((pest_scenario.get_control_info().noptmax > 0) && (act_obs_names.size() > 0))
 	{
+	    int num_ineq = ph.get_gt_obs_names().size() + ph.get_lt_obs_names().size();
+	    int nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
 		if (ph.get_mean(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
 		{
-			throw_em_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");
+		    if ((cycle != NetPackage::NULL_DA_CYCLE) && (num_ineq == nnz_obs))
+            {
+		        message(0,"initial actual phi mean too low but only ineqaulity are being used, continuing...");
+                continue_anyway = true;
+            }
+		    else
+			    throw_em_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");
 		}
 		if (ph.get_std(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
 		{
-			message(0,"WARNING: initial actual phi stdev is very low, something is probably wrong...");
+            if ((cycle != NetPackage::NULL_DA_CYCLE) && (num_ineq == nnz_obs))
+            {
+                message(0,"initial actual phi stdev is very low but only ineqaulity are being used, continuing...");
+                continue_anyway = true;
+            }
+			else
+                message(0,"WARNING: initial actual phi stdev is very low, something is probably wrong...");
 		}
 		if (last_best_mean < 1.0e-10)
 		{
-			throw_em_error("initial composite phi mean too low, something is wrong...");
+            if ((cycle != NetPackage::NULL_DA_CYCLE) && (num_ineq == nnz_obs))
+            {
+                message(0,"initial composite phi mean too low but only ineqaulity are being used, continuing...");
+                continue_anyway = true;
+            }
+			else
+                throw_em_error("initial composite phi mean too low, something is wrong...");
 		}
 		if (last_best_std < 1.0e-10)
 		{
-			message(0, "WARNING: initial composite phi stdev is very low, something is probably wrong...");
+            if ((cycle != NetPackage::NULL_DA_CYCLE) && (num_ineq == nnz_obs))
+            {
+                message(0,"initial composite phi stdev is ver low but only ineqaulity are being used, continuing...");
+                continue_anyway = true;
+            }
+			else
+            message(0, "WARNING: initial composite phi stdev is very low, something is probably wrong...");
 		}
 	}
 
 	if (last_best_lam <= 0.0)
 	{
-		//double x = last_best_mean / (2.0 * double(oe.shape().second));
-		double org_val = last_best_lam;
-		double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
-		last_best_lam = pow(10.0, (floor(log10(x))));
-		if (last_best_lam < 1.0e-10)
-		{
-			message(1, "initial lambda estimation from phi failed, using 10,000");
-			last_best_lam = 10000;
-		}
-		if (org_val < 0.0)
-		{
-			org_val *= -1.0;
-			ss.str("");
-			ss << "scaling phi-based initial lambda: " << last_best_lam << ", by user-supplied (negative) initial lambda: " << org_val;
-			message(1, ss.str());
-			last_best_lam *= org_val;
-		}
+        if (continue_anyway)
+        {
+            last_best_lam = 1000;//?
+        }
+        else {
+            //double x = last_best_mean / (2.0 * double(oe.shape().second));
+            double org_val = last_best_lam;
+            double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
+            last_best_lam = pow(10.0, (floor(log10(x))));
+            if (last_best_lam < 1.0e-10) {
+                message(1, "initial lambda estimation from phi failed, using 10,000");
+                last_best_lam = 10000;
+            }
+            if (org_val < 0.0) {
+                org_val *= -1.0;
+                ss.str("");
+                ss << "scaling phi-based initial lambda: " << last_best_lam
+                   << ", by user-supplied (negative) initial lambda: " << org_val;
+                message(1, ss.str());
+                last_best_lam *= org_val;
+            }
+        }
 	}
 
 	if (cycle != NetPackage::NULL_DA_CYCLE)

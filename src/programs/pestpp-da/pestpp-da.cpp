@@ -857,7 +857,7 @@ int main(int argc, char* argv[])
 			if (childPest.get_ctl_ordered_nz_obs_names().size() > 0)
 			{
 
-				if (pest_scenario.get_control_info().noptmax > 0) // 
+				if ((pest_scenario.get_control_info().noptmax > 0) && (da.get_phi_handler().get_mean(L2PhiHandler::phiType::ACTUAL) > 0)) //
 				{
 
 					da.da_update(*icycle);
