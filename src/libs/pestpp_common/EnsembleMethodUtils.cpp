@@ -4231,6 +4231,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
                 {
                     message(0,"all non-zero weighted observations in conflict state, continuing to next cycle");
                     zero_weight_obs(in_conflict,false,false);
+                    ph.update(oe,pe);
                     return;
                 }
             }
@@ -6483,7 +6484,7 @@ void EnsembleMethod::zero_weight_obs(vector<string>& obs_to_zero_weight, bool up
 	message(1, ss.str());
 }
 
-vector<string> EnsembleMethod::detect_prior_data_conflict()
+vector<string> EnsembleMethod::detect_prior_data_conflict(bool save)
 {
 	message(1, "checking for prior-data conflict...");
 	//for now, just really simple metric - checking for overlap
@@ -6520,7 +6521,8 @@ vector<string> EnsembleMethod::detect_prior_data_conflict()
 	int oe_nr = oe.shape().first;
 	int oe_base_nr = oe_base.shape().first;
 	Eigen::VectorXd t;
-	pdccsv << "name,obs_mean,obs_std,obs_min,obs_max,obs_stat_min,obs_stat_max,sim_mean,sim_std,sim_min,sim_max,sim_stat_min,sim_stat_max,distance" << endl;
+
+    pdccsv << "name,obs_mean,obs_std,obs_min,obs_max,obs_stat_min,obs_stat_max,sim_mean,sim_std,sim_min,sim_max,sim_stat_min,sim_stat_max,distance" << endl;
 	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
 	{
 		//if (ineq.find(oname) != end)
@@ -6580,8 +6582,12 @@ vector<string> EnsembleMethod::detect_prior_data_conflict()
         {
             in_conflict.push_back(oname);
             dist = max((smin - omax), (omin - smax));
-            pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
-            pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
+
+            pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << ","
+                   << omax_stat;
+            pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << ","
+                   << smax_stat << "," << dist << endl;
+
         }
 	}
 
