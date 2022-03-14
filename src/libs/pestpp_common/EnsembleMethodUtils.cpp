@@ -6496,10 +6496,10 @@ vector<string> EnsembleMethod::detect_prior_data_conflict()
 	vector<string> snames = oe.get_var_names();
 	vector<string> onames = oe_base.get_var_names();
 	vector<string> temp = ph.get_lt_obs_names();
-	set<string> ineq(temp.begin(), temp.end());
-	set<string>::iterator end = ineq.end();
+	set<string> ineq_lt(temp.begin(), temp.end());
+	//set<string>::iterator end = ineq.end();
 	temp = ph.get_gt_obs_names();
-	ineq.insert(temp.begin(), temp.end());
+	set<string> ineq_gt(temp.begin(), temp.end());
 	temp.resize(0);
 
 	for (int i = 0; i < snames.size(); i++)
@@ -6523,8 +6523,8 @@ vector<string> EnsembleMethod::detect_prior_data_conflict()
 	pdccsv << "name,obs_mean,obs_std,obs_min,obs_max,obs_stat_min,obs_stat_max,sim_mean,sim_std,sim_min,sim_max,sim_stat_min,sim_stat_max,distance" << endl;
 	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
 	{
-		if (ineq.find(oname) != end)
-			continue;
+		//if (ineq.find(oname) != end)
+		//	continue;
 		sidx = smap[oname];
 		oidx = omap[oname];
 		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
@@ -6541,27 +6541,48 @@ vector<string> EnsembleMethod::detect_prior_data_conflict()
 		ostd = std::sqrt((t.array() - omn).square().sum() / (oe_base_nr - 1));
 		omin_stat = omn - (sd * ostd);
 		omax_stat = omn + (sd * ostd);
-
+        bool conflicted = false;
 		if (use_stat_dist)
 		{
-			if ((smin_stat > omax_stat) || (smax_stat < omin_stat))
+		    if (ineq_lt.find(oname) != ineq_lt.end())
+            {
+		        if (smin_stat > omax_stat)
+                    conflicted = true;
+            }
+		    else if (ineq_gt.find(oname) != ineq_gt.end())
+		    {
+		        if (smax_stat < omin_stat)
+                    conflicted = true;
+            }
+            else if ((smin_stat > omax_stat) || (smax_stat < omin_stat))
 			{
-				in_conflict.push_back(oname);
-				dist = max((smin_stat - omax_stat), (omin_stat - smax_stat));
-				pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
-				pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
+				conflicted = true;
 			}
 		}
 		else
 		{
-			if ((smin > omax) || (smax < omin))
+            if (ineq_lt.find(oname) != ineq_lt.end())
+            {
+                if (smin > omax)
+                    conflicted = true;
+            }
+            else if (ineq_gt.find(oname) != ineq_gt.end())
+            {
+                if (smax < omin)
+                    conflicted = true;
+            }
+			else if ((smin > omax) || (smax < omin))
 			{
-				in_conflict.push_back(oname);
-				dist = max((smin - omax), (omin - smax));
-				pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
-				pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
+				conflicted = true;
 			}
 		}
+		if (conflicted)
+        {
+            in_conflict.push_back(oname);
+            dist = max((smin - omax), (omin - smax));
+            pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
+            pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
+        }
 	}
 
 	return in_conflict;
