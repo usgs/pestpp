@@ -4231,6 +4231,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
                 {
                     message(0,"all non-zero weighted observations in conflict state, continuing to next cycle");
                     zero_weight_obs(in_conflict,false,false);
+                    ph.update(oe,pe);
                     return;
                 }
             }
@@ -4297,45 +4298,77 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
+	bool continue_anyway = false;
 	if ((pest_scenario.get_control_info().noptmax > 0) && (act_obs_names.size() > 0))
 	{
+	    int num_ineq = ph.get_gt_obs_names().size() + ph.get_lt_obs_names().size();
+	    int nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
 		if (ph.get_mean(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
 		{
-			throw_em_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");
+		    if ((cycle != NetPackage::NULL_DA_CYCLE) && (num_ineq == nnz_obs))
+            {
+		        message(0,"initial actual phi mean too low but only inequality obs are being used, continuing...");
+                continue_anyway = true;
+            }
+		    else
+			    throw_em_error("initial actual phi mean too low, something is wrong...or you have the perfect model that already fits the data shockingly well");
 		}
 		if (ph.get_std(L2PhiHandler::phiType::ACTUAL) < 1.0e-10)
 		{
-			message(0,"WARNING: initial actual phi stdev is very low, something is probably wrong...");
+            if ((cycle != NetPackage::NULL_DA_CYCLE) && (num_ineq == nnz_obs))
+            {
+                message(0,"initial actual phi stdev is very low but only inequality obs are being used, continuing...");
+                continue_anyway = true;
+            }
+			else
+                message(0,"WARNING: initial actual phi stdev is very low, something is probably wrong...");
 		}
 		if (last_best_mean < 1.0e-10)
 		{
-			throw_em_error("initial composite phi mean too low, something is wrong...");
+            if ((cycle != NetPackage::NULL_DA_CYCLE) && (num_ineq == nnz_obs))
+            {
+                message(0,"initial composite phi mean too low but only inequality obs are being used, continuing...");
+                continue_anyway = true;
+            }
+			else
+                throw_em_error("initial composite phi mean too low, something is wrong...");
 		}
 		if (last_best_std < 1.0e-10)
 		{
-			message(0, "WARNING: initial composite phi stdev is very low, something is probably wrong...");
+            if ((cycle != NetPackage::NULL_DA_CYCLE) && (num_ineq == nnz_obs))
+            {
+                message(0,"initial composite phi stdev is ver low but only inequality obs are being used, continuing...");
+                continue_anyway = true;
+            }
+			else
+            message(0, "WARNING: initial composite phi stdev is very low, something is probably wrong...");
 		}
 	}
 
 	if (last_best_lam <= 0.0)
 	{
-		//double x = last_best_mean / (2.0 * double(oe.shape().second));
-		double org_val = last_best_lam;
-		double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
-		last_best_lam = pow(10.0, (floor(log10(x))));
-		if (last_best_lam < 1.0e-10)
-		{
-			message(1, "initial lambda estimation from phi failed, using 10,000");
-			last_best_lam = 10000;
-		}
-		if (org_val < 0.0)
-		{
-			org_val *= -1.0;
-			ss.str("");
-			ss << "scaling phi-based initial lambda: " << last_best_lam << ", by user-supplied (negative) initial lambda: " << org_val;
-			message(1, ss.str());
-			last_best_lam *= org_val;
-		}
+        if (continue_anyway)
+        {
+            last_best_lam = 1000;//?
+        }
+        else {
+            //double x = last_best_mean / (2.0 * double(oe.shape().second));
+            double org_val = last_best_lam;
+            double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
+            last_best_lam = pow(10.0, (floor(log10(x))));
+            if (last_best_lam < 1.0e-10) {
+                message(1, "initial lambda estimation from phi failed, using 10,000");
+                last_best_lam = 10000;
+            }
+            if (org_val < 0.0) {
+                org_val *= -1.0;
+                ss.str("");
+                ss << "scaling phi-based initial lambda: " << last_best_lam
+                   << ", by user-supplied (negative) initial lambda: " << org_val;
+                message(1, ss.str());
+                last_best_lam *= org_val;
+            }
+        }
 	}
 
 	if (cycle != NetPackage::NULL_DA_CYCLE)
@@ -6451,7 +6484,7 @@ void EnsembleMethod::zero_weight_obs(vector<string>& obs_to_zero_weight, bool up
 	message(1, ss.str());
 }
 
-vector<string> EnsembleMethod::detect_prior_data_conflict()
+vector<string> EnsembleMethod::detect_prior_data_conflict(bool save)
 {
 	message(1, "checking for prior-data conflict...");
 	//for now, just really simple metric - checking for overlap
@@ -6464,10 +6497,10 @@ vector<string> EnsembleMethod::detect_prior_data_conflict()
 	vector<string> snames = oe.get_var_names();
 	vector<string> onames = oe_base.get_var_names();
 	vector<string> temp = ph.get_lt_obs_names();
-	set<string> ineq(temp.begin(), temp.end());
-	set<string>::iterator end = ineq.end();
+	set<string> ineq_lt(temp.begin(), temp.end());
+	//set<string>::iterator end = ineq.end();
 	temp = ph.get_gt_obs_names();
-	ineq.insert(temp.begin(), temp.end());
+	set<string> ineq_gt(temp.begin(), temp.end());
 	temp.resize(0);
 
 	for (int i = 0; i < snames.size(); i++)
@@ -6488,11 +6521,12 @@ vector<string> EnsembleMethod::detect_prior_data_conflict()
 	int oe_nr = oe.shape().first;
 	int oe_base_nr = oe_base.shape().first;
 	Eigen::VectorXd t;
-	pdccsv << "name,obs_mean,obs_std,obs_min,obs_max,obs_stat_min,obs_stat_max,sim_mean,sim_std,sim_min,sim_max,sim_stat_min,sim_stat_max,distance" << endl;
+
+    pdccsv << "name,obs_mean,obs_std,obs_min,obs_max,obs_stat_min,obs_stat_max,sim_mean,sim_std,sim_min,sim_max,sim_stat_min,sim_stat_max,distance" << endl;
 	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
 	{
-		if (ineq.find(oname) != end)
-			continue;
+		//if (ineq.find(oname) != end)
+		//	continue;
 		sidx = smap[oname];
 		oidx = omap[oname];
 		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
@@ -6509,27 +6543,52 @@ vector<string> EnsembleMethod::detect_prior_data_conflict()
 		ostd = std::sqrt((t.array() - omn).square().sum() / (oe_base_nr - 1));
 		omin_stat = omn - (sd * ostd);
 		omax_stat = omn + (sd * ostd);
-
+        bool conflicted = false;
 		if (use_stat_dist)
 		{
-			if ((smin_stat > omax_stat) || (smax_stat < omin_stat))
+		    if (ineq_lt.find(oname) != ineq_lt.end())
+            {
+		        if (smin_stat > omax_stat)
+                    conflicted = true;
+            }
+		    else if (ineq_gt.find(oname) != ineq_gt.end())
+		    {
+		        if (smax_stat < omin_stat)
+                    conflicted = true;
+            }
+            else if ((smin_stat > omax_stat) || (smax_stat < omin_stat))
 			{
-				in_conflict.push_back(oname);
-				dist = max((smin_stat - omax_stat), (omin_stat - smax_stat));
-				pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
-				pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
+				conflicted = true;
 			}
 		}
 		else
 		{
-			if ((smin > omax) || (smax < omin))
+            if (ineq_lt.find(oname) != ineq_lt.end())
+            {
+                if (smin > omax)
+                    conflicted = true;
+            }
+            else if (ineq_gt.find(oname) != ineq_gt.end())
+            {
+                if (smax < omin)
+                    conflicted = true;
+            }
+			else if ((smin > omax) || (smax < omin))
 			{
-				in_conflict.push_back(oname);
-				dist = max((smin - omax), (omin - smax));
-				pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << "," << omax_stat;
-				pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << "," << smax_stat << "," << dist << endl;
+				conflicted = true;
 			}
 		}
+		if (conflicted)
+        {
+            in_conflict.push_back(oname);
+            dist = max((smin - omax), (omin - smax));
+
+            pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << ","
+                   << omax_stat;
+            pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << ","
+                   << smax_stat << "," << dist << endl;
+
+        }
 	}
 
 	return in_conflict;

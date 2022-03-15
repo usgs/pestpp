@@ -326,6 +326,8 @@ public:
 	vector<string>& get_par_dyn_state_names() { return par_dyn_state_names; }
 
 
+
+
 protected:
 	string alg_tag;
 	int  verbose_level;
@@ -405,10 +407,12 @@ protected:
 
 	vector<int> get_subset_idxs(int size, int _subset_size);
 
-	vector<string> detect_prior_data_conflict();
+
 
 	//void set_subset_idx(int size);
 	Eigen::MatrixXd get_Am(const vector<string>& real_names, const vector<string>& par_names);
+
+    vector<string> detect_prior_data_conflict(bool save=true);
 
 	void zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov = true, bool update_oe_base = true);
 
