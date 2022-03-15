@@ -77,8 +77,9 @@ map<string,int> prepare_parameter_csv(Parameters pars, ifstream &csv, bool forgi
 	// check for parameter names that in the pest control file but that are missing from the csv file
 	vector<string> missing_names;
 	string name;
+	set<string> stokens(header_tokens.begin(),header_tokens.end());
 	for (auto &p : pars)
-	if (find(header_tokens.begin(), header_tokens.end(), p.first) == header_tokens.end())
+	if (stokens.find(p.first) == stokens.end())
 		missing_names.push_back(p.first);
 
 	if (missing_names.size() > 0)
@@ -491,7 +492,8 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_max_run_fail(),
 				pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
 				pest_scenario.get_pestpp_options().get_additional_ins_delimiters(),
-				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
+				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads(),
+				pest_scenario.get_pestpp_options().get_tpl_force_decimal());
 		}
 
 

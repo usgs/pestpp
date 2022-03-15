@@ -120,17 +120,23 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, in
 	int par_lb = 0;
 	vector<string> adj_pnames = get_ctl_ordered_adj_par_names();
 	set<string> sadj(adj_pnames.begin(), adj_pnames.end());
+    const ParameterRec *prec;
+    const map<string,pair<string,double>> tied_map = base_par_transform.get_tied_ptr()->get_items();
+    ParameterRec::TRAN_TYPE tranfixed = ParameterRec::TRAN_TYPE::FIXED;
+    ParameterRec::TRAN_TYPE trantied = ParameterRec::TRAN_TYPE::TIED;
+    ParameterRec::TRAN_TYPE tran;
 	for (auto &pname : ctl_ordered_par_names)
 	{
 		//double pval = ctl_parameters[pname];
 		//double lb = ctl_parameter_info.get_low_bnd(pname);
-		const ParameterRec *prec = ctl_parameter_info.get_parameter_rec_ptr(pname);
+		prec = ctl_parameter_info.get_parameter_rec_ptr(pname);
+		tran = prec->tranform_type;
 		adj_par = true;
-		if ((prec->tranform_type == ParameterRec::TRAN_TYPE::FIXED) || (prec->tranform_type == ParameterRec::TRAN_TYPE::TIED))
+		if ((tran == tranfixed) || (tran == tranfixed))
 			adj_par = false;
-		if (prec->tranform_type == ParameterRec::TRAN_TYPE::TIED)
+		if (tran == trantied)
 		{
-			string partied = base_par_transform.get_tied_ptr()->get_items().at(pname).first;
+			string partied = tied_map.at(pname).first;
 			if (sadj.find(partied) == sadj.end())
 			{
 				par_problems.push_back("'tied' parameter '" + pname + "' is tied to '" + partied + "' which is not an adjustable parameter");
@@ -3149,7 +3155,10 @@ void Pest::tokens_to_par_group_rec(ofstream &f_rec, const vector<string>& tokens
 	convert_ip(tokens[6], pgi.dermthd);
 	if (n_tokens >= 8) convert_ip(tokens[7], pgi.splitthresh);
 	if (n_tokens >= 9) convert_ip(tokens[8], pgi.splitreldiff);
-	base_group_info.insert_group(name, pgi);
+
+    if ((pgi.derinc != 0) && (!isnormal(pgi.derinc)))
+        throw_control_file_error(f_rec,"denormal derinc '"+tokens[4]+"' for parameter group "+tokens[0]);
+    base_group_info.insert_group(name, pgi);
 
 }
 
@@ -3167,8 +3176,19 @@ void Pest::tokens_to_par_rec(ofstream &f_rec, const vector<string>& tokens, Tran
 	convert_ip(tokens[6], pi.group);
 	convert_ip(tokens[7], scale);
 	convert_ip(tokens[8], offset);
-	
-	if (control_info.numcom > 1)
+
+    if ((pi.init_value != 0) && (!isnormal(pi.init_value)))
+        throw_control_file_error(f_rec,"denormal parval1 '"+tokens[3]+"' for parameter "+tokens[0]);
+    if ((pi.lbnd != 0) && (!isnormal(pi.lbnd)))
+        throw_control_file_error(f_rec,"denormal parlbnd '"+tokens[4]+"' for parameter "+tokens[0]);
+    if ((pi.ubnd != 0) && (!isnormal(pi.ubnd)))
+        throw_control_file_error(f_rec,"denormal parubnd '"+tokens[5]+"' for parameter "+tokens[0]);
+    if ((pi.scale != 0) && (!isnormal(pi.scale)))
+        throw_control_file_error(f_rec,"denormal scale '"+tokens[7]+"' for parameter "+tokens[0]);
+    if ((pi.offset != 0) && (!isnormal(pi.offset)))
+        throw_control_file_error(f_rec,"denormal offset '"+tokens[8]+"' for parameter "+tokens[0]);
+
+    if (control_info.numcom > 1)
         try {
 
             convert_ip(tokens[9], pi.dercom);
@@ -3266,17 +3286,42 @@ void Pest::tokens_to_obs_rec(ofstream& f_rec, const vector<string> &tokens)
 	ObservationRec obs_i;
 	string name = tokens[0];
 	double value;
+	size_t idx;
 	//convert_ip(tokens[1], value);
-	value = stod(tokens[1]);
+    try
+    {
+        value = stod(tokens[1],&idx);
+    }
+	catch (...)
+    {
+	    throw_control_file_error(f_rec,"error parsing obsval '"+tokens[1]+"' for observation "+tokens[0]);
+    }
+	if (idx != tokens[1].size())
+    {
+        throw_control_file_error(f_rec,"error parsing obsval '"+tokens[1]+"' for observation "+tokens[0]);
+    }
 	//convert_ip(tokens[2], obs_i.weight);
-	obs_i.weight = stod(tokens[2]);
-	obs_i.group = tokens[3];
+	try {
+        obs_i.weight = stod(tokens[2],&idx);
+    }
+	catch (...)
+    {
+        throw_control_file_error(f_rec,"error parsing weight '"+tokens[2]+"' for observation "+tokens[0]);
+    }
+    if (idx != tokens[2].size())
+    {
+        throw_control_file_error(f_rec,"error parsing weight '"+tokens[2]+"' for observation "+tokens[0]);
+    }
+	if ((value != 0) && (!isnormal(value)))
+        throw_control_file_error(f_rec,"denormal obsval '"+tokens[1]+"' for observation "+tokens[0]);
+    if (((obs_i.weight!= 0) && !isnormal(obs_i.weight)))
+        throw_control_file_error(f_rec,"denormal weight '"+tokens[2]+"' for observation "+tokens[0]);
+
+    obs_i.group = tokens[3];
 	if (observation_values.find(name) != observation_values.end())
         throw_control_file_error(f_rec,"duplicate observation names in control file for: '" + name + "'");
 	ctl_ordered_obs_names.push_back(name);
 	observation_info.observations[name] = obs_i;
-
-
 	observation_values.insert(name, value);
 	name = obs_i.group;
 	//vector<string>::iterator is = find(ctl_ordered_obs_group_names.begin(), ctl_ordered_obs_group_names.end(), name);

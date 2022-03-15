@@ -37,7 +37,7 @@ ModelInterface::ModelInterface(vector<string> _tplfile_vec, vector<string> _inpf
                                _insfile_vec, vector<string> _outfile_vec, vector<string> _comline_vec):
                                insfile_vec(_insfile_vec), outfile_vec(_outfile_vec), tplfile_vec(_tplfile_vec),
                                inpfile_vec(_inpfile_vec), comline_vec(_comline_vec), fill_tpl_zeros(false),
-                               additional_ins_delimiters(""),num_threads(1)
+                               additional_ins_delimiters(""),num_threads(1),tpl_force_decimal(false)
 {
     //scrub any os seps from the file names
 
@@ -286,6 +286,7 @@ void ThreadedTemplateProcess::work(int tid, vector<int>& tpl_idx, Parameters par
 		}
 		TemplateFile tpl(tplfile_vec[i]);
 		tpl.set_fill_zeros(fill);
+		tpl.set_force_decimal(force_decimal);
 		Parameters ppars = tpl.write_input_file(inpfile_vec[i], pars);
 		while (true)
 		{
@@ -350,7 +351,7 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 	vector<thread> threads;
 	vector<exception_ptr> exception_ptrs;
 	Parameters pro_pars = *pars_ptr; //copy
-	ThreadedTemplateProcess ttp(tplfile_vec, inpfile_vec, fill_tpl_zeros);
+	ThreadedTemplateProcess ttp(tplfile_vec, inpfile_vec, fill_tpl_zeros, tpl_force_decimal);
 
 	for (int i = 0; i < nnum_threads; i++)
 	{
@@ -1012,7 +1013,7 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 	bool sci = false;
 	if (value < 0)
 		precision--; // for the minus sign
-	if ((abs(value) >= 100) || (abs(value) < 0.01))
+	if ((!force_decimal) && ((abs(value) >= 100) || (abs(value) < 0.01)))
 	{
 		ss << scientific;
 		precision = precision - 2; //for the "e" and (at least) 1 exponent digit
@@ -1057,7 +1058,7 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 			//if there is an unnesscary zero(s) between the radix and the exponent
 			int r_idx = val_str.find_first_of(".")+1; // to skip past the radix
 			int e_idx = val_str.find_first_of("Ee");
-			if (r_idx != e_idx)
+			if ((e_idx != -1) && (r_idx != -1) && (r_idx != e_idx))
 			{
 				string t = val_str.substr(r_idx, e_idx - r_idx);
 				if (stod(t) == 0.0)
@@ -1068,6 +1069,14 @@ string TemplateFile::cast_to_fixed_len_string(int size, double value, string& na
 						break;
 				}
 			}
+			//ok now just drop everything right of the radix and the radix
+			else if ((e_idx == -1) && (r_idx != -1))
+            {
+			    string t = val_str.substr(0,r_idx-1);
+			    if (t.size() <= size)
+			        val_str = t;
+			        break;
+            }
 			ss.str("");
 		 	ss << "TemplateFile casting error: cant represent value " << value;
 			ss << " for " << name << " in space that is only " << size << " chars wide";

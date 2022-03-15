@@ -736,7 +736,7 @@ void AutoAdaLocThread::work(int thread_id)
 					par_indices_guard.unlock();
 					return;
 				}
-				if (par_indices.size() % 10000 == 0)
+				if (par_indices.size() % 1000 == 0)
 				{
 					ss.str("");
 					ss << "autoadaloc iter " << iter << " progress: " << par_indices.size() << " of " << npar << " parameters done";

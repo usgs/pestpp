@@ -70,6 +70,7 @@ AgentInfoRec::AgentInfoRec(int _socket_fd)
 	failed_runs = 0;
 	state_strings = vector<string>({ "NEW", "CWD_REQ", "CWD_RCV", "NAMES_SENT", "LINPACK_REQ", "LINPACK_RCV", "WAITING", "ACTIVE",
 	"KILLED", "KILLED_FAILED", "COMPLETE" });
+	state = State::NEW;
 
 }
 

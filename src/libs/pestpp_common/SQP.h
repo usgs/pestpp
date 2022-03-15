@@ -28,18 +28,21 @@ struct FilterRec
 	double viol_val;
 	int iter;
 	double alpha;
+    friend bool operator<(const FilterRec &k1, const FilterRec &k2) {
+        if ((k1.obj_val < k2.obj_val) && (k1.viol_val < k2.viol_val))
+            return true;
+        return false;
+    }
 };
 
-template<>
-struct std::less<FilterRec>
-{
-	bool operator()(const FilterRec& k1, const FilterRec& k2) const
-	{
-		if ((k1.obj_val < k2.obj_val) && (k1.viol_val < k2.viol_val))
-			return true;
-		return false;
-	}
-};
+//template<>
+//struct std::less<FilterRec> {
+//    bool operator()(const FilterRec &k1, const FilterRec &k2) const {
+//        if ((k1.obj_val < k2.obj_val) && (k1.viol_val < k2.viol_val))
+//            return true;
+//        return false;
+//    }
+//};
 
 class SqpFilter
 {

@@ -1261,6 +1261,11 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		fill_tpl_zeros = pest_utils::parse_string_arg_to_bool(value);
 		return true;
 	}
+    else if (key == "TPL_FORCE_DECIMAL")
+    {
+        tpl_force_decimal = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
 	else if (key == "FORGIVE_UNKNOWN_ARGS")
 	{
 		forgive_unknown_args = pest_utils::parse_string_arg_to_bool(value);
@@ -1512,6 +1517,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "debug_parse_only: " << debug_parse_only << endl;
 	os << "check_tplins: " << check_tplins << endl;
 	os << "fill_tpl_zeros: " << fill_tpl_zeros << endl;
+	os << "tpl_force_decimal: " << tpl_force_decimal << endl;
 	os << "additional_ins_delimiters: " << additional_ins_delimiters << endl;
 	os << "random_seed: " << random_seed << endl;
 	os << "num_tpl_ins_threads: " << num_tpl_ins_threads << endl;
@@ -1930,6 +1936,7 @@ void PestppOptions::set_defaults()
 	set_debug_parse_only(false);
 	set_check_tplins(true);
 	set_fill_tpl_zeros(false);
+    set_tpl_force_decimal(false);
 	set_additional_ins_delimiters("");
 	set_num_tpl_ins_threads(1);	
 
@@ -2156,6 +2163,13 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 	int noptswitch;
 	double splitswh;
 	PestMode pestmode;*/
+	set<string> valid_args{"RSTFLE","PESTMODE","NPAR","NOBS","NPARGP","NPRIOR","NOBSGP","MAXCOMPDIM","NTPLFLE","NINSFLE",
+                         "PRECIS","DPOINT","NUMCOM","JACFILE","MESSFILE","OBSREREF","RLAMBDA1","RLAMFAC","PHIREDLAM",
+                         "PHIRATSUF","NUMLAM","JACUPDATE","LAMFORGIVE","DERFORGIVE","RELPARMAX","FACPARMAX",
+                         "FACORIG","IBOUNDSTICK","UPVECBEND","PHIREDSWH","NOPTSWITCH","SPLITSWH","DOAUI","DOSENRESUSE",
+                         "BOUNDSCALE","NOPTMAX","PHIREDSTP","NPHINORED","RELPARSTP","NRELPAR","PHISTOPTHRESH",
+                         "LASTRUN","PHIABANDON","ICOV","ICOR","IEIG","IRES","JCOSAVE","VERBOSEREC","JCOSAVEITN",
+                         "REISAVEITN","PARSAVEITN","PARSAVERUN"};
 	string value = upper_cp(org_value);
 	if (passed_args.find(key) != passed_args.end())
 		return PestppOptions::ARG_STATUS::ARG_DUPLICATE;
@@ -2192,6 +2206,10 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 		else
 			return PestppOptions::ARG_STATUS::ARG_INVALID;
 	}
+	else if (valid_args.find(key) != valid_args.end())
+    {
+	    //a valid but unused ctl data arg
+    }
 	else
 		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;
 	return PestppOptions::ARG_STATUS::ARG_ACCEPTED;

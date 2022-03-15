@@ -502,7 +502,8 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_max_run_fail(),
 				pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
 				pest_scenario.get_pestpp_options().get_additional_ins_delimiters(),
-				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
+				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads(),
+				pest_scenario.get_pestpp_options().get_tpl_force_decimal());
 		}
 		
 		//generate a parent ensemble which includes all parameters across all cycles
@@ -592,7 +593,9 @@ int main(int argc, char* argv[])
 					file_manager.build_filename("rns"), pathname,
 					childPest.get_pestpp_options().get_max_run_fail(),
 					childPest.get_pestpp_options().get_fill_tpl_zeros(),
-					childPest.get_pestpp_options().get_additional_ins_delimiters());
+					childPest.get_pestpp_options().get_additional_ins_delimiters(),
+					pest_scenario.get_pestpp_options().get_num_tpl_ins_threads(),
+					pest_scenario.get_pestpp_options().get_tpl_force_decimal());
 			}
 
 			ParamTransformSeq& base_trans_seq = childPest.get_base_par_tran_seq_4_mod();
@@ -854,13 +857,24 @@ int main(int argc, char* argv[])
 			if (childPest.get_ctl_ordered_nz_obs_names().size() > 0)
 			{
 
-				if (pest_scenario.get_control_info().noptmax > 0) // 
+				if (pest_scenario.get_control_info().noptmax > 0)
 				{
+                    if ((da.get_phi_handler().get_mean(L2PhiHandler::phiType::ACTUAL) == 0) ||
+                    (da.get_phi_handler().get_mean(L2PhiHandler::phiType::MEAS) == 0))
+                    {
+                        ss.str("");
+                        ss << "...Note:current mean actual and/or measurement phi is too low for solution, continuing..." << endl;
+                        fout_rec << ss.str();
+                        cout << ss.str();
+                    }
+                    else {
 
-					da.da_update(*icycle);
-					ss.str("");
-					ss << file_manager.get_base_filename() << ".global." << *icycle << "." << da.get_iter() << ".pcs.csv";
-					pcs.summarize(*da.get_pe_ptr(), ss.str());
+                        da.da_update(*icycle);
+                        ss.str("");
+                        ss << file_manager.get_base_filename() << ".global." << *icycle << "." << da.get_iter()
+                           << ".pcs.csv";
+                        pcs.summarize(*da.get_pe_ptr(), ss.str());
+                    }
 				}
 				write_global_phi_info(*icycle, f_phi, da, init_real_names);
 			}
