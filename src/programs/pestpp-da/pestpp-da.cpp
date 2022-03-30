@@ -518,6 +518,9 @@ int main(int argc, char* argv[])
 		ObservationEnsemble curr_noise(&pest_scenario);
 		generate_global_ensembles(da, fout_rec, curr_pe, curr_oe, curr_noise);
 
+		//now reset ies_include_base to false b/c later if the base real fails, all kinds of shit goes wrong
+		pest_scenario.get_pestpp_options_ptr()->set_ies_include_base(false);
+
 		map<int,int> noptmax_schedule = da.initialize_noptmax_schedule(assimilation_cycles);
 
 		//prepare a phi csv file for all cycles
@@ -780,6 +783,10 @@ int main(int argc, char* argv[])
 				da.set_noise_oe(cycle_curr_noise);
 				cycle_curr_noise.to_csv("cycle_curr_noise.csv");
 			}
+			else
+            {
+			    da.set_noise_oe(cycle_curr_oe);
+            }
 			da.set_localizer(global_loc);
 
 			//check if we can use the previous outputs

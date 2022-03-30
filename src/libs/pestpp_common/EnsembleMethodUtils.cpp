@@ -5299,8 +5299,12 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		vector<int> fails = run_ensemble(remaining_pe_lam, remaining_oe_lam,vector<int>(),cycle);
 
 		//for testing
-		if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder())
-			fails.push_back(0);
+		if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder()) {
+            ss.str("");
+            ss << "ies_debug_fail_remainder is True, failing  par:obs realization " << org_pe_idxs[0] << ":" << org_oe_idxs[0];
+            message(0,ss.str());
+            fails.push_back(0);
+        }
 
 		//if any of the remaining runs failed
 		if (fails.size() == org_pe_idxs.size())
