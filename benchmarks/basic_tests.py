@@ -1248,7 +1248,7 @@ if __name__ == "__main__":
     #salib_verf()
     #tplins1_test()
     #secondary_marker_test()
-    ext_stdcol_test()
+    #ext_stdcol_test()
 
     # parallel_consist_test()
     # ext_stdcol_test()
@@ -1262,7 +1262,7 @@ if __name__ == "__main__":
     #da_prep_4_mf6_freyberg_seq_tbl()
     #da_mf6_freyberg_test_2()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
-    #tplins1_test()
+    tplins1_test()
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
 
