@@ -524,7 +524,7 @@ map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ve
 			{
 				fout_rec << p << endl;
 			}
-			throw runtime_error("DA_PARAMTER_CYCLE_TABLE contains missing parameters, see rec file for listing");
+			throw runtime_error("DA_PARAMETER_CYCLE_TABLE contains missing parameters, see rec file for listing");
 		}
 		if (notfixed.size() > 0)
 		{
@@ -533,7 +533,7 @@ map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ve
 			{
 				fout_rec << p << endl;
 			}
-			throw runtime_error("DA_PARAMTER_CYCLE_TABLE contains non-fixed parameters, see rec file for listing");
+			throw runtime_error("DA_PARAMETER_CYCLE_TABLE contains non-fixed parameters, see rec file for listing");
 		}
 		if (notneg.size() > 0)
 		{
@@ -542,7 +542,7 @@ map<int, map<string, double>> process_da_par_cycle_table(Pest& pest_scenario, ve
 			{
 				fout_rec << p << endl;
 			}
-			throw runtime_error("DA_PARAMTER_CYCLE_TABLE contains parameters with cycle!=-1, see rec file for listing");
+			throw runtime_error("DA_PARAMETER_CYCLE_TABLE contains parameters with cycle!=-1, see rec file for listing");
 		}
 		//process the remaining columns - these should be cycle numbers
 		string col_name;
