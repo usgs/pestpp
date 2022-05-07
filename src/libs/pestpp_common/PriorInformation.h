@@ -82,6 +82,7 @@ public:
 	size_t size() const {return prior_info_map.size();}
 	int get_nnz_pi() const;
 	std::vector<std::string> get_keys() const;
+	void clear(){prior_info_map.clear();}
 private:
 	std::map<std::string, PriorInformationRec> prior_info_map;
 };

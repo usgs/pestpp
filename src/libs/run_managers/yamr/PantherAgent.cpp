@@ -139,6 +139,7 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 	}
 	report("checking model interface files", true);
 	pest_scenario.check_io(frec);
+	pest_scenario.release_unused_for_agent();
 	poll_interval_seconds = pest_scenario.get_pestpp_options().get_worker_poll_interval();
 
 	mi = ModelInterface(pest_scenario.get_model_exec_info().tplfile_vec, 

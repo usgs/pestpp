@@ -3455,6 +3455,25 @@ map<string,string> Pest::get_ext_file_string_map(const string& section_name, con
 	return val_map;
 }
 
+void Pest::release_unused_for_agent()
+{
+    ctl_ordered_obs_names.clear();
+    ctl_ordered_obs_group_names.clear();
+    ctl_ordered_par_names.clear();
+    ctl_ordered_pi_names.clear();
+    ctl_ordered_par_group_names.clear();
+    base_group_info.clear();
+    prior_info.clear();
+    set<string> keep_cols{"cycle"};
+    for (auto& efile : efiles_map)
+    {
+        for (auto& eefile : efile.second)
+        {
+            eefile.keep_cols(keep_cols);
+        }
+    }
+}
+
 
 map<string, double> Pest::get_ext_file_double_map(const string& section_name, const string& col_name)
 {

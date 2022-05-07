@@ -116,6 +116,7 @@ public:
     int get_num_ext_file_maps() const {return efiles_map.size();}
     void clear_ext_files() { efiles_map.clear(); }
 	map<string, vector<pest_utils::ExternalCtlFile>>& get_efiles_map() { return efiles_map; }
+	void release_unused_for_agent();
 	virtual ~Pest();
 	
 protected:
