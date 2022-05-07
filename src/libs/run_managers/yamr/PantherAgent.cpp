@@ -685,7 +685,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			}
 			Serialization::unserialize(net_pack.get_data(), par_name_vec);
 			//make sure all par names are found in the scenario
-			vector<string> vnames = pest_scenario.get_ctl_ordered_par_names();
+			//vector<string> vnames = pest_scenario.get_ctl_ordered_par_names();
+			vector<string> vnames = pest_scenario.get_ctl_parameters().get_keys();
 			set<string> snames(vnames.begin(), vnames.end());
 			vnames.clear();
 			for (auto& pname : par_name_vec)
@@ -713,7 +714,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			}	
 			snames.clear();
 			snames.insert(par_name_vec.begin(), par_name_vec.end());
-			for (auto name : pest_scenario.get_ctl_ordered_par_names())
+			for (auto name : pest_scenario.get_ctl_parameters().get_keys())
 			{
 				if (snames.find(name) == snames.end())
 					vnames.push_back(name);
@@ -754,7 +755,8 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			}
 			Serialization::unserialize(net_pack.get_data(), obs_name_vec);
 			//make sure all par names are found in the scenario
-			vector<string> vnames = pest_scenario.get_ctl_ordered_obs_names();
+			//vector<string> vnames = pest_scenario.get_ctl_ordered_obs_names();
+            vector<string> vnames = pest_scenario.get_ctl_observations().get_keys();
 			set<string> snames(vnames.begin(), vnames.end());
 			vnames.clear();
 			for (auto& oname : obs_name_vec)
@@ -783,7 +785,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			}
 			snames.clear();
 			snames.insert(obs_name_vec.begin(), obs_name_vec.end());
-			for (auto name : pest_scenario.get_ctl_ordered_obs_names())
+			for (auto name : pest_scenario.get_ctl_observations().get_keys())
 			{
 				if (snames.find(name) == snames.end())
 					vnames.push_back(name);

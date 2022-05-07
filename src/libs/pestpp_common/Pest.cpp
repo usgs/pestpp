@@ -3464,7 +3464,7 @@ void Pest::release_unused_for_agent()
     ctl_ordered_par_group_names.clear();
     base_group_info.clear();
     prior_info.clear();
-    set<string> keep_cols{"cycle"};
+    set<string> keep_cols{"cycle","name","parnme","obsnme","pest_file","model_file"};
     for (auto& efile : efiles_map)
     {
         for (auto& eefile : efile.second)
