@@ -2723,8 +2723,8 @@ void Pest::child_pest_update(int icycle, bool keep_order)
     }
 	else
     {
-        parnames = get_ctl_parameters().get_keys();
-        obsnames = get_ctl_observations().get_keys();
+        //parnames = get_ctl_parameters().get_keys();
+        //obsnames = get_ctl_observations().get_keys();
     }
 
 	ParameterInfo pi = get_ctl_parameter_info();
@@ -2733,8 +2733,10 @@ void Pest::child_pest_update(int icycle, bool keep_order)
             ctl_parameter_info.erase(p);
             ctl_parameters.erase(p);
             base_group_info.par_erase(p);// .parameter2group.erase(p);
-            parnames.erase(remove(parnames.begin(),
-                                  parnames.end(), p), parnames.end());
+            if (keep_order) {
+                parnames.erase(remove(parnames.begin(),
+                                      parnames.end(), p), parnames.end());
+            }
         }
 //        if (pi.get_parameter_rec_ptr(p)->cycle != icycle &&
 //            pi.get_parameter_rec_ptr(p)->cycle >= 0) {
@@ -2774,8 +2776,10 @@ void Pest::child_pest_update(int icycle, bool keep_order)
 		{
 			observation_info.erase_ob(ob);
 			observation_values.erase(ob);
-			obsnames.erase(remove(obsnames.begin(),
-				obsnames.end(), ob), obsnames.end());
+			if (keep_order) {
+                obsnames.erase(remove(obsnames.begin(),
+                                      obsnames.end(), ob), obsnames.end());
+            }
 		}
 		else
 		{
@@ -2864,7 +2868,7 @@ void Pest::child_pest_update(int icycle, bool keep_order)
 	//pestpp_options
 	//base_par_transform
 	//ctl_ordered_par_names
-	if (!keep_order) {
+	if (keep_order) {
         ctl_ordered_par_names = parnames;
 
         //ctl_ordered_obs_names
