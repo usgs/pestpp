@@ -2704,7 +2704,7 @@ vector<pair<string, int>> Pest::extract_cycle_numbers2(ofstream& f_rec, string s
 
 }
 
-void Pest::child_pest_update(int icycle)
+void Pest::child_pest_update(int icycle, bool keep_order)
 {
 	/*
 	Update Pest members to reflect current cycle data only
@@ -2717,10 +2717,18 @@ void Pest::child_pest_update(int icycle)
 	//pareto_info
 	//svd_info
 
-	parnames = get_ctl_ordered_par_names();
-	obsnames = get_ctl_ordered_obs_names();
+	if (keep_order) {
+        parnames = get_ctl_ordered_par_names();
+        obsnames = get_ctl_ordered_obs_names();
+    }
+	else
+    {
+        parnames = get_ctl_parameters().get_keys();
+        obsnames = get_ctl_observations().get_keys();
+    }
+
 	ParameterInfo pi = get_ctl_parameter_info();
-	for (auto& p : get_ctl_ordered_par_names()) {
+	for (auto& p : ctl_parameters.get_keys()) {
         if (!cycle_in_range(icycle, pi.get_parameter_rec_ptr(p)->dci)) {
             ctl_parameter_info.erase(p);
             ctl_parameters.erase(p);
@@ -2759,7 +2767,7 @@ void Pest::child_pest_update(int icycle)
 	// update observations
 	vector<string> cycle_grps_o, unique_cycle_grps_o, grps_o;
 	ObservationInfo obs_info = get_ctl_observation_info();
-	for (auto& ob : get_ctl_ordered_obs_names())
+	for (auto& ob : observation_values.get_keys())
 	    if (!cycle_in_range(icycle,obs_info.get_observation_rec_ptr(ob)->dci))
 //		if (obs_info.get_observation_rec_ptr(ob)->cycle != icycle &&
 //			obs_info.get_observation_rec_ptr(ob)->cycle >= 0)
@@ -2856,14 +2864,16 @@ void Pest::child_pest_update(int icycle)
 	//pestpp_options
 	//base_par_transform
 	//ctl_ordered_par_names
-	ctl_ordered_par_names = parnames;
-	
-	//ctl_ordered_obs_names
-	ctl_ordered_obs_names = obsnames;
+	if (!keep_order) {
+        ctl_ordered_par_names = parnames;
 
-	//ctl_ordered_par_group_names ----> TODO: Check if the groups order is preserved..
-	ctl_ordered_par_group_names = unique_cycle_grps;
-	ctl_ordered_obs_group_names = unique_cycle_grps_o;
+        //ctl_ordered_obs_names
+        ctl_ordered_obs_names = obsnames;
+
+        //ctl_ordered_par_group_names ----> TODO: Check if the groups order is preserved..
+        ctl_ordered_par_group_names = unique_cycle_grps;
+        ctl_ordered_obs_group_names = unique_cycle_grps_o;
+    }
 	
 	// get number of adj par for current cycle
 	ParameterRec::TRAN_TYPE tfixed = ParameterRec::TRAN_TYPE::FIXED;
@@ -3462,7 +3472,7 @@ void Pest::release_unused_for_agent()
     ctl_ordered_par_names.clear();
     ctl_ordered_pi_names.clear();
     ctl_ordered_par_group_names.clear();
-    base_group_info.clear();
+    //base_group_info.clear();
     prior_info.clear();
     set<string> keep_cols{"cycle","name","parnme","obsnme","pest_file","model_file"};
     for (auto& efile : efiles_map)
