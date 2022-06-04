@@ -149,12 +149,11 @@ jobs:
       shell: bash -l {0}
       run: |
         cp -r benchmarks/test_bin/win $HOME/.local/bin
-        echo "../../test_bin/win" >> $GITHUB_PATH
         if [[ "$RUNNER_OS" == "Windows" ]]; then
             cp -r benchmarks/test_bin/win $HOME/.local/bin
-            echo "../../test_bin/win" >> $GITHUB_PATH  
+            #echo "../../test_bin/win" >> $GITHUB_PATH  
         else
-            echo "../../test_bin/linux" >> $GITHUB_PATH
+            #echo "../../test_bin/linux" >> $GITHUB_PATH
             cp -r benchmarks/test_bin/win $HOME/.local/bin
         fi
         echo "$HOME/.local/bin" >> $GITHUB_PATH
