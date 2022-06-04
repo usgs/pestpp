@@ -151,7 +151,7 @@ jobs:
       shell: bash -l {0}
       run: |
         if [[ "$RUNNER_OS" == "Windows" ]]; then
-            echo "../../test_bin\win" >> $GITHUB_PATH        
+            echo "../../test_bin/ win" >> $GITHUB_PATH        
         else
             echo "../../test_bin/linux" >> $GITHUB_PATH
         fi
@@ -159,6 +159,7 @@ jobs:
     - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
       shell: bash -l {0}
       run: |
+        echo $GITHUB_PATH
         ls -l
         cd ${{ env.test_dir }}
         nosetests -v ${{ env.test_script }}
