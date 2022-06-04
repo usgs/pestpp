@@ -116,7 +116,7 @@ jobs:
     #       conda env update --name pyemu --file etc/environment.yml
     #     fi
 
-     - name: Add packages to pyemu environment using conda
+    - name: Add packages to pyemu environment using conda
       if: ${{ matrix.python-version < 3.8 }}
       # if: ${{ runner.os == 'Windows' || matrix.python-version < 3.8 }}
       shell: bash -l {0}
