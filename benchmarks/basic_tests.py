@@ -872,6 +872,20 @@ def mf6_v5_ies_test():
     pyemu.os_utils.run("{0} freyberg6_run_ies.pst".format(exe_path),cwd=t_d)
 
     pst.control_data.noptmax = 3
+
+    m_d = os.path.join(model_d, "master_ies_glm_noloc_standard")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d, "freyberg6_run_ies.pst"))
+    pst.pestpp_options.pop("ies_localizer",None)
+    pst.pestpp_options.pop("ies_autoadaloc",None)
+    pst.pestpp_options["ies_bad_phi_sigma"] = 2.5
+    pst.control_data.noptmax = 3
+    pst.write(os.path.join(t_d, "freyberg6_run_ies_glm_noloc_standard.pst"))
+    pyemu.os_utils.start_workers(t_d, exe_path, "freyberg6_run_ies_glm_noloc_standard.pst", num_workers=15,
+                                 master_dir=m_d, worker_root=model_d, port=port)
+
+    return
     pst.write(os.path.join(t_d,"freyberg6_run_ies_glm_loc.pst"))
 
     m_d = os.path.join(model_d, "master_ies_glm_covloc")
@@ -1262,8 +1276,8 @@ if __name__ == "__main__":
     #da_prep_4_mf6_freyberg_seq_tbl()
     #da_mf6_freyberg_test_2()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
-    tplins1_test()
-    #mf6_v5_ies_test()
+    #tplins1_test()
+    mf6_v5_ies_test()
     #mf6_v5_sen_test()
 
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))

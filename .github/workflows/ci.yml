@@ -9,7 +9,7 @@ on:
 jobs:
   pestppCI:
     name: benchmarks
-    runs-on: ubuntu-latest #${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -89,21 +89,46 @@ jobs:
     - name: Setup Miniconda
       uses: conda-incubator/setup-miniconda@v2.0.0
       with:
+        # python-version: ${{ matrix.python-version }}
+        # #mamba-version: "0.20.0"
+        # channels: conda-forge
+        # auto-update-conda: true
+        # activate-environment: pyemu
+        # use-only-tar-bz2: true
+        miniforge-version: latest
+        # miniconda-version: "latest"
         python-version: ${{ matrix.python-version }}
-        mamba-version: "0.20.0"
-        channels: conda-forge
-        auto-update-conda: true
+        # mamba-version: "*"
+        # channels: conda-forge
+        miniforge-variant: Mambaforge
+        # auto-update-conda: true
         activate-environment: pyemu
-        use-only-tar-bz2: true
+        use-mamba: true
+        # environment-file: etc/environment.yml
+        # use-only-tar-bz2: true
 
-    - name: Add packages to pyemu environment using mamba or conda
+    # - name: Add packages to pyemu environment using mamba or conda
+    #   shell: bash -l {0}
+    #   run: |
+    #     if [ "$RUNNER_OS" == "Windows" ]; then
+    #       conda env update --name pyemu --file etc/environment.yml
+    #     else
+    #       conda env update --name pyemu --file etc/environment.yml
+    #     fi
+
+     - name: Add packages to pyemu environment using conda
+      if: ${{ matrix.python-version < 3.8 }}
+      # if: ${{ runner.os == 'Windows' || matrix.python-version < 3.8 }}
       shell: bash -l {0}
       run: |
-        if [ "$RUNNER_OS" == "Windows" ]; then
           conda env update --name pyemu --file etc/environment.yml
-        else
-          conda env update --name pyemu --file etc/environment.yml
-        fi
+    
+    - name: Add packages to pyemu environment using mamba
+      # if: ${{ runner.os != 'Windows' && matrix.python-version >= 3.8 }}
+      if: ${{ matrix.python-version >= 3.8 }}
+      shell: bash -l {0}
+      run: |
+          mamba env update --name pyemu --file etc/environment.yml
     
     - name: Install Flopy & pyemu?
       shell: bash -l {0}
