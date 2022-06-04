@@ -150,6 +150,7 @@ jobs:
     - name: aux bin path hackery
       shell: bash -l {0}
       run: |
+        echo "../../test_bin/win" >> $GITHUB_PATH
         if [[ "$RUNNER_OS" == "Windows" ]]; then
             echo "../../test_bin/win" >> $GITHUB_PATH        
         else
