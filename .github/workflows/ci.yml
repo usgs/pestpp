@@ -144,8 +144,6 @@ jobs:
         fi
         cd ..
 
-   
-    
     
     - name: aux bin path hackery
       shell: bash -l {0}
@@ -162,7 +160,11 @@ jobs:
       shell: bash -l {0}
       run: |
         if [[ "$RUNNER_OS" == "Windows" ]]; then
-            echo "../../test_bin/win" >> $GITHUB_PATH  
+            echo "../../test_bin/win" >> $GITHUB_PATH 
+            cd benchmarks/test_bin/win
+            mfwnt.exe
+            mfnwt
+            cd ../../../ 
         else
             echo "../../test_bin/linux" >> $GITHUB_PATH
         fi
