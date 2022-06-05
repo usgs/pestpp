@@ -1206,12 +1206,13 @@ def fr_timeout_test():
         os.remove(oe_file)
     pst.control_data.noptmax = -1
     pst.pestpp_options["overdue_giveup_fac"] = 1.0e+10
-    pst.pestpp_options["overdue_giveup_minutes"] = 0.5
+    pst.pestpp_options["overdue_giveup_minutes"] = 0.25
     pst.pestpp_options["ies_num_reals"] = 10
     pst.pestpp_options["ies_include_base"] = False
+    pst.pestpp_options["max_run_fail"] = 1
 
     #pst.pestpp_options["panther_transfer_on_fail"] = "10par_xsec.list"
-    pst.pestpp_options["panther_agent_freeze_on_fail"] = True
+    pst.pestpp_options["panther_agent_freeze_on_fail"] = False
     pst.write(os.path.join(new_d, "pest.pst"))
 
     m_d = os.path.join(model_d,"fr_timeout_master")
