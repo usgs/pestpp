@@ -704,6 +704,12 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 				//if the process ended, break
 				if (exitcode != STILL_ACTIVE)
 				{
+					if (exitcode != 0)
+					{
+						finished->set(true);
+						cout << "exit_code: " << exitcode << endl;
+						throw std::runtime_error("GetExitCodeProcess() returned error status for command: " + cmd_string);
+					}
 					break;
 				}
 				//else cout << exitcode << "...still waiting for command " << cmd_string << endl;

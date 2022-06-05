@@ -733,6 +733,10 @@ def tplins1_test():
     jco = pyemu.Jco.from_binary(os.path.join(t_d,"pest.jcb")).to_dataframe().apply(np.abs)
     assert jco.sum().sum() == 0, jco.sum()
 
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d,"pest.pst"))
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-glm")),cwd=t_d)
+
     # check the input file - the last two number should be the same
     arr = np.loadtxt(os.path.join(t_d,"hk_Layer_1.ref"))
     assert arr[-2] == arr[-1],arr[-2] - arr[-1]
@@ -742,6 +746,7 @@ def tplins1_test():
     assert len(lines_tpl) - 1 == len(lines_in)
 
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
+    pst.control_data.noptmax = -1
     pst.pestpp_options["fill_tpl_zeros"] = True
     pst.write(os.path.join(t_d,"pest_fill.pst"))
     pyemu.os_utils.run("{0} pest_fill.pst".format(exe_path.replace("-ies","-glm")),cwd=t_d)
@@ -758,6 +763,10 @@ def tplins1_test():
     jco = pyemu.Jco.from_binary(os.path.join(t_d,"pest_fill.jcb")).to_dataframe().apply(np.abs)
     assert jco.sum().sum() == 0, jco.sum()
 
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d,"pest.pst"))
+    pyemu.os_utils.run("{0} pest.pst".format(exe_path.replace("-ies","-glm")),cwd=t_d)
+
     # check the input file - the last two number should be the same
     arr = np.loadtxt(os.path.join(t_d,"hk_Layer_1.ref"))
     assert arr[-2] == arr[-1]
@@ -773,6 +782,7 @@ def tplins1_test():
     pst.model_output_data = pd.DataFrame({"pest_file":"out1dum.dat.ins",
                                           "model_file":'out1.dat'},index=["out1dum.dat.ins"])
     #pst.instruction_files = ['out1dum.dat.ins']
+    pst.control_data.noptmax = -1
     pst.write(os.path.join(t_d, "pest_dum.pst"))
     pyemu.os_utils.run("{0} pest_dum.pst".format(exe_path.replace("-ies", "-glm")), cwd=t_d)
     obf_df = pd.read_csv(os.path.join(t_d, "out1.dat.obf"), delim_whitespace=True, header=None,
@@ -1120,7 +1130,7 @@ def fr_fail_test():
     assert not os.path.exists(oe_file)
     m_d = os.path.join(model_d,"fr_fail_master")
     try:
-        pyemu.os_utils.start_workers(new_d,exe_path,"pest.pst",num_workers=1,worker_root=model_d,master_dir=m_d)
+        pyemu.os_utils.start_workers(new_d,exe_path,"pest.pst",num_workers=5,worker_root=model_d,master_dir=m_d)
     except:
         pass
     else:
@@ -1198,20 +1208,19 @@ def fr_timeout_test():
     pst.pestpp_options["overdue_giveup_fac"] = 1.0e+10
     pst.pestpp_options["overdue_giveup_minutes"] = 0.1
     pst.pestpp_options["ies_num_reals"] = 10
+    pst.pestpp_options["ies_include_base"] = False
 
     #pst.pestpp_options["panther_transfer_on_fail"] = "10par_xsec.list"
     pst.pestpp_options["panther_agent_freeze_on_fail"] = True
     pst.write(os.path.join(new_d, "pest.pst"))
-    pyemu.os_utils.run("{0} pest.pst".format(exe_path),cwd=new_d)
 
-    assert os.path.exists(oe_file)
     m_d = os.path.join(model_d,"fr_timeout_master")
-    pyemu.os_utils.start_workers(new_d,exe_path,"pest.pst",num_workers=1,worker_root=model_d,master_dir=m_d)
+    pyemu.os_utils.start_workers(new_d,exe_path,"pest.pst",num_workers=5,worker_root=model_d,master_dir=m_d)
     oe_file = os.path.join(m_d, "pest.0.obs.csv")
     assert os.path.exists(oe_file)
     oe = pd.read_csv(oe_file,index_col=0)
     print(oe.shape)
-    assert oe.shape[0] == 4
+    assert oe.shape[0] == 5,oe.shape
 
 def ins_missing_e_test():
     import os
@@ -1275,9 +1284,9 @@ if __name__ == "__main__":
 
     #da_prep_4_mf6_freyberg_seq_tbl()
     #da_mf6_freyberg_test_2()
-    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
-    mf6_v5_ies_test()
+    #mf6_v5_ies_test()
     #mf6_v5_sen_test()
 
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
@@ -1289,3 +1298,4 @@ if __name__ == "__main__":
     #mf6_v5_ies_test()
     #fr_timeout_test()
     #fr_fail_test()
+    tplins1_test()
