@@ -1199,14 +1199,14 @@ def fr_timeout_test():
         f.write("import os\nimport time\nimport pyemu\npyemu.os_utils.run('mfnwt 10par_xsec.nam')\n")
         f.write("if not os.path.exists('run.info'):\n    exit()\n")
         f.write("lines = open('run.info','r').readlines()\nrnum = int(lines[-1].split()[-1].split('=')[-1])\n")
-        f.write("if rnum % 2 == 0:\n    time.sleep(100000)\n")
+        f.write("if rnum % 2 == 0:\n    time.sleep(10000000)\n")
     pst.model_command = "python run.py"
     oe_file = os.path.join(new_d, "pest.0.obs.csv")
     if os.path.exists(oe_file):
         os.remove(oe_file)
     pst.control_data.noptmax = -1
     pst.pestpp_options["overdue_giveup_fac"] = 1.0e+10
-    pst.pestpp_options["overdue_giveup_minutes"] = 0.1
+    pst.pestpp_options["overdue_giveup_minutes"] = 0.5
     pst.pestpp_options["ies_num_reals"] = 10
     pst.pestpp_options["ies_include_base"] = False
 
@@ -1296,6 +1296,6 @@ if __name__ == "__main__":
     #cmdline_test()
     #basic_sqp_test()
     #mf6_v5_ies_test()
-    #fr_timeout_test()
+    fr_timeout_test()
     #fr_fail_test()
-    tplins1_test()
+    #tplins1_test()
