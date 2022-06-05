@@ -149,11 +149,12 @@ jobs:
       shell: bash -l {0}
       run: |
         cp -r benchmarks/test_bin/win $HOME/.local/bin
+        echo "../../test_bin/win" >> $GITHUB_PATH
         if [[ "$RUNNER_OS" == "Windows" ]]; then
             cp -r benchmarks/test_bin/win $HOME/.local/bin
-            #echo "../../test_bin/win" >> $GITHUB_PATH  
+            echo "../../test_bin/win" >> $GITHUB_PATH  
         else
-            #echo "../../test_bin/linux" >> $GITHUB_PATH
+            echo "../../test_bin/linux" >> $GITHUB_PATH
             cp -r benchmarks/test_bin/win $HOME/.local/bin
         fi
         echo "$HOME/.local/bin" >> $GITHUB_PATH
@@ -161,15 +162,6 @@ jobs:
     - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
       shell: bash -l {0}
       run: |
-        # if [[ "$RUNNER_OS" == "Windows" ]]; then
-        #     echo "../../test_bin/win" >> $GITHUB_PATH 
-        #     cd benchmarks/test_bin/win
-        #     mfwnt.exe
-        #     mfnwt
-        #     cd ../../../ 
-        # else
-        #     echo "../../test_bin/linux" >> $GITHUB_PATH
-        # fi
         ls -l
         cd ${{ env.test_dir }}
         nosetests -v ${{ env.test_script }}
