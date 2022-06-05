@@ -144,22 +144,24 @@ jobs:
         fi
         cd ..
 
-   
-    
     
     - name: aux bin path hackery
       shell: bash -l {0}
       run: |
+        cp -r benchmarks/test_bin/win $HOME/bin
+        echo "../../test_bin/win" >> $GITHUB_PATH
         if [[ "$RUNNER_OS" == "Windows" ]]; then
-            echo "../../test_bin/win" >> $GITHUB_PATH        
+            cp -r benchmarks/test_bin/win $HOME/bin
+            echo "../../test_bin/win" >> $GITHUB_PATH  
         else
             echo "../../test_bin/linux" >> $GITHUB_PATH
+            cp -r benchmarks/test_bin/win $HOME/bin
         fi
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
 
     - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
       shell: bash -l {0}
       run: |
-        echo $GITHUB_PATH
         ls -l
         cd ${{ env.test_dir }}
         nosetests -v ${{ env.test_script }}
