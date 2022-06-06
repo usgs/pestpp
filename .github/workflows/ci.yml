@@ -163,7 +163,7 @@ jobs:
     - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
       shell: bash -l {0}
       run: |
-        if [[[ "$RUNNER_OS" == "Windows" ]] and ${{ env.test_script == mou_tests_2.py }}; then
+        if [[[ "$RUNNER_OS" == "Windows" ]] and ${{ env.test_script }} == "mou_tests_2.py"; then
             ls -l
         else
           ls -l
