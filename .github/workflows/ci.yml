@@ -42,7 +42,7 @@ jobs:
       
         exclude:
           - os: windows-latest 
-          - test_script: mou_tests_2.py
+          - env.test_script: mou_tests_2.py
 
     env: ${{ matrix.env }}
 
