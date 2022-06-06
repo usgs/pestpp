@@ -42,7 +42,7 @@ jobs:
       
         exclude:
           - os: windows-latest 
-          - env.test_script: mou_tests_2.py
+          - env: { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests_2.py"}
 
     env: ${{ matrix.env }}
 
