@@ -67,11 +67,12 @@ ostream& operator<< (ostream &os, const map<string, ParameterGroupRec> &val);
 
 class ParameterGroupInfo {
 	friend ostream& operator<< (ostream &os, const ParameterGroupInfo &val);
+
 public:
 	ParameterGroupInfo() {}
 	ParameterGroupInfo(const ParameterGroupInfo&rhs) {*this=rhs;}
 	void insert_group(const string &group_name, ParameterGroupRec &rec);
-
+    void clear() {groups.clear();parameter2group.clear();}
 	/** @brief Creates a link from a parameter to its parameters group.
 
 	This method add a record to a hash table to link the specified parameter

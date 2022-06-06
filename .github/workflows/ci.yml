@@ -9,7 +9,7 @@ on:
 jobs:
   pestppCI:
     name: benchmarks
-    runs-on: ubuntu-latest #${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -34,11 +34,14 @@ jobs:
           - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "ies_test_part4.py"}
           - { test_dir: "pestpp-glm_benchmarks", test_repo: "https://github.com/pestpp/pestpp-glm_benchmarks", test_script: "glm_test_base.py"}
           - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests.py"}
-          - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests_2.py"}
+          #- { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests_2.py"}
           - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "henry_test.py"}
           - { test_dir: "pestpp-da_benchmarks", test_repo: "https://github.com/pestpp/pestpp-da_benchmarks", test_script: "da_tests.py"}
           - { test_dir: "pestpp-da_benchmarks", test_repo: "https://github.com/pestpp/pestpp-da_benchmarks", test_script: "lorenz96_tests.py"}
           - { test_dir: "pestpp-sqp_benchmarks", test_repo: "https://github.com/pestpp/pestpp-sqp_benchmarks", test_script: "sqp_tests.py"}
+        include: 
+            - os: ubuntu-latest
+              env: { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests_2.py"}
     env: ${{ matrix.env }}
 
     steps:
@@ -60,6 +63,67 @@ jobs:
     - name: Set Windows ENV
       if: runner.os == 'Windows'
       uses: ilammy/msvc-dev-cmd@v1
+
+    
+
+    # Standard python fails on windows without GDAL installation
+    # Using custom bash shell ("shell: bash -l {0}") with Miniconda
+    - name: Setup Miniconda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        # python-version: ${{ matrix.python-version }}
+        # #mamba-version: "0.20.0"
+        # channels: conda-forge
+        # auto-update-conda: true
+        # activate-environment: pyemu
+        # use-only-tar-bz2: true
+        miniforge-version: latest
+        # miniconda-version: "latest"
+        python-version: ${{ matrix.python-version }}
+        # mamba-version: "*"
+        # channels: conda-forge
+        miniforge-variant: Mambaforge
+        # auto-update-conda: true
+        activate-environment: pyemu
+        use-mamba: true
+        # environment-file: etc/environment.yml
+        # use-only-tar-bz2: true
+
+    # - name: Add packages to pyemu environment using mamba or conda
+    #   shell: bash -l {0}
+    #   run: |
+    #     if [ "$RUNNER_OS" == "Windows" ]; then
+    #       conda env update --name pyemu --file etc/environment.yml
+    #     else
+    #       conda env update --name pyemu --file etc/environment.yml
+    #     fi
+
+    - name: Add packages to pyemu environment using conda
+      if: ${{ matrix.python-version < 3.8 }}
+      # if: ${{ runner.os == 'Windows' || matrix.python-version < 3.8 }}
+      shell: bash -l {0}
+      run: |
+          conda env update --name pyemu --file etc/environment.yml
+    
+    - name: Add packages to pyemu environment using mamba
+      # if: ${{ runner.os != 'Windows' && matrix.python-version >= 3.8 }}
+      if: ${{ matrix.python-version >= 3.8 }}
+      shell: bash -l {0}
+      run: |
+          mamba env update --name pyemu --file etc/environment.yml
+    
+    - name: Install Flopy & pyemu?
+      shell: bash -l {0}
+      run: |
+        git clone -b develop --depth 1 https://github.com/modflowpy/flopy.git
+        cd flopy
+        python setup.py install
+        cd ..
+        pip install https://github.com/modflowpy/pymake/zipball/master
+        git clone -b develop --depth 1 https://github.com/pypest/pyemu.git
+        cd pyemu
+        python setup.py install
+        cd ..
 
     # - name: Get specific version CMake, v3.19
     #   if: ${{ runner.os == 'Windows' }} 
@@ -83,58 +147,30 @@ jobs:
         fi
         cd ..
 
-   
-    # Standard python fails on windows without GDAL installation
-    # Using custom bash shell ("shell: bash -l {0}") with Miniconda
-    - name: Setup Miniconda
-      uses: conda-incubator/setup-miniconda@v2.0.0
-      with:
-        python-version: ${{ matrix.python-version }}
-        mamba-version: "0.20.0"
-        channels: conda-forge
-        auto-update-conda: true
-        activate-environment: pyemu
-        use-only-tar-bz2: true
-
-    - name: Add packages to pyemu environment using mamba or conda
-      shell: bash -l {0}
-      run: |
-        if [ "$RUNNER_OS" == "Windows" ]; then
-          conda env update --name pyemu --file etc/environment.yml
-        else
-          conda env update --name pyemu --file etc/environment.yml
-        fi
-    
-    - name: Install Flopy & pyemu?
-      shell: bash -l {0}
-      run: |
-        git clone -b develop --depth 1 https://github.com/modflowpy/flopy.git
-        cd flopy
-        python setup.py install
-        cd ..
-        pip install https://github.com/modflowpy/pymake/zipball/master
-        git clone -b develop --depth 1 https://github.com/pypest/pyemu.git
-        cd pyemu
-        python setup.py install
-        cd ..
     
     - name: aux bin path hackery
       shell: bash -l {0}
       run: |
+        cp -r benchmarks/test_bin/win $HOME/bin
+        echo "../../test_bin/win" >> $GITHUB_PATH
         if [[ "$RUNNER_OS" == "Windows" ]]; then
-            echo "..\..\test_bin\win" >> $GITHUB_PATH        
+            cp -r benchmarks/test_bin/win $HOME/bin
+            echo "../../test_bin/win" >> $GITHUB_PATH  
         else
             echo "../../test_bin/linux" >> $GITHUB_PATH
+            cp -r benchmarks/test_bin/win $HOME/bin
         fi
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
 
     - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
       shell: bash -l {0}
       run: |
+        
         ls -l
         cd ${{ env.test_dir }}
         nosetests -v ${{ env.test_script }}
         cd
-
+    
         
 
 
