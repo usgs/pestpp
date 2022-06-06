@@ -34,12 +34,14 @@ jobs:
           - { test_dir: "pestpp-ies_benchmarks", test_repo: "https://github.com/pestpp/pestpp-ies_benchmarks", test_script: "ies_test_part4.py"}
           - { test_dir: "pestpp-glm_benchmarks", test_repo: "https://github.com/pestpp/pestpp-glm_benchmarks", test_script: "glm_test_base.py"}
           - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests.py"}
-          - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests_2.py"}
+          #- { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests_2.py"}
           - { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "henry_test.py"}
           - { test_dir: "pestpp-da_benchmarks", test_repo: "https://github.com/pestpp/pestpp-da_benchmarks", test_script: "da_tests.py"}
           - { test_dir: "pestpp-da_benchmarks", test_repo: "https://github.com/pestpp/pestpp-da_benchmarks", test_script: "lorenz96_tests.py"}
           - { test_dir: "pestpp-sqp_benchmarks", test_repo: "https://github.com/pestpp/pestpp-sqp_benchmarks", test_script: "sqp_tests.py"}
-      
+        include: 
+            - os: ubuntu-latest
+              env: { test_dir: "pestpp-mou_benchmarks", test_repo: "https://github.com/pestpp/pestpp-mou_benchmarks", test_script: "mou_tests_2.py"}
     env: ${{ matrix.env }}
 
     steps:
@@ -163,15 +165,12 @@ jobs:
     - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
       shell: bash -l {0}
       run: |
-        if [[ "$RUNNER_OS" == "Windows" ]] and [[$env.test_script  == "mou_tests_2.py"]]; then
-            ls -l
-        else
-          ls -l
-          cd ${{ env.test_dir }}
-          nosetests -v ${{ env.test_script }}
-          cd
-        fi
-
+        
+        ls -l
+        cd ${{ env.test_dir }}
+        nosetests -v ${{ env.test_script }}
+        cd
+    
         
 
 
