@@ -104,7 +104,7 @@ public:
 	map<string, double> calc_par_dss(const Jacobian& jac, ParamTransformSeq& par_transform);
 
 	Pest get_child_pest(int icycle);
-	void child_pest_update(int icycle);
+	void child_pest_update(int icycle, bool keep_order=true);
 	//vector<int> get_assim_cycles(ofstream& f_rec, vector<int> unique_cycles);
 	vector<int> get_assim_dci_cycles(ofstream& f_rec, vector<int> unique_cycles);
 	//vector<int> get_assim_cycles(ofstream& f_rec);
@@ -116,6 +116,7 @@ public:
     int get_num_ext_file_maps() const {return efiles_map.size();}
     void clear_ext_files() { efiles_map.clear(); }
 	map<string, vector<pest_utils::ExternalCtlFile>>& get_efiles_map() { return efiles_map; }
+	void release_unused_for_agent();
 	virtual ~Pest();
 	
 protected:

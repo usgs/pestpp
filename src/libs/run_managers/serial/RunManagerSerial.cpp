@@ -125,6 +125,10 @@ void RunManagerSerial::run()
 	vector<int> run_id_vec;
 	
 	std::chrono::system_clock::time_point start_time_all = std::chrono::system_clock::now();
+	int run_status;
+	string info_txt;
+	int group_id = -1;
+	double info_value;
 	while (!(run_id_vec = get_outstanding_run_ids()).empty())
 	{
 		for (int i_run : run_id_vec)
@@ -137,6 +141,23 @@ void RunManagerSerial::run()
                 failed_runs++;
                 continue;
             }
+
+			file_stor.get_info(i_run, run_status, info_txt, info_value);
+			try
+			{
+				ofstream fout("run.info");
+				if (fout.good())
+				{
+					fout << "run_id, " << i_run << endl;
+					fout << "group_id, " << group_id << endl;
+					fout << "info_txt," << info_txt << endl;
+				}
+				fout.close();
+			}
+			catch (...)
+			{
+
+			}
 			std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
 			try
 			{	

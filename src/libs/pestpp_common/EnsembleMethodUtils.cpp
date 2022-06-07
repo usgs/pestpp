@@ -4720,14 +4720,16 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
         message(1,ss.str());
 
     }
-    if (rec_report) {
-        ofstream& frec = file_manager.rec_ofstream();
+    if ((rec_report) && (obs_dyn_state_names.size() < 10000)) {
+        ofstream &frec = file_manager.rec_ofstream();
         frec << "...observation-to-parameter state mapping: " << endl;
         for (int i = 0; i < obs_dyn_state_names.size(); i++) {
             frec << "observation state '" << obs_dyn_state_names[i] << "' maps to parameter initial state '"
                  << par_dyn_state_names[i] << "'" << endl;
         }
-        
+    }
+    if ((rec_report) && (final2init_par_state_names.size() < 10000)) {
+        ofstream &frec = file_manager.rec_ofstream();
         frec << endl << "...final-to-initial parameter state mapping: " << endl;
         for (auto &sm : final2init_par_state_names) {
             frec << "final state '" << sm.first << "' maps to initial state '" << sm.second << "'" << endl;
