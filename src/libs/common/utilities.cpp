@@ -377,7 +377,7 @@ map<string, double> read_twocol_ascii_to_map(string filename, int header_lines, 
 {
 	map<string, double> result;
 	ifstream fin(filename);
-	if (!fin.good())
+    if (!fin.good())
 		throw runtime_error("could not open file " + filename + " for reading");
 	string line;
 	double value;
@@ -406,7 +406,7 @@ vector<string> read_onecol_ascii_to_vector(std::string filename)
 {
 	vector<string> result;
 	ifstream fin(filename);
-	if (!fin.good())
+    if (!fin.good())
 		throw runtime_error("could not open file " + filename + " for reading");
 	string line;
 	vector<string> tokens;
@@ -430,7 +430,7 @@ void read_res(string& res_filename, Observations& obs)
 {
 	map<string, double> result;
 	ifstream fin(res_filename);
-	if (!fin.good())
+    if (!fin.good())
 		throw runtime_error("could not open residuals file " + res_filename + " for reading");
 	vector<string> tokens;
 	string line, name;
@@ -720,7 +720,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 	stringstream ss;
 	ifstream in;
 	in.open(filename.c_str(), ifstream::binary);
-	if (in.bad())
+    if (!in.good())
 	{
 		ss.str("");
 		ss << "read_dense_binary() error opening binary file " << filename << " for reading";
@@ -754,7 +754,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 		for (int i = 0; i < n_obs_and_pi; i++)
 		{
 			in.read((char*)&(name_size), sizeof(name_size));
-			if (in.bad())
+            if (!in.good())
 			{
 				ss.str("");
 				ss << "read_dense_binary(), dense format error reading size column name size for column number " << i;
@@ -769,7 +769,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 		{
 			char* col_name = new char[col_name_size];
 			in.read(col_name, col_name_size);
-			if (in.bad())
+            if (!in.good())
 			{
 				ss.str("");
 				ss << "read_dense_binary(), dense format error reading column name for column number " << i << ", size " << col_name_size;
@@ -796,7 +796,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 			}
 
 			in.read((char*)&(name_size), sizeof(name_size));
-			if (in.bad())
+            if (!in.good())
 			{
 				ss.str("");
 				ss << "read_dense_binary(), dense format incomplete record: error reading row name size for row number " << i << "...continuing";
@@ -805,7 +805,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 			}
 			char* row_name = new char[name_size];
 			in.read(row_name, name_size);
-			if (in.bad())
+            if (!in.good())
 			{
 				ss.str("");
 				ss << "read_dense_binary(), dense format incomplete record: error reading row name for row number " << i << "...continuing";
@@ -815,7 +815,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 			name = string(row_name, name_size);
 			pest_utils::strip_ip(name);
 			pest_utils::upper_ip(name);
-			if (in.bad())
+            if (!in.good())
 			{
 				ss.str("");
 				ss << "read_dense_binary(), dense format incomplete record: error skipping values for row  " << i << "...continuing ";
@@ -828,7 +828,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 			in.read(row_name, sizeof(double)* col_names.size());
 			if (in.eof())
 				break;
-			if (in.bad())
+            if (!in.good())
 			{
 				ss.str("");
 				ss << "read_dense_binary(), dense format incomplete record: error skipping values for row  " << i << "...continuing ";
@@ -852,7 +852,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 			in.seekg(sizeof(int) + row_names[i].size(), ios_base::cur);
 			for (int j = 0; j < col_names.size(); j++)
 			{
-				if (in.bad())
+                if (!in.good())
 				{
 					ss.str("");
 					ss << "read_dense_binary(), dense format incomplete record: error reading row,col value  " << i << "," << j << "...continuing ";
@@ -871,7 +871,7 @@ void read_binary_matrix_header(const string& filename, int& tmp1, int& tmp2, int
 	stringstream ss;
 	ifstream in;
 	in.open(filename.c_str(), ifstream::binary);
-	if (in.bad())
+    if (!in.good())
 	{
 		ss.str("");
 		ss << "pest_utils::read_binary_matrix_header() error opening binary file " << filename << " for reading";
@@ -880,7 +880,7 @@ void read_binary_matrix_header(const string& filename, int& tmp1, int& tmp2, int
 	in.read((char*)&tmp1, sizeof(tmp1));
 	in.read((char*)&tmp2, sizeof(tmp2));
 	in.read((char*)&tmp3, sizeof(tmp3));
-	if (in.bad())
+    if (!in.good())
 	{
 		ss.str("");
 		ss << "pest_utils::read_binary_matrix_header() error header from binary file " << filename << " for reading";
@@ -929,7 +929,7 @@ bool read_binary(const string &filename, vector<string> &row_names, vector<strin
 	stringstream ss;
 	ifstream in;
 	in.open(filename.c_str(), ifstream::binary);
-	if (in.bad())
+	if (!in.good())
 	{
 		ss.str("");
 		ss << "pest_utils::read_binary() error opening binary file " << filename << " for reading";
@@ -1376,7 +1376,7 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 		throw_externalctrlfile_error("filename '" + filename + "' not found");
 	}
 	ifstream f_in(filename);
-	if (!f_in.good())
+    if (!f_in.good())
 	{
 		throw_externalctrlfile_error("error opening filename '" + filename + "' for reading");
 	}

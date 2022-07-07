@@ -1736,7 +1736,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "gsa_morris_r: " << gsa_morris_r << endl;
 	os << "gsa_morris_delta: " <<  gsa_morris_delta << endl;
 	os << "gsa_sobol_samples: " << gsa_sobol_samples << endl;
-	os << "gsa_sobol_par_dist: " << gsa_sobol_par_dist << endl;
+	os << "gsa_sobol_par_dist: " << gsa_sobol_par_dist << endl << endl;
 	
 	os << "pestpp-da options (those not shared with pestpp-ies):" << endl;
 	os << "da_parameter_cycle_table: " << da_par_cycle_table << endl;
@@ -1860,7 +1860,7 @@ void PestppOptions::set_defaults()
 	set_ies_use_approx(true);
 	set_ies_subset_size(4);
 	set_ies_reg_factor(0.0);
-	set_ies_verbose_level(0);
+	set_ies_verbose_level(1);
 	set_ies_use_prior_scaling(false);
 	set_ies_num_reals(50);
 	set_ies_bad_phi(1.0e+300);

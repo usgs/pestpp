@@ -784,9 +784,10 @@ void SeqQuadProgram::initialize()
 		message(2, "using all adjustable parameters as decision variables: ", act_par_names.size());
 		dv_names = act_par_names;
 	}
-	initialize_objfunc();
+
 	constraints.initialize(dv_names, numeric_limits<double>::max());
 	constraints.initial_report();
+    initialize_objfunc();
 	//some risk-based stuff here
 	string chance_points = ppo->get_opt_chance_points();
 	if (chance_points == "ALL")
