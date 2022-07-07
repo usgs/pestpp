@@ -60,7 +60,8 @@ private:
 
 	set<FilterRec> obj_viol_pairs;
 
-	bool first_dominates_second(const FilterRec& first, const FilterRec& second);
+	bool first_partially_dominates_second(const FilterRec& first, const FilterRec& second);
+    bool first_strictly_dominates_second(const FilterRec& first, const FilterRec& second);
 	
 };
 

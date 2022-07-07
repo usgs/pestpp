@@ -34,18 +34,18 @@ bool SqpFilter::accept(double obj_val, double violation_val, int iter, double al
 		candidate.obj_val *= (1 - obj_tol);
 	candidate.viol_val *= (1 + viol_tol);
 	
-	bool accept = false;
+	bool accept = true;
 	for (auto& p : obj_viol_pairs)
-		if (first_dominates_second(candidate, p))
+		if (!first_partially_dominates_second(candidate, p))
 		{
-			accept = true;
+			accept = false;
 			break;
 		}
 	return accept;
 }
 
 
-bool SqpFilter::first_dominates_second(const FilterRec& first, const FilterRec& second)
+bool SqpFilter::first_partially_dominates_second(const FilterRec& first, const FilterRec& second)
 {
 	if (minimize)
 	{
@@ -62,6 +62,25 @@ bool SqpFilter::first_dominates_second(const FilterRec& first, const FilterRec& 
 			return false;
 	}
 }
+
+bool SqpFilter::first_strictly_dominates_second(const FilterRec& first, const FilterRec& second)
+{
+    if (minimize)
+    {
+        if ((first.obj_val < second.obj_val) && (first.viol_val < second.viol_val))
+            return true;
+        else
+            return false;
+    }
+    else
+    {
+        if ((first.obj_val > second.obj_val) && (first.viol_val < second.viol_val))
+            return true;
+        else
+            return false;
+    }
+}
+
 bool SqpFilter::update(double obj_val, double violation_val, int iter, double alpha)
 {
 	bool acc = accept(obj_val, violation_val,iter, alpha);
@@ -75,7 +94,7 @@ bool SqpFilter::update(double obj_val, double violation_val, int iter, double al
 	set<FilterRec> updated{ candidate };
 	for (auto& p : obj_viol_pairs)
 	{
-		if (first_dominates_second(p, candidate))
+		if (first_strictly_dominates_second(p, candidate))
 			updated.insert(p);
 	}
 	obj_viol_pairs = updated;
@@ -2535,23 +2554,29 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		//but maybe we want to just add all of these candidates to the filter?
 		//there is also a test method with the filter that doesnt add 
 		//to the records...
-		filter_accept = filter.update(obj_vec[i], infeas_sum,iter,alpha_vals[i]);
+		filter_accept = filter.accept(obj_vec[i], infeas_sum,iter,alpha_vals[i]);
 		if (filter_accept)
 			ss << " filter accepted ";
 		else
 			ss << " filter rejected ";
 		message(1, ss.str());
-		if ((obj_sense=="minimize") && (obj_vec[i] < oext))
-		{
-			idx = i;
-			oext = obj_vec[i];
-		}
-		else if ((obj_sense == "maximize") && (obj_vec[i] > oext))
-		{
-			idx = i;
-			oext = obj_vec[i];
-		}
-		
+//		if ((obj_sense=="minimize") && (obj_vec[i] < oext))
+//		{
+//			idx = i;
+//			oext = obj_vec[i];
+//		}
+//		else if ((obj_sense == "maximize") && (obj_vec[i] > oext))
+//		{
+//			idx = i;
+//			oext = obj_vec[i];
+//		}
+        if (filter_accept)
+        {
+            idx = i;
+            oext = obj_vec[i];
+            // now update the filter recs to remove any dominated pairs
+            filter.update(obj_vec[i], infeas_sum, iter, alpha_vals[i]);
+        }
 		//report the constraint info for this candidate
 		t = dv_candidates.get_real_vector(real_names[i]);
 		cand_dv_values = current_ctl_dv_values;
