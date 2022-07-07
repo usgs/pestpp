@@ -52,6 +52,8 @@ public:
 	}
 	bool accept(double obj_val, double violation_val,int iter=0,double alpha=-1.0);
 	bool update(double obj_val, double violation_val, int iter=0,double alpha=-1.0);
+    void report(ofstream& frec,int iter);
+
 
 private:
 	bool minimize;

@@ -81,6 +81,35 @@ bool SqpFilter::first_strictly_dominates_second(const FilterRec& first, const Fi
     }
 }
 
+void SqpFilter::report(ofstream& frec, int iter)
+{
+    frec << "...SQP filter members for iteration " << iter << ":" << endl << "    obj, violation" << endl;
+    double omin = 1.0e+300,omax = -1e+300,vmin = 1e+300,vmax = -1e+300;
+    for (auto& fr : obj_viol_pairs)
+    {
+        frec << setw(6) << setprecision(3) << fr.obj_val << "," << fr.viol_val << endl;
+        omin = min(fr.obj_val,omin);
+        omax = max(fr.obj_val,omax);
+        vmin = min(fr.viol_val,vmin);
+        vmax = max(fr.viol_val,vmax);
+    }
+    stringstream ss;
+    ss.str("");
+    ss << endl << "... filter summary for iteration " << iter << ":" << endl;
+    ss << "-->obj min:" << omin << endl;
+    ss << "-->obj max:" << omax << endl;
+    ss << "-->violation min:" << vmin << endl;
+    ss << "-->violation max:" << vmax << endl;
+    ss << endl;
+
+    frec << ss.str();
+    cout << ss.str();
+
+
+
+
+}
+
 bool SqpFilter::update(double obj_val, double violation_val, int iter, double alpha)
 {
 	bool acc = accept(obj_val, violation_val,iter, alpha);
@@ -2588,6 +2617,8 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		constraints.sqp_report(iter, cand_dv_values, cand_obs_values, false,tag);
 
 	}
+
+	filter.report(file_manager.rec_ofstream(),iter);
 
 
 	if (idx == -1)
