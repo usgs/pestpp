@@ -86,7 +86,7 @@ private:
 	OutputFileWriter &output_file_writer;
 	PerformanceLog *performance_log;
 	RunManagerAbstract* run_mgr_ptr;
-	L2PhiHandler ph;
+	//L2PhiHandler ph;
 	ParChangeSummarizer pcs;
 	Covariance parcov, obscov;
 	double reg_factor;
@@ -184,13 +184,9 @@ private:
 	void save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool save_base=true);
 	void save_mat(string prefix, Eigen::MatrixXd &mat);
 	bool initialize_dv(Covariance &cov);
-	//bool initialize_oe(Covariance &cov);
 	bool initialize_restart();
 	void initialize_parcov();
-	void initialize_obscov();
 	void initialize_objfunc();
-	void drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe, bool is_subset=false);
-	
 	void queue_chance_runs();
 	
 	template<typename T, typename A>
@@ -202,12 +198,8 @@ private:
 
 	void sanity_checks();
 
-	void add_bases();
+	void add_current_as_bases(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
 
-	void update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe);
-
-	void set_subset_idx(int size);
-	
 };
 
 #endif

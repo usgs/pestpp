@@ -422,7 +422,7 @@ pair<Covariance,Covariance> Ensemble::get_empirical_cov_matrices(FileManager* fi
 	}
 	double scale = (num_reals / ((num_reals - 1.) * (num_reals - 1.) * (num_reals - 1.))) * wij_sum;
 	scale = scale / demon;
-	cout << "optimal residual covariance matrix shrinkage factor: " << scale << endl;
+	//cout << "optimal residual covariance matrix shrinkage factor: " << scale << endl;
 	file_manager_ptr->rec_ofstream() << "optimal residual covariance matrix shrinkage factor : " << scale << endl;
 		
 	Covariance rcov_diag;

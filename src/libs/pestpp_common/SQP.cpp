@@ -268,38 +268,39 @@ bool SeqQuadProgram::initialize_dv(Covariance &cov)
 
 }
 
-void SeqQuadProgram::add_bases()
+void SeqQuadProgram::add_current_as_bases(ParameterEnsemble& _dv, ObservationEnsemble& _oe)
 {
 	//check that 'base' isn't already in ensemble
-	vector<string> rnames = dv.get_real_names();
+	vector<string> rnames = _dv.get_real_names();
 	bool inpar = false;
 	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
-		message(1, "'base' realization already in parameter ensemble, ignoring '++ies_include_base'");
+		message(1, "'base' realization already in parameter ensemble, ignoring 'include_base'");
 		inpar = true;
 	}
 	else
 	{
 		message(1, "adding 'base' parameter values to ensemble");
 		Parameters pars = pest_scenario.get_ctl_parameters();
-		dv.get_par_transform().active_ctl2numeric_ip(pars);
-		vector<int> drop{ dv.shape().first - 1 };
-		dv.drop_rows(drop);
-		dv.append(BASE_REAL_NAME, pars);
+		pars.update_without_clear(dv_names,current_ctl_dv_values.get_data_vec(dv_names));
+		_dv.get_par_transform().active_ctl2numeric_ip(pars);
+		vector<int> drop{ _dv.shape().first - 1 };
+		_dv.drop_rows(drop);
+		_dv.append(BASE_REAL_NAME, pars);
 	}
 
 	//check that 'base' isn't already in ensemble
-	rnames = oe.get_real_names();
+	rnames = _oe.get_real_names();
 	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
-		message(1, "'base' realization already in observation ensemble, ignoring '++ies_include_base'");
+		message(1, "'base' realization already in observation ensemble, ignoring 'include_base'");
 	}
 	else
 	{
 		Observations obs = pest_scenario.get_ctl_observations();
 		if (inpar)
 		{
-			vector<string> prnames = dv.get_real_names();
+			vector<string> prnames = _dv.get_real_names();
 
 			int idx = find(prnames.begin(), prnames.end(), BASE_REAL_NAME) - prnames.begin();
 			//cout << idx << "," << rnames.size() << endl;
@@ -311,43 +312,21 @@ void SeqQuadProgram::add_bases()
 			message(1, mess);
 			vector<string> drop;
 			drop.push_back(oreal);
-			oe.drop_rows(drop);
-			oe.append(BASE_REAL_NAME, obs);
+			_oe.drop_rows(drop);
+			_oe.append(BASE_REAL_NAME, obs);
 			//rnames.insert(rnames.begin() + idx, string(base_name));
 			rnames[idx] = BASE_REAL_NAME;
-			oe.reorder(rnames, vector<string>());
+			_oe.reorder(rnames, vector<string>());
 		}
 		else
 		{
 			message(1, "adding 'base' observation values to ensemble");
-			vector<int> drop{ oe.shape().first - 1 };
-			oe.drop_rows(drop);
-			oe.append(BASE_REAL_NAME, obs);
+			vector<int> drop{ _oe.shape().first - 1 };
+			_oe.drop_rows(drop);
+			_oe.append(BASE_REAL_NAME, obs);
 		}
 	}
 }
-
-
-//template<typename T, typename A>
-//void SeqQuadProgram::message(int level, char* _message, vector<T, A> _extras)
-//{
-//	string s(_message);
-//	message(level, s, _extras);
-//}
-
-//void SeqQuadProgram::message(int level, char* _message)
-//{
-//	string s(_message);
-//	message(level, s);
-//}
-
-//template<typename T>
-//void SeqQuadProgram::message(int level, char* _message, T extra)
-//{
-//	string s(_message);
-//	message(level, s, extra);
-//
-//}
 
 template<typename T, typename A>
 void SeqQuadProgram::message(int level, const string &_message, vector<T, A> _extras, bool echo)
@@ -676,18 +655,6 @@ void SeqQuadProgram::initialize_parcov()
 
 }
 
-
-void SeqQuadProgram::initialize_obscov()
-{
-	message(1, "initializing observation noise covariance matrix");
-	string obscov_filename = pest_scenario.get_pestpp_options().get_obscov_filename();
-
-	string how = obscov.try_from(pest_scenario, file_manager, false, true);
-	message(1, "obscov loaded ", how);
-	
-}
-
-
 void SeqQuadProgram::initialize()
 {	
 	message(0, "initializing");
@@ -855,7 +822,7 @@ void SeqQuadProgram::initialize()
 
 
 	scale_vals = ppo->get_sqp_scale_facs();
-	message(1, "using the following upgrade vector scale values (e.g. 'line search'):", scale_vals);
+	message(1, "using the following upgrade vector scale (e.g. 'line search') values:", scale_vals);
 	
 	//ofstream &frec = file_manager.rec_ofstream();
 	last_best = 1.0E+30;
@@ -863,8 +830,8 @@ void SeqQuadProgram::initialize()
 	warn_min_reals = 10;
 	error_min_reals = 2;
 	
-	vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
-	message(1, "using scaling factors: ", scale_facs);
+	//vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
+	//message(1, "using scaling factors: ", scale_facs);
 	
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
@@ -880,11 +847,9 @@ void SeqQuadProgram::initialize()
 		echo = true;
 
 	initialize_parcov();
-	//I dont think SQP needs an obscov? 
-	//initialize_obscov();
-
 
 	//these will be the ones we track...
+	//this means the initial dv vals in the control file will be the "center" of the enopt ensemble
 	current_ctl_dv_values = pest_scenario.get_ctl_parameters();
 	current_obs = pest_scenario.get_ctl_observations();
 
@@ -1073,9 +1038,11 @@ void SeqQuadProgram::make_gradient_runs(Parameters& _current_dv_vals, Observatio
 		Parameters dv_par = _current_dv_vals.get_subset(dv_names.begin(),dv_names.end());
 		ofstream& frec = file_manager.rec_ofstream();
 		_dv.draw(pest_scenario.get_pestpp_options().get_sqp_num_reals(), dv_par, parcov, performance_log, 0, frec);
+
 		//todo: save _dv here in case something bad happens...
 		ObservationEnsemble _oe(&pest_scenario, &rand_gen);
 		_oe.reserve(_dv.get_real_names(), constraints.get_obs_constraint_names());
+        add_current_as_bases(_dv, _oe);
 		message(1, "running new dv ensemble");
 		run_ensemble(_dv, _oe);
 		save(_dv, _oe);
@@ -1178,18 +1145,14 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 
 
-	//TODO: think about what adding the base would do for SQP?
-	/*if (pest_scenario.get_pestpp_options().get_ies_include_base())
-		if (pp_args.find("SQP_RESTART_OBS_EN") != pp_args.end())
-		{
-			message(1, "Warning: even though `sqp_include_base` is true, you passed a restart obs en, not adding 'base' realization...");
-		}
-		else
-			add_bases();*/
+	//TODO: think about what adding the base would do for SQP
+    if (pp_args.find("SQP_RESTART_OBS_EN") != pp_args.end())
+    {
+        message(1, "Warning: even though `sqp_include_base` is true, you passed a restart obs en, not adding 'base' realization...");
+    }
+    else
+        add_current_as_bases(dv, oe);
 
-
-			//now we check to see if we need to try to align the par and obs en
-			//this would only be needed if either of these were not drawn
 	if (!dv_drawn || !oe_drawn)
 	{
 		bool aligned = dv.try_align_other_rows(performance_log, oe);
@@ -1218,12 +1181,10 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 			frec << ma << endl;
 	}
 
-
-
 	message(2, "checking for denormal values in dv");
 	dv.check_for_normal("initial transformed dv ensemble");
 	ss.str("");
-	//TODO: setup an sqp save bin flag?  or piggy back?
+
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename() << ".0.par.jcb";
@@ -1239,19 +1200,7 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	oe.check_for_normal("observation ensemble");
 	ss.str("");
 
-
-	/*if (pest_scenario.get_pestpp_options().get_ies_save_binary())
-	{
-		ss << file_manager.get_base_filename() << ".obs.jcb";
-		oe.to_binary(ss.str());
-	}
-	else
-	{
-		ss << file_manager.get_base_filename() << ".obs.csv";
-		oe.to_csv(ss.str());
-	}
-	message(1, "saved initial observation ensemble to ", ss.str());*/
-	message(1, "centering on ensemble mean vector");
+	message(1, "centering on 'base' realization");
 
 	if (pest_scenario.get_control_info().noptmax == -2)
 	{
@@ -1276,16 +1225,7 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 		_oe.append("mean", pest_scenario.get_ctl_observations());
 		oe_base = _oe;
 		oe_base.reorder(vector<string>(), act_obs_names);
-		//initialize the phi handler
-		ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &dv_base, &parcov);
-		if (ph.get_lt_obs_names().size() > 0)
-		{
-			message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
-		}
-		if (ph.get_gt_obs_names().size())
-		{
-			message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
-		}
+
 		message(1, "running mean dv values");
 
 		vector<int> failed_idxs = run_ensemble(_pe, _oe);
@@ -1299,11 +1239,11 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 		_oe.to_csv(obs_csv);
 
 
-		//TODO: rather than report l2 phi, report actual obj func and feas status
-		ph.update(_oe, _pe);
-		message(0, "mean parameter phi report:");
-		ph.report(true);
-		ph.write(0, 1);
+        Eigen::VectorXd o = _oe.get_real_vector("mean");
+        current_obs = pest_scenario.get_ctl_observations();
+        current_obs.update_without_clear(_oe.get_var_names(), o);
+        save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, "mean");
+        constraints.sqp_report(0,current_ctl_dv_values, current_obs);
 
 		return;
 	}
@@ -1355,48 +1295,6 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 	save_real_par_rei(pest_scenario, dv, oe, output_file_writer, file_manager, -1);
 
 
-	performance_log->log_event("calc pre-drop phi");
-	//todo: I think we probably want to use the opt_objective_function arg
-	//to define the objective function.  Support and obs or a pi.  
-	//what about an external file like pestpp-opt with just coefficients?
-
-
-	//initialize the phi handler
-	//todo: can we also use the l2 norm of residuals to ident 
-	//"bad" realizations?
-
-	/*ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &dv_base, &parcov);
-
-	if (ph.get_lt_obs_names().size() > 0)
-	{
-		message(1, "less_than inequality defined for observations: ", ph.get_lt_obs_names().size());
-	}
-	if (ph.get_gt_obs_names().size())
-	{
-		message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
-	}
-
-	ph.update(oe, dv);
-	message(0, "pre-drop initial phi summary");
-	ph.report(true);
-	drop_bad_phi(dv, oe);
-	if (oe.shape().first == 0)
-	{
-		throw_sqp_error(string("all realizations dropped as 'bad'"));
-	}
-	if (oe.shape().first <= error_min_reals)
-	{
-		message(0, "too few active realizations:", oe.shape().first);
-		message(1, "need at least ", error_min_reals);
-		throw_sqp_error(string("too few active realizations, cannot continue"));
-	}
-	if (oe.shape().first < warn_min_reals)
-	{
-		ss.str("");
-		ss << "WARNING: less than " << warn_min_reals << " active realizations...might not be enough";
-		string s = ss.str();
-		message(0, s);
-	}*/
 
 	pcs = ParChangeSummarizer(&dv_base, &file_manager, &output_file_writer);
 
@@ -1413,88 +1311,7 @@ void SeqQuadProgram::prep_4_ensemble_grad()
 
 }
 
-void SeqQuadProgram::drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe, bool is_subset)
-{
-	//don't use this assert because _pe maybe full size, but _oe might be subset size
-	if (!is_subset)
-		if (_pe.shape().first != _oe.shape().first)
-			throw_sqp_error("SeqQuadProgram::drop_bad_phi() error: _pe != _oe and not subset");
-		
-	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
-	double bad_phi_sigma = pest_scenario.get_pestpp_options().get_ies_bad_phi_sigma();
-	vector<int> idxs = ph.get_idxs_greater_than(bad_phi,bad_phi_sigma, _oe);
 
-	if (pest_scenario.get_pestpp_options().get_ies_debug_bad_phi())
-		idxs.push_back(0);
-	
-	if (idxs.size() > 0)
-	{
-
-		message(0, "dropping realizations as bad: ", idxs.size());
-
-		vector<string> par_real_names = _pe.get_real_names(), obs_real_names = _oe.get_real_names();
-		stringstream ss;
-		string pname;
-		string oname;
-
-		int pidx;
-		vector<string> full_onames, full_pnames;
-		// if a subset drop, then use the full oe index, otherwise, just use _oe index
-		/*if (_oe.shape().first != _pe.shape().first)
-		{
-			full_onames = oe.get_real_names();
-		}
-		else
-		{
-			full_onames = _oe.get_real_names();
-		}*/
-		full_onames = oe.get_real_names();
-		full_pnames = dv.get_real_names();
-		vector<string> pdrop, odrop;
-		for (auto i : idxs)
-		{
-			oname = obs_real_names[i];
-			
-			/*if (is_subset)
-			{
-				pidx = find(full_onames.begin(), full_onames.end(), oname) - full_onames.begin();
-				if (find(subset_idxs.begin(), subset_idxs.end(), pidx) == subset_idxs.end())
-				{
-					ss.str("");
-					ss << "drop_bad_phi() error: idx " << pidx << " not found in subset_idxs";
-					throw_sqp_error(ss.str());
-				}
-				pname = full_pnames[pidx];
-			}*/
-			//else
-			{
-				pidx = i;
-				pname = par_real_names[pidx];
-			}
-			ss << pname << " : " << obs_real_names[i] << " , ";
-			pdrop.push_back(pname);
-			odrop.push_back(obs_real_names[i]);
-		}
-
-		string s = "dropping par:obs realizations: "+ ss.str();
-		message(1, s);
-		try
-		{
-			_pe.drop_rows(pdrop);
-			_oe.drop_rows(odrop);
-		}
-		catch (const exception &e)
-		{
-			stringstream ss;
-			ss << "drop_bad_phi() error : " << e.what();
-			throw_sqp_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_sqp_error(string("drop_bad_phi() error"));
-		}
-	}
-}
 
 void SeqQuadProgram::save_mat(string prefix, Eigen::MatrixXd &mat)
 {
@@ -1554,15 +1371,20 @@ void SeqQuadProgram::iterate_2_solution()
 
 		//todo: save and write out the current phi grad vector (maybe save all of them???)
 		ss.str("");
-		ss << "best phi sequence:";
+		ss << "best phi sequence:" << endl;
+		ss << "       ";
 		int ii = 0;
 		for (auto phi : best_phis)
 		{
-			ss << phi << " ";
+			ss << setw(10) << setprecision(4) << phi << " ";
 			ii++;
-			if (ii % 7 == 0)
-				ss << endl;
+			if (ii % 6 == 0) {
+                ss << endl;
+                ss << "       ";
+            }
+
 		}
+		ss << endl;
 		message(0, ss.str());
 
 		//check to break here before making more runs
@@ -1672,67 +1494,6 @@ bool SeqQuadProgram::should_terminate()
 
 
 
-void SeqQuadProgram::update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe)
-{
-
-	vector<string> oe_names = _oe.get_real_names();
-	vector<string> pe_names = _pe.get_real_names();
-	vector<string> oe_base_names = oe.get_real_names();
-	vector<string> pe_base_names = dv.get_real_names();
-
-	//if (pe_names.size() != oe_base_names.size())
-	//	throw runtime_error("SeqQuadProgram::update_reals_by_phi() error: pe_names != oe_base_names");
-	map<string, int> oe_name_to_idx;
-	map<int,string> pe_idx_to_name;
-
-	for (int i = 0; i < oe_base_names.size(); i++)
-		oe_name_to_idx[oe_base_names[i]] = i;
-	
-	for (int i = 0; i < pe_base_names.size(); i++)
-		pe_idx_to_name[i] = pe_base_names[i];
-	//store map of current phi values
-	ph.update(oe, dv);
-	L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
-	map<string, double> phi_map = ph.get_phi_map(pt);
-	map<string, double> cur_phi_map;
-	for (auto p : phi_map)
-		cur_phi_map[p.first] = p.second;
-
-	//now get a phi map of the new phi values
-	ph.update(_oe, _pe);
-	phi_map = ph.get_phi_map(pt);
-	
-	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
-	double cur_phi, new_phi;
-	string oname, pname;
-	Eigen::VectorXd real;
-	stringstream ss;
-	for (int i=0;i<_oe.shape().first;i++)
-	{
-		oname = oe_names[i];
-		new_phi = phi_map.at(oname);
-		cur_phi = cur_phi_map.at(oname);
-		if (new_phi < cur_phi * acc_fac)
-		{
-			//pname = pe_names[i];
-			//pname = pe_names[oe_name_to_idx[oname]];
-			pname = pe_idx_to_name[oe_name_to_idx[oname]];
-			if (find(pe_names.begin(), pe_names.end(), pname) == pe_names.end())
-				throw runtime_error("SeqQuadProgram::update_reals_by_phi() error: pname not in pe_names: " + pname);
-			ss.str("");
-			ss << "updating dv:oe real =" << pname << ":" << oname << ", current phi: new phi  =" << cur_phi << ":" << new_phi;
-			message(3, ss.str());
-			
-			real = _pe.get_real_vector(pname);
-			dv.update_real_ip(pname, real);
-			real = _oe.get_real_vector(oname);
-			oe.update_real_ip(oname, real);
-		}
-	}
-	ph.update(oe, dv);
-
-}
-
 Eigen::VectorXd SeqQuadProgram::calc_gradient_vector_from_coeffs(const Parameters& _current_dv_values)
 {
 	Eigen::VectorXd grad(dv_names.size());
@@ -1775,6 +1536,7 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 {
 	stringstream ss;
 	Eigen::VectorXd grad(dv_names.size());
+    //TODO: should this be optional?
 	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
 	
 	//if don't already have or if already have and exit
@@ -1792,9 +1554,6 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 		//ensemble stuff here
 		if (use_obj_obs)
 		{
-			
-			//todo: need to make sqp specific or refactor ies arg names
-
 			// compute sample dec var cov matrix and its pseudo inverse
 			// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
 			// TODO: so can pseudo inverse: Covariance dv_cov_matrix; 
@@ -1821,8 +1580,9 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 			Covariance shrunk_cov = dv.get_empirical_cov_matrices(&file_manager).second;
 			shrunk_cov.inv_ip();
 			parcov_inv = shrunk_cov.e_ptr()->toDense();
+			//cout << "parcov inv: " << endl << parcov_inv << endl;
 			//TODO: Matt to check consistency being sample cov forms
-			message(1, "empirical parcov inv:", parcov_inv);  // tmp
+            //message(1, "empirical parcov inv:", parcov_inv);  // tmp
 			
 			// try pseudo_inv_ip()
 			//Covariance x;
@@ -1838,7 +1598,7 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 			Eigen::MatrixXd obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str}, center_on);
 			Eigen::MatrixXd cross_cov_vector;  // or Eigen::VectorXd?
 			cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
-			cout << "dv-obj_cross_cov:" << cross_cov_vector << endl;
+			//cout << "dv-obj_cross_cov:" << endl << cross_cov_vector << endl;
 			
 			// now compute grad vector
 			// this is a matrix-vector product; the matrix being the pseudo inv of diag empirical dec var cov matrix and the vector being the dec var-phi cross-cov vector\
@@ -2058,7 +1818,8 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 	// combine to make total direction
 	message(1, "combining range and null space components of search direction");  // tmp
 	search_d = Y * p_y + Z * p_z;
-	message(1, "SD", search_d);  // tmp
+    //message(1, "SD", search_d);  // tmp
+
 	if (search_d.size() != curved_grad.size())
 	{
 		throw_sqp_error("search direction vector computation error (in null space KKT solve method)!");
@@ -2139,10 +1900,10 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 	pair<Eigen::VectorXd, Eigen::VectorXd> x;
 	
 
-	message(1, "hessian:", hessian);  // tmp
+	//message(1, "hessian:", hessian);  // tmp
     Mat constraint_mat;
     if (use_ensemble_grad) {
-        message(2, "getting ensemble-based working set constraint matrix");
+        message(1, "getting ensemble-based working set constraint matrix");
         constraint_mat = constraints.get_working_set_constraint_matrix(current_ctl_dv_values, current_obs, dv, oe,true);
     }
     else
@@ -2536,14 +2297,16 @@ bool SeqQuadProgram::solve_new()
 	//enforce bounds on candidates - TODO: report the shrinkage summary that enforce_bounds returns
 	dv_candidates.enforce_bounds(performance_log,false);
 	ss.str("");
-	ss << file_manager.get_base_filename() << "." << iter << ".par.csv";
+	ss << file_manager.get_base_filename() << "." << iter << ".dv_candidates.csv";
 	dv_candidates.to_csv(ss.str());
 
 	message(0, "running candidate decision variable batch");
 	vector<double> passed_scale_vals = scale_vals;	
 	//passed_scale_vals will get amended in this function based on run fails...
 	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates, passed_scale_vals);
-
+    ss.str("");
+    ss << file_manager.get_base_filename() << "." << iter << ".oe_candidates.csv";
+    oe_candidates.to_csv(ss.str());
 	//todo: decide which if any dv candidate to accept...
 	bool success = pick_candidate_and_update_current(dv_candidates, oe_candidates, passed_scale_vals);
 	if (!success)
@@ -2797,12 +2560,23 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		t = _oe.get_real_vector(real_names[i]);
 		cand_obs_values.update_without_clear(onames, t);
 		
-		constraints.sqp_report(iter, cand_dv_values, cand_obs_values, true,tag);
+		constraints.sqp_report(iter, cand_dv_values, cand_obs_values, false,tag);
 
 	}
-	message(0, "best phi this iteration: ", oext);
+
+
 	if (idx == -1)
 		throw_sqp_error("shits busted");
+    message(0, "best phi this iteration: ", oext);
+    t = dv_candidates.get_real_vector(real_names[idx]);
+    cand_dv_values = current_ctl_dv_values;
+    cand_dv_values.update_without_clear(dv_names, t);
+    pts.numeric2ctl_ip(cand_dv_values);
+    t = _oe.get_real_vector(real_names[idx]);
+    cand_obs_values.update_without_clear(onames, t);
+    ss.str("");
+    ss << "best candidate (scale factor: " << setprecision(4) << scale_vals[idx] << ", phi: " << oext << ")";
+    constraints.sqp_report(iter, cand_dv_values, cand_obs_values, true,ss.str());
 	best_phis.push_back(oext);
 	if (((obj_sense == "minimize") && (oext < last_best)) || ((obj_sense == "maximize") && (oext > last_best)))
 	{
@@ -2820,6 +2594,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		current_obs.update_without_clear(onames, t);
 		last_best = oext;
 		message(0, "new best phi:", last_best);
+
 
 
 		// todo add constraint (largest violating constraint not already in working set) to working set
