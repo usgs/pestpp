@@ -1823,7 +1823,8 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 	rhs = (-1. * constraint_diff);
 	message(1, "rhs", rhs);
 	rsvd.solve_ip(coeff, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-	coeff = V * s.inverse() * U.transpose();
+	coeff = V * s.inverse().asDiagonal() * U.transpose();
+
 	message(1, "coeff inv", coeff);
 	p_y = coeff * rhs;
 	message(1, "p_y", p_y);  // tmp
@@ -2032,7 +2033,8 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		// throw error here if not all on/near constraint
 		if ((constraint_diff.array() != 0.0).any())  // todo make some level of forgiveness with a tolerance parameter here
 		{
-			throw_sqp_error("not on constraint");  // better to pick this up elsewhere (before) anyway
+			//throw_sqp_error("not on constraint");  // better to pick this up elsewhere (before) anyway
+			message(0,"WARNING: not on constraint, continuing...");
 		}
 
 		// some transforms for solve
@@ -2502,7 +2504,7 @@ bool SeqQuadProgram::seek_feasible()
 	constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true, "post feasible seek");
 	//todo: probably more algorithmic things here...
 	last_best = get_obj_value(current_ctl_dv_values, current_obs);
-	message(1, "reset best phi value to ", last_best);
+	message(1, "finished seeking feasible, reset best phi value to ", last_best);
 	return false;
 }
 
