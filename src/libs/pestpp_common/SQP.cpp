@@ -2565,6 +2565,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
 	bool filter_accept;
 	string tag;
+	vector<double> infeas_vec;
 	for (int i = 0; i < obj_vec.size(); i++)
 	{
 		ss.str("");
@@ -2578,7 +2579,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 			infeas_sum += v.second;
 		}
 		ss << " infeasibilty total: " << infeas_sum << ", ";
-		
+		infeas_vec.push_back(infeas_sum);
 		//not sure how to deal with filter here - liu and reynolds have a scheme about it...
 		//but maybe we want to just add all of these candidates to the filter?
 		//there is also a test method with the filter that doesnt add 
@@ -2620,9 +2621,47 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 
 	filter.report(file_manager.rec_ofstream(),iter);
 
-
+    //if the filter approach failed...some heuristics
 	if (idx == -1)
-		throw_sqp_error("shits busted");
+    {
+	    message(0,"filter failed, checking for feasible solutions....");
+	    double viol_tol = filter.get_viol_tol();
+        for (int i=0;i<infeas_vec.size();i++)
+        {
+            if (infeas_vec[i] < viol_tol)
+            {
+                if ((obj_sense=="minimize") && (obj_vec[i] < oext))
+                {
+                    idx = i;
+                    oext = obj_vec[i];
+                }
+                else if ((obj_sense == "maximize") && (obj_vec[i] > oext))
+                {
+                    idx = i;
+                    oext = obj_vec[i];
+                }
+            }
+        }
+        if (idx == -1)
+        {
+            message(0,"no feasible solutions, choosing lowest constraint violation...");
+            //now what?
+            //how about least violation - probably going to hand off to ies now anyway...
+            double viol_min = 1e+300;
+            for (int i=0;i<infeas_vec.size();i++)
+            {
+                if (infeas_vec[i] < viol_min)
+                {
+                    viol_min = infeas_vec[i];
+                    idx = i;
+                    oext = obj_vec[i];
+                }
+            }
+        }
+
+    }
+	if (idx == -1)
+	    throw_sqp_error("shits busted");
     message(0, "best phi this iteration: ", oext);
     t = dv_candidates.get_real_vector(real_names[idx]);
     cand_dv_values = current_ctl_dv_values;
