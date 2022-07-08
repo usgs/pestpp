@@ -1480,6 +1480,7 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 			convert_ip(t, v);
 			sqp_scale_facs.push_back(v);
 		}
+		return true;
 	}
 	
 	return false;

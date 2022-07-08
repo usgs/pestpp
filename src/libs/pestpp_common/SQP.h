@@ -103,6 +103,8 @@ private:
 	map<string, double> obj_func_coef_map;
 
 	int num_threads;
+	int n_consec_infeas;
+	int MAX_CONSEC_INFEAS = 3;
 
 	double eigthresh;
 	vector<double> scale_vals;

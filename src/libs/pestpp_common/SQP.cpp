@@ -83,7 +83,7 @@ bool SqpFilter::first_strictly_dominates_second(const FilterRec& first, const Fi
 
 void SqpFilter::report(ofstream& frec, int iter)
 {
-    frec << "...SQP filter members for iteration " << iter << ":" << endl << "    obj, violation" << endl;
+    frec << "...SQP filter members (" << obj_viol_pairs.size() <<") for iteration " << iter << ":" << endl << "    obj, violation" << endl;
     double omin = 1.0e+300,omax = -1e+300,vmin = 1e+300,vmax = -1e+300;
     for (auto& fr : obj_viol_pairs)
     {
@@ -95,23 +95,19 @@ void SqpFilter::report(ofstream& frec, int iter)
     }
     stringstream ss;
     ss.str("");
-    ss << endl << "... filter summary for iteration " << iter << ":" << endl;
-    ss << "-->obj min:" << omin << endl;
-    ss << "-->obj max:" << omax << endl;
-    ss << "-->violation min:" << vmin << endl;
-    ss << "-->violation max:" << vmax << endl;
+    ss << endl << "... filter summary with " << obj_viol_pairs.size() << " pairs for iteration " << iter << ":" << endl;
+    ss << "-->obj min:max" << omin << ":" << omax << endl;
+    ss << "-->violation min:max" << vmin << ":" << vmax << endl;
     ss << endl;
 
     frec << ss.str();
     cout << ss.str();
 
-
-
-
 }
 
 bool SqpFilter::update(double obj_val, double violation_val, int iter, double alpha)
 {
+    //check if this candidate is nondom
 	bool acc = accept(obj_val, violation_val,iter, alpha);
 	if (!acc)
 		return false;
@@ -121,11 +117,36 @@ bool SqpFilter::update(double obj_val, double violation_val, int iter, double al
 	candidate.iter = iter;
 	candidate.alpha = alpha;
 	set<FilterRec> updated{ candidate };
-	for (auto& p : obj_viol_pairs)
-	{
-		if (first_strictly_dominates_second(p, candidate))
-			updated.insert(p);
-	}
+	//for (auto& p : obj_viol_pairs)
+	//{
+	//	if (first_strictly_dominates_second(p, candidate))
+	//		updated.insert(p);
+	//}
+	bool i_is_dominated = false;
+	set<FilterRec>::iterator first = obj_viol_pairs.begin();
+    set<FilterRec>::iterator second = obj_viol_pairs.begin();
+	for (int i=0;i<obj_viol_pairs.size();i++)
+    {
+
+	    i_is_dominated = false;
+	    second = obj_viol_pairs.begin();
+	    for (int j=0;j<obj_viol_pairs.size();j++)
+        {
+	        if (i == j)
+	            continue;
+	        if (first_strictly_dominates_second(*first,*second)) {
+                i_is_dominated = true;
+                break;
+            }
+	        second++;
+        }
+	    if (!i_is_dominated)
+        {
+	        updated.insert(*first);
+        }
+	    first++;
+
+    }
 	obj_viol_pairs = updated;
 	return true;
  }
@@ -144,6 +165,7 @@ SeqQuadProgram::SeqQuadProgram(Pest &_pest_scenario, FileManager &_file_manager,
 	oe.set_pest_scenario_ptr(&pest_scenario);
 	dv.set_rand_gen(&rand_gen);
 	oe.set_rand_gen(&rand_gen);
+
 	
 }
 
@@ -1406,6 +1428,7 @@ void SeqQuadProgram::iterate_2_solution()
 	ofstream &frec = file_manager.rec_ofstream();
 	
 	bool accept;
+	n_consec_infeas = 0;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
 		iter++;
@@ -1438,6 +1461,16 @@ void SeqQuadProgram::iterate_2_solution()
 		//check to break here before making more runs
 		if (should_terminate())
 			break;
+
+		if (n_consec_infeas > MAX_CONSEC_INFEAS)
+        {
+		    ss.str("");
+		    ss << "number of consecutive infeasible iterations > " << MAX_CONSEC_INFEAS << ", switching ies to seek feasibility";
+		    message(0,ss.str());
+		    seek_feasible();
+		    n_consec_infeas = 0;
+        }
+
 
 		//update the underlying runs
 		make_gradient_runs(current_ctl_dv_values,current_obs);
@@ -2339,9 +2372,6 @@ bool SeqQuadProgram::solve_new()
 		throw_sqp_error("ies_debug_upgrade_only is true, exiting");
 	}
 
-	//TODO: add sqp option to save candidates
-	
-
 	//enforce bounds on candidates - TODO: report the shrinkage summary that enforce_bounds returns
 	dv_candidates.enforce_bounds(performance_log,false);
 	ss.str("");
@@ -2374,8 +2404,6 @@ bool SeqQuadProgram::seek_feasible()
 {
 	stringstream ss;
 	message(1, "seeking feasibility with iterative ensemble smoother solution");
-	
-
 	Pest ies_pest_scenario;
 	string pst_filename = pest_scenario.get_pst_filename();
 	ifstream fin(pest_scenario.get_pst_filename());
@@ -2386,7 +2414,7 @@ bool SeqQuadProgram::seek_feasible()
 	ParamTransformSeq pts = ies_pest_scenario.get_base_par_tran_seq_4_mod();
 	TranFixed* tf_ptr = pts.get_fixed_ptr_4_mod();
 
-	Parameters ctl_pars = ies_pest_scenario.get_ctl_parameters_4_mod();
+	Parameters& ctl_pars = ies_pest_scenario.get_ctl_parameters_4_mod();
 
 	for (auto& name : ies_pest_scenario.get_ctl_ordered_par_names())
 	{
@@ -2419,7 +2447,7 @@ bool SeqQuadProgram::seek_feasible()
     {
 	    shifted = constraints.get_chance_shifted_constraints(current_obs);
     }
-	Observations ctl_obs = ies_pest_scenario.get_ctl_observations_4_mod();
+	Observations& ctl_obs = ies_pest_scenario.get_ctl_observations_4_mod();
 	for (auto& name : ies_pest_scenario.get_ctl_ordered_obs_names())
 	{
 		if (snames.find(name) == send)
@@ -2566,6 +2594,9 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	bool filter_accept;
 	string tag;
 	vector<double> infeas_vec;
+	vector<int> accept_idxs;
+	bool accept;
+
 	for (int i = 0; i < obj_vec.size(); i++)
 	{
 		ss.str("");
@@ -2580,32 +2611,20 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		}
 		ss << " infeasibilty total: " << infeas_sum << ", ";
 		infeas_vec.push_back(infeas_sum);
-		//not sure how to deal with filter here - liu and reynolds have a scheme about it...
-		//but maybe we want to just add all of these candidates to the filter?
-		//there is also a test method with the filter that doesnt add 
-		//to the records...
 		filter_accept = filter.accept(obj_vec[i], infeas_sum,iter,alpha_vals[i]);
 		if (filter_accept)
 			ss << " filter accepted ";
 		else
 			ss << " filter rejected ";
 		message(1, ss.str());
-//		if ((obj_sense=="minimize") && (obj_vec[i] < oext))
-//		{
-//			idx = i;
-//			oext = obj_vec[i];
-//		}
-//		else if ((obj_sense == "maximize") && (obj_vec[i] > oext))
-//		{
-//			idx = i;
-//			oext = obj_vec[i];
-//		}
         if (filter_accept)
         {
-            idx = i;
-            oext = obj_vec[i];
-            // now update the filter recs to remove any dominated pairs
-            filter.update(obj_vec[i], infeas_sum, iter, alpha_vals[i]);
+            accept_idxs.push_back(i);
+//            idx = i;
+//            oext = obj_vec[i];
+//            // now update the filter recs to remove any dominated pairs
+//            filter.update(obj_vec[i], infeas_sum, iter, alpha_vals[i]);
+//            accept = true;
         }
 		//report the constraint info for this candidate
 		t = dv_candidates.get_real_vector(real_names[i]);
@@ -2621,8 +2640,26 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 
 	filter.report(file_manager.rec_ofstream(),iter);
 
-    //if the filter approach failed...some heuristics
-	if (idx == -1)
+
+    if (accept_idxs.size() > 0)
+    {
+        accept = true;
+        //since all of the these passed the filter, choose the one with lowest phi
+        double min_obj = 1.0e+300;
+        ss.str("");
+        ss << "number of scale factors passing filter:" << accept_idxs.size();
+        message(1,ss.str());
+        for (auto iidx : accept_idxs)
+        {
+            if (obj_vec[iidx] < min_obj)
+            {
+                min_obj = obj_vec[iidx];
+                idx = iidx;
+                oext = obj_vec[iidx];
+            }
+        }
+    }
+	else
     {
 	    message(0,"filter failed, checking for feasible solutions....");
 	    double viol_tol = filter.get_viol_tol();
@@ -2672,8 +2709,10 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
     ss.str("");
     ss << "best candidate (scale factor: " << setprecision(4) << scale_vals[idx] << ", phi: " << oext << ")";
     constraints.sqp_report(iter, cand_dv_values, cand_obs_values, true,ss.str());
-	best_phis.push_back(oext);
-	if (((obj_sense == "minimize") && (oext < last_best)) || ((obj_sense == "maximize") && (oext > last_best)))
+
+	//TODO: need more thinking here - do we accept only if filter accepts?  I think so....
+	//if (((obj_sense == "minimize") && (oext < last_best)) || ((obj_sense == "maximize") && (oext > last_best)))
+	if (accept)
 	{
 		//todo:update current_dv and current_obs
 		message(0, "accepting upgrade", real_names[idx]);
@@ -2689,14 +2728,17 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		current_obs.update_without_clear(onames, t);
 		last_best = oext;
 		message(0, "new best phi:", last_best);
-
-
+        best_phis.push_back(oext);
 
 		// todo add constraint (largest violating constraint not already in working set) to working set
 		// is this the right place to do this? after accepting a particular candidate? 
 		// also can we adapt alpha_mult based on subset? using concept of blocking constraint here?
 		// take diff between vector of strings of constraints in working set and constraints with non-zero violation (return constraint idx from filter?)
 
+		if (infeas_vec[idx] > filter.get_viol_tol())
+        {
+		    n_consec_infeas++;
+        }
 
 		return true;
 		
@@ -2704,12 +2746,14 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	else
 	{
 		message(0, "not accepting upgrade #sad");
+        best_phis.push_back(last_best);
+        if (infeas_vec[idx] > filter.get_viol_tol())
+        {
+            n_consec_infeas++;
+        }
+		//TODO: something here to adapt to the failed iteration, otherwise I think we will continue failing...
 		return false;
 	}
-	
-	
-	
-	//return true;
 }
 
 void SeqQuadProgram::report_and_save_ensemble()
