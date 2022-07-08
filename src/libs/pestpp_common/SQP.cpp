@@ -2461,10 +2461,17 @@ bool SeqQuadProgram::seek_feasible()
 		}
 	}
 
-	snames = ies_pest_scenario.get_pestpp_options().get_passed_args();
-	if (snames.find("IES_NUM_REALS") == snames.end())
-		ies_pest_scenario.get_pestpp_options_ptr()->set_ies_num_reals(10);
-	IterEnsembleSmoother ies(ies_pest_scenario, file_manager, output_file_writer, performance_log, run_mgr_ptr);
+	//snames = ies_pest_scenario.get_pestpp_options().get_passed_args();
+	//if (snames.find("IES_NUM_REALS") == snames.end())
+	ies_pest_scenario.get_pestpp_options_ptr()->set_ies_num_reals(pest_scenario.get_pestpp_options().get_sqp_num_reals());
+	ies_pest_scenario.get_pestpp_options_ptr()->set_ies_no_noise(true);
+	ies_pest_scenario.get_pestpp_options_ptr()->set_ies_obs_csv("");
+    ies_pest_scenario.get_pestpp_options_ptr()->set_ies_obs_restart_csv("");
+    ies_pest_scenario.get_pestpp_options_ptr()->set_ies_par_csv("");
+    ies_pest_scenario.get_pestpp_options_ptr()->set_ies_par_restart_csv("");
+    ies_pest_scenario.get_control_info_4_mod().noptmax = 3; //TODO: make this an option some how?
+
+    IterEnsembleSmoother ies(ies_pest_scenario, file_manager, output_file_writer, performance_log, run_mgr_ptr);
 	ies.initialize();
 	ies.iterate_2_solution();
 
@@ -2585,7 +2592,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	vector<string> real_names = dv_candidates.get_real_names();
 	map<string, double> obj_map = get_obj_map(dv_candidates, _oe);
 	//todo make sure chances have been applied before now...
-	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates,_oe);
+	map<string, map<string, double>> violations = constraints.get_ensemble_violations_map(dv_candidates,_oe,filter.get_viol_tol(),true);
 	Parameters cand_dv_values = current_ctl_dv_values;
 	Observations cand_obs_values = current_obs;
 	Eigen::VectorXd t;

@@ -2815,7 +2815,7 @@ map<string, double> Constraints::get_unsatified_pi_constraints(Parameters& par_a
 	return unsatisfied;
 }
 
-map<string, map<string, double>> Constraints::get_ensemble_violations_map(ParameterEnsemble& pe, ObservationEnsemble& oe)
+map<string, map<string, double>> Constraints::get_ensemble_violations_map(ParameterEnsemble& pe, ObservationEnsemble& oe, double tol, bool include_weight)
 {
 	//make sure pe and oe share realizations
 	vector<string> pe_names = pe.get_real_names();
@@ -2835,7 +2835,7 @@ map<string, map<string, double>> Constraints::get_ensemble_violations_map(Parame
 	{
 		v = oe.get_real_vector(name);
 		obs.update_without_clear(vnames, v);
-		vmap = get_unsatified_obs_constraints(obs);
+		vmap = get_unsatified_obs_constraints(obs,tol,true,include_weight);
 		violations[name] = vmap;
 	}
 
@@ -2855,7 +2855,7 @@ map<string, map<string, double>> Constraints::get_ensemble_violations_map(Parame
 }
 
 
-map<string, double> Constraints::get_unsatified_obs_constraints(Observations& constraints_sim, double tol, bool do_shift)
+map<string, double> Constraints::get_unsatified_obs_constraints(Observations& constraints_sim, double tol, bool do_shift, bool include_weight)
 {
 	/* get a map of name, distance for each of the obs-based (e.g. model-based) constraints that are not satisfied in the constraint_obs container.
 	tol is a percent-based tolerance to accont for constraints that are very near their required (rhs) value
@@ -2866,6 +2866,8 @@ map<string, double> Constraints::get_unsatified_obs_constraints(Observations& co
 	Observations _constraints_sim(constraints_sim);
 	if ((do_shift) && (use_chance))
 		_constraints_sim = get_chance_shifted_constraints(constraints_sim);
+	ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+	double weight;
 	for (int i = 0; i < num_obs_constraints(); ++i)
 	{
 		string name = ctl_ord_obs_constraint_names[i];
@@ -2880,14 +2882,16 @@ map<string, double> Constraints::get_unsatified_obs_constraints(Observations& co
 			scaled_diff = abs((obs_val - sim_val) / obs_val);
 		else
 			scaled_diff = abs(obs_val - sim_val);
-
+        weight = 1.0;
+        if (include_weight)
+            weight = oi.get_weight(name);
 		//check for invalid obs constraints (e.g. satified)
 		if ((constraint_sense_map[name] == ConstraintSense::less_than) && (sim_val > obs_val) && (scaled_diff > tol))
-			unsatisfied[name] = sim_val - obs_val;
+			unsatisfied[name] = weight * (sim_val - obs_val);
 		else if ((constraint_sense_map[name] == ConstraintSense::greater_than) && (sim_val < obs_val) && (scaled_diff > tol))
-			unsatisfied[name] = obs_val - sim_val;
+			unsatisfied[name] = weight * (obs_val - sim_val);
 		else if ((constraint_sense_map[name] == ConstraintSense::equal_to) && (sim_val != obs_val) && (scaled_diff > tol))
-			unsatisfied[name] = abs(sim_val - obs_val);
+			unsatisfied[name] = weight * abs(sim_val - obs_val);
 	}
 	return unsatisfied;
 
