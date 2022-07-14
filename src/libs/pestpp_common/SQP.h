@@ -105,6 +105,9 @@ private:
 	int num_threads;
 	int n_consec_infeas;
 	int MAX_CONSEC_INFEAS = 3;
+    int MAX_CONSEC_PHIINC = 3;
+
+    int n_consec_phiinc;
 
 	double eigthresh;
 	vector<double> scale_vals;

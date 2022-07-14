@@ -1429,6 +1429,7 @@ void SeqQuadProgram::iterate_2_solution()
 	
 	bool accept;
 	n_consec_infeas = 0;
+	n_consec_phiinc = 0;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
 		iter++;
@@ -1501,76 +1502,72 @@ void SeqQuadProgram::iterate_2_solution()
 
 bool SeqQuadProgram::should_terminate()
 {
+    //todo: use ies accept fac here?
+    double phiredstp = pest_scenario.get_control_info().phiredstp;
+    int nphistp = pest_scenario.get_control_info().nphistp;
+    int nphinored = pest_scenario.get_control_info().nphinored;
+    bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
+    double phi, ratio;
+    int count = 0;
+    int nphired = 0;
+    //best_mean_phis = vector<double>{ 1.0,0.8,0.81,0.755,1.1,0.75,0.75,1.2 };
+
+
+
+    /*if ((!consec_sat )&& (best_mean_phis.size() == 0))
+        return false;*/
+    message(0, "phi-based termination criteria check");
+    message(1, "phiredstp: ", phiredstp);
+    message(1, "nphistp: ", nphistp);
+    message(1, "nphinored: ", nphinored);
+    message(1, "best phi yet: ", best_phi_yet);
+
+    for (auto& phi : best_phis)
+    {
+        ratio = (phi - best_phi_yet) / phi;
+        if (ratio <= phiredstp)
+            count++;
+    }
+    message(1, "number of iterations satisfying phiredstp criteria: ", count);
+    if (count >= nphistp)
+    {
+        message(1, "number iterations satisfying phiredstp criteria > nphistp");
+        phiredstp_sat = true;
+    }
+
+    message(1, "number of iterations since best yet mean phi: ", nphired);
+    if (nphired >= nphinored)
+    {
+        message(1, "number of iterations since best yet mean phi > nphinored");
+        nphinored_sat = true;
+    }
+    if (best_phis[best_phis.size() - 1] == 0.0)
+    {
+        message(1, "phi is zero, all done");
+        return true;
+    }
+
+    if ((nphinored_sat) || (phiredstp_sat) || (consec_sat))
+    {
+        message(1, "phi-based termination criteria satisfied, all done");
+        return true;
+    }
     int q = pest_utils::quit_file_found();
     if ((q == 1) || (q == 2))
     {
-        cout << "pest.stp' found, quitting" << endl;
-        file_manager.rec_ofstream() << "pest.stp' found, quitting" << endl;
+        message(1,"'pest.stp' found, quitting");
         return true;
     }
-	if (iter >= pest_scenario.get_control_info().noptmax)
-		return true;
-
-	//todo: work out some SQP-based criteria here...
-	//double phiredstp = pest_scenario.get_control_info().phiredstp;
-	//int nphistp = pest_scenario.get_control_info().nphistp;
-	//int nphinored = pest_scenario.get_control_info().nphinored;
-	//bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
-	//double phi, ratio;
-	//int count = 0;
-	//int nphired = 0;
-
-	//message(0, "phi-based termination criteria check");
-	//message(1, "phiredstp: ", phiredstp);
-	//message(1, "nphistp: ", nphistp);
-	//message(1, "nphinored (also used for consecutive bad lambda cycles): ", nphinored);
-	//if (best_mean_phis.size() > 0)
-	//{
-	//	vector<double>::iterator idx = min_element(best_mean_phis.begin(), best_mean_phis.end());
-	//	nphired = (best_mean_phis.end() - idx) - 1;
-	//	best_phi_yet = best_mean_phis[idx - best_mean_phis.begin()];// *pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
-	//	message(1, "best mean phi sequence: ", best_mean_phis);
-	//	message(1, "best phi yet: ", best_phi_yet);
-	//}
-	//message(1, "number of consecutive bad lambda testing cycles: ", consec_bad_lambda_cycles);
-	//if (consec_bad_lambda_cycles >= nphinored)
-	//{
-	//	message(1, "number of consecutive bad lambda testing cycles > nphinored");
-	//	consec_sat = true;
-	//}
-
-	//for (auto &phi : best_mean_phis)
-	//{
-	//	ratio = (phi - best_phi_yet) / phi;
-	//	if (ratio <= phiredstp)
-	//		count++;
-	//}
-	//message(1, "number of iterations satisfying phiredstp criteria: ", count);
-	//if (count >= nphistp)
-	//{
-	//	message(1, "number iterations satisfying phiredstp criteria > nphistp");
-	//	phiredstp_sat = true;
-	//}
-
-	//message(1, "number of iterations since best yet mean phi: ", nphired);
-	//if (nphired >= nphinored)
-	//{
-	//	message(1, "number of iterations since best yet mean phi > nphinored");
-	//	nphinored_sat = true;
-	//}
-
-	//if ((nphinored_sat) || (phiredstp_sat) || (consec_sat))
-	//{
-	//	message(1, "phi-based termination criteria satisfied, all done");
-	//	return true;
-	//}
-	return false;
+    else if (q == 4)
+    {
+        message(0,"pest.stp found with '4'.  run mgr has returned control, removing file.");
+        if (!pest_utils::try_remove_quit_file())
+        {
+            message(0,"error removing pest.stp file, bad times ahead...");
+        }
+    }
+    return false;
 }
-
-
-
-
-
 
 
 Eigen::VectorXd SeqQuadProgram::calc_gradient_vector_from_coeffs(const Parameters& _current_dv_values)
