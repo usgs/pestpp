@@ -96,8 +96,8 @@ void SqpFilter::report(ofstream& frec, int iter)
     stringstream ss;
     ss.str("");
     ss << endl << "... filter summary with " << obj_viol_pairs.size() << " pairs for iteration " << iter << ":" << endl;
-    ss << "-->obj min:max" << omin << ":" << omax << endl;
-    ss << "-->violation min:max" << vmin << ":" << vmax << endl;
+    ss << "-->obj min,max: " << omin << "," << omax << endl;
+    ss << "-->violation min,max: " << vmin << "," << vmax << endl;
     ss << endl;
 
     frec << ss.str();
@@ -1465,13 +1465,11 @@ void SeqQuadProgram::iterate_2_solution()
 		if (n_consec_infeas > MAX_CONSEC_INFEAS)
         {
 		    ss.str("");
-		    ss << "number of consecutive infeasible iterations > " << MAX_CONSEC_INFEAS << ", switching ies to seek feasibility";
+		    ss << "number of consecutive infeasible iterations > " << MAX_CONSEC_INFEAS << ", switching to IES to seek feasibility";
 		    message(0,ss.str());
 		    seek_feasible();
 		    n_consec_infeas = 0;
         }
-
-
 		//update the underlying runs
 		make_gradient_runs(current_ctl_dv_values,current_obs);
 		
@@ -1822,8 +1820,14 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 	message(1, "coeff matrix for p_range_space component", coeff);  // tmp
 	rhs = (-1. * constraint_diff);
 	message(1, "rhs", rhs);
+	cout << "starting SVD..." << endl;
 	rsvd.solve_ip(coeff, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-	coeff = V * s.inverse().asDiagonal() * U.transpose();
+	cout << "...done..." << endl;
+	S_ = s.asDiagonal().inverse();
+	cout << "s:" << S_.rows() << "," << S_.cols() << ", U:" << U.rows() << "," << U.cols() << ", V:" << V.rows() << "," << V.cols() << endl;
+	cout << endl << endl;
+
+	coeff = V * S_ * U.transpose();
 
 	message(1, "coeff inv", coeff);
 	p_y = coeff * rhs;
@@ -2014,8 +2018,6 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		message(0, "current working set:", cnames);
 		Eigen::MatrixXd constraint_jco = constraint_mat.e_ptr()->toDense();  // or would you pref to slice and dice each time - this won't get too big but want to avoid replicates  // and/or make Jacobian obj?
 
-		
-
 		//constraint_jco = jco.get_matrix(cnames, dv_names);
 		message(1, "A:", constraint_jco);  // tmp
 		// add check here that A is full rank; warn that linearly dependent will be removed via factorization
@@ -2031,10 +2033,11 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 		message(1, "constraint diff:", constraint_diff);  // tmp
 		
 		// throw error here if not all on/near constraint
-		if ((constraint_diff.array() != 0.0).any())  // todo make some level of forgiveness with a tolerance parameter here
+		if ((constraint_diff.array().abs() > filter.get_viol_tol()).any())  // todo make some level of forgiveness with a tolerance parameter here
 		{
 			//throw_sqp_error("not on constraint");  // better to pick this up elsewhere (before) anyway
-			message(0,"WARNING: not on constraint, continuing...");
+			cout << "constraint diff vector: " << constraint_diff.array() << endl;
+			message(0,"WARNING: not on constraint but working set not empty, continuing...");
 		}
 
 		// some transforms for solve
@@ -2128,7 +2131,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 
 			string to_drop = cnames[idx];
 			cnames.erase(cnames.begin() + idx);
-			message(1, "cnames after dropping atttempting:", cnames);  // tmp
+			message(1, "cnames after dropping attempting:", cnames);  // tmp
 
 			// todo JDub now we need to skip alpha testing for this iter and recalc search_d without this constraint... i moved to next iter in proto because it was cheap, probably want to go back to start of search_d computation?
 			// jwhite: will this process happen multiple times?  If so, we probably need to wrap this process in a "while true" loop
@@ -2455,16 +2458,20 @@ bool SeqQuadProgram::seek_feasible()
 		if (snames.find(name) == send)
 		{
 			oi->get_observation_rec_ptr_4_mod(name)->weight = 0.0;
+
 		}
 		else
 		{
 			ctl_obs.update_rec(name, shifted.get_rec(name));
-			//oi->get_observation_rec_ptr_4_mod(name)->group = "__nz_temp__";
+            oi->get_observation_rec_ptr_4_mod(name)->group = "__eqconstraint__"+name;
 		}
 	}
 
-	//snames = ies_pest_scenario.get_pestpp_options().get_passed_args();
-	//if (snames.find("IES_NUM_REALS") == snames.end())
+	snames = ies_pest_scenario.get_pestpp_options().get_passed_args();
+	if (snames.find("IES_BAD_PHI_SIGMA") == snames.end())
+    {
+	    ies_pest_scenario.get_pestpp_options_ptr()->set_ies_bad_phi_sigma(1.25);
+    }
 	ies_pest_scenario.get_pestpp_options_ptr()->set_ies_num_reals(pest_scenario.get_pestpp_options().get_sqp_num_reals());
 	ies_pest_scenario.get_pestpp_options_ptr()->set_ies_no_noise(true);
 	ies_pest_scenario.get_pestpp_options_ptr()->set_ies_obs_csv("");
@@ -2474,27 +2481,44 @@ bool SeqQuadProgram::seek_feasible()
     ies_pest_scenario.get_control_info_4_mod().noptmax = 3; //TODO: make this an option some how?
 
     IterEnsembleSmoother ies(ies_pest_scenario, file_manager, output_file_writer, performance_log, run_mgr_ptr);
-	ies.initialize();
+    if (use_ensemble_grad) {
+        ies.set_pe(dv);
+        ies.set_oe(oe);
+        ies.set_noise_oe(oe_base);
+    }
+    ies.initialize(iter,true,true);
+
 	ies.iterate_2_solution();
 
 	//what to do here? maybe we need to eval the kkt conditions to pick a new point that maintains the hessian?
 	ParameterEnsemble* ies_pe_ptr = ies.get_pe_ptr();
+	ObservationEnsemble* ies_oe_ptr = ies.get_oe_ptr();
+	vector<string> oreal_names = ies_oe_ptr->get_real_names();
+	map<string,double> aphi_map = ies.get_phi_handler().get_phi_map(L2PhiHandler::phiType::ACTUAL);
+
 	ies_pe_ptr->transform_ip(ParameterEnsemble::transStatus::CTL);
 	names = ies_pe_ptr->get_var_names();
+
 	Eigen::VectorXd cdv = current_ctl_dv_values.get_data_eigen_vec(dv_names);
 	double mndiff = 1.0e+300;
 	int mndiff_idx = -1;
 	for (int i = 0; i < ies_pe_ptr->shape().first; i++)
 	{
-		Eigen::VectorXd real = ies_pe_ptr->get_eigen_ptr()->row(i);
-		Eigen::VectorXd d = real - cdv;
-		double diff = (d.array() * d.array()).sum();
-		if (diff < mndiff)
+	    //cout << "real:" << oreal_names[i] << ", phi: " << aphi_map[oreal_names[i]] << endl;
+		//Eigen::VectorXd real = ies_pe_ptr->get_eigen_ptr()->row(i);
+		//Eigen::VectorXd d = real - cdv;
+		//double diff = (d.array() * d.array()).sum();
+		//if (diff < mndiff)
+		if (aphi_map[oreal_names[i]] < mndiff)
 		{
-			mndiff = diff;
+			mndiff = aphi_map[oreal_names[i]];
 			mndiff_idx = i;
 		}
 	}
+	ss.str("");
+	ss << "updating current decision variable values with realization " << ies_pe_ptr->get_real_names()[mndiff_idx];
+	ss << ", with minimum weighted constraint phi of " << mndiff;
+	message(1,ss.str());
 	cdv = ies_pe_ptr->get_real_vector(mndiff_idx);
 	current_ctl_dv_values.update_without_clear(names, cdv);
 	//update current obs
