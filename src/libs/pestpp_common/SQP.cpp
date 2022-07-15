@@ -18,7 +18,7 @@
 #include "EnsembleSmoother.h"
 
 
-bool SqpFilter::accept(double obj_val, double violation_val, int iter, double alpha)
+bool SqpFilter::accept(double obj_val, double violation_val, int iter, double alpha,bool keep)
 {
 	FilterRec candidate{ obj_val, violation_val,iter,alpha };
 	if (obj_viol_pairs.size() == 0)
@@ -41,6 +41,11 @@ bool SqpFilter::accept(double obj_val, double violation_val, int iter, double al
 			accept = false;
 			break;
 		}
+	if ((keep) && (accept))
+    {
+	    //cout << "obj:" << obj_val << ", viol:" << violation_val << ", alpha:" << alpha << endl;
+	    obj_viol_pairs.insert(candidate);
+    }
 	return accept;
 }
 
@@ -96,8 +101,10 @@ void SqpFilter::report(ofstream& frec, int iter)
     stringstream ss;
     ss.str("");
     ss << endl << "... filter summary with " << obj_viol_pairs.size() << " pairs for iteration " << iter << ":" << endl;
-    ss << "-->obj min,max: " << omin << "," << omax << endl;
-    ss << "-->violation min,max: " << vmin << "," << vmax << endl;
+    ss << "         obj min: " <<  setw(10) << omin << endl;
+    ss << "         obj max: " << setw(10) << omax << endl;
+    ss << "   violation min: " << setw(10) << vmin << endl;
+    ss << "   violation max: " << setw(10) << vmax << endl;
     ss << endl;
 
     frec << ss.str();
@@ -108,23 +115,19 @@ void SqpFilter::report(ofstream& frec, int iter)
 bool SqpFilter::update(double obj_val, double violation_val, int iter, double alpha)
 {
     //check if this candidate is nondom
-	bool acc = accept(obj_val, violation_val,iter, alpha);
-	if (!acc)
-		return false;
+	//bool acc = accept(obj_val, violation_val,iter, alpha);
+	//if (!acc)
+	//	return false;
 	FilterRec candidate;
 	candidate.obj_val = obj_val;
 	candidate.viol_val = violation_val;
 	candidate.iter = iter;
 	candidate.alpha = alpha;
-	set<FilterRec> updated{ candidate };
-	//for (auto& p : obj_viol_pairs)
-	//{
-	//	if (first_strictly_dominates_second(p, candidate))
-	//		updated.insert(p);
-	//}
+	multiset<FilterRec> updated;
+	obj_viol_pairs.insert(candidate);
 	bool i_is_dominated = false;
-	set<FilterRec>::iterator first = obj_viol_pairs.begin();
-    set<FilterRec>::iterator second = obj_viol_pairs.begin();
+	multiset<FilterRec>::iterator first = obj_viol_pairs.begin();
+    multiset<FilterRec>::iterator second = obj_viol_pairs.begin();
 	for (int i=0;i<obj_viol_pairs.size();i++)
     {
 
@@ -1441,23 +1444,22 @@ void SeqQuadProgram::iterate_2_solution()
 		//solve for and test candidates
 		accept = solve_new();
 
-		//todo: save and write out the current phi grad vector (maybe save all of them???)
-		ss.str("");
-		ss << "best phi sequence:" << endl;
-		ss << "       ";
-		int ii = 0;
-		for (auto phi : best_phis)
-		{
-			ss << setw(10) << setprecision(4) << phi << " ";
-			ii++;
-			if (ii % 6 == 0) {
-                ss << endl;
-                ss << "       ";
-            }
+        //save some stuff...
+        if (use_ensemble_grad)
+            report_and_save_ensemble();
 
-		}
-		ss << endl;
-		message(0, ss.str());
+        constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true);
+
+        //report dec var change stats - only for ensemble form
+        if (use_ensemble_grad)
+        {
+            ss.str("");
+            ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
+            pcs.summarize(dv, ss.str());
+        }
+
+        //store the grad vector used for this iteration
+        grad_vector_map[iter] = current_grad_vector;
 
 		//check to break here before making more runs
 		if (should_terminate())
@@ -1471,37 +1473,23 @@ void SeqQuadProgram::iterate_2_solution()
 		    seek_feasible();
 		    n_consec_infeas = 0;
         }
-		//update the underlying runs
-		make_gradient_runs(current_ctl_dv_values,current_obs);
-		
-		//save some stuff...
-		if (use_ensemble_grad)
-			report_and_save_ensemble();
 
+        //update the underlying runs
+        make_gradient_runs(current_ctl_dv_values,current_obs);
 		//update the hessian
 		update_hessian_and_grad_vector();
-	
-		//todo: report some obj function stats
 
 		//todo: report constraint stats
 		//a la constraints.mou_report();
-		constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true);
 
-		//report dec var change stats - only for ensemble form
-		if (use_ensemble_grad)
-		{
-			ss.str("");
-			ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
-			pcs.summarize(dv, ss.str());
-		}
-		
-		//store the grad vector used for this iteration
-		grad_vector_map[iter] = current_grad_vector;
+
+
 	}
 }
 
 bool SeqQuadProgram::should_terminate()
 {
+    stringstream ss;
     //todo: use ies accept fac here?
     double phiredstp = pest_scenario.get_control_info().phiredstp;
     int nphistp = pest_scenario.get_control_info().nphistp;
@@ -1512,7 +1500,23 @@ bool SeqQuadProgram::should_terminate()
     int nphired = 0;
     //best_mean_phis = vector<double>{ 1.0,0.8,0.81,0.755,1.1,0.75,0.75,1.2 };
 
+    //todo: save and write out the current phi grad vector (maybe save all of them???)
+    ss.str("");
+    ss << "best phi sequence:" << endl;
+    ss << "       ";
+    int ii = 0;
+    for (auto phi : best_phis)
+    {
+        ss << setw(10) << setprecision(4) << phi << " ";
+        ii++;
+        if (ii % 6 == 0) {
+            ss << endl;
+            ss << "       ";
+        }
 
+    }
+    ss << endl;
+    message(0, ss.str());
 
     /*if ((!consec_sat )&& (best_mean_phis.size() == 0))
         return false;*/
@@ -2290,7 +2294,6 @@ bool SeqQuadProgram::solve_new()
 		//Eigen::VectorXd vec = dv_num_candidate.get_data_eigen_vec(dv_names); 
 		Eigen::VectorXd vec = num_candidate.get_data_eigen_vec(dv_names);
 		dv_candidates.update_real_ip(real_names[i], vec);
-		
 
 		ss.str("");
 		message(1, "finished calcs for scaling factor:", scale_val);
@@ -2482,8 +2485,13 @@ bool SeqQuadProgram::seek_feasible()
         ies.set_pe(dv);
         ies.set_oe(oe);
         ies.set_noise_oe(oe_base);
+        ies.initialize(iter,true,true);
     }
-    ies.initialize(iter,true,true);
+    else{
+        ies.initialize();
+    }
+
+
 
 	ies.iterate_2_solution();
 
@@ -2641,7 +2649,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		}
 		ss << " infeasibilty total: " << infeas_sum << ", ";
 		infeas_vec.push_back(infeas_sum);
-		filter_accept = filter.accept(obj_vec[i], infeas_sum,iter,alpha_vals[i]);
+		filter_accept = filter.accept(obj_vec[i], infeas_sum,iter,alpha_vals[i],true);
 		if (filter_accept)
 			ss << " filter accepted ";
 		else
@@ -2668,7 +2676,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 
 	}
 
-	filter.report(file_manager.rec_ofstream(),iter);
+
 
 
     if (accept_idxs.size() > 0)
@@ -2688,6 +2696,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
                 oext = obj_vec[iidx];
             }
         }
+        filter.update(min_obj,infeas_vec[idx],iter,alpha_vals[idx]);
     }
 	else
     {
@@ -2739,7 +2748,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
     ss.str("");
     ss << "best candidate (scale factor: " << setprecision(4) << scale_vals[idx] << ", phi: " << oext << ")";
     constraints.sqp_report(iter, cand_dv_values, cand_obs_values, true,ss.str());
-
+    filter.report(file_manager.rec_ofstream(),iter);
 	//TODO: need more thinking here - do we accept only if filter accepts?  I think so....
 	//if (((obj_sense == "minimize") && (oext < last_best)) || ((obj_sense == "maximize") && (oext > last_best)))
 	if (accept)

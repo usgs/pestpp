@@ -50,18 +50,17 @@ public:
 	SqpFilter(bool _minimize=true,double _obj_tol = 0.01, double _viol_tol = 0.01) {
 		minimize = _minimize; obj_tol = _obj_tol; viol_tol = _viol_tol;
 	}
-	bool accept(double obj_val, double violation_val,int iter=0,double alpha=-1.0);
+	bool accept(double obj_val, double violation_val,int iter=0,double alpha=-1.0, bool keep=false);
 	bool update(double obj_val, double violation_val, int iter=0,double alpha=-1.0);
     void report(ofstream& frec,int iter);
     double get_viol_tol() {return viol_tol;}
-
 
 private:
 	bool minimize;
 	double obj_tol;
 	double viol_tol;
 
-	set<FilterRec> obj_viol_pairs;
+	multiset<FilterRec> obj_viol_pairs;
 
 	bool first_partially_dominates_second(const FilterRec& first, const FilterRec& second);
     bool first_strictly_dominates_second(const FilterRec& first, const FilterRec& second);
