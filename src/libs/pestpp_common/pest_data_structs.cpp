@@ -856,10 +856,13 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
 	return true;
 	}
 
-    else if ((key == "IES_WEIGHTS_ENSEMBLE") || (key == "IES_WEIGHTS_EN"))
+    else if ((key == "IES_WEIGHTS_ENSEMBLE") || (key == "IES_WEIGHTS_EN") ||
+            (key == "IES_WEIGHT_ENSEMBLE") || (key == "IES_WEIGHT_EN"))
     {
         passed_args.insert("IES_WEIGHTS_ENSEMBLE");
         passed_args.insert("IES_WEIGHTS_EN");
+        passed_args.insert("IES_WEIGHT_ENSEMBLE");
+        passed_args.insert("IES_WEIGHT_EN");
         //convert_ip(value, ies_obs_restart_csv);
         ies_weights_csv = org_value;
         return true;
