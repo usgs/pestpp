@@ -2258,7 +2258,7 @@ void ParameterEnsemble::from_binary(string file_name, bool forgive)
 	map<string,int> header_info = Ensemble::from_binary(file_name, names, false);
 	unordered_set<string>svar_names(var_names.begin(), var_names.end());
 	vector<string> missing;
-	for (auto& name : pest_scenario_ptr->get_ctl_ordered_adj_par_names())
+	for (auto& name : names)
 	{
 		if (svar_names.find(name) == svar_names.end())
 		{
@@ -2282,6 +2282,24 @@ void ParameterEnsemble::from_binary(string file_name, bool forgive)
 			throw_ensemble_error("from_binary() error: the following adjustable parameter names in the control file are not in the binary parameter ensemble file:", missing);
 		}
 	}
+	missing.clear();
+	svar_names.clear();
+	svar_names.insert(names.begin(),names.end());
+	unordered_set<string>::iterator send = svar_names.end();
+	for (auto& name: var_names)
+    {
+	    if (svar_names.find(name) == send)
+        {
+	        missing.push_back(name);
+        }
+    }
+	if (missing.size() > 0)
+    {
+	    drop_cols(missing);
+    }
+
+
+
 
 	prep_par_ensemble_after_read(header_info);
 }
@@ -3735,6 +3753,23 @@ void ObservationEnsemble::from_binary(string file_name)
 	if (missing.size() > 0)
 		throw_ensemble_error("from_binary() error: the following non-zero-weighted obs names in the control file are not in the binary obs ensemble file:", missing);
 	names = pest_scenario_ptr->get_ctl_ordered_obs_names();
+	missing.clear();
+	svar_names.clear();
+	svar_names.insert(names.begin(),names.end());
+	unordered_set<string>::iterator send = svar_names.end();
+
+    for (auto& name : var_names)
+    {
+        if (svar_names.find(name) == send)
+        {
+            missing.push_back(name);
+        }
+    }
+    if (missing.size() > 0)
+    {
+        //drop these extra vars
+        drop_cols(missing);
+    }
 	if (var_names.size() < names.size())
 	{
 		update_var_map();

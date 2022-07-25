@@ -4133,6 +4133,10 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         vector<int> failed = run_ensemble(pe, oe, vector<int>(), cycle);
         if (pe.shape().first == 0)
             throw_em_error("all realizations failed during initial evaluation");
+        if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder())
+        {
+            failed.push_back(0);
+        }
         if (failed.size() > 0)
         {
             ss.str("");

@@ -790,7 +790,8 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 		while (true)
 		{
 			//finished
-			if ((in.bad()) || (in.eof()))
+			//if ((in.bad()) || (in.eof()))
+			if ((i > 0) && (!in.good()))
 			{
 				break;
 			}
@@ -836,6 +837,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 				break;
 			}
 			row_names.push_back(name);
+            i++;
 		}
 
 		in.close();
