@@ -2284,6 +2284,7 @@ void ParameterEnsemble::from_binary(string file_name, bool forgive)
 	}
 	missing.clear();
 	svar_names.clear();
+    names = pest_scenario_ptr->get_ctl_ordered_par_names();
 	svar_names.insert(names.begin(),names.end());
 	unordered_set<string>::iterator send = svar_names.end();
 	for (auto& name: var_names)
