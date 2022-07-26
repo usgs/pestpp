@@ -1977,6 +1977,7 @@ ParameterEnsemble::ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* _ra
 	reals = _reals;
 	var_names = _var_names;
 	real_names = _real_names;
+	org_real_names = _real_names;
 	tstat = transStatus::CTL;
 	set_fixed_names();
 }
