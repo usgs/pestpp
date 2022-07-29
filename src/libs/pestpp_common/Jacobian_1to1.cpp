@@ -296,11 +296,12 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 			run_manager.get_model_parameters(par_run.second[0], run_list.back().ctl_pars);
 			bool success = run_manager.get_observations_vec(par_run.second[0], run_list.back().obs_vec);
 			run_list.back().numeric_derivative_par = cur_numeric_par_value;
-			/*if ((debug_fail) && (i_run == 1))
+			if (debug_fail)
 			{
 				file_manager.rec_ofstream() << "NOTE: 'GLM_DEBUG_DER_FAIL' is true, failing jco run for parameter '" << cur_par_name << "'" << endl;
 				success = false;
-			}*/
+				debug_fail = false;
+			}
 			if (success)
 			{
 				par_transform.model2ctl_ip(run_list.back().ctl_pars);
