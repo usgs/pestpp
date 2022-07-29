@@ -4133,6 +4133,10 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         vector<int> failed = run_ensemble(pe, oe, vector<int>(), cycle);
         if (pe.shape().first == 0)
             throw_em_error("all realizations failed during initial evaluation");
+        if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder())
+        {
+            failed.push_back(0);
+        }
         if (failed.size() > 0)
         {
             ss.str("");
@@ -4200,7 +4204,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		ss << " with the prior simulated ensemble." << endl;
 		message(0, ss.str());
 
-		cout << "...see rec file or " << file_manager.get_base_filename() << ".pdc.csv" << "for listing of conflicted observations" << endl << endl;
+		cout << "...see rec file or " << file_manager.get_base_filename() << ".pdc.csv" << " for listing of conflicted observations" << endl << endl;
 		ofstream& frec = file_manager.rec_ofstream();
 		frec << endl << "...conflicted observations: " << endl;
 		for (auto oname : in_conflict)

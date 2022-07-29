@@ -856,10 +856,13 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
 	return true;
 	}
 
-    else if ((key == "IES_WEIGHTS_ENSEMBLE") || (key == "IES_WEIGHTS_EN"))
+    else if ((key == "IES_WEIGHTS_ENSEMBLE") || (key == "IES_WEIGHTS_EN") ||
+            (key == "IES_WEIGHT_ENSEMBLE") || (key == "IES_WEIGHT_EN"))
     {
         passed_args.insert("IES_WEIGHTS_ENSEMBLE");
         passed_args.insert("IES_WEIGHTS_EN");
+        passed_args.insert("IES_WEIGHT_ENSEMBLE");
+        passed_args.insert("IES_WEIGHT_EN");
         //convert_ip(value, ies_obs_restart_csv);
         ies_weights_csv = org_value;
         return true;
@@ -1480,6 +1483,7 @@ bool PestppOptions::assign_value_by_key_sqp(const string& key, const string& val
 			convert_ip(t, v);
 			sqp_scale_facs.push_back(v);
 		}
+		return true;
 	}
 	
 	return false;
@@ -1736,7 +1740,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "gsa_morris_r: " << gsa_morris_r << endl;
 	os << "gsa_morris_delta: " <<  gsa_morris_delta << endl;
 	os << "gsa_sobol_samples: " << gsa_sobol_samples << endl;
-	os << "gsa_sobol_par_dist: " << gsa_sobol_par_dist << endl;
+	os << "gsa_sobol_par_dist: " << gsa_sobol_par_dist << endl << endl;
 	
 	os << "pestpp-da options (those not shared with pestpp-ies):" << endl;
 	os << "da_parameter_cycle_table: " << da_par_cycle_table << endl;
@@ -1826,7 +1830,7 @@ void PestppOptions::set_defaults()
 	set_sqp_obs_restart_en("");
 	set_sqp_num_reals(-1);
 	set_sqp_update_hessian(false);
-	set_sqp_scale_facs(vector<double>{0.00001, 0.0001, 0.01, 0.1, 1.0});
+	set_sqp_scale_facs(vector<double>{0.00001, 0.0001,0.001, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25,0.5, 1.0});
 
 	set_mou_generator("DE");
 	set_mou_population_size(100);
@@ -1860,7 +1864,7 @@ void PestppOptions::set_defaults()
 	set_ies_use_approx(true);
 	set_ies_subset_size(4);
 	set_ies_reg_factor(0.0);
-	set_ies_verbose_level(0);
+	set_ies_verbose_level(1);
 	set_ies_use_prior_scaling(false);
 	set_ies_num_reals(50);
 	set_ies_bad_phi(1.0e+300);
