@@ -50,17 +50,20 @@ public:
 	SqpFilter(bool _minimize=true,double _obj_tol = 0.01, double _viol_tol = 0.01) {
 		minimize = _minimize; obj_tol = _obj_tol; viol_tol = _viol_tol;
 	}
-	bool accept(double obj_val, double violation_val,int iter=0,double alpha=-1.0);
+	bool accept(double obj_val, double violation_val,int iter=0,double alpha=-1.0, bool keep=false);
 	bool update(double obj_val, double violation_val, int iter=0,double alpha=-1.0);
+    void report(ofstream& frec,int iter);
+    double get_viol_tol() {return viol_tol;}
 
 private:
 	bool minimize;
 	double obj_tol;
 	double viol_tol;
 
-	set<FilterRec> obj_viol_pairs;
+	multiset<FilterRec> obj_viol_pairs;
 
-	bool first_dominates_second(const FilterRec& first, const FilterRec& second);
+	bool first_partially_dominates_second(const FilterRec& first, const FilterRec& second);
+    bool first_strictly_dominates_second(const FilterRec& first, const FilterRec& second);
 	
 };
 
@@ -86,7 +89,7 @@ private:
 	OutputFileWriter &output_file_writer;
 	PerformanceLog *performance_log;
 	RunManagerAbstract* run_mgr_ptr;
-	L2PhiHandler ph;
+	//L2PhiHandler ph;
 	ParChangeSummarizer pcs;
 	Covariance parcov, obscov;
 	double reg_factor;
@@ -99,6 +102,11 @@ private:
 	map<string, double> obj_func_coef_map;
 
 	int num_threads;
+	int n_consec_infeas;
+	int MAX_CONSEC_INFEAS = 3;
+    int MAX_CONSEC_PHIINC = 3;
+
+    int n_consec_phiinc;
 
 	double eigthresh;
 	vector<double> scale_vals;
@@ -184,13 +192,9 @@ private:
 	void save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool save_base=true);
 	void save_mat(string prefix, Eigen::MatrixXd &mat);
 	bool initialize_dv(Covariance &cov);
-	//bool initialize_oe(Covariance &cov);
 	bool initialize_restart();
 	void initialize_parcov();
-	void initialize_obscov();
 	void initialize_objfunc();
-	void drop_bad_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe, bool is_subset=false);
-	
 	void queue_chance_runs();
 	
 	template<typename T, typename A>
@@ -202,12 +206,8 @@ private:
 
 	void sanity_checks();
 
-	void add_bases();
+	void add_current_as_bases(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
 
-	void update_reals_by_phi(ParameterEnsemble &_pe, ObservationEnsemble &_oe);
-
-	void set_subset_idx(int size);
-	
 };
 
 #endif

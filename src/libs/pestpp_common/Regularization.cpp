@@ -102,8 +102,11 @@ PestppOptions::ARG_STATUS DynamicRegularization::assign_value_by_key(const std::
 		pest_utils::convert_ip(value, wf_min);
 	else if (key == "WFMAX")
 		pest_utils::convert_ip(value, wf_max);
-	else if (key == "WFINIT")
-		pest_utils::convert_ip(value, wf_init);
+	else if (key == "WFINIT") {
+        pest_utils::convert_ip(value, wf_init);
+        tikhonov_weight = wf_init;
+    }
+
 	else if (key == "WFTOL")
 		pest_utils::convert_ip(value, wftol);
 	else if (key == "WFFAC")
@@ -140,6 +143,7 @@ void DynamicRegularization::set_defaults()
 	wffac = 0;
 	wftol = 1000;
 	wf_init = 1.0;
+	tikhonov_weight = 1.0;
 	max_reg_iter = 20;
 }
 
