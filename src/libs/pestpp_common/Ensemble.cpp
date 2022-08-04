@@ -2173,6 +2173,7 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 	{
 		par_transform.active_ctl2model_ip(pars);
 	}
+    //map<string, pair<string, double>> tied_items = par_transform.get_tied_ptr()->get_items();
 	Parameters pars_real = pars;
 	Eigen::VectorXd evec;
 	vector<double> svec;
@@ -2937,6 +2938,10 @@ void ParameterEnsemble::to_binary_ordered(string file_name)
 		throw runtime_error("error opening file for binary parameter ensemble:" + file_name);
 	}
 
+	bool has_tied = false;
+	if (par_transform.get_tied_ptr()->get_items().size() > 0)
+	    has_tied = true;
+
 	//vector<string> vnames = var_names;
 	vector<string> vnames = pest_scenario_ptr->get_ctl_ordered_par_names();
 	//vnames.insert(vnames.end(), fixed_names.begin(), fixed_names.end());
@@ -3010,6 +3015,11 @@ void ParameterEnsemble::to_binary_ordered(string file_name)
 			par_transform.model2ctl_ip(pars);
 		else if (tstat == transStatus::NUM)
 			par_transform.numeric2ctl_ip(pars);
+        else if ((has_tied) && (tstat == transStatus::CTL))
+        {
+            par_transform.active_ctl2model_ip(pars);
+            par_transform.model2ctl_ip(pars);
+        }
 		replace_fixed(real_names[irow], pars);
 
 		for (int jcol = 0; jcol<n_var; ++jcol)
@@ -3128,6 +3138,9 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 
 	//write matrix
 	n = 0;
+	bool has_tied = false;
+	if (par_transform.get_tied_ptr()->get_items().size() > 0)
+	    has_tied = true;
 	//map<string, double>::const_iterator found_pi_par;
 	//map<string, double>::const_iterator not_found_pi_par;
 	//icount = row_idxs + 1 + col_idxs * self.shape[0]
@@ -3145,6 +3158,11 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 			par_transform.model2ctl_ip(pars);
 		else if (tstat == transStatus::NUM)
 			par_transform.numeric2ctl_ip(pars);
+        else if ((has_tied) && (tstat == transStatus::CTL))
+        {
+            par_transform.active_ctl2model_ip(pars);
+            par_transform.model2ctl_ip(pars);
+        }
 		replace_fixed(real_names[irow], pars);
 		string name = real_names[irow];
 		tmp = name.size();
@@ -3331,7 +3349,9 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv, bool write_header)
 	}
 	if (write_header)
 		csv << endl;
-
+    bool has_tied = false;
+    if (par_transform.get_tied_ptr()->get_items().size() > 0)
+        has_tied = true;
 	//get the pars and transform to be in sync with ensemble trans status
 	/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
 	if (tstat == transStatus::NUM)
@@ -3358,6 +3378,11 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv, bool write_header)
 		{
 			par_transform.active_ctl2model_ip(pars);
 		}
+        else if ((has_tied) && (tstat == transStatus::CTL))
+        {
+            par_transform.active_ctl2model_ip(pars);
+            par_transform.model2ctl_ip(pars);
+        }
 		ireal = real_map[rname];
 		pars.update_without_clear(var_names, reals.row(ireal));
 		if (tstat == transStatus::MODEL)
@@ -3404,6 +3429,10 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 	}*/
 
 	//for (int ireal = 0; ireal < reals.rows(); ireal++)
+	bool has_tied = false;
+	if (par_transform.get_tied_ptr()->get_items().size() > 0)
+	    has_tied = true;
+
 	int ireal = 0;
 	map<string, int> real_map;
 	for (int i = 0; i < real_names.size(); i++)
@@ -3435,7 +3464,14 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 			par_transform.model2ctl_ip(pars);
 		else if (tstat == transStatus::NUM)
 			par_transform.numeric2ctl_ip(pars);
+		// here we need to check for tied parameters...
+		else if ((has_tied) && (tstat == transStatus::CTL))
+        {
+            par_transform.active_ctl2model_ip(pars);
+            par_transform.model2ctl_ip(pars);
+        }
 		replace_fixed(real_names[ireal],pars);
+
 		for (auto &name : names)
 			csv << ',' << pars[name];
 		csv << endl;
