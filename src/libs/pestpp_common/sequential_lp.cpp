@@ -185,10 +185,14 @@ map<string,double> sequentialLP::get_out_of_bounds_dec_vars(Parameters &upgrade_
 
 pair<double,double> sequentialLP::postsolve_decision_var_report(Parameters &upgrade_pars)
 {
+    int width = 12;
+    for(auto& n : dv_names)
+        width = max(width,(int)n.size());
+    width = width + 2;
 	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
 	const double *reduced_cost = model.getReducedCost();
 	f_rec << endl << endl << "     decision variable information at end of SLP iteration " << slp_iter << endl << endl;
-	f_rec << setw(20) << left << "name" << right << setw(15) << "current" << setw(15)  << "new";
+	f_rec << setw(width) << left << "name" << right << setw(15) << "current" << setw(15)  << "new";
 	f_rec << setw(15) << "objfunc coef" << setw(15) << "cur contrib" << setw(15) << "new contrib" << setw(15) << "reduced cost";
 	f_rec << setw(25) << "simplex status" << endl;
 	string name;
@@ -206,7 +210,7 @@ pair<double,double> sequentialLP::postsolve_decision_var_report(Parameters &upgr
 
 		new_val = upgrade_pars[name];
 		actual_pars.update_rec(name, new_val);
-		f_rec << setw(20) << left << name;
+		f_rec << setw(width) << left << name;
 		f_rec << setw(15) << right << cur_val;
 		f_rec << setw(15) << new_val;
 		f_rec << setw(15) << obj_coef;
@@ -841,6 +845,7 @@ void sequentialLP::iter_postsolve()
 	{
 		iter_obj_values.push_back(cur_new_obj.first);
 		obj_best = cur_new_obj.second;
+        best_pars.update_without_clear(dv_names, upgrade_pars.get_data_vec(dv_names));
 	}
 	iter_obj_values.push_back(cur_new_obj.second);
 	double obj_func_change = abs(cur_new_obj.first - cur_new_obj.second) / abs(max(max(cur_new_obj.first,cur_new_obj.second),1.0));

@@ -1649,7 +1649,8 @@ double Constraints::get_probit()
 
 double Constraints::get_probit(double _risk)
 {
-	/* the probit function estimate - needed for the fosm-basd chance constraints*/
+	/* the probit function estimate
+	 * - needed for the fosm-basd chance constraints*/
 	double output = sqrt(2.0) * ErfInv2((2.0 * _risk) - 1.0);
 	return output;
 }
@@ -2221,9 +2222,13 @@ void Constraints::postsolve_obs_constraints_report(Observations& old_obs, Observ
 	This really only applies to the simplex solution because we can, with the linear assumption, 
 	project what the resulting constraint values should be*/
 
+	int width = 20;
+	for(auto& n : ctl_ord_obs_constraint_names)
+	    width = max(width,(int)n.size());
+	width = width + 2;
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
 	f_rec << endl << endl << "     " << tag << " constraint/objective information at end of iteration " << iter << endl << endl;
-	f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(25);
+	f_rec << setw(width) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(25);
 	if (status_map.size() > 0)
 		f_rec << "simplex status";
 	if (price_map.size() > 0)
@@ -2247,7 +2252,7 @@ void Constraints::postsolve_obs_constraints_report(Observations& old_obs, Observ
 	{
 		string name = ctl_ord_obs_constraint_names[i];
 		sim_val = new_obs[name];
-		f_rec << setw(20) << left << name;
+		f_rec << setw(width) << left << name;
 		f_rec << setw(15) << right << constraint_sense_name[name];
 		f_rec << setw(15) << constraints_obs.get_rec(name);
 		if (status_map.size() > 0)
@@ -2287,8 +2292,12 @@ void Constraints::postsolve_pi_constraints_report(Parameters& old_pars, Paramete
 	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
 	if (num_pi_constraints() > 0)
 	{
+	    int width = 20;
+	    for (auto& n : ctl_ord_pi_constraint_names)
+	        width = max(width,(int)n.size());
+	    width = width + 2;
 		f_rec << endl << endl << " --- prior information constraint summary at end of iteration " << iter << " --- " << endl << endl;
-		f_rec << setw(20) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(25);
+		f_rec << setw(width) << left << "name" << right << setw(15) << "sense" << setw(15) << "required" << setw(25);
 		if (status_map.size() > 0)
 			f_rec << "simplex status";
 		if (price_map.size() > 0)
@@ -2301,7 +2310,7 @@ void Constraints::postsolve_pi_constraints_report(Parameters& old_pars, Paramete
 			PriorInformationRec pi_rec = constraints_pi.get_pi_rec(name);
 			pair<double,double> cur_sim_resid = pi_rec.calc_sim_and_resid(old_pars);
 			pair<double,double> new_sim_resid = pi_rec.calc_sim_and_resid(new_pars);
-			f_rec << setw(20) << left << name;
+			f_rec << setw(width) << left << name;
 			f_rec << setw(15) << right << constraint_sense_name[name];
 			f_rec << setw(15) << pi_rec.get_obs_value();
 			if (status_map.size() > 0)
