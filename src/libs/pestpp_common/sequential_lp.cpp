@@ -671,8 +671,8 @@ void sequentialLP::solve()
 		cout << "  ---------------------------------" << endl << endl << endl;
 
 		iter_presolve();
-		iter_solve();
-		iter_postsolve();
+        iter_solve();
+        iter_postsolve();
 		if (terminate) break;
 		slp_iter++;
 		if (slp_iter > pest_scenario.get_control_info().noptmax)
@@ -1112,10 +1112,11 @@ void sequentialLP::iter_presolve()
 		
 		bool init_obs = false;
 		if (slp_iter == 1) init_obs = true;
-		
+
 		bool success = jco.build_runs(current_pars, current_constraints_sim, names_to_run, par_trans,
 			pest_scenario.get_base_group_info(), pest_scenario.get_ctl_parameter_info(),
 			*run_mgr_ptr, out_of_bounds,false,init_obs);
+
 		if (!success)
 		{
 			const set<string> failed = jco.get_failed_parameter_names();
@@ -1133,6 +1134,7 @@ void sequentialLP::iter_presolve()
 		set<int> failed = run_mgr_ptr->get_failed_run_ids();
 
 		//process the remaining responses
+
 		success = jco.process_runs(par_trans, pest_scenario.get_base_group_info(), *run_mgr_ptr, 
 			*null_prior, false,false);
 		if (!success)
@@ -1154,8 +1156,13 @@ void sequentialLP::iter_presolve()
 		
 		if (init_obs)
 		{
-			//Observations temp_obs;
+			//Observations temp_obs
+            //Parameters temp = current_pars;
 			run_mgr_ptr->get_run(0, current_pars, current_constraints_sim, false);
+//			for (auto& n : dv_names) {
+//                current_pars.update_rec(n, temp.get_rec(n));
+//            }
+            par_trans.model2ctl_ip(current_pars);
 		}
 	}
 
