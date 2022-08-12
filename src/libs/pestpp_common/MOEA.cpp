@@ -1358,7 +1358,8 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		op_archive.keep_rows(keep);
 		dp_archive.keep_rows(keep);
 	}
-
+	dp_archive.reset_org_real_names();
+	op_archive.reset_org_real_names();
 	save_populations(dp_archive, op_archive, "archive");
 }
 
@@ -1417,7 +1418,8 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 			op_archive.keep_rows(keep);
 			dp_archive.keep_rows(keep);
 		}
-
+        dp_archive.reset_org_real_names();
+        op_archive.reset_org_real_names();
 		save_populations(dp_archive, op_archive, "archive");
 	}
 }
@@ -3776,7 +3778,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	return tmp_dp;
 }
 
-void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag)
+void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag)
 {
 	
 	stringstream ss;
@@ -3791,16 +3793,16 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
-		dp.to_binary(ss.str());
+		_dp.to_binary(ss.str());
 	}
 	else
 	{
 		ss << ".csv";
-		dp.to_csv(ss.str());
+		_dp.to_csv(ss.str());
 	}
 	string name = ss.str();
 	ss.str("");
-	ss << " saved decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << name << "'";
+	ss << " saved decision variable population of size " << _dp.shape().first << " X " << _dp.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 	ss.str("");
 	if ((save_every > 0) && (iter % save_every == 0))
@@ -3814,16 +3816,16 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
 			ss << ".jcb";
-			dp.to_binary(ss.str());
+			_dp.to_binary(ss.str());
 		}
 		else
 		{
 			ss << ".csv";
-			dp.to_csv(ss.str());
+			_dp.to_csv(ss.str());
 		}
 		string name = ss.str();
 		ss.str("");
-		ss << " saved generation-specific decision variable population of size " << dp.shape().first << " X " << dp.shape().second << " to '" << name << "'";
+		ss << " saved generation-specific decision variable population of size " << _dp.shape().first << " X " << _dp.shape().second << " to '" << name << "'";
 		message(1, ss.str());
 	}
 	
@@ -3838,16 +3840,16 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
-		op.to_binary(ss.str());
+		_op.to_binary(ss.str());
 	}
 	else
 	{
 		ss << ".csv";
-		op.to_csv(ss.str());
+		_op.to_csv(ss.str());
 	}
 	name = ss.str();
 	ss.str("");
-	ss << " saved observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << name << "'";
+	ss << " saved observation population of size " << _op.shape().first << " X " << _op.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 
 	if ((save_every > 0) && (iter % save_every == 0))
@@ -3862,16 +3864,16 @@ void MOEA::save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, stri
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
 			ss << ".jcb";
-			op.to_binary(ss.str());
+			_op.to_binary(ss.str());
 		}
 		else
 		{
 			ss << ".csv";
-			op.to_csv(ss.str());
+			_op.to_csv(ss.str());
 		}
 		name = ss.str();
 		ss.str("");
-		ss << " saved generation-specific observation population of size " << op.shape().first << " X " << op.shape().second << " to '" << name << "'";
+		ss << " saved generation-specific observation population of size " << _op.shape().first << " X " << _op.shape().second << " to '" << name << "'";
 		message(1, ss.str());
 	}
 
