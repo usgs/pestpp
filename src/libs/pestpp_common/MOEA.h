@@ -84,8 +84,6 @@ private:
 	void fill_domination_containers(map<string, map<string, double>>& _member_struct, map<string,
 		vector<string>>&solutions_dominated_map, map<string, int>& num_dominating_map, bool dup_as_dom=false);
 
-
-
 	bool compare_two_nsga(string& first, string& second);
 	bool compare_two_spea(string& first, string& second);
 
@@ -222,7 +220,7 @@ private:
 
 	string get_new_member_name(string tag = string());
 
-	void save_populations(ParameterEnsemble& dp, ObservationEnsemble& op, string tag = string());
+	void save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag = string());
 	void gauss_mutation_ip(ParameterEnsemble& _dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx(double probability, double eta_m, int idx1, int idx2);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1,

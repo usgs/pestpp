@@ -3883,7 +3883,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	if ((obs_restart_csv.size() == 0) && (!pe_drawn) && (oe_drawn))
 	{
 		vector<string> rnames = pe.get_real_names();
-		oe_base.set_real_names(rnames);
+		oe_base.set_real_names(rnames,true);
 		message(2, "resetting obs + noise ensemble real names to parameter ensemble real names");
 	}
 
