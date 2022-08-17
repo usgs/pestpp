@@ -63,7 +63,7 @@ bool Jacobian_1to1::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vect
 	failed_ctl_parameters.clear();
 	par_run_map.clear();
 	// add base run
-	int run_id = run_manager.add_run(model_parameters, "__base__", 0);
+	int run_id = run_manager.add_run(model_parameters, "par_name:__base__", 0);
 	par_run_map["__base__"] = vector<int>{ run_id };
 	//if base run is has already been complete, update it and mark it as complete
 	// compute runs for to jacobain calculation as it is influenced by derivative type( forward or central)
@@ -97,7 +97,7 @@ bool Jacobian_1to1::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vect
 				{
 					model_parameters[ipar.first] = ipar.second;
 				}
-				int id = run_manager.add_run(model_parameters, i_name, par);
+				int id = run_manager.add_run(model_parameters, "par_name:"+i_name, par);
 				if (par_run_map.count(i_name) == 0)
 					par_run_map[i_name] = vector<int>{ id };
 				else
@@ -143,7 +143,7 @@ bool Jacobian_1to1::build_runs(ModelRun &init_model_run, vector<string> numeric_
 	failed_ctl_parameters.clear();
 	par_run_map.clear();
 	// add base run
-	int run_id = run_manager.add_run(model_parameters, "", 0);
+	int run_id = run_manager.add_run(model_parameters, "par_name:__base__", 0);
 	par_run_map["__base__"] = vector<int>{ run_id };
 	//if base run is has already been complete, update it and mark it as complete
 	// compute runs for to jacobain calculation as it is influenced by derivative type( forward or central)
@@ -177,7 +177,7 @@ bool Jacobian_1to1::build_runs(ModelRun &init_model_run, vector<string> numeric_
 				{
 					model_parameters[ipar.first] = ipar.second;
 				}
-				int id = run_manager.add_run(model_parameters, i_name, par);
+				int id = run_manager.add_run(model_parameters, "par_name:"+i_name, par);
 
 				if (par_run_map.count(i_name) == 0)
 					par_run_map[i_name] = vector<int>{ id };
@@ -284,15 +284,15 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 	double par_value_next;
 	double cur_numeric_par_value;
 	list<JacobianRun> run_list;
-	
+
 	
 	for (auto par_run : par_run_map)
-	{
-		
+    {
 		for (auto rid : par_run.second)
 		{
 			run_list.push_back(JacobianRun());
 			run_manager.get_info(par_run.second[0], r_status, cur_par_name, cur_numeric_par_value);
+			cur_par_name = cur_par_name.substr(9,cur_par_name.size());
 			run_manager.get_model_parameters(par_run.second[0], run_list.back().ctl_pars);
 			bool success = run_manager.get_observations_vec(par_run.second[0], run_list.back().obs_vec);
 			run_list.back().numeric_derivative_par = cur_numeric_par_value;

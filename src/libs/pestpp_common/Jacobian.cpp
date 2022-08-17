@@ -280,7 +280,7 @@ bool Jacobian::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vector<st
 	debug_msg("Jacobian::build_runs method: begin");
 	// add base run
 	Parameters model_pars = par_transform.ctl2model_cp(ctl_pars);
-	int run_id = run_manager.add_run(model_pars, "__base__", 0);
+	int run_id = run_manager.add_run(model_pars, "par_name:__base__", 0);
 
 	if (!calc_init_obs) {
 		const Observations &observations = ctl_obs;
@@ -307,7 +307,7 @@ bool Jacobian::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vector<st
 			{
 				numeric_parameters.update_rec(ipar_name, ipar_val);
 				Parameters model_parameters = par_transform.numeric2model_cp(numeric_parameters);
-				run_manager.add_run(model_parameters, ipar_name, ipar_val);
+				run_manager.add_run(model_parameters, "par_name:"+ipar_name, ipar_val);
 			}
 		}
 		else

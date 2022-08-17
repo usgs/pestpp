@@ -1025,7 +1025,7 @@ void RunManagerPanther::close_agent(list<AgentInfoRec>::iterator agent_info_iter
         open_file_trans_streams.erase(ret.first);
         stringstream ss;
         ss.str("");
-        ss << "lost comms with agent, closed file '" << fname << ", " << file_size << " bytes transferred";
+        ss << "lost comms with agent, closed file:" << fname << " bytes:" << file_size << "  transferred";
 
         report(ss.str(),false);
         files_transferred += 1;
@@ -1143,7 +1143,7 @@ void RunManagerPanther::schedule_runs()
 						if (success >= 0)
 						{
 							stringstream ss;
-							ss << n_concur << " concurrent runs for run id:" << run_id;
+							ss << " run_id:" << run_id << " concurrent:" << n_concur;
 							report(ss.str(), false);
 						}
 						else
@@ -1241,7 +1241,7 @@ int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::it
 			active_runid_to_iterset_map.insert(make_pair(run_id, *it_agent));
 			stringstream ss;
 			ss << "Sending run_id:" << run_id << " to:" << host_name << "$" << (*it_agent)->get_work_dir() <<
-				" group_id:" << cur_group_id << " " << info_txt << " concurrent runs:" << get_n_concurrent(run_id) << ")";
+				" group_id:" << cur_group_id << " " << info_txt << " concurrent:" << get_n_concurrent(run_id) << ")";
 			report(ss.str(), false);
 			free_agent_list.erase(it_agent);
 			scheduled = 1;
