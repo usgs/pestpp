@@ -844,9 +844,9 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 				
 				for (auto token : tokens)
 				{
-					if (token.find("=") != string::npos)
+					if (token.find(":") != string::npos)
 					{
-						pest_utils::tokenize(token, ttokens, "=");
+						pest_utils::tokenize(token, ttokens, ":");
 						if (ttokens[0] == "DA_CYCLE")
 						{
 							if (ttokens[1].size() > 0)
