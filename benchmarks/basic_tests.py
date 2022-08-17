@@ -1198,7 +1198,7 @@ def fr_timeout_test():
     with open(os.path.join(new_d,"run.py"),'w') as f:
         f.write("import os\nimport time\nimport pyemu\npyemu.os_utils.run('mfnwt 10par_xsec.nam')\n")
         f.write("if not os.path.exists('run.info'):\n    exit()\n")
-        f.write("lines = open('run.info','r').readlines()\nrnum = int(lines[-1].split()[-1].split('=')[-1])\n")
+        f.write("lines = open('run.info','r').readlines()\nrnum = int(lines[-1].split()[-1].split(':')[-1])\n")
         f.write("if rnum % 2 == 0:\n    time.sleep(10000000)\n")
     pst.model_command = "python run.py"
     oe_file = os.path.join(new_d, "pest.0.obs.csv")
@@ -1285,7 +1285,7 @@ if __name__ == "__main__":
 
     #da_prep_4_mf6_freyberg_seq_tbl()
     #da_mf6_freyberg_test_2()
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
+    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
