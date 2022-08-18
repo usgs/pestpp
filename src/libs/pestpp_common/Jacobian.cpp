@@ -353,7 +353,7 @@ bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 		bool debug_fail)
 {
 	// calculate jacobian
-  base_sim_obs_names = run_manager.get_obs_name_vec();
+    base_sim_obs_names = run_manager.get_obs_name_vec();
 	vector<string> prior_info_name = prior_info.get_keys();
 	base_sim_obs_names.insert(base_sim_obs_names.end(), prior_info_name.begin(), prior_info_name.end());
 	std::vector<Eigen::Triplet<double> > triplet_list;
@@ -388,7 +388,9 @@ bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 	{
 		run_list.push_back(JacobianRun());
 				run_manager. get_info(i_run, r_status, cur_par_name, cur_numeric_par_value);
-		run_manager.get_model_parameters(i_run,  run_list.back().ctl_pars);
+            //this is to strip off the "par_name:" tag
+            cur_par_name = cur_par_name.substr(9,cur_par_name.size());
+            run_manager.get_model_parameters(i_run,  run_list.back().ctl_pars);
 			bool success = run_manager.get_observations_vec(i_run, run_list.back().obs_vec);
 			if ((debug_fail) && (i_run == 1))
 			{
@@ -410,6 +412,8 @@ bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 		if (i_run+1<nruns)
 		{
 			run_manager.get_info(i_run+1, run_status_next, par_name_next, par_value_next);
+			//again the par_name: tag
+			par_name_next = par_name_next.substr(9,par_name_next.size());
 		}
 
 		if (i_run + 1 >= nruns || (cur_par_name != par_name_next))
