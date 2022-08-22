@@ -4243,8 +4243,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 			if (ppo->get_ies_localizer().size() > 0)
 			{
 				message(1, "updating localizer");
-				//if (localizer.get_use())
-				//    localizer.get_orgmat_ptr()->clear_names();
+				if (localizer.get_use())
+				    localizer.get_orgmat_ptr()->clear_names();
 				use_localizer = localizer.initialize(performance_log, true);
 			}
 
