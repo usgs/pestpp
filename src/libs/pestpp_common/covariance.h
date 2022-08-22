@@ -30,6 +30,7 @@ public:
 
 	vector<string> get_row_names(){ return row_names; }
 	vector<string> get_col_names(){ return col_names; }
+	void clear_names(){row_names.clear();col_names.clear();}
 	const vector<string>* rn_ptr();
 	const vector<string>* cn_ptr();
 	Eigen::SparseMatrix<double> get_matrix(){ return matrix; }

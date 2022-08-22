@@ -422,8 +422,7 @@ void Mat::from_csv(const string &filename)
 		throw runtime_error("error reading header (first) line from csv file :");
 	pest_utils::strip_ip(line);
 	pest_utils::upper_ip(line);
-	col_names.clear();
-	row_names.clear();
+
 
 	pest_utils::tokenize(line, col_names, ",", false);
 	col_names.erase(col_names.begin()); //drop the index label
