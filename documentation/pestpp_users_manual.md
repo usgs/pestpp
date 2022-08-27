@@ -1,7 +1,7 @@
 
  <img src="0d3cb7750c90b712af04ea3a51c8ecb968d784cc.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.1.20
+# <a id='s1' />Version 5.1.21
 
 <img src="0e14ec9848f78a9809081572ca785af9990c2d38.png" style="width:6.26806in;height:3.05972in" />
 
@@ -70,7 +70,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Table of Contents
 
-- [Version 5.1.20](#s1)
+- [Version 5.1.21](#s1)
 - [Acknowledgements](#s2)
 - [Preface](#s3)
 - [License](#s4)
@@ -2998,11 +2998,11 @@ Note the following.
 
 PESTPP-SWP can fill in values for fixed and tied parameters if these are missing from its input file. Actually, it can provide values for other missing parameters as well if the *sweep_forgive()* control variable is set to *true*. These missing values are taken from the PEST control file which is read by PESTPP-SWP.
 
-PESTPP-SWP writes a model output file whose name is provided through the *sweep_output_csv_file()* control variable. If this variable is not provided, PESTPP-SWP employs the name *sweep_out.csv* for its output file.
+PESTPP-SWP writes a model output file whose name is provided through the *sweep_output_csv_file()* control variable. If this variable is not provided, PESTPP-SWP employs the name *sweep_out.csv* for its output file. This fiile contains input and output run identifiers, objective function information, and the simulated value for each control file “observation” for each run. Note that, by default, PESTPP-SWP will not calculate the contribution of prior information equations to the total objective function reported in the sweep output file. This can be overridden with the *sweep_include_regul_phi* option.
 
 The control variable *sweep_chunk()* pertains to parallelization of model runs. Runs are done in bundles of size *N*, where *N* is the value supplied for this variable. (A chunk of 500 is the default). This number should be chosen wisely. It should be a multiple of the number of agents that PESTPP-SWP can use for carrying out model runs.
 
-Also note that PESTPP-SWP can be particularly useful if users need complete model output files for a given set of runs. In this case, the file transfer capabilities of the parallel run manager can be used with PESTPP-SWP to run a sweep of parameter values and model output files can be transferred back to the master directory.
+PESTPP-SWP can be particularly useful if users need complete model output files for a given set of runs. In this case, the file transfer capabilities of the parallel run manager can be used with PESTPP-SWP to run a sweep of parameter values and model output files can be transferred back to the master directory.
 
 ## <a id='s14-3' />10.3 Summary of Control Variables
 
@@ -3020,6 +3020,7 @@ The number of control variables may change with time. Refer to the PEST++ web si
 | *enforce_tied_bounds(false)*             | Boolean  | Flag to enforce parameter bounds on any tied parameters                                                                                                                                                                                                 |
 | *tie_by_group(false)*                    | Boolean  | Flag to tie all adjustable parameters together within each parameter group. Initial parameter ratios are maintained as parameters are adjusted. Parameters that are designated as already tied, or that have parameters tied to them, are not affected. |
 | *ensemble_output_precision*              | int      | Number of significant digits to use in ASCII format ensemble files. Default is 6                                                                                                                                                                        |
+| *Sweep_include_regul_phi*                | Boolean  | Flag to include the contribution of prior information equations in the total objective function information reported in the sweep output file, Default is false.                                                                                        |
 
 Table 10.1 PESTPP-SWP control variables. Parallel run management variables can be supplied in addition to these; see section 5.3.6
 
