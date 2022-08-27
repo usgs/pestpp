@@ -19,7 +19,7 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 	how = How::OBSERVATIONS; //set this for the case with no localization
 	string loc_typ;
 	string how_str;
-		
+
 	par2col_map.clear();
 	obs2row_map.clear();
 	colname2col_map.clear();
@@ -74,6 +74,7 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 		return use;
 	}
 	performance_log->log_event("loading localizer matrix from file " + filename);
+
 	org_mat.from_file(filename);
 	
 	performance_log->log_event("processing localizer matrix");

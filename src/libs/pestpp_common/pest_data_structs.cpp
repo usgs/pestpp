@@ -546,8 +546,13 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		sweep_base_run = pest_utils::parse_string_arg_to_bool(value);
 	}
+    else if (key == "SWEEP_INCLUDE_REGUL_PHI")
+    {
+        sweep_include_regul_phi = pest_utils::parse_string_arg_to_bool(value);
+    }
 
-	else if (key == "TIE_BY_GROUP")
+
+    else if (key == "TIE_BY_GROUP")
 	{
 		tie_by_group = pest_utils::parse_string_arg_to_bool(value);
 	}
@@ -1607,6 +1612,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sweep_chunk: " << sweep_chunk << endl;
 	os << "sweep_forgive: " << sweep_forgive << endl;
 	os << "sweep_base_run: " << sweep_base_run << endl;
+	os << "sweep_include_regul_phi: " << sweep_include_regul_phi << endl;
 	
 	os << endl << "...pestpp-opt options:" << endl;
 	os << "opt_objective_function: " <<  opt_obj_func << endl;
@@ -1804,6 +1810,7 @@ void PestppOptions::set_defaults()
 	set_sweep_chunk(500);
 	set_tie_by_group(false);
 	set_enforce_tied_bounds(false);
+    set_sweep_include_regul_phi(false);
 
 
 	set_opt_obj_func("");

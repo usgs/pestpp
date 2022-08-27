@@ -1036,7 +1036,10 @@ map<string, map<string, double>> MOEA::decvar_change_report(map<string, map<stri
     double change, percent_change;
 
     stringstream ss;
-    int max_len = get_max_len_obj_name();
+    int max_len = 19;
+    for (auto& n : dv_names)
+        max_len = max(max_len,(int)n.size());
+
     ss << left << setw(max_len) << "decision variable" << right << setw(11) << "mean change";
     ss << setw(11) << "% change";
     ss << setw(11) << "max change" << setw(11) << "% change";
