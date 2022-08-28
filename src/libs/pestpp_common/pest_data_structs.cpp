@@ -1126,8 +1126,10 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         convert_ip(value,ies_multimodal_alpha);
         return true;
     }
-    else if (key == "IES_LOCALIZER_FORGIVE_MISSING")
+    else if ((key == "IES_LOCALIZER_FORGIVE_MISSING") || (key == "IES_LOCALIZER_FORGIVE_EXTRA"))
     {
+        passed_args.insert("IES_LOCALIZER_FORGIVE_MISSING");
+        passed_args.insert("IES_LOCALIZER_FORGIVE_EXTRA");
         ies_localizer_forgive_missing = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
@@ -1738,7 +1740,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_upgrades_in_memory: " << ies_upgrades_in_memory << endl;
 	os << "ies_ordered_binary: " << ies_ordered_binary << endl;
 	os << "ies_multimodal_alpha: " << ies_multimodal_alpha << endl;
-	os << "ies_localizer_forgive_missing: " << ies_localizer_forgive_missing << endl;
+	os << "ies_localizer_forgive_extra: " << ies_localizer_forgive_missing << endl;
 
 
 	os << endl << "pestpp-sen options: " << endl;
