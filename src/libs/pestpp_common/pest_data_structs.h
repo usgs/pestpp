@@ -476,6 +476,10 @@ public:
 	void set_ies_subset_how(string _ies_subset_how) { ies_subset_how = _ies_subset_how; }
 	void set_ies_localize_how(string _how) { ies_localize_how = _how; }
 	string get_ies_localize_how() const { return ies_localize_how; }
+	bool get_ies_localizer_forgive_missing() const {return ies_localizer_forgive_missing;}
+	void set_ies_localizer_forgive_missing(bool _flag) {ies_localizer_forgive_missing = _flag;}
+
+
 
 
 	int get_ies_num_threads() const { return ies_num_threads; }
@@ -795,6 +799,7 @@ private:
 	bool ies_upgrades_in_memory;
 	bool ies_ordered_binary;
 	double ies_multimodal_alpha;
+	bool ies_localizer_forgive_missing;
 
 
 	// Data Assimilation parameters

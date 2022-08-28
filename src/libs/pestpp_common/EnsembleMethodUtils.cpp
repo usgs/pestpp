@@ -3675,7 +3675,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	else
 	{
 		message(1, "initializing localizer");
-		use_localizer = localizer.initialize(performance_log);
+		bool forgive_missing = pest_scenario.get_pestpp_options().get_ies_localizer_forgive_missing();
+		use_localizer = localizer.initialize(performance_log, forgive_missing);
 	}
 	num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
 	if (!use_localizer)
