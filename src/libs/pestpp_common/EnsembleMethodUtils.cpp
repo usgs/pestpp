@@ -3923,20 +3923,23 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 			frec << ma << endl;
 	}
 
+    int num_par_elements = pest_scenario.get_ctl_parameters().size();
 	if ((pp_args.find("IES_ORDERED_BINARY") == pp_args.end()) && (pp_args.find("DA_ORDERED_BINARY") == pp_args.end()))
 	{
-		if ((pe.shape().second > 100000) && (pest_scenario.get_pestpp_options().get_save_binary()))
+
+		//if ((pe.shape().second > 100000) && (pest_scenario.get_pestpp_options().get_save_binary()))
+        if ((num_par_elements > 100000) && (pest_scenario.get_pestpp_options().get_save_binary()))
 		{
-			message(1, "'ies_ordered_binary' was not passed, but 'ies_save_binary' is true and num adj pars > 100,000, switching to unordered binary...");
+			message(1, "'ies_ordered_binary' was not passed, but 'ies_save_binary' is true and npar > 100,000, switching to unordered binary...");
 			pest_scenario.get_pestpp_options_ptr()->set_ies_ordered_binary(false);
 		}
 	}
 
 	if ((pp_args.find("IES_UPGRADES_IN_MEMORY") == pp_args.end()) && (pp_args.find("DA_UPGRADES_IN_MEMORY") == pp_args.end()))
 	{
-		if (pe.shape().second > 100000)
+		if (num_par_elements > 100000)
 		{
-			message(1, "'ies_upgrades_in_memory' was not passed, but num adj pars > 100,000, switching ies_upgrades_in_memory to false...");
+			message(1, "'ies_upgrades_in_memory' was not passed, but npar > 100,000, switching ies_upgrades_in_memory to false...");
 			pest_scenario.get_pestpp_options_ptr()->set_ies_upgrades_in_memory(false);
 		}
 	}
