@@ -537,7 +537,8 @@ int main(int argc, char* argv[])
 		cout << "initializing 'global' localizer" << endl;
 		fout_rec << "initializing 'global' localizer" << endl;
 		Localizer global_loc(&pest_scenario);
-		global_loc.initialize(&performance_log);
+		bool forgive_missing = pest_scenario.get_pestpp_options().get_ies_localizer_forgive_missing();
+		global_loc.initialize(&performance_log,forgive_missing);
 
 		//ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr
 		ParChangeSummarizer pcs(&curr_pe, &file_manager, &output_file_writer);

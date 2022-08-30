@@ -313,6 +313,8 @@ public:
 	void set_sweep_forgive(bool _forgive) { sweep_forgive = _forgive; }
 	bool get_sweep_base_run()const { return sweep_base_run; }
 	void set_sweep_base_run(bool _base) { sweep_base_run = _base; }
+	bool get_sweep_include_regul_phi() const {return sweep_include_regul_phi;}
+	void set_sweep_include_regul_phi(bool _flag) {sweep_include_regul_phi = _flag;}
 
 	bool get_jac_scale()const { return jac_scale; }
 	void set_jac_scale(bool _jac_scale) { jac_scale = _jac_scale; }
@@ -474,6 +476,10 @@ public:
 	void set_ies_subset_how(string _ies_subset_how) { ies_subset_how = _ies_subset_how; }
 	void set_ies_localize_how(string _how) { ies_localize_how = _how; }
 	string get_ies_localize_how() const { return ies_localize_how; }
+	bool get_ies_localizer_forgive_missing() const {return ies_localizer_forgive_missing;}
+	void set_ies_localizer_forgive_missing(bool _flag) {ies_localizer_forgive_missing = _flag;}
+
+
 
 
 	int get_ies_num_threads() const { return ies_num_threads; }
@@ -682,6 +688,7 @@ private:
 	bool sweep_forgive;
 	int sweep_chunk;
 	bool sweep_base_run;
+	bool sweep_include_regul_phi;
 
 	GLOBAL_OPT global_opt;
 	string moea_name;
@@ -792,6 +799,7 @@ private:
 	bool ies_upgrades_in_memory;
 	bool ies_ordered_binary;
 	double ies_multimodal_alpha;
+	bool ies_localizer_forgive_missing;
 
 
 	// Data Assimilation parameters

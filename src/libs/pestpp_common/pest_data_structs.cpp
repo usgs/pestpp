@@ -546,8 +546,13 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 	{
 		sweep_base_run = pest_utils::parse_string_arg_to_bool(value);
 	}
+    else if (key == "SWEEP_INCLUDE_REGUL_PHI")
+    {
+        sweep_include_regul_phi = pest_utils::parse_string_arg_to_bool(value);
+    }
 
-	else if (key == "TIE_BY_GROUP")
+
+    else if (key == "TIE_BY_GROUP")
 	{
 		tie_by_group = pest_utils::parse_string_arg_to_bool(value);
 	}
@@ -1121,9 +1126,13 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         convert_ip(value,ies_multimodal_alpha);
         return true;
     }
-
-
-
+    else if ((key == "IES_LOCALIZER_FORGIVE_MISSING") || (key == "IES_LOCALIZER_FORGIVE_EXTRA"))
+    {
+        passed_args.insert("IES_LOCALIZER_FORGIVE_MISSING");
+        passed_args.insert("IES_LOCALIZER_FORGIVE_EXTRA");
+        ies_localizer_forgive_missing = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
 	return false;
 }
 
@@ -1607,6 +1616,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "sweep_chunk: " << sweep_chunk << endl;
 	os << "sweep_forgive: " << sweep_forgive << endl;
 	os << "sweep_base_run: " << sweep_base_run << endl;
+	os << "sweep_include_regul_phi: " << sweep_include_regul_phi << endl;
 	
 	os << endl << "...pestpp-opt options:" << endl;
 	os << "opt_objective_function: " <<  opt_obj_func << endl;
@@ -1730,6 +1740,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_upgrades_in_memory: " << ies_upgrades_in_memory << endl;
 	os << "ies_ordered_binary: " << ies_ordered_binary << endl;
 	os << "ies_multimodal_alpha: " << ies_multimodal_alpha << endl;
+	os << "ies_localizer_forgive_extra: " << ies_localizer_forgive_missing << endl;
 
 
 	os << endl << "pestpp-sen options: " << endl;
@@ -1804,6 +1815,7 @@ void PestppOptions::set_defaults()
 	set_sweep_chunk(500);
 	set_tie_by_group(false);
 	set_enforce_tied_bounds(false);
+    set_sweep_include_regul_phi(false);
 
 
 	set_opt_obj_func("");
@@ -1907,6 +1919,7 @@ void PestppOptions::set_defaults()
 	set_ies_ordered_binary(true);
     set_ies_multimodal_alpha(1.0);
     set_ensemble_output_precision(6);
+    set_ies_localizer_forgive_missing(false);
 
 	// DA parameters
 	//set_da_use_ies(false);

@@ -147,6 +147,7 @@ public:
 	void update_par_values(const map<string, double>& pval_map);
 	void clear() { fixed_info.clear(); fixed_names.clear(); }
 	void fill_fixed(map<string, double>& fixed_map, vector<string>& rnames);
+	int get_map_size() {return fixed_info.size();}
 private:
 	bool initialized;
 	vector<string> fixed_names;

@@ -430,7 +430,13 @@ int main(int argc, char* argv[])
 			throw(e);
 		}
 		pest_scenario.check_inputs(fout_rec, true);
-		
+
+		if (!pest_scenario.get_pestpp_options().get_sweep_include_regul_phi())
+        {
+		    pest_scenario.get_regul_scheme_ptr()->set_zero();
+            pest_scenario.get_prior_info_ptr()->clear();
+        }
+
 		OutputFileWriter ofw(file_manager, pest_scenario, false, false, 0);
 		ofw.scenario_report(fout_rec, false);
 		PestppOptions ppopt = pest_scenario.get_pestpp_options();
@@ -440,6 +446,7 @@ int main(int argc, char* argv[])
 		fout_rec << "    sweep chunk size = " << left << setw(10) << ppopt.get_sweep_chunk() << endl;
 		//fout_rec << "    sweep base run = " << left << setw(10) << ppopt.get_sweep_base_run() << endl;
 		fout_rec << "    sweep forgive failed runs = " << left << setw(10) << ppopt.get_sweep_forgive() << endl;
+
 
 		if (pest_scenario.get_pestpp_options().get_debug_parse_only())
 		{

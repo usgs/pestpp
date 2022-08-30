@@ -526,7 +526,7 @@ ModelRun SVDASolver::iteration_upgrd(RunManagerAbstract &run_manager, Terminatio
 					0, i_lambda, i_scale, scaled_ctl_pars);
 
 				stringstream ss;
-				ss << "scale(" << std::fixed << std::setprecision(2) << i_scale << ")";
+				ss << "scale:" << std::fixed << std::setprecision(2) << i_scale << "";
 				par_transform.numeric2model_ip(scaled_pars);
 				int run_id = run_manager.add_run(scaled_pars, ss.str(), i_lambda);
 				num_lam_runs++;
