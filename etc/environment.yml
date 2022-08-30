@@ -10,4 +10,4 @@ dependencies:
   - matplotlib
   - coverage
   - scipy
-  - shapely
+  - shapely>=1.8

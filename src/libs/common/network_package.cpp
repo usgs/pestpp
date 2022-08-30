@@ -45,6 +45,7 @@ string NetPackage::get_info_txt()
 {
 	string info_txt = extract_string(desc, DESC_LEN);
 	info_txt.erase(std::find(info_txt.begin(), info_txt.end(), '\0'), info_txt.end());
+    std::transform(info_txt.begin(), info_txt.end(), info_txt.begin(), ::tolower);
 	return info_txt;
 }
 

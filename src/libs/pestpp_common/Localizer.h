@@ -75,6 +75,7 @@ public:
 	LocTyp get_loctyp() { return loctyp; }
 	void report(ofstream &f_rec);
 	bool is_initialized() { return initialized; }
+	Mat* get_orgmat_ptr() {return &org_mat;}
 private:
 	bool use;
 	bool autoadaloc;
