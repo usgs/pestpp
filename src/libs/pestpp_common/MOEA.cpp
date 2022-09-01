@@ -2604,7 +2604,7 @@ void MOEA::iterate_to_solution()
 	map<string, map<string, double>> summary;
 	while(iter <= pest_scenario.get_control_info().noptmax)
 	{
-		message(0, "starting iteration ", iter);
+		message(0, "starting generation ", iter);
 
 		//generate offspring
 		ParameterEnsemble new_dp = generate_population();
@@ -2727,22 +2727,22 @@ void MOEA::iterate_to_solution()
 			throw_moea_error("unrecognized 'mou_env'");
 		}
         ss.str("");
-        ss << "iteration " << iter << " decision variable summary:";
+        ss << "generation " << iter << " decision variable summary:";
         message(0, ss.str());
         summary = decvar_report(dp);
 
         ss.str("");
-        ss << "iteration " << iter << " decision variable change summary:";
+        ss << "generation " << iter << " decision variable change summary:";
         message(0, ss.str());
         decvar_change_report(summary);
         previous_dv_summary = summary;
 
 		ss.str("");
-		ss << "iteration " << iter << " objective function summary:";
+		ss << "generation " << iter << " objective function summary:";
 		message(0, ss.str());
 		summary = obj_func_report(dp, op);
 		ss.str("");
-		ss << "iteration " << iter << " objective function change summary:";
+		ss << "generation " << iter << " objective function change summary:";
 		message(0, ss.str());
 		obj_func_change_report(summary);
 		previous_obj_summary = summary;

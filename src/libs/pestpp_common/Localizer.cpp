@@ -93,7 +93,7 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 }
 
 void Localizer::update_obs_info_from_mat(Mat& mat, vector<vector<string>>& obs_map, vector<string>& missing, vector<string>& dups, set<string>& obs_names, 
-	map<string, vector<string>>& obgnme_map, vector<string>& not_allowed)
+	map<string, vector<string>>& obgnme_map, vector<string>& not_allowed, bool forgive_missing)
 {
 	vector<string> row_names = mat.get_row_names();
 	set<string> dup_check;
@@ -120,19 +120,26 @@ void Localizer::update_obs_info_from_mat(Mat& mat, vector<vector<string>>& obs_m
 		}
 		else if (obgnme_map.find(o) != obgnme_map.end())
 		{
-			obs_map.push_back(obgnme_map[o]);
-			if (obgnme_map[o].size() == 0)
-				throw runtime_error("Localizer::process_mat() error: listed observation group '" + o + "' has no non-zero weight observations");
-			for (auto& oo : obgnme_map[o])
-			{
-				obs2row_map[oo] = i;
-				if (dup_check.find(oo) != dup_check.end())
-					dups.push_back(oo);
-				dup_check.emplace(oo);
-				if (obs_names.find(oo) == obs_names.end())
-					not_allowed.push_back(oo);
 
-			}
+			if (obgnme_map[o].size() == 0) {
+                if (!forgive_missing)
+                    throw runtime_error("Localizer::process_mat() error: listed observation group '" + o +
+                                        "' has no non-zero weight observations");
+            }
+            else
+            {
+                    obs_map.push_back(obgnme_map[o]);
+
+                    for (auto &oo : obgnme_map[o]) {
+                        obs2row_map[oo] = i;
+                        if (dup_check.find(oo) != dup_check.end())
+                            dups.push_back(oo);
+                        dup_check.emplace(oo);
+                        if (obs_names.find(oo) == obs_names.end())
+                            not_allowed.push_back(oo);
+
+                    }
+            }
 		}
 		else
 			missing.push_back(o);
@@ -229,7 +236,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 	set<string> dup_check;
 
 
-	update_obs_info_from_mat(mat, obs_map, missing, dups, obs_names, obgnme_map, not_allowed);
+	update_obs_info_from_mat(mat, obs_map, missing, dups, obs_names, obgnme_map, not_allowed, forgive_missing);
 	
 	if (not_allowed.size() > 0)
 	{
