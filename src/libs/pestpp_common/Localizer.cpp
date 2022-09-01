@@ -37,6 +37,8 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 	}
 	else
 	{
+	    performance_log->log_event("Localizer error: 'ies_localization_type' must start with 'C' (covariance) or 'L' (local analysis) not " + loc_typ);
+	    cout << "Localizer error: 'ies_localization_type' must start with 'C' (covariance) or 'L' (local analysis) not " << loc_typ << endl;
 		throw runtime_error("Localizer error: 'ies_localization_type' must start with 'C' (covariance) or 'L' (local analysis) not " + loc_typ);
 	}
 
@@ -50,12 +52,18 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 	}
 	else
 	{
-		throw runtime_error("Localizer error: 'ies_localize_how' or 'da_localize_how' must start with 'P' (pars) or 'O' (obs) not " + how_str);
+	    performance_log->log_event("Localizer error: 'ies_localize_how' or 'da_localize_how' must start with 'P' (pars) or 'O' (obs) not " + how_str);
+	    cout << "Localizer error: 'ies_localize_how' or 'da_localize_how' must start with 'P' (pars) or 'O' (obs) not \" + how_str" << endl;
+	    throw runtime_error("Localizer error: 'ies_localize_how' or 'da_localize_how' must start with 'P' (pars) or 'O' (obs) not " + how_str);
 	}
 
-	if ((loctyp == LocTyp::COVARIANCE) && (how == How::OBSERVATIONS))
-		throw runtime_error("Localizer error: covariance localization can only be used with localization by parameters");
+	if ((loctyp == LocTyp::COVARIANCE) && (how == How::OBSERVATIONS)) {
+        performance_log->log_event("Localizer error: covariance localization can only be used with localization by parameters");
+        cout << "Localizer error: covariance localization can only be used with localization by parameters" << endl;
 
+        throw runtime_error(
+                "Localizer error: covariance localization can only be used with localization by parameters");
+    }
 	string filename = pest_scenario_ptr->get_pestpp_options().get_ies_localizer();
 	autoadaloc = pest_scenario_ptr->get_pestpp_options().get_ies_autoadaloc();
 	sigma_dist = pest_scenario_ptr->get_pestpp_options().get_ies_autoadaloc_sigma_dist();
@@ -84,11 +92,26 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 	{
 		//string how = pest_scenario_ptr->get_pestpp_options().get_ies_localize_how();
 		if (how != How::PARAMETERS)
+		    performance_log->log_event("error: using a localizer matrix and autoadaloc requires ies_ or da_ localize_how == 'PARAMETERS'");
+		    cout << "error: using a localizer matrix and autoadaloc requires ies_ or da_ localize_how == 'PARAMETERS'" << endl;
 			throw runtime_error("using a localizer matrix and autoadaloc requires ies_ or da_ localize_how == 'PARAMETERS'");		
 	}
 	else
 		cur_mat = org_mat;
 	initialized = true;
+	if (pest_scenario_ptr->get_pestpp_options().get_ies_verbose_level() > 1)
+    {
+	    if (pest_scenario_ptr->get_pestpp_options().get_save_binary())
+        {
+	        cur_mat.to_binary_new("initialized_localizer.jcb");
+	        performance_log->log_event("saved 'initialized_localizer.jcb'");
+        }
+	    else
+        {
+	        cur_mat.to_ascii("initialized_localizer.mat");
+            performance_log->log_event("saved 'initialized_localizer.mat'");
+        }
+    }
 	return use;
 }
 
@@ -122,9 +145,16 @@ void Localizer::update_obs_info_from_mat(Mat& mat, vector<vector<string>>& obs_m
 		{
 
 			if (obgnme_map[o].size() == 0) {
-                if (!forgive_missing)
+                if (!forgive_missing) {
+                    cout << "Localizer::process_mat() error: listed observation group '" << o <<
+                         "' has no non-zero weight observations" << endl;
                     throw runtime_error("Localizer::process_mat() error: listed observation group '" + o +
                                         "' has no non-zero weight observations");
+                }
+                else
+                {
+                    missing.push_back(o);
+                }
             }
             else
             {
@@ -178,8 +208,13 @@ void Localizer::update_par_info_from_mat(Mat& mat, vector<vector<string>>& par_m
 		else if (pargp_map.find(p) != pargp_map.end())
 		{
 			par_map.push_back(pargp_map[p]);
-			if (pargp_map[p].size() == 0)
-				throw runtime_error("Localizer::process_mat() error:  listed parameter group '" + p + "' has no adjustable parameters");
+			if (pargp_map[p].size() == 0) {
+			    cout << "Localizer::process_mat() error:  listed parameter group '" << p <<
+                        "' has no adjustable parameters" << endl;
+                throw runtime_error("Localizer::process_mat() error:  listed parameter group '" + p +
+                                    "' has no adjustable parameters");
+            }
+
 			for (auto& pp : pargp_map[p])
 			{
 				par2col_map[pp] = i;
@@ -244,6 +279,8 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 		ss << "Localizer::process_mat() error: the following obs names were identified through obs groups but are not in the non-zero weight obs names: ";
 		for (auto &oo : not_allowed)
 			ss << oo << ",";
+		cout << ss.str() << endl;
+        performance_log->log_event("error:" + ss.str());
 		throw runtime_error(ss.str());
 	}
 		
@@ -254,6 +291,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 			mat.drop_rows(missing);
 			ss.str("");
 			ss << "dropped " << missing.size() << " from localizer rows because forgive_missing is true";
+			cout << ss.str() << endl;
 			performance_log->log_event(ss.str());
 			update_obs_info_from_mat(mat, obs_map, missing, dups, obs_names, obgnme_map, not_allowed);
 		}
@@ -264,6 +302,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 			for (auto& m : missing)
 				ss << m << ',';
 			performance_log->log_event("error:" + ss.str());
+            cout << ss.str() << endl;
 			throw runtime_error(ss.str());
 		}
 	}
@@ -274,6 +313,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 		for (auto & d : dups)
 			ss << d << ',';
 		performance_log->log_event("error:" + ss.str());
+        cout << ss.str() << endl;
 		throw runtime_error(ss.str());
 	}
 
@@ -285,6 +325,8 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 		ss << "Localizer::process_mat() error: the following par names were identified through par groups but are not in the adj par names: ";
 		for (auto &pp : not_allowed)
 			ss << pp << ",";
+        cout << ss.str() << endl;
+        performance_log->log_event("error:" + ss.str());
 		throw runtime_error(ss.str());
 
 	}
@@ -306,6 +348,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 			for (auto& m : missing)
 				ss << m << ',';
 			performance_log->log_event("error:" + ss.str());
+			cout << ss.str() << endl;
 			throw runtime_error(ss.str());
 		}
 	
@@ -316,6 +359,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 		for (auto & d : dups)
 			ss << d << ',';
 		performance_log->log_event("error:" + ss.str());
+		cout << ss.str() << endl;
 		throw runtime_error(ss.str());
 	}
 
@@ -499,6 +543,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 		ss.str("");
 		ss << "Localizer::get_localizer_map() Error: for autoadaloc, pe must have same number of reals (" << pe.shape().first << ") as oe (" << oe.shape().first << ")";
 		performance_log->log_event(ss.str());
+		cout << ss.str() << endl;
 		throw runtime_error(ss.str());
 	}
 
@@ -524,7 +569,11 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 		string filename = ss.str();
 		f_out.open(filename);
 		if (!f_out.good())
-			throw runtime_error("autoadaloc error opening filename " + filename + " for verbose output");
+        {
+		    cout << "autoadaloc error opening filename " << filename << " for verbose output" << endl;
+            throw runtime_error("autoadaloc error opening filename " + filename + " for verbose output");
+        }
+
 		f_out << "obsnme,parnme,correlation_coeff,background_mean,background_stdev,threshold,kept";
 		for (int i = 0; i < nreals - 1; i++)
 			f_out << "," << i;
@@ -576,6 +625,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 				{
 					ss.str("");
 					ss << "thread " << i << "raised an exception: " << e.what();
+
 					throw runtime_error(ss.str());
 				}
 			}
@@ -589,6 +639,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 	{
 		ss.str("");
 		ss << "autoadaloc error: no non-zero entries in localization matrix, can not continue";
+		cout << ss.str() << endl;
 		throw runtime_error(ss.str());
 	}
 	if (ies_verbose > 1)
@@ -909,7 +960,12 @@ Eigen::VectorXd Localizer::get_obs_hadamard_vector(string par_name, vector<strin
 	if (colname2col_map.find(par_name) == colname2col_map.end())
 	{
 		if (par2col_map.find(par_name) == par2col_map.end())
-			throw runtime_error("Localizer::get_obs_hadamard_vector(): error: par name '" + par_name + "' not found");
+        {
+		    cout << "Localizer::get_obs_hadamard_vector(): error: par name '" << par_name << "' not found" << endl;
+            throw runtime_error("Localizer::get_obs_hadamard_vector(): error: par name '" + par_name + "' not found");
+
+        }
+
 		idx = par2col_map[par_name];
 	}
 	else
@@ -930,8 +986,11 @@ Eigen::VectorXd Localizer::get_obs_hadamard_vector(string par_name, vector<strin
 
 Eigen::MatrixXd Localizer::get_obsdiff_hadamard_matrix(int num_reals, string col_name, vector<string> &obs_names)
 {
-	if (colname2col_map.find(col_name) == colname2col_map.end())
-		throw runtime_error("Localizer::get_obsdiff_hadamard_matrix error: col_name not found in localizer matrix: " + col_name);
+	if (colname2col_map.find(col_name) == colname2col_map.end()) {
+        cout << "Localizer::get_obsdiff_hadamard_matrix error: col_name not found in localizer matrix: " << col_name << endl;
+        throw runtime_error(
+                "Localizer::get_obsdiff_hadamard_matrix error: col_name not found in localizer matrix: " + col_name);
+    }
 	int idx = colname2col_map.at(col_name);
 	Eigen::VectorXd mat_vec = cur_mat.e_ptr()->col(idx);
 	Eigen::MatrixXd loc(obs_names.size(), num_reals);
@@ -945,8 +1004,11 @@ Eigen::MatrixXd Localizer::get_obsdiff_hadamard_matrix(int num_reals, string col
 
 Eigen::MatrixXd Localizer::get_pardiff_hadamard_matrix(int num_reals, string row_name, vector<string> &par_names)
 {
-	if (rowname2row_map.find(row_name) == rowname2row_map.end())
-		throw runtime_error("Localizer::get_pardiff_hadamard_matrix error: row_name not found in localizer matrix: " + row_name);
+	if (rowname2row_map.find(row_name) == rowname2row_map.end()) {
+        cout << "Localizer::get_pardiff_hadamard_matrix error: row_name not found in localizer matrix: " << row_name << endl;
+        throw runtime_error(
+                "Localizer::get_pardiff_hadamard_matrix error: row_name not found in localizer matrix: " + row_name);
+    }
 	int idx = rowname2row_map.at(row_name);
 	Eigen::VectorXd mat_vec = cur_mat.e_ptr()->row(idx);
 	Eigen::MatrixXd loc(par_names.size(), num_reals);
