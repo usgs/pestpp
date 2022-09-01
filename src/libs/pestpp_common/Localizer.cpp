@@ -91,10 +91,14 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 	if (autoadaloc)
 	{
 		//string how = pest_scenario_ptr->get_pestpp_options().get_ies_localize_how();
-		if (how != How::PARAMETERS)
-		    performance_log->log_event("error: using a localizer matrix and autoadaloc requires ies_ or da_ localize_how == 'PARAMETERS'");
-		    cout << "error: using a localizer matrix and autoadaloc requires ies_ or da_ localize_how == 'PARAMETERS'" << endl;
-			throw runtime_error("using a localizer matrix and autoadaloc requires ies_ or da_ localize_how == 'PARAMETERS'");		
+		if (how != How::PARAMETERS) {
+            performance_log->log_event(
+                    "error: using a localizer matrix and autoadaloc requires ies_ or da_ localize_how == 'PARAMETERS'");
+            cout << "error: using a localizer matrix and autoadaloc requires ies_ or da_ localize_how == 'PARAMETERS'"
+                 << endl;
+            throw runtime_error(
+                    "using a localizer matrix and autoadaloc requires ies_ or da_ localize_how == 'PARAMETERS'");
+        }
 	}
 	else
 		cur_mat = org_mat;
