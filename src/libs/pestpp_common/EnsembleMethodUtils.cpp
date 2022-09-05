@@ -5369,7 +5369,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		ph.update(oe_lam_best, pe_lams[best_idx]);
 		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-
 	}
 
 	ph.update(oe_lam_best, pe_lams[best_idx]);
