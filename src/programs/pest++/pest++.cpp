@@ -218,6 +218,11 @@ int main(int argc, char* argv[])
 			}
 		}
 
+		if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
+        {
+
+        }
+
 		//Initialize OutputFileWriter to hadle IO of suplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
