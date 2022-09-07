@@ -2099,24 +2099,46 @@ void L2PhiHandler::report_group(bool echo) {
 
 
     double tot = 0, ptot = 0;
+    double v = 0,pv = 0;
     int c = 0;
     for (auto& g : snzgroups)
     {
         tot = 0;
         ptot = 0;
+        v = 0;
+        pv = 0;
         c = 0;
         for (auto& o : obs_group_phi_map)
         {
-            if (meas.find(o.first) == meas.end())
+            if (actual.find(o.first) == actual.end())
             {
                 continue;
             }
             tot = tot + o.second[g];
-            ptot = ptot + (o.second[g]/meas[o.first]);
+            ptot = ptot + (o.second[g]/actual[o.first]);
             c++;
         }
         tot = tot / (double)c;
-        ptot = 100.0 * (ptot/(double)c);
+        ptot = ptot/(double)c;
+        mn_map[g] = tot;
+        pmn_map[g] = ptot;
+        for (auto& o : obs_group_phi_map)
+        {
+            if (actual.find(o.first) == actual.end())
+            {
+                continue;
+            }
+            v = v + (pow(o.second[g] - tot,2));
+            pv = pv + (pow(ptot - (o.second[g]/actual[o.first]),2));
+        }
+        if (v != 0)
+            std_map[g] = sqrt(v/(double)(c-1));
+        else
+            std_map[g] = 0.0;
+        if (pv != 0)
+            pstd_map[g] = sqrt(pv/(double)(c-1));
+        else
+            pstd_map[g] = 0.0;
     }
 
 
@@ -2135,17 +2157,31 @@ void L2PhiHandler::report_group(bool echo) {
     string s;
     stringstream ss;
     ss.str("");
+    ss << endl << "    --- Observation Group Phi Summary  ---- " << endl;
+    ss << "    (computed using 'actual' phi) " << endl;
     ss << setw(len) << "obs_group" << setw(15) << "phi_mean" << setw(15) << "phi_std";
     ss << setw(15) << "percent_mean" << setw(15) << "percent_std" << endl;
     f << ss.str();
     if (echo)
         cout << ss.str();
 
-
-
-    obs_group_phi_map;
-    meas;
-
+    vector<string> nzgroups(snzgroups.begin(),snzgroups.end());
+    sort(nzgroups.begin(),nzgroups.end());
+    for (auto& g : nzgroups)
+    {
+        ss.str("");
+        ss << setw(len) << g;
+        ss << setw(15) << mn_map[g];
+        ss << setw(15) << std_map[g];
+        ss << setw(15) << pmn_map[g];
+        ss << setw(15) << pstd_map[g] << endl;
+        f << ss.str();
+        if (echo)
+            cout << ss.str();
+    }
+    f << endl;
+    if (echo)
+        cout << endl;
 }
 
 void L2PhiHandler::report(bool echo)
