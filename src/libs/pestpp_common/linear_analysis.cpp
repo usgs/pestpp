@@ -416,7 +416,7 @@ pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerA
 		
 		
 
-		pe.draw(num_reals, optimum_run.get_ctl_pars(), cov, &pfm, 3, file_manager.rec_ofstream());
+		pe.draw(num_reals, optimum_run.get_ctl_pars(), cov, &pfm, 4, file_manager.rec_ofstream());
 		stringstream ss;
 		ss.str("");
 		if (iter != -999)
