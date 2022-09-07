@@ -2088,6 +2088,10 @@ void L2PhiHandler::report_group(bool echo) {
     map<string,double> std_map;
     map<string,double> pmn_map;
     map<string,double> pstd_map;
+    map<string,double> mx_map;
+    map<string,double> mmn_map;
+    map<string,double> pmx_map;
+    map<string,double> pmmn_map;
 
     set<string> snzgroups;
     ObservationInfo* oi_ptr = pest_scenario->get_observation_info_ptr();
@@ -2108,6 +2112,10 @@ void L2PhiHandler::report_group(bool echo) {
         v = 0;
         pv = 0;
         c = 0;
+        mx_map[g] = -1e+300;
+        mmn_map[g] = 1e+300;
+        pmx_map[g] = -1e+300;
+        pmmn_map[g] = 1e+300;
         for (auto& o : obs_group_phi_map)
         {
             if (actual.find(o.first) == actual.end())
@@ -2116,12 +2124,17 @@ void L2PhiHandler::report_group(bool echo) {
             }
             tot = tot + o.second[g];
             ptot = ptot + (o.second[g]/actual[o.first]);
+            mx_map[g] = max(mx_map[g],o.second[g]);
+            mmn_map[g] = min(mmn_map[g],o.second[g]);
+            pmx_map[g] = max(pmx_map[g],(o.second[g]/actual[o.first]));
+            pmmn_map[g] = min(pmmn_map[g],(o.second[g]/actual[o.first]));
             c++;
         }
         tot = tot / (double)c;
         ptot = ptot/(double)c;
         mn_map[g] = tot;
         pmn_map[g] = ptot;
+
         for (auto& o : obs_group_phi_map)
         {
             if (actual.find(o.first) == actual.end())
@@ -2157,10 +2170,11 @@ void L2PhiHandler::report_group(bool echo) {
     string s;
     stringstream ss;
     ss.str("");
-    ss << endl << "    --- Observation Group Phi Summary  ---- " << endl;
-    ss << "    (computed using 'actual' phi) " << endl;
-    ss << setw(len) << "obs_group" << setw(15) << "phi_mean" << setw(15) << "phi_std";
-    ss << setw(15) << "percent_mean" << setw(15) << "percent_std" << endl;
+    ss << endl << "  --- Observation Group Phi Summary  --- " << endl;
+    ss << "  (computed using 'actual' phi) " << endl;
+    ss << left << setw(len) << "obs_group" << right << setw(15) << "mean" << setw(15) << "std";
+    ss << setw(15) << "min" << setw(15) << "max";
+    ss << setw(15) << "percent" << setw(15) << "std" << setw(15) << "min" << setw(15) << "max" << endl;
     f << ss.str();
     if (echo)
         cout << ss.str();
@@ -2170,18 +2184,25 @@ void L2PhiHandler::report_group(bool echo) {
     for (auto& g : nzgroups)
     {
         ss.str("");
-        ss << setw(len) << g;
-        ss << setw(15) << mn_map[g];
+        ss << left << setw(len) << g;
+        ss << right << setw(15) << mn_map[g];
         ss << setw(15) << std_map[g];
-        ss << setw(15) << pmn_map[g];
-        ss << setw(15) << pstd_map[g] << endl;
+        ss << setw(15) << mmn_map[g];
+        ss << setw(15) << mx_map[g];
+
+        ss << setw(15) << 100. * pmn_map[g];
+        ss << setw(15) << 100. * pstd_map[g];
+        ss << setw(15) << 100. * pmmn_map[g];
+        ss << setw(15) << 100. * pmx_map[g];
+        ss << endl;
+
         f << ss.str();
         if (echo)
             cout << ss.str();
     }
-    f << endl;
+    f << "    Note: 'percent' is the percentage of the total phi for each realization." << endl << endl;
     if (echo)
-        cout << endl;
+        cout << "    Note: 'percent' is the percentage of the total phi for each realization." << endl << endl;
 }
 
 void L2PhiHandler::report(bool echo)
