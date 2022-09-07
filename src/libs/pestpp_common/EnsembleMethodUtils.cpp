@@ -2082,6 +2082,72 @@ string L2PhiHandler::get_summary_header()
 }
 
 
+void L2PhiHandler::report_group(bool echo) {
+
+    map<string,double> mn_map;
+    map<string,double> std_map;
+    map<string,double> pmn_map;
+    map<string,double> pstd_map;
+
+    set<string> snzgroups;
+    ObservationInfo* oi_ptr = pest_scenario->get_observation_info_ptr();
+    for (auto& o : pest_scenario->get_ctl_ordered_nz_obs_names())
+    {
+        if (snzgroups.find(oi_ptr->get_group(o)) == snzgroups.end())
+            snzgroups.emplace(oi_ptr->get_group(o));
+    }
+
+
+    double tot = 0, ptot = 0;
+    int c = 0;
+    for (auto& g : snzgroups)
+    {
+        tot = 0;
+        ptot = 0;
+        c = 0;
+        for (auto& o : obs_group_phi_map)
+        {
+            if (meas.find(o.first) == meas.end())
+            {
+                continue;
+            }
+            tot = tot + o.second[g];
+            ptot = ptot + (o.second[g]/meas[o.first]);
+            c++;
+        }
+        tot = tot / (double)c;
+        ptot = 100.0 * (ptot/(double)c);
+    }
+
+
+    ofstream& f = file_manager->rec_ofstream();
+    int len = 20;
+    for (auto& o : obs_group_phi_map)
+    {
+        for (auto& oo : o.second)
+        {
+            len = max(len,(int)oo.first.size());
+        }
+        break;
+    }
+    len++;
+
+    string s;
+    stringstream ss;
+    ss.str("");
+    ss << setw(len) << "obs_group" << setw(15) << "phi_mean" << setw(15) << "phi_std";
+    ss << setw(15) << "percent_mean" << setw(15) << "percent_std" << endl;
+    f << ss.str();
+    if (echo)
+        cout << ss.str();
+
+
+
+    obs_group_phi_map;
+    meas;
+
+}
+
 void L2PhiHandler::report(bool echo)
 {
 	ofstream& f = file_manager->rec_ofstream();
@@ -2176,6 +2242,9 @@ void L2PhiHandler::report(bool echo)
 
 	f << endl << endl;
 	f.flush();
+
+    report_group(echo);
+
 }
 
 
