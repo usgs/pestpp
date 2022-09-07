@@ -478,7 +478,8 @@ public:
 	string get_ies_localize_how() const { return ies_localize_how; }
 	bool get_ies_localizer_forgive_missing() const {return ies_localizer_forgive_missing;}
 	void set_ies_localizer_forgive_missing(bool _flag) {ies_localizer_forgive_missing = _flag;}
-
+	string get_ies_phi_fractions_file() const {return ies_phi_fractions_file;}
+	void set_ies_phi_fractions_files(string _file) {ies_phi_fractions_file = _file;}
 
 
 
@@ -800,6 +801,7 @@ private:
 	bool ies_ordered_binary;
 	double ies_multimodal_alpha;
 	bool ies_localizer_forgive_missing;
+	string ies_phi_fractions_file;
 
 
 	// Data Assimilation parameters

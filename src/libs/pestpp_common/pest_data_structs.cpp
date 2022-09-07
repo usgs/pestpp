@@ -1133,6 +1133,11 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         ies_localizer_forgive_missing = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
+    else if (key == "IES_PHI_FRACTIONS_FILE")
+    {
+        ies_phi_fractions_file = org_value;
+        return true;
+    }
 	return false;
 }
 
@@ -1741,6 +1746,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_ordered_binary: " << ies_ordered_binary << endl;
 	os << "ies_multimodal_alpha: " << ies_multimodal_alpha << endl;
 	os << "ies_localizer_forgive_extra: " << ies_localizer_forgive_missing << endl;
+	os << "ies_phi_fractions_file: " << ies_phi_fractions_file << endl;
 
 
 	os << endl << "pestpp-sen options: " << endl;
@@ -1920,6 +1926,7 @@ void PestppOptions::set_defaults()
     set_ies_multimodal_alpha(1.0);
     set_ensemble_output_precision(6);
     set_ies_localizer_forgive_missing(false);
+    set_ies_phi_fractions_files("");
 
 	// DA parameters
 	//set_da_use_ies(false);
