@@ -2503,9 +2503,31 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
 	double std = calc_std(&_meas);
 	vector<int> idxs;
 	vector<string> names = oe.get_real_names();
+	double bad_thres = 1.0e+300;
+	if (bad_phi_sigma > 0) {
+        bad_thres = mean + (std * bad_phi_sigma);
+        ofstream &frec = file_manager->rec_ofstream();
+        frec << "...bad_phi_sigma " << bad_phi_sigma << " and mean " << mean << " yields bad phi threshold of " << bad_thres << endl;
+    }
+        else
+    {
+	    vector<double> meas_vec;
+	    for (auto & m : _meas)
+	        meas_vec.push_back(m.second);
+	    sort(meas_vec.begin(),meas_vec.end());
+	    double qval = -1. * bad_phi_sigma / 100.;
+	    int qidx = (int)(qval * (double)meas_vec.size());
+	    qidx = min(0,qidx);
+	    qidx = max(((int)meas_vec.size()) - 1,qidx);
+	    bad_thres = meas_vec[qidx];
+	    ofstream& frec = file_manager->rec_ofstream();
+	    frec << "...bad_phi_sigma quantile value " << qval << " yields bad phi threshold of " << bad_thres << endl;
+
+    }
+
 	for (int i = 0; i < names.size(); i++) {
 
-        if ((_meas[names[i]] > bad_phi) || (_meas[names[i]] > mean + (std * bad_phi_sigma))) {
+        if ((_meas[names[i]] > bad_phi) || (_meas[names[i]] > bad_thres)) {
             if (names[i] == BASE_REAL_NAME)
                 cout << "...not dropping 'base' real even though phi is 'bad'" << endl;
             else
@@ -4563,6 +4585,7 @@ void EnsembleMethod::adjust_weights() {
         return;
     }
 
+
     ss.str("");
     ss << "adjusting weights using phi factors in file " << fname;
     message(0,ss.str());
@@ -4622,6 +4645,12 @@ void EnsembleMethod::adjust_weights() {
         for (auto& g : group_map.at(pf.first))
             ss << g << ",";
         message(2,ss.str());
+        if (pf.second <= 0.0)
+        {
+            ss.str("");
+            ss << "adjust_weights(): phi factor '" << pf.first << "' less or equal 0.0 - this not allowed";
+            throw_em_error(ss.str());
+        }
     }
 
     ss.str("");
@@ -4668,18 +4697,24 @@ void EnsembleMethod::adjust_weights() {
     }
     //cur_mean_phi = nzobs_obs_fac * cur_mean_phi;
     map<string,double> current_phi_fracs;
+    map<string,double> init_group_phis,adj_group_phis;
     double total = 0;
     double scale_fac = 0;
+    double sub_total = 0;
     for (auto& pf: phi_fracs)
     {
         total = 0;
         for (auto& g : group_map.at(pf.first))
         {
+            sub_total = 0;
             for (auto oname : group_to_obs_map.at(g))
             {
                 total += mean_swr_map.at(oname);
+                sub_total += mean_swr_map.at(oname);
             }
+            init_group_phis[g] = sub_total;
         }
+
         if (total == 0)
         {
             ss.str("");
@@ -4705,15 +4740,35 @@ void EnsembleMethod::adjust_weights() {
     for (auto& pf: phi_fracs) {
         total = 0;
         for (auto &g : group_map.at(pf.first)) {
+            sub_total = 0;
             for (auto oname : group_to_obs_map.at(g)) {
                 total += mean_swr_map.at(oname);
+                sub_total += mean_swr_map.at(oname);
             }
+            adj_group_phis[g] = sub_total;
+
         }
         current_phi_fracs[pf.first] = total / cur_mean_phi;
         ss.str("");
         ss << "file tag '" << pf.first << "' adjusted mean phi (factor): " << total << " ("
            << total / cur_mean_phi << ")";
         message(1, ss.str());
+    }
+    if (verbose_level > 2)
+    {
+        fname = file_manager.get_base_filename() + ".obsgroupadj.summary.csv";
+        ofstream f(fname);
+        if (!f.good())
+            throw_em_error("error opening weight adjustment summary file "+fname);
+
+        f << "group,initial_phi,adjusted_phi" << endl;
+        for (auto& g : init_group_phis)
+        {
+            f << g.first << "," << g.second << "," << adj_group_phis.at(g.first) << endl;
+        }
+        f.close();
+        message(2,"saved obs group weight adjustment summary to "+fname);
+
     }
 }
 

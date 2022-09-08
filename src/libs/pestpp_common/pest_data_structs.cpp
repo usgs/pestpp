@@ -1133,7 +1133,7 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         ies_localizer_forgive_missing = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
-    else if (key == "IES_PHI_FRACTIONS_FILE")
+    else if (key == "IES_PHI_FACTOR_FILE")
     {
         ies_phi_fractions_file = org_value;
         return true;
