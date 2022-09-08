@@ -1717,24 +1717,34 @@ Eigen::MatrixXd L2PhiHandler::get_obs_resid(ObservationEnsemble &oe, bool apply_
 	return resid;
 }
 
-map<string,double> L2PhiHandler::get_mean_actual_swr_map(ObservationEnsemble& oe)
+map<string,double> L2PhiHandler::get_actual_swr_map(ObservationEnsemble& oe, string real_name)
 {
     Eigen::MatrixXd resid = get_actual_obs_resid(oe);
     Eigen::VectorXd q = get_q_vector();
-
-    map<string,double> actual_swr_map;
-    vector<string> var_names = oe.get_var_names();
-    //ObservationInfo* oi = pest_scenario->get_observation_info_ptr();
-    //Eigen::VectorXd mean_vec = resid.colwise().mean();
-//    for (int i=0;i<mean_vec.size();i++)
-//    {
-//        actual_swr_map[var_names[i]] = pow(oi->get_weight(var_names[i]) * mean_vec[i],2);
-//    }
     for (int i=0;i<resid.rows();i++) {
         resid.row(i) = resid.row(i).array() * q.array().transpose();
         resid.row(i) = resid.row(i).array() * resid.row(i).array();
     }
-    Eigen::VectorXd mean_vec = resid.colwise().mean();
+    Eigen::VectorXd mean_vec;
+    map<string,double> actual_swr_map;
+    vector<string> var_names = oe.get_var_names();
+    if (real_name.size() > 0)
+    {
+        map<string,int> real_map = oe.get_real_map();
+        if (real_map.find(real_name) != real_map.end())
+        {
+            mean_vec = resid.row(real_map[real_name]);
+        }
+        else
+        {
+            mean_vec = resid.colwise().mean();
+        }
+    }
+    else
+    {
+        mean_vec = resid.colwise().mean();
+    }
+
     for (int i=0;i<mean_vec.size();i++)
     {
         actual_swr_map[var_names[i]] = mean_vec[i];
@@ -4549,7 +4559,9 @@ void EnsembleMethod::adjust_weights() {
     {
         return;
     }
-    message(1,"adjusting weights using phi fractions in file "+fname);
+    ss.str("");
+    ss << "adjusting weights using phi fractions in file " << fname;
+    message(1,ss.str());
     performance_log->log_event("reading 'ies_phi_fractions_file': "+fname);
     map<string,double> phi_fracs = pest_utils::read_twocol_ascii_to_map(fname);
 
@@ -4572,6 +4584,8 @@ void EnsembleMethod::adjust_weights() {
     //check that each nzgroup is not found more than once using the tags in the file
     map<string,vector<string>> group_map;
     map<string,vector<string>> rev_group_map;
+    for (auto& g : nzgroups)
+        rev_group_map[g] = vector<string>();
 
     for (auto& pf : phi_fracs)
     {
@@ -4583,6 +4597,11 @@ void EnsembleMethod::adjust_weights() {
                 group_map[pf.first].push_back(g);
             }
         }
+        ss.str("");
+        ss << "file tag '" << pf.first << "' with fraction " << pf.second << " maps to groups ";
+        for (auto& g : group_map[pf.first])
+            ss << g << ",";
+        message(2,ss.str());
     }
 
     ss.str("");
@@ -4610,10 +4629,16 @@ void EnsembleMethod::adjust_weights() {
     }
 
     ss.str("");
-    map<string,double> mean_swr_map = ph.get_mean_actual_swr_map(oe);
+    string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
+    if (center_on.size() != 0)
+        message(1,"using realization "+center_on+" residuals for reweighting (if available");
+    else
+        message(1,"using mean residuals for reweighting");
+    map<string,double> mean_swr_map = ph.get_actual_swr_map(oe,center_on);
     double cur_mean_phi = 0;
     for (auto& sw : mean_swr_map)
         cur_mean_phi += sw.second;
+
     message(1,"original mean phi: ",cur_mean_phi);
     //if the current is really low, just return and the traps in initialize() will catch it.
     if (cur_mean_phi < 1.0e-10)
@@ -4621,7 +4646,7 @@ void EnsembleMethod::adjust_weights() {
         performance_log->log_event("mean phi too low - returning to initialize()");
         return;
     }
-
+    //cur_mean_phi = nzobs_obs_fac * cur_mean_phi;
     map<string,double> current_phi_fracs;
     double total = 0;
     double scale_fac = 0;
@@ -4643,19 +4668,19 @@ void EnsembleMethod::adjust_weights() {
         }
         current_phi_fracs[pf.first] = total / cur_mean_phi;
         ss.str("");
-        ss << "file tag '" << pf.first << "' original mean phi (fraction): " << total << "(" << current_phi_fracs[pf.first] << ")";
+        ss << "file tag '" << pf.first << "' original mean phi (fraction): " << total << " (" << current_phi_fracs[pf.first] << ")";
         message(1,ss.str());
         scale_fac = sqrt((cur_mean_phi * pf.second) / total);
         for (auto& g : group_map[pf.first])
         {
             for (auto oname : group_to_obs_map[g])
             {
-                oi->set_weight(oname,oi->get_weight(oname) * scale_fac);
+                oi->set_weight(oname,oi->get_weight(oname) * scale_fac );
             }
         }
     }
     ph.update(oe,pe);
-    mean_swr_map = ph.get_mean_actual_swr_map(oe);
+    mean_swr_map = ph.get_actual_swr_map(oe);
     for (auto& pf: phi_fracs) {
         total = 0;
         for (auto &g : group_map[pf.first]) {
@@ -4663,15 +4688,10 @@ void EnsembleMethod::adjust_weights() {
                 total += mean_swr_map[oname];
             }
         }
-        if (total == 0) {
-            ss.str("");
-            ss << "adjust_weights(): file tag " << pf.first << "has 0.0 phi";
-            throw_em_error(ss.str());
-        }
         current_phi_fracs[pf.first] = total / cur_mean_phi;
         ss.str("");
-        ss << "file tag '" << pf.first << "' adjusted mean phi (fraction): " << total << "("
-           << current_phi_fracs[pf.first] << ")";
+        ss << "file tag '" << pf.first << "' adjusted mean phi (fraction): " << total << " ("
+           << total / cur_mean_phi << ")";
         message(1, ss.str());
     }
 }
