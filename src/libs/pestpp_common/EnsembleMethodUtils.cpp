@@ -1727,7 +1727,7 @@ map<string,double> L2PhiHandler::get_actual_swr_map(ObservationEnsemble& oe, str
     }
     Eigen::VectorXd mean_vec;
     map<string,double> actual_swr_map;
-    vector<string> var_names = oe.get_var_names();
+    vector<string> var_names = oe_base->get_var_names();
     if (real_name.size() > 0)
     {
         map<string,int> real_map = oe.get_real_map();
@@ -4570,12 +4570,14 @@ void EnsembleMethod::adjust_weights() {
     set<string> nzgroups;
     map<string,vector<string>> group_to_obs_map;
 
-    for (auto& oname : pest_scenario.get_ctl_ordered_nz_obs_names())
+    for (auto& oname : pest_scenario.get_ctl_ordered_obs_names())
     {
+        if (oi->get_weight(oname) == 0)
+            continue;
         if (nzgroups.find(oi->get_group(oname)) == nzgroups.end())
         {
             nzgroups.insert(oi->get_group(oname));
-            group_to_obs_map[oi->get_group(oname)] = vector<string>();
+            group_to_obs_map[oi->get_group(oname)]= vector<string>();
         }
         group_to_obs_map[oi->get_group(oname)].push_back(oname);
 
@@ -4587,19 +4589,29 @@ void EnsembleMethod::adjust_weights() {
     for (auto& g : nzgroups)
         rev_group_map[g] = vector<string>();
 
+    vector<string> in_groups;
     for (auto& pf : phi_fracs)
     {
+        in_groups.clear();
         for (auto& g : nzgroups)
         {
+
             if (g.find(pest_utils::upper_cp(pf.first)) != string::npos)
             {
-                rev_group_map[g].push_back(pf.first);
-                group_map[pf.first].push_back(g);
+                rev_group_map.at(g).push_back(pf.first);
+                in_groups.push_back(g);
             }
         }
+        group_map[pf.first] = in_groups;
+        if (in_groups.size() == 0)
+        {
+            message(1,"WARNING: no non-zero obs groups found for tag '"+pf.first+"'");
+            continue;
+        }
+
         ss.str("");
         ss << "file tag '" << pf.first << "' with fraction " << pf.second << " maps to groups ";
-        for (auto& g : group_map[pf.first])
+        for (auto& g : group_map.at(pf.first))
             ss << g << ",";
         message(2,ss.str());
     }
@@ -4653,27 +4665,28 @@ void EnsembleMethod::adjust_weights() {
     for (auto& pf: phi_fracs)
     {
         total = 0;
-        for (auto& g : group_map[pf.first])
+        for (auto& g : group_map.at(pf.first))
         {
-            for (auto oname : group_to_obs_map[g])
+            for (auto oname : group_to_obs_map.at(g))
             {
-                total += mean_swr_map[oname];
+                total += mean_swr_map.at(oname);
             }
         }
         if (total == 0)
         {
             ss.str("");
-            ss << "adjust_weights(): file tag " << pf.first << "has 0.0 phi";
-            throw_em_error(ss.str());
+            ss << "WARNING: adjust_weights(): file tag " << pf.first << " has 0.0 phi";
+            message(1,ss.str());
+            continue;
         }
         current_phi_fracs[pf.first] = total / cur_mean_phi;
         ss.str("");
         ss << "file tag '" << pf.first << "' original mean phi (fraction): " << total << " (" << current_phi_fracs[pf.first] << ")";
         message(1,ss.str());
         scale_fac = sqrt((cur_mean_phi * pf.second) / total);
-        for (auto& g : group_map[pf.first])
+        for (auto& g : group_map.at(pf.first))
         {
-            for (auto oname : group_to_obs_map[g])
+            for (auto oname : group_to_obs_map.at(g))
             {
                 oi->set_weight(oname,oi->get_weight(oname) * scale_fac );
             }
@@ -4683,9 +4696,9 @@ void EnsembleMethod::adjust_weights() {
     mean_swr_map = ph.get_actual_swr_map(oe);
     for (auto& pf: phi_fracs) {
         total = 0;
-        for (auto &g : group_map[pf.first]) {
-            for (auto oname : group_to_obs_map[g]) {
-                total += mean_swr_map[oname];
+        for (auto &g : group_map.at(pf.first)) {
+            for (auto oname : group_to_obs_map.at(g)) {
+                total += mean_swr_map.at(oname);
             }
         }
         current_phi_fracs[pf.first] = total / cur_mean_phi;
