@@ -2518,7 +2518,7 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
 	    double qval = -1. * bad_phi_sigma / 100.;
 	    int qidx = (int)(qval * (double)meas_vec.size());
 	    qidx = min(0,qidx);
-	    qidx = max(((int)meas_vec.size()) - 1,qidx);
+	    qidx = max(((int)meas_vec.size()) - 2,qidx);
 	    bad_thres = meas_vec[qidx];
 	    ofstream& frec = file_manager->rec_ofstream();
 	    frec << "...bad_phi_sigma quantile value " << qval << " yields bad phi threshold of " << bad_thres << endl;
@@ -3309,9 +3309,13 @@ void EnsembleMethod::sanity_checks()
     {
         warnings.push_back("'ies_save_rescov' with more than 30,000 observations will likely produce allocation errors, be prepared!");
     }
-    if (pest_scenario.get_pestpp_options().get_ies_weights_csv().size() > 0)
+    if (ppo->get_ies_weights_csv().size() > 0)
     {
         warnings.push_back("ies_weight_ensemble is highly experimental - user beware");
+        if (ppo->get_ies_phi_fractions_file().size() > 0)
+        {
+            errors.push_back("weight ensemble cant be used with internal weight adjustment");
+        }
     }
 
     if (warnings.size() > 0)
