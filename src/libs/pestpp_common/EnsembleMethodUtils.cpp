@@ -2187,8 +2187,6 @@ void L2PhiHandler::report_group(bool echo) {
         else
             pstd_map[g] = 0.0;
     }
-
-
     ofstream& f = file_manager->rec_ofstream();
     int len = 20;
     for (auto& o : obs_group_phi_map)
@@ -2204,9 +2202,9 @@ void L2PhiHandler::report_group(bool echo) {
     string s;
     stringstream ss;
     ss.str("");
-    ss << endl << "  --- Observation Group Phi Summary  --- " << endl;
-    ss << "  (computed using 'actual' phi) " << endl;
-    ss << left << setw(len) << "obs_group" << right << setw(15) << "mean" << setw(15) << "std";
+    ss << "  ---  Observation Group Phi Summary ---  " << endl;
+    ss << "       (computed using 'actual' phi)" << endl;
+    ss << left << setw(len) << "group" << right << setw(15) << "mean" << setw(15) << "std";
     ss << setw(15) << "min" << setw(15) << "max";
     ss << setw(15) << "percent" << setw(15) << "std" << setw(15) << "min" << setw(15) << "max" << endl;
     f << ss.str();
@@ -2218,7 +2216,7 @@ void L2PhiHandler::report_group(bool echo) {
     for (auto& g : nzgroups)
     {
         ss.str("");
-        ss << left << setw(len) << g;
+        ss << left << setw(len) << pest_utils::lower_cp(g);
         ss << right << setw(15) << mn_map[g];
         ss << setw(15) << std_map[g];
         ss << setw(15) << mmn_map[g];
@@ -2234,12 +2232,12 @@ void L2PhiHandler::report_group(bool echo) {
         if (echo)
             cout << ss.str();
     }
-    f << "    Note: 'percent' is the percentage of the total phi for each realization." << endl << endl;
+    f << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl << endl;
     if (echo)
-        cout << "    Note: 'percent' is the percentage of the total phi for each realization." << endl << endl;
+        cout << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl << endl;
 }
 
-void L2PhiHandler::report(bool echo)
+void L2PhiHandler::report(bool echo, bool group_report)
 {
 	ofstream& f = file_manager->rec_ofstream();
 	string s;
@@ -2333,8 +2331,8 @@ void L2PhiHandler::report(bool echo)
 
 	f << endl << endl;
 	f.flush();
-
-    report_group(echo);
+    if (group_report)
+        report_group(echo);
 
 }
 
@@ -4559,10 +4557,15 @@ void EnsembleMethod::adjust_weights() {
     {
         return;
     }
+
     ss.str("");
-    ss << "adjusting weights using phi fractions in file " << fname;
-    message(1,ss.str());
-    performance_log->log_event("reading 'ies_phi_fractions_file': "+fname);
+    ss << "adjusting weights using phi factors in file " << fname;
+    message(0,ss.str());
+
+    ph.update(oe, pe);
+    message(0, "pre-weight-adjustment initial phi summary");
+    ph.report(true);
+    performance_log->log_event("reading 'ies_phi_factors_file': "+fname);
     map<string,double> phi_fracs = pest_utils::read_twocol_ascii_to_map(fname);
 
     //first a lot of error trapping
@@ -4610,25 +4613,25 @@ void EnsembleMethod::adjust_weights() {
         }
 
         ss.str("");
-        ss << "file tag '" << pf.first << "' with fraction " << pf.second << " maps to groups ";
+        ss << "file tag '" << pf.first << "' with factor " << pf.second << " maps to groups ";
         for (auto& g : group_map.at(pf.first))
             ss << g << ",";
         message(2,ss.str());
     }
 
     ss.str("");
-    ss << "Errors in phi fraction file: ";
+    ss << "Errors in phi factors file: ";
     bool has_errors = false;
     for (auto& rg : rev_group_map)
     {
         if (rg.second.size() == 0)
         {
-            ss << ", group '" << rg.first << "' not identified with any file tags " << endl;
+            ss << ", group '" << rg.first << "' not identified with any tags " << endl;
             has_errors = true;
         }
         else if (rg.second.size() > 1)
         {
-            ss << ", group '" << rg.first << "' mapped to multiple file tags: ";
+            ss << ", group '" << rg.first << "' mapped to multiple tags: ";
             for (auto &tag : rg.second)
                 ss << " " << tag;
             ss << endl;
@@ -4675,13 +4678,13 @@ void EnsembleMethod::adjust_weights() {
         if (total == 0)
         {
             ss.str("");
-            ss << "WARNING: adjust_weights(): file tag " << pf.first << " has 0.0 phi";
+            ss << "WARNING: adjust_weights(): tag " << pf.first << " has 0.0 phi";
             message(1,ss.str());
             continue;
         }
         current_phi_fracs[pf.first] = total / cur_mean_phi;
         ss.str("");
-        ss << "file tag '" << pf.first << "' original mean phi (fraction): " << total << " (" << current_phi_fracs[pf.first] << ")";
+        ss << "file tag '" << pf.first << "' original mean phi (factor): " << total << " (" << current_phi_fracs[pf.first] << ")";
         message(1,ss.str());
         scale_fac = sqrt((cur_mean_phi * pf.second) / total);
         for (auto& g : group_map.at(pf.first))
@@ -4703,7 +4706,7 @@ void EnsembleMethod::adjust_weights() {
         }
         current_phi_fracs[pf.first] = total / cur_mean_phi;
         ss.str("");
-        ss << "file tag '" << pf.first << "' adjusted mean phi (fraction): " << total << " ("
+        ss << "file tag '" << pf.first << "' adjusted mean phi (factor): " << total << " ("
            << total / cur_mean_phi << ")";
         message(1, ss.str());
     }

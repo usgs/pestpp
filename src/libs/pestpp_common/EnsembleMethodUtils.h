@@ -43,7 +43,7 @@ public:
 
 	map<string, double>* get_phi_map_ptr(L2PhiHandler::phiType pt);
 	map<string, double> get_phi_map(L2PhiHandler::phiType pt);
-	void report(bool echo=true);
+	void report(bool echo=true, bool group_report=true);
 	void report_group(bool echo=true);
 
 	void write(int iter_num, int total_runs, bool write_group = true);

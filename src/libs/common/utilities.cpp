@@ -785,7 +785,9 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 		double data = -1.;
 		// record current position in file
 		streampos begin_rows = in.tellg();
-		
+		in.seekg(0,std::ios::end);
+		streampos end = in.tellg();
+		in.seekg(begin_rows,std::ios::beg);
 		//read the row names so we can dimension the matrix
 		while (true)
 		{
@@ -795,8 +797,10 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 			{
 				break;
 			}
-
-			in.read((char*)&(name_size), sizeof(name_size));
+			if (in.tellg() == end) {
+                break;
+            }
+            in.read((char*)&(name_size), sizeof(name_size));
             if (!in.good())
 			{
 				ss.str("");
