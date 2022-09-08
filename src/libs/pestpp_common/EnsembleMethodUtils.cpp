@@ -2202,7 +2202,7 @@ void L2PhiHandler::report_group(bool echo) {
     string s;
     stringstream ss;
     ss.str("");
-    ss << "  ---  Observation Group Phi Summary ---  " << endl;
+    ss << "  ---  observation group phi summary ---  " << endl;
     ss << "       (computed using 'actual' phi)" << endl;
     ss << left << setw(len) << "group" << right << setw(15) << "mean" << setw(15) << "std";
     ss << setw(15) << "min" << setw(15) << "max";
@@ -2329,10 +2329,15 @@ void L2PhiHandler::report(bool echo, bool group_report)
 	}
 	
 
-	f << endl << endl;
-	f.flush();
+
     if (group_report)
+    {
+        cout << endl;
         report_group(echo);
+    }
+
+    f << endl << endl;
+    f.flush();
 
 }
 
@@ -2734,7 +2739,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 
 	stringstream ss;
 	ofstream &frec = file_manager_ptr->rec_ofstream();
-	ss << endl << "   ---  Parameter Group Change Summmary  ---    " << endl;
+	ss << endl << "   ---  parameter group change summmary  ---    " << endl;
 	ss << "   (compared to the initial ensemble using active realizations)" << endl;
 	cout << ss.str();
 	frec << ss.str();
@@ -5613,7 +5618,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			}
 		message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 		ph.update(oe_lams[best_idx], pe_lams[best_idx]);
-		ph.report(true);
+		ph.report(true,false);
 		message(0, "running remaining realizations for best lambda, scale:", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 
 		//pe_keep_names and oe_keep_names are names of the remaining reals to eval
@@ -5679,7 +5684,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
-		ph.report(true);
+		ph.report(true, false);
 	}
 	else
 	{
