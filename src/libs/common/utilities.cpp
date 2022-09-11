@@ -378,9 +378,17 @@ map<string, double> read_twocol_ascii_to_map(string filename, int header_lines, 
 	map<string, double> result;
 	ifstream fin(filename);
     if (!fin.good())
-		throw runtime_error("could not open file " + filename + " for reading");
-	string line;
+    {
+        cout << "ERROR: could not open file " + filename + " for reading" << endl;
+        cerr << "ERROR: could not open file " + filename + " for reading" << endl;
+
+        throw runtime_error("could not open file " + filename + " for reading");
+
+    }
+
+	string line, dtoken;
 	double value;
+	size_t idx;
 	vector<string> tokens;
 	for (int i = 0; i < header_lines; i++)
 		getline(fin, line);
@@ -394,8 +402,21 @@ map<string, double> read_twocol_ascii_to_map(string filename, int header_lines, 
 		tokenize(line, tokens,"\t\r, ");
 		//only use the first two columns of file
 		if (tokens.size() < data_col + 1)
-			throw runtime_error("not enough entries on line :" + line);
-		convert_ip(tokens[data_col], value);
+        {
+		    cout << "ERROR: not enough entries on line :"<<  line << " of file " << filename << endl;
+            cerr << "ERROR: not enough entries on line :"<<  line << " of file " << filename << endl;
+            throw runtime_error("not enough entries on line :" + line);
+        }
+
+		value = stod(tokens[data_col],&idx);
+		//convert_ip(tokens[data_col], value);
+		if (idx != tokens[data_col].size())
+        {
+            cout << "WARNING: left over chars after data for token " << tokens[data_col] << " on line " << line << " of file " << filename << endl;
+            cerr << "WARNING: left over chars after data for token " << tokens[data_col] << " on line " << line << " of file " << filename << endl;
+            throw runtime_error("WARNING: left over chars after data for token "+tokens[data_col]+" on line "+line+" of file "+filename);
+        }
+
 		result[tokens[0]] = value;
 	}
 	fin.close();
