@@ -1264,7 +1264,8 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 
 	if (fosm_real_info.second.size() > 0)
 	{
-		pair<ObservationEnsemble, map<string, double>> fosm_obs_info = la.process_fosm_reals(&run_manager, fosm_real_info,
+		Parameters frzn_pars = best_upgrade_run.get_frozen_ctl_pars();
+	    pair<ObservationEnsemble, map<string, double>> fosm_obs_info = la.process_fosm_reals(&run_manager, fosm_real_info,
 			termination_ctl.get_iteration_number(), base_run.get_phi(*regul_scheme_ptr));
 		if (pest_scenario.get_pestpp_options().get_glm_accept_mc_phi())
 		{
@@ -1282,11 +1283,9 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 					par_transform.numeric2ctl_ip(tmp_pars);
 					best_upgrade_run.update_ctl(tmp_pars, tmp_obs);
 				}
-
-
-
 			}
 		}
+		best_upgrade_run.add_frozen_ctl_parameters(frzn_pars);
 	}
 
 	

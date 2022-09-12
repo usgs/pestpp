@@ -218,6 +218,19 @@ int main(int argc, char* argv[])
 			}
 		}
 
+		if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
+        {
+		    if ((pest_scenario.get_pestpp_options().get_glm_iter_mc()) &&
+		    (pest_scenario.get_pestpp_options().get_glm_accept_mc_phi()))
+            {
+		        stringstream ss;
+		        ss << endl << "WARNING 'regularization' mode is not conceptually compatible with 'glm_accept_mc_phi'" << endl;
+		        cout << ss.str();
+		        fout_rec << ss.str();
+            }
+
+        }
+
 		//Initialize OutputFileWriter to hadle IO of suplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;
 		OutputFileWriter output_file_writer(file_manager, pest_scenario, restart_flag);
