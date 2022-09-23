@@ -1118,6 +1118,7 @@ def fr_fail_test():
         os.remove(oe_file)
     pst.control_data.noptmax = 1
     pst.pestpp_options["panther_transfer_on_fail"] = "10par_xsec.list"
+    pst.pestpp_options["ies_num_reals"] = 10
     #pst.pestpp_options["panther_agent_freeze_on_fail"] = True
     pst.write(os.path.join(new_d, "pest.pst"))
     try:
@@ -1137,6 +1138,11 @@ def fr_fail_test():
         raise Exception("should have failed")
     oe_file = os.path.join(m_d, "pest.0.obs.csv")
     assert not os.path.exists(oe_file)
+
+    trx_files = [f for f in os.listdir(m_d) if "failed-agent_filename" in f]
+    print(trx_file)
+    assert len(trx_files) > 3,len(trx_files)
+
 
 
 
@@ -1285,7 +1291,7 @@ if __name__ == "__main__":
 
     #da_prep_4_mf6_freyberg_seq_tbl()
     #da_mf6_freyberg_test_2()
-    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
+    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
