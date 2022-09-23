@@ -1299,6 +1299,6 @@ if __name__ == "__main__":
     #cmdline_test()
     #basic_sqp_test()
     #mf6_v5_ies_test()
-    fr_timeout_test()
-    #fr_fail_test()
+    #fr_timeout_test()
+    fr_fail_test()
     #tplins1_test()
