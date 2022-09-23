@@ -1504,7 +1504,7 @@ void RunManagerPanther::process_message(int i_sock)
                 pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
                 ofstream& out = *ret.first->second;
                 vector<int8_t> ibuf = net_pack.get_data();
-                cout << reinterpret_cast<char*>(ibuf.data()) << endl;
+                //cout << reinterpret_cast<char*>(ibuf.data()) << endl;
 				if (out.bad())
 				{
 					ss.str("");
