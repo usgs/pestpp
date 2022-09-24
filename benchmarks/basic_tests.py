@@ -1140,7 +1140,7 @@ def fr_fail_test():
     assert not os.path.exists(oe_file)
 
     trx_files = [f for f in os.listdir(m_d) if "failed-agent_filename" in f]
-    print(trx_file)
+    print(trx_files)
     assert len(trx_files) > 3,len(trx_files)
 
 
@@ -1291,10 +1291,10 @@ if __name__ == "__main__":
 
     #da_prep_4_mf6_freyberg_seq_tbl()
     #da_mf6_freyberg_test_2()
-    shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
+    #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
     #mf6_v5_ies_test()
-    #mf6_v5_sen_test()
+    mf6_v5_sen_test()
 
 
 
@@ -1306,5 +1306,5 @@ if __name__ == "__main__":
     #basic_sqp_test()
     #mf6_v5_ies_test()
     #fr_timeout_test()
-    fr_fail_test()
+    #fr_fail_test()
     #tplins1_test()

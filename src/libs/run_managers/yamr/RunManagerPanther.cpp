@@ -1626,11 +1626,11 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
         }
 		
     }
-	replace(master_filename.begin(), master_filename.end(), '/', '-');
-	replace(master_filename.begin(), master_filename.end(), '\\', '-');
-	replace(master_filename.begin(), master_filename.end(), '.', '-');
-	replace(master_filename.begin(), master_filename.end(), '(', '-');
-	replace(master_filename.begin(), master_filename.end(), ')', '-');
+//	replace(master_filename.begin(), master_filename.end(), '/', '-');
+//	replace(master_filename.begin(), master_filename.end(), '\\', '-');
+//	replace(master_filename.begin(), master_filename.end(), '.', '-');
+//	replace(master_filename.begin(), master_filename.end(), '(', '-');
+//	replace(master_filename.begin(), master_filename.end(), ')', '-');
 	replace(master_filename.begin(), master_filename.end(), ':', '-');
 
     if (master_filename.size() > 255)
