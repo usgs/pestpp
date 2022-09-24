@@ -282,7 +282,7 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	idle_thread(nullptr), should_echo(_should_echo)
 {
 
-	char * t = 
+	const char * t =
     "\n\n:~-._                                                 _.-~:\n"
     ": :.~^o._        ________---------________        _.o^~.:.:\n"
     " : ::.`?88booo~~~.::::::::...::::::::::::..~~oood88P'.::.:\n"
