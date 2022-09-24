@@ -1139,9 +1139,9 @@ def fr_fail_test():
     oe_file = os.path.join(m_d, "pest.0.obs.csv")
     assert not os.path.exists(oe_file)
 
-    trx_files = [f for f in os.listdir(m_d) if "failed-agent_filename" in f]
+    trx_files = [f for f in os.listdir(m_d) if f.endswith(".list")]
     print(trx_files)
-    assert len(trx_files) > 3,len(trx_files)
+    assert len(trx_files) == 11,len(trx_files)
 
 
 
@@ -1294,7 +1294,7 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
     #mf6_v5_ies_test()
-    mf6_v5_sen_test()
+    #mf6_v5_sen_test()
 
 
 
@@ -1306,5 +1306,5 @@ if __name__ == "__main__":
     #basic_sqp_test()
     #mf6_v5_ies_test()
     #fr_timeout_test()
-    #fr_fail_test()
+    fr_fail_test()
     #tplins1_test()
