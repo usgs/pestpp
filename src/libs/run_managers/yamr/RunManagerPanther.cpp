@@ -582,6 +582,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
         {
             ss.str("");
             ss << "lost comms with all agents, closing all reminaing open file transfers";
+            report(ss.str(),true);
             for (auto& m : open_file_socket_map) {
                 string fname = m.second;
                 pair<map<string, ofstream *>::iterator, bool> ret = open_file_trans_streams.insert(
@@ -592,7 +593,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
                 out.close();
                 open_file_trans_streams.erase(ret.first);
                 ss.str("");
-                ss << "closed file '" << fname << " for file transfer, transferred " << file_size << " bytes";
+                ss << "closed master_file:" << fname << " for file transfer, transferred bytes:" << file_size;
                 report(ss.str(), false);
                 files_transferred += 1;
 
@@ -604,6 +605,31 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
         {
             listen();
             break;
+        }
+        int q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2) || (q == 4))
+        {
+            cout << "'pest.stp' found" << endl;
+            kill_all_active_runs();
+            ss.str("");
+            ss << "'pest.stp' found, closing all reminaing open file transfers";
+            report(ss.str(),true);
+            for (auto& m : open_file_socket_map) {
+                string fname = m.second;
+                pair<map<string, ofstream *>::iterator, bool> ret = open_file_trans_streams.insert(
+                        pair<string, ofstream *>(fname, new ofstream));
+                ofstream &out = *ret.first->second;
+                int file_size = out.tellp();
+                out.flush();
+                out.close();
+                open_file_trans_streams.erase(ret.first);
+                ss.str("");
+                ss << "closed master_file:" << fname << " for file transfer, transferred bytes:" << file_size;
+                report(ss.str(), false);
+                files_transferred += 1;
+
+            }
+
         }
 
 
@@ -630,8 +656,6 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
             message << "   " << bytes_transferred << " bytes transferred" << endl;
 
         }
-		
-		
 		
 		cout << message.str() << endl << endl;
 		f_rmr << endl << "---------------------" << endl << message.str() << endl;
@@ -1605,7 +1629,6 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
     replace(hostname.begin(),hostname.end(),' ','-');
     replace(hostname.begin(),hostname.end(),'\t','-');
 
-
     replace(working_dir.begin(),working_dir.end(),'/','-');
     replace(working_dir.begin(),working_dir.end(),'\\','-');
     replace(working_dir.begin(),working_dir.end(),'.','-');
@@ -1671,6 +1694,16 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
     replace(new_master_filename.begin(),new_master_filename.end(),':','-');
     replace(new_master_filename.begin(),new_master_filename.end(),' ','-');
     replace(new_master_filename.begin(),new_master_filename.end(),'\t','-');
+
+    if (org_new_master_fxt_map.find(master_filename) == org_new_master_fxt_map.end())
+    {
+        nftx++;
+        org_new_master_fxt_map[master_filename] = new_master_filename;
+    }
+    else
+    {
+        new_master_filename = org_new_master_fxt_map.at(master_filename);
+    }
     ss.str("");
     ss << " org_master_file:" << master_filename << " new master_file:" << new_master_filename;
     report(ss.str(),false);
@@ -1680,7 +1713,8 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
         ss << "WARNING: master_filename:" << new_master_filename << " size > 255" << endl;
         report(ss.str(),true);
     }
-    nftx++;
+
+
     return make_pair(agent_filename,new_master_filename);
 }
 
