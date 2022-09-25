@@ -1118,6 +1118,7 @@ def fr_fail_test():
         os.remove(oe_file)
     pst.control_data.noptmax = 1
     pst.pestpp_options["panther_transfer_on_fail"] = "10par_xsec.list"
+    pst.pestpp_options["ies_num_reals"] = 10
     #pst.pestpp_options["panther_agent_freeze_on_fail"] = True
     pst.write(os.path.join(new_d, "pest.pst"))
     try:
@@ -1137,6 +1138,11 @@ def fr_fail_test():
         raise Exception("should have failed")
     oe_file = os.path.join(m_d, "pest.0.obs.csv")
     assert not os.path.exists(oe_file)
+
+    trx_files = [f for f in os.listdir(m_d) if f.endswith(".list")]
+    print(trx_files)
+    assert len(trx_files) == 11,len(trx_files)
+
 
 
 
@@ -1299,6 +1305,6 @@ if __name__ == "__main__":
     #cmdline_test()
     #basic_sqp_test()
     #mf6_v5_ies_test()
-    fr_timeout_test()
-    #fr_fail_test()
+    #fr_timeout_test()
+    fr_fail_test()
     #tplins1_test()

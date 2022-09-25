@@ -214,7 +214,8 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 	//make sure the cov is aligned
 	if (cov.get_col_names() != draw_names)
 		cov = cov.get(draw_names);
-
+    if (level > 3)
+        cout << "cov:" << cov << endl;
 	//make standard normal draws
 	plog->log_event("making standard normal draws");
 	//RedSVD::sample_gaussian(draws);
@@ -231,6 +232,10 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 		ofstream f("standard_normal_draws.dat");
 		f << draws << endl;
 		f.close();
+		if (level > 3)
+        {
+		    cout << "standard normal draws: " << draws << endl;
+        }
 	}
 	//Eigen::MatrixXd draws_temp = draws;
 
@@ -328,12 +333,15 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 			{
 				found_invalid = true;
 				iv++;
+                if (level>3)
+                    cout << "invalid: " << draw_names[j] << ": " << draws(i,j) << endl;
 			}
 
 		}
 		if ((level>2) && (iv > 0))
 		{
 			cout << iv+1 << " invalid values found for " << draw_names[j] << endl;
+
 		}
 	}
 

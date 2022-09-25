@@ -43,7 +43,9 @@ public:
 
 	map<string, double>* get_phi_map_ptr(L2PhiHandler::phiType pt);
 	map<string, double> get_phi_map(L2PhiHandler::phiType pt);
-	void report(bool echo=true);
+	void report(bool echo=true, bool group_report=true);
+	void report_group(bool echo=true);
+
 	void write(int iter_num, int total_runs, bool write_group = true);
 	void write_group(int iter_num, int total_runs, vector<double> extra);
 	vector<int> get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe);
@@ -63,6 +65,8 @@ public:
 	void save_residual_cov(ObservationEnsemble& oe, int iter);
 
 	map<string,double> get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec);
+
+	map<string,double> get_actual_swr_map(ObservationEnsemble& oe, string real_name="");
 
 private:
 	string tag;
@@ -347,59 +351,41 @@ protected:
 	int num_threads;
 	set<string> pp_args;
 	int iter;
-	bool use_subset;	
-	
+	bool use_subset;
 	double last_best_lam, last_best_mean, last_best_std;
 	vector<double> best_mean_phis;
 	double best_phi_yet;
 	vector<double> mda_lambdas;
-
 	vector<string> obs_dyn_state_names, par_dyn_state_names;
 	map<string,string> final2init_par_state_names;
-
 	int consec_bad_lambda_cycles;
-
 	double lambda_max, lambda_min;
 	int warn_min_reals, error_min_reals;
 	vector<double> lam_mults;
-
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
-	//vector<int> subset_idxs;
-
 	ParameterEnsemble pe, pe_base;
 	ObservationEnsemble oe, oe_base, weights;
-	//Eigen::MatrixXd prior_pe_diff;
-	//Eigen::MatrixXd Am;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
-
 	bool oe_drawn, pe_drawn;
 
 	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
+
 	bool solve_mda(bool last_iter, int cycle = NetPackage::NULL_DA_CYCLE);
 
 	bool solve(bool use_mda, vector<double> inflation_factors, vector<double> backtrack_factors, int cycle=NetPackage::NULL_DA_CYCLE);
-	//bool solve_old();
-	//bool solve();
-	//ParameterEnsemble calc_localized_upgrade_threaded(double cur_lam, unordered_map<string, pair<vector<string>, vector<string>>> &loc_map);
 
 	vector<int> run_ensemble(ParameterEnsemble& _pe, ObservationEnsemble& _oe, const vector<int>& real_idxs = vector<int>(), int cycle=NetPackage::NULL_DA_CYCLE);
-	
-	//vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle= NetPackage::NULL_DA_CYCLE);
 
 	vector<ObservationEnsemble> run_lambda_ensembles(vector<ParameterEnsemble>& pe_lams, vector<double>& lam_vals, vector<double>& scale_vals, int cycle, vector<int>& pe_subset_idxs, vector<int>& oe_subset_idxs);
 
 	void report_and_save(int cycle);
-	void save_mat(string prefix, Eigen::MatrixXd& mat);
-	//bool initialize_pe(Covariance& cov);
-	
-	void initialize_restart();
-	//void initialize_parcov();
-	
-	void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, vector<int> subset_idxs = vector<int>());
-	
 
-	//void sanity_checks();
+	void save_mat(string prefix, Eigen::MatrixXd& mat);
+
+	void initialize_restart();
+
+	void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, vector<int> subset_idxs = vector<int>());
 
 	void add_bases();
 
@@ -407,9 +393,6 @@ protected:
 
 	vector<int> get_subset_idxs(int size, int _subset_size);
 
-
-
-	//void set_subset_idx(int size);
 	Eigen::MatrixXd get_Am(const vector<string>& real_names, const vector<string>& par_names);
 
     vector<string> detect_prior_data_conflict(bool save=true);
@@ -417,6 +400,8 @@ protected:
 	void zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov = true, bool update_oe_base = true);
 
 	void norm_map_report(map<string, double>& norm_map, string tag, double thres = 0.1);
+
+	void adjust_weights();
 
 };
 #endif

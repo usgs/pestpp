@@ -384,6 +384,8 @@ bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 	double cur_numeric_par_value;
 	list<JacobianRun> run_list;
 	base_numeric_par_names.clear();
+	int nfailed = 0;
+
 	for(; i_run<nruns; ++i_run)
 	{
 		run_list.push_back(JacobianRun());
@@ -392,11 +394,11 @@ bool Jacobian::process_runs(ParamTransformSeq &par_transform,
             cur_par_name = cur_par_name.substr(9,cur_par_name.size());
             run_manager.get_model_parameters(i_run,  run_list.back().ctl_pars);
 			bool success = run_manager.get_observations_vec(i_run, run_list.back().obs_vec);
-			if ((debug_fail) && (i_run == 1))
-			{
-		
+			if ((debug_fail) && (nfailed < 2))
+            {
 				file_manager.rec_ofstream() << "NOTE: 'GLM_DEBUG_DER_FAIL' is true, failing jco run for parameter '" << cur_par_name << "'" << endl;
 				success = false;
+				nfailed++;
 			}
 		if (success)
 		{

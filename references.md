@@ -1,6 +1,8 @@
 # A Brief Compendium of Use Cases for PEST++
 
+
 ## Published Papers on Theory and Background
+
  * White, Jeremy T. "A model-independent iterative ensemble smoother for efficient history-matching and uncertainty quantification in very high dimensions." Environmental Modelling & Software 109 (2018): 191-201. [https://www.sciencedirect.com/science/article/abs/pii/S1364815218302676?via%3Dihub](https://www.sciencedirect.com/science/article/abs/pii/S1364815218302676?via%3Dihub)
   * White, J.T., Hunt, R.J., Fienen, M.N., and Doherty, J.E., 2020, Approaches to Highly Parameterized Inversion: PEST++ Version 5, a Software Suite for Parameter Estimation, Uncertainty Analysis, Management Optimization and Sensitivity Analysis: U.S. Geological Survey Techniques and Methods 7C26, 52 p., [https://doi.org/10.3133/tm7C26](https://doi.org/10.3133/tm7C26).
   * White, J.T., Fienen, M.N., Barlow, P.M. and Welter, D.E., 2018. A tool for efficient, model-independent management optimization under uncertainty. Environmental modelling & software, 100, pp.213-221. [https://doi.org/10.1016/j.envsoft.2017.11.019](https://doi.org/10.1016/j.envsoft.2017.11.019)

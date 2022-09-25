@@ -413,10 +413,7 @@ pair<ParameterEnsemble,map<int,int>> LinearAnalysis::draw_fosm_reals(RunManagerA
 		pfm.log_event("drawing, saving and queuing FOSM parameter realizations");
 		bool binary = pest_scenario.get_pestpp_options().get_save_binary();
 		int num_reals = pest_scenario.get_pestpp_options().get_glm_num_reals();
-		
-		
-
-		pe.draw(num_reals, optimum_run.get_ctl_pars(), cov, &pfm, 1, file_manager.rec_ofstream());
+		pe.draw(num_reals, optimum_run.get_ctl_pars(), cov, &pfm, 2, file_manager.rec_ofstream());
 		stringstream ss;
 		ss.str("");
 		if (iter != -999)

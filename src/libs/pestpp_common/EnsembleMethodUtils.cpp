@@ -1717,6 +1717,40 @@ Eigen::MatrixXd L2PhiHandler::get_obs_resid(ObservationEnsemble &oe, bool apply_
 	return resid;
 }
 
+map<string,double> L2PhiHandler::get_actual_swr_map(ObservationEnsemble& oe, string real_name)
+{
+    Eigen::MatrixXd resid = get_actual_obs_resid(oe);
+    Eigen::VectorXd q = get_q_vector();
+    for (int i=0;i<resid.rows();i++) {
+        resid.row(i) = resid.row(i).array() * q.array().transpose();
+        resid.row(i) = resid.row(i).array() * resid.row(i).array();
+    }
+    Eigen::VectorXd mean_vec;
+    map<string,double> actual_swr_map;
+    vector<string> var_names = oe_base->get_var_names();
+    if (real_name.size() > 0)
+    {
+        map<string,int> real_map = oe.get_real_map();
+        if (real_map.find(real_name) != real_map.end())
+        {
+            mean_vec = resid.row(real_map[real_name]);
+        }
+        else
+        {
+            mean_vec = resid.colwise().mean();
+        }
+    }
+    else
+    {
+        mean_vec = resid.colwise().mean();
+    }
+
+    for (int i=0;i<mean_vec.size();i++)
+    {
+        actual_swr_map[var_names[i]] = mean_vec[i];
+    }
+    return actual_swr_map;
+}
 
 Eigen::MatrixXd L2PhiHandler::get_obs_resid_subset(ObservationEnsemble &oe, bool apply_ineq, vector<string> real_names)
 {
@@ -2082,7 +2116,128 @@ string L2PhiHandler::get_summary_header()
 }
 
 
-void L2PhiHandler::report(bool echo)
+void L2PhiHandler::report_group(bool echo) {
+
+    map<string,double> mn_map;
+    map<string,double> std_map;
+    map<string,double> pmn_map;
+    map<string,double> pstd_map;
+    map<string,double> mx_map;
+    map<string,double> mmn_map;
+    map<string,double> pmx_map;
+    map<string,double> pmmn_map;
+
+    set<string> snzgroups;
+    ObservationInfo* oi_ptr = pest_scenario->get_observation_info_ptr();
+    for (auto& o : pest_scenario->get_ctl_ordered_nz_obs_names())
+    {
+        if (snzgroups.find(oi_ptr->get_group(o)) == snzgroups.end())
+            snzgroups.emplace(oi_ptr->get_group(o));
+    }
+
+
+    double tot = 0, ptot = 0;
+    double v = 0,pv = 0;
+    int c = 0;
+    for (auto& g : snzgroups)
+    {
+        tot = 0;
+        ptot = 0;
+        v = 0;
+        pv = 0;
+        c = 0;
+        mx_map[g] = -1e+300;
+        mmn_map[g] = 1e+300;
+        pmx_map[g] = -1e+300;
+        pmmn_map[g] = 1e+300;
+        for (auto& o : obs_group_phi_map)
+        {
+            if (actual.find(o.first) == actual.end())
+            {
+                continue;
+            }
+            tot = tot + o.second[g];
+            ptot = ptot + (o.second[g]/actual[o.first]);
+            mx_map[g] = max(mx_map[g],o.second[g]);
+            mmn_map[g] = min(mmn_map[g],o.second[g]);
+            pmx_map[g] = max(pmx_map[g],(o.second[g]/actual[o.first]));
+            pmmn_map[g] = min(pmmn_map[g],(o.second[g]/actual[o.first]));
+            c++;
+        }
+        tot = tot / (double)c;
+        ptot = ptot/(double)c;
+        mn_map[g] = tot;
+        pmn_map[g] = ptot;
+
+        for (auto& o : obs_group_phi_map)
+        {
+            if (actual.find(o.first) == actual.end())
+            {
+                continue;
+            }
+            v = v + (pow(o.second[g] - tot,2));
+            pv = pv + (pow(ptot - (o.second[g]/actual[o.first]),2));
+        }
+        if (v != 0)
+            std_map[g] = sqrt(v/(double)(c-1));
+        else
+            std_map[g] = 0.0;
+        if (pv != 0)
+            pstd_map[g] = sqrt(pv/(double)(c-1));
+        else
+            pstd_map[g] = 0.0;
+    }
+    ofstream& f = file_manager->rec_ofstream();
+    int len = 20;
+    for (auto& o : obs_group_phi_map)
+    {
+        for (auto& oo : o.second)
+        {
+            len = max(len,(int)oo.first.size());
+        }
+        break;
+    }
+    len++;
+
+    string s;
+    stringstream ss;
+    ss.str("");
+    ss << "  ---  observation group phi summary ---  " << endl;
+    ss << "       (computed using 'actual' phi)" << endl;
+    ss << left << setw(len) << "group" << right << setw(15) << "mean" << setw(15) << "std";
+    ss << setw(15) << "min" << setw(15) << "max";
+    ss << setw(15) << "percent" << setw(15) << "std" << setw(15) << "min" << setw(15) << "max" << endl;
+    f << ss.str();
+    if (echo)
+        cout << ss.str();
+
+    vector<string> nzgroups(snzgroups.begin(),snzgroups.end());
+    sort(nzgroups.begin(),nzgroups.end());
+    for (auto& g : nzgroups)
+    {
+        ss.str("");
+        ss << left << setw(len) << pest_utils::lower_cp(g);
+        ss << right << setw(15) << mn_map[g];
+        ss << setw(15) << std_map[g];
+        ss << setw(15) << mmn_map[g];
+        ss << setw(15) << mx_map[g];
+
+        ss << setw(15) << 100. * pmn_map[g];
+        ss << setw(15) << 100. * pstd_map[g];
+        ss << setw(15) << 100. * pmmn_map[g];
+        ss << setw(15) << 100. * pmx_map[g];
+        ss << endl;
+
+        f << ss.str();
+        if (echo)
+            cout << ss.str();
+    }
+    f << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl << endl;
+    if (echo)
+        cout << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl << endl;
+}
+
+void L2PhiHandler::report(bool echo, bool group_report)
 {
 	ofstream& f = file_manager->rec_ofstream();
 	string s;
@@ -2174,8 +2329,16 @@ void L2PhiHandler::report(bool echo)
 	}
 	
 
-	f << endl << endl;
-	f.flush();
+
+    if (group_report)
+    {
+        cout << endl;
+        report_group(echo);
+    }
+
+    f << endl << endl;
+    f.flush();
+
 }
 
 
@@ -2340,9 +2503,31 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
 	double std = calc_std(&_meas);
 	vector<int> idxs;
 	vector<string> names = oe.get_real_names();
+	double bad_thres = 1.0e+300;
+	if (bad_phi_sigma > 0) {
+        bad_thres = mean + (std * bad_phi_sigma);
+        ofstream &frec = file_manager->rec_ofstream();
+        frec << "...bad_phi_sigma " << bad_phi_sigma << " and mean " << mean << " yields bad phi threshold of " << bad_thres << endl;
+    }
+        else
+    {
+	    vector<double> meas_vec;
+	    for (auto & m : _meas)
+	        meas_vec.push_back(m.second);
+	    sort(meas_vec.begin(),meas_vec.end());
+	    double qval = -1. * bad_phi_sigma / 100.;
+	    int qidx = (int)(qval * (double)meas_vec.size());
+	    qidx = min(0,qidx);
+	    qidx = max(((int)meas_vec.size()) - 2,qidx);
+	    bad_thres = meas_vec[qidx];
+	    ofstream& frec = file_manager->rec_ofstream();
+	    frec << "...bad_phi_sigma quantile value " << qval << " yields bad phi threshold of " << bad_thres << endl;
+
+    }
+
 	for (int i = 0; i < names.size(); i++) {
 
-        if ((_meas[names[i]] > bad_phi) || (_meas[names[i]] > mean + (std * bad_phi_sigma))) {
+        if ((_meas[names[i]] > bad_phi) || (_meas[names[i]] > bad_thres)) {
             if (names[i] == BASE_REAL_NAME)
                 cout << "...not dropping 'base' real even though phi is 'bad'" << endl;
             else
@@ -2576,7 +2761,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 
 	stringstream ss;
 	ofstream &frec = file_manager_ptr->rec_ofstream();
-	ss << endl << "   ---  Parameter Group Change Summmary  ---    " << endl;
+	ss << endl << "   ---  parameter group change summmary  ---    " << endl;
 	ss << "   (compared to the initial ensemble using active realizations)" << endl;
 	cout << ss.str();
 	frec << ss.str();
@@ -3124,9 +3309,13 @@ void EnsembleMethod::sanity_checks()
     {
         warnings.push_back("'ies_save_rescov' with more than 30,000 observations will likely produce allocation errors, be prepared!");
     }
-    if (pest_scenario.get_pestpp_options().get_ies_weights_csv().size() > 0)
+    if (ppo->get_ies_weights_csv().size() > 0)
     {
         warnings.push_back("ies_weight_ensemble is highly experimental - user beware");
+        if (ppo->get_ies_phi_fractions_file().size() > 0)
+        {
+            errors.push_back("weight ensemble cant be used with internal weight adjustment");
+        }
     }
 
     if (warnings.size() > 0)
@@ -3789,8 +3978,6 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	else
 		oe_drawn = initialize_oe(obscov);
 
-
-
 	string center_on = ppo->get_ies_center_on();
 
 	try
@@ -3802,7 +3989,6 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		string message = e.what();
 		throw_em_error("error in parameter ensemble: " + message);
 	}
-
 	try
 	{
 		oe_base.check_for_dups();
@@ -3834,19 +4020,19 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 				message(1, ss.str());
 				message(1, " the realization names are compatible");
 				message(1, "re-indexing obs+noise en to align with par en...");
-				cout << "oe names: " << endl;
-				for (auto& name : oe_names)
-					cout << name << endl;
-				oe_names = pe.get_real_names();
-				cout << endl << "pe names: " << endl;
-				for (auto& name : oe_names)
-					cout << name << endl;
+//				cout << "oe names: " << endl;
+//				for (auto& name : oe_names)
+//					cout << name << endl;
+//				oe_names = pe.get_real_names();
+//				cout << endl << "pe names: " << endl;
+//				for (auto& name : oe_names)
+//					cout << name << endl;
 				oe_base.reorder(pe.get_real_names(), vector<string>());
-				oe_names = oe_base.get_real_names();
-				cout << "new oe names: " << endl;
-				for (auto& name : oe_names)
-					cout << name << endl;
-				cout << endl;
+				//oe_names = oe_base.get_real_names();
+//				cout << "new oe names: " << endl;
+//				for (auto& name : oe_names)
+//					cout << name << endl;
+//				cout << endl;
 			}
 			else
 			{
@@ -4291,6 +4477,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		message(0, s);
 	}
 
+	adjust_weights();
 
 	performance_log->log_event("calc initial phi");
 	ph.update(oe, pe);
@@ -4393,11 +4580,205 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
     message(0, "initialization complete");
 }
 
+void EnsembleMethod::adjust_weights() {
+    //todo: deal with ineq obs
+    stringstream ss;
+    string fname = pest_scenario.get_pestpp_options().get_ies_phi_fractions_file();
+    if (fname.size() == 0)
+    {
+        return;
+    }
+
+
+    ss.str("");
+    ss << "adjusting weights using phi factors in file " << fname;
+    message(0,ss.str());
+
+    ph.update(oe, pe);
+    message(0, "pre-weight-adjustment initial phi summary");
+    ph.report(true);
+    performance_log->log_event("reading 'ies_phi_factors_file': "+fname);
+    map<string,double> phi_fracs = pest_utils::read_twocol_ascii_to_map(fname);
+
+    //first a lot of error trapping
+    ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+    set<string> nzgroups;
+    map<string,vector<string>> group_to_obs_map;
+
+    for (auto& oname : pest_scenario.get_ctl_ordered_obs_names())
+    {
+        if (oi->get_weight(oname) == 0)
+            continue;
+        if (nzgroups.find(oi->get_group(oname)) == nzgroups.end())
+        {
+            nzgroups.insert(oi->get_group(oname));
+            group_to_obs_map[oi->get_group(oname)]= vector<string>();
+        }
+        group_to_obs_map[oi->get_group(oname)].push_back(oname);
+
+    }
+
+    //check that each nzgroup is not found more than once using the tags in the file
+    map<string,vector<string>> group_map;
+    map<string,vector<string>> rev_group_map;
+    for (auto& g : nzgroups)
+        rev_group_map[g] = vector<string>();
+
+    vector<string> in_groups;
+    for (auto& pf : phi_fracs)
+    {
+        in_groups.clear();
+        for (auto& g : nzgroups)
+        {
+
+            if (g.find(pest_utils::upper_cp(pf.first)) != string::npos)
+            {
+                rev_group_map.at(g).push_back(pf.first);
+                in_groups.push_back(g);
+            }
+        }
+        group_map[pf.first] = in_groups;
+        if (in_groups.size() == 0)
+        {
+            message(1,"WARNING: no non-zero obs groups found for tag '"+pf.first+"'");
+            continue;
+        }
+
+        ss.str("");
+        ss << "file tag '" << pf.first << "' with factor " << pf.second << " maps to groups ";
+        for (auto& g : group_map.at(pf.first))
+            ss << g << ",";
+        message(2,ss.str());
+        if (pf.second <= 0.0)
+        {
+            ss.str("");
+            ss << "adjust_weights(): phi factor '" << pf.first << "' less or equal 0.0 - this not allowed";
+            throw_em_error(ss.str());
+        }
+    }
+
+    ss.str("");
+    ss << "Errors in phi factors file: ";
+    bool has_errors = false;
+    for (auto& rg : rev_group_map)
+    {
+        if (rg.second.size() == 0)
+        {
+            ss << ", group '" << rg.first << "' not identified with any tags " << endl;
+            has_errors = true;
+        }
+        else if (rg.second.size() > 1)
+        {
+            ss << ", group '" << rg.first << "' mapped to multiple tags: ";
+            for (auto &tag : rg.second)
+                ss << " " << tag;
+            ss << endl;
+            has_errors = true;
+        }
+    }
+    if (has_errors)
+    {
+        throw_em_error(ss.str());
+    }
+
+    ss.str("");
+    string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
+    if (center_on.size() != 0)
+        message(1,"using realization "+center_on+" residuals for reweighting (if available");
+    else
+        message(1,"using mean residuals for reweighting");
+    map<string,double> mean_swr_map = ph.get_actual_swr_map(oe,center_on);
+    double cur_mean_phi = 0;
+    for (auto& sw : mean_swr_map)
+        cur_mean_phi += sw.second;
+
+    message(1,"original mean phi: ",cur_mean_phi);
+    //if the current is really low, just return and the traps in initialize() will catch it.
+    if (cur_mean_phi < 1.0e-10)
+    {
+        performance_log->log_event("mean phi too low - returning to initialize()");
+        return;
+    }
+    //cur_mean_phi = nzobs_obs_fac * cur_mean_phi;
+    map<string,double> current_phi_fracs;
+    map<string,double> init_group_phis,adj_group_phis;
+    double total = 0;
+    double scale_fac = 0;
+    double sub_total = 0;
+    for (auto& pf: phi_fracs)
+    {
+        total = 0;
+        for (auto& g : group_map.at(pf.first))
+        {
+            sub_total = 0;
+            for (auto oname : group_to_obs_map.at(g))
+            {
+                total += mean_swr_map.at(oname);
+                sub_total += mean_swr_map.at(oname);
+            }
+            init_group_phis[g] = sub_total;
+        }
+
+        if (total == 0)
+        {
+            ss.str("");
+            ss << "WARNING: adjust_weights(): tag " << pf.first << " has 0.0 phi";
+            message(1,ss.str());
+            continue;
+        }
+        current_phi_fracs[pf.first] = total / cur_mean_phi;
+        ss.str("");
+        ss << "file tag '" << pf.first << "' original mean phi (factor): " << total << " (" << current_phi_fracs[pf.first] << ")";
+        message(1,ss.str());
+        scale_fac = sqrt((cur_mean_phi * pf.second) / total);
+        for (auto& g : group_map.at(pf.first))
+        {
+            for (auto oname : group_to_obs_map.at(g))
+            {
+                oi->set_weight(oname,oi->get_weight(oname) * scale_fac );
+            }
+        }
+    }
+    ph.update(oe,pe);
+    mean_swr_map = ph.get_actual_swr_map(oe);
+    for (auto& pf: phi_fracs) {
+        total = 0;
+        for (auto &g : group_map.at(pf.first)) {
+            sub_total = 0;
+            for (auto oname : group_to_obs_map.at(g)) {
+                total += mean_swr_map.at(oname);
+                sub_total += mean_swr_map.at(oname);
+            }
+            adj_group_phis[g] = sub_total;
+
+        }
+        current_phi_fracs[pf.first] = total / cur_mean_phi;
+        ss.str("");
+        ss << "file tag '" << pf.first << "' adjusted mean phi (factor): " << total << " ("
+           << total / cur_mean_phi << ")";
+        message(1, ss.str());
+    }
+    if (verbose_level > 2)
+    {
+        fname = file_manager.get_base_filename() + ".obsgroupadj.summary.csv";
+        ofstream f(fname);
+        if (!f.good())
+            throw_em_error("error opening weight adjustment summary file "+fname);
+
+        f << "group,initial_phi,adjusted_phi" << endl;
+        for (auto& g : init_group_phis)
+        {
+            f << g.first << "," << g.second << "," << adj_group_phis.at(g.first) << endl;
+        }
+        f.close();
+        message(2,"saved obs group weight adjustment summary to "+fname);
+
+    }
+}
+
 void EnsembleMethod::transfer_dynamic_state_from_oe_to_initial_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
 {
-	//vector<string> real_names = oe.get_real_names();
-
-	if (obs_dyn_state_names.size() > 0) 
+	if (obs_dyn_state_names.size() > 0)
 	{
 		map<string, int> par2col_map;
 		for (int i = 0; i < par_dyn_state_names.size(); i++)
@@ -5296,7 +5677,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			}
 		message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 		ph.update(oe_lams[best_idx], pe_lams[best_idx]);
-		ph.report(true);
+		ph.report(true,false);
 		message(0, "running remaining realizations for best lambda, scale:", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 
 		//pe_keep_names and oe_keep_names are names of the remaining reals to eval
@@ -5362,14 +5743,13 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
-		ph.report(true);
+		ph.report(true, false);
 	}
 	else
 	{
 		ph.update(oe_lam_best, pe_lams[best_idx]);
 		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-
 	}
 
 	ph.update(oe_lam_best, pe_lams[best_idx]);
