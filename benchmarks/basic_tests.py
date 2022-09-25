@@ -1007,17 +1007,17 @@ def mf6_v5_sen_test():
     msngrp_file = msn_file.replace(".msn",".group.msn")
     assert os.path.exists(msngrp_file),msngrp_file
 
-    jcb_files = [f for f in os.listdir(m_d) if f.lower().startswith("hostname") and f.lower().endswith(".jcb")]
+    jcb_files = [f for f in os.listdir(m_d) if f.lower().startswith("ftx_") and f.lower().endswith(".jcb")]
     print(len(jcb_files))
     assert len(jcb_files) == 52
     for jcb_file in jcb_files:
         j = pyemu.Jco.from_binary(os.path.join(m_d,jcb_file))
 
-    lst_files = [f for f in os.listdir(m_d) if f.lower().startswith("hostname") and f.lower().endswith(".lst")]
+    lst_files = [f for f in os.listdir(m_d) if f.lower().startswith("ftx_") and f.lower().endswith(".lst")]
     print(len(lst_files))
     assert len(lst_files) == 52
     
-    cbc_files = [f for f in os.listdir(m_d) if f.lower().startswith("hostname") and f.lower().endswith(".cbc")]
+    cbc_files = [f for f in os.listdir(m_d) if f.lower().startswith("ftx") and f.lower().endswith(".cbc")]
     print(len(cbc_files))
     assert len(cbc_files) == 52
     
@@ -1271,7 +1271,7 @@ if __name__ == "__main__":
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
-    sweep_forgive_test()
+    #sweep_forgive_test()
     #inv_regul_test()
     #tie_by_group_test()
     #sen_basic_test()
@@ -1294,7 +1294,7 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
     #mf6_v5_ies_test()
-    #mf6_v5_sen_test()
+    mf6_v5_sen_test()
 
 
 
