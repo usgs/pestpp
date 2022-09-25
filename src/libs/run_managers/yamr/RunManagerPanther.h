@@ -141,6 +141,7 @@ private:
 	long long bytes_transferred;
 	int files_transferred;
 	bool should_echo;
+	int nftx;
 	fd_set master; // master file descriptor list
 	list<AgentInfoRec> agent_info_set;
 	map<int, list<AgentInfoRec>::iterator> socket_to_iter_map;
