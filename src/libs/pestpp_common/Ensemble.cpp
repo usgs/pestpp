@@ -3633,18 +3633,25 @@ void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *p
 	ObservationInfo oi = pest_scenario_ptr->get_ctl_observation_info();
 	map<string, vector<string>> grouper;
 	vector<string> ogroups = pest_scenario_ptr->get_ctl_ordered_obs_group_names();
+	vector<string> vars_in_group;
+	vector<string> sorted_var_names;
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_group_draws())
 	{
 		for (auto group : ogroups)
 		{
-			for (auto &oname : var_names)
-			{
-				if (oi.get_group(oname) == group)
-					grouper[group].push_back(oname);
-			}
-		}
+            vars_in_group.clear();
+            for (auto &oname : var_names)
+            {
+                if (oi.get_group(oname) == group)
+                    vars_in_group.push_back(oname);
+            }
+
+            sort(vars_in_group.begin(), vars_in_group.end());
+            sorted_var_names.insert(sorted_var_names.end(), vars_in_group.begin(), vars_in_group.end());
+            grouper[group] = vars_in_group;
+        }
 	}
-	Ensemble::draw(num_reals, cov, obs, pest_scenario_ptr->get_ctl_ordered_nz_obs_names(), grouper, plog, level);
+	Ensemble::draw(num_reals, cov, obs, sorted_var_names, grouper, plog, level);
 
 	//apply any bounds that were supplied
 	map<string, double> lower_bnd = pest_scenario_ptr->get_ext_file_double_map("observation data external", "lower_bound");
