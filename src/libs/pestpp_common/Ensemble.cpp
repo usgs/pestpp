@@ -3655,19 +3655,23 @@ void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *p
 
     //check
     bool same = true;
-    if (var_names.size() != sorted_var_names.size())
-        throw_ensemble_error("sorted obs names not equal to org obs names");
-    for (int i = 0; i < var_names.size(); i++)
-        if (var_names[i] != sorted_var_names[i])
-        {
-            same = false;
-            break;
-        }
+    if (var_names.size() == sorted_var_names.size()) {
+        //throw_ensemble_error("sorted obs names not equal to org obs names");
+        for (int i = 0; i < var_names.size(); i++)
+            if (var_names[i] != sorted_var_names[i]) {
+                same = false;
+                break;
+            }
+    }
     if (!same)
     {
         plog->log_event("observations not grouped by observation groups, reordering obs ensemble");
         cout << "observations not grouped by observations groups, reordering obs ensemble" << endl;
         var_names = sorted_var_names;
+    }
+    else
+    {
+        sorted_var_names = var_names;
     }
 
 	Ensemble::draw(num_reals, cov, obs, sorted_var_names, grouper, plog, level);
