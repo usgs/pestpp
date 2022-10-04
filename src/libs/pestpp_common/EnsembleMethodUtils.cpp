@@ -2245,7 +2245,7 @@ void L2PhiHandler::report_group(bool echo) {
         ss << endl;
 
         f << ss.str();
-        if ((echo) and (c <= 10))
+        if ((echo) && (c <= 10))
             cout << ss.str();
         c++;
     }
