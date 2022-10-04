@@ -2208,7 +2208,8 @@ void L2PhiHandler::report_group(bool echo) {
     stringstream ss;
     ss.str("");
     ss << "  ---  observation group phi summary ---  " << endl;
-    ss << "       (computed using 'actual' phi, sorted by mean phi)" << endl;
+    ss << "       (computed using 'actual' phi)" << endl;
+    ss << "           (sorted by mean phi)" << endl;
     ss << left << setw(len) << "group" << right << setw(15) << "mean" << setw(15) << "std";
     ss << setw(15) << "min" << setw(15) << "max";
     ss << setw(15) << "percent" << setw(15) << "std" << setw(15) << "min" << setw(15) << "max" << endl;
@@ -2252,7 +2253,7 @@ void L2PhiHandler::report_group(bool echo) {
     if (echo)
         cout << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl;
     if (c > 10)
-        cout << "    Note: only the first 10 groups with highest mean phi are reported. See rec file for full listing" << endl;
+        cout << "    Note: only the first 10 highest mean phi groups are listed. See rec file for full listing" << endl;
     cout << endl;
 }
 
