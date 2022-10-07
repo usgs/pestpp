@@ -953,10 +953,13 @@ void SeqQuadProgram::initialize()
 	
 	last_best = get_obj_value(current_ctl_dv_values, current_obs);
 	last_viol = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
-	message(0, "Initial phi value:", last_best);
+	message(0, "Initial phi value, infeasible value:", vector<double>{last_best,last_viol});
 	best_phis.push_back(last_best);
+    best_violations.push_back(last_viol);
 
-	double v = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
+
+
+    double v = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
 	filter.update(last_best, v, 0, -1.0);
 
 	if (v > 0.0)
@@ -1513,7 +1516,7 @@ bool SeqQuadProgram::should_terminate()
     {
         phi = best_phis[i];
         infeas = best_violations[i];
-        ss << setw(10) << setw(5) << setprecision(4) << phi << "," << setw(5) << setprecision(4) << infeas << " ";
+        ss << setw(10) << setw(5) << setprecision(4) << right << phi << "," << setw(5) << setprecision(4) << left << infeas << " ";
         ii++;
         if (ii % 6 == 0) {
             ss << endl;
@@ -2540,7 +2543,9 @@ bool SeqQuadProgram::seek_feasible()
 	//todo: probably more algorithmic things here...
 	last_best = get_obj_value(current_ctl_dv_values, current_obs);
 	last_viol = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
-	message(1, "finished seeking feasible, reset best phi value to ", last_best);
+	best_phis[best_phis.size()-1] = last_best;
+	best_violations[best_violations.size() -1] = last_viol;
+	message(1, "finished seeking feasible, reset best phi,infeasible value to ", vector<double>{last_best,last_viol});
 	return false;
 }
 

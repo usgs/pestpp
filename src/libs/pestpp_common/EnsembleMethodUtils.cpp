@@ -2352,7 +2352,6 @@ void L2PhiHandler::report(bool echo, bool group_report)
 
     if (group_report)
     {
-        cout << endl;
         report_group(echo);
     }
 

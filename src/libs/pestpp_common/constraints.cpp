@@ -1061,6 +1061,8 @@ double Constraints::get_sum_of_violations(Parameters& pars, Observations& obs)
 		sum += c.second;
 	for (auto& c : get_unsatified_pi_constraints(pars))
 		sum += c.second;
+	if (sum < 1e-10)
+	    sum = 0.0;
 	return sum;
 }
 
