@@ -141,6 +141,7 @@ private:
 	long long bytes_transferred;
 	int files_transferred;
 	bool should_echo;
+	int nftx;
 	fd_set master; // master file descriptor list
 	list<AgentInfoRec> agent_info_set;
 	map<int, list<AgentInfoRec>::iterator> socket_to_iter_map;
@@ -199,6 +200,7 @@ private:
 	vector<string> par_names_to_check_worker;
 	vector<string> obs_names_to_check_worker;
     pair<string,string> get_recv_filenames(NetPackage& net_pack, string host_name, string working_dir);
+    map<string,string> org_new_master_fxt_map;
 };
 
 class RunManagerYAMRCondor : public RunManagerPanther

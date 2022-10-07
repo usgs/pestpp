@@ -3633,18 +3633,48 @@ void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *p
 	ObservationInfo oi = pest_scenario_ptr->get_ctl_observation_info();
 	map<string, vector<string>> grouper;
 	vector<string> ogroups = pest_scenario_ptr->get_ctl_ordered_obs_group_names();
+	vector<string> vars_in_group;
+	vector<string> sorted_var_names;
 	if (pest_scenario_ptr->get_pestpp_options().get_ies_group_draws())
 	{
 		for (auto group : ogroups)
 		{
-			for (auto &oname : var_names)
-			{
-				if (oi.get_group(oname) == group)
-					grouper[group].push_back(oname);
-			}
-		}
+            vars_in_group.clear();
+            for (auto &oname : var_names)
+            {
+                if (oi.get_group(oname) == group)
+                    vars_in_group.push_back(oname);
+            }
+            if (vars_in_group.size() == 0)
+                continue;
+            sort(vars_in_group.begin(), vars_in_group.end());
+            sorted_var_names.insert(sorted_var_names.end(), vars_in_group.begin(), vars_in_group.end());
+            grouper[group] = vars_in_group;
+        }
 	}
-	Ensemble::draw(num_reals, cov, obs, pest_scenario_ptr->get_ctl_ordered_nz_obs_names(), grouper, plog, level);
+
+    //check
+    bool same = true;
+    if (var_names.size() == sorted_var_names.size()) {
+        //throw_ensemble_error("sorted obs names not equal to org obs names");
+        for (int i = 0; i < var_names.size(); i++)
+            if (var_names[i] != sorted_var_names[i]) {
+                same = false;
+                break;
+            }
+    }
+    if (!same)
+    {
+        plog->log_event("observations not grouped by observation groups, reordering obs ensemble");
+        cout << "observations not grouped by observations groups, reordering obs ensemble" << endl;
+        var_names = sorted_var_names;
+    }
+    else
+    {
+        sorted_var_names = var_names;
+    }
+
+	Ensemble::draw(num_reals, cov, obs, sorted_var_names, grouper, plog, level);
 
 	//apply any bounds that were supplied
 	map<string, double> lower_bnd = pest_scenario_ptr->get_ext_file_double_map("observation data external", "lower_bound");

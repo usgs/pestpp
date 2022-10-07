@@ -279,7 +279,7 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	overdue_reched_fac(_overdue_reched_fac), overdue_giveup_fac(_overdue_giveup_fac),
 	port(_port), f_rmr(_f_rmr), n_no_ops(0), overdue_giveup_minutes(_overdue_giveup_minutes),
 	terminate_idle_thread(false), currently_idle(true), idling(false), idle_thread_finished(false),
-	idle_thread(nullptr), should_echo(_should_echo)
+	idle_thread(nullptr), should_echo(_should_echo),nftx(0)
 {
 
 	const char * t =
@@ -356,8 +356,6 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	par_names_to_check_worker = par_names;
 	obs_names_to_check_worker = obs_names;
 	mgr_type = RUN_MGR_TYPE::PANTHER;
-
-	
 }
 
 int RunManagerPanther::get_n_concurrent(int run_id)
@@ -584,6 +582,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
         {
             ss.str("");
             ss << "lost comms with all agents, closing all reminaing open file transfers";
+            report(ss.str(),true);
             for (auto& m : open_file_socket_map) {
                 string fname = m.second;
                 pair<map<string, ofstream *>::iterator, bool> ret = open_file_trans_streams.insert(
@@ -594,7 +593,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
                 out.close();
                 open_file_trans_streams.erase(ret.first);
                 ss.str("");
-                ss << "closed file '" << fname << " for file transfer, transferred " << file_size << " bytes";
+                ss << "closed master_file:" << fname << " for file transfer, transferred bytes:" << file_size;
                 report(ss.str(), false);
                 files_transferred += 1;
 
@@ -606,6 +605,31 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
         {
             listen();
             break;
+        }
+        int q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2) || (q == 4))
+        {
+            cout << "'pest.stp' found" << endl;
+            kill_all_active_runs();
+            ss.str("");
+            ss << "'pest.stp' found, closing all reminaing open file transfers";
+            report(ss.str(),true);
+            for (auto& m : open_file_socket_map) {
+                string fname = m.second;
+                pair<map<string, ofstream *>::iterator, bool> ret = open_file_trans_streams.insert(
+                        pair<string, ofstream *>(fname, new ofstream));
+                ofstream &out = *ret.first->second;
+                int file_size = out.tellp();
+                out.flush();
+                out.close();
+                open_file_trans_streams.erase(ret.first);
+                ss.str("");
+                ss << "closed master_file:" << fname << " for file transfer, transferred bytes:" << file_size;
+                report(ss.str(), false);
+                files_transferred += 1;
+
+            }
+
         }
 
 
@@ -632,8 +656,6 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
             message << "   " << bytes_transferred << " bytes transferred" << endl;
 
         }
-		
-		
 		
 		cout << message.str() << endl << endl;
 		f_rmr << endl << "---------------------" << endl << message.str() << endl;
@@ -1475,7 +1497,14 @@ void RunManagerPanther::process_message(int i_sock)
                     report(ss.str(),true);
                 }
                 ss.str("");
-                ss << " agent:" << host_name << "$" << agent_info_iter->get_work_dir() << " request opened master_file:" << fnames.second << " for file transfer of agent_file:" << fnames.first;
+                string agent_dir = host_name + "$" + agent_info_iter->get_work_dir();
+                if (agent_dir.find(" ") != string::npos)
+                {
+                    agent_dir = "\"" + agent_dir + "\"";
+                }
+
+                ss << "file transfer request from agent:" << agent_dir;
+                ss << " from agent_file:" << fnames.first << " to master_file:" << fnames.second << " " << net_pack.get_info_txt();
 
                 report(ss.str(),false);
                 open_file_socket_map.insert(make_pair(i_sock,fnames.second));
@@ -1523,7 +1552,12 @@ void RunManagerPanther::process_message(int i_sock)
                 ss.str("");
                 
 				int file_size = out.tellp();
-				ss << " agent:" << host_name << "$" << agent_info_iter->get_work_dir() << " transferred bytes:" << ibuf.size() << " to master_file:" << fnames.second << " total_bytes: " << file_size;
+                string agent_dir = host_name + "$" + agent_info_iter->get_work_dir();
+                if (agent_dir.find(" ") != string::npos)
+                {
+                    agent_dir = "\"" + agent_dir + "\"";
+                }
+				ss << " agent:" << agent_dir << " transferred bytes:" << ibuf.size() << " to master_file:" << fnames.second << " total_bytes: " << file_size;
 				report(ss.str(), false);
 
             }
@@ -1543,7 +1577,12 @@ void RunManagerPanther::process_message(int i_sock)
         {
             if (open_file_trans_streams.find(fnames.second) == open_file_trans_streams.end())
             {
-                ss << "file transfer error from agent:" << host_name << "$" << agent_info_iter->get_work_dir() << " agent_file:" << fnames.first << "' master_file:" << fnames.second << " - not open yet, can't close, something is wrong";
+                string agent_dir = host_name + "$" + agent_info_iter->get_work_dir();
+                if (agent_dir.find(" ") != string::npos)
+                {
+                    agent_dir = "\"" + agent_dir + "\"";
+                }
+                ss << "file transfer error from agent:" << agent_dir << " agent_file:" << fnames.first << "' master_file:" << fnames.second << " - not open yet, can't close, something is wrong";
                 report(ss.str(),true);
             }
             else
@@ -1554,9 +1593,14 @@ void RunManagerPanther::process_message(int i_sock)
                 out.flush();
                 out.close();
                 open_file_trans_streams.erase(ret.first);
+                string agent_dir = host_name + "$" + agent_info_iter->get_work_dir();
+                if (agent_dir.find(" ") != string::npos)
+                {
+                    agent_dir = "\"" + agent_dir + "\"";
+                }
                 ss.str("");
                 ss << "closed master_file:" << fnames.second << " for file transfer of agent_file:" << fnames.first;
-                ss << " from agent:" << host_name << "$" << agent_info_iter->get_work_dir() << " transferred bytes:" << file_size;
+                ss << " from agent:" << agent_dir << " transferred bytes:" << file_size;
                 report(ss.str(),false);
                 files_transferred += 1;
                 open_file_socket_map.erase(i_sock);
@@ -1582,6 +1626,8 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
     replace(hostname.begin(),hostname.end(),'(','-');
     replace(hostname.begin(),hostname.end(),')','-');
     replace(hostname.begin(),hostname.end(),':','-');
+    replace(hostname.begin(),hostname.end(),' ','-');
+    replace(hostname.begin(),hostname.end(),'\t','-');
 
     replace(working_dir.begin(),working_dir.end(),'/','-');
     replace(working_dir.begin(),working_dir.end(),'\\','-');
@@ -1589,6 +1635,8 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
     replace(working_dir.begin(),working_dir.end(),'(','-');
     replace(working_dir.begin(),working_dir.end(),')','-');
     replace(working_dir.begin(),working_dir.end(),':','-');
+    replace(working_dir.begin(),working_dir.end(),' ','-');
+    replace(working_dir.begin(),working_dir.end(),'\t','-');
     stringstream ss;
     ss.str("");
     ss << "hostname=" << hostname;
@@ -1601,8 +1649,9 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
     string agent_filename_token = "";
     string agent_filename = "";
     string master_filename = "";
+    string new_master_filename = "";
     for (auto& token : tokens) {
-        if (token.find("agent_filename=") != string::npos)
+        if (token.find("agent_filename:") != string::npos)
             agent_filename_token = token;
         else
             ss << "." << token;
@@ -1610,36 +1659,63 @@ pair<string,string> RunManagerPanther::get_recv_filenames(NetPackage& net_pack, 
     if (agent_filename_token.size() == 0)
     {
         ss.str("");
+        ss << "generic_ftx_" << nftx << ".dat";
+        master_filename = ss.str();
+        ss.str("");
         ss << "WARNING: could not find 'agent_filename' tag in net_pack info txt: '" << info_txt;
         ss << " from agent:" << hostname << "$" << working_dir << " -  unable form file transfer names";
         report (ss.str(), true);
+        new_master_filename = master_filename;
     }
     else {
         ss << "." << agent_filename_token;
         tokens.clear();
-        tokenize(agent_filename_token, tokens, "=");
+        tokenize(agent_filename_token, tokens, ":");
         if (tokens.size() != 2) {
-            //do something here
-        } else {
+            report("WARNING: invalid 'agent_filename' token found:"+agent_filename_token,true);
+            agent_filename = tokens[1];
+            master_filename = ss.str();
+
+        }
+        else {
             agent_filename = tokens[1];
             master_filename = ss.str();
         }
+        ss.str("");
+        ss << "ftx_" << nftx << "." << agent_filename;
+        new_master_filename = ss.str();
 		
     }
-//	replace(master_filename.begin(), master_filename.end(), '/', '-');
-//	replace(master_filename.begin(), master_filename.end(), '\\', '-');
-//	replace(master_filename.begin(), master_filename.end(), '.', '-');
-//	replace(master_filename.begin(), master_filename.end(), '(', '-');
-//	replace(master_filename.begin(), master_filename.end(), ')', '-');
-	replace(master_filename.begin(), master_filename.end(), ':', '-');
+	replace(master_filename.begin(), master_filename.end(), ':', '=');
+    replace(new_master_filename.begin(),new_master_filename.end(),'/','-');
+    replace(new_master_filename.begin(),new_master_filename.end(),'\\','-');
+    replace(new_master_filename.begin(),new_master_filename.end(),'(','-');
+    replace(new_master_filename.begin(),new_master_filename.end(),')','-');
+    replace(new_master_filename.begin(),new_master_filename.end(),':','-');
+    replace(new_master_filename.begin(),new_master_filename.end(),' ','-');
+    replace(new_master_filename.begin(),new_master_filename.end(),'\t','-');
 
-    if (master_filename.size() > 255)
+    if (org_new_master_fxt_map.find(master_filename) == org_new_master_fxt_map.end())
+    {
+        nftx++;
+        org_new_master_fxt_map[master_filename] = new_master_filename;
+    }
+    else
+    {
+        new_master_filename = org_new_master_fxt_map.at(master_filename);
+    }
+    ss.str("");
+    ss << " org_master_file:" << master_filename << " new master_file:" << new_master_filename;
+    report(ss.str(),false);
+    if (new_master_filename.size() > 255)
     {
         ss.str("");
-        ss << "WARNING: master_filename:" << master_filename << " size > 255" << endl;
+        ss << "WARNING: master_filename:" << new_master_filename << " size > 255" << endl;
         report(ss.str(),true);
     }
-    return make_pair(agent_filename,master_filename);
+
+
+    return make_pair(agent_filename,new_master_filename);
 }
 
 
