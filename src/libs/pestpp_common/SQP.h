@@ -115,8 +115,11 @@ private:
 	int iter;
 
 	double last_best;
+	double last_viol;
 	vector<double> best_phis;
+	vector<double> best_violations;
 	double best_phi_yet;
+	double best_violation_yet;
 
 	int warn_min_reals, error_min_reals;
 	

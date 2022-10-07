@@ -899,6 +899,7 @@ void SeqQuadProgram::initialize()
 	
 	//ofstream &frec = file_manager.rec_ofstream();
 	last_best = 1.0E+30;
+	last_viol = 0.0;
 	
 	warn_min_reals = 10;
 	error_min_reals = 2;
@@ -951,6 +952,7 @@ void SeqQuadProgram::initialize()
 	//todo: save and report on initial gradient - make some checks would be useful?
 	
 	last_best = get_obj_value(current_ctl_dv_values, current_obs);
+	last_viol = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
 	message(0, "Initial phi value:", last_best);
 	best_phis.push_back(last_best);
 
@@ -959,6 +961,7 @@ void SeqQuadProgram::initialize()
 
 	if (v > 0.0)
 	{
+	    message(0,"initial solution infeasible, seeking feasible solution");
 		seek_feasible();
 	}
 	
@@ -1495,19 +1498,22 @@ bool SeqQuadProgram::should_terminate()
     int nphistp = pest_scenario.get_control_info().nphistp;
     int nphinored = pest_scenario.get_control_info().nphinored;
     bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
-    double phi, ratio;
+    double phi, ratio, infeas;
     int count = 0;
     int nphired = 0;
     //best_mean_phis = vector<double>{ 1.0,0.8,0.81,0.755,1.1,0.75,0.75,1.2 };
 
     //todo: save and write out the current phi grad vector (maybe save all of them???)
     ss.str("");
-    ss << "best phi sequence:" << endl;
+    ss << "best phi-infeas sequence:" << endl;
     ss << "       ";
     int ii = 0;
-    for (auto phi : best_phis)
+    for (int i=0;i<best_phis.size();i++)
+    //for (auto phi : best_phis)
     {
-        ss << setw(10) << setprecision(4) << phi << " ";
+        phi = best_phis[i];
+        infeas = best_violations[i];
+        ss << setw(10) << setw(5) << setprecision(4) << phi << "," << setw(5) << setprecision(4) << infeas << " ";
         ii++;
         if (ii % 6 == 0) {
             ss << endl;
@@ -2533,6 +2539,7 @@ bool SeqQuadProgram::seek_feasible()
 	constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true, "post feasible seek");
 	//todo: probably more algorithmic things here...
 	last_best = get_obj_value(current_ctl_dv_values, current_obs);
+	last_viol = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
 	message(1, "finished seeking feasible, reset best phi value to ", last_best);
 	return false;
 }
@@ -2614,7 +2621,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	message(0, " current best phi:", last_best);
 	stringstream ss;
 	Eigen::VectorXd obj_vec = get_obj_vector(dv_candidates, _oe);
-	double oext;
+	double oext,oviol;
 	if (obj_sense == "minimize")
 		oext = numeric_limits<double>::max();
 	else
@@ -2649,7 +2656,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		}
 		ss << " infeasibilty total: " << infeas_sum << ", ";
 		infeas_vec.push_back(infeas_sum);
-		filter_accept = filter.accept(obj_vec[i], infeas_sum,iter,alpha_vals[i],true);
+		filter_accept = filter.accept(obj_vec[i], infeas_sum,iter,alpha_vals[i],false);
 		if (filter_accept)
 			ss << " filter accepted ";
 		else
@@ -2694,6 +2701,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
                 min_obj = obj_vec[iidx];
                 idx = iidx;
                 oext = obj_vec[iidx];
+                oviol = infeas_vec[iidx];
             }
         }
         filter.update(min_obj,infeas_vec[idx],iter,alpha_vals[idx]);
@@ -2710,11 +2718,13 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
                 {
                     idx = i;
                     oext = obj_vec[i];
+                    oviol = infeas_vec[i];
                 }
                 else if ((obj_sense == "maximize") && (obj_vec[i] > oext))
                 {
                     idx = i;
                     oext = obj_vec[i];
+                    oviol = infeas_vec[i];
                 }
             }
         }
@@ -2731,6 +2741,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
                     viol_min = infeas_vec[i];
                     idx = i;
                     oext = obj_vec[i];
+                    oviol = infeas_vec[i];
                 }
             }
         }
@@ -2738,7 +2749,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
     }
 	if (idx == -1)
 	    throw_sqp_error("shits busted");
-    message(0, "best phi this iteration: ", oext);
+    message(0, "best phi and infeas this iteration: ", vector<double>{oext,oviol});
     t = dv_candidates.get_real_vector(real_names[idx]);
     cand_dv_values = current_ctl_dv_values;
     cand_dv_values.update_without_clear(dv_names, t);
@@ -2746,7 +2757,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
     t = _oe.get_real_vector(real_names[idx]);
     cand_obs_values.update_without_clear(onames, t);
     ss.str("");
-    ss << "best candidate (scale factor: " << setprecision(4) << scale_vals[idx] << ", phi: " << oext << ")";
+    ss << "best candidate (scale factor: " << setprecision(4) << scale_vals[idx] << ", phi: " << oext << ", infeas: " << oviol << ")";
     constraints.sqp_report(iter, cand_dv_values, cand_obs_values, true,ss.str());
     filter.report(file_manager.rec_ofstream(),iter);
 	//TODO: need more thinking here - do we accept only if filter accepts?  I think so....
@@ -2766,15 +2777,18 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		t = _oe.get_real_vector(idx);
 		current_obs.update_without_clear(onames, t);
 		last_best = oext;
-		message(0, "new best phi:", last_best);
+		last_viol = oviol;
+		message(0, "new best phi and infeas:", vector<double>{last_best,last_viol});
         best_phis.push_back(oext);
+        best_violations.push_back(oviol);
 
 		// todo add constraint (largest violating constraint not already in working set) to working set
 		// is this the right place to do this? after accepting a particular candidate? 
 		// also can we adapt alpha_mult based on subset? using concept of blocking constraint here?
 		// take diff between vector of strings of constraints in working set and constraints with non-zero violation (return constraint idx from filter?)
 
-		if (infeas_vec[idx] > filter.get_viol_tol())
+		//if no filter-accepted solutions and we are in violation...
+		if((accept_idxs.size() == 0) && (infeas_vec[idx] > filter.get_viol_tol()))
         {
 		    n_consec_infeas++;
         }
@@ -2786,6 +2800,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	{
 		message(0, "not accepting upgrade #sad");
         best_phis.push_back(last_best);
+        best_violations.push_back(last_viol);
         if (infeas_vec[idx] > filter.get_viol_tol())
         {
             n_consec_infeas++;
