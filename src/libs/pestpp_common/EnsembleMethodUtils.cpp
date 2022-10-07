@@ -2115,6 +2115,11 @@ string L2PhiHandler::get_summary_header()
 	return ss.str();
 }
 
+bool cmp_pair(pair<string,double>& first, pair<string,double>& second)
+{
+    return first.second > second.second;
+}
+
 
 void L2PhiHandler::report_group(bool echo) {
 
@@ -2204,6 +2209,7 @@ void L2PhiHandler::report_group(bool echo) {
     ss.str("");
     ss << "  ---  observation group phi summary ---  " << endl;
     ss << "       (computed using 'actual' phi)" << endl;
+    ss << "           (sorted by mean phi)" << endl;
     ss << left << setw(len) << "group" << right << setw(15) << "mean" << setw(15) << "std";
     ss << setw(15) << "min" << setw(15) << "max";
     ss << setw(15) << "percent" << setw(15) << "std" << setw(15) << "min" << setw(15) << "max" << endl;
@@ -2212,9 +2218,19 @@ void L2PhiHandler::report_group(bool echo) {
         cout << ss.str();
 
     vector<string> nzgroups(snzgroups.begin(),snzgroups.end());
-    sort(nzgroups.begin(),nzgroups.end());
-    for (auto& g : nzgroups)
+    //sort(nzgroups.begin(),nzgroups.end());
+    vector<pair<string,double>> pairs;
+    for (auto& it : mn_map)
+        pairs.push_back(it);
+
+
+    sort(pairs.begin(),pairs.end(),cmp_pair);
+
+    c = 0;
+    string g;
+    for (auto& pair : pairs)
     {
+        g = pair.first;
         ss.str("");
         ss << left << setw(len) << pest_utils::lower_cp(g);
         ss << right << setw(15) << mn_map[g];
@@ -2229,12 +2245,16 @@ void L2PhiHandler::report_group(bool echo) {
         ss << endl;
 
         f << ss.str();
-        if (echo)
+        if ((echo) && (c <= 10))
             cout << ss.str();
+        c++;
     }
     f << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl << endl;
     if (echo)
-        cout << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl << endl;
+        cout << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl;
+    if (c > 10)
+        cout << "    Note: only the first 10 highest mean phi groups are listed. See rec file for full listing" << endl;
+    cout << endl;
 }
 
 void L2PhiHandler::report(bool echo, bool group_report)
@@ -4020,19 +4040,26 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 				message(1, ss.str());
 				message(1, " the realization names are compatible");
 				message(1, "re-indexing obs+noise en to align with par en...");
-//				cout << "oe names: " << endl;
-//				for (auto& name : oe_names)
-//					cout << name << endl;
-//				oe_names = pe.get_real_names();
-//				cout << endl << "pe names: " << endl;
-//				for (auto& name : oe_names)
-//					cout << name << endl;
-				oe_base.reorder(pe.get_real_names(), vector<string>());
-				//oe_names = oe_base.get_real_names();
-//				cout << "new oe names: " << endl;
-//				for (auto& name : oe_names)
-//					cout << name << endl;
-//				cout << endl;
+                if (verbose_level > 1) {
+                    cout << "oe names: " << endl;
+                    for (auto &name : oe_names)
+                        cout << name << endl;
+                    oe_names = pe.get_real_names();
+                    cout << endl << "pe names: " << endl;
+                    for (auto &name : oe_names)
+                        cout << name << endl;
+                }
+
+                    oe_base.reorder(pe.get_real_names(), vector<string>());
+
+                if (verbose_level > 1)
+                {
+                    oe_names = oe_base.get_real_names();
+                    cout << "new oe names: " << endl;
+                    for (auto &name : oe_names)
+                        cout << name << endl;
+                    cout << endl;
+                }
 			}
 			else
 			{
