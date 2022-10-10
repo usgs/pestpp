@@ -107,7 +107,10 @@ private:
     int MAX_CONSEC_PHIINC = 3;
 
     int n_consec_phiinc;
-
+    double par_sigma_decfac = 5.0;
+    double par_sigma_incfac = 0.1;
+    double par_sigma_max = 100;
+    double par_sigma_min = 4;
 	double eigthresh;
 	vector<double> scale_vals;
 	set<string> pp_args;

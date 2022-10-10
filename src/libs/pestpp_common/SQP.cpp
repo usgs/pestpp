@@ -1453,7 +1453,29 @@ void SeqQuadProgram::iterate_2_solution()
         //save some stuff...
         if (use_ensemble_grad)
             report_and_save_ensemble();
+        else
+        {
+            //save par and res files for this iteration
+            ss.str("");
+            ss << file_manager.get_base_filename() << "." << iter << ".base.par";
+            string par_name = ss.str();
+            ofstream of(par_name);
+            if (of.bad())
+            {
+                throw_sqp_error("error opening par file"+par_name);
+            }
+            const TranOffset& toff = *pest_scenario.get_base_par_tran_seq().get_offset_ptr();
+            const TranScale& tsc = *pest_scenario.get_base_par_tran_seq().get_scale_ptr();
 
+            output_file_writer.write_par(of,current_ctl_dv_values,toff,tsc);
+            of.close();
+            ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
+            ss.str("");
+            ss << ".base.rei";
+            output_file_writer.write_rei(file_manager.open_ofile_ext(ss.str()), iter,
+                                         pest_scenario.get_ctl_observations(), current_obs, obj_func, current_ctl_dv_values);
+            file_manager.close_all_files_ending_with("rei");
+        }
         constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true);
 
         //report dec var change stats - only for ensemble form
@@ -2797,7 +2819,15 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
         {
 		    n_consec_infeas++;
         }
+		if (use_ensemble_grad) {
+            double new_par_sigma = pest_scenario.get_pestpp_options().get_par_sigma_range();
+            new_par_sigma = new_par_sigma * (par_sigma_incfac * (double)iter);
+            new_par_sigma = max(new_par_sigma, par_sigma_max);
 
+            message(1, "increasing par_sigma_range to", new_par_sigma);
+            message(1, "regenerating parcov");
+            parcov.try_from(pest_scenario, file_manager);
+        }
 		return true;
 		
 	}
@@ -2810,7 +2840,14 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
         {
             n_consec_infeas++;
         }
-		//TODO: something here to adapt to the failed iteration, otherwise I think we will continue failing...
+        if (use_ensemble_grad) {
+            double new_par_sigma = pest_scenario.get_pestpp_options().get_par_sigma_range();
+            new_par_sigma = new_par_sigma * par_sigma_decfac;
+            new_par_sigma = min(new_par_sigma, par_sigma_min);
+            message(1, "decreasing par_sigma_range to", new_par_sigma);
+            message(1, "regenerating parcov");
+            parcov.try_from(pest_scenario, file_manager);
+        }
 		return false;
 	}
 }
