@@ -975,6 +975,33 @@ void SeqQuadProgram::initialize()
 	message(0, "initialization complete");
 }
 
+void SeqQuadProgram::save_current_dv_obs()
+{
+    stringstream ss;
+    ss.str("");
+    ss << file_manager.get_base_filename() << "." << iter << "." << BASE_REAL_NAME << ".par";
+    string par_name = ss.str();
+    pest_utils::lower_ip(par_name);
+    ofstream of(par_name);
+    if (of.bad())
+    {
+        throw_sqp_error("error opening par file"+par_name);
+    }
+    const TranOffset& toff = *pest_scenario.get_base_par_tran_seq().get_offset_ptr();
+    const TranScale& tsc = *pest_scenario.get_base_par_tran_seq().get_scale_ptr();
+    output_file_writer.write_par(of,current_ctl_dv_values,toff,tsc);
+    of.close();
+    ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
+    ss.str("");
+    ss << iter << "." << BASE_REAL_NAME << ".rei";
+    string rei_name = ss.str();
+    pest_utils::lower_ip(rei_name);
+    ofstream& ofr = file_manager.open_ofile_ext(rei_name);
+    output_file_writer.write_rei(ofr, iter,
+                                 pest_scenario.get_ctl_observations(), current_obs, obj_func, current_ctl_dv_values);
+    file_manager.close_all_files_ending_with("rei");
+
+}
 
 void SeqQuadProgram::prep_4_fd_grad()
 {
@@ -1060,6 +1087,7 @@ void SeqQuadProgram::prep_4_fd_grad()
 	}
 	jco.save("0.jcb");
 	message(1, "saved initial jacobian to " + file_manager.get_base_filename() + ".0.jcb");
+	save_current_dv_obs();
 }
 
 void SeqQuadProgram::run_jacobian(Parameters& _current_ctl_dv_vals, Observations& _current_obs, bool init_obs)
@@ -1456,25 +1484,7 @@ void SeqQuadProgram::iterate_2_solution()
         else
         {
             //save par and res files for this iteration
-            ss.str("");
-            ss << file_manager.get_base_filename() << "." << iter << ".base.par";
-            string par_name = ss.str();
-            ofstream of(par_name);
-            if (of.bad())
-            {
-                throw_sqp_error("error opening par file"+par_name);
-            }
-            const TranOffset& toff = *pest_scenario.get_base_par_tran_seq().get_offset_ptr();
-            const TranScale& tsc = *pest_scenario.get_base_par_tran_seq().get_scale_ptr();
-
-            output_file_writer.write_par(of,current_ctl_dv_values,toff,tsc);
-            of.close();
-            ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
-            ss.str("");
-            ss << ".base.rei";
-            output_file_writer.write_rei(file_manager.open_ofile_ext(ss.str()), iter,
-                                         pest_scenario.get_ctl_observations(), current_obs, obj_func, current_ctl_dv_values);
-            file_manager.close_all_files_ending_with("rei");
+            save_current_dv_obs();
         }
         constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true);
 
@@ -1686,11 +1696,17 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 			//dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
 			//message(1, "dv_cov:", dv_cov_matrix);
 			//parcov_inv = dv_cov_matrix.cwiseInverse();  // check equivalence to pseudo inv
-			
-			//the second return matrix should be shrunk optimally to be nonsingular...but who knows!
-			Covariance shrunk_cov = dv.get_empirical_cov_matrices(&file_manager).second;
-			shrunk_cov.inv_ip();
-			parcov_inv = shrunk_cov.e_ptr()->toDense();
+
+			if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior()) {
+                //the second return matrix should be shrunk optimally to be nonsingular...but who knows!
+                Covariance shrunk_cov = dv.get_empirical_cov_matrices(&file_manager).second;
+                shrunk_cov.inv_ip();
+                parcov_inv = shrunk_cov.e_ptr()->toDense();
+            }
+			else
+            {
+			    parcov_inv = parcov.inv().e_ptr()->toDense();
+            }
 			//cout << "parcov inv: " << endl << parcov_inv << endl;
 			//TODO: Matt to check consistency being sample cov forms
             //message(1, "empirical parcov inv:", parcov_inv);  // tmp
@@ -1706,15 +1722,25 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 			// compute dec var-phi cross-cov vector
 			// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
 			// start by computing mean-shifted obj function ensemble
+            Eigen::MatrixXd ivec, upgrade_1, s, V, U, st;
+            SVD_REDSVD rsvd;
+            //SVD_EIGEN rsvd;
+            rsvd.set_performance_log(performance_log);
+            //dv_anoms.transposeInPlace();
+
+            rsvd.solve_ip(dv_anoms, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+            Eigen::MatrixXd dv_anoms_pseudoinv = V * s.asDiagonal().inverse() * U.transpose();
+
 			Eigen::MatrixXd obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str}, center_on);
 			Eigen::MatrixXd cross_cov_vector;  // or Eigen::VectorXd?
-			cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
+			//cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
 			//cout << "dv-obj_cross_cov:" << endl << cross_cov_vector << endl;
 			
 			// now compute grad vector
 			// this is a matrix-vector product; the matrix being the pseudo inv of diag empirical dec var cov matrix and the vector being the dec var-phi cross-cov vector\
 			// see, e.g., Chen et al. (2009) and Fonseca et al. (2015) 
-			grad = parcov_inv * cross_cov_vector;//*parcov.e_ptr() * cross_cov_vector;
+			//grad = parcov_inv * cross_cov_vector;//*parcov.e_ptr() * cross_cov_vector;
+			grad = 1.0 / ((double)dv.shape().first - 1.0) * (dv_anoms_pseudoinv * obj_anoms);
 			// if (constraints)
 			//{
 			//	ss.str("");
@@ -2293,9 +2319,16 @@ bool SeqQuadProgram::solve_new()
 	//	}
 	
 	vector<string> real_names;
-	
+
+	scale_vals.clear();
+	for (auto& sf : pest_scenario.get_pestpp_options().get_sqp_scale_facs())
+    {
+	    scale_vals.push_back(sf * base_scale_factor);
+    }
+
+
 	for (auto sv : scale_vals)
-	{
+    {
 		ss.str("");
 		ss << "dv_cand_sv:" << left << setw(8) << setprecision(3) << sv;
 		real_names.push_back(ss.str());
@@ -2819,16 +2852,23 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
         {
 		    n_consec_infeas++;
         }
-		if (use_ensemble_grad) {
-            double new_par_sigma = pest_scenario.get_pestpp_options().get_par_sigma_range();
-            new_par_sigma = new_par_sigma * (par_sigma_incfac * (double)iter);
-            new_par_sigma = max(new_par_sigma, par_sigma_max);
+		else {
+            if (use_ensemble_grad) {
+                double new_par_sigma = pest_scenario.get_pestpp_options().get_par_sigma_range();
+                new_par_sigma = new_par_sigma * (par_sigma_incfac);
+                new_par_sigma = min(new_par_sigma, par_sigma_max);
 
-            message(1, "increasing par_sigma_range to", new_par_sigma);
-            message(1, "regenerating parcov");
-            parcov.try_from(pest_scenario, file_manager);
+                message(1, "increasing par_sigma_range to", new_par_sigma);
+                message(1, "regenerating parcov");
+                pest_scenario.get_pestpp_options_ptr()->set_par_sigma_range(new_par_sigma);
+                parcov.try_from(pest_scenario, file_manager);
+                cout << parcov << endl;
+            }
+            base_scale_factor = base_scale_factor * sf_dec_fac;
+            message(0, "new base scale factor", base_scale_factor);
         }
-		return true;
+
+        return true;
 		
 	}
 	else
@@ -2843,11 +2883,15 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
         if (use_ensemble_grad) {
             double new_par_sigma = pest_scenario.get_pestpp_options().get_par_sigma_range();
             new_par_sigma = new_par_sigma * par_sigma_decfac;
-            new_par_sigma = min(new_par_sigma, par_sigma_min);
+            new_par_sigma = max(new_par_sigma, par_sigma_min);
             message(1, "decreasing par_sigma_range to", new_par_sigma);
             message(1, "regenerating parcov");
             parcov.try_from(pest_scenario, file_manager);
+            pest_scenario.get_pestpp_options_ptr()->set_par_sigma_range(new_par_sigma);
+            cout << parcov << endl;
         }
+        base_scale_factor = base_scale_factor * sf_inc_fac;
+        message(0,"new base scale factor",base_scale_factor);
 		return false;
 	}
 }

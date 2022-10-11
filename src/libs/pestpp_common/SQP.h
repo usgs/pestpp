@@ -107,11 +107,14 @@ private:
     int MAX_CONSEC_PHIINC = 3;
 
     int n_consec_phiinc;
-    double par_sigma_decfac = 5.0;
-    double par_sigma_incfac = 0.1;
+    double par_sigma_decfac = 0.75;
+    double par_sigma_incfac = 1.25;
     double par_sigma_max = 100;
-    double par_sigma_min = 4;
+    double par_sigma_min = 1;
 	double eigthresh;
+	double base_scale_factor = 1.0;
+	double sf_dec_fac = 0.95;
+	double sf_inc_fac = 1.05;
 	vector<double> scale_vals;
 	set<string> pp_args;
 
@@ -143,6 +146,8 @@ private:
 	//these are used so that we can update the constraints based on the current best values
 	//Parameters best_mean_dv_values;
 	//Observations best_mean_obs_values;
+
+	void save_current_dv_obs();
 
 	Constraints constraints;
 
