@@ -107,10 +107,11 @@ private:
     int MAX_CONSEC_PHIINC = 3;
 
     int n_consec_phiinc;
-    double par_sigma_decfac = 0.75;
-    double par_sigma_incfac = 1.25;
+    double par_sigma_decfac = 0.5;
+    double par_sigma_incfac = 1.05;
     double par_sigma_max = 100;
-    double par_sigma_min = 1;
+    //todo add warning for par_sigma_range too low
+    double par_sigma_min = 10;
 	double eigthresh;
 	double base_scale_factor = 1.0;
 	double sf_dec_fac = 0.95;

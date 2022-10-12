@@ -1466,7 +1466,6 @@ void SeqQuadProgram::iterate_2_solution()
 	
 	bool accept;
 	n_consec_infeas = 0;
-	n_consec_phiinc = 0;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
 		iter++;
@@ -1566,7 +1565,7 @@ bool SeqQuadProgram::should_terminate()
     message(1, "nphistp: ", nphistp);
     message(1, "nphinored: ", nphinored);
     message(1, "best phi yet: ", best_phi_yet);
-
+    message(1,"number of consecutive infeasible solutions: ",n_consec_infeas);
     for (auto& phi : best_phis)
     {
         ratio = (phi - best_phi_yet) / phi;

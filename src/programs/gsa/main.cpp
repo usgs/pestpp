@@ -228,13 +228,41 @@ int main(int argc, char* argv[])
 	pest_scenario.check_inputs(frec);
 	pest_scenario.check_io(frec);
 
+	//check for zero-weighted obs groups and warn
+	stringstream ss;
+
+
+    if (pest_scenario.get_ctl_ordered_nz_obs_names().size() == 0)
+    {
+        ss.str("");
+        ss << "WARNING: all observations are zero weighted - resetting all weights to 1.0";
+        cout << ss.str() << endl;
+        fout_rec << ss.str() << endl;
+        ObservationInfo* oi_ptr = pest_scenario.get_observation_info_ptr();
+
+        for (auto& o : pest_scenario.get_ctl_observations())
+        {
+            oi_ptr->set_weight(o.first,1.0);
+        }
+    }
+    else
+    {
+        ss.str("");
+        ss << endl << "Note: only non-zero weighted observations contribute to" << endl;
+        ss << "      the phi and group phi sensitivity metrics.  Please" << endl;
+        ss << "      make sure this is what you want..." << endl << endl;
+        cout << ss.str();
+        fout_rec << ss.str();
+    }
+
 	//map<string, string> gsa_opt_map;
 	//process .gsa file
 	string gsa_filename = file_manager.get_base_filename() + ".gsa";
 	
 	if (check_exist_in(gsa_filename))
 	{
-		cout << "WARNING: use of .gsa files is deprecated - .gsa file '" << gsa_filename << "' is being ignored, please use '++' args";
+		cout << "ERROR: use of .gsa files is deprecated - .gsa file '" << gsa_filename << "' is being ignored, please use '++' args";
+		fout_rec<< "ERROR: use of .gsa files is deprecated - .gsa file '" << gsa_filename << "' is being ignored, please use '++' args";
 		return 1;
 	}
 
