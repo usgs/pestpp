@@ -112,13 +112,12 @@ private:
     double BASE_SCALE_FACTOR = 1.0;
     double PAR_SIGMA_DEC_FAC = 0.9;
     double PAR_SIGMA_INC_FAC = 1.1;
+    bool SOLVE_EACH_REAL = true;
     double par_sigma_max = 100;
     //todo add warning for par_sigma_range too low
     double par_sigma_min = 10;
 	double eigthresh;
 
-
-	vector<double> scale_vals;
 	set<string> pp_args;
 
 	int iter;
@@ -174,9 +173,9 @@ private:
 	
 	bool seek_feasible();
 
-	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, vector<double>& alpha_vals);
+	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string,double>& sf_map);
 
-	Parameters calc_gradient_vector(const Parameters& _current_dv_values);
+	Parameters calc_gradient_vector(const Parameters& _current_dv_values, string _center_on=string());
 
 	Eigen::VectorXd calc_gradient_vector_from_coeffs(const Parameters & _current_dv_values);
 
@@ -192,10 +191,10 @@ private:
 	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_null_space(Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>& cnames);
 
 	//Parameters fancy_solve_routine(double scale_val, const Parameters& _current_dv_);
-	Eigen::VectorXd fancy_solve_routine(const Parameters& _current_dv_);
+	Eigen::VectorXd fancy_solve_routine(const Parameters& _current_dv_, const Parameters& _grad_vector);
 
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
-	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates, vector<double> &scale_vals);
+	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates);
 
 	void run_jacobian(Parameters& _current_dv_vals,Observations& _current_obs, bool init_obs);
 
