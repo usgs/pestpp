@@ -103,19 +103,21 @@ private:
 
 	int num_threads;
 	int n_consec_infeas;
-	int MAX_CONSEC_INFEAS = 3;
-    int MAX_CONSEC_PHIINC = 3;
-
-    int n_consec_phiinc;
-    double par_sigma_decfac = 0.5;
-    double par_sigma_incfac = 1.05;
+	//todo: make these ++ args
+	int MAX_CONSEC_INFEAS = 6;
+    int MAX_CONSEC_INFEAS_IES = 3;
+    int MAX_CONSEC_PHIINC = 6;
+    double SF_DEC_FAC = 0.95;
+    double SF_INC_FAC = 1.05;
+    double BASE_SCALE_FACTOR = 1.0;
+    double PAR_SIGMA_DEC_FAC = 0.9;
+    double PAR_SIGMA_INC_FAC = 1.1;
     double par_sigma_max = 100;
     //todo add warning for par_sigma_range too low
     double par_sigma_min = 10;
 	double eigthresh;
-	double base_scale_factor = 1.0;
-	double sf_dec_fac = 0.95;
-	double sf_inc_fac = 1.05;
+
+
 	vector<double> scale_vals;
 	set<string> pp_args;
 

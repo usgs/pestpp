@@ -3265,9 +3265,9 @@ void EnsembleMethod::sanity_checks()
     if ((ppo->get_ies_num_reals() < error_min_reals) && (par_csv.size() == 0))
     {
         ss.str("");
-        ss << "ies_num_reals < " << error_min_reals << ", this is redic, increaing to " << warn_min_reals;
+        ss << "ies_num_reals < " << error_min_reals << ", this is redic!";
         warnings.push_back(ss.str());
-        ppo->set_ies_num_reals(warn_min_reals);
+        //ppo->set_ies_num_reals(warn_min_reals);
     }
     if ((ppo->get_ies_num_reals() < warn_min_reals) && (par_csv.size() == 0))
     {

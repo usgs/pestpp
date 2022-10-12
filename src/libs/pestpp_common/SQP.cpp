@@ -748,8 +748,6 @@ void SeqQuadProgram::initialize()
 		ppo->set_par_sigma_range(20.0);
 	}
 
-	
-
 	//reset the par bound PI augmentation since that option is just for simplex
 	ppo->set_opt_include_bnd_pi(false);
 
@@ -1502,7 +1500,7 @@ void SeqQuadProgram::iterate_2_solution()
 		if (should_terminate())
 			break;
 
-		if (n_consec_infeas > MAX_CONSEC_INFEAS)
+		if (n_consec_infeas > MAX_CONSEC_INFEAS_IES)
         {
 		    ss.str("");
 		    ss << "number of consecutive infeasible iterations > " << MAX_CONSEC_INFEAS << ", switching to IES to seek feasibility";
@@ -1530,12 +1528,28 @@ bool SeqQuadProgram::should_terminate()
     //todo: use ies accept fac here?
     double phiredstp = pest_scenario.get_control_info().phiredstp;
     int nphistp = pest_scenario.get_control_info().nphistp;
-    int nphinored = pest_scenario.get_control_info().nphinored;
+    int nphinored = MAX_CONSEC_PHIINC;
     bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
     double phi, ratio, infeas;
     int count = 0;
     int nphired = 0;
-    //best_mean_phis = vector<double>{ 1.0,0.8,0.81,0.755,1.1,0.75,0.75,1.2 };
+    best_phi_yet = 1.0e+300;
+    int best_idx_yet = 0;
+    for (int i=0;i<best_phis.size();i++)
+    {
+        if (best_phis[i]<best_phi_yet)
+        {
+            best_phi_yet = best_phis[i];
+            best_violation_yet = best_violations[i];
+            best_idx_yet = i;
+        }
+    }
+    nphired = best_phis.size() - best_idx_yet;
+
+    if (best_idx_yet == 0)
+    {
+        throw_sqp_error("something is wrong in shouuld_terminate()");
+    }
 
     //todo: save and write out the current phi grad vector (maybe save all of them???)
     ss.str("");
@@ -1547,7 +1561,7 @@ bool SeqQuadProgram::should_terminate()
     {
         phi = best_phis[i];
         infeas = best_violations[i];
-        ss << setw(10) << setw(5) << setprecision(4) << right << phi << "," << setw(5) << setprecision(4) << left << infeas << " ";
+        ss << setw(10) << setw(5) << setprecision(4) << setfill('0') << right << phi << "," << setw(5) << setprecision(4) << left << setfill('0') << infeas << " ";
         ii++;
         if (ii % 6 == 0) {
             ss << endl;
@@ -1677,8 +1691,8 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 			// compute sample dec var cov matrix and its pseudo inverse
 			// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
 			// TODO: so can pseudo inverse: Covariance dv_cov_matrix; 
-			Eigen::MatrixXd dv_cov_matrix;
-			Eigen::MatrixXd parcov_inv;
+			//Eigen::MatrixXd dv_cov_matrix;
+			//Eigen::MatrixXd parcov_inv;
 			// start by computing mean-shifted dec var ensemble
 			Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, center_on);  // need this for both cov and cross-cov
 			if (dv.shape().first > 1000)  // until we encounter
@@ -1696,16 +1710,16 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 			//message(1, "dv_cov:", dv_cov_matrix);
 			//parcov_inv = dv_cov_matrix.cwiseInverse();  // check equivalence to pseudo inv
 
-			if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior()) {
-                //the second return matrix should be shrunk optimally to be nonsingular...but who knows!
-                Covariance shrunk_cov = dv.get_empirical_cov_matrices(&file_manager).second;
-                shrunk_cov.inv_ip();
-                parcov_inv = shrunk_cov.e_ptr()->toDense();
-            }
-			else
-            {
-			    parcov_inv = parcov.inv().e_ptr()->toDense();
-            }
+//			if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior()) {
+//                //the second return matrix should be shrunk optimally to be nonsingular...but who knows!
+//                Covariance shrunk_cov = dv.get_empirical_cov_matrices(&file_manager).second;
+//                shrunk_cov.inv_ip();
+//                parcov_inv = shrunk_cov.e_ptr()->toDense();
+//            }
+//			else
+//            {
+//			    parcov_inv = parcov.inv().e_ptr()->toDense();
+//            }
 			//cout << "parcov inv: " << endl << parcov_inv << endl;
 			//TODO: Matt to check consistency being sample cov forms
             //message(1, "empirical parcov inv:", parcov_inv);  // tmp
@@ -2322,7 +2336,7 @@ bool SeqQuadProgram::solve_new()
 	scale_vals.clear();
 	for (auto& sf : pest_scenario.get_pestpp_options().get_sqp_scale_facs())
     {
-	    scale_vals.push_back(sf * base_scale_factor);
+	    scale_vals.push_back(sf * BASE_SCALE_FACTOR);
     }
 
 
@@ -2516,6 +2530,7 @@ bool SeqQuadProgram::seek_feasible()
 	    shifted = constraints.get_chance_shifted_constraints(current_obs);
     }
 	Observations& ctl_obs = ies_pest_scenario.get_ctl_observations_4_mod();
+	map<string,double> viol_map = constraints.get_unsatified_obs_constraints(current_obs,filter.get_viol_tol());
 	for (auto& name : ies_pest_scenario.get_ctl_ordered_obs_names())
 	{
 		if (snames.find(name) == send)
@@ -2525,8 +2540,10 @@ bool SeqQuadProgram::seek_feasible()
 		}
 		else
 		{
-			ctl_obs.update_rec(name, shifted.get_rec(name));
-            oi->get_observation_rec_ptr_4_mod(name)->group = "__eqconstraint__"+name;
+		    if (viol_map.find(name) != viol_map.end()) {
+                ctl_obs.update_rec(name, shifted.get_rec(name));
+                oi->get_observation_rec_ptr_4_mod(name)->group = "__eqconstraint__" + name;
+            }
 		}
 	}
 
@@ -2535,14 +2552,34 @@ bool SeqQuadProgram::seek_feasible()
     {
 	    ies_pest_scenario.get_pestpp_options_ptr()->set_ies_bad_phi_sigma(1.25);
     }
-	ies_pest_scenario.get_pestpp_options_ptr()->set_ies_num_reals(pest_scenario.get_pestpp_options().get_sqp_num_reals());
-	ies_pest_scenario.get_pestpp_options_ptr()->set_ies_no_noise(true);
+
+    if (snames.find("IES_LAMBBDA_MULTS") == snames.end())
+    {
+        ies_pest_scenario.get_pestpp_options_ptr()->set_ies_lam_mults(vector<double>{0.1,1.0,10});
+    }
+
+    if (snames.find("LAMBBDA_SCALE_FAC") == snames.end())
+    {
+        ies_pest_scenario.get_pestpp_options_ptr()->set_lambda_scale_vec(vector<double>{0.5,1.0});
+    }
+    if (snames.find("IES_NUM_REALS") == snames.end()) {
+        ies_pest_scenario.get_pestpp_options_ptr()->set_ies_num_reals(
+                max(pest_scenario.get_pestpp_options().get_sqp_num_reals(), 5));
+    }
+    if (snames.find("IES_SUBSET_SIZE") == snames.end()) {
+        ies_pest_scenario.get_pestpp_options_ptr()->set_ies_subset_size(1);
+    }
+    ies_pest_scenario.get_pestpp_options_ptr()->set_ies_no_noise(true);
 	ies_pest_scenario.get_pestpp_options_ptr()->set_ies_obs_csv("");
     ies_pest_scenario.get_pestpp_options_ptr()->set_ies_obs_restart_csv("");
     ies_pest_scenario.get_pestpp_options_ptr()->set_ies_par_csv("");
     ies_pest_scenario.get_pestpp_options_ptr()->set_ies_par_restart_csv("");
     ies_pest_scenario.get_control_info_4_mod().noptmax = 3; //TODO: make this an option some how?
+    ss.str("");
+    string org_base = file_manager.get_base_filename();
+    ss << "feas_ies_" << iter << "_" << org_base;
 
+    file_manager.set_base_filename(ss.str());
     IterEnsembleSmoother ies(ies_pest_scenario, file_manager, output_file_writer, performance_log, run_mgr_ptr);
     if (use_ensemble_grad) {
         ies.set_pe(dv);
@@ -2557,7 +2594,7 @@ bool SeqQuadProgram::seek_feasible()
 
 
 	ies.iterate_2_solution();
-
+    file_manager.set_base_filename(org_base);
 	//what to do here? maybe we need to eval the kkt conditions to pick a new point that maintains the hessian?
 	ParameterEnsemble* ies_pe_ptr = ies.get_pe_ptr();
 	ObservationEnsemble* ies_oe_ptr = ies.get_oe_ptr();
@@ -2847,14 +2884,14 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		// take diff between vector of strings of constraints in working set and constraints with non-zero violation (return constraint idx from filter?)
 
 		//if no filter-accepted solutions and we are in violation...
-		if((accept_idxs.size() == 0) && (infeas_vec[idx] > filter.get_viol_tol()))
+		if (infeas_vec[idx] > filter.get_viol_tol())
         {
 		    n_consec_infeas++;
         }
 		else {
             if (use_ensemble_grad) {
                 double new_par_sigma = pest_scenario.get_pestpp_options().get_par_sigma_range();
-                new_par_sigma = new_par_sigma * (par_sigma_incfac);
+                new_par_sigma = new_par_sigma * (PAR_SIGMA_INC_FAC);
                 new_par_sigma = min(new_par_sigma, par_sigma_max);
 
                 message(1, "increasing par_sigma_range to", new_par_sigma);
@@ -2863,8 +2900,8 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
                 parcov.try_from(pest_scenario, file_manager);
                 cout << parcov << endl;
             }
-            base_scale_factor = base_scale_factor * sf_dec_fac;
-            message(0, "new base scale factor", base_scale_factor);
+            BASE_SCALE_FACTOR = BASE_SCALE_FACTOR * SF_DEC_FAC;
+            message(0, "new base scale factor", BASE_SCALE_FACTOR);
         }
 
         return true;
@@ -2881,7 +2918,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
         }
         if (use_ensemble_grad) {
             double new_par_sigma = pest_scenario.get_pestpp_options().get_par_sigma_range();
-            new_par_sigma = new_par_sigma * par_sigma_decfac;
+            new_par_sigma = new_par_sigma * PAR_SIGMA_DEC_FAC;
             new_par_sigma = max(new_par_sigma, par_sigma_min);
             message(1, "decreasing par_sigma_range to", new_par_sigma);
             message(1, "regenerating parcov");
@@ -2889,8 +2926,8 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
             pest_scenario.get_pestpp_options_ptr()->set_par_sigma_range(new_par_sigma);
             cout << parcov << endl;
         }
-        base_scale_factor = base_scale_factor * sf_inc_fac;
-        message(0,"new base scale factor",base_scale_factor);
+        BASE_SCALE_FACTOR = BASE_SCALE_FACTOR * SF_INC_FAC;
+        message(0, "new base scale factor", BASE_SCALE_FACTOR);
 		return false;
 	}
 }

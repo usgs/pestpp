@@ -289,6 +289,7 @@ void MorrisMethod::assemble_runs(RunManagerAbstract &run_manager)
 			{
 				par_name = adj_par_name_vec[i-1];
 			}
+			//note: the "par_name:" prefix is hard coded later when processing runs...
 			run_id = run_manager.add_run(pars, "par_name:"+par_name, Parameters::no_data);
 			base_partran_seq_ptr->model2ctl_ip(pars);
 			par_map[run_id] =  pars;
@@ -388,6 +389,18 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 		pars0 = pars1;
 		obs0 = obs1;
 		run1_ok = run_manager.get_run(i_run, pars1, obs1, par_name_1, null_value);
+		if (par_name_1.empty())
+        {
+		    throw runtime_error("Morris: empty par name");
+        }
+		//remove the "par_name:" prefix
+        cout << par_name_1 << endl;
+		par_name_1 = par_name_1.substr(9);
+		cout << par_name_1 << endl << endl;
+		if ((!par_name_1.empty()) && (pars1.find(par_name_1) == pars1.end()))
+        {
+		    throw runtime_error("Morris:parameter name not found: "+par_name_1);
+        }
 		base_partran_seq_ptr->model2numeric_ip(pars1);
 		// Add run0 to obs_stats
 		if (run0_ok)
