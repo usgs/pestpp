@@ -47,7 +47,7 @@ struct FilterRec
 class SqpFilter
 {
 public:
-	SqpFilter(bool _minimize=true,double _obj_tol = 0.01, double _viol_tol = 0.01) {
+	SqpFilter(bool _minimize=true,double _obj_tol = 0.05, double _viol_tol = 0.05) {
 		minimize = _minimize; obj_tol = _obj_tol; viol_tol = _viol_tol;
 	}
 	bool accept(double obj_val, double violation_val,int iter=0,double alpha=-1.0, bool keep=false);
@@ -107,12 +107,13 @@ private:
 	int MAX_CONSEC_INFEAS = 6;
     int MAX_CONSEC_INFEAS_IES = 3;
     int MAX_CONSEC_PHIINC = 6;
-    double SF_DEC_FAC = 0.95;
+    double SF_DEC_FAC = 0.5;
     double SF_INC_FAC = 1.05;
     double BASE_SCALE_FACTOR = 1.0;
     double PAR_SIGMA_DEC_FAC = 0.9;
     double PAR_SIGMA_INC_FAC = 1.1;
     bool SOLVE_EACH_REAL = true;
+    double PHI_ACCEPT_FAC = 0.05;
     double par_sigma_max = 100;
     //todo add warning for par_sigma_range too low
     double par_sigma_min = 10;

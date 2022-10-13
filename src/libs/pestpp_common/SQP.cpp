@@ -903,6 +903,18 @@ void SeqQuadProgram::initialize()
 	
 	//vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
 	//message(1, "using scaling factors: ", scale_facs);
+	set<string> passed = ppo->get_passed_args();
+	if (passed.find("SQP_SCALE_FACS") == passed.end())
+	{
+	    if ((use_ensemble_grad) && (SOLVE_EACH_REAL))
+        {
+	        message(1,"'sqp_scale_facs' not passed, using ensemble gradient, and solving each real, resetting scale facs");
+	        vector<double> new_scale_facs{0.000001,0.00001,0.0005,0.01,.1};
+	        message(1,"new sqp_scale_facs",new_scale_facs);
+	        ppo->set_sqp_scale_facs(new_scale_facs);
+        };
+	}
+
 	
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
@@ -1553,19 +1565,19 @@ bool SeqQuadProgram::should_terminate()
     //todo: save and write out the current phi grad vector (maybe save all of them???)
     ss.str("");
     ss << "best phi,infeas sequence:" << endl;
-    ss << "       ";
+    //ss << "       ";
     int ii = 0;
     for (int i=0;i<best_phis.size();i++)
     //for (auto phi : best_phis)
     {
         phi = best_phis[i];
         infeas = best_violations[i];
-        ss << setw(5) << setprecision(4) << right << phi << "," << setw(5) << setprecision(4) << left << infeas << " ";
+        ss << "    " << setw(5) << setprecision(4) << right << phi << "," << setw(5) << setprecision(4) << left << infeas << endl;
         ii++;
-        if (ii % 6 == 0) {
-            ss << endl;
-            ss << "       ";
-        }
+//        if (ii % 6 == 0) {
+//            ss << endl;
+//            ss << "       ";
+//        }
 
     }
     ss << endl;
@@ -1688,7 +1700,7 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 	if (use_ensemble_grad)
 	{
 		//ensemble stuff here
-		if (use_obj_obs)
+		//if (use_obj_obs)
 		{
 			// compute sample dec var cov matrix and its pseudo inverse
 			// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
@@ -1745,8 +1757,31 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 
             rsvd.solve_ip(dv_anoms, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
             Eigen::MatrixXd dv_anoms_pseudoinv = V * s.asDiagonal().inverse() * U.transpose();
+            Eigen::MatrixXd obj_anoms(dv.shape().first,1);
+            if (use_obj_obs) {
+                obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str},center_on);
+            }
+            else
+            {
+                dv.update_var_map();
+                map<string,int> vmap = dv.get_var_map();
+                Eigen::VectorXd real;
+                double oval;
+                int i =0;
+                for (auto& real_name: dv.get_real_names())
+                {
+                    oval = 0;
+                    real = dv.get_real_vector(real_name);
+                    for (auto& dv :dv_names)
+                    {
+                        oval += obj_func_coef_map.at(dv) * real(vmap.at(dv));
+                    }
+                    obj_anoms(i,0) = oval;
+                    i++;
+                }
+                obj_anoms.array() -= obj_anoms.mean();
 
-			Eigen::MatrixXd obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str}, center_on);
+            }
 			Eigen::MatrixXd cross_cov_vector;  // or Eigen::VectorXd?
 			//cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
 			//cout << "dv-obj_cross_cov:" << endl << cross_cov_vector << endl;
@@ -1773,26 +1808,26 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 		//pi base obj, need representative dv values using the "center_on" arg
 		//represent the mean/median/base - that is, derived from the "center_on" arg
 		//todo: for now, just using mean dv values
-		else
-		{
-			//if not center_on arg, use the mean dv values
-			//if (center_on.size() == 0)
-			//{
-			//	//pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
-			//	for (int i = 0; i < dv_names.size(); i++)
-			//	{
-			//		grad[i] = obj_func_coef_map[dv_names[i]];// * mm.first[dv_names[i]];
-			//	}
-			//}
-			//else
-			//{
-
-			//	grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
-			//}
-			// 
-			//I think we should just eval the gradient around the current dv values
-			grad = calc_gradient_vector_from_coeffs(_current_dv_values);
-		}
+//		else
+//		{
+//			//if not center_on arg, use the mean dv values
+//			//if (center_on.size() == 0)
+//			//{
+//			//	//pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
+//			//	for (int i = 0; i < dv_names.size(); i++)
+//			//	{
+//			//		grad[i] = obj_func_coef_map[dv_names[i]];// * mm.first[dv_names[i]];
+//			//	}
+//			//}
+//			//else
+//			//{
+//
+//			//	grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
+//			//}
+//			//
+//			//I think we should just eval the gradient around the current dv values
+//			grad = calc_gradient_vector_from_coeffs(_current_dv_values);
+//		}
 			
 	}
 	else
@@ -1873,7 +1908,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 
 	message(1, "A before", constraint_jco);
 	rsvd.solve_ip(constraint_jco, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-	message(1, "A after", constraint_jco); 
+	message(1, "A after", constraint_jco);
 	S_ = s.asDiagonal();  // check truncation done automatically
 	message(1, "singular values of A matrix", S_);  // tmp
 	message(1, "V", V);  // tmp
@@ -2073,7 +2108,8 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 	//todo:probably need to check if constraint_mat has any nonzeros?
 	vector<string> cnames = constraint_mat.get_row_names();
 
-	if (cnames.size() > 0)  // solve constrained QP subproblem
+	//if (cnames.size() > 0)  // solve constrained QP subproblem
+	if (false)
 	{
 		// solve (E)QP sub-problem via active set method for search direction
 
@@ -2364,6 +2400,7 @@ bool SeqQuadProgram::solve_new()
 	dv_candidates.reserve(real_names, dv_names);
     int ii = 0;
     vector<double> used_scale_vals;
+    map<string,double> real_sf_map;
 	for (int i=0;i<scale_vals.size();i++)
 	{
 		double scale_val = scale_vals[i];
@@ -2392,8 +2429,10 @@ bool SeqQuadProgram::solve_new()
                 //num_candidate.update_without_clear(dv_names, cvals);
                 //Eigen::VectorXd vec = num_candidate.get_data_eigen_vec(dv_names);
                 dv_candidates.update_real_ip(real_names[ii], cvals);
+                real_sf_map[real_names[ii]] = scale_val;
                 ii++;
                 used_scale_vals.push_back(scale_val);
+
 
             }
         }
@@ -2414,6 +2453,7 @@ bool SeqQuadProgram::solve_new()
             Eigen::VectorXd vec = num_candidate.get_data_eigen_vec(dv_names);
             dv_candidates.update_real_ip(real_names[i], vec);
             used_scale_vals.push_back(scale_val);
+            real_sf_map[real_names[i]] = scale_val;
         }
 
 		ss.str("");
@@ -2503,6 +2543,38 @@ bool SeqQuadProgram::solve_new()
 	ss.str("");
 	ss << file_manager.get_base_filename() << "." << iter << ".dv_candidates.csv";
 	dv_candidates.to_csv(ss.str());
+
+	//check for duplicate candidates
+	Eigen::VectorXd v1,v2;
+	double d;
+	vector<string> drop;
+	set<int> jvals;
+	for (int i=0;i<dv_candidates.shape().first;i++)
+    {
+	    v1 = dv_candidates.get_real_vector(i);
+	    for (int j=i+1;j<dv_candidates.shape().first;j++) {
+            v2 = (dv_candidates.get_real_vector(j) - v1).array() / v1.array().cwiseAbs();
+            d = v2.transpose() * v2;
+            if ((abs(d) < 1e-7) && (jvals.find(j) == jvals.end())) {
+                message(1, "duplicate candidates:", vector<string>{real_names[i], real_names[j]});
+                drop.push_back(real_names[j]);
+                jvals.emplace(j);
+            }
+        }
+
+    }
+	if (drop.size() > 0)
+    {
+	    message(1,"dropping the following duplicate candidates: ",drop);
+	    dv_candidates.drop_rows(drop,true);
+	    used_scale_vals.clear();
+	    for (auto& real_name : dv_candidates.get_real_names())
+        {
+	        used_scale_vals.push_back(real_sf_map.at(real_name));
+        }
+
+    }
+
 
 	message(0, "running candidate decision variable batch");
 	vector<double> passed_scale_vals = scale_vals;	
@@ -2614,10 +2686,10 @@ bool SeqQuadProgram::seek_feasible()
     }
     if (snames.find("IES_NUM_REALS") == snames.end()) {
         ies_pest_scenario.get_pestpp_options_ptr()->set_ies_num_reals(
-                max(pest_scenario.get_pestpp_options().get_sqp_num_reals(), 5));
+                max(max(pest_scenario.get_pestpp_options().get_sqp_num_reals(), (int)(constraints.num_constraints()*1.1)),30));
     }
     if (snames.find("IES_SUBSET_SIZE") == snames.end()) {
-        ies_pest_scenario.get_pestpp_options_ptr()->set_ies_subset_size(1);
+        ies_pest_scenario.get_pestpp_options_ptr()->set_ies_subset_size(-5);
     }
     ies_pest_scenario.get_pestpp_options_ptr()->set_ies_no_noise(true);
 	ies_pest_scenario.get_pestpp_options_ptr()->set_ies_obs_csv("");
@@ -2810,6 +2882,13 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		message(1, ss.str());
         if (filter_accept)
         {
+            if ((best_violation_yet > 1e-7) && (infeas_vec[i] > (best_violation_yet * 2.0)))
+            {
+                ss << ", infeasibility exceeds previous best infeasibility threshold";
+            }
+            else{
+                accept_idxs.push_back(i);
+            }
             accept_idxs.push_back(i);
 //            idx = i;
 //            oext = obj_vec[i];
@@ -2824,13 +2903,8 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		pts.numeric2ctl_ip(cand_dv_values);
 		t = _oe.get_real_vector(real_names[i]);
 		cand_obs_values.update_without_clear(onames, t);
-		
 		constraints.sqp_report(iter, cand_dv_values, cand_obs_values, false,tag);
-
 	}
-
-
-
 
     if (accept_idxs.size() > 0)
     {
