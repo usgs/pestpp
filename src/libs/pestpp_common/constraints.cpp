@@ -2945,8 +2945,9 @@ map<string, double> Constraints::get_constraint_map(Parameters& par_and_dec_vars
 
 Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, ParameterEnsemble& dv, ObservationEnsemble& oe, bool do_shift, double working_set_tol)
 {
-    vector<string> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol);
-    if (working_set.size() > 0) {
+    pair<vector<string>,vector<string>> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol);
+    Mat mat;
+    if (working_set.first.size() > 0) {
         Covariance cov = dv.get_empirical_cov_matrices(file_mgr_ptr).second;
         Eigen::MatrixXd delta_dv = *cov.inv().e_ptr() * dv.get_eigen_anomalies().transpose();
 
@@ -2973,32 +2974,48 @@ Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars,
         V.resize(0, 0);
         U.resize(0, 0);
         full_s_inv.resize(0, 0);
-        Eigen::MatrixXd working_mat(working_set.size(), dv.shape().second);
+        Eigen::MatrixXd working_mat(working_set.first.size(), dv.shape().second);
         oe.update_var_map();
         map<string, int> vmap = oe.get_var_map();
         int i = 0;
-        for (auto &n : working_set) {
+        for (auto &n : working_set.first) {
             working_mat.row(i) = approx_jco.row(vmap[n]);
             i++;
         }
-        return Mat(working_set, dv.get_var_names(), working_mat.sparseView());
+        mat = Mat(working_set.first, dv.get_var_names(), working_mat.sparseView());
+        //return Mat(working_set, dv.get_var_names(), working_mat.sparseView());
     }
-    else
+    if (working_set.second.size() > 0)
     {
-        return Mat();
+        //deal with pi constraints in the working set
     }
+    return Mat();
 }
 
 Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars, Observations& constraints_sim, const Jacobian_1to1& _jco, bool do_shift, double working_set_tol)
 {
-	vector<string> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol);
-	Eigen::SparseMatrix<double> t = _jco.get_matrix(working_set, dec_var_names);
-	return Mat(working_set, dec_var_names,t);
+	pair<vector<string>,vector<string>> working_set = get_working_set(par_and_dec_vars,constraints_sim,do_shift,working_set_tol);
+	Mat mat;
+    if (working_set.first.size() > 0) {
+        Eigen::SparseMatrix<double> t = _jco.get_matrix(working_set.first, dec_var_names);
+        Mat(working_set.first, dec_var_names, t);
+    }
+	if (working_set.second.size() > 0) {
+        augment_constraint_mat_with_pi(mat,working_set.second);
+
+
+    }
+	return mat;
 }
 
-vector<string> Constraints::get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol) {
+void Constraints::augment_constraint_mat_with_pi(Mat& mat, vector<string>& pi_names)
+{
+
+}
+
+pair<vector<string>,vector<string>> Constraints::get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol) {
     map<string, double> constraint_map = get_constraint_map(par_and_dec_vars, constraints_sim, do_shift);
-    vector<string> working_set;
+    vector<string> working_set,working_set_pi;
     for (auto &name : ctl_ord_obs_constraint_names) {
         if (constraint_sense_map[name] == ConstraintSense::equal_to)
             working_set.push_back(name);
@@ -3009,13 +3026,13 @@ vector<string> Constraints::get_working_set(Parameters& par_and_dec_vars, Observ
     }
     for (auto &name : ctl_ord_pi_constraint_names) {
         if (constraint_sense_map[name] == ConstraintSense::equal_to)
-            working_set.push_back(name);
+            working_set_pi.push_back(name);
 
         else if (abs(constraint_map[name]) < working_set_tol) {
-            working_set.push_back(name);
+            working_set_pi.push_back(name);
         }
     }
-    return working_set;
+    return pair<vector<string>,vector<string>>(working_set,working_set_pi);
 }
 
 int Constraints::get_num_nz_pi_constraint_elements()

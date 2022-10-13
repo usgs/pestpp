@@ -2108,8 +2108,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 	//todo:probably need to check if constraint_mat has any nonzeros?
 	vector<string> cnames = constraint_mat.get_row_names();
 
-	//if (cnames.size() > 0)  // solve constrained QP subproblem
-	if (false)
+	if (cnames.size() > 0)  // solve constrained QP subproblem
 	{
 		// solve (E)QP sub-problem via active set method for search direction
 
