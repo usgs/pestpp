@@ -2252,9 +2252,10 @@ void L2PhiHandler::report_group(bool echo) {
     f << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl << endl;
     if (echo)
         cout << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl;
-    if (c > 10)
+    if ((echo) && (c > 10))
         cout << "    Note: only the first 10 highest mean phi groups are listed. See rec file for full listing" << endl;
-    cout << endl;
+    if (echo)
+        cout << endl;
 }
 
 void L2PhiHandler::report(bool echo, bool group_report)

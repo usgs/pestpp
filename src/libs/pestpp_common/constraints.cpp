@@ -2988,6 +2988,7 @@ Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars,
     if (working_set.second.size() > 0)
     {
         //deal with pi constraints in the working set
+        augment_constraint_mat_with_pi(mat,working_set.second);
     }
     return Mat();
 }
@@ -3010,6 +3011,7 @@ Mat Constraints::get_working_set_constraint_matrix(Parameters& par_and_dec_vars,
 
 void Constraints::augment_constraint_mat_with_pi(Mat& mat, vector<string>& pi_names)
 {
+    
 
 }
 
