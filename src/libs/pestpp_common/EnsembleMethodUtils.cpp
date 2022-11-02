@@ -5477,7 +5477,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	else
  		oe_lams = run_lambda_ensembles(pe_lams, lam_vals, scale_vals, cycle, subset_idxs,subset_idxs);
 
-	message(0, "evaluting upgrade ensembles");
+	message(0, "evaluating upgrade ensembles");
 	message(1, "last mean: ", last_best_mean);
 	message(1, "last stdev: ", last_best_std);
 
@@ -6670,7 +6670,7 @@ void EnsembleMethod::initialize_restart()
 			}
 			else
 			{
-				ss << "the 'base' realization was not found in the restart obs en and also not found in the par en";
+				ss << "the 'base' realization was not found consistently in the restart obs en, par en, and/or the obs+noise en";
 				throw_em_error(ss.str());
 			}
 
