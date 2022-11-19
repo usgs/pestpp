@@ -1013,8 +1013,8 @@ map<string, map<string, double>> MOEA::decvar_report(ParameterEnsemble& _dp)
         ss << right << setw(10) << meanmap[dv];
         ss << right << setw(20) << stdmap[dv];
         vec = _dp.get_var_vector(dv);
-        ss << setw(12) << vec.maxCoeff();
         ss << setw(12) << vec.minCoeff();
+        ss << setw(12) << vec.maxCoeff();
         ss << endl;
         sum["mean"] = meanmap[dv];
         sum["std"] = stdmap[dv];
@@ -1909,6 +1909,7 @@ void MOEA::initialize()
 			pi_ptr->AddRecord(pest_utils::upper_cp(ss.str()));
 			message(1, "added prior information objective for '" + RISK_NAME + "': ", ss.str());
 			pi_obj_names.push_back(RISK_NAME);
+			obj_dir_mult[RISK_NAME] = -1;
 		}
 		ss.str("");
 		ss << "'mou_risk_objective' is true, using " << RISK_NAME << " decision variable as risk in chance calcs";

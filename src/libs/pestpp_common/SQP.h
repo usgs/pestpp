@@ -64,7 +64,7 @@ private:
 
 	bool first_partially_dominates_second(const FilterRec& first, const FilterRec& second);
     bool first_strictly_dominates_second(const FilterRec& first, const FilterRec& second);
-	
+
 };
 
 class SeqQuadProgram
@@ -73,7 +73,7 @@ public:
 	SeqQuadProgram(Pest& _pest_scenario, FileManager& _file_manager,
 		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 		RunManagerAbstract* _run_mgr_ptr);
-	
+
 	void initialize();
 	void iterate_2_solution();
 	void finalize();
@@ -112,7 +112,7 @@ private:
     double BASE_SCALE_FACTOR = 1.0;
     double PAR_SIGMA_DEC_FAC = 0.9;
     double PAR_SIGMA_INC_FAC = 1.1;
-    bool SOLVE_EACH_REAL = true;
+    bool SOLVE_EACH_REAL = false;
     double PHI_ACCEPT_FAC = 0.05;
     double par_sigma_max = 100;
     //todo add warning for par_sigma_range too low
@@ -131,12 +131,12 @@ private:
 	double best_violation_yet;
 
 	int warn_min_reals, error_min_reals;
-	
+
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
 	vector<string> dv_names;
 	//vector<int> subset_idxs;
-	
+
 	Parameters current_ctl_dv_values;
 	Observations current_obs;
 
@@ -171,7 +171,7 @@ private:
 	bool update_hessian_and_grad_vector();
 
 	bool solve_new();
-	
+
 	bool seek_feasible();
 
 	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string,double>& sf_map);
@@ -181,7 +181,7 @@ private:
 	Eigen::VectorXd calc_gradient_vector_from_coeffs(const Parameters & _current_dv_values);
 
 	Eigen::VectorXd get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
-	
+
 	double get_obj_value(Parameters& _current_ctl_dv_vals, Observations& _current_obs);
 	map<string, double> get_obj_map(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
 
@@ -210,7 +210,7 @@ private:
 	void initialize_parcov();
 	void initialize_objfunc();
 	void queue_chance_runs();
-	
+
 	template<typename T, typename A>
 	void message(int level, const string &_message, vector<T, A> _extras, bool echo=true);
 	void message(int level, const string &_message);
