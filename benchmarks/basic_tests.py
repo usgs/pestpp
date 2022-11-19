@@ -1341,7 +1341,7 @@ def build_and_draw_prior(t_d="ends",num_reals=500):
 
 if __name__ == "__main__":
     mf6_v5_ies_test()
-    prep_ends()
+    #prep_ends()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
     #shutil.copy2(os.path.join("..", "exe", "windows", "x64", "Debug", "pestpp-ies.exe"),
     #             os.path.join("..", "bin", "win", "pestpp-ies.exe"))

@@ -2193,7 +2193,7 @@ void L2PhiHandler::report_group(bool echo) {
             pstd_map[g] = 0.0;
     }
     ofstream& f = file_manager->rec_ofstream();
-    int len = 20;
+    int len = 1;
     for (auto& o : obs_group_phi_map)
     {
         for (auto& oo : o.second)
@@ -2210,9 +2210,9 @@ void L2PhiHandler::report_group(bool echo) {
     ss << "  ---  observation group phi summary ---  " << endl;
     ss << "       (computed using 'actual' phi)" << endl;
     ss << "           (sorted by mean phi)" << endl;
-    ss << left << setw(len) << "group" << right << setw(15) << "mean" << setw(15) << "std";
-    ss << setw(15) << "min" << setw(15) << "max";
-    ss << setw(15) << "percent" << setw(15) << "std" << setw(15) << "min" << setw(15) << "max" << endl;
+    ss << left << setw(len) << "group" << right << setw(10) << "mean" << setw(10) << "std";
+    ss << setw(10) << "min" << setw(10) << "max";
+    ss << setw(10) << "percent" << setw(10) << "std" << endl; //<< setw(10) << "min " << setw(10) << "max " << endl;
     f << ss.str();
     if (echo)
         cout << ss.str();
@@ -2232,16 +2232,16 @@ void L2PhiHandler::report_group(bool echo) {
     {
         g = pair.first;
         ss.str("");
-        ss << left << setw(len) << pest_utils::lower_cp(g);
-        ss << right << setw(15) << mn_map[g];
-        ss << setw(15) << std_map[g];
-        ss << setw(15) << mmn_map[g];
-        ss << setw(15) << mx_map[g];
+        ss << left << setw(len) << pest_utils::lower_cp(g) << " ";
+        ss << right << setw(9) << mn_map[g] << " ";
+        ss << setw(9) << std_map[g] << " ";
+        ss << setw(9) << mmn_map[g] << " ";
+        ss << setw(9) << mx_map[g] << " ";
 
-        ss << setw(15) << 100. * pmn_map[g];
-        ss << setw(15) << 100. * pstd_map[g];
-        ss << setw(15) << 100. * pmmn_map[g];
-        ss << setw(15) << 100. * pmx_map[g];
+        ss << setw(9) << 100. * pmn_map[g] << " ";
+        ss << setw(9) << 100. * pstd_map[g];
+        //ss << setw(15) << 100. * pmmn_map[g];
+        //ss << setw(15) << 100. * pmx_map[g];
         ss << endl;
 
         f << ss.str();
