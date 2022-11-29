@@ -2066,7 +2066,7 @@ double L2PhiHandler::get_max(phiType pt)
 
 double L2PhiHandler::get_min(phiType pt)
 {
-	double mn = 1.0e+30;
+	double mn = numeric_limits<double>::max();//1.0e+30;
 	map<string, double>* phi_map = get_phi_map_ptr(pt);
 	map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
 	for (; pi != end; ++pi)
