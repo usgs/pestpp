@@ -1284,7 +1284,7 @@ void RunManagerPanther::echo()
 	if (!should_echo)
 		return;
 	map<string, int> stats_map = get_agent_stats();
-	cout << get_time_string_short() << " avg:" << setw(5) << setprecision(2) << left << get_global_runtime_minute()  << " runs("
+	cout << get_time_string_short() << " mn:" << setw(5) << setprecision(2) << left << get_global_runtime_minute()  << " runs("
 	     << "C" << setw(5) << left << model_runs_done
 		<< "|F" << setw(5) << left << model_runs_failed
 		<< "|T" << setw(5) << left << model_runs_timed_out << ") agents("
