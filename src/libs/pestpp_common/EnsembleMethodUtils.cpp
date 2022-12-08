@@ -6287,13 +6287,13 @@ bool EnsembleMethod::initialize_weights()
 	string weight_csv = pest_scenario.get_pestpp_options().get_ies_weights_csv();
 	bool drawn = false;
     Eigen::VectorXd wvec(act_obs_names.size());
+
     int i = 0;
     for (auto& n : act_obs_names)
     {
         wvec[i] = pest_scenario.get_observation_info_ptr()->get_weight(n);
         i++;
     }
-
 
 	if (weight_csv.size() == 0) {
         int num_reals = oe.shape().first;
@@ -6361,9 +6361,16 @@ bool EnsembleMethod::initialize_weights()
         {
 		    if ((missing.size() == 1) && (missing[0] == BASE_REAL_NAME) && (pest_scenario.get_pestpp_options().get_ies_include_base()))
             {
+		        message(2,"'base' realization missing from weight ensemble, replacing last realizations with 'base'");
+                Eigen::VectorXd wvec_full(weights.get_var_names().size());
+                i = 0;
+                for (auto& n : weights.get_var_names()) {
+                    wvec_full[i] = pest_scenario.get_observation_info_ptr()->get_weight(n);
+                    i++;
+                }
                 vector<int> drop{ weights.shape().first - 1 };
                 weights.drop_rows(drop);
-                weights.append(BASE_REAL_NAME, wvec);
+                weights.append(BASE_REAL_NAME, wvec_full);
             }
 		    else {
                 ss.str("");
