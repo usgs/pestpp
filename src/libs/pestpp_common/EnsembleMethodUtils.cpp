@@ -4210,6 +4210,15 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		message(1, "calculating mean parameter values");
 		Parameters pars;
 		vector<double> mv = pe.get_mean_stl_var_vector();
+		if (pe.get_fixed_info().get_map_size() > 0)
+        {
+		    ss.str("");
+		    ss << "WARNING: 'fixed' parameter realizations provided but ctrl " << endl;
+            ss << "         file parameter values are being used for 'fixed' parameters" << endl;
+            ss << "         in the mean parameter value run." << endl;
+		    message(0,ss.str());
+        }
+
 		pars.update(pe.get_var_names(), pe.get_mean_stl_var_vector());
 		ParamTransformSeq pts = pe.get_par_transform();
 
