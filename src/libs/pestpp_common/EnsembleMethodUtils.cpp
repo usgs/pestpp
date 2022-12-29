@@ -1025,6 +1025,13 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 
 		obs_diff = scale * (weights * obs_diff);
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
+        if (verbose_level > 1) {
+            Eigen::MatrixXd temp = parcov_inv.toDenseMatrix();
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp );
+            ss.str("");
+            ss << "solution scaling factor: " << scale;
+            performance_log->log_event(ss.str());
+        }
 		if (use_prior_scaling)
 			par_diff = scale * parcov_inv * par_diff;
 		else
@@ -1326,11 +1333,19 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
         Eigen::MatrixXd ivec, s, s2, V, Ut, d_dash;
         string key;
         obs_resid = weights * obs_resid;
-        int num_reals = par_resid.rows();
+        int num_reals = par_resid.cols();
         double scale = (1.0 / (sqrt(double(num_reals - 1))));
         obs_diff = scale * (weights * obs_diff);
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
+        if (verbose_level > 1) {
+            Eigen::MatrixXd temp = parcov_inv.toDenseMatrix();
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp );
+            ss.str("");
+            ss << "solution scaling factor: " << scale;
+            cout << ss.str() << endl;
+        }
         if (use_prior_scaling)
+
             par_diff = scale * parcov_inv * par_diff;
         else
             par_diff = scale * par_diff;
@@ -7332,7 +7347,7 @@ Eigen::MatrixXd EnsembleMethod::get_Am(const vector<string>& real_names, const v
 	par_diff.transposeInPlace();
 	if (verbose_level > 1)
 	{
-		cout << "prior_par_diff: " << par_diff.rows() << ',' << par_diff.cols() << endl;
+		cout << "prior_par_diff shape: " << par_diff.rows() << ',' << par_diff.cols() << endl;
 		if (verbose_level > 2)
 			save_mat("prior_par_diff.dat", par_diff);
 	}
