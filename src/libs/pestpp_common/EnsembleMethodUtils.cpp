@@ -1340,9 +1340,9 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
         if (verbose_level > 1) {
             Eigen::MatrixXd temp = parcov_inv.toDenseMatrix();
             local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp );
-            ss.str("");
-            ss << "solution scaling factor: " << scale;
-            cout << ss.str() << endl;
+//            ss.str("");
+//            ss << "solution scaling factor: " << scale;
+//            cout << ss.str() << endl;
         }
         if (use_prior_scaling)
 
