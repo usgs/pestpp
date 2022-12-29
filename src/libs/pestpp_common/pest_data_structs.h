@@ -819,8 +819,6 @@ private:
 	bool da_use_simulated_states;
 	string da_noptmax_schedule;
 
-	
-
 	// End of Data Assimilation Parameters
 
 	string gsa_method;

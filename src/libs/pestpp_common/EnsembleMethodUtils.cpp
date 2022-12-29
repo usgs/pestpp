@@ -36,12 +36,17 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
     iter = _iter;
     verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
     //prep the fast look par cov info
-    message(1,"preparing fast-look containers for threaded localization solve");
-    initialize();
+
+    if (localizer.get_use())
+    {
+        message(1,"preparing fast-look containers for threaded localization solve");
+        initialize_for_localized_solve();
+    }
+
 }
 
 
-void EnsembleSolver::initialize(string center_on, vector<int> real_idxs)
+void EnsembleSolver::initialize_for_localized_solve(string center_on, vector<int> real_idxs)
 {
     vector<string> pe_real_names = pe.get_real_names();
     vector<string> oe_real_names = oe.get_real_names();
@@ -57,7 +62,6 @@ void EnsembleSolver::initialize(string center_on, vector<int> real_idxs)
     }
     else
     {
-
         for (auto ri : real_idxs)
         {
             t.push_back(pe_real_names[ri]);
@@ -70,10 +74,7 @@ void EnsembleSolver::initialize(string center_on, vector<int> real_idxs)
         }
         oe_real_names = t;
         t.clear();
-
     }
-
-
 
 	parcov_inv_map.clear();
 	parcov_inv_map.reserve(pe.shape().second);
@@ -235,6 +236,8 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
     typedef std::set<std::pair<std::string, double>, Comparator>::iterator sortedset_iter;
 
     int subset_size = (int)(((double)pe.shape().first) * mm_alpha);
+    if (subset_size <= 0)
+        throw runtime_error("solve_multimodal error: subsize size zero or negative");
     ss.str("");
     ss << "multimodal upgrade using " << subset_size << " realizations";
     performance_log->log_event(ss.str());
@@ -274,7 +277,9 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
 
     for (int i=0;i<pe.shape().first;i++) {
         real_name = real_names[i];
-        performance_log->log_event("calculating multimodal upgrade for " + real_name);
+
+        performance_log->log_event("calculating realization neighborhood for " + real_name);
+
         euclid_par_dist.clear();
         real = pe.get_real_vector(real_name);
 
@@ -300,9 +305,9 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
         //flip to map to par realization names
         map<string,double> par_phi_map;
         vector<string> oreal_names = oe.get_real_names(),preal_names=pe.get_real_names();
-        for (int i=0;i<oreal_names.size();i++)
+        for (int ii=0;ii<oreal_names.size();ii++)
         {
-            par_phi_map[preal_names[i]] = phi_map.at(oreal_names[i]);
+            par_phi_map[preal_names[ii]] = phi_map.at(oreal_names[ii]);
         }
         phi_map.clear();
 
@@ -373,21 +378,37 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
 
             csv << endl;
         }
-        initialize(string(),real_idxs);
-        //reset the weight map
-        weight_map.clear();
-        weight_map.reserve(q_vec.size());
-        iii = 0;
-        for (auto& name : act_obs_names)
-        {
-            weight_map[name] = q_vec[iii];
-            iii++;
-        }
-
 
         ParameterEnsemble pe_real(&pest_scenario,pe.get_rand_gen_ptr());
         pe_real.reserve(upgrade_real_names,pe.get_var_names());
-        solve(num_threads,cur_lam,use_glm_form,pe_real,loc_map);
+
+        if (!localizer.get_use())
+        {
+            performance_log->log_event("calculating nonlocalized multimodal upgrade for " + real_name);
+            //get weights here
+            //Eigen::DiagonalMatrix<double, Eigen::Dynamic> weights(q_vec);
+            nonlocalized_solve(cur_lam,use_glm_form,pe_real,real_name,real_idxs,q_vec);
+            //solve(num_threads,cur_lam,use_glm_form,pe_real,loc_map);
+        }
+        else
+        {
+            performance_log->log_event("re-initializing solver for localized multimodal upgrade for " + real_name);
+            initialize_for_localized_solve(string(),real_idxs);
+            //reset the weight map
+            weight_map.clear();
+            weight_map.reserve(q_vec.size());
+            iii = 0;
+            for (auto& name : act_obs_names)
+            {
+                weight_map[name] = q_vec[iii];
+                iii++;
+            }
+            performance_log->log_event("calculating localized multimodal upgrade for " + real_name);
+
+            solve(num_threads,cur_lam,use_glm_form,pe_real,loc_map);
+        }
+
+
         real = pe_real.get_real_vector(real_name);
         //cout << real << endl;
         pe_upgrade.update_real_ip(real_name,real);
@@ -413,6 +434,96 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
 
 }
 
+void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, ParameterEnsemble& pe_upgrade,
+                        string center_on, vector<int> real_idxs,Eigen::VectorXd q_vec)
+{
+    pe_upgrade.set_zeros();
+    if (real_idxs.size() == 0)
+    {
+        for (int i = 0;i<pe_upgrade.shape().first;i++)
+            real_idxs.push_back(i);
+    }
+    vector<string> names = oe.get_real_names();
+    vector<string> oe_real_names;
+    for (auto i : real_idxs)
+        oe_real_names.push_back(names[i]);
+    vector<string> pe_real_names = pe_upgrade.get_real_names();
+
+    Eigen::MatrixXd obs_resid = ph.get_obs_resid_subset(oe,true,oe_real_names);
+
+    Eigen::MatrixXd obs_diff = oe.get_eigen_anomalies(oe_real_names, act_obs_names, center_on);
+
+    Eigen::MatrixXd obs_err = base_oe.get_eigen(oe_real_names, act_obs_names);
+    Observations ctl_obs = pest_scenario.get_ctl_observations();
+    for (int j = 0; j < act_obs_names.size(); j++)
+    {
+        obs_err.col(j) = obs_err.col(j).array() - ctl_obs.get_rec(act_obs_names[j]);
+    }
+    Eigen::MatrixXd par_resid = ph.get_par_resid_subset(pe,pe_real_names);
+
+    Eigen::MatrixXd par_diff = pe.get_eigen_anomalies(pe_real_names,act_par_names,center_on);
+    int maxsing = pest_scenario.get_svd_info().maxsing;
+    bool use_prior_scaling = pest_scenario.get_pestpp_options().get_ies_use_prior_scaling();
+    bool use_approx = pest_scenario.get_pestpp_options().get_ies_use_approx();
+    double eigthresh = pest_scenario.get_svd_info().eigthresh;
+    if (q_vec.size() == 0)
+    {
+        q_vec.resize(act_obs_names.size());
+        if ((center_on.size() > 0) && (center_on != MEDIAN_CENTER_ON_NAME))
+        {
+
+            map<string, int> oreal_map = oe.get_real_map();
+            int ireal = oreal_map.at(center_on);
+            map<string, int> ovar_map = oe.get_var_map();
+            int ii = 0;
+            for (auto &aon : act_obs_names)
+            {
+                q_vec[ii] = weights.get_eigen_ptr()->coeff(ireal, ovar_map.at(aon));
+                ii++;
+            }
+        }
+        else
+        {
+            int ii = 0;
+            ObservationInfo *oi_ptr = pest_scenario.get_observation_info_ptr();
+            for (auto &aon : act_obs_names) {
+                q_vec[ii] = oi_ptr->get_weight(aon);
+                ii++;
+            }
+        }
+    }
+    Eigen::DiagonalMatrix<double, Eigen::Dynamic> local_weights(q_vec);
+
+    Eigen::VectorXd parcov_inv_vec;// = parcov.get(par_names).inv().e_ptr()->toDense().cwiseSqrt().asDiagonal();
+    if (parcov.get_row_names().size() != act_par_names.size())
+    {
+        throw runtime_error("parcov not aligned with act par names");
+    }
+    if (parcov.isdiagonal())
+    {
+        parcov_inv_vec = parcov.get_matrix().diagonal();
+    }
+    else
+    {
+        Covariance parcov_diag;
+        parcov_diag.from_diagonal(parcov);
+        parcov_inv_vec = parcov_diag.get_matrix().diagonal();
+    }
+    parcov_inv_vec = parcov_inv_vec.cwiseSqrt().cwiseInverse();
+    Eigen::DiagonalMatrix<double, Eigen::Dynamic> parcov_inv(parcov_inv_vec);
+    Eigen::MatrixXd upgrade_1;
+    par_diff.transposeInPlace();
+    obs_diff.transposeInPlace();
+    obs_resid.transposeInPlace();
+    par_resid.transposeInPlace();
+    obs_err.transposeInPlace();
+    ensemble_solution(iter,verbose_level,maxsing,0,0,use_prior_scaling,use_approx,use_glm_form,cur_lam,eigthresh,par_resid,
+                      par_diff,Am,obs_resid,obs_diff,upgrade_1,obs_err,local_weights,parcov_inv);
+    pe_upgrade.add_2_cols_ip(act_par_names, upgrade_1);
+
+
+}
+
 void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map)
 {
 
@@ -421,6 +532,12 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 //		message(1, "using glm form");
 //	else
 //		message(1, "using mda form");
+    if (!localizer.get_use())
+    {
+        string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
+        nonlocalized_solve(cur_lam,use_glm_form,pe_upgrade,center_on);
+        return;
+    }
 	pe_upgrade.set_zeros();
 	stringstream ss;
 	Localizer::How _how = localizer.get_how();
@@ -905,7 +1022,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 	//----------------------------------
 	else
 	{
-		
+
 		obs_diff = scale * (weights * obs_diff);
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
 		if (use_prior_scaling)
@@ -1088,12 +1205,12 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 }
 
 
-void glm_solution(const int iter, const int verbose_level,const int maxsing, const bool
-                use_prior_scaling,const bool use_approx, const double cur_lam,
-                const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
-                Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
-                const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
-                const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv)
+void ensemble_solution(const int iter, const int verbose_level,const int maxsing, const int thread_id, const int t_count, const bool
+                        use_prior_scaling,const bool use_approx, const bool use_glm, const double cur_lam,
+                        const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
+                        Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
+                        Eigen::MatrixXd& obs_err, const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
+                        const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv)
 {
     class local_utils
     {
@@ -1130,96 +1247,164 @@ void glm_solution(const int iter, const int verbose_level,const int maxsing, con
     };
 
     stringstream ss;
-
-    Eigen::MatrixXd ivec, s, s2, V, Ut, d_dash;
-    string key;
-    obs_resid = weights * obs_resid;
-    int num_reals = par_resid.rows();
-    double scale = (1.0 / (sqrt(double(num_reals - 1))));
-    obs_diff = scale * (weights * obs_diff);
-    int thread_id = 0;
-    int t_count = 0;
-    local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
-    if (use_prior_scaling)
-        par_diff = scale * parcov_inv * par_diff;
-    else
-        par_diff = scale * par_diff;
-    local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_par_diff", par_diff);
-    SVD_REDSVD rsvd;
-    rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
-
-    Ut.transposeInPlace();
-    obs_diff.resize(0, 0);
-    local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Ut", Ut);
-    local_utils::save_mat(verbose_level, thread_id, iter, t_count, "s", s);
-    local_utils::save_mat(verbose_level, thread_id, iter, t_count, "V", V);
-
-    s2 = s.cwiseProduct(s);
-
-    ivec = ((Eigen::VectorXd::Ones(s2.size()) * (cur_lam + 1.0)) + s2).asDiagonal().inverse();
-    local_utils::save_mat(verbose_level, thread_id, iter, t_count, "ivec", ivec);
-
-    Eigen::MatrixXd X1 = Ut * obs_resid;
-    local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
-
-    Eigen::MatrixXd X2 = ivec * X1;
-    X1.resize(0, 0);
-    local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X2", X2);
-
-    Eigen::MatrixXd X3 = V * s.asDiagonal() * X2;
-    X2.resize(0, 0);
-    local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X3", X3);
-    upgrade_1 = -1.0 * par_diff * X3;
-
-    if (use_prior_scaling)
+    if (!use_glm)
     {
-        //upgrade_1 = parcov_inv * upgrade_1;
-    }
-
-    upgrade_1.transposeInPlace();
-    local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
-    X3.resize(0, 0);
-
-    Eigen::MatrixXd upgrade_2;
-    if ((!use_approx) && (iter > 1))
-    {
-        if (use_prior_scaling)
+        if (true)
         {
-            par_resid = parcov_inv * par_resid;
-        }
+            // Low rank Cee. Section 14.3.2 Evenson Book
+            obs_err = obs_err.colwise() - obs_err.rowwise().mean();
+            obs_err = sqrt(cur_lam) * obs_err;
+            Eigen::MatrixXd s0, V0, U0, s0_i;
+            SVD_REDSVD rsvd;
+            rsvd.solve_ip(obs_diff, s0, U0, V0, eigthresh, maxsing);
+            s0_i = s0.asDiagonal().inverse();
+            Eigen::MatrixXd X0 = U0.transpose() * obs_err;
+            X0 = s0_i * X0;
+            Eigen::MatrixXd s1, V1, U1, s1_2, s1_2i;
+            rsvd.solve_ip(X0, s1, U1, V1, 0, maxsing);
 
-        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Am", Am);
-        Eigen::MatrixXd x4 = Am.transpose() * par_resid;
-        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X4", x4);
+            s1_2 = s1.cwiseProduct(s1);
+            s1_2i = (Eigen::VectorXd::Ones(s1_2.size()) + s1_2).asDiagonal().inverse();
+            Eigen::MatrixXd X1 = s0_i * U1;
+            X1 = U0 * X1;
 
-        par_resid.resize(0, 0);
+            Eigen::MatrixXd X4 = s1_2i * X1.transpose();
+            Eigen::MatrixXd X2 = X4 * obs_resid;
+            Eigen::MatrixXd X3 = X1 * X2;
 
-        Eigen::MatrixXd x5 = Am * x4;
-        x4.resize(0, 0);
-        Am.resize(0, 0);
+            X3 = obs_diff.transpose() * X3;
+            upgrade_1 = -1 * par_diff * X3;
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
+            upgrade_1.transposeInPlace();
 
-        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X5", x5);
-        Eigen::MatrixXd x6 = par_diff.transpose() * x5;
-        x5.resize(0, 0);
-
-        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X6", x6);
-        Eigen::MatrixXd x7 = V * ivec * V.transpose() * x6;
-        x6.resize(0, 0);
-
-        if (use_prior_scaling)
-        {
-            upgrade_2 = -1.0 * parcov_inv * par_diff * x7;
         }
         else
         {
-            upgrade_2 = -1.0 * (par_diff * x7);
+            // Use when ensemble size is larger than number of observation.
+            // This is a good option when number of observation is small
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_err", obs_err);
+            obs_err = obs_err.colwise() - obs_err.rowwise().mean();
+
+            Eigen::MatrixXd s2_, s, V, U, cum_sum;
+            SVD_REDSVD rsvd;
+            Eigen::MatrixXd C;
+            C = obs_diff + (sqrt(cur_lam) * obs_err); // curr_lam is the inflation factor
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "C", C);
+            Eigen::VectorXd s2;
+
+
+            rsvd.solve_ip(C, s, U, V, eigthresh, maxsing);
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "s", s);
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "U", U);
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "V", V);
+            s2 = s.cwiseProduct(s);
+            s2_ = s2.asDiagonal().inverse();
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "inv_s2_", s2_);
+
+
+            Eigen::MatrixXd X1 = s2_ * U.transpose();
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
+
+            X1 = X1 * obs_resid;
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1_obs_resid", X1);
+
+            X1 = U * X1;
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "U_X1", X1);
+
+            X1 = obs_diff.transpose() * X1;
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff_X1", X1);
+
+            upgrade_1 = -1 * par_diff * X1;
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
+            upgrade_1.transposeInPlace();
         }
-        x7.resize(0, 0);
 
-        upgrade_1 = upgrade_1 + upgrade_2.transpose();
-        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_2", upgrade_2);
-        upgrade_2.resize(0, 0);
+    }
+    else
+    {
 
+        Eigen::MatrixXd ivec, s, s2, V, Ut, d_dash;
+        string key;
+        obs_resid = weights * obs_resid;
+        int num_reals = par_resid.rows();
+        double scale = (1.0 / (sqrt(double(num_reals - 1))));
+        obs_diff = scale * (weights * obs_diff);
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
+        if (use_prior_scaling)
+            par_diff = scale * parcov_inv * par_diff;
+        else
+            par_diff = scale * par_diff;
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_par_diff", par_diff);
+        SVD_REDSVD rsvd;
+        rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
+
+        Ut.transposeInPlace();
+        obs_diff.resize(0, 0);
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Ut", Ut);
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "s", s);
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "V", V);
+
+        s2 = s.cwiseProduct(s);
+
+        ivec = ((Eigen::VectorXd::Ones(s2.size()) * (cur_lam + 1.0)) + s2).asDiagonal().inverse();
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "ivec", ivec);
+
+        Eigen::MatrixXd X1 = Ut * obs_resid;
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
+
+        Eigen::MatrixXd X2 = ivec * X1;
+        X1.resize(0, 0);
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X2", X2);
+
+        Eigen::MatrixXd X3 = V * s.asDiagonal() * X2;
+        X2.resize(0, 0);
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X3", X3);
+        upgrade_1 = -1.0 * par_diff * X3;
+
+        if (use_prior_scaling) {
+            //upgrade_1 = parcov_inv * upgrade_1;
+        }
+
+        upgrade_1.transposeInPlace();
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
+        X3.resize(0, 0);
+
+        Eigen::MatrixXd upgrade_2;
+        if ((!use_approx) && (iter > 1)) {
+            if (use_prior_scaling) {
+                par_resid = parcov_inv * par_resid;
+            }
+
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "Am", Am);
+            Eigen::MatrixXd x4 = Am.transpose() * par_resid;
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X4", x4);
+
+            par_resid.resize(0, 0);
+
+            Eigen::MatrixXd x5 = Am * x4;
+            x4.resize(0, 0);
+            Am.resize(0, 0);
+
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X5", x5);
+            Eigen::MatrixXd x6 = par_diff.transpose() * x5;
+            x5.resize(0, 0);
+
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X6", x6);
+            Eigen::MatrixXd x7 = V * ivec * V.transpose() * x6;
+            x6.resize(0, 0);
+
+            if (use_prior_scaling) {
+                upgrade_2 = -1.0 * parcov_inv * par_diff * x7;
+            } else {
+                upgrade_2 = -1.0 * (par_diff * x7);
+            }
+            x7.resize(0, 0);
+
+            upgrade_1 = upgrade_1 + upgrade_2.transpose();
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_2", upgrade_2);
+            upgrade_2.resize(0, 0);
+
+        }
     }
 }
 
@@ -1382,7 +1567,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 					//	use_localizer = true;
 					use_localizer = true;
 				}
-				if (count % 1000 == 0)
+				if ((count % 1000 == 0) && (count > 0))
 				{
 					ss.str("");
 					ss << "upgrade thread progress: " << count << " of " << total << " parts done";
@@ -1397,45 +1582,6 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				break;
 			}
 		}
-
-		//check here that the names in the case match the names passed - this is needed for seq da
-		/*vector<string> t;
-		set<string>::iterator end = sorg_par_names.end();
-		for (auto& par_name : par_names)
-			if (sorg_par_names.find(par_name) != end)
-				t.push_back(par_name);
-		if (t.size() == 0)
-		{
-			ss.str("");
-			ss << "thread " << thread_id << " processing case " << key << " - no par_names in case found in act_par_names";
-			throw runtime_error(ss.str());
-		}
-		if (t.size() != par_names.size())
-		{
-			f_thread << "par_names for case " << key << "reduced from " << par_names.size() << " to " << t.size() << endl;
-		}
-		par_names = t;
-
-		t.clear();
-		end = sorg_obs_names.end();
-		for (auto& obs_name : obs_names)
-			if (sorg_obs_names.find(obs_name) != end)
-				t.push_back(obs_name);
-		if (t.size() == 0)
-		{
-			ss.str("");
-			ss << "thread " << thread_id << " processing case " << key << " - no obs_names in case found in act_obs_names";
-			throw runtime_error(ss.str());
-		}
-		if (t.size() != obs_names.size())
-		{
-			f_thread << "obs_names for case " << key << "reduced from " << obs_names.size() << " to " << t.size() << endl;
-		}
-		obs_names = t;
-		t.clear();*/
-
-
-
 
 		if (verbose_level > 2)
 		{
@@ -1592,95 +1738,104 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				obs_diff = obs_diff.cwiseProduct(loc);
 		}
 
-		Eigen::MatrixXd ivec, upgrade_1, s, s2, V, Ut, d_dash;
+        Eigen::MatrixXd upgrade_1;
+//        void ensemble_solution(const int iter, const int verbose_level,const int maxsing, const int thread_id, const int t_count, const bool
+//        use_prior_scaling,const bool use_approx, const bool use_glm, const double cur_lam,
+//                               const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
+//                               Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
+//                               Eigen::MatrixXd& obs_err, const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
+//                               const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv)
+        ensemble_solution(iter,verbose_level,maxsing,thread_id,t_count, use_prior_scaling,use_approx,use_glm_form,cur_lam,eigthresh,par_resid,par_diff,Am,obs_resid,
+                          obs_diff,upgrade_1,obs_err,weights,parcov_inv);
+
+		//Eigen::MatrixXd ivec, upgrade_1, s, s2, V, Ut, d_dash;
 
 		//----------------------------------
 		//es-mda solution
 		//----------------------------------
 		
-		if (!use_glm_form)
-		{
-			if (true)
-			{
-                // Low rank Cee. Section 14.3.2 Evenson Book
-				obs_err = obs_err.colwise() - obs_err.rowwise().mean();
-				obs_err = sqrt(cur_lam) * obs_err;
-				Eigen::MatrixXd s0, V0, U0, s0_i;
-				SVD_REDSVD rsvd;
-				rsvd.solve_ip(obs_diff, s0, U0, V0, eigthresh, maxsing);
-				s0_i = s0.asDiagonal().inverse();
-				Eigen::MatrixXd X0 = U0.transpose() * obs_err;
-				X0 = s0_i * X0;
-				Eigen::MatrixXd s1, V1, U1, s1_2, s1_2i;
-				rsvd.solve_ip(X0, s1, U1, V1, 0, maxsing);
-
-				s1_2 = s1.cwiseProduct(s1);
-				s1_2i = (Eigen::VectorXd::Ones(s1_2.size()) + s1_2).asDiagonal().inverse();
-				Eigen::MatrixXd X1 = s0_i * U1;
-				X1 = U0 * X1;
-
-				Eigen::MatrixXd X4 = s1_2i * X1.transpose();
-				Eigen::MatrixXd X2 = X4 * obs_resid;
-				Eigen::MatrixXd X3 = X1 * X2;
-
-				X3 = obs_diff.transpose() * X3;
-				upgrade_1 = -1 * par_diff * X3;
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
-				upgrade_1.transposeInPlace();
-
-			}
-			else
-			{
-				// Use when ensemble size is larger than number of observation. 
-				// This is a good option when number of observation is small
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_err", obs_err);
-				obs_err = obs_err.colwise() - obs_err.rowwise().mean();
-
-				Eigen::MatrixXd s2_, s, V, U, cum_sum;
-				SVD_REDSVD rsvd;
-				Eigen::MatrixXd C;
-				C = obs_diff + (sqrt(cur_lam) * obs_err); // curr_lam is the inflation factor 	
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "C", C);
-				Eigen::VectorXd s2;
-
-
-				rsvd.solve_ip(C, s, U, V, eigthresh, maxsing);
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "s", s);
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "U", U);
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "V", V);
-				s2 = s.cwiseProduct(s);
-				s2_ = s2.asDiagonal().inverse();
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "inv_s2_", s2_);
-
-
-				Eigen::MatrixXd X1 = s2_ * U.transpose();
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
-
-				X1 = X1 * obs_resid;
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1_obs_resid", X1);
-
-				X1 = U * X1;
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "U_X1", X1);
-
-				X1 = obs_diff.transpose() * X1;
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff_X1", X1);
-
-				upgrade_1 = -1 * par_diff * X1;
-				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
-				upgrade_1.transposeInPlace();
-			}		
-			
-			
-		}
-
+//		if (!use_glm_form)
+//		{
+//			if (true)
+//			{
+//                // Low rank Cee. Section 14.3.2 Evenson Book
+//				obs_err = obs_err.colwise() - obs_err.rowwise().mean();
+//				obs_err = sqrt(cur_lam) * obs_err;
+//				Eigen::MatrixXd s0, V0, U0, s0_i;
+//				SVD_REDSVD rsvd;
+//				rsvd.solve_ip(obs_diff, s0, U0, V0, eigthresh, maxsing);
+//				s0_i = s0.asDiagonal().inverse();
+//				Eigen::MatrixXd X0 = U0.transpose() * obs_err;
+//				X0 = s0_i * X0;
+//				Eigen::MatrixXd s1, V1, U1, s1_2, s1_2i;
+//				rsvd.solve_ip(X0, s1, U1, V1, 0, maxsing);
+//
+//				s1_2 = s1.cwiseProduct(s1);
+//				s1_2i = (Eigen::VectorXd::Ones(s1_2.size()) + s1_2).asDiagonal().inverse();
+//				Eigen::MatrixXd X1 = s0_i * U1;
+//				X1 = U0 * X1;
+//
+//				Eigen::MatrixXd X4 = s1_2i * X1.transpose();
+//				Eigen::MatrixXd X2 = X4 * obs_resid;
+//				Eigen::MatrixXd X3 = X1 * X2;
+//
+//				X3 = obs_diff.transpose() * X3;
+//				upgrade_1 = -1 * par_diff * X3;
+//				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
+//				upgrade_1.transposeInPlace();
+//
+//			}
+//			else
+//			{
+//				// Use when ensemble size is larger than number of observation.
+//				// This is a good option when number of observation is small
+//				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_err", obs_err);
+//				obs_err = obs_err.colwise() - obs_err.rowwise().mean();
+//
+//				Eigen::MatrixXd s2_, s, V, U, cum_sum;
+//				SVD_REDSVD rsvd;
+//				Eigen::MatrixXd C;
+//				C = obs_diff + (sqrt(cur_lam) * obs_err); // curr_lam is the inflation factor
+//				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "C", C);
+//				Eigen::VectorXd s2;
+//
+//
+//				rsvd.solve_ip(C, s, U, V, eigthresh, maxsing);
+//				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "s", s);
+//				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "U", U);
+//				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "V", V);
+//				s2 = s.cwiseProduct(s);
+//				s2_ = s2.asDiagonal().inverse();
+//				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "inv_s2_", s2_);
+//
+//
+//				Eigen::MatrixXd X1 = s2_ * U.transpose();
+//				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1", X1);
+//
+//				X1 = X1 * obs_resid;
+//				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X1_obs_resid", X1);
+//
+//				X1 = U * X1;
+//				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "U_X1", X1);
+//
+//				X1 = obs_diff.transpose() * X1;
+//				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff_X1", X1);
+//
+//				upgrade_1 = -1 * par_diff * X1;
+//				local_utils::save_mat(verbose_level, thread_id, iter, t_count, "upgrade_1", upgrade_1);
+//				upgrade_1.transposeInPlace();
+//			}
+//
+//
+//		}
+//
 
 		//----------------------------------
 		//glm solution
 		//----------------------------------
-		else
-		{
-            glm_solution(iter,verbose_level,maxsing,use_prior_scaling,use_approx,cur_lam,eigthresh,par_resid,par_diff,Am,obs_resid,
-                         obs_diff,upgrade_1,weights,parcov_inv);
+//		else
+//		{
+
 //			obs_resid = weights * obs_resid;
 //			obs_diff = scale * (weights * obs_diff);
 //			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
@@ -1765,7 +1920,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 //				upgrade_2.resize(0, 0);
 //
 //			}
-		}
+//		}
 		
 		while (true)
 		{

@@ -185,8 +185,9 @@ private:
 	template<typename T>
 	void message(int level, const string& _message, T extra);
 
-	void initialize(string center_on = string(), vector<int> real_idxs=vector<int>());
-
+	void initialize_for_localized_solve(string center_on = string(), vector<int> real_idxs=vector<int>());
+	void nonlocalized_solve(double cur_lam,bool use_glm_form, ParameterEnsemble& pe_upgrade,
+                         string center_on=string(), vector<int> real_idxs=vector<int>(),Eigen::VectorXd q_vec=Eigen::VectorXd());
 
 };
 
@@ -226,13 +227,14 @@ protected:
 
 };
 
-void glm_solution(const int iter, const int verbose_level,const int maxsing, const bool
-                  use_prior_scaling,const bool use_approx, const double cur_lam,
+void ensemble_solution(const int iter, const int verbose_level,const int maxsing,  const int thread_id,
+                       const int t_count, const bool
+                  use_prior_scaling,const bool use_approx, const bool use_glm, const double cur_lam,
                   const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
                   Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
+                  Eigen::MatrixXd& obs_err,
                   const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
                   const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv);
-void mda_solution();
 
 class CovLocalizationUpgradeThread : public UpgradeThread
 {
