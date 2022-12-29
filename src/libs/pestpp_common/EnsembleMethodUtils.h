@@ -226,6 +226,14 @@ protected:
 
 };
 
+void glm_solution(const int iter, const int verbose_level,const int maxsing, const bool
+                  use_prior_scaling,const bool use_approx, const double cur_lam,
+                  const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
+                  Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
+                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
+                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv);
+void mda_solution();
+
 class CovLocalizationUpgradeThread : public UpgradeThread
 {
 public:
