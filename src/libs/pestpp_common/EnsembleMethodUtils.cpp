@@ -1208,7 +1208,7 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 void ensemble_solution(const int iter, const int verbose_level,const int maxsing, const int thread_id, const int t_count, const bool
                         use_prior_scaling,const bool use_approx, const bool use_glm, const double cur_lam,
                         const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
-                        Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
+                        const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
                         Eigen::MatrixXd& obs_err, const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
                         const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv)
 {
@@ -1383,7 +1383,7 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
 
             Eigen::MatrixXd x5 = Am * x4;
             x4.resize(0, 0);
-            Am.resize(0, 0);
+            //Am.resize(0, 0);
 
             local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X5", x5);
             Eigen::MatrixXd x6 = par_diff.transpose() * x5;
