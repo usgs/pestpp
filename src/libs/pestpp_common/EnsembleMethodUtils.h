@@ -158,6 +158,7 @@ public:
 	void solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
     void solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,
                         pair<vector<string>, vector<string>>>& loc_map, double mm_alpha);
+    void update_multimodal_components(const double mm_alpha);
 
 
 private:
@@ -176,6 +177,8 @@ private:
 	unordered_map<string, Eigen::VectorXd> par_diff_map, obs_diff_map, obs_err_map;
 	unordered_map<string, double> weight_map;
 	unordered_map<string, double> parcov_inv_map;
+	unordered_map<string,vector<int>> mm_real_idx_map;
+    unordered_map<string,Eigen::VectorXd> mm_q_vec_map;
 	//unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	vector<string>& act_par_names, act_obs_names;
 	template<typename T, typename A>

@@ -45,6 +45,162 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 
 }
 
+void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
+    mm_real_idx_map.clear();
+    mm_q_vec_map.clear();
+
+    stringstream ss;
+    //util functions
+    typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
+    // Defining a lambda function to compare two pairs. It will compare two pairs using second field
+    Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2) {
+        return elem1.second < elem2.second;
+    };
+    typedef std::set<std::pair<std::string, double>, Comparator> sortedset;
+    typedef std::set<std::pair<std::string, double>, Comparator>::iterator sortedset_iter;
+
+    int subset_size = (int) (((double) pe.shape().first) * mm_alpha);
+    if (subset_size <= 0)
+        throw runtime_error("solve_multimodal error: subsize size zero or negative");
+    ss.str("");
+    ss << "calculating multimodal neighborhoods with " << subset_size << " realizations";
+    performance_log->log_event(ss.str());
+
+    vector<string> real_names = pe.get_real_names(), oreal_names = oe.get_real_names(), upgrade_real_names;
+    string real_name, oreal_name;
+
+    map<string, double> euclid_par_dist;
+    Eigen::VectorXd real, diff;
+    Eigen::SparseMatrix<double> parcov_inv = parcov.inv().get_matrix();
+    double edist;
+    map<string, int> real_map = pe.get_real_map();
+    oe.update_var_map();
+    map<string, int> ovar_map = oe.get_var_map();
+
+    vector<int> real_idxs;
+    //Eigen::MatrixXd* real_ptr = pe_upgrade.get_eigen_ptr_4_mod();
+
+    ofstream csv;
+    if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1) {
+        ss.str("");
+        ss << file_manager.get_base_filename() << "." << iter << "." << ".mm.info.csv";
+        csv.open(ss.str());
+        csv << "real_name";
+        for (int j = 0; j < subset_size; j++) {
+            csv << ",neighbor_" << j << ",phi,pdiff";
+        }
+        csv << endl;
+
+    }
+
+    for (int i = 0; i < pe.shape().first; i++) {
+        real_name = real_names[i];
+
+        performance_log->log_event("calculating multimodal neighborhood for realization " + real_name);
+
+        euclid_par_dist.clear();
+        real = pe.get_real_vector(real_name);
+
+        //get the phi map for this realization using the weights vector for this realization
+        oreal_name = oreal_names[i];
+        performance_log->log_event("...getting weights");
+        Eigen::VectorXd q_vec(act_obs_names.size());
+        int ii = 0;
+        for (auto &aon : act_obs_names) {
+            q_vec[ii] = weights.get_eigen_ptr()->coeff(i, ovar_map.at(aon));
+            ii++;
+        }
+        performance_log->log_event("...getting phi vector");
+        map<string, double> phi_map = ph.get_meas_phi(oe, q_vec);
+        double mx = -1.0e+300;
+        for (auto &p : phi_map) {
+            if (p.second > mx)
+                mx = p.second;
+        }
+        for (auto &p : phi_map) {
+            p.second /= mx;
+        }
+        //flip to map to par realization names
+        map<string, double> par_phi_map;
+        vector<string> oreal_names = oe.get_real_names(), preal_names = pe.get_real_names();
+        for (int ii = 0; ii < oreal_names.size(); ii++) {
+            par_phi_map[preal_names[ii]] = phi_map.at(oreal_names[ii]);
+        }
+        phi_map.clear();
+
+        //cout << real << endl;
+        performance_log->log_event("...getting par distances");
+        for (auto &rname : real_names) {
+            if (rname == real_name)
+                continue;
+            diff = real - pe.get_real_vector(rname);
+            edist = diff.transpose() * parcov_inv * diff;
+            euclid_par_dist[rname] = edist;
+//            cout << real << endl;
+//            cout << pe.get_real_vector(rname) << endl;
+//            cout << diff << endl;
+//            cout << real_name << "," << rname << "," << edist << endl << endl;
+
+        }
+
+        mx = -1e300;
+        for (auto &e : euclid_par_dist) {
+            if (e.second > mx)
+                mx = e.second;
+        }
+        if (mx <= 0.0) {
+            ss.str("");
+            ss << "multimodal solve error: maximum par diff for realization '" << real_name << "' not valid";
+            message(0, ss.str());
+        } else {
+            for (auto &e : euclid_par_dist) {
+                e.second /= mx;
+            }
+        }
+
+        map<string, double> composite_score;
+        for (auto &rname : real_names) {
+            if (rname == real_name)
+                continue;
+            composite_score[rname] = euclid_par_dist.at(rname) + par_phi_map.at(rname);
+        }
+        performance_log->log_event("...sorting composite score");
+        sortedset fitness_sorted(composite_score.begin(), composite_score.end(), compFunctor);
+        real_idxs.clear();
+        upgrade_real_names.clear();
+        real_idxs.push_back(real_map.at(real_name));
+        upgrade_real_names.push_back(real_name);
+        int iii = 0;
+        for (sortedset_iter ii = fitness_sorted.begin(); ii != fitness_sorted.end(); ++ii) {
+            int idx = real_map.at(ii->first);
+            real_idxs.push_back(idx);
+            upgrade_real_names.push_back(ii->first);
+            iii++;
+            if (iii >= subset_size)//plus one to count 'real_name'
+                break;
+            //cout << real_name << "," << ii->first << "," << ii->second << endl;
+
+        }
+        if (real_idxs.size() != subset_size+1)
+        {
+            throw runtime_error("multimodal_solve: real_idxs.size() != subset_size");
+
+        }
+        if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1) {
+            csv << real_name;
+            for (auto &rname : upgrade_real_names) {
+                if (rname == real_name)
+                    continue;
+                csv << "," << rname << "," << par_phi_map.at(rname) << "," << euclid_par_dist.at(rname);
+            }
+
+            csv << endl;
+        }
+        mm_real_idx_map[real_name] = real_idxs;
+        mm_q_vec_map[real_name] = q_vec;
+    }
+    csv.close();
+}
 
 void EnsembleSolver::initialize_for_localized_solve(string center_on, vector<int> real_idxs)
 {
@@ -221,217 +377,54 @@ void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form
 }
 
 
-void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map,
+void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade,
+                                      unordered_map<string, pair<vector<string>, vector<string>>>& loc_map,
                                       double mm_alpha) {
 
     stringstream ss;
-    //util functions
-    typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
-    // Defining a lambda function to compare two pairs. It will compare two pairs using second field
-    Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2)
-    {
-        return elem1.second < elem2.second;
-    };
-    typedef std::set<std::pair<std::string, double>, Comparator> sortedset;
-    typedef std::set<std::pair<std::string, double>, Comparator>::iterator sortedset_iter;
-
-    int subset_size = (int)(((double)pe.shape().first) * mm_alpha);
-    if (subset_size <= 0)
-        throw runtime_error("solve_multimodal error: subsize size zero or negative");
-    ss.str("");
-    ss << "multimodal upgrade using " << subset_size << " realizations";
-    performance_log->log_event(ss.str());
-
-    //for each par realization in pe
-    //get the normed phi map
-
-
     vector<string> real_names = pe.get_real_names(),oreal_names = oe.get_real_names(),upgrade_real_names;
-    string real_name, oreal_name;
-
-    map<string,double> euclid_par_dist;
-    Eigen::VectorXd real,diff;
-    Eigen::SparseMatrix<double> parcov_inv = parcov.inv().get_matrix();
-    double edist;
-    map<string,int> real_map = pe.get_real_map();
-    oe.update_var_map();
-    map<string,int> ovar_map = oe.get_var_map();
-
+    string real_name;
     vector<int> real_idxs;
-    //Eigen::MatrixXd* real_ptr = pe_upgrade.get_eigen_ptr_4_mod();
-
-    ofstream csv;
-    if (pest_scenario.get_pestpp_options().get_ies_verbose_level()>1)
-    {
-        ss.str("");
-        ss << file_manager.get_base_filename() << "." << iter << "." << cur_lam << ".mm.info.csv";
-        csv.open(ss.str());
-        csv << "real_name";
-        for (int j=0;j<subset_size;j++)
-        {
-            csv << ",neighbor_" << j << ",phi,pdiff";
-        }
-        csv << endl;
-
-    }
-
+    Eigen::VectorXd q_vec,real;
     for (int i=0;i<pe.shape().first;i++) {
         real_name = real_names[i];
-
-        performance_log->log_event("calculating realization neighborhood for " + real_name);
-
-        euclid_par_dist.clear();
-        real = pe.get_real_vector(real_name);
-
-        //get the phi map for this realization using the weights vector for this realization
-        oreal_name = oreal_names[i];
-        Eigen::VectorXd q_vec(act_obs_names.size());
-        int ii =0;
-        for (auto& aon : act_obs_names) {
-            q_vec[ii] = weights.get_eigen_ptr()->coeff(i, ovar_map.at(aon));
-            ii++;
-        }
-        map<string,double> phi_map = ph.get_meas_phi(oe,q_vec);
-        double mx = -1.0e+300;
-        for (auto& p : phi_map)
-        {
-            if (p.second > mx)
-                mx = p.second;
-        }
-        for (auto& p : phi_map)
-        {
-            p.second /= mx;
-        }
-        //flip to map to par realization names
-        map<string,double> par_phi_map;
-        vector<string> oreal_names = oe.get_real_names(),preal_names=pe.get_real_names();
-        for (int ii=0;ii<oreal_names.size();ii++)
-        {
-            par_phi_map[preal_names[ii]] = phi_map.at(oreal_names[ii]);
-        }
-        phi_map.clear();
-
-        //cout << real << endl;
-
-        for (auto &rname : real_names) {
-            if (rname == real_name)
-                continue;
-            diff = real - pe.get_real_vector(rname);
-            edist = diff.transpose() * parcov_inv * diff;
-            euclid_par_dist[rname] = edist;
-//            cout << real << endl;
-//            cout << pe.get_real_vector(rname) << endl;
-//            cout << diff << endl;
-//            cout << real_name << "," << rname << "," << edist << endl << endl;
-
-        }
-
-        mx = -1e300;
-        for (auto &e : euclid_par_dist) {
-            if (e.second > mx)
-                mx = e.second;
-        }
-        if (mx <= 0.0)
-        {
-            ss.str("");
-            ss << "multimodal solve error: maximum par diff for realization '" << real_name <<"' not valid";
-            message(0,ss.str());
-        }
-        else {
-            for (auto &e : euclid_par_dist) {
-                e.second /= mx;
-            }
-        }
-
-        map<string, double> composite_score;
-        for (auto &rname : real_names) {
-            if (rname == real_name)
-                continue;
-            composite_score[rname] = euclid_par_dist.at(rname) + par_phi_map.at(rname);
-        }
-        sortedset fitness_sorted(composite_score.begin(), composite_score.end(), compFunctor);
         real_idxs.clear();
         upgrade_real_names.clear();
-        real_idxs.push_back(real_map.at(real_name));
-        upgrade_real_names.push_back(real_name);
-        int iii = 0;
-        for (sortedset_iter ii=fitness_sorted.begin();ii!=fitness_sorted.end();++ii)
-        {
-            int idx = real_map.at(ii->first);
-            real_idxs.push_back(idx);
-            upgrade_real_names.push_back(ii->first);
-            iii++;
-            if (iii >= subset_size)//plus one to count 'real_name'
-                break;
-            //cout << real_name << "," << ii->first << "," << ii->second << endl;
+        real_idxs = mm_real_idx_map.at(real_name);
+        q_vec = mm_q_vec_map.at(real_name);
+        for (auto idx : real_idxs)
+            upgrade_real_names.push_back(real_names[idx]);
 
-        }
-        if (pest_scenario.get_pestpp_options().get_ies_verbose_level()>1)
-        {
-            csv << real_name;
-            for (auto& rname : upgrade_real_names)
-            {
-                if (rname == real_name)
-                    continue;
-                csv << "," << rname << "," << par_phi_map.at(rname) << "," << euclid_par_dist.at(rname);
-            }
+        ParameterEnsemble pe_real(&pest_scenario, pe.get_rand_gen_ptr());
+        pe_real.reserve(upgrade_real_names, pe.get_var_names());
 
-            csv << endl;
-        }
-
-        ParameterEnsemble pe_real(&pest_scenario,pe.get_rand_gen_ptr());
-        pe_real.reserve(upgrade_real_names,pe.get_var_names());
-
-        if (!localizer.get_use())
-        {
+        if (!localizer.get_use()) {
             performance_log->log_event("calculating nonlocalized multimodal upgrade for " + real_name);
             //get weights here
             //Eigen::DiagonalMatrix<double, Eigen::Dynamic> weights(q_vec);
-            nonlocalized_solve(cur_lam,use_glm_form,pe_real,real_name,real_idxs,q_vec);
+            nonlocalized_solve(cur_lam, use_glm_form, pe_real, real_name, real_idxs, q_vec);
             //solve(num_threads,cur_lam,use_glm_form,pe_real,loc_map);
-        }
-        else
-        {
+        } else {
             performance_log->log_event("re-initializing solver for localized multimodal upgrade for " + real_name);
-            initialize_for_localized_solve(string(),real_idxs);
+            initialize_for_localized_solve(string(), real_idxs);
             //reset the weight map
             weight_map.clear();
             weight_map.reserve(q_vec.size());
-            iii = 0;
-            for (auto& name : act_obs_names)
-            {
+            int iii = 0;
+            for (auto &name : act_obs_names) {
                 weight_map[name] = q_vec[iii];
                 iii++;
             }
             performance_log->log_event("calculating localized multimodal upgrade for " + real_name);
 
-            solve(num_threads,cur_lam,use_glm_form,pe_real,loc_map);
+            solve(num_threads, cur_lam, use_glm_form, pe_real, loc_map);
         }
 
 
         real = pe_real.get_real_vector(real_name);
         //cout << real << endl;
-        pe_upgrade.update_real_ip(real_name,real);
-//        iii = 0;
-//        for (auto ridx : real_idxs) {
-//            real_ptr->row(ridx) = pe_real.get_eigen_ptr()->row(iii);
-//            iii++;
-//        }
-
-
+        pe_upgrade.update_real_ip(real_name, real);
     }
-    csv.close();
-    //  get normalized par real scaled par diff l2 norm map
-    //  calculate composite normalized score and sort
-    //  select subset_size best reals
-    //  (re-)initialize this using current real as "center on" real
-    //  create a subset-sized pe instance and set zero
-    //  solve for subset_sized pe instance
-    //  randomly select a real subset-sized pe or use current real and set row in pe_upgrade
-
-
-
-
 }
 
 void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, ParameterEnsemble& pe_upgrade,
@@ -5657,6 +5650,11 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	//pass pe so that we can use the current par values but pass oe_upgrade since it only includes nz weight obs
     EnsembleSolver es(performance_log, file_manager, pest_scenario, pe, oe_upgrade, oe_base, weights, localizer, parcov, Am, ph,
 		use_localizer, iter, act_par_names, act_obs_names);
+    double mm_alpha = pest_scenario.get_pestpp_options().get_ies_multimodal_alpha();
+    if (mm_alpha != 1.0)
+    {
+        es.update_multimodal_components(mm_alpha);
+    }
 
 
     //solve for each factor
@@ -5672,7 +5670,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		pe_upgrade = ParameterEnsemble(pe.get_pest_scenario_ptr(), &rand_gen, pe.get_eigen(vector<string>(), act_par_names, false), pe.get_real_names(), act_par_names);
         pe_upgrade.set_zeros();
 		pe_upgrade.set_trans_status(pe.get_trans_status());
-        double mm_alpha = pest_scenario.get_pestpp_options().get_ies_multimodal_alpha();
+
 		if (mm_alpha != 1.0)
         {
             message(1,"multimodal solve for inflation factor ",cur_lam);
