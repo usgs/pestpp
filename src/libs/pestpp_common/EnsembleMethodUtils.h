@@ -67,6 +67,7 @@ public:
 	map<string,double> get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec);
 
 	map<string,double> get_actual_swr_map(ObservationEnsemble& oe, string real_name="");
+	map<string,map<string,double>> get_meas_phi_weight_ensemble(ObservationEnsemble& oe, ObservationEnsemble& weights);
 
 private:
 	string tag;

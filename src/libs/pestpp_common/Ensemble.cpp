@@ -772,7 +772,7 @@ Eigen::MatrixXd Ensemble::get_eigen(vector<string> row_names, vector<string> col
 {
 	//get a dense eigen matrix from reals by row and col names
 	vector<string> missing_rows,missing_cols;
-	vector<string>::iterator iter, start = real_names.begin(), end = real_names.end();
+	//vector<string>::iterator iter, start = real_names.begin(), end = real_names.end();
 	vector<int> row_idxs, col_idxs;
 
 	//check for missing
@@ -783,11 +783,12 @@ Eigen::MatrixXd Ensemble::get_eigen(vector<string> row_names, vector<string> col
 		map<string, int> real_map;
 		for (int i = 0; i < real_names.size(); i++)
 			real_map[real_names[i]] = i;
-		set<string> real_set(real_names.begin(), end = real_names.end());
-		set<string>::iterator end = real_set.end();
+		map<string,int>::iterator end = real_map.end();
+		//set<string> real_set(real_names.begin(), end = real_names.end());
+		//set<string>::iterator end = real_set.end();
 		for (auto &name : row_names)
 		{
-			if (real_set.find(name) == end)
+			if (real_map.find(name) == end)
 				missing.push_back(name);
 			row_idxs.push_back(real_map[name]);
 		}
