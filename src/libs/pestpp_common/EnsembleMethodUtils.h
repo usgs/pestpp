@@ -67,6 +67,7 @@ public:
 	map<string,double> get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec);
 
 	map<string,double> get_actual_swr_map(ObservationEnsemble& oe, string real_name="");
+	map<string,map<string,double>> get_meas_phi_weight_ensemble(ObservationEnsemble& oe, ObservationEnsemble& weights);
 
 private:
 	string tag;
@@ -158,6 +159,7 @@ public:
 	void solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
     void solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,
                         pair<vector<string>, vector<string>>>& loc_map, double mm_alpha);
+    void update_multimodal_components(const double mm_alpha);
 
 
 private:
@@ -176,6 +178,8 @@ private:
 	unordered_map<string, Eigen::VectorXd> par_diff_map, obs_diff_map, obs_err_map;
 	unordered_map<string, double> weight_map;
 	unordered_map<string, double> parcov_inv_map;
+	unordered_map<string,vector<int>> mm_real_idx_map;
+    unordered_map<string,Eigen::VectorXd> mm_q_vec_map;
 	//unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	vector<string>& act_par_names, act_obs_names;
 	template<typename T, typename A>
@@ -185,8 +189,9 @@ private:
 	template<typename T>
 	void message(int level, const string& _message, T extra);
 
-	void initialize(string center_on = string(), vector<int> real_idxs=vector<int>());
-
+	void initialize_for_localized_solve(string center_on = string(), vector<int> real_idxs=vector<int>());
+	void nonlocalized_solve(double cur_lam,bool use_glm_form, ParameterEnsemble& pe_upgrade,
+                         string center_on=string(), vector<int> real_idxs=vector<int>(),Eigen::VectorXd q_vec=Eigen::VectorXd());
 
 };
 
@@ -225,6 +230,15 @@ protected:
 	mutex next_lock;
 
 };
+
+void ensemble_solution(const int iter, const int verbose_level,const int maxsing,  const int thread_id,
+                       const int t_count, const bool
+                  use_prior_scaling,const bool use_approx, const bool use_glm, const double cur_lam,
+                  const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
+                  const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
+                  Eigen::MatrixXd& obs_err,
+                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
+                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv);
 
 class CovLocalizationUpgradeThread : public UpgradeThread
 {
