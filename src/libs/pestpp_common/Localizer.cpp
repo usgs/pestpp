@@ -845,53 +845,55 @@ void AutoAdaLocThread::work(int thread_id)
 		bool no_obs = true;
 		for (int iobs = 0; iobs < nobs; iobs++)
 		{
-			while (true)
-			{
-				if (oe_diff_gaurd.try_lock())
-				{
-					
-					obs_ss = oe_diff.col(iobs);
-					oname = obs_names[iobs];
-					oe_diff_gaurd.unlock();
-					break;
-				}
 
-			}
-			if (obs_std[iobs] == 0.0) 
+			if (obs_std[iobs] == 0.0)
 			{
 				continue;
 			}
-			
+
 			if ((use_list_obs) && (sobs.size() == 0))
 				continue;
 
+			while (true)
+            {
+                if (oe_diff_gaurd.try_lock())
+                {
+
+                    obs_ss = oe_diff.col(iobs);
+                    oname = obs_names[iobs];
+                    oe_diff_gaurd.unlock();
+                    break;
+                }
+
+            }
 			if ((sobs.size() > 0) && (sobs.find(oname) == sobs.end()))
 			{
 				continue;
 			}
 			obs_ss = obs_ss * (1.0 / obs_std[iobs]);
 			cc = (par_ss.transpose() * obs_ss)[0] * scale;
-			obs_ss_shift = 1.0 * obs_ss; //force a copy
-			for (int ireal = 0; ireal < nreals - 1; ireal++)
-			{
-
-				//obs_ss_shift.transpose() = obs_ss_shift.transpose() * perm;
-				//circular shift
-				t = obs_ss_shift[nreals - 1];
-				for (int i = nreals - 1; i > 0; i--)
-					obs_ss_shift[i] = obs_ss_shift[i - 1];
-				obs_ss_shift[0] = t;
-
-				//bg_cc = (par_ss.transpose() * obs_ss_shift)[0] * scale;
-				bg_cc_vec[ireal] = (par_ss.transpose() * obs_ss_shift)[0] * scale;
-				//cout << ireal << " " << par_names[jpar] << " " << obs_names[iobs] << " " << cc << " " << bg_cc << endl;
-			}
+//			obs_ss_shift = 1.0 * obs_ss; //force a copy
+//			for (int ireal = 0; ireal < nreals - 1; ireal++)
+//			{
+//
+//				//obs_ss_shift.transpose() = obs_ss_shift.transpose() * perm;
+//				//circular shift
+//				t = obs_ss_shift[nreals - 1];
+//				for (int i = nreals - 1; i > 0; i--)
+//					obs_ss_shift[i] = obs_ss_shift[i - 1];
+//				obs_ss_shift[0] = t;
+//
+//				//bg_cc = (par_ss.transpose() * obs_ss_shift)[0] * scale;
+//				bg_cc_vec[ireal] = (par_ss.transpose() * obs_ss_shift)[0] * scale;
+//				//cout << ireal << " " << par_names[jpar] << " " << obs_names[iobs] << " " << cc << " " << bg_cc << endl;
+//			}
 
 			//cout << par_names[jpar] << " " << obs_names[iobs] << " " << cc << " " << bg_cc << endl; 
 			(cc < 0.0) ? sign = -1. : sign = 1.;
 
-			bg_mean = bg_cc_vec.mean();
-			bg_std = sqrt((bg_cc_vec - bg_mean).pow(2).sum() / (nreals - 1));
+			//bg_mean = bg_cc_vec.mean();
+			//bg_std = sqrt((bg_cc_vec - bg_mean).pow(2).sum() / (nreals - 1));
+			bg_std = sqrt(1.0/((double)nreals-2));
 			thres = bg_mean + (sign * sigma_dist * bg_std);
 			if (ies_verbose > 1)
 			{
