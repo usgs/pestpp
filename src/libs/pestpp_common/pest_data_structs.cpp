@@ -1242,8 +1242,10 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		convert_ip(value, additional_ins_delimiters);
 		return true;
 	}
-	else if (key == "RANDOM_SEED")
+	else if ((key == "RANDOM_SEED") || (key == "RAND_SEED"))
 	{
+		passed_args.insert("RANDOM_SEED");
+		passed_args.insert("RAND_SEED");
 		convert_ip(value, random_seed);
 		return true;
 	}
