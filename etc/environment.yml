@@ -12,3 +12,4 @@ dependencies:
   - scipy
   - shapely>=1.8
   - tomli
+  - pip

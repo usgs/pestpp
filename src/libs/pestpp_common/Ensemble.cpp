@@ -2424,19 +2424,19 @@ void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_in
 			tied_names.push_back(name);
 		}
 	}
-	vector<string> problems;
-	for (auto& name : fixed_names)
-    {
-	    if ((pi.get_parameter_rec_ptr(name)->scale != 1.0) ||
-                (pi.get_parameter_rec_ptr(name)->offset != 0.0))
-        {
-	        problems.push_back(name);
-        }
-    }
-	if (problems.size())
-    {
-        throw_ensemble_error("the follwing fixed parameters have been passed values but have non-trivial scale/offset, which is not supported",problems);
-    }
+//	vector<string> problems;
+//	for (auto& name : fixed_names)
+//    {
+//	    if ((pi.get_parameter_rec_ptr(name)->scale != 1.0) ||
+//                (pi.get_parameter_rec_ptr(name)->offset != 0.0))
+//        {
+//	        problems.push_back(name);
+//        }
+//    }
+//	if (problems.size())
+//    {
+//        throw_ensemble_error("the follwing fixed parameters have been passed values but have non-trivial scale/offset, which is not supported",problems);
+//    }
 	pfinfo.set_fixed_names(fixed_names);
 	fill_fixed(header_info, fixed_names);
 	save_fixed(fixed_names);
@@ -2483,8 +2483,16 @@ void ParameterEnsemble::save_fixed(vector<string>& fixed_names)
 {
 	if (fixed_names.size() == 0)
 		return;
-	
+
 	Eigen::MatrixXd fixed_reals = get_eigen(vector<string>(), fixed_names);
+	double scale,offset;
+    for (int i=0;i<fixed_names.size();i++)
+    {
+        scale = pest_scenario_ptr->get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr(fixed_names[i])->scale;
+        offset = pest_scenario_ptr->get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr(fixed_names[i])->offset;
+        fixed_reals.col(i).array() *= scale;
+        fixed_reals.col(i).array() += offset;
+    }
 	Eigen::VectorXd v;
 	for (int i = 0; i < real_names.size(); i++)
 	{
