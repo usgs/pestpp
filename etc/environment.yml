@@ -11,3 +11,4 @@ dependencies:
   - coverage
   - scipy
   - shapely>=1.8
+  - tomli
