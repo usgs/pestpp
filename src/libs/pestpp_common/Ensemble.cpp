@@ -2424,6 +2424,19 @@ void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_in
 			tied_names.push_back(name);
 		}
 	}
+	vector<string> problems;
+	for (auto& name : fixed_names)
+    {
+	    if ((pi.get_parameter_rec_ptr(name)->scale != 1.0) ||
+                (pi.get_parameter_rec_ptr(name)->offset != 0.0))
+        {
+	        problems.push_back(name);
+        }
+    }
+	if (problems.size())
+    {
+        throw_ensemble_error("the follwing fixed parameters have been passed values but have non-trivial scale/offset, which is not supported",problems);
+    }
 	pfinfo.set_fixed_names(fixed_names);
 	fill_fixed(header_info, fixed_names);
 	save_fixed(fixed_names);
