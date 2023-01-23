@@ -294,6 +294,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 			//dirty trick alert: apply the abs to make sure all eigen values are positive - nasty!
 			Eigen::MatrixXd proj = (eig.eigenvectors() * (fac * eig.eigenvalues()).cwiseAbs().cwiseSqrt().asDiagonal());
 
+
 			if (level > 2)
 			{
 				ofstream f("cov_eigenvectors.dat");
