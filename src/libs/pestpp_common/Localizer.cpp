@@ -753,7 +753,7 @@ void AutoAdaLocThread::work(int thread_id)
 
 	stringstream ss;
 	int jpar, pcount = 0, nreals = pe_diff.rows();
-	double cc, bg_cc, bg_mean, bg_std, thres, t;
+	double cc, bg_cc, bg_mean = 0, bg_std, thres, t;
 	double sign;
 	double scale = 1.0 / double(nreals - 1);
 	double pstd, ostd;
