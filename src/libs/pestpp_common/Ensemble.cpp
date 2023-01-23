@@ -333,7 +333,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 			{
 				found_invalid = true;
 				iv++;
-                if (level>3)
+                if (level>2)
                     cout << "invalid: " << draw_names[j] << ": " << draws(i,j) << endl;
 			}
 
