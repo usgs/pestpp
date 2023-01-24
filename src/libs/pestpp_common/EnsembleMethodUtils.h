@@ -196,6 +196,39 @@ private:
 
 };
 
+class MmUpgradeThread
+{
+public:
+    MmUpgradeThread(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map,
+                    unordered_map<string, Eigen::VectorXd>& _par_diff_map,
+                  unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map,
+                  unordered_map<string, Eigen::VectorXd>& _obs_err_map,
+                  unordered_map<string, Eigen::VectorXd>& _weight_map, ParameterEnsemble& _pe_upgrade,
+                  unordered_map<string, pair<vector<string>, vector<string>>>& _cases);
+
+    void work(int thread_id, int iter, double cur_lam, bool use_glm_form, Eigen::VectorXd parcov_inv_vec, Eigen::MatrixXd Am);
+
+protected:
+    PerformanceLog* performance_log;
+    vector<string> keys;
+    int count, total;
+
+    unordered_map<string, pair<vector<string>, vector<string>>>& cases;
+
+    ParameterEnsemble& pe_upgrade;
+    unordered_map<string, Eigen::VectorXd>& weight_map;
+
+    unordered_map<string, Eigen::VectorXd>& par_resid_map, & par_diff_map;
+    unordered_map<string, Eigen::VectorXd>& obs_resid_map, & obs_diff_map, obs_err_map;
+
+    mutex ctrl_lock, weight_lock, loc_lock, parcov_lock;
+    mutex obs_resid_lock, obs_diff_lock, par_resid_lock;
+    mutex par_diff_lock, am_lock, put_lock, obs_err_lock;
+    mutex next_lock;
+
+};
+
+
 
 class UpgradeThread
 {

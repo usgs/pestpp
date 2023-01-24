@@ -131,7 +131,18 @@ void Ensemble::replace_col_vals(const vector<string>& other_var_names, const Eig
 }
 
 
+void Ensemble::add_2_row_ip(const string& real_name,const Eigen::VectorXd& row_vec)
+{
+    if (shape().second != row_vec.size())
+        throw_ensemble_error("Ensemble::add_2_row_ip(): dimensions don't match");
 
+    map<string,int> real_map = get_real_map();
+    if (real_map.find(real_name) == real_map.end())
+    {
+        throw_ensemble_error("Ensemble::add_2_row_ip(): real name '"+real_name+"' not found");
+    }
+    reals.row(real_map.at(real_name)) += row_vec;
+}
 
 void Ensemble::add_2_cols_ip(const vector<string> &other_var_names, const Eigen::MatrixXd &mat)
 {
