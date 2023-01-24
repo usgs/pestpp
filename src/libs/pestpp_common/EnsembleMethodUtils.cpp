@@ -446,6 +446,11 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
                                       double mm_alpha) {
 
     stringstream ss;
+    if ((!localizer.get_use()) && (num_threads > 1))
+    {
+
+        return;
+    }
     vector<string> real_names = pe.get_real_names(),oreal_names = oe.get_real_names(),upgrade_real_names;
     string real_name;
     vector<int> real_idxs;
@@ -839,7 +844,7 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
     Eigen::MatrixXd obs_resid, obs_diff, obs_err, loc;
     Eigen::DiagonalMatrix<double, Eigen::Dynamic> weights;
     string key;
-    Eigen::VectorXd upgrade_row;
+    Eigen::VectorXd row_vec;
 
 
     //these locks are used to control (thread-safe) access to the fast look up containers
@@ -984,6 +989,13 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
         }
 
         //now form the deviations - both pars and obs
+        row_vec = par_diff.row(0);
+        for (int i=0;i<par_diff.rows();i++)
+            par_diff.row(i) -= row_vec;
+        row_vec = obs_diff.row(0);
+        for (int i=0;i<obs_diff.rows();i++)
+            obs_diff.row(i) -= row_vec;
+
 
         par_diff.transposeInPlace();
         obs_diff.transposeInPlace();
@@ -1184,16 +1196,16 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
 
             }
         }
-        upgrade_row.resize(0);
+
         //assuming that the fist row is the realization we are after...
-        upgrade_row = upgrade_1.row(0);
+        row_vec = upgrade_1.row(0);
 
         while (true)
         {
             if (put_guard.try_lock())
             {
                 //pe_upgrade.add_2_cols_ip(par_names, upgrade_1);
-                pe_upgrade.add_2_row_ip(key,upgrade_row);
+                pe_upgrade.add_2_row_ip(key,row_vec);
                 put_guard.unlock();
                 break;
             }
@@ -1224,7 +1236,6 @@ MmUpgradeThread::MmUpgradeThread(PerformanceLog* _performance_log, unordered_map
     //sort(keys.begin(), keys.end());
     total = keys.size();
     //random_shuffle(keys.begin(), keys.end());
-
 
 }
 
