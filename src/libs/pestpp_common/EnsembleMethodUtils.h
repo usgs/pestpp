@@ -190,6 +190,7 @@ private:
 	void message(int level, const string& _message, T extra);
 
 	void initialize_for_localized_solve(string center_on = string(), vector<int> real_idxs=vector<int>());
+    void initialize_for_mm_solve();
 	void nonlocalized_solve(double cur_lam,bool use_glm_form, ParameterEnsemble& pe_upgrade,
                          string center_on=string(), vector<int> real_idxs=vector<int>(),Eigen::VectorXd q_vec=Eigen::VectorXd());
 

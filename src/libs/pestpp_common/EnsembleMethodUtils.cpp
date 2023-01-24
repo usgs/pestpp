@@ -207,6 +207,65 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     csv.close();
 }
 
+void EnsembleSolver::initialize_for_mm_solve()
+{
+    vector<string> pe_real_names = pe.get_real_names();
+    vector<string> oe_real_names = oe.get_real_names();
+    vector<string> t;
+    vector<string> obs_names = oe.get_var_names();
+
+
+    //prep a fast look for obs, par and resid matrices - stored as column vectors in a map
+    par_resid_map.clear();
+    par_resid_map.reserve(pe_real_names.size());
+    par_diff_map.clear();
+    par_diff_map.reserve(pe_real_names.size());
+
+    obs_resid_map.clear();
+    obs_resid_map.reserve(oe_real_names.size());
+    obs_diff_map.clear();
+    obs_diff_map.reserve(oe_real_names.size());
+    obs_err_map.clear();
+    obs_err_map.reserve(oe_real_names.size());
+
+    //check for the 'center_on' real - it may have been dropped...
+
+    Eigen::MatrixXd mat = ph.get_obs_resid_subset(oe,true,oe_real_names);
+    for (int i = 0; i < oe_real_names.size(); i++)
+    {
+        obs_resid_map[oe_real_names[i]] = mat.row(i);
+    }
+
+    //oe should be in the right row and col order...
+    for (int i = 0; i < oe_real_names.size(); i++)
+    {
+        obs_diff_map[oe_real_names[i]] = oe.get_eigen_ptr()->row(i);
+    }
+
+    mat = base_oe.get_eigen(oe_real_names, obs_names);
+    Observations ctl_obs = pest_scenario.get_ctl_observations();
+    Eigen::VectorXd ovals = ctl_obs.get_data_eigen_vec(obs_names);
+    for (int i = 0; i < oe_real_names.size(); i++)
+    {
+        obs_err_map[oe_real_names[i]] = mat.row(i).array() - ovals.array();
+    }
+
+    mat = ph.get_par_resid_subset(pe,pe_real_names);
+    for (int i = 0; i < pe_real_names.size(); i++)
+    {
+        par_resid_map[pe_real_names[i]] = mat.row(i);
+    }
+
+    //vector<string> par_names = pe.get_var_names();
+    for (int i = 0; i < pe_real_names.size(); i++)
+    {
+        par_diff_map[pe_real_names[i]] = pe.get_eigen_ptr()->row(i);
+    }
+    
+    mat.resize(0, 0);
+}
+
+
 void EnsembleSolver::initialize_for_localized_solve(string center_on, vector<int> real_idxs)
 {
     vector<string> pe_real_names = pe.get_real_names();
