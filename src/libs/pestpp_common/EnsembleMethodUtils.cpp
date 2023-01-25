@@ -37,9 +37,8 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
     verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
     //prep the fast look par cov info
 
-    if (localizer.get_use())
-    {
-        message(1,"preparing fast-look containers for threaded localization solve");
+    if (localizer.get_use()) {
+        message(1, "preparing fast-look containers for threaded localization solve");
         initialize_for_localized_solve();
     }
 
@@ -472,6 +471,7 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
     stringstream ss;
     if ((!localizer.get_use()) && (num_threads > 1))
     {
+        initialize_for_mm_solve();
         Eigen::setNbThreads(1);
         vector<thread> threads;
         vector<exception_ptr> exception_ptrs;
@@ -939,6 +939,7 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
             use_prior_scaling = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_use_prior_scaling();
             verbose_level = pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_ies_verbose_level();
             ctrl_guard.unlock();
+            break;
         }
 
     }
@@ -1000,7 +1001,7 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
                 pair<vector<string>,vector<string>> p = cases.at(key);
                 pe_real_names = p.first;
                 oe_real_names = p.second;
-                if ((count % 1000 == 0) && (count > 0))
+                if ((count % 10 == 0) && (count > 0))
                 {
                     ss.str("");
                     ss << "upgrade thread progress: " << count << " of " << total << " parts done";
