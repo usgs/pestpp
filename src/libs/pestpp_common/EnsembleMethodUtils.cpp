@@ -66,7 +66,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     ss << "calculating multimodal neighborhoods with " << subset_size << " realizations";
     performance_log->log_event(ss.str());
 
-    vector<string> real_names = pe.get_real_names(), oreal_names = oe.get_real_names();
+    vector<string> real_names = pe.get_real_names(), oreal_names = oe.get_real_names(),preal_names;
     string real_name, oreal_name;
 
     map<string, double> euclid_par_dist;
@@ -96,6 +96,10 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     performance_log->log_event("getting phi vectors for all weights");
     map<string,map<string,double>> weight_phi_map = ph.get_meas_phi_weight_ensemble(oe,weights);
     string prname, orname;
+
+    Eigen::MatrixXd wmat = weights.get_eigen(vector<string>(),act_obs_names);
+    Eigen::VectorXd q_vec;
+    map<string, double> phi_map;
     for (int i = 0; i < pe.shape().first; i++) {
         real_name = real_names[i];
 
@@ -107,17 +111,18 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         //get the phi map for this realization using the weights vector for this realization
         oreal_name = oreal_names[i];
         performance_log->log_event("...getting weights");
-        Eigen::VectorXd q_vec(act_obs_names.size());
-        int ii = 0;
-        for (auto &aon : act_obs_names) {
-            q_vec[ii] = weights.get_eigen_ptr()->coeff(i, ovar_map.at(aon));
-            ii++;
-        }
+//        Eigen::VectorXd q_vec(act_obs_names.size());
+//        int ii = 0;
+//        for (auto &aon : act_obs_names) {
+//            q_vec[ii] = weights.get_eigen_ptr()->coeff(i, ovar_map.at(aon));
+//            ii++;
+//        }
+            q_vec = wmat.row(i);
 //        performance_log->log_event("...getting phi vector");
 //        map<string, double> phi_map = ph.get_meas_phi(oe, q_vec);
 
         oreal_name = oreal_names[i];
-        map<string, double> phi_map = weight_phi_map.at(oreal_name);
+        phi_map = weight_phi_map.at(oreal_name);
         double mx = -1.0e+300;
         for (auto &p : phi_map) {
             if (p.second > mx)
@@ -128,7 +133,8 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         }
         //flip to map to par realization names
         map<string, double> par_phi_map;
-        vector<string> oreal_names = oe.get_real_names(), preal_names = pe.get_real_names();
+        oreal_names = oe.get_real_names();
+        preal_names = pe.get_real_names();
         for (int ii = 0; ii < oreal_names.size(); ii++) {
             par_phi_map[preal_names[ii]] = phi_map.at(oreal_names[ii]);
         }
