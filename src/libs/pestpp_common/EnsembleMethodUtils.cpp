@@ -965,10 +965,8 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
     unique_lock<mutex> obs_err_guard(obs_err_lock, defer_lock);
     unique_lock<mutex> par_diff_guard(par_diff_lock, defer_lock);
     unique_lock<mutex> par_resid_guard(par_resid_lock, defer_lock);
-    unique_lock<mutex> loc_guard(loc_lock, defer_lock);
     unique_lock<mutex> weight_guard(weight_lock, defer_lock);
     unique_lock<mutex> parcov_guard(parcov_lock, defer_lock);
-    unique_lock<mutex> am_guard(am_lock, defer_lock);
     unique_lock<mutex> put_guard(put_lock, defer_lock);
 
     vector<string> pe_real_names,oe_real_names;
@@ -1001,7 +999,7 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
                 pair<vector<string>,vector<string>> p = cases.at(key);
                 pe_real_names = p.first;
                 oe_real_names = p.second;
-                if ((count % 10 == 0) && (count > 0))
+                if ((count % 100 == 0) && (count > 0))
                 {
                     ss.str("");
                     ss << "upgrade thread progress: " << count << " of " << total << " parts done";
@@ -1033,7 +1031,6 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
         obs_resid.resize(0, 0);
         obs_diff.resize(0, 0);
         obs_err.resize(0, 0);
-        Am.resize(0, 0);
         weights.resize(0);
 
         num_reals = pe_real_names.size();
