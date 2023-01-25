@@ -48,6 +48,7 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     mm_real_idx_map.clear();
     mm_q_vec_map.clear();
+    mm_real_name_map.clear();
 
     stringstream ss;
     //util functions
@@ -66,7 +67,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     ss << "calculating multimodal neighborhoods with " << subset_size << " realizations";
     performance_log->log_event(ss.str());
 
-    vector<string> real_names = pe.get_real_names(), oreal_names = oe.get_real_names(), upgrade_real_names;
+    vector<string> real_names = pe.get_real_names(), oreal_names = oe.get_real_names();
     string real_name, oreal_name;
 
     map<string, double> euclid_par_dist;
@@ -78,6 +79,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     map<string, int> ovar_map = oe.get_var_map();
 
     vector<int> real_idxs;
+    vector<string> pe_real_names_case,oe_real_names_case;
     //Eigen::MatrixXd* real_ptr = pe_upgrade.get_eigen_ptr_4_mod();
 
     ofstream csv;
@@ -85,7 +87,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         ss.str("");
         ss << file_manager.get_base_filename() << "." << iter << "." << ".mm.info.csv";
         csv.open(ss.str());
-        csv << "real_name";
+        csv << "pe_real_name,oe_real_name";
         for (int j = 0; j < subset_size; j++) {
             csv << ",neighbor_" << j << ",phi,pdiff";
         }
@@ -94,7 +96,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     }
     performance_log->log_event("getting phi vectors for all weights");
     map<string,map<string,double>> weight_phi_map = ph.get_meas_phi_weight_ensemble(oe,weights);
-
+    string prname, orname;
     for (int i = 0; i < pe.shape().first; i++) {
         real_name = real_names[i];
 
@@ -172,14 +174,17 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         performance_log->log_event("...sorting composite score");
         sortedset fitness_sorted(composite_score.begin(), composite_score.end(), compFunctor);
         real_idxs.clear();
-        upgrade_real_names.clear();
+        oe_real_names_case.clear();
+        pe_real_names_case.clear();
         real_idxs.push_back(real_map.at(real_name));
-        upgrade_real_names.push_back(real_name);
+        pe_real_names_case.push_back(real_name);
+        oe_real_names_case.push_back(oreal_name);
         int iii = 0;
         for (sortedset_iter ii = fitness_sorted.begin(); ii != fitness_sorted.end(); ++ii) {
             int idx = real_map.at(ii->first);
             real_idxs.push_back(idx);
-            upgrade_real_names.push_back(ii->first);
+            pe_real_names_case.push_back(ii->first);
+            oe_real_names_case.push_back(oreal_names[idx]);
             iii++;
             if (iii >= subset_size)//plus one to count 'real_name'
                 break;
@@ -188,21 +193,27 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         }
         if (real_idxs.size() != subset_size+1)
         {
+
             throw runtime_error("multimodal_solve: real_idxs.size() != subset_size");
 
         }
         if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1) {
             csv << real_name;
-            for (auto &rname : upgrade_real_names) {
-                if (rname == real_name)
-                    continue;
-                csv << "," << rname << "," << par_phi_map.at(rname) << "," << euclid_par_dist.at(rname);
+        //for (auto &rname : pe_real_names_case) {
+        for (int i=0;i<pe_real_names_case.size();i++)
+        {
+            prname = pe_real_names_case[i];
+            orname = oe_real_names_case[i];
+            if (prname == real_name)
+                continue;
+            csv << "," << prname << "," << orname << "," << par_phi_map.at(prname) << "," << euclid_par_dist.at(prname);
             }
 
             csv << endl;
         }
         mm_real_idx_map[real_name] = real_idxs;
         mm_q_vec_map[real_name] = q_vec;
+        mm_real_name_map[real_name] = make_pair(pe_real_names_case,oe_real_names_case);
     }
     csv.close();
 }
@@ -440,6 +451,19 @@ void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form
 	return;
 }
 
+//void work(int thread_id, int iter, double cur_lam, bool use_glm_form, Eigen::VectorXd parcov_inv_vec, Eigen::MatrixXd Am);
+void upgrade_thread_function_mm(int id, int iter, double cur_lam, bool use_glm_form, Eigen::VectorXd parcov_inv_vec,
+                             Eigen::MatrixXd Am, MmUpgradeThread& worker, exception_ptr& eptr) {
+    try {
+        worker.work(id, iter, cur_lam, use_glm_form, parcov_inv_vec, Am);
+    }
+    catch (...) {
+        eptr = current_exception();
+    }
+
+    return;
+}
+
 
 void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade,
                                       unordered_map<string, pair<vector<string>, vector<string>>>& loc_map,
@@ -448,6 +472,92 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
     stringstream ss;
     if ((!localizer.get_use()) && (num_threads > 1))
     {
+        Eigen::setNbThreads(1);
+        vector<thread> threads;
+        vector<exception_ptr> exception_ptrs;
+        message(2, "launching threads");
+        /*MmUpgradeThread(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map,
+                    unordered_map<string, Eigen::VectorXd>& _par_diff_map,
+                  unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map,
+                  unordered_map<string, Eigen::VectorXd>& _obs_err_map,
+                  unordered_map<string, Eigen::VectorXd>& _weight_map, ParameterEnsemble& _pe_upgrade,
+                  unordered_map<string, pair<vector<string>, vector<string>>>& _cases);
+                  */
+        MmUpgradeThread* ut_ptr = new MmUpgradeThread(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map, obs_err_map,
+                                                                        mm_q_vec_map, pe_upgrade,mm_real_name_map);
+
+        Eigen::VectorXd parcov_inv_vec = 1. / parcov.e_ptr()->diagonal().array();
+        for (int i = 0; i < num_threads; i++)
+        {
+            exception_ptrs.push_back(exception_ptr());
+        }
+
+        for (int i = 0; i < num_threads; i++)
+        {
+            threads.push_back(thread(upgrade_thread_function_mm, i, iter, cur_lam, use_glm_form, parcov_inv_vec,
+                                     Am, std::ref(*ut_ptr), std::ref(exception_ptrs[i])));
+
+
+
+        }
+        message(2, "waiting to join threads");
+        //for (auto &t : threads)
+        //	t.join();
+        ss.str("");
+        int num_exp = 0;
+
+        for (int i = 0; i < num_threads; ++i)
+        {
+            bool found = false;
+            if (exception_ptrs[i])
+            {
+                found = true;
+                num_exp++;
+                try
+                {
+                    rethrow_exception(exception_ptrs[i]);
+                }
+                catch (const std::exception& e)
+                {
+                    //ss.str("");
+                    ss << " thread " << i << "raised an exception: " << e.what();
+                    //throw runtime_error(ss.str());
+                }
+                catch (...)
+                {
+                    //ss.str("");
+                    ss << " thread " << i << "raised an exception";
+                    //throw runtime_error(ss.str());
+                }
+            }
+            threads[i].join();
+            if ((exception_ptrs[i]) && (!found))
+            {
+                num_exp++;
+                try
+                {
+                    rethrow_exception(exception_ptrs[i]);
+                }
+                catch (const std::exception& e)
+                {
+                    //ss.str("");
+                    ss << " thread " << i << "raised an exception: " << e.what();
+                    //throw runtime_error(ss.str());
+                }
+                catch (...)
+                {
+                    //ss.str("");
+                    ss << " thread " << i << "raised an exception: ";
+                    //throw runtime_error(ss.str());
+                }
+            }
+        }
+        if (num_exp > 0)
+        {
+            throw runtime_error(ss.str());
+        }
+        delete ut_ptr;
+        message(1, "upgrade calculation done");
 
         return;
     }

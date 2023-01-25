@@ -179,6 +179,7 @@ private:
 	unordered_map<string, double> weight_map;
 	unordered_map<string, double> parcov_inv_map;
 	unordered_map<string,vector<int>> mm_real_idx_map;
+	unordered_map<string,pair<vector<string>,vector<string>>> mm_real_name_map;
     unordered_map<string,Eigen::VectorXd> mm_q_vec_map;
 	//unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	vector<string>& act_par_names, act_obs_names;
@@ -273,6 +274,7 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
                   Eigen::MatrixXd& obs_err,
                   const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
                   const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv);
+
 
 class CovLocalizationUpgradeThread : public UpgradeThread
 {
