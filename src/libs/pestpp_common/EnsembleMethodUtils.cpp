@@ -44,6 +44,160 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 
 }
 
+MmNeighborThread::MmNeighborThread(ParameterEnsemble& _pe,
+                                   unordered_map<string,vector<int>>& _mm_real_idx_map,
+                                   unordered_map<string,pair<vector<string>,vector<string>>>& _mm_real_name_map,
+                                   unordered_map<string,Eigen::VectorXd>& _mm_q_vec_map, const Eigen::MatrixXd& _wmat):
+pe(_pe),mm_real_idx_map(_mm_real_idx_map),mm_real_name_map(_mm_real_name_map),mm_q_vec_map(_mm_q_vec_map), wmat(_wmat)
+{
+    count = 0;
+    total = 0;
+    for (int i=0;i<pe.shape().first;i++)
+        indexes.push_back(i);
+}
+
+void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map, vector<string> preal_names, vector<string> oreal_names,
+                            Eigen::SparseMatrix<double> parcov_inv,map<string,int> real_map)
+{
+    stringstream ss;
+    //util functions
+    typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
+    // Defining a lambda function to compare two pairs. It will compare two pairs using second field
+    Comparator compFunctor = [](std::pair<std::string, double> elem1, std::pair<std::string, double> elem2) {
+        return elem1.second < elem2.second;
+    };
+    typedef std::set<std::pair<std::string, double>, Comparator> sortedset;
+    typedef std::set<std::pair<std::string, double>, Comparator>::iterator sortedset_iter;
+
+    //need to gaurd these
+    int num_reals = pe.shape().first;
+    preal_names = pe.get_real_names();
+
+
+
+    int subset_size = (int) (((double) num_reals) * mm_alpha);
+    if (subset_size <= 0)
+        throw runtime_error("solve_multimodal error: subsize size zero or negative");
+
+
+    string real_name, oreal_name;
+
+    map<string, double> euclid_par_dist;
+    Eigen::VectorXd real, diff;
+    double edist;
+
+    vector<int> real_idxs;
+    vector<string> pe_real_names_case,oe_real_names_case;
+
+    string prname, orname;
+
+
+    Eigen::VectorXd q_vec;
+    map<string, double> phi_map;
+    for (int i = 0; i < num_reals; i++) {
+        real_name = preal_names[i];
+
+        euclid_par_dist.clear();
+
+        //need to gaurd these:
+        phi_map = weight_phi_map.at(oreal_name);
+        real = pe.get_real_vector(real_name);
+        q_vec = wmat.row(i);
+        //think about filling dmat - how can this be faster?
+        Eigen::MatrixXd dmat;
+        dmat.resize(num_reals,real.size());
+        for (int i=0;i<num_reals;i++) {
+            dmat.row(i) = pe.get_eigen_ptr()->row(i) - real;
+        }
+
+        //scale the phi values from 0 to 1
+        oreal_name = oreal_names[i];
+        double mx = -1.0e+300;
+        for (auto &p : phi_map) {
+            if (p.second > mx)
+                mx = p.second;
+        }
+        for (auto &p : phi_map) {
+            p.second /= mx;
+        }
+
+        //flip to map to par realization names
+        map<string, double> par_phi_map;
+        for (int ii = 0; ii < oreal_names.size(); ii++) {
+            par_phi_map[preal_names[ii]] = phi_map.at(oreal_names[ii]);
+        }
+        phi_map.clear();
+
+        //work out the par space distance
+        for (int ii=0;ii<num_reals;ii++)
+        {
+            if (preal_names[ii] == real_name)
+                continue;
+            diff = dmat.row(ii);
+            edist = diff.transpose() * parcov_inv * diff;
+            euclid_par_dist[preal_names[ii]] = edist;
+        }
+
+        //scale the par space distance from 0 to 1
+        mx = -1e300;
+        for (auto &e : euclid_par_dist) {
+            if (e.second > mx)
+                mx = e.second;
+        }
+        if (mx <= 0.0) {
+            ss.str("");
+            ss << "multimodal solve error: maximum par diff for realization '" << real_name << "' not valid";
+            throw runtime_error(ss.str());
+        } else {
+            for (auto &e : euclid_par_dist) {
+                e.second /= mx;
+            }
+        }
+
+        //calc composite score
+        map<string, double> composite_score;
+        for (auto &rname : preal_names) {
+            if (rname == real_name)
+                continue;
+            composite_score[rname] = euclid_par_dist.at(rname) + par_phi_map.at(rname);
+        }
+        //sort by score
+        sortedset fitness_sorted(composite_score.begin(), composite_score.end(), compFunctor);
+
+        //fill the reset containers
+        real_idxs.clear();
+        oe_real_names_case.clear();
+        pe_real_names_case.clear();
+        real_idxs.push_back(real_map.at(real_name));
+        pe_real_names_case.push_back(real_name);
+        oe_real_names_case.push_back(oreal_name);
+        int iii = 0;
+        for (sortedset_iter ii = fitness_sorted.begin(); ii != fitness_sorted.end(); ++ii) {
+            int idx = real_map.at(ii->first);
+            real_idxs.push_back(idx);
+            pe_real_names_case.push_back(ii->first);
+            oe_real_names_case.push_back(oreal_names[idx]);
+            iii++;
+            if (iii >= subset_size)//plus one to count 'real_name'
+                break;
+
+        }
+        if (real_idxs.size() != subset_size+1)
+        {
+
+            throw runtime_error("multimodal_solve: real_idxs.size() != subset_size");
+
+        }
+
+        //need to gaurd these
+        mm_real_idx_map[real_name] = real_idxs;
+        mm_q_vec_map[real_name] = q_vec;
+        mm_real_name_map[real_name] = make_pair(pe_real_names_case,oe_real_names_case);
+    }
+
+}
+
+
 void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     mm_real_idx_map.clear();
     mm_q_vec_map.clear();
