@@ -3528,18 +3528,152 @@ map<string,double> L2PhiHandler::get_meas_phi(ObservationEnsemble& oe, Eigen::Ve
     return meas_phi;
 
 }
+//void PhiThread::work(int thread_id, Eigen::MatrixXd wmat, Eigen::MatrixXd resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map)
+void upgrade_thread_function_phi(int id, Eigen::MatrixXd wmat, Eigen::MatrixXd resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map, PhiThread& worker, exception_ptr& eptr) {
+    try {
+        worker.work(id, wmat, resid, oe_real_names, phi_map);
+    }
+    catch (...) {
+        eptr = current_exception();
+    }
+
+    return;
+}
+
+
+PhiThread::PhiThread(vector<string> _oe_real_names)
+: keys(_oe_real_names)
+{
+    count = 0;
+    total = 0;
+
+}
+
+void PhiThread::work(int thread_id, Eigen::MatrixXd wmat, Eigen::MatrixXd resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map) {
+    stringstream ss;
+
+    //these locks are used to control (thread-safe) access to the fast look up containers
+    unique_lock<mutex> next_guard(next_lock, defer_lock);
+    unique_lock<mutex> phi_map_guard(phi_map_lock, defer_lock);
+
+
+    //This is the main thread loop - it continues until all upgrade pieces have been completed
+    int idx;
+    Eigen::MatrixXd rresid;
+    map<string,double> pmap;
+    string rname;
+    while (true) {
+
+        while (true) {
+            if (next_guard.try_lock()) {
+                //if all the pieces have been completed, return
+                if (count == keys.size()) {
+
+                    return;
+                }
+
+                idx = count;
+                count++;
+                next_guard.unlock();
+                break;
+            }
+        }
+
+        rresid = resid.array().rowwise() * wmat.row(idx).array();
+        rresid = rresid.array().cwiseProduct(rresid.array());
+        pmap.clear();
+        for (int ii = 0; ii<resid.rows(); ii++)
+        {
+            rname = oe_real_names[ii];
+            pmap[rname] = rresid.row(ii).sum();
+        }
+
+        while (true) {
+            if (phi_map_guard.try_lock()) {
+                phi_map[oe_real_names[idx]] = pmap;
+                phi_map_guard.unlock();
+                break;
+            }
+        }
+
+    }
+}
+
 
 map<string,map<string,double>> L2PhiHandler::get_meas_phi_weight_ensemble(ObservationEnsemble& oe, ObservationEnsemble& weights)
 {
     assert(oe.shape().first == weights.shape().first);
+    map<string,map<string,double>> phi_map;
     vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
     Eigen::MatrixXd resid = get_obs_resid(oe);// this is (Ho - Hs)
     Eigen::MatrixXd wmat = weights.get_eigen(vector<string>(),oe.get_var_names());
     assert(oe_real_names.size() == resid.rows());
+    int num_threads = pest_scenario->get_pestpp_options().get_ies_num_threads();
+    stringstream ss;
+    if ((num_threads > 1)) {
+
+        Eigen::setNbThreads(1);
+        vector<thread> threads;
+        vector<exception_ptr> exception_ptrs;
+        PhiThread *ut_ptr = new PhiThread(oe_real_names);
+        for (int i = 0; i < num_threads; i++) {
+            exception_ptrs.push_back(exception_ptr());
+        }
+        //int id, Eigen::MatrixXd wmat, Eigen::MatrixXd resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map, PhiThread& worker, exception_ptr& eptr
+        for (int i = 0; i < num_threads; i++) {
+            threads.push_back(thread(upgrade_thread_function_phi, i, wmat,resid,oe_real_names,std::ref(phi_map),std::ref(*ut_ptr), std::ref(exception_ptrs[i])));
+        }
+
+        int num_exp = 0;
+
+        for (int i = 0; i < num_threads; ++i) {
+            bool found = false;
+            if (exception_ptrs[i]) {
+                found = true;
+                num_exp++;
+                try {
+                    rethrow_exception(exception_ptrs[i]);
+                }
+                catch (const std::exception &e) {
+                    //ss.str("");
+                    ss << " thread " << i << "raised an exception: " << e.what();
+                    //throw runtime_error(ss.str());
+                }
+                catch (...) {
+                    //ss.str("");
+                    ss << " thread " << i << "raised an exception";
+                    //throw runtime_error(ss.str());
+                }
+            }
+            threads[i].join();
+            if ((exception_ptrs[i]) && (!found)) {
+                num_exp++;
+                try {
+                    rethrow_exception(exception_ptrs[i]);
+                }
+                catch (const std::exception &e) {
+                    //ss.str("");
+                    ss << " thread " << i << "raised an exception: " << e.what();
+                    //throw runtime_error(ss.str());
+                }
+                catch (...) {
+                    //ss.str("");
+                    ss << " thread " << i << "raised an exception: ";
+                    //throw runtime_error(ss.str());
+                }
+            }
+        }
+        if (num_exp > 0) {
+            throw runtime_error(ss.str());
+        }
+        delete ut_ptr;
+        return phi_map;
+    }
+
     set<string> bset(base_real_names.begin(),base_real_names.end());
     set<string>::iterator end = bset.end();
     string rname;
-    map<string,map<string,double>> phi_map;
+
     map<string,double> pmap;
     Eigen::MatrixXd rresid;
     for (int i=0;i<oe.shape().first;i++)
@@ -3550,8 +3684,8 @@ map<string,map<string,double>> L2PhiHandler::get_meas_phi_weight_ensemble(Observ
         for (int ii = 0; ii<resid.rows(); ii++)
         {
             rname = oe_real_names[ii];
-            if (bset.find(rname) == end)
-                continue;
+            //if (bset.find(rname) == end)
+            //    continue;
             //diff = resid.row(i);
             //cout << diff << endl;
             //diff = resid.row(i).cwiseProduct(q_vec);
@@ -3562,6 +3696,7 @@ map<string,map<string,double>> L2PhiHandler::get_meas_phi_weight_ensemble(Observ
     }
     return phi_map;
 }
+
 
 
 
