@@ -1344,65 +1344,72 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
         num_reals = pe_real_names.size();
 
         //now loop until this thread gets access to all the containers it needs to solve with
-        while (true)
-        {
-            //if all the solution pieces are filled, break out and solve!
-            if (((use_approx) || (par_resid.rows() > 0)) &&
-                (weights.size() > 0) &&
-                (par_diff.rows() > 0) &&
-                (obs_resid.rows() > 0) &&
-                (obs_err.rows() > 0) &&
-                (obs_diff.rows() > 0) &&
-                ((use_approx) || (Am.rows() > 0)))
-                break;
+//        while (true)
+//        {
+//            //if all the solution pieces are filled, break out and solve!
+//            if (((use_approx) || (par_resid.rows() > 0)) &&
+//                (weights.size() > 0) &&
+//                (par_diff.rows() > 0) &&
+//                (obs_resid.rows() > 0) &&
+//                (obs_err.rows() > 0) &&
+//                (obs_diff.rows() > 0) &&
+//                ((use_approx) || (Am.rows() > 0)))
+//                break;
+//
+//            //get access to the obs_diff container
+//            if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
+//            {
+//                //piggy back here for thread safety
+//                //if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
+//                //	use_propack = true;
+//                obs_diff = local_utils::get_matrix_from_map(oe_real_names, obs_diff_map);
+//                obs_diff_guard.unlock();
+//            }
+//
+//            //get access to the residual container
+//            if ((obs_resid.rows() == 0) && (obs_resid_guard.try_lock()))
+//            {
+//                obs_resid = local_utils::get_matrix_from_map(oe_real_names, obs_resid_map);
+//                obs_resid_guard.unlock();
+//            }
+//
+//            //get access to the obs noise container
+//            if ((obs_err.rows() == 0) && (obs_err_guard.try_lock()))
+//            {
+//                obs_err = local_utils::get_matrix_from_map(oe_real_names, obs_err_map);
+//                obs_err_guard.unlock();
+//            }
+//
+//            //get access to the par diff container
+//            if ((par_diff.rows() == 0) && (par_diff_guard.try_lock()))
+//            {
+//                par_diff = local_utils::get_matrix_from_map(pe_real_names, par_diff_map);
+//                par_diff_guard.unlock();
+//            }
+//
+//            //get access to the par residual container
+//            if ((par_resid.rows() == 0) && (par_resid_guard.try_lock()))
+//            {
+//                par_resid = local_utils::get_matrix_from_map(pe_real_names, par_resid_map);
+//                par_resid_guard.unlock();
+//            }
+//
+//            //get access to the obs weights container
+//            if ((weights.rows() == 0) && (weight_guard.try_lock()))
+//            {
+//                weights = weight_map.at(key).asDiagonal();
+//                weight_guard.unlock();
+//            }
+//
+//
+//        }
 
-            //get access to the obs_diff container
-            if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
-            {
-                //piggy back here for thread safety
-                //if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
-                //	use_propack = true;
-                obs_diff = local_utils::get_matrix_from_map(oe_real_names, obs_diff_map);
-                obs_diff_guard.unlock();
-            }
-
-            //get access to the residual container
-            if ((obs_resid.rows() == 0) && (obs_resid_guard.try_lock()))
-            {
-                obs_resid = local_utils::get_matrix_from_map(oe_real_names, obs_resid_map);
-                obs_resid_guard.unlock();
-            }
-
-            //get access to the obs noise container
-            if ((obs_err.rows() == 0) && (obs_err_guard.try_lock()))
-            {
-                obs_err = local_utils::get_matrix_from_map(oe_real_names, obs_err_map);
-                obs_err_guard.unlock();
-            }
-
-            //get access to the par diff container
-            if ((par_diff.rows() == 0) && (par_diff_guard.try_lock()))
-            {
-                par_diff = local_utils::get_matrix_from_map(pe_real_names, par_diff_map);
-                par_diff_guard.unlock();
-            }
-
-            //get access to the par residual container
-            if ((par_resid.rows() == 0) && (par_resid_guard.try_lock()))
-            {
-                par_resid = local_utils::get_matrix_from_map(pe_real_names, par_resid_map);
-                par_resid_guard.unlock();
-            }
-
-            //get access to the obs weights container
-            if ((weights.rows() == 0) && (weight_guard.try_lock()))
-            {
-                weights = weight_map.at(key).asDiagonal();
-                weight_guard.unlock();
-            }
-
-
-        }
+        obs_diff = local_utils::get_matrix_from_map(oe_real_names, obs_diff_map);
+        obs_resid = local_utils::get_matrix_from_map(oe_real_names, obs_resid_map);
+        obs_err = local_utils::get_matrix_from_map(oe_real_names, obs_err_map);
+        par_diff = local_utils::get_matrix_from_map(pe_real_names, par_diff_map);
+        par_resid = local_utils::get_matrix_from_map(pe_real_names, par_resid_map);
+        weights = weight_map.at(key).asDiagonal();
 
         //now form the deviations - both pars and obs
         row_vec = par_diff.row(0);
@@ -3831,7 +3838,7 @@ map<string,double> L2PhiHandler::get_meas_phi(ObservationEnsemble& oe, Eigen::Ve
 
 }
 //void PhiThread::work(int thread_id, Eigen::MatrixXd wmat, Eigen::MatrixXd resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map)
-void upgrade_thread_function_phi(int id, Eigen::MatrixXd wmat, Eigen::MatrixXd resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map, PhiThread& worker, exception_ptr& eptr) {
+void upgrade_thread_function_phi(int id, Eigen::MatrixXd& wmat, Eigen::MatrixXd& resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map, PhiThread& worker, exception_ptr& eptr) {
     try {
         worker.work(id, wmat, resid, oe_real_names, phi_map);
     }
@@ -3851,7 +3858,7 @@ PhiThread::PhiThread(vector<string> _oe_real_names)
 
 }
 
-void PhiThread::work(int thread_id, Eigen::MatrixXd wmat, Eigen::MatrixXd resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map) {
+void PhiThread::work(int thread_id, Eigen::MatrixXd& wmat, Eigen::MatrixXd& resid, vector<string>& oe_real_names, map<string,map<string,double>>& phi_map) {
     stringstream ss;
 
     //these locks are used to control (thread-safe) access to the fast look up containers
@@ -3864,6 +3871,7 @@ void PhiThread::work(int thread_id, Eigen::MatrixXd wmat, Eigen::MatrixXd resid,
     Eigen::MatrixXd rresid;
     map<string,double> pmap;
     string rname;
+    Eigen::VectorXd phi;
     while (true) {
 
         while (true) {
@@ -3883,11 +3891,13 @@ void PhiThread::work(int thread_id, Eigen::MatrixXd wmat, Eigen::MatrixXd resid,
 
         rresid = resid.array().rowwise() * wmat.row(idx).array();
         rresid = rresid.array().cwiseProduct(rresid.array());
+        phi = rresid.rowwise().sum();
         pmap.clear();
         for (int ii = 0; ii<resid.rows(); ii++)
         {
-            rname = oe_real_names[ii];
-            pmap[rname] = rresid.row(ii).sum();
+            //rname = oe_real_names[ii];
+            //pmap[rname] = rresid.row(ii).sum();
+            pmap[oe_real_names[ii]] = phi(ii);
         }
 
         while (true) {
@@ -3923,7 +3933,7 @@ map<string,map<string,double>> L2PhiHandler::get_meas_phi_weight_ensemble(Observ
         }
         //int id, Eigen::MatrixXd wmat, Eigen::MatrixXd resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map, PhiThread& worker, exception_ptr& eptr
         for (int i = 0; i < num_threads; i++) {
-            threads.push_back(thread(upgrade_thread_function_phi, i, wmat,resid,oe_real_names,std::ref(phi_map),std::ref(*ut_ptr), std::ref(exception_ptrs[i])));
+            threads.push_back(thread(upgrade_thread_function_phi, i, std::ref(wmat),std::ref(resid),oe_real_names,std::ref(phi_map),std::ref(*ut_ptr), std::ref(exception_ptrs[i])));
         }
 
         int num_exp = 0;

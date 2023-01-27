@@ -49,7 +49,7 @@ class PhiThread
 public:
     PhiThread(vector<string> _oe_real_names);
 
-    void work(int thread_id, Eigen::MatrixXd _weights, Eigen::MatrixXd _resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map);
+    void work(int thread_id, Eigen::MatrixXd& weights, Eigen::MatrixXd& resid, vector<string>& oe_real_names, map<string,map<string,double>>& phi_map);
 
 protected:
     vector<string> keys;
