@@ -1593,7 +1593,7 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
 
                 Eigen::MatrixXd x5 = Am * x4;
                 x4.resize(0, 0);
-                Am.resize(0, 0);
+                //Am.resize(0, 0);
 
                 local_utils::save_mat(verbose_level, thread_id, iter, t_count, "X5", x5);
                 Eigen::MatrixXd x6 = par_diff.transpose() * x5;
