@@ -44,23 +44,23 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 
 }
 
-MmNeighborThread::MmNeighborThread(ParameterEnsemble& _pe,
+MmNeighborThread::MmNeighborThread(unordered_map<string,Eigen::VectorXd>& _real_vec_map,
                                    unordered_map<string,vector<int>>& _mm_real_idx_map,
-                                   unordered_map<string,pair<vector<string>,vector<string>>>& _mm_real_name_map,
-                                   unordered_map<string,Eigen::VectorXd>& _mm_q_vec_map, const Eigen::MatrixXd& _wmat):
-pe(_pe),mm_real_idx_map(_mm_real_idx_map),mm_real_name_map(_mm_real_name_map),mm_q_vec_map(_mm_q_vec_map), wmat(_wmat)
+                                   unordered_map<string,pair<vector<string>,vector<string>>>& _mm_real_name_map):
+real_vec_map(_real_vec_map),mm_real_idx_map(_mm_real_idx_map),mm_real_name_map(_mm_real_name_map)
 {
     count = 0;
     total = 0;
-    for (int i=0;i<pe.shape().first;i++)
+    for (int i=0;i<real_vec_map.size();i++)
         indexes.push_back(i);
 }
 
 void mm_neighbor_thread_function(int id, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map,
                                  vector<string> preal_names, vector<string> oreal_names,Eigen::SparseMatrix<double> parcov_inv,
+                                 map<string,int> real_map,
                                  MmNeighborThread& worker, exception_ptr& eptr) {
     try {
-        worker.work(id,verbose_level,mm_alpha,weight_phi_map,preal_names,oreal_names,parcov_inv);
+        worker.work(id,verbose_level,mm_alpha,weight_phi_map,preal_names,oreal_names,real_map,parcov_inv);
     }
     catch (...) {
         eptr = current_exception();
@@ -69,7 +69,7 @@ void mm_neighbor_thread_function(int id, int verbose_level, double mm_alpha, map
 }
 
 void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map, vector<string> preal_names,
-                            vector<string> oreal_names,Eigen::SparseMatrix<double> parcov_inv)
+                            vector<string> oreal_names,map<string,int> real_map,Eigen::SparseMatrix<double> parcov_inv)
 {
     unique_lock<mutex> next_guard(next_lock, defer_lock);
     unique_lock<mutex> pe_vec_guard(pe_vec_lock, defer_lock);
@@ -90,15 +90,17 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
 
     //need to gaurd these
     int num_reals,idx;
-    map<string,int> real_map;
-    while (true) {
-        if (pe_guard.try_lock()) {
-            num_reals = pe.shape().first;
-            real_map = pe.get_real_map();
-            pe_guard.unlock();
-            break;
-        }
-    }
+    //map<string,int> real_map;
+    num_reals = real_vec_map.size();
+
+//    while (true) {
+//        if (pe_guard.try_lock()) {
+//            num_reals = pe.shape().first;
+//            real_map = pe.get_real_map();
+//            pe_guard.unlock();
+//            break;
+//        }
+//    }
     int subset_size = (int) (((double) num_reals) * mm_alpha);
     if (subset_size <= 0)
         throw runtime_error("solve_multimodal error: subsize size zero or negative");
@@ -112,7 +114,6 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
     vector<int> real_idxs;
     vector<string> pe_real_names_case,oe_real_names_case;
     string prname, orname;
-    Eigen::VectorXd q_vec;
     map<string, double> phi_map;
     Eigen::MatrixXd dmat;
     while (true) {
@@ -137,25 +138,27 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
         euclid_par_dist.clear();
         phi_map = weight_phi_map.at(oreal_name);
         //need to gaurd these:
-        real.resize(0);
-        q_vec.resize(0);
-        while (true)
-        {
-            if ((real.size() > 0) && (q_vec.size() > 0))
-            {
-                break;
-            }
-            if (pe_vec_guard.try_lock())
-            {
-                real = pe.get_real_vector(idx);
-                pe_vec_guard.unlock();
-            }
-            if (wmat_guard.try_lock())
-            {
-                q_vec = wmat.row(idx);
-                wmat_guard.unlock();
-            }
-        }
+//        real.resize(0);
+//        q_vec.resize(0);
+//        while (true)
+//        {
+//            if ((real.size() > 0) && (q_vec.size() > 0))
+//            {
+//                break;
+//            }
+//            if (pe_vec_guard.try_lock())
+//            {
+//                real = pe.get_real_vector(idx);
+//                pe_vec_guard.unlock();
+//            }
+//            if (wmat_guard.try_lock())
+//            {
+//                q_vec = wmat.row(idx);
+//                wmat_guard.unlock();
+//            }
+//        }
+        real = real_vec_map.at(preal_names[idx]);
+
 
         //scale the phi values from 0 to 1
 
@@ -191,7 +194,8 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
             if (preal_names[ii] == real_name)
                 continue;
             //diff = dmat.row(ii);
-            diff = pe.get_eigen_ptr()->row(ii) - real;
+            //diff = pe.get_eigen_ptr()->row(ii) - real;
+            diff = real_vec_map[preal_names[ii]];
             edist = diff.transpose() * parcov_inv * diff;
             euclid_par_dist[preal_names[ii]] = edist;
         }
@@ -242,9 +246,7 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
         }
         if (real_idxs.size() != subset_size+1)
         {
-
             throw runtime_error("multimodal_solve: real_idxs.size() != subset_size");
-
         }
 
         //need to gaurd these
@@ -253,15 +255,12 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
             if (results_lock.try_lock())
             {
                 mm_real_idx_map[real_name] = real_idxs;
-                mm_q_vec_map[real_name] = q_vec;
                 mm_real_name_map[real_name] = make_pair(pe_real_names_case,oe_real_names_case);
                 results_lock.unlock();
                 break;
             }
         }
-
     }
-
 }
 
 
@@ -285,7 +284,15 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         vector<exception_ptr> exception_ptrs;
         vector<string> preal_names = pe.get_real_names();
         vector<string> oreal_names = oe.get_real_names();
-        MmNeighborThread *ut_ptr = new MmNeighborThread(pe,mm_real_idx_map,mm_real_name_map,mm_q_vec_map,wmat);
+        unordered_map<string,Eigen::VectorXd> real_vec_map;
+        mm_q_vec_map.clear();
+        for (int i=0;i<preal_names.size();i++) {
+            real_vec_map[preal_names[i]] = pe.get_eigen_ptr()->row(i);
+            mm_q_vec_map[oreal_names[i]] = wmat.row(i);
+        }
+        map<string,int> real_map = pe.get_real_map();
+
+        MmNeighborThread *ut_ptr = new MmNeighborThread(real_vec_map,mm_real_idx_map,mm_real_name_map);
         for (int i = 0; i < num_threads; i++) {
             exception_ptrs.push_back(exception_ptr());
         }
@@ -294,7 +301,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
             //                                 vector<string> preal_names, vector<string> oreal_names,Eigen::SparseMatrix<double> parcov_inv,
             //                                 MmNeighborThread& worker, exception_ptr& eptr
             threads.push_back(thread(mm_neighbor_thread_function, i, verbose_level, mm_alpha, weight_phi_map,preal_names,
-                                     oreal_names, parcov_inv,std::ref(*ut_ptr), std::ref(exception_ptrs[i])));
+                                     oreal_names, parcov_inv, real_map, std::ref(*ut_ptr), std::ref(exception_ptrs[i])));
         }
 
         int num_exp = 0;

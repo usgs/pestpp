@@ -24,22 +24,22 @@ enum chancePoints { ALL, SINGLE };
 class MmNeighborThread
 {
 public:
-    MmNeighborThread(ParameterEnsemble& _pe,
+    MmNeighborThread(unordered_map<string,Eigen::VectorXd>& _real_vec_map,
                      unordered_map<string,vector<int>>& _mm_real_idx_map,
-                     unordered_map<string,pair<vector<string>,vector<string>>>& _mm_real_name_map,
-                        unordered_map<string,Eigen::VectorXd>& _mm_q_vec_map,const Eigen::MatrixXd& _wmat);
+                     unordered_map<string,pair<vector<string>,vector<string>>>& _mm_real_name_map);
 
-    void work(int tid, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map, vector<string> preal_names, vector<string> oreal_names,
+    void work(int tid, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map,
+              vector<string> preal_names, vector<string> oreal_names,map<string,int> real_map,
               Eigen::SparseMatrix<double> parcov_inv);
 
 protected:
-    ParameterEnsemble& pe;
+    unordered_map<string, Eigen::VectorXd>& real_vec_map;
     vector<int> indexes;
     int count, total;
-    const Eigen::MatrixXd& wmat;
+
     unordered_map<string,vector<int>>& mm_real_idx_map;
     unordered_map<string,pair<vector<string>,vector<string>>>& mm_real_name_map;
-    unordered_map<string,Eigen::VectorXd>& mm_q_vec_map;
+
     mutex next_lock, pe_vec_lock,pe_lock,wmat_lock,results_lock;
 
 };
