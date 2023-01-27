@@ -93,7 +93,7 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
     map<string,int> real_map;
     while (true) {
         if (pe_guard.try_lock()) {
-            int num_reals = pe.shape().first;
+            num_reals = pe.shape().first;
             real_map = pe.get_real_map();
             pe_guard.unlock();
             break;
@@ -176,30 +176,24 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
         phi_map.clear();
 
         //guard this access
-        while (true)
-        {
-            if (pe_guard.try_lock())
-            {
-                dmat = (pe.get_eigen_ptr()->rowwise() - real.transpose());
-                pe_guard.unlock();
-                break;
-            }
-        }
-
-        Eigen::VectorXd t = (dmat.transpose() * parcov_inv * dmat).rowwise().squaredNorm();
-        dmat.resize(0,0);
-//        for (int i=0;i<num_reals;i++) {
-
-//            dmat.row(i) = pe.get_eigen_ptr()->row(i) - real;
+//        while (true)
+//        {
+//            if (pe_guard.try_lock())
+//            {
+//                dmat = (pe.get_eigen_ptr()->rowwise() - real.transpose());
+//                pe_guard.unlock();
+//                break;
+//            }
 //        }
+
         for (int ii=0;ii<num_reals;ii++)
         {
             if (preal_names[ii] == real_name)
                 continue;
             //diff = dmat.row(ii);
-            //edist = diff.transpose() * parcov_inv * diff;
-            //euclid_par_dist[preal_names[ii]] = edist;
-            euclid_par_dist[preal_names[ii]] = t[ii];
+            diff = pe.get_eigen_ptr()->row(ii) - real;
+            edist = diff.transpose() * parcov_inv * diff;
+            euclid_par_dist[preal_names[ii]] = edist;
         }
 
         //scale the par space distance from 0 to 1
@@ -282,7 +276,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     performance_log->log_event("getting phi vectors for all weights");
     map<string,map<string,double>> weight_phi_map = ph.get_meas_phi_weight_ensemble(oe,weights);
     //int verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
-    if (num_threads > 1)
+    if (true) //(num_threads > 1)
     {
         performance_log->log_event("starting multithreaded MM neighbor calcs");
         ss.str("");
