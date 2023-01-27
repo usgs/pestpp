@@ -26,7 +26,9 @@ class MmNeighborThread
 public:
     MmNeighborThread(unordered_map<string,Eigen::VectorXd>& _real_vec_map,
                      unordered_map<string,vector<int>>& _mm_real_idx_map,
-                     unordered_map<string,pair<vector<string>,vector<string>>>& _mm_real_name_map);
+                     unordered_map<string,pair<vector<string>,vector<string>>>& _mm_real_name_map,
+                     unordered_map<string,unordered_map<string,double>> _neighbor_phi_map,
+                     unordered_map<string,unordered_map<string,double>> _neighbor_pardist_map);
 
     void work(int tid, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map,
               vector<string> preal_names, vector<string> oreal_names,map<string,int> real_map,
@@ -34,6 +36,8 @@ public:
 
 protected:
     unordered_map<string, Eigen::VectorXd>& real_vec_map;
+    unordered_map<string,unordered_map<string,double>> neighbor_phi_map;
+    unordered_map<string,unordered_map<string,double>> neighbor_pardist_map;
     vector<int> indexes;
     int count, total;
 
@@ -58,8 +62,6 @@ protected:
     mutex next_lock, phi_map_lock;
 
 };
-
-
 
 class L2PhiHandler
 {
@@ -157,8 +159,6 @@ public:
 	ParChangeSummarizer() { ; }
 	ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr);
 	void summarize(ParameterEnsemble &pe, string filename = string());
-	
-
 private:
 	double cv_dec_threshold = 0.3;
 	ParameterEnsemble * base_pe_ptr;

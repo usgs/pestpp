@@ -46,8 +46,11 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 
 MmNeighborThread::MmNeighborThread(unordered_map<string,Eigen::VectorXd>& _real_vec_map,
                                    unordered_map<string,vector<int>>& _mm_real_idx_map,
-                                   unordered_map<string,pair<vector<string>,vector<string>>>& _mm_real_name_map):
-real_vec_map(_real_vec_map),mm_real_idx_map(_mm_real_idx_map),mm_real_name_map(_mm_real_name_map)
+                                   unordered_map<string,pair<vector<string>,vector<string>>>& _mm_real_name_map,
+                                   unordered_map<string,unordered_map<string,double>> _neighbor_phi_map,
+                                   unordered_map<string,unordered_map<string,double>> _neighbor_pardist_map):
+real_vec_map(_real_vec_map),mm_real_idx_map(_mm_real_idx_map),mm_real_name_map(_mm_real_name_map),
+neighbor_phi_map(_neighbor_phi_map),neighbor_pardist_map(_neighbor_pardist_map)
 {
     count = 0;
     total = 0;
@@ -116,6 +119,7 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
     string prname, orname;
     map<string, double> phi_map;
     Eigen::MatrixXd dmat;
+    unordered_map<string,double> nphi,npardist;
     while (true) {
 
         while (true) {
@@ -157,7 +161,7 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
 //                wmat_guard.unlock();
 //            }
 //        }
-        real = real_vec_map.at(preal_names[idx]);
+        real = real_vec_map.at(real_name);
 
 
         //scale the phi values from 0 to 1
@@ -233,12 +237,16 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
         real_idxs.push_back(real_map.at(real_name));
         pe_real_names_case.push_back(real_name);
         oe_real_names_case.push_back(oreal_name);
+        nphi.clear();
+        npardist.clear();
         int iii = 0;
         for (sortedset_iter ii = fitness_sorted.begin(); ii != fitness_sorted.end(); ++ii) {
             int iidx = real_map.at(ii->first);
             real_idxs.push_back(iidx);
             pe_real_names_case.push_back(ii->first);
             oe_real_names_case.push_back(oreal_names[iidx]);
+            nphi[oreal_names[idx]] = par_phi_map.at(ii->first);
+            npardist[oreal_names[idx]] = euclid_par_dist.at(ii->first);
             iii++;
             if (iii >= subset_size)//plus one to count 'real_name'
                 break;
@@ -256,6 +264,8 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
             {
                 mm_real_idx_map[real_name] = real_idxs;
                 mm_real_name_map[real_name] = make_pair(pe_real_names_case,oe_real_names_case);
+                neighbor_phi_map[real_name] = nphi;
+                neighbor_pardist_map[real_name] = npardist;
                 results_lock.unlock();
                 break;
             }
@@ -275,7 +285,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     performance_log->log_event("getting phi vectors for all weights");
     map<string,map<string,double>> weight_phi_map = ph.get_meas_phi_weight_ensemble(oe,weights);
     //int verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
-    if (true) //(num_threads > 1)
+    if (num_threads > 1)
     {
         performance_log->log_event("starting multithreaded MM neighbor calcs");
         ss.str("");
@@ -285,6 +295,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         vector<string> preal_names = pe.get_real_names();
         vector<string> oreal_names = oe.get_real_names();
         unordered_map<string,Eigen::VectorXd> real_vec_map;
+        unordered_map<string,unordered_map<string,double>> neighbor_phi_map, neighbor_pardist_map;
         mm_q_vec_map.clear();
         for (int i=0;i<preal_names.size();i++) {
             real_vec_map[preal_names[i]] = pe.get_eigen_ptr()->row(i);
@@ -292,7 +303,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         }
         map<string,int> real_map = pe.get_real_map();
 
-        MmNeighborThread *ut_ptr = new MmNeighborThread(real_vec_map,mm_real_idx_map,mm_real_name_map);
+        MmNeighborThread *ut_ptr = new MmNeighborThread(real_vec_map,mm_real_idx_map,mm_real_name_map,neighbor_phi_map,neighbor_pardist_map);
         for (int i = 0; i < num_threads; i++) {
             exception_ptrs.push_back(exception_ptr());
         }
@@ -348,6 +359,36 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         }
         delete ut_ptr;
 
+        if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1) {
+            int subset_size = (int) (((double) pe.shape().first) * mm_alpha);
+            ofstream csv;
+            ss.str("");
+            ss << file_manager.get_base_filename() << "." << iter << "." << ".mm.info.csv";
+            csv.open(ss.str());
+            csv << "pe_real_name,oe_real_name";
+            for (int j = 0; j < subset_size; j++) {
+                csv << ",neighbor_" << j << ",phi,pdiff";
+            }
+            csv << endl;
+            string prname,orname;
+            for (auto& names : mm_real_name_map)
+            {
+                for (int i=0;i<names.first.size();i++)
+                {
+                    prname = names.second.first[i];
+                    orname = names.second.second[i];
+                    if (prname == names.first)
+                        continue;
+                    csv << "," << prname << "," << orname << "," << neighbor_phi_map.at(names.first).at(orname) << ",";
+                    csv << neighbor_pardist_map.at(names.first).at(orname);
+
+                }
+                csv << endl;
+
+            }
+            csv.close();
+
+        }
         return;
     }
 
