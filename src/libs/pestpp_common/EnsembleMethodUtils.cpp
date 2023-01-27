@@ -47,8 +47,8 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
 MmNeighborThread::MmNeighborThread(unordered_map<string,Eigen::VectorXd>& _real_vec_map,
                                    unordered_map<string,vector<int>>& _mm_real_idx_map,
                                    unordered_map<string,pair<vector<string>,vector<string>>>& _mm_real_name_map,
-                                   unordered_map<string,unordered_map<string,double>> _neighbor_phi_map,
-                                   unordered_map<string,unordered_map<string,double>> _neighbor_pardist_map):
+                                   unordered_map<string,unordered_map<string,double>>& _neighbor_phi_map,
+                                   unordered_map<string,unordered_map<string,double>>& _neighbor_pardist_map):
 real_vec_map(_real_vec_map),mm_real_idx_map(_mm_real_idx_map),mm_real_name_map(_mm_real_name_map),
 neighbor_phi_map(_neighbor_phi_map),neighbor_pardist_map(_neighbor_pardist_map)
 {
@@ -239,14 +239,16 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
         oe_real_names_case.push_back(oreal_name);
         nphi.clear();
         npardist.clear();
+        nphi[oreal_name] = par_phi_map[real_name];
+        npardist[oreal_name] = 0.0;
         int iii = 0;
         for (sortedset_iter ii = fitness_sorted.begin(); ii != fitness_sorted.end(); ++ii) {
             int iidx = real_map.at(ii->first);
             real_idxs.push_back(iidx);
             pe_real_names_case.push_back(ii->first);
             oe_real_names_case.push_back(oreal_names[iidx]);
-            nphi[oreal_names[idx]] = par_phi_map.at(ii->first);
-            npardist[oreal_names[idx]] = euclid_par_dist.at(ii->first);
+            nphi[oreal_names[iidx]] = par_phi_map.at(ii->first);
+            npardist[oreal_names[iidx]] = euclid_par_dist.at(ii->first);
             iii++;
             if (iii >= subset_size)//plus one to count 'real_name'
                 break;
@@ -285,7 +287,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     performance_log->log_event("getting phi vectors for all weights");
     map<string,map<string,double>> weight_phi_map = ph.get_meas_phi_weight_ensemble(oe,weights);
     //int verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
-    if (num_threads > 1)
+    if (false) //(num_threads > 1)
     {
         performance_log->log_event("starting multithreaded MM neighbor calcs");
         ss.str("");
@@ -373,13 +375,13 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
             string prname,orname;
             for (auto& names : mm_real_name_map)
             {
-                for (int i=0;i<names.first.size();i++)
+                for (int i=0;i<names.second.first.size();i++)
                 {
                     prname = names.second.first[i];
                     orname = names.second.second[i];
-                    if (prname == names.first)
-                        continue;
-                    csv << "," << prname << "," << orname << "," << neighbor_phi_map.at(names.first).at(orname) << ",";
+                    //if (prname == names.first)
+                    //    continue;
+                    csv  << prname << "," << orname << "," << neighbor_phi_map.at(names.first).at(orname) << ",";
                     csv << neighbor_pardist_map.at(names.first).at(orname);
 
                 }
