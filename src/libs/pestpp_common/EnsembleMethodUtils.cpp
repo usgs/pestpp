@@ -268,14 +268,14 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
                 mm_real_name_map[real_name] = make_pair(pe_real_names_case,oe_real_names_case);
                 neighbor_phi_map[real_name] = nphi;
                 neighbor_pardist_map[real_name] = npardist;
-                cout << endl << "real_name: " << real_name << endl;
-                for (sortedset_iter ii = fitness_sorted.begin(); ii != fitness_sorted.end(); ++ii) {
-                    cout << "neighbor:" << ii->first << ", score:" << ii->second;
-                    cout << ", phi:" << par_phi_map.at(ii->first) << ", par dist:" << euclid_par_dist.at(ii->first) << endl;
-
-                }
-                cout << endl;
-                cout << "real values:" << real << endl;
+//                cout << endl << "real_name: " << real_name << endl;
+//                for (sortedset_iter ii = fitness_sorted.begin(); ii != fitness_sorted.end(); ++ii) {
+//                    cout << "neighbor:" << ii->first << ", score:" << ii->second;
+//                    cout << ", phi:" << par_phi_map.at(ii->first) << ", par dist:" << euclid_par_dist.at(ii->first) << endl;
+//
+//                }
+//                cout << endl;
+//                cout << "real values:" << real << endl;
 
 
                 results_lock.unlock();
@@ -375,9 +375,8 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
             int subset_size = (int) (((double) pe.shape().first) * mm_alpha);
             ofstream csv;
             ss.str("");
-            ss << file_manager.get_base_filename() << "." << iter << "." << ".mm.info.csv";
-            //csv.open(ss.str());
-            csv.open("temp.csv");
+            ss << file_manager.get_base_filename() << "." << iter << ".mm.info.csv";
+            csv.open(ss.str());
             csv << "pe_real_name,oe_real_name";
             for (int j = 0; j < subset_size; j++) {
                 csv << ",par_real_neighbor_" << j << ",phi,pdiff";
