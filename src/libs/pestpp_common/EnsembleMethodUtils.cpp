@@ -199,7 +199,7 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
                 continue;
             //diff = dmat.row(ii);
             //diff = pe.get_eigen_ptr()->row(ii) - real;
-            diff = real_vec_map[preal_names[ii]];
+            diff = real_vec_map[preal_names[ii]] - real;
             edist = diff.transpose() * parcov_inv * diff;
             euclid_par_dist[preal_names[ii]] = edist;
         }
@@ -239,16 +239,16 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
         oe_real_names_case.push_back(oreal_name);
         nphi.clear();
         npardist.clear();
-        nphi[oreal_name] = par_phi_map[real_name];
-        npardist[oreal_name] = 0.0;
+        //nphi[oreal_name] = par_phi_map[real_name];
+        //npardist[oreal_name] = 0.0;
         int iii = 0;
         for (sortedset_iter ii = fitness_sorted.begin(); ii != fitness_sorted.end(); ++ii) {
             int iidx = real_map.at(ii->first);
             real_idxs.push_back(iidx);
             pe_real_names_case.push_back(ii->first);
             oe_real_names_case.push_back(oreal_names[iidx]);
-            nphi[oreal_names[iidx]] = par_phi_map.at(ii->first);
-            npardist[oreal_names[iidx]] = euclid_par_dist.at(ii->first);
+            nphi[preal_names[iidx]] = par_phi_map.at(ii->first);
+            npardist[preal_names[iidx]] = euclid_par_dist.at(ii->first);
             iii++;
             if (iii >= subset_size)//plus one to count 'real_name'
                 break;
@@ -268,6 +268,16 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
                 mm_real_name_map[real_name] = make_pair(pe_real_names_case,oe_real_names_case);
                 neighbor_phi_map[real_name] = nphi;
                 neighbor_pardist_map[real_name] = npardist;
+                cout << endl << "real_name: " << real_name << endl;
+                for (sortedset_iter ii = fitness_sorted.begin(); ii != fitness_sorted.end(); ++ii) {
+                    cout << "neighbor:" << ii->first << ", score:" << ii->second;
+                    cout << ", phi:" << par_phi_map.at(ii->first) << ", par dist:" << euclid_par_dist.at(ii->first) << endl;
+
+                }
+                cout << endl;
+                cout << "real values:" << real << endl;
+
+
                 results_lock.unlock();
                 break;
             }
@@ -287,7 +297,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
     performance_log->log_event("getting phi vectors for all weights");
     map<string,map<string,double>> weight_phi_map = ph.get_meas_phi_weight_ensemble(oe,weights);
     //int verbose_level = pest_scenario.get_pestpp_options().get_ies_verbose_level();
-    if (false) //(num_threads > 1)
+    if (num_threads > 1)
     {
         performance_log->log_event("starting multithreaded MM neighbor calcs");
         ss.str("");
@@ -366,30 +376,31 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
             ofstream csv;
             ss.str("");
             ss << file_manager.get_base_filename() << "." << iter << "." << ".mm.info.csv";
-            csv.open(ss.str());
+            //csv.open(ss.str());
+            csv.open("temp.csv");
             csv << "pe_real_name,oe_real_name";
             for (int j = 0; j < subset_size; j++) {
-                csv << ",neighbor_" << j << ",phi,pdiff";
+                csv << ",par_real_neighbor_" << j << ",phi,pdiff";
             }
             csv << endl;
             string prname,orname;
-            for (auto& names : mm_real_name_map)
+            //for (auto& names : mm_real_name_map)
+            for (auto real_name : preal_names)
             {
-                for (int i=0;i<names.second.first.size();i++)
+                auto names = mm_real_name_map.at(real_name);
+                csv << real_name << "," << mm_real_name_map.at(real_name).second[0];
+                for (int i=0;i<names.first.size();i++)
                 {
-                    prname = names.second.first[i];
-                    orname = names.second.second[i];
-                    //if (prname == names.first)
-                    //    continue;
-                    csv  << prname << "," << orname << "," << neighbor_phi_map.at(names.first).at(orname) << ",";
-                    csv << neighbor_pardist_map.at(names.first).at(orname);
-
+                    prname = names.first[i];
+                    orname = names.second[i];
+                    if (prname == real_name)
+                        continue;
+                    csv  << "," << prname << "," << neighbor_phi_map.at(real_name).at(prname) << ",";
+                    csv << neighbor_pardist_map.at(real_name).at(prname);
                 }
                 csv << endl;
-
             }
             csv.close();
-
         }
         return;
     }
@@ -434,7 +445,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         csv.open(ss.str());
         csv << "pe_real_name,oe_real_name";
         for (int j = 0; j < subset_size; j++) {
-            csv << ",neighbor_" << j << ",phi,pdiff";
+            csv << ",par_real_neighbor_" << j << ",phi,pdiff";
         }
         csv << endl;
 
@@ -556,7 +567,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
             orname = oe_real_names_case[i];
             if (prname == real_name)
                 continue;
-            csv << "," << prname << "," << orname << "," << par_phi_map.at(prname) << "," << euclid_par_dist.at(prname);
+            csv << "," << prname << ","  << par_phi_map.at(prname) << "," << euclid_par_dist.at(prname);
             }
 
             csv << endl;
