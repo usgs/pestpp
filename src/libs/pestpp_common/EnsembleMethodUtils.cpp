@@ -38,7 +38,7 @@ EnsembleSolver::EnsembleSolver(PerformanceLog* _performance_log, FileManager& _f
     //prep the fast look par cov info
 
     if (localizer.get_use()) {
-        message(1, "preparing fast-look containers for threaded localization solve");
+        message(1, "preparing fast-lookup containers for threaded localization solve");
         initialize_for_localized_solve();
     }
 
@@ -2749,6 +2749,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
                         loc = localizer.get_obsdiff_hadamard_matrix(num_reals, key, obs_names);
                     }
                     loc_guard.unlock();
+                    break;
                 }
 
             }
