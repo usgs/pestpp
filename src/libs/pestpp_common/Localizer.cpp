@@ -913,7 +913,7 @@ void AutoAdaLocThread::work(int thread_id)
 			//bg_std = sqrt((bg_cc_vec - bg_mean).pow(2).sum() / (nreals - 1));
 			bg_std = sqrt(1.0/((double)nreals-2));
 			thres = bg_mean + (sign * sigma_dist * bg_std);
-			if (ies_verbose > 2)
+			if (ies_verbose > 1)
 			{
 				
 				while (true)
