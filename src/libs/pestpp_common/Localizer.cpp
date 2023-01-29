@@ -742,7 +742,7 @@ AutoAdaLocThread::AutoAdaLocThread(PerformanceLog *_performance_log, ofstream *_
 	performance_log = _performance_log;
 	f_out = _f_out;
 	sigma_dist = _sigma_dist;
-	
+	par_count = 0;
 	for (int i = 0; i < obs_names.size(); i++)
 		idx2obs[i] = obs_names[i];
 
@@ -800,10 +800,10 @@ void AutoAdaLocThread::work(int thread_id)
 					par_indices_guard.unlock();
 					return;
 				}
-				if (par_indices.size() % 1000 == 0)
+				if (par_count % 1000 == 0)
 				{
 					ss.str("");
-					ss << "autoadaloc iter " << iter << " progress: " << par_indices.size() << " of " << npar << " parameters done";
+					ss << "autoadaloc iter " << iter << " progress: " << par_count << " of " << npar << " parameters done";
 					while (true)
 					{
 						if (pfm_guard.try_lock())
@@ -836,6 +836,7 @@ void AutoAdaLocThread::work(int thread_id)
 					use_list_obs = false;
 				}*/
 				pcount++;
+				par_count++;
 				par_indices_guard.unlock();
 				break;
 			}

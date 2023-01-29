@@ -31,7 +31,7 @@ public:
 
 
 private:
-	int npar, nobs, ies_verbose, iter;
+	int npar, nobs, ies_verbose, iter, par_count;
 	int nzero_par, nzero_obs;
 	double sigma_dist;
 	Eigen::MatrixXd &pe_diff, &oe_diff;
