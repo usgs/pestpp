@@ -44,7 +44,7 @@ protected:
     unordered_map<string,vector<int>>& mm_real_idx_map;
     unordered_map<string,pair<vector<string>,vector<string>>>& mm_real_name_map;
 
-    mutex next_lock, pe_vec_lock,pe_lock,wmat_lock,results_lock;
+    mutex next_lock, results_lock;
 
 };
 

@@ -75,9 +75,6 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
                             vector<string> oreal_names,map<string,int> real_map,Eigen::SparseMatrix<double> parcov_inv)
 {
     unique_lock<mutex> next_guard(next_lock, defer_lock);
-    unique_lock<mutex> pe_vec_guard(pe_vec_lock, defer_lock);
-    unique_lock<mutex> pe_guard(pe_lock, defer_lock);
-    unique_lock<mutex> wmat_guard(wmat_lock, defer_lock);
     unique_lock<mutex> results_guard(results_lock, defer_lock);
 
 
@@ -141,26 +138,7 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
         oreal_name = oreal_names[idx];
         euclid_par_dist.clear();
         phi_map = weight_phi_map.at(oreal_name);
-        //need to gaurd these:
-//        real.resize(0);
-//        q_vec.resize(0);
-//        while (true)
-//        {
-//            if ((real.size() > 0) && (q_vec.size() > 0))
-//            {
-//                break;
-//            }
-//            if (pe_vec_guard.try_lock())
-//            {
-//                real = pe.get_real_vector(idx);
-//                pe_vec_guard.unlock();
-//            }
-//            if (wmat_guard.try_lock())
-//            {
-//                q_vec = wmat.row(idx);
-//                wmat_guard.unlock();
-//            }
-//        }
+
         real = real_vec_map.at(real_name);
 
 
@@ -181,17 +159,6 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
             par_phi_map[preal_names[ii]] = phi_map.at(oreal_names[ii]);
         }
         phi_map.clear();
-
-        //guard this access
-//        while (true)
-//        {
-//            if (pe_guard.try_lock())
-//            {
-//                dmat = (pe.get_eigen_ptr()->rowwise() - real.transpose());
-//                pe_guard.unlock();
-//                break;
-//            }
-//        }
 
         for (int ii=0;ii<num_reals;ii++)
         {
@@ -1854,89 +1821,110 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 	//loop until this thread gets access to all the containers it needs to solve with 
 	//which in this solution, is all active pars and obs...
 	
-	while (true)
-	{
-		//if all the solution pieces are filled, break out and solve!
-		if (((use_approx) || (par_resid.rows() > 0)) &&
-			(weights.size() > 0) &&
-			(parcov_inv.size() > 0) &&
-			(par_diff.rows() > 0) &&
-			(obs_resid.rows() > 0) &&
-			(obs_err.rows() > 0) &&
-			(obs_diff.rows() > 0) &&
-			((!use_localizer) || (loc.rows() > 0)) &&
-			((use_approx) || (Am.rows() > 0)))
-			break;
+//	while (true)
+//	{
+//		//if all the solution pieces are filled, break out and solve!
+//		if (((use_approx) || (par_resid.rows() > 0)) &&
+//			(weights.size() > 0) &&
+//			(parcov_inv.size() > 0) &&
+//			(par_diff.rows() > 0) &&
+//			(obs_resid.rows() > 0) &&
+//			(obs_err.rows() > 0) &&
+//			(obs_diff.rows() > 0) &&
+//			((!use_localizer) || (loc.rows() > 0)) &&
+//			((use_approx) || (Am.rows() > 0)))
+//			break;
+//
+//
+//		//get access to the obs_diff container
+//		if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
+//		{
+//			//piggy back here for thread safety
+//			//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
+//			//	use_propack = true;
+//			obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
+//			obs_diff_guard.unlock();
+//		}
+//
+//		//get access to the residual container
+//		if ((obs_resid.rows() == 0) && (obs_resid_guard.try_lock()))
+//		{
+//			obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
+//			obs_resid_guard.unlock();
+//		}
+//
+//		//get access to the obs noise container
+//		if ((obs_err.rows() == 0) && (obs_err_guard.try_lock()))
+//		{
+//			obs_err = local_utils::get_matrix_from_map(num_reals, obs_names, obs_err_map);
+//			obs_err_guard.unlock();
+//		}
+//
+//		//get access to the par diff container
+//		if ((par_diff.rows() == 0) && (par_diff_guard.try_lock()))
+//		{
+//			par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
+//			par_diff_guard.unlock();
+//		}
+//
+//		//get access to the par residual container
+//		if ((par_resid.rows() == 0) && (par_resid_guard.try_lock()))
+//		{
+//			par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
+//			par_resid_guard.unlock();
+//		}
+//
+//		//get access to the obs weights container
+//		if ((weights.rows() == 0) && (weight_guard.try_lock()))
+//		{
+//			weights = local_utils::get_matrix_from_map(obs_names, weight_map);
+//			weight_guard.unlock();
+//		}
+//
+//		//get access to the inverse prior parcov
+//		if ((parcov_inv.rows() == 0) && (parcov_guard.try_lock()))
+//		{
+//			parcov_inv = local_utils::get_matrix_from_map(par_names, parcov_inv_map);
+//			parcov_guard.unlock();
+//		}
+//
+//		//if needed, get access to the Am container - needed in the full glm solution
+//		if ((!use_approx) && (Am.rows() == 0) && (am_guard.try_lock()))
+//		{
+//			//Am = local_utils::get_matrix_from_map(num_reals, par_names, Am_map).transpose();
+//			int am_cols = Am_map[par_names[0]].size();
+//			Am.resize(par_names.size(), am_cols);
+//			Am.setZero();
+//
+//			for (int j = 0; j < par_names.size(); j++)
+//			{
+//				Am.row(j) = Am_map[par_names[j]];
+//			}
+//			am_guard.unlock();
+//		}
+//	}
 
 
-		//get access to the obs_diff container
-		if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
-		{
-			//piggy back here for thread safety
-			//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
-			//	use_propack = true;
-			obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
-			obs_diff_guard.unlock();
-		}
+    obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
+    obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
+    obs_err = local_utils::get_matrix_from_map(num_reals, obs_names, obs_err_map);
+    par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
+    par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
+    weights = local_utils::get_matrix_from_map(obs_names, weight_map);
+    parcov_inv = local_utils::get_matrix_from_map(par_names, parcov_inv_map);
 
-		//get access to the residual container
-		if ((obs_resid.rows() == 0) && (obs_resid_guard.try_lock()))
-		{
-			obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
-			obs_resid_guard.unlock();
-		}
+    if ((!use_approx) && (Am.rows() == 0))
+    {
+        //Am = local_utils::get_matrix_from_map(num_reals, par_names, Am_map).transpose();
+        int am_cols = Am_map[par_names[0]].size();
+        Am.resize(par_names.size(), am_cols);
+        Am.setZero();
 
-		//get access to the obs noise container
-		if ((obs_err.rows() == 0) && (obs_err_guard.try_lock()))
-		{
-			obs_err = local_utils::get_matrix_from_map(num_reals, obs_names, obs_err_map);
-			obs_err_guard.unlock();
-		}
-
-		//get access to the par diff container
-		if ((par_diff.rows() == 0) && (par_diff_guard.try_lock()))
-		{
-			par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
-			par_diff_guard.unlock();
-		}
-
-		//get access to the par residual container
-		if ((par_resid.rows() == 0) && (par_resid_guard.try_lock()))
-		{
-			par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
-			par_resid_guard.unlock();
-		}
-
-		//get access to the obs weights container
-		if ((weights.rows() == 0) && (weight_guard.try_lock()))
-		{
-			weights = local_utils::get_matrix_from_map(obs_names, weight_map);
-			weight_guard.unlock();
-		}
-
-		//get access to the inverse prior parcov
-		if ((parcov_inv.rows() == 0) && (parcov_guard.try_lock()))
-		{
-			parcov_inv = local_utils::get_matrix_from_map(par_names, parcov_inv_map);
-			parcov_guard.unlock();
-		}
-
-		//if needed, get access to the Am container - needed in the full glm solution
-		if ((!use_approx) && (Am.rows() == 0) && (am_guard.try_lock()))
-		{
-			//Am = local_utils::get_matrix_from_map(num_reals, par_names, Am_map).transpose();
-			int am_cols = Am_map[par_names[0]].size();
-			Am.resize(par_names.size(), am_cols);
-			Am.setZero();
-
-			for (int j = 0; j < par_names.size(); j++)
-			{
-				Am.row(j) = Am_map[par_names[j]];
-			}
-			am_guard.unlock();
-		}
-	}
-
+        for (int j = 0; j < par_names.size(); j++)
+        {
+            Am.row(j) = Am_map[par_names[j]];
+        }
+    }
 
 	par_diff.transposeInPlace();
 	obs_diff.transposeInPlace();
@@ -2648,105 +2636,146 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 		
 		//now loop until this thread gets access to all the containers it needs to solve with
-		while (true)
-		{
-			//if all the solution pieces are filled, break out and solve!
-			if (((use_approx) || (par_resid.rows() > 0)) &&
-				(weights.size() > 0) &&
-				(parcov_inv.size() > 0) &&
-				(par_diff.rows() > 0) &&
-				(obs_resid.rows() > 0) &&
-				(obs_err.rows() > 0) &&
-				(obs_diff.rows() > 0) &&
-				((!use_localizer) || (loc.rows() > 0)) &&
-				((use_approx) || (Am.rows() > 0)))
-				break;
-			
-			//get access to the localizer
-			if ((use_localizer) && (loc.rows() == 0) && (loc_guard.try_lock()))
-			{
-				//get a matrix that is either the shape of par diff or obs diff
-				if (loc_by_obs)
-				{
-					//loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
-					loc = localizer.get_pardiff_hadamard_matrix(num_reals, key, par_names);
-				}
+//		while (true)
+//		{
+//			//if all the solution pieces are filled, break out and solve!
+//			if (((use_approx) || (par_resid.rows() > 0)) &&
+//				(weights.size() > 0) &&
+//				(parcov_inv.size() > 0) &&
+//				(par_diff.rows() > 0) &&
+//				(obs_resid.rows() > 0) &&
+//				(obs_err.rows() > 0) &&
+//				(obs_diff.rows() > 0) &&
+//				((!use_localizer) || (loc.rows() > 0)) &&
+//				((use_approx) || (Am.rows() > 0)))
+//				break;
+//
+//			//get access to the localizer
+//			if ((use_localizer) && (loc.rows() == 0) && (loc_guard.try_lock()))
+//			{
+//				//get a matrix that is either the shape of par diff or obs diff
+//				if (loc_by_obs)
+//				{
+//					//loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
+//					loc = localizer.get_pardiff_hadamard_matrix(num_reals, key, par_names);
+//				}
+//
+//				else
+//				{
+//					//loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
+//					loc = localizer.get_obsdiff_hadamard_matrix(num_reals, key, obs_names);
+//				}
+//				loc_guard.unlock();
+//			}
+//
+//			//get access to the obs_diff container
+//			if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
+//			{
+//				//piggy back here for thread safety
+//				//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
+//				//	use_propack = true;
+//				obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
+//				obs_diff_guard.unlock();
+//			}
+//
+//			//get access to the residual container
+//			if ((obs_resid.rows() == 0) && (obs_resid_guard.try_lock()))
+//			{
+//				obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
+//				obs_resid_guard.unlock();
+//			}
+//
+//			//get access to the obs noise container
+//			if ((obs_err.rows() == 0) && (obs_err_guard.try_lock()))
+//			{
+//				obs_err = local_utils::get_matrix_from_map(num_reals, obs_names, obs_err_map);
+//				obs_err_guard.unlock();
+//			}
+//
+//			//get access to the par diff container
+//			if ((par_diff.rows() == 0) && (par_diff_guard.try_lock()))
+//			{
+//				par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
+//				par_diff_guard.unlock();
+//			}
+//
+//			//get access to the par residual container
+//			if ((par_resid.rows() == 0) && (par_resid_guard.try_lock()))
+//			{
+//				par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
+//				par_resid_guard.unlock();
+//			}
+//
+//			//get access to the obs weights container
+//			if ((weights.rows() == 0) && (weight_guard.try_lock()))
+//			{
+//				weights = local_utils::get_matrix_from_map(obs_names, weight_map);
+//				weight_guard.unlock();
+//			}
+//
+//			//get access to the inverse prior parcov
+//			if ((parcov_inv.rows() == 0) && (parcov_guard.try_lock()))
+//			{
+//				parcov_inv = local_utils::get_matrix_from_map(par_names, parcov_inv_map);
+//				parcov_guard.unlock();
+//			}
+//
+//			//if needed, get access to the Am container - needed in the full glm solution
+//			if ((!use_approx) && (Am.rows() == 0) && (am_guard.try_lock()))
+//			{
+//				//Am = local_utils::get_matrix_from_map(num_reals, par_names, Am_map).transpose();
+//				int am_cols = Am_map[par_names[0]].size();
+//				Am.resize(par_names.size(), am_cols);
+//				Am.setZero();
+//
+//				for (int j = 0; j < par_names.size(); j++)
+//				{
+//					Am.row(j) = Am_map[par_names[j]];
+//				}
+//				am_guard.unlock();
+//			}
+//		}
 
-				else
-				{
-					//loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
-					loc = localizer.get_obsdiff_hadamard_matrix(num_reals, key, obs_names);
-				}
-				loc_guard.unlock();
-			}
+		if ((use_localizer) && (loc.rows() == 0)) {
+            while (true) {
+                //get access to the localizer
+                if (loc_guard.try_lock()) {
+                    //get a matrix that is either the shape of par diff or obs diff
+                    if (loc_by_obs) {
+                        //loc = localizer.get_localizing_par_hadamard_matrix(num_reals, obs_names[0], par_names);
+                        loc = localizer.get_pardiff_hadamard_matrix(num_reals, key, par_names);
+                    } else {
+                        //loc = localizer.get_localizing_obs_hadamard_matrix(num_reals, par_names[0], obs_names);
+                        loc = localizer.get_obsdiff_hadamard_matrix(num_reals, key, obs_names);
+                    }
+                    loc_guard.unlock();
+                }
 
-			//get access to the obs_diff container
-			if ((obs_diff.rows() == 0) && (obs_diff_guard.try_lock()))
-			{
-				//piggy back here for thread safety
-				//if (pe_upgrade.get_pest_scenario_ptr()->get_pestpp_options().get_svd_pack() == PestppOptions::SVD_PACK::PROPACK)
-				//	use_propack = true;
-				obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
-				obs_diff_guard.unlock();
-			}
+            }
+        }
 
-			//get access to the residual container
-			if ((obs_resid.rows() == 0) && (obs_resid_guard.try_lock()))
-			{
-				obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
-				obs_resid_guard.unlock();
-			}
+        obs_diff = local_utils::get_matrix_from_map(num_reals, obs_names, obs_diff_map);
+        obs_resid = local_utils::get_matrix_from_map(num_reals, obs_names, obs_resid_map);
+        obs_err = local_utils::get_matrix_from_map(num_reals, obs_names, obs_err_map);
+        par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
+        par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
+        weights = local_utils::get_matrix_from_map(obs_names, weight_map);
+        parcov_inv = local_utils::get_matrix_from_map(par_names, parcov_inv_map);
 
-			//get access to the obs noise container
-			if ((obs_err.rows() == 0) && (obs_err_guard.try_lock()))
-			{
-				obs_err = local_utils::get_matrix_from_map(num_reals, obs_names, obs_err_map);
-				obs_err_guard.unlock();
-			}
+        if ((!use_approx) && (Am.rows() == 0))
+        {
+            //Am = local_utils::get_matrix_from_map(num_reals, par_names, Am_map).transpose();
+            int am_cols = Am_map[par_names[0]].size();
+            Am.resize(par_names.size(), am_cols);
+            Am.setZero();
 
-			//get access to the par diff container
-			if ((par_diff.rows() == 0) && (par_diff_guard.try_lock()))
-			{
-				par_diff = local_utils::get_matrix_from_map(num_reals, par_names, par_diff_map);
-				par_diff_guard.unlock();
-			}
+            for (int j = 0; j < par_names.size(); j++)
+            {
+                Am.row(j) = Am_map[par_names[j]];
+            }
+        }
 
-			//get access to the par residual container
-			if ((par_resid.rows() == 0) && (par_resid_guard.try_lock()))
-			{
-				par_resid = local_utils::get_matrix_from_map(num_reals, par_names, par_resid_map);
-				par_resid_guard.unlock();
-			}
 
-			//get access to the obs weights container
-			if ((weights.rows() == 0) && (weight_guard.try_lock()))
-			{
-				weights = local_utils::get_matrix_from_map(obs_names, weight_map);
-				weight_guard.unlock();
-			}
-
-			//get access to the inverse prior parcov
-			if ((parcov_inv.rows() == 0) && (parcov_guard.try_lock()))
-			{
-				parcov_inv = local_utils::get_matrix_from_map(par_names, parcov_inv_map);
-				parcov_guard.unlock();
-			}
-
-			//if needed, get access to the Am container - needed in the full glm solution
-			if ((!use_approx) && (Am.rows() == 0) && (am_guard.try_lock()))
-			{
-				//Am = local_utils::get_matrix_from_map(num_reals, par_names, Am_map).transpose();
-				int am_cols = Am_map[par_names[0]].size();
-				Am.resize(par_names.size(), am_cols);
-				Am.setZero();
-
-				for (int j = 0; j < par_names.size(); j++)
-				{
-					Am.row(j) = Am_map[par_names[j]];
-				}
-				am_guard.unlock();
-			}
-		}
 
 		par_diff.transposeInPlace();
 		obs_diff.transposeInPlace();
