@@ -142,6 +142,10 @@ int main(int argc, char* argv[])
 		else if (cmdline.restart)
 		{
 			ifstream &fin_rst = file_manager.open_ifile_ext("rst");
+			if (fin_rst.bad())
+            {
+			    throw runtime_error("restart error: error opening rst file '"+file_manager.get_base_filename()+".rst'");
+            }
 			restart_ctl.process_rst_file(fin_rst);
 			file_manager.close_file("rst");
 			restart_flag = true;

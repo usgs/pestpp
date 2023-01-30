@@ -7453,8 +7453,17 @@ void EnsembleMethod::message(int level, const string& _message, vector<string> _
 	if (_extras.size() > 0)
 	{
 
-		for (auto& e : _extras)
-			ss << e << " , ";
+        int ee = 0;
+        for (auto& e : _extras)
+        {
+            ss << e << " , ";
+            if (ee > 5)
+            {
+                ss << endl << "     ";
+                ee = 0;
+            }
+            ee++;
+        }
 
 	}
 	if (level == 0)
@@ -7478,8 +7487,17 @@ void EnsembleMethod::message(int level, const string& _message, vector<int> _ext
 	if (_extras.size() > 0)
 	{
 
-		for (auto& e : _extras)
-			ss << e << " , ";
+        int ee = 0;
+        for (auto& e : _extras)
+        {
+            ss << e << " , ";
+            if (ee > 5)
+            {
+                ss << endl << "     ";
+                ee = 0;
+            }
+            ee++;
+        }
 
 	}
 	if (level == 0)
@@ -7499,11 +7517,21 @@ void EnsembleMethod::message(int level, const string& _message, vector<double> _
 	else if (level == 1)
 		ss << "...";
 	ss << _message;
+
 	if (_extras.size() > 0)
 	{
-
+        int ee = 0;
 		for (auto& e : _extras)
-			ss << e << " , ";
+        {
+            ss << e << " , ";
+            if (ee > 5)
+            {
+                ss << endl << "     ";
+                ee = 0;
+            }
+            ee++;
+        }
+
 
 	}
 	if (level == 0)

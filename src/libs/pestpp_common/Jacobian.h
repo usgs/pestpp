@@ -111,6 +111,9 @@ public:
 	void set_base_numeric_pars(Parameters _base_numeric_pars);
 	void set_base_sim_obs(Observations _base_sim_obs);
 
+    map<string, vector<int>> get_par_run_map() const { return par_run_map; }
+    void set_par_run_map(map<string, vector<int>> _map){par_run_map = _map;}
+
 protected:
 
 	vector<string> base_numeric_par_names;  //ordered names of base parameters used to calculate the jacobian
@@ -123,6 +126,7 @@ protected:
 	//const vector<string> &ctl_file_ordered_pi_names;
 	Eigen::SparseMatrix<double> matrix;
 	FileManager &file_manager;  // filemanger used to get name of jaobian file
+    std::map<string, vector<int>> par_run_map;
 
 	virtual std::vector<Eigen::Triplet<double> > calc_derivative(const string &numeric_par_name, double base_numeric_par_value, int jcol, list<JacobianRun> &run_list, const ParameterGroupInfo &group_info,
 		const PriorInformation &prior_info, bool splitswh_flag);
