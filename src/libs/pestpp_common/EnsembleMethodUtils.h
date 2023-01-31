@@ -72,6 +72,7 @@ public:
 		       ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
 		       Covariance *_parcov, bool should_prep_csv = true, string _tag=string());
 	void update(ObservationEnsemble &oe, ParameterEnsemble &pe);
+    void update(ObservationEnsemble &oe, ParameterEnsemble &pe, ObservationEnsemble& weights);
 	double get_mean(phiType pt);
 	double get_std(phiType pt);
 	double get_max(phiType pt);

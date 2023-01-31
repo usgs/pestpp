@@ -3205,20 +3205,6 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 	vector<string> nnz_obs = oe_base->get_var_names();
 	ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
 	vector<int> idx;
-
-	/*for (auto& og : pest_scenario->get_ctl_ordered_obs_group_names())
-	{
-		idx.clear();
-		for (int i = 0; i < nnz_obs.size(); i++)
-		{
-			if (oinfo.get_group(nnz_obs[i]) == og)
-			{
-				idx.push_back(i);
-			}
-		}
-		if (idx.size() > 0)
-			obs_group_idx_map[og] = idx;
-	}*/
 	for (auto& og : pest_scenario->get_ctl_ordered_obs_group_names())
 		obs_group_idx_map[og] = vector<int>();
 
@@ -3226,7 +3212,6 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 	{
 		obs_group_idx_map[oinfo.get_group(nnz_obs[i])].push_back(i);
 	}
-
 
 	//update the various phi component vectors
 	meas.clear();
@@ -3256,23 +3241,9 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 		}
 		regul.clear();
 		map<string, Eigen::VectorXd> reg_map = calc_regul(pe);//, *reg_factor);
-		//for (auto &pv : calc_regul(pe))
-		//string name;
-		//big assumption - if oe is a diff shape, then this
-		//must be a subset, so just use the first X rows of pe
-		/*for (int i = 0; i < oe.shape().first; i++)
-		{
-			//name = preal_names[i];
-			name = pe.get_real_names()[i];
-			//cout << name << endl;
-			regul[name] = reg_map[name].sum();
-			par_group_phi_map[name] = get_par_group_contrib(reg_map[name]);
-		}*/
+
         for (auto& r : reg_map)
         {
-            //name = preal_names[i];
-            //name = pe.get_real_names()[i];
-            //cout << name << endl;
             regul[r.first] = r.second.sum();
             par_group_phi_map[r.first] = get_par_group_contrib(r.second);
         }
@@ -3292,6 +3263,72 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 	}
 
 }
+
+void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, ObservationEnsemble& weights)
+{
+    //build up obs group and par group idx maps for group reporting
+    obs_group_idx_map.clear();
+    vector<string> nnz_obs = oe_base->get_var_names();
+    ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
+    vector<int> idx;
+    for (auto& og : pest_scenario->get_ctl_ordered_obs_group_names())
+        obs_group_idx_map[og] = vector<int>();
+
+    for (int i = 0; i < nnz_obs.size(); i++)
+    {
+        obs_group_idx_map[oinfo.get_group(nnz_obs[i])].push_back(i);
+    }
+
+    //update the various phi component vectors
+    meas.clear();
+    obs_group_phi_map.clear();
+    map<string, Eigen::VectorXd> meas_map = calc_meas(oe, weights);
+    for (auto &pv : meas_map)
+    {
+        meas[pv.first] = pv.second.sum();
+
+    }
+    if (org_reg_factor != 0.0)
+    {
+        par_group_idx_map.clear();
+        vector<string> pars = pe_base->get_var_names();
+        ParameterInfo pi = pest_scenario->get_ctl_parameter_info();
+        for (auto& pg : pest_scenario->get_ctl_ordered_par_group_names())
+        {
+            idx.clear();
+            for (int i = 0; i < pars.size(); i++)
+            {
+                if (pi.get_parameter_rec_ptr(pars[i])->group == pg)
+                    idx.push_back(i);
+            }
+            if (idx.size() > 0)
+                par_group_idx_map[pg] = idx;
+        }
+        regul.clear();
+        map<string, Eigen::VectorXd> reg_map = calc_regul(pe);//, *reg_factor);
+
+        for (auto& r : reg_map)
+        {
+            regul[r.first] = r.second.sum();
+            par_group_phi_map[r.first] = get_par_group_contrib(r.second);
+        }
+        composite.clear();
+        composite = calc_composite(meas, regul);
+    }
+    else
+    {
+        composite = meas;
+    }
+
+    actual.clear();
+    for (auto &pv : calc_actual(oe, weights))
+    {
+        actual[pv.first] = pv.second.sum();
+        obs_group_phi_map[pv.first] = get_obs_group_contrib(pv.second);
+    }
+
+}
+
 
 void L2PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
 {
@@ -5988,7 +6025,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
 	}
 
-	ph.update(oe, pe);
+	ph.update(oe, pe, weights);
 	message(0, "pre-drop initial phi summary");
 	ph.report(true);
 	
@@ -6087,7 +6124,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	adjust_weights();
 
 	performance_log->log_event("calc initial phi");
-	ph.update(oe, pe);
+	ph.update(oe, pe, weights);
 	message(0, "initial phi summary");
 	ph.report(true);
 	ph.write(0, run_mgr_ptr->get_total_runs());
