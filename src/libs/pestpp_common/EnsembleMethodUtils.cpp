@@ -3150,6 +3150,7 @@ Eigen::MatrixXd L2PhiHandler::get_actual_obs_resid(ObservationEnsemble &oe)
 	return resid;
 }
 
+
 Eigen::VectorXd L2PhiHandler::get_q_vector()
 {
 	const ObservationInfo* oinfo = pest_scenario->get_ctl_observation_info_ptr();
@@ -4099,11 +4100,9 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_meas(ObservationEnsemble & oe, E
 {
 	map<string, Eigen::VectorXd> phi_map;
 	Eigen::VectorXd oe_base_vec, oe_vec, diff, w_vec;
-	//Eigen::VectorXd q = get_q_vector();
 	vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
 	vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
-	//vector<string>::iterator start = base_real_names.begin(), end = base_real_names.end();
-    set<string> bset(base_real_names.begin(),base_real_names.end());
+	set<string> bset(base_real_names.begin(),base_real_names.end());
 	set<string>::iterator end = bset.end();
 	string rname;
 	if (act_obs_names.size() == 0)
@@ -4121,14 +4120,42 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_meas(ObservationEnsemble & oe, E
 		rname = oe_real_names[i];
 		if (bset.find(rname) == end)
 			continue;
-		//diff = resid.row(i);
-		//cout << diff << endl;
-		//diff = resid.row(i).cwiseProduct(q_vec);
-		//phi_map[rname] = diff.cwiseProduct(diff);
-        phi_map[rname] = resid.row(i);
+	    phi_map[rname] = resid.row(i);
 	}
 	return phi_map;
 }
+
+map<string, Eigen::VectorXd> L2PhiHandler::calc_meas(ObservationEnsemble & oe, ObservationEnsemble& weights)
+{
+    map<string, Eigen::VectorXd> phi_map;
+    Eigen::VectorXd oe_base_vec, oe_vec, diff, w_vec;
+    vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
+
+    if (act_obs_names.size() == 0)
+    {
+        for (auto name : oe.get_real_names())
+            phi_map[name] = Eigen::VectorXd();
+        return phi_map;
+    }
+    vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
+    set<string> bset(base_real_names.begin(),base_real_names.end());
+    set<string>::iterator end = bset.end();
+    string rname;
+    Eigen::MatrixXd resid = get_obs_resid(oe);// this is (Ho - Hs)
+    Eigen::MatrixXd wmat = weights.get_eigen(oe.get_real_names(),oe_base->get_var_names());
+    assert(oe_real_names.size() == resid.rows());
+    resid = resid.array() * wmat.array();
+    resid = resid.array().cwiseProduct(resid.array());
+    for (int i = 0; i<resid.rows(); i++)
+    {
+        rname = oe_real_names[i];
+        if (bset.find(rname) == end)
+            continue;
+        phi_map[rname] = resid.row(i);
+    }
+    return phi_map;
+}
+
 
 map<string, Eigen::VectorXd> L2PhiHandler::calc_regul(ParameterEnsemble & pe)
 {
@@ -4221,28 +4248,40 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_actual(ObservationEnsemble & oe,
 	vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
 	set<string> bset(base_real_names.begin(),base_real_names.end());
 	set<string>::iterator end = bset.end();
-	//vector<string>::iterator start = base_real_names.begin(), end = base_real_names.end();
-	//double phi;
 	string rname;
 
-	//Eigen::MatrixXd oe_reals = oe.get_eigen(vector<string>(), oe_base->get_var_names());
-    resid = resid.array().rowwise() * q_vec.transpose().array();
+	resid = resid.array().rowwise() * q_vec.transpose().array();
     resid = resid.array().cwiseProduct(resid.array());
-	//Eigen::VectorXd diff;
 	for (int i = 0; i<oe.shape().first; i++)
 	{
 		rname = oe_real_names[i];
-		//if (find(start, end, rname) == end)
 		if (bset.find(rname) == end)
 			continue;
-		//diff = (oe_vec - obs_val_vec).cwiseProduct(q);
-		//diff = resid.row(i);
-		//diff = diff.cwiseProduct(q_vec);
-		//phi = (diff.cwiseProduct(diff)).sum();
-		//phi_map[rname] = diff.cwiseProduct(diff);
 		phi_map[rname] = resid.row(i);
 	}
 	return phi_map;
+}
+
+map<string, Eigen::VectorXd> L2PhiHandler::calc_actual(ObservationEnsemble & oe, ObservationEnsemble& weights)
+{
+    map<string, Eigen::VectorXd> phi_map;
+    Eigen::MatrixXd resid = get_actual_obs_resid(oe);
+    Eigen::MatrixXd wmat = weights.get_eigen(oe.get_real_names(),oe_base->get_var_names());
+    vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
+    set<string> bset(base_real_names.begin(),base_real_names.end());
+    set<string>::iterator end = bset.end();
+    string rname;
+
+    resid = resid.array() * wmat.array();
+    resid = resid.array().cwiseProduct(resid.array());
+    for (int i = 0; i<oe.shape().first; i++)
+    {
+        rname = oe_real_names[i];
+        if (bset.find(rname) == end)
+            continue;
+        phi_map[rname] = resid.row(i);
+    }
+    return phi_map;
 }
 
 
