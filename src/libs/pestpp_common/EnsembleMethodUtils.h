@@ -418,8 +418,6 @@ public:
 	vector<string>& get_par_dyn_state_names() { return par_dyn_state_names; }
 
 
-
-
 protected:
 	string alg_tag;
 	int  verbose_level;
@@ -490,6 +488,8 @@ protected:
 	void norm_map_report(map<string, double>& norm_map, string tag, double thres = 0.1);
 
 	void adjust_weights();
+
+    void check_and_fill_phi_factors(map<string,vector<string>>& group_to_obs_map,map<string,vector<string>>& group_map);
 
 };
 #endif

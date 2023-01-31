@@ -480,6 +480,8 @@ public:
 	void set_ies_localizer_forgive_missing(bool _flag) {ies_localizer_forgive_missing = _flag;}
 	string get_ies_phi_fractions_file() const {return ies_phi_fractions_file;}
 	void set_ies_phi_fractions_files(string _file) {ies_phi_fractions_file = _file;}
+    bool get_ies_phi_factors_by_real() const {return ies_phi_factors_by_real;}
+    void set_ies_phi_factors_by_real(bool _flag) {ies_phi_factors_by_real = _flag;}
 
 
 
@@ -802,6 +804,7 @@ private:
 	double ies_multimodal_alpha;
 	bool ies_localizer_forgive_missing;
 	string ies_phi_fractions_file;
+	bool ies_phi_factors_by_real;
 
 
 	// Data Assimilation parameters

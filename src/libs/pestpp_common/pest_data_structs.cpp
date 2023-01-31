@@ -1138,6 +1138,12 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         ies_phi_fractions_file = org_value;
         return true;
     }
+    else if (key == "IES_PHI_FACTORS_BY_REAL")
+    {
+        ies_phi_factors_by_real = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
+
 	return false;
 }
 
@@ -1748,7 +1754,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_ordered_binary: " << ies_ordered_binary << endl;
 	os << "ies_multimodal_alpha: " << ies_multimodal_alpha << endl;
 	os << "ies_localizer_forgive_extra: " << ies_localizer_forgive_missing << endl;
-	os << "ies_phi_fractions_file: " << ies_phi_fractions_file << endl;
+	os << "ies_phi_factors_file: " << ies_phi_fractions_file << endl;
+    os << "ies_phi_factors_by_real: " << ies_phi_factors_by_real << endl;
 
 
 	os << endl << "pestpp-sen options: " << endl;

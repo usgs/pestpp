@@ -5281,6 +5281,10 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	stringstream ss;
 
+    map<string,vector<string>> group_map,group_to_obs_map;
+    check_and_fill_phi_factors(group_to_obs_map,group_map);
+
+
 	if (pest_scenario.get_control_info().noptmax == 0)
 	{
 		
@@ -6144,30 +6148,61 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
     message(0, "initialization complete");
 }
 
-void EnsembleMethod::adjust_weights() {
-    //todo: deal with ineq obs
+void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& group_to_obs_map,map<string,vector<string>>& group_map)
+{
     stringstream ss;
     string fname = pest_scenario.get_pestpp_options().get_ies_phi_fractions_file();
     if (fname.size() == 0)
     {
         return;
     }
-
-
     ss.str("");
-    ss << "adjusting weights using phi factors in file " << fname;
+    ss << "checking phi factors in file " << fname;
     message(0,ss.str());
+    map<string,map<string,double>> phi_fracs_by_real;
+    if (pest_scenario.get_pestpp_options().get_ies_phi_factors_by_real())
+    {
+        performance_log->log_event("reading 'ies_phi_factors_file for each realization': "+fname);
+        phi_fracs_by_real = pest_utils::read_threecol_ascii_to_nested_map(fname,1,0,1,2);
+        performance_log->log_event("checking phi factors for each realizations': "+fname);
+        map<string,double> base_facs;
+        vector<string> diff;
+        string first_real;
+        for (auto& entry : phi_fracs_by_real)
+        {
+            if (base_facs.size() == 0)
+            {
+                base_facs = entry.second;
+                first_real = entry.first;
+            }
+            else
+            {
+                for (auto& e : base_facs)
+                    if (entry.second.find(e.first) == entry.second.end())
+                        diff.push_back(e.first);
+                for (auto& e : entry.second)
+                    if (base_facs.find(e.first) == base_facs.end())
+                        diff.push_back(e.first);
+                if (diff.size() > 0)
+                {
+                    ss.str("");
+                    ss << "error in phi factors (by real): tags for realization '" << entry.first << "' not consistent";
+                    ss << " with the tags found for the first realization ('" << first_real << "'";
+                    throw_em_error(ss.str());
+                }
+            }
+        }
+    }
+    else
+    {
+        performance_log->log_event("reading 'ies_phi_factors_file for all realizations': "+fname);
+        map<string,double> phi_fracs = pest_utils::read_twocol_ascii_to_map(fname);
+        phi_fracs_by_real[BASE_REAL_NAME] = phi_fracs;
+    }
 
-    ph.update(oe, pe);
-    message(0, "pre-weight-adjustment initial phi summary");
-    ph.report(true);
-    performance_log->log_event("reading 'ies_phi_factors_file': "+fname);
-    map<string,double> phi_fracs = pest_utils::read_twocol_ascii_to_map(fname);
 
-    //first a lot of error trapping
     ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
     set<string> nzgroups;
-    map<string,vector<string>> group_to_obs_map;
 
     for (auto& oname : pest_scenario.get_ctl_ordered_obs_names())
     {
@@ -6183,67 +6218,90 @@ void EnsembleMethod::adjust_weights() {
     }
 
     //check that each nzgroup is not found more than once using the tags in the file
-    map<string,vector<string>> group_map;
     map<string,vector<string>> rev_group_map;
     for (auto& g : nzgroups)
         rev_group_map[g] = vector<string>();
 
-    vector<string> in_groups;
-    for (auto& pf : phi_fracs)
-    {
-        in_groups.clear();
-        for (auto& g : nzgroups)
-        {
 
-            if (g.find(pest_utils::upper_cp(pf.first)) != string::npos)
-            {
-                rev_group_map.at(g).push_back(pf.first);
-                in_groups.push_back(g);
+    map<string,double> phi_fracs;
+    for (auto& entry : phi_fracs_by_real) {
+        phi_fracs = entry.second;
+        vector<string> in_groups;
+        for (auto &pf : phi_fracs) {
+            in_groups.clear();
+            for (auto &g : nzgroups) {
+
+                if (g.find(pest_utils::upper_cp(pf.first)) != string::npos) {
+                    rev_group_map.at(g).push_back(pf.first);
+                    in_groups.push_back(g);
+                }
             }
-        }
-        group_map[pf.first] = in_groups;
-        if (in_groups.size() == 0)
-        {
-            message(1,"WARNING: no non-zero obs groups found for tag '"+pf.first+"'");
-            continue;
+            group_map[pf.first] = in_groups;
+            if (in_groups.size() == 0) {
+                message(1, "WARNING: no non-zero obs groups found for tag '" + pf.first + "'");
+                continue;
+            }
+
+            ss.str("");
+            ss << "file tag '" << pf.first << "' with factor " << pf.second << " maps to groups ";
+            for (auto &g : group_map.at(pf.first))
+                ss << g << ",";
+            message(2, ss.str());
+            if (pf.second <= 0.0) {
+                ss.str("");
+                ss << "adjust_weights(): phi factor '" << pf.first << "' less or equal 0.0 - this not allowed";
+                throw_em_error(ss.str());
+            }
         }
 
         ss.str("");
-        ss << "file tag '" << pf.first << "' with factor " << pf.second << " maps to groups ";
-        for (auto& g : group_map.at(pf.first))
-            ss << g << ",";
-        message(2,ss.str());
-        if (pf.second <= 0.0)
-        {
-            ss.str("");
-            ss << "adjust_weights(): phi factor '" << pf.first << "' less or equal 0.0 - this not allowed";
+        ss << "Errors in phi factors file: ";
+        bool has_errors = false;
+        for (auto &rg : rev_group_map) {
+            if (rg.second.size() == 0) {
+                ss << ", group '" << rg.first << "' not identified with any tags " << endl;
+                has_errors = true;
+            } else if (rg.second.size() > 1) {
+                ss << ", group '" << rg.first << "' mapped to multiple tags: ";
+                for (auto &tag : rg.second)
+                    ss << " " << tag;
+                ss << endl;
+                has_errors = true;
+            }
+        }
+        if (has_errors) {
             throw_em_error(ss.str());
         }
+        //we can break after the firt iterate since we have checked that if by reals, all the
+        // tags are coherent...
+        break;
     }
 
+}
+
+void EnsembleMethod::adjust_weights() {
+
+    stringstream ss;
+    string fname = pest_scenario.get_pestpp_options().get_ies_phi_fractions_file();
+    if (fname.size() == 0)
+    {
+        return;
+    }
+
+
+    ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
     ss.str("");
-    ss << "Errors in phi factors file: ";
-    bool has_errors = false;
-    for (auto& rg : rev_group_map)
-    {
-        if (rg.second.size() == 0)
-        {
-            ss << ", group '" << rg.first << "' not identified with any tags " << endl;
-            has_errors = true;
-        }
-        else if (rg.second.size() > 1)
-        {
-            ss << ", group '" << rg.first << "' mapped to multiple tags: ";
-            for (auto &tag : rg.second)
-                ss << " " << tag;
-            ss << endl;
-            has_errors = true;
-        }
-    }
-    if (has_errors)
-    {
-        throw_em_error(ss.str());
-    }
+    ss << "adjusting weights using phi factors in file " << fname;
+    message(0,ss.str());
+
+    ph.update(oe, pe);
+    message(0, "pre-weight-adjustment initial phi summary");
+    ph.report(true);
+    performance_log->log_event("reading 'ies_phi_factors_file': "+fname);
+    map<string,double> phi_fracs = pest_utils::read_twocol_ascii_to_map(fname);
+
+    map<string,vector<string>> group_map,group_to_obs_map;
+    check_and_fill_phi_factors(group_to_obs_map,group_map);
 
     ss.str("");
     string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
