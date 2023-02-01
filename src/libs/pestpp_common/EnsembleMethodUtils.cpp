@@ -6134,21 +6134,6 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         output_file_writer.scenario_obs_csv(f_obs);
         f_obs.close();
 
-        message(1, "updated observation data information written to file ", filename);
-        ss.str("");
-        if (pest_scenario.get_pestpp_options().get_save_binary())
-        {
-            ss << file_manager.get_base_filename();
-            ss << ".adjusted.weights.jcb";
-            weights.to_binary(ss.str());
-        }
-        else
-        {
-            ss << file_manager.get_base_filename();
-            ss << ".adjusted.weights.csv";
-            weights.to_csv(ss.str());
-        }
-        message(1, "saved adjusted weight ensemble to ", ss.str());
     }
 
 
@@ -6173,7 +6158,28 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	adjust_weights();
 
-	performance_log->log_event("calc initial phi");
+    if ((ppo->get_ies_phi_fractions_file().size() > 0) ||
+        (ppo->get_obscov_filename().size() > 0) ||
+        (in_conflict.size() > 0))
+    {
+        ss.str("");
+        if (pest_scenario.get_pestpp_options().get_save_binary())
+        {
+            ss << file_manager.get_base_filename();
+            ss << ".adjusted.weights.jcb";
+            weights.to_binary(ss.str());
+        }
+        else
+        {
+            ss << file_manager.get_base_filename();
+            ss << ".adjusted.weights.csv";
+            weights.to_csv(ss.str());
+        }
+        message(1, "saved adjusted weight ensemble to ", ss.str());
+    }
+
+
+    performance_log->log_event("calc initial phi");
 	ph.update(oe, pe, weights);
 	message(0, "initial phi summary");
 	ph.report(true);
@@ -6546,14 +6552,15 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
             scale_fac = sqrt((cur_mean_phi * pf.second) / total);
             for (auto &g : group_map.at(pf.first)) {
                 for (auto oname : group_to_obs_map.at(g)) {
-                    weights.get_eigen_ptr_4_mod()->coeffRef(weight_real_map.at(swr_map.first),
-                                                            weight_var_map.at(oname)) *= scale_fac;
+                    weights.get_eigen_ptr_4_mod()->row(weight_real_map.at(swr_map.first))(weight_var_map.at(oname)) *= scale_fac;
                 }
             }
         }
+
         real_init_group_phis[swr_map.first] = init_group_phis;
 
     }
+
     map<string,map<string,double>> adj_swr_map = ph.get_actual_swr_real_map(oe,weights);
     for (auto& swr_map : adj_swr_map) {
         phi_fracs = phi_fracs_by_real.at(swr_map.first);
@@ -6597,7 +6604,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
         f << "realization,group,initial_phi,adjusted_phi" << endl;
         for (auto& grp_entry : real_init_group_phis) {
             for (auto &g : init_group_phis) {
-                f << grp_entry.first << "<" << g.first << "," << g.second << "," << real_adj_group_phis.at(grp_entry.first).at(g.first) << endl;
+                f << grp_entry.first << "," << g.first << "," << g.second << "," << real_adj_group_phis.at(grp_entry.first).at(g.first) << endl;
             }
         }
         f.close();
@@ -8236,6 +8243,7 @@ bool EnsembleMethod::initialize_weights()
         int num_reals = oe.shape().first;
         message(1, "setting weights ensemble from control file weights");
         weights.reserve(oe_base.get_real_names(), act_obs_names);
+        weights.get_eigen_ptr_4_mod()->setZero();
         for (int i = 0; i < weights.shape().first; i++) {
             weights.get_eigen_ptr_4_mod()->row(i) = wvec;
         }
@@ -8840,9 +8848,11 @@ void EnsembleMethod::zero_weight_obs(vector<string>& obs_to_zero_weight, bool up
 
 	ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
 	int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
+	map<string,int> weight_var_map = weights.get_var_map();
 	for (auto n : obs_to_zero_weight)
 	{
 		oi->set_weight(n, 0.0);
+		weights.get_eigen_ptr_4_mod()->col(weight_var_map.at(n)).setZero();
 	}
     act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	stringstream ss;
