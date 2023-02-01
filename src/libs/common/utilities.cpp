@@ -373,13 +373,12 @@ vector<string> fortran_str_array_2_vec(char *fstr, int str_len, int array_len)
 //	return;
 //}
 
-map<string,map<string, double>> read_threecol_ascii_to_nested_map(string filename, int header_lines,
-                                                                  int idx0_col, int idx1_col, int data_col)
+map<string,map<string, double>> read_csv_to_nested_map(string filename)
 {
     stringstream ss;
 	map<string,map<string, double>> result;
 	ifstream fin(filename);
-    if (!fin.good())
+    if (fin.bad())
     {
         cout << "ERROR: could not open file " + filename + " for reading" << endl;
         cerr << "ERROR: could not open file " + filename + " for reading" << endl;
@@ -387,59 +386,98 @@ map<string,map<string, double>> read_threecol_ascii_to_nested_map(string filenam
         throw runtime_error("could not open file " + filename + " for reading");
 
     }
-
-    int max_col = max(max(idx0_col,idx1_col),data_col);
 	string line, dtoken;
 	double value;
 	size_t idx;
-	vector<string> tokens;
-	for (int i = 0; i < header_lines; i++)
-		getline(fin, line);
-	string idx0,idx1;
+	vector<string> tokens,header_tokens;
+    getline(fin, line);
+    if (fin.bad())
+    {
+        ss.str("");
+        ss << "error reading header line from csv file " << filename << endl;
+        cout << ss.str();
+        cerr << ss.str();
+        throw runtime_error(ss.str());
+    }
+    strip_ip(line);
+    upper_ip(line);
+    header_tokens.clear();
+    tokenize(line, header_tokens,"\t\r, ");
+    if (header_tokens.size() < 2)
+    {
+        ss.str("");
+        ss << "Error: read_csv_to_nested_map: too few columns found, need at least 2";
+        cout << ss.str();
+        cerr << ss.str();
+        throw runtime_error(ss.str());
+    }
+    for (int i=0;i<header_tokens.size();i++)
+    {
+        if (header_tokens[i].size() == 0)
+        {
+            if (i ==0)
+                continue;
+            else
+            {
+                ss.str("");
+                ss << "Error: read_csv_to_nested_map: empty header token in column " << i << endl;
+                cout << ss.str();
+                cerr << ss.str();
+                throw runtime_error(ss.str());
+            }
+        }
+    }
+
+
+    int line_count = 1;
+    string idx_val;
+    map<string,double> row;
 	while (getline(fin, line))
 	{
 		strip_ip(line);
 		upper_ip(line);
-		if ((line.size() == 0) || (line.at(0) == '#'))
+		line_count++;
+		if (line.at(0) == '#')
 			continue;
 		tokens.clear();
 		tokenize(line, tokens,"\t\r, ");
 		//only use the first two columns of file
-		if (tokens.size() < max_col)
+		if (tokens.size() != header_tokens.size())
         {
 		    ss.str("");
 
-		    ss << "ERROR: not enough entries on line :"<<  line << " of file " << filename << endl;
+		    ss << "ERROR: read_csv_to_nested_map: line number " << line_count << " does not have the same number of tokens (";
+		    ss << tokens.size() << ") as the header (" << header_tokens.size() << ")" << endl;
             cout << ss.str();
             cerr << ss.str();
             throw runtime_error(ss.str());
         }
-
-		value = stod(tokens[data_col],&idx);
-		//convert_ip(tokens[data_col], value);
-		if (idx != tokens[data_col].size())
+		idx_val = tokens[0];
+		row.clear();
+        for (int i=1;i<tokens.size();i++)
         {
-		    ss.str("");
-            ss << "Error: left over chars after data for token " << tokens[data_col] << " on line " << line << " of file " << filename << endl;
-            cout << ss.str();
-            cerr << ss.str();
-            throw runtime_error(ss.str());
-        }
-        idx0 = tokens[idx0_col];
-		idx1 = tokens[idx1_col];
-		if (result.find(idx0) == result.end())
-		    result[idx0] = map<string,double>();
-		else
-		    if (result[idx0].find(idx1) != result[idx0].end())
+
+            value = stod(tokens[i], &idx);
+            //convert_ip(tokens[data_col], value);
+            if (idx != tokens[i].size())
             {
-		        ss.str("");
-                ss << "Error: duplicate second index '" << idx1 << "' found for first index '" << idx0 << "' on line " << line << " of file " << filename << endl;
+                ss.str("");
+                ss << "Error: read_csv_to_nested_map: left over chars after data for token " << tokens[i] << " on line number " << line_count << endl;
                 cout << ss.str();
                 cerr << ss.str();
-
                 throw runtime_error(ss.str());
             }
-		result[idx0][idx1] = value;
+            if ((!isnormal(value)) && (value != 0.0))
+            {
+                ss.str("");
+                ss << "Error: read_csv_to_nested_map: denormal value for token " << tokens[i] << " on line number " << line_count << endl;
+                cout << ss.str();
+                cerr << ss.str();
+                throw runtime_error(ss.str());
+            }
+            row[header_tokens[i]] = value;
+        }
+		result[idx_val] = row;
 	}
 	fin.close();
 	return result;

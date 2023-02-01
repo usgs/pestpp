@@ -6239,34 +6239,29 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
     if (pest_scenario.get_pestpp_options().get_ies_phi_factors_by_real())
     {
         performance_log->log_event("reading 'ies_phi_factors_file for each realization': "+fname);
-        phi_fracs_by_real = pest_utils::read_threecol_ascii_to_nested_map(fname,1,0,1,2);
+        phi_fracs_by_real = pest_utils::read_csv_to_nested_map(fname);
         performance_log->log_event("checking phi factors for each realizations': "+fname);
-        map<string,double> base_facs;
-        vector<string> diff;
-        string first_real;
-        for (auto& entry : phi_fracs_by_real)
+        //make sure all factors are strictly positive
+        vector<pair<string,string>> problems;
+        for (auto& row : phi_fracs_by_real)
         {
-            if (base_facs.size() == 0)
+            for (auto& entry : row.second)
             {
-                base_facs = entry.second;
-                first_real = entry.first;
-            }
-            else
-            {
-                for (auto& e : base_facs)
-                    if (entry.second.find(e.first) == entry.second.end())
-                        diff.push_back(e.first);
-                for (auto& e : entry.second)
-                    if (base_facs.find(e.first) == base_facs.end())
-                        diff.push_back(e.first);
-                if (diff.size() > 0)
+                if (entry.second <= 0.0)
                 {
-                    ss.str("");
-                    ss << "error in phi factors (by real): tags for realization '" << entry.first << "' not consistent";
-                    ss << " with the tags found for the first realization ('" << first_real << "'";
-                    throw_em_error(ss.str());
+                    problems.push_back(make_pair(row.first,entry.first));
                 }
             }
+        }
+        if (problems.size() > 0)
+        {
+            ss.str("");
+            ss << "the following row/col positions have phi factors <= 0.0 :";
+            for (auto& p : problems)
+            {
+                ss << p.first << ":" << p.second << ",";
+            }
+            throw_em_error(ss.str());
         }
     }
     else
