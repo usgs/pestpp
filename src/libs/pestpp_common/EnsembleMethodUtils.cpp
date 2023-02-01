@@ -5835,7 +5835,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         if (cycle != NetPackage::NULL_DA_CYCLE)
             ss << "." << cycle;
         ss << ".weights.jcb";
-        oe_base.to_binary(ss.str());
+        weights.to_binary(ss.str());
     }
     else
     {
@@ -5843,7 +5843,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         if (cycle != NetPackage::NULL_DA_CYCLE)
             ss << "." << cycle;
         ss << ".weights.csv";
-        oe_base.to_csv(ss.str());
+        weights.to_csv(ss.str());
     }
     message(1, "saved weight ensemble to ", ss.str());
 
@@ -6120,26 +6120,37 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 				    localizer.get_orgmat_ptr()->clear_names();
 				use_localizer = localizer.initialize(performance_log, true);
 			}
-
 		}
-		string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
-		ofstream f_obs(filename);
-		if (f_obs.bad())
-			throw_em_error("error opening: " + filename);
-		output_file_writer.scenario_obs_csv(f_obs);
-		f_obs.close();
-		message(1, "updated observation data information written to file ", filename);
 	}
-	else if (ppo->get_obscov_filename().size() > 0)
-	{
-		string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
-		ofstream f_obs(filename);
-		if (f_obs.bad())
-			throw_em_error("error opening: " + filename);
-		output_file_writer.scenario_obs_csv(f_obs);
-		f_obs.close();
-		message(1, "updated observation data information written to file ", filename);
-	}
+
+	if ((ppo->get_ies_phi_fractions_file().size() > 0) ||
+	    (ppo->get_obscov_filename().size() > 0) ||
+        (in_conflict.size() > 0))
+    {
+        string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
+        ofstream f_obs(filename);
+        if (f_obs.bad())
+            throw_em_error("error opening: " + filename);
+        output_file_writer.scenario_obs_csv(f_obs);
+        f_obs.close();
+
+        message(1, "updated observation data information written to file ", filename);
+        ss.str("");
+        if (pest_scenario.get_pestpp_options().get_save_binary())
+        {
+            ss << file_manager.get_base_filename();
+            ss << ".adjusted.weights.jcb";
+            oe_base.to_binary(ss.str());
+        }
+        else
+        {
+            ss << file_manager.get_base_filename();
+            ss << ".adjusted.weights.csv";
+            oe_base.to_csv(ss.str());
+        }
+        message(1, "saved adjusted weight ensemble to ", ss.str());
+    }
+
 
 	drop_bad_phi(pe, oe);
 	if (oe.shape().first == 0)
@@ -6481,21 +6492,6 @@ void EnsembleMethod::adjust_weights() {
         adjust_weights_by_real(group_to_obs_map, group_map,phi_fracs_by_real,index);
 
     }
-
-    ss.str("");
-    if (pest_scenario.get_pestpp_options().get_save_binary())
-    {
-        ss << file_manager.get_base_filename();
-        ss << ".adjusted.weights.jcb";
-        oe_base.to_binary(ss.str());
-    }
-    else
-    {
-        ss << file_manager.get_base_filename();
-        ss << ".adjusted.weights.csv";
-        oe_base.to_csv(ss.str());
-    }
-    message(1, "saved adjusted weight ensemble to ", ss.str());
 }
 
 void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
