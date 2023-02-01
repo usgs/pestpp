@@ -6516,9 +6516,20 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
     double scale_fac = 0;
     double sub_total = 0;
     double cur_mean_phi = 0;
+    bool do_adjust = true;
     for (auto& swr_map : actual_swr_map)
     {
-        phi_fracs = phi_fracs_by_real.at(swr_map.first);
+        if ((swr_map.first == BASE_REAL_NAME) && (phi_fracs_by_real.find(swr_map.first) == phi_fracs_by_real.end()))
+        {
+            //just use any phi fracs here because they are not used
+            phi_fracs = phi_fracs_by_real.begin()->second;
+            do_adjust = false;
+        }
+        else
+        {
+            phi_fracs = phi_fracs_by_real.at(swr_map.first);
+            do_adjust = true;
+        }
         cur_mean_phi = 0.0;
         for (auto& p : swr_map.second)
             cur_mean_phi += p.second;
@@ -6549,9 +6560,14 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
             ss << "realization " << swr_map.first << ", file tag '" << pf.first << "' original phi (factor): "
                << total << " (" << current_phi_fracs[pf.first] << ")";
             message(2, ss.str());
-            scale_fac = sqrt((cur_mean_phi * pf.second) / total);
+            if (!do_adjust)
+                scale_fac = 1.0;
+            else
+                scale_fac = sqrt((cur_mean_phi * pf.second) / total);
             for (auto &g : group_map.at(pf.first)) {
+
                 for (auto oname : group_to_obs_map.at(g)) {
+                    //cout << swr_map.first << "," << g << "," << oname << endl;
                     weights.get_eigen_ptr_4_mod()->row(weight_real_map.at(swr_map.first))(weight_var_map.at(oname)) *= scale_fac;
                 }
             }
@@ -6563,7 +6579,17 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
 
     map<string,map<string,double>> adj_swr_map = ph.get_actual_swr_real_map(oe,weights);
     for (auto& swr_map : adj_swr_map) {
-        phi_fracs = phi_fracs_by_real.at(swr_map.first);
+        if ((swr_map.first == BASE_REAL_NAME) && (phi_fracs_by_real.find(swr_map.first) == phi_fracs_by_real.end()))
+        {
+            //just use any phi fracs here because they are not used
+            phi_fracs = phi_fracs_by_real.begin()->second;
+            do_adjust = false;
+        }
+        else
+        {
+            phi_fracs = phi_fracs_by_real.at(swr_map.first);
+            do_adjust = true;
+        }
         cur_mean_phi = 0.0;
         for (auto &p : swr_map.second)
             cur_mean_phi += p.second;
@@ -6582,8 +6608,6 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
                 }
                 init_group_phis[g] = sub_total;
             }
-
-
             current_phi_fracs[pf.first] = total / cur_mean_phi;
             ss.str("");
             ss << "realization " << swr_map.first << ", file tag '" << pf.first << "' adjusted mean phi (factor): "
