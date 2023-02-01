@@ -6140,13 +6140,13 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         {
             ss << file_manager.get_base_filename();
             ss << ".adjusted.weights.jcb";
-            oe_base.to_binary(ss.str());
+            weights.to_binary(ss.str());
         }
         else
         {
             ss << file_manager.get_base_filename();
             ss << ".adjusted.weights.csv";
-            oe_base.to_csv(ss.str());
+            weights.to_csv(ss.str());
         }
         message(1, "saved adjusted weight ensemble to ", ss.str());
     }
