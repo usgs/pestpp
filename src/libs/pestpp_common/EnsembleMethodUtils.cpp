@@ -3074,6 +3074,7 @@ map<string,map<string,double>> L2PhiHandler::get_actual_swr_real_map(Observation
     Eigen::MatrixXd resid = get_actual_obs_resid(oe);
     Eigen::MatrixXd wmat = weights.get_eigen(oe.get_real_names(),oe_base->get_var_names());
     resid = resid.array() * wmat.array();
+    resid = resid.array() * resid.array();
     map<string,map<string,double>> actual_swr_map;
     vector<string> var_names = oe_base->get_var_names();
     vector<string> real_names = oe.get_real_names();
@@ -6392,7 +6393,7 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
             }
 
             ss.str("");
-            ss << "file tag '" << pf.first << "' with factor " << pf.second << " maps to groups ";
+            ss << "file tag '" << pf.first << " maps to groups ";
             for (auto &g : group_map.at(pf.first))
                 ss << g << ",";
             message(2, ss.str());
@@ -6509,7 +6510,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
             }
             current_phi_fracs[pf.first] = total / cur_mean_phi;
             ss.str("");
-            ss << "realization " << swr_map.first << ", file tag '" << pf.first << "' original mean phi (factor): "
+            ss << "realization " << swr_map.first << ", file tag '" << pf.first << "' original phi (factor): "
                << total << " (" << current_phi_fracs[pf.first] << ")";
             message(2, ss.str());
             scale_fac = sqrt((cur_mean_phi * pf.second) / total);
@@ -6520,9 +6521,40 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
                 }
             }
         }
+
     }
+    map<string,map<string,double>> adj_swr_map = ph.get_actual_swr_real_map(oe,weights);
+    for (auto& swr_map : adj_swr_map) {
+        phi_fracs = phi_fracs_by_real.at(swr_map.first);
+        cur_mean_phi = 0.0;
+        for (auto &p : swr_map.second)
+            cur_mean_phi += p.second;
+        current_phi_fracs = swr_map.second;
+        init_group_phis.clear();
+        adj_group_phis.clear();
+        total = 0;
+        sub_total = 0;
+        scale_fac = 0;
+        for (auto &pf: phi_fracs) {
+            total = 0;
+            for (auto &g : group_map.at(pf.first)) {
+                sub_total = 0;
+                for (auto oname : group_to_obs_map.at(g)) {
+                    total += swr_map.second.at(oname);
+                    sub_total += swr_map.second.at(oname);
+                }
+                init_group_phis[g] = sub_total;
+            }
 
 
+            current_phi_fracs[pf.first] = total / cur_mean_phi;
+            ss.str("");
+            ss << "realization " << swr_map.first << ", file tag '" << pf.first << "' adjusted mean phi (factor): "
+               << total << " (" << current_phi_fracs[pf.first] << ")";
+            message(2, ss.str());
+
+        }
+    }
 }
 
 void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
