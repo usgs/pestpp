@@ -6301,10 +6301,13 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
                 if (oe_base_real_map.size() > phi_fracs_by_real.size())
                     throw_em_error("too few phi frac realizations passed");
                 map<string,map<string,double>> temp;
+                vector<string> oe_base_real_names = oe_base.get_real_names();
                 for (int i=0;i<oe_base_real_map.size();i++)
                 {
-                    temp[oe_org_real_names[i]] = phi_fracs_by_real[index[i]];
+                    temp[oe_base_real_names[i]] = phi_fracs_by_real[index[i]];
                 }
+                phi_fracs_by_real = temp;
+
             }
             else {
                 vector<string> missing;
@@ -6479,7 +6482,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
     {
         phi_fracs = phi_fracs_by_real.at(swr_map.first);
         cur_mean_phi = 0.0;
-        for (auto& p : phi_fracs)
+        for (auto& p : swr_map.second)
             cur_mean_phi += p.second;
         current_phi_fracs = swr_map.second;
         init_group_phis.clear();
