@@ -238,7 +238,7 @@ map<string, string> parse_plusplus_line(const string& line);
 
 map<string, double> read_twocol_ascii_to_map(std::string filename, int header_lines = 0, int data_col = 1);
 
-map<string,map<string, double>> read_csv_to_nested_map(string filename);
+map<string,map<string, double>> read_csv_to_nested_map(string filename, vector<string>& index);
 
 vector<string> read_onecol_ascii_to_vector(std::string filename);
 

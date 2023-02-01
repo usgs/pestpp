@@ -373,7 +373,7 @@ vector<string> fortran_str_array_2_vec(char *fstr, int str_len, int array_len)
 //	return;
 //}
 
-map<string,map<string, double>> read_csv_to_nested_map(string filename)
+map<string,map<string, double>> read_csv_to_nested_map(string filename, vector<string>& index)
 {
     stringstream ss;
 	map<string,map<string, double>> result;
@@ -410,6 +410,10 @@ map<string,map<string, double>> read_csv_to_nested_map(string filename)
         cout << ss.str();
         cerr << ss.str();
         throw runtime_error(ss.str());
+    }
+    if (line[0] == ',')
+    {
+        header_tokens.insert(header_tokens.begin(),"");
     }
     for (int i=0;i<header_tokens.size();i++)
     {
@@ -478,6 +482,8 @@ map<string,map<string, double>> read_csv_to_nested_map(string filename)
             row[header_tokens[i]] = value;
         }
 		result[idx_val] = row;
+        index.push_back((idx_val));
+
 	}
 	fin.close();
 	return result;

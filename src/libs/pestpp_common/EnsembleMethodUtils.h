@@ -106,7 +106,9 @@ public:
 
 	map<string,double> get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec);
 
-	map<string,double> get_actual_swr_map(ObservationEnsemble& oe, string real_name="");
+	map<string,map<string,double>> get_actual_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights);
+
+    map<string,double> get_actual_swr_map(ObservationEnsemble& oe, string real_name="");
 	map<string,map<string,double>> get_meas_phi_weight_ensemble(ObservationEnsemble& oe, ObservationEnsemble& weights);
 
 private:
@@ -493,7 +495,15 @@ protected:
 
 	void adjust_weights();
 
-    void check_and_fill_phi_factors(map<string,vector<string>>& group_to_obs_map,map<string,vector<string>>& group_map);
+    void adjust_weights_single(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
+            map<string,double>& phi_fracs);
+
+    void adjust_weights_by_real(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
+                               map<string,map<string,double>>& phi_fracs_by_real,vector<string> index);
+
+    void check_and_fill_phi_factors(map<string,vector<string>>& group_to_obs_map,map<string,vector<string>>& group_map,
+                                    map<string,map<string,double>>& phi_fracs_by_real,
+                                    vector<string>& index, bool check_reals);
 
 };
 #endif

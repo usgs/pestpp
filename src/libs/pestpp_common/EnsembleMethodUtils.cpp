@@ -3069,6 +3069,23 @@ Eigen::MatrixXd L2PhiHandler::get_obs_resid(ObservationEnsemble &oe, bool apply_
 	return resid;
 }
 
+map<string,map<string,double>> L2PhiHandler::get_actual_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights)
+{
+    Eigen::MatrixXd resid = get_actual_obs_resid(oe);
+    Eigen::MatrixXd wmat = weights.get_eigen(oe.get_real_names(),oe_base->get_var_names());
+    resid = resid.array() * wmat.array();
+    map<string,map<string,double>> actual_swr_map;
+    vector<string> var_names = oe_base->get_var_names();
+    vector<string> real_names = oe.get_real_names();
+    for (int i=0;i<real_names.size();i++) {
+        actual_swr_map[real_names[i]] = map<string,double>();
+        for (int j = 0; j < var_names.size(); j++) {
+            actual_swr_map[real_names[i]][var_names[j]] = resid(i, j);
+        }
+    }
+    return actual_swr_map;
+}
+
 map<string,double> L2PhiHandler::get_actual_swr_map(ObservationEnsemble& oe, string real_name)
 {
     Eigen::MatrixXd resid = get_actual_obs_resid(oe);
@@ -3103,6 +3120,7 @@ map<string,double> L2PhiHandler::get_actual_swr_map(ObservationEnsemble& oe, str
     }
     return actual_swr_map;
 }
+
 
 Eigen::MatrixXd L2PhiHandler::get_obs_resid_subset(ObservationEnsemble &oe, bool apply_ineq, vector<string> real_names)
 {
@@ -5358,8 +5376,9 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	stringstream ss;
 
     map<string,vector<string>> group_map,group_to_obs_map;
-    check_and_fill_phi_factors(group_to_obs_map,group_map);
-
+    map<string,map<string,double>> phi_fracs_by_real;
+    vector<string> index;
+    check_and_fill_phi_factors(group_to_obs_map,group_map,phi_fracs_by_real,index,false);
 
 	if (pest_scenario.get_control_info().noptmax == 0)
 	{
@@ -6224,7 +6243,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
     message(0, "initialization complete");
 }
 
-void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& group_to_obs_map,map<string,vector<string>>& group_map)
+void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& group_to_obs_map,map<string,vector<string>>& group_map,map<string,map<string,double>>& phi_fracs_by_real,
+                                                vector<string>& index, bool check_reals)
 {
     stringstream ss;
     string fname = pest_scenario.get_pestpp_options().get_ies_phi_fractions_file();
@@ -6235,11 +6255,11 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
     ss.str("");
     ss << "checking phi factors in file " << fname;
     message(0,ss.str());
-    map<string,map<string,double>> phi_fracs_by_real;
+    ;
     if (pest_scenario.get_pestpp_options().get_ies_phi_factors_by_real())
     {
         performance_log->log_event("reading 'ies_phi_factors_file for each realization': "+fname);
-        phi_fracs_by_real = pest_utils::read_csv_to_nested_map(fname);
+        phi_fracs_by_real = pest_utils::read_csv_to_nested_map(fname, index);
         performance_log->log_event("checking phi factors for each realizations': "+fname);
         //make sure all factors are strictly positive
         vector<pair<string,string>> problems;
@@ -6263,6 +6283,61 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
             }
             throw_em_error(ss.str());
         }
+        if (check_reals)
+        {
+            map<string,int> oe_base_real_map = oe_base.get_real_map();
+            //base is in the obs+noise en
+            if (oe_base_real_map.find(BASE_REAL_NAME) != oe_base_real_map.end())
+            {
+                //base not in the phi fracs
+                if (phi_fracs_by_real.find(BASE_REAL_NAME) == phi_fracs_by_real.end())
+                {
+                    message(2,"'"+BASE_REAL_NAME+" not in phi factors but in obs+noise ensemble, leaving base realization weights unaltered");
+
+                }
+            }
+            if (pest_scenario.get_pestpp_options().get_ies_obs_csv().size() == 0)
+            {
+                if (oe_base_real_map.size() > phi_fracs_by_real.size())
+                    throw_em_error("too few phi frac realizations passed");
+                map<string,map<string,double>> temp;
+                for (int i=0;i<oe_base_real_map.size();i++)
+                {
+                    temp[oe_org_real_names[i]] = phi_fracs_by_real[index[i]];
+                }
+            }
+            else {
+                vector<string> missing;
+                map<string, map<string, double>>::iterator end = phi_fracs_by_real.end();
+                for (auto &oereal : oe_base_real_map) {
+                    if (phi_fracs_by_real.find(oereal.first) == end) {
+                        if (oereal.first != BASE_REAL_NAME)
+                            missing.push_back(oereal.first);
+                    }
+                }
+                if (missing.size() > 0)
+                {
+                    ss.str("");
+                    ss << "error in phi factors by realization: the obs+noise ensemble was passed but the realization names ";
+                    ss << "in this ensemble do not align with the realziation names in the phi factor realizations";
+                    throw_em_error(ss.str());
+                }
+            }
+
+
+
+
+        }
+        //now we need to somehow align the rows of the phi factor table with the realization names
+        //first check if they are full coincident
+
+        //if not, check if the obs+noise ensemble was passed, if not, then we can just assuming the user
+        // doesnt care about real names
+        //but we need to make sure this jives with the base real option
+        //but we have to make sure we have at least enough rows in the phi factor table - warn if more than needed,
+        //  error if not enough
+
+
     }
     else
     {
@@ -6354,26 +6429,104 @@ void EnsembleMethod::adjust_weights() {
 
     stringstream ss;
     string fname = pest_scenario.get_pestpp_options().get_ies_phi_fractions_file();
-    if (fname.size() == 0)
-    {
+    if (fname.size() == 0) {
         return;
     }
 
 
-    ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+
     ss.str("");
     ss << "adjusting weights using phi factors in file " << fname;
-    message(0,ss.str());
+    message(0, ss.str());
 
     ph.update(oe, pe);
     message(0, "pre-weight-adjustment initial phi summary");
     ph.report(true);
-    performance_log->log_event("reading 'ies_phi_factors_file': "+fname);
-    map<string,double> phi_fracs = pest_utils::read_twocol_ascii_to_map(fname);
+    //performance_log->log_event("reading 'ies_phi_factors_file': "+fname);
+    //map<string,double> phi_fracs = pest_utils::read_twocol_ascii_to_map(fname);
+    map<string, map<string, double>> phi_fracs_by_real;
+    vector<string> index;
+    map<string, vector<string>> group_map, group_to_obs_map;
+    check_and_fill_phi_factors(group_to_obs_map, group_map, phi_fracs_by_real, index,true);
 
-    map<string,vector<string>> group_map,group_to_obs_map;
-    check_and_fill_phi_factors(group_to_obs_map,group_map);
+    if (phi_fracs_by_real.size() == 1)
+    {
+        map<string, double> phi_fracs = phi_fracs_by_real.begin()->second;
+        adjust_weights_single(group_to_obs_map, group_map, phi_fracs);
+    } else
+    {
+        adjust_weights_by_real(group_to_obs_map, group_map,phi_fracs_by_real,index);
 
+    }
+}
+
+void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
+                            map<string,map<string,double>>& phi_fracs_by_real,vector<string> index)
+{
+    stringstream ss;
+    ss.str("");
+    map<string,map<string,double>> actual_swr_map = ph.get_actual_swr_real_map(oe,weights);
+    map<string,double> phi_fracs;
+    map<string,double> current_phi_fracs;
+    map<string,double> init_group_phis,adj_group_phis;
+    map<string,int> weight_real_map = weights.get_real_map();
+    map<string,int> weight_var_map = weights.get_var_map();
+    double total = 0;
+    double scale_fac = 0;
+    double sub_total = 0;
+    double cur_mean_phi = 0;
+    for (auto& swr_map : actual_swr_map)
+    {
+        phi_fracs = phi_fracs_by_real.at(swr_map.first);
+        cur_mean_phi = 0.0;
+        for (auto& p : phi_fracs)
+            cur_mean_phi += p.second;
+        current_phi_fracs = swr_map.second;
+        init_group_phis.clear();
+        adj_group_phis.clear();
+        total = 0;
+        sub_total=0;
+        scale_fac = 0;
+        for (auto& pf: phi_fracs) {
+            total = 0;
+            for (auto &g : group_map.at(pf.first)) {
+                sub_total = 0;
+                for (auto oname : group_to_obs_map.at(g)) {
+                    total += swr_map.second.at(oname);
+                    sub_total += swr_map.second.at(oname);
+                }
+                init_group_phis[g] = sub_total;
+            }
+
+            if (total == 0) {
+                ss.str("");
+                ss << "WARNING: adjust_weights(): tag " << pf.first << " has 0.0 phi";
+                message(1, ss.str());
+                continue;
+            }
+            current_phi_fracs[pf.first] = total / cur_mean_phi;
+            ss.str("");
+            ss << "realization " << swr_map.first << ", file tag '" << pf.first << "' original mean phi (factor): "
+               << total << " (" << current_phi_fracs[pf.first] << ")";
+            message(2, ss.str());
+            scale_fac = sqrt((cur_mean_phi * pf.second) / total);
+            for (auto &g : group_map.at(pf.first)) {
+                for (auto oname : group_to_obs_map.at(g)) {
+                    weights.get_eigen_ptr_4_mod()->coeffRef(weight_real_map.at(swr_map.first),
+                                                            weight_var_map.at(oname)) *= scale_fac;
+                }
+            }
+        }
+    }
+
+
+}
+
+void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
+                                           map<string,double>& phi_fracs)
+{
+    ObservationInfo *oi = pest_scenario.get_observation_info_ptr();
+    stringstream ss;
     ss.str("");
     string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
     if (center_on.size() != 0)
@@ -6433,7 +6586,7 @@ void EnsembleMethod::adjust_weights() {
         }
     }
     ph.update(oe,pe);
-    mean_swr_map = ph.get_actual_swr_map(oe);
+    mean_swr_map = ph.get_actual_swr_map(oe,  center_on);
     for (auto& pf: phi_fracs) {
         total = 0;
         for (auto &g : group_map.at(pf.first)) {
@@ -6453,7 +6606,7 @@ void EnsembleMethod::adjust_weights() {
     }
     if (verbose_level > 2)
     {
-        fname = file_manager.get_base_filename() + ".obsgroupadj.summary.csv";
+        string fname = file_manager.get_base_filename() + ".obsgroupadj.summary.csv";
         ofstream f(fname);
         if (!f.good())
             throw_em_error("error opening weight adjustment summary file "+fname);
@@ -6465,7 +6618,6 @@ void EnsembleMethod::adjust_weights() {
         }
         f.close();
         message(2,"saved obs group weight adjustment summary to "+fname);
-
     }
 }
 
