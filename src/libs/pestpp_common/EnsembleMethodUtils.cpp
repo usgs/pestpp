@@ -5828,6 +5828,25 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	message(1, "saved obs+noise observation ensemble (obsval + noise realizations) to ", ss.str());
 
     initialize_weights();
+    ss.str("");
+    if (pest_scenario.get_pestpp_options().get_save_binary())
+    {
+        ss << file_manager.get_base_filename();
+        if (cycle != NetPackage::NULL_DA_CYCLE)
+            ss << "." << cycle;
+        ss << ".weights.jcb";
+        oe_base.to_binary(ss.str());
+    }
+    else
+    {
+        ss << file_manager.get_base_filename();
+        if (cycle != NetPackage::NULL_DA_CYCLE)
+            ss << "." << cycle;
+        ss << ".weights.csv";
+        oe_base.to_csv(ss.str());
+    }
+    message(1, "saved weight ensemble to ", ss.str());
+
     message(2, "checking for denormal values in weights ensemble");
     weights.check_for_normal("weights ensemble");
     ss.str("");
@@ -6089,7 +6108,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
                 {
                     message(0,"all non-zero weighted observations in conflict state, continuing to next cycle");
                     zero_weight_obs(in_conflict,false,false);
-                    ph.update(oe,pe);
+                    ph.update(oe,pe, weights);
                     return;
                 }
             }
@@ -6462,6 +6481,21 @@ void EnsembleMethod::adjust_weights() {
         adjust_weights_by_real(group_to_obs_map, group_map,phi_fracs_by_real,index);
 
     }
+
+    ss.str("");
+    if (pest_scenario.get_pestpp_options().get_save_binary())
+    {
+        ss << file_manager.get_base_filename();
+        ss << ".adjusted.weights.jcb";
+        oe_base.to_binary(ss.str());
+    }
+    else
+    {
+        ss << file_manager.get_base_filename();
+        ss << ".adjusted.weights.csv";
+        oe_base.to_csv(ss.str());
+    }
+    message(1, "saved adjusted weight ensemble to ", ss.str());
 }
 
 void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
@@ -6472,7 +6506,8 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
     map<string,map<string,double>> actual_swr_map = ph.get_actual_swr_real_map(oe,weights);
     map<string,double> phi_fracs;
     map<string,double> current_phi_fracs;
-    map<string,double> init_group_phis,adj_group_phis;
+    map<string,double> init_group_phis;
+    map<string,map<string,double>> real_init_group_phis,real_adj_group_phis;
     map<string,int> weight_real_map = weights.get_real_map();
     map<string,int> weight_var_map = weights.get_var_map();
     double total = 0;
@@ -6487,7 +6522,6 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
             cur_mean_phi += p.second;
         current_phi_fracs = swr_map.second;
         init_group_phis.clear();
-        adj_group_phis.clear();
         total = 0;
         sub_total=0;
         scale_fac = 0;
@@ -6521,6 +6555,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
                 }
             }
         }
+        real_init_group_phis[swr_map.first] = init_group_phis;
 
     }
     map<string,map<string,double>> adj_swr_map = ph.get_actual_swr_real_map(oe,weights);
@@ -6531,7 +6566,6 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
             cur_mean_phi += p.second;
         current_phi_fracs = swr_map.second;
         init_group_phis.clear();
-        adj_group_phis.clear();
         total = 0;
         sub_total = 0;
         scale_fac = 0;
@@ -6554,7 +6588,26 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
             message(2, ss.str());
 
         }
+        real_adj_group_phis[swr_map.first] = init_group_phis;
+
     }
+    if (verbose_level > 2)
+    {
+        string fname = file_manager.get_base_filename() + ".obsgroupadj.summary.csv";
+        ofstream f(fname);
+        if (!f.good())
+            throw_em_error("error opening weight adjustment summary file "+fname);
+
+        f << "realization,group,initial_phi,adjusted_phi" << endl;
+        for (auto& grp_entry : real_init_group_phis) {
+            for (auto &g : init_group_phis) {
+                f << grp_entry.first << "<" << g.first << "," << g.second << "," << real_adj_group_phis.at(grp_entry.first).at(g.first) << endl;
+            }
+        }
+        f.close();
+        message(2,"saved obs group weight adjustment summary to "+fname);
+    }
+
 }
 
 void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
@@ -6583,6 +6636,7 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
     //cur_mean_phi = nzobs_obs_fac * cur_mean_phi;
     map<string,double> current_phi_fracs;
     map<string,double> init_group_phis,adj_group_phis;
+    map<string,int> weight_var_map = weights.get_var_map();
     double total = 0;
     double scale_fac = 0;
     double sub_total = 0;
@@ -6617,6 +6671,7 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
             for (auto oname : group_to_obs_map.at(g))
             {
                 oi->set_weight(oname,oi->get_weight(oname) * scale_fac );
+                weights.get_eigen_ptr_4_mod()->col(weight_var_map.at(oname)) *= scale_fac;
             }
         }
     }
@@ -7308,7 +7363,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		pe = pe_lams[0];
 		//move the estimated states to the oe, which will then later be transferred back to the pe
 		//transfer_dynamic_state_from_pe_to_oe(pe, oe);
-		ph.update(oe, pe);
+		ph.update(oe, pe, weights);
 		double best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		double best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		best_mean_phis.push_back(best_mean);
@@ -7388,7 +7443,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			continue;
 		}
 
-		ph.update(oe_lams[i], pe_lams[i]);
+		ph.update(oe_lams[i], pe_lams[i], weights);
 
 		message(0, "phi summary for lambda, scale fac:", vals, echo);
 		ph.report(echo);
@@ -7442,7 +7497,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 				message(1, "updating realizations with reduced phi");
 				update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx],subset_idxs);
 			}
-			ph.update(oe, pe);
+			ph.update(oe, pe,weights);
 			//re-check phi
 			double new_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 			if (new_best_mean < best_mean)
@@ -7561,7 +7616,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 				oe_keep_names.push_back(oe_names[i]);
 			}
 		message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
-		ph.update(oe_lams[best_idx], pe_lams[best_idx]);
+		ph.update(oe_lams[best_idx], pe_lams[best_idx],weights);
 		ph.report(true,false);
 		message(0, "running remaining realizations for best lambda, scale:", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 
@@ -7624,7 +7679,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			throw_em_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
 		}
 		performance_log->log_event("updating phi");
-		ph.update(oe_lam_best, pe_lams[best_idx]);
+		ph.update(oe_lam_best, pe_lams[best_idx], weights);
 		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
@@ -7632,12 +7687,12 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	}
 	else
 	{
-		ph.update(oe_lam_best, pe_lams[best_idx]);
+		ph.update(oe_lam_best, pe_lams[best_idx], weights);
 		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	}
 
-	ph.update(oe_lam_best, pe_lams[best_idx]);
+	ph.update(oe_lam_best, pe_lams[best_idx], weights);
 	best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 	best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	message(1, "last best mean phi * acceptable phi factor: ", last_best_mean * acc_fac);
@@ -7684,7 +7739,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			update_reals_by_phi(pe_lams[best_idx], oe_lam_best);
 			
 		}
-		ph.update(oe, pe);
+		ph.update(oe, pe, weights);
 		//re-check phi
 		double new_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		if (new_best_mean < best_mean)
@@ -9049,7 +9104,7 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 			pe_idx_to_name[i] = pe_names[i];
 	}
 	//store map of current phi values
-	ph.update(oe, pe);
+	ph.update(oe, pe, weights);
 	L2PhiHandler::phiType pt = L2PhiHandler::phiType::COMPOSITE;
 	map<string, double>* phi_map = ph.get_phi_map_ptr(pt);
 	map<string, double> cur_phi_map;
@@ -9057,7 +9112,7 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 		cur_phi_map[p.first] = p.second;
 
 	//now get a phi map of the new phi values
-	ph.update(_oe, _pe);
+	ph.update(_oe, _pe, weights);
 	phi_map = ph.get_phi_map_ptr(pt);
 
 	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
@@ -9087,7 +9142,7 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 			oe.update_real_ip(oname, real);
 		}
 	}
-	ph.update(oe, pe);
+	ph.update(oe, pe, weights);
 
 }
 
