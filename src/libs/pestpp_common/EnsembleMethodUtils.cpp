@@ -8201,6 +8201,7 @@ void EnsembleMethod::norm_map_report(map<string, double>& norm_map, string tag, 
 
 void EnsembleMethod::add_bases()
 {
+    stringstream ss;
 	//check that 'base' isn't already in ensemble
 	vector<string> rnames = pe.get_real_names();
 	bool inpar = false;
@@ -8231,7 +8232,15 @@ void EnsembleMethod::add_bases()
 		message(1, "'base' realization already in observation ensemble, ignoring 'include_base'");
 		if (in_weight)
         {
-            throw_em_error("'base' realization found in weight ensemble but not in observation ensemble");
+		    int odist = distance(rnames.begin(),find(rnames.begin(), rnames.end(), BASE_REAL_NAME));
+            int wdist = distance(wrnames.begin(),find(wrnames.begin(), wrnames.end(), BASE_REAL_NAME));
+            if (odist != wdist)
+            {
+                ss.str("");
+                ss << "'base' realization found at different location in weight ensemble (" << wdist;
+                ss << ") than in obs ensemble (" << odist << ")";
+                throw_em_error(ss.str());
+            }
         }
 	}
 	else
@@ -8267,7 +8276,7 @@ void EnsembleMethod::add_bases()
 			if (!in_weight)
             {
                 string oreal = wrnames[idx];
-                stringstream ss;
+                ss.str("");
                 ss << "warning: 'base' realization in par ensenmble but not in weight ensemble," << endl;
                 ss << "         replacing weight realization '" << oreal << "' with 'base' weights";
                 string mess = ss.str();
