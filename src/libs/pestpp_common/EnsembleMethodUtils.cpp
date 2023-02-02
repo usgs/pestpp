@@ -8977,6 +8977,7 @@ void EnsembleMethod::zero_weight_obs(vector<string>& obs_to_zero_weight, bool up
 		if (sdrop.find(oname) == sdrop.end())
 			t.push_back(oname);
 	act_obs_names = t;
+	int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
 
 	//update obscov
 	if (update_obscov)
@@ -8988,14 +8989,20 @@ void EnsembleMethod::zero_weight_obs(vector<string>& obs_to_zero_weight, bool up
 
 	//shouldnt need to update localizer since we dropping not adding
 	//updating weights in control file
-
-	ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
-	int org_nnz_obs = pest_scenario.get_ctl_ordered_nz_obs_names().size();
-	map<string,int> weight_var_map = weights.get_var_map();
-	for (auto n : obs_to_zero_weight)
+	if (weights.shape().first == 0)
 	{
-		oi->set_weight(n, 0.0);
-		weights.get_eigen_ptr_4_mod()->col(weight_var_map.at(n)).setZero();
+		message(2, "weight ensemble not yet initialized, skipping zero weighting");
+	}
+	else
+	{
+		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+		
+		map<string, int> weight_var_map = weights.get_var_map();
+		for (auto n : obs_to_zero_weight)
+		{
+			oi->set_weight(n, 0.0);
+			weights.get_eigen_ptr_4_mod()->col(weight_var_map.at(n)).setZero();
+		}
 	}
     act_obs_names = pest_scenario.get_ctl_ordered_nz_obs_names();
 	stringstream ss;
