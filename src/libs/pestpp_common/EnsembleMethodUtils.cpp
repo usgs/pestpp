@@ -8310,7 +8310,25 @@ bool EnsembleMethod::initialize_weights()
 {
 	stringstream ss;
     if (act_obs_names.size() == 0)
+    {
+        int i = 0;
+        Eigen::VectorXd wvec(oe_base.shape().second);
+        for (auto& n : oe_base.get_var_names())
+        {
+            wvec[i] = 0.0;
+            i++;
+        }
+        int num_reals = oe_base.shape().first;
+        message(1, "setting weights ensemble to zeros - no non-zero weighted obs found");
+        weights.reserve(oe_base.get_real_names(), oe_base.get_var_names());
+        weights.get_eigen_ptr_4_mod()->setZero();
+        for (int i = 0; i < weights.shape().first; i++) {
+            weights.get_eigen_ptr_4_mod()->row(i) = wvec;
+        }
         return true;
+
+    }
+
 
 	string weight_csv = pest_scenario.get_pestpp_options().get_ies_weights_csv();
 	bool drawn = false;
@@ -8324,7 +8342,7 @@ bool EnsembleMethod::initialize_weights()
     }
 
 	if (weight_csv.size() == 0) {
-        int num_reals = oe.shape().first;
+        int num_reals = oe_base.shape().first;
         message(1, "setting weights ensemble from control file weights");
         weights.reserve(oe_base.get_real_names(), act_obs_names);
         weights.get_eigen_ptr_4_mod()->setZero();
