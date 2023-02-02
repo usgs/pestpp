@@ -3037,7 +3037,6 @@ L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 
 	//save the org reg factor and org q vector
 	org_reg_factor = pest_scenario->get_pestpp_options().get_ies_reg_factor();
-	org_q_vec = get_q_vector();
 	//Eigen::VectorXd parcov_inv_diag = parcov_inv.e_ptr()->diagonal();
 	parcov_inv_diag = _parcov->e_ptr()->diagonal();
 	for (int i = 0; i < parcov_inv_diag.size(); i++)
@@ -3922,13 +3921,14 @@ void L2PhiHandler::prepare_group_csv(ofstream &csv, vector<string> extra)
 	csv << endl;
 }
 
-vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe)
+vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe, ObservationEnsemble& weights)
 {
     //todo: handle weights ensemble here...
 	map<string, double> _meas;
-	Eigen::VectorXd q = get_q_vector();
-	for (auto &pv : calc_meas(oe, q))
-		_meas[pv.first] = pv.second.sum();
+	//Eigen::VectorXd q = get_q_vector();
+	//for (auto &pv : calc_meas(oe, q))
+    for (auto &pv : calc_meas(oe, weights))
+        _meas[pv.first] = pv.second.sum();
 	double mean = calc_mean(&_meas);
 	double std = calc_std(&_meas);
 	vector<int> idxs;
@@ -6491,7 +6491,7 @@ void EnsembleMethod::adjust_weights() {
     ss << "adjusting weights using phi factors in file " << fname;
     message(0, ss.str());
 
-    ph.update(oe, pe);
+    ph.update(oe, pe, weights);
     message(0, "pre-weight-adjustment initial phi summary");
     ph.report(true);
     //performance_log->log_event("reading 'ies_phi_factors_file': "+fname);
@@ -6669,7 +6669,7 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
     //if the current is really low, just return and the traps in initialize() will catch it.
     if (cur_mean_phi < 1.0e-10)
     {
-        performance_log->log_event("mean phi too low - returning to initialize()");
+        performance_log->log_event("mean phi too low - returning");
         return;
     }
     //cur_mean_phi = nzobs_obs_fac * cur_mean_phi;
@@ -9151,7 +9151,7 @@ void EnsembleMethod::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _
 
 	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
 	double bad_phi_sigma = pest_scenario.get_pestpp_options().get_ies_bad_phi_sigma();
-	vector<int> idxs = ph.get_idxs_greater_than(bad_phi, bad_phi_sigma, _oe);
+	vector<int> idxs = ph.get_idxs_greater_than(bad_phi, bad_phi_sigma, _oe, weights);
 
 	if (pest_scenario.get_pestpp_options().get_ies_debug_bad_phi())
 		idxs.push_back(0);

@@ -88,7 +88,7 @@ public:
 
 	void write(int iter_num, int total_runs, bool write_group = true);
 	void write_group(int iter_num, int total_runs, vector<double> extra);
-	vector<int> get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe);
+	vector<int> get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe, ObservationEnsemble& weights);
 
 	Eigen::MatrixXd get_obs_resid(ObservationEnsemble &oe, bool apply_ineq=true);
 	Eigen::MatrixXd get_obs_resid_subset(ObservationEnsemble &oe, bool apply_ineq=true,vector<string> real_names=vector<string>());
@@ -134,7 +134,6 @@ private:
 		vector<double> extra = vector<double>());
 
 	double org_reg_factor;
-	Eigen::VectorXd org_q_vec;
 	vector<string> oreal_names,preal_names;
 	Pest* pest_scenario;
 	FileManager* file_manager;
