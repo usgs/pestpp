@@ -106,7 +106,7 @@ public:
 
 	map<string,double> get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec);
 
-	map<string,map<string,double>> get_actual_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights);
+	map<string,map<string,double>> get_meas_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights);
 
     map<string,double> get_actual_swr_map(ObservationEnsemble& oe, string real_name="");
 	map<string,map<string,double>> get_meas_phi_weight_ensemble(ObservationEnsemble& oe, ObservationEnsemble& weights);

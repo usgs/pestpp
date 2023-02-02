@@ -3069,9 +3069,10 @@ Eigen::MatrixXd L2PhiHandler::get_obs_resid(ObservationEnsemble &oe, bool apply_
 	return resid;
 }
 
-map<string,map<string,double>> L2PhiHandler::get_actual_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights)
+map<string,map<string,double>> L2PhiHandler::get_meas_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights)
 {
-    Eigen::MatrixXd resid = get_actual_obs_resid(oe);
+    Eigen::MatrixXd resid = get_obs_resid(oe,true);
+
     Eigen::MatrixXd wmat = weights.get_eigen(oe.get_real_names(),oe_base->get_var_names());
     resid = resid.array() * wmat.array();
     resid = resid.array() * resid.array();
@@ -6505,7 +6506,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
 {
     stringstream ss;
     ss.str("");
-    map<string,map<string,double>> actual_swr_map = ph.get_actual_swr_real_map(oe,weights);
+    map<string,map<string,double>> actual_swr_map = ph.get_meas_swr_real_map(oe, weights);
     map<string,double> phi_fracs;
     map<string,double> current_phi_fracs;
     map<string,double> init_group_phis;
@@ -6577,7 +6578,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
 
     }
 
-    map<string,map<string,double>> adj_swr_map = ph.get_actual_swr_real_map(oe,weights);
+    map<string,map<string,double>> adj_swr_map = ph.get_meas_swr_real_map(oe, weights);
     for (auto& swr_map : adj_swr_map) {
         if ((swr_map.first == BASE_REAL_NAME) && (phi_fracs_by_real.find(swr_map.first) == phi_fracs_by_real.end()))
         {
