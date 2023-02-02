@@ -4885,6 +4885,8 @@ void EnsembleMethod::sanity_checks()
         errors.push_back("use of ies_restart_par_en requires ies_restart_obs_en");
     if ((par_csv.size() == 0) && (restart_obs.size() > 0))
         errors.push_back("ies_par_en is empty but ies_restart_obs_en is not - how can this work?");
+    if ((obs_csv.size() == 0) && (ppo->get_ies_weights_csv().size() > 0))
+        errors.push_back("ies_obs_en is empty but ies_weight_en is not");
     if (ppo->get_ies_bad_phi() <= 0.0)
         errors.push_back("ies_bad_phi <= 0.0, really?");
     if ((ppo->get_ies_num_reals() < error_min_reals) && (par_csv.size() == 0))
@@ -4958,8 +4960,16 @@ void EnsembleMethod::sanity_checks()
         warnings.push_back("ies_weight_ensemble is highly experimental - user beware");
         if (ppo->get_ies_phi_fractions_file().size() > 0)
         {
-            errors.push_back("weight ensemble cant be used with internal weight adjustment");
+            warnings.push_back("weight ensemble used with internal weight adjustment is even more experimental!");
         }
+    }
+    if (ppo->get_ies_multimodal_alpha() > 1.0)
+    {
+        errors.push_back("multimodal alpha > 1.0");
+    }
+    if (ppo->get_ies_multimodal_alpha() < 0.001)
+    {
+        errors.push_back("multimodal alpha < 0.001");
     }
 
     if (warnings.size() > 0)
@@ -5712,9 +5722,30 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	string obs_restart_csv = pest_scenario.get_pestpp_options().get_ies_obs_restart_csv();
 	string par_restart_csv = pest_scenario.get_pestpp_options().get_ies_par_restart_csv();
-	// if no restart and a pe was passed and no oe was passed, reset here before adding base
 
 
+    initialize_weights();
+    ss.str("");
+    if (pest_scenario.get_pestpp_options().get_save_binary())
+    {
+        ss << file_manager.get_base_filename();
+        if (cycle != NetPackage::NULL_DA_CYCLE)
+            ss << "." << cycle;
+        ss << ".weights.jcb";
+        weights.to_binary(ss.str());
+    }
+    else
+    {
+        ss << file_manager.get_base_filename();
+        if (cycle != NetPackage::NULL_DA_CYCLE)
+            ss << "." << cycle;
+        ss << ".weights.csv";
+        weights.to_csv(ss.str());
+    }
+    message(1, "saved weight ensemble to ", ss.str());
+    message(2, "checking for denormal values in weights ensemble");
+    weights.check_for_normal("weights ensemble");
+    // if no restart and a pe was passed and no oe was passed, reset here before adding base
 	if (pest_scenario.get_pestpp_options().get_ies_include_base()) {
         if (pp_args.find("IES_RESTART_OBS_EN") != pp_args.end()) {
             message(1,
@@ -5727,6 +5758,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	{
 		vector<string> rnames = pe.get_real_names();
 		oe_base.set_real_names(rnames,true);
+		weights.set_real_names(rnames,true);
 		message(2, "resetting obs + noise ensemble real names to parameter ensemble real names");
 	}
 
@@ -5828,28 +5860,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	}
 	message(1, "saved obs+noise observation ensemble (obsval + noise realizations) to ", ss.str());
 
-    initialize_weights();
-    ss.str("");
-    if (pest_scenario.get_pestpp_options().get_save_binary())
-    {
-        ss << file_manager.get_base_filename();
-        if (cycle != NetPackage::NULL_DA_CYCLE)
-            ss << "." << cycle;
-        ss << ".weights.jcb";
-        weights.to_binary(ss.str());
-    }
-    else
-    {
-        ss << file_manager.get_base_filename();
-        if (cycle != NetPackage::NULL_DA_CYCLE)
-            ss << "." << cycle;
-        ss << ".weights.csv";
-        weights.to_csv(ss.str());
-    }
-    message(1, "saved weight ensemble to ", ss.str());
 
-    message(2, "checking for denormal values in weights ensemble");
-    weights.check_for_normal("weights ensemble");
     ss.str("");
 
 	if (pest_scenario.get_control_info().noptmax == -2)
@@ -8210,13 +8221,30 @@ void EnsembleMethod::add_bases()
 
 	//check that 'base' isn't already in ensemble
 	rnames = oe_base.get_real_names();
+	vector<string> wrnames = weights.get_real_names();
+	bool in_weight = false;
+    if (find(wrnames.begin(),wrnames.end(),BASE_REAL_NAME) != wrnames.end()) {
+        in_weight = true;
+    }
 	if (find(rnames.begin(), rnames.end(), BASE_REAL_NAME) != rnames.end())
 	{
 		message(1, "'base' realization already in observation ensemble, ignoring 'include_base'");
+		if (in_weight)
+        {
+            throw_em_error("'base' realization found in weight ensemble but not in observation ensemble");
+        }
 	}
 	else
 	{
 		Observations obs = pest_scenario.get_ctl_observations();
+		Observations wobs;
+        wobs.clear();
+        ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+        for (auto& oname : weights.get_var_names())
+        {
+            wobs[oname] = oi->get_weight(oname);
+        }
+
 		if (inpar)
 		{
 			vector<string> prnames = pe.get_real_names();
@@ -8236,6 +8264,24 @@ void EnsembleMethod::add_bases()
 			//rnames.insert(rnames.begin() + idx, string(base_name));
 			rnames[idx] = BASE_REAL_NAME;
 			oe_base.reorder(rnames, vector<string>());
+			if (!in_weight)
+            {
+                string oreal = wrnames[idx];
+                stringstream ss;
+                ss << "warning: 'base' realization in par ensenmble but not in weight ensemble," << endl;
+                ss << "         replacing weight realization '" << oreal << "' with 'base' weights";
+                string mess = ss.str();
+                message(1, mess);
+                vector<string> drop;
+                drop.push_back(oreal);
+                weights.drop_rows(drop);
+
+                weights.append(BASE_REAL_NAME, wobs);
+                //rnames.insert(rnames.begin() + idx, string(base_name));
+                wrnames[idx] = BASE_REAL_NAME;
+                weights.reorder(wrnames, vector<string>());
+            }
+
 		}
 		else
 		{
@@ -8243,6 +8289,10 @@ void EnsembleMethod::add_bases()
 			vector<int> drop{ oe_base.shape().first - 1 };
 			oe_base.drop_rows(drop);
 			oe_base.append(BASE_REAL_NAME, obs);
+            message(1, "adding 'base' weight values to weight ensemble");
+            vector<int> wdrop{ weights.shape().first - 1 };
+            weights.drop_rows(wdrop);
+            weights.append(BASE_REAL_NAME, wobs);
 		}
 	}
 }
@@ -8644,6 +8694,30 @@ void EnsembleMethod::initialize_restart()
 					oe_base.to_csv(ss.str());
 				}
 				message(1, "re-saved obs+noise observation ensemble (obsval+noise) to ", ss.str());
+
+				ss.str("");
+				oe_base_real_names = weights.get_real_names();
+                ss << "WARNING: replacing weight realization '" << oe_base_real_names[base_par_idx] << "' with 'base' weight values to match par en 'base' location";
+                message(1, ss.str());
+                Observations wobs;
+                ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+                for (auto& name : weights.get_var_names())
+                {
+                    wobs[name] = oi->get_weight(name);
+                }
+                weights.replace(base_par_idx, wobs, BASE_REAL_NAME);
+                ss.str("");
+                if (pest_scenario.get_pestpp_options().get_save_binary())
+                {
+                    ss << file_manager.get_base_filename() << ".weights.jcb";
+                    oe_base.to_binary(ss.str());
+                }
+                else
+                {
+                    ss << file_manager.get_base_filename() << ".weights.csv";
+                    oe_base.to_csv(ss.str());
+                }
+                message(1, "re-saved weight ensemble to ", ss.str());
 			}
 			else
 			{
@@ -8723,6 +8797,7 @@ void EnsembleMethod::initialize_restart()
 		if ((oe_drawn) && (oe_base.shape().first == oe_real_names.size()))
 		{
 			oe_base.set_real_names(oe_real_names);
+			weights.set_real_names(oe_real_names);
 		}
 		else
 		{
@@ -8739,6 +8814,22 @@ void EnsembleMethod::initialize_restart()
 			{
 				throw_em_error(string("error reordering oe_base with restart oe"));
 			}
+
+            try
+            {
+                weights.reorder(oe_real_names, vector<string>());
+            }
+            catch (exception& e)
+            {
+                ss << "error reordering weights with restart oe:" << e.what();
+                throw_em_error(ss.str());
+            }
+            catch (...)
+            {
+                throw_em_error(string("error reordering weights with restart oe"));
+            }
+
+
 		}
 		//if (par_restart_csv.size() > 0)
 		if (true)
