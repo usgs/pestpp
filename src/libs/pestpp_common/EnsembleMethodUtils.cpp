@@ -8986,7 +8986,11 @@ void EnsembleMethod::zero_weight_obs(vector<string>& obs_to_zero_weight, bool up
 	//drop from oe_base
 	if (update_oe_base)
 		oe_base.drop_cols(obs_to_zero_weight);
-
+    ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
+    for (auto n : obs_to_zero_weight)
+    {
+        oi->set_weight(n, 0.0);
+    }
 	//shouldnt need to update localizer since we dropping not adding
 	//updating weights in control file
 	if (weights.shape().first == 0)
@@ -8995,12 +8999,9 @@ void EnsembleMethod::zero_weight_obs(vector<string>& obs_to_zero_weight, bool up
 	}
 	else
 	{
-		ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
-		
 		map<string, int> weight_var_map = weights.get_var_map();
 		for (auto n : obs_to_zero_weight)
 		{
-			oi->set_weight(n, 0.0);
 			weights.get_eigen_ptr_4_mod()->col(weight_var_map.at(n)).setZero();
 		}
 	}
