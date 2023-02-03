@@ -1446,7 +1446,8 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 			//because they are in sync. _dp hasnt been run yet...
 			string opt_member;
 			pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op, opt_member);
-			pars = po_pair.first;
+			for (auto& item : po_pair.first)
+			    pars.update_rec(item.first,item.second);
 			pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
 			obs = po_pair.second;
 			constraints.add_runs(iter, pars, obs, run_mgr_ptr);
