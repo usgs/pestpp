@@ -1936,6 +1936,7 @@ void PestppOptions::set_defaults()
     set_ensemble_output_precision(6);
     set_ies_localizer_forgive_missing(false);
     set_ies_phi_fractions_files("");
+    set_ies_phi_factors_by_real(false);
 
 	// DA parameters
 	//set_da_use_ies(false);

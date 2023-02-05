@@ -6447,7 +6447,7 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
             message(2, ss.str());
             if (pf.second <= 0.0) {
                 ss.str("");
-                ss << "adjust_weights(): phi factor '" << pf.first << "' less or equal 0.0 - this not allowed";
+                ss << "adjust_weights(): phi factor '" << pf.first << "' less or equal 0.0 - this is not allowed";
                 throw_em_error(ss.str());
             }
         }
