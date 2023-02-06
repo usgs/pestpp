@@ -373,11 +373,12 @@ vector<string> fortran_str_array_2_vec(char *fstr, int str_len, int array_len)
 //	return;
 //}
 
-map<string, double> read_twocol_ascii_to_map(string filename, int header_lines, int data_col)
+map<string,map<string, double>> read_csv_to_nested_map(string filename, vector<string>& index)
 {
-	map<string, double> result;
+    stringstream ss;
+	map<string,map<string, double>> result;
 	ifstream fin(filename);
-    if (!fin.good())
+    if (fin.bad())
     {
         cout << "ERROR: could not open file " + filename + " for reading" << endl;
         cerr << "ERROR: could not open file " + filename + " for reading" << endl;
@@ -385,43 +386,159 @@ map<string, double> read_twocol_ascii_to_map(string filename, int header_lines, 
         throw runtime_error("could not open file " + filename + " for reading");
 
     }
-
 	string line, dtoken;
 	double value;
 	size_t idx;
-	vector<string> tokens;
-	for (int i = 0; i < header_lines; i++)
-		getline(fin, line);
+	vector<string> tokens,header_tokens;
+    getline(fin, line);
+    if (fin.bad())
+    {
+        ss.str("");
+        ss << "error reading header line from csv file " << filename << endl;
+        cout << ss.str();
+        cerr << ss.str();
+        throw runtime_error(ss.str());
+    }
+    strip_ip(line);
+    upper_ip(line);
+    header_tokens.clear();
+    tokenize(line, header_tokens,"\t\r, ");
+    if (header_tokens.size() < 2)
+    {
+        ss.str("");
+        ss << "Error: read_csv_to_nested_map: too few columns found, need at least 2";
+        cout << ss.str();
+        cerr << ss.str();
+        throw runtime_error(ss.str());
+    }
+    if (line[0] == ',')
+    {
+        header_tokens.insert(header_tokens.begin(),"");
+    }
+    for (int i=0;i<header_tokens.size();i++)
+    {
+        if (header_tokens[i].size() == 0)
+        {
+            if (i ==0)
+                continue;
+            else
+            {
+                ss.str("");
+                ss << "Error: read_csv_to_nested_map: empty header token in column " << i << endl;
+                cout << ss.str();
+                cerr << ss.str();
+                throw runtime_error(ss.str());
+            }
+        }
+    }
+
+
+    int line_count = 1;
+    string idx_val;
+    map<string,double> row;
 	while (getline(fin, line))
 	{
 		strip_ip(line);
 		upper_ip(line);
-		if ((line.size() == 0) || (line.at(0) == '#'))
+		line_count++;
+		if (line.at(0) == '#')
 			continue;
 		tokens.clear();
 		tokenize(line, tokens,"\t\r, ");
 		//only use the first two columns of file
-		if (tokens.size() < data_col + 1)
+		if (tokens.size() != header_tokens.size())
         {
-		    cout << "ERROR: not enough entries on line :"<<  line << " of file " << filename << endl;
-            cerr << "ERROR: not enough entries on line :"<<  line << " of file " << filename << endl;
-            throw runtime_error("not enough entries on line :" + line);
-        }
+		    ss.str("");
 
-		value = stod(tokens[data_col],&idx);
-		//convert_ip(tokens[data_col], value);
-		if (idx != tokens[data_col].size())
+		    ss << "ERROR: read_csv_to_nested_map: line number " << line_count << " does not have the same number of tokens (";
+		    ss << tokens.size() << ") as the header (" << header_tokens.size() << ")" << endl;
+            cout << ss.str();
+            cerr << ss.str();
+            throw runtime_error(ss.str());
+        }
+		idx_val = tokens[0];
+		row.clear();
+        for (int i=1;i<tokens.size();i++)
         {
-            cout << "WARNING: left over chars after data for token " << tokens[data_col] << " on line " << line << " of file " << filename << endl;
-            cerr << "WARNING: left over chars after data for token " << tokens[data_col] << " on line " << line << " of file " << filename << endl;
-            throw runtime_error("WARNING: left over chars after data for token "+tokens[data_col]+" on line "+line+" of file "+filename);
-        }
 
-		result[tokens[0]] = value;
+            value = stod(tokens[i], &idx);
+            //convert_ip(tokens[data_col], value);
+            if (idx != tokens[i].size())
+            {
+                ss.str("");
+                ss << "Error: read_csv_to_nested_map: left over chars after data for token " << tokens[i] << " on line number " << line_count << endl;
+                cout << ss.str();
+                cerr << ss.str();
+                throw runtime_error(ss.str());
+            }
+            if ((!isnormal(value)) && (value != 0.0))
+            {
+                ss.str("");
+                ss << "Error: read_csv_to_nested_map: denormal value for token " << tokens[i] << " on line number " << line_count << endl;
+                cout << ss.str();
+                cerr << ss.str();
+                throw runtime_error(ss.str());
+            }
+            row[header_tokens[i]] = value;
+        }
+		result[idx_val] = row;
+        index.push_back((idx_val));
+
 	}
 	fin.close();
 	return result;
 }
+
+map<string, double> read_twocol_ascii_to_map(string filename, int header_lines, int data_col)
+    {
+        map<string, double> result;
+        ifstream fin(filename);
+        if (!fin.good())
+        {
+            cout << "ERROR: could not open file " + filename + " for reading" << endl;
+            cerr << "ERROR: could not open file " + filename + " for reading" << endl;
+
+            throw runtime_error("could not open file " + filename + " for reading");
+
+        }
+
+        string line, dtoken;
+        double value;
+        size_t idx;
+        vector<string> tokens;
+        for (int i = 0; i < header_lines; i++)
+            getline(fin, line);
+        while (getline(fin, line))
+        {
+            strip_ip(line);
+            upper_ip(line);
+            if ((line.size() == 0) || (line.at(0) == '#'))
+                continue;
+            tokens.clear();
+            tokenize(line, tokens,"\t\r, ");
+            //only use the first two columns of file
+            if (tokens.size() < data_col + 1)
+            {
+                cout << "ERROR: not enough entries on line :"<<  line << " of file " << filename << endl;
+                cerr << "ERROR: not enough entries on line :"<<  line << " of file " << filename << endl;
+                throw runtime_error("not enough entries on line :" + line);
+            }
+
+            value = stod(tokens[data_col],&idx);
+            //convert_ip(tokens[data_col], value);
+            if (idx != tokens[data_col].size())
+            {
+                cout << "Error: left over chars after data for token " << tokens[data_col] << " on line " << line << " of file " << filename << endl;
+                cerr << "Error: left over chars after data for token " << tokens[data_col] << " on line " << line << " of file " << filename << endl;
+                throw runtime_error("Error: left over chars after data for token "+tokens[data_col]+" on line "+line+" of file "+filename);
+            }
+
+            result[tokens[0]] = value;
+        }
+        fin.close();
+        return result;
+    }
+
 
 vector<string> read_onecol_ascii_to_vector(std::string filename)
 {

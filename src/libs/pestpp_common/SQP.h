@@ -47,7 +47,7 @@ struct FilterRec
 class SqpFilter
 {
 public:
-	SqpFilter(bool _minimize=true,double _obj_tol = 0.01, double _viol_tol = 0.01) {
+	SqpFilter(bool _minimize=true,double _obj_tol = 0.05, double _viol_tol = 0.05) {
 		minimize = _minimize; obj_tol = _obj_tol; viol_tol = _viol_tol;
 	}
 	bool accept(double obj_val, double violation_val,int iter=0,double alpha=-1.0, bool keep=false);
@@ -64,7 +64,7 @@ private:
 
 	bool first_partially_dominates_second(const FilterRec& first, const FilterRec& second);
     bool first_strictly_dominates_second(const FilterRec& first, const FilterRec& second);
-	
+
 };
 
 class SeqQuadProgram
@@ -73,7 +73,7 @@ public:
 	SeqQuadProgram(Pest& _pest_scenario, FileManager& _file_manager,
 		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 		RunManagerAbstract* _run_mgr_ptr);
-	
+
 	void initialize();
 	void iterate_2_solution();
 	void finalize();
@@ -103,28 +103,40 @@ private:
 
 	int num_threads;
 	int n_consec_infeas;
-	int MAX_CONSEC_INFEAS = 3;
-    int MAX_CONSEC_PHIINC = 3;
-
-    int n_consec_phiinc;
-
+	//todo: make these ++ args
+	int MAX_CONSEC_INFEAS = 100000;
+    int MAX_CONSEC_INFEAS_IES = 3;
+    int MAX_CONSEC_PHIINC = 100000;
+    double SF_DEC_FAC = 0.5;
+    double SF_INC_FAC = 1.05;
+    double BASE_SCALE_FACTOR = 1.0;
+    double PAR_SIGMA_DEC_FAC = 0.9;
+    double PAR_SIGMA_INC_FAC = 1.1;
+    bool SOLVE_EACH_REAL = false;
+    double PHI_ACCEPT_FAC = 0.05;
+    double par_sigma_max = 100;
+    //todo add warning for par_sigma_range too low
+    double par_sigma_min = 10;
 	double eigthresh;
-	vector<double> scale_vals;
+
 	set<string> pp_args;
 
 	int iter;
 
 	double last_best;
+	double last_viol;
 	vector<double> best_phis;
+	vector<double> best_violations;
 	double best_phi_yet;
+	double best_violation_yet;
 
 	int warn_min_reals, error_min_reals;
-	
+
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
 	vector<string> dv_names;
 	//vector<int> subset_idxs;
-	
+
 	Parameters current_ctl_dv_values;
 	Observations current_obs;
 
@@ -137,6 +149,8 @@ private:
 	//these are used so that we can update the constraints based on the current best values
 	//Parameters best_mean_dv_values;
 	//Observations best_mean_obs_values;
+
+	void save_current_dv_obs();
 
 	Constraints constraints;
 
@@ -157,17 +171,17 @@ private:
 	bool update_hessian_and_grad_vector();
 
 	bool solve_new();
-	
+
 	bool seek_feasible();
 
-	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, vector<double>& alpha_vals);
+	bool pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string,double>& sf_map);
 
-	Parameters calc_gradient_vector(const Parameters& _current_dv_values);
+	Parameters calc_gradient_vector(const Parameters& _current_dv_values, string _center_on=string());
 
 	Eigen::VectorXd calc_gradient_vector_from_coeffs(const Parameters & _current_dv_values);
 
 	Eigen::VectorXd get_obj_vector(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
-	
+
 	double get_obj_value(Parameters& _current_ctl_dv_vals, Observations& _current_obs);
 	map<string, double> get_obj_map(ParameterEnsemble& _dv, ObservationEnsemble& _oe);
 
@@ -178,10 +192,10 @@ private:
 	pair<Eigen::VectorXd, Eigen::VectorXd> _kkt_null_space(Eigen::MatrixXd& inv_hessian, Eigen::MatrixXd& constraint_jco, Eigen::VectorXd& constraint_diff, Eigen::VectorXd& curved_grad, vector<string>& cnames);
 
 	//Parameters fancy_solve_routine(double scale_val, const Parameters& _current_dv_);
-	Eigen::VectorXd fancy_solve_routine(const Parameters& _current_dv_);
+	Eigen::VectorXd fancy_solve_routine(const Parameters& _current_dv_, const Parameters& _grad_vector);
 
 	vector<int> run_ensemble(ParameterEnsemble &_pe, ObservationEnsemble &_oe, const vector<int> &real_idxs=vector<int>());
-	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates, vector<double> &scale_vals);
+	ObservationEnsemble run_candidate_ensemble(ParameterEnsemble&dv_candidates);
 
 	void run_jacobian(Parameters& _current_dv_vals,Observations& _current_obs, bool init_obs);
 
@@ -196,7 +210,7 @@ private:
 	void initialize_parcov();
 	void initialize_objfunc();
 	void queue_chance_runs();
-	
+
 	template<typename T, typename A>
 	void message(int level, const string &_message, vector<T, A> _extras, bool echo=true);
 	void message(int level, const string &_message);

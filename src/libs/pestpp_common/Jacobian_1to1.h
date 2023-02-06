@@ -37,12 +37,12 @@ public:
 		bool debug_fail);
 	virtual void report_errors(std::ostream &fout);
 	virtual ~Jacobian_1to1();
-	map<string, vector<int>> get_par_run_map() const { return par_run_map; }
+
 protected:
 	Parameters failed_ctl_parameters;
 	Parameters failed_to_increment_parmaeters;
 	OutputFileWriter* output_file_writer_ptr;
-	std::map<string, vector<int>> par_run_map;
+
 	bool forward_diff(const string &par_name, double derivative_par_value,
 		const ParameterGroupInfo &group_info, const ParameterInfo &ctl_par_info, const ParamTransformSeq &par_trans, double &new_par_val);
 	bool central_diff(const string &par_name, double derivative_par_value,

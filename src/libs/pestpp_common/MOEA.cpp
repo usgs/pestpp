@@ -1013,8 +1013,8 @@ map<string, map<string, double>> MOEA::decvar_report(ParameterEnsemble& _dp)
         ss << right << setw(10) << meanmap[dv];
         ss << right << setw(20) << stdmap[dv];
         vec = _dp.get_var_vector(dv);
-        ss << setw(12) << vec.maxCoeff();
         ss << setw(12) << vec.minCoeff();
+        ss << setw(12) << vec.maxCoeff();
         ss << endl;
         sum["mean"] = meanmap[dv];
         sum["std"] = stdmap[dv];
@@ -1445,8 +1445,13 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 			//dont use the _dp, use the class attr dp and op here
 			//because they are in sync. _dp hasnt been run yet...
 			string opt_member;
+			Parameters::iterator end = pars.end();
 			pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op, opt_member);
+			for (auto& item : po_pair.first)
+				if (pars.find(item.first) != end)
+					pars.update_rec(item.first,item.second);
 			pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
+			obs = po_pair.second;
 			constraints.add_runs(iter, pars, obs, run_mgr_ptr);
 		}
 		else if (chancepoints == chancePoints::ALL)
@@ -1909,6 +1914,7 @@ void MOEA::initialize()
 			pi_ptr->AddRecord(pest_utils::upper_cp(ss.str()));
 			message(1, "added prior information objective for '" + RISK_NAME + "': ", ss.str());
 			pi_obj_names.push_back(RISK_NAME);
+			obj_dir_mult[RISK_NAME] = -1;
 		}
 		ss.str("");
 		ss << "'mou_risk_objective' is true, using " << RISK_NAME << " decision variable as risk in chance calcs";

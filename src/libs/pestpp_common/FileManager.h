@@ -35,6 +35,7 @@ public:
 	std::string build_filename(const std::string &ext, bool include_dir = false);
 	//std::string get_full_filename(const std::string &tag);
 	std::string get_base_filename() {return pest_base_filename;}
+	void set_base_filename(std::string new_base) {pest_base_filename = new_base;}
 	std::ofstream &rec_ofstream();
 	std::ofstream &sen_ofstream();
 	std::ofstream &open_ofile_ext(const std::string &extension, std::ios_base::openmode mode = std::ofstream::out);
