@@ -1436,6 +1436,7 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 	{
 		dp.transform_ip(ParameterEnsemble::transStatus::NUM);
 		Parameters pars = pest_scenario.get_ctl_parameters();
+		Parameters opars;
 		pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(pars);
 		Observations obs = pest_scenario.get_ctl_observations();
 		//if this is the first iter and no restart
@@ -1447,10 +1448,12 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 			string opt_member;
 			Parameters::iterator end = pars.end();
 			pair<Parameters, Observations> po_pair = get_optimal_solution(dp, op, opt_member);
-			for (auto& item : po_pair.first)
+            opars = po_pair.first;
+            pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(opars);
+			for (auto& item : opars)
 				if (pars.find(item.first) != end)
 					pars.update_rec(item.first,item.second);
-			pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
+
 			obs = po_pair.second;
 			constraints.add_runs(iter, pars, obs, run_mgr_ptr);
 		}
@@ -2548,8 +2551,8 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 		pars.update_without_clear(_dp.get_var_names(), _dp.get_real_vector(opt_member));
 		obs.update_without_clear(_op.get_var_names(), _op.get_real_vector(opt_member));
 		opt_member_name=opt_member;
+        pest_scenario.get_base_par_tran_seq().numeric2ctl_ip(pars);
 	}
-
 	return pair<Parameters, Observations>(pars, obs);
 }
 
