@@ -1862,10 +1862,11 @@ void MOEA::initialize()
 		else if (missing.size() > 0)
 		{
 			ss.str("");
-			ss << "WARNING: the following mou_objectives were not found in the non-zero-weighted observations or prior info eqs: ";
+			ss << "the following mou_objectives were not found in the non-zero-weighted observations or prior info eqs: ";
 			for (auto m : missing)
 				ss << m << ",";
-			message(1, ss.str());
+			//message(1, ss.str());
+            throw_moea_error(ss.str());
 
 		}
 		obs_obj_names = keep_obs;
