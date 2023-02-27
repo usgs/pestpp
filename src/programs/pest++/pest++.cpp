@@ -224,6 +224,10 @@ int main(int argc, char* argv[])
 
 		if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
         {
+		    if (pest_scenario.get_prior_info().get_nnz_pi() == 0)
+            {
+		        throw runtime_error("regularization mode requires at least one non-zero weighted prior info equation");
+            }
 		    if ((pest_scenario.get_pestpp_options().get_glm_iter_mc()) &&
 		    (pest_scenario.get_pestpp_options().get_glm_accept_mc_phi()))
             {

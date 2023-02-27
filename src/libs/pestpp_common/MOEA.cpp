@@ -2683,11 +2683,12 @@ void MOEA::iterate_to_solution()
 			save_populations(new_dp, new_op_shifted,"chance");
 			new_op = new_op_shifted;
 		}
+        else {
+            //append offspring dp and (risk-shifted) op to make new dp and op containers
 
-		//append offspring dp and (risk-shifted) op to make new dp and op containers
-
-		new_dp.append_other_rows(dp);
-		new_op.append_other_rows(op);
+            new_dp.append_other_rows(dp);
+            new_op.append_other_rows(op);
+        }
 
 		update_pso_pbest(new_dp, new_op);
 
