@@ -157,10 +157,6 @@ private:
 	int save_every;
 	map<int,int> population_schedule;
 
-	//these two instances are passed as pointers to the constraints
-	//Parameters effective_constraint_pars;
-	//Observations effective_constraint_obs;
-
 	ParetoObjectives objectives;
 	Constraints constraints;
 	const ParameterInfo *ctl_par_info_ptr;
@@ -174,9 +170,13 @@ private:
 	ParameterEnsemble dp, dp_archive;
 	ObservationEnsemble op, op_archive;
 
+	map<string,Eigen::VectorXd> par_sim_map, obs_sim_map;
+
 	ParameterEnsemble pso_velocity, pso_pbest_dp;
 	ObservationEnsemble pso_pbest_op;
 
+	void update_sim_maps(ParameterEnsemble& _dp, ObservationEnsemble& _op);
+	void fill_populations_from_maps(ParameterEnsemble& new_dp, ObservationEnsemble& new_op );
 
 	void update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp);
 	void update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp);

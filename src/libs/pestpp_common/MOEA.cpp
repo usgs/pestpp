@@ -1765,6 +1765,7 @@ void MOEA::initialize()
 				obj_sense_map[oname] = "minimize";
 				obj_dir_mult[oname] = 1.0;
 			}
+
 		}
 
 		onames = pest_scenario.get_ctl_ordered_pi_names();
@@ -2437,9 +2438,26 @@ void MOEA::initialize()
 	constraints.mou_report(0,dp, op, obs_obj_names,pi_obj_names);
 
     initialize_pso_bits();
-	
+
+    par_sim_map.clear();
+    obs_sim_map.clear();
+    update_sim_maps(dp,op);
 
 	message(0, "initialization complete");
+}
+
+void MOEA::update_sim_maps(ParameterEnsemble& _dp, ObservationEnsemble& _op)
+{
+    map<string,int> rmap = _dp.get_real_map();
+    for (auto& ridx : rmap)
+    {
+        par_sim_map[ridx.first] = _dp.get_eigen_ptr()->row(ridx.second);
+    }
+    rmap = _op.get_real_map();
+    for (auto& ridx : rmap)
+    {
+        obs_sim_map[ridx.first] = _op.get_eigen_ptr()->row(ridx.second);
+    }
 }
 
 
@@ -2605,6 +2623,27 @@ ParameterEnsemble MOEA::generate_population()
 	return new_pop;
 }
 
+void MOEA::fill_populations_from_maps(ParameterEnsemble& new_dp, ObservationEnsemble& new_op )
+{
+    vector<string> rnames;
+    for (auto& entry : par_sim_map)
+    {
+        rnames.push_back(entry.first);
+    }
+    new_dp.reserve(rnames,dp.get_var_names());
+    map<string,int> rmap = new_dp.get_real_map();
+    for (auto& ridx : rmap)
+    {
+        new_dp.get_eigen_ptr_4_mod()->row(ridx.second) = par_sim_map.at(ridx.first);
+    }
+    new_op.reserve(rnames,op.get_var_names());
+    rmap = new_op.get_real_map();
+    for (auto& ridx : rmap)
+    {
+        new_op.get_eigen_ptr_4_mod()->row(ridx.second) = obs_sim_map.at(ridx.first);
+    }
+}
+
 void MOEA::iterate_to_solution()
 {
 	iter = 1;
@@ -2624,13 +2663,17 @@ void MOEA::iterate_to_solution()
 		new_op.reserve(new_dp.get_real_names(), op.get_var_names());
 		run_population(new_dp, new_op, true);
 
-		//and risk-shift
-			
-		//TODO: save new_dp, new_op and new_op_shifted?
 		save_populations(new_dp, new_op);
+        update_sim_maps(new_dp,new_op);
+        
 		if (constraints.get_use_chance())
 		{
-		    string csum = constraints.mou_population_observation_constraint_summary(iter,new_op,"pre-shift",obs_obj_names);
+		    //if we are using chances, then we need to make sure to update the archive as well as the current population
+		    // from the full history of available members since uncertainty estimates could be changing as we evolve
+		    // e.g. Rui's problem...
+            fill_populations_from_maps(new_dp,new_op);
+
+            string csum = constraints.mou_population_observation_constraint_summary(iter,new_op,"pre-shift",obs_obj_names);
 		    cout << csum;
 		    file_manager.rec_ofstream() << csum;
 		    string opt_member;
@@ -2641,8 +2684,6 @@ void MOEA::iterate_to_solution()
 			new_op = new_op_shifted;
 		}
 
-
-		
 		//append offspring dp and (risk-shifted) op to make new dp and op containers
 
 		new_dp.append_other_rows(dp);
