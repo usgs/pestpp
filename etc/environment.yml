@@ -7,7 +7,7 @@ dependencies:
   - pyshp
   - nose-timer
   - nbsphinx
-  - matplotlib>=3.7
+  - matplotlib<=3.5
   - coverage
   - scipy
   - shapely>=1.8
