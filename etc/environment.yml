@@ -1,16 +1,19 @@
 name: pyemu
 channels:
-  - defaults
-dependencies:  
-  - numpy 
-  - pandas 
+  - conda-forge
+dependencies:
+  # required
+  - python>=3.8
+  - numpy>=1.15.0
+  - pandas
+  # optional
+  - matplotlib>=1.4.0
   - pyshp
-  - nose-timer
-  - nbsphinx
-  - matplotlib
-  - coverage
-  - scipy
-  - shapely>=1.8
-  - tomli
-  - pillow=9.3
-  - pip
+  - jinja2
+  # tests
+  - coveralls
+  - pytest
+  - pytest-cov
+  - pytest-xdist
+  - nbmake
+  - shapely
