@@ -7,9 +7,10 @@ dependencies:
   - pyshp
   - nose-timer
   - nbsphinx
-  - matplotlib<=3.5
+  - matplotlib
   - coverage
   - scipy
   - shapely>=1.8
   - tomli
+  - pillow=9.3
   - pip
