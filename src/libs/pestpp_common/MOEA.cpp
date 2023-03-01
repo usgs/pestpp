@@ -866,9 +866,11 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 		front = q_front;
 
 		num_front_solutions += front.size();
-		if (num_front_solutions > _member_struct.size())
+		if (num_front_solutions >= _member_struct.size())
         {
-		    throw runtime_error("error in nsga-ii front sorting: number of visited solutions > number of members");
+		    //throw runtime_error("error in nsga-ii front sorting: number of visited solutions > number of members");
+		    cout << "note: nsga-ii front sorting: number of visited solutions >= number of members" << endl;
+		    break;
         }
 //		for (auto& sol : front)
 //        {
