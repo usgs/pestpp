@@ -1279,8 +1279,6 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
                 real_vec = shifts.colwise().sum();
                 shifted_oe.get_eigen_ptr_4_mod()->row(real_map.at(missing[i])) = real_vec;
 
-
-
 				if (min_real_name.size() == 0)
 					//do something here
 					throw_constraints_error("couldnt find a nearest dv real for stack mapping");
@@ -1288,11 +1286,15 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 					throw_constraints_error("nearest dv real '" + min_real_name +"' not in stack oe map");
 				if (min_dist > 0.0) min_dist = sqrt(min_dist);
 
-				if (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 3)
-				{
-					frec << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
-					cout << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
-				}
+
+                if (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 3) {
+                    for (int ii = 0; ii < factors.size(); ii++) {
+                        frec << "member '" << missing[i] << "' mapped to '" << dreal_names[ii] << "' at a distance of "
+                             << distances[ii] << " with a IDW factor of " << factors[ii] << " for stack-based chances"
+                             << endl;
+                    }
+
+                }
 
 				real_vec = shifted_oe.get_real_vector(missing[i]);
 				sim.update_without_clear(onames, real_vec);
