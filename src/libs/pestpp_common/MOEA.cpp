@@ -842,12 +842,11 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 	map<int, vector<string>> front_map;
 	front_map[1] = first_front;
 	vector<string> front = first_front;
-
+    vector<string> sorted = first_front;
 	int num_front_solutions = front.size();
 
 	while (true)
 	{
-		
 		q_front.clear();
 		for (auto solution_p : front)
 		{
@@ -867,6 +866,34 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 		front = q_front;
 
 		num_front_solutions += front.size();
+		if (num_front_solutions > _member_struct.size())
+        {
+		    throw runtime_error("error in nsga-ii front sorting: number of visited solutions > number of members");
+        }
+//		for (auto& sol : front)
+//        {
+//		    sorted.push_back(sol);
+//        }
+//
+//		//do we really need more than 10 front for multiobjectives - I dont think so...
+//		if ((i > 10) && ((*obs_obj_names_ptr + *pi_obj_names_ptr) > 1))
+//        {
+//		    set<string> ssorted(sorted.begin(),sorted.end());
+//		    set<string>::iterator end = ssorted.end();
+//		    q_front.clear();
+//		    for (auto& member : _member_struct)
+//            {
+//		        if (ssorted.find(member.first) == end)
+//                {
+//		            q_front.push_back(member.first);
+//                }
+//            }
+//		    i++;
+//		    front_map[i] = q_front;
+//		    break;
+//        }
+
+
 	}
 	
 	if (num_front_solutions != _member_struct.size())
@@ -2672,6 +2699,11 @@ void MOEA::iterate_to_solution()
 		    // from the full history of available members since uncertainty estimates could be changing as we evolve
 		    // e.g. Rui's problem...
             fill_populations_from_maps(new_dp,new_op);
+            if (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 2) {
+                ss.str("");
+                ss << "." << iter << ".all.pre-shift";
+                save_populations(new_dp, new_op, ss.str());
+            }
 
             string csum = constraints.mou_population_observation_constraint_summary(iter,new_op,"pre-shift",obs_obj_names);
 		    cout << csum;
@@ -2690,7 +2722,9 @@ void MOEA::iterate_to_solution()
             new_op.append_other_rows(op);
         }
 
-		update_pso_pbest(new_dp, new_op);
+        if (find(gen_types.begin(),gen_types.end(),MouGenType::PSO) != gen_types.end()) {
+            update_pso_pbest(new_dp, new_op);
+        }
 
 		if (envtype == MouEnvType::NSGA)
 		{
