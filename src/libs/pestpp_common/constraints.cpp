@@ -1087,7 +1087,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
     ss << file_mgr_ptr->get_base_filename() << "." << gen << ".population_stack_summary.csv";
     ofstream csv;
     if (!use_fosm) {
-        (ss.str());
+        csv.open(ss.str());
 
         if (csv.bad()) {
             throw_constraints_error("error opening '" + ss.str() + "' for writing");

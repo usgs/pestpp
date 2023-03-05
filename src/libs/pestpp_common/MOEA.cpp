@@ -863,15 +863,22 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 		i++;
 		front_map[i] = q_front;
 		
-		front = q_front;
 
-		num_front_solutions += front.size();
-		if (num_front_solutions >= _member_struct.size())
+
+		num_front_solutions += q_front.size();
+		if (num_front_solutions > _member_struct.size())
         {
 		    //throw runtime_error("error in nsga-ii front sorting: number of visited solutions > number of members");
-		    cout << "note: nsga-ii front sorting: number of visited solutions >= number of members" << endl;
-		    break;
+		    cout << "note: nsga-ii front sorting: number of visited solutions " << num_front_solutions << " >= number of members " << _member_struct.size() << endl;
+		    cout << "q_front:" <<endl;
+		    for (auto& f : q_front)
+		        cout << "  " << f << endl;
+            cout << "front:" <<endl;
+            for (auto& f : front)
+                cout << "  " << f << endl;
+		    //break;
         }
+        front = q_front;
 //		for (auto& sol : front)
 //        {
 //		    sorted.push_back(sol);
@@ -902,7 +909,7 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 	{
 		stringstream ss;
 		ss << "ERROR: ParetoObjectives::sort_members_by_dominance_into_fronts(): number of solutions in fronts (";
-		ss << num_front_solutions << ") != member_stuct.size() (" << _member_struct.size() << endl;
+		ss << num_front_solutions << ") != member_stuct.size() (" << _member_struct.size() << "," << endl;
 		file_manager.rec_ofstream() << ss.str();
 		cout << ss.str();
 		throw runtime_error(ss.str());
@@ -2703,9 +2710,10 @@ void MOEA::iterate_to_solution()
             fill_populations_from_maps(new_dp,new_op);
             if (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 2) {
                 ss.str("");
-                ss << "." << iter << ".all.pre-shift";
+                ss << "all.pre-shift";
                 save_populations(new_dp, new_op, ss.str());
             }
+
 
             string csum = constraints.mou_population_observation_constraint_summary(iter,new_op,"pre-shift",obs_obj_names);
 		    cout << csum;
