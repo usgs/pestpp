@@ -868,7 +868,6 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 		num_front_solutions += q_front.size();
 		if (num_front_solutions > _member_struct.size())
         {
-		    //throw runtime_error("error in nsga-ii front sorting: number of visited solutions > number of members");
 		    cout << "note: nsga-ii front sorting: number of visited solutions " << num_front_solutions << " >= number of members " << _member_struct.size() << endl;
 		    cout << "q_front:" <<endl;
 		    for (auto& f : q_front)
@@ -876,7 +875,9 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
             cout << "front:" <<endl;
             for (auto& f : front)
                 cout << "  " << f << endl;
-		    //break;
+            throw runtime_error("error in nsga-ii front sorting: number of visited solutions > number of members");
+
+            break;
         }
         front = q_front;
 //		for (auto& sol : front)
@@ -2678,6 +2679,7 @@ void MOEA::fill_populations_from_maps(ParameterEnsemble& new_dp, ObservationEnse
     {
         new_op.get_eigen_ptr_4_mod()->row(ridx.second) = obs_sim_map.at(ridx.first);
     }
+
 }
 
 void MOEA::iterate_to_solution()
@@ -2701,13 +2703,13 @@ void MOEA::iterate_to_solution()
 
 		save_populations(new_dp, new_op);
         update_sim_maps(new_dp,new_op);
-
+        fill_populations_from_maps(new_dp,new_op);
 		if (constraints.get_use_chance())
 		{
 		    //if we are using chances, then we need to make sure to update the archive as well as the current population
 		    // from the full history of available members since uncertainty estimates could be changing as we evolve
 		    // e.g. Rui's problem...
-            fill_populations_from_maps(new_dp,new_op);
+            //fill_populations_from_maps(new_dp,new_op);
             if (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 2) {
                 ss.str("");
                 ss << "all.pre-shift";
@@ -2728,8 +2730,8 @@ void MOEA::iterate_to_solution()
         else {
             //append offspring dp and (risk-shifted) op to make new dp and op containers
 
-            new_dp.append_other_rows(dp);
-            new_op.append_other_rows(op);
+            //new_dp.append_other_rows(dp);
+            //new_op.append_other_rows(op);
         }
 
         if (find(gen_types.begin(),gen_types.end(),MouGenType::PSO) != gen_types.end()) {

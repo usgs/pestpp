@@ -1246,7 +1246,11 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
                 factor_sum = 0.0;
                 for (auto& t : temp)
                 {
-                    factor = 1.0/t;
+
+                    if (t == 0)
+                        factor = 10000.0;
+                    else
+                        factor = 1.0/t;
                     factor_sum += factor;
                     factors.push_back(factor);
 
