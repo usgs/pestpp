@@ -1244,11 +1244,6 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 		sum["max"] = _op.get_eigen_ptr()->col(var_map[obs_obj]).maxCoeff();
 		summary_stats[obs_obj] = sum;
 	}
-
-	//mm = _dp.get_moment_maps();
-	//mean_map.clear();
-	//std_map.clear();
-	//_dp.fill_moment_maps(mean_map, std_map);
 	_dp.update_var_map();
 	var_map = _dp.get_var_map();
 	vector<string> dp_names = _dp.get_var_names();
@@ -1278,6 +1273,7 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 
 	for (auto pi_obj : pi_obj_names)
 	{
+
 		vec = stlvec_2_eigenvec(pi_vals[pi_obj]);
 		sum.clear();
 		sum["mean"] = vec.mean();
@@ -1286,6 +1282,29 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 		sum["max"] = vec.maxCoeff();
 		summary_stats[pi_obj] = sum;
 	}
+
+	//calculate relative hyper volumes
+	//first form the ideal solution vector
+	Eigen::VectorXd ideal(summary_stats.size());
+	int i=0;
+	for (auto& oname : obs_obj_names)
+    {
+	    if (obj_dir_mult[oname] == 1)
+	        ideal[i] = summary_stats.at(oname).at("min");
+	    else
+            ideal[i] = summary_stats.at(oname).at("max");
+	    i++;
+    }
+	for (auto& pname : pi_obj_names)
+    {
+        if (obj_dir_mult[pname] == 1)
+            ideal[i] = summary_stats.at(pname).at("min");
+        else
+            ideal[i] = summary_stats.at(pname).at("max");
+        i++;
+    }
+	
+
 	return summary_stats;
 }
 
