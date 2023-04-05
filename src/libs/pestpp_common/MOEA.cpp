@@ -3193,17 +3193,6 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 			//new_pbest_names.push_back(lm.first);
 		}
 	}
-	//drop any fails...
-	/*if (names.size() > 0)
-	{
-		pso_pbest_dp.drop_rows(names);
-		pso_pbest_op.drop_rows(names);
-	}*/
-	//names = _dp.get_real_names();
-	//pso_pbest_dp.set_real_names(new_pbest_names);
-	//names = _op.get_real_names();
-	//pso_pbest_op.set_real_names(new_pbest_names);
-	//pso_pbest
 	pso_pbest_dp = tdp;
 	pso_pbest_op = top;
 }
@@ -3217,17 +3206,6 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 	int num_dv = _dp.shape().second;
 	vector<double> r;
 	Eigen::VectorXd rand1, rand2, cur_real, p_best, g_best, new_real, cur_vel;
-	/*if (pso_velocity.shape().first > _dp.shape().first)
-	{
-		vector<string> names = pso_velocity.get_real_names();
-		set<string> snames(names.begin(), names.end());
-		names.clear();
-		for (auto& name : _dp.get_real_names())
-			if (snames.find(name) == snames.end())
-				names.push_back(name);
-		pso_velocity.drop_rows(names);
-	}*/
-	
 	pso_pbest_dp.transform_ip(_dp.get_trans_status());
 	dp_archive.set_trans_status(_dp.get_trans_status());
 	Eigen::MatrixXd new_vel(_dp.shape().first, _dp.shape().second);
@@ -3282,14 +3260,18 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	for (auto& cd : crowd_dist)
 		if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
 			mx = cd.second;
-	
-	for (auto& cd : crowd_dist)
-		if (cd.second == CROWDING_EXTREME)
-			cd.second = 1.0;
-		else if (mx != 0.0)
-			cd.second = cd.second / mx;
-		else
-	cd.second = 0.5;
+	if ((mx < 0.0) && (iter > 0))
+        throw_moea_error("pso max crowding distance is negative");
+
+	for (auto& cd : crowd_dist) {
+        if (cd.second == CROWDING_EXTREME) {
+            cd.second = 1.0;
+        } else if (mx != 0.0) {
+            cd.second = cd.second / mx;
+        } else {
+            cd.second = 0.5;
+        }
+    }
 
 	vector<string> working;
 	string candidate;
