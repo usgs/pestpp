@@ -1374,8 +1374,9 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		throw_moea_error(ss.str());
 	}
 	//if this is a population reset because of trying to reuse chances, then we need to reset the archive now also...
-    if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 0))
+    if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1))
     {
+        message(2,"resetting archive after chance update");
         dp_archive = _dp;
         op_archive = _op;
         return;
@@ -1439,8 +1440,9 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		ss << "MOEA::update_archive_spea(): op_archive members " << op_archive.shape().first << " != dp_archive members " << dp_archive.shape().first;
 		throw_moea_error(ss.str());
 	}
-    if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 0))
+    if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1))
     {
+        message(1,"resetting archive after chance update");
         dp_archive = _dp;
         op_archive = _op;
     }
@@ -2737,7 +2739,7 @@ void MOEA::iterate_to_solution()
         // from the full history of available members since uncertainty estimates could be changing as we evolve
         // e.g. Rui's problem...
         // this same conditional is used in the update archive functions
-        if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 0))
+        if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1))
         {
             message(1,"chances re-evaluated, resetting current population to complete history of population to update dominance sorting");
             fill_populations_from_maps(new_dp,new_op);
@@ -2779,7 +2781,8 @@ void MOEA::iterate_to_solution()
 			message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
 			DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
 
-            if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 0)) {
+            if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1)) {
+                message(2,"keeping all nondom members after chance update");
                 keep = dompair.first;
             }
             else {
@@ -2821,8 +2824,9 @@ void MOEA::iterate_to_solution()
 		{
 			map<string, double> fit = objectives.get_spea2_fitness(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
 			//first find all members with fitness less than 1 (nondom)
-            if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 0))
+            if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1))
             {
+                message(2,"keeping all nondom members after chance update");
                 keep = new_dp.get_real_names();
             }
             else {
