@@ -1373,7 +1373,13 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		ss << "MOEA::update_archive_nsga(): op_archive members " << op_archive.shape().first << " != dp_archive members " << dp_archive.shape().first;
 		throw_moea_error(ss.str());
 	}
-
+	//if this is a population reset because of trying to reuse chances, then we need to reset the archive now also...
+    if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 0))
+    {
+        dp_archive = _dp;
+        op_archive = _op;
+        return;
+    }
 	//check that members of _op arent in the archive already
 	vector<string> keep, temp = op_archive.get_real_names();
 	set<string> archive_members(temp.begin(), temp.end());
@@ -1433,6 +1439,11 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		ss << "MOEA::update_archive_spea(): op_archive members " << op_archive.shape().first << " != dp_archive members " << dp_archive.shape().first;
 		throw_moea_error(ss.str());
 	}
+    if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 0))
+    {
+        dp_archive = _dp;
+        op_archive = _op;
+    }
 
 	//check that members of _op arent in the archive already
 	vector<string> keep, temp = op_archive.get_real_names();
@@ -2722,13 +2733,19 @@ void MOEA::iterate_to_solution()
 
 		save_populations(new_dp, new_op);
         update_sim_maps(new_dp,new_op);
-        fill_populations_from_maps(new_dp,new_op);
+        //if we are using chances, then we need to make sure to update the archive as well as the current population
+        // from the full history of available members since uncertainty estimates could be changing as we evolve
+        // e.g. Rui's problem...
+        // this same conditional is used in the update archive functions
+        if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 0))
+        {
+            message(1,"chances re-evaluated, resetting current population to complete history of population to update dominance sorting");
+            fill_populations_from_maps(new_dp,new_op);
+        }
+
 		if (constraints.get_use_chance())
 		{
-		    //if we are using chances, then we need to make sure to update the archive as well as the current population
-		    // from the full history of available members since uncertainty estimates could be changing as we evolve
-		    // e.g. Rui's problem...
-            //fill_populations_from_maps(new_dp,new_op);
+
             if (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 2) {
                 ss.str("");
                 ss << "all.pre-shift";
@@ -2762,16 +2779,17 @@ void MOEA::iterate_to_solution()
 			message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
 			DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
 
-			//drop shitty members
-			//TODO: this is just a cheap hack, prob something more meaningful to be done...
-			keep.clear();
-			for (auto nondom : dompair.first)
-			{
-				if (keep.size() >= num_members)
-					break;
-				keep.push_back(nondom);
-
-			}
+            if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 0)) {
+                keep = dompair.first;
+            }
+            else {
+                keep.clear();
+                for (auto nondom : dompair.first) {
+                    if (keep.size() >= num_members)
+                        break;
+                    keep.push_back(nondom);
+                }
+            }
 
 			if (keep.size() > 0)
 			{
@@ -2803,30 +2821,32 @@ void MOEA::iterate_to_solution()
 		{
 			map<string, double> fit = objectives.get_spea2_fitness(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
 			//first find all members with fitness less than 1 (nondom)
-			keep.clear();
-			for (auto member : new_dp.get_real_names())
-			{
-				if (fit[member] < 1.0)
-					keep.push_back(member);
-			}
-			ss.str("");
-			ss << keep.size() << " non-dominated members (spea2 fitness less than 1.0)";
-			cout << ss.str() << endl;
-			file_manager.rec_ofstream() << ss.str() << endl;
-			if (keep.size() < num_members)
-			{
-				//fill with members of increasing fitness value
-				sortedset fit_sorted(fit.begin(), fit.end(), compFunctor);
-				sortedset::iterator it = next(fit_sorted.begin(), keep.size());		
-				for (; it != fit_sorted.end(); ++it)
-				{
-					keep.push_back(it->first);
-					if (keep.size() == num_members)
-						break;
-				}
-				//cout << keep.size() << endl;;
-			}
-
+            if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 0))
+            {
+                keep = new_dp.get_real_names();
+            }
+            else {
+                keep.clear();
+                for (auto member : new_dp.get_real_names()) {
+                    if (fit[member] < 1.0)
+                        keep.push_back(member);
+                }
+                ss.str("");
+                ss << keep.size() << " non-dominated members (spea2 fitness less than 1.0)";
+                cout << ss.str() << endl;
+                file_manager.rec_ofstream() << ss.str() << endl;
+                if (keep.size() < num_members) {
+                    //fill with members of increasing fitness value
+                    sortedset fit_sorted(fit.begin(), fit.end(), compFunctor);
+                    sortedset::iterator it = next(fit_sorted.begin(), keep.size());
+                    for (; it != fit_sorted.end(); ++it) {
+                        keep.push_back(it->first);
+                        if (keep.size() == num_members)
+                            break;
+                    }
+                    //cout << keep.size() << endl;;
+                }
+            }
 			if (keep.size() > num_members)
 			{
 				objectives.get_spea2_archive_names_to_keep(num_members, keep, new_op, new_dp);
