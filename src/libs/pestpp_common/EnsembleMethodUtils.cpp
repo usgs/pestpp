@@ -5524,7 +5524,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	{
 		message(1, "initializing localizer");
 		bool forgive_missing = pest_scenario.get_pestpp_options().get_ies_localizer_forgive_missing();
-		use_localizer = localizer.initialize(performance_log, forgive_missing);
+		ofstream& frec = file_manager.rec_ofstream();
+		use_localizer = localizer.initialize(performance_log, frec, forgive_missing);
 	}
 	num_threads = pest_scenario.get_pestpp_options().get_ies_num_threads();
 	if (!use_localizer)
@@ -6130,7 +6131,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 				message(1, "updating localizer");
 				if (localizer.get_use())
 				    localizer.get_orgmat_ptr()->clear_names();
-				use_localizer = localizer.initialize(performance_log, true);
+				ofstream& frec = file_manager.rec_ofstream();
+				use_localizer = localizer.initialize(performance_log, frec, true);
 			}
 		}
 	}
