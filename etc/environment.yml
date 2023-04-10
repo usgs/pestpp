@@ -3,9 +3,9 @@ channels:
   - conda-forge
 dependencies:
   # required
-  - python>=3.8
+  - python>=3.9
   - numpy>=1.15.0
-  - pandas
+  - pandas<2.0.0
   - scipy
   # optional
   - matplotlib>=1.4.0
@@ -17,3 +17,5 @@ dependencies:
   - pytest-xdist
   - nbmake
   - shapely
+  - flopy
+  - mfpymake

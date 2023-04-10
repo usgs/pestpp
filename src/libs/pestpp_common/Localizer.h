@@ -57,7 +57,7 @@ public:
 	enum LocTyp {COVARIANCE, LOCALANALYSIS };
 	Localizer() { initialized=false; }
 	Localizer(Pest* _pest_scenario_ptr) { pest_scenario_ptr = _pest_scenario_ptr; initialized = false; }
-	bool initialize(PerformanceLog *performance_log, bool forgive_missing=false);
+	bool initialize(PerformanceLog *performance_log, ofstream& frec, bool forgive_missing=false);
 	unordered_map<string, pair<vector<string>, vector<string>>> get_localanalysis_case_map(int iter, vector<string>& act_obs_names, vector<string>& act_par_names, 
 		ObservationEnsemble &oe, ParameterEnsemble &pe, PerformanceLog *performance_log);// { return localizer_map; }
 	

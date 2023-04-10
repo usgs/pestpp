@@ -863,15 +863,23 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 		i++;
 		front_map[i] = q_front;
 		
-		front = q_front;
 
-		num_front_solutions += front.size();
-		if (num_front_solutions >= _member_struct.size())
+
+		num_front_solutions += q_front.size();
+		if (num_front_solutions > _member_struct.size())
         {
-		    //throw runtime_error("error in nsga-ii front sorting: number of visited solutions > number of members");
-		    cout << "note: nsga-ii front sorting: number of visited solutions >= number of members" << endl;
-		    break;
+		    cout << "note: nsga-ii front sorting: number of visited solutions " << num_front_solutions << " >= number of members " << _member_struct.size() << endl;
+		    cout << "q_front:" <<endl;
+		    for (auto& f : q_front)
+		        cout << "  " << f << endl;
+            cout << "front:" <<endl;
+            for (auto& f : front)
+                cout << "  " << f << endl;
+            throw runtime_error("error in nsga-ii front sorting: number of visited solutions > number of members");
+
+            break;
         }
+        front = q_front;
 //		for (auto& sol : front)
 //        {
 //		    sorted.push_back(sol);
@@ -902,7 +910,7 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 	{
 		stringstream ss;
 		ss << "ERROR: ParetoObjectives::sort_members_by_dominance_into_fronts(): number of solutions in fronts (";
-		ss << num_front_solutions << ") != member_stuct.size() (" << _member_struct.size() << endl;
+		ss << num_front_solutions << ") != member_stuct.size() (" << _member_struct.size() << "," << endl;
 		file_manager.rec_ofstream() << ss.str();
 		cout << ss.str();
 		throw runtime_error(ss.str());
@@ -1236,11 +1244,6 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 		sum["max"] = _op.get_eigen_ptr()->col(var_map[obs_obj]).maxCoeff();
 		summary_stats[obs_obj] = sum;
 	}
-
-	//mm = _dp.get_moment_maps();
-	//mean_map.clear();
-	//std_map.clear();
-	//_dp.fill_moment_maps(mean_map, std_map);
 	_dp.update_var_map();
 	var_map = _dp.get_var_map();
 	vector<string> dp_names = _dp.get_var_names();
@@ -1270,6 +1273,7 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 
 	for (auto pi_obj : pi_obj_names)
 	{
+
 		vec = stlvec_2_eigenvec(pi_vals[pi_obj]);
 		sum.clear();
 		sum["mean"] = vec.mean();
@@ -1278,6 +1282,29 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 		sum["max"] = vec.maxCoeff();
 		summary_stats[pi_obj] = sum;
 	}
+
+	//calculate relative hyper volumes
+	//first form the ideal solution vector
+	Eigen::VectorXd ideal(summary_stats.size());
+	int i=0;
+	for (auto& oname : obs_obj_names)
+    {
+	    if (obj_dir_mult[oname] == 1)
+	        ideal[i] = summary_stats.at(oname).at("min");
+	    else
+            ideal[i] = summary_stats.at(oname).at("max");
+	    i++;
+    }
+	for (auto& pname : pi_obj_names)
+    {
+        if (obj_dir_mult[pname] == 1)
+            ideal[i] = summary_stats.at(pname).at("min");
+        else
+            ideal[i] = summary_stats.at(pname).at("max");
+        i++;
+    }
+	
+
 	return summary_stats;
 }
 
@@ -1346,7 +1373,14 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		ss << "MOEA::update_archive_nsga(): op_archive members " << op_archive.shape().first << " != dp_archive members " << dp_archive.shape().first;
 		throw_moea_error(ss.str());
 	}
-
+	//if this is a population reset because of trying to reuse chances, then we need to reset the archive now also...
+    if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1))
+    {
+        message(2,"resetting archive after chance update");
+        dp_archive = _dp;
+        op_archive = _op;
+        return;
+    }
 	//check that members of _op arent in the archive already
 	vector<string> keep, temp = op_archive.get_real_names();
 	set<string> archive_members(temp.begin(), temp.end());
@@ -1406,6 +1440,12 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		ss << "MOEA::update_archive_spea(): op_archive members " << op_archive.shape().first << " != dp_archive members " << dp_archive.shape().first;
 		throw_moea_error(ss.str());
 	}
+    if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1))
+    {
+        message(1,"resetting archive after chance update");
+        dp_archive = _dp;
+        op_archive = _op;
+    }
 
 	//check that members of _op arent in the archive already
 	vector<string> keep, temp = op_archive.get_real_names();
@@ -2671,6 +2711,7 @@ void MOEA::fill_populations_from_maps(ParameterEnsemble& new_dp, ObservationEnse
     {
         new_op.get_eigen_ptr_4_mod()->row(ridx.second) = obs_sim_map.at(ridx.first);
     }
+
 }
 
 void MOEA::iterate_to_solution()
@@ -2694,18 +2735,25 @@ void MOEA::iterate_to_solution()
 
 		save_populations(new_dp, new_op);
         update_sim_maps(new_dp,new_op);
+        //if we are using chances, then we need to make sure to update the archive as well as the current population
+        // from the full history of available members since uncertainty estimates could be changing as we evolve
+        // e.g. Rui's problem...
+        // this same conditional is used in the update archive functions
+        if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1))
+        {
+            message(1,"chances re-evaluated, resetting current population to complete history of population to update dominance sorting");
+            fill_populations_from_maps(new_dp,new_op);
+        }
 
 		if (constraints.get_use_chance())
 		{
-		    //if we are using chances, then we need to make sure to update the archive as well as the current population
-		    // from the full history of available members since uncertainty estimates could be changing as we evolve
-		    // e.g. Rui's problem...
-            fill_populations_from_maps(new_dp,new_op);
+
             if (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 2) {
                 ss.str("");
-                ss << "." << iter << ".all.pre-shift";
+                ss << "all.pre-shift";
                 save_populations(new_dp, new_op, ss.str());
             }
+
 
             string csum = constraints.mou_population_observation_constraint_summary(iter,new_op,"pre-shift",obs_obj_names);
 		    cout << csum;
@@ -2720,8 +2768,8 @@ void MOEA::iterate_to_solution()
         else {
             //append offspring dp and (risk-shifted) op to make new dp and op containers
 
-            new_dp.append_other_rows(dp);
-            new_op.append_other_rows(op);
+            //new_dp.append_other_rows(dp);
+            //new_op.append_other_rows(op);
         }
 
         if (find(gen_types.begin(),gen_types.end(),MouGenType::PSO) != gen_types.end()) {
@@ -2733,16 +2781,18 @@ void MOEA::iterate_to_solution()
 			message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
 			DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
 
-			//drop shitty members
-			//TODO: this is just a cheap hack, prob something more meaningful to be done...
-			keep.clear();
-			for (auto nondom : dompair.first)
-			{
-				if (keep.size() >= num_members)
-					break;
-				keep.push_back(nondom);
-
-			}
+            if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1)) {
+                message(2,"keeping all nondom members after chance update");
+                keep = dompair.first;
+            }
+            else {
+                keep.clear();
+                for (auto nondom : dompair.first) {
+                    if (keep.size() >= num_members)
+                        break;
+                    keep.push_back(nondom);
+                }
+            }
 
 			if (keep.size() > 0)
 			{
@@ -2774,30 +2824,33 @@ void MOEA::iterate_to_solution()
 		{
 			map<string, double> fit = objectives.get_spea2_fitness(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
 			//first find all members with fitness less than 1 (nondom)
-			keep.clear();
-			for (auto member : new_dp.get_real_names())
-			{
-				if (fit[member] < 1.0)
-					keep.push_back(member);
-			}
-			ss.str("");
-			ss << keep.size() << " non-dominated members (spea2 fitness less than 1.0)";
-			cout << ss.str() << endl;
-			file_manager.rec_ofstream() << ss.str() << endl;
-			if (keep.size() < num_members)
-			{
-				//fill with members of increasing fitness value
-				sortedset fit_sorted(fit.begin(), fit.end(), compFunctor);
-				sortedset::iterator it = next(fit_sorted.begin(), keep.size());		
-				for (; it != fit_sorted.end(); ++it)
-				{
-					keep.push_back(it->first);
-					if (keep.size() == num_members)
-						break;
-				}
-				//cout << keep.size() << endl;;
-			}
-
+            if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1))
+            {
+                message(2,"keeping all nondom members after chance update");
+                keep = new_dp.get_real_names();
+            }
+            else {
+                keep.clear();
+                for (auto member : new_dp.get_real_names()) {
+                    if (fit[member] < 1.0)
+                        keep.push_back(member);
+                }
+                ss.str("");
+                ss << keep.size() << " non-dominated members (spea2 fitness less than 1.0)";
+                cout << ss.str() << endl;
+                file_manager.rec_ofstream() << ss.str() << endl;
+                if (keep.size() < num_members) {
+                    //fill with members of increasing fitness value
+                    sortedset fit_sorted(fit.begin(), fit.end(), compFunctor);
+                    sortedset::iterator it = next(fit_sorted.begin(), keep.size());
+                    for (; it != fit_sorted.end(); ++it) {
+                        keep.push_back(it->first);
+                        if (keep.size() == num_members)
+                            break;
+                    }
+                    //cout << keep.size() << endl;;
+                }
+            }
 			if (keep.size() > num_members)
 			{
 				objectives.get_spea2_archive_names_to_keep(num_members, keep, new_op, new_dp);
@@ -3164,17 +3217,6 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 			//new_pbest_names.push_back(lm.first);
 		}
 	}
-	//drop any fails...
-	/*if (names.size() > 0)
-	{
-		pso_pbest_dp.drop_rows(names);
-		pso_pbest_op.drop_rows(names);
-	}*/
-	//names = _dp.get_real_names();
-	//pso_pbest_dp.set_real_names(new_pbest_names);
-	//names = _op.get_real_names();
-	//pso_pbest_op.set_real_names(new_pbest_names);
-	//pso_pbest
 	pso_pbest_dp = tdp;
 	pso_pbest_op = top;
 }
@@ -3188,17 +3230,6 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 	int num_dv = _dp.shape().second;
 	vector<double> r;
 	Eigen::VectorXd rand1, rand2, cur_real, p_best, g_best, new_real, cur_vel;
-	/*if (pso_velocity.shape().first > _dp.shape().first)
-	{
-		vector<string> names = pso_velocity.get_real_names();
-		set<string> snames(names.begin(), names.end());
-		names.clear();
-		for (auto& name : _dp.get_real_names())
-			if (snames.find(name) == snames.end())
-				names.push_back(name);
-		pso_velocity.drop_rows(names);
-	}*/
-	
 	pso_pbest_dp.transform_ip(_dp.get_trans_status());
 	dp_archive.set_trans_status(_dp.get_trans_status());
 	Eigen::MatrixXd new_vel(_dp.shape().first, _dp.shape().second);
@@ -3253,14 +3284,18 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	for (auto& cd : crowd_dist)
 		if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
 			mx = cd.second;
-	
-	for (auto& cd : crowd_dist)
-		if (cd.second == CROWDING_EXTREME)
-			cd.second = 1.0;
-		else if (mx != 0.0)
-			cd.second = cd.second / mx;
-		else
-	cd.second = 0.5;
+	if ((mx < 0.0) && (iter > 0))
+        throw_moea_error("pso max crowding distance is negative");
+
+	for (auto& cd : crowd_dist) {
+        if (cd.second == CROWDING_EXTREME) {
+            cd.second = 1.0;
+        } else if (mx != 0.0) {
+            cd.second = cd.second / mx;
+        } else {
+            cd.second = 0.5;
+        }
+    }
 
 	vector<string> working;
 	string candidate;
@@ -3874,7 +3909,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	
 	stringstream ss;
 	string fname;
-
+    _dp.reset_org_real_names();
 	ss << file_manager.get_base_filename();
 	if (tag.size() > 0)
 	{
