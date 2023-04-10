@@ -3909,7 +3909,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	
 	stringstream ss;
 	string fname;
-
+    _dp.reset_org_real_names();
 	ss << file_manager.get_base_filename();
 	if (tag.size() > 0)
 	{
