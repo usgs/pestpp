@@ -170,7 +170,7 @@ private:
 	ParameterEnsemble dp, dp_archive;
 	ObservationEnsemble op, op_archive;
 
-	map<string,Eigen::VectorXd> par_sim_map, obs_sim_map;
+	map<string,Eigen::VectorXd> par_sim_map, obs_sim_map, pso_velocity_map;
 
 	ParameterEnsemble pso_velocity, pso_pbest_dp;
 	ObservationEnsemble pso_pbest_op;
@@ -195,7 +195,9 @@ private:
 	void queue_chance_runs(ParameterEnsemble& _dp);
 	ObservationEnsemble get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op, string& opt_member);
 
-	void initialize_pso_bits();
+	void initialize_pso();
+    ParameterEnsemble get_initial_pso_velocities(int num_members);
+    void update_pso_velocity_map(ParameterEnsemble& _pso_velocity);
     void initialize_population_schedule();
 	bool initialize_dv_population();
 	void initialize_obs_restart_population();
@@ -242,6 +244,7 @@ private:
 
 
 	int get_max_len_obj_name();
+	bool should_use_multigen();
 };
 
 #endif //MOEA_H_

@@ -418,6 +418,8 @@ public:
 	void set_mou_simplex_factors(vector<double> _factors) { mou_simplex_factors = _factors; }
     bool get_mou_simplex_mutation() const {return mou_simplex_mutation;}
     void set_mou_simplex_mutation(bool _flag) {mou_simplex_mutation = _flag;}
+    bool get_mou_use_multigen() const {return mou_use_multigen;}
+    void set_mou_use_multigen(bool _flag) {mou_use_multigen = _flag;}
 
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
@@ -746,6 +748,7 @@ private:
 	int mou_simplex_reflections;
 	vector<double> mou_simplex_factors;
 	bool mou_simplex_mutation;
+	bool mou_use_multigen;
 
 	int ies_subset_size;
 	string ies_par_csv;
