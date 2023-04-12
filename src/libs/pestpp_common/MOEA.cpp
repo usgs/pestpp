@@ -2725,6 +2725,15 @@ void MOEA::iterate_to_solution()
 	{
 		message(0, "starting generation ", iter);
 
+		if (dp.shape().first < error_min_members)
+        {
+            throw_moea_error("too few members to continue");
+        }
+		if (dp.shape().first < warn_min_members)
+        {
+		    message(0,"WARNING: very few members in current population...");
+        }
+
 		//generate offspring
 		ParameterEnsemble new_dp = generate_population();
 		
