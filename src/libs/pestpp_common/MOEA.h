@@ -66,6 +66,8 @@ public:
 	
 	set<string> get_duplicates() { return duplicates;  }
 
+	int get_num_feasible(){ return feas_member_struct.size();}
+
 private:
 	
 	Pest& pest_scenario;

@@ -1152,7 +1152,10 @@ map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, O
 		frec << setw(15) << summary[pi_obj]["max"] << endl;
 	}
 
+
+
 	frec << endl;
+	frec << endl << "  ---  number of feasible solutions: " << objectives.get_num_feasible() << "  ---" << endl;
 	file_manager.rec_ofstream() << frec.str();
 	cout << frec.str();
 	return summary;
@@ -3419,7 +3422,6 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
 	{
 		new_name = get_new_member_name("pso");
 		new_name = get_new_member_name("pso");
-		cout <<real_name << ", " << new_name << endl;
 		current_pso_lineage_map[real_name] = new_name;
 		new_names.push_back(new_name);
 	}
@@ -4415,9 +4417,6 @@ pair<Eigen::VectorXd, Eigen::VectorXd> MOEA::sbx_new(double crossover_probabilit
 			break;
 
 	}
-
-	cout << endl;
-
 	return pair<Eigen::VectorXd, Eigen::VectorXd>(child1, child2);
 
 }
