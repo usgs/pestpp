@@ -1374,46 +1374,53 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		throw_moea_error(ss.str());
 	}
 	//if this is a population reset because of trying to reuse chances, then we need to reset the archive now also...
-    if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1))
+    if (should_use_multigen())
     {
-        message(2,"resetting archive after chance update");
+        message(2,"resetting archive for multi-generational population");
         dp_archive = _dp;
         op_archive = _op;
-        return;
+        DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, true,
+                                                                ARC_SUM_TAG);
+        dp_archive.keep_rows(dompair.first);
+        op_archive.keep_rows(dompair.first);
+
     }
-	//check that members of _op arent in the archive already
-	vector<string> keep, temp = op_archive.get_real_names();
-	set<string> archive_members(temp.begin(), temp.end());
-	for (auto& member : _op.get_real_names())
-	{
-		if (archive_members.find(member) == archive_members.end())
-			keep.push_back(member);
-	}
-	if (keep.size() == 0)
-	{
-		message(2, "all nondominated members in already in archive");
-		return;
-	}
-	
-	ss.str("");
-	ss << "adding " << keep.size() << " non-dominated members to archive";
-	message(2, ss.str());
-	Eigen::MatrixXd other = _op.get_eigen(keep, vector<string>());
-	op_archive.append_other_rows(keep, other);
-	other = _dp.get_eigen(keep, vector<string>());
-	dp_archive.append_other_rows(keep, other);
-	other.resize(0, 0);
-	message(2, "pareto dominance sorting archive of size", op_archive.shape().first);
-	DomPair dompair = objectives.get_nsga2_pareto_dominance(iter,op_archive, dp_archive,&constraints,true,ARC_SUM_TAG);
-	
-	ss.str("");
-	ss << "resizing archive from " << op_archive.shape().first << " to " << dompair.first.size() << " current non-dominated solutions";
-	message(2, ss.str());
-	op_archive.keep_rows(dompair.first);
-	dp_archive.keep_rows(dompair.first);
+    else {
+        //check that members of _op arent in the archive already
+        vector<string> keep, temp = op_archive.get_real_names();
+        set<string> archive_members(temp.begin(), temp.end());
+        for (auto &member : _op.get_real_names()) {
+            if (archive_members.find(member) == archive_members.end())
+                keep.push_back(member);
+        }
+        if (keep.size() == 0) {
+            message(2, "all nondominated members in already in archive");
+            return;
+        }
+
+        ss.str("");
+        ss << "adding " << keep.size() << " non-dominated members to archive";
+        message(2, ss.str());
+        Eigen::MatrixXd other = _op.get_eigen(keep, vector<string>());
+        op_archive.append_other_rows(keep, other);
+        other = _dp.get_eigen(keep, vector<string>());
+        dp_archive.append_other_rows(keep, other);
+        other.resize(0, 0);
+        message(2, "pareto dominance sorting archive of size", op_archive.shape().first);
+        DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, true,
+                                                                ARC_SUM_TAG);
+
+        ss.str("");
+        ss << "resizing archive from " << op_archive.shape().first << " to " << dompair.first.size()
+           << " current non-dominated solutions";
+        message(2, ss.str());
+        op_archive.keep_rows(dompair.first);
+        dp_archive.keep_rows(dompair.first);
+    }
 
 	if (op_archive.shape().first > archive_size)
 	{
+	    vector<string> keep;
 		ss.str("");
 		ss << "trimming archive size from " << op_archive.shape().first << " to max archive size " << archive_size;
 		message(2, ss.str());
@@ -1426,6 +1433,7 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	}
 	dp_archive.reset_org_real_names();
 	op_archive.reset_org_real_names();
+
 	save_populations(dp_archive, op_archive, "archive");
 }
 
@@ -1440,37 +1448,46 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		ss << "MOEA::update_archive_spea(): op_archive members " << op_archive.shape().first << " != dp_archive members " << dp_archive.shape().first;
 		throw_moea_error(ss.str());
 	}
-    if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1))
+    if (should_use_multigen())
     {
-        message(1,"resetting archive after chance update");
+        message(1,"resetting archive for multigenerational population");
         dp_archive = _dp;
         op_archive = _op;
+        vector<string> keep = dp_archive.get_real_names();
+        if (op_archive.shape().first > current_archive_size)
+        {
+            objectives.get_spea2_archive_names_to_keep(current_archive_size, keep, op_archive, dp_archive);
+            op_archive.keep_rows(keep);
+            dp_archive.keep_rows(keep);
+        }
+        save_populations(dp_archive, op_archive, "archive");
+        return;
     }
 
-	//check that members of _op arent in the archive already
-	vector<string> keep, temp = op_archive.get_real_names();
-	set<string> archive_members(temp.begin(), temp.end());
-	for (auto& member : _op.get_real_names())
-	{
-		if (archive_members.find(member) == archive_members.end())
-			keep.push_back(member);
-	}
-	if (keep.size() == 0)
-	{
-		message(2, "all members in already in archive");
-		return;
-	}
+    //check that members of _op arent in the archive already
+    vector<string> keep, temp = op_archive.get_real_names();
+    set<string> archive_members(temp.begin(), temp.end());
+    for (auto &member : _op.get_real_names()) {
+        if (archive_members.find(member) == archive_members.end())
+            keep.push_back(member);
+    }
+    if (keep.size() == 0) {
+        message(2, "all members in already in archive");
+        return;
+    }
 
-	ss.str("");
-	ss << "adding " << keep.size() << " members to archive";
-	message(2, ss.str());
-	Eigen::MatrixXd other = _op.get_eigen(keep, vector<string>());
-	op_archive.append_other_rows(keep, other);
-	other = _dp.get_eigen(keep, vector<string>());
-	dp_archive.append_other_rows(keep, other);
-	other.resize(0, 0);
-	message(2, "spea fitness calculation for archive of size ", op_archive.shape().first);
-	map<string,double> fit = objectives.get_spea2_fitness(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+    ss.str("");
+    ss << "adding " << keep.size() << " members to archive";
+    message(2, ss.str());
+    Eigen::MatrixXd other = _op.get_eigen(keep, vector<string>());
+    op_archive.append_other_rows(keep, other);
+    other = _dp.get_eigen(keep, vector<string>());
+    dp_archive.append_other_rows(keep, other);
+    other.resize(0, 0);
+    message(2, "spea fitness calculation for archive of size ", op_archive.shape().first);
+    map<string, double> fit = objectives.get_spea2_fitness(iter, op_archive, dp_archive, &constraints, true,
+                                                           ARC_SUM_TAG);
+
 
 	keep.clear();
 	for (auto& f : fit)
@@ -1492,6 +1509,8 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		}
         dp_archive.reset_org_real_names();
         op_archive.reset_org_real_names();
+        objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, true,
+                                                                ARC_SUM_TAG);
 		save_populations(dp_archive, op_archive, "archive");
 	}
 }
@@ -2506,7 +2525,7 @@ void MOEA::initialize()
 
 	constraints.mou_report(0,dp, op, obs_obj_names,pi_obj_names);
 
-    initialize_pso_bits();
+    initialize_pso();
 
     par_sim_map.clear();
     obs_sim_map.clear();
@@ -2527,30 +2546,43 @@ void MOEA::update_sim_maps(ParameterEnsemble& _dp, ObservationEnsemble& _op)
     {
         obs_sim_map[ridx.first] = _op.get_eigen_ptr()->row(ridx.second);
     }
+
 }
 
+ParameterEnsemble MOEA::get_initial_pso_velocities(int num_members) {
+    double init_vel_scale_fac = 0.5;
+    ParameterEnsemble _pso_velocity = dp.zeros_like(num_members);
+    Parameters lb = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
+    Parameters ub = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
+    _pso_velocity.get_par_transform().ctl2numeric_ip(lb);
+    _pso_velocity.get_par_transform().ctl2numeric_ip(ub);
+    Parameters dist = ub - lb;
+    for (auto& dv_name : dv_names)
+    {
+        vector<double> vals = uniform_draws(num_members, -dist[dv_name]* init_vel_scale_fac, dist[dv_name]* init_vel_scale_fac, rand_gen);
+        Eigen::VectorXd real = stlvec_2_eigenvec(vals);
+        _pso_velocity.replace_col(dv_name, real);
+    }
+    return _pso_velocity;
+}
 
-void MOEA::initialize_pso_bits()
+void MOEA::initialize_pso()
 {
-	//initialize PSO bits
-	double init_vel_scale_fac = 0.5;
-	pso_velocity = dp.zeros_like();
-	int num_reals = dp.shape().first;
-	Parameters lb = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
-	Parameters ub = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
-	pso_velocity.get_par_transform().ctl2numeric_ip(lb);
-	pso_velocity.get_par_transform().ctl2numeric_ip(ub);
-	Parameters dist = ub - lb;
-	for (auto& dv_name : dv_names)
-	{
-		vector<double> vals = uniform_draws(num_reals, -dist[dv_name]* init_vel_scale_fac, dist[dv_name]* init_vel_scale_fac, rand_gen);
-		Eigen::VectorXd real = stlvec_2_eigenvec(vals);
-		pso_velocity.replace_col(dv_name, real);
-	}
+	pso_velocity = get_initial_pso_velocities(dp.shape().first);
+    update_pso_velocity_map(pso_velocity);
 	pso_pbest_dp = ParameterEnsemble(&pest_scenario, &rand_gen, dp.get_eigen(), dp.get_real_names(), dp.get_var_names());
 	pso_pbest_dp.set_trans_status(dp.get_trans_status());
 	pso_pbest_op = ObservationEnsemble(&pest_scenario, &rand_gen, op.get_eigen(), op.get_real_names(), op.get_var_names());
 
+}
+
+void MOEA::update_pso_velocity_map(ParameterEnsemble& _pso_velocity)
+{
+    map<string,int> rmap = _pso_velocity.get_real_map();
+    for (auto& ridx : rmap)
+    {
+        pso_velocity_map[ridx.first] = _pso_velocity.get_eigen_ptr()->row(ridx.second);
+    }
 }
 
 pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp, ObservationEnsemble& _op, string& opt_member_name)
@@ -2725,6 +2757,15 @@ void MOEA::iterate_to_solution()
 	{
 		message(0, "starting generation ", iter);
 
+		if (dp.shape().first < error_min_members)
+        {
+            throw_moea_error("too few members to continue");
+        }
+		if (dp.shape().first < warn_min_members)
+        {
+		    message(0,"WARNING: very few members in current population...");
+        }
+
 		//generate offspring
 		ParameterEnsemble new_dp = generate_population();
 		
@@ -2739,9 +2780,9 @@ void MOEA::iterate_to_solution()
         // from the full history of available members since uncertainty estimates could be changing as we evolve
         // e.g. Rui's problem...
         // this same conditional is used in the update archive functions
-        if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1))
+        if (should_use_multigen())
         {
-            message(1,"chances re-evaluated, resetting current population to complete history of population to update dominance sorting");
+            message(1,"using multi-generational population in dominance sorting");
             fill_populations_from_maps(new_dp,new_op);
         }
 
@@ -2781,8 +2822,8 @@ void MOEA::iterate_to_solution()
 			message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
 			DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
 
-            if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1)) {
-                message(2,"keeping all nondom members after chance update");
+            if (should_use_multigen()) {
+                message(2,"keeping all feasible nondom members from multi-generational population");
                 keep = dompair.first;
             }
             else {
@@ -2824,9 +2865,9 @@ void MOEA::iterate_to_solution()
 		{
 			map<string, double> fit = objectives.get_spea2_fitness(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
 			//first find all members with fitness less than 1 (nondom)
-            if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1))
+            if (should_use_multigen())
             {
-                message(2,"keeping all nondom members after chance update");
+                message(2,"keeping all feasible nondom members from multigenerational population");
                 keep = new_dp.get_real_names();
             }
             else {
@@ -2905,6 +2946,18 @@ void MOEA::iterate_to_solution()
         }
 	}
 
+}
+
+bool MOEA::should_use_multigen() {
+
+    if (pest_scenario.get_pestpp_options().get_mou_use_multigen()) {
+        return true;
+    }
+    if ((constraints.should_update_chance(iter)) && (pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() != 1))
+    {
+        return true;
+    }
+    return false;
 }
 
 void MOEA::initialize_population_schedule()
@@ -3242,6 +3295,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 	for (int i=0;i<_dp.shape().first;i++)
 	{
 		real_name = real_names[i];
+		cout << "real name: " << real_name << endl;
 		r = uniform_draws(num_dv, 0.0, 1.0, rand_gen);
 		rand1 = stlvec_2_eigenvec(r);
 		r = uniform_draws(num_dv, 0.0, 1.0, rand_gen);
@@ -3251,8 +3305,10 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 		g_best = dp_archive.get_real_vector(gbest_solutions[i]);
 		if (snames.find(real_name) != snames.end())
 			cur_vel = pso_velocity.get_real_vector(real_name);
-		else
-			cur_vel = pso_velocity.get_real_vector(current_pso_lineage_map.at(real_name));
+		else {
+            //cur_vel = pso_velocity.get_real_vector(current_pso_lineage_map.at(real_name));
+            cur_vel = pso_velocity_map.at(real_name);
+        }
 
 		new_real = (omega * cur_vel.array()) + (cog_const * rand1.array() * (p_best.array() - cur_real.array()));
 		new_real = new_real.array() + (social_const * rand2.array() * (g_best.array() - cur_real.array()));
@@ -3332,36 +3388,56 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 
 ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemble& _dp)
 {
+    //generate this first before pso resets the objectives member map...
+    ParameterEnsemble temp(&pest_scenario, _dp.get_rand_gen_ptr());
+    if (num_members > _dp.shape().first)
+    {
+        int num_reals = num_members - _dp.shape().first;
+        message(1,"augmenting PSO population DE population of size",num_reals);
+        temp = generate_diffevol_population(num_reals, _dp);
+
+    }
+    message(1, "generating PSO population of size", num_members);
 	vector<string> gbest_solutions = get_pso_gbest_solutions(_dp.shape().first, dp_archive, op_archive);
 	ParameterEnsemble cur_velocity = get_updated_pso_velocty(_dp, gbest_solutions);
 	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, _dp.get_eigen().array() + cur_velocity.get_eigen().array(), _dp.get_real_names(), _dp.get_var_names());
-	
-	//augment with DE if needed...
-	//need to think more about this bc of tracking pbest...
-	/*if (num_members > _dp.shape().first)
-	{
-		int num_reals = num_members - _dp.shape().first;
-		ParameterEnsemble temp = generate_diffevol_population(num_reals, _dp);
-		new_dp.append_other_rows(temp);
-		pso_pbest_dp.append_other_rows(temp);
-		pso_pbest_op;
-	}*/
 
-	current_pso_lineage_map.clear();
+    if (temp.shape().first > 0) {
+        new_dp.append_other_rows(temp);
+        pso_pbest_dp.append_other_rows(temp);
+        vector<string> real_names = temp.get_real_names();
+        temp = get_initial_pso_velocities(temp.shape().first);
+        temp.set_real_names(real_names);
+        cur_velocity.append_other_rows(temp);
+    }
+
+
+    current_pso_lineage_map.clear();
 	string new_name;
 	vector<string> new_names;
 	for (auto real_name : new_dp.get_real_names())
 	{
 		new_name = get_new_member_name("pso");
+		new_name = get_new_member_name("pso");
+		cout <<real_name << ", " << new_name << endl;
 		current_pso_lineage_map[real_name] = new_name;
 		new_names.push_back(new_name);
 	}
 	cur_velocity.set_real_names(new_names);
 	pso_velocity = cur_velocity;
+    update_pso_velocity_map(pso_velocity);
 	new_dp.set_real_names(new_names);
 	new_dp.set_trans_status(_dp.get_trans_status());
 	new_dp.enforce_bounds(performance_log,false);
 	new_dp.check_for_normal("new pso population");
+    if (num_members < new_dp.shape().first)
+    {
+        vector<string> keep;
+        for (int i=0;i<num_members;i++)
+            keep.push_back(new_names[i]);
+        new_dp.keep_rows(keep,true);
+        pso_velocity.keep_rows(keep,true);
+    }
 	return new_dp;
 }
 

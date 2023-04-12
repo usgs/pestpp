@@ -899,21 +899,7 @@ void AutoAdaLocThread::work(int thread_id)
 
 			if ((use_list_obs) && (sobs.size() == 0))
 				continue;
-
-//			while (true)
-//            {
-//                if (oe_diff_gaurd.try_lock())
-//                {
-//
-//                    obs_ss = oe_diff.col(iobs);
-//                    oname = obs_names[iobs];
-//                    oe_diff_gaurd.unlock();
-//                    break;
-//                }
-//
-//            }
-
-            obs_ss = oe_diff.col(iobs);
+			obs_ss = oe_diff.col(iobs);
             oname = obs_names[iobs];
 
 			if ((sobs.size() > 0) && (sobs.find(oname) == sobs.end()))
@@ -1012,17 +998,17 @@ void AutoAdaLocThread::work(int thread_id)
 		else
         {
             while (true)
-				{
-					if (triplets_guard.try_lock())
-					{
-					    for (auto& t : otrips)
-                        {
-                            triplets.push_back(t);
-                        }
-						triplets_guard.unlock();
-						break;
-					}
-				}
+            {
+                if (triplets_guard.try_lock())
+                {
+                    for (auto& t : otrips)
+                    {
+                        triplets.push_back(t);
+                    }
+                    triplets_guard.unlock();
+                    break;
+                }
+            }
         }
 	}
 }
@@ -1068,6 +1054,7 @@ Eigen::MatrixXd Localizer::get_obsdiff_hadamard_matrix(int num_reals, string col
 	int idx = colname2col_map.at(col_name);
 	Eigen::VectorXd mat_vec = cur_mat.e_ptr()->col(idx);
 	Eigen::MatrixXd loc(obs_names.size(), num_reals);
+	loc.setZero();
 	for (int i=0;i<obs_names.size();i++)
 	{
 		loc.row(i).setConstant(mat_vec[obs2row_map.at(obs_names[i])]);
@@ -1086,6 +1073,7 @@ Eigen::MatrixXd Localizer::get_pardiff_hadamard_matrix(int num_reals, string row
 	int idx = rowname2row_map.at(row_name);
 	Eigen::VectorXd mat_vec = cur_mat.e_ptr()->row(idx);
 	Eigen::MatrixXd loc(par_names.size(), num_reals);
+	loc.setZero();
 	for (int i = 0; i<par_names.size(); i++)
 	{
 		loc.row(i).setConstant(mat_vec[par2col_map.at(par_names[i])]);
