@@ -4444,7 +4444,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 
 	ss.str("");
 	ss << "    Note: parameter change summary sorted according to abs 'mean change'." << endl;
-	ss << "          'n CV decr' is the number of parameters with current CV less " << cv_dec_threshold*100.0 << "% of the initial CV" << endl;
+	//ss << "          'n CV decr' is the number of parameters with current CV less " << cv_dec_threshold*100.0 << "% of the initial CV" << endl;
 	cout << ss.str();
 	frec << ss.str();
 	if (grp_names.size() > 15)
