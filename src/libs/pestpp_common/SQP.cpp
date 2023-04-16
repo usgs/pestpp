@@ -1545,22 +1545,23 @@ bool SeqQuadProgram::should_terminate()
     int count = 0;
     int nphired = 0;
     best_phi_yet = 1.0e+300;
-    int best_idx_yet = 0;
+    int best_idx_yet = -1;
     for (int i=0;i<best_phis.size();i++)
     {
-        if (best_phis[i]<best_phi_yet)
+        if (best_phis[i]<=best_phi_yet)
         {
             best_phi_yet = best_phis[i];
             best_violation_yet = best_violations[i];
             best_idx_yet = i;
         }
     }
-    nphired = best_phis.size() - best_idx_yet;
-
-    if (best_idx_yet == 0)
+    if (best_idx_yet == -1)
     {
         throw_sqp_error("something is wrong in shouuld_terminate()");
     }
+    nphired = best_phis.size() - best_idx_yet;
+
+
 
     //todo: save and write out the current phi grad vector (maybe save all of them???)
     ss.str("");
