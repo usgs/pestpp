@@ -4406,7 +4406,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	stringstream ss;
 	ofstream &frec = file_manager_ptr->rec_ofstream();
 	ss << endl << "   ---  parameter group change summmary  ---    " << endl;
-	ss << "   (compared to the initial ensemble using active realizations)" << endl;
+	//ss << "   (compared to the initial ensemble using active realizations)" << endl;
 	cout << ss.str();
 	frec << ss.str();
 	ss.str("");
@@ -4445,6 +4445,8 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	ss.str("");
 	ss << "    Note: parameter change summary sorted according to abs 'mean change'." << endl;
 	//ss << "          'n CV decr' is the number of parameters with current CV less " << cv_dec_threshold*100.0 << "% of the initial CV" << endl;
+	ss << "    Note: the parameter change statistics implicitly include the effect of " << endl;
+	ss << "          realizations that have failed or have been dropped." << endl;
 	cout << ss.str();
 	frec << ss.str();
 	if (grp_names.size() > 15)
