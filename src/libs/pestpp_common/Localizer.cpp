@@ -877,7 +877,7 @@ void AutoAdaLocThread::work(int thread_id)
         par_ss = pe_diff.col(jpar) * (1.0 / par_std[jpar]);
         if (list_obs.size() > 0)
         {
-            sobs = list_obs[par_names[jpar]];
+            sobs = list_obs.at(par_names[jpar]);
             use_list_obs = true;
         }
         else
