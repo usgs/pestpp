@@ -461,7 +461,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 			//localizer_map.push_back(p);
 			localizer_map[row_names[idx.first]] = p;
 		}
-	}	
+	}
 	return localizer_map;
 }
 
@@ -877,7 +877,7 @@ void AutoAdaLocThread::work(int thread_id)
         par_ss = pe_diff.col(jpar) * (1.0 / par_std[jpar]);
         if (list_obs.size() > 0)
         {
-            sobs = list_obs.at(par_names[jpar]);
+            sobs = list_obs[par_names[jpar]]; // dont use at here - this way, any missing pars just get no obs
             use_list_obs = true;
         }
         else
