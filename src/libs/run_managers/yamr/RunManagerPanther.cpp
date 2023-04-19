@@ -47,7 +47,7 @@ using namespace pest_utils;
 const int RunManagerPanther::BACKLOG = 1000;
 const int RunManagerPanther::MAX_FAILED_PINGS = 60;
 const int RunManagerPanther::N_PINGS_UNRESPONSIVE = 3;
-const int RunManagerPanther::MIN_PING_INTERVAL_SECS = 5;				// Ping each slave at most once every minute
+const int RunManagerPanther::MIN_PING_INTERVAL_SECS = 60;				// Ping each slave at most once every minute
 const int RunManagerPanther::MAX_PING_INTERVAL_SECS = 120;				// Ping each slave at least once every 2 minutes
 const int RunManagerPanther::MAX_CONCURRENT_RUNS_LOWER_LIMIT = 1;
 const int RunManagerPanther::IDLE_THREAD_SIGNAL_TIMEOUT_SECS = 10;		// Allow up to 10s for the run_idle_async() thread to acknowledge signals (pause idling, terminate)
@@ -930,7 +930,7 @@ bool RunManagerPanther::ping(int i_sock)
 			}
 		}
 		else agent_info_iter->set_ping(true);
-			report("ping sent to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
+			//report("ping sent to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
 
 #ifdef _DEBUG
 		report("ping sent to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
@@ -1464,7 +1464,7 @@ void RunManagerPanther::process_message(int i_sock)
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::PING)
 	{
-		report("ping received from agent:" + host_name + "$" + agent_info_iter->get_work_dir(), false);
+		//report("ping received from agent:" + host_name + "$" + agent_info_iter->get_work_dir(), false);
 #ifdef _DEBUG
 		report("ping received from agent:" + host_name + "$" + agent_info_iter->get_work_dir(), false);
 #endif
