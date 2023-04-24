@@ -1120,7 +1120,7 @@ map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, O
 	int max_len = get_max_len_obj_name();
 	string dir;
 	frec << left << setw(max_len) << "objective function" << right << setw(12) << "direction" << setw(15) << "mean" << setw(15) << "std dev" << setw(15) << "min" << setw(15) << "max" << endl;
-    frec << setprecision(7);
+    frec << endl << setprecision(7);
 	for (auto obs_obj : obs_obj_names)
 	{
 
@@ -1153,7 +1153,6 @@ map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, O
 
 
 	frec << endl;
-	frec << endl << "  ---  number of feasible solutions: " << objectives.get_num_feasible() << "  ---" << endl;
 	file_manager.rec_ofstream() << frec.str();
 	cout << frec.str();
 	return summary;
@@ -2373,9 +2372,6 @@ void MOEA::initialize()
 	message(0, "initial population objective function summary:");
 	previous_obj_summary = obj_func_report(dp, op);
 
-
-
-
 	if (constraints.get_use_chance())
 	{
         string sum = constraints.mou_population_observation_constraint_summary(0,op,"pre-shift",obs_obj_names);
@@ -2531,7 +2527,9 @@ void MOEA::initialize()
     par_sim_map.clear();
     obs_sim_map.clear();
     update_sim_maps(dp,op);
-
+    ss.str("");
+    ss << "number of initial feasible solutions: " << objectives.get_num_feasible();
+    message(1,ss.str());
 	message(0, "initialization complete");
 }
 
@@ -2929,7 +2927,9 @@ void MOEA::iterate_to_solution()
 		obj_func_change_report(summary);
 		previous_obj_summary = summary;
 		constraints.mou_report(iter, new_dp, new_op, obs_obj_names, pi_obj_names, true);
-
+        ss.str("");
+        ss << "number of feasible solutions at the end of generation " << iter << ": " << objectives.get_num_feasible();
+        message(1,ss.str());
 		iter++;
         int q = pest_utils::quit_file_found();
         if ((q == 1) || (q == 2))
@@ -3295,7 +3295,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 	for (int i=0;i<_dp.shape().first;i++)
 	{
 		real_name = real_names[i];
-		cout << "real name: " << real_name << endl;
+		//cout << "real name: " << real_name << endl;
 		r = uniform_draws(num_dv, 0.0, 1.0, rand_gen);
 		rand1 = stlvec_2_eigenvec(r);
 		r = uniform_draws(num_dv, 0.0, 1.0, rand_gen);
@@ -4003,7 +4003,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	}
 	string name = ss.str();
 	ss.str("");
-	ss << " saved decision variable population of size " << _dp.shape().first << " X " << _dp.shape().second << " to '" << name << "'";
+	ss << "saved decision variable population of size " << _dp.shape().first << " X " << _dp.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 	ss.str("");
 	if ((save_every > 0) && (iter % save_every == 0))
@@ -4026,7 +4026,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 		}
 		string name = ss.str();
 		ss.str("");
-		ss << " saved generation-specific decision variable population of size " << _dp.shape().first << " X " << _dp.shape().second << " to '" << name << "'";
+		ss << "saved generation-specific decision variable population of size " << _dp.shape().first << " X " << _dp.shape().second << " to '" << name << "'";
 		message(1, ss.str());
 	}
 	
@@ -4050,7 +4050,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	}
 	name = ss.str();
 	ss.str("");
-	ss << " saved observation population of size " << _op.shape().first << " X " << _op.shape().second << " to '" << name << "'";
+	ss << "saved observation population of size " << _op.shape().first << " X " << _op.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 
 	if ((save_every > 0) && (iter % save_every == 0))
@@ -4074,7 +4074,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 		}
 		name = ss.str();
 		ss.str("");
-		ss << " saved generation-specific observation population of size " << _op.shape().first << " X " << _op.shape().second << " to '" << name << "'";
+		ss << "saved generation-specific observation population of size " << _op.shape().first << " X " << _op.shape().second << " to '" << name << "'";
 		message(1, ss.str());
 	}
 
