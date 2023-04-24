@@ -281,75 +281,73 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 			}
 
 		}
-		if (check_constraints)
-		{
-			performance_log->log_event("feasible sorting");
-			//sort into feasible and infeasible 
-			map<string, double> violations;
-			double vsum;
-			Observations obs = pest_scenario.get_ctl_observations();
-			Parameters pars = pest_scenario.get_ctl_parameters();
-			vector<string> onames = op.get_var_names(), pnames = dp.get_var_names();
-			set<string> obs_obj_set(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
-			set<string> pi_obj_set(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());
-			ObservationInfo* oi = pest_scenario.get_observation_info_ptr();
-			PriorInformation* pi = pest_scenario.get_prior_info_ptr();
-			feas_member_struct.clear();
-			for (auto real_name : real_names)
-			{
-				vsum = 0.0;
-				obs.update_without_clear(onames, op.get_real_vector(real_name));
-				//TODO: add a constraint tol ++ arg and use it here
-				// the 'false' arg is to not apply risk shifting to the satisfaction calcs since
-				// 'op' has already been shifted
-				violations = constraints_ptr->get_unsatified_obs_constraints(obs, 0.0, false);
-				for (auto v : violations)
-				{
-					if (obs_obj_set.find(v.first) == obs_obj_set.end())
-						vsum += pow(v.second * oi->get_weight(v.first),2);
-				}
-				pars.update_without_clear(pnames, dp.get_real_vector(real_name));
-				violations = constraints_ptr->get_unsatified_pi_constraints(pars, 0.0);
-				for (auto v : violations)
-				{
-					if (pi_obj_set.find(v.first) == pi_obj_set.end())
-						vsum += pow(v.second * pi->get_pi_rec(v.first).get_weight(),2);
-				}
-				if (vsum > 0.0)
-				{
-					infeas[real_name] = vsum;
-				}
-				else
-					feas_member_struct[real_name] = member_struct[real_name];
-			}
-			/*if (feas_member_struct.size() == 0)
-			{
-				ss.str("");
-				ss << "WARNING: all members are infeasible" << endl;
-				frec << ss.str();
-				cout << ss.str();
-				all_infeas = true;
-			}
-			else
-			{
-				ss.str("");
-				ss << feas_member_struct.size() << " feasible solutions" << endl;
-				frec << ss.str();
-				cout << ss.str();
-				member_struct = feas_member_struct;
-			}*/
+		if (check_constraints) {
+            performance_log->log_event("feasible sorting");
+            //sort into feasible and infeasible
+            map<string, double> violations;
+            double vsum;
+            Observations obs = pest_scenario.get_ctl_observations();
+            Parameters pars = pest_scenario.get_ctl_parameters();
+            vector<string> onames = op.get_var_names(), pnames = dp.get_var_names();
+            set<string> obs_obj_set(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
+            set<string> pi_obj_set(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());
+            ObservationInfo *oi = pest_scenario.get_observation_info_ptr();
+            PriorInformation *pi = pest_scenario.get_prior_info_ptr();
+            feas_member_struct.clear();
+            for (auto real_name : real_names) {
+                vsum = 0.0;
+                obs.update_without_clear(onames, op.get_real_vector(real_name));
+                //TODO: add a constraint tol ++ arg and use it here
+                // the 'false' arg is to not apply risk shifting to the satisfaction calcs since
+                // 'op' has already been shifted
+                violations = constraints_ptr->get_unsatified_obs_constraints(obs, 0.0, false);
+                for (auto v : violations) {
+                    if (obs_obj_set.find(v.first) == obs_obj_set.end())
+                        vsum += pow(v.second * oi->get_weight(v.first), 2);
+                }
+                pars.update_without_clear(pnames, dp.get_real_vector(real_name));
+                violations = constraints_ptr->get_unsatified_pi_constraints(pars, 0.0);
+                for (auto v : violations) {
+                    if (pi_obj_set.find(v.first) == pi_obj_set.end())
+                        vsum += pow(v.second * pi->get_pi_rec(v.first).get_weight(), 2);
+                }
+                if (vsum > 0.0) {
+                    infeas[real_name] = vsum;
+                } else
+                    feas_member_struct[real_name] = member_struct[real_name];
+            }
+            /*if (feas_member_struct.size() == 0)
+            {
+                ss.str("");
+                ss << "WARNING: all members are infeasible" << endl;
+                frec << ss.str();
+                cout << ss.str();
+                all_infeas = true;
+            }
+            else
+            {
+                ss.str("");
+                ss << feas_member_struct.size() << " feasible solutions" << endl;
+                frec << ss.str();
+                cout << ss.str();
+                member_struct = feas_member_struct;
+            }*/
 
-			//sort the infeasible members by violation
-			vector <pair<string, double>> infeas_vec;
-			for (auto inf : infeas)
-				infeas_vec.push_back(inf);
+            //sort the infeasible members by violation
+            vector<pair<string, double>> infeas_vec;
+            for (auto inf : infeas)
+                infeas_vec.push_back(inf);
 
-			std::sort(infeas_vec.begin(), infeas_vec.end(),
-				compFunctor);
+            std::sort(infeas_vec.begin(), infeas_vec.end(),
+                      compFunctor);
 
-			for (auto inf : infeas_vec)
-				infeas_ordered.push_back(inf.first);
-		}
+            for (auto inf : infeas_vec)
+                infeas_ordered.push_back(inf.first);
+        }
+		else
+        {
+            feas_member_struct = member_struct;
+        }
 	}
 
 
@@ -2809,13 +2807,12 @@ void MOEA::iterate_to_solution()
 			save_populations(new_dp, new_op_shifted,"chance");
 			new_op = new_op_shifted;
 		}
-        else {
+        else if (!should_use_multigen()) {
             //append offspring dp and (risk-shifted) op to make new dp and op containers
 
-            //new_dp.append_other_rows(dp);
-            //new_op.append_other_rows(op);
+            new_dp.append_other_rows(dp);
+            new_op.append_other_rows(op);
         }
-
         if (find(gen_types.begin(),gen_types.end(),MouGenType::PSO) != gen_types.end()) {
             update_pso_pbest(new_dp, new_op);
         }
