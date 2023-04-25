@@ -167,7 +167,7 @@ int main(int argc, char* argv[])
 		}
 
 		ofstream& fout_rec = file_manager.rec_ofstream();
-		PerformanceLog performance_log(file_manager.open_ofile_ext("pfm"));
+		PerformanceLog performance_log(file_manager.open_ofile_ext("log"));
 
 		if (!restart_flag || save_restart_rec_header)
 		{
@@ -538,7 +538,7 @@ int main(int argc, char* argv[])
 		fout_rec << "initializing 'global' localizer" << endl;
 		Localizer global_loc(&pest_scenario);
 		bool forgive_missing = pest_scenario.get_pestpp_options().get_ies_localizer_forgive_missing();
-		global_loc.initialize(&performance_log,forgive_missing);
+		global_loc.initialize(&performance_log,fout_rec,forgive_missing);
 
 		//ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr
 		ParChangeSummarizer pcs(&curr_pe, &file_manager, &output_file_writer);

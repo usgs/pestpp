@@ -512,7 +512,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		cout << "   avg = average model run time in minutes" << endl;
 		cout << "   runs(C = completed | F = failed | T = timed out)" << endl;
 		cout << "   agents(R = running | W = waiting | U = unavailable)" << endl;
-		cout << "---------------------------------------------------------------------------------" << endl;
+		cout << "--------------------------------------------------------------------------------" << endl;
 	}
 	else
 	{
@@ -930,6 +930,8 @@ bool RunManagerPanther::ping(int i_sock)
 			}
 		}
 		else agent_info_iter->set_ping(true);
+			//report("ping sent to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
+
 #ifdef _DEBUG
 		report("ping sent to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
 #endif
@@ -1284,7 +1286,7 @@ void RunManagerPanther::echo()
 	if (!should_echo)
 		return;
 	map<string, int> stats_map = get_agent_stats();
-	cout << get_time_string_short() << " avg:" << setw(5) << setprecision(2) << left << get_global_runtime_minute()  << " runs("
+	cout << get_time_string_short() << " mn:" << setw(5) << setprecision(2) << left << get_global_runtime_minute()  << " runs("
 	     << "C" << setw(5) << left << model_runs_done
 		<< "|F" << setw(5) << left << model_runs_failed
 		<< "|T" << setw(5) << left << model_runs_timed_out << ") agents("
@@ -1462,8 +1464,9 @@ void RunManagerPanther::process_message(int i_sock)
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::PING)
 	{
+		//report("ping received from agent:" + host_name + "$" + agent_info_iter->get_work_dir(), false);
 #ifdef _DEBUG
-		report("ping received from agent" + host_name + "$" + agent_info_iter->get_work_dir(), false);
+		report("ping received from agent:" + host_name + "$" + agent_info_iter->get_work_dir(), false);
 #endif
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::IO_ERROR)

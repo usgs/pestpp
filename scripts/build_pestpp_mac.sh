@@ -8,7 +8,7 @@ full_path=$(realpath $0)
 script_path=$(dirname $full_path)
 cd "$script_path"/..
 
-rm -r build
+rm -rfd build
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icpc -DFORCE_STATIC=ON ..

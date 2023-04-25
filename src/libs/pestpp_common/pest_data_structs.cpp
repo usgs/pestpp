@@ -1138,6 +1138,12 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         ies_phi_fractions_file = org_value;
         return true;
     }
+    else if (key == "IES_PHI_FACTORS_BY_REAL")
+    {
+        ies_phi_factors_by_real = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
+
 	return false;
 }
 
@@ -1242,8 +1248,10 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
 		convert_ip(value, additional_ins_delimiters);
 		return true;
 	}
-	else if (key == "RANDOM_SEED")
+	else if ((key == "RANDOM_SEED") || (key == "RAND_SEED"))
 	{
+		passed_args.insert("RANDOM_SEED");
+		passed_args.insert("RAND_SEED");
 		convert_ip(value, random_seed);
 		return true;
 	}
@@ -1457,6 +1465,11 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 	else if (key == "MOU_SIMPLEX_MUTATION")
     {
         mou_simplex_mutation = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
+    else if (key == "MOU_USE_MULTIGEN_POPULATION")
+    {
+        mou_use_multigen = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
 	return false;
@@ -1689,6 +1702,8 @@ void PestppOptions::summary(ostream& os) const
 		os << " " << f << endl;
 	}
 	os << "mou_simplex_mutation: " << mou_simplex_mutation << endl;
+    os << "mou_use_multigen:" << mou_use_multigen << endl;
+
 
 	os << endl << "...shared pestpp-ies/pestpp-da options:" << endl;
 	os << "(note: 'da' args override 'ies' args when using pestpp-da)" << endl;
@@ -1746,7 +1761,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_ordered_binary: " << ies_ordered_binary << endl;
 	os << "ies_multimodal_alpha: " << ies_multimodal_alpha << endl;
 	os << "ies_localizer_forgive_extra: " << ies_localizer_forgive_missing << endl;
-	os << "ies_phi_fractions_file: " << ies_phi_fractions_file << endl;
+	os << "ies_phi_factors_file: " << ies_phi_fractions_file << endl;
+    os << "ies_phi_factors_by_real: " << ies_phi_factors_by_real << endl;
 
 
 	os << endl << "pestpp-sen options: " << endl;
@@ -1848,7 +1864,7 @@ void PestppOptions::set_defaults()
 	set_sqp_obs_restart_en("");
 	set_sqp_num_reals(-1);
 	set_sqp_update_hessian(false);
-	set_sqp_scale_facs(vector<double>{0.00001, 0.0001,0.001, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25,0.5, 1.0});
+	set_sqp_scale_facs(vector<double>{0.00001, 0.0001,0.0005, 0.001, 0.0025, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25,0.5, 1.0,2.,5.,10.,});
 
 	set_mou_generator("DE");
 	set_mou_population_size(100);
@@ -1871,6 +1887,7 @@ void PestppOptions::set_defaults()
 	set_mou_simplex_reflections(10);
 	set_mou_simplex_factors(vector<double>{0.5, 0.6, 0.7, 0.8});
     set_mou_simplex_mutation(false);
+    set_mou_use_multigen(false);
 	
 	set_ies_par_csv("");
 	set_ies_obs_csv("");
@@ -1927,6 +1944,7 @@ void PestppOptions::set_defaults()
     set_ensemble_output_precision(6);
     set_ies_localizer_forgive_missing(false);
     set_ies_phi_fractions_files("");
+    set_ies_phi_factors_by_real(false);
 
 	// DA parameters
 	//set_da_use_ies(false);

@@ -131,7 +131,18 @@ void Ensemble::replace_col_vals(const vector<string>& other_var_names, const Eig
 }
 
 
+void Ensemble::add_2_row_ip(const string& real_name,const Eigen::VectorXd& row_vec)
+{
+    if (shape().second != row_vec.size())
+        throw_ensemble_error("Ensemble::add_2_row_ip(): dimensions don't match");
 
+    map<string,int> real_map = get_real_map();
+    if (real_map.find(real_name) == real_map.end())
+    {
+        throw_ensemble_error("Ensemble::add_2_row_ip(): real name '"+real_name+"' not found");
+    }
+    reals.row(real_map.at(real_name)) += row_vec;
+}
 
 void Ensemble::add_2_cols_ip(const vector<string> &other_var_names, const Eigen::MatrixXd &mat)
 {
@@ -294,6 +305,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 			//dirty trick alert: apply the abs to make sure all eigen values are positive - nasty!
 			Eigen::MatrixXd proj = (eig.eigenvectors() * (fac * eig.eigenvalues()).cwiseAbs().cwiseSqrt().asDiagonal());
 
+
 			if (level > 2)
 			{
 				ofstream f("cov_eigenvectors.dat");
@@ -333,7 +345,7 @@ void Ensemble::draw(int num_reals, Covariance cov, Transformable &tran, const ve
 			{
 				found_invalid = true;
 				iv++;
-                if (level>3)
+                if (level>2)
                     cout << "invalid: " << draw_names[j] << ": " << draws(i,j) << endl;
 			}
 
@@ -772,7 +784,7 @@ Eigen::MatrixXd Ensemble::get_eigen(vector<string> row_names, vector<string> col
 {
 	//get a dense eigen matrix from reals by row and col names
 	vector<string> missing_rows,missing_cols;
-	vector<string>::iterator iter, start = real_names.begin(), end = real_names.end();
+	//vector<string>::iterator iter, start = real_names.begin(), end = real_names.end();
 	vector<int> row_idxs, col_idxs;
 
 	//check for missing
@@ -783,11 +795,12 @@ Eigen::MatrixXd Ensemble::get_eigen(vector<string> row_names, vector<string> col
 		map<string, int> real_map;
 		for (int i = 0; i < real_names.size(); i++)
 			real_map[real_names[i]] = i;
-		set<string> real_set(real_names.begin(), end = real_names.end());
-		set<string>::iterator end = real_set.end();
+		map<string,int>::iterator end = real_map.end();
+		//set<string> real_set(real_names.begin(), end = real_names.end());
+		//set<string>::iterator end = real_set.end();
 		for (auto &name : row_names)
 		{
-			if (real_set.find(name) == end)
+			if (real_map.find(name) == end)
 				missing.push_back(name);
 			row_idxs.push_back(real_map[name]);
 		}
@@ -2423,6 +2436,19 @@ void ParameterEnsemble::prep_par_ensemble_after_read(map<string, int>& header_in
 			tied_names.push_back(name);
 		}
 	}
+//	vector<string> problems;
+//	for (auto& name : fixed_names)
+//    {
+//	    if ((pi.get_parameter_rec_ptr(name)->scale != 1.0) ||
+//                (pi.get_parameter_rec_ptr(name)->offset != 0.0))
+//        {
+//	        problems.push_back(name);
+//        }
+//    }
+//	if (problems.size())
+//    {
+//        throw_ensemble_error("the follwing fixed parameters have been passed values but have non-trivial scale/offset, which is not supported",problems);
+//    }
 	pfinfo.set_fixed_names(fixed_names);
 	fill_fixed(header_info, fixed_names);
 	save_fixed(fixed_names);
@@ -2469,8 +2495,16 @@ void ParameterEnsemble::save_fixed(vector<string>& fixed_names)
 {
 	if (fixed_names.size() == 0)
 		return;
-	
+
 	Eigen::MatrixXd fixed_reals = get_eigen(vector<string>(), fixed_names);
+	double scale,offset;
+    for (int i=0;i<fixed_names.size();i++)
+    {
+        scale = pest_scenario_ptr->get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr(fixed_names[i])->scale;
+        offset = pest_scenario_ptr->get_ctl_parameter_info_ptr_4_mod()->get_parameter_rec_ptr(fixed_names[i])->offset;
+        fixed_reals.col(i).array() *= scale;
+        fixed_reals.col(i).array() += offset;
+    }
 	Eigen::VectorXd v;
 	for (int i = 0; i < real_names.size(); i++)
 	{

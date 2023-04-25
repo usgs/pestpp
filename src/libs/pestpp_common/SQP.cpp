@@ -748,8 +748,6 @@ void SeqQuadProgram::initialize()
 		ppo->set_par_sigma_range(20.0);
 	}
 
-	
-
 	//reset the par bound PI augmentation since that option is just for simplex
 	ppo->set_opt_include_bnd_pi(false);
 
@@ -894,17 +892,29 @@ void SeqQuadProgram::initialize()
 	}
 
 
-	scale_vals = ppo->get_sqp_scale_facs();
-	message(1, "using the following upgrade vector scale (e.g. 'line search') values:", scale_vals);
+	message(1, "using the following upgrade vector scale (e.g. 'line search') values:", ppo->get_sqp_scale_facs());
 	
 	//ofstream &frec = file_manager.rec_ofstream();
 	last_best = 1.0E+30;
+	last_viol = 0.0;
 	
 	warn_min_reals = 10;
 	error_min_reals = 2;
 	
 	//vector<double> scale_facs = pest_scenario.get_pestpp_options().get_lambda_scale_vec();
 	//message(1, "using scaling factors: ", scale_facs);
+	set<string> passed = ppo->get_passed_args();
+	if (passed.find("SQP_SCALE_FACS") == passed.end())
+	{
+	    if ((use_ensemble_grad) && (SOLVE_EACH_REAL))
+        {
+	        message(1,"'sqp_scale_facs' not passed, using ensemble gradient, and solving each real, resetting scale facs");
+	        vector<double> new_scale_facs{0.000001,0.00001,0.0005,0.01,.1};
+	        message(1,"new sqp_scale_facs",new_scale_facs);
+	        ppo->set_sqp_scale_facs(new_scale_facs);
+        };
+	}
+
 	
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
@@ -951,14 +961,19 @@ void SeqQuadProgram::initialize()
 	//todo: save and report on initial gradient - make some checks would be useful?
 	
 	last_best = get_obj_value(current_ctl_dv_values, current_obs);
-	message(0, "Initial phi value:", last_best);
+	last_viol = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
+	message(0, "Initial phi value, infeasible value:", vector<double>{last_best,last_viol});
 	best_phis.push_back(last_best);
+    best_violations.push_back(last_viol);
 
-	double v = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
+
+
+    double v = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
 	filter.update(last_best, v, 0, -1.0);
 
 	if (v > 0.0)
 	{
+	    message(0,"initial solution infeasible, seeking feasible solution");
 		seek_feasible();
 	}
 	
@@ -969,6 +984,33 @@ void SeqQuadProgram::initialize()
 	message(0, "initialization complete");
 }
 
+void SeqQuadProgram::save_current_dv_obs()
+{
+    stringstream ss;
+    ss.str("");
+    ss << file_manager.get_base_filename() << "." << iter << "." << BASE_REAL_NAME << ".par";
+    string par_name = ss.str();
+    pest_utils::lower_ip(par_name);
+    ofstream of(par_name);
+    if (of.bad())
+    {
+        throw_sqp_error("error opening par file"+par_name);
+    }
+    const TranOffset& toff = *pest_scenario.get_base_par_tran_seq().get_offset_ptr();
+    const TranScale& tsc = *pest_scenario.get_base_par_tran_seq().get_scale_ptr();
+    output_file_writer.write_par(of,current_ctl_dv_values,toff,tsc);
+    of.close();
+    ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
+    ss.str("");
+    ss << iter << "." << BASE_REAL_NAME << ".rei";
+    string rei_name = ss.str();
+    pest_utils::lower_ip(rei_name);
+    ofstream& ofr = file_manager.open_ofile_ext(rei_name);
+    output_file_writer.write_rei(ofr, iter,
+                                 pest_scenario.get_ctl_observations(), current_obs, obj_func, current_ctl_dv_values);
+    file_manager.close_all_files_ending_with("rei");
+
+}
 
 void SeqQuadProgram::prep_4_fd_grad()
 {
@@ -1054,6 +1096,7 @@ void SeqQuadProgram::prep_4_fd_grad()
 	}
 	jco.save("0.jcb");
 	message(1, "saved initial jacobian to " + file_manager.get_base_filename() + ".0.jcb");
+	save_current_dv_obs();
 }
 
 void SeqQuadProgram::run_jacobian(Parameters& _current_ctl_dv_vals, Observations& _current_obs, bool init_obs)
@@ -1432,7 +1475,6 @@ void SeqQuadProgram::iterate_2_solution()
 	
 	bool accept;
 	n_consec_infeas = 0;
-	n_consec_phiinc = 0;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
 		iter++;
@@ -1447,7 +1489,11 @@ void SeqQuadProgram::iterate_2_solution()
         //save some stuff...
         if (use_ensemble_grad)
             report_and_save_ensemble();
-
+        else
+        {
+            //save par and res files for this iteration
+            save_current_dv_obs();
+        }
         constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true);
 
         //report dec var change stats - only for ensemble form
@@ -1465,7 +1511,7 @@ void SeqQuadProgram::iterate_2_solution()
 		if (should_terminate())
 			break;
 
-		if (n_consec_infeas > MAX_CONSEC_INFEAS)
+		if (n_consec_infeas > MAX_CONSEC_INFEAS_IES)
         {
 		    ss.str("");
 		    ss << "number of consecutive infeasible iterations > " << MAX_CONSEC_INFEAS << ", switching to IES to seek feasibility";
@@ -1493,26 +1539,46 @@ bool SeqQuadProgram::should_terminate()
     //todo: use ies accept fac here?
     double phiredstp = pest_scenario.get_control_info().phiredstp;
     int nphistp = pest_scenario.get_control_info().nphistp;
-    int nphinored = pest_scenario.get_control_info().nphinored;
+    int nphinored = MAX_CONSEC_PHIINC;
     bool phiredstp_sat = false, nphinored_sat = false, consec_sat = false;
-    double phi, ratio;
+    double phi, ratio, infeas;
     int count = 0;
     int nphired = 0;
-    //best_mean_phis = vector<double>{ 1.0,0.8,0.81,0.755,1.1,0.75,0.75,1.2 };
+    best_phi_yet = 1.0e+300;
+    int best_idx_yet = -1;
+    for (int i=0;i<best_phis.size();i++)
+    {
+        if (best_phis[i]<=best_phi_yet)
+        {
+            best_phi_yet = best_phis[i];
+            best_violation_yet = best_violations[i];
+            best_idx_yet = i;
+        }
+    }
+    if (best_idx_yet == -1)
+    {
+        throw_sqp_error("something is wrong in shouuld_terminate()");
+    }
+    nphired = best_phis.size() - best_idx_yet;
+
+
 
     //todo: save and write out the current phi grad vector (maybe save all of them???)
     ss.str("");
-    ss << "best phi sequence:" << endl;
-    ss << "       ";
+    ss << "best phi,infeas sequence:" << endl;
+    //ss << "       ";
     int ii = 0;
-    for (auto phi : best_phis)
+    for (int i=0;i<best_phis.size();i++)
+    //for (auto phi : best_phis)
     {
-        ss << setw(10) << setprecision(4) << phi << " ";
+        phi = best_phis[i];
+        infeas = best_violations[i];
+        ss << "    " << setw(5) << setprecision(4) << right << phi << "," << setw(5) << setprecision(4) << left << infeas << endl;
         ii++;
-        if (ii % 6 == 0) {
-            ss << endl;
-            ss << "       ";
-        }
+//        if (ii % 6 == 0) {
+//            ss << endl;
+//            ss << "       ";
+//        }
 
     }
     ss << endl;
@@ -1525,7 +1591,7 @@ bool SeqQuadProgram::should_terminate()
     message(1, "nphistp: ", nphistp);
     message(1, "nphinored: ", nphinored);
     message(1, "best phi yet: ", best_phi_yet);
-
+    message(1,"number of consecutive infeasible solutions: ",n_consec_infeas);
     for (auto& phi : best_phis)
     {
         ratio = (phi - best_phi_yet) / phi;
@@ -1612,12 +1678,15 @@ Eigen::VectorXd SeqQuadProgram::calc_gradient_vector_from_coeffs(const Parameter
 }
 
 
-Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_values)
+Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_values, string _center_on)
 {
 	stringstream ss;
 	Eigen::VectorXd grad(dv_names.size());
     //TODO: should this be optional?
+
 	string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
+	if (!_center_on.empty())
+	    center_on = _center_on;
 	
 	//if don't already have or if already have and exit
 	//	if (LBFGS) &(num_it > 2)& (constraints False); // constraint False as need phi_grad for Lagrangian
@@ -1632,13 +1701,13 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 	if (use_ensemble_grad)
 	{
 		//ensemble stuff here
-		if (use_obj_obs)
+		//if (use_obj_obs)
 		{
 			// compute sample dec var cov matrix and its pseudo inverse
 			// see eq (8) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
 			// TODO: so can pseudo inverse: Covariance dv_cov_matrix; 
-			Eigen::MatrixXd dv_cov_matrix;
-			Eigen::MatrixXd parcov_inv;
+			//Eigen::MatrixXd dv_cov_matrix;
+			//Eigen::MatrixXd parcov_inv;
 			// start by computing mean-shifted dec var ensemble
 			Eigen::MatrixXd dv_anoms = dv.get_eigen_anomalies(vector<string>(), dv_names, center_on);  // need this for both cov and cross-cov
 			if (dv.shape().first > 1000)  // until we encounter
@@ -1655,11 +1724,17 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 			//dv_cov_matrix = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * dv_anoms);
 			//message(1, "dv_cov:", dv_cov_matrix);
 			//parcov_inv = dv_cov_matrix.cwiseInverse();  // check equivalence to pseudo inv
-			
-			//the second return matrix should be shrunk optimally to be nonsingular...but who knows!
-			Covariance shrunk_cov = dv.get_empirical_cov_matrices(&file_manager).second;
-			shrunk_cov.inv_ip();
-			parcov_inv = shrunk_cov.e_ptr()->toDense();
+
+//			if (pest_scenario.get_pestpp_options().get_ies_use_empirical_prior()) {
+//                //the second return matrix should be shrunk optimally to be nonsingular...but who knows!
+//                Covariance shrunk_cov = dv.get_empirical_cov_matrices(&file_manager).second;
+//                shrunk_cov.inv_ip();
+//                parcov_inv = shrunk_cov.e_ptr()->toDense();
+//            }
+//			else
+//            {
+//			    parcov_inv = parcov.inv().e_ptr()->toDense();
+//            }
 			//cout << "parcov inv: " << endl << parcov_inv << endl;
 			//TODO: Matt to check consistency being sample cov forms
             //message(1, "empirical parcov inv:", parcov_inv);  // tmp
@@ -1675,15 +1750,48 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 			// compute dec var-phi cross-cov vector
 			// see eq (9) of Dehdari and Oliver 2012 SPE and Fonseca et al 2015 SPE
 			// start by computing mean-shifted obj function ensemble
-			Eigen::MatrixXd obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str}, center_on);
+            Eigen::MatrixXd ivec, upgrade_1, s, V, U, st;
+            SVD_REDSVD rsvd;
+            //SVD_EIGEN rsvd;
+            rsvd.set_performance_log(performance_log);
+            //dv_anoms.transposeInPlace();
+
+            rsvd.solve_ip(dv_anoms, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
+            Eigen::MatrixXd dv_anoms_pseudoinv = V * s.asDiagonal().inverse() * U.transpose();
+            Eigen::MatrixXd obj_anoms(dv.shape().first,1);
+            if (use_obj_obs) {
+                obj_anoms = oe.get_eigen_anomalies(vector<string>(), vector<string>{obj_func_str},center_on);
+            }
+            else
+            {
+                dv.update_var_map();
+                map<string,int> vmap = dv.get_var_map();
+                Eigen::VectorXd real;
+                double oval;
+                int i =0;
+                for (auto& real_name: dv.get_real_names())
+                {
+                    oval = 0;
+                    real = dv.get_real_vector(real_name);
+                    for (auto& dv :dv_names)
+                    {
+                        oval += obj_func_coef_map.at(dv) * real(vmap.at(dv));
+                    }
+                    obj_anoms(i,0) = oval;
+                    i++;
+                }
+                obj_anoms.array() -= obj_anoms.mean();
+
+            }
 			Eigen::MatrixXd cross_cov_vector;  // or Eigen::VectorXd?
-			cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
+			//cross_cov_vector = 1.0 / (dv.shape().first - 1.0) * (dv_anoms.transpose() * obj_anoms);
 			//cout << "dv-obj_cross_cov:" << endl << cross_cov_vector << endl;
 			
 			// now compute grad vector
 			// this is a matrix-vector product; the matrix being the pseudo inv of diag empirical dec var cov matrix and the vector being the dec var-phi cross-cov vector\
 			// see, e.g., Chen et al. (2009) and Fonseca et al. (2015) 
-			grad = parcov_inv * cross_cov_vector;//*parcov.e_ptr() * cross_cov_vector;
+			//grad = parcov_inv * cross_cov_vector;//*parcov.e_ptr() * cross_cov_vector;
+			grad = 1.0 / ((double)dv.shape().first - 1.0) * (dv_anoms_pseudoinv * obj_anoms);
 			// if (constraints)
 			//{
 			//	ss.str("");
@@ -1701,26 +1809,26 @@ Parameters SeqQuadProgram::calc_gradient_vector(const Parameters& _current_dv_va
 		//pi base obj, need representative dv values using the "center_on" arg
 		//represent the mean/median/base - that is, derived from the "center_on" arg
 		//todo: for now, just using mean dv values
-		else
-		{
-			//if not center_on arg, use the mean dv values
-			//if (center_on.size() == 0)
-			//{
-			//	//pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
-			//	for (int i = 0; i < dv_names.size(); i++)
-			//	{
-			//		grad[i] = obj_func_coef_map[dv_names[i]];// * mm.first[dv_names[i]];
-			//	}
-			//}
-			//else
-			//{
-
-			//	grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
-			//}
-			// 
-			//I think we should just eval the gradient around the current dv values
-			grad = calc_gradient_vector_from_coeffs(_current_dv_values);
-		}
+//		else
+//		{
+//			//if not center_on arg, use the mean dv values
+//			//if (center_on.size() == 0)
+//			//{
+//			//	//pair<map<string, double>, map<string, double>> mm = dv.get_moment_maps();
+//			//	for (int i = 0; i < dv_names.size(); i++)
+//			//	{
+//			//		grad[i] = obj_func_coef_map[dv_names[i]];// * mm.first[dv_names[i]];
+//			//	}
+//			//}
+//			//else
+//			//{
+//
+//			//	grad = dv.get_real_vector(pest_scenario.get_pestpp_options().get_ies_center_on());
+//			//}
+//			//
+//			//I think we should just eval the gradient around the current dv values
+//			grad = calc_gradient_vector_from_coeffs(_current_dv_values);
+//		}
 			
 	}
 	else
@@ -1801,7 +1909,7 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::_kkt_null_space(Eigen::Ma
 
 	message(1, "A before", constraint_jco);
 	rsvd.solve_ip(constraint_jco, s, U, V, pest_scenario.get_svd_info().eigthresh, pest_scenario.get_svd_info().maxsing);
-	message(1, "A after", constraint_jco); 
+	message(1, "A after", constraint_jco);
 	S_ = s.asDiagonal();  // check truncation done automatically
 	message(1, "singular values of A matrix", S_);  // tmp
 	message(1, "V", V);  // tmp
@@ -2169,16 +2277,16 @@ pair<Eigen::VectorXd, Eigen::VectorXd> SeqQuadProgram::calc_search_direction_vec
 	if (obj_sense == "minimize")
 		search_d *= -1.;
 
-	message(1, "sd:", search_d);  // tmp
+	message(1, "sd:", search_d.transpose());  // tmp
 
 	return pair<Eigen::VectorXd, Eigen::VectorXd> (search_d, lm);  // lm will be empty if non-constrained solve
 }
 
-Eigen::VectorXd SeqQuadProgram::fancy_solve_routine(const Parameters& _current_dv_num_values)
+Eigen::VectorXd SeqQuadProgram::fancy_solve_routine(const Parameters& _current_dv_num_values, const Parameters& _grad_vector)
 {
 
 	// grad vector computation
-	Eigen::VectorXd grad = current_grad_vector.get_data_eigen_vec(dv_names);
+	Eigen::VectorXd grad = _grad_vector.get_data_eigen_vec(dv_names);
 
 	// search direction computation
 	//Eigen::VectorXd search_d = calc_search_direction_vector(_current_dv_num_values, grad);  
@@ -2237,7 +2345,7 @@ bool SeqQuadProgram::solve_new()
 	
 	// search direction computation
 	Eigen::VectorXd search_d;
-	search_d = fancy_solve_routine(_current_num_dv_values);
+	search_d = fancy_solve_routine(_current_num_dv_values,current_grad_vector);
 
 	
 	//backtracking/line search factors
@@ -2262,15 +2370,37 @@ bool SeqQuadProgram::solve_new()
 	//	}
 	
 	vector<string> real_names;
-	
-	for (auto sv : scale_vals)
-	{
-		ss.str("");
-		ss << "dv_cand_sv:" << left << setw(8) << setprecision(3) << sv;
-		real_names.push_back(ss.str());
-	}
-	dv_candidates.reserve(real_names, dv_names);
+    vector<double> scale_vals;
+	scale_vals.clear();
+	for (auto& sf : pest_scenario.get_pestpp_options().get_sqp_scale_facs())
+    {
+	    scale_vals.push_back(sf * BASE_SCALE_FACTOR);
+    }
 
+    if ((use_ensemble_grad) && (SOLVE_EACH_REAL))
+    {
+        for (auto sv : scale_vals)
+        {
+            for (auto& real_name : dv.get_real_names())
+             {
+                ss.str("");
+                ss << "dv_cand_" << real_name << "_sv:" << left << setw(8) << setprecision(3) << sv;
+                real_names.push_back(ss.str());
+            }
+        }
+
+    }
+    else {
+        for (auto sv : scale_vals) {
+            ss.str("");
+            ss << "dv_cand_sv:" << left << setw(8) << setprecision(3) << sv;
+            real_names.push_back(ss.str());
+        }
+    }
+	dv_candidates.reserve(real_names, dv_names);
+    int ii = 0;
+    vector<double> used_scale_vals;
+    map<string,double> real_sf_map;
 	for (int i=0;i<scale_vals.size();i++)
 	{
 		double scale_val = scale_vals[i];
@@ -2278,22 +2408,53 @@ bool SeqQuadProgram::solve_new()
 		ss << "starting calcs for scaling factor" << scale_val;
 		message(1, "starting lambda calcs for scaling factor", scale_val);
 		message(2, "see .log file for more details");
-		
-		//dv_num_candidate = fancy_solve_routine(scale_val, _current_num_dv_values);
-		Parameters num_candidate = _current_num_dv_values;
 
-		Eigen::VectorXd scale_search_d = search_d * scale_val;
-		if (scale_search_d.squaredNorm() < 1.0 - 10)
-			message(1, "very short upgrade for scale value", scale_val); 
-		
-		Eigen::VectorXd cvals = num_candidate.get_data_eigen_vec(dv_names);
+		if ((use_ensemble_grad) && (SOLVE_EACH_REAL))
+        {
+		    Parameters real_grad,num_candidate=current_ctl_dv_values;
+		    pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(num_candidate);
+		    Eigen::VectorXd real,scale_search_d,cvals;
+		    dv.transform_ip(ParameterEnsemble::transStatus::NUM);
 
-		cvals.array() += scale_search_d.array();
-		num_candidate.update_without_clear(dv_names, cvals); 
+		    for (auto& real_name : dv.get_real_names())
+            {
+		        real_grad = calc_gradient_vector(current_ctl_dv_values,real_name);
 
-		//Eigen::VectorXd vec = dv_num_candidate.get_data_eigen_vec(dv_names); 
-		Eigen::VectorXd vec = num_candidate.get_data_eigen_vec(dv_names);
-		dv_candidates.update_real_ip(real_names[i], vec);
+                real = dv.get_real_vector(real_name);
+                num_candidate.update_without_clear(dv.get_var_names(),real);
+                search_d = fancy_solve_routine(num_candidate,real_grad);
+                scale_search_d = search_d * scale_val;
+                cvals = num_candidate.get_data_eigen_vec(dv_names);
+                cvals.array() += scale_search_d.array();
+                //num_candidate.update_without_clear(dv_names, cvals);
+                //Eigen::VectorXd vec = num_candidate.get_data_eigen_vec(dv_names);
+                dv_candidates.update_real_ip(real_names[ii], cvals);
+                real_sf_map[real_names[ii]] = scale_val;
+                ii++;
+                used_scale_vals.push_back(scale_val);
+
+
+            }
+        }
+		else {
+            //dv_num_candidate = fancy_solve_routine(scale_val, _current_num_dv_values);
+            Parameters num_candidate = _current_num_dv_values;
+
+            Eigen::VectorXd scale_search_d = search_d * scale_val;
+            if (scale_search_d.squaredNorm() < 1.0 - 10)
+                message(1, "very short upgrade for scale value", scale_val);
+
+            Eigen::VectorXd cvals = num_candidate.get_data_eigen_vec(dv_names);
+
+            cvals.array() += scale_search_d.array();
+            num_candidate.update_without_clear(dv_names, cvals);
+
+            //Eigen::VectorXd vec = dv_num_candidate.get_data_eigen_vec(dv_names);
+            Eigen::VectorXd vec = num_candidate.get_data_eigen_vec(dv_names);
+            dv_candidates.update_real_ip(real_names[i], vec);
+            used_scale_vals.push_back(scale_val);
+            real_sf_map[real_names[i]] = scale_val;
+        }
 
 		ss.str("");
 		message(1, "finished calcs for scaling factor:", scale_val);
@@ -2383,15 +2544,53 @@ bool SeqQuadProgram::solve_new()
 	ss << file_manager.get_base_filename() << "." << iter << ".dv_candidates.csv";
 	dv_candidates.to_csv(ss.str());
 
+	//check for duplicate candidates
+	Eigen::VectorXd v1,v2;
+	double d;
+	vector<string> drop;
+	set<int> jvals;
+	for (int i=0;i<dv_candidates.shape().first;i++)
+    {
+	    v1 = dv_candidates.get_real_vector(i);
+	    for (int j=i+1;j<dv_candidates.shape().first;j++) {
+            v2 = (dv_candidates.get_real_vector(j) - v1).array() / v1.array().cwiseAbs();
+            d = v2.transpose() * v2;
+            if ((abs(d) < 1e-7) && (jvals.find(j) == jvals.end())) {
+                message(1, "duplicate candidates:", vector<string>{real_names[i], real_names[j]});
+                drop.push_back(real_names[j]);
+                jvals.emplace(j);
+            }
+        }
+
+    }
+	if (drop.size() > 0)
+    {
+	    message(1,"dropping the following duplicate candidates: ",drop);
+	    dv_candidates.drop_rows(drop,true);
+	    used_scale_vals.clear();
+	    for (auto& real_name : dv_candidates.get_real_names())
+        {
+	        used_scale_vals.push_back(real_sf_map.at(real_name));
+        }
+
+    }
+
+
 	message(0, "running candidate decision variable batch");
 	vector<double> passed_scale_vals = scale_vals;	
 	//passed_scale_vals will get amended in this function based on run fails...
-	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates, passed_scale_vals);
+
+	ObservationEnsemble oe_candidates = run_candidate_ensemble(dv_candidates);
     ss.str("");
     ss << file_manager.get_base_filename() << "." << iter << ".oe_candidates.csv";
     oe_candidates.to_csv(ss.str());
 	//todo: decide which if any dv candidate to accept...
-	bool success = pick_candidate_and_update_current(dv_candidates, oe_candidates, passed_scale_vals);
+	map<string,double> sf_map;
+	for (int i=0;i<real_names.size();i++)
+    {
+	    sf_map[real_names[i]] = used_scale_vals[i];
+    }
+	bool success = pick_candidate_and_update_current(dv_candidates, oe_candidates,sf_map);
 	if (!success)
 	{
 		//// deal with unsuccessful iteration
@@ -2453,6 +2652,7 @@ bool SeqQuadProgram::seek_feasible()
 	    shifted = constraints.get_chance_shifted_constraints(current_obs);
     }
 	Observations& ctl_obs = ies_pest_scenario.get_ctl_observations_4_mod();
+	map<string,double> viol_map = constraints.get_unsatified_obs_constraints(current_obs,filter.get_viol_tol());
 	for (auto& name : ies_pest_scenario.get_ctl_ordered_obs_names())
 	{
 		if (snames.find(name) == send)
@@ -2462,8 +2662,10 @@ bool SeqQuadProgram::seek_feasible()
 		}
 		else
 		{
-			ctl_obs.update_rec(name, shifted.get_rec(name));
-            oi->get_observation_rec_ptr_4_mod(name)->group = "__eqconstraint__"+name;
+		    if (viol_map.find(name) != viol_map.end()) {
+                ctl_obs.update_rec(name, shifted.get_rec(name));
+                oi->get_observation_rec_ptr_4_mod(name)->group = "__eqconstraint__" + name;
+            }
 		}
 	}
 
@@ -2472,14 +2674,34 @@ bool SeqQuadProgram::seek_feasible()
     {
 	    ies_pest_scenario.get_pestpp_options_ptr()->set_ies_bad_phi_sigma(1.25);
     }
-	ies_pest_scenario.get_pestpp_options_ptr()->set_ies_num_reals(pest_scenario.get_pestpp_options().get_sqp_num_reals());
-	ies_pest_scenario.get_pestpp_options_ptr()->set_ies_no_noise(true);
+
+    if (snames.find("IES_LAMBBDA_MULTS") == snames.end())
+    {
+        ies_pest_scenario.get_pestpp_options_ptr()->set_ies_lam_mults(vector<double>{0.1,1.0,10});
+    }
+
+    if (snames.find("LAMBBDA_SCALE_FAC") == snames.end())
+    {
+        ies_pest_scenario.get_pestpp_options_ptr()->set_lambda_scale_vec(vector<double>{0.5,1.0});
+    }
+    if (snames.find("IES_NUM_REALS") == snames.end()) {
+        ies_pest_scenario.get_pestpp_options_ptr()->set_ies_num_reals(
+                max(max(pest_scenario.get_pestpp_options().get_sqp_num_reals(), (int)(constraints.num_constraints()*1.1)),30));
+    }
+    if (snames.find("IES_SUBSET_SIZE") == snames.end()) {
+        ies_pest_scenario.get_pestpp_options_ptr()->set_ies_subset_size(-5);
+    }
+    ies_pest_scenario.get_pestpp_options_ptr()->set_ies_no_noise(true);
 	ies_pest_scenario.get_pestpp_options_ptr()->set_ies_obs_csv("");
     ies_pest_scenario.get_pestpp_options_ptr()->set_ies_obs_restart_csv("");
     ies_pest_scenario.get_pestpp_options_ptr()->set_ies_par_csv("");
     ies_pest_scenario.get_pestpp_options_ptr()->set_ies_par_restart_csv("");
     ies_pest_scenario.get_control_info_4_mod().noptmax = 3; //TODO: make this an option some how?
+    ss.str("");
+    string org_base = file_manager.get_base_filename();
+    ss << "feas_ies_" << iter << "_" << org_base;
 
+    file_manager.set_base_filename(ss.str());
     IterEnsembleSmoother ies(ies_pest_scenario, file_manager, output_file_writer, performance_log, run_mgr_ptr);
     if (use_ensemble_grad) {
         ies.set_pe(dv);
@@ -2494,7 +2716,7 @@ bool SeqQuadProgram::seek_feasible()
 
 
 	ies.iterate_2_solution();
-
+    file_manager.set_base_filename(org_base);
 	//what to do here? maybe we need to eval the kkt conditions to pick a new point that maintains the hessian?
 	ParameterEnsemble* ies_pe_ptr = ies.get_pe_ptr();
 	ObservationEnsemble* ies_oe_ptr = ies.get_oe_ptr();
@@ -2533,7 +2755,10 @@ bool SeqQuadProgram::seek_feasible()
 	constraints.sqp_report(iter, current_ctl_dv_values, current_obs, true, "post feasible seek");
 	//todo: probably more algorithmic things here...
 	last_best = get_obj_value(current_ctl_dv_values, current_obs);
-	message(1, "finished seeking feasible, reset best phi value to ", last_best);
+	last_viol = constraints.get_sum_of_violations(current_ctl_dv_values, current_obs);
+	best_phis[best_phis.size()-1] = last_best;
+	best_violations[best_violations.size() -1] = last_viol;
+	message(1, "finished seeking feasible, reset best phi,infeasible value to ", vector<double>{last_best,last_viol});
 	return false;
 }
 
@@ -2608,13 +2833,13 @@ Eigen::VectorXd SeqQuadProgram::get_obj_vector(ParameterEnsemble& _dv, Observati
 	return obj_vec;
 }
 
-bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, vector<double>& alpha_vals)
+bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_candidates, ObservationEnsemble& _oe, map<string,double>& sf_map)
 {
 	//decide!
 	message(0, " current best phi:", last_best);
 	stringstream ss;
 	Eigen::VectorXd obj_vec = get_obj_vector(dv_candidates, _oe);
-	double oext;
+	double oext,oviol;
 	if (obj_sense == "minimize")
 		oext = numeric_limits<double>::max();
 	else
@@ -2634,11 +2859,11 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 	vector<double> infeas_vec;
 	vector<int> accept_idxs;
 	bool accept;
-
 	for (int i = 0; i < obj_vec.size(); i++)
 	{
 		ss.str("");
-		ss << "scale factor " << setprecision(4) << scale_vals[i];
+		//ss << "scale factor " << setprecision(4) << scale_vals[i];
+		ss << "candidate: " << real_names[i] << ", scale factor: " << sf_map.at(real_names[i]);
 		tag = ss.str();
 		ss.str("");
 		ss << "candidate: " << tag << " phi: " << obj_vec[i];
@@ -2649,7 +2874,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		}
 		ss << " infeasibilty total: " << infeas_sum << ", ";
 		infeas_vec.push_back(infeas_sum);
-		filter_accept = filter.accept(obj_vec[i], infeas_sum,iter,alpha_vals[i],true);
+		filter_accept = filter.accept(obj_vec[i], infeas_sum,iter,sf_map.at(real_names[i]),false);
 		if (filter_accept)
 			ss << " filter accepted ";
 		else
@@ -2657,6 +2882,13 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		message(1, ss.str());
         if (filter_accept)
         {
+            if ((best_violation_yet > 1e-7) && (infeas_vec[i] > (best_violation_yet * 2.0)))
+            {
+                ss << ", infeasibility exceeds previous best infeasibility threshold";
+            }
+            else{
+                accept_idxs.push_back(i);
+            }
             accept_idxs.push_back(i);
 //            idx = i;
 //            oext = obj_vec[i];
@@ -2671,13 +2903,8 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		pts.numeric2ctl_ip(cand_dv_values);
 		t = _oe.get_real_vector(real_names[i]);
 		cand_obs_values.update_without_clear(onames, t);
-		
 		constraints.sqp_report(iter, cand_dv_values, cand_obs_values, false,tag);
-
 	}
-
-
-
 
     if (accept_idxs.size() > 0)
     {
@@ -2694,9 +2921,10 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
                 min_obj = obj_vec[iidx];
                 idx = iidx;
                 oext = obj_vec[iidx];
+                oviol = infeas_vec[iidx];
             }
         }
-        filter.update(min_obj,infeas_vec[idx],iter,alpha_vals[idx]);
+        filter.update(min_obj,infeas_vec[idx],iter,sf_map.at(real_names.at(idx)));
     }
 	else
     {
@@ -2710,11 +2938,13 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
                 {
                     idx = i;
                     oext = obj_vec[i];
+                    oviol = infeas_vec[i];
                 }
                 else if ((obj_sense == "maximize") && (obj_vec[i] > oext))
                 {
                     idx = i;
                     oext = obj_vec[i];
+                    oviol = infeas_vec[i];
                 }
             }
         }
@@ -2731,6 +2961,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
                     viol_min = infeas_vec[i];
                     idx = i;
                     oext = obj_vec[i];
+                    oviol = infeas_vec[i];
                 }
             }
         }
@@ -2738,7 +2969,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
     }
 	if (idx == -1)
 	    throw_sqp_error("shits busted");
-    message(0, "best phi this iteration: ", oext);
+    message(0, "best phi and infeas this iteration: ", vector<double>{oext,oviol});
     t = dv_candidates.get_real_vector(real_names[idx]);
     cand_dv_values = current_ctl_dv_values;
     cand_dv_values.update_without_clear(dv_names, t);
@@ -2746,7 +2977,7 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
     t = _oe.get_real_vector(real_names[idx]);
     cand_obs_values.update_without_clear(onames, t);
     ss.str("");
-    ss << "best candidate (scale factor: " << setprecision(4) << scale_vals[idx] << ", phi: " << oext << ")";
+    ss << "best candidate (scale factor: " << setprecision(4) << sf_map.at(real_names[idx]) << ", phi: " << oext << ", infeas: " << oviol << ")";
     constraints.sqp_report(iter, cand_dv_values, cand_obs_values, true,ss.str());
     filter.report(file_manager.rec_ofstream(),iter);
 	//TODO: need more thinking here - do we accept only if filter accepts?  I think so....
@@ -2766,31 +2997,61 @@ bool SeqQuadProgram::pick_candidate_and_update_current(ParameterEnsemble& dv_can
 		t = _oe.get_real_vector(idx);
 		current_obs.update_without_clear(onames, t);
 		last_best = oext;
-		message(0, "new best phi:", last_best);
+		last_viol = oviol;
+		message(0, "new best phi and infeas:", vector<double>{last_best,last_viol});
         best_phis.push_back(oext);
+        best_violations.push_back(oviol);
 
 		// todo add constraint (largest violating constraint not already in working set) to working set
 		// is this the right place to do this? after accepting a particular candidate? 
 		// also can we adapt alpha_mult based on subset? using concept of blocking constraint here?
 		// take diff between vector of strings of constraints in working set and constraints with non-zero violation (return constraint idx from filter?)
 
+		//if no filter-accepted solutions and we are in violation...
 		if (infeas_vec[idx] > filter.get_viol_tol())
         {
 		    n_consec_infeas++;
         }
+		else {
+            if (use_ensemble_grad) {
+                double new_par_sigma = pest_scenario.get_pestpp_options().get_par_sigma_range();
+                new_par_sigma = new_par_sigma * (PAR_SIGMA_INC_FAC);
+                new_par_sigma = min(new_par_sigma, par_sigma_max);
 
-		return true;
+                message(1, "increasing par_sigma_range to", new_par_sigma);
+                message(1, "regenerating parcov");
+                pest_scenario.get_pestpp_options_ptr()->set_par_sigma_range(new_par_sigma);
+                parcov.try_from(pest_scenario, file_manager);
+                cout << parcov << endl;
+            }
+            BASE_SCALE_FACTOR = BASE_SCALE_FACTOR * SF_DEC_FAC;
+            message(0, "new base scale factor", BASE_SCALE_FACTOR);
+        }
+
+        return true;
 		
 	}
 	else
 	{
 		message(0, "not accepting upgrade #sad");
         best_phis.push_back(last_best);
+        best_violations.push_back(last_viol);
         if (infeas_vec[idx] > filter.get_viol_tol())
         {
             n_consec_infeas++;
         }
-		//TODO: something here to adapt to the failed iteration, otherwise I think we will continue failing...
+        if (use_ensemble_grad) {
+            double new_par_sigma = pest_scenario.get_pestpp_options().get_par_sigma_range();
+            new_par_sigma = new_par_sigma * PAR_SIGMA_DEC_FAC;
+            new_par_sigma = max(new_par_sigma, par_sigma_min);
+            message(1, "decreasing par_sigma_range to", new_par_sigma);
+            message(1, "regenerating parcov");
+            parcov.try_from(pest_scenario, file_manager);
+            pest_scenario.get_pestpp_options_ptr()->set_par_sigma_range(new_par_sigma);
+            cout << parcov << endl;
+        }
+        BASE_SCALE_FACTOR = BASE_SCALE_FACTOR * SF_INC_FAC;
+        message(0, "new base scale factor", BASE_SCALE_FACTOR);
 		return false;
 	}
 }
@@ -2998,7 +3259,7 @@ void SeqQuadProgram::save(ParameterEnsemble& _dv, ObservationEnsemble& _oe, bool
 //	//return subset_idx_map;
 //}
 
-ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv_candidates, vector<double> &scale_vals)
+ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv_candidates)
 {
 	run_mgr_ptr->reinitialize();
 	ofstream &frec = file_manager.rec_ofstream();
@@ -3101,11 +3362,11 @@ ObservationEnsemble SeqQuadProgram::run_candidate_ensemble(ParameterEnsemble& dv
 			_oe.drop_rows(failed_obs_names);
 			dv_candidates.drop_rows(failed_par_names);
 			//update scale_vals 
-			vector<double> new_scale_vals;
-			for (int i = 0; i < scale_vals.size(); i++)
+			/*vector<double> new_scale_vals;
+			for (int i = 0; i < real_names.size(); i++)
 				if (find(failed_real_indices.begin(), failed_real_indices.end(), i) == failed_real_indices.end())
 					new_scale_vals.push_back(scale_vals[i]);
-			scale_vals = new_scale_vals;
+			scale_vals = new_scale_vals;*/
 		}
 	}
 	

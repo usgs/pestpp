@@ -111,7 +111,7 @@ ofstream &FileManager::open_ofile_absolute(const string &tag, const string &file
 		f_new.open(filename, mode);
 		filename_map.insert(pair<string, string>(tag, filename));
 	}
-	if (!f_new.good())
+	if (f_new.bad())
 	{
 		throw PestFileError(filename);
 	}
@@ -142,7 +142,7 @@ ifstream &FileManager::open_ifile_absolute(const string &tag, const string &file
 		f_new.open(filename, mode);
 		filename_map.insert(pair<string, string>(tag, filename));
 	}
-	if (!f_new.good())
+	if (f_new.bad())
 	{
 		PestFileError pest_err(filename);
 		cerr << pest_err.what();

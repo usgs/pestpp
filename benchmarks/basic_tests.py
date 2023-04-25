@@ -1256,7 +1256,92 @@ def ins_missing_e_test():
     else:
         raise Exception("should have failed")
 
+
+def prep_ends():
+    model_d = "mf6_freyberg"
+    base_d = os.path.join(model_d, "template")
+    new_d = os.path.join(model_d, "ends")
+    if os.path.exists(new_d):
+        shutil.rmtree(new_d)
+    os.makedirs(new_d)
+    skip = ["pst","csv","log","grb","hds","par","rei","lst","jcb","cov","rec","cbc"]
+    files = [f for f in os.listdir(base_d) if f.lower().split('.')[-1] not in skip]
+    print(files)
+    [shutil.copy2(os.path.join(base_d,f),os.path.join(new_d,f)) for f in files]
+    [shutil.copy2(os.path.join(base_d,f),os.path.join(new_d,f)) for f in ["ies_prior.jcb"]]
+    
+    pyemu.os_utils.run("mf6",cwd=new_d)
+    pst = pyemu.Pst(os.path.join(base_d,"freyberg6_run_ies.pst"))
+    pst.control_data.noptmax = 0
+    pst.pestpp_options = {}
+    pst.pestpp_options["ies_par_en"] = "prior.jcb"
+
+    pst.write(os.path.join(new_d,"freyberg6_run_ies.pst"),version=2)
+    pyemu.os_utils.run("pestpp-ies freyberg6_run_ies.pst",cwd=new_d)
+
+    build_and_draw_prior(new_d,num_reals=5000)
+    pst.control_data.noptmax = -1
+    pst.write(os.path.join(new_d,"freyberg6_run_ies.pst"),version=2)
+    m_d = os.path.join(model_d,"ends_master")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+
+    pyemu.os_utils.start_workers(new_d,"pestpp-ies","freyberg6_run_ies.pst",num_workers=15,worker_root=model_d,master_dir=m_d)
+
+
+def build_and_draw_prior(t_d="ends",num_reals=500):
+    import flopy
+
+    sim = flopy.mf6.MFSimulation.load(sim_ws=t_d)
+    m = sim.get_model("freyberg6")
+    xgrid = m.modelgrid.xcellcenters
+    ygrid = m.modelgrid.ycellcenters
+    pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_ies.pst"))
+    par = pst.parameter_data
+    static_par = par.loc[par.parnme.apply(lambda x: x[:3] in ["npf","sto"]),:].copy()
+    static_par.loc[:, "i"] = static_par.parnme.apply(lambda x: int(x.split('_')[3]))
+    static_par.loc[:, "j"] = static_par.parnme.apply(lambda x: int(x.split('_')[4]))
+    static_par.loc[:, "x"] = static_par.apply(lambda x: xgrid[x.i,x.j],axis=1)
+    static_par.loc[:, "y"] = static_par.apply(lambda x: ygrid[x.i, x.j], axis=1)
+    static_par.loc[:,"pargp"] = static_par.parnme.apply(lambda x: "_".join(x.split('_')[:3]))
+
+    wel_par = par.loc[par.parnme.apply(lambda x: x.startswith("wel")),:].copy()
+    wel_par.loc[:,"x"] = wel_par.parnme.apply(lambda x: int(x.split('_')[-1]))
+    wel_par.loc[:,"y"] = 0.0
+    wel_par.loc[:,"pargp"] = wel_par.parnme.apply(lambda x: '_'.join(x.split('_')[:-1]))
+
+    rch_par = par.loc[par.parnme.str.startswith("rch"),:].copy()
+    rch_par.loc[:,"x"] = rch_par.parnme.apply(lambda x: int(x.split('_')[-1]))
+    rch_par.loc[:,"y"] = 0.0
+
+    spatial_v = pyemu.geostats.ExpVario(contribution=1.0,a=1000.0)
+    temporal_v = pyemu.geostats.ExpVario(contribution=1.0,a=3)
+    spatial_gs = pyemu.geostats.GeoStruct(variograms=spatial_v)
+    temporal_gs = pyemu.geostats.GeoStruct(variograms=temporal_v)
+
+    static_struct_dict = {spatial_gs:[]}
+    sgrps = static_par.pargp.unique()
+    sgrps.sort()
+    for pargp in sgrps:
+        static_struct_dict[spatial_gs].append(static_par.loc[static_par.pargp==pargp,["parnme","x","y","i","j"]])
+    temporal_struct_dict = {temporal_gs: [rch_par.loc[:, ["parnme", "x", "y"]]]}
+    wgrps = wel_par.pargp.unique()
+    wgrps.sort()
+    for pargp in wgrps:
+        temporal_struct_dict[temporal_gs].append(wel_par.loc[wel_par.pargp == pargp, ["parnme", "x", "y"]])
+
+    struct_dict = static_struct_dict
+    for k,v in temporal_struct_dict.items():
+        struct_dict[k] = v
+    print(struct_dict)
+    np.random.seed(pyemu.en.SEED)
+    pe = pyemu.helpers.geostatistical_draws(pst,struct_dict=struct_dict,num_reals=num_reals)
+    pe.to_binary(os.path.join(t_d,"prior.jcb"))
+
+
 if __name__ == "__main__":
+    #mf6_v5_ies_test()
+    #prep_ends()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
     #shutil.copy2(os.path.join("..", "exe", "windows", "x64", "Debug", "pestpp-ies.exe"),
     #             os.path.join("..", "bin", "win", "pestpp-ies.exe"))
@@ -1294,12 +1379,10 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
     #mf6_v5_ies_test()
-    mf6_v5_sen_test()
-
-
+    #mf6_v5_sen_test()
 
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
-    #mf6_v5_opt_stack_test()
+    mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
     #mf6_v5_ies_test()
     #cmdline_test()

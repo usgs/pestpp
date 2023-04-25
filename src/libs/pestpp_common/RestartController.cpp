@@ -66,6 +66,7 @@ void RestartController::process_rst_file(std::ifstream &fin)
 
 		if (tokens.empty())
 		{
+		    continue;
 		}
 		else if (tokens[0] == "start_iteration")
 		{

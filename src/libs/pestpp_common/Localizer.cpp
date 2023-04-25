@@ -13,7 +13,7 @@
 #include "system_variables.h"
 #include "Localizer.h"
 
-bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing)
+bool Localizer::initialize(PerformanceLog *performance_log, ofstream& frec, bool forgive_missing)
 {
 	stringstream ss;
 	how = How::OBSERVATIONS; //set this for the case with no localization
@@ -87,7 +87,39 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
 	
 	performance_log->log_event("processing localizer matrix");
 	_localizer_map = process_mat(performance_log,org_mat,forgive_missing);
-	
+    vector<string> missing_from_loc;
+	if ((filename.size() > 0) && (how == How::PARAMETERS))
+    {
+        map<string,int>::iterator end = par2col_map.end();
+        for (auto& pname : pest_scenario_ptr->get_ctl_ordered_adj_par_names())
+        {
+            if (par2col_map.find(pname) == end)
+            {
+                missing_from_loc.push_back(pname);
+            }
+        }
+        if (missing_from_loc.size() > 0)
+        {
+            int i = 0;
+            ss.str("");
+            ss << "Localizer warning: the following adjustable parameters were not listed in localizing " << endl;
+            ss << "                   matrix, which implies they are 'fixed' and will not be adjusted:" << endl;
+            for (auto& m : missing_from_loc)
+            {
+                ss << " " << m;
+                i++;
+                if (i > 5)
+                {
+                    ss << endl;
+                    i = 0;
+                }
+            }
+            performance_log->log_event(ss.str());
+            cout << ss.str() << endl;
+            frec << ss.str() << endl;
+
+        }
+    }
 	if (autoadaloc)
 	{
 		//string how = pest_scenario_ptr->get_pestpp_options().get_ies_localize_how();
@@ -107,12 +139,12 @@ bool Localizer::initialize(PerformanceLog *performance_log, bool forgive_missing
     {
 	    if (pest_scenario_ptr->get_pestpp_options().get_save_binary())
         {
-	        cur_mat.to_binary_new("initialized_localizer.jcb");
+	        org_mat.to_binary_new("initialized_localizer.jcb");
 	        performance_log->log_event("saved 'initialized_localizer.jcb'");
         }
 	    else
         {
-	        cur_mat.to_ascii("initialized_localizer.mat");
+	        org_mat.to_ascii("initialized_localizer.mat");
             performance_log->log_event("saved 'initialized_localizer.mat'");
         }
     }
@@ -235,7 +267,7 @@ void Localizer::update_par_info_from_mat(Mat& mat, vector<vector<string>>& par_m
 	}
 }
 
-unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_mat(PerformanceLog* performance_log, Mat& mat, bool forgive_missing)
+unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_mat(PerformanceLog* performance_log, Mat& mat,  bool forgive_missing)
 {
 	stringstream ss;
 
@@ -429,7 +461,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::process_m
 			//localizer_map.push_back(p);
 			localizer_map[row_names[idx.first]] = p;
 		}
-	}	
+	}
 	return localizer_map;
 }
 
@@ -742,7 +774,7 @@ AutoAdaLocThread::AutoAdaLocThread(PerformanceLog *_performance_log, ofstream *_
 	performance_log = _performance_log;
 	f_out = _f_out;
 	sigma_dist = _sigma_dist;
-	
+	par_count = 0;
 	for (int i = 0; i < obs_names.size(); i++)
 		idx2obs[i] = obs_names[i];
 
@@ -753,7 +785,7 @@ void AutoAdaLocThread::work(int thread_id)
 
 	stringstream ss;
 	int jpar, pcount = 0, nreals = pe_diff.rows();
-	double cc, bg_cc, bg_mean, bg_std, thres, t;
+	double cc, bg_cc, bg_mean = 0, bg_std, thres, t;
 	double sign;
 	double scale = 1.0 / double(nreals - 1);
 	double pstd, ostd;
@@ -772,6 +804,7 @@ void AutoAdaLocThread::work(int thread_id)
 	unique_lock<mutex>pfm_guard(pfm_lock, defer_lock);
 	unique_lock<mutex>par_names_guard(par_names_lock, defer_lock);
 	bool use_list_obs = true;
+	vector<Eigen::Triplet<double>> otrips;
 	while (true)
 	{
 
@@ -783,7 +816,7 @@ void AutoAdaLocThread::work(int thread_id)
 				{
 					ss.str("");
 					ss << "autoadaloc thread: " << thread_id << " processed " << pcount << " parameters ";
-					if (ies_verbose > 1)
+					if (ies_verbose > 2)
 					{
 						cout << ss.str() << endl;
 					}
@@ -799,10 +832,10 @@ void AutoAdaLocThread::work(int thread_id)
 					par_indices_guard.unlock();
 					return;
 				}
-				if (par_indices.size() % 1000 == 0)
+				if (par_count % 1000 == 0)
 				{
 					ss.str("");
-					ss << "autoadaloc iter " << iter << " progress: " << par_indices.size() << " of " << npar << " parameters done";
+					ss << "autoadaloc iter " << iter << " progress: " << par_count << " of " << npar << " parameters done";
 					while (true)
 					{
 						if (pfm_guard.try_lock())
@@ -812,7 +845,7 @@ void AutoAdaLocThread::work(int thread_id)
 							break;
 						}
 					}
-					if (ies_verbose > 1)
+					if (ies_verbose > 2)
 						cout << ss.str() << endl;
 				}
 				
@@ -823,7 +856,7 @@ void AutoAdaLocThread::work(int thread_id)
 					par_indices_guard.unlock();
 					continue;
 				}
-				par_ss = pe_diff.col(jpar) * (1.0 / par_std[jpar]);
+				/*par_ss = pe_diff.col(jpar) * (1.0 / par_std[jpar]);
 				
 				if (list_obs.size() > 0)
 				{
@@ -833,37 +866,41 @@ void AutoAdaLocThread::work(int thread_id)
 				else
 				{
 					use_list_obs = false;
-				}
+				}*/
 				pcount++;
+				par_count++;
 				par_indices_guard.unlock();
 				break;
 			}
 		}
 
+        par_ss = pe_diff.col(jpar) * (1.0 / par_std[jpar]);
+        if (list_obs.size() > 0)
+        {
+            sobs = list_obs[par_names[jpar]]; // dont use at here - this way, any missing pars just get no obs
+            use_list_obs = true;
+        }
+        else
+        {
+            use_list_obs = false;
+        }
+
 		
 		string oname;
 		bool no_obs = true;
+		otrips.clear();
 		for (int iobs = 0; iobs < nobs; iobs++)
 		{
-			while (true)
-			{
-				if (oe_diff_gaurd.try_lock())
-				{
-					
-					obs_ss = oe_diff.col(iobs);
-					oname = obs_names[iobs];
-					oe_diff_gaurd.unlock();
-					break;
-				}
 
-			}
-			if (obs_std[iobs] == 0.0) 
+			if (obs_std[iobs] == 0.0)
 			{
 				continue;
 			}
-			
+
 			if ((use_list_obs) && (sobs.size() == 0))
 				continue;
+			obs_ss = oe_diff.col(iobs);
+            oname = obs_names[iobs];
 
 			if ((sobs.size() > 0) && (sobs.find(oname) == sobs.end()))
 			{
@@ -871,27 +908,28 @@ void AutoAdaLocThread::work(int thread_id)
 			}
 			obs_ss = obs_ss * (1.0 / obs_std[iobs]);
 			cc = (par_ss.transpose() * obs_ss)[0] * scale;
-			obs_ss_shift = 1.0 * obs_ss; //force a copy
-			for (int ireal = 0; ireal < nreals - 1; ireal++)
-			{
-
-				//obs_ss_shift.transpose() = obs_ss_shift.transpose() * perm;
-				//circular shift
-				t = obs_ss_shift[nreals - 1];
-				for (int i = nreals - 1; i > 0; i--)
-					obs_ss_shift[i] = obs_ss_shift[i - 1];
-				obs_ss_shift[0] = t;
-
-				//bg_cc = (par_ss.transpose() * obs_ss_shift)[0] * scale;
-				bg_cc_vec[ireal] = (par_ss.transpose() * obs_ss_shift)[0] * scale;
-				//cout << ireal << " " << par_names[jpar] << " " << obs_names[iobs] << " " << cc << " " << bg_cc << endl;
-			}
+//			obs_ss_shift = 1.0 * obs_ss; //force a copy
+//			for (int ireal = 0; ireal < nreals - 1; ireal++)
+//			{
+//
+//				//obs_ss_shift.transpose() = obs_ss_shift.transpose() * perm;
+//				//circular shift
+//				t = obs_ss_shift[nreals - 1];
+//				for (int i = nreals - 1; i > 0; i--)
+//					obs_ss_shift[i] = obs_ss_shift[i - 1];
+//				obs_ss_shift[0] = t;
+//
+//				//bg_cc = (par_ss.transpose() * obs_ss_shift)[0] * scale;
+//				bg_cc_vec[ireal] = (par_ss.transpose() * obs_ss_shift)[0] * scale;
+//				//cout << ireal << " " << par_names[jpar] << " " << obs_names[iobs] << " " << cc << " " << bg_cc << endl;
+//			}
 
 			//cout << par_names[jpar] << " " << obs_names[iobs] << " " << cc << " " << bg_cc << endl; 
 			(cc < 0.0) ? sign = -1. : sign = 1.;
 
-			bg_mean = bg_cc_vec.mean();
-			bg_std = sqrt((bg_cc_vec - bg_mean).pow(2).sum() / (nreals - 1));
+			//bg_mean = bg_cc_vec.mean();
+			//bg_std = sqrt((bg_cc_vec - bg_mean).pow(2).sum() / (nreals - 1));
+			bg_std = sqrt(1.0/((double)nreals-2));
 			thres = bg_mean + (sign * sigma_dist * bg_std);
 			if (ies_verbose > 1)
 			{
@@ -914,15 +952,16 @@ void AutoAdaLocThread::work(int thread_id)
 			if (((sign * cc) - (sign * thres)) > 0.0)
 			{
 				//cout << par_names[jpar] << " " << obs_names[iobs] << " " << cc << " " << bg_mean << " " << bg_std << " " << thres << " kept " << endl;
-				while (true)
-				{
-					if (triplets_guard.try_lock())
-					{
-						triplets.push_back(Eigen::Triplet<double>(iobs, jpar, cc));
-						triplets_guard.unlock();
-						break;
-					}
-				}
+				otrips.push_back(Eigen::Triplet<double>(iobs, jpar, cc));
+//				while (true)
+//				{
+//					if (triplets_guard.try_lock())
+//					{
+//						triplets.push_back(Eigen::Triplet<double>(iobs, jpar, cc));
+//						triplets_guard.unlock();
+//						break;
+//					}
+//				}
 				no_obs = false;
 				
 			}
@@ -931,16 +970,18 @@ void AutoAdaLocThread::work(int thread_id)
 		}
 		if (no_obs)
 		{
-			string pname;
-			while (true)
-			{
-				if (par_names_guard.try_lock())
-				{
-					pname = par_names[jpar];
-					par_names_guard.unlock();
-					break;
-				}
-			}
+			//string pname;
+//			while (true)
+//			{
+//				if (par_names_guard.try_lock())
+//				{
+//					pname = par_names[jpar];
+//					par_names_guard.unlock();
+//					break;
+//				}
+//			}
+
+            string pname = par_names[jpar];
 			ss.str("");
 
 			ss << "autoadaloc warning: parameter " << pname << " is completely localized -it maps to no observations";
@@ -954,6 +995,21 @@ void AutoAdaLocThread::work(int thread_id)
 				}
 			}
 		}
+		else
+        {
+            while (true)
+            {
+                if (triplets_guard.try_lock())
+                {
+                    for (auto& t : otrips)
+                    {
+                        triplets.push_back(t);
+                    }
+                    triplets_guard.unlock();
+                    break;
+                }
+            }
+        }
 	}
 }
 
@@ -998,6 +1054,7 @@ Eigen::MatrixXd Localizer::get_obsdiff_hadamard_matrix(int num_reals, string col
 	int idx = colname2col_map.at(col_name);
 	Eigen::VectorXd mat_vec = cur_mat.e_ptr()->col(idx);
 	Eigen::MatrixXd loc(obs_names.size(), num_reals);
+	loc.setZero();
 	for (int i=0;i<obs_names.size();i++)
 	{
 		loc.row(i).setConstant(mat_vec[obs2row_map.at(obs_names[i])]);
@@ -1016,6 +1073,7 @@ Eigen::MatrixXd Localizer::get_pardiff_hadamard_matrix(int num_reals, string row
 	int idx = rowname2row_map.at(row_name);
 	Eigen::VectorXd mat_vec = cur_mat.e_ptr()->row(idx);
 	Eigen::MatrixXd loc(par_names.size(), num_reals);
+	loc.setZero();
 	for (int i = 0; i<par_names.size(); i++)
 	{
 		loc.row(i).setConstant(mat_vec[par2col_map.at(par_names[i])]);

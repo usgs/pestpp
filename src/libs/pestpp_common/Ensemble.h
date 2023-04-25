@@ -48,6 +48,8 @@ public:
 	void extend_cols(Eigen::MatrixXd &_reals, const vector<string> &_var_names);
 	void add_2_cols_ip(Ensemble &other);
 	void add_2_cols_ip(const vector<string> &_var_names, const Eigen::MatrixXd &mat);
+	void add_2_row_ip(const string& real_name,const Eigen::VectorXd& row_vec);
+
 	Ensemble zeros_like(int nrow=-1);
 
 	void broadcast_vec2mat(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);

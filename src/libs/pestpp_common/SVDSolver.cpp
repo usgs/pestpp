@@ -934,14 +934,31 @@ bool SVDSolver::iteration_jac(RunManagerAbstract &run_manager, TerminationContro
 		if (!base_run.obs_valid() || calc_init_obs == true) {
 			calc_init_obs = true;
 		}
-		cout << "  calculating jacobian... ";
+		cout << "  calculating jacobian... " << endl;
 		performance_log->log_event("commencing to build jacobian parameter sets");
 		jacobian.build_runs(base_run, numeric_parname_vec, par_transform,
 			*par_group_info_ptr, *ctl_par_info_ptr, run_manager, out_ofbound_pars,
 			phiredswh_flag, calc_init_obs);
 
-		RestartController::write_jac_runs_built(fout_restart);
 	}
+	else
+    {
+        cout << "  restarting jacobian runs... " << endl;
+	    map<string,vector<int>> par_run_map = run_manager.get_run_info_map();
+        map<string,vector<int>> clean_par_run_map;
+        string cur_par_name;
+        for (auto& entry : par_run_map)
+        {
+            cur_par_name = entry.first.substr(9,entry.first.size());
+            clean_par_run_map[cur_par_name] = entry.second;
+        }
+        par_run_map.clear();
+	    vector<int> failed = run_manager.get_outstanding_run_ids();
+        cout << "  " << failed.size() << " runs left to complete..." << endl;
+        jacobian.set_par_run_map(clean_par_run_map);
+	    cout << endl;
+    }
+    RestartController::write_jac_runs_built(fout_restart);
 
 	performance_log->log_event("jacobian parameter sets built, commencing model runs");
 	jacobian.make_runs(run_manager);

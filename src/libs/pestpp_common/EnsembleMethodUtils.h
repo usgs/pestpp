@@ -21,7 +21,46 @@
 enum chancePoints { ALL, SINGLE };
 
 
+class MmNeighborThread
+{
+public:
+    MmNeighborThread(unordered_map<string,Eigen::VectorXd>& _real_vec_map,
+                     unordered_map<string,vector<int>>& _mm_real_idx_map,
+                     unordered_map<string,pair<vector<string>,vector<string>>>& _mm_real_name_map,
+                     unordered_map<string,unordered_map<string,double>>& _neighbor_phi_map,
+                     unordered_map<string,unordered_map<string,double>>& _neighbor_pardist_map);
 
+    void work(int tid, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map,
+              vector<string> preal_names, vector<string> oreal_names,map<string,int> real_map,
+              Eigen::SparseMatrix<double> parcov_inv);
+
+protected:
+    unordered_map<string, Eigen::VectorXd>& real_vec_map;
+    unordered_map<string,unordered_map<string,double>>& neighbor_phi_map;
+    unordered_map<string,unordered_map<string,double>>& neighbor_pardist_map;
+    vector<int> indexes;
+    int count, total;
+
+    unordered_map<string,vector<int>>& mm_real_idx_map;
+    unordered_map<string,pair<vector<string>,vector<string>>>& mm_real_name_map;
+
+    mutex next_lock, results_lock;
+
+};
+
+class PhiThread
+{
+public:
+    PhiThread(vector<string> _oe_real_names);
+
+    void work(int thread_id, Eigen::MatrixXd& weights, Eigen::MatrixXd& resid, vector<string>& oe_real_names, map<string,map<string,double>>& phi_map);
+
+protected:
+    vector<string> keys;
+    int count, total;
+
+    mutex next_lock, phi_map_lock;
+};
 
 class L2PhiHandler
 {
@@ -33,6 +72,7 @@ public:
 		       ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
 		       Covariance *_parcov, bool should_prep_csv = true, string _tag=string());
 	void update(ObservationEnsemble &oe, ParameterEnsemble &pe);
+    void update(ObservationEnsemble &oe, ParameterEnsemble &pe, ObservationEnsemble& weights);
 	double get_mean(phiType pt);
 	double get_std(phiType pt);
 	double get_max(phiType pt);
@@ -48,7 +88,7 @@ public:
 
 	void write(int iter_num, int total_runs, bool write_group = true);
 	void write_group(int iter_num, int total_runs, vector<double> extra);
-	vector<int> get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe);
+	vector<int> get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe, ObservationEnsemble& weights);
 
 	Eigen::MatrixXd get_obs_resid(ObservationEnsemble &oe, bool apply_ineq=true);
 	Eigen::MatrixXd get_obs_resid_subset(ObservationEnsemble &oe, bool apply_ineq=true,vector<string> real_names=vector<string>());
@@ -66,7 +106,10 @@ public:
 
 	map<string,double> get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec);
 
-	map<string,double> get_actual_swr_map(ObservationEnsemble& oe, string real_name="");
+	map<string,map<string,double>> get_meas_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights);
+
+    map<string,double> get_actual_swr_map(ObservationEnsemble& oe, string real_name="");
+	map<string,map<string,double>> get_meas_phi_weight_ensemble(ObservationEnsemble& oe, ObservationEnsemble& weights);
 
 private:
 	string tag;
@@ -77,8 +120,12 @@ private:
 	void prepare_group_csv(ofstream &csv, vector<string> extra = vector<string>());
 
 	map<string, Eigen::VectorXd> calc_meas(ObservationEnsemble &oe, Eigen::VectorXd& q_vec);
+    map<string, Eigen::VectorXd> calc_meas(ObservationEnsemble &oe, ObservationEnsemble& weights);
+
 	map<string, Eigen::VectorXd> calc_regul(ParameterEnsemble &pe);// , double _reg_fac);
 	map<string, Eigen::VectorXd> calc_actual(ObservationEnsemble &oe, Eigen::VectorXd& q_vec);
+    map<string, Eigen::VectorXd> calc_actual(ObservationEnsemble & oe, ObservationEnsemble& weights);
+
 	map<string, double> calc_composite(map<string,double> &_meas, map<string,double> &_regul);
 	//map<string, double>* get_phi_map(PhiHandler::phiType &pt);
 	void write_csv(int iter_num, int total_runs,ofstream &csv, phiType pt,
@@ -87,7 +134,6 @@ private:
 		vector<double> extra = vector<double>());
 
 	double org_reg_factor;
-	Eigen::VectorXd org_q_vec;
 	vector<string> oreal_names,preal_names;
 	Pest* pest_scenario;
 	FileManager* file_manager;
@@ -118,8 +164,6 @@ public:
 	ParChangeSummarizer() { ; }
 	ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileManager *_file_manager_ptr, OutputFileWriter* _output_file_writer_ptr);
 	void summarize(ParameterEnsemble &pe, string filename = string());
-	
-
 private:
 	double cv_dec_threshold = 0.3;
 	ParameterEnsemble * base_pe_ptr;
@@ -131,9 +175,10 @@ private:
 	map<string, double> std_change;
 	map<string, double> init_cv;
 	map<string, double> curr_cv;
-	map<string, int> num_dec_cv;
-	map<string, int> num_at_bounds;
-	map<string, int> percent_at_bounds;
+	map<string, int> num_at_ubound;
+	map<string, int> percent_at_ubound;
+    map<string, int> num_at_lbound;
+    map<string, int> percent_at_lbound;
 
 	void update(ParameterEnsemble& pe);
 	void write_to_csv(string& filename);
@@ -158,6 +203,7 @@ public:
 	void solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
     void solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,
                         pair<vector<string>, vector<string>>>& loc_map, double mm_alpha);
+    void update_multimodal_components(const double mm_alpha);
 
 
 private:
@@ -176,6 +222,9 @@ private:
 	unordered_map<string, Eigen::VectorXd> par_diff_map, obs_diff_map, obs_err_map;
 	unordered_map<string, double> weight_map;
 	unordered_map<string, double> parcov_inv_map;
+	unordered_map<string,vector<int>> mm_real_idx_map;
+	unordered_map<string,pair<vector<string>,vector<string>>> mm_real_name_map;
+    unordered_map<string,Eigen::VectorXd> mm_q_vec_map;
 	//unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	vector<string>& act_par_names, act_obs_names;
 	template<typename T, typename A>
@@ -185,10 +234,45 @@ private:
 	template<typename T>
 	void message(int level, const string& _message, T extra);
 
-	void initialize(string center_on = string(), vector<int> real_idxs=vector<int>());
-
+	void initialize_for_localized_solve(string center_on = string(), vector<int> real_idxs=vector<int>());
+    void initialize_for_mm_solve();
+	void nonlocalized_solve(double cur_lam,bool use_glm_form, ParameterEnsemble& pe_upgrade,
+                         string center_on=string(), vector<int> real_idxs=vector<int>(),Eigen::VectorXd q_vec=Eigen::VectorXd());
 
 };
+
+class MmUpgradeThread
+{
+public:
+    MmUpgradeThread(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map,
+                    unordered_map<string, Eigen::VectorXd>& _par_diff_map,
+                  unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map,
+                  unordered_map<string, Eigen::VectorXd>& _obs_err_map,
+                  unordered_map<string, Eigen::VectorXd>& _weight_map, ParameterEnsemble& _pe_upgrade,
+                  unordered_map<string, pair<vector<string>, vector<string>>>& _cases);
+
+    void work(int thread_id, int iter, double cur_lam, bool use_glm_form, Eigen::VectorXd parcov_inv_vec, Eigen::MatrixXd Am);
+
+protected:
+    PerformanceLog* performance_log;
+    vector<string> keys;
+    int count, total;
+
+    unordered_map<string, pair<vector<string>, vector<string>>>& cases;
+
+    ParameterEnsemble& pe_upgrade;
+    unordered_map<string, Eigen::VectorXd>& weight_map;
+
+    unordered_map<string, Eigen::VectorXd>& par_resid_map, & par_diff_map;
+    unordered_map<string, Eigen::VectorXd>& obs_resid_map, & obs_diff_map, obs_err_map;
+
+    mutex ctrl_lock, weight_lock, loc_lock, parcov_lock;
+    mutex obs_resid_lock, obs_diff_lock, par_resid_lock;
+    mutex par_diff_lock, am_lock, put_lock, obs_err_lock;
+    mutex next_lock;
+
+};
+
 
 
 class UpgradeThread
@@ -225,6 +309,16 @@ protected:
 	mutex next_lock;
 
 };
+
+void ensemble_solution(const int iter, const int verbose_level,const int maxsing,  const int thread_id,
+                       const int t_count, const bool
+                  use_prior_scaling,const bool use_approx, const bool use_glm, const double cur_lam,
+                  const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
+                  const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
+                  Eigen::MatrixXd& obs_err,
+                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
+                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv);
+
 
 class CovLocalizationUpgradeThread : public UpgradeThread
 {
@@ -330,8 +424,6 @@ public:
 	vector<string>& get_par_dyn_state_names() { return par_dyn_state_names; }
 
 
-
-
 protected:
 	string alg_tag;
 	int  verbose_level;
@@ -402,6 +494,16 @@ protected:
 	void norm_map_report(map<string, double>& norm_map, string tag, double thres = 0.1);
 
 	void adjust_weights();
+
+    void adjust_weights_single(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
+            map<string,double>& phi_fracs);
+
+    void adjust_weights_by_real(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
+                               map<string,map<string,double>>& phi_fracs_by_real,vector<string> index);
+
+    void check_and_fill_phi_factors(map<string,vector<string>>& group_to_obs_map,map<string,vector<string>>& group_map,
+                                    map<string,map<string,double>>& phi_fracs_by_real,
+                                    vector<string>& index, bool check_reals);
 
 };
 #endif

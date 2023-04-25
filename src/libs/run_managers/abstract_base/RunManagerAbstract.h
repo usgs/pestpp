@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <map>
 #include "RunStorage.h"
 #include <Eigen/Dense>
 #include <chrono>
@@ -64,6 +65,7 @@ public:
 	virtual bool get_run(int run_id, std::vector<double> &pars_vec, std::vector<double> &obs_vec, std::string &info_txt, double &info_value);
 	virtual bool get_run(int run_id, std::vector<double> &pars_vec, std::vector<double> &obs_vec);
 	virtual const std::set<int> get_failed_run_ids();
+    virtual const std::map<std::string,std::vector<int>> get_run_info_map();
 	virtual bool get_model_parameters(int run_num, Parameters &pars);
 	virtual bool get_observations_vec(int run_id, std::vector<double> &data_vec);
 	virtual Observations get_obs_template(double value = -9999.0) const;
