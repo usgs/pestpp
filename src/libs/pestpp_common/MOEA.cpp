@@ -417,6 +417,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 	if (obs_obj_names_ptr->size() + pi_obj_names_ptr->size() > 1)
 	{
 		frec << "...pareto dominance sort yielded " << front_map.size() << " domination fronts" << endl;
+
 		for (auto front : front_map)
 		{
 			if (front.second.size() == 0)
@@ -426,7 +427,10 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 				performance_log->log_event(ss.str());
 				throw runtime_error(ss.str());
 			}
-			frec << front.second.size() << " in the front " << front.first << endl;
+			if (front.first < 10)
+			    frec << front.second.size() << " in the front " << front.first << endl;
+			else if (front.first == 10)
+			    frec << "(not reporting remaining front membership)" << endl;
 		}
 	}
 
