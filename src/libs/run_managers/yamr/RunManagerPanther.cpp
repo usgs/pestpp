@@ -930,6 +930,8 @@ bool RunManagerPanther::ping(int i_sock)
 			}
 		}
 		else agent_info_iter->set_ping(true);
+			//report("ping sent to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
+
 #ifdef _DEBUG
 		report("ping sent to agent:" + sock_hostname + "$" + agent_info_iter->get_work_dir(), false);
 #endif
@@ -1462,8 +1464,9 @@ void RunManagerPanther::process_message(int i_sock)
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::PING)
 	{
+		//report("ping received from agent:" + host_name + "$" + agent_info_iter->get_work_dir(), false);
 #ifdef _DEBUG
-		report("ping received from agent" + host_name + "$" + agent_info_iter->get_work_dir(), false);
+		report("ping received from agent:" + host_name + "$" + agent_info_iter->get_work_dir(), false);
 #endif
 	}
 	else if (net_pack.get_type() == NetPackage::PackType::IO_ERROR)

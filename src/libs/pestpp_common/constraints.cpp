@@ -1087,7 +1087,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
     ss << file_mgr_ptr->get_base_filename() << "." << gen << ".population_stack_summary.csv";
     ofstream csv;
     if (!use_fosm) {
-        (ss.str());
+        csv.open(ss.str());
 
         if (csv.bad()) {
             throw_constraints_error("error opening '" + ss.str() + "' for writing");
@@ -1186,7 +1186,10 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 		{
 			frec << missing.size() << " members not in current oe stack runs, mapping to nearest point in decision variable space" << endl;
 			cout << missing.size() << " members not in current oe stack runs, mapping to nearest point in decision variable space" << endl;
-			
+
+
+
+
 			//so the idea here is to figure out which pe in the pe stack map is closest to the missing solutions in dec var space. 
 			if (stack_pe_map.size() != stack_oe_map.size())
 				throw_constraints_error("stack_pe_map size != stack_oe_map size");
@@ -1199,50 +1202,109 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
             }
 			Eigen::MatrixXd missing_dv_mat = pe.get_eigen(missing, dvnames);
 			Eigen::VectorXd missing_dv_vec, stack_dv_vec;
-			//for (auto m : missing)
-			double dist, min_dist;
+			double dist, min_dist, max_dist;
 			string min_real_name,missing_real_name;
+			vector<double> distances;
+			vector<double> factors,temp;
+			vector<string> dreal_names;
+
+            Eigen::MatrixXd shifts;
+            double factor_sum, factor, factor_sum2;
 			for (int i=0;i<missing.size();i++)
 			{
                 missing_real_name = missing[i];
 				missing_dv_vec = missing_dv_mat.row(i);
 				min_dist = numeric_limits<double>::max();
 				min_real_name = "";
+				distances.clear();
+                double _risk = risk;
+
+                if (risk_obj.size() > 0)
+                {
+                    //_risk = stack_pe_map[min_real_name][risk_obj];
+                    _risk = risk_map[missing_real_name];
+                }
+
 				for (auto& p : stack_pe_map)
 				{
 					stack_dv_vec = p.second.get_data_eigen_vec(dvnames);
 					dist = (stack_dv_vec - missing_dv_vec).squaredNorm();
+					distances.push_back(dist);
+					dreal_names.push_back(p.first);
 					if (dist < min_dist)
 					{
 						min_dist = dist;
 						min_real_name = p.first;
 					}
 				}
+                temp.clear();
+				max_dist = *max_element(distances.begin(),distances.end());
+                for (auto& d : distances)
+                    temp.push_back(d / max_dist);
+                max_dist = *max_element(temp.begin(),temp.end());
+                factors.clear();
+                factor_sum = 0.0;
+                for (auto& t : temp)
+                {
+
+                    if (t == 0)
+                        factor = 10000.0;
+                    else
+                        factor = 1.0/t;
+                    factor_sum += factor;
+                    factors.push_back(factor);
+
+                }
+                temp = factors;
+                factors.clear();
+                factor_sum2 = 0.0;
+                for (auto& t : temp)
+                {
+                    factor = t / factor_sum;
+                    factors.push_back(factor);
+                    factor_sum2 += factor;
+
+                }
+
+                shifts.resize(factors.size(),shifted_oe.shape().second);
+                shifts.setZero();
+                real_vec = shifted_oe.get_real_vector(missing[i]);
+                sim.update_without_clear(onames, real_vec);
+                for (int ii=0;ii<factors.size();ii++)
+                {
+                    if (factors[ii] == 0.0)
+                    {
+                        continue;
+                    }
+                    //this call uses the class stack_oe attribute;
+                    sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[dreal_names[ii]],_risk,true);
+                    shifts.row(ii) = sim_shifted.get_data_eigen_vec(shifted_oe.get_var_names()) * factors[ii];
+                }
+                real_vec = shifts.colwise().sum();
+                shifted_oe.get_eigen_ptr_4_mod()->row(real_map.at(missing[i])) = real_vec;
+
 				if (min_real_name.size() == 0)
 					//do something here
 					throw_constraints_error("couldnt find a nearest dv real for stack mapping");
 				if (stack_oe_map.find(min_real_name) == stack_oe_map.end())
 					throw_constraints_error("nearest dv real '" + min_real_name +"' not in stack oe map");
-				//todo add some output here to report the mapping results
-
 				if (min_dist > 0.0) min_dist = sqrt(min_dist);
 
-				if (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 3)
-				{
-					frec << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
-					cout << "member '" << missing[i] << "' mapped to '" << min_real_name << "' at a distance of " << min_dist << " for stack-based chances" << endl;
-				}
-				double _risk = risk;
-				if (risk_obj.size() > 0)
-				{	
-					//_risk = stack_pe_map[min_real_name][risk_obj];
-					_risk = risk_map[missing_real_name];
-				}
+
+                if (pest_scenario.get_pestpp_options().get_mou_verbose_level() > 3) {
+                    for (int ii = 0; ii < factors.size(); ii++) {
+                        frec << "member '" << missing[i] << "' mapped to '" << dreal_names[ii] << "' at a distance of "
+                             << distances[ii] << " with a IDW factor of " << factors[ii] << " for stack-based chances"
+                             << endl;
+                    }
+
+                }
+
 				real_vec = shifted_oe.get_real_vector(missing[i]);
 				sim.update_without_clear(onames, real_vec);
 				//this call uses the class stack_oe attribute;
 				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[min_real_name],_risk,true);
-				shifted_oe.replace(real_map[missing[i]], sim_shifted);
+				//shifted_oe.replace(real_map.at(missing[i]), sim_shifted);
                 stack_oe_map[min_real_name].fill_moment_maps(stack_mean,stack_std);
                 for (auto& constraint : ctl_ord_obs_constraint_names) {
                     csv << missing[i] << "," << min_real_name << "," << constraint << ",";

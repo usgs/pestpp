@@ -66,6 +66,8 @@ public:
 	
 	set<string> get_duplicates() { return duplicates;  }
 
+	int get_num_feasible(){ return feas_member_struct.size();}
+
 private:
 	
 	Pest& pest_scenario;
@@ -157,10 +159,6 @@ private:
 	int save_every;
 	map<int,int> population_schedule;
 
-	//these two instances are passed as pointers to the constraints
-	//Parameters effective_constraint_pars;
-	//Observations effective_constraint_obs;
-
 	ParetoObjectives objectives;
 	Constraints constraints;
 	const ParameterInfo *ctl_par_info_ptr;
@@ -174,9 +172,13 @@ private:
 	ParameterEnsemble dp, dp_archive;
 	ObservationEnsemble op, op_archive;
 
+	map<string,Eigen::VectorXd> par_sim_map, obs_sim_map, pso_velocity_map;
+
 	ParameterEnsemble pso_velocity, pso_pbest_dp;
 	ObservationEnsemble pso_pbest_op;
 
+	void update_sim_maps(ParameterEnsemble& _dp, ObservationEnsemble& _op);
+	void fill_populations_from_maps(ParameterEnsemble& new_dp, ObservationEnsemble& new_op );
 
 	void update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp);
 	void update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp);
@@ -195,7 +197,9 @@ private:
 	void queue_chance_runs(ParameterEnsemble& _dp);
 	ObservationEnsemble get_chance_shifted_op(ParameterEnsemble& _dp, ObservationEnsemble& _op, string& opt_member);
 
-	void initialize_pso_bits();
+	void initialize_pso();
+    ParameterEnsemble get_initial_pso_velocities(int num_members);
+    void update_pso_velocity_map(ParameterEnsemble& _pso_velocity);
     void initialize_population_schedule();
 	bool initialize_dv_population();
 	void initialize_obs_restart_population();
@@ -242,6 +246,7 @@ private:
 
 
 	int get_max_len_obj_name();
+	bool should_use_multigen();
 };
 
 #endif //MOEA_H_

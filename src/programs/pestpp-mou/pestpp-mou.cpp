@@ -35,10 +35,10 @@ using namespace pest_utils;
 
 int main(int argc, char* argv[])
 {
-#ifndef _DEBUG
-	try
-	{
-#endif
+//#ifndef _DEBUG
+//	try
+//	{
+//#endif
 		string version = PESTPP_VERSION;
 		cout << endl << endl;
 		cout << "             pestpp-mou: multi-objective optimization under uncertainty" << endl << endl;
@@ -317,20 +317,20 @@ int main(int argc, char* argv[])
         fout_rec << "took " << setprecision(6) << (double)chrono::duration_cast<chrono::seconds>(end - start).count()/60.0 << " minutes" << endl;
         fout_rec.close();
         return 0;
-#ifndef _DEBUG
-	}
-	catch (exception &e)
-	{
-		cout << "Error condition prevents further execution: " << endl << e.what() << endl;
-		//cout << "press enter to continue" << endl;
-		//char buf[256];
-		//OperSys::gets_s(buf, sizeof(buf));
-		return 1;
-	}
-	catch (...)
-	{
-		cout << "Error condition prevents further execution: " << endl;
-		return 1;
-	}
-#endif
+//#ifndef _DEBUG
+//	}
+//	catch (exception &e)
+//	{
+//		cout << "Error condition prevents further execution: " << endl << e.what() << endl;
+//		//cout << "press enter to continue" << endl;
+//		//char buf[256];
+//		//OperSys::gets_s(buf, sizeof(buf));
+//		return 1;
+//	}
+//	catch (...)
+//	{
+//		cout << "Error condition prevents further execution: " << endl;
+//		return 1;
+//	}
+//#endif
 }
