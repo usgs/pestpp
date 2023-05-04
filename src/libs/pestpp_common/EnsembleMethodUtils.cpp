@@ -1043,17 +1043,26 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 	Localizer::How _how = localizer.get_how();
 	Localizer::LocTyp loctyp = localizer.get_loctyp();
 	bool use_cov_loc = true;
-	if (loctyp == Localizer::LocTyp::LOCALANALYSIS)
-		use_cov_loc = false;
+	if (loctyp == Localizer::LocTyp::LOCALANALYSIS) {
+        use_cov_loc = false;
+    }
 	//LocalAnalysisUpgradeThread worker(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map,obs_err_map,
 	//	localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
 	UpgradeThread* ut_ptr;
-	if (!use_cov_loc)
-		ut_ptr = new LocalAnalysisUpgradeThread(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map, obs_err_map,
-			localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
-	else
-		ut_ptr = new CovLocalizationUpgradeThread(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map, obs_err_map,
-			localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map, _how);
+	if (!use_cov_loc) {
+        ut_ptr = new LocalAnalysisUpgradeThread(performance_log, par_resid_map, par_diff_map, obs_resid_map,
+                                                obs_diff_map, obs_err_map,
+                                                localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map,
+                                                _how);
+        performance_log->log_event("using local analysis upgrade thread");
+    }
+	else {
+        ut_ptr = new CovLocalizationUpgradeThread(performance_log, par_resid_map, par_diff_map, obs_resid_map,
+                                                  obs_diff_map, obs_err_map,
+                                                  localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map,
+                                                  _how);
+        performance_log->log_event("using covariance localization upgrade thread");
+    }
 	if ((num_threads < 1) || (loc_map.size() == 1))
 		//if (num_threads < 1)
 	{
@@ -2036,15 +2045,18 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 	//----------------------------------
 	else
 	{
-
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
 		obs_diff = scale * (weights * obs_diff);
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_diff", obs_diff);
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
         if (verbose_level > 1) {
-            Eigen::MatrixXd temp = parcov_inv.toDenseMatrix();
-            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp );
+            if (parcov_inv.size() < 10000) {
+                Eigen::MatrixXd temp = parcov_inv.toDenseMatrix();
+                local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp);
+            }
             ss.str("");
             ss << "solution scaling factor: " << scale;
-            performance_log->log_event(ss.str());
+            cout << ss.str() << endl;
         }
 		if (use_prior_scaling)
 			par_diff = scale * parcov_inv * par_diff;
@@ -2066,7 +2078,8 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "ivec", ivec);
 
 		obs_resid = weights * obs_resid;
-		t = V * s.asDiagonal() * ivec * Ut;
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_resid", obs_resid);
+        t = V * s.asDiagonal() * ivec * Ut;
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "t", t);
 
 		if ((!use_approx) && (iter > 1))
@@ -2349,14 +2362,21 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
         obs_resid = weights * obs_resid;
         int num_reals = par_resid.cols();
         double scale = (1.0 / (sqrt(double(num_reals - 1))));
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
         obs_diff = scale * (weights * obs_diff);
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_diff", obs_diff);
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
         if (verbose_level > 1) {
-            Eigen::MatrixXd temp = parcov_inv.toDenseMatrix();
-            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp );
-//            ss.str("");
-//            ss << "solution scaling factor: " << scale;
-//            cout << ss.str() << endl;
+            if (parcov_inv.size() < 10000) {
+
+                Eigen::MatrixXd temp = parcov_inv.toDenseMatrix();
+                local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp);
+            }
+            ss.str("");
+            ss << "solution scaling factor: " << scale << endl;
+            ss << "eigthresh: " << eigthresh << endl;
+            ss << "maxsing: " << maxsing << endl;
+            cout << ss.str() << endl;
         }
         if (use_prior_scaling)
 
@@ -2365,6 +2385,7 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
             par_diff = scale * par_diff;
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_par_diff", par_diff);
         SVD_REDSVD rsvd;
+
         rsvd.solve_ip(obs_diff, s, Ut, V, eigthresh, maxsing);
 
         Ut.transposeInPlace();
@@ -2796,8 +2817,19 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 
 		double scale = (1.0 / (sqrt(double(num_reals - 1))));
 
-		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
+        if (verbose_level > 1) {
+            ss.str("");
+            ss << "solution scaling factor: " << scale;
+            cout << ss.str() << endl;
+            if (parcov_inv.size() < 10000)
+            {
+                Eigen::MatrixXd temp = parcov_inv.toDenseMatrix();
+                local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp);
+            }
+        }
 
+		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
+        cout << "obs_diff" << obs_diff << endl;
 		//apply the localizer here...
 		if (use_localizer)
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "loc", loc);
@@ -2902,7 +2934,9 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 		{
 
 			obs_resid = weights * obs_resid;
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_resid", par_diff);
 			obs_diff = scale * (weights * obs_diff);
+            local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_diff", par_diff);
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
 			if (use_prior_scaling)
 				par_diff = scale * parcov_inv * par_diff;
