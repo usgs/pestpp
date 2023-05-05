@@ -111,6 +111,8 @@ public:
     map<string,double> get_actual_swr_map(ObservationEnsemble& oe, string real_name="");
 	map<string,map<string,double>> get_meas_phi_weight_ensemble(ObservationEnsemble& oe, ObservationEnsemble& weights);
 
+    vector<string> get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names);
+
 private:
 	string tag;
 	map<string, double> get_summary_stats(phiType pt);

@@ -4312,6 +4312,60 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_regul(ParameterEnsemble & pe)
 	return phi_map;
 }
 
+vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names)
+{
+    stringstream ss;
+    vector<string> viol_real_names;
+    if (viol_obs_names.size() == 0)
+        return viol_real_names;
+
+    Eigen::MatrixXd resid = get_actual_obs_resid(oe);
+    map<string,int> vmap = oe.get_var_map();
+    map<string,int>::iterator end = vmap.end();
+    vector<string> missing;
+    ObservationInfo* oi = pest_scenario->get_observation_info_ptr();
+    vector<string> nz_viol_obs_names;
+    map<string,int> nz_viol_vmap;
+    for (auto& name : viol_obs_names)
+    {
+        if (vmap.find(name) == end)
+            missing.push_back(name);
+        else
+        {
+            if (oi->get_weight(name) > 0)
+            {
+                nz_viol_obs_names.push_back(name);
+                nz_viol_vmap[name] = vmap.at(name);
+            }
+        }
+    }
+    if (missing.size() > 0)
+    {
+        ss.str("");
+        ss << "L2PhiHandler::get_violating_realizations(): the following violation obs names not found " << endl;
+        for (auto& m : missing)
+            ss << m << endl;
+        throw runtime_error(ss.str());
+    }
+    Eigen::VectorXd real;
+    double sum;
+    vector<string> rnames = oe.get_real_names();
+    for (int i=0;i<resid.rows();i++)
+    {
+        real = resid.row(i).cwiseAbs();
+        sum = 0.0;
+        for (auto& v : nz_viol_vmap)
+        {
+            sum += real(v.second);
+        }
+        if (sum > 1.0e-7)
+        {
+            viol_real_names.push_back(rnames[i]);
+        }
+    }
+    return viol_real_names;
+}
+
 
 void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, vector<string> &names)
 {
