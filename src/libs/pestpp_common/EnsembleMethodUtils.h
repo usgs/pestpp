@@ -317,7 +317,8 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
                   const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
                   Eigen::MatrixXd& obs_err,
                   const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
-                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv);
+                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv,
+                  const vector<string>& act_obs_names,const vector<string>& act_par_names);
 
 
 class CovLocalizationUpgradeThread : public UpgradeThread

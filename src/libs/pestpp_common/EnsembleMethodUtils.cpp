@@ -1018,7 +1018,7 @@ void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, Parame
     par_resid.transposeInPlace();
     obs_err.transposeInPlace();
     ensemble_solution(iter,verbose_level,maxsing,0,0,use_prior_scaling,use_approx,use_glm_form,cur_lam,eigthresh,par_resid,
-                      par_diff,Am,obs_resid,obs_diff,upgrade_1,obs_err,local_weights,parcov_inv);
+                      par_diff,Am,obs_resid,obs_diff,upgrade_1,obs_err,local_weights,parcov_inv, act_obs_names,act_par_names);
     pe_upgrade.add_2_cols_ip(act_par_names, upgrade_1);
 
 
@@ -2244,11 +2244,38 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
                         const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
                         const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
                         Eigen::MatrixXd& obs_err, const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
-                        const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv)
+                        const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv, const vector<string>& act_obs_names,
+                        const vector<string>& act_par_names)
 {
     class local_utils
     {
     public:
+
+        static void save_names(int verbose_level, const vector<string>& names, string prefix)
+        {
+            if (verbose_level < 2)
+                return;
+
+            if (verbose_level < 3)
+                return;
+            stringstream ss;
+            ss <<  prefix << ".dat";
+            string fname = ss.str();
+            ofstream f(fname);
+            if (!f.good())
+                cout << "error getting ofstream " << fname << endl;
+            else
+            {
+                for (const auto& name : names)
+                {
+                    f << name << endl;
+                }
+
+            }
+            f.close();
+            return;
+        }
+
         static void save_mat(int verbose_level, int tid, int iter, int t_count, string prefix, const Eigen::MatrixXd& mat)
         {
             if (verbose_level < 2)
@@ -2266,7 +2293,6 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
                 cout << "error getting ofstream " << fname << endl;
             else
             {
-
                 try
                 {
                     f << mat << endl;
@@ -2279,6 +2305,9 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
             }
         }
     };
+
+    local_utils::save_names(verbose_level,act_obs_names,"act_obs_names");
+    local_utils::save_names(verbose_level,act_par_names,"act_par_names");
 
     stringstream ss;
     if (!use_glm)
@@ -2359,7 +2388,11 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
 
         Eigen::MatrixXd ivec, s, s2, V, Ut, d_dash;
         string key;
+         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "weights", weights.toDenseMatrix());
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
         obs_resid = weights * obs_resid;
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_resid", obs_resid);
+
         int num_reals = par_resid.cols();
         double scale = (1.0 / (sqrt(double(num_reals - 1))));
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
