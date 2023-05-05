@@ -459,10 +459,12 @@ protected:
 	vector<double> lam_mults;
 	vector<string> oe_org_real_names, pe_org_real_names;
 	vector<string> act_obs_names, act_par_names;
+	vector<string> violation_obs;
 	ParameterEnsemble pe, pe_base;
 	ObservationEnsemble oe, oe_base, weights;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 	bool oe_drawn, pe_drawn;
+
 
 	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
 
@@ -480,7 +482,7 @@ protected:
 
 	void initialize_restart();
 
-	void drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, vector<int> subset_idxs = vector<int>());
+	void drop_bad_reals(ParameterEnsemble& _pe, ObservationEnsemble& _oe, vector<int> subset_idxs = vector<int>());
 
 	void add_bases();
 
@@ -507,6 +509,8 @@ protected:
     void check_and_fill_phi_factors(map<string,vector<string>>& group_to_obs_map,map<string,vector<string>>& group_map,
                                     map<string,map<string,double>>& phi_fracs_by_real,
                                     vector<string>& index, bool check_reals);
+
+    void prep_drop_violations();
 
 };
 #endif

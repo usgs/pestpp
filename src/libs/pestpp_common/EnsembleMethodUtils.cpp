@@ -4320,7 +4320,10 @@ vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe,
         return viol_real_names;
 
     Eigen::MatrixXd resid = get_actual_obs_resid(oe);
-    map<string,int> vmap = oe.get_var_map();
+    map<string,int> vmap;
+    vector<string> nz_onames = oe_base->get_var_names();
+    for (int i=0;i<nz_onames.size();i++)
+        vmap[nz_onames[i]] = i;
     map<string,int>::iterator end = vmap.end();
     vector<string> missing;
     ObservationInfo* oi = pest_scenario->get_observation_info_ptr();
@@ -4339,14 +4342,14 @@ vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe,
             }
         }
     }
-    if (missing.size() > 0)
-    {
-        ss.str("");
-        ss << "L2PhiHandler::get_violating_realizations(): the following violation obs names not found " << endl;
-        for (auto& m : missing)
-            ss << m << endl;
-        throw runtime_error(ss.str());
-    }
+//    if (missing.size() > 0)
+//    {
+//        ss.str("");
+//        ss << "L2PhiHandler::get_violating_realizations(): the following violation obs names not found " << endl;
+//        for (auto& m : missing)
+//            ss << m << endl;
+//        throw runtime_error(ss.str());
+//    }
     Eigen::VectorXd real;
     double sum;
     vector<string> rnames = oe.get_real_names();
@@ -5727,6 +5730,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	message(1, "lambda decrease factor: ", dec_fac);
 	message(1, "max run fail: ", ppo->get_max_run_fail());
 
+    prep_drop_violations();
+
 	//todo: add sanity checks for weights en
 	//like conflict with da weight cycle table
 	sanity_checks();
@@ -6294,7 +6299,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
     }
 
 
-	drop_bad_phi(pe, oe);
+    drop_bad_reals(pe, oe);
 	if (oe.shape().first == 0)
 	{
 		throw_em_error(string("all realizations dropped as 'bad'"));
@@ -6436,6 +6441,43 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
     }
     message(0, "initialization complete");
 }
+
+void EnsembleMethod::prep_drop_violations()
+{
+    violation_obs.clear();
+    string section = "observation data external";
+    string viol_col = "drop_violations";
+    map<string, string> viol_map = pest_scenario.get_ext_file_string_map(section,viol_col);
+    if (viol_map.size() == 0)
+    {
+        return;
+    }
+
+    string sval;
+    for (auto& v : viol_map)
+    {
+        sval = pest_utils::strip_cp(pest_utils::lower_cp(v.second));
+        if (sval == "true")
+        {
+            violation_obs.push_back(v.first);
+        }
+    }
+    stringstream ss;
+    ss << violation_obs.size() << " 'drop_violations' observations detected, see rec file for listing";
+    message(1,ss.str());
+    ofstream& f_rec = file_manager.rec_ofstream();
+    f_rec << endl << "The following observations are being used as 'drop_violations' constraints:" << endl;
+
+    for (auto& o : violation_obs)
+    {
+        f_rec << o << endl;
+    }
+    f_rec << "Note: any 'drop_violation' observations that are not inequalities will be treated as " << endl;
+    f_rec << "      equality constraints such that any realization that does not match the observation" << endl;
+    f_rec << "      value (numerically) exactly will be dropped. User beware..." << endl << endl;
+
+}
+
 
 void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& group_to_obs_map,map<string,vector<string>>& group_map,map<string,map<string,double>>& phi_fracs_by_real,
                                                 vector<string>& index, bool check_reals)
@@ -7620,7 +7662,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			frec << "lambda, scale value " << lam_vals[i] << ',' << scale_vals[i] << " obs ensemble saved to " << ss.str() << endl;
 
 		}
-		drop_bad_phi(pe_lams[i], oe_lams[i], subset_idxs);
+        drop_bad_reals(pe_lams[i], oe_lams[i], subset_idxs);
 		if (oe_lams[i].shape().first == 0)
 		{
 			message(1, "all realizations dropped as 'bad' for lambda, scale fac ", vals);
@@ -7857,7 +7899,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		//append the remaining obs en
 		oe_lam_best.append_other_rows(remaining_oe_lam);
 		assert(pe_lams[best_idx].shape().first == oe_lam_best.shape().first);
-		drop_bad_phi(pe_lams[best_idx], oe_lam_best);
+        drop_bad_reals(pe_lams[best_idx], oe_lam_best);
 		if (oe_lam_best.shape().first == 0)
 		{
 			throw_em_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
@@ -9292,19 +9334,40 @@ Eigen::MatrixXd EnsembleMethod::get_Am(const vector<string>& real_names, const v
 	return Am;
 }
 
-void EnsembleMethod::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _oe, vector<int> subset_idxs)
+void EnsembleMethod::drop_bad_reals(ParameterEnsemble& _pe, ObservationEnsemble& _oe, vector<int> subset_idxs)
 {
+    stringstream ss;
 	//don't use this assert because _pe maybe full size, but _oe might be subset size
 	bool is_subset = false;
 	if (subset_idxs.size() > 0)
 		is_subset = true;
 	if (!is_subset)
 		if (_pe.shape().first != _oe.shape().first)
-			throw_em_error("EnsembleMethod::drop_bad_phi() error: _pe != _oe and not subset");
+			throw_em_error("EnsembleMethod::drop_bad_reals() error: _pe != _oe and not subset");
 
 	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
 	double bad_phi_sigma = pest_scenario.get_pestpp_options().get_ies_bad_phi_sigma();
 	vector<int> idxs = ph.get_idxs_greater_than(bad_phi, bad_phi_sigma, _oe, weights);
+    vector<string> viol_reals = ph.get_violating_realizations(_oe,violation_obs);
+    map<string,int> rmap = _oe.get_real_map();
+    int idx;
+    if (viol_reals.size() > 0) {
+        ss.str("");
+        ss << viol_reals.size() << " realizations failed 'drop_violations'";
+        message(2,ss.str());
+        for (auto &v : viol_reals) {
+            if (v == BASE_REAL_NAME) {
+                message(3, "not droppping base real even though it violates 'drop_violations'");
+
+            } else
+            {
+                idx = rmap.at(v);
+                if (find(idxs.begin(), idxs.end(), idx) == idxs.end()) {
+                    idxs.push_back(idx);
+                }
+            }
+        }
+    }
 
 	if (pest_scenario.get_pestpp_options().get_ies_debug_bad_phi())
 		idxs.push_back(0);
@@ -9315,7 +9378,7 @@ void EnsembleMethod::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _
 		message(0, "dropping realizations as bad: ", idxs.size());
 
 		vector<string> par_real_names = _pe.get_real_names(), obs_real_names = _oe.get_real_names();
-		stringstream ss;
+
 		string pname;
 		string oname;
 
@@ -9343,7 +9406,7 @@ void EnsembleMethod::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _
 				if (find(subset_idxs.begin(), subset_idxs.end(), pidx) == subset_idxs.end())
 				{
 					ss.str("");
-					ss << "drop_bad_phi() error: idx " << pidx << " not found in subset_idxs";
+					ss << "drop_bad_reals() error: idx " << pidx << " not found in subset_idxs";
 					throw_em_error(ss.str());
 				}
 				pname = full_pnames[pidx];
@@ -9368,12 +9431,12 @@ void EnsembleMethod::drop_bad_phi(ParameterEnsemble& _pe, ObservationEnsemble& _
 		catch (const exception& e)
 		{
 			stringstream ss;
-			ss << "drop_bad_phi() error : " << e.what();
+			ss << "drop_bad_reals() error : " << e.what();
 			throw_em_error(ss.str());
 		}
 		catch (...)
 		{
-			throw_em_error(string("drop_bad_phi() error"));
+			throw_em_error(string("drop_bad_reals() error"));
 		}
 	}
 }
