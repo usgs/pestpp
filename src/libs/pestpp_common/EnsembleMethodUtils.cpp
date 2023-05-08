@@ -2862,7 +2862,6 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
         }
 
 		local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_diff", obs_diff);
-        cout << "obs_diff" << obs_diff << endl;
 		//apply the localizer here...
 		if (use_localizer)
 			local_utils::save_mat(verbose_level, thread_id, iter, t_count, "loc", loc);
@@ -6260,28 +6259,52 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 			//check that all obs are in conflict
 			message(1, "dropping conflicted observations");
 
-			if (in_conflict.size() == act_obs_names.size())
-			{
-			    if (cycle == NetPackage::NULL_DA_CYCLE) {
+			if (in_conflict.size() == act_obs_names.size()) {
+                if (cycle == NetPackage::NULL_DA_CYCLE) {
                     throw_em_error("all non-zero weighted observations in conflict state, cannot continue");
-                }
-			    else
-                {
-                    message(0,"all non-zero weighted observations in conflict state, continuing to next cycle");
-                    zero_weight_obs(in_conflict,false,false);
-                    ph.update(oe,pe, weights);
+                } else {
+                    message(0, "all non-zero weighted observations in conflict state, continuing to next cycle");
+                    zero_weight_obs(in_conflict, false, false);
+                    ph.update(oe, pe, weights);
                     return;
                 }
             }
-            zero_weight_obs(in_conflict);
-			if (ppo->get_ies_localizer().size() > 0)
-			{
-				message(1, "updating localizer");
-				if (localizer.get_use())
-				    localizer.get_orgmat_ptr()->clear_names();
-				ofstream& frec = file_manager.rec_ofstream();
-				use_localizer = localizer.initialize(performance_log, frec, true);
-			}
+			if (violation_obs.size() > 0)
+            {
+			    set<string> sviol_obs(violation_obs.begin(),violation_obs.end());
+			    set<string>::iterator end = sviol_obs.end();
+			    vector<string> temp,temp2;
+			    for (auto& obs : in_conflict)
+                {
+			        if (sviol_obs.find(obs) == end)
+                    {
+			            temp.push_back(obs);
+                    }
+			        else
+			        {
+			            temp2.push_back(obs);
+			        }
+                }
+                if (temp2.size() > 0)
+                {
+                    ss.str("");
+                    ss << "WARNING: the following observations are 'in conflict' but" << endl;
+                    ss << "         also contain 'drop_violation' conditions, " << endl;
+                    ss << "         so they are not being treated as conflicts...user beware..." << endl;
+                    message(1,ss.str(),temp2);
+                    in_conflict = temp;
+                }
+            }
+            if (in_conflict.size() > 0) {
+                zero_weight_obs(in_conflict);
+                if (ppo->get_ies_localizer().size() > 0) {
+                    message(1, "updating localizer");
+                    if (localizer.get_use())
+                        localizer.get_orgmat_ptr()->clear_names();
+                    ofstream &frec = file_manager.rec_ofstream();
+                    use_localizer = localizer.initialize(performance_log, frec, true);
+                }
+            }
 		}
 	}
 
@@ -9353,11 +9376,11 @@ void EnsembleMethod::drop_bad_reals(ParameterEnsemble& _pe, ObservationEnsemble&
     int idx;
     if (viol_reals.size() > 0) {
         ss.str("");
-        ss << viol_reals.size() << " realizations failed 'drop_violations'";
+        ss << viol_reals.size() << " realizations meet 'drop_violations' conditions";
         message(2,ss.str());
         for (auto &v : viol_reals) {
             if (v == BASE_REAL_NAME) {
-                message(3, "not droppping base real even though it violates 'drop_violations'");
+                message(3, "not dropping 'base' real even though it meets 'drop_violations' conditions");
 
             } else
             {

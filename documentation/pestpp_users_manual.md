@@ -1,13 +1,13 @@
 
  <img src="0d3cb7750c90b712af04ea3a51c8ecb968d784cc.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.3
+# <a id='s1' />Version 5.2.4
 
 <img src="0e14ec9848f78a9809081572ca785af9990c2d38.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-April 2023
+May 2023
 
 # <a id='s2' />Acknowledgements
 
@@ -70,7 +70,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Table of Contents
 
-- [Version 5.2.3](#s1)
+- [Version 5.2.4](#s1)
 - [Acknowledgements](#s2)
 - [Preface](#s3)
 - [License](#s4)
@@ -2693,6 +2693,8 @@ If an observation belongs to an observation group whose name begins with the str
 
 Similarly, if an observation belongs to an observation group whose name begins with the string “l\_” or “less\_”, then this observation is a “less than” observation. No objective function penalty is incurred if the modelled value of the pertinent quantity is less than the measured value listed in the “observation data” section of the PEST control file. However, if the model-calculated value is greater than the measured value, the objective function penalty is calculated in the usual manner, that is as the squared residual times the squared weight.
 
+Users that wish to (very) strongly enforce inequality conditions are advised to avoid using extremely high weights for inequalities, and instead are encouraged to use the “drop_violations” functionality described later.
+
 ### <a id='s13-1-11' />9.1.11 Localization
 
 Calculating an empirical cross-covariance between large numbers of parameters and observations from a limited number of realizations is likely to result in spurious cross-correlations. Because of this, some parameters will be adjusted when they should not be adjusted. Furthermore, when large numbers of independent observations comprise a calibration dataset, a small ensemble size will almost certainly not provide enough degrees of freedom to reproduce these data. To combat these problems, users can employ localization. The term “localization” comes from ensemble Kalman filter parlance. It refers to a strategy whereby only “local” covariances inform unmeasured states in a spatially distributed filtering problem.
@@ -2738,6 +2740,8 @@ Closely related to the concept of measurement noise and the associated ensemble 
 While detecting prior-data conflict is relatively simple (and PESTPP-IES will do this after evaluating the prior parameter ensemble or during a restart), resolving this issue is more problematic. If time and budget permit, users should investigate the cause of these disagreements through detailed investigation of data sources, as well as through paired complex-simple analyses around model discretization and process representation. Another, simpler, but likely more controversial approach, is to remove (from the parameter adjustment process) the observations that are in conflict. In this way, users are willing to accept higher posterior variance to avoid bias–a concrete example of the bias-variance trade-off. PESTPP-IES will implement this draconian prior-data conflict resolution with use of the *ies_drop_conflicts* option (and the associated *ies_pdc_sigma_distance*). By only specifying the *ies_drop_conflicts* option, and observation whose prior realizations do not overlap or “cover” the corresponding observation values plus noise realizations will be marked as “conflicted”. Optionally, the *ies_pdc_sigma\_*distance can be passed as a positive real number this being the number of standard deviations from the mean for both the prior and observations plus noise realizations that will be treated as point where these two distributions must overlap or “cover” each. If the prior realizations mean value minus *ies_pdc_sigma_distance* times the corresponding standard deviation is greater than the observations plus noise realizations mean plus *ies_pdc_sigma\_*distance times the corresponding standard deviation, then the given observation is treated as conflicted (the converse of this situation is also checked).
 
 With these options active, PESTPP-IES will remove observations in a prior-data conflict state from the parameter adjustment process, that is, these observations will not feature in the residual matrix used for upgrade calculations.
+
+Note that observations tagged with the “drop_violations” flag will not be “dropped” for prior-data conflict reasons.
 
 ### <a id='s13-1-14' />9.1.14 Multi-modal solution process
 
@@ -2888,6 +2892,8 @@ PESTPP-IES makes an exception to this protocol, however, if realization names ar
 Where model runs are based on random parameter realizations, the risk of occasional model run failure is high for some models. The parallel run manager used by programs of the PEST++ suite is able to accommodate model run failure in ways described in section 5.3 of this manual. When model run failure is encountered, PESTPP-IES drops the parameter set that precipitated this failure from the ensemble. The ensemble thus loses a member.
 
 PESTPP-IES provides a mechanism for detection of model run failure that extends those provided by its run manager. If the objective function associated with a particular model run is calculated to be greater than a certain threshold, PESTPP-IES deems the model run to have failed. This threshold is supplied as the value of *ies_bad_phi()* control variable. In addition the absolute filtering/rejecting of realizations provided by *ies_bad_phi*, users can also activate a relative filter with *ies_bad_phi_sigma*. This option accepts a floating-poin number that represents the number of standard deviations above the mean that a realizations phi value must be before it is considered “bad”. This fitler is adaptive in that as the realizations move toward a minimum of the objective function, the measured phi value of each realization changes. A setting of 2.0 for *ies_bad_phi_sigma* results in realizations with a measured phi exceeding the mean phi plus 2 standard deviations being removed. This obviously assumes a normal distribution of measured phi values, which is often violated. In the case where users are concerned about this normality assumption, the value of *ies_bad_phi_sigma* can be supplied as a negative value, in which case the absolute value of *ies_bad_phi_sigma* is treated at the empirical phi quantile value above which realizations are treated as “bad”. For example, an *ies_bad_phi_sigma* value of -95 indicates that realizations above the upper 95<sup>th</sup> quantile of phi should removed.
+
+PESTPP-IES also supports a more granular approach to identifying and removing “bad” realizations through the use of an additional column in the observation data section (this requires the version 2 control file). This column must be named “drop_violations” and it should contain entries that are either “true” or “false”. If true, then any realization that violates the observation condition will be dropped. This functionality is designed to work with inequality-type observations so that if a realization violates the inequality, it is removed from the ensemble, rather than penalizing the objective function. Note “drop_violations” also works with standard equality type observation, in which case, any realization that does not numerically equal the *obsval* quantity of the observation (to within 1.0e-7) will also be dropped. The “drop_violations” functionality respects the weight values for observations, so users can activate and de-activate the violation enforcement by simply changing the weights from non-zero to zero, respectively.
 
 To forestall excessive PESTPP-IES run times incurred by occasional model failure, it is a good idea to set the *max_run_fail()* model run control variable to 1 (the default value for PESTPP‑IES), and to choose values for the *overdue_giveup_fac()* and/or *overdue_giveup_minutes()* control variables judiciously; see section 5.3. Note also that model run failure does not hurt PESTPP-IES as much as it hurts PESTPP-GLM or PEST. This is because the value of any model run undertaken by PESTPP-IES is lower than that undertaken by PEST or PESTPP-GLM. For the latter programs a failed model run during finite-difference derivatives calculation may lead to an empty column of the Jacobian matrix. In contrast, because PESTPP-IES uses an entire ensemble to fill a Jacobian matrix, a single failed model run does not result in an empty Jacobian matrix column. The outcome of model run failure is that the number of model runs employed in the averaging process through which this column is calculated is reduced by one.
 
