@@ -1700,7 +1700,8 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 		class local_utils
 	{
 	public:
-        static void save_names(int verbose_level, const vector<string>& names, string prefix)
+
+        static void save_names(int verbose_level, int tid, int iter, int t_count, string prefix, vector<string>& names)
         {
             if (verbose_level < 2)
                 return;
@@ -1708,7 +1709,8 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
             if (verbose_level < 3)
                 return;
             stringstream ss;
-            ss <<  prefix << ".dat";
+
+            ss << "thread_" << tid << ".count_ " << t_count << ".iter_" << iter << "." << prefix << ".dat";
             string fname = ss.str();
             ofstream f(fname);
             if (!f.good())
@@ -1812,12 +1814,12 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 		}
 	}
 	ofstream f_thread;
-	local_utils::save_names(verbose_level,obs_names,"act_obs_names");
-    local_utils::save_names(verbose_level,par_names,"act_par_names");
+    local_utils::save_names(verbose_level,thread_id, iter, t_count,"act_obs_names",obs_names);
+    local_utils::save_names(verbose_level,thread_id, iter, t_count,"act_par_names",par_names);
     if (verbose_level > 2)
     {
         ss.str("");
-        ss << "thread_" << thread_id << "part_map.csv";
+        ss << "thread_" << thread_id << ".part_map.csv";
         f_thread.open(ss.str());
         ss.str("");
     }
@@ -2277,7 +2279,7 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
     {
     public:
 
-        static void save_names(int verbose_level, const vector<string>& names, string prefix)
+        static void save_names(int verbose_level, int tid, int iter, int t_count, string prefix, const vector<string>& names)
         {
             if (verbose_level < 2)
                 return;
@@ -2285,7 +2287,7 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
             if (verbose_level < 3)
                 return;
             stringstream ss;
-            ss <<  prefix << ".dat";
+            ss << "thread_" << tid << ".count_ " << t_count << ".iter_" << iter << "." << prefix << ".dat";
             string fname = ss.str();
             ofstream f(fname);
             if (!f.good())
@@ -2332,8 +2334,8 @@ void ensemble_solution(const int iter, const int verbose_level,const int maxsing
         }
     };
 
-    local_utils::save_names(verbose_level,act_obs_names,"act_obs_names");
-    local_utils::save_names(verbose_level,act_par_names,"act_par_names");
+    local_utils::save_names(verbose_level,thread_id, iter, t_count,"act_obs_names", act_obs_names);
+    local_utils::save_names(verbose_level,thread_id, iter, t_count,"act_par_names", act_par_names);
 
     stringstream ss;
     if (!use_glm)
@@ -2525,7 +2527,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 	class local_utils
 	{
 	public:
-        static void save_names(int verbose_level, const vector<string>& names, string prefix)
+        static void save_names(int verbose_level, int tid, int iter, int t_count, string prefix, vector<string>& names)
         {
             if (verbose_level < 2)
                 return;
@@ -2533,7 +2535,8 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
             if (verbose_level < 3)
                 return;
             stringstream ss;
-            ss <<  prefix << ".dat";
+
+            ss << "thread_" << tid << ".count_ " << t_count << ".iter_" << iter << "." << prefix << ".dat";
             string fname = ss.str();
             ofstream f(fname);
             if (!f.good())
@@ -2636,7 +2639,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 	if (verbose_level > 2)
 	{
 		ss.str("");
-		ss << "thread_" << thread_id << "part_map.csv";
+		ss << "thread_" << thread_id << ".part_map.csv";
 		f_thread.open(ss.str());
 		ss.str("");
 	}
@@ -2717,8 +2720,8 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			}
 		}
 
-        local_utils::save_names(verbose_level,obs_names,"act_obs_names");
-        local_utils::save_names(verbose_level,par_names,"act_par_names");
+        local_utils::save_names(verbose_level,thread_id, iter, t_count,"act_obs_names",obs_names);
+        local_utils::save_names(verbose_level,thread_id, iter, t_count,"act_par_names",par_names);
 
         if (verbose_level > 2)
 		{
