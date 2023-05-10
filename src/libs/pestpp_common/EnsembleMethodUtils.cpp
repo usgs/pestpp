@@ -1700,6 +1700,30 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 		class local_utils
 	{
 	public:
+        static void save_names(int verbose_level, const vector<string>& names, string prefix)
+        {
+            if (verbose_level < 2)
+                return;
+
+            if (verbose_level < 3)
+                return;
+            stringstream ss;
+            ss <<  prefix << ".dat";
+            string fname = ss.str();
+            ofstream f(fname);
+            if (!f.good())
+                cout << "error getting ofstream " << fname << endl;
+            else
+            {
+                for (const auto& name : names)
+                {
+                    f << name << endl;
+                }
+
+            }
+            f.close();
+            return;
+        }
 		static Eigen::DiagonalMatrix<double, Eigen::Dynamic> get_matrix_from_map(vector<string>& names, unordered_map<string, double>& dmap)
 		{
 			Eigen::VectorXd vec(names.size());
@@ -1788,13 +1812,15 @@ void CovLocalizationUpgradeThread::work(int thread_id, int iter, double cur_lam,
 		}
 	}
 	ofstream f_thread;
-	if (verbose_level > 2)
-	{
-		ss.str("");
-		ss << "thread_" << thread_id << "part_map.csv";
-		f_thread.open(ss.str());
-		ss.str("");
-	}
+	local_utils::save_names(verbose_level,obs_names,"act_obs_names");
+    local_utils::save_names(verbose_level,par_names,"act_par_names");
+    if (verbose_level > 2)
+    {
+        ss.str("");
+        ss << "thread_" << thread_id << "part_map.csv";
+        f_thread.open(ss.str());
+        ss.str("");
+    }
 	Eigen::MatrixXd par_resid, par_diff, Am;
 	Eigen::MatrixXd obs_resid, obs_diff, obs_err, loc;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> weights, parcov_inv;
@@ -2499,6 +2525,31 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 	class local_utils
 	{
 	public:
+        static void save_names(int verbose_level, const vector<string>& names, string prefix)
+        {
+            if (verbose_level < 2)
+                return;
+
+            if (verbose_level < 3)
+                return;
+            stringstream ss;
+            ss <<  prefix << ".dat";
+            string fname = ss.str();
+            ofstream f(fname);
+            if (!f.good())
+                cout << "error getting ofstream " << fname << endl;
+            else
+            {
+                for (const auto& name : names)
+                {
+                    f << name << endl;
+                }
+
+            }
+            f.close();
+            return;
+        }
+
 		static Eigen::DiagonalMatrix<double, Eigen::Dynamic> get_matrix_from_map(vector<string>& names, unordered_map<string, double>& dmap)
 		{
 			Eigen::VectorXd vec(names.size());
@@ -2666,8 +2717,12 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 			}
 		}
 
-		if (verbose_level > 2)
+        local_utils::save_names(verbose_level,obs_names,"act_obs_names");
+        local_utils::save_names(verbose_level,par_names,"act_par_names");
+
+        if (verbose_level > 2)
 		{
+
 			f_thread << t_count << "," << iter;
 			for (auto name : par_names)
 				f_thread << "," << name;
