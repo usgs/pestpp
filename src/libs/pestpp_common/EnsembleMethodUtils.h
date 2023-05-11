@@ -289,6 +289,14 @@ public:
 
 	virtual void work(int thread_id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names, vector<string> obs_names) { ; }
 
+
+    static void ensemble_solution(const int iter, const int verbose_level,const int maxsing,  const int thread_id,
+                           const int t_count, const bool use_prior_scaling,const bool use_approx, const bool use_glm,
+                           const double cur_lam,const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
+                           const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
+                           Eigen::MatrixXd& obs_err, const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
+                           const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv,
+                           const vector<string>& act_obs_names,const vector<string>& act_par_names);
 protected:
 	PerformanceLog* performance_log;
 	Localizer::How how;
@@ -310,17 +318,19 @@ protected:
 	mutex par_diff_lock, am_lock, put_lock, obs_err_lock;
 	mutex next_lock;
 
+
+
 };
 
-void ensemble_solution(const int iter, const int verbose_level,const int maxsing,  const int thread_id,
-                       const int t_count, const bool
-                  use_prior_scaling,const bool use_approx, const bool use_glm, const double cur_lam,
-                  const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
-                  const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
-                  Eigen::MatrixXd& obs_err,
-                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
-                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv,
-                  const vector<string>& act_obs_names,const vector<string>& act_par_names);
+//void ensemble_solution(const int iter, const int verbose_level,const int maxsing,  const int thread_id,
+//                       const int t_count, const bool
+//                  use_prior_scaling,const bool use_approx, const bool use_glm, const double cur_lam,
+//                  const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
+//                  const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
+//                  Eigen::MatrixXd& obs_err,
+//                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
+//                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv,
+//                  const vector<string>& act_obs_names,const vector<string>& act_par_names);
 
 
 class CovLocalizationUpgradeThread : public UpgradeThread
@@ -337,29 +347,6 @@ public:
 	using UpgradeThread::UpgradeThread;
 
 	void work(int thread_id, int iter, double cur_lam,bool use_glm_form, vector<string> par_names, vector<string> obs_names);
-
-
-//private:
-//	PerformanceLog* performance_log;
-//	Localizer::How how;
-//	vector<string> keys;
-//	int count, total;
-//
-//	unordered_map<string, pair<vector<string>, vector<string>>>& cases;
-//
-//	ParameterEnsemble& pe_upgrade;
-//	Localizer& localizer;
-//	unordered_map<string, double>& parcov_inv_map;
-//	unordered_map<string, double>& weight_map;
-//
-//	unordered_map<string, Eigen::VectorXd>& par_resid_map, & par_diff_map, & Am_map;
-//	unordered_map<string, Eigen::VectorXd>& obs_resid_map, & obs_diff_map, obs_err_map;
-//
-//	mutex ctrl_lock, weight_lock, loc_lock, parcov_lock;
-//	mutex obs_resid_lock, obs_diff_lock, par_resid_lock;
-//	mutex par_diff_lock, am_lock, put_lock, obs_err_lock;
-//	mutex next_lock;
-
 };
 
 class EnsembleMethod
