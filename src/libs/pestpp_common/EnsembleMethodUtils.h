@@ -333,13 +333,13 @@ protected:
 //                  const vector<string>& act_obs_names,const vector<string>& act_par_names);
 
 
-class CovLocalizationUpgradeThread : public UpgradeThread
-{
-public:
-	using UpgradeThread::UpgradeThread;
-
-	void work(int thread_id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names, vector<string> obs_names);
-};
+//class CovLocalizationUpgradeThread : public UpgradeThread
+//{
+//public:
+//	using UpgradeThread::UpgradeThread;
+//
+//	void work(int thread_id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names, vector<string> obs_names);
+//};
 
 class LocalAnalysisUpgradeThread: public UpgradeThread
 {

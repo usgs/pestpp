@@ -29,7 +29,12 @@ bool Localizer::initialize(PerformanceLog *performance_log, ofstream& frec, bool
 	loc_typ = pest_scenario_ptr->get_pestpp_options().get_ies_loc_type();
 	if (loc_typ[0] == 'C')
 	{
-		loctyp = LocTyp::COVARIANCE;
+	    ss.str("");
+	    ss << "WARNING: covariance type localization deprecated, resetting to local-analysis";
+        frec << ss.str() << endl;
+        cout << ss.str() << endl;
+        performance_log->log_event(ss.str());
+		loctyp = LocTyp::LOCALANALYSIS;
 	}
 	else if (loc_typ[0] == 'L')
 	{
@@ -42,14 +47,24 @@ bool Localizer::initialize(PerformanceLog *performance_log, ofstream& frec, bool
 		throw runtime_error("Localizer error: 'ies_localization_type' must start with 'C' (covariance) or 'L' (local analysis) not " + loc_typ);
 	}
 
-	if (how_str[0] == 'P')
-	{
-		how = How::PARAMETERS;
-	}
-	else if (how_str[0] == 'O')
-	{
-		how = How::OBSERVATIONS;
-	}
+    how = How::PARAMETERS;
+    if (how_str[0] == 'O')
+    {
+        ss.str("");
+        ss << "WARNING: localization 'how' by observations is deprecated, resetting to 'how' by parameters";
+        frec << ss.str() << endl;
+        cout << ss.str() << endl;
+        performance_log->log_event(ss.str());
+        how = How::PARAMETERS;
+    }
+//	if (how_str[0] == 'P')
+//	{
+//		how = How::PARAMETERS;
+//	}
+//	else if (how_str[0] == 'O')
+//	{
+//		how = How::OBSERVATIONS;
+//	}
 	else
 	{
 	    performance_log->log_event("Localizer error: 'ies_localize_how' or 'da_localize_how' must start with 'P' (pars) or 'O' (obs) not " + how_str);
@@ -57,13 +72,13 @@ bool Localizer::initialize(PerformanceLog *performance_log, ofstream& frec, bool
 	    throw runtime_error("Localizer error: 'ies_localize_how' or 'da_localize_how' must start with 'P' (pars) or 'O' (obs) not " + how_str);
 	}
 
-	if ((loctyp == LocTyp::COVARIANCE) && (how == How::OBSERVATIONS)) {
-        performance_log->log_event("Localizer error: covariance localization can only be used with localization by parameters");
-        cout << "Localizer error: covariance localization can only be used with localization by parameters" << endl;
-
-        throw runtime_error(
-                "Localizer error: covariance localization can only be used with localization by parameters");
-    }
+//	if ((loctyp == LocTyp::COVARIANCE) && (how == How::OBSERVATIONS)) {
+//        performance_log->log_event("Localizer error: covariance localization can only be used with localization by parameters");
+//        cout << "Localizer error: covariance localization can only be used with localization by parameters" << endl;
+//
+//        throw runtime_error(
+//                "Localizer error: covariance localization can only be used with localization by parameters");
+//    }
 	string filename = pest_scenario_ptr->get_pestpp_options().get_ies_localizer();
 	autoadaloc = pest_scenario_ptr->get_pestpp_options().get_ies_autoadaloc();
 	sigma_dist = pest_scenario_ptr->get_pestpp_options().get_ies_autoadaloc_sigma_dist();
