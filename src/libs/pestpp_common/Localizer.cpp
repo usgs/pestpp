@@ -48,7 +48,11 @@ bool Localizer::initialize(PerformanceLog *performance_log, ofstream& frec, bool
 	}
 
     how = How::PARAMETERS;
-    if (how_str[0] == 'O')
+    if (how_str[0] == 'P')
+    {
+
+    }
+    else if (how_str[0] == 'O')
     {
         ss.str("");
         ss << "WARNING: localization 'how' by observations is deprecated, resetting to 'how' by parameters";
