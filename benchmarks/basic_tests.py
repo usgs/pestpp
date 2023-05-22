@@ -1351,7 +1351,7 @@ if __name__ == "__main__":
     #glm_long_name_test()
     #sen_plusplus_test()
     #parchglim_test()
-    #unc_file_test()
+    unc_file_test()
     #cmdline_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
@@ -1382,7 +1382,7 @@ if __name__ == "__main__":
     #mf6_v5_sen_test()
 
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
-    mf6_v5_opt_stack_test()
+    #mf6_v5_opt_stack_test()
     #mf6_v5_glm_test()
     #mf6_v5_ies_test()
     #cmdline_test()

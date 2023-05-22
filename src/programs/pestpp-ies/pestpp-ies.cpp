@@ -133,7 +133,7 @@ int main(int argc, char* argv[])
 
         if (!restart_flag || save_restart_rec_header) {
             fout_rec << "             pestpp-ies - a GLM iterative Ensemble Smoother" << endl
-                     << "for PEST(++) datasets " << endl << endl;
+                     << "                      for PEST(++) datasets " << endl << endl;
             fout_rec << "                 by the PEST++ developement team" << endl << endl << endl;
             fout_rec << endl;
             fout_rec << endl << endl << "version: " << version << endl;

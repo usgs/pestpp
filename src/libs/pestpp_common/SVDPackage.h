@@ -27,7 +27,7 @@
 class SVDPackage
 {
 public:
-	SVDPackage(std::string _descritpion="undefined", int _n_max_sing=1000, double _eign_thres=1.0e-7);
+	SVDPackage(std::string _descritpion="undefined", int _n_max_sing=1000000, double _eign_thres=1.0e-7);
 	SVDPackage(const SVDPackage &rhs) : description(rhs.description), n_max_sing(rhs.n_max_sing), eign_thres(rhs.eign_thres), performance_log(rhs.performance_log) {}
 	virtual void solve_ip(Eigen::SparseMatrix<double>& A, Eigen::VectorXd &Sigma, Eigen::SparseMatrix<double> & U, Eigen::SparseMatrix<double>& VT, Eigen::VectorXd &Sigma_trunc) = 0;
 	virtual void solve_ip(Eigen::SparseMatrix<double>& A, Eigen::VectorXd &Sigma, Eigen::SparseMatrix<double> & U, Eigen::SparseMatrix<double>& VT, Eigen::VectorXd &Sigma_trunc, double _eigen_thres) = 0;
@@ -48,7 +48,7 @@ protected:
 class SVD_EIGEN : public SVDPackage
 {
 public:
-	SVD_EIGEN(int _n_max_sing = 1000, double _eign_thres = 1.0e-7) : SVDPackage("Eigen JacobiSVD", _n_max_sing, _eign_thres)  {}
+	SVD_EIGEN(int _n_max_sing = 1000000, double _eign_thres = 1.0e-7) : SVDPackage("Eigen JacobiSVD", _n_max_sing, _eign_thres)  {}
 	SVD_EIGEN(const SVD_EIGEN &rhs) : SVDPackage(rhs) {}
 	virtual void solve_ip(Eigen::SparseMatrix<double>& A, Eigen::VectorXd &Sigma, Eigen::SparseMatrix<double>& U, Eigen::SparseMatrix<double>& VT, Eigen::VectorXd &Sigma_trunc);
 	virtual void solve_ip(Eigen::SparseMatrix<double>& A, Eigen::VectorXd &Sigma, Eigen::SparseMatrix<double>& U, Eigen::SparseMatrix<double>& VT, Eigen::VectorXd &Sigma_trunc, double _eigen_thres);
@@ -62,7 +62,7 @@ public:
 class SVD_REDSVD : public SVDPackage
 {
 public:
-	SVD_REDSVD(int _n_max_sing = 1000, double _eign_thres = 1.0e-7) : SVDPackage("RedSVD", _n_max_sing, _eign_thres) {}
+	SVD_REDSVD(int _n_max_sing = 1000000, double _eign_thres = 1.0e-7) : SVDPackage("RedSVD", _n_max_sing, _eign_thres) {}
 	SVD_REDSVD(const SVD_REDSVD &rhs) : SVDPackage(rhs) {}
 	virtual void solve_ip(Eigen::SparseMatrix<double>& A, Eigen::VectorXd &Sigma, Eigen::SparseMatrix<double>& U,
 		Eigen::SparseMatrix<double>& VT, Eigen::VectorXd &Sigma_trunc);
