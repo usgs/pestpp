@@ -2735,6 +2735,7 @@ void MOEA::fill_populations_from_maps(ParameterEnsemble& new_dp, ObservationEnse
         rnames.push_back(entry.first);
     }
     new_dp.reserve(rnames,dp.get_var_names());
+
     map<string,int> rmap = new_dp.get_real_map();
     for (auto& ridx : rmap)
     {
@@ -2813,6 +2814,11 @@ void MOEA::iterate_to_solution()
             //append offspring dp and (risk-shifted) op to make new dp and op containers
 
             new_dp.append_other_rows(dp);
+            if (dp.get_fixed_info().get_map_size() > 0)
+            {
+                map<string,map<string,double>> fi = dp.get_fixed_info().get_fixed_info_map();
+                new_dp.get_fixed_info().add_realizations(fi);
+            }
             new_op.append_other_rows(op);
         }
         if (find(gen_types.begin(),gen_types.end(),MouGenType::PSO) != gen_types.end()) {
@@ -3419,12 +3425,17 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
     current_pso_lineage_map.clear();
 	string new_name;
 	vector<string> new_names;
+	map<string,string> primary_parent_map;
+    ofstream& lin = file_manager.get_ofstream(lineage_tag);
 	for (auto real_name : new_dp.get_real_names())
 	{
 		new_name = get_new_member_name("pso");
 		new_name = get_new_member_name("pso");
 		current_pso_lineage_map[real_name] = new_name;
 		new_names.push_back(new_name);
+		primary_parent_map[new_name] = real_name;
+		lin << new_name << "," << real_name << ",," << endl;
+
 	}
 	cur_velocity.set_real_names(new_names);
 	pso_velocity = cur_velocity;
@@ -3440,6 +3451,15 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
             keep.push_back(new_names[i]);
         new_dp.keep_rows(keep,true);
         pso_velocity.keep_rows(keep,true);
+    }
+    if (_dp.get_fixed_info().get_map_size() > 0) {
+        vector<string> fi_fixed_names = _dp.get_fixed_info().get_fixed_names();
+        new_dp.get_fixed_info().set_fixed_names(fi_fixed_names);
+        map<string, double> fi;
+        for (auto &p : primary_parent_map) {
+            fi = _dp.get_fixed_info().get_real_fixed_values(p.second);
+            new_dp.get_fixed_info().add_realization(p.first, fi);
+        }
     }
 	return new_dp;
 }
@@ -3617,6 +3637,7 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
 
 
     int i_newreal = 0;
+    map<string,string> primary_parent_map;
     for (int k=0;k<num_reflect;k++)
     {
         //fitness is sorted from best to worst, so work from the end
@@ -3638,6 +3659,7 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
             i_newreal++;
             //write the lineage info
             lin << new_name << "," << current_name << endl;
+            primary_parent_map[new_name] = current_name;
         }
     }
     ParameterEnsemble new_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
@@ -3647,6 +3669,15 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
         gauss_mutation_ip(new_dp);
     }
     new_dp.enforce_bounds(performance_log, false);
+    if (_dp.get_fixed_info().get_map_size() > 0) {
+        vector<string> fi_fixed_names = _dp.get_fixed_info().get_fixed_names();
+        new_dp.get_fixed_info().set_fixed_names(fi_fixed_names);
+        map<string, double> fi;
+        for (auto &p : primary_parent_map) {
+            fi = _dp.get_fixed_info().get_real_fixed_values(p.second);
+            new_dp.get_fixed_info().add_realization(p.first, fi);
+        }
+    }
     return new_dp;
 }
 
@@ -3699,6 +3730,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	bts.ctl2numeric_ip(ubnd);
 	int tries = 0;
 	int i = 0;
+	map<string,string> primary_parent_map;
 	while (i < num_members)
     {
 		selected = selection(4, _dp, mattype);
@@ -3759,6 +3791,7 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 			continue;
 		new_name = get_new_member_name("de");
 		new_member_names.push_back(new_name);
+        primary_parent_map[new_name] = real_names[selected[0]];
 		lin << new_name;
 		for (auto idx : selected)
 			lin << "," << real_names[idx];
@@ -3771,6 +3804,18 @@ ParameterEnsemble MOEA::generate_diffevol_population(int num_members, ParameterE
 	
 	new_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
 	new_dp.enforce_bounds(performance_log, false);
+	//transfer any fixed par info
+	if (_dp.get_fixed_info().get_map_size() > 0)
+    {
+	    vector<string> fi_fixed_names = _dp.get_fixed_info().get_fixed_names();
+	    new_dp.get_fixed_info().set_fixed_names(fi_fixed_names);
+	    map<string,double> fi;
+	    for (auto& p : primary_parent_map)
+        {
+	        fi = _dp.get_fixed_info().get_real_fixed_values(p.second);
+	        new_dp.get_fixed_info().add_realization(p.first,fi);
+        }
+    }
 	return new_dp;
 }
 
@@ -3805,6 +3850,7 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 	if (var_map.find(MR_NAME) != var_map.end())
 		adaptive_mr = true;
 	double mut_prob = org_mut_prob;
+	map<string,string> primary_parent_map;
 	while (imember < num_members)
 	{
 		selected = selection(1, _dp, mattype);
@@ -3826,12 +3872,22 @@ ParameterEnsemble MOEA::generate_pm_population(int num_members, ParameterEnsembl
 		lin << new_name;
 		for (auto idx : selected)
 			lin << "," << real_names[idx];
-		lin << endl;	
+		lin << endl;
+		primary_parent_map[new_name] = real_names[selected[0]];
 	}
 
 	ParameterEnsemble tmp_dp(&pest_scenario, &rand_gen, new_reals, new_member_names, _dp.get_var_names());
 	tmp_dp.set_trans_status(ParameterEnsemble::transStatus::NUM);
 	tmp_dp.enforce_bounds(performance_log,false);
+    if (_dp.get_fixed_info().get_map_size() > 0) {
+        vector<string> fi_fixed_names = _dp.get_fixed_info().get_fixed_names();
+        tmp_dp.get_fixed_info().set_fixed_names(fi_fixed_names);
+        map<string, double> fi;
+        for (auto &p : primary_parent_map) {
+            fi = _dp.get_fixed_info().get_real_fixed_values(p.second);
+            tmp_dp.get_fixed_info().add_realization(p.first, fi);
+        }
+    }
 
 	return tmp_dp;
 }
@@ -3927,6 +3983,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	bool adaptive_cr = false;
 	if (var_map.find(CR_NAME) != var_map.end())
 		adaptive_cr = true;
+	map<string,string> primary_parent_map;
 	while (i_member < num_members)
 	{
 		selected = selection(2, _dp, mattype);
@@ -3965,6 +4022,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 		new_name = get_new_member_name("sbx");
 		lin << new_name << "," << real_names[p1_idx] << "," << real_names[p2_idx] << endl;
 		new_member_names.push_back(new_name);
+		primary_parent_map[new_name] = real_names[p1_idx];
 		//cout << i_member << "," << p1_idx << "," << p2_idx << new_names[new_names.size() -1] << endl;
 		i_member++;
 		tries++;
@@ -3980,6 +4038,15 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	//generate_pm_population(tmp_dp.shape().first, tmp_dp);
 	
 	tmp_dp.enforce_bounds(performance_log,false);
+    if (_dp.get_fixed_info().get_map_size() > 0) {
+        vector<string> fi_fixed_names = _dp.get_fixed_info().get_fixed_names();
+        tmp_dp.get_fixed_info().set_fixed_names(fi_fixed_names);
+        map<string, double> fi;
+        for (auto &p : primary_parent_map) {
+            fi = _dp.get_fixed_info().get_real_fixed_values(p.second);
+            tmp_dp.get_fixed_info().add_realization(p.first, fi);
+        }
+    }
 	return tmp_dp;
 }
 
