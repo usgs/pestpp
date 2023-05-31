@@ -9155,7 +9155,7 @@ vector<string> EnsembleMethod::detect_prior_data_conflict(bool save)
             in_conflict.push_back(oname);
             dist = max((smin - omax), (omin - smax));
 
-            pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << ","
+            pdccsv << pest_utils::lower_cp(oname) << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << ","
                    << omax_stat;
             pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << ","
                    << smax_stat << "," << dist << endl;
