@@ -16,6 +16,7 @@
 #include "constraints.h"
 #include "EnsembleMethodUtils.h"
 
+
 const string POP_SUM_TAG = "pareto.summary.csv";
 const string ARC_SUM_TAG = "pareto.archive.summary.csv";
 const string RISK_NAME = "_RISK_";
@@ -25,7 +26,7 @@ const string MR_NAME = "_MR_";
 const double CROWDING_EXTREME = 1.0e+30;
 
 enum MouGenType { DE, SBX, PM, PSO, SMP };
-enum MouEnvType { NSGA, SPEA };
+enum MouEnvType { NSGA, SPEA, NSGA_PPD }; //added NSGA_PPD for probabilistic Pareto dominance
 enum MouMateType { RANDOM, TOURNAMENT };
 
 class ParetoObjectives
@@ -35,12 +36,13 @@ public:
 		PerformanceLog* _performance_log);
 
 	pair<vector<string>, vector<string>> get_nsga2_pareto_dominance(int generation, ObservationEnsemble& op, 
-		ParameterEnsemble& dp, Constraints* constraints_ptr=nullptr, bool report=true, string sum_tag=string());
+		ParameterEnsemble& dp, Constraints* constraints_ptr=nullptr, bool ppd=false, bool report=true, string sum_tag=string());
 	
 	//this must be called at least once before the diversity metrixs can be called...
-	void set_pointers(vector<string>& _obs_obj_names, vector<string>& _pi_obj_names, map<string, double>& _obj_dir_mult)
+	void set_pointers(vector<string>& _obs_obj_names, vector<string>& _obs_obj_sd_names, vector<string>& _pi_obj_names, map<string, double>& _obj_dir_mult)
 	{
 		obs_obj_names_ptr = &_obs_obj_names; 
+		obs_obj_sd_names_ptr = &_obs_obj_sd_names;
 		pi_obj_names_ptr = &_pi_obj_names; 
 		obj_dir_mult_ptr = &_obj_dir_mult;
 		prep_pareto_summary_file(POP_SUM_TAG);
@@ -87,9 +89,14 @@ private:
 		vector<string>>&solutions_dominated_map, map<string, int>& num_dominating_map, bool dup_as_dom=false);
 
 	bool compare_two_nsga(string& first, string& second);
+	bool compare_two_ppd(string& first, string& second, string& first_sd, string& second_sd); //pass variance
 	bool compare_two_spea(string& first, string& second);
 
-	
+	map<string, double> dominance_probability(map<string, double>& first, map<string, double>& second);
+	bool prob_pareto;
+	double first_ppd_limit = 0.51;
+	double second_ppd_limit = 0.35;
+
 	//sort all members in member struct
 	//map<string, double> get_cuboid_crowding_distance();
 	map<string, double> get_cuboid_crowding_distance(map<string, map<string, double>>& _member_struct);
@@ -101,6 +108,7 @@ private:
 
 	map<string, map<string, double>> member_struct;
 	vector<string>* obs_obj_names_ptr;
+	vector<string>* obs_obj_sd_names_ptr;
 	vector<string>* pi_obj_names_ptr;
 	map<string, double>* obj_dir_mult_ptr;
 	set<string> duplicates;
@@ -149,12 +157,13 @@ private:
 	chancePoints chancepoints;
 	FileManager &file_manager; 
 	std::mt19937 rand_gen;
-	vector<string> obs_obj_names, pi_obj_names;
+	vector<string> obs_obj_names, pi_obj_names, obs_obj_sd_names;
 	vector<string> dv_names;
 	map<string, double> obj_dir_mult;
 	int n_adaptive_dvs;
 	map<string, map<string, double>> previous_obj_summary, previous_dv_summary;
 	bool risk_obj;
+	bool prob_pareto = false; //probabilistic pareto dominance
 	int restart_iter_offset;
 	int save_every;
 	map<int,int> population_schedule;

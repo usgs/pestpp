@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <iterator>
 #include <map>
+#include <boost/math/distributions/normal.hpp> //boost library for Gaussian dist
 #include "MOEA.h"
 #include "Ensemble.h"
 #include "RunManagerAbstract.h"
@@ -11,7 +12,9 @@
 #include "constraints.h"
 #include "eigen_tools.h"
 
+
 using namespace std;
+using boost::math::normal;
 
 //util functions
 typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
@@ -40,7 +43,7 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 
 	//map<string, map<double, string>> obj_struct;
 	vector<string> real_names = op.get_real_names();
-	Eigen::VectorXd obj_vals;
+	Eigen::VectorXd obj_vals, obj_sd_vals;
 	map<string, map<string, double>> temp;
 	for (auto obj_name : *obs_obj_names_ptr)
 	{
@@ -55,7 +58,7 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 		map<string, double> t;
 		for (int i = 0; i < real_names.size(); i++)
 		{
-			obj_map[obj_vals[i]] = real_names[i];
+			obj_map[obj_vals[i]] = real_names[i]; //rm: not used?
 			t[real_names[i]] = obj_vals[i];
 		}
 		//obj_struct[obj_name] = obj_map;
@@ -63,6 +66,25 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 
 	}
 
+	//add variance info for obj values to member_struct
+	if (prob_pareto) {
+		for (auto obj_sd_name : *obs_obj_sd_names_ptr)
+		{
+			obj_sd_vals = op.get_eigen(vector<string>(), vector<string>{obj_sd_name});
+
+			map<double, string> obj_sd_map;
+			map<string, double> t;
+
+			for (int i = 0; i < real_names.size(); i++)
+			{
+				//obj_sd_map[obj_sd_vals[i]] = real_names[i];
+				t[real_names[i]] = obj_sd_vals[i];
+			}
+			temp[obj_sd_name] = t;
+
+		}
+	}
+	
 
 	//map<string, map<string, double>> member_struct;
 
@@ -78,6 +100,10 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 		_member_struct[real_name] = obj_map;
 	}
 	temp.clear();
+
+	
+
+
 
 	//add any prior info obj values to member_struct
 	if (pi_obj_names_ptr->size() > 0)
@@ -124,6 +150,8 @@ bool ParetoObjectives::compare_two(string& first, string& second, MouEnvType env
 		return compare_two_nsga(first, second);
 	else if (envtyp == MouEnvType::SPEA)
 		return compare_two_spea(first, second);
+	//else if (envtyp == MouEnvType::NSGA_PPD) //for probabilistic Pareto dominance
+	//	return compare_two_nsga(first, second);
 	else
 		throw runtime_error("ParetoObjectives::compare_two(): unrecognized envtyp");
 }
@@ -150,6 +178,23 @@ bool ParetoObjectives::compare_two_nsga(string& first, string& second)
 	}
 	return false;
 }
+
+//added ppd
+bool ParetoObjectives::compare_two_ppd(string& first, string& second, string& first_sd, string& second_sd)
+{
+	//insert probability of dominance
+	if (member_front_map.at(first) < member_front_map.at(second)) ///should compare probability of dominance
+		return true;
+	if (member_front_map.at(first) == member_front_map.at(second))
+	{
+		if (crowd_map.at(first) > crowd_map.at(second))
+			return true;
+		else
+			return false;
+	}
+	return false;
+}
+
 
 void ParetoObjectives::drop_duplicates(map<string, map<string, double>>& _member_struct)
 {
@@ -290,6 +335,7 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
             Parameters pars = pest_scenario.get_ctl_parameters();
             vector<string> onames = op.get_var_names(), pnames = dp.get_var_names();
             set<string> obs_obj_set(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
+			set<string> obs_obj_sd_set(obs_obj_sd_names_ptr->begin(), obs_obj_sd_names_ptr->end());
             set<string> pi_obj_set(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());
             ObservationInfo *oi = pest_scenario.get_observation_info_ptr();
             PriorInformation *pi = pest_scenario.get_prior_info_ptr();
@@ -377,7 +423,10 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 		}
 	}
 	performance_log->log_event("pareto front sorting");
+		
 	front_map = sort_members_by_dominance_into_fronts(member_struct);	
+	//if (prob_pareto) front_map = sort_members_by_dominance_into_prob_fronts(member_struct);
+
 	return;
 }
 
@@ -403,8 +452,9 @@ map<string, double> ParetoObjectives::get_spea2_fitness(int generation, Observat
 }
 
 pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominance(int generation, ObservationEnsemble& op,
-	ParameterEnsemble& dp, Constraints* constraints_ptr, bool report, string sum_tag)
+	ParameterEnsemble& dp, Constraints* constraints_ptr, bool ppd, bool report, string sum_tag)
 {
+	prob_pareto = ppd;
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
 	ss << "ParetoObjectives::get_nsga2_pareto_dominance() for " << op.shape().first << " population members";
@@ -788,35 +838,35 @@ void ParetoObjectives::fill_domination_containers(map<string, map<string, double
 	int domination_counter;
 	vector<string> solutions_dominated, first_front;
 	performance_log->log_event("fill domination containers");
-	for (auto solution_p : _member_struct)
-	{
-		domination_counter = 0;
-		solutions_dominated.clear();
-		for (auto solution_q : _member_struct)
+		for (auto solution_p : _member_struct)
 		{
-			if (solution_p.first == solution_q.first) //string compare real name
-				continue;
+			domination_counter = 0;
+			solutions_dominated.clear();
+			for (auto solution_q : _member_struct)
+			{
+				if (solution_p.first == solution_q.first) //string compare real name
+					continue;
 
-			//if the solutions are identical...
-			if (first_equals_second(solution_p.second, solution_q.second))
-			{
-				if (dup_as_dom)
+				//if the solutions are identical...
+				if (first_equals_second(solution_p.second, solution_q.second))
+				{
+					if (dup_as_dom)
+						domination_counter++;
+					else
+						throw runtime_error("ParetoObjectives::fill_domination_containers(): solution '" + solution_p.first + "' and '" + solution_q.first + "' are identical");
+				}
+				else if (first_dominates_second(solution_p.second, solution_q.second))
+				{
+					solutions_dominated.push_back(solution_q.first);
+				}
+				else if (first_dominates_second(solution_q.second, solution_p.second))
+				{
 					domination_counter++;
-				else
-					throw runtime_error("ParetoObjectives::fill_domination_containers(): solution '" + solution_p.first + "' and '" + solution_q.first + "' are identical");
+				}
 			}
-			else if (first_dominates_second(solution_p.second, solution_q.second))
-			{
-				solutions_dominated.push_back(solution_q.first);
-			}
-			else if (first_dominates_second(solution_q.second, solution_p.second))
-			{
-				domination_counter++;
-			}
+			num_dominating_map[solution_p.first] = domination_counter;
+			solutions_dominated_map[solution_p.first] = solutions_dominated;
 		}
-		num_dominating_map[solution_p.first] = domination_counter;
-		solutions_dominated_map[solution_p.first] = solutions_dominated;
-	}
 }
 
 map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(map<string, map<string, double>>& _member_struct)
@@ -826,7 +876,7 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 	//map<string,map<string,double>> Sp, F1;
 	map<string, vector<string>> solutions_dominated_map;
 	map<string, int> num_dominating_map;
-	fill_domination_containers(_member_struct, solutions_dominated_map, num_dominating_map);
+	fill_domination_containers(_member_struct, solutions_dominated_map, num_dominating_map); 
 	vector<string> solutions_dominated, first_front;
 	performance_log->log_event("finding first front");
 	for (auto  num_dom : num_dominating_map)
@@ -855,6 +905,9 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 			solutions_dominated = solutions_dominated_map[solution_p];
 			for (auto solution_q : solutions_dominated)
 			{
+				/*if (!first_dominates_second(_member_struct[solution_q], _member_struct[solution_p])) num_dominating_map[solution_q] = 0;
+				else num_dominating_map[solution_q]--;
+				*/
 				num_dominating_map[solution_q]--;
 				if (num_dominating_map[solution_q] <= 0)
 					q_front.push_back(solution_q);
@@ -921,6 +974,23 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 	return front_map;
 }
 
+//compute probability of dominance
+map<string, double> ParetoObjectives::dominance_probability(map<string, double>& first, map<string, double>& second)
+{
+	map<string, double> prob_dom;
+	double prob;
+
+	for (auto obj_name : *obs_obj_names_ptr)
+	{
+		normal first_normal(first[obj_name], first[obj_name + "_SD"]);	//normal i(mean,sd)
+		prob = cdf(first_normal, second[obj_name]); //cdf(distribution,x)
+		prob_dom[obj_name] = prob;
+	}
+
+	return prob_dom;
+}
+
+
 bool ParetoObjectives::first_equals_second(map<string, double>& first, map<string, double>& second)
 {
 	for (auto f : first)
@@ -931,14 +1001,29 @@ bool ParetoObjectives::first_equals_second(map<string, double>& first, map<strin
 	return true;
 }
 
-bool ParetoObjectives::first_dominates_second(map<string,double>& first, map<string,double>& second)
+bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<string, double>& second)
 {
-	for (auto f: first)
+	if (prob_pareto)
 	{
-		if (f.second > second[f.first])
-			return false;
+		map<string, double> first_prob_dom = dominance_probability(first, second);
+		map<string, double> second_prob_dom = dominance_probability(second, first);
+		for (auto f : first_prob_dom)
+		{
+			if ((/*f.second > 0.5 &&*/ f.second < first_ppd_limit) && (/*second_prob_dom[f.first] < 0.5 &&*/ second_prob_dom[f.first] > second_ppd_limit))
+				return false;
+		}
+		return true;
 	}
-	return true;
+	else
+	{
+		for (auto f : first)
+		{
+			if (f.second > second[f.first])
+				return false;
+		}
+		return true;
+	}
+
 }
 
 MOEA::MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer, 
@@ -1383,7 +1468,7 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
         message(2,"resetting archive for multi-generational population");
         dp_archive = _dp;
         op_archive = _op;
-        DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, true,
+        DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, prob_pareto, true,
                                                                 ARC_SUM_TAG);
         dp_archive.keep_rows(dompair.first);
         op_archive.keep_rows(dompair.first);
@@ -1411,7 +1496,7 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
         dp_archive.append_other_rows(keep, other);
         other.resize(0, 0);
         message(2, "pareto dominance sorting archive of size", op_archive.shape().first);
-        DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, true,
+        DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, prob_pareto, true,
                                                                 ARC_SUM_TAG);
 
         ss.str("");
@@ -1513,7 +1598,7 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		}
         dp_archive.reset_org_real_names();
         op_archive.reset_org_real_names();
-        objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, true,
+        objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, prob_pareto, true,
                                                                 ARC_SUM_TAG);
 		save_populations(dp_archive, op_archive, "archive");
 	}
@@ -1696,6 +1781,12 @@ void MOEA::initialize()
 	{
 		envtype = MouEnvType::NSGA;
 		message(1, "using 'nsga2' env selector");
+	}
+	else if (env == "NSGA_PPD")
+	{
+		envtype = MouEnvType::NSGA;
+		prob_pareto = true;
+		message(1, "using 'nsga2_ppd' env selector");
 	}
 	else if (env == "SPEA")
 	{
@@ -1889,7 +1980,7 @@ void MOEA::initialize()
 		onames = pest_scenario.get_ctl_ordered_pi_names();
 		set<string> pinames(onames.begin(), onames.end());
 		onames.clear();
-		vector<string> missing,keep_obs, keep_pi,err_sense;
+		vector<string> missing,keep_obs, keep_pi,err_sense,keep_obs_sd;
 		for (auto obj_name : passed_obj_names)
 		{
 			if ((oset.find(obj_name) == oset.end()) && (pinames.find(obj_name) == pinames.end()))
@@ -1915,7 +2006,12 @@ void MOEA::initialize()
 					}
 					obs_obj_names.push_back(obj_name);
 				}
+				if (prob_pareto) keep_obs_sd.push_back(obj_name + "_SD");
 			}
+			//else if (oset.find(obj_name+"_sd") != oset.end()) //find the corresponding sd observations
+			//{
+			//	keep_obs_sd.push_back(obj_name + "_sd");
+			//}
 			else
 			{
 				sense = Constraints::get_sense_from_group_name(pest_scenario.get_prior_info().get_pi_rec(obj_name).get_group());
@@ -1963,6 +2059,7 @@ void MOEA::initialize()
 
 		}
 		obs_obj_names = keep_obs;
+		obs_obj_sd_names = keep_obs_sd;
 		pi_obj_names = keep_pi;
 	}
 
@@ -2436,12 +2533,12 @@ void MOEA::initialize()
 
 	//do an initial pareto dominance sort
 	message(1, "performing initial pareto dominance sort");
-	objectives.set_pointers(obs_obj_names, pi_obj_names, obj_dir_mult);
+	objectives.set_pointers(obs_obj_names, obs_obj_sd_names, pi_obj_names, obj_dir_mult);
     archive_size = ppo->get_mou_max_archive_size();
     vector<string> keep;
 	if (envtype == MouEnvType::NSGA)
 	{
-		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, true, POP_SUM_TAG);
+		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, prob_pareto, true, POP_SUM_TAG);
 
         //drop any duplicates
         keep.clear();
@@ -2473,7 +2570,7 @@ void MOEA::initialize()
 
 
 		//this causes the initial archive pareto summary file to be written
-		objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, true, ARC_SUM_TAG);
+		objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, prob_pareto, true, ARC_SUM_TAG);
 	}
 	else if (envtype == MouEnvType::SPEA)
 	{
@@ -2689,7 +2786,7 @@ ParameterEnsemble MOEA::generate_population()
 	int new_members_per_gen = int(total_new_members / gen_types.size());
 	ParameterEnsemble new_pop(&pest_scenario, &rand_gen);
 	new_pop.set_trans_status(ParameterEnsemble::transStatus::NUM);
-	objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, false);
+	objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, prob_pareto, false);
 	for (auto gen_type : gen_types)
 	{
 		ParameterEnsemble p(&pest_scenario);
@@ -2822,7 +2919,7 @@ void MOEA::iterate_to_solution()
 		if (envtype == MouEnvType::NSGA)
 		{
 			message(1, "pareto dominance sorting combined parent-child populations of size ", new_dp.shape().first);
-			DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, new_op, new_dp, &constraints, true, POP_SUM_TAG);
+			DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, new_op, new_dp, &constraints, prob_pareto, true, POP_SUM_TAG);
 
             if (should_use_multigen()) {
                 message(2,"keeping all feasible nondom members from multi-generational population");
@@ -3237,7 +3334,7 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 	ParameterEnsemble tdp = _dp;
 	ObservationEnsemble top = _op;
 	objectives.update(top, tdp, &constraints);
-	objectives.get_nsga2_pareto_dominance(-999, _op, _dp, &constraints, false);
+	objectives.get_nsga2_pareto_dominance(-999, _op, _dp, &constraints, prob_pareto, false);
 	Eigen::VectorXd real;
 	string f, s;
 	vector<string> names = _dp.get_real_names();
@@ -3323,7 +3420,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 
 vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
-	DomPair dompair = objectives.get_nsga2_pareto_dominance(-999, _op, _dp, &constraints, false);
+	DomPair dompair = objectives.get_nsga2_pareto_dominance(-999, _op, _dp, &constraints, prob_pareto, false);
 	vector<string> nondom_solutions = dompair.first;
 	vector<string> gbest_solutions;
 	//if no non dom solutions, then use the dominated ones...
@@ -3572,7 +3669,7 @@ ParameterEnsemble MOEA::generate_simplex_population(int num_members, ParameterEn
 {
     message(1, "generating simplex population of size", num_members);
     //for now just using nsga selector. TODO: work in spea2 selector if requested
-    DomPair t = objectives.get_nsga2_pareto_dominance(-999,_op,_dp,&constraints,false);
+    DomPair t = objectives.get_nsga2_pareto_dominance(-999,_op,_dp,&constraints,prob_pareto,false);
     vector<string> fitness;
     for (auto& tt : t.first)
         fitness.push_back(tt);
