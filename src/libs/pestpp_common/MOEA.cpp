@@ -703,29 +703,33 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 
 map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
-	
+
 	map<string, map<string, double>> obj_member_map;
 	map<string, double> crowd_distance_map;
 	string m = members[0];
 	vector<string> obj_names;
-	for (auto obj_map : _member_struct[m])
+	/*for (auto obj_map : _member_struct[m])
 	{
 		obj_member_map[obj_map.first] = map<string, double>();
 		obj_names.push_back(obj_map.first);
-	}
+	}*/
+
+
 
 	for (auto member : members)
 	{
 		crowd_distance_map[member] = 0.0;
-		for (auto obj_map : _member_struct[member])
-			obj_member_map[obj_map.first][member] = obj_map.second;
+		/*for (auto obj_map : _member_struct[member])
+			obj_member_map[obj_map.first][member] = obj_map.second;*/
 
+		for (auto obj_map : *obs_obj_names_ptr) //need to make sure the SDs are not included
+			obj_member_map[obj_map][member] = _member_struct[member][obj_map];
 	}
 
 	//map<double,string>::iterator start, end;
 	map<string, double> omap;
 	double obj_range;
-	
+
 	for (auto obj_map : obj_member_map)
 	{
 		omap = obj_map.second;
@@ -740,7 +744,7 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 
 		//the obj extrema - makes sure they are retained 
 		crowd_distance_map[start->first] = CROWDING_EXTREME;
-			crowd_distance_map[last->first] = CROWDING_EXTREME;
+		crowd_distance_map[last->first] = CROWDING_EXTREME;
 		if (crowd_sorted.size() == 3)
 		{
 			sortedset::iterator it = start;
