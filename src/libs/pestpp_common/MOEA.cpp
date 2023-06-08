@@ -2,7 +2,7 @@
 #include <iomanip>
 #include <iterator>
 #include <map>
-#include <boost/math/distributions/normal.hpp> //boost library for Gaussian dist
+//#include <boost/math/distributions/normal.hpp> //boost library for Gaussian dist
 #include "MOEA.h"
 #include "Ensemble.h"
 #include "RunManagerAbstract.h"
@@ -14,7 +14,7 @@
 
 
 using namespace std;
-using boost::math::normal;
+//using boost::math::normal;
 
 //util functions
 typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
@@ -133,7 +133,7 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 
 bool ParetoObjectives::compare_two(string& first, string& second, MouEnvType envtyp)
 {
-	if (infeas.find(first) != infeas.end())
+    if (infeas.find(first) != infeas.end())
 	{	//if both are infeas, select the solution that is less infeasible
 		if (infeas.find(second) != infeas.end())
 		{
@@ -182,6 +182,7 @@ bool ParetoObjectives::compare_two_nsga(string& first, string& second)
 //added ppd
 bool ParetoObjectives::compare_two_ppd(string& first, string& second, string& first_sd, string& second_sd)
 {
+
 	//insert probability of dominance
 	if (member_front_map.at(first) < member_front_map.at(second)) ///should compare probability of dominance
 		return true;
@@ -278,6 +279,22 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 	performance_log->log_event(ss.str());
 	performance_log->log_event("preparing fast-lookup containers");
 
+    map<string,string> obs_link_map = pest_scenario.get_ext_file_string_map("observation data external","link_to");
+    map<string,string> reversed_obs_link_map;
+    if (obs_link_map.size() > 0)
+    {
+        ss.str("");
+        ss << "'link_to' detected in 'observation data external' columns, using probabilistic pareto dominance, size:" << obs_link_map.size();
+        performance_log->log_event(ss.str());
+        for (auto& link : obs_link_map)
+        {
+            if (reversed_obs_link_map.find(link.second) != reversed_obs_link_map.end())
+            {
+                throw runtime_error("'link_to' obs "+link.second+" listed more than once");
+            }
+            reversed_obs_link_map[link.second] = link.first;
+        }
+    }
 
 	ofstream& frec = file_manager.rec_ofstream();
 
@@ -983,11 +1000,12 @@ map<string, double> ParetoObjectives::dominance_probability(map<string, double>&
 {
 	map<string, double> prob_dom;
 	double prob;
-
+    double sqrt_2 = sqrt(2.0);
 	for (auto obj_name : *obs_obj_names_ptr)
 	{
-		normal first_normal(first[obj_name], first[obj_name + "_SD"]);	//normal i(mean,sd)
-		prob = cdf(first_normal, second[obj_name]); //cdf(distribution,x)
+	    prob = 0.5 * (1+erf((second.at(obj_name) - first.at(obj_name))/(sqrt_2 * first.at(obj_name+"_SD"))));
+		//normal first_normal(first[obj_name], first[obj_name + "_SD"]);	//normal i(mean,sd)
+		//prob = cdf(first_normal, second[obj_name]); //cdf(distribution,x)
 		prob_dom[obj_name] = prob;
 	}
 
