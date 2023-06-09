@@ -1339,7 +1339,34 @@ def build_and_draw_prior(t_d="ends",num_reals=500):
     pe.to_binary(os.path.join(t_d,"prior.jcb"))
 
 
+def obs_link_test():
+    model_d = "temp_tests"
+    base_d = os.path.join(model_d, "zdt1_template")
+    new_d = os.path.join(model_d, "zdt1_test_template")
+    if os.path.exists(new_d):
+        shutil.rmtree(new_d)
+    shutil.copytree(base_d, new_d)
+
+    pst = pyemu.Pst(os.path.join(new_d,"zdt1.pst"))
+    pst.add_observations(os.path.join(new_d,"obj_link.dat.ins"),os.path.join(new_d,"obj_link.dat"),pst_path=".")
+    obs = pst.observation_data
+    obs.loc[:,"link_to"] = np.nan
+    obs.loc["link_obj_1","link_to"] = "obj_1"
+    obs.loc["link_obj_2","link_to"] = "obj_2"
+
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(new_d,"zdt1.pst"),version=2)
+
+    pyemu.os_utils.run("{0} zdt1.pst".format(exe_path.replace("-ies","-mou")),cwd=new_d)
+
+    pst.control_data.noptmax = 30
+    pst.write(os.path.join(new_d,"zdt1.pst"),version=2)
+
+
+
+
 if __name__ == "__main__":
+    obs_link_test()
     #mf6_v5_ies_test()
     #prep_ends()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
@@ -1351,7 +1378,7 @@ if __name__ == "__main__":
     #glm_long_name_test()
     #sen_plusplus_test()
     #parchglim_test()
-    unc_file_test()
+    #unc_file_test()
     #cmdline_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
