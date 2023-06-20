@@ -2,7 +2,6 @@
 #include <iomanip>
 #include <iterator>
 #include <map>
-//#include <boost/math/distributions/normal.hpp> //boost library for Gaussian dist
 #include "MOEA.h"
 #include "Ensemble.h"
 #include "RunManagerAbstract.h"
@@ -14,7 +13,6 @@
 
 
 using namespace std;
-//using boost::math::normal;
 
 //util functions
 typedef std::function<bool(std::pair<std::string, double>, std::pair<std::string, double>)> Comparator;
@@ -58,7 +56,7 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 		map<string, double> t;
 		for (int i = 0; i < real_names.size(); i++)
 		{
-			obj_map[obj_vals[i]] = real_names[i]; //rm: not used?
+			obj_map[obj_vals[i]] = real_names[i];
 			t[real_names[i]] = obj_vals[i];
 		}
 		//obj_struct[obj_name] = obj_map;
@@ -178,24 +176,6 @@ bool ParetoObjectives::compare_two_nsga(string& first, string& second)
 	}
 	return false;
 }
-
-//added ppd
-bool ParetoObjectives::compare_two_ppd(string& first, string& second, string& first_sd, string& second_sd)
-{
-
-	//insert probability of dominance
-	if (member_front_map.at(first) < member_front_map.at(second)) ///should compare probability of dominance
-		return true;
-	if (member_front_map.at(first) == member_front_map.at(second))
-	{
-		if (crowd_map.at(first) > crowd_map.at(second))
-			return true;
-		else
-			return false;
-	}
-	return false;
-}
-
 
 void ParetoObjectives::drop_duplicates(map<string, map<string, double>>& _member_struct)
 {
@@ -441,8 +421,14 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 	}
 	performance_log->log_event("pareto front sorting");
 		
-	front_map = sort_members_by_dominance_into_fronts(member_struct);	
-	//if (prob_pareto) front_map = sort_members_by_dominance_into_prob_fronts(member_struct);
+	/*if (ppd_sort)
+	{
+		front_map = sort_members_by_dominance_into_fronts(member_struct);
+		prob_front_map = sort_members_by_dominance_into_prob_fronts(front_map, member_struct);
+		front_map = prob_front_map;
+	}
+	else*/
+		front_map = sort_members_by_dominance_into_fronts(member_struct);
 
 	return;
 }
@@ -469,9 +455,10 @@ map<string, double> ParetoObjectives::get_spea2_fitness(int generation, Observat
 }
 
 pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominance(int generation, ObservationEnsemble& op,
-	ParameterEnsemble& dp, Constraints* constraints_ptr, bool ppd, bool report, string sum_tag)
+	ParameterEnsemble& dp, Constraints* constraints_ptr, bool sort_ppd, bool report, string sum_tag)
 {
-	prob_pareto = ppd;
+	//ppd_sort = sort_ppd;
+	prob_pareto = sort_ppd;
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
 	ss << "ParetoObjectives::get_nsga2_pareto_dominance() for " << op.shape().first << " population members";
@@ -725,11 +712,11 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 	map<string, double> crowd_distance_map;
 	string m = members[0];
 	vector<string> obj_names;
-	/*for (auto obj_map : _member_struct[m])
-	{
-		obj_member_map[obj_map.first] = map<string, double>();
-		obj_names.push_back(obj_map.first);
-	}*/
+	//for (auto obj_map : _member_struct[m])
+	//{
+	//	obj_member_map[obj_map.first] = map<string, double>();
+	//	obj_names.push_back(obj_map.first);
+	//}
 
 
 
@@ -876,6 +863,14 @@ void ParetoObjectives::fill_domination_containers(map<string, map<string, double
 					else
 						throw runtime_error("ParetoObjectives::fill_domination_containers(): solution '" + solution_p.first + "' and '" + solution_q.first + "' are identical");
 				}
+				/*else if (first_dominates_second(solution_p.second, solution_q.second, 0.5))
+				{
+					solutions_dominated.push_back(solution_q.first);
+				}
+				else if (first_dominates_second(solution_q.second, solution_p.second, 0.5))
+				{
+					domination_counter++;
+				}*/
 				else if (first_dominates_second(solution_p.second, solution_q.second))
 				{
 					solutions_dominated.push_back(solution_q.first);
@@ -938,8 +933,6 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 			break;
 		i++;
 		front_map[i] = q_front;
-		
-
 
 		num_front_solutions += q_front.size();
 		if (num_front_solutions > _member_struct.size())
@@ -995,6 +988,98 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 	return front_map;
 }
 
+map<int, vector<string>> ParetoObjectives::sort_members_by_dominance_into_prob_fronts(map<int, vector<string>>& front_map, map<string, map<string, double>>& _member_struct)
+{
+	//following fast non-dom alg in Deb
+	performance_log->log_event("starting 'fast non-dom probabilistic sort");
+	//map<string,map<string,double>> Sp, F1;
+	map<string, vector<string>> solutions_dominated_map;
+	map<string, int> num_dominating_map;
+	fill_domination_containers(_member_struct, solutions_dominated_map, num_dominating_map);
+	vector<string> solutions_dominated, solutions_dominated_by_q, first_front, all_front;
+
+	int ppd_front_i = 1;
+	int front_i = 1;
+	
+	vector<string> prob_front;
+	map<int, vector<string>> prob_front_map;
+
+	auto it = max_element(front_map.begin(), front_map.end());
+	int num_nonprob_front = it->first;
+
+	while (true) 
+	{
+		prob_front.clear();
+
+		for (auto solution_f : front_map[front_i])
+		{
+			if (find(all_front.begin(), all_front.end(), solution_f) != all_front.end())
+				continue;
+			else
+			{
+				prob_front.push_back(solution_f);
+				all_front.push_back(solution_f);
+				solutions_dominated = solutions_dominated_map[solution_f];
+				for (auto solution_r : solutions_dominated)
+				{
+					if (find(all_front.begin(), all_front.end(), solution_r) != all_front.end())
+						continue;
+
+					if (!first_dominates_second(_member_struct[solution_f], _member_struct[solution_r]))
+					{
+						
+						prob_front.push_back(solution_r);
+						all_front.push_back(solution_r);
+
+					}
+				}
+			}
+		}
+		
+		if (prob_front.size() == 0)
+		{
+			if (all_front.size() == _member_struct.size())
+				break;
+		}
+		else
+		{
+			prob_front_map[ppd_front_i] = prob_front;
+			ppd_front_i++;
+		}
+			
+		front_i++;
+		if (front_i > num_nonprob_front)
+			break;
+
+		if (all_front.size() > _member_struct.size())
+		{
+			cout << "note: nsga-ii front sorting: number of visited solutions " << all_front.size() << " >= number of members " << _member_struct.size() << endl;
+			/*cout << "q_front:" << endl;
+			for (auto& f : q_front)
+				cout << "  " << f << endl;
+			cout << "front:" << endl;
+			for (auto& f : front)
+				cout << "  " << f << endl;*/
+			throw runtime_error("error in nsga-ii front sorting: number of visited solutions > number of members");
+
+			break;
+		}
+
+	}
+
+	if (all_front.size() != _member_struct.size())
+	{
+		stringstream ss;
+		ss << "ERROR: ParetoObjectives::sort_members_by_dominance_into_fronts(): number of solutions in fronts (";
+		ss << all_front.size() << ") != member_stuct.size() (" << _member_struct.size() << "," << endl;
+		file_manager.rec_ofstream() << ss.str();
+		cout << ss.str();
+		throw runtime_error(ss.str());
+	}
+
+	return prob_front_map;
+}
+
 //compute probability of dominance
 map<string, double> ParetoObjectives::dominance_probability(map<string, double>& first, map<string, double>& second)
 {
@@ -1004,8 +1089,6 @@ map<string, double> ParetoObjectives::dominance_probability(map<string, double>&
 	for (auto obj_name : *obs_obj_names_ptr)
 	{
 	    prob = 0.5 * (1+erf((second.at(obj_name) - first.at(obj_name))/(sqrt_2 * first.at(obj_name+"_SD"))));
-		//normal first_normal(first[obj_name], first[obj_name + "_SD"]);	//normal i(mean,sd)
-		//prob = cdf(first_normal, second[obj_name]); //cdf(distribution,x)
 		prob_dom[obj_name] = prob;
 	}
 
@@ -1021,6 +1104,30 @@ bool ParetoObjectives::first_equals_second(map<string, double>& first, map<strin
 			return false;
 	}
 	return true;
+}
+
+bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<string, double>& second, double ppd_convmode)
+{
+	if (prob_pareto)
+	{
+		map<string, double> first_prob_dom = dominance_probability(first, second);
+		map<string, double> second_prob_dom = dominance_probability(second, first);
+		for (auto f : first_prob_dom)
+		{
+			if ((/*f.second > 0.5 &&*/ f.second < ppd_convmode) && (/*second_prob_dom[f.first] < 0.5 &&*/ second_prob_dom[f.first] > ppd_convmode))
+				return false;
+		}
+		return true;
+	}
+	else
+	{
+		for (auto f : first)
+		{
+			if (f.second > second[f.first])
+				return false;
+		}
+		return true;
+	}
 }
 
 bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<string, double>& second)
@@ -1802,6 +1909,7 @@ void MOEA::initialize()
 	if (env == "NSGA")
 	{
 		envtype = MouEnvType::NSGA;
+		prob_pareto = false;
 		message(1, "using 'nsga2' env selector");
 	}
 	else if (env == "NSGA_PPD")
@@ -3442,6 +3550,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 
 vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
+
 	DomPair dompair = objectives.get_nsga2_pareto_dominance(-999, _op, _dp, &constraints, prob_pareto, false);
 	vector<string> nondom_solutions = dompair.first;
 	vector<string> gbest_solutions;

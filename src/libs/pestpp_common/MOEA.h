@@ -78,22 +78,23 @@ private:
 	//vector<string> obj_names;
 	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, double>& crowd_map, map<string, map<string, double>>& _member_struct);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
+	bool first_dominates_second(map<string, double>& first, map<string, double>& second, double ppd_convmode);
 	map<string, map<string, double>> get_member_struct(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	void drop_duplicates(map<string, map<string, double>>& _member_struct);
 	bool first_equals_second(map<string, double>& first, map<string, double>& second);
 
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& _member_struct);
+	map<int, vector<string>> sort_members_by_dominance_into_prob_fronts(map<int, vector<string>>& front_map, map<string, map<string, double>>& _member_struct);
 	pair<map<string, double>, map<string, double>> get_spea2_fitness(map<string, map<string, double>>& _member_struct);
 
 	void fill_domination_containers(map<string, map<string, double>>& _member_struct, map<string,
 		vector<string>>&solutions_dominated_map, map<string, int>& num_dominating_map, bool dup_as_dom=false);
 
 	bool compare_two_nsga(string& first, string& second);
-	bool compare_two_ppd(string& first, string& second, string& first_sd, string& second_sd); //pass variance
 	bool compare_two_spea(string& first, string& second);
 
 	map<string, double> dominance_probability(map<string, double>& first, map<string, double>& second);
-	bool prob_pareto;
+	bool prob_pareto = false, ppd_sort;
 	double first_ppd_limit = 0.51;
 	double second_ppd_limit = 0.35;
 
@@ -115,6 +116,7 @@ private:
 
 	map<string, map<string, double>> feas_member_struct;
 	map<int, vector<string>> front_map;
+	map<int, vector<string>> prob_front_map;
 	map<string, double> crowd_map;
 	map<string, int> member_front_map;
 	map<string, double> infeas;
@@ -164,6 +166,7 @@ private:
 	map<string, map<string, double>> previous_obj_summary, previous_dv_summary;
 	bool risk_obj;
 	bool prob_pareto = false; //probabilistic pareto dominance
+	bool ppd_sort;
 	int restart_iter_offset;
 	int save_every;
 	map<int,int> population_schedule;
