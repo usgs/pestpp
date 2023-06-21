@@ -148,8 +148,6 @@ bool ParetoObjectives::compare_two(string& first, string& second, MouEnvType env
 		return compare_two_nsga(first, second);
 	else if (envtyp == MouEnvType::SPEA)
 		return compare_two_spea(first, second);
-	//else if (envtyp == MouEnvType::NSGA_PPD) //for probabilistic Pareto dominance
-	//	return compare_two_nsga(first, second);
 	else
 		throw runtime_error("ParetoObjectives::compare_two(): unrecognized envtyp");
 }
@@ -1138,7 +1136,7 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 		map<string, double> second_prob_dom = dominance_probability(second, first);
 		for (auto f : first_prob_dom)
 		{
-			if ((/*f.second > 0.5 &&*/ f.second < first_ppd_limit) && (/*second_prob_dom[f.first] < 0.5 &&*/ second_prob_dom[f.first] > second_ppd_limit))
+			if ((f.second < first_ppd_limit) && (second_prob_dom[f.first] > second_ppd_limit))
 				return false;
 		}
 		return true;
@@ -1154,6 +1152,88 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 	}
 
 }
+
+double ParetoObjectives::std_norm_cdf(double x, double mu, double sd, bool cumdf)
+{
+	double Z, val;
+	const double sqrt_2 = sqrt(2.0);
+	const double dz = 1.0e-30;
+
+	Z = (x - mu) / sd;
+
+	if (cumdf)
+		val = 0.5 * (1 + erf(Z / sqrt_2));
+	else
+		val = (std_norm_cdf(x, mu, sd, true) - std_norm_cdf(x - dz, mu, sd, true)) / dz;
+
+	return val;
+}
+
+double ParetoObjectives::psi_function(double aa, double bb, double mu, double sd)
+{
+	double psi = sd * std_norm_cdf(bb, mu, sd, false) + (aa - mu) * std_norm_cdf(bb, mu, sd, true);
+	return psi;
+}
+
+//hypervolume works for two-objective problems for now
+map<int, map<string, double>> ParetoObjectives::get_hypervolume_partitions(ObservationEnsemble& op, ParameterEnsemble& dp)
+{
+	stringstream ss;
+	ofstream& frec = file_manager.rec_ofstream();
+	ss << "ParetoObjectives::get_hypervolume() for " << op.shape().first << " archive members";
+	performance_log->log_event(ss.str());
+
+	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
+	map<string, map<string, double>> hv_parts;
+	map<int, map<string, double>> hypervolume;
+	map<string, double> hv_partition, hpv;
+
+	
+	//initialize reference values
+	int mult = 1;
+	vector <string> ref_tags {"r_0", "rfty"};
+	for (string reftags : ref_tags)
+	{
+		for (auto obj_map : *obs_obj_names_ptr)
+		{
+			hv_parts[reftags][obj_map] = EXTREME_AQF * mult;
+			mult *= -1;
+		}
+		mult *= -1;
+
+		hv_partition[reftags] = hv_parts[reftags][obs_obj_names_ptr->at(1)];
+	}
+	
+	//set partition boundaries: rectangular strips along obj 2
+	for (auto member : _member_struct)
+	{
+		for (auto obj_map : *obs_obj_names_ptr)
+		{
+			hv_parts[member.first][obj_map] = _member_struct[member.first][obj_map]; //get only objective values, leave SDs, for easy referencing later
+		}
+		hv_partition[member.first] = _member_struct[member.first][obs_obj_names_ptr->at(1)];
+	}
+
+	sortedset hv_parts_sorted(hv_partition.begin(), hv_partition.end(), compFunctor); 
+
+	int i = 0;
+	for (auto hv : hv_parts_sorted)
+	{
+		hpv.clear();
+		for (auto obj_map : *obs_obj_names_ptr)
+		{
+			hpv[obj_map] = hv_parts[hv.first][obj_map];
+		}
+		hypervolume[i] = hpv;
+		i++;
+	}
+	
+	return hypervolume;
+}
+//map<string, double> ParetoObjectives::front_partitioned(ObservationEnsemble& op)
+//{
+//
+//}
 
 MOEA::MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer, 
 	PerformanceLog *_performance_log, RunManagerAbstract* _run_mgr_ptr)
@@ -2701,6 +2781,9 @@ void MOEA::initialize()
 
 		//this causes the initial archive pareto summary file to be written
 		objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, prob_pareto, true, ARC_SUM_TAG);
+
+		//compute EHVI of the front
+		objectives.get_hypervolume_partitions(op_archive, dp_archive);
 	}
 	else if (envtype == MouEnvType::SPEA)
 	{

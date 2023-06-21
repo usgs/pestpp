@@ -38,6 +38,9 @@ public:
 	pair<vector<string>, vector<string>> get_nsga2_pareto_dominance(int generation, ObservationEnsemble& op, 
 		ParameterEnsemble& dp, Constraints* constraints_ptr=nullptr, bool ppd=false, bool report=true, string sum_tag=string());
 	
+	map<int, map<string, double>> get_hypervolume_partitions(ObservationEnsemble& op, ParameterEnsemble& dp);
+	//double get_EHVI(ObservationEnsemble& op);
+
 	//this must be called at least once before the diversity metrixs can be called...
 	void set_pointers(vector<string>& _obs_obj_names, vector<string>& _obs_obj_sd_names, vector<string>& _pi_obj_names, map<string, double>& _obj_dir_mult)
 	{
@@ -93,11 +96,6 @@ private:
 	bool compare_two_nsga(string& first, string& second);
 	bool compare_two_spea(string& first, string& second);
 
-	map<string, double> dominance_probability(map<string, double>& first, map<string, double>& second);
-	bool prob_pareto = false, ppd_sort;
-	double first_ppd_limit = 0.51;
-	double second_ppd_limit = 0.35;
-
 	//sort all members in member struct
 	//map<string, double> get_cuboid_crowding_distance();
 	map<string, double> get_cuboid_crowding_distance(map<string, map<string, double>>& _member_struct);
@@ -124,7 +122,19 @@ private:
 	map<string, double> spea2_constrained_fitness_map;
 	map<string, double> spea2_unconstrained_fitness_map;
 	
-	
+
+	//PPD-related stuff
+	map<string, double> dominance_probability(map<string, double>& first, map<string, double>& second);
+	bool prob_pareto, ppd_sort;
+	double first_ppd_limit = 0.55;
+	double second_ppd_limit = 0.35;
+
+	//EHVI-related stuff
+	const double EXTREME_AQF = 25;
+	double std_norm_cdf(double x, double mu, double sd, bool cumdf);
+	double psi_function(double aa, double bb, double mu, double sd);
+	map<string, double> front_partitioned(map<int, vector<string>>& front);
+	double EHVI;
 	
 };
 
@@ -259,6 +269,8 @@ private:
 
 	int get_max_len_obj_name();
 	bool should_use_multigen();
+
+
 };
 
 #endif //MOEA_H_
