@@ -1157,36 +1157,39 @@ double ParetoObjectives::std_norm_cdf(double x, double mu, double sd, bool cumdf
 {
 	double Z, val;
 	const double sqrt_2 = sqrt(2.0);
-	const double dz = 1.0e-30;
+	const double dz = 1.0e-10;
 
 	Z = (x - mu) / sd;
 
 	if (cumdf)
-		val = 0.5 * (1 + erf(Z / sqrt_2));
+		val = 0.5 * (1 + erf((x - mu)/(sqrt_2*sd)));
 	else
-		val = (std_norm_cdf(x, mu, sd, true) - std_norm_cdf(x - dz, mu, sd, true)) / dz;
+		val = (std_norm_cdf(x, mu, sd, true) - std_norm_cdf(x - dz*sd, mu, sd, true)) / dz;
 
 	return val;
 }
 
 double ParetoObjectives::psi_function(double aa, double bb, double mu, double sd)
 {
+	double a = std_norm_cdf(bb, mu, sd, false);
+	double b = std_norm_cdf(bb, mu, sd, true);
 	double psi = sd * std_norm_cdf(bb, mu, sd, false) + (aa - mu) * std_norm_cdf(bb, mu, sd, true);
 	return psi;
 }
 
 //hypervolume works for two-objective problems for now
-map<int, map<string, double>> ParetoObjectives::get_hypervolume_partitions(ObservationEnsemble& op, ParameterEnsemble& dp)
+void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
-	ss << "ParetoObjectives::get_hypervolume() for " << op.shape().first << " archive members";
+	ss << "ParetoObjectives::set_hypervolume() for " << op.shape().first << " archive members";
 	performance_log->log_event(ss.str());
 
 	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
 	map<string, map<string, double>> hv_parts;
-	map<int, map<string, double>> hypervolume;
-	map<string, double> hv_partition, hpv;
+	map<int, vector<double>> hypervolume;
+	map<string, double> hv_partition;
+	vector<double> hpv;
 
 	
 	//initialize reference values
@@ -1214,6 +1217,7 @@ map<int, map<string, double>> ParetoObjectives::get_hypervolume_partitions(Obser
 		hv_partition[member.first] = _member_struct[member.first][obs_obj_names_ptr->at(1)];
 	}
 
+	//order points by increasing obj 2 values
 	sortedset hv_parts_sorted(hv_partition.begin(), hv_partition.end(), compFunctor); 
 
 	int i = 0;
@@ -1222,14 +1226,59 @@ map<int, map<string, double>> ParetoObjectives::get_hypervolume_partitions(Obser
 		hpv.clear();
 		for (auto obj_map : *obs_obj_names_ptr)
 		{
-			hpv[obj_map] = hv_parts[hv.first][obj_map];
+			hpv.push_back(hv_parts[hv.first][obj_map]);
 		}
 		hypervolume[i] = hpv;
 		i++;
 	}
 	
-	return hypervolume;
+	hypervolume_partitions = hypervolume;
 }
+
+//this works only for two objectives following the method of Yang et al (2019)
+void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
+{
+	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
+	map<int, vector<double>> hv_i = hypervolume_partitions;
+
+	double t1, t2, p1, p2, p3, ehvi;
+	vector<double> obj, obj_sd;
+
+	for (auto member : _member_struct)
+	{
+		obj.clear();
+		obj_sd.clear();
+		for (auto obj_map : *obs_obj_names_ptr)
+			obj.push_back(member.second[obj_map]);
+
+		for (auto obj_sd_map : *obs_obj_sd_names_ptr)
+			obj_sd.push_back(member.second[obj_sd_map]);
+
+		t1 = 0;
+		t2 = 0;
+
+		map<int, vector<double>>::iterator it = next(hv_i.begin(), 1), iprev;
+		for (; it != hv_i.end(); it++)
+		{
+			iprev = prev(it, 1);
+
+			p1 = hv_i[iprev->first][0] - hv_i[it->first][0];
+			p2 = std_norm_cdf(hv_i[it->first][0], obj.at(0), obj_sd.at(0), true);
+			p3 = psi_function(hv_i[it->first][1], hv_i[it->first][1], obj.at(1), obj_sd.at(1));
+			t1 += p1 * p2 * p3;
+			
+			p1 = psi_function(hv_i[iprev->first][0], hv_i[iprev->first][0], obj.at(0), obj_sd.at(0));
+			p2 = psi_function(hv_i[iprev->first][0], hv_i[it->first][0], obj.at(0), obj_sd.at(0));
+			p3 = psi_function(hv_i[it->first][1], hv_i[it->first][1], obj.at(1), obj_sd.at(1));
+			t2 += (p1-p2)*p3;
+		}
+
+		ehvi = t1 + t2;
+		
+		ehvi_member_map[member.first] = ehvi;
+	}
+}
+
 //map<string, double> ParetoObjectives::front_partitioned(ObservationEnsemble& op)
 //{
 //
@@ -2782,8 +2831,10 @@ void MOEA::initialize()
 		//this causes the initial archive pareto summary file to be written
 		objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, prob_pareto, true, ARC_SUM_TAG);
 
-		//compute EHVI of the front
-		objectives.get_hypervolume_partitions(op_archive, dp_archive);
+		//compute EHVI
+		objectives.set_hypervolume_partitions(op_archive, dp_archive);
+		objectives.get_ehvi(op, dp);
+		
 	}
 	else if (envtype == MouEnvType::SPEA)
 	{
@@ -3582,6 +3633,7 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 				top.update_real_ip(f, real);
 			}
 			//new_pbest_names.push_back(lm.first);
+
 		}
 	}
 	pso_pbest_dp = tdp;

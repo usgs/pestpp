@@ -38,7 +38,8 @@ public:
 	pair<vector<string>, vector<string>> get_nsga2_pareto_dominance(int generation, ObservationEnsemble& op, 
 		ParameterEnsemble& dp, Constraints* constraints_ptr=nullptr, bool ppd=false, bool report=true, string sum_tag=string());
 	
-	map<int, map<string, double>> get_hypervolume_partitions(ObservationEnsemble& op, ParameterEnsemble& dp);
+	void set_hypervolume_partitions(ObservationEnsemble& op, ParameterEnsemble& dp);
+	void get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp);
 	//double get_EHVI(ObservationEnsemble& op);
 
 	//this must be called at least once before the diversity metrixs can be called...
@@ -126,14 +127,15 @@ private:
 	//PPD-related stuff
 	map<string, double> dominance_probability(map<string, double>& first, map<string, double>& second);
 	bool prob_pareto, ppd_sort;
-	double first_ppd_limit = 0.55;
-	double second_ppd_limit = 0.35;
+	double first_ppd_limit = 0.5;
+	double second_ppd_limit = 0.5;
 
 	//EHVI-related stuff
 	const double EXTREME_AQF = 25;
 	double std_norm_cdf(double x, double mu, double sd, bool cumdf);
 	double psi_function(double aa, double bb, double mu, double sd);
-	map<string, double> front_partitioned(map<int, vector<string>>& front);
+	map<string, double> ehvi_member_map;
+	map<int, vector<double>> hypervolume_partitions;
 	double EHVI;
 	
 };
