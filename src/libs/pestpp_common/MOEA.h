@@ -127,8 +127,7 @@ private:
 	//PPD-related stuff
 	map<string, double> dominance_probability(map<string, double>& first, map<string, double>& second);
 	bool prob_pareto, ppd_sort;
-	double first_ppd_limit = 0.5;
-	double second_ppd_limit = 0.5;
+	vector<double> ppd_limits = pest_scenario.get_pestpp_options().get_mou_ppd_limits();;
 
 	//EHVI-related stuff
 	const double EXTREME_AQF = 25;

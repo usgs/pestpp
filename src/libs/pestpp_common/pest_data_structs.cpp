@@ -1439,6 +1439,24 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_pso_cognitive_const);
 		return true;
 	}
+	else if (key == "MOU_PSO_ALPHA")
+	{
+		convert_ip(value, mou_pso_alpha);
+		return true;
+		}
+	else if (key == "MOU_PPD_LIMITS")
+	{
+		mou_ppd_limits.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			mou_ppd_limits.push_back(v);
+		}
+		return true;
+		}
 	else if (key == "MOU_POPULATION_SCHEDULE")
     {
 	    mou_population_schedule = org_value;
@@ -1694,6 +1712,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_pso_omega: " << mou_pso_omega << endl;
 	os << "mou_pso_social_const: " << mou_pso_social_const << endl;
 	os << "mou_pso_cognitive: " << mou_pso_cognitive_const << endl;
+	os << "mou_pso_alpha: " << mou_pso_alpha << endl;
 	os << "mou_population_schedule: " << mou_population_schedule << endl;
 	os << "mou_simplex_reflections:" << mou_simplex_reflections << endl;
 	os << "mou_simplex_factors: " << endl;
@@ -1883,6 +1902,8 @@ void PestppOptions::set_defaults()
 	set_mou_pso_omega(0.7);
 	set_mou_pso_cognitive_const(2.0);
 	set_mou_pso_social_const(2.0);
+	set_mou_pso_alpha(1.0);
+	set_mou_ppd_limits(vector<double>{0.5, 0.5});
 	set_mou_population_schedule("");
 	set_mou_simplex_reflections(10);
 	set_mou_simplex_factors(vector<double>{0.5, 0.6, 0.7, 0.8});

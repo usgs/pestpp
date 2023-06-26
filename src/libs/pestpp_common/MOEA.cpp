@@ -455,8 +455,8 @@ map<string, double> ParetoObjectives::get_spea2_fitness(int generation, Observat
 pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominance(int generation, ObservationEnsemble& op,
 	ParameterEnsemble& dp, Constraints* constraints_ptr, bool sort_ppd, bool report, string sum_tag)
 {
-	//ppd_sort = sort_ppd;
-	prob_pareto = sort_ppd;
+	ppd_sort = sort_ppd;
+	//prob_pareto = sort_ppd;
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
 	ss << "ParetoObjectives::get_nsga2_pareto_dominance() for " << op.shape().first << " population members";
@@ -1082,12 +1082,10 @@ map<int, vector<string>> ParetoObjectives::sort_members_by_dominance_into_prob_f
 map<string, double> ParetoObjectives::dominance_probability(map<string, double>& first, map<string, double>& second)
 {
 	map<string, double> prob_dom;
-	double prob;
-    double sqrt_2 = sqrt(2.0);
+
 	for (auto obj_name : *obs_obj_names_ptr)
 	{
-	    prob = 0.5 * (1+erf((second.at(obj_name) - first.at(obj_name))/(sqrt_2 * first.at(obj_name+"_SD"))));
-		prob_dom[obj_name] = prob;
+		prob_dom[obj_name] = std_norm_cdf(second.at(obj_name), first.at(obj_name), first.at(obj_name + "_SD"), true);
 	}
 
 	return prob_dom;
@@ -1104,39 +1102,16 @@ bool ParetoObjectives::first_equals_second(map<string, double>& first, map<strin
 	return true;
 }
 
-bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<string, double>& second, double ppd_convmode)
-{
-	if (prob_pareto)
-	{
-		map<string, double> first_prob_dom = dominance_probability(first, second);
-		map<string, double> second_prob_dom = dominance_probability(second, first);
-		for (auto f : first_prob_dom)
-		{
-			if ((/*f.second > 0.5 &&*/ f.second < ppd_convmode) && (/*second_prob_dom[f.first] < 0.5 &&*/ second_prob_dom[f.first] > ppd_convmode))
-				return false;
-		}
-		return true;
-	}
-	else
-	{
-		for (auto f : first)
-		{
-			if (f.second > second[f.first])
-				return false;
-		}
-		return true;
-	}
-}
-
 bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<string, double>& second)
 {
-	if (prob_pareto)
+
+	if (/*prob_pareto*/ ppd_sort)
 	{
 		map<string, double> first_prob_dom = dominance_probability(first, second);
 		map<string, double> second_prob_dom = dominance_probability(second, first);
 		for (auto f : first_prob_dom)
 		{
-			if ((f.second < first_ppd_limit) && (second_prob_dom[f.first] > second_ppd_limit))
+			if ((f.second < ppd_limits[0]) && (second_prob_dom[f.first] > ppd_limits[1]))
 				return false;
 		}
 		return true;
@@ -1182,7 +1157,7 @@ void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, Param
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
-	ss << "ParetoObjectives::set_hypervolume() for " << op.shape().first << " archive members";
+	ss << "ParetoObjectives::set_hypervolume_partitions() for " << op.shape().first << " archive members";
 	performance_log->log_event(ss.str());
 
 	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
@@ -2829,11 +2804,11 @@ void MOEA::initialize()
 
 
 		//this causes the initial archive pareto summary file to be written
-		objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, prob_pareto, true, ARC_SUM_TAG);
+		objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, false, true, ARC_SUM_TAG);
 
 		//compute EHVI
-		objectives.set_hypervolume_partitions(op_archive, dp_archive);
-		objectives.get_ehvi(op, dp);
+		//objectives.set_hypervolume_partitions(op_archive, dp_archive);
+		//objectives.get_ehvi(op, dp);
 		
 	}
 	else if (envtype == MouEnvType::SPEA)
@@ -3689,6 +3664,7 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	DomPair dompair = objectives.get_nsga2_pareto_dominance(-999, _op, _dp, &constraints, prob_pareto, false);
 	vector<string> nondom_solutions = dompair.first;
 	vector<string> gbest_solutions;
+	double alpha = pest_scenario.get_pestpp_options().get_mou_pso_alpha();
 	//if no non dom solutions, then use the dominated ones...
 	if (nondom_solutions.size() == 0)
 	{
@@ -3714,9 +3690,9 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
         if (cd.second == CROWDING_EXTREME) {
             cd.second = 1.0;
         } else if (mx != 0.0) {
-            cd.second = cd.second / mx;
+            cd.second = pow(cd.second / mx, alpha); //added alpha following Siade et al(2019); default value is 1.0
         } else {
-            cd.second = 0.5;
+            cd.second = pow(0.5, alpha);
         }
     }
 

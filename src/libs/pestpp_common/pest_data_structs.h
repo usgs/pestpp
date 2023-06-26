@@ -410,6 +410,10 @@ public:
 	void set_mou_pso_social_const(double val) { mou_pso_social_const = val; }
 	double get_mou_pso_cognitive_const() const { return mou_pso_cognitive_const; }
 	void set_mou_pso_cognitive_const(double val) { mou_pso_cognitive_const = val; }
+	double get_mou_pso_alpha() const { return mou_pso_alpha; }
+	void set_mou_pso_alpha(double val) { mou_pso_alpha = val; }
+	vector<double> get_mou_ppd_limits() const { return mou_ppd_limits; }
+	void set_mou_ppd_limits(vector<double> _vals) { mou_ppd_limits = _vals; }
 	string get_mou_population_schedule() const {return mou_population_schedule;}
     void set_mou_population_schedule(string fname) {mou_population_schedule = fname;}
 	int get_mou_simplex_reflections() const { return mou_simplex_reflections; }
@@ -744,6 +748,8 @@ private:
 	double mou_pso_omega;
 	double mou_pso_social_const;
 	double mou_pso_cognitive_const;
+	double mou_pso_alpha;
+	vector<double> mou_ppd_limits;
 	string mou_population_schedule;
 	int mou_simplex_reflections;
 	vector<double> mou_simplex_factors;
