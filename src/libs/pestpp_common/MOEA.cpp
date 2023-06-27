@@ -1123,7 +1123,8 @@ map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, O
 
 	int max_len = get_max_len_obj_name();
 	string dir;
-	frec << left << setw(max_len) << "objective function" << right << setw(12) << "direction" << setw(15) << "mean" << setw(15) << "std dev" << setw(15) << "min" << setw(15) << "max" << endl;
+	frec << left << setw(max_len) << "objective function" << right << setw(10) << "direction" << setw(13) << "mean";
+	frec << setw(13) << "std dev" << setw(13) << "min" << setw(13) << "max" << setw(13) << "knee" << endl;
     frec << endl << setprecision(7);
 	for (auto obs_obj : obs_obj_names)
 	{
@@ -1133,11 +1134,13 @@ map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, O
 		if (obj_dir_mult[obs_obj] == -1)
 			dir = "maximize";
 
-		frec << right << setw(12) << dir;
-		frec << right << setw(15) << summary[obs_obj]["mean"];
-		frec << setw(15) << summary[obs_obj]["std"];
-		frec << setw(15) << summary[obs_obj]["min"];
-		frec << setw(15) << summary[obs_obj]["max"] << endl;
+		frec << right << setw(10) << dir;
+		frec << right << setw(13) << summary[obs_obj]["mean"];
+		frec << setw(13) << summary[obs_obj]["std"];
+		frec << setw(13) << summary[obs_obj]["min"];
+		frec << setw(13) << summary[obs_obj]["max"] ;
+		frec << setw(13) << summary[obs_obj]["knee"];
+		frec << endl;
 	}
 
 	
@@ -1147,11 +1150,13 @@ map<string, map<string, double>> MOEA::obj_func_report(ParameterEnsemble& _dp, O
 		dir = "minimize";
 		if (obj_dir_mult[pi_obj] == -1)
 			dir = "maximize";
-		frec << right << setw(12) << dir;
-		frec << right << setw(15) << summary[pi_obj]["mean"];
-		frec << setw(15) << summary[pi_obj]["std"];
-		frec << setw(15) << summary[pi_obj]["min"];
-		frec << setw(15) << summary[pi_obj]["max"] << endl;
+		frec << right << setw(10) << dir;
+		frec << right << setw(13) << summary[pi_obj]["mean"];
+		frec << setw(13) << summary[pi_obj]["std"];
+		frec << setw(13) << summary[pi_obj]["min"];
+		frec << setw(13) << summary[pi_obj]["max"];
+        frec << setw(13) << summary[pi_obj]["knee"];
+		frec << endl;
 	}
 
 
@@ -1171,12 +1176,14 @@ map<string, map<string, double>> MOEA::obj_func_change_report(map<string, map<st
 	
 	stringstream ss;
 	int max_len = get_max_len_obj_name();
-	ss << left << setw(max_len) << "objective function" << right << setw(11) << "mean change";
-	ss << setw(11) << "% change";
-	ss << setw(11) << "max change" << setw(11) << "% change";
-	ss << setw(11) << "min change" << setw(11) << "% change" << endl;
+	ss << left << setw(max_len) << "objective function" << right << setw(12) << "mean change";
+	ss << setw(12) << "% change";
+	ss << setw(12) << "max change" << setw(12) << "% change";
+	ss << setw(12) << "min change" << setw(12) << "% change";
+    ss << setw(12) << "knee change" << setw(12) << "% change";
+	ss << endl;
 
-	vector<string> tags{ "mean","max","min" };
+	vector<string> tags{ "mean","max","min","knee" };
 	for (auto obs_obj : obs_obj_names)
 	{
 		change_summary[obs_obj] = map<string, double>();
@@ -1194,8 +1201,8 @@ map<string, map<string, double>> MOEA::obj_func_change_report(map<string, map<st
 			else
 				percent_change = 100.0 * (change / previous_obj_summary[obs_obj][tag]);
 			
-			ss << right << setw(11) << change;
-			ss << setw(11) << percent_change;
+			ss << right << setw(12) << change;
+			ss << setw(12) << percent_change;
 			change_summary[obs_obj][tag] = change;
 			change_summary[obs_obj][tag+"_percent"] = percent_change;
 		}
@@ -1217,8 +1224,8 @@ map<string, map<string, double>> MOEA::obj_func_change_report(map<string, map<st
 			else
 				percent_change = 100.0 * (change / previous_obj_summary[pi_obj][tag]);
 			
-			ss << right << setw(11) << change;
-			ss << setw(11) << percent_change;
+			ss << right << setw(12) << change;
+			ss << setw(12) << percent_change;
 			change_summary[pi_obj][tag] = change;
 			change_summary[pi_obj][tag + "_percent"] = percent_change;
 		}
@@ -1239,6 +1246,8 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 	map<string, int> var_map = _op.get_var_map();
 	map<string, double> sum;
 	map<string, map<string, double>> summary_stats;
+	string opt_member_name;
+	pair<Parameters,Observations> p = get_optimal_solution(_dp,_op,opt_member_name);
 	for (auto obs_obj : obs_obj_names)
 	{
 		sum.clear();
@@ -1246,6 +1255,7 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 		sum["std"] = std_map[obs_obj];
 		sum["min"] = _op.get_eigen_ptr()->col(var_map[obs_obj]).minCoeff();
 		sum["max"] = _op.get_eigen_ptr()->col(var_map[obs_obj]).maxCoeff();
+		sum["knee"] = p.second[obs_obj];
 		summary_stats[obs_obj] = sum;
 	}
 	_dp.update_var_map();
@@ -1277,36 +1287,37 @@ map<string, map<string, double>> MOEA::get_obj_func_summary_stats(ParameterEnsem
 
 	for (auto pi_obj : pi_obj_names)
 	{
-
+        sim_res = prior_info_ptr->get_pi_rec(pi_obj).calc_sim_and_resid(p.first);
 		vec = stlvec_2_eigenvec(pi_vals[pi_obj]);
 		sum.clear();
 		sum["mean"] = vec.mean();
 		sum["std"] = sqrt((vec.array() - vec.mean()).pow(2).sum() / (vec.size() - 1));
 		sum["min"] = vec.minCoeff();
 		sum["max"] = vec.maxCoeff();
+		sum["knee"] = sim_res.first;
 		summary_stats[pi_obj] = sum;
 	}
 
-	//calculate relative hyper volumes
-	//first form the ideal solution vector
-	Eigen::VectorXd ideal(summary_stats.size());
-	int i=0;
-	for (auto& oname : obs_obj_names)
-    {
-	    if (obj_dir_mult[oname] == 1)
-	        ideal[i] = summary_stats.at(oname).at("min");
-	    else
-            ideal[i] = summary_stats.at(oname).at("max");
-	    i++;
-    }
-	for (auto& pname : pi_obj_names)
-    {
-        if (obj_dir_mult[pname] == 1)
-            ideal[i] = summary_stats.at(pname).at("min");
-        else
-            ideal[i] = summary_stats.at(pname).at("max");
-        i++;
-    }
+//	//calculate relative hyper volumes
+//	//first form the ideal solution vector
+//	Eigen::VectorXd ideal(summary_stats.size());
+//	int i=0;
+//	for (auto& oname : obs_obj_names)
+//    {
+//	    if (obj_dir_mult[oname] == 1)
+//	        ideal[i] = summary_stats.at(oname).at("min");
+//	    else
+//            ideal[i] = summary_stats.at(oname).at("max");
+//	    i++;
+//    }
+//	for (auto& pname : pi_obj_names)
+//    {
+//        if (obj_dir_mult[pname] == 1)
+//            ideal[i] = summary_stats.at(pname).at("min");
+//        else
+//            ideal[i] = summary_stats.at(pname).at("max");
+//        i++;
+//    }
 	
 
 	return summary_stats;
