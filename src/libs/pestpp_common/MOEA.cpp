@@ -2724,8 +2724,27 @@ ParameterEnsemble MOEA::generate_population()
 
 	if ((pest_scenario.get_pestpp_options().get_mou_shuffle_fixed_pars()) && (new_pop.get_fixed_info().get_map_size() > 0))
     {
-	    cout << endl;
 
+	    vector<string> real_names = new_pop.get_real_names();
+        vector<string> fixed_names = new_pop.get_fixed_info().get_fixed_names();
+
+        vector<int> ireals;
+	    for (int i=0;i<real_names.size();i++)
+	        ireals.push_back((i));
+        shuffle(ireals.begin(),ireals.end(),rand_gen);
+        string name1,name2;
+        Eigen::MatrixXd new_fixed(real_names.size(),fixed_names.size());
+        new_fixed.setZero();
+        vector<double> t;
+        for (int i=0;i<real_names.size();i++)
+        {
+            name1 = real_names[i];
+            name2 = real_names[ireals[i]];
+            t = new_pop.get_fixed_info().get_real_fixed_values(name2,fixed_names);
+            new_fixed.row(i) = Eigen::Map<Eigen::VectorXd>(&t[0],t.size());
+            //cout << name1 << ", " << new_fixed.row(i) << endl;
+        }
+        new_pop.get_fixed_info().update_realizations(fixed_names,real_names,new_fixed);
     }
 	
 
