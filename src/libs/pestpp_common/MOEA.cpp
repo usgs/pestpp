@@ -2722,6 +2722,11 @@ ParameterEnsemble MOEA::generate_population()
 			new_pop.append_other_rows(p);
 	}
 
+	if ((pest_scenario.get_pestpp_options().get_mou_shuffle_fixed_pars()) && (new_pop.get_fixed_info().get_map_size() > 0))
+    {
+	    cout << endl;
+
+    }
 	
 
 	return new_pop;
