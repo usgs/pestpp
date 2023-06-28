@@ -2014,12 +2014,15 @@ void MOEA::initialize()
 	{
 		envtype = MouEnvType::NSGA;
 		prob_pareto = false;
+		objectives.set_prob_pareto(prob_pareto);
 		message(1, "using 'nsga2' env selector");
 	}
 	else if (env == "NSGA_PPD")
 	{
 		envtype = MouEnvType::NSGA;
 		prob_pareto = true;
+		objectives.set_ppd_limits();
+		objectives.set_prob_pareto(prob_pareto);
 		message(1, "using 'nsga2_ppd' env selector");
 	}
 	else if (env == "SPEA")

@@ -38,6 +38,8 @@ public:
 	pair<vector<string>, vector<string>> get_nsga2_pareto_dominance(int generation, ObservationEnsemble& op, 
 		ParameterEnsemble& dp, Constraints* constraints_ptr=nullptr, bool ppd=false, bool report=true, string sum_tag=string());
 	
+	void set_ppd_limits() { ppd_limits = pest_scenario.get_pestpp_options().get_mou_ppd_limits(); }
+	void set_prob_pareto(bool ppd) { prob_pareto = ppd; }
 	void set_hypervolume_partitions(ObservationEnsemble& op, ParameterEnsemble& dp);
 	void get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp);
 	//double get_EHVI(ObservationEnsemble& op);
@@ -82,7 +84,6 @@ private:
 	//vector<string> obj_names;
 	vector<string> sort_members_by_crowding_distance(vector<string>& members, map<string, double>& crowd_map, map<string, map<string, double>>& _member_struct);
 	bool first_dominates_second(map<string, double>& first, map<string, double>& second);
-	bool first_dominates_second(map<string, double>& first, map<string, double>& second, double ppd_convmode);
 	map<string, map<string, double>> get_member_struct(ObservationEnsemble& oe, ParameterEnsemble& dp);
 	void drop_duplicates(map<string, map<string, double>>& _member_struct);
 	bool first_equals_second(map<string, double>& first, map<string, double>& second);
@@ -127,7 +128,7 @@ private:
 	//PPD-related stuff
 	map<string, double> dominance_probability(map<string, double>& first, map<string, double>& second);
 	bool prob_pareto, ppd_sort;
-	vector<double> ppd_limits = pest_scenario.get_pestpp_options().get_mou_ppd_limits();;
+	vector<double> ppd_limits;
 
 	//EHVI-related stuff
 	const double EXTREME_AQF = 25;
