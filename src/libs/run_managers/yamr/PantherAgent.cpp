@@ -538,6 +538,7 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 void PANTHERAgent::run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, exception_ptr& run_exception,
 	Parameters* pars, Observations* obs)
 {
+    mi.set_sleep_ms(300);
 	mi.run(terminate,finished,run_exception, pars, obs);
 }
 
@@ -1132,7 +1133,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 						ss.str("");
 						ss << "frozen";
 						report(ss.str(), true);
-						w_sleep(30 * 1000);
+						w_sleep(3000);
 						if (quit_file_found()) {
                             report("pest.stp file found, resetting panther_agent_freeze_on_fail and continuing...",
                                    true);
