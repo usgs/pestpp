@@ -212,7 +212,6 @@ void ModelInterface::run(Parameters* pars, Observations* obs)
 	pest_utils::thread_flag terminate(false);
 	pest_utils::thread_flag finished(false);
 
-
 	run(&terminate, &finished, run_exception, pars, obs);
 	if (run_exception)
 	{
@@ -697,8 +696,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 			DWORD exitcode;
 			while (true)
 			{
-				//sleep
-				std::this_thread::sleep_for(std::chrono::milliseconds(OperSys::thread_sleep_milli_secs));
+
 				//check if process is still active
 				GetExitCodeProcess(pi.hProcess, &exitcode);
 				//if the process ended, break
@@ -730,6 +728,8 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 
 					break;
 				}
+				//sleep
+				std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
 			}
 			//jump out of the for loop if terminated
 			if (term_break) break;
@@ -748,9 +748,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 			int command_pid = start(cmd_string);
 			while (true)
 			{
-				//sleep
-				std::this_thread::sleep_for(std::chrono::milliseconds(OperSys::thread_sleep_milli_secs));
-				//check if process is still active
+
 				int status = 0;
 				pid_t exit_code = waitpid(command_pid, &status, WNOHANG);
 				//if the process ended, break
@@ -780,6 +778,9 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 					term_break = true;
 					break;
 				}
+                //sleep
+                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+                //check if process is still active
 			}
 			//jump out of the for loop if terminated
 			if (term_break) break;

@@ -560,7 +560,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		}
 
 	}
-    w_sleep(2000);
+    w_sleep(1000);
 	n_no_ops = 0;
     while (true)
     {
@@ -1006,7 +1006,7 @@ void RunManagerPanther::close_agents()
 			sock_nums.push_back(si.first);
 		for (auto si : sock_nums)
 			close_agent(si);
-		w_sleep(2000);
+		w_sleep(100);
 
 	}
 }
