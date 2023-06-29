@@ -151,7 +151,7 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 	mi.set_fill_tpl_zeros(pest_scenario.get_pestpp_options().get_fill_tpl_zeros());
 	mi.set_tpl_force_decimal(pest_scenario.get_pestpp_options().get_tpl_force_decimal());
 	mi.set_num_threads(pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
-    mi.set_sleep_ms(100);
+    mi.set_sleep_ms(500);
 	restart_on_error = pest_scenario.get_pestpp_options().get_panther_agent_restart_on_error();
 	max_time_without_master_ping_seconds = pest_scenario.get_pestpp_options().get_panther_agent_no_ping_timeout_secs();
 	FileManager fm("panther_agent");
