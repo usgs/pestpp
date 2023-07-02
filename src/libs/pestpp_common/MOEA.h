@@ -131,8 +131,8 @@ private:
 	vector<double> ppd_limits;
 
 	//EHVI-related stuff
-	const double EXTREME_AQF = 25;
-	double std_norm_cdf(double x, double mu, double sd, bool cumdf);
+	const double HYPERVOLUME_EXTREME = 25;
+	double std_norm_df(double x, double mu, double sd, bool cumdf);
 	double psi_function(double aa, double bb, double mu, double sd);
 	map<string, double> ehvi_member_map;
 	map<int, vector<double>> hypervolume_partitions;
@@ -272,6 +272,7 @@ private:
 	int get_max_len_obj_name();
 	bool should_use_multigen();
 
+	void queue_resample_runs(ParameterEnsemble& _dp); //outer iters
 
 };
 

@@ -1444,6 +1444,16 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_pso_alpha);
 		return true;
 		}
+	else if (key == "MOU_RESAMPLE_EVERY")
+	{
+		convert_ip(value, mou_resample_every);
+		return true;
+		}
+	else if (key == "MOU_RESAMPLE_COMMAND")
+	{
+		mou_resample_command = value;
+		return true;
+		}
 	else if (key == "MOU_PPD_LIMITS")
 	{
 		mou_ppd_limits.clear();
@@ -1904,6 +1914,8 @@ void PestppOptions::set_defaults()
 	set_mou_pso_social_const(2.0);
 	set_mou_pso_alpha(1.0);
 	set_mou_ppd_limits(vector<double>{0.5, 0.5});
+	set_mou_resample_every(-1);
+	set_mou_resample_command("");
 	set_mou_population_schedule("");
 	set_mou_simplex_reflections(10);
 	set_mou_simplex_factors(vector<double>{0.5, 0.6, 0.7, 0.8});

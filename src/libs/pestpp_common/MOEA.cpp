@@ -583,6 +583,13 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 		}
 		sum << "," << member_front_map[member];
 		sum << "," << crowd_map[member];
+		if (prob_pareto)
+		{
+			if (generation == 0)
+				sum << "," << 0;
+			else
+				sum << "," << ehvi_member_map[member];
+		}
 		sum << "," << spea2_constrained_fitness_map[member];
 		sum << "," << spea2_unconstrained_fitness_map[member];
 		if (infeas.find(member) != infeas.end())
@@ -609,8 +616,10 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 		sum << "," << pest_utils::lower_cp(obj);
 	for (auto obj : *pi_obj_names_ptr)
 		sum << "," << pest_utils::lower_cp(obj);
-	sum << ",nsga2_front,nsga2_crowding_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
-
+	if (prob_pareto)
+		sum << ",nsga2_front,nsga2_crowding_distance,ehvi,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
+	else
+		sum << ",nsga2_front,nsga2_crowding_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
 }
 
 map<string, double> ParetoObjectives::get_spea2_kth_nn_crowding_distance(ObservationEnsemble& op, ParameterEnsemble& dp)
@@ -1085,7 +1094,7 @@ map<string, double> ParetoObjectives::dominance_probability(map<string, double>&
 
 	for (auto obj_name : *obs_obj_names_ptr)
 	{
-		prob_dom[obj_name] = std_norm_cdf(second.at(obj_name), first.at(obj_name), first.at(obj_name + "_SD"), true);
+		prob_dom[obj_name] = std_norm_df(second.at(obj_name), first.at(obj_name), first.at(obj_name + "_SD"), true);
 	}
 
 	return prob_dom;
@@ -1128,27 +1137,27 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 
 }
 
-double ParetoObjectives::std_norm_cdf(double x, double mu, double sd, bool cumdf)
+double ParetoObjectives::std_norm_df(double x, double mu, double sd, bool cumdf)
 {
 	double Z, val;
 	const double sqrt_2 = sqrt(2.0);
-	const double dz = 1.0e-10;
+	const double inv_sqrt_2pi = 0.3989422804;
 
 	Z = (x - mu) / sd;
 
 	if (cumdf)
 		val = 0.5 * (1 + erf((x - mu)/(sqrt_2*sd)));
 	else
-		val = (std_norm_cdf(x, mu, sd, true) - std_norm_cdf(x - dz*sd, mu, sd, true)) / dz;
+		val = inv_sqrt_2pi*exp(-0.5 * Z * Z);
 
 	return val;
 }
 
 double ParetoObjectives::psi_function(double aa, double bb, double mu, double sd)
 {
-	double a = std_norm_cdf(bb, mu, sd, false);
-	double b = std_norm_cdf(bb, mu, sd, true);
-	double psi = sd * std_norm_cdf(bb, mu, sd, false) + (aa - mu) * std_norm_cdf(bb, mu, sd, true);
+	double a = std_norm_df(bb, mu, sd, false);
+	double b = std_norm_df(bb, mu, sd, true);
+	double psi = sd * std_norm_df(bb, mu, sd, false) + (aa - mu) * std_norm_df(bb, mu, sd, true);
 	return psi;
 }
 
@@ -1174,7 +1183,7 @@ void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, Param
 	{
 		for (auto obj_map : *obs_obj_names_ptr)
 		{
-			hv_parts[reftags][obj_map] = EXTREME_AQF * mult;
+			hv_parts[reftags][obj_map] = HYPERVOLUME_EXTREME * mult;
 			mult *= -1;
 		}
 		mult *= -1;
@@ -1213,9 +1222,10 @@ void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, Param
 //this works only for two objectives following the method of Yang et al (2019)
 void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
+	ehvi_member_map.clear();
 	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
 	map<int, vector<double>> hv_i = hypervolume_partitions;
-
+	stringstream ss;
 	double t1, t2, p1, p2, p3, ehvi;
 	vector<double> obj, obj_sd;
 
@@ -1231,6 +1241,7 @@ void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
 
 		t1 = 0;
 		t2 = 0;
+		ehvi = 0;
 
 		map<int, vector<double>>::iterator it = next(hv_i.begin(), 1), iprev;
 		for (; it != hv_i.end(); it++)
@@ -1238,7 +1249,7 @@ void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
 			iprev = prev(it, 1);
 
 			p1 = hv_i[iprev->first][0] - hv_i[it->first][0];
-			p2 = std_norm_cdf(hv_i[it->first][0], obj.at(0), obj_sd.at(0), true);
+			p2 = std_norm_df(hv_i[it->first][0], obj.at(0), obj_sd.at(0), true);
 			p3 = psi_function(hv_i[it->first][1], hv_i[it->first][1], obj.at(1), obj_sd.at(1));
 			t1 += p1 * p2 * p3;
 			
@@ -1250,6 +1261,14 @@ void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
 
 		ehvi = t1 + t2;
 		
+		if (ehvi < 0)
+		{
+			ss.str("");
+			ss << "EHVI of " << member.first << " is negative.";
+			performance_log->log_event(ss.str());
+			throw runtime_error(ss.str());
+		}
+
 		ehvi_member_map[member.first] = ehvi;
 	}
 }
@@ -1837,6 +1856,11 @@ void MOEA::update_archive_spea(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 	}
 }
 
+void MOEA::queue_resample_runs(ParameterEnsemble& _dp)
+{
+	//insert outer iter scripts
+}
+
 
 void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 {
@@ -1886,6 +1910,10 @@ vector<int> MOEA::run_population(ParameterEnsemble& _dp, ObservationEnsemble& _o
 	//queue up any chance related runs
 	if (allow_chance)
 		queue_chance_runs(_dp);
+
+	//queue up outer iter runs
+	/*if (iter % pest_scenario.get_pestpp_options().get_mou_resample_every() == 0)
+		queue_resample_runs(_dp);*/
 
 	message(1, "running population of size ", _dp.shape().first);
 	stringstream ss;
@@ -2809,10 +2837,10 @@ void MOEA::initialize()
 		//this causes the initial archive pareto summary file to be written
 		objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, false, true, ARC_SUM_TAG);
 
-		//compute EHVI
-		//objectives.set_hypervolume_partitions(op_archive, dp_archive);
-		//objectives.get_ehvi(op, dp);
-		
+		//set hypervolume partitions of nondom solutions
+		if (prob_pareto)
+			objectives.set_hypervolume_partitions(op_archive, dp_archive);
+				
 	}
 	else if (envtype == MouEnvType::SPEA)
 	{
@@ -3118,6 +3146,14 @@ void MOEA::iterate_to_solution()
 
 		save_populations(new_dp, new_op);
         update_sim_maps(new_dp,new_op);
+
+		//compute ehvi of each solution
+		if (prob_pareto)
+		{
+			message(1, "computing the expected hypervolume improvement of members in current population");
+			objectives.get_ehvi(new_op, new_dp);
+		}
+
         //if we are using chances, then we need to make sure to update the archive as well as the current population
         // from the full history of available members since uncertainty estimates could be changing as we evolve
         // e.g. Rui's problem...
@@ -3199,6 +3235,8 @@ void MOEA::iterate_to_solution()
 			new_op.keep_rows(keep);
 			dp = new_dp;
 			op = new_op;
+
+
 
 		}
 
@@ -3763,7 +3801,6 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
 	vector<string> new_names;
 	for (auto real_name : new_dp.get_real_names())
 	{
-		new_name = get_new_member_name("pso");
 		new_name = get_new_member_name("pso");
 		current_pso_lineage_map[real_name] = new_name;
 		new_names.push_back(new_name);
