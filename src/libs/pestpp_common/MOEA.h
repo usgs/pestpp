@@ -71,6 +71,7 @@ public:
 
 	//sort specific members
 	map<string, double> get_cuboid_crowding_distance(vector<string>& members);
+	map<string, double> get_ehvi(vector<string>& members);
 	
 	set<string> get_duplicates() { return duplicates;  }
 
@@ -137,7 +138,8 @@ private:
 	map<string, double> ehvi_member_map;
 	map<int, vector<double>> hypervolume_partitions;
 	double EHVI;
-	
+
+	double get_ehvi(string& member, map<string, map<string, double>>& _member_struct);
 };
 
 
@@ -179,6 +181,7 @@ private:
 	bool risk_obj;
 	bool prob_pareto = false; //probabilistic pareto dominance
 	bool ppd_sort;
+	vector<double> fitness_const = pest_scenario.get_pestpp_options().get_mou_fitness_const();
 	int restart_iter_offset;
 	int save_every;
 	map<int,int> population_schedule;

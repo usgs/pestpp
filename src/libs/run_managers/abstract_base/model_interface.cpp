@@ -786,7 +786,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		}
 #endif
 
-		cout << pest_utils::get_time_string() << " foward run command(s) finished, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
+		cout << pest_utils::get_time_string() << " forward run command(s) finished, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
 
 		if (term_break) return;
 

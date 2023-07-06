@@ -414,6 +414,8 @@ public:
 	void set_mou_pso_alpha(double val) { mou_pso_alpha = val; }
 	vector<double> get_mou_ppd_limits() const { return mou_ppd_limits; }
 	void set_mou_ppd_limits(vector<double> _vals) { mou_ppd_limits = _vals; }
+	vector<double> get_mou_fitness_const() const { return mou_fitness_const; }
+	void set_mou_fitness_const(vector<double> _vals) { mou_fitness_const = _vals; }
 	int get_mou_resample_every()const { return mou_resample_every; }
 	void set_mou_resample_every(int _every) { mou_resample_every = _every; }
 	string get_mou_resample_command()const { return mou_resample_command; }
@@ -754,6 +756,7 @@ private:
 	double mou_pso_cognitive_const;
 	double mou_pso_alpha;
 	vector<double> mou_ppd_limits;
+	vector<double> mou_fitness_const;
 	int mou_resample_every;
 	string mou_resample_command;
 	string mou_population_schedule;

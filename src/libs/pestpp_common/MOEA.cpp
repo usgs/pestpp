@@ -1222,61 +1222,89 @@ void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, Param
 //this works only for two objectives following the method of Yang et al (2019)
 void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
-	ehvi_member_map.clear();
 	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
-	map<int, vector<double>> hv_i = hypervolume_partitions;
-	stringstream ss;
-	double t1, t2, p1, p2, p3, ehvi;
-	vector<double> obj, obj_sd;
+	string member;
+	double ehvi_m;
 
-	for (auto member : _member_struct)
+	for (auto m : _member_struct)
 	{
-		obj.clear();
-		obj_sd.clear();
-		for (auto obj_map : *obs_obj_names_ptr)
-			obj.push_back(member.second[obj_map]);
-
-		for (auto obj_sd_map : *obs_obj_sd_names_ptr)
-			obj_sd.push_back(member.second[obj_sd_map]);
-
-		t1 = 0;
-		t2 = 0;
-		ehvi = 0;
-
-		map<int, vector<double>>::iterator it = next(hv_i.begin(), 1), iprev;
-		for (; it != hv_i.end(); it++)
-		{
-			iprev = prev(it, 1);
-
-			p1 = hv_i[iprev->first][0] - hv_i[it->first][0];
-			p2 = std_norm_df(hv_i[it->first][0], obj.at(0), obj_sd.at(0), true);
-			p3 = psi_function(hv_i[it->first][1], hv_i[it->first][1], obj.at(1), obj_sd.at(1));
-			t1 += p1 * p2 * p3;
-			
-			p1 = psi_function(hv_i[iprev->first][0], hv_i[iprev->first][0], obj.at(0), obj_sd.at(0));
-			p2 = psi_function(hv_i[iprev->first][0], hv_i[it->first][0], obj.at(0), obj_sd.at(0));
-			p3 = psi_function(hv_i[it->first][1], hv_i[it->first][1], obj.at(1), obj_sd.at(1));
-			t2 += (p1-p2)*p3;
-		}
-
-		ehvi = t1 + t2;
-		
-		if (ehvi < 0)
-		{
-			ss.str("");
-			ss << "EHVI of " << member.first << " is negative.";
-			performance_log->log_event(ss.str());
-			throw runtime_error(ss.str());
-		}
-
-		ehvi_member_map[member.first] = ehvi;
+		member = m.first;
+		ehvi_m = get_ehvi(member, _member_struct);
+		ehvi_member_map[member] = ehvi_m;
 	}
+	
 }
 
-//map<string, double> ParetoObjectives::front_partitioned(ObservationEnsemble& op)
-//{
-//
-//}
+map<string, double> ParetoObjectives::get_ehvi(vector<string>& members)
+{
+	map<string, double> ehvi_map;
+	double ehvi_mem;
+
+	for (auto m : members)
+	{
+		ehvi_mem = get_ehvi(m, member_struct);
+		ehvi_map[m] = ehvi_mem;
+	}
+
+	return ehvi_map;
+}
+
+double ParetoObjectives::get_ehvi(string& member, map<string, map<string, double>>& _member_struct)
+{
+	map<int, vector<double>> hv_i = hypervolume_partitions;
+	stringstream ss;
+	double t1, t2, p1, p2, p3, ehvi=0;
+	vector<double> obj, obj_sd;
+
+	obj.clear();
+	obj_sd.clear();
+	for (auto obj_map : *obs_obj_names_ptr)
+		obj.push_back(_member_struct[member][obj_map]);
+
+	for (auto obj_sd_map : *obs_obj_sd_names_ptr)
+		obj_sd.push_back(_member_struct[member][obj_sd_map]);
+
+	t1 = 0;
+	t2 = 0;
+	ehvi = 0;
+
+	map<int, vector<double>>::iterator it = next(hv_i.begin(), 1), iprev;
+	for (; it != hv_i.end(); it++)
+	{
+		iprev = prev(it, 1);
+
+		p1 = hv_i[iprev->first][0] - hv_i[it->first][0];
+		p2 = std_norm_df(hv_i[it->first][0], obj.at(0), obj_sd.at(0), true);
+		p3 = psi_function(hv_i[it->first][1], hv_i[it->first][1], obj.at(1), obj_sd.at(1));
+		t1 += p1 * p2 * p3;
+
+		p1 = psi_function(hv_i[iprev->first][0], hv_i[iprev->first][0], obj.at(0), obj_sd.at(0));
+		p2 = psi_function(hv_i[iprev->first][0], hv_i[it->first][0], obj.at(0), obj_sd.at(0));
+		p3 = psi_function(hv_i[it->first][1], hv_i[it->first][1], obj.at(1), obj_sd.at(1));
+		t2 += (p1 - p2) * p3;
+	}
+
+	ehvi = t1 + t2;
+
+	if (ehvi < 0 && ehvi > -0.01) //Sometimes the value is only a little bit negative. Perhaps, due to the approximation of std normal. This happened only few times, though, but when it does, temporarily set the value to 0. Will revisit this later.
+	{
+		ss.str("");
+		ss << "WARNING: EHVI of " << member << " is negative = " << ehvi << ".Setting to 0.0.";
+		performance_log->log_event(ss.str());
+		ehvi = 0;
+	}
+
+	if (ehvi <= -0.01) //If it is way too negative, something must be really wrong.
+	{
+		ss.str("");
+		ss << "EHVI of " << member << " is negative.";
+		performance_log->log_event(ss.str());
+		throw runtime_error(ss.str());
+	}
+
+	return ehvi;
+}
+
 
 MOEA::MOEA(Pest &_pest_scenario, FileManager &_file_manager, OutputFileWriter &_output_file_writer, 
 	PerformanceLog *_performance_log, RunManagerAbstract* _run_mgr_ptr)
@@ -3718,6 +3746,14 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 		return gbest_solutions;
 	}
 	
+	map<string, double> ehvi_nondom = objectives.get_ehvi(nondom_solutions);
+	double mean_ei = 0;
+	for (auto& ei : ehvi_nondom)
+		mean_ei += ei.second / nondom_solutions.size();
+
+	for (auto& ei : ehvi_nondom)
+		ei.second = 1 - (abs(ei.second - mean_ei) / mean_ei);
+	
 	map<string, double> crowd_dist = objectives.get_cuboid_crowding_distance(nondom_solutions);
 	//normalize cd
 	double mx = -1.0e+30;
@@ -3737,15 +3773,48 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
         }
     }
 
+	for (auto& cd : crowd_dist) {
+		if (ehvi_nondom[cd.first] < -1)
+			cd.second = 0;
+	}
+
+	//map<string, double> fitness;
+	//for (auto f : crowd_dist)
+	//{
+	//	fitness[f.first] = fitness_const[0] * f.second + fitness_const[1] * ehvi_nondom[f.first];
+	//}
+
 	vector<string> working;
 	string candidate;
 	int count = 0;
 	vector < double> r;
 	bool found;
+	double size = nondom_solutions.size();
 	for (int i = 0; i < num_reals; i++)
 	{
 		count = 0;
 		found = false;
+
+		/*while (true)
+		{
+			working = nondom_solutions;
+			shuffle(working.begin(), working.end(), rand_gen);
+			r = uniform_draws(nondom_solutions.size(), 0.0, 1.0, rand_gen);
+			for (int i = 0; i < r.size(); i++)
+				if (fitness[working[i]] >= r[i])
+				{
+					candidate = working[i];
+					found = true;
+					break;
+				}
+
+			if (found)
+				break;
+			count++;
+			if (count > 1000000)
+				throw_moea_error("MOEA::get_pso_gbest_solutions() seems to be stuck in a infinite loop....");	
+		}*/
+		
 		while (true)
 		{
 			working = nondom_solutions;

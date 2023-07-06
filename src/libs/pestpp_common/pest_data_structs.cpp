@@ -1467,6 +1467,19 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		}
 		return true;
 		}
+	else if (key == "MOU_FITNESS_CONST")
+	{
+		mou_fitness_const.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			mou_fitness_const.push_back(v);
+		}
+		return true;
+		}
 	else if (key == "MOU_POPULATION_SCHEDULE")
     {
 	    mou_population_schedule = org_value;
@@ -1914,6 +1927,7 @@ void PestppOptions::set_defaults()
 	set_mou_pso_social_const(2.0);
 	set_mou_pso_alpha(1.0);
 	set_mou_ppd_limits(vector<double>{0.5, 0.5});
+	set_mou_fitness_const(vector<double>{0.5, 0.5});
 	set_mou_resample_every(-1);
 	set_mou_resample_command("");
 	set_mou_population_schedule("");
