@@ -151,7 +151,7 @@ void PANTHERAgent::process_ctl_file(const string &ctl_filename)
 	mi.set_fill_tpl_zeros(pest_scenario.get_pestpp_options().get_fill_tpl_zeros());
 	mi.set_tpl_force_decimal(pest_scenario.get_pestpp_options().get_tpl_force_decimal());
 	mi.set_num_threads(pest_scenario.get_pestpp_options().get_num_tpl_ins_threads());
-
+    mi.set_sleep_ms(500);
 	restart_on_error = pest_scenario.get_pestpp_options().get_panther_agent_restart_on_error();
 	max_time_without_master_ping_seconds = pest_scenario.get_pestpp_options().get_panther_agent_no_ping_timeout_secs();
 	FileManager fm("panther_agent");
@@ -538,6 +538,7 @@ std::pair<NetPackage::PackType,std::string> PANTHERAgent::run_model(Parameters &
 void PANTHERAgent::run_async(pest_utils::thread_flag* terminate, pest_utils::thread_flag* finished, exception_ptr& run_exception,
 	Parameters* pars, Observations* obs)
 {
+    mi.set_sleep_ms(300);
 	mi.run(terminate,finished,run_exception, pars, obs);
 }
 
@@ -1132,7 +1133,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 						ss.str("");
 						ss << "frozen";
 						report(ss.str(), true);
-						w_sleep(30 * 1000);
+						w_sleep(3000);
 						if (quit_file_found()) {
                             report("pest.stp file found, resetting panther_agent_freeze_on_fail and continuing...",
                                    true);

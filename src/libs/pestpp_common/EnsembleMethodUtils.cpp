@@ -581,11 +581,12 @@ void EnsembleSolver::initialize_for_mm_solve()
     }
 
     mat = base_oe.get_eigen(oe_real_names, obs_names);
+    mat.transposeInPlace();
     Observations ctl_obs = pest_scenario.get_ctl_observations();
-    Eigen::VectorXd ovals = ctl_obs.get_data_eigen_vec(obs_names);
+    Eigen::ArrayXd ovals = ctl_obs.get_data_eigen_vec(obs_names).array();
     for (int i = 0; i < oe_real_names.size(); i++)
     {
-        obs_err_map[oe_real_names[i]] = mat.row(i).array() - ovals.array();
+        obs_err_map[oe_real_names[i]] = mat.col(i).array() - ovals;
     }
 
     mat = ph.get_par_resid_subset(pe,pe_real_names);
@@ -5470,10 +5471,11 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	if (ppo->get_ies_use_mda())
 	{
+	    message(1, "using multiple-data-assimilation algorithm");
 		int noptmax = pest_scenario.get_control_info().noptmax;
 		if (noptmax > 0)
 		{
-			message(0, "using multiple-data-assimilation algorithm");
+
             if (ppo->get_ies_no_noise())
             {
                 throw_em_error("'no noise'is not compatible with 'use_mda' as this solution relies on noise draws");
@@ -5482,7 +5484,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	}
 	else
 	{
-		message(0, "using glm algorithm");
+		message(1, "using glm algorithm");
 	}
 
 	verbose_level = pest_scenario.get_pestpp_options_ptr()->get_ies_verbose_level();
@@ -6347,7 +6349,7 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
     }
     ss.str("");
     ss << "checking phi factors in file " << fname;
-    message(0,ss.str());
+    message(1,ss.str());
     ;
     if (pest_scenario.get_pestpp_options().get_ies_phi_factors_by_real())
     {
@@ -9155,7 +9157,7 @@ vector<string> EnsembleMethod::detect_prior_data_conflict(bool save)
             in_conflict.push_back(oname);
             dist = max((smin - omax), (omin - smax));
 
-            pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << ","
+            pdccsv << pest_utils::lower_cp(oname) << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << ","
                    << omax_stat;
             pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << ","
                    << smax_stat << "," << dist << endl;
