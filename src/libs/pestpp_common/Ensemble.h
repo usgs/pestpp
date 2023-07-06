@@ -144,12 +144,18 @@ public:
 	vector<double> get_real_fixed_values(const string& rname, vector<string>& pnames);
 	map<string, double> get_real_fixed_values(const string& rname);
 	void add_realization(string rname, Eigen::VectorXd& rvals, vector<string>& pnames);
+    void add_realization(string rname, map<string, double>& rvals);
 	void keep_realizations(const vector<string>& keep);
 	void update_realizations(const vector<string>& other_var_names, const vector<string>& other_real_names, const Eigen::MatrixXd& other_mat);
+	void add_realizations(map<string,map<string,double>>& other_fixed_info);
 	void update_par_values(const map<string, double>& pval_map);
 	void clear() { fixed_info.clear(); fixed_names.clear(); }
 	void fill_fixed(map<string, double>& fixed_map, vector<string>& rnames);
 	int get_map_size() {return fixed_info.size();}
+	vector<string> get_real_names();
+    vector<string> get_fixed_names() {return fixed_names;}
+    map<string,map<string,double>> get_fixed_info_map() {return fixed_info;}
+
 private:
 	bool initialized;
 	vector<string> fixed_names;

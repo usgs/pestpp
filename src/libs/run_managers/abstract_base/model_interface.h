@@ -112,9 +112,11 @@ public:
 	void set_fill_tpl_zeros(bool _flag) { fill_tpl_zeros = _flag; }
 	void set_tpl_force_decimal(bool _flag) {tpl_force_decimal = _flag;}
 	void set_num_threads(int _num_threads) { num_threads = _num_threads; }
+	void set_sleep_ms(int _sleep_ms){sleep_ms = _sleep_ms;}
 
 private:
 	int num_threads;
+	int sleep_ms;
 	//Pest* pest_scenario_ptr;
 	vector<TemplateFile> templatefiles;
 	vector<InstructionFile> instructionfiles;
