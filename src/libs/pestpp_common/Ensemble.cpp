@@ -4299,12 +4299,84 @@ void FixedParInfo::add_realization(string rname, Eigen::VectorXd& rvals, vector<
 	map<string, double> v;
 	for (int i = 0; i < rvals.size(); i++)
 		v[pnames[i]] = rvals[i];
+	map<string,double>::iterator  end = v.end();
 	for (auto& name : fixed_names)
 	{
-		if (v.find(name) == v.end())
+		if (v.find(name) == end)
 			throw runtime_error("FixedParInfo::add_realization(): fixed name '" + name + "' not in pnames");
 		fixed_info.at(name)[rname] = v.at(name);
 	}
+}
+
+vector<string> FixedParInfo::get_real_names()
+{
+    if (!initialized)
+    {
+        return vector<string>();
+    }
+    if (fixed_names.size() == 0)
+    {
+        return vector<string>();
+    }
+    vector<string> rnames;
+    for (auto& fi : fixed_info)
+    {
+        for (auto& ri : fi.second)
+        {
+            rnames.push_back(ri.first);
+        }
+    }
+    return rnames;
+
+}
+
+void FixedParInfo::add_realizations(map<string,map<string,double>>& other_fixed_info)
+{
+    if (!initialized)
+    {
+        throw runtime_error("FixedParInfo::update_realizations: not initialized");
+    }
+    if (fixed_names.size() == 0)
+    {
+        //this needs to be error checked..
+        fixed_info = other_fixed_info;
+        return;
+    }
+    map<string,map<string,double>>::iterator end = fixed_info.end();
+    for (auto& ofi : other_fixed_info)
+    {
+        if (fixed_info.find(ofi.first) == end)
+        {
+            throw runtime_error("FixedParInfo::add_realizations() error: pname "+ofi.first+" not in fixed_info");
+        }
+        for (auto& ori : ofi.second)
+        {
+            //probably should error check this also to make sure other_fixed_info isnt replacing things...
+            fixed_info.at(ofi.first)[ori.first] = ori.second;
+        }
+    }
+}
+
+
+void FixedParInfo::add_realization(string rname, map<string, double>& rvals)
+{
+    if (!initialized)
+    {
+        throw runtime_error("FixedParInfo::add_realization(): not initialized");
+    }
+    if (fixed_names.size() == 0)
+    {
+        return;
+    }
+    map<string,double>::iterator  end = rvals.end();
+    for (auto& name : fixed_names)
+    {
+        if (rvals.find(name) == end)
+            throw runtime_error("FixedParInfo::add_realization(): fixed name '" + name + "' not in pnames");
+        fixed_info.at(name)[rname] = rvals.at(name);
+    }
+
+
 }
 
 void FixedParInfo::keep_realizations(const vector<string>& keep)
@@ -4341,6 +4413,7 @@ void FixedParInfo::keep_realizations(const vector<string>& keep)
 		}
 	}
 }
+
 
 void FixedParInfo::update_realizations(const vector<string>& other_var_names, const vector<string>& other_real_names, const Eigen::MatrixXd& other_mat)
 {

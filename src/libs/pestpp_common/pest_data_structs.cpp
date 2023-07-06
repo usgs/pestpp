@@ -1513,6 +1513,13 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
         mou_use_multigen = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
+    else if (key == "MOU_SHUFFLE_FIXED_PARS")
+    {
+        mou_shuffle_fixed_pars = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
+
+
 	return false;
 }
 
@@ -1745,6 +1752,7 @@ void PestppOptions::summary(ostream& os) const
 	}
 	os << "mou_simplex_mutation: " << mou_simplex_mutation << endl;
     os << "mou_use_multigen:" << mou_use_multigen << endl;
+    os << "mou_shuffle_fixed_pars: " << mou_shuffle_fixed_pars << endl;
 
 
 	os << endl << "...shared pestpp-ies/pestpp-da options:" << endl;
@@ -1935,6 +1943,7 @@ void PestppOptions::set_defaults()
 	set_mou_simplex_factors(vector<double>{0.5, 0.6, 0.7, 0.8});
     set_mou_simplex_mutation(false);
     set_mou_use_multigen(false);
+    set_mou_shuffle_fixed_pars(false);
 	
 	set_ies_par_csv("");
 	set_ies_obs_csv("");

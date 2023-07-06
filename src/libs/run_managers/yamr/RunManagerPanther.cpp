@@ -1006,7 +1006,7 @@ void RunManagerPanther::close_agents()
 			sock_nums.push_back(si.first);
 		for (auto si : sock_nums)
 			close_agent(si);
-		w_sleep(2000);
+		w_sleep(100);
 
 	}
 }
