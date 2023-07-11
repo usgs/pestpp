@@ -412,10 +412,14 @@ public:
 	void set_mou_pso_cognitive_const(double val) { mou_pso_cognitive_const = val; }
 	double get_mou_pso_alpha() const { return mou_pso_alpha; }
 	void set_mou_pso_alpha(double val) { mou_pso_alpha = val; }
+	double get_mou_pso_rramp() const { return mou_pso_rramp; }
+	void set_mou_pso_rramp(double val) { mou_pso_rramp = val; }
+	double get_mou_pso_rfit() const { return mou_pso_rfit; }
+	void set_mou_pso_rfit(double val) { mou_pso_rfit = val; }
+	double get_mou_hypervolume_extreme() const { return mou_hypervolume_extreme; }
+	void set_mou_hypervolume_extreme(double val) { mou_hypervolume_extreme = val; }
 	vector<double> get_mou_ppd_limits() const { return mou_ppd_limits; }
 	void set_mou_ppd_limits(vector<double> _vals) { mou_ppd_limits = _vals; }
-	vector<double> get_mou_fitness_const() const { return mou_fitness_const; }
-	void set_mou_fitness_const(vector<double> _vals) { mou_fitness_const = _vals; }
 	int get_mou_resample_every()const { return mou_resample_every; }
 	void set_mou_resample_every(int _every) { mou_resample_every = _every; }
 	string get_mou_resample_command()const { return mou_resample_command; }
@@ -757,8 +761,10 @@ private:
 	double mou_pso_social_const;
 	double mou_pso_cognitive_const;
 	double mou_pso_alpha;
+	double mou_pso_rramp;
+	double mou_pso_rfit;
 	vector<double> mou_ppd_limits;
-	vector<double> mou_fitness_const;
+	double mou_hypervolume_extreme;
 	int mou_resample_every;
 	string mou_resample_command;
 	string mou_population_schedule;

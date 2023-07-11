@@ -1174,7 +1174,7 @@ void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, Param
 	map<int, vector<double>> hypervolume;
 	map<string, double> hv_partition;
 	vector<double> hpv;
-
+	double hv_extreme = pest_scenario.get_pestpp_options().get_mou_hypervolume_extreme();
 	
 	//initialize reference values
 	int mult = 1;
@@ -1183,7 +1183,7 @@ void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, Param
 	{
 		for (auto obj_map : *obs_obj_names_ptr)
 		{
-			hv_parts[reftags][obj_map] = HYPERVOLUME_EXTREME * mult;
+			hv_parts[reftags][obj_map] = hv_extreme * mult;
 			mult *= -1;
 		}
 		mult *= -1;
@@ -1286,7 +1286,7 @@ double ParetoObjectives::get_ehvi(string& member, map<string, map<string, double
 
 	ehvi = t1 + t2;
 
-	if (ehvi < 0 && ehvi > -0.01) //Sometimes the value is only a little bit negative. Perhaps, due to the approximation of std normal. This happened only few times, though, but when it does, temporarily set the value to 0. Will revisit this later.
+	if (ehvi < 0) //Sometimes the value is only a little bit negative. Perhaps, due to the approximation of std normal. This happened only few times, though, but when it does, temporarily set the value to 0. Will revisit this later.
 	{
 		ss.str("");
 		ss << "WARNING: EHVI of " << member << " is negative = " << ehvi << ".Setting to 0.0.";
@@ -1294,13 +1294,13 @@ double ParetoObjectives::get_ehvi(string& member, map<string, map<string, double
 		ehvi = 0;
 	}
 
-	if (ehvi <= -0.01) //If it is way too negative, something must be really wrong.
-	{
-		ss.str("");
-		ss << "EHVI of " << member << " is negative.";
-		performance_log->log_event(ss.str());
-		throw runtime_error(ss.str());
-	}
+	//if (ehvi <= -0.1) //If it is way too negative, something must be really wrong.
+	//{
+	//	ss.str("");
+	//	ss << "EHVI of " << member << " is negative: " << ehvi;
+	//	performance_log->log_event(ss.str());
+	//	throw runtime_error(ss.str());
+	//}
 
 	return ehvi;
 }
@@ -3804,11 +3804,28 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	if ((mx < 0.0) && (iter > 0))
         throw_moea_error("pso max crowding distance is negative");
 
+	//variable alpha
+	if (alpha == 0)
+	{
+		double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
+		double pfull = nondom_solutions.size() / maxarchivesize;
+		double rramp = pest_scenario.get_pestpp_options().get_mou_pso_rramp();
+		double rfit = pest_scenario.get_pestpp_options().get_mou_pso_rfit();
+
+		if (rramp == -5e+02)
+			throw_moea_error("PSO alpha is zero");
+		if (rramp == 0.0)
+			throw_moea_error("PSO RRAMP is zero");
+
+		alpha = 1 + (exp(rramp * pfull) - 1.0) / (exp(rramp) - 1) * (rfit - 1.0);
+
+	}
+	
 	for (auto& cd : crowd_dist) {
         if (cd.second == CROWDING_EXTREME) {
             cd.second = 1.0;
         } else if (mx != 0.0) {
-            cd.second = pow(cd.second / mx, alpha); //added alpha following Siade et al(2019); default value is 1.0
+            cd.second = pow(cd.second / mx, alpha);
         } else {
             cd.second = pow(0.5, alpha);
         }

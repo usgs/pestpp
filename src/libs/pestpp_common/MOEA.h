@@ -132,7 +132,6 @@ private:
 	vector<double> ppd_limits;
 
 	//EHVI-related stuff
-	const double HYPERVOLUME_EXTREME = 25;
 	double std_norm_df(double x, double mu, double sd, bool cumdf);
 	double psi_function(double aa, double bb, double mu, double sd);
 	map<string, double> ehvi_member_map;
@@ -181,7 +180,6 @@ private:
 	bool risk_obj;
 	bool prob_pareto = false; //probabilistic pareto dominance
 	bool ppd_sort;
-	vector<double> fitness_const = pest_scenario.get_pestpp_options().get_mou_fitness_const();
 	int restart_iter_offset;
 	int save_every;
 	map<int,int> population_schedule;

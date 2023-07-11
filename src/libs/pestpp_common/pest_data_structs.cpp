@@ -1444,6 +1444,21 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_pso_alpha);
 		return true;
 		}
+	else if (key == "MOU_PSO_RRAMP")
+	{
+		convert_ip(value, mou_pso_rramp);
+		return true;
+		}
+	else if (key == "MOU_PSO_RFIT")
+	{
+		convert_ip(value, mou_pso_rfit);
+		return true;
+		}
+	else if (key == "MOU_HYPERVOLUME_EXTREME")
+	{
+		convert_ip(value, mou_hypervolume_extreme);
+		return true;
+		}
 	else if (key == "MOU_RESAMPLE_EVERY")
 	{
 		convert_ip(value, mou_resample_every);
@@ -1464,19 +1479,6 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		{
 			convert_ip(t, v);
 			mou_ppd_limits.push_back(v);
-		}
-		return true;
-		}
-	else if (key == "MOU_FITNESS_CONST")
-	{
-		mou_fitness_const.clear();
-		vector<string> tok;
-		tokenize(value, tok, ",		");
-		double v;
-		for (const auto& t : tok)
-		{
-			convert_ip(t, v);
-			mou_fitness_const.push_back(v);
 		}
 		return true;
 		}
@@ -1934,8 +1936,10 @@ void PestppOptions::set_defaults()
 	set_mou_pso_cognitive_const(2.0);
 	set_mou_pso_social_const(2.0);
 	set_mou_pso_alpha(1.0);
+	set_mou_pso_rramp(-5e+02);
+	set_mou_pso_rfit(2.0);
+	set_mou_hypervolume_extreme(1e+10);
 	set_mou_ppd_limits(vector<double>{0.5, 0.5});
-	set_mou_fitness_const(vector<double>{0.5, 0.5});
 	set_mou_resample_every(-1);
 	set_mou_resample_command("");
 	set_mou_population_schedule("");
