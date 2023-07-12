@@ -3786,15 +3786,7 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 			gbest_solutions.push_back(nondom_solutions[0]);
 		return gbest_solutions;
 	}
-	
-	map<string, double> ehvi_nondom = objectives.get_ehvi(nondom_solutions);
-	double mean_ei = 0;
-	for (auto& ei : ehvi_nondom)
-		mean_ei += ei.second / nondom_solutions.size();
-
-	for (auto& ei : ehvi_nondom)
-		ei.second = 1 - (abs(ei.second - mean_ei) / mean_ei);
-	
+		
 	map<string, double> crowd_dist = objectives.get_cuboid_crowding_distance(nondom_solutions);
 	//normalize cd
 	double mx = -1.0e+30;
@@ -3831,9 +3823,20 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
         }
     }
 
-	for (auto& cd : crowd_dist) {
-		if (ehvi_nondom[cd.first] < -1)
-			cd.second = 0;
+	if (prob_pareto)
+	{
+		map<string, double> ehvi_nondom = objectives.get_ehvi(nondom_solutions);
+		double mean_ei = 0;
+		for (auto& ei : ehvi_nondom)
+			mean_ei += ei.second / nondom_solutions.size();
+
+		for (auto& ei : ehvi_nondom)
+			ei.second = 1 - (abs(ei.second - mean_ei) / mean_ei);
+
+		for (auto& cd : crowd_dist) {
+			if (ehvi_nondom[cd.first] < -1) //penalty for overpromising points
+				cd.second = 0;
+		}
 	}
 
 	//map<string, double> fitness;
