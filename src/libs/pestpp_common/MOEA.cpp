@@ -870,14 +870,6 @@ void ParetoObjectives::fill_domination_containers(map<string, map<string, double
 					else
 						throw runtime_error("ParetoObjectives::fill_domination_containers(): solution '" + solution_p.first + "' and '" + solution_q.first + "' are identical");
 				}
-				/*else if (first_dominates_second(solution_p.second, solution_q.second, 0.5))
-				{
-					solutions_dominated.push_back(solution_q.first);
-				}
-				else if (first_dominates_second(solution_q.second, solution_p.second, 0.5))
-				{
-					domination_counter++;
-				}*/
 				else if (first_dominates_second(solution_p.second, solution_q.second))
 				{
 					solutions_dominated.push_back(solution_q.first);
@@ -986,7 +978,7 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 	{
 		stringstream ss;
 		ss << "ERROR: ParetoObjectives::sort_members_by_dominance_into_fronts(): number of solutions in fronts (";
-		ss << num_front_solutions << ") != member_stuct.size() (" << _member_struct.size() << "," << endl;
+		ss << num_front_solutions << ") != member_struct.size() (" << _member_struct.size() << "," << endl;
 		file_manager.rec_ofstream() << ss.str();
 		cout << ss.str();
 		throw runtime_error(ss.str());
@@ -1094,7 +1086,8 @@ map<string, double> ParetoObjectives::dominance_probability(map<string, double>&
 
 	for (auto obj_name : *obs_obj_names_ptr)
 	{
-		prob_dom[obj_name] = std_norm_df(second.at(obj_name), first.at(obj_name), first.at(obj_name + "_SD"), true);
+		//prob_dom[obj_name] = std_norm_df(second.at(obj_name), first.at(obj_name), first.at(obj_name + "_SD"), true);
+		prob_dom[obj_name] = std_norm_df(0, first.at(obj_name) - second.at(obj_name), sqrt(pow(first.at(obj_name + "_SD"),2) + pow(second.at(obj_name + "_SD"),2)), true);
 	}
 
 	return prob_dom;
@@ -1116,14 +1109,43 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 
 	if (/*prob_pareto*/ ppd_sort)
 	{
-		map<string, double> first_prob_dom = dominance_probability(first, second);
+		bool dom = true;
+
+		for (auto f : first)
+		{
+			if (f.second > second[f.first])
+			{
+				dom = false;
+				break;
+			}
+				
+		}
+
+		if (dom)
+			return true;
+
+		map<string, double> prob_dom = dominance_probability(first, second);
+
+		int i = 0;
+		for (auto d : prob_dom)
+		{
+			if (d.second < ppd_limits[i])
+				return false;
+			i++;
+		}
+		return true;
+		
+
+		/*map<string, double> first_prob_dom = dominance_probability(first, second);
 		map<string, double> second_prob_dom = dominance_probability(second, first);
+
 		for (auto f : first_prob_dom)
 		{
 			if ((f.second < ppd_limits[0]) && (second_prob_dom[f.first] > ppd_limits[1]))
 				return false;
 		}
-		return true;
+		return true;*/
+
 	}
 	else
 	{
