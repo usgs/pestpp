@@ -1261,6 +1261,10 @@ void InstructionFile::prep_ins_file_for_reading(ifstream& f_ins)
 	if (s_marker.size() != 1)
 		throw_ins_error("marker on first line should be one character, not: " + s_marker);
 	marker = s_marker.c_str()[0];
+    if (marker == '!')
+    {
+        throw_ins_error("the bang ('!') cant be used as the marker bc it is used to indicate free-format instructions");
+    }
 }
 
 
