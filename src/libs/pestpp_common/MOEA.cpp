@@ -1118,7 +1118,6 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 				dom = false;
 				break;
 			}
-				
 		}
 
 		if (dom)
@@ -1240,6 +1239,39 @@ void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, Param
 	
 	hypervolume_partitions = hypervolume;
 }
+
+void ParetoObjectives::update_ppd_criteria(ObservationEnsemble& op, ParameterEnsemble& dp)
+{
+	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
+	double cv;
+	ppd_range = pest_scenario.get_pestpp_options().get_mou_ppd_limits();
+	double ppd_lb = ppd_range[0], ppd_ub = ppd_range[1];
+	stringstream ss;
+
+	int i = 0;
+	for (auto obj_name : *obs_obj_names_ptr)
+	{
+		cv = 0;
+		for (auto m : _member_struct)
+		{
+			cv += abs(m.second[obj_name + "_SD"]/ m.second[obj_name]);
+		}
+		cv /=_member_struct.size();
+
+		if (cv < 1)
+			ppd_limits[i] = ppd_ub;
+		else
+			ppd_limits[i] = ppd_lb + ((exp(1 / cv) - 1) / (exp(1) - 1)) * (ppd_ub - ppd_lb);
+
+		i++;
+	}
+
+	ss.str("");
+	ss << "Overlap criteria used - objective 1: " << ppd_limits[0] << " ; objective 2: " << ppd_limits[1];
+	performance_log->log_event(ss.str());
+
+}
+
 
 //this works only for two objectives following the method of Yang et al (2019)
 void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
@@ -2864,7 +2896,7 @@ void MOEA::initialize()
     vector<string> keep;
 	if (envtype == MouEnvType::NSGA)
 	{
-		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, prob_pareto, true, POP_SUM_TAG);
+		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, false, true, POP_SUM_TAG);
 
         //drop any duplicates
         keep.clear();
@@ -3238,6 +3270,13 @@ void MOEA::iterate_to_solution()
 		{
 			message(1, "computing the expected hypervolume improvement of members in current population");
 			objectives.get_ehvi(new_op, new_dp);
+
+			if (pest_scenario.get_pestpp_options().get_mou_adaptive_ppd())
+			{
+				message(1, "updating overlap criteria for probabilistic dominance sorting");
+				objectives.update_ppd_criteria(new_op, new_dp);
+			}
+			
 		}
 
         //if we are using chances, then we need to make sure to update the archive as well as the current population

@@ -42,7 +42,7 @@ public:
 	void set_prob_pareto(bool ppd) { prob_pareto = ppd; }
 	void set_hypervolume_partitions(ObservationEnsemble& op, ParameterEnsemble& dp);
 	void get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp);
-	//double get_EHVI(ObservationEnsemble& op);
+	void update_ppd_criteria(ObservationEnsemble& op, ParameterEnsemble& dp);
 
 	//this must be called at least once before the diversity metrixs can be called...
 	void set_pointers(vector<string>& _obs_obj_names, vector<string>& _obs_obj_sd_names, vector<string>& _pi_obj_names, map<string, double>& _obj_dir_mult)
@@ -120,6 +120,7 @@ private:
 	map<int, vector<string>> prob_front_map;
 	map<string, double> crowd_map;
 	map<string, int> member_front_map;
+	map<string, double> member_cvar;
 	map<string, double> infeas;
 	vector<string> infeas_ordered;
 	map<string, double> spea2_constrained_fitness_map;
@@ -130,6 +131,7 @@ private:
 	map<string, double> dominance_probability(map<string, double>& first, map<string, double>& second);
 	bool prob_pareto, ppd_sort;
 	vector<double> ppd_limits;
+	vector<double> ppd_range;
 
 	//EHVI-related stuff
 	double std_norm_df(double x, double mu, double sd, bool cumdf);

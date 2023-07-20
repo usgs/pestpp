@@ -421,6 +421,8 @@ public:
 	vector<double> get_mou_ppd_limits() const { return mou_ppd_limits; }
 	void set_mou_ppd_limits(vector<double> _vals) { mou_ppd_limits = _vals; }
 	int get_mou_resample_every()const { return mou_resample_every; }
+	void set_mou_adaptive_ppd(bool _flag) { mou_adaptive_ppd = _flag; };
+	bool get_mou_adaptive_ppd() const { return mou_adaptive_ppd; }
 	void set_mou_resample_every(int _every) { mou_resample_every = _every; }
 	string get_mou_resample_command()const { return mou_resample_command; }
 	void set_mou_resample_command(string _rescmd) { mou_resample_command = _rescmd; }
@@ -764,6 +766,7 @@ private:
 	double mou_pso_rramp;
 	double mou_pso_rfit;
 	vector<double> mou_ppd_limits;
+	bool mou_adaptive_ppd;
 	double mou_hypervolume_extreme;
 	int mou_resample_every;
 	string mou_resample_command;
