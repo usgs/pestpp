@@ -3508,6 +3508,8 @@ void L2PhiHandler::report_group(bool echo) {
     {
         for (auto& oo : o.second)
         {
+            if (oo.second == 0.0)
+                continue;
             len = max(len,(int)oo.first.size());
         }
         break;
@@ -3543,13 +3545,13 @@ void L2PhiHandler::report_group(bool echo) {
         g = pair.first;
         ss.str("");
         ss << left << setw(len) << pest_utils::lower_cp(g) << " ";
-        ss << right << setw(9) << mn_map[g] << " ";
-        ss << setw(9) << std_map[g] << " ";
-        ss << setw(9) << mmn_map[g] << " ";
-        ss << setw(9) << mx_map[g] << " ";
+        ss << right << setw(9) << setprecision(3) << mn_map[g] << " ";
+        ss << setw(9) << setprecision(3) << std_map[g] << " ";
+        ss << setw(9) << setprecision(3) << mmn_map[g] << " ";
+        ss << setw(9) << setprecision(3) << mx_map[g] << " ";
 
-        ss << setw(9) << 100. * pmn_map[g] << " ";
-        ss << setw(9) << 100. * pstd_map[g];
+        ss << setw(9) << setprecision(3) << 100. * pmn_map[g] << " ";
+        ss << setw(9) << setprecision(3) << 100. * pstd_map[g];
         //ss << setw(15) << 100. * pmmn_map[g];
         //ss << setw(15) << 100. * pmx_map[g];
         ss << endl;
