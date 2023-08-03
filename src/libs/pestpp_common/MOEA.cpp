@@ -3854,6 +3854,8 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	for (auto& cd : crowd_dist)
 		if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
 			mx = cd.second;
+		else if (nondom_solutions.size() == 2)
+			mx = cd.second;
 	if ((mx < 0.0) && (iter > 0))
         throw_moea_error("pso max crowding distance is negative");
 
