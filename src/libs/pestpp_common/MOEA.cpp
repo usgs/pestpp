@@ -3967,6 +3967,7 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
 {
     //generate this first before pso resets the objectives member map...
     ParameterEnsemble temp(&pest_scenario, _dp.get_rand_gen_ptr());
+
     if (num_members > _dp.shape().first)
     {
         int num_reals = num_members - _dp.shape().first;
@@ -3981,11 +3982,12 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
 
     if (temp.shape().first > 0) {
         new_dp.append_other_rows(temp);
+
         pso_pbest_dp.append_other_rows(temp);
         vector<string> real_names = temp.get_real_names();
-        temp = get_initial_pso_velocities(temp.shape().first);
-        temp.set_real_names(real_names);
-        cur_velocity.append_other_rows(temp);
+        ParameterEnsemble ptemp = get_initial_pso_velocities(temp.shape().first);
+        ptemp.set_real_names(real_names);
+        cur_velocity.append_other_rows(ptemp);
     }
 
 
@@ -4022,8 +4024,19 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
         vector<string> fi_fixed_names = _dp.get_fixed_info().get_fixed_names();
         new_dp.get_fixed_info().set_fixed_names(fi_fixed_names);
         map<string, double> fi;
+        vector<string> rnames = _dp.get_fixed_info().get_real_names();
+        set<string> sdp_rnames(rnames.begin(),rnames.end());
+        set<string>::iterator dpend = sdp_rnames.end();
+        rnames = temp.get_fixed_info().get_real_names();
+        set<string> stemp_rnames(rnames.begin(),rnames.end());
+        set<string>::iterator tend = sdp_rnames.end();
         for (auto &p : primary_parent_map) {
-            fi = _dp.get_fixed_info().get_real_fixed_values(p.second);
+            if (sdp_rnames.find(p.second) != dpend)
+                fi = _dp.get_fixed_info().get_real_fixed_values(p.second);
+            else if (stemp_rnames.find(p.second) != tend)
+                fi = temp.get_fixed_info().get_real_fixed_values(p.second);
+            else
+                throw_moea_error("fixed info for existing realization '"+p.second+"' not found");
             new_dp.get_fixed_info().add_realization(p.first, fi);
         }
     }
