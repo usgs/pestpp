@@ -4029,7 +4029,7 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
         set<string>::iterator dpend = sdp_rnames.end();
         rnames = temp.get_fixed_info().get_real_names();
         set<string> stemp_rnames(rnames.begin(),rnames.end());
-        set<string>::iterator tend = sdp_rnames.end();
+        set<string>::iterator tend = stemp_rnames.end();
         for (auto &p : primary_parent_map) {
             if (sdp_rnames.find(p.second) != dpend)
                 fi = _dp.get_fixed_info().get_real_fixed_values(p.second);
