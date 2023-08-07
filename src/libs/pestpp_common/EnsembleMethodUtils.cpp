@@ -4435,7 +4435,7 @@ void ParChangeSummarizer::write_to_csv(string& filename)
 	{
 		f << pest_utils::lower_cp(grp_name) << "," << mean_change[grp_name]*100.0 << "," << std_change[grp_name]*100.0 << ",";
 		f << num_at_lbound[grp_name] << "," << percent_at_lbound[grp_name];
-        f << num_at_ubound[grp_name] << "," << percent_at_ubound[grp_name];
+        f << "," << num_at_ubound[grp_name] << "," << percent_at_ubound[grp_name];
 		f <<","<< init_cv[grp_name] << "," << curr_cv[grp_name] <<  endl;
 	}
 	f.close();
