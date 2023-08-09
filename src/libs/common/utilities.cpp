@@ -1520,7 +1520,7 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 		throw_externalctrlfile_error("filename '" + filename + "' not found");
 	}
 	ifstream f_in(filename);
-    if (!f_in.good())
+    if (f_in.bad())
 	{
 		throw_externalctrlfile_error("error opening filename '" + filename + "' for reading");
 	}
@@ -1542,10 +1542,10 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 				cleaned = true;
 			}
 		}
-		if (cleaned)
-		{
+//		if (cleaned)
+//		{
 			strip_ip(t);
-		}
+//		}
 	}
 	int hsize = col_names.size();
 	set<string> tset;
