@@ -903,9 +903,10 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 		}
 		int i = 0;
 		string name;
+		char* col_name;
 		for (auto col_name_size : col_name_sizes)
 		{
-			char* col_name = new char[col_name_size];
+			col_name = new char[col_name_size];
 			in.read(col_name, col_name_size);
             if (!in.good())
 			{
@@ -919,6 +920,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 			col_names.push_back(name);
 			i++;
 		}
+		delete col_name;
 		i = 0;
 		double data = -1.;
 		// record current position in file
@@ -927,6 +929,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 		streampos end = in.tellg();
 		in.seekg(begin_rows,std::ios::beg);
 		//read the row names so we can dimension the matrix
+		char* row_name;
 		while (true)
 		{
 			//finished
@@ -946,7 +949,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 				cout << ss.str();
 				break;
 			}
-			char* row_name = new char[name_size];
+			row_name = new char[name_size];
 			in.read(row_name, name_size);
             if (!in.good())
 			{
@@ -981,7 +984,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 			row_names.push_back(name);
             i++;
 		}
-
+        delete row_name;
 		in.close();
 		in.open(filename.c_str(), ifstream::binary);
 

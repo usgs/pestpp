@@ -3169,14 +3169,16 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 		fout.write((char*)&tmp, sizeof(tmp));
 		mx = max(tmp, mx);
 	}
+	char* par_name;
 	for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
 		b != e; ++b)
 	{
 		string name = pest_utils::lower_cp(*b);
-		char* par_name = new char[name.size()];
+		par_name = new char[name.size()];
 		pest_utils::string_to_fortran_char(name, par_name, name.size());
 		fout.write(par_name, name.size());
 	}
+	delete par_name;
 
 	//write matrix
 	n = 0;
@@ -3191,6 +3193,7 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 		par_transform.ctl2model_ip(org_pars);
 	else if (tstat == transStatus::NUM)
 		par_transform.ctl2numeric_ip(org_pars);
+	char* real_name;
 	for (int irow = 0; irow < n_real; ++irow)
 	{
 		//Parameters pars(var_names, reals.row(irow));
@@ -3208,7 +3211,7 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 		replace_fixed(real_names[irow], pars);
 		string name = real_names[irow];
 		tmp = name.size();
-		char* real_name = new char[tmp];
+		real_name = new char[tmp];
 		fout.write((char*)&tmp, sizeof(tmp));
 		pest_utils::string_to_fortran_char(name, real_name, tmp);
 		fout.write(real_name, tmp);
@@ -3218,7 +3221,7 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 			fout.write((char*)&(data), sizeof(data));
 		}
 	}
-	
+	delete real_name;
 	fout.close();
 }
 

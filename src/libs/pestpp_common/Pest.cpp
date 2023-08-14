@@ -55,10 +55,16 @@ void Pest::set_defaults()
 {
 	pestpp_options.set_defaults();
 	svd_info.set_defaults();
-	regul_scheme_ptr = new DynamicRegularization;
-	regul_scheme_ptr->set_defaults();
+	regul_scheme_ptr = 0;//new DynamicRegularization;
+	//regul_scheme_ptr->set_defaults();
 	control_info.set_defaults();
 
+}
+
+void Pest::set_default_dynreg()
+{
+    regul_scheme_ptr = new DynamicRegularization;
+    regul_scheme_ptr->set_defaults();
 }
 
 void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, int cycle)
@@ -3066,7 +3072,7 @@ map<string, double> Pest::get_pars_at_near_bounds(const Parameters & pars, doubl
 
 
 Pest::~Pest() {
-	/*if (regul_scheme_ptr != 0)
+	if (regul_scheme_ptr != 0)
 	{
 		try
 		{
@@ -3075,7 +3081,7 @@ Pest::~Pest() {
 		catch (...)
 		{
 		}
-	}*/
+	}
 }
 
 pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string &line)
