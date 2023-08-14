@@ -903,10 +903,9 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 		}
 		int i = 0;
 		string name;
-		char* col_name;
 		for (auto col_name_size : col_name_sizes)
 		{
-			col_name = new char[col_name_size];
+			char* col_name = new char[col_name_size];
 			in.read(col_name, col_name_size);
             if (!in.good())
 			{
@@ -919,8 +918,8 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 			pest_utils::upper_ip(name);
 			col_names.push_back(name);
 			i++;
+			delete[] col_name;
 		}
-		delete col_name;
 		i = 0;
 		double data = -1.;
 		// record current position in file
@@ -929,7 +928,6 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 		streampos end = in.tellg();
 		in.seekg(begin_rows,std::ios::beg);
 		//read the row names so we can dimension the matrix
-		char* row_name;
 		while (true)
 		{
 			//finished
@@ -949,7 +947,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 				cout << ss.str();
 				break;
 			}
-			row_name = new char[name_size];
+			char* row_name = new char[name_size];
 			in.read(row_name, name_size);
             if (!in.good())
 			{
@@ -959,6 +957,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 				break;
 			}
 			name = string(row_name, name_size);
+            delete[] row_name;
 			pest_utils::strip_ip(name);
 			pest_utils::upper_ip(name);
             if (!in.good())
@@ -968,10 +967,12 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 				cout << ss.str();
 				break;
 			}
+
 			//skip the values
 			//in.seekg(col_names.size() * sizeof(double), ios_base::cur);
-			row_name = new char[sizeof(double) * col_names.size()];
-			in.read(row_name, sizeof(double)* col_names.size());
+			char* rest_of_line = new char[sizeof(double) * col_names.size()];
+			in.read(rest_of_line, sizeof(double)* col_names.size());
+			delete[] rest_of_line;
 			if (in.eof())
 				break;
             if (!in.good())
@@ -984,7 +985,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 			row_names.push_back(name);
             i++;
 		}
-        delete row_name;
+
 		in.close();
 		in.open(filename.c_str(), ifstream::binary);
 
