@@ -1000,7 +1000,10 @@ int main(int argc, char* argv[])
 
                 }
             }
-
+            if (cmdline.runmanagertype == CmdLine::RunManagerType::SERIAL)
+            {
+                delete run_manager_ptr;
+            }
 
 		} // end cycle loop
 

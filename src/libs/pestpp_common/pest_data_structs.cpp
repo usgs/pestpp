@@ -159,6 +159,7 @@ const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo
 		ParameterGroupRec* new_ptr = new ParameterGroupRec(*(*it).second);
 		groups[(*it).first] = new_ptr;
 		old2new[(*it).second] = new_ptr;
+
 	}
 	unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator it_find;
 	it = rhs.parameter2group.begin();
