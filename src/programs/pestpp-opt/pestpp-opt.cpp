@@ -273,10 +273,10 @@ int main(int argc, char* argv[])
 
 		ObjectiveFunc obj_func(&(pest_scenario.get_ctl_observations()), &(pest_scenario.get_ctl_observation_info()), &(pest_scenario.get_prior_info()));
 
-		TerminationController termination_ctl(pest_scenario.get_control_info().noptmax, pest_scenario.get_control_info().phiredstp,
-			pest_scenario.get_control_info().nphistp, pest_scenario.get_control_info().nphinored, pest_scenario.get_control_info().relparstp,
-			pest_scenario.get_control_info().nrelpar, pest_scenario.get_regul_scheme_ptr()->get_use_dynamic_reg(),
-			pest_scenario.get_regul_scheme_ptr()->get_phimaccept());
+//		TerminationController termination_ctl(pest_scenario.get_control_info().noptmax, pest_scenario.get_control_info().phiredstp,
+//			pest_scenario.get_control_info().nphistp, pest_scenario.get_control_info().nphinored, pest_scenario.get_control_info().relparstp,
+//			pest_scenario.get_control_info().nrelpar, pest_scenario.get_regul_scheme_ptr()->get_use_dynamic_reg(),
+//			pest_scenario.get_regul_scheme_ptr()->get_phimaccept());
 
 		
 
@@ -321,7 +321,7 @@ int main(int argc, char* argv[])
 
 			if (success)
 			{
-				termination_ctl.check_last_iteration();
+				//termination_ctl.check_last_iteration();
 				optimum_run.update_ctl(tmp_pars, tmp_obs);
 				// save parameters to .par file
 				output_file_writer.write_par(file_manager.open_ofile_ext("par"), optimum_run.get_ctl_pars(), *(base_trans_seq.get_offset_ptr()),
@@ -341,7 +341,7 @@ int main(int argc, char* argv[])
 				fout_rec << "Model run failed.  No results were recorded." << endl << endl;
 				exit(1);
 			}
-			termination_ctl.set_terminate(true);
+			//termination_ctl.set_terminate(true);
 		}
 
 
