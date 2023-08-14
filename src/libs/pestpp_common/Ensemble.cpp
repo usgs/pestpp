@@ -3176,8 +3176,8 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 		string name = pest_utils::lower_cp(*b);
 		char* par_name = new char[name.size()];
 		pest_utils::string_to_fortran_char(name, par_name, name.size());
-		delete[] par_name;
 		fout.write(par_name, name.size());
+        delete[] par_name;
 	}
 	
 
@@ -3215,8 +3215,8 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 		char* real_name = new char[tmp];
 		fout.write((char*)&tmp, sizeof(tmp));
 		pest_utils::string_to_fortran_char(name, real_name, tmp);
-		delete[] real_name;
 		fout.write(real_name, tmp);
+        delete[] real_name;
 		for (int jcol = 0; jcol < n_var; ++jcol)
 		{
 			data = pars[vnames[jcol]];
@@ -3301,6 +3301,7 @@ void ParameterEnsemble::to_dense_unordered(string file_name)
 		char* par_name = new char[name.size()];
 		pest_utils::string_to_fortran_char(name, par_name, name.size());
 		fout.write(par_name, name.size());
+		delete[] par_name;
 	}
 
 	//write matrix
@@ -3318,6 +3319,7 @@ void ParameterEnsemble::to_dense_unordered(string file_name)
 		fout.write((char*)&tmp, sizeof(tmp));
 		pest_utils::string_to_fortran_char(name, real_name, tmp);
 		fout.write(real_name, tmp);
+		delete[] real_name;
 		for (int jcol = 0; jcol < var_names.size(); ++jcol)
 		{
 			data = t[jcol];
