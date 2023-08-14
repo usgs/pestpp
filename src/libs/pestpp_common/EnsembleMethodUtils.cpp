@@ -1152,6 +1152,7 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 		}
 		if (num_exp > 0)
 		{
+		    performance_log->log_event(ss.str());
 			throw runtime_error(ss.str());
 		}
 		delete ut_ptr;
@@ -4676,10 +4677,12 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 	{
 		ss.str("");
 		ss << "error running ensemble: " << e.what();
+		performance_log->log_event(ss.str());
 		throw runtime_error(ss.str());
 	}
 	catch (...)
 	{
+        performance_log->log_event("error running ensemble");
 		throw runtime_error(string("error running ensemble"));
 	}
 
@@ -4698,10 +4701,12 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 	{
 		ss.str("");
 		ss << "error processing runs: " << e.what();
+        performance_log->log_event(ss.str());
 		throw runtime_error(ss.str());
 	}
 	catch (...)
 	{
+        performance_log->log_event("error processing runs");
 		throw runtime_error(string("error processing runs"));
 	}
 	
