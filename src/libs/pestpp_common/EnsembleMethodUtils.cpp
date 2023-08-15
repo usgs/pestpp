@@ -1352,7 +1352,7 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
         Eigen::MatrixXd ivec, s, s2, V, Ut, d_dash;
         string key;
         Eigen::MatrixXd wtemp = weights.diagonal().matrix();
-        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "weights", wtemp;
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "weights", wtemp);
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
         obs_resid = weights * obs_resid;
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_resid", obs_resid);
