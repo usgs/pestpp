@@ -159,6 +159,7 @@ const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo
 		ParameterGroupRec* new_ptr = new ParameterGroupRec(*(*it).second);
 		groups[(*it).first] = new_ptr;
 		old2new[(*it).second] = new_ptr;
+
 	}
 	unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator it_find;
 	it = rhs.parameter2group.begin();
@@ -168,7 +169,15 @@ const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo
 		if (it_find != old2new.end())
 			parameter2group[(*it).first] = (*it_find).second;
 	}
-	return *this;
+//    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator iit(old2new.begin());
+//    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator eend(old2new.end());
+//
+//    for (; iit != eend; ++iit) {
+//        delete (*iit).second;
+//        delete (*iit).first;
+//    }
+
+    return *this;
 }
 
 vector<string> ParameterGroupInfo::get_group_names() const
@@ -195,11 +204,36 @@ bool ParameterGroupInfo::have_switch_derivative() const
 
 ParameterGroupInfo::~ParameterGroupInfo()
 {
-	unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
+//	unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
+//	unordered_map<string, ParameterGroupRec*>::iterator end(groups.end());
+//	for (; it != end; ++it) {
+//		delete (*it).second;
+//	}
+//
+//    it = parameter2group.begin();
+//	end = parameter2group.end();
+//
+//    for (; it != end; ++it) {
+//        delete (*it).second;
+//    }
+}
+
+void ParameterGroupInfo::free_mem()
+{
+    unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
 	unordered_map<string, ParameterGroupRec*>::iterator end(groups.end());
 	for (; it != end; ++it) {
 		delete (*it).second;
 	}
+
+    it = parameter2group.begin();
+	end = parameter2group.end();
+
+    for (; it != end; ++it) {
+        delete (*it).second;
+    }
+    groups.clear();
+    parameter2group.clear();
 }
 
 ostream& operator<< (ostream &os, const ParameterGroupInfo &val)
@@ -1874,7 +1908,7 @@ void PestppOptions::set_defaults()
 	set_sqp_update_hessian(false);
 	set_sqp_scale_facs(vector<double>{0.00001, 0.0001,0.0005, 0.001, 0.0025, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25,0.5, 1.0,2.,5.,10.,});
 
-	set_mou_generator("DE");
+	set_mou_generator("PSO");
 	set_mou_population_size(100);
 	set_mou_dv_population_file("");
 	set_mou_obs_population_restart_file("");

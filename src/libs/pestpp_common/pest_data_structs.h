@@ -90,6 +90,7 @@ public:
 	void par_erase(const string& par_name) { parameter2group.erase(par_name); }
 	void grp_erase(const string& grp_name) { groups.erase(grp_name);
 	}
+	void free_mem();
 	~ParameterGroupInfo();
 private:
 	unordered_map<string, ParameterGroupRec*> groups;
@@ -127,7 +128,7 @@ public:
 	Parameters get_init_value(const vector<string> &keys) const;
 	const ParameterRec* get_parameter_rec_ptr(const string &name) const;
 	ParameterRec* get_parameter_rec_ptr_4_mod(const string &name);
-	void insert(const string &name, const ParameterRec &rec) {parameter_info[name] = rec;}
+	void insert(const string &name, ParameterRec rec) {parameter_info[name] = rec;}
 	void erase(const string& name) { parameter_info.erase(name);}
 	ParameterInfo() {}
 	~ParameterInfo() {}

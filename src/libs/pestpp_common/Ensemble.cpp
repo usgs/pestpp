@@ -3169,6 +3169,7 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 		fout.write((char*)&tmp, sizeof(tmp));
 		mx = max(tmp, mx);
 	}
+	
 	for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
 		b != e; ++b)
 	{
@@ -3176,7 +3177,9 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 		char* par_name = new char[name.size()];
 		pest_utils::string_to_fortran_char(name, par_name, name.size());
 		fout.write(par_name, name.size());
+        delete[] par_name;
 	}
+	
 
 	//write matrix
 	n = 0;
@@ -3191,6 +3194,7 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 		par_transform.ctl2model_ip(org_pars);
 	else if (tstat == transStatus::NUM)
 		par_transform.ctl2numeric_ip(org_pars);
+	
 	for (int irow = 0; irow < n_real; ++irow)
 	{
 		//Parameters pars(var_names, reals.row(irow));
@@ -3212,6 +3216,7 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 		fout.write((char*)&tmp, sizeof(tmp));
 		pest_utils::string_to_fortran_char(name, real_name, tmp);
 		fout.write(real_name, tmp);
+        delete[] real_name;
 		for (int jcol = 0; jcol < n_var; ++jcol)
 		{
 			data = pars[vnames[jcol]];
@@ -3296,6 +3301,7 @@ void ParameterEnsemble::to_dense_unordered(string file_name)
 		char* par_name = new char[name.size()];
 		pest_utils::string_to_fortran_char(name, par_name, name.size());
 		fout.write(par_name, name.size());
+		delete[] par_name;
 	}
 
 	//write matrix
@@ -3313,6 +3319,7 @@ void ParameterEnsemble::to_dense_unordered(string file_name)
 		fout.write((char*)&tmp, sizeof(tmp));
 		pest_utils::string_to_fortran_char(name, real_name, tmp);
 		fout.write(real_name, tmp);
+		delete[] real_name;
 		for (int jcol = 0; jcol < var_names.size(); ++jcol)
 		{
 			data = t[jcol];

@@ -918,6 +918,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 			pest_utils::upper_ip(name);
 			col_names.push_back(name);
 			i++;
+			delete[] col_name;
 		}
 		i = 0;
 		double data = -1.;
@@ -956,6 +957,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 				break;
 			}
 			name = string(row_name, name_size);
+            delete[] row_name;
 			pest_utils::strip_ip(name);
 			pest_utils::upper_ip(name);
             if (!in.good())
@@ -965,10 +967,12 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 				cout << ss.str();
 				break;
 			}
+
 			//skip the values
 			//in.seekg(col_names.size() * sizeof(double), ios_base::cur);
-			row_name = new char[sizeof(double) * col_names.size()];
-			in.read(row_name, sizeof(double)* col_names.size());
+			char* rest_of_line = new char[sizeof(double) * col_names.size()];
+			in.read(rest_of_line, sizeof(double)* col_names.size());
+			delete[] rest_of_line;
 			if (in.eof())
 				break;
             if (!in.good())
@@ -1520,7 +1524,7 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 		throw_externalctrlfile_error("filename '" + filename + "' not found");
 	}
 	ifstream f_in(filename);
-    if (!f_in.good())
+    if (f_in.bad())
 	{
 		throw_externalctrlfile_error("error opening filename '" + filename + "' for reading");
 	}
@@ -1542,10 +1546,10 @@ void ExternalCtlFile::read_file(ofstream& f_rec)
 				cleaned = true;
 			}
 		}
-		if (cleaned)
-		{
+//		if (cleaned)
+//		{
 			strip_ip(t);
-		}
+//		}
 	}
 	int hsize = col_names.size();
 	set<string> tset;

@@ -61,7 +61,7 @@ void  FileManager::open_default_files(bool restart)
 
 FileManager::~FileManager(void)
 {
-	/*for (auto &i : ofile_map)
+	for (auto &i : ofile_map)
 	{
 		if(i.second->is_open()) i.second->close();
 		delete i.second;
@@ -75,7 +75,7 @@ FileManager::~FileManager(void)
 	{
 		if(i.second->is_open()) i.second->close();
 		delete i.second;
-	}*/
+	}
 }
 
 string FileManager::build_filename(const string &ext, bool include_dir)

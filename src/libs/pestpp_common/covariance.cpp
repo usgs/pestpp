@@ -1319,7 +1319,7 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 						throw runtime_error("Cov::from_uncertainty_file() error:EOF encountered while reading standard_deviation block\
 							from uncertainty file:" + filename);
 					pest_utils::upper_ip(line);
-					if (line.find("END") != string::npos)
+					if (line.find("END STANDARD_DEVIATION") != string::npos)
 					{
 						break;
 					}

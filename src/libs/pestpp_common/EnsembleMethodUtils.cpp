@@ -1152,6 +1152,7 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 		}
 		if (num_exp > 0)
 		{
+		    performance_log->log_event(ss.str());
 			throw runtime_error(ss.str());
 		}
 		delete ut_ptr;
@@ -1350,7 +1351,8 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
 
         Eigen::MatrixXd ivec, s, s2, V, Ut, d_dash;
         string key;
-        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "weights", weights.toDenseMatrix());
+        Eigen::MatrixXd wtemp = weights.diagonal().matrix();
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "weights", wtemp);
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
         obs_resid = weights * obs_resid;
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_resid", obs_resid);
@@ -1365,6 +1367,11 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
             if (parcov_inv.size() < 10000) {
 
                 Eigen::MatrixXd temp = parcov_inv.toDenseMatrix();
+                local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp);
+            }
+            else
+            {
+                Eigen::MatrixXd temp = parcov_inv.diagonal().matrix();
                 local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp);
             }
             if (act_obs_names.size() > 0) { //this works bc the mm solve doesnt pass these names...
@@ -3508,6 +3515,8 @@ void L2PhiHandler::report_group(bool echo) {
     {
         for (auto& oo : o.second)
         {
+            if (oo.second == 0.0)
+                continue;
             len = max(len,(int)oo.first.size());
         }
         break;
@@ -3543,13 +3552,13 @@ void L2PhiHandler::report_group(bool echo) {
         g = pair.first;
         ss.str("");
         ss << left << setw(len) << pest_utils::lower_cp(g) << " ";
-        ss << right << setw(9) << mn_map[g] << " ";
-        ss << setw(9) << std_map[g] << " ";
-        ss << setw(9) << mmn_map[g] << " ";
-        ss << setw(9) << mx_map[g] << " ";
+        ss << right << setw(9) << setprecision(3) << mn_map[g] << " ";
+        ss << setw(9) << setprecision(3) << std_map[g] << " ";
+        ss << setw(9) << setprecision(3) << mmn_map[g] << " ";
+        ss << setw(9) << setprecision(3) << mx_map[g] << " ";
 
-        ss << setw(9) << 100. * pmn_map[g] << " ";
-        ss << setw(9) << 100. * pstd_map[g];
+        ss << setw(9) << setprecision(3) << 100. * pmn_map[g] << " ";
+        ss << setw(9) << setprecision(3) << 100. * pstd_map[g];
         //ss << setw(15) << 100. * pmmn_map[g];
         //ss << setw(15) << 100. * pmx_map[g];
         ss << endl;
@@ -4433,7 +4442,7 @@ void ParChangeSummarizer::write_to_csv(string& filename)
 	{
 		f << pest_utils::lower_cp(grp_name) << "," << mean_change[grp_name]*100.0 << "," << std_change[grp_name]*100.0 << ",";
 		f << num_at_lbound[grp_name] << "," << percent_at_lbound[grp_name];
-        f << num_at_ubound[grp_name] << "," << percent_at_ubound[grp_name];
+        f << "," << num_at_ubound[grp_name] << "," << percent_at_ubound[grp_name];
 		f <<","<< init_cv[grp_name] << "," << curr_cv[grp_name] <<  endl;
 	}
 	f.close();
@@ -4674,10 +4683,12 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 	{
 		ss.str("");
 		ss << "error running ensemble: " << e.what();
+		performance_log->log_event(ss.str());
 		throw runtime_error(ss.str());
 	}
 	catch (...)
 	{
+        performance_log->log_event("error running ensemble");
 		throw runtime_error(string("error running ensemble"));
 	}
 
@@ -4696,10 +4707,12 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 	{
 		ss.str("");
 		ss << "error processing runs: " << e.what();
+        performance_log->log_event(ss.str());
 		throw runtime_error(ss.str());
 	}
 	catch (...)
 	{
+        performance_log->log_event("error processing runs");
 		throw runtime_error(string("error processing runs"));
 	}
 	

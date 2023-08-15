@@ -281,7 +281,8 @@ void OutputFileWriter::scenario_report(std::ostream &os, bool report_mode)
 	os << setw(0) << "    Number of parameters = " << pest_scenario.get_ctl_ordered_par_names().size() << endl;
 	os << setw(0) << "    Number of adjustable parameters = " << pest_scenario.get_n_adj_par() << endl;
 	os << setw(0) << "    Number of observations = " << pest_scenario.get_ctl_ordered_obs_names().size() << endl;
-	os << setw(0) << "    Number of prior estimates = " << pest_scenario.get_ctl_ordered_pi_names().size() << endl << endl;
+    os << setw(0) << "    Number of non-zero weighted observations = " << pest_scenario.get_ctl_ordered_nz_obs_names().size() << endl;
+    os << setw(0) << "    Number of prior estimates = " << pest_scenario.get_ctl_ordered_pi_names().size() << endl << endl;
 
 	os << pest_scenario.get_control_info() << endl;
 	pest_scenario.get_pestpp_options().summary(os);
