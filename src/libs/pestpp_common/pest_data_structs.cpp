@@ -169,13 +169,13 @@ const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo
 		if (it_find != old2new.end())
 			parameter2group[(*it).first] = (*it_find).second;
 	}
-    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator iit(old2new.begin());
-    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator eend(old2new.end());
-
-    for (; iit != eend; ++iit) {
-        delete (*iit).second;
-        delete (*iit).first;
-    }
+//    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator iit(old2new.begin());
+//    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator eend(old2new.end());
+//
+//    for (; iit != eend; ++iit) {
+//        delete (*iit).second;
+//        delete (*iit).first;
+//    }
 
     return *this;
 }
@@ -204,7 +204,23 @@ bool ParameterGroupInfo::have_switch_derivative() const
 
 ParameterGroupInfo::~ParameterGroupInfo()
 {
-	unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
+//	unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
+//	unordered_map<string, ParameterGroupRec*>::iterator end(groups.end());
+//	for (; it != end; ++it) {
+//		delete (*it).second;
+//	}
+//
+//    it = parameter2group.begin();
+//	end = parameter2group.end();
+//
+//    for (; it != end; ++it) {
+//        delete (*it).second;
+//    }
+}
+
+void ParameterGroupInfo::free_mem()
+{
+    unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
 	unordered_map<string, ParameterGroupRec*>::iterator end(groups.end());
 	for (; it != end; ++it) {
 		delete (*it).second;
@@ -212,10 +228,12 @@ ParameterGroupInfo::~ParameterGroupInfo()
 
     it = parameter2group.begin();
 	end = parameter2group.end();
-    
+
     for (; it != end; ++it) {
         delete (*it).second;
     }
+    groups.clear();
+    parameter2group.clear();
 }
 
 ostream& operator<< (ostream &os, const ParameterGroupInfo &val)
