@@ -1351,7 +1351,8 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
 
         Eigen::MatrixXd ivec, s, s2, V, Ut, d_dash;
         string key;
-        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "weights", weights.toDenseMatrix());
+        Eigen::MatrixXd wtemp = weights.diagonal().matrix();
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "weights", wtemp;
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
         obs_resid = weights * obs_resid;
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_resid", obs_resid);
@@ -1366,6 +1367,11 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
             if (parcov_inv.size() < 10000) {
 
                 Eigen::MatrixXd temp = parcov_inv.toDenseMatrix();
+                local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp);
+            }
+            else
+            {
+                Eigen::MatrixXd temp = parcov_inv.diagonal().matrix();
                 local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp);
             }
             if (act_obs_names.size() > 0) { //this works bc the mm solve doesnt pass these names...
