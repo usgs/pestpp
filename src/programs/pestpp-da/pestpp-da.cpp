@@ -1004,6 +1004,7 @@ int main(int argc, char* argv[])
             {
                 delete run_manager_ptr;
             }
+            childPest.get_base_group_info_ptr_4_mod()->~ParameterGroupInfo();
 
 		} // end cycle loop
 
