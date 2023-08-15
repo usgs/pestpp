@@ -55,10 +55,16 @@ void Pest::set_defaults()
 {
 	pestpp_options.set_defaults();
 	svd_info.set_defaults();
-	regul_scheme_ptr = new DynamicRegularization;
-	regul_scheme_ptr->set_defaults();
+	regul_scheme_ptr = 0;//new DynamicRegularization;
+	//regul_scheme_ptr->set_defaults();
 	control_info.set_defaults();
 
+}
+
+void Pest::set_default_dynreg()
+{
+    regul_scheme_ptr = new DynamicRegularization;
+    regul_scheme_ptr->set_defaults();
 }
 
 void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, int cycle)
@@ -1015,9 +1021,9 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 	vector<string> tokens_case_sen;
 	vector<string> model_input_formal_names{ "PEST_FILE","MODEL_FILE" };
 	vector<string> model_output_formal_names{ "PEST_FILE","MODEL_FILE" };
-#ifndef _DEBUG
-	try {
-#endif
+//#ifndef _DEBUG
+//	try {
+//#endif
 		prior_info_string = "";
 		
 		for (lnum = 1, sec_begin_lnum = 1; getline(fin, line); ++lnum)
@@ -1685,16 +1691,16 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 		{
 			tokens_to_pi_rec(f_rec, line_upper);
 		}
-#ifndef _DEBUG
-	}
-	catch (PestConversionError& e) {
-		std::stringstream out;
-		out << "Error processing \"" << pst_filename << "\" on line number " << lnum << endl;
-		out << e.what() << endl;
-		e.add_front(out.str());
-		e.raise();
-	}
-#endif
+//#ifndef _DEBUG
+//	}
+//	catch (PestConversionError& e) {
+//		std::stringstream out;
+//		out << "Error processing \"" << pst_filename << "\" on line number " << lnum << endl;
+//		out << e.what() << endl;
+//		e.add_front(out.str());
+//		e.raise();
+//	}
+//#endif
 	fin.close();
 
 	
@@ -3066,7 +3072,7 @@ map<string, double> Pest::get_pars_at_near_bounds(const Parameters & pars, doubl
 
 
 Pest::~Pest() {
-	/*if (regul_scheme_ptr != 0)
+	if (regul_scheme_ptr != 0)
 	{
 		try
 		{
@@ -3075,7 +3081,7 @@ Pest::~Pest() {
 		catch (...)
 		{
 		}
-	}*/
+	}
 }
 
 pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string &line)

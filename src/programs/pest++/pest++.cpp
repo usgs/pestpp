@@ -193,6 +193,7 @@ int main(int argc, char* argv[])
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
+		pest_scenario.set_default_dynreg();
 #ifndef _DEBUG
 		try {
 #endif

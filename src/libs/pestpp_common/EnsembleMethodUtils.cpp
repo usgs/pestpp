@@ -581,11 +581,12 @@ void EnsembleSolver::initialize_for_mm_solve()
     }
 
     mat = base_oe.get_eigen(oe_real_names, obs_names);
+    mat.transposeInPlace();
     Observations ctl_obs = pest_scenario.get_ctl_observations();
-    Eigen::VectorXd ovals = ctl_obs.get_data_eigen_vec(obs_names);
+    Eigen::ArrayXd ovals = ctl_obs.get_data_eigen_vec(obs_names).array();
     for (int i = 0; i < oe_real_names.size(); i++)
     {
-        obs_err_map[oe_real_names[i]] = mat.row(i).array() - ovals.array();
+        obs_err_map[oe_real_names[i]] = mat.col(i).array() - ovals;
     }
 
     mat = ph.get_par_resid_subset(pe,pe_real_names);
@@ -1151,6 +1152,7 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
 		}
 		if (num_exp > 0)
 		{
+		    performance_log->log_event(ss.str());
 			throw runtime_error(ss.str());
 		}
 		delete ut_ptr;
@@ -1349,7 +1351,8 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
 
         Eigen::MatrixXd ivec, s, s2, V, Ut, d_dash;
         string key;
-        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "weights", weights.toDenseMatrix());
+        Eigen::MatrixXd wtemp = weights.diagonal().matrix();
+        local_utils::save_mat(verbose_level, thread_id, iter, t_count, "weights", wtemp);
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
         obs_resid = weights * obs_resid;
         local_utils::save_mat(verbose_level, thread_id, iter, t_count, "scaled_obs_resid", obs_resid);
@@ -1364,6 +1367,11 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
             if (parcov_inv.size() < 10000) {
 
                 Eigen::MatrixXd temp = parcov_inv.toDenseMatrix();
+                local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp);
+            }
+            else
+            {
+                Eigen::MatrixXd temp = parcov_inv.diagonal().matrix();
                 local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp);
             }
             if (act_obs_names.size() > 0) { //this works bc the mm solve doesnt pass these names...
@@ -3507,6 +3515,8 @@ void L2PhiHandler::report_group(bool echo) {
     {
         for (auto& oo : o.second)
         {
+            if (oo.second == 0.0)
+                continue;
             len = max(len,(int)oo.first.size());
         }
         break;
@@ -3542,13 +3552,13 @@ void L2PhiHandler::report_group(bool echo) {
         g = pair.first;
         ss.str("");
         ss << left << setw(len) << pest_utils::lower_cp(g) << " ";
-        ss << right << setw(9) << mn_map[g] << " ";
-        ss << setw(9) << std_map[g] << " ";
-        ss << setw(9) << mmn_map[g] << " ";
-        ss << setw(9) << mx_map[g] << " ";
+        ss << right << setw(9) << setprecision(3) << mn_map[g] << " ";
+        ss << setw(9) << setprecision(3) << std_map[g] << " ";
+        ss << setw(9) << setprecision(3) << mmn_map[g] << " ";
+        ss << setw(9) << setprecision(3) << mx_map[g] << " ";
 
-        ss << setw(9) << 100. * pmn_map[g] << " ";
-        ss << setw(9) << 100. * pstd_map[g];
+        ss << setw(9) << setprecision(3) << 100. * pmn_map[g] << " ";
+        ss << setw(9) << setprecision(3) << 100. * pstd_map[g];
         //ss << setw(15) << 100. * pmmn_map[g];
         //ss << setw(15) << 100. * pmx_map[g];
         ss << endl;
@@ -4432,7 +4442,7 @@ void ParChangeSummarizer::write_to_csv(string& filename)
 	{
 		f << pest_utils::lower_cp(grp_name) << "," << mean_change[grp_name]*100.0 << "," << std_change[grp_name]*100.0 << ",";
 		f << num_at_lbound[grp_name] << "," << percent_at_lbound[grp_name];
-        f << num_at_ubound[grp_name] << "," << percent_at_ubound[grp_name];
+        f << "," << num_at_ubound[grp_name] << "," << percent_at_ubound[grp_name];
 		f <<","<< init_cv[grp_name] << "," << curr_cv[grp_name] <<  endl;
 	}
 	f.close();
@@ -4673,10 +4683,12 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 	{
 		ss.str("");
 		ss << "error running ensemble: " << e.what();
+		performance_log->log_event(ss.str());
 		throw runtime_error(ss.str());
 	}
 	catch (...)
 	{
+        performance_log->log_event("error running ensemble");
 		throw runtime_error(string("error running ensemble"));
 	}
 
@@ -4695,10 +4707,12 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 	{
 		ss.str("");
 		ss << "error processing runs: " << e.what();
+        performance_log->log_event(ss.str());
 		throw runtime_error(ss.str());
 	}
 	catch (...)
 	{
+        performance_log->log_event("error processing runs");
 		throw runtime_error(string("error processing runs"));
 	}
 	
@@ -5470,10 +5484,11 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	if (ppo->get_ies_use_mda())
 	{
+	    message(1, "using multiple-data-assimilation algorithm");
 		int noptmax = pest_scenario.get_control_info().noptmax;
 		if (noptmax > 0)
 		{
-			message(0, "using multiple-data-assimilation algorithm");
+
             if (ppo->get_ies_no_noise())
             {
                 throw_em_error("'no noise'is not compatible with 'use_mda' as this solution relies on noise draws");
@@ -5482,7 +5497,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	}
 	else
 	{
-		message(0, "using glm algorithm");
+		message(1, "using glm algorithm");
 	}
 
 	verbose_level = pest_scenario.get_pestpp_options_ptr()->get_ies_verbose_level();
@@ -6347,7 +6362,7 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
     }
     ss.str("");
     ss << "checking phi factors in file " << fname;
-    message(0,ss.str());
+    message(1,ss.str());
     ;
     if (pest_scenario.get_pestpp_options().get_ies_phi_factors_by_real())
     {
@@ -9155,7 +9170,7 @@ vector<string> EnsembleMethod::detect_prior_data_conflict(bool save)
             in_conflict.push_back(oname);
             dist = max((smin - omax), (omin - smax));
 
-            pdccsv << oname << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << ","
+            pdccsv << pest_utils::lower_cp(oname) << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << ","
                    << omax_stat;
             pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << ","
                    << smax_stat << "," << dist << endl;

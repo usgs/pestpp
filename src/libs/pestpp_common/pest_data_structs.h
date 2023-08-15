@@ -90,6 +90,7 @@ public:
 	void par_erase(const string& par_name) { parameter2group.erase(par_name); }
 	void grp_erase(const string& grp_name) { groups.erase(grp_name);
 	}
+	void free_mem();
 	~ParameterGroupInfo();
 private:
 	unordered_map<string, ParameterGroupRec*> groups;
@@ -127,7 +128,7 @@ public:
 	Parameters get_init_value(const vector<string> &keys) const;
 	const ParameterRec* get_parameter_rec_ptr(const string &name) const;
 	ParameterRec* get_parameter_rec_ptr_4_mod(const string &name);
-	void insert(const string &name, const ParameterRec &rec) {parameter_info[name] = rec;}
+	void insert(const string &name, ParameterRec rec) {parameter_info[name] = rec;}
 	void erase(const string& name) { parameter_info.erase(name);}
 	ParameterInfo() {}
 	~ParameterInfo() {}
@@ -420,6 +421,8 @@ public:
     void set_mou_simplex_mutation(bool _flag) {mou_simplex_mutation = _flag;}
     bool get_mou_use_multigen() const {return mou_use_multigen;}
     void set_mou_use_multigen(bool _flag) {mou_use_multigen = _flag;}
+    bool get_mou_shuffle_fixed_pars() const {return mou_shuffle_fixed_pars;}
+    void set_mou_shuffle_fixed_pars(bool _flag) {mou_shuffle_fixed_pars = _flag;}
 
 	string get_ies_par_csv()const { return ies_par_csv; }
 	void set_ies_par_csv(string _ies_par_csv) { ies_par_csv = _ies_par_csv; }
@@ -749,6 +752,7 @@ private:
 	vector<double> mou_simplex_factors;
 	bool mou_simplex_mutation;
 	bool mou_use_multigen;
+	bool mou_shuffle_fixed_pars;
 
 	int ies_subset_size;
 	string ies_par_csv;
