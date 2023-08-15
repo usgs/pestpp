@@ -169,7 +169,15 @@ const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo
 		if (it_find != old2new.end())
 			parameter2group[(*it).first] = (*it_find).second;
 	}
-	return *this;
+    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator iit(old2new.begin());
+    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator eend(old2new.end());
+
+    for (; iit != eend; ++iit) {
+        delete (*iit).second;
+        delete (*iit).first;
+    }
+
+    return *this;
 }
 
 vector<string> ParameterGroupInfo::get_group_names() const
@@ -201,6 +209,13 @@ ParameterGroupInfo::~ParameterGroupInfo()
 	for (; it != end; ++it) {
 		delete (*it).second;
 	}
+
+    it = parameter2group.begin();
+	end = parameter2group.end();
+    
+    for (; it != end; ++it) {
+        delete (*it).second;
+    }
 }
 
 ostream& operator<< (ostream &os, const ParameterGroupInfo &val)
