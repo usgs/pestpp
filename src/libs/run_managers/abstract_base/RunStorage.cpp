@@ -28,6 +28,7 @@
 #include "Serialization.h"
 #include "Transformable.h"
 #include <limits>
+#include "utilities.h"
 
 using std::numeric_limits;
 
@@ -54,11 +55,22 @@ void RunStorage::reset(const vector<string> &_par_names, const vector<string> &_
 	{
 		buf_stream.close();
 	}
+
+	if ((pest_utils::check_exist_in(filename)) || (pest_utils::check_exist_out(filename)))
+    {
+	    int flag = remove(filename.c_str());
+	    if (flag != 0)
+        {
+	        throw runtime_error("RunStorage::reset(): error removing existing file '"+filename+"'");
+
+        }
+    }
+
 	buf_stream.open(filename.c_str(), ios_base::out |  ios_base::binary);
-        buf_stream.close();
+	buf_stream.close();
 	buf_stream.open(filename.c_str(), ios_base::out | ios_base::in | ios_base::binary);
 	//assert(buf_stream.good() == true);
-	if (!buf_stream.good())
+	if (!buf_stream)
 	{
 		throw runtime_error("RunStorage::reset() stream not good");
 	}
