@@ -1391,7 +1391,7 @@ void RunManagerPanther::process_message(int i_sock)
 		if (run_finished(run_id))
 		{
 			stringstream ss;
-			ss << "Prevoiusly completed run_id:" << run_id << " finished on:" << host_name << "$" << agent_info_iter->get_work_dir() <<
+			ss << "Previously completed run_id:" << run_id << " finished on:" << host_name << "$" << agent_info_iter->get_work_dir() <<
 				"  run time:" << agent_info_iter->get_runtime_minute() << " min group_id:" << group_id <<
 				" " << net_pack.get_info_txt() << " concurrent:" << get_n_concurrent(run_id);
 			report(ss.str(), false);
