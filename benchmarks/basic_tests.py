@@ -1288,6 +1288,38 @@ def fr_timeout_test():
     print(oe.shape)
     assert oe.shape[0] == 5,oe.shape
 
+    with open(os.path.join(new_d,"run.py"),'w') as f:
+        f.write("import os\nimport time\nimport pyemu\npyemu.os_utils.run('mfnwt 10par_xsec.nam')\n")
+        f.write("if not os.path.exists('run.info'):\n    exit()\n")
+        f.write("lines = open('run.info','r').readlines()\nrnum = int(lines[-1].split()[-1].split(':')[-1])\n")
+        f.write("if rnum % 10 == 0:\n    print(junk)\n")
+    pst.pestpp_options = {}
+    pst.pestpp_options["ies_num_reals"] = 20 # hard coded to conditional below
+    pst.pestpp_options["panther_agent_freeze_on_fail"] = True
+    #pst.pestpp_options["overdue_giveup_fac"] = 1.0e+10
+    #pst.pestpp_options["overdue_giveup_minutes"] = 0.25
+    pst.write(os.path.join(new_d, "pest.pst"))
+    pst.control_data.noptmax = 2
+
+    pst.write(os.path.join(new_d, "pest.pst"))
+    m_d = os.path.join(model_d,"fr_timeout_master_freeze")
+    #num workers hard coded with conditional below
+    pyemu.os_utils.start_workers(new_d,exe_path,"pest.pst",num_workers=10,worker_root=model_d,master_dir=m_d)
+    #df = pyemu.helpers.parse_rmr_file(os.path.join(m_d,"pest.rmr"))
+    #print(df.action.to_list())
+    oe = pd.read_csv(os.path.join(m_d,"pest.{0}.obs.csv".format(pst.control_data.noptmax)),index_col=0)
+    assert oe.shape[0] == 17 # hard coded to num reals
+    with open(os.path.join(m_d,"pest.rmr"),'r') as f:
+        for line in f:
+            if "timeout" in line.lower():
+                raise Exception()
+            if line.strip().lower().endswith("agents connected"):
+                num = int(line.strip().split()[0])
+                print(line.strip())
+                assert num == 7 # hard coded above
+
+
+
 def ins_missing_e_test():
     import os
     import shutil
@@ -1446,8 +1478,8 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
     
-
-    mf6_v5_ies_test()
+    fr_timeout_test()
+    #mf6_v5_ies_test()
     #mf6_v5_sen_test()
 
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
