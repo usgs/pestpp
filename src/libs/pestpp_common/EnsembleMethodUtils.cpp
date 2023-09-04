@@ -3515,7 +3515,8 @@ void L2PhiHandler::report_group(bool echo) {
     {
         for (auto& oo : o.second)
         {
-            if (oo.second == 0.0)
+            //if (oo.second == 0.0)
+            if (snzgroups.find(oo.first) == snzgroups.end())
                 continue;
             len = max(len,(int)oo.first.size());
         }

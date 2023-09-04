@@ -896,7 +896,10 @@ void AutoAdaLocThread::work(int thread_id)
         par_ss = pe_diff.col(jpar) * (1.0 / par_std[jpar]);
         if (list_obs.size() > 0)
         {
-            sobs = list_obs[par_names[jpar]]; // dont use at here - this way, any missing pars just get no obs
+            if (list_obs.find(par_names[jpar]) != list_obs.end())
+                sobs = list_obs[par_names[jpar]]; // dont use at here - this way, any missing pars just get no obs
+            else
+                sobs.clear();
             use_list_obs = true;
         }
         else
