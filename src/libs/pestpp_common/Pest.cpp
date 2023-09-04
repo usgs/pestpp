@@ -968,6 +968,10 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename)
 int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 {
 	cout << "processing control file " << _pst_filename << endl;
+	if (!fin)
+    {
+	    throw PestError("control file stream is not good");
+    }
 	string line;
 	string line_upper;
 	string section("");

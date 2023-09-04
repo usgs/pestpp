@@ -3515,7 +3515,8 @@ void L2PhiHandler::report_group(bool echo) {
     {
         for (auto& oo : o.second)
         {
-            if (oo.second == 0.0)
+            //if (oo.second == 0.0)
+            if (snzgroups.find(oo.first) == snzgroups.end())
                 continue;
             len = max(len,(int)oo.first.size());
         }
@@ -4508,9 +4509,9 @@ void ParChangeSummarizer:: update(ParameterEnsemble& pe)
 			for (int i = 0; i < num_reals; i++)
 			{
 				v = arr[i];
-				if (v > (ub[par_name] * 1.01))
+				if (v > (ub[par_name] - (abs(ub[par_name]) * 0.01)))
 					num_out_u++;
-				else if (v < (lb[par_name] * 0.99))
+				else if (v < (lb[par_name] + (abs(lb[par_name]) * 0.01)))
 				    num_out_l++;
 			}
 			value1 = init_moments.first[par_name];
