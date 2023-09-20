@@ -2983,7 +2983,7 @@ map<string,map<string,double>> L2PhiHandler::get_swr_real_map(ObservationEnsembl
     {
       resid = get_obs_resid(oe,true);
     }
-    if else (ptype == phiType::ACTUAL)
+    else if (ptype == phiType::ACTUAL)
     {
         resid = get_actual_obs_resid(oe);
     }
