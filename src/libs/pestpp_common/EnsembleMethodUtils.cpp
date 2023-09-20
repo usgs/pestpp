@@ -2976,35 +2976,62 @@ Eigen::MatrixXd L2PhiHandler::get_obs_resid(ObservationEnsemble &oe, bool apply_
 	return resid;
 }
 
-map<string,map<string,double>> L2PhiHandler::get_meas_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights)
+map<string,map<string,double>> L2PhiHandler::get_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights,phiType ptype)
 {
-    Eigen::MatrixXd resid = get_obs_resid(oe,true);
+    Eigen::MatrixXd resid;
+    if (ptype == phiType::MEAS)
+    {
+      resid = get_obs_resid(oe,true);
+    }
+    if (ptype == phiType::ACTUAL)
+    {
+        resid = get_actual_obs_resid(oe);
+    }
+    else
+    {
+        throw runtime_error("L2PhiHandler::get_swr_real_map() unsupported ptype");
+    }
 
     Eigen::MatrixXd wmat = weights.get_eigen(oe.get_real_names(),oe_base->get_var_names());
     resid = resid.array() * wmat.array();
     resid = resid.array() * resid.array();
-    map<string,map<string,double>> actual_swr_map;
+    map<string,map<string,double>> swr_map;
     vector<string> var_names = oe_base->get_var_names();
     vector<string> real_names = oe.get_real_names();
     for (int i=0;i<real_names.size();i++) {
-        actual_swr_map[real_names[i]] = map<string,double>();
+        swr_map[real_names[i]] = map<string,double>();
         for (int j = 0; j < var_names.size(); j++) {
-            actual_swr_map[real_names[i]][var_names[j]] = resid(i, j);
+            swr_map[real_names[i]][var_names[j]] = resid(i, j);
         }
     }
-    return actual_swr_map;
+    return swr_map;
 }
 
-map<string,double> L2PhiHandler::get_actual_swr_map(ObservationEnsemble& oe, string real_name)
+map<string,double> L2PhiHandler::get_swr_map(ObservationEnsemble& oe, string real_name,phiType ptype)
 {
-    Eigen::MatrixXd resid = get_actual_obs_resid(oe);
+
+    Eigen::MatrixXd resid;
+    if (ptype == phiType::ACTUAL)
+    {
+       resid = get_actual_obs_resid(oe);
+    }
+    else if (ptype == phiType::MEAS)
+    {
+        resid = get_obs_resid(oe,true);
+    }
+    else
+    {
+        throw runtime_error("L2PhiHandler::get_swr_map() unsupported ptype");
+    }
+
+
     Eigen::VectorXd q = get_q_vector();
     for (int i=0;i<resid.rows();i++) {
         resid.row(i) = resid.row(i).array() * q.array().transpose();
         resid.row(i) = resid.row(i).array() * resid.row(i).array();
     }
     Eigen::VectorXd mean_vec;
-    map<string,double> actual_swr_map;
+    map<string,double> swr_map;
     vector<string> var_names = oe_base->get_var_names();
     if (real_name.size() > 0)
     {
@@ -3025,9 +3052,9 @@ map<string,double> L2PhiHandler::get_actual_swr_map(ObservationEnsemble& oe, str
 
     for (int i=0;i<mean_vec.size();i++)
     {
-        actual_swr_map[var_names[i]] = mean_vec[i];
+        swr_map[var_names[i]] = mean_vec[i];
     }
-    return actual_swr_map;
+    return swr_map;
 }
 
 
@@ -6577,7 +6604,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
 {
     stringstream ss;
     ss.str("");
-    map<string,map<string,double>> actual_swr_map = ph.get_meas_swr_real_map(oe, weights);
+    map<string,map<string,double>> actual_swr_map = ph.get_swr_real_map(oe, weights);
     map<string,double> phi_fracs;
     map<string,double> current_phi_fracs;
     map<string,double> init_group_phis;
@@ -6649,7 +6676,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
 
     }
 
-    map<string,map<string,double>> adj_swr_map = ph.get_meas_swr_real_map(oe, weights);
+    map<string,map<string,double>> adj_swr_map = ph.get_swr_real_map(oe, weights);
     for (auto& swr_map : adj_swr_map) {
         if ((swr_map.first == BASE_REAL_NAME) && (phi_fracs_by_real.find(swr_map.first) == phi_fracs_by_real.end()))
         {
@@ -6720,7 +6747,8 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
         message(1,"using realization "+center_on+" residuals for reweighting (if available");
     else
         message(1,"using mean residuals for reweighting");
-    map<string,double> mean_swr_map = ph.get_actual_swr_map(oe,center_on);
+    L2PhiHandler::phiType ptype = L2PhiHandler::phiType::MEAS;
+    map<string,double> mean_swr_map = ph.get_swr_map(oe, center_on);
     double cur_mean_phi = 0;
     for (auto& sw : mean_swr_map)
         cur_mean_phi += sw.second;
@@ -6775,7 +6803,7 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
         }
     }
     ph.update(oe,pe);
-    mean_swr_map = ph.get_actual_swr_map(oe,  center_on);
+    mean_swr_map = ph.get_swr_map(oe, center_on);
     for (auto& pf: phi_fracs) {
         total = 0;
         for (auto &g : group_map.at(pf.first)) {

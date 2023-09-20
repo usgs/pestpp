@@ -106,9 +106,9 @@ public:
 
 	map<string,double> get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec);
 
-	map<string,map<string,double>> get_meas_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights);
+	map<string,map<string,double>> get_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights,phiType ptype=phiType::MEAS);
 
-    map<string,double> get_actual_swr_map(ObservationEnsemble& oe, string real_name="");
+    map<string,double> get_swr_map(ObservationEnsemble& oe, string real_name= "",phiType ptype=phiType::MEAS);
 	map<string,map<string,double>> get_meas_phi_weight_ensemble(ObservationEnsemble& oe, ObservationEnsemble& weights);
 
     vector<string> get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names);
