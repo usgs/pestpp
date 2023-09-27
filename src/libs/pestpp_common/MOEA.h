@@ -45,11 +45,13 @@ public:
 	void update_ppd_criteria(ObservationEnsemble& op, ParameterEnsemble& dp);
 
 	//this must be called at least once before the diversity metrixs can be called...
-	void set_pointers(vector<string>& _obs_obj_names, vector<string>& _obs_obj_sd_names, vector<string>& _pi_obj_names, map<string, double>& _obj_dir_mult)
+	void set_pointers(vector<string>& _obj_names, vector<string>& _obs_obj_names, vector<string>& _obs_obj_sd_names, vector<string>& _pi_obj_names, vector<string>& _pi_obj_sd_names, map<string, double>& _obj_dir_mult)
 	{
+		obj_names_ptr = &_obj_names;
 		obs_obj_names_ptr = &_obs_obj_names; 
 		obs_obj_sd_names_ptr = &_obs_obj_sd_names;
 		pi_obj_names_ptr = &_pi_obj_names; 
+		pi_obj_sd_names_ptr = &_pi_obj_sd_names;
 		obj_dir_mult_ptr = &_obj_dir_mult;
 		prep_pareto_summary_file(POP_SUM_TAG);
 		prep_pareto_summary_file(ARC_SUM_TAG);
@@ -109,9 +111,11 @@ private:
 	map<string, double> get_cuboid_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
 
 	map<string, map<string, double>> member_struct;
+	vector<string>* obj_names_ptr;
 	vector<string>* obs_obj_names_ptr;
 	vector<string>* obs_obj_sd_names_ptr;
 	vector<string>* pi_obj_names_ptr;
+	vector<string>* pi_obj_sd_names_ptr;
 	map<string, double>* obj_dir_mult_ptr;
 	set<string> duplicates;
 
@@ -174,7 +178,7 @@ private:
 	chancePoints chancepoints;
 	FileManager &file_manager; 
 	std::mt19937 rand_gen;
-	vector<string> obs_obj_names, pi_obj_names, obs_obj_sd_names;
+	vector<string> obj_names, obs_obj_names, pi_obj_names, obs_obj_sd_names, pi_obj_sd_names;
 	vector<string> dv_names;
 	map<string, double> obj_dir_mult;
 	int n_adaptive_dvs;

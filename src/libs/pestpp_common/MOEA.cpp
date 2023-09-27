@@ -66,12 +66,25 @@ map<string, map<string, double>> ParetoObjectives::get_member_struct(Observation
 
 	//add variance info for obj values to member_struct
 	if (prob_pareto) {
+		map<double, string> obj_sd_map;
+		map<string, double> t;
+		
 		for (auto obj_sd_name : *obs_obj_sd_names_ptr)
 		{
 			obj_sd_vals = op.get_eigen(vector<string>(), vector<string>{obj_sd_name});
+					
 
-			map<double, string> obj_sd_map;
-			map<string, double> t;
+			for (int i = 0; i < real_names.size(); i++)
+			{
+				//obj_sd_map[obj_sd_vals[i]] = real_names[i];
+				t[real_names[i]] = obj_sd_vals[i];
+			}
+			temp[obj_sd_name] = t;
+
+		}
+		for (auto obj_sd_name : *pi_obj_sd_names_ptr)
+		{
+			obj_sd_vals = op.get_eigen(vector<string>(), vector<string>{obj_sd_name});
 
 			for (int i = 0; i < real_names.size(); i++)
 			{
@@ -1084,7 +1097,7 @@ map<string, double> ParetoObjectives::dominance_probability(map<string, double>&
 {
 	map<string, double> prob_dom;
 
-	for (auto obj_name : *obs_obj_names_ptr)
+	for (auto obj_name : *obj_names_ptr)
 	{
 		//prob_dom[obj_name] = std_norm_df(second.at(obj_name), first.at(obj_name), first.at(obj_name + "_SD"), true);
 		prob_dom[obj_name] = std_norm_df(0, first.at(obj_name) - second.at(obj_name), sqrt(pow(first.at(obj_name + "_SD"),2) + pow(second.at(obj_name + "_SD"),2)), true);
@@ -1197,29 +1210,31 @@ void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, Param
 	vector<double> hpv;
 	double hv_extreme = pest_scenario.get_pestpp_options().get_mou_hypervolume_extreme();
 	
+
+
 	//initialize reference values
 	int mult = 1;
 	vector <string> ref_tags {"r_0", "rfty"};
 	for (string reftags : ref_tags)
 	{
-		for (auto obj_map : *obs_obj_names_ptr)
+		for (auto obj_map : *obj_names_ptr)
 		{
 			hv_parts[reftags][obj_map] = hv_extreme * mult;
 			mult *= -1;
 		}
 		mult *= -1;
 
-		hv_partition[reftags] = hv_parts[reftags][obs_obj_names_ptr->at(1)];
+		hv_partition[reftags] = hv_parts[reftags][obj_names_ptr->at(1)];
 	}
 	
 	//set partition boundaries: rectangular strips along obj 2
 	for (auto member : _member_struct)
 	{
-		for (auto obj_map : *obs_obj_names_ptr)
+		for (auto obj_map : *obj_names_ptr)
 		{
 			hv_parts[member.first][obj_map] = _member_struct[member.first][obj_map]; //get only objective values, leave SDs, for easy referencing later
 		}
-		hv_partition[member.first] = _member_struct[member.first][obs_obj_names_ptr->at(1)];
+		hv_partition[member.first] = _member_struct[member.first][obj_names_ptr->at(1)];
 	}
 
 	//order points by increasing obj 2 values
@@ -1229,7 +1244,7 @@ void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, Param
 	for (auto hv : hv_parts_sorted)
 	{
 		hpv.clear();
-		for (auto obj_map : *obs_obj_names_ptr)
+		for (auto obj_map : *obj_names_ptr)
 		{
 			hpv.push_back(hv_parts[hv.first][obj_map]);
 		}
@@ -1249,7 +1264,7 @@ void ParetoObjectives::update_ppd_criteria(ObservationEnsemble& op, ParameterEns
 	stringstream ss;
 
 	int i = 0;
-	for (auto obj_name : *obs_obj_names_ptr)
+	for (auto obj_name : *obj_names_ptr)
 	{
 		cv = 0;
 		for (auto m : _member_struct)
@@ -1312,11 +1327,11 @@ double ParetoObjectives::get_ehvi(string& member, map<string, map<string, double
 
 	obj.clear();
 	obj_sd.clear();
-	for (auto obj_map : *obs_obj_names_ptr)
+	for (auto obj_map : *obj_names_ptr)
+	{
 		obj.push_back(_member_struct[member][obj_map]);
-
-	for (auto obj_sd_map : *obs_obj_sd_names_ptr)
-		obj_sd.push_back(_member_struct[member][obj_sd_map]);
+		obj_sd.push_back(_member_struct[member][obj_map + "_SD"]);
+	}
 
 	t1 = 0;
 	t2 = 0;
@@ -2338,7 +2353,7 @@ void MOEA::initialize()
 		onames = pest_scenario.get_ctl_ordered_pi_names();
 		set<string> pinames(onames.begin(), onames.end());
 		onames.clear();
-		vector<string> missing,keep_obs, keep_pi,err_sense,keep_obs_sd;
+		vector<string> missing,keep_obs, keep_pi,err_sense,keep_obs_sd, keep_pi_sd;
 		for (auto obj_name : passed_obj_names)
 		{
 			if ((oset.find(obj_name) == oset.end()) && (pinames.find(obj_name) == pinames.end()))
@@ -2391,6 +2406,7 @@ void MOEA::initialize()
 					}
 					pi_obj_names.push_back(obj_name);
 				}
+				if (prob_pareto) keep_pi_sd.push_back(obj_name + "_SD");
 			}
 		}
 		if (err_sense.size() > 0)
@@ -2416,9 +2432,11 @@ void MOEA::initialize()
             throw_moea_error(ss.str());
 
 		}
+		obj_names = passed_obj_names;
 		obs_obj_names = keep_obs;
 		obs_obj_sd_names = keep_obs_sd;
 		pi_obj_names = keep_pi;
+		pi_obj_sd_names = keep_pi_sd;
 	}
 
 	ss.str("");
@@ -2891,7 +2909,7 @@ void MOEA::initialize()
 
 	//do an initial pareto dominance sort
 	message(1, "performing initial pareto dominance sort");
-	objectives.set_pointers(obs_obj_names, obs_obj_sd_names, pi_obj_names, obj_dir_mult);
+	objectives.set_pointers(obj_names, obs_obj_names, obs_obj_sd_names, pi_obj_names, pi_obj_sd_names, obj_dir_mult);
     archive_size = ppo->get_mou_max_archive_size();
     vector<string> keep;
 	if (envtype == MouEnvType::NSGA)
