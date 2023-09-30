@@ -36,6 +36,8 @@ void IterEnsembleSmoother::iterate_2_solution()
 	ofstream &frec = file_manager.rec_ofstream();
 	
 	bool accept;
+	int n_iter_mean = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
+
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
 		iter++;
@@ -68,7 +70,18 @@ void IterEnsembleSmoother::iterate_2_solution()
 		else
 			consec_bad_lambda_cycles++;
 
-		if (should_terminate())
+		if (iter == n_iter_mean)
+        {
+		    double phi_lam = get_lambda();
+		    //if (phi_lam > last_best_lam)
+            //{
+            last_best_lam = phi_lam;
+            message(1,"iter = ies_n_iter_mean, resetting lambda to ",last_best_lam);
+            //}
+		    consec_bad_lambda_cycles = 0;
+        }
+
+		if ((iter > n_iter_mean) && (should_terminate()))
 			break;
 	}
 }

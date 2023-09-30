@@ -501,5 +501,7 @@ protected:
 
     void remove_external_pe_filenames(vector<string>& pe_filenames);
 
+    double get_lambda();
+
 };
 #endif

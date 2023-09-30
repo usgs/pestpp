@@ -6312,22 +6312,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
             last_best_lam = 1000;//?
         }
         else {
-            //double x = last_best_mean / (2.0 * double(oe.shape().second));
-            double org_val = last_best_lam;
-            double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
-            last_best_lam = pow(10.0, (floor(log10(x))));
-            if (last_best_lam < 1.0e-10) {
-                message(1, "initial lambda estimation from phi failed, using 10,000");
-                last_best_lam = 10000;
-            }
-            if (org_val < 0.0) {
-                org_val *= -1.0;
-                ss.str("");
-                ss << "scaling phi-based initial lambda: " << last_best_lam
-                   << ", by user-supplied (negative) initial lambda: " << org_val;
-                message(1, ss.str());
-                last_best_lam *= org_val;
-            }
+            last_best_lam = get_lambda();
         }
 	}
 
@@ -6341,6 +6326,30 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         message(1, "current lambda:", last_best_lam);
     }
     message(0, "initialization complete");
+}
+
+double EnsembleMethod::get_lambda()
+{
+    //double x = last_best_mean / (2.0 * double(oe.shape().second));
+    stringstream ss;
+    double lam_val = 0.0;
+    double org_val = last_best_lam;
+    double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
+    lam_val = pow(10.0, (floor(log10(x))));
+    if (lam_val < 1.0e-10) {
+        message(1, "initial lambda estimation from phi failed, using 10,000");
+        lam_val = 10000;
+    }
+    if (org_val < 0.0) {
+        org_val *= -1.0;
+        ss.str("");
+        ss << "scaling phi-based initial lambda: " << last_best_lam
+           << ", by user-supplied (negative) initial lambda: " << org_val;
+        message(1, ss.str());
+        lam_val *= org_val;
+    }
+    return lam_val;
+
 }
 
 void EnsembleMethod::prep_drop_violations()
@@ -7597,10 +7606,8 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	double lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
 
 
-	//subset stuff here
-
 	if (iter <= pest_scenario.get_pestpp_options().get_ies_n_iter_mean()) {
-        performance_log->log_event("this is a mean-only iteration");
+        message(2,"this is a mean-only iteration");
         performance_log->log_event("getting prior parameter ensemble mean-centered anomalies");
         Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe.get_real_names(), pe.get_var_names());
 
@@ -7640,6 +7647,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         }
         output_file_writer.write_par(pfile,pars,*pe.get_par_transform().get_offset_ptr(),*pe.get_par_transform().get_scale_ptr());
         pfile.close();
+        message(2,"saved best ensemble mean vector to ",ss.str());
         pe_best = pe.zeros_like(0);
         if (verbose_level > 2)
         {
@@ -7671,13 +7679,14 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds()) {
             new_pe.enforce_bounds(performance_log, false);
         }
-        performance_log->log_event("running mean-shifted prior realizations");
+        oe_lam_best = oe; //copy
+
+        message(1,"running mean-shifted prior realizations: ",new_pe.shape().first);
         run_ensemble_util(performance_log,frec,new_pe,oe_lam_best,run_mgr_ptr);
         pe_lams[best_idx] = new_pe;
 
         //make sure we dont try to process the subset stuff below
         local_subset_size = pe.shape().first;
-
     }
 
 
