@@ -7627,12 +7627,35 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
         vector<double> mean_vec = pe_best.get_mean_stl_var_vector();
         //TODO: save par file for mean vector
+        Parameters pars = pest_scenario.get_ctl_parameters();
+        pe.get_par_transform().ctl2numeric_ip(pars);
+        pars.update_without_clear(pe_best.get_var_names(),mean_vec);
+        pe.get_par_transform().numeric2ctl_ip(pars);
+        ss.str("");
+        ss << file_manager.get_base_filename() << "." << iter << ".best.par";
+        ofstream pfile(ss.str());
+        if (!pfile)
+        {
+            throw_em_error("error opening best par file '" + ss.str() + "' for writing");
+        }
+        output_file_writer.write_par(pfile,pars,*pe.get_par_transform().get_offset_ptr(),*pe.get_par_transform().get_scale_ptr());
+        pfile.close();
         pe_best = pe.zeros_like(0);
         if (verbose_level > 2)
         {
             performance_log->log_event("saving 'best' parameter ensemble that was used to form mean vector");
-            //TODO:...
-            //pe_best.to_csv()
+            ss.str("");
+            ss << file_manager.get_base_filename() << "." << iter << ".best.par";
+            if (pest_scenario.get_pestpp_options().get_save_binary())
+            {
+                ss << ".jcb";
+                pe_best.to_binary(ss.str());
+            }
+            else
+            {
+                ss << ".csv";
+                pe_best.to_csv(ss.str());
+            }
         }
 
         performance_log->log_event("adding mean to anomalies");
