@@ -499,5 +499,7 @@ protected:
 
     void prep_drop_violations();
 
+    void remove_external_pe_filenames(vector<string>& pe_filenames);
+
 };
 #endif

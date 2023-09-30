@@ -3871,26 +3871,27 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
 	double std = calc_std(&_meas);
 	vector<int> idxs;
 	vector<string> names = oe.get_real_names();
-	double bad_thres = 1.0e+300;
-	if (bad_phi_sigma > 0) {
-        bad_thres = mean + (std * bad_phi_sigma);
-        ofstream &frec = file_manager->rec_ofstream();
-        frec << "...bad_phi_sigma " << bad_phi_sigma << " and mean " << mean << " yields bad phi threshold of " << bad_thres << endl;
-    }
-        else
-    {
-	    vector<double> meas_vec;
-	    for (auto & m : _meas)
-	        meas_vec.push_back(m.second);
-	    sort(meas_vec.begin(),meas_vec.end());
-	    double qval = -1. * bad_phi_sigma / 100.;
-	    int qidx = (int)(qval * (double)meas_vec.size());
-	    qidx = min(0,qidx);
-	    qidx = max(((int)meas_vec.size()) - 2,qidx);
-	    bad_thres = meas_vec[qidx];
-	    ofstream& frec = file_manager->rec_ofstream();
-	    frec << "...bad_phi_sigma quantile value " << qval << " yields bad phi threshold of " << bad_thres << endl;
+	double bad_thres = std::numeric_limits<double>::max();
+	if (bad_phi_sigma < std::numeric_limits<double>::max()) {
+        if (bad_phi_sigma > 0) {
+            bad_thres = min(std::numeric_limits<double>::max(), mean + (std * bad_phi_sigma));
+            ofstream &frec = file_manager->rec_ofstream();
+            frec << "...bad_phi_sigma " << bad_phi_sigma << " and mean " << mean << " yields bad phi threshold of "
+                 << bad_thres << endl;
+        } else {
+            vector<double> meas_vec;
+            for (auto &m : _meas)
+                meas_vec.push_back(m.second);
+            sort(meas_vec.begin(), meas_vec.end());
+            double qval = -1. * bad_phi_sigma / 100.;
+            int qidx = (int) (qval * (double) meas_vec.size());
+            qidx = min(0, qidx);
+            qidx = max(((int) meas_vec.size()) - 2, qidx);
+            bad_thres = min(std::numeric_limits<double>::max(),meas_vec[qidx]);
+            ofstream &frec = file_manager->rec_ofstream();
+            frec << "...bad_phi_sigma quantile value " << qval << " yields bad phi threshold of " << bad_thres << endl;
 
+        }
     }
 
 	for (int i = 0; i < names.size(); i++) {
@@ -5623,7 +5624,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	reg_factor = pest_scenario.get_pestpp_options().get_ies_reg_factor();
 	message(1, "using reg_factor: ", reg_factor);
 	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
-	if (bad_phi < 1.0e+30)
+	if (bad_phi < std::numeric_limits<double>::max())
 		message(1, "using bad_phi: ", bad_phi);
 
 	int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
@@ -7314,7 +7315,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
             local_subset_size = 4;
             message(2,ss.str());
         }
-
     }
 
 	if ((use_subset) && (local_subset_size > pe.shape().first))
@@ -7500,7 +7500,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	vector<map<int, int>> real_run_ids_lams;
 	int best_idx = -1;
-	double best_mean = 1.0e+30, best_std = 1.0e+30; // todo (Ayman): read those from input
+	double best_mean = 1.0e+300, best_std = 1.0e+300; // todo (Ayman): read those from input
 	double mean, std;
 
 	message(0, "running upgrade ensembles");
@@ -7598,7 +7598,67 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 
 	//subset stuff here
-	if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
+
+	if (iter <= pest_scenario.get_pestpp_options().get_ies_n_iter_mean()) {
+        performance_log->log_event("this is a mean-only iteration");
+        performance_log->log_event("getting prior parameter ensemble mean-centered anomalies");
+        Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe.get_real_names(), pe.get_var_names());
+
+        performance_log->log_event("getting current parameter ensemble");
+        for (int i = 0; i < pe_lams.size(); i++)
+        {
+            if (i == best_idx)
+                continue;
+            pe_lams[i] = pe.zeros_like(0);
+        }
+
+        ParameterEnsemble pe_best = pe_lams[best_idx];
+        pe_best.set_fixed_info(pe.get_fixed_info());
+
+        if (pe_filenames.size() > 0)
+        {
+            performance_log->log_event("'ies_upgrades_in_memory' is 'false', loading 'best' parameter ensemble from file '" + pe_filenames[best_idx] + "'");
+
+            pe_best.from_binary(pe_filenames[best_idx]);
+            pe_best.transform_ip(ParameterEnsemble::transStatus::NUM);
+            //remove any failed runs from subset testing
+            remove_external_pe_filenames(pe_filenames);
+        }
+
+        vector<double> mean_vec = pe_best.get_mean_stl_var_vector();
+        //TODO: save par file for mean vector
+        pe_best = pe.zeros_like(0);
+        if (verbose_level > 2)
+        {
+            performance_log->log_event("saving 'best' parameter ensemble that was used to form mean vector);
+            //TODO:...
+            //pe_best.to_csv()
+        }
+
+        performance_log->log_event("adding mean to anomalies");
+        for (int i = 0; i < mean_vec.size(); i++)
+        {
+            anoms.col(i) = anoms.col(i).array() + mean_vec[i];
+        }
+        performance_log->log_event("forming new parameter ensemble of mean-shifted prior realizations");
+        ParameterEnsemble new_pe = ParameterEnsemble(&pest_scenario,&rand_gen,anoms,pe.get_real_names(),pe.get_var_names());
+
+        new_pe.set_trans_status(pe.get_trans_status());
+        new_pe.set_fixed_info(pe.get_fixed_info());
+        if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds()) {
+            new_pe.enforce_bounds(performance_log, false);
+        }
+        performance_log->log_event("running mean-shifted prior realizations");
+        run_ensemble_util(performance_log,frec,new_pe,oe_lam_best,run_mgr_ptr);
+        pe_lams[best_idx] = new_pe;
+
+        //make sure we dont try to process the subset stuff below
+        local_subset_size = pe.shape().first;
+
+    }
+
+
+    else if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
 	{
 
 		double acc_phi = last_best_mean * acc_fac;
@@ -7672,7 +7732,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		//need to work out which par and obs en real names to run - some may have failed during subset testing...
 		ObservationEnsemble remaining_oe_lam = oe;//copy
 
-		
 		ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
 		remaining_pe_lam.set_fixed_info(pe.get_fixed_info());
 
@@ -7700,23 +7759,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			//remove any failed runs from subset testing
 			if (missing.size() > 0)
 				remaining_pe_lam.drop_rows(missing);
-			for (auto& pe_filename : pe_filenames)
-			{ 
-				performance_log->log_event("removing upgrade ensemble '" + pe_filename + "'");
-				try
-				{
-					remove(pe_filename.c_str());
-				}
-				catch (exception& e)
-				{
-					message(2, "error removing upgrade ensemble: '" + pe_filename + "' :" + e.what());
-				}
-				catch (...)
-				{
-					message(2, "error removing upgrade ensemble: '" + pe_filename);
-				}
-				
-			}
+			remove_external_pe_filenames(pe_filenames);
 			
 		}
 		
@@ -7907,11 +7950,31 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
             last_best_lam = new_lam;
         }
         save_ensembles("rejected",cycle,pe_lams[best_idx],oe_lam_best);
-
-
 	}
-	//report_and_save();
+	report_and_save();
+
 	return true;
+}
+
+void EnsembleMethod::remove_external_pe_filenames(vector<string>& pe_filenames)
+{
+    for (auto& pe_filename : pe_filenames)
+    {
+        performance_log->log_event("removing upgrade ensemble '" + pe_filename + "'");
+        try
+        {
+            remove(pe_filename.c_str());
+        }
+        catch (exception& e)
+        {
+            message(2, "error removing upgrade ensemble: '" + pe_filename + "' :" + e.what());
+        }
+        catch (...)
+        {
+            message(2, "error removing upgrade ensemble: '" + pe_filename);
+        }
+
+    }
 }
 
 //template<typename T, typename A>
