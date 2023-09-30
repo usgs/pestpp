@@ -7630,7 +7630,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         pe_best = pe.zeros_like(0);
         if (verbose_level > 2)
         {
-            performance_log->log_event("saving 'best' parameter ensemble that was used to form mean vector);
+            performance_log->log_event("saving 'best' parameter ensemble that was used to form mean vector");
             //TODO:...
             //pe_best.to_csv()
         }
@@ -7951,7 +7951,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         }
         save_ensembles("rejected",cycle,pe_lams[best_idx],oe_lam_best);
 	}
-	report_and_save();
 
 	return true;
 }
