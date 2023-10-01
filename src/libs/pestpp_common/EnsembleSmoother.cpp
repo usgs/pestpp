@@ -81,8 +81,16 @@ void IterEnsembleSmoother::iterate_2_solution()
 		    consec_bad_lambda_cycles = 0;
         }
 
-		if ((iter > n_iter_mean) && (should_terminate()))
-			break;
+		if (should_terminate())
+        {
+		    if (iter > pest_scenario.get_pestpp_options().get_ies_n_iter_mean()) {
+                break;
+            }
+		    else{
+		        message(1,"continuing iterations to satisfy ies_n_iter_mean");
+		    }
+        }
+
 	}
 }
 

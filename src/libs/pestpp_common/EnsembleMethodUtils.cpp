@@ -7607,11 +7607,15 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 
 	if (iter <= pest_scenario.get_pestpp_options().get_ies_n_iter_mean()) {
-        message(2,"this is a mean-only iteration");
+        message(1,"processing mean-only upgrade");
+
+        message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
+        ph.update(oe_lams[best_idx], pe_lams[best_idx],weights);
+        ph.report(true,false);
+
         performance_log->log_event("getting prior parameter ensemble mean-centered anomalies");
         Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe.get_real_names(), pe.get_var_names());
 
-        performance_log->log_event("getting current parameter ensemble");
         for (int i = 0; i < pe_lams.size(); i++)
         {
             if (i == best_idx)
@@ -7631,9 +7635,9 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
             //remove any failed runs from subset testing
             remove_external_pe_filenames(pe_filenames);
         }
-
+        performance_log->log_event("getting best-lambda parameter ensemble mean vector");
         vector<double> mean_vec = pe_best.get_mean_stl_var_vector();
-        //TODO: save par file for mean vector
+
         Parameters pars = pest_scenario.get_ctl_parameters();
         pe.get_par_transform().ctl2numeric_ip(pars);
         pars.update_without_clear(pe_best.get_var_names(),mean_vec);
@@ -7643,15 +7647,15 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         ofstream pfile(ss.str());
         if (!pfile)
         {
-            throw_em_error("error opening best par file '" + ss.str() + "' for writing");
+            throw_em_error("error opening best-lambda mean par file '" + ss.str() + "' for writing");
         }
         output_file_writer.write_par(pfile,pars,*pe.get_par_transform().get_offset_ptr(),*pe.get_par_transform().get_scale_ptr());
         pfile.close();
-        message(2,"saved best ensemble mean vector to ",ss.str());
+        message(2,"saved best-lambda par ensemble mean vector to ",ss.str());
         pe_best = pe.zeros_like(0);
         if (verbose_level > 2)
         {
-            performance_log->log_event("saving 'best' parameter ensemble that was used to form mean vector");
+            performance_log->log_event("saving best-lambda par ensemble");
             ss.str("");
             ss << file_manager.get_base_filename() << "." << iter << ".best.par";
             if (pest_scenario.get_pestpp_options().get_save_binary())
@@ -7681,7 +7685,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         }
         oe_lam_best = oe; //copy
 
-        message(1,"running mean-shifted prior realizations: ",new_pe.shape().first);
+        message(0,"running mean-shifted prior realizations: ",new_pe.shape().first);
         run_ensemble_util(performance_log,frec,new_pe,oe_lam_best,run_mgr_ptr);
         pe_lams[best_idx] = new_pe;
 
