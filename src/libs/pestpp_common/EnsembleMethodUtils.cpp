@@ -7358,6 +7358,19 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	parcov.update_sets();
 	obscov.update_sets();
 
+	//make sure weight ensemble is in sync with oe
+	if (weights.shape().first != oe.shape().first)
+    {
+	    if (weights.shape().first < oe.shape().first)
+        {
+            throw_em_error("weight ensemble has less realizations that obs ensemble");
+        }
+	    ss.str("");
+	    ss << "resizing weight ensemble from " << weights.shape().first << " realizations to " << oe.shape().first << " realizations";
+	    performance_log->log_event(ss.str());
+	    weights.keep_rows(oe.get_real_names());
+    }
+
 	//buid up this container here and then reuse it for each lambda later...
 	unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	if (use_localizer)
