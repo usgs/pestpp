@@ -178,9 +178,9 @@ private:
 	map<string, double> init_cv;
 	map<string, double> curr_cv;
 	map<string, int> num_at_ubound;
-	map<string, int> percent_at_ubound;
+	map<string, double> percent_at_ubound;
     map<string, int> num_at_lbound;
-    map<string, int> percent_at_lbound;
+    map<string, double> percent_at_lbound;
 
 	void update(ParameterEnsemble& pe);
 	void write_to_csv(string& filename);

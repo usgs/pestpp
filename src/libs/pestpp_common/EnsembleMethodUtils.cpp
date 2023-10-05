@@ -4416,22 +4416,22 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	
 	int i = 0;
 	int num_out;
-	int percent_out;
+	double percent_out;
 	for (auto &grp_name : grp_names)
 	{
 		double mean_diff = mean_change[grp_name];
 		double std_diff = std_change[grp_name];
 
 		ss.str("");
-		ss << setw(mxlen) << left << pest_utils::lower_cp(grp_name) << setw(10) << setprecision(2) << right << mean_diff * 100.0;
-		ss << setw(10) << setprecision(2) << std_diff * 100.0;
+		ss << setw(mxlen) << left << pest_utils::lower_cp(grp_name) << setw(10) << setprecision(4) << right << mean_diff * 100.0;
+		ss << setw(10) << setprecision(4) << std_diff * 100.0;
         num_out = num_at_ubound[grp_name];
         percent_out = percent_at_ubound[grp_name];
-		ss << setw(10) << num_out << setw(10) << setprecision(2) << percent_out;
+		ss << setw(10) << num_out << setw(10) << setprecision(4) << percent_out;
         num_out = num_at_lbound[grp_name];
         percent_out = percent_at_lbound[grp_name];
-        ss << setw(10) << num_out << setw(10) << setprecision(2) << percent_out;
-		ss << setw(10) << setprecision(2) << init_cv[grp_name] << setw(10) << curr_cv[grp_name] << setw(10) << setprecision(2) << endl;
+        ss << setw(10) << num_out << setw(10) << setprecision(4) << percent_out;
+		ss << setw(10) << setprecision(4) << init_cv[grp_name] << setw(10) << curr_cv[grp_name] << setw(10) << setprecision(4) << endl;
 		if (i < 15)
 			cout << ss.str();
 		frec << ss.str();
@@ -4467,6 +4467,7 @@ void ParChangeSummarizer::write_to_csv(string& filename)
 		throw runtime_error("ParChangeSummarizer::write_to_csv() error opening file " + filename);
 
 	f << "group,mean_change,std_change,num_at_near_lbound,percent_at_near_lbound,num_at_near_ubound,percent_at_near_ubound,initial_cv,current_cv" << endl;
+	f << setprecision(20);
 	for (auto grp_name : base_pe_ptr->get_pest_scenario_ptr()->get_ctl_ordered_par_group_names())
 	{
 		f << pest_utils::lower_cp(grp_name) << "," << mean_change[grp_name]*100.0 << "," << std_change[grp_name]*100.0 << ",";
@@ -4611,11 +4612,11 @@ void ParChangeSummarizer:: update(ParameterEnsemble& pe)
         num_at_ubound[grp_name] = num_out_u;
         percent_out = 0.0;
 		if (num_pars > 0)
-            percent_out = double(num_out_l) / double(num_pars * num_reals) * 100;
+            percent_out = double(num_out_l) / double(num_pars * num_reals) * 100.;
 		percent_at_lbound[grp_name] = percent_out;
         percent_out = 0.0;
         if (num_pars > 0)
-            percent_out = double(num_out_u) / double(num_pars * num_reals) * 100;
+            percent_out = double(num_out_u) / double(num_pars * num_reals) * 100.;
         percent_at_ubound[grp_name] = percent_out;
         curr_cv[grp_name] = ccv;
 		init_cv[grp_name] = icv;
