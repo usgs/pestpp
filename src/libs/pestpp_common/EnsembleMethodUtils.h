@@ -106,9 +106,9 @@ public:
 
 	map<string,double> get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec);
 
-	map<string,map<string,double>> get_meas_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights);
+	map<string,map<string,double>> get_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights,phiType ptype=phiType::MEAS);
 
-    map<string,double> get_actual_swr_map(ObservationEnsemble& oe, string real_name="");
+    map<string,double> get_swr_map(ObservationEnsemble& oe, string real_name= "",phiType ptype=phiType::MEAS);
 	map<string,map<string,double>> get_meas_phi_weight_ensemble(ObservationEnsemble& oe, ObservationEnsemble& weights);
 
     vector<string> get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names);
@@ -178,9 +178,9 @@ private:
 	map<string, double> init_cv;
 	map<string, double> curr_cv;
 	map<string, int> num_at_ubound;
-	map<string, int> percent_at_ubound;
+	map<string, double> percent_at_ubound;
     map<string, int> num_at_lbound;
-    map<string, int> percent_at_lbound;
+    map<string, double> percent_at_lbound;
 
 	void update(ParameterEnsemble& pe);
 	void write_to_csv(string& filename);
@@ -498,6 +498,10 @@ protected:
                                     vector<string>& index, bool check_reals);
 
     void prep_drop_violations();
+
+    void remove_external_pe_filenames(vector<string>& pe_filenames);
+
+    double get_lambda();
 
 };
 #endif

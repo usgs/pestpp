@@ -2976,35 +2976,62 @@ Eigen::MatrixXd L2PhiHandler::get_obs_resid(ObservationEnsemble &oe, bool apply_
 	return resid;
 }
 
-map<string,map<string,double>> L2PhiHandler::get_meas_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights)
+map<string,map<string,double>> L2PhiHandler::get_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights,phiType ptype)
 {
-    Eigen::MatrixXd resid = get_obs_resid(oe,true);
+    Eigen::MatrixXd resid;
+    if (ptype == phiType::MEAS)
+    {
+      resid = get_obs_resid(oe,true);
+    }
+    else if (ptype == phiType::ACTUAL)
+    {
+        resid = get_actual_obs_resid(oe);
+    }
+    else
+    {
+        throw runtime_error("L2PhiHandler::get_swr_real_map() unsupported ptype");
+    }
 
     Eigen::MatrixXd wmat = weights.get_eigen(oe.get_real_names(),oe_base->get_var_names());
     resid = resid.array() * wmat.array();
     resid = resid.array() * resid.array();
-    map<string,map<string,double>> actual_swr_map;
+    map<string,map<string,double>> swr_map;
     vector<string> var_names = oe_base->get_var_names();
     vector<string> real_names = oe.get_real_names();
     for (int i=0;i<real_names.size();i++) {
-        actual_swr_map[real_names[i]] = map<string,double>();
+        swr_map[real_names[i]] = map<string,double>();
         for (int j = 0; j < var_names.size(); j++) {
-            actual_swr_map[real_names[i]][var_names[j]] = resid(i, j);
+            swr_map[real_names[i]][var_names[j]] = resid(i, j);
         }
     }
-    return actual_swr_map;
+    return swr_map;
 }
 
-map<string,double> L2PhiHandler::get_actual_swr_map(ObservationEnsemble& oe, string real_name)
+map<string,double> L2PhiHandler::get_swr_map(ObservationEnsemble& oe, string real_name,phiType ptype)
 {
-    Eigen::MatrixXd resid = get_actual_obs_resid(oe);
+
+    Eigen::MatrixXd resid;
+    if (ptype == phiType::ACTUAL)
+    {
+       resid = get_actual_obs_resid(oe);
+    }
+    else if (ptype == phiType::MEAS)
+    {
+        resid = get_obs_resid(oe,true);
+    }
+    else
+    {
+        throw runtime_error("L2PhiHandler::get_swr_map() unsupported ptype");
+    }
+
+
     Eigen::VectorXd q = get_q_vector();
     for (int i=0;i<resid.rows();i++) {
         resid.row(i) = resid.row(i).array() * q.array().transpose();
         resid.row(i) = resid.row(i).array() * resid.row(i).array();
     }
     Eigen::VectorXd mean_vec;
-    map<string,double> actual_swr_map;
+    map<string,double> swr_map;
     vector<string> var_names = oe_base->get_var_names();
     if (real_name.size() > 0)
     {
@@ -3025,9 +3052,9 @@ map<string,double> L2PhiHandler::get_actual_swr_map(ObservationEnsemble& oe, str
 
     for (int i=0;i<mean_vec.size();i++)
     {
-        actual_swr_map[var_names[i]] = mean_vec[i];
+        swr_map[var_names[i]] = mean_vec[i];
     }
-    return actual_swr_map;
+    return swr_map;
 }
 
 
@@ -3844,26 +3871,27 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
 	double std = calc_std(&_meas);
 	vector<int> idxs;
 	vector<string> names = oe.get_real_names();
-	double bad_thres = 1.0e+300;
-	if (bad_phi_sigma > 0) {
-        bad_thres = mean + (std * bad_phi_sigma);
-        ofstream &frec = file_manager->rec_ofstream();
-        frec << "...bad_phi_sigma " << bad_phi_sigma << " and mean " << mean << " yields bad phi threshold of " << bad_thres << endl;
-    }
-        else
-    {
-	    vector<double> meas_vec;
-	    for (auto & m : _meas)
-	        meas_vec.push_back(m.second);
-	    sort(meas_vec.begin(),meas_vec.end());
-	    double qval = -1. * bad_phi_sigma / 100.;
-	    int qidx = (int)(qval * (double)meas_vec.size());
-	    qidx = min(0,qidx);
-	    qidx = max(((int)meas_vec.size()) - 2,qidx);
-	    bad_thres = meas_vec[qidx];
-	    ofstream& frec = file_manager->rec_ofstream();
-	    frec << "...bad_phi_sigma quantile value " << qval << " yields bad phi threshold of " << bad_thres << endl;
+	double bad_thres = std::numeric_limits<double>::max();
+	if (bad_phi_sigma < std::numeric_limits<double>::max()) {
+        if (bad_phi_sigma > 0) {
+            bad_thres = min(std::numeric_limits<double>::max(), mean + (std * bad_phi_sigma));
+            ofstream &frec = file_manager->rec_ofstream();
+            frec << "...bad_phi_sigma " << bad_phi_sigma << " and mean " << mean << " yields bad phi threshold of "
+                 << bad_thres << endl;
+        } else {
+            vector<double> meas_vec;
+            for (auto &m : _meas)
+                meas_vec.push_back(m.second);
+            sort(meas_vec.begin(), meas_vec.end());
+            double qval = -1. * bad_phi_sigma / 100.;
+            int qidx = (int) (qval * (double) meas_vec.size());
+            qidx = min(0, qidx);
+            qidx = max(((int) meas_vec.size()) - 2, qidx);
+            bad_thres = min(std::numeric_limits<double>::max(),meas_vec[qidx]);
+            ofstream &frec = file_manager->rec_ofstream();
+            frec << "...bad_phi_sigma quantile value " << qval << " yields bad phi threshold of " << bad_thres << endl;
 
+        }
     }
 
 	for (int i = 0; i < names.size(); i++) {
@@ -4388,22 +4416,22 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	
 	int i = 0;
 	int num_out;
-	int percent_out;
+	double percent_out;
 	for (auto &grp_name : grp_names)
 	{
 		double mean_diff = mean_change[grp_name];
 		double std_diff = std_change[grp_name];
 
 		ss.str("");
-		ss << setw(mxlen) << left << pest_utils::lower_cp(grp_name) << setw(10) << setprecision(2) << right << mean_diff * 100.0;
-		ss << setw(10) << setprecision(2) << std_diff * 100.0;
+		ss << setw(mxlen) << left << pest_utils::lower_cp(grp_name) << setw(10) << setprecision(4) << right << mean_diff * 100.0;
+		ss << setw(10) << setprecision(4) << std_diff * 100.0;
         num_out = num_at_ubound[grp_name];
         percent_out = percent_at_ubound[grp_name];
-		ss << setw(10) << num_out << setw(10) << setprecision(2) << percent_out;
+		ss << setw(10) << num_out << setw(10) << setprecision(4) << percent_out;
         num_out = num_at_lbound[grp_name];
         percent_out = percent_at_lbound[grp_name];
-        ss << setw(10) << num_out << setw(10) << setprecision(2) << percent_out;
-		ss << setw(10) << setprecision(2) << init_cv[grp_name] << setw(10) << curr_cv[grp_name] << setw(10) << setprecision(2) << endl;
+        ss << setw(10) << num_out << setw(10) << setprecision(4) << percent_out;
+		ss << setw(10) << setprecision(4) << init_cv[grp_name] << setw(10) << curr_cv[grp_name] << setw(10) << setprecision(4) << endl;
 		if (i < 15)
 			cout << ss.str();
 		frec << ss.str();
@@ -4439,6 +4467,7 @@ void ParChangeSummarizer::write_to_csv(string& filename)
 		throw runtime_error("ParChangeSummarizer::write_to_csv() error opening file " + filename);
 
 	f << "group,mean_change,std_change,num_at_near_lbound,percent_at_near_lbound,num_at_near_ubound,percent_at_near_ubound,initial_cv,current_cv" << endl;
+	f << setprecision(20);
 	for (auto grp_name : base_pe_ptr->get_pest_scenario_ptr()->get_ctl_ordered_par_group_names())
 	{
 		f << pest_utils::lower_cp(grp_name) << "," << mean_change[grp_name]*100.0 << "," << std_change[grp_name]*100.0 << ",";
@@ -4583,11 +4612,11 @@ void ParChangeSummarizer:: update(ParameterEnsemble& pe)
         num_at_ubound[grp_name] = num_out_u;
         percent_out = 0.0;
 		if (num_pars > 0)
-            percent_out = double(num_out_l) / double(num_pars * num_reals) * 100;
+            percent_out = double(num_out_l) / double(num_pars * num_reals) * 100.;
 		percent_at_lbound[grp_name] = percent_out;
         percent_out = 0.0;
         if (num_pars > 0)
-            percent_out = double(num_out_u) / double(num_pars * num_reals) * 100;
+            percent_out = double(num_out_u) / double(num_pars * num_reals) * 100.;
         percent_at_ubound[grp_name] = percent_out;
         curr_cv[grp_name] = ccv;
 		init_cv[grp_name] = icv;
@@ -5596,7 +5625,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	reg_factor = pest_scenario.get_pestpp_options().get_ies_reg_factor();
 	message(1, "using reg_factor: ", reg_factor);
 	double bad_phi = pest_scenario.get_pestpp_options().get_ies_bad_phi();
-	if (bad_phi < 1.0e+30)
+	if (bad_phi < std::numeric_limits<double>::max())
 		message(1, "using bad_phi: ", bad_phi);
 
 	int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
@@ -6284,22 +6313,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
             last_best_lam = 1000;//?
         }
         else {
-            //double x = last_best_mean / (2.0 * double(oe.shape().second));
-            double org_val = last_best_lam;
-            double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
-            last_best_lam = pow(10.0, (floor(log10(x))));
-            if (last_best_lam < 1.0e-10) {
-                message(1, "initial lambda estimation from phi failed, using 10,000");
-                last_best_lam = 10000;
-            }
-            if (org_val < 0.0) {
-                org_val *= -1.0;
-                ss.str("");
-                ss << "scaling phi-based initial lambda: " << last_best_lam
-                   << ", by user-supplied (negative) initial lambda: " << org_val;
-                message(1, ss.str());
-                last_best_lam *= org_val;
-            }
+            last_best_lam = get_lambda();
         }
 	}
 
@@ -6313,6 +6327,30 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         message(1, "current lambda:", last_best_lam);
     }
     message(0, "initialization complete");
+}
+
+double EnsembleMethod::get_lambda()
+{
+    //double x = last_best_mean / (2.0 * double(oe.shape().second));
+    stringstream ss;
+    double lam_val = 0.0;
+    double org_val = last_best_lam;
+    double x = last_best_mean / (2.0 * double(pest_scenario.get_ctl_ordered_nz_obs_names().size()));
+    lam_val = pow(10.0, (floor(log10(x))));
+    if (lam_val < 1.0e-10) {
+        message(1, "initial lambda estimation from phi failed, using 10,000");
+        lam_val = 10000;
+    }
+    if (org_val < 0.0) {
+        org_val *= -1.0;
+        ss.str("");
+        ss << "scaling phi-based initial lambda: " << last_best_lam
+           << ", by user-supplied (negative) initial lambda: " << org_val;
+        message(1, ss.str());
+        lam_val *= org_val;
+    }
+    return lam_val;
+
 }
 
 void EnsembleMethod::prep_drop_violations()
@@ -6577,7 +6615,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
 {
     stringstream ss;
     ss.str("");
-    map<string,map<string,double>> actual_swr_map = ph.get_meas_swr_real_map(oe, weights);
+    map<string,map<string,double>> actual_swr_map = ph.get_swr_real_map(oe, weights);
     map<string,double> phi_fracs;
     map<string,double> current_phi_fracs;
     map<string,double> init_group_phis;
@@ -6649,7 +6687,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
 
     }
 
-    map<string,map<string,double>> adj_swr_map = ph.get_meas_swr_real_map(oe, weights);
+    map<string,map<string,double>> adj_swr_map = ph.get_swr_real_map(oe, weights);
     for (auto& swr_map : adj_swr_map) {
         if ((swr_map.first == BASE_REAL_NAME) && (phi_fracs_by_real.find(swr_map.first) == phi_fracs_by_real.end()))
         {
@@ -6720,7 +6758,8 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
         message(1,"using realization "+center_on+" residuals for reweighting (if available");
     else
         message(1,"using mean residuals for reweighting");
-    map<string,double> mean_swr_map = ph.get_actual_swr_map(oe,center_on);
+    L2PhiHandler::phiType ptype = L2PhiHandler::phiType::MEAS;
+    map<string,double> mean_swr_map = ph.get_swr_map(oe, center_on);
     double cur_mean_phi = 0;
     for (auto& sw : mean_swr_map)
         cur_mean_phi += sw.second;
@@ -6775,7 +6814,7 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
         }
     }
     ph.update(oe,pe);
-    mean_swr_map = ph.get_actual_swr_map(oe,  center_on);
+    mean_swr_map = ph.get_swr_map(oe, center_on);
     for (auto& pf: phi_fracs) {
         total = 0;
         for (auto &g : group_map.at(pf.first)) {
@@ -7286,7 +7325,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
             local_subset_size = 4;
             message(2,ss.str());
         }
-
     }
 
 	if ((use_subset) && (local_subset_size > pe.shape().first))
@@ -7320,6 +7358,19 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	pe.update_var_map();
 	parcov.update_sets();
 	obscov.update_sets();
+
+	//make sure weight ensemble is in sync with oe
+	if (weights.shape().first != oe.shape().first)
+    {
+	    if (weights.shape().first < oe.shape().first)
+        {
+            throw_em_error("weight ensemble has less realizations that obs ensemble");
+        }
+	    ss.str("");
+	    ss << "resizing weight ensemble from " << weights.shape().first << " realizations to " << oe.shape().first << " realizations";
+	    performance_log->log_event(ss.str());
+	    weights.keep_rows(oe.get_real_names());
+    }
 
 	//buid up this container here and then reuse it for each lambda later...
 	unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
@@ -7472,7 +7523,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	vector<map<int, int>> real_run_ids_lams;
 	int best_idx = -1;
-	double best_mean = 1.0e+30, best_std = 1.0e+30; // todo (Ayman): read those from input
+	double best_mean = 1.0e+300, best_std = 1.0e+300; // todo (Ayman): read those from input
 	double mean, std;
 
 	message(0, "running upgrade ensembles");
@@ -7569,8 +7620,95 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	double lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
 
 
-	//subset stuff here
-	if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
+	if (iter <= pest_scenario.get_pestpp_options().get_ies_n_iter_mean()) {
+        message(1,"processing mean-only upgrade");
+
+        message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
+        ph.update(oe_lams[best_idx], pe_lams[best_idx],weights);
+        ph.report(true,false);
+
+        performance_log->log_event("getting prior parameter ensemble mean-centered anomalies");
+        Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe.get_real_names(), pe.get_var_names());
+
+        for (int i = 0; i < pe_lams.size(); i++)
+        {
+            if (i == best_idx)
+                continue;
+            pe_lams[i] = pe.zeros_like(0);
+        }
+
+        ParameterEnsemble pe_best = pe_lams[best_idx];
+        pe_best.set_fixed_info(pe.get_fixed_info());
+
+        if (pe_filenames.size() > 0)
+        {
+            performance_log->log_event("'ies_upgrades_in_memory' is 'false', loading 'best' parameter ensemble from file '" + pe_filenames[best_idx] + "'");
+
+            pe_best.from_binary(pe_filenames[best_idx]);
+            pe_best.transform_ip(ParameterEnsemble::transStatus::NUM);
+            //remove any failed runs from subset testing
+            remove_external_pe_filenames(pe_filenames);
+        }
+        performance_log->log_event("getting best-lambda parameter ensemble mean vector");
+        vector<double> mean_vec = pe_best.get_mean_stl_var_vector();
+
+        Parameters pars = pest_scenario.get_ctl_parameters();
+        pe.get_par_transform().ctl2numeric_ip(pars);
+        pars.update_without_clear(pe_best.get_var_names(),mean_vec);
+        pe.get_par_transform().numeric2ctl_ip(pars);
+        ss.str("");
+        ss << file_manager.get_base_filename() << "." << iter << ".best.par";
+        ofstream pfile(ss.str());
+        if (!pfile)
+        {
+            throw_em_error("error opening best-lambda mean par file '" + ss.str() + "' for writing");
+        }
+        output_file_writer.write_par(pfile,pars,*pe.get_par_transform().get_offset_ptr(),*pe.get_par_transform().get_scale_ptr());
+        pfile.close();
+        message(2,"saved best-lambda par ensemble mean vector to ",ss.str());
+        pe_best = pe.zeros_like(0);
+        if (verbose_level > 2)
+        {
+            performance_log->log_event("saving best-lambda par ensemble");
+            ss.str("");
+            ss << file_manager.get_base_filename() << "." << iter << ".best.par";
+            if (pest_scenario.get_pestpp_options().get_save_binary())
+            {
+                ss << ".jcb";
+                pe_best.to_binary(ss.str());
+            }
+            else
+            {
+                ss << ".csv";
+                pe_best.to_csv(ss.str());
+            }
+        }
+
+        performance_log->log_event("adding mean to anomalies");
+        for (int i = 0; i < mean_vec.size(); i++)
+        {
+            anoms.col(i) = anoms.col(i).array() + mean_vec[i];
+        }
+        performance_log->log_event("forming new parameter ensemble of mean-shifted prior realizations");
+        ParameterEnsemble new_pe = ParameterEnsemble(&pest_scenario,&rand_gen,anoms,pe.get_real_names(),pe.get_var_names());
+
+        new_pe.set_trans_status(pe.get_trans_status());
+        new_pe.set_fixed_info(pe.get_fixed_info());
+        if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds()) {
+            new_pe.enforce_bounds(performance_log, false);
+        }
+        oe_lam_best = oe; //copy
+
+        message(0,"running mean-shifted prior realizations: ",new_pe.shape().first);
+        run_ensemble_util(performance_log,frec,new_pe,oe_lam_best,run_mgr_ptr);
+        pe_lams[best_idx] = new_pe;
+
+        //make sure we dont try to process the subset stuff below
+        local_subset_size = pe.shape().first;
+    }
+
+
+    else if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
 	{
 
 		double acc_phi = last_best_mean * acc_fac;
@@ -7644,7 +7782,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		//need to work out which par and obs en real names to run - some may have failed during subset testing...
 		ObservationEnsemble remaining_oe_lam = oe;//copy
 
-		
 		ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
 		remaining_pe_lam.set_fixed_info(pe.get_fixed_info());
 
@@ -7672,23 +7809,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			//remove any failed runs from subset testing
 			if (missing.size() > 0)
 				remaining_pe_lam.drop_rows(missing);
-			for (auto& pe_filename : pe_filenames)
-			{ 
-				performance_log->log_event("removing upgrade ensemble '" + pe_filename + "'");
-				try
-				{
-					remove(pe_filename.c_str());
-				}
-				catch (exception& e)
-				{
-					message(2, "error removing upgrade ensemble: '" + pe_filename + "' :" + e.what());
-				}
-				catch (...)
-				{
-					message(2, "error removing upgrade ensemble: '" + pe_filename);
-				}
-				
-			}
+			remove_external_pe_filenames(pe_filenames);
 			
 		}
 		
@@ -7879,11 +8000,30 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
             last_best_lam = new_lam;
         }
         save_ensembles("rejected",cycle,pe_lams[best_idx],oe_lam_best);
-
-
 	}
-	//report_and_save();
+
 	return true;
+}
+
+void EnsembleMethod::remove_external_pe_filenames(vector<string>& pe_filenames)
+{
+    for (auto& pe_filename : pe_filenames)
+    {
+        performance_log->log_event("removing upgrade ensemble '" + pe_filename + "'");
+        try
+        {
+            remove(pe_filename.c_str());
+        }
+        catch (exception& e)
+        {
+            message(2, "error removing upgrade ensemble: '" + pe_filename + "' :" + e.what());
+        }
+        catch (...)
+        {
+            message(2, "error removing upgrade ensemble: '" + pe_filename);
+        }
+
+    }
 }
 
 //template<typename T, typename A>
