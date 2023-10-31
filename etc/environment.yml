@@ -19,3 +19,4 @@ dependencies:
   - shapely
   - flopy
   - mfpymake
+  - imp
