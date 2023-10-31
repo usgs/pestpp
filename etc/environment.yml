@@ -1,9 +1,9 @@
-name: pyemu
+name: pestpp_tester
 channels:
   - conda-forge
 dependencies:
   # required
-  - python>=3.9
+  - python=3.9
   - numpy>=1.15.0
   - pandas
   - scipy
@@ -20,3 +20,4 @@ dependencies:
   - flopy
   - mfpymake
   - imp
+  - nose
