@@ -4994,6 +4994,10 @@ void EnsembleMethod::sanity_checks()
     {
         errors.push_back("multimodal alpha < 0.001");
     }
+    if (ppo->get_ies_n_iter_mean() > 0)
+    {
+        warnings.push_back("mean-shifting iterations is a new concept and subject to change - experimental at best");
+    }
 
     if (warnings.size() > 0)
     {
