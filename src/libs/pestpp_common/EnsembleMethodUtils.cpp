@@ -5130,11 +5130,16 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 	vector<map<int, int>> real_run_ids_vec;
 	//ParameterEnsemble pe_lam;
 	//for (int i=0;i<pe_lams.size();i++)
-	for (auto& pe_lam : pe_lams)
+	//for (auto& pe_lam : pe_lams)
+	string additional_tag;
+	for (int i=0;i<pe_lams.size();i++)
 	{
+	    ss.str("");
+	    ss << " lambda:" << lam_vals[i] << " scale_fac:" << scale_vals[i];
+	    additional_tag = ss.str();
 		try
 		{
-			real_run_ids_vec.push_back(pe_lam.add_runs(run_mgr_ptr, pe_subset_idxs,cycle));
+			real_run_ids_vec.push_back(pe_lams[i].add_runs(run_mgr_ptr, pe_subset_idxs,cycle,additional_tag));
 		}
 		catch (const exception& e)
 		{
