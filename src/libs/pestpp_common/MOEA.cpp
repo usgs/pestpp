@@ -1034,8 +1034,8 @@ map<string, map<string, double>> MOEA::decvar_report(ParameterEnsemble& _dp)
     {
         max_len = max(max_len,(int)dv.size());
     }
-    ss << left << setw(max_len) << "decision variable" << right << setw(10) << "ubnd" << setw(10) << "lbnd" << setw(10) << "mean" << setw(20);
-    ss << "standard devation" << setw(12) << "min" << setw(12) << "max" << endl;
+    ss << left << setw(max_len) << "decision variable " << right << setw(10) << "ubnd " << setw(10) << "lbnd " << setw(12) << "mean " << setw(12);
+    ss << "stdev " << setw(12) << "min " << setw(12) << "max " << endl;
     map<string,double> meanmap,stdmap;
     _dp.fill_moment_maps(meanmap,stdmap);
     Eigen::VectorXd vec;
@@ -1046,13 +1046,13 @@ map<string, map<string, double>> MOEA::decvar_report(ParameterEnsemble& _dp)
     {
         sum.clear();
         prec = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(dv);
-        ss << left << setw(max_len) << dv;
-        ss << right << setw(10) << prec->ubnd;
-        ss << right << setw(10) << prec->lbnd;
-        ss << right << setw(10) << meanmap[dv];
-        ss << right << setw(20) << stdmap[dv];
+        ss << left << setw(max_len) << dv << " ";
+        ss << right << setw(10) << prec->ubnd << " ";
+        ss << right << setw(10) << prec->lbnd << " ";
+        ss << right << setw(12) << meanmap[dv] << " ";
+        ss << right << setw(12) << stdmap[dv] << " ";
         vec = _dp.get_var_vector(dv);
-        ss << setw(12) << vec.minCoeff();
+        ss << setw(12) << vec.minCoeff() << " ";
         ss << setw(12) << vec.maxCoeff();
         ss << endl;
         sum["mean"] = meanmap[dv];
@@ -1079,10 +1079,10 @@ map<string, map<string, double>> MOEA::decvar_change_report(map<string, map<stri
     for (auto& n : dv_names)
         max_len = max(max_len,(int)n.size());
 
-    ss << left << setw(max_len) << "decision variable" << right << setw(11) << "mean change";
-    ss << setw(11) << "% change";
-    ss << setw(11) << "max change" << setw(11) << "% change";
-    ss << setw(11) << "min change" << setw(11) << "% change" << endl;
+    ss << left << setw(max_len) << "decision variable " << right << setw(11) << "mean change ";
+    ss << setw(11) << "% change ";
+    ss << setw(11) << "max change " << setw(11) << "% change ";
+    ss << setw(11) << "min change " << setw(11) << "% change " << endl;
 
     vector<string> tags{ "mean","max","min" };
     for (auto dv : dv_names)
@@ -1092,7 +1092,7 @@ map<string, map<string, double>> MOEA::decvar_change_report(map<string, map<stri
             throw_moea_error("decvar_change_report() error: dv '" + dv + "' not in previous summary");
         if (current_dv_summary.find(dv) == current_dv_summary.end())
             throw_moea_error("decvar_change_report() error: dv '" + dv + "' not in current summary");
-        ss << left << setw(max_len) << dv;
+        ss << left << setw(max_len) << dv << " ";
         for (auto tag : tags)
         {
 
@@ -1102,8 +1102,8 @@ map<string, map<string, double>> MOEA::decvar_change_report(map<string, map<stri
             else
                 percent_change = 100.0 * (change / previous_dv_summary[dv][tag]);
 
-            ss << right << setw(11) << change;
-            ss << setw(11) << percent_change;
+            ss << right << setw(11) << change << " ";
+            ss << setw(11) << percent_change << " ";
             change_summary[dv][tag] = change;
             change_summary[dv][tag+"_percent"] = percent_change;
         }
@@ -2316,7 +2316,15 @@ void MOEA::initialize()
 			message(1, ss.str());
 			if (common.size() < error_min_members)
 			{
-				throw_moea_error("too few members to continue");
+			    if (pest_scenario.get_control_info().noptmax > 0)
+				    throw_moea_error("too few members to continue");
+			    else
+                {
+                    ss.str("");
+                    ss << "WARNING: very few population members..." << endl;
+                    message(0,ss.str());
+                }
+
 			}
 			
 			message(2,"aligning dv and obs populations");
@@ -2434,7 +2442,8 @@ void MOEA::initialize()
 	{
 		message(0, "too few population members:", op.shape().first);
 		message(1, "need at least ", error_min_members);
-		throw_moea_error(string("too few active population members, cannot continue"));
+		if (pest_scenario.get_control_info().noptmax > 0)
+		    throw_moea_error(string("too few active population members, cannot continue"));
 	}
 	if (op.shape().first < warn_min_members)
 	{
@@ -3364,16 +3373,23 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 
 vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
+    stringstream ss;
 	DomPair dompair = objectives.get_nsga2_pareto_dominance(-999, _op, _dp, &constraints, false);
 	vector<string> nondom_solutions = dompair.first;
 	vector<string> gbest_solutions;
 	//if no non dom solutions, then use the dominated ones...
 	if (nondom_solutions.size() == 0)
 	{
+        ss.str("");
+        ss << "WARNING: no nondom solutions for pst gbest calculation, using dominated solutions" << endl;
 		nondom_solutions = dompair.second;
 	}
-	if (nondom_solutions.size() == 1)
+	else if (nondom_solutions.size() == 1)
 	{
+	    ss.str("");
+	    ss << "WARNING: only one nondom solution for pst gbest calculation" << endl;
+	    file_manager.rec_ofstream() << ss.str();
+	    cout << ss.str();
 		for (int i = 0; i < num_reals; i++)
 			gbest_solutions.push_back(nondom_solutions[0]);
 		return gbest_solutions;
@@ -3381,12 +3397,18 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	
 	map<string, double> crowd_dist = objectives.get_cuboid_crowding_distance(nondom_solutions);
 	//normalize cd
-	double mx = -1.0e+30;
+	double mx = 0.0;
 	for (auto& cd : crowd_dist)
 		if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
 			mx = cd.second;
-	if ((mx < 0.0) && (iter > 0))
-        throw_moea_error("pso max crowding distance is negative");
+	if ((mx == 0.0) && (iter > 0)) {
+        ss.str("");
+        ss << "WARNING: pso gbest solution max crowding distance == 0.0, " << nondom_solutions.size()
+           << " nondom solutions being used" << endl;
+        file_manager.rec_ofstream() << ss.str();
+        cout << ss.str();
+
+    }
 
 	for (auto& cd : crowd_dist) {
         if (cd.second == CROWDING_EXTREME) {
@@ -3423,8 +3445,9 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 			if (found)
 				break;
 			count++;
-			if (count > 1000000)
-				throw_moea_error("MOEA::get_pso_gbest_solutions() seems to be stuck in a infinite loop....");
+			if (count > 1000000) {
+                throw_moea_error("MOEA::get_pso_gbest_solutions() seems to be stuck in a infinite loop....");
+            }
 		}
 		gbest_solutions.push_back(candidate);
 	}
