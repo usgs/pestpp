@@ -771,8 +771,7 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 		crowd_distance_map[last->first] = CROWDING_EXTREME;
 		if (crowd_sorted.size() == 3)
 		{
-			sortedset::iterator it = start;
-			next(it, 1);
+			sortedset::iterator it = next(start, 1);
 			crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((last->second - start->second) / obj_range);
 
 		}
@@ -3867,12 +3866,15 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	}
 		
 	map<string, double> crowd_dist = objectives.get_cuboid_crowding_distance(nondom_solutions);
+	sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
 	//normalize cd
 	double mx = -1.0e+30;
 	for (auto& cd : crowd_dist)
 		if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
 			mx = cd.second;
 		else if (nondom_solutions.size() == 2)
+			mx = cd.second;
+		else if (crowd_sorted.size() == 1)
 			mx = cd.second;
 	if ((mx < 0.0) && (iter > 0))
         throw_moea_error("pso max crowding distance is negative");

@@ -1,0 +1,11 @@
+parnme,partrans,parchglim,parval1,parlbnd,parubnd,pargp,scale,offset,dercom
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:84_idx1:0_idx2:1799,none,factor,-1,-4.75,0,dv_pars,1,0,1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:69_idx1:0_idx2:1799,none,factor,-1,-4.75,0,dv_pars,1,0,1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:54_idx1:0_idx2:1799,none,factor,-1,-4.75,0,dv_pars,1,0,1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:39_idx1:0_idx2:1799,none,factor,-1,-4.75,0,dv_pars,1,0,1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:84_idx1:0_idx2:1249,none,factor,-1,-4.75,0,dv_pars,1,0,1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:69_idx1:0_idx2:1249,none,factor,-1,-4.75,0,dv_pars,1,0,1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:54_idx1:0_idx2:1249,none,factor,-1,-4.75,0,dv_pars,1,0,1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:39_idx1:0_idx2:1249,none,factor,-1,-4.75,0,dv_pars,1,0,1
+ar_rate_1,none,factor,2.5,0,7,dv_pars,1,0,1
+ar_rate_2,none,factor,3,0,7,dv_pars,1,0,1

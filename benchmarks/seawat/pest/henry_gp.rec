@@ -1,0 +1,671 @@
+              pestpp-mou: multi-objective optimization under uncertainty
+                         by the PEST++ developement team
+
+
+
+
+
+version: 5.2.5
+binary compiled on Nov 21 2023 at 08:53:45
+
+using control file: "./pest/henry_gp.pst"
+in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\Henry_tests\henry\run7b6.1.3f_gp1\mogp_1"
+on host: "DUMPLING-FL"
+started at 11/21/23 23:58:49
+
+on host: "DUMPLING-FL"
+
+...reading external file './pest/henry.pargp_data.csv'
+...header line: PARGPNME,INCTYP,DERINC,DERINCLB,FORCEN,DERINCMUL,DERMTHD,SPLITTHRESH,SPLITRELDIFF,SPLITACTION
+...read 2 lines from external file
+...reading external file './pest/henry.par_data.csv'
+...header line: PARNME,PARTRANS,PARCHGLIM,PARVAL1,PARLBND,PARUBND,PARGP,SCALE,OFFSET,DERCOM
+...read 11 lines from external file
+...reading external file './pest/henry.gp.obs_data.csv'
+...header line: OBSNME,OBSVAL,WEIGHT,OBGNME
+...read 11 lines from external file
+...reading external file './pest/henry.gp.tplfile_data.csv'
+...header line: PEST_FILE,MODEL_FILE
+...read 3 lines from external file
+...reading external file './pest/henry.gp.insfile_data.csv'
+...header line: PEST_FILE,MODEL_FILE
+...read 2 lines from external file
+
+    This software has been approved for release by the
+    U.S.Geological Survey(USGS).Although the software has 
+    been subjected to rigorous review, the USGS reserves the
+    right to update the software as needed pursuant to further
+    analysisand review.No warranty, expressed or implied, is 
+    made by the USGS or the U.S.Government as to the
+    functionality of the softwareand related material nor shall
+    the fact of release constitute any such warranty.
+    Furthermore, the software is released on condition that
+    neither the USGS nor the U.S.Government shall be held
+    liable for any damages resulting from its authorized 
+    or unauthorized use.
+
+
+Case dimensions:- 
+    Number of parameters = 10
+    Number of adjustable parameters = 10
+    Number of observations = 10
+    Number of prior estimates = 0
+
+PEST Control Information
+    relparmax = 1
+    facparmax = 1.1
+    facorig = 0.001
+    phiredswh = 0.1
+    noptmax = 200
+    phiredstp = 0.01
+    nphistp = 3
+    nphinored = 3
+    relparstp = 0.01
+    nrelpar = 3
+
+
+    PEST++ OPTIONS: 
+
+...general options (used in multiple tools): 
+svd_pack: redsvd
+lambda_scale_fac: 0.75,1,1.1,
+forgive_unknown_args: 0
+max_run_fail: 3
+panther_poll_interval: 1
+parameter_covariance: 
+observation_covariance: 
+hotstart_resfile: 
+overdue_resched_fac: 1.15
+overdue_giveup_fac: 100
+overdue_giveup_minutes: 1e+30
+condor_submit_file: 
+tie_by_group: 0
+par_sigma_range: 4
+enforce_tied_bounds: 0
+debug_parse_only: 0
+check_tplins: 1
+fill_tpl_zeros: 0
+tpl_force_decimal: 0
+additional_ins_delimiters: 
+random_seed: 358183147
+num_tpl_ins_threads: 1
+save_binary: 0
+ensemble_output_precision: 6
+panther_echo: 1
+panther_agent_restart_on_error: 0
+panther_agent_no_ping_timeout_secs: -1
+panther_debug_loop: 0
+debug_check_par_en_consistency: 0
+panther_agent_freeze_on_fail: 0
+panther_transfer_on_finish: 
+panther_transfer_on_fail: 
+
+...pestpp-glm specific options:
+max_n_super: 1000000
+super_eigthresh: 1e-06
+n_iter_base: 1000000
+n_iter_super: 0
+super_relparmax: 0.1
+max_super_frz_iter: 20
+max_reg_iter: 20
+lambdas: 0.1,1,10,100,1000,
+iteration_summary: 0
+der_forgive: 1
+uncertainty: 1
+forecasts: 
+base_jacobian: 
+glm_num_reals: 0
+jac_scale: 1
+glm_normal_form: DIAG
+glm_debug_der_fail: 0
+glm_debug_lamb_fail: 0
+glm_debug_real_fail: 0
+glm_accept_mc_phi: 0
+glm_rebase_super: 0
+glm_iter_mc: 0
+glm_high_2nd_iter_phi: 0
+
+...pestpp-swp options:
+sweep_parameter_csv_file: 
+sweep_output_csv_file: sweep_out.csv
+sweep_chunk: 500
+sweep_forgive: 0
+sweep_base_run: 0
+sweep_include_regul_phi: 0
+
+...pestpp-opt options:
+opt_objective_function: 
+opt_coin_log: 1
+opt_skip_final: 0
+opt_std_weights: 0
+opt_stack_size: 0
+opt_par_stack: 
+opt_obs_stack: 
+opt_decision_variable_groups: DV_PARS,
+opt_external_variable_groups: 
+opt_constraint_groups: 
+opt_risk: 0.5
+opt_iter_derinc_fac: 1
+opt_direction: 1
+opt_iter_tol: 0.001
+opt_recalc_fosm_every: 1
+opt_chance_points: SINGLE
+
+...pestpp-sqp options:
+sqp_dv_en: 
+sqp_obs_restart_en: 
+sqp_num_reals: -1
+sqp_update_hessian: 0
+sqp_scale_facs:
+  1e-05
+  0.0001
+  0.0005
+  0.001
+  0.0025
+  0.005
+  0.01
+  0.05
+  0.075
+  0.1
+  0.25
+  0.5
+  1
+  2
+  5
+  10
+
+...pestpp-mou options:
+mou_generator: pso
+mou_population_size: 100
+mou_dv_population_file: ./model/input/mogp_henry.dv_pop.csv
+mou_obs_population_restart_file: ./model/input/mogp_henry.obs_pop.csv
+mou_objectives: 
+  AR_RATE_TOTAL
+  MEAN_CONC
+mou_max_archive_size: 100
+mou_risk_objective: 0
+mou_verbose_level: 1
+mou_env_selector: NSGA_PPD
+mou_mating_selector: TOURNAMENT
+mou_crossover_prob: 0.75
+mou_mutation_prob: -999
+mou_de_f: 0.8
+mou_save_population_every: 1
+mou_pso_omega: 0.7
+mou_pso_social_const: 2
+mou_pso_cognitive: 2
+mou_pso_alpha: 0
+mou_pso_rramp: -1
+mou_pso_rfit: 2
+mou_hypervolume_extreme: 1e+10
+mou_adaptive_ppd: 0
+mou_ppd_limits: 
+ 0.65
+ 0.65
+mou_population_schedule: 
+mou_simplex_reflections:10
+mou_simplex_factors: 
+ 0.5
+ 0.6
+ 0.7
+ 0.8
+mou_simplex_mutation: 0
+mou_use_multigen:0
+mou_shuffle_fixed_pars: 0
+
+...shared pestpp-ies/pestpp-da options:
+(note: 'da' args override 'ies' args when using pestpp-da)
+ies_parameter_ensemble: 
+ies_observation_ensemble: 
+ies_weights_ensemble: 
+ies_restart_parameter_ensemble: 
+ies_restart_observation_ensemble: 
+ies_use_approximate_solution: 1
+ies_lambda_mults: 0.1,1,10,
+ies_initial_lambda: 0
+ies_use_approx: 1
+ies_subset_size: 4
+ies_reg_factor: 0
+ies_verbose_level: 1
+ies_use_prior_scaling: 0
+ies_num_reals: 50
+ies_bad_phi: 1e+300
+ies_bad_phi_sigma: 1e+300
+ies_include_base: 1
+ies_use_empirical_prior: 0
+ies_group_draws: 1
+ies_enforce_bounds: 1
+ies_localizer: 
+ies_accept_phi_fac: 1.05
+ies_lambda_inc_fac: 10
+ies_lambda_dec_fac: 0.75
+ies_save_lambda_ensembles: 0
+ies_subset_how: RANDOM
+ies_localize_how: PARAMETERS
+ies_num_threads: -1
+ies_debug_fail_subset: 0
+ies_debug_fail_remainder: 0
+ies_debug_bad_phi: 0
+ies_debug_upgrade_only: 0
+ies_debug_high_subset_phi: 0
+ies_debug_high_upgrade_phi: 0
+ies_csv_by_reals: 1
+ies_autoadaloc: 0
+ies_autoadaloc_sigma_dist: 1
+ies_enforce_chglim: 0
+ies_center_on: 
+ies_no_noise: 0
+ies_drop_conflicts: 0
+ies_save_rescov:0
+ies_pdc_sigma_distance: -1
+ies_use_mda: 0
+ies_mda_init_fac: 10
+ies_mda_dec_fac: 0.5
+ies_localization_type: LOCAL
+ies_upgrades_in_memory: 1
+ies_ordered_binary: 1
+ies_multimodal_alpha: 1
+ies_localizer_forgive_extra: 0
+ies_phi_factors_file: 
+ies_phi_factors_by_real: 0
+
+pestpp-sen options: 
+gsa_method: MORRIS
+gsa_morris_pooled_obs: 0
+gsa_morris_obs_sen: 1
+gsa_morris_p: 4
+gsa_morris_r: 4
+gsa_morris_delta: 0.6666
+gsa_sobol_samples: 4
+gsa_sobol_par_dist: norm
+
+pestpp-da options (those not shared with pestpp-ies):
+da_parameter_cycle_table: 
+da_observation_cycle_table: 
+da_hotstart_cycle: 0
+da_stop_cycle: 1000000000
+da_use_simulated_states: 1
+da_noptmax_schedule: 
+
+
+
+Model command line(s):- 
+    ./pest/MODELRUN_MOGP.BAT
+
+Model interface files:-
+    template files:
+      .\pest\flow.wel_stress_period_data_scenario_base.txt.tpl
+      .\pest\artrch.dat.tpl
+    model input files:
+      .\model\input\flow.wel_stress_period_data_scenario_base.txt
+      .\model\input\artrch.dat
+
+    instruction files:
+      .\pest\gp_output.dat.ins
+    model output files:
+      .\model\output\gp_output.dat
+
+
+Parameter group information
+NAME          INCREMENT TYPE     DERIVATIVE INCREMENT    INCREMENT LOWER BOUND  FORCE CENTRAL     INCREMENT MULTIPLIER
+dv_pars             RELATIVE                     0.01                        0         SWITCH                        2
+
+
+
+Parameter information
+NAME                                                                 TRANSFORMATION        CHANGE LIMIT  INITIAL VALUE    LOWER BOUND    UPPER BOUND        GROUP          SCALE         OFFSET  DERIVATIVE COMMAND
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:84_idx1:0_idx2:1799 none                    FACTOR             -1          -4.75              0      dv_pars              1              0                   1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:69_idx1:0_idx2:1799 none                    FACTOR             -1          -4.75              0      dv_pars              1              0                   1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:54_idx1:0_idx2:1799 none                    FACTOR             -1          -4.75              0      dv_pars              1              0                   1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:39_idx1:0_idx2:1799 none                    FACTOR             -1          -4.75              0      dv_pars              1              0                   1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:84_idx1:0_idx2:1249 none                    FACTOR             -1          -4.75              0      dv_pars              1              0                   1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:69_idx1:0_idx2:1249 none                    FACTOR             -1          -4.75              0      dv_pars              1              0                   1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:54_idx1:0_idx2:1249 none                    FACTOR             -1          -4.75              0      dv_pars              1              0                   1
+pname:wel_inst:0_ptype:gr_usecol:3_pstyle:d_idx0:39_idx1:0_idx2:1249 none                    FACTOR             -1          -4.75              0      dv_pars              1              0                   1
+ar_rate_1                                                            none                    FACTOR            2.5              0              7      dv_pars              1              0                   1
+ar_rate_2                                                            none                    FACTOR              3              0              7      dv_pars              1              0                   1
+
+
+
+Observation information
+NAME                                VALUE                GROUP              WEIGHT
+mean_conc                              35            less_than                   1
+salinity                                1            less_than                   1
+total_pump_rate                      28.5         greater_than                   1
+ar_rate_total                           8            less_than                   1
+wetland_dd                           5.68            less_than                   1
+ar_rate_t                               8            less_than                   1
+mean_conc_sd                          0.1                stdev                   1
+salinity_sd                           0.1                stdev                   1
+ar_rate_total_sd                      0.1                stdev                   1
+wetland_dd_sd                         0.1                stdev                   1
+
+
+
+Prior information
+
+   no prior information provided
+
+
+
+PEST SVD Information
+    maxsing = 10000000
+    eigthresh = 1e-05
+
+
+
+
+
+
+  ---  initializing MOEA process  ---  
+...population schedule: generation,population size:
+...   0, 100
+...   1, 100
+...   2, 100
+...   3, 100
+...   4, 100
+...   5, 100
+...   6, 100
+...   7, 100
+...   8, 100
+...   9, 100
+...   10, 100
+...   11, 100
+...   12, 100
+...   13, 100
+...   14, 100
+...   15, 100
+...   16, 100
+...   17, 100
+...   18, 100
+...   19, 100
+...   20, 100
+...   21, 100
+...   22, 100
+...   23, 100
+...   24, 100
+...   25, 100
+...   26, 100
+...   27, 100
+...   28, 100
+...   29, 100
+...   30, 100
+...   31, 100
+...   32, 100
+...   33, 100
+...   34, 100
+...   35, 100
+...   36, 100
+...   37, 100
+...   38, 100
+...   39, 100
+...   40, 100
+...   41, 100
+...   42, 100
+...   43, 100
+...   44, 100
+...   45, 100
+...   46, 100
+...   47, 100
+...   48, 100
+...   49, 100
+...   50, 100
+...   51, 100
+...   52, 100
+...   53, 100
+...   54, 100
+...   55, 100
+...   56, 100
+...   57, 100
+...   58, 100
+...   59, 100
+...   60, 100
+...   61, 100
+...   62, 100
+...   63, 100
+...   64, 100
+...   65, 100
+...   66, 100
+...   67, 100
+...   68, 100
+...   69, 100
+...   70, 100
+...   71, 100
+...   72, 100
+...   73, 100
+...   74, 100
+...   75, 100
+...   76, 100
+...   77, 100
+...   78, 100
+...   79, 100
+...   80, 100
+...   81, 100
+...   82, 100
+...   83, 100
+...   84, 100
+...   85, 100
+...   86, 100
+...   87, 100
+...   88, 100
+...   89, 100
+...   90, 100
+...   91, 100
+...   92, 100
+...   93, 100
+...   94, 100
+...   95, 100
+...   96, 100
+...   97, 100
+...   98, 100
+...   99, 100
+...   100, 100
+...   101, 100
+...   102, 100
+...   103, 100
+...   104, 100
+...   105, 100
+...   106, 100
+...   107, 100
+...   108, 100
+...   109, 100
+...   110, 100
+...   111, 100
+...   112, 100
+...   113, 100
+...   114, 100
+...   115, 100
+...   116, 100
+...   117, 100
+...   118, 100
+...   119, 100
+...   120, 100
+...   121, 100
+...   122, 100
+...   123, 100
+...   124, 100
+...   125, 100
+...   126, 100
+...   127, 100
+...   128, 100
+...   129, 100
+...   130, 100
+...   131, 100
+...   132, 100
+...   133, 100
+...   134, 100
+...   135, 100
+...   136, 100
+...   137, 100
+...   138, 100
+...   139, 100
+...   140, 100
+...   141, 100
+...   142, 100
+...   143, 100
+...   144, 100
+...   145, 100
+...   146, 100
+...   147, 100
+...   148, 100
+...   149, 100
+...   150, 100
+...   151, 100
+...   152, 100
+...   153, 100
+...   154, 100
+...   155, 100
+...   156, 100
+...   157, 100
+...   158, 100
+...   159, 100
+...   160, 100
+...   161, 100
+...   162, 100
+...   163, 100
+...   164, 100
+...   165, 100
+...   166, 100
+...   167, 100
+...   168, 100
+...   169, 100
+...   170, 100
+...   171, 100
+...   172, 100
+...   173, 100
+...   174, 100
+...   175, 100
+...   176, 100
+...   177, 100
+...   178, 100
+...   179, 100
+...   180, 100
+...   181, 100
+...   182, 100
+...   183, 100
+...   184, 100
+...   185, 100
+...   186, 100
+...   187, 100
+...   188, 100
+...   189, 100
+...   190, 100
+...   191, 100
+...   192, 100
+...   193, 100
+...   194, 100
+...   195, 100
+...   196, 100
+...   197, 100
+...   198, 100
+...   199, 100
+...using 'nsga2_ppd' env selector
+...using binary tournament mating pool selector
+...saving generation specific populations and archives every nth generation 1
+'opt_dec_var_groups' passed, using 10 adjustable parameters as decision variables
+decision variables:
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:84_IDX1:0_IDX2:1799 PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:69_IDX1:0_IDX2:1799 PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:54_IDX1:0_IDX2:1799 PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:39_IDX1:0_IDX2:1799 PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:84_IDX1:0_IDX2:1249 PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:69_IDX1:0_IDX2:1249 PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:54_IDX1:0_IDX2:1249 PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:39_IDX1:0_IDX2:1249 AR_RATE_1 AR_RATE_2 
+
+...number of decision variables:  10
+...max run fail:  3
+...'opt_chance_points' = SINGLE, evaluting chance at representative point
+...using the following observations as objectives: 
+                 AR_RATE_TOTAL   minimize
+                     MEAN_CONC   minimize
+
+  ---  observation constraints and/or objectives ---  
+name                 sense          value          
+MEAN_CONC            less_than      35             
+SALINITY             less_than      1              
+TOTAL_PUMP_RATE      greater_than   28.5           
+AR_RATE_TOTAL        less_than      8              
+WETLAND_DD           less_than      5.68           
+AR_RATE_T            less_than      8              
+...using particle swarm generator
+...loading dv population from csv file ./model/input/mogp_henry.dv_pop.csv
+...dv population with 98 members read from './model/input/mogp_henry.dv_pop.csv'
+
+...loading obs population from csv file ./model/input/mogp_henry.obs_pop.csv
+...obs population with 98 members read from './model/input/mogp_henry.obs_pop.csv'
+
+... saved observation population to  ./pest/henry_gp.0.obs_pop.csv
+
+  ---  initial population decision variable summary:  ---  
+decision variable                                                         ubnd      lbnd      mean   standard devation         min         max
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:84_IDX1:0_IDX2:1799         0     -4.75    -4.167            0.337578    -4.74588    -3.56594
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:69_IDX1:0_IDX2:1799         0     -4.75  -4.16253            0.342226    -4.74812    -3.56283
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:54_IDX1:0_IDX2:1799         0     -4.75  -4.16717            0.338194    -4.74762    -3.56416
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:39_IDX1:0_IDX2:1799         0     -4.75  -4.15378            0.340654    -4.74949    -3.56997
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:84_IDX1:0_IDX2:1249         0     -4.75  -4.15542            0.338735    -4.74771    -3.56837
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:69_IDX1:0_IDX2:1249         0     -4.75  -4.15388            0.343648    -4.74404    -3.56494
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:54_IDX1:0_IDX2:1249         0     -4.75  -4.16065            0.342537    -4.74176    -3.56362
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:39_IDX1:0_IDX2:1249         0     -4.75  -4.15514            0.344255    -4.73877    -3.57422
+AR_RATE_1                                                                    7         0   3.43982             1.99415   0.0138063     6.97496
+AR_RATE_2                                                                    7         0   3.44324             2.00308    0.058755     6.98437
+
+
+  ---  initial population objective function summary:  ---  
+seeking optimal trade-off point for single 'optimal' chance point runs
+using member GEN=0_MEMBER=89 as single, 'optimal' point
+   with distance of 7.47428 from optimal trade - off
+objective function   direction         mean      std dev          min          max         knee
+
+AR_RATE_TOTAL         minimize     6.883058     2.676881     0.241433      11.9838      7.24707
+MEAN_CONC             minimize     5.811831     3.174851     0.212639      14.5871      2.81762
+
+... saved initial dv population to  ./pest/henry_gp.0.dv_pop.csv
+...performing initial pareto dominance sort
+WARNING: all members are infeasible
+...pareto dominance sort yielded 9 domination fronts
+17 in the front 1
+20 in the front 2
+22 in the front 3
+16 in the front 4
+11 in the front 5
+6 in the front 6
+3 in the front 7
+2 in the front 8
+1 in the front 9
+...wrote pareto summary to ./pest/henry_gp.pareto.summary.csv
+initialized archives with 17 nondominated members
+WARNING: all members are infeasible
+...pareto dominance sort yielded 1 domination fronts
+17 in the front 1
+...wrote pareto summary to ./pest/henry_gp.pareto.archive.summary.csv
+...saved decision variable population of size 17 X 10 to './pest/henry_gp.archive.dv_pop.csv'
+...saved generation-specific decision variable population of size 17 X 10 to './pest/henry_gp.0.archive.dv_pop.csv'
+...saved observation population of size 17 X 10 to './pest/henry_gp.archive.obs_pop.csv'
+...saved generation-specific observation population of size 17 X 10 to './pest/henry_gp.0.archive.obs_pop.csv'
+
+  ---   population observation constraint summary at iteration 0  ---  
+name                         sense    required        sim min       sim mean        sim max  % unsatisfied
+SALINITY                 less_than           1       0.212639        5.81183        14.5871        93.8776
+TOTAL_PUMP_RATE       greater_than        28.5        30.8678        33.2756        35.6674              0
+WETLAND_DD               less_than        5.68        5.45001        7.24303        9.72785        98.9796
+AR_RATE_T                less_than           8       0.241433        6.88306        11.9838        37.7551
+...number of initial feasible solutions: 0
+
+  ---  initialization complete  ---  
+
+  ---  starting generation  1  ---  
+WARNING: all members are infeasible
+...pareto dominance sort yielded 9 domination fronts
+17 in the front 1
+20 in the front 2
+22 in the front 3
+16 in the front 4
+11 in the front 5
+6 in the front 6
+3 in the front 7
+2 in the front 8
+1 in the front 9
+...augmenting PSO population DE population of size 2
+...generating diffevol population of size 2
+...generating PSO population of size 100
+WARNING: all members are infeasible
+...pareto dominance sort yielded 1 domination fronts
+17 in the front 1
+
+   ************   
+    MOEA error: MOEA::get_pso_gbest_solutions() seems to be stuck in a infinite loop....
+

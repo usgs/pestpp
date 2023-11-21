@@ -1,0 +1,3 @@
+pest_file,model_file
+.\pest\flow.wel_stress_period_data_scenario_base.txt.tpl,.\model\input\flow.wel_stress_period_data_scenario_base.txt
+.\pest\artrch.dat.tpl,.\model\input\artrch.dat
