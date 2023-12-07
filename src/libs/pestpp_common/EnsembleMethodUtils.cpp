@@ -4683,7 +4683,7 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 
 
 vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,ParameterEnsemble& _pe, ObservationEnsemble& _oe, 
-	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, int da_cycle)
+	RunManagerAbstract* run_mgr_ptr, bool check_pe_consistency, const vector<int>& real_idxs, int da_cycle, string additional_tag)
 {
 	stringstream ss;
 	ss << "queuing " << _pe.shape().first << " runs";
@@ -4692,7 +4692,7 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 	map<int, int> real_run_ids;
 	try
 	{
-		real_run_ids = _pe.add_runs(run_mgr_ptr, real_idxs,da_cycle);
+		real_run_ids = _pe.add_runs(run_mgr_ptr, real_idxs,da_cycle,additional_tag);
 	}
 	catch (const exception& e)
 	{
@@ -5139,7 +5139,7 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 	for (int i=0;i<pe_lams.size();i++)
 	{
 	    ss.str("");
-	    ss << " lambda:" << lam_vals[i] << " scale_fac:" << scale_vals[i];
+	    ss << " lambda:" << lam_vals[i] << " scale_fac:" << scale_vals[i] << " iteration:" << iter;
 	    additional_tag = ss.str();
 		try
 		{
@@ -5372,13 +5372,15 @@ vector<int> EnsembleMethod::run_ensemble(ParameterEnsemble& _pe,
 	ObservationEnsemble& _oe, const vector<int>& real_idxs, int cycle)
 {
 	stringstream ss;
+	ss.str("");
+	ss << " iteration:" << iter;
 	vector<int> failed_real_indices;
 	try
 	{
 		failed_real_indices = run_ensemble_util(performance_log, file_manager.rec_ofstream(), 
 			_pe, _oe, run_mgr_ptr, 
 			pest_scenario.get_pestpp_options().get_debug_check_par_en_consistency(), 
-			real_idxs, cycle);
+			real_idxs, cycle,ss.str());
 	}
 	catch (const exception& e)
 	{
@@ -7709,13 +7711,15 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         oe_lam_best = oe; //copy
 
         message(0,"running mean-shifted prior realizations: ",new_pe.shape().first);
-        run_ensemble_util(performance_log,frec,new_pe,oe_lam_best,run_mgr_ptr);
+        ss.str("");
+        ss << "iteration:" << iter;
+        vector<int> temp;
+        run_ensemble_util(performance_log,frec,new_pe,oe_lam_best,run_mgr_ptr,false,temp,NetPackage::NULL_DA_CYCLE, ss.str());
         pe_lams[best_idx] = new_pe;
 
         //make sure we dont try to process the subset stuff below
         local_subset_size = pe.shape().first;
     }
-
 
     else if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
 	{
