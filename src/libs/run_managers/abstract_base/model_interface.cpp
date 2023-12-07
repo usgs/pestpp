@@ -693,7 +693,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 			{
 				throw PestError("could not add process to job object: " + cmd_string);
 			}
-			DWORD pid = GetProcessId(pi);
+			DWORD pid = pi.dwProcessId;
 			cout << "...pid: " << pid << endl;
 			DWORD exitcode;
 			while (true)
