@@ -168,7 +168,7 @@ jobs:
         
         ls -l
         cd ${{ env.test_dir }}
-        nosetests -v ${{ env.test_script }}
+        nosetests --nocapture -v ${{ env.test_script }}
         cd
     
         
