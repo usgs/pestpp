@@ -85,6 +85,8 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+add_compile_definitions(_HAS_STD_BYTE=0)
+
 # Use global "-fvisibility=hidden" see https://gcc.gnu.org/wiki/Visibility
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
