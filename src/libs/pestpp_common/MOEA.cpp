@@ -1003,7 +1003,7 @@ void MOEA::message(int level, const string& _message, T extra)
 void MOEA::throw_moea_error(const string& message)
 {
 	performance_log->log_event("MOEA error: " + message);
-	cout << endl << "   ************   " << endl << "    MOEAerror: " << message << endl << endl;
+	cout << endl << "   ************   " << endl << "    MOEA error: " << message << endl << endl;
 	file_manager.rec_ofstream() << endl << "   ************   " << endl << "    MOEA error: " << message << endl << endl;
 	file_manager.close_file("rec");
 	performance_log->~PerformanceLog();
@@ -2629,7 +2629,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 		for (int i = 0; i < _dp.shape().first; i++)
 		{
 			//dist = dp_mean.dot(_dp.get_eigen_ptr()->row(i));
-			dist = (dp_mean - _dp.get_eigen_ptr()->row(i).transpose()).squaredNorm();
+            dist = (dp_mean - _dp.get_eigen_ptr()->row(i).transpose()).squaredNorm();
 			if (dist < dist_min)
 			{
 				idx_min = i;
