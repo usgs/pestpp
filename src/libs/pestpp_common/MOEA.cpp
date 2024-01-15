@@ -2487,7 +2487,8 @@ void MOEA::initialize()
 
 		dp_archive = ParameterEnsemble(&pest_scenario, &rand_gen,
 			dp.get_eigen(dompair.first, vector<string>()), dompair.first, dp.get_var_names());
-		ss.str("");
+		dp_archive.set_trans_status(dp.get_trans_status());
+        ss.str("");
 		ss << "initialized archives with " << dompair.first.size() << " nondominated members";
 		message(2, ss.str());
 
