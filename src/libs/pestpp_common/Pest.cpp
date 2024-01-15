@@ -131,6 +131,7 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, in
     ParameterRec::TRAN_TYPE tranfixed = ParameterRec::TRAN_TYPE::FIXED;
     ParameterRec::TRAN_TYPE trantied = ParameterRec::TRAN_TYPE::TIED;
     ParameterRec::TRAN_TYPE tran;
+    stringstream ss;
 	for (auto &pname : ctl_ordered_par_names)
 	{
 		//double pval = ctl_parameters[pname];
@@ -150,39 +151,44 @@ void Pest::check_inputs(ostream &f_rec, bool forgive, bool forgive_parchglim, in
 		}
 		if (prec->lbnd >= prec->ubnd)
 		{
+            ss.str("");
+            ss << pname << ": bounds are busted:" << prec->lbnd << " >= " << prec->ubnd;
 			if ((forgive) || (!adj_par))
-			{
-				par_warnings.push_back(pname + ": bounds are busted");
+            {
+				par_warnings.push_back(ss.str());
 			}
 			else
 			{
-				par_problems.push_back(pname + ": bounds are busted");
+				par_problems.push_back(ss.str());
 			}
 		}
 		if (prec->init_value < prec->lbnd)
 		{
+            ss.str("");
+            ss << pname << ": initial value is less than lower bound:" << prec->init_value << " < " << prec->lbnd;
 			if ((forgive) || (!adj_par))
 			{
-				par_warnings.push_back(pname + " initial value is less than lower bound");
+				par_warnings.push_back(ss.str());
 			}
 			else
 			{
-				par_problems.push_back(pname + " initial value is less than lower bound");
+				par_problems.push_back(ss.str());
 			}
 		}
 		else if (prec->init_value == prec->lbnd)
 		{
 			par_lb++;
 		}
-		if (prec->init_value > prec->ubnd)
-			if ((forgive) || (!adj_par))
-			{
-				par_warnings.push_back(pname + " initial value is greater than upper bound");
-			}
-			else
-			{
-				par_problems.push_back(pname + " initial value is greater than upper bound");
-			}
+		if (prec->init_value > prec->ubnd) {
+            ss.str("");
+            ss << pname << ": initial value is greater than upper bound:" << prec->init_value << " > " << prec->ubnd;
+
+            if ((forgive) || (!adj_par)) {
+                par_warnings.push_back(ss.str());
+            } else {
+                par_problems.push_back(ss.str());
+            }
+        }
 		else if (prec->init_value == prec->ubnd)
 		{
 			par_ub++;
