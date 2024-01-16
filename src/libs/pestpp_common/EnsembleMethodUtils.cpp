@@ -5051,7 +5051,7 @@ bool EnsembleMethod::should_terminate()
 	if (best_mean_phis.size() > 0)
 	{
 		vector<double>::iterator idx = min_element(best_mean_phis.begin(), best_mean_phis.end());
-		nphired = (best_mean_phis.end() - idx) - 1;
+        nphired = (best_mean_phis.end() - idx) - 1;
 		best_phi_yet = best_mean_phis[idx - best_mean_phis.begin()];// *pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
 		message(1, "best mean phi sequence: ", best_mean_phis);
 		message(1, "best phi yet: ", best_phi_yet);
@@ -5063,10 +5063,10 @@ bool EnsembleMethod::should_terminate()
 		consec_sat = true;
 	}
 
-	for (auto& phi : best_mean_phis)
+    for (auto& phi : best_mean_phis)
 	{
 		ratio = (phi - best_phi_yet) / phi;
-		if (ratio <= phiredstp)
+    	if (ratio <= phiredstp)
 			count++;
 	}
 	message(1, "number of iterations satisfying phiredstp criteria: ", count);
@@ -7631,7 +7631,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	double lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
 
 
-	if (iter <= pest_scenario.get_pestpp_options().get_ies_n_iter_mean()) {
+	/*if (iter <= pest_scenario.get_pestpp_options().get_ies_n_iter_mean()) {
         message(1,"processing mean-only upgrade");
 
         message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
@@ -7719,9 +7719,9 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
         //make sure we dont try to process the subset stuff below
         local_subset_size = pe.shape().first;
-    }
+    }*/
 
-    else if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
+    if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
 	{
 
 		double acc_phi = last_best_mean * acc_fac;
@@ -7741,12 +7741,15 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
 			string m = ss.str();
 			message(0, m);
-			
+            ph.update(oe, pe,weights);
+            best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
+
 			if (!use_mda)
 			{
 				message(1, "updating realizations with reduced phi");
 				update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx],subset_idxs);
 			}
+
 			ph.update(oe, pe,weights);
 			//re-check phi
 			double new_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
@@ -7781,7 +7784,8 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 				message(1, "abandoning current upgrade ensembles, returning to upgrade calculations and increasing lambda to ", new_lam);
 
 			}
-			message(1, "returing to upgrade calculations...");
+			message(1, "returning to upgrade calculations...");
+
 			return false;
 		}
 
@@ -8016,6 +8020,48 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	}
 
 	return true;
+}
+
+void EnsembleMethod::reset_par_ensemble_to_prior_mean(ParameterEnsemble& _pe, ObservationEnsemble& _oe){
+
+    message(0,"resetting current parameter ensemble to prior ensemble with current ensemble mean");
+    performance_log->log_event("getting prior parameter ensemble mean-centered anomalies");
+    Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe.get_real_names(), pe.get_var_names());
+
+
+
+    performance_log->log_event("getting current parameter ensemble mean vector");
+    vector<double> mean_vec = _pe.get_mean_stl_var_vector();
+
+    performance_log->log_event("adding mean to anomalies");
+    for (int i = 0; i < mean_vec.size(); i++)
+    {
+        anoms.col(i) = anoms.col(i).array() + mean_vec[i];
+    }
+    performance_log->log_event("forming new parameter ensemble of mean-shifted prior realizations");
+    ParameterEnsemble new_pe = ParameterEnsemble(&pest_scenario,&rand_gen,anoms,pe.get_real_names(),pe.get_var_names());
+
+    new_pe.set_trans_status(pe.get_trans_status());
+    new_pe.set_fixed_info(pe.get_fixed_info());
+    if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds()) {
+        new_pe.enforce_bounds(performance_log, false);
+    }
+
+    message(0,"running new mean-shifted prior realizations: ",new_pe.shape().first);
+    stringstream ss;
+    ss.str("");
+    ss << "iteration:" << iter;
+    vector<int> temp;
+    ofstream& frec = file_manager.rec_ofstream();
+    run_ensemble_util(performance_log,frec,new_pe,_oe,run_mgr_ptr,false,temp,NetPackage::NULL_DA_CYCLE, ss.str());
+
+    ph.update(_oe,_pe,weights);\
+    message(0,"mean-shifted prior phi report:");
+
+    ph.report(true);
+    ss.str("");
+    ss << file_manager.get_base_filename() << "." << iter << ".meanshift.pcs.csv";
+    pcs.summarize(_pe, ss.str());
 }
 
 void EnsembleMethod::remove_external_pe_filenames(vector<string>& pe_filenames)

@@ -504,5 +504,7 @@ protected:
 
     double get_lambda();
 
+    void reset_par_ensemble_to_prior_mean(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
+
 };
 #endif

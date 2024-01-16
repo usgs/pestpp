@@ -72,6 +72,7 @@ void IterEnsembleSmoother::iterate_2_solution()
 
 		if (iter == n_iter_mean)
         {
+            reset_par_ensemble_to_prior_mean(pe,oe);
 		    double phi_lam = get_lambda();
 		    //if (phi_lam > last_best_lam)
             //{
@@ -79,6 +80,11 @@ void IterEnsembleSmoother::iterate_2_solution()
             message(1,"iter = ies_n_iter_mean, resetting lambda to ",last_best_lam);
             //}
 		    consec_bad_lambda_cycles = 0;
+            best_mean_phis.clear();
+            ph = L2PhiHandler(&pest_scenario, &file_manager, &oe_base, &pe_base, &parcov);
+            ph.update(oe,pe);
+            last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+            last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
         }
 
 		if (should_terminate())
