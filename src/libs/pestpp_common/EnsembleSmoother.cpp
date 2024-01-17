@@ -63,8 +63,6 @@ void IterEnsembleSmoother::iterate_2_solution()
 		ss.str("");
 		ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
 		pcs.summarize(pe,ss.str());
-			
-			
 		if (accept)
 			consec_bad_lambda_cycles = 0;
 		else
