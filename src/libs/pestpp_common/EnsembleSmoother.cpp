@@ -63,8 +63,6 @@ void IterEnsembleSmoother::iterate_2_solution()
 		ss.str("");
 		ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
 		pcs.summarize(pe,ss.str());
-			
-			
 		if (accept)
 			consec_bad_lambda_cycles = 0;
 		else
@@ -72,13 +70,8 @@ void IterEnsembleSmoother::iterate_2_solution()
 
 		if (iter == n_iter_mean)
         {
-		    double phi_lam = get_lambda();
-		    //if (phi_lam > last_best_lam)
-            //{
-            last_best_lam = phi_lam;
-            message(1,"iter = ies_n_iter_mean, resetting lambda to ",last_best_lam);
-            //}
-		    consec_bad_lambda_cycles = 0;
+            iter++;
+            reset_par_ensemble_to_prior_mean();
         }
 
 		if (should_terminate())

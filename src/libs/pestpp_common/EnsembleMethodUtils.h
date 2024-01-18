@@ -192,7 +192,8 @@ pair<Parameters,Observations> save_real_par_rei(Pest& pest_scenario, ParameterEn
 
 vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
 	ObservationEnsemble& _oe, RunManagerAbstract* run_mgr_ptr,
-	bool check_pe_consistency = false, const vector<int>& real_idxs = vector<int>(),int da_cycle=NetPackage::NULL_DA_CYCLE);
+	bool check_pe_consistency = false, const vector<int>& real_idxs = vector<int>(),int da_cycle=NetPackage::NULL_DA_CYCLE,
+	string additional_tag="");
 
 class EnsembleSolver
 {
@@ -502,6 +503,8 @@ protected:
     void remove_external_pe_filenames(vector<string>& pe_filenames);
 
     double get_lambda();
+
+    void reset_par_ensemble_to_prior_mean();
 
 };
 #endif

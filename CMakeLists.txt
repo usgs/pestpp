@@ -9,7 +9,7 @@ if("${PESTPP_VERSION}" STREQUAL "")
   message(SEND_ERROR
     "Could not find PESTPP_VERSION in src/libs/common/config_os.h")
 endif()
-
+ 
 message(STATUS
   "Configuring CMake ${CMAKE_VERSION} to build PESTPP ${PESTPP_VERSION}")
 
@@ -85,6 +85,8 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+add_compile_definitions(_HAS_STD_BYTE=0)
+
 # Use global "-fvisibility=hidden" see https://gcc.gnu.org/wiki/Visibility
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
@@ -110,8 +112,10 @@ include(GNUInstallDirs)
 add_subdirectory(src)
 
 # Define an custom OS tag for CPACK_SYSTEM_NAME and (for now) local bin sub-directory
+message(STATUS
+  "CMAKE compiler ID ${CMAKE_CXX_COMPILER_ID}")
 if(WIN32)
-  if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+  if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "IntelLLVM")
     set(_ostag "iwin")
   else()
     set(_ostag "win")
