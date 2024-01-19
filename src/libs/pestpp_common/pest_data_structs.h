@@ -540,8 +540,11 @@ public:
     void set_ies_multimodal_alpha(double _flag) { ies_multimodal_alpha = _flag; }
     void set_ensemble_output_precision(int prec) { ensemble_output_precision = prec;}
     int get_ensemble_output_precision() const {return ensemble_output_precision;}
+    void set_ies_n_iter_mean(int _n_iter_mean)  {ies_n_iter_mean = _n_iter_mean;}
+    int get_ies_n_iter_mean() const {return ies_n_iter_mean;}
 
-	string get_gsa_method() const { return gsa_method; }
+
+    string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
 	bool get_gsa_morris_pooled_obs() const { return gsa_morris_pooled_obs; }
 	void set_gsa_morris_pooled_obs(bool _flag) {gsa_morris_pooled_obs = _flag; }
@@ -812,6 +815,7 @@ private:
 	bool ies_localizer_forgive_missing;
 	string ies_phi_fractions_file;
 	bool ies_phi_factors_by_real;
+	int ies_n_iter_mean;
 
 
 	// Data Assimilation parameters

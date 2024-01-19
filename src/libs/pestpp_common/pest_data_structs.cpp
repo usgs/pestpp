@@ -1177,8 +1177,12 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         ies_phi_factors_by_real = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
-
-	return false;
+    else if (key == "IES_N_ITER_MEAN")
+    {
+        convert_ip(value,ies_n_iter_mean);
+        return true;
+    }
+    return false;
 }
 
 bool PestppOptions::assign_da_value_by_key(const string& key, const string& value, const string& org_value)
@@ -1805,6 +1809,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_localizer_forgive_extra: " << ies_localizer_forgive_missing << endl;
 	os << "ies_phi_factors_file: " << ies_phi_fractions_file << endl;
     os << "ies_phi_factors_by_real: " << ies_phi_factors_by_real << endl;
+    os << "ies_n_iter_mean: " << ies_n_iter_mean << endl;
 
 
 	os << endl << "pestpp-sen options: " << endl;
@@ -1945,8 +1950,8 @@ void PestppOptions::set_defaults()
 	set_ies_verbose_level(1);
 	set_ies_use_prior_scaling(false);
 	set_ies_num_reals(50);
-	set_ies_bad_phi(1.0e+300);
-	set_ies_bad_phi_sigma(1.0e+300);
+	set_ies_bad_phi(std::numeric_limits<double>::max());
+	set_ies_bad_phi_sigma(std::numeric_limits<double>::max());
 	set_ies_include_base(true);
 	set_ies_use_empirical_prior(false);
 	set_ies_group_draws(true);
@@ -1988,6 +1993,7 @@ void PestppOptions::set_defaults()
     set_ies_localizer_forgive_missing(false);
     set_ies_phi_fractions_files("");
     set_ies_phi_factors_by_real(false);
+    set_ies_n_iter_mean(0);
 
 	// DA parameters
 	//set_da_use_ies(false);
