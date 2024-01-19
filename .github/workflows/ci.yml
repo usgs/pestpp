@@ -68,26 +68,37 @@ jobs:
 
     # Standard python fails on windows without GDAL installation
     # Using custom bash shell ("shell: bash -l {0}") with Miniconda
-    - name: Setup Miniconda
-      uses: conda-incubator/setup-miniconda@v2
+    # - name: Setup Miniconda
+    #   uses: conda-incubator/setup-miniconda@v2
+    #   with:
+    #     # python-version: ${{ matrix.python-version }}
+    #     # #mamba-version: "0.20.0"
+    #     # channels: conda-forge
+    #     # auto-update-conda: true
+    #     # activate-environment: pyemu
+    #     # use-only-tar-bz2: true
+    #     miniforge-version: latest
+    #     # miniconda-version: "latest"
+    #     python-version: ${{ matrix.python-version }}
+    #     # mamba-version: "*"
+    #     # channels: conda-forge
+    #     miniforge-variant: Mambaforge
+    #     # auto-update-conda: true
+    #     activate-environment: pyemu
+    #     use-mamba: true
+    #     # environment-file: etc/environment.yml
+    #     # use-only-tar-bz2: true
+
+    - name: setup micromamba
+      uses: mamba-org/setup-micromamba@v1
       with:
-        # python-version: ${{ matrix.python-version }}
-        # #mamba-version: "0.20.0"
-        # channels: conda-forge
-        # auto-update-conda: true
-        # activate-environment: pyemu
-        # use-only-tar-bz2: true
-        miniforge-version: latest
-        # miniconda-version: "latest"
-        python-version: ${{ matrix.python-version }}
-        # mamba-version: "*"
-        # channels: conda-forge
-        miniforge-variant: Mambaforge
-        # auto-update-conda: true
-        activate-environment: pyemu
-        use-mamba: true
-        # environment-file: etc/environment.yml
-        # use-only-tar-bz2: true
+        micromamba-version: '1.3.1-0'
+        environment-file: etc/environment.yml
+        init-shell: >-
+          bash
+          powershell
+        cache-environment: true
+        post-cleanup: 'all'
 
     # - name: Add packages to pyemu environment using mamba or conda
     #   shell: bash -l {0}
@@ -98,32 +109,32 @@ jobs:
     #       conda env update --name pyemu --file etc/environment.yml
     #     fi
 
-    - name: Add packages to pyemu environment using conda
-      if: ${{ matrix.python-version < 3.8 }}
-      # if: ${{ runner.os == 'Windows' || matrix.python-version < 3.8 }}
-      shell: bash -l {0}
-      run: |
-          conda env update --name pyemu --file etc/environment.yml
+    # - name: Add packages to pyemu environment using conda
+    #   if: ${{ matrix.python-version < 3.8 }}
+    #   # if: ${{ runner.os == 'Windows' || matrix.python-version < 3.8 }}
+    #   shell: bash -l {0}
+    #   run: |
+    #       conda env update --name pyemu --file etc/environment.yml
     
-    - name: Add packages to pyemu environment using mamba
-      # if: ${{ runner.os != 'Windows' && matrix.python-version >= 3.8 }}
-      if: ${{ matrix.python-version >= 3.8 }}
-      shell: bash -l {0}
-      run: |
-          mamba env update --name pyemu --file etc/environment.yml
+    # - name: Add packages to pyemu environment using mamba
+    #   # if: ${{ runner.os != 'Windows' && matrix.python-version >= 3.8 }}
+    #   if: ${{ matrix.python-version >= 3.8 }}
+    #   shell: bash -l {0}
+    #   run: |
+    #       mamba env update --name pyemu --file etc/environment.yml
     
-    - name: Install Flopy & pyemu?
-      shell: bash -l {0}
-      run: |
-        # git clone -b develop --depth 1 https://github.com/modflowpy/flopy.git
-        # cd flopy
-        # python setup.py install
-        # cd ..
-        # pip install https://github.com/modflowpy/pymake/zipball/master
-        git clone -b develop --depth 1 https://github.com/pypest/pyemu.git
-        cd pyemu
-        python setup.py install
-        cd ..
+    # - name: Install Flopy & pyemu?
+    #   shell: bash -l {0}
+    #   run: |
+    #     # git clone -b develop --depth 1 https://github.com/modflowpy/flopy.git
+    #     # cd flopy
+    #     # python setup.py install
+    #     # cd ..
+    #     # pip install https://github.com/modflowpy/pymake/zipball/master
+    #     git clone -b develop --depth 1 https://github.com/pypest/pyemu.git
+    #     cd pyemu
+    #     python setup.py install
+    #     cd ..
 
     # - name: Get specific version CMake, v3.19
     #   if: ${{ runner.os == 'Windows' }} 
