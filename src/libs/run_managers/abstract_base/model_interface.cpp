@@ -693,6 +693,8 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 			{
 				throw PestError("could not add process to job object: " + cmd_string);
 			}
+			DWORD pid = pi.dwProcessId;
+			cout << "...pid: " << pid << endl;
 			DWORD exitcode;
 			while (true)
 			{
@@ -746,6 +748,7 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
             cout << pest_utils::get_time_string() << " calling forward run command: '" << cmd_string << "' " << endl;
 			//start the command
 			int command_pid = start(cmd_string);
+			cout << "...pid: " << command_pid << endl;
 			while (true)
 			{
                 std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));

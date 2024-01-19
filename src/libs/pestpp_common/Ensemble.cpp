@@ -2179,7 +2179,8 @@ ParameterEnsemble ParameterEnsemble::zeros_like(int nrows)
 
 }
 
-map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs, int da_cycle)
+map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const vector<int> &real_idxs,
+                                         int da_cycle, string additional_tag)
 {
 	//add runs to the run manager using int indices
 	map<int,int> real_run_ids;
@@ -2205,6 +2206,7 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 			run_real_names.push_back(real_names[i]);
 	else
 		run_real_names = real_names;
+
 	int idx;
 	map<string, int> rmap;
 
@@ -2219,8 +2221,15 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 		ss << " da_cycle:" << da_cycle << " ";
 		info_txt = ss.str();
 	}
-	for (auto &rname : run_real_names)
+	if (additional_tag.size() > 0)
+    {
+	    info_txt = info_txt + " " + additional_tag;
+    }
+	string rname,rinfo_txt;
+	//for (auto &rname : run_real_names)
+	for (int i=0;i<run_real_names.size();i++)
 	{
+	    rname = run_real_names[i];
 		//idx = find(real_names.begin(), real_names.end(), rname) - real_names.begin();
 		idx = rmap[rname];
 		//Eigen::VectorXd rvector = get_real_vector(idx);
@@ -2233,14 +2242,13 @@ map<int,int> ParameterEnsemble::add_runs(RunManagerAbstract *run_mgr_ptr,const v
 			par_transform.numeric2model_ip(pars_real);
 		replace_fixed(rname, pars_real);
 		nn = pars_real.get_notnormal_keys();
-		if (nn.size() > 0)
-		{
-			stringstream ss;
-			ss << "ParameterEnsemble:: add_runs() error: denormal values for realization " << rname << " : ";
-			for (auto n : nn)
-				ss << n << ",";
-			throw_ensemble_error(ss.str());
-		}
+		if (nn.size() > 0) {
+            stringstream ss;
+            ss << "ParameterEnsemble:: add_runs() error: denormal values for realization " << rname << " : ";
+            for (auto n : nn)
+                ss << n << ",";
+            throw_ensemble_error(ss.str());
+        }
 		run_id = run_mgr_ptr->add_run(pars_real,info_txt+"  realization:"+rname);
 		real_run_ids[idx]  = run_id;
 	}

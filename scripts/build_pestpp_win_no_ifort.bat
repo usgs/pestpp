@@ -9,9 +9,9 @@ rmdir /Q /S bin
 rmdir /Q /S build
 mkdir build
 rem call "C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\bin\compilervars.bat" intel64
-call "C:\Program Files (x86)\Intel\oneAPI\setvars.bat" intel64
+call "C:\Program Files (x86)\Intel\oneAPI\setvars.bat" intel64 --force
 cd build
-cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icl ..
+cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=icx ..
 ninja
 cpack -G ZIP
 copy /y *.zip ..\

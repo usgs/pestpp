@@ -875,7 +875,7 @@ void Constraints::initial_report()
 		f_rec << setw(15) << constraint_sense_name[name];
 		f_rec << setw(15) << constraints_obs.get_rec(name) << endl;
 	}
-	cout << "..." << ctl_ord_obs_constraint_names.size() << " obs-based constraints, see rec file for listing" << endl;
+	cout << "..." << ctl_ord_obs_constraint_names.size() << " obs-based constraints/objectives, see rec file for listing" << endl;
 
 	if (num_pi_constraints() > 0)
 	{
