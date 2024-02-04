@@ -5674,11 +5674,36 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		message(1, "not using prior parameter covariance matrix scaling");
 	}
 
-	if ((oe_base.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE))
-	{
-		message(2, "using previously initialized observation (simulated output) ensemble");
-		oe_drawn = false;
-	}
+    //check to see if any explicit obs noise options are set
+    bool reset_to_nonoise = true;
+    if (ppo->get_passed_args().find("IES_NO_NOISE") != ppo->get_passed_args().end())
+    {
+        reset_to_nonoise = false;
+    }
+    else if (!ppo->get_ies_obs_csv().empty())
+        reset_to_nonoise = false;
+    else if (!ppo->get_obscov_filename().empty())
+        reset_to_nonoise = false;
+    else
+    {
+        map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
+        if (obs_std.size() > 0)
+            reset_to_nonoise = false;
+    }
+
+    if (reset_to_nonoise)
+    {
+        ss.str("");
+        ss << "NOTE: no obs-noise-specific options have been passed, resetting to `ies_no_noise` to true";
+        message(0,ss.str());
+        ppo->set_ies_no_noise(true);
+    }
+
+
+	if ((oe_base.shape().first > 0) && (cycle != NetPackage::NULL_DA_CYCLE)) {
+        message(2, "using previously initialized observation (simulated output) ensemble");
+        oe_drawn = false;
+    }
 	else
 		oe_drawn = initialize_oe(obscov);
 
