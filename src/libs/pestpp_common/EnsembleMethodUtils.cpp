@@ -5690,7 +5690,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         if (obs_std.size() > 0)
             reset_to_nonoise = false;
     }
-
+    reset_to_nonoise = false;
     if (reset_to_nonoise)
     {
         ss.str("");
