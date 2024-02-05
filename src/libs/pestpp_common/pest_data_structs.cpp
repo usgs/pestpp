@@ -1945,7 +1945,7 @@ void PestppOptions::set_defaults()
 	set_ies_lam_mults(vector<double>());
 	set_ies_init_lam(0.0);
 	set_ies_use_approx(true);
-	set_ies_subset_size(-10);
+	set_ies_subset_size(4);
 	set_ies_reg_factor(0.0);
 	set_ies_verbose_level(1);
 	set_ies_use_prior_scaling(false);
