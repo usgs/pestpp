@@ -7,6 +7,7 @@ maxsing         10000000
 eigthresh          1e-06
 eigwrite               1
 ies_par_en    prior.jcb
+tie_by_group true
 * parameter groups external
 freyberg6_run_sen.pargrp_data.csv
 * parameter data external
