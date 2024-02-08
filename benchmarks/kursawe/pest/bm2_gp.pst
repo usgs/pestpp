@@ -32,7 +32,7 @@ obj_2_sd	0		1	miscdata
 ++panther_agent_freeze_on_fail(True)
 ++mou_save_population_every(1)
 ++mou_generator(pso)
-++mou_ppd_limits(0.5,0.5)
+++mou_ppd_limits(0.36)
 ++mou_env_selector(NSGA_PPD)
 ++mou_pso_alpha(0)
 ++mou_pso_rramp(-1)

@@ -1137,15 +1137,26 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 
 		map<string, double> prob_dom = dominance_probability(first, second);
 
-		int i = 0;
+		/*int i = 0;
 		for (auto d : prob_dom)
 		{
 			if (d.second < ppd_limits[i])
 				return false;
 			i++;
 		}
-		return true;
+		return true;*/
 		
+		double pd = 1;
+		for (auto d : prob_dom)
+		{
+			pd *= d.second;
+		}
+
+		if (pd < ppd_limits) {
+			return false;
+		}
+		else
+			return true;
 
 		/*map<string, double> first_prob_dom = dominance_probability(first, second);
 		map<string, double> second_prob_dom = dominance_probability(second, first);
@@ -1256,7 +1267,7 @@ void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, Param
 
 void ParetoObjectives::update_ppd_criteria(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
-	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
+	/*map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
 	double cv;
 	ppd_range = pest_scenario.get_pestpp_options().get_mou_ppd_limits();
 	double ppd_lb = ppd_range[0], ppd_ub = ppd_range[1];
@@ -1282,7 +1293,7 @@ void ParetoObjectives::update_ppd_criteria(ObservationEnsemble& op, ParameterEns
 
 	ss.str("");
 	ss << "Overlap criteria used - objective 1: " << ppd_limits[0] << " ; objective 2: " << ppd_limits[1];
-	performance_log->log_event(ss.str());
+	performance_log->log_event(ss.str());*/
 
 }
 

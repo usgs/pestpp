@@ -134,7 +134,7 @@ private:
 	//PPD-related stuff
 	map<string, double> dominance_probability(map<string, double>& first, map<string, double>& second);
 	bool prob_pareto, ppd_sort;
-	vector<double> ppd_limits;
+	double ppd_limits;
 	vector<double> ppd_range;
 
 	//EHVI-related stuff
