@@ -1121,7 +1121,7 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 
 	if (/*prob_pareto*/ ppd_sort)
 	{
-		bool dom = true;
+		/*bool dom = true;
 
 		for (auto f : first)
 		{
@@ -1133,7 +1133,7 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 		}
 
 		if (dom)
-			return true;
+			return true;*/
 
 		map<string, double> prob_dom = dominance_probability(first, second);
 

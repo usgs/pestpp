@@ -17,8 +17,8 @@ mou_pso_rramp				   -1
 mou_ppd_limits				   0.65,0.65
 mou_adaptive_ppd			   False
 mou_env_selector               NSGA_PPD
-mou_dv_population_file         ./model/input/mogp_henry.dv_pop.csv
-mou_obs_population_restart_file	./model/input/mogp_henry.obs_pop.csv
+mou_dv_population_file         ./model/input/henry_gp.dv_pop.csv
+mou_obs_population_restart_file	./model/input/henry_gp.obs_pop.csv
 mou_save_population_every	   1
 * parameter groups external
 ./pest/henry.pargp_data.csv

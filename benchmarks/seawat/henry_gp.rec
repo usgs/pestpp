@@ -11,7 +11,7 @@ binary compiled on Nov 21 2023 at 08:53:45
 using control file: "henry_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp\benchmarks\seawat"
 on host: "DUMPLING-FL"
-started at 11/22/23 05:49:06
+started at 02/08/24 10:10:29
 
 on host: "DUMPLING-FL"
 
@@ -177,8 +177,8 @@ sqp_scale_facs:
 ...pestpp-mou options:
 mou_generator: pso
 mou_population_size: 100
-mou_dv_population_file: ./model/input/mogp_henry.dv_pop.csv
-mou_obs_population_restart_file: ./model/input/mogp_henry.obs_pop.csv
+mou_dv_population_file: ./model/input/henry_gp.dv_pop.csv
+mou_obs_population_restart_file: ./model/input/henry_gp.obs_pop.csv
 mou_objectives: 
   AR_RATE_TOTAL
   MEAN_CONC
@@ -387,86 +387,76 @@ AR_RATE_TOTAL        less_than      8
 WETLAND_DD           less_than      5.68           
 AR_RATE_T            less_than      8              
 ...using particle swarm generator
-...loading dv population from csv file ./model/input/mogp_henry.dv_pop.csv
-...dv population with 98 members read from './model/input/mogp_henry.dv_pop.csv'
+...loading dv population from csv file ./model/input/henry_gp.dv_pop.csv
+...dv population with 100 members read from './model/input/henry_gp.dv_pop.csv'
 
-...loading obs population from csv file ./model/input/mogp_henry.obs_pop.csv
-...obs population with 98 members read from './model/input/mogp_henry.obs_pop.csv'
+...previous generation numbers detected in dv population, fast forwarding generation counter to 1
+...loading obs population from csv file ./model/input/henry_gp.obs_pop.csv
+...obs population with 100 members read from './model/input/henry_gp.obs_pop.csv'
 
 ... saved observation population to  henry_gp.0.obs_pop.csv
 
   ---  initial population decision variable summary:  ---  
 decision variable                                                         ubnd      lbnd      mean   standard devation         min         max
-PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:84_IDX1:0_IDX2:1799         0     -4.75    -4.167            0.337578    -4.74588    -3.56594
-PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:69_IDX1:0_IDX2:1799         0     -4.75  -4.16253            0.342226    -4.74812    -3.56283
-PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:54_IDX1:0_IDX2:1799         0     -4.75  -4.16717            0.338194    -4.74762    -3.56416
-PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:39_IDX1:0_IDX2:1799         0     -4.75  -4.15378            0.340654    -4.74949    -3.56997
-PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:84_IDX1:0_IDX2:1249         0     -4.75  -4.15542            0.338735    -4.74771    -3.56837
-PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:69_IDX1:0_IDX2:1249         0     -4.75  -4.15388            0.343648    -4.74404    -3.56494
-PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:54_IDX1:0_IDX2:1249         0     -4.75  -4.16065            0.342537    -4.74176    -3.56362
-PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:39_IDX1:0_IDX2:1249         0     -4.75  -4.15514            0.344255    -4.73877    -3.57422
-AR_RATE_1                                                                    7         0   3.43982             1.99415   0.0138063     6.97496
-AR_RATE_2                                                                    7         0   3.44324             2.00308    0.058755     6.98437
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:84_IDX1:0_IDX2:1799         0     -4.75  -4.09728            0.809092       -4.75    -1.46222
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:69_IDX1:0_IDX2:1799         0     -4.75  -3.73259            0.880005       -4.75      -1.695
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:54_IDX1:0_IDX2:1799         0     -4.75  -3.60615            0.849272       -4.75    -1.84885
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:39_IDX1:0_IDX2:1799         0     -4.75  -3.73321            0.848667       -4.75    -1.50525
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:84_IDX1:0_IDX2:1249         0     -4.75  -3.86114            0.805457       -4.75    -1.94345
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:69_IDX1:0_IDX2:1249         0     -4.75  -3.89122            0.807327       -4.75    -2.10673
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:54_IDX1:0_IDX2:1249         0     -4.75  -3.72778            0.878985       -4.75    -1.64664
+PNAME:WEL_INST:0_PTYPE:GR_USECOL:3_PSTYLE:D_IDX0:39_IDX1:0_IDX2:1249         0     -4.75  -3.87174            0.880282       -4.75    -1.55036
+AR_RATE_1                                                                    7         0   2.45038              2.0621           0           7
+AR_RATE_2                                                                    7         0   3.07176             2.12178           0           7
 
 
   ---  initial population objective function summary:  ---  
 seeking optimal trade-off point for single 'optimal' chance point runs
-using member GEN=0_MEMBER=89 as single, 'optimal' point
-   with distance of 7.47428 from optimal trade - off
+using member GEN=1_MEMBER=71_PSO as single, 'optimal' point
+   with distance of 6.92571 from optimal trade - off
 objective function   direction         mean      std dev          min          max         knee
 
-AR_RATE_TOTAL         minimize     6.883058     2.676881     0.241433      11.9838      7.24707
-MEAN_CONC             minimize     5.811831     3.174851     0.212639      14.5871      2.81762
+AR_RATE_TOTAL         minimize     5.522142     2.936356            0      13.5505      5.68348
+MEAN_CONC             minimize     4.531766     4.107885     -5.19171      13.6232       -1.234
 
 ... saved initial dv population to  henry_gp.0.dv_pop.csv
 ...performing initial pareto dominance sort
 WARNING: all members are infeasible
-...pareto dominance sort yielded 9 domination fronts
-17 in the front 1
-20 in the front 2
-22 in the front 3
-16 in the front 4
-11 in the front 5
-6 in the front 6
-3 in the front 7
-2 in the front 8
-1 in the front 9
+...pareto dominance sort yielded 5 domination fronts
+57 in the front 1
+29 in the front 2
+9 in the front 3
+4 in the front 4
+1 in the front 5
 ...wrote pareto summary to henry_gp.pareto.summary.csv
-initialized archives with 17 nondominated members
+initialized archives with 57 nondominated members
 WARNING: all members are infeasible
 ...pareto dominance sort yielded 1 domination fronts
-17 in the front 1
+57 in the front 1
 ...wrote pareto summary to henry_gp.pareto.archive.summary.csv
-...saved decision variable population of size 17 X 10 to 'henry_gp.archive.dv_pop.csv'
-...saved generation-specific decision variable population of size 17 X 10 to 'henry_gp.0.archive.dv_pop.csv'
-...saved observation population of size 17 X 10 to 'henry_gp.archive.obs_pop.csv'
-...saved generation-specific observation population of size 17 X 10 to 'henry_gp.0.archive.obs_pop.csv'
+...saved decision variable population of size 57 X 10 to 'henry_gp.archive.dv_pop.csv'
+...saved generation-specific decision variable population of size 57 X 10 to 'henry_gp.0.archive.dv_pop.csv'
+...saved observation population of size 57 X 10 to 'henry_gp.archive.obs_pop.csv'
+...saved generation-specific observation population of size 57 X 10 to 'henry_gp.0.archive.obs_pop.csv'
 
   ---   population observation constraint summary at iteration 0  ---  
 name                         sense    required        sim min       sim mean        sim max  % unsatisfied
-SALINITY                 less_than           1       0.212639        5.81183        14.5871        93.8776
-TOTAL_PUMP_RATE       greater_than        28.5        30.8678        33.2756        35.6674              0
-WETLAND_DD               less_than        5.68        5.45001        7.24303        9.72785        98.9796
-AR_RATE_T                less_than           8       0.241433        6.88306        11.9838        37.7551
+SALINITY                 less_than           1       -5.19171        4.53177        13.6232             80
+TOTAL_PUMP_RATE       greater_than        28.5        25.4377        30.5211        37.3405             17
+WETLAND_DD               less_than        5.68        3.43193        6.66621        9.30839             78
+AR_RATE_T                less_than           8              0        5.52214        13.5505             18
 ...number of initial feasible solutions: 0
 
   ---  initialization complete  ---  
 
   ---  starting generation  1  ---  
 WARNING: all members are infeasible
-...pareto dominance sort yielded 9 domination fronts
-17 in the front 1
-20 in the front 2
-22 in the front 3
-16 in the front 4
-11 in the front 5
-6 in the front 6
-3 in the front 7
-2 in the front 8
-1 in the front 9
-...augmenting PSO population DE population of size 2
-...generating diffevol population of size 2
+...pareto dominance sort yielded 7 domination fronts
+15 in the front 1
+16 in the front 2
+19 in the front 3
+18 in the front 4
+15 in the front 5
+12 in the front 6
+5 in the front 7
 ...generating PSO population of size 100
-WARNING: all members are infeasible
-...pareto dominance sort yielded 1 domination fronts
-17 in the front 1
