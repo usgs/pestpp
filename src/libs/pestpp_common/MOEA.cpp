@@ -1137,8 +1137,8 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 
 		map<string, double> prob_dom = dominance_probability(first, second);
 
-		/*int i = 0;
-		for (auto d : prob_dom)
+		int i = 0;
+		/*for (auto d : prob_dom)
 		{
 			if (d.second < ppd_limits[i])
 				return false;
@@ -1152,8 +1152,9 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 			pd *= d.second;
 		}
 
-		if (pd < ppd_limits) {
+		if (pd < ppd_limits[0]) {
 			return false;
+
 		}
 		else
 			return true;
@@ -1267,7 +1268,7 @@ void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, Param
 
 void ParetoObjectives::update_ppd_criteria(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
-	/*map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
+	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
 	double cv;
 	ppd_range = pest_scenario.get_pestpp_options().get_mou_ppd_limits();
 	double ppd_lb = ppd_range[0], ppd_ub = ppd_range[1];
@@ -1293,7 +1294,7 @@ void ParetoObjectives::update_ppd_criteria(ObservationEnsemble& op, ParameterEns
 
 	ss.str("");
 	ss << "Overlap criteria used - objective 1: " << ppd_limits[0] << " ; objective 2: " << ppd_limits[1];
-	performance_log->log_event(ss.str());*/
+	performance_log->log_event(ss.str());
 
 }
 
@@ -3875,63 +3876,167 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 			gbest_solutions.push_back(nondom_solutions[0]);
 		return gbest_solutions;
 	}
-		
-	map<string, double> crowd_dist = objectives.get_cuboid_crowding_distance(nondom_solutions);
-	sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
-	//normalize cd
-	double mx = -1.0e+30;
-	for (auto& cd : crowd_dist)
-		if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
-			mx = cd.second;
-		else if (nondom_solutions.size() == 2)
-			mx = cd.second;
-		else if (crowd_sorted.size() == 1)
-			mx = cd.second;
-	if ((mx < 0.0) && (iter > 0))
-        throw_moea_error("pso max crowding distance is negative");
-
-	//variable alpha
-	if (alpha == 0)
-	{
-		double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
-		double pfull = nondom_solutions.size() / maxarchivesize;
-		double rramp = pest_scenario.get_pestpp_options().get_mou_pso_rramp();
-		double rfit = pest_scenario.get_pestpp_options().get_mou_pso_rfit();
-
-		if (rramp == -5e+02)
-			throw_moea_error("PSO alpha is zero");
-		if (rramp == 0.0)
-			throw_moea_error("PSO RRAMP is zero");
-
-		alpha = 1 + (exp(rramp * pfull) - 1.0) / (exp(rramp) - 1) * (rfit - 1.0);
-
-	}
 	
-	for (auto& cd : crowd_dist) {
-        if (cd.second == CROWDING_EXTREME) {
-            cd.second = 1.0;
-        } else if (mx != 0.0) {
-            cd.second = pow(cd.second / mx, alpha);
-        } else {
-            cd.second = pow(0.5, alpha);
-        }
-    }
+	map<string, double> ehvi_nondom = objectives.get_ehvi(nondom_solutions); //use crowd_dist for now just to for it to work with the rest of the code but here it is actually ehvi
+	map<string, double> crowd_dist = objectives.get_cuboid_crowding_distance(nondom_solutions); //just to get the extreme points
+
+	map<string, double> fitness; //use crowd_dist for now just to for it to work with the rest of the code but here it is actually ehvi
 
 	if (prob_pareto)
 	{
-		map<string, double> ehvi_nondom = objectives.get_ehvi(nondom_solutions);
-		double mean_ei = 0;
-		for (auto& ei : ehvi_nondom)
-			mean_ei += ei.second / nondom_solutions.size();
+		sortedset ehvi_sorted(ehvi_nondom.begin(), ehvi_nondom.end(), compFunctor);
 
-		for (auto& ei : ehvi_nondom)
-			ei.second = 1 - (abs(ei.second - mean_ei) / mean_ei);
+		double mx = -1.0e+30;
+		for (auto& cd : ehvi_nondom)
+			if (cd.second > mx)
+				if (crowd_dist[cd.first] != CROWDING_EXTREME)
+					mx = cd.second;
+				else
+					cd.second = CROWDING_EXTREME;
+			else if (nondom_solutions.size() == 2)
+				mx = cd.second;
+			else if (ehvi_sorted.size() == 1)
+				mx = cd.second;
+		if ((mx < 0.0) && (iter > 0))
+			throw_moea_error("pso max EHVI is negative");
+
+		//variable alpha
+		if (alpha == 0)
+		{
+			double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
+			double pfull = nondom_solutions.size() / maxarchivesize;
+			double rramp = pest_scenario.get_pestpp_options().get_mou_pso_rramp();
+			double rfit = pest_scenario.get_pestpp_options().get_mou_pso_rfit();
+
+			if (rramp == -5e+02)
+				throw_moea_error("PSO alpha is zero");
+			if (rramp == 0.0)
+				throw_moea_error("PSO RRAMP is zero");
+
+			alpha = 1 + (exp(rramp * pfull) - 1.0) / (exp(rramp) - 1) * (rfit - 1.0);
+
+		}
+
+		for (auto& cd : ehvi_nondom) {
+			if (cd.second == CROWDING_EXTREME) {
+				cd.second = 1.0;
+			}
+			else if (mx != 0.0) {
+				cd.second = pow(cd.second / mx, alpha);
+			}
+			else {
+				cd.second = pow(0.5, alpha);
+			}
+		}
+
+		fitness = ehvi_nondom;
+
+
+	}
+	else
+	{
+		map<string, double> crowd_dist = objectives.get_cuboid_crowding_distance(nondom_solutions);
+		sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
+
+		double mx = -1.0e+30;
+		for (auto& cd : crowd_dist)
+			if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
+				mx = cd.second;
+			else if (nondom_solutions.size() == 2)
+				mx = cd.second;
+			else if (crowd_sorted.size() == 1)
+				mx = cd.second;
+		if ((mx < 0.0) && (iter > 0))
+			throw_moea_error("pso max crowding distance is negative");
+
+		//variable alpha
+		if (alpha == 0)
+		{
+			double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
+			double pfull = nondom_solutions.size() / maxarchivesize;
+			double rramp = pest_scenario.get_pestpp_options().get_mou_pso_rramp();
+			double rfit = pest_scenario.get_pestpp_options().get_mou_pso_rfit();
+
+			if (rramp == -5e+02)
+				throw_moea_error("PSO alpha is zero");
+			if (rramp == 0.0)
+				throw_moea_error("PSO RRAMP is zero");
+
+			alpha = 1 + (exp(rramp * pfull) - 1.0) / (exp(rramp) - 1) * (rfit - 1.0);
+
+		}
 
 		for (auto& cd : crowd_dist) {
-			if (ehvi_nondom[cd.first] < -1) //penalty for overpromising points
-				cd.second = 0;
+			if (cd.second == CROWDING_EXTREME) {
+				cd.second = 1.0;
+			}
+			else if (mx != 0.0) {
+				cd.second = pow(cd.second / mx, alpha);
+			}
+			else {
+				cd.second = pow(0.5, alpha);
+			}
 		}
+
+		fitness = crowd_dist;
 	}
+
+	//map<string, double> crowd_dist = objectives.get_cuboid_crowding_distance(nondom_solutions);
+	//sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
+	////normalize cd
+	//double mx = -1.0e+30;
+	//for (auto& cd : crowd_dist)
+	//	if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
+	//		mx = cd.second;
+	//	else if (nondom_solutions.size() == 2)
+	//		mx = cd.second;
+	//	else if (crowd_sorted.size() == 1)
+	//		mx = cd.second;
+	//if ((mx < 0.0) && (iter > 0))
+	//	throw_moea_error("pso max crowding distance is negative");
+
+	////variable alpha
+	//if (alpha == 0)
+	//{
+	//	double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
+	//	double pfull = nondom_solutions.size() / maxarchivesize;
+	//	double rramp = pest_scenario.get_pestpp_options().get_mou_pso_rramp();
+	//	double rfit = pest_scenario.get_pestpp_options().get_mou_pso_rfit();
+
+	//	if (rramp == -5e+02)
+	//		throw_moea_error("PSO alpha is zero");
+	//	if (rramp == 0.0)
+	//		throw_moea_error("PSO RRAMP is zero");
+
+	//	alpha = 1 + (exp(rramp * pfull) - 1.0) / (exp(rramp) - 1) * (rfit - 1.0);
+
+	//}
+	//
+	//for (auto& cd : crowd_dist) {
+ //       if (cd.second == CROWDING_EXTREME) {
+ //           cd.second = 1.0;
+ //       } else if (mx != 0.0) {
+ //           cd.second = pow(cd.second / mx, alpha);
+ //       } else {
+ //           cd.second = pow(0.5, alpha);
+ //       }
+ //   }
+
+	//if (prob_pareto)
+	//{
+	//	map<string, double> ehvi_nondom = objectives.get_ehvi(nondom_solutions);
+	//	double mean_ei = 0;
+	//	for (auto& ei : ehvi_nondom)
+	//		mean_ei += ei.second / nondom_solutions.size();
+
+	//	for (auto& ei : ehvi_nondom)
+	//		ei.second = 1 - (abs(ei.second - mean_ei) / mean_ei);
+
+	//	for (auto& cd : crowd_dist) {
+	//		if (ehvi_nondom[cd.first] < -1) //penalty for overpromising points
+	//			cd.second = 0;
+	//	}
+	//}
 
 	//map<string, double> fitness;
 	//for (auto f : crowd_dist)
@@ -3976,7 +4081,7 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 			shuffle(working.begin(), working.end(), rand_gen);
 			r = uniform_draws(nondom_solutions.size(), 0.0, 1.0, rand_gen);
 			for (int i = 0; i < r.size(); i++)
-				if (crowd_dist[working[i]] >= r[i])
+				if (fitness[working[i]] >= r[i])
 				{
 					candidate = working[i];
 					found = true;

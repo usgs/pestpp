@@ -1471,11 +1471,6 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		}
 	else if (key == "MOU_PPD_LIMITS")
 	{
-		convert_ip(value, mou_ppd_limits);
-		return true;
-	}
-	/*else if (key == "MOU_PPD_LIMITS")
-	{
 		mou_ppd_limits.clear();
 		vector<string> tok;
 		tokenize(value, tok, ",		");
@@ -1486,7 +1481,7 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 			mou_ppd_limits.push_back(v);
 		}
 		return true;
-	}*/
+	}
 	else if (key == "MOU_ADAPTIVE_PPD")
 	{
 		mou_adaptive_ppd = pest_utils::parse_string_arg_to_bool(value);
@@ -1759,11 +1754,11 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_pso_rfit: " << mou_pso_rfit << endl;
 	os << "mou_hypervolume_extreme: " << mou_hypervolume_extreme << endl;
 	os << "mou_adaptive_ppd: " << mou_adaptive_ppd << endl;
-	os << "mou_ppd_limits: " << mou_ppd_limits << endl;
-	/*for (auto& p : mou_ppd_limits)
+	os << "mou_ppd_limits: " << endl;
+	for (auto& p : mou_ppd_limits)
 	{
 		os << " " << p << endl;
-	}*/
+	}
 	os << "mou_population_schedule: " << mou_population_schedule << endl;
 	os << "mou_simplex_reflections:" << mou_simplex_reflections << endl;
 	os << "mou_simplex_factors: " << endl;
@@ -1958,8 +1953,7 @@ void PestppOptions::set_defaults()
 	set_mou_pso_rramp(-5e+02);
 	set_mou_pso_rfit(2.0);
 	set_mou_hypervolume_extreme(1e+10);
-	set_mou_ppd_limits(0.5);
-	//set_mou_ppd_limits(vector<double>{0.5, 0.5});
+	set_mou_ppd_limits(vector<double>{0.5, 0.5});
 	set_mou_adaptive_ppd(false);
 	set_mou_resample_every(-1);
 	set_mou_resample_command("");
