@@ -418,8 +418,10 @@ public:
 	void set_mou_pso_rfit(double val) { mou_pso_rfit = val; }
 	double get_mou_hypervolume_extreme() const { return mou_hypervolume_extreme; }
 	void set_mou_hypervolume_extreme(double val) { mou_hypervolume_extreme = val; }
-	vector<double> get_mou_ppd_limits() const { return mou_ppd_limits; }
-	void set_mou_ppd_limits(vector<double> _vals) { mou_ppd_limits = _vals; }
+	double get_mou_ppd_limits() const { return mou_ppd_limits; }
+	//vector<double> get_mou_ppd_limits() const { return mou_ppd_limits; }
+	void set_mou_ppd_limits(double val) { mou_ppd_limits = val; }
+	//void set_mou_ppd_limits(vector<double> _vals) { mou_ppd_limits = _vals; }
 	int get_mou_resample_every()const { return mou_resample_every; }
 	void set_mou_adaptive_ppd(bool _flag) { mou_adaptive_ppd = _flag; };
 	bool get_mou_adaptive_ppd() const { return mou_adaptive_ppd; }
@@ -765,7 +767,7 @@ private:
 	double mou_pso_alpha;
 	double mou_pso_rramp;
 	double mou_pso_rfit;
-	vector<double> mou_ppd_limits;
+	double mou_ppd_limits;
 	bool mou_adaptive_ppd;
 	double mou_hypervolume_extreme;
 	int mou_resample_every;
