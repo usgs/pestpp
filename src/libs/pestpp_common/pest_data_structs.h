@@ -416,8 +416,12 @@ public:
 	void set_mou_pso_rramp(double val) { mou_pso_rramp = val; }
 	double get_mou_pso_rfit() const { return mou_pso_rfit; }
 	void set_mou_pso_rfit(double val) { mou_pso_rfit = val; }
+	string get_mou_outer_repo_obs_file() const { return mou_outer_repo_obs_file; }
+	void set_mou_outer_repo_obs_file(string name) { mou_outer_repo_obs_file = name; }
 	double get_mou_hypervolume_extreme() const { return mou_hypervolume_extreme; }
 	void set_mou_hypervolume_extreme(double val) { mou_hypervolume_extreme = val; }
+	int get_mou_infill_size() const { return mou_infill_size; }
+	void set_mou_infill_size(int size) { mou_infill_size = size; }
 	double get_mou_ppd_limits() const { return mou_ppd_limits; }
 	//vector<double> get_mou_ppd_limits() const { return mou_ppd_limits; }
 	void set_mou_ppd_limits(double val) { mou_ppd_limits = val; }
@@ -769,6 +773,8 @@ private:
 	double mou_pso_rfit;
 	double mou_ppd_limits;
 	bool mou_adaptive_ppd;
+	string mou_outer_repo_obs_file;
+	int mou_infill_size;
 	double mou_hypervolume_extreme;
 	int mou_resample_every;
 	string mou_resample_command;

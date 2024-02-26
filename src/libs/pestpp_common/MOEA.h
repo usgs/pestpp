@@ -40,7 +40,7 @@ public:
 	
 	void set_ppd_limits() { ppd_limits = pest_scenario.get_pestpp_options().get_mou_ppd_limits(); }
 	void set_prob_pareto(bool ppd) { prob_pareto = ppd; }
-	void set_hypervolume_partitions(ObservationEnsemble& op, ParameterEnsemble& dp);
+	void set_hypervolume_partitions(map<string, map<string, double>> _hv_parts);
 	void get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp);
 	void update_ppd_criteria(ObservationEnsemble& op, ParameterEnsemble& dp);
 
@@ -170,7 +170,7 @@ private:
 	vector<string> act_obs_names, act_par_names;
 	int iter, warn_min_members, error_min_members;
 	int member_count;
-	int archive_size;
+	int archive_size, infill_size;
 	string population_dv_file, population_obs_restart_file;
 	string dv_pop_file_tag = "dv_pop";
 	string obs_pop_file_tag = "obs_pop";

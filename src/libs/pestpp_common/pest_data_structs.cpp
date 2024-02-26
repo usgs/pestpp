@@ -1454,9 +1454,19 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_pso_rfit);
 		return true;
 		}
+	else if (key == "MOU_OUTER_REPO_OBS_FILE")
+	{
+		mou_outer_repo_obs_file = org_value;
+		return true;
+		}
 	else if (key == "MOU_HYPERVOLUME_EXTREME")
 	{
 		convert_ip(value, mou_hypervolume_extreme);
+		return true;
+		}
+	else if (key == "MOU_INFILL_SIZE")
+	{
+		convert_ip(value, mou_infill_size);
 		return true;
 		}
 	else if (key == "MOU_RESAMPLE_EVERY")
@@ -1757,7 +1767,9 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_pso_alpha: " << mou_pso_alpha << endl;
 	os << "mou_pso_rramp: " << mou_pso_rramp << endl;
 	os << "mou_pso_rfit: " << mou_pso_rfit << endl;
+	os << "mou_outer_repo_obs_file: " << mou_outer_repo_obs_file << endl;
 	os << "mou_hypervolume_extreme: " << mou_hypervolume_extreme << endl;
+	os << "mou_infill_size: " << mou_infill_size << endl;
 	os << "mou_adaptive_ppd: " << mou_adaptive_ppd << endl;
 	os << "mou_ppd_limits: " << mou_ppd_limits << endl;
 	/*for (auto& p : mou_ppd_limits)
@@ -1957,7 +1969,9 @@ void PestppOptions::set_defaults()
 	set_mou_pso_alpha(1.0);
 	set_mou_pso_rramp(-5e+02);
 	set_mou_pso_rfit(2.0);
+	set_mou_outer_repo_obs_file("");
 	set_mou_hypervolume_extreme(1e+10);
+	set_mou_infill_size(100);
 	set_mou_ppd_limits(0.5);
 	//set_mou_ppd_limits(vector<double>{0.5, 0.5});
 	set_mou_adaptive_ppd(false);

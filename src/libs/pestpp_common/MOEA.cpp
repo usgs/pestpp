@@ -598,9 +598,6 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 		sum << "," << crowd_map[member];
 		if (prob_pareto)
 		{
-			if (generation == 0)
-				sum << "," << 0;
-			else
 				sum << "," << ehvi_member_map[member];
 		}
 		sum << "," << spea2_constrained_fitness_map[member];
@@ -1206,22 +1203,19 @@ double ParetoObjectives::psi_function(double aa, double bb, double mu, double sd
 }
 
 //hypervolume works for two-objective problems for now
-void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, ParameterEnsemble& dp)
+void ParetoObjectives::set_hypervolume_partitions(map<string, map<string, double>> _hv_pts)
 {
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
-	ss << "ParetoObjectives::set_hypervolume_partitions() for " << op.shape().first << " archive members";
+	ss << "ParetoObjectives::set_hypervolume_partitions() for outer pareto archive members";
 	performance_log->log_event(ss.str());
 
-	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
 	map<string, map<string, double>> hv_parts;
 	map<int, vector<double>> hypervolume;
 	map<string, double> hv_partition;
 	vector<double> hpv;
 	double hv_extreme = pest_scenario.get_pestpp_options().get_mou_hypervolume_extreme();
 	
-
-
 	//initialize reference values
 	int mult = 1;
 	vector <string> ref_tags {"r_0", "rfty"};
@@ -1238,13 +1232,13 @@ void ParetoObjectives::set_hypervolume_partitions(ObservationEnsemble& op, Param
 	}
 	
 	//set partition boundaries: rectangular strips along obj 2
-	for (auto member : _member_struct)
+	for (auto member : _hv_pts)
 	{
 		for (auto obj_map : *obj_names_ptr)
 		{
-			hv_parts[member.first][obj_map] = _member_struct[member.first][obj_map]; //get only objective values, leave SDs, for easy referencing later
+			hv_parts[member.first][obj_map] = _hv_pts[member.first][obj_map]; //get only objective values, leave SDs, for easy referencing later
 		}
-		hv_partition[member.first] = _member_struct[member.first][obj_names_ptr->at(1)];
+		hv_partition[member.first] = _hv_pts[member.first][obj_names_ptr->at(1)];
 	}
 
 	//order points by increasing obj 2 values
@@ -2901,7 +2895,7 @@ void MOEA::initialize()
 	message(1, " saved initial dv population to ", ss.str());
 
 	//TODO: think about a bad phi (or phis) for MOEA
-	
+
 	if (op.shape().first < error_min_members)
 	{
 		message(0, "too few population members:", op.shape().first);
@@ -2920,28 +2914,28 @@ void MOEA::initialize()
 	//do an initial pareto dominance sort
 	message(1, "performing initial pareto dominance sort");
 	objectives.set_pointers(obj_names, obs_obj_names, obs_obj_sd_names, pi_obj_names, pi_obj_sd_names, obj_dir_mult);
-    archive_size = ppo->get_mou_max_archive_size();
-    vector<string> keep;
+	archive_size = ppo->get_mou_max_archive_size();
+	vector<string> keep;
 	if (envtype == MouEnvType::NSGA)
 	{
 		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, false, true, POP_SUM_TAG);
 
-        //drop any duplicates
-        keep.clear();
-        for (auto nondom : dompair.first)
-        {
-            keep.push_back(nondom);
-        }
-        for (auto nondom : dompair.second)
-        {
-            keep.push_back(nondom);
-        }
-        if (keep.size() == 0)
-        {
-            throw_moea_error("initial sorting yielded zero valid solutions");
-        }
-        dp.keep_rows(keep);
-        op.keep_rows(keep);
+		//drop any duplicates
+		keep.clear();
+		for (auto nondom : dompair.first)
+		{
+			keep.push_back(nondom);
+		}
+		for (auto nondom : dompair.second)
+		{
+			keep.push_back(nondom);
+		}
+		if (keep.size() == 0)
+		{
+			throw_moea_error("initial sorting yielded zero valid solutions");
+		}
+		dp.keep_rows(keep);
+		op.keep_rows(keep);
 
 
 		//initialize op and dp archives
@@ -2958,9 +2952,52 @@ void MOEA::initialize()
 		//this causes the initial archive pareto summary file to be written
 		objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, false, true, ARC_SUM_TAG);
 
-		//set hypervolume partitions of nondom solutions
+		//set hypervolume partitions of nondom solutions from previous outer iteration
 		if (prob_pareto)
-			objectives.set_hypervolume_partitions(op_archive, dp_archive);
+		{
+			map<string, map<string, double>> hv_pts;
+			vector<string> tokens;
+
+
+			string outer_repo_obs_filename = pest_scenario.get_pestpp_options().get_mou_outer_repo_obs_file();
+			message(1, "loading outer repository obs from csv file", outer_repo_obs_filename);
+			try
+			{
+				ifstream csv(outer_repo_obs_filename);
+				string line;
+				getline(csv, line);
+
+				while (getline(csv, line))
+				{
+					pest_utils::strip_ip(line);
+					tokens.clear();
+					pest_utils::tokenize(line, tokens, ",", false);
+					map<string, double> vals;
+					int i = 1;
+					for (auto obj : obs_obj_names)
+					{
+						vals[obj] = stod(tokens[i]);
+						i++;
+					}
+					hv_pts[tokens[0]] = vals;
+				}
+
+			}
+			catch (const exception& e)
+			{
+				ss << "error processing outer repository obs file: " << e.what();
+				throw_moea_error(ss.str());
+			}
+			catch (...)
+			{
+				throw_moea_error(string("error processing outer repository obs file"));
+			}
+
+			objectives.set_hypervolume_partitions(hv_pts);
+
+			objectives.get_ehvi(op, dp);
+		}
+			
 				
 	}
 	else if (envtype == MouEnvType::SPEA)
@@ -3299,11 +3336,11 @@ void MOEA::iterate_to_solution()
 			message(1, "computing the expected hypervolume improvement of members in current population");
 			objectives.get_ehvi(new_op, new_dp);
 
-			if (pest_scenario.get_pestpp_options().get_mou_adaptive_ppd())
+			/*if (pest_scenario.get_pestpp_options().get_mou_adaptive_ppd())
 			{
 				message(1, "updating overlap criteria for probabilistic dominance sorting");
 				objectives.update_ppd_criteria(new_op, new_dp);
-			}
+			}*/
 			
 		}
 
