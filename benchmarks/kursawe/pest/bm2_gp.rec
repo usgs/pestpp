@@ -11,7 +11,7 @@ binary compiled on Feb 29 2024 at 11:55:54
 using control file: "./pest/bm2_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp\benchmarks\kursawe"
 on host: "DUMPLING-FL"
-started at 02/29/24 12:49:24
+started at 02/29/24 15:24:30
 
 on host: "DUMPLING-FL"
 
@@ -44,7 +44,7 @@ PEST Control Information
     facparmax = 10
     facorig = 0.001
     phiredswh = 0.1
-    noptmax = 2
+    noptmax = 3
     phiredstp = 0.01
     nphistp = 3
     nphinored = 3
@@ -334,6 +334,7 @@ PEST SVD Information
 ...population schedule: generation,population size:
 ...   0, 100
 ...   1, 100
+...   2, 100
 ...using 'nsga2_ppd' env selector
 ...using binary tournament mating pool selector
 ...saving generation specific populations and archives every nth generation 1
@@ -506,4 +507,3 @@ OBJ_2                    3.24648     49.9044      5.1644     26.1325           0
 ...generating PSO population of size 100
 ...pareto dominance sort yielded 1 domination fronts
 9 in the front 1
-...running population of size  100

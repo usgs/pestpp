@@ -728,8 +728,8 @@ map<string, double> ParetoObjectives::get_prob_non_dominance(vector<string>& mem
 
 map<string, double> ParetoObjectives::get_prob_non_dominance(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
-	map<string, double> prob_nondom_map, PD_k, f;
-	double PD, PND; 
+	map<string, double> prob_nondom_map, PD_ij, PD_ji;
+	double PD_i, PD_j, PND; 
 
 	for (auto n : members)
 	{	
@@ -740,12 +740,17 @@ map<string, double> ParetoObjectives::get_prob_non_dominance(vector<string>& mem
 				continue;
 			else
 			{
-				PD_k = dominance_probability(_member_struct[n], m.second);
-				PD = 1;
+				PD_ij = dominance_probability(_member_struct[n], m.second);
+				PD_ji = dominance_probability(m.second, _member_struct[n]);
+				PD_i = 1;
+				PD_j = 1;
 				for (auto obj_name : *obj_names_ptr)
-
-					PD *= PD_k[obj_name];
-				PND = PND * (1 - PD);
+				{
+					PD_i *= PD_ij[obj_name];
+					PD_j *= PD_ji[obj_name];
+				}
+					
+				PND = PND * (1 - PD_i - PD_j);
 			}
 			
 		}
@@ -3972,7 +3977,6 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 			throw_moea_error("PSO RRAMP is zero");
 
 		alpha = 1 + (exp(rramp * pfull) - 1.0) / (exp(rramp) - 1) * (rfit - 1.0);
-
 	}
 
 	for (auto& cd :fitness) {
