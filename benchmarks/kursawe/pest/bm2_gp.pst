@@ -6,7 +6,7 @@ restart estimation
  10  2  .3  .01  8 
  10  10  .001
  .1
- 1   .01  3  3	.01  3 
+ 2   .01  3  3	.01  3 
  1   1   1 
 * parameter groups
 decvar	absolute  0.01  0.0		switch  	1 	parabolic
@@ -32,12 +32,13 @@ obj_2_sd	0		1	miscdata
 ++panther_agent_freeze_on_fail(True)
 ++mou_save_population_every(1)
 ++mou_generator(pso)
-++mou_ppd_limits(0.36)
+++mou_ppd_limits(0.5)
 ++mou_env_selector(NSGA_PPD)
 ++mou_pso_alpha(0)
 ++mou_pso_rramp(-1)
 ++mou_outer_repo_obs_file(./model/input/outer.0.archive.obs_pop.csv)
 ++mou_hypervolume_extreme(50)
 ++mou_infill_size(100)
+++mou_population_size(100)
 ++mou_dv_population_file(./model/input/mogp_bm2.dv_pop.csv)
 ++mou_obs_population_restart_file(./model/input/mogp_bm2.obs_pop.csv)

@@ -74,7 +74,8 @@ public:
 	//sort specific members
 	map<string, double> get_cuboid_crowding_distance(vector<string>& members);
 	map<string, double> get_ehvi(vector<string>& members);
-	
+	map<string, double> get_prob_non_dominance(vector<string>& members);
+
 	set<string> get_duplicates() { return duplicates;  }
 
 	int get_num_feasible(){ return feas_member_struct.size();}
@@ -109,6 +110,8 @@ private:
 	map<string, double> get_spea2_kth_nn_crowding_distance(map<string, map<string, double>>& _member_struct);
 	map<string, double> get_spea2_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);	
 	map<string, double> get_cuboid_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
+
+	map<string, double> get_prob_non_dominance(vector<string>& members, map<string, map<string, double>>& _member_struct);
 
 	map<string, map<string, double>> member_struct;
 	vector<string>* obj_names_ptr;
