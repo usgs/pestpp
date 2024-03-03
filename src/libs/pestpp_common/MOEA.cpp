@@ -760,16 +760,23 @@ map<string, double> ParetoObjectives::get_prob_non_dominance(vector<string>& mem
 	return prob_nondom_map;
 }
 
-double ParetoObjectives::get_euclidean_distance(map<string, double> first, map<string, double> second)
+vector<double> ParetoObjectives::get_euclidean_distance(map<string, double> first, map<string, double> second)
 {
-	double euclidean_dist = 0;
+	vector<double> euclidean_dist{0, 0};
+	
 	for (auto obj : *obs_obj_names_ptr)
-		euclidean_dist += pow(first[obj] - second[obj], 2);
+		euclidean_dist.at(0) += pow(first[obj] - second[obj], 2);
 
 	if (prob_pareto)
 	{
+		for (auto obj : *obs_obj_names_ptr)
+			euclidean_dist.at(1) += 4 * pow(first[obj] - second[obj], 2) * (pow(first[obj + "_SD"], 2) + pow(second[obj + "_SD"], 2));
 		for (auto objsd : *obs_obj_sd_names_ptr)
-			euclidean_dist += pow(first[objsd],2) + pow(second[objsd],2);
+		{
+			euclidean_dist.at(0) += pow(first[objsd], 2) + pow(second[objsd], 2);
+			euclidean_dist.at(1) += 2 * pow(pow(first[objsd], 2) + pow(second[objsd], 2), 2);
+		}
+			
 	}
 
 	return euclidean_dist;
@@ -826,7 +833,8 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 
 		if (prob_pareto) //cluster-based crowding distance calc needed for Pareto cloud
 		{
-			double eucd_prev_it, eucd_it_next, edmx;
+			vector<double> eucd_prev_it, eucd_it_next;
+			double edmx;
 
 			//sdmap = objsd_member_map;
 			edmx = -1e-30;
@@ -835,18 +843,18 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 			{
 				sortedset::iterator it = next(start, 1);
 				eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[start->first]);
-				if (eucd_prev_it > crowd_distance_map[it->first])
-					crowd_distance_map[it->first] = eucd_prev_it;
+				if (eucd_prev_it.at(0) > crowd_distance_map[it->first])
+					crowd_distance_map[it->first] = eucd_prev_it.at(0);
 
 				eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[last->first]);
-				if (eucd_it_next > crowd_distance_map[it->first])
-					crowd_distance_map[it->first] = eucd_prev_it;
+				if (eucd_it_next.at(0) > crowd_distance_map[it->first])
+					crowd_distance_map[it->first] = eucd_prev_it.at(0);
 			}
 			else if (crowd_sorted.size() > 3)
 			{
 				//need iterators to start and stop one off from the edges
 				start = next(crowd_sorted.begin(), 1);
-				last = prev(crowd_sorted.end(), 2);
+				last = prev(crowd_sorted.end(), 1);
 
 				sortedset::iterator it = start;
 				sortedset::iterator inext, iprev;
@@ -857,12 +865,12 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 					inext = next(it, 1);
 
 					eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[iprev->first]);
-					if (eucd_prev_it > crowd_distance_map[it->first])
-						crowd_distance_map[it->first] = eucd_prev_it;
+					if (eucd_prev_it.at(0) > crowd_distance_map[it->first])
+						crowd_distance_map[it->first] = eucd_prev_it.at(0);
 
 					eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[inext->first]);
-					if (eucd_it_next > crowd_distance_map[it->first])
-						crowd_distance_map[it->first] = eucd_prev_it;
+					if (eucd_it_next.at(0) > crowd_distance_map[it->first])
+						crowd_distance_map[it->first] = eucd_prev_it.at(0);
 				}
 
 			}
@@ -881,7 +889,7 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 			{
 				//need iterators to start and stop one off from the edges
 				start = next(crowd_sorted.begin(), 1);
-				last = prev(crowd_sorted.end(), 2);
+				last = prev(crowd_sorted.end(), 1);
 
 				sortedset::iterator it = start;
 
@@ -940,6 +948,11 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string
 		compFunctor);
 
 	reverse(cs_vec.begin(), cs_vec.end());
+
+	if (prob_pareto)
+	{
+
+	}
 
 
 	vector<string> crowd_ordered;
