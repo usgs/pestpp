@@ -891,13 +891,17 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 			sortedset::iterator it = next(start, 1);
 			eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[start->first]);
 			if (eucd_prev_it.at(0) > crowd_distance_map[it->first])
+			{
 				crowd_distance_map[it->first] = eucd_prev_it.at(0);
 				var_distance_map[it->first] = eucd_prev_it.at(1);
+			}
 
 			eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[last->first]);
 			if (eucd_it_next.at(0) > crowd_distance_map[it->first])
+			{
 				crowd_distance_map[it->first] = eucd_it_next.at(0);
 				var_distance_map[it->first] = eucd_it_next.at(1);
+			}
 		}
 		else if (crowd_sorted.size() > 3)
 		{
@@ -915,13 +919,17 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 				eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[iprev->first]);
 				if (eucd_prev_it.at(0) > crowd_distance_map[it->first])
+				{
 					crowd_distance_map[it->first] = eucd_prev_it.at(0);
 					var_distance_map[it->first] = eucd_prev_it.at(1);
+				}
 
 				eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[inext->first]);
 				if (eucd_it_next.at(0) > crowd_distance_map[it->first])
+				{
 					crowd_distance_map[it->first] = eucd_it_next.at(0);
 					var_distance_map[it->first] = eucd_it_next.at(1);
+				}
 			}
 
 		}
@@ -4148,7 +4156,7 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	for (auto& cd : crowd_dist)
 	{
 		if (cd.second != CROWDING_EXTREME)
-			cd.second = cd.second / pow(var_dist[cd.first] / min, 0.5);
+			cd.second = pow(cd.second / pow(var_dist[cd.first], 0.5), 0.5);
 	}
 		
 	//normalize cd
