@@ -73,6 +73,7 @@ public:
 
 	//sort specific members
 	map<string, double> get_cuboid_crowding_distance(vector<string>& members);
+	pair<map<string, double>, map<string, double>> get_euclidean_crowding_distance(vector<string>& members);
 	map<string, double> get_ehvi(vector<string>& members);
 	map<string, double> get_prob_non_dominance(vector<string>& members);
 
@@ -114,6 +115,7 @@ private:
 	map<string, double> get_prob_non_dominance(vector<string>& members, map<string, map<string, double>>& _member_struct);
 
 	vector<double> get_euclidean_distance(map<string, double> first, map<string, double> second);
+	pair<map<string, double>, map<string, double>> get_euclidean_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
 
 	map<string, map<string, double>> member_struct;
 	vector<string>* obj_names_ptr;
@@ -127,7 +129,7 @@ private:
 	map<string, map<string, double>> feas_member_struct;
 	map<int, vector<string>> front_map;
 	map<int, vector<string>> prob_front_map;
-	map<string, double> crowd_map;
+	map<string, double> crowd_map, expected_crowd_map, var_crowd_map;
 	map<string, int> member_front_map;
 	map<string, double> member_cvar;
 	map<string, double> infeas;

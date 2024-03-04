@@ -6,12 +6,12 @@
 
 
 version: 5.2.5
-binary compiled on Feb 29 2024 at 22:02:57
+binary compiled on Mar  4 2024 at 11:37:30
 
 using control file: "./pest/bm2_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp\benchmarks\kursawe"
 on host: "DUMPLING-FL"
-started at 03/01/24 08:02:39
+started at 03/04/24 14:58:16
 
 on host: "DUMPLING-FL"
 
@@ -420,3 +420,177 @@ initialized archives with 5 nondominated members
 ...pareto dominance sort yielded 1 domination fronts
 5 in the front 1
 ...running population of size  100
+...saved decision variable population of size 100 X 3 to './pest/bm2_gp.dv_pop.csv'
+...saved generation-specific decision variable population of size 100 X 3 to './pest/bm2_gp.1.dv_pop.csv'
+...saved observation population of size 100 X 4 to './pest/bm2_gp.obs_pop.csv'
+...saved generation-specific observation population of size 100 X 4 to './pest/bm2_gp.1.obs_pop.csv'
+...computing the expected hypervolume improvement of members in current population
+...pareto dominance sort yielded 23 domination fronts
+10 in the front 1
+7 in the front 2
+13 in the front 3
+15 in the front 4
+9 in the front 5
+15 in the front 6
+10 in the front 7
+11 in the front 8
+12 in the front 9
+(not reporting remaining front membership)
+...pareto dominance sorting combined parent-child populations of size  200
+...pareto dominance sort yielded 23 domination fronts
+10 in the front 1
+7 in the front 2
+13 in the front 3
+15 in the front 4
+9 in the front 5
+15 in the front 6
+10 in the front 7
+11 in the front 8
+12 in the front 9
+(not reporting remaining front membership)
+...wrote pareto summary to ./pest/bm2_gp.pareto.summary.csv
+updating archive
+adding 5 non-dominated members to archive
+pareto dominance sorting archive of size 10
+...pareto dominance sort yielded 1 domination fronts
+10 in the front 1
+...wrote pareto summary to ./pest/bm2_gp.pareto.archive.summary.csv
+resizing archive from 10 to 10 current non-dominated solutions
+...saved decision variable population of size 10 X 3 to './pest/bm2_gp.archive.dv_pop.csv'
+...saved generation-specific decision variable population of size 10 X 3 to './pest/bm2_gp.1.archive.dv_pop.csv'
+...saved observation population of size 10 X 4 to './pest/bm2_gp.archive.obs_pop.csv'
+...saved generation-specific observation population of size 10 X 4 to './pest/bm2_gp.1.archive.obs_pop.csv'
+...resizing current populations to  100
+
+  ---  generation 1 decision variable summary:  ---  
+decision variable        ubnd      lbnd      mean   standard devation         min         max
+X1                          5        -5 -0.463055              2.9549          -5           5
+X2                          5        -5  0.192564             1.84151    -3.62261           5
+X3                          5        -5  0.106675             2.15581    -4.83651     4.68925
+
+
+  ---  generation 1 decision variable change summary:  ---  
+decision variable  mean change   % change max change   % change min change   % change
+X1                    0.464694    28349.2   -0.00903  -0.180927    0.08194          0
+X2                   -0.192619          0   -0.01692  -0.339549   -1.30298          0
+X3                    -0.10873          0    0.26653    5.37816   -0.15782          0
+
+
+  ---  generation 1 objective function summary:  ---  
+seeking optimal trade-off point for single 'optimal' chance point runs
+using member GEN=0_MEMBER=26 as single, 'optimal' point
+   with distance of 3.98163 from optimal trade - off
+objective function   direction         mean      std dev          min          max         knee
+
+OBJ_1                 minimize    -11.88852     2.416347    -16.48564    -5.375513        -13.3
+OBJ_2                 minimize     3.221807     4.500676     -8.44242     15.89567     -6.05389
+
+
+  ---  generation 1 objective function change summary:  ---  
+objective function   mean change    % change  max change    % change  min change    % change knee change    % change
+OBJ_1                    2.08595           0   -0.449067           0   0.0627376           0           0           0
+OBJ_2                    3.28359     50.4749     3.86673     19.5661           0           0           0           0
+
+...number of feasible solutions at the end of generation 1: 10
+
+  ---  starting generation  2  ---  
+...pareto dominance sort yielded 9 domination fronts
+10 in the front 1
+7 in the front 2
+13 in the front 3
+15 in the front 4
+9 in the front 5
+15 in the front 6
+10 in the front 7
+11 in the front 8
+10 in the front 9
+...generating PSO population of size 100
+...pareto dominance sort yielded 1 domination fronts
+10 in the front 1
+...running population of size  100
+...saved decision variable population of size 100 X 3 to './pest/bm2_gp.dv_pop.csv'
+...saved generation-specific decision variable population of size 100 X 3 to './pest/bm2_gp.2.dv_pop.csv'
+...saved observation population of size 100 X 4 to './pest/bm2_gp.obs_pop.csv'
+...saved generation-specific observation population of size 100 X 4 to './pest/bm2_gp.2.obs_pop.csv'
+...computing the expected hypervolume improvement of members in current population
+...pareto dominance sort yielded 17 domination fronts
+11 in the front 1
+10 in the front 2
+12 in the front 3
+13 in the front 4
+16 in the front 5
+16 in the front 6
+19 in the front 7
+17 in the front 8
+22 in the front 9
+(not reporting remaining front membership)
+...pareto dominance sorting combined parent-child populations of size  200
+...pareto dominance sort yielded 17 domination fronts
+11 in the front 1
+10 in the front 2
+12 in the front 3
+13 in the front 4
+16 in the front 5
+16 in the front 6
+19 in the front 7
+17 in the front 8
+22 in the front 9
+(not reporting remaining front membership)
+...wrote pareto summary to ./pest/bm2_gp.pareto.summary.csv
+updating archive
+adding 1 non-dominated members to archive
+pareto dominance sorting archive of size 11
+...pareto dominance sort yielded 1 domination fronts
+11 in the front 1
+...wrote pareto summary to ./pest/bm2_gp.pareto.archive.summary.csv
+resizing archive from 11 to 11 current non-dominated solutions
+...saved decision variable population of size 11 X 3 to './pest/bm2_gp.archive.dv_pop.csv'
+...saved generation-specific decision variable population of size 11 X 3 to './pest/bm2_gp.2.archive.dv_pop.csv'
+...saved observation population of size 11 X 4 to './pest/bm2_gp.archive.obs_pop.csv'
+...saved generation-specific observation population of size 11 X 4 to './pest/bm2_gp.2.archive.obs_pop.csv'
+...resizing current populations to  100
+
+  ---  generation 2 decision variable summary:  ---  
+decision variable        ubnd      lbnd      mean   standard devation         min         max
+X1                          5        -5 -0.298734             2.61209          -5           5
+X2                          5        -5 0.0653856             1.64967    -3.62261           5
+X3                          5        -5 0.0921132             1.99451          -5     3.99285
+
+
+  ---  generation 2 decision variable change summary:  ---  
+decision variable  mean change   % change max change   % change min change   % change
+X1                    -0.16432          0          0          0          0          0
+X2                    0.127179    66.0448          0          0          0          0
+X3                   0.0145622     13.651   0.696403     14.851    0.16349          0
+
+
+  ---  generation 2 objective function summary:  ---  
+seeking optimal trade-off point for single 'optimal' chance point runs
+using member GEN=0_MEMBER=26 as single, 'optimal' point
+   with distance of 4.15936 from optimal trade - off
+objective function   direction         mean      std dev          min          max         knee
+
+OBJ_1                 minimize    -12.62448     2.311885    -16.70517    -4.619827        -13.3
+OBJ_2                 minimize     2.061962     3.932512     -8.44242     15.89567     -6.05389
+
+
+  ---  generation 2 objective function change summary:  ---  
+objective function   mean change    % change  max change    % change  min change    % change knee change    % change
+OBJ_1                   0.735962           0   -0.755685           0    0.219534           0           0           0
+OBJ_2                    1.15984     35.9998           0           0           0           0           0           0
+
+...number of feasible solutions at the end of generation 2: 11
+
+  ---  starting generation  3  ---  
+...pareto dominance sort yielded 8 domination fronts
+11 in the front 1
+10 in the front 2
+12 in the front 3
+13 in the front 4
+16 in the front 5
+16 in the front 6
+19 in the front 7
+3 in the front 8
+...generating PSO population of size 100
+...pareto dominance sort yielded 1 domination fronts
+11 in the front 1

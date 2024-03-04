@@ -502,6 +502,8 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 	vector<string> nondom_crowd_ordered,dom_crowd_ordered;
 	vector<string> crowd_ordered_front;
 	crowd_map.clear();
+	expected_crowd_map.clear();
+	var_crowd_map.clear();
 	member_front_map.clear();
 	for (auto front : front_map)
 	{	
@@ -594,10 +596,19 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 		{
 			sum << "," << obj_dir_mult_ptr->at(obj) * member_struct[member][obj];
 		}
+		if (prob_pareto)
+		{
+			for (auto objsd : *obs_obj_sd_names_ptr)
+			{
+				sum << "," << member_struct[member][objsd];
+			}
+		}
 		sum << "," << member_front_map[member];
 		sum << "," << crowd_map[member];
 		if (prob_pareto)
 		{
+				sum << "," << expected_crowd_map[member];
+				sum << "," << var_crowd_map[member];
 				sum << "," << ehvi_member_map[member];
 		}
 		sum << "," << spea2_constrained_fitness_map[member];
@@ -627,7 +638,11 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 	for (auto obj : *pi_obj_names_ptr)
 		sum << "," << pest_utils::lower_cp(obj);
 	if (prob_pareto)
-		sum << ",nsga2_front,nsga2_crowding_distance,ehvi,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
+	{
+		for (auto objsd : *obs_obj_sd_names_ptr)
+			sum << "," << pest_utils::lower_cp(objsd);
+		sum << ",nsga2_front,nsga2_crowding_distance,nsga2_exp_distance,nsga2_varp_distance,ehvi,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
+	}
 	else
 		sum << ",nsga2_front,nsga2_crowding_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
 }
@@ -721,49 +736,80 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 	return get_cuboid_crowding_distance(members, member_struct);
 }
 
-map<string, double> ParetoObjectives::get_prob_non_dominance(vector<string>& members)
+map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
-	return get_prob_non_dominance(members, member_struct);
-}
 
-map<string, double> ParetoObjectives::get_prob_non_dominance(vector<string>& members, map<string, map<string, double>>& _member_struct)
-{
-	map<string, double> prob_nondom_map, PD_ij, PD_ji;
-	double PD_i, PD_j, PND; 
+	map<string, map<string, double>> obj_member_map;
+	map<string, double> crowd_distance_map;
+	string m = members[0];
+	vector<string> obj_names;
+	//for (auto obj_map : _member_struct[m])
+	//{
+	//	obj_member_map[obj_map.first] = map<string, double>();
+	//	obj_names.push_back(obj_map.first);
+	//}
 
-	for (auto n : members)
-	{	
-		PND = 1;
-		for (auto m : _member_struct)
-		{
-			if (first_equals_second(_member_struct[n], m.second))
-				continue;
-			else
-			{
-				PD_ij = dominance_probability(_member_struct[n], m.second);
-				PD_ji = dominance_probability(m.second, _member_struct[n]);
-				PD_i = 1;
-				PD_j = 1;
-				for (auto obj_name : *obj_names_ptr)
-				{
-					PD_i *= PD_ij[obj_name];
-					PD_j *= PD_ji[obj_name];
-				}
-					
-				PND = PND * (1 - PD_i - PD_j);
-			}
-			
-		}
-		prob_nondom_map[n] = PND;
+
+
+	for (auto member : members)
+	{
+		crowd_distance_map[member] = 0.0;
+		/*for (auto obj_map : _member_struct[member])
+			obj_member_map[obj_map.first][member] = obj_map.second;*/
+
+		for (auto obj_map : *obs_obj_names_ptr) //need to make sure the SDs are not included
+			obj_member_map[obj_map][member] = _member_struct[member][obj_map];
 	}
-	
-	return prob_nondom_map;
+
+	//map<double,string>::iterator start, end;
+	map<string, double> omap;
+	double obj_range;
+
+	for (auto obj_map : obj_member_map)
+	{
+		omap = obj_map.second;
+		//note: for members with identical distances, only the first one gets into the 
+		//sorted set but this is ok since we initialized the distance map with zeros
+		//for all members, so it works out...
+		sortedset crowd_sorted(omap.begin(), omap.end(), compFunctor);
+
+		sortedset::iterator start = crowd_sorted.begin(), last = prev(crowd_sorted.end(), 1);
+
+		obj_range = last->second - start->second;
+
+		//the obj extrema - makes sure they are retained 
+		crowd_distance_map[start->first] = CROWDING_EXTREME;
+		crowd_distance_map[last->first] = CROWDING_EXTREME;
+		if (crowd_sorted.size() == 3)
+		{
+			sortedset::iterator it = next(start, 1);
+			crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((last->second - start->second) / obj_range);
+
+		}
+		else if (crowd_sorted.size() > 3)
+		{
+			//need iterators to start and stop one off from the edges
+			start = next(crowd_sorted.begin(), 1);
+			last = prev(crowd_sorted.end(), 1);
+
+			sortedset::iterator it = start;
+
+			sortedset::iterator inext, iprev;
+			for (; it != last; ++it)
+			{
+				iprev = prev(it, 1);
+				inext = next(it, 1);
+				crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((inext->second - iprev->second) / obj_range);
+			}
+		}
+	}
+	return crowd_distance_map;
 }
 
 vector<double> ParetoObjectives::get_euclidean_distance(map<string, double> first, map<string, double> second)
 {
-	vector<double> euclidean_dist{0, 0};
-	
+	vector<double> euclidean_dist{ 0, 0 };
+
 	for (auto obj : *obs_obj_names_ptr)
 		euclidean_dist.at(0) += pow(first[obj] - second[obj], 2);
 
@@ -776,17 +822,22 @@ vector<double> ParetoObjectives::get_euclidean_distance(map<string, double> firs
 			euclidean_dist.at(0) += pow(first[objsd], 2) + pow(second[objsd], 2);
 			euclidean_dist.at(1) += 2 * pow(pow(first[objsd], 2) + pow(second[objsd], 2), 2);
 		}
-			
+
 	}
 
 	return euclidean_dist;
 }
 
-map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
+pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_crowding_distance(vector<string>& members)
+{
+	return get_euclidean_crowding_distance(members, member_struct);
+}
+
+pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
 
 	map<string, map<string, double>> obj_member_map, objsd_member_map;
-	map<string, double> crowd_distance_map;
+	map<string, double> crowd_distance_map, var_distance_map;
 	string m = members[0];
 	vector<string> obj_names;
 	//for (auto obj_map : _member_struct[m])
@@ -798,6 +849,7 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 	for (auto member : members)
 	{
 		crowd_distance_map[member] = 0.0;
+		var_distance_map[member] = 1.0e-10;
 		/*for (auto obj_map : _member_struct[member])
 			obj_member_map[obj_map.first][member] = obj_map.second;*/
 
@@ -831,129 +883,76 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 		crowd_distance_map[start->first] = CROWDING_EXTREME;
 		crowd_distance_map[last->first] = CROWDING_EXTREME;
 
-		if (prob_pareto) //cluster-based crowding distance calc needed for Pareto cloud
-		{
-			vector<double> eucd_prev_it, eucd_it_next;
-			double edmx;
+		vector<double> eucd_prev_it, eucd_it_next;
 
-			//sdmap = objsd_member_map;
-			edmx = -1e-30;
-			
-			if (crowd_sorted.size() == 3)
+		//sdmap = objsd_member_map;
+		if (crowd_sorted.size() == 3)
+		{
+			sortedset::iterator it = next(start, 1);
+			eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[start->first]);
+			if (eucd_prev_it.at(0) > crowd_distance_map[it->first])
+				crowd_distance_map[it->first] = eucd_prev_it.at(0);
+				var_distance_map[it->first] = eucd_prev_it.at(1);
+
+			eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[last->first]);
+			if (eucd_it_next.at(0) > crowd_distance_map[it->first])
+				crowd_distance_map[it->first] = eucd_it_next.at(0);
+				var_distance_map[it->first] = eucd_it_next.at(1);
+		}
+		else if (crowd_sorted.size() > 3)
+		{
+			//need iterators to start and stop one off from the edges
+			start = next(crowd_sorted.begin(), 1);
+			last = prev(crowd_sorted.end(), 1);
+
+			sortedset::iterator it = start;
+			sortedset::iterator inext, iprev;
+
+			for (; it != last; ++it)
 			{
-				sortedset::iterator it = next(start, 1);
-				eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[start->first]);
+				iprev = prev(it, 1);
+				inext = next(it, 1);
+
+				eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[iprev->first]);
 				if (eucd_prev_it.at(0) > crowd_distance_map[it->first])
 					crowd_distance_map[it->first] = eucd_prev_it.at(0);
+					var_distance_map[it->first] = eucd_prev_it.at(1);
 
-				eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[last->first]);
+				eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[inext->first]);
 				if (eucd_it_next.at(0) > crowd_distance_map[it->first])
-					crowd_distance_map[it->first] = eucd_prev_it.at(0);
-			}
-			else if (crowd_sorted.size() > 3)
-			{
-				//need iterators to start and stop one off from the edges
-				start = next(crowd_sorted.begin(), 1);
-				last = prev(crowd_sorted.end(), 1);
-
-				sortedset::iterator it = start;
-				sortedset::iterator inext, iprev;
-
-				for (; it != last; ++it)
-				{
-					iprev = prev(it, 1);
-					inext = next(it, 1);
-
-					eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[iprev->first]);
-					if (eucd_prev_it.at(0) > crowd_distance_map[it->first])
-						crowd_distance_map[it->first] = eucd_prev_it.at(0);
-
-					eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[inext->first]);
-					if (eucd_it_next.at(0) > crowd_distance_map[it->first])
-						crowd_distance_map[it->first] = eucd_prev_it.at(0);
-				}
-
+					crowd_distance_map[it->first] = eucd_it_next.at(0);
+					var_distance_map[it->first] = eucd_it_next.at(1);
 			}
 
 		}
-		
-		else //deterministic crowding distance
-		{
-			if (crowd_sorted.size() == 3)
-			{
-				sortedset::iterator it = next(start, 1);
-				crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((last->second - start->second) / obj_range);
 
-			}
-			else if (crowd_sorted.size() > 3)
-			{
-				//need iterators to start and stop one off from the edges
-				start = next(crowd_sorted.begin(), 1);
-				last = prev(crowd_sorted.end(), 1);
 
-				sortedset::iterator it = start;
-
-				sortedset::iterator inext, iprev;
-				for (; it != last; ++it)
-				{
-					iprev = prev(it, 1);
-					inext = next(it, 1);
-					crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((inext->second - iprev->second) / obj_range);
-				}
-			}
-		}
-
-		//if (crowd_sorted.size() == 3)
-		//{
-		//	sortedset::iterator it = next(start, 1);
-		//	crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((last->second - start->second) / obj_range);
-
-		//}
-		//else if (crowd_sorted.size() > 3)
-		//{
-		//	//need iterators to start and stop one off from the edges
-		//	start = next(crowd_sorted.begin(), 1);
-		//	last = prev(crowd_sorted.end(), 2);
-
-		//	sortedset::iterator it = start;
-
-		//	sortedset::iterator inext, iprev;
-		//	for (; it != last; ++it)
-		//	{
-		//		iprev = prev(it, 1);
-		//		inext = next(it, 1);
-		//		crowd_distance_map[it->first] = crowd_distance_map[it->first] + ((inext->second - iprev->second) / obj_range);
-		//	}
-		//}
 	}
-	return crowd_distance_map;
+	return pair<map<string, double>, map<string, double>>(crowd_distance_map, var_distance_map);
 }
-
 
 vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members, map<string,double>& crowd_map, 
 	map<string, map<string, double>>& _member_struct)
 {
 
 	map<string, double> crowd_distance_map = get_cuboid_crowding_distance(members, _member_struct);
-	
+	pair<map<string, double>, map<string, double>> euclidean_maps = get_euclidean_crowding_distance(members, _member_struct);
+	map<string, double> expected_dist_map = euclidean_maps.first;
+	map<string, double> var_dist_map = euclidean_maps.second;
 
 	vector <pair<string, double>> cs_vec;
 	for (auto cd : crowd_distance_map)
 	{
 		cs_vec.push_back(cd);
 		crowd_map[cd.first] = cd.second;
+		expected_crowd_map[cd.first] = expected_dist_map[cd.first];
+		var_crowd_map[cd.first] = var_dist_map[cd.first];
 	}
 
 	std::sort(cs_vec.begin(), cs_vec.end(),
 		compFunctor);
 
 	reverse(cs_vec.begin(), cs_vec.end());
-
-	if (prob_pareto)
-	{
-
-	}
-
 
 	vector<string> crowd_ordered;
 	for (auto cs : cs_vec)
@@ -965,6 +964,44 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string
 	return crowd_ordered;
 }
 
+map<string, double> ParetoObjectives::get_prob_non_dominance(vector<string>& members)
+{
+	return get_prob_non_dominance(members, member_struct);
+}
+
+map<string, double> ParetoObjectives::get_prob_non_dominance(vector<string>& members, map<string, map<string, double>>& _member_struct)
+{
+	map<string, double> prob_nondom_map, PD_ij, PD_ji;
+	double PD_i, PD_j, PND;
+
+	for (auto n : members)
+	{
+		PND = 1;
+		for (auto m : _member_struct)
+		{
+			if (first_equals_second(_member_struct[n], m.second))
+				continue;
+			else
+			{
+				PD_ij = dominance_probability(_member_struct[n], m.second);
+				PD_ji = dominance_probability(m.second, _member_struct[n]);
+				PD_i = 1;
+				PD_j = 1;
+				for (auto obj_name : *obj_names_ptr)
+				{
+					PD_i *= PD_ij[obj_name];
+					PD_j *= PD_ji[obj_name];
+				}
+
+				PND = PND * (1 - PD_i - PD_j);
+			}
+
+		}
+		prob_nondom_map[n] = PND;
+	}
+
+	return prob_nondom_map;
+}
 
 pair<map<string, double>, map<string, double>> ParetoObjectives::get_spea2_fitness(map<string, map<string, double>>& _member_struct)
 {
@@ -4092,17 +4129,39 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
  //      }
 	//}
 
-	map<string, double> crowd_dist = objectives.get_cuboid_crowding_distance(nondom_solutions);
+
+	pair<map<string, double>, map<string, double>> euclidean_crowd_dist = objectives.get_euclidean_crowding_distance(nondom_solutions);
+	map<string, double> crowd_dist = euclidean_crowd_dist.first;
+	map<string, double> var_dist = euclidean_crowd_dist.second;
 	sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
+	
+	double min = 1.0e+30;
+	for (auto& cd : var_dist)
+	{
+		if ((cd.second < min))
+			min = cd.second;
+	}
+
+	if (min == 0)
+		min = 1e-10;
+
+	for (auto& cd : crowd_dist)
+	{
+		if (cd.second != CROWDING_EXTREME)
+			cd.second = cd.second / pow(var_dist[cd.first] / min, 0.5);
+	}
+		
 	//normalize cd
 	double mx = -1.0e+30;
 	for (auto& cd : crowd_dist)
+	{
 		if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
 			mx = cd.second;
 		else if (nondom_solutions.size() == 2)
 			mx = cd.second;
 		else if (crowd_sorted.size() == 1)
 			mx = cd.second;
+	}
 	if ((mx < 0.0) && (iter > 0))
         throw_moea_error("pso max crowding distance is negative");
 
@@ -4133,21 +4192,21 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
         }
     }
 
-	if (prob_pareto)
-	{
-		map<string, double> ehvi_nondom = objectives.get_ehvi(nondom_solutions);
-		double mean_ei = 0;
-		for (auto& ei : ehvi_nondom)
-			mean_ei += ei.second / nondom_solutions.size();
+	//if (prob_pareto)
+	//{
+	//	map<string, double> ehvi_nondom = objectives.get_ehvi(nondom_solutions);
+	//	double mean_ei = 0;
+	//	for (auto& ei : ehvi_nondom)
+	//		mean_ei += ei.second / nondom_solutions.size();
 
-		for (auto& ei : ehvi_nondom)
-			ei.second = 1 - (abs(ei.second - mean_ei) / mean_ei);
+	//	for (auto& ei : ehvi_nondom)
+	//		ei.second = 1 - (abs(ei.second - mean_ei) / mean_ei);
 
-		for (auto& cd : crowd_dist) {
-			if (ehvi_nondom[cd.first] < -1) //penalty for overpromising points
-				cd.second = 0;
-		}
-	}
+	//	for (auto& cd : crowd_dist) {
+	//		if (ehvi_nondom[cd.first] < -1) //penalty for overpromising points
+	//			cd.second = 0;
+	//	}
+	//}
 
 	map<string, double> fitness = crowd_dist;
 	//for (auto f : crowd_dist)
