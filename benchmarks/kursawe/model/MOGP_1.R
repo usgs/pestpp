@@ -17,7 +17,9 @@ Xref_obj <- matrix(unlist(dv),nrow=1)
 OBJ1.alc <- laGP(Xref_obj, 10, 60, X, Y1, d=NULL, method = "alc")
 OBJ2.alc <- laGP(Xref_obj, 10, 60, X, Y2, d=NULL, method = "alc")
 
+Pf_obj_2 <- 1-pnorm(-20-OBJ2.alc$mean/sqrt(OBJ2.alc$s2))
+
 #save results to pass to MOU
-objective <- c(OBJ1.alc$mean, OBJ2.alc$mean, sqrt(OBJ1.alc$s2), sqrt(OBJ2.alc$s2))
+objective <- c(OBJ1.alc$mean, OBJ2.alc$mean, sqrt(OBJ1.alc$s2), sqrt(OBJ2.alc$s2), Pf_obj_2)
 
 write.csv(objective, "./model/output/gp_output.dat", quote = F, row.names = F)

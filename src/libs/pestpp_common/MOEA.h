@@ -76,6 +76,7 @@ public:
 	pair<map<string, double>, map<string, double>> get_euclidean_crowding_distance(vector<string>& members);
 	map<string, double> get_ehvi(vector<string>& members);
 	map<string, double> get_prob_non_dominance(vector<string>& members);
+	map<string, double> get_mopso_fitness(vector<string> members, ObservationEnsemble& op, ParameterEnsemble& dp);
 
 	set<string> get_duplicates() { return duplicates;  }
 
@@ -96,7 +97,7 @@ private:
 
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& _member_struct);
 	map<int, vector<string>> sort_members_by_dominance_into_prob_fronts(map<int, vector<string>>& front_map, map<string, map<string, double>>& _member_struct);
-	map<string, double> get_mopso_fitness(vector<string> members);
+	map<string, double> get_mopso_fitness(vector<string> members, map<string, map<string, double>>& _member_struct);
 	pair<map<string, double>, map<string, double>> get_spea2_fitness(map<string, map<string, double>>& _member_struct);
 
 	void fill_domination_containers(map<string, map<string, double>>& _member_struct, map<string,

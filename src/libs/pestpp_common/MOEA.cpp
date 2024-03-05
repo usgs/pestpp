@@ -244,7 +244,13 @@ void ParetoObjectives::drop_duplicates(map<string, map<string, double>>& _member
 	}
 }
 
-map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members)
+map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, ObservationEnsemble& op, ParameterEnsemble& dp)
+{
+	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
+	return get_mopso_fitness(members, _member_struct);
+}
+
+map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, map<string, map<string, double>>& _member_struct)
 {
 	pair<map<string, double>, map<string, double>> euclidean_crowd_dist = get_euclidean_crowding_distance(members);
 	map<string, double> crowd_dist = euclidean_crowd_dist.first;
@@ -252,15 +258,6 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members)
 	sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
 	double alpha = pest_scenario.get_pestpp_options().get_mou_pso_alpha();
 
-	double min = 1.0e+30;
-	for (auto& cd : var_dist)
-	{
-		if ((cd.second < min))
-			min = cd.second;
-	}
-
-	if (min == 0)
-		min = 1e-10;
 
 	for (auto& cd : crowd_dist)
 	{
@@ -300,8 +297,19 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members)
 	}
 
 	for (auto& cd : crowd_dist) {
-		if (cd.second == CROWDING_EXTREME) {
-			cd.second = 1.0;
+		if (cd.second == CROWDING_EXTREME) 
+		{
+			map<string, double> mem = _member_struct[cd.first];
+			for (auto obj_sd_name : *obs_obj_sd_names_ptr)
+			{
+				if (mem[obj_sd_name] > 1E-5)
+				{
+					cd.second = 0;
+					break;
+				}
+				else
+					cd.second = 1.0;
+			}
 		}
 		else if (mx != 0.0) {
 			cd.second = pow(cd.second / mx, alpha);
@@ -956,7 +964,6 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 		vector<double> eucd_prev_it, eucd_it_next;
 
-		//sdmap = objsd_member_map;
 		if (crowd_sorted.size() == 3)
 		{
 			sortedset::iterator it = next(start, 1);
@@ -1021,7 +1028,7 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 	map<string, double> fit_map;
 	if (front==1)
 	{
-		fit_map = get_mopso_fitness(members);
+		fit_map = get_mopso_fitness(members, _member_struct);
 		euclidean_maps = get_euclidean_crowding_distance(members, _member_struct);
 		expected_dist_map = euclidean_maps.first;
 		var_dist_map = euclidean_maps.second;
@@ -4229,67 +4236,67 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	//}
 
 
-	pair<map<string, double>, map<string, double>> euclidean_crowd_dist = objectives.get_euclidean_crowding_distance(nondom_solutions);
-	map<string, double> crowd_dist = euclidean_crowd_dist.first;
-	map<string, double> var_dist = euclidean_crowd_dist.second;
-	sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
-	
-	double min = 1.0e+30;
-	for (auto& cd : var_dist)
-	{
-		if ((cd.second < min))
-			min = cd.second;
-	}
+	//pair<map<string, double>, map<string, double>> euclidean_crowd_dist = objectives.get_euclidean_crowding_distance(nondom_solutions);
+	//map<string, double> crowd_dist = euclidean_crowd_dist.first;
+	//map<string, double> var_dist = euclidean_crowd_dist.second;
+	//sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
+	//
+	//double min = 1.0e+30;
+	//for (auto& cd : var_dist)
+	//{
+	//	if ((cd.second < min))
+	//		min = cd.second;
+	//}
 
-	if (min == 0)
-		min = 1e-10;
+	//if (min == 0)
+	//	min = 1e-10;
 
-	for (auto& cd : crowd_dist)
-	{
-		if (cd.second != CROWDING_EXTREME)
-			cd.second = pow(cd.second / pow(var_dist[cd.first], 0.5), 0.5);
-	}
-		
-	//normalize cd
-	double mx = -1.0e+30;
-	for (auto& cd : crowd_dist)
-	{
-		if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
-			mx = cd.second;
-		else if (nondom_solutions.size() == 2)
-			mx = cd.second;
-		else if (crowd_sorted.size() == 1)
-			mx = cd.second;
-	}
-	if ((mx < 0.0) && (iter > 0))
-        throw_moea_error("pso max crowding distance is negative");
+	//for (auto& cd : crowd_dist)
+	//{
+	//	if (cd.second != CROWDING_EXTREME)
+	//		cd.second = pow(cd.second / pow(var_dist[cd.first], 0.5), 0.5);
+	//}
+	//	
+	////normalize cd
+	//double mx = -1.0e+30;
+	//for (auto& cd : crowd_dist)
+	//{
+	//	if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
+	//		mx = cd.second;
+	//	else if (nondom_solutions.size() == 2)
+	//		mx = cd.second;
+	//	else if (crowd_sorted.size() == 1)
+	//		mx = cd.second;
+	//}
+	//if ((mx < 0.0) && (iter > 0))
+ //       throw_moea_error("pso max crowding distance is negative");
 
-	//variable alpha
-	if (alpha == 0)
-	{
-		double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
-		double pfull = nondom_solutions.size() / maxarchivesize;
-		double rramp = pest_scenario.get_pestpp_options().get_mou_pso_rramp();
-		double rfit = pest_scenario.get_pestpp_options().get_mou_pso_rfit();
+	////variable alpha
+	//if (alpha == 0)
+	//{
+	//	double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
+	//	double pfull = nondom_solutions.size() / maxarchivesize;
+	//	double rramp = pest_scenario.get_pestpp_options().get_mou_pso_rramp();
+	//	double rfit = pest_scenario.get_pestpp_options().get_mou_pso_rfit();
 
-		if (rramp == -5e+02)
-			throw_moea_error("PSO alpha is zero");
-		if (rramp == 0.0)
-			throw_moea_error("PSO RRAMP is zero");
+	//	if (rramp == -5e+02)
+	//		throw_moea_error("PSO alpha is zero");
+	//	if (rramp == 0.0)
+	//		throw_moea_error("PSO RRAMP is zero");
 
-		alpha = 1 + (exp(rramp * pfull) - 1.0) / (exp(rramp) - 1) * (rfit - 1.0);
+	//	alpha = 1 + (exp(rramp * pfull) - 1.0) / (exp(rramp) - 1) * (rfit - 1.0);
 
-	}
-	
-	for (auto& cd : crowd_dist) {
-        if (cd.second == CROWDING_EXTREME) {
-            cd.second = 1.0;
-        } else if (mx != 0.0) {
-            cd.second = pow(cd.second / mx, alpha);
-        } else {
-            cd.second = pow(0.5, alpha);
-        }
-    }
+	//}
+	//
+	//for (auto& cd : crowd_dist) {
+ //       if (cd.second == CROWDING_EXTREME) {
+ //           cd.second = 1.0;
+ //       } else if (mx != 0.0) {
+ //           cd.second = pow(cd.second / mx, alpha);
+ //       } else {
+ //           cd.second = pow(0.5, alpha);
+ //       }
+ //   }
 
 	//if (prob_pareto)
 	//{
@@ -4307,12 +4314,7 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	//	}
 	//}
 
-	map<string, double> fitness = crowd_dist;
-	//for (auto f : crowd_dist)
-	//{
-	//	fitness[f.first] = fitness_const[0] * f.second + fitness_const[1] * ehvi_nondom[f.first];
-	//}
-
+	map<string, double> fitness = objectives.get_mopso_fitness(nondom_solutions, _op, _dp);
 	vector<string> working;
 	string candidate;
 	int count = 0;
