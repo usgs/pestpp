@@ -6,12 +6,12 @@
 
 
 version: 5.2.5
-binary compiled on Mar  4 2024 at 18:21:23
+binary compiled on Mar  5 2024 at 11:31:42
 
 using control file: "./pest/bm2_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp\benchmarks\kursawe"
 on host: "DUMPLING-FL"
-started at 03/04/24 21:47:39
+started at 03/05/24 11:52:41
 
 on host: "DUMPLING-FL"
 
@@ -182,8 +182,8 @@ mou_save_population_every: 1
 mou_pso_omega: 0.7
 mou_pso_social_const: 2
 mou_pso_cognitive: 2
-mou_pso_alpha: 0
-mou_pso_rramp: -1
+mou_pso_alpha: 1
+mou_pso_rramp: -500
 mou_pso_rfit: 2
 mou_outer_repo_obs_file: ./model/input/outer.0.archive.obs_pop.csv
 mou_hypervolume_extreme: 50
@@ -673,6 +673,6 @@ OBJ_2                   0.607789     33.0073      1.6438     17.0702           0
 
 
 pestpp-mou analysis complete...
-started at 03/04/24 21:47:39
-finished at 03/04/24 21:58:15
-took 10.6 minutes
+started at 03/05/24 11:52:41
+finished at 03/05/24 11:55:55
+took 3.21667 minutes

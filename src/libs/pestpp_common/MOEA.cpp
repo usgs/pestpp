@@ -244,6 +244,76 @@ void ParetoObjectives::drop_duplicates(map<string, map<string, double>>& _member
 	}
 }
 
+map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members)
+{
+	pair<map<string, double>, map<string, double>> euclidean_crowd_dist = get_euclidean_crowding_distance(members);
+	map<string, double> crowd_dist = euclidean_crowd_dist.first;
+	map<string, double> var_dist = euclidean_crowd_dist.second;
+	sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
+	double alpha = pest_scenario.get_pestpp_options().get_mou_pso_alpha();
+
+	double min = 1.0e+30;
+	for (auto& cd : var_dist)
+	{
+		if ((cd.second < min))
+			min = cd.second;
+	}
+
+	if (min == 0)
+		min = 1e-10;
+
+	for (auto& cd : crowd_dist)
+	{
+		if (cd.second != CROWDING_EXTREME)
+			cd.second = pow(cd.second / pow(var_dist[cd.first], 0.5), 0.5);
+	}
+
+	//normalize cd
+	double mx = -1.0e+30;
+	for (auto& cd : crowd_dist)
+	{
+		if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
+			mx = cd.second;
+		else if (members.size() == 2)
+			mx = cd.second;
+		else if (crowd_sorted.size() == 1)
+			mx = cd.second;
+	}
+	if (mx < 0.0)
+		throw runtime_error("pso max crowding distance is negative");
+
+	//variable alpha
+	if (alpha == 0)
+	{
+		double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
+		double pfull = members.size() / maxarchivesize;
+		double rramp = pest_scenario.get_pestpp_options().get_mou_pso_rramp();
+		double rfit = pest_scenario.get_pestpp_options().get_mou_pso_rfit();
+
+		if (rramp == -5e+02)
+			throw runtime_error("PSO alpha is zero");
+		if (rramp == 0.0)
+			throw runtime_error("PSO RRAMP is zero");
+
+		alpha = 1 + (exp(rramp * pfull) - 1.0) / (exp(rramp) - 1) * (rfit - 1.0);
+
+	}
+
+	for (auto& cd : crowd_dist) {
+		if (cd.second == CROWDING_EXTREME) {
+			cd.second = 1.0;
+		}
+		else if (mx != 0.0) {
+			cd.second = pow(cd.second / mx, alpha);
+		}
+		else {
+			cd.second = pow(0.5, alpha);
+		}
+	}
+
+	return crowd_dist;	
+}
+
 void ParetoObjectives::get_spea2_archive_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp)
 {
 	ParameterEnsemble temp_dp = dp;
@@ -519,7 +589,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 
 		else
 		{
-			crowd_ordered_front = sort_members_by_crowding_distance(front.second, crowd_map, member_struct);
+			crowd_ordered_front = sort_members_by_crowding_distance(front.first, front.second, crowd_map, member_struct);
 		}
 
 		if (front.first == 1)
@@ -610,6 +680,7 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 				sum << "," << expected_crowd_map[member];
 				sum << "," << var_crowd_map[member];
 				sum << "," << ehvi_member_map[member];
+				sum << "," << fitness_map[member];
 		}
 		sum << "," << spea2_constrained_fitness_map[member];
 		sum << "," << spea2_unconstrained_fitness_map[member];
@@ -641,7 +712,7 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 	{
 		for (auto objsd : *obs_obj_sd_names_ptr)
 			sum << "," << pest_utils::lower_cp(objsd);
-		sum << ",nsga2_front,nsga2_crowding_distance,nsga2_exp_distance,nsga2_varp_distance,ehvi,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
+		sum << ",nsga2_front,nsga2_crowding_distance,exp_distance,var_distance,ehvi,pso_fitness,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
 	}
 	else
 		sum << ",nsga2_front,nsga2_crowding_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
@@ -939,22 +1010,40 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 	return pair<map<string, double>, map<string, double>>(crowd_distance_map, var_distance_map);
 }
 
-vector<string> ParetoObjectives::sort_members_by_crowding_distance(vector<string>& members, map<string,double>& crowd_map, 
+vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, vector<string>& members, map<string,double>& crowd_map, 
 	map<string, map<string, double>>& _member_struct)
 {
 
 	map<string, double> crowd_distance_map = get_cuboid_crowding_distance(members, _member_struct);
-	pair<map<string, double>, map<string, double>> euclidean_maps = get_euclidean_crowding_distance(members, _member_struct);
-	map<string, double> expected_dist_map = euclidean_maps.first;
-	map<string, double> var_dist_map = euclidean_maps.second;
+	pair<map<string, double>, map<string, double>> euclidean_maps;
+	map<string, double> expected_dist_map;
+	map<string, double> var_dist_map;
+	map<string, double> fit_map;
+	if (front==1)
+	{
+		fit_map = get_mopso_fitness(members);
+		euclidean_maps = get_euclidean_crowding_distance(members, _member_struct);
+		expected_dist_map = euclidean_maps.first;
+		var_dist_map = euclidean_maps.second;
+	}
 
 	vector <pair<string, double>> cs_vec;
 	for (auto cd : crowd_distance_map)
 	{
 		cs_vec.push_back(cd);
 		crowd_map[cd.first] = cd.second;
-		expected_crowd_map[cd.first] = expected_dist_map[cd.first];
-		var_crowd_map[cd.first] = var_dist_map[cd.first];
+		if (front == 1)
+		{
+			expected_crowd_map[cd.first] = expected_dist_map[cd.first];
+			var_crowd_map[cd.first] = var_dist_map[cd.first];
+			fitness_map[cd.first] = fit_map[cd.first];
+		}
+		else
+		{
+			expected_crowd_map[cd.first] = -999;
+			var_crowd_map[cd.first] = -999;
+			fitness_map[cd.first] = -999;
+		}
 	}
 
 	std::sort(cs_vec.begin(), cs_vec.end(),
@@ -4080,6 +4169,8 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 	}
 	return ParameterEnsemble(&pest_scenario, &rand_gen, new_vel, _dp.get_real_names(), _dp.get_var_names());
 }
+
+
 
 vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
