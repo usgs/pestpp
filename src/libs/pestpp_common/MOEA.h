@@ -132,7 +132,7 @@ private:
 	map<string, map<string, double>> feas_member_struct;
 	map<int, vector<string>> front_map;
 	map<int, vector<string>> prob_front_map;
-	map<string, double> crowd_map, expected_crowd_map, var_crowd_map, fitness_map;
+	map<string, double> crowd_map, expected_crowd_map, var_crowd_map, fitness_map, probnotdom_map;
 	map<string, int> member_front_map;
 	map<string, double> member_cvar;
 	map<string, double> infeas;
