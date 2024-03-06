@@ -307,7 +307,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 				{
 					if (mem[obj_sd_name] > 1E-5)
 					{
-						cd.second = 0.5;
+						cd.second = pow(0.5, alpha);
 						break;
 					}
 					else
@@ -1042,14 +1042,14 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 		{
 			sortedset::iterator it = next(start, 1);
 			eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[start->first]);
-			if (eucd_prev_it.at(0) > crowd_distance_map[it->first])
+			if (eucd_prev_it.at(0) > (crowd_distance_map[it->first] / pow(var_distance_map[it->first], 0.5)))
 			{
 				crowd_distance_map[it->first] = eucd_prev_it.at(0);
 				var_distance_map[it->first] = eucd_prev_it.at(1);
 			}
 
 			eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[last->first]);
-			if (eucd_it_next.at(0) > crowd_distance_map[it->first])
+			if (eucd_it_next.at(0) > (crowd_distance_map[it->first] / pow(var_distance_map[it->first], 0.5)))
 			{
 				crowd_distance_map[it->first] = eucd_it_next.at(0);
 				var_distance_map[it->first] = eucd_it_next.at(1);
@@ -1100,7 +1100,7 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 	map<string, double> expected_dist_map, prob_not_dom;
 	map<string, double> var_dist_map;
 	map<string, double> fit_map;
-	if (front==1)
+	if (front==1 && prob_pareto)
 	{
 		fit_map = get_mopso_fitness(members, _member_struct);
 		euclidean_maps = get_euclidean_crowding_distance(members, _member_struct);
