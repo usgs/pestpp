@@ -252,33 +252,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 
 map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, map<string, map<string, double>>& _member_struct)
 {
-	pair<map<string, double>, map<string, double>> euclidean_crowd_dist = get_euclidean_crowding_distance(members);
-	map<string, double> crowd_dist = euclidean_crowd_dist.first;
-	map<string, double> var_dist = euclidean_crowd_dist.second;
-	sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
 	double alpha = pest_scenario.get_pestpp_options().get_mou_pso_alpha();
-
-	for (auto& cd : crowd_dist)
-	{
-		if (cd.second != CROWDING_EXTREME)
-			cd.second = pow(cd.second / pow(var_dist[cd.first], 0.5), 0.5);
-	}
-
-	//normalize cd
-	double mx = -1.0e+30;
-	for (auto& cd : crowd_dist)
-	{
-		if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
-			mx = cd.second;
-		else if (members.size() == 2)
-			mx = cd.second;
-		else if (crowd_sorted.size() == 1)
-			mx = cd.second;
-	}
-	if (mx < 0.0)
-		throw runtime_error("pso max crowding distance is negative");
-
-	//variable alpha
 	if (alpha == 0)
 	{
 		double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
@@ -295,27 +269,91 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 
 	}
 
-	for (auto& cd : crowd_dist) {
-		if (cd.second == CROWDING_EXTREME) 
+	map<string, double> fitness;
+
+	if (prob_pareto)
+	{
+		pair<map<string, double>, map<string, double>> euclidean_crowd_dist = get_euclidean_crowding_distance(members);
+		map<string, double> crowd_dist = euclidean_crowd_dist.first;
+		map<string, double> var_dist = euclidean_crowd_dist.second;
+
+		sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
+		
+		for (auto& cd : crowd_dist)
 		{
-			map<string, double> mem = _member_struct[cd.first];
-			for (auto obj_sd_name : *obs_obj_sd_names_ptr)
+			if (cd.second != CROWDING_EXTREME)
+				cd.second = pow(cd.second / pow(var_dist[cd.first], 0.5), 0.5);
+		}
+
+		//normalize cd
+		double mx = -1.0e+30;
+		for (auto& cd : crowd_dist)
+		{
+			if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
+				mx = cd.second;
+			else if (members.size() == 2)
+				mx = cd.second;
+			else if (crowd_sorted.size() == 1)
+				mx = cd.second;
+		}
+		if (mx < 0.0)
+			throw runtime_error("pso max crowding distance is negative");
+
+		for (auto& cd : crowd_dist) {
+			if (cd.second == CROWDING_EXTREME)
 			{
-				if (mem[obj_sd_name] > 1E-5)
+				map<string, double> mem = _member_struct[cd.first];
+				for (auto obj_sd_name : *obs_obj_sd_names_ptr)
 				{
-					cd.second = 0;
-					break;
+					if (mem[obj_sd_name] > 1E-5)
+					{
+						cd.second = 0.5;
+						break;
+					}
+					else
+						cd.second = 1.0;
 				}
-				else
-					cd.second = 1.0;
+			}
+			else if (mx != 0.0) {
+				cd.second = pow(cd.second / mx, alpha);
+			}
+			else {
+				cd.second = pow(0.5, alpha);
 			}
 		}
-		else if (mx != 0.0) {
-			cd.second = pow(cd.second / mx, alpha);
+
+		fitness = crowd_dist;
+	}
+	else
+	{
+		map<string, double> crowd_dist = get_cuboid_crowding_distance(members);
+		sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
+		//normalize cd
+		double mx = -1.0e+30;
+		for (auto& cd : crowd_dist)
+			if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
+				mx = cd.second;
+			else if (members.size() == 2)
+				mx = cd.second;
+			else if (crowd_sorted.size() == 1)
+				mx = cd.second;
+		if ((mx < 0.0))
+			runtime_error("pso max crowding distance is negative");
+
+		for (auto& cd : crowd_dist) {
+			if (cd.second == CROWDING_EXTREME) {
+				cd.second = 1.0;
+			}
+			else if (mx != 0.0) {
+				cd.second = pow(cd.second / mx, alpha);
+			}
+			else {
+				cd.second = pow(0.5, alpha);
+			}
 		}
-		else {
-			cd.second = pow(0.5, alpha);
-		}
+
+		fitness = crowd_dist;
+
 	}
 
 	//map<string, double> fitness = get_prob_non_dominance(members, _member_struct);
@@ -349,7 +387,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 	//else
 	//	return fitness;	
 
-	return crowd_dist;
+	return fitness;
 }
 
 void ParetoObjectives::get_spea2_archive_names_to_keep(int num_members, vector<string>& keep, const ObservationEnsemble& op, const ParameterEnsemble& dp)
