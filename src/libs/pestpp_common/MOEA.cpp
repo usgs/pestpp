@@ -304,15 +304,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 			{
 				map<string, double> mem = _member_struct[cd.first];
 				for (auto obj_sd_name : *obs_obj_sd_names_ptr)
-				{
-					if (mem[obj_sd_name] > 1E-5)
-					{
-						cd.second = pow(0.5, alpha);
-						break;
-					}
-					else
-						cd.second = 1.0;
-				}
+					cd.second *= pow(exp(mem[obj_sd_name]), -alpha);
 			}
 			else if (mx != 0.0) {
 				cd.second = pow(cd.second / mx, alpha);
@@ -760,9 +752,7 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 		{
 				sum << "," << expected_crowd_map[member];
 				sum << "," << var_crowd_map[member];
-				sum << "," << ehvi_member_map[member];
 				sum << "," << fitness_map[member];
-				sum << "," << probnotdom_map[member];
 		}
 		sum << "," << spea2_constrained_fitness_map[member];
 		sum << "," << spea2_unconstrained_fitness_map[member];
@@ -794,7 +784,7 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 	{
 		for (auto objsd : *obs_obj_sd_names_ptr)
 			sum << "," << pest_utils::lower_cp(objsd);
-		sum << ",nsga2_front,nsga2_crowding_distance,exp_distance,var_distance,ehvi,pso_fitness,prob_not_dom,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
+		sum << ",nsga2_front,nsga2_crowding_distance,exp_distance,var_distance,pso_fitness,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
 	}
 	else
 		sum << ",nsga2_front,nsga2_crowding_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
@@ -1097,7 +1087,7 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 
 	map<string, double> crowd_distance_map = get_cuboid_crowding_distance(members, _member_struct);
 	pair<map<string, double>, map<string, double>> euclidean_maps;
-	map<string, double> expected_dist_map, prob_not_dom;
+	map<string, double> expected_dist_map/*, prob_not_dom*/;
 	map<string, double> var_dist_map;
 	map<string, double> fit_map;
 	if (front==1 && prob_pareto)
@@ -1106,7 +1096,7 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 		euclidean_maps = get_euclidean_crowding_distance(members, _member_struct);
 		expected_dist_map = euclidean_maps.first;
 		var_dist_map = euclidean_maps.second;
-		prob_not_dom = get_prob_non_dominance(members, _member_struct);
+		//prob_not_dom = get_prob_non_dominance(members, _member_struct);
 	}
 
 	vector <pair<string, double>> cs_vec;
@@ -1119,14 +1109,14 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 			expected_crowd_map[cd.first] = expected_dist_map[cd.first];
 			var_crowd_map[cd.first] = var_dist_map[cd.first];
 			fitness_map[cd.first] = fit_map[cd.first];
-			probnotdom_map[cd.first] = prob_not_dom[cd.first];
+			//probnotdom_map[cd.first] = prob_not_dom[cd.first];
 		}
 		else
 		{
 			expected_crowd_map[cd.first] = -999;
 			var_crowd_map[cd.first] = -999;
 			fitness_map[cd.first] = -999;
-			probnotdom_map[cd.first] = -999;
+			//probnotdom_map[cd.first] = -999;
 		}
 	}
 
@@ -3349,9 +3339,9 @@ void MOEA::initialize()
 				throw_moea_error(string("error processing outer repository obs file"));
 			}
 
-			objectives.set_hypervolume_partitions(hv_pts);
+			/*objectives.set_hypervolume_partitions(hv_pts);
 
-			objectives.get_ehvi(op, dp);
+			objectives.get_ehvi(op, dp);*/
 		}
 			
 				
@@ -3662,7 +3652,8 @@ void MOEA::iterate_to_solution()
 	vector<string> keep;
 	stringstream ss;
 	map<string, map<string, double>> summary;
-	while(iter <= pest_scenario.get_control_info().noptmax)
+	int noptmax = pest_scenario.get_control_info().noptmax;
+	while(iter <= noptmax)
 	{
 		message(0, "starting generation ", iter);
 
@@ -3687,18 +3678,19 @@ void MOEA::iterate_to_solution()
         update_sim_maps(new_dp,new_op);
 
 		//compute ehvi of each solution
-		if (prob_pareto)
-		{
-			message(1, "computing the expected hypervolume improvement of members in current population");
-			objectives.get_ehvi(new_op, new_dp);
+		//need to shelve it for now
+		//if (prob_pareto)
+		//{
+		//	message(1, "computing the expected hypervolume improvement of members in current population");
+		//	objectives.get_ehvi(new_op, new_dp);
 
-			/*if (pest_scenario.get_pestpp_options().get_mou_adaptive_ppd())
-			{
-				message(1, "updating overlap criteria for probabilistic dominance sorting");
-				objectives.update_ppd_criteria(new_op, new_dp);
-			}*/
-			
-		}
+		//	/*if (pest_scenario.get_pestpp_options().get_mou_adaptive_ppd())
+		//	{
+		//		message(1, "updating overlap criteria for probabilistic dominance sorting");
+		//		objectives.update_ppd_criteria(new_op, new_dp);
+		//	}*/
+		//	
+		//}
 
         //if we are using chances, then we need to make sure to update the archive as well as the current population
         // from the full history of available members since uncertainty estimates could be changing as we evolve
