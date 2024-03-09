@@ -282,7 +282,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		for (auto& cd : crowd_dist)
 		{
 			if (cd.second != CROWDING_EXTREME)
-				cd.second = pow(cd.second / pow(var_dist[cd.first], 0.5), 0.5);
+				cd.second = pow(cd.second / (pow(var_dist[cd.first], 0.5)+1), 0.5);
 		}
 
 		//normalize cd
@@ -302,6 +302,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		for (auto& cd : crowd_dist) {
 			if (cd.second == CROWDING_EXTREME)
 			{
+				cd.second = 1;
 				map<string, double> mem = _member_struct[cd.first];
 				for (auto obj_sd_name : *obs_obj_sd_names_ptr)
 					cd.second *= pow(exp(mem[obj_sd_name]), -alpha);
@@ -1032,14 +1033,14 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 		{
 			sortedset::iterator it = next(start, 1);
 			eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[start->first]);
-			if (eucd_prev_it.at(0) > (crowd_distance_map[it->first] / pow(var_distance_map[it->first], 0.5)))
+			if (eucd_prev_it.at(0) > (crowd_distance_map[it->first] / (pow(var_distance_map[it->first], 0.5) + 1)))
 			{
 				crowd_distance_map[it->first] = eucd_prev_it.at(0);
 				var_distance_map[it->first] = eucd_prev_it.at(1);
 			}
 
 			eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[last->first]);
-			if (eucd_it_next.at(0) > (crowd_distance_map[it->first] / pow(var_distance_map[it->first], 0.5)))
+			if (eucd_it_next.at(0) > (crowd_distance_map[it->first] / (pow(var_distance_map[it->first], 0.5) + 1)))
 			{
 				crowd_distance_map[it->first] = eucd_it_next.at(0);
 				var_distance_map[it->first] = eucd_it_next.at(1);
@@ -1060,14 +1061,14 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 				inext = next(it, 1);
 
 				eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[iprev->first]);
-				if (eucd_prev_it.at(0) > (crowd_distance_map[it->first]/pow(var_distance_map[it->first], 0.5)))
+				if (eucd_prev_it.at(0) > (crowd_distance_map[it->first]/ (pow(var_distance_map[it->first], 0.5) + 1)))
 				{
 					crowd_distance_map[it->first] = eucd_prev_it.at(0);
 					var_distance_map[it->first] = eucd_prev_it.at(1);
 				}
 
 				eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[inext->first]);
-				if (eucd_it_next.at(0) > (crowd_distance_map[it->first] / pow(var_distance_map[it->first], 0.5)))
+				if (eucd_it_next.at(0) > (crowd_distance_map[it->first] / (pow(var_distance_map[it->first], 0.5) + 1)))
 				{
 					crowd_distance_map[it->first] = eucd_it_next.at(0);
 					var_distance_map[it->first] = eucd_it_next.at(1);
