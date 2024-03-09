@@ -282,7 +282,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		for (auto& cd : crowd_dist)
 		{
 			if (cd.second != CROWDING_EXTREME)
-				cd.second = pow(cd.second / (pow(var_dist[cd.first], 0.5)+1), 0.5);
+				cd.second = cd.second / (pow(var_dist[cd.first], 0.5)+1);
 		}
 
 		//normalize cd
