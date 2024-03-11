@@ -118,6 +118,7 @@ private:
 	map<string, double> get_prob_non_dominance(vector<string>& members, map<string, map<string, double>>& _member_struct);
 
 	vector<double> get_euclidean_distance(map<string, double> first, map<string, double> second);
+	double get_euclidean_fitness(double E, double V);
 	pair<map<string, double>, map<string, double>> get_euclidean_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
 
 	map<string, map<string, double>> member_struct;

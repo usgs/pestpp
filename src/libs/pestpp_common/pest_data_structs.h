@@ -416,6 +416,8 @@ public:
 	void set_mou_pso_rramp(double val) { mou_pso_rramp = val; }
 	double get_mou_pso_rfit() const { return mou_pso_rfit; }
 	void set_mou_pso_rfit(double val) { mou_pso_rfit = val; }
+	double get_mou_fit_gamma() const { return mou_fit_gamma; }
+	void set_mou_fit_gamma(double val) { mou_fit_gamma = val; }
 	string get_mou_outer_repo_obs_file() const { return mou_outer_repo_obs_file; }
 	void set_mou_outer_repo_obs_file(string name) { mou_outer_repo_obs_file = name; }
 	double get_mou_hypervolume_extreme() const { return mou_hypervolume_extreme; }
@@ -771,6 +773,7 @@ private:
 	double mou_pso_alpha;
 	double mou_pso_rramp;
 	double mou_pso_rfit;
+	double mou_fit_gamma;
 	double mou_ppd_limits;
 	bool mou_adaptive_ppd;
 	string mou_outer_repo_obs_file;
