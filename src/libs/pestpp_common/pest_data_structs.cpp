@@ -1444,7 +1444,7 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_pso_alpha);
 		return true;
 		}
-	else if (key == "MOU_FIT_beta")
+	else if (key == "MOU_FIT_BETA")
 	{
 		convert_ip(value, mou_fit_beta);
 		return true;

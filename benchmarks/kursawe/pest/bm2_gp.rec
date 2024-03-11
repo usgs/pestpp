@@ -11,7 +11,7 @@ binary compiled on Mar 11 2024 at 11:45:08
 using control file: "./pest/bm2_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp\benchmarks\kursawe"
 on host: "DUMPLING-FL"
-started at 03/11/24 11:51:30
+started at 03/11/24 12:06:26
 
 on host: "DUMPLING-FL"
 
@@ -185,7 +185,7 @@ mou_pso_cognitive: 2
 mou_pso_alpha: 0
 mou_pso_rramp: -1
 mou_pso_rfit: 2
-mou_fit_beta: 1
+mou_fit_beta: 0.5
 mou_outer_repo_obs_file: ./model/input/outer_repo.archive.obs_pop.csv
 mou_hypervolume_extreme: 1e+10
 mou_infill_size: 100
