@@ -253,7 +253,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, map<string, map<string, double>>& _member_struct)
 {
 	double alpha = pest_scenario.get_pestpp_options().get_mou_pso_alpha();
-	double gamma = pest_scenario.get_pestpp_options().get_mou_fit_gamma();
+	double beta = pest_scenario.get_pestpp_options().get_mou_fit_beta();
 	if (alpha == 0)
 	{
 		double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
@@ -287,7 +287,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		for (auto& cd : crowd_dist)
 		{
 			if (cd.second != CROWDING_EXTREME)
-				cd.second = cd.second / (gamma * pow(var_dist[cd.first], 0.5)+1);
+				cd.second = cd.second / (beta * pow(var_dist[cd.first], 0.5)+1);
 		}
 
 		//normalize cd
@@ -979,10 +979,10 @@ vector<double> ParetoObjectives::get_euclidean_distance(map<string, double> firs
 
 double ParetoObjectives::get_euclidean_fitness(double E, double V)
 {
-	double gamma = pest_scenario.get_pestpp_options().get_mou_fit_gamma();
+	double beta = pest_scenario.get_pestpp_options().get_mou_fit_beta();
 	double val;
 
-	val = E / (gamma * pow(V, 0.5) + 1);
+	val = E / (beta * pow(V, 0.5) + 1);
 
 	return val;
 }

@@ -1444,9 +1444,9 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_pso_alpha);
 		return true;
 		}
-	else if (key == "MOU_FIT_GAMMA")
+	else if (key == "MOU_FIT_beta")
 	{
-		convert_ip(value, mou_fit_gamma);
+		convert_ip(value, mou_fit_beta);
 		return true;
 	}
 	else if (key == "MOU_PSO_RRAMP")
@@ -1772,7 +1772,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_pso_alpha: " << mou_pso_alpha << endl;
 	os << "mou_pso_rramp: " << mou_pso_rramp << endl;
 	os << "mou_pso_rfit: " << mou_pso_rfit << endl;
-	os << "mou_fit_gamma: " << mou_fit_gamma << endl;
+	os << "mou_fit_beta: " << mou_fit_beta << endl;
 	os << "mou_outer_repo_obs_file: " << mou_outer_repo_obs_file << endl;
 	os << "mou_hypervolume_extreme: " << mou_hypervolume_extreme << endl;
 	os << "mou_infill_size: " << mou_infill_size << endl;
@@ -1975,7 +1975,7 @@ void PestppOptions::set_defaults()
 	set_mou_pso_alpha(1.0);
 	set_mou_pso_rramp(-5e+02);
 	set_mou_pso_rfit(2.0);
-	set_mou_fit_gamma(1.0);
+	set_mou_fit_beta(1.0);
 	set_mou_outer_repo_obs_file("");
 	set_mou_hypervolume_extreme(1e+10);
 	set_mou_infill_size(100);
