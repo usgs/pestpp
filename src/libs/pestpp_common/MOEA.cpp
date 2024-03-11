@@ -983,7 +983,7 @@ double ParetoObjectives::get_euclidean_fitness(double E, double V)
 	double val;
 
 	val = E / (beta * pow(V, 0.5) + 1);
-
+	//val = E / exp(pow(V, 0.5));
 	return val;
 }
 
@@ -1554,6 +1554,9 @@ double ParetoObjectives::std_norm_df(double x, double mu, double sd, bool cumdf)
 	double Z, val;
 	const double sqrt_2 = sqrt(2.0);
 	const double inv_sqrt_2pi = 0.3989422804;
+
+	if (sd == 0)
+		sd = 1E-30;
 
 	Z = (x - mu) / sd;
 
