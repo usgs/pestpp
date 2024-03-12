@@ -982,8 +982,11 @@ double ParetoObjectives::get_euclidean_fitness(double E, double V)
 	double beta = pest_scenario.get_pestpp_options().get_mou_fit_beta();
 	double val;
 
-	val = E / (beta * pow(V, 0.5) + 1);
-	//val = E / exp(pow(V, 0.5));
+	if (beta == 0)
+		val = E / exp(pow(V, 0.5));
+	else
+		val = E / (beta * pow(V, 0.5) + 1);
+	
 	return val;
 }
 
