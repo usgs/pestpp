@@ -287,7 +287,8 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		for (auto& cd : crowd_dist)
 		{
 			if (cd.second != CROWDING_EXTREME)
-				cd.second = cd.second / (beta * pow(var_dist[cd.first], 0.5)+1);
+				cd.second = get_euclidean_fitness(cd.second, var_dist[cd.first]);
+				
 		}
 
 		//normalize cd
@@ -307,10 +308,21 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		for (auto& cd : crowd_dist) {
 			if (cd.second == CROWDING_EXTREME)
 			{
-				cd.second = 1;
-				map<string, double> mem = _member_struct[cd.first];
-				for (auto obj_sd_name : *obs_obj_sd_names_ptr)
-					cd.second *= pow(exp(mem[obj_sd_name]), -alpha);
+				if (beta == 0)
+				{
+					cd.second = 1;
+					map<string, double> mem = _member_struct[cd.first];
+					for (auto obj_sd_name : *obs_obj_sd_names_ptr)
+						cd.second *= pow(exp(mem[obj_sd_name]), -alpha);
+				}
+				else
+				{
+					cd.second = 1;
+					map<string, double> mem = _member_struct[cd.first];
+					for (auto obj_sd_name : *obs_obj_sd_names_ptr)
+						cd.second *= mem[obj_sd_name];
+					cd.second = pow(1+ beta * cd.second, -alpha);
+				}
 			}
 			else if (mx != 0.0) {
 				cd.second = pow(cd.second / mx, alpha);

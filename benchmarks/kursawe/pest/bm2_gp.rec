@@ -11,7 +11,7 @@ binary compiled on Mar 11 2024 at 11:45:08
 using control file: "./pest/bm2_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp\benchmarks\kursawe"
 on host: "DUMPLING-FL"
-started at 03/11/24 21:59:35
+started at 03/13/24 10:38:21
 
 on host: "DUMPLING-FL"
 
@@ -185,7 +185,7 @@ mou_pso_cognitive: 2
 mou_pso_alpha: 0
 mou_pso_rramp: -1
 mou_pso_rfit: 2
-mou_fit_beta: 0.6
+mou_fit_beta: 1
 mou_outer_repo_obs_file: 
 mou_hypervolume_extreme: 1e+10
 mou_infill_size: 100
@@ -512,3 +512,170 @@ OBJ_2                   0.675783           0     3.24706     48.9636           0
 ...pareto dominance sort yielded 1 domination fronts
 19 in the front 1
 ...running population of size  100
+...saved decision variable population of size 100 X 3 to './pest/bm2_gp.dv_pop.csv'
+...saved generation-specific decision variable population of size 100 X 3 to './pest/bm2_gp.2.dv_pop.csv'
+...saved observation population of size 100 X 5 to './pest/bm2_gp.obs_pop.csv'
+...saved generation-specific observation population of size 100 X 5 to './pest/bm2_gp.2.obs_pop.csv'
+200 feasible solutions
+200 feasible solutions
+...pareto dominance sort yielded 21 domination fronts
+19 in the front 1
+15 in the front 2
+14 in the front 3
+11 in the front 4
+11 in the front 5
+10 in the front 6
+12 in the front 7
+9 in the front 8
+10 in the front 9
+(not reporting remaining front membership)
+...pareto dominance sorting combined parent-child populations of size  200
+200 feasible solutions
+...pareto dominance sort yielded 21 domination fronts
+19 in the front 1
+15 in the front 2
+14 in the front 3
+11 in the front 4
+11 in the front 5
+10 in the front 6
+12 in the front 7
+9 in the front 8
+10 in the front 9
+(not reporting remaining front membership)
+...wrote pareto summary to ./pest/bm2_gp.pareto.summary.csv
+updating archive
+all nondominated members in already in archive
+...resizing current populations to  100
+
+  ---  generation 2 decision variable summary:  ---  
+decision variable        ubnd      lbnd      mean   standard devation         min         max
+X1                          5        -5 -0.749551            0.679169     -3.4053    0.403836
+X2                          5        -5 -0.462282            0.543871    -2.70897    0.401607
+X3                          5        -5 -0.251557            0.575437     -1.8609       2.222
+
+
+  ---  generation 2 decision variable change summary:  ---  
+decision variable  mean change   % change max change   % change min change   % change
+X1                  -0.0367149          0   0.611828    60.2392  -0.986469          0
+X2                   0.0206992          0   0.874919    68.5391          0          0
+X3                    0.122829          0          0          0          0          0
+
+
+  ---  generation 2 objective function summary:  ---  
+seeking optimal trade-off point for single 'optimal' chance point runs
+using member GEN=50_MEMBER=4996_PSO as single, 'optimal' point
+   with distance of 3.97641 from optimal trade - off
+objective function   direction         mean      std dev          min          max         knee
+
+OBJ_1                 minimize    -16.80648      1.85842     -19.4915     -11.0689      -16.006
+OBJ_2                 minimize      -1.2295      2.11559     -8.44242      1.56576     -6.52849
+
+
+  ---  generation 2 objective function change summary:  ---  
+objective function   mean change    % change  max change    % change  min change    % change knee change    % change
+OBJ_1                  0.0508211           0           0           0           0           0           0           0
+OBJ_2                   0.105536           0     1.81876     53.7376           0           0           0           0
+
+...number of feasible solutions at the end of generation 2: 200
+
+  ---  starting generation  3  ---  
+100 feasible solutions
+...pareto dominance sort yielded 8 domination fronts
+19 in the front 1
+15 in the front 2
+14 in the front 3
+11 in the front 4
+11 in the front 5
+10 in the front 6
+12 in the front 7
+8 in the front 8
+...generating PSO population of size 100
+19 feasible solutions
+...pareto dominance sort yielded 1 domination fronts
+19 in the front 1
+...running population of size  100
+...saved decision variable population of size 100 X 3 to './pest/bm2_gp.dv_pop.csv'
+...saved generation-specific decision variable population of size 100 X 3 to './pest/bm2_gp.3.dv_pop.csv'
+...saved observation population of size 100 X 5 to './pest/bm2_gp.obs_pop.csv'
+...saved generation-specific observation population of size 100 X 5 to './pest/bm2_gp.3.obs_pop.csv'
+200 feasible solutions
+200 feasible solutions
+...pareto dominance sort yielded 23 domination fronts
+19 in the front 1
+15 in the front 2
+14 in the front 3
+11 in the front 4
+12 in the front 5
+16 in the front 6
+15 in the front 7
+11 in the front 8
+6 in the front 9
+(not reporting remaining front membership)
+...pareto dominance sorting combined parent-child populations of size  200
+200 feasible solutions
+...pareto dominance sort yielded 23 domination fronts
+19 in the front 1
+15 in the front 2
+14 in the front 3
+11 in the front 4
+12 in the front 5
+16 in the front 6
+15 in the front 7
+11 in the front 8
+6 in the front 9
+(not reporting remaining front membership)
+...wrote pareto summary to ./pest/bm2_gp.pareto.summary.csv
+updating archive
+all nondominated members in already in archive
+...resizing current populations to  100
+
+  ---  generation 3 decision variable summary:  ---  
+decision variable        ubnd      lbnd      mean   standard devation         min         max
+X1                          5        -5 -0.761401            0.614334     -3.4053    0.181654
+X2                          5        -5 -0.447082            0.463859    -2.70897    0.331211
+X3                          5        -5 -0.215346            0.544376    -1.85193       2.222
+
+
+  ---  generation 3 decision variable change summary:  ---  
+decision variable  mean change   % change max change   % change min change   % change
+X1                   0.0118496          0   0.222182    55.0179          0          0
+X2                  -0.0152002          0   0.070396    17.5286          0          0
+X3                  -0.0362113          0          0          0-0.00897393          0
+
+
+  ---  generation 3 objective function summary:  ---  
+seeking optimal trade-off point for single 'optimal' chance point runs
+using member GEN=50_MEMBER=4996_PSO as single, 'optimal' point
+   with distance of 3.97641 from optimal trade - off
+objective function   direction         mean      std dev          min          max         knee
+
+OBJ_1                 minimize    -16.83675     1.660653     -19.4915     -11.0689      -16.006
+OBJ_2                 minimize    -1.303512     2.079396     -8.44242      1.01307     -6.52849
+
+
+  ---  generation 3 objective function change summary:  ---  
+objective function   mean change    % change  max change    % change  min change    % change knee change    % change
+OBJ_1                   0.030268           0           0           0           0           0           0           0
+OBJ_2                  0.0740117           0     0.55269     35.2985           0           0           0           0
+
+...number of feasible solutions at the end of generation 3: 200
+
+  ---  starting generation  4  ---  
+100 feasible solutions
+...pareto dominance sort yielded 7 domination fronts
+19 in the front 1
+15 in the front 2
+14 in the front 3
+11 in the front 4
+12 in the front 5
+16 in the front 6
+13 in the front 7
+...generating PSO population of size 100
+19 feasible solutions
+...pareto dominance sort yielded 1 domination fronts
+19 in the front 1
+...running population of size  100
+...saved decision variable population of size 100 X 3 to './pest/bm2_gp.dv_pop.csv'
+...saved generation-specific decision variable population of size 100 X 3 to './pest/bm2_gp.4.dv_pop.csv'
+...saved observation population of size 100 X 5 to './pest/bm2_gp.obs_pop.csv'
+...saved generation-specific observation population of size 100 X 5 to './pest/bm2_gp.4.obs_pop.csv'
