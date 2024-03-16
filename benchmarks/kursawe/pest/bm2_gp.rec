@@ -11,7 +11,7 @@ binary compiled on Mar 11 2024 at 11:45:08
 using control file: "./pest/bm2_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp\benchmarks\kursawe"
 on host: "DUMPLING-FL"
-started at 03/15/24 11:29:45
+started at 03/15/24 23:33:19
 
 on host: "DUMPLING-FL"
 
@@ -824,6 +824,6 @@ OBJ_2                  0.0023319           0           0           0           0
 
 
 pestpp-mou analysis complete...
-started at 03/15/24 11:29:45
-finished at 03/15/24 11:35:00
-took 5.23333 minutes
+started at 03/15/24 23:33:19
+finished at 03/16/24 10:14:51
+took 641.517 minutes

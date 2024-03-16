@@ -1135,7 +1135,7 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 	map<string, double> expected_dist_map/*, prob_not_dom*/;
 	map<string, double> var_dist_map;
 	map<string, double> fit_map;
-	if (front==1 && prob_pareto)
+	if (prob_pareto)
 	{
 		fit_map = get_mopso_fitness(members, _member_struct);
 		euclidean_maps = get_euclidean_crowding_distance(members, _member_struct);
@@ -1149,20 +1149,25 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 	{
 		cs_vec.push_back(cd);
 		crowd_map[cd.first] = cd.second;
-		if (front == 1)
-		{
-			expected_crowd_map[cd.first] = expected_dist_map[cd.first];
-			var_crowd_map[cd.first] = var_dist_map[cd.first];
-			fitness_map[cd.first] = fit_map[cd.first];
-			//probnotdom_map[cd.first] = prob_not_dom[cd.first];
-		}
-		else
-		{
-			expected_crowd_map[cd.first] = -999;
-			var_crowd_map[cd.first] = -999;
-			fitness_map[cd.first] = -999;
-			//probnotdom_map[cd.first] = -999;
-		}
+
+		expected_crowd_map[cd.first] = expected_dist_map[cd.first];
+		var_crowd_map[cd.first] = var_dist_map[cd.first];
+		fitness_map[cd.first] = fit_map[cd.first];
+
+		//if (front == 1)
+		//{
+		//	expected_crowd_map[cd.first] = expected_dist_map[cd.first];
+		//	var_crowd_map[cd.first] = var_dist_map[cd.first];
+		//	fitness_map[cd.first] = fit_map[cd.first];
+		//	//probnotdom_map[cd.first] = prob_not_dom[cd.first];
+		//}
+		//else
+		//{
+		//	expected_crowd_map[cd.first] = -999;
+		//	var_crowd_map[cd.first] = -999;
+		//	fitness_map[cd.first] = -999;
+		//	//probnotdom_map[cd.first] = -999;
+		//}
 	}
 
 	std::sort(cs_vec.begin(), cs_vec.end(),
