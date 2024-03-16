@@ -11,7 +11,7 @@ binary compiled on Mar 11 2024 at 11:45:08
 using control file: "./pest/bm2_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp\benchmarks\kursawe"
 on host: "DUMPLING-FL"
-started at 03/15/24 23:33:19
+started at 03/16/24 20:17:42
 
 on host: "DUMPLING-FL"
 
@@ -440,8 +440,8 @@ initialized archives with 19 nondominated members
 14 in the front 3
 11 in the front 4
 11 in the front 5
-8 in the front 6
-9 in the front 7
+9 in the front 6
+8 in the front 7
 7 in the front 8
 5 in the front 9
 (not reporting remaining front membership)
@@ -453,8 +453,8 @@ initialized archives with 19 nondominated members
 14 in the front 3
 11 in the front 4
 11 in the front 5
-8 in the front 6
-9 in the front 7
+9 in the front 6
+8 in the front 7
 7 in the front 8
 5 in the front 9
 (not reporting remaining front membership)
@@ -465,16 +465,16 @@ all nondominated members in already in archive
 
   ---  generation 1 decision variable summary:  ---  
 decision variable        ubnd      lbnd      mean   standard devation         min         max
-X1                          5        -5 -0.786266            0.880874    -4.39177     1.01566
-X2                          5        -5 -0.441583            0.558941    -2.70897     1.27653
-X3                          5        -5 -0.128728            0.634879     -1.8609       2.222
+X1                          5        -5 -0.806576            0.861653    -4.39177    0.629333
+X2                          5        -5  -0.41426            0.533693    -2.70897     1.27653
+X3                          5        -5-0.0806825            0.689778     -1.8609     2.66714
 
 
   ---  generation 1 decision variable change summary:  ---  
 decision variable  mean change   % change max change   % change min change   % change
-X1                    0.254726          0   0.198106    16.3216   0.986469          0
-X2                    0.118934          0   -0.64644   -102.595          0          0
-X3                  -0.0514206          0          0          0    0.78086          0
+X1                    0.275036          0   0.584437    48.1506   0.986469          0
+X2                   0.0916112          0   -0.64644   -102.595          0          0
+X3                  -0.0994665          0  -0.445139   -20.0332    0.78086          0
 
 
   ---  generation 1 objective function summary:  ---  
@@ -483,14 +483,14 @@ using member GEN=50_MEMBER=4996_PSO as single, 'optimal' point
    with distance of 3.97641 from optimal trade - off
 objective function   direction         mean      std dev          min          max         knee
 
-OBJ_1                 minimize    -16.75566      2.01099     -19.4915     -11.0689      -16.006
-OBJ_2                 minimize    -1.123964     2.192228     -8.44242      3.38452     -6.52849
+OBJ_1                 minimize    -16.76794     1.986465     -19.4915     -11.0689      -16.006
+OBJ_2                 minimize     -1.12689     2.191883     -8.44242      3.38452     -6.52849
 
 
   ---  generation 1 objective function change summary:  ---  
 objective function   mean change    % change  max change    % change  min change    % change knee change    % change
-OBJ_1                  -0.499359           0           0           0           0           0           0           0
-OBJ_2                   0.675783           0     3.24706     48.9636           0           0           0           0
+OBJ_1                   -0.48708           0           0           0           0           0           0           0
+OBJ_2                   0.678708           0     3.24706     48.9636           0           0           0           0
 
 ...number of feasible solutions at the end of generation 1: 200
 
@@ -502,8 +502,8 @@ OBJ_2                   0.675783           0     3.24706     48.9636           0
 14 in the front 3
 11 in the front 4
 11 in the front 5
-8 in the front 6
-9 in the front 7
+9 in the front 6
+8 in the front 7
 7 in the front 8
 5 in the front 9
 (not reporting remaining front membership)
@@ -518,29 +518,29 @@ OBJ_2                   0.675783           0     3.24706     48.9636           0
 ...saved generation-specific observation population of size 100 X 5 to './pest/bm2_gp.2.obs_pop.csv'
 200 feasible solutions
 200 feasible solutions
-...pareto dominance sort yielded 21 domination fronts
+...pareto dominance sort yielded 22 domination fronts
 19 in the front 1
 15 in the front 2
 14 in the front 3
 11 in the front 4
 11 in the front 5
-10 in the front 6
-12 in the front 7
-9 in the front 8
-10 in the front 9
+13 in the front 6
+10 in the front 7
+8 in the front 8
+9 in the front 9
 (not reporting remaining front membership)
 ...pareto dominance sorting combined parent-child populations of size  200
 200 feasible solutions
-...pareto dominance sort yielded 21 domination fronts
+...pareto dominance sort yielded 22 domination fronts
 19 in the front 1
 15 in the front 2
 14 in the front 3
 11 in the front 4
 11 in the front 5
-10 in the front 6
-12 in the front 7
-9 in the front 8
-10 in the front 9
+13 in the front 6
+10 in the front 7
+8 in the front 8
+9 in the front 9
 (not reporting remaining front membership)
 ...wrote pareto summary to ./pest/bm2_gp.pareto.summary.csv
 updating archive
@@ -549,16 +549,16 @@ all nondominated members in already in archive
 
   ---  generation 2 decision variable summary:  ---  
 decision variable        ubnd      lbnd      mean   standard devation         min         max
-X1                          5        -5 -0.749551            0.679169     -3.4053    0.403836
-X2                          5        -5 -0.462282            0.543871    -2.70897    0.401607
-X3                          5        -5 -0.251557            0.575437     -1.8609       2.222
+X1                          5        -5 -0.736177            0.638469     -3.4053    0.403836
+X2                          5        -5  -0.48221            0.524736    -2.70897    0.373458
+X3                          5        -5 -0.246226            0.608885     -1.8609       2.222
 
 
   ---  generation 2 decision variable change summary:  ---  
 decision variable  mean change   % change max change   % change min change   % change
-X1                  -0.0367149          0   0.611828    60.2392  -0.986469          0
-X2                   0.0206992          0   0.874919    68.5391          0          0
-X3                    0.122829          0          0          0          0          0
+X1                  -0.0703991          0   0.225497    35.8311  -0.986469          0
+X2                   0.0679498          0   0.903068    70.7442          0          0
+X3                    0.165544          0   0.445139    16.6897          0          0
 
 
   ---  generation 2 objective function summary:  ---  
@@ -567,14 +567,14 @@ using member GEN=50_MEMBER=4996_PSO as single, 'optimal' point
    with distance of 3.97641 from optimal trade - off
 objective function   direction         mean      std dev          min          max         knee
 
-OBJ_1                 minimize    -16.80648      1.85842     -19.4915     -11.0689      -16.006
-OBJ_2                 minimize      -1.2295      2.11559     -8.44242      1.56576     -6.52849
+OBJ_1                 minimize    -16.78572     1.837264     -19.4915     -11.0689      -16.006
+OBJ_2                 minimize     -1.27714     2.097405     -8.44242      1.56576     -6.52849
 
 
   ---  generation 2 objective function change summary:  ---  
 objective function   mean change    % change  max change    % change  min change    % change knee change    % change
-OBJ_1                  0.0508211           0           0           0           0           0           0           0
-OBJ_2                   0.105536           0     1.81876     53.7376           0           0           0           0
+OBJ_1                  0.0177737           0           0           0           0           0           0           0
+OBJ_2                   0.150251           0     1.81876     53.7376           0           0           0           0
 
 ...number of feasible solutions at the end of generation 2: 200
 
@@ -586,9 +586,9 @@ OBJ_2                   0.105536           0     1.81876     53.7376           0
 14 in the front 3
 11 in the front 4
 11 in the front 5
-10 in the front 6
-12 in the front 7
-8 in the front 8
+13 in the front 6
+10 in the front 7
+7 in the front 8
 ...generating PSO population of size 100
 19 feasible solutions
 ...pareto dominance sort yielded 1 domination fronts
@@ -600,29 +600,29 @@ OBJ_2                   0.105536           0     1.81876     53.7376           0
 ...saved generation-specific observation population of size 100 X 5 to './pest/bm2_gp.3.obs_pop.csv'
 200 feasible solutions
 200 feasible solutions
-...pareto dominance sort yielded 23 domination fronts
+...pareto dominance sort yielded 20 domination fronts
 19 in the front 1
 15 in the front 2
 14 in the front 3
 11 in the front 4
 12 in the front 5
-16 in the front 6
-15 in the front 7
-11 in the front 8
-6 in the front 9
+14 in the front 6
+16 in the front 7
+10 in the front 8
+11 in the front 9
 (not reporting remaining front membership)
 ...pareto dominance sorting combined parent-child populations of size  200
 200 feasible solutions
-...pareto dominance sort yielded 23 domination fronts
+...pareto dominance sort yielded 20 domination fronts
 19 in the front 1
 15 in the front 2
 14 in the front 3
 11 in the front 4
 12 in the front 5
-16 in the front 6
-15 in the front 7
-11 in the front 8
-6 in the front 9
+14 in the front 6
+16 in the front 7
+10 in the front 8
+11 in the front 9
 (not reporting remaining front membership)
 ...wrote pareto summary to ./pest/bm2_gp.pareto.summary.csv
 updating archive
@@ -631,16 +631,16 @@ all nondominated members in already in archive
 
   ---  generation 3 decision variable summary:  ---  
 decision variable        ubnd      lbnd      mean   standard devation         min         max
-X1                          5        -5 -0.761401            0.614334     -3.4053    0.181654
-X2                          5        -5 -0.447082            0.463859    -2.70897    0.331211
-X3                          5        -5 -0.215346            0.544376    -1.85193       2.222
+X1                          5        -5 -0.692942            0.562072     -3.4053    0.772128
+X2                          5        -5 -0.478563            0.482884    -2.70897    0.331211
+X3                          5        -5 -0.267153            0.603344    -1.78842       2.222
 
 
   ---  generation 3 decision variable change summary:  ---  
 decision variable  mean change   % change max change   % change min change   % change
-X1                   0.0118496          0   0.222182    55.0179          0          0
-X2                  -0.0152002          0   0.070396    17.5286          0          0
-X3                  -0.0362113          0          0          0-0.00897393          0
+X1                  -0.0432352          0  -0.368292   -91.1984          0          0
+X2                 -0.00364705          0   0.042247    11.3124          0          0
+X3                   0.0209265          0          0          0 -0.0724824          0
 
 
   ---  generation 3 objective function summary:  ---  
@@ -649,14 +649,14 @@ using member GEN=50_MEMBER=4996_PSO as single, 'optimal' point
    with distance of 3.97641 from optimal trade - off
 objective function   direction         mean      std dev          min          max         knee
 
-OBJ_1                 minimize    -16.83675     1.660653     -19.4915     -11.0689      -16.006
-OBJ_2                 minimize    -1.303512     2.079396     -8.44242      1.01307     -6.52849
+OBJ_1                 minimize    -16.82844     1.682924     -19.4915     -11.0689      -16.006
+OBJ_2                 minimize    -1.303585     2.072724     -8.44242      1.01307     -6.52849
 
 
   ---  generation 3 objective function change summary:  ---  
 objective function   mean change    % change  max change    % change  min change    % change knee change    % change
-OBJ_1                   0.030268           0           0           0           0           0           0           0
-OBJ_2                  0.0740117           0     0.55269     35.2985           0           0           0           0
+OBJ_1                  0.0427226           0           0           0           0           0           0           0
+OBJ_2                   0.026445           0     0.55269     35.2985           0           0           0           0
 
 ...number of feasible solutions at the end of generation 3: 200
 
@@ -668,8 +668,8 @@ OBJ_2                  0.0740117           0     0.55269     35.2985           0
 14 in the front 3
 11 in the front 4
 12 in the front 5
-16 in the front 6
-13 in the front 7
+14 in the front 6
+15 in the front 7
 ...generating PSO population of size 100
 19 feasible solutions
 ...pareto dominance sort yielded 1 domination fronts
@@ -681,29 +681,29 @@ OBJ_2                  0.0740117           0     0.55269     35.2985           0
 ...saved generation-specific observation population of size 100 X 5 to './pest/bm2_gp.4.obs_pop.csv'
 200 feasible solutions
 200 feasible solutions
-...pareto dominance sort yielded 20 domination fronts
+...pareto dominance sort yielded 19 domination fronts
 19 in the front 1
 15 in the front 2
 14 in the front 3
 11 in the front 4
 13 in the front 5
-21 in the front 6
-15 in the front 7
-11 in the front 8
-7 in the front 9
+15 in the front 6
+21 in the front 7
+13 in the front 8
+10 in the front 9
 (not reporting remaining front membership)
 ...pareto dominance sorting combined parent-child populations of size  200
 200 feasible solutions
-...pareto dominance sort yielded 20 domination fronts
+...pareto dominance sort yielded 19 domination fronts
 19 in the front 1
 15 in the front 2
 14 in the front 3
 11 in the front 4
 13 in the front 5
-21 in the front 6
-15 in the front 7
-11 in the front 8
-7 in the front 9
+15 in the front 6
+21 in the front 7
+13 in the front 8
+10 in the front 9
 (not reporting remaining front membership)
 ...wrote pareto summary to ./pest/bm2_gp.pareto.summary.csv
 updating archive
@@ -712,16 +712,16 @@ all nondominated members in already in archive
 
   ---  generation 4 decision variable summary:  ---  
 decision variable        ubnd      lbnd      mean   standard devation         min         max
-X1                          5        -5 -0.715431            0.562068     -3.4053     0.68136
-X2                          5        -5 -0.459783            0.451813    -2.70897    0.548667
-X3                          5        -5 -0.237683            0.568145    -1.53978       2.222
+X1                          5        -5 -0.687253            0.569546     -3.4053    0.772128
+X2                          5        -5 -0.472372            0.450354    -2.70897    0.331211
+X3                          5        -5 -0.277127            0.539885    -1.78842       2.222
 
 
   ---  generation 4 decision variable change summary:  ---  
 decision variable  mean change   % change max change   % change min change   % change
-X1                  -0.0459697          0  -0.499706   -275.087          0          0
-X2                    0.012701          0  -0.217456   -65.6549          0          0
-X3                   0.0223369          0          0          0  -0.312145          0
+X1                 -0.00568897          0          0          0          0          0
+X2                 -0.00619016          0          0          0          0          0
+X3                  0.00997368          0          0          0          0          0
 
 
   ---  generation 4 objective function summary:  ---  
@@ -730,14 +730,14 @@ using member GEN=50_MEMBER=4996_PSO as single, 'optimal' point
    with distance of 3.97641 from optimal trade - off
 objective function   direction         mean      std dev          min          max         knee
 
-OBJ_1                 minimize    -16.84044     1.605409     -19.4915     -11.0689      -16.006
-OBJ_2                 minimize    -1.356622     2.052986     -8.44242      1.01307     -6.52849
+OBJ_1                 minimize    -16.87713      1.61458     -19.4915     -11.0689      -16.006
+OBJ_2                 minimize     -1.35648     2.064113     -8.44242      1.01307     -6.52849
 
 
   ---  generation 4 objective function change summary:  ---  
 objective function   mean change    % change  max change    % change  min change    % change knee change    % change
-OBJ_1                 0.00368675           0           0           0           0           0           0           0
-OBJ_2                  0.0531106           0           0           0           0           0           0           0
+OBJ_1                  0.0486937           0           0           0           0           0           0           0
+OBJ_2                   0.052895           0           0           0           0           0           0           0
 
 ...number of feasible solutions at the end of generation 4: 200
 
@@ -749,8 +749,8 @@ OBJ_2                  0.0531106           0           0           0           0
 14 in the front 3
 11 in the front 4
 13 in the front 5
-21 in the front 6
-7 in the front 7
+15 in the front 6
+13 in the front 7
 ...generating PSO population of size 100
 19 feasible solutions
 ...pareto dominance sort yielded 1 domination fronts
@@ -766,11 +766,11 @@ OBJ_2                  0.0531106           0           0           0           0
 19 in the front 1
 15 in the front 2
 14 in the front 3
-11 in the front 4
+12 in the front 4
 13 in the front 5
-21 in the front 6
-17 in the front 7
-10 in the front 8
+20 in the front 6
+20 in the front 7
+11 in the front 8
 7 in the front 9
 (not reporting remaining front membership)
 ...pareto dominance sorting combined parent-child populations of size  200
@@ -779,11 +779,11 @@ OBJ_2                  0.0531106           0           0           0           0
 19 in the front 1
 15 in the front 2
 14 in the front 3
-11 in the front 4
+12 in the front 4
 13 in the front 5
-21 in the front 6
-17 in the front 7
-10 in the front 8
+20 in the front 6
+20 in the front 7
+11 in the front 8
 7 in the front 9
 (not reporting remaining front membership)
 ...wrote pareto summary to ./pest/bm2_gp.pareto.summary.csv
@@ -793,16 +793,16 @@ all nondominated members in already in archive
 
   ---  generation 5 decision variable summary:  ---  
 decision variable        ubnd      lbnd      mean   standard devation         min         max
-X1                          5        -5 -0.686852            0.555652     -3.4053     0.68136
-X2                          5        -5 -0.457486            0.447309    -2.70897    0.331211
-X3                          5        -5 -0.215942            0.562864    -1.53978       2.222
+X1                          5        -5 -0.708201            0.539502     -3.4053    0.181654
+X2                          5        -5 -0.475018            0.449172    -2.70897    0.331211
+X3                          5        -5 -0.262301            0.514983    -1.62585       2.222
 
 
   ---  generation 5 decision variable change summary:  ---  
 decision variable  mean change   % change max change   % change min change   % change
-X1                  -0.0285796          0          0          0          0          0
-X2                 -0.00229688          0   0.217456    39.6335          0          0
-X3                  -0.0217408          0          0          0          0          0
+X1                    0.020948          0   0.590474    76.4736          0          0
+X2                  0.00264567          0          0          0          0          0
+X3                  -0.0148254          0          0          0  -0.162565          0
 
 
   ---  generation 5 objective function summary:  ---  
@@ -811,19 +811,19 @@ using member GEN=50_MEMBER=4996_PSO as single, 'optimal' point
    with distance of 3.97641 from optimal trade - off
 objective function   direction         mean      std dev          min          max         knee
 
-OBJ_1                 minimize    -16.87597     1.574713     -19.4915     -11.0689      -16.006
-OBJ_2                 minimize    -1.358954     2.063395     -8.44242      1.01307     -6.52849
+OBJ_1                 minimize    -16.86527     1.585547     -19.4915     -11.0689      -16.006
+OBJ_2                 minimize    -1.417781      2.03385     -8.44242      1.01307     -6.52849
 
 
   ---  generation 5 objective function change summary:  ---  
 objective function   mean change    % change  max change    % change  min change    % change knee change    % change
-OBJ_1                  0.0355357           0           0           0           0           0           0           0
-OBJ_2                  0.0023319           0           0           0           0           0           0           0
+OBJ_1                 -0.0118636           0           0           0           0           0           0           0
+OBJ_2                  0.0613001           0           0           0           0           0           0           0
 
 ...number of feasible solutions at the end of generation 5: 200
 
 
 pestpp-mou analysis complete...
-started at 03/15/24 23:33:19
-finished at 03/16/24 10:14:51
-took 641.517 minutes
+started at 03/16/24 20:17:42
+finished at 03/16/24 20:22:12
+took 4.5 minutes

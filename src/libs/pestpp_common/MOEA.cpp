@@ -308,12 +308,12 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		for (auto& cd : crowd_dist) {
 			if (cd.second == CROWDING_EXTREME)
 			{
-				cd.second = 1;
+				/*cd.second = 1;
 				map<string, double> mem = _member_struct[cd.first];
 				for (auto obj_name : *obs_obj_names_ptr)
-					cd.second *= pow(1+abs(mem[obj_name+"_SD"] / mem[obj_name]), -alpha);
+					cd.second *= pow(1+abs(mem[obj_name+"_SD"] / mem[obj_name]), -alpha);*/
 
-				/*if (beta == 0)
+				if (beta == 0)
 				{
 					cd.second = 1;
 					map<string, double> mem = _member_struct[cd.first];
@@ -327,7 +327,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 					for (auto obj_sd_name : *obs_obj_sd_names_ptr)
 						cd.second *= mem[obj_sd_name];
 					cd.second = pow(1+ beta * cd.second, -alpha);
-				}*/
+				}
 			}
 			else if (mx != 0.0) {
 				cd.second = pow(cd.second / mx, alpha);
@@ -1000,9 +1000,9 @@ double ParetoObjectives::get_euclidean_fitness(double E, double V)
 	double val;
 
 	if (beta == 0)
-		val = E / exp(pow(V, 0.5));
+		val = pow(E / exp(pow(V, 0.5)),0.5);
 	else
-		val = E / (beta * pow(V, 0.5) + 1);
+		val = pow(E / (beta * pow(V, 0.5) + 1),0.5);
 	
 	return val;
 }
