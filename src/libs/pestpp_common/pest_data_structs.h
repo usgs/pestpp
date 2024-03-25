@@ -363,6 +363,8 @@ public:
 	void set_opt_obs_stack(string _stack) { opt_obs_stack = _stack; }
 	string get_opt_chance_points() const { return opt_chance_points; }
 	void set_opt_chance_points(string chance_points) { opt_chance_points = chance_points; }
+    string get_opt_chance_schedule() const {return opt_chance_schedule;}
+    void set_opt_chance_schedule(string fname) {opt_chance_schedule = fname;}
 
 
 	string get_sqp_dv_en()const { return sqp_dv_en; }
@@ -726,6 +728,7 @@ private:
 	string opt_par_stack;
 	string opt_obs_stack;
 	string opt_chance_points;
+    string opt_chance_schedule;
 
 	string sqp_dv_en;
 	string sqp_obs_restart_en;

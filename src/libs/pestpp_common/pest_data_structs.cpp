@@ -1482,6 +1482,12 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 	    mou_population_schedule = org_value;
 	    return true;
     }
+    else if (key == "OPT_CHANCE_SCHEDULE")
+    {
+        opt_chance_schedule = org_value;
+        return true;
+    }
+
 	else if (key == "MOU_SIMPLEX_REFLECTIONS")
 	{
 		convert_ip(value, mou_simplex_reflections);
@@ -1707,6 +1713,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "opt_iter_tol: " << opt_iter_tol << endl;
 	os << "opt_recalc_fosm_every: " << opt_recalc_fosm_every << endl;
 	os << "opt_chance_points: " << opt_chance_points << endl;
+    os << "opt_chance_schedule: " << opt_chance_schedule << endl;
+
 	
 	
 
@@ -1905,6 +1913,7 @@ void PestppOptions::set_defaults()
 	set_opt_par_stack("");
 	set_opt_obs_stack("");
 	set_opt_chance_points("SINGLE");
+    set_opt_chance_schedule("");
 	
 
 	set_sqp_dv_en("");
