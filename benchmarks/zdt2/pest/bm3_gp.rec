@@ -1,0 +1,619 @@
+              pestpp-mou: multi-objective optimization under uncertainty
+                         by the PEST++ developement team
+
+
+
+
+
+version: 5.2.5
+binary compiled on Mar 25 2024 at 14:12:11
+
+using control file: "./pest/bm3_gp.pst"
+in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp\benchmarks\zdt2"
+on host: "DUMPLING-FL"
+started at 03/25/24 14:47:38
+
+on host: "DUMPLING-FL"
+
+Note: 2 unused lines in pest control file:
+  -->  line number 6: '10  2  .3  .01  8' 
+  -->  line number 10: '1   1   1' 
+parameter warning: 30 parameters are at lower bound
+
+    This software has been approved for release by the
+    U.S.Geological Survey(USGS).Although the software has 
+    been subjected to rigorous review, the USGS reserves the
+    right to update the software as needed pursuant to further
+    analysisand review.No warranty, expressed or implied, is 
+    made by the USGS or the U.S.Government as to the
+    functionality of the softwareand related material nor shall
+    the fact of release constitute any such warranty.
+    Furthermore, the software is released on condition that
+    neither the USGS nor the U.S.Government shall be held
+    liable for any damages resulting from its authorized 
+    or unauthorized use.
+
+
+Case dimensions:- 
+    Number of parameters = 30
+    Number of adjustable parameters = 30
+    Number of observations = 4
+    Number of prior estimates = 0
+
+PEST Control Information
+    relparmax = 10
+    facparmax = 10
+    facorig = 0.001
+    phiredswh = 0.1
+    noptmax = 5
+    phiredstp = 0.01
+    nphistp = 3
+    nphinored = 3
+    relparstp = 0.01
+    nrelpar = 3
+
+
+    PEST++ OPTIONS: 
+
+...general options (used in multiple tools): 
+svd_pack: redsvd
+lambda_scale_fac: 0.75,1,1.1,
+forgive_unknown_args: 0
+max_run_fail: 3
+panther_poll_interval: 1
+parameter_covariance: 
+observation_covariance: 
+hotstart_resfile: 
+overdue_resched_fac: 1.15
+overdue_giveup_fac: 100
+overdue_giveup_minutes: 1e+30
+condor_submit_file: 
+tie_by_group: 0
+par_sigma_range: 4
+enforce_tied_bounds: 0
+debug_parse_only: 0
+check_tplins: 1
+fill_tpl_zeros: 0
+tpl_force_decimal: 0
+additional_ins_delimiters: 
+random_seed: 358183147
+num_tpl_ins_threads: 1
+save_binary: 0
+ensemble_output_precision: 6
+panther_echo: 1
+panther_agent_restart_on_error: 0
+panther_agent_no_ping_timeout_secs: -1
+panther_debug_loop: 0
+debug_check_par_en_consistency: 0
+panther_agent_freeze_on_fail: 1
+panther_transfer_on_finish: 
+panther_transfer_on_fail: 
+
+...pestpp-glm specific options:
+max_n_super: 1000000
+super_eigthresh: 1e-06
+n_iter_base: 1000000
+n_iter_super: 0
+super_relparmax: 0.1
+max_super_frz_iter: 20
+max_reg_iter: 20
+lambdas: 0.1,1,10,100,1000,
+iteration_summary: 0
+der_forgive: 1
+uncertainty: 1
+forecasts: 
+base_jacobian: 
+glm_num_reals: 0
+jac_scale: 1
+glm_normal_form: DIAG
+glm_debug_der_fail: 0
+glm_debug_lamb_fail: 0
+glm_debug_real_fail: 0
+glm_accept_mc_phi: 0
+glm_rebase_super: 0
+glm_iter_mc: 0
+glm_high_2nd_iter_phi: 0
+
+...pestpp-swp options:
+sweep_parameter_csv_file: 
+sweep_output_csv_file: sweep_out.csv
+sweep_chunk: 500
+sweep_forgive: 0
+sweep_base_run: 0
+sweep_include_regul_phi: 0
+
+...pestpp-opt options:
+opt_objective_function: 
+opt_coin_log: 1
+opt_skip_final: 0
+opt_std_weights: 0
+opt_stack_size: 0
+opt_par_stack: 
+opt_obs_stack: 
+opt_decision_variable_groups: DECVAR,
+opt_external_variable_groups: 
+opt_constraint_groups: 
+opt_risk: 0.5
+opt_iter_derinc_fac: 1
+opt_direction: 1
+opt_iter_tol: 0.001
+opt_recalc_fosm_every: 1
+opt_chance_points: SINGLE
+
+...pestpp-sqp options:
+sqp_dv_en: 
+sqp_obs_restart_en: 
+sqp_num_reals: -1
+sqp_update_hessian: 0
+sqp_scale_facs:
+  1e-05
+  0.0001
+  0.0005
+  0.001
+  0.0025
+  0.005
+  0.01
+  0.05
+  0.075
+  0.1
+  0.25
+  0.5
+  1
+  2
+  5
+  10
+
+...pestpp-mou options:
+mou_generator: pso
+mou_population_size: 100
+mou_dv_population_file: ./model/input/mogp_bm3.dv_pop.csv
+mou_obs_population_restart_file: ./model/input/mogp_bm3.obs_pop.csv
+mou_objectives: 
+  OBJ_1
+  OBJ_2
+mou_max_archive_size: 100
+mou_risk_objective: 0
+mou_verbose_level: 1
+mou_env_selector: NSGA_PPD
+mou_mating_selector: TOURNAMENT
+mou_crossover_prob: 0.75
+mou_mutation_prob: -999
+mou_de_f: 0.8
+mou_save_population_every: 1
+mou_pso_omega: 0.7
+mou_pso_social_const: 2
+mou_pso_cognitive: 2
+mou_pso_alpha: 1
+mou_pso_rramp: -500
+mou_pso_rfit: 2
+mou_fit_beta: 10
+mou_outer_repo_obs_file: 
+mou_hypervolume_extreme: 50
+mou_infill_size: 100
+mou_adaptive_ppd: 0
+mou_ppd_limits: 0.8
+mou_population_schedule: 
+mou_simplex_reflections:10
+mou_simplex_factors: 
+ 0.5
+ 0.6
+ 0.7
+ 0.8
+mou_simplex_mutation: 0
+mou_use_multigen:0
+mou_shuffle_fixed_pars: 0
+
+...shared pestpp-ies/pestpp-da options:
+(note: 'da' args override 'ies' args when using pestpp-da)
+ies_parameter_ensemble: 
+ies_observation_ensemble: 
+ies_weights_ensemble: 
+ies_restart_parameter_ensemble: 
+ies_restart_observation_ensemble: 
+ies_use_approximate_solution: 1
+ies_lambda_mults: 0.1,1,10,
+ies_initial_lambda: 0
+ies_use_approx: 1
+ies_subset_size: 4
+ies_reg_factor: 0
+ies_verbose_level: 1
+ies_use_prior_scaling: 0
+ies_num_reals: 50
+ies_bad_phi: 1e+300
+ies_bad_phi_sigma: 1e+300
+ies_include_base: 1
+ies_use_empirical_prior: 0
+ies_group_draws: 1
+ies_enforce_bounds: 1
+ies_localizer: 
+ies_accept_phi_fac: 1.05
+ies_lambda_inc_fac: 10
+ies_lambda_dec_fac: 0.75
+ies_save_lambda_ensembles: 0
+ies_subset_how: RANDOM
+ies_localize_how: PARAMETERS
+ies_num_threads: -1
+ies_debug_fail_subset: 0
+ies_debug_fail_remainder: 0
+ies_debug_bad_phi: 0
+ies_debug_upgrade_only: 0
+ies_debug_high_subset_phi: 0
+ies_debug_high_upgrade_phi: 0
+ies_csv_by_reals: 1
+ies_autoadaloc: 0
+ies_autoadaloc_sigma_dist: 1
+ies_enforce_chglim: 0
+ies_center_on: 
+ies_no_noise: 0
+ies_drop_conflicts: 0
+ies_save_rescov:0
+ies_pdc_sigma_distance: -1
+ies_use_mda: 0
+ies_mda_init_fac: 10
+ies_mda_dec_fac: 0.5
+ies_localization_type: LOCAL
+ies_upgrades_in_memory: 1
+ies_ordered_binary: 1
+ies_multimodal_alpha: 1
+ies_localizer_forgive_extra: 0
+ies_phi_factors_file: 
+ies_phi_factors_by_real: 0
+
+pestpp-sen options: 
+gsa_method: MORRIS
+gsa_morris_pooled_obs: 0
+gsa_morris_obs_sen: 1
+gsa_morris_p: 4
+gsa_morris_r: 4
+gsa_morris_delta: 0.6666
+gsa_sobol_samples: 4
+gsa_sobol_par_dist: norm
+
+pestpp-da options (those not shared with pestpp-ies):
+da_parameter_cycle_table: 
+da_observation_cycle_table: 
+da_hotstart_cycle: 0
+da_stop_cycle: 1000000000
+da_use_simulated_states: 1
+da_noptmax_schedule: 
+
+
+
+Model command line(s):- 
+    ./pest/MODELRUN_MOGP.bat
+
+Model interface files:-
+    template files:
+      ./pest/dv_tpl.dat
+    model input files:
+      ./model/input/dv.dat
+
+    instruction files:
+      ./pest/gp_output.ins
+    model output files:
+      ./model/output/gp_output.dat
+
+
+Parameter group information
+NAME          INCREMENT TYPE     DERIVATIVE INCREMENT    INCREMENT LOWER BOUND  FORCE CENTRAL     INCREMENT MULTIPLIER
+decvar              ABSOLUTE                     0.01                        0         SWITCH                        1
+
+
+
+Parameter information
+NAME         TRANSFORMATION        CHANGE LIMIT  INITIAL VALUE    LOWER BOUND    UPPER BOUND        GROUP          SCALE         OFFSET  DERIVATIVE COMMAND
+x1           none                  RELATIVE              0              0              1       decvar              1              0                   1
+x2           none                  RELATIVE              0              0              1       decvar              1              0                   1
+x3           none                  RELATIVE              0              0              1       decvar              1              0                   1
+x4           none                  RELATIVE              0              0              1       decvar              1              0                   1
+x5           none                  RELATIVE              0              0              1       decvar              1              0                   1
+x6           none                  RELATIVE              0              0              1       decvar              1              0                   1
+x7           none                  RELATIVE              0              0              1       decvar              1              0                   1
+x8           none                  RELATIVE              0              0              1       decvar              1              0                   1
+x9           none                  RELATIVE              0              0              1       decvar              1              0                   1
+x10          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x11          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x12          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x13          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x14          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x15          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x16          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x17          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x18          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x19          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x20          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x21          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x22          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x23          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x24          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x25          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x26          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x27          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x28          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x29          none                  RELATIVE              0              0              1       decvar              1              0                   1
+x30          none                  RELATIVE              0              0              1       decvar              1              0                   1
+
+
+
+Observation information
+NAME                                VALUE                GROUP              WEIGHT
+obj_1                                   0             less_obj                   1
+obj_2                                   0             less_obj                   1
+obj_1_sd                                0             miscdata                   1
+obj_2_sd                                0             miscdata                   1
+
+
+
+Prior information
+
+   no prior information provided
+
+
+
+PEST SVD Information
+    maxsing = 1000000
+    eigthresh = 1e-06
+
+
+
+
+
+
+  ---  initializing MOEA process  ---  
+...population schedule: generation,population size:
+...   0, 100
+...   1, 100
+...   2, 100
+...   3, 100
+...   4, 100
+...using 'nsga2_ppd' env selector
+...using binary tournament mating pool selector
+...saving generation specific populations and archives every nth generation 1
+'opt_dec_var_groups' passed, using 30 adjustable parameters as decision variables
+decision variables:
+X1 X2 X3 X4 X5 X6 X7 X8 X9 X10 
+X11 X12 X13 X14 X15 X16 X17 X18 X19 X20 
+X21 X22 X23 X24 X25 X26 X27 X28 X29 X30 
+
+...number of decision variables:  30
+...max run fail:  3
+...'opt_chance_points' = SINGLE, evaluting chance at representative point
+...using the following observations as objectives: 
+                         OBJ_1   minimize
+                         OBJ_2   minimize
+
+  ---  observation constraints and/or objectives ---  
+name                 sense          value          
+OBJ_1                less_than      0              
+OBJ_2                less_than      0              
+...using particle swarm generator
+...loading dv population from csv file ./model/input/mogp_bm3.dv_pop.csv
+...dv population with 100 members read from './model/input/mogp_bm3.dv_pop.csv'
+
+...loading obs population from csv file ./model/input/mogp_bm3.obs_pop.csv
+...obs population with 100 members read from './model/input/mogp_bm3.obs_pop.csv'
+
+... saved observation population to  ./pest/bm3_gp.0.obs_pop.csv
+
+  ---  initial population decision variable summary:  ---  
+decision variable        ubnd      lbnd      mean   standard devation         min         max
+X1                          1         0  0.499956            0.288109  0.00379521    0.998152
+X2                          1         0  0.499949            0.288874  0.00915232    0.994038
+X3                          1         0   0.50041            0.288981  0.00631718    0.996003
+X4                          1         0  0.499689            0.287894  0.00593549    0.992408
+X5                          1         0  0.499817            0.288656   0.0019811    0.999347
+X6                          1         0  0.499663            0.289086  0.00049802     0.99369
+X7                          1         0  0.500001            0.288935  0.00548474    0.997007
+X8                          1         0  0.500001            0.288844  0.00651229    0.998976
+X9                          1         0  0.500194            0.288618  0.00447026    0.999554
+X10                         1         0  0.500112            0.288583  0.00684169    0.998768
+X11                         1         0  0.500081            0.289104  0.00140566    0.999969
+X12                         1         0  0.499997            0.288894  0.00919551    0.999063
+X13                         1         0  0.499788            0.288468  0.00533916    0.996603
+X14                         1         0  0.499875            0.288689  0.00742821    0.990198
+X15                         1         0  0.500072            0.288822  0.00107173    0.995264
+X16                         1         0   0.50003            0.289174  0.00270002    0.998195
+X17                         1         0  0.499733            0.288422  0.00614318       0.992
+X18                         1         0   0.50007            0.288298  0.00594641    0.990979
+X19                         1         0  0.499864            0.288997  0.00296153    0.990032
+X20                         1         0  0.499785            0.289163  0.00138575    0.996829
+X21                         1         0  0.499911            0.288201  0.00312728    0.996212
+X22                         1         0  0.500201            0.288716  0.00167095    0.991225
+X23                         1         0  0.500452            0.288953  0.00704524    0.996819
+X24                         1         0  0.499551            0.288518 0.000389105    0.996607
+X25                         1         0  0.499963            0.288003   0.0068135    0.994758
+X26                         1         0  0.499845            0.288691  0.00560235    0.992204
+X27                         1         0  0.500404            0.288788   0.0045381    0.999638
+X28                         1         0  0.500062            0.288708  0.00788663    0.992878
+X29                         1         0  0.500374            0.288572  0.00335562    0.995491
+X30                         1         0  0.499946             0.28876  0.00160502     0.99029
+
+
+  ---  initial population objective function summary:  ---  
+seeking optimal trade-off point for single 'optimal' chance point runs
+using member GEN=0_MEMBER=60 as single, 'optimal' point
+   with distance of 0.398486 from optimal trade - off
+objective function   direction         mean      std dev          min          max         knee
+
+OBJ_1                 minimize     0.499956    0.2881094    0.0037952     0.998152    0.0435346
+OBJ_2                 minimize       5.4388    0.4569061      4.28211      7.16973      4.67861
+
+... saved initial dv population to  ./pest/bm3_gp.0.dv_pop.csv
+...performing initial pareto dominance sort
+...pareto dominance sort yielded 14 domination fronts
+6 in the front 1
+10 in the front 2
+9 in the front 3
+6 in the front 4
+9 in the front 5
+8 in the front 6
+12 in the front 7
+8 in the front 8
+8 in the front 9
+(not reporting remaining front membership)
+...wrote pareto summary to ./pest/bm3_gp.pareto.summary.csv
+initialized archives with 6 nondominated members
+...pareto dominance sort yielded 1 domination fronts
+6 in the front 1
+...wrote pareto summary to ./pest/bm3_gp.pareto.archive.summary.csv
+...loading outer repository obs from csv file 
+...saved decision variable population of size 6 X 30 to './pest/bm3_gp.archive.dv_pop.csv'
+...saved generation-specific decision variable population of size 6 X 30 to './pest/bm3_gp.0.archive.dv_pop.csv'
+...saved observation population of size 6 X 4 to './pest/bm3_gp.archive.obs_pop.csv'
+...saved generation-specific observation population of size 6 X 4 to './pest/bm3_gp.0.archive.obs_pop.csv'
+...number of initial feasible solutions: 6
+
+  ---  initialization complete  ---  
+
+  ---  starting generation  1  ---  
+...pareto dominance sort yielded 14 domination fronts
+6 in the front 1
+10 in the front 2
+9 in the front 3
+6 in the front 4
+9 in the front 5
+8 in the front 6
+12 in the front 7
+8 in the front 8
+8 in the front 9
+(not reporting remaining front membership)
+...generating PSO population of size 100
+...pareto dominance sort yielded 1 domination fronts
+6 in the front 1
+...running population of size  100
+...saved decision variable population of size 100 X 30 to './pest/bm3_gp.dv_pop.csv'
+...saved generation-specific decision variable population of size 100 X 30 to './pest/bm3_gp.1.dv_pop.csv'
+...saved observation population of size 100 X 4 to './pest/bm3_gp.obs_pop.csv'
+...saved generation-specific observation population of size 100 X 4 to './pest/bm3_gp.1.obs_pop.csv'
+...pareto dominance sort yielded 15 domination fronts
+50 in the front 1
+31 in the front 2
+20 in the front 3
+17 in the front 4
+8 in the front 5
+12 in the front 6
+8 in the front 7
+13 in the front 8
+9 in the front 9
+(not reporting remaining front membership)
+...pareto dominance sorting combined parent-child populations of size  200
+...pareto dominance sort yielded 15 domination fronts
+50 in the front 1
+31 in the front 2
+20 in the front 3
+17 in the front 4
+8 in the front 5
+12 in the front 6
+8 in the front 7
+13 in the front 8
+9 in the front 9
+(not reporting remaining front membership)
+...wrote pareto summary to ./pest/bm3_gp.pareto.summary.csv
+updating archive
+adding 50 non-dominated members to archive
+pareto dominance sorting archive of size 56
+...pareto dominance sort yielded 2 domination fronts
+50 in the front 1
+6 in the front 2
+...wrote pareto summary to ./pest/bm3_gp.pareto.archive.summary.csv
+resizing archive from 56 to 50 current non-dominated solutions
+...saved decision variable population of size 50 X 30 to './pest/bm3_gp.archive.dv_pop.csv'
+...saved generation-specific decision variable population of size 50 X 30 to './pest/bm3_gp.1.archive.dv_pop.csv'
+...saved observation population of size 50 X 4 to './pest/bm3_gp.archive.obs_pop.csv'
+...saved generation-specific observation population of size 50 X 4 to './pest/bm3_gp.1.archive.obs_pop.csv'
+...resizing current populations to  100
+
+  ---  generation 1 decision variable summary:  ---  
+decision variable        ubnd      lbnd      mean   standard devation         min         max
+X1                          1         0  0.318336            0.342593           0           1
+X2                          1         0  0.509225            0.311867           0           1
+X3                          1         0  0.486694             0.28169           0           1
+X4                          1         0  0.471913            0.280986           0           1
+X5                          1         0  0.420023            0.326136           0           1
+X6                          1         0  0.401551             0.30941           0           1
+X7                          1         0  0.563259            0.320791           0           1
+X8                          1         0  0.485658            0.367559           0           1
+X9                          1         0  0.370321            0.285658           0           1
+X10                         1         0  0.399051            0.297255           0           1
+X11                         1         0  0.357569            0.275513           0    0.946921
+X12                         1         0  0.413829            0.318637           0           1
+X13                         1         0  0.451069            0.334261           0           1
+X14                         1         0  0.494103            0.399834           0           1
+X15                         1         0  0.263408            0.285296           0           1
+X16                         1         0  0.431066            0.308121           0           1
+X17                         1         0  0.450591            0.335005           0           1
+X18                         1         0  0.526002            0.288685           0           1
+X19                         1         0  0.562041            0.363522           0           1
+X20                         1         0   0.44112            0.351142           0           1
+X21                         1         0  0.277496            0.253255           0    0.834146
+X22                         1         0  0.413363            0.284763           0           1
+X23                         1         0   0.46744            0.328285           0           1
+X24                         1         0  0.418563            0.329339           0           1
+X25                         1         0  0.582818            0.255461           0           1
+X26                         1         0  0.378637            0.307534           0           1
+X27                         1         0  0.691371            0.321049           0           1
+X28                         1         0  0.355681            0.310341           0           1
+X29                         1         0  0.385394            0.337559           0           1
+X30                         1         0  0.535721            0.325966           0           1
+
+
+  ---  generation 1 decision variable change summary:  ---  
+decision variable  mean change   % change max change   % change min change   % change
+X1                     0.18162    36.3272  -0.001848  -0.185142 0.00379521        100
+X2                 -0.00927668   -1.85553  -0.005962  -0.599776 0.00915232        100
+X3                    0.013716    2.74094  -0.003997  -0.401304 0.00631718        100
+X4                   0.0277762    5.55869  -0.007592  -0.765008 0.00593549        100
+X5                   0.0797942    15.9647  -0.000653 -0.0653427  0.0019811        100
+X6                   0.0981117    19.6356   -0.00631  -0.635007 0.00049802        100
+X7                  -0.0632582   -12.6516  -0.002993  -0.300198 0.00548474        100
+X8                   0.0143425    2.86849  -0.001024  -0.102505 0.00651229        100
+X9                    0.129873    25.9645  -0.000446 -0.0446199 0.00447026        100
+X10                   0.101061    20.2077  -0.001232  -0.123352 0.00684169        100
+X11                   0.142512    28.4978  0.0530483    5.30499 0.00140566        100
+X12                  0.0861685    17.2338  -0.000937 -0.0937879 0.00919551        100
+X13                  0.0487183     9.7478  -0.003397  -0.340858 0.00533916        100
+X14                 0.00577214    1.15472  -0.009802  -0.989903 0.00742821        100
+X15                   0.236663    47.3259  -0.004736  -0.475854 0.00107173        100
+X16                   0.068964     13.792  -0.001805  -0.180826 0.00270002        100
+X17                   0.049142    9.83365     -0.008  -0.806452 0.00614318        100
+X18                 -0.0259317   -5.18562  -0.009021  -0.910312 0.00594641        100
+X19                  -0.062177   -12.4388  -0.009968   -1.00684 0.00296153        100
+X20                  0.0586655    11.7381  -0.003171  -0.318109 0.00138575        100
+X21                   0.222414    44.4908   0.162066    16.2682 0.00312728        100
+X22                  0.0868378    17.3606  -0.008775  -0.885268 0.00167095        100
+X23                  0.0330118    6.59639  -0.003181  -0.319115 0.00704524        100
+X24                  0.0809885    16.2122  -0.003393  -0.3404550.000389105        100
+X25                 -0.0828551   -16.5723  -0.005242  -0.526962  0.0068135        100
+X26                   0.121208     24.249  -0.007796  -0.785726 0.00560235        100
+X27                  -0.190966   -38.1625  -0.000362 -0.0362131  0.0045381        100
+X28                   0.144381    28.8727  -0.007122  -0.717309 0.00788663        100
+X29                    0.11498    22.9788  -0.004509  -0.452942 0.00335562        100
+X30                 -0.0357752   -7.15581   -0.00971  -0.980521 0.00160502        100
+
+
+  ---  generation 1 objective function summary:  ---  
+seeking optimal trade-off point for single 'optimal' chance point runs
+using member GEN=1_MEMBER=45_PSO as single, 'optimal' point
+   with distance of 0.876494 from optimal trade - off
+objective function   direction         mean      std dev          min          max         knee
+
+OBJ_1                 minimize    0.3183358    0.3425931            0            1    0.2757955
+OBJ_2                 minimize     4.633839     0.662427     2.732986      6.22985     3.564958
+
+
+  ---  generation 1 objective function change summary:  ---  
+objective function   mean change    % change  max change    % change  min change    % change knee change    % change
+OBJ_1                    0.18162     36.3272   -0.001848   -0.185142   0.0037952         100   -0.232261    -533.509
+OBJ_2                   0.804961     14.8003     0.93988      13.109     1.54912     36.1767     1.11365      23.803
+
+...number of feasible solutions at the end of generation 1: 56
+
+  ---  starting generation  2  ---  
+...pareto dominance sort yielded 3 domination fronts
+50 in the front 1
+31 in the front 2
+19 in the front 3
+...generating PSO population of size 100
+...pareto dominance sort yielded 1 domination fronts
+50 in the front 1
+...running population of size  100
