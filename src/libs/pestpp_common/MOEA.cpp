@@ -2070,6 +2070,7 @@ void MOEA::initialize()
 		n_adaptive_dvs++;
 	}
 	constraints.initialize(dv_names, numeric_limits<double>::max());
+
 	constraints.initial_report();
 
 	if (pest_scenario.get_control_info().noptmax == 0)

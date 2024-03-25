@@ -490,6 +490,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 		}
 
 		probit_val = get_probit();
+        initialize_chance_schedule(f_rec);
 		//if the std weight options was selected, use it - it overrides all other options
 		if (std_weights)
 		{
