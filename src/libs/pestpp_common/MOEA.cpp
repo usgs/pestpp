@@ -2239,8 +2239,7 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
         dp_archive.append_other_rows(keep, other);
         other.resize(0, 0);
         message(2, "pareto dominance sorting archive of size", op_archive.shape().first);
-        DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, prob_pareto, true,
-                                                                ARC_SUM_TAG);
+        DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, prob_pareto, true, ARC_SUM_TAG);
 
         ss.str("");
         ss << "resizing archive from " << op_archive.shape().first << " to " << dompair.first.size()
@@ -2263,6 +2262,10 @@ void MOEA::update_archive_nsga(ObservationEnsemble& _op, ParameterEnsemble& _dp)
 		op_archive.keep_rows(keep);
 		dp_archive.keep_rows(keep);
 	}
+
+	//report only trimmed archive with updated fitness value
+	objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, prob_pareto, true, ARC_TRIM_SUM_TAG);
+
 	dp_archive.reset_org_real_names();
 	op_archive.reset_org_real_names();
 
@@ -3330,6 +3333,7 @@ void MOEA::initialize()
 
 		//this causes the initial archive pareto summary file to be written
 		objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, false, true, ARC_SUM_TAG);
+		objectives.get_nsga2_pareto_dominance(iter, op_archive, dp_archive, &constraints, false, true, ARC_TRIM_SUM_TAG);
 
 		//set hypervolume partitions of nondom solutions from previous outer iteration
 		if (prob_pareto)

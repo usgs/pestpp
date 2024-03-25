@@ -19,6 +19,7 @@
 
 const string POP_SUM_TAG = "pareto.summary.csv";
 const string ARC_SUM_TAG = "pareto.archive.summary.csv";
+const string ARC_TRIM_SUM_TAG = "pareto.trimmed.archive.summary.csv";
 const string RISK_NAME = "_RISK_";
 const string DE_F_NAME = "_DE_F_";
 const string CR_NAME = "_CR_";
@@ -55,6 +56,7 @@ public:
 		obj_dir_mult_ptr = &_obj_dir_mult;
 		prep_pareto_summary_file(POP_SUM_TAG);
 		prep_pareto_summary_file(ARC_SUM_TAG);
+		prep_pareto_summary_file(ARC_TRIM_SUM_TAG);
 	}
 	
 	void update(ObservationEnsemble& oe, ParameterEnsemble& dp, Constraints* constraints_ptr = nullptr);
