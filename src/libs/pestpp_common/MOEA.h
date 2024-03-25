@@ -123,7 +123,7 @@ private:
 	double get_euclidean_fitness(double E, double V);
 	pair<map<string, double>, map<string, double>> get_euclidean_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
 
-	map<string, map<string, double>> member_struct;
+	map<string, map<string, double>> member_struct, extreme_members;
 	vector<string>* obj_names_ptr;
 	vector<string>* obs_obj_names_ptr;
 	vector<string>* obs_obj_sd_names_ptr;
