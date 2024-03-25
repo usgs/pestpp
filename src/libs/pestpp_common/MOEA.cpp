@@ -1543,7 +1543,9 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 		pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(pars);
 		Observations obs = pest_scenario.get_ctl_observations();
 		//if this is the first iter and no restart
-		
+        ss.str("");
+        ss << "queuing chance runs for generation " << iter;
+		message(1,ss.str());
 		if (chancepoints == chancePoints::SINGLE)
 		{
 			//dont use the _dp, use the class attr dp and op here
