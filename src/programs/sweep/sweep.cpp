@@ -835,7 +835,6 @@ int main(int argc, char* argv[])
 			{
 				//Parameters temp = base_trans_seq.active_ctl2model_cp(par);
 		        irun_ids.push_back(run_manager_ptr->add_run(base_trans_seq.active_ctl2model_cp(par)));
-                break;
 			}
 
 			//make some runs
@@ -871,6 +870,7 @@ int main(int argc, char* argv[])
 		// clean up
 
 		obs_stream.close();
+        par_stream.close();
 		delete run_manager_ptr;
 
 		string case_name = file_manager.get_base_filename();

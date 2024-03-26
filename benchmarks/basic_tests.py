@@ -187,6 +187,8 @@ def sweep_forgive_test():
     assert diff.max().max() == 0.0
 
 
+
+
 def inv_regul_test():
     model_d = "ies_10par_xsec"
     
@@ -1437,11 +1439,56 @@ def run():
     pyemu.os_utils.start_workers(t_d, exe_path, pst_name, num_workers=15,
                                  worker_root=model_d, port=4004)
 
+def sweep_bin_test():
+
+    model_d = "ies_10par_xsec"
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_sweep_bin")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
+    pe = pyemu.ParameterEnsemble.from_uniform_draw(pst,num_reals=50)#.loc[:,pst.par_names[:2]]
+
+    pe.to_csv(os.path.join(t_d,"sweep_in.csv"))
+    pe._df.index = pe.index.map(str)
+    print(pe.index)
+    pe.to_dense(os.path.join(t_d,"sweep_in.bin"))
+    pst.pestpp_options["ies_par_en"] = "sweep_in.csv"
+    pst.pestpp_options["sweep_forgive"] = True
+    pst.pestpp_options["sweep_parameter_file"] = "sweep_in.bin"
+    pst.control_data.noptmax = -1
+    pst.pestpp_options.pop("ies_num_reals",None)
+    pst.write(os.path.join(t_d,"pest_forgive.pst"))
+    pst.pestpp_options["sweep_output_file"] = "sweep_out.bin"
+    pst.pestpp_options["sweep_chunk"] = 9
+    pst.pestpp_options["ies_include_base"] = False
+    pst.write(os.path.join(t_d,"pest_forgive.pst"))
+    m_d = os.path.join(model_d,"master_sweep_bin_base")
+    pyemu.os_utils.start_workers(t_d, exe_path, "pest_forgive.pst", 10, master_dir=m_d,
+                           worker_root=model_d,port=port)
+    df1 = pd.read_csv(os.path.join(m_d, "pest_forgive.0.obs.csv"),index_col=0)
+    assert df1.shape[0] == pe.shape[0]
+    m_d = os.path.join(model_d, "master_sweep_bin")
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-swp"), "pest_forgive.pst", 10, master_dir=m_d,
+                                 worker_root=model_d, port=port)
+    df2 = pyemu.Matrix.from_binary(os.path.join(m_d,"sweep_out.bin")).to_dataframe()
+    print(df2)
+    print(df1)
+    assert df2.shape == df1.shape
+    diff = (df1.values - df2.values)
+    print(diff)
+    print(diff.max())
+    print(np.abs(diff).max())
+    assert np.abs(diff).max() < 1e-7
+
+
+
 if __name__ == "__main__":
     #run()
     #mf6_v5_ies_test()
     #prep_ends()
-    mf6_v5_sen_test()
+    sweep_bin_test()
+    #mf6_v5_sen_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
     #shutil.copy2(os.path.join("..", "exe", "windows", "x64", "Debug", "pestpp-ies.exe"),
     #             os.path.join("..", "bin", "win", "pestpp-ies.exe"))
