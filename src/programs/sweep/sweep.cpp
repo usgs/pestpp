@@ -323,81 +323,111 @@ void load_parameters_from_dense_binary(map<string, int>& header_info, ifstream& 
     //return pair<vector<string>,vector<Parameters>> (run_ids,sweep_pars);
 }
 
-void prep_sweep_output_file(Pest &pest_scenario, ofstream &csv)
+void prep_sweep_output_file(Pest &pest_scenario, ofstream &out, bool& is_binary)
 {
-	//ofstream csv(pest_scenario.get_pestpp_options().get_sweep_output_csv_file());
-	csv.open(pest_scenario.get_pestpp_options().get_sweep_output_csv_file());	
-	if (!csv.good())
-	{
-		throw runtime_error("could not open sweep_output_csv_file for writing: " +
-			pest_scenario.get_pestpp_options().get_sweep_output_csv_file());
-	}
-	csv << setprecision(numeric_limits<double>::digits10);
-	csv << "run_id,input_run_id,failed_flag";
-	csv << ",phi,meas_phi,regul_phi";
-	for (auto &ogrp : pest_scenario.get_ctl_ordered_obs_group_names())
-	{
-		csv << ',' << pest_utils::lower_cp(ogrp);
-	}
-	for (auto &oname : pest_scenario.get_ctl_ordered_obs_names())
-		csv << ',' << pest_utils::lower_cp(oname);
-	csv << endl;
-	csv.flush();
-	//return csv;
+	//ofstream out(pest_scenario.get_pestpp_options().get_sweep_output_csv_file());
+    vector<string> obs_names = pest_scenario.get_ctl_ordered_obs_names();
+    string filename = pest_scenario.get_pestpp_options().get_sweep_output_csv_file();
+    string obs_ext = filename.substr(filename.size() - 3, filename.size());
+    pest_utils::lower_ip(obs_ext);
+    if (obs_ext.compare("bin") == 0)
+    {
+        out.open(filename,ios::binary);
+        if (!out.good()) {
+            throw runtime_error("could not open sweep_output_file for writing: " +
+                                filename);
+        }
+        prep_save_dense_binary(out,obs_names);
+        is_binary = true;
+
+    }
+    else {
+        out.open(filename);
+
+
+        if (!out.good()) {
+            throw runtime_error("could not open sweep_output_file for writing: " +
+                                filename);
+        }
+        out << setprecision(numeric_limits<double>::digits10);
+        out << "run_id,input_run_id,failed_flag";
+        out << ",phi,meas_phi,regul_phi";
+        for (auto &ogrp: pest_scenario.get_ctl_ordered_obs_group_names()) {
+            out << ',' << pest_utils::lower_cp(ogrp);
+        }
+        for (auto &oname: pest_scenario.get_ctl_ordered_obs_names())
+            out << ',' << pest_utils::lower_cp(oname);
+        out << endl;
+        out.flush();
+        is_binary = false;
+        //return out;
+    }
 }
 
-void process_sweep_runs(ofstream &csv, Pest &pest_scenario, RunManagerAbstract* run_manager_ptr, vector<int> run_ids, vector<string> listed_run_ids, ObjectiveFunc obj_func,int total_runs_done)
+void process_sweep_runs(ofstream &out, Pest &pest_scenario, RunManagerAbstract* run_manager_ptr, vector<int> run_ids, vector<string> listed_run_ids,
+                        ObjectiveFunc obj_func,int total_runs_done,bool is_binary_output)
 {
 	Parameters pars;
 	Observations obs;
-	double fail_val = -1.0E+10;
+	double fail_val = -1.0E+100;
 	int run_id;
 	string listed_run_id;
+    bool success;
 	//for (auto &run_id : run_ids)
+
+    vector<string> obs_names = pest_scenario.get_ctl_ordered_obs_names();
+    vector<string> obs_group_names = pest_scenario.get_ctl_ordered_obs_group_names();
+    Eigen::VectorXd vec(obs_names.size());
+    vec.setConstant(fail_val);
 	for (int i = 0;i <run_ids.size();++i)
 	{
 		run_id = run_ids[i];
 		listed_run_id = listed_run_ids[i];
-		csv << run_id + total_runs_done;
-		csv << ',' << listed_run_id;
-		// if the run was successful
-		if (run_manager_ptr->get_run(run_id, pars, obs))
-		{
-			PhiData phi_data = obj_func.phi_report(obs, pars, *(pest_scenario.get_regul_scheme_ptr()));
+        success = run_manager_ptr->get_run(run_id, pars, obs);
+        if (is_binary_output)
+        {
+            vec.setConstant(fail_val);
+            if (success)
+            {
+                vec = obs.get_data_eigen_vec(obs_names);
+            }
+            save_dense_binary(out,listed_run_id,vec);
+        }
+        else {
+            out << run_id + total_runs_done;
+            out << ',' << listed_run_id;
+            // if the run was successful
+            if (success) {
+                PhiData phi_data = obj_func.phi_report(obs, pars, *(pest_scenario.get_regul_scheme_ptr()));
 
-			csv << ",0";
+                out << ",0";
 
-			csv << ',' << phi_data.total();
-			csv << ',' << phi_data.meas;
-			csv << ',' << phi_data.regul;
-			for (auto &obs_grp : pest_scenario.get_ctl_ordered_obs_group_names())
-			{
-				csv << ',' << phi_data.group_phi.at(obs_grp);
-			}
-			for (auto oname : pest_scenario.get_ctl_ordered_obs_names())
-			{
-				csv << ',' << obs[oname];
-			}
-			csv << endl;
-		}
-		//if the run bombed
-		else
-		{
-			csv << ",1";
-			csv << ",,,";
-			for (auto &ogrp : pest_scenario.get_ctl_ordered_obs_group_names())
-			{
-				csv << ',';
-			}
-			for (int i = 0; i < pest_scenario.get_ctl_ordered_obs_names().size(); i++)
-			{
-				csv << ',' << fail_val;
-			}
-			csv << endl;
-		}
+                out << ',' << phi_data.total();
+                out << ',' << phi_data.meas;
+                out << ',' << phi_data.regul;
+                for (auto &obs_grp: obs_group_names) {
+                    out << ',' << phi_data.group_phi.at(obs_grp);
+                }
+                for (auto &oname: obs_names) {
+                    out << ',' << obs[oname];
+                }
+                out << endl;
+            }
+                //if the run bombed
+            else {
+                out << ",1";
+                out << ",,,";
+                for (auto &ogrp: obs_group_names) {
+                    out << ',';
+                }
+                for (int i = 0; i < obs_names.size(); i++) {
+                    out << ',' << fail_val;
+                }
+                out << endl;
+            }
+        }
 	}
 }
-
 
 
 int main(int argc, char* argv[])
@@ -702,7 +732,8 @@ int main(int argc, char* argv[])
 
 		// prepare the output file
 		ofstream obs_stream;
-		prep_sweep_output_file(pest_scenario,obs_stream);
+        bool is_binary_output = false;
+		prep_sweep_output_file(pest_scenario,obs_stream,is_binary_output);
 
 		int chunk = pest_scenario.get_pestpp_options().get_sweep_chunk();
 		//pair<vector<string>,vector<Parameters>> sweep_par_info;
@@ -814,7 +845,7 @@ int main(int argc, char* argv[])
 			//process the runs
 			cout << "processing runs...";
 			//process_sweep_runs(obs_stream, pest_scenario, run_manager_ptr, run_ids, obj_func,total_runs_done);
-			//process_sweep_runs(obs_stream, pest_scenario, run_manager_ptr,irun_ids, run_ids, obj_func, total_runs_done);
+			process_sweep_runs(obs_stream, pest_scenario, run_manager_ptr,irun_ids, run_ids, obj_func, total_runs_done,is_binary_output);
 
 			cout << "done" << endl;
 			total_runs_done += run_ids.size();

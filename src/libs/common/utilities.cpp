@@ -1478,6 +1478,109 @@ void save_binary_extfmt(const string &filename, const vector<string> &row_names,
 	jout.close();
 }
 
+void save_dense_binary(ofstream& out,const string& row_name,Eigen::VectorXd& data)
+{
+    if (!out.good())
+    {
+        throw runtime_error("save_dense_binary(): stream not good");
+    }
+    int tmp;
+    double d;
+    tmp = row_name.size();
+    char *real_name = new char[tmp];
+    out.write((char *) &tmp, sizeof(tmp));
+    pest_utils::string_to_fortran_char(row_name, real_name, tmp);
+    out.write(real_name, tmp);
+    delete[] real_name;
+    for (int jcol = 0; jcol < data.size(); ++jcol)
+    {
+        d = data(jcol);
+        out.write((char*)&(d), sizeof(d));
+    }
+
+    if (!out.good())
+    {
+        throw runtime_error("save_dense_binary(): stream not good");
+    }
+}
+
+
+void save_dense_binary(ofstream& out,const vector<string>& row_names,Eigen::MatrixXd& data)
+{
+    if (!out.good())
+    {
+        throw runtime_error("save_dense_binary(): stream not good");
+    }
+    streampos current_pos = out.tellp();
+    if (current_pos == 0)
+    {
+        throw runtime_error("save_dense_binary(): stream is uninitialized");
+    }
+    int tmp;
+    double d;
+    Eigen::VectorXd row;
+    string name;
+    for (int irow=0;irow<row_names.size();irow++)
+    {
+        row = data.row(irow);
+        save_dense_binary(out,row_names[irow],row);
+//        string name = row_names[irow];
+//        tmp = name.size();
+//        char *real_name = new char[tmp];
+//        out.write((char *) &tmp, sizeof(tmp));
+//        pest_utils::string_to_fortran_char(name, real_name, tmp);
+//        out.write(real_name, tmp);
+//        delete[] real_name;
+//        for (int jcol = 0; jcol < data.cols(); ++jcol)
+//        {
+//            d = data(irow,jcol);
+//            out.write((char*)&(d), sizeof(d));
+//        }
+    }
+    if (!out.good())
+    {
+        throw runtime_error("save_dense_binary(): stream not good");
+    }
+}
+
+void prep_save_dense_binary(ofstream& out,const vector<string>& col_names)
+{
+    if (!out.good())
+    {
+        throw runtime_error("prep_save_dense_binary(): stream not good");
+    }
+    int tmp = 0;
+    out.write((char*)&tmp, sizeof(tmp));
+    int n_var = col_names.size();
+    int n = -1 * n_var;
+    out.write((char*)&n, sizeof(n));
+    out.write((char*)&n, sizeof(n));
+    for (vector<string>::const_iterator b = col_names.begin(), e = col_names.end();
+         b != e; ++b)
+    {
+        string name = pest_utils::lower_cp(*b);
+        tmp = name.size();
+        out.write((char*)&tmp, sizeof(tmp));
+        //mx = max(tmp, mx);
+    }
+    if (!out.good())
+    {
+        throw runtime_error("prep_save_dense_binary(): stream not good");
+    }
+    for (vector<string>::const_iterator b = col_names.begin(), e = col_names.end();
+         b != e; ++b)
+    {
+        string name = pest_utils::lower_cp(*b);
+        char* par_name = new char[name.size()];
+        pest_utils::string_to_fortran_char(name, par_name, name.size());
+        out.write(par_name, name.size());
+        delete[] par_name;
+    }
+    if (!out.good())
+    {
+        throw runtime_error("prep_save_dense_binary(): stream not good");
+    }
+}
 
 void save_binary_orgfmt(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix)
 {

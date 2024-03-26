@@ -309,7 +309,9 @@ bool read_binary(const string &filename, vector<string> &row_names, vector<strin
 
 bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::MatrixXd &matrix);
 
-
+void prep_save_dense_binary(ofstream& out,const vector<string>& col_names);
+void save_dense_binary(ofstream& out,const vector<string>& row_names,Eigen::MatrixXd& data);
+void save_dense_binary(ofstream& out,const string& row_name,Eigen::VectorXd& data);
 void save_binary(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix);
 void save_binary_extfmt(const string &filename,const  vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix);
 void save_binary_orgfmt(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix);

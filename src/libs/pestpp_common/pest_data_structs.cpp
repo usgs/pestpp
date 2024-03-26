@@ -564,10 +564,11 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
         //convert_ip(org_value, sweep_parameter_csv_file);
 		sweep_parameter_csv_file = org_value;
 	}
-	else if ((key == "SWEEP_OUTPUT_CSV_FILE") || (key == "SWEEP_OBS_CSV"))
+	else if ((key == "SWEEP_OUTPUT_CSV_FILE") || (key == "SWEEP_OBS_CSV") || (key == "SWEEP_OUTPUT_FILE"))
 	{
 		passed_args.insert("SWEEP_OUTPUT_CSV_FILE");
 		passed_args.insert("SWEEP_OBS_CSV");
+        passed_args.insert("SWEEP_OUTPUT_FILE");
 			
 		//convert_ip(org_value, sweep_output_csv_file);
 		sweep_output_csv_file = org_value;
