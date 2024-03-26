@@ -116,8 +116,9 @@ map<string,int> prepare_parameter_csv(Parameters pars, ifstream &csv, bool forgi
 	return header_info;
 }
 
-map<string,int> prepare_parameter_dense_binary(Parameters pars, ifstream &in, bool forgive)
+map<string,int> prepare_parameter_dense_binary(Parameters pars, ifstream &in, bool forgive, vector<string>& header_tokens)
 {
+    stringstream ss;
     if (!in.good())
     {
         throw runtime_error("ifstream not good in prepare_parameter_dense_binary()");
@@ -125,13 +126,19 @@ map<string,int> prepare_parameter_dense_binary(Parameters pars, ifstream &in, bo
 
     //process the header
     //any missing header labels will be marked to ignore those columns later
-    int tmp1,n_cols,tmp3;
-    read_binary_matrix_header(in,tmp1,n_cols,tmp3);
-    if (!is_dense_binary_matrix(tmp1,n_cols,tmp3))
+    int tmp1,n_col,tmp3;
+    read_binary_matrix_header(in,tmp1,n_col,tmp3);
+    if (!is_dense_binary_matrix(tmp1,n_col,tmp3))
     {
         throw runtime_error("prepare_parameter_dense_binary() file does not contain a dense binary matrix");
     }
-    vector<string> header_tokens = read_dense_binary_col_names(in,n_cols);
+    n_col *= -1;
+    header_tokens.clear();
+    header_tokens = read_dense_binary_col_names(in,n_col);
+    ss.str("");
+    ss << "..." << header_tokens.size() << " valid parameter entries found in dense binary parameter file ("
+    << n_col << " total columns)" << endl;
+    cout << ss.str();
     // check for parameter names that in the pest control file but that are missing from the csv file
     vector<string> missing_names;
     string name;
@@ -642,10 +649,12 @@ int main(int argc, char* argv[])
 		if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
 		{
 			cout << "  ---  binary jco-type file detected for par_csv" << endl;
+            fout_rec << "  ---  binary jco-type file detected for par_csv" << endl;
 			use_jco = true;
 			Jacobian jco(file_manager);
 			jco.read(par_csv_file);
 			cout << jco.get_matrix_ptr()->rows() << " runs found in binary jco-type file" << endl;
+            fout_rec << jco.get_matrix_ptr()->rows() << " runs found in binary jco-type file" << endl;
 			//check that the jco is compatible with the control file
 			vector<string> names = jco.get_base_numeric_par_names();
 			jco_col_names = jco.get_sim_obs_names();
@@ -670,13 +679,21 @@ int main(int argc, char* argv[])
 		else if (par_ext.compare("csv") == 0)
 		{
             cout << "  ---  csv file detected for par_csv" << endl;
+            fout_rec << "  ---  csv file detected for par_csv" << endl;
 			header_info = prepare_parameter_csv(pest_scenario.get_ctl_parameters(),
 				par_stream, pest_scenario.get_pestpp_options().get_sweep_forgive());
 		}
         else if (par_ext.compare("bin")==0)
         {
             cout << "  ---  dense binary file detected for par_csv" << endl;
-            header_info = prepare_parameter_dense_binary(pest_scenario.get_ctl_parameters(),par_stream, pest_scenario.get_pestpp_options().get_sweep_forgive());
+            fout_rec << "  ---  dense binary file detected for par_csv" << endl;
+            vector<string> col_names;
+            header_info = prepare_parameter_dense_binary(pest_scenario.get_ctl_parameters(),par_stream,
+                                                         pest_scenario.get_pestpp_options().get_sweep_forgive(),col_names);
+            vector<string> all_row_names = read_dense_binary_remaining_row_names(par_stream,col_names);
+            cout << "..." << all_row_names.size() << " parameter sets found in dense binary file" << endl;
+            fout_rec << "..." << all_row_names.size() << " parameter sets found in dense binary file" << endl;
+
 
         }
         else

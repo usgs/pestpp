@@ -1078,7 +1078,7 @@ void read_binary_matrix_header(ifstream& in, int& tmp1, int& tmp2, int& tmp3)
         throw runtime_error(ss.str());
     }
 
-    in.close();
+
 
 }
 
