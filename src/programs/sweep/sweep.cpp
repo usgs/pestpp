@@ -116,6 +116,73 @@ map<string,int> prepare_parameter_csv(Parameters pars, ifstream &csv, bool forgi
 	return header_info;
 }
 
+map<string,int> prepare_parameter_densebin(Parameters pars, ifstream &csv, bool forgive)
+{
+    if (!csv.good())
+    {
+        throw runtime_error("ifstream not good");
+    }
+
+    //process the header
+    //any missing header labels will be marked to ignore those columns later
+
+    string line;
+    vector<string> header_tokens;
+    if (!getline(csv, line))
+        throw runtime_error("error reading header (first) line from csv file :");
+    strip_ip(line);
+    upper_ip(line);
+    tokenize(line, header_tokens, ",", false);
+
+    for (auto &t : header_tokens)
+    {
+        strip_ip(t);
+    }
+    //cout << tokens << endl;
+    //vector<string> header_tokens = tokens;
+
+    // check for parameter names that in the pest control file but that are missing from the csv file
+    vector<string> missing_names;
+    string name;
+    set<string> stokens(header_tokens.begin(),header_tokens.end());
+    for (auto &p : pars)
+        if (stokens.find(p.first) == stokens.end())
+            missing_names.push_back(p.first);
+
+    if (missing_names.size() > 0)
+    {
+        stringstream ss;
+        ss << " the following pest control file parameter names were not found in the parameter csv file:" << endl;
+        for (auto &n : missing_names) ss << n << endl;
+        if (!forgive)
+            throw runtime_error(ss.str());
+        else
+            cout << ss.str() << endl << "continuing anyway..." << endl;
+    }
+
+    if (header_tokens[header_tokens.size() - 1].size() == 0)
+        header_tokens.pop_back();
+
+
+    //build up a list of idxs to use
+    vector<string> ctl_pnames = pars.get_keys();
+    unordered_set<string> s_pnames(ctl_pnames.begin(), ctl_pnames.end());
+    unordered_set<string>::iterator end = s_pnames.end();
+    ctl_pnames.resize(0);
+    vector<int> header_idxs;
+    map<string, int> header_info;
+    for (int i = 0; i < header_tokens.size(); i++)
+    {
+        //if (find(ctl_pnames.begin(), ctl_pnames.end(), header_tokens[i]) != ctl_pnames.end())
+        if (s_pnames.find(header_tokens[i]) != end)
+        {
+            //header_idxs.push_back(i);
+            header_info[header_tokens[i]] = i;
+        }
+    }
+    return header_info;
+}
+
 //pair<vector<string>,vector<Parameters>> load_parameters_from_csv(map<string,int> &header_info, ifstream &csv, int chunk, const Parameters &ctl_pars, vector<string> &run_ids, vector<Parameters> &sweep_pars)
 void load_parameters_from_csv(map<string, int>& header_info, ifstream& csv, int chunk, const Parameters& ctl_pars, vector<string>& run_ids, vector<Parameters>& sweep_pars)
 
@@ -469,7 +536,7 @@ int main(int argc, char* argv[])
 		ifstream par_stream(par_csv_file);
 		if (!par_stream.good())
 		{
-			throw runtime_error("could not open parameter csv file " + par_csv_file);
+			throw runtime_error("could not open parameter sweep file " + par_csv_file);
 		}
 
 		RunManagerAbstract *run_manager_ptr;
@@ -557,11 +624,23 @@ int main(int argc, char* argv[])
 			jco_mat = jco.get_matrix(jco.get_sim_obs_names(), pest_scenario.get_ctl_ordered_par_names()).toDense();
 		}
 
-		else
+		else if (par_ext.compare("csv") == 0)
 		{
+            cout << "  ---  csv file detected for par_csv" << endl;
 			header_info = prepare_parameter_csv(pest_scenario.get_ctl_parameters(),
 				par_stream, pest_scenario.get_pestpp_options().get_sweep_forgive());
 		}
+        else if (par_ext.compare("bin")==0)
+        {
+            cout << "  ---  dense binary file detected for par_csv" << endl;
+            header_info = prepare_parameter_densebin(pest_scenario.get_ctl_parameters(),par_stream, pest_scenario.get_pestpp_options().get_sweep_forgive());
+
+
+        }
+        else
+        {
+            throw runtime_error("unrecognized parameter sweep input file extension: '"+par_ext+"'");
+        }
 
 		// prepare the output file
 		ofstream obs_stream;
