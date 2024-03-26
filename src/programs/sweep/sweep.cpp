@@ -116,31 +116,22 @@ map<string,int> prepare_parameter_csv(Parameters pars, ifstream &csv, bool forgi
 	return header_info;
 }
 
-map<string,int> prepare_parameter_densebin(Parameters pars, ifstream &csv, bool forgive)
+map<string,int> prepare_parameter_dense_binary(Parameters pars, ifstream &in, bool forgive)
 {
-    if (!csv.good())
+    if (!in.good())
     {
-        throw runtime_error("ifstream not good");
+        throw runtime_error("ifstream not good in prepare_parameter_dense_binary()");
     }
 
     //process the header
     //any missing header labels will be marked to ignore those columns later
-
-    string line;
-    vector<string> header_tokens;
-    if (!getline(csv, line))
-        throw runtime_error("error reading header (first) line from csv file :");
-    strip_ip(line);
-    upper_ip(line);
-    tokenize(line, header_tokens, ",", false);
-
-    for (auto &t : header_tokens)
+    int tmp1,n_cols,tmp3;
+    read_binary_matrix_header(in,tmp1,n_cols,tmp3);
+    if (!is_dense_binary_matrix(tmp1,n_cols,tmp3))
     {
-        strip_ip(t);
+        throw runtime_error("prepare_parameter_dense_binary() file does not contain a dense binary matrix");
     }
-    //cout << tokens << endl;
-    //vector<string> header_tokens = tokens;
-
+    vector<string> header_tokens = read_dense_binary_col_names(in,n_cols);
     // check for parameter names that in the pest control file but that are missing from the csv file
     vector<string> missing_names;
     string name;
@@ -159,10 +150,6 @@ map<string,int> prepare_parameter_densebin(Parameters pars, ifstream &csv, bool 
         else
             cout << ss.str() << endl << "continuing anyway..." << endl;
     }
-
-    if (header_tokens[header_tokens.size() - 1].size() == 0)
-        header_tokens.pop_back();
-
 
     //build up a list of idxs to use
     vector<string> ctl_pnames = pars.get_keys();
@@ -271,6 +258,64 @@ void load_parameters_from_csv(map<string, int>& header_info, ifstream& csv, int 
 	//return pair<vector<string>,vector<Parameters>> (run_ids,sweep_pars);
 }
 
+void load_parameters_from_dense_binary(map<string, int>& header_info, ifstream& in, int chunk, const Parameters& ctl_pars, vector<string>& run_ids, vector<Parameters>& sweep_pars)
+
+{
+    cout << endl;
+    //process each parameter value line in the csv file
+    streampos current_pos = in.tellg();
+    in.seekg(current_pos,std::ios::beg);
+    int tmp1,n_cols,tmp3;
+    read_binary_matrix_header(in,tmp1,n_cols,tmp3);
+    if (!is_dense_binary_matrix(tmp1,n_cols,tmp3))
+    {
+        throw runtime_error("prepare_parameter_dense_binary() file does not contain a dense binary matrix");
+    }
+    in.seekg(current_pos);
+
+
+    vector<vector<double>> rec_vecs;
+
+
+
+    run_ids.clear();
+    sweep_pars.clear();
+
+    bool success = read_dense_binary_records(in,chunk,n_cols,run_ids,rec_vecs);
+    if (!success)
+    {
+        throw runtime_error("error processing dense binary file parameter records");
+    }
+    sweep_pars.reserve(rec_vecs.size());
+
+    double val;
+    string line;
+    vector<string> tokens,names;
+    vector<double> vals;
+    Parameters pars = ctl_pars;
+    string run_id;
+
+    char c;
+
+    for (int irec=0;irec < run_ids.size();irec++)
+    {
+        //for (int i = 0; i < header_tokens.size(); i++)
+        for (auto hi : header_info)
+        {
+            pars.update_rec(hi.first, rec_vecs[irec][hi.second]);
+            //}
+        }
+        //pars.update_without_clear(names, vals);
+        sweep_pars.push_back(pars);
+        //sweep_pars.emplace_back(pars);
+        run_ids.push_back(run_id);
+
+        if (pars.size() > 10000)
+            cout << irec << "\r" << flush;
+    }
+    //csv.close();
+    //return pair<vector<string>,vector<Parameters>> (run_ids,sweep_pars);
+}
 
 void prep_sweep_output_file(Pest &pest_scenario, ofstream &csv)
 {
@@ -293,9 +338,7 @@ void prep_sweep_output_file(Pest &pest_scenario, ofstream &csv)
 	csv << endl;
 	csv.flush();
 	//return csv;
-
 }
-
 
 void process_sweep_runs(ofstream &csv, Pest &pest_scenario, RunManagerAbstract* run_manager_ptr, vector<int> run_ids, vector<string> listed_run_ids, ObjectiveFunc obj_func,int total_runs_done)
 {
@@ -460,7 +503,7 @@ int main(int argc, char* argv[])
 		if (!restart_flag || save_restart_rec_header)
 		{
 			fout_rec << "             pestpp-swp.exe - a parameteric sweep utility" << endl << "for PEST(++) datasets " << endl << endl;
-			fout_rec << "                 by the PEST++ developement team" << endl << endl << endl;
+			fout_rec << "                 by the PEST++ development team" << endl << endl << endl;
 			fout_rec << endl;
 			fout_rec << endl << endl << "version: " << version << endl;
 			fout_rec << "binary compiled on " << __DATE__ << " at " << __TIME__ << endl << endl;
@@ -490,9 +533,9 @@ int main(int argc, char* argv[])
 		}
 		catch (PestError e)
 		{
-			cerr << "Error prococessing control file: " << filename << endl << endl;
+			cerr << "Error processing control file: " << filename << endl << endl;
 			cerr << e.what() << endl << endl;
-			fout_rec << "Error prococessing control file: " << filename << endl << endl;
+			fout_rec << "Error processing control file: " << filename << endl << endl;
 			fout_rec << e.what() << endl << endl;
 			fout_rec.close();
 			throw(e);
@@ -633,8 +676,7 @@ int main(int argc, char* argv[])
         else if (par_ext.compare("bin")==0)
         {
             cout << "  ---  dense binary file detected for par_csv" << endl;
-            header_info = prepare_parameter_densebin(pest_scenario.get_ctl_parameters(),par_stream, pest_scenario.get_pestpp_options().get_sweep_forgive());
-
+            header_info = prepare_parameter_dense_binary(pest_scenario.get_ctl_parameters(),par_stream, pest_scenario.get_pestpp_options().get_sweep_forgive());
 
         }
         else
@@ -688,21 +730,45 @@ int main(int argc, char* argv[])
 			}
 			else
 			{
-				try {
-					performance_log.log_event("starting to read parameter csv file");
-					load_parameters_from_csv(header_info, par_stream, chunk, pest_scenario.get_ctl_parameters(), run_ids,sweep_pars);
-					performance_log.log_event("finished reading parameter csv file");
-				}
-				catch (exception &e)
-				{
-					stringstream ss;
-					ss << "error processing parameter csv file: " << e.what();
-					performance_log.log_event(ss.str());
-					fout_rec << endl << ss.str() << endl;
-					fout_rec.close();
+                if (par_ext.compare("bin")==0)
+                {
+                    try {
+                        performance_log.log_event("starting to read parameter dense binary file");
+                        load_parameters_from_dense_binary(header_info, par_stream, chunk, pest_scenario.get_ctl_parameters(), run_ids,sweep_pars);
+                        performance_log.log_event("finished reading parameter dense binary file");
+                    }
+                    catch (exception &e)
+                    {
+                        stringstream ss;
+                        ss << "error processing parameter dense binary file: " << e.what();
+                        performance_log.log_event(ss.str());
+                        fout_rec << endl << ss.str() << endl;
+                        fout_rec.close();
 
-					throw runtime_error(ss.str());
-				}
+                        throw runtime_error(ss.str());
+                    }
+
+                }
+                else
+                {
+                    try {
+                        performance_log.log_event("starting to read parameter csv file");
+                        load_parameters_from_csv(header_info, par_stream, chunk, pest_scenario.get_ctl_parameters(), run_ids,sweep_pars);
+                        performance_log.log_event("finished reading parameter csv file");
+                    }
+                    catch (exception &e)
+                    {
+                        stringstream ss;
+                        ss << "error processing parameter csv file: " << e.what();
+                        performance_log.log_event(ss.str());
+                        fout_rec << endl << ss.str() << endl;
+                        fout_rec.close();
+
+                        throw runtime_error(ss.str());
+                    }
+
+                }
+
 			}
 			cout << "done" << endl;
 			// if there are no parameters to run, we are done

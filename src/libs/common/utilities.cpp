@@ -893,10 +893,10 @@ vector<string> read_dense_binary_col_names(ifstream& in,int n_col)
 
 }
 
-bool read_dense_binary_records(ifstream& in,int n_records, int name_size,const vector<string>& col_names,vector<string>& row_names, vector<map<string,double>>& rec_vec)
+bool read_dense_binary_records(ifstream& in,int n_records,int n_col,vector<string>& row_names, vector<vector<double>>& rec_vecs)
 {
     stringstream ss;
-    int i;
+    int i, name_size;
     streampos current_pos = in.tellg();
     in.seekg(0,std::ios::end);
     streampos end = in.tellg();
@@ -904,9 +904,9 @@ bool read_dense_binary_records(ifstream& in,int n_records, int name_size,const v
     bool success = true;
     string name;
     double data;
-    map<string,double> rec;
-    rec_vec.clear();
-    int n_col = col_names.size();
+    vector<double> rec;
+    rec_vecs.clear();
+
     while (true)
     {
         //finished
@@ -962,7 +962,7 @@ bool read_dense_binary_records(ifstream& in,int n_records, int name_size,const v
                 break;
             }
             in.read((char*)&(data), sizeof(data));
-            rec[col_names[j]] = data;
+            rec.push_back(data);
 
         }
         if (in.eof())
@@ -976,6 +976,7 @@ bool read_dense_binary_records(ifstream& in,int n_records, int name_size,const v
             break;
         }
         row_names.push_back(name);
+        rec_vecs.push_back(rec);
         i++;
     }
 
@@ -1078,9 +1079,13 @@ void read_binary_matrix_header(ifstream& in, int& tmp1, int& tmp2, int& tmp3)
     }
 
     in.close();
-    
+
 }
 
+bool is_dense_binary_matrix(int tmp1, int tmp2, int tmp3)
+{
+    return ((tmp1 == 0) && (tmp2 < 0) && (tmp3 < 0) && (tmp2 == tmp3));
+}
 
 void read_dense_binary(const string& filename, vector<string>& row_names, vector<string>& col_names, Eigen::MatrixXd& matrix)
 {
@@ -1106,7 +1111,8 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 
     read_binary_matrix_header(in,n_par,n_obs_and_pi,n_nonzero);
 
-	if ((n_par == 0) && (n_obs_and_pi < 0) && (n_nonzero < 0) && (n_obs_and_pi == n_nonzero))
+	//if ((n_par == 0) && (n_obs_and_pi < 0) && (n_nonzero < 0) && (n_obs_and_pi == n_nonzero))
+    if (is_dense_binary_matrix(n_par,n_obs_and_pi,n_nonzero))
 	{	
 		n_obs_and_pi *= -1;
 		cout << "reading 'dense' format matrix with " << n_obs_and_pi << " columns" << endl;

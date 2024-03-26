@@ -299,6 +299,11 @@ private:
 //
 
 void read_binary_matrix_header(const string& filename, int& tmp1, int& tmp2, int& tmp3);
+void read_binary_matrix_header(ifstream& in, int& tmp1, int& tmp2, int& tmp3);
+vector<string> read_dense_binary_remaining_row_names(ifstream& in,const vector<string>& col_names);
+vector<string> read_dense_binary_col_names(ifstream& in,int n_col);
+bool is_dense_binary_matrix(int tmp1, int tmp2, int tmp3);
+bool read_dense_binary_records(ifstream& in,int n_records, int n_col,vector<string>& row_names, vector<vector<double>>& rec_vecs);
 void read_dense_binary(const string& filename, vector<string>& row_names, vector<string>& col_names, Eigen::MatrixXd& matrix);
 bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::SparseMatrix<double> &matrix);
 
