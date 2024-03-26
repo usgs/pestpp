@@ -271,24 +271,23 @@ void load_parameters_from_dense_binary(map<string, int>& header_info, ifstream& 
     cout << endl;
     //process each parameter value line in the csv file
     streampos current_pos = in.tellg();
-    in.seekg(current_pos,std::ios::beg);
-    int tmp1,n_cols,tmp3;
-    read_binary_matrix_header(in,tmp1,n_cols,tmp3);
-    if (!is_dense_binary_matrix(tmp1,n_cols,tmp3))
+    in.seekg(0,std::ios::beg);
+    int tmp1,n_col,tmp3;
+    read_binary_matrix_header(in,tmp1,n_col,tmp3);
+    if (!is_dense_binary_matrix(tmp1,n_col,tmp3))
     {
         throw runtime_error("prepare_parameter_dense_binary() file does not contain a dense binary matrix");
     }
-    in.seekg(current_pos);
+    n_col *= -1;
+    in.seekg(current_pos,std::ios::beg);
 
 
     vector<vector<double>> rec_vecs;
 
-
-
     run_ids.clear();
     sweep_pars.clear();
 
-    bool success = read_dense_binary_records(in,chunk,n_cols,run_ids,rec_vecs);
+    bool success = read_dense_binary_records(in,chunk,n_col,run_ids,rec_vecs);
     if (!success)
     {
         throw runtime_error("error processing dense binary file parameter records");
@@ -315,7 +314,7 @@ void load_parameters_from_dense_binary(map<string, int>& header_info, ifstream& 
         //pars.update_without_clear(names, vals);
         sweep_pars.push_back(pars);
         //sweep_pars.emplace_back(pars);
-        run_ids.push_back(run_id);
+        //run_ids.push_back(run_id);
 
         if (pars.size() > 10000)
             cout << irec << "\r" << flush;
@@ -805,7 +804,7 @@ int main(int argc, char* argv[])
 			{
 				//Parameters temp = base_trans_seq.active_ctl2model_cp(par);
 		        irun_ids.push_back(run_manager_ptr->add_run(base_trans_seq.active_ctl2model_cp(par)));
-
+                break;
 			}
 
 			//make some runs
@@ -815,7 +814,7 @@ int main(int argc, char* argv[])
 			//process the runs
 			cout << "processing runs...";
 			//process_sweep_runs(obs_stream, pest_scenario, run_manager_ptr, run_ids, obj_func,total_runs_done);
-			process_sweep_runs(obs_stream, pest_scenario, run_manager_ptr,irun_ids, run_ids, obj_func, total_runs_done);
+			//process_sweep_runs(obs_stream, pest_scenario, run_manager_ptr,irun_ids, run_ids, obj_func, total_runs_done);
 
 			cout << "done" << endl;
 			total_runs_done += run_ids.size();

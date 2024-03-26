@@ -906,7 +906,8 @@ bool read_dense_binary_records(ifstream& in,int n_records,int n_col,vector<strin
     double data;
     vector<double> rec;
     rec_vecs.clear();
-
+    row_names.clear();
+    i = 0;
     while (true)
     {
         //finished
@@ -951,6 +952,7 @@ bool read_dense_binary_records(ifstream& in,int n_records,int n_col,vector<strin
         }
 
         rec.clear();
+        rec.resize(n_col,0);
         for (int j = 0; j < n_col; j++)
         {
             if (!in.good())
@@ -962,7 +964,8 @@ bool read_dense_binary_records(ifstream& in,int n_records,int n_col,vector<strin
                 break;
             }
             in.read((char*)&(data), sizeof(data));
-            rec.push_back(data);
+            //rec.push_back(data);
+            rec[j] = data;
 
         }
         if (in.eof())
@@ -977,7 +980,13 @@ bool read_dense_binary_records(ifstream& in,int n_records,int n_col,vector<strin
         }
         row_names.push_back(name);
         rec_vecs.push_back(rec);
+
         i++;
+        if (i >= n_records)
+        {
+            break;
+        }
+
     }
 
     return success;
