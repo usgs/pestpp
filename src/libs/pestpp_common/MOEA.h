@@ -39,6 +39,7 @@ public:
 	pair<vector<string>, vector<string>> get_nsga2_pareto_dominance(int generation, ObservationEnsemble& op, 
 		ParameterEnsemble& dp, Constraints* constraints_ptr=nullptr, bool ppd=false, bool report=true, string sum_tag=string());
 	
+	map<string, map<string, double>> get_members(ObservationEnsemble& op, ParameterEnsemble& dp) { return get_member_struct(op, dp); };
 	void set_ppd_limits() { ppd_limits = pest_scenario.get_pestpp_options().get_mou_ppd_limits(); }
 	void set_prob_pareto(bool ppd) { prob_pareto = ppd; }
 	void set_hypervolume_partitions(map<string, map<string, double>> _hv_parts);
@@ -123,7 +124,7 @@ private:
 	double get_euclidean_fitness(double E, double V);
 	pair<map<string, double>, map<string, double>> get_euclidean_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
 
-	map<string, map<string, double>> member_struct, extreme_members;
+	map<string, map<string, double>> member_struct;
 	vector<string>* obj_names_ptr;
 	vector<string>* obs_obj_names_ptr;
 	vector<string>* obs_obj_sd_names_ptr;
@@ -154,9 +155,10 @@ private:
 	double std_norm_df(double x, double mu, double sd, bool cumdf);
 	double psi_function(double aa, double bb, double mu, double sd);
 	map<string, double> ehvi_member_map;
+	map<string, map<string, double>> incumbent_front_extreme;
 	map<int, vector<double>> hypervolume_partitions;
 	double EHVI;
-
+	int iter;
 	double get_ehvi(string& member, map<string, map<string, double>>& _member_struct);
 };
 

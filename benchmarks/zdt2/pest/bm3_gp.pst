@@ -66,3 +66,4 @@ obj_2_sd	0		1	miscdata
 ++mou_fit_beta(10)
 ++mou_dv_population_file(./model/input/mogp_bm3.dv_pop.csv)
 ++mou_obs_population_restart_file(./model/input/mogp_bm3.obs_pop.csv)
+++mou_outer_repo_obs_file(./model/input/outer_repo.archive.obs_pop.csv)

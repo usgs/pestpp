@@ -308,21 +308,27 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		for (auto& cd : crowd_dist) {
 			if (cd.second == CROWDING_EXTREME)
 			{
-				double end_mem_fitness = 0;
-				cd.second = 0;
-				map<string, double> mem = extreme_members[cd.first];
+				cd.second = 1;
+				/*cd.second = 1;
+				map<string, double> mem = _member_struct[cd.first];
 				for (auto obj_name : *obs_obj_names_ptr)
+					cd.second *= pow(1+abs(mem[obj_name+"_SD"] / mem[obj_name]), -alpha);*/
+
+				/*if (beta == 0)
 				{
-					if (mem[obj_name + "_SD"] != -999)
-					{
-						if (abs(mem[obj_name]) > 1)
-							end_mem_fitness = pow(1 + mem[obj_name + "_SD"] / abs(mem[obj_name]), -1);
-						else
-							end_mem_fitness = pow(1 + mem[obj_name + "_SD"], -1);
-					}
-					if (end_mem_fitness > cd.second)
-						cd.second = end_mem_fitness;
+					cd.second = 1;
+					map<string, double> mem = _member_struct[cd.first];
+					for (auto obj_sd_name : *obs_obj_sd_names_ptr)
+						cd.second *= pow(exp(mem[obj_sd_name]), -alpha);
 				}
+				else
+				{
+					cd.second = 1;
+					map<string, double> mem = _member_struct[cd.first];
+					for (auto obj_sd_name : *obs_obj_sd_names_ptr)
+						cd.second *= mem[obj_sd_name];
+					cd.second = pow(1+ beta * cd.second, -alpha);
+				}*/
 			}
 			else if (mx != 0.0) {
 				cd.second = pow(cd.second / mx, alpha);
@@ -625,6 +631,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 	ParameterEnsemble& dp, Constraints* constraints_ptr, bool sort_ppd, bool report, string sum_tag)
 {
 	ppd_sort = sort_ppd;
+	iter = generation;
 	//prob_pareto = sort_ppd;
 	stringstream ss;
 	ofstream& frec = file_manager.rec_ofstream();
@@ -770,7 +777,7 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 		{
 				sum << "," << expected_crowd_map[member];
 				sum << "," << var_crowd_map[member];
-				sum << "," << fitness_map[member];
+				sum << "," << ehvi_member_map[member];
 		}
 		sum << "," << spea2_constrained_fitness_map[member];
 		sum << "," << spea2_unconstrained_fitness_map[member];
@@ -802,7 +809,7 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 	{
 		for (auto objsd : *obs_obj_sd_names_ptr)
 			sum << "," << pest_utils::lower_cp(objsd);
-		sum << ",nsga2_front,nsga2_crowding_distance,exp_distance,var_distance,pso_fitness,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
+		sum << ",nsga2_front,nsga2_crowding_distance,exp_distance,var_distance,ehvi,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
 	}
 	else
 		sum << ",nsga2_front,nsga2_crowding_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
@@ -1010,7 +1017,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
 
-	map<string, map<string, double>> obj_member_map, end_member_map;
+	map<string, map<string, double>> obj_member_map;
 	map<string, double> crowd_distance_map, var_distance_map, euclidean_fitness_map;
 	string m = members[0];
 	vector<string> obj_names;
@@ -1029,19 +1036,13 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 			obj_member_map[obj_map.first][member] = obj_map.second;*/
 
 		for (auto obj_map : *obs_obj_names_ptr) //need to make sure the SDs are not included
-		{
 			obj_member_map[obj_map][member] = _member_struct[member][obj_map];
-			end_member_map[member][obj_map] = _member_struct[member][obj_map];
-		}
-
-		for (auto objsd_map : *obs_obj_names_ptr)
-			end_member_map[member][objsd_map + "_SD"] = -999;
 	}
 
 	//map<double,string>::iterator start, end;
 	map<string, double> omap;
 	double fitness;
-	extreme_members.clear();
+	vector<double> nonuniq_obj;
 
 	for (auto obj_map : obj_member_map)
 	{
@@ -1053,38 +1054,204 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 		sortedset::iterator start = crowd_sorted.begin(), last = prev(crowd_sorted.end(), 1);
 
-		//the obj extrema - makes sure they are retained 
-		crowd_distance_map[start->first] = CROWDING_EXTREME;
-		euclidean_fitness_map[start->first] = CROWDING_EXTREME;
-		end_member_map[start->first][obj_map.first + "_SD"] = _member_struct[start->first][obj_map.first + "_SD"];
-		extreme_members[start->first] = end_member_map[start->first];
+		if (omap.size() != crowd_sorted.size())
+		{
+			for (auto o : omap)
+			{
+				int count = 1;
+				for (auto cd : crowd_sorted)
+					if (cd.second == o.second)
+						count++;
 
-		crowd_distance_map[last->first] = CROWDING_EXTREME;
-		euclidean_fitness_map[last->first] = CROWDING_EXTREME;
-		end_member_map[last->first][obj_map.first + "_SD"] = _member_struct[last->first][obj_map.first + "_SD"];
-		extreme_members[last->first] = end_member_map[last->first];
-
+				if (count > 1)
+					nonuniq_obj.push_back(o.second);
+			}
+			
+		}
+		
 		vector<double> eucd_prev_it, eucd_it_next;
 
+		//if unique, compute fitness as usual, through its neighbors, not minding if it is extreme, which will be dealt later using ehvi
+		if (find(nonuniq_obj.begin(), nonuniq_obj.end(), start->second) == nonuniq_obj.end())
+		{
+			sortedset::iterator inext = next(start, 1);
+
+			eucd_it_next = get_euclidean_distance(_member_struct[start->first], _member_struct[inext->first]);
+			fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
+			if (fitness > euclidean_fitness_map[start->first])
+			{
+				crowd_distance_map[start->first] = eucd_it_next.at(0);
+				var_distance_map[start->first] = eucd_it_next.at(1);
+				euclidean_fitness_map[start->first] = fitness;
+			}
+
+		}
+
+		if (find(nonuniq_obj.begin(), nonuniq_obj.end(), last->second) == nonuniq_obj.end())
+		{
+			sortedset::iterator iprev = prev(last, 1);
+
+			eucd_prev_it = get_euclidean_distance(_member_struct[last->first], _member_struct[iprev->first]);
+			fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
+			if (fitness > euclidean_fitness_map[last->first])
+			{
+				crowd_distance_map[last->first] = eucd_prev_it.at(0);
+				var_distance_map[last->first] = eucd_prev_it.at(1);
+				euclidean_fitness_map[last->first] = fitness;
+			}
+
+		}
+
+		if (iter > 0)
+		{
+			map<string, map<string, double>> lower_extreme_candidates, upper_extreme_candidates;
+			map<string, double> curr;
+			vector<string> all_extreme_set;
+
+			for (auto m : incumbent_front_extreme)
+				curr[m.first] = incumbent_front_extreme[m.first][obj_map.first];
+
+			sortedset curr_sorted(curr.begin(), curr.end(), compFunctor);
+			double lb = incumbent_front_extreme[curr_sorted.begin()->first][obj_map.first];
+			double ub = incumbent_front_extreme[prev(curr_sorted.end(), 1)->first][obj_map.first];
+
+			//get the lower and upper objective bounds of the incumbent true front
+			for (auto m : members) 
+			{
+				if (_member_struct[m][obj_map.first] < lb)
+				{
+					lower_extreme_candidates[m] = _member_struct[m];
+					all_extreme_set.push_back(m);
+				}
+
+				if (_member_struct[m][obj_map.first] > ub)
+				{
+					upper_extreme_candidates[m] = _member_struct[m];
+					all_extreme_set.push_back(m);
+				}
+			}
+
+			//assign the lower extreme in current population
+			if (lower_extreme_candidates.size() == 0) //if size is 0, the extreme is an incumbent front member
+			{
+				crowd_distance_map[start->first] = CROWDING_EXTREME;
+				var_distance_map[start->first] = CROWDING_EXTREME;
+				euclidean_fitness_map[start->first] = CROWDING_EXTREME;
+			}
+			else //use ehvi to assign the end member
+			{
+				double mx = 0;
+				string endmem;
+				for (auto l : lower_extreme_candidates)
+				{
+					if (ehvi_member_map[l.first] > mx)
+					{
+						mx = ehvi_member_map[l.first];
+						endmem = l.first;
+					}
+				}
+				if (mx == 0)
+				{
+					crowd_distance_map[start->first] = CROWDING_EXTREME;
+					var_distance_map[start->first] = CROWDING_EXTREME;
+					euclidean_fitness_map[start->first] = CROWDING_EXTREME;
+				}
+				else
+				{
+					crowd_distance_map[endmem] = CROWDING_EXTREME;
+					var_distance_map[endmem] = CROWDING_EXTREME;
+					euclidean_fitness_map[endmem] = CROWDING_EXTREME;
+				}
+			}
+			
+			//assign the upper extreme in current population
+			if (upper_extreme_candidates.size() == 0) //if size is 0, the extreme is an incumbent front member
+			{
+				crowd_distance_map[last->first] = CROWDING_EXTREME;
+				var_distance_map[last->first] = CROWDING_EXTREME;
+				euclidean_fitness_map[last->first] = CROWDING_EXTREME;
+			}
+			else //use ehvi to assign the end member
+			{
+				double mx = 0;
+				string endmem;
+				for (auto u : upper_extreme_candidates)
+				{
+					if (ehvi_member_map[u.first] > mx)
+					{
+						mx = ehvi_member_map[u.first];
+						endmem = u.first;
+					}
+				}
+				if (mx == 0)
+				{
+					crowd_distance_map[last->first] = CROWDING_EXTREME;
+					var_distance_map[last->first] = CROWDING_EXTREME;
+					euclidean_fitness_map[last->first] = CROWDING_EXTREME;
+				}
+				else
+				{
+					crowd_distance_map[endmem] = CROWDING_EXTREME;
+					var_distance_map[endmem] = CROWDING_EXTREME;
+					euclidean_fitness_map[endmem] = CROWDING_EXTREME;
+				}
+			}
+
+			double mx = 0;
+			string maxehvi;
+			for (auto m : members)
+			{
+				if (find(all_extreme_set.begin(), all_extreme_set.end(), m) == all_extreme_set.end())
+				{
+					if (ehvi_member_map[m] > mx)
+					{
+						mx = ehvi_member_map[m];
+						maxehvi = m;
+					}
+				}	
+			}
+			if (mx != 0)
+			{
+				crowd_distance_map[maxehvi] = CROWDING_EXTREME;
+				var_distance_map[maxehvi] = CROWDING_EXTREME;
+				euclidean_fitness_map[maxehvi] = CROWDING_EXTREME;
+			}
+		}
+		else
+		{
+			crowd_distance_map[start->first] = CROWDING_EXTREME;
+			var_distance_map[start->first] = CROWDING_EXTREME;
+			euclidean_fitness_map[start->first] = CROWDING_EXTREME;
+
+			crowd_distance_map[last->first] = CROWDING_EXTREME;
+			var_distance_map[last->first] = CROWDING_EXTREME;
+			euclidean_fitness_map[last->first] = CROWDING_EXTREME;
+		}
+
+		//crowding distance calculation for non extreme members;
 		if (crowd_sorted.size() == 3)
 		{
 			sortedset::iterator it = next(start, 1);
-			eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[start->first]);
-			fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-			if (fitness > euclidean_fitness_map[it->first])
+			
+			if (find(nonuniq_obj.begin(), nonuniq_obj.end(), it->second) == nonuniq_obj.end())
 			{
-				crowd_distance_map[it->first] = eucd_prev_it.at(0);
-				var_distance_map[it->first] = eucd_prev_it.at(1);
-				euclidean_fitness_map[it->first] = fitness;
-			}
+				eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[start->first]);
+				fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
+				if (fitness > euclidean_fitness_map[it->first])
+				{
+					crowd_distance_map[it->first] = eucd_prev_it.at(0);
+					var_distance_map[it->first] = eucd_prev_it.at(1);
+					euclidean_fitness_map[it->first] = fitness;
+				}
 
-			eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[last->first]);
-			fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
-			if (fitness > euclidean_fitness_map[it->first])
-			{
-				crowd_distance_map[it->first] = eucd_it_next.at(0);
-				var_distance_map[it->first] = eucd_it_next.at(1);
-				euclidean_fitness_map[it->first] = fitness;
+				eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[last->first]);
+				fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
+				if (fitness > euclidean_fitness_map[it->first])
+				{
+					crowd_distance_map[it->first] = eucd_it_next.at(0);
+					var_distance_map[it->first] = eucd_it_next.at(1);
+					euclidean_fitness_map[it->first] = fitness;
+				}
 			}
 		}
 		else if (crowd_sorted.size() > 3)
@@ -1098,32 +1265,64 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 			for (; it != last; ++it)
 			{
-				iprev = prev(it, 1);
-				inext = next(it, 1);
-
-				eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[iprev->first]);
-				fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-				if (fitness > euclidean_fitness_map[it->first])
+				if (find(nonuniq_obj.begin(), nonuniq_obj.end(), it->second) == nonuniq_obj.end())
 				{
-					crowd_distance_map[it->first] = eucd_prev_it.at(0);
-					var_distance_map[it->first] = eucd_prev_it.at(1);
-					euclidean_fitness_map[it->first] = fitness;
-				}
+					iprev = prev(it, 1);
+					inext = next(it, 1);
 
-				eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[inext->first]);
-				fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
-				if (fitness > euclidean_fitness_map[it->first])
-				{
-					crowd_distance_map[it->first] = eucd_it_next.at(0);
-					var_distance_map[it->first] = eucd_it_next.at(1);
-					euclidean_fitness_map[it->first] = fitness;
+					eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[iprev->first]);
+					fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
+					if (fitness > euclidean_fitness_map[it->first])
+					{
+						crowd_distance_map[it->first] = eucd_prev_it.at(0);
+						var_distance_map[it->first] = eucd_prev_it.at(1);
+						euclidean_fitness_map[it->first] = fitness;
+					}
+
+					eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[inext->first]);
+					fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
+					if (fitness > euclidean_fitness_map[it->first])
+					{
+						crowd_distance_map[it->first] = eucd_it_next.at(0);
+						var_distance_map[it->first] = eucd_it_next.at(1);
+						euclidean_fitness_map[it->first] = fitness;
+					}
 				}
 			}
 
 		}
 
-
 	}
+
+	for (auto cd : crowd_distance_map)
+	{
+		expected_crowd_map[cd.first] = crowd_distance_map[cd.first];
+		var_crowd_map[cd.first] = var_distance_map[cd.first];
+	}
+
+	
+	
+		
+
+	//for (auto obj_map : obj_member_map)
+	//{
+	//	map<string, double> member = obj_map.second;
+	//	//get lower extreme
+
+	//	map<int, vector<double>>::iterator it = next(hypervolume_partitions.begin(), 1);
+
+	//	//double lb_ext = hypervolume_partitions[1][i];
+	//	
+
+	//	////get upper extreme
+	//	//double ub_ext = hypervolume_partitions[-2][i];
+	//	
+	//	i++;
+	//}
+
+
+
+
 	return pair<map<string, double>, map<string, double>>(crowd_distance_map, var_distance_map);
 }
 
@@ -1138,9 +1337,9 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 	if (prob_pareto)
 	{
 		fit_map = get_mopso_fitness(members, _member_struct);
-		euclidean_maps = get_euclidean_crowding_distance(members, _member_struct);
+		/*euclidean_maps = get_euclidean_crowding_distance(members, _member_struct);
 		expected_dist_map = euclidean_maps.first;
-		var_dist_map = euclidean_maps.second;
+		var_dist_map = euclidean_maps.second;*/
 		//prob_not_dom = get_prob_non_dominance(members, _member_struct);
 	}
 	else
@@ -1152,8 +1351,8 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 		cs_vec.push_back(cd);
 		crowd_map[cd.first] = cd.second;
 
-		expected_crowd_map[cd.first] = expected_dist_map[cd.first];
-		var_crowd_map[cd.first] = var_dist_map[cd.first];
+		/*expected_crowd_map[cd.first] = expected_dist_map[cd.first];
+		var_crowd_map[cd.first] = var_dist_map[cd.first];*/
 		fitness_map[cd.first] = fit_map[cd.first];
 	}
 
@@ -1595,7 +1794,7 @@ void ParetoObjectives::set_hypervolume_partitions(map<string, map<string, double
 	ofstream& frec = file_manager.rec_ofstream();
 	ss << "ParetoObjectives::set_hypervolume_partitions() for outer pareto archive members";
 	performance_log->log_event(ss.str());
-
+		
 	map<string, map<string, double>> hv_parts;
 	map<int, vector<double>> hypervolume;
 	map<string, double> hv_partition;
@@ -1643,6 +1842,17 @@ void ParetoObjectives::set_hypervolume_partitions(map<string, map<string, double
 	}
 	
 	hypervolume_partitions = hypervolume;
+
+	//get the extreme points of the incumbent front to be used for identifying extreme points of pareto cloud thru ehvi
+	map<string, double> obj_map;
+	for (auto pts : _hv_pts)
+		obj_map[pts.first] = _hv_pts[pts.first][obj_names_ptr->at(1)];
+
+	sortedset sortedpts(obj_map.begin(), obj_map.end(), compFunctor);
+
+	sortedset::iterator start = sortedpts.begin(), end = prev(sortedpts.end(), 1);
+	incumbent_front_extreme[start->first] = _hv_pts[start->first];
+	incumbent_front_extreme[end->first] = _hv_pts[end->first];
 }
 
 void ParetoObjectives::update_ppd_criteria(ObservationEnsemble& op, ParameterEnsemble& dp)
@@ -3348,44 +3558,54 @@ void MOEA::initialize()
 			map<string, map<string, double>> hv_pts;
 			vector<string> tokens;
 
-
 			string outer_repo_obs_filename = pest_scenario.get_pestpp_options().get_mou_outer_repo_obs_file();
-			message(1, "loading outer repository obs from csv file", outer_repo_obs_filename);
-			try
+			if (outer_repo_obs_filename != "")
 			{
-				ifstream csv(outer_repo_obs_filename);
-				string line;
-				getline(csv, line);
-
-				while (getline(csv, line))
+				message(1, "loading outer repository obs from csv file", outer_repo_obs_filename);
+				try
 				{
-					pest_utils::strip_ip(line);
-					tokens.clear();
-					pest_utils::tokenize(line, tokens, ",", false);
-					map<string, double> vals;
-					int i = 1;
-					for (auto obj : obs_obj_names)
+					ifstream csv(outer_repo_obs_filename);
+					string line;
+					getline(csv, line);
+
+					while (getline(csv, line))
 					{
-						vals[obj] = stod(tokens[i]);
-						i++;
+						pest_utils::strip_ip(line);
+						tokens.clear();
+						pest_utils::tokenize(line, tokens, ",", false);
+						map<string, double> vals;
+						int i = 1;
+						for (auto obj : obs_obj_names)
+						{
+							vals[obj] = stod(tokens[i]);
+							i++;
+						}
+						hv_pts[tokens[0]] = vals;
 					}
-					hv_pts[tokens[0]] = vals;
+
 				}
-
+				catch (const exception& e)
+				{
+					ss << "error processing outer repository obs file: " << e.what();
+					throw_moea_error(ss.str());
+				}
+				catch (...)
+				{
+					throw_moea_error(string("error processing outer repository obs file"));
+				}
 			}
-			catch (const exception& e)
+			else
 			{
-				ss << "error processing outer repository obs file: " << e.what();
-				throw_moea_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_moea_error(string("error processing outer repository obs file"));
-			}
+				message(1, "using the initial population for hypervolume partitioning");
+				stringstream ss;
+				ofstream& frec = file_manager.rec_ofstream();
+				ss << "ParetoObjectives::get_hypervolume() for " << op.shape().first << " archive members";
+				performance_log->log_event(ss.str());
 
-			/*objectives.set_hypervolume_partitions(hv_pts);
-
-			objectives.get_ehvi(op, dp);*/
+				hv_pts = objectives.get_members(op_archive, dp_archive);
+			}
+			objectives.set_hypervolume_partitions(hv_pts);
+			objectives.get_ehvi(op, dp);
 		}
 			
 				
@@ -3722,19 +3942,18 @@ void MOEA::iterate_to_solution()
         update_sim_maps(new_dp,new_op);
 
 		//compute ehvi of each solution
-		//need to shelve it for now
-		//if (prob_pareto)
-		//{
-		//	message(1, "computing the expected hypervolume improvement of members in current population");
-		//	objectives.get_ehvi(new_op, new_dp);
+		if (prob_pareto)
+		{
+			message(1, "computing the expected hypervolume improvement of members in current population");
+			objectives.get_ehvi(new_op, new_dp);
 
-		//	/*if (pest_scenario.get_pestpp_options().get_mou_adaptive_ppd())
-		//	{
-		//		message(1, "updating overlap criteria for probabilistic dominance sorting");
-		//		objectives.update_ppd_criteria(new_op, new_dp);
-		//	}*/
-		//	
-		//}
+			/*if (pest_scenario.get_pestpp_options().get_mou_adaptive_ppd())
+			{
+				message(1, "updating overlap criteria for probabilistic dominance sorting");
+				objectives.update_ppd_criteria(new_op, new_dp);
+			}*/
+			
+		}
 
         //if we are using chances, then we need to make sure to update the archive as well as the current population
         // from the full history of available members since uncertainty estimates could be changing as we evolve
@@ -4319,25 +4538,7 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 		count = 0;
 		found = false;
 
-		/*while (true)
-		{
-			working = nondom_solutions;
-			shuffle(working.begin(), working.end(), rand_gen);
-			r = uniform_draws(nondom_solutions.size(), 0.0, 1.0, rand_gen);
-			for (int i = 0; i < r.size(); i++)
-				if (fitness[working[i]] >= r[i])
-				{
-					candidate = working[i];
-					found = true;
-					break;
-				}
-
-			if (found)
-				break;
-			count++;
-			if (count > 1000000)
-				throw_moea_error("MOEA::get_pso_gbest_solutions() seems to be stuck in a infinite loop....");	
-		}*/
+		
 		
 		while (true)
 		{
