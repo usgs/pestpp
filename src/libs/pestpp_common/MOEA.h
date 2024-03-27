@@ -81,6 +81,8 @@ public:
 	map<string, double> get_prob_non_dominance(vector<string>& members);
 	map<string, double> get_mopso_fitness(vector<string> members, ObservationEnsemble& op, ParameterEnsemble& dp);
 
+	double get_ei(map<string, double> phi, string obj, double curr_opt);
+
 	set<string> get_duplicates() { return duplicates;  }
 
 	int get_num_feasible(){ return feas_member_struct.size();}

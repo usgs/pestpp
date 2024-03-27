@@ -1104,6 +1104,8 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 		if (iter > 0)
 		{
+
+
 			map<string, map<string, double>> lower_extreme_candidates, upper_extreme_candidates;
 			map<string, double> curr;
 			vector<string> all_extreme_set;
@@ -1140,13 +1142,14 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 			}
 			else //use ehvi to assign the end member
 			{
-				double mx = 0;
+				double mx = 0, ei;
 				string endmem;
 				for (auto l : lower_extreme_candidates)
 				{
-					if (ehvi_member_map[l.first] > mx)
+					ei = get_ei(_member_struct[l.first], obj_map.first, lb);
+					if (ei > mx)
 					{
-						mx = ehvi_member_map[l.first];
+						mx = ei;
 						endmem = l.first;
 					}
 				}
@@ -1165,39 +1168,39 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 			}
 			
 			//assign the upper extreme in current population
-			if (upper_extreme_candidates.size() == 0) //if size is 0, the extreme is an incumbent front member
-			{
-				crowd_distance_map[last->first] = CROWDING_EXTREME;
-				var_distance_map[last->first] = CROWDING_EXTREME;
-				euclidean_fitness_map[last->first] = CROWDING_EXTREME;
-			}
-			else //use ehvi to assign the end member
-			{
-				double mx = 0;
-				string endmem;
-				for (auto u : upper_extreme_candidates)
-				{
-					if (ehvi_member_map[u.first] > mx)
-					{
-						mx = ehvi_member_map[u.first];
-						endmem = u.first;
-					}
-				}
-				if (mx == 0)
-				{
-					crowd_distance_map[last->first] = CROWDING_EXTREME;
-					var_distance_map[last->first] = CROWDING_EXTREME;
-					euclidean_fitness_map[last->first] = CROWDING_EXTREME;
-				}
-				else
-				{
-					crowd_distance_map[endmem] = CROWDING_EXTREME;
-					var_distance_map[endmem] = CROWDING_EXTREME;
-					euclidean_fitness_map[endmem] = CROWDING_EXTREME;
-				}
-			}
+			//if (upper_extreme_candidates.size() == 0) //if size is 0, the extreme is an incumbent front member
+			//{
+			//	crowd_distance_map[last->first] = CROWDING_EXTREME;
+			//	var_distance_map[last->first] = CROWDING_EXTREME;
+			//	euclidean_fitness_map[last->first] = CROWDING_EXTREME;
+			//}
+			//else //use ehvi to assign the end member
+			//{
+			//	double mx = 0;
+			//	string endmem;
+			//	for (auto u : upper_extreme_candidates)
+			//	{
+			//		if (ehvi_member_map[u.first] > mx)
+			//		{
+			//			mx = ehvi_member_map[u.first];
+			//			endmem = u.first;
+			//		}
+			//	}
+			//	if (mx == 0)
+			//	{
+			//		crowd_distance_map[last->first] = CROWDING_EXTREME;
+			//		var_distance_map[last->first] = CROWDING_EXTREME;
+			//		euclidean_fitness_map[last->first] = CROWDING_EXTREME;
+			//	}
+			//	else
+			//	{
+			//		crowd_distance_map[endmem] = CROWDING_EXTREME;
+			//		var_distance_map[endmem] = CROWDING_EXTREME;
+			//		euclidean_fitness_map[endmem] = CROWDING_EXTREME;
+			//	}
+			//}
 
-			double mx = 0;
+			/*double mx = 0;
 			string maxehvi;
 			for (auto m : members)
 			{
@@ -1215,7 +1218,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 				crowd_distance_map[maxehvi] = CROWDING_EXTREME;
 				var_distance_map[maxehvi] = CROWDING_EXTREME;
 				euclidean_fitness_map[maxehvi] = CROWDING_EXTREME;
-			}
+			}*/
 		}
 		else
 		{
@@ -1902,6 +1905,12 @@ void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
 		ehvi_member_map[member] = ehvi_m;
 	}
 	
+}
+
+double ParetoObjectives::get_ei(map<string, double> phi, string obj, double curr_opt)
+{
+	double ei = (curr_opt - phi[obj]) * std_norm_df(curr_opt, phi[obj], phi[obj + "_SD"], true) + phi[obj + "_SD"] * std_norm_df(curr_opt, phi[obj], phi[obj + "_SD"], false);
+	return ei;
 }
 
 map<string, double> ParetoObjectives::get_ehvi(vector<string>& members)
