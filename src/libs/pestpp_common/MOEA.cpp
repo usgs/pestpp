@@ -1019,6 +1019,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 	map<string, map<string, double>> obj_member_map;
 	map<string, double> crowd_distance_map, var_distance_map, euclidean_fitness_map;
+	map<string, double> dist, var, fit;
 	string m = members[0];
 	
 	vector<string> obj_names;
@@ -1033,9 +1034,9 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 	for (auto member : members)
 	{
-		crowd_distance_map[member] = 0.0;
-		var_distance_map[member] = 0.0;
-		euclidean_fitness_map[member] = 0.0;
+		crowd_distance_map[member] = 1E+50;
+		var_distance_map[member] = 1E+50;
+		euclidean_fitness_map[member] = 1E+50;
 		/*for (auto obj_map : _member_struct[member])
 			obj_member_map[obj_map.first][member] = obj_map.second;*/
 
@@ -1050,10 +1051,14 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 	for (auto obj_map : obj_member_map)
 	{
+		for (auto member : members)
+		{
+			dist[member] = 0.0;
+			var[member] = 0.0;
+			fit[member] = 0.0;
+		}
+
 		omap = obj_map.second;
-		//note: for members with identical distances, only the first one gets into the 
-		//sorted set but this is ok since we initialized the distance map with zeros
-		//for all members, so it works out...
 		sortedset crowd_sorted(omap.begin(), omap.end(), compFunctor);
 
 		sortedset::iterator start = crowd_sorted.begin(), last = prev(crowd_sorted.end(), 1);
@@ -1083,11 +1088,11 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 			eucd_it_next = get_euclidean_distance(_member_struct[start->first], _member_struct[inext->first]);
 			fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
-			if (fitness > euclidean_fitness_map[start->first])
+			if (fitness > fit[start->first])
 			{
-				crowd_distance_map[start->first] = eucd_it_next.at(0);
-				var_distance_map[start->first] = eucd_it_next.at(1);
-				euclidean_fitness_map[start->first] = fitness;
+				dist[start->first] = eucd_it_next.at(0);
+				var[start->first] = eucd_it_next.at(1);
+				fit[start->first] = fitness;
 			}
 
 		}
@@ -1098,11 +1103,11 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 			eucd_prev_it = get_euclidean_distance(_member_struct[last->first], _member_struct[iprev->first]);
 			fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-			if (fitness > euclidean_fitness_map[last->first])
+			if (fitness > fit[last->first])
 			{
-				crowd_distance_map[last->first] = eucd_prev_it.at(0);
-				var_distance_map[last->first] = eucd_prev_it.at(1);
-				euclidean_fitness_map[last->first] = fitness;
+				dist[last->first] = eucd_prev_it.at(0);
+				var[last->first] = eucd_prev_it.at(1);
+				fit[last->first] = fitness;
 			}
 
 		}
@@ -1126,24 +1131,18 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 			for (auto m : members) 
 			{
 				if (_member_struct[m][obj_map.first] < lb)
-				{
 					lower_extreme_candidates[m] = _member_struct[m];
-					all_extreme_set.push_back(m);
-				}
 
 				if (_member_struct[m][obj_map.first] > ub)
-				{
 					upper_extreme_candidates[m] = _member_struct[m];
-					all_extreme_set.push_back(m);
-				}
 			}
 
 			//assign the lower extreme in current population
 			if (lower_extreme_candidates.size() == 0) //if size is 0, the extreme is an incumbent front member
 			{
-				crowd_distance_map[start->first] = CROWDING_EXTREME;
-				var_distance_map[start->first] = CROWDING_EXTREME;
-				euclidean_fitness_map[start->first] = CROWDING_EXTREME;
+				dist[start->first] = CROWDING_EXTREME;
+				var[start->first] = CROWDING_EXTREME;
+				fit[start->first] = CROWDING_EXTREME;
 			}
 			else //use ei to assign the end member
 			{
@@ -1160,147 +1159,106 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 				}
 				if (mx == 0)
 				{
-					crowd_distance_map[start->first] = CROWDING_EXTREME;
-					var_distance_map[start->first] = CROWDING_EXTREME;
-					euclidean_fitness_map[start->first] = CROWDING_EXTREME;
+					dist[start->first] = CROWDING_EXTREME;
+					var[start->first] = CROWDING_EXTREME;
+					fit[start->first] = CROWDING_EXTREME;
 				}
 				else
 				{
-					crowd_distance_map[endmem] = CROWDING_EXTREME;
-					var_distance_map[endmem] = CROWDING_EXTREME;
-					euclidean_fitness_map[endmem] = CROWDING_EXTREME;
+					dist[endmem] = CROWDING_EXTREME;
+					var[endmem] = CROWDING_EXTREME;
+					fit[endmem] = CROWDING_EXTREME;
 				}
 			}
-			
-			//assign the upper extreme in current population
-			//if (upper_extreme_candidates.size() == 0) //if size is 0, the extreme is an incumbent front member
-			//{
-			//	crowd_distance_map[last->first] = CROWDING_EXTREME;
-			//	var_distance_map[last->first] = CROWDING_EXTREME;
-			//	euclidean_fitness_map[last->first] = CROWDING_EXTREME;
-			//}
-			//else //use ehvi to assign the end member
-			//{
-			//	double mx = 0;
-			//	string endmem;
-			//	for (auto u : upper_extreme_candidates)
-			//	{
-			//		if (ehvi_member_map[u.first] > mx)
-			//		{
-			//			mx = ehvi_member_map[u.first];
-			//			endmem = u.first;
-			//		}
-			//	}
-			//	if (mx == 0)
-			//	{
-			//		crowd_distance_map[last->first] = CROWDING_EXTREME;
-			//		var_distance_map[last->first] = CROWDING_EXTREME;
-			//		euclidean_fitness_map[last->first] = CROWDING_EXTREME;
-			//	}
-			//	else
-			//	{
-			//		crowd_distance_map[endmem] = CROWDING_EXTREME;
-			//		var_distance_map[endmem] = CROWDING_EXTREME;
-			//		euclidean_fitness_map[endmem] = CROWDING_EXTREME;
-			//	}
-			//}
+		}
+		else
+		{
+			dist[start->first] = CROWDING_EXTREME;
+			var[start->first] = CROWDING_EXTREME;
+			fit[start->first] = CROWDING_EXTREME;
+		}
 
-			/*double mx = 0;
-			string maxehvi;
-			for (auto m : members)
+		if (crowd_sorted.size() == 3)
+		{
+			sortedset::iterator it = next(start, 1);
+
+			if (find(nonuniq_obj.begin(), nonuniq_obj.end(), it->second) == nonuniq_obj.end())
 			{
-				if (find(all_extreme_set.begin(), all_extreme_set.end(), m) == all_extreme_set.end())
+				eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[start->first]);
+				fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
+				if (fitness > fit[it->first])
 				{
-					if (ehvi_member_map[m] > mx)
-					{
-						mx = ehvi_member_map[m];
-						maxehvi = m;
-					}
-				}	
+					dist[it->first] = eucd_prev_it.at(0);
+					var[it->first] = eucd_prev_it.at(1);
+					fit[it->first] = fitness;
+				}
+
+				eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[last->first]);
+				fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
+				if (fitness > fit[it->first])
+				{
+					dist[it->first] = eucd_it_next.at(0);
+					var[it->first] = eucd_it_next.at(1);
+					fit[it->first] = fitness;
+				}
 			}
-			if (mx != 0)
-			{
-				crowd_distance_map[maxehvi] = CROWDING_EXTREME;
-				var_distance_map[maxehvi] = CROWDING_EXTREME;
-				euclidean_fitness_map[maxehvi] = CROWDING_EXTREME;
-			}*/
 		}
-		else
+		else if (crowd_sorted.size() > 3)
 		{
-			crowd_distance_map[start->first] = CROWDING_EXTREME;
-			var_distance_map[start->first] = CROWDING_EXTREME;
-			euclidean_fitness_map[start->first] = CROWDING_EXTREME;
-		}
+			//need iterators to start and stop one off from the edges
+			start = next(crowd_sorted.begin(), 1);
+			last = prev(crowd_sorted.end(), 1);
 
-		//crowding distance calculation for non extreme members;
-		if (obj_map.first != obj_names[0]) //only do this along one objective
-			continue;
-		else
-		{
-			if (crowd_sorted.size() == 3)
+			sortedset::iterator it = start;
+			sortedset::iterator inext, iprev;
+
+			for (; it != last; ++it)
 			{
-				sortedset::iterator it = next(start, 1);
-
 				if (find(nonuniq_obj.begin(), nonuniq_obj.end(), it->second) == nonuniq_obj.end())
 				{
-					eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[start->first]);
+					iprev = prev(it, 1);
+					inext = next(it, 1);
+
+					eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[iprev->first]);
 					fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-					if (fitness > euclidean_fitness_map[it->first])
+					if (fitness > fit[it->first])
 					{
-						crowd_distance_map[it->first] = eucd_prev_it.at(0);
-						var_distance_map[it->first] = eucd_prev_it.at(1);
-						euclidean_fitness_map[it->first] = fitness;
+						dist[it->first] = eucd_prev_it.at(0);
+						var[it->first] = eucd_prev_it.at(1);
+						fit[it->first] = fitness;
 					}
 
-					eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[last->first]);
+					eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[inext->first]);
 					fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
-					if (fitness > euclidean_fitness_map[it->first])
+					if (fitness > fit[it->first])
 					{
-						crowd_distance_map[it->first] = eucd_it_next.at(0);
-						var_distance_map[it->first] = eucd_it_next.at(1);
-						euclidean_fitness_map[it->first] = fitness;
+						dist[it->first] = eucd_it_next.at(0);
+						var[it->first] = eucd_it_next.at(1);
+						fit[it->first] = fitness;
 					}
 				}
 			}
-			else if (crowd_sorted.size() > 3)
-			{
-				//need iterators to start and stop one off from the edges
-				start = next(crowd_sorted.begin(), 1);
-				last = prev(crowd_sorted.end(), 1);
 
-				sortedset::iterator it = start;
-				sortedset::iterator inext, iprev;
-
-				for (; it != last; ++it)
-				{
-					if (find(nonuniq_obj.begin(), nonuniq_obj.end(), it->second) == nonuniq_obj.end())
-					{
-						iprev = prev(it, 1);
-						inext = next(it, 1);
-
-						eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[iprev->first]);
-						fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-						if (fitness > euclidean_fitness_map[it->first])
-						{
-							crowd_distance_map[it->first] = eucd_prev_it.at(0);
-							var_distance_map[it->first] = eucd_prev_it.at(1);
-							euclidean_fitness_map[it->first] = fitness;
-						}
-
-						eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[inext->first]);
-						fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
-						if (fitness > euclidean_fitness_map[it->first])
-						{
-							crowd_distance_map[it->first] = eucd_it_next.at(0);
-							var_distance_map[it->first] = eucd_it_next.at(1);
-							euclidean_fitness_map[it->first] = fitness;
-						}
-					}
-				}
-
-			}
 		}
 
+		for (auto member : members)
+		{
+			if (euclidean_fitness_map[member] == CROWDING_EXTREME)
+				continue;
+
+			if ((fit[member] < euclidean_fitness_map[member]) && (fit[member] != CROWDING_EXTREME))
+			{
+				crowd_distance_map[member] = dist[member];
+				var_distance_map[member] = var[member];
+				euclidean_fitness_map[member] = fit[member];
+			}
+			else if (fit[member] == CROWDING_EXTREME)
+			{
+				crowd_distance_map[member] = CROWDING_EXTREME;
+				var_distance_map[member] = CROWDING_EXTREME;
+				euclidean_fitness_map[member] = CROWDING_EXTREME;
+			}
+		}
 	}
 
 	for (auto cd : crowd_distance_map)
