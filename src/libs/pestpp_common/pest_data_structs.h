@@ -420,6 +420,8 @@ public:
 	void set_mou_fit_beta(double val) { mou_fit_beta = val; }
 	string get_mou_outer_repo_obs_file() const { return mou_outer_repo_obs_file; }
 	void set_mou_outer_repo_obs_file(string name) { mou_outer_repo_obs_file = name; }
+	string get_mou_lex_order_by() const { return mou_lex_order_by; }
+	void set_mou_lex_order_by(string obj) { mou_lex_order_by = obj; }
 	double get_mou_hypervolume_extreme() const { return mou_hypervolume_extreme; }
 	void set_mou_hypervolume_extreme(double val) { mou_hypervolume_extreme = val; }
 	int get_mou_infill_size() const { return mou_infill_size; }
@@ -777,6 +779,7 @@ private:
 	double mou_ppd_limits;
 	bool mou_adaptive_ppd;
 	string mou_outer_repo_obs_file;
+	string mou_lex_order_by;
 	int mou_infill_size;
 	double mou_hypervolume_extreme;
 	int mou_resample_every;

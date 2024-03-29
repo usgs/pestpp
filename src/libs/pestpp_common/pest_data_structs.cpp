@@ -1464,6 +1464,11 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		mou_outer_repo_obs_file = org_value;
 		return true;
 		}
+	else if (key == "MOU_LEX_ORDER_BY")
+	{
+		mou_lex_order_by = org_value;
+		return true;
+		}
 	else if (key == "MOU_HYPERVOLUME_EXTREME")
 	{
 		convert_ip(value, mou_hypervolume_extreme);
@@ -1977,6 +1982,7 @@ void PestppOptions::set_defaults()
 	set_mou_pso_rfit(2.0);
 	set_mou_fit_beta(1.0);
 	set_mou_outer_repo_obs_file("");
+	set_mou_lex_order_by("");
 	set_mou_hypervolume_extreme(1e+10);
 	set_mou_infill_size(100);
 	set_mou_ppd_limits(0.5);
