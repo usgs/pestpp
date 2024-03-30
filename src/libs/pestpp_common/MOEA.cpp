@@ -3514,7 +3514,15 @@ void MOEA::initialize()
 	vector<string> keep;
 	if (envtype == MouEnvType::NSGA)
 	{
+
+		//debug
+		message(1, "performing debug on cluster - checkpoint 1 clear");
+
 		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, false, true, POP_SUM_TAG);
+
+
+		//debug
+		message(1, "performing debug on cluster - checkpoint 2 clear");
 
 		//drop any duplicates
 		keep.clear();
@@ -3533,19 +3541,11 @@ void MOEA::initialize()
 		dp.keep_rows(keep);
 		op.keep_rows(keep);
 
-		//debug
-		message(1, "performing debug on cluster - checkpoint 1 clear");
-
 		//initialize op and dp archives
 		op_archive = ObservationEnsemble(&pest_scenario, &rand_gen,
 			op.get_eigen(dompair.first, vector<string>()), dompair.first, op.get_var_names());
-
-		message(1, "performing debug on cluster - checkpoint 2 clear");
-
 		dp_archive = ParameterEnsemble(&pest_scenario, &rand_gen,
 			dp.get_eigen(dompair.first, vector<string>()), dompair.first, dp.get_var_names());
-
-		message(1, "performing debug on cluster - checkpoint 3 clear");
 
 		ss.str("");
 		ss << "initialized archives with " << dompair.first.size() << " nondominated members";
