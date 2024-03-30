@@ -687,13 +687,8 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 
 		else
 		{
-			//debug
-			frec << "performing debug on cluster - checkpoint 1 clear" << endl ;
-
 			crowd_ordered_front = sort_members_by_crowding_distance(front.first, front.second, crowd_map, member_struct);
 		}
-
-		frec << "performing debug on cluster - checkpoint 2 clear" << endl;
 
 		if (front.first == 1)
 			for (auto front_member : crowd_ordered_front)
@@ -702,8 +697,6 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 			for (auto front_member : crowd_ordered_front)
 				dom_crowd_ordered.push_back(front_member);
 	}
-
-	frec << "performing debug on cluster - checkpoint 3 clear" << endl;
 
 	//now add the infeasible members
 	//if there is atleast one feasible nondom solution, then add the infeasible ones to dom solutions
@@ -1155,64 +1148,94 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 			//if unique, compute fitness as usual, through its neighbors, not minding if it is extreme, which will be dealt later using ehvi
 			if (find(nonuniq_obj.begin(), nonuniq_obj.end(), start->second) == nonuniq_obj.end())
 			{
-				sortedset::iterator inext = next(start, 1);
-
-				nn_count = 1;
-				double val = 1E+50;
-				for (; inext != crowd_sorted.end(); ++inext)
+				if (crowd_sorted.size() == 2)
 				{
-					if (nn_count > nn_max)
-						break;
+					eucd = get_euclidean_distance(_member_struct[start->first], _member_struct[last->first]);
+					fitness = get_euclidean_fitness(eucd.at(0), eucd.at(1));
 
-					eucd = get_euclidean_distance(_member_struct[start->first], _member_struct[inext->first]);
-					if (eucd.at(0) < val)
+					if (fitness > euclidean_fitness_map[start->first])
 					{
-						val = eucd.at(0);
-						eucd_it_next = eucd;
+						crowd_distance_map[start->first] = eucd.at(0);
+						var_distance_map[start->first] = eucd.at(1);
+						euclidean_fitness_map[start->first] = fitness;
 					}
-					nn_count++;
-
+					
+					
 				}
-
-				fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
-				if (fitness > euclidean_fitness_map[start->first])
+				else if (crowd_sorted.size() > 2)
 				{
-					crowd_distance_map[start->first] = eucd_it_next.at(0);
-					var_distance_map[start->first] = eucd_it_next.at(1);
-					euclidean_fitness_map[start->first] = fitness;
+					sortedset::iterator inext = next(start, 1);
+					nn_count = 1;
+					double val = 1E+50;
+					for (; inext != crowd_sorted.end(); ++inext)
+					{
+						if (nn_count > nn_max)
+							break;
+
+						eucd = get_euclidean_distance(_member_struct[start->first], _member_struct[inext->first]);
+						if (eucd.at(0) < val)
+						{
+							val = eucd.at(0);
+							eucd_it_next = eucd;
+						}
+						nn_count++;
+
+					}
+
+					fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
+					if (fitness > euclidean_fitness_map[start->first])
+					{
+						crowd_distance_map[start->first] = eucd_it_next.at(0);
+						var_distance_map[start->first] = eucd_it_next.at(1);
+						euclidean_fitness_map[start->first] = fitness;
+					}
 				}
 
 			}
 
 			if (find(nonuniq_obj.begin(), nonuniq_obj.end(), last->second) == nonuniq_obj.end())
 			{
-				sortedset::iterator iprev = prev(last, 1);
-
-				nn_count = 1;
-				double val = 1E+50;
-				for (; iprev != prev(crowd_sorted.begin(), 1); --iprev)
+				if (crowd_sorted.size() == 2)
 				{
-					if (nn_count > nn_max)
-						break;
+					eucd = get_euclidean_distance(_member_struct[start->first], _member_struct[last->first]);
+					fitness = get_euclidean_fitness(eucd.at(0), eucd.at(1));
 
-					eucd = get_euclidean_distance(_member_struct[last->first], _member_struct[iprev->first]);
-					if (eucd.at(0) < val)
+					if (fitness > euclidean_fitness_map[last->first])
 					{
-						val = eucd.at(0);
-						eucd_prev_it = eucd;
+						crowd_distance_map[last->first] = eucd.at(0);
+						var_distance_map[last->first] = eucd.at(1);
+						euclidean_fitness_map[last->first] = fitness;
 					}
-					nn_count++;
-
 				}
-
-				fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-				if (fitness > euclidean_fitness_map[last->first])
+				else if (crowd_sorted.size() > 2)
 				{
-					crowd_distance_map[last->first] = eucd_prev_it.at(0);
-					var_distance_map[last->first] = eucd_prev_it.at(1);
-					euclidean_fitness_map[last->first] = fitness;
-				}
+					sortedset::iterator iprev = prev(last, 1);
 
+					nn_count = 1;
+					double val = 1E+50;
+					for (; iprev != prev(crowd_sorted.begin(), 1); --iprev)
+					{
+						if (nn_count > nn_max)
+							break;
+
+						eucd = get_euclidean_distance(_member_struct[last->first], _member_struct[iprev->first]);
+						if (eucd.at(0) < val)
+						{
+							val = eucd.at(0);
+							eucd_prev_it = eucd;
+						}
+						nn_count++;
+
+					}
+
+					fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
+					if (fitness > euclidean_fitness_map[last->first])
+					{
+						crowd_distance_map[last->first] = eucd_prev_it.at(0);
+						var_distance_map[last->first] = eucd_prev_it.at(1);
+						euclidean_fitness_map[last->first] = fitness;
+					}
+				}
 			}
 
 			if (crowd_sorted.size() == 3)
