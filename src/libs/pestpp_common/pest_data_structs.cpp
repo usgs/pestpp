@@ -1783,6 +1783,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_pso_rramp: " << mou_pso_rramp << endl;
 	os << "mou_pso_rfit: " << mou_pso_rfit << endl;
 	os << "mou_fit_beta: " << mou_fit_beta << endl;
+	os << "mou_lex_order_by: " << mou_lex_order_by << endl;
+	os << "mou_max_nn_search: " << mou_max_nn_search << endl;
 	os << "mou_outer_repo_obs_file: " << mou_outer_repo_obs_file << endl;
 	os << "mou_hypervolume_extreme: " << mou_hypervolume_extreme << endl;
 	os << "mou_infill_size: " << mou_infill_size << endl;
