@@ -777,7 +777,6 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 		{
 				sum << "," << expected_crowd_map[member];
 				sum << "," << var_crowd_map[member];
-				sum << "," << ehvi_member_map[member];
 		}
 		sum << "," << spea2_constrained_fitness_map[member];
 		sum << "," << spea2_unconstrained_fitness_map[member];
@@ -809,7 +808,7 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 	{
 		for (auto objsd : *obs_obj_sd_names_ptr)
 			sum << "," << pest_utils::lower_cp(objsd);
-		sum << ",nsga2_front,nsga2_crowding_distance,exp_distance,var_distance,ehvi,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
+		sum << ",nsga2_front,nsga2_crowding_distance,exp_distance,var_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
 	}
 	else
 		sum << ",nsga2_front,nsga2_crowding_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
@@ -1019,7 +1018,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 	map<string, map<string, double>> obj_member_map;
 	map<string, double> crowd_distance_map, var_distance_map, euclidean_fitness_map;
-	string m = members[0];
+	int nn_count, nn_max = pest_scenario.get_pestpp_options().get_mou_max_nn_search();
 	
 	vector<string> obj_names;
 	for (auto obj_map : *obs_obj_names_ptr)
@@ -1065,46 +1064,13 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 			{
 				int count = 0;
 				for (auto cd : crowd_sorted)
-					if (cd.second == o.second)
+					if ((cd.second == o.second) && (cd.first != o.first))
 						count++;
 
-				if (count > 1)
+				if (count > 0)
 					nonuniq_obj.push_back(o.second);
 			}
 			
-		}
-		
-		vector<double> eucd_prev_it, eucd_it_next;
-
-		//if unique, compute fitness as usual, through its neighbors, not minding if it is extreme, which will be dealt later using ehvi
-		if (find(nonuniq_obj.begin(), nonuniq_obj.end(), start->second) == nonuniq_obj.end())
-		{
-			sortedset::iterator inext = next(start, 1);
-
-			eucd_it_next = get_euclidean_distance(_member_struct[start->first], _member_struct[inext->first]);
-			fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
-			if (fitness > euclidean_fitness_map[start->first])
-			{
-				crowd_distance_map[start->first] = eucd_it_next.at(0);
-				var_distance_map[start->first] = eucd_it_next.at(1);
-				euclidean_fitness_map[start->first] = fitness;
-			}
-
-		}
-
-		if (find(nonuniq_obj.begin(), nonuniq_obj.end(), last->second) == nonuniq_obj.end())
-		{
-			sortedset::iterator iprev = prev(last, 1);
-
-			eucd_prev_it = get_euclidean_distance(_member_struct[last->first], _member_struct[iprev->first]);
-			fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-			if (fitness > euclidean_fitness_map[last->first])
-			{
-				crowd_distance_map[last->first] = eucd_prev_it.at(0);
-				var_distance_map[last->first] = eucd_prev_it.at(1);
-				euclidean_fitness_map[last->first] = fitness;
-			}
-
 		}
 
 		if (iter > 0)
@@ -1181,13 +1147,78 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 		//crowding distance calculation for non extreme members;
 		string lex_order = pest_scenario.get_pestpp_options().get_mou_lex_order_by();
-		if (lex_order == "")
+		if ((lex_order == "") && (lex_order != "all"))
 			lex_order = obj_names[0];
+		
 
-		if (obj_map.first != lex_order) //only do this along one objective
+		vector<double> eucd_prev_it, eucd_it_next, eucd;
+		if ((obj_map.first != lex_order) && (lex_order != "all")) //only do neighborhood selection along the specified objective
 			continue;
-		else
+		else if ((obj_map.first == lex_order) || (lex_order == "all"))
 		{
+			//if unique, compute fitness as usual, through its neighbors, not minding if it is extreme, which will be dealt later using ehvi
+			if (find(nonuniq_obj.begin(), nonuniq_obj.end(), start->second) == nonuniq_obj.end())
+			{
+				sortedset::iterator inext = next(start, 1);
+
+				nn_count = 1;
+				double val = 1E+50;
+				for (; inext != crowd_sorted.end(); ++inext)
+				{
+					if (nn_count > nn_max)
+						break;
+
+					eucd = get_euclidean_distance(_member_struct[start->first], _member_struct[inext->first]);
+					if (eucd.at(0) < val)
+					{
+						val = eucd.at(0);
+						eucd_it_next = eucd;
+					}
+					nn_count++;
+
+				}
+
+				fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
+				if (fitness > euclidean_fitness_map[start->first])
+				{
+					crowd_distance_map[start->first] = eucd_it_next.at(0);
+					var_distance_map[start->first] = eucd_it_next.at(1);
+					euclidean_fitness_map[start->first] = fitness;
+				}
+
+			}
+
+			if (find(nonuniq_obj.begin(), nonuniq_obj.end(), last->second) == nonuniq_obj.end())
+			{
+				sortedset::iterator iprev = prev(last, 1);
+
+				nn_count = 1;
+				double val = 1E+50;
+				for (; iprev != prev(crowd_sorted.begin(), 1); --iprev)
+				{
+					if (nn_count > nn_max)
+						break;
+
+					eucd = get_euclidean_distance(_member_struct[last->first], _member_struct[iprev->first]);
+					if (eucd.at(0) < val)
+					{
+						val = eucd.at(0);
+						eucd_prev_it = eucd;
+					}
+					nn_count++;
+
+				}
+
+				fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
+				if (fitness > euclidean_fitness_map[last->first])
+				{
+					crowd_distance_map[last->first] = eucd_prev_it.at(0);
+					var_distance_map[last->first] = eucd_prev_it.at(1);
+					euclidean_fitness_map[last->first] = fitness;
+				}
+
+			}
+
 			if (crowd_sorted.size() == 3)
 			{
 				sortedset::iterator it = next(start, 1);
@@ -1229,7 +1260,22 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 						iprev = prev(it, 1);
 						inext = next(it, 1);
 
-						eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[iprev->first]);
+						nn_count = 1;
+						double val = 1E+50;
+						for (; iprev != prev(crowd_sorted.begin(), 1); --iprev)
+						{
+							if (nn_count > nn_max)
+								break;
+							
+							eucd = get_euclidean_distance(_member_struct[it->first], _member_struct[iprev->first]);
+							if (eucd.at(0) < val)
+							{
+								val = eucd.at(0);
+								eucd_prev_it = eucd;
+							}
+							nn_count++;
+						}
+
 						fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
 						if (fitness > euclidean_fitness_map[it->first])
 						{
@@ -1238,7 +1284,22 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 							euclidean_fitness_map[it->first] = fitness;
 						}
 
-						eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[inext->first]);
+						nn_count = 1;
+						val = 1E+50;
+						for (; inext != crowd_sorted.end(); ++inext)
+						{
+							if (nn_count > nn_max)
+								break;
+
+							eucd = get_euclidean_distance(_member_struct[it->first], _member_struct[inext->first]);
+							if (eucd.at(0) < val)
+							{
+								val = eucd.at(0);
+								eucd_it_next = eucd;
+							}
+							nn_count++;
+						}
+						
 						fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
 						if (fitness > euclidean_fitness_map[it->first])
 						{
@@ -3550,7 +3611,7 @@ void MOEA::initialize()
 				hv_pts = objectives.get_members(op_archive, dp_archive);
 			}
 			objectives.set_hypervolume_partitions(hv_pts);
-			objectives.get_ehvi(op, dp);
+			//objectives.get_ehvi(op, dp);
 		}
 			
 				
@@ -3887,18 +3948,18 @@ void MOEA::iterate_to_solution()
         update_sim_maps(new_dp,new_op);
 
 		//compute ehvi of each solution
-		if (prob_pareto)
-		{
-			message(1, "computing the expected hypervolume improvement of members in current population");
-			objectives.get_ehvi(new_op, new_dp);
+		//if (prob_pareto)
+		//{
+		//	message(1, "computing the expected hypervolume improvement of members in current population");
+		//	objectives.get_ehvi(new_op, new_dp);
 
-			/*if (pest_scenario.get_pestpp_options().get_mou_adaptive_ppd())
-			{
-				message(1, "updating overlap criteria for probabilistic dominance sorting");
-				objectives.update_ppd_criteria(new_op, new_dp);
-			}*/
-			
-		}
+		//	/*if (pest_scenario.get_pestpp_options().get_mou_adaptive_ppd())
+		//	{
+		//		message(1, "updating overlap criteria for probabilistic dominance sorting");
+		//		objectives.update_ppd_criteria(new_op, new_dp);
+		//	}*/
+		//	
+		//}
 
         //if we are using chances, then we need to make sure to update the archive as well as the current population
         // from the full history of available members since uncertainty estimates could be changing as we evolve

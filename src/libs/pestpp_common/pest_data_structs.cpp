@@ -1466,7 +1466,12 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		}
 	else if (key == "MOU_LEX_ORDER_BY")
 	{
-		mou_lex_order_by = org_value;
+		mou_lex_order_by = upper_cp(strip_cp(value));
+		return true;
+		}
+	else if (key == "MOU_MAX_NN_SEARCH")
+	{
+		convert_ip(value, mou_max_nn_search);
 		return true;
 		}
 	else if (key == "MOU_HYPERVOLUME_EXTREME")
@@ -1983,6 +1988,7 @@ void PestppOptions::set_defaults()
 	set_mou_fit_beta(1.0);
 	set_mou_outer_repo_obs_file("");
 	set_mou_lex_order_by("");
+	set_mou_max_nn_search(get_mou_population_size());
 	set_mou_hypervolume_extreme(1e+10);
 	set_mou_infill_size(100);
 	set_mou_ppd_limits(0.5);
