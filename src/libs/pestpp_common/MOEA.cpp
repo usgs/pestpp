@@ -1092,16 +1092,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 			for (auto m : members) 
 			{
 				if (_member_struct[m][obj_map.first] < lb)
-				{
 					lower_extreme_candidates[m] = _member_struct[m];
-					all_extreme_set.push_back(m);
-				}
-
-				if (_member_struct[m][obj_map.first] > ub)
-				{
-					upper_extreme_candidates[m] = _member_struct[m];
-					all_extreme_set.push_back(m);
-				}
 			}
 
 			//assign the lower extreme in current population
@@ -3542,13 +3533,20 @@ void MOEA::initialize()
 		dp.keep_rows(keep);
 		op.keep_rows(keep);
 
+		//debug
+		message(1, "performing debug on cluster - checkpoint 1 clear");
 
 		//initialize op and dp archives
 		op_archive = ObservationEnsemble(&pest_scenario, &rand_gen,
 			op.get_eigen(dompair.first, vector<string>()), dompair.first, op.get_var_names());
 
+		message(1, "performing debug on cluster - checkpoint 2 clear");
+
 		dp_archive = ParameterEnsemble(&pest_scenario, &rand_gen,
 			dp.get_eigen(dompair.first, vector<string>()), dompair.first, dp.get_var_names());
+
+		message(1, "performing debug on cluster - checkpoint 3 clear");
+
 		ss.str("");
 		ss << "initialized archives with " << dompair.first.size() << " nondominated members";
 		message(2, ss.str());
