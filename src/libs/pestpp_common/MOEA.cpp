@@ -1073,8 +1073,6 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 		if (iter > 0)
 		{
-
-
 			map<string, map<string, double>> lower_extreme_candidates, upper_extreme_candidates;
 			map<string, double> curr;
 			vector<string> all_extreme_set;
@@ -1121,9 +1119,50 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 				}
 				else
 				{
-					crowd_distance_map[endmem] = CROWDING_EXTREME;
-					var_distance_map[endmem] = CROWDING_EXTREME;
-					euclidean_fitness_map[endmem] = CROWDING_EXTREME;
+					if (find(nonuniq_obj.begin(), nonuniq_obj.end(), lower_extreme_candidates[endmem][obj_map.first]) != nonuniq_obj.end())
+					{
+						map<string, double> ext_mems_pd;
+						for (auto l : lower_extreme_candidates)
+						{
+							if (lower_extreme_candidates[l.first][obj_map.first] != lower_extreme_candidates[endmem][obj_map.first])
+								continue;
+
+							double pd = 1;
+							for (auto m : lower_extreme_candidates)
+							{
+								if (l.first != m.first)
+								{
+									map<string, double> PD = dominance_probability(_member_struct[l.first], _member_struct[m.first]);
+									for (auto objname : *obj_names_ptr)
+									{
+										if (objname != obj_map.first)
+											pd *= PD[objname];
+									}
+								}
+							}
+							ext_mems_pd[l.first] = pd;
+						}
+
+						double mx = 0;
+						string extreme_member_name;
+						for (auto em : ext_mems_pd)
+						{
+							if (em.second > mx)
+							{
+								mx = em.second;
+								extreme_member_name = em.first;
+							}
+						}
+						crowd_distance_map[extreme_member_name] = CROWDING_EXTREME;
+						var_distance_map[extreme_member_name] = CROWDING_EXTREME;
+						euclidean_fitness_map[extreme_member_name] = CROWDING_EXTREME;
+					}
+					else
+					{
+						crowd_distance_map[endmem] = CROWDING_EXTREME;
+						var_distance_map[endmem] = CROWDING_EXTREME;
+						euclidean_fitness_map[endmem] = CROWDING_EXTREME;
+					}
 				}
 			}
 		}
