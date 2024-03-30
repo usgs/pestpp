@@ -8,10 +8,10 @@
 version: 5.2.5
 binary compiled on Mar 30 2024 at 09:10:27
 
-using control file: ".\pest\bm3_gp.pst"
+using control file: "./pest/bm3_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp-moudev\benchmarks\zdt2"
 on host: "DUMPLING-FL"
-started at 03/30/24 15:39:23
+started at 03/30/24 16:21:28
 
 on host: "DUMPLING-FL"
 
@@ -440,7 +440,7 @@ OBJ_2                less_than      0
 ...loading obs population from csv file ./model/input/mogp_bm3.obs_pop.csv
 ...obs population with 100 members read from './model/input/mogp_bm3.obs_pop.csv'
 
-... saved observation population to  .\pest\bm3_gp.0.obs_pop.csv
+... saved observation population to  ./pest/bm3_gp.0.obs_pop.csv
 
   ---  initial population decision variable summary:  ---  
 decision variable        ubnd      lbnd      mean   standard devation         min         max
@@ -485,49 +485,5 @@ objective function   direction         mean      std dev          min          m
 OBJ_1                 minimize     0.499956    0.2881094    0.0037952     0.998152    0.0435346
 OBJ_2                 minimize       5.4388    0.4569061      4.28211      7.16973      4.67861
 
-... saved initial dv population to  .\pest\bm3_gp.0.dv_pop.csv
+... saved initial dv population to  ./pest/bm3_gp.0.dv_pop.csv
 ...performing initial pareto dominance sort
-...pareto dominance sort yielded 14 domination fronts
-6 in the front 1
-10 in the front 2
-9 in the front 3
-6 in the front 4
-9 in the front 5
-8 in the front 6
-12 in the front 7
-8 in the front 8
-8 in the front 9
-(not reporting remaining front membership)
-...wrote pareto summary to .\pest\bm3_gp.pareto.summary.csv
-initialized archives with 6 nondominated members
-...pareto dominance sort yielded 1 domination fronts
-6 in the front 1
-...wrote pareto summary to .\pest\bm3_gp.pareto.archive.summary.csv
-...pareto dominance sort yielded 1 domination fronts
-6 in the front 1
-...wrote pareto summary to .\pest\bm3_gp.pareto.trimmed.archive.summary.csv
-...using the initial population for hypervolume partitioning
-...saved decision variable population of size 6 X 30 to '.\pest\bm3_gp.archive.dv_pop.csv'
-...saved generation-specific decision variable population of size 6 X 30 to '.\pest\bm3_gp.0.archive.dv_pop.csv'
-...saved observation population of size 6 X 4 to '.\pest\bm3_gp.archive.obs_pop.csv'
-...saved generation-specific observation population of size 6 X 4 to '.\pest\bm3_gp.0.archive.obs_pop.csv'
-...number of initial feasible solutions: 6
-
-  ---  initialization complete  ---  
-
-  ---  starting generation  1  ---  
-...pareto dominance sort yielded 14 domination fronts
-6 in the front 1
-10 in the front 2
-9 in the front 3
-6 in the front 4
-9 in the front 5
-8 in the front 6
-12 in the front 7
-8 in the front 8
-8 in the front 9
-(not reporting remaining front membership)
-...generating PSO population of size 100
-...pareto dominance sort yielded 1 domination fronts
-6 in the front 1
-...running population of size  100

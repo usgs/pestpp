@@ -687,8 +687,13 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 
 		else
 		{
+			//debug
+			frec << "performing debug on cluster - checkpoint 1 clear" << endl ;
+
 			crowd_ordered_front = sort_members_by_crowding_distance(front.first, front.second, crowd_map, member_struct);
 		}
+
+		frec << "performing debug on cluster - checkpoint 2 clear" << endl;
 
 		if (front.first == 1)
 			for (auto front_member : crowd_ordered_front)
@@ -698,7 +703,7 @@ pair<vector<string>, vector<string>> ParetoObjectives::get_nsga2_pareto_dominanc
 				dom_crowd_ordered.push_back(front_member);
 	}
 
-	
+	frec << "performing debug on cluster - checkpoint 3 clear" << endl;
 
 	//now add the infeasible members
 	//if there is atleast one feasible nondom solution, then add the infeasible ones to dom solutions
@@ -3514,15 +3519,7 @@ void MOEA::initialize()
 	vector<string> keep;
 	if (envtype == MouEnvType::NSGA)
 	{
-
-		//debug
-		message(1, "performing debug on cluster - checkpoint 1 clear");
-
 		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, false, true, POP_SUM_TAG);
-
-
-		//debug
-		message(1, "performing debug on cluster - checkpoint 2 clear");
 
 		//drop any duplicates
 		keep.clear();
