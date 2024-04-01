@@ -1030,9 +1030,9 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 	for (auto member : members)
 	{
-		crowd_distance_map[member] = 0.0;
-		var_distance_map[member] = 0.0;
-		euclidean_fitness_map[member] = 0.0;
+		crowd_distance_map[member] = 1E+40;
+		var_distance_map[member] = 1E+40;
+		euclidean_fitness_map[member] = 1E+40;
 		/*for (auto obj_map : _member_struct[member])
 			obj_member_map[obj_map.first][member] = obj_map.second;*/
 
@@ -1175,14 +1175,14 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 		//crowding distance calculation for non extreme members;
 		string lex_order = pest_scenario.get_pestpp_options().get_mou_lex_order_by();
-		if ((lex_order == "") && (lex_order != "all"))
+		if ((lex_order == "") && (lex_order != "ALL"))
 			lex_order = obj_names[0];
 		
 
 		vector<double> eucd_prev_it, eucd_it_next, eucd;
-		if ((obj_map.first != lex_order) && (lex_order != "all")) //only do neighborhood selection along the specified objective
+		if ((obj_map.first != lex_order) && (lex_order != "ALL")) //only do neighborhood selection along the specified objective
 			continue;
-		else if ((obj_map.first == lex_order) || (lex_order == "all"))
+		else if ((obj_map.first == lex_order) || (lex_order == "ALL"))
 		{
 			//if unique, compute fitness as usual, through its neighbors, not minding if it is extreme, which will be dealt later using ehvi
 			if (find(nonuniq_obj.begin(), nonuniq_obj.end(), start->second) == nonuniq_obj.end())
@@ -1192,7 +1192,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 					eucd = get_euclidean_distance(_member_struct[start->first], _member_struct[last->first]);
 					fitness = get_euclidean_fitness(eucd.at(0), eucd.at(1));
 
-					if (fitness > euclidean_fitness_map[start->first])
+					if ((eucd.at(0) < crowd_distance_map[start->first]) && (crowd_distance_map[start->first] != CROWDING_EXTREME))
 					{
 						crowd_distance_map[start->first] = eucd.at(0);
 						var_distance_map[start->first] = eucd.at(1);
@@ -1222,7 +1222,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 					}
 
 					fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
-					if (fitness > euclidean_fitness_map[start->first])
+					if ((eucd_it_next.at(0) < crowd_distance_map[start->first]) && (crowd_distance_map[start->first] != CROWDING_EXTREME))
 					{
 						crowd_distance_map[start->first] = eucd_it_next.at(0);
 						var_distance_map[start->first] = eucd_it_next.at(1);
@@ -1239,7 +1239,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 					eucd = get_euclidean_distance(_member_struct[start->first], _member_struct[last->first]);
 					fitness = get_euclidean_fitness(eucd.at(0), eucd.at(1));
 
-					if (fitness > euclidean_fitness_map[last->first])
+					if ((eucd.at(0) < crowd_distance_map[last->first]) && (crowd_distance_map[last->first] != CROWDING_EXTREME))
 					{
 						crowd_distance_map[last->first] = eucd.at(0);
 						var_distance_map[last->first] = eucd.at(1);
@@ -1268,7 +1268,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 					}
 
 					fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-					if (fitness > euclidean_fitness_map[last->first])
+					if ((eucd_prev_it.at(0) < crowd_distance_map[last->first]) && (crowd_distance_map[last->first] != CROWDING_EXTREME))
 					{
 						crowd_distance_map[last->first] = eucd_prev_it.at(0);
 						var_distance_map[last->first] = eucd_prev_it.at(1);
@@ -1285,7 +1285,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 				{
 					eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[start->first]);
 					fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-					if (fitness > euclidean_fitness_map[it->first])
+					if ((eucd_prev_it.at(0) < crowd_distance_map[it->first]) && (crowd_distance_map[it->first] != CROWDING_EXTREME))
 					{
 						crowd_distance_map[it->first] = eucd_prev_it.at(0);
 						var_distance_map[it->first] = eucd_prev_it.at(1);
@@ -1294,7 +1294,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 					eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[last->first]);
 					fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
-					if (fitness > euclidean_fitness_map[it->first])
+					if ((eucd_it_next.at(0) < crowd_distance_map[it->first]) && (crowd_distance_map[it->first] != CROWDING_EXTREME))
 					{
 						crowd_distance_map[it->first] = eucd_it_next.at(0);
 						var_distance_map[it->first] = eucd_it_next.at(1);
@@ -1335,7 +1335,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 						}
 
 						fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-						if (fitness > euclidean_fitness_map[it->first])
+						if ((eucd_prev_it.at(0) < crowd_distance_map[it->first]) && (crowd_distance_map[it->first] != CROWDING_EXTREME))
 						{
 							crowd_distance_map[it->first] = eucd_prev_it.at(0);
 							var_distance_map[it->first] = eucd_prev_it.at(1);
@@ -1359,7 +1359,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 						}
 						
 						fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
-						if (fitness > euclidean_fitness_map[it->first])
+						if ((eucd_it_next.at(0) < crowd_distance_map[it->first]) && (crowd_distance_map[it->first] != CROWDING_EXTREME))
 						{
 							crowd_distance_map[it->first] = eucd_it_next.at(0);
 							var_distance_map[it->first] = eucd_it_next.at(1);
