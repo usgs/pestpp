@@ -6,7 +6,7 @@ restart estimation
  10  2  .3  .01  8 
  10  10  .001
  .1
- 5   .01  3  3	.01  3 
+ 50   .01  3  3	.01  3 
  1   1   1 
 * parameter groups
 decvar	absolute  0.01  0.0		switch  	1 	parabolic
@@ -61,8 +61,8 @@ obj_2_sd	0		1	miscdata
 ++mou_generator(pso)
 ++mou_ppd_limits(0.8)
 ++mou_env_selector(NSGA_PPD)
-++mou_pso_alpha(0)
-++mou_pso_rramp(-1)
+#++mou_pso_alpha(0)
+#++mou_pso_rramp(-1)
 ++mou_max_archive_size(100)
 ++mou_lex_order_by(all)
 ++mou_fit_beta(1)
