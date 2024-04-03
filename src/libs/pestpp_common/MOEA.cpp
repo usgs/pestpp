@@ -1007,7 +1007,7 @@ double ParetoObjectives::get_euclidean_fitness(double E, double V)
 	double beta = pest_scenario.get_pestpp_options().get_mou_fit_beta();
 	double val;
 
-	if (beta == 0)
+	if (beta < 0)
 		val = pow(E / exp(pow(V, 0.5)),0.5);
 	else
 		val = pow(E / (beta * pow(V, 0.5) + 1),0.5);
@@ -1085,8 +1085,20 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 				if (count > 0)
 					nonuniq_obj.push_back(o.second);
+			}	
+		}
+
+		if (nonuniq_obj.size() != 0)
+		{
+			for (auto m : members)
+			{
+				if (find(nonuniq_obj.begin(), nonuniq_obj.end(), _member_struct[m][obj_map.first]) != nonuniq_obj.end())
+				{
+					crowd_distance_map[m] = -1;
+					var_distance_map[m] = -1;
+					euclidean_fitness_map[m] = -1;
+				}
 			}
-			
 		}
 
 		if (iter > 0)
@@ -1178,12 +1190,6 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 								crowd_distance_map[em.first] = CROWDING_EXTREME;
 								var_distance_map[em.first] = CROWDING_EXTREME;
 								euclidean_fitness_map[em.first] = CROWDING_EXTREME;
-							}
-							else
-							{
-								crowd_distance_map[em.first] = -1;
-								var_distance_map[em.first] = -1;
-								euclidean_fitness_map[em.first] = -1;
 							}
 						}
 					}
@@ -1434,11 +1440,34 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 						for (auto em : nonuniq_pd)
 						{
-							if (em.first != mx_pd_mem)
+							if (em.first == mx_pd_mem)
 							{
-								crowd_distance_map[em.first] = -1;
-								var_distance_map[em.first] = -1;
-								euclidean_fitness_map[em.first] = -1;
+								iprev = prev(it, 1);
+								inext = next(it, 1);
+
+								nn_count = 1;
+								double val = 1E+50;
+								for (; iprev != prev(crowd_sorted.begin(), 1); --iprev)
+								{
+									if (nn_count > nn_max)
+										break;
+
+									eucd = get_euclidean_distance(_member_struct[em.first], _member_struct[iprev->first], obj_range);
+									if (eucd.at(0) < val)
+									{
+										val = eucd.at(0);
+										eucd_prev_it = eucd;
+									}
+									nn_count++;
+								}
+
+								fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
+								if ((fitness > euclidean_fitness_map[em.first]))
+								{
+									crowd_distance_map[em.first] = eucd_prev_it.at(0);
+									var_distance_map[em.first] = eucd_prev_it.at(1);
+									euclidean_fitness_map[em.first] = fitness;
+								}
 							}
 						}
 
