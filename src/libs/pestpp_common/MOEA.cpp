@@ -343,7 +343,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 				probnondom[cd.first] = 1;
 			}
 			else if (mxpd != 0.0) {
-				probnondom[cd.first] = pow(cd.second / mxpd, alpha);
+				probnondom[cd.first] = pow(probnondom[cd.first] / mxpd, alpha);
 			}
 			else {
 				probnondom[cd.first] = 1.0;
