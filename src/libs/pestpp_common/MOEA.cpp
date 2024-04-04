@@ -282,13 +282,17 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		pair<map<string, double>, map<string, double>> euclidean_crowd_dist = get_euclidean_crowding_distance(members);
 		map<string, double> crowd_dist = euclidean_crowd_dist.first;
 		map<string, double> var_dist = euclidean_crowd_dist.second;
+		map<string, double> probnondom;
 
 		sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
 		
 		for (auto& cd : crowd_dist)
 		{
 			if (cd.second != CROWDING_EXTREME)
+			{
 				cd.second = get_euclidean_fitness(cd.second, var_dist[cd.first]);
+				probnondom[cd.first] = probnotdominated_map[cd.first];
+			}
 				
 		}
 
@@ -310,26 +314,6 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 			if (cd.second == CROWDING_EXTREME)
 			{
 				cd.second = 1;
-				/*cd.second = 1;
-				map<string, double> mem = _member_struct[cd.first];
-				for (auto obj_name : *obs_obj_names_ptr)
-					cd.second *= pow(1+abs(mem[obj_name+"_SD"] / mem[obj_name]), -alpha);*/
-
-				/*if (beta == 0)
-				{
-					cd.second = 1;
-					map<string, double> mem = _member_struct[cd.first];
-					for (auto obj_sd_name : *obs_obj_sd_names_ptr)
-						cd.second *= pow(exp(mem[obj_sd_name]), -alpha);
-				}
-				else
-				{
-					cd.second = 1;
-					map<string, double> mem = _member_struct[cd.first];
-					for (auto obj_sd_name : *obs_obj_sd_names_ptr)
-						cd.second *= mem[obj_sd_name];
-					cd.second = pow(1+ beta * cd.second, -alpha);
-				}*/
 			}
 			else if (mx != 0.0) {
 				cd.second = pow(cd.second / mx, alpha);
@@ -337,6 +321,37 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 			else {
 				cd.second = pow(0.5, alpha);
 			}
+		}
+
+		//normalize prob of nondom
+		double mxpd = -1.0E+30;
+		for (auto& cd : crowd_dist)
+		{
+			if ((cd.second != CROWDING_EXTREME) && (probnondom[cd.first] > mxpd))
+				mxpd = probnondom[cd.first];
+			else if (members.size() == 2)
+				mxpd = probnondom[cd.first];
+			else if (crowd_sorted.size() == 1)
+				mxpd = probnondom[cd.first];
+		}
+		if (mxpd < 0.0)
+			throw runtime_error("pso max probability of nondominance is negative");
+
+		for (auto& cd : crowd_dist) {
+			if (cd.second == CROWDING_EXTREME)
+			{
+				probnondom[cd.first] = 1;
+			}
+			else if (mxpd != 0.0) {
+				probnondom[cd.first] = pow(cd.second / mxpd, alpha);
+			}
+			else {
+				probnondom[cd.first] = 1.0;
+			}
+		}
+
+		for (auto& cd : crowd_dist) {
+			cd.second = cd.second * probnondom[cd.first];
 		}
 
 		fitness = crowd_dist;
@@ -1546,9 +1561,9 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 	vector <pair<string, double>> cs_vec;
 	for (auto cd : fit_map)
 	{
-		//cs_vec.push_back(cd);
-		pair <string, double> pnd {cd.first, probnotdominated_map[cd.first]};
-		cs_vec.push_back(pnd);
+		cs_vec.push_back(cd);
+		/*pair <string, double> pnd {cd.first, probnotdominated_map[cd.first]};
+		cs_vec.push_back(pnd);*/
 		crowd_map[cd.first] = cd.second;
 
 		/*expected_crowd_map[cd.first] = expected_dist_map[cd.first];
