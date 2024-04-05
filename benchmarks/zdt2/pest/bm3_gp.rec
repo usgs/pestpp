@@ -11,7 +11,7 @@ binary compiled on Apr  4 2024 at 07:47:32
 using control file: "./pest/bm3_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp-moudev\benchmarks\zdt2"
 on host: "DUMPLING-FL"
-started at 04/04/24 16:43:09
+started at 04/05/24 11:09:44
 
 on host: "DUMPLING-FL"
 
@@ -530,4 +530,3 @@ initialized archives with 6 nondominated members
 ...generating PSO population of size 100
 ...pareto dominance sort yielded 1 domination fronts
 6 in the front 1
-...running population of size  100
