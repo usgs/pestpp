@@ -943,15 +943,15 @@ void Constraints::initial_report()
 		}
 		cout << "...opt_risk = " << risk;
 		if (std_weights)
-			cout << ", using FOSM-based chance constraints/objectives with the weights of non-zero-weighted constraints as standard deviation" << endl;
+			cout << ", using FOSM-based chance constraints with the weights of non-zero-weighted constraints as standard deviation" << endl;
 		else if (use_fosm)
-			cout << ", using FOSM-based chance constraints/objectives with " << adj_par_names.size() << " adjustable parameters" << endl;
+			cout << ", using FOSM-based chance constraints with " << adj_par_names.size() << " adjustable parameters" << endl;
 		else
-			cout << ", using stack-based chance constraints/objectives with " << stack_pe.shape().first << " realizations" << endl;
+			cout << ", using stack-based chance constraints with " << stack_pe.shape().first << " realizations" << endl;
 	}
 	else
 	{
-		cout << "...not using chance constraints/objectives" << endl;
+		cout << "...not using chance constraints" << endl;
 	}
 }
 
@@ -1203,21 +1203,11 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
             }
 			Eigen::MatrixXd missing_dv_mat = pe.get_eigen(missing, dvnames);
 			Eigen::VectorXd missing_dv_vec, stack_dv_vec;
-			double dist, min_dist, max_dist;
+			double dist, min_dist, max_dist,cutoff;
 			string min_real_name,missing_real_name;
 			vector<double> distances;
-			vector<double> factors,temp;
+			vector<double> factors,temp, temp2;
 			vector<string> dreal_names;
-
-            Eigen::MatrixXd stack_pe_mat(stack_pe_map.size(),dvnames.size());
-            vector<string> stack_pe_map_rnames;
-            int i = 0;
-            for (auto& p : stack_pe_map) {
-                stack_dv_vec = p.second.get_data_eigen_vec(dvnames);
-                stack_pe_mat.row(i) = stack_dv_vec;
-                stack_pe_map_rnames.push_back(p.first);
-                i++;
-            }
 
             Eigen::MatrixXd shifts;
             double factor_sum, factor, factor_sum2;
@@ -1230,41 +1220,36 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 				distances.clear();
                 double _risk = risk;
 
-                if (risk_obj.size() > 0) {
+                if (risk_obj.size() > 0)
+                {
                     //_risk = stack_pe_map[min_real_name][risk_obj];
                     _risk = risk_map[missing_real_name];
                 }
 
-//				for (auto& p : stack_pe_map)
-//				{
-//					stack_dv_vec = p.second.get_data_eigen_vec(dvnames);
-//					dist = (stack_dv_vec - missing_dv_vec).squaredNorm();
-//					distances.push_back(dist);
-//					dreal_names.push_back(p.first);
-//					if (dist < min_dist)
-//					{
-//						min_dist = dist;
-//						min_real_name = p.first;
-//					}
-//				}
-                for (i=0;i<stack_pe_map_rnames.size();i++)
-                {
-                    dist = (stack_pe_mat.row(i) - missing_dv_vec).squaredNorm();
-                    distances.push_back(dist);
-                    if (dist < min_dist)
-                    {
-                        min_dist = dist;
-                        min_real_name = stack_pe_map_rnames[i];
-                    }
-                }
-                dreal_names = stack_pe_map_rnames;
-
-
+				for (auto& p : stack_pe_map)
+				{
+					stack_dv_vec = p.second.get_data_eigen_vec(dvnames);
+					dist = (stack_dv_vec - missing_dv_vec).squaredNorm();
+					distances.push_back(dist);
+					dreal_names.push_back(p.first);
+					if (dist < min_dist)
+					{
+						min_dist = dist;
+						min_real_name = p.first;
+					}
+				}
                 temp.clear();
 				max_dist = *max_element(distances.begin(),distances.end());
                 for (auto& d : distances)
                     temp.push_back(d / max_dist);
                 max_dist = *max_element(temp.begin(),temp.end());
+                temp2 = temp;
+                sort(temp2.begin(),temp2.end());
+                cutoff = temp2[temp2.size()-1];
+                if (temp2.size() > 5)
+                {
+                    cutoff = temp2[4];
+                }
                 factors.clear();
                 factor_sum = 0.0;
                 for (auto& t : temp)
@@ -1272,6 +1257,10 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 
                     if (t == 0)
                         factor = 10000.0;
+                    else if (t > cutoff)
+                    {
+                        factor = 0.0;
+                    }
                     else
                         factor = 1.0/t;
                     factor_sum += factor;
