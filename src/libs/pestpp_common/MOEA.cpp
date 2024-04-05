@@ -2294,7 +2294,7 @@ void MOEA::initialize()
 		{
 			//this can be done, but we need to make sure the appropriate chance restart
 			//args were supplied: base_jacobian or obs_stack
-			throw_moea_error("chance constraints not yet supported with restart");
+			throw_moea_error("chance constraints/objectives not yet supported with restart");
 		}
 	
 		//since mou reqs strict linking of realization names, let's see if we can find an intersection set 
@@ -3078,6 +3078,7 @@ void MOEA::initialize_population_schedule()
         }
         in.close();
     }
+
     ofstream& frec = file_manager.rec_ofstream();
     frec << "...population schedule: generation,population size:" << endl;
     for (int i=0;i<pest_scenario.get_control_info().noptmax;i++)

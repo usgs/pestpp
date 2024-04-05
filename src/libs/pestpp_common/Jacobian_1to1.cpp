@@ -394,7 +394,8 @@ bool Jacobian_1to1::forward_diff(const string &par_name, double base_derivative_
 
 	// perturb derivative parameters
 	double incr = derivative_inc(par_name, group_info, base_derivative_val, false);
-	if (incr == 0.0) return false;
+	if (incr == 0.0)
+        return false;
 	new_par_val = new_par[par_name] = base_derivative_val + incr;
 	// try forward derivative
 	out_of_bound_forward = out_of_bounds(new_par, par_info_ptr);

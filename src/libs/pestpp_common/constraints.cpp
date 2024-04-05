@@ -943,15 +943,15 @@ void Constraints::initial_report()
 		}
 		cout << "...opt_risk = " << risk;
 		if (std_weights)
-			cout << ", using FOSM-based chance constraints with the weights of non-zero-weighted constraints as standard deviation" << endl;
+			cout << ", using FOSM-based chance constraints/objectives with the weights of non-zero-weighted constraints as standard deviation" << endl;
 		else if (use_fosm)
-			cout << ", using FOSM-based chance constraints with " << adj_par_names.size() << " adjustable parameters" << endl;
+			cout << ", using FOSM-based chance constraints/objectives with " << adj_par_names.size() << " adjustable parameters" << endl;
 		else
-			cout << ", using stack-based chance constraints with " << stack_pe.shape().first << " realizations" << endl;
+			cout << ", using stack-based chance constraints/objectives with " << stack_pe.shape().first << " realizations" << endl;
 	}
 	else
 	{
-		cout << "...not using chance constraints" << endl;
+		cout << "...not using chance constraints/objectives" << endl;
 	}
 }
 
@@ -1209,6 +1209,16 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 			vector<double> factors,temp;
 			vector<string> dreal_names;
 
+            Eigen::MatrixXd stack_pe_mat(stack_pe_map.size(),dvnames.size());
+            vector<string> stack_pe_map_rnames;
+            int i = 0;
+            for (auto& p : stack_pe_map) {
+                stack_dv_vec = p.second.get_data_eigen_vec(dvnames);
+                stack_pe_mat.row(i) = stack_dv_vec;
+                stack_pe_map_rnames.push_back(p.first);
+                i++;
+            }
+
             Eigen::MatrixXd shifts;
             double factor_sum, factor, factor_sum2;
 			for (int i=0;i<missing.size();i++)
@@ -1220,24 +1230,36 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 				distances.clear();
                 double _risk = risk;
 
-                if (risk_obj.size() > 0)
-                {
+                if (risk_obj.size() > 0) {
                     //_risk = stack_pe_map[min_real_name][risk_obj];
                     _risk = risk_map[missing_real_name];
                 }
 
-				for (auto& p : stack_pe_map)
-				{
-					stack_dv_vec = p.second.get_data_eigen_vec(dvnames);
-					dist = (stack_dv_vec - missing_dv_vec).squaredNorm();
-					distances.push_back(dist);
-					dreal_names.push_back(p.first);
-					if (dist < min_dist)
-					{
-						min_dist = dist;
-						min_real_name = p.first;
-					}
-				}
+//				for (auto& p : stack_pe_map)
+//				{
+//					stack_dv_vec = p.second.get_data_eigen_vec(dvnames);
+//					dist = (stack_dv_vec - missing_dv_vec).squaredNorm();
+//					distances.push_back(dist);
+//					dreal_names.push_back(p.first);
+//					if (dist < min_dist)
+//					{
+//						min_dist = dist;
+//						min_real_name = p.first;
+//					}
+//				}
+                for (i=0;i<stack_pe_map_rnames.size();i++)
+                {
+                    dist = (stack_pe_mat.row(i) - missing_dv_vec).squaredNorm();
+                    distances.push_back(dist);
+                    if (dist < min_dist)
+                    {
+                        min_dist = dist;
+                        min_real_name = stack_pe_map_rnames[i];
+                    }
+                }
+                dreal_names = stack_pe_map_rnames;
+
+
                 temp.clear();
 				max_dist = *max_element(distances.begin(),distances.end());
                 for (auto& d : distances)
