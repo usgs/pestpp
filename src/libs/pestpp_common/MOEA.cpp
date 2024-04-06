@@ -257,8 +257,8 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 	if (alpha == 0)
 	{
 		//double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
-		double maxinfillsize = pest_scenario.get_pestpp_options().get_mou_infill_size();
-		double pfull = members.size() / maxinfillsize;
+		double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
+		double pfull = members.size() / maxarchivesize;
 		double rramp = pest_scenario.get_pestpp_options().get_mou_pso_rramp();
 		double rfit = pest_scenario.get_pestpp_options().get_mou_pso_rfit();
 
@@ -279,22 +279,13 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 
 	if (prob_pareto)
 	{
-		pair<map<string, double>, map<string, double>> euclidean_crowd_dist = get_euclidean_crowding_distance(members);
-		map<string, double> crowd_dist = euclidean_crowd_dist.first;
-		map<string, double> var_dist = euclidean_crowd_dist.second;
+		map<string, double> cluster_crowding = get_cluster_crowding_fitness(members);
 
-		sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
+		sortedset crowd_sorted(cluster_crowding.begin(), cluster_crowding.end(), compFunctor);
 		
-		for (auto& cd : crowd_dist)
-		{
-			if (cd.second != CROWDING_EXTREME)
-				cd.second = get_euclidean_fitness(cd.second, var_dist[cd.first]);
-				
-		}
-
 		//normalize cd
 		double mx = -1.0e+30;
-		for (auto& cd : crowd_dist)
+		for (auto& cd : cluster_crowding)
 		{
 			if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
 				mx = cd.second;
@@ -306,7 +297,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		if (mx < 0.0)
 			throw runtime_error("pso max crowding distance is negative");
 
-		for (auto& cd : crowd_dist) {
+		for (auto& cd : cluster_crowding) {
 			if (cd.second == CROWDING_EXTREME)
 			{
 				cd.second = 1;
@@ -339,7 +330,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 			}
 		}
 
-		fitness = crowd_dist;
+		fitness = cluster_crowding;
 	}
 	else
 	{
@@ -372,37 +363,6 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		fitness = crowd_dist;
 
 	}
-
-	//map<string, double> fitness = get_prob_non_dominance(members, _member_struct);
-	////variable alpha
-	//if (alpha == 0)
-	//{
-	//	double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
-	//	double pfull = members.size() / maxarchivesize;
-	//	double rramp = pest_scenario.get_pestpp_options().get_mou_pso_rramp();
-	//	double rfit = pest_scenario.get_pestpp_options().get_mou_pso_rfit();
-
-	//	if (rramp == -5e+02)
-	//		throw runtime_error("PSO alpha is zero");
-	//	if (rramp == 0.0)
-	//		throw runtime_error("PSO RRAMP is zero");
-
-	//	alpha = 1 + (exp(rramp * pfull) - 1.0) / (exp(rramp) - 1) * (rfit - 1.0);
-
-	//}
-
-	//bool allzero = true;
-	//for (auto& fit : fitness)
-	//{
-	//	fit.second = pow(fit.second, alpha);
-	//	if (fit.second != 0)
-	//		allzero = false;
-	//}
-	//		
-	//if (allzero)
-	//	return crowd_dist;
-	//else
-	//	return fitness;	
 
 	return fitness;
 }
@@ -773,11 +733,8 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 		sum << "," << member_front_map[member];
 		sum << "," << crowd_map[member];
 		if (prob_pareto)
-		{
-				sum << "," << expected_crowd_map[member];
-				sum << "," << var_crowd_map[member];
-				sum << "," << probnondom_map[member];
-		}
+			sum << "," << probnondom_map[member];
+		
 		sum << "," << spea2_constrained_fitness_map[member];
 		sum << "," << spea2_unconstrained_fitness_map[member];
 		if (infeas.find(member) != infeas.end())
@@ -808,7 +765,7 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 	{
 		for (auto objsd : *obs_obj_sd_names_ptr)
 			sum << "," << pest_utils::lower_cp(objsd);
-		sum << ",nsga2_front,nsga2_crowding_distance,exp_distance,var_distance,probnondom,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
+		sum << ",nsga2_front,nsga2_crowding_distance,probnondom,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
 	}
 	else
 		sum << ",nsga2_front,nsga2_crowding_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
@@ -973,31 +930,30 @@ map<string, double> ParetoObjectives::get_cuboid_crowding_distance(vector<string
 	return crowd_distance_map;
 }
 
-vector<double> ParetoObjectives::get_euclidean_distance(map<string, double> first, map<string, double> second, map<string, double> scaling_factor)
+vector<double> ParetoObjectives::get_euclidean_distance(map<string, double> first, map<string, double> second)
 {
 	vector<double> euclidean_dist{ 0, 0 };
-	map<string, double> sf = scaling_factor;
 
 	for (auto obj : *obs_obj_names_ptr)
 		euclidean_dist.at(0) += pow(first[obj] - second[obj], 2);
 
 	if (prob_pareto)
 	{
-		/*for (auto obj : *obs_obj_names_ptr)
+		for (auto obj : *obs_obj_names_ptr)
 			euclidean_dist.at(1) += 4 * pow(first[obj] - second[obj], 2) * (pow(first[obj + "_SD"], 2) + pow(second[obj + "_SD"], 2));
 		for (auto objsd : *obs_obj_sd_names_ptr)
 		{
 			euclidean_dist.at(0) += pow(first[objsd], 2) + pow(second[objsd], 2);
 			euclidean_dist.at(1) += 2 * pow(pow(first[objsd], 2) + pow(second[objsd], 2), 2);
-		}*/
+		}
 
-		for (auto obj : *obs_obj_names_ptr)
+		/*for (auto obj : *obs_obj_names_ptr)
 		{
 			euclidean_dist.at(1) += 4 * pow((first[obj] - second[obj]) / sf[obj], 2) * (pow(first[obj + "_SD"], 2) + pow(second[obj + "_SD"], 2)) / pow(sf[obj], 2);
 
 			euclidean_dist.at(0) += (pow(first[obj + "_SD"], 2) + pow(second[obj + "_SD"], 2)) / pow(sf[obj], 2);
 			euclidean_dist.at(1) += 2 * pow((pow(first[obj + "_SD"], 2) + pow(second[obj + "_SD"], 2)) / pow(sf[obj], 2), 2);
-		}
+		}*/
 
 	}
 
@@ -1017,55 +973,58 @@ double ParetoObjectives::get_euclidean_fitness(double E, double V)
 	return val;
 }
 
-pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_crowding_distance(vector<string>& members)
+void ParetoObjectives::prep_expected_distance_lookup_table(ObservationEnsemble& op, ParameterEnsemble& dp)
 {
-	return get_euclidean_crowding_distance(members, member_struct);
+	map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
+	vector<double> eucd;
+	expdist_lookup.clear();
+
+	for (auto m : _member_struct)
+	{
+		for (auto n : _member_struct)
+		{
+			if (m.first == n.first)
+				continue;
+
+			eucd = get_euclidean_distance(_member_struct[m.first], _member_struct[n.first]);
+			expdist_lookup[m.first][n.first] = eucd.at(0);
+
+		}
+	}
+
+	//debug: lookup table check
+	//int i = 0;
 }
 
-pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct)
+map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string>& members)
+{
+	return get_cluster_crowding_fitness(members, member_struct);
+}
+
+map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string>& members, map<string, map<string, double>>& _member_struct)
 {
 
 	map<string, map<string, double>> obj_member_map;
-	map<string, double> crowd_distance_map, var_distance_map, euclidean_fitness_map, nondomprob_map;
-	int nn_count, nn_max = pest_scenario.get_pestpp_options().get_mou_max_nn_search();
-	string second;
+	map<string, double> nondomprob_map;
 	
-	vector<string> obj_names;
+	vector<string> obj_names, nn_names;
+	vector<double> eucd;
+
 	for (auto obj_map : *obs_obj_names_ptr)
 		obj_names.push_back(obj_map);
 
-	//for (auto obj_map : _member_struct[m])
-	//{
-	//	obj_member_map[obj_map.first] = map<string, double>();
-	//	obj_names.push_back(obj_map.first);
-	//}
-
 	for (auto member : members)
 	{
-		crowd_distance_map[member] = 0.0;
-		var_distance_map[member] = 0.0;
-		euclidean_fitness_map[member] = 0.0;
 		nondomprob_map[member] = 0.0;
-		/*for (auto obj_map : _member_struct[member])
-			obj_member_map[obj_map.first][member] = obj_map.second;*/
 
 		for (auto obj_map : *obs_obj_names_ptr) //need to make sure the SDs are not included
 			obj_member_map[obj_map][member] = _member_struct[member][obj_map];
 	}
 
 	//map<double,string>::iterator start, end;
-	map<string, double> omap, obj_range;
+	map<string, double> omap;
 	double fitness;
 	vector<double> nonuniq_obj;
-
-	for (auto obj_map : obj_member_map)
-	{
-		omap = obj_map.second;
-		sortedset crowd_sorted(omap.begin(), omap.end(), compFunctor);
-		sortedset::iterator start = crowd_sorted.begin(), last = prev(crowd_sorted.end(), 1);
-
-		obj_range[obj_map.first] = 1;
-	}
 
 	for (auto obj_map : obj_member_map)
 	{
@@ -1076,8 +1035,14 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 		sortedset crowd_sorted(omap.begin(), omap.end(), compFunctor);
 
 		sortedset::iterator start = crowd_sorted.begin(), last = prev(crowd_sorted.end(), 1);
+
+		if (members.size() <= pest_scenario.get_pestpp_options().get_mou_max_archive_size())
+			min_sd[obj_map.first] = (last->second - start->second) / (4*members.size());
+		else
+			min_sd[obj_map.first] = (last->second - start->second) / (4*pest_scenario.get_pestpp_options().get_mou_max_archive_size());
+
 		nonuniq_obj.clear();
-		
+
 		if (omap.size() != crowd_sorted.size())
 		{
 			for (auto o : omap)
@@ -1089,7 +1054,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 				if (count > 0)
 					nonuniq_obj.push_back(o.second);
-			}	
+			}
 		}
 
 		if (nonuniq_obj.size() != 0)
@@ -1097,11 +1062,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 			for (auto m : members)
 			{
 				if (find(nonuniq_obj.begin(), nonuniq_obj.end(), _member_struct[m][obj_map.first]) != nonuniq_obj.end())
-				{
-					crowd_distance_map[m] = -1;
-					var_distance_map[m] = -1;
-					euclidean_fitness_map[m] = -1;
-				}
+					nondomprob_map[m] = -1;
 			}
 		}
 
@@ -1119,7 +1080,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 			//double ub = incumbent_front_extreme[prev(curr_sorted.end(), 1)->first][obj_map.first];
 
 			//get the lower and upper objective bounds of the incumbent true front
-			for (auto m : members) 
+			for (auto m : members)
 			{
 				if (_member_struct[m][obj_map.first] < lb)
 					lower_extreme_candidates[m] = _member_struct[m];
@@ -1127,12 +1088,8 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 
 			//assign the lower extreme in current population
 			if (lower_extreme_candidates.size() == 0) //if size is 0, the extreme is an incumbent front member
-			{
-				crowd_distance_map[start->first] = CROWDING_EXTREME;
-				var_distance_map[start->first] = CROWDING_EXTREME;
-				euclidean_fitness_map[start->first] = CROWDING_EXTREME;
-				nondomprob_map[start->first] = 1.0;
-			}
+				nondomprob_map[start->first] = CROWDING_EXTREME;
+
 			else //use ei to assign the end member
 			{
 				double mx = 0, ei;
@@ -1146,13 +1103,9 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 						endmem = l.first;
 					}
 				}
+
 				if (mx == 0)
-				{
-					crowd_distance_map[start->first] = CROWDING_EXTREME;
-					var_distance_map[start->first] = CROWDING_EXTREME;
-					euclidean_fitness_map[start->first] = CROWDING_EXTREME;
-					nondomprob_map[start->first] = 1.0;
-				}
+					nondomprob_map[start->first] = CROWDING_EXTREME;
 				else
 				{
 					if (find(nonuniq_obj.begin(), nonuniq_obj.end(), lower_extreme_candidates[endmem][obj_map.first]) != nonuniq_obj.end())
@@ -1167,14 +1120,7 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 							for (auto m : lower_extreme_candidates)
 							{
 								if (l.first != m.first)
-								{
-									map<string, double> PD = dominance_probability(_member_struct[l.first], _member_struct[m.first]);
-									for (auto objname : *obj_names_ptr)
-									{
-										if (objname != obj_map.first)
-											pd *= PD[objname];
-									}
-								}
+									pd *= dominance_probability(_member_struct[l.first], _member_struct[m.first]);
 							}
 							ext_mems_pd[l.first] = pd;
 						}
@@ -1192,335 +1138,62 @@ pair<map<string, double>, map<string, double>> ParetoObjectives::get_euclidean_c
 						for (auto em : ext_mems_pd)
 						{
 							if (em.first == extreme_member_name)
-							{
-								crowd_distance_map[em.first] = CROWDING_EXTREME;
-								var_distance_map[em.first] = CROWDING_EXTREME;
-								euclidean_fitness_map[em.first] = CROWDING_EXTREME;
-								nondomprob_map[em.first] = 1.0;
-							}
+								nondomprob_map[em.first] = CROWDING_EXTREME;
+
 						}
 					}
 					else
-					{
-						crowd_distance_map[endmem] = CROWDING_EXTREME;
-						var_distance_map[endmem] = CROWDING_EXTREME;
-						euclidean_fitness_map[endmem] = CROWDING_EXTREME;
-						nondomprob_map[endmem] = 1.0;
-					}
+						nondomprob_map[endmem] = CROWDING_EXTREME;
 				}
 			}
 		}
 		else
-		{
-			crowd_distance_map[start->first] = CROWDING_EXTREME;
-			var_distance_map[start->first] = CROWDING_EXTREME;
-			euclidean_fitness_map[start->first] = CROWDING_EXTREME;
-			nondomprob_map[start->first] = 1.0;
-		}
+			nondomprob_map[start->first] = CROWDING_EXTREME;
+	}
 
-		//crowding distance calculation for non extreme members;
-		string lex_order = pest_scenario.get_pestpp_options().get_mou_lex_order_by();
-		if ((lex_order == "") && (lex_order != "ALL"))
-			lex_order = obj_names[0];
+	//crowding distance calculation for non extreme members;
+	int nn_count, nn = 1, nn_max = pest_scenario.get_pestpp_options().get_mou_max_nn_search();
+
+	for (auto m : members)
+	{
+		double pnd;
+		map<string, double> nn_dist;
+		for (auto n: members)
+		{
+			if (m != n)
+				nn_dist[n] = expdist_lookup[m][n];
+		}
+		
+		sortedset nn_sorted(nn_dist.begin(), nn_dist.end(), compFunctor);
+		sortedset::iterator inextnn = nn_sorted.begin();
 		
 
-		vector<double> eucd_prev_it, eucd_it_next, eucd;
-		if ((obj_map.first != lex_order) && (lex_order != "ALL")) //only do neighborhood selection along the specified objective
-			continue;
-		else if ((obj_map.first == lex_order) || (lex_order == "ALL"))
+		if (nondomprob_map[m] == CROWDING_EXTREME)
 		{
-			//if unique, compute fitness as usual, through its neighbors, not minding if it is extreme, which will be dealt later using ehvi
-			/*if (find(nonuniq_obj.begin(), nonuniq_obj.end(), start->second) == nonuniq_obj.end())
-			{
-				if (crowd_sorted.size() == 2)
-				{
-					eucd = get_euclidean_distance(_member_struct[start->first], _member_struct[last->first], obj_range);
-					fitness = get_euclidean_fitness(eucd.at(0), eucd.at(1));
-
-					if ((eucd.at(0) < crowd_distance_map[start->first]) && (crowd_distance_map[start->first] != CROWDING_EXTREME))
-					{
-						crowd_distance_map[start->first] = eucd.at(0);
-						var_distance_map[start->first] = eucd.at(1);
-						euclidean_fitness_map[start->first] = fitness;
-					}
-					
-					
-				}
-				else if (crowd_sorted.size() > 2)
-				{
-					sortedset::iterator inext = next(start, 1);
-					nn_count = 1;
-					double val = 1E+50;
-					for (; inext != crowd_sorted.end(); ++inext)
-					{
-						if (nn_count > nn_max)
-							break;
-
-						eucd = get_euclidean_distance(_member_struct[start->first], _member_struct[inext->first], obj_range);
-						if (eucd.at(0) < val)
-						{
-							val = eucd.at(0);
-							eucd_it_next = eucd;
-						}
-						nn_count++;
-
-					}
-
-					fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
-					if ((val < crowd_distance_map[start->first]) && (crowd_distance_map[start->first] != CROWDING_EXTREME))
-					{
-						crowd_distance_map[start->first] = eucd_it_next.at(0);
-						var_distance_map[start->first] = eucd_it_next.at(1);
-						euclidean_fitness_map[start->first] = fitness;
-					}
-				}
-
-			}*/
-
-			if (find(nonuniq_obj.begin(), nonuniq_obj.end(), last->second) == nonuniq_obj.end())
-			{
-				if (crowd_sorted.size() == 2)
-				{
-					eucd = get_euclidean_distance(_member_struct[start->first], _member_struct[last->first], obj_range);
-					fitness = get_euclidean_fitness(eucd.at(0), eucd.at(1));
-
-					if ((fitness > euclidean_fitness_map[last->first]) && (crowd_distance_map[last->first] != -1))
-					{
-						crowd_distance_map[last->first] = eucd.at(0);
-						var_distance_map[last->first] = eucd.at(1);
-						euclidean_fitness_map[last->first] = fitness;
-						nondomprob_map[last->first] = 1 - dominance_probability_product(_member_struct[start->first], _member_struct[last->first]) - dominance_probability_product(_member_struct[last->first], _member_struct[start->first]);
-					}
-				}
-				else if (crowd_sorted.size() > 2)
-				{
-					sortedset::iterator iprev = prev(last, 1);
-
-					nn_count = 1;
-					double val = 1E+50;
-					for (; iprev != prev(crowd_sorted.begin(), 1); --iprev)
-					{
-						if (nn_count > nn_max)
-							break;
-
-						eucd = get_euclidean_distance(_member_struct[last->first], _member_struct[iprev->first], obj_range);
-						if (eucd.at(0) < val)
-						{
-							val = eucd.at(0);
-							eucd_prev_it = eucd;
-							second = iprev->first;
-						}
-						nn_count++;
-
-					}
-
-					fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-					if ((fitness > euclidean_fitness_map[last->first]) && (crowd_distance_map[last->first] != -1))
-					{
-						crowd_distance_map[last->first] = eucd_prev_it.at(0);
-						var_distance_map[last->first] = eucd_prev_it.at(1);
-						euclidean_fitness_map[last->first] = fitness;
-						nondomprob_map[last->first] = 1 - dominance_probability_product(_member_struct[last->first], _member_struct[second]) - dominance_probability_product(_member_struct[second], _member_struct[last->first]);
-					}
-				}
-			}
-
-			//if (crowd_sorted.size() == 3)
-			//{
-			//	sortedset::iterator it = next(start, 1);
-
-			//	if (find(nonuniq_obj.begin(), nonuniq_obj.end(), it->second) == nonuniq_obj.end())
-			//	{
-			//		eucd_prev_it = get_euclidean_distance(_member_struct[it->first], _member_struct[start->first], obj_range);
-			//		fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-			//		if ((eucd_prev_it.at(0) < crowd_distance_map[it->first]) && (crowd_distance_map[it->first] != CROWDING_EXTREME))
-			//		{
-			//			crowd_distance_map[it->first] = eucd_prev_it.at(0);
-			//			var_distance_map[it->first] = eucd_prev_it.at(1);
-			//			euclidean_fitness_map[it->first] = fitness;
-			//		}
-
-			//		/*eucd_it_next = get_euclidean_distance(_member_struct[it->first], _member_struct[last->first], obj_range);
-			//		fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
-			//		if ((eucd_it_next.at(0) < crowd_distance_map[it->first]) && (crowd_distance_map[it->first] != CROWDING_EXTREME))
-			//		{
-			//			crowd_distance_map[it->first] = eucd_it_next.at(0);
-			//			var_distance_map[it->first] = eucd_it_next.at(1);
-			//			euclidean_fitness_map[it->first] = fitness;
-			//		}*/
-			//	}
-			//}
-			if (crowd_sorted.size() > 2)
-			{
-				//need iterators to start and stop one off from the edges
-				start = next(crowd_sorted.begin(), 1);
-				last = prev(crowd_sorted.end(), 1);
-
-				sortedset::iterator it = start;
-				sortedset::iterator inext, iprev;
-
-				for (; it != crowd_sorted.end(); ++it)
-				{
-					if (find(nonuniq_obj.begin(), nonuniq_obj.end(), it->second) == nonuniq_obj.end())
-					{
-						iprev = prev(it, 1);
-						inext = next(it, 1);
-
-						nn_count = 1;
-						double val = 1E+50;
-						for (; iprev != prev(crowd_sorted.begin(), 1); --iprev)
-						{
-							if (nn_count > nn_max)
-								break;
-							
-							eucd = get_euclidean_distance(_member_struct[it->first], _member_struct[iprev->first], obj_range);
-							if (eucd.at(0) < val)
-							{
-								val = eucd.at(0);
-								eucd_prev_it = eucd;
-								second = iprev->first;
-							}
-							nn_count++;
-						}
-
-						fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-						if ((fitness > euclidean_fitness_map[it->first]) && (crowd_distance_map[it->first] != -1))
-						{
-							crowd_distance_map[it->first] = eucd_prev_it.at(0);
-							var_distance_map[it->first] = eucd_prev_it.at(1);
-							euclidean_fitness_map[it->first] = fitness;
-							nondomprob_map[it->first] = 1 - dominance_probability_product(_member_struct[it->first], _member_struct[second]) - dominance_probability_product(_member_struct[second], _member_struct[it->first]);
-						}
-
-						/*nn_count = 1;
-						val = 1E+50;
-						for (; inext != crowd_sorted.end(); ++inext)
-						{
-							if (nn_count > nn_max)
-								break;
-
-							eucd = get_euclidean_distance(_member_struct[it->first], _member_struct[inext->first], obj_range);
-							if (eucd.at(0) < val)
-							{
-								val = eucd.at(0);
-								eucd_it_next = eucd;
-							}
-							nn_count++;
-						}
-						
-						fitness = get_euclidean_fitness(eucd_it_next.at(0), eucd_it_next.at(1));
-						if ((eucd_it_next.at(0) < crowd_distance_map[it->first]) && (crowd_distance_map[it->first] != CROWDING_EXTREME))
-						{
-							crowd_distance_map[it->first] = eucd_it_next.at(0);
-							var_distance_map[it->first] = eucd_it_next.at(1);
-							euclidean_fitness_map[it->first] = fitness;
-						}*/
-					}
-					else
-					{
-						map<string, map<string, double>> nonuniq;
-						map<string, double> nonuniq_pd;
-						for (auto m : members)
-						{
-							if (_member_struct[m][obj_map.first] == it->second)
-								nonuniq[m] = _member_struct[m];
-						}
-
-						for (auto l : nonuniq)
-						{
-							double pd = 1;
-							for (auto m : nonuniq)
-							{
-								map<string, double> PD = dominance_probability(_member_struct[l.first], _member_struct[m.first]);
-								for (auto objname : *obj_names_ptr)
-								{
-									if (objname != obj_map.first)
-										pd *= PD[objname];
-								}
-							}
-							nonuniq_pd[l.first] = pd;
-						}
-
-						double mx = 0;
-						string mx_pd_mem;
-						for (auto em : nonuniq_pd)
-						{
-							if (em.second > mx)
-							{
-								mx = em.second;
-								mx_pd_mem = em.first;
-							}
-						}
-
-						for (auto em : nonuniq_pd)
-						{
-							if (em.first == mx_pd_mem)
-							{
-								iprev = prev(it, 1);
-								inext = next(it, 1);
-
-								nn_count = 1;
-								double val = 1E+50;
-								for (; iprev != prev(crowd_sorted.begin(), 1); --iprev)
-								{
-									if (nn_count > nn_max)
-										break;
-
-									eucd = get_euclidean_distance(_member_struct[em.first], _member_struct[iprev->first], obj_range);
-									if (eucd.at(0) < val)
-									{
-										val = eucd.at(0);
-										eucd_prev_it = eucd;
-										second = iprev->first;
-									}
-									nn_count++;
-								}
-
-								fitness = get_euclidean_fitness(eucd_prev_it.at(0), eucd_prev_it.at(1));
-								if ((fitness > euclidean_fitness_map[em.first]))
-								{
-									crowd_distance_map[em.first] = eucd_prev_it.at(0);
-									var_distance_map[em.first] = eucd_prev_it.at(1);
-									euclidean_fitness_map[em.first] = fitness;
-									nondomprob_map[it->first] = 1 - dominance_probability_product(_member_struct[it->first], _member_struct[second]) - dominance_probability_product(_member_struct[second], _member_struct[it->first]);
-								}
-							}
-						}
-
-					}
-				}
-
-			}
-		}
-
-	}
-
-	for (auto cd : crowd_distance_map)
-	{
-		if (cd.second == -1)
-		{
-			expected_crowd_map[cd.first] = 0;
-			var_crowd_map[cd.first] = 0;
-			probnondom_map[cd.first] = 0;
-
-			crowd_distance_map[cd.first] = 0;
-			var_distance_map[cd.first] = 0;
-			euclidean_fitness_map[cd.first] = 0;
-			nondomprob_map[cd.first] = 0;
+			pnd = CROWDING_EXTREME;
+			nn = 1;
 		}
 		else
 		{
-			expected_crowd_map[cd.first] = crowd_distance_map[cd.first];
-			var_crowd_map[cd.first] = var_distance_map[cd.first];
-			probnondom_map[cd.first] = nondomprob_map[cd.first];
+			pnd = 1;
+			nn_count = 1;
+			for (; inextnn != nn_sorted.end(); ++inextnn)
+			{
+				pnd *= nondominance_probability(_member_struct[m], _member_struct[inextnn->first]);
+				
+				nn_count++;
+				if (nn_count > nn_max)
+					break;
+			}
+			nn = nn_count - 1;
 		}
-	}
 
+		nondomprob_map[m] = pow(pnd,pow(nn, -1));
+		probnondom_map[m] = pnd;
 
+	}		
 
-
-
-	return pair<map<string, double>, map<string, double>>(crowd_distance_map, var_distance_map);
+	return nondomprob_map;
 }
 
 vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, vector<string>& members, map<string,double>& crowd_map, 
@@ -1535,7 +1208,7 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 	if (prob_pareto)
 	{
 		fit_map = get_mopso_fitness(members, _member_struct);
-		/*euclidean_maps = get_euclidean_crowding_distance(members, _member_struct);
+		/*euclidean_maps = get_cluster_crowding_fitness(members, _member_struct);
 		expected_dist_map = euclidean_maps.first;
 		var_dist_map = euclidean_maps.second;*/
 		//prob_not_dom = get_prob_non_dominance(members, _member_struct);
@@ -1546,9 +1219,9 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 	vector <pair<string, double>> cs_vec;
 	for (auto cd : fit_map)
 	{
-		//cs_vec.push_back(cd);
-		pair <string, double> pnd {cd.first, probnondom_map[cd.first]};
-		cs_vec.push_back(pnd);
+		cs_vec.push_back(cd);
+		/*pair <string, double> pnd {cd.first, probnondom_map[cd.first]};
+		cs_vec.push_back(pnd);*/
 		crowd_map[cd.first] = cd.second;
 
 		/*expected_crowd_map[cd.first] = expected_dist_map[cd.first];
@@ -1569,41 +1242,6 @@ vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, ve
 	if (crowd_ordered.size() != members.size())
 		throw runtime_error("ParetoObjectives::sort_members_by_crowding_distance() error: final sort size != initial size");
 	return crowd_ordered;
-}
-
-map<string, double> ParetoObjectives::get_prob_non_dominance(vector<string>& members)
-{
-	return get_prob_non_dominance(members, member_struct);
-}
-
-map<string, double> ParetoObjectives::get_prob_non_dominance(vector<string>& members, map<string, map<string, double>>& _member_struct)
-{
-	map<string, double> prob_nondom_map, PDominated;
-	double PND, PD;
-
-	for (auto n : members)
-	{
-		PND = 1;
-		for (auto m : members)
-		{
-			if (first_equals_second(_member_struct[n], _member_struct[m]))
-				continue;
-			else
-			{
-				PDominated = dominance_probability(_member_struct[m], _member_struct[n]);
-				PD = 1;
-
-				for (auto obj_name : *obj_names_ptr)
-					PD *= PDominated[obj_name];
-				
-				PND = PND * (1 - PD);
-			}
-
-		}
-		prob_nondom_map[n] = 1- PND;
-	}
-
-	return prob_nondom_map;
 }
 
 pair<map<string, double>, map<string, double>> ParetoObjectives::get_spea2_fitness(map<string, map<string, double>>& _member_struct)
@@ -1871,27 +1509,33 @@ map<int, vector<string>> ParetoObjectives::sort_members_by_dominance_into_prob_f
 }
 
 //compute probability of dominance
-map<string, double> ParetoObjectives::dominance_probability(map<string, double>& first, map<string, double>& second)
+double ParetoObjectives::dominance_probability(map<string, double>& first, map<string, double>& second)
 {
-	map<string, double> prob_dom;
+	double prob_dom = 1;
 
 	for (auto obj_name : *obj_names_ptr)
 	{
 		//prob_dom[obj_name] = std_norm_df(second.at(obj_name), first.at(obj_name), first.at(obj_name + "_SD"), true);
-		prob_dom[obj_name] = std_norm_df(0, first.at(obj_name) - second.at(obj_name), sqrt(pow(first.at(obj_name + "_SD"),2) + pow(second.at(obj_name + "_SD"),2)), true);
+		prob_dom *= (std_norm_df(0, first.at(obj_name) - second.at(obj_name), sqrt(pow(first.at(obj_name + "_SD"),2) + pow(second.at(obj_name + "_SD"),2)), true));
 	}
 
 	return prob_dom;
 }
 
-double ParetoObjectives::dominance_probability_product(map<string, double>& first, map<string, double>& second)
+double ParetoObjectives::nondominance_probability(map<string, double>& first, map<string, double>& second)
 {
-	map<string, double> prob_dom = dominance_probability(first, second);
-	double pd = 1;
-
+	map<string, double> f = first, s = second;
 	for (auto obj_name : *obj_names_ptr)
-		pd *= prob_dom[obj_name];
-	
+	{
+		if (f[obj_name + "_SD"] < min_sd[obj_name])
+			f[obj_name + "_SD"] = min_sd[obj_name];
+
+		if (s[obj_name + "_SD"] < min_sd[obj_name])
+			s[obj_name + "_SD"] = min_sd[obj_name];
+	}
+
+	double pd = 1 - dominance_probability(f, s) - dominance_probability(s, f);
+
 	return pd;
 }
 
@@ -1911,53 +1555,13 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 
 	if (/*prob_pareto*/ ppd_sort)
 	{
-		/*bool dom = true;
-
-		for (auto f : first)
-		{
-			if (f.second > second[f.first])
-			{
-				dom = false;
-				break;
-			}
-		}
-
-		if (dom)
-			return true;*/
-
-		map<string, double> prob_dom = dominance_probability(first, second);
-
-		/*int i = 0;
-		for (auto d : prob_dom)
-		{
-			if (d.second < ppd_limits[i])
-				return false;
-			i++;
-		}
-		return true;*/
-		
-		double pd = 1;
-		for (auto d : prob_dom)
-		{
-			pd *= d.second;
-		}
+		double pd = dominance_probability(first, second);
 
 		if (pd < ppd_limits) {
 			return false;
 		}
 		else
 			return true;
-
-		/*map<string, double> first_prob_dom = dominance_probability(first, second);
-		map<string, double> second_prob_dom = dominance_probability(second, first);
-
-		for (auto f : first_prob_dom)
-		{
-			if ((f.second < ppd_limits[0]) && (second_prob_dom[f.first] > ppd_limits[1]))
-				return false;
-		}
-		return true;*/
-
 	}
 	else
 	{
@@ -3734,6 +3338,8 @@ void MOEA::initialize()
 	vector<string> keep;
 	if (envtype == MouEnvType::NSGA)
 	{
+		if (prob_pareto)
+			objectives.prep_expected_distance_lookup_table(op, dp);
 		DomPair dompair = objectives.get_nsga2_pareto_dominance(iter, op, dp, &constraints, false, true, POP_SUM_TAG);
 
 		//drop any duplicates
@@ -4212,6 +3818,9 @@ void MOEA::iterate_to_solution()
             }
             new_op.append_other_rows(op);
         }
+
+		objectives.prep_expected_distance_lookup_table(new_op, new_dp);
+
         if (find(gen_types.begin(),gen_types.end(),MouGenType::PSO) != gen_types.end()) {
             update_pso_pbest(new_dp, new_op);
         }

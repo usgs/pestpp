@@ -64,7 +64,5 @@ obj_2_sd	0		1	miscdata
 ++mou_pso_alpha(0)
 ++mou_pso_rramp(-1)
 ++mou_max_archive_size(100)
-++mou_lex_order_by(all)
-++mou_fit_beta(10)
 ++mou_dv_population_file(./model/input/mogp_bm3.dv_pop.csv)
 ++mou_obs_population_restart_file(./model/input/mogp_bm3.obs_pop.csv)

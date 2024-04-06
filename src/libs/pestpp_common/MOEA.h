@@ -76,9 +76,9 @@ public:
 
 	//sort specific members
 	map<string, double> get_cuboid_crowding_distance(vector<string>& members);
-	pair<map<string, double>, map<string, double>> get_euclidean_crowding_distance(vector<string>& members);
+	map<string, double> get_cluster_crowding_fitness(vector<string>& members);
+	void prep_expected_distance_lookup_table(ObservationEnsemble& op, ParameterEnsemble& dp);
 	map<string, double> get_ehvi(vector<string>& members);
-	map<string, double> get_prob_non_dominance(vector<string>& members);
 	map<string, double> get_mopso_fitness(vector<string> members, ObservationEnsemble& op, ParameterEnsemble& dp);
 
 	double get_ei(map<string, double> phi, string obj, double curr_opt);
@@ -120,11 +120,9 @@ private:
 	map<string, double> get_spea2_kth_nn_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);	
 	map<string, double> get_cuboid_crowding_distance(ObservationEnsemble& oe, ParameterEnsemble& dp);
 
-	map<string, double> get_prob_non_dominance(vector<string>& members, map<string, map<string, double>>& _member_struct);
-
-	vector<double> get_euclidean_distance(map<string, double> first, map<string, double> second, map<string, double> scaling_factor);
+	vector<double> get_euclidean_distance(map<string, double> first, map<string, double> second);
 	double get_euclidean_fitness(double E, double V);
-	pair<map<string, double>, map<string, double>> get_euclidean_crowding_distance(vector<string>& members, map<string, map<string, double>>& _member_struct);
+	map<string, double> get_cluster_crowding_fitness(vector<string>& members, map<string, map<string, double>>& _member_struct);
 
 	map<string, map<string, double>> member_struct;
 	vector<string>* obj_names_ptr;
@@ -138,7 +136,7 @@ private:
 	map<string, map<string, double>> feas_member_struct;
 	map<int, vector<string>> front_map;
 	map<int, vector<string>> prob_front_map;
-	map<string, double> crowd_map, expected_crowd_map, var_crowd_map, fitness_map, probnondom_map;
+	map<string, double> crowd_map, expected_crowd_map, var_crowd_map, fitness_map, probnondom_map, min_sd;
 	map<string, int> member_front_map;
 	map<string, double> member_cvar;
 	map<string, double> infeas;
@@ -148,8 +146,8 @@ private:
 	
 
 	//PPD-related stuff
-	map<string, double> dominance_probability(map<string, double>& first, map<string, double>& second);
-	double dominance_probability_product(map<string, double>& first, map<string, double>& second);
+	double dominance_probability(map<string, double>& first, map<string, double>& second);
+	double nondominance_probability(map<string, double>& first, map<string, double>& second);
 	bool prob_pareto, ppd_sort;
 	double ppd_limits;
 	vector<double> ppd_range;
@@ -158,7 +156,7 @@ private:
 	double std_norm_df(double x, double mu, double sd, bool cumdf);
 	double psi_function(double aa, double bb, double mu, double sd);
 	map<string, double> ehvi_member_map;
-	map<string, map<string, double>> incumbent_front_extreme;
+	map<string, map<string, double>> incumbent_front_extreme, expdist_lookup;
 	map<int, vector<double>> hypervolume_partitions;
 	double EHVI;
 	int iter;

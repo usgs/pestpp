@@ -1464,11 +1464,6 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		mou_outer_repo_obs_file = org_value;
 		return true;
 		}
-	else if (key == "MOU_LEX_ORDER_BY")
-	{
-		mou_lex_order_by = upper_cp(strip_cp(value));
-		return true;
-		}
 	else if (key == "MOU_MAX_NN_SEARCH")
 	{
 		convert_ip(value, mou_max_nn_search);
@@ -1783,7 +1778,6 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_pso_rramp: " << mou_pso_rramp << endl;
 	os << "mou_pso_rfit: " << mou_pso_rfit << endl;
 	os << "mou_fit_beta: " << mou_fit_beta << endl;
-	os << "mou_lex_order_by: " << mou_lex_order_by << endl;
 	os << "mou_max_nn_search: " << mou_max_nn_search << endl;
 	os << "mou_outer_repo_obs_file: " << mou_outer_repo_obs_file << endl;
 	os << "mou_hypervolume_extreme: " << mou_hypervolume_extreme << endl;
@@ -1989,7 +1983,6 @@ void PestppOptions::set_defaults()
 	set_mou_pso_rfit(2.0);
 	set_mou_fit_beta(1.0);
 	set_mou_outer_repo_obs_file("");
-	set_mou_lex_order_by("");
 	set_mou_max_nn_search(get_mou_population_size());
 	set_mou_hypervolume_extreme(1e+10);
 	set_mou_infill_size(100);
