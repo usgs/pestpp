@@ -1156,7 +1156,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 
 	for (auto m : members)
 	{
-		double pnd;
+		double pnd, pnd_ij, pd_ij;
 		map<string, double> nn_dist;
 		for (auto n: members)
 		{
@@ -1179,8 +1179,16 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 			nn_count = 1;
 			for (; inextnn != nn_sorted.end(); ++inextnn)
 			{
-				pnd *= nondominance_probability(_member_struct[m], _member_struct[inextnn->first]);
-				
+				pnd_ij = nondominance_probability(_member_struct[m], _member_struct[inextnn->first]);
+				if (pnd_ij < 0.5)
+				{
+					pd_ij = 1 - dominance_probability(_member_struct[inextnn->first], _member_struct[m]);
+					pnd *= pd_ij;
+
+				}
+				else
+					pnd *= pnd_ij;
+
 				nn_count++;
 				if (nn_count > nn_max)
 					break;
@@ -1535,6 +1543,8 @@ double ParetoObjectives::nondominance_probability(map<string, double>& first, ma
 	}
 
 	double pd = 1 - dominance_probability(f, s) - dominance_probability(s, f);
+
+	//double pd = 1 - dominance_probability(s, f);
 
 	return pd;
 }
