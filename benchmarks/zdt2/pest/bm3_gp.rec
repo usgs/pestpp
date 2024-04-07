@@ -11,7 +11,7 @@ binary compiled on Apr  6 2024 at 08:46:46
 using control file: "./pest/bm3_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp-moudev\benchmarks\zdt2"
 on host: "DUMPLING-FL"
-started at 04/07/24 08:56:19
+started at 04/07/24 21:57:54
 
 on host: "DUMPLING-FL"
 
@@ -45,7 +45,7 @@ PEST Control Information
     facparmax = 10
     facorig = 0.001
     phiredswh = 0.1
-    noptmax = 50
+    noptmax = -1
     phiredstp = 0.01
     nphistp = 3
     nphinored = 3
@@ -166,8 +166,8 @@ sqp_scale_facs:
 ...pestpp-mou options:
 mou_generator: pso
 mou_population_size: 100
-mou_dv_population_file: ./model/input/mogp_bm3.dv_pop.csv
-mou_obs_population_restart_file: ./model/input/mogp_bm3.obs_pop.csv
+mou_dv_population_file: ./model/input/bm3_gp_1.dv_pop.csv
+mou_obs_population_restart_file: ./model/input/bm3_gp_1.obs_pop.csv
 mou_objectives: 
   OBJ_1
   OBJ_2
@@ -184,11 +184,11 @@ mou_pso_omega: 0.7
 mou_pso_social_const: 2
 mou_pso_cognitive: 2
 mou_pso_alpha: 4
-mou_pso_rramp: -500
+mou_pso_rramp: -1
 mou_pso_rfit: 2
 mou_fit_beta: 1
 mou_max_nn_search: 100
-mou_outer_repo_obs_file: 
+mou_outer_repo_obs_file: ./model/input/outer_repo.archive.obs_pop.csv
 mou_hypervolume_extreme: 1e+10
 mou_infill_size: 100
 mou_adaptive_ppd: 0
@@ -362,56 +362,6 @@ PEST SVD Information
 
   ---  initializing MOEA process  ---  
 ...population schedule: generation,population size:
-...   0, 100
-...   1, 100
-...   2, 100
-...   3, 100
-...   4, 100
-...   5, 100
-...   6, 100
-...   7, 100
-...   8, 100
-...   9, 100
-...   10, 100
-...   11, 100
-...   12, 100
-...   13, 100
-...   14, 100
-...   15, 100
-...   16, 100
-...   17, 100
-...   18, 100
-...   19, 100
-...   20, 100
-...   21, 100
-...   22, 100
-...   23, 100
-...   24, 100
-...   25, 100
-...   26, 100
-...   27, 100
-...   28, 100
-...   29, 100
-...   30, 100
-...   31, 100
-...   32, 100
-...   33, 100
-...   34, 100
-...   35, 100
-...   36, 100
-...   37, 100
-...   38, 100
-...   39, 100
-...   40, 100
-...   41, 100
-...   42, 100
-...   43, 100
-...   44, 100
-...   45, 100
-...   46, 100
-...   47, 100
-...   48, 100
-...   49, 100
 ...using 'nsga2_ppd' env selector
 ...using binary tournament mating pool selector
 ...saving generation specific populations and archives every nth generation 1
@@ -433,100 +383,88 @@ name                 sense          value
 OBJ_1                less_than      0              
 OBJ_2                less_than      0              
 ...using particle swarm generator
-...loading dv population from csv file ./model/input/mogp_bm3.dv_pop.csv
-...dv population with 100 members read from './model/input/mogp_bm3.dv_pop.csv'
+...loading dv population from csv file ./model/input/bm3_gp_1.dv_pop.csv
+...dv population with 100 members read from './model/input/bm3_gp_1.dv_pop.csv'
 
-...loading obs population from csv file ./model/input/mogp_bm3.obs_pop.csv
-...obs population with 100 members read from './model/input/mogp_bm3.obs_pop.csv'
+...previous generation numbers detected in dv population, fast forwarding generation counter to 1
+...loading obs population from csv file ./model/input/bm3_gp_1.obs_pop.csv
+...obs population with 100 members read from './model/input/bm3_gp_1.obs_pop.csv'
 
 ... saved observation population to  ./pest/bm3_gp.0.obs_pop.csv
 
   ---  initial population decision variable summary:  ---  
 decision variable        ubnd      lbnd      mean   standard devation         min         max
-X1                          1         0  0.499956            0.288109  0.00379521    0.998152
-X2                          1         0  0.499949            0.288874  0.00915232    0.994038
-X3                          1         0   0.50041            0.288981  0.00631718    0.996003
-X4                          1         0  0.499689            0.287894  0.00593549    0.992408
-X5                          1         0  0.499817            0.288656   0.0019811    0.999347
-X6                          1         0  0.499663            0.289086  0.00049802     0.99369
-X7                          1         0  0.500001            0.288935  0.00548474    0.997007
-X8                          1         0  0.500001            0.288844  0.00651229    0.998976
-X9                          1         0  0.500194            0.288618  0.00447026    0.999554
-X10                         1         0  0.500112            0.288583  0.00684169    0.998768
-X11                         1         0  0.500081            0.289104  0.00140566    0.999969
-X12                         1         0  0.499997            0.288894  0.00919551    0.999063
-X13                         1         0  0.499788            0.288468  0.00533916    0.996603
-X14                         1         0  0.499875            0.288689  0.00742821    0.990198
-X15                         1         0  0.500072            0.288822  0.00107173    0.995264
-X16                         1         0   0.50003            0.289174  0.00270002    0.998195
-X17                         1         0  0.499733            0.288422  0.00614318       0.992
-X18                         1         0   0.50007            0.288298  0.00594641    0.990979
-X19                         1         0  0.499864            0.288997  0.00296153    0.990032
-X20                         1         0  0.499785            0.289163  0.00138575    0.996829
-X21                         1         0  0.499911            0.288201  0.00312728    0.996212
-X22                         1         0  0.500201            0.288716  0.00167095    0.991225
-X23                         1         0  0.500452            0.288953  0.00704524    0.996819
-X24                         1         0  0.499551            0.288518 0.000389105    0.996607
-X25                         1         0  0.499963            0.288003   0.0068135    0.994758
-X26                         1         0  0.499845            0.288691  0.00560235    0.992204
-X27                         1         0  0.500404            0.288788   0.0045381    0.999638
-X28                         1         0  0.500062            0.288708  0.00788663    0.992878
-X29                         1         0  0.500374            0.288572  0.00335562    0.995491
-X30                         1         0  0.499946             0.28876  0.00160502     0.99029
+X1                          1         0   0.34315            0.325491           0           1
+X2                          1         0  0.524568            0.321743           0           1
+X3                          1         0  0.493693            0.308329           0           1
+X4                          1         0  0.486562            0.309262           0           1
+X5                          1         0  0.403535            0.316707           0           1
+X6                          1         0   0.47497            0.335546           0           1
+X7                          1         0  0.515107            0.329624           0           1
+X8                          1         0   0.50745            0.369052           0           1
+X9                          1         0  0.392171            0.259304           0           1
+X10                         1         0  0.412944            0.309349           0           1
+X11                         1         0  0.333581            0.257939           0           1
+X12                         1         0  0.438955            0.321926           0           1
+X13                         1         0  0.479932            0.330003           0           1
+X14                         1         0  0.457188            0.386913           0           1
+X15                         1         0  0.309582            0.292742           0           1
+X16                         1         0   0.40619            0.308264           0           1
+X17                         1         0   0.51969            0.334073           0           1
+X18                         1         0  0.533707            0.291724           0           1
+X19                         1         0  0.642899            0.356485           0           1
+X20                         1         0  0.428267            0.340503           0           1
+X21                         1         0  0.265951            0.262079           0           1
+X22                         1         0  0.394023            0.271877           0           1
+X23                         1         0  0.488381            0.340493           0           1
+X24                         1         0  0.422532             0.31765           0           1
+X25                         1         0  0.554824            0.326916           0           1
+X26                         1         0  0.402829            0.314128           0           1
+X27                         1         0  0.735566            0.263805   0.0385626           1
+X28                         1         0  0.330619            0.304492           0           1
+X29                         1         0  0.371623            0.332837           0           1
+X30                         1         0  0.520297            0.313076           0           1
 
 
   ---  initial population objective function summary:  ---  
 seeking optimal trade-off point for single 'optimal' chance point runs
-using member GEN=0_MEMBER=60 as single, 'optimal' point
-   with distance of 0.398486 from optimal trade - off
+using member GEN=1_MEMBER=46_PSO as single, 'optimal' point
+   with distance of 0.359554 from optimal trade - off
 objective function   direction         mean      std dev          min          max         knee
 
-OBJ_1                 minimize     0.499956    0.2881094    0.0037952     0.998152    0.0435346
-OBJ_2                 minimize       5.4388    0.4569061      4.28211      7.16973      4.67861
+OBJ_1                 minimize    0.3431501    0.3254905            0            1     0.156703
+OBJ_2                 minimize     4.691522    0.6130265      3.03485      6.37174      3.35846
 
 ... saved initial dv population to  ./pest/bm3_gp.0.dv_pop.csv
 ...performing initial pareto dominance sort
-...pareto dominance sort yielded 14 domination fronts
-6 in the front 1
-10 in the front 2
-9 in the front 3
-6 in the front 4
-9 in the front 5
-8 in the front 6
-12 in the front 7
-8 in the front 8
-8 in the front 9
-(not reporting remaining front membership)
+...pareto dominance sort yielded 8 domination fronts
+24 in the front 1
+21 in the front 2
+19 in the front 3
+15 in the front 4
+10 in the front 5
+7 in the front 6
+3 in the front 7
+1 in the front 8
 ...wrote pareto summary to ./pest/bm3_gp.pareto.summary.csv
-initialized archives with 6 nondominated members
+initialized archives with 24 nondominated members
 ...pareto dominance sort yielded 1 domination fronts
-6 in the front 1
+24 in the front 1
 ...wrote pareto summary to ./pest/bm3_gp.pareto.archive.summary.csv
 ...pareto dominance sort yielded 1 domination fronts
-6 in the front 1
+24 in the front 1
 ...wrote pareto summary to ./pest/bm3_gp.pareto.trimmed.archive.summary.csv
-...using the initial population for hypervolume partitioning
-...saved decision variable population of size 6 X 30 to './pest/bm3_gp.archive.dv_pop.csv'
-...saved generation-specific decision variable population of size 6 X 30 to './pest/bm3_gp.0.archive.dv_pop.csv'
-...saved observation population of size 6 X 4 to './pest/bm3_gp.archive.obs_pop.csv'
-...saved generation-specific observation population of size 6 X 4 to './pest/bm3_gp.0.archive.obs_pop.csv'
-...number of initial feasible solutions: 6
+...loading outer repository obs from csv file ./model/input/outer_repo.archive.obs_pop.csv
+...saved decision variable population of size 24 X 30 to './pest/bm3_gp.archive.dv_pop.csv'
+...saved generation-specific decision variable population of size 24 X 30 to './pest/bm3_gp.0.archive.dv_pop.csv'
+...saved observation population of size 24 X 4 to './pest/bm3_gp.archive.obs_pop.csv'
+...saved generation-specific observation population of size 24 X 4 to './pest/bm3_gp.0.archive.obs_pop.csv'
+...number of initial feasible solutions: 24
 
   ---  initialization complete  ---  
 
-  ---  starting generation  1  ---  
-...pareto dominance sort yielded 14 domination fronts
-6 in the front 1
-10 in the front 2
-9 in the front 3
-6 in the front 4
-9 in the front 5
-8 in the front 6
-12 in the front 7
-8 in the front 8
-8 in the front 9
-(not reporting remaining front membership)
-...generating PSO population of size 100
-...pareto dominance sort yielded 1 domination fronts
-6 in the front 1
-...running population of size  100
+
+pestpp-mou analysis complete...
+started at 04/07/24 21:57:54
+finished at 04/07/24 21:58:06
+took 0.183333 minutes
