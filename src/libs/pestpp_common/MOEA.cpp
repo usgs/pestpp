@@ -1037,9 +1037,9 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 		sortedset::iterator start = crowd_sorted.begin(), last = prev(crowd_sorted.end(), 1);
 
 		if (members.size() <= pest_scenario.get_pestpp_options().get_mou_max_archive_size())
-			min_sd[obj_map.first] = (last->second - start->second) / (4*members.size());
+			min_sd[obj_map.first] = (last->second - start->second) / (10*members.size());
 		else
-			min_sd[obj_map.first] = (last->second - start->second) / (4*pest_scenario.get_pestpp_options().get_mou_max_archive_size());
+			min_sd[obj_map.first] = (last->second - start->second) / (10*pest_scenario.get_pestpp_options().get_mou_max_archive_size());
 
 		nonuniq_obj.clear();
 
@@ -1181,15 +1181,15 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 			{
 				//pnd_ij = 1 - dominance_probability(_member_struct[inextnn->first], _member_struct[m]);
 				pnd_ij = nondominance_probability(_member_struct[m], _member_struct[inextnn->first]);
-				if (pnd_ij < 0.5)
+				/*if (pnd_ij < 0.5)
 				{
 					pd_ij = 1 - dominance_probability(_member_struct[inextnn->first], _member_struct[m]);
 					pnd *= pd_ij;
 
 				}
 				else
-					pnd *= pnd_ij;
-
+					pnd *= pnd_ij;*/
+				pnd *= pnd_ij;
 				nn_count++;
 				if (nn_count > nn_max)
 					break;
@@ -1197,7 +1197,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 			nn = nn_count - 1;
 		}
 
-		nondomprob_map[m] = pow(pnd,pow(nn, -1));
+		nondomprob_map[m] = pnd /*pow(pnd,pow(nn, -1))*/;
 		probnondom_map[m] = pnd;
 
 	}		
@@ -1543,7 +1543,7 @@ double ParetoObjectives::nondominance_probability(map<string, double>& first, ma
 			s[obj_name + "_SD"] = min_sd[obj_name];
 	}
 
-	double pd = 1 - dominance_probability(f, s) - dominance_probability(s, f);
+	double pd = 1 -/* dominance_probability(f, s) -*/ dominance_probability(s, f);
 
 	//double pd = 1 - dominance_probability(s, f);
 
