@@ -1179,16 +1179,16 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 			nn_count = 1;
 			for (; inextnn != nn_sorted.end(); ++inextnn)
 			{
-				pnd_ij = 1 - dominance_probability(_member_struct[inextnn->first], _member_struct[m]);
-				//pnd_ij = nondominance_probability(_member_struct[m], _member_struct[inextnn->first]);
-				/*if (pnd_ij < 0.5)
+				//pnd_ij = 1 - dominance_probability(_member_struct[inextnn->first], _member_struct[m]);
+				pnd_ij = nondominance_probability(_member_struct[m], _member_struct[inextnn->first]);
+				if (pnd_ij < 0.5)
 				{
-					pd_ij = 1 - dominance_probability(_member_struct[inextnn->first], _member_struct[m]);
+					pd_ij = dominance_probability(_member_struct[m], _member_struct[inextnn->first]);
 					pnd *= pd_ij;
 
 				}
-				else*/
-				pnd *= pnd_ij;
+				else
+					pnd *= pnd_ij;
 
 				nn_count++;
 				if (nn_count > nn_max)
