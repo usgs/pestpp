@@ -26,6 +26,6 @@ OBJ1_true <- Xref_obj[1]
 OBJ1_SD <- 0
 
 #save results to pass to MOU
-objective <- c(OBJ1_true, OBJ2.alc$mean, OBJ1_SD, sqrt(OBJ2.alc$s2))
+objective <- c(OBJ1_true, OBJ2.alc$mean, OBJ1_SD, sqrt(OBJ2.alc$s2), OBJ1_true, OBJ1_true)
 
 write.csv(objective, "./model/output/gp_output.dat", quote = F, row.names = F)

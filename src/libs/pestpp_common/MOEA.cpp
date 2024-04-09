@@ -733,7 +733,7 @@ void ParetoObjectives::write_pareto_summary(string& sum_tag, int generation, Obs
 		sum << "," << member_front_map[member];
 		sum << "," << crowd_map[member];
 		if (prob_pareto)
-			sum << "," << probnondom_map[member];
+			sum << "," << nn_map[member];
 		
 		sum << "," << spea2_constrained_fitness_map[member];
 		sum << "," << spea2_unconstrained_fitness_map[member];
@@ -765,7 +765,7 @@ void ParetoObjectives::prep_pareto_summary_file(string summary_tag)
 	{
 		for (auto objsd : *obs_obj_sd_names_ptr)
 			sum << "," << pest_utils::lower_cp(objsd);
-		sum << ",nsga2_front,nsga2_crowding_distance,probnondom,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
+		sum << ",nsga2_front,nsga2_crowding_distance,nn_count,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
 	}
 	else
 		sum << ",nsga2_front,nsga2_crowding_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance" << endl;
@@ -988,7 +988,6 @@ void ParetoObjectives::prep_expected_distance_lookup_table(ObservationEnsemble& 
 
 			eucd = get_euclidean_distance(_member_struct[m.first], _member_struct[n.first]);
 			expdist_lookup[m.first][n.first] = eucd.at(0);
-
 		}
 	}
 
@@ -1005,7 +1004,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 {
 
 	map<string, map<string, double>> obj_member_map;
-	map<string, double> nondomprob_map;
+	map<string, double> nondomprob_map, fit_map;
 	
 	vector<string> obj_names, nn_names;
 	vector<double> eucd;
@@ -1016,6 +1015,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 	for (auto member : members)
 	{
 		nondomprob_map[member] = 0.0;
+		fit_map[member] = 0.0;
 
 		for (auto obj_map : *obs_obj_names_ptr) //need to make sure the SDs are not included
 			obj_member_map[obj_map][member] = _member_struct[member][obj_map];
@@ -1037,9 +1037,9 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 		sortedset::iterator start = crowd_sorted.begin(), last = prev(crowd_sorted.end(), 1);
 
 		if (members.size() <= pest_scenario.get_pestpp_options().get_mou_max_archive_size())
-			min_sd[obj_map.first] = (last->second - start->second) / (10*members.size());
+			min_sd[obj_map.first] = 3 * (last->second - start->second) / (members.size());
 		else
-			min_sd[obj_map.first] = (last->second - start->second) / (10*pest_scenario.get_pestpp_options().get_mou_max_archive_size());
+			min_sd[obj_map.first] = 3 * (last->second - start->second) / (pest_scenario.get_pestpp_options().get_mou_max_archive_size());
 
 		nonuniq_obj.clear();
 
@@ -1062,7 +1062,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 			for (auto m : members)
 			{
 				if (find(nonuniq_obj.begin(), nonuniq_obj.end(), _member_struct[m][obj_map.first]) != nonuniq_obj.end())
-					nondomprob_map[m] = -1;
+					fit_map[m] = -1;
 			}
 		}
 
@@ -1088,7 +1088,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 
 			//assign the lower extreme in current population
 			if (lower_extreme_candidates.size() == 0) //if size is 0, the extreme is an incumbent front member
-				nondomprob_map[start->first] = CROWDING_EXTREME;
+				fit_map[start->first] = CROWDING_EXTREME;
 
 			else //use ei to assign the end member
 			{
@@ -1105,7 +1105,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 				}
 
 				if (mx == 0)
-					nondomprob_map[start->first] = CROWDING_EXTREME;
+					fit_map[start->first] = CROWDING_EXTREME;
 				else
 				{
 					if (find(nonuniq_obj.begin(), nonuniq_obj.end(), lower_extreme_candidates[endmem][obj_map.first]) != nonuniq_obj.end())
@@ -1138,71 +1138,112 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 						for (auto em : ext_mems_pd)
 						{
 							if (em.first == extreme_member_name)
-								nondomprob_map[em.first] = CROWDING_EXTREME;
+								fit_map[em.first] = CROWDING_EXTREME;
 
 						}
 					}
 					else
-						nondomprob_map[endmem] = CROWDING_EXTREME;
+						fit_map[endmem] = CROWDING_EXTREME;
 				}
 			}
 		}
 		else
-			nondomprob_map[start->first] = CROWDING_EXTREME;
+			fit_map[start->first] = CROWDING_EXTREME;
 	}
 
 	//crowding distance calculation for non extreme members;
-	int nn_count, nn = 1, nn_max = pest_scenario.get_pestpp_options().get_mou_max_nn_search();
-
+	int nn = 1, nn_max = pest_scenario.get_pestpp_options().get_mou_max_nn_search();
+	double gamma = 1 - ppd_limits - 0.05;
+	double pd, nn_count;
 	for (auto m : members)
 	{
-		double pnd, pnd_ij, pd_ij;
-		map<string, double> nn_dist;
-		for (auto n: members)
-		{
-			if (m != n)
-				nn_dist[n] = expdist_lookup[m][n];
-		}
-		
-		sortedset nn_sorted(nn_dist.begin(), nn_dist.end(), compFunctor);
-		sortedset::iterator inextnn = nn_sorted.begin();
-		
-
-		if (nondomprob_map[m] == CROWDING_EXTREME)
-		{
-			pnd = CROWDING_EXTREME;
-			nn = 1;
-		}
+		if (fit_map[m] == CROWDING_EXTREME)
+			nn_map[m] = CROWDING_EXTREME;
 		else
 		{
-			pnd = 1;
-			nn_count = 1;
-			for (; inextnn != nn_sorted.end(); ++inextnn)
+			nn_count = 0;
+			for (auto n : members)
 			{
-				//pnd_ij = 1 - dominance_probability(_member_struct[inextnn->first], _member_struct[m]);
-				pnd_ij = nondominance_probability(_member_struct[m], _member_struct[inextnn->first]);
-				/*if (pnd_ij < 0.5)
+				if (m != n)
 				{
-					pd_ij = 1 - dominance_probability(_member_struct[inextnn->first], _member_struct[m]);
-					pnd *= pd_ij;
-
+					pd = dominance_prob_adhoc(_member_struct[n], _member_struct[m]);
+					if (pd < gamma)
+						nn_count += 1.0;
 				}
-				else
-					pnd *= pnd_ij;*/
-				pnd *= pnd_ij;
-				nn_count++;
-				if (nn_count > nn_max)
-					break;
 			}
-			nn = nn_count - 1;
+			fit_map[m] = nn_count;
+			nn_map[m] = nn_count;
 		}
+	}
 
-		nondomprob_map[m] = pnd /*pow(pnd,pow(nn, -1))*/;
-		probnondom_map[m] = pnd;
+	double mx = 0;
+	for (auto f : fit_map)
+	{
+		if ((f.second > mx) && (f.second != CROWDING_EXTREME))
+			mx = f.second;
+	}
 
-	}		
+	for (auto f : fit_map)
+	{
+		if (f.second != CROWDING_EXTREME)
+			fit_map[f.first] = f.second / (mx + 1.0);
+	}
 
-	return nondomprob_map;
+	//for (auto m : members)
+	//{
+	//	double f_ij, pnd_ij, pd_ij, pnd;
+	//	map<string, double> nn_dist, nn_fit;
+	//	for (auto n: members)
+	//	{
+	//		if (m != n)
+	//			nn_fit[n] = fit_lookup[m][n];
+	//	}
+	//	
+	//	sortedset nn_sorted(nn_fit.begin(), nn_fit.end(), compFunctor);
+	//	sortedset::iterator inextnn = nn_sorted.begin();
+	//	
+
+	//	if (fit_map[m] == CROWDING_EXTREME)
+	//	{
+	//		f_ij = CROWDING_EXTREME;
+	//		pnd = CROWDING_EXTREME;
+	//		nn = 1;
+	//	}
+	//	else
+	//	{
+	//		f_ij = 0;
+	//		pnd = 1;
+	//		nn_count = 1;
+	//		for (; inextnn != nn_sorted.end(); ++inextnn)
+	//		{
+	//			pnd_ij = dominance_probability(_member_struct[m], _member_struct[inextnn->first]);
+	//			pnd *= pnd_ij;
+
+	//			//pnd_ij = nondominance_probability(_member_struct[m], _member_struct[inextnn->first]);
+	//			/*if (pnd_ij < 0.5)
+	//			{
+	//				pd_ij = 1 - dominance_probability(_member_struct[inextnn->first], _member_struct[m]);
+	//				pnd *= pd_ij;
+
+	//			}
+	//			else
+	//				pnd *= pnd_ij;*/
+	//			
+
+	//			f_ij += inextnn->second;
+	//			nn_count++;
+	//			if (nn_count > nn_max)
+	//				break;
+	//		}
+	//		nn = nn_count - 1;
+	//	}
+
+	//	fit_map[m] = f_ij /*pow(pnd,pow(nn, -1))*/;
+	//	probnondom_map[m] = pnd;
+
+	//}		
+
+	return fit_map;
 }
 
 vector<string> ParetoObjectives::sort_members_by_crowding_distance(int front, vector<string>& members, map<string,double>& crowd_map, 
@@ -1531,6 +1572,25 @@ double ParetoObjectives::dominance_probability(map<string, double>& first, map<s
 	return prob_dom;
 }
 
+double ParetoObjectives::dominance_prob_adhoc(map<string, double>& first, map<string, double>& second)
+{
+	map<string, double> f = first, s = second;
+	for (auto obj_name : *obj_names_ptr)
+	{
+		if (f[obj_name + "_SD"] < min_sd[obj_name])
+			f[obj_name + "_SD"] = min_sd[obj_name];
+
+		if (s[obj_name + "_SD"] < min_sd[obj_name])
+			s[obj_name + "_SD"] = min_sd[obj_name];
+	}
+
+	double pd = /*1 - dominance_probability(f, s) -*/ dominance_probability(f, s);
+
+	//double pd = 1 - dominance_probability(s, f);
+
+	return pd;
+}
+
 double ParetoObjectives::nondominance_probability(map<string, double>& first, map<string, double>& second)
 {
 	map<string, double> f = first, s = second;
@@ -1543,7 +1603,7 @@ double ParetoObjectives::nondominance_probability(map<string, double>& first, ma
 			s[obj_name + "_SD"] = min_sd[obj_name];
 	}
 
-	double pd = 1 -/* dominance_probability(f, s) -*/ dominance_probability(s, f);
+	double pd = 1 - dominance_probability(f, s) - dominance_probability(s, f);
 
 	//double pd = 1 - dominance_probability(s, f);
 

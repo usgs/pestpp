@@ -1,7 +1,7 @@
 pcf
 * control data 
 restart estimation
- 30   4   1   0   2 
+ 30   6   1   0   4 
  1   1  single point
  10  2  .3  .01  8 
  10  10  .001
@@ -11,7 +11,7 @@ restart estimation
 * parameter groups
 decvar	absolute  0.01  0.0		switch  	1 	parabolic
 * parameter data
-x1   	none    relative  	0	0	1	decvar	1   0   1
+x1   	none    relative  	0	-0.01	1.01	decvar	1   0   1
 x2		none    relative  	0	0	1	decvar	1   0   1
 x3		none    relative  	0	0	1	decvar	1   0   1
 x4		none    relative  	0	0	1	decvar	1   0   1
@@ -44,11 +44,15 @@ x30		none    relative  	0	0	1	decvar	1   0   1
 * Observation groups
 less_obj
 miscdata
+greater_than
+less_than
 * Observation data
 obj_1		0		1	less_obj
 obj_2		0		1	less_obj
 obj_1_sd	0		1	miscdata
 obj_2_sd	0		1	miscdata
+obj_1l  	0		1	greater_than
+obj_1u  	1		1	less_than
 * model command line
 ./pest/MODELRUN_MOGP.bat
 * model input/output
@@ -61,9 +65,11 @@ obj_2_sd	0		1	miscdata
 ++mou_generator(pso)
 ++mou_ppd_limits(0.8)
 ++mou_env_selector(NSGA_PPD)
-++mou_pso_alpha(4)
+++mou_pso_alpha(0)
 ++mou_pso_rramp(-1)
+++mou_fit_beta(1)
+++mou_max_nn_search(5)
 ++mou_max_archive_size(100)
-++mou_dv_population_file(./model/input/bm3_gp_1_20.archive.dv_pop.csv)
-++mou_obs_population_restart_file(./model/input/bm3_gp_1_20.archive.obs_pop.csv)
+++mou_dv_population_file(./model/input/bm3_gp_1_3.archive.dv_pop.csv)
+++mou_obs_population_restart_file(./model/input/bm3_gp_1_3.archive.obs_pop.csv)
 ++mou_outer_repo_obs_file(./model/input/outer_repo.archive_1.obs_pop.csv)
