@@ -1037,19 +1037,9 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 		sortedset::iterator start = crowd_sorted.begin(), last = prev(crowd_sorted.end(), 1);
 
 		if (members.size() <= pest_scenario.get_pestpp_options().get_mou_max_archive_size())
-			min_sd[obj_map.first] = (last->second - start->second) / (members.size());
+			min_sd[obj_map.first] = 3 * (last->second - start->second) / (members.size());
 		else
-			min_sd[obj_map.first] = (last->second - start->second) / (pest_scenario.get_pestpp_options().get_mou_max_archive_size());
-
-
-		for (auto m : members)
-		{
-			if (_member_struct[m][obj_map.first + "_SD"] < min_sd[obj_map.first])
-			{
-				_member_struct[m][obj_map.first + "_SD"] = min_sd[obj_map.first];
-			}
-		}
-
+			min_sd[obj_map.first] = 3 * (last->second - start->second) / (pest_scenario.get_pestpp_options().get_mou_max_archive_size());
 
 		nonuniq_obj.clear();
 
@@ -1186,7 +1176,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 		}
 	}
 
-	/*double mx = 0;
+	double mx = 0;
 	for (auto f : fit_map)
 	{
 		if ((f.second > mx) && (f.second != CROWDING_EXTREME))
@@ -1197,7 +1187,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 	{
 		if (f.second != CROWDING_EXTREME)
 			fit_map[f.first] = f.second / (mx + 1.0);
-	}*/
+	}
 
 	//for (auto m : members)
 	//{
