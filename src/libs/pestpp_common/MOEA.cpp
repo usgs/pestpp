@@ -280,15 +280,22 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 	if (prob_pareto)
 	{
 		map<string, double> cluster_crowding = get_cluster_crowding_fitness(members);
-		
+
+
 		//normalize cd
 		double mx = -1.0e+30;
+		double mn = 1.0e+30;
 		for (auto& cd : cluster_crowding)
 		{
 			if ((cd.second > mx) && (cd.second != CROWDING_EXTREME))
 				mx = cd.second;
 			else if (members.size() == 2)
 				mx = 0.0;
+
+			if ((cd.second < mn) && (cd.second != CROWDING_EXTREME))
+				mn = cd.second;
+			else if (members.size() == 2)
+				mn = 0.0;
 			/*else if (crowd_sorted.size() == 1)
 				mx = cd.second;*/
 		}
@@ -301,7 +308,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 				cd.second = 1;
 			}
 			else if (mx >= 0.0) {
-				cd.second = pow(1 - cd.second / (mx + 1), alpha);
+				cd.second = pow(1 - (cd.second - mn) / (mx - mn + 1), alpha);
 			}
 			/*else {
 				cd.second = pow(0.5, alpha);
