@@ -40,7 +40,7 @@ public:
 		ParameterEnsemble& dp, Constraints* constraints_ptr=nullptr, bool ppd=false, bool report=true, string sum_tag=string());
 	
 	map<string, map<string, double>> get_members(ObservationEnsemble& op, ParameterEnsemble& dp) { return get_member_struct(op, dp); };
-	void set_ppd_limits() { ppd_limits = pest_scenario.get_pestpp_options().get_mou_ppd_limits(); }
+	void set_ppd_beta() { ppd_beta = pest_scenario.get_pestpp_options().get_mou_ppd_beta(); }
 	void set_prob_pareto(bool ppd) { prob_pareto = ppd; }
 	void set_hypervolume_partitions(map<string, map<string, double>> _hv_parts);
 	void get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp);
@@ -150,7 +150,7 @@ private:
 	double dominance_prob_adhoc(map<string, double>& first, map<string, double>& second);
 	double nondominance_probability(map<string, double>& first, map<string, double>& second);
 	bool prob_pareto, ppd_sort;
-	double ppd_limits;
+	double ppd_beta;
 	vector<double> ppd_range;
 
 	//EHVI-related stuff

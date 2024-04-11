@@ -416,8 +416,6 @@ public:
 	void set_mou_pso_rramp(double val) { mou_pso_rramp = val; }
 	double get_mou_pso_rfit() const { return mou_pso_rfit; }
 	void set_mou_pso_rfit(double val) { mou_pso_rfit = val; }
-	double get_mou_fit_beta() const { return mou_fit_beta; }
-	void set_mou_fit_beta(double val) { mou_fit_beta = val; }
 	int get_mou_max_nn_search() const { return mou_max_nn_search;}
 	void set_mou_max_nn_search(int val) { mou_max_nn_search = val; }
 	string get_mou_outer_repo_obs_file() const { return mou_outer_repo_obs_file; }
@@ -426,10 +424,10 @@ public:
 	void set_mou_hypervolume_extreme(double val) { mou_hypervolume_extreme = val; }
 	int get_mou_infill_size() const { return mou_infill_size; }
 	void set_mou_infill_size(int size) { mou_infill_size = size; }
-	double get_mou_ppd_limits() const { return mou_ppd_limits; }
-	//vector<double> get_mou_ppd_limits() const { return mou_ppd_limits; }
-	void set_mou_ppd_limits(double val) { mou_ppd_limits = val; }
-	//void set_mou_ppd_limits(vector<double> _vals) { mou_ppd_limits = _vals; }
+	double get_mou_ppd_beta() const { return mou_ppd_beta; }
+	void set_mou_ppd_beta(double val) { mou_ppd_beta = val; }
+	double get_mou_ppd_epsilon() const { return mou_ppd_epsilon; }
+	void set_mou_ppd_epsilon(double val) { mou_ppd_epsilon = val; }
 	int get_mou_resample_every()const { return mou_resample_every; }
 	void set_mou_adaptive_ppd(bool _flag) { mou_adaptive_ppd = _flag; };
 	bool get_mou_adaptive_ppd() const { return mou_adaptive_ppd; }
@@ -775,8 +773,8 @@ private:
 	double mou_pso_alpha;
 	double mou_pso_rramp;
 	double mou_pso_rfit;
-	double mou_fit_beta;
-	double mou_ppd_limits;
+	double mou_ppd_beta;
+	double mou_ppd_epsilon;
 	bool mou_adaptive_ppd;
 	string mou_outer_repo_obs_file;
 	int mou_max_nn_search;

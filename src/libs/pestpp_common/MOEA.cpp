@@ -948,13 +948,13 @@ vector<double> ParetoObjectives::get_euclidean_distance(map<string, double> firs
 
 double ParetoObjectives::get_euclidean_fitness(double E, double V)
 {
-	double beta = pest_scenario.get_pestpp_options().get_mou_fit_beta();
+	//double beta = pest_scenario.get_pestpp_options().get_mou_fit_beta();
 	double val;
 
-	if (beta < 0)
+	/*if (beta < 0)
 		val = pow(E / exp(pow(V, 0.5)),0.5);
 	else
-		val = pow(E / (beta * pow(V, 0.5) + 1),0.5);
+		val = pow(E / (beta * pow(V, 0.5) + 1),0.5);*/
 	
 	return val;
 }
@@ -1147,7 +1147,8 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 
 	//crowding distance calculation for non extreme members;
 	int nn = 1, nn_max = pest_scenario.get_pestpp_options().get_mou_max_nn_search();
-	double gamma = 1 - ppd_limits - 0.05;
+	double epsilon = pest_scenario.get_pestpp_options().get_mou_ppd_epsilon();
+	double gamma = 1 - ppd_beta - epsilon;
 	double pd, nn_count;
 	for (auto m : members)
 	{
@@ -1557,7 +1558,7 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 	{
 		double pd = dominance_probability(first, second);
 
-		if (pd < ppd_limits) {
+		if (pd < ppd_beta) {
 			return false;
 		}
 		else
@@ -1674,7 +1675,7 @@ void ParetoObjectives::update_ppd_criteria(ObservationEnsemble& op, ParameterEns
 {
 	/*map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
 	double cv;
-	ppd_range = pest_scenario.get_pestpp_options().get_mou_ppd_limits();
+	ppd_range = pest_scenario.get_pestpp_options().get_mou_ppd_beta();
 	double ppd_lb = ppd_range[0], ppd_ub = ppd_range[1];
 	stringstream ss;
 
@@ -1689,15 +1690,15 @@ void ParetoObjectives::update_ppd_criteria(ObservationEnsemble& op, ParameterEns
 		cv /=_member_struct.size();
 
 		if (cv < 1)
-			ppd_limits[i] = ppd_ub;
+			ppd_beta[i] = ppd_ub;
 		else
-			ppd_limits[i] = ppd_lb + ((exp(1 / cv) - 1) / (exp(1) - 1)) * (ppd_ub - ppd_lb);
+			ppd_beta[i] = ppd_lb + ((exp(1 / cv) - 1) / (exp(1) - 1)) * (ppd_ub - ppd_lb);
 
 		i++;
 	}
 
 	ss.str("");
-	ss << "Overlap criteria used - objective 1: " << ppd_limits[0] << " ; objective 2: " << ppd_limits[1];
+	ss << "Overlap criteria used - objective 1: " << ppd_beta[0] << " ; objective 2: " << ppd_beta[1];
 	performance_log->log_event(ss.str());*/
 
 }
@@ -2581,7 +2582,7 @@ void MOEA::initialize()
 	{
 		envtype = MouEnvType::NSGA;
 		prob_pareto = true;
-		objectives.set_ppd_limits();
+		objectives.set_ppd_beta();
 		objectives.set_prob_pareto(prob_pareto);
 		message(1, "using 'nsga2_ppd' env selector");
 	}

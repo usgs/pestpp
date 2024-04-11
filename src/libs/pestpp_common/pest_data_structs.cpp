@@ -1444,11 +1444,6 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_pso_alpha);
 		return true;
 		}
-	else if (key == "MOU_FIT_BETA")
-	{
-		convert_ip(value, mou_fit_beta);
-		return true;
-	}
 	else if (key == "MOU_PSO_RRAMP")
 	{
 		convert_ip(value, mou_pso_rramp);
@@ -1489,21 +1484,26 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		mou_resample_command = value;
 		return true;
 		}
-	else if (key == "MOU_PPD_LIMITS")
+	else if (key == "MOU_PPD_BETA")
 	{
-		convert_ip(value, mou_ppd_limits);
+		convert_ip(value, mou_ppd_beta);
 		return true;
 	}
-	/*else if (key == "MOU_PPD_LIMITS")
+	else if (key == "MOU_PPD_EPSILON")
 	{
-		mou_ppd_limits.clear();
+		convert_ip(value, mou_ppd_epsilon);
+		return true;
+		}
+	/*else if (key == "MOU_PPD_BETA")
+	{
+		mou_PPD_BETA.clear();
 		vector<string> tok;
 		tokenize(value, tok, ",		");
 		double v;
 		for (const auto& t : tok)
 		{
 			convert_ip(t, v);
-			mou_ppd_limits.push_back(v);
+			mou_PPD_BETA.push_back(v);
 		}
 		return true;
 	}*/
@@ -1777,17 +1777,13 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_pso_alpha: " << mou_pso_alpha << endl;
 	os << "mou_pso_rramp: " << mou_pso_rramp << endl;
 	os << "mou_pso_rfit: " << mou_pso_rfit << endl;
-	os << "mou_fit_beta: " << mou_fit_beta << endl;
 	os << "mou_max_nn_search: " << mou_max_nn_search << endl;
 	os << "mou_outer_repo_obs_file: " << mou_outer_repo_obs_file << endl;
 	os << "mou_hypervolume_extreme: " << mou_hypervolume_extreme << endl;
 	os << "mou_infill_size: " << mou_infill_size << endl;
 	os << "mou_adaptive_ppd: " << mou_adaptive_ppd << endl;
-	os << "mou_ppd_limits: " << mou_ppd_limits << endl;
-	/*for (auto& p : mou_ppd_limits)
-	{
-		os << " " << p << endl;
-	}*/
+	os << "mou_ppd_beta: " << mou_ppd_beta << endl;
+	os << "mou_ppd_epsilon: " << mou_ppd_epsilon << endl;
 	os << "mou_population_schedule: " << mou_population_schedule << endl;
 	os << "mou_simplex_reflections:" << mou_simplex_reflections << endl;
 	os << "mou_simplex_factors: " << endl;
@@ -1981,13 +1977,12 @@ void PestppOptions::set_defaults()
 	set_mou_pso_alpha(1.0);
 	set_mou_pso_rramp(-5e+02);
 	set_mou_pso_rfit(2.0);
-	set_mou_fit_beta(1.0);
 	set_mou_outer_repo_obs_file("");
 	set_mou_max_nn_search(get_mou_population_size());
 	set_mou_hypervolume_extreme(1e+10);
 	set_mou_infill_size(100);
-	set_mou_ppd_limits(0.5);
-	//set_mou_ppd_limits(vector<double>{0.5, 0.5});
+	set_mou_ppd_beta(0.5);
+	set_mou_ppd_epsilon(0.05);
 	set_mou_adaptive_ppd(false);
 	set_mou_resample_every(-1);
 	set_mou_resample_command("");
