@@ -11,7 +11,7 @@ binary compiled on Apr 11 2024 at 10:06:27
 using control file: "./pest/bm3_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp-moudev\benchmarks\zdt_fitness_expt"
 on host: "DUMPLING-FL"
-started at 04/11/24 10:13:57
+started at 04/11/24 10:27:12
 
 on host: "DUMPLING-FL"
 
@@ -475,6 +475,6 @@ OBJ_1U                   less_than           1              0       0.532854    
 
 
 pestpp-mou analysis complete...
-started at 04/11/24 10:13:57
-finished at 04/11/24 10:14:01
-took 0.05 minutes
+started at 04/11/24 10:27:12
+finished at 04/11/24 10:27:17
+took 0.0666667 minutes
