@@ -287,9 +287,9 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		{
 			if ((cd.second > mx) && (cd.second != CROWDING_EXTREME))
 				mx = cd.second;
-			/*else if (members.size() == 2)
-				mx = cd.second;
-			else if (crowd_sorted.size() == 1)
+			else if (members.size() == 2)
+				mx = 0.0;
+			/*else if (crowd_sorted.size() == 1)
 				mx = cd.second;*/
 		}
 		if (mx < 0.0)
@@ -300,7 +300,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 			{
 				cd.second = 1;
 			}
-			else if (mx != 0.0) {
+			else if (mx >= 0.0) {
 				cd.second = pow(1 - cd.second / (mx + 1), alpha);
 			}
 			/*else {
