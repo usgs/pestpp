@@ -11,7 +11,7 @@ binary compiled on Apr 11 2024 at 15:16:00
 using control file: "./pest/bm3_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp-moudev\benchmarks\zdt_fitness_expt"
 on host: "DUMPLING-FL"
-started at 04/11/24 15:54:38
+started at 04/11/24 16:16:36
 
 on host: "DUMPLING-FL"
 
@@ -441,15 +441,3 @@ OBJ_2                 minimize     5.047454    0.6664328      3.46803      7.169
 
 ... saved initial dv population to  ./pest/bm3_gp.0.dv_pop.csv
 ...performing initial pareto dominance sort
-162 feasible solutions
-...pareto dominance sort yielded 14 domination fronts
-19 in the front 1
-28 in the front 2
-20 in the front 3
-13 in the front 4
-17 in the front 5
-11 in the front 6
-12 in the front 7
-8 in the front 8
-9 in the front 9
-(not reporting remaining front membership)

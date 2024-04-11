@@ -296,11 +296,15 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 				mn = cd.second;
 			else if (members.size() == 2)
 				mn = 0.0;
-			/*else if (crowd_sorted.size() == 1)
-				mx = cd.second;*/
+			
+			if ((members.size() <= 4) && (mx == -1.0e+30))
+				mx = 0.0;
+			
+			if ((members.size() <= 4) && (mn == 1.0e+30))
+				mn = 0.0;
 		}
 		if (mx < 0.0)
-			throw runtime_error("pso max crowding distance is negative");
+			throw runtime_error("pso max cluster count is negative");
 
 		for (auto& cd : cluster_crowding) {
 			if (cd.second == CROWDING_EXTREME)
