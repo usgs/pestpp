@@ -1489,9 +1489,9 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_ppd_beta);
 		return true;
 	}
-	else if (key == "MOU_PPD_EPSILON")
+	else if (key == "MOU_FIT_EPSILON")
 	{
-		convert_ip(value, mou_ppd_epsilon);
+		convert_ip(value, mou_fit_epsilon);
 		return true;
 		}
 	/*else if (key == "MOU_PPD_BETA")
@@ -1783,7 +1783,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_infill_size: " << mou_infill_size << endl;
 	os << "mou_adaptive_ppd: " << mou_adaptive_ppd << endl;
 	os << "mou_ppd_beta: " << mou_ppd_beta << endl;
-	os << "mou_ppd_epsilon: " << mou_ppd_epsilon << endl;
+	os << "mou_fit_epsilon: " << mou_fit_epsilon << endl;
 	os << "mou_population_schedule: " << mou_population_schedule << endl;
 	os << "mou_simplex_reflections:" << mou_simplex_reflections << endl;
 	os << "mou_simplex_factors: " << endl;
@@ -1982,7 +1982,7 @@ void PestppOptions::set_defaults()
 	set_mou_hypervolume_extreme(1e+10);
 	set_mou_infill_size(100);
 	set_mou_ppd_beta(0.5);
-	set_mou_ppd_epsilon(0.05);
+	set_mou_fit_epsilon(0.05);
 	set_mou_adaptive_ppd(false);
 	set_mou_resample_every(-1);
 	set_mou_resample_command("");

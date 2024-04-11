@@ -426,8 +426,8 @@ public:
 	void set_mou_infill_size(int size) { mou_infill_size = size; }
 	double get_mou_ppd_beta() const { return mou_ppd_beta; }
 	void set_mou_ppd_beta(double val) { mou_ppd_beta = val; }
-	double get_mou_ppd_epsilon() const { return mou_ppd_epsilon; }
-	void set_mou_ppd_epsilon(double val) { mou_ppd_epsilon = val; }
+	double get_mou_fit_epsilon() const { return mou_fit_epsilon; }
+	void set_mou_fit_epsilon(double val) { mou_fit_epsilon = val; }
 	int get_mou_resample_every()const { return mou_resample_every; }
 	void set_mou_adaptive_ppd(bool _flag) { mou_adaptive_ppd = _flag; };
 	bool get_mou_adaptive_ppd() const { return mou_adaptive_ppd; }
@@ -774,7 +774,7 @@ private:
 	double mou_pso_rramp;
 	double mou_pso_rfit;
 	double mou_ppd_beta;
-	double mou_ppd_epsilon;
+	double mou_fit_epsilon;
 	bool mou_adaptive_ppd;
 	string mou_outer_repo_obs_file;
 	int mou_max_nn_search;

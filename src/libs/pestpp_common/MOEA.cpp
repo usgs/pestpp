@@ -990,8 +990,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 	map<string, map<string, double>> obj_member_map;
 	map<string, double> nondomprob_map, fit_map;
 	
-	vector<string> obj_names, nn_names;
-	vector<double> eucd;
+	vector<string> obj_names;
 
 	for (auto obj_map : *obs_obj_names_ptr)
 		obj_names.push_back(obj_map);
@@ -1033,142 +1032,142 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 				_member_struct[m][obj_map.first + "_SD_syn"] = _member_struct[m][obj_map.first + "_SD"];
 		}
 
-		nonuniq_obj.clear();
+		fit_map[start->first] = CROWDING_EXTREME;
+		fit_map[last ->first] = CROWDING_EXTREME;
 
-		if (omap.size() != crowd_sorted.size())
-		{
-			for (auto o : omap)
-			{
-				int count = 0;
-				for (auto cd : crowd_sorted)
-					if ((cd.second == o.second) && (cd.first != o.first))
-						count++;
+		//nonuniq_obj.clear();
 
-				if (count > 0)
-					nonuniq_obj.push_back(o.second);
-			}
-		}
+		//if (omap.size() != crowd_sorted.size())
+		//{
+		//	for (auto o : omap)
+		//	{
+		//		int count = 0;
+		//		for (auto cd : crowd_sorted)
+		//			if ((cd.second == o.second) && (cd.first != o.first))
+		//				count++;
 
-		if (nonuniq_obj.size() != 0)
-		{
-			for (auto m : members)
-			{
-				if (find(nonuniq_obj.begin(), nonuniq_obj.end(), _member_struct[m][obj_map.first]) != nonuniq_obj.end())
-					fit_map[m] = -1;
-			}
-		}
+		//		if (count > 0)
+		//			nonuniq_obj.push_back(o.second);
+		//	}
+		//}
 
-		if (iter > 0)
-		{
-			map<string, map<string, double>> lower_extreme_candidates, upper_extreme_candidates;
-			map<string, double> curr;
-			vector<string> all_extreme_set;
+		//if (nonuniq_obj.size() != 0)
+		//{
+		//	for (auto m : members)
+		//	{
+		//		if (find(nonuniq_obj.begin(), nonuniq_obj.end(), _member_struct[m][obj_map.first]) != nonuniq_obj.end())
+		//			fit_map[m] = -1;
+		//	}
+		//}
 
-			for (auto m : incumbent_front_extreme)
-				curr[m.first] = incumbent_front_extreme[m.first][obj_map.first];
+		//if (iter > 0)
+		//{
+		//	map<string, map<string, double>> lower_extreme_candidates, upper_extreme_candidates;
+		//	map<string, double> curr;
+		//	vector<string> all_extreme_set;
 
-			sortedset curr_sorted(curr.begin(), curr.end(), compFunctor);
-			double lb = incumbent_front_extreme[curr_sorted.begin()->first][obj_map.first];
-			//double ub = incumbent_front_extreme[prev(curr_sorted.end(), 1)->first][obj_map.first];
+		//	for (auto m : incumbent_front_extreme)
+		//		curr[m.first] = incumbent_front_extreme[m.first][obj_map.first];
 
-			//get the lower and upper objective bounds of the incumbent true front
-			for (auto m : members)
-			{
-				if (_member_struct[m][obj_map.first] < lb)
-					lower_extreme_candidates[m] = _member_struct[m];
-			}
+		//	sortedset curr_sorted(curr.begin(), curr.end(), compFunctor);
+		//	double lb = incumbent_front_extreme[curr_sorted.begin()->first][obj_map.first];
+		//	//double ub = incumbent_front_extreme[prev(curr_sorted.end(), 1)->first][obj_map.first];
 
-			//assign the lower extreme in current population
-			if (lower_extreme_candidates.size() == 0) //if size is 0, the extreme is an incumbent front member
-				fit_map[start->first] = CROWDING_EXTREME;
+		//	//get the lower and upper objective bounds of the incumbent true front
+		//	for (auto m : members)
+		//	{
+		//		if (_member_struct[m][obj_map.first] < lb)
+		//			lower_extreme_candidates[m] = _member_struct[m];
+		//	}
 
-			else //use ei to assign the end member
-			{
-				double mx = 0, ei;
-				string endmem;
-				for (auto l : lower_extreme_candidates)
-				{
-					ei = get_ei(_member_struct[l.first], obj_map.first, lb);
-					if (ei > mx)
-					{
-						mx = ei;
-						endmem = l.first;
-					}
-				}
+		//	//assign the lower extreme in current population
+		//	if (lower_extreme_candidates.size() == 0) //if size is 0, the extreme is an incumbent front member
+		//		fit_map[start->first] = CROWDING_EXTREME;
 
-				if (mx == 0)
-					fit_map[start->first] = CROWDING_EXTREME;
-				else
-				{
-					if (find(nonuniq_obj.begin(), nonuniq_obj.end(), lower_extreme_candidates[endmem][obj_map.first]) != nonuniq_obj.end())
-					{
-						map<string, double> ext_mems_pd;
-						for (auto l : lower_extreme_candidates)
-						{
-							if (lower_extreme_candidates[l.first][obj_map.first] != lower_extreme_candidates[endmem][obj_map.first])
-								continue;
+		//	else //use ei to assign the end member
+		//	{
+		//		double mx = 0, ei;
+		//		string endmem;
+		//		for (auto l : lower_extreme_candidates)
+		//		{
+		//			ei = get_ei(_member_struct[l.first], obj_map.first, lb);
+		//			if (ei > mx)
+		//			{
+		//				mx = ei;
+		//				endmem = l.first;
+		//			}
+		//		}
 
-							double pd = 1;
-							for (auto m : lower_extreme_candidates)
-							{
-								if (l.first != m.first)
-									pd *= dominance_probability(_member_struct[l.first], _member_struct[m.first]);
-							}
-							ext_mems_pd[l.first] = pd;
-						}
+		//		if (mx == 0)
+		//			fit_map[start->first] = CROWDING_EXTREME;
+		//		else
+		//		{
+		//			if (find(nonuniq_obj.begin(), nonuniq_obj.end(), lower_extreme_candidates[endmem][obj_map.first]) != nonuniq_obj.end())
+		//			{
+		//				map<string, double> ext_mems_pd;
+		//				for (auto l : lower_extreme_candidates)
+		//				{
+		//					if (lower_extreme_candidates[l.first][obj_map.first] != lower_extreme_candidates[endmem][obj_map.first])
+		//						continue;
 
-						double mx = 0;
-						string extreme_member_name;
-						for (auto em : ext_mems_pd)
-						{
-							if (em.second > mx)
-							{
-								mx = em.second;
-								extreme_member_name = em.first;
-							}
-						}
-						for (auto em : ext_mems_pd)
-						{
-							if (em.first == extreme_member_name)
-								fit_map[em.first] = CROWDING_EXTREME;
+		//					double pd = 1;
+		//					for (auto m : lower_extreme_candidates)
+		//					{
+		//						if (l.first != m.first)
+		//							pd *= dominance_probability(_member_struct[l.first], _member_struct[m.first]);
+		//					}
+		//					ext_mems_pd[l.first] = pd;
+		//				}
 
-						}
-					}
-					else
-						fit_map[endmem] = CROWDING_EXTREME;
-				}
-			}
-		}
-		else
-			fit_map[start->first] = CROWDING_EXTREME;
+		//				double mx = 0;
+		//				string extreme_member_name;
+		//				for (auto em : ext_mems_pd)
+		//				{
+		//					if (em.second > mx)
+		//					{
+		//						mx = em.second;
+		//						extreme_member_name = em.first;
+		//					}
+		//				}
+		//				for (auto em : ext_mems_pd)
+		//				{
+		//					if (em.first == extreme_member_name)
+		//						fit_map[em.first] = CROWDING_EXTREME;
+
+		//				}
+		//			}
+		//			else
+		//				fit_map[endmem] = CROWDING_EXTREME;
+		//		}
+		//	}
+		//}
+		//else
+		//	fit_map[start->first] = CROWDING_EXTREME;
 	}
 
 	//crowding distance calculation for non extreme members;
 	int nn = 1, nn_max = pest_scenario.get_pestpp_options().get_mou_max_nn_search();
-	double epsilon = pest_scenario.get_pestpp_options().get_mou_ppd_epsilon();
+	double epsilon = pest_scenario.get_pestpp_options().get_mou_fit_epsilon();
 	double gamma = 1 - ppd_beta - epsilon;
 	double pd, nn_count;
 	for (auto m : members)
-	{
-		if (fit_map[m] == CROWDING_EXTREME)
-			continue;
-
+	{		
 		nn_count = 0;
 		for (auto n : members)
 		{
-			if (m != n)
+			if ((m != n) && (fit_map[n] != CROWDING_EXTREME))
 			{
-				if (fit_map[n] == CROWDING_EXTREME)
-					continue;
-
 				pd = dominance_prob_adhoc(_member_struct[n], _member_struct[m]);
 				if (pd > gamma)
 					nn_count += 1.0;
 			}
 		}
 
-		fit_map[m] = nn_count;
 		nn_map[m] = nn_count;
+
+		if (fit_map[m] != CROWDING_EXTREME)
+			fit_map[m] = nn_count;
+		
 	}
 
 	return fit_map;
