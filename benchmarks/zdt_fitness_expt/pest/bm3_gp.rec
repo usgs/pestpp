@@ -11,7 +11,7 @@ binary compiled on Apr 11 2024 at 15:16:00
 using control file: "./pest/bm3_gp.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp-moudev\benchmarks\zdt_fitness_expt"
 on host: "DUMPLING-FL"
-started at 04/11/24 16:16:36
+started at 04/12/24 09:36:40
 
 on host: "DUMPLING-FL"
 
@@ -441,3 +441,44 @@ OBJ_2                 minimize     5.047454    0.6664328      3.46803      7.169
 
 ... saved initial dv population to  ./pest/bm3_gp.0.dv_pop.csv
 ...performing initial pareto dominance sort
+162 feasible solutions
+...pareto dominance sort yielded 14 domination fronts
+19 in the front 1
+28 in the front 2
+20 in the front 3
+13 in the front 4
+17 in the front 5
+11 in the front 6
+12 in the front 7
+8 in the front 8
+9 in the front 9
+(not reporting remaining front membership)
+...wrote pareto summary to ./pest/bm3_gp.pareto.summary.csv
+initialized archives with 19 nondominated members
+19 feasible solutions
+...pareto dominance sort yielded 1 domination fronts
+19 in the front 1
+...wrote pareto summary to ./pest/bm3_gp.pareto.archive.summary.csv
+19 feasible solutions
+...pareto dominance sort yielded 1 domination fronts
+19 in the front 1
+...wrote pareto summary to ./pest/bm3_gp.pareto.trimmed.archive.summary.csv
+...loading outer repository obs from csv file ./model/input/outer_repo.archive_1.obs_pop.csv
+...saved decision variable population of size 19 X 30 to './pest/bm3_gp.archive.dv_pop.csv'
+...saved generation-specific decision variable population of size 19 X 30 to './pest/bm3_gp.0.archive.dv_pop.csv'
+...saved observation population of size 19 X 6 to './pest/bm3_gp.archive.obs_pop.csv'
+...saved generation-specific observation population of size 19 X 6 to './pest/bm3_gp.0.archive.obs_pop.csv'
+
+  ---   population observation constraint summary at iteration 0  ---  
+name                         sense    required        sim min       sim mean        sim max  % unsatisfied
+OBJ_1L                greater_than           0          -0.01       0.416505           1.01           17.5
+OBJ_1U                   less_than           1          -0.01       0.416505           1.01            1.5
+...number of initial feasible solutions: 19
+
+  ---  initialization complete  ---  
+
+
+pestpp-mou analysis complete...
+started at 04/12/24 09:36:40
+finished at 04/12/24 09:36:44
+took 0.05 minutes
