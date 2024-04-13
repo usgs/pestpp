@@ -1788,6 +1788,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_infill_size: " << mou_infill_size << endl;
 	os << "mou_adaptive_ppd: " << mou_adaptive_ppd << endl;
 	os << "mou_ppd_beta: " << mou_ppd_beta << endl;
+	os << "mou_fit_gamma: " << mou_fit_gamma << endl;
 	os << "mou_fit_epsilon: " << mou_fit_epsilon << endl;
 	os << "mou_population_schedule: " << mou_population_schedule << endl;
 	os << "mou_simplex_reflections:" << mou_simplex_reflections << endl;
