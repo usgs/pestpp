@@ -1489,6 +1489,11 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_ppd_beta);
 		return true;
 	}
+	else if (key == "MOU_FIT_GAMMA")
+	{
+		convert_ip(value, mou_fit_gamma);
+		return true;
+		}
 	else if (key == "MOU_FIT_EPSILON")
 	{
 		convert_ip(value, mou_fit_epsilon);
@@ -1983,6 +1988,7 @@ void PestppOptions::set_defaults()
 	set_mou_infill_size(100);
 	set_mou_ppd_beta(0.5);
 	set_mou_fit_epsilon(0.05);
+	set_mou_fit_gamma(0.25);
 	set_mou_adaptive_ppd(false);
 	set_mou_resample_every(-1);
 	set_mou_resample_command("");

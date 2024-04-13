@@ -1155,8 +1155,15 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 
 	//crowding distance calculation for non extreme members;
 	int nn = 1, nn_max = pest_scenario.get_pestpp_options().get_mou_max_nn_search();
-	double epsilon = pest_scenario.get_pestpp_options().get_mou_fit_epsilon();
-	double gamma = 1 - ppd_beta - epsilon;
+	
+	
+	double gamma = pest_scenario.get_pestpp_options().get_mou_fit_gamma();
+	if (gamma == 0)
+	{
+		double epsilon = pest_scenario.get_pestpp_options().get_mou_fit_epsilon();
+		gamma = 1 - ppd_beta - epsilon;
+	}
+
 	double pd, PD, nn_count;
 	for (auto m : members)
 	{		
