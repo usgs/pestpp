@@ -490,6 +490,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 		}
 
 		probit_val = get_probit();
+        initialize_chance_schedule(f_rec);
 		//if the std weight options was selected, use it - it overrides all other options
 		if (std_weights)
 		{
@@ -1202,10 +1203,10 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
             }
 			Eigen::MatrixXd missing_dv_mat = pe.get_eigen(missing, dvnames);
 			Eigen::VectorXd missing_dv_vec, stack_dv_vec;
-			double dist, min_dist, max_dist;
+			double dist, min_dist, max_dist,cutoff;
 			string min_real_name,missing_real_name;
 			vector<double> distances;
-			vector<double> factors,temp;
+			vector<double> factors,temp, temp2;
 			vector<string> dreal_names;
 
             Eigen::MatrixXd shifts;
@@ -1242,6 +1243,13 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
                 for (auto& d : distances)
                     temp.push_back(d / max_dist);
                 max_dist = *max_element(temp.begin(),temp.end());
+                temp2 = temp;
+                sort(temp2.begin(),temp2.end());
+                cutoff = temp2[temp2.size()-1];
+                if (temp2.size() > 5)
+                {
+                    cutoff = temp2[4];
+                }
                 factors.clear();
                 factor_sum = 0.0;
                 for (auto& t : temp)
@@ -1249,6 +1257,10 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 
                     if (t == 0)
                         factor = 10000.0;
+                    else if (t > cutoff)
+                    {
+                        factor = 0.0;
+                    }
                     else
                         factor = 1.0/t;
                     factor_sum += factor;
@@ -2272,11 +2284,92 @@ bool Constraints::should_update_chance(int iter)
 		else
 			return true;
 	}
-	else if ((iter) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)
+	//else if ((iter) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)
+    else if (chance_schedule[iter])
 		return true;
 	return false;
 }
 
+void Constraints::initialize_chance_schedule(ofstream& frec)
+{
+    stringstream ss;
+    chance_schedule.clear();
+
+    string fname = pest_scenario.get_pestpp_options().get_opt_chance_schedule();
+    string line;
+    vector<string> tokens;
+    int lcount = 0, gen;
+    bool should_eval = false;
+    int recalc_every = pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every();
+    for (int i=0;i<max(1,pest_scenario.get_control_info().noptmax+1);i++)
+        if (i%recalc_every == 0)
+            chance_schedule[i] = true;
+        else
+        chance_schedule[i] = false;
+    chance_schedule[0] = true;
+    if (fname.size() > 0)
+    {
+        ss.str("");
+        ss << "...reading population schedule from file '" << fname << "' " << endl;
+        frec << ss.str();
+        cout << ss.str();
+        ifstream in(fname);
+        if (in.bad())
+        {
+            throw runtime_error("error opening opt_chance_schedule file '"+fname+"'");
+        }
+        while (getline(in,line))
+        {
+            lcount++;
+            tokens.clear();
+            pest_utils::tokenize(line,tokens,"\t ,");
+            if (tokens.size() < 2)
+            {
+                ss.str("");
+                ss << "opt_chance_schedule file '" << fname << "' line " << lcount << " needs at least two entries";
+                throw runtime_error(ss.str());
+            }
+            try
+            {
+                gen = stoi(tokens[0]);
+            }
+            catch (...)
+            {
+                ss.str("");
+                ss << "error casting '" << tokens[0] << "' to generation integer on line " << lcount << " in opt_chance_schedule file";
+                throw runtime_error(ss.str());
+            }
+
+            try
+            {
+                should_eval = pest_utils::parse_string_arg_to_bool(tokens[1]);
+            }
+            catch (...)
+            {
+                ss.str("");
+                ss << "error casting '" << tokens[1] << "' to bool on line " << lcount << " in opt_chance_schedule file";
+                throw runtime_error(ss.str());
+            }
+            chance_schedule[gen] = should_eval;
+        }
+        in.close();
+    }
+
+    if (!chance_schedule[0])
+    {
+        ss.str("");
+        ss << "...chances must be evaluated during the first generation, resetting chance_schedule" << endl;
+        frec << ss.str();
+        cout << ss.str();
+        chance_schedule[0] = true;
+    }
+
+    frec << "...chance schedule: generation,should_eval_chances:" << endl;
+    for (int i=0;i<pest_scenario.get_control_info().noptmax;i++)
+    {
+        frec << "...   " << i << ", " << chance_schedule.at(i) << endl;
+    }
+}
 
 void Constraints::postsolve_obs_constraints_report(Observations& old_obs, Observations& new_obs, string tag, int iter, 
 									map<string,string> status_map, map<string,double> price_map)

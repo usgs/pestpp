@@ -299,12 +299,19 @@ private:
 //
 
 void read_binary_matrix_header(const string& filename, int& tmp1, int& tmp2, int& tmp3);
+void read_binary_matrix_header(ifstream& in, int& tmp1, int& tmp2, int& tmp3);
+vector<string> read_dense_binary_remaining_row_names(ifstream& in,const vector<string>& col_names);
+vector<string> read_dense_binary_col_names(ifstream& in,int n_col);
+bool is_dense_binary_matrix(int tmp1, int tmp2, int tmp3);
+bool read_dense_binary_records(ifstream& in,int n_records, int n_col,vector<string>& row_names, vector<vector<double>>& rec_vecs);
 void read_dense_binary(const string& filename, vector<string>& row_names, vector<string>& col_names, Eigen::MatrixXd& matrix);
 bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::SparseMatrix<double> &matrix);
 
 bool read_binary(const string &filename, vector<string> &row_names, vector<string> &col_names, Eigen::MatrixXd &matrix);
 
-
+void prep_save_dense_binary(ofstream& out,const vector<string>& col_names);
+void save_dense_binary(ofstream& out,const vector<string>& row_names,Eigen::MatrixXd& data);
+void save_dense_binary(ofstream& out,const string& row_name,Eigen::VectorXd& data);
 void save_binary(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix);
 void save_binary_extfmt(const string &filename,const  vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix);
 void save_binary_orgfmt(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix);

@@ -56,7 +56,7 @@ void RunStorage::reset(const vector<string> &_par_names, const vector<string> &_
 		buf_stream.close();
 	}
 
-	if ((pest_utils::check_exist_in(filename)) || (pest_utils::check_exist_out(filename)))
+	/*if ((pest_utils::check_exist_in(filename)) || (pest_utils::check_exist_out(filename)))
     {
 	    int flag = remove(filename.c_str());
 	    if (flag != 0)
@@ -64,7 +64,7 @@ void RunStorage::reset(const vector<string> &_par_names, const vector<string> &_
 	        throw runtime_error("RunStorage::reset(): error removing existing file '"+filename+"'");
 
         }
-    }
+    }*/
 
 	buf_stream.open(filename.c_str(), ios_base::out |  ios_base::binary);
     if (!buf_stream)

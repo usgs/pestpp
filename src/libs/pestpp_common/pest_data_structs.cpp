@@ -554,18 +554,21 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		//convert_ip(value, condor_submit_file);
 		condor_submit_file = org_value;
 	}
-	else if ((key == "SWEEP_PARAMETER_CSV_FILE") || (key == "SWEEP_PAR_CSV"))
+	else if ((key == "SWEEP_PARAMETER_CSV_FILE") || (key == "SWEEP_PAR_CSV") || (key == "SWEEP_PARAMETER_FILE"))
 	{
 		passed_args.insert("SWEEP_PARAMETER_CSV_FILE");
 		passed_args.insert("SWEEP_PAR_CSV");
-			
-		//convert_ip(org_value, sweep_parameter_csv_file);
+        passed_args.insert("SWEEP_PARAMETER_FILE");
+
+
+        //convert_ip(org_value, sweep_parameter_csv_file);
 		sweep_parameter_csv_file = org_value;
 	}
-	else if ((key == "SWEEP_OUTPUT_CSV_FILE") || (key == "SWEEP_OBS_CSV"))
+	else if ((key == "SWEEP_OUTPUT_CSV_FILE") || (key == "SWEEP_OBS_CSV") || (key == "SWEEP_OUTPUT_FILE"))
 	{
 		passed_args.insert("SWEEP_OUTPUT_CSV_FILE");
 		passed_args.insert("SWEEP_OBS_CSV");
+        passed_args.insert("SWEEP_OUTPUT_FILE");
 			
 		//convert_ip(org_value, sweep_output_csv_file);
 		sweep_output_csv_file = org_value;
@@ -1482,6 +1485,12 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 	    mou_population_schedule = org_value;
 	    return true;
     }
+    else if (key == "OPT_CHANCE_SCHEDULE")
+    {
+        opt_chance_schedule = org_value;
+        return true;
+    }
+
 	else if (key == "MOU_SIMPLEX_REFLECTIONS")
 	{
 		convert_ip(value, mou_simplex_reflections);
@@ -1707,6 +1716,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "opt_iter_tol: " << opt_iter_tol << endl;
 	os << "opt_recalc_fosm_every: " << opt_recalc_fosm_every << endl;
 	os << "opt_chance_points: " << opt_chance_points << endl;
+    os << "opt_chance_schedule: " << opt_chance_schedule << endl;
+
 	
 	
 
@@ -1905,6 +1916,7 @@ void PestppOptions::set_defaults()
 	set_opt_par_stack("");
 	set_opt_obs_stack("");
 	set_opt_chance_points("SINGLE");
+    set_opt_chance_schedule("");
 	
 
 	set_sqp_dv_en("");
@@ -1945,7 +1957,7 @@ void PestppOptions::set_defaults()
 	set_ies_lam_mults(vector<double>());
 	set_ies_init_lam(0.0);
 	set_ies_use_approx(true);
-	set_ies_subset_size(4);
+	set_ies_subset_size(-10);
 	set_ies_reg_factor(0.0);
 	set_ies_verbose_level(1);
 	set_ies_use_prior_scaling(false);
