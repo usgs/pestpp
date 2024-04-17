@@ -296,12 +296,6 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 				mn = cd.second;
 			else if (members.size() == 2)
 				mn = 0.0;
-			
-			if ((members.size() <= 4) && (mx == -1.0e+30))
-				mx = 0.0;
-			
-			if ((members.size() <= 4) && (mn == 1.0e+30))
-				mn = 0.0;
 		}
 		if (mx < 0.0)
 			throw runtime_error("pso max cluster count is negative");
@@ -1155,15 +1149,15 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 
 	//crowding distance calculation for non extreme members;
 	int nn = 1, nn_max = pest_scenario.get_pestpp_options().get_mou_max_nn_search();
-	
-	
-	double gamma = pest_scenario.get_pestpp_options().get_mou_fit_gamma();
-	if (gamma == 0)
+		
+	double gamma1 = pest_scenario.get_pestpp_options().get_mou_fit_gamma();
+	if (gamma1 == 0)
 	{
 		double epsilon = pest_scenario.get_pestpp_options().get_mou_fit_epsilon();
-		gamma = 1 - ppd_beta - epsilon;
+		gamma1 = 1 - ppd_beta - epsilon;
 	}
 
+	double gamma2 = pow (gamma1, 2);
 	double pd, PD, nn_count;
 	for (auto m : members)
 	{		
@@ -1174,7 +1168,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 			{
 				pd = dominance_prob_adhoc(_member_struct[n], _member_struct[m]);
 				PD = dominance_prob_adhoc(_member_struct[m], _member_struct[n]);
-				if ((pd > gamma) && (PD > 0.25 * gamma))
+				if ((pd > gamma1) && (PD > gamma2))
 					nn_count += 1.0;
 			}
 		}
