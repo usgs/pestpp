@@ -851,7 +851,250 @@ bool parse_string_arg_to_bool(string arg)
 	}
 }
 
+vector<string> read_dense_binary_col_names(ifstream& in,int n_col)
+{
+    //first read the names of the columns
+    stringstream ss;
+    vector<int> col_name_sizes;
+    int name_size = 0;
+    for (int i = 0; i < n_col; i++)
+    {
+        in.read((char*)&(name_size), sizeof(name_size));
+        if (!in.good())
+        {
+            ss.str("");
+            ss << "read_dense_binary(), dense format error reading size column name size for column number " << i;
+            throw runtime_error(ss.str());
+        }
 
+        col_name_sizes.push_back(name_size);
+    }
+    int i = 0;
+    string name;
+    vector<string> col_names;
+    for (auto col_name_size : col_name_sizes)
+    {
+        char* col_name = new char[col_name_size];
+        in.read(col_name, col_name_size);
+        if (!in.good())
+        {
+            ss.str("");
+            ss << "read_dense_binary(), dense format error reading column name for column number " << i << ", size " << col_name_size;
+            throw runtime_error(ss.str());
+        }
+        name = string(col_name, col_name_size);
+        pest_utils::strip_ip(name);
+        pest_utils::upper_ip(name);
+        col_names.push_back(name);
+        i++;
+        delete[] col_name;
+    }
+    return col_names;
+
+}
+
+bool read_dense_binary_records(ifstream& in,int n_records,int n_col,vector<string>& row_names, vector<vector<double>>& rec_vecs)
+{
+    stringstream ss;
+    int i, name_size;
+    streampos current_pos = in.tellg();
+    in.seekg(0,std::ios::end);
+    streampos end = in.tellg();
+    in.seekg(current_pos,std::ios::beg);
+    bool success = true;
+    string name;
+    double data;
+    vector<double> rec;
+    rec_vecs.clear();
+    row_names.clear();
+    i = 0;
+    while (true)
+    {
+        //finished
+        //if ((in.bad()) || (in.eof()))
+        if ((i > 0) && (!in.good()))
+        {
+            break;
+        }
+        if (in.tellg() == end) {
+            break;
+        }
+        in.read((char*)&(name_size), sizeof(name_size));
+        if (!in.good())
+        {
+            ss.str("");
+            ss << "read_dense_binary(), dense format incomplete record: error reading row name size for row number " << i << "...continuing";
+            cout << ss.str();
+            success = false;
+            break;
+        }
+        char* row_name = new char[name_size];
+        in.read(row_name, name_size);
+        if (!in.good())
+        {
+            ss.str("");
+            ss << "read_dense_binary(), dense format incomplete record: error reading row name for row number " << i << "...continuing";
+            cout << ss.str();
+            success = false;
+            break;
+        }
+        name = string(row_name, name_size);
+        delete[] row_name;
+        pest_utils::strip_ip(name);
+        pest_utils::upper_ip(name);
+        if (!in.good())
+        {
+            ss.str("");
+            ss << "read_dense_binary(), dense format incomplete record: error skipping values for row  " << i << "...continuing ";
+            cout << ss.str();
+            success = false;
+            break;
+        }
+
+        rec.clear();
+        rec.resize(n_col,0);
+        for (int j = 0; j < n_col; j++)
+        {
+            if (!in.good())
+            {
+                ss.str("");
+                ss << "read_dense_binary(), dense format incomplete record: error reading row,col value  " << i << "," << j << "...continuing ";
+                cout << ss.str();
+                success = false;
+                break;
+            }
+            in.read((char*)&(data), sizeof(data));
+            //rec.push_back(data);
+            rec[j] = data;
+
+        }
+        if (in.eof())
+            break;
+        if (!in.good())
+        {
+            ss.str("");
+            ss << "read_dense_binary(), dense format incomplete record: error skipping values for row  " << i << "...continuing ";
+            cout << ss.str();
+            success = false;
+            break;
+        }
+        row_names.push_back(name);
+        rec_vecs.push_back(rec);
+
+        i++;
+        if (i >= n_records)
+        {
+            break;
+        }
+
+    }
+
+    return success;
+}
+
+vector<string> read_dense_binary_remaining_row_names(ifstream& in,const vector<string>& col_names)
+{
+    stringstream ss;
+    int name_size = 0;
+    string name;
+    int i = 0;
+    double data = -1.;
+    vector<string> row_names;
+    // record current position in file
+    streampos current_pos = in.tellg();
+    in.seekg(0,std::ios::end);
+    streampos end = in.tellg();
+    in.seekg(current_pos,std::ios::beg);
+
+    while (true)
+    {
+        //finished
+        //if ((in.bad()) || (in.eof()))
+        if ((i > 0) && (!in.good()))
+        {
+            break;
+        }
+        if (in.tellg() == end) {
+            break;
+        }
+        in.read((char*)&(name_size), sizeof(name_size));
+        if (!in.good())
+        {
+            ss.str("");
+            ss << "read_dense_binary(), dense format incomplete record: error reading row name size for row number " << i << "...continuing";
+            cout << ss.str();
+            break;
+        }
+        char* row_name = new char[name_size];
+        in.read(row_name, name_size);
+        if (!in.good())
+        {
+            ss.str("");
+            ss << "read_dense_binary(), dense format incomplete record: error reading row name for row number " << i << "...continuing";
+            cout << ss.str();
+            break;
+        }
+        name = string(row_name, name_size);
+        delete[] row_name;
+        pest_utils::strip_ip(name);
+        pest_utils::upper_ip(name);
+        if (!in.good())
+        {
+            ss.str("");
+            ss << "read_dense_binary(), dense format incomplete record: error skipping values for row  " << i << "...continuing ";
+            cout << ss.str();
+            break;
+        }
+
+        //skip the values
+        //in.seekg(col_names.size() * sizeof(double), ios_base::cur);
+        char* rest_of_line = new char[sizeof(double) * col_names.size()];
+        in.read(rest_of_line, sizeof(double)* col_names.size());
+        delete[] rest_of_line;
+        if (in.eof())
+            break;
+        if (!in.good())
+        {
+            ss.str("");
+            ss << "read_dense_binary(), dense format incomplete record: error skipping values for row  " << i << "...continuing ";
+            cout << ss.str();
+            break;
+        }
+        row_names.push_back(name);
+        i++;
+    }
+    in.seekg(current_pos,std::ios::beg);
+    return row_names;
+}
+
+void read_binary_matrix_header(ifstream& in, int& tmp1, int& tmp2, int& tmp3)
+{
+    stringstream ss;
+
+    if (!in.good())
+    {
+        ss.str("");
+        ss << "read_binary_matrix_header - stream is not good";
+        throw runtime_error(ss.str());
+    }
+    in.read((char*)&tmp1, sizeof(tmp1));
+    in.read((char*)&tmp2, sizeof(tmp2));
+    in.read((char*)&tmp3, sizeof(tmp3));
+    if (!in.good())
+    {
+        ss.str("");
+        ss << "read_binary_matrix_header - stream is not good";
+        throw runtime_error(ss.str());
+    }
+
+
+
+}
+
+bool is_dense_binary_matrix(int tmp1, int tmp2, int tmp3)
+{
+    return ((tmp1 == 0) && (tmp2 < 0) && (tmp3 < 0) && (tmp2 == tmp3));
+}
 
 void read_dense_binary(const string& filename, vector<string>& row_names, vector<string>& col_names, Eigen::MatrixXd& matrix)
 {
@@ -874,125 +1117,24 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 	int n_obs_and_pi;
 	int i, j;
 	double data;
-	//char* col_name;
-	//char* row_name;
 
-	// read header
-	in.read((char*)&n_par, sizeof(n_par));
-	in.read((char*)&n_obs_and_pi, sizeof(n_obs_and_pi));
-	in.read((char*)&n_nonzero, sizeof(n_nonzero));
+    read_binary_matrix_header(in,n_par,n_obs_and_pi,n_nonzero);
 
-	if ((n_par == 0) && (n_obs_and_pi < 0) && (n_nonzero < 0) && (n_obs_and_pi == n_nonzero))
+	//if ((n_par == 0) && (n_obs_and_pi < 0) && (n_nonzero < 0) && (n_obs_and_pi == n_nonzero))
+    if (is_dense_binary_matrix(n_par,n_obs_and_pi,n_nonzero))
 	{	
 		n_obs_and_pi *= -1;
 		cout << "reading 'dense' format matrix with " << n_obs_and_pi << " columns" << endl;
-		//first read the names of the columns
-		vector<int> col_name_sizes;
-		int name_size = 0;
-		for (int i = 0; i < n_obs_and_pi; i++)
-		{
-			in.read((char*)&(name_size), sizeof(name_size));
-            if (!in.good())
-			{
-				ss.str("");
-				ss << "read_dense_binary(), dense format error reading size column name size for column number " << i;
-				throw runtime_error(ss.str());
-			}
+		//first read the names of the columns and the rows
+        col_names = read_dense_binary_col_names(in,n_obs_and_pi);
+        row_names = read_dense_binary_remaining_row_names(in,col_names);
 
-			col_name_sizes.push_back(name_size);
-		}
-		int i = 0;
-		string name;
-		for (auto col_name_size : col_name_sizes)
-		{
-			char* col_name = new char[col_name_size];
-			in.read(col_name, col_name_size);
-            if (!in.good())
-			{
-				ss.str("");
-				ss << "read_dense_binary(), dense format error reading column name for column number " << i << ", size " << col_name_size;
-				throw runtime_error(ss.str());
-			}
-			name = string(col_name, col_name_size);
-			pest_utils::strip_ip(name);
-			pest_utils::upper_ip(name);
-			col_names.push_back(name);
-			i++;
-			delete[] col_name;
-		}
-		i = 0;
-		double data = -1.;
-		// record current position in file
-		streampos begin_rows = in.tellg();
-		in.seekg(0,std::ios::end);
-		streampos end = in.tellg();
-		in.seekg(begin_rows,std::ios::beg);
-		//read the row names so we can dimension the matrix
-		while (true)
-		{
-			//finished
-			//if ((in.bad()) || (in.eof()))
-			if ((i > 0) && (!in.good()))
-			{
-				break;
-			}
-			if (in.tellg() == end) {
-                break;
-            }
-            in.read((char*)&(name_size), sizeof(name_size));
-            if (!in.good())
-			{
-				ss.str("");
-				ss << "read_dense_binary(), dense format incomplete record: error reading row name size for row number " << i << "...continuing";
-				cout << ss.str();
-				break;
-			}
-			char* row_name = new char[name_size];
-			in.read(row_name, name_size);
-            if (!in.good())
-			{
-				ss.str("");
-				ss << "read_dense_binary(), dense format incomplete record: error reading row name for row number " << i << "...continuing";
-				cout << ss.str();
-				break;
-			}
-			name = string(row_name, name_size);
-            delete[] row_name;
-			pest_utils::strip_ip(name);
-			pest_utils::upper_ip(name);
-            if (!in.good())
-			{
-				ss.str("");
-				ss << "read_dense_binary(), dense format incomplete record: error skipping values for row  " << i << "...continuing ";
-				cout << ss.str();
-				break;
-			}
-
-			//skip the values
-			//in.seekg(col_names.size() * sizeof(double), ios_base::cur);
-			char* rest_of_line = new char[sizeof(double) * col_names.size()];
-			in.read(rest_of_line, sizeof(double)* col_names.size());
-			delete[] rest_of_line;
-			if (in.eof())
-				break;
-            if (!in.good())
-			{
-				ss.str("");
-				ss << "read_dense_binary(), dense format incomplete record: error skipping values for row  " << i << "...continuing ";
-				cout << ss.str();
-				break;
-			}
-			row_names.push_back(name);
-            i++;
-		}
 
 		in.close();
 		in.open(filename.c_str(), ifstream::binary);
 
 		//resize the matrix now that we know big it should be
 		matrix.resize(row_names.size(), col_names.size());
-		//seek back to the first row
-		in.seekg(begin_rows, ios_base::beg);
 
 		for (int i=0;i<row_names.size();i++)
 		{
@@ -1012,6 +1154,10 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 			}
 		}
 	}
+    else
+    {
+        throw runtime_error("binary matrix header values do not indicate a dense matrix format");
+    }
 }
 
 void read_binary_matrix_header(const string& filename, int& tmp1, int& tmp2, int& tmp3)
@@ -1332,6 +1478,109 @@ void save_binary_extfmt(const string &filename, const vector<string> &row_names,
 	jout.close();
 }
 
+void save_dense_binary(ofstream& out,const string& row_name,Eigen::VectorXd& data)
+{
+    if (!out.good())
+    {
+        throw runtime_error("save_dense_binary(): stream not good");
+    }
+    int tmp;
+    double d;
+    tmp = row_name.size();
+    char *real_name = new char[tmp];
+    out.write((char *) &tmp, sizeof(tmp));
+    pest_utils::string_to_fortran_char(row_name, real_name, tmp);
+    out.write(real_name, tmp);
+    delete[] real_name;
+    for (int jcol = 0; jcol < data.size(); ++jcol)
+    {
+        d = data(jcol);
+        out.write((char*)&(d), sizeof(d));
+    }
+
+    if (!out.good())
+    {
+        throw runtime_error("save_dense_binary(): stream not good");
+    }
+}
+
+
+void save_dense_binary(ofstream& out,const vector<string>& row_names,Eigen::MatrixXd& data)
+{
+    if (!out.good())
+    {
+        throw runtime_error("save_dense_binary(): stream not good");
+    }
+    streampos current_pos = out.tellp();
+    if (current_pos == 0)
+    {
+        throw runtime_error("save_dense_binary(): stream is uninitialized");
+    }
+    int tmp;
+    double d;
+    Eigen::VectorXd row;
+    string name;
+    for (int irow=0;irow<row_names.size();irow++)
+    {
+        row = data.row(irow);
+        save_dense_binary(out,row_names[irow],row);
+//        string name = row_names[irow];
+//        tmp = name.size();
+//        char *real_name = new char[tmp];
+//        out.write((char *) &tmp, sizeof(tmp));
+//        pest_utils::string_to_fortran_char(name, real_name, tmp);
+//        out.write(real_name, tmp);
+//        delete[] real_name;
+//        for (int jcol = 0; jcol < data.cols(); ++jcol)
+//        {
+//            d = data(irow,jcol);
+//            out.write((char*)&(d), sizeof(d));
+//        }
+    }
+    if (!out.good())
+    {
+        throw runtime_error("save_dense_binary(): stream not good");
+    }
+}
+
+void prep_save_dense_binary(ofstream& out,const vector<string>& col_names)
+{
+    if (!out.good())
+    {
+        throw runtime_error("prep_save_dense_binary(): stream not good");
+    }
+    int tmp = 0;
+    out.write((char*)&tmp, sizeof(tmp));
+    int n_var = col_names.size();
+    int n = -1 * n_var;
+    out.write((char*)&n, sizeof(n));
+    out.write((char*)&n, sizeof(n));
+    for (vector<string>::const_iterator b = col_names.begin(), e = col_names.end();
+         b != e; ++b)
+    {
+        string name = pest_utils::lower_cp(*b);
+        tmp = name.size();
+        out.write((char*)&tmp, sizeof(tmp));
+        //mx = max(tmp, mx);
+    }
+    if (!out.good())
+    {
+        throw runtime_error("prep_save_dense_binary(): stream not good");
+    }
+    for (vector<string>::const_iterator b = col_names.begin(), e = col_names.end();
+         b != e; ++b)
+    {
+        string name = pest_utils::lower_cp(*b);
+        char* par_name = new char[name.size()];
+        pest_utils::string_to_fortran_char(name, par_name, name.size());
+        out.write(par_name, name.size());
+        delete[] par_name;
+    }
+    if (!out.good())
+    {
+        throw runtime_error("prep_save_dense_binary(): stream not good");
+    }
+}
 
 void save_binary_orgfmt(const string &filename, const vector<string> &row_names, const vector<string> &col_names, const Eigen::SparseMatrix<double> &matrix)
 {

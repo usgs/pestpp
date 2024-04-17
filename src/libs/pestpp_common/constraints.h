@@ -181,6 +181,7 @@ private:
 	double risk;
 	double probit_val;
 	double dbl_max;
+    map<int,bool> chance_schedule;
 
 
 	Covariance obscov;
@@ -255,5 +256,9 @@ private:
 
 	pair<vector<string>,vector<string>> get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol=0.1);
     void augment_constraint_mat_with_pi(Mat& mat, vector<string>& pi_names);
+
+    void initialize_chance_schedule(ofstream& frec);
+
+
 };
 #endif

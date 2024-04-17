@@ -1337,7 +1337,7 @@ void MOEA::sanity_checks()
 	if ((ppo->get_mou_population_size() < error_min_members) && (population_dv_file.size() == 0))
 	{
 		ss.str("");
-		ss << "population_size < " << error_min_members << ", this is redic, increaing to " << warn_min_members;
+		ss << "population_size < " << error_min_members << ", this is redic, increasing to " << warn_min_members;
 		warnings.push_back(ss.str());
 		ppo->set_ies_num_reals(warn_min_members);
 	}
@@ -1543,7 +1543,9 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 		pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(pars);
 		Observations obs = pest_scenario.get_ctl_observations();
 		//if this is the first iter and no restart
-		
+        ss.str("");
+        ss << "queuing chance runs for generation " << iter;
+		message(1,ss.str());
 		if (chancepoints == chancePoints::SINGLE)
 		{
 			//dont use the _dp, use the class attr dp and op here
@@ -2070,6 +2072,7 @@ void MOEA::initialize()
 		n_adaptive_dvs++;
 	}
 	constraints.initialize(dv_names, numeric_limits<double>::max());
+
 	constraints.initial_report();
 
 	if (pest_scenario.get_control_info().noptmax == 0)
@@ -2291,7 +2294,7 @@ void MOEA::initialize()
 		{
 			//this can be done, but we need to make sure the appropriate chance restart
 			//args were supplied: base_jacobian or obs_stack
-			throw_moea_error("chance constraints not yet supported with restart");
+			throw_moea_error("chance constraints/objectives not yet supported with restart");
 		}
 	
 		//since mou reqs strict linking of realization names, let's see if we can find an intersection set 
@@ -3075,6 +3078,7 @@ void MOEA::initialize_population_schedule()
         }
         in.close();
     }
+
     ofstream& frec = file_manager.rec_ofstream();
     frec << "...population schedule: generation,population size:" << endl;
     for (int i=0;i<pest_scenario.get_control_info().noptmax;i++)

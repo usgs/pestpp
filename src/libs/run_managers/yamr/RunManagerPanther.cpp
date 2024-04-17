@@ -603,8 +603,8 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
         }
         if (open_file_trans_streams.size() == 0)
         {
-            listen();
-            break;
+            if (!listen())
+                break;
         }
         int q = pest_utils::quit_file_found();
         if ((q == 1) || (q == 2) || (q == 4))

@@ -1,13 +1,13 @@
 pcf version=2
 * control data keyword
-pestmode                                 estimation
-noptmax                                 0
-svdmode                                 1
-maxsing                          10000000
-eigthresh                           1e-06
-eigwrite                                1
-ies_par_en                     prior.jcb
-tie_by_group                   True
+pestmode   estimation
+noptmax                0
+svdmode                1
+maxsing         10000000
+eigthresh          1e-06
+eigwrite               1
+ies_par_en    prior.jcb
+tie_by_group true
 * parameter groups external
 freyberg6_run_sen.pargrp_data.csv
 * parameter data external
