@@ -2993,6 +2993,9 @@ void MOEA::iterate_to_solution()
         if ((q == 1) || (q == 2))
         {
 		    message(0,"'pest.stp' found, quitting");
+            message(1,"force-saving current populations");
+            save_populations(dp,op,"",true);
+            save_populations(dp_archive, op_archive, "archive",true);
 		    break;
         }
         else if (q == 4) {
@@ -4126,7 +4129,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	return tmp_dp;
 }
 
-void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag)
+void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag, bool force_save)
 {
 	
 	stringstream ss;
@@ -4153,7 +4156,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	ss << "saved decision variable population of size " << _dp.shape().first << " X " << _dp.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 	ss.str("");
-	if ((save_every > 0) && (iter % save_every == 0))
+	if (((save_every > 0) && (iter % save_every == 0)) || (iter == pest_scenario.get_control_info().noptmax) || (force_save))
 	{
 		ss << file_manager.get_base_filename() << "." << iter;
 		if (tag.size() > 0)

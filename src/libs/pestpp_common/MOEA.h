@@ -224,7 +224,7 @@ private:
 
 	string get_new_member_name(string tag = string());
 
-	void save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag = string());
+	void save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag = string(), bool force_save=false);
 	void gauss_mutation_ip(ParameterEnsemble& _dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx(double probability, double eta_m, int idx1, int idx2);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1,
