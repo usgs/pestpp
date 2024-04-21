@@ -291,9 +291,11 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
             vector<string> onames = op.get_var_names(), pnames = dp.get_var_names();
             set<string> obs_obj_set(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
             set<string> pi_obj_set(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());
+            set<string>::iterator end;
             ObservationInfo *oi = pest_scenario.get_observation_info_ptr();
             PriorInformation *pi = pest_scenario.get_prior_info_ptr();
             feas_member_struct.clear();
+
             for (auto real_name : real_names) {
                 vsum = 0.0;
                 obs.update_without_clear(onames, op.get_real_vector(real_name));
@@ -301,14 +303,16 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
                 // the 'false' arg is to not apply risk shifting to the satisfaction calcs since
                 // 'op' has already been shifted
                 violations = constraints_ptr->get_unsatified_obs_constraints(obs, 0.0, false);
+                end = obs_obj_set.end()=;
                 for (auto v : violations) {
-                    if (obs_obj_set.find(v.first) == obs_obj_set.end())
+                    if (obs_obj_set.find(v.first) == end)
                         vsum += pow(v.second * oi->get_weight(v.first), 2);
                 }
                 pars.update_without_clear(pnames, dp.get_real_vector(real_name));
                 violations = constraints_ptr->get_unsatified_pi_constraints(pars, 0.0);
+                end = pi_obj_set.end();
                 for (auto v : violations) {
-                    if (pi_obj_set.find(v.first) == pi_obj_set.end())
+                    if (pi_obj_set.find(v.first) == end)
                         vsum += pow(v.second * pi->get_pi_rec(v.first).get_weight(), 2);
                 }
                 if (vsum > 0.0) {
