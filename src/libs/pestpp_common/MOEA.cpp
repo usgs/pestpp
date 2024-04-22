@@ -303,7 +303,7 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
                 // the 'false' arg is to not apply risk shifting to the satisfaction calcs since
                 // 'op' has already been shifted
                 violations = constraints_ptr->get_unsatified_obs_constraints(obs, 0.0, false);
-                end = obs_obj_set.end()=;
+                end = obs_obj_set.end();
                 for (auto v : violations) {
                     if (obs_obj_set.find(v.first) == end)
                         vsum += pow(v.second * oi->get_weight(v.first), 2);
