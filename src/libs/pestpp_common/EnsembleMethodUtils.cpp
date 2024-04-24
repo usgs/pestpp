@@ -6456,7 +6456,14 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
         {
             for (auto& entry : row.second)
             {
-                if (entry.second <= 0.0)
+                if (entry.second == -999.)
+                {
+                    ss.str("");
+                    ss << "phi factor tag '" << row.first << "' has -999 value, indicating that weights for this tag should not be adjusted";
+                    message(1,ss.str());
+
+                }
+                else if (entry.second <= 0.0)
                 {
                     problems.push_back(make_pair(row.first,entry.first));
                 }
@@ -6585,7 +6592,13 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
             for (auto &g : group_map.at(pf.first))
                 ss << g << ",";
             message(2, ss.str());
-            if (pf.second <= 0.0) {
+            if (pf.second == -999.0)
+            {
+                ss.str("");
+                ss << "phi factor tag '" << pf.first << "' has -999 value, indicating that weights for this tag should not be adjusted";
+                message(1,ss.str());
+            }
+            else if (pf.second <= 0.0) {
                 ss.str("");
                 ss << "adjust_weights(): phi factor '" << pf.first << "' less or equal 0.0 - this is not allowed";
                 throw_em_error(ss.str());
@@ -6691,6 +6704,13 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
         sub_total=0;
         scale_fac = 0;
         for (auto& pf: phi_fracs) {
+            if (pf.second == -999)
+            {
+                ss.str("");
+                ss << "NOTE: adjust_weights(): tag " << pf.first << " for realization " << swr_map.first << " has a factor value of -999, skipping this tag";
+                message(1,ss.str());
+                continue;
+            }
             total = 0;
             for (auto &g : group_map.at(pf.first)) {
                 sub_total = 0;
@@ -6822,6 +6842,13 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
     double sub_total = 0;
     for (auto& pf: phi_fracs)
     {
+        if (pf.second == -999)
+        {
+            ss.str("");
+            ss << "NOTE: adjust_weights(): tag " << pf.first << " has a factor value of -999, skipping this tag";
+            message(1,ss.str());
+            continue;
+        }
         total = 0;
         for (auto& g : group_map.at(pf.first))
         {
