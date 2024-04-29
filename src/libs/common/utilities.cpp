@@ -1134,7 +1134,7 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 		in.close();
 
 		in.open(filename.c_str(), ifstream::binary);
-        in.seekg(first_record);
+        //in.seekg(first_record);
 		//resize the matrix now that we know big it should be
 		matrix.resize(row_names.size(), col_names.size());
 
