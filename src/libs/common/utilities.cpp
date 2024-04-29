@@ -1127,12 +1127,14 @@ void read_dense_binary(const string& filename, vector<string>& row_names, vector
 		cout << "reading 'dense' format matrix with " << n_obs_and_pi << " columns" << endl;
 		//first read the names of the columns and the rows
         col_names = read_dense_binary_col_names(in,n_obs_and_pi);
+        streampos first_record = in.tellg();
         row_names = read_dense_binary_remaining_row_names(in,col_names);
 
 
 		in.close();
-		in.open(filename.c_str(), ifstream::binary);
 
+		in.open(filename.c_str(), ifstream::binary);
+        in.seekg(first_record);
 		//resize the matrix now that we know big it should be
 		matrix.resize(row_names.size(), col_names.size());
 
