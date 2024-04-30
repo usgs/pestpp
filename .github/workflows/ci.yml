@@ -174,7 +174,9 @@ jobs:
         echo "$HOME/.local/bin" >> $GITHUB_PATH
 
     - name: run test script ${{ env.test_script }} in ${{ env.test_dir }}
-      run: |   
+      shell: bash -l {0}
+      run: |
+        
         ls -l
         cd ${{ env.test_dir }}
         nosetests -v ${{ env.test_script }}
