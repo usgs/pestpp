@@ -181,7 +181,7 @@ jobs:
         cd ${{ env.test_dir }}
         nosetests -v ${{ env.test_script }}
         echo $?
-        exit 1
+        exit $?
         cd
     
         
