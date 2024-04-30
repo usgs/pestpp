@@ -1374,13 +1374,13 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
                 Eigen::MatrixXd temp = parcov_inv.diagonal().matrix();
                 local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp);
             }
-            if (act_obs_names.size() > 0) { //this works bc the mm solve doesnt pass these names...
-                ss.str("");
-                ss << "solution scaling factor: " << scale << endl;
-                ss << "eigthresh: " << eigthresh << endl;
-                ss << "maxsing: " << maxsing << endl;
-                cout << ss.str() << endl;
-            }
+//            if (act_obs_names.size() > 0) { //this works bc the mm solve doesnt pass these names...
+//                ss.str("");
+//                ss << "solution scaling factor: " << scale << endl;
+//                ss << "eigthresh: " << eigthresh << endl;
+//                ss << "maxsing: " << maxsing << endl;
+//                cout << ss.str() << endl;
+//            }
         }
         if (use_prior_scaling)
 

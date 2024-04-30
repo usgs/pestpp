@@ -180,15 +180,14 @@ jobs:
         ls -l
         cd ${{ env.test_dir }}
         nosetests -v ${{ env.test_script }}
-        status = $?
-        echo status
-        
-        if [status == 0];then
+        status=$?
+        echo $status
+
+        if [ $status -eq 0 ]; then
             exit 0
         else
             exit 127
         fi
-    
         
 
 
