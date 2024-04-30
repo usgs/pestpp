@@ -1485,6 +1485,7 @@ def sweep_bin_test():
 
 if __name__ == "__main__":
     #run()
+    exit(1)
     #mf6_v5_ies_test()
     #prep_ends()
     sweep_bin_test()
