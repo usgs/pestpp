@@ -179,7 +179,7 @@ jobs:
         
         ls -l
         cd ${{ env.test_dir }}
-        nosetests --nocapture -v ${{ env.test_script }}
+        nosetests -v ${{ env.test_script }}
         cd ..
     
         
