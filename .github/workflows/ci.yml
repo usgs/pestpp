@@ -180,6 +180,7 @@ jobs:
         ls -l
         cd ${{ env.test_dir }}
         nosetests -v ${{ env.test_script }}
+        echo $?
         cd
     
         
