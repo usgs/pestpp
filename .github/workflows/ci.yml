@@ -181,8 +181,12 @@ jobs:
         cd ${{ env.test_dir }}
         nosetests -v ${{ env.test_script }}
         echo $?
-        exit $?
-        cd
+        
+        if [$? == 0];then
+            exit 0
+        else
+            exit 127
+        fi
     
         
 
