@@ -5685,12 +5685,15 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         reset_to_nonoise = false;
     else if (!ppo->get_obscov_filename().empty())
         reset_to_nonoise = false;
+    else if (ppo->get_ies_use_mda())
+        reset_to_nonoise = false;
     else
     {
         map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
         if (obs_std.size() > 0)
             reset_to_nonoise = false;
     }
+
     if (reset_to_nonoise)
     {
         ss.str("");

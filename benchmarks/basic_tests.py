@@ -821,6 +821,7 @@ def ext_stdcol_test():
     par.loc[pst.adj_par_names,"standard_deviation"] = (par.loc[pst.adj_par_names,"parubnd_trans"] - par.loc[pst.adj_par_names,"parlbnd_trans"]) / 4.0
     #par.loc[pst.adj_par_names[0],"mean"] = par.loc[pst.adj_par_names[0],"parubnd"]
     pst.pestpp_options["ies_num_reals"] = 10
+    pst.pestpp_options["ies_no_noise"] = False
     pst.control_data.noptmax = -1
     pst.write(os.path.join(m_d,"pest_base.pst"))
     pyemu.os_utils.run("{0} pest_base.pst".format(exe_path),cwd=m_d)
@@ -1488,8 +1489,9 @@ if __name__ == "__main__":
     #run()
     #mf6_v5_ies_test()
     #prep_ends()
-    sweep_bin_test()
+    #sweep_bin_test()
     #mf6_v5_sen_test()
+    ext_stdcol_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
     #shutil.copy2(os.path.join("..", "exe", "windows", "x64", "Debug", "pestpp-ies.exe"),
     #             os.path.join("..", "bin", "win", "pestpp-ies.exe"))
