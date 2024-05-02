@@ -5676,7 +5676,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
     //check to see if any explicit obs noise options are set
     bool reset_to_nonoise = true;
-    if (ppo->get_passed_args().find("IES_NO_NOISE") != ppo->get_passed_args().end())
+	set<string> passed = ppo->get_passed_args();
+    if (passed.find("IES_NO_NOISE") != passed.end())
     {
         reset_to_nonoise = false;
     }
