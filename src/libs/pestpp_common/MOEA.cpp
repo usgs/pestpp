@@ -3389,17 +3389,20 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	DomPair dompair = objectives.get_nsga2_pareto_dominance(-999, _op, _dp, &constraints, false);
 	vector<string> nondom_solutions = dompair.first;
 	vector<string> gbest_solutions;
+    int num_objs = pi_obj_names.size()+obs_obj_names.size();
+
 	//if no non dom solutions, then use the dominated ones...
 	if (nondom_solutions.size() == 0)
 	{
         ss.str("");
-        ss << "WARNING: no nondom solutions for pst gbest calculation, using dominated solutions" << endl;
+        ss << "WARNING: no nondom solutions for pso gbest calculation, using dominated solutions" << endl;
 		nondom_solutions = dompair.second;
 	}
-	else if (nondom_solutions.size() == 1)
+    //todo: should we warn for nondom > 1 and objs == 1?
+	else if ((nondom_solutions.size() == 1) && (num_objs > 1))
 	{
 	    ss.str("");
-	    ss << "WARNING: only one nondom solution for pst gbest calculation" << endl;
+	    ss << "WARNING: only one nondom solution for pso gbest calculation" << endl;
 	    file_manager.rec_ofstream() << ss.str();
 	    cout << ss.str();
 		for (int i = 0; i < num_reals; i++)

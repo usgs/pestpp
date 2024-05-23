@@ -1141,7 +1141,7 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				//try to use this as a control data arg
 				if (stat == PestppOptions::ARG_STATUS::ARG_NOTFOUND)
 				{
-					stat = control_info.assign_value_by_key(kv.first,kv.second);
+					stat = control_info.assign_value_by_key(kv.first,kv.second,f_rec);
 					check_report_assignment(f_rec, stat, kv.first, kv.second);
 				}
 				

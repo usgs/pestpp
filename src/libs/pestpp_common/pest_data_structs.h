@@ -879,7 +879,7 @@ public:
 	int noptswitch;
 	double splitswh;
 	PestMode pestmode;
-	PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value);
+	PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value, ofstream& f_rec);
 	ControlInfo() { ; }
 	void set_defaults();
 
