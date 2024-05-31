@@ -5225,13 +5225,16 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 			ss.str("");
 			ss << "  WARNING: Prior-data conflict detected.  Continuing with IES parameter" << endl;
 			ss << "           adjustment will likely result in parameter and forecast bias." << endl;
-			ss << "           Consider using 'ies_drop_conflicts' as a quick fix.";
+			//ss << "           Consider using 'ies_drop_conflicts' as a quick fix.";
 			message(1, ss.str());
 		}
 		else
 		{
-
-			//check that all obs are in conflict
+            ss.str("");
+            ss << "  WARNING: 'ies_drop_conflicts' is not an ideal approach.  A better" << endl;
+            ss << "           approach would be to dig in and figure out why these observations " << endl;
+			ss << "           are in conflict." << endl;
+            //check that all obs are in conflict
 			message(1, "dropping conflicted observations");
 
 			if (in_conflict.size() == act_obs_names.size()) {

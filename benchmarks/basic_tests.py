@@ -1491,7 +1491,7 @@ if __name__ == "__main__":
     #prep_ends()
     #sweep_bin_test()
     #mf6_v5_sen_test()
-    ext_stdcol_test()
+    #ext_stdcol_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
     #shutil.copy2(os.path.join("..", "exe", "windows", "x64", "Debug", "pestpp-ies.exe"),
     #             os.path.join("..", "bin", "win", "pestpp-ies.exe"))
@@ -1529,7 +1529,7 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
     
-    #fr_timeout_test()
+    fr_timeout_test()
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
 
