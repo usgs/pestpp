@@ -82,7 +82,7 @@ void sequentialLP::initial_report()
 	f_rec << "-->objective function sense (direction): " << optobjfunc.get_obj_sense() << endl;
 
 
-	f_rec << "-->number of decision variable: " << num_dec_vars() << endl;
+	f_rec << "-->number of decision variables: " << num_dec_vars() << endl;
 	f_rec << "-->number of observation constraints: " << constraints.num_obs_constraints() << endl;
 	f_rec << "-->number of prior information constraints: " << constraints.num_pi_constraints() << endl;
 	if (iter_derinc_fac != 1.0)
@@ -326,12 +326,41 @@ void sequentialLP::initialize_and_check()
 
 	//if any decision vars have a transformation that is not allowed
 	vector<string> problem_trans;
-	for (auto &name : dv_names)
-		if (pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type != ParameterRec::TRAN_TYPE::NONE)
+	vector<string> temp_dv_names;
+    vector<string> tied_dv_names;
+    //this should just skip over fixed dvs
+    for (auto &name : dv_names)
+    {
+		if (pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type == ParameterRec::TRAN_TYPE::NONE)
+            temp_dv_names.push_back(name);
+        else if (pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type == ParameterRec::TRAN_TYPE::TIED)
+             tied_dv_names.push_back(name);
+        else if (pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type == ParameterRec::TRAN_TYPE::LOG)
 			problem_trans.push_back(name);
-	if (problem_trans.size() > 0)
-		throw_sequentialLP_error("the following decision variables don't have 'none' type parameter transformation: ", problem_trans);
+    }
+    if (!problem_trans.empty())
+		throw_sequentialLP_error("the following decision variables have 'log' type parameter transformation: ", problem_trans);
+    if (!tied_dv_names.empty())
+    {
+        set<string> sdv_names(temp_dv_names.begin(),temp_dv_names.end());
+        auto send = sdv_names.end();
+        problem_trans.clear();
+        string tied_name;
+        map<string,pair<string,double>> tied_info = pest_scenario.get_base_par_tran_seq().get_tied_ptr()->get_items();
+        for (auto& name : tied_dv_names)
+        {
 
+            if (sdv_names.find(tied_info[name].first) == send)
+                problem_trans.push_back(name);
+        }
+        if (!problem_trans.empty())
+        {
+            throw_sequentialLP_error("the following 'tied' decision variables are not tied to a decision variable: ", problem_trans);
+        }
+
+    }
+    dv_names = temp_dv_names;
+    temp_dv_names.clear();
 	current_constraints_sim = pest_scenario.get_ctl_observations();
 
  	constraints.initialize(dv_names, COIN_DBL_MAX);
@@ -958,11 +987,11 @@ bool sequentialLP::make_upgrade_run(Parameters &upgrade_pars, Observations &upgr
 {
 
 	cout << "  ---  running the model once with optimal decision variables  ---  " << endl;
-	int run_id = run_mgr_ptr->add_run(par_trans.ctl2model_cp(upgrade_pars));
+	int run_id = run_mgr_ptr->add_run(par_trans.active_ctl2model_cp(upgrade_pars));
 	run_mgr_ptr->run();
 	bool success = run_mgr_ptr->get_run(run_id, upgrade_pars, upgrade_obs);
 	if (success)
-		par_trans.model2ctl_ip(upgrade_pars);
+		par_trans.model2active_ctl_ip(upgrade_pars);
 	return success;
 }
 
@@ -1044,7 +1073,7 @@ void sequentialLP::iter_presolve()
 		}
 		else
 		{
-			//make the intial base run
+			//make the initial base run
 			cout << "  ---  running the model once with initial decision variables  ---  " << endl;
 			int run_id = run_mgr_ptr->add_run(par_trans.ctl2model_cp(current_pars));
 			//this would be only for stack runs since the fosm runs should have been in the jco

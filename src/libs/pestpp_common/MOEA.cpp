@@ -291,9 +291,11 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
             vector<string> onames = op.get_var_names(), pnames = dp.get_var_names();
             set<string> obs_obj_set(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
             set<string> pi_obj_set(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());
+            set<string>::iterator end;
             ObservationInfo *oi = pest_scenario.get_observation_info_ptr();
             PriorInformation *pi = pest_scenario.get_prior_info_ptr();
             feas_member_struct.clear();
+
             for (auto real_name : real_names) {
                 vsum = 0.0;
                 obs.update_without_clear(onames, op.get_real_vector(real_name));
@@ -301,14 +303,16 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
                 // the 'false' arg is to not apply risk shifting to the satisfaction calcs since
                 // 'op' has already been shifted
                 violations = constraints_ptr->get_unsatified_obs_constraints(obs, 0.0, false);
+                end = obs_obj_set.end();
                 for (auto v : violations) {
-                    if (obs_obj_set.find(v.first) == obs_obj_set.end())
+                    if (obs_obj_set.find(v.first) == end)
                         vsum += pow(v.second * oi->get_weight(v.first), 2);
                 }
                 pars.update_without_clear(pnames, dp.get_real_vector(real_name));
                 violations = constraints_ptr->get_unsatified_pi_constraints(pars, 0.0);
+                end = pi_obj_set.end();
                 for (auto v : violations) {
-                    if (pi_obj_set.find(v.first) == pi_obj_set.end())
+                    if (pi_obj_set.find(v.first) == end)
                         vsum += pow(v.second * pi->get_pi_rec(v.first).get_weight(), 2);
                 }
                 if (vsum > 0.0) {
@@ -2993,6 +2997,9 @@ void MOEA::iterate_to_solution()
         if ((q == 1) || (q == 2))
         {
 		    message(0,"'pest.stp' found, quitting");
+            message(1,"force-saving current populations");
+            save_populations(dp,op,"",true);
+            save_populations(dp_archive, op_archive, "archive",true);
 		    break;
         }
         else if (q == 4) {
@@ -3382,17 +3389,20 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 	DomPair dompair = objectives.get_nsga2_pareto_dominance(-999, _op, _dp, &constraints, false);
 	vector<string> nondom_solutions = dompair.first;
 	vector<string> gbest_solutions;
+    int num_objs = pi_obj_names.size()+obs_obj_names.size();
+
 	//if no non dom solutions, then use the dominated ones...
 	if (nondom_solutions.size() == 0)
 	{
         ss.str("");
-        ss << "WARNING: no nondom solutions for pst gbest calculation, using dominated solutions" << endl;
+        ss << "WARNING: no nondom solutions for pso gbest calculation, using dominated solutions" << endl;
 		nondom_solutions = dompair.second;
 	}
-	else if (nondom_solutions.size() == 1)
+    //todo: should we warn for nondom > 1 and objs == 1?
+	else if ((nondom_solutions.size() == 1) && (num_objs > 1))
 	{
 	    ss.str("");
-	    ss << "WARNING: only one nondom solution for pst gbest calculation" << endl;
+	    ss << "WARNING: only one nondom solution for pso gbest calculation" << endl;
 	    file_manager.rec_ofstream() << ss.str();
 	    cout << ss.str();
 		for (int i = 0; i < num_reals; i++)
@@ -4126,7 +4136,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	return tmp_dp;
 }
 
-void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag)
+void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag, bool force_save)
 {
 	
 	stringstream ss;
@@ -4153,7 +4163,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	ss << "saved decision variable population of size " << _dp.shape().first << " X " << _dp.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 	ss.str("");
-	if ((save_every > 0) && (iter % save_every == 0))
+	if (((save_every > 0) && (iter % save_every == 0)) || (iter == pest_scenario.get_control_info().noptmax) || (force_save))
 	{
 		ss << file_manager.get_base_filename() << "." << iter;
 		if (tag.size() > 0)
