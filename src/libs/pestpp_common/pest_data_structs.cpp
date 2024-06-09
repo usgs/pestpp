@@ -2251,7 +2251,7 @@ ostream& operator<< (ostream &os, const SVDInfo& val)
 	return os;
 }
 
-PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, const string org_value)
+PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, const string org_value, ofstream& f_rec)
 {
 	/*enum PestMode { ESTIMATION, REGUL, PARETO, UNKNOWN };
 	double phiredswh;
@@ -2266,6 +2266,7 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 	int noptswitch;
 	double splitswh;
 	PestMode pestmode;*/
+    stringstream ss;
 	set<string> valid_args{"RSTFLE","PESTMODE","NPAR","NOBS","NPARGP","NPRIOR","NOBSGP","MAXCOMPDIM","NTPLFLE","NINSFLE",
                          "PRECIS","DPOINT","NUMCOM","JACFILE","MESSFILE","OBSREREF","RLAMBDA1","RLAMFAC","PHIREDLAM",
                          "PHIRATSUF","NUMLAM","JACUPDATE","LAMFORGIVE","DERFORGIVE","RELPARMAX","FACPARMAX",
@@ -2298,6 +2299,14 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 		convert_ip(value, noptswitch);
 	else if (key == "SPLITSWH")
 		convert_ip(value, splitswh);
+    else if (key == "PHIREDSWH")
+    {
+        convert_ip(value,phiredswh);
+    }
+    else if (key == "NRELPAR")
+    {
+        convert_ip(value, nrelpar);
+    }
 	else if (key == "PESTMODE")
 	{
 		if (value == "ESTIMATION")
@@ -2311,7 +2320,10 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 	}
 	else if (valid_args.find(key) != valid_args.end())
     {
-	    //a valid but unused ctl data arg
+        ss.str("");
+        ss << "WARNING: unused 'control data keyword' option,value:" << key << "," << value;
+        f_rec << ss.str();
+        cout << ss.str();
     }
 	else
 		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;

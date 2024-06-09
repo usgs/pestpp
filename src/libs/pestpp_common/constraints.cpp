@@ -229,7 +229,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	//current_constraints_sim_ptr = _current_constraints_sim_ptr;
 	//same for dec var values
 	//current_pars_and_dec_vars_ptr = _current_pars_and_dec_vars_ptr;
-	//check for a stack size arg - if postive, then use stacks for chances
+	//check for a stack size arg - if positive, then use stacks for chances
 	stack_size = pest_scenario.get_pestpp_options().get_opt_stack_size();
 	//an existing parameter stack for chances
 	string par_stack_name = pest_scenario.get_pestpp_options().get_opt_par_stack();
@@ -450,7 +450,12 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	}
 
 	set<string> dec_set(ctl_ord_dec_var_names.begin(), ctl_ord_dec_var_names.end());
-	for (auto& name : pest_scenario.get_ctl_ordered_par_names())
+	vector<string> prob_pars;
+    //disabled the exception for adj pars tied to dec vars
+    //string partied;
+    //map<string,pair<string,double>> tied_info = pest_scenario.get_base_par_tran_seq().get_tied_ptr()->get_items();
+
+    for (auto& name : pest_scenario.get_ctl_ordered_par_names())
 	{
 		//if this parameter is not a decision var
 		//if (find(start, end, name) == end)
@@ -458,13 +463,26 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 		{
 			ParameterRec::TRAN_TYPE tt = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type;
 			if ((tt == ParameterRec::TRAN_TYPE::LOG) || (tt == ParameterRec::TRAN_TYPE::NONE))
-				adj_par_names.push_back(name);
+            {
+                adj_par_names.push_back(name);
+            }
+//            else if (tt == ParameterRec::TRAN_TYPE::TIED)
+//            {
+//                partied = tied_info[name].first;
+//                if (dec_set.find(partied) != dec_set.end())
+//                    prob_pars.push_back(name);
+//            }
 		}
+
 	}
+//     if (!prob_pars.empty())
+//     {
+//         throw_constraints_error("the following adjustable pars are 'tied' to decision variables",prob_pars);
+//     }
 
 
 	//------------------------------------------
-	//  ---  chance constratints  ---
+	//  ---  chance constraints  ---
 	//------------------------------------------
 	risk = pest_scenario.get_pestpp_options().get_opt_risk();
 	if (risk != 0.5)

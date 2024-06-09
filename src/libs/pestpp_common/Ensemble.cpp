@@ -2166,10 +2166,18 @@ ParameterEnsemble ParameterEnsemble::zeros_like(int nrows)
 	if (nrows < 0)
 		nrows = real_names.size();
 	Eigen::MatrixXd new_reals = Eigen::MatrixXd::Zero(nrows, var_names.size());
-	
+	stringstream ss;
 	vector<string> new_real_names;
 	for (int i = 0; i < nrows; i++)
-		new_real_names.push_back(real_names[i]);
+        if (i < real_names.size())
+		    new_real_names.push_back(real_names[i]);
+        else
+        {
+            ss.str("");
+            ss << "zeros_like_real_" << i;
+            new_real_names.push_back(ss.str());
+        }
+
 
 	ParameterEnsemble new_en(pest_scenario_ptr, rand_gen_ptr);
 	new_en.from_eigen_mat(new_reals, new_real_names, var_names);

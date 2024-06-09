@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest] 
-        python-version: [3.9] # , 3.7, 3.6]
+        python-version: [3.10] # , 3.7, 3.6]
         run-type: [std]
         # test_repo: [""]
         # test_dir: [""]
@@ -46,7 +46,7 @@ jobs:
 
     steps:
 
-    - uses:  actions/checkout@v2.3.4 
+    - uses:  actions/checkout@v4
     # - name: Setup Ninja
       # if: ${{ runner.os == 'Windows' }} 
     - uses: seanmiddleditch/gha-setup-ninja@master
@@ -179,9 +179,15 @@ jobs:
         
         ls -l
         cd ${{ env.test_dir }}
-        nosetests --nocapture -v ${{ env.test_script }}
-        cd
-    
+        nosetests -v ${{ env.test_script }}
+        status=$?
+        echo $status
+
+        if [ $status -eq 0 ]; then
+            exit 0
+        else
+            exit 127
+        fi
         
 
 

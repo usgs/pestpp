@@ -716,6 +716,8 @@ int main(int argc, char* argv[])
         {
             cout << "  ---  dense binary file detected for par_csv" << endl;
             fout_rec << "  ---  dense binary file detected for par_csv" << endl;
+			par_stream.close();
+			par_stream.open(par_csv_file, ifstream::binary);
             vector<string> col_names;
             header_info = prepare_parameter_dense_binary(pest_scenario.get_ctl_parameters(),par_stream,
                                                          pest_scenario.get_pestpp_options().get_sweep_forgive(),col_names);
