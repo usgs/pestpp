@@ -1185,6 +1185,12 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         convert_ip(value,ies_n_iter_mean);
         return true;
     }
+    else if (key == "IES_OBS_BOUNDS_AS_INEQ")
+    {
+        ies_obs_bounds_as_ineq = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
+
     return false;
 }
 
@@ -1821,6 +1827,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_phi_factors_file: " << ies_phi_fractions_file << endl;
     os << "ies_phi_factors_by_real: " << ies_phi_factors_by_real << endl;
     os << "ies_n_iter_mean: " << ies_n_iter_mean << endl;
+    os << "ies_obs_bounds_as_ineq: " << ies_obs_bounds_as_ineq << endl;
 
 
 	os << endl << "pestpp-sen options: " << endl;
@@ -2006,6 +2013,7 @@ void PestppOptions::set_defaults()
     set_ies_phi_fractions_files("");
     set_ies_phi_factors_by_real(false);
     set_ies_n_iter_mean(0);
+    set_ies_obs_bounds_as_ineq(false);
 
 	// DA parameters
 	//set_da_use_ies(false);

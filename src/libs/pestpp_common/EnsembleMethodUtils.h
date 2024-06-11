@@ -100,7 +100,7 @@ public:
 	vector<string> get_lt_obs_names() { return lt_obs_names; }
 	vector<string> get_gt_obs_names() { return gt_obs_names; }
 
-	void apply_ineq_constraints(Eigen::MatrixXd &resid, vector<string> &names);
+	void apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixXd &sim_vals, vector<string> &names);
 
 	void save_residual_cov(ObservationEnsemble& oe, int iter);
 
@@ -150,6 +150,9 @@ private:
 
 	vector<string> lt_obs_names;
 	vector<string> gt_obs_names;
+    map<string,double> lt_obs_bounds;
+    map<string,double> gt_obs_bounds;
+    map<string,pair<double,double>> double_obs_bounds;
 
 	map<string, vector<int>> obs_group_idx_map;
 	map<string, vector<int>> par_group_idx_map;

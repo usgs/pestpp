@@ -2029,7 +2029,11 @@ L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 	string og;
 	double weight;
 	const ObservationInfo* oi = pest_scenario->get_ctl_observation_info_ptr();
-	for (auto &oname : pest_scenario->get_ctl_ordered_obs_names())
+    bool use_obs_bound_ineq = pest_scenario->get_pestpp_options().get_ies_obs_bounds_as_ineq();
+	map<string,double> extfile_lb = pest_scenario->get_ext_file_double_map("observation data external","lower_bound");
+    map<string,double> extfile_ub = pest_scenario->get_ext_file_double_map("observation data external","upper_bound");
+
+    for (auto &oname : pest_scenario->get_ctl_ordered_obs_names())
 	{
 		og = oi->get_group(oname);
 		weight = oi->get_weight(oname);
@@ -2047,7 +2051,23 @@ L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 		{
 			gt_obs_names.push_back(oname);
 		}
-	}
+        else if (use_obs_bound_ineq)
+        {
+            if ((extfile_lb.find(oname) != extfile_lb.end()) &&
+                    (extfile_ub.find(oname) != extfile_ub.end()))
+            {
+                double_obs_bounds[oname] = pair<double,double>(extfile_lb.at(oname),extfile_ub.at(oname));
+            }
+            else if (extfile_lb.find(oname) != extfile_lb.end())
+            {
+                gt_obs_bounds[oname] = extfile_lb.at(oname);
+            }
+            else if (extfile_ub.find(oname) != extfile_ub.end())
+            {
+                lt_obs_bounds[oname] = extfile_ub.at(oname);
+            }
+        }
+    }
 
 	//save the org reg factor and org q vector
 	org_reg_factor = pest_scenario->get_pestpp_options().get_ies_reg_factor();
@@ -2074,11 +2094,12 @@ L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 Eigen::MatrixXd L2PhiHandler::get_obs_resid(ObservationEnsemble &oe, bool apply_ineq)
 {
 	vector<string> names = oe_base->get_var_names();
-	Eigen::MatrixXd resid = oe.get_eigen(vector<string>(),names) -
+    Eigen::MatrixXd oe_vals = oe.get_eigen(vector<string>(),names);
+	Eigen::MatrixXd resid = oe_vals -
 		oe_base->get_eigen(oe.get_real_names(), vector<string>());
 	
 	if (apply_ineq)
-		apply_ineq_constraints(resid,names);
+		apply_ineq_constraints(resid,oe_vals, names);
 	return resid;
 }
 
@@ -2171,9 +2192,10 @@ Eigen::MatrixXd L2PhiHandler::get_obs_resid_subset(ObservationEnsemble &oe, bool
         real_names = oe.get_real_names();
     }
 	vector<string> names = oe.get_var_names();
-	Eigen::MatrixXd resid = oe.get_eigen(real_names,vector<string>()) - oe_base->get_eigen(real_names, names);
+    Eigen::MatrixXd oe_vals = oe.get_eigen(real_names,vector<string>());
+	Eigen::MatrixXd resid = oe_vals - oe_base->get_eigen(real_names, names);
 	if (apply_ineq)
-		apply_ineq_constraints(resid, names);
+		apply_ineq_constraints(resid, oe_vals,names);
 	return resid;
 }
 
@@ -2206,7 +2228,7 @@ Eigen::MatrixXd L2PhiHandler::get_actual_obs_resid(ObservationEnsemble &oe)
 	ovals.transposeInPlace();
 	for (int i = 0; i < resid.rows(); i++)
 		resid.row(i) = oe_vals.row(i) - ovals;
-	apply_ineq_constraints(resid, act_obs_names);
+	apply_ineq_constraints(resid, oe_vals, act_obs_names);
 	return resid;
 }
 
@@ -3292,13 +3314,15 @@ vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe,
 }
 
 
-void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, vector<string> &names)
+void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixXd &sim_vals,vector<string> &names)
 {
 	
 	//vector<string> names = oe_base->get_var_names();
 	//vector<string> lt_names = get_lt_obs_names(), gt_names = get_gt_obs_names();
 	//vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
-	if ((lt_obs_names.size() == 0) && (gt_obs_names.size() == 0))
+	if ((lt_obs_names.empty()) && (gt_obs_names.empty()) &&
+            (lt_obs_bounds.empty()) && (gt_obs_bounds.empty()) &&
+            (double_obs_bounds.empty()))
 	    return;
 	assert(names.size() == resid.cols());
 
@@ -3308,7 +3332,9 @@ void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, vector<string>
 		lt_vals[n] = obs.get_rec(n);
 	for (auto &n : gt_obs_names)
 		gt_vals[n] = obs.get_rec(n);
-	if ((lt_vals.size() == 0) && (gt_vals.size() == 0))
+	if ((lt_vals.empty()) && (gt_vals.empty()) &&
+       (lt_obs_bounds.empty()) && (gt_obs_bounds.empty()) &&
+            (double_obs_bounds.empty()))
 		return;
 	map<string, int> idxs;
 	//for (int i = 0; i < act_obs_names.size(); i++)
@@ -3316,10 +3342,27 @@ void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, vector<string>
 	for (int i = 0; i < names.size(); i++)
 		idxs[names[i]] = i;
 	int idx;
-	double val;
-	Eigen::VectorXd col;
+	double val,val2;
+	Eigen::VectorXd col, scol;
 
-	for (auto iv : lt_vals)
+    for (auto const iv : double_obs_bounds)
+    {
+        idx = idxs[iv.first];
+        col = resid.col(idx);
+        scol = sim_vals.col(idx);
+        val = iv.second.first;
+        val2 = iv.second.second;
+
+        //cout << resid.col(idx) << endl;
+        for (int i = 0; i < resid.rows(); i++)
+            col(i) = ((scol(i) > val) && (scol(i) < val2)) ? 0.0 : col(i);
+        //cout << resid.col(idx) << endl;
+        cout << col << endl << endl;
+        resid.col(idx) = col;
+        //cout << resid.col(idx) << endl;
+    }
+
+	for (auto const iv : lt_vals)
 	{
 		idx = idxs[iv.first];
 		col = resid.col(idx);
@@ -3332,7 +3375,25 @@ void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, vector<string>
 		//cout << resid.col(idx) << endl;
 	}
 
-	for (auto iv : gt_vals)
+
+    for (auto const iv : lt_obs_bounds)
+    {
+        idx = idxs[iv.first];
+        col = resid.col(idx);
+        scol = sim_vals.col(idx);
+        val = iv.second;
+        //cout << resid.col(idx) << endl;
+        for (int i = 0; i < resid.rows(); i++)
+            col(i) = (scol(i) < val) ? 0.0 : col(i);
+        //cout << resid.col(idx) << endl;
+        cout << col << endl << endl;
+        resid.col(idx) = col;
+        //cout << resid.col(idx) << endl;
+    }
+
+
+    //Eigen::MatrixXd temp = resid;
+	for (auto const iv : gt_vals)
 	{
 		idx = idxs[iv.first];
 		col = resid.col(idx);
@@ -3341,7 +3402,19 @@ void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, vector<string>
 			col(i) = (col(i) > 0.0) ? 0.0 : col(i);
 		resid.col(idx) = col;
 	}
+
+    for (auto const iv : gt_obs_bounds)
+    {
+        idx = idxs[iv.first];
+        col = resid.col(idx);
+        scol = sim_vals.col(idx);
+        val = iv.second;
+        for (int i = 0; i < resid.rows(); i++)
+            col(i) = (scol(i) > val) ? 0.0 : col(i);
+        resid.col(idx) = col;
+    }
 }
+
 
 
 map<string, Eigen::VectorXd> L2PhiHandler::calc_actual(ObservationEnsemble & oe, Eigen::VectorXd &q_vec)

@@ -544,6 +544,8 @@ public:
     int get_ensemble_output_precision() const {return ensemble_output_precision;}
     void set_ies_n_iter_mean(int _n_iter_mean)  {ies_n_iter_mean = _n_iter_mean;}
     int get_ies_n_iter_mean() const {return ies_n_iter_mean;}
+    void set_ies_obs_bounds_as_ineq(bool _flag)  {ies_obs_bounds_as_ineq = _flag;}
+    bool get_ies_obs_bounds_as_ineq() const {return ies_obs_bounds_as_ineq;}
 
 
     string get_gsa_method() const { return gsa_method; }
@@ -819,6 +821,7 @@ private:
 	string ies_phi_fractions_file;
 	bool ies_phi_factors_by_real;
 	int ies_n_iter_mean;
+    bool ies_obs_bounds_as_ineq;
 
 
 	// Data Assimilation parameters
