@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.10
+# <a id='s1' />Version 5.2.12
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-April 2024
+June 2024
 
 # <a id='s2' />Acknowledgements
 
@@ -70,7 +70,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Table of Contents
 
-- [Version 5.2.10](#s1)
+- [Version 5.2.12](#s1)
 - [Acknowledgements](#s2)
 - [Preface](#s3)
 - [License](#s4)
@@ -3505,11 +3505,15 @@ As is usual practice in the PEST++ suite, if a parameter is designated as log-tr
 
 ### <a id='s13-1-10' />9.1.10 Inequality Observations
 
-PESTPP-IES introduces a special observation type that is not available in PESTPP-GLM or PEST, but resembles constraints supported by PESTPP-OPT. This is the “one way observation” type, which is synonymous with the inequality constraints used in PESTPP-OPT. For observations of this type, a residual is zero unless model outputs are either greater than or less than its “measured” value; the user specifies which of these apply. This reflects the nature of some types of measurements. However, their use is broader than this. “Greater than” and “less than” observations can comprise a powerful mechanism for inserting “soft knowledge” into the history-matching process.
+PESTPP-IES introduces a special observation type that is not available in PESTPP-GLM or PEST, but resembles constraints supported by PESTPP-OPT. This is the “one way observation” type, which is synonymous with the inequality constraints used in PESTPP-OPT. For observations of this type, a residual is zero unless model outputs are either greater than or less than its “measured” value; the user specifies which of these apply. This reflects the nature of some types of measurements. However, their use is broader than this. “Greater than” and “less than” observations can comprise a powerful mechanism for inserting “soft knowledge” into the history-matching process, as well as accommodating increasingly imprecise data within the data assimilation process.
 
 If an observation belongs to an observation group whose name begins with the string “g\_” or “greater\_”, this observation is a “greater than” observation. No objective function penalty is incurred if the modelled value of the pertinent quantity is greater than its observed value as listed in the “observation data” section of the PEST control file. However, if the model-calculated value is less than the observed value, the objective function penalty is calculated in the usual manner, that is as the squared residual times the squared weight. That is, these observations are treated as quadratic penalty inequality constraints.
 
 Similarly, if an observation belongs to an observation group whose name begins with the string “l\_” or “less\_”, then this observation is a “less than” observation. No objective function penalty is incurred if the modelled value of the pertinent quantity is less than the measured value listed in the “observation data” section of the PEST control file. However, if the model-calculated value is greater than the measured value, the objective function penalty is calculated in the usual manner, that is as the squared residual times the squared weight.
+
+As of version 5.2.12, users can describe inequality observations with the version 2 control file by adding an optional “less_than” and/or “greater_than” column to the \* observation data section of the control file. In this usecase, only observations that have a non-null/non-nan value for “lower_bound” or “upper_bound” and that have a non-zero weight are used as inequality observations. Note, and this getting fancy, users can supply both less_than and greater_than value for the same non-zero weighted observation, which then triggers that observation to be treated as a so-called “range observation”, employing a double-sided equality to constrain the acceptable range of that observation. This usecase is synonymous with a uniform error model, in contrast to the standard gaussian error model that is typically used. Note that if less_than and/or greater_than are supplied for a non-zero weighted observation, if the observation group meets the standard inequality definitions (stated above), then the observation value is used preferentially.
+
+Note that observation noise is never added to inequality type observations and even if noise realizations are supplied through an external file, PESTPP-IES will ignore the noise values.
 
 Users that wish to (very) strongly enforce inequality conditions are advised to avoid using extremely high weights for inequalities, and instead are encouraged to use the “drop_violations” functionality described later.
 

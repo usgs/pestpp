@@ -99,6 +99,9 @@ public:
 	Eigen::VectorXd get_q_vector();
 	vector<string> get_lt_obs_names() { return lt_obs_names; }
 	vector<string> get_gt_obs_names() { return gt_obs_names; }
+    map<string,double> get_lt_obs_bounds() {return lt_obs_bounds;}
+    map<string,double> get_gt_obs_bounds() {return gt_obs_bounds;}
+    map<string,pair<double,double>> get_double_obs_bounds() {return double_obs_bounds;}
 
 	void apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixXd &sim_vals, vector<string> &names);
 

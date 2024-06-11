@@ -4620,6 +4620,46 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		{
 			message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
 		}
+        map<string,double> t;
+        t = ph.get_lt_obs_bounds();
+        if (!t.empty())
+        {
+            ss.str("");
+            ss << "less_than inequality defined through 'less_than' data for observations:" << endl;
+            for (const auto it : t)
+            {
+                ss << it.first << "," << it.second << endl;
+            }
+            ss << endl;
+            message(1,ss.str());
+        }
+        t = ph.get_gt_obs_bounds();
+        if (!t.empty())
+        {
+            ss.str("");
+            ss << "greater_than inequality defined through 'greater_than' data for observations:" << endl;
+            for (const auto it : t)
+            {
+                ss << it.first << "," << it.second << endl;
+            }
+            ss << endl;
+            message(1,ss.str());
+        }
+        t.clear();
+        map<string,pair<double,double>> tt = ph.get_double_obs_bounds();
+        if (!tt.empty())
+        {
+            ss.str("");
+            ss << "double inequality defined through 'greater_than' and 'less_than' data for observations:" << endl;
+            for (const auto it : tt)
+            {
+                ss << it.first << "," << it.second.first << " to " << it.second.second << endl;
+            }
+            ss << endl;
+            message(1,ss.str());
+        }
+
+
 		message(1, "running control file parameter values");
 
 		vector<int> failed_idxs = run_ensemble(_pe, _oe,vector<int>(),cycle);
@@ -5105,7 +5145,47 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		{
 			message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
 		}
-		message(1, "running mean parameter values");
+        map<string,double> t;
+        t = ph.get_lt_obs_bounds();
+        if (!t.empty())
+        {
+            ss.str("");
+            ss << "less_than inequality defined through 'less_than' data for observations:" << endl;
+            for (const auto it : t)
+            {
+                ss << it.first << "," << it.second << endl;
+            }
+            ss << endl;
+            message(1,ss.str());
+        }
+        t = ph.get_gt_obs_bounds();
+        if (!t.empty())
+        {
+            ss.str("");
+            ss << "greater_than inequality defined through 'greater_than' data for observations:" << endl;
+            for (const auto it : t)
+            {
+                ss << it.first << "," << it.second << endl;
+            }
+            ss << endl;
+            message(1,ss.str());
+        }
+        t.clear();
+        map<string,pair<double,double>> tt = ph.get_double_obs_bounds();
+        if (!tt.empty())
+        {
+            ss.str("");
+            ss << "double inequality defined through 'greater_than' and 'less_than' data for observations:" << endl;
+            for (const auto it : tt)
+            {
+                ss << it.first << "," << it.second.first << " to " << it.second.second << endl;
+            }
+            ss << endl;
+            message(1,ss.str());
+        }
+
+
+        message(1, "running mean parameter values");
 
 		vector<int> failed_idxs = run_ensemble(_pe, _oe,vector<int>(),cycle);
 		if (failed_idxs.size() != 0)
@@ -5270,8 +5350,47 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	{
 		message(1, "greater_than inequality defined for observations: ", ph.get_gt_obs_names().size());
 	}
+    map<string,double> t;
+    t = ph.get_lt_obs_bounds();
+    if (!t.empty())
+    {
+        ss.str("");
+        ss << "less_than inequality defined through 'less_than' data for observations:" << endl;
+        for (const auto it : t)
+        {
+            ss << it.first << "," << it.second << endl;
+        }
+        ss << endl;
+        message(1,ss.str());
+    }
+    t = ph.get_gt_obs_bounds();
+    if (!t.empty())
+    {
+        ss.str("");
+        ss << "greater_than inequality defined through 'greater_than' data for observations:" << endl;
+        for (const auto it : t)
+        {
+            ss << it.first << "," << it.second << endl;
+        }
+        ss << endl;
+        message(1,ss.str());
+    }
+    t.clear();
+    map<string,pair<double,double>> tt = ph.get_double_obs_bounds();
+    if (!tt.empty())
+    {
+        ss.str("");
+        ss << "double inequality defined through 'greater_than' and 'less_than' data for observations:" << endl;
+        for (const auto it : tt)
+        {
+            ss << it.first << "," << it.second.first << " to " << it.second.second << endl;
+        }
+        ss << endl;
+        message(1,ss.str());
+    }
 
-	ph.update(oe, pe, weights);
+
+    ph.update(oe, pe, weights);
 	message(0, "pre-drop initial phi summary");
 	ph.report(true);
 	
