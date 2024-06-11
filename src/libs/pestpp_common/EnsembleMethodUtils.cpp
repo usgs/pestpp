@@ -2029,9 +2029,8 @@ L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 	string og;
 	double weight;
 	const ObservationInfo* oi = pest_scenario->get_ctl_observation_info_ptr();
-    bool use_obs_bound_ineq = pest_scenario->get_pestpp_options().get_ies_obs_bounds_as_ineq();
-	map<string,double> extfile_lb = pest_scenario->get_ext_file_double_map("observation data external","lower_bound");
-    map<string,double> extfile_ub = pest_scenario->get_ext_file_double_map("observation data external","upper_bound");
+    map<string,double> extfile_gt = pest_scenario->get_ext_file_double_map("observation data external","greater_than");
+    map<string,double> extfile_lt = pest_scenario->get_ext_file_double_map("observation data external","less_than");
 
     for (auto &oname : pest_scenario->get_ctl_ordered_obs_names())
 	{
@@ -2051,20 +2050,20 @@ L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 		{
 			gt_obs_names.push_back(oname);
 		}
-        else if (use_obs_bound_ineq)
+        else
         {
-            if ((extfile_lb.find(oname) != extfile_lb.end()) &&
-                    (extfile_ub.find(oname) != extfile_ub.end()))
+            if ((extfile_gt.find(oname) != extfile_gt.end()) &&
+                    (extfile_lt.find(oname) != extfile_lt.end()))
             {
-                double_obs_bounds[oname] = pair<double,double>(extfile_lb.at(oname),extfile_ub.at(oname));
+                double_obs_bounds[oname] = pair<double,double>(extfile_gt.at(oname),extfile_lt.at(oname));
             }
-            else if (extfile_lb.find(oname) != extfile_lb.end())
+            else if (extfile_gt.find(oname) != extfile_gt.end())
             {
-                gt_obs_bounds[oname] = extfile_lb.at(oname);
+                gt_obs_bounds[oname] = extfile_gt.at(oname);
             }
-            else if (extfile_ub.find(oname) != extfile_ub.end())
+            else if (extfile_lt.find(oname) != extfile_lt.end())
             {
-                lt_obs_bounds[oname] = extfile_ub.at(oname);
+                lt_obs_bounds[oname] = extfile_lt.at(oname);
             }
         }
     }
