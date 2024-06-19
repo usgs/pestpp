@@ -224,7 +224,7 @@ pair<double,double> sequentialLP::postsolve_decision_var_report(Parameters &upgr
 	}
 	stringstream ss;
 	ss << slp_iter << ".par";
-
+    par_trans.active_ctl2ctl_ip(actual_pars);
 	of_wr.write_par(file_mgr_ptr->open_ofile_ext(ss.str()),actual_pars,*par_trans.get_offset_ptr(),*par_trans.get_scale_ptr());
 	file_mgr_ptr->close_file(ss.str());
 	of_wr.write_par(file_mgr_ptr->open_ofile_ext("par"), actual_pars, *par_trans.get_offset_ptr(), *par_trans.get_scale_ptr());
