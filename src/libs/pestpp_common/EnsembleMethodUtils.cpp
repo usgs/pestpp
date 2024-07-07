@@ -2083,9 +2083,12 @@ L2PhiHandler::L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 	{
 		prepare_csv(file_manager->open_ofile_ext(tag+"phi.actual.csv"), oreal_names);
 		prepare_csv(file_manager->open_ofile_ext(tag+"phi.meas.csv"), oreal_names);
+        //prepare_csv(file_manager->open_ofile_ext(tag+"phi.noise.csv"), oreal_names);
 		prepare_csv(file_manager->open_ofile_ext(tag+"phi.composite.csv"), oreal_names);
 		prepare_csv(file_manager->open_ofile_ext(tag+"phi.regul.csv"), preal_names);
 		prepare_group_csv(file_manager->open_ofile_ext(tag+"phi.group.csv"));
+        prepare_lambda_csv(file_manager->open_ofile_ext(tag+"phi.lambda.csv"));
+
 	}
 
 }
@@ -2231,6 +2234,35 @@ Eigen::MatrixXd L2PhiHandler::get_actual_obs_resid(ObservationEnsemble &oe)
 	return resid;
 }
 
+//Eigen::MatrixXd L2PhiHandler::get_noise_resid(ObservationEnsemble &oe, bool apply_ineq)
+//{
+//    //vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
+//    vector<string> act_obs_names = oe_base->get_var_names();
+//
+//    Eigen::MatrixXd oe_vals = oe.get_eigen(vector<string>(),act_obs_names);
+//    Eigen::MatrixXd noise_vals = oe_base->get_eigen(oe.get_real_names(), vector<string>());
+//
+//    Observations obs = pest_scenario->get_ctl_observations();
+//    Eigen::MatrixXd ovals = obs.get_data_eigen_vec(act_obs_names);
+//    ovals.transposeInPlace();
+//    for (int i = 0; i < oe_vals.rows(); i++)
+//    {
+//        cout << "ovals " << ovals << endl;
+//        cout << "o1 " << oe_vals.row(i) << endl;
+//        cout << "n1 " << noise_vals.row(i) << endl;
+//
+//        oe_vals.row(i) = oe_vals.row(i) - ovals;
+//        noise_vals.row(i) = noise_vals.row(i) - ovals;
+//        cout << "o2 " << oe_vals.row(i) << endl;
+//        cout << "n2 " << noise_vals.row(i) << endl << endl;
+//    }
+//
+//    Eigen::MatrixXd resid = oe_vals - noise_vals;
+//    if (apply_ineq)
+//        apply_ineq_constraints(resid,oe_vals, act_obs_names);
+//    return resid;
+//}
+
 
 Eigen::VectorXd L2PhiHandler::get_q_vector()
 {
@@ -2304,6 +2336,13 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 		meas[pv.first] = pv.second.sum();
 
 	}
+
+//    noise.clear();
+//    map<string, Eigen::VectorXd> noise_map = calc_noise(oe, q);
+//    for (auto &pv : noise_map) {
+//        noise[pv.first] = pv.second.sum();
+//    }
+
 	if (org_reg_factor != 0.0)
 	{
 		par_group_idx_map.clear();
@@ -2369,6 +2408,14 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, Obse
         meas[pv.first] = pv.second.sum();
 
     }
+//    noise.clear();
+//    map<string, Eigen::VectorXd> noise_map = calc_noise(oe, weights);
+//    for (auto &pv : noise_map)
+//    {
+//        noise[pv.first] = pv.second.sum();
+//
+//    }
+
     if (org_reg_factor != 0.0)
     {
         par_group_idx_map.clear();
@@ -2459,6 +2506,8 @@ map<string, double>* L2PhiHandler::get_phi_map_ptr(L2PhiHandler::phiType pt)
 		return &meas;
 	case L2PhiHandler::phiType::REGUL:
 		return &regul;
+    case L2PhiHandler::phiType::NOISE:
+        return &noise;
 	}
 	throw runtime_error("PhiHandler::get_phi_map() didn't find a phi map...");
 }
@@ -2475,6 +2524,8 @@ map<string, double> L2PhiHandler::get_phi_map(L2PhiHandler::phiType pt)
 		return meas;
 	case L2PhiHandler::phiType::REGUL:
 		return regul;
+    case L2PhiHandler::phiType::NOISE:
+        return noise;
 	}
 	throw runtime_error("PhiHandler::get_phi_map() didn't find a phi map...");
 }
@@ -2574,6 +2625,9 @@ string L2PhiHandler::get_summary_string(L2PhiHandler::phiType pt)
 	case L2PhiHandler::phiType::COMPOSITE:
 		typ = "composite";
 		break;
+    case L2PhiHandler::phiType::NOISE:
+        typ = "noise";
+        break;
 	}
 	ss << setw(15) << typ << setw(15) << stats["mean"] << setw(15) << stats["std"] << setw(15) << stats["min"] << setw(15) << stats["max"] << endl;
 	return ss.str();
@@ -2777,7 +2831,11 @@ void L2PhiHandler::report(bool echo, bool group_report)
 			s = get_summary_string(L2PhiHandler::phiType::ACTUAL);
 			f << s;
 			if (echo)
-				cout << s;	
+				cout << s;
+//            s = get_summary_string(L2PhiHandler::phiType::NOISE);
+//            f << s;
+//            if (echo)
+//                cout << s;
 		}
 		else
 		{
@@ -2793,6 +2851,11 @@ void L2PhiHandler::report(bool echo, bool group_report)
 			f << s;
 			if (echo)
 				cout << s;
+//            s = get_summary_string(L2PhiHandler::phiType::NOISE);
+//            f << s;
+//            if (echo)
+//                cout << s;
+
 		}
 
 	}
@@ -2842,12 +2905,15 @@ void L2PhiHandler::write(int iter_num, int total_runs, bool write_group)
 {
 	write_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.actual.csv"), phiType::ACTUAL,oreal_names);
 	write_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.meas.csv"), phiType::MEAS, oreal_names);
-	if (pest_scenario->get_pestpp_options().get_ies_reg_factor() != 0.0)
+    //write_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.noise.csv"), phiType::NOISE, oreal_names);
+
+    if (pest_scenario->get_pestpp_options().get_ies_reg_factor() != 0.0)
 	{
 		write_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.regul.csv"), phiType::REGUL, preal_names);	
 	}
 	write_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.composite.csv"), phiType::COMPOSITE, oreal_names);
-	if (write_group)
+
+    if (write_group)
 		write_group_csv(iter_num, total_runs, file_manager->get_ofstream(tag+"phi.group.csv"));
 }
 
@@ -2915,6 +2981,16 @@ void L2PhiHandler::write_group_csv(int iter_num, int total_runs, ofstream &csv, 
 	}
 }
 
+void L2PhiHandler::write_lambda(int iteration,int num_reals,double current_lambda,double current_comp_mean_phi,
+                                double current_comp_std_phi,double lambda_mult,
+                                double lambda, double comp_mean_phi,double comp_std_phi)
+{
+    ofstream& csv = file_manager->get_ofstream(tag+"phi.lambda.csv");
+    csv << iteration << ',' << num_reals << ',' << current_lambda << ',' << current_comp_mean_phi << ',',
+    csv << current_comp_std_phi << ',' << lambda_mult << ',';
+    csv << lambda << ',' << comp_mean_phi << ',' << comp_std_phi << endl;
+}
+
 void L2PhiHandler::prepare_group_csv(ofstream &csv, vector<string> extra)
 {
 	csv << "iteration,total_runs,obs_realization,par_realization";
@@ -2929,6 +3005,13 @@ void L2PhiHandler::prepare_group_csv(ofstream &csv, vector<string> extra)
 	}
 	csv << endl;
 }
+
+void L2PhiHandler::prepare_lambda_csv(ofstream &csv)
+{
+    csv << "iteration,num_reals,current_lambda,current_comp_mean_phi,current_comp_std_phi,lambda_scale_fac,lambda,comp_mean_phi,comp_std_phi" << endl;
+}
+
+
 
 vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe, ObservationEnsemble& weights)
 {
@@ -2977,17 +3060,17 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
 	return idxs;
 }
 
-map<string,double> L2PhiHandler::get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec)
-{
-    map<string,Eigen::VectorXd> meas_map = calc_meas(oe,q_vec);
-    map<string,double> meas_phi;
-    for (auto& m : meas_map)
-    {
-        meas_phi[m.first] = m.second.sum();
-    }
-    return meas_phi;
-
-}
+//map<string,double> L2PhiHandler::get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec)
+//{
+//    map<string,Eigen::VectorXd> meas_map = calc_meas(oe,q_vec);
+//    map<string,double> meas_phi;
+//    for (auto& m : meas_map)
+//    {
+//        meas_phi[m.first] = m.second.sum();
+//    }
+//    return meas_phi;
+//
+//}
 //void PhiThread::work(int thread_id, Eigen::MatrixXd wmat, Eigen::MatrixXd resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map)
 void upgrade_thread_function_phi(int id, Eigen::MatrixXd& wmat, Eigen::MatrixXd& resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map, PhiThread& worker, exception_ptr& eptr) {
     try {
@@ -3192,6 +3275,36 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_meas(ObservationEnsemble & oe, E
 	return phi_map;
 }
 
+//map<string, Eigen::VectorXd> L2PhiHandler::calc_noise(ObservationEnsemble & oe, Eigen::VectorXd& q_vec)
+//{
+//    map<string, Eigen::VectorXd> phi_map;
+//    Eigen::VectorXd oe_base_vec, oe_vec, diff, w_vec;
+//    vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
+//
+//    if (act_obs_names.size() == 0)
+//    {
+//        for (auto name : oe.get_real_names())
+//            phi_map[name] = Eigen::VectorXd();
+//        return phi_map;
+//    }
+//    vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
+//    set<string> bset(base_real_names.begin(),base_real_names.end());
+//    set<string>::iterator end = bset.end();
+//    string rname;
+//    Eigen::MatrixXd resid = get_noise_resid(oe);
+//    assert(oe_real_names.size() == resid.rows());
+//    resid = resid.array().rowwise() * q_vec.transpose().array();
+//    resid = resid.array().cwiseProduct(resid.array());
+//    for (int i = 0; i<resid.rows(); i++)
+//    {
+//        rname = oe_real_names[i];
+//        if (bset.find(rname) == end)
+//            continue;
+//        phi_map[rname] = resid.row(i);
+//    }
+//    return phi_map;
+//}
+
 map<string, Eigen::VectorXd> L2PhiHandler::calc_meas(ObservationEnsemble & oe, ObservationEnsemble& weights)
 {
     map<string, Eigen::VectorXd> phi_map;
@@ -3222,6 +3335,39 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_meas(ObservationEnsemble & oe, O
     }
     return phi_map;
 }
+
+
+//map<string, Eigen::VectorXd> L2PhiHandler::calc_noise(ObservationEnsemble & oe, ObservationEnsemble& weights)
+//{
+//    map<string, Eigen::VectorXd> phi_map;
+//    Eigen::VectorXd oe_base_vec, oe_vec, diff, w_vec;
+//    vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
+//
+//    if (act_obs_names.size() == 0)
+//    {
+//        for (auto name : oe.get_real_names())
+//            phi_map[name] = Eigen::VectorXd();
+//        return phi_map;
+//    }
+//    vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
+//    set<string> bset(base_real_names.begin(),base_real_names.end());
+//    set<string>::iterator end = bset.end();
+//    string rname;
+//    Eigen::MatrixXd resid = get_noise_resid(oe);
+//    Eigen::MatrixXd wmat = weights.get_eigen(oe.get_real_names(),oe_base->get_var_names());
+//    assert(oe_real_names.size() == resid.rows());
+//    resid = resid.array() * wmat.array();
+//    resid = resid.array().cwiseProduct(resid.array());
+//    for (int i = 0; i<resid.rows(); i++)
+//    {
+//        rname = oe_real_names[i];
+//        if (bset.find(rname) == end)
+//            continue;
+//        phi_map[rname] = resid.row(i);
+//    }
+//    return phi_map;
+//}
+
 
 
 map<string, Eigen::VectorXd> L2PhiHandler::calc_regul(ParameterEnsemble & pe)
@@ -5355,37 +5501,54 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
     if (!t.empty())
     {
         ss.str("");
-        ss << "less_than inequality defined through 'less_than' data for observations:" << endl;
-        for (const auto it : t)
-        {
-            ss << it.first << "," << it.second << endl;
+        if (t.size() < 50) {
+            ss << "less_than inequality defined through 'less_than' data for observations:" << endl;
+            for (const auto it: t) {
+                ss << it.first << "," << it.second << endl;
+            }
+            ss << endl;
         }
-        ss << endl;
+        else
+        {
+            ss << "less_than inequality defined through 'less_than' data for " << t.size() << " observations" << endl;
+        }
         message(1,ss.str());
     }
     t = ph.get_gt_obs_bounds();
     if (!t.empty())
     {
         ss.str("");
-        ss << "greater_than inequality defined through 'greater_than' data for observations:" << endl;
-        for (const auto it : t)
-        {
-            ss << it.first << "," << it.second << endl;
+        if (t.size() < 50) {
+            ss << "greater_than inequality defined through 'greater_than' data for observations:" << endl;
+            for (const auto it: t) {
+                ss << it.first << "," << it.second << endl;
+            }
+            ss << endl;
         }
-        ss << endl;
         message(1,ss.str());
+    }
+    else
+    {
+        ss << "greater_than inequality defined through 'greater_than' data for " << t.size() << " observations" << endl;
+
     }
     t.clear();
     map<string,pair<double,double>> tt = ph.get_double_obs_bounds();
     if (!tt.empty())
     {
         ss.str("");
-        ss << "double inequality defined through 'greater_than' and 'less_than' data for observations:" << endl;
-        for (const auto it : tt)
-        {
-            ss << it.first << "," << it.second.first << " to " << it.second.second << endl;
+        if (tt.size() < 50) {
+            ss << "double inequality defined through 'greater_than' and 'less_than' data for observations:" << endl;
+            for (const auto it: tt) {
+                ss << it.first << "," << it.second.first << " to " << it.second.second << endl;
+            }
+            ss << endl;
         }
-        ss << endl;
+        else
+        {
+            ss << "double inequality defined through 'greater_than' and 'less_than' data for " << tt.size() << " observations" << endl;
+
+        }
         message(1,ss.str());
     }
 
@@ -6875,6 +7038,9 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         }
     }
 
+    double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
+    double lam_inc = pest_scenario.get_pestpp_options().get_ies_lambda_inc_fac();
+    double lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
 	ObservationEnsemble oe_lam_best(&pest_scenario);
 	bool echo = false;
 	if (verbose_level > 1)
@@ -6915,8 +7081,12 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		message(0, "phi summary for lambda, scale fac:", vals, echo);
 		ph.report(echo);
 
+
 		mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+        ph.write_lambda(iter,oe_lams[i].shape().first,last_best_lam,last_best_mean,
+                        last_best_std,
+                        scale_vals[i],lam_vals[i],mean,std);
 		if (mean < best_mean)
 		{
 			oe_lam_best = oe_lams[i];
@@ -6932,100 +7102,9 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		return false;
 
 	}
-	double acc_fac = pest_scenario.get_pestpp_options().get_ies_accept_phi_fac();
-	double lam_inc = pest_scenario.get_pestpp_options().get_ies_lambda_inc_fac();
-	double lam_dec = pest_scenario.get_pestpp_options().get_ies_lambda_dec_fac();
 
 
-	/*if (iter <= pest_scenario.get_pestpp_options().get_ies_n_iter_mean()) {
-        message(1,"processing mean-only upgrade");
 
-        message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
-        ph.update(oe_lams[best_idx], pe_lams[best_idx],weights);
-        ph.report(true,false);
-
-        performance_log->log_event("getting prior parameter ensemble mean-centered anomalies");
-        Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe.get_real_names(), pe.get_var_names());
-
-        for (int i = 0; i < pe_lams.size(); i++)
-        {
-            if (i == best_idx)
-                continue;
-            pe_lams[i] = pe.zeros_like(0);
-        }
-
-        ParameterEnsemble pe_best = pe_lams[best_idx];
-        pe_best.set_fixed_info(pe.get_fixed_info());
-
-        if (pe_filenames.size() > 0)
-        {
-            performance_log->log_event("'ies_upgrades_in_memory' is 'false', loading 'best' parameter ensemble from file '" + pe_filenames[best_idx] + "'");
-
-            pe_best.from_binary(pe_filenames[best_idx]);
-            pe_best.transform_ip(ParameterEnsemble::transStatus::NUM);
-            //remove any failed runs from subset testing
-            remove_external_pe_filenames(pe_filenames);
-        }
-        performance_log->log_event("getting best-lambda parameter ensemble mean vector");
-        vector<double> mean_vec = pe_best.get_mean_stl_var_vector();
-
-        Parameters pars = pest_scenario.get_ctl_parameters();
-        pe.get_par_transform().ctl2numeric_ip(pars);
-        pars.update_without_clear(pe_best.get_var_names(),mean_vec);
-        pe.get_par_transform().numeric2ctl_ip(pars);
-        ss.str("");
-        ss << file_manager.get_base_filename() << "." << iter << ".best.par";
-        ofstream pfile(ss.str());
-        if (!pfile)
-        {
-            throw_em_error("error opening best-lambda mean par file '" + ss.str() + "' for writing");
-        }
-        output_file_writer.write_par(pfile,pars,*pe.get_par_transform().get_offset_ptr(),*pe.get_par_transform().get_scale_ptr());
-        pfile.close();
-        message(2,"saved best-lambda par ensemble mean vector to ",ss.str());
-        pe_best = pe.zeros_like(0);
-        if (verbose_level > 2)
-        {
-            performance_log->log_event("saving best-lambda par ensemble");
-            ss.str("");
-            ss << file_manager.get_base_filename() << "." << iter << ".best.par";
-            if (pest_scenario.get_pestpp_options().get_save_binary())
-            {
-                ss << ".jcb";
-                pe_best.to_binary(ss.str());
-            }
-            else
-            {
-                ss << ".csv";
-                pe_best.to_csv(ss.str());
-            }
-        }
-
-        performance_log->log_event("adding mean to anomalies");
-        for (int i = 0; i < mean_vec.size(); i++)
-        {
-            anoms.col(i) = anoms.col(i).array() + mean_vec[i];
-        }
-        performance_log->log_event("forming new parameter ensemble of mean-shifted prior realizations");
-        ParameterEnsemble new_pe = ParameterEnsemble(&pest_scenario,&rand_gen,anoms,pe.get_real_names(),pe.get_var_names());
-
-        new_pe.set_trans_status(pe.get_trans_status());
-        new_pe.set_fixed_info(pe.get_fixed_info());
-        if (pest_scenario.get_pestpp_options().get_ies_enforce_bounds()) {
-            new_pe.enforce_bounds(performance_log, false);
-        }
-        oe_lam_best = oe; //copy
-
-        message(0,"running mean-shifted prior realizations: ",new_pe.shape().first);
-        ss.str("");
-        ss << "iteration:" << iter;
-        vector<int> temp;
-        run_ensemble_util(performance_log,frec,new_pe,oe_lam_best,run_mgr_ptr,false,temp,NetPackage::NULL_DA_CYCLE, ss.str());
-        pe_lams[best_idx] = new_pe;
-
-        //make sure we dont try to process the subset stuff below
-        local_subset_size = pe.shape().first;
-    }*/
 
     if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
 	{
@@ -8621,7 +8700,7 @@ vector<string> EnsembleMethod::detect_prior_data_conflict(bool save)
 		use_stat_dist = false;
 
 	double smn, sstd, omn, ostd, dist;
-	double sd = pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance();
+	double sd = abs(pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance());
 	int oe_nr = oe.shape().first;
 	int oe_base_nr = oe_base.shape().first;
 	Eigen::VectorXd t;
