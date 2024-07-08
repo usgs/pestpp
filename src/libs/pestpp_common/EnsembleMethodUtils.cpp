@@ -3652,16 +3652,18 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 {
 	update(pe);
 	vector<string> grp_names;// = base_pe_ptr->get_pest_scenario().get_ctl_ordered_par_group_names();
-	vector<pair<double, string>> mean_pairs;
-	for (auto m : mean_change)
-	{
-		mean_pairs.push_back(pair<double, string>(abs(m.second), m.first));
+	vector<pair<double, string>> pairs;
+    //for (auto m : mean_change)
+	for (auto& m : percent_at_lbound)
+    {
+		//mean_pairs.push_back(pair<double, string>(abs(m.second), m.first));
+        pairs.push_back(pair<int,string>(m.second+percent_at_ubound.at(m.first),m.first));
 	}
-	sort(mean_pairs.begin(), mean_pairs.end());
+	sort(pairs.begin(), pairs.end());
 	//for (auto m : mean_pairs)
-	for (int i = mean_pairs.size() - 1; i >= 0; i--)
+	for (int i = pairs.size() - 1; i >= 0; i--)
 	{
-		grp_names.push_back(mean_pairs[i].second);
+		grp_names.push_back(pairs[i].second);
 	}
 	int mxlen = 15;
 	for (auto& g : grp_names)
@@ -3707,7 +3709,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	}
 
 	ss.str("");
-	ss << "    Note: parameter change summary sorted according to abs 'mean change'." << endl;
+	ss << "    Note: parameter change summary sorted according to percent at bounds." << endl;
 	//ss << "          'n CV decr' is the number of parameters with current CV less " << cv_dec_threshold*100.0 << "% of the initial CV" << endl;
 	ss << "    Note: the parameter change statistics implicitly include the effect of " << endl;
 	ss << "          realizations that have failed or have been dropped." << endl;
