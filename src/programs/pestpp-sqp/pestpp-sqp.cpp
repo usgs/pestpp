@@ -84,8 +84,10 @@ int main(int argc, char* argv[])
 					yam_agent.process_ctl_file(ctl_file);
 					
 				}
-				catch (PestError e)
+				catch (exception &e)
 				{
+                    frec << "Error processing control file: " << ctl_file << endl << endl;
+                    frec << e.what() << endl << endl;
 					cerr << "Error processing control file: " << ctl_file << endl << endl;
 					cerr << e.what() << endl << endl;
 					throw(e);
@@ -170,11 +172,11 @@ int main(int argc, char* argv[])
 			file_manager.close_file("pst");
 			performance_log.log_event("finished processing control file");
 		}
-		catch (PestError e)
+		catch (exception &e)
 		{
-			cerr << "Error prococessing control file: " << cmdline.ctl_file_name << endl << endl;
+			cerr << "Error processing control file: " << cmdline.ctl_file_name << endl << endl;
 			cerr << e.what() << endl << endl;
-			fout_rec << "Error prococessing control file: " << cmdline.ctl_file_name << endl << endl;
+			fout_rec << "Error processing control file: " << cmdline.ctl_file_name << endl << endl;
 			fout_rec << e.what() << endl << endl;
 			fout_rec.close();
 			throw(e);

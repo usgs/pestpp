@@ -1485,7 +1485,14 @@ def sweep_bin_test():
 #def fail_test():
 #    raise Exception("fail please")
 
+def invest():
+    pst = pyemu.Pst(os.path.join("PESTPPTest","PestPilotPointTest.pst"))
+
+
+
+
 if __name__ == "__main__":
+    invest()
     #run()
     #mf6_v5_ies_test()
     #prep_ends()
@@ -1529,7 +1536,7 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
     
-    fr_timeout_test()
+    #fr_timeout_test()
     #mf6_v5_ies_test()
     #mf6_v5_sen_test()
 
