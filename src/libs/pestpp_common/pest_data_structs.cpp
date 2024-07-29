@@ -679,6 +679,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		passed_args.insert("OPT_OBJ_FUNC");
 		passed_args.insert("OPT_OBJECTIVE_FUNCTION");
 		convert_ip(value,opt_obj_func);
+        org_opt_obj_func = org_value;
 	}
 	else if (key == "OPT_COIN_LOG")
 	{
@@ -1901,6 +1902,7 @@ void PestppOptions::set_defaults()
 
 
 	set_opt_obj_func("");
+    set_org_opt_obj_func("");
 	set_opt_coin_log(true);
 	set_opt_skip_final(false);
 	set_opt_std_weights(false);

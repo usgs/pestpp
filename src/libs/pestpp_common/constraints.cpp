@@ -127,6 +127,7 @@ void OptObjFunc::throw_optobjfunc_error(string message)
 
 void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv_names)
 {
+    stringstream ss;
 	//initialize the objective function
 	obj_func_str = pest_scenario.get_pestpp_options().get_opt_obj_func();
 	obj_sense = (pest_scenario.get_pestpp_options().get_opt_direction() == 1) ? "minimize" : "maximize";
@@ -143,6 +144,10 @@ void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv
 		use_obj_obs = true;
 		obj_obs = obj_func_str;
 		//check
+        ss.str("");
+        ss << "...objective function defined by observation '" << obj_func_str << "'" << endl;
+        cout << ss.str();
+        f_rec << ss.str();
 		set<string> names(constraint_names.begin(), constraint_names.end());
 		if (names.find(obj_obs) != names.end())
 		{
@@ -162,25 +167,39 @@ void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv
 	{
 		if (obj_func_str.size() == 0)
 		{
-			f_rec << " warning: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
-			for (auto& name : dv_names)
+			f_rec << " note: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
+			cout << " note: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
+            for (auto& name : dv_names)
 				obj_func_coef_map[name] = 1.0;
 		}
 
 		//or if it is a prior info equation
 		else if (pest_scenario.get_prior_info().find(obj_func_str) != pest_scenario.get_prior_info().end())
 		{
+            ss.str("");
+            ss << "...objective function defined by prior information equation '" << obj_func_str << "'" << endl;
+            cout << ss.str();
+            f_rec << ss.str();
 			obj_func_coef_map = pest_scenario.get_prior_info().get_pi_rec(obj_func_str).get_atom_factors();
 			//throw_sequentialLP_error("prior-information-based objective function not implemented");
 		}
 		else
 		{
 			//check if this obj_str is a filename
-			ifstream if_obj(obj_func_str);
+            obj_func_str = pest_scenario.get_pestpp_options().get_org_opt_obj_func();
+            ss.str("");
+            ss << "...objective function defined by 2-column external file '" << obj_func_str << "'" << endl;
+            cout << ss.str();
+            f_rec << ss.str();
+            if (!pest_utils::check_exist_in(obj_func_str))
+            {
+                throw_optobjfunc_error("unable to open objective function file '"+obj_func_str+"' for reading");
+            }
+			/*ifstream if_obj(obj_func_str);
 			if (!if_obj.good())
 				throw_optobjfunc_error("unrecognized ++opt_objective_function arg: " + obj_func_str);
-			else
-				obj_func_coef_map = pest_utils::read_twocol_ascii_to_map(obj_func_str);
+			else*/
+            obj_func_coef_map = pest_utils::read_twocol_ascii_to_map(obj_func_str);
 		}
 
 
