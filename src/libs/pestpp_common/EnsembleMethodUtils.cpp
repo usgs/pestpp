@@ -2656,6 +2656,7 @@ void L2PhiHandler::report_group(bool echo) {
     map<string,double> mmn_map;
     map<string,double> pmx_map;
     map<string,double> pmmn_map;
+    map<string,int> count_map;
 
     set<string> snzgroups;
     ObservationInfo* oi_ptr = pest_scenario->get_observation_info_ptr();
@@ -2698,6 +2699,7 @@ void L2PhiHandler::report_group(bool echo) {
         ptot = ptot/(double)c;
         mn_map[g] = tot;
         pmn_map[g] = ptot;
+        count_map[g] = c;
 
         for (auto& o : obs_group_phi_map)
         {
@@ -2738,7 +2740,7 @@ void L2PhiHandler::report_group(bool echo) {
     ss << "  ---  observation group phi summary ---  " << endl;
     ss << "       (computed using 'actual' phi)" << endl;
     ss << "           (sorted by mean phi)" << endl;
-    ss << left << setw(len) << "group" << right << setw(10) << "mean" << setw(10) << "std";
+    ss << left << setw(len) << "group" << right << setw(6) << "count" << setw(10) << "mean" << setw(10) << "std";
     ss << setw(10) << "min" << setw(10) << "max";
     ss << setw(10) << "percent" << setw(10) << "std" << endl; //<< setw(10) << "min " << setw(10) << "max " << endl;
     f << ss.str();
@@ -2761,6 +2763,7 @@ void L2PhiHandler::report_group(bool echo) {
         g = pair.first;
         ss.str("");
         ss << left << setw(len) << pest_utils::lower_cp(g) << " ";
+        ss << right << setw(5) << count_map[g] << " ";
         ss << right << setw(9) << setprecision(3) << mn_map[g] << " ";
         ss << setw(9) << setprecision(3) << std_map[g] << " ";
         ss << setw(9) << setprecision(3) << mmn_map[g] << " ";
