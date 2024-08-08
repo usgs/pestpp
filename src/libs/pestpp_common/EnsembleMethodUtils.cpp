@@ -2656,7 +2656,6 @@ void L2PhiHandler::report_group(bool echo) {
     map<string,double> mmn_map;
     map<string,double> pmx_map;
     map<string,double> pmmn_map;
-    map<string,int> count_map;
 
     set<string> snzgroups;
     ObservationInfo* oi_ptr = pest_scenario->get_observation_info_ptr();
@@ -2699,7 +2698,6 @@ void L2PhiHandler::report_group(bool echo) {
         ptot = ptot/(double)c;
         mn_map[g] = tot;
         pmn_map[g] = ptot;
-        count_map[g] = c;
 
         for (auto& o : obs_group_phi_map)
         {
@@ -2757,13 +2755,22 @@ void L2PhiHandler::report_group(bool echo) {
     sort(pairs.begin(),pairs.end(),cmp_pair);
 
     c = 0;
+    int nzc = 0;
     string g;
     for (auto& pair : pairs)
     {
         g = pair.first;
+        nzc = 0;
+        for (auto& n : oi_ptr->observations)
+        {
+            if ((n.second.weight > 0) && (n.second.group == g))
+            {
+                nzc++;
+            }
+        }
         ss.str("");
         ss << left << setw(len) << pest_utils::lower_cp(g) << " ";
-        ss << right << setw(5) << count_map[g] << " ";
+        ss << right << setw(5) << nzc << " ";
         ss << right << setw(9) << setprecision(3) << mn_map[g] << " ";
         ss << setw(9) << setprecision(3) << std_map[g] << " ";
         ss << setw(9) << setprecision(3) << mmn_map[g] << " ";
@@ -5645,18 +5652,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		}
 	}
 
-	if ((ppo->get_ies_phi_fractions_file().size() > 0) ||
-	    (ppo->get_obscov_filename().size() > 0) ||
-        (in_conflict.size() > 0))
-    {
-        string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
-        ofstream f_obs(filename);
-        if (f_obs.bad())
-            throw_em_error("error opening: " + filename);
-        output_file_writer.scenario_obs_csv(f_obs);
-        f_obs.close();
 
-    }
 
 
     drop_bad_reals(pe, oe);
@@ -5698,6 +5694,18 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
             weights.to_csv(ss.str());
         }
         message(1, "saved adjusted weight ensemble to ", ss.str());
+    }
+    if ((ppo->get_ies_phi_fractions_file().size() > 0) ||
+        (ppo->get_obscov_filename().size() > 0) ||
+        (in_conflict.size() > 0))
+    {
+        string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
+        ofstream f_obs(filename);
+        if (f_obs.bad())
+            throw_em_error("error opening: " + filename);
+        output_file_writer.scenario_obs_csv(f_obs);
+        f_obs.close();
+
     }
 
 
@@ -6244,7 +6252,7 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
 
     message(1,"original mean phi: ",cur_mean_phi);
     //if the current is really low, just return and the traps in initialize() will catch it.
-    if (cur_mean_phi < 1.0e-10)
+    if (cur_mean_phi < 1.0e-30)
     {
         performance_log->log_event("mean phi too low - returning");
         return;
