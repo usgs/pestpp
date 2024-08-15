@@ -96,6 +96,8 @@ int main(int argc, char* argv[])
 				}
 				catch (PestError e)
 				{
+                    frec << "Error processing control file: " << ctl_file << endl << endl;
+                    frec << e.what() << endl << endl;
 					cerr << "Error prococessing control file: " << ctl_file << endl << endl;
 					cerr << e.what() << endl << endl;
 					throw(e);
@@ -168,9 +170,9 @@ int main(int argc, char* argv[])
 			performance_log.log_event("finished processing control file");
 #ifndef _DEBUG
 		}
-		catch (PestError e)
+		catch (exception &e)
 		{
-			cerr << "Error prococessing control file: " << filename << endl << endl;
+			cerr << "Error processing control file: " << filename << endl << endl;
 			cerr << e.what() << endl << endl;
 			throw(e);
 		}
@@ -363,12 +365,24 @@ int main(int argc, char* argv[])
 			}
 			
 			fout_rec << "   -----    Starting Optimization Iterations    ----    " << endl << endl;
-			
-			Covariance parcov;
-			parcov.try_from(pest_scenario, file_manager);
-			sequentialLP slp(pest_scenario, run_manager_ptr, parcov, &file_manager, output_file_writer, performance_log);
-			slp.solve();
-			fout_rec << "Number of forward model runs performed during optimization: " << run_manager_ptr->get_total_runs() << endl;
+			try {
+                Covariance parcov;
+                parcov.try_from(pest_scenario, file_manager);
+                sequentialLP slp(pest_scenario, run_manager_ptr, parcov, &file_manager, output_file_writer,
+                                 performance_log);
+                slp.solve();
+            }
+            catch (exception &e)
+            {
+                fout_rec << "ERROR: " << e.what() << endl;
+                throw runtime_error(e.what());
+
+            }
+            catch (...)
+            {
+                throw runtime_error("ERROR in sLP process");
+            }
+            fout_rec << "Number of forward model runs performed during optimization: " << run_manager_ptr->get_total_runs() << endl;
 		}
 		// clean up
 		//fout_rec.close();

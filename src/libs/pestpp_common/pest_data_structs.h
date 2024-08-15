@@ -329,7 +329,10 @@ public:
 
 	string get_opt_obj_func()const { return opt_obj_func; }
 	void set_opt_obj_func(string _opt_obj_func) { opt_obj_func = _opt_obj_func; }
-	bool get_opt_coin_log()const { return opt_coin_log; }
+    string get_org_opt_obj_func()const { return org_opt_obj_func; }
+    void set_org_opt_obj_func(string _org_opt_obj_func) { org_opt_obj_func = _org_opt_obj_func; }
+
+    bool get_opt_coin_log()const { return opt_coin_log; }
 	void set_opt_coin_log(bool _log) { opt_coin_log = _log; }
 	bool get_opt_skip_final()const { return opt_skip_final; }
 	void set_opt_skip_final(bool _skip_final) { opt_skip_final = _skip_final; }
@@ -712,6 +715,7 @@ private:
 	bool de_dither_f;
 
 	string opt_obj_func;
+    string org_opt_obj_func;
 	bool opt_coin_log;
 	bool opt_skip_final;
 	vector<string> opt_dec_var_groups;

@@ -612,7 +612,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
             cout << "'pest.stp' found" << endl;
             kill_all_active_runs();
             ss.str("");
-            ss << "'pest.stp' found, closing all reminaing open file transfers";
+            ss << "'pest.stp' found, closing all remaining open file transfers";
             report(ss.str(),true);
             for (auto& m : open_file_socket_map) {
                 string fname = m.second;

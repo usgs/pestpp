@@ -679,6 +679,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		passed_args.insert("OPT_OBJ_FUNC");
 		passed_args.insert("OPT_OBJECTIVE_FUNCTION");
 		convert_ip(value,opt_obj_func);
+        org_opt_obj_func = org_value;
 	}
 	else if (key == "OPT_COIN_LOG")
 	{
@@ -1185,6 +1186,8 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         convert_ip(value,ies_n_iter_mean);
         return true;
     }
+
+
     return false;
 }
 
@@ -1899,6 +1902,7 @@ void PestppOptions::set_defaults()
 
 
 	set_opt_obj_func("");
+    set_org_opt_obj_func("");
 	set_opt_coin_log(true);
 	set_opt_skip_final(false);
 	set_opt_std_weights(false);
@@ -2006,6 +2010,7 @@ void PestppOptions::set_defaults()
     set_ies_phi_fractions_files("");
     set_ies_phi_factors_by_real(false);
     set_ies_n_iter_mean(0);
+
 
 	// DA parameters
 	//set_da_use_ies(false);

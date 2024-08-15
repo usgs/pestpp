@@ -100,6 +100,8 @@ int main(int argc, char* argv[])
 				}
 				catch (PestError e)
 				{
+                    frec << "Error processing control file: " << ctl_file << endl << endl;
+                    frec << e.what() << endl << endl;
 					cerr << "Error processing control file: " << ctl_file << endl << endl;
 					cerr << e.what() << endl << endl;
 					throw(e);
@@ -180,13 +182,13 @@ int main(int argc, char* argv[])
 			file_manager.close_file("pst");
 			performance_log.log_event("finished processing control file");
 		}
-		catch (PestError e)
+		catch (exception &e)
 		{
-			cerr << "Error prococessing control file: " << filename << endl << endl;
+			cerr << "Error processing control file: " << filename << endl << endl;
 			cerr << e.what() << endl << endl;
-			fout_rec << "Error prococessing control file: " << filename << endl << endl;
+			fout_rec << "Error processing control file: " << filename << endl << endl;
 			fout_rec << e.what() << endl << endl;
-			fout_rec.close();
+
 			throw(e);
 		}
 		pest_scenario.check_inputs(fout_rec);

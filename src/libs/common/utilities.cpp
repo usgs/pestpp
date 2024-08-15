@@ -636,14 +636,14 @@ void read_res(string& res_filename, Observations& obs)
 	if (extra.size() > 0)
 	{
 		stringstream ss;
-		ss << "extra obs found res file...ignoring: ";
-		int i = 0;
+		ss << extra.size() << " extra obs found res file...ignoring: ";
+		/*int i = 0;
 		for (auto& n : extra)
 		{
 			ss << n << ' ';
 			i++;
 			if (i % 5 == 0) ss << endl;
-		}
+		}*/
 		cout << ss.str();
 	}
 }
