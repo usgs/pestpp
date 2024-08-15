@@ -610,12 +610,17 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 	if (upgrade_active_ctl_pars.get_notnormal_keys().size() > 0)
 	{
 		stringstream ss;
-		for (auto &n : upgrade_active_ctl_pars.get_notnormal_keys())
+        ss << "not normal floating point in upgrade pars :" << endl;
+        for (auto &n : upgrade_active_ctl_pars.get_notnormal_keys())
 			ss << n << ',';
-		string message = "not normal floating point in upgrade pars: " + ss.str();
-		file_manager.rec_ofstream() << message << endl;
-		cout << message;
-		throw runtime_error(message);
+
+        ss << "(this usually happens when the SVD truncation is too aggressive)" << endl;
+        ss << "(try increasing eigthresh)" << endl << endl;
+
+        file_manager.rec_ofstream() << ss.str();
+
+        cout << ss.str();
+		throw runtime_error(ss.str());
 
 	}
 	performance_log->log_event("commencing check of parameter bounds");
@@ -629,7 +634,7 @@ void SVDSolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_active
 	pair<string,double> ctl_info = pest_scenario.enforce_par_limits(performance_log, notfrozen_upgrade_active_ctl_pars, base_run_active_ctl_pars, true, true);
 	
 	ss.str("");
-	ss << "change limit/bound enforement for lambda " << i_lambda << ": " << ctl_info.first << ", scaling factor: " << ctl_info.second;
+	ss << "change limit/bound enforcement for lambda " << i_lambda << ": " << ctl_info.first << ", scaling factor: " << ctl_info.second;
 	performance_log->log_event(ss.str());
 	if (ctl_info.second < 0.01)
 	{

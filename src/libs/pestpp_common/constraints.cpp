@@ -127,6 +127,7 @@ void OptObjFunc::throw_optobjfunc_error(string message)
 
 void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv_names)
 {
+    stringstream ss;
 	//initialize the objective function
 	obj_func_str = pest_scenario.get_pestpp_options().get_opt_obj_func();
 	obj_sense = (pest_scenario.get_pestpp_options().get_opt_direction() == 1) ? "minimize" : "maximize";
@@ -143,6 +144,10 @@ void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv
 		use_obj_obs = true;
 		obj_obs = obj_func_str;
 		//check
+        ss.str("");
+        ss << "...objective function defined by observation '" << obj_func_str << "'" << endl;
+        cout << ss.str();
+        f_rec << ss.str();
 		set<string> names(constraint_names.begin(), constraint_names.end());
 		if (names.find(obj_obs) != names.end())
 		{
@@ -162,25 +167,39 @@ void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv
 	{
 		if (obj_func_str.size() == 0)
 		{
-			f_rec << " warning: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
-			for (auto& name : dv_names)
+			f_rec << " note: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
+			cout << " note: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
+            for (auto& name : dv_names)
 				obj_func_coef_map[name] = 1.0;
 		}
 
 		//or if it is a prior info equation
 		else if (pest_scenario.get_prior_info().find(obj_func_str) != pest_scenario.get_prior_info().end())
 		{
+            ss.str("");
+            ss << "...objective function defined by prior information equation '" << obj_func_str << "'" << endl;
+            cout << ss.str();
+            f_rec << ss.str();
 			obj_func_coef_map = pest_scenario.get_prior_info().get_pi_rec(obj_func_str).get_atom_factors();
 			//throw_sequentialLP_error("prior-information-based objective function not implemented");
 		}
 		else
 		{
 			//check if this obj_str is a filename
-			ifstream if_obj(obj_func_str);
+            obj_func_str = pest_scenario.get_pestpp_options().get_org_opt_obj_func();
+            ss.str("");
+            ss << "...objective function defined by 2-column external file '" << obj_func_str << "'" << endl;
+            cout << ss.str();
+            f_rec << ss.str();
+            if (!pest_utils::check_exist_in(obj_func_str))
+            {
+                throw_optobjfunc_error("unable to open objective function file '"+obj_func_str+"' for reading");
+            }
+			/*ifstream if_obj(obj_func_str);
 			if (!if_obj.good())
 				throw_optobjfunc_error("unrecognized ++opt_objective_function arg: " + obj_func_str);
-			else
-				obj_func_coef_map = pest_utils::read_twocol_ascii_to_map(obj_func_str);
+			else*/
+            obj_func_coef_map = pest_utils::read_twocol_ascii_to_map(obj_func_str);
 		}
 
 
@@ -241,7 +260,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	std_weights = pest_scenario.get_pestpp_options().get_opt_std_weights();
 	if ((!std_weights) && ((stack_size > 0) || (par_stack_name.size() > 0) || (obs_stack_name.size() > 0)))
 		use_fosm = false;
-	//initialize the stack constainers (ensemble class instances)
+	//initialize the stack containers (ensemble class instances)
 	stack_pe.set_pest_scenario(&pest_scenario);
 	stack_pe.set_rand_gen(&rand_gen);
 	stack_oe.set_pest_scenario_ptr(&pest_scenario);
@@ -786,7 +805,10 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 						missing.push_back(name);
 				if (missing.size() > 0)
 					throw_constraints_error("obs stack missing the following constraints: ", missing);
-
+                if (stack_size == 0)
+                {
+                    stack_size = stack_oe.shape().first;
+                }
 				//a restart with "all"
 				if ((stack_pe_map.size() > 0) && (pest_scenario.get_pestpp_options().get_opt_chance_points() == "ALL"))
 				{
@@ -1066,11 +1088,11 @@ double Constraints::get_max_constraint_change(Observations& current_obs, Observa
 	return max_abs_constraint_change;
 }
 
-//Observations Constraints::get_chance_shifted_constraints()
+//Observations Constraints::get_stack_shifted_chance_constraints()
 //{
 //	/* one version of this method that doesnt take any args just use the pointer to the
 //	current sim constraint values*/
-//	return get_chance_shifted_constraints(*current_constraints_sim_ptr);
+//	return get_stack_shifted_chance_constraints(*current_constraints_sim_ptr);
 //}
 
 double Constraints::get_sum_of_violations(Parameters& pars, Observations& obs)
@@ -1189,7 +1211,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 			{
 				real_vec = shifted_oe.get_real_vector(real_name);
 				sim.update_without_clear(onames, real_vec);
-				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[real_name],risk_map[real_name], true);
+				sim_shifted = get_stack_shifted_chance_constraints(sim, stack_oe_map[real_name], risk_map[real_name],true, false);
                 stack_oe_map[real_name].fill_moment_maps(stack_mean,stack_std);
 				shifted_oe.replace(real_map[real_name], sim_shifted);
                 for (auto& constraint : ctl_ord_obs_constraint_names) {
@@ -1307,7 +1329,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
                         continue;
                     }
                     //this call uses the class stack_oe attribute;
-                    sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[dreal_names[ii]],_risk,true);
+                    sim_shifted = get_stack_shifted_chance_constraints(sim, stack_oe_map[dreal_names[ii]], _risk, true, false);
                     shifts.row(ii) = sim_shifted.get_data_eigen_vec(shifted_oe.get_var_names()) * factors[ii];
                 }
                 real_vec = shifts.colwise().sum();
@@ -1333,7 +1355,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 				real_vec = shifted_oe.get_real_vector(missing[i]);
 				sim.update_without_clear(onames, real_vec);
 				//this call uses the class stack_oe attribute;
-				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[min_real_name],_risk,true);
+				sim_shifted = get_stack_shifted_chance_constraints(sim, stack_oe_map[min_real_name], _risk, true, false);
 				//shifted_oe.replace(real_map.at(missing[i]), sim_shifted);
                 stack_oe_map[min_real_name].fill_moment_maps(stack_mean,stack_std);
                 for (auto& constraint : ctl_ord_obs_constraint_names) {
@@ -1360,7 +1382,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 
 
 
-Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, double _risk)
+Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, double _risk, bool use_stack_anomalies)
 {
 	/* get the simulated constraint values with the chance shift applied*/
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
@@ -1415,11 +1437,11 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 		if (stack_oe_map.size() > 0)
 		{
 			ObservationEnsemble _mean_stack = get_stack_mean(stack_oe_map);
-			shifted_obs = get_chance_shifted_constraints(current_obs, _mean_stack, _risk);
+			shifted_obs = get_stack_shifted_chance_constraints(current_obs, _mean_stack, _risk, false, false);
 		}
 
 		else
-			shifted_obs = get_chance_shifted_constraints(current_obs, stack_oe, _risk);
+			shifted_obs = get_stack_shifted_chance_constraints(current_obs, stack_oe, _risk,false, use_stack_anomalies);
 		
 	}
 	vector<string> names = shifted_obs.get_keys();
@@ -1506,7 +1528,8 @@ ObservationEnsemble Constraints::get_stack_mean(map<string, ObservationEnsemble>
 	return _mean_stack;
 }
 
-Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe, double _risk, bool full_obs)
+Observations Constraints::get_stack_shifted_chance_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe,
+                                                               double _risk, bool full_obs, bool use_stack_anomalies)
 {
 	double old_constraint_val, required_val, pt_offset, new_constraint_val;
 
@@ -1517,7 +1540,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	if (_stack_oe.shape().first < 3)
 		throw_constraints_error("too few (<3) stack members, cannot continue with stack-based chance constraints/objectives");
 	int cur_num_reals = _stack_oe.shape().first;
-	//get the inde (which realization number) represents the risk value according to constraint sense
+	//get the index (which realization number) represents the risk value according to constraint sense
 	//
 	//the "less than" realization index is just the risk value times the number of reals
 	int lt_idx = int(_risk * cur_num_reals);
@@ -1527,14 +1550,21 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	int eq_idx = int(0.5 * cur_num_reals);
 	//get the mean-centered anomalies - we want to subtract off the mean 
 	//in case these stack values are being re-used from a previous iteration
-	Eigen::MatrixXd anom = _stack_oe.get_eigen_anomalies();
-	//get the map of realization name to index location in the stack
+	//Eigen::MatrixXd anom = _stack_oe.get_eigen_anomalies();
+    Eigen::MatrixXd anom;
+    if (use_stack_anomalies)
+        anom = _stack_oe.get_eigen_anomalies();
+    else
+        anom = _stack_oe.get_eigen();
+
+    //get the map of realization name to index location in the stack
 	_stack_oe.update_var_map();
 	map<string, int> var_map = _stack_oe.get_var_map();
-	//get the mean and stdev summary containters, summarized by observation (e.g. constraint) name
+	//get the mean and stdev summary containers, summarized by observation (e.g. constraint) name
 	//pair<map<string, double>, map<string, double>> mm = _stack_oe.get_moment_maps();
 	map<string, double> mean_map, std_map;
 	_stack_oe.fill_moment_maps(mean_map, std_map);
+    Eigen::VectorXd cvec;
 	for (auto& name : ctl_ord_obs_constraint_names)
 	{
 		old_constraint_val = current_obs.get_rec(name);
@@ -1543,10 +1573,18 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 		// the realized values of this stack are the anomalies added to the
 		//current constraint value - this assumes the current value 
 		//is the mean of the stack distribution
-		Eigen::VectorXd cvec = anom.col(var_map[name]).array() + old_constraint_val;
+        if (use_stack_anomalies)
+            cvec = anom.col(var_map[name]).array() + old_constraint_val;
+        else
+		    cvec = anom.col(var_map[name]).array();// + old_constraint_val;
 		//now sort the anomolies + current (mean) value vector
 		sort(cvec.data(), cvec.data() + cvec.size());
-		//set the stdev container info - this isnt used in 
+		/*cout << cvec << endl << endl;
+        Eigen::VectorXd temp = _stack_oe.get_var_vector(name);
+        sort(temp.data(),temp.data() + temp.size());
+        cout << temp << endl << endl;*/
+
+        //set the stdev container info - this isnt used in
 		//calculations but gets reported
 		prior_constraint_stdev[name] = std_map[name];
 		post_constraint_stdev[name] = std_map[name];
@@ -1607,7 +1645,7 @@ vector<double> Constraints::get_constraint_residual_vec(Observations& sim)
 	return residuals_vec;
 }
 
-pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Parameters& current_pars, Observations& current_obs)
+pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Parameters& current_pars, Observations& current_obs, bool use_stack_anomalies)
 {
 	/* get the upper and lower bound constraint vectors. For less than constraints, the lower bound is 
 	set to double max, for greater than constraints, the upper bound is set to double max.
@@ -1615,7 +1653,7 @@ pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Pa
 	vector<double> residuals;
 	if (use_chance)
 	{
-		Observations current_constraints_chance = get_chance_shifted_constraints(current_obs);
+		Observations current_constraints_chance = get_chance_shifted_constraints(current_obs, risk, use_stack_anomalies);
 		residuals = get_constraint_residual_vec(current_constraints_chance);
 	}
 	else
@@ -2181,7 +2219,7 @@ void Constraints::stack_summary(int iter, Observations& shifted_obs, bool echo, 
 	if (!use_chance)
 		return;
 
-	//Observations current_constraints_chance = get_chance_shifted_constraints(current_obs);
+	//Observations current_constraints_chance = get_stack_shifted_chance_constraints(current_obs);
 
 	int nsize = 20;
 	for (auto o : ctl_ord_obs_constraint_names)

@@ -224,7 +224,7 @@ pair<double,double> sequentialLP::postsolve_decision_var_report(Parameters &upgr
 	}
 	stringstream ss;
 	ss << slp_iter << ".par";
-
+    par_trans.active_ctl2ctl_ip(actual_pars);
 	of_wr.write_par(file_mgr_ptr->open_ofile_ext(ss.str()),actual_pars,*par_trans.get_offset_ptr(),*par_trans.get_scale_ptr());
 	file_mgr_ptr->close_file(ss.str());
 	of_wr.write_par(file_mgr_ptr->open_ofile_ext("par"), actual_pars, *par_trans.get_offset_ptr(), *par_trans.get_scale_ptr());
@@ -510,10 +510,27 @@ void sequentialLP::iter_solve()
 	//convert Jacobian_1to1 to CoinPackedMatrix
 	cout << "  ---  forming LP model  --- " << endl;
 	CoinPackedMatrix matrix = jacobian_to_coinpackedmatrix();
-
+    stringstream ss;
 	build_dec_var_bounds();
+    bool use_stack_anamolies = true;
+    if ((constraints.get_use_chance()) && (!constraints.get_use_fosm()))
+    {
+        if (constraints.should_update_chance(slp_iter))
+        {
+            ss.str("");
+            ss << "...using direct stack simulated results in chance calculations";
+            use_stack_anamolies = false;
+        }
+        else
+        {
+            ss.str("");
+            ss << "...using stack anomalies and current simulated constraint values in chance calculations";
+        }
+        f_rec << ss.str() << endl;
+        cout << ss.str() << endl;
 
-	pair<vector<double>, vector<double>> bounds = constraints.get_constraint_bound_vectors(current_pars, current_constraints_sim);
+    }
+    pair<vector<double>, vector<double>> bounds = constraints.get_constraint_bound_vectors(current_pars, current_constraints_sim,use_stack_anamolies);
 	constraints.presolve_report(slp_iter,current_pars, current_constraints_sim);
 	//load the linear simplex model
 	//model.loadProblem(matrix, dec_var_lb, dec_var_ub, ctl_ord_obj_func_coefs, constraint_lb, constraint_ub);
@@ -531,7 +548,7 @@ void sequentialLP::iter_solve()
 	//if maximum ++opt_coin_loglev, then also write iteration specific mps files
 	if (pest_scenario.get_pestpp_options().get_opt_coin_log())
 	{
-		stringstream ss;
+		ss.str("");
 		ss << slp_iter << ".mps";
 		string mps_name = file_mgr_ptr->build_filename(ss.str());
 		model.writeMps(mps_name.c_str(),0,1);
@@ -1172,7 +1189,7 @@ void sequentialLP::iter_presolve()
 		stringstream ss;
 		ss << slp_iter << ".jcb";
 		string rspmat_file = file_mgr_ptr->build_filename(ss.str());
-		f_rec << endl << "saving iteration " << slp_iter << " reponse matrix to file: " << rspmat_file << endl;
+		f_rec << endl << "saving iteration " << slp_iter << " response matrix to file: " << rspmat_file << endl;
 		jco.save(ss.str());
 
 		//check for failed runs

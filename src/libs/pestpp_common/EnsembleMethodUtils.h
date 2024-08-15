@@ -66,7 +66,7 @@ class L2PhiHandler
 {
 public:
 
-	enum phiType { MEAS, COMPOSITE, REGUL, ACTUAL };
+	enum phiType { MEAS, COMPOSITE, REGUL, ACTUAL, NOISE };
 	L2PhiHandler() { ; }
 	L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 		       ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
@@ -88,6 +88,9 @@ public:
 
 	void write(int iter_num, int total_runs, bool write_group = true);
 	void write_group(int iter_num, int total_runs, vector<double> extra);
+    //csv << "iteration,num_reals,current_lambda,accept_phi,lambda_mult,lambda_scale_fac,lambda,meas_phi" << endl;
+    void write_lambda(int iteration,int num_reals,double current_lambda,double current_comp_mean_phi,double current_comp_std_phi,
+                      double lambda_mult,double lambda, double comp_mean_phi, double comp_std_phi);
 	vector<int> get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe, ObservationEnsemble& weights);
 
 	Eigen::MatrixXd get_obs_resid(ObservationEnsemble &oe, bool apply_ineq=true);
@@ -96,15 +99,19 @@ public:
 	Eigen::MatrixXd get_par_resid(ParameterEnsemble &pe);
 	Eigen::MatrixXd get_par_resid_subset(ParameterEnsemble &pe,vector<string> real_names=vector<string>());
 	Eigen::MatrixXd get_actual_obs_resid(ObservationEnsemble &oe);
+    //Eigen::MatrixXd get_noise_resid(ObservationEnsemble &oe, bool apply_ineq=true);
 	Eigen::VectorXd get_q_vector();
 	vector<string> get_lt_obs_names() { return lt_obs_names; }
 	vector<string> get_gt_obs_names() { return gt_obs_names; }
+    map<string,double> get_lt_obs_bounds() {return lt_obs_bounds;}
+    map<string,double> get_gt_obs_bounds() {return gt_obs_bounds;}
+    map<string,pair<double,double>> get_double_obs_bounds() {return double_obs_bounds;}
 
-	void apply_ineq_constraints(Eigen::MatrixXd &resid, vector<string> &names);
+	void apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixXd &sim_vals, vector<string> &names);
 
 	void save_residual_cov(ObservationEnsemble& oe, int iter);
 
-	map<string,double> get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec);
+	//map<string,double> get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec);
 
 	map<string,map<string,double>> get_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights,phiType ptype=phiType::MEAS);
 
@@ -120,10 +127,12 @@ private:
 	string get_summary_header();
 	void prepare_csv(ofstream &csv,vector<string> &names);
 	void prepare_group_csv(ofstream &csv, vector<string> extra = vector<string>());
+    void prepare_lambda_csv(ofstream &csv);
 
 	map<string, Eigen::VectorXd> calc_meas(ObservationEnsemble &oe, Eigen::VectorXd& q_vec);
     map<string, Eigen::VectorXd> calc_meas(ObservationEnsemble &oe, ObservationEnsemble& weights);
-
+    //map<string, Eigen::VectorXd> calc_noise(ObservationEnsemble &oe, ObservationEnsemble& weights);
+    //map<string, Eigen::VectorXd> calc_noise(ObservationEnsemble &oe, Eigen::VectorXd& q_vec);
 	map<string, Eigen::VectorXd> calc_regul(ParameterEnsemble &pe);// , double _reg_fac);
 	map<string, Eigen::VectorXd> calc_actual(ObservationEnsemble &oe, Eigen::VectorXd& q_vec);
     map<string, Eigen::VectorXd> calc_actual(ObservationEnsemble & oe, ObservationEnsemble& weights);
@@ -147,9 +156,13 @@ private:
 	map<string, double> regul;
 	map<string, double> composite;
 	map<string, double> actual;
+    map<string, double> noise;
 
 	vector<string> lt_obs_names;
 	vector<string> gt_obs_names;
+    map<string,double> lt_obs_bounds;
+    map<string,double> gt_obs_bounds;
+    map<string,pair<double,double>> double_obs_bounds;
 
 	map<string, vector<int>> obs_group_idx_map;
 	map<string, vector<int>> par_group_idx_map;

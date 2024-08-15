@@ -94,7 +94,9 @@ int main(int argc, char* argv[])
 			}
 			catch (PestError e)
 			{
-				cerr << "Error prococessing control file: " << ctl_file << endl << endl;
+                frec << "Error processing control file: " << ctl_file << endl << endl;
+                frec << e.what() << endl << endl;
+                cerr << "Error prococessing control file: " << ctl_file << endl << endl;
 				cerr << e.what() << endl << endl;
 				throw(e);
 			}

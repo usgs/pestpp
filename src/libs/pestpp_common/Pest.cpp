@@ -676,7 +676,14 @@ int Pest::process_ctl_file(ifstream& fin, string _pst_filename, ofstream& f_rec)
 				{
 					convert_ip(tokens[0], num_tpl_file);
 					if (tokens.size() >= 5) {
-						convert_ip(tokens[4], control_info.numcom);
+                        try {
+                            convert_ip(tokens[4], control_info.numcom);
+                        }
+                        catch (...)
+                        {
+                            cout << "WARNING: error parsing '" << tokens[4] <<"' to numcom option...continuing" << endl;
+                            control_info.numcom = 0;
+                        }
 					}
 					else {
 						control_info.numcom = 0;

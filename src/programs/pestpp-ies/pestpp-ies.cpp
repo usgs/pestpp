@@ -81,7 +81,9 @@ int main(int argc, char* argv[])
                     yam_agent.process_ctl_file(ctl_file);
 
                 }
-                catch (PestError e) {
+                catch (exception &e) {
+                    frec << "Error processing control file: " << ctl_file << endl << endl;
+                    frec << e.what() << endl << endl;
                     cerr << "Error processing control file: " << ctl_file << endl << endl;
                     cerr << e.what() << endl << endl;
                     throw (e);
@@ -154,8 +156,18 @@ int main(int argc, char* argv[])
         Pest pest_scenario;
         //try {
         performance_log.log_event("starting to process control file");
-        pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),
-                                       fout_rec);
+        try {
+            pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),
+                                           fout_rec);
+        }
+        catch (exception &e)
+        {
+            fout_rec << "Error processing control file: " << file_manager.build_filename("pst") << endl << endl;
+            fout_rec << e.what() << endl << endl;
+            cerr << "Error processing control file: " << file_manager.build_filename("pst") << endl << endl;
+            cerr << e.what() << endl << endl;
+            throw(e);
+        }
         file_manager.close_file("pst");
         performance_log.log_event("finished processing control file");
         /*}
@@ -308,6 +320,7 @@ int main(int argc, char* argv[])
 	catch (exception &e)
 	{
 		cout << "Error condition prevents further execution: " << endl << e.what() << endl;
+
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));
