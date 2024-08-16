@@ -1186,6 +1186,11 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         convert_ip(value,ies_n_iter_mean);
         return true;
     }
+    else if (key == "IES_UPDATE_BY_REALS")
+    {
+        ies_updatebyreals = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
 
 
     return false;
@@ -1824,9 +1829,11 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_phi_factors_file: " << ies_phi_fractions_file << endl;
     os << "ies_phi_factors_by_real: " << ies_phi_factors_by_real << endl;
     os << "ies_n_iter_mean: " << ies_n_iter_mean << endl;
+    os << "ies_updatebyreals: " << ies_updatebyreals << endl;
 
 
-	os << endl << "pestpp-sen options: " << endl;
+
+    os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
 	os << "gsa_morris_pooled_obs: " << gsa_morris_pooled_obs << endl;
 	os << "gsa_morris_obs_sen: " << gsa_morris_obs_sen << endl;
@@ -2010,6 +2017,7 @@ void PestppOptions::set_defaults()
     set_ies_phi_fractions_files("");
     set_ies_phi_factors_by_real(false);
     set_ies_n_iter_mean(0);
+    set_ies_updatebyreals(true);
 
 
 	// DA parameters

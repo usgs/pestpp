@@ -7110,8 +7110,8 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	}
 	if (best_idx == -1)
 	{
-		message(0, "WARNING:  unsuccessful upgrade testing, resetting lambda to 10000.0 and returning to upgrade calculations");
-		last_best_lam = 10000.0;
+		message(0, "WARNING:  unsuccessful upgrade testing, multiplying lambda by 10000.0 and returning to upgrade calculations");
+		last_best_lam *= 10000.0;
 		return false;
 
 	}
@@ -7121,7 +7121,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
     if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
 	{
-
 		double acc_phi = last_best_mean * acc_fac;
 
 		if (pest_scenario.get_pestpp_options().get_ies_debug_high_subset_phi())
@@ -7348,9 +7347,15 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		message(0, "updating parameter ensemble");
 		performance_log->log_event("updating parameter ensemble");
 		last_best_mean = best_mean;
-
-		pe = pe_lams[best_idx];
-		oe = oe_lam_best;
+        if (pest_scenario.get_pestpp_options().get_ies_updatebyreals())
+        {
+            message(0, "only updating realizations with reduced phi");
+            update_reals_by_phi(pe_lams[best_idx], oe_lam_best);
+        }
+        else {
+            pe = pe_lams[best_idx];
+            oe = oe_lam_best;
+        }
 		if (best_std < last_best_std * acc_fac)
 		{
 			double new_lam = lam_vals[best_idx] * lam_dec;
@@ -7368,11 +7373,10 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	else
 	{
 		//message(0, "not updating parameter ensemble");
-		if (!use_mda)
+		if ((!use_mda) && (!pest_scenario.get_pestpp_options().get_ies_updatebyreals()))
 		{
 			message(0, "only updating realizations with reduced phi");
 			update_reals_by_phi(pe_lams[best_idx], oe_lam_best);
-			
 		}
 		ph.update(oe, pe, weights);
 		//re-check phi
