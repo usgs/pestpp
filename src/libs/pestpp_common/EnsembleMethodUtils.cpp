@@ -7089,11 +7089,16 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			continue;
 		}
 
+        if (pest_scenario.get_pestpp_options().get_ies_updatebyreals())
+        {
+            message(1, "updating realizations with reduced phi");
+            update_reals_by_phi(pe_lams[i], oe_lams[i],subset_idxs);
+        }
+
 		ph.update(oe_lams[i], pe_lams[i], weights);
 
 		message(0, "phi summary for lambda, scale fac:", vals, echo);
 		ph.report(echo);
-
 
 		mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
