@@ -492,6 +492,8 @@ public:
 	void set_ies_phi_fractions_files(string _file) {ies_phi_fractions_file = _file;}
     bool get_ies_phi_factors_by_real() const {return ies_phi_factors_by_real;}
     void set_ies_phi_factors_by_real(bool _flag) {ies_phi_factors_by_real = _flag;}
+    bool get_ies_updatebyreals() const {return ies_updatebyreals;}
+    void set_ies_updatebyreals(bool _flag) {ies_updatebyreals = _flag;}
 
 
 
@@ -823,6 +825,7 @@ private:
 	string ies_phi_fractions_file;
 	bool ies_phi_factors_by_real;
 	int ies_n_iter_mean;
+    bool ies_updatebyreals;
 
 
 	// Data Assimilation parameters

@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.12
+# <a id='s1' />Version 5.2.13
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-June 2024
+October 2024
 
 # <a id='s2' />Acknowledgements
 
@@ -70,7 +70,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Table of Contents
 
-- [Version 5.2.12](#s1)
+- [Version 5.2.13](#s1)
 - [Acknowledgements](#s2)
 - [Preface](#s3)
 - [License](#s4)
@@ -253,6 +253,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         - [9.2.8 Reporting ](#s13-2-8)
         - [9.2.9 Termination Criteria, Objective Functions, and Upgrade Acceptance ](#s13-2-9)
         - [9.2.10 Internal Weight Adjustment ](#s13-2-10)
+        - [9.2.11 Selective Updates ](#s13-2-11)
     - [9.3 PESTPP-IES Output Files](#s13-3)
         - [9.3.1 CSV Output Files](#s13-3-1)
         - [9.3.2 Non-CSV Output Files](#s13-3-2)
@@ -3821,6 +3822,14 @@ When using a weight ensemble and the multi-modal solution process, users may als
 
 If users want to have more fine-grained control of the weight adjustment, option are available in both pyEMU and the PEST utilities.
 
+### <a id='s13-2-11' />9.2.11 Selective Updates 
+
+In highly nonlinear settings, some realizations may show an increase in phi across iterations, while the majority of realizations shows decreases – see Figure 9.4 for an example. This indicates that, because of nonlinearity, the optimal parameter ensemble update that is effective at reducing phi for the ensemble as a whole is not ideal for all realizations. To combat this problem, PESTPP-IES will, by default (as of version 5.2.13), only update realizations that meet the phi reduction criteria. This is identical to the partial upgrade process that is triggered automatically of the mean phi of the entire ensemble does not meet the phi reduction criteria. This behaviour is controlled with the *ies_update_by_reals* option, which is true by default.
+
+<img src="./media/image7.png" style="width:6.26806in;height:3.20347in" alt="A graph of a graph Description automatically generated with medium confidence" />
+
+Figure 9.4 – The ensemble upgrade from iteration 2 to iteration 3 shows that some realizations have an increase in phi values, while most realizations show a decrease in phi.
+
 ## <a id='s13-3' />9.3 PESTPP-IES Output Files
 
 ### <a id='s13-3-1' />9.3.1 CSV Output Files
@@ -4152,7 +4161,12 @@ Note also that the number of control variables may change with time. Refer to th
 <tr class="odd">
 <td><em>ies_n_iter_mean</em></td>
 <td>int</td>
-<td>The number of mean-shift iterations to use. Default is 0-</td>
+<td>The number of mean-shift iterations to use. Default is 0, which is indicates not to do the prior-mean-shifting process</td>
+</tr>
+<tr class="even">
+<td><em>ies_update_by_reals</em></td>
+<td>bool</td>
+<td>Flag to indicate whether or not to update each realization according to its phi reduction.</td>
 </tr>
 </tbody>
 </table>
@@ -4722,7 +4736,7 @@ In this way, the string-based cycle values allow users to apply sophisticated ru
 
 Although PESTPP-DA is a tool designed for flexible sequential and batch data assimilation, the generalized nature of the cycle concept, in concert with the observation and weight cycle tables, also provides a range of other functionality. In this way, the cycle concept can be thought of as an outer iteration process. For example, users can undertake the advanced “direct predictive hypothesis testing” analysis (e.g., Moore et al., 2010) with PESTPP-DA by constructing a generic weight cycle table where each cycle includes increasing weight on a control file observation quantity that represents a simulated outcome of interest. For example, assume a model has been constructed to simulate surface-water/groundwater exchange (SGE) along an important river reach. Further assume that the simulated SGE along this reach is included in the control file as an observation. To test the hypothesis that the SGE for this reach could be zero, users should set the observation value quantity in the control file to 0.0 and set the weight to 1.0 (this weight will not be used but simply activates this quantity in the PESTPP-DA cycle process). Now users can construct a weight cycle table. Let’s use 10 cycles. For the historic observations that are being assimilated, the entries for all cycles in the weight cycle table for these observations should be identical to the weights in the control file. The entries for the SGE “observation” in the weight cycle table should slow increase from 0.0 in the first cycle to a value large enough to dominate the objective function in the last cycle. Conceptually, during each PESTPP-DA “cycle”, a (iterative) ensemble smoother formulation will be used to minimize the objective function, but as cycles progress, the desire to force the SGE towards zero increasingly features in the objective function. In this way, the compatibility between the fitting the historic observations and the ability to make SGE be zero is directly tested. If the ability to fit the past observations is maintained while also making the simulated SGE zero, then one cannot reject the hypothesis that the SGE could be zero on the basis of compatibility with historic observations. This technique is very similar to “pareto mode” in PEST(\_HP), except here, we can take advantage of the computational efficiency of the iterative ensemble solver in PESTPP-DA. Figure 12.XXX depicts the results of such an analysis
 
-<img src="./media/image7.png" style="width:6.26806in;height:6.29514in" alt="Chart, scatter chart Description automatically generated" />
+<img src="./media/image8.png" style="width:6.26806in;height:6.29514in" alt="Chart, scatter chart Description automatically generated" />
 
 Figure 12.XXX. Results of a direct predictive hypothesis testing analysis where the relation between fitting historic observations and a desire to make surface-water/groundwater exchange (SGE) zero is evaluated. The ensemble-based pareto trade-off between these two quantities shows that simulating an SGE of zero is not compatible with the historic observations.
 
