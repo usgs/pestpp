@@ -3908,11 +3908,14 @@ map<string,int> ParChangeSummarizer::get_npar_per_group_with_excess_std_reductio
     {
         if (std.second <= 0.0)
         {
-            ss.str("");
+            /*ss.str("");
             ss << "L2PhiHandler: prior std <=0 for par '" << std.first << "': " << std.second;
-            throw runtime_error(ss.str());
+            throw runtime_error(ss.str());*/
+            ratio = 1.0;
         }
-        ratio = pt_std.at(std.first) / std.second;
+        else {
+            ratio = pt_std.at(std.first) / std.second;
+        }
         if (!isnormal(ratio) && (ratio != 0.0))
         {
             ss.str("");
