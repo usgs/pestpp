@@ -120,6 +120,7 @@ public:
 
     vector<string> get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names);
 
+
 private:
 	string tag;
 	map<string, double> get_summary_stats(phiType pt);
@@ -197,6 +198,8 @@ private:
 
 	void update(ParameterEnsemble& pe);
 	void write_to_csv(string& filename);
+    map<string,int> get_npar_per_group_with_excess_std_reduction(ParameterEnsemble& _pe, double thresh=0.95);
+
 
 };
 

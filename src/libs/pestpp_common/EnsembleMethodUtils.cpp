@@ -3411,6 +3411,7 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_regul(ParameterEnsemble & pe)
 	return phi_map;
 }
 
+
 vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names)
 {
     stringstream ss;
@@ -3661,6 +3662,7 @@ ParChangeSummarizer::ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileMa
 void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 {
 	update(pe);
+    map<string,int> excess_std_reduction = get_npar_per_group_with_excess_std_reduction(pe);
 	vector<string> grp_names;// = base_pe_ptr->get_pest_scenario().get_ctl_ordered_par_group_names();
 	vector<pair<double, string>> pairs;
     //for (auto m : mean_change)
@@ -3675,7 +3677,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	{
 		grp_names.push_back(pairs[i].second);
 	}
-	int mxlen = 15;
+	int mxlen = 7;
 	for (auto& g : grp_names)
 		mxlen = max(mxlen, (int)g.size());
 
@@ -3686,10 +3688,10 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	cout << ss.str();
 	frec << ss.str();
 	ss.str("");
-	ss << setw(mxlen) << left << "group" << setw(10) << right << "mean chg" << setw(10) << "std chg";
-	ss << setw(10) << "n at ubnd" << setw(10) << "% at ubnd";
-    ss << setw(10) << "n at lbnd" << setw(10) << "% at lbnd";
-	ss << setw(10) << "init CV" << setw(10) << "curr CV" << setw(10) << endl;
+	ss << setw(mxlen) << left << "group" << right << setw(6) << "count" << setw(10) << right << "mean chg" << setw(9) << "std chg";
+	ss << setw(11) << "n at ubnd" << setw(11) << "% at ubnd";
+    ss << setw(11) << "n at lbnd" << setw(11) << "% at lbnd";
+	ss << setw(12) << "n std decr" << endl;
 	cout << ss.str();
 	frec << ss.str();	
 	
@@ -3703,16 +3705,18 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 		double std_diff = std_change[grp_name];
 
 		ss.str("");
-		ss << setw(mxlen) << left << pest_utils::lower_cp(grp_name) << setw(10) << setprecision(4) << right << mean_diff * 100.0;
-		ss << setw(10) << setprecision(4) << std_diff * 100.0;
+		ss << setw(mxlen) << left << pest_utils::lower_cp(grp_name) << right << setw(6) << pargp2par_map[grp_name].size();
+        ss << setw(10) << setprecision(4) << right << mean_diff * 100.0;
+		ss << setw(9) << setprecision(4) << std_diff * 100.0;
         num_out = num_at_ubound[grp_name];
         percent_out = percent_at_ubound[grp_name];
-		ss << setw(10) << num_out << setw(10) << setprecision(4) << percent_out;
+		ss << setw(11) << num_out << setw(11) << setprecision(4) << percent_out;
         num_out = num_at_lbound[grp_name];
         percent_out = percent_at_lbound[grp_name];
-        ss << setw(10) << num_out << setw(10) << setprecision(4) << percent_out;
-		ss << setw(10) << setprecision(4) << init_cv[grp_name] << setw(10) << curr_cv[grp_name] << setw(10) << setprecision(4) << endl;
-		if (i < 15)
+        ss << setw(11) << num_out << setw(11) << setprecision(4) << percent_out;
+		//ss << setw(10) << setprecision(4) << init_cv[grp_name] << setw(10) << curr_cv[grp_name] << setw(10) << setprecision(4) << endl;
+		ss << setw(12) << excess_std_reduction[grp_name] << endl;
+        if (i < 15)
 			cout << ss.str();
 		frec << ss.str();
 		i++;
@@ -3723,6 +3727,9 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	//ss << "          'n CV decr' is the number of parameters with current CV less " << cv_dec_threshold*100.0 << "% of the initial CV" << endl;
 	ss << "    Note: the parameter change statistics implicitly include the effect of " << endl;
 	ss << "          realizations that have failed or have been dropped." << endl;
+    ss << "    Note: the 'n std decr' is the number of parameters with current" << endl;
+    ss << "          std less 5% of their initial std." << endl;
+
 	cout << ss.str();
 	frec << ss.str();
 	if (grp_names.size() > 15)
@@ -3758,6 +3765,49 @@ void ParChangeSummarizer::write_to_csv(string& filename)
 	f.close();
 	file_manager_ptr->rec_ofstream() << "...saved parameter change summary to " << filename << endl;
 	cout << "...saved parameter change summary to " << filename << endl;
+
+}
+
+map<string,int> ParChangeSummarizer::get_npar_per_group_with_excess_std_reduction(ParameterEnsemble& _pe, double thresh)
+{
+    stringstream ss;
+    map<string,double> pr_mn,pr_std;
+    base_pe_ptr->fill_moment_maps(pr_mn,pr_std);
+    map<string,double> pt_mn,pt_std;
+    _pe.fill_moment_maps(pt_mn,pt_std);
+
+    double ratio;
+    map<string,int> results;
+    ParameterInfo* pi = _pe.get_pest_scenario_ptr()->get_ctl_parameter_info_ptr_4_mod();
+    string group;
+    for (auto& std : pr_std)
+    {
+        if (std.second <= 0.0)
+        {
+            ss.str("");
+            ss << "L2PhiHandler: prior std <=0 for par '" << std.first << "': " << std.second;
+            throw runtime_error(ss.str());
+        }
+        ratio = pt_std.at(std.first) / std.second;
+        if (!isnormal(ratio) && (ratio != 0.0))
+        {
+            ss.str("");
+            ss << "L2PhiHandler: posterior-prior std ratio not normal for par '" << std.first << "': " << ratio;
+            throw runtime_error(ss.str());
+        }
+        ratio = 1.0 - ratio;
+        group = pi->get_parameter_rec_ptr(std.first)->group;
+        if (results.find(group) == results.end()) {
+            results[group] = 0;
+        }
+        if (ratio >= thresh)
+        {
+            results[group]++;
+        }
+
+    }
+    return results;
+
 
 }
 
