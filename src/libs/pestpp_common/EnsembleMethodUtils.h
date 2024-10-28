@@ -496,7 +496,7 @@ protected:
 
 	Eigen::MatrixXd get_Am(const vector<string>& real_names, const vector<string>& par_names);
 
-    vector<string> detect_prior_data_conflict(bool save=true);
+    vector<string> detect_simulation_data_conflict(ObservationEnsemble& _oe, string csv_tag);
 
 	void zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov = true, bool update_oe_base = true);
 

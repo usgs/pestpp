@@ -5620,7 +5620,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	ph.report(true);
 	
 	pcs = ParChangeSummarizer(&pe_base, &file_manager, &output_file_writer);
-	vector<string> in_conflict = detect_prior_data_conflict();
+	vector<string> in_conflict = detect_simulation_data_conflict(oe,"pdc.csv");
 	if (in_conflict.size() > 0)
 	{
 		ss.str("");
@@ -8739,17 +8739,18 @@ void EnsembleMethod::zero_weight_obs(vector<string>& obs_to_zero_weight, bool up
 	message(1, ss.str());
 }
 
-vector<string> EnsembleMethod::detect_prior_data_conflict(bool save)
+vector<string> EnsembleMethod::detect_simulation_data_conflict(ObservationEnsemble& _oe, string csv_tag)
 {
-	message(1, "checking for prior-data conflict...");
+	message(1, "checking for simulation-data conflict...");
 	//for now, just really simple metric - checking for overlap
-	// write out conflicted obs and some related info to a csv file
-	ofstream pdccsv(file_manager.get_base_filename() + ".pdc.csv");
+	// write out conflicted obs and some related info
+    // to a csv file
+	ofstream pdccsv(file_manager.get_base_filename() + csv_tag);
 
 	vector<string> in_conflict;
 	double smin, smax, omin, omax, smin_stat, smax_stat, omin_stat, omax_stat;
 	map<string, int> smap, omap;
-	vector<string> snames = oe.get_var_names();
+	vector<string> snames = _oe.get_var_names();
 	vector<string> onames = oe_base.get_var_names();
 	vector<string> temp = ph.get_lt_obs_names();
 	set<string> ineq_lt(temp.begin(), temp.end());
@@ -8773,7 +8774,7 @@ vector<string> EnsembleMethod::detect_prior_data_conflict(bool save)
 
 	double smn, sstd, omn, ostd, dist;
 	double sd = abs(pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance());
-	int oe_nr = oe.shape().first;
+	int oe_nr = _oe.shape().first;
 	int oe_base_nr = oe_base.shape().first;
 	Eigen::VectorXd t;
 
@@ -8784,11 +8785,11 @@ vector<string> EnsembleMethod::detect_prior_data_conflict(bool save)
 		//	continue;
 		sidx = smap[oname];
 		oidx = omap[oname];
-		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
+		smin = _oe.get_eigen_ptr()->col(sidx).minCoeff();
 		omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
-		smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
+		smax = _oe.get_eigen_ptr()->col(sidx).maxCoeff();
 		omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
-		t = oe.get_eigen_ptr()->col(sidx);
+		t = _oe.get_eigen_ptr()->col(sidx);
 		smn = t.mean();
 		sstd = std::sqrt((t.array() - smn).square().sum() / (oe_nr - 1));
 		smin_stat = smn - (sd * sstd);
