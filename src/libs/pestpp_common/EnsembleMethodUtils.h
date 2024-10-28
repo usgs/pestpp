@@ -119,7 +119,7 @@ public:
 	map<string,map<string,double>> get_meas_phi_weight_ensemble(ObservationEnsemble& oe, ObservationEnsemble& weights);
 
     vector<string> get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names);
-
+    vector<string> detect_simulation_data_conflict(ObservationEnsemble& _oe, string csv_tag);
 
 private:
 	string tag;
@@ -158,6 +158,7 @@ private:
 	map<string, double> composite;
 	map<string, double> actual;
     map<string, double> noise;
+    map<string,int> num_conflict_group;
 
 	vector<string> lt_obs_names;
 	vector<string> gt_obs_names;
@@ -496,7 +497,6 @@ protected:
 
 	Eigen::MatrixXd get_Am(const vector<string>& real_names, const vector<string>& par_names);
 
-    vector<string> detect_simulation_data_conflict(ObservationEnsemble& _oe, string csv_tag);
 
 	void zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov = true, bool update_oe_base = true);
 

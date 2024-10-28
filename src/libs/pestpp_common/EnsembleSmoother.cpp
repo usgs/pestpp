@@ -57,6 +57,9 @@ void IterEnsembleSmoother::iterate_2_solution()
 		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
 		last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		ph.report(true);
+        ss.str("");
+        ss << "." << iter << ".pdc.csv";
+        ph.detect_simulation_data_conflict(oe,ss.str());
 		ph.write(iter, run_mgr_ptr->get_total_runs());
 		if (pest_scenario.get_pestpp_options().get_ies_save_rescov())
 			ph.save_residual_cov(oe,iter);
