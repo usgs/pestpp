@@ -718,6 +718,10 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 						cout << "exit_code: " << exitcode << endl;
 						throw std::runtime_error("GetExitCodeProcess() returned error status for command: " + cmd_string);
 					}
+                    if (should_echo)
+                    {
+                        cout << "...exit_code: " << exitcode << endl;
+                    }
 					break;
 				}
 				//else cout << exitcode << "...still waiting for command " << cmd_string << endl;
@@ -765,16 +769,22 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
                 //check if process is still active
 				int status = 0;
 				pid_t exit_code = waitpid(command_pid, &status, WNOHANG);
-				//if the process ended, break
+
+                //if the process ended, break
 				if ((exit_code == -1) || (status != 0))
 				{
+                    cout << "exit_code: " << exit_code << endl;
+                    cout << "status: " << status << endl;
 					finished->set(true);
-					cout << "exit_code: " << exit_code << endl;
-					cout << "status: " << status << endl;
 					throw std::runtime_error("waitpid() returned error status for command: " + cmd_string);
 				}
 				else if (exit_code != 0)
 				{
+                    if (should_echo)
+                    {
+                        cout << "...exit_code: " << exit_code << endl;
+                        cout << "...status: " << status << endl;
+                    }
 				    break;
 				}
 				//check for termination flag
