@@ -3902,11 +3902,23 @@ map<string,int> ParChangeSummarizer::get_npar_per_group_with_excess_std_reductio
 
     double ratio;
     map<string,int> results;
+
     ParameterInfo* pi = _pe.get_pest_scenario_ptr()->get_ctl_parameter_info_ptr_4_mod();
     string group;
-    for (auto& std : pr_std)
+    for (auto& pname : _pe.get_pest_scenario_ptr()->get_ctl_parameters())
     {
-        if (std.second <= 0.0)
+        group = pi->get_parameter_rec_ptr(pname.first)->group;
+        if (results.find(group) == results.end())
+        {
+            results[group] = 0;
+        }
+    }
+
+    double demon = 0.0;
+    for (auto& std : pt_std)
+    {
+        demon = pr_std.at(std.first);
+        if (demon <= 0.0)
         {
             /*ss.str("");
             ss << "L2PhiHandler: prior std <=0 for par '" << std.first << "': " << std.second;
@@ -3914,7 +3926,7 @@ map<string,int> ParChangeSummarizer::get_npar_per_group_with_excess_std_reductio
             ratio = 1.0;
         }
         else {
-            ratio = pt_std.at(std.first) / std.second;
+            ratio = std.second / demon;
         }
         if (!isnormal(ratio) && (ratio != 0.0))
         {
@@ -3924,9 +3936,9 @@ map<string,int> ParChangeSummarizer::get_npar_per_group_with_excess_std_reductio
         }
         ratio = 1.0 - ratio;
         group = pi->get_parameter_rec_ptr(std.first)->group;
-        if (results.find(group) == results.end()) {
-            results[group] = 0;
-        }
+//        if (results.find(group) == results.end()) {
+//            results[group] = 0;
+//        }
         if (ratio >= thresh)
         {
             results[group]++;
