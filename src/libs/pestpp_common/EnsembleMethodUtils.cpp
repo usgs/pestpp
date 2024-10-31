@@ -2788,6 +2788,9 @@ void L2PhiHandler::report_group(bool echo) {
             snzgroups.emplace(oi_ptr->get_group(o));
     }
 
+    if (snzgroups.size() == 0)
+        return;
+
     double tot = 0, ptot = 0;
     double v = 0,pv = 0;
     int c = 0;
