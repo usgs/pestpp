@@ -1485,14 +1485,168 @@ def sweep_bin_test():
 #def fail_test():
 #    raise Exception("fail please")
 
-def invest():
-    pst = pyemu.Pst(os.path.join("PESTPPTest","PestPilotPointTest.pst"))
+
+def tenpar_collapse_invest():
+    model_d = "ies_10par_xsec"
+    pyemu.Ensemble.reseed()
+    base_d = os.path.join(model_d, "template")
+    new_d = os.path.join(model_d, "test_template")
+    if os.path.exists(new_d):
+        shutil.rmtree(new_d)
+    shutil.copytree(base_d, new_d)
+    print(platform.platform().lower())
+    pst = pyemu.Pst(os.path.join(new_d, "pest.pst"))
+    print(pst.model_command)
+    
+    obs = pst.observation_data
+    obs.loc[obs.obsnme.str.startswith("h01"),"weight"] = 10.0
+    
+    obs.loc[obs.obsnme.str.startswith("h01"),"standard_deviation"] = 0.1
+
+    pst.parameter_data.loc[:,"partrans"] = "log"
+
+    # set noptmax
+    num_reals = [10,30,100]
+    pst.control_data.noptmax = 10
+    for num_real in num_reals:
+
+        # wipe all pestpp options
+        pst.pestpp_options = {}
+        pst.pestpp_options["ies_num_reals"] = num_real
+        pst.write(os.path.join(new_d, "pest.pst"))
+               
+        m_d = os.path.join(model_d,"master_ies_base_{0}reals".format(pst.pestpp_options["ies_num_reals"]))
+        if os.path.exists(m_d):
+            shutil.rmtree(m_d)
+        pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 50, master_dir=m_d,
+                               worker_root=model_d,port=port,verbose=True)
+
+    pst.pestpp_options = {}
+    pst.pestpp_options["ies_num_reals"] = 5000
+    pst.control_data.noptmax = -1
+    pst.write(os.path.join(new_d, "pest.pst"))
+           
+    m_d = os.path.join(model_d,"master_ies_base_{0}reals".format(pst.pestpp_options["ies_num_reals"]))
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 200, master_dir=m_d,
+                           worker_root=model_d,port=port,verbose=True)
+
+
+    pst.observation_data.loc[pst.nnz_obs_names[3],"obsval"] += 1.5
+    pst.observation_data.loc[pst.nnz_obs_names[5],"obsval"] -= 1.5
+
+    # set noptmax
+    pst.control_data.noptmax = 10
+    for num_real in num_reals:
+
+        # wipe all pestpp options
+        pst.pestpp_options = {}
+        pst.pestpp_options["ies_num_reals"] = num_real
+        pst.write(os.path.join(new_d, "pest.pst"))
+               
+        m_d = os.path.join(model_d,"master_ies_corrupt_{0}reals".format(pst.pestpp_options["ies_num_reals"]))
+        if os.path.exists(m_d):
+            shutil.rmtree(m_d)
+        pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 50, master_dir=m_d,
+                               worker_root=model_d,port=port,verbose=True)
+
+    pst.pestpp_options = {}
+    pst.pestpp_options["ies_num_reals"] = 5000
+    pst.control_data.noptmax = -1
+    pst.write(os.path.join(new_d, "pest.pst"))
+           
+    m_d = os.path.join(model_d,"master_ies_corrupt_{0}reals".format(pst.pestpp_options["ies_num_reals"]))
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 200, master_dir=m_d,
+                           worker_root=model_d,port=port,verbose=True)
+
+def plot_collapse_invest():
+    b_d = "ies_10par_xsec"
+    m_ds = [os.path.join(b_d,d) for d in os.listdir(b_d) if os.path.isdir(os.path.join(b_d,d)) and d.startswith("master") and d.endswith("reals")]
+
+    pes, oes, phidfs = {},{},{}
+    names = []
+    for m_d in m_ds:
+        phidf = pd.read_csv(os.path.join(m_d,"pest.phi.actual.csv"))
+        pst = pyemu.Pst(os.path.join(m_d,"pest.pst"))
+        p,o = [],[]
+        for i in [0,phidf.iteration.max()]:
+            oe = pd.read_csv(os.path.join(m_d,"pest.{0}.obs.csv".format(i)),index_col=0)
+            oe.index = oe.index.map(str)
+            pe = pd.read_csv(os.path.join(m_d,"pest.{0}.par.csv".format(i)),index_col=0)
+            pe.index = pe.index.map(str)
+            o.append(oe)
+            p.append(pe)
+        if phidf.iteration.max() == 0:
+            realphis = phidf.iloc[0,6:]
+            realkeep = realphis.loc[realphis < pst.nnz_obs * 1.1]
+            print(realkeep.shape)
+            print(o[0].index)
+            print(p[0].index)
+            
+            p.append(p[0].loc[realkeep.index,:].copy())
+
+            o.append(o[0].loc[realkeep.index,:].copy())
+            
+        name = "{0}, {1} realizations".format(m_d.split("_")[-2],m_d.split("_")[-1].replace("reals",""))
+        names.append(name)
+        pes[name] = p
+        oes[name] = o
+        phidfs[name] = phidf
+    
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+    names.sort()
+    with PdfPages("collapse_compare.pdf") as pdf:
+        for par in pst.adj_par_names:
+            fig,axes = plt.subplots(len(m_ds),1,figsize=(8.5,8.5))
+            mn,mx = 1e30,-1e30
+            for m_d,ax in zip(names,axes):
+                p = pes[m_d]
+                o = oes[m_d]
+                print(m_d,len(p))
+                colors = ["0.5","b"]
+                labels = ["prior","posterior"]
+                for pp,oo,c,l in zip(p,o,colors,labels):
+                    pp.loc[:,par].plot(ax=ax,kind="hist",color=c,alpha=0.5,label=l,density=True)
+                ax.set_title("{0}, {1}".format(par,m_d),loc="left")
+                mn = min(mn,ax.get_xlim()[0])
+                mx = max(mn,ax.get_xlim()[1])
+            for ax in axes:
+                ax.set_xlim(mn,mx)
+            plt.tight_layout()
+            pdf.savefig()
+            plt.close(fig)
+        for obs in pst.obs_names:
+            fig,axes = plt.subplots(len(m_ds),1,figsize=(8.5,8.5))
+            mn,mx = 1e30,-1e30
+            for m_d,ax in zip(names,axes):
+                p = pes[m_d]
+                o = oes[m_d]
+                colors = ["0.5","b"]
+                labels = ["prior","posterior"]
+                for pp,oo,c,l in zip(p,o,colors,labels):
+                    oo.loc[:,obs].plot(kind="hist",color=c,alpha=0.5,label=l,ax=ax,density=True)
+                ax.set_title("{0}, {1}".format(obs,m_d),loc="left")
+                mn = min(mn,ax.get_xlim()[0])
+                mx = max(mn,ax.get_xlim()[1])
+            for ax in axes:
+                ax.set_xlim(mn,mx)
+                
+            plt.tight_layout()
+            pdf.savefig()
+            plt.close(fig)
 
 
 
+            
+    print(m_ds)
 
 if __name__ == "__main__":
-    invest()
+    tenpar_collapse_invest()
+    plot_collapse_invest()
     #run()
     #mf6_v5_ies_test()
     #prep_ends()

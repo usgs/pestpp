@@ -466,7 +466,7 @@ protected:
 	vector<string> act_obs_names, act_par_names;
 	vector<string> violation_obs;
 	ParameterEnsemble pe, pe_base;
-	ObservationEnsemble oe, oe_base, weights;
+	ObservationEnsemble oe, oe_base, weights, weights_base;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 	bool oe_drawn, pe_drawn;
 

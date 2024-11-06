@@ -4522,8 +4522,8 @@ bool EnsembleMethod::should_terminate()
 	message(1, "nphinored (also used for consecutive bad lambda cycles): ", nphinored);
 	int n_mean_iter = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
     vector<double>::iterator begin_idx = best_mean_phis.begin();
-    if (best_mean_phis.size() > n_mean_iter)
-        begin_idx += (n_mean_iter+1); //bc of prior phi and then adding the mean shift to the list
+    if ((n_mean_iter > 0) && (best_mean_phis.size() > n_mean_iter))
+        begin_idx = best_mean_phis.end() - (n_mean_iter+1); //bc of prior phi and then adding the mean shift to the list
     if (best_mean_phis.size() > 0)
 	{
 
@@ -5036,6 +5036,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		//transfer_dynamic_state_from_oe_to_initial_pe(_pe, _oe);
 		pe = _pe;
 		oe = _oe;
+
 		return;
 	}
 
@@ -5604,6 +5605,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	//the hard way to restart
 	if (obs_restart_csv.size() > 0)
 		initialize_restart();
+    //we need this for the prior mean shifting
+    weights_base = weights;
 
 	if (!run)
 		return;
@@ -7282,11 +7285,11 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			continue;
 		}
 
-        if (pest_scenario.get_pestpp_options().get_ies_updatebyreals())
-        {
-            message(1, "updating realizations with reduced phi");
-            update_reals_by_phi(pe_lams[i], oe_lams[i],subset_idxs);
-        }
+//        if (pest_scenario.get_pestpp_options().get_ies_updatebyreals())
+//        {
+//            message(1, "updating realizations with reduced phi");
+//            update_reals_by_phi(pe_lams[i], oe_lams[i],subset_idxs);
+//        }
 
 		ph.update(oe_lams[i], pe_lams[i], weights);
 
@@ -7547,6 +7550,16 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		last_best_mean = best_mean;
         if (pest_scenario.get_pestpp_options().get_ies_updatebyreals())
         {
+
+            if (pe.shape().first > pe_lams[best_idx].shape().first)
+            {
+                performance_log->log_event("aligning rows of pe with pe_lams[best_idx]");
+                pe.keep_rows(pe_lams[best_idx].get_real_names());
+            }
+            if (oe.shape().first > oe_lam_best.shape().first) {
+                performance_log->log_event("aligning rows of oe with oe_lam_best");
+                oe.keep_rows(oe_lam_best.get_real_names());
+            }
             message(0, "only updating realizations with reduced phi");
             update_reals_by_phi(pe_lams[best_idx], oe_lam_best);
         }
@@ -7626,7 +7639,7 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
 
     message(0,"resetting current parameter ensemble to prior ensemble with current ensemble mean");
     performance_log->log_event("getting prior parameter ensemble mean-centered anomalies");
-    Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe.get_real_names(), pe.get_var_names());
+    Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe_base.get_real_names(), pe.get_var_names());
 
     performance_log->log_event("getting current parameter ensemble mean vector");
     vector<double> mean_vec = pe.get_mean_stl_var_vector();
@@ -7637,7 +7650,7 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
         anoms.col(i) = anoms.col(i).array() + mean_vec[i];
     }
     performance_log->log_event("forming new parameter ensemble of mean-shifted prior realizations");
-    ParameterEnsemble new_pe = ParameterEnsemble(&pest_scenario,&rand_gen,anoms,pe.get_real_names(),pe.get_var_names());
+    ParameterEnsemble new_pe = ParameterEnsemble(&pest_scenario,&rand_gen,anoms,pe_base.get_real_names(),pe.get_var_names());
 
     new_pe.set_trans_status(pe.get_trans_status());
     new_pe.set_fixed_info(pe.get_fixed_info());
@@ -7651,12 +7664,13 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
     ss << "iteration:" << iter;
     vector<int> temp;
     ofstream& frec = file_manager.rec_ofstream();
-
+    oe = oe_base;
+    weights = weights_base;
     run_ensemble_util(performance_log,frec,new_pe,oe,run_mgr_ptr,false,temp,NetPackage::NULL_DA_CYCLE, ss.str());
     pe = new_pe;
     new_pe = ParameterEnsemble();
     report_and_save(NetPackage::NULL_DA_CYCLE);
-    ph.update(oe,pe,weights);\
+    ph.update(oe,pe,weights);
     message(0,"mean-shifted prior phi report:");
 
     best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
@@ -8086,7 +8100,7 @@ void EnsembleMethod::add_bases()
 		Parameters pars = pest_scenario.get_ctl_parameters();
 		pe.get_par_transform().active_ctl2numeric_ip(pars);
 		vector<int> drop{ pe.shape().first - 1 };
-		pe.drop_rows(drop);
+		pe.drop_rows(drop,true);
 		pe.append(BASE_REAL_NAME, pars);
 	}
 
@@ -8138,7 +8152,7 @@ void EnsembleMethod::add_bases()
 			message(1, mess);
 			vector<string> drop;
 			drop.push_back(oreal);
-			oe_base.drop_rows(drop);
+			oe_base.drop_rows(drop,true);
 			oe_base.append(BASE_REAL_NAME, obs);
 			//rnames.insert(rnames.begin() + idx, string(base_name));
 			rnames[idx] = BASE_REAL_NAME;
@@ -8147,13 +8161,13 @@ void EnsembleMethod::add_bases()
             {
                 string oreal = wrnames[idx];
                 ss.str("");
-                ss << "warning: 'base' realization in par ensenmble but not in weight ensemble," << endl;
+                ss << "warning: 'base' realization in par ensemble but not in weight ensemble," << endl;
                 ss << "         replacing weight realization '" << oreal << "' with 'base' weights";
                 string mess = ss.str();
                 message(1, mess);
                 vector<string> drop;
                 drop.push_back(oreal);
-                weights.drop_rows(drop);
+                weights.drop_rows(drop,true);
 
                 weights.append(BASE_REAL_NAME, wobs);
                 //rnames.insert(rnames.begin() + idx, string(base_name));
@@ -8768,6 +8782,7 @@ void EnsembleMethod::initialize_restart()
 		ss << "restart oe has too many rows: " << oe.shape().first << " compared to oe_base: " << oe_base.shape().first;
 		throw_em_error(ss.str());
 	}
+
 }
 
 
