@@ -37,10 +37,11 @@ void IterEnsembleSmoother::iterate_2_solution()
 	
 	bool accept;
 	int n_iter_mean = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
-
+    int solution_iter = 0;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
 		iter++;
+        solution_iter++;
 		message(0, "starting solve for iteration:", iter);
 		ss.str("");
 		ss << "starting solve for iteration: " << iter;
@@ -71,7 +72,7 @@ void IterEnsembleSmoother::iterate_2_solution()
 		else
 			consec_bad_lambda_cycles++;
 
-		if (iter % n_iter_mean == 0)
+		if (solution_iter % n_iter_mean == 0)
         {
             iter++;
             reset_par_ensemble_to_prior_mean();
