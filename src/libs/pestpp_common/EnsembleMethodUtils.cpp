@@ -4544,7 +4544,7 @@ bool EnsembleMethod::should_terminate()
     for (auto& phi : best_mean_phis)
 	{
 		ratio = (phi - best_phi_yet) / phi;
-    	if ((i> n_mean_iter) && (ratio <= phiredstp))
+    	if ((i>=(iter - n_mean_iter)) && (ratio <= phiredstp))
 			count++;
         i++;
 	}
@@ -7682,6 +7682,7 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
     ss.str("");
     ss << file_manager.get_base_filename() << "." << iter << ".meanshift.pcs.csv";
     pcs.summarize(pe, ss.str());
+    last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
     double phi_lam = get_lambda();
     last_best_lam = phi_lam;
     message(1,"iter = ies_n_iter_mean, resetting lambda to ",last_best_lam);
