@@ -15,6 +15,7 @@
 #include "Ensemble.h"
 #include "constraints.h"
 #include "EnsembleMethodUtils.h"
+#include "RedSVD-h.h"
 
 const string POP_SUM_TAG = "pareto.summary.csv";
 const string ARC_SUM_TAG = "pareto.archive.summary.csv";
@@ -212,13 +213,13 @@ private:
 	ParameterEnsemble generate_pso_population(int num_members, ParameterEnsemble& _dp);
 	ParameterEnsemble simplex_cceua_kn(ParameterEnsemble s, int k, int optbounds);																																		
     ParameterEnsemble generate_simplex_population(int num_members, ParameterEnsemble& _dp, ObservationEnsemble& _op);
-
+    ParameterEnsemble generate_empcov_population(int num_members, ParameterEnsemble& _dp, ObservationEnsemble& _op);
 	ParameterEnsemble get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions);
 
 	vector<string> get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _dp, ObservationEnsemble& _op);
 	void update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
-	map<string, string> current_pso_lineage_map;
+	map<string, string> current_pso_lineage_map, current_empcov_lineage_map;
 
 	vector<int> selection(int num_to_select, ParameterEnsemble& _dp, MouMateType& matetype);
 

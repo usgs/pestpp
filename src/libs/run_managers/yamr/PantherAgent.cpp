@@ -829,9 +829,6 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 			int group_id = net_pack.get_group_id();
 			int run_id = net_pack.get_run_id();
 			string info_txt = net_pack.get_info_txt();
-			//jwhite 25 may 2020 - commented this out in develop merge from Ayman's develop
-			//so that I can pull in the run mgr message passing enhancements
-			//will uncommented later when merging in pestpp-da
 			pest_utils::upper_ip(info_txt);
 			int da_cycle = NetPackage::NULL_DA_CYCLE;
 			if (info_txt.find("DA_CYCLE:") != string::npos)
