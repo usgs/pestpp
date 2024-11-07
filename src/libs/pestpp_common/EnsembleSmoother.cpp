@@ -72,7 +72,7 @@ void IterEnsembleSmoother::iterate_2_solution()
 		else
 			consec_bad_lambda_cycles++;
 
-		if (solution_iter % n_iter_mean == 0)
+		if ((n_iter_mean> 0) && (solution_iter % n_iter_mean == 0))
         {
             iter++;
             reset_par_ensemble_to_prior_mean();
