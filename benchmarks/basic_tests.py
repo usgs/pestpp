@@ -1504,9 +1504,11 @@ def tenpar_collapse_invest():
     obs.loc[obs.obsnme.str.startswith("h01"),"standard_deviation"] = 0.1
 
     pst.parameter_data.loc[:,"partrans"] = "log"
+    pst.pestpp_options["ies_multimodal_alpha"] = 0.99
+
 
     # set noptmax
-    num_reals = [10,30,100]
+    num_reals = [10,30,400]
     pst.control_data.noptmax = 10
     for num_real in num_reals:
 
@@ -1522,7 +1524,7 @@ def tenpar_collapse_invest():
                                worker_root=model_d,port=port,verbose=True)
 
     pst.pestpp_options = {}
-    pst.pestpp_options["ies_num_reals"] = 5000
+    pst.pestpp_options["ies_num_reals"] = 50000
     pst.control_data.noptmax = -1
     pst.write(os.path.join(new_d, "pest.pst"))
            
@@ -1552,7 +1554,7 @@ def tenpar_collapse_invest():
                                worker_root=model_d,port=port,verbose=True)
 
     pst.pestpp_options = {}
-    pst.pestpp_options["ies_num_reals"] = 5000
+    pst.pestpp_options["ies_num_reals"] = 50000
     pst.control_data.noptmax = -1
     pst.write(os.path.join(new_d, "pest.pst"))
            
@@ -1568,8 +1570,11 @@ def plot_collapse_invest():
 
     pes, oes, phidfs = {},{},{}
     names = []
+    min_phi = 1e300
     for m_d in m_ds:
         phidf = pd.read_csv(os.path.join(m_d,"pest.phi.actual.csv"))
+        if "corrupt" in m_d:
+            min_phi = min(min_phi,phidf.iloc[:,6:].values.min())
         pst = pyemu.Pst(os.path.join(m_d,"pest.pst"))
         p,o = [],[]
         for i in [0,phidf.iteration.max()]:
@@ -1579,16 +1584,16 @@ def plot_collapse_invest():
             pe.index = pe.index.map(str)
             o.append(oe)
             p.append(pe)
-        if phidf.iteration.max() == 0:
-            realphis = phidf.iloc[0,6:]
-            realkeep = realphis.loc[realphis < pst.nnz_obs * 1.1]
-            print(realkeep.shape)
-            print(o[0].index)
-            print(p[0].index)
+        #if phidf.iteration.max() == 0:
+            #realphis = phidf.iloc[0,6:]
+            #realkeep = realphis.loc[realphis < pst.nnz_obs * 1.1]
+            #print(realkeep.shape)
+            #print(o[0].index)
+            #print(p[0].index)
             
-            p.append(p[0].loc[realkeep.index,:].copy())
+        #    p.append(p[0])#.loc[realkeep.index,:].copy())
 
-            o.append(o[0].loc[realkeep.index,:].copy())
+        #    o.append(o[0])#.loc[realkeep.index,:].copy())
             
         name = "{0}, {1} realizations".format(m_d.split("_")[-2],m_d.split("_")[-1].replace("reals",""))
         names.append(name)
@@ -1596,6 +1601,33 @@ def plot_collapse_invest():
         oes[name] = o
         phidfs[name] = phidf
     
+    #print(min_phi)
+
+    # now filter
+    #thresh = min_phi * 5
+    thresh = 10
+    corrupt_thresh = min_phi * 2
+    for m_d in names:
+        p = pes[m_d]
+        o = oes[m_d]
+        phidf = phidfs[m_d]
+        #print(m_d,len(p))
+        assert len(p) == 2
+        assert len(o) == 2
+        ppost = p[-1]
+        opost = o[-1]
+        phipost = phidf.iloc[-1,:].copy()
+        phipost = phipost.iloc[6:]
+        #print(phipost)
+        if "corrupt" in m_d:
+            phipost = phipost.loc[phipost<=corrupt_thresh]
+        else:    
+            phipost = phipost.loc[phipost<=thresh]
+        print(m_d,phipost.shape)
+        pes[m_d][-1] = ppost.loc[phipost.index.values,:].copy()
+        oes[m_d][-1] = opost.loc[phipost.index.values,:].copy()
+                
+
     import matplotlib.pyplot as plt
     from matplotlib.backends.backend_pdf import PdfPages
     names.sort()
@@ -1606,12 +1638,14 @@ def plot_collapse_invest():
             for m_d,ax in zip(names,axes):
                 p = pes[m_d]
                 o = oes[m_d]
-                print(m_d,len(p))
+                #print(m_d,len(p))
+
                 colors = ["0.5","b"]
                 labels = ["prior","posterior"]
                 for pp,oo,c,l in zip(p,o,colors,labels):
                     pp.loc[:,par].plot(ax=ax,kind="hist",color=c,alpha=0.5,label=l,density=True)
-                ax.set_title("{0}, {1}".format(par,m_d),loc="left")
+                ax.set_title("{0}, {1}, {2} posterior realizations".format(par,m_d,pp.shape[0]),loc="left")
+                ax.set_yticks([])
                 mn = min(mn,ax.get_xlim()[0])
                 mx = max(mn,ax.get_xlim()[1])
             for ax in axes:
@@ -1629,7 +1663,7 @@ def plot_collapse_invest():
                 labels = ["prior","posterior"]
                 for pp,oo,c,l in zip(p,o,colors,labels):
                     oo.loc[:,obs].plot(kind="hist",color=c,alpha=0.5,label=l,ax=ax,density=True)
-                ax.set_title("{0}, {1}".format(obs,m_d),loc="left")
+                ax.set_title("{0}, {1}, {2} posterior realizations".format(obs,m_d,oo.shape[0]),loc="left")
                 mn = min(mn,ax.get_xlim()[0])
                 mx = max(mn,ax.get_xlim()[1])
             for ax in axes:
@@ -1645,7 +1679,7 @@ def plot_collapse_invest():
     print(m_ds)
 
 if __name__ == "__main__":
-    tenpar_collapse_invest()
+    #tenpar_collapse_invest()
     plot_collapse_invest()
     #run()
     #mf6_v5_ies_test()

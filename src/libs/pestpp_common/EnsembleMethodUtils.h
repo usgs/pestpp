@@ -469,6 +469,7 @@ protected:
 	ObservationEnsemble oe, oe_base, weights, weights_base;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 	bool oe_drawn, pe_drawn;
+    bool reinflate_to_minphi_real;
 
 
 	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);

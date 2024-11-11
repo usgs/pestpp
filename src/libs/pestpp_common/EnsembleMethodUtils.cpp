@@ -500,6 +500,37 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         }
         performance_log->log_event("...sorting composite score");
         sortedset fitness_sorted(composite_score.begin(), composite_score.end(), compFunctor);
+        set<string> dups;
+        if (fitness_sorted.size() != composite_score.size())
+        {
+            performance_log->log_event("duplicates in composite score...dealing");
+            map<double,int> counts;
+            for (auto& score : composite_score)
+            {
+                if (counts.find(score.second) == counts.end())
+                    counts[score.second] = 0;
+                counts[score.second]++;
+            }
+            for (auto& score : composite_score)
+            {
+                if (counts[score.second] > 1)
+                {
+                    bool isin = false;
+                    for (auto &ii: fitness_sorted) {
+                        if (ii.first == score.first) {
+                            isin = true;
+                            break;
+                        }
+                    }
+
+                    if (!isin) {
+                        dups.insert(score.first);
+                    }
+                }
+
+            }
+
+        }
         real_idxs.clear();
         oe_real_names_case.clear();
         pe_real_names_case.clear();
@@ -517,6 +548,10 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
                 break;
             //cout << real_name << "," << ii->first << "," << ii->second << endl;
 
+        }
+        for (auto& dup: dups)
+        {
+            real_idxs.push_back(real_map.at(dup));
         }
         if (real_idxs.size() != subset_size+1)
         {
@@ -4330,14 +4365,14 @@ void EnsembleMethod::sanity_checks()
     }
 
 
-    if (pest_scenario.get_control_info().noptmax > 10)
-	{
-		warnings.push_back("noptmax > 10, don't expect anything meaningful from the results!");
-	}
+//    if (pest_scenario.get_control_info().noptmax > 10)
+//	{
+//		warnings.push_back("noptmax > 10, don't expect anything meaningful from the results!");
+//	}
 
 	else if (pest_scenario.get_control_info().noptmax > 3)
 	{
-		warnings.push_back("noptmax > 3, this is a lot of iterations for an ensemble method, please consider using fewer iterations for better outcomes");
+		warnings.push_back("noptmax > 3, this is a lot of iterations for an ensemble method...");
 	}
 
     if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
@@ -5124,7 +5159,13 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	lambda_min = 1.0E-30;
 
 	consec_bad_lambda_cycles = 0;
-
+    reinflate_to_minphi_real = false;
+    if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0)
+    {
+        message(2,"n_iter_mean < 0, using min-phi real for re-inflation, resetting n_iter_mean to positive");
+        reinflate_to_minphi_real = true;
+        pest_scenario.get_pestpp_options_ptr()->set_ies_n_iter_mean(-1 * pest_scenario.get_pestpp_options().get_ies_n_iter_mean());
+    }
 	lam_mults = pest_scenario.get_pestpp_options().get_ies_lam_mults();
 	if (lam_mults.size() == 0)
 		lam_mults.push_back(1.0);
@@ -7636,18 +7677,50 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 }
 
 void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
+    string min_phi_name = "";
+    if (true)
+    {
+        map<string,double> pmap = ph.get_phi_map(L2PhiHandler::phiType::ACTUAL);
+        double min_phi = numeric_limits<double>::max();
 
+        for (auto& item : pmap)
+        {
+            if (item.second < min_phi)
+            {
+                min_phi = item.second;
+                min_phi_name = item.first;
+            }
+        }
+        vector<string> real_names = oe.get_real_names();
+        int idx = distance(real_names.begin(),find(real_names.begin(),real_names.end(),min_phi_name));
+        if (idx == real_names.size())
+        {
+            throw_em_error("min phi realization name not found in obs ensemble");
+        }
+        real_names = pe.get_real_names();
+        min_phi_name = real_names[idx];
+
+    }
     message(0,"resetting current parameter ensemble to prior ensemble with current ensemble mean");
     performance_log->log_event("getting prior parameter ensemble mean-centered anomalies");
-    Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe_base.get_real_names(), pe.get_var_names());
+    Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe_base.get_real_names(), pe.get_var_names(), pest_scenario.get_pestpp_options().get_ies_center_on());
 
     performance_log->log_event("getting current parameter ensemble mean vector");
     vector<double> mean_vec = pe.get_mean_stl_var_vector();
+    Eigen::VectorXd offset(mean_vec.size());
+    for (int i=0;i<mean_vec.size();i++)
+        offset[i] = mean_vec[i];
+    if (reinflate_to_minphi_real)
+    {
+        offset = pe.get_real_vector(min_phi_name);
+        message(2,"using min-phi realization for offset");
+    }
 
-    performance_log->log_event("adding mean to anomalies");
+
+    performance_log->log_event("adding offset to anomalies");
     for (int i = 0; i < mean_vec.size(); i++)
     {
-        anoms.col(i) = anoms.col(i).array() + mean_vec[i];
+        anoms.col(i) = anoms.col(i).array() + offset[i];
     }
     performance_log->log_event("forming new parameter ensemble of mean-shifted prior realizations");
     ParameterEnsemble new_pe = ParameterEnsemble(&pest_scenario,&rand_gen,anoms,pe_base.get_real_names(),pe.get_var_names());
