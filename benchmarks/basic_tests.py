@@ -1499,16 +1499,18 @@ def tenpar_collapse_invest():
     print(pst.model_command)
     
     obs = pst.observation_data
-    obs.loc[obs.obsnme.str.startswith("h01"),"weight"] = 10.0
+    obs.loc[:,"weight"] = 0.0
+
+    nzoname = obs.obsnme.str.startswith("h01").index[3]
+    obs.loc[nzoname,"weight"] = 10.0
     
-    obs.loc[obs.obsnme.str.startswith("h01"),"standard_deviation"] = 0.1
+    obs.loc[nzoname,"standard_deviation"] = 0.1
 
     pst.parameter_data.loc[:,"partrans"] = "log"
     pst.pestpp_options["ies_multimodal_alpha"] = 0.99
 
-
     # set noptmax
-    num_reals = [10,30,400]
+    num_reals = [10,30,50,100,400,1000]
     pst.control_data.noptmax = 10
     for num_real in num_reals:
 
@@ -1524,7 +1526,7 @@ def tenpar_collapse_invest():
                                worker_root=model_d,port=port,verbose=True)
 
     pst.pestpp_options = {}
-    pst.pestpp_options["ies_num_reals"] = 50000
+    pst.pestpp_options["ies_num_reals"] = 100000
     pst.control_data.noptmax = -1
     pst.write(os.path.join(new_d, "pest.pst"))
            
@@ -1535,8 +1537,8 @@ def tenpar_collapse_invest():
                            worker_root=model_d,port=port,verbose=True)
 
 
-    pst.observation_data.loc[pst.nnz_obs_names[3],"obsval"] += 1.5
-    pst.observation_data.loc[pst.nnz_obs_names[5],"obsval"] -= 1.5
+    pst.observation_data.loc[nzoname,"obsval"] += 8
+    #pst.observation_data.loc[pst.nnz_obs_names[5],"obsval"] -= 1.5
 
     # set noptmax
     pst.control_data.noptmax = 10
@@ -1554,7 +1556,7 @@ def tenpar_collapse_invest():
                                worker_root=model_d,port=port,verbose=True)
 
     pst.pestpp_options = {}
-    pst.pestpp_options["ies_num_reals"] = 50000
+    pst.pestpp_options["ies_num_reals"] = 100000
     pst.control_data.noptmax = -1
     pst.write(os.path.join(new_d, "pest.pst"))
            
@@ -1570,6 +1572,7 @@ def plot_collapse_invest():
 
     pes, oes, phidfs = {},{},{}
     names = []
+    name_dict = {}
     min_phi = 1e300
     for m_d in m_ds:
         phidf = pd.read_csv(os.path.join(m_d,"pest.phi.actual.csv"))
@@ -1595,45 +1598,61 @@ def plot_collapse_invest():
 
         #    o.append(o[0])#.loc[realkeep.index,:].copy())
             
-        name = "{0}, {1} realizations".format(m_d.split("_")[-2],m_d.split("_")[-1].replace("reals",""))
+        if phidf.iteration.max() == 0:
+            nreals = oe.shape[0]
+            name = "{0}, {1} realizations".format(m_d.split("_")[-2],nreals)
+        else:
+
+            name = "{0}, {1} realizations".format(m_d.split("_")[-2],m_d.split("_")[-1].replace("reals",""))
+            nreals = int(m_d.split("_")[-1].replace("reals",""))
+        if nreals not in name_dict:
+            name_dict[nreals] = []
+        name_dict[nreals].append(name)
         names.append(name)
         pes[name] = p
         oes[name] = o
         phidfs[name] = phidf
     
     #print(min_phi)
+    reals = list(name_dict.keys())
+    reals.sort()
 
     # now filter
     #thresh = min_phi * 5
     thresh = 10
-    corrupt_thresh = min_phi * 2
-    for m_d in names:
-        p = pes[m_d]
-        o = oes[m_d]
-        phidf = phidfs[m_d]
-        #print(m_d,len(p))
-        assert len(p) == 2
-        assert len(o) == 2
-        ppost = p[-1]
-        opost = o[-1]
-        phipost = phidf.iloc[-1,:].copy()
-        phipost = phipost.iloc[6:]
-        #print(phipost)
-        if "corrupt" in m_d:
-            phipost = phipost.loc[phipost<=corrupt_thresh]
-        else:    
-            phipost = phipost.loc[phipost<=thresh]
-        print(m_d,phipost.shape)
-        pes[m_d][-1] = ppost.loc[phipost.index.values,:].copy()
-        oes[m_d][-1] = opost.loc[phipost.index.values,:].copy()
-                
+    corrupt_thresh = min_phi * 1.075
+    names = []
+    for nreals in reals:
+        m_ds = name_dict[nreals]
+        m_ds.sort()
+        for m_d in m_ds:
+            p = pes[m_d]
+            o = oes[m_d]
+            phidf = phidfs[m_d]
+            #print(m_d,len(p))
+            assert len(p) == 2
+            assert len(o) == 2
+            ppost = p[-1]
+            opost = o[-1]
+            phipost = phidf.iloc[-1,:].copy()
+            phipost = phipost.iloc[6:]
+            #print(phipost)
+            if "corrupt" in m_d:
+                phipost = phipost.loc[phipost<=corrupt_thresh]
+            else:    
+                phipost = phipost.loc[phipost<=thresh]
+            print(m_d,phipost.shape)
+            pes[m_d][-1] = ppost.loc[phipost.index.values,:].copy()
+            oes[m_d][-1] = opost.loc[phipost.index.values,:].copy()
+            names.append(m_d)   
+                 
 
     import matplotlib.pyplot as plt
     from matplotlib.backends.backend_pdf import PdfPages
-    names.sort()
+    
     with PdfPages("collapse_compare.pdf") as pdf:
         for par in pst.adj_par_names:
-            fig,axes = plt.subplots(len(m_ds),1,figsize=(8.5,8.5))
+            fig,axes = plt.subplots(len(names),1,figsize=(8.5,8.5))
             mn,mx = 1e30,-1e30
             for m_d,ax in zip(names,axes):
                 p = pes[m_d]
@@ -1643,18 +1662,23 @@ def plot_collapse_invest():
                 colors = ["0.5","b"]
                 labels = ["prior","posterior"]
                 for pp,oo,c,l in zip(p,o,colors,labels):
+                    if "stage" not in par:
+                        pp.loc[:,par] = np.log10(pp.loc[:,par].values)
                     pp.loc[:,par].plot(ax=ax,kind="hist",color=c,alpha=0.5,label=l,density=True)
-                ax.set_title("{0}, {1}, {2} posterior realizations".format(par,m_d,pp.shape[0]),loc="left")
+                ax.set_title("{0}, {1} {2} posterior realizations".format(par,m_d,pp.shape[0]),loc="left")
                 ax.set_yticks([])
                 mn = min(mn,ax.get_xlim()[0])
                 mx = max(mn,ax.get_xlim()[1])
+                print(m_d)
+            
             for ax in axes:
                 ax.set_xlim(mn,mx)
             plt.tight_layout()
             pdf.savefig()
             plt.close(fig)
+             
         for obs in pst.obs_names:
-            fig,axes = plt.subplots(len(m_ds),1,figsize=(8.5,8.5))
+            fig,axes = plt.subplots(len(names),1,figsize=(8.5,8.5))
             mn,mx = 1e30,-1e30
             for m_d,ax in zip(names,axes):
                 p = pes[m_d]
@@ -1679,7 +1703,7 @@ def plot_collapse_invest():
     print(m_ds)
 
 if __name__ == "__main__":
-    #tenpar_collapse_invest()
+    tenpar_collapse_invest()
     plot_collapse_invest()
     #run()
     #mf6_v5_ies_test()

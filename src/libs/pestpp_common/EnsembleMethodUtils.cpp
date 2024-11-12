@@ -4501,10 +4501,7 @@ void EnsembleMethod::sanity_checks()
     {
         errors.push_back("multimodal alpha < 0.001");
     }
-    if (ppo->get_ies_n_iter_mean() > 0)
-    {
-        warnings.push_back("mean-shifting iterations is a new concept and subject to change - experimental at best");
-    }
+
 
     if (warnings.size() > 0)
     {
@@ -5162,7 +5159,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
     reinflate_to_minphi_real = false;
     if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0)
     {
-        message(2,"n_iter_mean < 0, using min-phi real for re-inflation, resetting n_iter_mean to positive");
+        message(2,"n_iter_mean < 0, using min-phi real for re-inflation, resetting n_iter_reinflate to positive");
         reinflate_to_minphi_real = true;
         pest_scenario.get_pestpp_options_ptr()->set_ies_n_iter_mean(-1 * pest_scenario.get_pestpp_options().get_ies_n_iter_mean());
     }
@@ -7758,7 +7755,7 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
     last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
     double phi_lam = get_lambda();
     last_best_lam = phi_lam;
-    message(1,"iter = ies_n_iter_mean, resetting lambda to ",last_best_lam);
+    message(1,"iter = ies_n_iter_reinflate, resetting lambda to ",last_best_lam);
     consec_bad_lambda_cycles = 0;
 
 }

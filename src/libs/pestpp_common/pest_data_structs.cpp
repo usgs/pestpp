@@ -1181,8 +1181,10 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         ies_phi_factors_by_real = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
-    else if (key == "IES_N_ITER_MEAN")
+    else if ((key == "IES_N_ITER_MEAN") || (key == "IES_N_ITER_REINFLATE"))
     {
+        passed_args.insert("IES_N_ITER_MEAN");
+        passed_args.insert("IES_N_ITER_REINFLATE");
         convert_ip(value,ies_n_iter_mean);
         return true;
     }
@@ -1828,7 +1830,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_localizer_forgive_extra: " << ies_localizer_forgive_missing << endl;
 	os << "ies_phi_factors_file: " << ies_phi_fractions_file << endl;
     os << "ies_phi_factors_by_real: " << ies_phi_factors_by_real << endl;
-    os << "ies_n_iter_mean: " << ies_n_iter_mean << endl;
+    os << "ies_n_iter_reinflate: " << ies_n_iter_mean << endl;
     os << "ies_updatebyreals: " << ies_updatebyreals << endl;
 
 
