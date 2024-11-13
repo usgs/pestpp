@@ -1512,47 +1512,52 @@ def tenpar_collapse_invest():
     # set noptmax
     num_reals = [10,30,50,100,400,1000]
     pst.control_data.noptmax = 10
-    for num_real in num_reals:
+    # for num_real in num_reals:
 
-        # wipe all pestpp options
-        pst.pestpp_options = {}
-        pst.pestpp_options["ies_num_reals"] = num_real
-        pst.write(os.path.join(new_d, "pest.pst"))
+    #     # wipe all pestpp options
+    #     pst.pestpp_options = {}
+    #     pst.pestpp_options["ies_num_reals"] = num_real
+    #     pst.write(os.path.join(new_d, "pest.pst"),version=2)
                
-        m_d = os.path.join(model_d,"master_ies_base_{0}reals".format(pst.pestpp_options["ies_num_reals"]))
-        if os.path.exists(m_d):
-            shutil.rmtree(m_d)
-        pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 50, master_dir=m_d,
-                               worker_root=model_d,port=port,verbose=True)
+    #     m_d = os.path.join(model_d,"master_ies_base_{0}reals".format(pst.pestpp_options["ies_num_reals"]))
+    #     if os.path.exists(m_d):
+    #         shutil.rmtree(m_d)
+    #     num_workers = 50
+    #     if num_real > 500:
+    #         num_workers = 200
+    #     pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", num_workers, master_dir=m_d,
+    #                            worker_root=model_d,port=port,verbose=True)
 
-    pst.pestpp_options = {}
-    pst.pestpp_options["ies_num_reals"] = 100000
-    pst.control_data.noptmax = -1
-    pst.write(os.path.join(new_d, "pest.pst"))
+    # pst.pestpp_options = {}
+    # pst.pestpp_options["ies_num_reals"] = 100000
+    # pst.control_data.noptmax = -1
+    # pst.write(os.path.join(new_d, "pest.pst"))
            
-    m_d = os.path.join(model_d,"master_ies_base_{0}reals".format(pst.pestpp_options["ies_num_reals"]))
-    if os.path.exists(m_d):
-        shutil.rmtree(m_d)
-    pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 200, master_dir=m_d,
-                           worker_root=model_d,port=port,verbose=True)
+    # m_d = os.path.join(model_d,"master_ies_base_{0}reals".format(pst.pestpp_options["ies_num_reals"]))
+    # if os.path.exists(m_d):
+    #     shutil.rmtree(m_d)
+    # pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 200, master_dir=m_d,
+    #                        worker_root=model_d,port=port,verbose=True)
 
 
-    pst.observation_data.loc[nzoname,"obsval"] += 8
-    #pst.observation_data.loc[pst.nnz_obs_names[5],"obsval"] -= 1.5
+    #pst.observation_data.loc[nzoname,"obsval"] += 8
+    pst.observation_data.loc[nzoname,"weight"] = 100.0
+    pst.observation_data.loc[nzoname,"obsval"] -= 1.5
 
-    # set noptmax
-    pst.control_data.noptmax = 10
     for num_real in num_reals:
 
         # wipe all pestpp options
         pst.pestpp_options = {}
         pst.pestpp_options["ies_num_reals"] = num_real
-        pst.write(os.path.join(new_d, "pest.pst"))
+        pst.write(os.path.join(new_d, "pest.pst"),version=2)
                
         m_d = os.path.join(model_d,"master_ies_corrupt_{0}reals".format(pst.pestpp_options["ies_num_reals"]))
         if os.path.exists(m_d):
             shutil.rmtree(m_d)
-        pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", 50, master_dir=m_d,
+        num_workers = 50
+        if num_real > 500:
+            num_workers = 200
+        pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", num_workers, master_dir=m_d,
                                worker_root=model_d,port=port,verbose=True)
 
     pst.pestpp_options = {}
@@ -1620,7 +1625,7 @@ def plot_collapse_invest():
     # now filter
     #thresh = min_phi * 5
     thresh = 10
-    corrupt_thresh = min_phi * 1.075
+    corrupt_thresh = min_phi * 1.1
     names = []
     for nreals in reals:
         m_ds = name_dict[nreals]
@@ -1650,6 +1655,39 @@ def plot_collapse_invest():
     import matplotlib.pyplot as plt
     from matplotlib.backends.backend_pdf import PdfPages
     
+    with PdfPages("collapse_compare_2ax.pdf") as pdf:
+        for par in pst.adj_par_names:
+            fig,axes = plt.subplots(2,1,figsize=(8.5,8.5))
+            mn,mx = 1e30,-1e30
+            for im_d,m_d in enumerate(names):
+                ax = axes[0]
+                if "corrupt" in m_d:
+                    ax = axes[1]
+
+                p = pes[m_d]
+                o = oes[m_d]
+                #print(m_d,len(p))
+                color = plt.cm.jet(np.linspace(0, 1, len(names))) 
+                pp = p[-1]
+                if "stage" not in par:
+                    pp.loc[:,par] = np.log10(pp.loc[:,par].values)
+                    pp.loc[:,par].plot(ax=ax,kind="hist",color=color[im_d],alpha=0.5,label=m_d,density=True)
+                mn = min(mn,ax.get_xlim()[0])
+                mx = max(mn,ax.get_xlim()[1])
+            axes[0].set_title("pure",loc="left")
+            axes[1].set_title("corrupt",loc="left")
+            
+            for ax in axes:
+                ax.set_xlim(mn,mx)
+                ax.set_yticks([])
+                ax.grid()
+                ax.legend(loc="upper left")
+
+            plt.tight_layout()
+            pdf.savefig()
+            plt.close(fig)
+             
+
     with PdfPages("collapse_compare.pdf") as pdf:
         for par in pst.adj_par_names:
             fig,axes = plt.subplots(len(names),1,figsize=(8.5,8.5))
@@ -1703,7 +1741,7 @@ def plot_collapse_invest():
     print(m_ds)
 
 if __name__ == "__main__":
-    tenpar_collapse_invest()
+    #tenpar_collapse_invest()
     plot_collapse_invest()
     #run()
     #mf6_v5_ies_test()
