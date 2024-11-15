@@ -2019,7 +2019,7 @@ void PestppOptions::set_defaults()
     set_ies_phi_fractions_files("");
     set_ies_phi_factors_by_real(false);
     set_ies_n_iter_mean(0);
-    set_ies_updatebyreals(true);
+    set_ies_updatebyreals(false);
 
 
 	// DA parameters
