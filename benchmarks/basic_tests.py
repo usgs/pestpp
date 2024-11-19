@@ -1544,26 +1544,26 @@ def tenpar_collapse_invest():
     pst.observation_data.loc[nzoname,"weight"] = 100.0
     pst.observation_data.loc[nzoname,"obsval"] -= 1.5
 
-    for num_real in num_reals:
+    # for num_real in num_reals:
 
-        # wipe all pestpp options
-        pst.pestpp_options = {}
-        pst.pestpp_options["ies_num_reals"] = num_real
-        pst.write(os.path.join(new_d, "pest.pst"),version=2)
+    #     # wipe all pestpp options
+    #     pst.pestpp_options = {}
+    #     pst.pestpp_options["ies_num_reals"] = num_real
+    #     pst.write(os.path.join(new_d, "pest.pst"),version=2)
                
-        m_d = os.path.join(model_d,"master_ies_corrupt_{0}reals".format(pst.pestpp_options["ies_num_reals"]))
-        if os.path.exists(m_d):
-            shutil.rmtree(m_d)
-        num_workers = 50
-        if num_real > 500:
-            num_workers = 200
-        pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", num_workers, master_dir=m_d,
-                               worker_root=model_d,port=port,verbose=True)
+    #     m_d = os.path.join(model_d,"master_ies_corrupt_{0}reals".format(pst.pestpp_options["ies_num_reals"]))
+    #     if os.path.exists(m_d):
+    #         shutil.rmtree(m_d)
+    #     num_workers = 50
+    #     if num_real > 500:
+    #         num_workers = 200
+    #     pyemu.os_utils.start_workers(new_d, exe_path, "pest.pst", num_workers, master_dir=m_d,
+    #                            worker_root=model_d,port=port,verbose=True)
 
     pst.pestpp_options = {}
     pst.pestpp_options["ies_num_reals"] = 100000
     pst.control_data.noptmax = -1
-    pst.write(os.path.join(new_d, "pest.pst"))
+    pst.write(os.path.join(new_d, "pest.pst"),version=2)
            
     m_d = os.path.join(model_d,"master_ies_corrupt_{0}reals".format(pst.pestpp_options["ies_num_reals"]))
     if os.path.exists(m_d):
@@ -1741,7 +1741,7 @@ def plot_collapse_invest():
     print(m_ds)
 
 if __name__ == "__main__":
-    #tenpar_collapse_invest()
+    tenpar_collapse_invest()
     plot_collapse_invest()
     #run()
     #mf6_v5_ies_test()

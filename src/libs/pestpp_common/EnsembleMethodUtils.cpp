@@ -5950,13 +5950,22 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	ph.write(0, run_mgr_ptr->get_total_runs());
 	if (ppo->get_ies_save_rescov())
 		ph.save_residual_cov(oe, 0);
-	best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
-	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
+    if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0) {
+        message(2,"ies_n_iter_reinflate < 0, using min phi - ah yeah!");
+        best_mean_phis.push_back(ph.get_min(L2PhiHandler::phiType::COMPOSITE));
+        last_best_mean = ph.get_min(L2PhiHandler::phiType::COMPOSITE);
+
+    }
+    else {
+        best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
+        last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+    }
+    if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
 	{
 		message(1, "using full (MAP) update solution");
 
 	}
-	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+
 	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
 	bool continue_anyway = false;
@@ -7241,7 +7250,13 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		//move the estimated states to the oe, which will then later be transferred back to the pe
 		//transfer_dynamic_state_from_pe_to_oe(pe, oe);
 		ph.update(oe, pe, weights);
-		double best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+        double best_mean;
+        if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0) {
+            best_mean = ph.get_min(L2PhiHandler::phiType::COMPOSITE);
+        }
+        else {
+            best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+        }
 		double best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		best_mean_phis.push_back(best_mean);
 
@@ -7334,7 +7349,12 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		message(0, "phi summary for lambda, scale fac:", vals, echo);
 		ph.report(echo);
 
-		mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+        if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0) {
+            mean = ph.get_min(L2PhiHandler::phiType::COMPOSITE);
+        }
+        else {
+            mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+        }
 		std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
         ph.write_lambda(iter,oe_lams[i].shape().first,last_best_lam,last_best_mean,
                         last_best_std,
@@ -7354,9 +7374,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		return false;
 
 	}
-
-
-
 
     if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
 	{
@@ -7378,7 +7395,13 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			string m = ss.str();
 			message(0, m);
             ph.update(oe, pe,weights);
-            best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
+            if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0) {
+                best_mean_phis.push_back(ph.get_min(L2PhiHandler::phiType::COMPOSITE));
+            }
+            else {
+                best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
+            }
+
 
 			if (!use_mda)
 			{
@@ -7388,7 +7411,14 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 			ph.update(oe, pe,weights);
 			//re-check phi
-			double new_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+			double new_best_mean;
+            if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0) {
+                new_best_mean = ph.get_min(L2PhiHandler::phiType::COMPOSITE);
+            }
+            else {
+                new_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+            }
+
 			if (new_best_mean < best_mean)
 			{
 				best_mean = new_best_mean;
@@ -7553,7 +7583,13 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		}
 		performance_log->log_event("updating phi");
 		ph.update(oe_lam_best, pe_lams[best_idx], weights);
-		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+
+        if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0) {
+            best_mean = ph.get_min(L2PhiHandler::phiType::COMPOSITE);
+        }
+        else {
+            best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+        }
 		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 		ph.report(true, false);
@@ -7561,12 +7597,22 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	else
 	{
 		ph.update(oe_lam_best, pe_lams[best_idx], weights);
-		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+        if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0) {
+            best_mean = ph.get_min(L2PhiHandler::phiType::COMPOSITE);
+        }
+        else {
+            best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+        }
 		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	}
 
 	ph.update(oe_lam_best, pe_lams[best_idx], weights);
-	best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+    if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0) {
+        best_mean = ph.get_min(L2PhiHandler::phiType::COMPOSITE);
+    }
+    else {
+        best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+    }
 	best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	message(1, "last best mean phi * acceptable phi factor: ", last_best_mean * acc_fac);
 	message(1, "current best mean phi: ", best_mean);
@@ -7629,7 +7675,13 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		}
 		ph.update(oe, pe, weights);
 		//re-check phi
-		double new_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+		double new_best_mean;
+        if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0) {
+            new_best_mean = ph.get_min(L2PhiHandler::phiType::COMPOSITE);
+        }
+        else {
+            new_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+        }
 		if (new_best_mean < best_mean)
 		{
 			best_mean = new_best_mean;
@@ -7743,8 +7795,16 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
     ph.update(oe,pe,weights);
     message(0,"mean-shifted prior phi report:");
 
-    best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
-    last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+    if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0) {
+        message(2,"ies_n_iter_reinflate < 0, using min phi - ah yeah!");
+        best_mean_phis.push_back(ph.get_min(L2PhiHandler::phiType::COMPOSITE));
+        last_best_mean = ph.get_min(L2PhiHandler::phiType::COMPOSITE);
+
+    }
+    else {
+        best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
+        last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+    }
     last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 
     ph.report(true,true);
