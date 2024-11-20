@@ -77,6 +77,7 @@ public:
 	double get_std(phiType pt);
 	double get_max(phiType pt);
 	double get_min(phiType pt);
+    double get_representative_phi(phiType pt);
 
 	double calc_mean(map<string, double> *phi_map);
 	double calc_std(map<string, double> *phi_map);
