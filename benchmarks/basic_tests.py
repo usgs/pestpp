@@ -1740,9 +1740,68 @@ def plot_collapse_invest():
             
     print(m_ds)
 
+
+def tenpar_uniform_invest():
+    model_d = "ies_10par_xsec"
+    pyemu.Ensemble.reseed()
+    base_d = os.path.join(model_d, "template")
+    new_d = os.path.join(model_d, "test_template_geo")
+    if os.path.exists(new_d):
+        shutil.rmtree(new_d)
+    shutil.copytree(base_d, new_d)
+    print(platform.platform().lower())
+    pst = pyemu.Pst(os.path.join(new_d, "pest.pst"))
+    print(pst.model_command)
+    obs = pst.observation_data
+    obs.loc[:,"weight"] = 0.0
+    obs.loc["h01_03","weight"] = 1.0
+    par = pst.parameter_data
+    par.loc[:,"partrans"] = "log"
+    par.loc["stage","partrans"] = "fixed"
+    v = pyemu.geostats.ExpVario(contribution=1.0,a=10)
+    gs = pyemu.geostats.GeoStruct(variograms=v)
+    x = np.cumsum(np.ones(10))
+    y = np.ones(10)
+    print(pst.adj_par_names)
+    cov = gs.covariance_matrix(x,y,names = pst.adj_par_names).to_dataframe()
+    cov.loc["stage",:] = 0.0
+    cov.loc[:,"stage"] = 0.0
+    
+    cov.loc["stage","stage"] = 0.1
+    #import matplotlib.pyplot as plt
+    #plt.imshow(cov.values)
+    #plt.show()
+    par.loc["stage","partrans"] = "none"
+
+    pe = pyemu.ParameterEnsemble.from_gaussian_draw(pst=pst,cov=pyemu.Cov.from_dataframe(cov),num_reals=20)
+    pe.enforce()
+    pe.to_csv(os.path.join(new_d,"geoprior.csv"))
+    pst.pestpp_options["ies_par_en"] = "geoprior.csv"
+    pst.control_data.noptmax = 10
+    pst.write(os.path.join(new_d,"pest.pst"))
+    pyemu.os_utils.run("pestpp-ies pest.pst",cwd=new_d)
+
+    for i,val in enumerate(np.linspace(1,5,pe.shape[0])):
+        print(val)
+        pe.iloc[i,:5] = val
+    new_d = os.path.join(model_d, "test_template_uniform")
+    if os.path.exists(new_d):
+        shutil.rmtree(new_d)
+    shutil.copytree(base_d, new_d)
+    pe.to_csv(os.path.join(new_d,"uniprior.csv"))
+    pst.pestpp_options["ies_par_en"] = "uniprior.csv"
+    pst.control_data.noptmax = 10
+    pst.write(os.path.join(new_d,"pest.pst"))
+    pyemu.os_utils.run("pestpp-ies pest.pst",cwd=new_d)
+
+
+
+
 if __name__ == "__main__":
-    tenpar_collapse_invest()
-    plot_collapse_invest()
+    tenpar_uniform_invest()
+    #tenpar_collapse_invest()
+    #plot_collapse_invest()
+
     #run()
     #mf6_v5_ies_test()
     #prep_ends()

@@ -5964,7 +5964,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
     best_mean_phis.push_back(ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE));
     last_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
-    
+
     if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
 	{
 		message(1, "using full (MAP) update solution");
