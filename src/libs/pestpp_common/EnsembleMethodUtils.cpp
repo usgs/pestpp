@@ -500,6 +500,37 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         }
         performance_log->log_event("...sorting composite score");
         sortedset fitness_sorted(composite_score.begin(), composite_score.end(), compFunctor);
+        set<string> dups;
+        if (fitness_sorted.size() != composite_score.size())
+        {
+            performance_log->log_event("duplicates in composite score...dealing");
+            map<double,int> counts;
+            for (auto& score : composite_score)
+            {
+                if (counts.find(score.second) == counts.end())
+                    counts[score.second] = 0;
+                counts[score.second]++;
+            }
+            for (auto& score : composite_score)
+            {
+                if (counts[score.second] > 1)
+                {
+                    bool isin = false;
+                    for (auto &ii: fitness_sorted) {
+                        if (ii.first == score.first) {
+                            isin = true;
+                            break;
+                        }
+                    }
+
+                    if (!isin) {
+                        dups.insert(score.first);
+                    }
+                }
+
+            }
+
+        }
         real_idxs.clear();
         oe_real_names_case.clear();
         pe_real_names_case.clear();
@@ -517,6 +548,10 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
                 break;
             //cout << real_name << "," << ii->first << "," << ii->second << endl;
 
+        }
+        for (auto& dup: dups)
+        {
+            real_idxs.push_back(real_map.at(dup));
         }
         if (real_idxs.size() != subset_size+1)
         {
@@ -2313,10 +2348,23 @@ map<string, double> L2PhiHandler::get_par_group_contrib(Eigen::VectorXd &phi_vec
 
 void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 {
+    ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
+    num_conflict_group.clear();
+    for (auto& group : pest_scenario->get_ctl_ordered_obs_group_names())
+    {
+        num_conflict_group[group] = 0;
+    }
+    vector<string> in_conflict = detect_simulation_data_conflict(oe,"");
+    string group;
+    for (auto& ic : in_conflict)
+    {
+        group = oinfo.get_group(ic);
+        num_conflict_group[group]++;
+    }
 	//build up obs group and par group idx maps for group reporting
 	obs_group_idx_map.clear();
 	vector<string> nnz_obs = oe_base->get_var_names();
-	ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
+
 	vector<int> idx;
 	for (auto& og : pest_scenario->get_ctl_ordered_obs_group_names())
 		obs_group_idx_map[og] = vector<int>();
@@ -2386,10 +2434,22 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 
 void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, ObservationEnsemble& weights)
 {
+    ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
+    num_conflict_group.clear();
+    for (auto& group : pest_scenario->get_ctl_ordered_obs_group_names())
+    {
+        num_conflict_group[group] = 0;
+    }
+    vector<string> in_conflict = detect_simulation_data_conflict(oe,"");
+    string group;
+    for (auto& ic : in_conflict)
+    {
+        group = oinfo.get_group(ic);
+        num_conflict_group[group]++;
+    }
     //build up obs group and par group idx maps for group reporting
     obs_group_idx_map.clear();
     vector<string> nnz_obs = oe_base->get_var_names();
-    ObservationInfo oinfo = pest_scenario->get_ctl_observation_info();
     vector<int> idx;
     for (auto& og : pest_scenario->get_ctl_ordered_obs_group_names())
         obs_group_idx_map[og] = vector<int>();
@@ -2551,6 +2611,17 @@ double L2PhiHandler::calc_std(map<string, double> *phi_map)
 	return sqrt(var / (phi_map->size() - 1));
 }
 
+double L2PhiHandler::get_representative_phi(phiType pt)
+{
+    if (pest_scenario->get_pestpp_options().get_ies_n_iter_mean() < 0) {
+        return get_min(pt);
+    }
+
+    else {
+        return get_mean(pt);
+    }
+}
+
 double L2PhiHandler::get_mean(phiType pt)
 {
 	//double mean = 0.0;
@@ -2645,6 +2716,104 @@ bool cmp_pair(pair<string,double>& first, pair<string,double>& second)
     return first.second > second.second;
 }
 
+vector<string> L2PhiHandler::detect_simulation_data_conflict(ObservationEnsemble& _oe, string csv_tag) {
+    vector<string> in_conflict;
+
+    ofstream pdccsv;
+    if (csv_tag.size() > 0)
+        pdccsv.open(file_manager->get_base_filename() + csv_tag);
+
+    double smin, smax, omin, omax, smin_stat, smax_stat, omin_stat, omax_stat;
+    map<string, int> smap, omap;
+    vector<string> snames = _oe.get_var_names();
+    vector<string> onames = oe_base->get_var_names();
+    vector<string> temp = get_lt_obs_names();
+    set<string> ineq_lt(temp.begin(), temp.end());
+    //set<string>::iterator end = ineq.end();
+    temp = get_gt_obs_names();
+    set<string> ineq_gt(temp.begin(), temp.end());
+    temp.resize(0);
+
+    for (int i = 0; i < snames.size(); i++) {
+        smap[snames[i]] = i;
+    }
+    for (int i = 0; i < onames.size(); i++) {
+        omap[onames[i]] = i;
+    }
+    int sidx, oidx;
+    bool use_stat_dist = true;
+    if (pest_scenario->get_pestpp_options().get_ies_pdc_sigma_distance() <= 0.0)
+        use_stat_dist = false;
+
+    double smn, sstd, omn, ostd, dist;
+    double sd = abs(pest_scenario->get_pestpp_options().get_ies_pdc_sigma_distance());
+    int oe_nr = _oe.shape().first;
+    int oe_base_nr = oe_base->shape().first;
+    Eigen::VectorXd t;
+
+    if (csv_tag.size() > 0)
+    {
+        pdccsv << "name,obs_mean,obs_std,obs_min,obs_max,obs_stat_min,obs_stat_max,sim_mean,sim_std,sim_min,sim_max,sim_stat_min,sim_stat_max,distance";
+        pdccsv << endl;
+    }
+
+    for (auto oname: pest_scenario->get_ctl_ordered_nz_obs_names()) {
+        //if (ineq.find(oname) != end)
+        //	continue;
+        sidx = smap[oname];
+        oidx = omap[oname];
+        smin = _oe.get_eigen_ptr()->col(sidx).minCoeff();
+        omin = oe_base->get_eigen_ptr()->col(oidx).minCoeff();
+        smax = _oe.get_eigen_ptr()->col(sidx).maxCoeff();
+        omax = oe_base->get_eigen_ptr()->col(oidx).maxCoeff();
+        t = _oe.get_eigen_ptr()->col(sidx);
+        smn = t.mean();
+        sstd = std::sqrt((t.array() - smn).square().sum() / (oe_nr - 1));
+        smin_stat = smn - (sd * sstd);
+        smax_stat = smn + (sd * sstd);
+        t = oe_base->get_eigen_ptr()->col(oidx);
+        omn = t.mean();
+        ostd = std::sqrt((t.array() - omn).square().sum() / (oe_base_nr - 1));
+        omin_stat = omn - (sd * ostd);
+        omax_stat = omn + (sd * ostd);
+        bool conflicted = false;
+        if (use_stat_dist) {
+            if (ineq_lt.find(oname) != ineq_lt.end()) {
+                if (smin_stat > omax_stat)
+                    conflicted = true;
+            } else if (ineq_gt.find(oname) != ineq_gt.end()) {
+                if (smax_stat < omin_stat)
+                    conflicted = true;
+            } else if ((smin_stat > omax_stat) || (smax_stat < omin_stat)) {
+                conflicted = true;
+            }
+        } else {
+            if (ineq_lt.find(oname) != ineq_lt.end()) {
+                if (smin > omax)
+                    conflicted = true;
+            } else if (ineq_gt.find(oname) != ineq_gt.end()) {
+                if (smax < omin)
+                    conflicted = true;
+            } else if ((smin > omax) || (smax < omin)) {
+                conflicted = true;
+            }
+        }
+        if (conflicted) {
+            in_conflict.push_back(oname);
+            if (csv_tag.size() > 0) {
+                dist = max((smin - omax), (omin - smax));
+
+                pdccsv << pest_utils::lower_cp(oname) << "," << omn << "," << ostd << "," << omin << "," << omax << ","
+                       << omin_stat << ","
+                       << omax_stat;
+                pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << ","
+                       << smax_stat << "," << dist << endl;
+            }
+        }
+    }
+    pdccsv.close();
+    return in_conflict;
+}
 
 void L2PhiHandler::report_group(bool echo) {
 
@@ -2665,6 +2834,8 @@ void L2PhiHandler::report_group(bool echo) {
             snzgroups.emplace(oi_ptr->get_group(o));
     }
 
+    if (snzgroups.size() == 0)
+        return;
 
     double tot = 0, ptot = 0;
     double v = 0,pv = 0;
@@ -2738,7 +2909,7 @@ void L2PhiHandler::report_group(bool echo) {
     ss << "  ---  observation group phi summary ---  " << endl;
     ss << "       (computed using 'actual' phi)" << endl;
     ss << "           (sorted by mean phi)" << endl;
-    ss << left << setw(len) << "group" << right << setw(6) << "count" << setw(10) << "mean" << setw(10) << "std";
+    ss << left << setw(len) << "group" << right << setw(6) << "count" << setw(11) << "nconflict" << setw(10) << "mean" << setw(10) << "std";
     ss << setw(10) << "min" << setw(10) << "max";
     ss << setw(10) << "percent" << setw(10) << "std" << endl; //<< setw(10) << "min " << setw(10) << "max " << endl;
     f << ss.str();
@@ -2771,6 +2942,8 @@ void L2PhiHandler::report_group(bool echo) {
         ss.str("");
         ss << left << setw(len) << pest_utils::lower_cp(g) << " ";
         ss << right << setw(5) << nzc << " ";
+        ss << right << setw(10) << num_conflict_group[g] << " ";
+
         ss << right << setw(9) << setprecision(3) << mn_map[g] << " ";
         ss << setw(9) << setprecision(3) << std_map[g] << " ";
         ss << setw(9) << setprecision(3) << mmn_map[g] << " ";
@@ -3411,6 +3584,7 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_regul(ParameterEnsemble & pe)
 	return phi_map;
 }
 
+
 vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names)
 {
     stringstream ss;
@@ -3661,6 +3835,7 @@ ParChangeSummarizer::ParChangeSummarizer(ParameterEnsemble *_base_pe_ptr, FileMa
 void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 {
 	update(pe);
+    map<string,int> excess_std_reduction = get_npar_per_group_with_excess_std_reduction(pe);
 	vector<string> grp_names;// = base_pe_ptr->get_pest_scenario().get_ctl_ordered_par_group_names();
 	vector<pair<double, string>> pairs;
     //for (auto m : mean_change)
@@ -3675,7 +3850,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	{
 		grp_names.push_back(pairs[i].second);
 	}
-	int mxlen = 15;
+	int mxlen = 7;
 	for (auto& g : grp_names)
 		mxlen = max(mxlen, (int)g.size());
 
@@ -3686,10 +3861,10 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	cout << ss.str();
 	frec << ss.str();
 	ss.str("");
-	ss << setw(mxlen) << left << "group" << setw(10) << right << "mean chg" << setw(10) << "std chg";
-	ss << setw(10) << "n at ubnd" << setw(10) << "% at ubnd";
-    ss << setw(10) << "n at lbnd" << setw(10) << "% at lbnd";
-	ss << setw(10) << "init CV" << setw(10) << "curr CV" << setw(10) << endl;
+	ss << setw(mxlen) << left << "group" << right << setw(6) << "count" << setw(10) << right << "mean chg" << setw(9) << "std chg";
+	ss << setw(11) << "n at ubnd" << setw(11) << "% at ubnd";
+    ss << setw(11) << "n at lbnd" << setw(11) << "% at lbnd";
+	ss << setw(12) << "n std decr" << endl;
 	cout << ss.str();
 	frec << ss.str();	
 	
@@ -3703,16 +3878,18 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 		double std_diff = std_change[grp_name];
 
 		ss.str("");
-		ss << setw(mxlen) << left << pest_utils::lower_cp(grp_name) << setw(10) << setprecision(4) << right << mean_diff * 100.0;
-		ss << setw(10) << setprecision(4) << std_diff * 100.0;
+		ss << setw(mxlen) << left << pest_utils::lower_cp(grp_name) << right << setw(6) << pargp2par_map[grp_name].size();
+        ss << setw(10) << setprecision(4) << right << mean_diff * 100.0;
+		ss << setw(9) << setprecision(4) << std_diff * 100.0;
         num_out = num_at_ubound[grp_name];
         percent_out = percent_at_ubound[grp_name];
-		ss << setw(10) << num_out << setw(10) << setprecision(4) << percent_out;
+		ss << setw(11) << num_out << setw(11) << setprecision(4) << percent_out;
         num_out = num_at_lbound[grp_name];
         percent_out = percent_at_lbound[grp_name];
-        ss << setw(10) << num_out << setw(10) << setprecision(4) << percent_out;
-		ss << setw(10) << setprecision(4) << init_cv[grp_name] << setw(10) << curr_cv[grp_name] << setw(10) << setprecision(4) << endl;
-		if (i < 15)
+        ss << setw(11) << num_out << setw(11) << setprecision(4) << percent_out;
+		//ss << setw(10) << setprecision(4) << init_cv[grp_name] << setw(10) << curr_cv[grp_name] << setw(10) << setprecision(4) << endl;
+		ss << setw(12) << excess_std_reduction[grp_name] << endl;
+        if (i < 15)
 			cout << ss.str();
 		frec << ss.str();
 		i++;
@@ -3723,6 +3900,9 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	//ss << "          'n CV decr' is the number of parameters with current CV less " << cv_dec_threshold*100.0 << "% of the initial CV" << endl;
 	ss << "    Note: the parameter change statistics implicitly include the effect of " << endl;
 	ss << "          realizations that have failed or have been dropped." << endl;
+    ss << "    Note: the 'n std decr' is the number of parameters with current" << endl;
+    ss << "          std less 5% of their initial std." << endl;
+
 	cout << ss.str();
 	frec << ss.str();
 	if (grp_names.size() > 15)
@@ -3758,6 +3938,64 @@ void ParChangeSummarizer::write_to_csv(string& filename)
 	f.close();
 	file_manager_ptr->rec_ofstream() << "...saved parameter change summary to " << filename << endl;
 	cout << "...saved parameter change summary to " << filename << endl;
+
+}
+
+map<string,int> ParChangeSummarizer::get_npar_per_group_with_excess_std_reduction(ParameterEnsemble& _pe, double thresh)
+{
+    stringstream ss;
+    map<string,double> pr_mn,pr_std;
+    base_pe_ptr->fill_moment_maps(pr_mn,pr_std);
+    map<string,double> pt_mn,pt_std;
+    _pe.fill_moment_maps(pt_mn,pt_std);
+
+    double ratio;
+    map<string,int> results;
+
+    ParameterInfo* pi = _pe.get_pest_scenario_ptr()->get_ctl_parameter_info_ptr_4_mod();
+    string group;
+    for (auto& pname : _pe.get_pest_scenario_ptr()->get_ctl_parameters())
+    {
+        group = pi->get_parameter_rec_ptr(pname.first)->group;
+        if (results.find(group) == results.end())
+        {
+            results[group] = 0;
+        }
+    }
+
+    double demon = 0.0;
+    for (auto& std : pt_std)
+    {
+        demon = pr_std.at(std.first);
+        if (demon <= 0.0)
+        {
+            /*ss.str("");
+            ss << "L2PhiHandler: prior std <=0 for par '" << std.first << "': " << std.second;
+            throw runtime_error(ss.str());*/
+            ratio = 1.0;
+        }
+        else {
+            ratio = std.second / demon;
+        }
+        if (!isnormal(ratio) && (ratio != 0.0))
+        {
+            ss.str("");
+            ss << "L2PhiHandler: posterior-prior std ratio not normal for par '" << std.first << "': " << ratio;
+            throw runtime_error(ss.str());
+        }
+        ratio = 1.0 - ratio;
+        group = pi->get_parameter_rec_ptr(std.first)->group;
+//        if (results.find(group) == results.end()) {
+//            results[group] = 0;
+//        }
+        if (ratio >= thresh)
+        {
+            results[group]++;
+        }
+
+    }
+    return results;
+
 
 }
 
@@ -4138,14 +4376,14 @@ void EnsembleMethod::sanity_checks()
     }
 
 
-    if (pest_scenario.get_control_info().noptmax > 10)
-	{
-		warnings.push_back("noptmax > 10, don't expect anything meaningful from the results!");
-	}
+//    if (pest_scenario.get_control_info().noptmax > 10)
+//	{
+//		warnings.push_back("noptmax > 10, don't expect anything meaningful from the results!");
+//	}
 
 	else if (pest_scenario.get_control_info().noptmax > 3)
 	{
-		warnings.push_back("noptmax > 3, this is a lot of iterations for an ensemble method, please consider using fewer iterations for better outcomes");
+		warnings.push_back("noptmax > 3, this is a lot of iterations for an ensemble method...");
 	}
 
     if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
@@ -4274,10 +4512,7 @@ void EnsembleMethod::sanity_checks()
     {
         errors.push_back("multimodal alpha < 0.001");
     }
-    if (ppo->get_ies_n_iter_mean() > 0)
-    {
-        warnings.push_back("mean-shifting iterations is a new concept and subject to change - experimental at best");
-    }
+
 
     if (warnings.size() > 0)
     {
@@ -4330,8 +4565,8 @@ bool EnsembleMethod::should_terminate()
 	message(1, "nphinored (also used for consecutive bad lambda cycles): ", nphinored);
 	int n_mean_iter = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
     vector<double>::iterator begin_idx = best_mean_phis.begin();
-    if (best_mean_phis.size() > n_mean_iter)
-        begin_idx += (n_mean_iter+1); //bc of prior phi and then adding the mean shift to the list
+    if ((n_mean_iter > 0) && (best_mean_phis.size() > n_mean_iter))
+        begin_idx = best_mean_phis.end() - (n_mean_iter+1); //bc of prior phi and then adding the mean shift to the list
     if (best_mean_phis.size() > 0)
 	{
 
@@ -4352,7 +4587,7 @@ bool EnsembleMethod::should_terminate()
     for (auto& phi : best_mean_phis)
 	{
 		ratio = (phi - best_phi_yet) / phi;
-    	if ((i> n_mean_iter) && (ratio <= phiredstp))
+    	if ((i>=(iter - n_mean_iter)) && (ratio <= phiredstp))
 			count++;
         i++;
 	}
@@ -4844,6 +5079,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		//transfer_dynamic_state_from_oe_to_initial_pe(_pe, _oe);
 		pe = _pe;
 		oe = _oe;
+
 		return;
 	}
 
@@ -4931,7 +5167,13 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	lambda_min = 1.0E-30;
 
 	consec_bad_lambda_cycles = 0;
-
+    reinflate_to_minphi_real = false;
+    if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0)
+    {
+        message(2,"n_iter_mean < 0, using min-phi real for re-inflation, resetting n_iter_reinflate to positive");
+        reinflate_to_minphi_real = true;
+        pest_scenario.get_pestpp_options_ptr()->set_ies_n_iter_mean(-1 * pest_scenario.get_pestpp_options().get_ies_n_iter_mean());
+    }
 	lam_mults = pest_scenario.get_pestpp_options().get_ies_lam_mults();
 	if (lam_mults.size() == 0)
 		lam_mults.push_back(1.0);
@@ -5412,6 +5654,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	//the hard way to restart
 	if (obs_restart_csv.size() > 0)
 		initialize_restart();
+    //we need this for the prior mean shifting
+    weights_base = weights;
 
 	if (!run)
 		return;
@@ -5570,7 +5814,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	ph.report(true);
 	
 	pcs = ParChangeSummarizer(&pe_base, &file_manager, &output_file_writer);
-	vector<string> in_conflict = detect_prior_data_conflict();
+	message(1,"checking for prior-data conflict");
+    vector<string> in_conflict = ph.detect_simulation_data_conflict(oe,"pdc.csv");
 	if (in_conflict.size() > 0)
 	{
 		ss.str("");
@@ -5716,13 +5961,16 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	ph.write(0, run_mgr_ptr->get_total_runs());
 	if (ppo->get_ies_save_rescov())
 		ph.save_residual_cov(oe, 0);
-	best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
-	if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
+
+    best_mean_phis.push_back(ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE));
+    last_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
+
+    if (!pest_scenario.get_pestpp_options().get_ies_use_approx())
 	{
 		message(1, "using full (MAP) update solution");
 
 	}
-	last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+
 	last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
 	bool continue_anyway = false;
@@ -7007,7 +7255,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		//move the estimated states to the oe, which will then later be transferred back to the pe
 		//transfer_dynamic_state_from_pe_to_oe(pe, oe);
 		ph.update(oe, pe, weights);
-		double best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+        double best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
 		double best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		best_mean_phis.push_back(best_mean);
 
@@ -7089,18 +7337,19 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			continue;
 		}
 
-        if (pest_scenario.get_pestpp_options().get_ies_updatebyreals())
-        {
-            message(1, "updating realizations with reduced phi");
-            update_reals_by_phi(pe_lams[i], oe_lams[i],subset_idxs);
-        }
+//        if (pest_scenario.get_pestpp_options().get_ies_updatebyreals())
+//        {
+//            message(1, "updating realizations with reduced phi");
+//            update_reals_by_phi(pe_lams[i], oe_lams[i],subset_idxs);
+//        }
 
 		ph.update(oe_lams[i], pe_lams[i], weights);
 
 		message(0, "phi summary for lambda, scale fac:", vals, echo);
 		ph.report(echo);
 
-		mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+        mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
+
 		std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
         ph.write_lambda(iter,oe_lams[i].shape().first,last_best_lam,last_best_mean,
                         last_best_std,
@@ -7120,9 +7369,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		return false;
 
 	}
-
-
-
 
     if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
 	{
@@ -7144,8 +7390,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			string m = ss.str();
 			message(0, m);
             ph.update(oe, pe,weights);
-            best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
-
+            best_mean_phis.push_back(ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE));
 			if (!use_mda)
 			{
 				message(1, "updating realizations with reduced phi");
@@ -7154,7 +7399,8 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 			ph.update(oe, pe,weights);
 			//re-check phi
-			double new_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+			double new_best_mean;
+            new_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
 			if (new_best_mean < best_mean)
 			{
 				best_mean = new_best_mean;
@@ -7319,7 +7565,8 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		}
 		performance_log->log_event("updating phi");
 		ph.update(oe_lam_best, pe_lams[best_idx], weights);
-		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+
+        best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
 		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		message(1, "phi summary for entire ensemble using lambda,scale_fac ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
 		ph.report(true, false);
@@ -7327,12 +7574,12 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	else
 	{
 		ph.update(oe_lam_best, pe_lams[best_idx], weights);
-		best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+        best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
 		best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	}
 
 	ph.update(oe_lam_best, pe_lams[best_idx], weights);
-	best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+    best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
 	best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 	message(1, "last best mean phi * acceptable phi factor: ", last_best_mean * acc_fac);
 	message(1, "current best mean phi: ", best_mean);
@@ -7354,6 +7601,16 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		last_best_mean = best_mean;
         if (pest_scenario.get_pestpp_options().get_ies_updatebyreals())
         {
+
+            if (pe.shape().first > pe_lams[best_idx].shape().first)
+            {
+                performance_log->log_event("aligning rows of pe with pe_lams[best_idx]");
+                pe.keep_rows(pe_lams[best_idx].get_real_names());
+            }
+            if (oe.shape().first > oe_lam_best.shape().first) {
+                performance_log->log_event("aligning rows of oe with oe_lam_best");
+                oe.keep_rows(oe_lam_best.get_real_names());
+            }
             message(0, "only updating realizations with reduced phi");
             update_reals_by_phi(pe_lams[best_idx], oe_lam_best);
         }
@@ -7385,7 +7642,8 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		}
 		ph.update(oe, pe, weights);
 		//re-check phi
-		double new_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+		double new_best_mean;
+        new_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
 		if (new_best_mean < best_mean)
 		{
 			best_mean = new_best_mean;
@@ -7430,21 +7688,53 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 }
 
 void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
+    string min_phi_name = "";
+    if (true)
+    {
+        map<string,double> pmap = ph.get_phi_map(L2PhiHandler::phiType::ACTUAL);
+        double min_phi = numeric_limits<double>::max();
 
+        for (auto& item : pmap)
+        {
+            if (item.second < min_phi)
+            {
+                min_phi = item.second;
+                min_phi_name = item.first;
+            }
+        }
+        vector<string> real_names = oe.get_real_names();
+        int idx = distance(real_names.begin(),find(real_names.begin(),real_names.end(),min_phi_name));
+        if (idx == real_names.size())
+        {
+            throw_em_error("min phi realization name not found in obs ensemble");
+        }
+        real_names = pe.get_real_names();
+        min_phi_name = real_names[idx];
+
+    }
     message(0,"resetting current parameter ensemble to prior ensemble with current ensemble mean");
     performance_log->log_event("getting prior parameter ensemble mean-centered anomalies");
-    Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe.get_real_names(), pe.get_var_names());
+    Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe_base.get_real_names(), pe.get_var_names(), pest_scenario.get_pestpp_options().get_ies_center_on());
 
     performance_log->log_event("getting current parameter ensemble mean vector");
     vector<double> mean_vec = pe.get_mean_stl_var_vector();
+    Eigen::VectorXd offset(mean_vec.size());
+    for (int i=0;i<mean_vec.size();i++)
+        offset[i] = mean_vec[i];
+    if (reinflate_to_minphi_real)
+    {
+        offset = pe.get_real_vector(min_phi_name);
+        message(2,"using min-phi realization for offset");
+    }
 
-    performance_log->log_event("adding mean to anomalies");
+
+    performance_log->log_event("adding offset to anomalies");
     for (int i = 0; i < mean_vec.size(); i++)
     {
-        anoms.col(i) = anoms.col(i).array() + mean_vec[i];
+        anoms.col(i) = anoms.col(i).array() + offset[i];
     }
     performance_log->log_event("forming new parameter ensemble of mean-shifted prior realizations");
-    ParameterEnsemble new_pe = ParameterEnsemble(&pest_scenario,&rand_gen,anoms,pe.get_real_names(),pe.get_var_names());
+    ParameterEnsemble new_pe = ParameterEnsemble(&pest_scenario,&rand_gen,anoms,pe_base.get_real_names(),pe.get_var_names());
 
     new_pe.set_trans_status(pe.get_trans_status());
     new_pe.set_fixed_info(pe.get_fixed_info());
@@ -7458,16 +7748,19 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
     ss << "iteration:" << iter;
     vector<int> temp;
     ofstream& frec = file_manager.rec_ofstream();
-
+    oe = oe_base;
+    weights = weights_base;
     run_ensemble_util(performance_log,frec,new_pe,oe,run_mgr_ptr,false,temp,NetPackage::NULL_DA_CYCLE, ss.str());
     pe = new_pe;
     new_pe = ParameterEnsemble();
     report_and_save(NetPackage::NULL_DA_CYCLE);
-    ph.update(oe,pe,weights);\
+    ph.update(oe,pe,weights);
     message(0,"mean-shifted prior phi report:");
 
-    best_mean_phis.push_back(ph.get_mean(L2PhiHandler::phiType::COMPOSITE));
-    last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+
+    best_mean_phis.push_back(ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE));
+    last_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
+
     last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 
     ph.report(true,true);
@@ -7475,9 +7768,10 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
     ss.str("");
     ss << file_manager.get_base_filename() << "." << iter << ".meanshift.pcs.csv";
     pcs.summarize(pe, ss.str());
+    last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
     double phi_lam = get_lambda();
     last_best_lam = phi_lam;
-    message(1,"iter = ies_n_iter_mean, resetting lambda to ",last_best_lam);
+    message(1,"iter = ies_n_iter_reinflate, resetting lambda to ",last_best_lam);
     consec_bad_lambda_cycles = 0;
 
 }
@@ -7893,7 +8187,7 @@ void EnsembleMethod::add_bases()
 		Parameters pars = pest_scenario.get_ctl_parameters();
 		pe.get_par_transform().active_ctl2numeric_ip(pars);
 		vector<int> drop{ pe.shape().first - 1 };
-		pe.drop_rows(drop);
+		pe.drop_rows(drop,true);
 		pe.append(BASE_REAL_NAME, pars);
 	}
 
@@ -7945,7 +8239,7 @@ void EnsembleMethod::add_bases()
 			message(1, mess);
 			vector<string> drop;
 			drop.push_back(oreal);
-			oe_base.drop_rows(drop);
+			oe_base.drop_rows(drop,true);
 			oe_base.append(BASE_REAL_NAME, obs);
 			//rnames.insert(rnames.begin() + idx, string(base_name));
 			rnames[idx] = BASE_REAL_NAME;
@@ -7954,13 +8248,13 @@ void EnsembleMethod::add_bases()
             {
                 string oreal = wrnames[idx];
                 ss.str("");
-                ss << "warning: 'base' realization in par ensenmble but not in weight ensemble," << endl;
+                ss << "warning: 'base' realization in par ensemble but not in weight ensemble," << endl;
                 ss << "         replacing weight realization '" << oreal << "' with 'base' weights";
                 string mess = ss.str();
                 message(1, mess);
                 vector<string> drop;
                 drop.push_back(oreal);
-                weights.drop_rows(drop);
+                weights.drop_rows(drop,true);
 
                 weights.append(BASE_REAL_NAME, wobs);
                 //rnames.insert(rnames.begin() + idx, string(base_name));
@@ -8575,6 +8869,7 @@ void EnsembleMethod::initialize_restart()
 		ss << "restart oe has too many rows: " << oe.shape().first << " compared to oe_base: " << oe_base.shape().first;
 		throw_em_error(ss.str());
 	}
+
 }
 
 
@@ -8689,115 +8984,6 @@ void EnsembleMethod::zero_weight_obs(vector<string>& obs_to_zero_weight, bool up
 	message(1, ss.str());
 }
 
-vector<string> EnsembleMethod::detect_prior_data_conflict(bool save)
-{
-	message(1, "checking for prior-data conflict...");
-	//for now, just really simple metric - checking for overlap
-	// write out conflicted obs and some related info to a csv file
-	ofstream pdccsv(file_manager.get_base_filename() + ".pdc.csv");
-
-	vector<string> in_conflict;
-	double smin, smax, omin, omax, smin_stat, smax_stat, omin_stat, omax_stat;
-	map<string, int> smap, omap;
-	vector<string> snames = oe.get_var_names();
-	vector<string> onames = oe_base.get_var_names();
-	vector<string> temp = ph.get_lt_obs_names();
-	set<string> ineq_lt(temp.begin(), temp.end());
-	//set<string>::iterator end = ineq.end();
-	temp = ph.get_gt_obs_names();
-	set<string> ineq_gt(temp.begin(), temp.end());
-	temp.resize(0);
-
-	for (int i = 0; i < snames.size(); i++)
-	{
-		smap[snames[i]] = i;
-	}
-	for (int i = 0; i < onames.size(); i++)
-	{
-		omap[onames[i]] = i;
-	}
-	int sidx, oidx;
-	bool use_stat_dist = true;
-	if (pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance() <= 0.0)
-		use_stat_dist = false;
-
-	double smn, sstd, omn, ostd, dist;
-	double sd = abs(pest_scenario.get_pestpp_options().get_ies_pdc_sigma_distance());
-	int oe_nr = oe.shape().first;
-	int oe_base_nr = oe_base.shape().first;
-	Eigen::VectorXd t;
-
-    pdccsv << "name,obs_mean,obs_std,obs_min,obs_max,obs_stat_min,obs_stat_max,sim_mean,sim_std,sim_min,sim_max,sim_stat_min,sim_stat_max,distance" << endl;
-	for (auto oname : pest_scenario.get_ctl_ordered_nz_obs_names())
-	{
-		//if (ineq.find(oname) != end)
-		//	continue;
-		sidx = smap[oname];
-		oidx = omap[oname];
-		smin = oe.get_eigen_ptr()->col(sidx).minCoeff();
-		omin = oe_base.get_eigen_ptr()->col(oidx).minCoeff();
-		smax = oe.get_eigen_ptr()->col(sidx).maxCoeff();
-		omax = oe_base.get_eigen_ptr()->col(oidx).maxCoeff();
-		t = oe.get_eigen_ptr()->col(sidx);
-		smn = t.mean();
-		sstd = std::sqrt((t.array() - smn).square().sum() / (oe_nr - 1));
-		smin_stat = smn - (sd * sstd);
-		smax_stat = smn + (sd * sstd);
-		t = oe_base.get_eigen_ptr()->col(oidx);
-		omn = t.mean();
-		ostd = std::sqrt((t.array() - omn).square().sum() / (oe_base_nr - 1));
-		omin_stat = omn - (sd * ostd);
-		omax_stat = omn + (sd * ostd);
-        bool conflicted = false;
-		if (use_stat_dist)
-		{
-		    if (ineq_lt.find(oname) != ineq_lt.end())
-            {
-		        if (smin_stat > omax_stat)
-                    conflicted = true;
-            }
-		    else if (ineq_gt.find(oname) != ineq_gt.end())
-		    {
-		        if (smax_stat < omin_stat)
-                    conflicted = true;
-            }
-            else if ((smin_stat > omax_stat) || (smax_stat < omin_stat))
-			{
-				conflicted = true;
-			}
-		}
-		else
-		{
-            if (ineq_lt.find(oname) != ineq_lt.end())
-            {
-                if (smin > omax)
-                    conflicted = true;
-            }
-            else if (ineq_gt.find(oname) != ineq_gt.end())
-            {
-                if (smax < omin)
-                    conflicted = true;
-            }
-			else if ((smin > omax) || (smax < omin))
-			{
-				conflicted = true;
-			}
-		}
-		if (conflicted)
-        {
-            in_conflict.push_back(oname);
-            dist = max((smin - omax), (omin - smax));
-
-            pdccsv << pest_utils::lower_cp(oname) << "," << omn << "," << ostd << "," << omin << "," << omax << "," << omin_stat << ","
-                   << omax_stat;
-            pdccsv << "," << smn << "," << sstd << "," << smin << "," << smax << "," << smin_stat << ","
-                   << smax_stat << "," << dist << endl;
-
-        }
-	}
-
-	return in_conflict;
-}
 
 Eigen::MatrixXd EnsembleMethod::get_Am(const vector<string>& real_names, const vector<string>& par_names)
 {
