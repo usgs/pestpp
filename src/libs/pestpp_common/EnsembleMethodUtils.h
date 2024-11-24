@@ -77,6 +77,7 @@ public:
 	double get_std(phiType pt);
 	double get_max(phiType pt);
 	double get_min(phiType pt);
+    double get_representative_phi(phiType pt);
 
 	double calc_mean(map<string, double> *phi_map);
 	double calc_std(map<string, double> *phi_map);
@@ -119,6 +120,7 @@ public:
 	map<string,map<string,double>> get_meas_phi_weight_ensemble(ObservationEnsemble& oe, ObservationEnsemble& weights);
 
     vector<string> get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names);
+    vector<string> detect_simulation_data_conflict(ObservationEnsemble& _oe, string csv_tag);
 
 private:
 	string tag;
@@ -157,6 +159,7 @@ private:
 	map<string, double> composite;
 	map<string, double> actual;
     map<string, double> noise;
+    map<string,int> num_conflict_group;
 
 	vector<string> lt_obs_names;
 	vector<string> gt_obs_names;
@@ -197,6 +200,8 @@ private:
 
 	void update(ParameterEnsemble& pe);
 	void write_to_csv(string& filename);
+    map<string,int> get_npar_per_group_with_excess_std_reduction(ParameterEnsemble& _pe, double thresh=0.95);
+
 
 };
 
@@ -462,9 +467,10 @@ protected:
 	vector<string> act_obs_names, act_par_names;
 	vector<string> violation_obs;
 	ParameterEnsemble pe, pe_base;
-	ObservationEnsemble oe, oe_base, weights;
+	ObservationEnsemble oe, oe_base, weights, weights_base;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 	bool oe_drawn, pe_drawn;
+    bool reinflate_to_minphi_real;
 
 
 	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
@@ -493,7 +499,6 @@ protected:
 
 	Eigen::MatrixXd get_Am(const vector<string>& real_names, const vector<string>& par_names);
 
-    vector<string> detect_prior_data_conflict(bool save=true);
 
 	void zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov = true, bool update_oe_base = true);
 
