@@ -3824,7 +3824,7 @@ If users want to have more fine-grained control of the weight adjustment, option
 
 ### <a id='s13-2-11' />9.2.11 Selective Updates 
 
-In highly nonlinear settings, some realizations may show an increase in phi across iterations, while the majority of realizations shows decreases – see Figure 9.4 for an example. This indicates that, because of nonlinearity, the optimal parameter ensemble update that is effective at reducing phi for the ensemble as a whole is not ideal for all realizations. To combat this problem, PESTPP-IES will, by default (as of version 5.2.13), only update realizations that meet the phi reduction criteria. This is identical to the partial upgrade process that is triggered automatically of the mean phi of the entire ensemble does not meet the phi reduction criteria. This behaviour is controlled with the *ies_update_by_reals* option, which is true by default.
+In highly nonlinear settings, some realizations may show an increase in phi across iterations, while the majority of realizations shows decreases – see Figure 9.4 for an example. This indicates that, because of nonlinearity, the optimal parameter ensemble update that is effective at reducing phi for the ensemble as a whole is not ideal for all realizations. To combat this problem, PESTPP-IES will, by default (as of version 5.2.13), only update realizations that meet the phi reduction criteria. This is identical to the partial upgrade process that is triggered automatically of the mean phi of the entire ensemble does not meet the phi reduction criteria. This behaviour is controlled with the *ies_update_by_reals* option, which is false by default.
 
 <img src="./media/image7.png" style="width:6.26806in;height:3.20347in" alt="A graph of a graph Description automatically generated with medium confidence" />
 
@@ -4166,7 +4166,7 @@ Note also that the number of control variables may change with time. Refer to th
 <tr class="even">
 <td><em>ies_update_by_reals</em></td>
 <td>bool</td>
-<td>Flag to indicate whether or not to update each realization according to its phi reduction.</td>
+<td>Flag to indicate whether or not to update each realization according to its phi reduction. Default is False.</td>
 </tr>
 </tbody>
 </table>
