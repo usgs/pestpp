@@ -560,7 +560,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		}
 
 	}
-    w_sleep(2000);
+    w_sleep(500);
 	n_no_ops = 0;
     while (true)
     {
