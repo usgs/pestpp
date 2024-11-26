@@ -1049,14 +1049,16 @@ def mf6_v5_sen_test():
 
     t_d = os.path.join(model_d,"template")
     m_d = os.path.join(model_d,"master_sen")
-    #if os.path.exists(m_d):
-    #    shutil.rmtree(m_d)
+    if os.path.exists(m_d):
+       shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_sen.pst"))
+    pst.pestpp_options["gsa_morris_p"] = 4
+    pst.pestpp_options["gsa_morris_r"] = 4
     pst.pestpp_options["panther_transfer_on_finish"] = ["freyberg6_freyberg.cbc","freyberg6.lst","ies_prior.jcb"]
     pst.write(os.path.join(t_d,"freyberg6_run_sen_trn.pst"))
     m_d = os.path.join(model_d,"master_sen")
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sen"), "freyberg6_run_sen_trn.pst",
-                                 num_workers=15, worker_root=model_d,
+                                 num_workers=50, worker_root=model_d,
                                  port=4004,verbose=True,master_dir=m_d)
 
     pst = pyemu.Pst(os.path.join(m_d,"freyberg6_run_sen_trn.pst"))
@@ -1798,7 +1800,8 @@ def tenpar_uniform_invest():
 
 
 if __name__ == "__main__":
-    tenpar_uniform_invest()
+    mf6_v5_sen_test()
+    #tenpar_uniform_invest()
     #tenpar_collapse_invest()
     #plot_collapse_invest()
 

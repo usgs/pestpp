@@ -639,7 +639,7 @@ void ModelInterface::remove_existing()
 		if (failed_file_op)
 		{
 			++n_tries;
-			w_sleep(1000);
+			w_sleep(500);
 			if (n_tries > 5)
 			{
 				ostringstream str;

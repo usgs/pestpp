@@ -1538,7 +1538,6 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
 
             if (verbose_level < 3)
                 return;
-            //cout << "thread: " << tid << ", " << t_count << ", " << prefix << " rows:cols" << mat.rows() << ":" << mat.cols() << endl;
             stringstream ss;
 
             ss << "thread_" << tid << ".count_ " << t_count << ".iter_" << iter << "." << prefix << ".dat";
@@ -3686,7 +3685,7 @@ void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixX
         for (int i = 0; i < resid.rows(); i++)
             col(i) = ((scol(i) > val) && (scol(i) < val2)) ? 0.0 : col(i);
         //cout << resid.col(idx) << endl;
-        cout << col << endl << endl;
+        //cout << col << endl << endl;
         resid.col(idx) = col;
         //cout << resid.col(idx) << endl;
     }
@@ -3715,7 +3714,7 @@ void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixX
         for (int i = 0; i < resid.rows(); i++)
             col(i) = (scol(i) < val) ? 0.0 : col(i);
         //cout << resid.col(idx) << endl;
-        cout << col << endl << endl;
+        //cout << col << endl << endl;
         resid.col(idx) = col;
         //cout << resid.col(idx) << endl;
     }
@@ -4319,7 +4318,7 @@ vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec,Pa
 		}
 		if (failing_reals.size() > 0)
 		{
-			cout << "parameter ensemble consisteny check failed for " << failing_reals.size() << ", see .rec file for listing" << endl;
+			cout << "parameter ensemble consistency check failed for " << failing_reals.size() << ", see .rec file for listing" << endl;
 			frec << "ERROR: the following realizations failed consistency check:" << endl;
 			for (auto fr : failing_reals)
 				frec << fr << ",";
@@ -5043,13 +5042,16 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         if (!tt.empty())
         {
             ss.str("");
+            ss << "double inequality defined through 'greater_than' and 'less_than' data for " << tt.size() << " observations" << endl;
+            ss.str("");
             ss << "double inequality defined through 'greater_than' and 'less_than' data for observations:" << endl;
             for (const auto it : tt)
             {
                 ss << it.first << "," << it.second.first << " to " << it.second.second << endl;
             }
             ss << endl;
-            message(1,ss.str());
+            message(1,ss.str(),false);
+
         }
 
 
