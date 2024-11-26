@@ -560,7 +560,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		}
 
 	}
-    w_sleep(100);
+    w_sleep(10);
 	n_no_ops = 0;
     while (true)
     {
@@ -726,7 +726,7 @@ void RunManagerPanther::run_idle_async()
 				idling.set(false);
 
 				// Sleep 1s to avoid spinlock
-				w_sleep(100);
+				w_sleep(10);
 				continue;
 			}
 
@@ -816,7 +816,7 @@ void RunManagerPanther::end_run_idle_async()
 		}
 		
 		// Sleep to avoid spinlock
-		w_sleep(50);
+		w_sleep(10);
 	}
 
 	report("Stopped idle ping thread, as Panther manager is shutting down.", false);
@@ -857,7 +857,7 @@ void RunManagerPanther::pause_idle()
 		}
 		
 		// Sleep to avoid spinlock
-		w_sleep(50);
+		w_sleep(10);
 	}
 
 	report("Panther idle ping thread paused prior to scheduling runs.", false);
@@ -1006,7 +1006,7 @@ void RunManagerPanther::close_agents()
 			sock_nums.push_back(si.first);
 		for (auto si : sock_nums)
 			close_agent(si);
-		w_sleep(100);
+		w_sleep(10);
 
 	}
 }
@@ -2132,7 +2132,7 @@ RunManagerPanther::~RunManagerPanther(void)
 	err = w_close(listener);
 	FD_CLR(listener, &master);
 	// this is needed to ensure that the first slave closes properly
-	w_sleep(500);
+	w_sleep(10);
 	for (int i = 0; i <= fdmax; i++)
 	{
 		if (FD_ISSET(i, &master))
@@ -2248,10 +2248,10 @@ void RunManagerYAMRCondor::cleanup(int cluster)
 	stringstream ss;
 	ss << "condor_rm " << cluster << " 1>cr_temp.stdout 2>cr_temp.stderr";
 	system(ss.str().c_str());
-	w_sleep(500);
+	w_sleep(10);
 	ss.str(string());
 	ss << "condor_rm " << cluster << " -forcex 1>cr_temp.stdout 2>cr_temp.stderr";
-	w_sleep(500);
+	w_sleep(10);
 	system(ss.str().c_str());
 	RunManagerPanther::close_agents();
 	cout << "   all agents freed " << endl << endl;
