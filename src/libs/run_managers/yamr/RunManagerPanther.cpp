@@ -947,7 +947,7 @@ bool RunManagerPanther::listen(pest_utils::thread_flag* terminate/* = nullptr*/)
 	fd_set read_fds; // temp file descriptor list for select()
 	socklen_t addr_len;
 	timeval tv;
-	tv.tv_sec = 1;
+	tv.tv_sec = 0.25;
 	tv.tv_usec = 0;
 	read_fds = master; // copy it
 	if (w_select(fdmax+1, &read_fds, NULL, NULL, &tv) == -1)
