@@ -1107,7 +1107,7 @@ void RunManagerPanther::schedule_runs()
 					duration = it_agent->get_duration_minute();
 					avg_runtime = it_agent->get_runtime_minute();
 					if (avg_runtime <= 0) avg_runtime = global_avg_runtime;
-					if (avg_runtime <= 0) avg_runtime = 1.0E+10;
+					if (avg_runtime <= 0) avg_runtime = 1.0E+300;
 					vector<int> overdue_kill_runs_vec = get_overdue_runs_over_kill_threshold(run_id);
 
 					if (failure_map.count(run_id) + overdue_kill_runs_vec.size() >= max_n_failure)
@@ -1131,7 +1131,8 @@ void RunManagerPanther::schedule_runs()
 						should_schedule = true;
 						model_runs_timed_out += overdue_kill_runs_vec.size();
 					}
-					else if (((duration > overdue_giveup_minutes) || (duration > avg_runtime*overdue_giveup_fac))
+
+					else if (((duration > overdue_giveup_minutes) || ((duration > avg_runtime*overdue_giveup_fac) && (avg_runtime > 0.16)))
 						&& free_agent_list.empty())
 					{
 						// If there are no free slaves kill the overdue ones
@@ -1147,7 +1148,8 @@ void RunManagerPanther::schedule_runs()
 						}
 						model_runs_timed_out += 1;
 					}
-					else if (duration > avg_runtime*overdue_reched_fac)
+
+					else if ((duration > avg_runtime*overdue_reched_fac) && (avg_runtime > 0.16))
 					{
 						//check how many concurrent runs are going
 						if (n_concur < max_concurrent_runs) should_schedule = true;
@@ -1939,7 +1941,8 @@ void RunManagerPanther::kill_all_active_runs()
 			 if (avg_runtime <= 0) avg_runtime = get_global_runtime_minute();;
 			 if (avg_runtime <= 0) avg_runtime = 1.0E+10;
 			 duration = i->second->get_duration_minute();
-			 if ((just_quit) || (duration > overdue_giveup_minutes) || (duration >= avg_runtime*overdue_giveup_fac))
+			 if ((just_quit) || (duration > overdue_giveup_minutes) ||
+                     ((duration >= avg_runtime*overdue_giveup_fac) && (avg_runtime > 0.16)))
 			 {
 				 sock_id_vec.push_back(i->second->get_socket_fd());
 			 }
