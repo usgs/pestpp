@@ -50,7 +50,8 @@ const int RunManagerPanther::N_PINGS_UNRESPONSIVE = 3;
 const int RunManagerPanther::MIN_PING_INTERVAL_SECS = 60;				// Ping each slave at most once every minute
 const int RunManagerPanther::MAX_PING_INTERVAL_SECS = 120;				// Ping each slave at least once every 2 minutes
 const int RunManagerPanther::MAX_CONCURRENT_RUNS_LOWER_LIMIT = 1;
-const int RunManagerPanther::IDLE_THREAD_SIGNAL_TIMEOUT_SECS = 10;		// Allow up to 10s for the run_idle_async() thread to acknowledge signals (pause idling, terminate)
+const int RunManagerPanther::IDLE_THREAD_SIGNAL_TIMEOUT_SECS = 10;  // Allow up to 10s for the run_idle_async() thread to acknowledge signals (pause idling, terminate)
+const double RunManagerPanther::MIN_AVGRUNMINS_FOR_KILL = 0.08; //minimum avg runtime to try to kill and/or resched runs
 
 
 AgentInfoRec::AgentInfoRec(int _socket_fd)
@@ -1132,7 +1133,8 @@ void RunManagerPanther::schedule_runs()
 						model_runs_timed_out += overdue_kill_runs_vec.size();
 					}
 
-					else if (((duration > overdue_giveup_minutes) || ((duration > avg_runtime*overdue_giveup_fac) && (avg_runtime > 0.16)))
+					else if (((duration > overdue_giveup_minutes) || ((duration > avg_runtime*overdue_giveup_fac) &&
+                                                                      (avg_runtime > MIN_AVGRUNMINS_FOR_KILL)))
 						&& free_agent_list.empty())
 					{
 						// If there are no free slaves kill the overdue ones
@@ -1149,7 +1151,7 @@ void RunManagerPanther::schedule_runs()
 						model_runs_timed_out += 1;
 					}
 
-					else if ((duration > avg_runtime*overdue_reched_fac) && (avg_runtime > 0.16))
+					else if ((duration > avg_runtime*overdue_reched_fac) && (avg_runtime > MIN_AVGRUNMINS_FOR_KILL))
 					{
 						//check how many concurrent runs are going
 						if (n_concur < max_concurrent_runs) should_schedule = true;
@@ -1942,7 +1944,8 @@ void RunManagerPanther::kill_all_active_runs()
 			 if (avg_runtime <= 0) avg_runtime = 1.0E+10;
 			 duration = i->second->get_duration_minute();
 			 if ((just_quit) || (duration > overdue_giveup_minutes) ||
-                     ((duration >= avg_runtime*overdue_giveup_fac) && (avg_runtime > 0.16)))
+                     ((duration >= avg_runtime*overdue_giveup_fac) &&
+                     (avg_runtime > MIN_AVGRUNMINS_FOR_KILL)))
 			 {
 				 sock_id_vec.push_back(i->second->get_socket_fd());
 			 }

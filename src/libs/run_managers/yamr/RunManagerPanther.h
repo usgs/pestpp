@@ -127,7 +127,7 @@ private:
 	static const int MAX_PING_INTERVAL_SECS;
 	static const int MAX_CONCURRENT_RUNS_LOWER_LIMIT;
 	static const int IDLE_THREAD_SIGNAL_TIMEOUT_SECS;
-
+    static const double MIN_AVGRUNMINS_FOR_KILL;
 	double overdue_reched_fac;
 	double overdue_giveup_fac;
 	double overdue_giveup_minutes;
