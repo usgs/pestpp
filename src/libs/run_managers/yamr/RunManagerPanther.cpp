@@ -1290,9 +1290,10 @@ void RunManagerPanther::echo()
 {
 	if (!should_echo)
 		return;
-    if (chrono::duration_cast<std::chrono::seconds> (chrono::system_clock::now() - last_echo_time).count() < SECONDS_BETWEEN_ECHOS)
+    std::chrono::system_clock::time_point now = chrono::system_clock::now();
+    if (chrono::duration_cast<std::chrono::seconds> ( now- last_echo_time).count() < SECONDS_BETWEEN_ECHOS)
         return;
-    last_echo_time = std::chrono::system_clock::now();
+    last_echo_time = now;
 	map<string, int> stats_map = get_agent_stats();
 	cout << get_time_string_short() << " mn:" << setw(5) << setprecision(2) << left << get_global_runtime_minute()  << " runs("
 	     << "C" << setw(5) << left << model_runs_done
