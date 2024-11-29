@@ -52,7 +52,7 @@ const int RunManagerPanther::MAX_PING_INTERVAL_SECS = 120;				// Ping each slave
 const int RunManagerPanther::MAX_CONCURRENT_RUNS_LOWER_LIMIT = 1;
 const int RunManagerPanther::IDLE_THREAD_SIGNAL_TIMEOUT_SECS = 10;  // Allow up to 10s for the run_idle_async() thread to acknowledge signals (pause idling, terminate)
 const double RunManagerPanther::MIN_AVGRUNMINS_FOR_KILL = 0.08; //minimum avg runtime to try to kill and/or resched runs
-
+const int RunManagerPanther::SECONDS_BETWEEN_ECHOS = 1;
 
 AgentInfoRec::AgentInfoRec(int _socket_fd)
 {
@@ -521,6 +521,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	}
 
 	std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
+    last_echo_time = std::chrono::system_clock::now();
 	double run_time_sec = 0.0;
 	while (!all_runs_complete() && terminate_reason == RUN_UNTIL_COND::NORMAL)
 	{
@@ -948,7 +949,7 @@ bool RunManagerPanther::listen(pest_utils::thread_flag* terminate/* = nullptr*/)
 	fd_set read_fds; // temp file descriptor list for select()
 	socklen_t addr_len;
 	timeval tv;
-	tv.tv_sec = 0.25;
+	tv.tv_sec = 0;
 	tv.tv_usec = 0;
 	read_fds = master; // copy it
 	if (w_select(fdmax+1, &read_fds, NULL, NULL, &tv) == -1)
@@ -1289,6 +1290,9 @@ void RunManagerPanther::echo()
 {
 	if (!should_echo)
 		return;
+    if (chrono::duration_cast<std::chrono::seconds> (chrono::system_clock::now() - last_echo_time).count() < SECONDS_BETWEEN_ECHOS)
+        return;
+    last_echo_time = std::chrono::system_clock::now();
 	map<string, int> stats_map = get_agent_stats();
 	cout << get_time_string_short() << " mn:" << setw(5) << setprecision(2) << left << get_global_runtime_minute()  << " runs("
 	     << "C" << setw(5) << left << model_runs_done
