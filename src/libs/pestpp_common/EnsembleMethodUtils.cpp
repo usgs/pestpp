@@ -7750,7 +7750,7 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
     ss << "iteration:" << iter;
     vector<int> temp;
     ofstream& frec = file_manager.rec_ofstream();
-    oe = oe_base;
+    oe.reserve(oe_base.get_real_names(),oe.get_var_names());
     weights = weights_base;
     run_ensemble_util(performance_log,frec,new_pe,oe,run_mgr_ptr,false,temp,NetPackage::NULL_DA_CYCLE, ss.str());
     pe = new_pe;
