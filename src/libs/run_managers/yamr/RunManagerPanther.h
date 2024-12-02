@@ -127,7 +127,8 @@ private:
 	static const int MAX_PING_INTERVAL_SECS;
 	static const int MAX_CONCURRENT_RUNS_LOWER_LIMIT;
 	static const int IDLE_THREAD_SIGNAL_TIMEOUT_SECS;
-
+    static const double MIN_AVGRUNMINS_FOR_KILL;
+    static const int SECONDS_BETWEEN_ECHOS;
 	double overdue_reched_fac;
 	double overdue_giveup_fac;
 	double overdue_giveup_minutes;
@@ -141,6 +142,7 @@ private:
 	long long bytes_transferred;
 	int files_transferred;
 	bool should_echo;
+    std::chrono::system_clock::time_point last_echo_time;
 	int nftx;
 	fd_set master; // master file descriptor list
 	list<AgentInfoRec> agent_info_set;
