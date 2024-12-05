@@ -25,7 +25,7 @@ const string CR_NAME = "_CR_";
 const string MR_NAME = "_MR_";
 const double CROWDING_EXTREME = 1.0e+30;
 
-enum MouGenType { DE, SBX, PM, PSO, SMP };
+enum MouGenType { DE, SBX, PM, PSO, SMP, EMPCOV };
 enum MouEnvType { NSGA, SPEA };
 enum MouMateType { RANDOM, TOURNAMENT };
 

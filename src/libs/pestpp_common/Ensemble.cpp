@@ -416,6 +416,7 @@ pair<Covariance,Covariance> Ensemble::get_empirical_cov_matrices(FileManager* fi
 	Eigen::MatrixXd ercov = reals.transpose() * reals;
 	Covariance rcov(var_names, ercov.sparseView());
 	Eigen::MatrixXd anom = get_eigen_anomalies();
+    anom = anom * (1.0/double(anom.rows()-1));
 	Eigen::VectorXd wij;
 	double num_reals = static_cast<double>(shape().first);
 	double wij_sum = 0;

@@ -1834,7 +1834,7 @@ void MOEA::initialize()
 	{
 		//evaluate the chance constraints at every individual, very costly, but most robust
 		chancepoints = chancePoints::ALL;
-		message(1, "'opt_chance_points' = ALL, evaluting chance at all population members");
+		message(1, "'opt_chance_points' = ALL, evaluating chance at all population members");
 	}
 	
 	else if (chance_points == "SINGLE")
@@ -1842,7 +1842,7 @@ void MOEA::initialize()
 		//evaluate the chance constraints only at the population member nearest the optimal tradeoff.
 		//much cheaper, but assumes linear coupling
 		chancepoints = chancePoints::SINGLE;
-		message(1, "'opt_chance_points' = SINGLE, evaluting chance at representative point");
+		message(1, "'opt_chance_points' = SINGLE, evaluating chance at representative point");
 	}
 	else
 	{
@@ -2174,9 +2174,14 @@ void MOEA::initialize()
             gen_types.push_back(MouGenType::SMP);
             message(1, "using simplex generator");
         }
-		else
+        else if (token == "EMPCOV")
+        {
+            gen_types.push_back(MouGenType::EMPCOV);
+            message(1, "using empirical-covariance generator");
+        }
+        else
 		{
-			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX','PM','PSO'}");
+			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX','PM','PSO','EMPCOV'}");
 		}
 	}
 	//TODO: report constraints being applied
@@ -2743,7 +2748,11 @@ ParameterEnsemble MOEA::generate_population()
         {
             p = generate_simplex_population(new_members_per_gen, dp, op);
         }
-		else
+        else if (gen_type == MouGenType::EMPCOV)
+        {
+            p = generate_empcov_population(new_members_per_gen, dp, op);
+        }
+        else
 			throw_moea_error("unrecognized mou generator");
 		if (new_pop.shape().first == 0)
 			new_pop = p;
@@ -3555,8 +3564,6 @@ ParameterEnsemble MOEA::generate_empcov_population(int num_members, ParameterEns
 {
 
     message(1, "generating empirical-covariance population of size", num_members);
-    vector<string> gbest_solutions = get_pso_gbest_solutions(_dp.shape().first, dp_archive, op_archive);
-    ParameterEnsemble cur_velocity = get_updated_pso_velocty(_dp, gbest_solutions);
     Eigen::MatrixXd draws(num_members,_dp.shape().second);
     for (int i = 0; i < num_members; i++)
     {
@@ -3565,7 +3572,25 @@ ParameterEnsemble MOEA::generate_empcov_population(int num_members, ParameterEns
             draws(i, j) = draw_standard_normal(rand_gen);
         }
     }
-    ParameterEnsemble new_dp(&pest_scenario, &rand_gen, draws, _dp.get_real_names(), _dp.get_var_names());
+    _dp.transform_ip(ParameterEnsemble::transStatus::NUM);
+    Eigen::MatrixXd anom,cov;
+    anom = _dp.get_eigen_anomalies();
+    anom = anom * (1.0/sqrt(double(anom.rows()-1)));
+    cov = anom.transpose() * anom;
+    Eigen::VectorXd dvmean = _dp.get_eigen_ptr()->colwise().mean();
+    Parameters pars = pest_scenario.get_ctl_parameters();
+    ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
+
+    bts.ctl2numeric_ip(pars);
+    pars.update_without_clear(_dp.get_var_names(),dvmean);
+
+    Covariance covmat(_dp.get_var_names(),cov.sparseView());
+    ParameterEnsemble new_dp(&pest_scenario, &rand_gen);
+    new_dp.reserve(_dp.get_real_names(), _dp.get_var_names());
+    ofstream &frec = file_manager.rec_ofstream();
+    map<string,double> norm_map = new_dp.draw(num_members,pars,covmat,performance_log,1,frec);
+
+    //ParameterEnsemble new_dp(&pest_scenario, &rand_gen, draws, _dp.get_real_names(), _dp.get_var_names());
     new_dp.set_fixed_info(_dp.get_fixed_info());
     vector<string> new_real_names;
     for (int i=0;i<num_members;i++)
@@ -3575,36 +3600,9 @@ ParameterEnsemble MOEA::generate_empcov_population(int num_members, ParameterEns
     new_dp.set_real_names(new_real_names);
     new_dp.reset_org_real_names();
 
-    Eigen::MatrixXd anom,cov;
-    anom = _dp.get_eigen_anomalies();
-    cov = anom.transpose() * anom;
-
-    Covariance covmat(new_dp.get_var_names(),cov.sparseView());
-
     new_dp.set_trans_status(_dp.get_trans_status());
     new_dp.enforce_bounds(performance_log,false);
     new_dp.check_for_normal("new emp-cov population");
-
-    /*if (_dp.get_fixed_info().get_map_size() > 0) {
-        vector<string> fi_fixed_names = _dp.get_fixed_info().get_fixed_names();
-        new_dp.get_fixed_info().set_fixed_names(fi_fixed_names);
-        map<string, double> fi;
-        vector<string> rnames = _dp.get_fixed_info().get_real_names();
-        set<string> sdp_rnames(rnames.begin(),rnames.end());
-        set<string>::iterator dpend = sdp_rnames.end();
-        rnames = temp.get_fixed_info().get_real_names();
-        set<string> stemp_rnames(rnames.begin(),rnames.end());
-        set<string>::iterator tend = stemp_rnames.end();
-        for (auto &p : primary_parent_map) {
-            if (sdp_rnames.find(p.second) != dpend)
-                fi = _dp.get_fixed_info().get_real_fixed_values(p.second);
-            else if (stemp_rnames.find(p.second) != tend)
-                fi = temp.get_fixed_info().get_real_fixed_values(p.second);
-            else
-                throw_moea_error("fixed info for existing realization '"+p.second+"' not found");
-            new_dp.get_fixed_info().add_realization(p.first, fi);
-        }*/
-    //}
     return new_dp;
 }
 
