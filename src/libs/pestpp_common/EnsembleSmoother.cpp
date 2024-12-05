@@ -37,10 +37,11 @@ void IterEnsembleSmoother::iterate_2_solution()
 	
 	bool accept;
 	int n_iter_mean = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
-
+    int solution_iter = 0;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
 		iter++;
+        solution_iter++;
 		message(0, "starting solve for iteration:", iter);
 		ss.str("");
 		ss << "starting solve for iteration: " << iter;
@@ -54,7 +55,7 @@ void IterEnsembleSmoother::iterate_2_solution()
         }
 		report_and_save(NetPackage::NULL_DA_CYCLE);
 		ph.update(oe,pe, weights);
-		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+		last_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
 		last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		ph.report(true);
         ss.str("");
@@ -71,7 +72,7 @@ void IterEnsembleSmoother::iterate_2_solution()
 		else
 			consec_bad_lambda_cycles++;
 
-		if (iter == n_iter_mean)
+		if ((n_iter_mean> 0) && (solution_iter % n_iter_mean == 0))
         {
             iter++;
             reset_par_ensemble_to_prior_mean();

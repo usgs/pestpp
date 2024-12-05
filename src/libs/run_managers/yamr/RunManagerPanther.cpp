@@ -50,8 +50,9 @@ const int RunManagerPanther::N_PINGS_UNRESPONSIVE = 3;
 const int RunManagerPanther::MIN_PING_INTERVAL_SECS = 60;				// Ping each slave at most once every minute
 const int RunManagerPanther::MAX_PING_INTERVAL_SECS = 120;				// Ping each slave at least once every 2 minutes
 const int RunManagerPanther::MAX_CONCURRENT_RUNS_LOWER_LIMIT = 1;
-const int RunManagerPanther::IDLE_THREAD_SIGNAL_TIMEOUT_SECS = 10;		// Allow up to 10s for the run_idle_async() thread to acknowledge signals (pause idling, terminate)
-
+const int RunManagerPanther::IDLE_THREAD_SIGNAL_TIMEOUT_SECS = 10;  // Allow up to 10s for the run_idle_async() thread to acknowledge signals (pause idling, terminate)
+const double RunManagerPanther::MIN_AVGRUNMINS_FOR_KILL = 0.08; //minimum avg runtime to try to kill and/or resched runs
+const int RunManagerPanther::SECONDS_BETWEEN_ECHOS = 1;
 
 AgentInfoRec::AgentInfoRec(int _socket_fd)
 {
@@ -520,6 +521,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	}
 
 	std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
+    last_echo_time = std::chrono::system_clock::now();
 	double run_time_sec = 0.0;
 	while (!all_runs_complete() && terminate_reason == RUN_UNTIL_COND::NORMAL)
 	{
@@ -560,7 +562,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		}
 
 	}
-    w_sleep(2000);
+    w_sleep(10);
 	n_no_ops = 0;
     while (true)
     {
@@ -726,7 +728,7 @@ void RunManagerPanther::run_idle_async()
 				idling.set(false);
 
 				// Sleep 1s to avoid spinlock
-				w_sleep(1000);
+				w_sleep(10);
 				continue;
 			}
 
@@ -816,7 +818,7 @@ void RunManagerPanther::end_run_idle_async()
 		}
 		
 		// Sleep to avoid spinlock
-		w_sleep(50);
+		w_sleep(10);
 	}
 
 	report("Stopped idle ping thread, as Panther manager is shutting down.", false);
@@ -857,7 +859,7 @@ void RunManagerPanther::pause_idle()
 		}
 		
 		// Sleep to avoid spinlock
-		w_sleep(50);
+		w_sleep(10);
 	}
 
 	report("Panther idle ping thread paused prior to scheduling runs.", false);
@@ -947,7 +949,7 @@ bool RunManagerPanther::listen(pest_utils::thread_flag* terminate/* = nullptr*/)
 	fd_set read_fds; // temp file descriptor list for select()
 	socklen_t addr_len;
 	timeval tv;
-	tv.tv_sec = 1;
+	tv.tv_sec = 0;
 	tv.tv_usec = 0;
 	read_fds = master; // copy it
 	if (w_select(fdmax+1, &read_fds, NULL, NULL, &tv) == -1)
@@ -1006,7 +1008,7 @@ void RunManagerPanther::close_agents()
 			sock_nums.push_back(si.first);
 		for (auto si : sock_nums)
 			close_agent(si);
-		w_sleep(100);
+		w_sleep(10);
 
 	}
 }
@@ -1107,7 +1109,7 @@ void RunManagerPanther::schedule_runs()
 					duration = it_agent->get_duration_minute();
 					avg_runtime = it_agent->get_runtime_minute();
 					if (avg_runtime <= 0) avg_runtime = global_avg_runtime;
-					if (avg_runtime <= 0) avg_runtime = 1.0E+10;
+					if (avg_runtime <= 0) avg_runtime = 1.0E+300;
 					vector<int> overdue_kill_runs_vec = get_overdue_runs_over_kill_threshold(run_id);
 
 					if (failure_map.count(run_id) + overdue_kill_runs_vec.size() >= max_n_failure)
@@ -1131,7 +1133,9 @@ void RunManagerPanther::schedule_runs()
 						should_schedule = true;
 						model_runs_timed_out += overdue_kill_runs_vec.size();
 					}
-					else if (((duration > overdue_giveup_minutes) || (duration > avg_runtime*overdue_giveup_fac))
+
+					else if (((duration > overdue_giveup_minutes) || ((duration > avg_runtime*overdue_giveup_fac) &&
+                                                                      (avg_runtime > MIN_AVGRUNMINS_FOR_KILL)))
 						&& free_agent_list.empty())
 					{
 						// If there are no free slaves kill the overdue ones
@@ -1147,7 +1151,8 @@ void RunManagerPanther::schedule_runs()
 						}
 						model_runs_timed_out += 1;
 					}
-					else if (duration > avg_runtime*overdue_reched_fac)
+
+					else if ((duration > avg_runtime*overdue_reched_fac) && (avg_runtime > MIN_AVGRUNMINS_FOR_KILL))
 					{
 						//check how many concurrent runs are going
 						if (n_concur < max_concurrent_runs) should_schedule = true;
@@ -1285,6 +1290,10 @@ void RunManagerPanther::echo()
 {
 	if (!should_echo)
 		return;
+    std::chrono::system_clock::time_point now = chrono::system_clock::now();
+    if (chrono::duration_cast<std::chrono::seconds> ( now- last_echo_time).count() < SECONDS_BETWEEN_ECHOS)
+        return;
+    last_echo_time = now;
 	map<string, int> stats_map = get_agent_stats();
 	cout << get_time_string_short() << " mn:" << setw(5) << setprecision(2) << left << get_global_runtime_minute()  << " runs("
 	     << "C" << setw(5) << left << model_runs_done
@@ -1939,7 +1948,9 @@ void RunManagerPanther::kill_all_active_runs()
 			 if (avg_runtime <= 0) avg_runtime = get_global_runtime_minute();;
 			 if (avg_runtime <= 0) avg_runtime = 1.0E+10;
 			 duration = i->second->get_duration_minute();
-			 if ((just_quit) || (duration > overdue_giveup_minutes) || (duration >= avg_runtime*overdue_giveup_fac))
+			 if ((just_quit) || (duration > overdue_giveup_minutes) ||
+                     ((duration >= avg_runtime*overdue_giveup_fac) &&
+                     (avg_runtime > MIN_AVGRUNMINS_FOR_KILL)))
 			 {
 				 sock_id_vec.push_back(i->second->get_socket_fd());
 			 }
@@ -2132,7 +2143,7 @@ RunManagerPanther::~RunManagerPanther(void)
 	err = w_close(listener);
 	FD_CLR(listener, &master);
 	// this is needed to ensure that the first slave closes properly
-	w_sleep(2000);
+	w_sleep(10);
 	for (int i = 0; i <= fdmax; i++)
 	{
 		if (FD_ISSET(i, &master))
@@ -2248,10 +2259,10 @@ void RunManagerYAMRCondor::cleanup(int cluster)
 	stringstream ss;
 	ss << "condor_rm " << cluster << " 1>cr_temp.stdout 2>cr_temp.stderr";
 	system(ss.str().c_str());
-	w_sleep(2000);
+	w_sleep(10);
 	ss.str(string());
 	ss << "condor_rm " << cluster << " -forcex 1>cr_temp.stdout 2>cr_temp.stderr";
-	w_sleep(2000);
+	w_sleep(10);
 	system(ss.str().c_str());
 	RunManagerPanther::close_agents();
 	cout << "   all agents freed " << endl << endl;

@@ -77,6 +77,7 @@ public:
 	double get_std(phiType pt);
 	double get_max(phiType pt);
 	double get_min(phiType pt);
+    double get_representative_phi(phiType pt);
 
 	double calc_mean(map<string, double> *phi_map);
 	double calc_std(map<string, double> *phi_map);
@@ -466,9 +467,10 @@ protected:
 	vector<string> act_obs_names, act_par_names;
 	vector<string> violation_obs;
 	ParameterEnsemble pe, pe_base;
-	ObservationEnsemble oe, oe_base, weights;
+	ObservationEnsemble oe, oe_base, weights, weights_base;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 	bool oe_drawn, pe_drawn;
+    bool reinflate_to_minphi_real;
 
 
 	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);

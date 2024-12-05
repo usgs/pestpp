@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.13
+# <a id='s1' />Version 5.2.16
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-October 2024
+December 2024
 
 # <a id='s2' />Acknowledgements
 
@@ -70,7 +70,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Table of Contents
 
-- [Version 5.2.13](#s1)
+- [Version 5.2.16](#s1)
 - [Acknowledgements](#s2)
 - [Preface](#s3)
 - [License](#s4)
@@ -241,7 +241,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         - [9.1.12 Use of observation noise covariance matrices](#s13-1-12)
         - [9.1.13 Detecting and resolving prior-data conflict](#s13-1-13)
         - [9.1.14 Multi-modal solution process](#s13-1-14)
-        - [9.1.15 Mean-Update Iterations](#s13-1-15)
+        - [9.1.15 Covariance Reinflation](#s13-1-15)
     - [9.2 Using PESTPP-IES](#s13-2)
         - [9.2.1 General](#s13-2-1)
         - [9.2.2 Initial Realizations](#s13-2-2)
@@ -3610,15 +3610,15 @@ Closely related to the multimodal solution process is the use of a “weights”
 
 Figure 9.2 – A demonstration of the multi-modal solution process using a weight ensemble on the ZDT1 benchmark problem. The standard solution process using single weight vector drives the posterior towards a single point, while the multi-modal upgrade process uses unique weights on each of the two objectives (observations in the control file) such that each realization targets a different point on the trade-off between the two objectives.
 
-### <a id='s13-1-15' />9.1.15 Mean-Update Iterations
+### <a id='s13-1-15' />9.1.15 Covariance Reinflation
 
 In highly nonlinear problems, the gradient between parameters and simulated equivalents to observations can change (drastically) between iterations of PESTPP-IES. This can drive the need for several iterations in order to fully assimilate data. However, during each iteration, due to the solution equations, both the mean and (co)variance of the parameter ensemble can change, with the latter usually decreasing substantially each iteration, meaning that across multiple iterations, the variance of the parameter ensemble reduces, sometime dramatically, this is especially true in highly nonlinear problems where changing gradients can condition different parameters (and/or parameter combinations) each iteration, and in cases where the prior simulated ensemble has a consistent bias compared to observed counterparts. Spurious correlations exacerbate this problem.
 
-To combat the variance reduction that occurs across multiple iterations, it might be desirable in some settings to “reset” the variance of the current parameter ensemble to the prior state; this can also be labelled “reinflation. Mechanically, this is done by subtracting the mean from the prior ensemble (forming the so-called deviations) and then adding the mean from the current parameter ensemble, thereby translating the prior ensemble across parameter space but (more or less) preserving the variance of the prior ensemble.
+To combat the variance reduction that occurs across multiple iterations, it might be desirable in some settings to “reset” the variance of the current parameter ensemble to the prior state; this can also be labelled “reinflation. Mechanically, this is done by subtracting the mean from the prior ensemble (forming the so-called deviations or “anomalies”) and then adding the mean from the current parameter ensemble, thereby translating the prior ensemble across parameter space but (more or less) preserving the variance of the prior ensemble.
 
-This option is implemented in PESTPP-IES via the *ies_n_iter_mean* option. As the name implies, the argument is the number of iterations to undertake before resetting the variance to the prior ensemble state. Some other behavioural characteristics of using mean-update iterations:
+This option is implemented in PESTPP-IES via the *ies_n_iter_reinflation* option. As the name implies, the argument is the number of iterations to undertake before resetting the variance to the prior ensemble state. Some other behavioural characteristics of using parameter covariance reinflation:
 
-- The phi reduction each iteration may not satisfy the requirements for a “successful” iteration. However, PESTPP-IES will continue iterating anyway and will also undertake partial upgrades of realizations that do show phi improvement; essentially PESTPP-IES will use all of it regular tricks to seek a good fit for iterations less than *ies_n_iter_mean*.
+- The phi reduction each iteration may not satisfy the requirements for a “successful” iteration. However, PESTPP-IES will continue iterating anyway and will also undertake partial upgrades of realizations that do show phi improvement; essentially PESTPP-IES will use all of it regular tricks to seek a good fit for iterations less than *ies_n_iter_reinflation*.
 
 - The iteration count in PESTPP-IES will be incremented during the reinflation. This is so the results of the reinflation can be tracked in the output files.
 
@@ -3824,7 +3824,7 @@ If users want to have more fine-grained control of the weight adjustment, option
 
 ### <a id='s13-2-11' />9.2.11 Selective Updates 
 
-In highly nonlinear settings, some realizations may show an increase in phi across iterations, while the majority of realizations shows decreases – see Figure 9.4 for an example. This indicates that, because of nonlinearity, the optimal parameter ensemble update that is effective at reducing phi for the ensemble as a whole is not ideal for all realizations. To combat this problem, PESTPP-IES will, by default (as of version 5.2.13), only update realizations that meet the phi reduction criteria. This is identical to the partial upgrade process that is triggered automatically of the mean phi of the entire ensemble does not meet the phi reduction criteria. This behaviour is controlled with the *ies_update_by_reals* option, which is true by default.
+In highly nonlinear settings, some realizations may show an increase in phi across iterations, while the majority of realizations shows decreases – see Figure 9.4 for an example. This indicates that, because of nonlinearity, the optimal parameter ensemble update that is effective at reducing phi for the ensemble as a whole is not ideal for all realizations. To combat this problem, PESTPP-IES will, by default (as of version 5.2.13), only update realizations that meet the phi reduction criteria. This is identical to the partial upgrade process that is triggered automatically of the mean phi of the entire ensemble does not meet the phi reduction criteria. This behaviour is controlled with the *ies_update_by_reals* option, which is false by default.
 
 <img src="./media/image7.png" style="width:6.26806in;height:3.20347in" alt="A graph of a graph Description automatically generated with medium confidence" />
 
@@ -4159,14 +4159,14 @@ Note also that the number of control variables may change with time. Refer to th
 <td>A flag to use internal weight balancing for each realization. This option should be used in conjunction with the multi-modal solution process.</td>
 </tr>
 <tr class="odd">
-<td><em>ies_n_iter_mean</em></td>
+<td><em>ies_n_iter_reinflation</em></td>
 <td>int</td>
-<td>The number of mean-shift iterations to use. Default is 0, which is indicates not to do the prior-mean-shifting process</td>
+<td>The number of between covariance re-inflation. Default is 0, which is indicates not re-inflate parameter covariance</td>
 </tr>
 <tr class="even">
 <td><em>ies_update_by_reals</em></td>
 <td>bool</td>
-<td>Flag to indicate whether or not to update each realization according to its phi reduction.</td>
+<td>Flag to indicate whether or not to update each realization according to its phi reduction. Default is False.</td>
 </tr>
 </tbody>
 </table>
