@@ -494,6 +494,8 @@ public:
     void set_ies_phi_factors_by_real(bool _flag) {ies_phi_factors_by_real = _flag;}
     bool get_ies_updatebyreals() const {return ies_updatebyreals;}
     void set_ies_updatebyreals(bool _flag) {ies_updatebyreals = _flag;}
+    bool get_ies_save_dense() const {return ies_save_dense; }
+    void set_ies_save_dense(bool _flag) {ies_save_dense = _flag;}
 
 
 
@@ -826,6 +828,7 @@ private:
 	bool ies_phi_factors_by_real;
 	int ies_n_iter_mean;
     bool ies_updatebyreals;
+    bool ies_save_dense;
 
 
 	// Data Assimilation parameters

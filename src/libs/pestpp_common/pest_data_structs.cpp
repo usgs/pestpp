@@ -1194,6 +1194,12 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         return true;
     }
 
+    else if (key == "IES_SAVE_DENSE")
+    {
+        ies_save_dense = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
+
 
     return false;
 }
@@ -1832,7 +1838,7 @@ void PestppOptions::summary(ostream& os) const
     os << "ies_phi_factors_by_real: " << ies_phi_factors_by_real << endl;
     os << "ies_n_iter_reinflate: " << ies_n_iter_mean << endl;
     os << "ies_updatebyreals: " << ies_updatebyreals << endl;
-
+    os << "ies_save_dense: " << ies_save_dense << endl;
 
 
     os << endl << "pestpp-sen options: " << endl;
@@ -2020,6 +2026,7 @@ void PestppOptions::set_defaults()
     set_ies_phi_factors_by_real(false);
     set_ies_n_iter_mean(0);
     set_ies_updatebyreals(false);
+    set_ies_save_dense(false);
 
 
 	// DA parameters
