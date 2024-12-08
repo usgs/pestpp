@@ -1194,9 +1194,9 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         return true;
     }
 
-    else if (key == "IES_SAVE_DENSE")
+    else if (key == "SAVE_DENSE")
     {
-        ies_save_dense = pest_utils::parse_string_arg_to_bool(value);
+        save_dense = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
 
@@ -1623,6 +1623,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "random_seed: " << random_seed << endl;
 	os << "num_tpl_ins_threads: " << num_tpl_ins_threads << endl;
 	os << "save_binary: " << save_binary << endl;
+    os << "save_dense: " << save_dense << endl;
     os << "ensemble_output_precision: " << ensemble_output_precision << endl;
 	
 	os << "panther_echo: " << panther_echo << endl;
@@ -1838,7 +1839,6 @@ void PestppOptions::summary(ostream& os) const
     os << "ies_phi_factors_by_real: " << ies_phi_factors_by_real << endl;
     os << "ies_n_iter_reinflate: " << ies_n_iter_mean << endl;
     os << "ies_updatebyreals: " << ies_updatebyreals << endl;
-    os << "ies_save_dense: " << ies_save_dense << endl;
 
 
     os << endl << "pestpp-sen options: " << endl;
@@ -2026,7 +2026,7 @@ void PestppOptions::set_defaults()
     set_ies_phi_factors_by_real(false);
     set_ies_n_iter_mean(0);
     set_ies_updatebyreals(false);
-    set_ies_save_dense(false);
+    set_save_dense(false);
 
 
 	// DA parameters

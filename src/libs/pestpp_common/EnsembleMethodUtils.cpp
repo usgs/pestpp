@@ -2405,6 +2405,7 @@ void L2PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
 	pair<Covariance,Covariance> rcovs = res.get_empirical_cov_matrices(file_manager);
 	stringstream ss;
 	ss << file_manager->get_base_filename() << "." << iter << ".res.";
+
 	if (pest_scenario->get_pestpp_options().get_save_binary())
 	{
 		ss << "jcb";
@@ -4546,7 +4547,12 @@ pair<string,string> EnsembleMethod::save_ensembles(string tag, int cycle, Parame
 		ss << "." << "mean" << ".obs";
 	else
 		ss << "." << iter << ".obs";
-	if (pest_scenario.get_pestpp_options().get_save_binary())
+    if (pest_scenario.get_pestpp_options().get_save_dense())
+    {
+        ss << ".bin";
+        _oe.to_dense(ss.str());
+    }
+	else if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
 		_oe.to_binary(ss.str());
@@ -4569,7 +4575,12 @@ pair<string,string> EnsembleMethod::save_ensembles(string tag, int cycle, Parame
 		ss << "." << "mean" << ".par";
 	else
 		ss << "." << iter << ".par";
-	if (pest_scenario.get_pestpp_options().get_save_binary())
+    if (pest_scenario.get_pestpp_options().get_save_dense())
+    {
+        ss << ".bin";
+        _pe.to_dense(ss.str());
+    }
+    else if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
 		_pe.to_binary(ss.str());
@@ -5076,7 +5087,15 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
     initialize_weights();
     ss.str("");
-    if (pest_scenario.get_pestpp_options().get_save_binary())
+    if (pest_scenario.get_pestpp_options().get_save_dense())
+    {
+        ss << file_manager.get_base_filename();
+        if (cycle != NetPackage::NULL_DA_CYCLE)
+            ss << "." << cycle;
+        ss << ".weights.bin";
+        weights.to_dense(ss.str());
+    }
+    else if (pest_scenario.get_pestpp_options().get_save_binary())
     {
         ss << file_manager.get_base_filename();
         if (cycle != NetPackage::NULL_DA_CYCLE)
@@ -5148,7 +5167,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	}
 
     int num_par_elements = pest_scenario.get_ctl_parameters().size();
-	if ((pp_args.find("IES_ORDERED_BINARY") == pp_args.end()) && (pp_args.find("DA_ORDERED_BINARY") == pp_args.end()))
+	if ((!pest_scenario.get_pestpp_options().get_save_dense()) && (pp_args.find("IES_ORDERED_BINARY") == pp_args.end()) && (pp_args.find("DA_ORDERED_BINARY") == pp_args.end()))
 	{
 
 		//if ((pe.shape().second > 100000) && (pest_scenario.get_pestpp_options().get_save_binary()))
@@ -5172,7 +5191,16 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	message(2, "checking for denormal values in pe");
 	pe.check_for_normal("initial transformed parameter ensemble");
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_save_binary())
+
+    if (pest_scenario.get_pestpp_options().get_save_dense())
+    {
+        ss << file_manager.get_base_filename();
+        if (cycle != NetPackage::NULL_DA_CYCLE)
+            ss << "." << cycle;
+        ss << ".0.par.bin";
+        pe.to_dense_unordered(ss.str());
+    }
+	else if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename();
 		if (cycle != NetPackage::NULL_DA_CYCLE)
@@ -5192,7 +5220,15 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	message(2, "checking for denormal values in obs + noise ensemble");
 	oe_base.check_for_normal("obs+noise observation ensemble");
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_save_binary())
+    if (pest_scenario.get_pestpp_options().get_save_dense())
+    {
+        ss << file_manager.get_base_filename();
+        if (cycle != NetPackage::NULL_DA_CYCLE)
+            ss << "." << cycle;
+        ss << ".obs+noise.bin";
+        oe_base.to_dense(ss.str());
+    }
+	else if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename();
 		if (cycle != NetPackage::NULL_DA_CYCLE)
@@ -5432,7 +5468,15 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	}
 
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_save_binary())
+    if (pest_scenario.get_pestpp_options().get_save_dense())
+    {
+        ss << file_manager.get_base_filename();
+        if (cycle != NetPackage::NULL_DA_CYCLE)
+            ss << "." << cycle;
+        ss << ".0.obs.bin";
+        oe.to_dense(ss.str());
+    }
+	else if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename();
 		if (cycle != NetPackage::NULL_DA_CYCLE)
@@ -5641,7 +5685,13 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         (in_conflict.size() > 0))
     {
         ss.str("");
-        if (pest_scenario.get_pestpp_options().get_save_binary())
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << file_manager.get_base_filename();
+            ss << ".adjusted.weights.bin";
+            weights.to_dense(ss.str());
+        }
+        else if (pest_scenario.get_pestpp_options().get_save_binary())
         {
             ss << file_manager.get_base_filename();
             ss << ".adjusted.weights.jcb";
@@ -6891,7 +6941,11 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			if (!pest_scenario.get_pestpp_options().get_ies_save_lambda_en())
 				continue;
 
-			if (pest_scenario.get_pestpp_options().get_save_binary())
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                pe_lam_scale.to_dense_unordered(ss.str()+".bin");
+            }
+			else if (pest_scenario.get_pestpp_options().get_save_binary())
 			{
 				pe_lam_scale.to_binary(ss.str()+".jcb");
 			}
@@ -6992,7 +7046,12 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			ss.str("");
 			ss << file_manager.get_base_filename() << "." << iter << "." << lam_vals[i] << ".lambda." << scale_vals[i] << ".scale.obs";
 
-			if (pest_scenario.get_pestpp_options().get_save_binary())
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                ss << ".bin";
+                oe_lams[i].to_dense(ss.str());
+            }
+			else if (pest_scenario.get_pestpp_options().get_save_binary())
 			{
 				ss << ".jcb";
 				oe_lams[i].to_binary(ss.str());
@@ -7736,16 +7795,17 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1)
 			{
 
+
 				if (pest_scenario.get_pestpp_options().get_save_binary())
 				{
 					string filename = file_manager.get_base_filename() + ".prior.jcb";
-					message(1, "saving emprirical parameter covariance matrix to binary file: ", filename);
+					message(1, "saving empirical parameter covariance matrix to binary file: ", filename);
 					parcov.to_binary(filename);
 				}
 				else
 				{
 					string filename = file_manager.get_base_filename() + ".prior.cov";
-					message(1, "saving emprirical parameter covariance matrix to ASCII file: ", filename);
+					message(1, "saving empirical parameter covariance matrix to ASCII file: ", filename);
 					parcov.to_ascii(filename);
 				}
 			}
@@ -8297,7 +8357,12 @@ void EnsembleMethod::initialize_restart()
 				Observations obs = pest_scenario.get_ctl_observations();
 				oe_base.replace(base_par_idx, obs, BASE_REAL_NAME);
 				ss.str("");
-				if (pest_scenario.get_pestpp_options().get_save_binary())
+                if (pest_scenario.get_pestpp_options().get_save_dense())
+                {
+                    ss << file_manager.get_base_filename() << ".obs+noise.bin";
+                    oe_base.to_dense(ss.str());
+                }
+				else if (pest_scenario.get_pestpp_options().get_save_binary())
 				{
 					ss << file_manager.get_base_filename() << ".obs+noise.jcb";
 					oe_base.to_binary(ss.str());
@@ -8321,15 +8386,20 @@ void EnsembleMethod::initialize_restart()
                 }
                 weights.replace(base_par_idx, wobs, BASE_REAL_NAME);
                 ss.str("");
-                if (pest_scenario.get_pestpp_options().get_save_binary())
+                if (pest_scenario.get_pestpp_options().get_save_dense())
+                {
+                    ss << file_manager.get_base_filename() << ".weights.bin";
+                    weights.to_binary(ss.str());
+                }
+                else if (pest_scenario.get_pestpp_options().get_save_binary())
                 {
                     ss << file_manager.get_base_filename() << ".weights.jcb";
-                    oe_base.to_binary(ss.str());
+                    weights.to_binary(ss.str());
                 }
                 else
                 {
                     ss << file_manager.get_base_filename() << ".weights.csv";
-                    oe_base.to_csv(ss.str());
+                    weights.to_csv(ss.str());
                 }
                 message(1, "re-saved weight ensemble to ", ss.str());
 			}
@@ -8891,5 +8961,5 @@ vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 
 	sort(subset_idxs.begin(), subset_idxs.end());
 	return subset_idxs;
-	
+
 }
