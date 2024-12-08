@@ -2729,7 +2729,8 @@ void L2PhiHandler::report_group(bool echo) {
                 continue;
             }
             tot = tot + o.second[g];
-            ptot = ptot + (o.second[g]/actual[o.first]);
+            if (actual[o.first] > 0)
+                ptot = ptot + (o.second[g]/actual[o.first]);
             mx_map[g] = max(mx_map[g],o.second[g]);
             mmn_map[g] = min(mmn_map[g],o.second[g]);
             pmx_map[g] = max(pmx_map[g],(o.second[g]/actual[o.first]));
@@ -2737,7 +2738,8 @@ void L2PhiHandler::report_group(bool echo) {
             c++;
         }
         tot = tot / (double)c;
-        ptot = ptot/(double)c;
+        if (ptot > 0)
+            ptot = ptot/(double)c;
         mn_map[g] = tot;
         pmn_map[g] = ptot;
 
@@ -2748,7 +2750,8 @@ void L2PhiHandler::report_group(bool echo) {
                 continue;
             }
             v = v + (pow(o.second[g] - tot,2));
-            pv = pv + (pow(ptot - (o.second[g]/actual[o.first]),2));
+            if (actual[o.first] > 0)
+                pv = pv + (pow(ptot - (o.second[g]/actual[o.first]),2));
         }
         if (v != 0)
             std_map[g] = sqrt(v/(double)(c-1));
@@ -2780,7 +2783,7 @@ void L2PhiHandler::report_group(bool echo) {
     ss << "  ---  observation group phi summary ---  " << endl;
     ss << "       (computed using 'actual' phi)" << endl;
     ss << "           (sorted by mean phi)" << endl;
-    ss << left << setw(len) << "group" << right << setw(6) << "count" << setw(11) << "nconflict" << setw(10) << "mean" << setw(10) << "std";
+    ss << left << setw(len) << "group" << right << setw(7) << "count" << setw(11) << "nconflict" << setw(10) << "mean" << setw(10) << "std";
     ss << setw(10) << "min" << setw(10) << "max";
     ss << setw(10) << "percent" << setw(10) << "std" << endl; //<< setw(10) << "min " << setw(10) << "max " << endl;
     f << ss.str();
@@ -2812,7 +2815,7 @@ void L2PhiHandler::report_group(bool echo) {
         }
         ss.str("");
         ss << left << setw(len) << pest_utils::lower_cp(g) << " ";
-        ss << right << setw(5) << nzc << " ";
+        ss << right << setw(6)  << setprecision(0) << nzc << " ";
         ss << right << setw(10) << num_conflict_group[g] << " ";
 
         ss << right << setw(9) << setprecision(3) << mn_map[g] << " ";
