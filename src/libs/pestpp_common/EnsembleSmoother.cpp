@@ -77,14 +77,16 @@ void IterEnsembleSmoother::iterate_2_solution()
 			consec_bad_lambda_cycles++;
 
 		//if ((n_iter_mean > 0) && (solution_iter % n_iter_mean == 0))
+        iters_since_reinflate++;
         if ((current_n_iter_mean > 0) && (iters_since_reinflate >= current_n_iter_mean))
         {
             iter++;
             reset_par_ensemble_to_prior_mean();
             iters_since_reinflate = 0;
+            n_iter_mean_idx++;
             if (n_iter_mean.size() > n_iter_mean_idx)
             {
-                n_iter_mean_idx++;
+
                 current_n_iter_mean = n_iter_mean[n_iter_mean_idx];
             }
         }
