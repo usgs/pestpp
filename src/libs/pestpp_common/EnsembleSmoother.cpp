@@ -78,7 +78,7 @@ void IterEnsembleSmoother::iterate_2_solution()
 
 		//if ((n_iter_mean > 0) && (solution_iter % n_iter_mean == 0))
         iters_since_reinflate++;
-        if ((current_n_iter_mean > 0) && (iters_since_reinflate >= current_n_iter_mean))
+        if ((current_n_iter_mean != 0) && (iters_since_reinflate >= current_n_iter_mean))
         {
             iter++;
             reset_par_ensemble_to_prior_mean();
@@ -86,7 +86,6 @@ void IterEnsembleSmoother::iterate_2_solution()
             n_iter_mean_idx++;
             if (n_iter_mean.size() > n_iter_mean_idx)
             {
-
                 current_n_iter_mean = n_iter_mean[n_iter_mean_idx];
             }
         }
@@ -94,11 +93,11 @@ void IterEnsembleSmoother::iterate_2_solution()
 		if (should_terminate(current_n_iter_mean))
         {
 		    //if (iter > pest_scenario.get_pestpp_options().get_ies_n_iter_mean()) {
-            if (iter > current_n_iter_mean) {
+            if (current_n_iter_mean == 0) {
                 break;
             }
 		    else{
-		        message(1,"continuing iterations to satisfy ies_n_iter_mean");
+		        message(1,"continuing iterations because reinflation is in use");
 		    }
         }
 

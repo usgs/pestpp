@@ -4319,8 +4319,8 @@ bool EnsembleMethod::should_terminate(int current_n_iter_mean)
 	message(1, "nphinored (also used for consecutive bad lambda cycles): ", nphinored);
 	//int n_mean_iter = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
     vector<double>::iterator begin_idx = best_mean_phis.begin();
-    if ((current_n_iter_mean > 0) && (best_mean_phis.size() > current_n_iter_mean))
-        begin_idx = best_mean_phis.end() - (current_n_iter_mean+1); //bc of prior phi and then adding the mean shift to the list
+    //if ((current_n_iter_mean > 0) && (best_mean_phis.size() > current_n_iter_mean))
+    //    begin_idx = best_mean_phis.end() - (current_n_iter_mean+1); //bc of prior phi and then adding the mean shift to the list
     if (best_mean_phis.size() > 0)
 	{
 
@@ -4341,7 +4341,8 @@ bool EnsembleMethod::should_terminate(int current_n_iter_mean)
     for (auto& phi : best_mean_phis)
 	{
 		ratio = (phi - best_phi_yet) / phi;
-    	if ((i>=(iter - current_n_iter_mean)) && (ratio <= phiredstp))
+    	//if ((i>=(iter - current_n_iter_mean)) && (ratio <= phiredstp))
+        if (ratio <= phiredstp)
 			count++;
         i++;
 	}
