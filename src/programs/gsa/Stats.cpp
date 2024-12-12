@@ -156,7 +156,7 @@ void RunningStats::add(double sample)
 	}
 	else
 	{
-		qk += (n - 1) * pow((sample - mk), 2.0) / n; // must happend before mk is updated
+		qk += (n - 1) * pow((sample - mk), 2.0) / n; // must happen before mk is updated
 		mk += (sample - mk) / n;
 		mk_abs += (abs(sample) - mk_abs) / n;
 	}
