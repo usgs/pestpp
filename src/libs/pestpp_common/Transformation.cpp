@@ -597,7 +597,7 @@ void TranSVD::calc_svd()
 	VectorXd Sigma_trunc;
 	//tran_svd_pack->solve_ip(SqrtQ_J, Sigma, U, Vt, Sigma_trunc);
 	tran_svd_pack->solve_ip(jtqj, Sigma, U, Vt, Sigma_trunc);
-	// calculate the number of singluar values above the threshold
+	// calculate the number of singular values above the threshold
 
 	debug_print(Sigma);
 	debug_print(U);

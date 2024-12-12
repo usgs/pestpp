@@ -90,7 +90,7 @@ void SVD_REDSVD::solve_ip(Eigen::MatrixXd& A, Eigen::MatrixXd &Sigma, Eigen::Mat
 		}
 	}
 	std::stringstream ss;
-	ss << "triming REDSVD components to " << num_sing_used << "elements";
+	ss << "trimming REDSVD components to " << num_sing_used << "elements";
 	if (performance_log)
 		performance_log->log_event(ss.str());
 	//std::cout << Sigma_full << std::endl;
@@ -169,7 +169,7 @@ void SVD_REDSVD::solve_ip(Eigen::SparseMatrix<double>& A, Eigen::VectorXd &Sigma
 		}
 	}
 	std::stringstream ss;
-	ss << "triming REDSVD components to " << num_sing_used << "elements";
+	ss << "trimming REDSVD components to " << num_sing_used << "elements";
 	if (performance_log)
 		performance_log->log_event(ss.str());
 
@@ -222,7 +222,7 @@ void SVD_EIGEN::solve_ip(Eigen::MatrixXd& A, Eigen::MatrixXd &Sigma, Eigen::Matr
 		}
 	}
 	std::stringstream ss;
-	ss << "triming REDSVD components to " << num_sing_used << "elements";
+	ss << "trimming REDSVD components to " << num_sing_used << "elements";
 	performance_log->log_event(ss.str());
 	//std::cout << Sigma_full << std::endl;
 	Sigma = Sigma_full.head(num_sing_used);
@@ -278,7 +278,7 @@ void SVD_EIGEN::solve_ip(Eigen::SparseMatrix<double>& A, Eigen::VectorXd &Sigma,
 			break;
 		}
 	}
-	//Trim the Matricies based on the number of singular values to be used
+	//Trim the Matrices based on the number of singular values to be used
 	Sigma = Sigma_full.head(num_sing_used);
 	Sigma_trunc = Sigma_full.tail(Sigma_full.size() - num_sing_used);
 

@@ -12,7 +12,7 @@ using std::chrono::system_clock;
 
 void Logger::writetime(stringstream &os, time_t tc) {
 	// alternative to put_time iomanip
-	// as put_time is not implimented in gcc4.8
+	// as put_time is not implemented in gcc4.8
 	locale loc;
 	const time_put<char>& tp = use_facet<time_put<char>>(loc);
 	const char *pat = "%F %T";

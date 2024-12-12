@@ -87,7 +87,7 @@ public:
 
 protected:
 	int total_runs;
-	int max_n_failure; // maximium number of times to retry a failed model run
+	int max_n_failure; // maximum number of times to retry a failed model run
 	int cur_group_id;  // used in some of the derived classes (ie PANTHER)
 	RunStorage file_stor;
 	RUN_MGR_TYPE mgr_type;

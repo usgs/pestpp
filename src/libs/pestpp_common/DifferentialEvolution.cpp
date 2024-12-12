@@ -55,9 +55,9 @@ void DifferentialEvolution::solve(RunManagerAbstract &run_manager,
 
 		// write header for iteration
 		cout << endl;
-		output_file_writer.iteration_report(cout, iter+1, run_manager.get_total_runs(), "differntial evolution");
+		output_file_writer.iteration_report(cout, iter+1, run_manager.get_total_runs(), "differential evolution");
 		os << endl;
-		output_file_writer.iteration_report(os, iter + 1, run_manager.get_total_runs(), "differntial evolution");
+		output_file_writer.iteration_report(os, iter + 1, run_manager.get_total_runs(), "differential evolution");
 		// write initial phi report for this iteration
 		bool run_target_ok = gen_1.get_run(best_run_idx, tmp_pars, tmp_obs);
 		par_transform.model2ctl_ip(tmp_pars);
@@ -108,7 +108,7 @@ void DifferentialEvolution::initialize_population(RunManagerAbstract &run_manage
 		run_manager.add_run(numeric_pars);
 	}
 	RestartController::write_upgrade_runs_built(fout_restart);
-	// make innitial population vector model runs
+	// make initial population vector model runs
 	cout << endl;
 	cout << "  performing initial population model runs... ";
 	cout.flush();
@@ -193,7 +193,7 @@ void DifferentialEvolution::mutation(RunManagerAbstract &run_manager, double f, 
 			xb_id = successful_run_ids[uni_run_ok(rand_engine)];
 		}
 		int xc_id = successful_run_ids[uni_run_ok(rand_engine)];
-		//initialize trail vector with the traget vector
+		//initialize trail vector with the target vector
 		gen_1.get_parameters(i_run, x_trial);
 		gen_1.get_parameters(xa_id, xa);
 		gen_1.get_parameters(xb_id, xb);
@@ -271,7 +271,7 @@ int DifferentialEvolution::recombination(RunManagerAbstract &run_manager)
 	double phi_min_new = std::numeric_limits<double>::max();
 
 	os << "  population phi values:" << endl;
-	os << "              parent         canidate" << endl;
+	os << "              parent         candidate" << endl;
 	os << "    id        phi            phi" << endl;
 	os << "    ----     ---------      ---------" << endl;
 	for (int i_run = 0; i_run < d; ++i_run)
@@ -325,7 +325,7 @@ int DifferentialEvolution::recombination(RunManagerAbstract &run_manager)
 			par_transform.model2ctl_ip(tmp_pars_targ);
 			run_target.update_ctl(tmp_pars_targ, tmp_obs_targ);
 			double phi_target = run_target.get_phi(DynamicRegularization::get_unit_reg_instance());
-			//process canidate parameters and observations
+			//process candidate parameters and observations
 			par_transform.model2ctl_ip(tmp_pars_can);
 			run_canidate.update_ctl(tmp_pars_can, tmp_obs_can);
 			double phi_canidate = run_canidate.get_phi(DynamicRegularization::get_unit_reg_instance());
@@ -390,7 +390,7 @@ void DifferentialEvolution::write_run_summary(std::ostream &os,
 	int nrun_can, double avg_can, double min_can, double max_can,
 	int nrun_child, double avg_child, double min_child, double max_child)
 {
-	os << "  summary of differntial evolution iteration:" << endl;
+	os << "  summary of differential evolution iteration:" << endl;
 	os << "    group      num runs     avg phi        min phi        max phi" << endl;
 	os << "    --------   --------    ---------      ---------      --------- " << endl;
 
@@ -400,7 +400,7 @@ void DifferentialEvolution::write_run_summary(std::ostream &os,
 		os << setw(15) << min_par;
 		os << setw(15) << max_par;
 		os << endl;
-		os << left << setw(17) << "    canidate";
+		os << left << setw(17) << "    candidate";
 		os << setw(11) << nrun_can;
 		os << setw(15) << avg_can;
 		os << setw(15) << min_can;
@@ -414,7 +414,7 @@ void DifferentialEvolution::write_run_summary(std::ostream &os,
 		os << endl;
 		//cout << "  summary:" << endl;
 		//cout << "    parents  : runs=" << n_good_runs_targ << ";  phi(avg=" << phi_avg_targ << "; min=" << phi_min_targ << "; max=" << phi_max_targ << endl;
-		//cout << "    canidates: runs=" << n_good_runs_can << ";  phi(avg=" << phi_avg_can << "; min=" << phi_min_can << "; max=" << phi_max_can << endl;
+		//cout << "    candidates: runs=" << n_good_runs_can << ";  phi(avg=" << phi_avg_can << "; min=" << phi_min_can << "; max=" << phi_max_can << endl;
 		//cout << "    children : runs=" << n_good_runs_new << ";  phi(avg=" << phi_avg_new << "; min=" << phi_min_new << "; max=" << phi_max_new << endl;
 
 }

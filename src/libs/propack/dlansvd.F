@@ -80,7 +80,7 @@ c          reorthogonalization is done using iterated modified Gram-Schmidt.
 c        ioption(2) = ELR. If ELR.EQ.1 then extended local orthogonality is
 c          enforced among u_{k}, u_{k+1} and v_{k} and v_{k+1} respectively.
 c     INFO: INTEGER. 
-c         INFO = 0  : The K largest singular triplets were computed succesfully
+c         INFO = 0  : The K largest singular triplets were computed successfully
 c         INFO = J>0, J<K: An invariant subspace of dimension J was found.
 c         INFO = -1 : K singular triplets did not converge within KMAX
 c                     iterations.   

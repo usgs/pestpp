@@ -1,0 +1,5 @@
+[codespell]
+check-filenames = true
+ignore-regex = [A-Za-z0-9+/]{100,}
+skip = *.grb,*.hh,./src/libs/mio,./src/libs/opt,./src/libs/Eigen,./benchmarks/one_dim_flow_enkf/da_enkf.*,./benchmarks/one_dim_flow/one_dim_flow.ipynb,./benchmarks/one_dim_flow_enkf/old_da_transit.ipynb
+ignore-words = .codespell.ignore

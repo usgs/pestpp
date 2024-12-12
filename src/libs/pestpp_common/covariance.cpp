@@ -34,7 +34,7 @@ Mat::Mat(string filename)
 		from_ascii(filename);
 	else
 		throw runtime_error("Mat::Mat() error: only .jco/.jcb or .mat\
-							 files can be used to instatiate a Mat");
+							 files can be used to instantiate a Mat");
 
 }
 
@@ -814,7 +814,7 @@ Mat Mat::get(const vector<string> &new_row_names, const vector<string> &new_col_
 
 	if ((row_not_found.size() != 0) || (col_not_found.size() != 0))
 	{
-		throw runtime_error("Mat::get() error: atleast one row or col name not found in Mat::get()");
+		throw runtime_error("Mat::get() error: at least one row or col name not found in Mat::get()");
 	}
 
 
@@ -934,7 +934,7 @@ void Mat::drop_cols(const vector<string> &drop_col_names)
 		for (auto &name : drop_col_names)
 			cout << name << ',';
 		cout << endl;
-		throw runtime_error("Mat::drop_cols() error: atleast one drop col name not found");
+		throw runtime_error("Mat::drop_cols() error: at least one drop col name not found");
 	}
 	vector<string> new_col_names;
 	if (drop_col_names.size() == 0)
@@ -977,7 +977,7 @@ void Mat::drop_rows(const vector<string> &drop_row_names)
 		for (auto &name : drop_row_names)
 			cout << name << ',';
 		cout << endl;
-		throw runtime_error("Mat::drop_rows() error: atleast one drop row name not found");
+		throw runtime_error("Mat::drop_rows() error: at least one drop row name not found");
 	}
 
 	vector<string> new_row_names;
@@ -1025,7 +1025,7 @@ Covariance::Covariance(string filename)
 		from_uncertainty_file(filename, empty);
 	else
 		throw runtime_error("Cov::Cov() error: only .unc or .mat\
-														 files can be used to instatiate a Cov");
+														 files can be used to instantiate a Cov");
 }
 
 Covariance::Covariance(vector<string> &names)
@@ -1449,7 +1449,7 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 					for (auto &_name : dup_names)
 						cout << _name << ',';
 					cout << endl;
-					throw runtime_error("Cov::from_uncertainty_file() error:atleast one name in covariance matrix " + cov_filename + " is already listed in uncertainty file: " + filename);
+					throw runtime_error("Cov::from_uncertainty_file() error:at least one name in covariance matrix " + cov_filename + " is already listed in uncertainty file: " + filename);
 				}
 
 				//build triplets from the covariance matrix

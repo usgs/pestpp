@@ -595,7 +595,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 				size_passed = false;
 			string par_csv = pest_scenario.get_pestpp_options().get_opt_par_stack();
 			string obs_csv = pest_scenario.get_pestpp_options().get_opt_obs_stack();
-			//if a par stack wasnt passed, draw one
+			//if a par stack wasn't passed, draw one
 			if (par_csv.size() == 0)
 			{
 				if ((stack_size == 0) && (obs_stack_name.size() == 0))
@@ -1047,7 +1047,7 @@ void Constraints::update_chance_offsets()
 		f_rec << "  ---   done with FOSM-based chance constraint/objective calculations  ---  " << endl << endl;
 	}
 	// or if we are using stacks, we just calculate a new token variance
-	//this isnt actually used in the shifting since we do a non-parametric shift along the PDF, but 
+	//this isn't actually used in the shifting since we do a non-parametric shift along the PDF, but 
 	//we can still report this variance.  So we dont need to worry about accounting for 
 	//every stack if there are some failed runs, etc.
 	else
@@ -1090,7 +1090,7 @@ double Constraints::get_max_constraint_change(Observations& current_obs, Observa
 
 //Observations Constraints::get_stack_shifted_chance_constraints()
 //{
-//	/* one version of this method that doesnt take any args just use the pointer to the
+//	/* one version of this method that doesn't take any args just use the pointer to the
 //	current sim constraint values*/
 //	return get_stack_shifted_chance_constraints(*current_constraints_sim_ptr);
 //}
@@ -1145,7 +1145,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 	if (risk_obj.size() > 0)
 	{
 		if (vm.find(risk_obj) == vm.end())
-			throw_constraints_error("couldnt find 'risk_obj' " + risk_obj + " in pe var names");
+			throw_constraints_error("couldn't find 'risk_obj' " + risk_obj + " in pe var names");
 		Eigen::VectorXd risk_vec = pe.get_var_vector(risk_obj);
 		int i = 0;
 		for (auto& rname : pe.get_real_names())
@@ -1337,7 +1337,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 
 				if (min_real_name.size() == 0)
 					//do something here
-					throw_constraints_error("couldnt find a nearest dv real for stack mapping");
+					throw_constraints_error("couldn't find a nearest dv real for stack mapping");
 				if (stack_oe_map.find(min_real_name) == stack_oe_map.end())
 					throw_constraints_error("nearest dv real '" + min_real_name +"' not in stack oe map");
 				if (min_dist > 0.0) min_dist = sqrt(min_dist);
@@ -1415,7 +1415,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 				post_constraint_offset[name] = pt_offset;
 				prior_constraint_offset[name] = pr_offset;
 			}
-			//if greater_than constraint, the substract from the sim value to move
+			//if greater_than constraint, the subtract from the sim value to move
 			//negative WRT the required constraint value
 			else if (constraint_sense_map[name] == ConstraintSense::greater_than)
 			{
@@ -1546,10 +1546,10 @@ Observations Constraints::get_stack_shifted_chance_constraints(Observations& cur
 	int lt_idx = int(_risk * cur_num_reals);
 	//the greater than index is the opposite direction
 	int gt_idx = int((1.0 - _risk) * cur_num_reals);
-	//the equality contraint risk index
+	//the equality constraint risk index
 	int eq_idx = int(0.5 * cur_num_reals);
 	//get the mean-centered anomalies - we want to subtract off the mean 
-	//in case these stack values are being re-used from a previous iteration
+	//in case these stack values are being reused from a previous iteration
 	//Eigen::MatrixXd anom = _stack_oe.get_eigen_anomalies();
     Eigen::MatrixXd anom;
     if (use_stack_anomalies)
@@ -1577,14 +1577,14 @@ Observations Constraints::get_stack_shifted_chance_constraints(Observations& cur
             cvec = anom.col(var_map[name]).array() + old_constraint_val;
         else
 		    cvec = anom.col(var_map[name]).array();// + old_constraint_val;
-		//now sort the anomolies + current (mean) value vector
+		//now sort the anomalies + current (mean) value vector
 		sort(cvec.data(), cvec.data() + cvec.size());
 		/*cout << cvec << endl << endl;
         Eigen::VectorXd temp = _stack_oe.get_var_vector(name);
         sort(temp.data(),temp.data() + temp.size());
         cout << temp << endl << endl;*/
 
-        //set the stdev container info - this isnt used in
+        //set the stdev container info - this isn't used in
 		//calculations but gets reported
 		prior_constraint_stdev[name] = std_map[name];
 		post_constraint_stdev[name] = std_map[name];
@@ -2183,7 +2183,7 @@ void Constraints::presolve_report(int iter, Parameters& current_pars, Observatio
 
 void Constraints::write_res_files(Observations& constraints, Parameters& pars_and_dec_vars, string tag, int iter)
 {
-	/* one form of this method that doesnt require advanced knowledge of whether or not chances are being used.
+	/* one form of this method that doesn't require advanced knowledge of whether or not chances are being used.
 	write a pest-style residuals file, and, if using chances, write a sep file that includes the chance offset info*/
 	write_res_file(constraints, pars_and_dec_vars, tag, iter, false);
 	if (use_chance)
@@ -2325,7 +2325,7 @@ void Constraints::presolve_chance_report(int iter, Observations& current_obs, bo
 bool Constraints::should_update_chance(int iter)
 {
 	/* this is a total hack - it tries to determine if it is time to update the chance
-	information, like should we queue up some JCO pertubation runs for FOSM chances or 
+	information, like should we queue up some JCO perturbation runs for FOSM chances or 
 	should we queue up some stack runs for stack-based chances*/
 	if (!use_chance)
 		return false;
@@ -2847,7 +2847,7 @@ void Constraints::process_runs(RunManagerAbstract* run_mgr_ptr,int iter)
 	{
 		if (jco.get_par_run_map().size() == 0)
 			return;
-		pfm.log_event("reading FOSM-based parameter pertubation runs into JCO");
+		pfm.log_event("reading FOSM-based parameter perturbation runs into JCO");
 		ParamTransformSeq par_trans = pest_scenario.get_base_par_tran_seq();
 		bool success = jco.process_runs(par_trans, pest_scenario.get_base_group_info(), *run_mgr_ptr,
 			*null_prior, false, false);
@@ -2875,16 +2875,16 @@ void Constraints::add_runs(int iter, Parameters& current_pars, Observations& cur
 	*/
 	if (!use_chance)
 		return;
-	//for fosm, we need to queue up parameter pertubation runs, centered at the current dec var values
+	//for fosm, we need to queue up parameter perturbation runs, centered at the current dec var values
 	if (use_fosm)
 	{
-		pfm.log_event("building FOSM-based parameter pertubation runs");
+		pfm.log_event("building FOSM-based parameter perturbation runs");
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
 		set<string> out_of_bounds;
 		//the  second-to-last true arg is to run the parvals listed in _current_pars_and_dec_vars as the "base" run
-		//this is to make sure we get good pertubations at the current point in par/dec var space.
+		//this is to make sure we get good perturbations at the current point in par/dec var space.
 		//but this means we might have to run the base run twice at least for the SLP process.
-		//the way around this is to just add the runs all at once wihin the SLP add run
+		//the way around this is to just add the runs all at once within the SLP add run
 		//bit using Constraints::get_fosm_par_names()
 		//the last false says not to reinitialize the run mgr since the calling process may have also
 		//added runs
@@ -2894,7 +2894,7 @@ void Constraints::add_runs(int iter, Parameters& current_pars, Observations& cur
 		if (!success)
 		{
 			const set<string> failed = jco.get_failed_parameter_names();
-			throw_constraints_error("failed to calc derviatives for the following FOSM parameters: ", failed);
+			throw_constraints_error("failed to calc derivatives for the following FOSM parameters: ", failed);
 		}
 		cout << "...adding " << jco.get_par_run_map().size() << " model runs for FOSM-based chance constraints" << endl;
 
@@ -3009,7 +3009,7 @@ vector<string> Constraints::get_fosm_par_names()
 map<string, double> Constraints::get_unsatified_pi_constraints(Parameters& par_and_dec_vars, double tol)
 {
 	/* get a map of name, distance for each of the prior info constraints that are not satisfied in the par_and_dec_vars container.
-	tol is a percent-based tolerance to accont for constraints that are very near their required (rhs) value
+	tol is a percent-based tolerance to account for constraints that are very near their required (rhs) value
 
 	*/
 	double sim_val, obs_val, scaled_diff;
@@ -3080,7 +3080,7 @@ map<string, map<string, double>> Constraints::get_ensemble_violations_map(Parame
 map<string, double> Constraints::get_unsatified_obs_constraints(Observations& constraints_sim, double tol, bool do_shift, bool include_weight)
 {
 	/* get a map of name, distance for each of the obs-based (e.g. model-based) constraints that are not satisfied in the constraint_obs container.
-	tol is a percent-based tolerance to accont for constraints that are very near their required (rhs) value
+	tol is a percent-based tolerance to account for constraints that are very near their required (rhs) value
 
 	*/
 	double sim_val, obs_val, scaled_diff;
@@ -3107,7 +3107,7 @@ map<string, double> Constraints::get_unsatified_obs_constraints(Observations& co
         weight = 1.0;
         if (include_weight)
             weight = oi.get_weight(name);
-		//check for invalid obs constraints (e.g. satified)
+		//check for invalid obs constraints (e.g. satisfied)
 		if ((constraint_sense_map[name] == ConstraintSense::less_than) && (sim_val > obs_val) && (scaled_diff > tol))
 			unsatisfied[name] = weight * (sim_val - obs_val);
 		else if ((constraint_sense_map[name] == ConstraintSense::greater_than) && (sim_val < obs_val) && (scaled_diff > tol))

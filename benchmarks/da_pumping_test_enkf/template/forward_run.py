@@ -70,7 +70,7 @@ def run_model():
     mf.bas6.strt = h2d
     mf.bas6.write_file()
 
-    # read hydrualic conductivity file
+    # read hydraulic conductivity file
     par_df = pd.read_csv("par_k.csv",  header=None)
     kh = par_df.values.reshape(50,50) # 10 was add to improve k
     kh = np.power(10,kh)

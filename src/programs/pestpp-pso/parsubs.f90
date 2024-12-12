@@ -157,7 +157,7 @@ subroutine svdjac()
   !
   if (lwmax < int(work(1))) then
     !
-    write(*,*)'Need to increase memeory for SVD work array'
+    write(*,*)'Need to increase memory for SVD work array'
     write(*,*)'work(1) = ',work(1)
     write(*,*)'-- stopping execution --'
     stop

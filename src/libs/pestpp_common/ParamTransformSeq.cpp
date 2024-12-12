@@ -741,7 +741,7 @@ const TranLog10 *ParamTransformSeq::get_log10_ptr() const
 TranSVD *ParamTransformSeq::get_svda_ptr()const
 {
 	Transformation* ptr=0;
-	auto iter = find_in_active_ctl2numeric(string("SVD Super Parameter Tranformation"));
+	auto iter = find_in_active_ctl2numeric(string("SVD Super Parameter Transformation"));
 	if (iter != tranSeq_active_ctl2numeric.end())
 	{
 		ptr = (*iter);

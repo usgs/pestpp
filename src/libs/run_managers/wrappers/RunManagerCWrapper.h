@@ -70,7 +70,7 @@ int rmic_get_num_failed_runs(RunManager *run_manager_ptr, int *nfail);
 
 //*************************************************************************************
 //******************************** IMPORTANT ******************************************
-//The calling program is resposible for freeing the memory associated with run_id_array
+//The calling program is responsible for freeing the memory associated with run_id_array
 //after calling this function by involking delete[] run_id_array
 //*************************************************************************************
 #ifdef OS_WIN

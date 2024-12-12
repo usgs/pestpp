@@ -132,7 +132,7 @@ subroutine parunc(basnam)
           call transpar(ipart,1)
           call transbnd(1)
           !
-!-------- project random parameter pertrubation onto null space
+!-------- project random parameter perturbation onto null space
           call nullproj(ipart)
           !
           call transpar(ipart,0)
@@ -217,7 +217,7 @@ subroutine parunc(basnam)
 !-- set gbest
     call getgbest(gindex,gbest,gmbest,gpbest)
     !  
-!-- list gerenal interation output
+!-- list general iteration output
     call listout(0,gbest,gmbest,gpbest,gindex,0.0d+00,iphistp)
     !
 !-- check if maximum allowable model failures has been exceeded
@@ -300,7 +300,7 @@ subroutine parunc(basnam)
           call transpar(ipart,1)
           call transbnd(1)
           !
-!-------- project random parameter pertrubation onto null space
+!-------- project random parameter perturbation onto null space
           call nullproj(ipart)
           !
           call transpar(ipart,0)
@@ -437,7 +437,7 @@ subroutine parunc(basnam)
           call transpar(ipart,1)
           call transbnd(1)
           !
-!-------- project random parameter pertrubation onto null space
+!-------- project random parameter perturbation onto null space
           call nullproj(ipart)
           !
           call transbnd(0)

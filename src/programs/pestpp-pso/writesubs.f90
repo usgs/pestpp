@@ -56,7 +56,7 @@ subroutine listini(basnam,gindex)
   write(unit(1),'(3X,A,T40,I6)')'Number of observations',nobs
   write(unit(1),'(3X,A,T40,I6,/)')'Number of prior estimates',nprior
   !
-  write(unit(1),'(A,/)')'Parameter defintions:-'
+  write(unit(1),'(A,/)')'Parameter definitions:-'
   !
   if (ntied > 0) then
     !
@@ -341,7 +341,7 @@ subroutine listipt(basnam)
   write(unit(1),'(3X,A,T40,I6)')'Number of observations',nobs
   write(unit(1),'(3X,A,T40,I6,/)')'Number of prior estimates',nprior
   !
-  write(unit(1),'(A,/)')'Parameter defintions:-'
+  write(unit(1),'(A,/)')'Parameter definitions:-'
   !
   if (ntied > 0) then
     !

@@ -20,7 +20,7 @@ import flopy
 # %%
 """
 ## Config Parameters
-In this excercise, we will use multiple user configuration parameters. To make things clean, we used the a configuration file to hold all these parameters.
+In this exercise, we will use multiple user configuration parameters. To make things clean, we used the a configuration file to hold all these parameters.
 
 """
 
@@ -36,7 +36,7 @@ print(settings)
 """
 ## Setup workspace
 Create a template folder that will contain model executable, model input files, and model output files. It is 
-called "template" becuase the worker will be generated from it.
+called "template" because the worker will be generated from it.
 """
 
 # %%
@@ -89,7 +89,7 @@ shutil.copy('..\obs_utils.py', os.path.join(template_ws, 'obs_utils.py'))
 # %%
 """
 ### Simplifying Model I/O
-We write a Python warapper that takes one file for each parameter group and generate one output file as output. Let us look at the model input files. and output file is similair to observation data section. This is just a personal prefernce! you may still deals with the native MODFLOW I/O files.
+We write a Python warapper that takes one file for each parameter group and generate one output file as output. Let us look at the model input files. and output file is similar to observation data section. This is just a personal preference! you may still deals with the native MODFLOW I/O files.
 * input_dis.csv
 * hk_1.dat
 * iheads_1.dat
@@ -160,7 +160,7 @@ sr = pyemu.helpers.SpatialReference(delr=delr, delc=delc )
 
 
 # %%
-# Before runing the model. Let us see something else. The trasnient data table.
+# Before running the model. Let us see something else. The trasnient data table.
 trans_data = pd.read_csv(os.path.join(template_ws, r".\model_dataset\temporal_param.csv" ))
 trans_data
 
@@ -330,7 +330,7 @@ for cycle in range(4):
     ttims = totims[cycle]
     actual_obs_for_cycles.loc[actual_obs_for_cycles['totim'].isin(ttims), 'cycle'] = cycle
 
-## use observation from the refernce
+## use observation from the reference
 pst.observation_data['obsval'] = df_truth_outupt['simval'].values
 pst.observation_data['weight'] = 1000 # this is 1/std
 

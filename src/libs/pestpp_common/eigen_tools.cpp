@@ -98,7 +98,7 @@ void matrix_del_rows_cols(Eigen::SparseMatrix<double> &mat, const vector<size_t>
 
 		std::vector<Eigen::Triplet<int> > triplet_list;
 
-		// add rows to be retained to the beginning of the  permuatation matrix
+		// add rows to be retained to the beginning of the  permutation matrix
 		int icol_new = 0;
 		int n_save = 0;
 		for (int icol_old = 0; icol_old<ncols; ++icol_old)
@@ -110,7 +110,7 @@ void matrix_del_rows_cols(Eigen::SparseMatrix<double> &mat, const vector<size_t>
 				++n_save;
 			}
 		}
-		// add rows to be deleted to end to permuatation matrix
+		// add rows to be deleted to end to permutation matrix
 		for (int icol_old :  id_vec)
 		{
 			triplet_list.push_back(Eigen::Triplet<int>(icol_old, icol_new, 1));

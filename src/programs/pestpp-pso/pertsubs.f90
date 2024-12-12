@@ -192,7 +192,7 @@ subroutine pertpareto(iiter)
     inertia = finert
   end if
   !  
-! tranform parameters
+! transform parameters
   call transbnd(1)
   call transrep(1)
   !
@@ -464,7 +464,7 @@ subroutine pertunc(iiter,gindex)
         end if
         !
         !
-!       reduce intertia if particle is close to calibration
+!       reduce inertia if particle is close to calibration
         if (objopt(ipart) <= inerthr) then
           inertia = finert
         else
@@ -472,7 +472,7 @@ subroutine pertunc(iiter,gindex)
         end if
         !
         !
-!       calcualte particle velocity
+!       calculate particle velocity
         partvel(ipart,iparm) = inertia*partvel(ipart,iparm) + local + global 
         !
         if (dabs(partvel(ipart,iparm)) > vmax(iparm)) then

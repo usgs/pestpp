@@ -503,7 +503,7 @@ void Localizer::report(ofstream &f_rec)
 		if (pest_scenario_ptr->get_pestpp_options().get_ies_verbose_level() > 1)
 		{
 			cout << ", see.rec file for listing" << endl;
-			f_rec << "Note: the following parameters/parmaeter groups have no non-zero entries in the localizer meaning they will not be adjusted:" << endl;
+			f_rec << "Note: the following parameters/parameter groups have no non-zero entries in the localizer meaning they will not be adjusted:" << endl;
 			int i = 0;
 			for (auto z : zeros)
 			{

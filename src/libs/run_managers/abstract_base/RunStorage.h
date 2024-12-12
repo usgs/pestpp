@@ -44,9 +44,9 @@ class RunStorage {
 	//              run_status=0   this run has not yet been completed
 	//			    run_status=-100   run was canceled
 	//				run_status<0 and >-100  run completed and failed.  This is the number of times it failed
-	//				run_status=1   run and been sucessfully completed
+	//				run_status=1   run and been successfully completed
 	//       info_txt  (description of model run)                                     char*
-	//       info_value (variable used to store an important value.  The varaible     double
+	//       info_value (variable used to store an important value.  The variable     double
 	//                   depends on the type of model run being stored  )
 	//       parameter_values  (parameters values for model runs)                     double*number of parameters
 	//       observationn_values( observations results produced by the model run)     double*number of observations

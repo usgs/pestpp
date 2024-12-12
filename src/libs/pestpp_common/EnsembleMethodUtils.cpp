@@ -88,7 +88,7 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
     typedef std::set<std::pair<std::string, double>, Comparator> sortedset;
     typedef std::set<std::pair<std::string, double>, Comparator>::iterator sortedset_iter;
 
-    //need to gaurd these
+    //need to guard these
     int num_reals,idx;
     //map<string,int> real_map;
     num_reals = real_vec_map.size();
@@ -226,7 +226,7 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
             throw runtime_error("multimodal_solve: real_idxs.size() != subset_size");
         }
 
-        //need to gaurd these
+        //need to guard these
         while (true)
         {
             if (results_lock.try_lock())
@@ -1409,7 +1409,7 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
                 Eigen::MatrixXd temp = parcov_inv.diagonal().matrix();
                 local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp);
             }
-//            if (act_obs_names.size() > 0) { //this works bc the mm solve doesnt pass these names...
+//            if (act_obs_names.size() > 0) { //this works bc the mm solve doesn't pass these names...
 //                ss.str("");
 //                ss << "solution scaling factor: " << scale << endl;
 //                ss << "eigthresh: " << eigthresh << endl;
@@ -3855,7 +3855,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 
 	stringstream ss;
 	ofstream &frec = file_manager_ptr->rec_ofstream();
-	ss << endl << "   ---  parameter group change summmary  ---    " << endl;
+	ss << endl << "   ---  parameter group change summary  ---    " << endl;
 	//ss << "   (compared to the initial ensemble using active realizations)" << endl;
 	cout << ss.str();
 	frec << ss.str();
@@ -5157,7 +5157,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 		}
 		if (localizer.get_how() == Localizer::How::OBSERVATIONS)
-			message(1, "localizing by obseravtions");
+			message(1, "localizing by observations");
 		else
 			message(1, "localizing by parameters");
 	}
@@ -6205,7 +6205,7 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
         //first check if they are full coincident
 
         //if not, check if the obs+noise ensemble was passed, if not, then we can just assuming the user
-        // doesnt care about real names
+        // doesn't care about real names
         //but we need to make sure this jives with the base real option
         //but we have to make sure we have at least enough rows in the phi factor table - warn if more than needed,
         //  error if not enough
@@ -6297,7 +6297,7 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
         if (has_errors) {
             throw_em_error(ss.str());
         }
-        //we can break after the firt iterate since we have checked that if by reals, all the
+        //we can break after the first iterate since we have checked that if by reals, all the
         // tags are coherent...
         break;
     }
@@ -6859,12 +6859,12 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
             {
                 continue;
             }
-            //if the linking par isnt in current par state names, thats a problem
+            //if the linking par isn't in current par state names, that's a problem
             if (pstates.find(sm.second) == send)
             {
                 missing.push_back(sm.second);
             }
-            //if the par is in the currrent par state names, thats a problem
+            //if the par is in the current par state names, that's a problem
             else if (pstates.find(sm.first) != send)
             {
                 already.push_back(sm.first);
@@ -7115,7 +7115,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	    weights.keep_rows(oe.get_real_names());
     }
 
-	//buid up this container here and then reuse it for each lambda later...
+	//build up this container here and then reuse it for each lambda later...
 	unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	if (use_localizer)
 	{
@@ -7128,7 +7128,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	}
 	if (loc_map.size() == 0)
 	{
-		throw_em_error("EnsembleMethod::solve() interal error: loc_map is empty");
+		throw_em_error("EnsembleMethod::solve() internal error: loc_map is empty");
 	}
 	//get this once and reuse it for each lambda
 	Eigen::MatrixXd Am;
@@ -7208,7 +7208,7 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			}
 			else if (!pest_scenario.get_pestpp_options().get_ies_upgrades_in_memory())
 			{
-				message(1, "even though 'ies_upgrades_in_memory' is 'false', there is no benefit to using this option because either you arent testing multiple upgrades or you arent using a subset");
+				message(1, "even though 'ies_upgrades_in_memory' is 'false', there is no benefit to using this option because either you aren't testing multiple upgrades or you aren't using a subset");
 			}
 
 			pe_lams.push_back(pe_lam_scale);
@@ -7673,14 +7673,14 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			{
 				double new_lam = last_best_lam * lam_inc;
 				new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
-				message(0, "incresing lambda to: ", new_lam);
+				message(0, "increasing lambda to: ", new_lam);
 				last_best_lam = new_lam;
 			}
 		}
         else {
             double new_lam = last_best_lam * lam_inc;
             new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
-            message(0, "incresing lambda to: ", new_lam);
+            message(0, "increasing lambda to: ", new_lam);
             last_best_lam = new_lam;
         }
         save_ensembles("rejected",cycle,pe_lams[best_idx],oe_lam_best);
@@ -8965,7 +8965,7 @@ void EnsembleMethod::zero_weight_obs(vector<string>& obs_to_zero_weight, bool up
     {
         oi->set_weight(n, 0.0);
     }
-	//shouldnt need to update localizer since we dropping not adding
+	//shouldn't need to update localizer since we dropping not adding
 	//updating weights in control file
 	if (weights.shape().first == 0)
 	{
@@ -9321,7 +9321,7 @@ vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 	}
 	else
 	{
-		//throw runtime_error("unkonwn 'subset_how'");
+		//throw runtime_error("unknown 'subset_how'");
 		throw_em_error("unknown 'subset_how'");
 	}
 	/*stringstream ss;

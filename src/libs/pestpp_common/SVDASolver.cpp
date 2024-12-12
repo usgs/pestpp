@@ -84,7 +84,7 @@ Parameters SVDASolver::limit_parameters_freeze_all_ip(const Parameters &init_act
 	for (auto &ipar : upgrade_active_ctl_pars)
 	{
 		name = &(ipar.first);  // parameter name
-		val_upgrade = ipar.second; // inital parameter value
+		val_upgrade = ipar.second; // initial parameter value
 		auto iter_pu = init_numeric_pars.find(*name);
 		assert(iter_pu != init_numeric_pars.end());
 		val_init = (*iter_pu).second;  // upgrade parameter value
@@ -146,13 +146,13 @@ void SVDASolver::calc_upgrade_vec(double i_lambda, Parameters &prev_frozen_activ
 	
 
 		// need to remove parameters frozen due to failed jacobian runs when calling calc_lambda_upgrade_vec
-		//Freeze Parameters at the boundary whose ugrade vector and gradient both head out of bounds
+		//Freeze Parameters at the boundary whose upgrade vector and gradient both head out of bounds
 	(*this.*calc_lambda_upgrade)(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
 			base_run_active_ctl_pars, prev_frozen_active_ctl_pars, i_lambda, upgrade_active_ctl_pars, upgrade_ctl_del_pars,
 			grad_ctl_del_pars);
 		num_upgrade_out_grad_in = check_bnd_par(new_frozen_ctl_pars, base_run_active_ctl_pars, upgrade_ctl_del_pars, grad_ctl_del_pars);
 		prev_frozen_active_ctl_pars.insert(new_frozen_ctl_pars.begin(), new_frozen_ctl_pars.end());
-		//Recompute the ugrade vector without the newly frozen parameters and freeze those at the boundary whose upgrade still goes heads out of bounds
+		//Recompute the upgrade vector without the newly frozen parameters and freeze those at the boundary whose upgrade still goes heads out of bounds
 		if (num_upgrade_out_grad_in > 0)
 		{
 			new_frozen_ctl_pars.clear();

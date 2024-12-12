@@ -7,7 +7,7 @@
 
 using namespace std;
 
-//Static Memeber Initialization
+//Static Member Initialization
 int64_t NetPackage::last_group_id = 0;
 int8_t NetPackage::security_code[5] = { 1, 3, 5, 7, 9 };
 
@@ -59,7 +59,7 @@ bool NetPackage::check_string(const vector<int8_t> &data_src, size_t index1, siz
 string NetPackage::extract_string(const int8_t *data_src, size_t _size)
 {
 	vector<char> buf;
-	// This is done to remove possible system dependicies on whether char/uchar
+	// This is done to remove possible system dependencies on whether char/uchar
 	// is use to represent a standard char
 	for (size_t i = 0; i < _size; ++i)
 	{
@@ -106,7 +106,7 @@ NetPackage::NetPackage(PackType _type, int _group, int _run_id, const string &de
 	memset(desc, '\0', DESC_LEN);
 	int i = 0;
 	int max_len = min(size_t(DESC_LEN - 1), desc_str.size());
-	// This is done to remove possible system dependicies on whether char/uchar
+	// This is done to remove possible system dependencies on whether char/uchar
 	// is use to represent a standard char
 	int i_desc = 0;
 	for (int i = 0; i < max_len; ++i)
@@ -135,7 +135,7 @@ void NetPackage::reset(PackType _type, int _group, int _run_id, const string &_d
 	run_id = _run_id;
 	memset(desc, '\0', DESC_LEN);
 	int max_len = min(size_t(DESC_LEN - 1), _desc.size());
-	// This is done to remove possible system dependicies on whether char/uchar
+	// This is done to remove possible system dependencies on whether char/uchar
 	// is use to represent a standard char
 	int i_desc = 0;
 	for (int i = 0; i < max_len; ++i)
@@ -291,7 +291,7 @@ pair<int,string>  NetPackage::recv(int sockfd)
 			w_memcpy_s(&run_id, sizeof(run_id), &header_buf[i_start], sizeof(run_id));
 			i_start += sizeof(run_id);
 			//w_memcpy_s(&desc, sizeof(desc), &header_buf[i_start], sizeof(desc));
-			// This is done to remove possible system dependicies on whether char/uchar
+			// This is done to remove possible system dependencies on whether char/uchar
 			// is use to represent a standard char
 			for (int i = 0; i < DESC_LEN; ++i)
 			{

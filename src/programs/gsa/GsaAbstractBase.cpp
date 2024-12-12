@@ -18,7 +18,7 @@ GsaAbstractBase::GsaAbstractBase(Pest &_pest_scenario,
 	: file_manager_ptr(&_file_manager), obj_func_ptr(_obj_func_ptr), base_partran_seq_ptr(0),
 	par_dist(_par_dist), seed(_seed)
 {
-//	// GSA metods only support one to one transformations
+//	// GSA methods only support one to one transformations
 //	if (!_par_transform.is_one_to_one())
 //	{
 //		throw PestError("Error: GSA methods only support one to one transformations.  Please insure the SVDA transformation is turned off.");

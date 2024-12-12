@@ -272,7 +272,7 @@ bool Jacobian_1to1::process_runs(ParamTransformSeq &par_transform,
 
 		
 
-	// process the parameter pertubation runs
+	// process the parameter perturbation runs
 	int nruns = run_manager.get_nruns();
 	base_numeric_par_names.clear();
 	int icol = 0;

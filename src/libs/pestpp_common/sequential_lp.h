@@ -99,7 +99,7 @@ private:
 	//report dec var info the newly solved LP solution.  returns the current and new obj func
 	pair<double,double> postsolve_decision_var_report(Parameters &upgrade_pars);
 
-	//check that all constraints and dec vars are satified
+	//check that all constraints and dec vars are satisfied
 	map<string, double> get_out_of_bounds_dec_vars(Parameters &upgrade_pars);
 
 	//prepare for LP solution, including filling response matrix
