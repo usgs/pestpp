@@ -36,7 +36,11 @@ void IterEnsembleSmoother::iterate_2_solution()
 	ofstream &frec = file_manager.rec_ofstream();
 	
 	bool accept;
-	int n_iter_mean = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
+	vector<int> n_iter_mean = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
+
+    int iters_since_reinflate = 0;
+    int n_iter_mean_idx = 0;
+    int current_n_iter_mean = n_iter_mean[n_iter_mean_idx];
     int solution_iter = 0;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
@@ -72,15 +76,23 @@ void IterEnsembleSmoother::iterate_2_solution()
 		else
 			consec_bad_lambda_cycles++;
 
-		if ((n_iter_mean> 0) && (solution_iter % n_iter_mean == 0))
+		//if ((n_iter_mean > 0) && (solution_iter % n_iter_mean == 0))
+        if ((current_n_iter_mean > 0) && (iters_since_reinflate >= current_n_iter_mean))
         {
             iter++;
             reset_par_ensemble_to_prior_mean();
+            iters_since_reinflate = 0;
+            if (n_iter_mean.size() > n_iter_mean_idx)
+            {
+                n_iter_mean_idx++;
+                current_n_iter_mean = n_iter_mean[n_iter_mean_idx];
+            }
         }
 
-		if (should_terminate())
+		if (should_terminate(current_n_iter_mean))
         {
-		    if (iter > pest_scenario.get_pestpp_options().get_ies_n_iter_mean()) {
+		    //if (iter > pest_scenario.get_pestpp_options().get_ies_n_iter_mean()) {
+            if (iter > current_n_iter_mean) {
                 break;
             }
 		    else{

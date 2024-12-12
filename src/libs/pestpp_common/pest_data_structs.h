@@ -550,8 +550,8 @@ public:
     void set_ies_multimodal_alpha(double _flag) { ies_multimodal_alpha = _flag; }
     void set_ensemble_output_precision(int prec) { ensemble_output_precision = prec;}
     int get_ensemble_output_precision() const {return ensemble_output_precision;}
-    void set_ies_n_iter_mean(int _n_iter_mean)  {ies_n_iter_mean = _n_iter_mean;}
-    int get_ies_n_iter_mean() const {return ies_n_iter_mean;}
+    void set_ies_n_iter_mean(vector<int> _n_iter_mean)  {ies_n_iter_mean = _n_iter_mean;}
+    vector<int> get_ies_n_iter_mean() const {return ies_n_iter_mean;}
 
 
     string get_gsa_method() const { return gsa_method; }
@@ -828,7 +828,7 @@ private:
 	bool ies_localizer_forgive_missing;
 	string ies_phi_fractions_file;
 	bool ies_phi_factors_by_real;
-	int ies_n_iter_mean;
+	vector<int> ies_n_iter_mean;
     bool ies_updatebyreals;
 
 

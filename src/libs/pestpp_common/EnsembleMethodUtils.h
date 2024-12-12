@@ -358,7 +358,7 @@ public:
 		RunManagerAbstract* _run_mgr_ptr, string _alg_tag="EnsembleMethod");
 
 	virtual void throw_em_error(string message);
-	bool should_terminate();
+	bool should_terminate(int current_n_iter_mean=0);
 	void sanity_checks();
 	//template<typename T, typename A>
 	//void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);

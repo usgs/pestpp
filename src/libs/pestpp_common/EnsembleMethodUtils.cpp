@@ -2492,7 +2492,18 @@ double L2PhiHandler::calc_std(map<string, double> *phi_map)
 
 double L2PhiHandler::get_representative_phi(phiType pt)
 {
-    if (pest_scenario->get_pestpp_options().get_ies_n_iter_mean() < 0) {
+    //if (pest_scenario->get_pestpp_options().get_ies_n_iter_mean() < 0)
+    bool use_min = false;
+    for (auto& fac : pest_scenario->get_pestpp_options().get_ies_n_iter_mean())
+    {
+        if (fac < 0)
+        {
+            use_min = true;
+            break;
+        }
+    }
+    if (use_min)
+    {
         return get_min(pt);
     }
 
@@ -4286,7 +4297,7 @@ void EnsembleMethod::throw_em_error(string message)
 	
 }
 
-bool EnsembleMethod::should_terminate()
+bool EnsembleMethod::should_terminate(int current_n_iter_mean)
 {
 	//todo: use ies accept fac here?
 	double phiredstp = pest_scenario.get_control_info().phiredstp;
@@ -4306,10 +4317,10 @@ bool EnsembleMethod::should_terminate()
 	message(1, "phiredstp: ", phiredstp);
 	message(1, "nphistp: ", nphistp);
 	message(1, "nphinored (also used for consecutive bad lambda cycles): ", nphinored);
-	int n_mean_iter = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
+	//int n_mean_iter = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
     vector<double>::iterator begin_idx = best_mean_phis.begin();
-    if ((n_mean_iter > 0) && (best_mean_phis.size() > n_mean_iter))
-        begin_idx = best_mean_phis.end() - (n_mean_iter+1); //bc of prior phi and then adding the mean shift to the list
+    if ((current_n_iter_mean > 0) && (best_mean_phis.size() > current_n_iter_mean))
+        begin_idx = best_mean_phis.end() - (current_n_iter_mean+1); //bc of prior phi and then adding the mean shift to the list
     if (best_mean_phis.size() > 0)
 	{
 
@@ -4330,7 +4341,7 @@ bool EnsembleMethod::should_terminate()
     for (auto& phi : best_mean_phis)
 	{
 		ratio = (phi - best_phi_yet) / phi;
-    	if ((i>=(iter - n_mean_iter)) && (ratio <= phiredstp))
+    	if ((i>=(iter - current_n_iter_mean)) && (ratio <= phiredstp))
 			count++;
         i++;
 	}
@@ -4897,11 +4908,21 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	consec_bad_lambda_cycles = 0;
     reinflate_to_minphi_real = false;
-    if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0)
+    bool use_min = false;
+    for (auto& fac : pest_scenario.get_pestpp_options().get_ies_n_iter_mean())
     {
-        message(2,"n_iter_mean < 0, using min-phi real for re-inflation, resetting n_iter_reinflate to positive");
+        if (fac < 0)
+        {
+            use_min = true;
+            fac *= -1;
+        }
+    }
+
+    if (use_min)
+    {
+        message(2,"n_iter_reinflate < 0, using min-phi real for re-inflation, resetting n_iter_reinflate to positive");
         reinflate_to_minphi_real = true;
-        pest_scenario.get_pestpp_options_ptr()->set_ies_n_iter_mean(-1 * pest_scenario.get_pestpp_options().get_ies_n_iter_mean());
+        //pest_scenario.get_pestpp_options_ptr()->set_ies_n_iter_mean(-1 * pest_scenario.get_pestpp_options().get_ies_n_iter_mean());
     }
 	lam_mults = pest_scenario.get_pestpp_options().get_ies_lam_mults();
 	if (lam_mults.size() == 0)

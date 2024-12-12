@@ -1185,7 +1185,13 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
     {
         passed_args.insert("IES_N_ITER_MEAN");
         passed_args.insert("IES_N_ITER_REINFLATE");
-        convert_ip(value,ies_n_iter_mean);
+        ies_n_iter_mean.clear();
+        vector<string> tok;
+        tokenize(value, tok, ",");
+        for (const auto& fac : tok)
+        {
+            ies_n_iter_mean.push_back(convert_cp<int>(fac));
+        }
         return true;
     }
     else if (key == "IES_UPDATE_BY_REALS")
@@ -1837,7 +1843,10 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_localizer_forgive_extra: " << ies_localizer_forgive_missing << endl;
 	os << "ies_phi_factors_file: " << ies_phi_fractions_file << endl;
     os << "ies_phi_factors_by_real: " << ies_phi_factors_by_real << endl;
-    os << "ies_n_iter_reinflate: " << ies_n_iter_mean << endl;
+    os << "ies_n_iter_reinflate: " << endl;
+    for (auto v : ies_n_iter_mean)
+        os << v << ",";
+    os << endl;
     os << "ies_updatebyreals: " << ies_updatebyreals << endl;
 
 
@@ -2024,7 +2033,7 @@ void PestppOptions::set_defaults()
     set_ies_localizer_forgive_missing(false);
     set_ies_phi_fractions_files("");
     set_ies_phi_factors_by_real(false);
-    set_ies_n_iter_mean(0);
+    set_ies_n_iter_mean(vector<int>{0});
     set_ies_updatebyreals(false);
     set_save_dense(false);
 
