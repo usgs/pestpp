@@ -1185,12 +1185,23 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
     {
         passed_args.insert("IES_N_ITER_MEAN");
         passed_args.insert("IES_N_ITER_REINFLATE");
-        ies_n_iter_mean.clear();
+        ies_n_iter_reinflate.clear();
         vector<string> tok;
         tokenize(value, tok, ",");
         for (const auto& fac : tok)
         {
-            ies_n_iter_mean.push_back(convert_cp<int>(fac));
+            ies_n_iter_reinflate.push_back(convert_cp<int>(fac));
+        }
+        return true;
+    }
+    else if (key == "IES_REINFLATE_FACTOR")
+    {
+        vector<string> tok;
+        tokenize(value, tok, ",");
+        ies_reinflate_factor.clear();
+        for (const auto& fac : tok)
+        {
+            ies_reinflate_factor.push_back(convert_cp<double>(fac));
         }
         return true;
     }
@@ -1844,7 +1855,11 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_phi_factors_file: " << ies_phi_fractions_file << endl;
     os << "ies_phi_factors_by_real: " << ies_phi_factors_by_real << endl;
     os << "ies_n_iter_reinflate: " << endl;
-    for (auto v : ies_n_iter_mean)
+    for (auto v : ies_n_iter_reinflate)
+        os << v << ",";
+    os << endl;
+    os << "ies_reinflate_factor: " << endl;
+    for (auto v : ies_reinflate_factor)
         os << v << ",";
     os << endl;
     os << "ies_updatebyreals: " << ies_updatebyreals << endl;
@@ -2033,10 +2048,11 @@ void PestppOptions::set_defaults()
     set_ies_localizer_forgive_missing(false);
     set_ies_phi_fractions_files("");
     set_ies_phi_factors_by_real(false);
-    set_ies_n_iter_mean(vector<int>{0});
+    set_ies_n_iter_reinflate(vector < int > {0});
+    set_ies_reinflate_factor(vector < double > {1.0});
+
     set_ies_updatebyreals(false);
     set_save_dense(false);
-
 
 	// DA parameters
 	//set_da_use_ies(false);

@@ -2492,16 +2492,16 @@ double L2PhiHandler::calc_std(map<string, double> *phi_map)
 
 double L2PhiHandler::get_representative_phi(phiType pt)
 {
-    //if (pest_scenario->get_pestpp_options().get_ies_n_iter_mean() < 0)
+    //if (pest_scenario->get_pestpp_options().get_ies_n_iter_reinflate() < 0)
     bool use_min = false;
-    for (auto& fac : pest_scenario->get_pestpp_options().get_ies_n_iter_mean())
-    {
-        if (fac < 0)
-        {
-            use_min = true;
-            break;
-        }
-    }
+//    for (auto& fac : pest_scenario->get_pestpp_options().get_ies_n_iter_reinflate())
+//    {
+//        if (fac < 0)
+//        {
+//            use_min = true;
+//            break;
+//        }
+//    }
     if (use_min)
     {
         return get_min(pt);
@@ -4317,7 +4317,7 @@ bool EnsembleMethod::should_terminate(int current_n_iter_mean)
 	message(1, "phiredstp: ", phiredstp);
 	message(1, "nphistp: ", nphistp);
 	message(1, "nphinored (also used for consecutive bad lambda cycles): ", nphinored);
-	//int n_mean_iter = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
+	//int n_mean_iter = pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate();
     vector<double>::iterator begin_idx = best_mean_phis.begin();
     //if ((current_n_iter_mean > 0) && (best_mean_phis.size() > current_n_iter_mean))
     //    begin_idx = best_mean_phis.end() - (current_n_iter_mean+1); //bc of prior phi and then adding the mean shift to the list
@@ -4910,7 +4910,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	consec_bad_lambda_cycles = 0;
     reinflate_to_minphi_real = false;
     bool use_min = false;
-    for (auto& fac : pest_scenario.get_pestpp_options().get_ies_n_iter_mean())
+    for (auto& fac : pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate())
     {
         if (fac < 0)
         {
@@ -4923,7 +4923,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
     {
         message(2,"n_iter_reinflate < 0, using min-phi real for re-inflation, resetting n_iter_reinflate to positive");
         reinflate_to_minphi_real = true;
-        //pest_scenario.get_pestpp_options_ptr()->set_ies_n_iter_mean(-1 * pest_scenario.get_pestpp_options().get_ies_n_iter_mean());
+        //pest_scenario.get_pestpp_options_ptr()->set_ies_n_iter_reinflate(-1 * pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate());
     }
 	lam_mults = pest_scenario.get_pestpp_options().get_ies_lam_mults();
 	if (lam_mults.size() == 0)
@@ -7438,35 +7438,35 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	return true;
 }
 
-void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
+void EnsembleMethod::reset_par_ensemble_to_prior_mean(double reinflate_factor){
+
     string min_phi_name = "";
-    if (true)
+    //find the min phi real...
+    map<string,double> pmap = ph.get_phi_map(L2PhiHandler::phiType::ACTUAL);
+    double min_phi = numeric_limits<double>::max();
+
+    for (auto& item : pmap)
     {
-        map<string,double> pmap = ph.get_phi_map(L2PhiHandler::phiType::ACTUAL);
-        double min_phi = numeric_limits<double>::max();
-
-        for (auto& item : pmap)
+        if (item.second < min_phi)
         {
-            if (item.second < min_phi)
-            {
-                min_phi = item.second;
-                min_phi_name = item.first;
-            }
+            min_phi = item.second;
+            min_phi_name = item.first;
         }
-        vector<string> real_names = oe.get_real_names();
-        int idx = distance(real_names.begin(),find(real_names.begin(),real_names.end(),min_phi_name));
-        if (idx == real_names.size())
-        {
-            throw_em_error("min phi realization name not found in obs ensemble");
-        }
-        real_names = pe.get_real_names();
-        min_phi_name = real_names[idx];
-
     }
+    vector<string> real_names = oe.get_real_names();
+    int idx = distance(real_names.begin(),find(real_names.begin(),real_names.end(),min_phi_name));
+    if (idx == real_names.size())
+    {
+        throw_em_error("min phi realization name not found in obs ensemble");
+    }
+    real_names = pe.get_real_names();
+    min_phi_name = real_names[idx];
+
     message(0,"resetting current parameter ensemble to prior ensemble with current ensemble mean");
+    message(1,"reinflation factor:",reinflate_factor);
     performance_log->log_event("getting prior parameter ensemble mean-centered anomalies");
     Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe_base.get_real_names(), pe.get_var_names(), pest_scenario.get_pestpp_options().get_ies_center_on());
-
+    anoms = anoms * reinflate_factor;
     performance_log->log_event("getting current parameter ensemble mean vector");
     vector<double> mean_vec = pe.get_mean_stl_var_vector();
     Eigen::VectorXd offset(mean_vec.size());
@@ -7477,7 +7477,6 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
         offset = pe.get_real_vector(min_phi_name);
         message(2,"using min-phi realization for offset");
     }
-
 
     performance_log->log_event("adding offset to anomalies");
     for (int i = 0; i < mean_vec.size(); i++)

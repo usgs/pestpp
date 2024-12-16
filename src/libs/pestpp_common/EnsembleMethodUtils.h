@@ -499,7 +499,7 @@ protected:
 
     double get_lambda();
 
-    void reset_par_ensemble_to_prior_mean();
+    void reset_par_ensemble_to_prior_mean(double reinflate_factor);
 
 };
 #endif

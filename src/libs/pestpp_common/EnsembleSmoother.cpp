@@ -36,11 +36,13 @@ void IterEnsembleSmoother::iterate_2_solution()
 	ofstream &frec = file_manager.rec_ofstream();
 	
 	bool accept;
-	vector<int> n_iter_mean = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
+	vector<int> n_iter_reinflate = pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate();
+    vector<double> reinflate_factor = pest_scenario.get_pestpp_options().get_ies_reinflate_factor();
 
     int iters_since_reinflate = 0;
-    int n_iter_mean_idx = 0;
-    int current_n_iter_mean = n_iter_mean[n_iter_mean_idx];
+    int n_iter_reinflate_idx = 0;
+    int current_n_iter_mean = n_iter_reinflate[n_iter_reinflate_idx];
+    double current_reinflate_factor = reinflate_factor[n_iter_reinflate_idx];
     int solution_iter = 0;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
@@ -76,23 +78,29 @@ void IterEnsembleSmoother::iterate_2_solution()
 		else
 			consec_bad_lambda_cycles++;
 
-		//if ((n_iter_mean > 0) && (solution_iter % n_iter_mean == 0))
+		//if ((n_iter_reinflate > 0) && (solution_iter % n_iter_reinflate == 0))
         iters_since_reinflate++;
         if ((current_n_iter_mean != 0) && (iters_since_reinflate >= current_n_iter_mean))
         {
+            message(2,"incrementing iteration count for reinflation cycle");
             iter++;
-            reset_par_ensemble_to_prior_mean();
+
+            reset_par_ensemble_to_prior_mean(current_reinflate_factor);
             iters_since_reinflate = 0;
-            n_iter_mean_idx++;
-            if (n_iter_mean.size() > n_iter_mean_idx)
+            n_iter_reinflate_idx++;
+            if (reinflate_factor.size() > n_iter_reinflate_idx)
             {
-                current_n_iter_mean = n_iter_mean[n_iter_mean_idx];
+                current_reinflate_factor = reinflate_factor[n_iter_reinflate_idx];
+            }
+            if (n_iter_reinflate.size() > n_iter_reinflate_idx)
+            {
+                current_n_iter_mean = n_iter_reinflate[n_iter_reinflate_idx];
             }
         }
 
 		if (should_terminate(current_n_iter_mean))
         {
-		    //if (iter > pest_scenario.get_pestpp_options().get_ies_n_iter_mean()) {
+		    //if (iter > pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate()) {
             if (current_n_iter_mean == 0) {
                 break;
             }
