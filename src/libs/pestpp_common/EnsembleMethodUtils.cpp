@@ -2846,8 +2846,8 @@ void L2PhiHandler::report_group(bool echo) {
         c++;
     }
     f << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl << endl;
-    if (echo)
-        cout << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl;
+    //if (echo)
+    //    cout << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl;
     if ((echo) && (c > 10))
         cout << "    Note: only the first 10 highest mean phi groups are listed. See rec file for full listing" << endl;
     if (echo)
@@ -3665,7 +3665,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
     ss << "    Note: the 'n std decr' is the number of parameters with current" << endl;
     ss << "          std less 5% of their initial std." << endl;
 
-	cout << ss.str();
+	//cout << ss.str();
 	frec << ss.str();
 	if (grp_names.size() > 15)
 	{
@@ -4265,6 +4265,18 @@ void EnsembleMethod::sanity_checks()
     if (ppo->get_ies_multimodal_alpha() < 0.001)
     {
         errors.push_back("multimodal alpha < 0.001");
+    }
+
+    for (auto& fac : ppo->get_ies_reinflate_factor())
+    {
+        if (fac <= 0.0)
+        {
+            errors.push_back("reinflation factor <= 0.0");
+        }
+        else if (fac > 1.0)
+        {
+            warnings.push_back("reinflation factor > 1.0..user beware!");
+        }
     }
 
 
@@ -4915,7 +4927,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         if (fac < 0)
         {
             use_min = true;
-            fac *= -1;
+            //fac *= -1;
         }
     }
 

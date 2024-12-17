@@ -41,7 +41,7 @@ void IterEnsembleSmoother::iterate_2_solution()
 
     int iters_since_reinflate = 0;
     int n_iter_reinflate_idx = 0;
-    int current_n_iter_mean = n_iter_reinflate[n_iter_reinflate_idx];
+    int current_n_iter_reinflate = abs(n_iter_reinflate[n_iter_reinflate_idx]);
     double current_reinflate_factor = reinflate_factor[n_iter_reinflate_idx];
     int solution_iter = 0;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
@@ -80,7 +80,7 @@ void IterEnsembleSmoother::iterate_2_solution()
 
 		//if ((n_iter_reinflate > 0) && (solution_iter % n_iter_reinflate == 0))
         iters_since_reinflate++;
-        if ((current_n_iter_mean != 0) && (iters_since_reinflate >= current_n_iter_mean))
+        if ((current_n_iter_reinflate != 0) && (iters_since_reinflate >= current_n_iter_reinflate))
         {
             message(2,"incrementing iteration count for reinflation cycle");
             iter++;
@@ -94,14 +94,14 @@ void IterEnsembleSmoother::iterate_2_solution()
             }
             if (n_iter_reinflate.size() > n_iter_reinflate_idx)
             {
-                current_n_iter_mean = n_iter_reinflate[n_iter_reinflate_idx];
+                current_n_iter_reinflate = abs(n_iter_reinflate[n_iter_reinflate_idx]);
             }
         }
 
-		if (should_terminate(current_n_iter_mean))
+		if (should_terminate(current_n_iter_reinflate))
         {
 		    //if (iter > pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate()) {
-            if (current_n_iter_mean == 0) {
+            if (current_n_iter_reinflate == 0) {
                 break;
             }
 		    else{
