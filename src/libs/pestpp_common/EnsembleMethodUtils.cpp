@@ -945,7 +945,7 @@ void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, Parame
         oe_real_names.push_back(names[i]);
     vector<string> pe_real_names = pe_upgrade.get_real_names();
     string obs_center_on = "";
-    if (center_on.size() > 0) {
+    if ((center_on.size() > 0) && (center_on != MEDIAN_CENTER_ON_NAME)) {
         for (int i = 0; i < pe_real_names.size(); i++) {
             if (pe_real_names[i] == center_on) {
                 obs_center_on = oe_real_names[i];
