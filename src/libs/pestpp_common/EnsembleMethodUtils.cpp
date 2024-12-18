@@ -944,10 +944,22 @@ void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, Parame
     for (auto i : real_idxs)
         oe_real_names.push_back(names[i]);
     vector<string> pe_real_names = pe_upgrade.get_real_names();
-
+    string obs_center_on = "";
+    if (center_on.size() > 0) {
+        for (int i = 0; i < pe_real_names.size(); i++) {
+            if (pe_real_names[i] == center_on) {
+                obs_center_on = oe.get_real_names()[i];
+                break;
+            }
+        }
+        if (obs_center_on.size() == 0) {
+            throw runtime_error(
+                    "EnsembleSolver::nonlocalized_solve: obs_center_on not found for center_on: " + center_on);
+        }
+    }
     Eigen::MatrixXd obs_resid = ph.get_obs_resid_subset(oe,true,oe_real_names);
 
-    Eigen::MatrixXd obs_diff = oe.get_eigen_anomalies(oe_real_names, act_obs_names, center_on);
+    Eigen::MatrixXd obs_diff = oe.get_eigen_anomalies(oe_real_names, act_obs_names, obs_center_on);
 
     Eigen::MatrixXd obs_err = base_oe.get_eigen(oe_real_names, act_obs_names);
     Observations ctl_obs = pest_scenario.get_ctl_observations();
@@ -969,7 +981,7 @@ void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, Parame
         {
 
             map<string, int> oreal_map = oe.get_real_map();
-            int ireal = oreal_map.at(center_on);
+            int ireal = oreal_map.at(obs_center_on);
             map<string, int> ovar_map = oe.get_var_map();
             int ii = 0;
             for (auto &aon : act_obs_names)
