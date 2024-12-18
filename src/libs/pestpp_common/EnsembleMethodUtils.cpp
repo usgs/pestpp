@@ -948,7 +948,7 @@ void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, Parame
     if (center_on.size() > 0) {
         for (int i = 0; i < pe_real_names.size(); i++) {
             if (pe_real_names[i] == center_on) {
-                obs_center_on = oe.get_real_names()[i];
+                obs_center_on = oe_real_names[i];
                 break;
             }
         }
