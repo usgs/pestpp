@@ -5083,9 +5083,9 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 					missing.push_back(n);
 				}
 			if (missing.size() == 0)
-			{
+			{ 
 				ss.str("");
-				ss << "par en has " << pe.shape().first << " realizations, compared to " << oe.shape().first << " obs+noise realizations";
+				ss << "par en has " << pe.shape().first << " realizations, compared to " << oe_base.shape().first << " obs+noise realizations";
 				message(1, ss.str());
 				message(1, " the realization names are compatible");
 				message(1, "re-indexing obs+noise en to align with par en...");
@@ -7540,7 +7540,7 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(double reinflate_factor){
     ph.report(true,true);
     ph.write(iter, run_mgr_ptr->get_total_runs());
     ss.str("");
-    ss << file_manager.get_base_filename() << "." << iter << ".meanshift.pcs.csv";
+    ss << file_manager.get_base_filename() << "." << iter << ".reinflate.pcs.csv";
     pcs.summarize(pe, ss.str());
     last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
     double phi_lam = get_lambda();
@@ -7776,7 +7776,7 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 	else
 	{
 		string par_ext = pest_utils::lower_cp(par_csv).substr(par_csv.size() - 3, par_csv.size());
-		performance_log->log_event("processing par csv " + par_csv);
+		performance_log->log_event("processing par ensemble " + par_csv);
 		if (par_ext.compare("csv") == 0)
 		{
 			message(1, "loading par ensemble from csv file", par_csv);
@@ -7794,7 +7794,7 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 				throw_em_error(string("error processing par csv"));
 			}
 		}
-		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0) || (par_ext.compare("bin")==0))
 		{
 			message(1, "loading par ensemble from binary file", par_csv);
 			try
@@ -7813,7 +7813,7 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 		}
 		else
 		{
-			ss << "unrecognized par csv extension " << par_ext << ", looking for csv, jcb, or jco";
+			ss << "unrecognized par ensemble extension " << par_ext << ", looking for csv, jcb, jco, or bin";
 			throw_em_error(ss.str());
 		}
 
@@ -8057,7 +8057,7 @@ bool EnsembleMethod::initialize_weights()
 	else
 	{
 		string obs_ext = pest_utils::lower_cp(weight_csv).substr(weight_csv.size() - 3, weight_csv.size());
-		performance_log->log_event("processing weights csv " + weight_csv);
+		performance_log->log_event("processing weights ensemble " + weight_csv);
 		if (obs_ext.compare("csv") == 0)
 		{
 			message(1, "loading weights ensemble from csv file", weight_csv);
@@ -8075,7 +8075,7 @@ bool EnsembleMethod::initialize_weights()
 				throw_em_error(string("error processing weights csv"));
 			}
 		}
-		else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
+		else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0) || (obs_ext.compare("bin")==0))
 		{
 			message(1, "loading weights ensemble from binary file", weight_csv);
 			try
@@ -8095,7 +8095,7 @@ bool EnsembleMethod::initialize_weights()
 		}
 		else
 		{
-			ss << "unrecognized weights ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
+			ss << "unrecognized weights ensemble extension " << obs_ext << ", looking for csv, jcb, jco, or bin";
 			throw_em_error(ss.str());
 		}
 		//make sure all oe realizations are in weights
@@ -8171,7 +8171,7 @@ bool EnsembleMethod::initialize_oe(Covariance& cov)
     else
     {
         string obs_ext = pest_utils::lower_cp(obs_csv).substr(obs_csv.size() - 3, obs_csv.size());
-        performance_log->log_event("processing obs csv " + obs_csv);
+        performance_log->log_event("processing obs ensemble" + obs_csv);
         if (obs_ext.compare("csv") == 0)
         {
             message(1, "loading obs ensemble from csv file", obs_csv);
@@ -8189,7 +8189,7 @@ bool EnsembleMethod::initialize_oe(Covariance& cov)
                 throw_em_error(string("error processing obs csv"));
             }
         }
-        else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
+        else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0) || (obs_ext.compare("bin")==0))
         {
             message(1, "loading obs ensemble from binary file", obs_csv);
             try
@@ -8209,7 +8209,7 @@ bool EnsembleMethod::initialize_oe(Covariance& cov)
         }
         else
         {
-            ss << "unrecognized obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
+            ss << "unrecognized obs ensemble extension " << obs_ext << ", looking for csv, jcb, jco, bin";
             throw_em_error(ss.str());
         }
         if (pp_args.find("IES_NUM_REALS") != pp_args.end())
@@ -8259,7 +8259,7 @@ void EnsembleMethod::initialize_restart()
 			throw_em_error(string("error processing restart obs csv"));
 		}
 	}
-	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
+	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0) || (obs_ext.compare("bin")==0))
 	{
 		message(1, "loading restart obs ensemble from binary file", obs_restart_csv);
 		try
@@ -8278,7 +8278,7 @@ void EnsembleMethod::initialize_restart()
 	}
 	else
 	{
-		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
+		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, jco, bin";
 		throw_em_error(ss.str());
 	}
 	if (par_restart_csv.size() > 0)
@@ -8301,7 +8301,7 @@ void EnsembleMethod::initialize_restart()
 				throw_em_error(string("error processing restart par csv"));
 			}
 		}
-		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0) || (par_ext.compare("bin")==0))
 		{
 			message(1, "loading restart par ensemble from binary file", par_restart_csv);
 			try
@@ -8320,7 +8320,7 @@ void EnsembleMethod::initialize_restart()
 		}
 		else
 		{
-			ss << "unrecognized restart par ensemble extension " << par_ext << ", looking for csv, jcb, or jco";
+			ss << "unrecognized restart par ensemble extension " << par_ext << ", looking for csv, jcb, jco, or bin";
 			throw_em_error(ss.str());
 		}
 		if (pe.shape().first != oe.shape().first)
