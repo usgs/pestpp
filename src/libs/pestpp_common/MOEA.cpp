@@ -2174,14 +2174,9 @@ void MOEA::initialize()
             gen_types.push_back(MouGenType::SMP);
             message(1, "using simplex generator");
         }
-        else if (token == "EMPCOV")
-        {
-            gen_types.push_back(MouGenType::EMPCOV);
-            message(1, "using empirical-covariance generator");
-        }
         else
 		{
-			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX','PM','PSO','EMPCOV'}");
+			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX','PM','PSO'}");
 		}
 	}
 	//TODO: report constraints being applied
@@ -2747,10 +2742,6 @@ ParameterEnsemble MOEA::generate_population()
         else if (gen_type == MouGenType::SMP)
         {
             p = generate_simplex_population(new_members_per_gen, dp, op);
-        }
-        else if (gen_type == MouGenType::EMPCOV)
-        {
-            p = generate_empcov_population(new_members_per_gen, dp, op);
         }
         else
 			throw_moea_error("unrecognized mou generator");
@@ -3350,7 +3341,7 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 	pso_pbest_op = top;
 }
 
-ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
+ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
 {
 	double omega = pest_scenario.get_pestpp_options().get_mou_pso_omega();
 	double cog_const = pest_scenario.get_pestpp_options().get_mou_pso_cognitive_const();
@@ -3493,7 +3484,7 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
     }
     message(1, "generating PSO population of size", num_members);
 	vector<string> gbest_solutions = get_pso_gbest_solutions(_dp.shape().first, dp_archive, op_archive);
-	ParameterEnsemble cur_velocity = get_updated_pso_velocty(_dp, gbest_solutions);
+	ParameterEnsemble cur_velocity = get_updated_pso_velocity(_dp, gbest_solutions);
 	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, _dp.get_eigen().array() + cur_velocity.get_eigen().array(), _dp.get_real_names(), _dp.get_var_names());
 
     if (temp.shape().first > 0) {
@@ -3560,51 +3551,6 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
 	return new_dp;
 }
 
-ParameterEnsemble MOEA::generate_empcov_population(int num_members, ParameterEnsemble& _dp, ObservationEnsemble& _op)
-{
-
-    message(1, "generating empirical-covariance population of size", num_members);
-    Eigen::MatrixXd draws(num_members,_dp.shape().second);
-    for (int i = 0; i < num_members; i++)
-    {
-        for (int j = 0; j < _dp.shape().second; j++)
-        {
-            draws(i, j) = draw_standard_normal(rand_gen);
-        }
-    }
-    _dp.transform_ip(ParameterEnsemble::transStatus::NUM);
-    Eigen::MatrixXd anom,cov;
-    anom = _dp.get_eigen_anomalies();
-    anom = anom * (1.0/sqrt(double(anom.rows()-1)));
-    cov = anom.transpose() * anom;
-    Eigen::VectorXd dvmean = _dp.get_eigen_ptr()->colwise().mean();
-    Parameters pars = pest_scenario.get_ctl_parameters();
-    ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
-
-    bts.ctl2numeric_ip(pars);
-    pars.update_without_clear(_dp.get_var_names(),dvmean);
-
-    Covariance covmat(_dp.get_var_names(),cov.sparseView());
-    ParameterEnsemble new_dp(&pest_scenario, &rand_gen);
-    new_dp.reserve(_dp.get_real_names(), _dp.get_var_names());
-    ofstream &frec = file_manager.rec_ofstream();
-    map<string,double> norm_map = new_dp.draw(num_members,pars,covmat,performance_log,1,frec);
-
-    //ParameterEnsemble new_dp(&pest_scenario, &rand_gen, draws, _dp.get_real_names(), _dp.get_var_names());
-    new_dp.set_fixed_info(_dp.get_fixed_info());
-    vector<string> new_real_names;
-    for (int i=0;i<num_members;i++)
-    {
-        new_real_names.push_back(get_new_member_name("empcov"));
-    }
-    new_dp.set_real_names(new_real_names);
-    new_dp.reset_org_real_names();
-
-    new_dp.set_trans_status(_dp.get_trans_status());
-    new_dp.enforce_bounds(performance_log,false);
-    new_dp.check_for_normal("new emp-cov population");
-    return new_dp;
-}
 
 
 ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int optbounds)

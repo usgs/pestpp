@@ -5083,7 +5083,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 					missing.push_back(n);
 				}
 			if (missing.size() == 0)
-			{ 
+			{
 				ss.str("");
 				ss << "par en has " << pe.shape().first << " realizations, compared to " << oe_base.shape().first << " obs+noise realizations";
 				message(1, ss.str());
