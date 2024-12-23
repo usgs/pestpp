@@ -3616,9 +3616,9 @@ In highly nonlinear problems, the gradient between parameters and simulated equi
 
 To combat the variance reduction that occurs across multiple iterations, it might be desirable in some settings to “reset” the variance of the current parameter ensemble to the prior state; this can also be labelled “reinflation”. Mechanically, this is done by subtracting the mean from the prior ensemble (forming the so-called deviations or “anomalies”) and then adding the mean from the current parameter ensemble, thereby translating the prior ensemble across parameter space but (more or less) preserving the variance of the prior ensemble.
 
-This option is implemented in PESTPP-IES via the *ies_n_iter_reinflation* option. As the name implies, the argument is the number of iterations to undertake before resetting the variance to the prior ensemble state. Note this argument can be a single integer or a sequence of integers like 2,5,9, in which case PESTPP-IES will reinflate the ensemble after the 2<sup>nd</sup> , 7<sup>th</sup>, and 16<sup>th</sup> iterations. Some other behavioural characteristics of using parameter covariance reinflation:
+This option is implemented in PESTPP-IES via the *ies_n_iter_reinflate* option. As the name implies, the argument is the number of iterations to undertake before resetting the variance to the prior ensemble state. Note this argument can be a single integer or a sequence of integers like 2,5,9, in which case PESTPP-IES will reinflate the ensemble after the 2<sup>nd</sup> , 7<sup>th</sup>, and 16<sup>th</sup> iterations. Some other behavioural characteristics of using parameter covariance reinflation:
 
-- The phi reduction each iteration may not satisfy the requirements for a “successful” iteration. However, PESTPP-IES will continue iterating anyway and will also undertake partial upgrades of realizations that do show phi improvement; essentially PESTPP-IES will use all of it regular tricks to seek a good fit for iterations less than *ies_n_iter_reinflation*.
+- The phi reduction each iteration may not satisfy the requirements for a “successful” iteration. However, PESTPP-IES will continue iterating anyway and will also undertake partial upgrades of realizations that do show phi improvement; essentially PESTPP-IES will use all of it regular tricks to seek a good fit for iterations less than *ies_n_iter_reinflate*.
 
 - The iteration count in PESTPP-IES will be incremented during the reinflation. This is so the results of the reinflation can be tracked in the output files.
 
@@ -4159,9 +4159,9 @@ Note also that the number of control variables may change with time. Refer to th
 <td>A flag to use internal weight balancing for each realization. This option should be used in conjunction with the multi-modal solution process.</td>
 </tr>
 <tr class="odd">
-<td><em>ies_n_iter_reinflation</em></td>
+<td><em>ies_n_iter_reinflate</em></td>
 <td>int</td>
-<td>The number of between covariance re-inflation. Default is 0, which is indicates not re-inflate parameter covariance. This argument can also be a sequence of integers, indicating the number of interations between each reinflation cycle</td>
+<td>The number of between covariance re-inflation. Default is 0, which is indicates not re-inflate parameter covariance. This argument can also be a sequence of integers, indicating the number of iterations between each reinflation cycle</td>
 </tr>
 <tr class="even">
 <td><em>ies_update_by_reals</em></td>
