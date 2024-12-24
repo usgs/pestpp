@@ -2364,8 +2364,16 @@ void MOEA::initialize()
 		ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag;
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
-			ss << ".jcb";
-			dp.to_binary(ss.str());
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                ss << ".bin";
+                dp.to_dense(ss.str());
+            }
+            else {
+                ss << ".jcb";
+                dp.to_binary(ss.str());
+            }
+
 		}
 		else
 		{
@@ -2387,8 +2395,15 @@ void MOEA::initialize()
 	ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag;
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		op.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            op.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            op.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -2411,11 +2426,19 @@ void MOEA::initialize()
 	    string opt_member;
 		ObservationEnsemble shifted_op = get_chance_shifted_op(dp, op, opt_member);
 		ss.str("");
-		ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".chance";
+		ss << file_manager.get_base_filename() << ".0.chance" << obs_pop_file_tag;
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
-			ss << ".jcb";
-			shifted_op.to_binary(ss.str());
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                ss << ".bin";
+                shifted_op.to_dense(ss.str());
+
+            }
+            else {
+                ss << ".jcb";
+                shifted_op.to_binary(ss.str());
+            }
 		}
 		else
 		{
@@ -2434,8 +2457,15 @@ void MOEA::initialize()
 	ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag;
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		dp.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            dp.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            dp.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -4153,8 +4183,15 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	ss << "." << dv_pop_file_tag;
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		_dp.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            _dp.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            _dp.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -4174,11 +4211,15 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 			ss << "." << tag;
 		}
 		ss << "." << dv_pop_file_tag;
-		if (pest_scenario.get_pestpp_options().get_save_binary())
-		{
-			ss << ".jcb";
-			_dp.to_binary(ss.str());
-		}
+		if (pest_scenario.get_pestpp_options().get_save_binary()) {
+            if (pest_scenario.get_pestpp_options().get_save_dense()) {
+                ss << ".bin";
+                _dp.to_dense(ss.str());
+            } else {
+                ss << ".jcb";
+                _dp.to_binary(ss.str());
+            }
+        }
 		else
 		{
 			ss << ".csv";
@@ -4200,8 +4241,15 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	ss << "." << obs_pop_file_tag;
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		_op.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            _op.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            _op.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -4224,8 +4272,15 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 		ss << "." << obs_pop_file_tag;
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
-			ss << ".jcb";
-			_op.to_binary(ss.str());
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                ss << ".bin";
+                _op.to_dense(ss.str());
+            }
+            else {
+                ss << ".jcb";
+                _op.to_binary(ss.str());
+            }
 		}
 		else
 		{
