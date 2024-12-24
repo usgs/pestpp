@@ -2426,7 +2426,7 @@ void MOEA::initialize()
 	    string opt_member;
 		ObservationEnsemble shifted_op = get_chance_shifted_op(dp, op, opt_member);
 		ss.str("");
-		ss << file_manager.get_base_filename() << ".0.chance" << obs_pop_file_tag;
+		ss << file_manager.get_base_filename() << ".0.chance." << obs_pop_file_tag;
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
             if (pest_scenario.get_pestpp_options().get_save_dense())
