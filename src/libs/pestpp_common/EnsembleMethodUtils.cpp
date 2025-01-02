@@ -3909,12 +3909,14 @@ void ParChangeSummarizer:: update(ParameterEnsemble& pe)
 
 
 pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
-	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter, string tag, int cycle)
+    OutputFileWriter& output_file_writer, FileManager& file_manager,
+    int iter, string tag, int cycle,map<string,double> base_weights)
 {
 	stringstream ss;
 	map<string, int> vmap = pe.get_real_map();
 	Parameters pars;
 	Observations obs;
+
 	if (vmap.find(tag) != vmap.end())
 	{
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
@@ -3951,7 +3953,7 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 				ss << iter << ".";
 			ss << pest_utils::lower_cp(tag) <<  ".rei";
 			output_file_writer.write_rei(file_manager.open_ofile_ext(ss.str()), iter,
-				pest_scenario.get_ctl_observations(), obs, obj_func, pars);
+				pest_scenario.get_ctl_observations(), obs, obj_func, pars,base_weights);
 			file_manager.close_all_files_ending_with("rei");
 		}
 		cout << "saved par and rei files for realization " << tag;
@@ -4649,8 +4651,10 @@ void EnsembleMethod::report_and_save(int cycle)
 	cout << "      current obs ensemble saved to " << names.second << endl;
 	frec << "      current par ensemble saved to " << names.first << endl;
 	cout << "      current par ensemble saved to " << names.first << endl;
-	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter, BASE_REAL_NAME, cycle);
-	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1, BASE_REAL_NAME, cycle);
+
+    map<string,double> base_weights = weights.get_real_map(BASE_REAL_NAME);
+	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter, BASE_REAL_NAME, cycle,base_weights);
+	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1, BASE_REAL_NAME, cycle,base_weights);
 }
 
 
@@ -5623,7 +5627,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	
 	pcs = ParChangeSummarizer(&pe_base, &file_manager, &output_file_writer);
 	message(1,"checking for prior-data conflict");
-    vector<string> in_conflict = ph.detect_simulation_data_conflict(oe,"pdc.csv");
+    vector<string> in_conflict = ph.detect_simulation_data_conflict(oe,".pdc.csv");
 	if (in_conflict.size() > 0)
 	{
 		ss.str("");
@@ -5705,9 +5709,6 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		}
 	}
 
-
-
-
     drop_bad_reals(pe, oe);
 	if (oe.shape().first == 0)
 	{
@@ -5758,12 +5759,18 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         (ppo->get_obscov_filename().size() > 0) ||
         (in_conflict.size() > 0))
     {
+        map<string,double> base_weights = weights.get_real_map(BASE_REAL_NAME,true);
         string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
         ofstream f_obs(filename);
         if (f_obs.bad())
             throw_em_error("error opening: " + filename);
-        output_file_writer.scenario_obs_csv(f_obs);
+        output_file_writer.scenario_obs_csv(f_obs, base_weights);
         f_obs.close();
+
+
+        save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter, BASE_REAL_NAME, cycle, base_weights);
+        save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1, BASE_REAL_NAME, cycle, base_weights);
+
 
     }
 
@@ -6148,6 +6155,7 @@ void EnsembleMethod::adjust_weights() {
         adjust_weights_by_real(group_to_obs_map, group_map,phi_fracs_by_real,index);
 
     }
+
 }
 
 void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,

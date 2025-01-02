@@ -1024,6 +1024,30 @@ Eigen::VectorXd Ensemble::get_real_vector(const string &real_name)
 	return get_real_vector(idx);
 }
 
+map<string,double> Ensemble::get_real_map(string real_name, bool forgive)
+{
+    map<string,double> real_map;
+    vector<string>::iterator idx = find(real_names.begin(), real_names.end(), real_name);
+    if (idx == real_names.end())
+    {
+        if (forgive)
+        {
+            return real_map;
+        }
+        else {
+            throw_ensemble_error("Ensemble::get_real_map() real name not found:" + real_name);
+        }
+    }
+
+    int i = idx - real_names.begin();
+    for (int j=0;j<reals.cols();j++)
+    {
+        real_map[var_names[j]] = reals(i,j);
+    }
+    return real_map;
+
+}
+
 void Ensemble::update_real_ip(const string & rname, Eigen::VectorXd & real)
 {
 	vector<string>::iterator idx = find(real_names.begin(), real_names.end(), rname);

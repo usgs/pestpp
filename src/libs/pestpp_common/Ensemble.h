@@ -63,6 +63,7 @@ public:
 	const Eigen::MatrixXd get_eigen() const { return reals; }
 	const Eigen::MatrixXd* get_eigen_ptr() const { return &reals; }
 	Eigen::MatrixXd* get_eigen_ptr_4_mod() { return &reals; }
+    map<string,double> get_real_map(string real_name,bool forgive=false);
 
 	void set_eigen(Eigen::MatrixXd _reals);
 	void reset_org_real_names() { org_real_names = real_names; }
