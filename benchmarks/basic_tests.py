@@ -233,6 +233,9 @@ def tie_by_group_test():
 
 
     pst.write(os.path.join(t_d,"pest_tied.pst"))
+    m_d = os.path.join(model_d,"master_tie_by_group_sen")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sen"), "pest_tied.pst", 5, master_dir=m_d,
                            worker_root=model_d,port=port)
     df = pd.read_csv(os.path.join(m_d,"pest_tied.sen.par.csv"),index_col=0)
@@ -248,6 +251,9 @@ def tie_by_group_test():
         assert too_high.shape[0] == 0, "sen,{0},{1}".format(real,too_high)
     
     #pst.write(os.path.join(t_d,"pest_tied.pst"))
+    m_d = os.path.join(model_d,"master_tie_by_group_glm")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-glm"), "pest_tied.pst", 5, master_dir=m_d,
                            worker_root=model_d,port=port)
     jco = pyemu.Jco.from_binary(os.path.join(m_d,"pest_tied.jcb"))
@@ -260,6 +266,9 @@ def tie_by_group_test():
     assert too_high.shape[0] == 0, too_high
 
     
+    m_d = os.path.join(model_d,"master_tie_by_group_ies")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
     pst.control_data.noptmax = 1
     pst.write(os.path.join(t_d, "pest_tied.pst"))
 
@@ -306,6 +315,9 @@ def tie_by_group_test():
         assert too_high.shape[0] == 0, "ies,{0},{1}".format(real,too_high)
     
     df.to_csv(os.path.join(t_d,"sweep_in.csv"))
+    m_d = os.path.join(model_d,"master_tie_by_group_swp")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_tied.pst", 5, master_dir=m_d,
                            worker_root=model_d,port=port)
     pst.control_data.noptmax = 3

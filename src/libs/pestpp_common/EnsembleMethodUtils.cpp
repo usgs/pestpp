@@ -5627,7 +5627,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	
 	pcs = ParChangeSummarizer(&pe_base, &file_manager, &output_file_writer);
 	message(1,"checking for prior-data conflict");
-    vector<string> in_conflict = ph.detect_simulation_data_conflict(oe,".pdc.csv");
+    vector<string> in_conflict = ph.detect_simulation_data_conflict(oe,".0.pdc.csv");
 	if (in_conflict.size() > 0)
 	{
 		ss.str("");
@@ -5635,7 +5635,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		ss << " with the prior simulated ensemble." << endl;
 		message(0, ss.str());
 
-		cout << "...see rec file or " << file_manager.get_base_filename() << ".pdc.csv" << " for listing of conflicted observations" << endl << endl;
+		cout << "...see rec file or " << file_manager.get_base_filename() << ".0.pdc.csv" << " for listing of conflicted observations" << endl << endl;
 		ofstream& frec = file_manager.rec_ofstream();
 		frec << endl << "...conflicted observations: " << endl;
 		for (auto oname : in_conflict)
