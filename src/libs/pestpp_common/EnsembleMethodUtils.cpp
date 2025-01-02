@@ -4652,7 +4652,7 @@ void EnsembleMethod::report_and_save(int cycle)
 	frec << "      current par ensemble saved to " << names.first << endl;
 	cout << "      current par ensemble saved to " << names.first << endl;
 
-    map<string,double> base_weights = weights.get_real_map(BASE_REAL_NAME);
+    map<string,double> base_weights = weights.get_real_map(BASE_REAL_NAME, true);
 	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter, BASE_REAL_NAME, cycle,base_weights);
 	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1, BASE_REAL_NAME, cycle,base_weights);
 }

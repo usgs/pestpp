@@ -1800,7 +1800,8 @@ def tenpar_uniform_invest():
 
 
 if __name__ == "__main__":
-    mf6_v5_sen_test()
+    #mf6_v5_sen_test()
+    tie_by_group_test()
     #tenpar_uniform_invest()
     #tenpar_collapse_invest()
     #plot_collapse_invest()
