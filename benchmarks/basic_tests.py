@@ -590,7 +590,8 @@ def sen_basic_test():
 
     with open(os.path.join(t_d,"forward_run.py"),'w') as f:
         f.write("import pandas as pd\n")
-        f.write("df = pd.read_csv('in.dat',index_col=0,delim_whitespace=True,names=['name','value'])\n")
+        f.write(r"df = pd.read_csv('in.dat',index_col=0,sep='\s+',names=['name','value'])")
+        f.write("\n")
         f.write("df.loc['p1+p2','value'] = df.loc['p1','value'] + df.loc['p2','value']\n")
         f.write("df.loc['p1*p2','value'] = df.loc['p1','value'] * df.loc['p2','value']\n")
         f.write("df.loc['p1^p2','value'] = df.loc['p1','value'] * df.loc['p2','value']\n")
@@ -655,6 +656,8 @@ def sen_basic_test():
     d_sti = (sti_vals.loc[pst.obs_names, :] - sti_verf_vals.loc[pst.obs_names, :]).apply(np.abs)
     print(d_sti.max())
     assert d_sti.max().max() < .001
+
+    
 
 
 def salib_verf():
@@ -1813,7 +1816,7 @@ def tenpar_uniform_invest():
 
 if __name__ == "__main__":
     #mf6_v5_sen_test()
-    tie_by_group_test()
+    #tie_by_group_test()
     #tenpar_uniform_invest()
     #tenpar_collapse_invest()
     #plot_collapse_invest()
@@ -1841,7 +1844,7 @@ if __name__ == "__main__":
     #sweep_forgive_test()
     #inv_regul_test()
     #tie_by_group_test()
-    #sen_basic_test()
+    sen_basic_test()
     #salib_verf()
     #tplins1_test()
     #secondary_marker_test()

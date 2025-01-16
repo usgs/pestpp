@@ -3650,7 +3650,8 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	{
 		double mean_diff = mean_change[grp_name];
 		double std_diff = std_change[grp_name];
-
+        if (pargp2par_map[grp_name].size() == 0)
+            continue;
 		ss.str("");
 		ss << setw(mxlen) << left << pest_utils::lower_cp(grp_name) << right << setw(6) << pargp2par_map[grp_name].size();
         ss << setw(10) << setprecision(4) << right << mean_diff * 100.0;
@@ -3663,10 +3664,11 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
         ss << setw(11) << num_out << setw(11) << setprecision(4) << percent_out;
 		//ss << setw(10) << setprecision(4) << init_cv[grp_name] << setw(10) << curr_cv[grp_name] << setw(10) << setprecision(4) << endl;
 		ss << setw(12) << excess_std_reduction[grp_name] << endl;
-        if (i < 15)
-			cout << ss.str();
+        if ((i < 15) && (pargp2par_map[grp_name].size() > 0)) {
+            cout << ss.str();
+            i++;
+        }
 		frec << ss.str();
-		i++;
 	}
 
 	ss.str("");
@@ -3682,7 +3684,7 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	if (grp_names.size() > 15)
 	{
 		ss.str("");
-		ss << "    Note: Only the first 15 parameter groups shown, see rec file for full listing" << endl;
+		ss << "    Note: Only the first 15 adjustable parameter groups shown, see rec file for full listing" << endl;
 		cout << ss.str();
 	}
 
