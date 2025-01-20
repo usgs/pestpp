@@ -1148,6 +1148,7 @@ def cmdline_test():
     t_d = os.path.join(model_d,"template")
     pst_name = "freyberg6_run_glm.pst"
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_glm.pst"))
+    pst.pestpp_options = {}
     pst.pestpp_options["debug_parse_only"] = True
     pst_name = "CmdLine_test.pst" #camel case on purpose for linux testing
     pst.write(os.path.join(t_d,pst_name))
@@ -1837,14 +1838,14 @@ if __name__ == "__main__":
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    #cmdline_test()
+    cmdline_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
     #sweep_forgive_test()
     #inv_regul_test()
     #tie_by_group_test()
-    sen_basic_test()
+    #sen_basic_test()
     #salib_verf()
     #tplins1_test()
     #secondary_marker_test()
