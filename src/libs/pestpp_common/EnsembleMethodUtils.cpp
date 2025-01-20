@@ -4151,9 +4151,9 @@ void EnsembleMethod::sanity_checks()
 //		warnings.push_back("noptmax > 10, don't expect anything meaningful from the results!");
 //	}
 
-	else if (pest_scenario.get_control_info().noptmax > 3)
+	else if (pest_scenario.get_control_info().noptmax > 15)
 	{
-		warnings.push_back("noptmax > 3, this is a lot of iterations for an ensemble method...");
+		warnings.push_back("noptmax > 15, this is a lot of iterations for an ensemble method...");
 	}
 
     if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
@@ -4718,8 +4718,11 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	if (pest_scenario.get_control_info().noptmax == 0)
 	{
-		
-		ParamTransformSeq pts = pe.get_par_transform();
+        if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
+            return;
+        }
+
+        ParamTransformSeq pts = pe.get_par_transform();
 		
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		if (cycle == NetPackage::NULL_DA_CYCLE)
@@ -5306,7 +5309,11 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	if (pest_scenario.get_control_info().noptmax == -2)
 	{
-		message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
+        if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
+            return;
+        }
+
+        message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
 		message(1, "calculating mean parameter values");
 		Parameters pars;
 		vector<double> mv = pe.get_mean_stl_var_vector();
@@ -5490,8 +5497,12 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	}
 	else
 		message(1, "centering on ensemble mean vector");
+    if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
+        return;
+    }
 
-	//ok, now run the prior ensemble - after checking for center_on
+
+    //ok, now run the prior ensemble - after checking for center_on
 	//in case something is wrong with center_on
 	if ((obs_restart_csv.size() == 0) && (!use_existing)) {
         performance_log->log_event("running initial ensemble");
