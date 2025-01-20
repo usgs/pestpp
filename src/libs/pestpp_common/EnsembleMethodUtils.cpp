@@ -6288,7 +6288,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
             }
             current_phi_fracs[pf.first] = total / cur_mean_phi;
             ss.str("");
-            ss << "realization " << swr_map.first << ", file tag '" << pf.first << "' adjusted mean phi (factor): "
+            ss << "realization " << swr_map.first << ", file tag '" << pf.first << "' adjusted phi (factor): "
                << total << " (" << current_phi_fracs[pf.first] << ")";
             message(2, ss.str());
 
@@ -6298,10 +6298,12 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
     }
     if (verbose_level > 2)
     {
-        string fname = file_manager.get_base_filename() + ".obsgroupadj.summary.csv";
-        ofstream f(fname);
+        ss.str("");
+        ss << file_manager.get_base_filename() << "." << iter << ".obsgroupadj.summary.csv";
+
+        ofstream f(ss.str());
         if (!f.good())
-            throw_em_error("error opening weight adjustment summary file "+fname);
+            throw_em_error("error opening weight adjustment summary file "+ss.str());
 
         f << "realization,group,initial_phi,adjusted_phi" << endl;
         for (auto& grp_entry : real_init_group_phis) {
@@ -6310,7 +6312,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
             }
         }
         f.close();
-        message(2,"saved obs group weight adjustment summary to "+fname);
+        message(2,"saved obs group weight adjustment summary to "+ss.str());
     }
 
 }
@@ -6409,10 +6411,12 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
     }
     if (verbose_level > 2)
     {
-        string fname = file_manager.get_base_filename() + ".obsgroupadj.summary.csv";
-        ofstream f(fname);
+        ss.str("");
+        ss << file_manager.get_base_filename() << "." << iter << ".obsgroupadj.summary.csv";
+
+        ofstream f(ss.str());
         if (!f.good())
-            throw_em_error("error opening weight adjustment summary file "+fname);
+            throw_em_error("error opening weight adjustment summary file "+ss.str());
 
         f << "group,initial_phi,adjusted_phi" << endl;
         for (auto& g : init_group_phis)
@@ -6420,7 +6424,7 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
             f << g.first << "," << g.second << "," << adj_group_phis.at(g.first) << endl;
         }
         f.close();
-        message(2,"saved obs group weight adjustment summary to "+fname);
+        message(2,"saved obs group weight adjustment summary to "+ss.str());
     }
 }
 
