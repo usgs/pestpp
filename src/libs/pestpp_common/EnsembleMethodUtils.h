@@ -449,6 +449,7 @@ protected:
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 	bool oe_drawn, pe_drawn;
     bool reinflate_to_minphi_real;
+    ObservationInfo org_obs_info;
 
 
 	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
@@ -482,7 +483,7 @@ protected:
 
 	void norm_map_report(map<string, double>& norm_map, string tag, double thres = 0.1);
 
-	void adjust_weights();
+	void adjust_weights(bool save=false);
 
     void adjust_weights_single(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
             map<string,double>& phi_fracs);

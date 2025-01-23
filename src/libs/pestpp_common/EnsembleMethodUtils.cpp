@@ -4126,6 +4126,7 @@ EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
 	iter = 0;
     warn_min_reals = 10;
     error_min_reals = 2;
+    org_obs_info = pest_scenario.get_ctl_observation_info_copy();
 
 }
 
@@ -5741,7 +5742,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		message(0, s);
 	}
 
-	adjust_weights();
+	adjust_weights(false);
 
     if ((ppo->get_ies_phi_fractions_file().size() > 0) ||
         (ppo->get_obscov_filename().size() > 0) ||
@@ -6135,14 +6136,13 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
 
 }
 
-void EnsembleMethod::adjust_weights() {
+void EnsembleMethod::adjust_weights(bool save) {
 
     stringstream ss;
     string fname = pest_scenario.get_pestpp_options().get_ies_phi_fractions_file();
     if (fname.size() == 0) {
         return;
     }
-
 
 
     ss.str("");
@@ -6157,19 +6157,42 @@ void EnsembleMethod::adjust_weights() {
     map<string, map<string, double>> phi_fracs_by_real;
     vector<string> index;
     map<string, vector<string>> group_map, group_to_obs_map;
-    check_and_fill_phi_factors(group_to_obs_map, group_map, phi_fracs_by_real, index,true);
+    check_and_fill_phi_factors(group_to_obs_map, group_map, phi_fracs_by_real, index, true);
 
-    if (phi_fracs_by_real.size() == 1)
-    {
+    if (phi_fracs_by_real.size() == 1) {
         map<string, double> phi_fracs = phi_fracs_by_real.begin()->second;
         adjust_weights_single(group_to_obs_map, group_map, phi_fracs);
-    } else
-    {
-        adjust_weights_by_real(group_to_obs_map, group_map,phi_fracs_by_real,index);
+    } else {
+        adjust_weights_by_real(group_to_obs_map, group_map, phi_fracs_by_real, index);
 
     }
 
+    if (save) {
+        ss.str("");
+        ss << file_manager.get_base_filename() << "." << iter;
+        if (pest_scenario.get_pestpp_options().get_save_dense()) {
+            ss << ".adjusted.weights.bin";
+            weights.to_dense(ss.str());
+        } else if (pest_scenario.get_pestpp_options().get_save_binary()) {
+            ss << ".adjusted.weights.jcb";
+            weights.to_binary(ss.str());
+        } else {
+            ss << ".adjusted.weights.csv";
+            weights.to_csv(ss.str());
+        }
+        message(1, "saved adjusted weight ensemble to ", ss.str());
+
+        map<string, double> base_weights = weights.get_real_map(BASE_REAL_NAME, true);
+        ss.str("");
+        ss << file_manager.get_base_filename()  << "." << iter << ".adjusted.obs_data.csv";
+        ofstream f_obs(ss.str());
+        if (f_obs.bad())
+            throw_em_error("error opening: " + ss.str());
+        output_file_writer.scenario_obs_csv(f_obs, base_weights);
+        f_obs.close();
+    }
 }
+
 
 void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
                             map<string,map<string,double>>& phi_fracs_by_real,vector<string> index)
@@ -7549,6 +7572,10 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(double reinflate_factor){
     ofstream& frec = file_manager.rec_ofstream();
     oe.reserve(oe_base.get_real_names(),oe.get_var_names());
     weights = weights_base;
+    for (auto& oname : oe.get_var_names())
+    {
+        pest_scenario.get_observation_info_ptr()->get_observation_rec_ptr_4_mod(oname)->weight = org_obs_info.get_weight(oname);
+    }
     run_ensemble_util(performance_log,frec,new_pe,oe,run_mgr_ptr,false,temp,NetPackage::NULL_DA_CYCLE, ss.str());
     pe = new_pe;
     new_pe = ParameterEnsemble();
