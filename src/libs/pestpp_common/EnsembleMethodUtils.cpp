@@ -5744,6 +5744,12 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	adjust_weights(false);
 
+    //need this here since during reinflation we reset weight ensemble and might rebalance weights
+    if (ppo->get_ies_phi_fractions_file().size() > 0)
+    {
+        weights_base = weights;
+        org_obs_info = pest_scenario.get_ctl_observation_info_copy();
+    }
     if ((ppo->get_ies_phi_fractions_file().size() > 0) ||
         (ppo->get_obscov_filename().size() > 0) ||
         (in_conflict.size() > 0))

@@ -86,7 +86,7 @@ void IterEnsembleSmoother::iterate_2_solution()
             iter++;
 
             reset_par_ensemble_to_prior_mean(current_reinflate_factor);
-            adjust_weights(true);
+            //adjust_weights(true);
             iters_since_reinflate = 0;
             n_iter_reinflate_idx++;
             if (reinflate_factor.size() > n_iter_reinflate_idx)
