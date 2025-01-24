@@ -109,6 +109,10 @@ void IterEnsembleSmoother::iterate_2_solution()
 		        message(1,"continuing iterations because reinflation is in use");
 		    }
         }
+        else if (solution_iter >= pest_scenario.get_control_info().noptmax){
+            message(1,"solution iterations >= noptmax, all done");
+            break;
+        }
 
 	}
 }
