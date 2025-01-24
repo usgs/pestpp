@@ -821,8 +821,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		enforce_tied_bounds = pest_utils::parse_string_arg_to_bool(value);
 	}
 
-	else if (key == "DEBUG_PARSE_ONLY")
+	else if ((key == "DEBUG_PARSE_ONLY") || (key == "PARSE_ONLY"))
 	{
+        passed_args.insert("DEBUG_PARSE_ONLY");
+        passed_args.insert("PARSE_ONLY");
 		debug_parse_only = pest_utils::parse_string_arg_to_bool(value);
 	
 	}

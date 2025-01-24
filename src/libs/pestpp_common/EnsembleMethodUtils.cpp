@@ -7201,161 +7201,171 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	}
 
-    if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
-	{
-		double acc_phi = last_best_mean * acc_fac;
+    if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first)) {
+        double acc_phi = last_best_mean * acc_fac;
 
-		if (pest_scenario.get_pestpp_options().get_ies_debug_high_subset_phi())
-		{
-			cout << "ies_debug_high_subset_phi active" << endl;
-			best_mean = acc_phi + 1.0;
-		}
+        if (pest_scenario.get_pestpp_options().get_ies_debug_high_subset_phi()) {
+            cout << "ies_debug_high_subset_phi active" << endl;
+            best_mean = acc_phi + 1.0;
+        }
 
-		if ((best_mean > acc_phi))
-		{
+        if ((best_mean > acc_phi)) {
 
-			ss.str("");
-			ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
-			string m = ss.str();
-			message(0, m);
-            ph.update(oe, pe,weights);
-            best_mean_phis.push_back(ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE));
-			if (!use_mda)
-			{
-				message(1, "updating realizations with reduced phi");
-				update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx],subset_idxs);
-			}
-
-			ph.update(oe, pe,weights);
-			//re-check phi
-			double new_best_mean;
-            new_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
-			if (new_best_mean < best_mean)
-			{
-				best_mean = new_best_mean;
-				best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-				//replace the last entry in the best mean phi tracker
-				best_mean_phis[best_mean_phis.size() - 1] = best_mean;
-				message(1, "current best mean phi (after updating reduced-phi reals): ", best_mean);
-				if (best_mean < last_best_mean * acc_fac)
-				{
-					if (best_std < last_best_std * acc_fac)
-					{
-						double new_lam = lam_vals[best_idx] * lam_dec;
-						new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
-						message(0, "partial update improved phi stats, updating lambda to ", new_lam);
-						last_best_lam = new_lam;
-					}
-					else
-					{
-						message(0, "not updating lambda (standard deviation reduction criteria not met)");
-					}
-					last_best_std = best_std;
-				}
-			}
-			else
-			{
-				double new_lam = last_best_lam * lam_inc;
-				new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
-				last_best_lam = new_lam;
-				message(1, "abandoning current upgrade ensembles, returning to upgrade calculations and increasing lambda to ", new_lam);
-
-			}
-			message(1, "returning to upgrade calculations...");
-
-			return false;
-		}
-
-		//release the memory of the unneeded pe_lams
-		for (int i = 0; i < pe_lams.size(); i++)
-		{
-			if (i == best_idx)
-				continue;
-			pe_lams[i] =pe.zeros_like(0);
-		}
-		//need to work out which par and obs en real names to run - some may have failed during subset testing...
-		ObservationEnsemble remaining_oe_lam = oe;//copy
-
-		ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
-		remaining_pe_lam.set_fixed_info(pe.get_fixed_info());
-
-		if (pe_filenames.size() > 0)
-		{
-			performance_log->log_event("'ies_upgrades_in_memory' is 'false', loading 'best' parameter ensemble from file '" + pe_filenames[best_idx] + "'");
-			vector<string> missing;
-			if (oe_lams[best_idx].shape().first != remaining_pe_lam.shape().first)
-			{
-				set<string> ssub_names;
-				for (auto real_name : oe_lams[best_idx].get_real_names())
-					ssub_names.emplace(real_name);
-				vector<string> oreal_names = oe.get_real_names();
-				vector<string> preal_names = pe.get_real_names();
-
-				for (auto idx : subset_idxs)
-					if (ssub_names.find(oreal_names[idx]) == ssub_names.end())
-						missing.push_back(preal_names[idx]);
-				if (missing.size() > 0)
-					pe_lams[best_idx].drop_rows(missing);
-			}
-			
-			remaining_pe_lam.from_binary(pe_filenames[best_idx]);
-			remaining_pe_lam.transform_ip(ParameterEnsemble::transStatus::NUM);
-			//remove any failed runs from subset testing
-			if (missing.size() > 0)
-				remaining_pe_lam.drop_rows(missing);
-			remove_external_pe_filenames(pe_filenames);
-			
-		}
-		
-		
-		vector<string> pe_keep_names, oe_keep_names;
-		vector<string> pe_names = pe.get_real_names(), oe_names = oe.get_real_names();
-
-		vector<string> org_pe_idxs, org_oe_idxs;
-		set<string> ssub;
-		for (auto& i : subset_idxs)
-			ssub.emplace(pe_names[i]);
-		for (int i = 0; i < pe_names.size(); i++)
-			if (ssub.find(pe_names[i]) == ssub.end())
-			{
-				pe_keep_names.push_back(pe_names[i]);
-				//oe_keep_names.push_back(oe_names[i]);
-			}
-		ssub.clear();
-		for (auto& i : subset_idxs)
-			ssub.emplace(oe_names[i]);
-		for (int i = 0; i < oe_names.size(); i++)
-			if (ssub.find(oe_names[i]) == ssub.end())
-			{
-				oe_keep_names.push_back(oe_names[i]);
-			}
-		message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
-		ph.update(oe_lams[best_idx], pe_lams[best_idx],weights);
-		ph.report(true,false);
-		message(0, "running remaining realizations for best lambda, scale:", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
-
-		//pe_keep_names and oe_keep_names are names of the remaining reals to eval
-		performance_log->log_event("dropping subset idxs from remaining_pe_lam");
-		remaining_pe_lam.keep_rows(pe_keep_names);
-		performance_log->log_event("dropping subset idxs from remaining_oe_lam");
-		remaining_oe_lam.keep_rows(oe_keep_names);
-		//save these names for later
-		org_pe_idxs = remaining_pe_lam.get_real_names();
-		org_oe_idxs = remaining_oe_lam.get_real_names();
-		///run
-		vector<int> fails = run_ensemble(remaining_pe_lam, remaining_oe_lam,vector<int>(),cycle);
-
-		//for testing
-		if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder()) {
             ss.str("");
-            ss << "ies_debug_fail_remainder is True, failing  par:obs realization " << org_pe_idxs[0] << ":" << org_oe_idxs[0];
-            message(0,ss.str());
+            ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
+            string m = ss.str();
+            message(0, m);
+            ph.update(oe, pe, weights);
+            best_mean_phis.push_back(ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE));
+            if (!use_mda) {
+                message(1, "updating realizations with reduced phi");
+                update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx], subset_idxs);
+            }
+
+            ph.update(oe, pe, weights);
+            //re-check phi
+            double new_best_mean;
+            new_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
+            if (new_best_mean < best_mean) {
+                best_mean = new_best_mean;
+                best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+                //replace the last entry in the best mean phi tracker
+                best_mean_phis[best_mean_phis.size() - 1] = best_mean;
+                message(1, "current best mean phi (after updating reduced-phi reals): ", best_mean);
+                if (best_mean < last_best_mean * acc_fac) {
+                    if (best_std < last_best_std * acc_fac) {
+                        double new_lam = lam_vals[best_idx] * lam_dec;
+                        new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
+                        message(0, "partial update improved phi stats, updating lambda to ", new_lam);
+                        last_best_lam = new_lam;
+                    } else {
+                        message(0, "not updating lambda (standard deviation reduction criteria not met)");
+                    }
+                    last_best_std = best_std;
+                }
+            } else {
+                double new_lam = last_best_lam * lam_inc;
+                new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
+                last_best_lam = new_lam;
+                message(1,
+                        "abandoning current upgrade ensembles, returning to upgrade calculations and increasing lambda to ",
+                        new_lam);
+
+            }
+            message(1, "returning to upgrade calculations...");
+
+            return false;
+        }
+
+        //release the memory of the unneeded pe_lams
+        for (int i = 0; i < pe_lams.size(); i++) {
+            if (i == best_idx)
+                continue;
+            pe_lams[i] = pe.zeros_like(0);
+        }
+        //need to work out which par and obs en real names to run - some may have failed during subset testing...
+        ObservationEnsemble remaining_oe_lam = oe;//copy
+
+        ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
+        remaining_pe_lam.set_fixed_info(pe.get_fixed_info());
+
+        if (pe_filenames.size() > 0) {
+            performance_log->log_event(
+                    "'ies_upgrades_in_memory' is 'false', loading 'best' parameter ensemble from file '" +
+                    pe_filenames[best_idx] + "'");
+            vector<string> missing;
+            if (oe_lams[best_idx].shape().first != remaining_pe_lam.shape().first) {
+                set<string> ssub_names;
+                for (auto real_name: oe_lams[best_idx].get_real_names())
+                    ssub_names.emplace(real_name);
+                vector<string> oreal_names = oe.get_real_names();
+                vector<string> preal_names = pe.get_real_names();
+
+                for (auto idx: subset_idxs)
+                    if (ssub_names.find(oreal_names[idx]) == ssub_names.end())
+                        missing.push_back(preal_names[idx]);
+                if (missing.size() > 0)
+                    pe_lams[best_idx].drop_rows(missing);
+            }
+
+            remaining_pe_lam.from_binary(pe_filenames[best_idx]);
+            remaining_pe_lam.transform_ip(ParameterEnsemble::transStatus::NUM);
+            //remove any failed runs from subset testing
+            if (missing.size() > 0)
+                remaining_pe_lam.drop_rows(missing);
+            remove_external_pe_filenames(pe_filenames);
+
+        }
+
+
+        vector<string> pe_keep_names, oe_keep_names;
+        vector<string> pe_names = pe.get_real_names(), oe_names = oe.get_real_names();
+
+        vector<string> org_pe_idxs, org_oe_idxs;
+        set<string> ssub;
+        for (auto &i: subset_idxs)
+            ssub.emplace(pe_names[i]);
+        for (int i = 0; i < pe_names.size(); i++)
+            if (ssub.find(pe_names[i]) == ssub.end()) {
+                pe_keep_names.push_back(pe_names[i]);
+                //oe_keep_names.push_back(oe_names[i]);
+            }
+        ssub.clear();
+        for (auto &i: subset_idxs)
+            ssub.emplace(oe_names[i]);
+        for (int i = 0; i < oe_names.size(); i++)
+            if (ssub.find(oe_names[i]) == ssub.end()) {
+                oe_keep_names.push_back(oe_names[i]);
+            }
+        message(0, "phi summary for best lambda, scale fac: ",
+                vector<double>({lam_vals[best_idx], scale_vals[best_idx]}));
+        ph.update(oe_lams[best_idx], pe_lams[best_idx], weights);
+        ph.report(true, false);
+        message(0, "running remaining realizations for best lambda, scale:",
+                vector<double>({lam_vals[best_idx], scale_vals[best_idx]}));
+
+        //pe_keep_names and oe_keep_names are names of the remaining reals to eval
+        performance_log->log_event("dropping subset idxs from remaining_pe_lam");
+        remaining_pe_lam.keep_rows(pe_keep_names);
+        performance_log->log_event("dropping subset idxs from remaining_oe_lam");
+        remaining_oe_lam.keep_rows(oe_keep_names);
+        //save these names for later
+        org_pe_idxs = remaining_pe_lam.get_real_names();
+        org_oe_idxs = remaining_oe_lam.get_real_names();
+        ///run
+        vector<int> fails = run_ensemble(remaining_pe_lam, remaining_oe_lam, vector<int>(), cycle);
+        int q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2)) {
+            message(1, "'pest.stp' found, quitting");
+            return true;
+        }
+        else if (q == 4)
+        {
+            message(0,"pest.stp found with '4'.  run mgr has returned control, removing file.");
+            if (!pest_utils::try_remove_quit_file())
+            {
+                message(0,"error removing pest.stp file, bad times ahead...");
+            }
+        }
+        //for testing
+        if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder()) {
+            ss.str("");
+            ss << "ies_debug_fail_remainder is True, failing  par:obs realization " << org_pe_idxs[0] << ":"
+               << org_oe_idxs[0];
+            message(0, ss.str());
             fails.push_back(0);
         }
 
-		//if any of the remaining runs failed
-		if (fails.size() == org_pe_idxs.size())
-			throw_em_error(string("all remaining realizations failed...something is prob wrong"));
+        //if any of the remaining runs failed
+        if (fails.size() == org_pe_idxs.size())
+        {
+            double new_lam = last_best_lam * lam_inc;
+            new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
+            last_best_lam = new_lam;
+            message(1, "all remaining realizations failed...something is prob wrong, returning to upgrade calculations and increasing lambda to ",
+                    new_lam);
+            return false;
+        }
 		if (fails.size() > 0)
 		{
 
@@ -7390,7 +7400,13 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         drop_bad_reals(pe_lams[best_idx], oe_lam_best);
 		if (oe_lam_best.shape().first == 0)
 		{
-			throw_em_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
+			//throw_em_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
+            double new_lam = last_best_lam * lam_inc;
+            new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
+            last_best_lam = new_lam;
+            message(1, "all realization dropped after finishing subset runs...something is prob wrong, returning to upgrade calculations and increasing lambda to ",
+                    new_lam);
+            return false;
 		}
 		performance_log->log_event("updating phi");
 		ph.update(oe_lam_best, pe_lams[best_idx], weights);
