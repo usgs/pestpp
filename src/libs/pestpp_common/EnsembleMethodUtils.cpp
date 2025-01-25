@@ -3113,8 +3113,8 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
             sort(meas_vec.begin(), meas_vec.end());
             double qval = -1. * bad_phi_sigma / 100.;
             int qidx = (int) (qval * (double) meas_vec.size());
-            qidx = min(0, qidx);
-            qidx = max(((int) meas_vec.size()) - 2, qidx);
+            qidx = max(0, qidx);
+            qidx = min(((int) meas_vec.size()) - 2, qidx);
             bad_thres = min(std::numeric_limits<double>::max(),meas_vec[qidx]);
             ofstream &frec = file_manager->rec_ofstream();
             frec << "...bad_phi_sigma quantile value " << qval << " yields bad phi threshold of " << bad_thres << endl;
