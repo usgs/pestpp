@@ -223,8 +223,7 @@ public:
 		bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string> &_act_obs_names);
 
 	void solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
-    void solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,
-                        pair<vector<string>, vector<string>>>& loc_map, double mm_alpha);
+    void solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,pair<vector<string>, vector<string>>>& loc_map, double mm_alpha);
     void update_multimodal_components(const double mm_alpha);
 
 

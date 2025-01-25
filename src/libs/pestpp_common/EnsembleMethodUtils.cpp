@@ -260,7 +260,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         mm_q_vec_map.clear();
         for (int i=0;i<preal_names.size();i++) {
             real_vec_map[preal_names[i]] = pe.get_eigen_ptr()->row(i);
-            mm_q_vec_map[oreal_names[i]] = wmat.row(i);
+            mm_q_vec_map[preal_names[i]] = wmat.row(i);
         }
         map<string,int> real_map = pe.get_real_map();
 
@@ -783,6 +783,7 @@ void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form
 //void work(int thread_id, int iter, double cur_lam, bool use_glm_form, Eigen::VectorXd parcov_inv_vec, Eigen::MatrixXd Am);
 void upgrade_thread_function_mm(int id, int iter, double cur_lam, bool use_glm_form, Eigen::VectorXd parcov_inv_vec,
                              Eigen::MatrixXd Am, MmUpgradeThread& worker, exception_ptr& eptr) {
+    //worker.work(id, iter, cur_lam, use_glm_form, parcov_inv_vec, Am);
     try {
         worker.work(id, iter, cur_lam, use_glm_form, parcov_inv_vec, Am);
     }
