@@ -3614,15 +3614,17 @@ Figure 9.2 – A demonstration of the multi-modal solution process using a weigh
 
 In highly nonlinear problems, the gradient between parameters and simulated equivalents to observations can change (drastically) between iterations of PESTPP-IES. This can drive the need for several iterations in order to fully assimilate data. However, during each iteration, due to the solution equations, both the mean and (co)variance of the parameter ensemble can change, with the latter usually decreasing substantially each iteration, meaning that across multiple iterations, the variance of the parameter ensemble reduces, sometime dramatically, this is especially true in highly nonlinear problems where changing gradients can condition different parameters (and/or parameter combinations) each iteration, and in cases where the prior simulated ensemble has a consistent bias compared to observed counterparts. Spurious correlations exacerbate this problem.
 
-To combat the variance reduction that occurs across multiple iterations, it might be desirable in some settings to “reset” the variance of the current parameter ensemble to the prior state; this can also be labelled “reinflation”. Mechanically, this is done by subtracting the mean from the prior ensemble (forming the so-called deviations or “anomalies”) and then adding the mean from the current parameter ensemble, thereby translating the prior ensemble across parameter space but (more or less) preserving the variance of the prior ensemble.
+To combat the variance reduction that occurs across multiple iterations, it might be desirable in some settings to “reset” the variance of the current parameter ensemble to the prior state; this can also be labelled “covariance reinflation”. Mechanically, this is done by subtracting the mean from the prior ensemble (forming the so-called deviations or “anomalies”) and then adding the mean from the current parameter ensemble, thereby translating the prior ensemble across parameter space but (more or less) preserving the variance of the prior ensemble.
 
 This option is implemented in PESTPP-IES via the *ies_n_iter_reinflate* option. As the name implies, the argument is the number of iterations to undertake before resetting the variance to the prior ensemble state. Note this argument can be a single integer or a sequence of integers like 2,5,9, in which case PESTPP-IES will reinflate the ensemble after the 2<sup>nd</sup> , 7<sup>th</sup>, and 16<sup>th</sup> iterations. Some other behavioural characteristics of using parameter covariance reinflation:
 
-- The phi reduction each iteration may not satisfy the requirements for a “successful” iteration. However, PESTPP-IES will continue iterating anyway and will also undertake partial upgrades of realizations that do show phi improvement; essentially PESTPP-IES will use all of it regular tricks to seek a good fit for iterations less than *ies_n_iter_reinflate*.
+- The phi reduction each iteration may not satisfy the requirements for a “successful” iteration. However, PESTPP-IES will continue iterating anyway and will also undertake partial upgrades of realizations that do show phi improvement; essentially PESTPP-IES will use all of it regular tricks to seek a good fit when using the *ies_n_iter_reinflate* option.
 
-- The iteration count in PESTPP-IES will be incremented during the reinflation. This is so the results of the reinflation can be tracked in the output files.
+- The iteration count in PESTPP-IES will be incremented during the reinflation. This is so the results of the reinflation can be tracked in the output files. So users may see an iteration number that is greater than NOPTMAX. But fear not, PESTPP-IES will do exactly NOPTMAX solution iterations.
 
 - Bound enforcement can be a problem when translating the prior realizations to a new mean vector, especially if the mean of the parameter ensemble is very diffuse. User beware.
+
+- There is a related option name *ies_reinflate_factor*, that can be a single floating point number or can be a sequence of floating point numbers ranging from greater than 0.0 to less than or equal to 1.0. The function of *ies_reinflate_factor* is dampen the variability in the prior parameter ensemble anomalies so that the reinflation isn’t to full prior parameter ensemble variance, but instead some scaled down version of that variance.
 
 Figure 9.3 shows how the mean-update iterations can prevent variance collapse for a very simple and contrived example problem. Notice how the realization trajectories collapse after one iteration.
 
@@ -4160,15 +4162,20 @@ Note also that the number of control variables may change with time. Refer to th
 </tr>
 <tr class="odd">
 <td><em>ies_n_iter_reinflate</em></td>
-<td>int</td>
+<td>Int or sequence of ints</td>
 <td>The number of between covariance re-inflation. Default is 0, which is indicates not re-inflate parameter covariance. This argument can also be a sequence of integers, indicating the number of iterations between each reinflation cycle</td>
 </tr>
 <tr class="even">
+<td><em>Ies_reinflate_factor</em></td>
+<td>Float or sequence of floats</td>
+<td>A scaling factor between 0 and 1 to reduce the variance of the prior parameter ensemble anomalies before translating them to the current parameter ensemble mean vector.</td>
+</tr>
+<tr class="odd">
 <td><em>ies_update_by_reals</em></td>
 <td>bool</td>
 <td>Flag to indicate whether or not to update each realization according to its phi reduction. Default is False.</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><em>save_dense</em></td>
 <td>bool</td>
 <td>Flag to save ensembles in a “dense” binary format, which in constrast to the sparse binary format of jcb/jco. Ensemble files will be given a “.bin” extension. These files can be read by PESTPP-IES (for restarting) and by pyEMU. This option only applies of <em>save_</em>binary is True. Default is False</td>
