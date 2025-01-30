@@ -44,7 +44,8 @@ public:
 	OutputFileWriter(FileManager &_file_manager, Pest &_pest_scenario, bool restart_flag = false, bool _save_rei = true, int _eigenwrite = 0);
 	void prep_glm_files(bool restart_flag);
 	void write_rei(std::ofstream &fout, int iter_no, const Observations &obs,
-		const Observations &sim, const ObjectiveFunc &obj_func, const Parameters &pars);
+		const Observations &sim, const ObjectiveFunc &obj_func, const Parameters &pars,
+        map<string,double> alt_weights=map<string,double>());
 	void write_par(std::ofstream &fout, const Parameters &pars, const TranOffset &offset_tran, const TranScale &scale_tran);
 	void write_restart_header(std::ostream &fout);
 	void write_sen_header(std::ostream &fout, const std::string &case_name);
@@ -63,7 +64,7 @@ public:
 	void scenario_obs_report(std::ostream &os);
 	void scenario_pi_report(std::ostream &os);
 
-	void scenario_obs_csv(ostream& os);
+	void scenario_obs_csv(ostream& os, map<string,double> alt_weights=map<string,double>());
 
 	void phi_report(std::ostream &os,int const iter, int const nruns, PhiData const &phi_comps,
 		double const dynamic_reg_weight,bool final=false, string tag="Starting");
@@ -71,7 +72,7 @@ public:
 	void par_report(std::ostream &os, int const iter, Parameters const &new_pars, Parameters const &old_pars, string par_type);
 	void iteration_report(std::ostream &os, int iter, int nruns, string iteration_type, string svd_type=string(""));
 	void scenario_report(std::ostream &os, bool report_mode=true);
-	void obs_report(std::ostream &os, const Observations &obs, const Observations &sim, ObservationInfo &oi);
+	void obs_report(std::ostream &os, const Observations &obs, const Observations &sim, ObservationInfo &oi, map<string,double> alt_weights=map<string,double>());
 
 	void param_change_stats(double p_old, double p_new, bool &have_fac, double &fac_change, bool &have_rel, double &rel_change);
 	void write_par_iter(int iter, Parameters const &ctl_pars);

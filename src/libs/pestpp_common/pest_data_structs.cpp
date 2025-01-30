@@ -821,8 +821,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		enforce_tied_bounds = pest_utils::parse_string_arg_to_bool(value);
 	}
 
-	else if (key == "DEBUG_PARSE_ONLY")
+	else if ((key == "DEBUG_PARSE_ONLY") || (key == "PARSE_ONLY"))
 	{
+        passed_args.insert("DEBUG_PARSE_ONLY");
+        passed_args.insert("PARSE_ONLY");
 		debug_parse_only = pest_utils::parse_string_arg_to_bool(value);
 	
 	}
@@ -1185,12 +1187,35 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
     {
         passed_args.insert("IES_N_ITER_MEAN");
         passed_args.insert("IES_N_ITER_REINFLATE");
-        convert_ip(value,ies_n_iter_mean);
+        ies_n_iter_reinflate.clear();
+        vector<string> tok;
+        tokenize(value, tok, ",");
+        for (const auto& fac : tok)
+        {
+            ies_n_iter_reinflate.push_back(convert_cp<int>(fac));
+        }
+        return true;
+    }
+    else if (key == "IES_REINFLATE_FACTOR")
+    {
+        vector<string> tok;
+        tokenize(value, tok, ",");
+        ies_reinflate_factor.clear();
+        for (const auto& fac : tok)
+        {
+            ies_reinflate_factor.push_back(convert_cp<double>(fac));
+        }
         return true;
     }
     else if (key == "IES_UPDATE_BY_REALS")
     {
         ies_updatebyreals = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
+
+    else if (key == "SAVE_DENSE")
+    {
+        save_dense = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
 
@@ -1617,6 +1642,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "random_seed: " << random_seed << endl;
 	os << "num_tpl_ins_threads: " << num_tpl_ins_threads << endl;
 	os << "save_binary: " << save_binary << endl;
+    os << "save_dense: " << save_dense << endl;
     os << "ensemble_output_precision: " << ensemble_output_precision << endl;
 	
 	os << "panther_echo: " << panther_echo << endl;
@@ -1830,9 +1856,15 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_localizer_forgive_extra: " << ies_localizer_forgive_missing << endl;
 	os << "ies_phi_factors_file: " << ies_phi_fractions_file << endl;
     os << "ies_phi_factors_by_real: " << ies_phi_factors_by_real << endl;
-    os << "ies_n_iter_reinflate: " << ies_n_iter_mean << endl;
+    os << "ies_n_iter_reinflate: " << endl;
+    for (auto v : ies_n_iter_reinflate)
+        os << v << ",";
+    os << endl;
+    os << "ies_reinflate_factor: " << endl;
+    for (auto v : ies_reinflate_factor)
+        os << v << ",";
+    os << endl;
     os << "ies_updatebyreals: " << ies_updatebyreals << endl;
-
 
 
     os << endl << "pestpp-sen options: " << endl;
@@ -2018,9 +2050,11 @@ void PestppOptions::set_defaults()
     set_ies_localizer_forgive_missing(false);
     set_ies_phi_fractions_files("");
     set_ies_phi_factors_by_real(false);
-    set_ies_n_iter_mean(0);
-    set_ies_updatebyreals(false);
+    set_ies_n_iter_reinflate(vector < int > {0});
+    set_ies_reinflate_factor(vector < double > {1.0});
 
+    set_ies_updatebyreals(false);
+    set_save_dense(false);
 
 	// DA parameters
 	//set_da_use_ies(false);

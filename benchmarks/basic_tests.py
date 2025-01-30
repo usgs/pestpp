@@ -233,6 +233,9 @@ def tie_by_group_test():
 
 
     pst.write(os.path.join(t_d,"pest_tied.pst"))
+    m_d = os.path.join(model_d,"master_tie_by_group_sen")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-sen"), "pest_tied.pst", 5, master_dir=m_d,
                            worker_root=model_d,port=port)
     df = pd.read_csv(os.path.join(m_d,"pest_tied.sen.par.csv"),index_col=0)
@@ -248,6 +251,9 @@ def tie_by_group_test():
         assert too_high.shape[0] == 0, "sen,{0},{1}".format(real,too_high)
     
     #pst.write(os.path.join(t_d,"pest_tied.pst"))
+    m_d = os.path.join(model_d,"master_tie_by_group_glm")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-glm"), "pest_tied.pst", 5, master_dir=m_d,
                            worker_root=model_d,port=port)
     jco = pyemu.Jco.from_binary(os.path.join(m_d,"pest_tied.jcb"))
@@ -260,6 +266,9 @@ def tie_by_group_test():
     assert too_high.shape[0] == 0, too_high
 
     
+    m_d = os.path.join(model_d,"master_tie_by_group_ies")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
     pst.control_data.noptmax = 1
     pst.write(os.path.join(t_d, "pest_tied.pst"))
 
@@ -306,6 +315,9 @@ def tie_by_group_test():
         assert too_high.shape[0] == 0, "ies,{0},{1}".format(real,too_high)
     
     df.to_csv(os.path.join(t_d,"sweep_in.csv"))
+    m_d = os.path.join(model_d,"master_tie_by_group_swp")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
     pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_tied.pst", 5, master_dir=m_d,
                            worker_root=model_d,port=port)
     pst.control_data.noptmax = 3
@@ -578,7 +590,8 @@ def sen_basic_test():
 
     with open(os.path.join(t_d,"forward_run.py"),'w') as f:
         f.write("import pandas as pd\n")
-        f.write("df = pd.read_csv('in.dat',index_col=0,delim_whitespace=True,names=['name','value'])\n")
+        f.write(r"df = pd.read_csv('in.dat',index_col=0,sep='\s+',names=['name','value'])")
+        f.write("\n")
         f.write("df.loc['p1+p2','value'] = df.loc['p1','value'] + df.loc['p2','value']\n")
         f.write("df.loc['p1*p2','value'] = df.loc['p1','value'] * df.loc['p2','value']\n")
         f.write("df.loc['p1^p2','value'] = df.loc['p1','value'] * df.loc['p2','value']\n")
@@ -643,6 +656,8 @@ def sen_basic_test():
     d_sti = (sti_vals.loc[pst.obs_names, :] - sti_verf_vals.loc[pst.obs_names, :]).apply(np.abs)
     print(d_sti.max())
     assert d_sti.max().max() < .001
+
+    
 
 
 def salib_verf():
@@ -1133,6 +1148,7 @@ def cmdline_test():
     t_d = os.path.join(model_d,"template")
     pst_name = "freyberg6_run_glm.pst"
     pst = pyemu.Pst(os.path.join(t_d,"freyberg6_run_glm.pst"))
+    pst.pestpp_options = {}
     pst.pestpp_options["debug_parse_only"] = True
     pst_name = "CmdLine_test.pst" #camel case on purpose for linux testing
     pst.write(os.path.join(t_d,pst_name))
@@ -1800,7 +1816,8 @@ def tenpar_uniform_invest():
 
 
 if __name__ == "__main__":
-    mf6_v5_sen_test()
+    #mf6_v5_sen_test()
+    #tie_by_group_test()
     #tenpar_uniform_invest()
     #tenpar_collapse_invest()
     #plot_collapse_invest()
@@ -1821,7 +1838,7 @@ if __name__ == "__main__":
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    #cmdline_test()
+    cmdline_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()

@@ -415,17 +415,23 @@ void OutputFileWriter::scenario_par_report(std::ostream &os)
 	os << endl << endl;
 }
 
-void OutputFileWriter::scenario_obs_csv(ostream& os)
+void OutputFileWriter::scenario_obs_csv(ostream& os, map<string,double> alt_weights)
 {
 	if (os.bad())
 		throw runtime_error("OutputFileWriter::scenario_obs_csv(): os is bad");
 	os << "name,value,group,weight" << endl;
 	const ObservationRec* obs_rec;
 	const Observations& obs = pest_scenario.get_ctl_observations();
+    double weight;
 	for (auto& obs_name : pest_scenario.get_ctl_ordered_obs_names())
 	{
 		obs_rec = pest_scenario.get_ctl_observation_info().get_observation_rec_ptr(obs_name);
-		os << lower_cp(obs_name) << "," << obs.get_rec(obs_name) << "," << lower_cp(obs_rec->group) << "," << obs_rec->weight << endl;
+        weight = obs_rec->weight;
+        if (alt_weights.find(obs_name) != alt_weights.end())
+        {
+            weight = alt_weights[obs_name];
+        }
+		os << lower_cp(obs_name) << "," << obs.get_rec(obs_name) << "," << lower_cp(obs_rec->group) << "," << weight << endl;
 	}
 }
 
@@ -635,7 +641,7 @@ void OutputFileWriter::phi_report(std::ostream &os, int const iter, int const nr
 }
 
 
-void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Observations &sim, ObservationInfo &oi)
+void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Observations &sim, ObservationInfo &oi, map<string,double> alt_weights)
 {
 	vector<string> obs_name_vec = pest_scenario.get_ctl_ordered_obs_names();
 	int nsize = 20;
@@ -650,10 +656,16 @@ void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Ob
 	//ObservationInfo oi = pest_scenario.get_ctl_observation_info();
 	//for(vector<string>::const_iterator b = obs_name_vec.begin(),
 	//	e = obs_name_vec.end(); b!=e; ++b)
+    double weight;
 	if (obs_name_vec.size() < 100000)
 	{
 		for (auto& b : obs_name_vec)
 		{
+            weight = oi.get_observation_rec_ptr(b)->weight;
+            if (alt_weights.find(b) != alt_weights.end())
+            {
+                weight = alt_weights.at(b);
+            }
 			obs_val = obs.get_rec(b);
 			sim_val = sim.get_rec(b);
 			os << " " << setw(nsize) << lower_cp(b)
@@ -661,13 +673,18 @@ void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Ob
 				<< " " << showpoint << setw(20) << obs_val
 				<< " " << showpoint << setw(20) << sim_val
 				<< " " << showpoint << setw(20) << obs_val - sim_val
-				<< " " << showpoint << setw(20) << oi.get_observation_rec_ptr(b)->weight << endl;
+				<< " " << showpoint << setw(20) << weight << endl;
 		}
 	}
 	else
 	{
 		for (auto& b : obs_name_vec)
 		{
+            weight = oi.get_observation_rec_ptr(b)->weight;
+            if (alt_weights.find(b) != alt_weights.end())
+            {
+                weight = alt_weights.at(b);
+            }
 			obs_val = obs.get_rec(b);
 			sim_val = sim.get_rec(b);
 			os << " " << lower_cp(b) 
@@ -675,7 +692,7 @@ void OutputFileWriter::obs_report(ostream &os, const Observations &obs, const Ob
 				<< " " << obs_val
 				<< " " << sim_val
 				<< " " << obs_val - sim_val
-				<< " " << oi.get_observation_rec_ptr(b)->weight << endl;
+				<< " " << weight << endl;
 		}
 	}
 
@@ -726,7 +743,7 @@ void OutputFileWriter::write_opt_constraint_rei(std::ofstream &fout, int iter_no
 
 
 void OutputFileWriter::write_rei(ofstream &fout, int iter_no, const Observations &obs, const Observations &sim,
-	const ObjectiveFunc &obj_func, const Parameters &pars)
+	const ObjectiveFunc &obj_func, const Parameters &pars, map<string,double> alt_weights)
 {
 	fout << setiosflags(ios::left);
 	fout.unsetf(ios::floatfield);
@@ -734,7 +751,7 @@ void OutputFileWriter::write_rei(ofstream &fout, int iter_no, const Observations
 	fout << " MODEL OUTPUTS AT END OF OPTIMISATION ITERATION NO. " << iter_no << ":-" << endl;
 	fout << endl << endl;
 	ObservationInfo oi = pest_scenario.get_ctl_observation_info();
-	obs_report(fout, obs, sim, oi);
+	obs_report(fout, obs, sim, oi,alt_weights);
 	//process prior information
 	const PriorInformation *prior_info_ptr = pest_scenario.get_prior_info_ptr();
 	const PriorInformationRec *pi_rec_ptr;
