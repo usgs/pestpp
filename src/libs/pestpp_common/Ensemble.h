@@ -22,20 +22,15 @@ const string MEDIAN_CENTER_ON_NAME = "_MEDIAN_";
 class Ensemble
 {
 public:
-	//Ensemble(Pest &_pest_scenario, FileManager &_file_manager,
-	//	OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log, unsigned int = 1);
 	Ensemble(Pest* _pest_scenario, std::mt19937* _rand_gen_ptr);
 	Ensemble(Pest* _pest_scenario);
-
 	Ensemble(){ ; }
-
-	//Ensemble get(vector<string> &_real_names, vector<string> &_var_names);
 
 	void to_csv(string file_name);
 	void to_csv_by_reals(ofstream& csv, bool write_header = true);
 	void to_csv_by_vars(ofstream& csv, bool write_header = true);
-	void to_binary_old(string file_name, bool transposed=false);
 	void to_binary(string file_name, bool transposed=false);
+    void to_dense(string file_name);
 	void from_eigen_mat(Eigen::MatrixXd mat, const vector<string> &_real_names, const vector<string> &_var_names);
 	pair<int, int> shape() { return pair<int, int>(reals.rows(), reals.cols()); }
 	void throw_ensemble_error(string message);
@@ -68,6 +63,7 @@ public:
 	const Eigen::MatrixXd get_eigen() const { return reals; }
 	const Eigen::MatrixXd* get_eigen_ptr() const { return &reals; }
 	Eigen::MatrixXd* get_eigen_ptr_4_mod() { return &reals; }
+    map<string,double> get_real_map(string real_name,bool forgive=false);
 
 	void set_eigen(Eigen::MatrixXd _reals);
 	void reset_org_real_names() { org_real_names = real_names; }
@@ -77,7 +73,6 @@ public:
 
 
 	vector<double> get_mean_stl_var_vector();
-	//pair<map<string, double>, map<string, double>>  get_moment_maps(const vector<string> &_real_names=vector<string>());
 	void fill_moment_maps(map<string, double>& mean_map, map<string, double>& std_map);
 	void append_other_rows(Ensemble &other,bool reset_org_real_names=false);
 	void append_other_rows(const vector<string>& _real_names, Eigen::MatrixXd& _reals);
@@ -105,7 +100,6 @@ public:
 	void draw(int num_reals, Covariance cov, Transformable &tran, const vector<string> &draw_names, const map<string,vector<string>> &grouper, PerformanceLog *plog, int level);
 	void update_var_map();
 	~Ensemble();
-	//Ensemble& operator=(const Ensemble& other);
 	void set_rand_gen(std::mt19937* _rand_gen_ptr) { rand_gen_ptr = _rand_gen_ptr; }
 	std::mt19937* get_rand_gen_ptr() { return rand_gen_ptr; }
 	map<string, int> get_var_map() { return var_map; }
@@ -116,10 +110,6 @@ public:
 protected:
 	std::mt19937* rand_gen_ptr;
 	Pest* pest_scenario_ptr;
-	//FileManager &file_manager;
-	//ObjectiveFunc *obj_func_ptr;
-	//OutputFileWriter &output_file_writer;
-	//PerformanceLog *performance_log;
 	Eigen::MatrixXd reals;
 	vector<string> var_names;
 	vector<string> real_names;	
@@ -159,11 +149,8 @@ public:
 private:
 	bool initialized;
 	vector<string> fixed_names;
-	//map<string, int> par2idx;
 	map<string, map<string, double>> fixed_info;
-
 	void initialize();
-
 };
 
 class ParameterEnsemble : public Ensemble
@@ -171,10 +158,6 @@ class ParameterEnsemble : public Ensemble
 
 public:
 	enum transStatus { CTL, NUM, MODEL };
-	/*ParameterEnsemble(const ParamTransformSeq &_par_transform, Pest &_pest_scenario,
-		FileManager &_file_manager,OutputFileWriter &_output_file_writer,
-		PerformanceLog *_performance_log, unsigned int seed = 1);
-	*/
 	ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr);
 	ParameterEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
 	ParameterEnsemble(Pest* _pest_scenario);
@@ -183,8 +166,6 @@ public:
 
 
 	void set_zeros();
-	//ParameterEnsemble get_new(const vector<string> &_real_names, const vector<string> &_var_names);
-
 	void from_csv(string file_name, bool forgive = false);	
 	void from_binary(string file_name, bool forgive = false);
 
@@ -216,8 +197,6 @@ public:
 	void to_dense_ordered(string filename);
 	void clear_fixed_map() { pfinfo.clear(); }
 	void replace_col_vals_and_fixed(const vector<string>& other_var_names, const Eigen::MatrixXd& mat);
-	//map<pair<string, string>, double> get_fixed_map() { return fixed_map; }
-    //map<pair<string, string>, double>* get_fixed_map_ptr() { return &fixed_map; }
 	FixedParInfo& get_fixed_info() { return pfinfo; }
 	void set_fixed_info(FixedParInfo _pfinfo) { pfinfo = _pfinfo; }
 	void keep_rows(const vector<int>& keep, bool update_fixed_map = false);
@@ -228,8 +207,6 @@ private:
 	transStatus tstat;
 	void save_fixed(vector<string>& fixed_names);
 	void fill_fixed(const map<string, int> &header_info, vector<string>& fixed_names);
-	//vector<string> fixed_names;
-	//map<pair<string, string>, double> fixed_map;
 	void replace_fixed(string real_name,Parameters &pars);
 	void prep_par_ensemble_after_read(map<string,int>& header_info);
 	FixedParInfo pfinfo;
@@ -238,26 +215,23 @@ private:
 class ObservationEnsemble : public Ensemble
 {
 public:
-	/*ObservationEnsemble(ObjectiveFunc *_obj_func, Pest &_pest_scenario, FileManager &_file_manager,
-    OutputFileWriter &_output_file_writer, PerformanceLog *_performance_log, unsigned int seed = 1);
-	*/
 	ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr);
 	ObservationEnsemble(Pest *_pest_scenario_ptr, std::mt19937* rand_gen_ptr, Eigen::MatrixXd _reals, vector<string> _real_names, vector<string> _var_names);
 	ObservationEnsemble(Pest* _pest_scenario);
 	ObservationEnsemble() { ; }
 	void to_binary(string filename) { Ensemble::to_binary(filename, true); }
+    void to_dense(string filename) { Ensemble::to_dense(filename); }
+
 	void update_from_obs(int row_idx, Observations &obs);
 	void update_from_obs(string real_name, Observations &obs);
-	//void from_csv(string &file_name, const vector<string> &ordered_names);
 	void from_csv(string file_name);
 	void from_eigen_mat(Eigen::MatrixXd mat, const vector<string> &_real_names, const vector<string> &_var_names);
-	void from_binary(string file_name);// { Ensemble::from_binary(file_name, true); }
+	void from_binary(string file_name);
 	vector<int> update_from_runs(map<int,int> &real_run_ids, RunManagerAbstract *run_mgr_ptr);
 	vector<int> update_from_runs(map<int, int>& real_run_ids, RunManagerAbstract* run_mgr_ptr, ParameterEnsemble& run_mgr_pe);
 
 	void draw(int num_reals, Covariance &cov, PerformanceLog *plog, int level, ofstream& frec);
 	void initialize_without_noise(int num_reals);
-	//ObservationEnsemble get_mean_diff();
 };
 
 

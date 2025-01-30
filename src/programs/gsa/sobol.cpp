@@ -87,17 +87,20 @@ MatrixXd Sobol::gen_N_matrix(const MatrixXd &m1, const MatrixXd &m2, const vecto
   return n;
 }
 
-void Sobol::add_model_runs(RunManagerAbstract &run_manager, const MatrixXd &n, ofstream &f_out)
+void Sobol::add_model_runs(RunManagerAbstract &run_manager, const MatrixXd &n, ofstream &f_out, string tag)
 {
 	int run_id;
+    stringstream ss;
 	for (int i=0; i<n_sample; ++i)
 	{
 		VectorXd tmp_vec =  n.row(i);
 		Parameters tmp_pars(adj_par_name_vec, tmp_vec);
 		base_partran_seq_ptr->numeric2model_ip(tmp_pars);
-		run_id = run_manager.add_run(tmp_pars);
+        ss.str("");
+        ss << "tag:" << tag + "_isample:" << i;;
+		run_id = run_manager.add_run(tmp_pars,ss.str());
 		base_partran_seq_ptr->model2ctl_ip(tmp_pars);
-		f_out << run_id;
+		f_out << run_id << "," << ss.str();
 		for (auto pname : adj_par_name_vec)
 			f_out << "," << tmp_pars.get_rec(pname);
 		f_out << endl;
@@ -112,7 +115,7 @@ void Sobol::assemble_runs(RunManagerAbstract &run_manager)
 
 	//open csv par file
 	ofstream &f_out = file_manager_ptr->open_ofile_ext("sobol.par.csv");
-	f_out << "run_id";
+	f_out << "run_id,info_txt";
 	for (auto pname : adj_par_name_vec)
 		f_out << "," << pest_utils::lower_cp(pname);
 	f_out << endl;
@@ -122,11 +125,12 @@ void Sobol::assemble_runs(RunManagerAbstract &run_manager)
 	int n_adj_par = adj_par_name_vec.size();
 	
 	
-	add_model_runs(run_manager, m1, f_out);
-	add_model_runs(run_manager, m2, f_out);
+	add_model_runs(run_manager, m1, f_out, "m1");
+	add_model_runs(run_manager, m2, f_out,"m2");
 
 	//calculate first order runs a1,....an
 	vector<int> idx_vec;
+    stringstream ss;
 	for (int ai=0; ai<n_adj_par; ++ai)
 	{
 		idx_vec.clear();
@@ -134,7 +138,9 @@ void Sobol::assemble_runs(RunManagerAbstract &run_manager)
 		idx_vec.push_back(ai);
 		c = gen_N_matrix(m1, m2, idx_vec);
 		//cout << c << endl << endl;
-		add_model_runs(run_manager, c, f_out);
+        ss.str("");
+        ss << "n-" << adj_par_name_vec[ai];
+		add_model_runs(run_manager, c, f_out,ss.str());
 	}
 	f_out.close();
 }
@@ -149,6 +155,9 @@ vector<double> Sobol::get_obs_vec(RunManagerAbstract &run_manager, int run_set, 
 	Observations obs0;
 	int nrun = 0;
 	vector<double> obs_vec = vector<double>(n_sample, MISSING_DATA);
+    int run_stat;
+    string info_txt;
+    double info_val;
 	for (int run_id = run_b; run_id<run_e; ++run_id)
 	{
 		double obs = MISSING_DATA;
@@ -159,6 +168,7 @@ vector<double> Sobol::get_obs_vec(RunManagerAbstract &run_manager, int run_set, 
 		{
 			//obs0 = run_map[run_id];
 			//run0.update_ctl(pars0, obs0);
+            run_manager.get_info(run_id,run_stat,info_txt,info_val);
 			obs = run_map[run_id].get_rec(obs_name);
 			if (obs == Observations::no_data) obs = MISSING_DATA;
 		}

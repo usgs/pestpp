@@ -495,6 +495,9 @@ public:
     bool get_ies_updatebyreals() const {return ies_updatebyreals;}
     void set_ies_updatebyreals(bool _flag) {ies_updatebyreals = _flag;}
 
+    bool get_save_dense() const {return save_dense; }
+    void set_save_dense(bool _flag) {save_dense = _flag;}
+
 
 
 	int get_ies_num_threads() const { return ies_num_threads; }
@@ -547,8 +550,11 @@ public:
     void set_ies_multimodal_alpha(double _flag) { ies_multimodal_alpha = _flag; }
     void set_ensemble_output_precision(int prec) { ensemble_output_precision = prec;}
     int get_ensemble_output_precision() const {return ensemble_output_precision;}
-    void set_ies_n_iter_mean(int _n_iter_mean)  {ies_n_iter_mean = _n_iter_mean;}
-    int get_ies_n_iter_mean() const {return ies_n_iter_mean;}
+    void set_ies_n_iter_reinflate(vector<int> _n_iter_reinflate)  { ies_n_iter_reinflate = _n_iter_reinflate;}
+    vector<int> get_ies_n_iter_reinflate() const {return ies_n_iter_reinflate;}
+    void set_ies_reinflate_factor(vector<double> reinflate_factor)  { ies_reinflate_factor = reinflate_factor;}
+    vector<double> get_ies_reinflate_factor() const {return ies_reinflate_factor;}
+
 
 
     string get_gsa_method() const { return gsa_method; }
@@ -788,6 +794,7 @@ private:
 	bool ies_enforce_bounds;
 	double par_sigma_range;
 	bool save_binary;
+    bool save_dense;
 	string ies_localizer;
 	double ies_accept_phi_fac;
 	double ies_lambda_inc_fac;
@@ -824,8 +831,10 @@ private:
 	bool ies_localizer_forgive_missing;
 	string ies_phi_fractions_file;
 	bool ies_phi_factors_by_real;
-	int ies_n_iter_mean;
+	vector<int> ies_n_iter_reinflate;
+    vector<double> ies_reinflate_factor;
     bool ies_updatebyreals;
+
 
 
 	// Data Assimilation parameters

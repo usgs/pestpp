@@ -93,14 +93,6 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
     //map<string,int> real_map;
     num_reals = real_vec_map.size();
 
-//    while (true) {
-//        if (pe_guard.try_lock()) {
-//            num_reals = pe.shape().first;
-//            real_map = pe.get_real_map();
-//            pe_guard.unlock();
-//            break;
-//        }
-//    }
     int subset_size = (int) (((double) num_reals) * mm_alpha);
     if (subset_size <= 0)
         throw runtime_error("solve_multimodal error: subsize size zero or negative");
@@ -206,8 +198,7 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
         oe_real_names_case.push_back(oreal_name);
         nphi.clear();
         npardist.clear();
-        //nphi[oreal_name] = par_phi_map[real_name];
-        //npardist[oreal_name] = 0.0;
+
         int iii = 0;
         for (sortedset_iter ii = fitness_sorted.begin(); ii != fitness_sorted.end(); ++ii) {
             int iidx = real_map.at(ii->first);
@@ -235,15 +226,6 @@ void MmNeighborThread::work(int tid, int verbose_level, double mm_alpha, map<str
                 mm_real_name_map[real_name] = make_pair(pe_real_names_case,oe_real_names_case);
                 neighbor_phi_map[real_name] = nphi;
                 neighbor_pardist_map[real_name] = npardist;
-//                cout << endl << "real_name: " << real_name << endl;
-//                for (sortedset_iter ii = fitness_sorted.begin(); ii != fitness_sorted.end(); ++ii) {
-//                    cout << "neighbor:" << ii->first << ", score:" << ii->second;
-//                    cout << ", phi:" << par_phi_map.at(ii->first) << ", par dist:" << euclid_par_dist.at(ii->first) << endl;
-//
-//                }
-//                cout << endl;
-//                cout << "real values:" << real << endl;
-
 
                 results_lock.unlock();
                 break;
@@ -278,7 +260,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         mm_q_vec_map.clear();
         for (int i=0;i<preal_names.size();i++) {
             real_vec_map[preal_names[i]] = pe.get_eigen_ptr()->row(i);
-            mm_q_vec_map[oreal_names[i]] = wmat.row(i);
+            mm_q_vec_map[preal_names[i]] = wmat.row(i);
         }
         map<string,int> real_map = pe.get_real_map();
 
@@ -287,9 +269,6 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
             exception_ptrs.push_back(exception_ptr());
         }
         for (int i = 0; i < num_threads; i++) {
-            //int id, int verbose_level, double mm_alpha, map<string,map<string,double>> weight_phi_map,
-            //                                 vector<string> preal_names, vector<string> oreal_names,Eigen::SparseMatrix<double> parcov_inv,
-            //                                 MmNeighborThread& worker, exception_ptr& eptr
             threads.push_back(thread(mm_neighbor_thread_function, i, verbose_level, mm_alpha, weight_phi_map,preal_names,
                                      oreal_names, parcov_inv, real_map, std::ref(*ut_ptr), std::ref(exception_ptrs[i])));
         }
@@ -312,7 +291,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
                 catch (...) {
                     //ss.str("");
                     ss << " thread " << i << "raised an exception";
-                    //throw runtime_error(ss.str());
+
                 }
             }
             threads[i].join();
@@ -324,12 +303,12 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
                 catch (const std::exception &e) {
                     //ss.str("");
                     ss << " thread " << i << "raised an exception: " << e.what();
-                    //throw runtime_error(ss.str());
+
                 }
                 catch (...) {
                     //ss.str("");
                     ss << " thread " << i << "raised an exception: ";
-                    //throw runtime_error(ss.str());
+
                 }
             }
         }
@@ -433,16 +412,7 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
         //get the phi map for this realization using the weights vector for this realization
         oreal_name = oreal_names[i];
         performance_log->log_event("...getting weights");
-//        Eigen::VectorXd q_vec(act_obs_names.size());
-//        int ii = 0;
-//        for (auto &aon : act_obs_names) {
-//            q_vec[ii] = weights.get_eigen_ptr()->coeff(i, ovar_map.at(aon));
-//            ii++;
-//        }
-            q_vec = wmat.row(i);
-//        performance_log->log_event("...getting phi vector");
-//        map<string, double> phi_map = ph.get_meas_phi(oe, q_vec);
-
+        q_vec = wmat.row(i);
         oreal_name = oreal_names[i];
         phi_map = weight_phi_map.at(oreal_name);
         double mx = -1.0e+300;
@@ -470,10 +440,6 @@ void EnsembleSolver::update_multimodal_components(const double mm_alpha) {
             diff = real - pe.get_real_vector(rname);
             edist = diff.transpose() * parcov_inv * diff;
             euclid_par_dist[rname] = edist;
-//            cout << real << endl;
-//            cout << pe.get_real_vector(rname) << endl;
-//            cout << diff << endl;
-//            cout << real_name << "," << rname << "," << edist << endl << endl;
 
         }
 
@@ -817,6 +783,7 @@ void upgrade_thread_function(int id, int iter, double cur_lam, bool use_glm_form
 //void work(int thread_id, int iter, double cur_lam, bool use_glm_form, Eigen::VectorXd parcov_inv_vec, Eigen::MatrixXd Am);
 void upgrade_thread_function_mm(int id, int iter, double cur_lam, bool use_glm_form, Eigen::VectorXd parcov_inv_vec,
                              Eigen::MatrixXd Am, MmUpgradeThread& worker, exception_ptr& eptr) {
+    //worker.work(id, iter, cur_lam, use_glm_form, parcov_inv_vec, Am);
     try {
         worker.work(id, iter, cur_lam, use_glm_form, parcov_inv_vec, Am);
     }
@@ -840,13 +807,7 @@ void EnsembleSolver::solve_multimodal(int num_threads, double cur_lam, bool use_
         vector<thread> threads;
         vector<exception_ptr> exception_ptrs;
         message(2, "launching threads");
-        /*MmUpgradeThread(PerformanceLog* _performance_log, unordered_map<string, Eigen::VectorXd>& _par_resid_map,
-                    unordered_map<string, Eigen::VectorXd>& _par_diff_map,
-                  unordered_map<string, Eigen::VectorXd>& _obs_resid_map, unordered_map<string, Eigen::VectorXd>& _obs_diff_map,
-                  unordered_map<string, Eigen::VectorXd>& _obs_err_map,
-                  unordered_map<string, Eigen::VectorXd>& _weight_map, ParameterEnsemble& _pe_upgrade,
-                  unordered_map<string, pair<vector<string>, vector<string>>>& _cases);
-                  */
+
         MmUpgradeThread* ut_ptr = new MmUpgradeThread(performance_log, par_resid_map, par_diff_map, obs_resid_map, obs_diff_map, obs_err_map,
                                                                         mm_q_vec_map, pe_upgrade,mm_real_name_map);
 
@@ -984,10 +945,22 @@ void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, Parame
     for (auto i : real_idxs)
         oe_real_names.push_back(names[i]);
     vector<string> pe_real_names = pe_upgrade.get_real_names();
-
+    string obs_center_on = "";
+    if ((center_on.size() > 0) && (center_on != MEDIAN_CENTER_ON_NAME)) {
+        for (int i = 0; i < pe_real_names.size(); i++) {
+            if (pe_real_names[i] == center_on) {
+                obs_center_on = oe_real_names[i];
+                break;
+            }
+        }
+        if (obs_center_on.size() == 0) {
+            throw runtime_error(
+                    "EnsembleSolver::nonlocalized_solve: obs_center_on not found for center_on: " + center_on);
+        }
+    }
     Eigen::MatrixXd obs_resid = ph.get_obs_resid_subset(oe,true,oe_real_names);
 
-    Eigen::MatrixXd obs_diff = oe.get_eigen_anomalies(oe_real_names, act_obs_names, center_on);
+    Eigen::MatrixXd obs_diff = oe.get_eigen_anomalies(oe_real_names, act_obs_names, obs_center_on);
 
     Eigen::MatrixXd obs_err = base_oe.get_eigen(oe_real_names, act_obs_names);
     Observations ctl_obs = pest_scenario.get_ctl_observations();
@@ -1009,7 +982,7 @@ void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, Parame
         {
 
             map<string, int> oreal_map = oe.get_real_map();
-            int ireal = oreal_map.at(center_on);
+            int ireal = oreal_map.at(obs_center_on);
             map<string, int> ovar_map = oe.get_var_map();
             int ii = 0;
             for (auto &aon : act_obs_names)
@@ -1063,11 +1036,7 @@ void EnsembleSolver::nonlocalized_solve(double cur_lam,bool use_glm_form, Parame
 void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map)
 {
 
-	//message(1, "starting solve for lambda", cur_lam);
-//	if (use_glm_form)
-//		message(1, "using glm form");
-//	else
-//		message(1, "using mda form");
+
     if (!localizer.get_use())
     {
         string center_on = pest_scenario.get_pestpp_options().get_ies_center_on();
@@ -1090,20 +1059,7 @@ void EnsembleSolver::solve(int num_threads, double cur_lam, bool use_glm_form, P
                                             localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map,
                                             _how);
     performance_log->log_event("using local analysis upgrade thread");
-//	if (!use_cov_loc) {
-//        ut_ptr = new LocalAnalysisUpgradeThread(performance_log, par_resid_map, par_diff_map, obs_resid_map,
-//                                                obs_diff_map, obs_err_map,
-//                                                localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map,
-//                                                _how);
-//        performance_log->log_event("using local analysis upgrade thread");
-//    }
-//	else {
-//        ut_ptr = new CovLocalizationUpgradeThread(performance_log, par_resid_map, par_diff_map, obs_resid_map,
-//                                                  obs_diff_map, obs_err_map,
-//                                                  localizer, parcov_inv_map, weight_map, pe_upgrade, loc_map, Am_map,
-//                                                  _how);
-//        performance_log->log_event("using covariance localization upgrade thread");
-//    }
+
 	if ((num_threads < 1) || (loc_map.size() == 1))
 		//if (num_threads < 1)
 	{
@@ -1230,10 +1186,7 @@ UpgradeThread::UpgradeThread(PerformanceLog* _performance_log, unordered_map<str
 		{
 			keys.push_back(c.first);
 		}
-		//sort(keys.begin(), keys.end());
 		total = keys.size();
-		//random_shuffle(keys.begin(), keys.end());
-
 	
 }
 
@@ -1409,13 +1362,7 @@ void UpgradeThread::ensemble_solution(const int iter, const int verbose_level,co
                 Eigen::MatrixXd temp = parcov_inv.diagonal().matrix();
                 local_utils::save_mat(verbose_level, thread_id, iter, t_count, "parcov_inv", temp);
             }
-//            if (act_obs_names.size() > 0) { //this works bc the mm solve doesnt pass these names...
-//                ss.str("");
-//                ss << "solution scaling factor: " << scale << endl;
-//                ss << "eigthresh: " << eigthresh << endl;
-//                ss << "maxsing: " << maxsing << endl;
-//                cout << ss.str() << endl;
-//            }
+
         }
         if (use_prior_scaling)
 
@@ -1695,14 +1642,6 @@ void MmUpgradeThread::work(int thread_id, int iter, double cur_lam, bool use_glm
         par_resid.transposeInPlace();
         obs_err.transposeInPlace();
 
-        //form the scaled obs resid matrix
-        //local_utils::save_mat(verbose_level, thread_id, iter, t_count, "obs_resid", obs_resid);
-        //Eigen::MatrixXd scaled_residual = weights * obs_resid;
-
-        //form the (optionally) scaled par resid matrix
-        //local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_resid", par_resid);
-        //local_utils::save_mat(verbose_level, thread_id, iter, t_count, "par_diff", par_diff);
-
         stringstream ss;
 
         double scale = (1.0 / (sqrt(double(num_reals - 1))));
@@ -1939,13 +1878,7 @@ void LocalAnalysisUpgradeThread::work(int thread_id, int iter, double cur_lam, b
 				obs_names = p.first;
 				if (localizer.get_use())
 				{
-					/*if ((loc_by_obs) && (par_names.size() == 1) && (k == par_names[0]))
-						use_localizer = true;
-					else if ((!loc_by_obs) && (obs_names.size() == 1) && (k == obs_names[0]))
-						use_localizer = true;*/
-					//if ((loc_by_obs) && (obs_names.size() == 1) && (k == obs_names[0]))	
-					//else if ((!loc_by_obs) && (par_names.size() == 1) && (k == par_names[0]))
-					//	use_localizer = true;
+
 					use_localizer = true;
 				}
 				if ((count % 1000 == 0) && (count > 0))
@@ -2268,36 +2201,6 @@ Eigen::MatrixXd L2PhiHandler::get_actual_obs_resid(ObservationEnsemble &oe)
 	return resid;
 }
 
-//Eigen::MatrixXd L2PhiHandler::get_noise_resid(ObservationEnsemble &oe, bool apply_ineq)
-//{
-//    //vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
-//    vector<string> act_obs_names = oe_base->get_var_names();
-//
-//    Eigen::MatrixXd oe_vals = oe.get_eigen(vector<string>(),act_obs_names);
-//    Eigen::MatrixXd noise_vals = oe_base->get_eigen(oe.get_real_names(), vector<string>());
-//
-//    Observations obs = pest_scenario->get_ctl_observations();
-//    Eigen::MatrixXd ovals = obs.get_data_eigen_vec(act_obs_names);
-//    ovals.transposeInPlace();
-//    for (int i = 0; i < oe_vals.rows(); i++)
-//    {
-//        cout << "ovals " << ovals << endl;
-//        cout << "o1 " << oe_vals.row(i) << endl;
-//        cout << "n1 " << noise_vals.row(i) << endl;
-//
-//        oe_vals.row(i) = oe_vals.row(i) - ovals;
-//        noise_vals.row(i) = noise_vals.row(i) - ovals;
-//        cout << "o2 " << oe_vals.row(i) << endl;
-//        cout << "n2 " << noise_vals.row(i) << endl << endl;
-//    }
-//
-//    Eigen::MatrixXd resid = oe_vals - noise_vals;
-//    if (apply_ineq)
-//        apply_ineq_constraints(resid,oe_vals, act_obs_names);
-//    return resid;
-//}
-
-
 Eigen::VectorXd L2PhiHandler::get_q_vector()
 {
 	const ObservationInfo* oinfo = pest_scenario->get_ctl_observation_info_ptr();
@@ -2384,11 +2287,6 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe)
 
 	}
 
-//    noise.clear();
-//    map<string, Eigen::VectorXd> noise_map = calc_noise(oe, q);
-//    for (auto &pv : noise_map) {
-//        noise[pv.first] = pv.second.sum();
-//    }
 
 	if (org_reg_factor != 0.0)
 	{
@@ -2467,13 +2365,7 @@ void L2PhiHandler::update(ObservationEnsemble & oe, ParameterEnsemble & pe, Obse
         meas[pv.first] = pv.second.sum();
 
     }
-//    noise.clear();
-//    map<string, Eigen::VectorXd> noise_map = calc_noise(oe, weights);
-//    for (auto &pv : noise_map)
-//    {
-//        noise[pv.first] = pv.second.sum();
-//
-//    }
+
 
     if (org_reg_factor != 0.0)
     {
@@ -2526,6 +2418,7 @@ void L2PhiHandler::save_residual_cov(ObservationEnsemble& oe, int iter)
 	pair<Covariance,Covariance> rcovs = res.get_empirical_cov_matrices(file_manager);
 	stringstream ss;
 	ss << file_manager->get_base_filename() << "." << iter << ".res.";
+
 	if (pest_scenario->get_pestpp_options().get_save_binary())
 	{
 		ss << "jcb";
@@ -2612,7 +2505,18 @@ double L2PhiHandler::calc_std(map<string, double> *phi_map)
 
 double L2PhiHandler::get_representative_phi(phiType pt)
 {
-    if (pest_scenario->get_pestpp_options().get_ies_n_iter_mean() < 0) {
+    //if (pest_scenario->get_pestpp_options().get_ies_n_iter_reinflate() < 0)
+    bool use_min = false;
+//    for (auto& fac : pest_scenario->get_pestpp_options().get_ies_n_iter_reinflate())
+//    {
+//        if (fac < 0)
+//        {
+//            use_min = true;
+//            break;
+//        }
+//    }
+    if (use_min)
+    {
         return get_min(pt);
     }
 
@@ -2634,15 +2538,7 @@ double L2PhiHandler::get_mean(phiType pt)
 
 double L2PhiHandler::get_std(phiType pt)
 {
-	//double mean = get_mean(pt);
-	//double var = 0.0;
 	map<string, double>* phi_map = get_phi_map_ptr(pt);
-	/*map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
-	for (; pi != end; ++pi)
-		var = var + (pow(pi->second - mean,2));
-	if (var == 0.0)
-		return 0.0;
-	return sqrt(var/(phi_map->size()-1));*/
 	return calc_std(phi_map);
 }
 
@@ -2857,7 +2753,8 @@ void L2PhiHandler::report_group(bool echo) {
                 continue;
             }
             tot = tot + o.second[g];
-            ptot = ptot + (o.second[g]/actual[o.first]);
+            if (actual[o.first] > 0)
+                ptot = ptot + (o.second[g]/actual[o.first]);
             mx_map[g] = max(mx_map[g],o.second[g]);
             mmn_map[g] = min(mmn_map[g],o.second[g]);
             pmx_map[g] = max(pmx_map[g],(o.second[g]/actual[o.first]));
@@ -2865,7 +2762,8 @@ void L2PhiHandler::report_group(bool echo) {
             c++;
         }
         tot = tot / (double)c;
-        ptot = ptot/(double)c;
+        if (ptot > 0)
+            ptot = ptot/(double)c;
         mn_map[g] = tot;
         pmn_map[g] = ptot;
 
@@ -2876,7 +2774,8 @@ void L2PhiHandler::report_group(bool echo) {
                 continue;
             }
             v = v + (pow(o.second[g] - tot,2));
-            pv = pv + (pow(ptot - (o.second[g]/actual[o.first]),2));
+            if (actual[o.first] > 0)
+                pv = pv + (pow(ptot - (o.second[g]/actual[o.first]),2));
         }
         if (v != 0)
             std_map[g] = sqrt(v/(double)(c-1));
@@ -2908,7 +2807,7 @@ void L2PhiHandler::report_group(bool echo) {
     ss << "  ---  observation group phi summary ---  " << endl;
     ss << "       (computed using 'actual' phi)" << endl;
     ss << "           (sorted by mean phi)" << endl;
-    ss << left << setw(len) << "group" << right << setw(6) << "count" << setw(11) << "nconflict" << setw(10) << "mean" << setw(10) << "std";
+    ss << left << setw(len) << "group" << right << setw(7) << "count" << setw(11) << "nconflict" << setw(10) << "mean" << setw(10) << "std";
     ss << setw(10) << "min" << setw(10) << "max";
     ss << setw(10) << "percent" << setw(10) << "std" << endl; //<< setw(10) << "min " << setw(10) << "max " << endl;
     f << ss.str();
@@ -2940,7 +2839,7 @@ void L2PhiHandler::report_group(bool echo) {
         }
         ss.str("");
         ss << left << setw(len) << pest_utils::lower_cp(g) << " ";
-        ss << right << setw(5) << nzc << " ";
+        ss << right << setw(6)  << setprecision(0) << nzc << " ";
         ss << right << setw(10) << num_conflict_group[g] << " ";
 
         ss << right << setw(9) << setprecision(3) << mn_map[g] << " ";
@@ -2960,8 +2859,8 @@ void L2PhiHandler::report_group(bool echo) {
         c++;
     }
     f << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl << endl;
-    if (echo)
-        cout << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl;
+    //if (echo)
+    //    cout << "    Note: 'percent' is the percentage of the actual phi for each realization." << endl;
     if ((echo) && (c > 10))
         cout << "    Note: only the first 10 highest mean phi groups are listed. See rec file for full listing" << endl;
     if (echo)
@@ -3014,10 +2913,7 @@ void L2PhiHandler::report(bool echo, bool group_report)
 			f << s;
 			if (echo)
 				cout << s;
-//            s = get_summary_string(L2PhiHandler::phiType::NOISE);
-//            f << s;
-//            if (echo)
-//                cout << s;
+
 		}
 		else
 		{
@@ -3033,10 +2929,6 @@ void L2PhiHandler::report(bool echo, bool group_report)
 			f << s;
 			if (echo)
 				cout << s;
-//            s = get_summary_string(L2PhiHandler::phiType::NOISE);
-//            f << s;
-//            if (echo)
-//                cout << s;
 
 		}
 
@@ -3221,8 +3113,8 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
             sort(meas_vec.begin(), meas_vec.end());
             double qval = -1. * bad_phi_sigma / 100.;
             int qidx = (int) (qval * (double) meas_vec.size());
-            qidx = min(0, qidx);
-            qidx = max(((int) meas_vec.size()) - 2, qidx);
+            qidx = max(0, qidx);
+            qidx = min(((int) meas_vec.size()) - 2, qidx);
             bad_thres = min(std::numeric_limits<double>::max(),meas_vec[qidx]);
             ofstream &frec = file_manager->rec_ofstream();
             frec << "...bad_phi_sigma quantile value " << qval << " yields bad phi threshold of " << bad_thres << endl;
@@ -3242,18 +3134,6 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
 	return idxs;
 }
 
-//map<string,double> L2PhiHandler::get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec)
-//{
-//    map<string,Eigen::VectorXd> meas_map = calc_meas(oe,q_vec);
-//    map<string,double> meas_phi;
-//    for (auto& m : meas_map)
-//    {
-//        meas_phi[m.first] = m.second.sum();
-//    }
-//    return meas_phi;
-//
-//}
-//void PhiThread::work(int thread_id, Eigen::MatrixXd wmat, Eigen::MatrixXd resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map)
 void upgrade_thread_function_phi(int id, Eigen::MatrixXd& wmat, Eigen::MatrixXd& resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map, PhiThread& worker, exception_ptr& eptr) {
     try {
         worker.work(id, wmat, resid, oe_real_names, phi_map);
@@ -3311,8 +3191,6 @@ void PhiThread::work(int thread_id, Eigen::MatrixXd& wmat, Eigen::MatrixXd& resi
         pmap.clear();
         for (int ii = 0; ii<resid.rows(); ii++)
         {
-            //rname = oe_real_names[ii];
-            //pmap[rname] = rresid.row(ii).sum();
             pmap[oe_real_names[ii]] = phi(ii);
         }
 
@@ -3347,7 +3225,6 @@ map<string,map<string,double>> L2PhiHandler::get_meas_phi_weight_ensemble(Observ
         for (int i = 0; i < num_threads; i++) {
             exception_ptrs.push_back(exception_ptr());
         }
-        //int id, Eigen::MatrixXd wmat, Eigen::MatrixXd resid, vector<string> oe_real_names, map<string,map<string,double>>& phi_map, PhiThread& worker, exception_ptr& eptr
         for (int i = 0; i < num_threads; i++) {
             threads.push_back(thread(upgrade_thread_function_phi, i, std::ref(wmat),std::ref(resid),oe_real_names,std::ref(phi_map),std::ref(*ut_ptr), std::ref(exception_ptrs[i])));
         }
@@ -3380,14 +3257,11 @@ map<string,map<string,double>> L2PhiHandler::get_meas_phi_weight_ensemble(Observ
                     rethrow_exception(exception_ptrs[i]);
                 }
                 catch (const std::exception &e) {
-                    //ss.str("");
                     ss << " thread " << i << "raised an exception: " << e.what();
-                    //throw runtime_error(ss.str());
+
                 }
                 catch (...) {
-                    //ss.str("");
                     ss << " thread " << i << "raised an exception: ";
-                    //throw runtime_error(ss.str());
                 }
             }
         }
@@ -3412,12 +3286,7 @@ map<string,map<string,double>> L2PhiHandler::get_meas_phi_weight_ensemble(Observ
         for (int ii = 0; ii<resid.rows(); ii++)
         {
             rname = oe_real_names[ii];
-            //if (bset.find(rname) == end)
-            //    continue;
-            //diff = resid.row(i);
-            //cout << diff << endl;
-            //diff = resid.row(i).cwiseProduct(q_vec);
-            //phi_map[rname] = diff.cwiseProduct(diff);
+
             pmap[rname] = rresid.row(ii).sum();
         }
         phi_map[oe_real_names[i]] = pmap;
@@ -3457,35 +3326,6 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_meas(ObservationEnsemble & oe, E
 	return phi_map;
 }
 
-//map<string, Eigen::VectorXd> L2PhiHandler::calc_noise(ObservationEnsemble & oe, Eigen::VectorXd& q_vec)
-//{
-//    map<string, Eigen::VectorXd> phi_map;
-//    Eigen::VectorXd oe_base_vec, oe_vec, diff, w_vec;
-//    vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
-//
-//    if (act_obs_names.size() == 0)
-//    {
-//        for (auto name : oe.get_real_names())
-//            phi_map[name] = Eigen::VectorXd();
-//        return phi_map;
-//    }
-//    vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
-//    set<string> bset(base_real_names.begin(),base_real_names.end());
-//    set<string>::iterator end = bset.end();
-//    string rname;
-//    Eigen::MatrixXd resid = get_noise_resid(oe);
-//    assert(oe_real_names.size() == resid.rows());
-//    resid = resid.array().rowwise() * q_vec.transpose().array();
-//    resid = resid.array().cwiseProduct(resid.array());
-//    for (int i = 0; i<resid.rows(); i++)
-//    {
-//        rname = oe_real_names[i];
-//        if (bset.find(rname) == end)
-//            continue;
-//        phi_map[rname] = resid.row(i);
-//    }
-//    return phi_map;
-//}
 
 map<string, Eigen::VectorXd> L2PhiHandler::calc_meas(ObservationEnsemble & oe, ObservationEnsemble& weights)
 {
@@ -3519,39 +3359,6 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_meas(ObservationEnsemble & oe, O
 }
 
 
-//map<string, Eigen::VectorXd> L2PhiHandler::calc_noise(ObservationEnsemble & oe, ObservationEnsemble& weights)
-//{
-//    map<string, Eigen::VectorXd> phi_map;
-//    Eigen::VectorXd oe_base_vec, oe_vec, diff, w_vec;
-//    vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
-//
-//    if (act_obs_names.size() == 0)
-//    {
-//        for (auto name : oe.get_real_names())
-//            phi_map[name] = Eigen::VectorXd();
-//        return phi_map;
-//    }
-//    vector<string> base_real_names = oe_base->get_real_names(), oe_real_names = oe.get_real_names();
-//    set<string> bset(base_real_names.begin(),base_real_names.end());
-//    set<string>::iterator end = bset.end();
-//    string rname;
-//    Eigen::MatrixXd resid = get_noise_resid(oe);
-//    Eigen::MatrixXd wmat = weights.get_eigen(oe.get_real_names(),oe_base->get_var_names());
-//    assert(oe_real_names.size() == resid.rows());
-//    resid = resid.array() * wmat.array();
-//    resid = resid.array().cwiseProduct(resid.array());
-//    for (int i = 0; i<resid.rows(); i++)
-//    {
-//        rname = oe_real_names[i];
-//        if (bset.find(rname) == end)
-//            continue;
-//        phi_map[rname] = resid.row(i);
-//    }
-//    return phi_map;
-//}
-
-
-
 map<string, Eigen::VectorXd> L2PhiHandler::calc_regul(ParameterEnsemble & pe)
 {
 	map<string, Eigen::VectorXd> phi_map;
@@ -3563,22 +3370,9 @@ map<string, Eigen::VectorXd> L2PhiHandler::calc_regul(ParameterEnsemble & pe)
 	resid = resid.array().rowwise() * parcov_inv_diag.transpose().array();
     resid = resid.array().cwiseProduct(resid.array());
 
-	//Eigen::VectorXd diff;
 	for (int i = 0; i < real_names.size(); i++)
 	{
-//		diff = resid.row(i);
-//		diff = diff.cwiseProduct(diff);
-//		//cout << diff << endl;
-//		diff = diff.cwiseProduct(parcov_inv_diag);
-//		//cout << diff << endl;
-//		//cout << parcov_inv_diag << endl;
-//		//phi_map[real_names[i]] = _reg_fac * diff;
-//		phi_map[real_names[i]] = diff;
-//		cout << phi_map.at(real_names[i]) << endl;
-//		cout << scaled_resid.row(i) << endl;
-//		cout << endl;
         phi_map[real_names[i]] = resid.row(i);
-		
 	}
 	return phi_map;
 }
@@ -3614,14 +3408,7 @@ vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe,
             }
         }
     }
-//    if (missing.size() > 0)
-//    {
-//        ss.str("");
-//        ss << "L2PhiHandler::get_violating_realizations(): the following violation obs names not found " << endl;
-//        for (auto& m : missing)
-//            ss << m << endl;
-//        throw runtime_error(ss.str());
-//    }
+
     Eigen::VectorXd real;
     double sum;
     vector<string> rnames = oe.get_real_names();
@@ -3644,10 +3431,6 @@ vector<string> L2PhiHandler::get_violating_realizations(ObservationEnsemble& oe,
 
 void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixXd &sim_vals,vector<string> &names)
 {
-	
-	//vector<string> names = oe_base->get_var_names();
-	//vector<string> lt_names = get_lt_obs_names(), gt_names = get_gt_obs_names();
-	//vector<string> act_obs_names = pest_scenario->get_ctl_ordered_nz_obs_names();
 	if ((lt_obs_names.empty()) && (gt_obs_names.empty()) &&
             (lt_obs_bounds.empty()) && (gt_obs_bounds.empty()) &&
             (double_obs_bounds.empty()))
@@ -3665,8 +3448,6 @@ void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixX
             (double_obs_bounds.empty()))
 		return;
 	map<string, int> idxs;
-	//for (int i = 0; i < act_obs_names.size(); i++)
-	//	idxs[act_obs_names[i]] = i;
 	for (int i = 0; i < names.size(); i++)
 		idxs[names[i]] = i;
 	int idx;
@@ -3681,13 +3462,9 @@ void L2PhiHandler::apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixX
         val = iv.second.first;
         val2 = iv.second.second;
 
-        //cout << resid.col(idx) << endl;
         for (int i = 0; i < resid.rows(); i++)
             col(i) = ((scol(i) > val) && (scol(i) < val2)) ? 0.0 : col(i);
-        //cout << resid.col(idx) << endl;
-        //cout << col << endl << endl;
         resid.col(idx) = col;
-        //cout << resid.col(idx) << endl;
     }
 
 	for (auto const iv : lt_vals)
@@ -3856,7 +3633,6 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	stringstream ss;
 	ofstream &frec = file_manager_ptr->rec_ofstream();
 	ss << endl << "   ---  parameter group change summmary  ---    " << endl;
-	//ss << "   (compared to the initial ensemble using active realizations)" << endl;
 	cout << ss.str();
 	frec << ss.str();
 	ss.str("");
@@ -3875,7 +3651,8 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
 	{
 		double mean_diff = mean_change[grp_name];
 		double std_diff = std_change[grp_name];
-
+        if (pargp2par_map[grp_name].size() == 0)
+            continue;
 		ss.str("");
 		ss << setw(mxlen) << left << pest_utils::lower_cp(grp_name) << right << setw(6) << pargp2par_map[grp_name].size();
         ss << setw(10) << setprecision(4) << right << mean_diff * 100.0;
@@ -3888,10 +3665,11 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
         ss << setw(11) << num_out << setw(11) << setprecision(4) << percent_out;
 		//ss << setw(10) << setprecision(4) << init_cv[grp_name] << setw(10) << curr_cv[grp_name] << setw(10) << setprecision(4) << endl;
 		ss << setw(12) << excess_std_reduction[grp_name] << endl;
-        if (i < 15)
-			cout << ss.str();
+        if ((i < 15) && (pargp2par_map[grp_name].size() > 0)) {
+            cout << ss.str();
+            i++;
+        }
 		frec << ss.str();
-		i++;
 	}
 
 	ss.str("");
@@ -3902,12 +3680,12 @@ void ParChangeSummarizer::summarize(ParameterEnsemble &pe, string filename)
     ss << "    Note: the 'n std decr' is the number of parameters with current" << endl;
     ss << "          std less 5% of their initial std." << endl;
 
-	cout << ss.str();
+	//cout << ss.str();
 	frec << ss.str();
 	if (grp_names.size() > 15)
 	{
 		ss.str("");
-		ss << "    Note: Only the first 15 parameter groups shown, see rec file for full listing" << endl;
+		ss << "    Note: Only the first 15 adjustable parameter groups shown, see rec file for full listing" << endl;
 		cout << ss.str();
 	}
 
@@ -3968,9 +3746,6 @@ map<string,int> ParChangeSummarizer::get_npar_per_group_with_excess_std_reductio
         demon = pr_std.at(std.first);
         if (demon <= 0.0)
         {
-            /*ss.str("");
-            ss << "L2PhiHandler: prior std <=0 for par '" << std.first << "': " << std.second;
-            throw runtime_error(ss.str());*/
             ratio = 1.0;
         }
         else {
@@ -3984,9 +3759,7 @@ map<string,int> ParChangeSummarizer::get_npar_per_group_with_excess_std_reductio
         }
         ratio = 1.0 - ratio;
         group = pi->get_parameter_rec_ptr(std.first)->group;
-//        if (results.find(group) == results.end()) {
-//            results[group] = 0;
-//        }
+
         if (ratio >= thresh)
         {
             results[group]++;
@@ -4009,10 +3782,7 @@ void ParChangeSummarizer:: update(ParameterEnsemble& pe)
     percent_at_lbound.clear();
 	init_cv.clear();
 	curr_cv.clear();
-
-	//pair<map<string, double>, map<string, double>> moments = pe.get_moment_maps();
-	//init_moments = base_pe_ptr->get_moment_maps(pe.get_real_names());
-	map<string, double> mean_map, std_map;
+    map<string, double> mean_map, std_map;
 	base_pe_ptr->fill_moment_maps(mean_map, std_map);
 	init_moments = pair<map<string, double>, map<string, double>>(mean_map, std_map);
 	mean_map.clear();
@@ -4142,12 +3912,14 @@ void ParChangeSummarizer:: update(ParameterEnsemble& pe)
 
 
 pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
-	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter, string tag, int cycle)
+    OutputFileWriter& output_file_writer, FileManager& file_manager,
+    int iter, string tag, int cycle,map<string,double> base_weights)
 {
 	stringstream ss;
 	map<string, int> vmap = pe.get_real_map();
 	Parameters pars;
 	Observations obs;
+
 	if (vmap.find(tag) != vmap.end())
 	{
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
@@ -4184,7 +3956,7 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 				ss << iter << ".";
 			ss << pest_utils::lower_cp(tag) <<  ".rei";
 			output_file_writer.write_rei(file_manager.open_ofile_ext(ss.str()), iter,
-				pest_scenario.get_ctl_observations(), obs, obj_func, pars);
+				pest_scenario.get_ctl_observations(), obs, obj_func, pars,base_weights);
 			file_manager.close_all_files_ending_with("rei");
 		}
 		cout << "saved par and rei files for realization " << tag;
@@ -4355,6 +4127,7 @@ EnsembleMethod::EnsembleMethod(Pest& _pest_scenario, FileManager& _file_manager,
 	iter = 0;
     warn_min_reals = 10;
     error_min_reals = 2;
+    org_obs_info = pest_scenario.get_ctl_observation_info_copy();
 
 }
 
@@ -4380,9 +4153,9 @@ void EnsembleMethod::sanity_checks()
 //		warnings.push_back("noptmax > 10, don't expect anything meaningful from the results!");
 //	}
 
-	else if (pest_scenario.get_control_info().noptmax > 3)
+	else if (pest_scenario.get_control_info().noptmax > 15)
 	{
-		warnings.push_back("noptmax > 3, this is a lot of iterations for an ensemble method...");
+		warnings.push_back("noptmax > 15, this is a lot of iterations for an ensemble method...");
 	}
 
     if (pest_scenario.get_control_info().pestmode == ControlInfo::PestMode::REGUL)
@@ -4512,6 +4285,18 @@ void EnsembleMethod::sanity_checks()
         errors.push_back("multimodal alpha < 0.001");
     }
 
+    for (auto& fac : ppo->get_ies_reinflate_factor())
+    {
+        if (fac <= 0.0)
+        {
+            errors.push_back("reinflation factor <= 0.0");
+        }
+        else if (fac > 1.0)
+        {
+            warnings.push_back("reinflation factor > 1.0..user beware!");
+        }
+    }
+
 
     if (warnings.size() > 0)
     {
@@ -4542,7 +4327,7 @@ void EnsembleMethod::throw_em_error(string message)
 	
 }
 
-bool EnsembleMethod::should_terminate()
+bool EnsembleMethod::should_terminate(int current_n_iter_mean)
 {
 	//todo: use ies accept fac here?
 	double phiredstp = pest_scenario.get_control_info().phiredstp;
@@ -4562,10 +4347,10 @@ bool EnsembleMethod::should_terminate()
 	message(1, "phiredstp: ", phiredstp);
 	message(1, "nphistp: ", nphistp);
 	message(1, "nphinored (also used for consecutive bad lambda cycles): ", nphinored);
-	int n_mean_iter = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
+	//int n_mean_iter = pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate();
     vector<double>::iterator begin_idx = best_mean_phis.begin();
-    if ((n_mean_iter > 0) && (best_mean_phis.size() > n_mean_iter))
-        begin_idx = best_mean_phis.end() - (n_mean_iter+1); //bc of prior phi and then adding the mean shift to the list
+    //if ((current_n_iter_mean > 0) && (best_mean_phis.size() > current_n_iter_mean))
+    //    begin_idx = best_mean_phis.end() - (current_n_iter_mean+1); //bc of prior phi and then adding the mean shift to the list
     if (best_mean_phis.size() > 0)
 	{
 
@@ -4586,7 +4371,8 @@ bool EnsembleMethod::should_terminate()
     for (auto& phi : best_mean_phis)
 	{
 		ratio = (phi - best_phi_yet) / phi;
-    	if ((i>=(iter - n_mean_iter)) && (ratio <= phiredstp))
+    	//if ((i>=(iter - current_n_iter_mean)) && (ratio <= phiredstp))
+        if (ratio <= phiredstp)
 			count++;
         i++;
 	}
@@ -4653,9 +4439,7 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 
 	//set_subset_idx(pe_lams[0].shape().first);
 	vector<map<int, int>> real_run_ids_vec;
-	//ParameterEnsemble pe_lam;
-	//for (int i=0;i<pe_lams.size();i++)
-	//for (auto& pe_lam : pe_lams)
+
 	string additional_tag;
 	for (int i=0;i<pe_lams.size();i++)
 	{
@@ -4697,19 +4481,14 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 	performance_log->log_event("processing runs");
 	vector<int> failed_real_indices;
 	vector<ObservationEnsemble> obs_lams;
-	//ObservationEnsemble _oe = oe;//copy
-	//if (subset_size < pe_lams[0].shape().first)
-	//	_oe.keep_rows(subset_idxs);
+
 	map<int, int> real_run_ids;
-	//for (auto &real_run_ids : real_run_ids_vec)
 	for (int i = 0; i < pe_lams.size(); i++)
 	{
 		ObservationEnsemble _oe = oe;//copy
 		vector<double> rep_vals{ lam_vals[i],scale_vals[i] };
 		real_run_ids = real_run_ids_vec[i];
-		//if using subset, reset the real_idx in real_run_ids to be just simple counter
-		//if (subset_size < pe_lams[0].shape().first)
-		//if ((use_subset) && (subset_idxs.size() < pe_lams[i].shape().first))
+
 		if ((use_subset) && ((_oe.shape().first > pe_lams[i].shape().first) || (pe_subset_idxs.size() < pe_lams[i].shape().first)))
 		{
 			_oe.keep_rows(oe_subset_idxs);
@@ -4788,8 +4567,7 @@ vector<ObservationEnsemble> EnsembleMethod::run_lambda_ensembles(vector<Paramete
 			else
 			{
 				performance_log->log_event("dropping failed realizations");
-				//_oe.drop_rows(failed_real_indices);
-				//pe_lams[i].drop_rows(failed_real_indices);
+
 				_oe.drop_rows(failed_obs_names);
 				pe_lams[i].drop_rows(failed_par_names);
 			}
@@ -4814,7 +4592,12 @@ pair<string,string> EnsembleMethod::save_ensembles(string tag, int cycle, Parame
 		ss << "." << "mean" << ".obs";
 	else
 		ss << "." << iter << ".obs";
-	if (pest_scenario.get_pestpp_options().get_save_binary())
+    if (pest_scenario.get_pestpp_options().get_save_dense())
+    {
+        ss << ".bin";
+        _oe.to_dense(ss.str());
+    }
+	else if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
 		_oe.to_binary(ss.str());
@@ -4837,7 +4620,12 @@ pair<string,string> EnsembleMethod::save_ensembles(string tag, int cycle, Parame
 		ss << "." << "mean" << ".par";
 	else
 		ss << "." << iter << ".par";
-	if (pest_scenario.get_pestpp_options().get_save_binary())
+    if (pest_scenario.get_pestpp_options().get_save_dense())
+    {
+        ss << ".bin";
+        _pe.to_dense(ss.str());
+    }
+    else if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << ".jcb";
 		_pe.to_binary(ss.str());
@@ -4867,8 +4655,10 @@ void EnsembleMethod::report_and_save(int cycle)
 	cout << "      current obs ensemble saved to " << names.second << endl;
 	frec << "      current par ensemble saved to " << names.first << endl;
 	cout << "      current par ensemble saved to " << names.first << endl;
-	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter, BASE_REAL_NAME, cycle);
-	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1, BASE_REAL_NAME, cycle);
+
+    map<string,double> base_weights = weights.get_real_map(BASE_REAL_NAME, true);
+	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter, BASE_REAL_NAME, cycle,base_weights);
+	save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1, BASE_REAL_NAME, cycle,base_weights);
 }
 
 
@@ -4909,25 +4699,6 @@ vector<int> EnsembleMethod::run_ensemble(ParameterEnsemble& _pe,
 		ss << "run_ensemble() error: " << e.what();
 		throw_em_error(ss.str());
 	}
-
-	/*if (failed_real_indices.size() > 0)
-	{
-		stringstream ss;
-		vector<string> par_real_names = _pe.get_real_names();
-		vector<string> obs_real_names = _oe.get_real_names();
-		ss << "the following par:obs realization runs failed: ";
-		for (auto &i : failed_real_indices)
-		{
-			ss << par_real_names[i] << ":" << obs_real_names[i] << ',';
-		}
-		performance_log->log_event(ss.str());
-		message(1, "failed realizations: ", failed_real_indices.size());
-		string s = ss.str();
-		message(1, s);
-		performance_log->log_event("dropping failed realizations");
-		_pe.drop_rows(failed_real_indices);
-		_oe.drop_rows(failed_real_indices);
-	}*/
 	return failed_real_indices;
 }
 
@@ -4949,8 +4720,11 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	if (pest_scenario.get_control_info().noptmax == 0)
 	{
-		
-		ParamTransformSeq pts = pe.get_par_transform();
+        if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
+            return;
+        }
+
+        ParamTransformSeq pts = pe.get_par_transform();
 		
 		ParameterEnsemble _pe(&pest_scenario, &rand_gen);
 		if (cycle == NetPackage::NULL_DA_CYCLE)
@@ -5170,11 +4944,21 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	consec_bad_lambda_cycles = 0;
     reinflate_to_minphi_real = false;
-    if (pest_scenario.get_pestpp_options().get_ies_n_iter_mean() < 0)
+    bool use_min = false;
+    for (auto& fac : pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate())
     {
-        message(2,"n_iter_mean < 0, using min-phi real for re-inflation, resetting n_iter_reinflate to positive");
+        if (fac < 0)
+        {
+            use_min = true;
+            //fac *= -1;
+        }
+    }
+
+    if (use_min)
+    {
+        message(2,"n_iter_reinflate < 0, using min-phi real for re-inflation, resetting n_iter_reinflate to positive");
         reinflate_to_minphi_real = true;
-        pest_scenario.get_pestpp_options_ptr()->set_ies_n_iter_mean(-1 * pest_scenario.get_pestpp_options().get_ies_n_iter_mean());
+        //pest_scenario.get_pestpp_options_ptr()->set_ies_n_iter_reinflate(-1 * pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate());
     }
 	lam_mults = pest_scenario.get_pestpp_options().get_ies_lam_mults();
 	if (lam_mults.size() == 0)
@@ -5312,7 +5096,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 			if (missing.size() == 0)
 			{
 				ss.str("");
-				ss << "par en has " << pe.shape().first << " realizations, compared to " << oe.shape().first << " obs+noise realizations";
+				ss << "par en has " << pe.shape().first << " realizations, compared to " << oe_base.shape().first << " obs+noise realizations";
 				message(1, ss.str());
 				message(1, " the realization names are compatible");
 				message(1, "re-indexing obs+noise en to align with par en...");
@@ -5363,7 +5147,15 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
     initialize_weights();
     ss.str("");
-    if (pest_scenario.get_pestpp_options().get_save_binary())
+    if (pest_scenario.get_pestpp_options().get_save_dense())
+    {
+        ss << file_manager.get_base_filename();
+        if (cycle != NetPackage::NULL_DA_CYCLE)
+            ss << "." << cycle;
+        ss << ".weights.bin";
+        weights.to_dense(ss.str());
+    }
+    else if (pest_scenario.get_pestpp_options().get_save_binary())
     {
         ss << file_manager.get_base_filename();
         if (cycle != NetPackage::NULL_DA_CYCLE)
@@ -5435,7 +5227,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	}
 
     int num_par_elements = pest_scenario.get_ctl_parameters().size();
-	if ((pp_args.find("IES_ORDERED_BINARY") == pp_args.end()) && (pp_args.find("DA_ORDERED_BINARY") == pp_args.end()))
+	if ((!pest_scenario.get_pestpp_options().get_save_dense()) && (pp_args.find("IES_ORDERED_BINARY") == pp_args.end()) && (pp_args.find("DA_ORDERED_BINARY") == pp_args.end()))
 	{
 
 		//if ((pe.shape().second > 100000) && (pest_scenario.get_pestpp_options().get_save_binary()))
@@ -5459,7 +5251,16 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	message(2, "checking for denormal values in pe");
 	pe.check_for_normal("initial transformed parameter ensemble");
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_save_binary())
+
+    if (pest_scenario.get_pestpp_options().get_save_dense())
+    {
+        ss << file_manager.get_base_filename();
+        if (cycle != NetPackage::NULL_DA_CYCLE)
+            ss << "." << cycle;
+        ss << ".0.par.bin";
+        pe.to_dense_unordered(ss.str());
+    }
+	else if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename();
 		if (cycle != NetPackage::NULL_DA_CYCLE)
@@ -5479,7 +5280,15 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	message(2, "checking for denormal values in obs + noise ensemble");
 	oe_base.check_for_normal("obs+noise observation ensemble");
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_save_binary())
+    if (pest_scenario.get_pestpp_options().get_save_dense())
+    {
+        ss << file_manager.get_base_filename();
+        if (cycle != NetPackage::NULL_DA_CYCLE)
+            ss << "." << cycle;
+        ss << ".obs+noise.bin";
+        oe_base.to_dense(ss.str());
+    }
+	else if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename();
 		if (cycle != NetPackage::NULL_DA_CYCLE)
@@ -5502,7 +5311,11 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 
 	if (pest_scenario.get_control_info().noptmax == -2)
 	{
-		message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
+        if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
+            return;
+        }
+
+        message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
 		message(1, "calculating mean parameter values");
 		Parameters pars;
 		vector<double> mv = pe.get_mean_stl_var_vector();
@@ -5686,8 +5499,12 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	}
 	else
 		message(1, "centering on ensemble mean vector");
+    if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
+        return;
+    }
 
-	//ok, now run the prior ensemble - after checking for center_on
+
+    //ok, now run the prior ensemble - after checking for center_on
 	//in case something is wrong with center_on
 	if ((obs_restart_csv.size() == 0) && (!use_existing)) {
         performance_log->log_event("running initial ensemble");
@@ -5719,7 +5536,15 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	}
 
 	ss.str("");
-	if (pest_scenario.get_pestpp_options().get_save_binary())
+    if (pest_scenario.get_pestpp_options().get_save_dense())
+    {
+        ss << file_manager.get_base_filename();
+        if (cycle != NetPackage::NULL_DA_CYCLE)
+            ss << "." << cycle;
+        ss << ".0.obs.bin";
+        oe.to_dense(ss.str());
+    }
+	else if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
 		ss << file_manager.get_base_filename();
 		if (cycle != NetPackage::NULL_DA_CYCLE)
@@ -5817,7 +5642,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	
 	pcs = ParChangeSummarizer(&pe_base, &file_manager, &output_file_writer);
 	message(1,"checking for prior-data conflict");
-    vector<string> in_conflict = ph.detect_simulation_data_conflict(oe,"pdc.csv");
+    vector<string> in_conflict = ph.detect_simulation_data_conflict(oe,".0.pdc.csv");
 	if (in_conflict.size() > 0)
 	{
 		ss.str("");
@@ -5825,7 +5650,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		ss << " with the prior simulated ensemble." << endl;
 		message(0, ss.str());
 
-		cout << "...see rec file or " << file_manager.get_base_filename() << ".pdc.csv" << " for listing of conflicted observations" << endl << endl;
+		cout << "...see rec file or " << file_manager.get_base_filename() << ".0.pdc.csv" << " for listing of conflicted observations" << endl << endl;
 		ofstream& frec = file_manager.rec_ofstream();
 		frec << endl << "...conflicted observations: " << endl;
 		for (auto oname : in_conflict)
@@ -5899,9 +5724,6 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		}
 	}
 
-
-
-
     drop_bad_reals(pe, oe);
 	if (oe.shape().first == 0)
 	{
@@ -5921,14 +5743,26 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		message(0, s);
 	}
 
-	adjust_weights();
+	adjust_weights(false);
 
+    //need this here since during reinflation we reset weight ensemble and might rebalance weights
+    if (ppo->get_ies_phi_fractions_file().size() > 0)
+    {
+        weights_base = weights;
+        org_obs_info = pest_scenario.get_ctl_observation_info_copy();
+    }
     if ((ppo->get_ies_phi_fractions_file().size() > 0) ||
         (ppo->get_obscov_filename().size() > 0) ||
         (in_conflict.size() > 0))
     {
         ss.str("");
-        if (pest_scenario.get_pestpp_options().get_save_binary())
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << file_manager.get_base_filename();
+            ss << ".adjusted.weights.bin";
+            weights.to_dense(ss.str());
+        }
+        else if (pest_scenario.get_pestpp_options().get_save_binary())
         {
             ss << file_manager.get_base_filename();
             ss << ".adjusted.weights.jcb";
@@ -5946,12 +5780,18 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         (ppo->get_obscov_filename().size() > 0) ||
         (in_conflict.size() > 0))
     {
+        map<string,double> base_weights = weights.get_real_map(BASE_REAL_NAME,true);
         string filename = file_manager.get_base_filename() + ".adjusted.obs_data.csv";
         ofstream f_obs(filename);
         if (f_obs.bad())
             throw_em_error("error opening: " + filename);
-        output_file_writer.scenario_obs_csv(f_obs);
+        output_file_writer.scenario_obs_csv(f_obs, base_weights);
         f_obs.close();
+
+
+        save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, iter, BASE_REAL_NAME, cycle, base_weights);
+        save_real_par_rei(pest_scenario, pe, oe, output_file_writer, file_manager, -1, BASE_REAL_NAME, cycle, base_weights);
+
 
     }
 
@@ -6210,7 +6050,6 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
         //but we have to make sure we have at least enough rows in the phi factor table - warn if more than needed,
         //  error if not enough
 
-
     }
     else
     {
@@ -6304,14 +6143,13 @@ void EnsembleMethod::check_and_fill_phi_factors(map<string,vector<string>>& grou
 
 }
 
-void EnsembleMethod::adjust_weights() {
+void EnsembleMethod::adjust_weights(bool save) {
 
     stringstream ss;
     string fname = pest_scenario.get_pestpp_options().get_ies_phi_fractions_file();
     if (fname.size() == 0) {
         return;
     }
-
 
 
     ss.str("");
@@ -6326,18 +6164,42 @@ void EnsembleMethod::adjust_weights() {
     map<string, map<string, double>> phi_fracs_by_real;
     vector<string> index;
     map<string, vector<string>> group_map, group_to_obs_map;
-    check_and_fill_phi_factors(group_to_obs_map, group_map, phi_fracs_by_real, index,true);
+    check_and_fill_phi_factors(group_to_obs_map, group_map, phi_fracs_by_real, index, true);
 
-    if (phi_fracs_by_real.size() == 1)
-    {
+    if (phi_fracs_by_real.size() == 1) {
         map<string, double> phi_fracs = phi_fracs_by_real.begin()->second;
         adjust_weights_single(group_to_obs_map, group_map, phi_fracs);
-    } else
-    {
-        adjust_weights_by_real(group_to_obs_map, group_map,phi_fracs_by_real,index);
+    } else {
+        adjust_weights_by_real(group_to_obs_map, group_map, phi_fracs_by_real, index);
 
     }
+
+    if (save) {
+        ss.str("");
+        ss << file_manager.get_base_filename() << "." << iter;
+        if (pest_scenario.get_pestpp_options().get_save_dense()) {
+            ss << ".adjusted.weights.bin";
+            weights.to_dense(ss.str());
+        } else if (pest_scenario.get_pestpp_options().get_save_binary()) {
+            ss << ".adjusted.weights.jcb";
+            weights.to_binary(ss.str());
+        } else {
+            ss << ".adjusted.weights.csv";
+            weights.to_csv(ss.str());
+        }
+        message(1, "saved adjusted weight ensemble to ", ss.str());
+
+        map<string, double> base_weights = weights.get_real_map(BASE_REAL_NAME, true);
+        ss.str("");
+        ss << file_manager.get_base_filename()  << "." << iter << ".adjusted.obs_data.csv";
+        ofstream f_obs(ss.str());
+        if (f_obs.bad())
+            throw_em_error("error opening: " + ss.str());
+        output_file_writer.scenario_obs_csv(f_obs, base_weights);
+        f_obs.close();
+    }
 }
+
 
 void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
                             map<string,map<string,double>>& phi_fracs_by_real,vector<string> index)
@@ -6456,7 +6318,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
             }
             current_phi_fracs[pf.first] = total / cur_mean_phi;
             ss.str("");
-            ss << "realization " << swr_map.first << ", file tag '" << pf.first << "' adjusted mean phi (factor): "
+            ss << "realization " << swr_map.first << ", file tag '" << pf.first << "' adjusted phi (factor): "
                << total << " (" << current_phi_fracs[pf.first] << ")";
             message(2, ss.str());
 
@@ -6466,10 +6328,12 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
     }
     if (verbose_level > 2)
     {
-        string fname = file_manager.get_base_filename() + ".obsgroupadj.summary.csv";
-        ofstream f(fname);
+        ss.str("");
+        ss << file_manager.get_base_filename() << "." << iter << ".obsgroupadj.summary.csv";
+
+        ofstream f(ss.str());
         if (!f.good())
-            throw_em_error("error opening weight adjustment summary file "+fname);
+            throw_em_error("error opening weight adjustment summary file "+ss.str());
 
         f << "realization,group,initial_phi,adjusted_phi" << endl;
         for (auto& grp_entry : real_init_group_phis) {
@@ -6478,7 +6342,7 @@ void EnsembleMethod::adjust_weights_by_real(map<string,vector<string>>& group_to
             }
         }
         f.close();
-        message(2,"saved obs group weight adjustment summary to "+fname);
+        message(2,"saved obs group weight adjustment summary to "+ss.str());
     }
 
 }
@@ -6577,10 +6441,12 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
     }
     if (verbose_level > 2)
     {
-        string fname = file_manager.get_base_filename() + ".obsgroupadj.summary.csv";
-        ofstream f(fname);
+        ss.str("");
+        ss << file_manager.get_base_filename() << "." << iter << ".obsgroupadj.summary.csv";
+
+        ofstream f(ss.str());
         if (!f.good())
-            throw_em_error("error opening weight adjustment summary file "+fname);
+            throw_em_error("error opening weight adjustment summary file "+ss.str());
 
         f << "group,initial_phi,adjusted_phi" << endl;
         for (auto& g : init_group_phis)
@@ -6588,7 +6454,7 @@ void EnsembleMethod::adjust_weights_single(map<string,vector<string>>& group_to_
             f << g.first << "," << g.second << "," << adj_group_phis.at(g.first) << endl;
         }
         f.close();
-        message(2,"saved obs group weight adjustment summary to "+fname);
+        message(2,"saved obs group weight adjustment summary to "+ss.str());
     }
 }
 
@@ -6713,40 +6579,13 @@ void EnsembleMethod::transfer_par_dynamic_state_final_to_initial_ip(ParameterEns
     }
 }
 
-
-//void EnsembleMethod::transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe)
-//{
-//	if (obs_dyn_state_names.size() > 0)
-//	{
-//		ParameterEnsemble::transStatus org_status = _pe.get_trans_status();
-//		ParamTransformSeq bts = pest_scenario.get_base_par_tran_seq();
-//		Eigen::MatrixXd mat = _pe.get_eigen(vector<string>(), par_dyn_state_names);
-//		if (org_status == ParameterEnsemble::transStatus::NUM)
-//		{
-//			for (int i = 0; i < mat.rows(); i++)
-//			{
-//				Parameters pars = pest_scenario.get_ctl_parameters();
-//				bts.ctl2numeric_ip(pars);
-//				pars.update(par_dyn_state_names, mat.row(i));
-//				bts.numeric2ctl_ip(pars);
-//				mat.row(i) = pars.get_data_eigen_vec(par_dyn_state_names);
-//			}
-//		}
-//		_oe.replace_col_vals(obs_dyn_state_names, mat);
-//	}
-//}
-
-
 void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 {
 	stringstream ss;
 	// find a list of dynamic states
-	//vector <string> dyn_states_names;	
 	obs_dyn_state_names.clear();
 	par_dyn_state_names.clear();
 	final2init_par_state_names.clear();
-	//vector<string> obs_names = oe.get_var_names(); // todo: get obs names from a different source. 
-	//vector<string> par_names = pe.get_var_names();
 	vector<string> obs_names = pest_scenario.get_ctl_observations().get_keys();
 	vector<string> par_names = pest_scenario.get_ctl_parameters().get_keys();
 	set<string> spar_names(par_names.begin(), par_names.end());
@@ -6757,8 +6596,6 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 	for (auto& name : obs_names)
 	{
 
-		//w = pest_scenario.get_observation_info_ptr()->get_weight(name);
-		//if ((w == 0) && (spar_names.find(name) != end))
 		if (spar_names.find(name) != end)
 		{
 			obs_dyn_state_names.push_back(name);
@@ -6804,13 +6641,9 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
 			}
 			else
 			{
-				//w = pest_scenario.get_observation_info_ptr()->get_weight(sm.first);
-				//if (w == 0)
-				{
-					obs_dyn_state_names.push_back(sm.first);
-					par_dyn_state_names.push_back(sm.second);
-					c++;
-				}
+                obs_dyn_state_names.push_back(sm.first);
+                par_dyn_state_names.push_back(sm.second);
+                c++;
 			}
 		}
 		if (dups.size() > 0)
@@ -6853,8 +6686,6 @@ void EnsembleMethod::initialize_dynamic_states(bool rec_report)
         int c = 0;
         for (auto& sm : par2par_state_map)
         {
-            //check if both names are not in the current Pest instance - if neither are
-            // in, continue - this means they are not in this cycle
             if ((spar_names.find(sm.first) == par_send) && (spar_names.find(sm.second) == par_send))
             {
                 continue;
@@ -6962,7 +6793,6 @@ bool EnsembleMethod::solve_mda(bool last_iter,int cycle)
 	//this function should cover the case where noptmax = 1 (vanilla) also...
 	vector<double> mda_facs, scaled_mda_facs;
 	mda_facs.push_back(pest_scenario.get_pestpp_options().get_ies_mda_init_fac());
-	//mda_facs.push_back(last_best_lam);
 	double tot, ttot;
 	if (iter == 1)	{
 		
@@ -7145,8 +6975,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	pe_upgrade.set_zeros();
 	pe_upgrade.set_trans_status(pe.get_trans_status());
 	ObservationEnsemble oe_upgrade(oe.get_pest_scenario_ptr(), &rand_gen, oe.get_eigen(vector<string>(), act_obs_names, false), oe.get_real_names(), act_obs_names);
-    //oe_upgrade.get_eigen_ptr_4_mod()->setZero();
-	//pass pe so that we can use the current par values but pass oe_upgrade since it only includes nz weight obs
     EnsembleSolver es(performance_log, file_manager, pest_scenario, pe, oe_upgrade, oe_base, weights, localizer, parcov, Am, ph,
 		use_localizer, iter, act_par_names, act_obs_names);
     double mm_alpha = pest_scenario.get_pestpp_options().get_ies_multimodal_alpha();
@@ -7217,7 +7045,11 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			if (!pest_scenario.get_pestpp_options().get_ies_save_lambda_en())
 				continue;
 
-			if (pest_scenario.get_pestpp_options().get_save_binary())
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                pe_lam_scale.to_dense_unordered(ss.str()+".bin");
+            }
+			else if (pest_scenario.get_pestpp_options().get_save_binary())
 			{
 				pe_lam_scale.to_binary(ss.str()+".jcb");
 			}
@@ -7255,7 +7087,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 		message(1, "non-iterative state-estimation detected, not evaluating update ensemble for current cycle");
 		pe = pe_lams[0];
 		//move the estimated states to the oe, which will then later be transferred back to the pe
-		//transfer_dynamic_state_from_pe_to_oe(pe, oe);
 		ph.update(oe, pe, weights);
         double best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
 		double best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
@@ -7319,7 +7150,12 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			ss.str("");
 			ss << file_manager.get_base_filename() << "." << iter << "." << lam_vals[i] << ".lambda." << scale_vals[i] << ".scale.obs";
 
-			if (pest_scenario.get_pestpp_options().get_save_binary())
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                ss << ".bin";
+                oe_lams[i].to_dense(ss.str());
+            }
+			else if (pest_scenario.get_pestpp_options().get_save_binary())
 			{
 				ss << ".jcb";
 				oe_lams[i].to_binary(ss.str());
@@ -7338,12 +7174,6 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 			message(1, "all realizations dropped as 'bad' for lambda, scale fac ", vals);
 			continue;
 		}
-
-//        if (pest_scenario.get_pestpp_options().get_ies_updatebyreals())
-//        {
-//            message(1, "updating realizations with reduced phi");
-//            update_reals_by_phi(pe_lams[i], oe_lams[i],subset_idxs);
-//        }
 
 		ph.update(oe_lams[i], pe_lams[i], weights);
 
@@ -7372,163 +7202,171 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 
 	}
 
-    if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first))
-	{
-		double acc_phi = last_best_mean * acc_fac;
+    if ((best_idx != -1) && (use_subset) && (local_subset_size < pe.shape().first)) {
+        double acc_phi = last_best_mean * acc_fac;
 
-		if (pest_scenario.get_pestpp_options().get_ies_debug_high_subset_phi())
-		{
-			cout << "ies_debug_high_subset_phi active" << endl;
-			best_mean = acc_phi + 1.0;
-		}
+        if (pest_scenario.get_pestpp_options().get_ies_debug_high_subset_phi()) {
+            cout << "ies_debug_high_subset_phi active" << endl;
+            best_mean = acc_phi + 1.0;
+        }
 
-		if ((best_mean > acc_phi))
-		{
-			//ph.update(oe_lams[best_idx],pe_lams[best_idx]);
+        if ((best_mean > acc_phi)) {
 
-			
-			ss.str("");
-			ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
-			string m = ss.str();
-			message(0, m);
-            ph.update(oe, pe,weights);
-            best_mean_phis.push_back(ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE));
-			if (!use_mda)
-			{
-				message(1, "updating realizations with reduced phi");
-				update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx],subset_idxs);
-			}
-
-			ph.update(oe, pe,weights);
-			//re-check phi
-			double new_best_mean;
-            new_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
-			if (new_best_mean < best_mean)
-			{
-				best_mean = new_best_mean;
-				best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
-				//replace the last entry in the best mean phi tracker
-				best_mean_phis[best_mean_phis.size() - 1] = best_mean;
-				message(1, "current best mean phi (after updating reduced-phi reals): ", best_mean);
-				if (best_mean < last_best_mean * acc_fac)
-				{
-					if (best_std < last_best_std * acc_fac)
-					{
-						double new_lam = lam_vals[best_idx] * lam_dec;
-						new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
-						message(0, "partial update improved phi stats, updating lambda to ", new_lam);
-						last_best_lam = new_lam;
-					}
-					else
-					{
-						message(0, "not updating lambda (standard deviation reduction criteria not met)");
-					}
-					last_best_std = best_std;
-				}
-			}
-			else
-			{
-				double new_lam = last_best_lam * lam_inc;
-				new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
-				last_best_lam = new_lam;
-				message(1, "abandoning current upgrade ensembles, returning to upgrade calculations and increasing lambda to ", new_lam);
-
-			}
-			message(1, "returning to upgrade calculations...");
-
-			return false;
-		}
-
-		//release the memory of the unneeded pe_lams
-		for (int i = 0; i < pe_lams.size(); i++)
-		{
-			if (i == best_idx)
-				continue;
-			pe_lams[i] =pe.zeros_like(0);
-		}
-		//need to work out which par and obs en real names to run - some may have failed during subset testing...
-		ObservationEnsemble remaining_oe_lam = oe;//copy
-
-		ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
-		remaining_pe_lam.set_fixed_info(pe.get_fixed_info());
-
-		if (pe_filenames.size() > 0)
-		{
-			performance_log->log_event("'ies_upgrades_in_memory' is 'false', loading 'best' parameter ensemble from file '" + pe_filenames[best_idx] + "'");
-			vector<string> missing;
-			if (oe_lams[best_idx].shape().first != remaining_pe_lam.shape().first)
-			{
-				set<string> ssub_names;
-				for (auto real_name : oe_lams[best_idx].get_real_names())
-					ssub_names.emplace(real_name);
-				vector<string> oreal_names = oe.get_real_names();
-				vector<string> preal_names = pe.get_real_names();
-
-				for (auto idx : subset_idxs)
-					if (ssub_names.find(oreal_names[idx]) == ssub_names.end())
-						missing.push_back(preal_names[idx]);
-				if (missing.size() > 0)
-					pe_lams[best_idx].drop_rows(missing);
-			}
-			
-			remaining_pe_lam.from_binary(pe_filenames[best_idx]);
-			remaining_pe_lam.transform_ip(ParameterEnsemble::transStatus::NUM);
-			//remove any failed runs from subset testing
-			if (missing.size() > 0)
-				remaining_pe_lam.drop_rows(missing);
-			remove_external_pe_filenames(pe_filenames);
-			
-		}
-		
-		
-		vector<string> pe_keep_names, oe_keep_names;
-		vector<string> pe_names = pe.get_real_names(), oe_names = oe.get_real_names();
-
-		vector<string> org_pe_idxs, org_oe_idxs;
-		set<string> ssub;
-		for (auto& i : subset_idxs)
-			ssub.emplace(pe_names[i]);
-		for (int i = 0; i < pe_names.size(); i++)
-			if (ssub.find(pe_names[i]) == ssub.end())
-			{
-				pe_keep_names.push_back(pe_names[i]);
-				//oe_keep_names.push_back(oe_names[i]);
-			}
-		ssub.clear();
-		for (auto& i : subset_idxs)
-			ssub.emplace(oe_names[i]);
-		for (int i = 0; i < oe_names.size(); i++)
-			if (ssub.find(oe_names[i]) == ssub.end())
-			{
-				oe_keep_names.push_back(oe_names[i]);
-			}
-		message(0, "phi summary for best lambda, scale fac: ", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
-		ph.update(oe_lams[best_idx], pe_lams[best_idx],weights);
-		ph.report(true,false);
-		message(0, "running remaining realizations for best lambda, scale:", vector<double>({ lam_vals[best_idx],scale_vals[best_idx] }));
-
-		//pe_keep_names and oe_keep_names are names of the remaining reals to eval
-		performance_log->log_event("dropping subset idxs from remaining_pe_lam");
-		remaining_pe_lam.keep_rows(pe_keep_names);
-		performance_log->log_event("dropping subset idxs from remaining_oe_lam");
-		remaining_oe_lam.keep_rows(oe_keep_names);
-		//save these names for later
-		org_pe_idxs = remaining_pe_lam.get_real_names();
-		org_oe_idxs = remaining_oe_lam.get_real_names();
-		///run
-		vector<int> fails = run_ensemble(remaining_pe_lam, remaining_oe_lam,vector<int>(),cycle);
-
-		//for testing
-		if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder()) {
             ss.str("");
-            ss << "ies_debug_fail_remainder is True, failing  par:obs realization " << org_pe_idxs[0] << ":" << org_oe_idxs[0];
-            message(0,ss.str());
+            ss << "best subset mean phi  (" << best_mean << ") greater than acceptable phi : " << acc_phi;
+            string m = ss.str();
+            message(0, m);
+            ph.update(oe, pe, weights);
+            best_mean_phis.push_back(ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE));
+            if (!use_mda) {
+                message(1, "updating realizations with reduced phi");
+                update_reals_by_phi(pe_lams[best_idx], oe_lams[best_idx], subset_idxs);
+            }
+
+            ph.update(oe, pe, weights);
+            //re-check phi
+            double new_best_mean;
+            new_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
+            if (new_best_mean < best_mean) {
+                best_mean = new_best_mean;
+                best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
+                //replace the last entry in the best mean phi tracker
+                best_mean_phis[best_mean_phis.size() - 1] = best_mean;
+                message(1, "current best mean phi (after updating reduced-phi reals): ", best_mean);
+                if (best_mean < last_best_mean * acc_fac) {
+                    if (best_std < last_best_std * acc_fac) {
+                        double new_lam = lam_vals[best_idx] * lam_dec;
+                        new_lam = (new_lam < lambda_min) ? lambda_min : new_lam;
+                        message(0, "partial update improved phi stats, updating lambda to ", new_lam);
+                        last_best_lam = new_lam;
+                    } else {
+                        message(0, "not updating lambda (standard deviation reduction criteria not met)");
+                    }
+                    last_best_std = best_std;
+                }
+            } else {
+                double new_lam = last_best_lam * lam_inc;
+                new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
+                last_best_lam = new_lam;
+                message(1,
+                        "abandoning current upgrade ensembles, returning to upgrade calculations and increasing lambda to ",
+                        new_lam);
+
+            }
+            message(1, "returning to upgrade calculations...");
+
+            return false;
+        }
+
+        //release the memory of the unneeded pe_lams
+        for (int i = 0; i < pe_lams.size(); i++) {
+            if (i == best_idx)
+                continue;
+            pe_lams[i] = pe.zeros_like(0);
+        }
+        //need to work out which par and obs en real names to run - some may have failed during subset testing...
+        ObservationEnsemble remaining_oe_lam = oe;//copy
+
+        ParameterEnsemble remaining_pe_lam = pe_lams[best_idx];
+        remaining_pe_lam.set_fixed_info(pe.get_fixed_info());
+
+        if (pe_filenames.size() > 0) {
+            performance_log->log_event(
+                    "'ies_upgrades_in_memory' is 'false', loading 'best' parameter ensemble from file '" +
+                    pe_filenames[best_idx] + "'");
+            vector<string> missing;
+            if (oe_lams[best_idx].shape().first != remaining_pe_lam.shape().first) {
+                set<string> ssub_names;
+                for (auto real_name: oe_lams[best_idx].get_real_names())
+                    ssub_names.emplace(real_name);
+                vector<string> oreal_names = oe.get_real_names();
+                vector<string> preal_names = pe.get_real_names();
+
+                for (auto idx: subset_idxs)
+                    if (ssub_names.find(oreal_names[idx]) == ssub_names.end())
+                        missing.push_back(preal_names[idx]);
+                if (missing.size() > 0)
+                    pe_lams[best_idx].drop_rows(missing);
+            }
+
+            remaining_pe_lam.from_binary(pe_filenames[best_idx]);
+            remaining_pe_lam.transform_ip(ParameterEnsemble::transStatus::NUM);
+            //remove any failed runs from subset testing
+            if (missing.size() > 0)
+                remaining_pe_lam.drop_rows(missing);
+            remove_external_pe_filenames(pe_filenames);
+
+        }
+
+
+        vector<string> pe_keep_names, oe_keep_names;
+        vector<string> pe_names = pe.get_real_names(), oe_names = oe.get_real_names();
+
+        vector<string> org_pe_idxs, org_oe_idxs;
+        set<string> ssub;
+        for (auto &i: subset_idxs)
+            ssub.emplace(pe_names[i]);
+        for (int i = 0; i < pe_names.size(); i++)
+            if (ssub.find(pe_names[i]) == ssub.end()) {
+                pe_keep_names.push_back(pe_names[i]);
+                //oe_keep_names.push_back(oe_names[i]);
+            }
+        ssub.clear();
+        for (auto &i: subset_idxs)
+            ssub.emplace(oe_names[i]);
+        for (int i = 0; i < oe_names.size(); i++)
+            if (ssub.find(oe_names[i]) == ssub.end()) {
+                oe_keep_names.push_back(oe_names[i]);
+            }
+        message(0, "phi summary for best lambda, scale fac: ",
+                vector<double>({lam_vals[best_idx], scale_vals[best_idx]}));
+        ph.update(oe_lams[best_idx], pe_lams[best_idx], weights);
+        ph.report(true, false);
+        message(0, "running remaining realizations for best lambda, scale:",
+                vector<double>({lam_vals[best_idx], scale_vals[best_idx]}));
+
+        //pe_keep_names and oe_keep_names are names of the remaining reals to eval
+        performance_log->log_event("dropping subset idxs from remaining_pe_lam");
+        remaining_pe_lam.keep_rows(pe_keep_names);
+        performance_log->log_event("dropping subset idxs from remaining_oe_lam");
+        remaining_oe_lam.keep_rows(oe_keep_names);
+        //save these names for later
+        org_pe_idxs = remaining_pe_lam.get_real_names();
+        org_oe_idxs = remaining_oe_lam.get_real_names();
+        ///run
+        vector<int> fails = run_ensemble(remaining_pe_lam, remaining_oe_lam, vector<int>(), cycle);
+        int q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2)) {
+            message(1, "'pest.stp' found, quitting");
+            return true;
+        }
+        else if (q == 4)
+        {
+            message(0,"pest.stp found with '4'.  run mgr has returned control, removing file.");
+            if (!pest_utils::try_remove_quit_file())
+            {
+                message(0,"error removing pest.stp file, bad times ahead...");
+            }
+        }
+        //for testing
+        if (pest_scenario.get_pestpp_options().get_ies_debug_fail_remainder()) {
+            ss.str("");
+            ss << "ies_debug_fail_remainder is True, failing  par:obs realization " << org_pe_idxs[0] << ":"
+               << org_oe_idxs[0];
+            message(0, ss.str());
             fails.push_back(0);
         }
 
-		//if any of the remaining runs failed
-		if (fails.size() == org_pe_idxs.size())
-			throw_em_error(string("all remaining realizations failed...something is prob wrong"));
+        //if any of the remaining runs failed
+        if (fails.size() == org_pe_idxs.size())
+        {
+            double new_lam = last_best_lam * lam_inc;
+            new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
+            last_best_lam = new_lam;
+            message(1, "all remaining realizations failed...something is prob wrong, returning to upgrade calculations and increasing lambda to ",
+                    new_lam);
+            return false;
+        }
 		if (fails.size() > 0)
 		{
 
@@ -7563,7 +7401,13 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
         drop_bad_reals(pe_lams[best_idx], oe_lam_best);
 		if (oe_lam_best.shape().first == 0)
 		{
-			throw_em_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
+			//throw_em_error(string("all realization dropped after finishing subset runs...something might be wrong..."));
+            double new_lam = last_best_lam * lam_inc;
+            new_lam = (new_lam > lambda_max) ? lambda_max : new_lam;
+            last_best_lam = new_lam;
+            message(1, "all realization dropped after finishing subset runs...something is prob wrong, returning to upgrade calculations and increasing lambda to ",
+                    new_lam);
+            return false;
 		}
 		performance_log->log_event("updating phi");
 		ph.update(oe_lam_best, pe_lams[best_idx], weights);
@@ -7689,35 +7533,35 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	return true;
 }
 
-void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
+void EnsembleMethod::reset_par_ensemble_to_prior_mean(double reinflate_factor){
+
     string min_phi_name = "";
-    if (true)
+    //find the min phi real...
+    map<string,double> pmap = ph.get_phi_map(L2PhiHandler::phiType::ACTUAL);
+    double min_phi = numeric_limits<double>::max();
+
+    for (auto& item : pmap)
     {
-        map<string,double> pmap = ph.get_phi_map(L2PhiHandler::phiType::ACTUAL);
-        double min_phi = numeric_limits<double>::max();
-
-        for (auto& item : pmap)
+        if (item.second < min_phi)
         {
-            if (item.second < min_phi)
-            {
-                min_phi = item.second;
-                min_phi_name = item.first;
-            }
+            min_phi = item.second;
+            min_phi_name = item.first;
         }
-        vector<string> real_names = oe.get_real_names();
-        int idx = distance(real_names.begin(),find(real_names.begin(),real_names.end(),min_phi_name));
-        if (idx == real_names.size())
-        {
-            throw_em_error("min phi realization name not found in obs ensemble");
-        }
-        real_names = pe.get_real_names();
-        min_phi_name = real_names[idx];
-
     }
+    vector<string> real_names = oe.get_real_names();
+    int idx = distance(real_names.begin(),find(real_names.begin(),real_names.end(),min_phi_name));
+    if (idx == real_names.size())
+    {
+        throw_em_error("min phi realization name not found in obs ensemble");
+    }
+    real_names = pe.get_real_names();
+    min_phi_name = real_names[idx];
+
     message(0,"resetting current parameter ensemble to prior ensemble with current ensemble mean");
+    message(1,"reinflation factor:",reinflate_factor);
     performance_log->log_event("getting prior parameter ensemble mean-centered anomalies");
     Eigen::MatrixXd anoms = pe_base.get_eigen_anomalies(pe_base.get_real_names(), pe.get_var_names(), pest_scenario.get_pestpp_options().get_ies_center_on());
-
+    anoms = anoms * reinflate_factor;
     performance_log->log_event("getting current parameter ensemble mean vector");
     vector<double> mean_vec = pe.get_mean_stl_var_vector();
     Eigen::VectorXd offset(mean_vec.size());
@@ -7728,7 +7572,6 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
         offset = pe.get_real_vector(min_phi_name);
         message(2,"using min-phi realization for offset");
     }
-
 
     performance_log->log_event("adding offset to anomalies");
     for (int i = 0; i < mean_vec.size(); i++)
@@ -7752,6 +7595,10 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
     ofstream& frec = file_manager.rec_ofstream();
     oe.reserve(oe_base.get_real_names(),oe.get_var_names());
     weights = weights_base;
+    for (auto& oname : oe.get_var_names())
+    {
+        pest_scenario.get_observation_info_ptr()->get_observation_rec_ptr_4_mod(oname)->weight = org_obs_info.get_weight(oname);
+    }
     run_ensemble_util(performance_log,frec,new_pe,oe,run_mgr_ptr,false,temp,NetPackage::NULL_DA_CYCLE, ss.str());
     pe = new_pe;
     new_pe = ParameterEnsemble();
@@ -7768,7 +7615,7 @@ void EnsembleMethod::reset_par_ensemble_to_prior_mean(){
     ph.report(true,true);
     ph.write(iter, run_mgr_ptr->get_total_runs());
     ss.str("");
-    ss << file_manager.get_base_filename() << "." << iter << ".meanshift.pcs.csv";
+    ss << file_manager.get_base_filename() << "." << iter << ".reinflate.pcs.csv";
     pcs.summarize(pe, ss.str());
     last_best_lam = pest_scenario.get_pestpp_options().get_ies_init_lam();
     double phi_lam = get_lambda();
@@ -7798,31 +7645,6 @@ void EnsembleMethod::remove_external_pe_filenames(vector<string>& pe_filenames)
 
     }
 }
-
-//template<typename T, typename A>
-//void EnsembleMethod::message(int level, const string& _message, vector<T, A> _extras, bool echo)
-//{
-//	stringstream ss;
-//	if (level == 0)
-//		ss << endl << "  ---  ";
-//	else if (level == 1)
-//		ss << "...";
-//	ss << _message;
-//	if (_extras.size() > 0)
-//	{
-//
-//		for (auto& e : _extras)
-//			ss << e << " , ";
-//
-//	}
-//	if (level == 0)
-//		ss << "  ---  ";
-//	if ((echo) && ((verbose_level >= 2) || (level < 2)))
-//		cout << ss.str() << endl;
-//	file_manager.rec_ofstream() << ss.str() << endl;
-//	performance_log->log_event(_message);
-//
-//}
 
 
 void EnsembleMethod::message(int level, const string& _message, vector<string> _extras, bool echo)
@@ -8023,17 +7845,13 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 
 		map<string, double> norm_map = pe.draw(num_reals, draw_par, cov, performance_log, pest_scenario.get_pestpp_options().get_ies_verbose_level(), file_manager.rec_ofstream());
 		norm_map_report(norm_map, "initial parameter realizations");
-		// stringstream ss;
-		// ss << file_manager.get_base_filename() << ".0.par.csv";
-		// message(1, "saving initial parameter ensemble to ", ss.str());
-		// pe.to_csv(ss.str());
 		drawn = true;
 		
 	}
 	else
 	{
 		string par_ext = pest_utils::lower_cp(par_csv).substr(par_csv.size() - 3, par_csv.size());
-		performance_log->log_event("processing par csv " + par_csv);
+		performance_log->log_event("processing par ensemble " + par_csv);
 		if (par_ext.compare("csv") == 0)
 		{
 			message(1, "loading par ensemble from csv file", par_csv);
@@ -8051,7 +7869,7 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 				throw_em_error(string("error processing par csv"));
 			}
 		}
-		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0) || (par_ext.compare("bin")==0))
 		{
 			message(1, "loading par ensemble from binary file", par_csv);
 			try
@@ -8070,7 +7888,7 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 		}
 		else
 		{
-			ss << "unrecognized par csv extension " << par_ext << ", looking for csv, jcb, or jco";
+			ss << "unrecognized par ensemble extension " << par_ext << ", looking for csv, jcb, jco, or bin";
 			throw_em_error(ss.str());
 		}
 
@@ -8079,11 +7897,7 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 		if (pp_args.find("IES_NUM_REALS") != pp_args.end())
 		{
 			int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
-			/*if (pest_scenario.get_pestpp_options().get_ies_include_base())
-			{
-				message(1, "Note: increasing num_reals by 1 to account for 'base' realization in existing par ensemble");
-				num_reals++;
-			}*/
+
 			if (num_reals < pe.shape().first)
 			{
 				message(1, "ies_num_reals arg passed, truncated parameter ensemble to ", num_reals);
@@ -8104,16 +7918,17 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 			if (pest_scenario.get_pestpp_options().get_ies_verbose_level() > 1)
 			{
 
+
 				if (pest_scenario.get_pestpp_options().get_save_binary())
 				{
 					string filename = file_manager.get_base_filename() + ".prior.jcb";
-					message(1, "saving emprirical parameter covariance matrix to binary file: ", filename);
+					message(1, "saving empirical parameter covariance matrix to binary file: ", filename);
 					parcov.to_binary(filename);
 				}
 				else
 				{
 					string filename = file_manager.get_base_filename() + ".prior.cov";
-					message(1, "saving emprirical parameter covariance matrix to ASCII file: ", filename);
+					message(1, "saving empirical parameter covariance matrix to ASCII file: ", filename);
 					parcov.to_ascii(filename);
 				}
 			}
@@ -8124,17 +7939,7 @@ bool EnsembleMethod::initialize_pe(Covariance& cov)
 				message(1, "Warning: even though ies_enforce_bounds is true, a restart obs en was passed, so bounds will not be enforced on the initial par en");
 			else
 			{
-				/*if (pest_scenario.get_pestpp_options().get_ies_enforce_chglim())
-				{
-					ss.str("");
-					ss << "WARNING: 'ies_enforce_chglim' is true, so bounds are being enforced on the " << endl;
-					ss << "          initial parameter ensemble by shrinking each realization towards the " << endl;
-					ss << "          parameter values in the pest control file. If any parameters are at / near " << endl;
-					ss << "          bounds in the control file this will cause many realizations to be nearly " << endl;
-					ss << "          identical to the parameter values in the control file" << endl;
-					message(1, ss.str());
 
-				}*/
 				//dont use the shrinking bounds - too many chances for zero length
 				map<string, double> norm_map = pe.enforce_bounds(performance_log, false);
 				norm_map_report(norm_map, "initial parameter");
@@ -8327,7 +8132,7 @@ bool EnsembleMethod::initialize_weights()
 	else
 	{
 		string obs_ext = pest_utils::lower_cp(weight_csv).substr(weight_csv.size() - 3, weight_csv.size());
-		performance_log->log_event("processing weights csv " + weight_csv);
+		performance_log->log_event("processing weights ensemble " + weight_csv);
 		if (obs_ext.compare("csv") == 0)
 		{
 			message(1, "loading weights ensemble from csv file", weight_csv);
@@ -8345,7 +8150,7 @@ bool EnsembleMethod::initialize_weights()
 				throw_em_error(string("error processing weights csv"));
 			}
 		}
-		else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
+		else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0) || (obs_ext.compare("bin")==0))
 		{
 			message(1, "loading weights ensemble from binary file", weight_csv);
 			try
@@ -8365,7 +8170,7 @@ bool EnsembleMethod::initialize_weights()
 		}
 		else
 		{
-			ss << "unrecognized weights ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
+			ss << "unrecognized weights ensemble extension " << obs_ext << ", looking for csv, jcb, jco, or bin";
 			throw_em_error(ss.str());
 		}
 		//make sure all oe realizations are in weights
@@ -8441,7 +8246,7 @@ bool EnsembleMethod::initialize_oe(Covariance& cov)
     else
     {
         string obs_ext = pest_utils::lower_cp(obs_csv).substr(obs_csv.size() - 3, obs_csv.size());
-        performance_log->log_event("processing obs csv " + obs_csv);
+        performance_log->log_event("processing obs ensemble" + obs_csv);
         if (obs_ext.compare("csv") == 0)
         {
             message(1, "loading obs ensemble from csv file", obs_csv);
@@ -8459,7 +8264,7 @@ bool EnsembleMethod::initialize_oe(Covariance& cov)
                 throw_em_error(string("error processing obs csv"));
             }
         }
-        else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
+        else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0) || (obs_ext.compare("bin")==0))
         {
             message(1, "loading obs ensemble from binary file", obs_csv);
             try
@@ -8479,17 +8284,13 @@ bool EnsembleMethod::initialize_oe(Covariance& cov)
         }
         else
         {
-            ss << "unrecognized obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
+            ss << "unrecognized obs ensemble extension " << obs_ext << ", looking for csv, jcb, jco, bin";
             throw_em_error(ss.str());
         }
         if (pp_args.find("IES_NUM_REALS") != pp_args.end())
         {
             int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
-            /*if (pest_scenario.get_pestpp_options().get_ies_include_base())
-            {
-                message(1, "Note: increasing num_reals by 1 to account for 'base' realization in existing obs ensemble");
-                num_reals++;
-            }*/
+
             if (num_reals < oe_base.shape().first)
             {
                 message(1, "ies_num_reals arg passed, truncated observation ensemble to ", num_reals);
@@ -8533,7 +8334,7 @@ void EnsembleMethod::initialize_restart()
 			throw_em_error(string("error processing restart obs csv"));
 		}
 	}
-	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0))
+	else if ((obs_ext.compare("jcb") == 0) || (obs_ext.compare("jco") == 0) || (obs_ext.compare("bin")==0))
 	{
 		message(1, "loading restart obs ensemble from binary file", obs_restart_csv);
 		try
@@ -8552,7 +8353,7 @@ void EnsembleMethod::initialize_restart()
 	}
 	else
 	{
-		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, or jco";
+		ss << "unrecognized restart obs ensemble extension " << obs_ext << ", looking for csv, jcb, jco, bin";
 		throw_em_error(ss.str());
 	}
 	if (par_restart_csv.size() > 0)
@@ -8575,7 +8376,7 @@ void EnsembleMethod::initialize_restart()
 				throw_em_error(string("error processing restart par csv"));
 			}
 		}
-		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0) || (par_ext.compare("bin")==0))
 		{
 			message(1, "loading restart par ensemble from binary file", par_restart_csv);
 			try
@@ -8594,7 +8395,7 @@ void EnsembleMethod::initialize_restart()
 		}
 		else
 		{
-			ss << "unrecognized restart par ensemble extension " << par_ext << ", looking for csv, jcb, or jco";
+			ss << "unrecognized restart par ensemble extension " << par_ext << ", looking for csv, jcb, jco, or bin";
 			throw_em_error(ss.str());
 		}
 		if (pe.shape().first != oe.shape().first)
@@ -8626,11 +8427,7 @@ void EnsembleMethod::initialize_restart()
 	if (pp_args.find("IES_NUM_REALS") != pp_args.end())
 	{
 		int num_reals = pest_scenario.get_pestpp_options().get_ies_num_reals();
-		/*if (pest_scenario.get_pestpp_options().get_ies_include_base())
-		{
-			message(1, "Note: increasing num_reals by 1 to account for 'base' realization in existing obs restart ensemble");
-			num_reals++;
-		}*/
+
 		if (num_reals < oe.shape().first)
 		{
 			message(1, "ies_num_reals arg passed, truncated restart obs ensemble to ", num_reals);
@@ -8683,7 +8480,12 @@ void EnsembleMethod::initialize_restart()
 				Observations obs = pest_scenario.get_ctl_observations();
 				oe_base.replace(base_par_idx, obs, BASE_REAL_NAME);
 				ss.str("");
-				if (pest_scenario.get_pestpp_options().get_save_binary())
+                if (pest_scenario.get_pestpp_options().get_save_dense())
+                {
+                    ss << file_manager.get_base_filename() << ".obs+noise.bin";
+                    oe_base.to_dense(ss.str());
+                }
+				else if (pest_scenario.get_pestpp_options().get_save_binary())
 				{
 					ss << file_manager.get_base_filename() << ".obs+noise.jcb";
 					oe_base.to_binary(ss.str());
@@ -8707,15 +8509,20 @@ void EnsembleMethod::initialize_restart()
                 }
                 weights.replace(base_par_idx, wobs, BASE_REAL_NAME);
                 ss.str("");
-                if (pest_scenario.get_pestpp_options().get_save_binary())
+                if (pest_scenario.get_pestpp_options().get_save_dense())
+                {
+                    ss << file_manager.get_base_filename() << ".weights.bin";
+                    weights.to_binary(ss.str());
+                }
+                else if (pest_scenario.get_pestpp_options().get_save_binary())
                 {
                     ss << file_manager.get_base_filename() << ".weights.jcb";
-                    oe_base.to_binary(ss.str());
+                    weights.to_binary(ss.str());
                 }
                 else
                 {
                     ss << file_manager.get_base_filename() << ".weights.csv";
-                    oe_base.to_csv(ss.str());
+                    weights.to_csv(ss.str());
                 }
                 message(1, "re-saved weight ensemble to ", ss.str());
 			}
@@ -8775,24 +8582,6 @@ void EnsembleMethod::initialize_restart()
 	//if (oe.shape().first < oe_base.shape().first) //maybe some runs failed...
 	if (oe.shape().first <= oe_base.shape().first)
 	{
-		//find which realizations are missing and reorder oe_base, pe and pe_base
-
-		//message(1, "shape mismatch detected with restart obs ensemble...checking for compatibility");
-
-		/*vector<string> pe_real_names;
-		start = oe_base_real_names.begin();
-		end = oe_base_real_names.end();
-		vector<string>::const_iterator it;
-		int iit;
-		for (int i = 0; i < oe.shape().first; i++)
-		{
-			it = find(start, end, oe_real_names[i]);
-			if (it != end)
-			{
-				iit = it - start;
-				pe_real_names.push_back(pe_org_real_names[iit]);
-			}
-		}*/
 		message(2, "reordering oe_base to align with restart obs en,num reals:", oe_real_names.size());
 		if ((oe_drawn) && (oe_base.shape().first == oe_real_names.size()))
 		{
@@ -8851,20 +8640,6 @@ void EnsembleMethod::initialize_restart()
 			}
 		}
 
-
-		/*try
-		{
-			pe.reorder(pe_real_names, vector<string>());
-		}
-		catch (exception &e)
-		{
-			ss << "error reordering pe with restart oe:" << e.what();
-			throw_ies_error(ss.str());
-		}
-		catch (...)
-		{
-			throw_ies_error(string("error reordering pe with restart oe"));
-		}*/
 	}
 	else if (oe.shape().first > oe_base.shape().first) //something is wrong
 	{
@@ -9063,14 +8838,7 @@ void EnsembleMethod::drop_bad_reals(ParameterEnsemble& _pe, ObservationEnsemble&
 		int pidx;
 		vector<string> full_onames, full_pnames;
 		// if a subset drop, then use the full oe index, otherwise, just use _oe index
-		/*if (_oe.shape().first != _pe.shape().first)
-		{
-			full_onames = oe.get_real_names();
-		}
-		else
-		{
-			full_onames = _oe.get_real_names();
-		}*/
+
 		full_onames = oe.get_real_names();
 		full_pnames = pe.get_real_names();
 		vector<string> pdrop, odrop;
@@ -9127,8 +8895,6 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 	vector<string> oe_base_names = oe.get_real_names();
 	vector<string> pe_base_names = pe.get_real_names();
 
-	//if (pe_names.size() != oe_base_names.size())
-	//	throw runtime_error("IterEnsembleSmoother::update_reals_by_phi() error: pe_names != oe_base_names");
 	map<string, int> oe_name_to_idx;
 	map<int, string> pe_idx_to_name;
 	if (subset_idxs.size() > 0)
@@ -9170,8 +8936,6 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 		cur_phi = cur_phi_map.at(oname);
 		if (new_phi < cur_phi * acc_fac)
 		{
-			//pname = pe_names[i];
-			//pname = pe_names[oe_name_to_idx[oname]];
 			pname = pe_idx_to_name.at(oe_name_to_idx.at(oname));
 			if (find(pe_names.begin(), pe_names.end(), pname) == pe_names.end())
 				throw runtime_error("EnsembeMethod::update_reals_by_phi() error: pname not in pe_names: " + pname);
@@ -9192,9 +8956,7 @@ void EnsembleMethod::update_reals_by_phi(ParameterEnsemble& _pe, ObservationEnse
 
 vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 {
-	//map<int,int> subset_idx_map;
 	vector<int> subset_idxs;
-	//int nreal_subset = pest_scenario.get_pestpp_options().get_ies_subset_size();
 	if ((!use_subset) || (nreal_subset >= size))
 	{
 		for (int i = 0; i < size; i++)
@@ -9303,8 +9065,7 @@ vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 
 
 		step = (phis.size() - 1) / nreal_subset;
-		//cout << step << endl;
-		//cout << (phis.size() - 1) << endl;
+
 		for (i = 1; i < nreal_subset; ++i)
 		{
 			//add higher phis first
@@ -9312,23 +9073,16 @@ vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 			if ((subset_idxs.size() < nreal_subset) && (find(subset_idxs.begin(), subset_idxs.end(), phis[idx].second) == subset_idxs.end()))
 			{
 				subset_idxs.push_back(phis[idx].second);
-				//cout << i << endl;
-				//cout << idx << endl;
-				//cout << phis[idx].first << endl;
-				//cout << phis[idx].second << endl;
+
 			}
 		}
 	}
 	else
 	{
-		//throw runtime_error("unkonwn 'subset_how'");
 		throw_em_error("unknown 'subset_how'");
 	}
-	/*stringstream ss;
-	for (auto i : subset_idxs)
-		ss << i << ":" << pe_names[i] << ", ";
-	message(1, "subset idx:pe real name: ", ss.str());*/
+
 	sort(subset_idxs.begin(), subset_idxs.end());
 	return subset_idxs;
-	//return subset_idx_map;
+
 }

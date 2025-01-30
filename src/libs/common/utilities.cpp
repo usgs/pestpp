@@ -129,6 +129,25 @@ std::string& strip_ip(string &s, const string &op, const string &delimiters)
 		else i+=1;
 		if (i<s.size()) s.erase(i);
 	}
+    int start_ascii = 0;
+    for (int i=0;i<s.size();i++)
+    {
+        if (static_cast<unsigned char>(s[i]) <= 127)
+        {
+            start_ascii = i;
+            break;
+        }
+    }
+    int end_ascii = s.size();
+    for (int i=s.size();i>=0;i--)
+    {
+        if (static_cast<unsigned char>(s[i]) <= 127)
+        {
+            end_ascii = i;
+            break;
+        }
+    }
+    s = s.substr(start_ascii, end_ascii);
 	return s;
 }
 
@@ -526,14 +545,16 @@ map<string, double> read_twocol_ascii_to_map(string filename, int header_lines, 
 
             value = stod(tokens[data_col],&idx);
             //convert_ip(tokens[data_col], value);
-            if (idx != tokens[data_col].size())
-            {
-                cout << "Error: left over chars after data for token " << tokens[data_col] << " on line " << line << " of file " << filename << endl;
-                cerr << "Error: left over chars after data for token " << tokens[data_col] << " on line " << line << " of file " << filename << endl;
-                throw runtime_error("Error: left over chars after data for token "+tokens[data_col]+" on line "+line+" of file "+filename);
+            if (idx != tokens[data_col].size()) {
+                cout << "Error: left over chars after data for token " << tokens[data_col] << " on line " << line
+                     << " of file " << filename << endl;
+                cerr << "Error: left over chars after data for token " << tokens[data_col] << " on line " << line
+                     << " of file " << filename << endl;
+                throw runtime_error(
+                        "Error: left over chars after data for token " + tokens[data_col] + " on line " + line +
+                        " of file " + filename);
             }
-
-            result[tokens[0]] = value;
+            result[strip_cp(tokens[0])] = value;
         }
         fin.close();
         return result;

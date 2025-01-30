@@ -10,6 +10,7 @@
 #include "EnsembleMethodUtils.h"
 #include "constraints.h"
 #include "eigen_tools.h"
+#include "RedSVD-h.h"
 
 using namespace std;
 
@@ -1833,7 +1834,7 @@ void MOEA::initialize()
 	{
 		//evaluate the chance constraints at every individual, very costly, but most robust
 		chancepoints = chancePoints::ALL;
-		message(1, "'opt_chance_points' = ALL, evaluting chance at all population members");
+		message(1, "'opt_chance_points' = ALL, evaluating chance at all population members");
 	}
 	
 	else if (chance_points == "SINGLE")
@@ -1841,7 +1842,7 @@ void MOEA::initialize()
 		//evaluate the chance constraints only at the population member nearest the optimal tradeoff.
 		//much cheaper, but assumes linear coupling
 		chancepoints = chancePoints::SINGLE;
-		message(1, "'opt_chance_points' = SINGLE, evaluting chance at representative point");
+		message(1, "'opt_chance_points' = SINGLE, evaluating chance at representative point");
 	}
 	else
 	{
@@ -2173,7 +2174,7 @@ void MOEA::initialize()
             gen_types.push_back(MouGenType::SMP);
             message(1, "using simplex generator");
         }
-		else
+        else
 		{
 			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX','PM','PSO'}");
 		}
@@ -2363,8 +2364,16 @@ void MOEA::initialize()
 		ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag;
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
-			ss << ".jcb";
-			dp.to_binary(ss.str());
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                ss << ".bin";
+                dp.to_dense(ss.str());
+            }
+            else {
+                ss << ".jcb";
+                dp.to_binary(ss.str());
+            }
+
 		}
 		else
 		{
@@ -2386,8 +2395,15 @@ void MOEA::initialize()
 	ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag;
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		op.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            op.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            op.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -2410,11 +2426,19 @@ void MOEA::initialize()
 	    string opt_member;
 		ObservationEnsemble shifted_op = get_chance_shifted_op(dp, op, opt_member);
 		ss.str("");
-		ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".chance";
+		ss << file_manager.get_base_filename() << ".0.chance." << obs_pop_file_tag;
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
-			ss << ".jcb";
-			shifted_op.to_binary(ss.str());
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                ss << ".bin";
+                shifted_op.to_dense(ss.str());
+
+            }
+            else {
+                ss << ".jcb";
+                shifted_op.to_binary(ss.str());
+            }
 		}
 		else
 		{
@@ -2433,8 +2457,15 @@ void MOEA::initialize()
 	ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag;
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		dp.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            dp.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            dp.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -2742,7 +2773,7 @@ ParameterEnsemble MOEA::generate_population()
         {
             p = generate_simplex_population(new_members_per_gen, dp, op);
         }
-		else
+        else
 			throw_moea_error("unrecognized mou generator");
 		if (new_pop.shape().first == 0)
 			new_pop = p;
@@ -3340,7 +3371,7 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 	pso_pbest_op = top;
 }
 
-ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
+ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
 {
 	double omega = pest_scenario.get_pestpp_options().get_mou_pso_omega();
 	double cog_const = pest_scenario.get_pestpp_options().get_mou_pso_cognitive_const();
@@ -3483,7 +3514,7 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
     }
     message(1, "generating PSO population of size", num_members);
 	vector<string> gbest_solutions = get_pso_gbest_solutions(_dp.shape().first, dp_archive, op_archive);
-	ParameterEnsemble cur_velocity = get_updated_pso_velocty(_dp, gbest_solutions);
+	ParameterEnsemble cur_velocity = get_updated_pso_velocity(_dp, gbest_solutions);
 	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, _dp.get_eigen().array() + cur_velocity.get_eigen().array(), _dp.get_real_names(), _dp.get_var_names());
 
     if (temp.shape().first > 0) {
@@ -3549,6 +3580,8 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
     }
 	return new_dp;
 }
+
+
 
 ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int optbounds)
 {
@@ -4150,8 +4183,15 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	ss << "." << dv_pop_file_tag;
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		_dp.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            _dp.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            _dp.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -4171,11 +4211,15 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 			ss << "." << tag;
 		}
 		ss << "." << dv_pop_file_tag;
-		if (pest_scenario.get_pestpp_options().get_save_binary())
-		{
-			ss << ".jcb";
-			_dp.to_binary(ss.str());
-		}
+		if (pest_scenario.get_pestpp_options().get_save_binary()) {
+            if (pest_scenario.get_pestpp_options().get_save_dense()) {
+                ss << ".bin";
+                _dp.to_dense(ss.str());
+            } else {
+                ss << ".jcb";
+                _dp.to_binary(ss.str());
+            }
+        }
 		else
 		{
 			ss << ".csv";
@@ -4197,8 +4241,15 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	ss << "." << obs_pop_file_tag;
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		_op.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            _op.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            _op.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -4221,8 +4272,15 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 		ss << "." << obs_pop_file_tag;
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
-			ss << ".jcb";
-			_op.to_binary(ss.str());
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                ss << ".bin";
+                _op.to_dense(ss.str());
+            }
+            else {
+                ss << ".jcb";
+                _op.to_binary(ss.str());
+            }
 		}
 		else
 		{

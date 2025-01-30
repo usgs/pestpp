@@ -206,7 +206,8 @@ private:
 };
 
 pair<Parameters,Observations> save_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
-	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter, string tag = BASE_REAL_NAME, int cycle = NetPackage::NULL_DA_CYCLE);
+    OutputFileWriter& output_file_writer, FileManager& file_manager, int iter, string tag = BASE_REAL_NAME,
+    int cycle = NetPackage::NULL_DA_CYCLE,map<string,double> base_weights=map<string,double>());
 
 vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
 	ObservationEnsemble& _oe, RunManagerAbstract* run_mgr_ptr,
@@ -222,8 +223,7 @@ public:
 		bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string> &_act_obs_names);
 
 	void solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
-    void solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,
-                        pair<vector<string>, vector<string>>>& loc_map, double mm_alpha);
+    void solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,pair<vector<string>, vector<string>>>& loc_map, double mm_alpha);
     void update_multimodal_components(const double mm_alpha);
 
 
@@ -341,25 +341,6 @@ protected:
 
 };
 
-//void ensemble_solution(const int iter, const int verbose_level,const int maxsing,  const int thread_id,
-//                       const int t_count, const bool
-//                  use_prior_scaling,const bool use_approx, const bool use_glm, const double cur_lam,
-//                  const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
-//                  const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
-//                  Eigen::MatrixXd& obs_err,
-//                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
-//                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv,
-//                  const vector<string>& act_obs_names,const vector<string>& act_par_names);
-
-
-//class CovLocalizationUpgradeThread : public UpgradeThread
-//{
-//public:
-//	using UpgradeThread::UpgradeThread;
-//
-//	void work(int thread_id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names, vector<string> obs_names);
-//};
-
 class LocalAnalysisUpgradeThread: public UpgradeThread
 {
 public:
@@ -376,11 +357,8 @@ public:
 		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 		RunManagerAbstract* _run_mgr_ptr, string _alg_tag="EnsembleMethod");
 
-	//virtual void initialize() { ; }
-	//virtual void iterate_2_solution() { ; }
-	//virtual void finalize() { ; }
 	virtual void throw_em_error(string message);
-	bool should_terminate();
+	bool should_terminate(int current_n_iter_mean=0);
 	void sanity_checks();
 	//template<typename T, typename A>
 	//void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
@@ -426,8 +404,7 @@ public:
 
 	void transfer_dynamic_state_from_oe_to_initial_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
     void transfer_dynamic_state_from_oe_to_final_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
-	//void transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
-    void transfer_par_dynamic_state_final_to_initial_ip(ParameterEnsemble& _pe);
+	void transfer_par_dynamic_state_final_to_initial_ip(ParameterEnsemble& _pe);
 
 	pair<string, string> save_ensembles(string tag, int cycle, ParameterEnsemble& _pe, ObservationEnsemble& _oe);
 	vector<string>& get_par_dyn_state_names() { return par_dyn_state_names; }
@@ -471,6 +448,7 @@ protected:
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 	bool oe_drawn, pe_drawn;
     bool reinflate_to_minphi_real;
+    ObservationInfo org_obs_info;
 
 
 	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
@@ -504,7 +482,7 @@ protected:
 
 	void norm_map_report(map<string, double>& norm_map, string tag, double thres = 0.1);
 
-	void adjust_weights();
+	void adjust_weights(bool save=false);
 
     void adjust_weights_single(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
             map<string,double>& phi_fracs);
@@ -522,7 +500,7 @@ protected:
 
     double get_lambda();
 
-    void reset_par_ensemble_to_prior_mean();
+    void reset_par_ensemble_to_prior_mean(double reinflate_factor);
 
 };
 #endif

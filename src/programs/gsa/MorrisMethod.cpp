@@ -394,9 +394,9 @@ void  MorrisMethod::calc_sen(RunManagerAbstract &run_manager, ModelRun model_run
 		    throw runtime_error("Morris: empty par name");
         }
 		//remove the "par_name:" prefix
-        cout << par_name_1 << endl;
+        //cout << par_name_1 << endl;
 		par_name_1 = par_name_1.substr(9);
-		cout << par_name_1 << endl << endl;
+		//cout << par_name_1 << endl << endl;
 		if ((!par_name_1.empty()) && (pars1.find(par_name_1) == pars1.end()))
         {
 		    throw runtime_error("Morris:parameter name not found: "+par_name_1);

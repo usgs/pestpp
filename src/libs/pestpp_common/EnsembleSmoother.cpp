@@ -36,8 +36,15 @@ void IterEnsembleSmoother::iterate_2_solution()
 	ofstream &frec = file_manager.rec_ofstream();
 	
 	bool accept;
-	int n_iter_mean = pest_scenario.get_pestpp_options().get_ies_n_iter_mean();
+	vector<int> n_iter_reinflate = pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate();
+    vector<double> reinflate_factor = pest_scenario.get_pestpp_options().get_ies_reinflate_factor();
+
+    int iters_since_reinflate = 0;
+    int n_iter_reinflate_idx = 0;
+    int current_n_iter_reinflate = abs(n_iter_reinflate[n_iter_reinflate_idx]);
+    double current_reinflate_factor = reinflate_factor[n_iter_reinflate_idx];
     int solution_iter = 0;
+    int q;
 	for (int i = 0; i < pest_scenario.get_control_info().noptmax; i++)
 	{
 		iter++;
@@ -67,25 +74,52 @@ void IterEnsembleSmoother::iterate_2_solution()
 		ss.str("");
 		ss << file_manager.get_base_filename() << "." << iter << ".pcs.csv";
 		pcs.summarize(pe,ss.str());
+        q = pest_utils::quit_file_found();
+        if ((q == 1) || (q == 2)) {
+            message(1, "'pest.stp' found, quitting");
+            return;
+        }
 		if (accept)
 			consec_bad_lambda_cycles = 0;
 		else
 			consec_bad_lambda_cycles++;
 
-		if ((n_iter_mean> 0) && (solution_iter % n_iter_mean == 0))
+		//if ((n_iter_reinflate > 0) && (solution_iter % n_iter_reinflate == 0))
+        iters_since_reinflate++;
+        if ((current_n_iter_reinflate != 0) && (iters_since_reinflate >= current_n_iter_reinflate))
         {
+            //do this so that we get a phi sequence report
+            should_terminate(current_n_iter_reinflate);
+            message(2,"incrementing iteration count for reinflation cycle");
             iter++;
-            reset_par_ensemble_to_prior_mean();
+
+            reset_par_ensemble_to_prior_mean(current_reinflate_factor);
+            //adjust_weights(true);
+            iters_since_reinflate = 0;
+            n_iter_reinflate_idx++;
+            if (reinflate_factor.size() > n_iter_reinflate_idx)
+            {
+                current_reinflate_factor = reinflate_factor[n_iter_reinflate_idx];
+            }
+            if (n_iter_reinflate.size() > n_iter_reinflate_idx)
+            {
+                current_n_iter_reinflate = abs(n_iter_reinflate[n_iter_reinflate_idx]);
+            }
         }
 
-		if (should_terminate())
+		else if (should_terminate(current_n_iter_reinflate))
         {
-		    if (iter > pest_scenario.get_pestpp_options().get_ies_n_iter_mean()) {
+		    //if (iter > pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate()) {
+            if (current_n_iter_reinflate == 0) {
                 break;
             }
 		    else{
-		        message(1,"continuing iterations to satisfy ies_n_iter_mean");
+		        message(1,"continuing iterations because reinflation is in use");
 		    }
+        }
+        else if (solution_iter >= pest_scenario.get_control_info().noptmax){
+            message(1,"solution iterations >= noptmax, all done");
+            break;
         }
 
 	}

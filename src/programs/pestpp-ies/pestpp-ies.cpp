@@ -213,10 +213,6 @@ int main(int argc, char* argv[])
             fout_rec << "...resetting overdue_resched_fac to 1.15" << endl;
         }
 
-        if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
-            cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
-            exit(0);
-        }
 
         RunManagerAbstract *run_manager_ptr;
 
@@ -269,6 +265,11 @@ int main(int argc, char* argv[])
 
         IterEnsembleSmoother ies(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
         ies.initialize();
+        if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
+            cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+            exit(0);
+        }
+
         int q = pest_utils::quit_file_found();
         if ((q == 1) || (q == 2)) {
             cout << "...'pest.stp' found, quitting" << endl;

@@ -583,7 +583,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
         if (agent_info_set.size() == 0)
         {
             ss.str("");
-            ss << "lost comms with all agents, closing all reminaing open file transfers";
+            ss << "lost comms with all agents, closing all remaining open file transfers";
             report(ss.str(),true);
             for (auto& m : open_file_socket_map) {
                 string fname = m.second;

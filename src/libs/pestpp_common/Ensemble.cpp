@@ -416,6 +416,7 @@ pair<Covariance,Covariance> Ensemble::get_empirical_cov_matrices(FileManager* fi
 	Eigen::MatrixXd ercov = reals.transpose() * reals;
 	Covariance rcov(var_names, ercov.sparseView());
 	Eigen::MatrixXd anom = get_eigen_anomalies();
+    anom = anom * (1.0/double(anom.rows()-1));
 	Eigen::VectorXd wij;
 	double num_reals = static_cast<double>(shape().first);
 	double wij_sum = 0;
@@ -1023,6 +1024,30 @@ Eigen::VectorXd Ensemble::get_real_vector(const string &real_name)
 	return get_real_vector(idx);
 }
 
+map<string,double> Ensemble::get_real_map(string real_name, bool forgive)
+{
+    map<string,double> real_map;
+    vector<string>::iterator idx = find(real_names.begin(), real_names.end(), real_name);
+    if (idx == real_names.end())
+    {
+        if (forgive)
+        {
+            return real_map;
+        }
+        else {
+            throw_ensemble_error("Ensemble::get_real_map() real name not found:" + real_name);
+        }
+    }
+
+    int i = idx - real_names.begin();
+    for (int j=0;j<reals.cols();j++)
+    {
+        real_map[var_names[j]] = reals(i,j);
+    }
+    return real_map;
+
+}
+
 void Ensemble::update_real_ip(const string & rname, Eigen::VectorXd & real)
 {
 	vector<string>::iterator idx = find(real_names.begin(), real_names.end(), rname);
@@ -1441,116 +1466,6 @@ void Ensemble::replace(int idx, const Transformable &trans, string real_name)
 	}
 }
 
-
-void Ensemble::to_binary_old(string file_name,bool transposed)
-{
-	ofstream fout(file_name, ios::binary);
-	if (!fout.good())
-	{
-		throw runtime_error("error opening file for binary ensemble:" + file_name);
-	}
-	int n_var = var_names.size();
-	int n_real =real_names.size();
-	int n;
-	int tmp;
-	double data;
-	char par_name[12];
-	char obs_name[20];
-
-	// write header
-	if (transposed)
-	{
-		tmp = -n_real;
-		fout.write((char*)&tmp, sizeof(tmp));
-		tmp = -n_var;
-		fout.write((char*)&tmp, sizeof(tmp));
-
-	}
-	else
-	{
-		tmp = -n_var;
-		fout.write((char*)&tmp, sizeof(tmp));
-		tmp = -n_real;
-		fout.write((char*)&tmp, sizeof(tmp));
-	}
-	
-
-	//write number nonzero elements in jacobian (includes prior information)
-	n = reals.size();
-	fout.write((char*)&n, sizeof(n));
-
-	//write matrix
-	n = 0;
-	//map<string, double>::const_iterator found_pi_par;
-	//map<string, double>::const_iterator not_found_pi_par;
-	//icount = row_idxs + 1 + col_idxs * self.shape[0]
-	if (transposed)
-	{
-		for (int irow = 0; irow < n_var; ++irow)
-		{
-			for (int jcol = 0; jcol < n_real; ++jcol)
-			{
-				n = irow + 1 + (jcol * n_var);
-				data = reals(jcol, irow);
-				fout.write((char*) &(n), sizeof(n));
-				fout.write((char*) &(data), sizeof(data));
-			}
-		}
-	}
-	else
-	{ 
-		for (int irow = 0; irow < n_real; ++irow)
-		{
-			for (int jcol = 0; jcol < n_var; ++jcol)
-			{
-				n = irow + 1 + (jcol * n_real);
-				data = reals(irow, jcol);
-				fout.write((char*) &(n), sizeof(n));
-				fout.write((char*) &(data), sizeof(data));
-			}
-		}
-	}
-	//save parameter names
-
-	if (transposed)
-	{
-		//save observation and Prior information names
-		for (vector<string>::const_iterator b = real_names.begin(), e = real_names.end();
-			b != e; ++b) {
-			string l = pest_utils::lower_cp(*b);
-			pest_utils::string_to_fortran_char(l, par_name, 12);
-			fout.write(par_name, 12);
-		}
-		
-		for (vector<string>::const_iterator b = var_names.begin(), e = var_names.end();
-			b != e; ++b) {
-			string l = pest_utils::lower_cp(*b);
-			pest_utils::string_to_fortran_char(l, obs_name, 20);
-			fout.write(obs_name, 20);
-		}
-
-	}
-	else
-	{
-		for (vector<string>::const_iterator b = var_names.begin(), e = var_names.end();
-			b != e; ++b) {
-			string l = pest_utils::lower_cp(*b);
-			pest_utils::string_to_fortran_char(l, par_name, 12);
-			fout.write(par_name, 12);
-		}
-
-		//save observation and Prior information names
-		for (vector<string>::const_iterator b = real_names.begin(), e = real_names.end();
-			b != e; ++b) {
-			string l = pest_utils::lower_cp(*b);
-			pest_utils::string_to_fortran_char(l, obs_name, 20);
-			fout.write(obs_name, 20);
-		}
-	}
-	//save observation names (part 2 prior information)
-	fout.close();
-}
-
 void Ensemble::check_for_normal(string context)
 {
 	stringstream ss;
@@ -1574,6 +1489,72 @@ void Ensemble::check_for_normal(string context)
 		throw_ensemble_error(ss.str());
 	}
 }
+
+void Ensemble::to_dense(string file_name)
+{
+    ofstream fout(file_name, ios::binary);
+    if (!fout.good())
+    {
+        throw runtime_error("error opening file for dense binary ensemble:" + file_name);
+    }
+
+    vector<string> vnames = var_names;
+
+    // write header
+    int tmp = 0;
+    fout.write((char*)&tmp, sizeof(tmp));
+
+    pair<string, string> p;
+    int n_real = reals.rows();
+    int n_var = vnames.size();
+    int n = -1 * n_var;
+    fout.write((char*)&n, sizeof(n));
+    fout.write((char*)&n, sizeof(n));
+
+    //save var names
+    int mx = 0;
+    for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
+         b != e; ++b)
+    {
+        string name = pest_utils::lower_cp(*b);
+        tmp = name.size();
+        fout.write((char*)&tmp, sizeof(tmp));
+        mx = max(tmp, mx);
+    }
+    for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
+         b != e; ++b)
+    {
+        string name = pest_utils::lower_cp(*b);
+        char* par_name = new char[name.size()];
+        pest_utils::string_to_fortran_char(name, par_name, name.size());
+        fout.write(par_name, name.size());
+        delete[] par_name;
+    }
+
+    //write matrix
+    n = 0;
+    double data;
+    Eigen::VectorXd t;
+    double fvalue;
+    for (int irow = 0; irow < n_real; ++irow)
+    {
+        t = reals.row(irow);
+        string name = real_names[irow];
+        tmp = name.size();
+        char* real_name = new char[tmp];
+        fout.write((char*)&tmp, sizeof(tmp));
+        pest_utils::string_to_fortran_char(name, real_name, tmp);
+        fout.write(real_name, tmp);
+        delete[] real_name;
+        for (int jcol = 0; jcol < var_names.size(); ++jcol)
+        {
+            data = t[jcol];
+            fout.write((char*)&(data), sizeof(data));
+        }
+    }
+    fout.close();
+}
+
 
 void Ensemble::to_binary(string file_name, bool transposed)
 {
@@ -2692,20 +2673,6 @@ map<string,double> ParameterEnsemble::enforce_bounds(PerformanceLog* plog, bool 
 	return norm_map;
 }
 
-//void ParameterEnsemble::set_fixed_info(map<pair<string, string>, double> _fixed_map)
-//{
-//	fixed_names.clear();
-//	fixed_map.clear();
-//	set<string> found;
-//	for (auto& fi : _fixed_map)
-//	{
-//		found.emplace(fi.first.second);
-//	}
-//	fixed_map = _fixed_map;
-//	fixed_names = vector<string>(found.begin(), found.end());
-//	//cout << "";
-//}
-
 void ParameterEnsemble::keep_rows(const vector<int>& keep, bool update_fixed_map)
 {
 	vector<string> str_keep;
@@ -2727,29 +2694,6 @@ void ParameterEnsemble::keep_rows(const vector<int>& keep, bool update_fixed_map
 void ParameterEnsemble::keep_rows(const vector<string>& keep, bool update_fixed_map)
 {
 
-	
-	/*if ((update_fixed_map) && (fixed_map.size() > 0))
-	{
-		set<string> skeep(keep.begin(), keep.end());
-		set<string>::iterator end = skeep.end();
-		set<string> sdrop;
-		for (auto& rname : real_names)
-			if (skeep.find(rname) == end)
-				sdrop.emplace(rname);
-		end = sdrop.end();
-		for (auto it = fixed_map.begin(); it != fixed_map.end();)
-		{
-			if (sdrop.find(it->first.first) != end)
-			{
-				fixed_map.erase(it++);
-			}
-			else
-			{
-				++it;
-			}
-		}
-
-	}*/
 	if (update_fixed_map)
 	{
 		pfinfo.keep_realizations(keep);
@@ -2791,13 +2735,7 @@ void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_v
 		for (auto& m : missing)
 		{
 			if (pi->get_parameter_rec_ptr(m)->tranform_type == ParameterRec::TRAN_TYPE::FIXED)
-			{
-				//map<string, double> fm;
-				//Eigen::VectorXd vec = mat.col(other_varmap[m]);
-				
-				//for (int i = 0; i < real_names.size(); i++)
-				//	fixed_map[pair<string, string>(real_names[i], m)] = vec[i];
-
+            {
 				found.emplace(m);
 			}
 			else
@@ -2808,12 +2746,8 @@ void ParameterEnsemble::replace_col_vals_and_fixed(const vector<string>& other_v
 			throw_ensemble_error("ParameterEnsemble::replace_col_vals_and_fixed(): the following par names in other were not found in adj or fixed pars", still_missing);
 		//update fixed_names
 
-		//set<string> fnames(fixed_names.begin(), fixed_names.end());
 		vector<string> fixed_names(found.begin(),found.end());
 
-		/*for (auto& f : found)
-			if (fnames.find(f) == fnames.end())
-				fixed_names.push_back(f);*/
 		pfinfo.set_fixed_names(fixed_names);
 		pfinfo.update_realizations(other_var_names, real_names, mat);
 
@@ -2850,8 +2784,6 @@ void ParameterEnsemble::to_binary_unordered(string file_name)
 	}
 
 	vector<string> vnames = var_names;
-	//vector<string> vnames = pest_scenario_ptr->get_ctl_ordered_par_names();
-	//vnames.insert(vnames.end(), fixed_names.begin(), fixed_names.end());
 	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
 	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
 	ParameterRec::TRAN_TYPE tt = ParameterRec::TRAN_TYPE::TIED;
@@ -2933,7 +2865,6 @@ void ParameterEnsemble::to_binary_unordered(string file_name)
 		
 			n = irow + 1 + (jcol * n_real);
 			p = pair<string, string>(real_names[irow], fname);
-			//if (fixed_map.find(p) == fixed_end)
 			if (pfinfo.get_fixed_value(fname,real_names[irow],fvalue))
 			{
 				data = fvalue;
@@ -2970,11 +2901,6 @@ void ParameterEnsemble::to_binary_unordered(string file_name)
 		pest_utils::string_to_fortran_char(l, par_name, 200);
 		fout.write(par_name, 200);
 	}
-	/*for (auto fname : fixed_names)
-	{
-		pest_utils::string_to_fortran_char(pest_utils::lower_cp(fname), par_name, 12);
-		fout.write(par_name, 12);
-	}*/
 
 	//save observation and Prior information names
 	for (vector<string>::const_iterator b = real_names.begin(), e = real_names.end();
@@ -3056,9 +2982,6 @@ void ParameterEnsemble::to_binary_ordered(string file_name)
 
 	//write matrix
 	n = 0;
-	//map<string, double>::const_iterator found_pi_par;
-	//map<string, double>::const_iterator not_found_pi_par;
-	//icount = row_idxs + 1 + col_idxs * self.shape[0]
 	Parameters org_pars = pest_scenario_ptr->get_ctl_parameters();
 	if (tstat == transStatus::MODEL)
 		par_transform.ctl2model_ip(org_pars);
@@ -3066,7 +2989,6 @@ void ParameterEnsemble::to_binary_ordered(string file_name)
 		par_transform.ctl2numeric_ip(org_pars);
 	for (int irow = 0; irow<n_real; ++irow)
 	{
-		//Parameters pars(var_names, reals.row(irow));
 		Parameters pars = org_pars;
 		pars.update_without_clear(var_names, reals.row(irow));
 		if (tstat == transStatus::MODEL)
@@ -3090,15 +3012,6 @@ void ParameterEnsemble::to_binary_ordered(string file_name)
 			fout.write((char*) &(data), sizeof(data));
 		}
 
-		/*int jcol = n_var;
-		for (auto &fname : fixed_names)
-		{
-			n = irow + 1 + (jcol * n_real);
-			data = fixed_map.at(pair<string, string>(real_names[irow], fname));
-			fout.write((char*) &(n), sizeof(n));
-			fout.write((char*) &(data), sizeof(data));
-			jcol++;
-		}*/
 	}
 	//save parameter names
 	for (vector<string>::const_iterator b = vnames.begin(), e = vnames.end();
@@ -3107,11 +3020,7 @@ void ParameterEnsemble::to_binary_ordered(string file_name)
 		pest_utils::string_to_fortran_char(l, par_name, 200);
 		fout.write(par_name, 200);
 	}
-	/*for (auto fname : fixed_names)
-	{
-		pest_utils::string_to_fortran_char(pest_utils::lower_cp(fname), par_name, 12);
-		fout.write(par_name, 12);
-	}*/
+
 
 	//save observation and Prior information names
 	for (vector<string>::const_iterator b = real_names.begin(), e = real_names.end();
@@ -3164,8 +3073,6 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 	int n;
 	int tmp;
 	double data;
-	//char par_name[200];
-	//char obs_name[200];
 
 	// write header
 	tmp = 0;
@@ -3202,9 +3109,6 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 	bool has_tied = false;
 	if (par_transform.get_tied_ptr()->get_items().size() > 0)
 	    has_tied = true;
-	//map<string, double>::const_iterator found_pi_par;
-	//map<string, double>::const_iterator not_found_pi_par;
-	//icount = row_idxs + 1 + col_idxs * self.shape[0]
 	Parameters org_pars = pest_scenario_ptr->get_ctl_parameters();
 	if (tstat == transStatus::MODEL)
 		par_transform.ctl2model_ip(org_pars);
@@ -3213,7 +3117,6 @@ void ParameterEnsemble::to_dense_ordered(string file_name)
 	
 	for (int irow = 0; irow < n_real; ++irow)
 	{
-		//Parameters pars(var_names, reals.row(irow));
 		Parameters pars = org_pars;
 		pars.update_without_clear(var_names, reals.row(irow));
 		if (tstat == transStatus::MODEL)
@@ -3260,8 +3163,6 @@ void ParameterEnsemble::to_dense_unordered(string file_name)
 	}
 
 	vector<string> vnames = var_names;
-	//vector<string> vnames = pest_scenario_ptr->get_ctl_ordered_par_names();
-	//vnames.insert(vnames.end(), fixed_names.begin(), fixed_names.end());
 	ParameterInfo pi = pest_scenario_ptr->get_ctl_parameter_info();
 	ParameterRec::TRAN_TYPE ft = ParameterRec::TRAN_TYPE::FIXED;
 	ParameterRec::TRAN_TYPE tt = ParameterRec::TRAN_TYPE::TIED;
@@ -3347,8 +3248,6 @@ void ParameterEnsemble::to_dense_unordered(string file_name)
 		for (auto& fname : f_names)
 		{
 
-			//p = pair<string, string>(real_names[irow], fname);
-			//if (fixed_map.find(p) == fixed_end)
 			if (pfinfo.get_fixed_value(fname,real_names[irow],fvalue))
 			{
 				data = fvalue;
@@ -3417,18 +3316,7 @@ void ParameterEnsemble::to_csv_by_vars(ofstream &csv, bool write_header)
     bool has_tied = false;
     if (par_transform.get_tied_ptr()->get_items().size() > 0)
         has_tied = true;
-	//get the pars and transform to be in sync with ensemble trans status
-	/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
-	if (tstat == transStatus::NUM)
-	{
-		par_transform.active_ctl2numeric_ip(pars);
-	}
-	else if (tstat == transStatus::MODEL)
-	{
-		par_transform.active_ctl2model_ip(pars);
-	}*/
 
-	//for (int ireal = 0; ireal < reals.rows(); ireal++)
 	map<string, Parameters> tpar_map;
 	for (auto rname : org_real_names)
 	{
@@ -3482,17 +3370,6 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 		csv << endl;
 	}
 
-	//get the pars and transform to be in sync with ensemble trans status
-	/*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
-	if (tstat == transStatus::NUM)
-	{
-		par_transform.active_ctl2numeric_ip(pars);
-	}
-	else if (tstat == transStatus::MODEL)
-	{
-		par_transform.active_ctl2model_ip(pars);
-	}*/
-
 	//for (int ireal = 0; ireal < reals.rows(); ireal++)
 	bool has_tied = false;
 	if (par_transform.get_tied_ptr()->get_items().size() > 0)
@@ -3522,8 +3399,6 @@ void ParameterEnsemble::to_csv_by_reals(ofstream &csv, bool write_header)
 
 		ireal = real_map[rname];
 		csv << pest_utils::lower_cp(real_names[ireal]);
-		//evec = reals.row(ireal);
-		//svec.assign(evec.data(), evec.data() + evec.size());
 		pars.update_without_clear(var_names, reals.row(ireal));
 		if (tstat == transStatus::MODEL)
 			par_transform.model2ctl_ip(pars);
@@ -3549,8 +3424,6 @@ void ParameterEnsemble::replace_fixed(string real_name,Parameters &pars)
 	map<string, double> rmap = pfinfo.get_real_fixed_values(real_name);
 	for (auto& r : rmap)
 	{
-		//pair<string, string> key(real_name, fname);
-		//double val = fixed_map.at(key);
 		pars.update_rec(r.first, r.second);
 	}
 
@@ -3577,42 +3450,6 @@ void ParameterEnsemble::transform_ip(transStatus to_tstat)
 			}
 			j++;
 		}
-		
-		//set<string> log_pars = par_transform.get_log10_ptr()->get_items();
-		//set<string>::iterator log_end = log_pars.end();
-
-		//vector<string> adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
-		//Eigen::MatrixXd new_reals = Eigen::MatrixXd(shape().first, adj_par_names.size());
-		//set<string> sadj_pars(adj_par_names.begin(), adj_par_names.end());
-		//
-		//int new_j = 0;
-		//Eigen::VectorXd t;
-		//update_var_map();
-		//for (auto& apar_name : adj_par_names)
-		//{
-		//	new_reals.col(new_j) = reals.col(var_map[apar_name]);
-		//	if (log_pars.find(apar_name) != log_end)
-		//	{
-		//		new_reals.col(new_j) = new_reals.col(new_j).array().log10();
-		//	}
-		//	new_j++;
-		//}
-		////cout << reals << endl << endl;
-		////cout << new_reals << endl << endl;
-		///*Parameters pars = pest_scenario_ptr->get_ctl_parameters();
-		//vector<string> adj_par_names = pest_scenario_ptr->get_ctl_ordered_adj_par_names();
-		//Eigen::MatrixXd new_reals = Eigen::MatrixXd(shape().first, adj_par_names.size());
-		//for (int ireal = 0; ireal < reals.rows(); ireal++)
-		//{
-		//	pars.update_without_clear(var_names, reals.row(ireal));
-		//	par_transform.ctl2numeric_ip(pars);
-		//	assert(pars.size() == adj_par_names.size());
-		//	new_reals.row(ireal) = pars.get_data_eigen_vec(adj_par_names);
-		//}
-		//cout << new_reals << endl;*/
-		//reals = new_reals;
-		//var_names = adj_par_names;
-		//update_var_map();
 		tstat = to_tstat;
 
 	}
@@ -3770,8 +3607,6 @@ void ObservationEnsemble::draw(int num_reals, Covariance &cov, PerformanceLog *p
 			
 		}
 	}
-	
-
 
 	//now fill in all the zero-weighted obs
 	Eigen::MatrixXd drawn = reals;
@@ -3805,11 +3640,7 @@ void ObservationEnsemble::update_from_obs(int row_idx, Observations &obs)
 	//update a row in reals from an int id
 	if (row_idx >= real_names.size())
 		throw_ensemble_error("ObservtionEnsemble.update_from_obs() obs_idx out of range");
-	//Eigen::VectorXd temp = obs.get_data_eigen_vec(var_names);
-	//cout << reals.row(row_idx) << endl << endl;
-	//cout << temp << endl;
 	reals.row(row_idx) = obs.get_data_eigen_vec(var_names);
-	//cout << reals.row(row_idx) << endl;
 	return;
 }
 
@@ -3853,7 +3684,6 @@ vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, R
 		if (failed_runs.find(real_run_id.second) != failed_runs.end())
 		{
 			failed_real_idxs.push_back(real_run_id.first);
-			//failed_real_idxs.push_back(ireal);
 		}
 
 		else
@@ -3863,7 +3693,7 @@ vector<int> ObservationEnsemble::update_from_runs(map<int, int>& real_run_ids, R
 			update_from_obs(real_run_id.first, obs);
 			Eigen::VectorXd real = pars.get_data_eigen_vec(var_names);
 			run_mgr_pe.update_real_ip(real_names[real_run_id.first], real);
-			//update_from_obs(ireal, obs);
+
 		}
 	}
 	return failed_real_idxs;
@@ -3980,9 +3810,7 @@ DrawThread::DrawThread(PerformanceLog * _performance_log, Covariance & _cov,
 	Eigen::MatrixXd *_draws_ptr, vector<string> &_group_keys, const map<string, vector<string>> &_grouper) : cov(_cov),
 	group_keys(_group_keys), grouper(_grouper)
 {
-	//idx_map = _idx_map;
-	//std_map = _std_map;
-	//std_map = _std_map;
+
 	performance_log = _performance_log;
 	draws_ptr = _draws_ptr;
 }
@@ -3994,7 +3822,6 @@ void DrawThread::work(int thread_id, int num_reals, int ies_verbose, map<string,
 
 	unique_lock<mutex> cov_guard(cov_lock,defer_lock);
 	unique_lock<mutex> draw_guard(draw_lock,defer_lock);
-	//unique_lock<mutex> grouper_guard(grouper_lock,defer_lock);
 	unique_lock<mutex> pfm_guard(pfm_lock,defer_lock);
 	unique_lock<mutex> key_guard(key_lock, defer_lock);
 	int count = 0;
@@ -4149,15 +3976,7 @@ void DrawThread::work(int thread_id, int num_reals, int ies_verbose, map<string,
 				break;
 			}
 		}
-		/*while (true)
-		{
-			if (draw_guard.try_lock())
-			{
-				block = draws_ptr->block(0, idx[0], num_reals, idx.size());
-				draw_guard.unlock();
-				break;
-			}
-		}*/
+
 		
 		ss.str("");
 		ss << "thread: " << thread_id <<  " - Randomized Eigen decomposition of full cov for " << names.size() << " element matrix" << endl;
@@ -4171,14 +3990,8 @@ void DrawThread::work(int thread_id, int num_reals, int ies_verbose, map<string,
 			}
 		}
 		eig.compute(*gcov.e_ptr() * (1.0 / fac), names.size());
-		//RedSVD::RedSVD<Eigen::SparseMatrix<double>> svd;
-		//svd.compute(*gcov.e_ptr(),gcov.get_col_names().size());// , gi.second.size());
-		//cout << svd.singularValues() << endl;
-		//Eigen::JacobiSVD<Eigen::MatrixXd> svd(gcov.e_ptr()->toDense(), Eigen::ComputeFullU);
-		//svd.computeU();
 
 		proj = (eig.eigenvectors() * (fac *eig.eigenvalues()).cwiseSqrt().asDiagonal());
-		//proj = (svd.matrixU() * svd.singularValues().asDiagonal());
 
 		if (ies_verbose > 2)
 		{
@@ -4194,8 +4007,6 @@ void DrawThread::work(int thread_id, int num_reals, int ies_verbose, map<string,
 			fff << proj << endl;
 			fff.close();
 		}
-		//cout << "block " << block.rows() << " , " << block.cols() << endl;
-		//cout << " proj " << proj.rows() << " , " << proj.cols() << endl;
 		while (true)
 		{
 			if (draw_guard.try_lock())
@@ -4223,17 +4034,14 @@ bool FixedParInfo::get_fixed_value(const string& pname, const string& rname, dou
 {
 	if (fixed_names.size() == 0)
 	{
-		//throw runtime_error("FixedParInfo::get_fixed_value(): fixed_names is empty");
 		return false;
 	}
 	if (fixed_info.find(pname) == fixed_info.end())
 	{
-		//throw runtime_error("FixedParInfo::get_real_fixed_value(): pname '" + pname + "' not in fixed_info");
 		return false;
 	}
 	if (fixed_info.at(pname).find(rname) == fixed_info.at(pname).end())
 	{
-		//throw runtime_error("FixedParInfo::get_real_fixed_value(): rname '" + rname + "' not in fixed_info");
 		return false;
 	}
 
@@ -4498,10 +4306,7 @@ void FixedParInfo::fill_fixed(map<string, double>& fixed_map, vector<string>& rn
 void FixedParInfo::initialize()
 {
 	fixed_info.clear();
-	/*if (fixed_names.size() == 0)
-	{
-		throw runtime_error("FixedParInfo::initialize: fixed_names is empty");
-	}*/
+
 	for (auto& name : fixed_names)
 	{
 		fixed_info[name] = map<string, double>();

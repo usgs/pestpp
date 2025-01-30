@@ -738,8 +738,16 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 			string filename = file_mgr_ptr->get_base_filename() + ".0.par_stack";
 			if (pest_scenario.get_pestpp_options().get_save_binary())
 			{
-				filename = filename + ".jcb";
-				stack_pe.to_binary(filename);
+
+                if (pest_scenario.get_pestpp_options().get_save_dense())
+                {
+                    filename = filename + ".bin";
+                    stack_pe.to_dense(filename);
+                }
+                else {
+                    filename = filename + ".jcb";
+                    stack_pe.to_binary(filename);
+                }
 			}
 			else
 			{
@@ -2587,8 +2595,15 @@ void Constraints::save_oe_stack(int iter, string real_name, ObservationEnsemble&
 
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		_stack_oe.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            _stack_oe.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            _stack_oe.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -2614,8 +2629,16 @@ void Constraints::save_pe_stack(int iter, string real_name, ParameterEnsemble& _
 
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		_stack_pe.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            _stack_pe.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            _stack_pe.to_binary(ss.str());
+        }
+
 	}
 	else
 	{
@@ -2728,12 +2751,24 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 		nested_pe.reset_org_real_names();
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
-			ss.str("");
-			ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.obs_stack.jcb";
-			nested_oe.to_binary(ss.str());
-			ss.str("");
-			ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.jcb";
-			nested_pe.to_binary(ss.str());
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                ss.str("");
+                ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.obs_stack.bin";
+                nested_oe.to_dense(ss.str());
+                ss.str("");
+                ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.bin";
+                nested_pe.to_dense(ss.str());
+
+            }
+            else {
+                ss.str("");
+                ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.obs_stack.jcb";
+                nested_oe.to_binary(ss.str());
+                ss.str("");
+                ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.jcb";
+                nested_pe.to_binary(ss.str());
+            }
 			
 		}
 		else
@@ -2968,10 +3003,31 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 		cout << real_info.first << "\r" << flush;
 		i++;
 	}
+
 	//save this as bin here - it will be resaved after runs are processed...
-	ss.str("");
-	ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.jcb";
-	nested_pe.to_binary(ss.str());
+	if (pest_scenario.get_pestpp_options().get_save_binary())
+    {
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss.str("");
+            ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.bin";
+            nested_pe.to_dense(ss.str());
+        }
+        else
+        {
+            ss.str("");
+            ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.jcb";
+            nested_pe.to_binary(ss.str());
+        }
+    }
+    else
+    {
+        ss.str("");
+        ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.csv";
+        nested_pe.to_csv(ss.str());
+
+    }
+
 	cout << "...adding " << count << " runs nested stack-based chance constraints" << endl;
 	stack_runs_processed = false;
 	//reset stack_oe to use the same real names as stack_pe
