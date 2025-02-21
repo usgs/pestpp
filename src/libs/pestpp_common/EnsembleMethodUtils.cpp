@@ -8621,7 +8621,7 @@ void EnsembleMethod::initialize_restart()
 
 		}
 		//if (par_restart_csv.size() > 0)
-		if (true)
+		if (false)
 		{
 			vector<string> pe_real_names = pe.get_real_names();
 			message(2, "reordering pe_base to align with restart par en,num reals:", pe_real_names.size());
