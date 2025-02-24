@@ -5723,8 +5723,13 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
             }
 		}
 	}
-
-    drop_bad_reals(pe, oe);
+    if ((ppo->get_ies_obs_restart_csv().size() > 0) && (ppo->get_ies_par_restart_csv().size() > 0))
+    {
+        message(1,"not dropping any realizations during initialization b/c restart obs and restart par ensembles passed");
+    }
+    else {
+        drop_bad_reals(pe, oe);
+    }
 	if (oe.shape().first == 0)
 	{
 		throw_em_error(string("all realizations dropped as 'bad'"));
