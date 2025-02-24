@@ -8585,43 +8585,47 @@ void EnsembleMethod::initialize_restart()
 		message(2, "reordering oe_base to align with restart obs en,num reals:", oe_real_names.size());
 		if ((oe_drawn) && (oe_base.shape().first == oe_real_names.size()))
 		{
-			oe_base.set_real_names(oe_real_names);
-			weights.set_real_names(oe_real_names);
+            if (pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate().size() > 0)
+                message(2,"reinflation is active, not reordering oe_base");
+            else {
+                oe_base.set_real_names(oe_real_names);
+                weights.set_real_names(oe_real_names);
+            }
 		}
 		else
 		{
-			try
-			{
-				oe_base.reorder(oe_real_names, vector<string>());
-			}
-			catch (exception& e)
-			{
-				ss << "error reordering oe_base with restart oe:" << e.what();
-				throw_em_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_em_error(string("error reordering oe_base with restart oe"));
-			}
+            if (pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate().size() > 0)
+                message(2,"reinflation is active, not reordering oe_base or weight ensembles");
+			else {
 
-            try
-            {
-                weights.reorder(oe_real_names, vector<string>());
-            }
-            catch (exception& e)
-            {
-                ss << "error reordering weights with restart oe:" << e.what();
-                throw_em_error(ss.str());
-            }
-            catch (...)
-            {
-                throw_em_error(string("error reordering weights with restart oe"));
+
+                try {
+                    oe_base.reorder(oe_real_names, vector<string>());
+                }
+                catch (exception &e) {
+                    ss << "error reordering oe_base with restart oe:" << e.what();
+                    throw_em_error(ss.str());
+                }
+                catch (...) {
+                    throw_em_error(string("error reordering oe_base with restart oe"));
+                }
+
+                try {
+                    weights.reorder(oe_real_names, vector<string>());
+                }
+                catch (exception &e) {
+                    ss << "error reordering weights with restart oe:" << e.what();
+                    throw_em_error(ss.str());
+                }
+                catch (...) {
+                    throw_em_error(string("error reordering weights with restart oe"));
+                }
             }
 
 
 		}
 		//if (par_restart_csv.size() > 0)
-		if (false)
+		if (pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate().size() == 0)
 		{
 			vector<string> pe_real_names = pe.get_real_names();
 			message(2, "reordering pe_base to align with restart par en,num reals:", pe_real_names.size());
@@ -8639,6 +8643,13 @@ void EnsembleMethod::initialize_restart()
 				throw_em_error(string("error reordering pe_base with restart pe"));
 			}
 		}
+        else
+        {
+            message(2,"reinflation is active, not reordering pe_base ensemble");
+            pe.set_fixed_info(pe_base.get_fixed_info());
+
+        }
+
 
 	}
 	else if (oe.shape().first > oe_base.shape().first) //something is wrong
