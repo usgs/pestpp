@@ -5728,7 +5728,14 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         message(1,"not dropping any realizations during initialization b/c restart obs and restart par ensembles passed");
     }
     else {
-        drop_bad_reals(pe, oe);
+        if (pest_scenario.get_control_info().noptmax < 0)
+        {
+            message(1,"not dropping any realizations during initialization b/c noptmax<0");
+        }
+        else
+        {
+            drop_bad_reals(pe, oe);
+        }
     }
 	if (oe.shape().first == 0)
 	{
