@@ -5406,7 +5406,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		if (failed_idxs.size() != 0)
 		{
 			message(0, "mean parameter value run failed...bummer");
-			return;
+            throw_em_error("mean parameter value run failed");
 		}
 		ss.str("");
 		ss << file_manager.get_base_filename();
@@ -5650,13 +5650,9 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		ss << " with the prior simulated ensemble." << endl;
 		message(0, ss.str());
 
-		cout << "...see rec file or " << file_manager.get_base_filename() << ".0.pdc.csv" << " for listing of conflicted observations" << endl << endl;
+		cout << "...see " << file_manager.get_base_filename() << ".0.pdc.csv" << " for listing of conflicted observations" << endl << endl;
 		ofstream& frec = file_manager.rec_ofstream();
-		frec << endl << "...conflicted observations: " << endl;
-		for (auto oname : in_conflict)
-		{
-			frec << oname << endl;
-		}
+        frec << "...see " << file_manager.get_base_filename() << ".0.pdc.csv" << " for listing of conflicted observations" << endl << endl;
 
 		if (!ppo->get_ies_drop_conflicts())
 		{
