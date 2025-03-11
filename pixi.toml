@@ -9,19 +9,12 @@ cmake = "*"
 ninja = "*"
 
 # test python dependencies
-numpy = "*"
-pandas = "*"
+flopy = "*"
+pyemu = "*"
 
 [tasks]
 # install
-install-flopy = "pip install --disable-pip-version-check git+https://github.com/modflowpy/flopy.git"
 install-modflow = "get-modflow --repo modflow6 $CONDA_PREFIX/bin"
-install-pyemu = "pip install --disable-pip-version-check git+https://github.com/pypest/pyemu.git"
-install = { depends-on = [
-    "install-flopy",
-    "install-modflow",
-    "install-pyemu",
-] }
 
 # debug build
 configure-debug = { cmd = "cmake -G Ninja -S . -B .build -DCMAKE_BUILD_TYPE=Debug", depends-on = ["clean-build"], outputs = [".build/"] }
