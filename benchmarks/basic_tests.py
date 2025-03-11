@@ -1816,17 +1816,17 @@ def tenpar_uniform_invest():
 
 
 if __name__ == "__main__":
-    #mf6_v5_sen_test()
+    # mf6_v5_sen_test()
     #tie_by_group_test()
     #tenpar_uniform_invest()
     #tenpar_collapse_invest()
     #plot_collapse_invest()
 
     #run()
-    #mf6_v5_ies_test()
+    # mf6_v5_ies_test()
     #prep_ends()
     #sweep_bin_test()
-    #mf6_v5_sen_test()
+    # mf6_v5_sen_test()
     #ext_stdcol_test()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
     #shutil.copy2(os.path.join("..", "exe", "windows", "x64", "Debug", "pestpp-ies.exe"),
@@ -1838,7 +1838,7 @@ if __name__ == "__main__":
     #sen_plusplus_test()
     #parchglim_test()
     #unc_file_test()
-    cmdline_test()
+    # cmdline_test()
     #secondary_marker_test()
     #basic_test("ies_10par_xsec")
     #glm_save_binary_test()
@@ -1860,8 +1860,8 @@ if __name__ == "__main__":
     # da_mf6_freyberg_smoother_test()
     # da_mf6_freyberg_test_1()
 
-    #da_prep_4_mf6_freyberg_seq_tbl()
-    #da_mf6_freyberg_test_2()
+    # da_prep_4_mf6_freyberg_seq_tbl()
+    # da_mf6_freyberg_test_2()
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-ies.exe"),os.path.join("..","bin","win","pestpp-ies.exe"))
     #tplins1_test()
     
@@ -1871,11 +1871,15 @@ if __name__ == "__main__":
 
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
     #mf6_v5_opt_stack_test()
-    #mf6_v5_glm_test()
-    #mf6_v5_ies_test()
+    # mf6_v5_glm_test()
+    # mf6_v5_ies_test()
     #cmdline_test()
     #basic_sqp_test()
     #mf6_v5_ies_test()
     #fr_timeout_test()
     #fr_fail_test()
     #tplins1_test()
+
+    mf6_v5_glm_test()
+    mf6_v5_ies_test()
+    mf6_v5_sen_test()

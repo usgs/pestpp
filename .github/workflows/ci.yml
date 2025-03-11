@@ -185,5 +185,34 @@ jobs:
             exit 127
         fi
         
+  pestpp-devenv:
+    name: pymake compilers
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-latest, shell: bash}
+          - {os: macos-13, shell: bash}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
 
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup pixi
+        uses: prefix-dev/setup-pixi@v0.8.3
+        with:
+          pixi-version: v0.42.1
+          manifest-path: "pixi.toml"
+
+      - name: Build pestpp
+        run: |
+          pixi run build-release 
+
+      - name: Test pestpp
+        run: |
+          pixi run test
 

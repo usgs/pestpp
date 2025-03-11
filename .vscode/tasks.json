@@ -1,0 +1,89 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Rebuild pest++ (release)",
+            "command": "${workspaceFolder}/.vscode/run_python.sh",
+            "windows": {
+                "command": "${workspaceFolder}/.vscode/run_python.cmd",
+                "args": [
+                    "${workspaceFolder}/.vscode/build_vscode.py",
+                    "--buildtype",
+                    "release",
+                    "rebuild"
+                ],
+                "problemMatcher": "$msCompile"
+            },
+            "args": [
+                "${workspaceFolder}/.vscode/build_vscode.py",
+                "--buildtype",
+                "release",
+                "rebuild"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "clear": true
+            }
+        },
+        {
+            "label": "Rebuild pest++ (debug)",
+            "command": "${workspaceFolder}/.vscode/run_python.sh",
+            "windows": {
+                "command": "${workspaceFolder}/.vscode/run_python.cmd",
+                "args": [
+                    "${workspaceFolder}/.vscode/build_vscode.py",
+                    "--buildtype",
+                    "debug",
+                    "rebuild"
+                ],
+                "problemMatcher": "$msCompile"
+            },
+            "args": [
+                "${workspaceFolder}/.vscode/build_vscode.py",
+                "--buildtype",
+                "debug",
+                "rebuild"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "clear": true
+            }
+        },
+        {
+            "label": "Build pest++",
+            "command": "${workspaceFolder}/.vscode/run_python.sh",
+            "windows": {
+                "command": "${workspaceFolder}/.vscode/run_python.cmd",
+                "args": [
+                    "${workspaceFolder}/.vscode/build_vscode.py",
+                    "--buildtype",
+                    "none",
+                    "build"
+                ],
+                "problemMatcher": "$msCompile"
+            },
+            "args": [
+                "${workspaceFolder}/.vscode/build_vscode.py",
+                "--buildtype",
+                "none",
+                "build"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "clear": true
+            }
+        },
+
+    ]
+}
