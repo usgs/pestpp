@@ -214,6 +214,8 @@ jobs:
           manifest-path: "pixi.toml"
 
       - name: Install modflow
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pixi run install-modflow
   
