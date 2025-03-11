@@ -213,6 +213,10 @@ jobs:
           pixi-version: v0.42.1
           manifest-path: "pixi.toml"
 
+      - name: Add additional pip dependencies
+        run: |
+          pixi run install
+  
       - name: Build pestpp
         run: |
           pixi run build-release 
