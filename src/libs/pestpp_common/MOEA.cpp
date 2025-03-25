@@ -3518,19 +3518,24 @@ void MOEA::update_sim_maps(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 }
 
 ParameterEnsemble MOEA::get_initial_pso_velocities(int num_members) {
-    double init_vel_scale_fac = 0.5;
-    ParameterEnsemble _pso_velocity = dp.zeros_like(num_members);
-    Parameters lb = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
-    Parameters ub = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
-    _pso_velocity.get_par_transform().ctl2numeric_ip(lb);
-    _pso_velocity.get_par_transform().ctl2numeric_ip(ub);
-    Parameters dist = ub - lb;
-    for (auto& dv_name : dv_names)
-    {
-        vector<double> vals = uniform_draws(num_members, -dist[dv_name]* init_vel_scale_fac, dist[dv_name]* init_vel_scale_fac, rand_gen);
-        Eigen::VectorXd real = stlvec_2_eigenvec(vals);
-        _pso_velocity.replace_col(dv_name, real);
-    }
+	ParameterEnsemble _pso_velocity;
+	if (pest_scenario.get_pestpp_options().get_mou_pso_zero_initial_velocities())
+		_pso_velocity = dp.zeros_like(num_members);
+	else
+	{
+		double init_vel_scale_fac = 0.5;
+		Parameters lb = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
+		Parameters ub = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
+		_pso_velocity.get_par_transform().ctl2numeric_ip(lb);
+		_pso_velocity.get_par_transform().ctl2numeric_ip(ub);
+		Parameters dist = ub - lb;
+		for (auto& dv_name : dv_names)
+		{
+			vector<double> vals = uniform_draws(num_members, -dist[dv_name] * init_vel_scale_fac, dist[dv_name] * init_vel_scale_fac, rand_gen);
+			Eigen::VectorXd real = stlvec_2_eigenvec(vals);
+			_pso_velocity.replace_col(dv_name, real);
+		}
+	}
     return _pso_velocity;
 }
 
@@ -4320,8 +4325,6 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 	}
 	else
 		omega = curr_omega;
-	
-	
 
 	real_names = _dp.get_real_names();
 	for (int i=0;i<_dp.shape().first;i++)

@@ -1467,7 +1467,11 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		}
 		return true;
 	}
-	
+	else if (key == "MOU_PSO_ZERO_INITIAL_VELOCITIES")
+	{
+		mou_pso_zero_initial_velocities = pest_utils::parse_string_arg_to_bool(value);
+		return true;
+	}
 	else if (key == "MOU_OUTER_REPO_OBS_FILE")
 	{
 		mou_outer_repo_obs_file = org_value;
@@ -1796,11 +1800,13 @@ void PestppOptions::summary(ostream& os) const
 	{
 		os << " " << f << " ";
 	}
+	os << endl;
 	os << "mou_pso_social_const: " << mou_pso_social_const << endl;
 	os << "mou_pso_cognitive: " << mou_pso_cognitive_const << endl;
 	os << "mou_pso_alpha: " << mou_pso_alpha << endl;
 	os << "mou_pso_rramp: " << mou_pso_rramp << endl;
 	os << "mou_pso_rfit: " << mou_pso_rfit << endl;
+	os << "mou_pso_zero_initial_velocities: " << mou_pso_zero_initial_velocities << endl;
 	os << "mou_max_nn_search: " << mou_max_nn_search << endl;
 	os << "mou_outer_repo_obs_file: " << mou_outer_repo_obs_file << endl;
 	os << "mou_hypervolume_extreme: " << mou_hypervolume_extreme << endl;
@@ -2003,6 +2009,7 @@ void PestppOptions::set_defaults()
 	set_mou_pso_rramp(-5e+02);
 	set_mou_pso_rfit(2.0);
 	set_mou_pso_inertia(vector<double>{0.7, 0.4, 0});
+	set_mou_pso_zero_initial_velocities(false);
 	set_mou_outer_repo_obs_file("");
 	set_mou_max_nn_search(get_mou_population_size());
 	set_mou_hypervolume_extreme(1e+10);

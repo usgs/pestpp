@@ -418,6 +418,8 @@ public:
 	void set_mou_pso_rfit(double val) { mou_pso_rfit = val; }
 	vector<double> get_mou_pso_inertia() const { return mou_pso_inertia; }
 	void set_mou_pso_inertia(vector<double> _vals) { mou_pso_inertia = _vals; }
+	bool get_mou_pso_zero_initial_velocities()const { return mou_pso_zero_initial_velocities; }
+	void set_mou_pso_zero_initial_velocities(bool _flag) { mou_pso_zero_initial_velocities = _flag; }
 	int get_mou_max_nn_search() const { return mou_max_nn_search;}
 	void set_mou_max_nn_search(int val) { mou_max_nn_search = val; }
 	string get_mou_outer_repo_obs_file() const { return mou_outer_repo_obs_file; }
@@ -777,6 +779,7 @@ private:
 	double mou_pso_alpha;
 	double mou_pso_rramp;
 	double mou_pso_rfit;
+	bool mou_pso_zero_initial_velocities;
 	vector<double> mou_pso_inertia;
 	double mou_ppd_beta;
 	double mou_fit_gamma;
