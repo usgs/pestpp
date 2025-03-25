@@ -83,6 +83,7 @@ output.ins output.dat
 ++mou_pso_alpha(0.0)
 ++mou_pso_inertia(0.8,0.3, 0)
 ++mou_pso_zero_initial_velocities(true)
+++mou_pso_social_const(0.5,3.5)
 ++mou_population_size(20)
 ++mou_dv_population_file(initial.dv_pop.csv)
 ++mou_obs_population_restart_file(initial.obs_pop.csv)

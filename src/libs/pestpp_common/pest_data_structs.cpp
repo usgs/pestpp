@@ -1431,14 +1431,30 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 	}
 	else if (key == "MOU_PSO_SOCIAL_CONST")
 	{
-		convert_ip(value, mou_pso_social_const);
+		mou_pso_social_const.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			mou_pso_social_const.push_back(v);
+		}
 		return true;
 	}
-	else if (key == "MOU_PSO_COGNITIVE_CONST")
+	else if (key == "MOU_PSO_COGNITIVE_CONST_RANGE")
 	{
-		convert_ip(value, mou_pso_cognitive_const);
+		mou_pso_cognitive_const.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			mou_pso_cognitive_const.push_back(v);
+		}
 		return true;
-	}
+		}
 	else if (key == "MOU_PSO_ALPHA")
 	{
 		convert_ip(value, mou_pso_alpha);
@@ -1801,8 +1817,16 @@ void PestppOptions::summary(ostream& os) const
 		os << " " << f << " ";
 	}
 	os << endl;
-	os << "mou_pso_social_const: " << mou_pso_social_const << endl;
-	os << "mou_pso_cognitive: " << mou_pso_cognitive_const << endl;
+	os << "mou_pso_social_const: " << endl;
+	for (auto& f : mou_pso_social_const)
+	{
+		os << " " << f << endl;
+	}
+	os << "mou_pso_cognitive: " << endl;
+	for (auto& f : mou_pso_cognitive_const)
+	{
+		os << " " << f << endl;
+	}
 	os << "mou_pso_alpha: " << mou_pso_alpha << endl;
 	os << "mou_pso_rramp: " << mou_pso_rramp << endl;
 	os << "mou_pso_rfit: " << mou_pso_rfit << endl;
@@ -2003,8 +2027,8 @@ void PestppOptions::set_defaults()
 	set_mou_de_f(0.8);
 	set_mou_save_population_every(-1);
 	set_mou_pso_omega(0.7);
-	set_mou_pso_cognitive_const(2.0);
-	set_mou_pso_social_const(2.0);
+	set_mou_pso_cognitive_const(vector<double>{2.0});
+	set_mou_pso_social_const(vector<double>{2.0});
 	set_mou_pso_alpha(1.0);
 	set_mou_pso_rramp(-5e+02);
 	set_mou_pso_rfit(2.0);

@@ -206,7 +206,7 @@ private:
 	int restart_iter_offset;
 	int save_every;
 	map<int,int> population_schedule;
-	vector<double> inertia_info;
+	vector<double> inertia_info, cog_const_range, social_const_range;
 	double curr_omega;
 
 	ParetoObjectives objectives;

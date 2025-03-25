@@ -3518,10 +3518,8 @@ void MOEA::update_sim_maps(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 }
 
 ParameterEnsemble MOEA::get_initial_pso_velocities(int num_members) {
-	ParameterEnsemble _pso_velocity;
-	if (pest_scenario.get_pestpp_options().get_mou_pso_zero_initial_velocities())
-		_pso_velocity = dp.zeros_like(num_members);
-	else
+	ParameterEnsemble _pso_velocity = dp.zeros_like(num_members);
+	if (!pest_scenario.get_pestpp_options().get_mou_pso_zero_initial_velocities())
 	{
 		double init_vel_scale_fac = 0.5;
 		Parameters lb = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
@@ -4303,9 +4301,22 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 
 ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
 {
+	double cog_const, social_const;
+	vector<double> cog_const_range = pest_scenario.get_pestpp_options().get_mou_pso_cognitive_const();
+	if (cog_const_range.size() == 1)
+		cog_const = cog_const_range[0];
+	else if (cog_const_range.size() == 2)
+		cog_const = cog_const_range[0] + (cog_const_range[1] - cog_const_range[0]) * (iter/ pest_scenario.get_control_info().noptmax);
+	else
+		throw_moea_error("invalid cognitive const range");
 
-	double cog_const = pest_scenario.get_pestpp_options().get_mou_pso_cognitive_const();
-	double social_const = pest_scenario.get_pestpp_options().get_mou_pso_social_const();
+	vector<double> social_const_range = pest_scenario.get_pestpp_options().get_mou_pso_social_const();
+	if (social_const_range.size() == 1)
+		social_const = social_const_range[0];
+	else if (social_const_range.size() == 2)
+		social_const = social_const_range[0] + (social_const_range[1] - social_const_range[0]) * (iter / pest_scenario.get_control_info().noptmax);
+	else
+		throw_moea_error("invalid social const range");
 
 	int num_dv = _dp.shape().second;
 	vector<double> r;

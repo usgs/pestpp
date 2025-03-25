@@ -406,10 +406,10 @@ public:
 	void set_mou_save_population_every(int every) { mou_save_population_every = every; }
 	double get_mou_pso_omega() const { return mou_pso_omega; }
 	void set_mou_pso_omega(double val) { mou_pso_omega = val; }
-	double get_mou_pso_social_const() const { return mou_pso_social_const; }
-	void set_mou_pso_social_const(double val) { mou_pso_social_const = val; }
-	double get_mou_pso_cognitive_const() const { return mou_pso_cognitive_const; }
-	void set_mou_pso_cognitive_const(double val) { mou_pso_cognitive_const = val; }
+	vector<double> get_mou_pso_social_const() const { return mou_pso_social_const; }
+	void set_mou_pso_social_const(vector<double> _vals) { mou_pso_social_const = _vals; }
+	vector<double> get_mou_pso_cognitive_const() const { return mou_pso_cognitive_const; }
+	void set_mou_pso_cognitive_const(vector<double> _vals) { mou_pso_cognitive_const = _vals; }
 	double get_mou_pso_alpha() const { return mou_pso_alpha; }
 	void set_mou_pso_alpha(double val) { mou_pso_alpha = val; }
 	double get_mou_pso_rramp() const { return mou_pso_rramp; }
@@ -774,8 +774,8 @@ private:
 	double mou_de_f;
 	int mou_save_population_every;
 	double mou_pso_omega;
-	double mou_pso_social_const;
-	double mou_pso_cognitive_const;
+	vector<double> mou_pso_social_const;
+	vector<double> mou_pso_cognitive_const;
 	double mou_pso_alpha;
 	double mou_pso_rramp;
 	double mou_pso_rfit;
