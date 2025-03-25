@@ -1442,7 +1442,7 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		}
 		return true;
 	}
-	else if (key == "MOU_PSO_COGNITIVE_CONST_RANGE")
+	else if (key == "MOU_PSO_COGNITIVE_CONST")
 	{
 		mou_pso_cognitive_const.clear();
 		vector<string> tok;

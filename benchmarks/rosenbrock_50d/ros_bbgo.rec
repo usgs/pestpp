@@ -11,7 +11,7 @@ binary compiled on Mar 25 2025 at 21:37:07
 using control file: "ros_bbgo.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp-moudev\benchmarks\rosenbrock_50d"
 on host: "DUMPLING-FL"
-started at 03/25/25 21:49:42
+started at 03/25/25 22:29:51
 
 on host: "DUMPLING-FL"
 
@@ -506,4 +506,4 @@ initialized archives with 1 nondominated members
 
   ---  starting generation  1  ---  
 ...generating PSO population of size 20
-...running population of size  20
+...computing pso velocity using social const:  0.5

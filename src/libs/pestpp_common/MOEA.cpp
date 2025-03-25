@@ -4306,7 +4306,10 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 	if (cog_const_range.size() == 1)
 		cog_const = cog_const_range[0];
 	else if (cog_const_range.size() == 2)
-		cog_const = cog_const_range[0] + (cog_const_range[1] - cog_const_range[0]) * (iter/ pest_scenario.get_control_info().noptmax);
+	{
+		cog_const = cog_const_range[0] + (cog_const_range[1] - cog_const_range[0]) * (iter / pest_scenario.get_control_info().noptmax);
+		message(1, "computing pso velocity using cognitive const: ", cog_const);
+	}
 	else
 		throw_moea_error("invalid cognitive const range");
 
@@ -4314,7 +4317,10 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 	if (social_const_range.size() == 1)
 		social_const = social_const_range[0];
 	else if (social_const_range.size() == 2)
+	{
 		social_const = social_const_range[0] + (social_const_range[1] - social_const_range[0]) * (iter / pest_scenario.get_control_info().noptmax);
+		message(1, "computing pso velocity using social const: ", social_const);
+	}
 	else
 		throw_moea_error("invalid social const range");
 
@@ -4333,6 +4339,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 	{
 		omega = inertia_info[0] + (inertia_info[1] - inertia_info[0]) * ((iter - 1) / inertia_info[2]);
 		curr_omega = omega;
+		message(1, "computing pso velocity using inertia weight: ", omega);
 	}
 	else
 		omega = curr_omega;
