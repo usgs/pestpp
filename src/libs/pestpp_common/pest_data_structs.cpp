@@ -1454,6 +1454,20 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 		convert_ip(value, mou_pso_rfit);
 		return true;
 		}
+	else if (key == "MOU_PSO_INERTIA")
+	{
+		mou_pso_inertia.clear();
+		vector<string> tok;
+		tokenize(value, tok, ",		");
+		double v;
+		for (const auto& t : tok)
+		{
+			convert_ip(t, v);
+			mou_pso_inertia.push_back(v);
+		}
+		return true;
+	}
+	
 	else if (key == "MOU_OUTER_REPO_OBS_FILE")
 	{
 		mou_outer_repo_obs_file = org_value;
@@ -1777,6 +1791,11 @@ void PestppOptions::summary(ostream& os) const
 	os << "mou_de_f: " << mou_de_f << endl;
 	os << "mou_save_population_every: " << mou_save_population_every << endl;
 	os << "mou_pso_omega: " << mou_pso_omega << endl;
+	os << "mou_pso_inertia (IINER, FINERT, INITER): " << endl;
+	for (auto& f : mou_pso_inertia)
+	{
+		os << " " << f << " ";
+	}
 	os << "mou_pso_social_const: " << mou_pso_social_const << endl;
 	os << "mou_pso_cognitive: " << mou_pso_cognitive_const << endl;
 	os << "mou_pso_alpha: " << mou_pso_alpha << endl;
@@ -1983,6 +2002,7 @@ void PestppOptions::set_defaults()
 	set_mou_pso_alpha(1.0);
 	set_mou_pso_rramp(-5e+02);
 	set_mou_pso_rfit(2.0);
+	set_mou_pso_inertia(vector<double>{0.7, 0.4, 0});
 	set_mou_outer_repo_obs_file("");
 	set_mou_max_nn_search(get_mou_population_size());
 	set_mou_hypervolume_extreme(1e+10);

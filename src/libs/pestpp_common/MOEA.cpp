@@ -3052,6 +3052,8 @@ void MOEA::initialize()
 		{
 			gen_types.push_back(MouGenType::PSO);
 			message(1, "using particle swarm generator");
+			inertia_info = pest_scenario.get_pestpp_options().get_mou_pso_inertia();
+			curr_omega = inertia_info[0];
 		}
         else if (token == "SIMPLEX")
         {
@@ -4296,7 +4298,7 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 
 ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
 {
-	double omega = pest_scenario.get_pestpp_options().get_mou_pso_omega();
+
 	double cog_const = pest_scenario.get_pestpp_options().get_mou_pso_cognitive_const();
 	double social_const = pest_scenario.get_pestpp_options().get_mou_pso_social_const();
 
@@ -4309,8 +4311,18 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 	string real_name;
 	vector<string> real_names = pso_velocity.get_real_names();
 	set<string> snames(real_names.begin(), real_names.end());
-		
-		
+	
+	double omega;
+	if (((iter - 1) <= inertia_info[2]) && (inertia_info[2] != 0))
+	{
+		omega = inertia_info[0] + (inertia_info[1] - inertia_info[0]) * ((iter - 1) / inertia_info[2]);
+		curr_omega = omega;
+	}
+	else
+		omega = curr_omega;
+	
+	
+
 	real_names = _dp.get_real_names();
 	for (int i=0;i<_dp.shape().first;i++)
 	{
