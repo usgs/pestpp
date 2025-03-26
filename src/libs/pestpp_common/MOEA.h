@@ -208,6 +208,7 @@ private:
 	map<int,int> population_schedule;
 	vector<double> inertia_info, cog_const_range, social_const_range;
 	double curr_omega;
+	map<string, double> pso_vmax;
 
 	ParetoObjectives objectives;
 	Constraints constraints;

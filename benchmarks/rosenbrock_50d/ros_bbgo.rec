@@ -6,14 +6,14 @@
 
 
 version: 5.2.5
-binary compiled on Mar 25 2025 at 21:37:07
+binary compiled on Mar 26 2025 at 22:49:09
 
 using control file: "ros_bbgo.pst"
-in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp-moudev\benchmarks\rosenbrock_50d"
-on host: "DUMPLING-FL"
-started at 03/25/25 22:29:51
+in directory: "C:\Users\rmacasieb\Documents\GitHub\pestpp\benchmarks\rosenbrock_50d"
+on host: "REYGIE"
+started at 03/26/25 23:14:22
 
-on host: "DUMPLING-FL"
+on host: "REYGIE"
 
 Note: 2 unused lines in pest control file:
   -->  line number 6: '10  2  .3  .01  8' 
@@ -189,6 +189,7 @@ mou_pso_cognitive:
 mou_pso_alpha: 0
 mou_pso_rramp: -500
 mou_pso_rfit: 2
+mou_pso_vmax_factor: 0.8
 mou_pso_zero_initial_velocities: 1
 mou_max_nn_search: 100
 mou_outer_repo_obs_file: 

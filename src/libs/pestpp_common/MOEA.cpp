@@ -3519,14 +3519,21 @@ void MOEA::update_sim_maps(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 
 ParameterEnsemble MOEA::get_initial_pso_velocities(int num_members) {
 	ParameterEnsemble _pso_velocity = dp.zeros_like(num_members);
+	Parameters lb = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
+	Parameters ub = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
+	_pso_velocity.get_par_transform().ctl2numeric_ip(lb);
+	_pso_velocity.get_par_transform().ctl2numeric_ip(ub);
+	Parameters dist = ub - lb;
+
+	pso_vmax.clear();
+	double vmax_scale_factor = pest_scenario.get_pestpp_options().get_mou_pso_vmax_factor();
+	for (auto& dv_name : dv_names) 
+		pso_vmax[dv_name] = dist[dv_name] * vmax_scale_factor;
+	
+
 	if (!pest_scenario.get_pestpp_options().get_mou_pso_zero_initial_velocities())
 	{
 		double init_vel_scale_fac = 0.5;
-		Parameters lb = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
-		Parameters ub = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
-		_pso_velocity.get_par_transform().ctl2numeric_ip(lb);
-		_pso_velocity.get_par_transform().ctl2numeric_ip(ub);
-		Parameters dist = ub - lb;
 		for (auto& dv_name : dv_names)
 		{
 			vector<double> vals = uniform_draws(num_members, -dist[dv_name] * init_vel_scale_fac, dist[dv_name] * init_vel_scale_fac, rand_gen);
@@ -4345,6 +4352,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 		omega = curr_omega;
 
 	real_names = _dp.get_real_names();
+	vector<string> dv_names = _dp.get_var_names();
 	for (int i=0;i<_dp.shape().first;i++)
 	{
 		real_name = real_names[i];
@@ -4365,6 +4373,18 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 
 		new_real = (omega * cur_vel.array()) + (cog_const * rand1.array() * (p_best.array() - cur_real.array()));
 		new_real = new_real.array() + (social_const * rand2.array() * (g_best.array() - cur_real.array()));
+		
+		for (int j = 0; j < new_real.size(); j++) 
+		{
+			double vmax = pso_vmax[dv_names[j]];
+			if (new_real[j] > vmax) {
+				new_real[j] = vmax;
+			}
+			else if (new_real[j] < -vmax) {
+				new_real[j] = -vmax;
+			}
+		}
+
 		new_vel.row(i) = new_real;
 	}
 	return ParameterEnsemble(&pest_scenario, &rand_gen, new_vel, _dp.get_real_names(), _dp.get_var_names());
