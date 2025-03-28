@@ -6957,7 +6957,8 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	if (use_localizer)
 	{
-		loc_map = localizer.get_localanalysis_case_map(iter, act_obs_names, act_par_names, oe, pe, performance_log);
+
+		loc_map = localizer.get_localanalysis_case_map(iter, act_obs_names, act_par_names, oe, pe, performance_log, frec);
 	}
 	else
 	{
