@@ -4382,7 +4382,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 
 		new_real = inertia_comp + cog_comp + social_comp;
 		
-		double new_dv;
+		double new_dv, last_wiggle_room = 0;
 		for (int j = 0; j < dv_names.size(); j++)
 		{
 			double lb_val = lb[dv_names[j]];
@@ -4405,8 +4405,17 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 				{
 					draws++;
 					if (draws > 1000)
+					{
+						cout << "problem with perturbing member: " << real_name << endl;
+						cout << "at dv: " << dv_names[j] << endl;
+						cout << "wiggle room: " << last_wiggle_room << endl;
+						cout << "inertia component: " << inertia_comp[j] << endl;
+						cout << "cognitive component: " << cog_comp[j] << endl;
+						cout << "social component: " << social_comp[j] << endl;
+						cout << "current dv: " << cur_real[j] << endl;
+						cout << "new dv: " << new_dv << endl;
 						throw_moea_error("infinite loop in pso velocity calculation");
-
+					}
 					double wiggle_room = 0;
 					if ((new_dv > ub_val))
 						wiggle_room = ub_val - cur_real[j];
@@ -4415,8 +4424,9 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 						wiggle_room = lb_val - cur_real[j];
 					else
 						throw_moea_error("invalid dv value in pso velocity calculation");
+					last_wiggle_room = wiggle_room;
 
-					if (abs(inertia_comp[j]) > abs(wiggle_room)) //there's no point spinning the wheel for r1 and r2
+					if (abs(inertia_comp[j]) >= abs(wiggle_room)) //there's no point spinning the wheel for r1 and r2
 					{
 						vector<double> r = uniform_draws(1, 0.0, 1.0, rand_gen);
 						new_real[j] = wiggle_room * r[0];
