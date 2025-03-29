@@ -25,7 +25,7 @@ const string DE_F_NAME = "_DE_F_";
 const string CR_NAME = "_CR_";
 const string MR_NAME = "_MR_";
 const double CROWDING_EXTREME = 1.0e+30;
-
+const double FLOAT_EPSILON = 1.0e-10;
 enum MouGenType { DE, SBX, PM, PSO, SMP };
 enum MouEnvType { NSGA, SPEA, NSGA_PPD }; //added NSGA_PPD for probabilistic Pareto dominance
 enum MouMateType { RANDOM, TOURNAMENT };

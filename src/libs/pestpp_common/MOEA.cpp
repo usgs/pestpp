@@ -1031,7 +1031,7 @@ map<string, double> ParetoObjectives::get_cluster_crowding_fitness(vector<string
 
 		for (auto m : members)
 		{
-			if (_member_struct[m][obj_map.first + "_SD"] < min_sd[obj_map.first])
+			if (_member_struct[m][obj_map.first + "_SD"] < min_sd[obj_map.first] - FLOAT_EPSILON)
 				_member_struct[m][obj_map.first + "_SD_syn"] = min_sd[obj_map.first];
 			else
 				_member_struct[m][obj_map.first + "_SD_syn"] = _member_struct[m][obj_map.first + "_SD"];
@@ -1514,10 +1514,10 @@ double ParetoObjectives::dominance_prob_adhoc(map<string, double>& first, map<st
 	map<string, double> f = first, s = second;
 	for (auto obj_name : *obj_names_ptr)
 	{
-		if (f[obj_name + "_SD"] < min_sd[obj_name])
+		if (f[obj_name + "_SD"] < min_sd[obj_name] - FLOAT_EPSILON)
 			f[obj_name + "_SD"] = min_sd[obj_name];
 
-		if (s[obj_name + "_SD"] < min_sd[obj_name])
+		if (s[obj_name + "_SD"] < min_sd[obj_name] - FLOAT_EPSILON)
 			s[obj_name + "_SD"] = min_sd[obj_name];
 	}
 
@@ -1531,10 +1531,10 @@ double ParetoObjectives::nondominance_probability(map<string, double>& first, ma
 	map<string, double> f = first, s = second;
 	for (auto obj_name : *obj_names_ptr)
 	{
-		if (f[obj_name + "_SD"] < min_sd[obj_name])
+		if (f[obj_name + "_SD"] < min_sd[obj_name] - FLOAT_EPSILON)
 			f[obj_name + "_SD"] = min_sd[obj_name];
 
-		if (s[obj_name + "_SD"] < min_sd[obj_name])
+		if (s[obj_name + "_SD"] < min_sd[obj_name] - FLOAT_EPSILON)
 			s[obj_name + "_SD"] = min_sd[obj_name];
 	}
 
@@ -1550,7 +1550,7 @@ bool ParetoObjectives::first_equals_second(map<string, double>& first, map<strin
 {
 	for (auto f : first)
 	{
-		if (f.second != second[f.first])
+		if (abs(f.second - second[f.first]) >= FLOAT_EPSILON)
 			return false;
 	}
 	return true;
@@ -1563,7 +1563,7 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 	{
 		double pd = dominance_probability(first, second);
 
-		if (pd < ppd_beta) {
+		if (pd < ppd_beta - FLOAT_EPSILON) {
 			return false;
 		}
 		else
@@ -1573,7 +1573,7 @@ bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<st
 	{
 		for (auto f : first)
 		{
-			if (f.second > second[f.first])
+			if (f.second > second[f.first] + FLOAT_EPSILON)
 				return false;
 		}
 		return true;
@@ -1782,7 +1782,7 @@ double ParetoObjectives::get_ehvi(string& member, map<string, map<string, double
 
 	ehvi = t1 + t2;
 
-	if (ehvi < 0) //Sometimes the value is only a little bit negative. Perhaps, due to the approximation of std normal. This happened only few times, though, but when it does, temporarily set the value to 0. Will revisit this later.
+	if (ehvi < -FLOAT_EPSILON) //Sometimes the value is only a little bit negative. Perhaps, due to the approximation of std normal. This happened only few times, though, but when it does, temporarily set the value to 0. Will revisit this later.
 	{
 		ss.str("");
 		ss << "WARNING: EHVI of " << member << " is negative = " << ehvi << ".Setting to 0.0.";
@@ -4401,7 +4401,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 			while (true)
 			{
 
-				if (!((new_dv <= ub_val) && (new_dv >= lb_val)))
+				if (!((new_dv <= ub_val + FLOAT_EPSILON) && (new_dv >= lb_val - FLOAT_EPSILON)))
 				{
 					draws++;
 					if (draws > 1000)
@@ -4417,16 +4417,15 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 						throw_moea_error("infinite loop in pso velocity calculation");
 					}
 					double wiggle_room = 0;
-					if ((new_dv > ub_val))
+					if ((new_dv > ub_val + FLOAT_EPSILON))
 						wiggle_room = ub_val - cur_real[j];
-
-					else if ((new_dv < lb_val))
+					else if ((new_dv < lb_val - FLOAT_EPSILON))
 						wiggle_room = lb_val - cur_real[j];
 					else
 						throw_moea_error("invalid dv value in pso velocity calculation");
 					last_wiggle_room = wiggle_room;
 
-					if (abs(inertia_comp[j]) >= abs(wiggle_room)) //there's no point spinning the wheel for r1 and r2
+					if (abs(inertia_comp[j]) + FLOAT_EPSILON >= abs(wiggle_room)) //there's no point spinning the wheel for r1 and r2
 					{
 						vector<double> r = uniform_draws(1, 0.0, 1.0, rand_gen);
 						new_real[j] = wiggle_room * r[0];
@@ -4441,7 +4440,6 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 						social_comp[j] = social_const * r2[0] * (g_best[j] - cur_real[j]);
 						new_real[j] = inertia_comp[j] + cog_comp[j] + social_comp[j];
 					}
-
 					new_dv = cur_real[j] + new_real[j];
 				}
 				else
