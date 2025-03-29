@@ -1,2 +1,9 @@
 generation,member,func,nsga2_front,nsga2_crowding_distance,spea2_unconstrained_fitness,spea2_constrained_fitness,is_feasible,feasible_distance
 0,gen=0_member=15,4.19802e+06,1,-999,0.5,0.5,1,-999
+1,gen=1_member=3_pso,2.56143e+06,1,-999,0.5,0.5,1,-999
+2,gen=2_member=26_pso,1.64731e+06,1,-999,0.5,0.5,1,-999
+3,gen=3_member=48_pso,1.43336e+06,1,-999,0.5,0.5,1,-999
+4,gen=4_member=73_pso,1.39446e+06,1,-999,0.5,0.5,1,-999
+5,gen=5_member=91_pso,1.3544e+06,1,-999,0.5,0.5,1,-999
+6,gen=6_member=106_pso,1.19499e+06,1,-999,0.5,0.5,1,-999
+7,gen=7_member=120_pso,1.19254e+06,1,-999,0.5,0.5,1,-999

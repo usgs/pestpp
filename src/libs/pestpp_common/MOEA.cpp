@@ -4333,7 +4333,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 
 	int num_dv = _dp.shape().second;
 	vector<double> r;
-	Eigen::VectorXd rand1, rand2, cur_real, p_best, g_best, new_real, cur_vel;
+	Eigen::VectorXd rand1, rand2, rand3, cur_real, p_best, g_best, new_real, cur_vel, inertia_comp, social_comp, cog_comp;
 	pso_pbest_dp.transform_ip(_dp.get_trans_status());
 	dp_archive.set_trans_status(_dp.get_trans_status());
 	Eigen::MatrixXd new_vel(_dp.shape().first, _dp.shape().second);
@@ -4351,12 +4351,23 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 	else
 		omega = curr_omega;
 
+	Parameters lb = pest_scenario.get_ctl_parameter_info().get_low_bnd(dv_names);
+	Parameters ub = pest_scenario.get_ctl_parameter_info().get_up_bnd(dv_names);
+
 	real_names = _dp.get_real_names();
 	vector<string> dv_names = _dp.get_var_names();
 	for (int i=0;i<_dp.shape().first;i++)
 	{
 		real_name = real_names[i];
-		//cout << "real name: " << real_name << endl;
+		if (snames.find(real_name) != snames.end())
+			cur_vel = pso_velocity.get_real_vector(real_name);
+		else 
+		{
+			//cur_vel = pso_velocity.get_real_vector(current_pso_lineage_map.at(real_name));
+			cur_vel = pso_velocity_map.at(real_name);
+		}
+
+
 		r = uniform_draws(num_dv, 0.0, 1.0, rand_gen);
 		rand1 = stlvec_2_eigenvec(r);
 		r = uniform_draws(num_dv, 0.0, 1.0, rand_gen);
@@ -4364,18 +4375,19 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 		cur_real = _dp.get_real_vector(real_name);
 		p_best = pso_pbest_dp.get_real_vector(real_name);
 		g_best = dp_archive.get_real_vector(gbest_solutions[i]);
-		if (snames.find(real_name) != snames.end())
-			cur_vel = pso_velocity.get_real_vector(real_name);
-		else {
-            //cur_vel = pso_velocity.get_real_vector(current_pso_lineage_map.at(real_name));
-            cur_vel = pso_velocity_map.at(real_name);
-        }
-
-		new_real = (omega * cur_vel.array()) + (cog_const * rand1.array() * (p_best.array() - cur_real.array()));
-		new_real = new_real.array() + (social_const * rand2.array() * (g_best.array() - cur_real.array()));
 		
-		for (int j = 0; j < new_real.size(); j++) 
+		inertia_comp = omega * cur_vel.array();
+		cog_comp = cog_const * rand1.array() * (p_best.array() - cur_real.array());
+		social_comp = social_const * rand2.array() * (g_best.array() - cur_real.array());
+
+		new_real = inertia_comp + cog_comp + social_comp;
+		
+		double new_dv;
+		for (int j = 0; j < dv_names.size(); j++)
 		{
+			double lb_val = lb[dv_names[j]];
+			double ub_val = ub[dv_names[j]];
+
 			double vmax = pso_vmax[dv_names[j]];
 			if (new_real[j] > vmax) {
 				new_real[j] = vmax;
@@ -4383,8 +4395,49 @@ ParameterEnsemble MOEA::get_updated_pso_velocty(ParameterEnsemble& _dp, vector<s
 			else if (new_real[j] < -vmax) {
 				new_real[j] = -vmax;
 			}
-		}
+			new_dv = cur_real[j] + new_real[j];
 
+			int draws = 0;
+			while (true)
+			{
+
+				if (!((new_dv <= ub_val) && (new_dv >= lb_val)))
+				{
+					draws++;
+					if (draws > 1000)
+						throw_moea_error("infinite loop in pso velocity calculation");
+
+					double wiggle_room = 0;
+					if ((new_dv > ub_val))
+						wiggle_room = ub_val - cur_real[j];
+
+					else if ((new_dv < lb_val))
+						wiggle_room = lb_val - cur_real[j];
+					else
+						throw_moea_error("invalid dv value in pso velocity calculation");
+
+					if (abs(inertia_comp[j]) > abs(wiggle_room)) //there's no point spinning the wheel for r1 and r2
+					{
+						vector<double> r = uniform_draws(1, 0.0, 1.0, rand_gen);
+						new_real[j] = wiggle_room * r[0];
+					}
+					else
+					{
+						vector<double> r1 = uniform_draws(1, 0.0, 1.0, rand_gen);
+						vector<double> r2 = uniform_draws(1, 0.0, 1.0, rand_gen);
+
+						inertia_comp[j] = omega * cur_vel[j];
+						cog_comp[j] = cog_const * r1[0] * (p_best[j] - cur_real[j]);
+						social_comp[j] = social_const * r2[0] * (g_best[j] - cur_real[j]);
+						new_real[j] = inertia_comp[j] + cog_comp[j] + social_comp[j];
+					}
+
+					new_dv = cur_real[j] + new_real[j];
+				}
+				else
+					break;
+			}
+		}
 		new_vel.row(i) = new_real;
 	}
 	return ParameterEnsemble(&pest_scenario, &rand_gen, new_vel, _dp.get_real_names(), _dp.get_var_names());
