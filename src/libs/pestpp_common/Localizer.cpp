@@ -629,7 +629,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
             frec << "...    " << pname << endl;
         }
         frec << endl;
-        sigma_dist_use = 100000;
+        sigma_dist_use = 0.0;
     }
 
 	//vector<string> par_names = pe.get_pest_scenario_ptr()->get_ctl_ordered_adj_par_names(), obs_names = pe.get_pest_scenario_ptr()->get_ctl_ordered_nz_obs_names();
@@ -753,7 +753,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
         vector<Eigen::Triplet<double>> temp;
         for (auto& t : triplets)
         {
-            if (abs(t.value()) >= global_max_abs_cc)
+            if (abs(t.value()) > global_max_abs_cc)
             {
                 temp.push_back(t);
             }
