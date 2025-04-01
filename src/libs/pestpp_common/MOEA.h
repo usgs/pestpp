@@ -264,7 +264,7 @@ private:
 	ParameterEnsemble simplex_cceua_kn(ParameterEnsemble s, int k, int optbounds);																																		
     ParameterEnsemble generate_simplex_population(int num_members, ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
-	ParameterEnsemble get_updated_pso_velocty(ParameterEnsemble& _dp, vector<string>& gbest_solutions);
+	ParameterEnsemble get_updated_pso_velocity(ParameterEnsemble& _dp, vector<string>& gbest_solutions);
 
 	vector<string> get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _dp, ObservationEnsemble& _op);
 	void update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op);
