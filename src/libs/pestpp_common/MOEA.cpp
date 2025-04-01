@@ -4395,9 +4395,8 @@ ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<
 			else if (new_par_vel[j] < -vmax - FLOAT_EPSILON) {
 				new_par_vel[j] = -vmax;
 			}
-			
-			cur_dv = cur_real[j];
-			new_dv = cur_dv + new_par_vel[j];
+
+			new_dv = cur_real[j] + new_par_vel[j];
 			
 			int draws = 0;
 			while (true)
@@ -4406,6 +4405,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<
 				if (!((new_dv <= ub_val + FLOAT_EPSILON) && (new_dv >= lb_val - FLOAT_EPSILON)))
 				{
 					draws++;
+					cur_real[j] = new_dv;
 					if (draws > 1000)
 					{
 						ss << "problem with perturbing member: " << real_name << endl;
@@ -4428,9 +4428,9 @@ ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<
 					vector<double> r1 = uniform_draws(1, 0.0, 1.0, rand_gen);
 					vector<double> r2 = uniform_draws(1, 0.0, 1.0, rand_gen);
 
-					inertia_comp[j] = omega * cur_vel[j];
-					cog_comp[j] = cog_const * r1[0] * (p_best[j] - cur_dv);
-					social_comp[j] = social_const * r2[0] * (g_best[j] - cur_dv);
+					inertia_comp[j] = omega * new_par_vel[j];
+					cog_comp[j] = cog_const * r1[0] * (p_best[j] - cur_real[j]);
+					social_comp[j] = social_const * r2[0] * (g_best[j] - cur_real[j]);
 
 					new_par_vel[j] = inertia_comp[j] + cog_comp[j] + social_comp[j];
 
@@ -4442,9 +4442,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<
 						new_par_vel[j] = -vmax;
 					}
 
-					cur_vel[j] = new_par_vel[j];
-					new_dv = cur_dv + new_par_vel[j];
-					cur_dv = new_dv;
+					new_dv = cur_real[j] + new_par_vel[j];
 
 					//Reygie's velocity damping algo to seek new feasible dv
 					/*
@@ -4474,10 +4472,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<
 					}*/
 				}
 				else
-				{
-					cur_real[j] = cur_dv;
 					break;
-				}
 			}
 		}
 		// update _dp because the new velocity is computed from the previous position, 

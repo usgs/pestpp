@@ -11,7 +11,7 @@ binary compiled on Apr  1 2025 at 09:43:47
 using control file: "ros_bbgo.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp-moudev\benchmarks\rosenbrock_50d"
 on host: "DUMPLING-FL"
-started at 04/01/25 10:15:28
+started at 04/01/25 15:43:40
 
 on host: "DUMPLING-FL"
 
@@ -597,19 +597,3 @@ FUNC                  minimize      1131590     614685.5      38410.9      31658
 
 ... saved initial dv population to  ros_bbgo.0.dv_pop.csv
 ...performing initial pareto dominance sort
-...wrote pareto summary to ros_bbgo.pareto.summary.csv
-initialized archives with 1 nondominated members
-...wrote pareto summary to ros_bbgo.pareto.archive.summary.csv
-...wrote pareto summary to ros_bbgo.pareto.trimmed.archive.summary.csv
-...saved decision variable population of size 1 X 10 to 'ros_bbgo.archive.dv_pop.csv'
-...saved generation-specific decision variable population of size 1 X 10 to 'ros_bbgo.0.archive.dv_pop.csv'
-...saved observation population of size 1 X 5 to 'ros_bbgo.archive.obs_pop.csv'
-...saved generation-specific observation population of size 1 X 5 to 'ros_bbgo.0.archive.obs_pop.csv'
-...number of initial feasible solutions: 1
-
-  ---  initialization complete  ---  
-
-  ---  starting generation  1  ---  
-...generating PSO population of size 1000
-...computing pso velocity using inertia weight:  0.7
-...running population of size  1000
