@@ -4147,7 +4147,6 @@ void EnsembleMethod::sanity_checks()
         errors.push_back("Covariance-based localization not supported with MDA solver");
     }
 
-
 //    if (pest_scenario.get_control_info().noptmax > 10)
 //	{
 //		warnings.push_back("noptmax > 10, don't expect anything meaningful from the results!");
@@ -5227,11 +5226,21 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	}
 
     int num_par_elements = pest_scenario.get_ctl_parameters().size();
-	if ((!pest_scenario.get_pestpp_options().get_save_dense()) && (pp_args.find("IES_ORDERED_BINARY") == pp_args.end()) && (pp_args.find("DA_ORDERED_BINARY") == pp_args.end()))
+    int num_obs_elements = pest_scenario.get_ctl_observations().size();
+    if ((num_par_elements > 1000000) || (num_obs_elements > 1000000))
+    {
+        if ((pest_scenario.get_pestpp_options().get_save_binary()) && (!pest_scenario.get_pestpp_options().get_save_dense()))
+        {
+            message(0,"WARNING: npar and/or nobs > 1e6, you are close to going out-of-range for jcb format.  Switching to dense '.bin' format");
+            pest_scenario.get_pestpp_options_ptr()->set_save_dense(true);
+        }
+    }
+
+    if ((!pest_scenario.get_pestpp_options().get_save_dense()) && (pp_args.find("IES_ORDERED_BINARY") == pp_args.end()) && (pp_args.find("DA_ORDERED_BINARY") == pp_args.end()))
 	{
 
 		//if ((pe.shape().second > 100000) && (pest_scenario.get_pestpp_options().get_save_binary()))
-        if ((num_par_elements > 100000) && (pest_scenario.get_pestpp_options().get_save_binary()))
+        if (((num_par_elements > 100000) || (num_obs_elements > 100000)) && (pest_scenario.get_pestpp_options().get_save_binary()))
 		{
 			message(1, "'ies_ordered_binary' was not passed, but 'ies_save_binary' is true and npar > 100,000, switching to unordered binary...");
 			pest_scenario.get_pestpp_options_ptr()->set_ies_ordered_binary(false);
