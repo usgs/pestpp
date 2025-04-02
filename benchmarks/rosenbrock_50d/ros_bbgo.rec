@@ -6,12 +6,12 @@
 
 
 version: 5.2.5
-binary compiled on Apr  1 2025 at 09:43:47
+binary compiled on Apr  3 2025 at 00:41:24
 
 using control file: "ros_bbgo.pst"
 in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp-moudev\benchmarks\rosenbrock_50d"
 on host: "DUMPLING-FL"
-started at 04/01/25 15:43:40
+started at 04/03/25 00:57:34
 
 on host: "DUMPLING-FL"
 
@@ -164,7 +164,7 @@ sqp_scale_facs:
 
 ...pestpp-mou options:
 mou_generator: pso
-mou_population_size: 1000
+mou_population_size: 20
 mou_dv_population_file: initial_2.dv_pop.csv
 mou_obs_population_restart_file: initial_2.obs_pop.csv
 mou_objectives: 
@@ -188,13 +188,12 @@ mou_pso_cognitive:
 mou_pso_alpha: 1
 mou_pso_rramp: -500
 mou_pso_rfit: 2
-mou_pso_vmax_factor: 0.9
-mou_pso_zero_initial_velocities: 0
+mou_pso_vmax_factor: 0.8
+mou_pso_dv_bound_restoration: ITERATIVE
 mou_max_nn_search: 100
 mou_outer_repo_obs_file: 
 mou_hypervolume_extreme: 1e+10
 mou_infill_size: 100
-mou_adaptive_ppd: 0
 mou_ppd_beta: 0.5
 mou_fit_gamma: 0.25
 mou_fit_epsilon: 0.05
@@ -348,206 +347,206 @@ PEST SVD Information
 
   ---  initializing MOEA process  ---  
 ...population schedule: generation,population size:
-...   0, 1000
-...   1, 1000
-...   2, 1000
-...   3, 1000
-...   4, 1000
-...   5, 1000
-...   6, 1000
-...   7, 1000
-...   8, 1000
-...   9, 1000
-...   10, 1000
-...   11, 1000
-...   12, 1000
-...   13, 1000
-...   14, 1000
-...   15, 1000
-...   16, 1000
-...   17, 1000
-...   18, 1000
-...   19, 1000
-...   20, 1000
-...   21, 1000
-...   22, 1000
-...   23, 1000
-...   24, 1000
-...   25, 1000
-...   26, 1000
-...   27, 1000
-...   28, 1000
-...   29, 1000
-...   30, 1000
-...   31, 1000
-...   32, 1000
-...   33, 1000
-...   34, 1000
-...   35, 1000
-...   36, 1000
-...   37, 1000
-...   38, 1000
-...   39, 1000
-...   40, 1000
-...   41, 1000
-...   42, 1000
-...   43, 1000
-...   44, 1000
-...   45, 1000
-...   46, 1000
-...   47, 1000
-...   48, 1000
-...   49, 1000
-...   50, 1000
-...   51, 1000
-...   52, 1000
-...   53, 1000
-...   54, 1000
-...   55, 1000
-...   56, 1000
-...   57, 1000
-...   58, 1000
-...   59, 1000
-...   60, 1000
-...   61, 1000
-...   62, 1000
-...   63, 1000
-...   64, 1000
-...   65, 1000
-...   66, 1000
-...   67, 1000
-...   68, 1000
-...   69, 1000
-...   70, 1000
-...   71, 1000
-...   72, 1000
-...   73, 1000
-...   74, 1000
-...   75, 1000
-...   76, 1000
-...   77, 1000
-...   78, 1000
-...   79, 1000
-...   80, 1000
-...   81, 1000
-...   82, 1000
-...   83, 1000
-...   84, 1000
-...   85, 1000
-...   86, 1000
-...   87, 1000
-...   88, 1000
-...   89, 1000
-...   90, 1000
-...   91, 1000
-...   92, 1000
-...   93, 1000
-...   94, 1000
-...   95, 1000
-...   96, 1000
-...   97, 1000
-...   98, 1000
-...   99, 1000
-...   100, 1000
-...   101, 1000
-...   102, 1000
-...   103, 1000
-...   104, 1000
-...   105, 1000
-...   106, 1000
-...   107, 1000
-...   108, 1000
-...   109, 1000
-...   110, 1000
-...   111, 1000
-...   112, 1000
-...   113, 1000
-...   114, 1000
-...   115, 1000
-...   116, 1000
-...   117, 1000
-...   118, 1000
-...   119, 1000
-...   120, 1000
-...   121, 1000
-...   122, 1000
-...   123, 1000
-...   124, 1000
-...   125, 1000
-...   126, 1000
-...   127, 1000
-...   128, 1000
-...   129, 1000
-...   130, 1000
-...   131, 1000
-...   132, 1000
-...   133, 1000
-...   134, 1000
-...   135, 1000
-...   136, 1000
-...   137, 1000
-...   138, 1000
-...   139, 1000
-...   140, 1000
-...   141, 1000
-...   142, 1000
-...   143, 1000
-...   144, 1000
-...   145, 1000
-...   146, 1000
-...   147, 1000
-...   148, 1000
-...   149, 1000
-...   150, 1000
-...   151, 1000
-...   152, 1000
-...   153, 1000
-...   154, 1000
-...   155, 1000
-...   156, 1000
-...   157, 1000
-...   158, 1000
-...   159, 1000
-...   160, 1000
-...   161, 1000
-...   162, 1000
-...   163, 1000
-...   164, 1000
-...   165, 1000
-...   166, 1000
-...   167, 1000
-...   168, 1000
-...   169, 1000
-...   170, 1000
-...   171, 1000
-...   172, 1000
-...   173, 1000
-...   174, 1000
-...   175, 1000
-...   176, 1000
-...   177, 1000
-...   178, 1000
-...   179, 1000
-...   180, 1000
-...   181, 1000
-...   182, 1000
-...   183, 1000
-...   184, 1000
-...   185, 1000
-...   186, 1000
-...   187, 1000
-...   188, 1000
-...   189, 1000
-...   190, 1000
-...   191, 1000
-...   192, 1000
-...   193, 1000
-...   194, 1000
-...   195, 1000
-...   196, 1000
-...   197, 1000
-...   198, 1000
-...   199, 1000
+...   0, 20
+...   1, 20
+...   2, 20
+...   3, 20
+...   4, 20
+...   5, 20
+...   6, 20
+...   7, 20
+...   8, 20
+...   9, 20
+...   10, 20
+...   11, 20
+...   12, 20
+...   13, 20
+...   14, 20
+...   15, 20
+...   16, 20
+...   17, 20
+...   18, 20
+...   19, 20
+...   20, 20
+...   21, 20
+...   22, 20
+...   23, 20
+...   24, 20
+...   25, 20
+...   26, 20
+...   27, 20
+...   28, 20
+...   29, 20
+...   30, 20
+...   31, 20
+...   32, 20
+...   33, 20
+...   34, 20
+...   35, 20
+...   36, 20
+...   37, 20
+...   38, 20
+...   39, 20
+...   40, 20
+...   41, 20
+...   42, 20
+...   43, 20
+...   44, 20
+...   45, 20
+...   46, 20
+...   47, 20
+...   48, 20
+...   49, 20
+...   50, 20
+...   51, 20
+...   52, 20
+...   53, 20
+...   54, 20
+...   55, 20
+...   56, 20
+...   57, 20
+...   58, 20
+...   59, 20
+...   60, 20
+...   61, 20
+...   62, 20
+...   63, 20
+...   64, 20
+...   65, 20
+...   66, 20
+...   67, 20
+...   68, 20
+...   69, 20
+...   70, 20
+...   71, 20
+...   72, 20
+...   73, 20
+...   74, 20
+...   75, 20
+...   76, 20
+...   77, 20
+...   78, 20
+...   79, 20
+...   80, 20
+...   81, 20
+...   82, 20
+...   83, 20
+...   84, 20
+...   85, 20
+...   86, 20
+...   87, 20
+...   88, 20
+...   89, 20
+...   90, 20
+...   91, 20
+...   92, 20
+...   93, 20
+...   94, 20
+...   95, 20
+...   96, 20
+...   97, 20
+...   98, 20
+...   99, 20
+...   100, 20
+...   101, 20
+...   102, 20
+...   103, 20
+...   104, 20
+...   105, 20
+...   106, 20
+...   107, 20
+...   108, 20
+...   109, 20
+...   110, 20
+...   111, 20
+...   112, 20
+...   113, 20
+...   114, 20
+...   115, 20
+...   116, 20
+...   117, 20
+...   118, 20
+...   119, 20
+...   120, 20
+...   121, 20
+...   122, 20
+...   123, 20
+...   124, 20
+...   125, 20
+...   126, 20
+...   127, 20
+...   128, 20
+...   129, 20
+...   130, 20
+...   131, 20
+...   132, 20
+...   133, 20
+...   134, 20
+...   135, 20
+...   136, 20
+...   137, 20
+...   138, 20
+...   139, 20
+...   140, 20
+...   141, 20
+...   142, 20
+...   143, 20
+...   144, 20
+...   145, 20
+...   146, 20
+...   147, 20
+...   148, 20
+...   149, 20
+...   150, 20
+...   151, 20
+...   152, 20
+...   153, 20
+...   154, 20
+...   155, 20
+...   156, 20
+...   157, 20
+...   158, 20
+...   159, 20
+...   160, 20
+...   161, 20
+...   162, 20
+...   163, 20
+...   164, 20
+...   165, 20
+...   166, 20
+...   167, 20
+...   168, 20
+...   169, 20
+...   170, 20
+...   171, 20
+...   172, 20
+...   173, 20
+...   174, 20
+...   175, 20
+...   176, 20
+...   177, 20
+...   178, 20
+...   179, 20
+...   180, 20
+...   181, 20
+...   182, 20
+...   183, 20
+...   184, 20
+...   185, 20
+...   186, 20
+...   187, 20
+...   188, 20
+...   189, 20
+...   190, 20
+...   191, 20
+...   192, 20
+...   193, 20
+...   194, 20
+...   195, 20
+...   196, 20
+...   197, 20
+...   198, 20
+...   199, 20
 ...using 'nsga2' env selector
 ...using binary tournament mating pool selector
 ...saving generation specific populations and archives every nth generation 1
@@ -568,6 +567,7 @@ FUNC                 less_than      0
 ...loading dv population from csv file initial_2.dv_pop.csv
 ...dv population with 1000 members read from 'initial_2.dv_pop.csv'
 
+...'mou_population_size' arg passed, truncated dv population to  20
 ...loading obs population from csv file initial_2.obs_pop.csv
 ...obs population with 1000 members read from 'initial_2.obs_pop.csv'
 
@@ -575,25 +575,163 @@ FUNC                 less_than      0
 
   ---  initial population decision variable summary:  ---  
 decision variable        ubnd      lbnd      mean   standard devation         min         max
-X1                         10        -5   2.62911             4.38449    -4.97893     9.98191
-X2                         10        -5   2.43574             4.39922    -4.97857      9.9838
-X3                         10        -5    2.2018             4.41236     -4.9905     9.99012
-X4                         10        -5   2.62415             4.26949    -4.97409     9.96812
-X5                         10        -5   2.37023             4.40341    -4.98825     9.98022
-X6                         10        -5   2.45562             4.30863    -4.96032     9.97913
-X7                         10        -5   2.32836             4.19932    -4.95836      9.9831
-X8                         10        -5   2.34004             4.21286    -4.96377     9.95878
-X9                         10        -5    2.3761             4.33226     -4.9924     9.98379
-X10                        10        -5   2.39076             4.44484    -4.97367     9.99399
+X1                         10        -5    1.3664             4.63239    -4.97893     9.81252
+X2                         10        -5   2.93328             4.16086    -4.15597     9.85951
+X3                         10        -5   2.29202             4.16952    -4.62717     9.47154
+X4                         10        -5   3.51156             4.40104    -4.64903     9.45074
+X5                         10        -5    1.6229             4.37634    -4.22978     8.45511
+X6                         10        -5   3.00065              4.9759    -4.16949     9.14842
+X7                         10        -5   2.45161             4.13406    -4.91994     8.61416
+X8                         10        -5   2.69892              5.4147    -4.86311     9.76242
+X9                         10        -5   2.11921             3.94042     -4.8482     9.24432
+X10                        10        -5   2.00725             4.28796    -4.43261     8.82284
 
 
   ---  initial population objective function summary:  ---  
 seeking optimal trade-off point for single 'optimal' chance point runs
-using member GEN=0_MEMBER=823 as single, 'optimal' point
+using member GEN=0_MEMBER=15 as single, 'optimal' point
    with distance of 0 from optimal trade - off
 objective function   direction         mean      std dev          min          max         knee
 
-FUNC                  minimize      1131590     614685.5      38410.9      3165890      38410.9
+FUNC                  minimize      1181102     741545.2       180368      2919030       180368
 
 ... saved initial dv population to  ros_bbgo.0.dv_pop.csv
 ...performing initial pareto dominance sort
+...wrote pareto summary to ros_bbgo.pareto.summary.csv
+initialized archives with 1 nondominated members
+...wrote pareto summary to ros_bbgo.pareto.archive.summary.csv
+...wrote pareto summary to ros_bbgo.pareto.trimmed.archive.summary.csv
+...saved decision variable population of size 1 X 10 to 'ros_bbgo.archive.dv_pop.csv'
+...saved generation-specific decision variable population of size 1 X 10 to 'ros_bbgo.0.archive.dv_pop.csv'
+...saved observation population of size 1 X 5 to 'ros_bbgo.archive.obs_pop.csv'
+...saved generation-specific observation population of size 1 X 5 to 'ros_bbgo.0.archive.obs_pop.csv'
+...number of initial feasible solutions: 1
+
+  ---  initialization complete  ---  
+
+  ---  starting generation  1  ---  
+...generating PSO population of size 20
+...computing pso velocity using inertia weight:  0.7
+...running population of size  20
+...saved decision variable population of size 20 X 10 to 'ros_bbgo.dv_pop.csv'
+...saved generation-specific decision variable population of size 20 X 10 to 'ros_bbgo.1.dv_pop.csv'
+...saved observation population of size 20 X 5 to 'ros_bbgo.obs_pop.csv'
+...saved generation-specific observation population of size 20 X 5 to 'ros_bbgo.1.obs_pop.csv'
+...pareto dominance sorting combined parent-child populations of size  40
+...wrote pareto summary to ros_bbgo.pareto.summary.csv
+updating archive
+adding 1 non-dominated members to archive
+pareto dominance sorting archive of size 2
+...wrote pareto summary to ros_bbgo.pareto.archive.summary.csv
+resizing archive from 2 to 1 current non-dominated solutions
+...wrote pareto summary to ros_bbgo.pareto.trimmed.archive.summary.csv
+...saved decision variable population of size 1 X 10 to 'ros_bbgo.archive.dv_pop.csv'
+...saved generation-specific decision variable population of size 1 X 10 to 'ros_bbgo.1.archive.dv_pop.csv'
+...saved observation population of size 1 X 5 to 'ros_bbgo.archive.obs_pop.csv'
+...saved generation-specific observation population of size 1 X 5 to 'ros_bbgo.1.archive.obs_pop.csv'
+...resizing current populations to  20
+
+  ---  generation 1 decision variable summary:  ---  
+decision variable        ubnd      lbnd      mean   standard devation         min         max
+X1                         10        -5 -0.198414             3.25781    -5.35517     6.42923
+X2                         10        -5   2.42625             2.78779    -2.05275     6.82701
+X3                         10        -5 -0.292591             3.63276    -8.82593     5.94761
+X4                         10        -5 -0.733113             4.05201     -6.7899     7.51085
+X5                         10        -5  0.496525             3.70663    -4.90069     7.88212
+X6                         10        -5 -0.876371              3.2777    -7.10292     6.48905
+X7                         10        -5 -0.135754             3.47367    -6.22678     6.72833
+X8                         10        -5  -1.93591             2.85703     -7.6076     3.99093
+X9                         10        -5   2.08788             3.24191    -4.58234     7.37319
+X10                        10        -5   2.89973             3.40315    -3.16847     8.68861
+
+
+  ---  generation 1 decision variable change summary:  ---  
+decision variable  mean change   % change max change   % change min change   % change
+X1                     1.56482    114.521    3.38329    34.4793    0.37624          0
+X2                    0.507028    17.2854     3.0325    30.7571   -2.10322          0
+X3                     2.58461    112.766    3.52393    37.2055    4.19876          0
+X4                     4.24467    120.877    1.93989    20.5263    2.14087          0
+X5                     1.12637    69.4051   0.572989    6.77683   0.670915          0
+X6                     3.87702    129.206    2.65937    29.0692    2.93343          0
+X7                     2.58736    105.537    1.88583    21.8922    1.30684          0
+X8                     4.63483    171.729    5.77149    59.1194    2.74449          0
+X9                   0.0313333    1.47854    1.87113    20.2409   -0.26586          0
+X10                   -0.89248   -44.4628    0.13423    1.52139   -1.26414          0
+
+
+  ---  generation 1 objective function summary:  ---  
+seeking optimal trade-off point for single 'optimal' chance point runs
+using member GEN=1_MEMBER=13_PSO as single, 'optimal' point
+   with distance of 0 from optimal trade - off
+objective function   direction         mean      std dev          min          max         knee
+
+FUNC                  minimize     303495.1     178546.6     52734.91       643651     52734.91
+
+
+  ---  generation 1 objective function change summary:  ---  
+objective function   mean change    % change  max change    % change  min change    % change knee change    % change
+FUNC                      877607     74.3041 2.27538e+06     77.9498      127633     70.7626      127633     70.7626
+
+...number of feasible solutions at the end of generation 1: 1
+
+  ---  starting generation  2  ---  
+...generating PSO population of size 20
+...computing pso velocity using inertia weight:  0.698235
+...running population of size  20
+...saved decision variable population of size 20 X 10 to 'ros_bbgo.dv_pop.csv'
+...saved generation-specific decision variable population of size 20 X 10 to 'ros_bbgo.2.dv_pop.csv'
+...saved observation population of size 20 X 5 to 'ros_bbgo.obs_pop.csv'
+...saved generation-specific observation population of size 20 X 5 to 'ros_bbgo.2.obs_pop.csv'
+...pareto dominance sorting combined parent-child populations of size  40
+...wrote pareto summary to ros_bbgo.pareto.summary.csv
+updating archive
+all nondominated members in already in archive
+...resizing current populations to  20
+
+  ---  generation 2 decision variable summary:  ---  
+decision variable        ubnd      lbnd      mean   standard devation         min         max
+X1                         10        -5 -0.195179             4.50099    -10.8125     13.3773
+X2                         10        -5    1.8561             2.69614    -2.68049      6.0759
+X3                         10        -5  -1.39259             3.95934    -10.3844     3.65733
+X4                         10        -5  -1.85679             3.82275    -9.48547     4.80953
+X5                         10        -5 -0.829514             4.39284    -12.0829     6.52701
+X6                         10        -5  -1.99795             3.78598    -11.2304     3.88239
+X7                         10        -5  0.185203             3.45964    -8.95474     5.14605
+X8                         10        -5 -0.255985             4.20316    -6.90125     6.48918
+X9                         10        -5   1.99412             2.43895     -1.3432     6.99328
+X10                        10        -5   1.60489             4.02075    -6.06896     6.93291
+
+
+  ---  generation 2 decision variable change summary:  ---  
+decision variable  mean change   % change max change   % change min change   % change
+X1                 -0.00323486          0   -6.94808    -108.07    5.45737          0
+X2                    0.570152    23.4993   0.751111    11.0021   0.627739          0
+X3                         1.1          0    2.29028    38.5076    1.55849          0
+X4                     1.12368          0    2.70132    35.9656    2.69557          0
+X5                     1.32604    267.064    1.35511    17.1923    7.18221          0
+X6                     1.12158          0    2.60665      40.17    4.12748          0
+X7                   -0.320957          0    1.58228    23.5167    2.72796          0
+X8                    -1.67993          0   -2.49825   -62.5981  -0.706353          0
+X9                   0.0937605     4.4907   0.379912    5.15261   -3.23914          0
+X10                    1.29485     44.654     1.7557     20.207    2.90049          0
+
+
+  ---  generation 2 objective function summary:  ---  
+seeking optimal trade-off point for single 'optimal' chance point runs
+using member GEN=1_MEMBER=13_PSO as single, 'optimal' point
+   with distance of 0 from optimal trade - off
+objective function   direction         mean      std dev          min          max         knee
+
+FUNC                  minimize     157288.3     72007.33     52734.91       316734     52734.91
+
+
+  ---  generation 2 objective function change summary:  ---  
+objective function   mean change    % change  max change    % change  min change    % change knee change    % change
+FUNC                      146207     48.1744      326917      50.791           0           0           0           0
+
+...number of feasible solutions at the end of generation 2: 40
+
+  ---  starting generation  3  ---  
+...generating PSO population of size 20
+...computing pso velocity using inertia weight:  0.696471
+...running population of size  20

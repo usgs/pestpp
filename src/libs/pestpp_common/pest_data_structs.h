@@ -418,10 +418,10 @@ public:
 	void set_mou_pso_rfit(double val) { mou_pso_rfit = val; }
 	vector<double> get_mou_pso_inertia() const { return mou_pso_inertia; }
 	void set_mou_pso_inertia(vector<double> _vals) { mou_pso_inertia = _vals; }
-	bool get_mou_pso_zero_initial_velocities()const { return mou_pso_zero_initial_velocities; }
-	void set_mou_pso_zero_initial_velocities(bool _flag) { mou_pso_zero_initial_velocities = _flag; }
 	double get_mou_pso_vmax_factor() const { return mou_pso_vmax_factor; }
 	void set_mou_pso_vmax_factor(double _val) { mou_pso_vmax_factor = _val; }
+	string get_mou_pso_dv_bound_restoration() const { return mou_pso_dv_bound_restoration; }
+	void set_mou_pso_dv_bound_restoration(string name) { mou_pso_dv_bound_restoration = name; }
 	int get_mou_max_nn_search() const { return mou_max_nn_search;}
 	void set_mou_max_nn_search(int val) { mou_max_nn_search = val; }
 	string get_mou_outer_repo_obs_file() const { return mou_outer_repo_obs_file; }
@@ -437,8 +437,6 @@ public:
 	double get_mou_fit_gamma() const { return mou_fit_gamma; }
 	void set_mou_fit_gamma(double val) { mou_fit_gamma = val; }
 	int get_mou_resample_every()const { return mou_resample_every; }
-	void set_mou_adaptive_ppd(bool _flag) { mou_adaptive_ppd = _flag; };
-	bool get_mou_adaptive_ppd() const { return mou_adaptive_ppd; }
 	void set_mou_resample_every(int _every) { mou_resample_every = _every; }
 	string get_mou_resample_command()const { return mou_resample_command; }
 	void set_mou_resample_command(string _rescmd) { mou_resample_command = _rescmd; }
@@ -781,13 +779,12 @@ private:
 	double mou_pso_alpha;
 	double mou_pso_rramp;
 	double mou_pso_rfit;
-	bool mou_pso_zero_initial_velocities;
+	string mou_pso_dv_bound_restoration;
 	vector<double> mou_pso_inertia;
 	double mou_pso_vmax_factor;
 	double mou_ppd_beta;
 	double mou_fit_gamma;
 	double mou_fit_epsilon;
-	bool mou_adaptive_ppd;
 	string mou_outer_repo_obs_file;
 	int mou_max_nn_search;
 	int mou_infill_size;

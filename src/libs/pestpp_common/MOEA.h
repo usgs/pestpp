@@ -209,6 +209,7 @@ private:
 	vector<double> inertia_info, cog_const_range, social_const_range;
 	double curr_omega;
 	map<string, double> pso_vmax;
+	string pso_dv_bound_restoration;
 
 	ParetoObjectives objectives;
 	Constraints constraints;
