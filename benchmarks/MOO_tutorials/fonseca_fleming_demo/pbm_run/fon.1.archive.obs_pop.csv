@@ -1,0 +1,6 @@
+real_name,obj1,obj2
+gen=1_member=20_pso,0.962998,0.0763176
+gen=0_member=20,0.155598,0.946508
+gen=0_member=6,0.603026,0.664925
+gen=1_member=11_pso,0.829876,0.366879
+gen=1_member=50_pso,0.722473,0.559594
