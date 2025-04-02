@@ -13,11 +13,29 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pyemu
 
-template_dir = "FON_template"
+template_dir = os.path.join("fonseca_fleming_demo", "FON_template")
 
 def fon_setup():
-    # Create a new PEST control file
-    pst = pyemu.Pst.from_scratch(template_dir)
+    # Create a basic PST file with minimal required content
+    with open(os.path.join(template_dir, "fon.pst"), "w") as f:
+        f.write("pcf\n")
+        f.write("* control data\n")
+        f.write("restart estimation\n")
+        f.write("2 2 1 0 1\n")
+        f.write("1 1 single point 1 0 0\n")
+        f.write("5.0 2.0 0.3 0.01 10\n")
+        f.write("5.0 5.0 0.001\n")
+        f.write("0.1\n")
+        f.write("30 0.01 3 3 0.01 3\n")
+        f.write("1 1 1\n")
+        f.write("* parameter groups\n")
+        f.write("* parameter data\n")
+        f.write("* observation data\n")
+        f.write("* model command line\n")
+        f.write("* model input/output\n")
+        f.write("fon.tpl fon.par\n")
+        f.write("fon.ins fon.out\n")
+    pst = pyemu.Pst(os.path.join(template_dir, "fon.pst"))
 
     pst.control_data.noptmax = 20
 

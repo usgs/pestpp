@@ -1,0 +1,17 @@
+pcf
+* control data
+restart estimation
+2 2 1 0 1
+1 1 single point 1 0 0
+5.0 2.0 0.3 0.01 10
+5.0 5.0 0.001
+0.1
+30 0.01 3 3 0.01 3
+1 1 1
+* parameter groups
+* parameter data
+* observation data
+* model command line
+* model input/output
+fon.tpl fon.par
+fon.ins fon.out
