@@ -553,7 +553,7 @@ void Localizer::report(ofstream &f_rec)
 }
 
 unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_localanalysis_case_map(int iter, vector<string>& act_obs_names, vector<string>& act_par_names, 
-	ObservationEnsemble &oe, ParameterEnsemble &pe, PerformanceLog *performance_log)
+	ObservationEnsemble &oe, ParameterEnsemble &pe, PerformanceLog *performance_log, ofstream& frec)
 {
 
 	set<string> sact_par_names(act_par_names.begin(), act_par_names.end());
@@ -580,6 +580,10 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 	{
 		return lmap;
 	}
+
+
+
+
 	map<string, set<string>> listed_obs;
 	for (auto i : lmap)
 	{
@@ -590,6 +594,8 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 		}
 	}
 
+
+
 	cout << "...starting automatic adaptive localization calculations" << endl;
 	stringstream ss;
 	performance_log->log_event("autoadaloc: checking for compat with par and obs ensembles");
@@ -599,10 +605,33 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 		ss << "Localizer::get_localizer_map() Error: for autoadaloc, pe must have same number of reals (" << pe.shape().first << ") as oe (" << oe.shape().first << ")";
 		performance_log->log_event(ss.str());
 		cout << ss.str() << endl;
+        frec << ss.str() << endl;
 		throw runtime_error(ss.str());
 	}
 
-	
+    vector<string> indicator_pars = pest_scenario_ptr->get_pestpp_options().get_ies_aal_indicator_pars();
+    vector<string> found_indicator_pars;
+    map<string,int> pmap = pe.get_var_map();
+    for (auto& pname : indicator_pars)
+    {
+        if (pmap.find(pname) != pmap.end())
+        {
+            found_indicator_pars.push_back(pname);
+        }
+    }
+
+    double sigma_dist_use = sigma_dist;
+    if (found_indicator_pars.size() > 0)
+    {
+        frec << "...found " << found_indicator_pars.size() << " spurious correlation indicator pars:" << endl;
+        for (auto& pname : found_indicator_pars)
+        {
+            frec << "...    " << pname << endl;
+        }
+        frec << endl;
+        sigma_dist_use = 0.0;
+    }
+
 	//vector<string> par_names = pe.get_pest_scenario_ptr()->get_ctl_ordered_adj_par_names(), obs_names = pe.get_pest_scenario_ptr()->get_ctl_ordered_nz_obs_names();
 
 	performance_log->log_event("autoadaloc: calculating correlation coefficients");
@@ -640,7 +669,7 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 	for (int jpar = 0; jpar < npar; jpar++)
 		par_indices.push_back(jpar);
 	vector<Eigen::Triplet<double>> triplets;
-	AutoAdaLocThread worker(performance_log, &f_out, iter, ies_verbose, npar, nobs, par_indices, pe_diff, oe_diff, par_std, obs_std, act_par_names, act_obs_names, triplets,sigma_dist,listed_obs);
+	AutoAdaLocThread worker(performance_log, &f_out, iter, ies_verbose, npar, nobs, par_indices, pe_diff, oe_diff, par_std, obs_std, act_par_names, act_obs_names, triplets,sigma_dist_use,listed_obs);
 
 	int num_threads = pe.get_pest_scenario_ptr()->get_pestpp_options().get_ies_num_threads();
 
@@ -697,11 +726,48 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 		cout << ss.str() << endl;
 		throw runtime_error(ss.str());
 	}
+
+    if (found_indicator_pars.size() > 0)
+    {
+        pmap.clear();
+        for (int i=0;i<act_par_names.size();i++)
+        {
+            pmap[act_par_names[i]] = i;
+        }
+        double global_max_abs_cc = 0.0;
+        for (auto& pname : found_indicator_pars)
+        {
+            int idx = pmap[pname];
+            double max_abs_cc = 0;
+            for (auto& t : triplets)
+            {
+                if (t.col() == idx)
+                {
+                   max_abs_cc = max(max_abs_cc,abs(t.value()));
+                }
+            }
+            frec << "...maximum abs CC for indicator par " << pname << ": " << max_abs_cc << endl;
+            global_max_abs_cc = max(global_max_abs_cc,max_abs_cc);
+        }
+        frec << "...maximum abs CC across all indicator pars: " << global_max_abs_cc << endl;
+        vector<Eigen::Triplet<double>> temp;
+        for (auto& t : triplets)
+        {
+            if (abs(t.value()) > global_max_abs_cc)
+            {
+                temp.push_back(t);
+            }
+        }
+        frec <<"...number of nonzero localizer entries reduced from " << triplets.size() << " to " << temp.size() << endl;
+        triplets = temp;
+        temp.clear();
+    }
+
 	if (ies_verbose > 1)
 	{
 		f_out.close();
 
-		performance_log->log_event("instantiating thresholded correlation coefficient matrix from triplets");
+		performance_log->log_event("instantiating (thresholded) correlation coefficient matrix from triplets");
 		cur_mat.from_triplets(act_obs_names, act_par_names, triplets);
 		ss.str("");
 		ss << pst_filename.substr(0, pst_filename.size() - 4) << "." << iter << ".autoadaloc.tCC";
@@ -709,13 +775,13 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 		if (pe.get_pest_scenario_ptr()->get_pestpp_options().get_save_binary())
 		{
 			filename = filename + ".jcb";
-			performance_log->log_event("saving thresholded CC matrix in binary format to " + filename);
+			performance_log->log_event("saving (thresholded) CC matrix in binary format to " + filename);
 			cur_mat.to_binary_new(filename);
 		}
 		else
 		{
 			filename = filename + ".mat";
-			performance_log->log_event("saving thresholded CC matrix in ASCII format to " + filename);
+			performance_log->log_event("saving (thresholded) CC matrix in ASCII format to " + filename);
 			cur_mat.to_ascii(filename);
 		}
 	}
@@ -742,17 +808,21 @@ unordered_map<string, pair<vector<string>, vector<string>>> Localizer::get_local
 	for (auto p : par_count)
 		if (p.second == 0)
 			zeros.push_back(p.first);
-	if (zeros.size() > 0)
-		cout << "Note: " << zeros.size() << " parameters have no nonzero entries in autoadaloc localizer" << endl;
+	if (zeros.size() > 0) {
+        cout << "Note: " << zeros.size() << " parameters have no nonzero entries in autoadaloc localizer" << endl;
+        frec << "Note: " << zeros.size() << " parameters have no nonzero entries in autoadaloc localizer" << endl;
+    }
 
-	zeros.clear();
+
+        zeros.clear();
 	for (auto o : obs_count)
 		if (o.second == 0)
 			zeros.push_back(o.first);
 
-	if (zeros.size() > 0)
-		cout << "Note: " << zeros.size() << " observations have no nonzero entries in autoadaloc localizer" << endl;
-
+	if (zeros.size() > 0) {
+        cout << "Note: " << zeros.size() << " observations have no nonzero entries in autoadaloc localizer" << endl;
+        frec << "Note: " << zeros.size() << " observations have no nonzero entries in autoadaloc localizer" << endl;
+    }
 	performance_log->log_event("instantiating localizer matrix from triplets");
 	cur_mat.from_triplets(act_obs_names, act_par_names, ones);
 
@@ -804,11 +874,10 @@ void AutoAdaLocThread::work(int thread_id)
 
 	stringstream ss;
 	int jpar, pcount = 0, nreals = pe_diff.rows();
-	double cc, bg_cc, bg_mean = 0, bg_std, thres, t;
+	double cc, bg_mean = 0, bg_std, thres;
+    bg_std = sqrt(1.0/((double)nreals-2));
 	double sign;
 	double scale = 1.0 / double(nreals - 1);
-	double pstd, ostd;
-	//vector<Eigen::Triplet<double>> triplets, ones;
 	Eigen::VectorXd par_ss, obs_ss, obs_ss_shift;
 
 	par_ss.resize(nreals);
@@ -875,17 +944,7 @@ void AutoAdaLocThread::work(int thread_id)
 					par_indices_guard.unlock();
 					continue;
 				}
-				/*par_ss = pe_diff.col(jpar) * (1.0 / par_std[jpar]);
-				
-				if (list_obs.size() > 0)
-				{
-					sobs = list_obs[par_names[jpar]];
-					use_list_obs = true;
-				}
-				else
-				{
-					use_list_obs = false;
-				}*/
+
 				pcount++;
 				par_count++;
 				par_indices_guard.unlock();
@@ -930,28 +989,8 @@ void AutoAdaLocThread::work(int thread_id)
 			}
 			obs_ss = obs_ss * (1.0 / obs_std[iobs]);
 			cc = (par_ss.transpose() * obs_ss)[0] * scale;
-//			obs_ss_shift = 1.0 * obs_ss; //force a copy
-//			for (int ireal = 0; ireal < nreals - 1; ireal++)
-//			{
-//
-//				//obs_ss_shift.transpose() = obs_ss_shift.transpose() * perm;
-//				//circular shift
-//				t = obs_ss_shift[nreals - 1];
-//				for (int i = nreals - 1; i > 0; i--)
-//					obs_ss_shift[i] = obs_ss_shift[i - 1];
-//				obs_ss_shift[0] = t;
-//
-//				//bg_cc = (par_ss.transpose() * obs_ss_shift)[0] * scale;
-//				bg_cc_vec[ireal] = (par_ss.transpose() * obs_ss_shift)[0] * scale;
-//				//cout << ireal << " " << par_names[jpar] << " " << obs_names[iobs] << " " << cc << " " << bg_cc << endl;
-//			}
+            (cc < 0.0) ? sign = -1. : sign = 1.;
 
-			//cout << par_names[jpar] << " " << obs_names[iobs] << " " << cc << " " << bg_cc << endl; 
-			(cc < 0.0) ? sign = -1. : sign = 1.;
-
-			//bg_mean = bg_cc_vec.mean();
-			//bg_std = sqrt((bg_cc_vec - bg_mean).pow(2).sum() / (nreals - 1));
-			bg_std = sqrt(1.0/((double)nreals-2));
 			thres = bg_mean + (sign * sigma_dist * bg_std);
 			if (ies_verbose > 1)
 			{

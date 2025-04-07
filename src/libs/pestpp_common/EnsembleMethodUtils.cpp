@@ -4147,7 +4147,6 @@ void EnsembleMethod::sanity_checks()
         errors.push_back("Covariance-based localization not supported with MDA solver");
     }
 
-
 //    if (pest_scenario.get_control_info().noptmax > 10)
 //	{
 //		warnings.push_back("noptmax > 10, don't expect anything meaningful from the results!");
@@ -5227,11 +5226,21 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 	}
 
     int num_par_elements = pest_scenario.get_ctl_parameters().size();
-	if ((!pest_scenario.get_pestpp_options().get_save_dense()) && (pp_args.find("IES_ORDERED_BINARY") == pp_args.end()) && (pp_args.find("DA_ORDERED_BINARY") == pp_args.end()))
+    int num_obs_elements = pest_scenario.get_ctl_observations().size();
+    if ((num_par_elements > 1000000) || (num_obs_elements > 1000000))
+    {
+        if ((pest_scenario.get_pestpp_options().get_save_binary()) && (!pest_scenario.get_pestpp_options().get_save_dense()))
+        {
+            message(0,"WARNING: npar and/or nobs > 1e6, you are close to going out-of-range for jcb format.  Switching to dense '.bin' format");
+            pest_scenario.get_pestpp_options_ptr()->set_save_dense(true);
+        }
+    }
+
+    if ((!pest_scenario.get_pestpp_options().get_save_dense()) && (pp_args.find("IES_ORDERED_BINARY") == pp_args.end()) && (pp_args.find("DA_ORDERED_BINARY") == pp_args.end()))
 	{
 
 		//if ((pe.shape().second > 100000) && (pest_scenario.get_pestpp_options().get_save_binary()))
-        if ((num_par_elements > 100000) && (pest_scenario.get_pestpp_options().get_save_binary()))
+        if (((num_par_elements > 100000) || (num_obs_elements > 100000)) && (pest_scenario.get_pestpp_options().get_save_binary()))
 		{
 			message(1, "'ies_ordered_binary' was not passed, but 'ies_save_binary' is true and npar > 100,000, switching to unordered binary...");
 			pest_scenario.get_pestpp_options_ptr()->set_ies_ordered_binary(false);
@@ -5406,7 +5415,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		if (failed_idxs.size() != 0)
 		{
 			message(0, "mean parameter value run failed...bummer");
-			return;
+            throw_em_error("mean parameter value run failed");
 		}
 		ss.str("");
 		ss << file_manager.get_base_filename();
@@ -5650,13 +5659,9 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
 		ss << " with the prior simulated ensemble." << endl;
 		message(0, ss.str());
 
-		cout << "...see rec file or " << file_manager.get_base_filename() << ".0.pdc.csv" << " for listing of conflicted observations" << endl << endl;
+		cout << "...see " << file_manager.get_base_filename() << ".0.pdc.csv" << " for listing of conflicted observations" << endl << endl;
 		ofstream& frec = file_manager.rec_ofstream();
-		frec << endl << "...conflicted observations: " << endl;
-		for (auto oname : in_conflict)
-		{
-			frec << oname << endl;
-		}
+        frec << "...see " << file_manager.get_base_filename() << ".0.pdc.csv" << " for listing of conflicted observations" << endl << endl;
 
 		if (!ppo->get_ies_drop_conflicts())
 		{
@@ -5723,8 +5728,20 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
             }
 		}
 	}
-
-    drop_bad_reals(pe, oe);
+    if ((ppo->get_ies_obs_restart_csv().size() > 0) && (ppo->get_ies_par_restart_csv().size() > 0))
+    {
+        message(1,"not dropping any realizations during initialization b/c restart obs and restart par ensembles passed");
+    }
+    else {
+        if (pest_scenario.get_control_info().noptmax < 0)
+        {
+            message(1,"not dropping any realizations during initialization b/c noptmax<0");
+        }
+        else
+        {
+            drop_bad_reals(pe, oe);
+        }
+    }
 	if (oe.shape().first == 0)
 	{
 		throw_em_error(string("all realizations dropped as 'bad'"));
@@ -6949,7 +6966,8 @@ bool EnsembleMethod::solve(bool use_mda, vector<double> inflation_factors, vecto
 	unordered_map<string, pair<vector<string>, vector<string>>> loc_map;
 	if (use_localizer)
 	{
-		loc_map = localizer.get_localanalysis_case_map(iter, act_obs_names, act_par_names, oe, pe, performance_log);
+
+		loc_map = localizer.get_localanalysis_case_map(iter, act_obs_names, act_par_names, oe, pe, performance_log, frec);
 	}
 	else
 	{
@@ -8585,43 +8603,47 @@ void EnsembleMethod::initialize_restart()
 		message(2, "reordering oe_base to align with restart obs en,num reals:", oe_real_names.size());
 		if ((oe_drawn) && (oe_base.shape().first == oe_real_names.size()))
 		{
-			oe_base.set_real_names(oe_real_names);
-			weights.set_real_names(oe_real_names);
+            if (pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate().size() > 0)
+                message(2,"reinflation is active, not reordering oe_base");
+            else {
+                oe_base.set_real_names(oe_real_names);
+                weights.set_real_names(oe_real_names);
+            }
 		}
 		else
 		{
-			try
-			{
-				oe_base.reorder(oe_real_names, vector<string>());
-			}
-			catch (exception& e)
-			{
-				ss << "error reordering oe_base with restart oe:" << e.what();
-				throw_em_error(ss.str());
-			}
-			catch (...)
-			{
-				throw_em_error(string("error reordering oe_base with restart oe"));
-			}
+            if (pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate().size() > 0)
+                message(2,"reinflation is active, not reordering oe_base or weight ensembles");
+			else {
 
-            try
-            {
-                weights.reorder(oe_real_names, vector<string>());
-            }
-            catch (exception& e)
-            {
-                ss << "error reordering weights with restart oe:" << e.what();
-                throw_em_error(ss.str());
-            }
-            catch (...)
-            {
-                throw_em_error(string("error reordering weights with restart oe"));
+
+                try {
+                    oe_base.reorder(oe_real_names, vector<string>());
+                }
+                catch (exception &e) {
+                    ss << "error reordering oe_base with restart oe:" << e.what();
+                    throw_em_error(ss.str());
+                }
+                catch (...) {
+                    throw_em_error(string("error reordering oe_base with restart oe"));
+                }
+
+                try {
+                    weights.reorder(oe_real_names, vector<string>());
+                }
+                catch (exception &e) {
+                    ss << "error reordering weights with restart oe:" << e.what();
+                    throw_em_error(ss.str());
+                }
+                catch (...) {
+                    throw_em_error(string("error reordering weights with restart oe"));
+                }
             }
 
 
 		}
 		//if (par_restart_csv.size() > 0)
-		if (false)
+		if (pest_scenario.get_pestpp_options().get_ies_n_iter_reinflate().size() == 0)
 		{
 			vector<string> pe_real_names = pe.get_real_names();
 			message(2, "reordering pe_base to align with restart par en,num reals:", pe_real_names.size());
@@ -8639,6 +8661,13 @@ void EnsembleMethod::initialize_restart()
 				throw_em_error(string("error reordering pe_base with restart pe"));
 			}
 		}
+        else
+        {
+            message(2,"reinflation is active, not reordering pe_base ensemble");
+            pe.set_fixed_info(pe_base.get_fixed_info());
+
+        }
+
 
 	}
 	else if (oe.shape().first > oe_base.shape().first) //something is wrong

@@ -1219,6 +1219,19 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         return true;
     }
 
+    else if (key == "IES_AUTOADALOC_INDICATOR_PARS")
+    {
+        vector<string> tok;
+        tokenize(value, tok, ",");
+        ies_aal_indicator_pars.clear();
+        for (const auto& fac : tok)
+        {
+            ies_aal_indicator_pars.push_back(upper_cp(fac));
+        }
+        return true;
+    }
+
+
 
     return false;
 }
@@ -1866,6 +1879,10 @@ void PestppOptions::summary(ostream& os) const
     os << endl;
     os << "ies_updatebyreals: " << ies_updatebyreals << endl;
 
+    os << "ies_autoadaloc_indicator_pars: " << endl;
+    for (auto v : ies_aal_indicator_pars)
+        os << v << ",";
+    os << endl;
 
     os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -2055,6 +2072,7 @@ void PestppOptions::set_defaults()
 
     set_ies_updatebyreals(false);
     set_save_dense(false);
+    set_ies_aal_indicator_pars(vector<string>());
 
 	// DA parameters
 	//set_da_use_ies(false);
