@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.17
+# <a id='s1' />Version 5.2.18
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-December 2024
+April 2025
 
 # <a id='s2' />Acknowledgements
 
@@ -70,7 +70,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Table of Contents
 
-- [Version 5.2.17](#s1)
+- [Version 5.2.18](#s1)
 - [Acknowledgements](#s2)
 - [Preface](#s3)
 - [License](#s4)
@@ -3566,6 +3566,8 @@ Using this collection of background correlation coefficients and the optional *i
 
 The automatic adaptive localization process can be used in conjunction with a localization matrix. In this case, the nonzero entries in the localization matrix are used to constraint the number of parameter-observation pairs to search for statistically significant correlations. In this mode of operation, the actual value of non-zero entries in the localization are not important. The localization matrix is only used to identify plausible and possible parameter-observation correlations and the automatic adaptive localization process then calculates estimated and background correlation coefficients as described previously.
 
+It is unlikely that a user can a prior guess the optimal value of *ies_autoadaloc_sigma_dist*. However, one can use “indicator” or “dummy” parameters to help empirically estimate the optimal automatic-adaptive-localization cutoff. The idea with indicator pars is that you add these parameters to the control file, but they have no effect of the simulated results – they are just floating out there, so in theory, there estimated values should not change as a result of the PESTPP-IES solution process because their sensitivity to all observations is zero. But, because spurious correlation from using too few realizations, there will be non-zero correlations between indicator parameters and observations, so their estimates values will change. We can use this knowledge to estimate a maximum spurious correlation coefficients between parameters and observations. By carrying one or more indicator parameters, we can “see” estimates of maximum spurious correlation, that is, the maximum absolute correlation between any indicator parameter and any non-zero weighted observation. Then we can use this maximum spurious correlation as a correlation coefficient threshold when forming the automatic adaptive localizer matrix. PESTPP-IES does all this for you under the hood, all you have to do is supply the *ies_autoadaloc_indicator_pars* argument.
+
 If the *ies_verbose_level()* flag is set to greater than 1, the automatic adaptive localization process implemented by PESTPP-IES will record the resulting localization matrix in a file named *case.N.autoadaloc.mat*, where case is the filename base of the PEST control file. It will also record a CSV file containing results of the adaptive localization process as *case.N.autodaloc.csv*. Both of these are recorded at the end of each iteration; *N* is the iteration number. The automatic adaptive localization process can be computationally demanding. However, it can be multi-threaded. This option is activated using the *ies_num_threads()* control variable.
 
 ### <a id='s13-1-12' />9.1.12 Use of observation noise covariance matrices
@@ -3626,7 +3628,9 @@ This option is implemented in PESTPP-IES via the *ies_n_iter_reinflate* option. 
 
 - There is a related option name *ies_reinflate_factor*, that can be a single floating point number or can be a sequence of floating point numbers ranging from greater than 0.0 to less than or equal to 1.0. The function of *ies_reinflate_factor* is dampen the variability in the prior parameter ensemble anomalies so that the reinflation isn’t to full prior parameter ensemble variance, but instead some scaled down version of that variance.
 
-Figure 9.3 shows how the mean-update iterations can prevent variance collapse for a very simple and contrived example problem. Notice how the realization trajectories collapse after one iteration.
+- During a reinflation cycle, all realizations that have either failed or have been removed for poor performance will be brought back into the current parameter ensemble. If restarting, supplying the previous prior parameter ensemble along with the restart parameter ensemble will enable PESTPP-IES to bring all the prior realizations lost during the previous analysis back into the current ensemble.
+
+Figure 9.3 shows how the reinflation cycles can mitigate variance collapse for a very simple and contrived example problem. Notice how the realization trajectories collapse after one iteration.
 
 <img src="./media/image6.emf" style="width:6.28022in;height:3.83791in" />
 
@@ -4176,6 +4180,11 @@ Note also that the number of control variables may change with time. Refer to th
 <td>Flag to indicate whether or not to update each realization according to its phi reduction. Default is False.</td>
 </tr>
 <tr class="even">
+<td><em>Ies_autoadaloc_indicator_pars</em></td>
+<td>Text</td>
+<td>The name of 1 or more parameters to treat as indicator parameters in the automatic adaptive localization process to help define the level of spurious correlation.</td>
+</tr>
+<tr class="odd">
 <td><em>save_dense</em></td>
 <td>bool</td>
 <td>Flag to save ensembles in a “dense” binary format, which in constrast to the sparse binary format of jcb/jco. Ensemble files will be given a “.bin” extension. These files can be read by PESTPP-IES (for restarting) and by pyEMU. This option only applies of <em>save_</em>binary is True. Default is False</td>
