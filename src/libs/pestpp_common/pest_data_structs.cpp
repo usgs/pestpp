@@ -1219,7 +1219,7 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         return true;
     }
 
-    else if (key == "IES_AAL_INDICATOR_PARS")
+    else if (key == "IES_AUTOADALOC_INDICATOR_PARS")
     {
         vector<string> tok;
         tokenize(value, tok, ",");
@@ -1879,7 +1879,7 @@ void PestppOptions::summary(ostream& os) const
     os << endl;
     os << "ies_updatebyreals: " << ies_updatebyreals << endl;
 
-    os << "ies_aal_indicator_pars: " << endl;
+    os << "ies_autoadaloc_indicator_pars: " << endl;
     for (auto v : ies_aal_indicator_pars)
         os << v << ",";
     os << endl;
