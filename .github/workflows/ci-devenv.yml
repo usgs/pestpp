@@ -1,0 +1,52 @@
+name: pestpp development environment continuous integration
+
+on: 
+  schedule:
+    - cron: '0 8 * * *' # run at 8 AM UTC (12 am PST)
+  push:
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+       
+  pestpp-devenv:
+    name: pest++ developer environment
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-latest, shell: bash}
+          - {os: macos-13, shell: bash}
+          - {os: ubuntu-latest, shell: bash}
+          - {os: ubuntu-22.04, shell: bash}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup pixi
+        uses: prefix-dev/setup-pixi@v0.8.3
+        with:
+          pixi-version: v0.42.1
+          manifest-path: "pixi.toml"
+
+      - name: Install modflow
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pixi run install-modflow
+  
+      - name: Build pestpp
+        run: |
+          pixi run build-release 
+
+      - name: Test pestpp
+        run: |
+          pixi run test
+
