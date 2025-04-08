@@ -4396,15 +4396,14 @@ ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<
 			}
 
 			new_dv = cur_real[j] + new_par_vel[j];
-			
+			double curr_vel = new_par_vel[j];
 			int draws = 0;
 			while (true)
 			{
-
+				
 				if (!((new_dv <= ub_val + FLOAT_EPSILON) && (new_dv >= lb_val - FLOAT_EPSILON)))
 				{
 					draws++;
-					cur_real[j] = new_dv;
 					if (draws > 1000)
 					{
 						ss << "problem with perturbing member: " << real_name << endl;
@@ -4426,23 +4425,26 @@ ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<
 					//Adam's recursive perturbation algo to seek new feasible dv
 					if (pso_dv_bound_restoration == "ITERATIVE")
 					{
+						double curr_dv = new_dv;
+
 						vector<double> r1 = uniform_draws(1, 0.0, 1.0, rand_gen);
 						vector<double> r2 = uniform_draws(1, 0.0, 1.0, rand_gen);
 
-						inertia_comp[j] = omega * new_par_vel[j];
-						cog_comp[j] = cog_const * r1[0] * (p_best[j] - cur_real[j]);
-						social_comp[j] = social_const * r2[0] * (g_best[j] - cur_real[j]);
+						inertia_comp[j] = omega * curr_vel;
+						cog_comp[j] = cog_const * r1[0] * (p_best[j] - curr_dv);
+						social_comp[j] = social_const * r2[0] * (g_best[j] - curr_dv);
 
-						new_par_vel[j] = inertia_comp[j] + cog_comp[j] + social_comp[j];
+						curr_vel = inertia_comp[j] + cog_comp[j] + social_comp[j];
 
 						double vmax = pso_vmax[dv_names[j]];
-						if (new_par_vel[j] > vmax + FLOAT_EPSILON) {
-							new_par_vel[j] = vmax;
+						if (curr_vel > vmax + FLOAT_EPSILON) {
+							curr_vel = vmax;
 						}
-						else if (new_par_vel[j] < -vmax - FLOAT_EPSILON) {
-							new_par_vel[j] = -vmax;
+						else if (curr_vel < -vmax - FLOAT_EPSILON) {
+							curr_vel = -vmax;
 						}
-						new_dv = cur_real[j] + new_par_vel[j];
+						new_dv = curr_dv + curr_vel;
+						new_par_vel[j] = new_dv - cur_real[j];
 					}
 					else if (pso_dv_bound_restoration == "DAMPED")
 					//Reygie's velocity damping algo to seek new feasible dv
@@ -4474,7 +4476,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<
 						new_dv = cur_real[j] + new_par_vel[j];
 					}
 					else if (pso_dv_bound_restoration == "RESET")
-						continue;
+						break;
 					else
 						throw_moea_error("invalid pso_dv_bound_restoration option. Choose between ITERATIVE, DAMPED, or RESET");
 				}
@@ -4483,7 +4485,7 @@ ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<
 			}
 		}
 
-		_dp.update_real_ip(real_name, cur_real);
+		//_dp.update_real_ip(real_name, cur_real);
 		new_vel.row(i) = new_par_vel;
 	}
 	return ParameterEnsemble(&pest_scenario, &rand_gen, new_vel, _dp.get_real_names(), _dp.get_var_names());
