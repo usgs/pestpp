@@ -1649,7 +1649,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 				ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at lower bound";
 				throw runtime_error(ss.str());
 			}*/
-			scaled_bnd_val = p_rec->ubnd + abs(p_rec->ubnd * bnd_tol);
+			/*scaled_bnd_val = p_rec->ubnd + abs(p_rec->ubnd * bnd_tol);
 			if (p.second > scaled_bnd_val)
 			{
 				temp = abs((p_rec->ubnd - last_val) / (p.second - last_val));
@@ -1684,12 +1684,30 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 					controlling_par = p.first;
 					control_type = "lower bound";
 				}
+			*/
+			{
+				double last_val = last_ctl_pars.get_rec(p.first);
+				p_rec = p_info.get_parameter_rec_ptr(p.first);
+		
+				if (enforce_bounds && p.second > p_rec->ubnd)
+				{
+					p.second = p_rec->ubnd;
+				}
+				else if (enforce_bounds && p.second < p_rec->lbnd)
+				{
+					p.second = p_rec->lbnd;
+				}
+				else
+				{
+					p.second = last_val + (p.second - last_val) * scaling_factor;
+				}
 			}
-		}	
-	}
-	ss.str("");
-	ss << "change enforcement controlling par:" << controlling_par << ", control_type: " << control_type << ", scaling_factor: " << scaling_factor << endl;
-
+		}
+	}	
+	
+	//ss.str("");
+	//ss << "change enforcement controlling par:" << controlling_par << ", control_type: " << control_type << ", scaling_factor: " << scaling_factor << endl;
+	/*
 	if (scaling_factor == 0.0)
 	{
 		ss.str("");
@@ -1707,7 +1725,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 			p.second =last_val + (p.second - last_val) *  scaling_factor;
 		}
 	}
-	
+	*/
 	//check for slightly out of bounds
 	for (auto &p : upgrade_ctl_pars)
 	{
@@ -1718,8 +1736,9 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 			p.second = p_rec->ubnd;
 
 	}
-	ss.str("");
-	ss << control_type << "," << controlling_par;
+	upgrade_active_ctl_pars = upgrade_ctl_pars;
+	//ss.str("");
+	//ss << control_type << "," << controlling_par;
 	pair<string, double> _control_info(ss.str(), scaling_factor);
 	return _control_info;
 
