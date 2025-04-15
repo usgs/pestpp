@@ -10,6 +10,7 @@
 #include "EnsembleMethodUtils.h"
 #include "constraints.h"
 #include "eigen_tools.h"
+#include "RedSVD-h.h"
 
 
 using namespace std;
@@ -298,7 +299,14 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 				mn = 0.0;
 		}
 		if (mx < 0.0)
-			throw runtime_error("pso max cluster count is negative");
+		{
+	        ss.str("");
+	        ss << "WARNING: pso gbest solution max crowding distance == 0.0, " << nondom_solutions.size()
+	           << " nondom solutions being used" << endl;
+	        file_manager.rec_ofstream() << ss.str();
+	        cout << ss.str();
+	        mx = 0.0
+    	}
 
 		for (auto& cd : cluster_crowding) {
 			if (cd.second == CROWDING_EXTREME)
@@ -308,9 +316,9 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 			else if (mx >= 0.0) {
 				cd.second = pow(1 - (cd.second - mn) / (mx - mn + 1), alpha);
 			}
-			/*else {
+			else {
 				cd.second = pow(0.5, alpha);
-			}*/
+			}
 		}
 
 		fitness = cluster_crowding;
@@ -328,8 +336,15 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 				mx = cd.second;
 			else if (crowd_sorted.size() == 1)
 				mx = cd.second;
-		if ((mx < 0.0))
-			throw runtime_error("pso max crowding distance is negative");
+		if (mx < 0.0)
+		{
+	        ss.str("");
+	        ss << "WARNING: pso gbest solution max crowding distance == 0.0, " << nondom_solutions.size()
+	           << " nondom solutions being used" << endl;
+	        file_manager.rec_ofstream() << ss.str();
+	        cout << ss.str();
+	        mx = 0.0
+    	}
 
 		for (auto& cd : crowd_dist) {
 			if (cd.second == CROWDING_EXTREME) {
@@ -451,9 +466,11 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
             set<string> obs_obj_set(obs_obj_names_ptr->begin(), obs_obj_names_ptr->end());
 			set<string> obs_obj_sd_set(obs_obj_sd_names_ptr->begin(), obs_obj_sd_names_ptr->end());
             set<string> pi_obj_set(pi_obj_names_ptr->begin(), pi_obj_names_ptr->end());
+            set<string>::iterator end;
             ObservationInfo *oi = pest_scenario.get_observation_info_ptr();
             PriorInformation *pi = pest_scenario.get_prior_info_ptr();
             feas_member_struct.clear();
+
             for (auto real_name : real_names) {
                 vsum = 0.0;
                 obs.update_without_clear(onames, op.get_real_vector(real_name));
@@ -461,14 +478,16 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
                 // the 'false' arg is to not apply risk shifting to the satisfaction calcs since
                 // 'op' has already been shifted
                 violations = constraints_ptr->get_unsatified_obs_constraints(obs, 0.0, false);
+                end = obs_obj_set.end();
                 for (auto v : violations) {
-                    if (obs_obj_set.find(v.first) == obs_obj_set.end())
+                    if (obs_obj_set.find(v.first) == end)
                         vsum += pow(v.second * oi->get_weight(v.first), 2);
                 }
                 pars.update_without_clear(pnames, dp.get_real_vector(real_name));
                 violations = constraints_ptr->get_unsatified_pi_constraints(pars, 0.0);
+                end = pi_obj_set.end();
                 for (auto v : violations) {
-                    if (pi_obj_set.find(v.first) == pi_obj_set.end())
+                    if (pi_obj_set.find(v.first) == end)
                         vsum += pow(v.second * pi->get_pi_rec(v.first).get_weight(), 2);
                 }
                 if (vsum > 0.0) {
@@ -1864,7 +1883,7 @@ void MOEA::message(int level, const string& _message, T extra)
 void MOEA::throw_moea_error(const string& message)
 {
 	performance_log->log_event("MOEA error: " + message);
-	cout << endl << "   ************   " << endl << "    MOEAerror: " << message << endl << endl;
+	cout << endl << "   ************   " << endl << "    MOEA error: " << message << endl << endl;
 	file_manager.rec_ofstream() << endl << "   ************   " << endl << "    MOEA error: " << message << endl << endl;
 	file_manager.close_file("rec");
 	performance_log->~PerformanceLog();
@@ -1895,8 +1914,8 @@ map<string, map<string, double>> MOEA::decvar_report(ParameterEnsemble& _dp)
     {
         max_len = max(max_len,(int)dv.size());
     }
-    ss << left << setw(max_len) << "decision variable" << right << setw(10) << "ubnd" << setw(10) << "lbnd" << setw(10) << "mean" << setw(20);
-    ss << "standard devation" << setw(12) << "min" << setw(12) << "max" << endl;
+    ss << left << setw(max_len) << "decision variable " << right << setw(10) << "ubnd " << setw(10) << "lbnd " << setw(12) << "mean " << setw(12);
+    ss << "stdev " << setw(12) << "min " << setw(12) << "max " << endl;
     map<string,double> meanmap,stdmap;
     _dp.fill_moment_maps(meanmap,stdmap);
     Eigen::VectorXd vec;
@@ -1907,13 +1926,13 @@ map<string, map<string, double>> MOEA::decvar_report(ParameterEnsemble& _dp)
     {
         sum.clear();
         prec = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(dv);
-        ss << left << setw(max_len) << dv;
-        ss << right << setw(10) << prec->ubnd;
-        ss << right << setw(10) << prec->lbnd;
-        ss << right << setw(10) << meanmap[dv];
-        ss << right << setw(20) << stdmap[dv];
+        ss << left << setw(max_len) << dv << " ";
+        ss << right << setw(10) << prec->ubnd << " ";
+        ss << right << setw(10) << prec->lbnd << " ";
+        ss << right << setw(12) << meanmap[dv] << " ";
+        ss << right << setw(12) << stdmap[dv] << " ";
         vec = _dp.get_var_vector(dv);
-        ss << setw(12) << vec.minCoeff();
+        ss << setw(12) << vec.minCoeff() << " ";
         ss << setw(12) << vec.maxCoeff();
         ss << endl;
         sum["mean"] = meanmap[dv];
@@ -1940,10 +1959,10 @@ map<string, map<string, double>> MOEA::decvar_change_report(map<string, map<stri
     for (auto& n : dv_names)
         max_len = max(max_len,(int)n.size());
 
-    ss << left << setw(max_len) << "decision variable" << right << setw(11) << "mean change";
-    ss << setw(11) << "% change";
-    ss << setw(11) << "max change" << setw(11) << "% change";
-    ss << setw(11) << "min change" << setw(11) << "% change" << endl;
+    ss << left << setw(max_len) << "decision variable " << right << setw(11) << "mean change ";
+    ss << setw(11) << "% change ";
+    ss << setw(11) << "max change " << setw(11) << "% change ";
+    ss << setw(11) << "min change " << setw(11) << "% change " << endl;
 
     vector<string> tags{ "mean","max","min" };
     for (auto dv : dv_names)
@@ -1953,7 +1972,7 @@ map<string, map<string, double>> MOEA::decvar_change_report(map<string, map<stri
             throw_moea_error("decvar_change_report() error: dv '" + dv + "' not in previous summary");
         if (current_dv_summary.find(dv) == current_dv_summary.end())
             throw_moea_error("decvar_change_report() error: dv '" + dv + "' not in current summary");
-        ss << left << setw(max_len) << dv;
+        ss << left << setw(max_len) << dv << " ";
         for (auto tag : tags)
         {
 
@@ -1963,8 +1982,8 @@ map<string, map<string, double>> MOEA::decvar_change_report(map<string, map<stri
             else
                 percent_change = 100.0 * (change / previous_dv_summary[dv][tag]);
 
-            ss << right << setw(11) << change;
-            ss << setw(11) << percent_change;
+            ss << right << setw(11) << change << " ";
+            ss << setw(11) << percent_change << " ";
             change_summary[dv][tag] = change;
             change_summary[dv][tag+"_percent"] = percent_change;
         }
@@ -2198,7 +2217,7 @@ void MOEA::sanity_checks()
 	if ((ppo->get_mou_population_size() < error_min_members) && (population_dv_file.size() == 0))
 	{
 		ss.str("");
-		ss << "population_size < " << error_min_members << ", this is redic, increaing to " << warn_min_members;
+		ss << "population_size < " << error_min_members << ", this is redic, increasing to " << warn_min_members;
 		warnings.push_back(ss.str());
 		ppo->set_ies_num_reals(warn_min_members);
 	}
@@ -2412,7 +2431,9 @@ void MOEA::queue_chance_runs(ParameterEnsemble& _dp)
 		pest_scenario.get_base_par_tran_seq().ctl2numeric_ip(pars);
 		Observations obs = pest_scenario.get_ctl_observations();
 		//if this is the first iter and no restart
-		
+        ss.str("");
+        ss << "queuing chance runs for generation " << iter;
+		message(1,ss.str());
 		if (chancepoints == chancePoints::SINGLE)
 		{
 			//dont use the _dp, use the class attr dp and op here
@@ -2710,7 +2731,7 @@ void MOEA::initialize()
 	{
 		//evaluate the chance constraints at every individual, very costly, but most robust
 		chancepoints = chancePoints::ALL;
-		message(1, "'opt_chance_points' = ALL, evaluting chance at all population members");
+		message(1, "'opt_chance_points' = ALL, evaluating chance at all population members");
 	}
 	
 	else if (chance_points == "SINGLE")
@@ -2718,7 +2739,7 @@ void MOEA::initialize()
 		//evaluate the chance constraints only at the population member nearest the optimal tradeoff.
 		//much cheaper, but assumes linear coupling
 		chancepoints = chancePoints::SINGLE;
-		message(1, "'opt_chance_points' = SINGLE, evaluting chance at representative point");
+		message(1, "'opt_chance_points' = SINGLE, evaluating chance at representative point");
 	}
 	else
 	{
@@ -2962,6 +2983,7 @@ void MOEA::initialize()
 		n_adaptive_dvs++;
 	}
 	constraints.initialize(dv_names, numeric_limits<double>::max());
+
 	constraints.initial_report();
 
 	if (pest_scenario.get_control_info().noptmax == 0)
@@ -3061,7 +3083,7 @@ void MOEA::initialize()
             gen_types.push_back(MouGenType::SMP);
             message(1, "using simplex generator");
         }
-		else
+        else
 		{
 			throw_moea_error("unrecognized generator type '" + token + "', should be in {'DE','SBX','PM','PSO'}");
 		}
@@ -3186,7 +3208,7 @@ void MOEA::initialize()
 		{
 			//this can be done, but we need to make sure the appropriate chance restart
 			//args were supplied: base_jacobian or obs_stack
-			throw_moea_error("chance constraints not yet supported with restart");
+			throw_moea_error("chance constraints/objectives not yet supported with restart");
 		}
 	
 		//since mou reqs strict linking of realization names, let's see if we can find an intersection set 
@@ -3211,7 +3233,15 @@ void MOEA::initialize()
 			message(1, ss.str());
 			if (common.size() < error_min_members)
 			{
-				throw_moea_error("too few members to continue");
+			    if (pest_scenario.get_control_info().noptmax > 0)
+				    throw_moea_error("too few members to continue");
+			    else
+                {
+                    ss.str("");
+                    ss << "WARNING: very few population members..." << endl;
+                    message(0,ss.str());
+                }
+
 			}
 			
 			message(2,"aligning dv and obs populations");
@@ -3243,8 +3273,16 @@ void MOEA::initialize()
 		ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag;
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
-			ss << ".jcb";
-			dp.to_binary(ss.str());
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                ss << ".bin";
+                dp.to_dense(ss.str());
+            }
+            else {
+                ss << ".jcb";
+                dp.to_binary(ss.str());
+            }
+
 		}
 		else
 		{
@@ -3266,8 +3304,15 @@ void MOEA::initialize()
 	ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag;
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		op.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            op.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            op.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -3290,11 +3335,19 @@ void MOEA::initialize()
 	    string opt_member;
 		ObservationEnsemble shifted_op = get_chance_shifted_op(dp, op, opt_member);
 		ss.str("");
-		ss << file_manager.get_base_filename() << ".0." << obs_pop_file_tag << ".chance";
+		ss << file_manager.get_base_filename() << ".0.chance." << obs_pop_file_tag;
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
-			ss << ".jcb";
-			shifted_op.to_binary(ss.str());
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                ss << ".bin";
+                shifted_op.to_dense(ss.str());
+
+            }
+            else {
+                ss << ".jcb";
+                shifted_op.to_binary(ss.str());
+            }
 		}
 		else
 		{
@@ -3313,8 +3366,15 @@ void MOEA::initialize()
 	ss << file_manager.get_base_filename() << ".0." << dv_pop_file_tag;
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		dp.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            dp.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            dp.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -3329,7 +3389,8 @@ void MOEA::initialize()
 	{
 		message(0, "too few population members:", op.shape().first);
 		message(1, "need at least ", error_min_members);
-		throw_moea_error(string("too few active population members, cannot continue"));
+		if (pest_scenario.get_control_info().noptmax > 0)
+		    throw_moea_error(string("too few active population members, cannot continue"));
 	}
 	if (op.shape().first < warn_min_members)
 	{
@@ -3373,8 +3434,7 @@ void MOEA::initialize()
 			op.get_eigen(dompair.first, vector<string>()), dompair.first, op.get_var_names());
 		dp_archive = ParameterEnsemble(&pest_scenario, &rand_gen,
 			dp.get_eigen(dompair.first, vector<string>()), dompair.first, dp.get_var_names());
-
-		ss.str("");
+		dp_archive.set_trans_status(dp.get_trans_status());
 		ss << "initialized archives with " << dompair.first.size() << " nondominated members";
 		message(2, ss.str());
 
@@ -3583,7 +3643,7 @@ pair<Parameters, Observations> MOEA::get_optimal_solution(ParameterEnsemble& _dp
 		for (int i = 0; i < _dp.shape().first; i++)
 		{
 			//dist = dp_mean.dot(_dp.get_eigen_ptr()->row(i));
-			dist = (dp_mean - _dp.get_eigen_ptr()->row(i).transpose()).squaredNorm();
+            dist = (dp_mean - _dp.get_eigen_ptr()->row(i).transpose()).squaredNorm();
 			if (dist < dist_min)
 			{
 				idx_min = i;
@@ -3688,7 +3748,7 @@ ParameterEnsemble MOEA::generate_population()
         {
             p = generate_simplex_population(new_members_per_gen, dp, op);
         }
-		else
+        else
 			throw_moea_error("unrecognized mou generator");
 		if (new_pop.shape().first == 0)
 			new_pop = p;
@@ -3965,6 +4025,9 @@ void MOEA::iterate_to_solution()
         if ((q == 1) || (q == 2))
         {
 		    message(0,"'pest.stp' found, quitting");
+            message(1,"force-saving current populations");
+            save_populations(dp,op,"",true);
+            save_populations(dp_archive, op_archive, "archive",true);
 		    break;
         }
         else if (q == 4) {
@@ -4050,6 +4113,7 @@ void MOEA::initialize_population_schedule()
         }
         in.close();
     }
+
     ofstream& frec = file_manager.rec_ofstream();
     frec << "...population schedule: generation,population size:" << endl;
     for (int i=0;i<pest_scenario.get_control_info().noptmax;i++)
@@ -4495,23 +4559,33 @@ ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<
 
 vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _dp, ObservationEnsemble& _op)
 {
-
+	stringstream ss;
 	DomPair dompair = objectives.get_nsga2_pareto_dominance(-999, _op, _dp, &constraints, prob_pareto, false);
 	vector<string> nondom_solutions = dompair.first;
 	vector<string> gbest_solutions;
 	double alpha = pest_scenario.get_pestpp_options().get_mou_pso_alpha();
+    int num_objs = pi_obj_names.size()+obs_obj_names.size();
+
 	//if no non dom solutions, then use the dominated ones...
 	if (nondom_solutions.size() == 0)
 	{
+        ss.str("");
+        ss << "WARNING: no nondom solutions for pso gbest calculation, using dominated solutions" << endl;
 		nondom_solutions = dompair.second;
 	}
-	if (nondom_solutions.size() == 1)
+    //todo: should we warn for nondom > 1 and objs == 1?
+	else if ((nondom_solutions.size() == 1) && (num_objs > 1))
 	{
+	    ss.str("");
+	    ss << "WARNING: only one nondom solution for pso gbest calculation" << endl;
+	    file_manager.rec_ofstream() << ss.str();
+	    cout << ss.str();
 		for (int i = 0; i < num_reals; i++)
 			gbest_solutions.push_back(nondom_solutions[0]);
 		return gbest_solutions;
 	}
 	
+
 	map<string, double> fitness = objectives.get_mopso_fitness(nondom_solutions, _op, _dp);
 	vector<string> working;
 	string candidate;
@@ -4542,8 +4616,9 @@ vector<string> MOEA::get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _
 			if (found)
 				break;
 			count++;
-			if (count > 1000000)
-				throw_moea_error("MOEA::get_pso_gbest_solutions() seems to be stuck in a infinite loop....");
+			if (count > 1000000) {
+                throw_moea_error("MOEA::get_pso_gbest_solutions() seems to be stuck in a infinite loop....");
+            }
 		}
 		gbest_solutions.push_back(candidate);
 	}
@@ -4629,6 +4704,8 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
     }
 	return new_dp;
 }
+
+
 
 ParameterEnsemble MOEA::simplex_cceua_kn(ParameterEnsemble s, int k, int optbounds)
 {
@@ -5216,7 +5293,7 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	return tmp_dp;
 }
 
-void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag)
+void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag, bool force_save)
 {
 	
 	stringstream ss;
@@ -5230,8 +5307,15 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	ss << "." << dv_pop_file_tag;
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		_dp.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            _dp.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            _dp.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -5243,7 +5327,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	ss << "saved decision variable population of size " << _dp.shape().first << " X " << _dp.shape().second << " to '" << name << "'";
 	message(1, ss.str());
 	ss.str("");
-	if ((save_every > 0) && (iter % save_every == 0))
+	if (((save_every > 0) && (iter % save_every == 0)) || (iter == pest_scenario.get_control_info().noptmax) || (force_save))
 	{
 		ss << file_manager.get_base_filename() << "." << iter;
 		if (tag.size() > 0)
@@ -5251,11 +5335,15 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 			ss << "." << tag;
 		}
 		ss << "." << dv_pop_file_tag;
-		if (pest_scenario.get_pestpp_options().get_save_binary())
-		{
-			ss << ".jcb";
-			_dp.to_binary(ss.str());
-		}
+		if (pest_scenario.get_pestpp_options().get_save_binary()) {
+            if (pest_scenario.get_pestpp_options().get_save_dense()) {
+                ss << ".bin";
+                _dp.to_dense(ss.str());
+            } else {
+                ss << ".jcb";
+                _dp.to_binary(ss.str());
+            }
+        }
 		else
 		{
 			ss << ".csv";
@@ -5277,8 +5365,15 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	ss << "." << obs_pop_file_tag;
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		_op.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            _op.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            _op.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -5301,8 +5396,15 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 		ss << "." << obs_pop_file_tag;
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
-			ss << ".jcb";
-			_op.to_binary(ss.str());
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                ss << ".bin";
+                _op.to_dense(ss.str());
+            }
+            else {
+                ss << ".jcb";
+                _op.to_binary(ss.str());
+            }
 		}
 		else
 		{

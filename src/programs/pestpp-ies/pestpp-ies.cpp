@@ -81,7 +81,9 @@ int main(int argc, char* argv[])
                     yam_agent.process_ctl_file(ctl_file);
 
                 }
-                catch (PestError e) {
+                catch (exception &e) {
+                    frec << "Error processing control file: " << ctl_file << endl << endl;
+                    frec << e.what() << endl << endl;
                     cerr << "Error processing control file: " << ctl_file << endl << endl;
                     cerr << e.what() << endl << endl;
                     throw (e);
@@ -154,8 +156,18 @@ int main(int argc, char* argv[])
         Pest pest_scenario;
         //try {
         performance_log.log_event("starting to process control file");
-        pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),
-                                       fout_rec);
+        try {
+            pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),
+                                           fout_rec);
+        }
+        catch (exception &e)
+        {
+            fout_rec << "Error processing control file: " << file_manager.build_filename("pst") << endl << endl;
+            fout_rec << e.what() << endl << endl;
+            cerr << "Error processing control file: " << file_manager.build_filename("pst") << endl << endl;
+            cerr << e.what() << endl << endl;
+            throw(e);
+        }
         file_manager.close_file("pst");
         performance_log.log_event("finished processing control file");
         /*}
@@ -201,10 +213,6 @@ int main(int argc, char* argv[])
             fout_rec << "...resetting overdue_resched_fac to 1.15" << endl;
         }
 
-        if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
-            cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
-            exit(0);
-        }
 
         RunManagerAbstract *run_manager_ptr;
 
@@ -239,7 +247,8 @@ int main(int argc, char* argv[])
                                                    pest_scenario.get_pestpp_options().get_fill_tpl_zeros(),
                                                    pest_scenario.get_pestpp_options().get_additional_ins_delimiters(),
                                                    pest_scenario.get_pestpp_options().get_num_tpl_ins_threads(),
-                                                   pest_scenario.get_pestpp_options().get_tpl_force_decimal());
+                                                   pest_scenario.get_pestpp_options().get_tpl_force_decimal(),
+                                                   pest_scenario.get_pestpp_options().get_panther_echo());
         }
 
         const ParamTransformSeq &base_trans_seq = pest_scenario.get_base_par_tran_seq();
@@ -256,6 +265,11 @@ int main(int argc, char* argv[])
 
         IterEnsembleSmoother ies(pest_scenario, file_manager, output_file_writer, &performance_log, run_manager_ptr);
         ies.initialize();
+        if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
+            cout << endl << endl << "DEBUG_PARSE_ONLY is true, exiting..." << endl << endl;
+            exit(0);
+        }
+
         int q = pest_utils::quit_file_found();
         if ((q == 1) || (q == 2)) {
             cout << "...'pest.stp' found, quitting" << endl;
@@ -307,6 +321,7 @@ int main(int argc, char* argv[])
 	catch (exception &e)
 	{
 		cout << "Error condition prevents further execution: " << endl << e.what() << endl;
+
 		//cout << "press enter to continue" << endl;
 		//char buf[256];
 		//OperSys::gets_s(buf, sizeof(buf));

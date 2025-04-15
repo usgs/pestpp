@@ -15,6 +15,7 @@
 #include "Ensemble.h"
 #include "constraints.h"
 #include "EnsembleMethodUtils.h"
+#include "RedSVD-h.h"
 
 
 const string POP_SUM_TAG = "pareto.summary.csv";
@@ -28,6 +29,7 @@ const double CROWDING_EXTREME = 1.0e+30;
 const double FLOAT_EPSILON = 1.0e-10;
 enum MouGenType { DE, SBX, PM, PSO, SMP };
 enum MouEnvType { NSGA, SPEA, NSGA_PPD }; //added NSGA_PPD for probabilistic Pareto dominance
+
 enum MouMateType { RANDOM, TOURNAMENT };
 
 class ParetoObjectives
@@ -265,18 +267,19 @@ private:
 	ParameterEnsemble simplex_cceua_kn(ParameterEnsemble s, int k, int optbounds);																																		
     ParameterEnsemble generate_simplex_population(int num_members, ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
+    ParameterEnsemble generate_empcov_population(int num_members, ParameterEnsemble& _dp, ObservationEnsemble& _op);
 	ParameterEnsemble get_updated_pso_velocity(ParameterEnsemble& _dp, vector<string>& gbest_solutions);
 
 	vector<string> get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _dp, ObservationEnsemble& _op);
 	void update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
-	map<string, string> current_pso_lineage_map;
+	map<string, string> current_pso_lineage_map, current_empcov_lineage_map;
 
 	vector<int> selection(int num_to_select, ParameterEnsemble& _dp, MouMateType& matetype);
 
 	string get_new_member_name(string tag = string());
 
-	void save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag = string());
+	void save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag = string(), bool force_save=false);
 	void gauss_mutation_ip(ParameterEnsemble& _dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx(double probability, double eta_m, int idx1, int idx2);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx_new(double crossover_probability, double di, Eigen::VectorXd& parent1,

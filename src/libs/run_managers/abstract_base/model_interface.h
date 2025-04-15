@@ -113,6 +113,7 @@ public:
 	void set_tpl_force_decimal(bool _flag) {tpl_force_decimal = _flag;}
 	void set_num_threads(int _num_threads) { num_threads = _num_threads; }
 	void set_sleep_ms(int _sleep_ms){sleep_ms = _sleep_ms;}
+    void set_should_echo(bool _should_echo){should_echo=_should_echo;}
 
 private:
 	int num_threads;
@@ -128,6 +129,7 @@ private:
 	bool fill_tpl_zeros;
 	bool tpl_force_decimal;
 	string additional_ins_delimiters;
+    bool should_echo;
 
 	void write_input_files(Parameters *pars_ptr);
 	void read_output_files(Observations *obs_ptr);

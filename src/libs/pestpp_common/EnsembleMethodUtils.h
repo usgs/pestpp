@@ -66,7 +66,7 @@ class L2PhiHandler
 {
 public:
 
-	enum phiType { MEAS, COMPOSITE, REGUL, ACTUAL };
+	enum phiType { MEAS, COMPOSITE, REGUL, ACTUAL, NOISE };
 	L2PhiHandler() { ; }
 	L2PhiHandler(Pest *_pest_scenario, FileManager *_file_manager,
 		       ObservationEnsemble *_oe_base, ParameterEnsemble *_pe_base,
@@ -77,6 +77,7 @@ public:
 	double get_std(phiType pt);
 	double get_max(phiType pt);
 	double get_min(phiType pt);
+    double get_representative_phi(phiType pt);
 
 	double calc_mean(map<string, double> *phi_map);
 	double calc_std(map<string, double> *phi_map);
@@ -88,6 +89,9 @@ public:
 
 	void write(int iter_num, int total_runs, bool write_group = true);
 	void write_group(int iter_num, int total_runs, vector<double> extra);
+    //csv << "iteration,num_reals,current_lambda,accept_phi,lambda_mult,lambda_scale_fac,lambda,meas_phi" << endl;
+    void write_lambda(int iteration,int num_reals,double current_lambda,double current_comp_mean_phi,double current_comp_std_phi,
+                      double lambda_mult,double lambda, double comp_mean_phi, double comp_std_phi);
 	vector<int> get_idxs_greater_than(double bad_phi, double bad_phi_sigma, ObservationEnsemble &oe, ObservationEnsemble& weights);
 
 	Eigen::MatrixXd get_obs_resid(ObservationEnsemble &oe, bool apply_ineq=true);
@@ -96,22 +100,27 @@ public:
 	Eigen::MatrixXd get_par_resid(ParameterEnsemble &pe);
 	Eigen::MatrixXd get_par_resid_subset(ParameterEnsemble &pe,vector<string> real_names=vector<string>());
 	Eigen::MatrixXd get_actual_obs_resid(ObservationEnsemble &oe);
+    //Eigen::MatrixXd get_noise_resid(ObservationEnsemble &oe, bool apply_ineq=true);
 	Eigen::VectorXd get_q_vector();
 	vector<string> get_lt_obs_names() { return lt_obs_names; }
 	vector<string> get_gt_obs_names() { return gt_obs_names; }
+    map<string,double> get_lt_obs_bounds() {return lt_obs_bounds;}
+    map<string,double> get_gt_obs_bounds() {return gt_obs_bounds;}
+    map<string,pair<double,double>> get_double_obs_bounds() {return double_obs_bounds;}
 
-	void apply_ineq_constraints(Eigen::MatrixXd &resid, vector<string> &names);
+	void apply_ineq_constraints(Eigen::MatrixXd &resid, Eigen::MatrixXd &sim_vals, vector<string> &names);
 
 	void save_residual_cov(ObservationEnsemble& oe, int iter);
 
-	map<string,double> get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec);
+	//map<string,double> get_meas_phi(ObservationEnsemble& oe, Eigen::VectorXd& q_vec);
 
-	map<string,map<string,double>> get_meas_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights);
+	map<string,map<string,double>> get_swr_real_map(ObservationEnsemble& oe, ObservationEnsemble& weights,phiType ptype=phiType::MEAS);
 
-    map<string,double> get_actual_swr_map(ObservationEnsemble& oe, string real_name="");
+    map<string,double> get_swr_map(ObservationEnsemble& oe, string real_name= "",phiType ptype=phiType::MEAS);
 	map<string,map<string,double>> get_meas_phi_weight_ensemble(ObservationEnsemble& oe, ObservationEnsemble& weights);
 
     vector<string> get_violating_realizations(ObservationEnsemble& oe, const vector<string>& viol_obs_names);
+    vector<string> detect_simulation_data_conflict(ObservationEnsemble& _oe, string csv_tag);
 
 private:
 	string tag;
@@ -120,10 +129,12 @@ private:
 	string get_summary_header();
 	void prepare_csv(ofstream &csv,vector<string> &names);
 	void prepare_group_csv(ofstream &csv, vector<string> extra = vector<string>());
+    void prepare_lambda_csv(ofstream &csv);
 
 	map<string, Eigen::VectorXd> calc_meas(ObservationEnsemble &oe, Eigen::VectorXd& q_vec);
     map<string, Eigen::VectorXd> calc_meas(ObservationEnsemble &oe, ObservationEnsemble& weights);
-
+    //map<string, Eigen::VectorXd> calc_noise(ObservationEnsemble &oe, ObservationEnsemble& weights);
+    //map<string, Eigen::VectorXd> calc_noise(ObservationEnsemble &oe, Eigen::VectorXd& q_vec);
 	map<string, Eigen::VectorXd> calc_regul(ParameterEnsemble &pe);// , double _reg_fac);
 	map<string, Eigen::VectorXd> calc_actual(ObservationEnsemble &oe, Eigen::VectorXd& q_vec);
     map<string, Eigen::VectorXd> calc_actual(ObservationEnsemble & oe, ObservationEnsemble& weights);
@@ -147,9 +158,14 @@ private:
 	map<string, double> regul;
 	map<string, double> composite;
 	map<string, double> actual;
+    map<string, double> noise;
+    map<string,int> num_conflict_group;
 
 	vector<string> lt_obs_names;
 	vector<string> gt_obs_names;
+    map<string,double> lt_obs_bounds;
+    map<string,double> gt_obs_bounds;
+    map<string,pair<double,double>> double_obs_bounds;
 
 	map<string, vector<int>> obs_group_idx_map;
 	map<string, vector<int>> par_group_idx_map;
@@ -178,21 +194,25 @@ private:
 	map<string, double> init_cv;
 	map<string, double> curr_cv;
 	map<string, int> num_at_ubound;
-	map<string, int> percent_at_ubound;
+	map<string, double> percent_at_ubound;
     map<string, int> num_at_lbound;
-    map<string, int> percent_at_lbound;
+    map<string, double> percent_at_lbound;
 
 	void update(ParameterEnsemble& pe);
 	void write_to_csv(string& filename);
+    map<string,int> get_npar_per_group_with_excess_std_reduction(ParameterEnsemble& _pe, double thresh=0.95);
+
 
 };
 
 pair<Parameters,Observations> save_real_par_rei(Pest& pest_scenario, ParameterEnsemble& pe, ObservationEnsemble& oe,
-	OutputFileWriter& output_file_writer, FileManager& file_manager, int iter, string tag = BASE_REAL_NAME, int cycle = NetPackage::NULL_DA_CYCLE);
+    OutputFileWriter& output_file_writer, FileManager& file_manager, int iter, string tag = BASE_REAL_NAME,
+    int cycle = NetPackage::NULL_DA_CYCLE,map<string,double> base_weights=map<string,double>());
 
 vector<int> run_ensemble_util(PerformanceLog* performance_log, ofstream& frec, ParameterEnsemble& _pe,
 	ObservationEnsemble& _oe, RunManagerAbstract* run_mgr_ptr,
-	bool check_pe_consistency = false, const vector<int>& real_idxs = vector<int>(),int da_cycle=NetPackage::NULL_DA_CYCLE);
+	bool check_pe_consistency = false, const vector<int>& real_idxs = vector<int>(),int da_cycle=NetPackage::NULL_DA_CYCLE,
+	string additional_tag="");
 
 class EnsembleSolver
 {
@@ -203,8 +223,7 @@ public:
 		bool _use_localizer, int _iter, vector<string>& _act_par_names, vector<string> &_act_obs_names);
 
 	void solve(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string, pair<vector<string>, vector<string>>>& loc_map);
-    void solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,
-                        pair<vector<string>, vector<string>>>& loc_map, double mm_alpha);
+    void solve_multimodal(int num_threads, double cur_lam, bool use_glm_form, ParameterEnsemble& pe_upgrade, unordered_map<string,pair<vector<string>, vector<string>>>& loc_map, double mm_alpha);
     void update_multimodal_components(const double mm_alpha);
 
 
@@ -322,25 +341,6 @@ protected:
 
 };
 
-//void ensemble_solution(const int iter, const int verbose_level,const int maxsing,  const int thread_id,
-//                       const int t_count, const bool
-//                  use_prior_scaling,const bool use_approx, const bool use_glm, const double cur_lam,
-//                  const double eigthresh, Eigen::MatrixXd& par_resid, Eigen::MatrixXd& par_diff,
-//                  const Eigen::MatrixXd& Am, Eigen::MatrixXd& obs_resid,Eigen::MatrixXd& obs_diff, Eigen::MatrixXd& upgrade_1,
-//                  Eigen::MatrixXd& obs_err,
-//                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& weights,
-//                  const Eigen::DiagonalMatrix<double, Eigen::Dynamic>& parcov_inv,
-//                  const vector<string>& act_obs_names,const vector<string>& act_par_names);
-
-
-//class CovLocalizationUpgradeThread : public UpgradeThread
-//{
-//public:
-//	using UpgradeThread::UpgradeThread;
-//
-//	void work(int thread_id, int iter, double cur_lam, bool use_glm_form, vector<string> par_names, vector<string> obs_names);
-//};
-
 class LocalAnalysisUpgradeThread: public UpgradeThread
 {
 public:
@@ -357,11 +357,8 @@ public:
 		OutputFileWriter& _output_file_writer, PerformanceLog* _performance_log,
 		RunManagerAbstract* _run_mgr_ptr, string _alg_tag="EnsembleMethod");
 
-	//virtual void initialize() { ; }
-	//virtual void iterate_2_solution() { ; }
-	//virtual void finalize() { ; }
 	virtual void throw_em_error(string message);
-	bool should_terminate();
+	bool should_terminate(int current_n_iter_mean=0);
 	void sanity_checks();
 	//template<typename T, typename A>
 	//void message(int level, const string& _message, vector<T, A> _extras, bool echo = true);
@@ -407,8 +404,7 @@ public:
 
 	void transfer_dynamic_state_from_oe_to_initial_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
     void transfer_dynamic_state_from_oe_to_final_pe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
-	//void transfer_dynamic_state_from_pe_to_oe(ParameterEnsemble& _pe, ObservationEnsemble& _oe);
-    void transfer_par_dynamic_state_final_to_initial_ip(ParameterEnsemble& _pe);
+	void transfer_par_dynamic_state_final_to_initial_ip(ParameterEnsemble& _pe);
 
 	pair<string, string> save_ensembles(string tag, int cycle, ParameterEnsemble& _pe, ObservationEnsemble& _oe);
 	vector<string>& get_par_dyn_state_names() { return par_dyn_state_names; }
@@ -448,9 +444,11 @@ protected:
 	vector<string> act_obs_names, act_par_names;
 	vector<string> violation_obs;
 	ParameterEnsemble pe, pe_base;
-	ObservationEnsemble oe, oe_base, weights;
+	ObservationEnsemble oe, oe_base, weights, weights_base;
 	Eigen::DiagonalMatrix<double, Eigen::Dynamic> obscov_inv_sqrt, parcov_inv_sqrt;
 	bool oe_drawn, pe_drawn;
+    bool reinflate_to_minphi_real;
+    ObservationInfo org_obs_info;
 
 
 	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
@@ -479,13 +477,12 @@ protected:
 
 	Eigen::MatrixXd get_Am(const vector<string>& real_names, const vector<string>& par_names);
 
-    vector<string> detect_prior_data_conflict(bool save=true);
 
 	void zero_weight_obs(vector<string>& obs_to_zero_weight, bool update_obscov = true, bool update_oe_base = true);
 
 	void norm_map_report(map<string, double>& norm_map, string tag, double thres = 0.1);
 
-	void adjust_weights();
+	void adjust_weights(bool save=false);
 
     void adjust_weights_single(map<string,vector<string>>& group_to_obs_map, map<string,vector<string>>& group_map,
             map<string,double>& phi_fracs);
@@ -498,6 +495,12 @@ protected:
                                     vector<string>& index, bool check_reals);
 
     void prep_drop_violations();
+
+    void remove_external_pe_filenames(vector<string>& pe_filenames);
+
+    double get_lambda();
+
+    void reset_par_ensemble_to_prior_mean(double reinflate_factor);
 
 };
 #endif

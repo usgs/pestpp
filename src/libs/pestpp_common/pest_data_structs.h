@@ -90,6 +90,7 @@ public:
 	void par_erase(const string& par_name) { parameter2group.erase(par_name); }
 	void grp_erase(const string& grp_name) { groups.erase(grp_name);
 	}
+	void free_mem();
 	~ParameterGroupInfo();
 private:
 	unordered_map<string, ParameterGroupRec*> groups;
@@ -127,7 +128,7 @@ public:
 	Parameters get_init_value(const vector<string> &keys) const;
 	const ParameterRec* get_parameter_rec_ptr(const string &name) const;
 	ParameterRec* get_parameter_rec_ptr_4_mod(const string &name);
-	void insert(const string &name, const ParameterRec &rec) {parameter_info[name] = rec;}
+	void insert(const string &name, ParameterRec rec) {parameter_info[name] = rec;}
 	void erase(const string& name) { parameter_info.erase(name);}
 	ParameterInfo() {}
 	~ParameterInfo() {}
@@ -328,7 +329,10 @@ public:
 
 	string get_opt_obj_func()const { return opt_obj_func; }
 	void set_opt_obj_func(string _opt_obj_func) { opt_obj_func = _opt_obj_func; }
-	bool get_opt_coin_log()const { return opt_coin_log; }
+    string get_org_opt_obj_func()const { return org_opt_obj_func; }
+    void set_org_opt_obj_func(string _org_opt_obj_func) { org_opt_obj_func = _org_opt_obj_func; }
+
+    bool get_opt_coin_log()const { return opt_coin_log; }
 	void set_opt_coin_log(bool _log) { opt_coin_log = _log; }
 	bool get_opt_skip_final()const { return opt_skip_final; }
 	void set_opt_skip_final(bool _skip_final) { opt_skip_final = _skip_final; }
@@ -362,6 +366,8 @@ public:
 	void set_opt_obs_stack(string _stack) { opt_obs_stack = _stack; }
 	string get_opt_chance_points() const { return opt_chance_points; }
 	void set_opt_chance_points(string chance_points) { opt_chance_points = chance_points; }
+    string get_opt_chance_schedule() const {return opt_chance_schedule;}
+    void set_opt_chance_schedule(string fname) {opt_chance_schedule = fname;}
 
 
 	string get_sqp_dv_en()const { return sqp_dv_en; }
@@ -516,6 +522,11 @@ public:
 	void set_ies_phi_fractions_files(string _file) {ies_phi_fractions_file = _file;}
     bool get_ies_phi_factors_by_real() const {return ies_phi_factors_by_real;}
     void set_ies_phi_factors_by_real(bool _flag) {ies_phi_factors_by_real = _flag;}
+    bool get_ies_updatebyreals() const {return ies_updatebyreals;}
+    void set_ies_updatebyreals(bool _flag) {ies_updatebyreals = _flag;}
+
+    bool get_save_dense() const {return save_dense; }
+    void set_save_dense(bool _flag) {save_dense = _flag;}
 
 
 
@@ -569,8 +580,14 @@ public:
     void set_ies_multimodal_alpha(double _flag) { ies_multimodal_alpha = _flag; }
     void set_ensemble_output_precision(int prec) { ensemble_output_precision = prec;}
     int get_ensemble_output_precision() const {return ensemble_output_precision;}
+    void set_ies_n_iter_reinflate(vector<int> _n_iter_reinflate)  { ies_n_iter_reinflate = _n_iter_reinflate;}
+    vector<int> get_ies_n_iter_reinflate() const {return ies_n_iter_reinflate;}
+    void set_ies_reinflate_factor(vector<double> reinflate_factor)  { ies_reinflate_factor = reinflate_factor;}
+    vector<double> get_ies_reinflate_factor() const {return ies_reinflate_factor;}
+    void set_ies_aal_indicator_pars(vector<string> pars)  { ies_aal_indicator_pars = pars;}
+    vector<string> get_ies_aal_indicator_pars() const {return ies_aal_indicator_pars;}
 
-	string get_gsa_method() const { return gsa_method; }
+    string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
 	bool get_gsa_morris_pooled_obs() const { return gsa_morris_pooled_obs; }
 	void set_gsa_morris_pooled_obs(bool _flag) {gsa_morris_pooled_obs = _flag; }
@@ -736,6 +753,7 @@ private:
 	bool de_dither_f;
 
 	string opt_obj_func;
+    string org_opt_obj_func;
 	bool opt_coin_log;
 	bool opt_skip_final;
 	vector<string> opt_dec_var_groups;
@@ -752,6 +770,7 @@ private:
 	string opt_par_stack;
 	string opt_obs_stack;
 	string opt_chance_points;
+    string opt_chance_schedule;
 
 	string sqp_dv_en;
 	string sqp_obs_restart_en;
@@ -820,6 +839,7 @@ private:
 	bool ies_enforce_bounds;
 	double par_sigma_range;
 	bool save_binary;
+    bool save_dense;
 	string ies_localizer;
 	double ies_accept_phi_fac;
 	double ies_lambda_inc_fac;
@@ -856,6 +876,11 @@ private:
 	bool ies_localizer_forgive_missing;
 	string ies_phi_fractions_file;
 	bool ies_phi_factors_by_real;
+	vector<int> ies_n_iter_reinflate;
+    vector<double> ies_reinflate_factor;
+    bool ies_updatebyreals;
+    vector<string> ies_aal_indicator_pars;
+
 
 
 	// Data Assimilation parameters
@@ -916,7 +941,7 @@ public:
 	int noptswitch;
 	double splitswh;
 	PestMode pestmode;
-	PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value);
+	PestppOptions::ARG_STATUS assign_value_by_key(const string key, const string org_value, ofstream& f_rec);
 	ControlInfo() { ; }
 	void set_defaults();
 

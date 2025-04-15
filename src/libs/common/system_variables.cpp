@@ -24,6 +24,7 @@
 #include <sstream>
 #include <cmath>
 #include <vector>
+#include <iostream>
 #include "system_variables.h"
 
 #ifdef OS_WIN
@@ -32,6 +33,7 @@
 
 #ifdef OS_LINUX
 #include "stdio.h"
+#include <fcntl.h>
 #include <unistd.h>
 
 #endif
@@ -163,17 +165,21 @@ int start(string &cmd_string)
 	//  argv[icmd] = cmds[icmd].data();
 	//}
 	//argv[cmds.size() + 1] = NULL; //last arg must be NULL
-
+   
 	arg_v.push_back(NULL);
 	pid_t pid = fork();
 	if (pid == 0)
 	{
 		setpgid(0, 0);
+//        int fd = open("stdout.dat", O_CREAT);
+//        dup2(fd, 1);
+//        std::cout << "file descrp " << fd << std::endl;
 		int success = execvp(arg_v[0], const_cast<char* const*>(&(arg_v[0])));
 		if (success == -1)
 		{
 			throw std::runtime_error("execv() failed for command: " + cmd_string);
 		}
+
 	}
 	else
 	{

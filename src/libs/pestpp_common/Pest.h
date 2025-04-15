@@ -41,6 +41,7 @@ public:
 	friend ostream& operator<< (ostream &os, const Pest& val);
 	Pest();
 	void set_defaults();
+	void set_default_dynreg();
 	void check_inputs(ostream &f_rec, bool forgive=false, bool forgive_parchglim=true,int cycle=NetPackage::NULL_DA_CYCLE);
 	void check_io(ofstream& f_rec, bool echo_errors=true);
 	//int process_ctl_file_old(ifstream &fin, string pst_filename, ofstream &f_rec);
@@ -121,7 +122,7 @@ public:
 	
 protected:
 	//this is the list of external file cols that have meaning...
-	set<string> efile_keep_cols{ "standard_deviation", "obsnme","parnme","name", "upper_bound","lower_bound", "cycle", "state_par_link","drop_violations","link_to" };
+	set<string> efile_keep_cols{ "standard_deviation", "obsnme","parnme","name", "upper_bound","lower_bound", "cycle", "state_par_link","drop_violations","greater_than","less_than","link_to" };
 	int n_adj_par = 0;
 	string prior_info_string;
 	ControlInfo control_info;

@@ -131,6 +131,10 @@ def clean_4_toc(docx_file,inFile,outFile,run_pandoc=True):
             math_str_pre = "<img src=\"https://latex.codecogs.com/svg.latex?\Large&space;{0}".format(eq_str)
             math_str_post = "\" title=\"\Large {0}\" />  {1}  <br>".format(eq_str,label)
             lines[i] = math_str_pre + " " + math_str_post
+        if lines[i].strip().startswith("<table>"): # and "pcf" in lines[i].lower():
+            lines[i] = "<div style=\"text-align: left\">" + lines[i] + "</div>"
+            if "comment" in lines[i].lower():
+                lines[i] = lines[i].replace("~","#")
         # elif "bmatrix" in lines[i].lower():
         #     eq_str = lines[i]
         #     lines.pop(i)
