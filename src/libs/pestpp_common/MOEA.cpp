@@ -254,7 +254,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, map<string, map<string, double>>& _member_struct)
 {
 	double alpha = pest_scenario.get_pestpp_options().get_mou_pso_alpha();
-	
+	stringstream ss;
 	if (alpha == 0)
 	{
 		//double maxarchivesize = pest_scenario.get_pestpp_options().get_mou_max_archive_size();
@@ -301,11 +301,10 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		if (mx < 0.0)
 		{
 	        ss.str("");
-	        ss << "WARNING: pso gbest solution max crowding distance == 0.0, " << nondom_solutions.size()
-	           << " nondom solutions being used" << endl;
+	        ss << "WARNING: pso gbest solution max crowding distance == 0.0" << endl;
 	        file_manager.rec_ofstream() << ss.str();
 	        cout << ss.str();
-	        mx = 0.0
+	        mx = 0.0;
     	}
 
 		for (auto& cd : cluster_crowding) {
@@ -339,11 +338,10 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 		if (mx < 0.0)
 		{
 	        ss.str("");
-	        ss << "WARNING: pso gbest solution max crowding distance == 0.0, " << nondom_solutions.size()
-	           << " nondom solutions being used" << endl;
+	        ss << "WARNING: pso gbest solution max crowding distance == 0.0" << endl;
 	        file_manager.rec_ofstream() << ss.str();
 	        cout << ss.str();
-	        mx = 0.0
+	        mx = 0.0;
     	}
 
 		for (auto& cd : crowd_dist) {
