@@ -317,25 +317,19 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 	}
 	else
 	{
-		stringstream ss;
 		map<string, double> crowd_dist = get_cuboid_crowding_distance(members);
 		sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
 		//normalize cd
-		double mx = 0.0;
+		double mx = -1.0e+30;
 		for (auto& cd : crowd_dist)
 			if ((cd.second != CROWDING_EXTREME) && (cd.second > mx))
 				mx = cd.second;
-			//else if (members.size() == 2)
-			//	mx = cd.second;
-			//else if (crowd_sorted.size() == 1)
-			//	mx = cd.second;
-		if ((mx == 0.0) && (iter > 0)) {
-			ss.str("");
-			ss << "WARNING: pso gbest solution max crowding distance == 0.0"; /*<< nondom_solutions.size()
-				<< " nondom solutions being used" << endl;*/
-			file_manager.rec_ofstream() << ss.str();
-			cout << ss.str();
-		}
+			else if (members.size() == 2)
+				mx = cd.second;
+			else if (crowd_sorted.size() == 1)
+				mx = cd.second;
+		if ((mx < 0.0))
+			throw runtime_error("pso max crowding distance is negative");
 
 		for (auto& cd : crowd_dist) {
 			if (cd.second == CROWDING_EXTREME) {
