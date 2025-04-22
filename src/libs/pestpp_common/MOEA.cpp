@@ -324,6 +324,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 	}
 	else
 	{
+		stringstream ss;
 		map<string, double> crowd_dist = get_cuboid_crowding_distance(members);
 		sortedset crowd_sorted(crowd_dist.begin(), crowd_dist.end(), compFunctor);
 		//normalize cd
@@ -343,6 +344,7 @@ map<string, double> ParetoObjectives::get_mopso_fitness(vector<string> members, 
 	        cout << ss.str();
 	        mx = 0.0;
     	}
+
 
 		for (auto& cd : crowd_dist) {
 			if (cd.second == CROWDING_EXTREME) {
@@ -4443,107 +4445,109 @@ ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<
 
 		new_par_vel = inertia_comp + cog_comp + social_comp;
 
-		double new_dv, cur_dv, last_wiggle_room = 0;
-		for (int j = 0; j < dv_names.size(); j++)
+		if (pso_dv_bound_restoration != "RESET")
+
 		{
-			double lb_val = lb[dv_names[j]];
-			double ub_val = ub[dv_names[j]];
-
-			double vmax = pso_vmax[dv_names[j]];
-			if (new_par_vel[j] > vmax + FLOAT_EPSILON) {
-				new_par_vel[j] = vmax;
-			}
-			else if (new_par_vel[j] < -vmax - FLOAT_EPSILON) {
-				new_par_vel[j] = -vmax;
-			}
-
-			new_dv = cur_real[j] + new_par_vel[j];
-			double curr_vel = new_par_vel[j];
-			int draws = 0;
-			while (true)
+			double new_dv, cur_dv, last_wiggle_room = 0;
+			for (int j = 0; j < dv_names.size(); j++)
 			{
-				
-				if (!((new_dv <= ub_val + FLOAT_EPSILON) && (new_dv >= lb_val - FLOAT_EPSILON)))
-				{
-					draws++;
-					if (draws > 1000)
-					{
-						ss << "problem with perturbing member: " << real_name << endl;
-						ss << "at dv: " << dv_names[j] << endl;
-						ss << setprecision(17) << fixed
-							<< "wiggle room: " << last_wiggle_room << endl
-							<< "inertia component: " << inertia_comp[j] << endl
-							<< "cognitive component: " << cog_comp[j] << endl
-							<< "social component: " << social_comp[j] << endl
-							<< "current dv: " << cur_real[j] << endl
-							<< "new dv: " << new_dv << endl
-							<< "pbest: " << p_best[j] << endl
-							<< "gbest: " << g_best[j] << endl;
-						ofstream& frec = file_manager.rec_ofstream();
-						frec << ss.str();
-						throw_moea_error("infinite loop in pso velocity calculation (see rec file for details)");
-					}
+				double lb_val = lb[dv_names[j]];
+				double ub_val = ub[dv_names[j]];
 
-					//Adam's recursive perturbation algo to seek new feasible dv
-					if (pso_dv_bound_restoration == "ITERATIVE")
-					{
-						double curr_dv = new_dv;
-
-						vector<double> r1 = uniform_draws(1, 0.0, 1.0, rand_gen);
-						vector<double> r2 = uniform_draws(1, 0.0, 1.0, rand_gen);
-
-						inertia_comp[j] = omega * curr_vel;
-						cog_comp[j] = cog_const * r1[0] * (p_best[j] - curr_dv);
-						social_comp[j] = social_const * r2[0] * (g_best[j] - curr_dv);
-
-						curr_vel = inertia_comp[j] + cog_comp[j] + social_comp[j];
-
-						double vmax = pso_vmax[dv_names[j]];
-						if (curr_vel > vmax + FLOAT_EPSILON) {
-							curr_vel = vmax;
-						}
-						else if (curr_vel < -vmax - FLOAT_EPSILON) {
-							curr_vel = -vmax;
-						}
-						new_dv = curr_dv + curr_vel;
-						new_par_vel[j] = new_dv - cur_real[j];
-					}
-					else if (pso_dv_bound_restoration == "DAMPED")
-					//Reygie's velocity damping algo to seek new feasible dv
-					{
-						double wiggle_room = 0;
-						if ((new_dv > ub_val + FLOAT_EPSILON))
-							wiggle_room = ub_val - cur_real[j];
-						else if ((new_dv < lb_val - FLOAT_EPSILON))
-							wiggle_room = lb_val - cur_real[j];
-						else
-							throw_moea_error("invalid dv value in pso velocity calculation");
-						last_wiggle_room = wiggle_room;
-
-						if (abs(abs(inertia_comp[j]) - abs(wiggle_room)) < FLOAT_EPSILON * max(abs(inertia_comp[j]), abs(wiggle_room)) || abs(inertia_comp[j]) + FLOAT_EPSILON >= abs(wiggle_room)) //there's no point spinning the wheel for r1 and r2
-						{
-							vector<double> r = uniform_draws(1, 0.0, 1.0, rand_gen);
-							new_par_vel[j] = wiggle_room * r[0];
-						}
-						else
-						{
-							vector<double> r = uniform_draws(1, 0.0, 1.0, rand_gen);
-
-							inertia_comp[j] = omega * cur_vel[j];
-							wiggle_room -= inertia_comp[j];
-
-							new_par_vel[j] = inertia_comp[j] + wiggle_room * r[0];
-
-						}
-						new_dv = cur_real[j] + new_par_vel[j];
-					}
-					else if (pso_dv_bound_restoration == "RESET")
-						break;
-					else
-						throw_moea_error("invalid pso_dv_bound_restoration option. Choose between ITERATIVE, DAMPED, or RESET");
+				double vmax = pso_vmax[dv_names[j]];
+				if (new_par_vel[j] > vmax + FLOAT_EPSILON) {
+					new_par_vel[j] = vmax;
 				}
-				else
-					break;
+				else if (new_par_vel[j] < -vmax - FLOAT_EPSILON) {
+					new_par_vel[j] = -vmax;
+				}
+
+				new_dv = cur_real[j] + new_par_vel[j];
+				double curr_vel = new_par_vel[j];
+				int draws = 0;
+				while (true)
+				{
+
+					if (!((new_dv <= ub_val + FLOAT_EPSILON) && (new_dv >= lb_val - FLOAT_EPSILON)))
+					{
+						draws++;
+						if (draws > 1000)
+						{
+							ss << "problem with perturbing member: " << real_name << endl;
+							ss << "at dv: " << dv_names[j] << endl;
+							ss << setprecision(17) << fixed
+								<< "wiggle room: " << last_wiggle_room << endl
+								<< "inertia component: " << inertia_comp[j] << endl
+								<< "cognitive component: " << cog_comp[j] << endl
+								<< "social component: " << social_comp[j] << endl
+								<< "current dv: " << cur_real[j] << endl
+								<< "new dv: " << new_dv << endl
+								<< "pbest: " << p_best[j] << endl
+								<< "gbest: " << g_best[j] << endl;
+							ofstream& frec = file_manager.rec_ofstream();
+							frec << ss.str();
+							throw_moea_error("infinite loop in pso velocity calculation (see rec file for details)");
+						}
+
+						//Adam's recursive perturbation algo to seek new feasible dv
+						if (pso_dv_bound_restoration == "ITERATIVE")
+						{
+							double curr_dv = new_dv;
+
+							vector<double> r1 = uniform_draws(1, 0.0, 1.0, rand_gen);
+							vector<double> r2 = uniform_draws(1, 0.0, 1.0, rand_gen);
+
+							inertia_comp[j] = omega * curr_vel;
+							cog_comp[j] = cog_const * r1[0] * (p_best[j] - curr_dv);
+							social_comp[j] = social_const * r2[0] * (g_best[j] - curr_dv);
+
+							curr_vel = inertia_comp[j] + cog_comp[j] + social_comp[j];
+
+							double vmax = pso_vmax[dv_names[j]];
+							if (curr_vel > vmax + FLOAT_EPSILON) {
+								curr_vel = vmax;
+							}
+							else if (curr_vel < -vmax - FLOAT_EPSILON) {
+								curr_vel = -vmax;
+							}
+							new_dv = curr_dv + curr_vel;
+							new_par_vel[j] = new_dv - cur_real[j];
+						}
+						else if (pso_dv_bound_restoration == "DAMPED")
+							//Reygie's velocity damping algo to seek new feasible dv
+						{
+							double wiggle_room = 0;
+							if ((new_dv > ub_val + FLOAT_EPSILON))
+								wiggle_room = ub_val - cur_real[j];
+							else if ((new_dv < lb_val - FLOAT_EPSILON))
+								wiggle_room = lb_val - cur_real[j];
+							else
+								throw_moea_error("invalid dv value in pso velocity calculation");
+							last_wiggle_room = wiggle_room;
+
+							if (abs(abs(inertia_comp[j]) - abs(wiggle_room)) < FLOAT_EPSILON * max(abs(inertia_comp[j]), abs(wiggle_room)) || abs(inertia_comp[j]) + FLOAT_EPSILON >= abs(wiggle_room)) //there's no point spinning the wheel for r1 and r2
+							{
+								vector<double> r = uniform_draws(1, 0.0, 1.0, rand_gen);
+								new_par_vel[j] = wiggle_room * r[0];
+							}
+							else
+							{
+								vector<double> r = uniform_draws(1, 0.0, 1.0, rand_gen);
+
+								inertia_comp[j] = omega * cur_vel[j];
+								wiggle_room -= inertia_comp[j];
+
+								new_par_vel[j] = inertia_comp[j] + wiggle_room * r[0];
+
+							}
+							new_dv = cur_real[j] + new_par_vel[j];
+						}
+						else
+							throw_moea_error("invalid pso_dv_bound_restoration option. Choose between ITERATIVE, DAMPED, or RESET");
+					}
+					else
+						break;
+				}
 			}
 		}
 
