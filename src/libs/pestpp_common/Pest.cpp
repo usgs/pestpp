@@ -1685,23 +1685,24 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 					control_type = "lower bound";
 				}
 			*/
+
+			// getting rid of the universal shrinkage code above
+			// now just clamping offending parameters to their bounds
+			double last_val = last_ctl_pars.get_rec(p.first);
+			p_rec = p_info.get_parameter_rec_ptr(p.first);
+	
+			if (enforce_bounds && p.second > p_rec->ubnd)
 			{
-				double last_val = last_ctl_pars.get_rec(p.first);
-				p_rec = p_info.get_parameter_rec_ptr(p.first);
-		
-				if (enforce_bounds && p.second > p_rec->ubnd)
-				{
-					p.second = p_rec->ubnd;
-				}
-				else if (enforce_bounds && p.second < p_rec->lbnd)
-				{
-					p.second = p_rec->lbnd;
-				}
-				else
-				{
-					p.second = last_val + (p.second - last_val) * scaling_factor;
-				}
+				p.second = p_rec->ubnd;
 			}
+			else if (enforce_bounds && p.second < p_rec->lbnd)
+			{
+				p.second = p_rec->lbnd;
+			}
+			else
+			{
+				p.second = last_val + (p.second - last_val) * scaling_factor;
+			}		
 		}
 	}	
 	
