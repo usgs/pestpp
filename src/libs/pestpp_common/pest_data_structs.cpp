@@ -159,6 +159,7 @@ const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo
 		ParameterGroupRec* new_ptr = new ParameterGroupRec(*(*it).second);
 		groups[(*it).first] = new_ptr;
 		old2new[(*it).second] = new_ptr;
+
 	}
 	unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator it_find;
 	it = rhs.parameter2group.begin();
@@ -168,7 +169,15 @@ const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo
 		if (it_find != old2new.end())
 			parameter2group[(*it).first] = (*it_find).second;
 	}
-	return *this;
+//    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator iit(old2new.begin());
+//    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator eend(old2new.end());
+//
+//    for (; iit != eend; ++iit) {
+//        delete (*iit).second;
+//        delete (*iit).first;
+//    }
+
+    return *this;
 }
 
 vector<string> ParameterGroupInfo::get_group_names() const
@@ -195,11 +204,36 @@ bool ParameterGroupInfo::have_switch_derivative() const
 
 ParameterGroupInfo::~ParameterGroupInfo()
 {
-	unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
+//	unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
+//	unordered_map<string, ParameterGroupRec*>::iterator end(groups.end());
+//	for (; it != end; ++it) {
+//		delete (*it).second;
+//	}
+//
+//    it = parameter2group.begin();
+//	end = parameter2group.end();
+//
+//    for (; it != end; ++it) {
+//        delete (*it).second;
+//    }
+}
+
+void ParameterGroupInfo::free_mem()
+{
+    unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
 	unordered_map<string, ParameterGroupRec*>::iterator end(groups.end());
 	for (; it != end; ++it) {
 		delete (*it).second;
 	}
+
+    it = parameter2group.begin();
+	end = parameter2group.end();
+
+    for (; it != end; ++it) {
+        delete (*it).second;
+    }
+    groups.clear();
+    parameter2group.clear();
 }
 
 ostream& operator<< (ostream &os, const ParameterGroupInfo &val)
@@ -520,18 +554,21 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		//convert_ip(value, condor_submit_file);
 		condor_submit_file = org_value;
 	}
-	else if ((key == "SWEEP_PARAMETER_CSV_FILE") || (key == "SWEEP_PAR_CSV"))
+	else if ((key == "SWEEP_PARAMETER_CSV_FILE") || (key == "SWEEP_PAR_CSV") || (key == "SWEEP_PARAMETER_FILE"))
 	{
 		passed_args.insert("SWEEP_PARAMETER_CSV_FILE");
 		passed_args.insert("SWEEP_PAR_CSV");
-			
-		//convert_ip(org_value, sweep_parameter_csv_file);
+        passed_args.insert("SWEEP_PARAMETER_FILE");
+
+
+        //convert_ip(org_value, sweep_parameter_csv_file);
 		sweep_parameter_csv_file = org_value;
 	}
-	else if ((key == "SWEEP_OUTPUT_CSV_FILE") || (key == "SWEEP_OBS_CSV"))
+	else if ((key == "SWEEP_OUTPUT_CSV_FILE") || (key == "SWEEP_OBS_CSV") || (key == "SWEEP_OUTPUT_FILE"))
 	{
 		passed_args.insert("SWEEP_OUTPUT_CSV_FILE");
 		passed_args.insert("SWEEP_OBS_CSV");
+        passed_args.insert("SWEEP_OUTPUT_FILE");
 			
 		//convert_ip(org_value, sweep_output_csv_file);
 		sweep_output_csv_file = org_value;
@@ -642,6 +679,7 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		passed_args.insert("OPT_OBJ_FUNC");
 		passed_args.insert("OPT_OBJECTIVE_FUNCTION");
 		convert_ip(value,opt_obj_func);
+        org_opt_obj_func = org_value;
 	}
 	else if (key == "OPT_COIN_LOG")
 	{
@@ -783,8 +821,10 @@ PestppOptions::ARG_STATUS PestppOptions::assign_value_by_key(string key, const s
 		enforce_tied_bounds = pest_utils::parse_string_arg_to_bool(value);
 	}
 
-	else if (key == "DEBUG_PARSE_ONLY")
+	else if ((key == "DEBUG_PARSE_ONLY") || (key == "PARSE_ONLY"))
 	{
+        passed_args.insert("DEBUG_PARSE_ONLY");
+        passed_args.insert("PARSE_ONLY");
 		debug_parse_only = pest_utils::parse_string_arg_to_bool(value);
 	
 	}
@@ -1143,8 +1183,57 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         ies_phi_factors_by_real = pest_utils::parse_string_arg_to_bool(value);
         return true;
     }
+    else if ((key == "IES_N_ITER_MEAN") || (key == "IES_N_ITER_REINFLATE"))
+    {
+        passed_args.insert("IES_N_ITER_MEAN");
+        passed_args.insert("IES_N_ITER_REINFLATE");
+        ies_n_iter_reinflate.clear();
+        vector<string> tok;
+        tokenize(value, tok, ",");
+        for (const auto& fac : tok)
+        {
+            ies_n_iter_reinflate.push_back(convert_cp<int>(fac));
+        }
+        return true;
+    }
+    else if (key == "IES_REINFLATE_FACTOR")
+    {
+        vector<string> tok;
+        tokenize(value, tok, ",");
+        ies_reinflate_factor.clear();
+        for (const auto& fac : tok)
+        {
+            ies_reinflate_factor.push_back(convert_cp<double>(fac));
+        }
+        return true;
+    }
+    else if (key == "IES_UPDATE_BY_REALS")
+    {
+        ies_updatebyreals = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
 
-	return false;
+    else if (key == "SAVE_DENSE")
+    {
+        save_dense = pest_utils::parse_string_arg_to_bool(value);
+        return true;
+    }
+
+    else if (key == "IES_AUTOADALOC_INDICATOR_PARS")
+    {
+        vector<string> tok;
+        tokenize(value, tok, ",");
+        ies_aal_indicator_pars.clear();
+        for (const auto& fac : tok)
+        {
+            ies_aal_indicator_pars.push_back(upper_cp(fac));
+        }
+        return true;
+    }
+
+
+
+    return false;
 }
 
 bool PestppOptions::assign_da_value_by_key(const string& key, const string& value, const string& org_value)
@@ -1543,6 +1632,12 @@ bool PestppOptions::assign_mou_value_by_key(const string& key, const string& val
 	    mou_population_schedule = org_value;
 	    return true;
     }
+    else if (key == "OPT_CHANCE_SCHEDULE")
+    {
+        opt_chance_schedule = org_value;
+        return true;
+    }
+
 	else if (key == "MOU_SIMPLEX_REFLECTIONS")
 	{
 		convert_ip(value, mou_simplex_reflections);
@@ -1659,6 +1754,7 @@ void PestppOptions::summary(ostream& os) const
 	os << "random_seed: " << random_seed << endl;
 	os << "num_tpl_ins_threads: " << num_tpl_ins_threads << endl;
 	os << "save_binary: " << save_binary << endl;
+    os << "save_dense: " << save_dense << endl;
     os << "ensemble_output_precision: " << ensemble_output_precision << endl;
 	
 	os << "panther_echo: " << panther_echo << endl;
@@ -1768,6 +1864,8 @@ void PestppOptions::summary(ostream& os) const
 	os << "opt_iter_tol: " << opt_iter_tol << endl;
 	os << "opt_recalc_fosm_every: " << opt_recalc_fosm_every << endl;
 	os << "opt_chance_points: " << opt_chance_points << endl;
+    os << "opt_chance_schedule: " << opt_chance_schedule << endl;
+
 	
 	
 
@@ -1896,9 +1994,22 @@ void PestppOptions::summary(ostream& os) const
 	os << "ies_localizer_forgive_extra: " << ies_localizer_forgive_missing << endl;
 	os << "ies_phi_factors_file: " << ies_phi_fractions_file << endl;
     os << "ies_phi_factors_by_real: " << ies_phi_factors_by_real << endl;
+    os << "ies_n_iter_reinflate: " << endl;
+    for (auto v : ies_n_iter_reinflate)
+        os << v << ",";
+    os << endl;
+    os << "ies_reinflate_factor: " << endl;
+    for (auto v : ies_reinflate_factor)
+        os << v << ",";
+    os << endl;
+    os << "ies_updatebyreals: " << ies_updatebyreals << endl;
 
+    os << "ies_autoadaloc_indicator_pars: " << endl;
+    for (auto v : ies_aal_indicator_pars)
+        os << v << ",";
+    os << endl;
 
-	os << endl << "pestpp-sen options: " << endl;
+    os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
 	os << "gsa_morris_pooled_obs: " << gsa_morris_pooled_obs << endl;
 	os << "gsa_morris_obs_sen: " << gsa_morris_obs_sen << endl;
@@ -1974,6 +2085,7 @@ void PestppOptions::set_defaults()
 
 
 	set_opt_obj_func("");
+    set_org_opt_obj_func("");
 	set_opt_coin_log(true);
 	set_opt_skip_final(false);
 	set_opt_std_weights(false);
@@ -1991,6 +2103,7 @@ void PestppOptions::set_defaults()
 	set_opt_par_stack("");
 	set_opt_obs_stack("");
 	set_opt_chance_points("SINGLE");
+    set_opt_chance_schedule("");
 	
 
 	set_sqp_dv_en("");
@@ -1999,7 +2112,7 @@ void PestppOptions::set_defaults()
 	set_sqp_update_hessian(false);
 	set_sqp_scale_facs(vector<double>{0.00001, 0.0001,0.0005, 0.001, 0.0025, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25,0.5, 1.0,2.,5.,10.,});
 
-	set_mou_generator("DE");
+	set_mou_generator("PSO");
 	set_mou_population_size(100);
 	set_mou_dv_population_file("");
 	set_mou_obs_population_restart_file("");
@@ -2046,13 +2159,13 @@ void PestppOptions::set_defaults()
 	set_ies_lam_mults(vector<double>());
 	set_ies_init_lam(0.0);
 	set_ies_use_approx(true);
-	set_ies_subset_size(4);
+	set_ies_subset_size(-10);
 	set_ies_reg_factor(0.0);
 	set_ies_verbose_level(1);
 	set_ies_use_prior_scaling(false);
 	set_ies_num_reals(50);
-	set_ies_bad_phi(1.0e+300);
-	set_ies_bad_phi_sigma(1.0e+300);
+	set_ies_bad_phi(std::numeric_limits<double>::max());
+	set_ies_bad_phi_sigma(std::numeric_limits<double>::max());
 	set_ies_include_base(true);
 	set_ies_use_empirical_prior(false);
 	set_ies_group_draws(true);
@@ -2094,6 +2207,12 @@ void PestppOptions::set_defaults()
     set_ies_localizer_forgive_missing(false);
     set_ies_phi_fractions_files("");
     set_ies_phi_factors_by_real(false);
+    set_ies_n_iter_reinflate(vector < int > {0});
+    set_ies_reinflate_factor(vector < double > {1.0});
+
+    set_ies_updatebyreals(false);
+    set_save_dense(false);
+    set_ies_aal_indicator_pars(vector<string>());
 
 	// DA parameters
 	//set_da_use_ies(false);
@@ -2339,7 +2458,7 @@ ostream& operator<< (ostream &os, const SVDInfo& val)
 	return os;
 }
 
-PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, const string org_value)
+PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, const string org_value, ofstream& f_rec)
 {
 	/*enum PestMode { ESTIMATION, REGUL, PARETO, UNKNOWN };
 	double phiredswh;
@@ -2354,6 +2473,7 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 	int noptswitch;
 	double splitswh;
 	PestMode pestmode;*/
+    stringstream ss;
 	set<string> valid_args{"RSTFLE","PESTMODE","NPAR","NOBS","NPARGP","NPRIOR","NOBSGP","MAXCOMPDIM","NTPLFLE","NINSFLE",
                          "PRECIS","DPOINT","NUMCOM","JACFILE","MESSFILE","OBSREREF","RLAMBDA1","RLAMFAC","PHIREDLAM",
                          "PHIRATSUF","NUMLAM","JACUPDATE","LAMFORGIVE","DERFORGIVE","RELPARMAX","FACPARMAX",
@@ -2386,6 +2506,14 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 		convert_ip(value, noptswitch);
 	else if (key == "SPLITSWH")
 		convert_ip(value, splitswh);
+    else if (key == "PHIREDSWH")
+    {
+        convert_ip(value,phiredswh);
+    }
+    else if (key == "NRELPAR")
+    {
+        convert_ip(value, nrelpar);
+    }
 	else if (key == "PESTMODE")
 	{
 		if (value == "ESTIMATION")
@@ -2399,7 +2527,10 @@ PestppOptions::ARG_STATUS ControlInfo::assign_value_by_key(const string key, con
 	}
 	else if (valid_args.find(key) != valid_args.end())
     {
-	    //a valid but unused ctl data arg
+        ss.str("");
+        ss << "WARNING: unused 'control data keyword' option,value:" << key << "," << value;
+        f_rec << ss.str();
+        cout << ss.str();
     }
 	else
 		return PestppOptions::ARG_STATUS::ARG_NOTFOUND;

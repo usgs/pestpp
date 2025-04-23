@@ -274,7 +274,7 @@ void ThreadedTemplateProcess::work(int tid, vector<int>& tpl_idx, Parameters par
 			{
 				if (tpl_idx.size() == 0)
 				{
-					cout << "thread " << tid << " processed " << count << " template files" << endl;
+					//cout << "thread " << tid << " processed " << count << " template files" << endl;
 					return;
 				}
 				i = tpl_idx[tpl_idx.size() - 1];
@@ -346,7 +346,8 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 	if (nnum_threads > tplfile_vec.size())
 		nnum_threads = tplfile_vec.size();
 	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
-	cout << pest_utils::get_time_string() << " processing template files with " << nnum_threads << " threads..." << endl;
+    if (should_echo)
+        cout << pest_utils::get_time_string() << " processing template files with " << nnum_threads << " threads..." << endl;
 	vector<thread> threads;
 	vector<exception_ptr> exception_ptrs;
 	Parameters pro_pars = *pars_ptr; //copy
@@ -454,7 +455,8 @@ void ModelInterface::write_input_files(Parameters *pars_ptr)
 	}
 
 	pars_ptr->update_without_clear(pro_pars.get_keys(), pro_pars.get_data_vec(pro_pars.get_keys()));
-	cout << pest_utils::get_time_string() << " done, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
+    if (should_echo)
+        cout << pest_utils::get_time_string() << " done, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
 }
 
 void ModelInterface::read_output_files(Observations *obs)
@@ -463,7 +465,8 @@ void ModelInterface::read_output_files(Observations *obs)
 	if (nnum_threads > insfile_vec.size())
 		nnum_threads = insfile_vec.size();
 	std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
-	cout << pest_utils::get_time_string() <<  " processing instruction files with " << nnum_threads << " threads..." << endl;
+    if (should_echo)
+        cout << pest_utils::get_time_string() <<  " processing instruction files with " << nnum_threads << " threads..." << endl;
 	vector<thread> threads;
 	vector<exception_ptr> exception_ptrs;
 	Observations temp_obs;
@@ -600,7 +603,8 @@ void ModelInterface::read_output_files(Observations *obs)
 	}
 	t = temp_obs.get_keys();
 	obs->update(t, temp_obs.get_data_vec(t));
-	cout << pest_utils::get_time_string() << " done, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
+    if (should_echo)
+	    cout << pest_utils::get_time_string() << " done, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
 
 }
 
@@ -635,7 +639,7 @@ void ModelInterface::remove_existing()
 		if (failed_file_op)
 		{
 			++n_tries;
-			w_sleep(1000);
+			w_sleep(500);
 			if (n_tries > 5)
 			{
 				ostringstream str;
@@ -661,7 +665,8 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		write_input_files(pars_ptr);
 		
 		std::chrono::system_clock::time_point start_time = chrono::system_clock::now();
-		cout << pest_utils::get_time_string() << " calling forward run command(s)" << endl;
+		if (should_echo)
+            cout << pest_utils::get_time_string() << " calling forward run command(s)" << endl;
 
 #ifdef OS_WIN
 		//a flag to track if the run was terminated
@@ -677,7 +682,8 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		}
 		for (auto &cmd_string : comline_vec)
 		{
-		    cout << pest_utils::get_time_string() << " calling forward run command: '" << cmd_string << "' " << endl;
+            if (should_echo)
+		        cout << pest_utils::get_time_string() << " calling forward run command: '" << cmd_string << "' " << endl;
 			//start the command
 			PROCESS_INFORMATION pi;
 			try
@@ -693,6 +699,9 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 			{
 				throw PestError("could not add process to job object: " + cmd_string);
 			}
+			DWORD pid = pi.dwProcessId;
+            if (should_echo)
+			    cout << "...pid: " << pid << endl;
 			DWORD exitcode;
 			while (true)
 			{
@@ -709,13 +718,18 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 						cout << "exit_code: " << exitcode << endl;
 						throw std::runtime_error("GetExitCodeProcess() returned error status for command: " + cmd_string);
 					}
+                    if (should_echo)
+                    {
+                        cout << "...exit_code: " << exitcode << endl;
+                    }
 					break;
 				}
 				//else cout << exitcode << "...still waiting for command " << cmd_string << endl;
 				//check for termination flag
 				if (terminate->get())
 				{
-					std::cout << "received terminate signal" << std::endl;
+                    if (should_echo)
+					    std::cout << "received terminate signal" << std::endl;
 					//try to kill the process
 					bool success = (CloseHandle(job) != 0);
 
@@ -743,31 +757,41 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 		bool term_break = false;
 		for (auto &cmd_string : comline_vec)
 		{
-            cout << pest_utils::get_time_string() << " calling forward run command: '" << cmd_string << "' " << endl;
+            if (should_echo)
+                cout << pest_utils::get_time_string() << " calling forward run command: '" << cmd_string << "' " << endl;
 			//start the command
 			int command_pid = start(cmd_string);
+            if (should_echo)
+			    cout << "...pid: " << command_pid << endl;
 			while (true)
 			{
                 std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
                 //check if process is still active
 				int status = 0;
 				pid_t exit_code = waitpid(command_pid, &status, WNOHANG);
-				//if the process ended, break
+
+                //if the process ended, break
 				if ((exit_code == -1) || (status != 0))
 				{
+                    cout << "exit_code: " << exit_code << endl;
+                    cout << "status: " << status << endl;
 					finished->set(true);
-					cout << "exit_code: " << exit_code << endl;
-					cout << "status: " << status << endl;
 					throw std::runtime_error("waitpid() returned error status for command: " + cmd_string);
 				}
 				else if (exit_code != 0)
 				{
+                    if (should_echo)
+                    {
+                        cout << "...exit_code: " << exit_code << endl;
+                        cout << "...status: " << status << endl;
+                    }
 				    break;
 				}
 				//check for termination flag
 				if (terminate->get())
 				{
-					std::cout << "received terminate signal" << std::endl;
+                    if (should_echo)
+					    std::cout << "received terminate signal" << std::endl;
 					//try to kill the process
 					errno = 0;
 					int success = kill(-command_pid, SIGKILL);
@@ -786,8 +810,8 @@ void ModelInterface::run(pest_utils::thread_flag* terminate, pest_utils::thread_
 			if (term_break) break;
 		}
 #endif
-
-		cout << pest_utils::get_time_string() << " forward run command(s) finished, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
+        if (should_echo)
+		    cout << pest_utils::get_time_string() << " forward run command(s) finished, took " << pest_utils::get_duration_sec(start_time) << " seconds" << endl;
 
 		if (term_break) return;
 

@@ -90,12 +90,11 @@ public:
 	//void risk_shift_obs_en_ip(ObservationEnsemble& oe);
 	
 	//get the (risk-shifted) distance to constraints (upper and lower bounds)
-	pair<vector<double>,vector<double>> get_constraint_bound_vectors(Parameters& current_pars, Observations &current_obs);
+	pair<vector<double>,vector<double>> get_constraint_bound_vectors(Parameters& current_pars, Observations &current_obs, bool use_stack_anomalies);
 	
 	//setters
 	void set_jco(Jacobian_1to1& _jco) { jco = _jco; }
-	void set_initial_constraints_sim(Observations _initial_constraints_sim) { initial_constraints_sim = _initial_constraints_sim;  }
-	
+
 	//get fosm-based parameter names
 	vector<string> get_fosm_par_names();
 
@@ -151,10 +150,10 @@ public:
 	static pair<ConstraintSense, string> get_sense_from_group_name(const string& name);
 
 	//get risk-shifted simulated constraint values using current_constraints_sim_ptr
-	//Observations get_chance_shifted_constraints();
+	//Observations get_stack_shifted_chance_constraints();
 	//get risk-shifted simulated constraint values using _constraints_sim arg
 	Observations get_chance_shifted_constraints(Observations& _constraints_sim);
-	Observations get_chance_shifted_constraints(Observations& _constraints_sim, double _risk);
+	Observations get_chance_shifted_constraints(Observations& _constraints_sim, double _risk, bool use_stack_anomalies=true);
 
 	ObservationEnsemble get_chance_shifted_constraints(ParameterEnsemble& pe, ObservationEnsemble& oe, int gen, string risk_obj = string(), string opt_member=string());
 
@@ -181,6 +180,7 @@ private:
 	double risk;
 	double probit_val;
 	double dbl_max;
+    map<int,bool> chance_schedule;
 
 
 	Covariance obscov;
@@ -193,7 +193,7 @@ private:
 	map<string, ObservationEnsemble> stack_oe_map;
 	map<string, Parameters> stack_pe_map;
 
-	Observations get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe, double _risk, bool full_obs = false);
+	Observations get_stack_shifted_chance_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe, double _risk, bool full_obs, bool use_stack_anomalies);
 
 	PriorInformation* null_prior = new PriorInformation();
 	PriorInformation constraints_pi;
@@ -255,5 +255,9 @@ private:
 
 	pair<vector<string>,vector<string>> get_working_set(Parameters& par_and_dec_vars, Observations& constraints_sim, bool do_shift, double working_set_tol=0.1);
     void augment_constraint_mat_with_pi(Mat& mat, vector<string>& pi_names);
+
+    void initialize_chance_schedule(ofstream& frec);
+
+
 };
 #endif

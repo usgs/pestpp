@@ -1319,7 +1319,7 @@ void Covariance::from_uncertainty_file(const string &filename, vector<string> &o
 						throw runtime_error("Cov::from_uncertainty_file() error:EOF encountered while reading standard_deviation block\
 							from uncertainty file:" + filename);
 					pest_utils::upper_ip(line);
-					if (line.find("END") != string::npos)
+					if (line.find("END STANDARD_DEVIATION") != string::npos)
 					{
 						break;
 					}
@@ -1540,7 +1540,8 @@ void Covariance::from_parameter_bounds(ofstream& frec, const vector<string> &par
 void Covariance::from_parameter_bounds(Pest &pest_scenario, ofstream& frec)
 {
 	map<string, double> par_std = pest_scenario.get_ext_file_double_map("parameter data external", "standard_deviation");
-	if (par_std.size() > 0)
+	const ParameterInfo pi = pest_scenario.get_ctl_parameter_info();
+    if (par_std.size() > 0)
 	{
 		frec << "Note: the following parameters have 'standard_deviation' defined - this will be used" << endl;
 		frec << "      instead of bounds for the prior parameter covariance matrix : " << endl;
@@ -1551,8 +1552,12 @@ void Covariance::from_parameter_bounds(Pest &pest_scenario, ofstream& frec)
 			{
 				if (par_std[pname] <= 0.0)
 				{
-					frec << "Warning: parameter " << pname << " 'standard_deviation' less than or equal to zero, using bounds instead" << endl;
-					remove.push_back(pname);
+                    ParameterRec::TRAN_TYPE t = pi.get_parameter_rec_ptr(pname)->tranform_type;
+                    if ((t != ParameterRec::TRAN_TYPE::FIXED) && (t != ParameterRec::TRAN_TYPE::TIED)) {
+                        frec << "Warning: parameter " << pname
+                             << " 'standard_deviation' less than or equal to zero, using bounds instead" << endl;
+                        remove.push_back(pname);
+                    }
 				}
 				else
 					frec << pname << ' ' << par_std[pname] << endl;
@@ -1658,6 +1663,7 @@ void Covariance::from_observation_weights(Pest &pest_scenario, ofstream& frec)
 {
 	map<string, double> obs_std = pest_scenario.get_ext_file_double_map("observation data external", "standard_deviation");
 	vector<string> remove;
+    const ObservationInfo oi = pest_scenario.get_ctl_observation_info();
 	if (obs_std.size() > 0)
 	{
 		frec << "Note: the following observations have 'standard_deviation' defined - this will be used" << endl;
@@ -1666,8 +1672,7 @@ void Covariance::from_observation_weights(Pest &pest_scenario, ofstream& frec)
 		{
 			if (obs_std.find(oname) != obs_std.end())
 			{
-				if (obs_std[oname] <= 0.0)
-				{
+				if ((obs_std[oname] <= 0.0) && (oi.get_weight(oname) > 0.0))				{
 					frec << "Warning: observation " << oname << " 'standard_deviation' less than or equal to zero, using weight" << endl;
 					remove.push_back(oname);
 				}

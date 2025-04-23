@@ -152,7 +152,7 @@ void DataAssimilator::da_update(int cycle)
 			accept = solve_glm(cycle);
 		report_and_save(cycle);
 		ph.update(oe, pe);
-		last_best_mean = ph.get_mean(L2PhiHandler::phiType::COMPOSITE);
+		last_best_mean = ph.get_representative_phi(L2PhiHandler::phiType::COMPOSITE);
 		last_best_std = ph.get_std(L2PhiHandler::phiType::COMPOSITE);
 		ph.report(true);
 		ph.write(iter, run_mgr_ptr->get_total_runs());

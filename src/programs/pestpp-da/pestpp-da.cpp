@@ -123,8 +123,10 @@ int main(int argc, char* argv[])
 					yam_agent.process_ctl_file(ctl_file);
 
 				}
-				catch (PestError e)
+				catch (exception &e)
 				{
+                    frec << "Error processing control file: " << ctl_file << endl << endl;
+                    frec << e.what() << endl << endl;
 					cerr << "Error processing control file: " << ctl_file << endl << endl;
 					cerr << e.what() << endl << endl;
 					throw(e);
@@ -197,13 +199,13 @@ int main(int argc, char* argv[])
 			pest_scenario.assign_da_cycles(fout_rec);
 			performance_log.log_event("finished processing control file");
 		}
-		catch (PestError e)
+		catch (exception &e)
 		{
-			cerr << "Error prococessing control file: " << filename << endl << endl;
+			cerr << "Error processing control file: " << filename << endl << endl;
 			cerr << e.what() << endl << endl;
-			fout_rec << "Error prococessing control file: " << filename << endl << endl;
+			fout_rec << "Error processing control file: " << filename << endl << endl;
 			fout_rec << e.what() << endl << endl;
-			fout_rec.close();
+
 			throw(e);
 		}
 		pest_scenario.check_inputs(fout_rec);
@@ -370,7 +372,7 @@ int main(int argc, char* argv[])
                 }
 
 
-				if (obs_cycle_info.find(*icycle) != obs_cycle_info.end())
+				if ((obs_cycle_info.find(*icycle) != obs_cycle_info.end()) || (weight_cycle_info.find(*icycle) != weight_cycle_info.end()))
 				{
 					performance_log.log_event("updating obs using da obs cycle table info");
 					map<string, double> cycle_map = obs_cycle_info[*icycle];
@@ -388,15 +390,22 @@ int main(int argc, char* argv[])
 						}
 						else
 						{
-							childPest.get_ctl_observations_4_mod().update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);
-							//check if this obs is in this cycle's weight info
-							if (weight_cycle_map.find(tbl_obs_name) != weight_cycle_map.end())
-							{
-								oi.set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
-								//pest_scenario.get_observation_info_ptr()->set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
-							}
+							childPest.get_ctl_observations_4_mod().update_rec(tbl_obs_name, cycle_map[tbl_obs_name]);	
 						}
 					}
+					for (auto tbl_obs_name : weights_in_tbl)
+					{
+						if (weight_cycle_map.find(tbl_obs_name) == weight_cycle_map.end())
+						{
+							oi.set_weight(tbl_obs_name, 0.0);
+						}
+						else
+						{	
+							oi.set_weight(tbl_obs_name, weight_cycle_map[tbl_obs_name]);
+						}
+					}
+
+
 					childPest.set_observation_info(oi);
 
 				}
@@ -504,6 +513,7 @@ int main(int argc, char* argv[])
 				pest_scenario.get_pestpp_options().get_additional_ins_delimiters(),
 				pest_scenario.get_pestpp_options().get_num_tpl_ins_threads(),
 				pest_scenario.get_pestpp_options().get_tpl_force_decimal());
+			run_manager_ptr->initialize(pest_scenario.get_ctl_parameters(), pest_scenario.get_ctl_observations());
 		}
 		
 		//generate a parent ensemble which includes all parameters across all cycles
@@ -619,7 +629,8 @@ int main(int argc, char* argv[])
 			}
 			//check for entries in the obs cycle table
 			//cout << childPest.get_ctl_observations().get_rec("GAGE_1") << ", " << pest_scenario.get_observation_info_ptr()->get_weight("GAGE_1") << endl;
-			if (obs_cycle_info.find(*icycle) != obs_cycle_info.end())
+			if ((obs_cycle_info.find(*icycle) != obs_cycle_info.end()) || (false))
+
 			{
 				performance_log.log_event("updating obs using da obs cycle table info");
 				map<string, double> cycle_map = obs_cycle_info[*icycle];
@@ -1000,7 +1011,11 @@ int main(int argc, char* argv[])
 
                 }
             }
-
+            if (cmdline.runmanagertype == CmdLine::RunManagerType::SERIAL)
+            {
+                delete run_manager_ptr;
+            }
+            //childPest.get_base_group_info_ptr_4_mod()->free_mem();
 
 		} // end cycle loop
 

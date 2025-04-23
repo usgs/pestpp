@@ -127,6 +127,7 @@ void OptObjFunc::throw_optobjfunc_error(string message)
 
 void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv_names)
 {
+    stringstream ss;
 	//initialize the objective function
 	obj_func_str = pest_scenario.get_pestpp_options().get_opt_obj_func();
 	obj_sense = (pest_scenario.get_pestpp_options().get_opt_direction() == 1) ? "minimize" : "maximize";
@@ -143,6 +144,10 @@ void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv
 		use_obj_obs = true;
 		obj_obs = obj_func_str;
 		//check
+        ss.str("");
+        ss << "...objective function defined by observation '" << obj_func_str << "'" << endl;
+        cout << ss.str();
+        f_rec << ss.str();
 		set<string> names(constraint_names.begin(), constraint_names.end());
 		if (names.find(obj_obs) != names.end())
 		{
@@ -162,25 +167,39 @@ void OptObjFunc::initialize(vector<string> _constraint_names, vector<string> _dv
 	{
 		if (obj_func_str.size() == 0)
 		{
-			f_rec << " warning: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
-			for (auto& name : dv_names)
+			f_rec << " note: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
+			cout << " note: no ++opt_objective_function-->forming a generic objective function (1.0 coef for each decision var)" << endl;
+            for (auto& name : dv_names)
 				obj_func_coef_map[name] = 1.0;
 		}
 
 		//or if it is a prior info equation
 		else if (pest_scenario.get_prior_info().find(obj_func_str) != pest_scenario.get_prior_info().end())
 		{
+            ss.str("");
+            ss << "...objective function defined by prior information equation '" << obj_func_str << "'" << endl;
+            cout << ss.str();
+            f_rec << ss.str();
 			obj_func_coef_map = pest_scenario.get_prior_info().get_pi_rec(obj_func_str).get_atom_factors();
 			//throw_sequentialLP_error("prior-information-based objective function not implemented");
 		}
 		else
 		{
 			//check if this obj_str is a filename
-			ifstream if_obj(obj_func_str);
+            obj_func_str = pest_scenario.get_pestpp_options().get_org_opt_obj_func();
+            ss.str("");
+            ss << "...objective function defined by 2-column external file '" << obj_func_str << "'" << endl;
+            cout << ss.str();
+            f_rec << ss.str();
+            if (!pest_utils::check_exist_in(obj_func_str))
+            {
+                throw_optobjfunc_error("unable to open objective function file '"+obj_func_str+"' for reading");
+            }
+			/*ifstream if_obj(obj_func_str);
 			if (!if_obj.good())
 				throw_optobjfunc_error("unrecognized ++opt_objective_function arg: " + obj_func_str);
-			else
-				obj_func_coef_map = pest_utils::read_twocol_ascii_to_map(obj_func_str);
+			else*/
+            obj_func_coef_map = pest_utils::read_twocol_ascii_to_map(obj_func_str);
 		}
 
 
@@ -229,7 +248,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	//current_constraints_sim_ptr = _current_constraints_sim_ptr;
 	//same for dec var values
 	//current_pars_and_dec_vars_ptr = _current_pars_and_dec_vars_ptr;
-	//check for a stack size arg - if postive, then use stacks for chances
+	//check for a stack size arg - if positive, then use stacks for chances
 	stack_size = pest_scenario.get_pestpp_options().get_opt_stack_size();
 	//an existing parameter stack for chances
 	string par_stack_name = pest_scenario.get_pestpp_options().get_opt_par_stack();
@@ -241,7 +260,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	std_weights = pest_scenario.get_pestpp_options().get_opt_std_weights();
 	if ((!std_weights) && ((stack_size > 0) || (par_stack_name.size() > 0) || (obs_stack_name.size() > 0)))
 		use_fosm = false;
-	//initialize the stack constainers (ensemble class instances)
+	//initialize the stack containers (ensemble class instances)
 	stack_pe.set_pest_scenario(&pest_scenario);
 	stack_pe.set_rand_gen(&rand_gen);
 	stack_oe.set_pest_scenario_ptr(&pest_scenario);
@@ -450,7 +469,12 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 	}
 
 	set<string> dec_set(ctl_ord_dec_var_names.begin(), ctl_ord_dec_var_names.end());
-	for (auto& name : pest_scenario.get_ctl_ordered_par_names())
+	vector<string> prob_pars;
+    //disabled the exception for adj pars tied to dec vars
+    //string partied;
+    //map<string,pair<string,double>> tied_info = pest_scenario.get_base_par_tran_seq().get_tied_ptr()->get_items();
+
+    for (auto& name : pest_scenario.get_ctl_ordered_par_names())
 	{
 		//if this parameter is not a decision var
 		//if (find(start, end, name) == end)
@@ -458,13 +482,26 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 		{
 			ParameterRec::TRAN_TYPE tt = pest_scenario.get_ctl_parameter_info().get_parameter_rec_ptr(name)->tranform_type;
 			if ((tt == ParameterRec::TRAN_TYPE::LOG) || (tt == ParameterRec::TRAN_TYPE::NONE))
-				adj_par_names.push_back(name);
+            {
+                adj_par_names.push_back(name);
+            }
+//            else if (tt == ParameterRec::TRAN_TYPE::TIED)
+//            {
+//                partied = tied_info[name].first;
+//                if (dec_set.find(partied) != dec_set.end())
+//                    prob_pars.push_back(name);
+//            }
 		}
+
 	}
+//     if (!prob_pars.empty())
+//     {
+//         throw_constraints_error("the following adjustable pars are 'tied' to decision variables",prob_pars);
+//     }
 
 
 	//------------------------------------------
-	//  ---  chance constratints  ---
+	//  ---  chance constraints  ---
 	//------------------------------------------
 	risk = pest_scenario.get_pestpp_options().get_opt_risk();
 	if (risk != 0.5)
@@ -490,6 +527,7 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 		}
 
 		probit_val = get_probit();
+        initialize_chance_schedule(f_rec);
 		//if the std weight options was selected, use it - it overrides all other options
 		if (std_weights)
 		{
@@ -700,8 +738,16 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 			string filename = file_mgr_ptr->get_base_filename() + ".0.par_stack";
 			if (pest_scenario.get_pestpp_options().get_save_binary())
 			{
-				filename = filename + ".jcb";
-				stack_pe.to_binary(filename);
+
+                if (pest_scenario.get_pestpp_options().get_save_dense())
+                {
+                    filename = filename + ".bin";
+                    stack_pe.to_dense(filename);
+                }
+                else {
+                    filename = filename + ".jcb";
+                    stack_pe.to_binary(filename);
+                }
 			}
 			else
 			{
@@ -767,7 +813,10 @@ void Constraints::initialize(vector<string>& ctl_ord_dec_var_names, double _dbl_
 						missing.push_back(name);
 				if (missing.size() > 0)
 					throw_constraints_error("obs stack missing the following constraints: ", missing);
-
+                if (stack_size == 0)
+                {
+                    stack_size = stack_oe.shape().first;
+                }
 				//a restart with "all"
 				if ((stack_pe_map.size() > 0) && (pest_scenario.get_pestpp_options().get_opt_chance_points() == "ALL"))
 				{
@@ -875,7 +924,7 @@ void Constraints::initial_report()
 		f_rec << setw(15) << constraint_sense_name[name];
 		f_rec << setw(15) << constraints_obs.get_rec(name) << endl;
 	}
-	cout << "..." << ctl_ord_obs_constraint_names.size() << " obs-based constraints, see rec file for listing" << endl;
+	cout << "..." << ctl_ord_obs_constraint_names.size() << " obs-based constraints/objectives, see rec file for listing" << endl;
 
 	if (num_pi_constraints() > 0)
 	{
@@ -1047,11 +1096,11 @@ double Constraints::get_max_constraint_change(Observations& current_obs, Observa
 	return max_abs_constraint_change;
 }
 
-//Observations Constraints::get_chance_shifted_constraints()
+//Observations Constraints::get_stack_shifted_chance_constraints()
 //{
 //	/* one version of this method that doesnt take any args just use the pointer to the
 //	current sim constraint values*/
-//	return get_chance_shifted_constraints(*current_constraints_sim_ptr);
+//	return get_stack_shifted_chance_constraints(*current_constraints_sim_ptr);
 //}
 
 double Constraints::get_sum_of_violations(Parameters& pars, Observations& obs)
@@ -1170,7 +1219,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 			{
 				real_vec = shifted_oe.get_real_vector(real_name);
 				sim.update_without_clear(onames, real_vec);
-				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[real_name],risk_map[real_name], true);
+				sim_shifted = get_stack_shifted_chance_constraints(sim, stack_oe_map[real_name], risk_map[real_name],true, false);
                 stack_oe_map[real_name].fill_moment_maps(stack_mean,stack_std);
 				shifted_oe.replace(real_map[real_name], sim_shifted);
                 for (auto& constraint : ctl_ord_obs_constraint_names) {
@@ -1202,10 +1251,10 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
             }
 			Eigen::MatrixXd missing_dv_mat = pe.get_eigen(missing, dvnames);
 			Eigen::VectorXd missing_dv_vec, stack_dv_vec;
-			double dist, min_dist, max_dist;
+			double dist, min_dist, max_dist,cutoff;
 			string min_real_name,missing_real_name;
 			vector<double> distances;
-			vector<double> factors,temp;
+			vector<double> factors,temp, temp2;
 			vector<string> dreal_names;
 
             Eigen::MatrixXd shifts;
@@ -1242,6 +1291,13 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
                 for (auto& d : distances)
                     temp.push_back(d / max_dist);
                 max_dist = *max_element(temp.begin(),temp.end());
+                temp2 = temp;
+                sort(temp2.begin(),temp2.end());
+                cutoff = temp2[temp2.size()-1];
+                if (temp2.size() > 5)
+                {
+                    cutoff = temp2[4];
+                }
                 factors.clear();
                 factor_sum = 0.0;
                 for (auto& t : temp)
@@ -1249,6 +1305,10 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 
                     if (t == 0)
                         factor = 10000.0;
+                    else if (t > cutoff)
+                    {
+                        factor = 0.0;
+                    }
                     else
                         factor = 1.0/t;
                     factor_sum += factor;
@@ -1277,7 +1337,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
                         continue;
                     }
                     //this call uses the class stack_oe attribute;
-                    sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[dreal_names[ii]],_risk,true);
+                    sim_shifted = get_stack_shifted_chance_constraints(sim, stack_oe_map[dreal_names[ii]], _risk, true, false);
                     shifts.row(ii) = sim_shifted.get_data_eigen_vec(shifted_oe.get_var_names()) * factors[ii];
                 }
                 real_vec = shifts.colwise().sum();
@@ -1303,7 +1363,7 @@ ObservationEnsemble Constraints::get_chance_shifted_constraints(ParameterEnsembl
 				real_vec = shifted_oe.get_real_vector(missing[i]);
 				sim.update_without_clear(onames, real_vec);
 				//this call uses the class stack_oe attribute;
-				sim_shifted = get_chance_shifted_constraints(sim, stack_oe_map[min_real_name],_risk,true);
+				sim_shifted = get_stack_shifted_chance_constraints(sim, stack_oe_map[min_real_name], _risk, true, false);
 				//shifted_oe.replace(real_map.at(missing[i]), sim_shifted);
                 stack_oe_map[min_real_name].fill_moment_maps(stack_mean,stack_std);
                 for (auto& constraint : ctl_ord_obs_constraint_names) {
@@ -1330,7 +1390,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 
 
 
-Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, double _risk)
+Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, double _risk, bool use_stack_anomalies)
 {
 	/* get the simulated constraint values with the chance shift applied*/
 	ofstream& f_rec = file_mgr_ptr->rec_ofstream();
@@ -1385,11 +1445,11 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 		if (stack_oe_map.size() > 0)
 		{
 			ObservationEnsemble _mean_stack = get_stack_mean(stack_oe_map);
-			shifted_obs = get_chance_shifted_constraints(current_obs, _mean_stack, _risk);
+			shifted_obs = get_stack_shifted_chance_constraints(current_obs, _mean_stack, _risk, false, false);
 		}
 
 		else
-			shifted_obs = get_chance_shifted_constraints(current_obs, stack_oe, _risk);
+			shifted_obs = get_stack_shifted_chance_constraints(current_obs, stack_oe, _risk,false, use_stack_anomalies);
 		
 	}
 	vector<string> names = shifted_obs.get_keys();
@@ -1476,7 +1536,8 @@ ObservationEnsemble Constraints::get_stack_mean(map<string, ObservationEnsemble>
 	return _mean_stack;
 }
 
-Observations Constraints::get_chance_shifted_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe, double _risk, bool full_obs)
+Observations Constraints::get_stack_shifted_chance_constraints(Observations& current_obs, ObservationEnsemble& _stack_oe,
+                                                               double _risk, bool full_obs, bool use_stack_anomalies)
 {
 	double old_constraint_val, required_val, pt_offset, new_constraint_val;
 
@@ -1487,7 +1548,7 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	if (_stack_oe.shape().first < 3)
 		throw_constraints_error("too few (<3) stack members, cannot continue with stack-based chance constraints/objectives");
 	int cur_num_reals = _stack_oe.shape().first;
-	//get the inde (which realization number) represents the risk value according to constraint sense
+	//get the index (which realization number) represents the risk value according to constraint sense
 	//
 	//the "less than" realization index is just the risk value times the number of reals
 	int lt_idx = int(_risk * cur_num_reals);
@@ -1497,14 +1558,21 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 	int eq_idx = int(0.5 * cur_num_reals);
 	//get the mean-centered anomalies - we want to subtract off the mean 
 	//in case these stack values are being re-used from a previous iteration
-	Eigen::MatrixXd anom = _stack_oe.get_eigen_anomalies();
-	//get the map of realization name to index location in the stack
+	//Eigen::MatrixXd anom = _stack_oe.get_eigen_anomalies();
+    Eigen::MatrixXd anom;
+    if (use_stack_anomalies)
+        anom = _stack_oe.get_eigen_anomalies();
+    else
+        anom = _stack_oe.get_eigen();
+
+    //get the map of realization name to index location in the stack
 	_stack_oe.update_var_map();
 	map<string, int> var_map = _stack_oe.get_var_map();
-	//get the mean and stdev summary containters, summarized by observation (e.g. constraint) name
+	//get the mean and stdev summary containers, summarized by observation (e.g. constraint) name
 	//pair<map<string, double>, map<string, double>> mm = _stack_oe.get_moment_maps();
 	map<string, double> mean_map, std_map;
 	_stack_oe.fill_moment_maps(mean_map, std_map);
+    Eigen::VectorXd cvec;
 	for (auto& name : ctl_ord_obs_constraint_names)
 	{
 		old_constraint_val = current_obs.get_rec(name);
@@ -1513,10 +1581,18 @@ Observations Constraints::get_chance_shifted_constraints(Observations& current_o
 		// the realized values of this stack are the anomalies added to the
 		//current constraint value - this assumes the current value 
 		//is the mean of the stack distribution
-		Eigen::VectorXd cvec = anom.col(var_map[name]).array() + old_constraint_val;
+        if (use_stack_anomalies)
+            cvec = anom.col(var_map[name]).array() + old_constraint_val;
+        else
+		    cvec = anom.col(var_map[name]).array();// + old_constraint_val;
 		//now sort the anomolies + current (mean) value vector
 		sort(cvec.data(), cvec.data() + cvec.size());
-		//set the stdev container info - this isnt used in 
+		/*cout << cvec << endl << endl;
+        Eigen::VectorXd temp = _stack_oe.get_var_vector(name);
+        sort(temp.data(),temp.data() + temp.size());
+        cout << temp << endl << endl;*/
+
+        //set the stdev container info - this isnt used in
 		//calculations but gets reported
 		prior_constraint_stdev[name] = std_map[name];
 		post_constraint_stdev[name] = std_map[name];
@@ -1577,7 +1653,7 @@ vector<double> Constraints::get_constraint_residual_vec(Observations& sim)
 	return residuals_vec;
 }
 
-pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Parameters& current_pars, Observations& current_obs)
+pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Parameters& current_pars, Observations& current_obs, bool use_stack_anomalies)
 {
 	/* get the upper and lower bound constraint vectors. For less than constraints, the lower bound is 
 	set to double max, for greater than constraints, the upper bound is set to double max.
@@ -1585,7 +1661,7 @@ pair<vector<double>,vector<double>> Constraints::get_constraint_bound_vectors(Pa
 	vector<double> residuals;
 	if (use_chance)
 	{
-		Observations current_constraints_chance = get_chance_shifted_constraints(current_obs);
+		Observations current_constraints_chance = get_chance_shifted_constraints(current_obs, risk, use_stack_anomalies);
 		residuals = get_constraint_residual_vec(current_constraints_chance);
 	}
 	else
@@ -2151,7 +2227,7 @@ void Constraints::stack_summary(int iter, Observations& shifted_obs, bool echo, 
 	if (!use_chance)
 		return;
 
-	//Observations current_constraints_chance = get_chance_shifted_constraints(current_obs);
+	//Observations current_constraints_chance = get_stack_shifted_chance_constraints(current_obs);
 
 	int nsize = 20;
 	for (auto o : ctl_ord_obs_constraint_names)
@@ -2272,11 +2348,92 @@ bool Constraints::should_update_chance(int iter)
 		else
 			return true;
 	}
-	else if ((iter) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)
+	//else if ((iter) % pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every() == 0)
+    else if (chance_schedule[iter])
 		return true;
 	return false;
 }
 
+void Constraints::initialize_chance_schedule(ofstream& frec)
+{
+    stringstream ss;
+    chance_schedule.clear();
+
+    string fname = pest_scenario.get_pestpp_options().get_opt_chance_schedule();
+    string line;
+    vector<string> tokens;
+    int lcount = 0, gen;
+    bool should_eval = false;
+    int recalc_every = pest_scenario.get_pestpp_options().get_opt_recalc_fosm_every();
+    for (int i=0;i<max(1,pest_scenario.get_control_info().noptmax+1);i++)
+        if (i%recalc_every == 0)
+            chance_schedule[i] = true;
+        else
+        chance_schedule[i] = false;
+    chance_schedule[0] = true;
+    if (fname.size() > 0)
+    {
+        ss.str("");
+        ss << "...reading population schedule from file '" << fname << "' " << endl;
+        frec << ss.str();
+        cout << ss.str();
+        ifstream in(fname);
+        if (in.bad())
+        {
+            throw runtime_error("error opening opt_chance_schedule file '"+fname+"'");
+        }
+        while (getline(in,line))
+        {
+            lcount++;
+            tokens.clear();
+            pest_utils::tokenize(line,tokens,"\t ,");
+            if (tokens.size() < 2)
+            {
+                ss.str("");
+                ss << "opt_chance_schedule file '" << fname << "' line " << lcount << " needs at least two entries";
+                throw runtime_error(ss.str());
+            }
+            try
+            {
+                gen = stoi(tokens[0]);
+            }
+            catch (...)
+            {
+                ss.str("");
+                ss << "error casting '" << tokens[0] << "' to generation integer on line " << lcount << " in opt_chance_schedule file";
+                throw runtime_error(ss.str());
+            }
+
+            try
+            {
+                should_eval = pest_utils::parse_string_arg_to_bool(tokens[1]);
+            }
+            catch (...)
+            {
+                ss.str("");
+                ss << "error casting '" << tokens[1] << "' to bool on line " << lcount << " in opt_chance_schedule file";
+                throw runtime_error(ss.str());
+            }
+            chance_schedule[gen] = should_eval;
+        }
+        in.close();
+    }
+
+    if (!chance_schedule[0])
+    {
+        ss.str("");
+        ss << "...chances must be evaluated during the first generation, resetting chance_schedule" << endl;
+        frec << ss.str();
+        cout << ss.str();
+        chance_schedule[0] = true;
+    }
+
+    frec << "...chance schedule: generation,should_eval_chances:" << endl;
+    for (int i=0;i<pest_scenario.get_control_info().noptmax;i++)
+    {
+        frec << "...   " << i << ", " << chance_schedule.at(i) << endl;
+    }
+}
 
 void Constraints::postsolve_obs_constraints_report(Observations& old_obs, Observations& new_obs, string tag, int iter, 
 									map<string,string> status_map, map<string,double> price_map)
@@ -2438,8 +2595,15 @@ void Constraints::save_oe_stack(int iter, string real_name, ObservationEnsemble&
 
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		_stack_oe.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            _stack_oe.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            _stack_oe.to_binary(ss.str());
+        }
 	}
 	else
 	{
@@ -2465,8 +2629,16 @@ void Constraints::save_pe_stack(int iter, string real_name, ParameterEnsemble& _
 
 	if (pest_scenario.get_pestpp_options().get_save_binary())
 	{
-		ss << ".jcb";
-		_stack_pe.to_binary(ss.str());
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss << ".bin";
+            _stack_pe.to_dense(ss.str());
+        }
+        else {
+            ss << ".jcb";
+            _stack_pe.to_binary(ss.str());
+        }
+
 	}
 	else
 	{
@@ -2579,12 +2751,24 @@ void Constraints::process_stack_runs(RunManagerAbstract* run_mgr_ptr, int iter)
 		nested_pe.reset_org_real_names();
 		if (pest_scenario.get_pestpp_options().get_save_binary())
 		{
-			ss.str("");
-			ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.obs_stack.jcb";
-			nested_oe.to_binary(ss.str());
-			ss.str("");
-			ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.jcb";
-			nested_pe.to_binary(ss.str());
+            if (pest_scenario.get_pestpp_options().get_save_dense())
+            {
+                ss.str("");
+                ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.obs_stack.bin";
+                nested_oe.to_dense(ss.str());
+                ss.str("");
+                ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.bin";
+                nested_pe.to_dense(ss.str());
+
+            }
+            else {
+                ss.str("");
+                ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.obs_stack.jcb";
+                nested_oe.to_binary(ss.str());
+                ss.str("");
+                ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.jcb";
+                nested_pe.to_binary(ss.str());
+            }
 			
 		}
 		else
@@ -2819,10 +3003,31 @@ void Constraints::add_runs(int iter, ParameterEnsemble& current_pe, Observations
 		cout << real_info.first << "\r" << flush;
 		i++;
 	}
+
 	//save this as bin here - it will be resaved after runs are processed...
-	ss.str("");
-	ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.jcb";
-	nested_pe.to_binary(ss.str());
+	if (pest_scenario.get_pestpp_options().get_save_binary())
+    {
+        if (pest_scenario.get_pestpp_options().get_save_dense())
+        {
+            ss.str("");
+            ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.bin";
+            nested_pe.to_dense(ss.str());
+        }
+        else
+        {
+            ss.str("");
+            ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.jcb";
+            nested_pe.to_binary(ss.str());
+        }
+    }
+    else
+    {
+        ss.str("");
+        ss << file_mgr_ptr->get_base_filename() << "." << iter << ".nested.par_stack.csv";
+        nested_pe.to_csv(ss.str());
+
+    }
+
 	cout << "...adding " << count << " runs nested stack-based chance constraints" << endl;
 	stack_runs_processed = false;
 	//reset stack_oe to use the same real names as stack_pe

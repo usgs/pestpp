@@ -1,0 +1,35 @@
+[project]
+name = "pestpp"
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "linux-aarch64", "osx-arm64", "osx-64"]
+
+[dependencies]
+# pestpp build dependencies
+cmake = "*"
+ninja = "*"
+
+# test python dependencies
+flopy = "*"
+pyemu = "*"
+
+[tasks]
+# install
+install-modflow = "get-modflow --repo modflow6 $CONDA_PREFIX/bin"
+
+# debug build
+configure-debug = { cmd = "cmake -G Ninja -S . -B .build -DCMAKE_BUILD_TYPE=Debug", depends-on = ["clean-build"], outputs = [".build/"] }
+build-debug = { cmd = "ninja -C .build", depends-on = ["configure-debug"] }
+
+# release build
+configure = { cmd = "cmake -G Ninja -S . -B .build -DCMAKE_BUILD_TYPE=Release", depends-on = ["clean-build"], outputs = [".build/"] }
+build-release = { cmd = "ninja -C .build", depends-on = ["configure"] }
+
+# generic build
+build = { cmd = "ninja -C .build" , inputs=[".build/"]}
+
+# clean build files
+clean = { cmd = "ninja -t clean", cwd = ".build" }
+clean-build = { cmd = "rm -rf .build" }
+
+# test build
+test = { cmd = "python basic_tests.py", cwd = "benchmarks" }
