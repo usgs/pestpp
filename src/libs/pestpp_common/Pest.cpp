@@ -1612,11 +1612,11 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		{ 
 			if (p.second > chg_ub)
 			{
-				p.second = chg_ub
+				p.second = chg_ub;
 			}
 			else if (p.second < chg_lb)
 			{
-				p.second = chg_lb
+				p.second = chg_lb;
 			}
 		}
 		/*
