@@ -1506,9 +1506,9 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	double facorig = control_info.facorig;
 	double rpm = control_info.relparmax;
 	double orig_val, last_val, fac_lb, fac_ub, rel_lb, rel_ub, eff_ub, eff_lb,chg_lb, chg_ub;
-	double chg_fac, chg_rel;
-	double scaling_factor = 1.0;
 	string parchglim;
+	double scaling_factor = 1.0;
+	double temp = 1.0;
 	double bnd_tol = 0.001;
 	double scaled_bnd_val;
 	string controlling_par = "";
@@ -1529,12 +1529,14 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		last_ctl_pars = last_active_ctl_pars;
 
 	}
-	for (auto p : upgrade_ctl_pars)
+	for (auto &p : upgrade_ctl_pars)
 	{
 		
-		/*if (pest_utils::lower_cp(p.first) == "s_xomehgwat")
-			cout << p.first << endl;*/
 		last_val = last_ctl_pars.get_rec(p.first);
+		if (parchglim == "RELATIVE" && last_val == 0.0)
+		{
+    		throw runtime_error("Relative parchglim not defined for zero-valued parameter " + p.first);
+		}
 		
 		p_rec = p_info.get_parameter_rec_ptr(p.first);
 		parchglim = p_rec->chglim;
@@ -1545,16 +1547,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		if (orig_val == 0.0)
 			orig_val = p_rec->ubnd / 4.0;
 
-
-			
-
-
 		//calc fac lims
-		// if (abs(last_val) > abs(p.second))
-		//	chg_fac = last_val / p.second;
-		//else
-		//	chg_fac = p.second / last_val;
-		//if (p.second > 0.0)
 		if (last_val > 0.0)
 		{
 			fac_lb = last_val / fpm;
@@ -1571,7 +1564,6 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		//calc rel lims
 		rel_lb = last_ctl_pars.get_rec(p.first) - (abs(last_val) * rpm);
 		rel_ub = last_ctl_pars.get_rec(p.first) + (abs(last_val) * rpm);
-		// chg_rel = (last_val - p.second) / last_val;
 
 		if (parchglim == "FACTOR")
 		{
@@ -1592,22 +1584,35 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		// double temp = 1.0;
 
 		// New logic for enforcing chglim and bounds
-		// First, we'll calculate p.second assuming it won't hit any bounds
-		// Then, we'll check the change limits.
-		// Finally, we'll check parameter bounds.
+		// First, we'll check the change limits.
+		// Next, we'll check parameter bounds.
 		// If anything violates, clamp to the offending bound.
-		// p_rec = p_info.get_parameter_rec_ptr(p.first);
-		// p.second = last_val + (p.second - last_val) * scaling_factor;
 
 		if (enforce_chglim)
 		// similar to below, clamp rather than shrink every parameter if a parameter violates change limits
 		{ 
 			if (p.second > chg_ub)
 			{
+				temp = abs((chg_ub - last_val) / (p.second - last_val));
+				if ((temp > 1.0) || (temp < 0.0))
+				{
+					ss.str("");
+					ss << "Pest::enforce_par_limts() error: invalid upper parchglim scaling factor " << temp << " for par " << p.first << endl;
+					ss << " chglim:" << chg_ub << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+					throw runtime_error(ss.str());
+				}
 				p.second = chg_ub;
 			}
 			else if (p.second < chg_lb)
 			{
+				temp = abs((last_val - chg_lb) / (last_val - p.second));
+				if ((temp > 1.0) || (temp < 0.0))
+				{
+					ss.str("");
+					ss << "Pest::enforce_par_limts() error: invalid lower parchglim scaling factor " << temp << " for par " << p.first << endl;
+					ss << " chglim:" << chg_lb << ", last_val:" << last_val << ", current_val:" << p.second << endl;
+					throw runtime_error(ss.str());
+				}
 				p.second = chg_lb;
 			}
 
@@ -1621,96 +1626,8 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 			}
 		}
 
-		/*
-		{		
-			if (p.second > chg_ub)
-			{
-				temp = abs((chg_ub - last_val) / (p.second - last_val));
-				if ((temp > 1.0) || (temp < 0.0))
-				{
-					ss.str("");
-					ss << "Pest::enforce_par_limts() error: invalid upper parchglim scaling factor " << temp << " for par " << p.first << endl;
-					ss << " chglim:" << chg_ub << ", last_val:" << last_val << ", current_val:" << p.second << endl;
-					throw runtime_error(ss.str());
-				}
-
-				if (temp < scaling_factor)
-				{
-					scaling_factor = temp;
-					controlling_par = p.first;
-					control_type = "upper change limit";
-				}
-			}
-
-			else if (p.second < chg_lb)
-				temp = abs((last_val - chg_lb) / (last_val - p.second));
-			if ((temp > 1.0) || (temp < 0.0))
-			{
-				ss.str("");
-				ss << "Pest::enforce_par_limts() error: invalid lower parchglim scaling factor " << temp << " for par " << p.first << endl;
-				ss << " chglim:" << chg_lb << ", last_val:" << last_val << ", current_val:" << p.second << endl;
-				throw runtime_error(ss.str());
-			}
-			if (temp < scaling_factor)
-			{
-				scaling_factor = temp;
-				controlling_par = p.first;
-				control_type = "lower change limit";
-			}
-		}
-		*/
 		if (enforce_bounds)
 		{
-			/*if (last_val >= p_rec->ubnd)
-			{
-				ss.str("");
-				ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at upper bound";
-				throw runtime_error(ss.str());
-			}
-
-			else if (last_val <= p_rec->lbnd)
-			{
-				ss.str("");
-				ss << "Pest::enforce_par_limits() error: last value for parameter " << p.first << " at lower bound";
-				throw runtime_error(ss.str());
-			}*/
-			/*scaled_bnd_val = p_rec->ubnd + abs(p_rec->ubnd * bnd_tol);
-			if (p.second > scaled_bnd_val)
-			{
-				temp = abs((p_rec->ubnd - last_val) / (p.second - last_val));
-				if ((temp > 1.0) || (temp < 0.0))
-				{
-					
-					ss << "Pest::enforce_par_limts() error: invalid upper bound scaling factor " << temp << " for par " << p.first << endl;
-					ss << " ubnd:" << p_rec->ubnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
-					throw runtime_error(ss.str());
-				}
-				if (temp < scaling_factor)
-				{
-					scaling_factor = temp;
-					controlling_par = p.first;
-					control_type = "upper bound";
-				}
-			}
-			scaled_bnd_val = p_rec->lbnd - abs(p_rec->lbnd * bnd_tol);
-			if (p.second < p_rec->lbnd)
-			{
-				temp = abs((last_val - p_rec->lbnd) / (last_val - p.second));
-				if ((temp > 1.0) || (temp < 0.0))
-				{
-					ss.str("");
-					ss << "Pest::enforce_par_limts() error: invalid lower bound scaling factor " << temp << " for par " << p.first << endl;
-					ss << " lbnd:" << p_rec->lbnd << ", last_val:" << last_val << ", current_val:" << p.second << endl;
-					throw runtime_error(ss.str());
-				}
-				if (temp < scaling_factor)
-				{
-					scaling_factor = temp;
-					controlling_par = p.first;
-					control_type = "lower bound";
-				}
-			*/
-
 			// getting rid of the universal shrinkage code above
 			// now just clamping offending parameters to their bounds
 			if (enforce_bounds && p.second > p_rec->ubnd)
@@ -1723,52 +1640,16 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 			}	
 		}
 	}	
-	
-	//ss.str("");
-	//ss << "change enforcement controlling par:" << controlling_par << ", control_type: " << control_type << ", scaling_factor: " << scaling_factor << endl;
-	/*
-	if (scaling_factor == 0.0)
-	{
-		ss.str("");
-		ss << "Pest::enforce_par_change_limits error : zero length parameter vector" << endl;
-		ss << "parameter: " << controlling_par << ", control type: " << control_type;
-		throw runtime_error(ss.str());
-	}
-
-	if (scaling_factor != 1.0)
-	{
-		for (auto &p : upgrade_active_ctl_pars)
-		{
-			
-			last_val = last_ctl_pars.get_rec(p.first);
-			p.second =last_val + (p.second - last_val) *  scaling_factor;
-		}
-	}
-	*/
-	//check for slightly out of bounds
-	//don't think we need this anymore as we're clamping
-	/*
-	for (auto &p : upgrade_ctl_pars)
-	{
-		p_rec = p_info.get_parameter_rec_ptr(p.first);
-		if (p.second < p_rec->lbnd)
-			p.second = p_rec->lbnd;
-		else if (p.second > p_rec->ubnd)
-			p.second = p_rec->ubnd;
-
-	}
-	*/
-
 
 	// Finally, map back to upgrade_active_ctl_pars
-	upgrade_active_ctl_pars = upgrade_ctl_pars;
 	if (pestpp_options.get_enforce_tied_bounds())
 	{
-    	upgrade_ctl_pars = base_par_transform.ctl2active_ctl_cp(upgrade_active_ctl_pars);
+    upgrade_active_ctl_pars = base_par_transform.ctl2active_ctl_cp(upgrade_ctl_pars);
 	}
-	upgrade_active_ctl_pars = upgrade_ctl_pars;
-	//ss.str("");
-	//ss << control_type << "," << controlling_par;
+	else
+	{
+    upgrade_active_ctl_pars = upgrade_ctl_pars;
+	}
 	pair<string, double> _control_info(ss.str(), scaling_factor);
 	return _control_info;
 
