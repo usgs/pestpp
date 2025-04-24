@@ -1531,6 +1531,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	}
 	for (auto p : upgrade_ctl_pars)
 	{
+		
 		/*if (pest_utils::lower_cp(p.first) == "s_xomehgwat")
 			cout << p.first << endl;*/
 		last_val = last_ctl_pars.get_rec(p.first);
@@ -1595,8 +1596,30 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		}
 
 
-		double temp = 1.0;
+		// double temp = 1.0;
+
+		// New logic for enforcing chglim and bounds
+		// First, we'll calculate p.second assuming it won't hit any bounds
+		// Then, we'll check the change limits.
+		// Finally, we'll check parameter bounds.
+		// If anything violates, clamp to the offending bound.
+		double last_val = last_ctl_pars.get_rec(p.first);
+		p_rec = p_info.get_parameter_rec_ptr(p.first);
+		p.second = last_val + (p.second - last_val) * scaling_factor;
+
 		if (enforce_chglim)
+		// similar to below, clamp rather than shrink every parameter if a parameter violates change limits
+		{ 
+			if (p.second > chg_ub)
+			{
+				p.second = chg_ub
+			}
+			else if (p.second < chg_lb)
+			{
+				p.second = chg_lb
+			}
+		}
+		/*
 		{		
 			if (p.second > chg_ub)
 			{
@@ -1633,7 +1656,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 				control_type = "lower change limit";
 			}
 		}
-
+		*/
 		if (enforce_bounds)
 		{
 			/*if (last_val >= p_rec->ubnd)
@@ -1688,9 +1711,6 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 
 			// getting rid of the universal shrinkage code above
 			// now just clamping offending parameters to their bounds
-			double last_val = last_ctl_pars.get_rec(p.first);
-			p_rec = p_info.get_parameter_rec_ptr(p.first);
-	
 			if (enforce_bounds && p.second > p_rec->ubnd)
 			{
 				p.second = p_rec->ubnd;
@@ -1698,11 +1718,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 			else if (enforce_bounds && p.second < p_rec->lbnd)
 			{
 				p.second = p_rec->lbnd;
-			}
-			else
-			{
-				p.second = last_val + (p.second - last_val) * scaling_factor;
-			}		
+			}	
 		}
 	}	
 	
@@ -1728,6 +1744,8 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	}
 	*/
 	//check for slightly out of bounds
+	//don't think we need this anymore as we're clamping
+	/*
 	for (auto &p : upgrade_ctl_pars)
 	{
 		p_rec = p_info.get_parameter_rec_ptr(p.first);
@@ -1737,6 +1755,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 			p.second = p_rec->ubnd;
 
 	}
+	*/
 	upgrade_active_ctl_pars = upgrade_ctl_pars;
 	//ss.str("");
 	//ss << control_type << "," << controlling_par;
