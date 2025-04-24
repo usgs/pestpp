@@ -1756,6 +1756,8 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 
 	}
 	*/
+
+	// Finally, map back to upgrade_active_ctl_pars
 	upgrade_active_ctl_pars = upgrade_ctl_pars;
 	//ss.str("");
 	//ss << control_type << "," << controlling_par;
