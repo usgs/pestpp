@@ -212,6 +212,7 @@ private:
 	double curr_omega;
 	map<string, double> pso_vmax;
 	string pso_dv_bound_restoration;
+	int enforce_bound_flag = -1;
 
 	ParetoObjectives objectives;
 	Constraints constraints;
