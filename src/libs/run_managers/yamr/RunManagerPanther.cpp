@@ -53,6 +53,7 @@ const int RunManagerPanther::MAX_CONCURRENT_RUNS_LOWER_LIMIT = 1;
 const int RunManagerPanther::IDLE_THREAD_SIGNAL_TIMEOUT_SECS = 10;  // Allow up to 10s for the run_idle_async() thread to acknowledge signals (pause idling, terminate)
 const double RunManagerPanther::MIN_AVGRUNMINS_FOR_KILL = 0.08; //minimum avg runtime to try to kill and/or resched runs
 const int RunManagerPanther::SECONDS_BETWEEN_ECHOS = 1;
+const int RunManagerPanther::TIMEOUT_MILLISECONDS = 10;
 
 AgentInfoRec::AgentInfoRec(int _socket_fd)
 {
@@ -562,7 +563,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		}
 
 	}
-    w_sleep(10);
+    w_sleep(TIMEOUT_MILLISECONDS);
 	n_no_ops = 0;
     while (true)
     {
@@ -728,7 +729,7 @@ void RunManagerPanther::run_idle_async()
 				idling.set(false);
 
 				// Sleep 1s to avoid spinlock
-				w_sleep(10);
+				w_sleep(TIMEOUT_MILLISECONDS);
 				continue;
 			}
 
@@ -818,7 +819,7 @@ void RunManagerPanther::end_run_idle_async()
 		}
 		
 		// Sleep to avoid spinlock
-		w_sleep(10);
+		w_sleep(TIMEOUT_MILLISECONDS);
 	}
 
 	report("Stopped idle ping thread, as Panther manager is shutting down.", false);
@@ -859,7 +860,7 @@ void RunManagerPanther::pause_idle()
 		}
 		
 		// Sleep to avoid spinlock
-		w_sleep(10);
+		w_sleep(TIMEOUT_MILLISECONDS);
 	}
 
 	report("Panther idle ping thread paused prior to scheduling runs.", false);
@@ -1008,7 +1009,7 @@ void RunManagerPanther::close_agents()
 			sock_nums.push_back(si.first);
 		for (auto si : sock_nums)
 			close_agent(si);
-		w_sleep(10);
+		w_sleep(TIMEOUT_MILLISECONDS);
 
 	}
 }
@@ -2143,7 +2144,7 @@ RunManagerPanther::~RunManagerPanther(void)
 	err = w_close(listener);
 	FD_CLR(listener, &master);
 	// this is needed to ensure that the first slave closes properly
-	w_sleep(10);
+	w_sleep(TIMEOUT_MILLISECONDS);
 	for (int i = 0; i <= fdmax; i++)
 	{
 		if (FD_ISSET(i, &master))
@@ -2259,10 +2260,10 @@ void RunManagerYAMRCondor::cleanup(int cluster)
 	stringstream ss;
 	ss << "condor_rm " << cluster << " 1>cr_temp.stdout 2>cr_temp.stderr";
 	system(ss.str().c_str());
-	w_sleep(10);
+	w_sleep(1000);
 	ss.str(string());
 	ss << "condor_rm " << cluster << " -forcex 1>cr_temp.stdout 2>cr_temp.stderr";
-	w_sleep(10);
+	w_sleep(1000);
 	system(ss.str().c_str());
 	RunManagerPanther::close_agents();
 	cout << "   all agents freed " << endl << endl;

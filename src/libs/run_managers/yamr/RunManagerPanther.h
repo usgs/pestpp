@@ -129,6 +129,7 @@ private:
 	static const int IDLE_THREAD_SIGNAL_TIMEOUT_SECS;
     static const double MIN_AVGRUNMINS_FOR_KILL;
     static const int SECONDS_BETWEEN_ECHOS;
+    static const int TIMEOUT_MILLISECONDS;
 	double overdue_reched_fac;
 	double overdue_giveup_fac;
 	double overdue_giveup_minutes;
