@@ -1515,21 +1515,10 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	string control_type = "";
 	ParameterInfo &p_info = ctl_parameter_info;
 	const ParameterRec *p_rec;
-	Parameters upgrade_ctl_pars;
-	Parameters last_ctl_pars;
+    Parameters &upgrade_ctl_pars = upgrade_active_ctl_pars;
+    const Parameters &last_ctl_pars = last_active_ctl_pars;
 
-	if (pestpp_options.get_enforce_tied_bounds())
-	{
-		upgrade_ctl_pars = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
-		last_ctl_pars = base_par_transform.active_ctl2ctl_cp(last_active_ctl_pars);
-	}
-	else
-	{
-		upgrade_ctl_pars = upgrade_active_ctl_pars;
-		last_ctl_pars = last_active_ctl_pars;
-
-	}
-	for (auto &p : upgrade_ctl_pars)
+	for (auto &p : active_ctl_pars)
 	{
 		
 		last_val = last_ctl_pars.get_rec(p.first);
@@ -1537,7 +1526,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		{
     		throw runtime_error("Relative parchglim not defined for zero-valued parameter " + p.first);
 		}
-		
+
 		p_rec = p_info.get_parameter_rec_ptr(p.first);
 		parchglim = p_rec->chglim;
 
@@ -1641,15 +1630,12 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		}
 	}	
 
-	// Finally, map back to upgrade_active_ctl_pars
+	// Finally, re-tie as needed
 	if (pestpp_options.get_enforce_tied_bounds())
-	{
-    upgrade_active_ctl_pars = base_par_transform.ctl2active_ctl_cp(upgrade_ctl_pars);
-	}
-	else
-	{
-    upgrade_active_ctl_pars = upgrade_ctl_pars;
-	}
+		{
+   	 	Parameters tmp_ctl = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
+    	upgrade_active_ctl_pars = base_par_transform.ctl2active_ctl_cp(tmp_ctl);
+		}
 	pair<string, double> _control_info(ss.str(), scaling_factor);
 	return _control_info;
 
