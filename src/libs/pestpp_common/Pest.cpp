@@ -1545,22 +1545,15 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		if (orig_val == 0.0)
 			orig_val = p_rec->ubnd / 4.0;
 
-		//apply facorig correction if needed
-		if (ctl_parameter_info.get_parameter_rec_ptr(p.first)->tranform_type == ParameterRec::TRAN_TYPE::NONE)
-		{
-			if (abs(p.second) < abs(orig_val) * facorig)
-				p.second = orig_val * facorig;
-			if (abs(last_val) < abs(orig_val * facorig))
-				last_val = orig_val * facorig;
-		}
+
 			
 
 
 		//calc fac lims
-		if (abs(last_val) > abs(p.second))
-			chg_fac = last_val / p.second;
-		else
-			chg_fac = p.second / last_val;
+		// if (abs(last_val) > abs(p.second))
+		//	chg_fac = last_val / p.second;
+		//else
+		//	chg_fac = p.second / last_val;
 		//if (p.second > 0.0)
 		if (last_val > 0.0)
 		{
@@ -1578,7 +1571,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		//calc rel lims
 		rel_lb = last_ctl_pars.get_rec(p.first) - (abs(last_val) * rpm);
 		rel_ub = last_ctl_pars.get_rec(p.first) + (abs(last_val) * rpm);
-		chg_rel = (last_val - p.second) / last_val;
+		// chg_rel = (last_val - p.second) / last_val;
 
 		if (parchglim == "FACTOR")
 		{
@@ -1603,9 +1596,8 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		// Then, we'll check the change limits.
 		// Finally, we'll check parameter bounds.
 		// If anything violates, clamp to the offending bound.
-		double last_val = last_ctl_pars.get_rec(p.first);
-		p_rec = p_info.get_parameter_rec_ptr(p.first);
-		p.second = last_val + (p.second - last_val) * scaling_factor;
+		// p_rec = p_info.get_parameter_rec_ptr(p.first);
+		// p.second = last_val + (p.second - last_val) * scaling_factor;
 
 		if (enforce_chglim)
 		// similar to below, clamp rather than shrink every parameter if a parameter violates change limits
@@ -1618,7 +1610,17 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 			{
 				p.second = chg_lb;
 			}
+
+			//apply facorig correction if needed
+			if (ctl_parameter_info.get_parameter_rec_ptr(p.first)->tranform_type == ParameterRec::TRAN_TYPE::NONE)
+			{
+				if (abs(p.second) < abs(orig_val) * facorig)
+					p.second = orig_val * facorig;
+				if (abs(last_val) < abs(orig_val * facorig))
+					last_val = orig_val * facorig;
+			}
 		}
+
 		/*
 		{		
 			if (p.second > chg_ub)
@@ -1757,7 +1759,13 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	}
 	*/
 
+
 	// Finally, map back to upgrade_active_ctl_pars
+	upgrade_active_ctl_pars = upgrade_ctl_pars;
+	if (pestpp_options.get_enforce_tied_bounds())
+	{
+    	upgrade_ctl_pars = base_par_transform.ctl2active_ctl_cp(upgrade_active_ctl_pars);
+	}
 	upgrade_active_ctl_pars = upgrade_ctl_pars;
 	//ss.str("");
 	//ss << control_type << "," << controlling_par;
