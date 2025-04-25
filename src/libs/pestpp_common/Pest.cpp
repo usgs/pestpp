@@ -1635,20 +1635,23 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 				for (const auto& potential_name : ctl_ordered_par_names)
 				{
 					const ParameterRec* potential_rec = p_info.get_parameter_rec_ptr(potential_name);
-					string partied = tied_map.at(potential_name).first;
-					if (potential_rec->tranform_type == ParameterRec::TRAN_TYPE::TIED &&
-						p.first == partied)
+					ParameterRec::TRAN_TYPE tran = potential_rec->tranform_type;
+					if (tran == ParameterRec::TRAN_TYPE::TIED)
 					{
-						if (p.second > potential_rec->ubnd)
+						string partied = tied_map.at(potential_name).first;
+						if (p.first == partied)
 						{
-							p.second = potential_rec->ubnd;
-						}
-						else if (p.second < potential_rec->lbnd)
-						{
-							p.second = potential_rec->lbnd;
-						}
+							if (p.second > potential_rec->ubnd)
+							{
+								p.second = potential_rec->ubnd;
+							}
+							else if (p.second < potential_rec->lbnd)
+							{
+								p.second = potential_rec->lbnd;
+							}
 
-					}	
+						}	
+					}
 				}
 			}
 		}	
