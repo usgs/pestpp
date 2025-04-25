@@ -1522,13 +1522,14 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	{
 		
 		last_val = last_active_ctl_pars.get_rec(p.first);
+		p_rec = p_info.get_parameter_rec_ptr(p.first);
 		parchglim = p_rec->chglim;
 		if (parchglim == "RELATIVE" && last_val == 0.0)
 		{
     		throw runtime_error("Relative parchglim not defined for zero-valued parameter " + p.first);
 		}
 
-		p_rec = p_info.get_parameter_rec_ptr(p.first);
+		
 
 		if (p.second == 0.0)
 			p.second = p_rec->ubnd / 4.0;
@@ -1630,11 +1631,13 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 			// if there are parameters tied to this one, check the tied parameter bounds
 			if (pestpp_options.get_enforce_tied_bounds())
 			{
-				for (const auto& potential : ctl_parameter_info.get_keys())
+				const map<string,pair<string,double>> tied_map = base_par_transform.get_tied_ptr()->get_items();
+				for (const auto& potential_name : ctl_ordered_par_names)
 				{
-					const ParameterRec* potential_rec = p_info.get_parameter_rec_ptr(potential);
+					const ParameterRec* potential_rec = p_info.get_parameter_rec_ptr(potential_name);
+					string partied = tied_map.at(potential_name).first;
 					if (potential_rec->tranform_type == ParameterRec::TRAN_TYPE::TIED &&
-						pest_utils::lower_cp(potential_rec->partied) == pest_utils::lower_cp(p.first))
+						p.first == partied)
 					{
 						if (p.second > potential_rec->ubnd)
 						{
