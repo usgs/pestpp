@@ -1522,13 +1522,13 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	{
 		
 		last_val = last_active_ctl_pars.get_rec(p.first);
+		parchglim = p_rec->chglim;
 		if (parchglim == "RELATIVE" && last_val == 0.0)
 		{
     		throw runtime_error("Relative parchglim not defined for zero-valued parameter " + p.first);
 		}
 
 		p_rec = p_info.get_parameter_rec_ptr(p.first);
-		parchglim = p_rec->chglim;
 
 		if (p.second == 0.0)
 			p.second = p_rec->ubnd / 4.0;
@@ -1619,20 +1619,39 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		{
 			// getting rid of the universal shrinkage code above
 			// now just clamping offending parameters to their bounds
-			if (enforce_bounds && p.second > p_rec->ubnd)
+			if (p.second > p_rec->ubnd)
 			{
 				p.second = p_rec->ubnd;
 			}
-			else if (enforce_bounds && p.second < p_rec->lbnd)
+			else if (p.second < p_rec->lbnd)
 			{
 				p.second = p_rec->lbnd;
-			}	
-		}
-	}	
+			}
+			// if there are parameters tied to this one, check the tied parameter bounds
+			if (pestpp_options.get_enforce_tied_bounds())
+			{
+				for (const auto& potential : ctl_parameter_info.get_keys())
+				{
+					const ParameterRec* potential_rec = p_info.get_parameter_rec_ptr(potential);
+					if (potential_rec->tranform_type == ParameterRec::TRAN_TYPE::TIED &&
+						pest_utils::lower_cp(potential_rec->partied) == pest_utils::lower_cp(p.first))
+					{
+						if (p.second > potential_rec->ubnd)
+						{
+							p.second = potential_rec->ubnd;
+						}
+						else if (p.second < potential_rec->lbnd)
+						{
+							p.second = potential_rec->lbnd;
+						}
 
+					}	
+				}
+			}
+		}	
+	}
 	pair<string, double> _control_info(ss.str(), scaling_factor);
 	return _control_info;
-
 }
 
 pair<Parameters,Parameters> Pest::get_effective_ctl_lower_upper_bnd(Parameters &pars)
