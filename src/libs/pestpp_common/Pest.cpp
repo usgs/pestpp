@@ -1630,29 +1630,29 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 			}
 			// if there are parameters tied to this one, check the tied parameter bounds
 			if (pestpp_options.get_enforce_tied_bounds())
-			ss.str("");
-			ss << "Enforcing tied bounds for pest++glm" << endl;
 			{
+				ss.str("");
+				ss << "Enforcing tied bounds for pest++glm" << endl;
+				Parameters upgrade_ctl_pars = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
 				const map<string,pair<string,double>> tied_map = base_par_transform.get_tied_ptr()->get_items();
-				for (const auto& potential_name : ctl_ordered_par_names)
+				for (auto p_potential : upgrade_ctl_pars)
 				{
-					const ParameterRec* potential_rec = p_info.get_parameter_rec_ptr(potential_name);
-					ParameterRec::TRAN_TYPE tran = potential_rec->tranform_type;
+					const ParameterRec *p_potential_rec = p_info.get_parameter_rec_ptr(p_potential.first);
+					ParameterRec::TRAN_TYPE tran = p_potential_rec->tranform_type;
 					if (tran == ParameterRec::TRAN_TYPE::TIED)
 					{
-						string partied = tied_map.at(potential_name).first;
+						string partied = tied_map.at(p_potential.first).first;
 						if (p.first == partied)
-						
 						{
 							ss.str("");
 							ss << "tied parameter to current active parameter found, checking for tighter bounds" << endl;
-							if (p.second > potential_rec->ubnd)
+							if (p.second > p_potential_rec->ubnd)
 							{
-								p.second = potential_rec->ubnd;
+								p.second = p_potential_rec->ubnd;
 							}
-							else if (p.second < potential_rec->lbnd)
+							else if (p.second < p_potential_rec->lbnd)
 							{
-								p.second = potential_rec->lbnd;
+								p.second = p_potential_rec->lbnd;
 							}
 
 						}	
