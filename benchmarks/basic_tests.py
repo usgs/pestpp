@@ -260,6 +260,7 @@ def tie_by_group_test():
     assert jco.shape[1] == 2,jco.shape
     par_df = pyemu.pst_utils.read_parfile(os.path.join(m_d,"pest_tied.par"))
     print(par_df)
+    print(tied_names)
     too_low = par.loc[par_df.parval1 < par.parlbnd,"parnme"]
     assert too_low.shape[0] == 0,too_low
     too_high = par.loc[par_df.parval1 > par.parubnd, "parnme"]

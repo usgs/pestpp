@@ -1630,6 +1630,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 			}
 			// if there are parameters tied to this one, check the tied parameter bounds
 			if (pestpp_options.get_enforce_tied_bounds())
+			print("Enforcing tied bounds for pest++glm")
 			{
 				const map<string,pair<string,double>> tied_map = base_par_transform.get_tied_ptr()->get_items();
 				for (const auto& potential_name : ctl_ordered_par_names)
@@ -1640,6 +1641,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 					{
 						string partied = tied_map.at(potential_name).first;
 						if (p.first == partied)
+						print("tied parameter to current active parameter found, checking for tighter bounds")
 						{
 							if (p.second > potential_rec->ubnd)
 							{
