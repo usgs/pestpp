@@ -3173,7 +3173,7 @@ bool MOEA::initialize_dv_population()
 				throw_moea_error(string("error processing dv population file"));
 			}
 		}
-		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+		else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0) || (par_ext.compare("bin") == 0))
 		{
 			message(1, "loading dv population from binary file", dv_filename);
 			try
@@ -3192,7 +3192,7 @@ bool MOEA::initialize_dv_population()
 		}
 		else
 		{
-			ss << "unrecognized dv population file extension " << par_ext << ", looking for csv, jcb, or jco";
+			ss << "unrecognized dv population file extension " << par_ext << ", looking for csv, jcb, bin, or jco";
 			throw_moea_error(ss.str());
 		}
 
@@ -3290,7 +3290,7 @@ void MOEA::initialize_obs_restart_population()
 			throw_moea_error(string("error processing obs population file"));
 		}
 	}
-	else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0))
+	else if ((par_ext.compare("jcb") == 0) || (par_ext.compare("jco") == 0) || (par_ext.compare("bin") == 0))
 	{
 	message(1, "loading obs population from binary file", obs_filename);
 	try
@@ -3309,7 +3309,7 @@ void MOEA::initialize_obs_restart_population()
 	}
 	else
 	{
-	ss << "unrecognized obs population restart file extension " << par_ext << ", looking for csv, jcb, or jco";
+	ss << "unrecognized obs population restart file extension " << par_ext << ", looking for csv, jcb, bin,  or jco";
 	throw_moea_error(ss.str());
 	}
 
