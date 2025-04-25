@@ -1518,7 +1518,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
     Parameters &upgrade_ctl_pars = upgrade_active_ctl_pars;
     const Parameters &last_ctl_pars = last_active_ctl_pars;
 
-	for (auto &p : active_ctl_pars)
+	for (auto &p : upgrade_ctl_pars)
 	{
 		
 		last_val = last_ctl_pars.get_rec(p.first);
