@@ -1515,13 +1515,13 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	string control_type = "";
 	ParameterInfo &p_info = ctl_parameter_info;
 	const ParameterRec *p_rec;
-    Parameters &upgrade_ctl_pars = upgrade_active_ctl_pars;
-    const Parameters &last_ctl_pars = last_active_ctl_pars;
 
-	for (auto &p : upgrade_ctl_pars)
+	// might be able to avoid dealing with tied parameters altogether
+	// if we just jump immediately to operating in upgrade_active_ctl_pars
+	for (auto &p : upgrade_active_ctl_pars)
 	{
 		
-		last_val = last_ctl_pars.get_rec(p.first);
+		last_val = last_active_ctl_pars.get_rec(p.first);
 		if (parchglim == "RELATIVE" && last_val == 0.0)
 		{
     		throw runtime_error("Relative parchglim not defined for zero-valued parameter " + p.first);
@@ -1551,8 +1551,8 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		}
 
 		//calc rel lims
-		rel_lb = last_ctl_pars.get_rec(p.first) - (abs(last_val) * rpm);
-		rel_ub = last_ctl_pars.get_rec(p.first) + (abs(last_val) * rpm);
+		rel_lb = last_active_ctl_pars.get_rec(p.first) - (abs(last_val) * rpm);
+		rel_ub = last_active_ctl_pars.get_rec(p.first) + (abs(last_val) * rpm);
 
 		if (parchglim == "FACTOR")
 		{
@@ -1630,12 +1630,6 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 		}
 	}	
 
-	// Finally, re-tie as needed
-	if (pestpp_options.get_enforce_tied_bounds())
-		{
-   	 	Parameters tmp_ctl = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
-    	upgrade_active_ctl_pars = base_par_transform.ctl2active_ctl_cp(tmp_ctl);
-		}
 	pair<string, double> _control_info(ss.str(), scaling_factor);
 	return _control_info;
 
