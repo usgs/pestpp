@@ -3076,7 +3076,7 @@ void MOEA::initialize()
 			message(1, "using particle swarm generator");
 			inertia_info = pest_scenario.get_pestpp_options().get_mou_pso_inertia();
 			curr_omega = inertia_info[0];
-			pso_dv_bound_restoration = pest_scenario.get_pestpp_options().get_mou_pso_dv_bound_restoration();
+			pso_dv_bound_handling = pest_scenario.get_pestpp_options().get_mou_pso_dv_bound_handling();
 		}
         else if (token == "SIMPLEX")
         {
@@ -4369,7 +4369,7 @@ void MOEA::update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op)
 	pso_pbest_op = top;
 }
 
-ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
+pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<string>& gbest_solutions)
 {
 	double cog_const, social_const;
 	stringstream ss;
@@ -4397,10 +4397,10 @@ ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<
 
 	int num_dv = _dp.shape().second;
 	vector<double> r;
-	Eigen::VectorXd rand1, rand2, cur_real, p_best, g_best, new_par_vel, cur_vel, inertia_comp, social_comp, cog_comp;
+	Eigen::VectorXd rand1, rand2, cur_real, p_best, g_best, new_par_vel, new_par_dval, cur_vel, inertia_comp, social_comp, cog_comp;
 	pso_pbest_dp.transform_ip(_dp.get_trans_status());
 	dp_archive.set_trans_status(_dp.get_trans_status());
-	Eigen::MatrixXd new_vel(_dp.shape().first, _dp.shape().second);
+	Eigen::MatrixXd new_vel(_dp.shape().first, _dp.shape().second), child_dv(_dp.shape().first, _dp.shape().second);
 	string real_name;
 	vector<string> real_names = pso_velocity.get_real_names();
 	set<string> snames(real_names.begin(), real_names.end());
@@ -4444,120 +4444,125 @@ ParameterEnsemble MOEA::get_updated_pso_velocity(ParameterEnsemble& _dp, vector<
 		social_comp = social_const * rand2.array() * (g_best.array() - cur_real.array());
 
 		new_par_vel = inertia_comp + cog_comp + social_comp;
+		new_par_dval = cur_real.array() + new_par_vel.array();
 
-		if (pso_dv_bound_restoration != "RESET")
+		if (pso_dv_bound_handling == "CLAMP") //this replaces the original "reset/basic"
 		{
-			if (enforce_bound_flag>0)
+			for (int j = 0; j < dv_names.size(); j++)
 			{
-				double new_dv, cur_dv, last_wiggle_room = 0;
-				for (int j = 0; j < dv_names.size(); j++)
+
+				double lb_val = lb[dv_names[j]];
+				double ub_val = ub[dv_names[j]];
+				double new_dv, cur_dv;
+				new_dv = new_par_dval[j] < lb_val - FLOAT_EPSILON ? lb_val : new_par_dval[j];
+				new_dv = new_par_dval[j] > ub_val + FLOAT_EPSILON ? ub_val : new_par_dval[j];
+				new_par_dval[j] = new_dv;
+			}
+			
+		}
+		else
+		{
+			bool change_flag = false;
+			double new_dv, cur_dv;
+			for (int j = 0; j < dv_names.size(); j++)
+			{
+				double lb_val = lb[dv_names[j]];
+				double ub_val = ub[dv_names[j]];
+
+				double vmax = pso_vmax[dv_names[j]];
+				if (new_par_vel[j] > vmax + FLOAT_EPSILON) {
+					new_par_vel[j] = vmax;
+				}
+				else if (new_par_vel[j] < -vmax - FLOAT_EPSILON) {
+					new_par_vel[j] = -vmax;
+				}
+
+				new_dv = cur_real[j] + new_par_vel[j];
+				new_par_dval[j] = new_dv;
+				double curr_vel = new_par_vel[j];
+				int draws = 0;
+				while (true)
 				{
-					double lb_val = lb[dv_names[j]];
-					double ub_val = ub[dv_names[j]];
 
-					double vmax = pso_vmax[dv_names[j]];
-					if (new_par_vel[j] > vmax + FLOAT_EPSILON) {
-						new_par_vel[j] = vmax;
-					}
-					else if (new_par_vel[j] < -vmax - FLOAT_EPSILON) {
-						new_par_vel[j] = -vmax;
-					}
-
-					new_dv = cur_real[j] + new_par_vel[j];
-					double curr_vel = new_par_vel[j];
-					int draws = 0;
-					while (true)
+					if (!((new_dv <= ub_val + FLOAT_EPSILON) && (new_dv >= lb_val - FLOAT_EPSILON)))
 					{
+						double wiggle_room = 0;
+						if ((new_dv > ub_val + FLOAT_EPSILON))
+							wiggle_room = ub_val - cur_real[j];
+						else if ((new_dv < lb_val - FLOAT_EPSILON))
+							wiggle_room = lb_val - cur_real[j];
+						else
+							throw_moea_error("invalid dv value in pso velocity calculation");
 
-						if (!((new_dv <= ub_val + FLOAT_EPSILON) && (new_dv >= lb_val - FLOAT_EPSILON)))
+						draws++;
+						if (draws > 1000)
 						{
-							draws++;
-							if (draws > 1000)
+							ss << "problem with perturbing member: " << real_name << endl;
+							ss << "at dv: " << dv_names[j] << endl;
+							ss << setprecision(17) << fixed
+								<< "wiggle room: " << wiggle_room << endl
+								<< "inertia component: " << inertia_comp[j] << endl
+								<< "cognitive component: " << cog_comp[j] << endl
+								<< "social component: " << social_comp[j] << endl
+								<< "current dv: " << cur_real[j] << endl
+								<< "new dv: " << new_dv << endl
+								<< "pbest: " << p_best[j] << endl
+								<< "gbest: " << g_best[j] << endl;
+							ofstream& frec = file_manager.rec_ofstream();
+							frec << ss.str();
+							throw_moea_error("infinite loop in pso velocity calculation (see rec file for details)");
+						}
+
+						//Adam's recursive perturbation algo to seek new feasible dv
+						if (pso_dv_bound_handling == "REPERTURB" || "HYBRID")
+						{
+							double curr_dv = new_dv;
+
+							vector<double> r1 = uniform_draws(1, 0.0, 1.0, rand_gen);
+							vector<double> r2 = uniform_draws(1, 0.0, 1.0, rand_gen);
+							vector<double> r3 = uniform_draws(1, 0.0, 1.0, rand_gen);
+
+							//do clamping sometimes -- recommended for MOO; straight up REPERTURBATION generally performs better for SOO
+							if ((2 * abs(wiggle_room) / (ub_val - lb_val)) < r3[0] &&
+								(pso_dv_bound_handling == "HYBRID"))
 							{
-								ss << "problem with perturbing member: " << real_name << endl;
-								ss << "at dv: " << dv_names[j] << endl;
-								ss << setprecision(17) << fixed
-									<< "wiggle room: " << last_wiggle_room << endl
-									<< "inertia component: " << inertia_comp[j] << endl
-									<< "cognitive component: " << cog_comp[j] << endl
-									<< "social component: " << social_comp[j] << endl
-									<< "current dv: " << cur_real[j] << endl
-									<< "new dv: " << new_dv << endl
-									<< "pbest: " << p_best[j] << endl
-									<< "gbest: " << g_best[j] << endl;
-								ofstream& frec = file_manager.rec_ofstream();
-								frec << ss.str();
-								throw_moea_error("infinite loop in pso velocity calculation (see rec file for details)");
+								new_dv = new_par_dval[j] < lb_val - FLOAT_EPSILON ? lb_val : new_par_dval[j];
+								new_dv = new_par_dval[j] > ub_val + FLOAT_EPSILON ? ub_val : new_par_dval[j];
+								new_par_dval[j] = new_dv;
+								break;
 							}
 
-							//Adam's recursive perturbation algo to seek new feasible dv
-							if (pso_dv_bound_restoration == "ITERATIVE")
-							{
-								double curr_dv = new_dv;
+							inertia_comp[j] = omega * curr_vel;
+							cog_comp[j] = cog_const * r1[0] * (p_best[j] - curr_dv);
+							social_comp[j] = social_const * r2[0] * (g_best[j] - curr_dv);
 
-								vector<double> r1 = uniform_draws(1, 0.0, 1.0, rand_gen);
-								vector<double> r2 = uniform_draws(1, 0.0, 1.0, rand_gen);
+							curr_vel = inertia_comp[j] + cog_comp[j] + social_comp[j];
 
-								inertia_comp[j] = omega * curr_vel;
-								cog_comp[j] = cog_const * r1[0] * (p_best[j] - curr_dv);
-								social_comp[j] = social_const * r2[0] * (g_best[j] - curr_dv);
-
-								curr_vel = inertia_comp[j] + cog_comp[j] + social_comp[j];
-
-								double vmax = pso_vmax[dv_names[j]];
-								if (curr_vel > vmax + FLOAT_EPSILON) {
-									curr_vel = vmax;
-								}
-								else if (curr_vel < -vmax - FLOAT_EPSILON) {
-									curr_vel = -vmax;
-								}
-								new_dv = curr_dv + curr_vel;
-								new_par_vel[j] = new_dv - cur_real[j];
+							double vmax = pso_vmax[dv_names[j]];
+							if (curr_vel > vmax + FLOAT_EPSILON) {
+								curr_vel = vmax;
 							}
-							else if (pso_dv_bound_restoration == "DAMPED")
-								//Reygie's velocity damping algo to seek new feasible dv
-							{
-								double wiggle_room = 0;
-								if ((new_dv > ub_val + FLOAT_EPSILON))
-									wiggle_room = ub_val - cur_real[j];
-								else if ((new_dv < lb_val - FLOAT_EPSILON))
-									wiggle_room = lb_val - cur_real[j];
-								else
-									throw_moea_error("invalid dv value in pso velocity calculation");
-								last_wiggle_room = wiggle_room;
-
-								if (abs(abs(inertia_comp[j]) - abs(wiggle_room)) < FLOAT_EPSILON * max(abs(inertia_comp[j]), abs(wiggle_room)) || abs(inertia_comp[j]) + FLOAT_EPSILON >= abs(wiggle_room)) //there's no point spinning the wheel for r1 and r2
-								{
-									vector<double> r = uniform_draws(1, 0.0, 1.0, rand_gen);
-									new_par_vel[j] = wiggle_room * r[0];
-								}
-								else
-								{
-									vector<double> r = uniform_draws(1, 0.0, 1.0, rand_gen);
-
-									inertia_comp[j] = omega * cur_vel[j];
-									wiggle_room -= inertia_comp[j];
-
-									new_par_vel[j] = inertia_comp[j] + wiggle_room * r[0];
-
-								}
-								new_dv = cur_real[j] + new_par_vel[j];
+							else if (curr_vel < -vmax - FLOAT_EPSILON) {
+								curr_vel = -vmax;
 							}
-							else
-								throw_moea_error("invalid pso_dv_bound_restoration option. Choose between ITERATIVE, DAMPED, or RESET");
+							new_dv = curr_dv + curr_vel;
+							new_par_dval[j] = new_dv;
+							//new_par_vel[j] = curr_vel;
+							new_par_vel[j] = new_dv - cur_real[j];
 						}
 						else
-							break;
+							throw_moea_error("invalid pso_dv_bound_handling option. Choose between REPERTURB, CLAMP, or HYBRID");
 					}
+					else
+						break;
 				}
 			}
-			enforce_bound_flag *= -1;
 		}
-
-		//_dp.update_real_ip(real_name, cur_real);
 		new_vel.row(i) = new_par_vel;
+		child_dv.row(i) = new_par_dval;
 	}
-	return ParameterEnsemble(&pest_scenario, &rand_gen, new_vel, _dp.get_real_names(), _dp.get_var_names());
+	return pair<ParameterEnsemble, ParameterEnsemble>(ParameterEnsemble(&pest_scenario, &rand_gen, new_vel, _dp.get_real_names(), _dp.get_var_names()), 
+		ParameterEnsemble(&pest_scenario, &rand_gen, child_dv, _dp.get_real_names(), _dp.get_var_names()));
 }
 
 
@@ -4644,8 +4649,9 @@ ParameterEnsemble MOEA::generate_pso_population(int num_members, ParameterEnsemb
     }
     message(1, "generating PSO population of size", num_members);
 	vector<string> gbest_solutions = get_pso_gbest_solutions(_dp.shape().first, dp_archive, op_archive);
-	ParameterEnsemble cur_velocity = get_updated_pso_velocity(_dp, gbest_solutions);
-	ParameterEnsemble new_dp(&pest_scenario, &rand_gen, _dp.get_eigen().array() + cur_velocity.get_eigen().array(), _dp.get_real_names(), _dp.get_var_names());
+	pair<ParameterEnsemble, ParameterEnsemble> new_gen = get_updated_pso_velocity(_dp, gbest_solutions);
+	ParameterEnsemble cur_velocity = new_gen.first;
+	ParameterEnsemble new_dp = new_gen.second;
 
     if (temp.shape().first > 0) {
         new_dp.append_other_rows(temp);

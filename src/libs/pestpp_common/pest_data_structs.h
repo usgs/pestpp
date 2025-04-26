@@ -426,8 +426,8 @@ public:
 	void set_mou_pso_inertia(vector<double> _vals) { mou_pso_inertia = _vals; }
 	double get_mou_pso_vmax_factor() const { return mou_pso_vmax_factor; }
 	void set_mou_pso_vmax_factor(double _val) { mou_pso_vmax_factor = _val; }
-	string get_mou_pso_dv_bound_restoration() const { return mou_pso_dv_bound_restoration; }
-	void set_mou_pso_dv_bound_restoration(string name) { mou_pso_dv_bound_restoration = name; }
+	string get_mou_pso_dv_bound_handling() const { return mou_pso_dv_bound_handling; }
+	void set_mou_pso_dv_bound_handling(string name) { mou_pso_dv_bound_handling = name; }
 	int get_mou_max_nn_search() const { return mou_max_nn_search;}
 	void set_mou_max_nn_search(int val) { mou_max_nn_search = val; }
 	string get_mou_outer_repo_obs_file() const { return mou_outer_repo_obs_file; }
@@ -798,7 +798,7 @@ private:
 	double mou_pso_alpha;
 	double mou_pso_rramp;
 	double mou_pso_rfit;
-	string mou_pso_dv_bound_restoration;
+	string mou_pso_dv_bound_handling;
 	vector<double> mou_pso_inertia;
 	double mou_pso_vmax_factor;
 	double mou_ppd_beta;

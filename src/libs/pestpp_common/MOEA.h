@@ -211,8 +211,7 @@ private:
 	vector<double> inertia_info, cog_const_range, social_const_range;
 	double curr_omega;
 	map<string, double> pso_vmax;
-	string pso_dv_bound_restoration;
-	int enforce_bound_flag = -1;
+	string pso_dv_bound_handling;
 
 	ParetoObjectives objectives;
 	Constraints constraints;
@@ -269,7 +268,7 @@ private:
     ParameterEnsemble generate_simplex_population(int num_members, ParameterEnsemble& _dp, ObservationEnsemble& _op);
 
     ParameterEnsemble generate_empcov_population(int num_members, ParameterEnsemble& _dp, ObservationEnsemble& _op);
-	ParameterEnsemble get_updated_pso_velocity(ParameterEnsemble& _dp, vector<string>& gbest_solutions);
+	pair<ParameterEnsemble, ParameterEnsemble> get_updated_pso_velocity(ParameterEnsemble& _dp, vector<string>& gbest_solutions);
 
 	vector<string> get_pso_gbest_solutions(int num_reals, ParameterEnsemble& _dp, ObservationEnsemble& _op);
 	void update_pso_pbest(ParameterEnsemble& _dp, ObservationEnsemble& _op);

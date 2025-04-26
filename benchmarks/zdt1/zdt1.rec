@@ -1,0 +1,29 @@
+              pestpp-mou: multi-objective optimization under uncertainty
+                         by the PEST++ developement team
+
+
+
+
+
+version: 5.2.18
+binary compiled on Apr 26 2025 at 20:37:49
+
+using control file: "zdt1.pst"
+in directory: "C:\Users\mac732\OneDrive - CSIRO\Documents\GitHub\pestpp-moudev\benchmarks\zdt1"
+on host: "DUMPLING-FL"
+started at 04/26/25 20:38:05
+
+on host: "DUMPLING-FL"
+
+control file parsing error:  the following '++' args were not accepted:
+mou_pso_dv_bound_handling,
+forgive_unknown_args is 'false' so this is treated as an error
+
+Error processing control file: zdt1.pst
+
+control file parsing error:  the following '++' args were not accepted:
+mou_pso_dv_bound_handling,
+forgive_unknown_args is 'false' so this is treated as an error
+
+
+
