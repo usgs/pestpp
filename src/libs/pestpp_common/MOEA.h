@@ -46,7 +46,6 @@ public:
 	void set_prob_pareto(bool ppd) { prob_pareto = ppd; }
 	void set_hypervolume_partitions(map<string, map<string, double>> _hv_parts);
 	void get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp);
-	void update_ppd_criteria(ObservationEnsemble& op, ParameterEnsemble& dp);
 
 	//this must be called at least once before the diversity metrixs can be called...
 	void set_pointers(vector<string>& _obj_names, vector<string>& _obs_obj_names, vector<string>& _obs_obj_sd_names, vector<string>& _pi_obj_names, vector<string>& _pi_obj_sd_names, map<string, double>& _obj_dir_mult)

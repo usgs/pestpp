@@ -1578,7 +1578,7 @@ bool ParetoObjectives::first_equals_second(map<string, double>& first, map<strin
 bool ParetoObjectives::first_dominates_second(map<string, double>& first, map<string, double>& second)
 {
 
-	if (/*prob_pareto*/ ppd_sort)
+	if (ppd_sort)
 	{
 		double pd = dominance_probability(first, second);
 
@@ -1694,39 +1694,6 @@ void ParetoObjectives::set_hypervolume_partitions(map<string, map<string, double
 	incumbent_front_extreme[start->first] = _hv_pts[start->first];
 	incumbent_front_extreme[end->first] = _hv_pts[end->first];
 }
-
-void ParetoObjectives::update_ppd_criteria(ObservationEnsemble& op, ParameterEnsemble& dp)
-{
-	/*map<string, map<string, double>> _member_struct = get_member_struct(op, dp);
-	double cv;
-	ppd_range = pest_scenario.get_pestpp_options().get_mou_ppd_beta();
-	double ppd_lb = ppd_range[0], ppd_ub = ppd_range[1];
-	stringstream ss;
-
-	int i = 0;
-	for (auto obj_name : *obj_names_ptr)
-	{
-		cv = 0;
-		for (auto m : _member_struct)
-		{
-			cv += abs(m.second[obj_name + "_SD"]/ m.second[obj_name]);
-		}
-		cv /=_member_struct.size();
-
-		if (cv < 1)
-			ppd_beta[i] = ppd_ub;
-		else
-			ppd_beta[i] = ppd_lb + ((exp(1 / cv) - 1) / (exp(1) - 1)) * (ppd_ub - ppd_lb);
-
-		i++;
-	}
-
-	ss.str("");
-	ss << "Overlap criteria used - objective 1: " << ppd_beta[0] << " ; objective 2: " << ppd_beta[1];
-	performance_log->log_event(ss.str());*/
-
-}
-
 
 //this works only for two objectives following the method of Yang et al (2019)
 void ParetoObjectives::get_ehvi(ObservationEnsemble& op, ParameterEnsemble& dp)
@@ -4462,7 +4429,6 @@ pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(Parame
 		}
 		else
 		{
-			bool change_flag = false;
 			double new_dv, cur_dv;
 			for (int j = 0; j < dv_names.size(); j++)
 			{
@@ -4523,7 +4489,7 @@ pair<ParameterEnsemble, ParameterEnsemble> MOEA::get_updated_pso_velocity(Parame
 							vector<double> r3 = uniform_draws(1, 0.0, 1.0, rand_gen);
 
 							//do clamping sometimes -- recommended for MOO; straight up REPERTURBATION generally performs better for SOO
-							if ((2 * abs(wiggle_room) / (ub_val - lb_val)) < r3[0] &&
+							if ((2 * abs(wiggle_room) / (ub_val - lb_val)) < r3[0] - FLOAT_EPSILON &&
 								(pso_dv_bound_handling == "HYBRID"))
 							{
 								new_dv = new_par_dval[j] < lb_val - FLOAT_EPSILON ? lb_val : new_par_dval[j];
