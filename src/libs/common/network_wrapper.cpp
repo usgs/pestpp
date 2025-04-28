@@ -137,12 +137,13 @@ int w_socket(int domain, int type, int protocol)
 		//cerr << "socket error: "  << w_get_error_msg() << endl;
 	}
 #ifdef OS_LINUX
-    int one = 1;
-    int retval = setsockopt(sockfd,SOL_SOCKET,SO_NOSIGPIPE,&one,sizeof(one));
-    if (retval != 0)
-    {
-        cout << "WARNING: unable to set SO_NOSIGPIPE on socket, continuing..." << endl;
-    }
+//    int one = 1;
+//    int retval = setsockopt(sockfd,SOL_SOCKET,SO_NOSIGPIPE,&one,sizeof(one));
+//    if (retval != 0)
+//    {
+//        cout << "WARNING: unable to set SO_NOSIGPIPE on socket, continuing..." << endl;
+//    }
+    signal(SIGPIPE, SIG_IGN);
 
 #endif
 	return sockfd;
