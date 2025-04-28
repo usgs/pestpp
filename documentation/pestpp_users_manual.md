@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.18
+# <a id='s1' />Version 5.2.19
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-April 2025
+May 2025
 
 # <a id='s2' />Acknowledgements
 
@@ -70,7 +70,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Table of Contents
 
-- [Version 5.2.18](#s1)
+- [Version 5.2.19](#s1)
 - [Acknowledgements](#s2)
 - [Preface](#s3)
 - [License](#s4)
@@ -2516,6 +2516,10 @@ In some cases, users may want to retrieve one or more model output files from th
 **panther_poll_interval**
 Once a panther agent is initialized, it will start to try to connect to the master instance. On some operating systems, this act of trying connect actually results in a OS-level “file handle” being opened, which, if substantial time passes, can accumulate to a large number of open file handles. To prevent this, the panther agents will “sleep” for a given number of seconds before trying to connect to the master again. The length of time the agent sleeps is controlled by the *panther_poll_interval*, which an interger value of seconds to sleep. By default, this value is 1 second.
 
+**panther_master_timeout_milliseconds**
+**In**
+**panther_master_echo_interval_milliseconds**
+**In**
 ## <a id='s9-4' />5.4 Run Book-Keeping Files
 
 After running a program of the PEST++ suite, you may notice a number of (possibly large) files in the folder from which it was run. These are *case.rns*, *case.rnu* and *case.rnj*, where *case* is the filename base of the PEST control file. These are binary files that are used for temporary storage of “raw” run results. They contain information that assists in parallel run management, and that facilitates restart of an interrupted PEST++ run – if PESTPP-XXX exits gracefully, these files are removed. These run storage files can be read and processed using pyEMU.
