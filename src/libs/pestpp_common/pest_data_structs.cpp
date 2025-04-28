@@ -1417,6 +1417,18 @@ bool PestppOptions::assign_value_by_key_continued(const string& key, const strin
         }
         return true;
     }
+    else if (key == "PANTHER_MASTER_TIMEOUT_MILLISECONDS")
+    {
+        convert_ip(value, panther_timeout_milliseconds);
+        return true;
+
+    }
+    else if (key == "PANTHER_MASTER_ECHO_INTERVAL_MILLISECONDS")
+    {
+        convert_ip(value, panther_echo_interval_milliseconds);
+        return true;
+
+    }
 
 	
 	return false;
@@ -1670,6 +1682,8 @@ void PestppOptions::summary(ostream& os) const
     os << "panther_transfer_on_fail: " << endl;
     for (auto& file : panther_transfer_on_fail)
         os << file << endl;
+    os << "panther_timeout_milliseconds: " << panther_timeout_milliseconds << endl;
+    os << "panther_echo_interval_milliseconds: " << panther_echo_interval_milliseconds << endl;
 
     os << endl;
 
@@ -2118,6 +2132,8 @@ void PestppOptions::set_defaults()
 	set_panther_echo(true);
     set_panther_transfer_on_finish(vector<string>{});
     set_panther_transfer_on_fail(vector<string>{});
+    set_panther_timeout_milliseconds(10);
+    set_panther_echo_interval_milliseconds(10);
 
 }
 

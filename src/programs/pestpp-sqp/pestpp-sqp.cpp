@@ -223,13 +223,17 @@ int main(int argc, char* argv[])
 				cout << endl << endl << "WARNING: 'noptmax' = 0 but using parallel run mgr.  This prob isn't what you want to happen..." << endl << endl;
 			}
 			const ModelExecInfo &exi = pest_scenario.get_model_exec_info();
-			run_manager_ptr = new RunManagerPanther(
-				rns_file, cmdline.panther_port,
-				file_manager.open_ofile_ext("rmr"),
-				pest_scenario.get_pestpp_options().get_max_run_fail(),
-				pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
-				pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
-				pest_scenario.get_pestpp_options().get_overdue_giveup_minutes());
+            run_manager_ptr = new RunManagerPanther(
+                    rns_file, cmdline.panther_port,
+                    file_manager.open_ofile_ext("rmr"),
+                    pest_scenario.get_pestpp_options().get_max_run_fail(),
+                    pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
+                    pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
+                    pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
+                    pest_scenario.get_pestpp_options().get_panther_echo(),
+                    vector<string>{}, vector<string>{},
+                    pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
+                    pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds());
 		}
 		else
 		{

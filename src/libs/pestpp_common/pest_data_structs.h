@@ -642,6 +642,13 @@ public:
     const vector<string>& get_panther_transfer_on_fail() const {return panther_transfer_on_fail;}
     void set_panther_transfer_on_finish(vector<string> _files) {panther_transfer_on_finish = _files;}
     void set_panther_transfer_on_fail(vector<string> _files) {panther_transfer_on_fail = _files;}
+    void set_panther_timeout_milliseconds(int _value) {panther_timeout_milliseconds = _value;}
+    void set_panther_echo_interval_milliseconds(int _value) {panther_echo_interval_milliseconds = _value;}
+    const int get_panther_echo_interval_milliseconds() const { return panther_echo_interval_milliseconds;}
+    const int get_panther_timeout_milliseconds() const { return panther_timeout_milliseconds;}
+
+
+
 
 
 
@@ -872,6 +879,8 @@ private:
 	bool panther_debug_fail_freeze;
 	bool panther_echo;
 	vector<string> panther_transfer_on_finish, panther_transfer_on_fail;
+    int panther_timeout_milliseconds;
+    int panther_echo_interval_milliseconds;
 
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);
