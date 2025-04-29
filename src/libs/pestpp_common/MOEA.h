@@ -102,7 +102,6 @@ private:
 	bool first_equals_second(map<string, double>& first, map<string, double>& second);
 
 	map<int, vector<string>> sort_members_by_dominance_into_fronts(map<string, map<string, double>>& _member_struct);
-	map<int, vector<string>> sort_members_by_dominance_into_prob_fronts(map<int, vector<string>>& front_map, map<string, map<string, double>>& _member_struct);
 	map<string, double> get_mopso_fitness(vector<string> members, map<string, map<string, double>>& _member_struct);
 	pair<map<string, double>, map<string, double>> get_spea2_fitness(map<string, map<string, double>>& _member_struct);
 
@@ -136,7 +135,6 @@ private:
 
 	map<string, map<string, double>> feas_member_struct;
 	map<int, vector<string>> front_map;
-	map<int, vector<string>> prob_front_map;
 	map<string, double> crowd_map, expected_crowd_map, var_crowd_map, fitness_map, probnondom_map, min_sd, nn_map;
 	map<string, int> member_front_map;
 	map<string, double> member_cvar;

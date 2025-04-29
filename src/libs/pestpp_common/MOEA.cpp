@@ -556,14 +556,15 @@ void ParetoObjectives::update(ObservationEnsemble& op, ParameterEnsemble& dp, Co
 		}
 	}
 	performance_log->log_event("pareto front sorting");
-		
-	/*if (ppd_sort)
+	
+	if (all_infeas)
 	{
-		front_map = sort_members_by_dominance_into_fronts(member_struct);
-		prob_front_map = sort_members_by_dominance_into_prob_fronts(front_map, member_struct);
-		front_map = prob_front_map;
+		front_map.clear();
+		for (int i = 0; i < infeas_ordered.size(); i++)
+			front_map[i].push_back(infeas_ordered[i]);	
 	}
-	else*/
+		
+	else
 		front_map = sort_members_by_dominance_into_fronts(member_struct);
 
 	return;
@@ -1420,98 +1421,6 @@ map<int,vector<string>> ParetoObjectives::sort_members_by_dominance_into_fronts(
 	}
 
 	return front_map;
-}
-
-map<int, vector<string>> ParetoObjectives::sort_members_by_dominance_into_prob_fronts(map<int, vector<string>>& front_map, map<string, map<string, double>>& _member_struct)
-{
-	//following fast non-dom alg in Deb
-	performance_log->log_event("starting 'fast non-dom probabilistic sort");
-	//map<string,map<string,double>> Sp, F1;
-	map<string, vector<string>> solutions_dominated_map;
-	map<string, int> num_dominating_map;
-	fill_domination_containers(_member_struct, solutions_dominated_map, num_dominating_map);
-	vector<string> solutions_dominated, solutions_dominated_by_q, first_front, all_front;
-
-	int ppd_front_i = 1;
-	int front_i = 1;
-	
-	vector<string> prob_front;
-	map<int, vector<string>> prob_front_map;
-
-	auto it = max_element(front_map.begin(), front_map.end());
-	int num_nonprob_front = it->first;
-
-	while (true) 
-	{
-		prob_front.clear();
-
-		for (auto solution_f : front_map[front_i])
-		{
-			if (find(all_front.begin(), all_front.end(), solution_f) != all_front.end())
-				continue;
-			else
-			{
-				prob_front.push_back(solution_f);
-				all_front.push_back(solution_f);
-				solutions_dominated = solutions_dominated_map[solution_f];
-				for (auto solution_r : solutions_dominated)
-				{
-					if (find(all_front.begin(), all_front.end(), solution_r) != all_front.end())
-						continue;
-
-					if (!first_dominates_second(_member_struct[solution_f], _member_struct[solution_r]))
-					{
-						
-						prob_front.push_back(solution_r);
-						all_front.push_back(solution_r);
-
-					}
-				}
-			}
-		}
-		
-		if (prob_front.size() == 0)
-		{
-			if (all_front.size() == _member_struct.size())
-				break;
-		}
-		else
-		{
-			prob_front_map[ppd_front_i] = prob_front;
-			ppd_front_i++;
-		}
-			
-		front_i++;
-		if (front_i > num_nonprob_front)
-			break;
-
-		if (all_front.size() > _member_struct.size())
-		{
-			cout << "note: nsga-ii front sorting: number of visited solutions " << all_front.size() << " >= number of members " << _member_struct.size() << endl;
-			/*cout << "q_front:" << endl;
-			for (auto& f : q_front)
-				cout << "  " << f << endl;
-			cout << "front:" << endl;
-			for (auto& f : front)
-				cout << "  " << f << endl;*/
-			throw runtime_error("error in nsga-ii front sorting: number of visited solutions > number of members");
-
-			break;
-		}
-
-	}
-
-	if (all_front.size() != _member_struct.size())
-	{
-		stringstream ss;
-		ss << "ERROR: ParetoObjectives::sort_members_by_dominance_into_fronts(): number of solutions in fronts (";
-		ss << all_front.size() << ") != member_stuct.size() (" << _member_struct.size() << "," << endl;
-		file_manager.rec_ofstream() << ss.str();
-		cout << ss.str();
-		throw runtime_error(ss.str());
-	}
-
-	return prob_front_map;
 }
 
 //compute probability of dominance
