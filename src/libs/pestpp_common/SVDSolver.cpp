@@ -1080,6 +1080,12 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		std::sort(lambda_vec.begin(), lambda_vec.end());
 		auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
 		lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
+
+		file_manager.rec_ofstream() << "DEBUG: lambda list at start of new iteration = ";
+		for (auto val : pest_scenario.get_pestpp_options().get_base_lambda_vec())
+			file_manager.rec_ofstream() << val << " ";
+		file_manager.rec_ofstream() << std::endl;
+
 		int i_update_vec = 0;
 		stringstream message;
 		stringstream prf_message;
@@ -1379,7 +1385,11 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		}
 	}
 	pest_scenario.get_pestpp_options_ptr()->set_base_lambda_vec(lambda_vec);
-	
+
+	file_manager.rec_ofstream() << "DEBUG: lambda list after extend = ";
+	for (auto val : pest_scenario.get_pestpp_options().get_base_lambda_vec())
+		file_manager.rec_ofstream() << val << " ";
+	file_manager.rec_ofstream() << std::endl;
 	return best_upgrade_run;
 }
 
