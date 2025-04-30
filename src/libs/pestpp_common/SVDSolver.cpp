@@ -1075,7 +1075,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		num_lamb_runs++; 
 		run_manager.update_run(run_id, base_model_pars, base_run.get_obs());
 		//Marquardt Lambda Update Vector
-		vector<double> lambda_vec = base_lambda_vec;
+		vector<double> lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();
 		
 		std::sort(lambda_vec.begin(), lambda_vec.end());
 		auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
