@@ -1137,6 +1137,8 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			Parameters del_numeric_pars = new_numeric_pars - base_numeric_pars;
 			for (double i_scale : lambda_scale_vec)
 			{
+				if (i_scale == 1.0) // skip scale == 1 as we run the normal length anyway
+					continue;
 				Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
 				
 				Parameters scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
@@ -1283,7 +1285,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 
 			auto last_lambda = lambda_vec.back();
 			auto first_lambda = lambda_vec.front();
-
+			file_manager.rec_ofstream() << "Checking to see if best lambda is at the edge" << std::endl;
 			double lambda_spacing_factor = 10.0; // doing powers of 10 for now
 			bool extended = false;
 
