@@ -1351,7 +1351,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 	// Check if best_lambda is at the edge of lambda_vec
 
 	// regrab lambda_vec
-	vector<double> lambda_vec = base_lambda_vec;	
+	vector<double> lambda_vec = pest_scenario.get_pestpp_options().get_base_lambda_vec();	
 	std::sort(lambda_vec.begin(), lambda_vec.end());
 	auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
 	lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
@@ -1384,6 +1384,7 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			file_manager.rec_ofstream() << "*** Extending lambda_vec: added smaller lambda " << new_lambda << std::endl;
 		}
 	}
+	std::sort(lambda_vec.begin(), lambda_vec.end());
 	pest_scenario.get_pestpp_options_ptr()->set_base_lambda_vec(lambda_vec);
 
 	file_manager.rec_ofstream() << "DEBUG: lambda list after extend = ";
