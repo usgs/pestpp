@@ -1137,8 +1137,6 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 			Parameters del_numeric_pars = new_numeric_pars - base_numeric_pars;
 			for (double i_scale : lambda_scale_vec)
 			{
-				if (i_scale >= 1.0)
-					continue;
 				Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
 				
 				Parameters scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
@@ -1170,39 +1168,6 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 		file_manager.close_file("fpr");
 		RestartController::write_upgrade_runs_built(fout_restart);
 
-		// After finding best_lambda at end of iteration_upgrd()
-		// Insert this logic just before returning best_upgrade_run
-
-		// Check if best_lambda is at the edge of lambda_vec
-		auto last_lambda = lambda_vec.back();
-		auto first_lambda = lambda_vec.front();
-
-		double lambda_spacing_factor = 10.0; // doing powers of 10 for now
-		bool extended = false;
-
-		if (best_lambda == last_lambda)
-		{
-			// Add a new larger lambda
-			double new_lambda = last_lambda * lambda_spacing_factor;
-			if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
-			{
-				lambda_vec.push_back(new_lambda);
-				extended = true;
-				file_manager.rec_ofstream() << "*** Extending lambda_vec: added larger lambda " << new_lambda << std::endl;
-			}
-		}
-		else if (best_lambda == first_lambda)
-		{
-			// Add a new smaller lambda
-			double new_lambda = first_lambda / lambda_spacing_factor;
-			if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
-			{
-				lambda_vec.push_back(new_lambda);
-				extended = true;
-				file_manager.rec_ofstream() << "*** Extending lambda_vec: added smaller lambda " << new_lambda << std::endl;
-			}
-		}
-		pest_scenario.get_pestpp_options_ptr()->set_base_lambda_vec(lambda_vec);
 	}
 
 	
@@ -1307,6 +1272,44 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 				best_upgrade_run = upgrade_run;
 				best_lambda = i_lambda;
 			}
+
+			// Check if best_lambda is at the edge of lambda_vec
+
+			// regrab lambda_vec
+			vector<double> lambda_vec = base_lambda_vec;	
+			std::sort(lambda_vec.begin(), lambda_vec.end());
+			auto iter = std::unique(lambda_vec.begin(), lambda_vec.end());
+			lambda_vec.resize(std::distance(lambda_vec.begin(), iter));
+
+			auto last_lambda = lambda_vec.back();
+			auto first_lambda = lambda_vec.front();
+
+			double lambda_spacing_factor = 10.0; // doing powers of 10 for now
+			bool extended = false;
+
+			if (best_lambda == last_lambda)
+			{
+				// Add a new larger lambda
+				double new_lambda = last_lambda * lambda_spacing_factor;
+				if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
+				{
+					lambda_vec.push_back(new_lambda);
+					extended = true;
+					file_manager.rec_ofstream() << "*** Extending lambda_vec: added larger lambda " << new_lambda << std::endl;
+				}
+			}
+			else if (best_lambda == first_lambda)
+			{
+				// Add a new smaller lambda
+				double new_lambda = first_lambda / lambda_spacing_factor;
+				if (std::find(lambda_vec.begin(), lambda_vec.end(), new_lambda) == lambda_vec.end())
+				{
+					lambda_vec.push_back(new_lambda);
+					extended = true;
+					file_manager.rec_ofstream() << "*** Extending lambda_vec: added smaller lambda " << new_lambda << std::endl;
+				}
+			}
+			pest_scenario.get_pestpp_options_ptr()->set_base_lambda_vec(lambda_vec);
 		}
 		else
 		{
