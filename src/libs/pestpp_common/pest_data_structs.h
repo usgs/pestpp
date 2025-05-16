@@ -497,9 +497,6 @@ public:
 
     bool get_save_dense() const {return save_dense; }
     void set_save_dense(bool _flag) {save_dense = _flag;}
-
-
-
 	int get_ies_num_threads() const { return ies_num_threads; }
 	void set_ies_num_threads(int _threads) { ies_num_threads = _threads; }
 
@@ -556,6 +553,8 @@ public:
     vector<double> get_ies_reinflate_factor() const {return ies_reinflate_factor;}
     void set_ies_aal_indicator_pars(vector<string> pars)  { ies_aal_indicator_pars = pars;}
     vector<string> get_ies_aal_indicator_pars() const {return ies_aal_indicator_pars;}
+    void set_ies_run_realname(string name) {ies_run_realname = name;}
+    string get_ies_run_realname() const {return ies_run_realname;}
 
     string get_gsa_method() const { return gsa_method; }
 	void set_gsa_method(string _m) { gsa_method = _m; }
@@ -842,6 +841,7 @@ private:
     vector<double> ies_reinflate_factor;
     bool ies_updatebyreals;
     vector<string> ies_aal_indicator_pars;
+    string ies_run_realname;
 
 
 

@@ -1231,6 +1231,13 @@ bool PestppOptions::assign_ies_value_by_key(const string& key, const string& val
         return true;
     }
 
+    else if (key == "IES_RUN_REALNAME")
+    {
+        ies_run_realname = value;
+        return true;
+
+    }
+
 
 
     return false;
@@ -1897,6 +1904,7 @@ void PestppOptions::summary(ostream& os) const
     for (auto v : ies_aal_indicator_pars)
         os << v << ",";
     os << endl;
+    os << "ies_run_realname: " << ies_run_realname;
 
     os << endl << "pestpp-sen options: " << endl;
 	os << "gsa_method: " << gsa_method << endl;
@@ -2083,6 +2091,7 @@ void PestppOptions::set_defaults()
     set_ies_phi_factors_by_real(false);
     set_ies_n_iter_reinflate(vector < int > {0});
     set_ies_reinflate_factor(vector < double > {1.0});
+    set_ies_run_realname("");
 
     set_ies_updatebyreals(false);
     set_save_dense(false);
