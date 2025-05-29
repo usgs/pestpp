@@ -105,6 +105,9 @@ void IterEnsembleSmoother::iterate_2_solution()
             {
                 current_n_iter_reinflate = abs(n_iter_reinflate[n_iter_reinflate_idx]);
             }
+            //now report again to get the new phi sequence after reinflation
+            should_terminate(current_n_iter_reinflate);
+
         }
 
 		else if (should_terminate(current_n_iter_reinflate))

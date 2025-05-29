@@ -1,13 +1,13 @@
 
  <img src="./media/image1.png" style="width:6.26806in;height:1.68194in" alt="A close up of a purple sign Description automatically generated" />
 
-# <a id='s1' />Version 5.2.18
+# <a id='s1' />Version 5.2.19
 
 <img src="./media/image2.png" style="width:6.26806in;height:3.05972in" />
 
 PEST++ Development Team
 
-April 2025
+May 2025
 
 # <a id='s2' />Acknowledgements
 
@@ -70,7 +70,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # Table of Contents
 
-- [Version 5.2.18](#s1)
+- [Version 5.2.19](#s1)
 - [Acknowledgements](#s2)
 - [Preface](#s3)
 - [License](#s4)
@@ -2516,6 +2516,10 @@ In some cases, users may want to retrieve one or more model output files from th
 **panther_poll_interval**
 Once a panther agent is initialized, it will start to try to connect to the master instance. On some operating systems, this act of trying connect actually results in a OS-level “file handle” being opened, which, if substantial time passes, can accumulate to a large number of open file handles. To prevent this, the panther agents will “sleep” for a given number of seconds before trying to connect to the master again. The length of time the agent sleeps is controlled by the *panther_poll_interval*, which an interger value of seconds to sleep. By default, this value is 1 second.
 
+**panther_master_timeout_milliseconds**
+**In**
+**panther_master_echo_interval_milliseconds**
+**In**
 ## <a id='s9-4' />5.4 Run Book-Keeping Files
 
 After running a program of the PEST++ suite, you may notice a number of (possibly large) files in the folder from which it was run. These are *case.rns*, *case.rnu* and *case.rnj*, where *case* is the filename base of the PEST control file. These are binary files that are used for temporary storage of “raw” run results. They contain information that assists in parallel run management, and that facilitates restart of an interrupted PEST++ run – if PESTPP-XXX exits gracefully, these files are removed. These run storage files can be read and processed using pyEMU.
@@ -3802,6 +3806,8 @@ Note that, as described above, PESTPP-IES also ceases execution if, during any p
 
 Special values of NOPTMAX can instigate special PESTPP-IES behaviour. If NOPTMAX is set to -1, PESTPP-IES does not upgrade random parameter sets which comprise an ensemble. It simply runs the model once for each parameter set, records model output values, and then ceases execution, thereby effective undertaking unconstrained Monte Carlo analysis. If NOPTMAX is set to zero, execution of PESTPP-IES is even shorter. It evaluates only the parameter values listed in the control file­ – replicating the behaviour of PESTPP-GLM and PEST. If NOPTMAX is supplied as -2, then PESTPP-IES will calculate the mean value of the initial parameter ensemble, evaluate it (by running the model once) and record the results.
 
+In many cases, users may want to run a single realization from an existing parameter ensemble file to have access to the underlying model input and output files. Historically, this involved several steps, including extracting the realization, setting the PARVAL1 quantity in the control file to the realization values, setting NOPTMAX = 0, saving the control file, and then running the PESTPP-IES. Clearly, this workflow provides many opportunities for hardship. To make this common set of steps easier and less prone to error, users can *ies_run_realname* to the name of a realization in the user-supplied parameter ensemble (through the *ies_parameter_ensemble* option), and set NOPTMAX = -2. When PESTPP-IES is run, it will extract the named realization and execute the model run process using this realization, record results and quit.
+
 PESTPP-IES reports several different objective functions, namely “composite”, “measurement”, “regularization”, and “actual”, depending on the mode of operation. The “measurement” objective function is calculated using the current simulated outputs and the observations values in the pest control combined with realizations of additive measurement noise (described elsewhere in this manual). The measurement objective function is calculated using the weights in the pest control file (unless an *obscov* is supplied, described elsewhere, or unless a user-generated observations plus noise ensemble is supplied, described elsewhere). Note that if the *ies_no_noise* option is activated, the “measurement” and “actual” objective functions are the same and only the “actual” is reported to the screen and record file.
 
 The “regularization” objective function is calculated as parameter value deviations from the initial (stochastic) realized values–this objective function is scaled by the diagonal of the prior parameter covariance matrix. Note the “regularization” objective function is only used and reported if the value of *ies_reg_factor* is supplied with a value greater than 0.0.
@@ -4188,6 +4194,11 @@ Note also that the number of control variables may change with time. Refer to th
 <td><em>save_dense</em></td>
 <td>bool</td>
 <td>Flag to save ensembles in a “dense” binary format, which in constrast to the sparse binary format of jcb/jco. Ensemble files will be given a “.bin” extension. These files can be read by PESTPP-IES (for restarting) and by pyEMU. This option only applies of <em>save_</em>binary is True. Default is False</td>
+</tr>
+<tr class="even">
+<td><em>ies_run_realname</em></td>
+<td>Text</td>
+<td>The name of a parameter realization in an external parameter ensemble file to run. Only used if noptmax = -2.</td>
 </tr>
 </tbody>
 </table>

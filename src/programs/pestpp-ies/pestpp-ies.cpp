@@ -231,7 +231,10 @@ int main(int argc, char* argv[])
                     pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
                     pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
                     pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
-                    pest_scenario.get_pestpp_options().get_panther_echo());
+                    pest_scenario.get_pestpp_options().get_panther_echo(),
+                    vector<string>{}, vector<string>{},
+                    pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
+                    pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds());
         } else {
             performance_log.log_event("starting basic model IO error checking");
             cout << "checking model IO files...";
