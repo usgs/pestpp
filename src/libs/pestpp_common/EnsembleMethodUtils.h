@@ -449,6 +449,7 @@ protected:
 	bool oe_drawn, pe_drawn;
     bool reinflate_to_minphi_real;
     ObservationInfo org_obs_info;
+    string dense_file_ext = ".bin";
 
 
 	bool solve_glm(int cycle = NetPackage::NULL_DA_CYCLE);
