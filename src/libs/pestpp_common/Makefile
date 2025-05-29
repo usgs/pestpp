@@ -33,7 +33,8 @@ OBJECTS := \
     linear_analysis\
     covariance \
     constraints \
-    EnsembleMethodUtils
+    EnsembleMethodUtils \
+    sequential_lp
 OBJECTS := $(addsuffix $(OBJ_EXT),$(OBJECTS))
 
 

@@ -196,14 +196,14 @@ int main(int argc, char* argv[])
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
 		pest_scenario.set_default_dynreg();
-#ifndef _DEBUG
+#ifndef _NDEBUG
 		try {
 #endif
 			performance_log.log_event("starting to process control file");
 			pest_scenario.process_ctl_file(file_manager.open_ifile_ext("pst"), file_manager.build_filename("pst"),fout_rec);
 			file_manager.close_file("pst");
 			performance_log.log_event("finished processing control file");
-#ifndef _DEBUG
+#ifndef _NDEBUG
 		}
 		catch (exception &e)
 		{
@@ -302,7 +302,10 @@ int main(int argc, char* argv[])
 					pest_scenario.get_pestpp_options().get_overdue_reched_fac(),
 					pest_scenario.get_pestpp_options().get_overdue_giveup_fac(),
 					pest_scenario.get_pestpp_options().get_overdue_giveup_minutes(),
-					pest_scenario.get_pestpp_options().get_panther_echo());
+					pest_scenario.get_pestpp_options().get_panther_echo(),
+                    vector<string>{}, vector<string>{},
+                    pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
+                    pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds());
 			}
 		}
 		

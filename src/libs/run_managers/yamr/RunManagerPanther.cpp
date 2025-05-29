@@ -52,7 +52,8 @@ const int RunManagerPanther::MAX_PING_INTERVAL_SECS = 120;				// Ping each slave
 const int RunManagerPanther::MAX_CONCURRENT_RUNS_LOWER_LIMIT = 1;
 const int RunManagerPanther::IDLE_THREAD_SIGNAL_TIMEOUT_SECS = 10;  // Allow up to 10s for the run_idle_async() thread to acknowledge signals (pause idling, terminate)
 const double RunManagerPanther::MIN_AVGRUNMINS_FOR_KILL = 0.08; //minimum avg runtime to try to kill and/or resched runs
-const int RunManagerPanther::SECONDS_BETWEEN_ECHOS = 1;
+//const int RunManagerPanther::MILLISECONDS_BETWEEN_ECHOS = 10;
+//const int RunManagerPanther::TIMEOUT_MILLISECONDS = 10;
 
 AgentInfoRec::AgentInfoRec(int _socket_fd)
 {
@@ -273,14 +274,15 @@ int AgentInfoRec::seconds_since_last_ping_time() const
 
 RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& _port, ofstream& _f_rmr, int _max_n_failure,
 	double _overdue_reched_fac, double _overdue_giveup_fac, double _overdue_giveup_minutes, bool _should_echo, const vector<string>& par_names,
-	const vector<string>& obs_names)
+	const vector<string>& obs_names,int _timeout_milliseconds,int _echo_interval_milliseconds)
 
 	: RunManagerAbstract(vector<string>(), vector<string>(), vector<string>(),
 		vector<string>(), vector<string>(), stor_filename, _max_n_failure),
 	overdue_reched_fac(_overdue_reched_fac), overdue_giveup_fac(_overdue_giveup_fac),
 	port(_port), f_rmr(_f_rmr), n_no_ops(0), overdue_giveup_minutes(_overdue_giveup_minutes),
 	terminate_idle_thread(false), currently_idle(true), idling(false), idle_thread_finished(false),
-	idle_thread(nullptr), should_echo(_should_echo),nftx(0)
+	idle_thread(nullptr), should_echo(_should_echo),nftx(0),timeout_milliseconds(_timeout_milliseconds),
+    echo_interval_milliseconds(_echo_interval_milliseconds)
 {
 
 	const char * t =
@@ -562,7 +564,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		}
 
 	}
-    w_sleep(10);
+    w_sleep(timeout_milliseconds);
 	n_no_ops = 0;
     while (true)
     {
@@ -728,7 +730,7 @@ void RunManagerPanther::run_idle_async()
 				idling.set(false);
 
 				// Sleep 1s to avoid spinlock
-				w_sleep(10);
+				w_sleep(timeout_milliseconds);
 				continue;
 			}
 
@@ -818,7 +820,7 @@ void RunManagerPanther::end_run_idle_async()
 		}
 		
 		// Sleep to avoid spinlock
-		w_sleep(10);
+		w_sleep(timeout_milliseconds);
 	}
 
 	report("Stopped idle ping thread, as Panther manager is shutting down.", false);
@@ -859,7 +861,7 @@ void RunManagerPanther::pause_idle()
 		}
 		
 		// Sleep to avoid spinlock
-		w_sleep(10);
+		w_sleep(timeout_milliseconds);
 	}
 
 	report("Panther idle ping thread paused prior to scheduling runs.", false);
@@ -1008,7 +1010,7 @@ void RunManagerPanther::close_agents()
 			sock_nums.push_back(si.first);
 		for (auto si : sock_nums)
 			close_agent(si);
-		w_sleep(10);
+		w_sleep(timeout_milliseconds);
 
 	}
 }
@@ -1291,7 +1293,7 @@ void RunManagerPanther::echo()
 	if (!should_echo)
 		return;
     std::chrono::system_clock::time_point now = chrono::system_clock::now();
-    if (chrono::duration_cast<std::chrono::seconds> ( now- last_echo_time).count() < SECONDS_BETWEEN_ECHOS)
+    if (chrono::duration_cast<std::chrono::milliseconds> ( now- last_echo_time).count() < echo_interval_milliseconds)
         return;
     last_echo_time = now;
 	map<string, int> stats_map = get_agent_stats();
@@ -2143,7 +2145,7 @@ RunManagerPanther::~RunManagerPanther(void)
 	err = w_close(listener);
 	FD_CLR(listener, &master);
 	// this is needed to ensure that the first slave closes properly
-	w_sleep(10);
+	w_sleep(timeout_milliseconds);
 	for (int i = 0; i <= fdmax; i++)
 	{
 		if (FD_ISSET(i, &master))
@@ -2259,10 +2261,10 @@ void RunManagerYAMRCondor::cleanup(int cluster)
 	stringstream ss;
 	ss << "condor_rm " << cluster << " 1>cr_temp.stdout 2>cr_temp.stderr";
 	system(ss.str().c_str());
-	w_sleep(10);
+	w_sleep(1000);
 	ss.str(string());
 	ss << "condor_rm " << cluster << " -forcex 1>cr_temp.stdout 2>cr_temp.stderr";
-	w_sleep(10);
+	w_sleep(1000);
 	system(ss.str().c_str());
 	RunManagerPanther::close_agents();
 	cout << "   all agents freed " << endl << endl;
