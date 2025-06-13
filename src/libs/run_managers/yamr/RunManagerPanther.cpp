@@ -564,7 +564,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		}
 
 	}
-    w_sleep(timeout_milliseconds);
+    w_sleep(get_current_sleep_timeout_milliseconds(timeout_milliseconds));
 	n_no_ops = 0;
     while (true)
     {
@@ -730,7 +730,7 @@ void RunManagerPanther::run_idle_async()
 				idling.set(false);
 
 				// Sleep 1s to avoid spinlock
-				w_sleep(timeout_milliseconds);
+				w_sleep(get_current_sleep_timeout_milliseconds(timeout_milliseconds));
 				continue;
 			}
 
@@ -820,7 +820,7 @@ void RunManagerPanther::end_run_idle_async()
 		}
 		
 		// Sleep to avoid spinlock
-		w_sleep(timeout_milliseconds);
+		w_sleep(get_current_sleep_timeout_milliseconds(timeout_milliseconds));
 	}
 
 	report("Stopped idle ping thread, as Panther manager is shutting down.", false);
@@ -861,7 +861,7 @@ void RunManagerPanther::pause_idle()
 		}
 		
 		// Sleep to avoid spinlock
-		w_sleep(timeout_milliseconds);
+		w_sleep(get_current_sleep_timeout_milliseconds(timeout_milliseconds));
 	}
 
 	report("Panther idle ping thread paused prior to scheduling runs.", false);
@@ -881,6 +881,20 @@ void RunManagerPanther::resume_idle()
 
 	// Don't bother waiting for acknowledgement here, as none of the management code relies on it; we can happily go off and do other processing while the thread gets around to resuming idle pings
 	report("Panther idle ping thread resumed.", false);
+}
+
+int RunManagerPanther::get_current_sleep_timeout_milliseconds(const int org_timeout_milliseconds)
+{
+    if (org_timeout_milliseconds > 0)
+    {
+        return org_timeout_milliseconds;
+    }
+    double avg = get_global_runtime_minute() / 1000.0;
+    double timeout = avg / 0.1;
+    timeout = max<double>(timeout,10);
+    timeout = min<double>(timeout,500);
+    cout << timeout;
+    return timeout;
 }
 
 bool RunManagerPanther::ping(int i_sock)
@@ -1010,7 +1024,8 @@ void RunManagerPanther::close_agents()
 			sock_nums.push_back(si.first);
 		for (auto si : sock_nums)
 			close_agent(si);
-		w_sleep(timeout_milliseconds);
+
+		w_sleep(get_current_sleep_timeout_milliseconds(timeout_milliseconds));
 
 	}
 }
@@ -2145,7 +2160,7 @@ RunManagerPanther::~RunManagerPanther(void)
 	err = w_close(listener);
 	FD_CLR(listener, &master);
 	// this is needed to ensure that the first slave closes properly
-	w_sleep(timeout_milliseconds);
+	w_sleep(get_current_sleep_timeout_milliseconds(timeout_milliseconds));
 	for (int i = 0; i <= fdmax; i++)
 	{
 		if (FD_ISSET(i, &master))
