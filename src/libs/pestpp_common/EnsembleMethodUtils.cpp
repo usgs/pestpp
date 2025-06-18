@@ -9128,10 +9128,6 @@ vector<int> EnsembleMethod::get_subset_idxs(int size, int nreal_subset)
 	}
 	else
 	{
-<<<<<<< HEAD
-=======
-		//throw runtime_error("unknown 'subset_how'");
->>>>>>> a70c0880b216a379eb2b065e1feed69b570c3cab
 		throw_em_error("unknown 'subset_how'");
 	}
 
