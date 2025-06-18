@@ -363,7 +363,7 @@ ObservationInfo LinearAnalysis::glm_iter_fosm(ModelRun& optimum_run, OutputFileW
 			{
 				//cout << "WARNING: initial simulation results not available, falling back to optimum run outputs for prior forecast mean" << endl;
 				// << "WARNING: initial simulation results not available for FOSM calcs, falling back to optimum run outputs for prior forecast mean" << endl;
-				pfm.log_event("no initial sim results, using curernt run instead: " + pred_name);
+				pfm.log_event("no initial sim results, using current run instead: " + pred_name);
 				ival = fval;
 			}
 
@@ -876,7 +876,7 @@ double LinearAnalysis::prior_prediction_variance(string &pred_name)
 	pest_utils::upper_ip(pred_name);
 	map<string, Mat>::iterator p_iter = predictions.find(pred_name);
 	if (p_iter == predictions.end())
-		throw_error("linear_analysis::prior_pred_variance() error: pred:" + pred_name + " not found in predicitons");
+		throw_error("linear_analysis::prior_pred_variance() error: pred:" + pred_name + " not found in predictions");
 
 	if (p_iter->second.e_ptr()->nonZeros() == 0)
 		return 0.0;
@@ -910,7 +910,7 @@ double LinearAnalysis::posterior_prediction_variance(string &pred_name)
 	pest_utils::upper_ip(pred_name);
 	map<string, Mat>::iterator p_iter = predictions.find(pred_name);
 	if (p_iter == predictions.end())
-		throw_error("linear_analysis::prior_pred_variance() error: pred:" + pred_name + " not found in predicitons");
+		throw_error("linear_analysis::prior_pred_variance() error: pred:" + pred_name + " not found in predictions");
 	if (p_iter->second.e_ptr()->nonZeros() == 0)
 		return 0.0;
 	if (posterior.nrow() == 0) calc_posterior();

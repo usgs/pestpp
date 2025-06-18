@@ -94,7 +94,7 @@ public:
 
 	~LinearAnalysis();
 
-	//some convience methods for PEST++ integration
+	//some convenience methods for PEST++ integration
 	void write_par_credible_range(ofstream &fout, string sum_filename, ParameterInfo parinfo,
 		Parameters init_pars, Parameters opt_pars,vector<string> ordered_names);
 	void write_pred_credible_range(ofstream &fout, string sum_filename, map<string,pair<double,double>> init_final_pred_values);

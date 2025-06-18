@@ -320,7 +320,7 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	struct addrinfo hints;
 	struct addrinfo* servinfo;
 	memset(&hints, 0, sizeof hints);
-	//Use this for IPv4 aand IPv6
+	//Use this for IPv4 and IPv6
 	//hints.ai_family = AF_UNSPEC;
 	//Use this just for IPv4;
 	hints.ai_family = AF_INET;
@@ -448,7 +448,7 @@ void RunManagerPanther::update_run(int run_id, const Parameters &pars, const Obs
 {
 
 	file_stor.update_run(run_id, pars, obs);
-	// erase any wating runs with this id
+	// erase any waiting runs with this id
 	for (auto it_run = waiting_runs.begin(); it_run != waiting_runs.end();)
 	{
 		if (*it_run == run_id)
@@ -491,7 +491,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 	cout << "    running model " << num_runs << " times" << endl;
 	f_rmr << "running model " << num_runs << " times" << endl;
 	cout << "    starting at " << pest_utils::get_time_string() << endl;
-	if (agent_info_set.size() == 0) // first entry is the listener, slave apears after this
+	if (agent_info_set.size() == 0) // first entry is the listener, slave appears after this
 	{
 		cout << endl << "    waiting for agents to appear..." << endl << endl;
 		//f_rmr << endl << "    waiting for agents to appear..." << endl << endl;
@@ -539,7 +539,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		//schedule runs on available nodes
 		schedule_runs();
 		echo();
-		// get and process incomming messages
+		// get and process incoming messages
 		if (!listen())
 		{
 			++n_no_ops;
@@ -1146,7 +1146,7 @@ void RunManagerPanther::schedule_runs()
 						// kill the overdue runs
 						kill_runs(run_id, true, "overdue");
 						// reschedule runs as we still haven't reach the max failure threshold
-						// and there are not concurrent runs for this id becuse we just killed all of them
+						// and there are not concurrent runs for this id because we just killed all of them
 						should_schedule = true;
 						model_runs_timed_out += overdue_kill_runs_vec.size();
 					}

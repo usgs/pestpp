@@ -101,7 +101,7 @@ void sequentialLP::initial_report()
 		f_rec << "-->skipping final, optimal model run" << endl;
 		if ((!bj.empty()) && (pest_scenario.get_control_info().noptmax == 1))
 		{
-			f_rec << "-->super secrect option to skip final run and upgrade run activated..." << endl;
+			f_rec << "-->super secret option to skip final run and upgrade run activated..." << endl;
 			super_secret_option = true;
 		}
 
@@ -1166,7 +1166,7 @@ void sequentialLP::iter_presolve()
 		if (!success)
 		{
 			const set<string> failed = jco.get_failed_parameter_names();
-			throw_sequentialLP_error("failed to calc derviatives for the following decision vars: ", failed);
+			throw_sequentialLP_error("failed to calc derivatives for the following decision vars: ", failed);
 		}
 
 		if ((constraints.should_update_chance(slp_iter-1)) && (!constraints.get_use_fosm()))

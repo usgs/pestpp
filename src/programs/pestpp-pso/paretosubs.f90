@@ -553,7 +553,7 @@ subroutine repgrid(repred)
 !       if there are no more particles set for removal, make all particles susceptible to removal.
 !       this can happen if the hypercube with the maximum number of particles contains fewer particles
 !       --  than need to be removed in order to get repcnt down to nrep; or, if there are the same number
-!       --  of particles in all hypercubes conatining particles, which most likely happens when there 
+!       --  of particles in all hypercubes containing particles, which most likely happens when there 
 !       --  are a small number of hypercubes containing particles and each hypercube only contains a 
 !       --  single particle.
         !
@@ -564,7 +564,7 @@ subroutine repgrid(repred)
 !       set rmcnt equal to the number of particles in the repository minus the minimum objective particles
         rmcnt = repcnt - nptogp
         !
-!       prevent mimimum objective particles from being susceptible to removal
+!       prevent minimum objective particles from being susceptible to removal
         do ipto=1,nptogp
           reprm(repmin(ipto)) = 0
         end do
