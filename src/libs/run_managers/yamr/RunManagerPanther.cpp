@@ -893,7 +893,7 @@ int RunManagerPanther::get_current_sleep_timeout_milliseconds(const int org_time
     double timeout = avg / 0.1;
     timeout = max<double>(timeout,10);
     timeout = min<double>(timeout,500);
-    cout << timeout;
+    //cout << timeout;
     return timeout;
 }
 
