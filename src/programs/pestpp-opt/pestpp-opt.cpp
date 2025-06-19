@@ -192,7 +192,7 @@ int main(int argc, char* argv[])
 			restart_ctl.get_restart_option() = RestartController::RestartOption::REUSE_JACOBIAN;
 		}
 
-		//Initialize OutputFileWriter to hadle IO of suplementary files (.par, .par, .svd)
+		//Initialize OutputFileWriter to handle IO of supplementary files (.par, .par, .svd)
 		//bool save_eign = pest_scenario.get_svd_info().eigwrite > 0;	=
 		OutputFileWriter output_file_writer(file_manager, pest_scenario,false);
 		
@@ -302,7 +302,7 @@ int main(int argc, char* argv[])
 		ModelRun optimum_run(&obj_func, pest_scenario.get_ctl_observations());
 
 
-		// if noptmax=0 make one run with the intital parameters
+		// if noptmax=0 make one run with the initial parameters
 		if (pest_scenario.get_control_info().noptmax == 0) {
 			Parameters init_model_pars = base_trans_seq.ctl2model_cp(cur_ctl_parameters);
 			optimum_run.set_ctl_parameters(init_model_pars);
@@ -353,7 +353,7 @@ int main(int argc, char* argv[])
 		
 		else
 		{
-			//Define model Run for Base Parameters (uses base parameter tranformations)
+			//Define model Run for Base Parameters (uses base parameter transformations)
 			ModelRun cur_run(&obj_func, pest_scenario.get_ctl_observations());
 
 			cur_run.set_ctl_parameters(cur_ctl_parameters);

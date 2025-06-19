@@ -46,7 +46,7 @@ void RunStorage::reset(const vector<string> &_par_names, const vector<string> &_
 	obs_names = _obs_names;
 	// a file needs to exist before it can be opened it with read and write
 	// permission.   So open it with write permission to crteate it, close
-	// and then reopen it with read and write permisssion.
+	// and then reopen it with read and write permission.
 	if (_filename.size() > 0)
 	{
 		filename = _filename;
@@ -88,7 +88,7 @@ void RunStorage::reset(const vector<string> &_par_names, const vector<string> &_
 	// calculate the number of bytes required to store a model run
 	run_par_byte_size = par_names.size() * sizeof(double);
 	run_data_byte_size = run_par_byte_size + obs_names.size() * sizeof(double);
-	//compute the amount of memeory required to store a single model run
+	//compute the amount of memory required to store a single model run
 	// run_byte_size = size of run_status + size of info_txt + size of info_value + size of parameter oand observation data
 	run_byte_size =  sizeof(std::int8_t) + info_txt_length*sizeof(char) * sizeof(double) + run_data_byte_size;
 	std::int64_t  run_size_64 = run_byte_size;
@@ -190,7 +190,7 @@ void RunStorage::init_restart(const std::string &_filename)
 		buf_stream.write(reinterpret_cast<char*>(pars_vec.data()), pars_vec.size() * sizeof(double));
 		buf_stream.write(reinterpret_cast<char*>(obs_vec.data()), obs_vec.size() * sizeof(double));
 		buf_stream.flush();
-		//reset flag for buffer at end of file to 0 to signal it is no longer relavent
+		//reset flag for buffer at end of file to 0 to signal it is no longer relevant
 		buf_status = 0;
 		buf_stream.seekp(get_stream_pos(end_of_runs), ios_base::beg);
 		buf_stream.write(reinterpret_cast<char*>(&buf_status), sizeof(buf_status));
@@ -336,7 +336,7 @@ void RunStorage::copy(const RunStorage &rhs_rs)
 	// std::ofstream::trunc will delete the file if it already exist
 	// a file needs to exist before it can be opened it with read and write
 	// permission.   So open it with write permission to create it, close
-	// and then reopen it with read and write permisssion.
+	// and then reopen it with read and write permission.
 	buf_stream.open(filename.c_str(), ios_base::out | ios_base::binary | std::ofstream::trunc);
     if (!buf_stream)
     {
@@ -369,7 +369,7 @@ void RunStorage::copy(const RunStorage &rhs_rs)
 void RunStorage::update_run(int run_id, const Parameters &pars, const Observations &obs)
 {
 
-	//set run status flage to complete
+	//set run status flag to complete
 	std::int8_t r_status = 1;
 	check_rec_id(run_id);
 	vector<double> par_data(pars.get_data_vec(par_names));
@@ -396,7 +396,7 @@ void RunStorage::update_run(int run_id, const Parameters &pars, const Observatio
 	buf_stream.write(reinterpret_cast<char*>(par_data.data()), par_data.size() * sizeof(double));
 	buf_stream.write(reinterpret_cast<char*>(obs_data.data()), obs_data.size() * sizeof(double));
 	buf_stream.flush();
-	//reset flag for buffer at end of file to 0 to signal it is no longer relavent
+	//reset flag for buffer at end of file to 0 to signal it is no longer relevant
 	buf_status = 0;
 	buf_stream.seekp(get_stream_pos(end_of_runs), ios_base::beg);
 	buf_stream.write(reinterpret_cast<char*>(&buf_status), sizeof(buf_status));
@@ -411,7 +411,7 @@ void RunStorage::update_run(int run_id, const Parameters &pars, const Observatio
 void RunStorage::update_run(int run_id, const Observations &obs)
 {
 
-	//set run status flage to complete
+	//set run status flag to complete
 	std::int8_t r_status = 1;
 	check_rec_id(run_id);
 	vector<double> obs_data(obs.get_data_vec(obs_names));
@@ -442,7 +442,7 @@ void RunStorage::update_run(int run_id, const Observations &obs)
 	buf_stream.seekp(n_pars * sizeof(double), ios_base::cur);
 	buf_stream.write(reinterpret_cast<char*>(obs_data.data()), obs_data.size() * sizeof(double));
 	buf_stream.flush();
-	//reset flag for buffer at end of file to 0 to signal it is no longer relavent
+	//reset flag for buffer at end of file to 0 to signal it is no longer relevant
 	buf_status = 0;
 	buf_stream.seekp(get_stream_pos(end_of_runs), ios_base::beg);
 	buf_stream.write(reinterpret_cast<char*>(&buf_status), sizeof(buf_status));
@@ -456,7 +456,7 @@ void RunStorage::update_run(int run_id, const Observations &obs)
 void RunStorage::update_run(int run_id, const vector<char> serial_data)
 {
 
-	//set run status flage to complete
+	//set run status flag to complete
 	std::int8_t r_status = 1;
 	check_rec_size(serial_data);
 	check_rec_id(run_id);
@@ -480,7 +480,7 @@ void RunStorage::update_run(int run_id, const vector<char> serial_data)
 	buf_stream.seekp(sizeof(char)*info_txt_length+sizeof(double), ios_base::cur);
 	buf_stream.write(serial_data.data(), serial_data.size());
 	buf_stream.flush();
-	//reset flag for buffer at end of file to 0 to signal it is no longer relavent
+	//reset flag for buffer at end of file to 0 to signal it is no longer relevant
 	buf_status = 0;
 	buf_stream.seekp(get_stream_pos(end_of_runs), ios_base::beg);
 	buf_stream.write(reinterpret_cast<char*>(&buf_status), sizeof(buf_status));

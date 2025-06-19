@@ -116,7 +116,6 @@ public:
 	~RunManagerPanther(void);
 	int get_n_waiting_runs() { return waiting_runs.size(); }
 	void close_agents();
-	
 
 private:
 	std::string port;
@@ -175,8 +174,9 @@ private:
 	void end_run_idle_async();
 	void pause_idle();
 	void resume_idle();
+    int get_current_sleep_timeout_milliseconds(const int org_timeout_milliseconds);
 
-	std::ofstream &f_rmr;
+    std::ofstream &f_rmr;
 	bool listen(pest_utils::thread_flag* terminate = nullptr);
 	bool process_model_run(int sock_id, NetPackage &net_pack);
 	void process_message(int i);
