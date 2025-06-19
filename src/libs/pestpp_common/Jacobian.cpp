@@ -174,7 +174,7 @@ unordered_map<string, int> Jacobian::get_obs2row_map() const
 Eigen::SparseMatrix<double> Jacobian::get_matrix(const vector<string> &obs_names, const vector<string> & par_names, bool forgive_missing, int n_cols) const
 {
     /* the n_cols arg is so you can reserve a sparse matrix with columns that are all zeros - this is for the LP solver in pestpp-opt when you have
-     * external dec vars - they wont be in the Jacobian instance but they need to be in the LP solution matrix.
+     * external dec vars - they won't be in the Jacobian instance but they need to be in the LP solution matrix.
      */
     stringstream ss;
 	int n_rows = obs_names.size();
@@ -314,7 +314,7 @@ bool Jacobian::build_runs(Parameters &ctl_pars, Observations &ctl_obs, vector<st
 		else
 		{
 			debug_msg("fail");
-			//cout << endl << " warning: failed to compute parameter deriviative for " << ipar_name << endl;
+			//cout << endl << " warning: failed to compute parameter derivative for " << ipar_name << endl;
 			file_manager.rec_ofstream() << " warning: failed to compute parameter derivative for " << ipar_name << endl;
 			failed_parameter_names.insert(ipar_name);
 		}
@@ -374,7 +374,7 @@ bool Jacobian::process_runs(ParamTransformSeq &par_transform,
 		++i_run;
 	}
 
-	// process the parameter pertubation runs
+	// process the parameter perturbation runs
 	int nruns = run_manager.get_nruns();
 	int icol = 0;
 	int r_status;
@@ -528,7 +528,7 @@ std::vector<Eigen::Triplet<double> >  Jacobian::calc_derivative(const string &nu
 	vector<double> sen_vec;
 	for (auto &iobs_name : base_sim_obs_names)
 	{
-		// Check if this is not prior infomation
+		// Check if this is not prior information
 		if (prior_info.find(iobs_name) == prior_info.end())
 		{
 			//Apply Split threshold on derivative if applicable
@@ -603,7 +603,7 @@ std::vector<Eigen::Triplet<double> >  Jacobian::calc_derivative(const string &nu
 		}
 		else
 		{
-			// Prior Information allways calculated using outer model runs even for central difference
+			// Prior Information always calculated using outer model runs even for central difference
 			del_par = run_last.numeric_derivative_par - run_first.numeric_derivative_par;
 			double del_prior_info;
 
@@ -1013,7 +1013,7 @@ void Jacobian::report_errors(std::ostream &fout)
 		{
 			fout << right << "  " << setw(12) << ipar << endl;
 		}
-		cout << "WARNING:  " << failed_parameter_names.size() << " parameter pertubation runs failed while computing jacobian, see rec file for listing" << endl;
+		cout << "WARNING:  " << failed_parameter_names.size() << " parameter perturbation runs failed while computing jacobian, see rec file for listing" << endl;
 	}
 
 }

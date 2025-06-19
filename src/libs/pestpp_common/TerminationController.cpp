@@ -167,7 +167,7 @@ void TerminationController::termination_summary(std::ostream &fout)
 	}
 	else
 	{
-		fout << "  NPHISTP lowest regularization PHI componets:" << endl;
+		fout << "  NPHISTP lowest regularization PHI components:" << endl;
 	}
 
 	for (const auto &it : lowest_phi)

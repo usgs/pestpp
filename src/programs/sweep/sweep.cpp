@@ -438,7 +438,7 @@ int main(int argc, char* argv[])
 #endif
 		string version = PESTPP_VERSION;
 		cout << endl << endl;
-		cout << "             pestpp-swp - a parameteric sweep utility, version " << version << endl;
+		cout << "             pestpp-swp - a parametric sweep utility, version " << version << endl;
 		cout << "                     for PEST(++) datasets " << endl << endl;
 		cout << "                 by the PEST++ development team" << endl << endl << endl;
 
@@ -462,7 +462,7 @@ int main(int argc, char* argv[])
 		int flag = remove(rns_file.c_str());
 		//w_sleep(2000);
 		//by default use the serial run manager.  This will be changed later if another
-		//run manger is specified on the command line.
+		//run manager is specified on the command line.
 		
 		if (cmdline.runmanagertype == CmdLine::RunManagerType::EXTERNAL)
 		{
@@ -540,7 +540,7 @@ int main(int argc, char* argv[])
         string start_string = get_time_string();
 		if (!restart_flag || save_restart_rec_header)
 		{
-			fout_rec << "             pestpp-swp.exe - a parameteric sweep utility" << endl << "for PEST(++) datasets " << endl << endl;
+			fout_rec << "             pestpp-swp.exe - a parametric sweep utility" << endl << "for PEST(++) datasets " << endl << endl;
 			fout_rec << "                 by the PEST++ development team" << endl << endl << endl;
 			fout_rec << endl;
 			fout_rec << endl << endl << "version: " << version << endl;

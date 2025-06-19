@@ -843,7 +843,7 @@ void OutputFileWriter::append_sen(std::ostream &fout, int iter_no, const Jacobia
 	Parameters ctl_pars = par_transform.numeric2ctl_cp(pars);
 	if (pars.size() == 0)
 	{
-		fout << "parameter values are not avaialble to compute CSS" << endl;
+		fout << "parameter values are not available to compute CSS" << endl;
 		fout << endl << endl;
 	}
 	else
@@ -979,7 +979,7 @@ void OutputFileWriter::write_jco(bool isBaseIter, string ext, Jacobian &jco)
 	if (jco.get_matrix_ptr()->nonZeros() == 0)
 	{
 		stringstream ss;
-		ss << "WARNING: jacobian matrix has no non-zeros - the parameter pertubations " << endl;
+		ss << "WARNING: jacobian matrix has no non-zeros - the parameter perturbations " << endl;
 		ss << "         have no effect on the control file observations." << endl;
 		ss << "         This usually means something is not setup correctly." << endl;
 		cout << ss.str();
