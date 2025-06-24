@@ -84,7 +84,7 @@ public:
 	ParameterGroupRec* get_group_by_groupname_4_mod(const string &group_name) { return groups.at(group_name); }
 	ParameterGroupRec* get_group_rec_ptr_4_mod(const string &par_name);
 	string get_group_name(const string &par_name) const;
-	const ParameterGroupInfo& operator=(const ParameterGroupInfo &rhs);
+	//const ParameterGroupInfo& operator=(const ParameterGroupInfo &rhs);
 	bool have_switch_derivative() const;
 	vector<string> get_group_names() const;
 	void par_erase(const string& par_name) { parameter2group.erase(par_name); }

@@ -150,35 +150,35 @@ void ParameterGroupInfo::insert_parameter_link(const string &parameter_name, con
 
 }
 
-const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo &rhs)
-{
-	unordered_map<ParameterGroupRec*, ParameterGroupRec*> old2new;
-	unordered_map<string, ParameterGroupRec*>::const_iterator it(rhs.groups.begin());
-	unordered_map<string, ParameterGroupRec*>::const_iterator end(rhs.groups.end());
-	for (; it != end; ++it) {
-		ParameterGroupRec* new_ptr = new ParameterGroupRec(*(*it).second);
-		groups[(*it).first] = new_ptr;
-		old2new[(*it).second] = new_ptr;
-
-	}
-	unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator it_find;
-	it = rhs.parameter2group.begin();
-	end =  rhs.parameter2group.end();
-	for (; it != end; ++it) {
-		it_find = old2new.find((*it).second);
-		if (it_find != old2new.end())
-			parameter2group[(*it).first] = (*it_find).second;
-	}
-//    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator iit(old2new.begin());
-//    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator eend(old2new.end());
+//const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo &rhs)
+//{
+//	unordered_map<ParameterGroupRec*, ParameterGroupRec*> old2new;
+//	unordered_map<string, ParameterGroupRec*>::const_iterator it(rhs.groups.begin());
+//	unordered_map<string, ParameterGroupRec*>::const_iterator end(rhs.groups.end());
+//	for (; it != end; ++it) {
+//		ParameterGroupRec* new_ptr = new ParameterGroupRec(*(*it).second);
+//		groups[(*it).first] = new_ptr;
+//		old2new[(*it).second] = new_ptr;
 //
-//    for (; iit != eend; ++iit) {
-//        delete (*iit).second;
-//        delete (*iit).first;
-//    }
-
-    return *this;
-}
+//	}
+//	unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator it_find;
+//	it = rhs.parameter2group.begin();
+//	end =  rhs.parameter2group.end();
+//	for (; it != end; ++it) {
+//		it_find = old2new.find((*it).second);
+//		if (it_find != old2new.end())
+//			parameter2group[(*it).first] = (*it_find).second;
+//	}
+////    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator iit(old2new.begin());
+////    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator eend(old2new.end());
+////
+////    for (; iit != eend; ++iit) {
+////        delete (*iit).second;
+////        delete (*iit).first;
+////    }
+//
+//    return *this;
+//}
 
 vector<string> ParameterGroupInfo::get_group_names() const
 {
@@ -223,6 +223,7 @@ void ParameterGroupInfo::free_mem()
     unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
 	unordered_map<string, ParameterGroupRec*>::iterator end(groups.end());
 	for (; it != end; ++it) {
+        (*it).second = nullptr;
 		delete (*it).second;
 	}
 
@@ -230,6 +231,7 @@ void ParameterGroupInfo::free_mem()
 	end = parameter2group.end();
 
     for (; it != end; ++it) {
+        (*it).second = nullptr;
         delete (*it).second;
     }
     groups.clear();

@@ -869,6 +869,7 @@ void RunManagerPanther::pause_idle()
 	{
 		report("Warning: timed out waiting for acknowledgement of signal from idle thread.", false);
 	}
+    delete idle_thread;
 }
 
 void RunManagerPanther::resume_idle()
@@ -1563,8 +1564,9 @@ void RunManagerPanther::process_message(int i_sock)
             }
             else
             {
-                pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
-                ofstream& out = *ret.first->second;
+                //pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
+                //ofstream& out = *ret.first->second;
+                ofstream& out = *open_file_trans_streams.at(fnames.second);
                 vector<int8_t> ibuf = net_pack.get_data();
                 //cout << reinterpret_cast<char*>(ibuf.data()) << endl;
 				if (out.bad())
@@ -1620,12 +1622,14 @@ void RunManagerPanther::process_message(int i_sock)
             }
             else
             {
-                pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
-                ofstream& out = *ret.first->second;
+                //pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
+                //ofstream& out = *ret.first->second;
+                ofstream& out = *open_file_trans_streams.at(fnames.second);
                 int file_size = out.tellp();
                 out.flush();
                 out.close();
-                open_file_trans_streams.erase(ret.first);
+                delete open_file_trans_streams.at(fnames.second);
+                open_file_trans_streams.erase(fnames.second);
                 string agent_dir = host_name + "$" + agent_info_iter->get_work_dir();
                 if (agent_dir.find(" ") != string::npos)
                 {
@@ -2173,6 +2177,8 @@ RunManagerPanther::~RunManagerPanther(void)
 		}
 	}
 	w_cleanup();
+    delete idle_thread;
+
 }
 
 RunManagerYAMRCondor::RunManagerYAMRCondor(const std::string & stor_filename,

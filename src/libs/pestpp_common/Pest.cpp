@@ -2707,6 +2707,7 @@ Pest::~Pest() {
 		{
 		}
 	}
+    base_group_info.free_mem();
 }
 
 pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string &line)
