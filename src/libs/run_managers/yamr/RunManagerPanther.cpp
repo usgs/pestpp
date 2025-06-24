@@ -869,7 +869,7 @@ void RunManagerPanther::pause_idle()
 	{
 		report("Warning: timed out waiting for acknowledgement of signal from idle thread.", false);
 	}
-    delete idle_thread;
+    //delete idle_thread;
 }
 
 void RunManagerPanther::resume_idle()
