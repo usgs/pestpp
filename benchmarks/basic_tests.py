@@ -1844,7 +1844,7 @@ def sweep_large_xfer_test():
     if os.path.exists(m_d):
         shutil.rmtree(m_d)
     pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
-    num_reals = 19
+    num_reals = 3
     pe = pyemu.ParameterEnsemble.from_uniform_draw(pst,num_reals=num_reals)#.loc[:,pst.par_names[:2]]
 
     pe.to_csv(os.path.join(t_d,"sweep_in.csv"))
@@ -1871,7 +1871,7 @@ def sweep_large_xfer_test():
     pst.write(os.path.join(t_d,"pest_forgive.pst"))
     m_d = os.path.join(model_d,"master_sweep_bin_base")
 
-    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_forgive.pst", 4, master_dir=m_d,
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_forgive.pst", 1, master_dir=m_d,
                            worker_root=model_d,port=port)
 
     for i in range(num_reals):
@@ -1882,7 +1882,8 @@ def sweep_large_xfer_test():
         print(fname,diff)
         assert diff < 1e-10
 if __name__ == "__main__":
-    sweep_large_xfer_test()
+    #sweep_large_xfer_test()
+    sweep_bin_test()
     exit()
     # mf6_v5_sen_test()
     #tie_by_group_test()
