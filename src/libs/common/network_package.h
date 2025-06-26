@@ -30,7 +30,7 @@ public:
 	std::vector<std::string> pack_strings;
 	const static int DESC_LEN = 1001;
 	const static int NULL_DA_CYCLE = -9999;
-	const static int FILE_TRANS_BUF_SIZE = 102400;
+	const static int FILE_TRANS_BUF_SIZE = 1024000;
 	std::pair<int,std::string> send(int sockfd, const void *data, int64_t data_len_l);
 	std::pair<int,std::string> recv(int sockfd);
 	void reset(PackType _type, int _group, int _run_id, const std::string &_desc);

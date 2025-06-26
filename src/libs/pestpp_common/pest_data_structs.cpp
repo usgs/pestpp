@@ -1972,7 +1972,6 @@ void PestppOptions::set_defaults()
 	set_basejac_filename(string());
     set_jac_scale(true);
 
-
     set_sweep_parameter_csv_file(string());
 	set_sweep_output_csv_file("sweep_out.csv");
 	set_sweep_base_run(false);
@@ -1981,7 +1980,6 @@ void PestppOptions::set_defaults()
 	set_tie_by_group(false);
 	set_enforce_tied_bounds(false);
     set_sweep_include_regul_phi(false);
-
 
 	set_opt_obj_func("");
     set_org_opt_obj_func("");

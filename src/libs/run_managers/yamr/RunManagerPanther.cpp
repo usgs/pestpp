@@ -577,7 +577,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
             n_no_ops = 0;
         }
 
-        cout << get_time_string_short() << " remaining file transfers: " << open_file_trans_streams.size() << "                                       \r" << flush;
+        cout << get_time_string_short() << " remaining file transfers: " << open_file_trans_streams.size() << "\r" << flush;
         if (ping())
         {
             n_no_ops = 0;
