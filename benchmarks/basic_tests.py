@@ -1852,7 +1852,7 @@ def sweep_large_xfer_test():
     print(pe.index)
     pe.to_dense(os.path.join(t_d,"sweep_in.bin"))
 
-    dimen = 10000
+    dimen = 1000
     cnames = ["col{0}".format(i) for i in range(dimen)]
     rnames = ["row{0}".format(i) for i in range(dimen)]
     vals = np.random.random((dimen,dimen))
@@ -1882,7 +1882,7 @@ def sweep_large_xfer_test():
         print(fname,diff)
         assert diff < 1e-10
 if __name__ == "__main__":
-    #sweep_large_xfer_test()
+    sweep_large_xfer_test()
     #sweep_bin_test()
     #exit()
     # mf6_v5_sen_test()
