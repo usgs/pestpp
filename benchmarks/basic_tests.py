@@ -1882,7 +1882,7 @@ def sweep_large_xfer_test():
         print(fname,diff)
         assert diff < 1e-10
 if __name__ == "__main__":
-    sweep_large_xfer_test()
+    #sweep_large_xfer_test()
     #sweep_bin_test()
     #exit()
     # mf6_v5_sen_test()
