@@ -2077,7 +2077,7 @@ string get_time_string()
 	timeinfo = localtime(&rawtime);
 	strftime(buffer, 80, "%m/%d/%y %H:%M:%S", timeinfo);
 	string t_str(buffer);
-    delete timeinfo;
+
 	return t_str;
 }
 
