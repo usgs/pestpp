@@ -79,10 +79,11 @@ public:
 	to the specified group
 	*/
 	void insert_parameter_link(const string &parameter_name, const string & group_name);
-	const ParameterGroupRec* get_group_rec_ptr(const string &par_name) const;
-	const ParameterGroupRec* get_group_by_groupname(const string &group_name) const { return groups.at(group_name); }
-	ParameterGroupRec* get_group_by_groupname_4_mod(const string &group_name) { return groups.at(group_name); }
-	ParameterGroupRec* get_group_rec_ptr_4_mod(const string &par_name);
+	const ParameterGroupRec get_group_rec(const string &par_name) const;
+    ParameterGroupRec* get_group_rec_ptr_4_mod(const string &par_name);
+	const ParameterGroupRec get_group_by_groupname(const string &group_name) const { return groups.at(group_name); }
+	ParameterGroupRec* get_group_ptr_by_groupname_4_mod(const string &group_name) { return &groups.at(group_name); }
+
 	string get_group_name(const string &par_name) const;
 	//const ParameterGroupInfo& operator=(const ParameterGroupInfo &rhs);
 	bool have_switch_derivative() const;
@@ -93,8 +94,8 @@ public:
 	void free_mem();
 	~ParameterGroupInfo();
 private:
-	unordered_map<string, ParameterGroupRec*> groups;
-	unordered_map<string, ParameterGroupRec*> parameter2group;
+	unordered_map<string, ParameterGroupRec> groups;
+	unordered_map<string, ParameterGroupRec> parameter2group;
 
 };
 

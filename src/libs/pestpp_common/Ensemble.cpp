@@ -2055,7 +2055,7 @@ map<string,double> ParameterEnsemble::draw(int num_reals, Parameters par, Covari
 			vars_in_group.clear();
 			for (auto name : var_names)
 			{
-				if (pgi.get_group_rec_ptr(name)->name == group)
+				if (pgi.get_group_rec(name).name == group)
 					vars_in_group.push_back(name);
 			}
 			if (vars_in_group.size() == 0)

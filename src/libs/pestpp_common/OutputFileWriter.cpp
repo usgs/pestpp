@@ -354,7 +354,7 @@ void OutputFileWriter::scenario_io_report(std::ostream &os)
 
 void OutputFileWriter::scenario_pargroup_report(std::ostream &os)
 {
-	const ParameterGroupRec *grp_rec;
+	ParameterGroupRec grp_rec;
 	int grp_len = 12;
 	for (auto& par_name : pest_scenario.get_ctl_ordered_par_group_names())
 		grp_len = max((int)par_name.size(), grp_len);
@@ -365,8 +365,8 @@ void OutputFileWriter::scenario_pargroup_report(std::ostream &os)
 	for (auto &grp_name : pest_scenario.get_ctl_ordered_par_group_names())
 	{
 		grp_rec = pest_scenario.get_base_group_info().get_group_by_groupname(grp_name);
-		os << left << setw(grp_len) << lower_cp(grp_rec->name) << right << setw(15) << grp_rec->inctyp << setw(25) << grp_rec->derinc;
-		os << setw(25) << grp_rec->derinclb << setw(15) << grp_rec->forcen << setw(25) << grp_rec->derincmul << endl;
+		os << left << setw(grp_len) << lower_cp(grp_rec.name) << right << setw(15) << grp_rec.inctyp << setw(25) << grp_rec.derinc;
+		os << setw(25) << grp_rec.derinclb << setw(15) << grp_rec.forcen << setw(25) << grp_rec.derincmul << endl;
 	}
 	os << endl << endl;
 }
