@@ -3110,6 +3110,7 @@ void Pest::release_unused_for_agent()
     ctl_ordered_par_group_names.clear();
     //base_group_info.clear();
     prior_info.clear();
+    base_group_info.free_mem();
 }
 
 

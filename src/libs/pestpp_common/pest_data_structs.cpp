@@ -222,7 +222,9 @@ void ParameterGroupInfo::free_mem()
 {
 
     groups.clear();
+    groups.reserve(0);
     parameter2group.clear();
+    parameter2group.reserve(0);
 }
 
 ostream& operator<< (ostream &os, const ParameterGroupInfo &val)
