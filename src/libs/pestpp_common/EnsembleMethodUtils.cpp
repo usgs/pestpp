@@ -3928,12 +3928,14 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 		if (pe.get_trans_status() == ParameterEnsemble::transStatus::NUM) {
             pts.numeric2ctl_ip(pars);
         }
-        map<string,double> fmap = pe.get_fixed_info().get_real_fixed_values(tag);
-        for (auto& item : fmap)
-        {
-            pars.update_rec(item.first,item.second);
-        }
+        vector<string> frnames = pe.get_fixed_info().get_real_names();
+        if (find(frnames.begin(),frnames.end(),tag) != frnames.end()) {
+            map<string, double> fmap = pe.get_fixed_info().get_real_fixed_values(tag);
 
+            for (auto &item: fmap) {
+                pars.update_rec(item.first, item.second);
+            }
+        }
 		if (cycle != NetPackage::NULL_DA_CYCLE)
 			ss << cycle << ".";
 		if (iter >= 0)
@@ -5413,7 +5415,10 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         ParameterEnsemble _pe(&pest_scenario, &rand_gen);
         _pe.reserve(vector<string>(), pe.get_var_names());
         _pe.set_trans_status(pe.get_trans_status());
-        _pe.set_fixed_info(pe.get_fixed_info());
+
+        if (rname != "mean") {
+            _pe.set_fixed_info(pe.get_fixed_info());
+        }
         _pe.append(org_rname, pars);
         ss.str("");
         ss << file_manager.get_base_filename();
