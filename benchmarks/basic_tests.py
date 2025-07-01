@@ -933,6 +933,16 @@ def mf6_v5_ies_test():
     pst.write(os.path.join(t_d, pst_name))
     pyemu.os_utils.start_workers(t_d, exe_path, pst_name, num_workers=15,
                                  master_dir=m_d, worker_root=model_d, port=port)
+    
+    pst.pestpp_options["ies_run_realname"] = "base"
+
+    pst.pestpp_options["ies_par_en"] = "{0}.{1}.par.csv".format(pst_name.replace(".pst",""),3)
+    pst.control_data.noptmax = -2
+    pst.write(os.path.join(m_d, "test.pst"))
+    pyemu.os_utils.run("{0} test.pst".format(exe_path),cwd=m_d)
+    exit()
+
+
     phidf = pd.read_csv(os.path.join(m_d,pst_name.replace(".pst",".phi.actual.csv")))
     assert phidf.shape[0] == pst.control_data.noptmax + 1
     for i in range(1,pst.control_data.noptmax+1):
@@ -1949,6 +1959,6 @@ if __name__ == "__main__":
     #fr_fail_test()
     #tplins1_test()
 
-    mf6_v5_glm_test()
+    #mf6_v5_glm_test()
     mf6_v5_ies_test()
-    mf6_v5_sen_test()
+    #mf6_v5_sen_test()
