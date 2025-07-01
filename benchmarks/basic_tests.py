@@ -934,13 +934,7 @@ def mf6_v5_ies_test():
     pyemu.os_utils.start_workers(t_d, exe_path, pst_name, num_workers=15,
                                  master_dir=m_d, worker_root=model_d, port=port)
     
-    pst.pestpp_options["ies_run_realname"] = "base"
-
-    pst.pestpp_options["ies_par_en"] = "{0}.{1}.par.csv".format(pst_name.replace(".pst",""),3)
-    pst.control_data.noptmax = -2
-    pst.write(os.path.join(m_d, "test.pst"))
-    pyemu.os_utils.run("{0} test.pst".format(exe_path),cwd=m_d)
-    exit()
+    
 
 
     phidf = pd.read_csv(os.path.join(m_d,pst_name.replace(".pst",".phi.actual.csv")))
@@ -970,7 +964,16 @@ def mf6_v5_ies_test():
             print(i,group,len(pnames),lb_count,pcs.loc[group,"num_at_near_lbound"],ub_count,pcs.loc[group,"num_at_near_ubound"])
             assert lb_count == pcs.loc[group,"num_at_near_lbound"]
             assert ub_count == pcs.loc[group,"num_at_near_ubound"]
-       
+    
+    pst.pestpp_options["ies_run_realname"] = "base"
+    pst.pestpp_options["ies_par_en"] = "{0}.{1}.par.csv".format(pst_name.replace(".pst",""),3)
+    pst.control_data.noptmax = -2
+    pst.write(os.path.join(m_d, "test.pst"))
+    pyemu.os_utils.run("{0} test.pst".format(exe_path),cwd=m_d)
+
+    pst.pestpp_options.pop("ies_run_realname")
+    pst.pestpp_options.pop("ies_par_en")
+
     pst.write(os.path.join(t_d,"freyberg6_run_ies_glm_loc.pst"))
 
     m_d = os.path.join(model_d, "master_ies_glm_covloc")
