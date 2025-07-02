@@ -811,7 +811,7 @@ void PANTHERAgent::start_impl(const string &host, const string &port)
 		else if(net_pack.get_type() == NetPackage::PackType::REQ_LINPACK)
 		{
 			report("received REQ_LINPACK",true);
-			linpack_wrap();
+			//linpack_wrap();
 			net_pack.reset(NetPackage::PackType::LINPACK, 0, 0,"");
 			char data;
 			err = send_message(net_pack, &data, 0);

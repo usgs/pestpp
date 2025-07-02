@@ -2070,14 +2070,15 @@ int ExternalCtlFile::get_row_idx(string key, string col_name)
 string get_time_string()
 {
 	time_t rawtime;
-	struct tm* timeinfo;
+	//struct tm* timeinfo;
 	char buffer[80];
 
 	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-	strftime(buffer, 80, "%m/%d/%y %H:%M:%S", timeinfo);
+	//timeinfo = localtime(&rawtime);
+	//strftime(buffer, 80, "%m/%d/%y %H:%M:%S", timeinfo);
+    strftime(buffer, 80, "%m/%d/%y %H:%M:%S",localtime(&rawtime));
 	string t_str(buffer);
-
+    //delete timeinfo;
 	return t_str;
 }
 
