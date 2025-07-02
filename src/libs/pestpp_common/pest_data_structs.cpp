@@ -2130,7 +2130,7 @@ void PestppOptions::set_defaults()
 	set_panther_echo(true);
     set_panther_transfer_on_finish(vector<string>{});
     set_panther_transfer_on_fail(vector<string>{});
-    set_panther_timeout_milliseconds(-999);
+    set_panther_timeout_milliseconds(500);
     set_panther_echo_interval_milliseconds(1000);
 
 }
