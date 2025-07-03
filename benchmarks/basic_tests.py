@@ -1894,7 +1894,83 @@ def sweep_large_xfer_test():
         diff = np.abs(vals - vals2).sum()
         print(fname,diff)
         assert diff < 1e-10
+
+
+
+def large_fake_test():
+    root_d = "large_fake_test"
+    if os.path.exists(root_d):
+        shutil.rmtree(root_d)
+    os.makedirs(root_d)
+    t_d = os.path.join(root_d,"template")
+    os.makedirs(t_d)
+
+    npar = 10000
+    nobs = 10000
+    nzobs = 1000
+
+    in_name = os.path.join(t_d,"in.dat")
+    out_name = os.path.join(t_d,"out.dat")
+
+    f_in = open(in_name,'w')
+    f_tpl = open(in_name+".tpl",'w')
+    f_tpl.write("ptf ~\n")
+
+    for i in range(npar):
+        f_in.write("par{0:06d},{0}\n".format(i))
+        f_tpl.write("par{0:06d},~    par{0:06d}     ~\n".format(i))
+    f_tpl.close()
+    f_in.close()
+
+
+    f_out = open(out_name,'w')
+    f_ins = open(out_name+".ins",'w')
+    f_ins.write("pif ~\n")
+    for i in range(nobs):
+        f_out.write("obs{0:06d},{0}\n".format(i))
+        f_ins.write("l1 ~,~ !obs{0:06d}!\n".format(i))
+    f_out.close()
+    f_ins.close()
+
+    pst = pyemu.Pst.from_io_files(in_name+".tpl",in_name,out_name+".ins",out_name,pst_path='.')
+    obs = pst.observation_data
+    obs["weight"] = 0.0
+    obs.loc[obs.index[:nzobs],"weight"] = 1.0
+
+    par = pst.parameter_data
+    par["parlbnd"] = 0
+    par["parubnd"] = npar
+    par["partrans"] = "none"
+
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d,"test.pst"),version=2)
+    #pyemu.utils.helpers.setup_fake_forward_run(pst, new_pst_name, org_cwd='.', bak_suffix='._bak', new_cwd='.')
+    pst = pyemu.helpers.setup_fake_forward_run(pst,"fake.pst",org_cwd=t_d,new_cwd=t_d)
+
+    pst.write(os.path.join(t_d,"fake.pst"),version=2)
+    
+    frun_name = os.path.join(t_d,"fake_forward_run.py")
+    lines = open(frun_name,'r').readlines()
+    with open(frun_name,'w') as f:
+        for line in lines:
+            f.write(line)
+        f.write("import time\n")
+        f.write("time.sleep(10)\n")
+
+    pyemu.os_utils.run("{0} fake.pst".format(exe_path),cwd=t_d)
+    pst.control_data.noptmax = -1
+    pst.write(os.path.join(t_d,"fake.pst"),version=2)
+
+    m_d = t_d.replace("template","master")
+    pyemu.os_utils.start_workers(t_d, exe_path, "fake.pst", 5, master_dir=m_d,
+                           worker_root=root_d,port=port,verbose=True)
+
+
+
+
 if __name__ == "__main__":
+    large_fake_test()
+    exit()
     #sweep_large_xfer_test()
     #sweep_bin_test()
     #exit()
