@@ -97,43 +97,43 @@ ostream& operator<< (ostream &os, const ParameterGroupRec& val)
 }
 
 /////////////////////////////////////  ParameterGroupInfo Methods ///////////////////////
-const ParameterGroupRec* ParameterGroupInfo::get_group_rec_ptr(const string &name) const
+const ParameterGroupRec ParameterGroupInfo::get_group_rec(const string &name) const
 {
-	const ParameterGroupRec *ret_val = 0;
-	unordered_map<string, ParameterGroupRec*>::const_iterator g_iter;
+	ParameterGroupRec ret_val;
+	unordered_map<string, ParameterGroupRec>::const_iterator g_iter;
 
 	g_iter = parameter2group.find(name);
 	if(g_iter != parameter2group.end()) {
-		ret_val = (*g_iter).second;
+		ret_val = g_iter->second;
 	}
 	return ret_val;
 }
 
 ParameterGroupRec* ParameterGroupInfo::get_group_rec_ptr_4_mod(const string &name)
 {
-	ParameterGroupRec *ret_val = 0;
-	unordered_map<string, ParameterGroupRec*>::const_iterator g_iter;
+	ParameterGroupRec* ret_val = 0;
+	unordered_map<string, ParameterGroupRec>::iterator g_iter;
 
 	g_iter = parameter2group.find(name);
 	if (g_iter != parameter2group.end()) {
-		ret_val = (*g_iter).second;
+		ret_val = &g_iter->second;
 	}
 	return ret_val;
 }
 
 string ParameterGroupInfo::get_group_name(const string &par_name) const
 {
-	return get_group_rec_ptr(par_name)->name;
+	return get_group_rec(par_name).name;
 }
 
 void ParameterGroupInfo::insert_group(const string &group_name, ParameterGroupRec &rec)
 {
-	groups[group_name] = new ParameterGroupRec(rec);
+	groups[group_name] = rec;
 }
 
 void ParameterGroupInfo::insert_parameter_link(const string &parameter_name, const string & group_name)
 {
-	unordered_map<string, ParameterGroupRec*>::const_iterator g_iter;
+	unordered_map<string, ParameterGroupRec>::const_iterator g_iter;
 
 	g_iter = groups.find(group_name);
 	if(g_iter == groups.end()) {
@@ -150,35 +150,35 @@ void ParameterGroupInfo::insert_parameter_link(const string &parameter_name, con
 
 }
 
-const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo &rhs)
-{
-	unordered_map<ParameterGroupRec*, ParameterGroupRec*> old2new;
-	unordered_map<string, ParameterGroupRec*>::const_iterator it(rhs.groups.begin());
-	unordered_map<string, ParameterGroupRec*>::const_iterator end(rhs.groups.end());
-	for (; it != end; ++it) {
-		ParameterGroupRec* new_ptr = new ParameterGroupRec(*(*it).second);
-		groups[(*it).first] = new_ptr;
-		old2new[(*it).second] = new_ptr;
-
-	}
-	unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator it_find;
-	it = rhs.parameter2group.begin();
-	end =  rhs.parameter2group.end();
-	for (; it != end; ++it) {
-		it_find = old2new.find((*it).second);
-		if (it_find != old2new.end())
-			parameter2group[(*it).first] = (*it_find).second;
-	}
-//    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator iit(old2new.begin());
-//    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator eend(old2new.end());
+//const ParameterGroupInfo& ParameterGroupInfo::operator=(const ParameterGroupInfo &rhs)
+//{
+//	unordered_map<ParameterGroupRec*, ParameterGroupRec*> old2new;
+//	unordered_map<string, ParameterGroupRec*>::const_iterator it(rhs.groups.begin());
+//	unordered_map<string, ParameterGroupRec*>::const_iterator end(rhs.groups.end());
+//	for (; it != end; ++it) {
+//		ParameterGroupRec* new_ptr = new ParameterGroupRec(*(*it).second);
+//		groups[(*it).first] = new_ptr;
+//		old2new[(*it).second] = new_ptr;
 //
-//    for (; iit != eend; ++iit) {
-//        delete (*iit).second;
-//        delete (*iit).first;
-//    }
-
-    return *this;
-}
+//	}
+//	unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator it_find;
+//	it = rhs.parameter2group.begin();
+//	end =  rhs.parameter2group.end();
+//	for (; it != end; ++it) {
+//		it_find = old2new.find((*it).second);
+//		if (it_find != old2new.end())
+//			parameter2group[(*it).first] = (*it_find).second;
+//	}
+////    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator iit(old2new.begin());
+////    unordered_map<ParameterGroupRec*, ParameterGroupRec*>::iterator eend(old2new.end());
+////
+////    for (; iit != eend; ++iit) {
+////        delete (*iit).second;
+////        delete (*iit).first;
+////    }
+//
+//    return *this;
+//}
 
 vector<string> ParameterGroupInfo::get_group_names() const
 {
@@ -193,7 +193,7 @@ bool ParameterGroupInfo::have_switch_derivative() const
 	bool switch_der = false;
 	for (const auto irec : groups)
 	{
-		if (lower_cp(irec.second->forcen) == "switch")
+		if (lower_cp(irec.second.forcen) == "switch")
 		{
 			switch_der = true;
 			break;
@@ -220,28 +220,19 @@ ParameterGroupInfo::~ParameterGroupInfo()
 
 void ParameterGroupInfo::free_mem()
 {
-    unordered_map<string, ParameterGroupRec*>::iterator it(groups.begin());
-	unordered_map<string, ParameterGroupRec*>::iterator end(groups.end());
-	for (; it != end; ++it) {
-		delete (*it).second;
-	}
 
-    it = parameter2group.begin();
-	end = parameter2group.end();
-
-    for (; it != end; ++it) {
-        delete (*it).second;
-    }
     groups.clear();
+
     parameter2group.clear();
+
 }
 
 ostream& operator<< (ostream &os, const ParameterGroupInfo &val)
 {
-	unordered_map<string, ParameterGroupRec*>::const_iterator it(val.parameter2group.begin());
-	unordered_map<string, ParameterGroupRec*>::const_iterator end(val.parameter2group.end());
+	unordered_map<string, ParameterGroupRec>::const_iterator it(val.parameter2group.begin());
+	unordered_map<string, ParameterGroupRec>::const_iterator end(val.parameter2group.end());
 	for (; it != end; ++it) {
-		os << *(it->second) << endl;
+		os << (it->second) << endl;
 	}
 	return os;
 }
@@ -1970,7 +1961,6 @@ void PestppOptions::set_defaults()
 	set_basejac_filename(string());
     set_jac_scale(true);
 
-
     set_sweep_parameter_csv_file(string());
 	set_sweep_output_csv_file("sweep_out.csv");
 	set_sweep_base_run(false);
@@ -1979,7 +1969,6 @@ void PestppOptions::set_defaults()
 	set_tie_by_group(false);
 	set_enforce_tied_bounds(false);
     set_sweep_include_regul_phi(false);
-
 
 	set_opt_obj_func("");
     set_org_opt_obj_func("");

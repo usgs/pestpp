@@ -355,9 +355,9 @@ bool Jacobian_1to1::get_derivative_parameters(const string &par_name, double par
 		vector<double> &delta_numeric_par_vec, bool phiredswh_flag)
 {
 	bool success = false;
-	const ParameterGroupRec *g_rec = group_info.get_group_rec_ptr(par_name);
+	const ParameterGroupRec g_rec = group_info.get_group_rec(par_name);
 
-	if (g_rec->forcen != "ALWAYS_2"  && (g_rec->forcen == "ALWAYS_3" || phiredswh_flag == true) ) {
+	if (g_rec.forcen != "ALWAYS_2"  && (g_rec.forcen == "ALWAYS_3" || phiredswh_flag == true) ) {
 		// Central Difference
 		vector<double> new_par_vec;
 		vector<Parameters> dir_numeric_pars_vec;

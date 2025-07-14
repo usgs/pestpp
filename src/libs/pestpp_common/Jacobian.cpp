@@ -464,12 +464,12 @@ bool Jacobian::get_derivative_parameters(const string &par_name, Parameters &num
 
 	}
 	bool success = false;
-	const ParameterGroupRec *g_rec;
+	ParameterGroupRec g_rec;
 	debug_msg("Jacobian::get_derivative_parameters begin");
 	debug_print(par_name);
-	g_rec = group_info.get_group_rec_ptr(par_name);
+	g_rec = group_info.get_group_rec(par_name);
 
-	if (g_rec->forcen == "ALWAYS_3" || phiredswh_flag == true) {
+	if (g_rec.forcen == "ALWAYS_3" || phiredswh_flag == true) {
 		debug_msg("trying central");
 		// Central Difference
 		vector<double> new_par_vec;
@@ -504,7 +504,7 @@ bool Jacobian::get_derivative_parameters(const string &par_name, Parameters &num
 std::vector<Eigen::Triplet<double> >  Jacobian::calc_derivative(const string &numeric_par_name, double base_numeric_par_value, int jcol, list<JacobianRun> &run_list,
 	const ParameterGroupInfo &group_info, const PriorInformation &prior_info, bool splitswh_flag)
 {
-	const ParameterGroupRec *g_rec;
+	ParameterGroupRec g_rec;
 	double del_par;
 	double del_obs;
 	double der;
@@ -520,9 +520,9 @@ std::vector<Eigen::Triplet<double> >  Jacobian::calc_derivative(const string &nu
 	auto  &run_last = run_list.back();
 
 	//p_rec = group_info.get_parameter_rec_ptr(*par_name);
-	g_rec = group_info.get_group_rec_ptr(numeric_par_name);
-	double splitthresh = g_rec->splitthresh;
-	double splitreldiff = g_rec->splitreldiff;
+	g_rec = group_info.get_group_rec(numeric_par_name);
+	double splitthresh = g_rec.splitthresh;
+	double splitreldiff = g_rec.splitreldiff;
 
 	irow = 0;
 	vector<double> sen_vec;
@@ -559,7 +559,7 @@ std::vector<Eigen::Triplet<double> >  Jacobian::calc_derivative(const string &nu
 				}
 			}
 
-			if (run_list.size() == 3 && g_rec->dermthd == "PARABOLIC" && !success)
+			if (run_list.size() == 3 && g_rec.dermthd == "PARABOLIC" && !success)
 			{
 				// Central Difference Parabola
 				// Solve Ac = o for c to get the equation for a parabola where:
@@ -741,23 +741,23 @@ bool Jacobian::out_of_bounds(const Parameters &ctl_parameters,
 
 double Jacobian::derivative_inc(const string &name, const ParameterGroupInfo &group_info, double cur_par_value, bool central)
 {
-	const ParameterGroupRec *g_rec;
+	ParameterGroupRec g_rec;
 	double incr = 0.0;
 
 	//// to do add error checking
-	g_rec = group_info.get_group_rec_ptr(name);
-	if (g_rec->inctyp == "ABSOLUTE") {
-		incr = g_rec->derinc;}
-	else if (g_rec->inctyp == "RELATIVE") {
-		incr =  g_rec->derinc * abs(cur_par_value);
+	g_rec = group_info.get_group_rec(name);
+	if (g_rec.inctyp == "ABSOLUTE") {
+		incr = g_rec.derinc;}
+	else if (g_rec.inctyp == "RELATIVE") {
+		incr =  g_rec.derinc * abs(cur_par_value);
 	}
 	// apply derincmul for central derivatives
 	if (central) {
-		incr *= g_rec->derincmul;
+		incr *= g_rec.derincmul;
 	}
 	// apply lower bound
-	if ((g_rec->inctyp != "ABSOLUTE") && (incr < g_rec->derinclb)) {
-		incr = g_rec->derinclb;
+	if ((g_rec.inctyp != "ABSOLUTE") && (incr < g_rec.derinclb)) {
+		incr = g_rec.derinclb;
 	}
 	return incr;
 }

@@ -3925,9 +3925,17 @@ pair<Parameters, Observations> save_real_par_rei(Pest& pest_scenario, ParameterE
 		ParamTransformSeq pts = pest_scenario.get_base_par_tran_seq();
 		Parameters pars;
 		pars.update(pe.get_var_names(), eigenvec_2_stlvec(pe.get_real_vector(tag)));
-		if (pe.get_trans_status() == ParameterEnsemble::transStatus::NUM)
-			pts.numeric2ctl_ip(pars);
-		// save parameters to .par file
+		if (pe.get_trans_status() == ParameterEnsemble::transStatus::NUM) {
+            pts.numeric2ctl_ip(pars);
+        }
+        vector<string> frnames = pe.get_fixed_info().get_real_names();
+        if (find(frnames.begin(),frnames.end(),tag) != frnames.end()) {
+            map<string, double> fmap = pe.get_fixed_info().get_real_fixed_values(tag);
+
+            for (auto &item: fmap) {
+                pars.update_rec(item.first, item.second);
+            }
+        }
 		if (cycle != NetPackage::NULL_DA_CYCLE)
 			ss << cycle << ".";
 		if (iter >= 0)
@@ -5371,6 +5379,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
             return;
         }
         string rname = ppo->get_ies_run_realname();
+        string org_rname = rname;
         Parameters pars;
         if (!rname.empty())
         {
@@ -5383,22 +5392,21 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
             rname = "real"+rname;
 
         }
-        else
-        {
+        else {
             rname = "mean";
+            org_rname = "mean";
             message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
             message(1, "calculating mean parameter values");
             pars.update(pe.get_var_names(), pe.get_mean_stl_var_vector());
 
-        }
 
-        if (pe.get_fixed_info().get_map_size() > 0)
-        {
-            ss.str("");
-            ss << "WARNING: 'fixed' parameter realizations provided but ctrl " << endl;
-            ss << "         file parameter values are being used for 'fixed' parameters" << endl;
-            ss << "         in the mean parameter value run." << endl;
-            message(0,ss.str());
+            if (pe.get_fixed_info().get_map_size() > 0) {
+                ss.str("");
+                ss << "WARNING: 'fixed' parameter realizations provided but ctrl " << endl;
+                ss << "         file parameter values are being used for 'fixed' parameters" << endl;
+                ss << "         in the mean parameter value run." << endl;
+                message(0, ss.str());
+            }
         }
 
 
@@ -5407,12 +5415,16 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         ParameterEnsemble _pe(&pest_scenario, &rand_gen);
         _pe.reserve(vector<string>(), pe.get_var_names());
         _pe.set_trans_status(pe.get_trans_status());
-        _pe.append(rname, pars);
+
+        if (rname != "mean") {
+            _pe.set_fixed_info(pe.get_fixed_info());
+        }
+        _pe.append(org_rname, pars);
         ss.str("");
         ss << file_manager.get_base_filename();
         if (cycle != NetPackage::NULL_DA_CYCLE)
             ss << "." << cycle;
-        ss << "." << rname << ".par.csv";
+        ss << "." <<  rname << ".par.csv";
         string par_csv = ss.str();
         message(1, "saving "+ rname +" parameter values to ", par_csv);
         _pe.to_csv(par_csv);
@@ -5420,7 +5432,8 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         pe_base.reorder(vector<string>(), act_par_names);
         ObservationEnsemble _oe(&pest_scenario, &rand_gen);
         _oe.reserve(vector<string>(), oe_base.get_var_names());
-        _oe.append(rname, pest_scenario.get_ctl_observations());
+        _oe.reserve(vector<string>(), pest_scenario.get_ctl_ordered_obs_names());
+        _oe.append(org_rname, pest_scenario.get_ctl_observations());
         oe_base = _oe;
         oe_base.reorder(vector<string>(), act_obs_names);
         //initialize the phi handler
@@ -5491,10 +5504,10 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         _oe.to_csv(obs_csv);
 
         ph.update(_oe, _pe);
-        message(0, rname+" parameter phi report:");
+        message(0,"realization "+ rname+" phi report:");
         ph.report(true);
         ph.write(0, 1);
-        save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, rname, cycle);
+        save_real_par_rei(pest_scenario, _pe, _oe, output_file_writer, file_manager, -1, org_rname, cycle);
         //transfer_dynamic_state_from_oe_to_initial_pe(_pe, _oe);
         pe = _pe;
         oe = _oe;
