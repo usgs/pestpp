@@ -524,7 +524,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 
 	std::chrono::system_clock::time_point start_time = std::chrono::system_clock::now();
     last_echo_time = std::chrono::system_clock::now();
-	double run_time_sec = 0.0;
+
 	while (!all_runs_complete() && terminate_reason == RUN_UNTIL_COND::NORMAL)
 	{
         int q = pest_utils::quit_file_found();
@@ -548,11 +548,12 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
 		{
 			n_no_ops = 0;
 		}
+        echo();
 		if (ping())
 		{
 			n_no_ops = 0;
 		}
-
+        echo();
 		if ((condition == RUN_UNTIL_COND::NO_OPS || condition == RUN_UNTIL_COND::NO_OPS_OR_TIME) && n_no_ops >= max_no_ops)
 		{
 			terminate_reason = RUN_UNTIL_COND::NO_OPS;
@@ -577,7 +578,7 @@ RunManagerAbstract::RUN_UNTIL_COND RunManagerPanther::run_until(RUN_UNTIL_COND c
             n_no_ops = 0;
         }
 
-        cout << get_time_string_short() << " remaining file transfers: " << open_file_trans_streams.size() << "                                       \r" << flush;
+        cout << get_time_string_short() << " remaining file transfers: " << open_file_trans_streams.size() << "\r" << flush;
         if (ping())
         {
             n_no_ops = 0;
@@ -869,6 +870,7 @@ void RunManagerPanther::pause_idle()
 	{
 		report("Warning: timed out waiting for acknowledgement of signal from idle thread.", false);
 	}
+    //delete idle_thread;
 }
 
 void RunManagerPanther::resume_idle()
@@ -885,14 +887,21 @@ void RunManagerPanther::resume_idle()
 
 int RunManagerPanther::get_current_sleep_timeout_milliseconds(const int org_timeout_milliseconds)
 {
+    double avg = get_global_runtime_minute() / 1000.0;
     if (org_timeout_milliseconds > 0)
     {
         return org_timeout_milliseconds;
     }
-    double avg = get_global_runtime_minute() / 1000.0;
-    double timeout = avg / 0.1;
-    timeout = max<double>(timeout,10);
-    timeout = min<double>(timeout,500);
+    double timeout;
+    if (avg == 0.0) {
+        timeout = 500;
+    }
+    else {
+        timeout = avg / 0.1;
+        timeout = max<double>(timeout, 10);
+        timeout = min<double>(timeout, 500);
+    }
+
     //cout << timeout;
     return timeout;
 }
@@ -966,7 +975,7 @@ bool RunManagerPanther::listen(pest_utils::thread_flag* terminate/* = nullptr*/)
 	socklen_t addr_len;
 	timeval tv;
 	tv.tv_sec = 0;
-	tv.tv_usec = 0;
+	tv.tv_usec = 250;
 	read_fds = master; // copy it
 	if (w_select(fdmax+1, &read_fds, NULL, NULL, &tv) == -1)
 	{
@@ -1563,8 +1572,9 @@ void RunManagerPanther::process_message(int i_sock)
             }
             else
             {
-                pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
-                ofstream& out = *ret.first->second;
+                //pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
+                //ofstream& out = *ret.first->second;
+                ofstream& out = *open_file_trans_streams.at(fnames.second);
                 vector<int8_t> ibuf = net_pack.get_data();
                 //cout << reinterpret_cast<char*>(ibuf.data()) << endl;
 				if (out.bad())
@@ -1620,12 +1630,14 @@ void RunManagerPanther::process_message(int i_sock)
             }
             else
             {
-                pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
-                ofstream& out = *ret.first->second;
+                //pair<map<string ,ofstream*>::iterator, bool> ret = open_file_trans_streams.insert(pair<string,ofstream*>(fnames.second,new ofstream));
+                //ofstream& out = *ret.first->second;
+                ofstream& out = *open_file_trans_streams.at(fnames.second);
                 int file_size = out.tellp();
                 out.flush();
                 out.close();
-                open_file_trans_streams.erase(ret.first);
+                delete open_file_trans_streams.at(fnames.second);
+                open_file_trans_streams.erase(fnames.second);
                 string agent_dir = host_name + "$" + agent_info_iter->get_work_dir();
                 if (agent_dir.find(" ") != string::npos)
                 {
@@ -2173,6 +2185,8 @@ RunManagerPanther::~RunManagerPanther(void)
 		}
 	}
 	w_cleanup();
+    delete idle_thread;
+
 }
 
 RunManagerYAMRCondor::RunManagerYAMRCondor(const std::string & stor_filename,

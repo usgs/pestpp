@@ -1137,21 +1137,21 @@ void sequentialLP::iter_presolve()
 			vector<string> act_dv_grps;
 			ParameterGroupInfo* pinfo = pest_scenario.get_base_group_info_ptr();
 
-			const ParameterGroupRec *gr_ptr;
+			ParameterGroupRec gr_ptr;
 			for (auto &name : dv_names)
 			{
-				gr_ptr = pinfo->get_group_rec_ptr(name);
-				if (find(act_dv_grps.begin(), act_dv_grps.end(), gr_ptr->name) == act_dv_grps.end())
-					act_dv_grps.push_back(gr_ptr->name);
+				gr_ptr = pinfo->get_group_rec(name);
+				if (find(act_dv_grps.begin(), act_dv_grps.end(), gr_ptr.name) == act_dv_grps.end())
+					act_dv_grps.push_back(gr_ptr.name);
 			}
 			double org_derinc, new_derinc;
 			ofstream &frec = file_mgr_ptr->rec_ofstream();
 			frec << setw(20) << left << "group_name" << setw(20) << left << "old_derinc" << setw(20) << left << "new_derinc" << endl;
 			for (auto &name : act_dv_grps)
 			{
-				org_derinc = pinfo->get_group_by_groupname_4_mod(name)->derinc;
+				org_derinc = pinfo->get_group_by_groupname(name).derinc;
 				new_derinc = org_derinc * iter_derinc_fac;
-				pinfo->get_group_by_groupname_4_mod(name)->derinc = new_derinc;
+				pinfo->get_group_ptr_by_groupname_4_mod(name)->derinc = new_derinc;
 				frec << setw(20) << left << name << setw(20) << left << org_derinc << setw(20) << left << new_derinc << endl;
 			}
 		}

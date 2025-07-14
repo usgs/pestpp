@@ -933,6 +933,10 @@ def mf6_v5_ies_test():
     pst.write(os.path.join(t_d, pst_name))
     pyemu.os_utils.start_workers(t_d, exe_path, pst_name, num_workers=15,
                                  master_dir=m_d, worker_root=model_d, port=port)
+    
+    
+
+
     phidf = pd.read_csv(os.path.join(m_d,pst_name.replace(".pst",".phi.actual.csv")))
     assert phidf.shape[0] == pst.control_data.noptmax + 1
     for i in range(1,pst.control_data.noptmax+1):
@@ -960,7 +964,16 @@ def mf6_v5_ies_test():
             print(i,group,len(pnames),lb_count,pcs.loc[group,"num_at_near_lbound"],ub_count,pcs.loc[group,"num_at_near_ubound"])
             assert lb_count == pcs.loc[group,"num_at_near_lbound"]
             assert ub_count == pcs.loc[group,"num_at_near_ubound"]
-       
+    
+    pst.pestpp_options["ies_run_realname"] = "base"
+    pst.pestpp_options["ies_par_en"] = "{0}.{1}.par.csv".format(pst_name.replace(".pst",""),3)
+    pst.control_data.noptmax = -2
+    pst.write(os.path.join(m_d, "test.pst"))
+    pyemu.os_utils.run("{0} test.pst".format(exe_path),cwd=m_d)
+
+    pst.pestpp_options.pop("ies_run_realname")
+    pst.pestpp_options.pop("ies_par_en")
+
     pst.write(os.path.join(t_d,"freyberg6_run_ies_glm_loc.pst"))
 
     m_d = os.path.join(model_d, "master_ies_glm_covloc")
@@ -1501,6 +1514,28 @@ def sweep_bin_test():
     print(np.abs(diff).max())
     assert np.abs(diff).max() < 1e-7
 
+
+
+    pst.pestpp_options.pop("sweep_output_file")
+    pst.pestpp_options["save_dense"] = True
+    m_d = os.path.join(model_d,"master_sweep_bin_base2")
+    pyemu.os_utils.start_workers(t_d, exe_path, "pest_forgive.pst", 10, master_dir=m_d,
+                           worker_root=model_d,port=port)
+    df1 = pd.read_csv(os.path.join(m_d, "pest_forgive.0.obs.csv"),index_col=0)
+    assert df1.shape[0] == pe.shape[0]
+    m_d = os.path.join(model_d, "master_sweep_bin2")
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies", "-swp"), "pest_forgive.pst", 10, master_dir=m_d,
+                                 worker_root=model_d, port=port)
+    df2 = pyemu.Matrix.from_binary(os.path.join(m_d,"sweep_out.bin")).to_dataframe()
+    print(df2)
+    print(df1)
+    assert df2.shape == df1.shape
+    diff = (df1.values - df2.values)
+    print(diff)
+    print(diff.max())
+    print(np.abs(diff).max())
+    assert np.abs(diff).max() < 1e-7
+
 #def fail_test():
 #    raise Exception("fail please")
 
@@ -1814,9 +1849,131 @@ def tenpar_uniform_invest():
     pyemu.os_utils.run("pestpp-ies pest.pst",cwd=new_d)
 
 
+def sweep_large_xfer_test():
+
+    model_d = "ies_10par_xsec"
+    t_d = os.path.join(model_d,"template")
+    m_d = os.path.join(model_d,"master_sweep_xfer")
+    if os.path.exists(m_d):
+        shutil.rmtree(m_d)
+    pst = pyemu.Pst(os.path.join(t_d,"pest.pst"))
+    num_reals = 3
+    pe = pyemu.ParameterEnsemble.from_uniform_draw(pst,num_reals=num_reals)#.loc[:,pst.par_names[:2]]
+
+    pe.to_csv(os.path.join(t_d,"sweep_in.csv"))
+    pe._df.index = pe.index.map(str)
+    print(pe.index)
+    pe.to_dense(os.path.join(t_d,"sweep_in.bin"))
+
+    dimen = 1000
+    cnames = ["col{0}".format(i) for i in range(dimen)]
+    rnames = ["row{0}".format(i) for i in range(dimen)]
+    vals = np.random.random((dimen,dimen))
+    pyemu.Matrix(x=vals,row_names=rnames,col_names=cnames).to_dense(os.path.join(t_d,"matrix.bin"))
+
+    pst.pestpp_options["ies_par_en"] = "sweep_in.csv"
+    pst.pestpp_options["sweep_forgive"] = True
+    pst.pestpp_options["sweep_parameter_file"] = "sweep_in.bin"
+    pst.control_data.noptmax = -1
+    pst.pestpp_options.pop("ies_num_reals",None)
+    pst.write(os.path.join(t_d,"pest_forgive.pst"))
+    pst.pestpp_options["sweep_output_file"] = "sweep_out.bin"
+    pst.pestpp_options["sweep_chunk"] = 9
+    pst.pestpp_options["ies_include_base"] = False
+    pst.pestpp_options["panther_transfer_on_finish"] = "matrix.bin"
+    pst.write(os.path.join(t_d,"pest_forgive.pst"))
+    m_d = os.path.join(model_d,"master_sweep_bin_base")
+
+    pyemu.os_utils.start_workers(t_d, exe_path.replace("-ies","-swp"), "pest_forgive.pst", 1, master_dir=m_d,
+                           worker_root=model_d,port=port)
+
+    for i in range(num_reals):
+        fname = os.path.join(m_d,"ftx_{0}.matrix.bin".format(i))
+        assert os.path.exists(fname)
+        vals2 = pyemu.Matrix.from_binary(fname).x
+        diff = np.abs(vals - vals2).sum()
+        print(fname,diff)
+        assert diff < 1e-10
+
+
+
+def large_fake_test():
+    root_d = "large_fake_test"
+    if os.path.exists(root_d):
+        shutil.rmtree(root_d)
+    os.makedirs(root_d)
+    t_d = os.path.join(root_d,"template")
+    os.makedirs(t_d)
+
+    npar = 10000
+    nobs = 10000
+    nzobs = 1000
+
+    in_name = os.path.join(t_d,"in.dat")
+    out_name = os.path.join(t_d,"out.dat")
+
+    f_in = open(in_name,'w')
+    f_tpl = open(in_name+".tpl",'w')
+    f_tpl.write("ptf ~\n")
+
+    for i in range(npar):
+        f_in.write("par{0:06d},{0}\n".format(i))
+        f_tpl.write("par{0:06d},~    par{0:06d}     ~\n".format(i))
+    f_tpl.close()
+    f_in.close()
+
+
+    f_out = open(out_name,'w')
+    f_ins = open(out_name+".ins",'w')
+    f_ins.write("pif ~\n")
+    for i in range(nobs):
+        f_out.write("obs{0:06d},{0}\n".format(i))
+        f_ins.write("l1 ~,~ !obs{0:06d}!\n".format(i))
+    f_out.close()
+    f_ins.close()
+
+    pst = pyemu.Pst.from_io_files(in_name+".tpl",in_name,out_name+".ins",out_name,pst_path='.')
+    obs = pst.observation_data
+    obs["weight"] = 0.0
+    obs.loc[obs.index[:nzobs],"weight"] = 1.0
+
+    par = pst.parameter_data
+    par["parlbnd"] = 0
+    par["parubnd"] = npar
+    par["partrans"] = "none"
+
+    pst.control_data.noptmax = 0
+    pst.write(os.path.join(t_d,"test.pst"),version=2)
+    #pyemu.utils.helpers.setup_fake_forward_run(pst, new_pst_name, org_cwd='.', bak_suffix='._bak', new_cwd='.')
+    pst = pyemu.helpers.setup_fake_forward_run(pst,"fake.pst",org_cwd=t_d,new_cwd=t_d)
+
+    pst.write(os.path.join(t_d,"fake.pst"),version=2)
+    
+    frun_name = os.path.join(t_d,"fake_forward_run.py")
+    lines = open(frun_name,'r').readlines()
+    with open(frun_name,'w') as f:
+        for line in lines:
+            f.write(line)
+        f.write("import time\n")
+        f.write("time.sleep(10)\n")
+
+    pyemu.os_utils.run("{0} fake.pst".format(exe_path),cwd=t_d)
+    pst.control_data.noptmax = -1
+    pst.write(os.path.join(t_d,"fake.pst"),version=2)
+
+    m_d = t_d.replace("template","master")
+    pyemu.os_utils.start_workers(t_d, exe_path, "fake.pst", 5, master_dir=m_d,
+                           worker_root=root_d,port=port,verbose=True)
+
+
 
 
 if __name__ == "__main__":
+    large_fake_test()
+    exit()
+    #sweep_large_xfer_test()
+    #sweep_bin_test()
+    #exit()
     # mf6_v5_sen_test()
     #tie_by_group_test()
     #tenpar_uniform_invest()
@@ -1881,6 +2038,6 @@ if __name__ == "__main__":
     #fr_fail_test()
     #tplins1_test()
 
-    mf6_v5_glm_test()
+    #mf6_v5_glm_test()
     mf6_v5_ies_test()
-    mf6_v5_sen_test()
+    #mf6_v5_sen_test()

@@ -294,8 +294,6 @@ protected:
 
 };
 
-
-
 class UpgradeThread
 {
 public: 

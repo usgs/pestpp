@@ -2707,6 +2707,7 @@ Pest::~Pest() {
 		{
 		}
 	}
+    base_group_info.free_mem();
 }
 
 pair<string, string> Pest::parse_keyword_line(ofstream &f_rec, const string &line)
@@ -3109,6 +3110,7 @@ void Pest::release_unused_for_agent()
     ctl_ordered_par_group_names.clear();
     //base_group_info.clear();
     prior_info.clear();
+    base_group_info.free_mem();
 }
 
 
