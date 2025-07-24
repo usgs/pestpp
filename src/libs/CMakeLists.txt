@@ -17,7 +17,7 @@ add_subdirectory(common)
 add_subdirectory(opt)
 add_subdirectory(pestpp_common)
 add_subdirectory(run_managers)
-add_subdirectory(zlib)
+add_subdirectory(miniz)
 
 if(Fortran_ENABLED)
   # These libraries are not linked anywhere
