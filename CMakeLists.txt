@@ -27,7 +27,7 @@ endif()
 
 project(PESTPP
   VERSION ${PESTPP_VERSION}
-  LANGUAGES CXX)
+  LANGUAGES CXX C)
 
 # Prevent running cmake in source dir
 if("${PESTPP_SOURCE_DIR}" STREQUAL "${PESTPP_BINARY_DIR}")
