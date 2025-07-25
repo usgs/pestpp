@@ -1969,8 +1969,8 @@ def large_fake_test():
 
 
 if __name__ == "__main__":
-    large_fake_test()
-    exit()
+    #large_fake_test()
+    #exit()
     #sweep_large_xfer_test()
     #sweep_bin_test()
     #exit()
