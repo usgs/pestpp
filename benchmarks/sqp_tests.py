@@ -409,37 +409,37 @@ def rosenc_test():
     return m_d
 
 
-def rosen_test():
-    sys.path.append(os.path.join("..","benchmarks"))
-    import opt_test_suite_helper as helper
+# def rosen_test():
+#     sys.path.append(os.path.join("..","benchmarks"))
+#     import opt_test_suite_helper as helper
 
-    t_d = helper.setup_problem("rosen")
-    model_d = "mou_tests"
-    pst = pyemu.Pst(os.path.join(t_d,"rosen.pst"))
-    print(pst.pestpp_options)
+#     t_d = helper.setup_problem("rosen")
+#     model_d = "mou_tests"
+#     pst = pyemu.Pst(os.path.join(t_d,"rosen.pst"))
+#     print(pst.pestpp_options)
 
-    pst.pestpp_options["opt_objective_function"] = "obj_1"
-    pst.observation_data.loc["obj_1","obgnme"] = "obj"
-    #pst.parameter_data.loc[:,"standard_deviation"] = np.nan
-    #pst.parameter_data.loc[["dv_0","dv_1"], "standard_deviation"] = 0.1
-    #pst.parameter_data.loc["dv_0","parval1"] = -0.052
-    #pst.parameter_data.loc["dv_1","parval1"] = -0.1
-    pst.pestpp_options["par_sigma_range"] = 25
-    pst.parameter_data.loc["dv_0", "parval1"] = -3
-    pst.parameter_data.loc["dv_1", "parval1"] = -3
-    pst.control_data.noptmax = 10
-    pst.pestpp_options["sqp_num_reals"] = 5
-    pst.pestpp_options["opt_direction"] = "min"
-    pst.write(os.path.join(t_d, "rosen.pst"),version=2)
+#     pst.pestpp_options["opt_objective_function"] = "obj_1"
+#     pst.observation_data.loc["obj_1","obgnme"] = "obj"
+#     #pst.parameter_data.loc[:,"standard_deviation"] = np.nan
+#     #pst.parameter_data.loc[["dv_0","dv_1"], "standard_deviation"] = 0.1
+#     #pst.parameter_data.loc["dv_0","parval1"] = -0.052
+#     #pst.parameter_data.loc["dv_1","parval1"] = -0.1
+#     pst.pestpp_options["par_sigma_range"] = 25
+#     pst.parameter_data.loc["dv_0", "parval1"] = -3
+#     pst.parameter_data.loc["dv_1", "parval1"] = -3
+#     pst.control_data.noptmax = 10
+#     pst.pestpp_options["sqp_num_reals"] = 5
+#     pst.pestpp_options["opt_direction"] = "min"
+#     pst.write(os.path.join(t_d, "rosen.pst"),version=2)
 
-    m_d = os.path.join(model_d, "master_rosen_enopt")
-    if not "sqp_num_reals" in pst.pestpp_options:
-        m_d = os.path.join(model_d, "master_rosen_opt")
+#     m_d = os.path.join(model_d, "master_rosen_enopt")
+#     if not "sqp_num_reals" in pst.pestpp_options:
+#         m_d = os.path.join(model_d, "master_rosen_opt")
 
-    if os.path.exists(m_d):
-        shutil.rmtree(m_d)
-    pyemu.os_utils.start_workers(t_d,exe_path,"rosen.pst",worker_root=model_d,num_workers=10,master_dir=m_d)
-    return m_d
+#     if os.path.exists(m_d):
+#         shutil.rmtree(m_d)
+#     pyemu.os_utils.start_workers(t_d,exe_path,"rosen.pst",worker_root=model_d,num_workers=10,master_dir=m_d)
+#     return m_d
 
 
 def plot_rosen(m_d):
@@ -576,7 +576,7 @@ if __name__ == "__main__":
     #rosenbrock_single_linear_constraint(nit=1)
     #dewater_basic_test()
     #dewater_slp_opt_test()
-    rosen_test()
+    rosenc_test()
     #m_d = rosenc_test()
     #m_d = os.path.join("mou_tests","master_rosenc_enopt")
     #plot_rosen(m_d)
