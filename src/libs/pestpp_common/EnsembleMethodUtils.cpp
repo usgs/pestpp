@@ -2513,7 +2513,7 @@ double L2PhiHandler::calc_median(const std::vector<double>& values) {
 		return (values[(size / 2) - 1] + values[size / 2]) / 2.0;
 	}
 }
-double L2PhiHandler::calc_iqr_thresh(map<string, double> *phi_map) {
+double L2PhiHandler::calc_iqr_thresh(map<string, double> *phi_map, double bad_phi_sigma) {
 	// get the phi map
 	map<string, double>::iterator pi = phi_map->begin(), end = phi_map->end();
 
@@ -2552,7 +2552,9 @@ double L2PhiHandler::calc_iqr_thresh(map<string, double> *phi_map) {
 	const double iqr =  q3 - q1;
 
 	// return the threshold
-	return q3+1.5*iqr;
+	if (bad_phi_sigma<0)
+		bad_phi_sigma = -1*bad_phi_sigma;
+	return q3+bad_phi_sigma*iqr;
 }
 
 
@@ -3162,7 +3164,7 @@ vector<int> L2PhiHandler::get_idxs_greater_than(double bad_phi, double bad_phi_s
                  << bad_thres << endl;
         } else {
             const double qval = -1. * bad_phi_sigma;
-            bad_thres = min(std::numeric_limits<double>::max(),calc_iqr_thresh(&_meas));//Q3 + 1.5 IQR
+            bad_thres = min(std::numeric_limits<double>::max(),calc_iqr_thresh(&_meas, bad_phi_sigma));//Q3 + bad_phi_sigma * IQR
             ofstream &frec = file_manager->rec_ofstream();
             frec << "...bad_phi_sigma interquartile factor " << qval << " yields bad phi threshold of " << bad_thres << endl;
         	if (qval > 3.) {
