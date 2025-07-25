@@ -223,9 +223,10 @@ def setup_pst():
                             ofile_sep=",")
         break
     pf.extra_py_imports.append("flopy")
-    pf.add_py_function("henry_test.py","process_unc()",is_pre_cmd=False)
+    path_to_file = os.path.relpath(__file__)
+    pf.add_py_function(path_to_file,"process_unc()",is_pre_cmd=False)
     pf.mod_sys_cmds.append("mf6")
-    pf.add_py_function("henry_test.py","add_artrch()",is_pre_cmd=True)
+    pf.add_py_function(path_to_file,"add_artrch()",is_pre_cmd=True)
     pf.tmp_files.append("flow.wel_stress_period_data_scenario.txt")
 
     # add artificial recharge basin dvs
@@ -235,7 +236,7 @@ def setup_pst():
     eval_head_at_artrch(new_dir)
     pf.add_observations("ar_heads.csv", ofile_sep=",", index_cols=[0,1], use_cols=[2], prefix="arhead")
 
-    pf.add_py_function("henry_test.py", "head_at_artrch()", is_pre_cmd=False)
+    pf.add_py_function(path_to_file, "head_at_artrch()", is_pre_cmd=False)
 
     pf.build_pst()
 
