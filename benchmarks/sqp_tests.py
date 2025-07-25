@@ -379,6 +379,7 @@ def dewater_slp_opt_test():
 
 
 def rosenc_test():
+    sys.path.append(os.path.join("..","benchmarks"))
     import opt_test_suite_helper as helper
 
     t_d = helper.setup_problem("rosenc")
@@ -409,6 +410,7 @@ def rosenc_test():
 
 
 def rosen_test():
+    sys.path.append(os.path.join("..","benchmarks"))
     import opt_test_suite_helper as helper
 
     t_d = helper.setup_problem("rosen")
