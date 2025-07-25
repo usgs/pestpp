@@ -4298,7 +4298,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	// remove __risk__ from pinames
 	pinames.erase(std::remove(pinames.begin(), pinames.end(), "_RISK_"), pinames.end());
 
-	if (pinames.empty())
+	if (not pinames.empty())
 	{
 		Ensemble _dpi= save_pi_constraints(_dp, pinames);
 
