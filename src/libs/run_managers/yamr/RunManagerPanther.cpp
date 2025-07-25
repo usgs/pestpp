@@ -1221,6 +1221,30 @@ void RunManagerPanther::schedule_runs()
 			cout << "exception trying to find overdue runs: " << endl << e.what() << endl;
 		}
 	}
+    if ((!persistent_workers) && (waiting_runs.size() < free_agent_list.size()))
+    {
+        stringstream ss;
+        free_agent_list = get_free_agent_list();
+        int num_to_close = free_agent_list.size() - waiting_runs.size();
+        list<AgentInfoRec>::iterator it_agent, iter_e;
+        int closed = 0;
+        for (it_agent = agent_info_set.begin(), iter_e = agent_info_set.end();
+             it_agent != iter_e; ++it_agent)
+        {
+            AgentInfoRec::State state = it_agent->get_state();
+            if (state == AgentInfoRec::State::WAITING) {
+                close_agent(it_agent);
+                closed++;
+                ss.str("");
+                ss << "using non-persistent agents, closed connection to agent: " << it_agent->get_socket_name() << ", number of agents: " << socket_to_iter_map.size();
+                report(ss.str(),false);
+            }
+
+            if (closed >= num_to_close)
+                break;
+        }
+
+    }
 }
 
 int RunManagerPanther::schedule_run(int run_id, std::list<list<AgentInfoRec>::iterator> &free_agent_list, int n_responsive_agents)
