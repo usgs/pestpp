@@ -4194,6 +4194,9 @@ Ensemble MOEA::save_pi_constraints(ParameterEnsemble &_dp)
 		PriorInformation constraints_pi = pest_scenario.get_prior_info();
 		vector<string> pinames;
 		pinames = constraints.get_pi_constraint_names();
+		// remove __risk__ from pinames
+		pinames.erase(std::remove(pinames.begin(), pinames.end(), "_RISK_"), pinames.end());
+
 		//Instantiate an empty Ensemble class with reserved row and col names
 		Ensemble pioe(&pest_scenario);
 		pioe.reserve(pinames,realnames);
@@ -4212,7 +4215,7 @@ Ensemble MOEA::save_pi_constraints(ParameterEnsemble &_dp)
 			pivals.resize(pinames.size());
 			int j = 0;
 			//loop over pi_constraint_names
-			for (auto &piname : constraints.get_pi_constraint_names())
+			for (auto &piname : pinames)
 				{
 				PriorInformationRec pi_rec = constraints_pi.get_pi_rec(piname);
 
@@ -4294,7 +4297,13 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	}
 
 	// record prior information constraint obs
-	if (constraints.num_pi_constraints() > 0)
+	PriorInformation constraints_pi = pest_scenario.get_prior_info();
+	vector<string> pinames;
+	pinames = constraints.get_pi_constraint_names();
+	// remove __risk__ from pinames
+	pinames.erase(std::remove(pinames.begin(), pinames.end(), "_RISK_"), pinames.end());
+
+	if (pinames.size()>0)//constraints.num_pi_constraints() > 0 )
 	{
 		Ensemble _dpi= save_pi_constraints(_dp);
 
