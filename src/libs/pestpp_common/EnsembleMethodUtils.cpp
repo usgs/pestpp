@@ -5373,7 +5373,7 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
     //we need this for the prior mean shifting
     weights_base = weights;
 
-    if (pest_scenario.get_control_info().noptmax == -2)
+    if (pest_scenario.get_control_info().noptmax <= -2)
     {
         if (pest_scenario.get_pestpp_options().get_debug_parse_only()) {
             return;
@@ -5381,33 +5381,48 @@ void EnsembleMethod::initialize(int cycle, bool run, bool use_existing)
         string rname = ppo->get_ies_run_realname();
         string org_rname = rname;
         Parameters pars;
-        if (!rname.empty())
+        if ((!rname.empty()) && (pest_scenario.get_control_info().noptmax == -2))
         {
             map<string,int> rmap = pe.get_real_map();
             if (rmap.find(rname) == rmap.end())
             {
                 throw_em_error("'ies_run_realname' argument supplied '"+rname+"' but that realization is not in the parameter ensemble");
             }
+        	message(0, "'noptmax'=-2, running a single parameter ensemble values and quitting");
+        	message(1, "'ies_run_realname' argument supplied as '"+rname);
             pars.update(pe.get_var_names(),pe.get_real_vector(rname));
             rname = "real"+rname;
 
         }
-        else {
-            rname = "mean";
-            org_rname = "mean";
-            message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
-            message(1, "calculating mean parameter values");
-            pars.update(pe.get_var_names(), pe.get_mean_stl_var_vector());
+        else if ((rname.empty()) && (pest_scenario.get_control_info().noptmax == -2))
+        {
+	        rname = "mean";
+        	org_rname = "mean";
+        	message(0, "'noptmax'=-2, running mean parameter ensemble values and quitting");
+        	message(1, "calculating mean parameter values");
+        	pars.update(pe.get_var_names(), pe.get_mean_stl_var_vector());
 
 
-            if (pe.get_fixed_info().get_map_size() > 0) {
-                ss.str("");
-                ss << "WARNING: 'fixed' parameter realizations provided but ctrl " << endl;
-                ss << "         file parameter values are being used for 'fixed' parameters" << endl;
-                ss << "         in the mean parameter value run." << endl;
-                message(0, ss.str());
-            }
+        	if (pe.get_fixed_info().get_map_size() > 0) {
+        		ss.str("");
+        		ss << "WARNING: 'fixed' parameter realizations provided but ctrl " << endl;
+        		ss << "         file parameter values are being used for 'fixed' parameters" << endl;
+        		ss << "         in the mean parameter value run." << endl;
+        		message(0, ss.str());
+        	}
         }
+    	else if (pest_scenario.get_control_info().noptmax == -3)
+		{
+			vector<string> rnames = pe.get_real_names();
+    		std::uniform_int_distribution<int> uni(0, pe.shape().first - 1);
+    		int randreal;
+   			randreal = uni(subset_rand_gen);
+    		pars.update(pe.get_var_names(),pe.get_real_vector(rnames[randreal]));
+    		org_rname = rnames[randreal];
+    		rname = "real"+org_rname;
+    		message(0, "'noptmax'=-3, running a single randomly selected parameter realization and quitting");
+    		message(1, "random realization selected: "+rnames[randreal]);
+		}
 
 
         ParamTransformSeq pts = pe.get_par_transform();
