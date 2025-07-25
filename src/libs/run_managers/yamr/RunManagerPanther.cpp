@@ -274,7 +274,7 @@ int AgentInfoRec::seconds_since_last_ping_time() const
 
 RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& _port, ofstream& _f_rmr, int _max_n_failure,
 	double _overdue_reched_fac, double _overdue_giveup_fac, double _overdue_giveup_minutes, bool _should_echo, const vector<string>& par_names,
-	const vector<string>& obs_names,int _timeout_milliseconds,int _echo_interval_milliseconds)
+	const vector<string>& obs_names,int _timeout_milliseconds,int _echo_interval_milliseconds, bool _persistent_workers)
 
 	: RunManagerAbstract(vector<string>(), vector<string>(), vector<string>(),
 		vector<string>(), vector<string>(), stor_filename, _max_n_failure),
@@ -282,7 +282,7 @@ RunManagerPanther::RunManagerPanther(const string& stor_filename, const string& 
 	port(_port), f_rmr(_f_rmr), n_no_ops(0), overdue_giveup_minutes(_overdue_giveup_minutes),
 	terminate_idle_thread(false), currently_idle(true), idling(false), idle_thread_finished(false),
 	idle_thread(nullptr), should_echo(_should_echo),nftx(0),timeout_milliseconds(_timeout_milliseconds),
-    echo_interval_milliseconds(_echo_interval_milliseconds)
+    echo_interval_milliseconds(_echo_interval_milliseconds),persistent_workers(_persistent_workers)
 {
 
 	const char * t =

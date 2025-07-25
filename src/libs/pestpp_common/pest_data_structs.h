@@ -646,6 +646,8 @@ public:
     void set_panther_echo_interval_milliseconds(int _value) {panther_echo_interval_milliseconds = _value;}
     const int get_panther_echo_interval_milliseconds() const { return panther_echo_interval_milliseconds;}
     const int get_panther_timeout_milliseconds() const { return panther_timeout_milliseconds;}
+    void set_panther_persistent_workers(bool _flag) {panther_persistent_workers = _flag;}
+    const bool get_panther_persistent_workers() const {return panther_persistent_workers;}
 
 
 
@@ -882,6 +884,7 @@ private:
 	vector<string> panther_transfer_on_finish, panther_transfer_on_fail;
     int panther_timeout_milliseconds;
     int panther_echo_interval_milliseconds;
+    bool panther_persistent_workers;
 
 };
 //ostream& operator<< (ostream &os, const PestppOptions& val);
