@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import platform
 import pyemu
-
+sys.path.append(os.path.join("..","benchmarks"))
 import opt_test_suite_helper as mou_suite_helper
 
 bin_path = os.path.join("test_bin")

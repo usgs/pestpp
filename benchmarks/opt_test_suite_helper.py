@@ -252,7 +252,9 @@ def setup_problem(name,additive_chance=False, risk_obj=False, self_adaptive=Fals
 
     # now scape this python file to get the function lines and
     # the helper lines
-    lines = open("opt_test_suite_helper.py",'r').readlines()
+    path_to_file = os.path.relpath(__file__)
+    print(path_to_file)
+    lines = open(path_to_file,'r').readlines()
     func_lines = []
     for i in range(len(lines)):
         if lines[i].startswith("def {0}(x):".format(name)):
