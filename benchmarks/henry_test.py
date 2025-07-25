@@ -798,7 +798,8 @@ def simple_henry_test():
 
 
 if __name__ == "__main__":
-    #simple_henry_test()
+    simple_henry_test()
+    exit()
     #eval_process_unc(os.path.join("henry", "henry_template"))
     #shutil.copy2(os.path.join("..", "bin", "win", "pestpp-mou.exe"), os.path.join("..", "bin", "pestpp-mou.exe"))
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-mou.exe"),os.path.join("..","bin","pestpp-mou.exe"))
