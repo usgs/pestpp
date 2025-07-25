@@ -2007,6 +2007,7 @@ def mf6_v5_ies_nonpersistent_test():
     pst.pestpp_options["ies_bad_phi_sigma"] = 2.5
     pst.pestpp_options["ies_num_reals"] = 100
     pst.pestpp_options["ensemble_output_precision"] = 40
+    pst.pestpp_options["panther_master_timeout_milliseconds"] = 1000
     pst.control_data.noptmax = -1
     pst_name = "freyberg6_run_ies_nonpersist.pst"
     pst.write(os.path.join(t_d, pst_name))
