@@ -4195,10 +4195,11 @@ Ensemble MOEA::save_pi_constraints(ParameterEnsemble &_dp, vector<string> &pinam
 
 		//Instantiate an empty Ensemble class with reserved row and col names
 		Ensemble pioe(&pest_scenario);
-		pioe.reserve(pinames,realnames);
+		pioe.reserve(realnames,pinames);
+		//pioe.update_var_map();
+		Eigen::MatrixXd piX(realnames.size(),pinames.size());
 
-		Eigen::MatrixXd piX;
-		piX.resize(realnames.size(),pinames.size());
+		//piX.resize(realnames.size(),pinames.size());
 
 		int i = 0;
 		for (auto &real : realnames)
@@ -4222,7 +4223,8 @@ Ensemble MOEA::save_pi_constraints(ParameterEnsemble &_dp, vector<string> &pinam
 				}
 			i++;
 			}
-		pioe.from_eigen_mat(piX,realnames,parnames);
+	pioe.update_var_map();
+	pioe.from_eigen_mat(piX,realnames,pinames);
 
 	//}
 	pioe.update_var_map();
@@ -4298,7 +4300,7 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 	// remove __risk__ from pinames
 	pinames.erase(std::remove(pinames.begin(), pinames.end(), "_RISK_"), pinames.end());
 
-	if (not pinames.empty())
+	if (pinames.size() >0)
 	{
 		Ensemble _dpi= save_pi_constraints(_dp, pinames);
 
