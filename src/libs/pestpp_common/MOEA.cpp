@@ -4175,6 +4175,63 @@ ParameterEnsemble MOEA::generate_sbx_population(int num_members, ParameterEnsemb
 	return tmp_dp;
 }
 
+Ensemble MOEA::save_pi_constraints(ParameterEnsemble &_dp, vector<string> &pinames)
+{
+	//check if there are prior info equations
+	//if (constraints.num_pi_constraints() > 0)
+	//	{
+		// get the parameter and realization names
+		vector<string> parnames;
+		parnames = _dp.get_var_names();
+		vector<string> realnames;
+		realnames = _dp.get_real_names();
+
+		// empty Parameters and parvals vector for populating later
+		Parameters pars;
+		Eigen::VectorXd parvals;
+
+		// pi obj for later
+		PriorInformation constraints_pi = pest_scenario.get_prior_info();
+
+		//Instantiate an empty Ensemble class with reserved row and col names
+		Ensemble pioe(&pest_scenario);
+		pioe.reserve(realnames,pinames);
+		//pioe.update_var_map();
+		Eigen::MatrixXd piX(realnames.size(),pinames.size());
+
+		//piX.resize(realnames.size(),pinames.size());
+
+		int i = 0;
+		for (auto &real : realnames)
+			{
+			// get Parameters for each realization
+			parvals = _dp.get_real_vector(real);
+			pars.update_without_clear(parnames,parvals);
+
+			Eigen::VectorXd pivals;
+			pivals.resize(pinames.size());
+			int j = 0;
+			//loop over pi_constraint_names
+			for (auto &piname : pinames)
+				{
+				PriorInformationRec pi_rec = constraints_pi.get_pi_rec(piname);
+
+				pair<double,double> pi_sim_resid = pi_rec.calc_sim_and_resid(pars);
+				// update the matrix
+				piX(i,j) = pi_sim_resid.first;
+				j++;
+				}
+			i++;
+			}
+	pioe.update_var_map();
+	pioe.from_eigen_mat(piX,realnames,pinames);
+
+	//}
+	pioe.update_var_map();
+	return pioe;
+}
+
+
 void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag, bool force_save)
 {
 	
@@ -4236,7 +4293,76 @@ void MOEA::save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, st
 		ss << "saved generation-specific decision variable population of size " << _dp.shape().first << " X " << _dp.shape().second << " to '" << name << "'";
 		message(1, ss.str());
 	}
-	
+
+	// record prior information constraint obs names
+	vector<string> pinames;
+	pinames = constraints.get_pi_constraint_names();
+	// remove __risk__ from pinames
+	pinames.erase(std::remove(pinames.begin(), pinames.end(), "_RISK_"), pinames.end());
+
+	if (pinames.size() >0)
+	{
+		Ensemble _dpi= save_pi_constraints(_dp, pinames);
+
+		ss.str("");
+		ss << file_manager.get_base_filename();
+		if (tag.size() > 0)
+		{
+			ss << "." << tag;
+		}
+
+		ss << "." << pi_pop_file_tag;
+		if (pest_scenario.get_pestpp_options().get_save_binary())
+		{
+			if (pest_scenario.get_pestpp_options().get_save_dense())
+			{
+				ss << ".bin";
+				_dpi.to_dense(ss.str());
+			}
+			else {
+				ss << ".jcb";
+				_dpi.to_binary(ss.str());
+			}
+		}
+		else
+		{
+			ss << ".csv";
+			_dpi.to_csv(ss.str());
+		}
+		string name = ss.str();
+		ss.str("");
+		ss << "saved prior information population of size " << _dpi.shape().first << " X " << _dpi.shape().second << " to '" << name << "'";
+		message(1, ss.str());
+		ss.str("");
+		if (((save_every > 0) && (iter % save_every == 0)) || (iter == pest_scenario.get_control_info().noptmax) || (force_save))
+		{
+			ss << file_manager.get_base_filename() << "." << iter;
+			if (tag.size() > 0)
+			{
+				ss << "." << tag;
+			}
+			ss << "." << pi_pop_file_tag;
+			if (pest_scenario.get_pestpp_options().get_save_binary()) {
+				if (pest_scenario.get_pestpp_options().get_save_dense()) {
+					ss << ".bin";
+					_dpi.to_dense(ss.str());
+				} else {
+					ss << ".jcb";
+					_dpi.to_binary(ss.str());
+				}
+			}
+			else
+			{
+				ss << ".csv";
+				_dpi.to_csv(ss.str());
+			}
+			string name = ss.str();
+			ss.str("");
+			ss << "saved generation-specific prior information population of size " << _dpi.shape().first << " X " << _dpi.shape().second << " to '" << name << "'";
+			message(1, ss.str());
+		}
+	}
+
 
 	ss.str("");
 	ss << file_manager.get_base_filename();
