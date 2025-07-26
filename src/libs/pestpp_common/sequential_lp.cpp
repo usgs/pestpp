@@ -705,6 +705,9 @@ CoinPackedMatrix sequentialLP::jacobian_to_coinpackedmatrix()
 void sequentialLP::solve()
 {
 	ofstream &f_rec = file_mgr_ptr->rec_ofstream();
+	ofstream &f_obj = file_mgr_ptr->open_ofile_ext("slp.iobj.csv");
+
+	f_obj << "iteration,objective_function" << endl;
 
 	slp_iter = 1;
 	while (true)
@@ -719,6 +722,10 @@ void sequentialLP::solve()
 		iter_presolve();
         iter_solve();
         iter_postsolve();
+		if (iter_obj_values.size() > 0)
+		{
+			f_obj << slp_iter << "," << iter_obj_values.at(iter_obj_values.size()-1) << endl;
+		}
 		if (terminate) break;
 		slp_iter++;
 		if (slp_iter > pest_scenario.get_control_info().noptmax)
@@ -732,6 +739,8 @@ void sequentialLP::solve()
 
         }
 	}
+	f_obj.close();
+
 	f_rec << endl << "  ---  objective function sequence  ---   " << endl << setw(10) << "iteration" << setw(15) << "obj func" << endl;
 	int i = 0;
 	for (auto &obj : iter_obj_values)
