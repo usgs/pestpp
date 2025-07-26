@@ -4028,7 +4028,7 @@ def freyberg_stacked_pe_invest():
 
 def tenpar_iqr_bad_phi_sigma_test():
     model_d = "ies_10par_xsec"
-    test_d = os.path.join(model_d, "master_iqr_badsigma")
+    test_d = os.path.join(model_d, "master_badphi")
     template_d = os.path.join(model_d, "test_template")
 
     if not os.path.exists(template_d):
@@ -4057,15 +4057,15 @@ def tenpar_iqr_bad_phi_sigma_test():
     pst.write(os.path.join(template_d,pst_name),version=2)
     pyemu.os_utils.start_workers(template_d, exe_path, pst_name, num_workers=8,
                                  master_dir=test_d, worker_root=model_d, port=port)
+    
+    df0 = pd.read_csv(os.path.join(test_d, "base.phi.actual.csv"),index_col=0)
 
     pst.pestpp_options["ies_bad_phi_sigma"] = -1.5
     pst_name = "iqr.pst"
     pst.write(os.path.join(template_d,pst_name),version=2)
     pyemu.os_utils.start_workers(template_d, exe_path, pst_name, num_workers=8,
-                                 reuse_master=True,
                                  master_dir=test_d, worker_root=model_d, port=port)
     # check bad phi is correct 
-    df0 = pd.read_csv(os.path.join(test_d, "base.phi.actual.csv"),index_col=0)
     df1 = pd.read_csv(os.path.join(test_d, "iqr.phi.actual.csv"))
     vals = df0.iloc[0,5:].values
     vals.sort()
