@@ -145,6 +145,7 @@ private:
 	int archive_size;
 	string population_dv_file, population_obs_restart_file;
 	string dv_pop_file_tag = "dv_pop";
+	string pi_pop_file_tag = "pi_pop";
 	string obs_pop_file_tag = "obs_pop";
 	string lineage_tag = "lineage.csv";
 	chancePoints chancepoints;
@@ -225,6 +226,7 @@ private:
 
 	string get_new_member_name(string tag = string());
 
+	Ensemble save_pi_constraints(ParameterEnsemble &_dp, vector<string> &pinames);
 	void save_populations(ParameterEnsemble& _dp, ObservationEnsemble& _op, string tag = string(), bool force_save=false);
 	void gauss_mutation_ip(ParameterEnsemble& _dp);
 	pair<Eigen::VectorXd, Eigen::VectorXd> sbx(double probability, double eta_m, int idx1, int idx2);
