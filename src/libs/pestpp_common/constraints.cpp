@@ -2522,8 +2522,8 @@ void Constraints::postsolve_pi_constraints_report(Parameters& old_pars, Paramete
 		if (status_map.size() > 0)
 			f_rec << "simplex status";
 		if (price_map.size() > 0)
-			f_rec << setw(15);
-		f_rec << "price" << setw(15) << "current" << setw(15) << "residual";
+			f_rec << setw(15) << "price";
+		f_rec  << setw(15) << "current" << setw(15) << "residual";
 		f_rec << setw(15) << "new" << setw(15) << "residual" << endl;
 		int i = 0;
 		for (auto &name : ctl_ord_pi_constraint_names)

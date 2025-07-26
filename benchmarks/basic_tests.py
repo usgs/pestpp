@@ -1969,8 +1969,8 @@ def large_fake_test():
 
 
 if __name__ == "__main__":
-    large_fake_test()
-    exit()
+    #large_fake_test()
+    #exit()
     #sweep_large_xfer_test()
     #sweep_bin_test()
     #exit()
@@ -2028,7 +2028,7 @@ if __name__ == "__main__":
     #mf6_v5_sen_test()
 
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-opt.exe"),os.path.join("..","bin","win","pestpp-opt.exe"))
-    #mf6_v5_opt_stack_test()
+    mf6_v5_opt_stack_test()
     # mf6_v5_glm_test()
     # mf6_v5_ies_test()
     #cmdline_test()
@@ -2039,5 +2039,5 @@ if __name__ == "__main__":
     #tplins1_test()
 
     #mf6_v5_glm_test()
-    mf6_v5_ies_test()
+    # mf6_v5_ies_test()
     #mf6_v5_sen_test()
