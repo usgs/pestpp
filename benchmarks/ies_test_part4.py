@@ -8,6 +8,7 @@ import pandas as pd
 import platform
 import matplotlib.pyplot as plt
 import pyemu
+import glob
 
 tests = """0) 10par_xsec "standard user mode" - draw reals from par-bounds prior and obs noise from weights
 0a) 10par_xsec same as 0) but with multple lambda 
