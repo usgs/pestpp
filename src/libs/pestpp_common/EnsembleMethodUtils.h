@@ -82,6 +82,10 @@ public:
 	double calc_mean(map<string, double> *phi_map);
 	double calc_std(map<string, double> *phi_map);
 
+	static double calc_median(const std::vector<double> &values);
+
+	double calc_iqr_thresh(map<string, double> *phi_map, double bad_phi_sigma);
+
 	map<string, double>* get_phi_map_ptr(L2PhiHandler::phiType pt);
 	map<string, double> get_phi_map(L2PhiHandler::phiType pt);
 	void report(bool echo=true, bool group_report=true);
