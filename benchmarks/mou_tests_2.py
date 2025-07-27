@@ -2666,9 +2666,25 @@ def plot_hosaki(m_d):
             cwd=plt_d)
 
 
+def pi_output_test():
+    t_d = mou_suite_helper.setup_problem("constr", additive_chance=True, risk_obj=False)
+    pst = pyemu.Pst(os.path.join(t_d, "constr.pst"))
+    pst.pestpp_options["opt_chance_points"] = "all"
+    #pst.pestpp_options["opt_recalc_chance_every"] = 5
+    #pst.pestpp_options["opt_stack_size"] = 10
+    pst.pestpp_options["mou_generator"] = "de"
+    pst.pestpp_options["mou_population_size"] = 10
+    pst.pestpp_options["opt_risk"] = 0.5
+    pst.control_data.noptmax = 1
+    pst.write(os.path.join(t_d, "constr.pst"))
+    m1 = os.path.join("mou_tests", "constr_test_master_pieq")
+    pyemu.os_utils.start_workers(t_d, exe_path, "constr.pst", 35, worker_root="mou_tests",
+                                 master_dir=m1, verbose=True,port=port)
+    assert len([f for f in os.listdir(m1) if "pi_pop" in f]) > 0
+
 
 if __name__ == "__main__":
-    basic_pso_test()
+    #basic_pso_test()
     #test_restart_all()
     #chance_consistency_test()
     #zdt1_chance_schedule_test()
@@ -2749,3 +2765,4 @@ if __name__ == "__main__":
 
     #pop_sched_test()
     #simplex_invest_1()
+    pi_output_test()
