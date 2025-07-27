@@ -8,6 +8,7 @@ import pandas as pd
 import platform
 import matplotlib.pyplot as plt
 import pyemu
+import glob
 
 tests = """0) 10par_xsec "standard user mode" - draw reals from par-bounds prior and obs noise from weights
 0a) 10par_xsec same as 0) but with multple lambda 
@@ -3711,6 +3712,18 @@ def tenpar_fixed_restart_test():
     d1 = r48_ovals - pst.res.modelled.loc[pst.obs_names]
     print(d1)
     assert np.abs(d1.values).sum() < 1.e-7
+    
+    pst.control_data.noptmax = -3
+    pst.pestpp_options.pop("ies_run_realname", None)
+    pst.write(os.path.join(test_d,"pest3.pst"),version=2)
+    pyemu.os_utils.run("{0} pest3.pst".format(exe_path),cwd=test_d)    
+    single_real_fn = glob.glob(os.path.join(test_d,'pest3.real*.par.csv'))
+    assert len(single_real_fn) == 1
+    nm3_real = single_real_fn[0].split('/')[-1].split('.')[1].replace('real','')
+    pst.set_res(os.path.join(test_d, f"pest3.{nm3_real}.rei"))
+    assert np.allclose(oe.loc[nm3_real,pst.obs_names],
+                    pst.res.modelled.loc[pst.obs_names])    
+    
 
 
     

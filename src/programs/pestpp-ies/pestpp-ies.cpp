@@ -32,7 +32,7 @@
 using namespace std;
 using namespace pest_utils;
 
-
+//#define _DEBUG   // uncomment to run in debug mode for now
 int main(int argc, char* argv[])
 {
 #ifndef _DEBUG
