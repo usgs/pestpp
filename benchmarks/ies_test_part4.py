@@ -1979,7 +1979,7 @@ def tenpar_adjust_weights_test():
     
     
     pst.pestpp_options['ies_verbose_level'] = 4
-    pst.pestpp_options["ies_bad_phi_sigma"] = -95
+    pst.pestpp_options["ies_bad_phi_sigma"] = -1.5
 
     
     pst.control_data.noptmax = 2
@@ -2181,7 +2181,7 @@ def tenpar_adjust_weights_test_by_real():
     pst.pestpp_options["ies_phi_factors_by_real"] = True
     pst.pestpp_options["ies_drop_conflicts"] = True
     pst.pestpp_options['ies_verbose_level'] = 4
-    pst.pestpp_options["ies_bad_phi_sigma"] = -95
+    pst.pestpp_options["ies_bad_phi_sigma"] = -1.5
 
     
     pst.control_data.noptmax = 2
@@ -2350,7 +2350,7 @@ def tenpar_drop_violations_test():
     
     
     pst.pestpp_options['ies_verbose_level'] = 4
-    pst.pestpp_options["ies_bad_phi_sigma"] = -95
+    pst.pestpp_options["ies_bad_phi_sigma"] = -1.5
     pst.pestpp_options["ies_autoadaloc"] = True
 
     
@@ -2990,7 +2990,7 @@ def tenpar_noise_invest():
 
     pst.pestpp_options["ies_num_reals"] = df.shape[0]
     pst.pestpp_options['ies_verbose_level'] = 4
-    pst.pestpp_options["ies_bad_phi_sigma"] = -90
+    pst.pestpp_options["ies_bad_phi_sigma"] = -1.2
     #pst.pestpp_options["ies_multimodal_alpha"] = 0.25
     #pst.pestpp_options["ies_n_iter_mean"] = 3
     
@@ -4025,13 +4025,66 @@ def freyberg_stacked_pe_invest():
     ax.grid()
     plt.show()
 
+
+def tenpar_iqr_bad_phi_sigma_test():
+    model_d = "ies_10par_xsec"
+    test_d = os.path.join(model_d, "master_badphi")
+    template_d = os.path.join(model_d, "test_template")
+
+    if not os.path.exists(template_d):
+        raise Exception("template_d {0} not found".format(template_d))
+    pst_name = os.path.join(template_d, "pest.pst")
+    pst = pyemu.Pst(pst_name)
+
+    if os.path.exists(test_d):
+        shutil.rmtree(test_d)
+
+
+    try:
+        pst.pestpp_options.pop("ies_bad_phi")
+    except KeyError:
+        pass
+    try:
+        pst.pestpp_options.pop("ies_bad_phi_sigma")
+    except KeyError:
+        pass
     
+
+    
+    pst.control_data.noptmax = 1
+
+    pst_name = "base.pst"
+    pst.write(os.path.join(template_d,pst_name),version=2)
+    pyemu.os_utils.start_workers(template_d, exe_path, pst_name, num_workers=8,
+                                 master_dir=test_d, worker_root=model_d, port=port)
+    
+    df0 = pd.read_csv(os.path.join(test_d, "base.phi.actual.csv"),index_col=0)
+
+    pst.pestpp_options["ies_bad_phi_sigma"] = -1.5
+    pst_name = "iqr.pst"
+    pst.write(os.path.join(template_d,pst_name),version=2)
+    pyemu.os_utils.start_workers(template_d, exe_path, pst_name, num_workers=8,
+                                 master_dir=test_d, worker_root=model_d, port=port)
+    # check bad phi is correct 
+    df1 = pd.read_csv(os.path.join(test_d, "iqr.phi.actual.csv"))
+    vals = df0.iloc[0,5:].values
+    vals.sort()
+    n = len(vals)
+    q1 = vals[int(0.25 * n)]
+    q3 = vals[int(0.75 * n)]
+    iqr = q3 - q1
+    f = pst.pestpp_options["ies_bad_phi_sigma"]
+    badphi = q3 + -f*iqr  
+    assert df1.iloc[0,5:].max() < badphi
+
+
 if __name__ == "__main__":
+    tenpar_iqr_bad_phi_sigma_test()
     #tenpar_fixed_restart_test()
     #freyberg_stacked_pe_invest()
     #freyberg_mean_invest()
     #exit()
-    tenpar_adjust_weights_test()
+    #tenpar_adjust_weights_test()
     #tenpar_uniformdist_invest()
     #temp_plot()
     #tenpar_fixed_restart_test()
