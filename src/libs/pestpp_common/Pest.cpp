@@ -1525,7 +1525,7 @@ pair<string,double> Pest::enforce_par_limits(PerformanceLog* performance_log, Pa
 	{
 		upgrade_ctl_pars = base_par_transform.active_ctl2ctl_cp(upgrade_active_ctl_pars);
 		last_ctl_pars = base_par_transform.active_ctl2ctl_cp(last_active_ctl_pars);
-		for (auto p : upgrade_ctl_pars)
+		for (auto& p : upgrade_ctl_pars)
 		{
 			/*if (pest_utils::lower_cp(p.first) == "s_xomehgwat")
 				cout << p.first << endl;*/

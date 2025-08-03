@@ -1141,9 +1141,11 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 				if (i_scale == 1.0) // skip scale == 1 as we run the normal length anyway
 					continue;
 				Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
-				
+
 				Parameters scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
-				output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
+                pest_scenario.enforce_par_limits(performance_log,scaled_ctl_pars,base_run_active_ctl_par,false,true);
+				scaled_pars = par_transform.ctl2numeric_cp(scaled_ctl_pars);
+                output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
 					0, i_lambda, i_scale, scaled_ctl_pars);
 
 				stringstream ss;
