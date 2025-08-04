@@ -518,7 +518,7 @@ void OutputFileWriter::par_report(std::ostream &os, int const iter, Parameters c
 //	os << "      ----------  ------------  ------------  ------------  ------------" << endl;
 	vector<string> par_names;
 	if (lower_cp(par_type) == "control file")
-		par_names = pest_scenario.get_ctl_ordered_par_names();
+		par_names = pest_scenario.get_ctl_ordered_adj_par_names();
 	else
 	{
 		par_names = new_pars.get_keys();
@@ -529,21 +529,14 @@ void OutputFileWriter::par_report(std::ostream &os, int const iter, Parameters c
 	//for (const auto &ipar : new_ctl_pars)
     int name_len = 20;
 	for (auto &p_name : par_names) {
-        if ((pinfo->get_parameter_rec_ptr(p_name)->tranform_type != ParameterRec::TRAN_TYPE::LOG) &&
-            (pinfo->get_parameter_rec_ptr(p_name)->tranform_type != ParameterRec::TRAN_TYPE::NONE)) {
-            continue;
-        }
+
         name_len = max((int) p_name.size(), name_len);
     }
 
     os << setw(name_len) << left << "name" << setw(19) << right << " current value" << setw(19) << " previous value";
     os << setw(19) << " factor change" << setw(19) << " relative change" << endl;
     for (auto &p_name : par_names) {
-        if ((pinfo->get_parameter_rec_ptr(p_name)->tranform_type != ParameterRec::TRAN_TYPE::LOG) &&
-            (pinfo->get_parameter_rec_ptr(p_name)->tranform_type != ParameterRec::TRAN_TYPE::NONE)) {
-            continue;
-        }
-
+        
 		Parameters::const_iterator pi = new_pars.find(p_name);
 		if (pi == new_pars.end()) continue;
 		p_new = new_pars.get_rec(p_name);
