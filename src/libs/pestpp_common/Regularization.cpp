@@ -140,11 +140,11 @@ void DynamicRegularization::set_defaults()
 	frac_phi_m = 1;
 	wf_min = 1e-10;
 	wf_max = 1e+10;
-	wffac = 0;
-	wftol = 1000;
+	wffac = 1.3;
+	wftol = 0.01;
 	wf_init = 1.0;
 	tikhonov_weight = 1.0;
-	max_reg_iter = 20;
+	max_reg_iter = 5;
 }
 
 void DynamicRegularization::set_zero()

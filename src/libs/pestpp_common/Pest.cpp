@@ -3015,6 +3015,7 @@ void Pest::tokens_to_pi_rec(ofstream& f_rec, const vector<string>& tokens)
 	if (s_obgnme.find(pi_name_group.second) == s_obgnme.end())
 	{
 		ctl_ordered_obs_group_names.push_back(pi_name_group.second);
+        s_obgnme.emplace(pi_name_group.second);
 	}
 	
 }
@@ -3111,6 +3112,8 @@ void Pest::release_unused_for_agent()
     //base_group_info.clear();
     prior_info.clear();
     base_group_info.free_mem();
+    regul_scheme_ptr = NULL;
+
 }
 
 
