@@ -85,7 +85,7 @@ void MorrisObsSenFile::calc_pooled_obs_sen(ofstream &fout_obs_sen, map<string, d
 				sstr << value;
 				weighted_sen = sstr.str();
 			}
-			fout_obs_sen << ipar << ", " << n_samples << ", " << iobs << ", " << mean << ", " << abs_mean << ", " << sigma << ", " << weighted_sen << endl;
+			fout_obs_sen << pest_utils::lower_cp(ipar) << "," << n_samples << "," << pest_utils::lower_cp(iobs) << "," << mean << ", " << abs_mean << "," << sigma << "," << weighted_sen << endl;
 		}
 	}
 }
