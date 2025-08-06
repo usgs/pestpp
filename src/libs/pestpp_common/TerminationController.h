@@ -63,6 +63,12 @@ private:
 	bool phi_accept_achieved;
 	std::string termimate_reason;
 	std::vector<double> lowest_phi;
+    std::vector<double> lowest_phi_meas;
+    std::vector<double> lowest_phi_reg;
+    std::vector<double> lowest_phi_comp;
+
+
+
 };
 
 #endif //TERMINATIONCONTROLLER_H_

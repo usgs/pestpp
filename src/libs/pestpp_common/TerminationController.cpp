@@ -50,6 +50,10 @@ bool TerminationController::process_iteration(const PhiComponets &phi_comp, doub
 	++nopt_count;
 	double phi_m = phi_comp.meas;
 	double phi_r = phi_comp.regul;
+    lowest_phi_meas.push_back(phi_m);
+    lowest_phi_reg.push_back(phi_r);
+    lowest_phi_comp.push_back(phi_m + phi_r);
+
 	double phi = 9e99;
 	bool regul_reject = false;
 
@@ -113,6 +117,7 @@ bool TerminationController::process_iteration(const PhiComponets &phi_comp, doub
 }
 bool TerminationController::check_last_iteration()
 {
+
 	if (nopt_count >= noptmax)
 	{
 		terminate_code = true;

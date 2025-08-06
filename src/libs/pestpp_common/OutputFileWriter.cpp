@@ -536,7 +536,7 @@ void OutputFileWriter::par_report(std::ostream &os, int const iter, Parameters c
     os << setw(name_len) << left << "name" << setw(19) << right << " current value" << setw(19) << " previous value";
     os << setw(19) << " factor change" << setw(19) << " relative change" << endl;
     for (auto &p_name : par_names) {
-        
+
 		Parameters::const_iterator pi = new_pars.find(p_name);
 		if (pi == new_pars.end()) continue;
 		p_new = new_pars.get_rec(p_name);
