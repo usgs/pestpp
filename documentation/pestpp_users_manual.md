@@ -2516,11 +2516,12 @@ In some cases, users may want to retrieve one or more model output files from th
 **panther_poll_interval**
 Once a panther agent is initialized, it will start to try to connect to the master instance. On some operating systems, this act of trying connect actually results in a OS-level “file handle” being opened, which, if substantial time passes, can accumulate to a large number of open file handles. To prevent this, the panther agents will “sleep” for a given number of seconds before trying to connect to the master again. The length of time the agent sleeps is controlled by the *panther_poll_interval*, which an integer value of seconds to sleep. By default, this value is 1 second.
 
-*panther_persistent_workers*
+**panther_persistent_workers**
+Part of the run management design for panther is that workers persist for the duration of any long-term PESTPP run. All PESTPP-XXX programs have iterative steps involved that can result in idle workers at some times. With long and potentially variable runtimes the worker idle time can be significant. As users start to pay for cloud resources, for example, that idle time can be wasteful. *panther_persistent_workers* is a Boolean parameter (default value is True) that, if False, will shut down workers when no more forward runs are requested. This decreases idle time of workers but also requires users to manually restart workers for the next batch of forward runs as, at completion of a batch, all workers will be shut down. It is recommended to set *panther_master_timeout_milliseconds* to a higher value (\>=1000) if setting *panther_persistent_workers* to False to prevent overloading the master.
 
-**Part**
 **panther_master_timeout_milliseconds**
-**In**
+In situations where the forward model runtime is very short, it is advantageous to have the panther master be as responsive as possible. But in other situations, where network traffic is heavy and latency is high, it is important for the panther master to be patience when communicating with workers. The *panther_master_timeout_milliseconds* option controls how quickly the panther master responds to requests. The default is 500 milliseconds. If users are experiencing “deadlock” on the master, you may need to increase the value.
+
 **panther_master_echo_interval_milliseconds**
 **In**
 ## <a id='s9-4' />5.4 Run Book-Keeping Files
