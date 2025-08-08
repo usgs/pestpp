@@ -495,7 +495,8 @@ int main(int argc, char* argv[])
 				pest_scenario.get_ctl_ordered_par_names(),
 				pest_scenario.get_ctl_ordered_obs_names(),
                 pest_scenario.get_pestpp_options().get_panther_timeout_milliseconds(),
-                pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds());
+                pest_scenario.get_pestpp_options().get_panther_echo_interval_milliseconds(),
+                pest_scenario.get_pestpp_options().get_panther_persistent_workers());
 			run_manager_ptr->initialize(pest_scenario.get_ctl_parameters(), pest_scenario.get_ctl_observations());
 		}
 		else
