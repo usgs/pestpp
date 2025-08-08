@@ -2683,8 +2683,11 @@ def pi_output_test():
     assert len([f for f in os.listdir(m1) if "pi_pop" in f]) > 0
 
 
+
+
+
 if __name__ == "__main__":
-    #basic_pso_test()
+    basic_pso_test()
     #test_restart_all()
     #chance_consistency_test()
     #zdt1_chance_schedule_test()

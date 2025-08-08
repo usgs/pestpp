@@ -1465,28 +1465,7 @@ def build_and_draw_prior(t_d="ends",num_reals=500):
     pe.to_binary(os.path.join(t_d,"prior.jcb"))
 
 
-def obs_link_test():
-    model_d = "temp_tests"
-    base_d = os.path.join(model_d, "zdt1_template")
-    new_d = os.path.join(model_d, "zdt1_test_template")
-    if os.path.exists(new_d):
-        shutil.rmtree(new_d)
-    shutil.copytree(base_d, new_d)
 
-    pst = pyemu.Pst(os.path.join(new_d,"zdt1.pst"))
-    pst.add_observations(os.path.join(new_d,"obj_link.dat.ins"),os.path.join(new_d,"obj_link.dat"),pst_path=".")
-    obs = pst.observation_data
-    obs.loc[:,"link_to"] = np.nan
-    obs.loc["link_obj_1","link_to"] = "obj_1"
-    obs.loc["link_obj_2","link_to"] = "obj_2"
-
-    pst.control_data.noptmax = 0
-    pst.write(os.path.join(new_d,"zdt1.pst"),version=2)
-
-    pyemu.os_utils.run("{0} zdt1.pst".format(exe_path.replace("-ies","-mou")),cwd=new_d)
-
-    pst.control_data.noptmax = 30
-    pst.write(os.path.join(new_d,"zdt1.pst"),version=2)
 
 def run():
     model_d = "mf6_freyberg"
