@@ -1141,9 +1141,13 @@ ModelRun SVDSolver::iteration_upgrd(RunManagerAbstract &run_manager, Termination
 				if (i_scale == 1.0) // skip scale == 1 as we run the normal length anyway
 					continue;
 				Parameters scaled_pars = base_numeric_pars + del_numeric_pars * i_scale;
-				
-				Parameters scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
-				output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
+
+				Parameters scaled_ctl_pars = par_transform.numeric2active_ctl_cp(scaled_pars);
+                pest_scenario.enforce_par_limits(performance_log,scaled_ctl_pars,base_run_active_ctl_par,false,true);
+				scaled_pars = par_transform.ctl2numeric_cp(scaled_ctl_pars);
+                //now flip back to all ctl pars not just active...
+                scaled_ctl_pars = par_transform.numeric2ctl_cp(scaled_pars);
+                output_file_writer.write_upgrade(termination_ctl.get_iteration_number(),
 					0, i_lambda, i_scale, scaled_ctl_pars);
 
 				stringstream ss;
@@ -1815,9 +1819,15 @@ PhiComponets SVDSolver::phi_estimate(const ModelRun &base_run, const Jacobian &j
 
 	UPGRADE_FUNCTION calc_lambda_upgrade = &SVDSolver::calc_lambda_upgrade_vec_JtQJ;
 
+    double meas = base_run.get_obj_func_ptr()->get_phi_comp(base_run.get_obs(), base_run.get_ctl_pars(), *regul_scheme_ptr).meas;
+    double lam_val = pow(10.0, (floor(log10(meas))));
+    if (lam_val < 1.0e-10) {
+        lam_val = 10000;
+    }
+    //double lam_val = 0.0;
 
 	(*this.*calc_lambda_upgrade)(jacobian, Q_sqrt, regul, residuals_vec, obs_names_vec,
-		base_run_active_ctl_par, freeze_active_ctl_pars, 0, new_pars, upgrade_ctl_del_pars,
+		base_run_active_ctl_par, freeze_active_ctl_pars, lam_val, new_pars, upgrade_ctl_del_pars,
 		grad_ctl_del_pars);
 
 	//Don't limit parameters as this is just an estimate
@@ -1957,7 +1967,8 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 			//mu_vec[0].print(cout);
 			//cout << endl;
 		}
-		if (mu_vec[0].mu <= wfmin) break;
+		if (mu_vec[0].mu <= wfmin)
+            break;
 	}
 
 	for (; i < max_iter; ++i)
@@ -1979,7 +1990,8 @@ void SVDSolver::dynamic_weight_adj(const ModelRun &base_run, const Jacobian &jac
 			//cout << endl;
 			cout << "    ...solving for optimal weight factor : " << setw(6) << mu_vec[3].mu << endl << flush;
 		}
-		if (mu_vec[3].mu >= wfmax) break;
+		if (mu_vec[3].mu >= wfmax)
+            break;
 	}
 
 	double tau = (sqrt(5.0) - 1.0) / 2.0;

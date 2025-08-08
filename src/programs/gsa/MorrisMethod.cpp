@@ -56,7 +56,7 @@ void MorrisObsSenFile::add_sen_run_pair(const std::string &par_name, double p1, 
 void MorrisObsSenFile::calc_pooled_obs_sen(ofstream &fout_obs_sen, map<string, double> &obs_2_sen_weight,
 	map<string, double> &par_2_sen_weight)
 {
-	fout_obs_sen << "par_name, n_samples, obs_name, mean, abs_mean, sigma, scaled_sen" << endl;
+	fout_obs_sen << "parameter_name,n_samples,observation_name,sen_mean,sen_mean_abs,sen_std_dev,scaled_sen" << endl;
 	for (const auto &ip : par_names_vec)
 	{
 		string ipar = ip;
@@ -85,7 +85,7 @@ void MorrisObsSenFile::calc_pooled_obs_sen(ofstream &fout_obs_sen, map<string, d
 				sstr << value;
 				weighted_sen = sstr.str();
 			}
-			fout_obs_sen << ipar << ", " << n_samples << ", " << iobs << ", " << mean << ", " << abs_mean << ", " << sigma << ", " << weighted_sen << endl;
+			fout_obs_sen << pest_utils::lower_cp(ipar) << "," << n_samples << "," << pest_utils::lower_cp(iobs) << "," << mean << ", " << abs_mean << "," << sigma << "," << weighted_sen << endl;
 		}
 	}
 }

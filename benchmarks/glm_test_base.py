@@ -590,7 +590,7 @@ def tenpar_xsec_high_phi_test():
     print(d)   
     assert d > 0.1 
 
-def tenpar_xsec_stress_test2():
+def tenpar_xsec_stress_test2a():
     model_d = "glm_10par_xsec"
     test_d = os.path.join(model_d, "master_stress2")
     template_d = os.path.join(model_d, "template")
@@ -790,6 +790,156 @@ def invest():
     jco = pyemu.Jco.from_binary(os.path.join(test_d,"pest_stress.jcb"))
     print(jco.to_dataframe())
 
+
+def tenpar_xsec_stress_test_5():
+    model_d = "glm_10par_xsec"
+    test_d = os.path.join(model_d, "master_stress5")
+    template_d = os.path.join(model_d, "template")
+    if not os.path.exists(template_d):
+        raise Exception("template_d {0} not found".format(template_d))
+    if os.path.exists(test_d):
+        shutil.rmtree(test_d)
+    # shutil.copytree(template_d, test_d)
+    pst_name = os.path.join(template_d, "pest.pst")
+    pst = pyemu.Pst(pst_name)
+    pst.pestpp_options = {}
+    par = pst.parameter_data
+    #par["partrans"] = "none"
+    #par.loc[:,"parubnd"] *= 1.25
+    #par.loc[:,"parubnd"] *= 0.75
+    
+    obs = pst.observation_data
+    obs["weight"] = 100
+    #np.random.seed(1123441)
+    #obs["obsval"] += np.random.normal(0,10,obs.shape[0])
+    obs["obsval"] += 100
+    pst.svd_data.maxsing = 10
+
+    pst.prior_information = pst.null_prior
+    pst.control_data.pestmode = "estimation"
+    pst.control_data.noptmax = 4 #hard coded to result check below...
+    pst.pestpp_options["glm_num_reals"] = 10
+    #pst.pestpp_options["n_iter_base"] = 1
+    #pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
+    pst.pestpp_options["glm_debug_der_fail"] = False
+    pst.pestpp_options["glm_debug_lamb_fail"] = True
+    pst.pestpp_options["glm_normal_form"] = "prior"
+    pst.pestpp_options["glm_accept_mc_phi"] = True
+    pst.write(os.path.join(template_d, "pest_stress.pst"))
+    pyemu.os_utils.start_workers(template_d, exe_path, "pest_stress.pst", num_workers=10,
+                                 master_dir=test_d, verbose=True, worker_root=model_d,
+                                 port=port)
+    pst = pyemu.Pst(os.path.join(test_d,"pest_stress.pst"))
+    print(pst.phi)
+    assert os.path.exists(os.path.join(test_d,"pest_stress.4.par"))
+
+    df = pd.read_csv(os.path.join(test_d,"pest_stress.upg.csv"),index_col=0)
+    violations = []
+    for name,lb,ub in zip(par.parnme,par.parlbnd,par.parubnd):
+        vals = df[name]
+        lb_out = vals[vals<lb]
+        ub_out = vals[vals>ub]
+        if lb_out.shape[0]:
+            print(name,lb_out)
+            violations.append(name)
+        if ub_out.shape[0]:
+            print(name,ub_out)
+            violations.append(name)
+    if len(violations) > 0:
+        raise Exception("the following pars are out of bounds in upg.csv:"+",".join(violations))
+
+    df = pd.read_csv(os.path.join(test_d,"pest_stress.ipar"),index_col=0)
+    print(df.shape)
+    assert df.shape[0] == 5
+    violations = []
+    for name,lb,ub in zip(par.parnme,par.parlbnd,par.parubnd):
+        vals = df[name]
+        lb_out = vals[vals<lb]
+        ub_out = vals[vals>ub]
+        if lb_out.shape[0]:
+            print(name,lb_out)
+            violations.append(name)
+        if ub_out.shape[0]:
+            print(name,ub_out)
+            violations.append(name)
+    if len(violations) > 0:
+        raise Exception("the following pars are out of bounds in ipar:"+",".join(violations))
+
+
+def tenpar_xsec_stress_test_5super():
+    model_d = "glm_10par_xsec"
+    test_d = os.path.join(model_d, "master_stress5")
+    template_d = os.path.join(model_d, "template")
+    if not os.path.exists(template_d):
+        raise Exception("template_d {0} not found".format(template_d))
+    if os.path.exists(test_d):
+        shutil.rmtree(test_d)
+    # shutil.copytree(template_d, test_d)
+    pst_name = os.path.join(template_d, "pest.pst")
+    pst = pyemu.Pst(pst_name)
+    pst.pestpp_options = {}
+    par = pst.parameter_data
+    #par["partrans"] = "none"
+    #par.loc[:,"parubnd"] *= 1.25
+    #par.loc[:,"parubnd"] *= 0.75
+    
+    obs = pst.observation_data
+    obs["weight"] = 100
+    #np.random.seed(1123441)
+    #obs["obsval"] += np.random.normal(0,10,obs.shape[0])
+    obs["obsval"] += 100
+    pst.svd_data.maxsing = 10
+
+    pst.prior_information = pst.null_prior
+    pst.control_data.pestmode = "estimation"
+    pst.control_data.noptmax = 4
+    pst.pestpp_options["glm_num_reals"] = 10
+    pst.pestpp_options["n_iter_base"] = 1
+    pst.pestpp_options["n_iter_super"] = pst.control_data.noptmax
+    pst.pestpp_options["glm_debug_der_fail"] = False
+    pst.pestpp_options["glm_debug_lamb_fail"] = True
+    pst.pestpp_options["glm_normal_form"] = "prior"
+    pst.pestpp_options["glm_accept_mc_phi"] = True
+    pst.write(os.path.join(template_d, "pest_stress.pst"))
+    pyemu.os_utils.start_workers(template_d, exe_path, "pest_stress.pst", num_workers=10,
+                                 master_dir=test_d, verbose=True, worker_root=model_d,
+                                 port=port)
+    pst = pyemu.Pst(os.path.join(test_d,"pest_stress.pst"))
+    print(pst.phi)
+    assert os.path.exists(os.path.join(test_d,"pest_stress.4.par"))
+
+    df = pd.read_csv(os.path.join(test_d,"pest_stress.upg.csv"),index_col=0)
+    violations = []
+    for name,lb,ub in zip(par.parnme,par.parlbnd,par.parubnd):
+        vals = df[name]
+        lb_out = vals[vals<lb]
+        ub_out = vals[vals>ub]
+        if lb_out.shape[0]:
+            print(name,lb_out)
+            violations.append(name)
+        if ub_out.shape[0]:
+            print(name,ub_out)
+            violations.append(name)
+    if len(violations) > 0:
+        raise Exception("the following pars are out of bounds in upg.csv:"+",".join(violations))
+
+    df = pd.read_csv(os.path.join(test_d,"pest_stress.ipar"),index_col=0)
+    print(df.shape)
+    assert df.shape[0] == 5
+    violations = []
+    for name,lb,ub in zip(par.parnme,par.parlbnd,par.parubnd):
+        vals = df[name]
+        lb_out = vals[vals<lb]
+        ub_out = vals[vals>ub]
+        if lb_out.shape[0]:
+            print(name,lb_out)
+            violations.append(name)
+        if ub_out.shape[0]:
+            print(name,ub_out)
+            violations.append(name)
+    if len(violations) > 0:
+        raise Exception("the following pars are out of bounds in ipar:"+",".join(violations))
+
 if __name__ == "__main__":
     #tenpar_base_test()
     #tenpar_superpar_restart_test()
@@ -802,8 +952,12 @@ if __name__ == "__main__":
     #shutil.copy2(os.path.join("..","exe","windows","x64","Debug","pestpp-glm.exe"),os.path.join("..","bin","win","pestpp-glm.exe"))
     #tenpar_xsec_stress_test_2()
     #tenpar_xsec_stress_test_3()
-    tenpar_xsec_stress_test_4()
+    tenpar_xsec_stress_test_5super()
     
+    tenpar_xsec_stress_test_5()
+
+    
+
         
     #invest()
     #tenpar_xsec_high_phi_test()

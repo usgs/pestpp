@@ -113,6 +113,7 @@ bool TerminationController::process_iteration(const PhiComponets &phi_comp, doub
 }
 bool TerminationController::check_last_iteration()
 {
+
 	if (nopt_count >= noptmax)
 	{
 		terminate_code = true;

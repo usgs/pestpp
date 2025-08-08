@@ -51,7 +51,7 @@ const int RunManagerPanther::MIN_PING_INTERVAL_SECS = 60;				// Ping each slave 
 const int RunManagerPanther::MAX_PING_INTERVAL_SECS = 120;				// Ping each slave at least once every 2 minutes
 const int RunManagerPanther::MAX_CONCURRENT_RUNS_LOWER_LIMIT = 1;
 const int RunManagerPanther::IDLE_THREAD_SIGNAL_TIMEOUT_SECS = 10;  // Allow up to 10s for the run_idle_async() thread to acknowledge signals (pause idling, terminate)
-const double RunManagerPanther::MIN_AVGRUNMINS_FOR_KILL = 0.08; //minimum avg runtime to try to kill and/or resched runs
+const double RunManagerPanther::MIN_AVGRUNMINS_FOR_KILL = 0.01; //minimum avg runtime to try to kill and/or resched runs
 //const int RunManagerPanther::MILLISECONDS_BETWEEN_ECHOS = 10;
 //const int RunManagerPanther::TIMEOUT_MILLISECONDS = 10;
 

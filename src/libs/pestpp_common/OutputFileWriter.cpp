@@ -513,20 +513,30 @@ void OutputFileWriter::par_report(std::ostream &os, int const iter, Parameters c
 	string max_rel_par = "N/A";
 
 	os << "    Iteration "<<iter<<" Parameter Upgrades (" << par_type << " Parameters) " << endl;
-	os << "      Parameter     Current       Previous       Factor       Relative" << endl;
-	os << "        Name         Value         Value         Change        Change" << endl;
-	os << "      ----------  ------------  ------------  ------------  ------------" << endl;
+//	os << "      Parameter     Current       Previous       Factor       Relative" << endl;
+//	os << "        Name         Value         Value         Change        Change" << endl;
+//	os << "      ----------  ------------  ------------  ------------  ------------" << endl;
 	vector<string> par_names;
 	if (lower_cp(par_type) == "control file")
-		par_names = pest_scenario.get_ctl_ordered_par_names();
+		par_names = pest_scenario.get_ctl_ordered_adj_par_names();
 	else
 	{
 		par_names = new_pars.get_keys();
 		sort(par_names.begin(), par_names.end());
 	}
+    const ParameterInfo* pinfo = pest_scenario.get_ctl_parameter_info_ptr_4_mod();
+
 	//for (const auto &ipar : new_ctl_pars)
-	for (auto &p_name : par_names)
-	{
+    int name_len = 20;
+	for (auto &p_name : par_names) {
+
+        name_len = max((int) p_name.size(), name_len);
+    }
+
+    os << setw(name_len) << left << "name" << setw(19) << right << " current value" << setw(19) << " previous value";
+    os << setw(19) << " factor change" << setw(19) << " relative change" << endl;
+    for (auto &p_name : par_names) {
+
 		Parameters::const_iterator pi = new_pars.find(p_name);
 		if (pi == new_pars.end()) continue;
 		p_new = new_pars.get_rec(p_name);
@@ -542,19 +552,18 @@ void OutputFileWriter::par_report(std::ostream &os, int const iter, Parameters c
 			max_rel_change = rel_change;
 			max_rel_par = p_name;
 		}
-		os << right;
-		os << "    " << setw(12) << lower_cp(p_name);
-		os << right;
-		os << "  " << setw(12) << p_new;
-		os << "  " << setw(12) << p_old;
-		if (have_fac)
-			os << "  " << setw(12) << fac_change;
+		os << setw(name_len) << left << p_name;
+        os << " " << setw(19) << right << p_new;
+        os << " " << setw(19) << right << p_old;
+
+        if (have_fac)
+			os << " " << setw(19) << right << fac_change;
 		else
-			os << "  " << setw(12) << "N/A";
+			os << " " << setw(19) << right << "N/A";
 		if (have_rel)
-			os << "  " << setw(12) << rel_change;
+			os << " " << setw(19) << right << rel_change;
 		else
-			os << "  " << setw(12) << "N/A";
+			os << " " << setw(19) << right << "N/A";
 		os << endl;
 	}
 	os << "       Maximum changes in \"" << par_type << "\" parameters:" << endl;

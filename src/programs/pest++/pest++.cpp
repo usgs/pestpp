@@ -195,7 +195,7 @@ int main(int argc, char* argv[])
 
 		// create pest run and process control file to initialize it
 		Pest pest_scenario;
-		pest_scenario.set_default_dynreg();
+        pest_scenario.set_default_dynreg();
 #ifndef _NDEBUG
 		try {
 #endif
@@ -497,6 +497,7 @@ int main(int argc, char* argv[])
 		{
 			fout_rec << "   -----    Starting pestpp-glm Iterations    ----    " << endl << endl;
 		}
+
 		while (!termination_ctl.terminate())
 		{
             int q = pest_utils::quit_file_found();
@@ -751,15 +752,17 @@ int main(int argc, char* argv[])
 		cout << endl;
 		termination_ctl.termination_summary(fout_rec);
 		fout_rec << endl;
-		cout << "FINAL OPTIMISATION RESULTS" << endl << endl;
-		fout_rec << "FINAL OPTIMISATION RESULTS" << endl << endl;
+        if ((pest_scenario.get_ctl_ordered_par_names().size() < 1000) && (pest_scenario.get_ctl_ordered_obs_names().size() < 1000)) {
+            cout << "FINAL OPTIMISATION RESULTS" << endl << endl;
+            fout_rec << "FINAL OPTIMISATION RESULTS" << endl << endl;
 
-		fout_rec << "  Optimal parameter values  " << endl;
-		output_file_writer.par_report(fout_rec, optimum_run.get_ctl_pars());
+            fout_rec << "  Optimal parameter values  " << endl;
+            output_file_writer.par_report(fout_rec, optimum_run.get_ctl_pars());
 
-		fout_rec << endl << "  Observations with optimal model-simulated equivalents and residuals" << endl;
-		ObservationInfo oi = pest_scenario.get_ctl_observation_info();
-		output_file_writer.obs_report(fout_rec, *obj_func.get_obs_ptr(), optimum_run.get_obs(),oi);
+            fout_rec << endl << "  Observations with optimal model-simulated equivalents and residuals" << endl;
+            ObservationInfo oi = pest_scenario.get_ctl_observation_info();
+            output_file_writer.obs_report(fout_rec, *obj_func.get_obs_ptr(), optimum_run.get_obs(), oi);
+        }
 
 		fout_rec << endl << "Final composite objective function " << endl;
 		PhiData phi_data = obj_func.phi_report(optimum_run.get_obs(), optimum_run.get_ctl_pars(), *(pest_scenario.get_regul_scheme_ptr()));
